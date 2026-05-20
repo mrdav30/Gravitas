@@ -1,0 +1,125 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<!-- General Properties -->
+	<PropertyGroup>
+		<LangVersion>11.0</LangVersion>
+		<TargetFrameworks>netstandard2.1;net8.0</TargetFrameworks>
+		<Configurations>Debug;Release;ReleaseLean</Configurations>
+		<DisableMemoryPack Condition="'$(DisableMemoryPack)' == ''">false</DisableMemoryPack>
+		<ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+		<Deterministic>true</Deterministic>
+	</PropertyGroup>
+
+	<!-- Git Versioning -->
+	<PropertyGroup>
+		<SemVer Condition="'$(GitVersion_FullSemVer)' != ''">$(GitVersion_FullSemVer)</SemVer>
+		<SemVer Condition="'$(SemVer)' == ''">0.0.0</SemVer>
+		<InfoVer Condition="'$(GitVersion_InformationalVersion)' != ''">$(GitVersion_InformationalVersion)</InfoVer>
+		<InfoVer Condition="'$(InfoVer)' == ''">$(SemVer)</InfoVer>
+		<AssemblySemVer Condition="'$(GitVersion_AssemblySemVer)' != ''">$(GitVersion_AssemblySemVer)</AssemblySemVer>
+		<AssemblySemVer Condition="'$(AssemblySemVer)' == ''">$(SemVer).0</AssemblySemVer>
+		<AssemblySemFileVer Condition="'$(GitVersion_AssemblySemFileVer)' != ''">$(GitVersion_AssemblySemFileVer)</AssemblySemFileVer>
+		<AssemblySemFileVer Condition="'$(AssemblySemFileVer)' == ''">$(AssemblySemVer)</AssemblySemFileVer>
+		<InformationalVersion>$(InfoVer)</InformationalVersion>
+		<Version>$(SemVer)</Version>
+		<AssemblyVersion>$(AssemblySemVer)</AssemblyVersion>
+		<FileVersion>$(AssemblySemFileVer)</FileVersion>
+	</PropertyGroup>
+
+	<!-- Code Analysis and Documentation -->
+	<PropertyGroup>
+		<ImplicitUsings>disable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+		<IncludeSymbols>true</IncludeSymbols>
+		<DebugType>portable</DebugType>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+		<DocumentationFile>bin\$(Configuration)\$(TargetFramework)\Gravitas.xml</DocumentationFile>
+	</PropertyGroup>
+
+	<!-- Output Settings -->
+	<PropertyGroup>
+		<AssemblyName>Gravitas</AssemblyName>
+		<RootNamespace>Gravitas</RootNamespace>
+		<ProjectGuid>{0D2EC1AC-B1A0-4C06-B198-79FAA2B58E97}</ProjectGuid>
+		<OutputPath>bin\$(Configuration)\</OutputPath>
+	</PropertyGroup>
+
+	<!-- NuGet Packaging Metadata -->
+	<PropertyGroup>
+		<Authors>mrdav30</Authors>
+		<Description></Description>
+		<PackageIconUrl>https://raw.githubusercontent.com/mrdav30/gravitas/main/icon.png</PackageIconUrl>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
+		<PackageLicenseFile>LICENSE</PackageLicenseFile>
+		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+		<SymbolPackageFormat>snupkg</SymbolPackageFormat>
+	</PropertyGroup>
+
+	<!-- Configurations Properties -->
+
+	<PropertyGroup Condition="'$(Configuration)' == 'ReleaseLean'">
+		<DisableMemoryPack>true</DisableMemoryPack>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(DisableMemoryPack)' == 'true'">
+		<DefineConstants>$(DefineConstants);GRAVITAS_DISABLE_MEMORYPACK</DefineConstants>
+		<PackageId>Gravitas.Lean</PackageId>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(DisableMemoryPack)' != 'true'">
+		<PackageId>Gravitas</PackageId>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(TargetFramework)' == 'netstandard2.1'">
+		<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+		<IncludeTransitiveProjectReferences>false</IncludeTransitiveProjectReferences>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+		<DebugSymbols>true</DebugSymbols>
+		<Optimize>false</Optimize>
+		<DefineConstants>$(DefineConstants);DEBUG;TRACE</DefineConstants>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)' == 'Release' Or '$(Configuration)' == 'ReleaseLean'">
+		<Optimize>true</Optimize>
+		<DefineConstants>$(DefineConstants);TRACE</DefineConstants>
+	</PropertyGroup>
+
+	<!-- Dependencies and Package References -->
+	<ItemGroup Condition="'$(DisableMemoryPack)' != 'true'">
+		<PackageReference Include="MemoryPack" Version="1.21.4" />
+		<PackageReference Include="FixedMathSharp" Version="4.0.0" />
+		<PackageReference Include="SwiftCollections" Version="4.0.5" />
+		<PackageReference Include="GridForge" Version="6.0.4" />
+		<PackageReference Include="Chronicler.Core" Version="0.2.0" />
+	</ItemGroup>
+
+	<ItemGroup Condition="'$(DisableMemoryPack)' == 'true'">
+		<PackageReference Include="FixedMathSharp.Lean" Version="4.0.0" />
+		<PackageReference Include="SwiftCollections.Lean" Version="4.0.5" />
+		<PackageReference Include="GridForge.Lean" Version="6.0.4" />
+		<PackageReference Include="Chronicler.Core.Lean" Version="0.2.0" />
+	</ItemGroup>
+
+	<ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.1'">
+		<PackageReference Include="System.Text.Json" Version="10.0.8" />
+	</ItemGroup>
+
+	<!-- Ensure LICENSE, README, & icon files are included in the NuGet package -->
+	<ItemGroup>
+		<None Include="..\..\COPYRIGHT" Pack="true" PackagePath="\" Visible="false" />
+		<None Include="..\..\NOTICE" Pack="true" PackagePath="\" Visible="false" />
+		<None Include="..\..\LICENSE" Pack="true" PackagePath="\" Visible="false" />
+		<None Include="..\..\README.md" Pack="true" PackagePath="\" Visible="false" />
+		<None Include="..\..\icon.png" Pack="true" PackagePath="\" Visible="false" />
+		<None Remove=".gitignore" />
+	</ItemGroup>
+
+	<!-- Ensure MemoryPack files are excluded when disabled -->
+	<ItemGroup Condition="'$(DisableMemoryPack)' == 'true'">
+		<Compile Remove="**\*.MemoryPack.cs" />
+	</ItemGroup>
+
+</Project>
