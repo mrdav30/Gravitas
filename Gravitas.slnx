@@ -1,0 +1,18 @@
+<Solution>
+  <Configurations>
+    <BuildType Name="Debug" />
+    <BuildType Name="Release" />
+    <BuildType Name="ReleaseLean" />
+  </Configurations>
+  <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
+    <File Path=".gitignore" />
+    <File Path="COPYRIGHT" />
+    <File Path="LICENSE" />
+    <File Path="NOTICE" />
+    <File Path="README.md" />
+  </Folder>
+  <Project Path="src/Gravitas/Gravitas.csproj" />
+  <Project Path="tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj" />
+  <Project Path="tests/Gravitas.Tests/Gravitas.Tests.csproj" />
+</Solution>
