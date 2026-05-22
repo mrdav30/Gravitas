@@ -1,4 +1,5 @@
 ﻿using FixedMathSharp;
+using SwiftCollections;
 
 namespace Gravitas.Support;
 
@@ -7,11 +8,15 @@ namespace Gravitas.Support;
 /// </summary>
 public struct WaitForRealSeconds : ILockedYieldInstruction
 {
+    private readonly GravitasWorldContext _context;
     private Fixed64 _accumulator;
     private Fixed64 _waitTime;
 
-    public WaitForRealSeconds(Fixed64 seconds)
+    public WaitForRealSeconds(GravitasWorldContext context, Fixed64 seconds)
     {
+        SwiftThrowHelper.ThrowIfNull(context, nameof(context));
+
+        _context = context;
         _accumulator = Fixed64.Zero;
         _waitTime = seconds;
     }
@@ -20,7 +25,7 @@ public struct WaitForRealSeconds : ILockedYieldInstruction
     {
         get
         {
-            _accumulator += PhysicsManager.DeltaTime;
+            _accumulator += _context.DeltaTime;
             return _accumulator < _waitTime;
         }
     }

@@ -456,12 +456,12 @@ dotnet build Gravitas.slnx --configuration Release
 
 **Tasks:**
 
-- [ ] Write tests for frame waits against one context clock.
-- [ ] Write tests for two contexts advancing at different frame counts.
-- [ ] Create `GravitasCoroutineService`.
-- [ ] Convert `CoroutineManager` behavior to instance service methods.
-- [ ] Update yield instructions to context/clock-bound constructors.
-- [ ] Run:
+- [x] Write tests for frame waits against one context clock.
+- [x] Write tests for two contexts advancing at different frame counts.
+- [x] Create `GravitasCoroutineService`.
+- [x] Convert `CoroutineManager` behavior to instance service methods.
+- [x] Update yield instructions to context/clock-bound constructors.
+- [x] Run:
 
 ```bash
 dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~GravitasCoroutineServiceTests|FullyQualifiedName~LockedYieldInstructionTests"
@@ -471,6 +471,8 @@ dotnet build Gravitas.slnx --configuration Release
 **Exit criteria:**
 
 - Coroutines and wait instructions are deterministic per context.
+
+**Status:** Complete for Phase 7. Added context-owned `GravitasCoroutineService`, exposed it through `GravitasWorldContext.Coroutines`, and made `GravitasWorldContext.Simulate()` advance context-local coroutines after the context clock and physics step. `WaitForFrames`, `WaitForNextSimulate`, and `WaitForRealSeconds` now bind to an explicit context through service factories, and `StiffBody.SkipGrounding()` uses its owning context coroutine service. Removed the old static `CoroutineManager` instead of leaving a compatibility facade. Verified with focused Phase 7 tests plus `Release` and `ReleaseLean` solution build/test runs.
 
 ## Phase 8: Remove Static Facades And Clean Public API
 

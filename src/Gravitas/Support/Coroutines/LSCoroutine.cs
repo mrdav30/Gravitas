@@ -2,31 +2,45 @@
 
 namespace Gravitas.Support;
 
-public struct LSCoroutine
+/// <summary>
+/// Represents one context-owned lockstep coroutine.
+/// </summary>
+public sealed class LSCoroutine
 {
-    public IEnumerator<ILockedYieldInstruction> Enumerator;
-    public bool Active = true;
-    public int Index;
+    private readonly IEnumerator<ILockedYieldInstruction> _enumerator;
 
-    public LSCoroutine(IEnumerator<ILockedYieldInstruction> enumerator)
+    internal LSCoroutine(GravitasCoroutineService owner, IEnumerator<ILockedYieldInstruction> enumerator)
     {
-        Enumerator = enumerator;
-        Active = true;
+        Owner = owner;
+        _enumerator = enumerator;
     }
 
-    public void Simulate()
+    /// <summary>
+    /// Gets whether this coroutine is still active.
+    /// </summary>
+    public bool Active { get; private set; } = true;
+
+    internal GravitasCoroutineService Owner { get; }
+
+    internal int Index { get; set; } = -1;
+
+    internal void Simulate()
     {
-        if (Enumerator.Current != null && Enumerator.Current.KeepWaiting)
+        if (_enumerator.Current != null && _enumerator.Current.KeepWaiting)
             return;
 
-        if (Enumerator.MoveNext())
+        if (_enumerator.MoveNext())
             return;
-        else
-            CoroutineManager.StopCoroutine(this);
+
+        Owner.StopCoroutine(this);
     }
-    public void End()
+
+    internal void End()
     {
+        if (!Active)
+            return;
+
         Active = false;
-        Enumerator.Dispose();
+        _enumerator.Dispose();
     }
 }

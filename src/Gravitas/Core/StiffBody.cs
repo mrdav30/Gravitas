@@ -864,13 +864,13 @@ public class StiffBody : IRecordable
     public void SkipGrounding(Fixed64 secs)
     {
         IsGrounded = false;
-        CoroutineManager.StartCoroutine(SkipGroundingCoroutine(secs));
+        Context.Coroutines.StartCoroutine(SkipGroundingCoroutine(secs));
     }
 
     private IEnumerator<ILockedYieldInstruction> SkipGroundingCoroutine(Fixed64 secs)
     {
         _skipGroundingCheck = true;
-        yield return new WaitForRealSeconds(secs);
+        yield return Context.Coroutines.WaitForRealSeconds(secs);
         _skipGroundingCheck = false;
     }
 
