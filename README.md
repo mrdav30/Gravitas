@@ -22,7 +22,7 @@ Gravitas is an engine-agnostic fixed-point physics prototype for simulation-heav
 
 Gravitas is preparing for alpha. The current library is intentionally experimental, 3D-focused, and not API-stable. Heavy redesigns are expected where they improve deterministic behavior, physics correctness, runtime complexity, or engine-agnostic integration.
 
-The unit test project now has focused runtime, settings, query, partition, and coroutine coverage. The benchmark project is scaffolded, but authored benchmark classes still need to be built out. Use this README as current orientation, and use [AGENTS.md](AGENTS.md) for detailed contributor guidance.
+The unit test project now has focused runtime, settings, query, partition, and coroutine coverage. The benchmark project has initial context lifecycle, registration/partitioning, and query-service benchmarks. Use this README as current orientation, and use [AGENTS.md](AGENTS.md) for detailed contributor guidance.
 
 ## Why Gravitas?
 
@@ -131,7 +131,7 @@ Release builds generate NuGet packages because `GeneratePackageOnBuild` is enabl
 
 ## Benchmarks
 
-The benchmark project is scaffolded for future physics hot-path measurements. There are no authored benchmark classes yet.
+The benchmark project includes initial physics hot-path measurements for context lifecycle, body/collider registration, partitioning, simulation, and query services.
 
 List available benchmark selections:
 

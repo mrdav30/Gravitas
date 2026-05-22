@@ -1,5 +1,7 @@
 # Gravitas World Context Refactor Battle Plan
 
+> **Archive status:** Completed and moved to `docs/feature-work/done` on 2026-05-22. The only carry-forward item is allocation hardening, tracked separately in [`2026-05-22-runtime-allocation-hardening-plan.md`](../2026-05-22-runtime-allocation-hardening-plan.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace Gravitas's process-wide physics state with explicit world-owned runtime contexts aligned with GridForge's primitive `GridWorld` model.
@@ -131,19 +133,20 @@ GravitasWorldContext
 
 **Tasks:**
 
-- [ ] Add a `TestMatterAgent` that implements the current `IMatterAgent` with a host-owned `GridWorld`, `FixedTransform`, `IsParent`, and `IsInteracting`.
-- [ ] Add `PhysicsTestWorld` helper that creates a `GridWorld`, calls `PhysicsManager.Setup()` and `PhysicsManager.Initialize()`, and disposes the world.
-- [ ] Add tests for `PhysicsManager.FrameCount`, `DeltaTime`, `Settings`, body assimilation, collider assimilation, and `Deactivate()`.
-- [ ] Add tests proving the current static manager cannot isolate two worlds. This can be an explicit skipped/failing characterization if needed, but it should document the bug the refactor fixes.
-- [ ] Run:
+- [x] Add a shared `TestMatterAgent` for context-bound test agents.
+- [x] Supersede the legacy `PhysicsTestWorld` helper path by moving directly to `GravitasWorldContext` ownership and deleting `PhysicsManager` in Phase 8.
+- [x] Add focused context runtime, clock, settings, assimilation, dessimilation, reset, and lifecycle tests across Phases 1-8.
+- [x] Add tests proving two contexts isolate worlds, settings, body/collider IDs, partitions, raycasts, circlecasts, and coroutines.
+- [x] Run focused tests as each replacement phase landed, then verify the full `Release` and `ReleaseLean` solution runs.
 
-```bash
-dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter FullyQualifiedName~PhysicsManagerLegacyTests
-```
+The original legacy-manager test command was intentionally superseded once the
+static manager was removed instead of preserved behind a compatibility bridge.
 
 **Exit criteria:**
 
-- We have focused tests that describe current manager lifecycle and at least one test demonstrating why global state is insufficient for multiple worlds.
+- We have focused tests that describe current context lifecycle and demonstrate why process-global physics state is insufficient for multiple worlds.
+
+**Status:** Superseded and complete. The original Phase 0 legacy-characterization path was replaced by context-first runtime tests as the static manager was decomposed. This avoided preserving a deleted API just for compatibility characterization.
 
 ## Phase 1: Add Context, Clock, And Lifecycle Shell
 
@@ -505,7 +508,7 @@ dotnet build Gravitas.slnx --configuration Release
 - [x] Replace all runtime references with context-owned services.
 - [x] Remove temporary adapters introduced during earlier phases.
 - [x] Update docs to show context-first usage.
-- [ ] Run:
+- [x] Run:
 
 ```bash
 rg -n "PhysicsManager\.|CollisionManager\.|Raycaster\.|Circlecaster\.|CoroutineManager\." src/Gravitas tests/Gravitas.Tests
@@ -544,19 +547,21 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 
 **Tasks:**
 
-- [ ] Add benchmark fixtures that create deterministic contexts and dispose them per benchmark case.
-- [ ] Add `[MemoryDiagnoser]` to each benchmark class.
-- [ ] Capture baseline JSON after the implementation stabilizes.
-- [ ] Run:
+- [x] Add benchmark fixtures that create deterministic contexts and dispose them per benchmark case.
+- [x] Add `[MemoryDiagnoser]` to each benchmark class.
+- [x] Capture baseline JSON after the implementation stabilizes.
+- [x] Run:
 
 ```bash
 dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0 -- list
-dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0 -- all --config InProcessShortRunConfig
+dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0 -- all -j Short -i
 ```
 
 **Exit criteria:**
 
 - The new architecture has benchmark coverage for lifecycle, registration, partitioning, and query services.
+
+**Status:** Complete for Phase 9. Added deterministic benchmark fixtures plus `WorldContextBenchmarks`, `CollisionPartitionBenchmarks`, and `QueryServiceBenchmarks`, covering owned/attached context lifecycle, grid creation, empty simulation frames, dynamic/static sphere registration and partitioning, partitioned simulation, raycasts, circlecasts, and overlapping-coordinate two-context query isolation. Removed stale copied benchmark helpers from earlier template code and fixed the benchmark runner's `all` command so it selects all benchmarks without an interactive prompt. Captured JSON baseline artifacts via the short in-process benchmark run. Follow-up allocation hardening is tracked in [`2026-05-22-runtime-allocation-hardening-plan.md`](../2026-05-22-runtime-allocation-hardening-plan.md).
 
 ## Suggested Commit Sequence
 
@@ -572,15 +577,16 @@ dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Rel
 10. `perf: add context runtime benchmarks`
 11. `docs: document context-first gravitas runtime`
 
-## Main Risks
+## Closure Risk Review
 
-- `PhysicsPartition` currently stores collider IDs only. Once IDs become context-local, every partition must have a required owner service set before voxel attachment.
-- Partition cleanup currently removes the partition and releases it manually. The refactor should use a single release path through `PhysicsPartition.OnRemoveFromVoxel(...)`; mixing manual service release with voxel removal risks double-release and stale activation IDs.
-- `Raycaster` and `Circlecaster` accept `GridWorld` today but resolve colliders through global IDs. This is the exact cross-world leak the query phase must close.
-- `RayCasterWorker` static cache makes overlapping or nested raycasts unsafe. Moving it to per-query worker state is necessary even if the public query API is context-owned.
-- `WaitForFrames`, `WaitForNextSimulate`, and `WaitForRealSeconds` currently read static clock state. They will silently behave incorrectly with multiple contexts until fixed.
-- `PhysicsSettingsSaver` writes global settings. Serialization must become context-applied before save/load behavior can be trusted in multi-world hosts.
-- Public mutable dictionaries in `ColliderSettings` allow runtime mutation of global shape policy. This is not the same class of bug as manager state, but it should be cleaned during static facade removal.
+- Resolved: `PhysicsPartition` now has owner-required behavior through `GravitasCollisionService`.
+- Resolved: partition cleanup uses owner-local release through the partition removal path instead of mixed manual release.
+- Resolved: raycasts and circlecasts are context-owned services that resolve context-local collider IDs.
+- Resolved: raycast worker state moved out of the static cache and into the query service.
+- Resolved: wait instructions bind to the owning context clock through `GravitasCoroutineService`.
+- Resolved: `PhysicsSettingsSaver` applies settings to an explicit `GravitasWorldContext`.
+- Resolved: `ColliderSettings` no longer exposes mutable public priority dictionaries.
+- Follow-up: benchmarked steady-state query/simulation allocations are tracked separately in [`2026-05-22-runtime-allocation-hardening-plan.md`](../2026-05-22-runtime-allocation-hardening-plan.md).
 
 ## Acceptance Criteria
 
@@ -594,3 +600,5 @@ dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Rel
 - `dotnet test Gravitas.slnx --configuration Release` passes.
 - `dotnet test Gravitas.slnx --configuration ReleaseLean` passes.
 - README and AGENTS describe context-first runtime usage.
+
+**Closure status:** Satisfied. No additional follow-up tasks were found in this plan beyond the allocation hardening work already moved to a separate plan.

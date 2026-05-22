@@ -55,8 +55,7 @@ Read these in order before making non-trivial changes:
 ## Source Of Truth
 
 When code, README, and generated docs disagree, prefer the code and project
-files. The README references wiki pages and pathing/navigation concepts that do
-not yet match this prototype.
+files. Keep docs honest as the prototype sheds older copied scaffolding.
 
 Keep these aligned whenever behavior, public API, package shape, or developer
 workflow changes:
@@ -81,7 +80,7 @@ workflow changes:
 | [`src/Gravitas/Settings`](src/Gravitas/Settings) | Physics settings and save helpers | Includes frame rate and layer collision matrix behavior. |
 | [`src/Gravitas/Support`](src/Gravitas/Support) | Fixed transforms, layers, lifecycle hooks, coroutine scaffolding, transient state helpers | Keep engine-specific assumptions out. |
 | [`tests/Gravitas.Tests`](tests/Gravitas.Tests) | xUnit v3 test project | Contains focused runtime/settings coverage; expand it alongside behavior changes. |
-| [`tests/Gravitas.Benchmarks`](tests/Gravitas.Benchmarks) | BenchmarkDotNet project | Scaffold exists; some docs/support names still reflect earlier pathing templates. |
+| [`tests/Gravitas.Benchmarks`](tests/Gravitas.Benchmarks) | BenchmarkDotNet project | Covers context lifecycle, registration/partitioning, simulation, and query services. |
 | [`docs/feature-work/prototype`](docs/feature-work/prototype) | Historical/prototype Unity-oriented reference code | Useful context, not the source of truth. |
 
 Ignore generated output when reviewing structure:
@@ -367,9 +366,8 @@ Important notes:
 
 ## Benchmark Workflow
 
-The benchmark project is scaffolded, but benchmark docs/support code still
-contain pathing/navigation template names. Verify or update the benchmark target
-before relying on a result.
+The benchmark project contains initial physics-specific coverage for context
+lifecycle, registration/partitioning, simulation, and query services.
 
 List available benchmark selections:
 

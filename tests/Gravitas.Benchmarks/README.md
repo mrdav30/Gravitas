@@ -2,7 +2,7 @@
 
 This project is the BenchmarkDotNet scaffold for Gravitas physics hot paths.
 
-The runner, alias catalog, short-run config, and deterministic fixture helpers are in place. There are currently no authored benchmark classes, so `list` may produce an empty selection list until the first `[Benchmark]` types are added.
+The runner, alias catalog, and deterministic fixture helpers are in place. Initial benchmark classes cover context lifecycle, registration/partitioning, simulation, and query-service paths.
 
 ## Requirements
 
@@ -52,10 +52,10 @@ dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Rel
 
 ### Fast development check
 
-`InProcessShortRunConfig` is available for quick local smoke runs. Use it to verify benchmark code compiles and produces plausible output without a full run:
+Use BenchmarkDotNet's short in-process job for quick local smoke runs. This verifies benchmark code compiles and produces plausible output without a full run:
 
 ```bash
-dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0 -- all --config InProcessShortRunConfig
+dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0 -- all -j Short -i
 ```
 
 Do not treat short-run numbers as canonical measurements.
@@ -83,7 +83,7 @@ Start with hot paths that can be isolated and repeated deterministically:
 - Reset or dispose context/world state between benchmark cases so measurements do not depend on previous cases.
 - Capture both throughput and allocation impact when changing hot-path collections, pooling, collision dispatch, or broad-phase behavior.
 
-Some support helpers were carried over from earlier templates. Retire or rename those helpers when the first physics-specific benchmark classes are added.
+Keep support helpers physics-specific. Remove copied template helpers when they stop serving a Gravitas benchmark scenario.
 
 ## Baseline Artifacts
 

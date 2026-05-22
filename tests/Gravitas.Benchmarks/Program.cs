@@ -42,7 +42,7 @@ internal static class Program
                 return 1;
             }
 
-            BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args.Skip(1).ToArray());
+            BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(EnsureAllBenchmarksSelected(args.Skip(1).ToArray()));
             return 0;
         }
 
@@ -67,6 +67,23 @@ internal static class Program
 
         BenchmarkSwitcher.FromTypes(selectedTypes).Run(args.Skip(aliasCount).ToArray());
         return 0;
+    }
+
+    private static string[] EnsureAllBenchmarksSelected(string[] benchmarkArgs)
+    {
+        if (benchmarkArgs.Any(IsBenchmarkSelectionArgument))
+            return benchmarkArgs;
+
+        return new[] { "--filter", "*" }.Concat(benchmarkArgs).ToArray();
+    }
+
+    private static bool IsBenchmarkSelectionArgument(string argument)
+    {
+        return string.Equals(argument, "--filter", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(argument, "-f", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(argument, "--list", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(argument, "--help", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(argument, "--version", StringComparison.OrdinalIgnoreCase);
     }
 
     private static void WriteUsage()
