@@ -503,7 +503,7 @@ public static class PhysicsManager
         if (!pair.Active) return;
 
         pair.Deactivate();
-        if (PhysicsSettings.PoolingEnabled)
+        if (Settings.PoolingEnabled)
             _cachedCollisionPairs.Push(pair);
     }
 

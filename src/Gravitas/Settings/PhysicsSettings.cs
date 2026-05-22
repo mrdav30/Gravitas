@@ -10,7 +10,7 @@ public sealed class PhysicsSettings
 
     public const int MaxLayers = 32;
 
-    public int FrameRate;
+    public int FrameRate { get; private set; }
 
     public Fixed64 FixedFrameRate => (Fixed64)FrameRate;
 
@@ -18,15 +18,21 @@ public sealed class PhysicsSettings
     private readonly bool[,] _collisionMatrix;
     public bool[,] CollisionMatrix => _collisionMatrix;
 
-    public static bool PoolingEnabled = true;
+    public bool PoolingEnabled { get; set; } = true;
 
     // This layer mask is used to ignore certain layers when checking for ground contact. It ignores the following layers:
     public SingleLayer IgnoreForGroundCheck = ~(1 << 8 | 1 << 10 | 1 << 7 | 1 << 11 | 1 << 12 | 1 << 17 | 1 << 15);
 
     public PhysicsSettings(int? frameRate, bool[,]? collisionMatrix)
     {
-        FrameRate = frameRate ?? DefaultFrameRate;
+        SetFrameRate(frameRate ?? DefaultFrameRate);
         _collisionMatrix = collisionMatrix ?? GetRegisteredCollisionMatrix();
+    }
+
+    public void SetFrameRate(int frameRate)
+    {
+        SwiftThrowHelper.ThrowIfNegativeOrZero(frameRate, nameof(frameRate));
+        FrameRate = frameRate;
     }
 
     public static PhysicsSettings DefaultSettings()

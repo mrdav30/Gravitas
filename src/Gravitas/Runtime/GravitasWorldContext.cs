@@ -31,12 +31,24 @@ public sealed class GravitasWorldContext : IDisposable
     {
         World = world;
         _ownsWorld = ownsWorld;
+        Settings = PhysicsSettings.DefaultSettings();
+        Environment = PhysicsEnvironment.Default(Settings.FrameRate);
     }
 
     /// <summary>
     /// Gets the explicit GridForge world owned or referenced by this context.
     /// </summary>
     public GridWorld World { get; }
+
+    /// <summary>
+    /// Gets this context's world-local physics settings.
+    /// </summary>
+    public PhysicsSettings Settings { get; private set; }
+
+    /// <summary>
+    /// Gets this context's world-local physical environment values.
+    /// </summary>
+    public PhysicsEnvironment Environment { get; }
 
     /// <summary>
     /// Gets whether this context has been disposed.
@@ -239,7 +251,22 @@ public sealed class GravitasWorldContext : IDisposable
     public void SetFrameRate(int frameRate)
     {
         ThrowIfDisposed();
+        Settings.SetFrameRate(frameRate);
         _clock.SetFrameRate(frameRate);
+        _hooks.InvokeFrameRateChanged();
+    }
+
+    /// <summary>
+    /// Applies context-local settings and synchronizes frame-derived clock state.
+    /// </summary>
+    /// <param name="settings">The settings instance to own.</param>
+    public void ApplySettings(PhysicsSettings settings)
+    {
+        ThrowIfDisposed();
+        SwiftThrowHelper.ThrowIfNull(settings, nameof(settings));
+
+        Settings = settings;
+        _clock.SetFrameRate(settings.FrameRate);
         _hooks.InvokeFrameRateChanged();
     }
 

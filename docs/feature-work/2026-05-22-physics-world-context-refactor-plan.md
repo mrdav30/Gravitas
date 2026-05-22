@@ -216,12 +216,12 @@ dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release -
 
 **Tasks:**
 
-- [ ] Write tests for context-specific settings: two contexts can have different frame rates and layer matrices.
-- [ ] Write tests for context-specific environment: two contexts can have different gravity and culling values without affecting each other.
-- [ ] Introduce `PhysicsEnvironment.Default()` with current values.
-- [ ] Add `Settings` and `Environment` properties to `GravitasWorldContext`.
-- [ ] Update `GravitasClock.SetFrameRate` call path so changing context settings updates clock deterministically.
-- [ ] Run:
+- [x] Write tests for context-specific settings: two contexts can have different frame rates and layer matrices.
+- [x] Write tests for context-specific environment: two contexts can have different gravity and culling values without affecting each other.
+- [x] Introduce `PhysicsEnvironment.Default()` with current values.
+- [x] Add `Settings` and `Environment` properties to `GravitasWorldContext`.
+- [x] Update `GravitasClock.SetFrameRate` call path so changing context settings updates clock deterministically.
+- [x] Run:
 
 ```bash
 dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~PhysicsEnvironmentTests|FullyQualifiedName~PhysicsSettingsTests|FullyQualifiedName~GravitasClockTests"
@@ -230,6 +230,8 @@ dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release -
 **Exit criteria:**
 
 - Configuration needed by simulation is context-owned and test-pinned.
+
+**Status:** Complete for Phase 2. Added `PhysicsEnvironment`, moved pooling into instance `PhysicsSettings`, added context-owned `Settings` and `Environment`, and added `ApplySettings(...)` so replacing settings synchronizes the context clock. Verified with focused Phase 2 tests plus `Release` and `ReleaseLean` solution build/test runs.
 
 ## Phase 3: Introduce Context-Owned Physics Registry
 
