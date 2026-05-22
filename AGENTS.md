@@ -45,8 +45,8 @@ Read these in order before making non-trivial changes:
    and [`src/Gravitas/Core/StiffBody.cs`](src/Gravitas/Core/StiffBody.cs).
 4. The relevant source folder under [`src/Gravitas`](src/Gravitas).
 5. The matching test or benchmark area under [`tests`](tests). The unit test
-   project currently has no authored tests, so new behavior usually needs new
-   tests.
+   project now has focused runtime/settings coverage, so new behavior usually
+   needs matching tests.
 6. [`src/Gravitas/Gravitas.csproj`](src/Gravitas/Gravitas.csproj),
    [`tests/Gravitas.Tests/Gravitas.Tests.csproj`](tests/Gravitas.Tests/Gravitas.Tests.csproj),
    and [`tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj`](tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj).
@@ -78,7 +78,7 @@ workflow changes:
 | [`src/Gravitas/Partitions`](src/Gravitas/Partitions) | GridForge-backed physics partitions | Tied to voxel ownership and pooling. |
 | [`src/Gravitas/Settings`](src/Gravitas/Settings) | Physics settings and save helpers | Includes frame rate and layer collision matrix behavior. |
 | [`src/Gravitas/Support`](src/Gravitas/Support) | Fixed transforms, layers, lifecycle hooks, coroutine scaffolding, transient state helpers | Keep engine-specific assumptions out. |
-| [`tests/Gravitas.Tests`](tests/Gravitas.Tests) | xUnit v3 test project | Scaffold exists; no authored tests yet. |
+| [`tests/Gravitas.Tests`](tests/Gravitas.Tests) | xUnit v3 test project | Contains focused runtime/settings coverage; expand it alongside behavior changes. |
 | [`tests/Gravitas.Benchmarks`](tests/Gravitas.Benchmarks) | BenchmarkDotNet project | Scaffold exists; some docs/support names still reflect earlier pathing templates. |
 | [`docs/feature-work/prototype`](docs/feature-work/prototype) | Historical/prototype Unity-oriented reference code | Useful context, not the source of truth. |
 
@@ -93,11 +93,19 @@ Ignore generated output when reviewing structure:
 
 ## Runtime Architecture Snapshot
 
-The current runtime is static-manager based and prototype-stage:
+The current runtime is mid-refactor from static-manager ownership to explicit
+world-context ownership:
 
-- `PhysicsManager` owns setup/initialize flow, frame count, fixed delta time,
-  dynamic body storage, collider IDs, collision-pair pooling, simulation phases,
-  and global physics settings.
+- `GravitasWorldContext` is the host-facing runtime shell. It owns the
+  `GridWorld`, context settings, physical environment, deterministic clock,
+  lifecycle hooks, and `GravitasPhysicsService`.
+- `GravitasPhysicsService` owns context-local dynamic body registration,
+  collider IDs, collider lookup, collision-pair pooling, active pair processing,
+  and physics lifecycle phases. It still bridges to static collision execution
+  until that subsystem is moved behind the context.
+- `PhysicsManager` still contains legacy static setup, timing, settings, and
+  compatibility surface from the prototype. Treat it as code being decomposed,
+  not as the desired long-term ownership model.
 - `StiffBody` owns simulated body state: position, rotation, visual
   interpolation state, velocity, acceleration, drag, friction, grounding,
   transforms, and Chronicler state recording.
@@ -118,6 +126,31 @@ The current runtime is static-manager based and prototype-stage:
 Treat this as a working prototype, not final architecture. Static manager state,
 global counters, partition reuse, collision-pair ownership, and simulation phase
 ordering are high-risk areas.
+
+## Lockstep Host Lifecycle
+
+The old LSF Unity prototype mapped the lockstep loop onto Unity callbacks, but
+the important contract is engine-agnostic. Hosts own the outer loop; Gravitas
+should expose deterministic phases that can be called from Unity, a server, a
+test harness, or another simulation runner.
+
+| Phase | Typical host timing | Gravitas expectation |
+| --- | --- | --- |
+| `Setup` | Once per run before instance initialization | Configure package/static defaults only. Prefer moving new state to explicit contexts instead of adding more ambient setup. |
+| `Initialize` | Once per context/session or when an agent is unpooled | Bind worlds, agents, bodies, colliders, settings, and pools. Do not advance simulation state here. |
+| `GameStart` | First simulation frame after commands can advance | Usually a host/game-layer hook. Add a Gravitas equivalent only for a real physics invariant. |
+| `Execute` | When deterministic commands or network frames are received | Apply ordered input into host-owned state before `Simulate`. Gravitas runtime code should not read wall-clock input timing. |
+| `Simulate` | Fixed-rate simulation step | Perform authoritative deterministic mutation only here or in `LateSimulate`. |
+| `LateSimulate` | End of the same fixed-rate step | Process deterministic deferred queues, pair cleanup, body late simulation, and post-step bookkeeping. |
+| `Visualize` | Render/update frame | Interpolate or publish presentation state. Do not mutate authoritative simulation state. |
+| `LateVisualize` | Late render/update frame | Finish presentation-only work after host transforms/animation have run. |
+| `UpdateGUI` | Host UI/debug draw pass | Keep this outside core physics unless it is diagnostics-only and non-authoritative. |
+| `Deactivate` | Session end, object disable, or object pooling | Release registrations and pooled runtime state so the object/context can be reused or disposed. |
+| `Quit` | Application shutdown | Host concern. Core physics should not require application-lifetime callbacks for correctness. |
+
+When changing lifecycle code, preserve the fixed-step boundary: deterministic
+state changes belong in `Simulate`/`LateSimulate`, while render-frame phases are
+for visualization and host-facing presentation only.
 
 ## 2D, 3D, And Mixed-Dimension Direction
 
@@ -325,8 +358,8 @@ dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release
 
 Important notes:
 
-- `tests/Gravitas.Tests` currently contains only the project file and coverage
-  settings. Add the first authored tests alongside any behavior change.
+- `tests/Gravitas.Tests` contains focused runtime/settings coverage. Mirror the
+  source area being changed and add regression tests alongside behavior changes.
 - Building the library produces NuGet packages because `GeneratePackageOnBuild`
   is enabled.
 - CI builds and tests `Release` and `ReleaseLean` on Ubuntu and Windows.
@@ -356,8 +389,9 @@ results as canonical performance evidence.
 
 ## Test Design Expectations
 
-Because there are no authored unit tests yet, new tests should establish the
-foundation for deterministic physics behavior.
+The existing tests are still early and focused on runtime shell, settings, and
+physics-service behavior. New tests should keep building the foundation for
+deterministic physics behavior.
 
 Prioritize tests for:
 
