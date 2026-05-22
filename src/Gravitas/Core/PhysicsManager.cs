@@ -39,7 +39,7 @@ public static class PhysicsManager
     /// One kilogram is equal to 2.20462262 pounds.
     /// To convert kilograms to pounds, multiply kg value by this
     /// To convert pounds to kilograms, divide pound value by this
-    /// </summary>         
+    /// </summary>
     public static readonly Fixed64 KilogramToPound = (Fixed64)2.20462262f;
 
     // Maximum speed should be comfortable for the players.
@@ -125,25 +125,6 @@ public static class PhysicsManager
     /// </summary>
     internal static int CullTimeMax => FrameRate / 5;
 
-    private static readonly object _cullDistributorLock = new();
-    /// <summary>
-    /// Distributes the culling checks across frames to help balance the load. 
-    /// </summary>
-    private static int _cullDistributor;
-    internal static int CullDistributor
-    {
-        get
-        {
-            lock (_cullDistributorLock)
-            {
-                if (_cullDistributor > 1)
-                    _cullDistributor = -1;
-
-                return _cullDistributor++;
-            }
-        }
-    }
-
     #endregion
 
     #region Assignment Variables
@@ -178,7 +159,6 @@ public static class PhysicsManager
     public static void Setup()
     {
         _defaultSettings = PhysicsSettings.DefaultSettings();
-        CollisionManager.Setup();
     }
 
     public static void Initialize()
@@ -205,7 +185,6 @@ public static class PhysicsManager
 
         if (!SimulatePhysics) return;
 
-        CollisionManager.CheckAndDistributeCollisions();
         Simulated = true;
     }
 
@@ -255,9 +234,9 @@ public static class PhysicsManager
             {
                 StiffBody body = _dynamicSimBodies[i];
                 // TODO: physics already performed, now we calculate visual position;
-                // after this, should we call PartitionManager.CheckAndDistributeCollisions(); for specific bodies?
-                // if body moved an is in continous detection mode?
-                // would need to get the grid node to retrieve attached partion node and mark it to check
+                // after this, should we distribute collisions for specific bodies?
+                // i.e. if body moved and is in continuous detection mode?
+                // would need to get the grid node to retrieve attached partition node and mark it to check
                 body?.LateSimulate();
             }
         }
@@ -307,10 +286,7 @@ public static class PhysicsManager
         }
     }
 
-    public static void Deactivate()
-    {
-        CollisionManager.Deactivate();
-    }
+    public static void Deactivate() { }
 
     private static void ResetVars()
     {
@@ -330,13 +306,12 @@ public static class PhysicsManager
         AssimalatedBodyCount = 0;
         AssimalatedColliderCount = 0;
 
-        CollisionManager.Initialize();
         _activeCollisionPairs?.FastClear();
     }
 
     internal static int AssimilateBody(StiffBody body, bool isDynamic)
     {
-        // Important: If isDynamic is false, PhysicsManager won't check to update the item every frame. 
+        // Important: If isDynamic is false, PhysicsManager won't check to update the item every frame.
         // When the object is changed, it must be updated manually.
         int dynamicId = -1;
         if (isDynamic)
@@ -491,7 +466,7 @@ public static class PhysicsManager
     {
         if (!pair.Active) return;
 
-        // If we fail to remove references, we still need to deactivate and 
+        // If we fail to remove references, we still need to deactivate and
         // pool the pair to avoid memory leaks and other issues.
         if (!TryRemovePairReferences(pair))
             DeactivateAndPoolPair(pair);

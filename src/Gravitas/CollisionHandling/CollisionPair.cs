@@ -270,7 +270,7 @@ public class CollisionPair
         if (!_preventDistanceCull)
         {
             int step = GetCullDistanceStep(World!);
-            distanceScore = Math.Clamp((int)(_fastDistance - _fastDistanceOffset) / step + PhysicsManager.CullDistributor, 0, Context.Environment.CullDistanceMax);
+            distanceScore = Math.Clamp((int)(_fastDistance - _fastDistanceOffset) / step + Context.Collisions.CullDistributor, 0, Context.Environment.CullDistanceMax);
             velocityScore = Math.Clamp((int)(ColliderA.Velocity - ColliderB.Velocity).Magnitude / Context.Environment.CullVelocityStep, 0, Context.Environment.CullVelocityMax);
         }
 

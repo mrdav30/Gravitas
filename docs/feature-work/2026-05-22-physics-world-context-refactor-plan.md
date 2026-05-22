@@ -337,7 +337,10 @@ dotnet build Gravitas.slnx --configuration Release
 **Files:**
 
 - Create: `src/Gravitas/Core/GravitasCollisionService.cs`
-- Modify: `src/Gravitas/Core/CollisionManager.cs`
+- Delete: `src/Gravitas/Core/CollisionManager.cs`
+- Modify: `src/Gravitas/Runtime/GravitasWorldContext.cs`
+- Modify: `src/Gravitas/Core/GravitasPhysicsService.cs`
+- Modify: `src/Gravitas/Core/PhysicsManager.cs`
 - Modify: `src/Gravitas/Partitions/PhysicsPartition.cs`
 - Modify: `src/Gravitas/Colliders/LSCollider.cs`
 - Modify: `src/Gravitas/CollisionHandling/CollisionPair.cs`
@@ -360,17 +363,17 @@ dotnet build Gravitas.slnx --configuration Release
 
 **Tasks:**
 
-- [ ] Write tests for partition activation/deactivation within one context.
-- [ ] Write tests for two contexts with overlapping world coordinates: partition activation in one context does not affect the other.
-- [ ] Write tests proving `PhysicsPartition.Distribute()` does not reuse static scratch state.
-- [ ] Write tests proving `PhysicsPartition.OnRemoveFromVoxel(...)` releases through the owner service and throws or logs a clear invariant violation when no owner exists.
-- [ ] Write tests proving empty partition cleanup removes the partition from the voxel exactly once and does not double-release it.
-- [ ] Create `GravitasCollisionService`.
-- [ ] Convert `CollisionManager` methods into instance methods on the service.
-- [ ] Convert `PhysicsPartition` to service-owned behavior with a required `SetOwner(GravitasCollisionService owner)` or owner-taking rent helper.
-- [ ] Replace direct pool release calls with `voxel.TryRemovePartition<PhysicsPartition>()` so `OnRemoveFromVoxel(...)` owns the release flow.
-- [ ] Remove or empty the old static `CollisionManager` after all callers use `Context.Collisions`.
-- [ ] Run:
+- [x] Write tests for partition activation/deactivation within one context.
+- [x] Write tests for two contexts with overlapping world coordinates: partition activation in one context does not affect the other.
+- [x] Write tests proving `PhysicsPartition.Distribute()` does not reuse static scratch state.
+- [x] Write tests proving `PhysicsPartition.OnRemoveFromVoxel(...)` releases through the owner service and throws or logs a clear invariant violation when no owner exists.
+- [x] Write tests proving empty partition cleanup removes the partition from the voxel exactly once and does not double-release it.
+- [x] Create `GravitasCollisionService`.
+- [x] Convert `CollisionManager` methods into instance methods on the service.
+- [x] Convert `PhysicsPartition` to service-owned behavior with a required `SetOwner(GravitasCollisionService owner)` or owner-taking rent helper.
+- [x] Replace direct pool release calls with `voxel.TryRemovePartition<PhysicsPartition>()` so `OnRemoveFromVoxel(...)` owns the release flow.
+- [x] Remove or empty the old static `CollisionManager` after all callers use `Context.Collisions`.
+- [x] Run:
 
 ```bash
 dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~GravitasCollisionServiceTests|FullyQualifiedName~PhysicsPartitionTests"
@@ -380,6 +383,8 @@ dotnet build Gravitas.slnx --configuration Release
 **Exit criteria:**
 
 - Collision partitioning is world-local, pair resolution is context-local, and static collision service state is gone.
+
+**Status:** Complete for Phase 5. Added `GravitasCollisionService`, exposed it through `GravitasWorldContext.Collisions`, moved partition activation, versioning, pooling, cull distribution, and collision distribution behind the context, converted `PhysicsPartition` to owner-required behavior, and deleted the old static `CollisionManager`. Empty partition cleanup now removes the partition from the voxel and lets `PhysicsPartition.OnRemoveFromVoxel(...)` release through the owning service. Verified with focused Phase 5 tests plus `Release` and `ReleaseLean` solution build/test runs.
 
 ## Phase 6: Move Raycast And Circlecast State Into Query Services
 

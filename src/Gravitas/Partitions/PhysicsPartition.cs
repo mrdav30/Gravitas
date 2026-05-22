@@ -7,6 +7,8 @@ namespace Gravitas;
 
 public class PhysicsPartition : IVoxelPartition
 {
+    private GravitasCollisionService? _owner;
+
     public WorldVoxelIndex WorldIndex { get; set; }
 
     public bool IsPartitioned { get; set; }
@@ -20,15 +22,31 @@ public class PhysicsPartition : IVoxelPartition
 
     public int ActivationId { get; private set; }
 
-    private static int _id1, _id2;
-
-    private static CollisionPair? _pair;
-
     public bool IsAllocated => ActivationId != -1;
 
-    public PhysicsPartition() { }
+    public GravitasCollisionService Owner
+    {
+        get
+        {
+            SwiftThrowHelper.ThrowIfTrue(
+                _owner == null,
+                nameof(PhysicsPartition),
+                "PhysicsPartition is missing its owner collision service.");
+            return _owner!;
+        }
+    }
 
-    public void OnAddToVoxel(Voxel voxel) => WorldIndex = voxel.WorldIndex;
+    public PhysicsPartition()
+    {
+        ActivationId = -1;
+    }
+
+    public void OnAddToVoxel(Voxel voxel)
+    {
+        _ = Owner;
+        WorldIndex = voxel.WorldIndex;
+        IsPartitioned = true;
+    }
 
     public void OnChange() { }
 
@@ -43,32 +61,33 @@ public class PhysicsPartition : IVoxelPartition
         // only distribute when there are dynamic objects on the same partition
         for (int j = 0; j < dynamicCount; j++)
         {
-            _id1 = ContainedDynamicObjects[j];
+            int id1 = ContainedDynamicObjects[j];
             for (int k = j + 1; k < dynamicCount; k++)
             {
-                _id2 = ContainedDynamicObjects[k];
-                if (_id1 != _id2)
-                    ProcessPair();
+                int id2 = ContainedDynamicObjects[k];
+                if (id1 != id2)
+                    ProcessPair(id1, id2);
             }
 
             for (int k = 0; k < staticCount; k++)
             {
-                _id2 = ContainedStaticObjects![k];
-                ProcessPair();
+                int id2 = ContainedStaticObjects![k];
+                ProcessPair(id1, id2);
             }
         }
     }
 
-    private void ProcessPair()
+    private void ProcessPair(int id1, int id2)
     {
-        _pair = PhysicsManager.GetCollisionPair(_id1, _id2);
+        GravitasCollisionService owner = Owner;
+        CollisionPair? pair = owner.Context.Physics.GetCollisionPair(id1, id2);
 
         //Ensures collision pairs are not run twice
-        if (_pair == null || _pair.PartitionVersion == CollisionManager.Version)
+        if (pair == null || pair.PartitionVersion == owner.Version)
             return;
 
-        _pair.PartitionVersion = CollisionManager.Version;
-        _pair.UpdateCollision();
+        pair.PartitionVersion = owner.Version;
+        pair.UpdateCollision();
     }
 
     public void AddDynamicObject(int item)
@@ -76,10 +95,10 @@ public class PhysicsPartition : IVoxelPartition
         if (ContainedDynamicObjects?.Contains(item) == true)
             return;
 
-        if (ContainedDynamicObjects?.Count == 0)
-            ActivationId = CollisionManager.ActivatePartitions(this);
-
         ContainedDynamicObjects ??= new();
+        if (ContainedDynamicObjects.Count == 0)
+            ActivationId = Owner.ActivatePartition(this);
+
         ContainedDynamicObjects.Add(item);
     }
 
@@ -94,9 +113,6 @@ public class PhysicsPartition : IVoxelPartition
 
     public void RemoveDynamicObject(int item)
     {
-        if (ActivationId == -1)
-            return;
-
         //todo get rid of this linear search
         if (ContainedDynamicObjects?.Remove(item) == false)
         {
@@ -108,7 +124,7 @@ public class PhysicsPartition : IVoxelPartition
             return;
 
         // If there are no more dynamic objects, we can deactivate the partition to save on future checks until it's needed again.
-        CollisionManager.RemoveActivatedNode(ActivationId);
+        Owner.DeactivatePartition(ActivationId);
         ActivationId = -1;
     }
 
@@ -118,17 +134,33 @@ public class PhysicsPartition : IVoxelPartition
             GravitasLogger.DebugChannel.Info($"Static item not removed - {item}");
     }
 
-    public void OnRemoveFromVoxel(Voxel voxel) => Reset();
+    public void OnRemoveFromVoxel(Voxel voxel)
+    {
+        Owner.ReleasePartition(this);
+    }
 
-    public void Reset()
+    internal void SetOwner(GravitasCollisionService owner)
+    {
+        SwiftThrowHelper.ThrowIfNull(owner, nameof(owner));
+        SwiftThrowHelper.ThrowIfArgument(
+            _owner != null && !ReferenceEquals(_owner, owner),
+            nameof(owner),
+            "PhysicsPartition is already owned by a different collision service.");
+
+        _owner = owner;
+    }
+
+    internal void ResetForPool()
     {
         ContainedDynamicObjects?.FastClear();
         ContainedStaticObjects?.FastClear();
 
         if (ActivationId != -1)
-            CollisionManager.RemoveActivatedNode(ActivationId);
+            _owner?.DeactivatePartition(ActivationId);
 
+        _owner = null;
         ActivationId = -1;
+        IsPartitioned = false;
     }
 
     /// <summary>

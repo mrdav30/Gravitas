@@ -75,7 +75,7 @@ public sealed class GravitasPhysicsService
         if (!SimulatePhysics)
             return;
 
-        CollisionManager.CheckAndDistributeCollisions();
+        _context.Collisions.CheckAndDistributeCollisions();
     }
 
     /// <summary>

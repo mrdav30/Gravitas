@@ -254,7 +254,7 @@ public abstract class LSCollider : IRecordable
         if (IsActive)
         {
             PartitionCoordinates ??= new();
-            CollisionManager.PartitionObject(this, ref PartitionCoordinates);
+            Context.Collisions.PartitionObject(this, ref PartitionCoordinates);
             SetPreviousGridBounds();
             IsPartitioned = true;
             PartitionChanged = true;
@@ -292,13 +292,13 @@ public abstract class LSCollider : IRecordable
     {
         GenerateDynamicRuntime();
 
-        if (!CollisionManager.ClearPartitionedObject(this))
+        if (!Context.Collisions.ClearPartitionedObject(this))
             return;
 
         IsPartitioned = false;
 
         PartitionCoordinates ??= new();
-        if (!CollisionManager.PartitionObject(this, ref PartitionCoordinates))
+        if (!Context.Collisions.PartitionObject(this, ref PartitionCoordinates))
             return;
 
         SetPreviousGridBounds();
@@ -510,7 +510,7 @@ public abstract class LSCollider : IRecordable
     {
         if (IsPartitioned)
         {
-            CollisionManager.ClearPartitionedObject(this, true);
+            Context.Collisions.ClearPartitionedObject(this, true);
             PartitionCoordinates?.Clear();
         }
 

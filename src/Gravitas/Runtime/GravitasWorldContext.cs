@@ -33,6 +33,7 @@ public sealed class GravitasWorldContext : IDisposable
         _ownsWorld = ownsWorld;
         Settings = PhysicsSettings.DefaultSettings();
         Environment = PhysicsEnvironment.Default(Settings.FrameRate);
+        Collisions = new GravitasCollisionService(this);
         Physics = new GravitasPhysicsService(this);
     }
 
@@ -50,6 +51,11 @@ public sealed class GravitasWorldContext : IDisposable
     /// Gets this context's world-local physical environment values.
     /// </summary>
     public PhysicsEnvironment Environment { get; }
+
+    /// <summary>
+    /// Gets this context's world-local collision partitioning service.
+    /// </summary>
+    public GravitasCollisionService Collisions { get; }
 
     /// <summary>
     /// Gets this context's world-local physics registration and pair service.
@@ -251,6 +257,7 @@ public sealed class GravitasWorldContext : IDisposable
     {
         ThrowIfDisposed();
         _clock.Reset();
+        Collisions.Reset();
         Physics.Reset();
         _hooks.InvokeReset();
     }
