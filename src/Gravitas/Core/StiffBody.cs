@@ -304,7 +304,7 @@ public class StiffBody : IRecordable
     //  Mass (in kilograms) is the measure of the amount of matter in a body
     //  Divide the weight (in Newtons) by the acceleration of gravity to determine the mass of an object (measured in Kilograms).
     //  On Earth, gravity accelerates at 9.8 meters per second squared (9.8 m/s^2)
-    //  ex: 150 Pounds x PhysicsManager.PoundToNewton = 667 Newtons ÷ 9.8 m/s^2 = 68 kilograms * PhysicsManager.KilogramtoPound = 150 Pounds
+    //  ex: 150 Pounds x PhysicsEnvironment.PoundToNewton = 667 Newtons / 9.8 m/s^2 = 68 kilograms * PhysicsEnvironment.KilogramToPound = 150 Pounds
     public Fixed64 Mass;
 
     // InverseMass is the reciprocal of mass, which is useful for performance reasons
@@ -315,8 +315,8 @@ public class StiffBody : IRecordable
 
     // Weight is a measure of how the force of gravity acts upon the mass.
     // Weight (in Newtons) is mass (in Kilograms) multiplied by the acceleration of gravity (g).
-    // ex: 68 kg * 9.8 m/s^2 = 667 Newtons / PhysicsManager.PoundsToNewton = 150 Pounds
-    private Fixed64 Weight => Mass * PhysicsManager.FixedGravity;
+    // ex: 68 kg * 9.8 m/s^2 = 667 Newtons / PhysicsEnvironment.PoundToNewton = 150 Pounds
+    private Fixed64 Weight => Mass * Context.Environment.Gravity;
 
     public IMatterAgent Agent { get; private set; } = null!;
 
@@ -460,11 +460,12 @@ public class StiffBody : IRecordable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void UpdateTimeScaledAcceleration()
     {
+        PhysicsEnvironment environment = Context.Environment;
         _timeScaledAcceleration = _linearSpeed > Fixed64.Zero
-            ? _linearAcceleration * _linearSpeed / PhysicsManager.FrameRate
+            ? _linearAcceleration * _linearSpeed / Context.FrameRate
             : Vector3d.Zero;
         _timeScaledDeceleration = _timeScaledAcceleration != Vector3d.Zero
-            ? _timeScaledAcceleration * PhysicsManager.DecelerationMultiplier
+            ? _timeScaledAcceleration * environment.DecelerationMultiplier
             : Vector3d.Zero;
     }
 
@@ -478,8 +479,7 @@ public class StiffBody : IRecordable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void AddLinearImpulse(Vector3d impulse)
     {
-        // LinearVelocity += (impulse * InverseMass) * LockstepManager.DeltaTime;
-        _impulseStore += (impulse * InverseMass) * PhysicsManager.DeltaTime;
+        _impulseStore += (impulse * InverseMass) * Context.DeltaTime;
         // testing immediate reaction for collisions...
         UpdateLinearVelocity();
         NonKinematicUpdate();
@@ -489,7 +489,7 @@ public class StiffBody : IRecordable
     public void AddAngularImpulse(Vector3d impulse)
     {
         if (!AngularForcesHalted)
-            _angularVelocity += (impulse * _inverseInertiaTensor) * PhysicsManager.DeltaTime;
+            _angularVelocity += (impulse * _inverseInertiaTensor) * Context.DeltaTime;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -537,7 +537,7 @@ public class StiffBody : IRecordable
     private void ApplyDragForce()
     {
         // Drag calculation and accumulation.
-        Fixed64 dragMagnitude = LinearDragCoefficient * PhysicsManager.AirDensity * Collider!.GetFrontalArea(_linearDirection) * _linearSpeed;
+        Fixed64 dragMagnitude = LinearDragCoefficient * Context.Environment.AirDensity * Collider!.GetFrontalArea(_linearDirection) * _linearSpeed;
         _linearAccelerationStore += (-_linearDirection * dragMagnitude);
     }
 
@@ -553,10 +553,11 @@ public class StiffBody : IRecordable
 
         // Object is moving on ground, add the friction force to the accumulated force
         // Adjust the friction with the normal force magnitude
+        PhysicsEnvironment environment = Context.Environment;
         Fixed64 effectiveFriction = FrictionCoefficient;
-        if (horizontalSpeed <= PhysicsManager.FrictionTransitionSpeed)
+        if (horizontalSpeed <= environment.FrictionTransitionSpeed)
         {
-            Fixed64 proportion = horizontalSpeed / PhysicsManager.FrictionTransitionSpeed;
+            Fixed64 proportion = horizontalSpeed / environment.FrictionTransitionSpeed;
             effectiveFriction *= proportion;
         }
 
@@ -566,10 +567,12 @@ public class StiffBody : IRecordable
 
     private void UpdateLinearVelocity()
     {
+        Fixed64 deltaTime = Context.DeltaTime;
+        PhysicsEnvironment environment = Context.Environment;
         Vector3d lastVelocity = _linearVelocity;
 
-        _linearVelocity += _impulseStore + (_linearAccelerationStore * PhysicsManager.DeltaTime);
-        // LinearVelocity = _impulseStore + (_linearAccelerationStore * PhysicsManager.DeltaTime);
+        _linearVelocity += _impulseStore + (_linearAccelerationStore * deltaTime);
+        // LinearVelocity = _impulseStore + (_linearAccelerationStore * deltaTime);
 
         // Reset stores for the next frame
         _linearAccelerationStore = Vector3d.Zero;
@@ -577,18 +580,18 @@ public class StiffBody : IRecordable
 
         // Apply gravity only if not grounded
         if (!IsGrounded)
-            _linearVelocity.y -= PhysicsManager.FixedGravity * PhysicsManager.DeltaTime;
+            _linearVelocity.y -= environment.Gravity * deltaTime;
 
         // Make sure we don't fall any faster than maxFallSpeed. This gives our character a terminal velocity
-        _linearVelocity.y = FixedMath.Max(_linearVelocity.y, -PhysicsManager.MaxFallSpeed);
+        _linearVelocity.y = FixedMath.Max(_linearVelocity.y, -environment.MaxFallSpeed);
 
         Fixed64 desiredSpeed = _linearVelocity.Magnitude;
-        if (desiredSpeed > PhysicsManager.MinSpeed)
+        if (desiredSpeed > environment.MinSpeed)
         {
-            if (desiredSpeed > PhysicsManager.MaxSpeed)
+            if (desiredSpeed > environment.MaxSpeed)
             {
-                _linearVelocity = _linearVelocity.Normal * PhysicsManager.MaxSpeed;
-                _linearSpeed = PhysicsManager.MaxSpeed;
+                _linearVelocity = _linearVelocity.Normal * environment.MaxSpeed;
+                _linearSpeed = environment.MaxSpeed;
             }
             else
                 _linearSpeed = desiredSpeed;
@@ -604,7 +607,7 @@ public class StiffBody : IRecordable
             ? _linearVelocity.Normal
             : _linearDirection;
         _linearAcceleration = _linearSpeed > Fixed64.Zero
-            ? (_linearVelocity - lastVelocity) / PhysicsManager.DeltaTime
+            ? (_linearVelocity - lastVelocity) / deltaTime
             : Vector3d.Zero;
 
         // TODO: send event for debugging purposes with the change in velocity and the forces that caused it, so we can visualize them in the editor
@@ -630,7 +633,7 @@ public class StiffBody : IRecordable
     private void ApplyDragTorque()
     {
         // Angular drag should also be proportional to the square of the angular velocity, just like linear drag.
-        Fixed64 angularDragMagnitude = AngularDragCoefficient * PhysicsManager.AirDensity * Collider!.GetFrontalArea(_angularDirection) * _angularSpeed;
+        Fixed64 angularDragMagnitude = AngularDragCoefficient * Context.Environment.AirDensity * Collider!.GetFrontalArea(_angularDirection) * _angularSpeed;
         _angularAccelerationStore += (-_angularDirection * angularDragMagnitude);
     }
 
@@ -640,10 +643,11 @@ public class StiffBody : IRecordable
             return;
 
         // Calculate the friction force and convert it into a torque
+        PhysicsEnvironment environment = Context.Environment;
         Fixed64 effectiveFriction = FrictionCoefficient;
-        if (_angularSpeed < PhysicsManager.FrictionTransitionSpeed)
+        if (_angularSpeed < environment.FrictionTransitionSpeed)
         {
-            Fixed64 proportion = _angularSpeed / PhysicsManager.FrictionTransitionSpeed;
+            Fixed64 proportion = _angularSpeed / environment.FrictionTransitionSpeed;
             effectiveFriction *= proportion;
         }
 
@@ -653,23 +657,25 @@ public class StiffBody : IRecordable
 
     private void UpdateAngularVelocity()
     {
+        Fixed64 deltaTime = Context.DeltaTime;
+        PhysicsEnvironment environment = Context.Environment;
         Vector3d lastVelocity = _angularVelocity;
         // Apply the accumulated angular acceleration
-        _angularVelocity += _angularAccelerationStore * PhysicsManager.DeltaTime;
+        _angularVelocity += _angularAccelerationStore * deltaTime;
         // Reset the acceleration store for the next frame
         _angularAccelerationStore = Vector3d.Zero;
 
         // Add damping torque, proportional to negative angular velocity
-        Vector3d dampingTorque = -PhysicsManager.DampingFactor * _angularVelocity;
-        _angularVelocity += _inverseInertiaTensor * dampingTorque * PhysicsManager.DeltaTime;
+        Vector3d dampingTorque = -environment.DampingFactor * _angularVelocity;
+        _angularVelocity += _inverseInertiaTensor * dampingTorque * deltaTime;
 
         Fixed64 desiredSpeed = _angularVelocity.Magnitude;
-        if (desiredSpeed > PhysicsManager.MinSpeed)
+        if (desiredSpeed > environment.MinSpeed)
         {
-            if (_angularSpeed > PhysicsManager.MaxSpeed)
+            if (_angularSpeed > environment.MaxSpeed)
             {
-                _angularVelocity = _angularVelocity.Normal * PhysicsManager.MaxSpeed;
-                _angularSpeed = PhysicsManager.MaxSpeed;
+                _angularVelocity = _angularVelocity.Normal * environment.MaxSpeed;
+                _angularSpeed = environment.MaxSpeed;
 
             }
             else
@@ -685,7 +691,7 @@ public class StiffBody : IRecordable
         }
 
         _angularAcceleration = _angularSpeed > Fixed64.Zero
-            ? (_angularVelocity - lastVelocity) / PhysicsManager.DeltaTime
+            ? (_angularVelocity - lastVelocity) / deltaTime
             : Vector3d.Zero;
     }
 
@@ -719,7 +725,7 @@ public class StiffBody : IRecordable
 
     private void PositionBasedOnForce()
     {
-        Vector3d velocityVector = Position3d + (_linearVelocity * PhysicsManager.DeltaTime);
+        Vector3d velocityVector = Position3d + (_linearVelocity * Context.DeltaTime);
         Vector2d velocityAxis = velocityVector.ToVector2d();
 
         // Find out how much we need to push towards the ground to avoid loosing grounding
@@ -741,7 +747,7 @@ public class StiffBody : IRecordable
     {
         // Convert angular velocity to a quaternion
         FixedQuaternion angularVelocityQuaternion = new(_angularVelocity.x, _angularVelocity.y, _angularVelocity.z, Fixed64.Zero);
-        FixedQuaternion spin = angularVelocityQuaternion * Rotation * Fixed64.Half * PhysicsManager.DeltaTime;
+        FixedQuaternion spin = angularVelocityQuaternion * Rotation * Fixed64.Half * Context.DeltaTime;
         Rotation = (Rotation + spin).Normal;
     }
 
@@ -759,7 +765,7 @@ public class StiffBody : IRecordable
     //  gyroscopic precession is a correction to the object's angular velocity based on its rotation
     private void ApplyGyroscopicPrecession()
     {
-        _angularVelocity += _inverseInertiaTensor * Vector3d.Cross(_angularVelocity, _interiaTensor * _angularVelocity) * PhysicsManager.DeltaTime;
+        _angularVelocity += _inverseInertiaTensor * Vector3d.Cross(_angularVelocity, _interiaTensor * _angularVelocity) * Context.DeltaTime;
     }
 
     public void OnVisualize()
@@ -767,7 +773,7 @@ public class StiffBody : IRecordable
         if (!Active || Immovable || IsKinematic || !SettingVisuals)
             return;
 
-        if (PhysicsManager.ResetAccumulation)
+        if (Context.ResetAccumulation)
         {
             if (CanSetVisualPosition)
                 SetVisualPosition(Position3d);
@@ -777,7 +783,7 @@ public class StiffBody : IRecordable
 
         if (CanSetVisualPosition)
         {
-            Vector3d expectedPosition = Vector3d.SpeedLerp(_lastVisualPosition, _visualPosition, Fixed64.One, PhysicsManager.ExpectedAccumulation);
+            Vector3d expectedPosition = Vector3d.SpeedLerp(_lastVisualPosition, _visualPosition, Fixed64.One, Context.ExpectedAccumulation);
             _positionTransform.Position = expectedPosition;
         }
 
@@ -786,8 +792,8 @@ public class StiffBody : IRecordable
 
         // TODO: need to multiply by rotation speed to slow rotations...
         Fixed64 targetSpeed = _rotationInterpoleSpeed > Fixed64.Zero
-            ? PhysicsManager.DeltaTime * _rotationInterpoleSpeed * _rotationSpeed
-            : PhysicsManager.ExpectedAccumulation;
+            ? Context.DeltaTime * _rotationInterpoleSpeed * _rotationSpeed
+            : Context.ExpectedAccumulation;
         FixedQuaternion expectedRotation = FixedQuaternion.Slerp(_lastVisualRotation, _visualRotation, targetSpeed);
         _rotationTransform.Rotation = expectedRotation;
     }
@@ -813,7 +819,7 @@ public class StiffBody : IRecordable
         {
             _positionChangedBuffer = _positionMutated;
             _positionMutated = false;
-            _settingVisualsCounter = PhysicsManager.FrameRate;
+            _settingVisualsCounter = Context.FrameRate;
         }
         else
             _positionChangedBuffer = false;
@@ -822,7 +828,7 @@ public class StiffBody : IRecordable
         {
             _rotationChangedBuffer = _rotationMutated;
             _rotationMutated = false;
-            _settingVisualsCounter = PhysicsManager.FrameRate;
+            _settingVisualsCounter = Context.FrameRate;
         }
         else
             _rotationChangedBuffer = false;

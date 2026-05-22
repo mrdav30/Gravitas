@@ -428,7 +428,7 @@ dotnet build Gravitas.slnx --configuration Release
 
 - Query state is context-local and static query buffers are gone.
 
-**Status:** Complete for Phase 6. Added context-owned `GravitasRaycastService` and `GravitasCirclecastService`, exposed them through `GravitasWorldContext`, reduced `Raycaster`/`Circlecaster` to explicit-context facades, and moved `RayCasterWorker` cached state into the context-owned `RaycastAxisWorker`. `StiffBody.CheckGround()` now uses the owning context's clock, settings, and circlecast service. Also normalized the raycast worker axis during preparation after focused tests exposed that the old raw-vector projection treated non-normalized ray directions as normalized. Verified with focused Phase 6 tests plus `Release` and `ReleaseLean` solution build/test runs.
+**Status:** Complete for Phase 6. Added context-owned `GravitasRaycastService` and `GravitasCirclecastService`, exposed them through `GravitasWorldContext`, removed the old query facades, and moved `RayCasterWorker` cached state into the context-owned `RaycastAxisWorker`. `StiffBody.CheckGround()` now uses the owning context's clock, settings, and circlecast service. Also normalized the raycast worker axis during preparation after focused tests exposed that the old raw-vector projection treated non-normalized ray directions as normalized. Verified with focused Phase 6 tests plus `Release` and `ReleaseLean` solution build/test runs.
 
 ## Phase 7: Move Coroutines And Yield Instructions To The Context Clock
 
@@ -474,7 +474,7 @@ dotnet build Gravitas.slnx --configuration Release
 
 **Status:** Complete for Phase 7. Added context-owned `GravitasCoroutineService`, exposed it through `GravitasWorldContext.Coroutines`, and made `GravitasWorldContext.Simulate()` advance context-local coroutines after the context clock and physics step. `WaitForFrames`, `WaitForNextSimulate`, and `WaitForRealSeconds` now bind to an explicit context through service factories, and `StiffBody.SkipGrounding()` uses its owning context coroutine service. Removed the old static `CoroutineManager` instead of leaving a compatibility facade. Verified with focused Phase 7 tests plus `Release` and `ReleaseLean` solution build/test runs.
 
-**Pre-Phase 8 follow-up:** Converted live context-owned `SwiftBucket` loops in `GravitasCoroutineService`, `GravitasPhysicsService`, and `GravitasCollisionService` to captured-peak `TryGetValue(...)` iteration. This avoids the `IsAllocated(...)` plus indexer double probe, tolerates removals during callback-driven simulation loops, and prevents newly added coroutines from running in the same simulation tick. The remaining old `SwiftBucket` loops are isolated to the legacy static `PhysicsManager` slated for removal/reduction in Phase 8.
+**Pre-Phase 8 follow-up:** Converted live context-owned `SwiftBucket` loops in `GravitasCoroutineService`, `GravitasPhysicsService`, and `GravitasCollisionService` to captured-peak `TryGetValue(...)` iteration. This avoids the `IsAllocated(...)` plus indexer double probe, tolerates removals during callback-driven simulation loops, and prevents newly added coroutines from running in the same simulation tick. At the time, the only remaining old `SwiftBucket` loops were isolated to the legacy static `PhysicsManager` slated for removal/reduction in Phase 8.
 
 ## Phase 8: Remove Static Facades And Clean Public API
 
@@ -501,10 +501,10 @@ dotnet build Gravitas.slnx --configuration Release
 
 **Tasks:**
 
-- [ ] Search for `PhysicsManager.`, `CollisionManager.`, `Raycaster.`, `Circlecaster.`, and `CoroutineManager.` references.
-- [ ] Replace all runtime references with context-owned services.
-- [ ] Remove temporary adapters introduced during earlier phases.
-- [ ] Update docs to show context-first usage.
+- [x] Search for `PhysicsManager.`, `CollisionManager.`, `Raycaster.`, `Circlecaster.`, and `CoroutineManager.` references.
+- [x] Replace all runtime references with context-owned services.
+- [x] Remove temporary adapters introduced during earlier phases.
+- [x] Update docs to show context-first usage.
 - [ ] Run:
 
 ```bash
@@ -518,6 +518,8 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 **Exit criteria:**
 
 - Runtime code no longer relies on mutable static manager state.
+
+**Status:** Complete for Phase 8. Added tests pinning context-local impulse timing and explicit settings-saver application, moved `StiffBody` timing/environment reads to its owning `GravitasWorldContext`, added `PhysicsSettingsSaver.ApplyTo(...)`, removed the legacy static `PhysicsManager` file, and converted `ColliderSettings` priority lookup away from a mutable public dictionary. README, AGENTS, and benchmark docs now describe the context-owned runtime API. Verified with the static-reference search plus `Release` and `ReleaseLean` solution build/test runs.
 
 ## Phase 9: Benchmarks And Regression Hardening
 

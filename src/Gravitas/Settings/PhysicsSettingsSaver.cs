@@ -1,6 +1,7 @@
 ﻿using Gravitas.Support;
 using MemoryPack;
 using System;
+using SwiftCollections;
 
 namespace Gravitas;
 
@@ -19,22 +20,54 @@ public sealed partial class PhysicsSettingsSaver : DefaultSaver
 
     public MatrixRow[]? CollisionMatrix;
 
+    [NonSerialized]
+    [MemoryPackIgnore]
+    private GravitasWorldContext? _context;
+
+    public void BindContext(GravitasWorldContext context)
+    {
+        SwiftThrowHelper.ThrowIfNull(context, nameof(context));
+        _context = context;
+    }
+
+    public void ApplyTo(GravitasWorldContext context)
+    {
+        SwiftThrowHelper.ThrowIfNull(context, nameof(context));
+        context.ApplySettings(CreateSettings());
+    }
+
+    public PhysicsSettings CreateSettings() =>
+        new(FrameRate, CreateCollisionMatrix());
+
     protected override void OnEarlyApply()
     {
-        // Convert the MatrixRow array back to a 2D bool array to pass to PhysicsManager
+        SwiftThrowHelper.ThrowIfTrue(
+            _context == null,
+            nameof(PhysicsSettingsSaver),
+            "PhysicsSettingsSaver requires an explicit GravitasWorldContext. Call BindContext or ApplyTo before applying.");
+
+        ApplyTo(_context!);
+    }
+
+    private bool[,]? CreateCollisionMatrix()
+    {
         int numberOfLayers = CollisionMatrix?.Length ?? 0;
         if (CollisionMatrix == null || numberOfLayers == 0)
-        {
-            // If there are no layers, we can just set an empty collision matrix
-            PhysicsManager.Settings = PhysicsSettings.DefaultSettings();
-            return;
-        }
+            return null;
 
         bool[,] matrix = new bool[numberOfLayers, numberOfLayers];
         for (int i = 0; i < numberOfLayers; ++i)
-            for (int j = 0; j < numberOfLayers; ++j)
-                matrix[i, j] = CollisionMatrix[i].row[j];
+        {
+            bool[] row = CollisionMatrix[i].row;
+            SwiftThrowHelper.ThrowIfTrue(
+                row == null || row.Length < numberOfLayers,
+                nameof(CollisionMatrix),
+                "Physics settings collision matrix rows must be square.");
 
-        PhysicsManager.Settings = new PhysicsSettings(FrameRate, matrix);
+            for (int j = 0; j < numberOfLayers; ++j)
+                matrix[i, j] = row[j];
+        }
+
+        return matrix;
     }
 }

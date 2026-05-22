@@ -64,11 +64,12 @@ Do not treat short-run numbers as canonical measurements.
 
 Start with hot paths that can be isolated and repeated deterministically:
 
-- `PhysicsManager` simulation phases and body/collider registration.
-- `CollisionManager` partitioning and partition cleanup.
+- `GravitasWorldContext` simulation phases and service phase ordering.
+- `GravitasPhysicsService` body/collider registration and collision-pair ownership.
+- `GravitasCollisionService` partitioning and partition cleanup.
 - `CollisionDetection` shape-pair checks.
 - `CollisionResponse` contact resolution.
-- `Raycaster` and `Circlecaster` query gathering, filtering, and result ordering.
+- `GravitasRaycastService` and `GravitasCirclecastService` query gathering, filtering, and result ordering.
 - Mesh collider preprocessing and convex mesh limits.
 - Pooling and allocation behavior for collision pairs, partitions, and temporary collections.
 
@@ -78,8 +79,8 @@ Start with hot paths that can be isolated and repeated deterministically:
 - Prefer one benchmark class per subsystem or scenario group.
 - Apply `[MemoryDiagnoser]` to benchmark classes unless there is a specific reason not to.
 - Use deterministic fixtures and fixed seeds. Do not use ambient randomness in measured paths.
-- Use `BenchmarkEnvironment.PrepareWorld(...)` to create isolated `GridWorld` instances and suppress logging noise.
-- Reset or dispose world state between benchmark cases so measurements do not depend on previous cases.
+- Create isolated `GravitasWorldContext` instances for measured scenarios, or use `BenchmarkEnvironment.PrepareWorld(...)` when a benchmark only needs raw GridForge setup.
+- Reset or dispose context/world state between benchmark cases so measurements do not depend on previous cases.
 - Capture both throughput and allocation impact when changing hot-path collections, pooling, collision dispatch, or broad-phase behavior.
 
 Some support helpers were carried over from earlier templates. Retire or rename those helpers when the first physics-specific benchmark classes are added.

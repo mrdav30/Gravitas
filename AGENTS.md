@@ -41,7 +41,8 @@ Read these in order before making non-trivial changes:
    - `../GridForge/AGENTS.md` and `../GridForge/README.md`
    - `../Chronicler/AGENTS.md` and `../Chronicler/README.md` when serialization
      behavior is involved.
-3. [`src/Gravitas/Core/PhysicsManager.cs`](src/Gravitas/Core/PhysicsManager.cs)
+3. [`src/Gravitas/Runtime/GravitasWorldContext.cs`](src/Gravitas/Runtime/GravitasWorldContext.cs),
+   [`src/Gravitas/Core/GravitasPhysicsService.cs`](src/Gravitas/Core/GravitasPhysicsService.cs),
    and [`src/Gravitas/Core/StiffBody.cs`](src/Gravitas/Core/StiffBody.cs).
 4. The relevant source folder under [`src/Gravitas`](src/Gravitas).
 5. The matching test or benchmark area under [`tests`](tests). The unit test
@@ -71,7 +72,8 @@ workflow changes:
 | Path | Purpose | Notes |
 | --- | --- | --- |
 | [`src/Gravitas`](src/Gravitas) | Main library project | Multi-targets `netstandard2.1` and `net8.0`. |
-| [`src/Gravitas/Core`](src/Gravitas/Core) | Simulation manager, body state, collision manager, host agent interface | Start here for architecture changes. |
+| [`src/Gravitas/Core`](src/Gravitas/Core) | Context-owned physics service, body state, and host agent interface | Start here for body/registration architecture changes. |
+| [`src/Gravitas/Runtime`](src/Gravitas/Runtime) | Explicit world context, deterministic clock, and lifecycle hooks | Start here for host integration changes. |
 | [`src/Gravitas/Colliders`](src/Gravitas/Colliders) | Collider base type, primitive colliders, physics mesh helpers | Shape logic is currently 3D-focused. |
 | [`src/Gravitas/CollisionHandling`](src/Gravitas/CollisionHandling) | Collision detection, response, pairs, contact data | Determinism and ordering are high risk here. |
 | [`src/Gravitas/Raycasting`](src/Gravitas/Raycasting) | Raycast and circlecast support | Keep result ordering stable. |
@@ -93,38 +95,35 @@ Ignore generated output when reviewing structure:
 
 ## Runtime Architecture Snapshot
 
-The current runtime is mid-refactor from static-manager ownership to explicit
-world-context ownership:
+The current runtime uses explicit world-context ownership:
 
 - `GravitasWorldContext` is the host-facing runtime shell. It owns the
   `GridWorld`, context settings, physical environment, deterministic clock,
-  lifecycle hooks, and `GravitasPhysicsService`.
+  lifecycle hooks, and context-local runtime services.
 - `GravitasPhysicsService` owns context-local dynamic body registration,
   collider IDs, collider lookup, collision-pair pooling, active pair processing,
-  and physics lifecycle phases. It still bridges to static collision execution
-  until that subsystem is moved behind the context.
-- `PhysicsManager` still contains legacy static setup, timing, settings, and
-  compatibility surface from the prototype. Treat it as code being decomposed,
-  not as the desired long-term ownership model.
+  and physics lifecycle phases.
+- `GravitasCollisionService` maps colliders into GridForge voxels via
+  `GridWorld`, `GridTracer`, `WorldVoxelIndex`, and `PhysicsPartition`, using
+  `SwiftCollections` pools and buckets.
+- `GravitasRaycastService` and `GravitasCirclecastService` own query buffers,
+  candidate gathering, filtering, and result ordering for one context.
+- `GravitasCoroutineService` owns lockstep coroutine state and context-bound
+  wait instructions for one context.
 - `StiffBody` owns simulated body state: position, rotation, visual
   interpolation state, velocity, acceleration, drag, friction, grounding,
   transforms, and Chronicler state recording.
-- `IMatterAgent` is the host boundary. Hosts provide a `GridWorld`, a
-  `FixedTransform`, hierarchy information, and interaction state without tying
+- `IMatterAgent` is the host boundary. Hosts provide a `GravitasWorldContext`,
+  a `FixedTransform`, hierarchy information, and interaction state without tying
   Gravitas to a game engine.
 - `LSCollider` and primitive subclasses own shape state, bounds, layers,
   trigger/contact events, GridForge partition coordinates, and collision-pair
   references.
-- `CollisionManager` maps colliders into GridForge voxels via `GridWorld`,
-  `GridTracer`, `WorldVoxelIndex`, and `PhysicsPartition`, using
-  `SwiftCollections` pools and buckets.
 - `CollisionDetection`, `CollisionResponse`, `CollisionPair`, `ContactPoint`,
   and context structs form the narrow-phase and response layer.
-- `Raycaster` and `Circlecaster` are query systems layered on top of collider
-  state and manager versions.
 
-Treat this as a working prototype, not final architecture. Static manager state,
-global counters, partition reuse, collision-pair ownership, and simulation phase
+Treat this as a working prototype, not final architecture. Context ownership,
+collider IDs, partition reuse, collision-pair ownership, and simulation phase
 ordering are high-risk areas.
 
 ## Lockstep Host Lifecycle
@@ -227,8 +226,8 @@ Always prefer:
 
 - `Fixed64`, `Vector2d`, `Vector3d`, and `FixedQuaternion` over `float`,
   `double`, and `System.Numerics` in deterministic runtime logic.
-- frame-based reasoning through `PhysicsManager.FrameRate`,
-  `PhysicsManager.DeltaTime`, and `PhysicsManager.FrameCount`.
+- frame-based reasoning through `GravitasWorldContext.FrameRate`,
+  `GravitasWorldContext.DeltaTime`, and `GravitasWorldContext.FrameCount`.
 - stable and explicit ordering when traversing colliders, partitions, voxels,
   contacts, collision pairs, raycast hits, or pooled collections.
 - deterministic seeds with explicit ownership for any randomness.
@@ -253,9 +252,10 @@ but new runtime systems should start lean rather than assuming a later cleanup.
 
 Likely hotspots:
 
-- `PhysicsManager.Simulate`, `LateSimulate`, `Visualize`, and collider
-  assimilation/dessimilation.
-- GridForge partitioning in `CollisionManager.PartitionObject` and
+- `GravitasWorldContext.Simulate`, `LateSimulate`, `Visualize`, and service
+  phase ordering.
+- body/collider assimilation and dessimilation in `GravitasPhysicsService`.
+- GridForge partitioning in `GravitasCollisionService.PartitionObject` and
   `ClearPartitionedObject`.
 - collision-pair creation, culling, notification, deactivation, and pooling.
 - narrow-phase shape checks in `CollisionDetection`.
@@ -312,8 +312,8 @@ Observed project conventions:
 - XML documentation output is generated for the library, while `.editorconfig`
   silences `CS1591`.
 - Namespace-folder matching is not enforced.
-- Source files currently mix region-heavy prototype style with direct static
-  manager code. Match nearby style for focused edits.
+- Source files currently mix region-heavy prototype style with newer
+  context-owned service code. Match nearby style for focused edits.
 
 Contributor expectations:
 
@@ -395,8 +395,10 @@ deterministic physics behavior.
 
 Prioritize tests for:
 
-- `PhysicsManager` setup, initialize, frame count, fixed delta time, settings,
-  assimilation, dessimilation, and reset behavior.
+- `GravitasWorldContext` setup, frame count, fixed delta time, settings,
+  service ownership, and reset behavior.
+- `GravitasPhysicsService` assimilation, dessimilation, collider lookup, pair
+  ownership, and reset behavior.
 - `StiffBody` force integration, velocity changes, drag/friction, grounding,
   rotation, transform helpers, rest state, and serialization.
 - collider bounds, local/world transforms, layer filtering, trigger/contact
@@ -444,7 +446,7 @@ If you are an automated coding agent working in this repository:
 - Do not broaden scope from one subsystem into another unless the change truly
   requires it.
 - Call out any build or test failures explicitly, with exact file references.
-- Treat static manager state, collider IDs, collision-pair ownership, partition
+- Treat context ownership, collider IDs, collision-pair ownership, partition
   reuse, pooled collections, settings, frame ordering, and GridForge world
   ownership as high-risk areas.
 - Treat serialization boundaries and load semantics as high-risk areas. Avoid

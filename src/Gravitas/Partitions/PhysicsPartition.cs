@@ -14,7 +14,7 @@ public class PhysicsPartition : IVoxelPartition
     public bool IsPartitioned { get; set; }
 
     /// <summary>
-    /// Stores dynamic bodies' PhysicsManager IDs.
+    /// Stores context-local dynamic body IDs.
     /// </summary>
     public SwiftList<int>? ContainedDynamicObjects;
 

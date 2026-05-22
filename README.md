@@ -22,7 +22,7 @@ Gravitas is an engine-agnostic fixed-point physics prototype for simulation-heav
 
 Gravitas is preparing for alpha. The current library is intentionally experimental, 3D-focused, and not API-stable. Heavy redesigns are expected where they improve deterministic behavior, physics correctness, runtime complexity, or engine-agnostic integration.
 
-The test and benchmark projects are scaffolded, but the authored unit and benchmark suites still need to be built out. Use this README as current orientation, and use [AGENTS.md](AGENTS.md) for detailed contributor guidance.
+The unit test project now has focused runtime, settings, query, partition, and coroutine coverage. The benchmark project is scaffolded, but authored benchmark classes still need to be built out. Use this README as current orientation, and use [AGENTS.md](AGENTS.md) for detailed contributor guidance.
 
 ## Why Gravitas?
 
@@ -71,22 +71,24 @@ For local development against the repository, reference the project directly:
 
 ## Mental Model
 
-Gravitas currently uses a static physics manager around host-owned world state:
+Gravitas is now centered around explicit world-context ownership:
 
-1. A host creates and owns a `GridForge.Grids.GridWorld`.
-2. Host objects expose deterministic transform and world access through `IMatterAgent`.
-3. `StiffBody` owns simulated body state such as position, rotation, velocity, acceleration, mass, drag, friction, grounding, and Chronicler state recording.
-4. `LSCollider` and primitive collider types own shape data, bounds, layers, trigger/contact events, and GridForge partition coordinates.
-5. `CollisionManager` maps colliders into GridForge voxels and activates `PhysicsPartition` instances for collision checks.
-6. `PhysicsManager` owns frame count, fixed delta time, simulation phases, body/collider registration, and collision-pair pooling.
+1. A host creates or attaches a `GravitasWorldContext`, which owns an explicit `GridForge.Grids.GridWorld`.
+2. Host objects expose deterministic transform and world context access through `IMatterAgent`.
+3. `GravitasWorldContext` owns fixed-step clock state, settings, physical environment values, lifecycle hooks, and context-local services.
+4. `GravitasPhysicsService` owns body/collider registration, collider ID lookup, collision-pair pooling, and physics lifecycle work for one context.
+5. `GravitasCollisionService` maps colliders into GridForge voxels and activates `PhysicsPartition` instances for collision checks.
+6. `GravitasRaycastService`, `GravitasCirclecastService`, and `GravitasCoroutineService` own query and coroutine state per context.
+7. `StiffBody` owns simulated body state such as position, rotation, velocity, acceleration, mass, drag, friction, grounding, and Chronicler state recording.
+8. `LSCollider` and primitive collider types own shape data, bounds, layers, trigger/contact events, and GridForge partition coordinates.
 
-The current lifecycle is prototype-level. Typical integration starts with `PhysicsManager.Setup()` and `PhysicsManager.Initialize()`, initializes bodies and colliders, then advances the simulation through `Simulate()`, `LateSimulate()`, `Visualize()`, and `LateVisualize()` according to the host's fixed-frame loop.
+Typical integration creates or attaches a context, initializes bodies and colliders against agents bound to that context, then advances the simulation through `Simulate()`, `LateSimulate()`, `Visualize()`, and `LateVisualize()` according to the host's fixed-frame loop.
 
 ## Main Systems
 
 | Area | What it does | Start here |
 | --- | --- | --- |
-| Core runtime | Static manager, body state, collision manager, and host agent boundary | [`src/Gravitas/Core`](src/Gravitas/Core) |
+| Core runtime | Context-owned physics service, body state, and host agent boundary | [`src/Gravitas/Core`](src/Gravitas/Core) and [`src/Gravitas/Runtime`](src/Gravitas/Runtime) |
 | Colliders | Collider base class, primitive shapes, mesh support, bounds, and layer behavior | [`src/Gravitas/Colliders`](src/Gravitas/Colliders) |
 | Collision handling | Shape-pair checks, contact data, collision pairs, and response logic | [`src/Gravitas/CollisionHandling`](src/Gravitas/CollisionHandling) |
 | Partitions | GridForge-backed physics partitions used by collision distribution | [`src/Gravitas/Partitions`](src/Gravitas/Partitions) |
@@ -99,7 +101,7 @@ The current lifecycle is prototype-level. Typical integration starts with `Physi
 | Path | Purpose |
 | --- | --- |
 | [`src/Gravitas`](src/Gravitas) | Main library project. |
-| [`tests/Gravitas.Tests`](tests/Gravitas.Tests) | xUnit v3 test project scaffold. No authored tests yet. |
+| [`tests/Gravitas.Tests`](tests/Gravitas.Tests) | xUnit v3 test project with focused runtime/settings/query coverage. |
 | [`tests/Gravitas.Benchmarks`](tests/Gravitas.Benchmarks) | BenchmarkDotNet project scaffold and benchmark runner. |
 | [`docs/feature-work/prototype`](docs/feature-work/prototype) | Historical Unity-oriented prototype/reference code. Not the source of truth. |
 | [`.github/workflows`](.github/workflows) | CI, coverage, release, NuGet publish, Discord, and wiki-sync workflows. |

@@ -94,6 +94,23 @@ public sealed class GravitasPhysicsServiceTests
     }
 
     [Fact]
+    public void AddLinearImpulse_ShouldUseOwningContextDeltaTime()
+    {
+        using GravitasWorldContext contextA = GravitasWorldContext.CreateOwned();
+        using GravitasWorldContext contextB = GravitasWorldContext.CreateOwned();
+        contextA.SetFrameRate(10);
+        contextB.SetFrameRate(100);
+        StiffBody bodyA = CreateInitializedBody(contextA);
+        StiffBody bodyB = CreateInitializedBody(contextB);
+
+        bodyA.AddLinearImpulse(Vector3d.Right);
+        bodyB.AddLinearImpulse(Vector3d.Right);
+
+        bodyA.LinearVelocity.x.Should().Be(Fixed64.One / (Fixed64)10);
+        bodyB.LinearVelocity.x.Should().Be(Fixed64.One / (Fixed64)100);
+    }
+
+    [Fact]
     public void Reset_ShouldClearContextLocalColliderTable()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
@@ -123,5 +140,17 @@ public sealed class GravitasPhysicsServiceTests
         body.Deactivate();
 
         context.Physics.AssimilatedBodyCount.Should().Be(0);
+    }
+
+    private static StiffBody CreateInitializedBody(GravitasWorldContext context)
+    {
+        var agent = new TestMatterAgent(context);
+        var collider = new LSSphereCollider();
+        var body = new StiffBody(agent, collider)
+        {
+            Mass = Fixed64.One
+        };
+        body.Initialize(Vector3d.Zero, FixedQuaternion.Identity);
+        return body;
     }
 }

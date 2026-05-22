@@ -4,23 +4,16 @@ namespace Gravitas.Colliders;
 
 public static class ColliderSettings
 {
-    public static SwiftDictionary<ColliderType, int> ColliderPriority = new()
-    {
-            {ColliderType.None, -1},
-            {ColliderType.Sphere, 0 },
-            {ColliderType.Capsule, 1 },
-            {ColliderType.AABox, 2 },
-            {ColliderType.OBBox, 2 },
-            {ColliderType.Mesh, 3 }
+    public static int GetPriority(ColliderType type) =>
+        type switch
+        {
+            ColliderType.Sphere => 0,
+            ColliderType.Capsule => 1,
+            ColliderType.AABox => 2,
+            ColliderType.OBBox => 2,
+            ColliderType.Mesh => 3,
+            _ => -1
         };
-
-    public static int GetPriority(ColliderType type)
-    {
-        if (!ColliderPriority.TryGetValue(type, out int priority))
-            return -1;
-
-        return priority;
-    }
 
     private static readonly SwiftDictionary<(ColliderType, ColliderType), CollisionType> CollisionTypeMapping = new()
     {
