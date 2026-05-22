@@ -88,10 +88,11 @@ public sealed class GravitasPhysicsService
 
         ProcessActiveCollisionPairs();
 
-        for (int i = 0; i < _dynamicBodies.PeakCount; i++)
+        int peak = _dynamicBodies.PeakCount;
+        for (int i = 0; i < peak; i++)
         {
-            if (_dynamicBodies.IsAllocated(i))
-                _dynamicBodies[i].LateSimulate();
+            if (_dynamicBodies.TryGetValue(i, out StiffBody body))
+                body.LateSimulate();
         }
     }
 
@@ -100,10 +101,11 @@ public sealed class GravitasPhysicsService
     /// </summary>
     public void Visualize()
     {
-        for (int i = 0; i < _dynamicBodies.PeakCount; i++)
+        int peak = _dynamicBodies.PeakCount;
+        for (int i = 0; i < peak; i++)
         {
-            if (_dynamicBodies.IsAllocated(i))
-                _dynamicBodies[i].OnVisualize();
+            if (_dynamicBodies.TryGetValue(i, out StiffBody body))
+                body.OnVisualize();
         }
     }
 
@@ -112,10 +114,11 @@ public sealed class GravitasPhysicsService
     /// </summary>
     public void LateVisualize()
     {
-        for (int i = 0; i < _dynamicBodies.PeakCount; i++)
+        int peak = _dynamicBodies.PeakCount;
+        for (int i = 0; i < peak; i++)
         {
-            if (_dynamicBodies.IsAllocated(i))
-                _dynamicBodies[i].LateVisualize();
+            if (_dynamicBodies.TryGetValue(i, out StiffBody body))
+                body.LateVisualize();
         }
     }
 
@@ -189,7 +192,7 @@ public sealed class GravitasPhysicsService
     {
         SwiftThrowHelper.ThrowIfNull(body, nameof(body));
         int dynamicId = body.DynamicId;
-        if (dynamicId < 0 || dynamicId >= _dynamicBodies.PeakCount || !_dynamicBodies.IsAllocated(dynamicId))
+        if (!_dynamicBodies.TryGetValue(dynamicId, out _))
             return;
 
         _dynamicBodies.TryRemoveAt(dynamicId);

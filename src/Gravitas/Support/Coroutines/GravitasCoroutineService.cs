@@ -42,17 +42,16 @@ public sealed class GravitasCoroutineService
     /// </summary>
     public void Simulate()
     {
-        if (_coroutines.PeakCount == 0)
+        int peak = _coroutines.PeakCount;
+        if (peak == 0)
             return;
 
-        for (int i = 0; i < _coroutines.PeakCount; i++)
+        for (int i = 0; i < peak; i++)
         {
-            if (!_coroutines.IsAllocated(i))
+            if (!_coroutines.TryGetValue(i, out LSCoroutine coroutine) || !coroutine.Active)
                 continue;
 
-            LSCoroutine coroutine = _coroutines[i];
-            if (coroutine.Active)
-                coroutine.Simulate();
+            coroutine.Simulate();
         }
     }
 
@@ -86,10 +85,8 @@ public sealed class GravitasCoroutineService
             return;
 
         int index = coroutine.Index;
-        if (index >= 0
-            && index < _coroutines.PeakCount
-            && _coroutines.IsAllocated(index)
-            && ReferenceEquals(_coroutines[index], coroutine))
+        if (_coroutines.TryGetValue(index, out LSCoroutine indexedCoroutine)
+            && ReferenceEquals(indexedCoroutine, coroutine))
         {
             _coroutines.TryRemoveAt(index);
         }
@@ -102,10 +99,11 @@ public sealed class GravitasCoroutineService
     /// </summary>
     public void Reset()
     {
-        for (int i = 0; i < _coroutines.PeakCount; i++)
+        int peak = _coroutines.PeakCount;
+        for (int i = 0; i < peak; i++)
         {
-            if (_coroutines.IsAllocated(i))
-                _coroutines[i].End();
+            if (_coroutines.TryGetValue(i, out LSCoroutine coroutine))
+                coroutine.End();
         }
 
         _coroutines.Clear();

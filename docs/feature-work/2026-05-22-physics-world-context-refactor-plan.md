@@ -474,6 +474,8 @@ dotnet build Gravitas.slnx --configuration Release
 
 **Status:** Complete for Phase 7. Added context-owned `GravitasCoroutineService`, exposed it through `GravitasWorldContext.Coroutines`, and made `GravitasWorldContext.Simulate()` advance context-local coroutines after the context clock and physics step. `WaitForFrames`, `WaitForNextSimulate`, and `WaitForRealSeconds` now bind to an explicit context through service factories, and `StiffBody.SkipGrounding()` uses its owning context coroutine service. Removed the old static `CoroutineManager` instead of leaving a compatibility facade. Verified with focused Phase 7 tests plus `Release` and `ReleaseLean` solution build/test runs.
 
+**Pre-Phase 8 follow-up:** Converted live context-owned `SwiftBucket` loops in `GravitasCoroutineService`, `GravitasPhysicsService`, and `GravitasCollisionService` to captured-peak `TryGetValue(...)` iteration. This avoids the `IsAllocated(...)` plus indexer double probe, tolerates removals during callback-driven simulation loops, and prevents newly added coroutines from running in the same simulation tick. The remaining old `SwiftBucket` loops are isolated to the legacy static `PhysicsManager` slated for removal/reduction in Phase 8.
+
 ## Phase 8: Remove Static Facades And Clean Public API
 
 **Purpose:** Finish the ownership inversion instead of leaving a disguised global manager.

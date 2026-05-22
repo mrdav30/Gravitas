@@ -187,10 +187,11 @@ public sealed class GravitasCollisionService
     {
         Version++;
 
-        for (int i = 0; i < _activePartitions.PeakCount; i++)
+        int peak = _activePartitions.PeakCount;
+        for (int i = 0; i < peak; i++)
         {
-            if (_activePartitions.IsAllocated(i))
-                _activePartitions[i].Distribute();
+            if (_activePartitions.TryGetValue(i, out PhysicsPartition partition))
+                partition.Distribute();
         }
     }
 

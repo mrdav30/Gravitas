@@ -60,6 +60,39 @@ public sealed class GravitasCoroutineServiceTests
         contextB.Coroutines.ActiveCoroutineCount.Should().Be(0);
     }
 
+    [Fact]
+    public void Simulate_ShouldNotRunCoroutinesStartedDuringCurrentTick()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        int parentSteps = 0;
+        int childSteps = 0;
+
+        context.Coroutines.StartCoroutine(Parent());
+
+        context.Simulate();
+
+        parentSteps.Should().Be(1);
+        childSteps.Should().Be(0);
+        context.Coroutines.ActiveCoroutineCount.Should().Be(2);
+
+        context.Simulate();
+
+        childSteps.Should().Be(1);
+
+        IEnumerator<ILockedYieldInstruction> Parent()
+        {
+            parentSteps++;
+            context.Coroutines.StartCoroutine(Child());
+            yield return context.Coroutines.WaitForNextSimulate();
+        }
+
+        IEnumerator<ILockedYieldInstruction> Child()
+        {
+            childSteps++;
+            yield return context.Coroutines.WaitForNextSimulate();
+        }
+    }
+
     private static IEnumerator<ILockedYieldInstruction> WaitForNext(
         GravitasWorldContext context,
         System.Action onResume)
