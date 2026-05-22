@@ -171,11 +171,11 @@ dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release -
 
 **Tasks:**
 
-- [ ] Write ownership tests: attach active world, reject inactive world, reject attaching the same active world twice, allow reattach after disposal.
-- [ ] Write owned-world disposal tests: `CreateOwned()` disposes its world; `Attach(takeOwnership: false)` leaves the host-owned world active.
-- [ ] Write clock tests: simulate increments `FrameCount` and `TotalTime`; late simulate marks accumulation reset; visualize resets then increments accumulation; setting frame rate changes `DeltaTime`.
-- [ ] Implement the shell with no dependency on `PhysicsManager`.
-- [ ] Run:
+- [x] Write ownership tests: attach active world, reject inactive world, reject attaching the same active world twice, allow reattach after disposal.
+- [x] Write owned-world disposal tests: `CreateOwned()` disposes its world; `Attach(takeOwnership: false)` leaves the host-owned world active.
+- [x] Write clock tests: simulate increments `FrameCount` and `TotalTime`; late simulate marks accumulation reset; visualize resets then increments accumulation; setting frame rate changes `DeltaTime`.
+- [x] Implement the shell with no dependency on `PhysicsManager`.
+- [x] Run:
 
 ```bash
 dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~GravitasWorldContextTests|FullyQualifiedName~GravitasClockTests"
@@ -184,6 +184,8 @@ dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release -
 **Exit criteria:**
 
 - Context lifecycle and timing are tested independently of the old static manager.
+
+**Status:** Complete for Phase 1. Added `GravitasWorldContext`, `GravitasClock`, `GravitasLifecycleHooks`, and focused runtime tests. Also added the MemoryPack-disabled shim so Lean builds keep the normal serialization attributes without compiler-condition noise. Verified with focused Phase 1 tests plus `Release` and `ReleaseLean` solution build/test runs.
 
 ## Phase 2: Move Settings And Environment State
 

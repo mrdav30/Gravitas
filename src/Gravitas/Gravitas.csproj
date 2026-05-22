@@ -49,7 +49,7 @@
 	<PropertyGroup>
 		<Authors>mrdav30</Authors>
 		<Description></Description>
-		<PackageIconUrl>https://raw.githubusercontent.com/mrdav30/gravitas/main/icon.png</PackageIconUrl>
+		<PackageIconUrl>icon.png</PackageIconUrl>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<PackageLicenseFile>LICENSE</PackageLicenseFile>
 		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
