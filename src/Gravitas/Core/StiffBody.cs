@@ -884,11 +884,11 @@ public class StiffBody : IRecordable
 
         // Only perform SphereCast if enough frames have passed
         bool frameGuard = Vector3d.Distance(_lastPosition, Position3d) < _groundCheckThreshold
-            && PhysicsManager.FrameCount - _lastGroundCheckFrame < _groundCheckFrameThreshold;
+            && Context.FrameCount - _lastGroundCheckFrame < _groundCheckFrameThreshold;
         if (frameGuard)
             return;
 
-        _lastGroundCheckFrame = PhysicsManager.FrameCount;
+        _lastGroundCheckFrame = Context.FrameCount;
         // We want origin to be close to the actor's feet
         Vector3d origin = Position3d;
         // but not to close...
@@ -902,7 +902,7 @@ public class StiffBody : IRecordable
         // if (Debug)
         //     Debug.DrawRay(origin, Vector3.down, Color.red);
 
-        if (!Circlecaster.CircleCast(World, origin, GroundCheckSphereRadius, Vector3d.Down, out LSRaycastHit hit, dis, PhysicsManager.Settings.IgnoreForGroundCheck))
+        if (!Context.Circlecasts.CircleCast(origin, GroundCheckSphereRadius, Vector3d.Down, out LSRaycastHit hit, dis, Context.Settings.IgnoreForGroundCheck))
         {
             _isGrounded = false;
             return;

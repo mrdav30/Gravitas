@@ -460,11 +460,11 @@ public class LSCuboidCollider : LSCollider
         return start + t * direction;
     }
 
-    public override bool ColliderOverlapsRay(ref SwiftList<Vector3d> outputIntersectionPoints)
+    public override bool ColliderOverlapsRay(RaycastAxisWorker worker, ref SwiftList<Vector3d> outputIntersectionPoints)
     {
         if (CurrentState == CuboidState.AABox)
-            return RayCasterWorker.CheckAABBoxOverlaps(this, ref outputIntersectionPoints);
+            return worker.CheckAABBoxOverlaps(this, ref outputIntersectionPoints);
 
-        return RayCasterWorker.CheckOBBoxOverlaps(this, ref outputIntersectionPoints);
+        return worker.CheckOBBoxOverlaps(this, ref outputIntersectionPoints);
     }
 }

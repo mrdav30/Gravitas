@@ -411,13 +411,13 @@ dotnet build Gravitas.slnx --configuration Release
 
 **Tasks:**
 
-- [ ] Write tests for raycast result ordering in one context.
-- [ ] Write tests for circlecast duplicate suppression in one context.
-- [ ] Write tests proving query buffers do not leak across two contexts.
-- [ ] Convert `Raycaster` into `GravitasRaycastService`.
-- [ ] Convert `Circlecaster` into `GravitasCirclecastService`.
-- [ ] Convert `RayCasterWorker` cached fields into instance-owned worker state.
-- [ ] Run:
+- [x] Write tests for raycast result ordering in one context.
+- [x] Write tests for circlecast duplicate suppression in one context.
+- [x] Write tests proving query buffers do not leak across two contexts.
+- [x] Convert `Raycaster` into `GravitasRaycastService`.
+- [x] Convert `Circlecaster` into `GravitasCirclecastService`.
+- [x] Convert `RayCasterWorker` cached fields into instance-owned worker state.
+- [x] Run:
 
 ```bash
 dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~GravitasRaycastServiceTests|FullyQualifiedName~GravitasCirclecastServiceTests"
@@ -427,6 +427,8 @@ dotnet build Gravitas.slnx --configuration Release
 **Exit criteria:**
 
 - Query state is context-local and static query buffers are gone.
+
+**Status:** Complete for Phase 6. Added context-owned `GravitasRaycastService` and `GravitasCirclecastService`, exposed them through `GravitasWorldContext`, reduced `Raycaster`/`Circlecaster` to explicit-context facades, and moved `RayCasterWorker` cached state into the context-owned `RaycastAxisWorker`. `StiffBody.CheckGround()` now uses the owning context's clock, settings, and circlecast service. Also normalized the raycast worker axis during preparation after focused tests exposed that the old raw-vector projection treated non-normalized ray directions as normalized. Verified with focused Phase 6 tests plus `Release` and `ReleaseLean` solution build/test runs.
 
 ## Phase 7: Move Coroutines And Yield Instructions To The Context Clock
 

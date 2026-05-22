@@ -43,7 +43,7 @@ public class PhysicsPartition : IVoxelPartition
 
     public void OnAddToVoxel(Voxel voxel)
     {
-        _ = Owner;
+        SwiftThrowHelper.ThrowIfTrue(_owner == null, nameof(PhysicsPartition), "PhysicsPartition is missing its owner collision service.");
         WorldIndex = voxel.WorldIndex;
         IsPartitioned = true;
     }

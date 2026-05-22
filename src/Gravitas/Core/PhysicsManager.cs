@@ -1,7 +1,6 @@
 ﻿using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
-using Gravitas.Raycasting;
 using SwiftCollections;
 using System;
 using System.Runtime.CompilerServices;
@@ -298,8 +297,6 @@ public static class PhysicsManager
 
 
         _dynamicSimBodies?.Clear();
-        Raycaster.Reset();
-        Circlecaster.Reset();
         _cachedColliderIds?.FastClear();
 
         PeakColliderCount = 0;

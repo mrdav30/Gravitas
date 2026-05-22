@@ -179,6 +179,6 @@ public class LSCapsuleCollider : LSCollider
         return direction / distance; // normalize
     }
 
-    public override bool ColliderOverlapsRay(ref SwiftList<Vector3d> outputIntersectionPoints) =>
-        RayCasterWorker.CheckCapsuleOverlaps(this, ref outputIntersectionPoints);
+    public override bool ColliderOverlapsRay(RaycastAxisWorker worker, ref SwiftList<Vector3d> outputIntersectionPoints) =>
+        worker.CheckCapsuleOverlaps(this, ref outputIntersectionPoints);
 }

@@ -1,6 +1,7 @@
 ﻿using Chronicler;
 using FixedMathSharp;
 using Gravitas.CollisionHandling;
+using Gravitas.Raycasting;
 using Gravitas.Support;
 using GridForge.Grids;
 using GridForge.Spatial;
@@ -471,9 +472,10 @@ public abstract class LSCollider : IRecordable
     /// <summary>
     /// Checks if this object overlaps the line formed by p1 and p2
     /// </summary>
+    /// <param name="worker">The prepared ray-axis worker for the owning query service.</param>
     /// <param name="outputIntersectionPoints"></param>
     /// <returns></returns>
-    public abstract bool ColliderOverlapsRay(ref SwiftList<Vector3d> outputIntersectionPoints);
+    public abstract bool ColliderOverlapsRay(RaycastAxisWorker worker, ref SwiftList<Vector3d> outputIntersectionPoints);
 
     public void SetPreviousGridBounds() =>
         (_lastGridBoundsMin, _lastGridBoundsMax) = World?.SnapBoundsToVoxelSize(BoundsMin, BoundsMax, Fixed64.Half)

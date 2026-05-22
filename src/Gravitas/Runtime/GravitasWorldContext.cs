@@ -1,4 +1,5 @@
 using FixedMathSharp;
+using Gravitas.Raycasting;
 using GridForge.Grids;
 using SwiftCollections;
 using System;
@@ -35,6 +36,8 @@ public sealed class GravitasWorldContext : IDisposable
         Environment = PhysicsEnvironment.Default(Settings.FrameRate);
         Collisions = new GravitasCollisionService(this);
         Physics = new GravitasPhysicsService(this);
+        Raycasts = new GravitasRaycastService(this);
+        Circlecasts = new GravitasCirclecastService(this);
     }
 
     /// <summary>
@@ -61,6 +64,16 @@ public sealed class GravitasWorldContext : IDisposable
     /// Gets this context's world-local physics registration and pair service.
     /// </summary>
     public GravitasPhysicsService Physics { get; }
+
+    /// <summary>
+    /// Gets this context's world-local raycast query service.
+    /// </summary>
+    public GravitasRaycastService Raycasts { get; }
+
+    /// <summary>
+    /// Gets this context's world-local circlecast query service.
+    /// </summary>
+    public GravitasCirclecastService Circlecasts { get; }
 
     /// <summary>
     /// Gets whether this context has been disposed.
@@ -259,6 +272,8 @@ public sealed class GravitasWorldContext : IDisposable
         _clock.Reset();
         Collisions.Reset();
         Physics.Reset();
+        Raycasts.Reset();
+        Circlecasts.Reset();
         _hooks.InvokeReset();
     }
 
