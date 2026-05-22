@@ -92,6 +92,7 @@
 		<PackageReference Include="MemoryPack" Version="1.21.4" />
 		<PackageReference Include="FixedMathSharp" Version="4.0.0" />
 		<PackageReference Include="SwiftCollections" Version="4.0.5" />
+		<PackageReference Include="SwiftCollections.FixedMathSharp" Version="4.0.5" />
 		<PackageReference Include="GridForge" Version="6.0.4" />
 		<PackageReference Include="Chronicler.Core" Version="0.2.0" />
 	</ItemGroup>
@@ -99,6 +100,7 @@
 	<ItemGroup Condition="'$(DisableMemoryPack)' == 'true'">
 		<PackageReference Include="FixedMathSharp.Lean" Version="4.0.0" />
 		<PackageReference Include="SwiftCollections.Lean" Version="4.0.5" />
+		<PackageReference Include="SwiftCollections.FixedMathSharp.Lean" Version="4.0.5" />
 		<PackageReference Include="GridForge.Lean" Version="6.0.4" />
 		<PackageReference Include="Chronicler.Core.Lean" Version="0.2.0" />
 	</ItemGroup>
