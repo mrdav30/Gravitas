@@ -9,17 +9,28 @@
 [![License](https://img.shields.io/github/license/mrdav30/Gravitas.svg)](https://github.com/mrdav30/Gravitas/blob/main/LICENSE)
 [![Frameworks](https://img.shields.io/badge/frameworks-netstandard2.1%20%7C%20net8.0-512BD4.svg)](https://github.com/mrdav30/Gravitas)
 
-**Deterministic physics engine for lockstep simulations and games.**
+**Deterministic physics for lockstep simulations and games.**
 
-Gravitas gives simulation-heavy .NET projects a fixed-point physics stack without tying them to a renderer, ECS, or game framework.
+Gravitas is an engine-agnostic fixed-point physics prototype for simulation-heavy .NET projects. It is designed to sit above the LSF stack:
 
-The README is the front door. The deeper integration notes live in the [wiki](docs/wiki/Home.md), starting with the [architecture overview](docs/wiki/Overview.md).
+- `FixedMathSharp` for deterministic fixed-point math.
+- `SwiftCollections` for low-allocation collections and pools.
+- `GridForge` for explicit voxel worlds and spatial partitioning.
+- `Chronicler.Core` for deterministic state transfer.
+
+## Prototype Status
+
+Gravitas is preparing for alpha. The current library is intentionally experimental, 3D-focused, and not API-stable. Heavy redesigns are expected where they improve deterministic behavior, physics correctness, runtime complexity, or engine-agnostic integration.
+
+The test and benchmark projects are scaffolded, but the authored unit and benchmark suites still need to be built out. Use this README as current orientation, and use [AGENTS.md](AGENTS.md) for detailed contributor guidance.
 
 ## Why Gravitas?
 
-- Deterministic runtime math through `FixedMathSharp` types such as `Fixed64`, `Vector3d`, and `FixedQuaternion`.
-- Voxel-backed world representation through `GridForge`, with explicit chart registration and context-owned runtime state.
-- Multi-targeted builds for `netstandard2.1` and `net8.0`.
+- Deterministic runtime math through `Fixed64`, `Vector2d`, `Vector3d`, and `FixedQuaternion`.
+- Engine-agnostic host boundary through `IMatterAgent` instead of direct renderer, ECS, or Unity coupling.
+- Grid-backed broad-phase partitioning through `GridForge` `GridWorld`, voxel tracing, and `PhysicsPartition`.
+- Runtime systems for bodies, colliders, collision pairs, collision detection/response, raycasts, circlecasts, and physics settings.
+- A future direction toward first-class 2D physics and mixed 2D/3D simulations where 2D and 3D bodies can interact through explicit dimensional rules.
 
 ## Install
 
@@ -31,28 +42,21 @@ Gravitas targets `netstandard2.1` and `net8.0`.
 
 ### Package Variants
 
-Gravitas is published in two build variants so you can choose between built-in `MemoryPack` support and a leaner dependency set:
+Gravitas is configured for two package variants:
 
-- `Gravitas`: Includes `MemoryPack` and depends on the standard `FixedMathSharp`, `SwiftCollections`, `GridForge`, and `Chronicler.Core` packages. This is the best default choice for most .NET applications, especially if you want the MemoryPack-backed Chronicler transport available out of the box.
-- `Gravitas.Lean`: Excludes the `MemoryPack` package, swaps to `FixedMathSharp.NoMemoryPack`, `SwiftCollections.Lean`, `GridForge.Lean`, and `Chronicler.Core.Lean`, and omits MemoryPack-specific source files. Choose this when you do not need built-in MemoryPack serialization, when you prefer a different serializer, or when you want the leanest dependency surface.
+- `Gravitas`: Includes `MemoryPack` and depends on the standard `FixedMathSharp`, `SwiftCollections`, `SwiftCollections.FixedMathSharp`, `GridForge`, and `Chronicler.Core` packages.
+- `Gravitas.Lean`: Excludes the direct `MemoryPack` package and swaps to the lean dependency chain: `FixedMathSharp.Lean`, `SwiftCollections.Lean`, `SwiftCollections.FixedMathSharp.Lean`, `GridForge.Lean`, and `Chronicler.Core.Lean`.
 
-Both variants expose the same core pathing and navigation API. The main difference is whether `MemoryPack` and the standard dependency chain are included.
+Both variants are intended to expose the same core physics API. The difference is whether built-in MemoryPack support and the standard dependency chain are present.
 
 Install via NuGet:
 
-- Standard package:
+```bash
+dotnet add package Gravitas
+dotnet add package Gravitas.Lean
+```
 
-  ```bash
-  dotnet add package Gravitas
-  ```
-
-- Lean package:
-
-  ```bash
-  dotnet add package Gravitas.Lean
-  ```
-
-If you build from source, the repository provides matching release configurations:
+If you build from source, the repository provides matching configurations:
 
 - `Release` builds the standard `Gravitas` package.
 - `ReleaseLean` builds the `Gravitas.Lean` package.
@@ -67,23 +71,38 @@ For local development against the repository, reference the project directly:
 
 ## Mental Model
 
-N/A
+Gravitas currently uses a static physics manager around host-owned world state:
 
-## Quick Start
+1. A host creates and owns a `GridForge.Grids.GridWorld`.
+2. Host objects expose deterministic transform and world access through `IMatterAgent`.
+3. `StiffBody` owns simulated body state such as position, rotation, velocity, acceleration, mass, drag, friction, grounding, and Chronicler state recording.
+4. `LSCollider` and primitive collider types own shape data, bounds, layers, trigger/contact events, and GridForge partition coordinates.
+5. `CollisionManager` maps colliders into GridForge voxels and activates `PhysicsPartition` instances for collision checks.
+6. `PhysicsManager` owns frame count, fixed delta time, simulation phases, body/collider registration, and collision-pair pooling.
 
-N/A
+The current lifecycle is prototype-level. Typical integration starts with `PhysicsManager.Setup()` and `PhysicsManager.Initialize()`, initializes bodies and colliders, then advances the simulation through `Simulate()`, `LateSimulate()`, `Visualize()`, and `LateVisualize()` according to the host's fixed-frame loop.
 
 ## Main Systems
 
 | Area | What it does | Start here |
 | --- | --- | --- |
-| N/A | N/A| N/A |
+| Core runtime | Static manager, body state, collision manager, and host agent boundary | [`src/Gravitas/Core`](src/Gravitas/Core) |
+| Colliders | Collider base class, primitive shapes, mesh support, bounds, and layer behavior | [`src/Gravitas/Colliders`](src/Gravitas/Colliders) |
+| Collision handling | Shape-pair checks, contact data, collision pairs, and response logic | [`src/Gravitas/CollisionHandling`](src/Gravitas/CollisionHandling) |
+| Partitions | GridForge-backed physics partitions used by collision distribution | [`src/Gravitas/Partitions`](src/Gravitas/Partitions) |
+| Raycasting | Raycast and circlecast query support | [`src/Gravitas/Raycasting`](src/Gravitas/Raycasting) |
+| Settings | Frame rate, collision matrix, pooling switch, and settings save helpers | [`src/Gravitas/Settings`](src/Gravitas/Settings) |
+| Support | Fixed transforms, layers, lifecycle hooks, coroutines, and transient state helpers | [`src/Gravitas/Support`](src/Gravitas/Support) |
 
 ## Repository Map
 
 | Path | Purpose |
 | --- | --- |
-| N/A | N/A |
+| [`src/Gravitas`](src/Gravitas) | Main library project. |
+| [`tests/Gravitas.Tests`](tests/Gravitas.Tests) | xUnit v3 test project scaffold. No authored tests yet. |
+| [`tests/Gravitas.Benchmarks`](tests/Gravitas.Benchmarks) | BenchmarkDotNet project scaffold and benchmark runner. |
+| [`docs/feature-work/prototype`](docs/feature-work/prototype) | Historical Unity-oriented prototype/reference code. Not the source of truth. |
+| [`.github/workflows`](.github/workflows) | CI, coverage, release, NuGet publish, Discord, and wiki-sync workflows. |
 
 ## Build And Test
 
@@ -93,17 +112,24 @@ dotnet build Gravitas.slnx --configuration Release
 dotnet test Gravitas.slnx --configuration Release
 ```
 
-For focused work, run the matching test area first:
+Validate the lean package path when changing package references, serialization, or conditional MemoryPack behavior:
 
 ```bash
-dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter FullyQualifiedName~N/A
+dotnet build Gravitas.slnx --configuration ReleaseLean
+dotnet test Gravitas.slnx --configuration ReleaseLean
+```
+
+For focused unit-test work:
+
+```bash
+dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release
 ```
 
 Release builds generate NuGet packages because `GeneratePackageOnBuild` is enabled.
 
 ## Benchmarks
 
-The benchmark suite measures path-request and navigation hot paths: N/A
+The benchmark project is scaffolded for future physics hot-path measurements. There are no authored benchmark classes yet.
 
 List available benchmark selections:
 
@@ -111,21 +137,20 @@ List available benchmark selections:
 dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0 -- list
 ```
 
-Run a specific group:
+Run all benchmarks once benchmark classes exist:
 
 ```bash
-dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0 -- guide-cache
+dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0 -- all
 ```
 
-See the [benchmark README](tests/Gravitas.Benchmarks/README.md) for the full command reference and suite design notes.
+See the [benchmark README](tests/Gravitas.Benchmarks/README.md) for runner details and benchmark authoring notes.
 
 ## Documentation
 
-Start with the [wiki home](docs/wiki/Home.md) if you are evaluating the project, or jump straight into:
+- [AGENTS.md](AGENTS.md) is the main contributor guide for deterministic, performance-sensitive, and physics-design work.
+- [`docs/feature-work/prototype`](docs/feature-work/prototype) contains historical prototype code and Unity-oriented reference material.
 
-- [Overview](docs/wiki/Overview.md) for the runtime model
-
-The wiki is intentionally more detailed than this README. If behavior changes, keep code, tests, README, and the relevant wiki page aligned.
+If behavior changes, keep code, tests, this README, and benchmark documentation aligned.
 
 ## Compatibility
 
@@ -135,9 +160,9 @@ The wiki is intentionally more detailed than this README. If behavior changes, k
 
 ## Contributing
 
-Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request, and prefer focused changes with release-mode validation.
+Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md) before opening a pull request.
 
-For issues, feature requests, or questions, use the repository issue tracker. Community discussion is also available on the official [Discord server](https://discord.gg/mhwK2QFNBA).
+Prefer focused changes with release-mode validation. Determinism, physics correctness, low time complexity, and allocation behavior are first-order design constraints.
 
 ## License
 
