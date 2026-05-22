@@ -7,6 +7,7 @@ using GridForge.Spatial;
 using SwiftCollections;
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 
 namespace Gravitas.Colliders;
 
@@ -29,6 +30,19 @@ public abstract class LSCollider : IRecordable
     public int Id => _id;
 
     private IMatterAgent? _agent;
+
+    private GravitasWorldContext? _context;
+    public GravitasWorldContext Context
+    {
+        get
+        {
+            SwiftThrowHelper.ThrowIfTrue(
+                _context == null,
+                nameof(LSCollider),
+                "Collider is not bound to a GravitasWorldContext.");
+            return _context!;
+        }
+    }
 
     private StiffBody? _body;
     public StiffBody? Body => _body;
@@ -75,7 +89,7 @@ public abstract class LSCollider : IRecordable
     // For dynamic colliders, this is the velocity of the body. For static colliders, this is always zero.
     public Vector3d Velocity => Body?.LinearVelocity ?? Vector3d.Zero;
 
-    public GridWorld? World => _agent?.World;
+    public GridWorld? World => _context?.World ?? _agent?.World;
 
     public FixedTransform Transform => Body?.PositionTransform
         ?? _agent?.Transform
@@ -194,9 +208,10 @@ public abstract class LSCollider : IRecordable
     {
         RaycastVersion = 0;
         SpherecastVersion = 0;
-        _id = PhysicsManager.AssimilateCollider(this);
 
         _agent = agent;
+        BindContext(GravitasWorldContext.RequireContext(agent.World));
+        Context.Physics.AssimilateCollider(this);
 
         // This is a top level parent
         if (_agent.IsParent)
@@ -482,7 +497,7 @@ public abstract class LSCollider : IRecordable
             return false;
 
         if (collisionPair.Active)
-            PhysicsManager.DeactivateAndPoolPair(collisionPair);
+            Context.Physics.DeactivateAndPoolPair(collisionPair);
         return true;
     }
 
@@ -503,20 +518,20 @@ public abstract class LSCollider : IRecordable
         {
             int otherId = kvp.Key;
             CollisionPair collisionPair = kvp.Value;
-            if (!PhysicsManager.TryGetColliderById(otherId, out LSCollider? other))
+            if (!Context.Physics.TryGetColliderById(otherId, out LSCollider? other))
                 continue;
             other!.TryRemoveCollisionPairHolder(Id);
-            // Remove the pair regardless of whether the other collider has already removed it, 
-            // to ensure it's cleaned up properly and to avoid potential issues with colliders 
+            // Remove the pair regardless of whether the other collider has already removed it,
+            // to ensure it's cleaned up properly and to avoid potential issues with colliders
             // that might still reference this collider in their pairs.
-            PhysicsManager.DeactivateAndPoolPair(collisionPair);
+            Context.Physics.DeactivateAndPoolPair(collisionPair);
         }
         _collisionPairs.Clear();
 
         // Remove this collider from the collision pair holders of all colliders it has pairs with
         for (int i = 0; i < _collisionPairHolders.Count; i++)
         {
-            if (!PhysicsManager.TryGetColliderById(_collisionPairHolders[i], out LSCollider? other))
+            if (!Context.Physics.TryGetColliderById(_collisionPairHolders[i], out LSCollider? other))
                 continue;
 
             if (other!.TryRemoveCollisionPair(Id) != true)
@@ -524,9 +539,27 @@ public abstract class LSCollider : IRecordable
         }
         _collisionPairHolders.Clear();
 
-        PhysicsManager.DessimilateCollider(this);
+        Context.Physics.DessimilateCollider(this);
         //  IsInCollision = false;
         _active = false;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal void BindContext(GravitasWorldContext context)
+    {
+        SwiftThrowHelper.ThrowIfNull(context, nameof(context));
+        SwiftThrowHelper.ThrowIfArgument(
+            _context != null && !ReferenceEquals(_context, context),
+            nameof(context),
+            "Collider is already bound to a different GravitasWorldContext.");
+        _context = context;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal void SetPhysicsId(int id)
+    {
+        SwiftThrowHelper.ThrowIfNegative(id, nameof(id));
+        _id = id;
     }
 
     #region Serialization

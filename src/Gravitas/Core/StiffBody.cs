@@ -218,7 +218,7 @@ public class StiffBody : IRecordable
     private Vector3d _linearDirection;
 
     /// <summary>
-    /// Represents the angular velocity of the body. 
+    /// Represents the angular velocity of the body.
     /// </summary>
     private Vector3d _angularVelocity;
     public Vector3d AngularVelocity => _angularVelocity;
@@ -226,7 +226,7 @@ public class StiffBody : IRecordable
     private Vector3d _angularDirection;
 
     /// <summary>
-    /// Represents the torque applied to the body. 
+    /// Represents the torque applied to the body.
     /// </summary>
     private Vector3d _deltaTorque;
 
@@ -277,8 +277,8 @@ public class StiffBody : IRecordable
     private bool _isVelocityConstant;
 
     /// <summary>
-    /// Represents a body's resistance to movement, akin to air resistance. 
-    /// Higher values slow down the body more quickly in absence of other forces. 
+    /// Represents a body's resistance to movement, akin to air resistance.
+    /// Higher values slow down the body more quickly in absence of other forces.
     /// The effect is significant when bodies are expected to slow down or stop without sustained forces.
     /// It's not constrained between 0 and 1, depends on the object's shape and the flow conditions.
     /// </summary>
@@ -287,21 +287,21 @@ public class StiffBody : IRecordable
     private Fixed64 AngularDragCoefficient = (Fixed64)0.75f;
 
     /// <summary>
-    /// Represents the friction force applied when the object is moving. 
+    /// Represents the friction force applied when the object is moving.
     /// Higher values simulate high friction surfaces causing quick stops, while lower values simulate low friction surfaces causing prolonged slides.
     /// The usual range is between 0 (no friction) and 1 (high friction).
     /// </summary>
     private Fixed64 FrictionCoefficient = Fixed64.One;
 
     /// <summary>
-    /// Represents the normal force on the object. 
+    /// Represents the normal force on the object.
     /// It's usually perpendicular to the contact surface and prevents the object from "falling" into the surface.
     /// Can be updated to simulate changes in terrain or surface inclination.
     /// </summary>
     private Vector3d _normalForce;
 
     //  Mass (in kilograms) is the measure of the amount of matter in a body
-    //  Divide the weight (in Newtons) by the acceleration of gravity to determine the mass of an object (measured in Kilograms). 
+    //  Divide the weight (in Newtons) by the acceleration of gravity to determine the mass of an object (measured in Kilograms).
     //  On Earth, gravity accelerates at 9.8 meters per second squared (9.8 m/s^2)
     //  ex: 150 Pounds x PhysicsManager.PoundToNewton = 667 Newtons ÷ 9.8 m/s^2 = 68 kilograms * PhysicsManager.KilogramtoPound = 150 Pounds
     public Fixed64 Mass;
@@ -319,7 +319,9 @@ public class StiffBody : IRecordable
 
     public IMatterAgent Agent { get; private set; } = null!;
 
-    public GridWorld? World => Agent?.World;
+    public GravitasWorldContext Context { get; private set; } = null!;
+
+    public GridWorld? World => Context?.World;
 
     public LSCollider Collider { get; private set; } = null!;
 
@@ -344,6 +346,7 @@ public class StiffBody : IRecordable
     {
         Agent = agent;
         Collider = collider;
+        Context = GravitasWorldContext.RequireContext(agent.World);
 
         Immovable = Immovable || Collider?.Shape == ColliderType.None;
 
@@ -395,7 +398,7 @@ public class StiffBody : IRecordable
 
         OnVisualize();
 
-        _dynamicId = PhysicsManager.AssimilateBody(this, isDynamic);
+        _dynamicId = Context.Physics.AssimilateBody(this, isDynamic);
         Collider!.Initialize(this);
 
         if (AngularForcesHalted)
@@ -784,7 +787,7 @@ public class StiffBody : IRecordable
             return;
 
         Collider!.Deactivate();
-        PhysicsManager.DessimilateBody(this);
+        Context.Physics.DessimilateBody(this);
         _dynamicId = -1;
         Active = false;
     }
@@ -914,8 +917,8 @@ public class StiffBody : IRecordable
     // https://forum.unity.com/threads/getting-impact-force-not-just-velocity.23746/
     // https://www2.chem.wisc.edu/deptfiles/genchem/netorial/modules/thermodynamics/energy/energy2.htm
     /// <summary>
-    /// Energy possessed by an object in motion that describes things like how long it will take to stop 
-    /// and how much damage it will do in a collision (aka measurement of how strong the hit was) 
+    /// Energy possessed by an object in motion that describes things like how long it will take to stop
+    /// and how much damage it will do in a collision (aka measurement of how strong the hit was)
     /// If kinetic energy is greater than defined break energy...do something, ex:
     ///  Debug.Log ("Impulse taken: " + result.magnitude);
     ///  if(result.magnitude > minForceToBreak){
@@ -1074,4 +1077,3 @@ public class StiffBody : IRecordable
         Collider?.RecordData(chronicler);
     }
 }
-

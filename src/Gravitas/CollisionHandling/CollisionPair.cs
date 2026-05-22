@@ -18,7 +18,9 @@ public class CollisionPair
 
     private bool _isPooledForDeactivation;
 
-    public GridWorld World { get; private set; } = null!;
+    public GravitasWorldContext Context { get; private set; } = null!;
+
+    public GridWorld World => Context.World;
 
     // stores order in which they come in
     public int Id1 { get; private set; }
@@ -61,10 +63,13 @@ public class CollisionPair
         SwiftThrowHelper.ThrowIfNull(c1, nameof(c1));
         SwiftThrowHelper.ThrowIfNull(c2, nameof(c2));
         SwiftThrowHelper.ThrowIfArgument(c1 == c2, nameof(c2), "Cannot create a CollisionPair with the same collider.");
-        SwiftThrowHelper.ThrowIfNull(c1.World, nameof(c1.World), "Collider's world cannot be null.");
-        SwiftThrowHelper.ThrowIfArgument(c1.World != c2.World, nameof(c2), "Colliders must be in the same world to create a CollisionPair.");
+        GravitasWorldContext context = c1.Context;
+        SwiftThrowHelper.ThrowIfArgument(
+            !ReferenceEquals(context, c2.Context),
+            nameof(c2),
+            "Colliders must be in the same context to create a CollisionPair.");
 
-        World = c1.World;
+        Context = context;
 
         Reset();
 
@@ -84,7 +89,7 @@ public class CollisionPair
         //TODO: The time between collision checks might cause goofy behavior
         //Maybe use a distance or velocity heuristic for culling instead of time since last collision
         //It wouldn't be able to replace partitions because of raycasts and fast-moving objects
-        //Let's see if this works well or if something better is needed. 
+        //Let's see if this works well or if something better is needed.
         if (ColliderA!.PreventCulling || ColliderB!.PreventCulling)
         {
             CullCounter = -1;  //  Never cull
@@ -95,11 +100,11 @@ public class CollisionPair
             //Immediately check collision
             CullCounter = 0;
             //If collision distance is too large, don't cull based on distance
-            _preventDistanceCull = _fastCollideDistance > PhysicsManager.CullFastDistanceMax;
+            _preventDistanceCull = _fastCollideDistance > Context.Environment.CullFastDistanceMax;
             _fastDistanceOffset = Fixed64.FromRaw((int)_fastCollideDistance) + (Fixed64.One * 2) * (Fixed64.One * 2);
         }
 
-        LastCollidedFrame = PhysicsManager.FrameCount;
+        LastCollidedFrame = Context.FrameCount;
         PairVersion++;
         Active = true;
     }
@@ -132,7 +137,7 @@ public class CollisionPair
     }
 
     /// <summary>
-    /// Checks and distributes collisions between colliders.  
+    /// Checks and distributes collisions between colliders.
     /// Called by Partition Manager every fixed update if 2 colliders are on the same partion.
     /// </summary>
     public void UpdateCollision()
@@ -161,14 +166,14 @@ public class CollisionPair
 
     private bool IsCollisionPairActive() => Active && ColliderA.IsActive && ColliderB.IsActive;
 
-    private void UpdateLastFrame() => LastFrame = PhysicsManager.FrameCount;
+    private void UpdateLastFrame() => LastFrame = Context.FrameCount;
 
     private void DeactivateAndPoolIfRequired()
     {
         if (_isPooledForDeactivation)
             return;
 
-        PhysicsManager.PoolForDeactivation(this);
+        Context.Physics.PoolForDeactivation(this);
         _isPooledForDeactivation = true;
     }
 
@@ -207,7 +212,7 @@ public class CollisionPair
     {
         if (_isColliding)
         {
-            LastCollidedFrame = PhysicsManager.FrameCount;
+            LastCollidedFrame = Context.FrameCount;
             return;
         }
 
@@ -265,11 +270,11 @@ public class CollisionPair
         if (!_preventDistanceCull)
         {
             int step = GetCullDistanceStep(World!);
-            distanceScore = Math.Clamp((int)(_fastDistance - _fastDistanceOffset) / step + PhysicsManager.CullDistributor, 0, PhysicsManager.CullDistanceMax);
-            velocityScore = Math.Clamp((int)(ColliderA.Velocity - ColliderB.Velocity).Magnitude / PhysicsManager.CullVelocityStep, 0, PhysicsManager.CullVelocityMax);
+            distanceScore = Math.Clamp((int)(_fastDistance - _fastDistanceOffset) / step + PhysicsManager.CullDistributor, 0, Context.Environment.CullDistanceMax);
+            velocityScore = Math.Clamp((int)(ColliderA.Velocity - ColliderB.Velocity).Magnitude / Context.Environment.CullVelocityStep, 0, Context.Environment.CullVelocityMax);
         }
 
-        int timeScore = Math.Clamp((PhysicsManager.FrameCount - LastCollidedFrame) / PhysicsManager.CullTimeStep, 0, PhysicsManager.CullTimeMax);
+        int timeScore = Math.Clamp((Context.FrameCount - LastCollidedFrame) / Context.Environment.CullTimeStep, 0, Context.Environment.CullTimeMax);
 
         CullCounter = (short)(distanceScore + velocityScore + timeScore);
     }
@@ -278,7 +283,7 @@ public class CollisionPair
     /// Defines the step value for distance-based culling. The score is increased
     /// when the distance between objects increases. Higher values make the culling more aggressive for distant objects.
     /// </summary>
-    internal static int GetCullDistanceStep(GridWorld world) => ((world.VoxelSize + Fixed64.One * 2) * (world.VoxelSize + Fixed64.One * 2) / PhysicsManager.CullDistanceMax).CeilToInt();
+    internal int GetCullDistanceStep(GridWorld world) => ((world.VoxelSize + Fixed64.One * 2) * (world.VoxelSize + Fixed64.One * 2) / Context.Environment.CullDistanceMax).CeilToInt();
 
     public void Reset()
     {

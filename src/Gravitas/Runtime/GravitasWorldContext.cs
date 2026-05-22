@@ -33,6 +33,7 @@ public sealed class GravitasWorldContext : IDisposable
         _ownsWorld = ownsWorld;
         Settings = PhysicsSettings.DefaultSettings();
         Environment = PhysicsEnvironment.Default(Settings.FrameRate);
+        Physics = new GravitasPhysicsService(this);
     }
 
     /// <summary>
@@ -49,6 +50,11 @@ public sealed class GravitasWorldContext : IDisposable
     /// Gets this context's world-local physical environment values.
     /// </summary>
     public PhysicsEnvironment Environment { get; }
+
+    /// <summary>
+    /// Gets this context's world-local physics registration and pair service.
+    /// </summary>
+    public GravitasPhysicsService Physics { get; }
 
     /// <summary>
     /// Gets whether this context has been disposed.
@@ -202,6 +208,7 @@ public sealed class GravitasWorldContext : IDisposable
     {
         ThrowIfDisposed();
         _clock.Simulate();
+        Physics.Simulate();
         _hooks.InvokeSimulate();
     }
 
@@ -212,6 +219,7 @@ public sealed class GravitasWorldContext : IDisposable
     {
         ThrowIfDisposed();
         _clock.LateSimulate();
+        Physics.LateSimulate();
         _hooks.InvokeLateSimulate();
     }
 
@@ -222,6 +230,7 @@ public sealed class GravitasWorldContext : IDisposable
     {
         ThrowIfDisposed();
         _clock.Visualize();
+        Physics.Visualize();
         _hooks.InvokeVisualize();
     }
 
@@ -231,6 +240,7 @@ public sealed class GravitasWorldContext : IDisposable
     public void LateVisualize()
     {
         ThrowIfDisposed();
+        Physics.LateVisualize();
         _hooks.InvokeLateVisualize();
     }
 
@@ -241,6 +251,7 @@ public sealed class GravitasWorldContext : IDisposable
     {
         ThrowIfDisposed();
         _clock.Reset();
+        Physics.Reset();
         _hooks.InvokeReset();
     }
 
@@ -315,6 +326,41 @@ public sealed class GravitasWorldContext : IDisposable
     {
         ThrowIfDisposed();
         return _hooks.RegisterOnFrameRateChanged(owner, order, callback);
+    }
+
+    internal static GravitasWorldContext RequireContext(GridWorld world)
+    {
+        SwiftThrowHelper.ThrowIfNull(world, nameof(world));
+        SwiftThrowHelper.ThrowIfTrue(
+            !TryGetContext(world, out GravitasWorldContext? context),
+            nameof(GravitasWorldContext),
+            "GridWorld is not attached to an active GravitasWorldContext.");
+
+        return context!;
+    }
+
+    internal static bool TryGetContext(GridWorld world, out GravitasWorldContext? context)
+    {
+        context = null;
+        if (world == null)
+            return false;
+
+        lock (_worldOwnershipLock)
+        {
+            if (!_worldOwners.TryGetValue(world, out WeakReference<GravitasWorldContext> weakOwner))
+                return false;
+
+            if (weakOwner.TryGetTarget(out GravitasWorldContext? owner)
+                && !owner.IsDisposed
+                && owner.World.IsActive)
+            {
+                context = owner;
+                return true;
+            }
+
+            _worldOwners.Remove(world);
+            return false;
+        }
     }
 
     /// <inheritdoc/>

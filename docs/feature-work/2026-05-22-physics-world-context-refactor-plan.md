@@ -271,13 +271,13 @@ dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release -
 
 **Tasks:**
 
-- [ ] Write tests proving collider IDs are context-local: two contexts can each allocate collider ID `1` without cross-resolution.
-- [ ] Write tests proving `TryGetColliderById` resolves only within its context.
-- [ ] Write tests proving a pair created in one context cannot use colliders from another context.
-- [ ] Add `GravitasPhysicsService` and wire it into `GravitasWorldContext`.
-- [ ] Replace body/collider assimilation calls in `StiffBody` and `LSCollider` with `Context.Physics`.
-- [ ] Keep a temporary internal adapter only if necessary to make incremental compilation possible. Remove the adapter by Phase 8.
-- [ ] Run:
+- [x] Write tests proving collider IDs are context-local: two contexts can each allocate collider ID `1` without cross-resolution.
+- [x] Write tests proving `TryGetColliderById` resolves only within its context.
+- [x] Write tests proving a pair created in one context cannot use colliders from another context.
+- [x] Add `GravitasPhysicsService` and wire it into `GravitasWorldContext`.
+- [x] Replace body/collider assimilation calls in `StiffBody` and `LSCollider` with `Context.Physics`.
+- [x] Keep a temporary internal adapter only if necessary to make incremental compilation possible. Remove the adapter by Phase 8.
+- [x] Run:
 
 ```bash
 dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter FullyQualifiedName~GravitasPhysicsServiceTests
@@ -287,6 +287,8 @@ dotnet build Gravitas.slnx --configuration Release
 **Exit criteria:**
 
 - Body and collider ownership no longer depends on process-wide static registries.
+
+**Status:** Complete for Phase 3. Added `GravitasPhysicsService`, moved body and collider registration through `GravitasWorldContext.Physics`, made collider IDs context-local, verified reset clears the context-local collider table without body-count underflow, and made `CollisionPair` reject colliders from different contexts. The temporary simulation bridge still calls the static collision manager, and cull distribution still uses the static distributor, until the collision step moves in Phase 5. Verified with focused Phase 3 tests plus `Release` and `ReleaseLean` solution build/test runs.
 
 ## Phase 4: Bind Agents To Context Instead Of Raw World
 
