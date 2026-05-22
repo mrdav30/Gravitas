@@ -4,6 +4,7 @@ using Gravitas.Colliders;
 using Gravitas.Raycasting;
 using Gravitas.Support;
 using GridForge.Grids;
+using SwiftCollections;
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -344,9 +345,21 @@ public class StiffBody : IRecordable
         FixedTransform? positionTransform,
         FixedTransform? rotationTransform)
     {
+        SwiftThrowHelper.ThrowIfNull(agent, nameof(agent));
+        SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
+
+        GravitasWorldContext context = agent.Context;
+        SwiftThrowHelper.ThrowIfNull(context, nameof(agent.Context));
+        SwiftThrowHelper.ThrowIfArgument(
+            collider.TryGetBoundContext(out GravitasWorldContext? colliderContext)
+                && !ReferenceEquals(colliderContext, context),
+            nameof(collider),
+            "Agent and collider must be bound to the same context.");
+
         Agent = agent;
         Collider = collider;
-        Context = GravitasWorldContext.RequireContext(agent.World);
+        Context = context;
+        Collider.BindContext(context);
 
         Immovable = Immovable || Collider?.Shape == ColliderType.None;
 

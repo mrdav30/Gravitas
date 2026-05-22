@@ -1,17 +1,29 @@
 using Gravitas.Support;
-using GridForge.Grids;
 
 namespace Gravitas;
 
+/// <summary>
+/// Defines the host-owned object boundary Gravitas needs to bind matter into a simulation context.
+/// </summary>
 public interface IMatterAgent
 {
-    // This is a marker interface for now, but we can add common properties or methods for matter agents here in the future
+    /// <summary>
+    /// Gets the explicit Gravitas runtime context this agent belongs to.
+    /// </summary>
+    GravitasWorldContext Context { get; }
 
-    GridWorld World { get; } // The GridWorld instance that this agent belongs to, used for accessing the physics world and other agents
+    /// <summary>
+    /// Gets the world transform used for collider and visual positioning.
+    /// </summary>
+    FixedTransform Transform { get; }
 
-    FixedTransform Transform { get; } // World transform of the agent, used for positioning the collider and visual representation
+    /// <summary>
+    /// Gets whether this agent is the top-level collider owner in its host hierarchy.
+    /// </summary>
+    bool IsParent { get; }
 
-    bool IsParent { get; } // i.e. in Unity `transform.GetComponentsInParent<LSCollider>().Length == 1`
-
-    bool IsInteracting { get; } // Whether the agent is currently interacting with another agent, used for modifying rotation speed and other interaction-related behaviors
+    /// <summary>
+    /// Gets whether the agent is currently interacting with another agent.
+    /// </summary>
+    bool IsInteracting { get; }
 }

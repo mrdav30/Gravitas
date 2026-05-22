@@ -328,41 +328,6 @@ public sealed class GravitasWorldContext : IDisposable
         return _hooks.RegisterOnFrameRateChanged(owner, order, callback);
     }
 
-    internal static GravitasWorldContext RequireContext(GridWorld world)
-    {
-        SwiftThrowHelper.ThrowIfNull(world, nameof(world));
-        SwiftThrowHelper.ThrowIfTrue(
-            !TryGetContext(world, out GravitasWorldContext? context),
-            nameof(GravitasWorldContext),
-            "GridWorld is not attached to an active GravitasWorldContext.");
-
-        return context!;
-    }
-
-    internal static bool TryGetContext(GridWorld world, out GravitasWorldContext? context)
-    {
-        context = null;
-        if (world == null)
-            return false;
-
-        lock (_worldOwnershipLock)
-        {
-            if (!_worldOwners.TryGetValue(world, out WeakReference<GravitasWorldContext> weakOwner))
-                return false;
-
-            if (weakOwner.TryGetTarget(out GravitasWorldContext? owner)
-                && !owner.IsDisposed
-                && owner.World.IsActive)
-            {
-                context = owner;
-                return true;
-            }
-
-            _worldOwners.Remove(world);
-            return false;
-        }
-    }
-
     /// <inheritdoc/>
     public void Dispose()
     {

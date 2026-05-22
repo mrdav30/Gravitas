@@ -297,9 +297,10 @@ dotnet build Gravitas.slnx --configuration Release
 **Files:**
 
 - Modify: `src/Gravitas/Core/IMatterAgent.cs`
+- Modify: `src/Gravitas/Runtime/GravitasWorldContext.cs`
 - Modify: `src/Gravitas/Core/StiffBody.cs`
 - Modify: `src/Gravitas/Colliders/LSCollider.cs`
-- Modify: `tests/Gravitas.Tests/Support/TestMatterAgent.cs`
+- Create: `tests/Gravitas.Tests/Support/TestMatterAgent.cs`
 - Create: `tests/Gravitas.Tests/Core/MatterAgentContextTests.cs`
 
 **Design:**
@@ -312,11 +313,11 @@ dotnet build Gravitas.slnx --configuration Release
 
 **Tasks:**
 
-- [ ] Write tests that constructing a body/collider with an agent from one context registers with that context.
-- [ ] Write tests that attempting to combine body/collider/agent ownership across contexts fails with a clear exception.
-- [ ] Update `IMatterAgent`.
-- [ ] Update all body and collider world access to `Context.World`.
-- [ ] Run:
+- [x] Write tests that constructing a body/collider with an agent from one context registers with that context.
+- [x] Write tests that attempting to combine body/collider/agent ownership across contexts fails with a clear exception.
+- [x] Update `IMatterAgent`.
+- [x] Update all body and collider world access to `Context.World`.
+- [x] Run:
 
 ```bash
 dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~MatterAgentContextTests|FullyQualifiedName~GravitasPhysicsServiceTests"
@@ -326,6 +327,8 @@ dotnet build Gravitas.slnx --configuration Release
 **Exit criteria:**
 
 - `GridWorld` handling is explicit through `GravitasWorldContext`, and agents cannot accidentally point physics at a world without its owning runtime state.
+
+**Status:** Complete for Phase 4. Replaced `IMatterAgent.World` with `IMatterAgent.Context`, moved body and static-collider binding through `agent.Context`, added shared test-agent support, added context-ownership tests, and removed the now-unused raw `GridWorld`-to-context lookup bridge from `GravitasWorldContext`. Verified with focused Phase 4/Phase 3 regression tests plus `Release` and `ReleaseLean` solution build/test runs.
 
 ## Phase 5: Move Collision Partitioning Into A Context Service
 

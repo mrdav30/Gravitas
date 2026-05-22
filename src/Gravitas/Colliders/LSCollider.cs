@@ -89,7 +89,7 @@ public abstract class LSCollider : IRecordable
     // For dynamic colliders, this is the velocity of the body. For static colliders, this is always zero.
     public Vector3d Velocity => Body?.LinearVelocity ?? Vector3d.Zero;
 
-    public GridWorld? World => _context?.World ?? _agent?.World;
+    public GridWorld? World => _context?.World ?? _agent?.Context.World;
 
     public FixedTransform Transform => Body?.PositionTransform
         ?? _agent?.Transform
@@ -97,8 +97,6 @@ public abstract class LSCollider : IRecordable
 
     private SingleLayer _layer = new();
     public int Layer { get => _layer.LayerIndex; set => _layer.Set(value); }
-
-    public LSCollider? Parent { get; private set; }
 
     //TODO: Account for teleports when culling.
     /// <summary>
@@ -192,6 +190,7 @@ public abstract class LSCollider : IRecordable
     public bool IsParent { get; private set; }
     private SwiftHashSet<int>? _children;
     public int ParentId { get; private set; }
+    public LSCollider? Parent { get; private set; }
 
     #endregion
 
@@ -206,11 +205,13 @@ public abstract class LSCollider : IRecordable
 
     private void InitCore(IMatterAgent agent)
     {
+        SwiftThrowHelper.ThrowIfNull(agent, nameof(agent));
+
         RaycastVersion = 0;
         SpherecastVersion = 0;
 
         _agent = agent;
-        BindContext(GravitasWorldContext.RequireContext(agent.World));
+        BindContext(agent.Context);
         Context.Physics.AssimilateCollider(this);
 
         // This is a top level parent
@@ -553,6 +554,13 @@ public abstract class LSCollider : IRecordable
             nameof(context),
             "Collider is already bound to a different GravitasWorldContext.");
         _context = context;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal bool TryGetBoundContext(out GravitasWorldContext? context)
+    {
+        context = _context;
+        return context != null;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

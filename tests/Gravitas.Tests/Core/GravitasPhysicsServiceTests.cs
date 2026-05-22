@@ -1,8 +1,7 @@
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
-using Gravitas.Support;
-using GridForge.Grids;
+using Gravitas.Tests.Support;
 using System;
 using Xunit;
 
@@ -75,7 +74,7 @@ public sealed class GravitasPhysicsServiceTests
     public void StiffBodyInitialize_ShouldRegisterBodyAndColliderWithContextPhysics()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
-        var agent = new TestMatterAgent(context.World);
+        var agent = new TestMatterAgent(context);
         var collider = new LSSphereCollider();
         var body = new StiffBody(agent, collider)
         {
@@ -112,7 +111,7 @@ public sealed class GravitasPhysicsServiceTests
     public void DessimilateBody_AfterReset_ShouldNotUnderflowBodyCount()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
-        var agent = new TestMatterAgent(context.World);
+        var agent = new TestMatterAgent(context);
         var collider = new LSSphereCollider();
         var body = new StiffBody(agent, collider)
         {
@@ -124,22 +123,5 @@ public sealed class GravitasPhysicsServiceTests
         body.Deactivate();
 
         context.Physics.AssimilatedBodyCount.Should().Be(0);
-    }
-
-    private sealed class TestMatterAgent : IMatterAgent
-    {
-        public TestMatterAgent(GridWorld world)
-        {
-            World = world;
-            Transform = new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One);
-        }
-
-        public GridWorld World { get; }
-
-        public FixedTransform Transform { get; }
-
-        public bool IsParent => true;
-
-        public bool IsInteracting => false;
     }
 }
