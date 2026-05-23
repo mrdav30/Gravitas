@@ -391,7 +391,6 @@ public class StiffBody : IRecordable
         _linearSpeed = Fixed64.Zero;
         _normalForce = Vector3d.Zero;
 
-        // TODO: we should probably check this...not assume true
         _isGrounded = true;
 
         _positionChangedBuffer = true;
@@ -609,13 +608,6 @@ public class StiffBody : IRecordable
         _linearAcceleration = _linearSpeed > Fixed64.Zero
             ? (_linearVelocity - lastVelocity) / deltaTime
             : Vector3d.Zero;
-
-        // TODO: send event for debugging purposes with the change in velocity and the forces that caused it, so we can visualize them in the editor
-        // if (!Debug || _linearDirection == Vector3d.Zero)
-        // {
-        //     Vector3 center = Collider.Center.ToVector3();
-        //     Debug.DrawLine(center, center + _linearDirection.ToVector3(), Color.cyan);
-        // }
     }
 
     private void ApplyAngularTorques()
@@ -790,7 +782,6 @@ public class StiffBody : IRecordable
         if (!CanSetVisualRotation)
             return;
 
-        // TODO: need to multiply by rotation speed to slow rotations...
         Fixed64 targetSpeed = _rotationInterpoleSpeed > Fixed64.Zero
             ? Context.DeltaTime * _rotationInterpoleSpeed * _rotationSpeed
             : Context.ExpectedAccumulation;
@@ -903,10 +894,6 @@ public class StiffBody : IRecordable
         Fixed64 dis = GroundedDistanceRay;
         if (!IsGrounded)
             dis = GroundDownDistanceOnAir;
-
-        // TODO: agnostic implementation
-        // if (Debug)
-        //     Debug.DrawRay(origin, Vector3.down, Color.red);
 
         if (!Context.Circlecasts.CircleCast(origin, GroundCheckSphereRadius, Vector3d.Down, out LSRaycastHit hit, dis, Context.Settings.IgnoreForGroundCheck))
         {

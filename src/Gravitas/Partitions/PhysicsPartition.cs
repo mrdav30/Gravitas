@@ -113,7 +113,6 @@ public class PhysicsPartition : IVoxelPartition
 
     public void RemoveDynamicObject(int item)
     {
-        //todo get rid of this linear search
         if (ContainedDynamicObjects?.Remove(item) == false)
         {
             GravitasLogger.DebugChannel.Info($"Dynamic item not removed - {item}");

@@ -99,7 +99,6 @@ public abstract class LSCollider : IRecordable
     private SingleLayer _layer = new();
     public int Layer { get => _layer.LayerIndex; set => _layer.Set(value); }
 
-    //TODO: Account for teleports when culling.
     /// <summary>
     /// Used to prevent distance culling for very large objects.
     /// </summary>
@@ -171,9 +170,6 @@ public abstract class LSCollider : IRecordable
 
     private SwiftDictionary<int, CollisionPair> _collisionPairs = new();
     private SwiftHashSet<int> _collisionPairHolders = new();
-
-    // TODO: this was for something
-    // public bool IsInCollision { get; private set; }
 
     public uint RaycastVersion { get; set; } = 0;
     public uint SpherecastVersion { get; set; } = 0;
@@ -378,8 +374,6 @@ public abstract class LSCollider : IRecordable
 
     private void CalculateBoundLimits()
     {
-        // TODO: rotation is causing weird issues with Mesh colliders
-        // when rotating the bounding box can sometimes be larger than the actual mesh
         if (Rotation == FixedQuaternion.Identity || Shape == ColliderType.Mesh)
             return;
 

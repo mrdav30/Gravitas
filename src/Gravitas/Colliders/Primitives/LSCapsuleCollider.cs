@@ -12,7 +12,6 @@ public class LSCapsuleCollider : LSCollider
     public override Fixed64 ScaledRadius => _radius * FixedMath.Max(LocalScale.x, LocalScale.z);
 
     // The local top and bottom center points that define the hemispheres of the capsule
-    // TODO: if height or radius changes, adjust these
     public Vector3d HemisphereCenterTop { get; private set; }
 
     public Vector3d HemisphereCenterBottom { get; private set; }

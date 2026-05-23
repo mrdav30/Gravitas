@@ -85,11 +85,6 @@ public class CollisionPair
 
         _doPhysics = ColliderA!.Body != null && ColliderB!.Body != null && (!ColliderA!.IsTrigger || !ColliderB!.IsTrigger);
 
-        // TODO: Space out checks when culled
-        // TODO: The time between collision checks might cause goofy behavior
-        // Maybe use a distance or velocity heuristic for culling instead of time since last collision
-        // It wouldn't be able to replace partitions because of raycasts and fast-moving objects
-        // Let's see if this works well or if something better is needed.
         if (ColliderA!.PreventCulling || ColliderB!.PreventCulling)
         {
             CullCounter = -1;  //  Never cull
@@ -197,9 +192,6 @@ public class CollisionPair
             return;
 
         CollisionResponse.CalculateImpulse(this);
-        // TODO: agnostic implementation
-        // if (_debug)
-        //     Debug.DrawLine(ColliderA.Center.ToVector3(), ColliderA.Center.ToVector3() + ContactPoint.Normal.ToVector3(), Color.red);
     }
 
     public void NotifyCollidersOfContact()

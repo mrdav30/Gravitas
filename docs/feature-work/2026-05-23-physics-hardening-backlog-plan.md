@@ -1,0 +1,337 @@
+# Physics Hardening Backlog Action Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Convert the former inline maintenance notes and current wiki prototype edges into a prioritized alpha-hardening backlog.
+
+**Architecture:** Work from contracts and tests outward: layer/query semantics first, then collider shape state, narrow-phase detection, response, body/grounding behavior, broad-phase culling, and diagnostics. Each phase should leave source comments clean, docs/wiki current, and the affected hot paths covered by tests plus benchmarks where complexity or allocation risk changes.
+
+**Tech Stack:** C# 11, `FixedMathSharp`, `SwiftCollections`, `GridForge`, xUnit v3, BenchmarkDotNet, Chronicler.
+
+---
+
+## Source Context Reviewed
+
+- `src/Gravitas/Core/StiffBody.cs`
+- `src/Gravitas/Support/SingleLayer.cs`
+- `src/Gravitas/Settings/PhysicsSettings.cs`
+- `src/Gravitas/Partitions/PhysicsPartition.cs`
+- `src/Gravitas/Colliders/LSCollider.cs`
+- `src/Gravitas/Colliders/Primitives/LSCapsuleCollider.cs`
+- `src/Gravitas/Colliders/Primitives/LSMeshCollider.cs`
+- `src/Gravitas/Colliders/Support/PhysicsMesh/PhysicsMesh.cs`
+- `src/Gravitas/CollisionHandling/CollisionDetection.cs`
+- `src/Gravitas/CollisionHandling/CollisionPair.cs`
+- `src/Gravitas/CollisionHandling/CollisionResponse.cs`
+- `docs/wiki/OVERVIEW.md`
+- `docs/wiki/QUERY_SERVICES.md`
+- `docs/wiki/HOST_INTEGRATION.md`
+- `docs/wiki/COLLISION_PIPELINE.md`
+- `docs/wiki/RUNTIME_ARCHITECTURE.md`
+- `../FixedMathSharp/src/FixedMathSharp/Geometry/Bounds/BoundingBox.cs`
+- `../FixedMathSharp/src/FixedMathSharp/Geometry/Bounds/BoundingFrustum.cs`
+- `../FixedMathSharp/src/FixedMathSharp/Geometry/Primitives/FixedPlane.cs`
+- `../FixedMathSharp/src/FixedMathSharp/Geometry/Primitives/FixedRay.cs`
+- `../SwiftCollections/src/SwiftCollections.FixedMathSharp/Query/BoundingVolume/SwiftFixedBVH.cs`
+- `../SwiftCollections/src/SwiftCollections.FixedMathSharp/Query/BoundingVolume/Volume/FixedBoundVolume.cs`
+- `../SwiftCollections/src/SwiftCollections.FixedMathSharp/Query/Octree/SwiftFixedOctree.cs`
+- `../SwiftCollections/src/SwiftCollections.FixedMathSharp/Query/SpatialHash/SwiftFixedSpatialHash.cs`
+- `../SwiftCollections/src/SwiftCollections/Observable`
+- `../SwiftCollections/src/SwiftCollections/Query`
+
+## Cleanup Completed While Creating This Plan
+
+- Removed the captured inline maintenance markers from `src/Gravitas`.
+- Removed dead commented scaffolding around `LSCollider.IsInCollision`.
+- Removed stale engine-specific debug draw comment blocks from body, detection, pair, and response code.
+- Updated wiki docs that were stale after the allocation hardening refactor:
+  - `docs/wiki/RUNTIME_ARCHITECTURE.md` no longer lists query hit buffers owned by query services.
+  - `docs/wiki/COLLISION_PIPELINE.md` now describes direct spatial-cell/voxel scanning instead of `GridTracer.GetCoveredVoxels(...)`.
+  - `docs/wiki/OVERVIEW.md` points to the completed allocation plan under `docs/feature-work/done`.
+
+## Downstream Library Notes
+
+- FixedMathSharp v4.0.0 includes deterministic `FixedRay`, `FixedPlane`,
+  `BoundingFrustum`, typed containment/intersection APIs for bounds, expanded
+  `Fixed4x4`, and `Vector4d`. Query and collider refactors should review these
+  before adding custom ray, plane, bounds, or matrix logic.
+- SwiftCollections already provides a FixedMathSharp query module:
+  `SwiftFixedBVH<T>`, `SwiftFixedOctree<T>`, `SwiftFixedSpatialHash<T>`, and
+  `FixedBoundVolume`. Prefer that module before using the generic
+  `SwiftCollections.Query` numerics-backed convenience types or building a
+  Gravitas-local fixed-point adapter.
+- `FixedBoundVolume` is min/max based. Current mesh BVH construction appears to
+  pass center/size-style values in at least one place, so Phase 3 should verify
+  and correct triangle bounds before relying on mesh query results.
+- `SwiftCollections.Observable` may be useful for host-facing diagnostics,
+  editor tooling, or presentation binding. Keep observable notifications out of
+  authoritative simulation hot paths unless deterministic ordering, allocation
+  behavior, and cost are covered by tests and benchmarks.
+
+## Captured Inline Note Inventory
+
+| Area | Captured concern | Priority | Destination |
+| --- | --- | ---: | --- |
+| `SingleLayer` | Type name and semantics blur layer index, bitmask, and host-layer metadata. | P0 | Phase 1 |
+| `PhysicsSettings` | Collision matrix uses `bool[,]`; ground-check mask is legacy and not clearly configured. | P0 | Phase 1 |
+| `docs/wiki/QUERY_SERVICES.md` | Query layer parameter behaves like include mask despite `ignoreLayers` naming. | P0 | Phase 1 |
+| `docs/wiki/QUERY_SERVICES.md` | Horizontal raycasts are rejected by the height-slope path. | P0 | Phase 2 |
+| `docs/wiki/QUERY_SERVICES.md` | Circlecast is a proximity query, not a true swept shape query. | P0 | Phase 2 |
+| `LSCollider` | Mesh rotation and bounds are not physically trustworthy enough. | P0 | Phase 3 |
+| `LSCapsuleCollider` | Capsule derived points need deterministic invalidation/rebuild when size inputs change. | P0 | Phase 3 |
+| `PhysicsMesh` | Mesh input validation is missing. | P0 | Phase 3 |
+| `PhysicsMesh` | Fixed query BVH bounds construction needs min/max verification. | P0 | Phase 3 |
+| `LSMeshCollider` | Mesh collider limits, dynamic support, convexity, and ray overlap need explicit policy. | P0 | Phase 3 and Phase 4 |
+| `docs/wiki/OVERVIEW.md` | Cylinder collider behavior is not implemented. | P1 | Phase 4 |
+| `CollisionDetection` | Detection needs engine-agnostic tests and instrumentation, not Unity debug draw leftovers. | P1 | Phase 4 and Phase 8 |
+| `CollisionResponse` | Response is prototype-level and needs physical solver hardening. | P1 | Phase 5 |
+| `CollisionPair` | Time-spaced culling can miss behavior; culling should account for distance, velocity, and pair state. | P1 | Phase 7 |
+| `LSCollider` | Teleports should invalidate culling assumptions. | P1 | Phase 7 |
+| `PhysicsPartition` | Dynamic-object removal is linear. | P2 | Phase 7 |
+| `StiffBody` | Initialization assumes grounded instead of deriving it from the world. | P1 | Phase 6 |
+| `StiffBody` | Rotation visualization interpolation needs a clear speed/time contract. | P2 | Phase 6 |
+| `StiffBody` | Force/ground debug visualization should become engine-agnostic diagnostics. | P2 | Phase 8 |
+| `PhysicsMesh` | Edge cache may be removable if face normals and on-demand edge normals cover all callers. | P2 | Phase 3 |
+
+## Recommendations
+
+- Treat `SingleLayer` as a design hazard before expanding collision tests. A clean split between layer index and layer mask will make query, collision matrix, and ground-check tests much easier to reason about.
+- Do not begin a broad collision-response rewrite until narrow-phase shape-pair tests exist. Response bugs are difficult to diagnose if contact normals and depths are not already pinned.
+- Split collider responsibilities deliberately. `LSCollider` currently owns identity, host binding, shape state, partition state, pair references, hierarchy filtering, query versions, and events. That is workable for a prototype but too dense for alpha hardening.
+- Keep mesh collider dynamic support behind tests and benchmarks. Mesh work can become the whole project if it is not boxed into validation, limits, bounds, and query/collision behavior.
+- Prefer downstream deterministic primitives before adding local equivalents. FixedMathSharp geometry and `SwiftCollections.FixedMathSharp` query structures should be the default starting point; if a custom Gravitas structure is better, prove it with tests, benchmarks, and a short design note.
+- Use engine-agnostic diagnostics rather than adding editor hooks to runtime classes. Diagnostics should report deterministic values and let hosts decide how to draw them.
+- Maintain `docs/wiki/` with each phase. The wiki is now useful enough that stale pages will mislead the next implementation pass.
+
+## Phase 0: Baseline Test And Benchmark Harness
+
+**Purpose:** Create enough harness coverage to safely refactor collider and collision internals.
+
+**Files:**
+
+- Create: `tests/Gravitas.Tests/Support/PhysicsScenarioBuilder.cs`
+- Create: `tests/Gravitas.Tests/CollisionHandling/CollisionDetectionShapePairTests.cs`
+- Create: `tests/Gravitas.Tests/CollisionHandling/CollisionResponseInvariantTests.cs`
+- Create: `tests/Gravitas.Benchmarks/CollisionHandling/CollisionDetectionBenchmarks.cs`
+- Create: `tests/Gravitas.Benchmarks/CollisionHandling/CollisionResponseBenchmarks.cs`
+- Modify: `tests/Gravitas.Benchmarks/Support/BenchmarkCatalog.cs` only if alias discovery needs new namespace handling.
+
+**Tasks:**
+
+- [ ] Add a scenario builder that creates a `GravitasWorldContext`, grid coverage, `TestMatterAgent`, body, and collider combinations with fixed positions and fixed rotations.
+- [ ] Add detection tests for supported shape pairs using separated, edge-touching, overlapping, degenerate, and rotated cases.
+- [ ] Add response invariant tests for immovable-vs-dynamic, dynamic-vs-dynamic, trigger-vs-solid, restitution zero, and nonzero angular velocity cases.
+- [ ] Add short benchmarks for narrow-phase dispatch and response solver paths using 64 deterministic pairs.
+- [ ] Run `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~CollisionDetectionShapePairTests|FullyQualifiedName~CollisionResponseInvariantTests"`.
+- [ ] Run `dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0 -- collision-detection collision-response --filter "*" -j Short -i --exporters json`.
+
+## Phase 1: Layer And Settings Contract
+
+**Purpose:** Remove ambiguity between layer index, layer mask, collision matrix, and ground-check filtering before those concepts spread into more tests.
+
+**Files:**
+
+- Modify: `src/Gravitas/Support/SingleLayer.cs`
+- Modify: `src/Gravitas/Settings/PhysicsSettings.cs`
+- Modify: `src/Gravitas/Raycasting/GravitasRaycastService.cs`
+- Modify: `src/Gravitas/Raycasting/GravitasCirclecastService.cs`
+- Modify: `src/Gravitas/Core/GravitasPhysicsService.cs`
+- Create: `tests/Gravitas.Tests/Settings/PhysicsLayerTests.cs`
+- Modify: `docs/wiki/QUERY_SERVICES.md`
+- Modify: `docs/wiki/HOST_INTEGRATION.md`
+
+**Tasks:**
+
+- [ ] Introduce explicit types for layer index and layer mask. Recommended names: `PhysicsLayer` for one index and `PhysicsLayerMask` for bitmask queries.
+- [ ] Replace query parameters named `ignoreLayers` with names that match observed behavior: `includedLayers` or `layerMask`.
+- [ ] Replace the legacy hard-coded `IgnoreForGroundCheck` default with a settings-owned mask that defaults to a documented value.
+- [ ] Decide whether the collision matrix remains `bool[,]` or moves to a SwiftCollections-backed bitset. If it changes, add benchmarks for layer lookups during pair filtering.
+- [ ] Add tests for single layer inclusion, multi-layer inclusion, include-all, include-none, collision matrix allow/deny, and ground-check layer filtering.
+- [ ] Update wiki examples to use the new names and semantics.
+- [ ] Run `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~PhysicsLayerTests|FullyQualifiedName~GravitasRaycastServiceTests|FullyQualifiedName~GravitasCirclecastServiceTests|FullyQualifiedName~PhysicsSettingsTests"`.
+
+## Phase 2: Query Semantics
+
+**Purpose:** Make raycasts and circlecasts physically named and deterministic before collision and grounding work depends on them.
+
+**Files:**
+
+- Modify: `src/Gravitas/Raycasting/GravitasRaycastService.cs`
+- Modify: `src/Gravitas/Raycasting/GravitasCirclecastService.cs`
+- Modify: `src/Gravitas/Raycasting/RaycastAxisWorker.cs`
+- Modify: `tests/Gravitas.Tests/Raycasting/GravitasRaycastServiceTests.cs`
+- Modify: `tests/Gravitas.Tests/Raycasting/GravitasCirclecastServiceTests.cs`
+- Modify: `tests/Gravitas.Benchmarks/Raycasting/QueryServiceBenchmarks.cs`
+- Modify: `docs/wiki/QUERY_SERVICES.md`
+
+**Tasks:**
+
+- [ ] Replace the raycast height-slope rejection with deterministic 3D segment handling so horizontal, vertical, and diagonal rays all have defined behavior.
+- [ ] Evaluate `FixedRay` and FixedMathSharp bounds/plane intersection APIs before keeping or expanding custom ray intersection workers.
+- [ ] Add raycast tests for horizontal rays, vertical rays, diagonal rays, starting-inside-collider rays, no-hit rays, multi-hit ordering, and cross-context isolation.
+- [ ] Rename or split the current circlecast behavior. Recommended contract: keep the current proximity scan as an overlap query, then implement true swept sphere or swept circle only after the dimensional model is explicit.
+- [ ] Add tests proving circle/proximity hit distance, normal, point, and ordering.
+- [ ] Keep caller-owned hit buffers and the allocation-free sorter in all all-hit paths.
+- [ ] Re-run the `query-service` allocation benchmark and confirm the all-hit paths remain at 0 B/op in the short smoke run.
+
+## Phase 3: Collider Shape And Runtime State Refactor
+
+**Purpose:** Reduce `LSCollider` responsibility density and make shape-derived state explicit, invalidatable, and testable.
+
+**Files:**
+
+- Modify: `src/Gravitas/Colliders/LSCollider.cs`
+- Modify: `src/Gravitas/Colliders/Primitives/LSCapsuleCollider.cs`
+- Modify: `src/Gravitas/Colliders/Primitives/LSMeshCollider.cs`
+- Modify: `src/Gravitas/Colliders/Support/PhysicsMesh/PhysicsMesh.cs`
+- Create: `tests/Gravitas.Tests/Colliders/ColliderRuntimeStateTests.cs`
+- Create: `tests/Gravitas.Tests/Colliders/PhysicsMeshTests.cs`
+- Create: `tests/Gravitas.Benchmarks/Colliders/ColliderShapeBenchmarks.cs`
+- Modify: `docs/wiki/COLLISION_PIPELINE.md`
+
+**Tasks:**
+
+- [ ] Split shape-derived data from collider identity and partition/pair state. Recommended first step: extract a focused internal shape-state helper before renaming public collider types.
+- [ ] Add tests that changing offset, scale, radius, height, or rotation invalidates and rebuilds bounds, radius, area, and capsule segment data exactly once per simulate step.
+- [ ] Fix capsule height/radius rebuild behavior and add tests for short, tall, scaled, and rotated capsules.
+- [ ] Add `PhysicsMesh` validation for null arrays, triangle-count multiples of three, out-of-range triangle indices, duplicate triangle indices, and degenerate triangles.
+- [ ] Fix or confirm mesh `FixedBoundVolume` construction so triangle BVH entries and query bounds use min/max coordinates, not center/size values.
+- [ ] Reuse FixedMathSharp typed bounds helpers where behavior matches tests, especially for closest point, containment, and intersection checks.
+- [ ] Define mesh collider limits in settings or collider construction. Recommended first policy: fail fast when vertex or triangle counts exceed explicit deterministic limits.
+- [ ] Prove whether `_edges` and cached edge normals are still required. Remove them only after mesh/cuboid and mesh/mesh SAT tests prove equivalent detection behavior.
+- [ ] Fix mesh bounds under rotation or make mesh collider rotation limitations explicit in API and tests.
+- [ ] Run collider tests and the new collider shape benchmark in Release.
+
+## Phase 4: Narrow-Phase Collision Detection Coverage
+
+**Purpose:** Complete and harden shape-pair detection before replacing response behavior.
+
+**Files:**
+
+- Modify: `src/Gravitas/CollisionHandling/CollisionDetection.cs`
+- Modify: `src/Gravitas/CollisionHandling/Support/ContactPoint.cs`
+- Modify: `src/Gravitas/Colliders/Primitives/LSCylinderCollider.cs`
+- Modify: `src/Gravitas/Colliders/Primitives/LSMeshCollider.cs`
+- Modify: `src/Gravitas/Colliders/Support/ColliderType.cs`
+- Modify: `src/Gravitas/Colliders/Support/CollisionType.cs`
+- Modify: `src/Gravitas/Colliders/ColliderSettings.cs`
+- Modify: `tests/Gravitas.Tests/CollisionHandling/CollisionDetectionShapePairTests.cs`
+- Modify: `tests/Gravitas.Benchmarks/CollisionHandling/CollisionDetectionBenchmarks.cs`
+- Modify: `docs/wiki/COLLISION_PIPELINE.md`
+
+**Tasks:**
+
+- [ ] Build a shape-pair matrix that lists every supported, unsupported, and intentionally deferred pair.
+- [ ] Review `FixedPlane`, `FixedPlaneIntersectionType`, and FixedMathSharp typed bounds APIs before adding or rewriting SAT, plane classification, frustum, or mesh support helpers.
+- [ ] Implement cylinder collision behavior or remove cylinder from active dispatch until its tests define support.
+- [ ] Restore mesh ray overlap only after `PhysicsMesh` validation, bounds, and triangle acceleration tests exist.
+- [ ] Decide non-convex mesh policy. Recommended alpha policy: preprocess into convex sub-meshes offline or at initialization, never during per-frame collision.
+- [ ] Add tests for contact normal orientation, penetration depth sign, and point ordering for every supported pair.
+- [ ] Add tests for pair dispatch stability so collider priority changes cannot silently flip contact data.
+- [ ] Run collision detection benchmarks before and after each shape-pair algorithm change.
+
+## Phase 5: Collision Response Solver Redesign
+
+**Purpose:** Replace prototype response behavior with a physically explainable deterministic solver.
+
+**Files:**
+
+- Modify: `src/Gravitas/CollisionHandling/CollisionResponse.cs`
+- Modify: `src/Gravitas/CollisionHandling/CollisionPair.cs`
+- Modify: `src/Gravitas/CollisionHandling/Support/ContactPoint.cs`
+- Modify: `src/Gravitas/Core/StiffBody.cs`
+- Modify: `tests/Gravitas.Tests/CollisionHandling/CollisionResponseInvariantTests.cs`
+- Modify: `tests/Gravitas.Benchmarks/CollisionHandling/CollisionResponseBenchmarks.cs`
+- Modify: `docs/wiki/COLLISION_PIPELINE.md`
+
+**Tasks:**
+
+- [ ] Define units and invariants for mass, inverse mass, inertia tensor, angular velocity, restitution, friction, drag, damping, and penetration correction.
+- [ ] Replace single-point response assumptions with an explicit contact model. Recommended first milestone: stable single-contact solver with room for contact manifolds.
+- [ ] Add tests for conservation expectations, restitution thresholds, immovable body behavior, kinematic body behavior, angular impulse direction, trigger exclusion, and stable resting contact.
+- [ ] Revisit `ContactPoint` depth clamping. Keep it only if tests prove it is a solver invariant rather than a hidden correction.
+- [ ] Add deterministic replay tests that run the same body pair for many fixed frames and compare final state.
+- [ ] Run response benchmarks and add allocation checks for active-pair processing after solver changes.
+
+## Phase 6: Body, Grounding, And Visualization Semantics
+
+**Purpose:** Make body state transitions deterministic and physically named instead of relying on prototype assumptions.
+
+**Files:**
+
+- Modify: `src/Gravitas/Core/StiffBody.cs`
+- Modify: `src/Gravitas/Runtime/GravitasClock.cs`
+- Modify: `src/Gravitas/Settings/PhysicsSettings.cs`
+- Create: `tests/Gravitas.Tests/Core/StiffBodyGroundingTests.cs`
+- Create: `tests/Gravitas.Tests/Core/StiffBodyIntegrationTests.cs`
+- Modify: `docs/wiki/RUNTIME_ARCHITECTURE.md`
+- Modify: `docs/wiki/HOST_INTEGRATION.md`
+
+**Tasks:**
+
+- [ ] Replace grounded-on-initialize with an explicit initial grounding probe or a documented default of not grounded until the first simulation step.
+- [ ] Rework ground checks to use the Phase 1 layer mask contract and the Phase 2 query contract.
+- [ ] Add tests for grounded initialization, airborne initialization, moving platforms, skipped ground checks, slope normals, and layer-filtered ground.
+- [ ] Define visual rotation interpolation as either frame accumulation or speed-limited interpolation. Add tests for both reset accumulation and steady visualize frames.
+- [ ] Add integration tests for force, velocity, drag, friction, torque, angular damping, and rest-state transitions using fixed expected values.
+
+## Phase 7: Broad-Phase Culling And Partition Performance
+
+**Purpose:** Keep collision candidate management low-complexity without hiding missed contacts behind culling.
+
+**Files:**
+
+- Modify: `src/Gravitas/Partitions/PhysicsPartition.cs`
+- Modify: `src/Gravitas/Core/GravitasCollisionService.cs`
+- Modify: `src/Gravitas/CollisionHandling/CollisionPair.cs`
+- Modify: `src/Gravitas/Colliders/LSCollider.cs`
+- Create: `tests/Gravitas.Tests/Partitions/PhysicsPartitionPerformanceShapeTests.cs`
+- Create: `tests/Gravitas.Tests/CollisionHandling/CollisionPairCullingTests.cs`
+- Create: `tests/Gravitas.Benchmarks/Core/PartitionCullingBenchmarks.cs`
+- Modify: `docs/wiki/COLLISION_PIPELINE.md`
+
+**Tasks:**
+
+- [ ] Add tests proving teleporting a collider invalidates pair culling and repartitions before the next collision distribution pass.
+- [ ] Replace dynamic-list removal only if benchmarks show churn is meaningful. Recommended implementation if needed: swap-remove plus an ID-to-index map owned by `PhysicsPartition`.
+- [ ] Benchmark current GridForge partitioning against `SwiftFixedSpatialHash<T>`, `SwiftFixedOctree<T>`, or `SwiftFixedBVH<T>` before replacing broad-phase structures.
+- [ ] Add tests for partition activation/deactivation transitions after dynamic object add/remove churn.
+- [ ] Redesign cull countdown using distance, relative velocity, frame count since collision, and partition movement state.
+- [ ] Add tests for fast-moving objects, large objects, recently collided pairs, and culling-disabled colliders.
+- [ ] Re-run `simulation-allocation`, `collision-partition`, and the new culling benchmark after every data-structure change.
+
+## Phase 8: Engine-Agnostic Diagnostics
+
+**Purpose:** Replace old debug draw intentions with deterministic diagnostic events that hosts can visualize however they want.
+
+**Files:**
+
+- Create: `src/Gravitas/Diagnostics/GravitasDiagnosticEvent.cs`
+- Create: `src/Gravitas/Diagnostics/GravitasDiagnosticSink.cs`
+- Modify: `src/Gravitas/Runtime/GravitasWorldContext.cs`
+- Modify: `src/Gravitas/Core/StiffBody.cs`
+- Modify: `src/Gravitas/CollisionHandling/CollisionDetection.cs`
+- Modify: `src/Gravitas/CollisionHandling/CollisionPair.cs`
+- Modify: `src/Gravitas/CollisionHandling/CollisionResponse.cs`
+- Create: `tests/Gravitas.Tests/Diagnostics/GravitasDiagnosticSinkTests.cs`
+- Create: `docs/wiki/DIAGNOSTICS.md`
+
+**Tasks:**
+
+- [ ] Add a context-owned diagnostic sink that is disabled by default and records deterministic event structs when enabled.
+- [ ] Evaluate `SwiftCollections.Observable` for host-facing diagnostic projection only; keep the core diagnostic sink deterministic, context-owned, and allocation-aware.
+- [ ] Emit force delta, velocity delta, ground probe, ray/query, contact normal, contact point, and response impulse events through the sink.
+- [ ] Ensure diagnostics do not allocate when disabled.
+- [ ] Add tests proving event ordering is deterministic and scoped to one `GravitasWorldContext`.
+- [ ] Add a benchmark that compares disabled diagnostics against the same path with diagnostics enabled.
+- [ ] Document how a Unity or server host can consume diagnostics without linking engine types into Gravitas.
+
+## Verification Gate For Every Phase
+
+- [ ] Run focused tests for the changed subsystem.
+- [ ] Run `dotnet build Gravitas.slnx --configuration Release`.
+- [ ] Run `dotnet test Gravitas.slnx --configuration Release --no-build`.
+- [ ] Run `dotnet build Gravitas.slnx --configuration ReleaseLean` when settings, serialization, package references, or MemoryPack-adjacent code changes.
+- [ ] Run `dotnet test Gravitas.slnx --configuration ReleaseLean --no-build` when the Lean build is touched.
+- [ ] Run the relevant benchmark aliases for any hot-path, data-structure, query, collision, partition, or solver change.
+- [ ] Update `docs/wiki/` and this plan status before marking a phase complete.

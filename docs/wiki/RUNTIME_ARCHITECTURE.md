@@ -24,8 +24,8 @@ pairs, queries, and coroutines remain context-local.
 | --- | --- |
 | `GravitasPhysicsService` | Dynamic body bucket, collider ID table, reusable collider IDs, collision-pair pool, active collision-pair queue, simulation switch. |
 | `GravitasCollisionService` | Active partition bucket, inactive partition pool, duplicate voxel checker, collision distribution version, cull distributor. |
-| `GravitasRaycastService` | Raycast worker, intersection buffer, hit buffer, duplicate collider checker, query version. |
-| `GravitasCirclecastService` | Hit buffer, duplicate collider checker, query version. |
+| `GravitasRaycastService` | Raycast worker, intersection buffer, duplicate voxel checker, duplicate collider checker, query version. |
+| `GravitasCirclecastService` | Duplicate collider checker, query version. |
 | `GravitasCoroutineService` | Active lockstep coroutine bucket and context-bound wait instruction factories. |
 | `GravitasLifecycleHooks` | Ordered callbacks for simulate, late simulate, visualize, late visualize, reset, and frame-rate change. |
 

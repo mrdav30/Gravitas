@@ -33,8 +33,6 @@ namespace Gravitas.Colliders
             ? CalculateFaceNormals()
             : _faceNormals;
 
-        // TODO: can probably tear this out; face normals seem to be sufficient for collision detection
-
         // Holds all the edges that make up a triangle in the form of indices to the vertices array
         // example: _edges[0] = [0,1,1,2,2,0] means that these vertices for the first triangle of the mesh make up the edges _vertices[0]-_vertices[1], _vertices[1]-_vertices[2], _vertices[2]-_vertices[0]
         private int[][] _edges;

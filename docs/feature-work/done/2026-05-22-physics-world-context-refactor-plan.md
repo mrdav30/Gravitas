@@ -1,6 +1,6 @@
 # Gravitas World Context Refactor Battle Plan
 
-> **Archive status:** Completed and moved to `docs/feature-work/done` on 2026-05-22. The only carry-forward item is allocation hardening, tracked separately in [`2026-05-22-runtime-allocation-hardening-plan.md`](../2026-05-22-runtime-allocation-hardening-plan.md).
+> **Archive status:** Completed and moved to `docs/feature-work/done` on 2026-05-22. The only carry-forward item is allocation hardening, tracked separately in [`2026-05-22-runtime-allocation-hardening-plan.md`](2026-05-22-runtime-allocation-hardening-plan.md).
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -561,7 +561,7 @@ dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Rel
 
 - The new architecture has benchmark coverage for lifecycle, registration, partitioning, and query services.
 
-**Status:** Complete for Phase 9. Added deterministic benchmark fixtures plus `WorldContextBenchmarks`, `CollisionPartitionBenchmarks`, and `QueryServiceBenchmarks`, covering owned/attached context lifecycle, grid creation, empty simulation frames, dynamic/static sphere registration and partitioning, partitioned simulation, raycasts, circlecasts, and overlapping-coordinate two-context query isolation. Removed stale copied benchmark helpers from earlier template code and fixed the benchmark runner's `all` command so it selects all benchmarks without an interactive prompt. Captured JSON baseline artifacts via the short in-process benchmark run. Follow-up allocation hardening is tracked in [`2026-05-22-runtime-allocation-hardening-plan.md`](../2026-05-22-runtime-allocation-hardening-plan.md).
+**Status:** Complete for Phase 9. Added deterministic benchmark fixtures plus `WorldContextBenchmarks`, `CollisionPartitionBenchmarks`, and `QueryServiceBenchmarks`, covering owned/attached context lifecycle, grid creation, empty simulation frames, dynamic/static sphere registration and partitioning, partitioned simulation, raycasts, circlecasts, and overlapping-coordinate two-context query isolation. Removed stale copied benchmark helpers from earlier template code and fixed the benchmark runner's `all` command so it selects all benchmarks without an interactive prompt. Captured JSON baseline artifacts via the short in-process benchmark run. Follow-up allocation hardening is tracked in [`2026-05-22-runtime-allocation-hardening-plan.md`](2026-05-22-runtime-allocation-hardening-plan.md).
 
 ## Suggested Commit Sequence
 
@@ -586,7 +586,7 @@ dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Rel
 - Resolved: wait instructions bind to the owning context clock through `GravitasCoroutineService`.
 - Resolved: `PhysicsSettingsSaver` applies settings to an explicit `GravitasWorldContext`.
 - Resolved: `ColliderSettings` no longer exposes mutable public priority dictionaries.
-- Follow-up: benchmarked steady-state query/simulation allocations are tracked separately in [`2026-05-22-runtime-allocation-hardening-plan.md`](../2026-05-22-runtime-allocation-hardening-plan.md).
+- Follow-up: benchmarked steady-state query/simulation allocations are tracked separately in [`2026-05-22-runtime-allocation-hardening-plan.md`](2026-05-22-runtime-allocation-hardening-plan.md).
 
 ## Acceptance Criteria
 

@@ -111,9 +111,6 @@ public static class CollisionDetection
         // Calculate the closest point the AABB to the sphere center
         Vector3d closetPointOnBox = cuboid.ClosestPointOnSurface(pair.ColliderB.Center);
 
-        // TODO: agnostic implemetation for all checks
-        // DebugShapes.DrawDot(closetPointOnBox.ToVector3(), 0.1f, UnityEngine.Color.yellow);
-
         Vector3d penetrationVector = pair.ColliderB.Center - closetPointOnBox;
         // Check if the distance from the closest point to the AABB is less than the capsule radius
         if (penetrationVector.SqrMagnitude > pair.ColliderB.ScaledRadiusSqr)

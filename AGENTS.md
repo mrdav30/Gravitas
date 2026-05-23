@@ -111,11 +111,12 @@ The current runtime uses explicit world-context ownership:
 - `GravitasPhysicsService` owns context-local dynamic body registration,
   collider IDs, collider lookup, collision-pair pooling, active pair processing,
   and physics lifecycle phases.
-- `GravitasCollisionService` maps colliders into GridForge voxels via
-  `GridWorld`, `GridTracer`, `WorldVoxelIndex`, and `PhysicsPartition`, using
-  `SwiftCollections` pools and buckets.
-- `GravitasRaycastService` and `GravitasCirclecastService` own query buffers,
-  candidate gathering, filtering, and result ordering for one context.
+- `GravitasCollisionService` maps colliders into GridForge voxels through
+  `GridWorld` spatial hash and active-grid access, `WorldVoxelIndex`, and
+  `PhysicsPartition`, using `SwiftCollections` pools and duplicate-check sets.
+- `GravitasRaycastService` and `GravitasCirclecastService` own query workers,
+  intersection state, candidate gathering, filtering, and result ordering for
+  one context. All-hit paths should write into caller-owned hit buffers.
 - `GravitasCoroutineService` owns lockstep coroutine state and context-bound
   wait instructions for one context.
 - `StiffBody` owns simulated body state: position, rotation, visual
@@ -230,11 +231,22 @@ changes that cannot be explained, tested, benchmarked, or made deterministic.
 
 The main external packages shape how this project should be changed:
 
-- `FixedMathSharp`: use `Fixed64`, `Vector2d`, `Vector3d`, `FixedQuaternion`,
-  `Fixed3x3`, bounds, and deterministic math helpers.
+- `FixedMathSharp`: use `Fixed64`, `Vector2d`, `Vector3d`, `Vector4d`,
+  `FixedQuaternion`, `Fixed3x3`, `Fixed4x4`, deterministic bounds, and
+  geometry primitives. Before hand-rolling spatial math, review
+  `../FixedMathSharp/src/FixedMathSharp/Geometry`, especially `BoundingBox`,
+  `BoundingArea`, `BoundingSphere`, `BoundingFrustum`, `FixedRay`,
+  `FixedPlane`, `ContainmentType`, and `FixedPlaneIntersectionType`.
 - `SwiftCollections`: prefer `SwiftBucket`, `SwiftList`, `SwiftQueue`,
   `SwiftStack`, `SwiftHashSet`, object pools, and related low-allocation types in
-  runtime or hot-path code.
+  runtime or hot-path code. For broad-phase or spatial-query experiments,
+  review `SwiftCollections.FixedMathSharp` first: `SwiftFixedBVH<T>`,
+  `SwiftFixedOctree<T>`, `SwiftFixedSpatialHash<T>`, and `FixedBoundVolume`.
+  The generic `SwiftCollections.Query` types can be useful, but avoid
+  `System.Numerics`/floating-point query helpers in deterministic runtime paths.
+  Use `SwiftCollections.Observable` for host-facing diagnostics or tooling only,
+  not authoritative per-frame simulation paths unless tests and benchmarks prove
+  the notification cost and ordering are acceptable.
 - `GridForge`: use explicit `GridWorld` ownership, voxel tracing, world voxel
   identities, partitions, and spatial queries. Do not reintroduce hidden
   process-global grid state.
@@ -298,6 +310,9 @@ Optimization rules:
 
 - Preserve physics correctness before reducing allocations.
 - Choose data structures by complexity and access pattern, not habit.
+- Check FixedMathSharp geometry and `SwiftCollections.FixedMathSharp` query
+  structures before creating custom bounds, ray, plane, BVH, octree, or spatial
+  hash code. If existing primitives are skipped, document why they do not fit.
 - For novel hot-path algorithms, capture a benchmark baseline and explain why
   the new approach is measurably better or complexity-safer.
 - Pool only when lifetime and ownership are obvious and testable.

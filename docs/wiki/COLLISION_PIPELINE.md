@@ -13,12 +13,13 @@ When a collider initializes or moves far enough to change snapped voxel bounds,
 `GravitasCollisionService.PartitionObject(...)`:
 
 1. validates that the collider belongs to the service context.
-2. traces covered voxels with `GridTracer.GetCoveredVoxels(...)`.
-3. suppresses duplicate voxel visits with a context-local `SwiftHashSet<int>`.
-4. checks that the voxel position falls within the collider bounds.
-5. rents or reuses a `PhysicsPartition` on the voxel.
-6. stores the collider's `WorldVoxelIndex`.
-7. adds the collider ID to the partition dynamic or static list.
+2. snaps collider bounds to the context `GridWorld` voxel size.
+3. scans the covered spatial grid cells and active `VoxelGrid` instances.
+4. suppresses duplicate grid and voxel visits with context-local sets.
+5. checks that the voxel position falls within the collider bounds.
+6. rents or reuses a `PhysicsPartition` on the voxel.
+7. stores the collider's `WorldVoxelIndex`.
+8. adds the collider ID to the partition dynamic or static list.
 
 `PhysicsPartition` is a GridForge voxel partition payload. It stores
 context-local collider IDs, not collider references. The owner service is

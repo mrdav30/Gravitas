@@ -127,10 +127,6 @@ public class LSMeshCollider : LSCollider
 
     public override bool ColliderOverlapsRay(RaycastAxisWorker worker, ref SwiftList<Vector3d> outputIntersectionPoints)
     {
-        // TODO: For non-convex meshes, perform Convex Decomposition on the non-convex mesh, splitting it into multiple convex sub-meshes (smaller convex shapes)
-        // For each of these sub-meshes, we can use the same collision detection method as in LSMeshConvexCollider
-        //  A well-known algorithm for polygon partitioning is the Ear Clipping method. 
-        // return worker.CheckMeshOverlaps(this, ref outputIntersectionPoints);
         return false;
     }
 }

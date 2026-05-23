@@ -130,8 +130,6 @@ events are emitted from the active-pair queue during `LateSimulate`.
   response, triggers, restitution, and physically coherent units.
 - Query services use context-owned mutable buffers. Treat them as same-thread,
   fixed-loop services unless they are redesigned for reentrancy.
-- The benchmarked steady-state allocation work is tracked in
-  [`2026-05-22-runtime-allocation-hardening-plan.md`](../feature-work/2026-05-22-runtime-allocation-hardening-plan.md).
 
 ## Where To Start In Source
 

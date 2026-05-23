@@ -13,9 +13,6 @@ public partial struct SingleLayer
     [MemoryPackInclude]
     private int m_LayerIndex = 0;
 
-    // TODO: expose configurable layers in the editor and use those instead of hardcoding them here. 
-    // This will require some changes to how we handle layers in general, 
-    // but it will allow for more flexibility and better integration with Unity's layer system if we choose to use it.    
     public SingleLayer(int layerIndex, string? layerName = null)
     {
         m_LayerIndex = layerIndex;
