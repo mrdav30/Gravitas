@@ -33,22 +33,27 @@ Current priorities:
 
 Read these in order before making non-trivial changes:
 
-1. [`README.md`](README.md), while remembering that it is sparse and currently
-   contains placeholder/stale text.
+1. [`README.md`](README.md) for current package orientation.
 2. The stack context, when sibling repositories are available:
    - `../FixedMathSharp/AGENTS.md` and `../FixedMathSharp/README.md`
    - `../SwiftCollections/AGENTS.md` and `../SwiftCollections/README.md`
    - `../GridForge/AGENTS.md` and `../GridForge/README.md`
    - `../Chronicler/AGENTS.md` and `../Chronicler/README.md` when serialization
      behavior is involved.
-3. [`src/Gravitas/Runtime/GravitasWorldContext.cs`](src/Gravitas/Runtime/GravitasWorldContext.cs),
+3. [`docs/wiki/OVERVIEW.md`](docs/wiki/OVERVIEW.md), then the matching wiki
+   page for the area being changed:
+   [`HOST_INTEGRATION.md`](docs/wiki/HOST_INTEGRATION.md),
+   [`RUNTIME_ARCHITECTURE.md`](docs/wiki/RUNTIME_ARCHITECTURE.md),
+   [`COLLISION_PIPELINE.md`](docs/wiki/COLLISION_PIPELINE.md), or
+   [`QUERY_SERVICES.md`](docs/wiki/QUERY_SERVICES.md).
+4. [`src/Gravitas/Runtime/GravitasWorldContext.cs`](src/Gravitas/Runtime/GravitasWorldContext.cs),
    [`src/Gravitas/Core/GravitasPhysicsService.cs`](src/Gravitas/Core/GravitasPhysicsService.cs),
    and [`src/Gravitas/Core/StiffBody.cs`](src/Gravitas/Core/StiffBody.cs).
-4. The relevant source folder under [`src/Gravitas`](src/Gravitas).
-5. The matching test or benchmark area under [`tests`](tests). The unit test
+5. The relevant source folder under [`src/Gravitas`](src/Gravitas).
+6. The matching test or benchmark area under [`tests`](tests). The unit test
    project now has focused runtime/settings coverage, so new behavior usually
    needs matching tests.
-6. [`src/Gravitas/Gravitas.csproj`](src/Gravitas/Gravitas.csproj),
+7. [`src/Gravitas/Gravitas.csproj`](src/Gravitas/Gravitas.csproj),
    [`tests/Gravitas.Tests/Gravitas.Tests.csproj`](tests/Gravitas.Tests/Gravitas.Tests.csproj),
    and [`tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj`](tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj).
 
@@ -61,6 +66,9 @@ Keep these aligned whenever behavior, public API, package shape, or developer
 workflow changes:
 
 - [`README.md`](README.md)
+- [`docs/wiki`](docs/wiki), especially when runtime ownership, host
+  integration, collision behavior, query behavior, lifecycle order, or known
+  prototype limitations change.
 - [`tests/Gravitas.Tests`](tests/Gravitas.Tests)
 - [`tests/Gravitas.Benchmarks`](tests/Gravitas.Benchmarks) when performance
   claims or hot paths change.
@@ -81,6 +89,7 @@ workflow changes:
 | [`src/Gravitas/Support`](src/Gravitas/Support) | Fixed transforms, layers, lifecycle hooks, coroutine scaffolding, transient state helpers | Keep engine-specific assumptions out. |
 | [`tests/Gravitas.Tests`](tests/Gravitas.Tests) | xUnit v3 test project | Contains focused runtime/settings coverage; expand it alongside behavior changes. |
 | [`tests/Gravitas.Benchmarks`](tests/Gravitas.Benchmarks) | BenchmarkDotNet project | Covers context lifecycle, registration/partitioning, simulation, and query services. |
+| [`docs/wiki`](docs/wiki) | Developer-facing architecture and usage notes | Keep current with runtime, host integration, collision, and query changes. |
 | [`docs/feature-work/prototype`](docs/feature-work/prototype) | Historical/prototype Unity-oriented reference code | Useful context, not the source of truth. |
 
 Ignore generated output when reviewing structure:
@@ -194,6 +203,29 @@ Avoid:
 - changes that improve one scenario by making another shape pair or dimension
   mode less physically coherent.
 
+## Experimental Design And Evidence Bar
+
+Gravitas is the core value target of the LSF stack. Much of the current physics
+logic is experimental by design: it follows useful patterns from other physics
+systems where they help, but it should not copy another engine just because that
+engine's approach is familiar.
+
+Thinking outside the box is welcome when the evidence is strong. Novel
+algorithms, data layouts, collision strategies, integration models, or
+partition/query approaches are acceptable if they:
+
+- preserve deterministic replay across repeated runs.
+- have explicit units, invariants, ordering rules, and failure modes.
+- are covered by focused unit tests for correctness and edge cases.
+- are measured against a baseline with benchmarks when they touch hot paths.
+- improve or preserve time complexity, allocation behavior, and physical
+  coherence.
+- are documented in `docs/wiki` or a feature-work plan when the design changes
+  how the system should be understood.
+
+Do not reject a better design just because it is unusual. Do reject clever
+changes that cannot be explained, tested, benchmarked, or made deterministic.
+
 ## External Dependencies
 
 The main external packages shape how this project should be changed:
@@ -266,6 +298,8 @@ Optimization rules:
 
 - Preserve physics correctness before reducing allocations.
 - Choose data structures by complexity and access pattern, not habit.
+- For novel hot-path algorithms, capture a benchmark baseline and explain why
+  the new approach is measurably better or complexity-safer.
 - Pool only when lifetime and ownership are obvious and testable.
 - Clear or return pooled collections on every path, including early exits.
 - Avoid resize spikes in hot paths; if growth is unavoidable, make capacity
@@ -432,8 +466,9 @@ For both humans and AI agents, use this order:
 8. Run the full `Release` suite before closing behavior work.
 9. Run `ReleaseLean` validation when package shape, serialization, or
    MemoryPack-related code changed.
-10. Update `README.md`, benchmark docs, or workflow docs if public behavior or
-    developer workflow changed.
+10. Update `docs/wiki`, `README.md`, benchmark docs, or workflow docs if public
+    behavior, developer workflow, system architecture, collision behavior, or
+    query behavior changed.
 
 ## Guidance For AI Agents
 
@@ -454,6 +489,9 @@ If you are an automated coding agent working in this repository:
   behavior.
 - If you change a public API or behavior, update tests and docs in the same
   pass.
+- If you change runtime architecture, host integration, collision flow, query
+  behavior, lifecycle order, or known prototype limitations, update the matching
+  page under `docs/wiki`.
 - If you add comments, comment the invariant or reason, not the syntax.
 - Do not leave generic helpers buried inside unrelated classes when they can
   stand alone as reusable support types.
