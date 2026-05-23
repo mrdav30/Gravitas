@@ -218,7 +218,7 @@ using Gravitas.Raycasting;
 using Gravitas.Support;
 using SwiftCollections;
 
-SingleLayer includeLayerZero = new(0);
+PhysicsLayerMask layerMask = PhysicsLayerMask.FromLayer(0);
 SwiftList<LSRaycastHit> circleHits = new();
 
 bool hit = context.Raycasts.Raycast(
@@ -226,9 +226,9 @@ bool hit = context.Raycasts.Raycast(
     direction,
     maxDistance,
     out LSRaycastHit rayHit,
-    includeLayerZero);
+    layerMask);
 
-int circleHitCount = context.Circlecasts.CircleCastAll(origin, radius, includeLayerZero, circleHits);
+int circleHitCount = context.Circlecasts.CircleCastAll(origin, radius, layerMask, circleHits);
 for (int i = 0; i < circleHitCount; i++)
 {
     LSRaycastHit circleHit = circleHits[i];
@@ -240,10 +240,15 @@ All-hit query APIs use caller-owned `SwiftList<LSRaycastHit>` buffers. They
 clear the supplied list, write sorted hits into it, and return the count so hot
 query loops do not allocate enumerators or temporary hit lists.
 
-The query parameter is currently named `ignoreLayers`, but the safe observed
-usage is closer to a single-layer include check: `new SingleLayer(layerIndex)`
-includes colliders on that layer. Multi-layer masks and "include all" semantics
-need API hardening before alpha.
+Query APIs use `PhysicsLayerMask` as an include mask. Use
+`PhysicsLayerMask.FromLayer(...)` for a single layer,
+`PhysicsLayerMask.FromLayers(...)` for several layers,
+`PhysicsLayerMask.All` for every layer, and `PhysicsLayerMask.None` when no
+collider should be included.
+
+Ground checks use `context.Settings.GroundCheckLayerMask`. The default preserves
+old prototype example exclusions only as a starting point; hosts should set this
+explicitly for their own layer model before relying on grounding behavior.
 
 ## Deactivation And Disposal
 

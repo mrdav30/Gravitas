@@ -12,7 +12,7 @@ namespace Gravitas.Tests.Raycasting;
 
 public sealed class GravitasCirclecastServiceTests
 {
-    private static readonly SingleLayer IncludeLayerZero = new(0);
+    private static readonly PhysicsLayerMask IncludeLayerZero = PhysicsLayerMask.FromLayer(0);
 
     [Fact]
     public void CircleCastAll_ShouldSuppressDuplicateColliderHitsWithinContext()

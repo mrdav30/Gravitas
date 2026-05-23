@@ -10,6 +10,19 @@ public sealed class PhysicsSettings
 
     public const int MaxLayers = 32;
 
+    /// <summary>
+    /// Legacy prototype example ground-check include mask. Hosts should configure
+    /// this explicitly for their own layer model.
+    /// </summary>
+    public static readonly PhysicsLayerMask DefaultGroundCheckLayerMask = PhysicsLayerMask.Excluding(
+        new PhysicsLayer(8),
+        new PhysicsLayer(10),
+        new PhysicsLayer(7),
+        new PhysicsLayer(11),
+        new PhysicsLayer(12),
+        new PhysicsLayer(17),
+        new PhysicsLayer(15));
+
     public int FrameRate { get; private set; }
 
     public Fixed64 FixedFrameRate => (Fixed64)FrameRate;
@@ -19,12 +32,16 @@ public sealed class PhysicsSettings
 
     public bool PoolingEnabled { get; set; } = true;
 
-    public SingleLayer IgnoreForGroundCheck = ~(1 << 8 | 1 << 10 | 1 << 7 | 1 << 11 | 1 << 12 | 1 << 17 | 1 << 15);
+    public PhysicsLayerMask GroundCheckLayerMask { get; set; }
 
-    public PhysicsSettings(int? frameRate, bool[,]? collisionMatrix)
+    public PhysicsSettings(
+        int? frameRate,
+        bool[,]? collisionMatrix,
+        PhysicsLayerMask? groundCheckLayerMask = null)
     {
         SetFrameRate(frameRate ?? DefaultFrameRate);
         _collisionMatrix = collisionMatrix ?? GetRegisteredCollisionMatrix();
+        GroundCheckLayerMask = groundCheckLayerMask ?? DefaultGroundCheckLayerMask;
     }
 
     public void SetFrameRate(int frameRate)
@@ -45,7 +62,7 @@ public sealed class PhysicsSettings
 
         for (int i = 0; i < MaxLayers; ++i)
         {
-            string? layerName = SingleLayer.LayerToName(i);
+            string? layerName = PhysicsLayer.LayerToName(i);
             // Check if the layer has a name
             if (!string.IsNullOrEmpty(layerName))
                 layersList.Add(layerName);

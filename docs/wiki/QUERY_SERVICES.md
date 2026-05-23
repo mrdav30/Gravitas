@@ -83,15 +83,17 @@ shape query.
 
 ## Layer Mask Semantics
 
-The query parameter is currently named `ignoreLayers`, but the safe observed
-usage is closer to a single-layer include check:
+Queries accept `PhysicsLayerMask layerMask`. This is an include mask:
 
-- `new SingleLayer(layerIndex)` includes colliders on that layer.
-- multi-layer masks and "include all" semantics need API hardening before
-  alpha.
+- `PhysicsLayerMask.FromLayer(layer)` includes one layer.
+- `PhysicsLayerMask.FromLayers(...)` includes several layers.
+- `PhysicsLayerMask.All` includes every layer.
+- `PhysicsLayerMask.None` includes no layers.
 
-For example, `new SingleLayer(0)` includes layer 0. This API should be renamed
-or clarified before alpha so call sites do not encode the wrong expectation.
+Use `PhysicsLayer` for a collider's single collision/filter layer and
+`PhysicsLayerMask` for query or ground-check filters. Keep those concepts
+separate in new APIs so layer identity does not get confused with bitmask
+membership.
 
 ## Reentrancy
 
@@ -120,8 +122,6 @@ null body.
 
 - replace horizontal-ray rejection with deterministic 3D segment handling.
 - make circlecast a precise shape query or rename it as a proximity query.
-- clarify layer mask API naming.
-- clarify `SingleLayer` versus bitmask semantics for queries and ground checks.
 - keep query benchmarks allocation-free as result ordering, filters, and shape
   support expand.
 - add shape-specific query tests for every collider type.

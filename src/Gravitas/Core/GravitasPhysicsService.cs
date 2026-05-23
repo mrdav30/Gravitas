@@ -1,5 +1,6 @@
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
+using Gravitas.Support;
 using SwiftCollections;
 using System;
 using System.Runtime.CompilerServices;
@@ -264,23 +265,19 @@ public sealed class GravitasPhysicsService
         return collider1.IsActive && collider2.IsActive
             && collider1.Shape != ColliderType.None && collider2.Shape != ColliderType.None
             && (collider1.Body != null || collider2.Body != null)
-            && !GetIgnoreLayerCollision(collider1.Layer, collider2.Layer)
+            && !IsLayerCollisionDisabled(collider1.Layer, collider2.Layer)
             && !collider1.IsSibling(collider2);
     }
 
-    internal bool GetIgnoreLayerCollision(int layer1, int layer2)
+    internal bool IsLayerCollisionDisabled(PhysicsLayer layer1, PhysicsLayer layer2)
     {
-        if (layer1 < 0 || layer1 > 31 || layer2 < 0 || layer2 > 31)
-        {
-            GravitasLogger.Channel.Error($"Layers must be between 0 and 31 inclusive.");
-            return false;
-        }
-
         bool[,] matrix = _context.Settings.CollisionMatrix;
-        if (layer1 >= matrix.GetLength(0) || layer2 >= matrix.GetLength(1))
+        int layerIndex1 = layer1.Index;
+        int layerIndex2 = layer2.Index;
+        if (layerIndex1 >= matrix.GetLength(0) || layerIndex2 >= matrix.GetLength(1))
             return false;
 
-        return !matrix[layer1, layer2];
+        return !matrix[layerIndex1, layerIndex2];
     }
 
     internal void PoolForDeactivation(CollisionPair pair)

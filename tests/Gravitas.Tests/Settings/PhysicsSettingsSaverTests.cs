@@ -1,5 +1,6 @@
 using FixedMathSharp;
 using FluentAssertions;
+using Gravitas.Support;
 using Xunit;
 
 namespace Gravitas.Tests.Settings;
@@ -18,7 +19,8 @@ public sealed class PhysicsSettingsSaverTests
             {
                 new MatrixRow { row = new[] { true, false } },
                 new MatrixRow { row = new[] { false, true } }
-            }
+            },
+            GroundCheckLayerMaskBits = PhysicsLayerMask.FromLayer(1).Bits
         };
 
         saver.ApplyTo(contextA);
@@ -30,6 +32,7 @@ public sealed class PhysicsSettingsSaverTests
         contextA.Settings.CollisionMatrix[0, 1].Should().BeFalse();
         contextA.Settings.CollisionMatrix[1, 0].Should().BeFalse();
         contextA.Settings.CollisionMatrix[1, 1].Should().BeTrue();
+        contextA.Settings.GroundCheckLayerMask.Should().Be(PhysicsLayerMask.FromLayer(1));
 
         contextB.Settings.FrameRate.Should().Be(PhysicsSettings.DefaultFrameRate);
         contextB.FrameRate.Should().Be(PhysicsSettings.DefaultFrameRate);

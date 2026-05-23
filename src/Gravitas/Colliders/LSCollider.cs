@@ -96,8 +96,14 @@ public abstract class LSCollider : IRecordable
         ?? _agent?.Transform
         ?? throw new InvalidOperationException("Collider has no body or static transform.");
 
-    private SingleLayer _layer = new();
-    public int Layer { get => _layer.LayerIndex; set => _layer.Set(value); }
+    private PhysicsLayer _layer = new();
+    public PhysicsLayer Layer
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => _layer;
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        set => _layer = value;
+    }
 
     /// <summary>
     /// Used to prevent distance culling for very large objects.

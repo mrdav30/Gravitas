@@ -14,7 +14,7 @@ public sealed class GravitasCirclecastService
     private readonly GravitasWorldContext _context;
     private readonly SwiftHashSet<int> _redundantColliderCheck = new();
 
-    private SingleLayer _currentIgnoreLayer;
+    private PhysicsLayerMask _currentLayerMask;
 
     /// <summary>
     /// Initializes a new circlecast service for the supplied context.
@@ -52,9 +52,9 @@ public sealed class GravitasCirclecastService
         Vector3d position,
         Fixed64 radius,
         out LSRaycastHit raycastHit,
-        SingleLayer ignoreLayers)
+        PhysicsLayerMask layerMask)
     {
-        _currentIgnoreLayer = ignoreLayers;
+        _currentLayerMask = layerMask;
         Version++;
         _redundantColliderCheck.Clear();
 
@@ -96,9 +96,9 @@ public sealed class GravitasCirclecastService
         Vector3d direction,
         out LSRaycastHit raycastHit,
         Fixed64 maxDistance,
-        SingleLayer ignoreLayers)
+        PhysicsLayerMask layerMask)
     {
-        if (CircleCast(position, radius, out LSRaycastHit hitInfo, ignoreLayers))
+        if (CircleCast(position, radius, out LSRaycastHit hitInfo, layerMask))
         {
             Vector3d toHit = hitInfo.Point - position;
             if (toHit.SqrMagnitude <= maxDistance * maxDistance && Vector3d.Dot(toHit.Normal, direction) > Fixed64.Zero)
@@ -118,12 +118,12 @@ public sealed class GravitasCirclecastService
     public int CircleCastAll(
         Vector3d position,
         Fixed64 radius,
-        SingleLayer ignoreLayers,
+        PhysicsLayerMask layerMask,
         SwiftList<LSRaycastHit> results)
     {
         SwiftThrowHelper.ThrowIfNull(results, nameof(results));
 
-        _currentIgnoreLayer = ignoreLayers;
+        _currentLayerMask = layerMask;
         Version++;
 
         results.FastClear();
@@ -237,12 +237,7 @@ public sealed class GravitasCirclecastService
             return false;
 
         LSCollider collider = current!;
-        bool layerMaskExclude = _currentIgnoreLayer >= -1 && (_currentIgnoreLayer & (1 << collider.Layer)) == 0;
-        if (layerMaskExclude)
-            return false;
-
-        bool layerMaskIncludes = _currentIgnoreLayer == -1 || (_currentIgnoreLayer & (1 << collider.Layer)) != 0;
-        if (!layerMaskIncludes
+        if (!_currentLayerMask.Includes(collider.Layer)
             || collider.SpherecastVersion == Version
             || !_redundantColliderCheck.Add(collider.Id))
         {

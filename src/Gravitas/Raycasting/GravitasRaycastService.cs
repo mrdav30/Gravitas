@@ -17,7 +17,7 @@ public sealed class GravitasRaycastService
     private readonly SwiftHashSet<int> _redundantColliderCheck = new();
     private readonly SwiftHashSet<int> _redundantVoxelCheck = new();
 
-    private SingleLayer _currentIgnoreLayer;
+    private PhysicsLayerMask _currentLayerMask;
 
     /// <summary>
     /// Initializes a new raycast service for the supplied context.
@@ -58,9 +58,9 @@ public sealed class GravitasRaycastService
         Vector3d direction,
         Fixed64 maxDistance,
         out LSRaycastHit raycastHit,
-        SingleLayer ignoreLayers)
+        PhysicsLayerMask layerMask)
     {
-        _currentIgnoreLayer = ignoreLayers;
+        _currentLayerMask = layerMask;
 
         Vector3d end = origin + direction * maxDistance;
         Fixed64 startHeight = origin.y;
@@ -89,12 +89,12 @@ public sealed class GravitasRaycastService
     public int RaycastAll(
         Vector3d start3d,
         Vector3d end3d,
-        SingleLayer ignoreLayers,
+        PhysicsLayerMask layerMask,
         SwiftList<LSRaycastHit> results)
     {
         SwiftThrowHelper.ThrowIfNull(results, nameof(results));
 
-        _currentIgnoreLayer = ignoreLayers;
+        _currentLayerMask = layerMask;
         results.FastClear();
 
         Fixed64 startHeight = start3d.y;
@@ -473,12 +473,7 @@ public sealed class GravitasRaycastService
         if (current == null)
             return false;
 
-        bool layerMaskExclude = _currentIgnoreLayer >= -1 && (_currentIgnoreLayer & (1 << current.Layer)) == 0;
-        if (layerMaskExclude)
-            return false;
-
-        bool layerMaskIncludes = _currentIgnoreLayer == -1 || (_currentIgnoreLayer & (1 << current.Layer)) != 0;
-        if (!layerMaskIncludes
+        if (!_currentLayerMask.Includes(current.Layer)
             || current.RaycastVersion == Version
             || !_redundantColliderCheck.Add(current.Id))
         {

@@ -13,7 +13,7 @@
 ## Source Context Reviewed
 
 - `src/Gravitas/Core/StiffBody.cs`
-- `src/Gravitas/Support/SingleLayer.cs`
+- `src/Gravitas/Support/PhysicsLayer.cs`
 - `src/Gravitas/Settings/PhysicsSettings.cs`
 - `src/Gravitas/Partitions/PhysicsPartition.cs`
 - `src/Gravitas/Colliders/LSCollider.cs`
@@ -72,9 +72,9 @@
 
 | Area | Captured concern | Priority | Destination |
 | --- | --- | ---: | --- |
-| `SingleLayer` | Type name and semantics blur layer index, bitmask, and host-layer metadata. | P0 | Phase 1 |
-| `PhysicsSettings` | Collision matrix uses `bool[,]`; ground-check mask is legacy and not clearly configured. | P0 | Phase 1 |
-| `docs/wiki/QUERY_SERVICES.md` | Query layer parameter behaves like include mask despite `ignoreLayers` naming. | P0 | Phase 1 |
+| `SingleLayer` | Type name and semantics blur layer index, bitmask, and host-layer metadata. | P0 | Phase 1 complete |
+| `PhysicsSettings` | Collision matrix uses `bool[,]`; ground-check mask is legacy and not clearly configured. | P0 | Phase 1 complete |
+| `docs/wiki/QUERY_SERVICES.md` | Query layer parameter behaves like include mask despite `ignoreLayers` naming. | P0 | Phase 1 complete |
 | `docs/wiki/QUERY_SERVICES.md` | Horizontal raycasts are rejected by the height-slope path. | P0 | Phase 2 |
 | `docs/wiki/QUERY_SERVICES.md` | Circlecast is a proximity query, not a true swept shape query. | P0 | Phase 2 |
 | `LSCollider` | Mesh rotation and bounds are not physically trustworthy enough. | P0 | Phase 3 |
@@ -96,7 +96,10 @@
 
 ## Recommendations
 
-- Treat `SingleLayer` as a design hazard before expanding collision tests. A clean split between layer index and layer mask will make query, collision matrix, and ground-check tests much easier to reason about.
+- Phase 1 resolved the `SingleLayer` hazard by splitting collider layer identity
+  from query/ground-check bitmask membership. Keep new code on
+  `PhysicsLayer`/`PhysicsLayerMask` rather than reintroducing ambiguous layer
+  helpers.
 - Do not begin a broad collision-response rewrite until narrow-phase shape-pair tests exist. Response bugs are difficult to diagnose if contact normals and depths are not already pinned.
 - Split collider responsibilities deliberately. `LSCollider` currently owns identity, host binding, shape state, partition state, pair references, hierarchy filtering, query versions, and events. That is workable for a prototype but too dense for alpha hardening.
 - Keep mesh collider dynamic support behind tests and benchmarks. Mesh work can become the whole project if it is not boxed into validation, limits, bounds, and query/collision behavior.
@@ -153,7 +156,8 @@
 
 **Files:**
 
-- Modify: `src/Gravitas/Support/SingleLayer.cs`
+- Delete: `src/Gravitas/Support/SingleLayer.cs`
+- Create: `src/Gravitas/Support/PhysicsLayer.cs`
 - Modify: `src/Gravitas/Settings/PhysicsSettings.cs`
 - Modify: `src/Gravitas/Raycasting/GravitasRaycastService.cs`
 - Modify: `src/Gravitas/Raycasting/GravitasCirclecastService.cs`
@@ -164,13 +168,26 @@
 
 **Tasks:**
 
-- [ ] Introduce explicit types for layer index and layer mask. Recommended names: `PhysicsLayer` for one index and `PhysicsLayerMask` for bitmask queries.
-- [ ] Replace query parameters named `ignoreLayers` with names that match observed behavior: `includedLayers` or `layerMask`.
-- [ ] Replace the legacy hard-coded `IgnoreForGroundCheck` default with a settings-owned mask that defaults to a documented value.
-- [ ] Decide whether the collision matrix remains `bool[,]` or moves to a SwiftCollections-backed bitset. If it changes, add benchmarks for layer lookups during pair filtering.
-- [ ] Add tests for single layer inclusion, multi-layer inclusion, include-all, include-none, collision matrix allow/deny, and ground-check layer filtering.
-- [ ] Update wiki examples to use the new names and semantics.
-- [ ] Run `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~PhysicsLayerTests|FullyQualifiedName~GravitasRaycastServiceTests|FullyQualifiedName~GravitasCirclecastServiceTests|FullyQualifiedName~PhysicsSettingsTests"`.
+- [x] Introduce explicit types for layer index and layer mask. Recommended names: `PhysicsLayer` for one index and `PhysicsLayerMask` for bitmask queries.
+- [x] Replace query parameters named `ignoreLayers` with names that match observed behavior: `includedLayers` or `layerMask`.
+- [x] Replace the legacy hard-coded `IgnoreForGroundCheck` default with a settings-owned mask that defaults to a documented value.
+- [x] Decide whether the collision matrix remains `bool[,]` or moves to a SwiftCollections-backed bitset. If it changes, add benchmarks for layer lookups during pair filtering.
+- [x] Add tests for single layer inclusion, multi-layer inclusion, include-all, include-none, collision matrix allow/deny, and ground-check layer filtering.
+- [x] Update wiki examples to use the new names and semantics.
+- [x] Run `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~PhysicsLayerTests|FullyQualifiedName~GravitasRaycastServiceTests|FullyQualifiedName~GravitasCirclecastServiceTests|FullyQualifiedName~PhysicsSettingsTests"`.
+
+**Phase 1 completion notes:**
+
+- Deleted `SingleLayer` and added `PhysicsLayer`/`PhysicsLayerMask` so collider
+  layer identity is separate from include-mask filtering.
+- Query APIs now use `layerMask` names while preserving the existing include
+  semantics.
+- Replaced `IgnoreForGroundCheck` with `PhysicsSettings.GroundCheckLayerMask`.
+  The default keeps the old prototype exclusions only as a documented example;
+  hosts should configure the mask explicitly for their own layer model.
+- Kept the collision matrix as `bool[,]` for now because this phase did not
+  produce evidence that a bitset migration would improve the pair-filtering hot
+  path enough to justify the churn.
 
 ## Phase 2: Query Semantics
 

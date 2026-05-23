@@ -20,6 +20,8 @@ public sealed partial class PhysicsSettingsSaver : DefaultSaver
 
     public MatrixRow[]? CollisionMatrix;
 
+    public int? GroundCheckLayerMaskBits;
+
     [NonSerialized]
     [MemoryPackIgnore]
     private GravitasWorldContext? _context;
@@ -37,7 +39,12 @@ public sealed partial class PhysicsSettingsSaver : DefaultSaver
     }
 
     public PhysicsSettings CreateSettings() =>
-        new(FrameRate, CreateCollisionMatrix());
+        new(
+            FrameRate,
+            CreateCollisionMatrix(),
+            GroundCheckLayerMaskBits.HasValue
+                ? new PhysicsLayerMask(GroundCheckLayerMaskBits.Value)
+                : null);
 
     protected override void OnEarlyApply()
     {

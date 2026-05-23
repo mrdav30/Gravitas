@@ -9,7 +9,7 @@ namespace Gravitas.Benchmarks;
 [MemoryDiagnoser]
 public class QueryServiceBenchmarks
 {
-    private static readonly SingleLayer IncludeLayerZero = new(0);
+    private static readonly PhysicsLayerMask IncludeLayerZero = PhysicsLayerMask.FromLayer(0);
 
     private GravitasWorldContext _context;
     private GravitasWorldContext _overlappingContext;
