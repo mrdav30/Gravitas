@@ -3,8 +3,6 @@ using Gravitas.Colliders;
 using Gravitas.Support;
 using GridForge.Grids;
 using SwiftCollections;
-using System;
-using System.Collections.Generic;
 
 namespace Gravitas.Raycasting;
 
@@ -13,10 +11,7 @@ namespace Gravitas.Raycasting;
 /// </summary>
 public sealed class GravitasCirclecastService
 {
-    private static readonly Comparison<LSRaycastHit> RaycastComparer = (a, b) => a.Distance.CompareTo(b.Distance);
-
     private readonly GravitasWorldContext _context;
-    private readonly SwiftList<LSRaycastHit> _hitColliders = new();
     private readonly SwiftHashSet<int> _redundantColliderCheck = new();
 
     private SingleLayer _currentIgnoreLayer;
@@ -47,7 +42,6 @@ public sealed class GravitasCirclecastService
     public void Reset()
     {
         Version = 0;
-        _hitColliders.FastClear();
         _redundantColliderCheck.Clear();
     }
 
@@ -62,18 +56,17 @@ public sealed class GravitasCirclecastService
     {
         _currentIgnoreLayer = ignoreLayers;
         Version++;
-
-        _hitColliders.FastClear();
         _redundantColliderCheck.Clear();
+
+        LSRaycastHit closestHit = default;
+        Fixed64 closestDist = Fixed64.MAX_VALUE;
+        bool found = false;
 
         Fixed64 xMin = position.x - radius;
         Fixed64 xMax = position.x + radius;
         Fixed64 y = position.y;
         Fixed64 zMin = position.z - radius;
         Fixed64 zMax = position.z + radius;
-
-        LSRaycastHit? closestHit = null;
-        Fixed64 closestDist = Fixed64.MAX_VALUE;
 
         for (Fixed64 x = xMin; x <= xMax; x += _context.World.VoxelSize)
         {
@@ -86,18 +79,12 @@ public sealed class GravitasCirclecastService
                     continue;
                 }
 
-                ProcessPartitionForClosestHit(partition!, position, radius, ref closestHit, ref closestDist);
+                ProcessPartitionForClosestHit(partition!, position, radius, ref found, ref closestHit, ref closestDist);
             }
         }
 
-        if (closestHit.HasValue)
-        {
-            raycastHit = closestHit.Value;
-            return true;
-        }
-
-        raycastHit = default;
-        return false;
+        raycastHit = closestHit;
+        return found;
     }
 
     /// <summary>
@@ -126,17 +113,20 @@ public sealed class GravitasCirclecastService
     }
 
     /// <summary>
-    /// Finds all colliders touching a circle and returns them from closest to farthest away.
+    /// Finds all colliders touching a circle and writes them from closest to farthest into caller-owned storage.
     /// </summary>
-    public IEnumerable<LSRaycastHit> CircleCastAll(
+    public int CircleCastAll(
         Vector3d position,
         Fixed64 radius,
-        SingleLayer ignoreLayers)
+        SingleLayer ignoreLayers,
+        SwiftList<LSRaycastHit> results)
     {
+        SwiftThrowHelper.ThrowIfNull(results, nameof(results));
+
         _currentIgnoreLayer = ignoreLayers;
         Version++;
 
-        _hitColliders.FastClear();
+        results.FastClear();
         _redundantColliderCheck.Clear();
 
         Fixed64 xMin = position.x - radius;
@@ -156,120 +146,122 @@ public sealed class GravitasCirclecastService
                     continue;
                 }
 
-                ProcessPartitionForAllHits(partition!, position, radius);
+                ProcessPartitionForAllHits(partition!, position, radius, results);
             }
         }
 
-        _hitColliders.Sort(Comparer<LSRaycastHit>.Create(RaycastComparer));
-
-        for (int i = 0; i < _hitColliders.Count; i++)
-            yield return _hitColliders[i];
+        RaycastHitSorter.SortByDistance(results);
+        return results.Count;
     }
 
     private void ProcessPartitionForClosestHit(
         PhysicsPartition partition,
         Vector3d position,
         Fixed64 radius,
-        ref LSRaycastHit? closestHit,
+        ref bool found,
+        ref LSRaycastHit closestHit,
         ref Fixed64 closestDist)
     {
-        int dynamicCount = partition.ContainedDynamicObjects?.Count ?? 0;
-        for (int i = dynamicCount - 1; i >= 0; i--)
+        ProcessColliderListForClosestHit(
+            partition.ContainedDynamicObjects,
+            position,
+            radius,
+            ref found,
+            ref closestHit,
+            ref closestDist);
+
+        ProcessColliderListForClosestHit(
+            partition.ContainedStaticObjects,
+            position,
+            radius,
+            ref found,
+            ref closestHit,
+            ref closestDist);
+    }
+
+    private void ProcessColliderListForClosestHit(
+        SwiftList<int>? colliderIds,
+        Vector3d position,
+        Fixed64 radius,
+        ref bool found,
+        ref LSRaycastHit closestHit,
+        ref Fixed64 closestDist)
+    {
+        if (colliderIds == null)
+            return;
+
+        for (int i = colliderIds.Count - 1; i >= 0; i--)
         {
-            int colliderId = partition.ContainedDynamicObjects?[i] ?? -1;
-            if (colliderId == -1)
-                continue;
-
-            if (_context.Physics.TryGetColliderById(colliderId, out LSCollider? current)
-                && CheckCollider(current, position, radius, out LSRaycastHit? hitInfo)
-                && hitInfo!.Value.Distance < closestDist)
+            if (!CheckCollider(colliderIds[i], position, radius, out LSRaycastHit hitInfo)
+                || hitInfo.Distance >= closestDist)
             {
-                closestHit = hitInfo;
-                closestDist = hitInfo.Value.Distance;
-            }
-        }
-
-        int staticCount = partition.ContainedStaticObjects?.Count ?? 0;
-        for (int i = staticCount - 1; i >= 0; i--)
-        {
-            int colliderId = partition.ContainedStaticObjects?[i] ?? -1;
-            if (colliderId == -1)
                 continue;
-
-            if (_context.Physics.TryGetColliderById(colliderId, out LSCollider? current)
-                && CheckCollider(current, position, radius, out LSRaycastHit? hitInfo)
-                && hitInfo!.Value.Distance < closestDist)
-            {
-                closestHit = hitInfo;
-                closestDist = hitInfo.Value.Distance;
             }
+
+            found = true;
+            closestHit = hitInfo;
+            closestDist = hitInfo.Distance;
         }
     }
 
-    private void ProcessPartitionForAllHits(PhysicsPartition partition, Vector3d position, Fixed64 radius)
+    private void ProcessPartitionForAllHits(
+        PhysicsPartition partition,
+        Vector3d position,
+        Fixed64 radius,
+        SwiftList<LSRaycastHit> results)
     {
-        int dynamicCount = partition.ContainedDynamicObjects?.Count ?? 0;
-        for (int i = dynamicCount - 1; i >= 0; i--)
+        ProcessColliderListForAllHits(partition.ContainedDynamicObjects, position, radius, results);
+        ProcessColliderListForAllHits(partition.ContainedStaticObjects, position, radius, results);
+    }
+
+    private void ProcessColliderListForAllHits(
+        SwiftList<int>? colliderIds,
+        Vector3d position,
+        Fixed64 radius,
+        SwiftList<LSRaycastHit> results)
+    {
+        if (colliderIds == null)
+            return;
+
+        for (int i = colliderIds.Count - 1; i >= 0; i--)
         {
-            int colliderId = partition.ContainedDynamicObjects?[i] ?? -1;
-            if (colliderId == -1)
-                continue;
-
-            if (_context.Physics.TryGetColliderById(colliderId, out LSCollider? current)
-                && CheckCollider(current, position, radius, out LSRaycastHit? raycastHit))
-            {
-                _hitColliders.Add(raycastHit!.Value);
-            }
-        }
-
-        int staticCount = partition.ContainedStaticObjects?.Count ?? 0;
-        for (int i = staticCount - 1; i >= 0; i--)
-        {
-            int colliderId = partition.ContainedStaticObjects?[i] ?? -1;
-            if (colliderId == -1)
-                continue;
-
-            if (_context.Physics.TryGetColliderById(colliderId, out LSCollider? current)
-                && CheckCollider(current, position, radius, out LSRaycastHit? raycastHit))
-            {
-                _hitColliders.Add(raycastHit!.Value);
-            }
+            if (CheckCollider(colliderIds[i], position, radius, out LSRaycastHit hitInfo))
+                results.Add(hitInfo);
         }
     }
 
-    private bool CheckCollider(LSCollider? current, Vector3d position, Fixed64 radius, out LSRaycastHit? raycastHit)
+    private bool CheckCollider(int colliderId, Vector3d position, Fixed64 radius, out LSRaycastHit raycastHit)
     {
-        raycastHit = null;
-
-        if (current == null)
+        raycastHit = default;
+        if (!_context.Physics.TryGetColliderById(colliderId, out LSCollider? current))
             return false;
 
-        bool layerMaskExclude = _currentIgnoreLayer >= -1 && (_currentIgnoreLayer & (1 << current.Layer)) == 0;
+        LSCollider collider = current!;
+        bool layerMaskExclude = _currentIgnoreLayer >= -1 && (_currentIgnoreLayer & (1 << collider.Layer)) == 0;
         if (layerMaskExclude)
             return false;
 
-        bool layerMaskIncludes = _currentIgnoreLayer == -1 || (_currentIgnoreLayer & (1 << current.Layer)) != 0;
-        if (layerMaskIncludes
-            && current.SpherecastVersion != Version
-            && _redundantColliderCheck.Add(current.Id))
+        bool layerMaskIncludes = _currentIgnoreLayer == -1 || (_currentIgnoreLayer & (1 << collider.Layer)) != 0;
+        if (!layerMaskIncludes
+            || collider.SpherecastVersion == Version
+            || !_redundantColliderCheck.Add(collider.Id))
         {
-            current.SpherecastVersion = Version;
-            Fixed64 minFastDist = current.ScaledRadius + radius;
-            minFastDist *= minFastDist;
-
-            Vector3d direction = current.Position - position;
-
-            if (direction.SqrMagnitude <= minFastDist)
-            {
-                Vector3d normal = direction.Normal;
-                Vector3d point = position + normal * radius;
-                Fixed64 distance = radius;
-
-                raycastHit = new LSRaycastHit(current, point, normal, distance, direction);
-                return true;
-            }
+            return false;
         }
 
-        return false;
+        collider.SpherecastVersion = Version;
+        Fixed64 minFastDist = collider.ScaledRadius + radius;
+        minFastDist *= minFastDist;
+
+        Vector3d direction = collider.Position - position;
+        if (direction.SqrMagnitude > minFastDist)
+            return false;
+
+        Vector3d normal = direction.Normal;
+        Vector3d point = position + normal * radius;
+        Fixed64 distance = direction.Magnitude;
+
+        raycastHit = new LSRaycastHit(collider, point, normal, distance, direction);
+        return true;
     }
 }

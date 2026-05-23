@@ -2,6 +2,7 @@ using BenchmarkDotNet.Attributes;
 using FixedMathSharp;
 using Gravitas.Raycasting;
 using Gravitas.Support;
+using SwiftCollections;
 
 namespace Gravitas.Benchmarks;
 
@@ -14,6 +15,9 @@ public class QueryServiceBenchmarks
     private GravitasWorldContext _overlappingContext;
     private Vector3d _rayStart;
     private Vector3d _rayEnd;
+    private SwiftList<LSRaycastHit> _raycastHits;
+    private SwiftList<LSRaycastHit> _overlappingRaycastHits;
+    private SwiftList<LSRaycastHit> _circlecastHits;
 
     [Params(64)]
     public int ColliderCount { get; set; }
@@ -31,6 +35,9 @@ public class QueryServiceBenchmarks
 
         _rayStart = new Vector3d((Fixed64)(-2), -Fixed64.Fraction(1, 4), Fixed64.Zero);
         _rayEnd = new Vector3d((Fixed64)(ColliderCount * 2), Fixed64.Fraction(1, 4), Fixed64.Zero);
+        _raycastHits = new SwiftList<LSRaycastHit>(ColliderCount);
+        _overlappingRaycastHits = new SwiftList<LSRaycastHit>(ColliderCount);
+        _circlecastHits = new SwiftList<LSRaycastHit>(ColliderCount);
     }
 
     [GlobalCleanup]
@@ -40,32 +47,36 @@ public class QueryServiceBenchmarks
         _overlappingContext.Dispose();
         _context = null;
         _overlappingContext = null;
+        _raycastHits = null;
+        _overlappingRaycastHits = null;
+        _circlecastHits = null;
     }
 
     [Benchmark]
     public int RaycastAllAcrossPopulatedContext() =>
-        CountRaycastHits(_context);
+        CountRaycastHits(_context, _raycastHits);
 
     [Benchmark]
-    public int CircleCastAllAcrossPopulatedContext()
-    {
-        int count = 0;
-        foreach (LSRaycastHit _ in _context.Circlecasts.CircleCastAll(Vector3d.Zero, (Fixed64)4, IncludeLayerZero))
-            count++;
+    public int CircleCastAllAcrossPopulatedContext() =>
+        _context.Circlecasts.CircleCastAll(Vector3d.Zero, (Fixed64)4, IncludeLayerZero, _circlecastHits);
 
-        return count;
-    }
+    [Benchmark]
+    public bool DirectionalCircleCastAcrossPopulatedContext() =>
+        _context.Circlecasts.CircleCast(
+            Vector3d.Zero,
+            (Fixed64)4,
+            Vector3d.Right,
+            out _,
+            (Fixed64)(ColliderCount * 2),
+            IncludeLayerZero);
 
     [Benchmark]
     public int RaycastAcrossTwoOverlappingContexts() =>
-        CountRaycastHits(_context) + CountRaycastHits(_overlappingContext);
+        CountRaycastHits(_context, _raycastHits)
+        + CountRaycastHits(_overlappingContext, _overlappingRaycastHits);
 
-    private int CountRaycastHits(GravitasWorldContext context)
+    private int CountRaycastHits(GravitasWorldContext context, SwiftList<LSRaycastHit> results)
     {
-        int count = 0;
-        foreach (LSRaycastHit _ in context.Raycasts.RaycastAll(_rayStart, _rayEnd, IncludeLayerZero))
-            count++;
-
-        return count;
+        return context.Raycasts.RaycastAll(_rayStart, _rayEnd, IncludeLayerZero, results);
     }
 }

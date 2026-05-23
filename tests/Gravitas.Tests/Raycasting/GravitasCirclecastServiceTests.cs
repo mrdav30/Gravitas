@@ -5,7 +5,7 @@ using Gravitas.Raycasting;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
 using GridForge.Configuration;
-using System.Linq;
+using SwiftCollections;
 using Xunit;
 
 namespace Gravitas.Tests.Raycasting;
@@ -19,12 +19,12 @@ public sealed class GravitasCirclecastServiceTests
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         LSSphereCollider collider = CreateDynamicSphere(context, Vector3d.Zero);
+        var hits = new SwiftList<LSRaycastHit>();
 
-        LSRaycastHit[] hits = context.Circlecasts
-            .CircleCastAll(Vector3d.Zero, Fixed64.One * 2, IncludeLayerZero)
-            .ToArray();
+        int count = context.Circlecasts
+            .CircleCastAll(Vector3d.Zero, Fixed64.One * 2, IncludeLayerZero, hits);
 
-        hits.Should().ContainSingle();
+        count.Should().Be(1);
         hits[0].Collider.Should().BeSameAs(collider);
     }
 
@@ -35,17 +35,17 @@ public sealed class GravitasCirclecastServiceTests
         using GravitasWorldContext contextB = GravitasWorldContext.CreateOwned();
         LSSphereCollider colliderA = CreateDynamicSphere(contextA, Vector3d.Zero);
         LSSphereCollider colliderB = CreateDynamicSphere(contextB, Vector3d.Zero);
+        var hitsA = new SwiftList<LSRaycastHit>();
+        var hitsB = new SwiftList<LSRaycastHit>();
         colliderA.Id.Should().Be(colliderB.Id);
 
-        LSRaycastHit[] hitsA = contextA.Circlecasts
-            .CircleCastAll(Vector3d.Zero, Fixed64.One * 2, IncludeLayerZero)
-            .ToArray();
-        LSRaycastHit[] hitsB = contextB.Circlecasts
-            .CircleCastAll(Vector3d.Zero, Fixed64.One * 2, IncludeLayerZero)
-            .ToArray();
+        int countA = contextA.Circlecasts
+            .CircleCastAll(Vector3d.Zero, Fixed64.One * 2, IncludeLayerZero, hitsA);
+        int countB = contextB.Circlecasts
+            .CircleCastAll(Vector3d.Zero, Fixed64.One * 2, IncludeLayerZero, hitsB);
 
-        hitsA.Should().ContainSingle();
-        hitsB.Should().ContainSingle();
+        countA.Should().Be(1);
+        countB.Should().Be(1);
         hitsA[0].Collider.Should().BeSameAs(colliderA);
         hitsB[0].Collider.Should().BeSameAs(colliderB);
         contextA.Circlecasts.Version.Should().Be(1);

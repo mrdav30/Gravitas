@@ -1,6 +1,7 @@
 using FixedMathSharp;
 using Gravitas.Colliders;
 using GridForge.Configuration;
+using SwiftCollections;
 using System;
 
 namespace Gravitas.Benchmarks;
@@ -26,10 +27,34 @@ internal static class BenchmarkPhysicsScene
         return context.Physics.AssimilatedBodyCount;
     }
 
+    public static int CreateDynamicSphereGrid(
+        GravitasWorldContext context,
+        int count,
+        SwiftList<StiffBody> bodies)
+    {
+        bodies.FastClear();
+        for (int i = 0; i < count; i++)
+            bodies.Add(CreateDynamicSphere(context, PositionForGridIndex(i)));
+
+        return bodies.Count;
+    }
+
     public static int CreateDynamicSphereLine(GravitasWorldContext context, int count)
     {
         for (int i = 0; i < count; i++)
             CreateDynamicSphere(context, new Vector3d(i * DefaultSpacing, 0, 0));
+
+        return context.Physics.AssimilatedBodyCount;
+    }
+
+    public static int CreateOverlappingDynamicSpherePairs(GravitasWorldContext context, int pairCount)
+    {
+        for (int i = 0; i < pairCount; i++)
+        {
+            Vector3d position = PositionForGridIndex(i);
+            CreateDynamicSphere(context, position);
+            CreateDynamicSphere(context, position + new Vector3d(Fixed64.Half, Fixed64.Zero, Fixed64.Zero));
+        }
 
         return context.Physics.AssimilatedBodyCount;
     }
@@ -57,7 +82,7 @@ internal static class BenchmarkPhysicsScene
         return Math.Max(DefaultGridPadding * 2, maxDimension);
     }
 
-    private static void CreateDynamicSphere(GravitasWorldContext context, Vector3d position)
+    private static StiffBody CreateDynamicSphere(GravitasWorldContext context, Vector3d position)
     {
         var agent = new BenchmarkMatterAgent(context, position);
         var collider = new LSSphereCollider();
@@ -67,6 +92,7 @@ internal static class BenchmarkPhysicsScene
         };
 
         body.Initialize(position, FixedQuaternion.Identity);
+        return body;
     }
 
     private static Vector3d PositionForGridIndex(int index)
@@ -82,7 +108,8 @@ internal static class BenchmarkPhysicsScene
             new Vector3d(-DefaultGridPadding, -DefaultGridPadding, -DefaultGridPadding),
             new Vector3d(extent, DefaultGridPadding, extent));
 
-        if (!context.World.TryAddGrid(configuration, out _))
-            throw new InvalidOperationException("Unable to add benchmark GridForge grid.");
+        SwiftThrowHelper.ThrowIfTrue(
+            !context.World.TryAddGrid(configuration, out _),
+            message: "Unable to add benchmark GridForge grid.");
     }
 }

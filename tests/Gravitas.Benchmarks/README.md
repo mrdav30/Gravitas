@@ -95,9 +95,28 @@ dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Rel
 
 BenchmarkDotNet writes results to `BenchmarkDotNet.Artifacts/results/` by default. Archive the JSON or markdown reports before changing algorithms so regressions can be compared against known results.
 
+## Allocation Smoke Targets
+
+For quick allocation checks around the current steady-state hot paths, run:
+
+```bash
+dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0 -- query-service simulation-allocation --filter "*" -j Short -i --exporters json
+```
+
+The short in-process job is not canonical timing evidence, but it is useful for
+catching obvious managed allocations. These scenarios should report no managed
+allocation in steady state:
+
+| Alias | Covered paths |
+| --- | --- |
+| `query-service` | `RaycastAll`, `CircleCastAll`, directional `CircleCast`, and overlapping-context queries. |
+| `simulation-allocation` | `StiffBody.LateSimulate`, grounding circlecast checks, collision partition distribution, and active-pair late simulation. |
+
 ## CI Guidance
 
-CI should at minimum compile the benchmark project in `Release`:
+CI should at minimum compile the benchmark project in `Release`. The normal
+`Gravitas.slnx` build already includes `tests/Gravitas.Benchmarks`; use this
+direct command when isolating benchmark compilation locally:
 
 ```bash
 dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj --configuration Release

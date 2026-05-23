@@ -216,8 +216,10 @@ Raycasts and circlecasts are context services:
 ```csharp
 using Gravitas.Raycasting;
 using Gravitas.Support;
+using SwiftCollections;
 
 SingleLayer includeLayerZero = new(0);
+SwiftList<LSRaycastHit> circleHits = new();
 
 bool hit = context.Raycasts.Raycast(
     origin,
@@ -226,11 +228,17 @@ bool hit = context.Raycasts.Raycast(
     out LSRaycastHit rayHit,
     includeLayerZero);
 
-foreach (LSRaycastHit circleHit in context.Circlecasts.CircleCastAll(origin, radius, includeLayerZero))
+int circleHitCount = context.Circlecasts.CircleCastAll(origin, radius, includeLayerZero, circleHits);
+for (int i = 0; i < circleHitCount; i++)
 {
+    LSRaycastHit circleHit = circleHits[i];
     // Consume proximity hits.
 }
 ```
+
+All-hit query APIs use caller-owned `SwiftList<LSRaycastHit>` buffers. They
+clear the supplied list, write sorted hits into it, and return the count so hot
+query loops do not allocate enumerators or temporary hit lists.
 
 The query parameter is currently named `ignoreLayers`, but the safe observed
 usage is closer to a single-layer include check: `new SingleLayer(layerIndex)`

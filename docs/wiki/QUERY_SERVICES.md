@@ -10,27 +10,33 @@ appears in multiple voxels.
 `GravitasRaycastService` exposes:
 
 - `Raycast(origin, direction, maxDistance, out hit, layerMask)`
-- `RaycastAll(start, end, layerMask)`
+- `RaycastAll(start, end, layerMask, results)`
 
 The raycast service owns:
 
 - one `RaycastAxisWorker`.
 - a reusable intersection-point buffer.
-- a reusable hit buffer.
 - a duplicate collider checker.
+- a duplicate voxel checker.
 - a context-local query `Version`.
+
+`RaycastAll` clears the caller-provided `SwiftList<LSRaycastHit>`, writes hits
+into it, returns the hit count, and sorts the results by distance using an
+allocation-free in-place sorter. Keep these result buffers owned by the caller or
+context that issues the query.
 
 The candidate path is:
 
 1. prepare the worker for the query line.
-2. trace voxels with `GridTracer.TraceLine(context.World, start, end)`.
-3. inspect each voxel's `PhysicsPartition`.
-4. resolve dynamic and static collider IDs through the context physics service.
-5. filter by layer mask.
-6. skip colliders already checked in this query.
-7. call the collider's `ColliderOverlapsRay(...)`.
-8. build `LSRaycastHit` values from intersection points, normals, and distance.
-9. sort `RaycastAll` results by distance.
+2. snap the query bounds to the context `GridWorld` voxel size.
+3. scan the covered spatial grid cells and active `VoxelGrid` instances.
+4. suppress duplicate voxels and inspect each voxel's `PhysicsPartition`.
+5. resolve dynamic and static collider IDs through the context physics service.
+6. filter by layer mask.
+7. skip colliders already checked in this query.
+8. call the collider's `ColliderOverlapsRay(...)`.
+9. build `LSRaycastHit` values from intersection points, normals, and distance.
+10. sort `RaycastAll` results by distance.
 
 Colliders also store `RaycastVersion`; this is a second duplicate guard scoped
 to the service version.
@@ -47,13 +53,16 @@ hardened.
 
 - `CircleCast(position, radius, out hit, layerMask)`
 - `CircleCast(position, radius, direction, out hit, maxDistance, layerMask)`
-- `CircleCastAll(position, radius, layerMask)`
+- `CircleCastAll(position, radius, layerMask, results)`
 
 The circlecast service owns:
 
-- a reusable hit buffer.
 - a duplicate collider checker.
 - a context-local query `Version`.
+
+`CircleCastAll` clears the caller-provided `SwiftList<LSRaycastHit>`, writes hits
+into it, returns the hit count, and uses the same allocation-free in-place sorter
+as raycasts.
 
 The candidate path is:
 
@@ -67,9 +76,10 @@ The candidate path is:
 8. return the closest hit or all hits sorted by distance.
 
 The directional overload is a post-filter on the closest non-directional hit. It
-is not a full swept-volume query yet. Current circlecast hit distance is also
-set to the query radius, so "closest" behavior should be treated as provisional
-until the query returns a true distance.
+is not a full swept-volume query yet. Current circlecast hit distance is the
+center-to-collider offset magnitude, not a swept time of impact, so the naming
+and semantics should be treated as provisional until this becomes a precise
+shape query.
 
 ## Layer Mask Semantics
 
@@ -112,8 +122,8 @@ null body.
 - make circlecast a precise shape query or rename it as a proximity query.
 - clarify layer mask API naming.
 - clarify `SingleLayer` versus bitmask semantics for queries and ground checks.
-- remove avoidable steady-state allocations from enumerable result paths and
-  sorting helpers.
+- keep query benchmarks allocation-free as result ordering, filters, and shape
+  support expand.
 - add shape-specific query tests for every collider type.
 - decide whether query services remain single-threaded or move to explicit
   query state objects.

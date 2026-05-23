@@ -5,7 +5,7 @@ using Gravitas.Raycasting;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
 using GridForge.Configuration;
-using System.Linq;
+using SwiftCollections;
 using Xunit;
 
 namespace Gravitas.Tests.Raycasting;
@@ -20,12 +20,14 @@ public sealed class GravitasRaycastServiceTests
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         LSSphereCollider near = CreateDynamicSphere(context, new Vector3d(0, 0, 0));
         LSSphereCollider far = CreateDynamicSphere(context, Vector3d.Right * 2);
+        var hits = new SwiftList<LSRaycastHit>();
 
-        LSRaycastHit[] hits = context.Raycasts
-            .RaycastAll(Vector(-2, -Fixed64.Fraction(1, 16), 0), Vector(4, Fixed64.Fraction(1, 8), 0), IncludeLayerZero)
-            .ToArray();
+        int count = context.Raycasts
+            .RaycastAll(Vector(-2, -Fixed64.Fraction(1, 16), 0), Vector(4, Fixed64.Fraction(1, 8), 0), IncludeLayerZero, hits);
 
-        hits.Select(static hit => hit.Collider?.Id).Should().Equal(near.Id, far.Id);
+        count.Should().Be(2);
+        hits[0].Collider?.Id.Should().Be(near.Id);
+        hits[1].Collider?.Id.Should().Be(far.Id);
         hits[0].Distance.Should().BeLessThan(hits[1].Distance);
     }
 
@@ -36,17 +38,17 @@ public sealed class GravitasRaycastServiceTests
         using GravitasWorldContext contextB = GravitasWorldContext.CreateOwned();
         LSSphereCollider colliderA = CreateDynamicSphere(contextA, new Vector3d(0, 0, 0));
         LSSphereCollider colliderB = CreateDynamicSphere(contextB, new Vector3d(0, 0, 0));
+        var hitsA = new SwiftList<LSRaycastHit>();
+        var hitsB = new SwiftList<LSRaycastHit>();
         colliderA.Id.Should().Be(colliderB.Id);
 
-        LSRaycastHit[] hitsA = contextA.Raycasts
-            .RaycastAll(Vector(-2, -Fixed64.Fraction(1, 4), 0), Vector(2, Fixed64.Fraction(1, 4), 0), IncludeLayerZero)
-            .ToArray();
-        LSRaycastHit[] hitsB = contextB.Raycasts
-            .RaycastAll(Vector(-2, -Fixed64.Fraction(1, 4), 0), Vector(2, Fixed64.Fraction(1, 4), 0), IncludeLayerZero)
-            .ToArray();
+        int countA = contextA.Raycasts
+            .RaycastAll(Vector(-2, -Fixed64.Fraction(1, 4), 0), Vector(2, Fixed64.Fraction(1, 4), 0), IncludeLayerZero, hitsA);
+        int countB = contextB.Raycasts
+            .RaycastAll(Vector(-2, -Fixed64.Fraction(1, 4), 0), Vector(2, Fixed64.Fraction(1, 4), 0), IncludeLayerZero, hitsB);
 
-        hitsA.Should().ContainSingle();
-        hitsB.Should().ContainSingle();
+        countA.Should().Be(1);
+        countB.Should().Be(1);
         hitsA[0].Collider.Should().BeSameAs(colliderA);
         hitsB[0].Collider.Should().BeSameAs(colliderB);
         contextA.Raycasts.Version.Should().Be(1);

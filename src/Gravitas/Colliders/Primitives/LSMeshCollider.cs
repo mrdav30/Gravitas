@@ -15,7 +15,7 @@ public class LSMeshCollider : LSCollider
 
     public PhysicsMesh Mesh { get; private set; }
 
-    public LSMeshCollider(Vector3d[] vertices, int[] triangles, BoundingBox bounds)
+    public LSMeshCollider(Vector3d[] vertices, int[] triangles)
     {
         Mesh = new PhysicsMesh(vertices, triangles, Center, Rotation);
 
