@@ -79,6 +79,7 @@
 | `docs/wiki/QUERY_SERVICES.md` | Circlecast is a proximity query, not a true swept shape query. | P0 | Phase 2 |
 | `LSCollider` | Mesh rotation and bounds are not physically trustworthy enough. | P0 | Phase 3 |
 | `LSCapsuleCollider` | Capsule derived points need deterministic invalidation/rebuild when size inputs change. | P0 | Phase 3 |
+| `LSCapsuleCollider` | Default capsule dimensions can produce a zero cylinder-height inertia tensor diagonal. | P0 | Phase 3 |
 | `PhysicsMesh` | Mesh input validation is missing. | P0 | Phase 3 |
 | `PhysicsMesh` | Fixed query BVH bounds construction needs min/max verification. | P0 | Phase 3 |
 | `LSMeshCollider` | Mesh collider limits, dynamic support, convexity, and ray overlap need explicit policy. | P0 | Phase 3 and Phase 4 |
@@ -118,12 +119,33 @@
 
 **Tasks:**
 
-- [ ] Add a scenario builder that creates a `GravitasWorldContext`, grid coverage, `TestMatterAgent`, body, and collider combinations with fixed positions and fixed rotations.
-- [ ] Add detection tests for supported shape pairs using separated, edge-touching, overlapping, degenerate, and rotated cases.
-- [ ] Add response invariant tests for immovable-vs-dynamic, dynamic-vs-dynamic, trigger-vs-solid, restitution zero, and nonzero angular velocity cases.
-- [ ] Add short benchmarks for narrow-phase dispatch and response solver paths using 64 deterministic pairs.
-- [ ] Run `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~CollisionDetectionShapePairTests|FullyQualifiedName~CollisionResponseInvariantTests"`.
-- [ ] Run `dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0 -- collision-detection collision-response --filter "*" -j Short -i --exporters json`.
+- [x] Add a scenario builder that creates a `GravitasWorldContext`, grid coverage, `TestMatterAgent`, body, and collider combinations with fixed positions and fixed rotations.
+- [x] Add detection tests for supported shape pairs using separated, edge-touching, overlapping, degenerate, and rotated cases.
+- [x] Add response invariant tests for immovable-vs-dynamic, dynamic-vs-dynamic, trigger-vs-solid, restitution zero, and nonzero angular velocity cases.
+- [x] Add short benchmarks for narrow-phase dispatch and response solver paths using 64 deterministic pairs.
+- [x] Run `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~CollisionDetectionShapePairTests|FullyQualifiedName~CollisionResponseInvariantTests"`.
+- [x] Run `dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0 -- collision-detection collision-response --filter "*" -j Short -i --exporters json`.
+
+**Phase 0 completion notes:**
+
+- Added `PhysicsScenarioBuilder`, primitive narrow-phase tests, response
+  invariant tests, and `collision-detection`/`collision-response` benchmark
+  aliases.
+- Fixed three small issues exposed by the new baseline:
+  - `StiffBody.Setup(...)` no longer evaluates stateful collider `Shape` before
+    the collider has a transform/body.
+  - capsule/capsule detection now handles degenerate capsule line segments
+    deterministically.
+  - trigger pairs now skip physical response in both pair dispatch and direct
+    `CollisionResponse.CalculateImpulse(...)` calls.
+- Short benchmark smoke on this machine:
+  - `CollisionDetectionBenchmarks.CheckPreparedPrimitivePairs`: 64 pairs,
+    mean about `53.44 us`, allocated about `3 KB`.
+  - `CollisionResponseBenchmarks.CalculateImpulseForPreparedPairs`: 64 pairs,
+    mean about `475.4 us`, allocated about `1.27 KB`.
+- BenchmarkDotNet could not raise process priority in this sandbox and warned
+  that the response benchmark iteration time is short. Treat these as smoke
+  baselines, not canonical performance numbers.
 
 ## Phase 1: Layer And Settings Contract
 
@@ -194,6 +216,7 @@
 - [ ] Split shape-derived data from collider identity and partition/pair state. Recommended first step: extract a focused internal shape-state helper before renaming public collider types.
 - [ ] Add tests that changing offset, scale, radius, height, or rotation invalidates and rebuilds bounds, radius, area, and capsule segment data exactly once per simulate step.
 - [ ] Fix capsule height/radius rebuild behavior and add tests for short, tall, scaled, and rotated capsules.
+- [ ] Fix capsule inertia for degenerate/default dimensions or define a sphere-fallback policy for zero cylinder height.
 - [ ] Add `PhysicsMesh` validation for null arrays, triangle-count multiples of three, out-of-range triangle indices, duplicate triangle indices, and degenerate triangles.
 - [ ] Fix or confirm mesh `FixedBoundVolume` construction so triangle BVH entries and query bounds use min/max coordinates, not center/size values.
 - [ ] Reuse FixedMathSharp typed bounds helpers where behavior matches tests, especially for closest point, containment, and intersection checks.

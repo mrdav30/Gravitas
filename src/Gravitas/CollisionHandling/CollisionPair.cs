@@ -83,7 +83,7 @@ public class CollisionPair
         _fastCollideDistance = ColliderA!.Bounds.Scope.Magnitude + ColliderB!.Bounds.Scope.Magnitude;
         _fastCollideDistance *= _fastCollideDistance;
 
-        _doPhysics = ColliderA!.Body != null && ColliderB!.Body != null && (!ColliderA!.IsTrigger || !ColliderB!.IsTrigger);
+        _doPhysics = ColliderA!.Body != null && ColliderB!.Body != null && !ColliderA!.IsTrigger && !ColliderB!.IsTrigger;
 
         if (ColliderA!.PreventCulling || ColliderB!.PreventCulling)
         {

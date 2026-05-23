@@ -361,8 +361,6 @@ public class StiffBody : IRecordable
         Context = context;
         Collider.BindContext(context);
 
-        Immovable = Immovable || Collider?.Shape == ColliderType.None;
-
         _positionTransform = positionTransform ?? agent.Transform;
         _rotationTransform = rotationTransform ?? agent.Transform;
 

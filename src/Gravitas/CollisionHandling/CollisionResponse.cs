@@ -16,6 +16,9 @@ public static class CollisionResponse
     /// <param name="pair">The collision pair containing the colliders and contact point information.</param>
     public static void CalculateImpulse(CollisionPair pair)
     {
+        if (pair.ColliderA.IsTrigger || pair.ColliderB.IsTrigger)
+            return;
+
         if (pair.ContactPoint.Depth < Fixed64.Zero)
             GravitasLogger.DebugChannel.Info($"Negative penetration depth detected: {pair.ContactPoint.Depth}. This may indicate an issue with the collision detection phase.");
         //return;

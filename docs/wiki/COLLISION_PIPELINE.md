@@ -108,7 +108,7 @@ Current shape support:
 | --- | --- |
 | Sphere/Sphere | center distance against combined radius. |
 | Capsule/Sphere | closest capsule surface point to sphere center. |
-| Capsule/Capsule | closest points between capsule line segments plus radii. |
+| Capsule/Capsule | closest points between capsule line segments plus radii, with a deterministic fallback for degenerate capsule segments. |
 | Cuboid/Sphere | closest cuboid surface point to sphere center. |
 | AABox/Capsule | closest capsule line point to box center, then box surface point. |
 | OBBox/Capsule | separating axes from cuboid/capsule support. |
@@ -140,17 +140,19 @@ hardening.
 
 `CollisionPair.ProcessCollision()` calls `CollisionResponse.CalculateImpulse(...)`
 when detection reports a collision and the pair should perform physics response.
+Pairs with either collider marked as a trigger skip physical response; they can
+still flow through contact notification.
 
-Current response behavior:
+Current non-trigger response behavior:
 
 1. apply position correction based on penetration depth, normal direction,
-   inverse masses, immovable flags, and trigger checks.
+   inverse masses and immovable flags.
 2. compute contact velocity from linear velocity plus angular velocity at the
    contact inputs.
 3. project contact velocity onto the contact normal.
 4. compute an impulse scalar using restitution, inverse mass, and angular
    inertia effect.
-5. apply linear impulse to movable non-trigger bodies.
+5. apply linear impulse to movable bodies.
 6. apply angular impulse when angular forces are allowed.
 
 This is intentionally documented as prototype response. It is a strong candidate
