@@ -3,12 +3,78 @@ using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Tests.Support;
+using System.Collections.Generic;
 using Xunit;
 
 namespace Gravitas.Tests.CollisionHandlingTests;
 
 public sealed class CollisionDetectionShapePairTests
 {
+    [Fact]
+    public void CollisionTypeMatrix_ShouldDeclareSupportedAndDeferredPairs()
+    {
+        var expected = new Dictionary<(ColliderType, ColliderType), CollisionType>
+        {
+            [(ColliderType.Sphere, ColliderType.Sphere)] = CollisionType.Sphere_Sphere,
+            [(ColliderType.Sphere, ColliderType.Capsule)] = CollisionType.Capsule_Sphere,
+            [(ColliderType.Sphere, ColliderType.AABox)] = CollisionType.Cuboid_Sphere,
+            [(ColliderType.Sphere, ColliderType.OBBox)] = CollisionType.Cuboid_Sphere,
+            [(ColliderType.Sphere, ColliderType.Cylinder)] = CollisionType.Cylinder_Sphere,
+            [(ColliderType.Sphere, ColliderType.Mesh)] = CollisionType.Mesh_Sphere,
+            [(ColliderType.Capsule, ColliderType.Sphere)] = CollisionType.Capsule_Sphere,
+            [(ColliderType.Capsule, ColliderType.Capsule)] = CollisionType.Capsule_Capsule,
+            [(ColliderType.Capsule, ColliderType.AABox)] = CollisionType.AABox_Capsule,
+            [(ColliderType.Capsule, ColliderType.OBBox)] = CollisionType.OBBox_Capsule,
+            [(ColliderType.Capsule, ColliderType.Cylinder)] = CollisionType.Cylinder_Capsule,
+            [(ColliderType.Capsule, ColliderType.Mesh)] = CollisionType.Mesh_Capsule,
+            [(ColliderType.AABox, ColliderType.Sphere)] = CollisionType.Cuboid_Sphere,
+            [(ColliderType.AABox, ColliderType.Capsule)] = CollisionType.AABox_Capsule,
+            [(ColliderType.AABox, ColliderType.AABox)] = CollisionType.Cuboid_Cuboid,
+            [(ColliderType.AABox, ColliderType.OBBox)] = CollisionType.Cuboid_Cuboid,
+            [(ColliderType.AABox, ColliderType.Cylinder)] = CollisionType.Cuboid_Cylinder,
+            [(ColliderType.AABox, ColliderType.Mesh)] = CollisionType.Mesh_Cuboid,
+            [(ColliderType.OBBox, ColliderType.Sphere)] = CollisionType.Cuboid_Sphere,
+            [(ColliderType.OBBox, ColliderType.Capsule)] = CollisionType.OBBox_Capsule,
+            [(ColliderType.OBBox, ColliderType.AABox)] = CollisionType.Cuboid_Cuboid,
+            [(ColliderType.OBBox, ColliderType.OBBox)] = CollisionType.Cuboid_Cuboid,
+            [(ColliderType.OBBox, ColliderType.Cylinder)] = CollisionType.Cuboid_Cylinder,
+            [(ColliderType.OBBox, ColliderType.Mesh)] = CollisionType.Mesh_Cuboid,
+            [(ColliderType.Cylinder, ColliderType.Sphere)] = CollisionType.Cylinder_Sphere,
+            [(ColliderType.Cylinder, ColliderType.Capsule)] = CollisionType.Cylinder_Capsule,
+            [(ColliderType.Cylinder, ColliderType.AABox)] = CollisionType.Cuboid_Cylinder,
+            [(ColliderType.Cylinder, ColliderType.OBBox)] = CollisionType.Cuboid_Cylinder,
+            [(ColliderType.Cylinder, ColliderType.Cylinder)] = CollisionType.Cylinder_Cylinder,
+            [(ColliderType.Cylinder, ColliderType.Mesh)] = CollisionType.None,
+            [(ColliderType.Mesh, ColliderType.Sphere)] = CollisionType.Mesh_Sphere,
+            [(ColliderType.Mesh, ColliderType.Capsule)] = CollisionType.Mesh_Capsule,
+            [(ColliderType.Mesh, ColliderType.AABox)] = CollisionType.Mesh_Cuboid,
+            [(ColliderType.Mesh, ColliderType.OBBox)] = CollisionType.Mesh_Cuboid,
+            [(ColliderType.Mesh, ColliderType.Cylinder)] = CollisionType.None,
+            [(ColliderType.Mesh, ColliderType.Mesh)] = CollisionType.Mesh_Mesh
+        };
+        ColliderType[] activeTypes =
+        {
+            ColliderType.Sphere,
+            ColliderType.Capsule,
+            ColliderType.AABox,
+            ColliderType.OBBox,
+            ColliderType.Cylinder,
+            ColliderType.Mesh
+        };
+
+        foreach (ColliderType first in activeTypes)
+        {
+            foreach (ColliderType second in activeTypes)
+            {
+                CollisionType expectedType = expected.TryGetValue((first, second), out CollisionType mapped)
+                    ? mapped
+                    : CollisionType.None;
+
+                ColliderSettings.GetCollisionType(first, second).Should().Be(expectedType);
+            }
+        }
+    }
+
     [Fact]
     public void SphereSphere_ShouldDetectOverlapTouchAndDegenerateCenter()
     {
@@ -109,6 +175,69 @@ public sealed class CollisionDetectionShapePairTests
         AssertCollision(scenario, first.Collider, second.Collider, CollisionType.Cuboid_Cuboid);
     }
 
+    [Fact]
+    public void CylinderSphere_ShouldDetectSideCapRotationAndSeparation()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSCylinderCollider> cylinder = scenario.CreateCylinder(PhysicsScenarioBuilder.Vector(0, 0, 0));
+        ScenarioBody<LSSphereCollider> sideOverlap = scenario.CreateSphere(new Vector3d(Fixed64.Fraction(3, 4), Fixed64.Zero, Fixed64.Zero));
+        ScenarioBody<LSSphereCollider> capOverlap = scenario.CreateSphere(new Vector3d(Fixed64.Zero, Fixed64.Fraction(3, 4), Fixed64.Zero));
+        ScenarioBody<LSCylinderCollider> rotatedCylinder = scenario.CreateCylinder(
+            PhysicsScenarioBuilder.Vector(4, 0, 0),
+            FixedQuaternion.FromEulerAnglesInDegrees(Fixed64.Zero, Fixed64.Zero, (Fixed64)90));
+        ScenarioBody<LSSphereCollider> rotatedCapOverlap = scenario.CreateSphere(new Vector3d((Fixed64)4 + Fixed64.Fraction(3, 4), Fixed64.Zero, Fixed64.Zero));
+        ScenarioBody<LSSphereCollider> separated = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(2, 0, 0));
+
+        AssertCollision(scenario, sideOverlap.Collider, cylinder.Collider, CollisionType.Cylinder_Sphere);
+        AssertCollision(scenario, cylinder.Collider, capOverlap.Collider, CollisionType.Cylinder_Sphere);
+        AssertCollision(scenario, rotatedCylinder.Collider, rotatedCapOverlap.Collider, CollisionType.Cylinder_Sphere);
+        AssertNoCollision(scenario, cylinder.Collider, separated.Collider, CollisionType.Cylinder_Sphere);
+    }
+
+    [Fact]
+    public void CylinderCapsule_ShouldDetectOverlapSeparationAndReversedDispatch()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSCylinderCollider> cylinder = scenario.CreateCylinder(PhysicsScenarioBuilder.Vector(0, 0, 0));
+        ScenarioBody<LSCapsuleCollider> overlapping = scenario.CreateCapsule(new Vector3d(Fixed64.Fraction(3, 4), Fixed64.Zero, Fixed64.Zero));
+        ScenarioBody<LSCapsuleCollider> separated = scenario.CreateCapsule(PhysicsScenarioBuilder.Vector(3, 0, 0));
+
+        AssertCollision(scenario, cylinder.Collider, overlapping.Collider, CollisionType.Cylinder_Capsule);
+        AssertCollision(scenario, overlapping.Collider, cylinder.Collider, CollisionType.Cylinder_Capsule);
+        AssertNoCollision(scenario, cylinder.Collider, separated.Collider, CollisionType.Cylinder_Capsule);
+    }
+
+    [Fact]
+    public void CylinderCylinder_ShouldRespectFlatCapsAndSideOverlap()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSCylinderCollider> cylinder = scenario.CreateCylinder(PhysicsScenarioBuilder.Vector(0, 0, 0));
+        ScenarioBody<LSCylinderCollider> sideOverlap = scenario.CreateCylinder(new Vector3d(Fixed64.Fraction(3, 4), Fixed64.Zero, Fixed64.Zero));
+        ScenarioBody<LSCylinderCollider> capSeparated = scenario.CreateCylinder(new Vector3d(Fixed64.Zero, Fixed64.Fraction(5, 4), Fixed64.Zero));
+        ScenarioBody<LSCylinderCollider> separated = scenario.CreateCylinder(PhysicsScenarioBuilder.Vector(2, 0, 0));
+
+        AssertCollision(scenario, cylinder.Collider, sideOverlap.Collider, CollisionType.Cylinder_Cylinder);
+        AssertNoCollision(scenario, cylinder.Collider, capSeparated.Collider, CollisionType.Cylinder_Cylinder);
+        AssertNoCollision(scenario, cylinder.Collider, separated.Collider, CollisionType.Cylinder_Cylinder);
+    }
+
+    [Fact]
+    public void CuboidCylinder_ShouldDetectAxisAlignedRotatedAndSeparated()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSCuboidCollider> cuboid = scenario.CreateCuboid(PhysicsScenarioBuilder.Vector(0, 0, 0));
+        ScenarioBody<LSCylinderCollider> overlapping = scenario.CreateCylinder(new Vector3d(Fixed64.Fraction(3, 4), Fixed64.Zero, Fixed64.Zero));
+        ScenarioBody<LSCuboidCollider> rotatedCuboid = scenario.CreateCuboid(
+            PhysicsScenarioBuilder.Vector(4, 0, 0),
+            PhysicsScenarioBuilder.Yaw(45));
+        ScenarioBody<LSCylinderCollider> rotatedOverlap = scenario.CreateCylinder(new Vector3d((Fixed64)4 + Fixed64.Half, Fixed64.Zero, Fixed64.Zero));
+        ScenarioBody<LSCylinderCollider> separated = scenario.CreateCylinder(PhysicsScenarioBuilder.Vector(2, 0, 0));
+
+        AssertCollision(scenario, cuboid.Collider, overlapping.Collider, CollisionType.Cuboid_Cylinder);
+        AssertCollision(scenario, rotatedCuboid.Collider, rotatedOverlap.Collider, CollisionType.Cuboid_Cylinder);
+        AssertNoCollision(scenario, cuboid.Collider, separated.Collider, CollisionType.Cuboid_Cylinder);
+    }
+
     private static CollisionPair AssertCollision(
         PhysicsScenarioBuilder scenario,
         LSCollider colliderA,
@@ -120,6 +249,9 @@ public sealed class CollisionDetectionShapePairTests
         pair.CollisionType.Should().Be(expectedType);
         CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
         pair.ContactPoint.Depth.Should().BeGreaterThan(Fixed64.Zero);
+        Vector3d centerDelta = pair.ColliderB.Center - pair.ColliderA.Center;
+        if (centerDelta.SqrMagnitude > Fixed64.Epsilon)
+            Vector3d.Dot(pair.ContactPoint.Normal, centerDelta).Should().BeGreaterThan(Fixed64.Zero);
         return pair;
     }
 

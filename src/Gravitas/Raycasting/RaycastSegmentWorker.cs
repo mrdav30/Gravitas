@@ -78,7 +78,7 @@ public sealed class RaycastSegmentWorker
 
     public bool CheckCapsuleOverlaps(LSCapsuleCollider capsuleCollider, ref SwiftList<Vector3d> outputIntersectionPoints)
     {
-        bool intersects = CheckCylinderOverlaps(capsuleCollider, ref outputIntersectionPoints);
+        bool intersects = CheckCapsuleCylinderOverlaps(capsuleCollider, ref outputIntersectionPoints);
 
         if (!intersects)
         {
@@ -89,32 +89,121 @@ public sealed class RaycastSegmentWorker
         return intersects;
     }
 
-    private bool CheckCylinderOverlaps(LSCapsuleCollider capsuleCollider, ref SwiftList<Vector3d> outputIntersectionPoints)
-    {
-        Vector3d transformedRayOrigin = (_cachedOrigin - capsuleCollider.Center) * capsuleCollider.Rotation.Inverse();
-        Vector3d transformedRayDirection = _segmentDirection * capsuleCollider.Rotation.Inverse();
+    public bool CheckCylinderOverlaps(LSCylinderCollider cylinderCollider, ref SwiftList<Vector3d> outputIntersectionPoints) =>
+        CheckFiniteCylinderOverlaps(
+            cylinderCollider.Center,
+            cylinderCollider.Rotation,
+            cylinderCollider.ScaledRadius,
+            cylinderCollider.ScaledRadiusSqr,
+            cylinderCollider.HalfHeight,
+            includeCaps: true,
+            ref outputIntersectionPoints);
 
-        Fixed64 a = transformedRayDirection.x * transformedRayDirection.x + transformedRayDirection.z * transformedRayDirection.z;
-        if (a == Fixed64.Zero)
+    private bool CheckCapsuleCylinderOverlaps(LSCapsuleCollider capsuleCollider, ref SwiftList<Vector3d> outputIntersectionPoints) =>
+        CheckFiniteCylinderOverlaps(
+            capsuleCollider.Center,
+            capsuleCollider.Rotation,
+            capsuleCollider.ScaledRadius,
+            capsuleCollider.ScaledRadiusSqr,
+            capsuleCollider.CylinderHeight * Fixed64.Half,
+            includeCaps: false,
+            ref outputIntersectionPoints);
+
+    private bool CheckFiniteCylinderOverlaps(
+        Vector3d center,
+        FixedQuaternion rotation,
+        Fixed64 radius,
+        Fixed64 radiusSqr,
+        Fixed64 halfHeight,
+        bool includeCaps,
+        ref SwiftList<Vector3d> outputIntersectionPoints)
+    {
+        FixedQuaternion inverseRotation = rotation.Inverse();
+        Vector3d localOrigin = (_cachedOrigin - center) * inverseRotation;
+
+        if (_segmentLengthSqr == Fixed64.Zero)
+            return CheckPointInsideFiniteCylinder(center, rotation, localOrigin, radiusSqr, halfHeight, ref outputIntersectionPoints);
+
+        Vector3d localDirection = _segmentDirection * inverseRotation;
+        if (PointInsideFiniteCylinder(localOrigin, radiusSqr, halfHeight))
+        {
+            if (_calculateIntersections)
+                outputIntersectionPoints.Add(_cachedOrigin);
+            return true;
+        }
+
+        bool intersects = CheckFiniteCylinderSide(
+            center,
+            rotation,
+            localOrigin,
+            localDirection,
+            radiusSqr,
+            halfHeight,
+            ref outputIntersectionPoints);
+
+        if (includeCaps)
+        {
+            intersects |= CheckFiniteCylinderCap(center, rotation, localOrigin, localDirection, radiusSqr, halfHeight, ref outputIntersectionPoints);
+            intersects |= CheckFiniteCylinderCap(center, rotation, localOrigin, localDirection, radiusSqr, -halfHeight, ref outputIntersectionPoints);
+        }
+
+        return intersects;
+    }
+
+    private bool CheckFiniteCylinderSide(
+        Vector3d center,
+        FixedQuaternion rotation,
+        Vector3d localOrigin,
+        Vector3d localDirection,
+        Fixed64 radiusSqr,
+        Fixed64 halfHeight,
+        ref SwiftList<Vector3d> outputIntersectionPoints)
+    {
+        Fixed64 a = localDirection.x * localDirection.x + localDirection.z * localDirection.z;
+        if (a <= Fixed64.Epsilon)
             return false;
 
-        Fixed64 b = 2 * (transformedRayOrigin.x * transformedRayDirection.x + transformedRayOrigin.z * transformedRayDirection.z);
-        Fixed64 c = transformedRayOrigin.x * transformedRayOrigin.x + transformedRayOrigin.z * transformedRayOrigin.z - capsuleCollider.ScaledRadiusSqr;
-
+        Fixed64 b = 2 * (localOrigin.x * localDirection.x + localOrigin.z * localDirection.z);
+        Fixed64 c = localOrigin.x * localOrigin.x + localOrigin.z * localOrigin.z - radiusSqr;
         Fixed64 discriminant = b * b - 4 * a * c;
         if (discriminant < Fixed64.Zero)
             return false;
 
         Fixed64 root = FixedMath.Sqrt(discriminant);
-        Fixed64 t1 = (-b - root) / (2 * a);
-        Fixed64 t2 = (-b + root) / (2 * a);
+        Fixed64 denominator = 2 * a;
+        Fixed64 t1 = (-b - root) / denominator;
+        Fixed64 t2 = (-b + root) / denominator;
 
-        bool intersects = false;
-        intersects |= TryAddCapsuleCylinderPoint(capsuleCollider, transformedRayOrigin, transformedRayDirection, t1, ref outputIntersectionPoints);
+        bool intersects = TryAddFiniteCylinderPoint(center, rotation, localOrigin, localDirection, t1, halfHeight, ref outputIntersectionPoints);
         if (t2 != t1)
-            intersects |= TryAddCapsuleCylinderPoint(capsuleCollider, transformedRayOrigin, transformedRayDirection, t2, ref outputIntersectionPoints);
+            intersects |= TryAddFiniteCylinderPoint(center, rotation, localOrigin, localDirection, t2, halfHeight, ref outputIntersectionPoints);
 
         return intersects;
+    }
+
+    private bool CheckFiniteCylinderCap(
+        Vector3d center,
+        FixedQuaternion rotation,
+        Vector3d localOrigin,
+        Vector3d localDirection,
+        Fixed64 radiusSqr,
+        Fixed64 capY,
+        ref SwiftList<Vector3d> outputIntersectionPoints)
+    {
+        if (localDirection.y.Abs() <= Fixed64.Epsilon)
+            return false;
+
+        Fixed64 distance = (capY - localOrigin.y) / localDirection.y;
+        if (distance < Fixed64.Zero || distance > _segmentLength)
+            return false;
+
+        Vector3d localPoint = localOrigin + localDirection * distance;
+        Fixed64 radialSqr = localPoint.x * localPoint.x + localPoint.z * localPoint.z;
+        if (radialSqr > radiusSqr + Fixed64.Epsilon)
+            return false;
+
+        AddLocalIntersectionPoint(center, rotation, localPoint, ref outputIntersectionPoints);
+        return true;
     }
 
     public bool CheckAABBoxOverlaps(LSCuboidCollider aabox, ref SwiftList<Vector3d> outputIntersectionPoints) =>
@@ -165,78 +254,63 @@ public sealed class RaycastSegmentWorker
         return true;
     }
 
-    public bool CheckMeshOverlaps(LSMeshCollider collider, ref SwiftList<Vector3d> outputIntersectionPoints)
-    {
-        for (int i = 0; i < collider.Mesh.Vertices.Length; i += 3)
-        {
-            Vector3d[] triangle = new Vector3d[3]
-            {
-                    collider.Mesh.Vertices[i],
-                    collider.Mesh.Vertices[i + 1],
-                    collider.Mesh.Vertices[i + 2]
-            };
-
-            if (RayTriangleIntersection(triangle, out Fixed64 t))
-            {
-                if (_calculateIntersections)
-                    outputIntersectionPoints.Add(_cachedOrigin + (_segmentDirection * t));
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    public bool RayTriangleIntersection(Vector3d[] triangle, out Fixed64 t)
-    {
-        t = Fixed64.Zero;
-
-        Vector3d edge1Displacement = triangle[1] - triangle[0];
-        Vector3d edge2Displacement = triangle[2] - triangle[1];
-
-        Vector3d directionCrossEdge2 = Vector3d.Cross(_segmentDirection, edge2Displacement);
-        Fixed64 determinant = Vector3d.Dot(edge1Displacement, directionCrossEdge2);
-
-        if (determinant > -Fixed64.Epsilon && determinant < Fixed64.Epsilon)
-            return false;
-
-        Fixed64 invDeterminant = Fixed64.One / determinant;
-
-        Vector3d originDifference = _cachedOrigin - triangle[0];
-        Fixed64 u = Vector3d.Dot(originDifference, directionCrossEdge2) * invDeterminant;
-
-        if (u < Fixed64.Zero || u > Fixed64.One)
-            return false;
-
-        Vector3d originDifferenceCrossEdge1 = Vector3d.Cross(originDifference, edge1Displacement);
-        Fixed64 v = Vector3d.Dot(_segmentDirection, originDifferenceCrossEdge1) * invDeterminant;
-
-        if (v < Fixed64.Zero || u + v > Fixed64.One)
-            return false;
-
-        t = Vector3d.Dot(edge2Displacement, originDifferenceCrossEdge1) * invDeterminant;
-
-        return t > Fixed64.Epsilon && t <= _segmentLength;
-    }
-
-    private bool TryAddCapsuleCylinderPoint(
-        LSCapsuleCollider capsuleCollider,
-        Vector3d transformedRayOrigin,
-        Vector3d transformedRayDirection,
+    private bool TryAddFiniteCylinderPoint(
+        Vector3d center,
+        FixedQuaternion rotation,
+        Vector3d localOrigin,
+        Vector3d localDirection,
         Fixed64 distance,
+        Fixed64 halfHeight,
         ref SwiftList<Vector3d> outputIntersectionPoints)
     {
         if (distance < Fixed64.Zero || distance > _segmentLength)
             return false;
 
-        Vector3d point = transformedRayOrigin + transformedRayDirection * distance;
-        if (point.y < -capsuleCollider.Bounds.Scope.y || point.y > capsuleCollider.Bounds.Scope.y)
+        Vector3d localPoint = localOrigin + localDirection * distance;
+        if (localPoint.y < -halfHeight || localPoint.y > halfHeight)
             return false;
 
-        if (_calculateIntersections)
-            outputIntersectionPoints.Add(capsuleCollider.Center + point);
-
+        AddLocalIntersectionPoint(center, rotation, localPoint, ref outputIntersectionPoints);
         return true;
+    }
+
+    private bool CheckPointInsideFiniteCylinder(
+        Vector3d center,
+        FixedQuaternion rotation,
+        Vector3d localPoint,
+        Fixed64 radiusSqr,
+        Fixed64 halfHeight,
+        ref SwiftList<Vector3d> outputIntersectionPoints)
+    {
+        if (!PointInsideFiniteCylinder(localPoint, radiusSqr, halfHeight))
+            return false;
+
+        AddLocalIntersectionPoint(center, rotation, localPoint, ref outputIntersectionPoints);
+        return true;
+    }
+
+    private static bool PointInsideFiniteCylinder(Vector3d localPoint, Fixed64 radiusSqr, Fixed64 halfHeight) =>
+        localPoint.y >= -halfHeight
+        && localPoint.y <= halfHeight
+        && localPoint.x * localPoint.x + localPoint.z * localPoint.z <= radiusSqr;
+
+    private void AddLocalIntersectionPoint(
+        Vector3d center,
+        FixedQuaternion rotation,
+        Vector3d localPoint,
+        ref SwiftList<Vector3d> outputIntersectionPoints)
+    {
+        if (!_calculateIntersections)
+            return;
+
+        Vector3d worldPoint = center + rotation * localPoint;
+        for (int i = 0; i < outputIntersectionPoints.Count; i++)
+        {
+            if (Vector3d.SqrDistance(outputIntersectionPoints[i], worldPoint) <= Fixed64.Epsilon)
+                return;
+        }
+
+        outputIntersectionPoints.Add(worldPoint);
     }
 
     private bool CheckPointInsideSphere(

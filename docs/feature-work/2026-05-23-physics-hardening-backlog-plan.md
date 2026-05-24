@@ -311,20 +311,56 @@
 - Modify: `src/Gravitas/Colliders/Support/ColliderType.cs`
 - Modify: `src/Gravitas/Colliders/Support/CollisionType.cs`
 - Modify: `src/Gravitas/Colliders/ColliderSettings.cs`
+- Modify: `src/Gravitas/Support/FixedTransform.cs`
 - Modify: `tests/Gravitas.Tests/CollisionHandling/CollisionDetectionShapePairTests.cs`
+- Modify: `tests/Gravitas.Tests/Raycasting/GravitasRaycastServiceTests.cs`
+- Create: `tests/Gravitas.Tests/Support/FixedTransformTests.cs`
 - Modify: `tests/Gravitas.Benchmarks/CollisionHandling/CollisionDetectionBenchmarks.cs`
 - Modify: `docs/wiki/COLLISION_PIPELINE.md`
 
 **Tasks:**
 
-- [ ] Build a shape-pair matrix that lists every supported, unsupported, and intentionally deferred pair.
-- [ ] Review `FixedPlane`, `FixedPlaneIntersectionType`, and FixedMathSharp typed bounds APIs before adding or rewriting SAT, plane classification, frustum, or mesh support helpers.
-- [ ] Implement cylinder collision behavior or remove cylinder from active dispatch until its tests define support.
-- [ ] Restore mesh ray overlap only after `PhysicsMesh` validation, bounds, and triangle acceleration tests exist.
-- [ ] Decide non-convex mesh policy. Recommended alpha policy: preprocess into convex sub-meshes offline or at initialization, never during per-frame collision.
-- [ ] Add tests for contact normal orientation, penetration depth sign, and point ordering for every supported pair.
-- [ ] Add tests for pair dispatch stability so collider priority changes cannot silently flip contact data.
-- [ ] Run collision detection benchmarks before and after each shape-pair algorithm change.
+- [x] Build a shape-pair matrix that lists every supported, unsupported, and intentionally deferred pair.
+- [x] Review `FixedPlane`, `FixedPlaneIntersectionType`, and FixedMathSharp typed bounds APIs before adding or rewriting SAT, plane classification, frustum, or mesh support helpers.
+- [x] Implement cylinder collision behavior or remove cylinder from active dispatch until its tests define support.
+- [x] Restore mesh ray overlap only after `PhysicsMesh` validation, bounds, and triangle acceleration tests exist.
+- [x] Decide non-convex mesh policy. Recommended alpha policy: preprocess into convex sub-meshes offline or at initialization, never during per-frame collision.
+- [x] Add tests for contact normal orientation, penetration depth sign, and point ordering for supported primitive pairs, with mesh contact hardening called out as deferred policy work.
+- [x] Add tests for pair dispatch stability so collider priority changes cannot silently flip contact data.
+- [x] Run collision detection benchmarks before and after each shape-pair algorithm change.
+
+**Phase 4 completion notes:**
+
+- Added an explicit shape-pair matrix in tests and docs. `Cylinder/Mesh`
+  remains intentionally deferred instead of being exposed through an untested
+  compatibility path.
+- Reviewed FixedMathSharp deterministic geometry primitives before extending
+  local SAT helpers. Phase 4 kept direct fixed-point projection helpers because
+  the new cylinder support needs finite capped-cylinder projections, pair-order
+  contact data, and caller-owned hot-path behavior.
+- Implemented `LSCylinderCollider` as a finite flat-capped cylinder with shape
+  rebuild state, cap centers, axis segment, surface area, frontal area, solid
+  cylinder inertia, closest-surface, surface-normal, and ray segment overlap.
+- Added cylinder narrow-phase support for cylinder/sphere, cylinder/capsule,
+  cylinder/cylinder, and cuboid/cylinder. Cylinder/capsule, cylinder/cylinder,
+  and cuboid/cylinder use projection tests that preserve flat cap separation.
+- Hardened older primitive contact normals that could return zero or flipped
+  normals when the tested point was already on or inside another shape.
+- Fixed `FixedTransform.LossyScale` to use basis-vector scale extraction so
+  rotated transforms do not collapse collider shape state by reading near-zero
+  matrix diagonals.
+- Removed the dormant mesh ray helper from `RaycastSegmentWorker`; mesh ray
+  overlap remains disabled until mesh validation, acceleration, and contact
+  policy tests justify restoring it.
+- Documented the alpha mesh policy: non-convex meshes should be decomposed
+  offline or during initialization, never during per-frame collision.
+- Expanded the collision detection benchmark mix to include cylinder/sphere,
+  cylinder/capsule, cylinder/cylinder, and cuboid/cylinder primitive pairs.
+- Short `collision-detection` benchmark smoke on this machine:
+  - `CollisionDetectionBenchmarks.CheckPreparedPrimitivePairs`: 64 pairs,
+    mean about `325.2 us`, allocated about `1.5 KB`.
+  - BenchmarkDotNet could not raise process priority in this sandbox, so this
+    is a smoke result rather than canonical timing evidence.
 
 ## Phase 5: Collision Response Solver Redesign
 

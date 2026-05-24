@@ -129,5 +129,27 @@ public static class AxisProjectionHelper
         return new FixedRange(min, max);
     }
 
+    public static FixedRange ProjectCylinderOntoAxis(
+        Vector3d axisVector,
+        Vector3d startPoint,
+        Vector3d endPoint,
+        Vector3d cylinderAxis,
+        Fixed64 radius)
+    {
+        Fixed64 startProjection = axisVector.Dot(startPoint.x, startPoint.y, startPoint.z);
+        Fixed64 endProjection = axisVector.Dot(endPoint.x, endPoint.y, endPoint.z);
+        Fixed64 minSegment = FixedMath.Min(startProjection, endProjection);
+        Fixed64 maxSegment = FixedMath.Max(startProjection, endProjection);
+
+        Fixed64 axialAlignment = Vector3d.Dot(axisVector, cylinderAxis);
+        Fixed64 radialProjectionSqr = Fixed64.One - axialAlignment * axialAlignment;
+        Fixed64 radialProjection = radialProjectionSqr <= Fixed64.Zero
+            ? Fixed64.Zero
+            : FixedMath.Sqrt(radialProjectionSqr);
+        Fixed64 radiusOffset = radius * radialProjection;
+
+        return new FixedRange(minSegment - radiusOffset, maxSegment + radiusOffset);
+    }
+
     #endregion
 }

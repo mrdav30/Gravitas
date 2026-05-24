@@ -46,7 +46,7 @@ public class FixedTransform
         set => _matrix.SetGlobalScale(value);
     }
 
-    public Vector3d LossyScale => _matrix.ExtractLossyScale();
+    public Vector3d LossyScale => _matrix.Scale;
 
     public Vector3d EulerAngles
     {

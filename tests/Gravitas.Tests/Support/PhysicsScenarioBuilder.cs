@@ -112,6 +112,22 @@ internal sealed class PhysicsScenarioBuilder : IDisposable
             preventAngularForces);
     }
 
+    public ScenarioBody<LSCylinderCollider> CreateCylinder(
+        Vector3d position,
+        FixedQuaternion? rotation = null,
+        Fixed64? mass = null,
+        bool immovable = false,
+        bool preventAngularForces = false)
+    {
+        return CreateBody(
+            new LSCylinderCollider(),
+            position,
+            rotation ?? FixedQuaternion.Identity,
+            mass,
+            immovable,
+            preventAngularForces);
+    }
+
     public CollisionPair CreatePair(LSCollider colliderA, LSCollider colliderB)
     {
         return new CollisionPair(colliderA, colliderB);

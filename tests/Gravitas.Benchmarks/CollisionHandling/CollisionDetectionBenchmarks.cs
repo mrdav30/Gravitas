@@ -52,7 +52,7 @@ public class CollisionDetectionBenchmarks
 
     private CollisionPair CreateDetectionPair(int index, Vector3d origin)
     {
-        return (index & 3) switch
+        return (index % 8) switch
         {
             0 => new CollisionPair(
                 CreateSphere(origin),
@@ -63,9 +63,21 @@ public class CollisionDetectionBenchmarks
             2 => new CollisionPair(
                 CreateCuboid(origin),
                 CreateSphere(origin + new Vector3d(Fixed64.Half, Fixed64.Zero, Fixed64.Zero))),
-            _ => new CollisionPair(
+            3 => new CollisionPair(
                 CreateCuboid(origin),
                 CreateCuboid(origin + new Vector3d(Fixed64.Half, Fixed64.Zero, Fixed64.Zero))),
+            4 => new CollisionPair(
+                CreateCylinder(origin),
+                CreateSphere(origin + new Vector3d(Fixed64.Half, Fixed64.Zero, Fixed64.Zero))),
+            5 => new CollisionPair(
+                CreateCylinder(origin),
+                CreateCapsule(origin + new Vector3d(Fixed64.Half, Fixed64.Zero, Fixed64.Zero))),
+            6 => new CollisionPair(
+                CreateCylinder(origin),
+                CreateCylinder(origin + new Vector3d(Fixed64.Half, Fixed64.Zero, Fixed64.Zero))),
+            _ => new CollisionPair(
+                CreateCuboid(origin),
+                CreateCylinder(origin + new Vector3d(Fixed64.Half, Fixed64.Zero, Fixed64.Zero))),
         };
     }
 
@@ -77,6 +89,9 @@ public class CollisionDetectionBenchmarks
 
     private LSCuboidCollider CreateCuboid(Vector3d position) =>
         CreateBody(new LSCuboidCollider(), position).Collider;
+
+    private LSCylinderCollider CreateCylinder(Vector3d position) =>
+        CreateBody(new LSCylinderCollider(), position).Collider;
 
     private ScenarioBody<TCollider> CreateBody<TCollider>(
         TCollider collider,

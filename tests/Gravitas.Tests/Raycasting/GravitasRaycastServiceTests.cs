@@ -85,6 +85,35 @@ public sealed class GravitasRaycastServiceTests
     }
 
     [Fact]
+    public void Raycast_ShouldHitCylinderSideAndCaps()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSCylinderCollider collider = CreateDynamicCylinder(context, Vector3d.Zero);
+
+        bool sideHit = context.Raycasts.Raycast(
+            Vector(-2, 0, 0),
+            Vector3d.Right,
+            (Fixed64)4,
+            out LSRaycastHit side,
+            IncludeLayerZero);
+        bool capHit = context.Raycasts.Raycast(
+            Vector(0, 2, 0),
+            -Vector3d.Up,
+            (Fixed64)4,
+            out LSRaycastHit cap,
+            IncludeLayerZero);
+
+        sideHit.Should().BeTrue();
+        capHit.Should().BeTrue();
+        side.Collider.Should().BeSameAs(collider);
+        cap.Collider.Should().BeSameAs(collider);
+        side.Point.Should().Be(new Vector3d(-Fixed64.Half, Fixed64.Zero, Fixed64.Zero));
+        cap.Point.Should().Be(new Vector3d(Fixed64.Zero, Fixed64.Half, Fixed64.Zero));
+        side.Normal.Should().Be(-Vector3d.Right);
+        cap.Normal.Should().Be(Vector3d.Up);
+    }
+
+    [Fact]
     public void RaycastAll_ShouldReturnNoHitsWhenSegmentMissesCollider()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
@@ -126,9 +155,19 @@ public sealed class GravitasRaycastServiceTests
 
     private static LSSphereCollider CreateDynamicSphere(GravitasWorldContext context, Vector3d position)
     {
+        return CreateDynamicCollider(context, new LSSphereCollider(), position);
+    }
+
+    private static LSCylinderCollider CreateDynamicCylinder(GravitasWorldContext context, Vector3d position)
+    {
+        return CreateDynamicCollider(context, new LSCylinderCollider(), position);
+    }
+
+    private static TCollider CreateDynamicCollider<TCollider>(GravitasWorldContext context, TCollider collider, Vector3d position)
+        where TCollider : LSCollider
+    {
         EnsureGrid(context);
         var agent = new TestMatterAgent(context);
-        var collider = new LSSphereCollider();
         var body = new StiffBody(agent, collider)
         {
             Mass = Fixed64.One

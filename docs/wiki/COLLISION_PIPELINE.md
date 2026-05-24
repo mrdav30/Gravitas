@@ -55,12 +55,28 @@ endpoints together. Short capsules collapse to a sphere-like segment and use a
 sphere inertia fallback instead of producing a zero diagonal for the capsule's
 main axis.
 
+Cylinders rebuild their finite flat-capped axis segment, cap centers, height,
+area, and inertia inputs together. Cylinder support intentionally treats the
+shape as a real finite cylinder rather than a capsule with ignored hemispheres,
+so cap separation and side separation are tested independently.
+
+`FixedTransform.LossyScale` uses basis-vector scale extraction rather than raw
+matrix diagonals. This matters for rotated colliders because diagonal extraction
+can report near-zero scale for 90-degree rotations and collapse derived shape
+state.
+
 Mesh colliders validate vertices and triangle indices at construction time.
 Triangle BVH entries and mesh query bounds use min/max `FixedBoundVolume`
 coordinates. Mesh collider construction transforms vertices from local mesh
 space only after the collider is bound to runtime state, so rotated meshes
 refresh bounds from transformed vertices instead of copying stale constructor
 bounds.
+
+Alpha mesh policy is conservative: non-convex meshes should be decomposed into
+convex sub-meshes offline or during initialization, not during per-frame
+collision. Dynamic mesh behavior, mesh/cylinder contact, and mesh ray overlap
+remain policy-gated until their bounds, acceleration structures, and contact
+ordering are tested directly.
 
 ## Active Partitions
 
@@ -145,13 +161,29 @@ Current shape support:
 | AABox/Capsule | closest capsule line point to box center, then box surface point. |
 | OBBox/Capsule | separating axes from cuboid/capsule support. |
 | Cuboid/Cuboid | AABB overlap for axis-aligned boxes, SAT for oriented boxes. |
+| Cylinder/Sphere | finite cylinder closest surface against sphere radius. |
+| Cylinder/Capsule | finite-cylinder projection axes against capsule segment/radius projection. |
+| Cylinder/Cylinder | finite-cylinder projection axes, preserving flat cap separation. |
+| Cuboid/Cylinder | cuboid vertex projection against finite-cylinder projection. |
 | Mesh/Sphere | closest mesh surface point to sphere center. |
 | Mesh/Capsule | closest capsule line point to mesh surface. |
 | Mesh/Cuboid | mesh/cuboid SAT using nearby mesh triangles. |
 | Mesh/Mesh | mesh/mesh SAT using nearby mesh triangles. |
 
-Cylinder collider methods are currently not implemented. Mesh raycast overlap is
-also disabled, even though mesh collision checks exist.
+Current shape-pair matrix:
+
+| A / B | Sphere | Capsule | Cuboid | Cylinder | Mesh |
+| --- | --- | --- | --- | --- | --- |
+| Sphere | Supported | Supported | Supported | Supported | Supported |
+| Capsule | Supported | Supported | Supported | Supported | Supported |
+| Cuboid | Supported | Supported | Supported | Supported | Supported |
+| Cylinder | Supported | Supported | Supported | Supported | Deferred |
+| Mesh | Supported | Supported | Supported | Deferred | Supported |
+
+`Cuboid` covers both `AABox` and `OBBox` dispatch. `Cylinder/Mesh` is
+intentionally deferred until mesh convexity, triangle acceleration, and contact
+policy are better pinned. Mesh raycast overlap is also disabled until that same
+validation and acceleration work exists.
 
 ## Contact Data
 

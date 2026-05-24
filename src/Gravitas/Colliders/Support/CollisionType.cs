@@ -10,10 +10,13 @@
         AABox_Capsule,
         OBBox_Capsule,
         Cuboid_Cuboid,
+        Cylinder_Sphere,
+        Cylinder_Capsule,
+        Cylinder_Cylinder,
+        Cuboid_Cylinder,
         Mesh_Sphere,
         Mesh_Capsule,
         Mesh_Cuboid,
         Mesh_Mesh
-        // ... Add all other combinations here
     }
 }
