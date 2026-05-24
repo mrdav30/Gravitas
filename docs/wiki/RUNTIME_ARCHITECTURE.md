@@ -79,10 +79,12 @@ invoke frame-rate-change hooks.
 - `AccumulatedTime`
 - `ExpectedAccumulation`
 - `ResetAccumulation`
+- `ResetAccumulationThisVisualize`
 
 Simulation code should use context time values rather than wall-clock APIs.
 `Visualize` advances deterministic accumulation by the fixed delta, not by
-elapsed real time.
+elapsed real time. `ExpectedAccumulation` is clamped to one simulation frame so
+frame-accumulated visual interpolation cannot overshoot its target.
 
 ## Registration Model
 
@@ -115,13 +117,28 @@ contexts. These checks are core invariants.
 
 Body movement currently happens in `StiffBody.LateSimulate()`, called by
 `GravitasPhysicsService.LateSimulate()`. Non-kinematic movable bodies process
-forces, update velocities, apply position/rotation changes, run a grounding
-directional circle-overlap query, and then update collider partition state
-through `Collider.Simulate()`.
+forces, update velocities, apply position/rotation changes, run a grounding ray
+probe through the context query service, and then update collider partition
+state through `Collider.Simulate()`.
+
+Body initialization does not assume grounded state. After the body collider is
+registered and partitioned, initialization performs an explicit ground probe.
+If no configured ground layer is hit, the body starts airborne. Ground probes
+use `PhysicsSettings.GroundCheckLayerMask`, write hits from `RaycastAll` into a
+body-owned buffer, and ignore the body's own collider before accepting the
+closest hit. Stationary grounded bodies can skip repeated simulation probes for
+a short frame window, but movement of the last hit platform invalidates that
+guard.
 
 Kinematic bodies read their host transforms during `LateSimulate`, update
 authoritative body position/rotation from those transforms, and then update
 visual values.
+
+Visual rotation has two modes. With no rotation interpolation speed, Gravitas
+uses clamped frame accumulation between the last visual rotation and the current
+authoritative rotation. With a positive interpolation speed, each visualize call
+speed-limits from the current presentation rotation toward the authoritative
+target.
 
 ## Collider State
 

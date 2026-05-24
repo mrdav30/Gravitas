@@ -99,11 +99,10 @@ public class StiffBody : IRecordable
 
     public Fixed64 GroundDownDistanceOnAir = (Fixed64)0.5f;
 
-    public Fixed64 GroundCheckSphereRadius = (Fixed64)0.2f;
-
     private int _lastGroundCheckFrame = 0;
     private const int _groundCheckFrameThreshold = 10;
     private readonly Fixed64 _groundCheckThreshold = (Fixed64)0.01f;
+    private readonly SwiftList<LSRaycastHit> _groundProbeHits = new();
 
     public Fixed64 StepOffset = (Fixed64)0.5f;
 
@@ -112,6 +111,8 @@ public class StiffBody : IRecordable
 
     private FixedTransform? _hitPlatform;
     public FixedTransform? HitPlatform { get => _hitPlatform; set => _hitPlatform = value; }
+
+    private Vector3d _hitPlatformPosition;
 
     private Vector3d _hitPoint;
     public Vector3d HitPoint => _hitPoint;
@@ -127,7 +128,7 @@ public class StiffBody : IRecordable
             if (_isGrounded == value)
                 return;
             _isGrounded = value;
-            OnGrounded?.Invoke(true);
+            OnGrounded?.Invoke(value);
         }
     }
 
@@ -389,11 +390,14 @@ public class StiffBody : IRecordable
         _linearSpeed = Fixed64.Zero;
         _normalForce = Vector3d.Zero;
 
-        _isGrounded = true;
+        _isGrounded = false;
+        _skipGroundingCheck = false;
+        _lastGroundCheckFrame = int.MinValue;
+        ResetGroundCalculations();
 
         _positionChangedBuffer = true;
         _position2dUnmarked = startPosition.ToVector2d();
-        _lastPosition = _spawnedPosition = startPosition;
+        _lastGroundedPosition = _lastPosition = _spawnedPosition = startPosition;
         _heightPosUnmarked = startPosition.y;
 
         _rotationChangedBuffer = true;
@@ -410,6 +414,7 @@ public class StiffBody : IRecordable
 
         _dynamicId = Context.Physics.AssimilateBody(this, isDynamic);
         Collider!.Initialize(this);
+        CheckGround(force: true);
 
         if (AngularForcesHalted)
             return;
@@ -738,7 +743,7 @@ public class StiffBody : IRecordable
         if (!AngularForcesHalted && _angularSpeed > Fixed64.Zero)
             RotationBasedOnTorque();
 
-        CheckGround();
+        CheckGroundForSimulation();
 
         if (_isGrounded)
             HeightPos = HitPoint.y;
@@ -803,7 +808,7 @@ public class StiffBody : IRecordable
         if (!Active || Immovable || IsKinematic || !SettingVisuals)
             return;
 
-        if (Context.ResetAccumulation)
+        if (Context.ResetAccumulationThisVisualize)
         {
             if (CanSetVisualPosition)
                 SetVisualPosition(Position3d);
@@ -820,11 +825,19 @@ public class StiffBody : IRecordable
         if (!CanSetVisualRotation)
             return;
 
-        Fixed64 targetSpeed = _rotationInterpoleSpeed > Fixed64.Zero
-            ? Context.DeltaTime * _rotationInterpoleSpeed * _rotationSpeed
-            : Context.ExpectedAccumulation;
-        FixedQuaternion expectedRotation = FixedQuaternion.Slerp(_lastVisualRotation, _visualRotation, targetSpeed);
+        Fixed64 targetSpeed = ResolveVisualRotationStep();
+        FixedQuaternion expectedRotation = _rotationInterpoleSpeed > Fixed64.Zero
+            ? FixedQuaternion.Slerp(_rotationTransform.Rotation, _visualRotation, targetSpeed)
+            : FixedQuaternion.Slerp(_lastVisualRotation, _visualRotation, targetSpeed);
         _rotationTransform.Rotation = expectedRotation;
+    }
+
+    private Fixed64 ResolveVisualRotationStep()
+    {
+        if (_rotationInterpoleSpeed <= Fixed64.Zero)
+            return Context.ExpectedAccumulation;
+
+        return FixedMath.Clamp01(Context.DeltaTime * _rotationInterpoleSpeed * _rotationSpeed);
     }
 
     public void LateVisualize() { }
@@ -898,27 +911,34 @@ public class StiffBody : IRecordable
 
     public void SkipGrounding(Fixed64 secs)
     {
-        IsGrounded = false;
+        _skipGroundingCheck = true;
+        ClearGrounding();
         Context.Coroutines.StartCoroutine(SkipGroundingCoroutine(secs));
     }
 
     private IEnumerator<ILockedYieldInstruction> SkipGroundingCoroutine(Fixed64 secs)
     {
-        _skipGroundingCheck = true;
         yield return Context.Coroutines.WaitForRealSeconds(secs);
         _skipGroundingCheck = false;
     }
 
-    public void CheckGround()
+    public void CheckGround() => CheckGround(force: true);
+
+    private void CheckGroundForSimulation() => CheckGround(force: false);
+
+    private void CheckGround(bool force)
     {
         if (_skipGroundingCheck || World is null)
         {
-            _isGrounded = false;
+            ClearGrounding();
             return;
         }
 
         // Only perform SphereCast if enough frames have passed
-        bool frameGuard = Vector3d.Distance(_lastPosition, Position3d) < _groundCheckThreshold
+        bool hitPlatformMoved = _hitPlatform != null && _hitPlatform.Position != _hitPlatformPosition;
+        bool frameGuard = !force
+            && !hitPlatformMoved
+            && Vector3d.Distance(_lastPosition, Position3d) < _groundCheckThreshold
             && Context.FrameCount - _lastGroundCheckFrame < _groundCheckFrameThreshold;
         if (frameGuard)
             return;
@@ -933,13 +953,14 @@ public class StiffBody : IRecordable
         if (!IsGrounded)
             dis = GroundDownDistanceOnAir;
 
-        if (!Context.CircleQueries.OverlapCircleInDirection(origin, GroundCheckSphereRadius, Vector3d.Down, out LSRaycastHit hit, dis, Context.Settings.GroundCheckLayerMask))
+        if (!TryFindGroundHit(origin, dis, out LSRaycastHit hit))
         {
-            _isGrounded = false;
+            ClearGrounding();
             return;
         }
 
         _hitPlatform = hit.Collider?.Transform;
+        _hitPlatformPosition = _hitPlatform?.Position ?? Vector3d.Zero;
         _hitPoint = hit.Point;
         _groundNormal = hit.Normal;
 
@@ -947,12 +968,37 @@ public class StiffBody : IRecordable
         Fixed64 weightInNormalDirection = Vector3d.Dot(weightVector, _groundNormal);
         _normalForce = weightInNormalDirection * _groundNormal;
 
-        _isGrounded = true;
+        IsGrounded = true;
+    }
+
+    private bool TryFindGroundHit(Vector3d origin, Fixed64 distance, out LSRaycastHit hit)
+    {
+        Vector3d end = origin + Vector3d.Down * distance;
+        int hitCount = Context.Raycasts.RaycastAll(origin, end, Context.Settings.GroundCheckLayerMask, _groundProbeHits);
+        for (int i = 0; i < hitCount; i++)
+        {
+            LSRaycastHit current = _groundProbeHits[i];
+            if (ReferenceEquals(current.Collider, Collider))
+                continue;
+
+            hit = current;
+            return true;
+        }
+
+        hit = default;
+        return false;
+    }
+
+    private void ClearGrounding()
+    {
+        IsGrounded = false;
+        ResetGroundCalculations();
     }
 
     private void ResetGroundCalculations()
     {
         _hitPlatform = null;
+        _hitPlatformPosition = Vector3d.Zero;
         _hitPoint = Vector3d.Zero;
         _groundNormal = Vector3d.Zero;
         _normalForce = Vector3d.Zero;
@@ -1080,6 +1126,7 @@ public class StiffBody : IRecordable
         RecordValues.Look(chronicler, ref StepOffset, "StepOffset");
         RecordValues.Look(chronicler, ref _groundNormal, "GroundNormal");
         RecordValues.Look(chronicler, ref _hitPlatform, "HitPlatform");
+        RecordValues.Look(chronicler, ref _hitPlatformPosition, "HitPlatformPosition");
         RecordValues.Look(chronicler, ref _hitPoint, "HitPoint");
         RecordValues.Look(chronicler, ref _isGrounded, "IsGrounded");
         RecordValues.Look(chronicler, ref _lastGroundedPosition, "LastGroundedPosition");

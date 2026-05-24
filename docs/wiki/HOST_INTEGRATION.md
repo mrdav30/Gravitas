@@ -249,6 +249,10 @@ collider should be included.
 Ground checks use `context.Settings.GroundCheckLayerMask`. The default preserves
 old prototype example exclusions only as a starting point; hosts should set this
 explicitly for their own layer model before relying on grounding behavior.
+`StiffBody.Initialize(...)` performs an initial ground probe after the collider
+is registered, so bodies only start grounded when the configured ground mask
+actually hits suitable geometry. Runtime ground probes use sorted raycast hits
+and ignore the body's own collider before accepting a ground result.
 
 ## Deactivation And Disposal
 

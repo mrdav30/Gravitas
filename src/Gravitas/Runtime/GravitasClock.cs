@@ -50,6 +50,11 @@ internal sealed class GravitasClock
     public bool ResetAccumulation { get; private set; }
 
     /// <summary>
+    /// Gets whether the current visualization step started from a reset.
+    /// </summary>
+    public bool ResetAccumulationThisVisualize { get; private set; }
+
+    /// <summary>
     /// Gets the accumulated visualization time expressed in simulation frames.
     /// </summary>
     public Fixed64 ExpectedAccumulation { get; private set; }
@@ -76,6 +81,7 @@ internal sealed class GravitasClock
     /// </summary>
     public void Visualize()
     {
+        ResetAccumulationThisVisualize = ResetAccumulation;
         if (ResetAccumulation)
         {
             AccumulatedTime = Fixed64.Zero;
@@ -83,7 +89,7 @@ internal sealed class GravitasClock
         }
 
         AccumulatedTime += _deltaTime;
-        ExpectedAccumulation = AccumulatedTime / _deltaTime;
+        ExpectedAccumulation = FixedMath.Clamp01(AccumulatedTime / _deltaTime);
     }
 
     /// <summary>
@@ -96,6 +102,7 @@ internal sealed class GravitasClock
         AccumulatedTime = Fixed64.Zero;
         ExpectedAccumulation = Fixed64.Zero;
         ResetAccumulation = false;
+        ResetAccumulationThisVisualize = false;
     }
 
     /// <summary>

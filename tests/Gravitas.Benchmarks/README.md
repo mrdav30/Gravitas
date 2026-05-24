@@ -111,7 +111,7 @@ allocation in steady state:
 | Alias | Covered paths |
 | --- | --- |
 | `query-service` | `RaycastAll`, `OverlapCircleAll`, directional `OverlapCircleInDirection`, and overlapping-context queries. |
-| `simulation-allocation` | `StiffBody.LateSimulate`, grounding directional circle-overlap checks, collision partition distribution, and active-pair late simulation. |
+| `simulation-allocation` | `StiffBody.LateSimulate`, grounding raycast probes, collision partition distribution, and active-pair late simulation. |
 
 Collider shape work has a focused selection:
 

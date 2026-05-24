@@ -137,6 +137,8 @@ public sealed class GravitasRaycastServiceTests
         var hitsA = new SwiftList<LSRaycastHit>();
         var hitsB = new SwiftList<LSRaycastHit>();
         colliderA.Id.Should().Be(colliderB.Id);
+        uint versionABefore = contextA.Raycasts.Version;
+        uint versionBBefore = contextB.Raycasts.Version;
 
         int countA = contextA.Raycasts
             .RaycastAll(Vector(-2, 0, 0), Vector(2, 0, 0), IncludeLayerZero, hitsA);
@@ -147,8 +149,8 @@ public sealed class GravitasRaycastServiceTests
         countB.Should().Be(1);
         hitsA[0].Collider.Should().BeSameAs(colliderA);
         hitsB[0].Collider.Should().BeSameAs(colliderB);
-        contextA.Raycasts.Version.Should().Be(1);
-        contextB.Raycasts.Version.Should().Be(1);
+        contextA.Raycasts.Version.Should().Be(versionABefore + 1);
+        contextB.Raycasts.Version.Should().Be(versionBBefore + 1);
     }
 
     private static Vector3d Vector(int x, int y, int z) => new((Fixed64)x, (Fixed64)y, (Fixed64)z);

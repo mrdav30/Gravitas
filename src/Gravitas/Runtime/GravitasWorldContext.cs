@@ -183,6 +183,15 @@ public sealed class GravitasWorldContext : IDisposable
         }
     }
 
+    internal bool ResetAccumulationThisVisualize
+    {
+        get
+        {
+            ThrowIfDisposed();
+            return _clock.ResetAccumulationThisVisualize;
+        }
+    }
+
     /// <summary>
     /// Gets this context's visualization accumulation expressed in simulation frames.
     /// </summary>

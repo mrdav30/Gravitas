@@ -1,6 +1,4 @@
 using BenchmarkDotNet.Attributes;
-using FixedMathSharp;
-using Gravitas.Raycasting;
 using Gravitas.Support;
 using SwiftCollections;
 
@@ -29,6 +27,7 @@ public class SimulationAllocationBenchmarks
         BenchmarkPhysicsScene.CreateDynamicSphereGrid(_lateSimulateContext, ColliderCount);
 
         _groundingContext = BenchmarkPhysicsScene.CreateContext(gridExtent);
+        _groundingContext.Settings.GroundCheckLayerMask = IncludeLayerZero;
         _groundedBodies = new SwiftList<StiffBody>(ColliderCount);
         BenchmarkPhysicsScene.CreateDynamicSphereGrid(_groundingContext, ColliderCount, _groundedBodies);
 
@@ -63,25 +62,15 @@ public class SimulationAllocationBenchmarks
     }
 
     [Benchmark]
-    public int GroundingOverlapCircleOnly()
+    public int GroundingRaycastProbeOnly()
     {
         int groundedCount = 0;
         for (int i = 0; i < _groundedBodies.Count; i++)
         {
             StiffBody body = _groundedBodies[i];
-            Vector3d origin = body.Position3d;
-            origin.y += body.GroundOriginOffset;
-
-            if (_groundingContext.CircleQueries.OverlapCircleInDirection(
-                    origin,
-                    body.GroundCheckSphereRadius,
-                    Vector3d.Down,
-                    out LSRaycastHit _,
-                    body.GroundedDistanceRay,
-                    IncludeLayerZero))
-            {
+            body.CheckGround();
+            if (body.IsGrounded)
                 groundedCount++;
-            }
         }
 
         return groundedCount;
