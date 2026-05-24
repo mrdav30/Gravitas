@@ -21,15 +21,19 @@ into one bounds/shape rebuild.
 5. checks that the voxel position falls within the collider bounds.
 6. rents or reuses a `PhysicsPartition` on the voxel.
 7. stores the collider's `WorldVoxelIndex`.
-8. adds the collider ID to the partition dynamic or static list.
+8. adds the collider ID to the partition dynamic or static membership set.
 
 `PhysicsPartition` is a GridForge voxel partition payload. It stores
-context-local collider IDs, not collider references. The owner service is
+context-local collider IDs, not collider references. Dynamic and static
+membership uses `SwiftSparseMap<byte>` as a sparse set: lookups and removals are
+keyed by collider ID, while dense-key spans keep partition iteration compact. Do
+not treat dense-key order as a semantic ordering rule; deterministic pair
+ordering must be explicit at the pair or service layer. The owner service is
 required before the partition is added to a voxel, and the partition returns to
 that owner service pool from `OnRemoveFromVoxel(...)`.
 
-Current static-list behavior is specific: colliders whose body exists and has
-`Immovable == true` are added to `ContainedStaticObjects`. Other registered
+Current static-membership behavior is specific: colliders whose body exists and
+has `Immovable == true` are added to `ContainedStaticObjects`. Other registered
 colliders are added to `ContainedDynamicObjects`, including bodyless colliders.
 
 ## Collider Runtime Shape State
@@ -80,11 +84,14 @@ ordering are tested directly.
 
 ## Active Partitions
 
-A partition becomes active when its dynamic list transitions from empty to
+A partition becomes active when its dynamic membership transitions from empty to
 non-empty. Active partitions are stored in
 `GravitasCollisionService._activePartitions`.
 
-During `context.Simulate()`, `GravitasPhysicsService.Simulate()` calls
+During `context.Simulate()`, `GravitasPhysicsService.Simulate()` first lets
+registered dynamic-body colliders refresh bounds and partition membership. This
+pre-distribution pass catches host command teleports or direct body moves made
+between frames. It then calls
 `GravitasCollisionService.CheckAndDistributeCollisions()`. The collision service
 increments its `Version` and asks each active partition to distribute candidate
 pairs.
@@ -131,9 +138,9 @@ not equal to the current service version, then stamps the pair with that version
 1. reject inactive pairs or inactive colliders.
 2. queue the pair for active-pair maintenance if this is the first update after
    activation.
-3. either run collision work immediately or decrement the cull counter.
-4. if a collider moved into a new partition while culled, reset culling and
-   re-run collision work.
+3. invalidate culling if either collider changed position, rotation, partition
+   state, or broad-phase version since the last pair check.
+4. either run collision work immediately or decrement the cull counter.
 
 Fast rejection happens before narrow phase:
 
@@ -141,9 +148,17 @@ Fast rejection happens before narrow phase:
   scope.
 - collider AABB bounds must intersect.
 
+If a pair was colliding on the previous check, it can reuse that state only
+while both colliders keep the same position, rotation, and broad-phase version.
+Shape or bounds changes must re-run narrow phase even when object transforms did
+not move.
+
 If the pair is not colliding, `CalculateCullScore()` combines distance,
-relative velocity, and time-since-last-collision into a frame countdown. Large
-or explicitly protected colliders can prevent culling.
+relative velocity, and time-since-last-collision into a frame countdown.
+Distance and age increase the delay; relative velocity reduces the delay so
+fast-moving pairs are checked more conservatively. Disabled or zero culling
+thresholds disable that score contribution rather than dividing by zero. Large or
+explicitly protected colliders can prevent culling.
 
 ## Narrow Phase
 

@@ -3,7 +3,6 @@ using Gravitas.Colliders;
 using GridForge.Grids;
 using GridForge.Spatial;
 using SwiftCollections;
-using SwiftCollections.Pool;
 
 namespace Gravitas;
 
@@ -12,9 +11,11 @@ namespace Gravitas;
 /// </summary>
 public sealed class GravitasCollisionService
 {
+    private const int DefaultPartitionPoolCapacity = 1024;
+
     private readonly GravitasWorldContext _context;
     private readonly SwiftBucket<PhysicsPartition> _activePartitions = new();
-    private readonly SwiftObjectPool<PhysicsPartition> _inactivePartitionPool;
+    private readonly SwiftStack<PhysicsPartition> _inactivePartitionPool = new(DefaultPartitionPoolCapacity);
     private readonly SwiftHashSet<int> _redundancyChecker = new();
     private readonly SwiftHashSet<ushort> _processedGrids = new();
     private readonly object _cullDistributorLock = new();
@@ -29,9 +30,6 @@ public sealed class GravitasCollisionService
     {
         SwiftThrowHelper.ThrowIfNull(context, nameof(context));
         _context = context;
-        _inactivePartitionPool = new SwiftObjectPool<PhysicsPartition>(
-            createFunc: () => new PhysicsPartition(),
-            actionOnRelease: partition => partition.ResetForPool());
     }
 
     /// <summary>
@@ -52,7 +50,7 @@ public sealed class GravitasCollisionService
     /// <summary>
     /// Gets the number of inactive partitions currently available for reuse.
     /// </summary>
-    public int InactivePartitionCount => _inactivePartitionPool.CountInactive;
+    public int InactivePartitionCount => _inactivePartitionPool.Count;
 
     internal int CullDistributor
     {
@@ -299,12 +297,8 @@ public sealed class GravitasCollisionService
     {
         Version++;
 
-        int peak = _activePartitions.PeakCount;
-        for (int i = 0; i < peak; i++)
-        {
-            if (_activePartitions.TryGetValue(i, out PhysicsPartition partition))
-                partition.Distribute();
-        }
+        foreach (PhysicsPartition partition in _activePartitions)
+            partition.Distribute();
     }
 
     internal int ActivatePartition(PhysicsPartition partition)
@@ -328,7 +322,9 @@ public sealed class GravitasCollisionService
 
     internal PhysicsPartition RentPartition()
     {
-        PhysicsPartition partition = _inactivePartitionPool.Rent();
+        PhysicsPartition partition = _inactivePartitionPool.Count > 0
+            ? _inactivePartitionPool.Pop()
+            : new PhysicsPartition();
         partition.SetOwner(this);
         return partition;
     }
@@ -341,6 +337,7 @@ public sealed class GravitasCollisionService
             nameof(partition),
             "Partition must be released through its owning collision service.");
 
-        _inactivePartitionPool.Release(partition);
+        partition.ResetForPool();
+        _inactivePartitionPool.Push(partition);
     }
 }

@@ -272,7 +272,7 @@ public sealed class GravitasRaycastService
     }
 
     private void ProcessColliderListForClosestHit(
-        SwiftList<int>? colliderIds,
+        SwiftSparseMap<byte>? colliderIds,
         Vector3d origin,
         Vector3d direction,
         ref bool found,
@@ -284,7 +284,7 @@ public sealed class GravitasRaycastService
 
         for (int i = colliderIds.Count - 1; i >= 0; i--)
         {
-            if (!TryBuildHitForCollider(colliderIds[i], origin, direction, out LSRaycastHit hit)
+            if (!TryBuildHitForCollider(colliderIds.DenseKeys[i], origin, direction, out LSRaycastHit hit)
                 || hit.Distance >= closestDistance)
             {
                 continue;
@@ -307,7 +307,7 @@ public sealed class GravitasRaycastService
     }
 
     private void ProcessColliderListForAllHits(
-        SwiftList<int>? colliderIds,
+        SwiftSparseMap<byte>? colliderIds,
         Vector3d origin,
         Vector3d direction,
         SwiftList<LSRaycastHit> results)
@@ -317,7 +317,7 @@ public sealed class GravitasRaycastService
 
         for (int i = colliderIds.Count - 1; i >= 0; i--)
         {
-            if (TryBuildHitForCollider(colliderIds[i], origin, direction, out LSRaycastHit hit))
+            if (TryBuildHitForCollider(colliderIds.DenseKeys[i], origin, direction, out LSRaycastHit hit))
                 results.Add(hit);
         }
     }

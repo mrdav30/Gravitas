@@ -40,6 +40,7 @@ Current context methods run in this order:
 Simulate
   Clock.Simulate
   Physics.Simulate
+    PrepareCollisionPartitions for dynamic-body colliders
     Collisions.CheckAndDistributeCollisions
   Coroutines.Simulate
   Hooks.InvokeSimulate
@@ -119,7 +120,10 @@ Body movement currently happens in `StiffBody.LateSimulate()`, called by
 `GravitasPhysicsService.LateSimulate()`. Non-kinematic movable bodies process
 forces, update velocities, apply position/rotation changes, run a grounding ray
 probe through the context query service, and then update collider partition
-state through `Collider.Simulate()`.
+state through `Collider.Simulate()`. `GravitasPhysicsService.Simulate()` also
+performs a pre-distribution collider refresh for dynamic-body colliders so host
+commands that teleport or reposition bodies before `Simulate()` are reflected in
+the same collision distribution pass.
 
 Body initialization does not assume grounded state. After the body collider is
 registered and partitioned, initialization performs an explicit ground probe.
@@ -156,10 +160,10 @@ target.
 - collision-pair references and holders.
 - raycast and circle-query version markers.
 
-Dynamic colliders are updated by their bodies. Bodyless/static colliders are
-not owned by the dynamic body bucket, so a host that moves one after
-initialization must call `collider.Simulate()` to refresh bounds and partition
-membership.
+Dynamic colliders are updated by their bodies during the simulation phases.
+Bodyless/static colliders are not owned by the dynamic body bucket, so a host
+that moves one after initialization must call `collider.Simulate()` to refresh
+bounds and partition membership.
 
 ## Settings And Environment
 

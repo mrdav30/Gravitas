@@ -112,6 +112,7 @@ allocation in steady state:
 | --- | --- |
 | `query-service` | `RaycastAll`, `OverlapCircleAll`, directional `OverlapCircleInDirection`, and overlapping-context queries. |
 | `simulation-allocation` | `StiffBody.LateSimulate`, grounding raycast probes, collision partition distribution, and active-pair late simulation. |
+| `partition-culling` | dynamic collider repartitioning after teleports, direct partition add/remove churn, and culled-pair invalidation after movement. |
 
 Collider shape work has a focused selection:
 

@@ -124,6 +124,9 @@ public abstract class LSCollider : IRecordable
     /// </summary>
     public bool PartitionChanged { get; set; }
 
+    private uint _broadPhaseVersion;
+    internal uint BroadPhaseVersion => _broadPhaseVersion;
+
     /// <summary>
     /// Center of collider in local space, used for calculating bounds and offsets. Should be set in the Setup method of each collider type.
     /// </summary>
@@ -314,6 +317,7 @@ public abstract class LSCollider : IRecordable
             SetPreviousGridBounds();
             IsPartitioned = true;
             PartitionChanged = true;
+            MarkBroadPhaseChanged();
         }
     }
 
@@ -347,6 +351,7 @@ public abstract class LSCollider : IRecordable
     private void UpdatePartition()
     {
         RebuildRuntimeShapeState();
+        MarkBroadPhaseChanged();
 
         if (!Context.Collisions.ClearPartitionedObject(this))
             return;
@@ -487,6 +492,9 @@ public abstract class LSCollider : IRecordable
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     protected void MarkShapeDirty() => _runtimeShapeState.MarkDirty();
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void MarkBroadPhaseChanged() => _broadPhaseVersion++;
 
     protected virtual void OnRadiusChanged() { }
 

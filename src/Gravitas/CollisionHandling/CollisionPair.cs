@@ -45,6 +45,8 @@ public class CollisionPair
     public short CullCounter { get; private set; }
     private bool _preventDistanceCull;
     private Fixed64 _fastDistanceOffset;
+    private uint _lastColliderABroadPhaseVersion;
+    private uint _lastColliderBBroadPhaseVersion;
 
     private bool _isColliding;
     private bool _isCollidingChanged;
@@ -100,6 +102,7 @@ public class CollisionPair
         }
 
         LastCollidedFrame = Context.FrameCount;
+        RefreshBroadPhaseVersions();
         PairVersion++;
         Active = true;
     }
@@ -144,10 +147,13 @@ public class CollisionPair
         DeactivateAndPoolIfRequired();
 
         _isCollidingChanged = false;
+        if (!_preventCulling && IsCullStateInvalidated())
+            CullCounter = 0;
 
         if (_preventCulling || CullCounter <= 0)
         {
             ProcessCollision();
+            RefreshBroadPhaseVersions();
             if (_isCollidingChanged && !_isColliding)
                 ContactPoint.Reset();
 
@@ -156,7 +162,6 @@ public class CollisionPair
         }
 
         if (!_preventCulling) CullCounter--;  //  Culled and counter 1 step closer until checking again
-        HandleColliderPartitionChange();
     }
 
     private bool IsCollisionPairActive() => Active && ColliderA.IsActive && ColliderB.IsActive;
@@ -212,16 +217,6 @@ public class CollisionPair
             CalculateCullScore();
     }
 
-    private void HandleColliderPartitionChange()
-    {
-        if (!ColliderA.PartitionChanged && !ColliderB.PartitionChanged)
-            return;
-
-        //New partition so collision culling may not be calculated yet
-        if (!_preventCulling) CullCounter = 0;
-        UpdateCollision();
-    }
-
     private bool CheckCollision()
     {
         bool positionOrRotationChanged = ColliderA.PositionChanged
@@ -229,10 +224,33 @@ public class CollisionPair
                                         || ColliderA.RotationChanged
                                         || ColliderB.RotationChanged;
 
-        if (!positionOrRotationChanged && _isColliding)
+        if (!positionOrRotationChanged && !BroadPhaseVersionChanged() && _isColliding)
             return _isColliding;
 
         return CollisionDetection.DoCollisionCheck(this);
+    }
+
+    private bool IsCullStateInvalidated()
+    {
+        return ColliderA.PartitionChanged
+            || ColliderB.PartitionChanged
+            || ColliderA.PositionChanged
+            || ColliderB.PositionChanged
+            || ColliderA.RotationChanged
+            || ColliderB.RotationChanged
+            || BroadPhaseVersionChanged();
+    }
+
+    private bool BroadPhaseVersionChanged()
+    {
+        return ColliderA.BroadPhaseVersion != _lastColliderABroadPhaseVersion
+            || ColliderB.BroadPhaseVersion != _lastColliderBBroadPhaseVersion;
+    }
+
+    private void RefreshBroadPhaseVersions()
+    {
+        _lastColliderABroadPhaseVersion = ColliderA.BroadPhaseVersion;
+        _lastColliderBBroadPhaseVersion = ColliderB.BroadPhaseVersion;
     }
 
     public void SetImmovableDirection(Vector3d directionA, Vector3d directionB)
@@ -261,21 +279,39 @@ public class CollisionPair
         int velocityScore = 0;
         if (!_preventDistanceCull)
         {
-            int step = GetCullDistanceStep(World!);
-            distanceScore = Math.Clamp((int)(_fastDistance - _fastDistanceOffset) / step + Context.Collisions.CullDistributor, 0, Context.Environment.CullDistanceMax);
-            velocityScore = Math.Clamp((int)(ColliderA.Velocity - ColliderB.Velocity).Magnitude / Context.Environment.CullVelocityStep, 0, Context.Environment.CullVelocityMax);
+            int distanceMax = Context.Environment.CullDistanceMax;
+            if (distanceMax > 0)
+            {
+                int step = GetCullDistanceStep(World!);
+                distanceScore = Math.Clamp((int)(_fastDistance - _fastDistanceOffset) / step + Context.Collisions.CullDistributor, 0, distanceMax);
+            }
+
+            int cullVelocityStep = Context.Environment.CullVelocityStep;
+            if (cullVelocityStep > 0)
+                velocityScore = Math.Clamp((int)(ColliderA.Velocity - ColliderB.Velocity).Magnitude / cullVelocityStep, 0, Context.Environment.CullVelocityMax);
         }
 
-        int timeScore = Math.Clamp((Context.FrameCount - LastCollidedFrame) / Context.Environment.CullTimeStep, 0, Context.Environment.CullTimeMax);
+        int timeScore = 0;
+        int cullTimeStep = Context.Environment.CullTimeStep;
+        if (cullTimeStep > 0)
+            timeScore = Math.Clamp((Context.FrameCount - LastCollidedFrame) / cullTimeStep, 0, Context.Environment.CullTimeMax);
 
-        CullCounter = (short)(distanceScore + velocityScore + timeScore);
+        CullCounter = (short)Math.Clamp(distanceScore + timeScore - velocityScore, 0, short.MaxValue);
     }
 
     /// <summary>
     /// Defines the step value for distance-based culling. The score is increased
     /// when the distance between objects increases. Higher values make the culling more aggressive for distant objects.
     /// </summary>
-    internal int GetCullDistanceStep(GridWorld world) => ((world.VoxelSize + Fixed64.One * 2) * (world.VoxelSize + Fixed64.One * 2) / Context.Environment.CullDistanceMax).CeilToInt();
+    internal int GetCullDistanceStep(GridWorld world)
+    {
+        int distanceMax = Context.Environment.CullDistanceMax;
+        if (distanceMax <= 0)
+            return int.MaxValue;
+
+        int step = ((world.VoxelSize + Fixed64.One * 2) * (world.VoxelSize + Fixed64.One * 2) / distanceMax).CeilToInt();
+        return Math.Max(1, step);
+    }
 
     public void Reset()
     {

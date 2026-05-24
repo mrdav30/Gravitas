@@ -243,7 +243,7 @@ public sealed class GravitasCircleQueryService
     }
 
     private void ProcessColliderListForClosestHit(
-        SwiftList<int>? colliderIds,
+        SwiftSparseMap<byte>? colliderIds,
         Vector3d position,
         Fixed64 radius,
         ref bool found,
@@ -255,7 +255,7 @@ public sealed class GravitasCircleQueryService
 
         for (int i = colliderIds.Count - 1; i >= 0; i--)
         {
-            if (!TryBuildOverlapHit(colliderIds[i], position, radius, out LSRaycastHit hitInfo)
+            if (!TryBuildOverlapHit(colliderIds.DenseKeys[i], position, radius, out LSRaycastHit hitInfo)
                 || hitInfo.Distance >= closestDist)
             {
                 continue;
@@ -282,7 +282,7 @@ public sealed class GravitasCircleQueryService
     }
 
     private void ProcessColliderListForDirectionalHit(
-        SwiftList<int>? colliderIds,
+        SwiftSparseMap<byte>? colliderIds,
         Vector3d position,
         Fixed64 radius,
         Vector3d direction,
@@ -296,7 +296,7 @@ public sealed class GravitasCircleQueryService
 
         for (int i = colliderIds.Count - 1; i >= 0; i--)
         {
-            if (!TryBuildOverlapHit(colliderIds[i], position, radius, out LSRaycastHit hitInfo))
+            if (!TryBuildOverlapHit(colliderIds.DenseKeys[i], position, radius, out LSRaycastHit hitInfo))
                 continue;
 
             Vector3d toHit = hitInfo.Point - position;
@@ -324,7 +324,7 @@ public sealed class GravitasCircleQueryService
     }
 
     private void ProcessColliderListForAllHits(
-        SwiftList<int>? colliderIds,
+        SwiftSparseMap<byte>? colliderIds,
         Vector3d position,
         Fixed64 radius,
         SwiftList<LSRaycastHit> results)
@@ -334,7 +334,7 @@ public sealed class GravitasCircleQueryService
 
         for (int i = colliderIds.Count - 1; i >= 0; i--)
         {
-            if (TryBuildOverlapHit(colliderIds[i], position, radius, out LSRaycastHit hitInfo))
+            if (TryBuildOverlapHit(colliderIds.DenseKeys[i], position, radius, out LSRaycastHit hitInfo))
                 results.Add(hitInfo);
         }
     }

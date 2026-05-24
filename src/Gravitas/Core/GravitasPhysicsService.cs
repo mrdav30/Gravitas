@@ -76,7 +76,14 @@ public sealed class GravitasPhysicsService
         if (!SimulatePhysics)
             return;
 
+        PrepareCollisionPartitions();
         _context.Collisions.CheckAndDistributeCollisions();
+    }
+
+    private void PrepareCollisionPartitions()
+    {
+        foreach (StiffBody body in _dynamicBodies)
+            body.Collider.Simulate();
     }
 
     /// <summary>

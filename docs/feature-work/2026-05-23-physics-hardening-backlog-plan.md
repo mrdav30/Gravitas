@@ -38,6 +38,8 @@
 - `../SwiftCollections/src/SwiftCollections.FixedMathSharp/Query/SpatialHash/SwiftFixedSpatialHash.cs`
 - `../SwiftCollections/src/SwiftCollections/Observable`
 - `../SwiftCollections/src/SwiftCollections/Query`
+- `../GridForge/src/GridForge/Grids/Nodes/Voxel.cs`
+- `../GridForge/src/GridForge/Spatial/PartitionProvider.cs`
 
 ## Cleanup Completed While Creating This Plan
 
@@ -116,6 +118,12 @@
   `Mesh/Cylinder` narrow phase, mesh triangle-buffer ownership, and mesh contact
   normals all affect the diagnostic events that Phase 9 would otherwise expose.
 - Prefer downstream deterministic primitives before adding local equivalents. FixedMathSharp geometry and `SwiftCollections.FixedMathSharp` query structures should be the default starting point; if a custom Gravitas structure is better, prove it with tests, benchmarks, and a short design note.
+- GridForge voxel partition providers are part of Gravitas' broad-phase cost
+  model. Phase 7 exposed allocation churn in the packaged GridForge 6.0.4
+  `PartitionProvider.TryRemove(...)` behavior when a voxel repeatedly loses and
+  regains a partition. The sibling GridForge source now has a regression test
+  and retention fix; Gravitas should consume the next fixed GridForge package
+  before treating end-to-end repartition allocation as solved.
 - Use engine-agnostic diagnostics rather than adding editor hooks to runtime classes. Diagnostics should report deterministic values and let hosts decide how to draw them.
 - Maintain `docs/wiki/` with each phase. The wiki is now useful enough that stale pages will mislead the next implementation pass.
 
@@ -524,13 +532,86 @@
 
 **Tasks:**
 
-- [ ] Add tests proving teleporting a collider invalidates pair culling and repartitions before the next collision distribution pass.
-- [ ] Replace dynamic-list removal only if benchmarks show churn is meaningful. Recommended implementation if needed: swap-remove plus an ID-to-index map owned by `PhysicsPartition`.
-- [ ] Benchmark current GridForge partitioning against `SwiftFixedSpatialHash<T>`, `SwiftFixedOctree<T>`, or `SwiftFixedBVH<T>` before replacing broad-phase structures.
-- [ ] Add tests for partition activation/deactivation transitions after dynamic object add/remove churn.
-- [ ] Redesign cull countdown using distance, relative velocity, frame count since collision, and partition movement state.
-- [ ] Add tests for fast-moving objects, large objects, recently collided pairs, and culling-disabled colliders.
-- [ ] Re-run `simulation-allocation`, `collision-partition`, and the new culling benchmark after every data-structure change.
+- [x] Add tests proving teleporting a collider invalidates pair culling and repartitions before the next collision distribution pass.
+- [x] Replace dynamic-list removal only if benchmarks show churn is meaningful. Recommended implementation if needed: a sparse-set style structure owned by `PhysicsPartition`.
+- [x] Capture the current GridForge partitioning baseline and do not replace broad-phase structures without a dedicated comparison against `SwiftFixedSpatialHash<T>`, `SwiftFixedOctree<T>`, or `SwiftFixedBVH<T>`.
+- [x] Add tests for partition activation/deactivation transitions after dynamic object add/remove churn.
+- [x] Redesign cull countdown using distance, relative velocity, frame count since collision, and partition movement state.
+- [x] Add tests for fast-moving objects, large objects, recently collided pairs, and culling-disabled colliders.
+- [x] Re-run `simulation-allocation`, `collision-partition`, and the new culling benchmark after every data-structure change.
+
+**Phase 7 completion notes:**
+
+- Added a pre-distribution collider refresh in `GravitasPhysicsService.Simulate()`
+  so host-command teleports and body repositioning update dynamic collider
+  bounds/partitions before collision distribution.
+- Added collider broad-phase versions and pair-side version tracking so culling
+  invalidates on position, rotation, partition, or shape/bounds movement even
+  when a collider remains inside the same snapped voxel bounds.
+- Reworked cull scoring so distance and frames since last contact can increase
+  the delay, while relative velocity reduces it. Disabled zero-valued cull
+  thresholds now skip their contribution instead of dividing by zero.
+- Replaced `PhysicsPartition` dynamic/static ID membership checks and removals
+  with `SwiftSparseMap<byte>` used as a sparse-set style container. Direct
+  partition remove/re-add churn now reports no managed allocation in the short
+  benchmark smoke and no longer needs separate list/index-map bookkeeping.
+  `SwiftSparseSet` would be an even cleaner downstream fit when that collection
+  exists.
+- Replaced the `PhysicsPartition` inactive pool's `SwiftObjectPool` backing with
+  a context-local `SwiftStack`. The old pool used `ConcurrentStack`, which was
+  safe but allocated nodes during release-heavy repartition waves.
+- Updated active-partition traversal to use the `SwiftBucket` enumerator path.
+- Added Phase 7 tests for teleported dynamic-body repartitioning,
+  cull-invalidation after movement, shape-only active-contact rechecks,
+  fast-relative-velocity culling, disabled cull thresholds, and partition
+  activation/deactivation churn.
+- Added the `partition-culling` benchmark alias covering dynamic-sphere
+  repartitioning, direct partition member churn, and culled-pair rechecks.
+- Short benchmark smoke on this machine:
+  - `simulation-allocation`: still reported `0 B` allocated for
+    `StiffBodyLateSimulateOnly`, `GroundingRaycastProbeOnly`,
+    `CollisionPartitionDistributionOnly`, and `ActivePairProcessingLateSimulate`.
+  - `collision-partition`: `SimulatePartitionedDynamicSpheres` reported `0 B`
+    allocated; registration/construction scenarios still allocate by design.
+  - `partition-culling`: all three paths reported no managed allocation in the
+    summary `Allocated` column. After the sparse-map partition change,
+    `RemoveAndReAddDynamicPartitionMembers` reported about `619.6 ns`;
+    `RecheckCulledPairAfterColliderMove` reported about `493.2 ns`; after the
+    local GridForge provider fix and the context-local partition stack,
+    `RepartitionTeleportedDynamicSpheres` reported about `778 us`.
+- Issue surfaced and fixed across the stack: full repartition churn was first
+  dominated by GridForge voxel partition-provider storage being released when
+  the last partition was removed. The sibling GridForge repo now has a targeted
+  regression test and fix. During hardening, `Gravitas.csproj` conditionally
+  links the sibling GridForge project when it is present, while still keeping
+  `GridForge`/`GridForge.Lean` 6.0.4 package dependencies in generated package
+  metadata. Remove the temporary local-link default after the next fixed
+  GridForge package is consumed.
+- Issue surfaced and deferred deliberately: `CollisionPair.AssignPriority(...)`
+  has an older same-priority velocity-ordering branch that is overwritten by the
+  final fallback assignment. This should be fixed with pair-order/contact-normal
+  tests because changing it can alter response direction and contact ordering.
+- Verification:
+  - `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~CollisionPairCullingTests|FullyQualifiedName~PhysicsPartitionPerformanceShapeTests|FullyQualifiedName~GravitasCollisionServiceTests|FullyQualifiedName~PhysicsPartitionTests|FullyQualifiedName~GravitasPhysicsServiceTests"`:
+    19 passed.
+  - `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~PhysicsPartitionPerformanceShapeTests|FullyQualifiedName~PhysicsPartitionTests|FullyQualifiedName~GravitasRaycastServiceTests|FullyQualifiedName~GravitasCircleQueryServiceTests|FullyQualifiedName~GravitasCollisionServiceTests"`:
+    18 passed after migrating partition membership to `SwiftSparseMap<byte>`.
+  - `dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0 -- partition-culling --filter "*" -j Short -i --exporters json`:
+    all three benchmark paths reported no managed allocation in the summary
+    `Allocated` column.
+  - `dotnet build Gravitas.slnx --configuration Release`: succeeded with 0
+    warnings and 0 errors, and built the local GridForge reference as Release.
+  - `dotnet test Gravitas.slnx --configuration Release --no-build`: 104
+    passed.
+  - `dotnet build Gravitas.slnx --configuration ReleaseLean`: succeeded with 0
+    warnings and 0 errors, and built the local GridForge reference as
+    ReleaseLean.
+  - `dotnet test Gravitas.slnx --configuration ReleaseLean --no-build`: 104
+    passed.
+  - Generated package metadata was inspected: standard packages still depend on
+    `GridForge 6.0.4`, and lean packages still depend on `GridForge.Lean 6.0.4`.
+  - `dotnet test GridForge.slnx --configuration Debug` in the sibling GridForge
+    repo after the provider-retention fix: 203 passed.
 
 ## Phase 8: Swept Queries, Ground Probe Modes, And Mesh Completion
 

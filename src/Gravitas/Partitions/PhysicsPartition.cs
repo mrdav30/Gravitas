@@ -7,6 +7,8 @@ namespace Gravitas;
 
 public class PhysicsPartition : IVoxelPartition
 {
+    private const byte Present = 0;
+
     private GravitasCollisionService? _owner;
 
     public WorldVoxelIndex WorldIndex { get; set; }
@@ -16,9 +18,9 @@ public class PhysicsPartition : IVoxelPartition
     /// <summary>
     /// Stores context-local dynamic body IDs.
     /// </summary>
-    public SwiftList<int>? ContainedDynamicObjects;
+    public SwiftSparseMap<byte>? ContainedDynamicObjects;
 
-    public SwiftList<int>? ContainedStaticObjects;
+    public SwiftSparseMap<byte>? ContainedStaticObjects;
 
     public int ActivationId { get; private set; }
 
@@ -61,17 +63,17 @@ public class PhysicsPartition : IVoxelPartition
         // only distribute when there are dynamic objects on the same partition
         for (int j = 0; j < dynamicCount; j++)
         {
-            int id1 = ContainedDynamicObjects[j];
+            int id1 = ContainedDynamicObjects.DenseKeys[j];
             for (int k = j + 1; k < dynamicCount; k++)
             {
-                int id2 = ContainedDynamicObjects[k];
+                int id2 = ContainedDynamicObjects.DenseKeys[k];
                 if (id1 != id2)
                     ProcessPair(id1, id2);
             }
 
             for (int k = 0; k < staticCount; k++)
             {
-                int id2 = ContainedStaticObjects![k];
+                int id2 = ContainedStaticObjects!.DenseKeys[k];
                 ProcessPair(id1, id2);
             }
         }
@@ -92,28 +94,28 @@ public class PhysicsPartition : IVoxelPartition
 
     public void AddDynamicObject(int item)
     {
-        if (ContainedDynamicObjects?.Contains(item) == true)
+        ContainedDynamicObjects ??= new();
+        if (ContainedDynamicObjects.ContainsKey(item))
             return;
 
-        ContainedDynamicObjects ??= new();
         if (ContainedDynamicObjects.Count == 0)
             ActivationId = Owner.ActivatePartition(this);
 
-        ContainedDynamicObjects.Add(item);
+        ContainedDynamicObjects.Add(item, Present);
     }
 
     public void AddStaticObject(int item)
     {
-        if (ContainedStaticObjects?.Contains(item) == true)
+        ContainedStaticObjects ??= new();
+        if (ContainedStaticObjects.ContainsKey(item))
             return;
 
-        ContainedStaticObjects ??= new();
-        ContainedStaticObjects.Add(item);
+        ContainedStaticObjects.Add(item, Present);
     }
 
     public void RemoveDynamicObject(int item)
     {
-        if (ContainedDynamicObjects?.Remove(item) == false)
+        if (ContainedDynamicObjects?.Remove(item) != true)
         {
             GravitasLogger.DebugChannel.Info($"Dynamic item not removed - {item}");
             return;
@@ -129,7 +131,7 @@ public class PhysicsPartition : IVoxelPartition
 
     public void RemoveStaticObject(int item)
     {
-        if (ContainedStaticObjects?.Remove(item) == false)
+        if (ContainedStaticObjects?.Remove(item) != true)
             GravitasLogger.DebugChannel.Info($"Static item not removed - {item}");
     }
 
@@ -151,8 +153,8 @@ public class PhysicsPartition : IVoxelPartition
 
     internal void ResetForPool()
     {
-        ContainedDynamicObjects?.FastClear();
-        ContainedStaticObjects?.FastClear();
+        ContainedDynamicObjects?.Clear();
+        ContainedStaticObjects?.Clear();
 
         if (ActivationId != -1)
             _owner?.DeactivatePartition(ActivationId);
