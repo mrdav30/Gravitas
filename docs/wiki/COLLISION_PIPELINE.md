@@ -1,8 +1,8 @@
 # Collision Pipeline
 
 Gravitas collision work is split into GridForge-backed broad phase,
-context-local pair management, shape-pair narrow phase, prototype response, and
-late contact notification.
+context-local pair management, shape-pair narrow phase, single-contact
+response, and late contact notification.
 
 ## Broad Phase: Voxel Partitions
 
@@ -189,16 +189,22 @@ validation and acceleration work exists.
 
 The narrow phase writes a `ContactPoint`:
 
+- validity flag indicating narrow-phase contact data is present.
 - point on collider A.
 - point on collider B.
 - penetration depth.
 - normal.
 - optional immovable collision direction.
 
-`ContactPoint.SetContactPoint(...)` clamps depth to at least a small
-penetration margin. That margin helps avoid tiny corrections that fail to
-separate bodies, but it is also one of the response details that needs alpha
-hardening.
+`ContactPoint.SetContactPoint(...)` stores the narrow phase's detected depth
+without adding a solver margin. Touching contacts can therefore have zero depth,
+and any stabilization margin belongs to the response solver rather than hidden
+inside contact data.
+
+`ContactPoint.HasContact` distinguishes unset contact data from legitimate
+zero-valued fields, such as touching contacts with zero depth or contact points
+at the origin. The response solver ignores pairs whose contact data has not been
+written by narrow phase.
 
 ## Response
 
@@ -207,22 +213,44 @@ when detection reports a collision and the pair should perform physics response.
 Pairs with either collider marked as a trigger skip physical response; they can
 still flow through contact notification.
 
-Current non-trigger response behavior:
+Current non-trigger response behavior is a deterministic single-contact solver:
 
-1. apply position correction based on penetration depth, normal direction,
-   inverse masses and immovable flags.
-2. compute contact velocity from linear velocity plus angular velocity at the
-   contact inputs.
-3. project contact velocity onto the contact normal.
-4. compute an impulse scalar using restitution, inverse mass, and angular
-   inertia effect.
-5. apply linear impulse to movable bodies.
-6. apply angular impulse when angular forces are allowed.
+1. build an explicit contact from collider A, collider B, the two contact
+   points, relative contact arms, detected depth, and a normal oriented from A
+   to B.
+2. treat `Immovable` and `IsKinematic` bodies as infinite mass for response.
+3. apply immediate positional correction only for depth above
+   `CollisionResponse.PenetrationSlop`; the correction is distributed by
+   inverse mass and scaled by `PenetrationCorrectionPercent`.
+4. compute contact velocity from linear velocity plus angular velocity at each
+   relative contact arm.
+5. skip impulse when the bodies are already separating along the contact normal.
+6. compute a normal impulse using inverse mass, inverse inertia, contact arms,
+   and the combined restitution.
+7. apply direct velocity deltas to movable bodies, plus angular velocity deltas
+   when angular forces are enabled.
 
-This is intentionally documented as prototype response. It is a strong candidate
-for future redesign around contact manifolds, stable stacking, continuous
-collision detection, friction impulses, restitution thresholds, angular units,
-and physically explainable 2D/3D interaction rules.
+Response units and invariants:
+
+- mass is body mass in the same unit model used by `StiffBody`.
+- inverse mass is zero for immovable and kinematic bodies.
+- linear velocity is world units per second.
+- angular velocity is radians per second around each local/world axis.
+- inertia tensors are diagonal fixed-point approximations supplied by the
+  collider shape and transformed by `StiffBody`.
+- restitution is clamped to `[0, 1]` and combined by the lower coefficient so a
+  low-bounce participant can dampen the pair.
+- closing speeds at or below `RestitutionVelocityThreshold` use zero
+  restitution to avoid resting-contact bounce.
+- penetration depth is a world distance from narrow phase; response slop is a
+  solver invariant, not contact data.
+- drag, friction, and angular damping remain integration/body behavior for now;
+  tangential friction impulses are deferred until contact manifolds and stable
+  stacking are designed.
+
+This is still the first alpha milestone, not a full response engine. Contact
+manifolds, friction impulses, continuous collision detection, warm starting,
+island solving, and 2D/3D mixed-dimension exchange rules remain future work.
 
 ## Contact Notifications
 

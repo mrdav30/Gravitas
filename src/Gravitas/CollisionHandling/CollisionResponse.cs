@@ -4,111 +4,242 @@ using Gravitas.Colliders;
 namespace Gravitas.CollisionHandling;
 
 /// <summary>
-/// Represents a pair of colliders in the physics simulation, handling their interaction.
+/// Solves the current single-contact collision response for one collision pair.
 /// </summary>
 public static class CollisionResponse
 {
     public const bool Debug = true;
 
     /// <summary>
-    /// Applies the separation vector to a collider, updating its position and velocity.
+    /// Penetration depth below this value is treated as contact slop and does not
+    /// produce positional correction.
     /// </summary>
-    /// <param name="pair">The collision pair containing the colliders and contact point information.</param>
-    public static void CalculateImpulse(CollisionPair pair)
-    {
-        if (pair.ColliderA.IsTrigger || pair.ColliderB.IsTrigger)
-            return;
-
-        if (pair.ContactPoint.Depth < Fixed64.Zero)
-            GravitasLogger.DebugChannel.Info($"Negative penetration depth detected: {pair.ContactPoint.Depth}. This may indicate an issue with the collision detection phase.");
-        //return;
-
-        LSCollider collider1 = pair.ColliderA, collider2 = pair.ColliderB;
-        ApplyPositionCorrection(collider1, collider2, pair.ContactPoint);
-
-        Vector3d fullVelocityA = collider1.Body!.LinearVelocity + Vector3d.Cross(collider1.Body.AngularVelocity, pair.ContactPoint.RelativeA);
-        Vector3d fullVelocityB = collider2.Body!.LinearVelocity + Vector3d.Cross(collider2.Body.AngularVelocity, pair.ContactPoint.RelativeB);
-        Vector3d contactVelocity = fullVelocityB - fullVelocityA;
-
-        if (contactVelocity == Vector3d.Zero)
-            return;
-
-        Fixed64 impulseForce = Vector3d.Dot(contactVelocity, pair.ContactPoint.Normal);
-
-        // work out the effects of interia
-        Vector3d interiaA = Vector3d.Cross(collider1.Body.InverseInteriaTensor * Vector3d.Cross(pair.ContactPoint.RelativeA, pair.ContactPoint.Normal), pair.ContactPoint.RelativeA);
-        Vector3d interiaB = Vector3d.Cross(collider2.Body.InverseInteriaTensor * Vector3d.Cross(pair.ContactPoint.RelativeB, pair.ContactPoint.Normal), pair.ContactPoint.RelativeB);
-        Fixed64 angularEffect = Vector3d.Dot(interiaA + interiaB, pair.ContactPoint.Normal);
-
-        Fixed64 restitution = -(Fixed64.One + FixedMath.Max(collider1.Body.RestitutionCoefficient, collider2.Body.RestitutionCoefficient));
-        Fixed64 impulseScalar = restitution * impulseForce;
-        impulseScalar /= collider1.Body.InverseMass + collider2.Body.InverseMass + angularEffect;
-
-        // direction of the impulse
-        Vector3d impulseDirection = (collider2.Center - collider1.Center).Normal;
-        // direction of the impulse
-        Vector3d fullImpulse = impulseDirection * impulseScalar;
-
-        SetVelocityImpulse(collider1, -fullImpulse, pair.ContactPoint.RelativeA);
-        SetVelocityImpulse(collider2, fullImpulse, pair.ContactPoint.RelativeB);
-    }
+    public static readonly Fixed64 PenetrationSlop = (Fixed64)0.01f;
 
     /// <summary>
-    /// This method is used to adjust the positions of colliding objects based on 
-    /// the penetration depth calculated during the collision detection phase.
-    /// It's more about correcting the overlap after the collision has been detected, 
-    /// rather than preemptively adjusting positions to avoid penetration, as in CCD.
-    /// </summary> 
-    /// <param name="collider1">The first collider involved in the collision.</param>
-    /// <param name="collider2">The second collider involved in the collision.</param>
-    /// <param name="point">The contact point information, including penetration depth and normal.</param>
-    private static void ApplyPositionCorrection(LSCollider collider1, LSCollider collider2, ContactPoint point)
+    /// Fraction of penetration above slop corrected per solver call.
+    /// </summary>
+    public static readonly Fixed64 PenetrationCorrectionPercent = (Fixed64)0.8f;
+
+    /// <summary>
+    /// Closing speed at or below this value is treated as resting contact and
+    /// uses zero restitution to avoid small deterministic bounces.
+    /// </summary>
+    public static readonly Fixed64 RestitutionVelocityThreshold = (Fixed64)0.25f;
+
+    /// <summary>
+    /// Applies positional correction and a normal impulse for the collision
+    /// pair's current contact.
+    /// </summary>
+    public static void CalculateImpulse(CollisionPair pair)
     {
-        //// Still testing this out...
-        //pair.SetImmovableDirection(-pair.ColliderB.Body.LinearVelocity.Normal, -pair.ColliderA.Body.LinearVelocity.Normal);
-
-        Vector3d direction = (collider2.Center - collider1.Center).Normal;
-
-        // Correct positions using MPV, penetration depth, & TOI position
-        if (!collider1.Body!.Immovable && !collider2.Body!.Immovable)
-        {
-            Fixed64 totalMass = collider1.Body.InverseMass + collider2.Body.InverseMass;
-            if (!collider1.IsTrigger)
-            {
-                Fixed64 move1 = point.Depth * (collider1.Body.InverseMass / totalMass);
-                collider1.Body.AddPositionCorrection(-direction * move1);
-            }
-
-            if (!collider2.IsTrigger)
-            {
-                Fixed64 move2 = point.Depth * (collider2.Body.InverseMass / totalMass);
-                collider2.Body.AddPositionCorrection(direction * move2);
-            }
-
+        if (!TryCreateContact(pair, out SingleContact contact))
             return;
-        }
 
-        if (!collider1.Body.Immovable && !collider1.IsTrigger)
-        {
-            collider1.Body.AddPositionCorrection(-direction * point.Depth);
-            return;
-        }
-
-        if (!collider2.Body!.Immovable && !collider1.IsTrigger)
-            collider2.Body.AddPositionCorrection(direction * point.Depth);
+        ApplyPositionCorrection(contact);
+        ApplyVelocityImpulse(contact);
     }
 
-    private static void SetVelocityImpulse(LSCollider collider, Vector3d impulse, Vector3d contactPointRelative)
+    private static bool TryCreateContact(CollisionPair pair, out SingleContact contact)
     {
-        if (collider.Body!.Immovable == true || collider.IsTrigger)
+        contact = default;
+        if (pair.ColliderA.IsTrigger || pair.ColliderB.IsTrigger)
+            return false;
+
+        if (pair.ColliderA.Body == null || pair.ColliderB.Body == null)
+            return false;
+
+        if (!pair.ContactPoint.HasContact)
+            return false;
+
+        Vector3d normal = ResolveContactNormal(pair.ContactPoint.Normal, pair.ColliderB.Center - pair.ColliderA.Center);
+        if (normal == Vector3d.Zero)
+            return false;
+
+        ResponseBody bodyA = ResponseBody.Create(pair.ColliderA);
+        ResponseBody bodyB = ResponseBody.Create(pair.ColliderB);
+        if (bodyA.InverseMass + bodyB.InverseMass <= Fixed64.Zero)
+            return false;
+
+        contact = new SingleContact(
+            bodyA,
+            bodyB,
+            pair.ContactPoint.RelativeA,
+            pair.ContactPoint.RelativeB,
+            pair.ContactPoint.RelativeA - pair.ColliderA.Center,
+            pair.ContactPoint.RelativeB - pair.ColliderB.Center,
+            pair.ContactPoint.Depth,
+            normal);
+        return true;
+    }
+
+    private static void ApplyPositionCorrection(SingleContact contact)
+    {
+        Fixed64 correctionDepth = contact.Depth - PenetrationSlop;
+        if (correctionDepth <= Fixed64.Zero)
             return;
 
-        collider.Body.AddLinearImpulse(impulse);
-
-        if (collider.Body.PreventAngularForces)
+        Fixed64 totalInverseMass = contact.TotalInverseMass;
+        if (totalInverseMass <= Fixed64.Zero)
             return;
 
-        Vector3d angularImpulse = Vector3d.Cross(contactPointRelative, impulse);
-        collider.Body.AddAngularImpulse(angularImpulse);
+        Vector3d correction = contact.Normal * (correctionDepth * PenetrationCorrectionPercent / totalInverseMass);
+        contact.A.Body.ApplyCollisionPositionCorrection(-correction * contact.A.InverseMass);
+        contact.B.Body.ApplyCollisionPositionCorrection(correction * contact.B.InverseMass);
+    }
+
+    private static void ApplyVelocityImpulse(SingleContact contact)
+    {
+        Vector3d velocityA = contact.A.Body.LinearVelocity + Vector3d.Cross(contact.A.Body.AngularVelocity, contact.RelativeA);
+        Vector3d velocityB = contact.B.Body.LinearVelocity + Vector3d.Cross(contact.B.Body.AngularVelocity, contact.RelativeB);
+        Fixed64 normalVelocity = Vector3d.Dot(velocityB - velocityA, contact.Normal);
+
+        if (normalVelocity >= Fixed64.Zero)
+            return;
+
+        Fixed64 denominator = contact.TotalInverseMass
+            + ComputeAngularDenominator(contact.A, contact.RelativeA, contact.Normal)
+            + ComputeAngularDenominator(contact.B, contact.RelativeB, contact.Normal);
+        if (denominator <= Fixed64.Epsilon)
+            return;
+
+        Fixed64 restitution = ResolveRestitution(contact, -normalVelocity);
+        Fixed64 impulseScalar = -(Fixed64.One + restitution) * normalVelocity / denominator;
+        if (impulseScalar <= Fixed64.Zero)
+            return;
+
+        Vector3d impulse = contact.Normal * impulseScalar;
+        ApplyImpulse(contact.A, -impulse, contact.RelativeA);
+        ApplyImpulse(contact.B, impulse, contact.RelativeB);
+    }
+
+    private static Fixed64 ComputeAngularDenominator(ResponseBody body, Vector3d relativeContactPoint, Vector3d normal)
+    {
+        if (!body.CanRotate)
+            return Fixed64.Zero;
+
+        Vector3d angular = Vector3d.Cross(
+            body.InverseInertiaTensor * Vector3d.Cross(relativeContactPoint, normal),
+            relativeContactPoint);
+        Fixed64 denominator = Vector3d.Dot(angular, normal);
+        return denominator > Fixed64.Zero ? denominator : Fixed64.Zero;
+    }
+
+    private static void ApplyImpulse(ResponseBody body, Vector3d impulse, Vector3d relativeContactPoint)
+    {
+        if (!body.CanMove)
+            return;
+
+        body.Body.ApplyCollisionLinearVelocityDelta(impulse * body.InverseMass);
+
+        if (!body.CanRotate)
+            return;
+
+        Vector3d angularVelocityDelta = body.InverseInertiaTensor * Vector3d.Cross(relativeContactPoint, impulse);
+        body.Body.ApplyCollisionAngularVelocityDelta(angularVelocityDelta);
+    }
+
+    private static Fixed64 ResolveRestitution(SingleContact contact, Fixed64 closingSpeed)
+    {
+        if (closingSpeed <= RestitutionVelocityThreshold)
+            return Fixed64.Zero;
+
+        Fixed64 restitution = FixedMath.Min(
+            contact.A.Body.RestitutionCoefficient,
+            contact.B.Body.RestitutionCoefficient);
+        return FixedMath.Clamp(restitution, Fixed64.Zero, Fixed64.One);
+    }
+
+    private static Vector3d ResolveContactNormal(Vector3d normal, Vector3d fallbackDirection)
+    {
+        Vector3d resolved = normal.SqrMagnitude > Fixed64.Epsilon
+            ? normal.Normal
+            : fallbackDirection.SqrMagnitude > Fixed64.Epsilon
+                ? fallbackDirection.Normal
+                : Vector3d.Zero;
+
+        if (resolved == Vector3d.Zero)
+            return resolved;
+
+        return fallbackDirection.SqrMagnitude > Fixed64.Epsilon
+            && Vector3d.Dot(resolved, fallbackDirection) < Fixed64.Zero
+                ? -resolved
+                : resolved;
+    }
+
+    private readonly struct SingleContact
+    {
+        public SingleContact(
+            ResponseBody bodyA,
+            ResponseBody bodyB,
+            Vector3d pointA,
+            Vector3d pointB,
+            Vector3d relativeA,
+            Vector3d relativeB,
+            Fixed64 depth,
+            Vector3d normal)
+        {
+            A = bodyA;
+            B = bodyB;
+            PointA = pointA;
+            PointB = pointB;
+            RelativeA = relativeA;
+            RelativeB = relativeB;
+            Depth = depth;
+            Normal = normal;
+        }
+
+        public ResponseBody A { get; }
+
+        public ResponseBody B { get; }
+
+        public Vector3d PointA { get; }
+
+        public Vector3d PointB { get; }
+
+        public Vector3d RelativeA { get; }
+
+        public Vector3d RelativeB { get; }
+
+        public Fixed64 Depth { get; }
+
+        public Vector3d Normal { get; }
+
+        public Fixed64 TotalInverseMass => A.InverseMass + B.InverseMass;
+    }
+
+    private readonly struct ResponseBody
+    {
+        private ResponseBody(LSCollider collider, StiffBody body, Fixed64 inverseMass, Fixed3x3 inverseInertiaTensor)
+        {
+            Collider = collider;
+            Body = body;
+            InverseMass = inverseMass;
+            InverseInertiaTensor = inverseInertiaTensor;
+        }
+
+        public LSCollider Collider { get; }
+
+        public StiffBody Body { get; }
+
+        public Fixed64 InverseMass { get; }
+
+        public Fixed3x3 InverseInertiaTensor { get; }
+
+        public bool CanMove => InverseMass > Fixed64.Zero;
+
+        public bool CanRotate => CanMove && !Body.AngularForcesHalted && !Body.IsKinematic;
+
+        public static ResponseBody Create(LSCollider collider)
+        {
+            StiffBody body = collider.Body!;
+            bool movable = !body.Immovable && !body.IsKinematic;
+            Fixed64 inverseMass = movable ? body.InverseMass : Fixed64.Zero;
+            Fixed3x3 inverseInertiaTensor = movable && !body.AngularForcesHalted
+                ? body.InverseInteriaTensor
+                : Fixed3x3.Zero;
+
+            return new ResponseBody(collider, body, inverseMass, inverseInertiaTensor);
+        }
     }
 }

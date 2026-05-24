@@ -373,17 +373,63 @@
 - Modify: `src/Gravitas/CollisionHandling/Support/ContactPoint.cs`
 - Modify: `src/Gravitas/Core/StiffBody.cs`
 - Modify: `tests/Gravitas.Tests/CollisionHandling/CollisionResponseInvariantTests.cs`
+- Modify: `tests/Gravitas.Tests/CollisionHandling/CollisionDetectionShapePairTests.cs`
+- Modify: `tests/Gravitas.Tests/Support/PhysicsScenarioBuilder.cs`
 - Modify: `tests/Gravitas.Benchmarks/CollisionHandling/CollisionResponseBenchmarks.cs`
 - Modify: `docs/wiki/COLLISION_PIPELINE.md`
 
 **Tasks:**
 
-- [ ] Define units and invariants for mass, inverse mass, inertia tensor, angular velocity, restitution, friction, drag, damping, and penetration correction.
-- [ ] Replace single-point response assumptions with an explicit contact model. Recommended first milestone: stable single-contact solver with room for contact manifolds.
-- [ ] Add tests for conservation expectations, restitution thresholds, immovable body behavior, kinematic body behavior, angular impulse direction, trigger exclusion, and stable resting contact.
-- [ ] Revisit `ContactPoint` depth clamping. Keep it only if tests prove it is a solver invariant rather than a hidden correction.
-- [ ] Add deterministic replay tests that run the same body pair for many fixed frames and compare final state.
-- [ ] Run response benchmarks and add allocation checks for active-pair processing after solver changes.
+- [x] Define units and invariants for mass, inverse mass, inertia tensor, angular velocity, restitution, friction, drag, damping, and penetration correction.
+- [x] Replace single-point response assumptions with an explicit contact model. Recommended first milestone: stable single-contact solver with room for contact manifolds.
+- [x] Add tests for conservation expectations, restitution thresholds, immovable body behavior, kinematic body behavior, angular impulse direction, trigger exclusion, and stable resting contact.
+- [x] Revisit `ContactPoint` depth clamping. Keep it only if tests prove it is a solver invariant rather than a hidden correction.
+- [x] Add deterministic replay tests that run the same body pair for many fixed frames and compare final state.
+- [x] Run response benchmarks and add allocation checks for active-pair processing after solver changes.
+
+**Phase 5 completion notes:**
+
+- Replaced the prototype response path with a deterministic single-contact
+  solver that builds an explicit contact from pair bodies, contact points,
+  relative contact arms, depth, and A-to-B normal.
+- Treats `Immovable` and `IsKinematic` bodies as infinite mass for response.
+  Movable bodies receive direct collision velocity deltas instead of the
+  time-scaled `StiffBody.AddLinearImpulse(...)` host API.
+- Removed the hidden `ContactPoint` depth floor. Contact data now stores the
+  narrow-phase depth directly, including zero-depth touching contacts.
+- Added `ContactPoint.HasContact` so zero-valued contact fields are not used as
+  implicit valid data, and response now skips pairs whose contact has not been
+  populated by narrow phase.
+- Moved stabilization into response constants:
+  `PenetrationSlop`, `PenetrationCorrectionPercent`, and
+  `RestitutionVelocityThreshold`.
+- Restitution is clamped to `[0, 1]`, combined by the lower participant
+  coefficient, and suppressed below the resting-contact threshold to avoid
+  deterministic micro-bounce.
+- Position correction now applies immediately through body collision correction
+  helpers and is distributed by inverse mass.
+- Added response tests for exact elastic normal-velocity exchange, zero
+  restitution damping, restitution-threshold resting contacts, kinematic
+  infinite-mass behavior, trigger exclusion, immovable behavior, angular impulse
+  direction, contact-depth storage, unset-contact response exclusion,
+  correction slop, and deterministic replay.
+- Updated collision detection shape tests so touching contacts require
+  non-negative depth rather than the removed artificial penetration margin.
+- Documented response units and the current deferral of tangential friction
+  impulses, warm starting, manifolds, island solving, and continuous collision
+  detection.
+- Short `collision-response` benchmark smoke on this machine:
+  - `CollisionResponseBenchmarks.CalculateImpulseForPreparedPairs`: 64 pairs,
+    mean about `915.7 us`, allocated `0 B`.
+  - BenchmarkDotNet could not raise process priority and warned that the
+    iteration time is very small, so this is a smoke result rather than
+    canonical timing evidence.
+- Short `simulation-allocation` smoke still reported `0 B` allocated for
+  active-pair processing:
+  - `ActivePairProcessingLateSimulate`: 64 colliders, mean about `58.72 us`.
+  - Other included smoke paths also reported `0 B` allocated:
+    `StiffBodyLateSimulateOnly`, `GroundingOverlapCircleOnly`, and
+    `CollisionPartitionDistributionOnly`.
 
 ## Phase 6: Body, Grounding, And Visualization Semantics
 

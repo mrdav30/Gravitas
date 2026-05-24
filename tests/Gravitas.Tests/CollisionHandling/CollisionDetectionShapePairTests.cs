@@ -248,7 +248,7 @@ public sealed class CollisionDetectionShapePairTests
 
         pair.CollisionType.Should().Be(expectedType);
         CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
-        pair.ContactPoint.Depth.Should().BeGreaterThan(Fixed64.Zero);
+        pair.ContactPoint.Depth.Should().BeGreaterThanOrEqualTo(Fixed64.Zero);
         Vector3d centerDelta = pair.ColliderB.Center - pair.ColliderA.Center;
         if (centerDelta.SqrMagnitude > Fixed64.Epsilon)
             Vector3d.Dot(pair.ContactPoint.Normal, centerDelta).Should().BeGreaterThan(Fixed64.Zero);

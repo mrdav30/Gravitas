@@ -48,7 +48,8 @@ internal sealed class PhysicsScenarioBuilder : IDisposable
         Fixed64? mass = null,
         bool immovable = false,
         bool preventAngularForces = false,
-        bool isDynamic = true)
+        bool isDynamic = true,
+        bool isKinematic = false)
         where TCollider : LSCollider
     {
         var transform = new FixedTransform(position, rotation, Vector3d.One);
@@ -57,6 +58,7 @@ internal sealed class PhysicsScenarioBuilder : IDisposable
         {
             Mass = mass ?? Fixed64.One,
             Immovable = immovable,
+            IsKinematic = isKinematic,
             PreventAngularForces = preventAngularForces
         };
 
@@ -69,7 +71,8 @@ internal sealed class PhysicsScenarioBuilder : IDisposable
         FixedQuaternion? rotation = null,
         Fixed64? mass = null,
         bool immovable = false,
-        bool preventAngularForces = false)
+        bool preventAngularForces = false,
+        bool isKinematic = false)
     {
         return CreateBody(
             new LSSphereCollider(),
@@ -77,7 +80,8 @@ internal sealed class PhysicsScenarioBuilder : IDisposable
             rotation ?? FixedQuaternion.Identity,
             mass,
             immovable,
-            preventAngularForces);
+            preventAngularForces,
+            isKinematic: isKinematic);
     }
 
     public ScenarioBody<LSCapsuleCollider> CreateCapsule(

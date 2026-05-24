@@ -489,6 +489,34 @@ public class StiffBody : IRecordable
             _angularVelocity += (impulse * _inverseInertiaTensor) * Context.DeltaTime;
     }
 
+    internal void ApplyCollisionLinearVelocityDelta(Vector3d velocityDelta)
+    {
+        if (Immovable || IsKinematic || velocityDelta == Vector3d.Zero)
+            return;
+
+        Vector3d lastVelocity = _linearVelocity;
+        _linearVelocity += velocityDelta;
+        RefreshLinearMotionState(lastVelocity);
+    }
+
+    internal void ApplyCollisionAngularVelocityDelta(Vector3d velocityDelta)
+    {
+        if (AngularForcesHalted || IsKinematic || velocityDelta == Vector3d.Zero)
+            return;
+
+        Vector3d lastVelocity = _angularVelocity;
+        _angularVelocity += velocityDelta;
+        RefreshAngularMotionState(lastVelocity);
+    }
+
+    internal void ApplyCollisionPositionCorrection(Vector3d positionCorrection)
+    {
+        if (Immovable || IsKinematic || positionCorrection == Vector3d.Zero)
+            return;
+
+        SetPosition(Position3d + positionCorrection);
+    }
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void SetPosition(Vector3d position) => Position3d = position;
 
@@ -582,6 +610,12 @@ public class StiffBody : IRecordable
         // Make sure we don't fall any faster than maxFallSpeed. This gives our character a terminal velocity
         _linearVelocity.y = FixedMath.Max(_linearVelocity.y, -environment.MaxFallSpeed);
 
+        RefreshLinearMotionState(lastVelocity);
+    }
+
+    private void RefreshLinearMotionState(Vector3d lastVelocity)
+    {
+        PhysicsEnvironment environment = Context.Environment;
         Fixed64 desiredSpeed = _linearVelocity.Magnitude;
         if (desiredSpeed > environment.MinSpeed)
         {
@@ -604,7 +638,7 @@ public class StiffBody : IRecordable
             ? _linearVelocity.Normal
             : _linearDirection;
         _linearAcceleration = _linearSpeed > Fixed64.Zero
-            ? (_linearVelocity - lastVelocity) / deltaTime
+            ? (_linearVelocity - lastVelocity) / Context.DeltaTime
             : Vector3d.Zero;
     }
 
@@ -659,10 +693,16 @@ public class StiffBody : IRecordable
         Vector3d dampingTorque = -environment.DampingFactor * _angularVelocity;
         _angularVelocity += _inverseInertiaTensor * dampingTorque * deltaTime;
 
+        RefreshAngularMotionState(lastVelocity);
+    }
+
+    private void RefreshAngularMotionState(Vector3d lastVelocity)
+    {
+        PhysicsEnvironment environment = Context.Environment;
         Fixed64 desiredSpeed = _angularVelocity.Magnitude;
         if (desiredSpeed > environment.MinSpeed)
         {
-            if (_angularSpeed > environment.MaxSpeed)
+            if (desiredSpeed > environment.MaxSpeed)
             {
                 _angularVelocity = _angularVelocity.Normal * environment.MaxSpeed;
                 _angularSpeed = environment.MaxSpeed;
@@ -681,7 +721,7 @@ public class StiffBody : IRecordable
         }
 
         _angularAcceleration = _angularSpeed > Fixed64.Zero
-            ? (_angularVelocity - lastVelocity) / deltaTime
+            ? (_angularVelocity - lastVelocity) / Context.DeltaTime
             : Vector3d.Zero;
     }
 
