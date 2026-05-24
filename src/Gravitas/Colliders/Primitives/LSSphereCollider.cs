@@ -18,11 +18,8 @@ public class LSSphereCollider : LSCollider
     }
 
 
-    protected override void GenerateShape() =>
+    protected override void BuildShape() =>
         Area = FixedMath.PI * ScaledRadiusSqr;  // The area of a circle is pi times the radius squared (A = π r²)
-
-    // No need to build a shape for a sphere
-    protected override void BuildShape() { }
 
     public override Fixed3x3 CalculateInertiaTensor(Fixed64 mass)
     {

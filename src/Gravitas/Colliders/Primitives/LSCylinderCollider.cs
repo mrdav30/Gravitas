@@ -15,11 +15,6 @@ public class LSCylinderCollider : LSCollider
         base.OnInitialize();
     }
 
-    protected override void GenerateShape()
-    {
-        throw new System.NotImplementedException();
-    }
-
     public override Fixed3x3 CalculateInertiaTensor(Fixed64 mass)
     {
         throw new System.NotImplementedException();

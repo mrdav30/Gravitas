@@ -69,6 +69,7 @@ Start with hot paths that can be isolated and repeated deterministically:
 - `GravitasCollisionService` partitioning and partition cleanup.
 - `CollisionDetection` shape-pair checks.
 - `CollisionResponse` contact resolution.
+- collider shape-state rebuilds, capsule derived state, and mesh validation/BVH construction.
 - `GravitasRaycastService` and `GravitasCircleQueryService` query gathering, filtering, and result ordering.
 - Mesh collider preprocessing and convex mesh limits.
 - Pooling and allocation behavior for collision pairs, partitions, and temporary collections.
@@ -111,6 +112,12 @@ allocation in steady state:
 | --- | --- |
 | `query-service` | `RaycastAll`, `OverlapCircleAll`, directional `OverlapCircleInDirection`, and overlapping-context queries. |
 | `simulation-allocation` | `StiffBody.LateSimulate`, grounding directional circle-overlap checks, collision partition distribution, and active-pair late simulation. |
+
+Collider shape work has a focused selection:
+
+```bash
+dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0 -- collider-shape --filter "*" -j Short -i --exporters json
+```
 
 ## CI Guidance
 

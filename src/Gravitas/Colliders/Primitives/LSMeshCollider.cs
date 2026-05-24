@@ -17,24 +17,30 @@ public class LSMeshCollider : LSCollider
 
     public LSMeshCollider(Vector3d[] vertices, int[] triangles)
     {
-        Mesh = new PhysicsMesh(vertices, triangles, Center, Rotation);
-
-        _bounds = Mesh.Bounds;
-        _offset = _bounds.Center;
-        _size = _bounds.Proportions;
+        Mesh = new PhysicsMesh(vertices, triangles, Vector3d.Zero, FixedQuaternion.Identity);
+        _offset = Mesh.LocalBounds.Center;
+        _size = Mesh.LocalBounds.Proportions;
+        _radius = _size.Magnitude * Fixed64.Half;
     }
 
     protected override void OnInitialize()
     {
-        Fixed64 diameter = FixedMath.Max(LocalScale.z, FixedMath.Max(LocalScale.y, LocalScale.x));
-        _radius = diameter / 2;
+        base.OnInitialize();
+    }
+
+    public override Fixed64 ScaledRadius => Bounds.Scope.Magnitude;
+
+    protected override void RebuildRuntimeShape()
+    {
+        BuildShape();
+        BuildBoundingBox();
     }
 
     protected override void BuildBoundingBox() =>
-        _bounds = Mesh.Bounds;
+        SetBounds(Mesh.Bounds);
 
     protected override void BuildShape() =>
-         Mesh.UpdatePosition(Center, Rotation);
+         Mesh.UpdatePosition(Position, Rotation);
 
     public override Fixed3x3 CalculateInertiaTensor(Fixed64 mass) =>
         Mesh.CalculateInertiaTensor(mass);
@@ -44,7 +50,7 @@ public class LSMeshCollider : LSCollider
 
     public SwiftList<int> GetNearbyTriangles(Vector3d queryPoint)
     {
-        FixedBoundVolume queryBounds = new(queryPoint, Vector3d.One * Bounds.Scope.x);
+        FixedBoundVolume queryBounds = CreateQueryBounds(queryPoint, Bounds.Scope.x);
         SwiftList<int> result = new();
         Mesh.TriangleBVH.Query(queryBounds, result);
         return result;
@@ -54,11 +60,17 @@ public class LSMeshCollider : LSCollider
     {
         SwiftList<int> result = new();
         Vector3d boundedPoint = Bounds.ClosestPointOnSurface(queryPoint);
-        FixedBoundVolume queryBounds = new(boundedPoint, Vector3d.One * Bounds.Scope.x);
+        FixedBoundVolume queryBounds = CreateQueryBounds(boundedPoint, Bounds.Scope.x);
         Mesh.TriangleBVH.Query(queryBounds, result);
         Vector3d direction = (queryBounds.Center - Center).Normal;
         Vector3d closest = ClosestPointToTriangles(result, direction, queryBounds.Center);
         return closest;
+    }
+
+    private static FixedBoundVolume CreateQueryBounds(Vector3d center, Fixed64 halfExtent)
+    {
+        Vector3d extents = Vector3d.One * halfExtent;
+        return new FixedBoundVolume(center - extents, center + extents);
     }
 
     private Vector3d ClosestPointToTriangles(SwiftList<int> indices, Vector3d direction, Vector3d point)

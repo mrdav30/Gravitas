@@ -106,6 +106,8 @@ public class LSCuboidCollider : LSCollider
 
     public override int Priority => ColliderSettings.GetPriority(Shape);
 
+    public override Fixed64 ScaledRadius => ScaledSize.Magnitude * Fixed64.Half;
+
     public LSCuboidCollider()
     {
         _vertices = new Vector3d[8];
@@ -119,14 +121,10 @@ public class LSCuboidCollider : LSCollider
     protected override void OnInitialize()
     {
         _orientedBounds = new BoundingBox(Center, ScaledSize);
-
-        Fixed64 diameter = FixedMath.Max(LocalScale.z, FixedMath.Max(LocalScale.y, LocalScale.x));
-        _radius = diameter / 2;
-
         base.OnInitialize();
     }
 
-    protected override void GenerateShape()
+    protected override void BuildShape()
     {
         GenerateVertices();
         GenerateAxes();
@@ -170,11 +168,8 @@ public class LSCuboidCollider : LSCollider
     {
         for (int i = 0; i < FaceDefinitions.Length; i++)
         {
-            int[] faceIndices = FaceDefinitions[i];
-            _faceVertices[i] = new int[faceIndices.Length];
-
-            for (int j = 0; j < faceIndices.Length; j++)
-                _faceVertices[i][j] = faceIndices[j];
+            if (_faceVertices[i] == null)
+                _faceVertices[i] = FaceDefinitions[i];
         }
     }
 
@@ -223,7 +218,10 @@ public class LSCuboidCollider : LSCollider
     protected virtual void GenerateEdges()
     {
         for (int i = 0; i < EdgeDefinitions.Length; i++)
-            _edgeVertices[i] = EdgeDefinitions[i];
+        {
+            if (_edgeVertices[i] == null)
+                _edgeVertices[i] = EdgeDefinitions[i];
+        }
     }
 
     // Method to get an edge by index
@@ -252,26 +250,7 @@ public class LSCuboidCollider : LSCollider
 
     protected virtual void GenerateArea() =>
         // Area calculation: A = 2lw + 2lh + 2wh
-        Area = 2 * ScaledSize.x * ScaledSize.z + 2 * ScaledSize.x * ScaledSize.y + 2 * ScaledSize.x * ScaledSize.y;
-
-    protected override void BuildShape()
-    {
-        GenerateVertices();
-        BuildAxixDirections();
-        CalculateFaceNormals();
-        CalculateFaceCentroids();
-        CalculateEdgeDirections();
-    }
-
-    protected void BuildAxixDirections()
-    {
-        if (!RotationChanged)
-            return;
-
-        _xAxisDirectionVector = (Vertices[1] - Vertices[0]) / _xAxisLength;
-        _yAxisDirectionVector = (Vertices[2] - Vertices[0]) / _yAxisLength;
-        _zAxisDirectionVector = (Vertices[4] - Vertices[0]) / _zAxisLength;
-    }
+        Area = 2 * ScaledSize.x * ScaledSize.z + 2 * ScaledSize.x * ScaledSize.y + 2 * ScaledSize.y * ScaledSize.z;
 
     public override Fixed3x3 CalculateInertiaTensor(Fixed64 mass)
     {

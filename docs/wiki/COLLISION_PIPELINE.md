@@ -6,9 +6,11 @@ late contact notification.
 
 ## Broad Phase: Voxel Partitions
 
-When a collider initializes or moves far enough to change snapped voxel bounds,
-`LSCollider` rebuilds its runtime shape data and asks
-`GravitasCollisionService` to repartition it.
+When a collider initializes, moves, rotates, changes scale, or changes local
+shape inputs, `LSCollider` rebuilds its runtime shape data and asks
+`GravitasCollisionService` to repartition it. Shape inputs are tracked by an
+internal snapshot so several local edits made before a simulation call collapse
+into one bounds/shape rebuild.
 
 `GravitasCollisionService.PartitionObject(...)`:
 
@@ -29,6 +31,36 @@ that owner service pool from `OnRemoveFromVoxel(...)`.
 Current static-list behavior is specific: colliders whose body exists and has
 `Immovable == true` are added to `ContainedStaticObjects`. Other registered
 colliders are added to `ContainedDynamicObjects`, including bodyless colliders.
+
+## Collider Runtime Shape State
+
+`LSCollider` separates collider identity and pair/partition ownership from the
+derived runtime shape snapshot used by bounds, area, and shape-specific caches.
+The current snapshot watches:
+
+- world-space center.
+- rotation.
+- local scale.
+- local offset.
+- unscaled local size.
+- unscaled local radius.
+
+Mutating `LocalOffset`, `Radius`, or `Size` marks the runtime shape dirty.
+Changing host/body scale, position, or rotation is detected from the snapshot on
+the next `Simulate()` call. If the snapshot has not changed, the collider skips
+the rebuild and keeps its existing partition state.
+
+Capsules rebuild their hemisphere centers, cylinder height, area, and segment
+endpoints together. Short capsules collapse to a sphere-like segment and use a
+sphere inertia fallback instead of producing a zero diagonal for the capsule's
+main axis.
+
+Mesh colliders validate vertices and triangle indices at construction time.
+Triangle BVH entries and mesh query bounds use min/max `FixedBoundVolume`
+coordinates. Mesh collider construction transforms vertices from local mesh
+space only after the collider is bound to runtime state, so rotated meshes
+refresh bounds from transformed vertices instead of copying stale constructor
+bounds.
 
 ## Active Partitions
 

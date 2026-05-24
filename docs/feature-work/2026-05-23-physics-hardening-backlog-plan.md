@@ -257,17 +257,46 @@
 
 **Tasks:**
 
-- [ ] Split shape-derived data from collider identity and partition/pair state. Recommended first step: extract a focused internal shape-state helper before renaming public collider types.
-- [ ] Add tests that changing offset, scale, radius, height, or rotation invalidates and rebuilds bounds, radius, area, and capsule segment data exactly once per simulate step.
-- [ ] Fix capsule height/radius rebuild behavior and add tests for short, tall, scaled, and rotated capsules.
-- [ ] Fix capsule inertia for degenerate/default dimensions or define a sphere-fallback policy for zero cylinder height.
-- [ ] Add `PhysicsMesh` validation for null arrays, triangle-count multiples of three, out-of-range triangle indices, duplicate triangle indices, and degenerate triangles.
-- [ ] Fix or confirm mesh `FixedBoundVolume` construction so triangle BVH entries and query bounds use min/max coordinates, not center/size values.
-- [ ] Reuse FixedMathSharp typed bounds helpers where behavior matches tests, especially for closest point, containment, and intersection checks.
-- [ ] Define mesh collider limits in settings or collider construction. Recommended first policy: fail fast when vertex or triangle counts exceed explicit deterministic limits.
-- [ ] Prove whether `_edges` and cached edge normals are still required. Remove them only after mesh/cuboid and mesh/mesh SAT tests prove equivalent detection behavior.
-- [ ] Fix mesh bounds under rotation or make mesh collider rotation limitations explicit in API and tests.
-- [ ] Run collider tests and the new collider shape benchmark in Release.
+- [x] Split shape-derived data from collider identity and partition/pair state. Recommended first step: extract a focused internal shape-state helper before renaming public collider types.
+- [x] Add tests that changing offset, scale, radius, height, or rotation invalidates and rebuilds bounds, radius, area, and capsule segment data exactly once per simulate step.
+- [x] Fix capsule height/radius rebuild behavior and add tests for short, tall, scaled, and rotated capsules.
+- [x] Fix capsule inertia for degenerate/default dimensions or define a sphere-fallback policy for zero cylinder height.
+- [x] Add `PhysicsMesh` validation for null arrays, triangle-count multiples of three, out-of-range triangle indices, duplicate triangle indices, and degenerate triangles.
+- [x] Fix or confirm mesh `FixedBoundVolume` construction so triangle BVH entries and query bounds use min/max coordinates, not center/size values.
+- [x] Reuse FixedMathSharp typed bounds helpers where behavior matches tests, especially for closest point, containment, and intersection checks.
+- [x] Define mesh collider limits in settings or collider construction. Recommended first policy: fail fast when vertex or triangle counts exceed explicit deterministic limits.
+- [x] Prove whether `_edges` and cached edge normals are still required. Remove them only after mesh/cuboid and mesh/mesh SAT tests prove equivalent detection behavior.
+- [x] Fix mesh bounds under rotation or make mesh collider rotation limitations explicit in API and tests.
+- [x] Run collider tests and the new collider shape benchmark in Release.
+
+**Phase 3 completion notes:**
+
+- Added `ColliderRuntimeShapeState`/`ColliderShapeSnapshot` so collider identity,
+  pair ownership, and partition state no longer hide the rebuild boundary for
+  bounds and shape-derived caches.
+- Added `LocalOffset`, `Radius`, and `Size` mutation paths that mark shape state
+  dirty. Scale, position, and rotation are detected from the snapshot so several
+  edits before `Simulate()` rebuild derived state once.
+- Rebuilt capsule derived state as one unit: hemisphere centers, cylinder
+  height, area, and segment endpoints. Short capsules now collapse the segment
+  and use a sphere inertia fallback for zero cylinder height.
+- Added `PhysicsMesh` input validation, deterministic vertex/triangle limits,
+  local bounds, defensive source-array copies, triangle-ordinal access, and
+  min/max `FixedBoundVolume` construction for triangle BVH/query bounds.
+- Fixed mesh collider construction so it no longer reads runtime `Center` before
+  binding, and fixed rotated mesh bounds to refresh from transformed vertices.
+- Reviewed the mesh `_edges`/edge-normal cache. It is retained for now because
+  current mesh SAT coverage does not yet prove it removable; Phase 4 shape-pair
+  tests should decide whether it can be deleted.
+- Added the `collider-shape` benchmark selection for capsule runtime rebuilds
+  and mesh validation/BVH construction.
+- Short `collider-shape` benchmark smoke on this machine:
+  - `RebuildCapsuleRuntimeShapeState`: 64 colliders, mean about `1.003 ms`,
+    allocated about `198.46 KB` while intentionally forcing repartitioning.
+  - `BuildValidatedMeshTriangleBVH`: two-triangle mesh construction plus BVH
+    query, mean about `2.268 us`, allocated about `2.84 KB`.
+  - BenchmarkDotNet could not raise process priority in this sandbox, so these
+    are smoke numbers rather than canonical timing evidence.
 
 ## Phase 4: Narrow-Phase Collision Detection Coverage
 

@@ -50,6 +50,8 @@ public abstract class LSCollider : IRecordable
 
     private bool _staticPositionChanged;
     private bool _staticRotationChanged;
+    private readonly ColliderRuntimeShapeState _runtimeShapeState = new();
+    internal uint RuntimeShapeVersion => _runtimeShapeState.RuntimeVersion;
 
     public virtual Vector3d Position
     {
@@ -127,10 +129,50 @@ public abstract class LSCollider : IRecordable
     /// </summary>
     protected Vector3d _offset;
 
+    /// <summary>
+    /// Gets or sets the unscaled local center offset used by bounds and shape-derived state.
+    /// </summary>
+    public Vector3d LocalOffset
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => _offset;
+        set
+        {
+            if (_offset == value)
+                return;
+
+            _offset = value;
+            MarkShapeDirty();
+        }
+    }
+
     public abstract ColliderType Shape { get; }
     public abstract int Priority { get; }
 
     protected Fixed64 _radius = Fixed64.Half;
+
+    /// <summary>
+    /// Gets or sets the unscaled shape radius used by radius-based colliders.
+    /// </summary>
+    public Fixed64 Radius
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => _radius;
+        set
+        {
+            SwiftThrowHelper.ThrowIfArgument(
+                value <= Fixed64.Zero,
+                nameof(value),
+                "Collider radius must be greater than zero.");
+
+            if (_radius == value)
+                return;
+
+            _radius = value;
+            OnRadiusChanged();
+            MarkShapeDirty();
+        }
+    }
 
     /// <summary>
     /// Gets the bounding circle radius.
@@ -142,6 +184,25 @@ public abstract class LSCollider : IRecordable
     public Fixed64 ScaledRadiusSqr => ScaledRadius * ScaledRadius;
 
     protected Vector3d _size = Vector3d.One;
+
+    /// <summary>
+    /// Gets or sets the unscaled local size used when rebuilding collider bounds.
+    /// </summary>
+    public Vector3d Size
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => _size;
+        set
+        {
+            ValidateSize(value);
+            Vector3d normalizedSize = NormalizeSize(value);
+            if (_size == normalizedSize)
+                return;
+
+            _size = normalizedSize;
+            MarkShapeDirty();
+        }
+    }
 
     public virtual Fixed64 Area { get; protected set; } = Fixed64.Zero;
 
@@ -159,6 +220,7 @@ public abstract class LSCollider : IRecordable
     public Vector3d Center => Position + (Rotation * ScaledOffset);
 
     protected BoundingBox _bounds;
+    private bool _boundsInitialized;
     public BoundingBox Bounds => _bounds;
     public Vector3d BoundsMin => _bounds.Min;
     public Vector3d BoundsMax => _bounds.Max;
@@ -238,21 +300,12 @@ public abstract class LSCollider : IRecordable
 
     protected virtual void OnInitialize()
     {
-        GenerateBoundingBox();
-        GenerateShape();
+        RebuildRuntimeShapeState();
     }
-
-    private void GenerateBoundingBox()
-    {
-        _bounds = new BoundingBox(Center, ScaledSize);
-        CalculateBoundLimits();
-    }
-
-    protected virtual void GenerateShape() { }
 
     private void InitialPartition()
     {
-        GenerateDynamicRuntime();
+        RebuildRuntimeShapeState();
 
         if (IsActive)
         {
@@ -284,7 +337,7 @@ public abstract class LSCollider : IRecordable
             return;
         }
 
-        if (PositionChanged || RotationChanged)
+        if (PositionChanged || RotationChanged || RuntimeShapeStateInvalid())
             UpdatePartition();
 
         if (_staticPositionChanged) _staticPositionChanged = false;
@@ -293,7 +346,7 @@ public abstract class LSCollider : IRecordable
 
     private void UpdatePartition()
     {
-        GenerateDynamicRuntime();
+        RebuildRuntimeShapeState();
 
         if (!Context.Collisions.ClearPartitionedObject(this))
             return;
@@ -366,16 +419,50 @@ public abstract class LSCollider : IRecordable
         return other.ParentId == ParentId;
     }
 
-    private void GenerateDynamicRuntime()
+    private bool RuntimeShapeStateInvalid()
+    {
+        ColliderShapeSnapshot snapshot = CaptureShapeSnapshot();
+        return _runtimeShapeState.ShouldRebuild(snapshot);
+    }
+
+    private void RebuildRuntimeShapeState()
+    {
+        ColliderShapeSnapshot snapshot = CaptureShapeSnapshot();
+        if (!_runtimeShapeState.ShouldRebuild(snapshot))
+            return;
+
+        RebuildRuntimeShape();
+        _runtimeShapeState.Commit(snapshot);
+    }
+
+    protected virtual void RebuildRuntimeShape()
     {
         BuildBoundingBox();
         BuildShape();
     }
 
+    private ColliderShapeSnapshot CaptureShapeSnapshot() =>
+        new(Center, Rotation, LocalScale, _offset, _size, _radius);
+
     protected virtual void BuildBoundingBox()
     {
-        _bounds.Orient(Center, ScaledSize);
+        if (!_boundsInitialized)
+        {
+            _bounds = new BoundingBox(Center, ScaledSize);
+            _boundsInitialized = true;
+        }
+        else
+        {
+            _bounds.Orient(Center, ScaledSize);
+        }
+
         CalculateBoundLimits();
+    }
+
+    protected void SetBounds(BoundingBox bounds)
+    {
+        _bounds = bounds;
+        _boundsInitialized = true;
     }
 
     private void CalculateBoundLimits()
@@ -397,6 +484,21 @@ public abstract class LSCollider : IRecordable
     }
 
     protected abstract void BuildShape();
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    protected void MarkShapeDirty() => _runtimeShapeState.MarkDirty();
+
+    protected virtual void OnRadiusChanged() { }
+
+    protected virtual Vector3d NormalizeSize(Vector3d value) => value;
+
+    private static void ValidateSize(Vector3d value)
+    {
+        SwiftThrowHelper.ThrowIfArgument(
+            value.x <= Fixed64.Zero || value.y <= Fixed64.Zero || value.z <= Fixed64.Zero,
+            nameof(value),
+            "Collider size components must be greater than zero.");
+    }
 
     // default to total area for shapes where frontal area doesn't make sense
     public virtual Fixed64 GetFrontalArea(Vector3d direction) => Area;
@@ -588,6 +690,7 @@ public abstract class LSCollider : IRecordable
         RecordValues.Look(chronicler, ref _offset, "Offset", Vector3d.Zero);
         RecordValues.Look(chronicler, ref _radius, "Radius", Fixed64.Half);
         RecordValues.Look(chronicler, ref _size, "Size", Vector3d.One);
+        MarkShapeDirty();
     }
 
     #endregion
