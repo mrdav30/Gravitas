@@ -178,7 +178,7 @@ public abstract class LSCollider : IRecordable
     private SwiftHashSet<int> _collisionPairHolders = new();
 
     public uint RaycastVersion { get; set; } = 0;
-    public uint SpherecastVersion { get; set; } = 0;
+    public uint CircleQueryVersion { get; set; } = 0;
 
     public delegate void BodyCollisionFunc(StiffBody other);
     public event BodyCollisionFunc? OnContact;
@@ -211,7 +211,7 @@ public abstract class LSCollider : IRecordable
         SwiftThrowHelper.ThrowIfNull(agent, nameof(agent));
 
         RaycastVersion = 0;
-        SpherecastVersion = 0;
+        CircleQueryVersion = 0;
 
         _agent = agent;
         BindContext(agent.Context);
@@ -475,7 +475,7 @@ public abstract class LSCollider : IRecordable
     /// <param name="worker">The prepared ray-axis worker for the owning query service.</param>
     /// <param name="outputIntersectionPoints"></param>
     /// <returns></returns>
-    public abstract bool ColliderOverlapsRay(RaycastAxisWorker worker, ref SwiftList<Vector3d> outputIntersectionPoints);
+    public abstract bool ColliderOverlapsRay(RaycastSegmentWorker worker, ref SwiftList<Vector3d> outputIntersectionPoints);
 
     public void SetPreviousGridBounds() =>
         (_lastGridBoundsMin, _lastGridBoundsMax) = World?.SnapBoundsToVoxelSize(BoundsMin, BoundsMax, Fixed64.Half)

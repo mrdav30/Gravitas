@@ -1,6 +1,6 @@
 # Query Services
 
-Raycasts and circlecasts are context-owned services. They use the same
+Raycasts and circle-overlap queries are context-owned services. They use the same
 GridForge-backed partitions as collision detection, resolve collider IDs through
 the owning `GravitasPhysicsService`, and suppress duplicate hits when a collider
 appears in multiple voxels.
@@ -14,7 +14,7 @@ appears in multiple voxels.
 
 The raycast service owns:
 
-- one `RaycastAxisWorker`.
+- one `RaycastSegmentWorker`.
 - a reusable intersection-point buffer.
 - a duplicate collider checker.
 - a duplicate voxel checker.
@@ -27,7 +27,7 @@ context that issues the query.
 
 The candidate path is:
 
-1. prepare the worker for the query line.
+1. prepare the worker for the 3D query segment.
 2. snap the query bounds to the context `GridWorld` voxel size.
 3. scan the covered spatial grid cells and active `VoxelGrid` instances.
 4. suppress duplicate voxels and inspect each voxel's `PhysicsPartition`.
@@ -41,28 +41,29 @@ The candidate path is:
 Colliders also store `RaycastVersion`; this is a second duplicate guard scoped
 to the service version.
 
-Current limitation: the raycast implementation uses 2D path distance plus a
-height slope to decide whether an intersection point is within collider height
-bounds. Perfectly horizontal ray lines currently produce no hit because the
-height slope is zero. Tests use a small deterministic height slope until this is
-hardened.
+Raycasts use deterministic 3D segment intersection points. Horizontal,
+vertical, diagonal, and starting-inside segments have defined behavior and are
+covered by focused tests. `FixedRay` was reviewed during this pass, but the
+service keeps a custom segment worker because the query path needs all segment
+intersection points, caller-owned buffers, and bounded segment distance rather
+than the first forward hit on an infinite ray.
 
-## Circlecasts
+## Circle Overlap Queries
 
-`GravitasCirclecastService` exposes:
+`GravitasCircleQueryService` exposes:
 
-- `CircleCast(position, radius, out hit, layerMask)`
-- `CircleCast(position, radius, direction, out hit, maxDistance, layerMask)`
-- `CircleCastAll(position, radius, layerMask, results)`
+- `OverlapCircle(position, radius, out hit, layerMask)`
+- `OverlapCircleInDirection(position, radius, direction, out hit, maxDistance, layerMask)`
+- `OverlapCircleAll(position, radius, layerMask, results)`
 
-The circlecast service owns:
+The circle query service owns:
 
 - a duplicate collider checker.
 - a context-local query `Version`.
 
-`CircleCastAll` clears the caller-provided `SwiftList<LSRaycastHit>`, writes hits
-into it, returns the hit count, and uses the same allocation-free in-place sorter
-as raycasts.
+`OverlapCircleAll` clears the caller-provided `SwiftList<LSRaycastHit>`, writes
+hits into it, returns the hit count, and uses the same allocation-free in-place
+sorter as raycasts.
 
 The candidate path is:
 
@@ -73,13 +74,12 @@ The candidate path is:
 5. filter by layer mask.
 6. skip duplicate colliders for this query version.
 7. perform a fast radius check against the collider's scaled radius.
-8. return the closest hit or all hits sorted by distance.
+8. build a proximity hit from the closest collider surface point.
+9. return the closest hit or all hits sorted by surface distance.
 
-The directional overload is a post-filter on the closest non-directional hit. It
-is not a full swept-volume query yet. Current circlecast hit distance is the
-center-to-collider offset magnitude, not a swept time of impact, so the naming
-and semantics should be treated as provisional until this becomes a precise
-shape query.
+`OverlapCircleInDirection` filters proximity hits by the direction from the
+query origin to the hit point and by maximum hit-point distance. It is not a
+swept circle or swept sphere query.
 
 ## Layer Mask Semantics
 
@@ -121,7 +121,8 @@ null body.
 ## Query Hardening Targets
 
 - replace horizontal-ray rejection with deterministic 3D segment handling.
-- make circlecast a precise shape query or rename it as a proximity query.
+- implement true swept circle or swept sphere queries once the 2D/3D dimensional
+  contract is explicit.
 - keep query benchmarks allocation-free as result ordering, filters, and shape
   support expand.
 - add shape-specific query tests for every collider type.

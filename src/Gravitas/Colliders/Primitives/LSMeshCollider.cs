@@ -125,7 +125,7 @@ public class LSMeshCollider : LSCollider
         return nearestPoint;
     }
 
-    public override bool ColliderOverlapsRay(RaycastAxisWorker worker, ref SwiftList<Vector3d> outputIntersectionPoints)
+    public override bool ColliderOverlapsRay(RaycastSegmentWorker worker, ref SwiftList<Vector3d> outputIntersectionPoints)
     {
         return false;
     }

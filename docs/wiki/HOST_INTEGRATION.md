@@ -211,7 +211,7 @@ in the same process. Frame-derived values such as `DeltaTime`, `FrameCount`, and
 
 ## Queries
 
-Raycasts and circlecasts are context services:
+Raycasts and circle-overlap queries are context services:
 
 ```csharp
 using Gravitas.Raycasting;
@@ -228,11 +228,11 @@ bool hit = context.Raycasts.Raycast(
     out LSRaycastHit rayHit,
     layerMask);
 
-int circleHitCount = context.Circlecasts.CircleCastAll(origin, radius, layerMask, circleHits);
+int circleHitCount = context.CircleQueries.OverlapCircleAll(origin, radius, layerMask, circleHits);
 for (int i = 0; i < circleHitCount; i++)
 {
     LSRaycastHit circleHit = circleHits[i];
-    // Consume proximity hits.
+    // Consume circle-overlap hits.
 }
 ```
 

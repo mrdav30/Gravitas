@@ -23,12 +23,79 @@ public sealed class GravitasRaycastServiceTests
         var hits = new SwiftList<LSRaycastHit>();
 
         int count = context.Raycasts
-            .RaycastAll(Vector(-2, -Fixed64.Fraction(1, 16), 0), Vector(4, Fixed64.Fraction(1, 8), 0), IncludeLayerZero, hits);
+            .RaycastAll(Vector(-2, 0, 0), Vector(4, 0, 0), IncludeLayerZero, hits);
 
         count.Should().Be(2);
         hits[0].Collider?.Id.Should().Be(near.Id);
         hits[1].Collider?.Id.Should().Be(far.Id);
         hits[0].Distance.Should().BeLessThan(hits[1].Distance);
+    }
+
+    [Fact]
+    public void Raycast_ShouldHitHorizontalVerticalAndDiagonalSegments()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSSphereCollider collider = CreateDynamicSphere(context, Vector3d.Zero);
+
+        bool horizontalHit = context.Raycasts.Raycast(
+            Vector(-2, 0, 0),
+            Vector3d.Right,
+            (Fixed64)4,
+            out LSRaycastHit horizontal,
+            IncludeLayerZero);
+        bool verticalHit = context.Raycasts.Raycast(
+            Vector(0, -2, 0),
+            Vector3d.Up,
+            (Fixed64)4,
+            out LSRaycastHit vertical,
+            IncludeLayerZero);
+        bool diagonalHit = context.Raycasts.Raycast(
+            Vector(-2, -2, -2),
+            new Vector3d(1, 1, 1).Normal,
+            (Fixed64)4,
+            out LSRaycastHit diagonal,
+            IncludeLayerZero);
+
+        horizontalHit.Should().BeTrue();
+        verticalHit.Should().BeTrue();
+        diagonalHit.Should().BeTrue();
+        horizontal.Collider.Should().BeSameAs(collider);
+        vertical.Collider.Should().BeSameAs(collider);
+        diagonal.Collider.Should().BeSameAs(collider);
+        horizontal.Distance.Should().BeLessThan(vertical.Distance + Fixed64.Epsilon);
+    }
+
+    [Fact]
+    public void Raycast_ShouldReturnZeroDistanceWhenSegmentStartsInsideCollider()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSSphereCollider collider = CreateDynamicSphere(context, Vector3d.Zero);
+
+        bool hit = context.Raycasts.Raycast(
+            new Vector3d(Fixed64.Fraction(1, 4), Fixed64.Zero, Fixed64.Zero),
+            Vector3d.Right,
+            (Fixed64)2,
+            out LSRaycastHit rayHit,
+            IncludeLayerZero);
+
+        hit.Should().BeTrue();
+        rayHit.Collider.Should().BeSameAs(collider);
+        rayHit.Distance.Should().Be(Fixed64.Zero);
+        rayHit.Point.Should().Be(new Vector3d(Fixed64.Fraction(1, 4), Fixed64.Zero, Fixed64.Zero));
+    }
+
+    [Fact]
+    public void RaycastAll_ShouldReturnNoHitsWhenSegmentMissesCollider()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        CreateDynamicSphere(context, Vector3d.Zero);
+        var hits = new SwiftList<LSRaycastHit>();
+
+        int count = context.Raycasts
+            .RaycastAll(Vector(-2, 2, 0), Vector(2, 2, 0), IncludeLayerZero, hits);
+
+        count.Should().Be(0);
+        hits.Count.Should().Be(0);
     }
 
     [Fact]
@@ -43,9 +110,9 @@ public sealed class GravitasRaycastServiceTests
         colliderA.Id.Should().Be(colliderB.Id);
 
         int countA = contextA.Raycasts
-            .RaycastAll(Vector(-2, -Fixed64.Fraction(1, 4), 0), Vector(2, Fixed64.Fraction(1, 4), 0), IncludeLayerZero, hitsA);
+            .RaycastAll(Vector(-2, 0, 0), Vector(2, 0, 0), IncludeLayerZero, hitsA);
         int countB = contextB.Raycasts
-            .RaycastAll(Vector(-2, -Fixed64.Fraction(1, 4), 0), Vector(2, Fixed64.Fraction(1, 4), 0), IncludeLayerZero, hitsB);
+            .RaycastAll(Vector(-2, 0, 0), Vector(2, 0, 0), IncludeLayerZero, hitsB);
 
         countA.Should().Be(1);
         countB.Should().Be(1);
@@ -54,6 +121,8 @@ public sealed class GravitasRaycastServiceTests
         contextA.Raycasts.Version.Should().Be(1);
         contextB.Raycasts.Version.Should().Be(1);
     }
+
+    private static Vector3d Vector(int x, int y, int z) => new((Fixed64)x, (Fixed64)y, (Fixed64)z);
 
     private static LSSphereCollider CreateDynamicSphere(GravitasWorldContext context, Vector3d position)
     {
@@ -81,5 +150,4 @@ public sealed class GravitasRaycastServiceTests
         context.World.TryAddGrid(configuration, out _).Should().BeTrue();
     }
 
-    private static Vector3d Vector(int x, Fixed64 y, int z) => new((Fixed64)x, y, (Fixed64)z);
 }

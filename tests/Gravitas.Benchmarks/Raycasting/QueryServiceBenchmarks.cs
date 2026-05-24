@@ -33,8 +33,8 @@ public class QueryServiceBenchmarks
         _overlappingContext = BenchmarkPhysicsScene.CreateContext(extent);
         BenchmarkPhysicsScene.CreateDynamicSphereLine(_overlappingContext, ColliderCount);
 
-        _rayStart = new Vector3d((Fixed64)(-2), -Fixed64.Fraction(1, 4), Fixed64.Zero);
-        _rayEnd = new Vector3d((Fixed64)(ColliderCount * 2), Fixed64.Fraction(1, 4), Fixed64.Zero);
+        _rayStart = new Vector3d((Fixed64)(-2), Fixed64.Zero, Fixed64.Zero);
+        _rayEnd = new Vector3d((Fixed64)(ColliderCount * 2), Fixed64.Zero, Fixed64.Zero);
         _raycastHits = new SwiftList<LSRaycastHit>(ColliderCount);
         _overlappingRaycastHits = new SwiftList<LSRaycastHit>(ColliderCount);
         _circlecastHits = new SwiftList<LSRaycastHit>(ColliderCount);
@@ -57,12 +57,12 @@ public class QueryServiceBenchmarks
         CountRaycastHits(_context, _raycastHits);
 
     [Benchmark]
-    public int CircleCastAllAcrossPopulatedContext() =>
-        _context.Circlecasts.CircleCastAll(Vector3d.Zero, (Fixed64)4, IncludeLayerZero, _circlecastHits);
+    public int OverlapCircleAllAcrossPopulatedContext() =>
+        _context.CircleQueries.OverlapCircleAll(Vector3d.Zero, (Fixed64)4, IncludeLayerZero, _circlecastHits);
 
     [Benchmark]
-    public bool DirectionalCircleCastAcrossPopulatedContext() =>
-        _context.Circlecasts.CircleCast(
+    public bool DirectionalOverlapCircleAcrossPopulatedContext() =>
+        _context.CircleQueries.OverlapCircleInDirection(
             Vector3d.Zero,
             (Fixed64)4,
             Vector3d.Right,

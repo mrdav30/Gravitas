@@ -78,7 +78,7 @@ Gravitas is now centered around explicit world-context ownership:
 3. `GravitasWorldContext` owns fixed-step clock state, settings, physical environment values, lifecycle hooks, and context-local services.
 4. `GravitasPhysicsService` owns body/collider registration, collider ID lookup, collision-pair pooling, and physics lifecycle work for one context.
 5. `GravitasCollisionService` maps colliders into GridForge voxels and activates `PhysicsPartition` instances for collision checks.
-6. `GravitasRaycastService`, `GravitasCirclecastService`, and `GravitasCoroutineService` own query and coroutine state per context.
+6. `GravitasRaycastService`, `GravitasCircleQueryService`, and `GravitasCoroutineService` own query and coroutine state per context.
 7. `StiffBody` owns simulated body state such as position, rotation, velocity, acceleration, mass, drag, friction, grounding, and Chronicler state recording.
 8. `LSCollider` and primitive collider types own shape data, bounds, layers, trigger/contact events, and GridForge partition coordinates.
 

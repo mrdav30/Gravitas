@@ -69,7 +69,7 @@ Start with hot paths that can be isolated and repeated deterministically:
 - `GravitasCollisionService` partitioning and partition cleanup.
 - `CollisionDetection` shape-pair checks.
 - `CollisionResponse` contact resolution.
-- `GravitasRaycastService` and `GravitasCirclecastService` query gathering, filtering, and result ordering.
+- `GravitasRaycastService` and `GravitasCircleQueryService` query gathering, filtering, and result ordering.
 - Mesh collider preprocessing and convex mesh limits.
 - Pooling and allocation behavior for collision pairs, partitions, and temporary collections.
 
@@ -109,8 +109,8 @@ allocation in steady state:
 
 | Alias | Covered paths |
 | --- | --- |
-| `query-service` | `RaycastAll`, `CircleCastAll`, directional `CircleCast`, and overlapping-context queries. |
-| `simulation-allocation` | `StiffBody.LateSimulate`, grounding circlecast checks, collision partition distribution, and active-pair late simulation. |
+| `query-service` | `RaycastAll`, `OverlapCircleAll`, directional `OverlapCircleInDirection`, and overlapping-context queries. |
+| `simulation-allocation` | `StiffBody.LateSimulate`, grounding directional circle-overlap checks, collision partition distribution, and active-pair late simulation. |
 
 ## CI Guidance
 

@@ -47,6 +47,6 @@ public class LSSphereCollider : LSCollider
 
     public override Vector3d GetNormalAtPoint(Vector3d point) => (point - Center).Normal;
 
-    public override bool ColliderOverlapsRay(RaycastAxisWorker worker, ref SwiftList<Vector3d> outputIntersectionPoints) =>
+    public override bool ColliderOverlapsRay(RaycastSegmentWorker worker, ref SwiftList<Vector3d> outputIntersectionPoints) =>
         worker.CheckSphereOverlaps(this, ref outputIntersectionPoints);
 }

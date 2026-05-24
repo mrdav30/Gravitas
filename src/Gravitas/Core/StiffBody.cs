@@ -893,7 +893,7 @@ public class StiffBody : IRecordable
         if (!IsGrounded)
             dis = GroundDownDistanceOnAir;
 
-        if (!Context.Circlecasts.CircleCast(origin, GroundCheckSphereRadius, Vector3d.Down, out LSRaycastHit hit, dis, Context.Settings.GroundCheckLayerMask))
+        if (!Context.CircleQueries.OverlapCircleInDirection(origin, GroundCheckSphereRadius, Vector3d.Down, out LSRaycastHit hit, dis, Context.Settings.GroundCheckLayerMask))
         {
             _isGrounded = false;
             return;

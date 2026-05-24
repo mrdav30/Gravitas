@@ -114,9 +114,11 @@ The current runtime uses explicit world-context ownership:
 - `GravitasCollisionService` maps colliders into GridForge voxels through
   `GridWorld` spatial hash and active-grid access, `WorldVoxelIndex`, and
   `PhysicsPartition`, using `SwiftCollections` pools and duplicate-check sets.
-- `GravitasRaycastService` and `GravitasCirclecastService` own query workers,
+- `GravitasRaycastService` and `GravitasCircleQueryService` own query workers,
   intersection state, candidate gathering, filtering, and result ordering for
-  one context. All-hit paths should write into caller-owned hit buffers.
+  one context. Raycasts are 3D segment queries; circle queries are X/Z overlap
+  and proximity queries, not swept casts. All-hit paths should write into
+  caller-owned hit buffers.
 - `GravitasCoroutineService` owns lockstep coroutine state and context-bound
   wait instructions for one context.
 - `StiffBody` owns simulated body state: position, rotation, visual

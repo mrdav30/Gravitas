@@ -76,7 +76,7 @@
 | `PhysicsSettings` | Collision matrix uses `bool[,]`; ground-check mask is legacy and not clearly configured. | P0 | Phase 1 complete |
 | `docs/wiki/QUERY_SERVICES.md` | Query layer parameter behaves like include mask despite `ignoreLayers` naming. | P0 | Phase 1 complete |
 | `docs/wiki/QUERY_SERVICES.md` | Horizontal raycasts are rejected by the height-slope path. | P0 | Phase 2 |
-| `docs/wiki/QUERY_SERVICES.md` | Circlecast is a proximity query, not a true swept shape query. | P0 | Phase 2 |
+| `docs/wiki/QUERY_SERVICES.md` | Former circle-cast behavior was a proximity query, not a true swept shape query. | P0 | Phase 2 complete |
 | `LSCollider` | Mesh rotation and bounds are not physically trustworthy enough. | P0 | Phase 3 |
 | `LSCapsuleCollider` | Capsule derived points need deterministic invalidation/rebuild when size inputs change. | P0 | Phase 3 |
 | `LSCapsuleCollider` | Default capsule dimensions can produce a zero cylinder-height inertia tensor diagonal. | P0 | Phase 3 |
@@ -160,7 +160,7 @@
 - Create: `src/Gravitas/Support/PhysicsLayer.cs`
 - Modify: `src/Gravitas/Settings/PhysicsSettings.cs`
 - Modify: `src/Gravitas/Raycasting/GravitasRaycastService.cs`
-- Modify: `src/Gravitas/Raycasting/GravitasCirclecastService.cs`
+- Modify: `src/Gravitas/Raycasting/GravitasCircleQueryService.cs`
 - Modify: `src/Gravitas/Core/GravitasPhysicsService.cs`
 - Create: `tests/Gravitas.Tests/Settings/PhysicsLayerTests.cs`
 - Modify: `docs/wiki/QUERY_SERVICES.md`
@@ -174,7 +174,7 @@
 - [x] Decide whether the collision matrix remains `bool[,]` or moves to a SwiftCollections-backed bitset. If it changes, add benchmarks for layer lookups during pair filtering.
 - [x] Add tests for single layer inclusion, multi-layer inclusion, include-all, include-none, collision matrix allow/deny, and ground-check layer filtering.
 - [x] Update wiki examples to use the new names and semantics.
-- [x] Run `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~PhysicsLayerTests|FullyQualifiedName~GravitasRaycastServiceTests|FullyQualifiedName~GravitasCirclecastServiceTests|FullyQualifiedName~PhysicsSettingsTests"`.
+- [x] Run the focused Phase 1 layer/query/settings test slice before the Phase 2 circle-query rename.
 
 **Phase 1 completion notes:**
 
@@ -196,22 +196,49 @@
 **Files:**
 
 - Modify: `src/Gravitas/Raycasting/GravitasRaycastService.cs`
-- Modify: `src/Gravitas/Raycasting/GravitasCirclecastService.cs`
-- Modify: `src/Gravitas/Raycasting/RaycastAxisWorker.cs`
+- Rename/modify: `src/Gravitas/Raycasting/GravitasCircleQueryService.cs`
+- Rename/modify: `src/Gravitas/Raycasting/RaycastSegmentWorker.cs`
 - Modify: `tests/Gravitas.Tests/Raycasting/GravitasRaycastServiceTests.cs`
-- Modify: `tests/Gravitas.Tests/Raycasting/GravitasCirclecastServiceTests.cs`
+- Rename/modify: `tests/Gravitas.Tests/Raycasting/GravitasCircleQueryServiceTests.cs`
 - Modify: `tests/Gravitas.Benchmarks/Raycasting/QueryServiceBenchmarks.cs`
 - Modify: `docs/wiki/QUERY_SERVICES.md`
 
 **Tasks:**
 
-- [ ] Replace the raycast height-slope rejection with deterministic 3D segment handling so horizontal, vertical, and diagonal rays all have defined behavior.
-- [ ] Evaluate `FixedRay` and FixedMathSharp bounds/plane intersection APIs before keeping or expanding custom ray intersection workers.
-- [ ] Add raycast tests for horizontal rays, vertical rays, diagonal rays, starting-inside-collider rays, no-hit rays, multi-hit ordering, and cross-context isolation.
-- [ ] Rename or split the current circlecast behavior. Recommended contract: keep the current proximity scan as an overlap query, then implement true swept sphere or swept circle only after the dimensional model is explicit.
-- [ ] Add tests proving circle/proximity hit distance, normal, point, and ordering.
-- [ ] Keep caller-owned hit buffers and the allocation-free sorter in all all-hit paths.
-- [ ] Re-run the `query-service` allocation benchmark and confirm the all-hit paths remain at 0 B/op in the short smoke run.
+- [x] Replace the raycast height-slope rejection with deterministic 3D segment handling so horizontal, vertical, and diagonal rays all have defined behavior.
+- [x] Evaluate `FixedRay` and FixedMathSharp bounds/plane intersection APIs before keeping or expanding custom ray intersection workers.
+- [x] Add raycast tests for horizontal rays, vertical rays, diagonal rays, starting-inside-collider rays, no-hit rays, multi-hit ordering, and cross-context isolation.
+- [x] Rename or split the current circlecast behavior. Recommended contract: keep the current proximity scan as an overlap query, then implement true swept sphere or swept circle only after the dimensional model is explicit.
+- [x] Add tests proving circle/proximity hit distance, normal, point, and ordering.
+- [x] Keep caller-owned hit buffers and the allocation-free sorter in all all-hit paths.
+- [x] Re-run the `query-service` allocation benchmark and confirm the all-hit paths remain at 0 B/op in the short smoke run.
+
+**Phase 2 completion notes:**
+
+- Replaced the raycast height-slope path with a 3D `RaycastSegmentWorker`.
+  `Raycast` normalizes direction before applying max distance, and `RaycastAll`
+  now accepts horizontal, vertical, diagonal, and starting-inside segments.
+- Reviewed FixedMathSharp `FixedRay` and bounds intersections. They remain a
+  good future primitive for first-hit infinite-ray checks, but Gravitas keeps a
+  custom segment worker here because this service needs bounded segment scans,
+  all intersection points, caller-owned buffers, and deterministic hit sorting.
+- Renamed the context service from the old circle-cast property to `CircleQueries` and the
+  service type to `GravitasCircleQueryService`. Current circle behavior is now
+  exposed as `OverlapCircle`, `OverlapCircleAll`, and
+  `OverlapCircleInDirection`; true swept circle/sphere casts remain deferred
+  until the dimensional contract is explicit.
+- Circle overlap hit data now uses the closest collider surface point, collider
+  surface normal, and surface distance for ordering.
+- Query docs, host examples, README/AGENTS references, and benchmark docs were
+  updated with the new terminology.
+- Short `query-service` benchmark smoke reported no managed allocation in the
+  `Allocated` column for `RaycastAll`, `OverlapCircleAll`,
+  `OverlapCircleInDirection`, and overlapping-context raycasts. BenchmarkDotNet
+  still warned that this sandbox cannot raise process priority, so these are
+  smoke numbers rather than canonical timing evidence.
+- Also reran the `simulation-allocation` smoke because grounding now uses
+  `OverlapCircleInDirection`; its scenarios also reported no managed allocation
+  in the `Allocated` column.
 
 ## Phase 3: Collider Shape And Runtime State Refactor
 

@@ -63,7 +63,7 @@ public class SimulationAllocationBenchmarks
     }
 
     [Benchmark]
-    public int GroundingCircleCastOnly()
+    public int GroundingOverlapCircleOnly()
     {
         int groundedCount = 0;
         for (int i = 0; i < _groundedBodies.Count; i++)
@@ -72,7 +72,7 @@ public class SimulationAllocationBenchmarks
             Vector3d origin = body.Position3d;
             origin.y += body.GroundOriginOffset;
 
-            if (_groundingContext.Circlecasts.CircleCast(
+            if (_groundingContext.CircleQueries.OverlapCircleInDirection(
                     origin,
                     body.GroundCheckSphereRadius,
                     Vector3d.Down,

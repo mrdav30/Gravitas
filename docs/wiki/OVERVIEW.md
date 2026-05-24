@@ -21,8 +21,8 @@ systems connect and where the current prototype needs hardening.
 - Read [Collision Pipeline](COLLISION_PIPELINE.md) when changing broad-phase
   partitioning, collision pairs, narrow-phase detection, contact data, or
   response behavior.
-- Read [Query Services](QUERY_SERVICES.md) when changing raycasts, circlecasts,
-  hit ordering, layer filtering, or query allocation behavior.
+- Read [Query Services](QUERY_SERVICES.md) when changing raycasts, circle
+  overlap queries, hit ordering, layer filtering, or query allocation behavior.
 
 ## Core Mental Model
 
@@ -41,7 +41,7 @@ Gravitas owns, per context:
 - world-local settings and environment values.
 - dynamic body and collider registration.
 - collision partitions and collision-pair state.
-- raycast, circlecast, and coroutine buffers.
+- raycast, circle-overlap, and coroutine buffers.
 - ordered lifecycle hooks.
 
 ```mermaid
@@ -54,7 +54,7 @@ flowchart TD
     Context --> Physics["GravitasPhysicsService"]
     Context --> Collisions["GravitasCollisionService"]
     Context --> Raycasts["GravitasRaycastService"]
-    Context --> Circlecasts["GravitasCirclecastService"]
+    Context --> CircleQueries["GravitasCircleQueryService"]
     Context --> Coroutines["GravitasCoroutineService"]
     Agent["IMatterAgent"] --> Context
     Agent --> Transform["FixedTransform"]
@@ -82,7 +82,7 @@ flowchart TD
 | `CollisionDetection` | Shape-pair narrow-phase collision checks and contact generation. |
 | `CollisionResponse` | Prototype position correction and impulse response for colliding bodies. |
 | `GravitasRaycastService` | Context-local raycast buffers, candidate gathering, duplicate suppression, and hit ordering. |
-| `GravitasCirclecastService` | Context-local circular proximity query buffers and hit ordering. |
+| `GravitasCircleQueryService` | Context-local X/Z circle overlap and proximity query buffers and hit ordering. |
 | `GravitasCoroutineService` | Lockstep coroutine execution and context-bound wait instructions. |
 
 ## Typical Flow
@@ -141,5 +141,5 @@ events are emitted from the active-pair queue during `LateSimulate`.
 | Collision broad phase | [`GravitasCollisionService.cs`](../../src/Gravitas/Core/GravitasCollisionService.cs), [`PhysicsPartition.cs`](../../src/Gravitas/Partitions/PhysicsPartition.cs) |
 | Colliders | [`LSCollider.cs`](../../src/Gravitas/Colliders/LSCollider.cs), [`Primitives`](../../src/Gravitas/Colliders/Primitives) |
 | Collision handling | [`CollisionPair.cs`](../../src/Gravitas/CollisionHandling/CollisionPair.cs), [`CollisionDetection.cs`](../../src/Gravitas/CollisionHandling/CollisionDetection.cs), [`CollisionResponse.cs`](../../src/Gravitas/CollisionHandling/CollisionResponse.cs) |
-| Queries | [`GravitasRaycastService.cs`](../../src/Gravitas/Raycasting/GravitasRaycastService.cs), [`GravitasCirclecastService.cs`](../../src/Gravitas/Raycasting/GravitasCirclecastService.cs), [`RaycastAxisWorker.cs`](../../src/Gravitas/Raycasting/RaycastAxisWorker.cs) |
+| Queries | [`GravitasRaycastService.cs`](../../src/Gravitas/Raycasting/GravitasRaycastService.cs), [`GravitasCircleQueryService.cs`](../../src/Gravitas/Raycasting/GravitasCircleQueryService.cs), [`RaycastSegmentWorker.cs`](../../src/Gravitas/Raycasting/RaycastSegmentWorker.cs) |
 | Tests and examples | [`tests/Gravitas.Tests`](../../tests/Gravitas.Tests), [`tests/Gravitas.Benchmarks`](../../tests/Gravitas.Benchmarks) |

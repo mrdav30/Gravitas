@@ -25,7 +25,7 @@ public class LSCylinderCollider : LSCollider
         throw new System.NotImplementedException();
     }
 
-    public override bool ColliderOverlapsRay(RaycastAxisWorker worker, ref SwiftList<Vector3d> outputIntersectionPoints)
+    public override bool ColliderOverlapsRay(RaycastSegmentWorker worker, ref SwiftList<Vector3d> outputIntersectionPoints)
     {
         throw new System.NotImplementedException();
     }

@@ -12,7 +12,7 @@ namespace Gravitas.Raycasting;
 public sealed class GravitasRaycastService
 {
     private readonly GravitasWorldContext _context;
-    private readonly RaycastAxisWorker _worker = new();
+    private readonly RaycastSegmentWorker _worker = new();
     private SwiftList<Vector3d> _bufferIntersectionPoints = new();
     private readonly SwiftHashSet<int> _redundantColliderCheck = new();
     private readonly SwiftHashSet<int> _redundantVoxelCheck = new();
@@ -61,26 +61,17 @@ public sealed class GravitasRaycastService
         PhysicsLayerMask layerMask)
     {
         _currentLayerMask = layerMask;
-
-        Vector3d end = origin + direction * maxDistance;
-        Fixed64 startHeight = origin.y;
-        Fixed64 dist2d = (end.ToVector2d() - origin.ToVector2d()).Magnitude;
-
-        if (dist2d == Fixed64.Zero)
+        if (direction.SqrMagnitude == Fixed64.Zero || maxDistance <= Fixed64.Zero)
         {
             raycastHit = default;
             return false;
         }
 
-        Fixed64 heightSlope = (end.y - origin.y) / dist2d;
-        if (heightSlope == Fixed64.Zero)
-        {
-            raycastHit = default;
-            return false;
-        }
+        Vector3d rayDirection = direction.Normal;
+        Vector3d end = origin + rayDirection * maxDistance;
 
         BeginRaycastTrace(origin, end);
-        return TryFindClosestHit(origin, end, direction, startHeight, heightSlope, out raycastHit);
+        return TryFindClosestHit(origin, end, rayDirection, out raycastHit);
     }
 
     /// <summary>
@@ -97,18 +88,12 @@ public sealed class GravitasRaycastService
         _currentLayerMask = layerMask;
         results.FastClear();
 
-        Fixed64 startHeight = start3d.y;
-        Fixed64 dist2d = (end3d.ToVector2d() - start3d.ToVector2d()).Magnitude;
-        if (dist2d == Fixed64.Zero)
-            return 0;
-
-        Fixed64 heightSlope = (end3d.y - start3d.y) / dist2d;
-        if (heightSlope == Fixed64.Zero)
+        Vector3d segment = end3d - start3d;
+        if (segment.SqrMagnitude == Fixed64.Zero)
             return 0;
 
         BeginRaycastTrace(start3d, end3d);
-        Vector3d direction = (end3d - start3d).Normal;
-        AddAllHits(start3d, end3d, direction, startHeight, heightSlope, results);
+        AddAllHits(start3d, end3d, segment.Normal, results);
         RaycastHitSorter.SortByDistance(results);
         return results.Count;
     }
@@ -119,52 +104,30 @@ public sealed class GravitasRaycastService
         _redundantVoxelCheck.Clear();
         _bufferIntersectionPoints.FastClear();
         Version++;
-        _worker.PrepareAxisCheck(start, end);
+        _worker.PrepareSegmentCheck(start, end);
     }
 
-    private bool TryFindClosestHit(
-        Vector3d start,
-        Vector3d end,
-        Vector3d direction,
-        Fixed64 startHeight,
-        Fixed64 heightSlope,
-        out LSRaycastHit raycastHit)
+    private bool TryFindClosestHit(Vector3d start, Vector3d end, Vector3d direction, out LSRaycastHit raycastHit)
     {
         bool found = false;
         Fixed64 closestDistance = Fixed64.MAX_VALUE;
         LSRaycastHit closestHit = default;
 
-        TraceLineForClosestHit(
-            start,
-            end,
-            direction,
-            startHeight,
-            heightSlope,
-            ref found,
-            ref closestDistance,
-            ref closestHit);
+        TraceLineForClosestHit(start, end, direction, ref found, ref closestDistance, ref closestHit);
 
         raycastHit = closestHit;
         return found;
     }
 
-    private void AddAllHits(
-        Vector3d start,
-        Vector3d end,
-        Vector3d direction,
-        Fixed64 startHeight,
-        Fixed64 heightSlope,
-        SwiftList<LSRaycastHit> results)
+    private void AddAllHits(Vector3d start, Vector3d end, Vector3d direction, SwiftList<LSRaycastHit> results)
     {
-        TraceLineForAllHits(start, end, direction, startHeight, heightSlope, results);
+        TraceLineForAllHits(start, end, direction, results);
     }
 
     private void TraceLineForClosestHit(
         Vector3d start,
         Vector3d end,
         Vector3d direction,
-        Fixed64 startHeight,
-        Fixed64 heightSlope,
         ref bool found,
         ref Fixed64 closestDistance,
         ref LSRaycastHit closestHit)
@@ -177,30 +140,18 @@ public sealed class GravitasRaycastService
                 _context.World.FloorToVoxelSize(traceStart + step * i),
                 start,
                 direction,
-                startHeight,
-                heightSlope,
                 ref found,
                 ref closestDistance,
                 ref closestHit);
         }
 
-        ProcessTracePositionForClosestHit(
-            end,
-            start,
-            direction,
-            startHeight,
-            heightSlope,
-            ref found,
-            ref closestDistance,
-            ref closestHit);
+        ProcessTracePositionForClosestHit(end, start, direction, ref found, ref closestDistance, ref closestHit);
     }
 
     private void TraceLineForAllHits(
         Vector3d start,
         Vector3d end,
         Vector3d direction,
-        Fixed64 startHeight,
-        Fixed64 heightSlope,
         SwiftList<LSRaycastHit> results)
     {
         PrepareTraceLine(start, end, out Vector3d traceStart, out Vector3d step, out Fixed64 steps);
@@ -211,12 +162,10 @@ public sealed class GravitasRaycastService
                 _context.World.FloorToVoxelSize(traceStart + step * i),
                 start,
                 direction,
-                startHeight,
-                heightSlope,
                 results);
         }
 
-        ProcessTracePositionForAllHits(end, start, direction, startHeight, heightSlope, results);
+        ProcessTracePositionForAllHits(end, start, direction, results);
     }
 
     private void PrepareTraceLine(Vector3d start, Vector3d end, out Vector3d traceStart, out Vector3d step, out Fixed64 steps)
@@ -237,8 +186,6 @@ public sealed class GravitasRaycastService
         Vector3d tracePosition,
         Vector3d origin,
         Vector3d direction,
-        Fixed64 startHeight,
-        Fixed64 heightSlope,
         ref bool found,
         ref Fixed64 closestDistance,
         ref LSRaycastHit closestHit)
@@ -265,8 +212,6 @@ public sealed class GravitasRaycastService
                 partition!,
                 origin,
                 direction,
-                startHeight,
-                heightSlope,
                 ref found,
                 ref closestDistance,
                 ref closestHit);
@@ -277,8 +222,6 @@ public sealed class GravitasRaycastService
         Vector3d tracePosition,
         Vector3d origin,
         Vector3d direction,
-        Fixed64 startHeight,
-        Fixed64 heightSlope,
         SwiftList<LSRaycastHit> results)
     {
         GridWorld world = _context.World;
@@ -299,7 +242,7 @@ public sealed class GravitasRaycastService
                 continue;
             }
 
-            ProcessPartitionForAllHits(partition!, origin, direction, startHeight, heightSlope, results);
+            ProcessPartitionForAllHits(partition!, origin, direction, results);
         }
     }
 
@@ -307,8 +250,6 @@ public sealed class GravitasRaycastService
         PhysicsPartition partition,
         Vector3d origin,
         Vector3d direction,
-        Fixed64 startHeight,
-        Fixed64 heightSlope,
         ref bool found,
         ref Fixed64 closestDistance,
         ref LSRaycastHit closestHit)
@@ -317,8 +258,6 @@ public sealed class GravitasRaycastService
             partition.ContainedDynamicObjects,
             origin,
             direction,
-            startHeight,
-            heightSlope,
             ref found,
             ref closestDistance,
             ref closestHit);
@@ -327,8 +266,6 @@ public sealed class GravitasRaycastService
             partition.ContainedStaticObjects,
             origin,
             direction,
-            startHeight,
-            heightSlope,
             ref found,
             ref closestDistance,
             ref closestHit);
@@ -338,8 +275,6 @@ public sealed class GravitasRaycastService
         SwiftList<int>? colliderIds,
         Vector3d origin,
         Vector3d direction,
-        Fixed64 startHeight,
-        Fixed64 heightSlope,
         ref bool found,
         ref Fixed64 closestDistance,
         ref LSRaycastHit closestHit)
@@ -349,7 +284,7 @@ public sealed class GravitasRaycastService
 
         for (int i = colliderIds.Count - 1; i >= 0; i--)
         {
-            if (!TryBuildHitForCollider(colliderIds[i], origin, direction, startHeight, heightSlope, out LSRaycastHit hit)
+            if (!TryBuildHitForCollider(colliderIds[i], origin, direction, out LSRaycastHit hit)
                 || hit.Distance >= closestDistance)
             {
                 continue;
@@ -365,33 +300,16 @@ public sealed class GravitasRaycastService
         PhysicsPartition partition,
         Vector3d origin,
         Vector3d direction,
-        Fixed64 startHeight,
-        Fixed64 heightSlope,
         SwiftList<LSRaycastHit> results)
     {
-        ProcessColliderListForAllHits(
-            partition.ContainedDynamicObjects,
-            origin,
-            direction,
-            startHeight,
-            heightSlope,
-            results);
-
-        ProcessColliderListForAllHits(
-            partition.ContainedStaticObjects,
-            origin,
-            direction,
-            startHeight,
-            heightSlope,
-            results);
+        ProcessColliderListForAllHits(partition.ContainedDynamicObjects, origin, direction, results);
+        ProcessColliderListForAllHits(partition.ContainedStaticObjects, origin, direction, results);
     }
 
     private void ProcessColliderListForAllHits(
         SwiftList<int>? colliderIds,
         Vector3d origin,
         Vector3d direction,
-        Fixed64 startHeight,
-        Fixed64 heightSlope,
         SwiftList<LSRaycastHit> results)
     {
         if (colliderIds == null)
@@ -399,7 +317,7 @@ public sealed class GravitasRaycastService
 
         for (int i = colliderIds.Count - 1; i >= 0; i--)
         {
-            if (TryBuildHitForCollider(colliderIds[i], origin, direction, startHeight, heightSlope, out LSRaycastHit hit))
+            if (TryBuildHitForCollider(colliderIds[i], origin, direction, out LSRaycastHit hit))
                 results.Add(hit);
         }
     }
@@ -408,56 +326,34 @@ public sealed class GravitasRaycastService
         int colliderId,
         Vector3d origin,
         Vector3d direction,
-        Fixed64 startHeight,
-        Fixed64 heightSlope,
         out LSRaycastHit hit)
     {
         hit = default;
         return _context.Physics.TryGetColliderById(colliderId, out LSCollider? current)
             && DoesCurrentColliderIntersectRay(current)
-            && TryBuildHit(current!, origin, direction, startHeight, heightSlope, out hit);
+            && TryBuildHit(current!, origin, direction, out hit);
     }
 
     private bool TryBuildHit(
         LSCollider collider,
         Vector3d origin,
         Vector3d direction,
-        Fixed64 startHeight,
-        Fixed64 heightSlope,
         out LSRaycastHit raycastHit)
     {
-        bool heightIntersects = false;
-        bool mined = false;
-        bool maxed = false;
         Fixed64 closestDistance = Fixed64.MAX_VALUE;
         Vector3d closestIntersection = Vector3d.Zero;
 
         for (int i = _bufferIntersectionPoints.Count - 1; i >= 0; i--)
         {
             Fixed64 dist = Vector3d.Distance(_bufferIntersectionPoints[i], origin);
-            Fixed64 heightAtPosition = startHeight + dist * heightSlope;
-
-            if (heightAtPosition < collider.BoundsMin.y)
-                mined = true;
-            else if (heightAtPosition > collider.BoundsMax.y)
-                maxed = true;
-            else
-                heightIntersects = true;
-
-            if (mined && maxed)
-                heightIntersects = true;
-
             if (dist < closestDistance)
             {
                 closestDistance = dist;
                 closestIntersection = _bufferIntersectionPoints[i];
             }
-
-            if (heightIntersects)
-                break;
         }
 
-        if (!heightIntersects)
+        if (closestDistance == Fixed64.MAX_VALUE)
         {
             raycastHit = default;
             return false;

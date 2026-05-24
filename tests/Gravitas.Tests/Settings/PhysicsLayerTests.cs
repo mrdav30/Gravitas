@@ -68,7 +68,7 @@ public sealed class PhysicsLayerTests
             new Vector3d((Fixed64)4, Fixed64.Fraction(1, 4), Fixed64.Zero),
             onlyLayerOne,
             rayHits);
-        int circleCount = context.Circlecasts.CircleCastAll(
+        int circleCount = context.CircleQueries.OverlapCircleAll(
             new Vector3d(1, 0, 0),
             (Fixed64)4,
             onlyLayerOne,

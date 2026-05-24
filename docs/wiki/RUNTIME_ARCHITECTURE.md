@@ -24,8 +24,8 @@ pairs, queries, and coroutines remain context-local.
 | --- | --- |
 | `GravitasPhysicsService` | Dynamic body bucket, collider ID table, reusable collider IDs, collision-pair pool, active collision-pair queue, simulation switch. |
 | `GravitasCollisionService` | Active partition bucket, inactive partition pool, duplicate voxel checker, collision distribution version, cull distributor. |
-| `GravitasRaycastService` | Raycast worker, intersection buffer, duplicate voxel checker, duplicate collider checker, query version. |
-| `GravitasCirclecastService` | Duplicate collider checker, query version. |
+| `GravitasRaycastService` | 3D segment worker, intersection buffer, duplicate voxel checker, duplicate collider checker, query version. |
+| `GravitasCircleQueryService` | Duplicate collider checker and query version for X/Z circle overlap/proximity queries. |
 | `GravitasCoroutineService` | Active lockstep coroutine bucket and context-bound wait instruction factories. |
 | `GravitasLifecycleHooks` | Ordered callbacks for simulate, late simulate, visualize, late visualize, reset, and frame-rate change. |
 
@@ -116,7 +116,8 @@ contexts. These checks are core invariants.
 Body movement currently happens in `StiffBody.LateSimulate()`, called by
 `GravitasPhysicsService.LateSimulate()`. Non-kinematic movable bodies process
 forces, update velocities, apply position/rotation changes, run a grounding
-circlecast, and then update collider partition state through `Collider.Simulate()`.
+directional circle-overlap query, and then update collider partition state
+through `Collider.Simulate()`.
 
 Kinematic bodies read their host transforms during `LateSimulate`, update
 authoritative body position/rotation from those transforms, and then update
@@ -136,7 +137,7 @@ visual values.
 - contact and trigger events.
 - parent/child metadata used to suppress sibling collisions.
 - collision-pair references and holders.
-- raycast and spherecast query version markers.
+- raycast and circle-query version markers.
 
 Dynamic colliders are updated by their bodies. Bodyless/static colliders are
 not owned by the dynamic body bucket, so a host that moves one after

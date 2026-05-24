@@ -38,7 +38,7 @@ public sealed class GravitasWorldContext : IDisposable
         Collisions = new GravitasCollisionService(this);
         Physics = new GravitasPhysicsService(this);
         Raycasts = new GravitasRaycastService(this);
-        Circlecasts = new GravitasCirclecastService(this);
+        CircleQueries = new GravitasCircleQueryService(this);
         Coroutines = new GravitasCoroutineService(this);
     }
 
@@ -73,9 +73,9 @@ public sealed class GravitasWorldContext : IDisposable
     public GravitasRaycastService Raycasts { get; }
 
     /// <summary>
-    /// Gets this context's world-local circlecast query service.
+    /// Gets this context's world-local X/Z circle overlap query service.
     /// </summary>
-    public GravitasCirclecastService Circlecasts { get; }
+    public GravitasCircleQueryService CircleQueries { get; }
 
     /// <summary>
     /// Gets this context's world-local lockstep coroutine service.
@@ -281,7 +281,7 @@ public sealed class GravitasWorldContext : IDisposable
         Collisions.Reset();
         Physics.Reset();
         Raycasts.Reset();
-        Circlecasts.Reset();
+        CircleQueries.Reset();
         Coroutines.Reset();
         _hooks.InvokeReset();
     }
