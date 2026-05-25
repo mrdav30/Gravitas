@@ -2,6 +2,7 @@
 using Gravitas.Colliders;
 using SwiftCollections;
 using SwiftCollections.Pool;
+using SwiftCollections.Query;
 
 namespace Gravitas.CollisionHandling;
 
@@ -26,6 +27,7 @@ public static class CollisionDetection
             CollisionType.Mesh_Sphere => DoMeshSphereCheck(pair),
             CollisionType.Mesh_Capsule => DoMeshCapsuleCheck(pair),
             CollisionType.Mesh_Cuboid => DoMeshCuboidCheck(pair),
+            CollisionType.Mesh_Cylinder => DoMeshCylinderCheck(pair),
             CollisionType.Mesh_Mesh => DoMeshesCheck(pair),
             _ => false,
         };
@@ -811,6 +813,78 @@ public static class CollisionDetection
         return true;
     }
 
+    private static bool DoMeshCylinderCheck(CollisionPair pair)
+    {
+        if (!TryGetPairColliders(pair, out LSMeshCollider mesh, out LSCylinderCollider cylinder))
+            return false;
+
+        SwiftList<int> nearbyTriangles = SwiftListPool<int>.Shared.Rent();
+        try
+        {
+            if (!TryFindMeshCylinderContact(
+                mesh,
+                cylinder,
+                nearbyTriangles,
+                out Vector3d pointOnMesh,
+                out Vector3d pointOnCylinder,
+                out Vector3d normalMeshToCylinder,
+                out Fixed64 depth))
+            {
+                return false;
+            }
+
+            SetContactPointInPairOrder(pair, mesh, pointOnMesh, cylinder, pointOnCylinder, depth, normalMeshToCylinder);
+            return true;
+        }
+        finally
+        {
+            SwiftListPool<int>.Shared.Release(nearbyTriangles);
+        }
+    }
+
+    private static bool TryFindMeshCylinderContact(
+        LSMeshCollider mesh,
+        LSCylinderCollider cylinder,
+        SwiftList<int> triangleBuffer,
+        out Vector3d pointOnMesh,
+        out Vector3d pointOnCylinder,
+        out Vector3d normalMeshToCylinder,
+        out Fixed64 depth)
+    {
+        pointOnMesh = Vector3d.Zero;
+        pointOnCylinder = Vector3d.Zero;
+        normalMeshToCylinder = Vector3d.Zero;
+        depth = Fixed64.Zero;
+
+        mesh.GetTrianglesInBounds(new FixedBoundVolume(cylinder.BoundsMin, cylinder.BoundsMax), triangleBuffer);
+        bool found = false;
+        Fixed64 bestDepth = Fixed64.MAX_VALUE;
+
+        for (int i = 0; i < triangleBuffer.Count; i++)
+        {
+            int triangleIndex = triangleBuffer[i];
+            mesh.Mesh.GetTriangleVertices(triangleIndex, out Vector3d first, out Vector3d second, out Vector3d third);
+            Vector3d faceNormal = mesh.Mesh.FaceNormals[triangleIndex];
+            Vector3d candidatePointOnMesh = MeshUtils.ClosestPointOnTriangle(first, second, third, faceNormal, cylinder.Center);
+            if (!IsPointInsideCylinder(cylinder, candidatePointOnMesh))
+                continue;
+
+            Vector3d candidatePointOnCylinder = cylinder.ClosestPointOnSurface(candidatePointOnMesh);
+            Fixed64 candidateDepth = Vector3d.Distance(candidatePointOnMesh, candidatePointOnCylinder);
+            if (found && candidateDepth >= bestDepth)
+                continue;
+
+            found = true;
+            bestDepth = candidateDepth;
+            pointOnMesh = candidatePointOnMesh;
+            pointOnCylinder = candidatePointOnCylinder;
+            normalMeshToCylinder = OrientNormal(faceNormal, cylinder.Center - candidatePointOnMesh);
+            depth = candidateDepth;
+        }
+
+        return found;
+    }
+
     /// <summary>
     /// Tests if there are any separating axes between a cuboid and a mesh using the given axis vectors.
     /// </summary>
@@ -848,9 +922,13 @@ public static class CollisionDetection
         collisionInfo = null;
 
         (Vector3d PointA, Vector3d PointB) = FindInitialPointsOfContact(mesh, cuboid);
-        SwiftList<int> nearbyMeshTriangles = mesh.GetNearbyTriangles(PointA);
+        SwiftList<int> nearbyMeshTriangles = SwiftListPool<int>.Shared.Rent();
+        mesh.GetNearbyTriangles(PointA, nearbyMeshTriangles);
         if (nearbyMeshTriangles.Count == 0)
+        {
+            SwiftListPool<int>.Shared.Release(nearbyMeshTriangles);
             return false;
+        }
 
         collisionInfo = (
             new MeshObjectInfo(mesh, PointA, nearbyMeshTriangles),
@@ -931,12 +1009,22 @@ public static class CollisionDetection
         (Vector3d Point1, Vector3d Point2) = FindInitialPointsOfContact(mesh1, mesh2);
 
         // Gather nearby triangles for each point of contact
-        SwiftList<int> nearbyTriangles1 = mesh1.GetNearbyTriangles(Point1);
+        SwiftList<int> nearbyTriangles1 = SwiftListPool<int>.Shared.Rent();
+        mesh1.GetNearbyTriangles(Point1, nearbyTriangles1);
         if (nearbyTriangles1.Count <= 0)
+        {
+            SwiftListPool<int>.Shared.Release(nearbyTriangles1);
             return false;
-        SwiftList<int> nearbyTriangles2 = mesh2.GetNearbyTriangles(Point2);
+        }
+
+        SwiftList<int> nearbyTriangles2 = SwiftListPool<int>.Shared.Rent();
+        mesh2.GetNearbyTriangles(Point2, nearbyTriangles2);
         if (nearbyTriangles2.Count <= 0)
+        {
+            SwiftListPool<int>.Shared.Release(nearbyTriangles1);
+            SwiftListPool<int>.Shared.Release(nearbyTriangles2);
             return false;
+        }
 
         collisionInfo = (
             new MeshObjectInfo(mesh1, Point1, nearbyTriangles1),
@@ -976,6 +1064,15 @@ public static class CollisionDetection
         }
 
         return true;
+    }
+
+    private static bool IsPointInsideCylinder(LSCylinderCollider cylinder, Vector3d point)
+    {
+        Vector3d local = cylinder.Rotation.Inverse() * (point - cylinder.Center);
+        Fixed64 radialSqr = local.x * local.x + local.z * local.z;
+        return radialSqr <= cylinder.ScaledRadiusSqr + Fixed64.Epsilon
+            && local.y >= -cylinder.HalfHeight - Fixed64.Epsilon
+            && local.y <= cylinder.HalfHeight + Fixed64.Epsilon;
     }
 
     #endregion

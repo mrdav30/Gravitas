@@ -1,6 +1,7 @@
 using FixedMathSharp;
 using Gravitas.Colliders;
 using SwiftCollections;
+using SwiftCollections.Query;
 
 namespace Gravitas.Raycasting;
 
@@ -15,6 +16,7 @@ public sealed class RaycastSegmentWorker
     private Fixed64 _segmentLength;
     private Fixed64 _segmentLengthSqr;
     private bool _calculateIntersections;
+    private readonly SwiftList<int> _meshTriangleBuffer = new();
 
     /// <summary>
     /// Prepares this worker for overlap checks against the line segment between two points.
@@ -98,6 +100,26 @@ public sealed class RaycastSegmentWorker
             cylinderCollider.HalfHeight,
             includeCaps: true,
             ref outputIntersectionPoints);
+
+    public bool CheckMeshOverlaps(LSMeshCollider meshCollider, ref SwiftList<Vector3d> outputIntersectionPoints)
+    {
+        _meshTriangleBuffer.FastClear();
+        meshCollider.Mesh.TriangleBVH.Query(CreateSegmentBounds(), _meshTriangleBuffer);
+        bool intersects = false;
+        for (int i = 0; i < _meshTriangleBuffer.Count; i++)
+        {
+            int triangleIndex = _meshTriangleBuffer[i];
+            meshCollider.Mesh.GetTriangleVertices(triangleIndex, out Vector3d first, out Vector3d second, out Vector3d third);
+            if (!TryAddTriangleIntersection(first, second, third, meshCollider.Mesh.FaceNormals[triangleIndex], ref outputIntersectionPoints))
+                continue;
+
+            intersects = true;
+            if (!_calculateIntersections)
+                return true;
+        }
+
+        return intersects;
+    }
 
     private bool CheckCapsuleCylinderOverlaps(LSCapsuleCollider capsuleCollider, ref SwiftList<Vector3d> outputIntersectionPoints) =>
         CheckFiniteCylinderOverlaps(
@@ -272,6 +294,80 @@ public sealed class RaycastSegmentWorker
 
         AddLocalIntersectionPoint(center, rotation, localPoint, ref outputIntersectionPoints);
         return true;
+    }
+
+    private bool TryAddTriangleIntersection(
+        Vector3d first,
+        Vector3d second,
+        Vector3d third,
+        Vector3d normal,
+        ref SwiftList<Vector3d> outputIntersectionPoints)
+    {
+        if (_segmentLengthSqr == Fixed64.Zero)
+        {
+            if (Vector3d.Dot(_cachedOrigin - first, normal).Abs() > Fixed64.Epsilon
+                || !MeshUtils.IsPointInTrianglePlane(first, second, third, normal, _cachedOrigin))
+            {
+                return false;
+            }
+
+            AddTriangleIntersectionPoint(_cachedOrigin, ref outputIntersectionPoints);
+            return true;
+        }
+
+        Fixed64 denominator = Vector3d.Dot(normal, _segmentDirection);
+        if (denominator.Abs() <= Fixed64.Epsilon)
+        {
+            if (Vector3d.Dot(_cachedOrigin - first, normal).Abs() > Fixed64.Epsilon)
+                return false;
+
+            bool found = false;
+            if (MeshUtils.IsPointInTrianglePlane(first, second, third, normal, _cachedOrigin))
+            {
+                AddTriangleIntersectionPoint(_cachedOrigin, ref outputIntersectionPoints);
+                found = true;
+            }
+
+            if (MeshUtils.IsPointInTrianglePlane(first, second, third, normal, _cachedEnd))
+            {
+                AddTriangleIntersectionPoint(_cachedEnd, ref outputIntersectionPoints);
+                found = true;
+            }
+
+            return found;
+        }
+
+        Fixed64 distance = Vector3d.Dot(first - _cachedOrigin, normal) / denominator;
+        if (distance < Fixed64.Zero || distance > _segmentLength)
+            return false;
+
+        Vector3d point = _cachedOrigin + _segmentDirection * distance;
+        if (!MeshUtils.IsPointInTrianglePlane(first, second, third, normal, point))
+            return false;
+
+        AddTriangleIntersectionPoint(point, ref outputIntersectionPoints);
+        return true;
+    }
+
+    private void AddTriangleIntersectionPoint(Vector3d point, ref SwiftList<Vector3d> outputIntersectionPoints)
+    {
+        if (!_calculateIntersections)
+            return;
+
+        for (int i = 0; i < outputIntersectionPoints.Count; i++)
+        {
+            if (Vector3d.SqrDistance(outputIntersectionPoints[i], point) <= Fixed64.Epsilon)
+                return;
+        }
+
+        outputIntersectionPoints.Add(point);
+    }
+
+    private FixedBoundVolume CreateSegmentBounds()
+    {
+        Vector3d min = Vector3d.Min(_cachedOrigin, _cachedEnd);
+        Vector3d max = Vector3d.Max(_cachedOrigin, _cachedEnd);
+        return new FixedBoundVolume(min, max);
     }
 
     private bool CheckPointInsideFiniteCylinder(

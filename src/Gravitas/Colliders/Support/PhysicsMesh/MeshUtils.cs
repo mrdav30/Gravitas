@@ -21,34 +21,56 @@ public static class MeshUtils
     /// </summary>
     public static Vector3d ClosestPointOnTriangle(Vector3d[] triangle, Vector3d normal, Vector3d point)
     {
-        Vector3d pointOnPlane = point - normal * Vector3d.Dot(point - triangle[0], normal);
-        if (IsPointInTrianglePlane(triangle, normal, pointOnPlane))
-            return pointOnPlane;
-
-        return ClosestPointOnTriangleEdges(triangle, point);
+        return ClosestPointOnTriangle(triangle[0], triangle[1], triangle[2], normal, point);
     }
 
-    public static bool IsPointInTrianglePlane(Vector3d[] triangle, Vector3d normal, Vector3d point)
+    public static Vector3d ClosestPointOnTriangle(
+        Vector3d first,
+        Vector3d second,
+        Vector3d third,
+        Vector3d normal,
+        Vector3d point)
+    {
+        Vector3d pointOnPlane = point - normal * Vector3d.Dot(point - first, normal);
+        if (IsPointInTrianglePlane(first, second, third, normal, pointOnPlane))
+            return pointOnPlane;
+
+        return ClosestPointOnTriangleEdges(first, second, third, point);
+    }
+
+    public static bool IsPointInTrianglePlane(Vector3d[] triangle, Vector3d normal, Vector3d point) =>
+        IsPointInTrianglePlane(triangle[0], triangle[1], triangle[2], normal, point);
+
+    public static bool IsPointInTrianglePlane(
+        Vector3d first,
+        Vector3d second,
+        Vector3d third,
+        Vector3d normal,
+        Vector3d point)
     {
         // Check if the point is inside the triangle by checking if the point is to the left of each edge
-        if (Vector3d.Dot(Vector3d.Cross((triangle[1] - triangle[0]).Normal, point - triangle[0]), normal) < Fixed64.Zero)
+        if (Vector3d.Dot(Vector3d.Cross((second - first).Normal, point - first), normal) < Fixed64.Zero)
             return false;
 
-        if (Vector3d.Dot(Vector3d.Cross((triangle[2] - triangle[1]).Normal, point - triangle[1]), normal) < Fixed64.Zero)
+        if (Vector3d.Dot(Vector3d.Cross((third - second).Normal, point - second), normal) < Fixed64.Zero)
             return false;
 
-        if (Vector3d.Dot(Vector3d.Cross((triangle[0] - triangle[2]).Normal, point - triangle[2]), normal) < Fixed64.Zero)
+        if (Vector3d.Dot(Vector3d.Cross((first - third).Normal, point - third), normal) < Fixed64.Zero)
             return false;
 
         return true;
     }
 
-    private static Vector3d ClosestPointOnTriangleEdges(Vector3d[] triangle, Vector3d point)
+    private static Vector3d ClosestPointOnTriangleEdges(
+        Vector3d first,
+        Vector3d second,
+        Vector3d third,
+        Vector3d point)
     {
-        Vector3d closestPoint = ClosestPointOnEdge(triangle[0], triangle[1], point);
+        Vector3d closestPoint = ClosestPointOnEdge(first, second, point);
         Fixed64 minDistanceSquared = Vector3d.SqrDistance(point, closestPoint);
 
-        Vector3d pointOnEdge = ClosestPointOnEdge(triangle[1], triangle[2], point);
+        Vector3d pointOnEdge = ClosestPointOnEdge(second, third, point);
         Fixed64 distanceSquared = Vector3d.SqrDistance(point, pointOnEdge);
         if (distanceSquared < minDistanceSquared)
         {
@@ -56,7 +78,7 @@ public static class MeshUtils
             closestPoint = pointOnEdge;
         }
 
-        pointOnEdge = ClosestPointOnEdge(triangle[2], triangle[0], point);
+        pointOnEdge = ClosestPointOnEdge(third, first, point);
         distanceSquared = Vector3d.SqrDistance(point, pointOnEdge);
         if (distanceSquared < minDistanceSquared)
             closestPoint = pointOnEdge;

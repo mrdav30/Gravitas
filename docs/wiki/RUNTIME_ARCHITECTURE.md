@@ -24,7 +24,7 @@ pairs, queries, and coroutines remain context-local.
 | --- | --- |
 | `GravitasPhysicsService` | Dynamic body bucket, collider ID table, reusable collider IDs, collision-pair pool, active collision-pair queue, simulation switch. |
 | `GravitasCollisionService` | Active partition bucket, inactive partition pool, duplicate voxel checker, collision distribution version, cull distributor. |
-| `GravitasRaycastService` | 3D segment worker, intersection buffer, duplicate voxel checker, duplicate collider checker, query version. |
+| `GravitasRaycastService` | 3D segment worker, swept-sphere worker, intersection buffer, duplicate voxel checker, duplicate collider checker, query version. |
 | `GravitasCircleQueryService` | Duplicate collider checker and query version for X/Z circle overlap/proximity queries. |
 | `GravitasCoroutineService` | Active lockstep coroutine bucket and context-bound wait instruction factories. |
 | `GravitasLifecycleHooks` | Ordered callbacks for simulate, late simulate, visualize, late visualize, reset, and frame-rate change. |
@@ -118,9 +118,9 @@ contexts. These checks are core invariants.
 
 Body movement currently happens in `StiffBody.LateSimulate()`, called by
 `GravitasPhysicsService.LateSimulate()`. Non-kinematic movable bodies process
-forces, update velocities, apply position/rotation changes, run a grounding ray
-probe through the context query service, and then update collider partition
-state through `Collider.Simulate()`. `GravitasPhysicsService.Simulate()` also
+forces, update velocities, apply position/rotation changes, run their selected
+ground probe through the context query services, and then update collider
+partition state through `Collider.Simulate()`. `GravitasPhysicsService.Simulate()` also
 performs a pre-distribution collider refresh for dynamic-body colliders so host
 commands that teleport or reposition bodies before `Simulate()` are reflected in
 the same collision distribution pass.
@@ -128,11 +128,14 @@ the same collision distribution pass.
 Body initialization does not assume grounded state. After the body collider is
 registered and partitioned, initialization performs an explicit ground probe.
 If no configured ground layer is hit, the body starts airborne. Ground probes
-use `PhysicsSettings.GroundCheckLayerMask`, write hits from `RaycastAll` into a
-body-owned buffer, and ignore the body's own collider before accepting the
-closest hit. Stationary grounded bodies can skip repeated simulation probes for
-a short frame window, but movement of the last hit platform invalidates that
-guard.
+use `PhysicsSettings.GroundCheckLayerMask`, write hits into a body-owned buffer,
+and ignore the body's own collider before accepting the closest hit. `Ray`
+ground probes use `RaycastAll`; `SweptSphere` probes use `SweepSphereAll`;
+`Auto` derives the mode from collider shape and probe radius. Stationary
+grounded bodies can skip repeated simulation probes for a short frame window,
+but movement of the last hit platform invalidates that guard. Ground probes
+accept bodyless colliders, immovable bodies, and kinematic bodies as ground;
+ordinary movable dynamic bodies are ignored.
 
 Kinematic bodies read their host transforms during `LateSimulate`, update
 authoritative body position/rotation from those transforms, and then update

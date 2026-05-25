@@ -15,10 +15,11 @@ public class MeshObjectInfo : CollisionObjectInfo
     {
         Collider = collider;
         PointOfContact = poc;
-        TriangleIndices = new SwiftList<int>(collider.Mesh.Triangles);
+        TriangleIndices = SwiftListPool<int>.Shared.Rent();
+        for (int i = 0; i < collider.Mesh.TriangleCount; i++)
+            TriangleIndices.Add(i);
     }
 
-    // Pass in filtered triangle indices to avoid unnecessary processing.
     public MeshObjectInfo(LSMeshCollider collider, Vector3d poc, SwiftList<int> triangleIndices) : base()
     {
         Collider = collider;
@@ -44,5 +45,10 @@ public class MeshObjectInfo : CollisionObjectInfo
         }
 
         SwiftHashSetPool<int>.Shared.Release(processedVertices);
+    }
+
+    protected override void OnDispose()
+    {
+        SwiftListPool<int>.Shared.Release(TriangleIndices);
     }
 }

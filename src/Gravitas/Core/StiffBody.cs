@@ -99,6 +99,16 @@ public class StiffBody : IRecordable
 
     public Fixed64 GroundDownDistanceOnAir = (Fixed64)0.5f;
 
+    /// <summary>
+    /// Selects the deterministic query primitive used for ground checks.
+    /// </summary>
+    public GroundProbeMode GroundProbeMode { get; set; } = GroundProbeMode.Auto;
+
+    /// <summary>
+    /// Optional explicit radius for swept-sphere ground probes. A zero value derives the radius from the collider.
+    /// </summary>
+    public Fixed64 GroundProbeRadius { get; set; }
+
     private int _lastGroundCheckFrame = 0;
     private const int _groundCheckFrameThreshold = 10;
     private readonly Fixed64 _groundCheckThreshold = (Fixed64)0.01f;
@@ -973,12 +983,27 @@ public class StiffBody : IRecordable
 
     private bool TryFindGroundHit(Vector3d origin, Fixed64 distance, out LSRaycastHit hit)
     {
+        GroundProbeMode mode = ResolveGroundProbeMode();
+        if (mode == GroundProbeMode.SweptSphere && TryFindGroundHitWithSweptSphere(origin, distance, out hit))
+            return true;
+
+        if (mode == GroundProbeMode.SweptSphere)
+        {
+            hit = default;
+            return false;
+        }
+
+        return TryFindGroundHitWithRay(origin, distance, out hit);
+    }
+
+    private bool TryFindGroundHitWithRay(Vector3d origin, Fixed64 distance, out LSRaycastHit hit)
+    {
         Vector3d end = origin + Vector3d.Down * distance;
         int hitCount = Context.Raycasts.RaycastAll(origin, end, Context.Settings.GroundCheckLayerMask, _groundProbeHits);
         for (int i = 0; i < hitCount; i++)
         {
             LSRaycastHit current = _groundProbeHits[i];
-            if (ReferenceEquals(current.Collider, Collider))
+            if (!IsValidGroundHit(current))
                 continue;
 
             hit = current;
@@ -987,6 +1012,73 @@ public class StiffBody : IRecordable
 
         hit = default;
         return false;
+    }
+
+    private bool TryFindGroundHitWithSweptSphere(Vector3d origin, Fixed64 distance, out LSRaycastHit hit)
+    {
+        Fixed64 radius = ResolveGroundProbeRadius();
+        if (radius <= Fixed64.Epsilon)
+            return TryFindGroundHitWithRay(origin, distance, out hit);
+
+        Vector3d end = origin + Vector3d.Down * distance;
+        int hitCount = Context.Raycasts.SweepSphereAll(
+            origin,
+            end,
+            radius,
+            Context.Settings.GroundCheckLayerMask,
+            _groundProbeHits,
+            Collider);
+
+        for (int i = 0; i < hitCount; i++)
+        {
+            LSRaycastHit current = _groundProbeHits[i];
+            if (!IsValidGroundHit(current))
+                continue;
+
+            hit = current;
+            return true;
+        }
+
+        hit = default;
+        return false;
+    }
+
+    private bool IsValidGroundHit(LSRaycastHit hit)
+    {
+        LSCollider? hitCollider = hit.Collider;
+        if (hitCollider == null || ReferenceEquals(hitCollider, Collider))
+            return false;
+
+        StiffBody? hitBody = hitCollider.Body;
+        return hitBody == null || hitBody.Immovable || hitBody.IsKinematic;
+    }
+
+    private GroundProbeMode ResolveGroundProbeMode()
+    {
+        if (GroundProbeMode != GroundProbeMode.Auto)
+            return GroundProbeMode;
+
+        return Collider is LSSphereCollider
+            || Collider is LSCapsuleCollider
+            || Collider is LSCylinderCollider
+            || (Collider is LSCuboidCollider && ResolveGroundProbeRadius() > Fixed64.Fraction(1, 8))
+                ? GroundProbeMode.SweptSphere
+                : GroundProbeMode.Ray;
+    }
+
+    private Fixed64 ResolveGroundProbeRadius()
+    {
+        if (GroundProbeRadius > Fixed64.Zero)
+            return GroundProbeRadius;
+
+        return Collider switch
+        {
+            LSSphereCollider sphere => sphere.ScaledRadius,
+            LSCapsuleCollider capsule => capsule.ScaledRadius,
+            LSCylinderCollider cylinder => cylinder.ScaledRadius,
+            LSCuboidCollider cuboid => FixedMath.Min(cuboid.Bounds.Scope.x, cuboid.Bounds.Scope.z),
+            _ => Fixed64.Zero
+        };
     }
 
     private void ClearGrounding()

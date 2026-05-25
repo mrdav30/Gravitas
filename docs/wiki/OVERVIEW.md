@@ -42,6 +42,7 @@ Gravitas owns, per context:
 - dynamic body and collider registration.
 - collision partitions and collision-pair state.
 - raycast, circle-overlap, and coroutine buffers.
+- swept-sphere query buffers.
 - ordered lifecycle hooks.
 
 ```mermaid
@@ -81,7 +82,7 @@ flowchart TD
 | `CollisionPair` | Pair identity, culling state, contact state, narrow-phase dispatch, response dispatch, and contact notification state. |
 | `CollisionDetection` | Shape-pair narrow-phase collision checks and contact generation. |
 | `CollisionResponse` | Prototype position correction and impulse response for colliding bodies. |
-| `GravitasRaycastService` | Context-local raycast buffers, candidate gathering, duplicate suppression, and hit ordering. |
+| `GravitasRaycastService` | Context-local raycast and swept-sphere buffers, candidate gathering, duplicate suppression, and hit ordering. |
 | `GravitasCircleQueryService` | Context-local X/Z circle overlap and proximity query buffers and hit ordering. |
 | `GravitasCoroutineService` | Lockstep coroutine execution and context-bound wait instructions. |
 
@@ -123,8 +124,11 @@ events are emitted from the active-pair queue during `LateSimulate`.
   interactions are design goals, not current guarantees.
 - `StiffBody` has a split 2D ground position plus height, but that is not a
   complete 2D physics model.
-- Cylinder collider behavior is not implemented.
-- Mesh raycast overlap is currently disabled.
+- Cylinder collision and query behavior is implemented for the current finite
+  cylinder model, but needs continued edge-case hardening.
+- Mesh raycast overlap and initial mesh/cylinder contact are implemented through
+  triangle-level tests. Swept mesh queries and full mesh contact manifolds remain
+  future hardening work.
 - Collision response is a prototype and should be treated as an alpha-hardening
   target, especially around contact manifolds, position correction, angular
   response, triggers, restitution, and physically coherent units.

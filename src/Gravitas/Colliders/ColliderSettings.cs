@@ -52,11 +52,13 @@ public static class ColliderSettings
             {(ColliderType.Cylinder, ColliderType.AABox), CollisionType.Cuboid_Cylinder},
             {(ColliderType.Cylinder, ColliderType.OBBox), CollisionType.Cuboid_Cylinder},
             {(ColliderType.Cylinder, ColliderType.Cylinder), CollisionType.Cylinder_Cylinder},
+            {(ColliderType.Cylinder, ColliderType.Mesh), CollisionType.Mesh_Cylinder},
             // Mesh
             {(ColliderType.Mesh, ColliderType.Sphere), CollisionType.Mesh_Sphere},
             {(ColliderType.Mesh, ColliderType.AABox), CollisionType.Mesh_Cuboid},
             {(ColliderType.Mesh, ColliderType.OBBox), CollisionType.Mesh_Cuboid},
             {(ColliderType.Mesh, ColliderType.Capsule), CollisionType.Mesh_Capsule},
+            {(ColliderType.Mesh, ColliderType.Cylinder), CollisionType.Mesh_Cylinder},
             {(ColliderType.Mesh, ColliderType.Mesh), CollisionType.Mesh_Mesh},
         };
 

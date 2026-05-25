@@ -52,7 +52,7 @@ public class CollisionDetectionBenchmarks
 
     private CollisionPair CreateDetectionPair(int index, Vector3d origin)
     {
-        return (index % 8) switch
+        return (index % 9) switch
         {
             0 => new CollisionPair(
                 CreateSphere(origin),
@@ -75,9 +75,12 @@ public class CollisionDetectionBenchmarks
             6 => new CollisionPair(
                 CreateCylinder(origin),
                 CreateCylinder(origin + new Vector3d(Fixed64.Half, Fixed64.Zero, Fixed64.Zero))),
-            _ => new CollisionPair(
+            7 => new CollisionPair(
                 CreateCuboid(origin),
                 CreateCylinder(origin + new Vector3d(Fixed64.Half, Fixed64.Zero, Fixed64.Zero))),
+            _ => new CollisionPair(
+                CreateMeshFloor(origin),
+                CreateCylinder(origin + new Vector3d(Fixed64.Zero, Fixed64.Fraction(1, 4), Fixed64.Zero))),
         };
     }
 
@@ -92,6 +95,20 @@ public class CollisionDetectionBenchmarks
 
     private LSCylinderCollider CreateCylinder(Vector3d position) =>
         CreateBody(new LSCylinderCollider(), position).Collider;
+
+    private LSMeshCollider CreateMeshFloor(Vector3d position) =>
+        CreateBody(
+            new LSMeshCollider(
+                new[]
+                {
+                    new Vector3d((Fixed64)(-1), Fixed64.Zero, (Fixed64)(-1)),
+                    new Vector3d(Fixed64.One, Fixed64.Zero, (Fixed64)(-1)),
+                    new Vector3d((Fixed64)(-1), Fixed64.Zero, Fixed64.One),
+                    new Vector3d(Fixed64.One, Fixed64.Zero, Fixed64.One)
+                },
+                new[] { 0, 2, 1, 1, 2, 3 }),
+            position,
+            preventAngularForces: true).Collider;
 
     private ScenarioBody<TCollider> CreateBody<TCollider>(
         TCollider collider,

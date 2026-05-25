@@ -11,9 +11,11 @@ public class SimulationAllocationBenchmarks
 
     private GravitasWorldContext _lateSimulateContext;
     private GravitasWorldContext _groundingContext;
+    private GravitasWorldContext _sweptGroundingContext;
     private GravitasWorldContext _distributionContext;
     private GravitasWorldContext _activePairContext;
     private SwiftList<StiffBody> _groundedBodies;
+    private SwiftList<StiffBody> _sweptGroundedBodies;
 
     [Params(64)]
     public int ColliderCount { get; set; }
@@ -30,6 +32,13 @@ public class SimulationAllocationBenchmarks
         _groundingContext.Settings.GroundCheckLayerMask = IncludeLayerZero;
         _groundedBodies = new SwiftList<StiffBody>(ColliderCount);
         BenchmarkPhysicsScene.CreateDynamicSphereGrid(_groundingContext, ColliderCount, _groundedBodies);
+        SetGroundProbeMode(_groundedBodies, GroundProbeMode.Ray);
+
+        _sweptGroundingContext = BenchmarkPhysicsScene.CreateContext(gridExtent);
+        _sweptGroundingContext.Settings.GroundCheckLayerMask = IncludeLayerZero;
+        _sweptGroundedBodies = new SwiftList<StiffBody>(ColliderCount);
+        BenchmarkPhysicsScene.CreateDynamicSphereGrid(_sweptGroundingContext, ColliderCount, _sweptGroundedBodies);
+        SetGroundProbeMode(_sweptGroundedBodies, GroundProbeMode.SweptSphere);
 
         _distributionContext = BenchmarkPhysicsScene.CreateContext(gridExtent);
         BenchmarkPhysicsScene.CreateDynamicSphereGrid(_distributionContext, ColliderCount);
@@ -44,14 +53,17 @@ public class SimulationAllocationBenchmarks
     {
         _lateSimulateContext.Dispose();
         _groundingContext.Dispose();
+        _sweptGroundingContext.Dispose();
         _distributionContext.Dispose();
         _activePairContext.Dispose();
 
         _lateSimulateContext = null;
         _groundingContext = null;
+        _sweptGroundingContext = null;
         _distributionContext = null;
         _activePairContext = null;
         _groundedBodies = null;
+        _sweptGroundedBodies = null;
     }
 
     [Benchmark]
@@ -77,6 +89,21 @@ public class SimulationAllocationBenchmarks
     }
 
     [Benchmark]
+    public int GroundingSweptSphereProbeOnly()
+    {
+        int groundedCount = 0;
+        for (int i = 0; i < _sweptGroundedBodies.Count; i++)
+        {
+            StiffBody body = _sweptGroundedBodies[i];
+            body.CheckGround();
+            if (body.IsGrounded)
+                groundedCount++;
+        }
+
+        return groundedCount;
+    }
+
+    [Benchmark]
     public uint CollisionPartitionDistributionOnly()
     {
         _distributionContext.Collisions.CheckAndDistributeCollisions();
@@ -88,5 +115,11 @@ public class SimulationAllocationBenchmarks
     {
         _activePairContext.Physics.LateSimulate();
         return _activePairContext.Physics.AssimilatedBodyCount;
+    }
+
+    private static void SetGroundProbeMode(SwiftList<StiffBody> bodies, GroundProbeMode mode)
+    {
+        for (int i = 0; i < bodies.Count; i++)
+            bodies[i].GroundProbeMode = mode;
     }
 }

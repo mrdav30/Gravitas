@@ -234,6 +234,15 @@ for (int i = 0; i < circleHitCount; i++)
     LSRaycastHit circleHit = circleHits[i];
     // Consume circle-overlap hits.
 }
+
+SwiftList<LSRaycastHit> sweepHits = new();
+int sweepHitCount = context.Raycasts.SweepSphereAll(
+    origin,
+    origin + direction * maxDistance,
+    radius,
+    layerMask,
+    sweepHits,
+    excludedCollider: null);
 ```
 
 All-hit query APIs use caller-owned `SwiftList<LSRaycastHit>` buffers. They
@@ -251,8 +260,20 @@ old prototype example exclusions only as a starting point; hosts should set this
 explicitly for their own layer model before relying on grounding behavior.
 `StiffBody.Initialize(...)` performs an initial ground probe after the collider
 is registered, so bodies only start grounded when the configured ground mask
-actually hits suitable geometry. Runtime ground probes use sorted raycast hits
-and ignore the body's own collider before accepting a ground result.
+actually hits suitable geometry.
+
+Each body selects its probe shape through `GroundProbeMode`:
+
+- `Ray` preserves the sorted raycast/self-exclusion behavior.
+- `SweptSphere` uses the true swept-sphere query and the body collider as the
+  excluded collider.
+- `Auto` uses swept spheres for sphere, capsule, cylinder, and wide cuboid
+  bodies, and ray probes for point-like or unsupported bodies.
+
+`GroundProbeRadius` can override the derived swept radius. Leave it at zero to
+derive radius from the collider shape. Ground probes ignore the body's own
+collider and ordinary movable dynamic bodies; valid ground targets are bodyless
+colliders, immovable bodies, or kinematic bodies.
 
 ## Deactivation And Disposal
 

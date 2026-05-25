@@ -78,9 +78,10 @@ bounds.
 
 Alpha mesh policy is conservative: non-convex meshes should be decomposed into
 convex sub-meshes offline or during initialization, not during per-frame
-collision. Dynamic mesh behavior, mesh/cylinder contact, and mesh ray overlap
-remain policy-gated until their bounds, acceleration structures, and contact
-ordering are tested directly.
+collision. Mesh ray overlap and initial mesh/cylinder contact are
+triangle-backed and covered by focused tests, but dynamic mesh behavior,
+arbitrary mesh contact manifolds, and swept mesh queries remain hardening
+targets.
 
 ## Active Partitions
 
@@ -191,6 +192,7 @@ Current shape support:
 | Mesh/Sphere | closest mesh surface point to sphere center. |
 | Mesh/Capsule | closest capsule line point to mesh surface. |
 | Mesh/Cuboid | mesh/cuboid SAT using nearby mesh triangles. |
+| Mesh/Cylinder | triangle-BVH candidate scan against finite cylinder volume. |
 | Mesh/Mesh | mesh/mesh SAT using nearby mesh triangles. |
 
 Current shape-pair matrix:
@@ -200,13 +202,12 @@ Current shape-pair matrix:
 | Sphere | Supported | Supported | Supported | Supported | Supported |
 | Capsule | Supported | Supported | Supported | Supported | Supported |
 | Cuboid | Supported | Supported | Supported | Supported | Supported |
-| Cylinder | Supported | Supported | Supported | Supported | Deferred |
-| Mesh | Supported | Supported | Supported | Deferred | Supported |
+| Cylinder | Supported | Supported | Supported | Supported | Supported |
+| Mesh | Supported | Supported | Supported | Supported | Supported |
 
 `Cuboid` covers both `AABox` and `OBBox` dispatch. `Cylinder/Mesh` is
-intentionally deferred until mesh convexity, triangle acceleration, and contact
-policy are better pinned. Mesh raycast overlap is also disabled until that same
-validation and acceleration work exists.
+normalized to `Mesh/Cylinder` by pair priority so contact data is written in the
+mesh-to-cylinder direction.
 
 ## Contact Data
 

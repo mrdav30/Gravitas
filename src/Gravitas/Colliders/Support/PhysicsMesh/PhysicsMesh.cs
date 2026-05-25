@@ -324,16 +324,23 @@ namespace Gravitas.Colliders
 
         public Vector3d[] GetTriangleAtIndex(int index)
         {
+            GetTriangleVertices(index, out Vector3d first, out Vector3d second, out Vector3d third);
 
-            if ((uint)index >= (uint)_triangleCount)
-                throw new InvalidOperationException("Invalid triangle index or out of bounds.");
+            return new Vector3d[3] {
+                            first,
+                            second,
+                            third
+                        };
+        }
+
+        public void GetTriangleVertices(int index, out Vector3d first, out Vector3d second, out Vector3d third)
+        {
+            SwiftThrowHelper.ThrowIfArrayIndexInvalid(index, _triangleCount, nameof(index));
 
             int triangleIndex = index * 3;
-            return new Vector3d[3] {
-                            _vertices[_triangles[triangleIndex]],
-                            _vertices[_triangles[triangleIndex + 1]],
-                            _vertices[_triangles[triangleIndex + 2]]
-                        };
+            first = _vertices[_triangles[triangleIndex]];
+            second = _vertices[_triangles[triangleIndex + 1]];
+            third = _vertices[_triangles[triangleIndex + 2]];
         }
 
         public Vector3d ConvertWorldToLocal(Vector3d worldPoint) =>

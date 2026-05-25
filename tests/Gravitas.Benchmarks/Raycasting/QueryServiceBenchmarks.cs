@@ -18,6 +18,7 @@ public class QueryServiceBenchmarks
     private SwiftList<LSRaycastHit> _raycastHits;
     private SwiftList<LSRaycastHit> _overlappingRaycastHits;
     private SwiftList<LSRaycastHit> _circlecastHits;
+    private SwiftList<LSRaycastHit> _sweepSphereHits;
 
     [Params(64)]
     public int ColliderCount { get; set; }
@@ -38,6 +39,7 @@ public class QueryServiceBenchmarks
         _raycastHits = new SwiftList<LSRaycastHit>(ColliderCount);
         _overlappingRaycastHits = new SwiftList<LSRaycastHit>(ColliderCount);
         _circlecastHits = new SwiftList<LSRaycastHit>(ColliderCount);
+        _sweepSphereHits = new SwiftList<LSRaycastHit>(ColliderCount);
     }
 
     [GlobalCleanup]
@@ -50,6 +52,7 @@ public class QueryServiceBenchmarks
         _raycastHits = null;
         _overlappingRaycastHits = null;
         _circlecastHits = null;
+        _sweepSphereHits = null;
     }
 
     [Benchmark]
@@ -74,6 +77,10 @@ public class QueryServiceBenchmarks
     public int RaycastAcrossTwoOverlappingContexts() =>
         CountRaycastHits(_context, _raycastHits)
         + CountRaycastHits(_overlappingContext, _overlappingRaycastHits);
+
+    [Benchmark]
+    public int SweepSphereAllAcrossPopulatedContext() =>
+        _context.Raycasts.SweepSphereAll(_rayStart, _rayEnd, Fixed64.Half, IncludeLayerZero, _sweepSphereHits);
 
     private int CountRaycastHits(GravitasWorldContext context, SwiftList<LSRaycastHit> results)
     {

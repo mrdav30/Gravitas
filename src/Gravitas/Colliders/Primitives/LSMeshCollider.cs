@@ -7,6 +7,8 @@ namespace Gravitas.Colliders;
 
 public class LSMeshCollider : LSCollider
 {
+    private readonly SwiftList<int> _triangleQueryBuffer = new();
+
     public override ColliderType Shape => ColliderType.Mesh;
 
     public override int Priority => ColliderSettings.GetPriority(Shape);
@@ -21,6 +23,7 @@ public class LSMeshCollider : LSCollider
         _offset = Mesh.LocalBounds.Center;
         _size = Mesh.LocalBounds.Proportions;
         _radius = _size.Magnitude * Fixed64.Half;
+        SetBounds(Mesh.Bounds);
     }
 
     protected override void OnInitialize()
@@ -48,24 +51,40 @@ public class LSMeshCollider : LSCollider
     public override Fixed64 GetFrontalArea(Vector3d direction) =>
         Mesh.GetFrontalArea(direction);
 
-    public SwiftList<int> GetNearbyTriangles(Vector3d queryPoint)
+    public void GetNearbyTriangles(Vector3d queryPoint, SwiftList<int> result)
     {
-        FixedBoundVolume queryBounds = CreateQueryBounds(queryPoint, Bounds.Scope.x);
-        SwiftList<int> result = new();
+        FixedBoundVolume queryBounds = CreateQueryBounds(queryPoint, GetMeshQueryHalfExtent());
+        GetTrianglesInBounds(queryBounds, result);
+    }
+
+    public void GetTrianglesInBounds(FixedBoundVolume queryBounds, SwiftList<int> result)
+    {
+        result.FastClear();
         Mesh.TriangleBVH.Query(queryBounds, result);
-        return result;
     }
 
     public override Vector3d ClosestPointOnSurface(Vector3d queryPoint)
     {
-        SwiftList<int> result = new();
-        Vector3d boundedPoint = Bounds.ClosestPointOnSurface(queryPoint);
-        FixedBoundVolume queryBounds = CreateQueryBounds(boundedPoint, Bounds.Scope.x);
-        Mesh.TriangleBVH.Query(queryBounds, result);
-        Vector3d direction = (queryBounds.Center - Center).Normal;
-        Vector3d closest = ClosestPointToTriangles(result, direction, queryBounds.Center);
-        return closest;
+        return TryFindClosestPointOnSurface(queryPoint, _triangleQueryBuffer, out Vector3d closest, out _)
+            ? closest
+            : Bounds.ClosestPointOnSurface(queryPoint);
     }
+
+    public bool TryFindClosestPointOnSurface(
+        Vector3d queryPoint,
+        SwiftList<int> triangleBuffer,
+        out Vector3d closest,
+        out Vector3d normal)
+    {
+        Vector3d boundedPoint = Bounds.ClosestPointOnSurface(queryPoint);
+        FixedBoundVolume queryBounds = CreateQueryBounds(boundedPoint, GetMeshQueryHalfExtent());
+        triangleBuffer.FastClear();
+        Mesh.TriangleBVH.Query(queryBounds, triangleBuffer);
+        return TryFindClosestPointToTriangles(triangleBuffer, queryPoint, out closest, out normal);
+    }
+
+    private Fixed64 GetMeshQueryHalfExtent() =>
+        FixedMath.Max(FixedMath.Max(Bounds.Scope.x, Bounds.Scope.y), Bounds.Scope.z);
 
     private static FixedBoundVolume CreateQueryBounds(Vector3d center, Fixed64 halfExtent)
     {
@@ -73,50 +92,42 @@ public class LSMeshCollider : LSCollider
         return new FixedBoundVolume(center - extents, center + extents);
     }
 
-    private Vector3d ClosestPointToTriangles(SwiftList<int> indices, Vector3d direction, Vector3d point)
+    private bool TryFindClosestPointToTriangles(
+        SwiftList<int> indices,
+        Vector3d point,
+        out Vector3d closest,
+        out Vector3d normal)
     {
         Fixed64 minDistance = Fixed64.MAX_VALUE;
-        Vector3d closest = point;
+        closest = point;
+        normal = Vector3d.Zero;
+        bool found = false;
 
         for (int i = 0; i < indices.Count; i++)
         {
             int index = indices[i]; // index of the triangle
-            if (Vector3d.Dot(Mesh.FaceNormals[index], direction) <= Fixed64.Zero)
-                continue;
-
-            Vector3d[] triangle = new Vector3d[3]
-            {
-                    Mesh.Vertices[Mesh.Triangles[index * 3]],
-                    Mesh.Vertices[Mesh.Triangles[index * 3 + 1]],
-                    Mesh.Vertices[Mesh.Triangles[index * 3 + 2]],
-            };
-
-            Vector3d pointOnTriangle = MeshUtils.ClosestPointOnTriangle(triangle, Mesh.FaceNormals[index], point);
+            Mesh.GetTriangleVertices(index, out Vector3d first, out Vector3d second, out Vector3d third);
+            Vector3d faceNormal = Mesh.FaceNormals[index];
+            Vector3d pointOnTriangle = MeshUtils.ClosestPointOnTriangle(first, second, third, faceNormal, point);
             Fixed64 distance = Vector3d.SqrDistance(point, pointOnTriangle);
             if (distance < minDistance)
             {
                 minDistance = distance;
                 closest = pointOnTriangle;
+                normal = OrientNormalTowardPoint(faceNormal, point - pointOnTriangle);
+                found = true;
                 if (minDistance < Fixed64.Epsilon)
                     break;
             }
         }
 
-        return closest;
-
-        //should we return only the triangles that include the closest point ?
-        //if (outputTriangles != null && output.HasValue)
-        //{
-        //    for (int i = 0; triangles.Count > i; i++)
-        //    {
-        //        if (triangles[i].IsPointConnectedToTriangle(output.Value))
-        //            outputTriangles.Add(triangles[i]);
-        //    }
-        //}
+        return found;
     }
 
     public override Vector3d GetNormalAtPoint(Vector3d point) =>
-        ClosestPointOnSurface(point).Normal;
+        TryFindClosestPointOnSurface(point, _triangleQueryBuffer, out _, out Vector3d normal)
+            ? normal
+            : (point - Center).Normal;
 
     public Vector3d GetSupportPoint(Vector3d point)
     {
@@ -139,6 +150,14 @@ public class LSMeshCollider : LSCollider
 
     public override bool ColliderOverlapsRay(RaycastSegmentWorker worker, ref SwiftList<Vector3d> outputIntersectionPoints)
     {
-        return false;
+        return worker.CheckMeshOverlaps(this, ref outputIntersectionPoints);
+    }
+
+    private static Vector3d OrientNormalTowardPoint(Vector3d normal, Vector3d targetDirection)
+    {
+        if (targetDirection.SqrMagnitude <= Fixed64.Epsilon)
+            return normal;
+
+        return Vector3d.Dot(normal, targetDirection) < Fixed64.Zero ? -normal : normal;
     }
 }

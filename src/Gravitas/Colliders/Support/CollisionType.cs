@@ -17,6 +17,7 @@
         Mesh_Sphere,
         Mesh_Capsule,
         Mesh_Cuboid,
+        Mesh_Cylinder,
         Mesh_Mesh
     }
 }

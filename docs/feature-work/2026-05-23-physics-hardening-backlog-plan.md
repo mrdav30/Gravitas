@@ -4,7 +4,7 @@
 
 **Goal:** Convert the former inline maintenance notes and current wiki prototype edges into a prioritized alpha-hardening backlog.
 
-**Architecture:** Work from contracts and tests outward: layer/query semantics first, then collider shape state, narrow-phase detection, response, body/grounding behavior, broad-phase culling, swept queries, mesh completion, and diagnostics. Each phase should leave source comments clean, docs/wiki current, and the affected hot paths covered by tests plus benchmarks where complexity or allocation risk changes.
+**Architecture:** Work from contracts and tests outward: layer/query semantics first, then collider shape state, narrow-phase detection, response, body/grounding behavior, broad-phase culling, swept queries, mesh completion, collision allocation cleanup, and diagnostics. Each phase should leave source comments clean, docs/wiki current, and the affected hot paths covered by tests plus benchmarks where complexity or allocation risk changes.
 
 **Tech Stack:** C# 11, `FixedMathSharp`, `SwiftCollections`, `GridForge`, xUnit v3, BenchmarkDotNet, Chronicler.
 
@@ -62,9 +62,8 @@
   `FixedBoundVolume`. Prefer that module before using the generic
   `SwiftCollections.Query` numerics-backed convenience types or building a
   Gravitas-local fixed-point adapter.
-- `FixedBoundVolume` is min/max based. Current mesh BVH construction appears to
-  pass center/size-style values in at least one place, so Phase 3 should verify
-  and correct triangle bounds before relying on mesh query results.
+- `FixedBoundVolume` is min/max based. Phase 3 verified mesh BVH triangle
+  bounds against that contract; keep future query bounds min/max based.
 - `SwiftCollections.Observable` may be useful for host-facing diagnostics,
   editor tooling, or presentation binding. Keep observable notifications out of
   authoritative simulation hot paths unless deterministic ordering, allocation
@@ -77,24 +76,24 @@
 | `SingleLayer` | Type name and semantics blur layer index, bitmask, and host-layer metadata. | P0 | Phase 1 complete |
 | `PhysicsSettings` | Collision matrix uses `bool[,]`; ground-check mask is legacy and not clearly configured. | P0 | Phase 1 complete |
 | `docs/wiki/QUERY_SERVICES.md` | Query layer parameter behaves like include mask despite `ignoreLayers` naming. | P0 | Phase 1 complete |
-| `docs/wiki/QUERY_SERVICES.md` | Horizontal raycasts are rejected by the height-slope path. | P0 | Phase 2 |
+| `docs/wiki/QUERY_SERVICES.md` | Horizontal raycasts are rejected by the height-slope path. | P0 | Phase 2 complete |
 | `docs/wiki/QUERY_SERVICES.md` | Former circle-cast behavior was a proximity query, not a true swept shape query. | P0 | Phase 2 complete; true sweep Phase 8 |
-| `LSCollider` | Mesh rotation and bounds are not physically trustworthy enough. | P0 | Phase 3 |
-| `LSCapsuleCollider` | Capsule derived points need deterministic invalidation/rebuild when size inputs change. | P0 | Phase 3 |
-| `LSCapsuleCollider` | Default capsule dimensions can produce a zero cylinder-height inertia tensor diagonal. | P0 | Phase 3 |
-| `PhysicsMesh` | Mesh input validation is missing. | P0 | Phase 3 |
-| `PhysicsMesh` | Fixed query BVH bounds construction needs min/max verification. | P0 | Phase 3 |
+| `LSCollider` | Mesh rotation and bounds are not physically trustworthy enough. | P0 | Phase 3 complete |
+| `LSCapsuleCollider` | Capsule derived points need deterministic invalidation/rebuild when size inputs change. | P0 | Phase 3 complete |
+| `LSCapsuleCollider` | Default capsule dimensions can produce a zero cylinder-height inertia tensor diagonal. | P0 | Phase 3 complete |
+| `PhysicsMesh` | Mesh input validation is missing. | P0 | Phase 3 complete |
+| `PhysicsMesh` | Fixed query BVH bounds construction needs min/max verification. | P0 | Phase 3 complete |
 | `LSMeshCollider` | Mesh collider limits, dynamic support, convexity, and ray overlap need explicit policy. | P0 | Phase 3 and Phase 4 foundation; Phase 8 completion |
-| `docs/wiki/OVERVIEW.md` | Cylinder collider behavior is not implemented. | P1 | Phase 4 complete; docs cleanup Phase 8 |
-| `CollisionDetection` | Detection needs engine-agnostic tests and instrumentation, not Unity debug draw leftovers. | P1 | Phase 4 and Phase 9 |
-| `CollisionResponse` | Response is prototype-level and needs physical solver hardening. | P1 | Phase 5 |
-| `CollisionPair` | Time-spaced culling can miss behavior; culling should account for distance, velocity, and pair state. | P1 | Phase 7 |
-| `LSCollider` | Teleports should invalidate culling assumptions. | P1 | Phase 7 |
-| `PhysicsPartition` | Dynamic-object removal is linear. | P2 | Phase 7 |
-| `StiffBody` | Initialization assumes grounded instead of deriving it from the world. | P1 | Phase 6 |
-| `StiffBody` | Rotation visualization interpolation needs a clear speed/time contract. | P2 | Phase 6 |
-| `StiffBody` | Force/ground debug visualization should become engine-agnostic diagnostics. | P2 | Phase 9 |
-| `PhysicsMesh` | Edge cache may be removable if face normals and on-demand edge normals cover all callers. | P2 | Phase 8 |
+| `docs/wiki/OVERVIEW.md` | Cylinder collider behavior was documented as unimplemented after Phase 4. | P1 | Phase 4 complete; docs cleanup Phase 8 complete |
+| `CollisionDetection` | Detection needs engine-agnostic tests and instrumentation, not Unity debug draw leftovers. | P1 | Phase 4 complete; Phase 9 and Phase 10 |
+| `CollisionResponse` | Response is prototype-level and needs physical solver hardening. | P1 | Phase 5 complete |
+| `CollisionPair` | Time-spaced culling can miss behavior; culling should account for distance, velocity, and pair state. | P1 | Phase 7 complete |
+| `LSCollider` | Teleports should invalidate culling assumptions. | P1 | Phase 7 complete |
+| `PhysicsPartition` | Dynamic-object removal is linear. | P2 | Phase 7 complete |
+| `StiffBody` | Initialization assumes grounded instead of deriving it from the world. | P1 | Phase 6 complete |
+| `StiffBody` | Rotation visualization interpolation needs a clear speed/time contract. | P2 | Phase 6 complete |
+| `StiffBody` | Force/ground debug visualization should become engine-agnostic diagnostics. | P2 | Phase 10 |
+| `PhysicsMesh` | Edge cache may be removable if face normals and on-demand edge normals cover all callers. | P2 | Phase 8 reviewed; retained for SAT |
 
 ## Recommendations
 
@@ -106,17 +105,16 @@
 - Split collider responsibilities deliberately. `LSCollider` currently owns identity, host binding, shape state, partition state, pair references, hierarchy filtering, query versions, and events. That is workable for a prototype but too dense for alpha hardening.
 - Keep mesh collider dynamic support behind tests and benchmarks. Mesh work can become the whole project if it is not boxed into validation, limits, bounds, and query/collision behavior.
 - Treat the current circle query service as overlap/proximity behavior only.
-  Do not route grounding or gameplay logic through `OverlapCircleInDirection`
-  when the needed primitive is a swept volume. Add a true deterministic swept
-  sphere query with its own tests and benchmarks before relying on it for
-  grounding.
-- Add explicit ground probe selection instead of baking the Phase 6 raycast
-  choice into `StiffBody`. Recommended contract: `GroundProbeMode.Ray`,
-  `GroundProbeMode.SweptSphere`, and `GroundProbeMode.Auto`, with `Auto`
-  choosing from shape/size data through documented and tested rules.
-- Close mesh-specific deferrals before diagnostics. Mesh ray overlap,
-  `Mesh/Cylinder` narrow phase, mesh triangle-buffer ownership, and mesh contact
-  normals all affect the diagnostic events that Phase 9 would otherwise expose.
+  Phase 8 added true deterministic swept-sphere queries; keep shape sweeps on
+  that path rather than routing them through `OverlapCircleInDirection`.
+- Keep ground probe selection explicit. Phase 8 added
+  `GroundProbeMode.Ray`, `GroundProbeMode.SweptSphere`, and
+  `GroundProbeMode.Auto`; future grounding changes should preserve documented
+  shape/size rules or update tests and docs with the new policy.
+- Mesh ray overlap, `Mesh/Cylinder` narrow phase, mesh triangle-buffer
+  ownership, and mesh contact normals were closed before diagnostics. Mesh
+  swept-sphere targets remain deliberately unsupported until a triangle sweep
+  policy and acceleration strategy are designed.
 - Prefer downstream deterministic primitives before adding local equivalents. FixedMathSharp geometry and `SwiftCollections.FixedMathSharp` query structures should be the default starting point; if a custom Gravitas structure is better, prove it with tests, benchmarks, and a short design note.
 - GridForge voxel partition providers are part of Gravitas' broad-phase cost
   model. Phase 7 exposed allocation churn in the packaged GridForge 6.0.4
@@ -124,6 +122,9 @@
   regains a partition. The sibling GridForge source now has a regression test
   and retention fix; Gravitas should consume the next fixed GridForge package
   before treating end-to-end repartition allocation as solved.
+- Do not start diagnostics on top of unexplained collision allocation. Phase 9
+  now isolates the remaining `CheckPreparedPrimitivePairs` allocation baseline
+  before Phase 10 records collision events.
 - Use engine-agnostic diagnostics rather than adding editor hooks to runtime classes. Diagnostics should report deterministic values and let hosts decide how to draw them.
 - Maintain `docs/wiki/` with each phase. The wiki is now useful enough that stale pages will mislead the next implementation pass.
 
@@ -245,7 +246,7 @@
 - Renamed the context service from the old circle-cast property to `CircleQueries` and the
   service type to `GravitasCircleQueryService`. Current circle behavior is now
   exposed as `OverlapCircle`, `OverlapCircleAll`, and
-  `OverlapCircleInDirection`; true swept sphere casts are planned for Phase 8.
+  `OverlapCircleInDirection`; true swept sphere casts are covered in Phase 8.
 - Circle overlap hit data now uses the closest collider surface point, collider
   surface normal, and surface distance for ordering.
 - Query docs, host examples, README/AGENTS references, and benchmark docs were
@@ -305,8 +306,9 @@
 - Fixed mesh collider construction so it no longer reads runtime `Center` before
   binding, and fixed rotated mesh bounds to refresh from transformed vertices.
 - Reviewed the mesh `_edges`/edge-normal cache. It is retained for now because
-  current mesh SAT coverage does not yet prove it removable; Phase 4 shape-pair
-  tests should decide whether it can be deleted.
+  mesh SAT still uses the existing context data; Phase 8 revisited the cache
+  after mesh ray and mesh/cylinder work and kept it pending broader mesh
+  manifold proof.
 - Added the `collider-shape` benchmark selection for capsule runtime rebuilds
   and mesh validation/BVH construction.
 - Short `collider-shape` benchmark smoke on this machine:
@@ -350,9 +352,9 @@
 
 **Phase 4 completion notes:**
 
-- Added an explicit shape-pair matrix in tests and docs. `Cylinder/Mesh`
-  remains intentionally deferred instead of being exposed through an untested
-  compatibility path.
+- Added an explicit shape-pair matrix in tests and docs. `Cylinder/Mesh` was
+  intentionally deferred in Phase 4 instead of being exposed through an untested
+  compatibility path, then implemented as `Mesh_Cylinder` in Phase 8.
 - Reviewed FixedMathSharp deterministic geometry primitives before extending
   local SAT helpers. Phase 4 kept direct fixed-point projection helpers because
   the new cylinder support needs finite capped-cylinder projections, pair-order
@@ -657,66 +659,141 @@ start reporting those paths as if they were final.
 
 **Tasks:**
 
-- [ ] Define the true swept sphere query contract before implementation. The
+- [x] Define the true swept sphere query contract before implementation. The
   contract should cover origin/end or direction/max-distance overloads, radius,
   layer mask, self-exclusion support for body-owned probes, starting-overlap
   behavior, hit normal semantics, and closest/all-hit ordering.
-- [ ] Implement swept sphere candidate gathering through the same context-owned
+- [x] Implement swept sphere candidate gathering through the same context-owned
   partition path as raycasts and circle queries. Keep result buffers caller-owned
   and sort all-hit results deterministically by time of impact, then collider ID
   or another explicit stable tie-breaker.
-- [ ] Support swept sphere intersection against the primitive shapes already
+- [x] Support swept sphere intersection against the primitive shapes already
   considered active for queries: sphere, capsule, cuboid, and cylinder. Avoid
   routing this through `OverlapCircleInDirection`; that method remains an X/Z
   proximity filter.
-- [ ] Decide and implement the mesh side of swept sphere queries only after mesh
+- [x] Decide and implement the mesh side of swept sphere queries only after mesh
   ray overlap and triangle acceleration are validated. If mesh sweep support is
   not ready in the same pass, document the unsupported state explicitly and keep
   mesh hits out of the swept-sphere API.
-- [ ] Add swept sphere tests for direct hits, grazing hits, starting overlap,
+- [x] Add swept sphere tests for direct hits, grazing hits, starting overlap,
   no-hit separation, layer filtering, duplicate suppression, self-exclusion,
   deterministic all-hit sorting, horizontal/vertical/diagonal sweeps, and
   rotated collider targets.
-- [ ] Add swept sphere benchmarks beside the existing ray/circle query benchmark
+- [x] Add swept sphere benchmarks beside the existing ray/circle query benchmark
   aliases, including an all-hit path with caller-owned buffers.
-- [ ] Add `GroundProbeMode` with at least `Ray`, `SweptSphere`, and `Auto`.
+- [x] Add `GroundProbeMode` with at least `Ray`, `SweptSphere`, and `Auto`.
   Prefer body-level selection with an optional settings default rather than a
   hidden global switch.
-- [ ] Update `StiffBody.CheckGround()` so `Ray` preserves the Phase 6 sorted
+- [x] Update `StiffBody.CheckGround()` so `Ray` preserves the Phase 6 sorted
   raycast/self-exclusion behavior, `SweptSphere` uses the new query, and `Auto`
   chooses from collider shape/size using explicit rules. A likely alpha policy
   is swept sphere for sphere/capsule/wide finite bodies and ray for small or
   intentionally point-like probes.
-- [ ] Add grounding tests proving ray and swept-sphere modes differ on edge and
+- [x] Add grounding tests proving ray and swept-sphere modes differ on edge and
   slope cases, while both preserve layer masks, skipped grounding, moving
   platform invalidation, and deterministic state after repeated runs.
-- [ ] Restore mesh ray overlap with triangle-level tests before exposing it
+- [x] Restore mesh ray overlap with triangle-level tests before exposing it
   through `LSMeshCollider.ColliderOverlapsRay(...)`. Use the mesh BVH/query data
   instead of brute-forcing every triangle in normal query paths.
-- [ ] Add `Mesh_Cylinder` collision support and map both `Mesh/Cylinder` and
+- [x] Add `Mesh_Cylinder` collision support and map both `Mesh/Cylinder` and
   `Cylinder/Mesh` dispatch entries, including narrow-phase tests, contact normal
   orientation, penetration-depth sign, and reversed-pair stability.
-- [ ] Remove mesh hot-path allocations while the mesh code is open. Current
+- [x] Remove mesh hot-path allocations while the mesh code is open. Current
   review targets include per-call `SwiftList<int>` allocation in
   `LSMeshCollider.GetNearbyTriangles(...)` and `ClosestPointOnSurface(...)`,
   per-triangle `Vector3d[]` allocation in `ClosestPointToTriangles(...)`, and
   `MeshObjectInfo` triangle/vertex ownership.
-- [ ] Verify mesh contact normals. `LSMeshCollider.GetNormalAtPoint(...)`
+- [x] Verify mesh contact normals. `LSMeshCollider.GetNormalAtPoint(...)`
   currently derives a normal from the closest point vector, which is unlikely to
   be a correct triangle/contact normal for arbitrary meshes.
-- [ ] Revisit the `PhysicsMesh` edge cache once mesh ray, mesh/cylinder, and
+- [x] Revisit the `PhysicsMesh` edge cache once mesh ray, mesh/cylinder, and
   contact-normal callers are known. Remove it only if face normals and on-demand
   edge normals cover all supported behavior with tests.
-- [ ] Update stale docs after this phase. In particular, remove the old
+- [x] Update stale docs after this phase. In particular, remove the old
   `docs/wiki/OVERVIEW.md` claim that cylinder behavior is unimplemented, update
   mesh ray and mesh/cylinder limitations, document true swept sphere queries in
   `docs/wiki/QUERY_SERVICES.md`, and document `GroundProbeMode` in host/runtime
   wiki pages.
-- [ ] Run the focused query, grounding, mesh, and collision shape-pair tests.
-- [ ] Re-run `query-service`, `simulation-allocation`, and
+- [x] Run the focused query, grounding, mesh, and collision shape-pair tests.
+- [x] Re-run `query-service`, `simulation-allocation`, and
   `collision-detection` benchmark smoke tests after the implementation is stable.
 
-## Phase 9: Engine-Agnostic Diagnostics
+**Phase 8 notes:**
+
+- Swept-sphere queries are true 3D segment sweeps against sphere, capsule,
+  cuboid, and finite-cylinder targets. Mesh targets remain deliberately
+  unsupported by swept-sphere queries until a triangle sweep policy and
+  acceleration strategy are designed.
+- `GroundProbeMode` is body-level. `Ray` preserves sorted raycast behavior,
+  `SweptSphere` uses the new query with self-exclusion, and `Auto` uses swept
+  spheres for sphere/capsule/cylinder/wide cuboid bodies. Ground-hit filtering
+  rejects ordinary movable dynamic bodies so swept probes do not treat nearby
+  peers as terrain.
+- Mesh ray overlap now uses the triangle BVH and no-alloc triangle access.
+  Mesh/cylinder dispatch is mapped in both directions and normalized to
+  mesh-to-cylinder contact data by pair priority.
+- Mesh hot-path allocation cleanup covered caller-owned triangle buffers,
+  pooled `MeshObjectInfo` triangle ownership, and no-alloc triangle vertex
+  access. The mesh edge cache is retained for now because mesh SAT still uses
+  existing context data and removal needs broader mesh manifold proof.
+- Final review found and fixed a mesh query edge case: `LSMeshCollider` now
+  seeds collider bounds from `PhysicsMesh.Bounds`, uses the dominant mesh bounds
+  axis for triangle query windows, and computes closest mesh points against the
+  original query point rather than the snapped bounds point.
+- Benchmark smoke still reports allocation in the broad collision-detection
+  benchmark (`CheckPreparedPrimitivePairs`, about 1.53 KB/op in the short local
+  run). Review points to the older SAT/context object-info path rather than the
+  new swept query path; Phase 9 handles that before diagnostics treat collision
+  events as allocation baselines.
+
+## Phase 9: Collision SAT Allocation Baseline
+
+**Purpose:** Isolate and remove the remaining broad collision-detection
+allocation before diagnostics make collision events more expensive to reason
+about.
+
+**Files:**
+
+- Modify: `src/Gravitas/CollisionHandling/CollisionDetection.cs`
+- Modify: `src/Gravitas/CollisionHandling/Support/Context/CollisionContext.cs`
+- Modify: `src/Gravitas/CollisionHandling/Support/Context/CollisionObjectInfo.cs`
+- Modify: `src/Gravitas/CollisionHandling/Support/Context/CuboidObjectInfo.cs`
+- Modify: `src/Gravitas/CollisionHandling/Support/Context/MeshObjectInfo.cs`
+- Modify: `src/Gravitas/CollisionHandling/CollisionPair.cs` only if
+  pair/context-owned scratch needs a stable owner.
+- Modify: `src/Gravitas/Core/GravitasPhysicsService.cs` or
+  `src/Gravitas/Runtime/GravitasWorldContext.cs` only if reusable scratch state
+  belongs at service/context scope.
+- Modify: `tests/Gravitas.Tests/CollisionHandling/CollisionDetectionShapePairTests.cs`
+- Modify: `tests/Gravitas.Benchmarks/CollisionHandling/CollisionDetectionBenchmarks.cs`
+- Modify: `docs/wiki/COLLISION_PIPELINE.md`
+
+**Tasks:**
+
+- [ ] Split the `collision-detection` benchmark so it reports primitive
+  non-SAT pairs, cuboid/cuboid SAT, mesh/cylinder, mesh/cuboid, and mesh/mesh
+  paths separately. Keep the current mixed `CheckPreparedPrimitivePairs`
+  benchmark as an aggregate smoke case.
+- [ ] Confirm the allocation source with the split benchmark before changing
+  implementation. The current hypothesis is that allocation comes from
+  per-check SAT/context object-info construction and pooled scratch container
+  churn, not from the Phase 8 swept query or mesh/cylinder path.
+- [ ] Replace per-check SAT object-info/context allocations with reusable,
+  deterministic scratch state. Prefer context-owned or physics-service-owned
+  scratch over static state so concurrent worlds and test contexts remain
+  isolated.
+- [ ] Preserve pair-order contact data, contact normal orientation, and
+  penetration-depth behavior for cuboid/cuboid, mesh/cuboid, mesh/mesh, and
+  mesh/cylinder checks.
+- [ ] Add or update tests for reversed pair ordering, rotated cuboid SAT,
+  mesh/cuboid triangle selection, mesh/mesh triangle selection, and
+  mesh/cylinder contact stability after the scratch refactor.
+- [ ] Re-run `collision-detection` benchmark smoke and document which paths
+  report `0 B/op` and which paths intentionally still allocate.
+- [ ] Update `docs/wiki/COLLISION_PIPELINE.md` if SAT scratch ownership,
+  mesh-contact selection, or benchmark expectations change.
+
+## Phase 10: Engine-Agnostic Diagnostics
 
 **Purpose:** Replace old debug draw intentions with deterministic diagnostic events that hosts can visualize however they want.
 
@@ -738,6 +815,9 @@ start reporting those paths as if they were final.
 - [ ] Evaluate `SwiftCollections.Observable` for host-facing diagnostic projection only; keep the core diagnostic sink deterministic, context-owned, and allocation-aware.
 - [ ] Emit force delta, velocity delta, ground probe, ray/query, contact normal, contact point, and response impulse events through the sink.
 - [ ] Ensure diagnostics do not allocate when disabled.
+- [ ] Confirm Phase 9's collision-detection allocation baseline before wiring
+  contact/response diagnostics, so diagnostics do not hide older
+  collision-pipeline allocation debt.
 - [ ] Add tests proving event ordering is deterministic and scoped to one `GravitasWorldContext`.
 - [ ] Add a benchmark that compares disabled diagnostics against the same path with diagnostics enabled.
 - [ ] Document how a Unity or server host can consume diagnostics without linking engine types into Gravitas.

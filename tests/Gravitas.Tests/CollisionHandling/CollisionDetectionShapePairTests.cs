@@ -44,12 +44,12 @@ public sealed class CollisionDetectionShapePairTests
             [(ColliderType.Cylinder, ColliderType.AABox)] = CollisionType.Cuboid_Cylinder,
             [(ColliderType.Cylinder, ColliderType.OBBox)] = CollisionType.Cuboid_Cylinder,
             [(ColliderType.Cylinder, ColliderType.Cylinder)] = CollisionType.Cylinder_Cylinder,
-            [(ColliderType.Cylinder, ColliderType.Mesh)] = CollisionType.None,
+            [(ColliderType.Cylinder, ColliderType.Mesh)] = CollisionType.Mesh_Cylinder,
             [(ColliderType.Mesh, ColliderType.Sphere)] = CollisionType.Mesh_Sphere,
             [(ColliderType.Mesh, ColliderType.Capsule)] = CollisionType.Mesh_Capsule,
             [(ColliderType.Mesh, ColliderType.AABox)] = CollisionType.Mesh_Cuboid,
             [(ColliderType.Mesh, ColliderType.OBBox)] = CollisionType.Mesh_Cuboid,
-            [(ColliderType.Mesh, ColliderType.Cylinder)] = CollisionType.None,
+            [(ColliderType.Mesh, ColliderType.Cylinder)] = CollisionType.Mesh_Cylinder,
             [(ColliderType.Mesh, ColliderType.Mesh)] = CollisionType.Mesh_Mesh
         };
         ColliderType[] activeTypes =
@@ -238,6 +238,30 @@ public sealed class CollisionDetectionShapePairTests
         AssertNoCollision(scenario, cuboid.Collider, separated.Collider, CollisionType.Cuboid_Cylinder);
     }
 
+    [Fact]
+    public void MeshCylinder_ShouldDetectCapSideSeparationAndReversedDispatch()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSMeshCollider> floor = scenario.CreateBody(
+            CreateHorizontalPlaneMesh(),
+            PhysicsScenarioBuilder.Vector(0, 0, 0),
+            FixedQuaternion.Identity);
+        ScenarioBody<LSCylinderCollider> capOverlap = scenario.CreateCylinder(new Vector3d(Fixed64.Zero, Fixed64.Fraction(1, 4), Fixed64.Zero));
+        ScenarioBody<LSCylinderCollider> capSeparated = scenario.CreateCylinder(new Vector3d(Fixed64.Zero, (Fixed64)2, Fixed64.Zero));
+        ScenarioBody<LSMeshCollider> wall = scenario.CreateBody(
+            CreateVerticalPlaneMesh(),
+            PhysicsScenarioBuilder.Vector(6, 0, 0),
+            FixedQuaternion.Identity);
+        ScenarioBody<LSCylinderCollider> sideOverlap = scenario.CreateCylinder(new Vector3d((Fixed64)6 + Fixed64.Fraction(1, 4), Fixed64.Zero, Fixed64.Zero));
+
+        CollisionPair capPair = AssertCollision(scenario, floor.Collider, capOverlap.Collider, CollisionType.Mesh_Cylinder);
+        CollisionPair sidePair = AssertCollision(scenario, sideOverlap.Collider, wall.Collider, CollisionType.Mesh_Cylinder);
+        AssertNoCollision(scenario, floor.Collider, capSeparated.Collider, CollisionType.Mesh_Cylinder);
+
+        capPair.ContactPoint.Normal.y.Should().BeGreaterThan(Fixed64.Zero);
+        sidePair.ContactPoint.Normal.x.Should().BeGreaterThan(Fixed64.Zero);
+    }
+
     private static CollisionPair AssertCollision(
         PhysicsScenarioBuilder scenario,
         LSCollider colliderA,
@@ -267,4 +291,26 @@ public sealed class CollisionDetectionShapePairTests
         CollisionDetection.DoCollisionCheck(pair).Should().BeFalse();
         pair.ContactPoint.Depth.Should().Be(Fixed64.Zero);
     }
+
+    private static LSMeshCollider CreateHorizontalPlaneMesh() =>
+        new(
+            new[]
+            {
+                new Vector3d((Fixed64)(-2), Fixed64.Zero, (Fixed64)(-2)),
+                new Vector3d((Fixed64)2, Fixed64.Zero, (Fixed64)(-2)),
+                new Vector3d((Fixed64)(-2), Fixed64.Zero, (Fixed64)2),
+                new Vector3d((Fixed64)2, Fixed64.Zero, (Fixed64)2)
+            },
+            new[] { 0, 2, 1, 1, 2, 3 });
+
+    private static LSMeshCollider CreateVerticalPlaneMesh() =>
+        new(
+            new[]
+            {
+                new Vector3d(Fixed64.Zero, (Fixed64)(-2), (Fixed64)(-2)),
+                new Vector3d(Fixed64.Zero, (Fixed64)(-2), (Fixed64)2),
+                new Vector3d(Fixed64.Zero, (Fixed64)2, (Fixed64)(-2)),
+                new Vector3d(Fixed64.Zero, (Fixed64)2, (Fixed64)2)
+            },
+            new[] { 0, 2, 1, 1, 2, 3 });
 }
