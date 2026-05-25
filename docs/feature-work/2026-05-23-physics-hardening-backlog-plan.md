@@ -759,39 +759,64 @@ about.
 - Modify: `src/Gravitas/CollisionHandling/Support/Context/CollisionObjectInfo.cs`
 - Modify: `src/Gravitas/CollisionHandling/Support/Context/CuboidObjectInfo.cs`
 - Modify: `src/Gravitas/CollisionHandling/Support/Context/MeshObjectInfo.cs`
-- Modify: `src/Gravitas/CollisionHandling/CollisionPair.cs` only if
-  pair/context-owned scratch needs a stable owner.
-- Modify: `src/Gravitas/Core/GravitasPhysicsService.cs` or
-  `src/Gravitas/Runtime/GravitasWorldContext.cs` only if reusable scratch state
-  belongs at service/context scope.
+- Create: `src/Gravitas/CollisionHandling/Support/Context/CollisionSatScratch.cs`
+- Modify: `src/Gravitas/Colliders/Primitives/LSCuboidCollider.cs`
+- Modify: `src/Gravitas/Runtime/GravitasWorldContext.cs`
 - Modify: `tests/Gravitas.Tests/CollisionHandling/CollisionDetectionShapePairTests.cs`
 - Modify: `tests/Gravitas.Benchmarks/CollisionHandling/CollisionDetectionBenchmarks.cs`
 - Modify: `docs/wiki/COLLISION_PIPELINE.md`
 
 **Tasks:**
 
-- [ ] Split the `collision-detection` benchmark so it reports primitive
+- [x] Split the `collision-detection` benchmark so it reports primitive
   non-SAT pairs, cuboid/cuboid SAT, mesh/cylinder, mesh/cuboid, and mesh/mesh
   paths separately. Keep the current mixed `CheckPreparedPrimitivePairs`
   benchmark as an aggregate smoke case.
-- [ ] Confirm the allocation source with the split benchmark before changing
+- [x] Confirm the allocation source with the split benchmark before changing
   implementation. The current hypothesis is that allocation comes from
   per-check SAT/context object-info construction and pooled scratch container
   churn, not from the Phase 8 swept query or mesh/cylinder path.
-- [ ] Replace per-check SAT object-info/context allocations with reusable,
+- [x] Replace per-check SAT object-info/context allocations with reusable,
   deterministic scratch state. Prefer context-owned or physics-service-owned
   scratch over static state so concurrent worlds and test contexts remain
   isolated.
-- [ ] Preserve pair-order contact data, contact normal orientation, and
+- [x] Preserve pair-order contact data, contact normal orientation, and
   penetration-depth behavior for cuboid/cuboid, mesh/cuboid, mesh/mesh, and
   mesh/cylinder checks.
-- [ ] Add or update tests for reversed pair ordering, rotated cuboid SAT,
+- [x] Add or update tests for reversed pair ordering, rotated cuboid SAT,
   mesh/cuboid triangle selection, mesh/mesh triangle selection, and
   mesh/cylinder contact stability after the scratch refactor.
-- [ ] Re-run `collision-detection` benchmark smoke and document which paths
+- [x] Re-run `collision-detection` benchmark smoke and document which paths
   report `0 B/op` and which paths intentionally still allocate.
-- [ ] Update `docs/wiki/COLLISION_PIPELINE.md` if SAT scratch ownership,
+- [x] Update `docs/wiki/COLLISION_PIPELINE.md` if SAT scratch ownership,
   mesh-contact selection, or benchmark expectations change.
+
+**Status:**
+
+- Split benchmark baseline confirmed allocations were concentrated in SAT and
+  mesh candidate paths:
+  - `CheckPreparedPrimitivePairs`: about 1.53 KB/op.
+  - `CheckCuboidCuboidSatPairs`: about 64.5 KB/op.
+  - `CheckMeshCylinderPairs`: about 2 KB/op.
+  - `CheckMeshCuboidPairs`: about 24 KB/op.
+  - `CheckMeshMeshPairs`: about 28.5 KB/op.
+- Implemented context-owned `CollisionSatScratch` on `GravitasWorldContext`.
+  The scratch owns reusable SAT context/object-info state and mesh/cylinder
+  triangle buffers for one world context, avoiding static scratch and keeping
+  concurrent worlds isolated.
+- `CollisionContext`, `CollisionObjectInfo`, `CuboidObjectInfo`, and
+  `MeshObjectInfo` now reuse owned `SwiftCollections` buffers instead of
+  constructing object-info wrappers and renting pooled collections per check.
+- `LSCuboidCollider.ClosestPointOnSurface(...)` now walks cached face index
+  data directly for rotated cuboids instead of allocating temporary face vertex
+  arrays through `GetFace(i)`.
+- Added allocation guardrails for axis-aligned cuboids, rotated cuboid SAT,
+  mesh/cylinder, mesh/cuboid SAT, and mesh/mesh SAT after warmup.
+- Short `collision-detection` benchmark smoke after the refactor reported no
+  managed allocation in the summary `Allocated` column for all split paths:
+  aggregate prepared primitives, non-SAT primitives, cuboid/cuboid SAT,
+  mesh/cylinder, mesh/cuboid, and mesh/mesh. Timings in that one-iteration smoke
+  are not canonical performance evidence.
 
 ## Phase 10: Engine-Agnostic Diagnostics
 

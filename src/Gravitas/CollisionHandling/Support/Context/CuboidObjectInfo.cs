@@ -4,23 +4,23 @@ using SwiftCollections;
 
 namespace Gravitas.CollisionHandling;
 
-public class CuboidObjectInfo : CollisionObjectInfo
+internal sealed class CuboidObjectInfo : CollisionObjectInfo
 {
-    public LSCuboidCollider Collider;
+    public LSCuboidCollider Collider = null!;
 
-    public CuboidObjectInfo(LSCuboidCollider collider, Vector3d poc) : base()
+    public CuboidObjectInfo() : base(8) { }
+
+    public void Set(LSCuboidCollider collider, Vector3d pointOfContact)
     {
         Collider = collider;
-        PointOfContact = poc;
+        PointOfContact = pointOfContact;
+        UniqueVertices.FastClear();
     }
 
-    protected override void OnPrepareVertices(ref SwiftHashSet<Vector3d> axisSet)
+    protected override void OnPrepareVertices(SwiftHashSet<Vector3d> axisSet)
     {
         for (int i = 0; i < Collider.FaceNormals.Length; i++)
-        {
-            if (!axisSet.Contains(Collider.FaceNormals[i]))
-                axisSet.Add(Collider.FaceNormals[i]);
-        }
+            axisSet.Add(Collider.FaceNormals[i]);
 
         for (int i = 0; i < Collider.Vertices.Length; i++)
             UniqueVertices.Add(Collider.Vertices[i]);

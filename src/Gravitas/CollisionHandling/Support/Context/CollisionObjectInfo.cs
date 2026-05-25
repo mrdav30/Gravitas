@@ -1,31 +1,21 @@
 ﻿using FixedMathSharp;
 using SwiftCollections;
-using SwiftCollections.Pool;
 
 namespace Gravitas.CollisionHandling;
 
-public abstract class CollisionObjectInfo : ICollisionObjectInfo
+internal abstract class CollisionObjectInfo
 {
     public Vector3d PointOfContact;
     public SwiftList<Vector3d> UniqueVertices;
 
-    public CollisionObjectInfo() =>
-        UniqueVertices = SwiftListPool<Vector3d>.Shared.Rent();
+    protected CollisionObjectInfo(int vertexCapacity = 16) =>
+        UniqueVertices = new SwiftList<Vector3d>(vertexCapacity);
 
-    public void PrepareVertices(ref SwiftHashSet<Vector3d> axisSet)
+    public void PrepareVertices(SwiftHashSet<Vector3d> axisSet)
     {
         UniqueVertices.FastClear();
-        OnPrepareVertices(ref axisSet);
+        OnPrepareVertices(axisSet);
     }
 
-    protected virtual void OnPrepareVertices(ref SwiftHashSet<Vector3d> axisSet) { }
-
-    public void Dispose()
-    {
-        if (UniqueVertices != null)
-            SwiftListPool<Vector3d>.Shared.Release(UniqueVertices);
-        OnDispose();
-    }
-
-    protected virtual void OnDispose() { }
+    protected virtual void OnPrepareVertices(SwiftHashSet<Vector3d> axisSet) { }
 }

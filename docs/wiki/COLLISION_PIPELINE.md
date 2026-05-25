@@ -64,6 +64,11 @@ area, and inertia inputs together. Cylinder support intentionally treats the
 shape as a real finite cylinder rather than a capsule with ignored hemispheres,
 so cap separation and side separation are tested independently.
 
+Cuboids keep face, edge, normal, and centroid arrays on the collider. Rotated
+closest-surface queries walk the cached face index data directly rather than
+materializing temporary face vertex arrays, because those queries are used by
+SAT contact seeding.
+
 `FixedTransform.LossyScale` uses basis-vector scale extraction rather than raw
 matrix diagonals. This matters for rotated colliders because diagonal extraction
 can report near-zero scale for 90-degree rotations and collapse derived shape
@@ -208,6 +213,17 @@ Current shape-pair matrix:
 `Cuboid` covers both `AABox` and `OBBox` dispatch. `Cylinder/Mesh` is
 normalized to `Mesh/Cylinder` by pair priority so contact data is written in the
 mesh-to-cylinder direction.
+
+SAT and mesh candidate paths use context-owned scratch state through
+`GravitasWorldContext`. `CollisionSatScratch` owns the reusable
+`CollisionContext`, cuboid object-info buffers, mesh object-info buffers,
+mesh/cylinder triangle buffer, and SAT axis sets for one world context. This is
+intentionally not static: concurrent worlds keep isolated scratch, while repeated
+checks in the same world avoid per-check object-info construction and pool
+rent/release churn. Short `collision-detection` benchmark smoke currently
+reports no managed allocation for the aggregate primitive path, non-SAT
+primitive path, cuboid/cuboid SAT, mesh/cylinder, mesh/cuboid, and mesh/mesh
+paths after warmup.
 
 ## Contact Data
 

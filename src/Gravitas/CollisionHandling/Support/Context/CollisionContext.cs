@@ -1,69 +1,66 @@
 ﻿using FixedMathSharp;
 using SwiftCollections;
-using SwiftCollections.Pool;
-using System;
 
 namespace Gravitas.CollisionHandling;
 
-public class CollisionContext : IDisposable
+internal sealed class CollisionContext
 {
-    private static readonly Fixed64 AngleThresholdDegrees = new(2); // 2 degrees
-    private static readonly Fixed64 AngleThresholdRadians = FixedMath.DegToRad(AngleThresholdDegrees);
-    private static readonly Fixed64 CosThreshold = FixedMath.Cos(AngleThresholdRadians);
+    /// <summary>
+    /// Cosine of the angle threshold. Used to determine if two axes are nearly parallel.
+    /// </summary>
+    private static readonly Fixed64 AngleThresholdCos = FixedMath.Cos(FixedMath.DegToRad(new(2)));
 
-    public CollisionObjectInfo CollisionInfoA { get; private set; }
+    private readonly SwiftHashSet<Vector3d> _potentialNewAxes = new(32);
 
-    public CollisionObjectInfo CollisionInfoB { get; private set; }
+    public CollisionObjectInfo CollisionInfoA { get; private set; } = null!;
+
+    public CollisionObjectInfo CollisionInfoB { get; private set; } = null!;
 
     public Vector3d Displacement { get; private set; }
 
     public (Vector3d Point1, Vector3d Point2) PointsOfContact => (CollisionInfoA.PointOfContact, CollisionInfoB.PointOfContact);
 
-    public SwiftHashSet<Vector3d> AxisVectors;
+    public SwiftHashSet<Vector3d> AxisVectors { get; } = new(32);
 
-    private SwiftHashSet<Vector3d>? _potentialNewAxes;
+    public CollisionContext() { }
 
-    public CollisionContext(CollisionObjectInfo collisionInfoA, CollisionObjectInfo collisionInfoB)
+    public void Set(CollisionObjectInfo collisionInfoA, CollisionObjectInfo collisionInfoB)
     {
-        AxisVectors ??= SwiftHashSetPool<Vector3d>.Shared.Rent();
         CollisionInfoA = collisionInfoA;
         CollisionInfoB = collisionInfoB;
+        AxisVectors.Clear();
+        _potentialNewAxes.Clear();
+        Displacement = Vector3d.Zero;
+    }
+
+    public void Prepare(CollisionObjectInfo collisionInfoA, CollisionObjectInfo collisionInfoB)
+    {
+        Set(collisionInfoA, collisionInfoB);
+        PrepareDataForSAT();
     }
 
     public void PrepareDataForSAT()
     {
-        //  Instead of adding to AxisVectors directly, use PotentialNewAxes to check uniqueness.
-        _potentialNewAxes = SwiftHashSetPool<Vector3d>.Shared.Rent();
-        CollisionInfoA.PrepareVertices(ref _potentialNewAxes);
-        CollisionInfoB.PrepareVertices(ref _potentialNewAxes);
+        _potentialNewAxes.Clear();
+        CollisionInfoA.PrepareVertices(_potentialNewAxes);
+        CollisionInfoB.PrepareVertices(_potentialNewAxes);
         ProcessAndAddAxes();
         Displacement = CollisionInfoB.PointOfContact - CollisionInfoA.PointOfContact;
-
-        SwiftHashSetPool<Vector3d>.Shared.Release(_potentialNewAxes);
-        _potentialNewAxes = null;
     }
 
     private void ProcessAndAddAxes()
     {
         AxisVectors.Clear();
-        foreach (Vector3d newAxis in _potentialNewAxes!)
+        foreach (Vector3d newAxis in _potentialNewAxes)
             TryAddAxis(newAxis);
     }
 
     private void TryAddAxis(Vector3d newAxis)
     {
-        foreach (Vector3d existingAxis in AxisVectors!)
-            if (Vector3d.AreAlmostParallel(existingAxis, newAxis, CosThreshold))
+        foreach (Vector3d existingAxis in AxisVectors)
+            if (Vector3d.AreAlmostParallel(existingAxis, newAxis, AngleThresholdCos))
                 return; // It's nearly parallel to an existing axis, don't add it.
 
-        // If it gets here, it's unique enough to be added.
         AxisVectors.Add(newAxis);
-    }
-
-    public void Dispose()
-    {
-        CollisionInfoA.Dispose();
-        CollisionInfoB.Dispose();
-        SwiftHashSetPool<Vector3d>.Shared.Release(AxisVectors);
     }
 }

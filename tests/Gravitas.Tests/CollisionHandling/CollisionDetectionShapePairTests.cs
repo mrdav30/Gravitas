@@ -3,6 +3,7 @@ using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Tests.Support;
+using System;
 using System.Collections.Generic;
 using Xunit;
 
@@ -176,6 +177,34 @@ public sealed class CollisionDetectionShapePairTests
     }
 
     [Fact]
+    public void AxisAlignedCuboidChecks_ShouldNotAllocateAfterWarmup()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSCuboidCollider> first = scenario.CreateCuboid(PhysicsScenarioBuilder.Vector(0, 0, 0));
+        ScenarioBody<LSCuboidCollider> second = scenario.CreateCuboid(PhysicsScenarioBuilder.Vector(Fixed64.Half, Fixed64.Zero, Fixed64.Zero));
+        CollisionPair pair = scenario.CreatePair(first.Collider, second.Collider);
+
+        long allocatedBytes = MeasureAllocatedBytes(() => EnsureCollision(pair));
+
+        allocatedBytes.Should().Be(0);
+    }
+
+    [Fact]
+    public void RotatedCuboidSatChecks_ShouldNotAllocateAfterWarmup()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSCuboidCollider> first = scenario.CreateCuboid(
+            PhysicsScenarioBuilder.Vector(0, 0, 0),
+            PhysicsScenarioBuilder.Yaw(35));
+        ScenarioBody<LSCuboidCollider> second = scenario.CreateCuboid(PhysicsScenarioBuilder.Vector(Fixed64.Half, Fixed64.Zero, Fixed64.Zero));
+        CollisionPair pair = scenario.CreatePair(first.Collider, second.Collider);
+
+        long allocatedBytes = MeasureAllocatedBytes(() => EnsureCollision(pair));
+
+        allocatedBytes.Should().Be(0);
+    }
+
+    [Fact]
     public void CylinderSphere_ShouldDetectSideCapRotationAndSeparation()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
@@ -262,6 +291,94 @@ public sealed class CollisionDetectionShapePairTests
         sidePair.ContactPoint.Normal.x.Should().BeGreaterThan(Fixed64.Zero);
     }
 
+    [Fact]
+    public void MeshCylinderChecks_ShouldNotAllocateAfterWarmup()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSMeshCollider> floor = scenario.CreateBody(
+            CreateHorizontalPlaneMesh(),
+            PhysicsScenarioBuilder.Vector(0, 0, 0),
+            FixedQuaternion.Identity);
+        ScenarioBody<LSCylinderCollider> cylinder = scenario.CreateCylinder(new Vector3d(Fixed64.Zero, Fixed64.Fraction(1, 4), Fixed64.Zero));
+        CollisionPair pair = scenario.CreatePair(floor.Collider, cylinder.Collider);
+
+        long allocatedBytes = MeasureAllocatedBytes(() => EnsureCollision(pair));
+
+        allocatedBytes.Should().Be(0);
+    }
+
+    [Fact]
+    public void MeshCuboid_ShouldPreserveTriangleContactAndReversedDispatch()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSMeshCollider> floor = scenario.CreateBody(
+            CreateHorizontalPlaneMesh(),
+            PhysicsScenarioBuilder.Vector(0, 0, 0),
+            FixedQuaternion.Identity);
+        ScenarioBody<LSCuboidCollider> cuboid = scenario.CreateCuboid(new Vector3d(Fixed64.Zero, Fixed64.Fraction(1, 4), Fixed64.Zero));
+
+        CollisionPair forward = AssertCollision(scenario, floor.Collider, cuboid.Collider, CollisionType.Mesh_Cuboid);
+        CollisionPair reversed = AssertCollision(scenario, cuboid.Collider, floor.Collider, CollisionType.Mesh_Cuboid);
+
+        forward.ContactPoint.Normal.y.Should().BeGreaterThan(Fixed64.Zero);
+        reversed.ContactPoint.Normal.y.Should().BeGreaterThan(Fixed64.Zero);
+        forward.ContactPoint.HasContact.Should().BeTrue();
+        reversed.ContactPoint.HasContact.Should().BeTrue();
+    }
+
+    [Fact]
+    public void MeshMesh_ShouldPreserveTriangleContact()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSMeshCollider> first = scenario.CreateBody(
+            CreateHorizontalPlaneMesh(),
+            PhysicsScenarioBuilder.Vector(0, 0, 0),
+            FixedQuaternion.Identity);
+        ScenarioBody<LSMeshCollider> second = scenario.CreateBody(
+            CreateVerticalPlaneMesh(),
+            PhysicsScenarioBuilder.Vector(0, 0, 0),
+            FixedQuaternion.Identity);
+
+        CollisionPair pair = AssertCollision(scenario, first.Collider, second.Collider, CollisionType.Mesh_Mesh);
+
+        pair.ContactPoint.HasContact.Should().BeTrue();
+    }
+
+    [Fact]
+    public void MeshCuboidSatChecks_ShouldNotAllocateAfterWarmup()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSMeshCollider> floor = scenario.CreateBody(
+            CreateHorizontalPlaneMesh(),
+            PhysicsScenarioBuilder.Vector(0, 0, 0),
+            FixedQuaternion.Identity);
+        ScenarioBody<LSCuboidCollider> cuboid = scenario.CreateCuboid(new Vector3d(Fixed64.Zero, Fixed64.Fraction(1, 4), Fixed64.Zero));
+        CollisionPair pair = scenario.CreatePair(floor.Collider, cuboid.Collider);
+
+        long allocatedBytes = MeasureAllocatedBytes(() => EnsureCollision(pair));
+
+        allocatedBytes.Should().Be(0);
+    }
+
+    [Fact]
+    public void MeshMeshSatChecks_ShouldNotAllocateAfterWarmup()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSMeshCollider> first = scenario.CreateBody(
+            CreateHorizontalPlaneMesh(),
+            PhysicsScenarioBuilder.Vector(0, 0, 0),
+            FixedQuaternion.Identity);
+        ScenarioBody<LSMeshCollider> second = scenario.CreateBody(
+            CreateVerticalPlaneMesh(),
+            PhysicsScenarioBuilder.Vector(0, 0, 0),
+            FixedQuaternion.Identity);
+        CollisionPair pair = scenario.CreatePair(first.Collider, second.Collider);
+
+        long allocatedBytes = MeasureAllocatedBytes(() => EnsureCollision(pair));
+
+        allocatedBytes.Should().Be(0);
+    }
+
     private static CollisionPair AssertCollision(
         PhysicsScenarioBuilder scenario,
         LSCollider colliderA,
@@ -277,6 +394,23 @@ public sealed class CollisionDetectionShapePairTests
         if (centerDelta.SqrMagnitude > Fixed64.Epsilon)
             Vector3d.Dot(pair.ContactPoint.Normal, centerDelta).Should().BeGreaterThan(Fixed64.Zero);
         return pair;
+    }
+
+    private static long MeasureAllocatedBytes(Action action)
+    {
+        action();
+
+        long before = GC.GetAllocatedBytesForCurrentThread();
+        for (int i = 0; i < 64; i++)
+            action();
+
+        return GC.GetAllocatedBytesForCurrentThread() - before;
+    }
+
+    private static void EnsureCollision(CollisionPair pair)
+    {
+        if (!CollisionDetection.DoCollisionCheck(pair))
+            throw new InvalidOperationException("Expected the prepared collision pair to collide.");
     }
 
     private static void AssertNoCollision(

@@ -189,12 +189,12 @@ public class LSCuboidCollider : LSCollider
     {
         for (int i = 0; i < _faceVertices.Length; i++)
         {
-            // Get the actual vertices of the face
-            Vector3d[] faceVertices = GetFace(i);
+            int[] faceVertices = _faceVertices[i];
+            Vector3d first = Vertices[faceVertices[0]];
 
             // Get two non-parallel edges
-            Vector3d edge1 = faceVertices[1] - faceVertices[0];
-            Vector3d edge2 = faceVertices[2] - faceVertices[0];
+            Vector3d edge1 = Vertices[faceVertices[1]] - first;
+            Vector3d edge2 = Vertices[faceVertices[2]] - first;
 
             // Calculate the normal using cross product
             _faceNormals[i] = Vector3d.Cross(edge1, edge2).Normal;
@@ -302,7 +302,7 @@ public class LSCuboidCollider : LSCollider
         return area;
     }
 
-    protected Vector3d ClosestPointOnFace(Vector3d[] faceVertices, Vector3d faceNormal, Vector3d faceCentroid, Vector3d point)
+    protected Vector3d ClosestPointOnFace(int[] faceVertices, Vector3d faceNormal, Vector3d faceCentroid, Vector3d point)
     {
         Vector3d projectedPoint = ProjectPointOntoPlane(faceNormal, faceCentroid, point);
 
@@ -311,13 +311,13 @@ public class LSCuboidCollider : LSCollider
             return projectedPoint;
 
         // Find the closest point on the edges or vertices
-        Vector3d closestPoint = faceVertices[0];
-        Fixed64 minDistanceSquared = (projectedPoint - faceVertices[0]).SqrMagnitude;
+        Vector3d closestPoint = Vertices[faceVertices[0]];
+        Fixed64 minDistanceSquared = (projectedPoint - closestPoint).SqrMagnitude;
 
         for (int i = 0; i < faceVertices.Length; i++)
         {
-            Vector3d start = faceVertices[i];
-            Vector3d end = faceVertices[(i + 1) % faceVertices.Length];
+            Vector3d start = Vertices[faceVertices[i]];
+            Vector3d end = Vertices[faceVertices[(i + 1) % faceVertices.Length]];
             Vector3d closestPointOnEdge = ClosestPointOnLineSegment(start, end, projectedPoint);
             Fixed64 distanceSquared = (projectedPoint - closestPointOnEdge).SqrMagnitude;
 
@@ -343,7 +343,7 @@ public class LSCuboidCollider : LSCollider
         for (int i = 0; i < _faceVertices.Length; i++)
         {
             // Calculate the closest point on the current face
-            Vector3d facePoint = ClosestPointOnFace(GetFace(i), _faceNormals[i], _faceCentroids[i], other);
+            Vector3d facePoint = ClosestPointOnFace(_faceVertices[i], _faceNormals[i], _faceCentroids[i], other);
             Fixed64 distance = Vector3d.SqrDistance(facePoint, other);
 
             if (distance < minDistance)
@@ -408,17 +408,17 @@ public class LSCuboidCollider : LSCollider
         return point - faceNormal * distance;
     }
 
-    protected bool IsPointInFacePlane(Vector3d[] faceVertices, Vector3d faceNorm, Vector3d point)
+    protected bool IsPointInFacePlane(int[] faceVertices, Vector3d faceNorm, Vector3d point)
     {
-        Vector3d v0 = faceVertices[0];
-        Vector3d edge0 = faceVertices[1] - v0;
+        Vector3d v0 = Vertices[faceVertices[0]];
+        Vector3d edge0 = Vertices[faceVertices[1]] - v0;
         Vector3d edge0_normal = Vector3d.Cross(faceNorm, edge0);
         Fixed64 dot0 = Vector3d.Dot(edge0_normal, point - v0);
 
         for (int i = 1; i < faceVertices.Length; i++)
         {
-            Vector3d vi = faceVertices[i];
-            Vector3d edgei = faceVertices[(i + 1) % faceVertices.Length] - vi;
+            Vector3d vi = Vertices[faceVertices[i]];
+            Vector3d edgei = Vertices[faceVertices[(i + 1) % faceVertices.Length]] - vi;
             Vector3d edgei_normal = Vector3d.Cross(faceNorm, edgei);
 
             if (Vector3d.Dot(edgei_normal, point - vi) * dot0 < Fixed64.Zero)

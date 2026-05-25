@@ -261,7 +261,7 @@ public static class CollisionDetection
         if (pair.ColliderA is not LSCuboidCollider cuboidA || pair.ColliderB is not LSCuboidCollider cuboidB)
             return false;
 
-        if (!TestCuboidsSeperatingAxes(cuboidA, cuboidB, out CollisionResult? output))
+        if (!TestCuboidsSeperatingAxes(pair.Context.CollisionScratch, cuboidA, cuboidB, out CollisionResult? output))
             return false;
 
         if (!output.HasValue) return false;
@@ -277,11 +277,13 @@ public static class CollisionDetection
     /// <summary>
     /// Tests if there are any separating axes between two polygons using the given axis vectors.
     /// </summary>
+    /// <param name="scratch">The context-owned SAT scratch buffers.</param>
     /// <param name="cuboidA">The first collider.</param>
     /// <param name="cuboidB">The second collider.</param>
     /// <param name="output">The resulting collision information if a collision is detected.</param>
     /// <returns>true if no separating axis is found, false otherwise.</returns>
     private static bool TestCuboidsSeperatingAxes(
+        CollisionSatScratch scratch,
         LSCuboidCollider cuboidA,
         LSCuboidCollider cuboidB,
         out CollisionResult? output)
@@ -289,10 +291,6 @@ public static class CollisionDetection
         output = null;
 
         (Vector3d PointA, Vector3d PointB) = FindInitialPointsOfContact(cuboidA, cuboidB);
-        (CuboidObjectInfo CollisionInfoA, CuboidObjectInfo CollisionInfoB) = (
-            new CuboidObjectInfo(cuboidA, PointA),
-            new CuboidObjectInfo(cuboidB, PointB)
-        );
 
         // check if we're dealing with 2 AABoxes
         if (cuboidA.CurrentState == CuboidState.AABox && cuboidB.CurrentState == CuboidState.AABox)
@@ -327,8 +325,7 @@ public static class CollisionDetection
             return false;
         }
 
-        using CollisionContext data = new(CollisionInfoA, CollisionInfoB);
-        data.PrepareDataForSAT();
+        CollisionContext data = scratch.PrepareCuboids(cuboidA, PointA, cuboidB, PointB);
         if (!PerformSeparatingAxisTest(data, out (Vector3d Vector, Fixed64 Depth)? axisPenetration))
             return false;
 
@@ -818,28 +815,21 @@ public static class CollisionDetection
         if (!TryGetPairColliders(pair, out LSMeshCollider mesh, out LSCylinderCollider cylinder))
             return false;
 
-        SwiftList<int> nearbyTriangles = SwiftListPool<int>.Shared.Rent();
-        try
+        SwiftList<int> nearbyTriangles = pair.Context.CollisionScratch.MeshCylinderTriangles;
+        if (!TryFindMeshCylinderContact(
+            mesh,
+            cylinder,
+            nearbyTriangles,
+            out Vector3d pointOnMesh,
+            out Vector3d pointOnCylinder,
+            out Vector3d normalMeshToCylinder,
+            out Fixed64 depth))
         {
-            if (!TryFindMeshCylinderContact(
-                mesh,
-                cylinder,
-                nearbyTriangles,
-                out Vector3d pointOnMesh,
-                out Vector3d pointOnCylinder,
-                out Vector3d normalMeshToCylinder,
-                out Fixed64 depth))
-            {
-                return false;
-            }
+            return false;
+        }
 
-            SetContactPointInPairOrder(pair, mesh, pointOnMesh, cylinder, pointOnCylinder, depth, normalMeshToCylinder);
-            return true;
-        }
-        finally
-        {
-            SwiftListPool<int>.Shared.Release(nearbyTriangles);
-        }
+        SetContactPointInPairOrder(pair, mesh, pointOnMesh, cylinder, pointOnCylinder, depth, normalMeshToCylinder);
+        return true;
     }
 
     private static bool TryFindMeshCylinderContact(
@@ -896,14 +886,12 @@ public static class CollisionDetection
         if (pair.ColliderA is not LSMeshCollider mesh || pair.ColliderB is not LSCuboidCollider cuboid)
             return false;
 
-        if (!GetCollisionInfo(mesh, cuboid,
-            out (MeshObjectInfo CollisionInfoA, CuboidObjectInfo CollisionInfoB)? collisionInfo))
+        (Vector3d PointA, Vector3d PointB) = FindInitialPointsOfContact(mesh, cuboid);
+        if (!pair.Context.CollisionScratch.TryPrepareMeshCuboid(mesh, PointA, cuboid, PointB, out CollisionContext data))
         {
             return false;
         }
 
-        using CollisionContext data = new(collisionInfo!.Value.CollisionInfoA, collisionInfo.Value.CollisionInfoB);
-        data.PrepareDataForSAT();
         if (!PerformSeparatingAxisTest(data, out (Vector3d Vector, Fixed64 Depth)? axisPenetration))
             return false;
 
@@ -911,29 +899,6 @@ public static class CollisionDetection
             data.PointsOfContact,
             axisPenetration!.Value);
 
-        return true;
-    }
-
-    private static bool GetCollisionInfo(
-        LSMeshCollider mesh,
-        LSCuboidCollider cuboid,
-        out (MeshObjectInfo MeshCollisionInfoA, CuboidObjectInfo MeshCollisionInfoB)? collisionInfo)
-    {
-        collisionInfo = null;
-
-        (Vector3d PointA, Vector3d PointB) = FindInitialPointsOfContact(mesh, cuboid);
-        SwiftList<int> nearbyMeshTriangles = SwiftListPool<int>.Shared.Rent();
-        mesh.GetNearbyTriangles(PointA, nearbyMeshTriangles);
-        if (nearbyMeshTriangles.Count == 0)
-        {
-            SwiftListPool<int>.Shared.Release(nearbyMeshTriangles);
-            return false;
-        }
-
-        collisionInfo = (
-            new MeshObjectInfo(mesh, PointA, nearbyMeshTriangles),
-            new CuboidObjectInfo(cuboid, PointB)
-        );
         return true;
     }
 
@@ -982,54 +947,18 @@ public static class CollisionDetection
         if (pair.ColliderA is not LSMeshCollider mesh1 || pair.ColliderB is not LSMeshCollider mesh2)
             return false;
 
-        if (!GetCollisionInfo(mesh1, mesh2,
-            out (MeshObjectInfo CollisionInfoA, MeshObjectInfo CollisionInfoB)? CollisionInfo))
+        (Vector3d Point1, Vector3d Point2) = FindInitialPointsOfContact(mesh1, mesh2);
+        if (!pair.Context.CollisionScratch.TryPrepareMeshes(mesh1, Point1, mesh2, Point2, out CollisionContext data))
         {
             return false;
         }
 
-        using CollisionContext data = new(CollisionInfo!.Value.CollisionInfoA, CollisionInfo.Value.CollisionInfoB);
-        data.PrepareDataForSAT();
         if (!PerformSeparatingAxisTest(data, out (Vector3d Vector, Fixed64 Depth)? axisPenetration))
             return false;
 
         output = new CollisionResult(
             data.PointsOfContact,
             axisPenetration!.Value);
-
-        return true;
-    }
-
-    private static bool GetCollisionInfo(
-        LSMeshCollider mesh1,
-        LSMeshCollider mesh2,
-        out (MeshObjectInfo CollisionInfoA, MeshObjectInfo CollisionInfoB)? collisionInfo)
-    {
-        collisionInfo = null;
-        (Vector3d Point1, Vector3d Point2) = FindInitialPointsOfContact(mesh1, mesh2);
-
-        // Gather nearby triangles for each point of contact
-        SwiftList<int> nearbyTriangles1 = SwiftListPool<int>.Shared.Rent();
-        mesh1.GetNearbyTriangles(Point1, nearbyTriangles1);
-        if (nearbyTriangles1.Count <= 0)
-        {
-            SwiftListPool<int>.Shared.Release(nearbyTriangles1);
-            return false;
-        }
-
-        SwiftList<int> nearbyTriangles2 = SwiftListPool<int>.Shared.Rent();
-        mesh2.GetNearbyTriangles(Point2, nearbyTriangles2);
-        if (nearbyTriangles2.Count <= 0)
-        {
-            SwiftListPool<int>.Shared.Release(nearbyTriangles1);
-            SwiftListPool<int>.Shared.Release(nearbyTriangles2);
-            return false;
-        }
-
-        collisionInfo = (
-            new MeshObjectInfo(mesh1, Point1, nearbyTriangles1),
-            new MeshObjectInfo(mesh2, Point2, nearbyTriangles2)
-        );
 
         return true;
     }
