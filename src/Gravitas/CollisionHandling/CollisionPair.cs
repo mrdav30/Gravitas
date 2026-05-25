@@ -109,29 +109,29 @@ public class CollisionPair
 
     public void AssignPriority(LSCollider c1, LSCollider c2)
     {
-        if (c2.Priority > c1.Priority)
+        if (ShouldFirstColliderLead(c1, c2))
         {
-            ColliderA = c2;
-            ColliderB = c1;
+            ColliderA = c1;
+            ColliderB = c2;
             return;
         }
 
-        if (c1.Body != null && c2.Body != null)
-        {
-            if (c1.Body.LinearSpeed > c2.Body.LinearSpeed)
-            {
-                ColliderA = c1;
-                ColliderB = c2;
-            }
-            else
-            {
-                ColliderA = c2;
-                ColliderB = c1;
-            }
-        }
+        ColliderA = c2;
+        ColliderB = c1;
+    }
 
-        ColliderA = c1;
-        ColliderB = c2;
+    private static bool ShouldFirstColliderLead(LSCollider c1, LSCollider c2)
+    {
+        if (c1.Priority != c2.Priority)
+            return c1.Priority > c2.Priority;
+
+        if (c1.Body == null || c2.Body == null)
+            return true;
+
+        if (c1.Body.LinearSpeed != c2.Body.LinearSpeed)
+            return c1.Body.LinearSpeed > c2.Body.LinearSpeed;
+
+        return true;
     }
 
     /// <summary>

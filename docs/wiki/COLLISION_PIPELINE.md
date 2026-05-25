@@ -122,6 +122,14 @@ creates a `CollisionPair`, stores it on the lower-ordered collider, and stores a
 holder entry on the other collider. This gives one owning side for cleanup while
 still allowing either collider to remove its relationship during deactivation.
 
+Inside the pair, `ColliderA` and `ColliderB` are ordered for narrow-phase
+dispatch and contact data, not for ownership. Shape priority wins first because
+some detection paths expect the higher-priority shape in `ColliderA`. When
+shape priority ties and both colliders have bodies, the higher linear speed wins
+so same-shape dynamic pairs produce contact normals from the more active body
+toward the other body. Equal priority and equal speed keep the original
+candidate order as the stable tie-breaker.
+
 ## Duplicate Suppression
 
 The same two colliders can share several voxels. `CollisionPair.PartitionVersion`

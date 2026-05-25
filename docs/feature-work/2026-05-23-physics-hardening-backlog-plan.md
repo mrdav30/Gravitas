@@ -565,6 +565,11 @@
   cull-invalidation after movement, shape-only active-contact rechecks,
   fast-relative-velocity culling, disabled cull thresholds, and partition
   activation/deactivation churn.
+- Resolved the older `CollisionPair.AssignPriority(...)` fallthrough before
+  Phase 8. Pair ordering now applies shape priority first, same-priority linear
+  speed second, and original candidate order as the deterministic tie-breaker.
+  Added pair-order/contact-normal tests so this cannot silently flip narrow-phase
+  contact data again.
 - Added the `partition-culling` benchmark alias covering dynamic-sphere
   repartitioning, direct partition member churn, and culled-pair rechecks.
 - Short benchmark smoke on this machine:
@@ -587,11 +592,12 @@
   `GridForge`/`GridForge.Lean` 6.0.4 package dependencies in generated package
   metadata. Remove the temporary local-link default after the next fixed
   GridForge package is consumed.
-- Issue surfaced and deferred deliberately: `CollisionPair.AssignPriority(...)`
-  has an older same-priority velocity-ordering branch that is overwritten by the
-  final fallback assignment. This should be fixed with pair-order/contact-normal
-  tests because changing it can alter response direction and contact ordering.
 - Verification:
+  - `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter FullyQualifiedName~CollisionPairPriorityTests`:
+    first failed against the old fallthrough behavior, then passed after the
+    priority fix.
+  - `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~CollisionPairPriorityTests|FullyQualifiedName~CollisionPairCullingTests|FullyQualifiedName~CollisionDetectionShapePairTests|FullyQualifiedName~CollisionResponseInvariantTests"`:
+    30 passed.
   - `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~CollisionPairCullingTests|FullyQualifiedName~PhysicsPartitionPerformanceShapeTests|FullyQualifiedName~GravitasCollisionServiceTests|FullyQualifiedName~PhysicsPartitionTests|FullyQualifiedName~GravitasPhysicsServiceTests"`:
     19 passed.
   - `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~PhysicsPartitionPerformanceShapeTests|FullyQualifiedName~PhysicsPartitionTests|FullyQualifiedName~GravitasRaycastServiceTests|FullyQualifiedName~GravitasCircleQueryServiceTests|FullyQualifiedName~GravitasCollisionServiceTests"`:
@@ -601,12 +607,12 @@
     `Allocated` column.
   - `dotnet build Gravitas.slnx --configuration Release`: succeeded with 0
     warnings and 0 errors, and built the local GridForge reference as Release.
-  - `dotnet test Gravitas.slnx --configuration Release --no-build`: 104
+  - `dotnet test Gravitas.slnx --configuration Release --no-build`: 106
     passed.
   - `dotnet build Gravitas.slnx --configuration ReleaseLean`: succeeded with 0
     warnings and 0 errors, and built the local GridForge reference as
     ReleaseLean.
-  - `dotnet test Gravitas.slnx --configuration ReleaseLean --no-build`: 104
+  - `dotnet test Gravitas.slnx --configuration ReleaseLean --no-build`: 106
     passed.
   - Generated package metadata was inspected: standard packages still depend on
     `GridForge 6.0.4`, and lean packages still depend on `GridForge.Lean 6.0.4`.
