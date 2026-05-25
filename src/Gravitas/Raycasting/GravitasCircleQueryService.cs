@@ -65,6 +65,16 @@ public sealed class GravitasCircleQueryService
         TraceCircleForClosestHit(position, radius, ref found, ref closestHit, ref closestDist);
 
         raycastHit = closestHit;
+        _context.Diagnostics.EmitCircleQuery(
+            position,
+            radius,
+            Vector3d.Zero,
+            Fixed64.Zero,
+            layerMask.Bits,
+            found,
+            found ? 1 : 0,
+            closestHit);
+
         return found;
     }
 
@@ -99,6 +109,16 @@ public sealed class GravitasCircleQueryService
             ref closestDist);
 
         raycastHit = closestHit;
+        _context.Diagnostics.EmitCircleQuery(
+            position,
+            radius,
+            normalizedDirection,
+            maxDistance,
+            layerMask.Bits,
+            found,
+            found ? 1 : 0,
+            closestHit);
+
         return found;
     }
 
@@ -122,6 +142,17 @@ public sealed class GravitasCircleQueryService
         TraceCircleForAllHits(position, radius, results);
 
         RaycastHitSorter.SortByDistance(results);
+        LSRaycastHit firstHit = results.Count > 0 ? results[0] : default;
+        _context.Diagnostics.EmitCircleQuery(
+            position,
+            radius,
+            Vector3d.Zero,
+            Fixed64.Zero,
+            layerMask.Bits,
+            results.Count > 0,
+            results.Count,
+            firstHit);
+
         return results.Count;
     }
 

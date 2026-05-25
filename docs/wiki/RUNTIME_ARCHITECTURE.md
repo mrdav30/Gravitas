@@ -27,6 +27,7 @@ pairs, queries, and coroutines remain context-local.
 | `GravitasRaycastService` | 3D segment worker, swept-sphere worker, intersection buffer, duplicate voxel checker, duplicate collider checker, query version. |
 | `GravitasCircleQueryService` | Duplicate collider checker and query version for X/Z circle overlap/proximity queries. |
 | `GravitasCoroutineService` | Active lockstep coroutine bucket and context-bound wait instruction factories. |
+| `GravitasDiagnosticSink` | Disabled-by-default diagnostic event buffer and engine-agnostic debug draw command buffer. |
 | `GravitasLifecycleHooks` | Ordered callbacks for simulate, late simulate, visualize, late visualize, reset, and frame-rate change. |
 
 The split is intentional: host code should mostly see the context and a few
@@ -67,6 +68,12 @@ LateVisualize
 `Reset` clears the clock and all context-local service state, then invokes reset
 hooks. `SetFrameRate` and `ApplySettings` update the clock's frame rate and
 invoke frame-rate-change hooks.
+
+Diagnostics are context-local and disabled by default. Runtime hooks can emit
+force, query, ground-probe, contact, response, and velocity-delta events through
+`context.Diagnostics` when enabled. Hosts can also capture colliders or simple
+line/ray/point draw commands into the same context-owned sink for visualization
+without adding renderer dependencies to core physics.
 
 ## Clock State
 
@@ -205,5 +212,7 @@ multi-context safe.
 - Partition ownership is through `GravitasCollisionService`; partitions are
   returned to the owning service pool through voxel removal.
 - Query services resolve collider IDs through their owning context only.
+- Diagnostic events and draw commands describe one context only; body and
+  collider IDs are not global.
 - Simulation state changes belong in fixed-step phases, not visualization
   phases.

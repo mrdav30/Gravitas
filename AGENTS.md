@@ -45,7 +45,8 @@ Read these in order before making non-trivial changes:
    [`HOST_INTEGRATION.md`](docs/wiki/HOST_INTEGRATION.md),
    [`RUNTIME_ARCHITECTURE.md`](docs/wiki/RUNTIME_ARCHITECTURE.md),
    [`COLLISION_PIPELINE.md`](docs/wiki/COLLISION_PIPELINE.md), or
-   [`QUERY_SERVICES.md`](docs/wiki/QUERY_SERVICES.md).
+   [`QUERY_SERVICES.md`](docs/wiki/QUERY_SERVICES.md), or
+   [`DIAGNOSTICS.md`](docs/wiki/DIAGNOSTICS.md).
 4. [`src/Gravitas/Runtime/GravitasWorldContext.cs`](src/Gravitas/Runtime/GravitasWorldContext.cs),
    [`src/Gravitas/Core/GravitasPhysicsService.cs`](src/Gravitas/Core/GravitasPhysicsService.cs),
    and [`src/Gravitas/Core/StiffBody.cs`](src/Gravitas/Core/StiffBody.cs).
@@ -84,12 +85,13 @@ workflow changes:
 | [`src/Gravitas/Colliders`](src/Gravitas/Colliders) | Collider base type, primitive colliders, physics mesh helpers | Shape logic is currently 3D-focused. |
 | [`src/Gravitas/CollisionHandling`](src/Gravitas/CollisionHandling) | Collision detection, response, pairs, contact data | Determinism and ordering are high risk here. |
 | [`src/Gravitas/Raycasting`](src/Gravitas/Raycasting) | Raycast and circlecast support | Keep result ordering stable. |
+| [`src/Gravitas/Diagnostics`](src/Gravitas/Diagnostics) | Context-owned diagnostic events and engine-agnostic debug draw commands | Keep disabled paths allocation-free and renderer-neutral. |
 | [`src/Gravitas/Partitions`](src/Gravitas/Partitions) | GridForge-backed physics partitions | Tied to voxel ownership and pooling. |
 | [`src/Gravitas/Settings`](src/Gravitas/Settings) | Physics settings and save helpers | Includes frame rate and layer collision matrix behavior. |
 | [`src/Gravitas/Support`](src/Gravitas/Support) | Fixed transforms, layers, lifecycle hooks, coroutine scaffolding, transient state helpers | Keep engine-specific assumptions out. |
 | [`tests/Gravitas.Tests`](tests/Gravitas.Tests) | xUnit v3 test project | Contains focused runtime/settings coverage; expand it alongside behavior changes. |
-| [`tests/Gravitas.Benchmarks`](tests/Gravitas.Benchmarks) | BenchmarkDotNet project | Covers context lifecycle, registration/partitioning, simulation, and query services. |
-| [`docs/wiki`](docs/wiki) | Developer-facing architecture and usage notes | Keep current with runtime, host integration, collision, and query changes. |
+| [`tests/Gravitas.Benchmarks`](tests/Gravitas.Benchmarks) | BenchmarkDotNet project | Covers context lifecycle, registration/partitioning, simulation, queries, and diagnostics. |
+| [`docs/wiki`](docs/wiki) | Developer-facing architecture and usage notes | Keep current with runtime, host integration, collision, query, and diagnostics changes. |
 | [`docs/feature-work/prototype`](docs/feature-work/prototype) | Historical/prototype Unity-oriented reference code | Useful context, not the source of truth. |
 
 Ignore generated output when reviewing structure:
@@ -121,6 +123,9 @@ The current runtime uses explicit world-context ownership:
   caller-owned hit buffers.
 - `GravitasCoroutineService` owns lockstep coroutine state and context-bound
   wait instructions for one context.
+- `GravitasDiagnosticSink` owns disabled-by-default diagnostic event and debug
+  draw buffers for one context. It should expose deterministic data that host
+  adapters can render or log without engine dependencies.
 - `StiffBody` owns simulated body state: position, rotation, visual
   interpolation state, velocity, acceleration, drag, friction, grounding,
   transforms, and Chronicler state recording.

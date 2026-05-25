@@ -482,10 +482,19 @@ public class StiffBody : IRecordable
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void AddTorque(Vector3d torque) => _deltaTorque += torque * _inverseInertiaTensor;
+    public void AddTorque(Vector3d torque)
+    {
+        _deltaTorque += torque * _inverseInertiaTensor;
+        Context.Diagnostics.EmitTorqueDelta(this, torque);
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void AddForce(Vector3d force) => _deltaAcceleration += force * InverseMass;
+    public void AddForce(Vector3d force)
+    {
+        Vector3d accelerationDelta = force * InverseMass;
+        _deltaAcceleration += accelerationDelta;
+        Context.Diagnostics.EmitForceDelta(this, force, accelerationDelta);
+    }
 
     private Vector3d _impulseStore = Vector3d.Zero;
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -512,6 +521,7 @@ public class StiffBody : IRecordable
         Vector3d lastVelocity = _linearVelocity;
         _linearVelocity += velocityDelta;
         RefreshLinearMotionState(lastVelocity);
+        Context.Diagnostics.EmitLinearVelocityDelta(this, lastVelocity, _linearVelocity);
     }
 
     internal void ApplyCollisionAngularVelocityDelta(Vector3d velocityDelta)
@@ -522,6 +532,7 @@ public class StiffBody : IRecordable
         Vector3d lastVelocity = _angularVelocity;
         _angularVelocity += velocityDelta;
         RefreshAngularMotionState(lastVelocity);
+        Context.Diagnostics.EmitAngularVelocityDelta(this, lastVelocity, _angularVelocity);
     }
 
     internal void ApplyCollisionPositionCorrection(Vector3d positionCorrection)
@@ -963,7 +974,15 @@ public class StiffBody : IRecordable
         if (!IsGrounded)
             dis = GroundDownDistanceOnAir;
 
-        if (!TryFindGroundHit(origin, dis, out LSRaycastHit hit))
+        GroundProbeMode mode = ResolveGroundProbeMode();
+        Fixed64 radius = mode == GroundProbeMode.SweptSphere
+            ? ResolveGroundProbeRadius()
+            : Fixed64.Zero;
+        Vector3d end = origin + Vector3d.Down * dis;
+        bool foundGround = TryFindGroundHit(mode, radius, origin, dis, out LSRaycastHit hit);
+        Context.Diagnostics.EmitGroundProbe(this, mode, origin, end, radius, foundGround, hit);
+
+        if (!foundGround)
         {
             ClearGrounding();
             return;
@@ -981,10 +1000,14 @@ public class StiffBody : IRecordable
         IsGrounded = true;
     }
 
-    private bool TryFindGroundHit(Vector3d origin, Fixed64 distance, out LSRaycastHit hit)
+    private bool TryFindGroundHit(
+        GroundProbeMode mode,
+        Fixed64 radius,
+        Vector3d origin,
+        Fixed64 distance,
+        out LSRaycastHit hit)
     {
-        GroundProbeMode mode = ResolveGroundProbeMode();
-        if (mode == GroundProbeMode.SweptSphere && TryFindGroundHitWithSweptSphere(origin, distance, out hit))
+        if (mode == GroundProbeMode.SweptSphere && TryFindGroundHitWithSweptSphere(origin, distance, radius, out hit))
             return true;
 
         if (mode == GroundProbeMode.SweptSphere)
@@ -1014,9 +1037,8 @@ public class StiffBody : IRecordable
         return false;
     }
 
-    private bool TryFindGroundHitWithSweptSphere(Vector3d origin, Fixed64 distance, out LSRaycastHit hit)
+    private bool TryFindGroundHitWithSweptSphere(Vector3d origin, Fixed64 distance, Fixed64 radius, out LSRaycastHit hit)
     {
-        Fixed64 radius = ResolveGroundProbeRadius();
         if (radius <= Fixed64.Epsilon)
             return TryFindGroundHitWithRay(origin, distance, out hit);
 

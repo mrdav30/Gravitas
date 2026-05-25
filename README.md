@@ -131,7 +131,7 @@ Release builds generate NuGet packages because `GeneratePackageOnBuild` is enabl
 
 ## Benchmarks
 
-The benchmark project includes initial physics hot-path measurements for context lifecycle, body/collider registration, partitioning, simulation, and query services.
+The benchmark project includes initial physics hot-path measurements for context lifecycle, body/collider registration, partitioning, simulation, query services, and diagnostics.
 
 List available benchmark selections:
 
@@ -150,7 +150,7 @@ See the [benchmark README](tests/Gravitas.Benchmarks/README.md) for runner detai
 ## Documentation
 
 - [AGENTS.md](AGENTS.md) is the main contributor guide for deterministic, performance-sensitive, and physics-design work.
-- [`docs/wiki/OVERVIEW.md`](docs/wiki/OVERVIEW.md) is the developer-facing architecture guide for context ownership, host integration, collisions, and queries.
+- [`docs/wiki/OVERVIEW.md`](docs/wiki/OVERVIEW.md) is the developer-facing architecture guide for context ownership, host integration, collisions, queries, and diagnostics.
 - [`docs/feature-work/prototype`](docs/feature-work/prototype) contains historical prototype code and Unity-oriented reference material.
 
 If behavior changes, keep code, tests, this README, and benchmark documentation aligned.

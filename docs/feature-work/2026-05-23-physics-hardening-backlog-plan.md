@@ -826,26 +826,56 @@ about.
 
 - Create: `src/Gravitas/Diagnostics/GravitasDiagnosticEvent.cs`
 - Create: `src/Gravitas/Diagnostics/GravitasDiagnosticSink.cs`
+- Create: `src/Gravitas/Diagnostics/GravitasDebugDrawCommand.cs`
+- Create: `src/Gravitas/Diagnostics/GravitasDiagnosticColor.cs`
+- Create: `src/Gravitas/Diagnostics/GravitasDiagnosticEventKind.cs`
+- Create: `src/Gravitas/Diagnostics/GravitasDebugDrawKind.cs`
 - Modify: `src/Gravitas/Runtime/GravitasWorldContext.cs`
 - Modify: `src/Gravitas/Core/StiffBody.cs`
-- Modify: `src/Gravitas/CollisionHandling/CollisionDetection.cs`
 - Modify: `src/Gravitas/CollisionHandling/CollisionPair.cs`
 - Modify: `src/Gravitas/CollisionHandling/CollisionResponse.cs`
+- Modify: `src/Gravitas/Raycasting/GravitasRaycastService.cs`
+- Modify: `src/Gravitas/Raycasting/GravitasCircleQueryService.cs`
 - Create: `tests/Gravitas.Tests/Diagnostics/GravitasDiagnosticSinkTests.cs`
+- Create: `tests/Gravitas.Benchmarks/Diagnostics/DiagnosticsBenchmarks.cs`
 - Create: `docs/wiki/DIAGNOSTICS.md`
 
 **Tasks:**
 
-- [ ] Add a context-owned diagnostic sink that is disabled by default and records deterministic event structs when enabled.
-- [ ] Evaluate `SwiftCollections.Observable` for host-facing diagnostic projection only; keep the core diagnostic sink deterministic, context-owned, and allocation-aware.
-- [ ] Emit force delta, velocity delta, ground probe, ray/query, contact normal, contact point, and response impulse events through the sink.
-- [ ] Ensure diagnostics do not allocate when disabled.
-- [ ] Confirm Phase 9's collision-detection allocation baseline before wiring
+- [x] Add a context-owned diagnostic sink that is disabled by default and records deterministic event structs when enabled.
+- [x] Evaluate `SwiftCollections.Observable` for host-facing diagnostic projection only; keep the core diagnostic sink deterministic, context-owned, and allocation-aware.
+- [x] Emit force delta, velocity delta, ground probe, ray/query, contact normal, contact point, and response impulse events through the sink.
+- [x] Ensure diagnostics do not allocate when disabled.
+- [x] Confirm Phase 9's collision-detection allocation baseline before wiring
   contact/response diagnostics, so diagnostics do not hide older
   collision-pipeline allocation debt.
-- [ ] Add tests proving event ordering is deterministic and scoped to one `GravitasWorldContext`.
-- [ ] Add a benchmark that compares disabled diagnostics against the same path with diagnostics enabled.
-- [ ] Document how a Unity or server host can consume diagnostics without linking engine types into Gravitas.
+- [x] Add tests proving event ordering is deterministic and scoped to one `GravitasWorldContext`.
+- [x] Add a benchmark that compares disabled diagnostics against the same path with diagnostics enabled.
+- [x] Document how a Unity or server host can consume diagnostics without linking engine types into Gravitas.
+
+**Status:** Implemented.
+
+**Implementation notes:**
+
+- Added `GravitasWorldContext.Diagnostics`, a context-owned
+  `GravitasDiagnosticSink` that stays disabled by default and resets with the
+  context.
+- Kept `SwiftCollections.Observable` out of the runtime sink. It remains a
+  possible host/tooling projection layer, but the core capture path uses
+  deterministic append-only buffers.
+- Added diagnostic events for body force/torque deltas, response velocity
+  deltas, ground probes, raycasts, swept-sphere queries, circle overlap queries,
+  contacts, and response impulses.
+- Added renderer-neutral draw commands for collider capture plus line, ray, and
+  point overlays. Mesh collider capture emits one wire-triangle command per
+  triangle.
+- Added focused diagnostics tests for disabled allocation, context scoping,
+  deterministic sequence ordering, collision event order, and debug draw command
+  emission.
+- Added the `diagnostics` benchmark selection to compare disabled and enabled
+  event hooks plus disabled and enabled collider debug draw capture.
+- Added `docs/wiki/DIAGNOSTICS.md` and linked diagnostics through the overview,
+  runtime, collision, query, README, benchmark README, and contributor guide.
 
 ## Verification Gate For Every Phase
 

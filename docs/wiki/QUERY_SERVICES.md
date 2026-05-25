@@ -26,6 +26,10 @@ into it, returns the hit count, and sorts the results by distance using an
 allocation-free in-place sorter. Keep these result buffers owned by the caller or
 context that issues the query.
 
+When diagnostics are enabled, raycast calls emit a `RayQuery` event. Swept
+sphere calls use the same event kind with `ScalarA` set to the sweep radius and
+`DataB` set to the captured hit count.
+
 The candidate path is:
 
 1. prepare the worker for the 3D query segment.
@@ -92,6 +96,10 @@ The circle query service owns:
 `OverlapCircleAll` clears the caller-provided `SwiftList<LSRaycastHit>`, writes
 hits into it, returns the hit count, and uses the same allocation-free in-place
 sorter as raycasts.
+
+When diagnostics are enabled, circle overlap calls emit a `CircleQuery` event
+with the query center, radius, optional direction extent, layer mask bits, and
+hit count.
 
 The candidate path is:
 

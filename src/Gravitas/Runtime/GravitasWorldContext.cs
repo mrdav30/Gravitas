@@ -1,5 +1,6 @@
 using FixedMathSharp;
 using Gravitas.CollisionHandling;
+using Gravitas.Diagnostics;
 using Gravitas.Raycasting;
 using Gravitas.Support;
 using GridForge.Grids;
@@ -37,6 +38,7 @@ public sealed class GravitasWorldContext : IDisposable
         Settings = PhysicsSettings.DefaultSettings();
         Environment = PhysicsEnvironment.Default(Settings.FrameRate);
         CollisionScratch = new CollisionSatScratch();
+        Diagnostics = new GravitasDiagnosticSink(this);
         Collisions = new GravitasCollisionService(this);
         Physics = new GravitasPhysicsService(this);
         Raycasts = new GravitasRaycastService(this);
@@ -83,6 +85,11 @@ public sealed class GravitasWorldContext : IDisposable
     /// Gets this context's world-local lockstep coroutine service.
     /// </summary>
     public GravitasCoroutineService Coroutines { get; }
+
+    /// <summary>
+    /// Gets this context's deterministic diagnostic sink.
+    /// </summary>
+    public GravitasDiagnosticSink Diagnostics { get; }
 
     internal CollisionSatScratch CollisionScratch { get; }
 
@@ -296,6 +303,7 @@ public sealed class GravitasWorldContext : IDisposable
         Raycasts.Reset();
         CircleQueries.Reset();
         Coroutines.Reset();
+        Diagnostics.Reset();
         _hooks.InvokeReset();
     }
 

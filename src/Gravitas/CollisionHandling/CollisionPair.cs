@@ -187,6 +187,9 @@ public class CollisionPair
         }
 
         bool result = CheckCollision();
+        if (result && ContactPoint.HasContact)
+            Context.Diagnostics.EmitContact(this, result);
+
         if (result ^ _isColliding)
         {
             _isColliding = result;

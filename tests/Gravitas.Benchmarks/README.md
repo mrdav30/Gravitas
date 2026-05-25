@@ -2,7 +2,7 @@
 
 This project is the BenchmarkDotNet scaffold for Gravitas physics hot paths.
 
-The runner, alias catalog, and deterministic fixture helpers are in place. Initial benchmark classes cover context lifecycle, registration/partitioning, simulation, and query-service paths.
+The runner, alias catalog, and deterministic fixture helpers are in place. Initial benchmark classes cover context lifecycle, registration/partitioning, simulation, query-service paths, and diagnostics.
 
 ## Requirements
 
@@ -73,6 +73,7 @@ Start with hot paths that can be isolated and repeated deterministically:
 - `GravitasRaycastService` and `GravitasCircleQueryService` query gathering, filtering, and result ordering.
 - Mesh collider preprocessing and convex mesh limits.
 - Pooling and allocation behavior for collision pairs, partitions, and temporary collections.
+- Diagnostics disabled overhead and enabled capture cost for event hooks and debug draw commands.
 
 ## Authoring Guidelines
 
@@ -101,7 +102,7 @@ BenchmarkDotNet writes results to `BenchmarkDotNet.Artifacts/results/` by defaul
 For quick allocation checks around the current steady-state hot paths, run:
 
 ```bash
-dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0 -- query-service simulation-allocation --filter "*" -j Short -i --exporters json
+dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0 -- query-service simulation-allocation diagnostics --filter "*" -j Short -i --exporters json
 ```
 
 The short in-process job is not canonical timing evidence, but it is useful for
@@ -112,6 +113,7 @@ allocation in steady state:
 | --- | --- |
 | `query-service` | `RaycastAll`, `OverlapCircleAll`, directional `OverlapCircleInDirection`, and overlapping-context queries. |
 | `simulation-allocation` | `StiffBody.LateSimulate`, grounding raycast probes, collision partition distribution, and active-pair late simulation. |
+| `diagnostics` | Disabled/enabled force and torque event hooks plus disabled/enabled collider debug draw capture. |
 | `partition-culling` | dynamic collider repartitioning after teleports, direct partition add/remove churn, and culled-pair invalidation after movement. |
 
 Collider shape work has a focused selection:

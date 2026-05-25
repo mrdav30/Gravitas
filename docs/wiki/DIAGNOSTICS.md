@@ -1,0 +1,138 @@
+# Diagnostics
+
+Gravitas diagnostics are context-owned, deterministic, and engine-agnostic.
+They are meant to expose physics state for debug drawing, logs, replay tooling,
+or server-side inspection without linking the core library to Unity, an editor,
+or a renderer.
+
+Diagnostics are disabled by default. When disabled, runtime hooks return before
+touching diagnostic buffers. When enabled, events and draw commands are appended
+to pre-sized `SwiftList` buffers owned by the active `GravitasWorldContext`.
+
+## Entry Point
+
+Use `context.Diagnostics`:
+
+```csharp
+context.Diagnostics.Enable(eventCapacity: 512, drawCommandCapacity: 256);
+context.Simulate();
+context.LateSimulate();
+
+foreach (GravitasDiagnosticEvent diagnosticEvent in context.Diagnostics.Events)
+{
+    // Translate to logs, overlays, replay markers, or host telemetry.
+}
+
+foreach (GravitasDebugDrawCommand command in context.Diagnostics.DrawCommands)
+{
+    // Translate to host-specific lines, meshes, gizmos, or debug shapes.
+}
+
+context.Diagnostics.Clear();
+```
+
+`Enable(...)` reserves capacity so enabled diagnostics can run without resize
+spikes when the expected event count is known. `Clear()` resets captured data
+and per-frame sequence values while keeping the allocated buffers. `Disable()`
+clears and stops capture.
+
+## Event Stream
+
+`GravitasDiagnosticEvent` is a compact generic payload. The common fields are:
+
+| Field | Meaning |
+| --- | --- |
+| `Frame` | Owning context frame count when the event was captured. |
+| `Sequence` | Capture order inside the current buffer. |
+| `Kind` | Event payload type. |
+| `BodyId` | Context-local dynamic body ID, or `-1` when not applicable. |
+| `ColliderAId` / `ColliderBId` | Context-local collider IDs, or `-1` when not applicable. |
+| `ColliderAType` / `ColliderBType` | Collider shape types when present. |
+| `Start` / `End` | Query segment, previous/current velocity, or other pair of vector values. |
+| `PointA` / `PointB` | Contact points, hit point, acceleration delta, or shape-specific point data. |
+| `Vector` | Force, torque, velocity delta, query normal, contact normal, or impulse direction. |
+| `ScalarA` / `ScalarB` | Event-specific fixed-point scalar values. |
+| `DataA` / `DataB` | Event-specific integer values, such as layer mask bits or hit count. |
+| `Hit` | Whether the event represents a successful hit/contact. |
+
+Current event kinds:
+
+| Kind | Captured from | Payload notes |
+| --- | --- | --- |
+| `ForceDelta` | `StiffBody.AddForce(...)` | `Vector` is the force, `PointA` is acceleration delta, `ScalarA` is force magnitude. |
+| `TorqueDelta` | `StiffBody.AddTorque(...)` | `Vector` is torque, `ScalarA` is torque magnitude. |
+| `LinearVelocityDelta` | Collision response velocity change | `Start` and `End` are previous/current velocity, `Vector` is the delta. |
+| `AngularVelocityDelta` | Collision response angular velocity change | Same shape as linear velocity delta. |
+| `GroundProbe` | `StiffBody.CheckGround(...)` | `Start`/`End` are probe segment, `ScalarA` is probe radius, `DataA` is `GroundProbeMode`. |
+| `RayQuery` | Raycast and swept-sphere queries | `ScalarA` is sweep radius, `DataA` is layer mask bits, `DataB` is hit count. |
+| `CircleQuery` | Circle overlap queries | `Start` is center, `End` is directional extent when used, `ScalarA` is radius. |
+| `Contact` | `CollisionPair.ProcessCollision()` | Contact points, normal, and depth from narrow phase. |
+| `ResponseImpulse` | `CollisionResponse` | `Vector` is normal impulse, `ScalarA` is impulse magnitude, `ScalarB` is normal velocity. |
+
+The stream is scoped to one context. Collider and body IDs are not global and
+must be resolved through the same context that produced the event.
+
+## Draw Commands
+
+`GravitasDebugDrawCommand` is the renderer-facing stream. Gravitas emits
+primitive draw descriptions; hosts translate them into their own debug drawing
+API.
+
+Current draw kinds:
+
+| Kind | Required payload |
+| --- | --- |
+| `Line` | `Start`, `End`, `Color` |
+| `Ray` | `Start`, `End`, `Color` |
+| `Point` | `Center`, `Radius`, `Color` |
+| `WireSphere` | `Center`, `Radius`, `Color` |
+| `WireBox` | `Center`, `Size`, `Rotation`, `Color` |
+| `WireCapsule` | `Center`, `Radius`, `Height`, `Rotation`, `Color` |
+| `WireCylinder` | `Center`, `Radius`, `Height`, `Rotation`, `Color` |
+| `WireTriangle` | `PointA`, `PointB`, `PointC`, `Color` |
+
+Use the explicit capture helpers for host-driven overlays:
+
+```csharp
+context.Diagnostics.CaptureCollider(collider, GravitasDiagnosticColor.Cyan);
+context.Diagnostics.CaptureLine(start, end, GravitasDiagnosticColor.Yellow);
+context.Diagnostics.CaptureRay(origin, direction, maxDistance, GravitasDiagnosticColor.Green);
+context.Diagnostics.CapturePoint(point, Fixed64.Half, GravitasDiagnosticColor.Red);
+```
+
+`CaptureCollider(...)` emits one command for primitive colliders and one
+`WireTriangle` command per mesh triangle. Large meshes can therefore generate a
+large command buffer; hosts should reserve capacity or choose filtered capture
+when inspecting dense mesh scenes.
+
+## Host Adapter Pattern
+
+A Unity adapter might translate draw commands into `Debug.DrawLine`, `Gizmos`,
+or `Handles`. A server adapter might ignore draw commands and only export the
+event stream as structured logs. A replay/debugger adapter might store both
+streams beside lockstep frame data.
+
+Keep adapters outside `src/Gravitas`. Core runtime code should emit fixed-point
+values, context-local IDs, stable ordering, and shape metadata only.
+
+## Performance Rules
+
+- Leave diagnostics disabled in normal hot-path measurements unless the
+  measurement is specifically about diagnostics.
+- Call `Enable(...)` with realistic capacities before a capture-heavy run.
+- Call `Clear()` once the host has consumed a frame or diagnostic window.
+- Do not project diagnostics through `SwiftCollections.Observable` in
+  authoritative simulation paths unless tests and benchmarks prove the ordering
+  and notification cost are acceptable.
+- Add benchmarks when new event hooks or draw commands touch collision,
+  partitioning, queries, body integration, or response paths.
+
+## Current Limits
+
+- Diagnostics are same-thread context buffers, matching the current lockstep
+  runtime model.
+- Event payloads are intentionally generic. When a subsystem needs richer
+  diagnostics, add a documented event kind instead of overloading fields in a
+  way hosts cannot decode.
+- Draw commands are wire/debug descriptions, not mesh generation utilities.
+  Hosts remain responsible for actual rendering.

@@ -37,7 +37,7 @@ public static class CollisionResponse
             return;
 
         ApplyPositionCorrection(contact);
-        ApplyVelocityImpulse(contact);
+        ApplyVelocityImpulse(pair, contact);
     }
 
     private static bool TryCreateContact(CollisionPair pair, out SingleContact contact)
@@ -88,7 +88,7 @@ public static class CollisionResponse
         contact.B.Body.ApplyCollisionPositionCorrection(correction * contact.B.InverseMass);
     }
 
-    private static void ApplyVelocityImpulse(SingleContact contact)
+    private static void ApplyVelocityImpulse(CollisionPair pair, SingleContact contact)
     {
         Vector3d velocityA = contact.A.Body.LinearVelocity + Vector3d.Cross(contact.A.Body.AngularVelocity, contact.RelativeA);
         Vector3d velocityB = contact.B.Body.LinearVelocity + Vector3d.Cross(contact.B.Body.AngularVelocity, contact.RelativeB);
@@ -109,6 +109,7 @@ public static class CollisionResponse
             return;
 
         Vector3d impulse = contact.Normal * impulseScalar;
+        pair.Context.Diagnostics.EmitResponseImpulse(pair, impulse, normalVelocity);
         ApplyImpulse(contact.A, -impulse, contact.RelativeA);
         ApplyImpulse(contact.B, impulse, contact.RelativeB);
     }

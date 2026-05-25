@@ -270,6 +270,12 @@ Current non-trigger response behavior is a deterministic single-contact solver:
 7. apply direct velocity deltas to movable bodies, plus angular velocity deltas
    when angular forces are enabled.
 
+When diagnostics are enabled, the pair emits contact and response events in the
+same deterministic order as collision processing: `Contact`, then
+`ResponseImpulse`, then body velocity-delta events produced by the applied
+response. The diagnostics stream is observational only; it does not change pair
+ordering, contact data, or response behavior.
+
 Response units and invariants:
 
 - mass is body mass in the same unit model used by `StiffBody`.

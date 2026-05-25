@@ -73,7 +73,16 @@ public sealed class GravitasRaycastService
         Vector3d end = origin + rayDirection * maxDistance;
 
         BeginRaycastTrace(origin, end);
-        return TryFindClosestHit(origin, end, rayDirection, out raycastHit);
+        bool hit = TryFindClosestHit(origin, end, rayDirection, out raycastHit);
+        _context.Diagnostics.EmitRayQuery(
+            origin,
+            end,
+            Fixed64.Zero,
+            layerMask.Bits,
+            hit,
+            hit ? 1 : 0,
+            raycastHit);
+        return hit;
     }
 
     /// <summary>
@@ -97,6 +106,14 @@ public sealed class GravitasRaycastService
         BeginRaycastTrace(start3d, end3d);
         AddAllHits(start3d, end3d, segment.Normal, results);
         RaycastHitSorter.SortByDistance(results);
+        _context.Diagnostics.EmitRayQuery(
+            start3d,
+            end3d,
+            Fixed64.Zero,
+            layerMask.Bits,
+            results.Count > 0,
+            results.Count,
+            results.Count > 0 ? results[0] : default);
         return results.Count;
     }
 
@@ -120,7 +137,16 @@ public sealed class GravitasRaycastService
 
         Vector3d sweepDirection = direction.Normal;
         Vector3d end = origin + sweepDirection * maxDistance;
-        return SweepSphere(origin, end, radius, layerMask, excludedCollider, out sweepHit);
+        bool hit = SweepSphere(origin, end, radius, layerMask, excludedCollider, out sweepHit);
+        _context.Diagnostics.EmitRayQuery(
+            origin,
+            end,
+            radius,
+            layerMask.Bits,
+            hit,
+            hit ? 1 : 0,
+            sweepHit);
+        return hit;
     }
 
     /// <summary>
@@ -144,6 +170,14 @@ public sealed class GravitasRaycastService
         BeginSweepTrace(start3d, end3d, radius, layerMask, excludedCollider);
         AddAllSweepHits(start3d, end3d, segment.Normal, radius, results);
         RaycastHitSorter.SortByDistance(results);
+        _context.Diagnostics.EmitRayQuery(
+            start3d,
+            end3d,
+            radius,
+            layerMask.Bits,
+            results.Count > 0,
+            results.Count,
+            results.Count > 0 ? results[0] : default);
         return results.Count;
     }
 

@@ -23,6 +23,8 @@ systems connect and where the current prototype needs hardening.
   response behavior.
 - Read [Query Services](QUERY_SERVICES.md) when changing raycasts, circle
   overlap queries, hit ordering, layer filtering, or query allocation behavior.
+- Read [Diagnostics](DIAGNOSTICS.md) when changing diagnostic events, debug draw
+  commands, host debug adapters, or instrumentation overhead.
 
 ## Core Mental Model
 
@@ -43,6 +45,7 @@ Gravitas owns, per context:
 - collision partitions and collision-pair state.
 - raycast, circle-overlap, and coroutine buffers.
 - swept-sphere query buffers.
+- deterministic diagnostic event and debug draw buffers when enabled.
 - ordered lifecycle hooks.
 
 ```mermaid
@@ -57,6 +60,7 @@ flowchart TD
     Context --> Raycasts["GravitasRaycastService"]
     Context --> CircleQueries["GravitasCircleQueryService"]
     Context --> Coroutines["GravitasCoroutineService"]
+    Context --> Diagnostics["GravitasDiagnosticSink"]
     Agent["IMatterAgent"] --> Context
     Agent --> Transform["FixedTransform"]
     Physics --> Body["StiffBody"]
@@ -85,6 +89,7 @@ flowchart TD
 | `GravitasRaycastService` | Context-local raycast and swept-sphere buffers, candidate gathering, duplicate suppression, and hit ordering. |
 | `GravitasCircleQueryService` | Context-local X/Z circle overlap and proximity query buffers and hit ordering. |
 | `GravitasCoroutineService` | Lockstep coroutine execution and context-bound wait instructions. |
+| `GravitasDiagnosticSink` | Disabled-by-default context diagnostics for deterministic events and engine-agnostic debug draw commands. |
 
 ## Typical Flow
 
@@ -134,6 +139,9 @@ events are emitted from the active-pair queue during `LateSimulate`.
   response, triggers, restitution, and physically coherent units.
 - Query services use context-owned mutable buffers. Treat them as same-thread,
   fixed-loop services unless they are redesigned for reentrancy.
+- Diagnostics are context-owned and disabled by default. Enabled draw capture can
+  produce large buffers for meshes, so hosts should reserve capacity or filter
+  capture scope.
 
 ## Where To Start In Source
 
@@ -146,4 +154,5 @@ events are emitted from the active-pair queue during `LateSimulate`.
 | Colliders | [`LSCollider.cs`](../../src/Gravitas/Colliders/LSCollider.cs), [`Primitives`](../../src/Gravitas/Colliders/Primitives) |
 | Collision handling | [`CollisionPair.cs`](../../src/Gravitas/CollisionHandling/CollisionPair.cs), [`CollisionDetection.cs`](../../src/Gravitas/CollisionHandling/CollisionDetection.cs), [`CollisionResponse.cs`](../../src/Gravitas/CollisionHandling/CollisionResponse.cs) |
 | Queries | [`GravitasRaycastService.cs`](../../src/Gravitas/Raycasting/GravitasRaycastService.cs), [`GravitasCircleQueryService.cs`](../../src/Gravitas/Raycasting/GravitasCircleQueryService.cs), [`RaycastSegmentWorker.cs`](../../src/Gravitas/Raycasting/RaycastSegmentWorker.cs) |
+| Diagnostics | [`Diagnostics`](../../src/Gravitas/Diagnostics) |
 | Tests and examples | [`tests/Gravitas.Tests`](../../tests/Gravitas.Tests), [`tests/Gravitas.Benchmarks`](../../tests/Gravitas.Benchmarks) |
