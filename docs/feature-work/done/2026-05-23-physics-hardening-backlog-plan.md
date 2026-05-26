@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+**Status:** Done. Superseded by `docs/feature-work/2026-05-25-alpha-physics-hardening-plan.md`.
+
 **Goal:** Convert the former inline maintenance notes and current wiki prototype edges into a prioritized alpha-hardening backlog.
 
 **Architecture:** Work from contracts and tests outward: layer/query semantics first, then collider shape state, narrow-phase detection, response, body/grounding behavior, broad-phase culling, swept queries, mesh completion, collision allocation cleanup, and diagnostics. Each phase should leave source comments clean, docs/wiki current, and the affected hot paths covered by tests plus benchmarks where complexity or allocation risk changes.
