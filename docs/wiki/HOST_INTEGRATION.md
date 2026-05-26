@@ -56,9 +56,22 @@ internal sealed class HostMatterAgent : IMatterAgent
 }
 ```
 
-`IsParent` and the collider parent/child fields are used to suppress sibling
-collisions in host hierarchies. This is the engine-agnostic replacement for the
-old prototype's reliance on transform parenting.
+`IsParent` marks whether an agent is intended to be a top-level hierarchy
+owner, but hierarchy collision filtering is bound explicitly on colliders. Hosts
+that need parent-child or sibling collision suppression should initialize the
+colliders first, then call `childCollider.SetParent(parentCollider)`.
+`SetParent(...)` walks the collider-parent chain to the top collider and stores
+the top parent ID on the child, so sibling filtering does not depend on Unity
+`transform.parent` or any other engine hierarchy object.
+
+```csharp
+weaponCollider.SetParent(characterCollider);
+leftFootCollider.SetParent(characterCollider);
+rightFootCollider.SetParent(characterCollider);
+```
+
+Use `ClearParent()` when a collider leaves that host hierarchy without being
+deactivated.
 
 ## Creating A Context
 
@@ -304,8 +317,9 @@ floor.Deactivate();
 
 `StiffBody.Deactivate()` deactivates the collider, removes the body from the
 physics service, and clears the dynamic ID. `LSCollider.Deactivate()` clears
-partition membership, removes collision-pair references, returns active pairs to
-the pool when enabled, and releases the collider ID.
+partition membership, removes collision-pair references, clears explicit parent
+binding, returns active pairs to the pool when enabled, and releases the
+collider ID.
 
 Use `context.Reset()` for a reusable session context. Use `context.Dispose()`
 when the context is finished. If the context owns its world, dispose will also

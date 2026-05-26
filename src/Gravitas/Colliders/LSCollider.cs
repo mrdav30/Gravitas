@@ -7,7 +7,6 @@ using GridForge.Grids;
 using GridForge.Spatial;
 using SwiftCollections;
 using System;
-using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
 namespace Gravitas.Colliders;
@@ -48,9 +47,12 @@ public abstract class LSCollider : IRecordable
     private StiffBody? _body;
     public StiffBody? Body => _body;
 
-    private bool _staticPositionChanged;
-    private bool _staticRotationChanged;
     private readonly ColliderRuntimeShapeState _runtimeShapeState = new();
+    private ColliderPartitionState _partitionState;
+    private ColliderQueryState _queryState;
+    private ColliderPairState _pairState;
+    private ColliderHierarchyState _hierarchyState;
+
     internal uint RuntimeShapeVersion => _runtimeShapeState.RuntimeVersion;
 
     public virtual Vector3d Position
@@ -63,11 +65,8 @@ public abstract class LSCollider : IRecordable
             if (_agent == null || _agent.Transform.Position == value)
                 return;
             _agent.Transform.Position = value;
-            _staticPositionChanged = true;
         }
     }
-
-    public bool PositionChanged => Body?.PositionChangePending ?? _staticPositionChanged;
 
     public Fixed64 HeightPos => Body?.HeightPos
         ?? _agent?.Transform.Position.y
@@ -83,11 +82,8 @@ public abstract class LSCollider : IRecordable
             if (_agent == null || _agent.Transform.Rotation == value)
                 return;
             _agent.Transform.Rotation = value;
-            _staticRotationChanged = true;
         }
     }
-
-    public bool RotationChanged => Body?.RotationChangePending ?? _staticRotationChanged;
 
     // For dynamic colliders, this is the velocity of the body. For static colliders, this is always zero.
     public Vector3d Velocity => Body?.LinearVelocity ?? Vector3d.Zero;
@@ -117,15 +113,20 @@ public abstract class LSCollider : IRecordable
     private bool _preventCulling = false;
     internal bool PreventCulling => _preventCulling;
 
-    public bool IsPartitioned { get; private set; }
+    public bool IsPartitioned => _partitionState.IsPartitioned;
 
     /// <summary>
     /// Used for preventing culling for the first frame this object is added to a new partition node.
     /// </summary>
-    public bool PartitionChanged { get; set; }
+    public bool PartitionChanged
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => _partitionState.PartitionChanged;
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        set => _partitionState.PartitionChanged = value;
+    }
 
-    private uint _broadPhaseVersion;
-    internal uint BroadPhaseVersion => _broadPhaseVersion;
+    internal uint BroadPhaseVersion => _partitionState.BroadPhaseVersion;
 
     /// <summary>
     /// Center of collider in local space, used for calculating bounds and offsets. Should be set in the Setup method of each collider type.
@@ -228,22 +229,39 @@ public abstract class LSCollider : IRecordable
     public Vector3d BoundsMin => _bounds.Min;
     public Vector3d BoundsMax => _bounds.Max;
 
-    private Vector3d _lastGridBoundsMin;
-    public Vector3d LastGridBoundsMin => _lastGridBoundsMin;
+    public Vector3d LastGridBoundsMin => _partitionState.LastGridBoundsMin;
 
-    private Vector3d _lastGridBoundsMax;
-    public Vector3d LastGridBoundsMax => _lastGridBoundsMax;
+    public Vector3d LastGridBoundsMax => _partitionState.LastGridBoundsMax;
 
-    [NonSerialized]
-    public SwiftList<WorldVoxelIndex>? PartitionCoordinates;
+    public SwiftList<WorldVoxelIndex>? PartitionCoordinates
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => _partitionState.Coordinates;
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        set => _partitionState.Coordinates = value;
+    }
 
     #endregion
 
-    private SwiftDictionary<int, CollisionPair> _collisionPairs = new();
-    private SwiftHashSet<int> _collisionPairHolders = new();
+    public uint RaycastVersion
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => _queryState.RaycastVersion;
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        set => _queryState.RaycastVersion = value;
+    }
 
-    public uint RaycastVersion { get; set; } = 0;
-    public uint CircleQueryVersion { get; set; } = 0;
+    public uint CircleQueryVersion
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => _queryState.CircleQueryVersion;
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        set => _queryState.CircleQueryVersion = value;
+    }
+
+    internal int CollisionPairCount => _pairState.CollisionPairCount;
+
+    internal int CollisionPairHolderCount => _pairState.CollisionPairHolderCount;
 
     public delegate void BodyCollisionFunc(StiffBody other);
     public event BodyCollisionFunc? OnContact;
@@ -254,11 +272,11 @@ public abstract class LSCollider : IRecordable
     public event TriggerCollisionFunc? OnTriggerEnter;
     public event TriggerCollisionFunc? OnTriggerExit;
 
-    public bool IsChild { get; private set; }
-    public bool IsParent { get; private set; }
-    private SwiftHashSet<int>? _children;
-    public int ParentId { get; private set; }
-    public LSCollider? Parent { get; private set; }
+    public bool IsChild => _hierarchyState.IsChild;
+    public bool IsParent => _hierarchyState.IsParent;
+    public int ParentId => _hierarchyState.ParentId;
+    public LSCollider? Parent => _hierarchyState.Parent;
+    internal int HierarchyChildCount => _hierarchyState.ChildCount;
 
     #endregion
 
@@ -275,28 +293,17 @@ public abstract class LSCollider : IRecordable
     {
         SwiftThrowHelper.ThrowIfNull(agent, nameof(agent));
 
-        RaycastVersion = 0;
-        CircleQueryVersion = 0;
+        _queryState.Reset();
 
         _agent = agent;
+        _active = true;
         BindContext(agent.Context);
         Context.Physics.AssimilateCollider(this);
-
-        // This is a top level parent
-        if (_agent.IsParent)
-        {
-            IsParent = true;
-            _children = new();
-        }
-        else
-            IsChild = true;
-
-        ParentId = -1;
+        _hierarchyState.Initialize(_agent.IsParent);
 
         OnInitialize();
 
-        _lastGridBoundsMin = Vector3d.Zero;
-        _lastGridBoundsMax = Vector3d.Zero;
+        _partitionState.SetPreviousGridBounds(Vector3d.Zero, Vector3d.Zero);
 
         InitialPartition();
     }
@@ -312,19 +319,17 @@ public abstract class LSCollider : IRecordable
 
         if (IsActive)
         {
-            PartitionCoordinates ??= new();
-            Context.Collisions.PartitionObject(this, ref PartitionCoordinates);
+            _partitionState.Coordinates ??= new();
+            SwiftList<WorldVoxelIndex>? partitionCoordinates = _partitionState.Coordinates;
+            Context.Collisions.PartitionObject(this, ref partitionCoordinates);
+            _partitionState.Coordinates = partitionCoordinates;
             SetPreviousGridBounds();
-            IsPartitioned = true;
-            PartitionChanged = true;
+            _partitionState.MarkPartitioned();
             MarkBroadPhaseChanged();
         }
     }
 
-    public void LateInitialize()
-    {
-        SetParent();
-    }
+    public void LateInitialize() { }
 
     // Dynamic Colliders attached to a body will be updated by the body
     // Static Colliders need to be updated by whatever is updating the static collider
@@ -341,65 +346,44 @@ public abstract class LSCollider : IRecordable
             return;
         }
 
-        if (PositionChanged || RotationChanged || RuntimeShapeStateInvalid())
+        if (RebuildRuntimeShapeState())
             UpdatePartition();
-
-        if (_staticPositionChanged) _staticPositionChanged = false;
-        if (_staticRotationChanged) _staticRotationChanged = false;
     }
 
     private void UpdatePartition()
     {
-        RebuildRuntimeShapeState();
         MarkBroadPhaseChanged();
 
         if (!Context.Collisions.ClearPartitionedObject(this))
             return;
 
-        IsPartitioned = false;
+        _partitionState.MarkUnpartitioned();
 
-        PartitionCoordinates ??= new();
-        if (!Context.Collisions.PartitionObject(this, ref PartitionCoordinates))
+        _partitionState.Coordinates ??= new();
+        SwiftList<WorldVoxelIndex>? partitionCoordinates = _partitionState.Coordinates;
+        bool partitioned = Context.Collisions.PartitionObject(this, ref partitionCoordinates);
+        _partitionState.Coordinates = partitionCoordinates;
+        if (!partitioned)
             return;
 
         SetPreviousGridBounds();
 
-        IsPartitioned = true;
-        PartitionChanged = true;
+        _partitionState.MarkPartitioned();
     }
 
-    public void SetParent()
+    public void SetParent(LSCollider parent)
     {
-        if (!IsChild)
-            return;
+        _hierarchyState.SetParent(this, parent);
+    }
 
-        LSCollider? currentParent = Parent;
-        LSCollider? topParentCollider = Parent;
-
-        // Traverse the parent hierarchy until you find the top-level parent
-        do
-        {
-            currentParent = currentParent?.Parent;
-            if (currentParent == null)
-                break;
-
-            topParentCollider = currentParent;
-        }
-        while (currentParent != null);
-
-        // Make sure the top parent has a collider
-        if (topParentCollider == null)
-            return;
-
-        // Add this collider to the top parent's list of children
-        topParentCollider.AddChild(_id);
-        ParentId = topParentCollider.Id;
+    public void ClearParent()
+    {
+        _hierarchyState.ClearParent(this);
     }
 
     public void AddChild(int id)
     {
-        _children ??= new();
-        if (_children.Add(id) != true)
+        if (_hierarchyState.AddChild(id) != true)
         {
             GravitasLogger.Channel.Warn($"Collider with ID {id} is already a child.");
             return;
@@ -408,7 +392,7 @@ public abstract class LSCollider : IRecordable
 
     public void RemoveChild(int id)
     {
-        if (_children?.Remove(id) != true)
+        if (_hierarchyState.RemoveChild(id) != true)
         {
             GravitasLogger.Channel.Warn($"Cannot remove. Collider with ID {id} is not a child.");
             return;
@@ -417,27 +401,18 @@ public abstract class LSCollider : IRecordable
 
     public bool IsSibling(LSCollider other)
     {
-        if (ParentId == -1) return false;
-        if (IsParent && Id == other.Id) return true;
-        if (other.IsParent && other.Id == ParentId) return true;
-
-        return other.ParentId == ParentId;
+        return _hierarchyState.ExcludesCollisionWith(other._hierarchyState, Id, other.Id);
     }
 
-    private bool RuntimeShapeStateInvalid()
-    {
-        ColliderShapeSnapshot snapshot = CaptureShapeSnapshot();
-        return _runtimeShapeState.ShouldRebuild(snapshot);
-    }
-
-    private void RebuildRuntimeShapeState()
+    private bool RebuildRuntimeShapeState()
     {
         ColliderShapeSnapshot snapshot = CaptureShapeSnapshot();
         if (!_runtimeShapeState.ShouldRebuild(snapshot))
-            return;
+            return false;
 
         RebuildRuntimeShape();
         _runtimeShapeState.Commit(snapshot);
+        return true;
     }
 
     protected virtual void RebuildRuntimeShape()
@@ -494,7 +469,7 @@ public abstract class LSCollider : IRecordable
     protected void MarkShapeDirty() => _runtimeShapeState.MarkDirty();
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private void MarkBroadPhaseChanged() => _broadPhaseVersion++;
+    private void MarkBroadPhaseChanged() => _partitionState.MarkBroadPhaseChanged();
 
     protected virtual void OnRadiusChanged() { }
 
@@ -587,16 +562,25 @@ public abstract class LSCollider : IRecordable
     /// <returns></returns>
     public abstract bool ColliderOverlapsRay(RaycastSegmentWorker worker, ref SwiftList<Vector3d> outputIntersectionPoints);
 
-    public void SetPreviousGridBounds() =>
-        (_lastGridBoundsMin, _lastGridBoundsMax) = World?.SnapBoundsToVoxelSize(BoundsMin, BoundsMax, Fixed64.Half)
-            ?? (Vector3d.Zero, Vector3d.Zero);
+    public void SetPreviousGridBounds()
+    {
+        GridWorld? world = World;
+        if (world == null)
+        {
+            _partitionState.SetPreviousGridBounds(Vector3d.Zero, Vector3d.Zero);
+            return;
+        }
+
+        (Vector3d min, Vector3d max) = world.SnapBoundsToVoxelSize(BoundsMin, BoundsMax, Fixed64.Half);
+        _partitionState.SetPreviousGridBounds(min, max);
+    }
 
     internal bool TryGetCollisionPair(int otherId, out CollisionPair? collisionPair) =>
-        _collisionPairs.TryGetValue(otherId, out collisionPair);
+        _pairState.TryGetCollisionPair(otherId, out collisionPair);
 
     internal bool TryAddCollisionPair(int otherId, CollisionPair collisionPair)
     {
-        if (_collisionPairs.TryAdd(otherId, collisionPair) != true)
+        if (_pairState.TryAddCollisionPair(otherId, collisionPair) != true)
         {
             GravitasLogger.Channel.Warn($"Collision pair with collider ID {otherId} already exists.");
             return false;
@@ -606,55 +590,81 @@ public abstract class LSCollider : IRecordable
 
     internal bool TryRemoveCollisionPair(int otherId)
     {
-        if (!_collisionPairs.Remove(otherId, out CollisionPair? collisionPair))
+        if (!_pairState.TryRemoveCollisionPair(otherId, out CollisionPair? collisionPair))
             return false;
 
-        if (collisionPair.Active)
+        if (collisionPair != null && collisionPair.Active)
             Context.Physics.DeactivateAndPoolPair(collisionPair);
         return true;
     }
 
-    internal bool TryAddCollisionPairHolder(int otherId) => _collisionPairHolders.Add(otherId);
+    internal bool TryAddCollisionPairHolder(int otherId) => _pairState.TryAddCollisionPairHolder(otherId);
 
-    internal bool TryRemoveCollisionPairHolder(int otherId) => _collisionPairHolders.Remove(otherId);
+    internal bool TryRemoveCollisionPairHolder(int otherId) => _pairState.TryRemoveCollisionPairHolder(otherId);
 
     public void Deactivate()
     {
         if (IsPartitioned)
         {
             Context.Collisions.ClearPartitionedObject(this, true);
-            PartitionCoordinates?.Clear();
+            _partitionState.ClearCoordinates();
+            _partitionState.MarkUnpartitioned();
         }
 
         // Remove all collision pairs involving this collider
-        foreach (var kvp in _collisionPairs)
+        SwiftDictionary<int, CollisionPair>? collisionPairs = _pairState.CollisionPairs;
+        if (collisionPairs != null)
         {
-            int otherId = kvp.Key;
-            CollisionPair collisionPair = kvp.Value;
-            if (!Context.Physics.TryGetColliderById(otherId, out LSCollider? other))
-                continue;
-            other!.TryRemoveCollisionPairHolder(Id);
-            // Remove the pair regardless of whether the other collider has already removed it,
-            // to ensure it's cleaned up properly and to avoid potential issues with colliders
-            // that might still reference this collider in their pairs.
-            Context.Physics.DeactivateAndPoolPair(collisionPair);
+            foreach (var kvp in collisionPairs)
+            {
+                int otherId = kvp.Key;
+                CollisionPair collisionPair = kvp.Value;
+                if (!Context.Physics.TryGetColliderById(otherId, out LSCollider? other))
+                    continue;
+                other!.TryRemoveCollisionPairHolder(Id);
+                // Remove the pair regardless of whether the other collider has already removed it,
+                // to ensure it's cleaned up properly and to avoid potential issues with colliders
+                // that might still reference this collider in their pairs.
+                Context.Physics.DeactivateAndPoolPair(collisionPair);
+            }
         }
-        _collisionPairs.Clear();
+        _pairState.ClearCollisionPairs();
 
-        // Remove this collider from the collision pair holders of all colliders it has pairs with
-        for (int i = 0; i < _collisionPairHolders.Count; i++)
+        // Remove this collider from the collision pair holders of all colliders it has pairs with.
+        SwiftHashSet<int>? collisionPairHolders = _pairState.CollisionPairHolders;
+        if (collisionPairHolders != null)
         {
-            if (!Context.Physics.TryGetColliderById(_collisionPairHolders[i], out LSCollider? other))
-                continue;
+            foreach (int holderId in collisionPairHolders)
+            {
+                if (!Context.Physics.TryGetColliderById(holderId, out LSCollider? other))
+                    continue;
 
-            if (other!.TryRemoveCollisionPair(Id) != true)
-                GravitasLogger.DebugChannel.Info($"Collider with ID {Id} was not found in the collision pairs of collider with ID {_collisionPairHolders[i]} during deactivation. This may indicate that the pair was already removed or that there is an inconsistency in the collision management.");
+                if (other!.TryRemoveCollisionPair(Id) != true)
+                    GravitasLogger.DebugChannel.Info($"Collider with ID {Id} was not found in the collision pairs of collider with ID {holderId} during deactivation. This may indicate that the pair was already removed or that there is an inconsistency in the collision management.");
+            }
         }
-        _collisionPairHolders.Clear();
+        _pairState.ClearCollisionPairHolders();
+        ClearChildParentReferences();
+        ClearParent();
 
         Context.Physics.DessimilateCollider(this);
         //  IsInCollision = false;
         _active = false;
+    }
+
+    private void ClearChildParentReferences()
+    {
+        SwiftHashSet<int>? children = _hierarchyState.Children;
+        if (children == null)
+            return;
+
+        foreach (int childId in children)
+        {
+            if (Context.Physics.TryGetColliderById(childId, out LSCollider? child))
+                child!._hierarchyState.ClearParentReference();
+        }
+
+        _hierarchyState.ClearChildren();
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

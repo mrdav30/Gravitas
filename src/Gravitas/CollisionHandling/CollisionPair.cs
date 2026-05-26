@@ -222,12 +222,7 @@ public class CollisionPair
 
     private bool CheckCollision()
     {
-        bool positionOrRotationChanged = ColliderA.PositionChanged
-                                        || ColliderB.PositionChanged
-                                        || ColliderA.RotationChanged
-                                        || ColliderB.RotationChanged;
-
-        if (!positionOrRotationChanged && !BroadPhaseVersionChanged() && _isColliding)
+        if (!BroadPhaseVersionChanged() && _isColliding)
             return _isColliding;
 
         return CollisionDetection.DoCollisionCheck(this);
@@ -237,10 +232,6 @@ public class CollisionPair
     {
         return ColliderA.PartitionChanged
             || ColliderB.PartitionChanged
-            || ColliderA.PositionChanged
-            || ColliderB.PositionChanged
-            || ColliderA.RotationChanged
-            || ColliderB.RotationChanged
             || BroadPhaseVersionChanged();
     }
 

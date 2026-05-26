@@ -4,6 +4,7 @@ using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Support;
 using GridForge.Configuration;
+using SwiftCollections;
 using System;
 using System.Reflection;
 
@@ -130,6 +131,21 @@ internal sealed class PhysicsScenarioBuilder : IDisposable
             mass,
             immovable,
             preventAngularForces);
+    }
+
+    public LSSphereCollider CreateStaticSphere(Vector3d position)
+    {
+        var collider = new LSSphereCollider();
+        InitializeStaticCollider(collider, position);
+        return collider;
+    }
+
+    public void InitializeStaticCollider(LSCollider collider, Vector3d position)
+    {
+        SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
+        var transform = new FixedTransform(position, FixedQuaternion.Identity, Vector3d.One);
+        var agent = new TestMatterAgent(Context, transform);
+        collider.InitializeWithNoBody(agent);
     }
 
     public CollisionPair CreatePair(LSCollider colliderA, LSCollider colliderB)

@@ -187,9 +187,11 @@ Meaningful deferred work captured from that plan and the wiki:
 
 - Modify: `src/Gravitas/Colliders/LSCollider.cs`
 - Modify: `src/Gravitas/Core/StiffBody.cs`
-- Potentially create: `src/Gravitas/Colliders/ColliderRuntimeShapeState.cs`
-- Potentially create: `src/Gravitas/Colliders/ColliderPartitionState.cs`
-- Potentially create: `src/Gravitas/Colliders/ColliderPairState.cs`
+- Already present: `src/Gravitas/Colliders/Support/ColliderRuntimeShapeState.cs`
+- Create: `src/Gravitas/Colliders/Support/ColliderPartitionState.cs`
+- Create: `src/Gravitas/Colliders/Support/ColliderQueryState.cs`
+- Create: `src/Gravitas/Colliders/Support/ColliderPairState.cs`
+- Create: `src/Gravitas/Colliders/Support/ColliderHierarchyState.cs`
 - Modify: `tests/Gravitas.Tests/Colliders`
 - Modify: `tests/Gravitas.Benchmarks/Colliders`
 - Modify: `docs/wiki/RUNTIME_ARCHITECTURE.md`
@@ -197,11 +199,45 @@ Meaningful deferred work captured from that plan and the wiki:
 
 **Tasks:**
 
-- [ ] Map `LSCollider` responsibilities into identity, host binding, runtime shape, partition state, query versioning, hierarchy filtering, and pair references.
-- [ ] Add regression tests around parent/child collision exclusion, collider deactivation cleanup, pair-holder cleanup, partition refresh, and query-version reset before moving state.
-- [ ] Extract only the state groups that reduce real complexity without creating indirection-heavy API bloat.
-- [ ] Preserve disabled/allocation hot paths for collider simulation and partition refresh.
-- [ ] Revisit parent/child metadata and document the engine-agnostic hierarchy rule that replaced Unity transform traversal.
+- [x] Map `LSCollider` responsibilities into identity, host binding, runtime shape, partition state, query versioning, hierarchy filtering, and pair references.
+- [x] Add regression tests around parent/child collision exclusion, collider deactivation cleanup, pair-holder cleanup, partition refresh, and query-version reset before moving state.
+- [x] Extract only the state groups that reduce real complexity without creating indirection-heavy API bloat.
+- [x] Preserve disabled/allocation hot paths for collider simulation and partition refresh.
+- [x] Revisit parent/child metadata and document the engine-agnostic hierarchy rule that replaced Unity transform traversal.
+
+**Phase 2 Status - 2026-05-26**
+
+- Split `LSCollider` dense mutable state into focused internal helpers:
+  `ColliderPartitionState`, `ColliderQueryState`, `ColliderPairState`, and
+  `ColliderHierarchyState`, while keeping identity, host binding, shape API, and
+  events on the collider itself.
+- Kept pair containers lazy so colliders that never collide avoid upfront pair
+  dictionary/holder set allocation. Existing partition and query hot paths still
+  use caller-owned/context-owned state.
+- Replaced implicit/unusable parent traversal with explicit
+  `SetParent(LSCollider parent)` and `ClearParent()` binding. Parent-child and
+  sibling filtering now depends on stored top-parent collider IDs, not host
+  transform traversal.
+- Added `ColliderOwnershipStateTests` for explicit hierarchy filtering,
+  owned-pair cleanup, holder-side cleanup, static partition refresh, and query
+  version reset.
+- Fixed a holder-side deactivation bug found by the new tests: holder cleanup
+  now enumerates the `SwiftHashSet<int>` instead of indexing it as though the
+  hash-set key were a dense ordinal.
+- Fixed parent deactivation cleanup so children drop stale parent IDs before the
+  parent collider ID can be reused by an unrelated collider.
+- Removed duplicate collider position/rotation dirty flags. Runtime-shape
+  snapshot commits now drive broad-phase versioning, and collision pairs use
+  broad-phase version changes as their authoritative movement/shape
+  invalidation signal.
+- Updated `docs/wiki/RUNTIME_ARCHITECTURE.md`,
+  `docs/wiki/COLLISION_PIPELINE.md`, and `docs/wiki/HOST_INTEGRATION.md` with
+  the new collider state split and explicit hierarchy contract.
+- Verification: focused collider/partition/physics-service tests passed, full
+  `Release` and `ReleaseLean` build/test gates passed with 145 tests, and short
+  `partition-culling` plus `simulation-allocation` benchmark smoke completed.
+  The only allocation reported in those selections was the existing
+  `GroundingSweptSphereProbeOnly` `1 B/op` short-job artifact.
 
 ## Phase 3: Contact Manifold Data Model
 

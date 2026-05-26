@@ -182,12 +182,25 @@ target.
 - active/trigger state.
 - layer index.
 - shape type and shape priority.
-- local offset, scale-derived size, radius, area, bounds, and partition
-  coordinates.
-- contact and trigger events.
-- parent/child metadata used to suppress sibling collisions.
-- collision-pair references and holders.
+- local offset, scale-derived size, radius, area, bounds, and runtime-shape
+  versioning.
+- partition coordinates, last grid bounds, partition-change flags, and
+  broad-phase versioning.
 - raycast and circle-query version markers.
+- explicit parent/child metadata used to suppress parent-child and sibling
+  collisions.
+- collision-pair references and holder references.
+- contact and trigger events.
+
+The dense mutable groups inside `LSCollider` are split into focused internal
+state helpers: runtime shape, partition, query, hierarchy, and pair state. The
+public collider remains the host-facing shape object, while the helpers keep
+ownership rules local enough for manifold and solver work to evolve without
+turning the base collider into a bigger conditional path.
+Runtime-shape snapshot commits are the source of truth for collider
+position/rotation/scale/shape invalidation. Partition state advances the
+broad-phase version from those commits, and collision pairs use broad-phase
+version changes instead of maintaining a second position/rotation dirty path.
 
 Dynamic colliders are updated by their bodies during the simulation phases.
 Bodyless/static colliders are not owned by the dynamic body bucket, so a host

@@ -38,9 +38,9 @@ colliders are added to `ContainedDynamicObjects`, including bodyless colliders.
 
 ## Collider Runtime Shape State
 
-`LSCollider` separates collider identity and pair/partition ownership from the
-derived runtime shape snapshot used by bounds, area, and shape-specific caches.
-The current snapshot watches:
+`LSCollider` separates collider identity and host binding from the dense mutable
+state used by shape rebuilds, partition ownership, query duplicate suppression,
+pair cleanup, and hierarchy filtering. The runtime-shape snapshot watches:
 
 - world-space center.
 - rotation.
@@ -53,6 +53,25 @@ Mutating `LocalOffset`, `Radius`, or `Size` marks the runtime shape dirty.
 Changing host/body scale, position, or rotation is detected from the snapshot on
 the next `Simulate()` call. If the snapshot has not changed, the collider skips
 the rebuild and keeps its existing partition state.
+
+Partition state tracks grid coordinates, previous snapped grid bounds,
+partition-change flags, and broad-phase versioning together. Query state tracks
+the raycast and circle-query versions used by context-owned query services to
+suppress duplicate collider hits. Pair state owns the one-sided collision-pair
+dictionary and the opposite-side holder set; both are allocated lazily so
+colliders that never form pairs do not pay for pair containers up front.
+Broad-phase versioning advances from committed runtime-shape changes, so
+collision pairs do not need separate collider position/rotation dirty flags.
+If the runtime snapshot changes, bounds/partition state refreshes and pairs
+observe the broad-phase version change.
+
+Hierarchy state is explicit. Hosts call `child.SetParent(parent)` after collider
+initialization when two colliders belong to the same engine object or aggregate
+body and should not collide with each other. Gravitas stores the top parent
+collider ID for filtering; it does not walk host transform trees at simulation
+time. When a parent collider deactivates, its child bindings are cleared before
+the parent collider ID returns to the reusable ID pool, preventing stale
+hierarchy IDs from suppressing collisions against future unrelated colliders.
 
 Capsules rebuild their hemisphere centers, cylinder height, area, and segment
 endpoints together. Short capsules collapse to a sphere-like segment and use a
@@ -121,7 +140,8 @@ with `RequireCollisionPair(...)`. A pair is required only when:
 - both colliders have real shapes.
 - at least one collider has a body.
 - the context collision matrix allows the two layers to collide.
-- the colliders are not siblings in the host hierarchy.
+- the colliders are not explicitly bound as parent-child or siblings in the
+  host hierarchy.
 
 If the pair already exists, it is reused. Otherwise, the service rents or
 creates a `CollisionPair`, stores it on the lower-ordered collider, and stores a
@@ -321,9 +341,10 @@ time they update. During `context.LateSimulate()`,
 1. clears partition membership through the owning collision service.
 2. removes owned collision-pair references.
 3. removes holder references from the opposite colliders.
-4. deactivates and pools pairs when pooling is enabled.
-5. returns the collider ID to the context-local physics service.
-6. marks the collider inactive.
+4. clears explicit parent binding.
+5. deactivates and pools pairs when pooling is enabled.
+6. returns the collider ID to the context-local physics service.
+7. marks the collider inactive.
 
 Partition cleanup must flow through the owning service. Do not manually return
 the same partition through a second path; that risks double-release and stale
