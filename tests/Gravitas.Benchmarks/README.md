@@ -102,17 +102,23 @@ BenchmarkDotNet writes results to `BenchmarkDotNet.Artifacts/results/` by defaul
 For quick allocation checks around the current steady-state hot paths, run:
 
 ```bash
-dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0 -- query-service simulation-allocation diagnostics --filter "*" -j Short -i --exporters json
+dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0 -- query-service simulation-allocation collision-detection collision-response partition-culling diagnostics --filter "*" -j Short -i --exporters json
 ```
 
 The short in-process job is not canonical timing evidence, but it is useful for
 catching obvious managed allocations. These scenarios should report no managed
-allocation in steady state:
+allocation in steady-state paths unless noted below:
+
+BenchmarkDotNet short in-process runs can occasionally report `1 B/op` noise on
+otherwise allocation-guarded paths. Treat repeatable non-zero values as a reason
+to add or tighten explicit allocation tests before changing the algorithm.
 
 | Alias | Covered paths |
 | --- | --- |
 | `query-service` | `RaycastAll`, `OverlapCircleAll`, directional `OverlapCircleInDirection`, and overlapping-context queries. |
 | `simulation-allocation` | `StiffBody.LateSimulate`, grounding raycast probes, collision partition distribution, and active-pair late simulation. |
+| `collision-detection` | prepared primitive pairs, non-SAT primitive pairs, cuboid SAT, mesh/cylinder, mesh/cuboid, and mesh/mesh checks. |
+| `collision-response` | current single-contact response solver. This is a tracked non-zero baseline until the solver hardening phase removes or explains the remaining allocation. |
 | `diagnostics` | Disabled/enabled force and torque event hooks plus disabled/enabled collider debug draw capture. |
 | `partition-culling` | dynamic collider repartitioning after teleports, direct partition add/remove churn, and culled-pair invalidation after movement. |
 

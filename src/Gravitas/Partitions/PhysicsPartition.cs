@@ -7,8 +7,6 @@ namespace Gravitas;
 
 public class PhysicsPartition : IVoxelPartition
 {
-    private const byte Present = 0;
-
     private GravitasCollisionService? _owner;
 
     public WorldVoxelIndex WorldIndex { get; set; }
@@ -18,9 +16,9 @@ public class PhysicsPartition : IVoxelPartition
     /// <summary>
     /// Stores context-local dynamic body IDs.
     /// </summary>
-    public SwiftSparseMap<byte>? ContainedDynamicObjects;
+    public SwiftSparseSet? ContainedDynamicObjects;
 
-    public SwiftSparseMap<byte>? ContainedStaticObjects;
+    public SwiftSparseSet? ContainedStaticObjects;
 
     public int ActivationId { get; private set; }
 
@@ -95,22 +93,17 @@ public class PhysicsPartition : IVoxelPartition
     public void AddDynamicObject(int item)
     {
         ContainedDynamicObjects ??= new();
-        if (ContainedDynamicObjects.ContainsKey(item))
+        if (!ContainedDynamicObjects.Add(item))
             return;
 
-        if (ContainedDynamicObjects.Count == 0)
+        if (ContainedDynamicObjects.Count == 1)
             ActivationId = Owner.ActivatePartition(this);
-
-        ContainedDynamicObjects.Add(item, Present);
     }
 
     public void AddStaticObject(int item)
     {
         ContainedStaticObjects ??= new();
-        if (ContainedStaticObjects.ContainsKey(item))
-            return;
-
-        ContainedStaticObjects.Add(item, Present);
+        ContainedStaticObjects.Add(item);
     }
 
     public void RemoveDynamicObject(int item)

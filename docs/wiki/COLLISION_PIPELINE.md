@@ -25,12 +25,12 @@ into one bounds/shape rebuild.
 
 `PhysicsPartition` is a GridForge voxel partition payload. It stores
 context-local collider IDs, not collider references. Dynamic and static
-membership uses `SwiftSparseMap<byte>` as a sparse set: lookups and removals are
-keyed by collider ID, while dense-key spans keep partition iteration compact. Do
-not treat dense-key order as a semantic ordering rule; deterministic pair
-ordering must be explicit at the pair or service layer. The owner service is
-required before the partition is added to a voxel, and the partition returns to
-that owner service pool from `OnRemoveFromVoxel(...)`.
+membership uses `SwiftSparseSet`: lookups and removals are keyed by collider ID,
+while dense-key storage keeps partition iteration compact. Do not treat dense-key
+order as a semantic ordering rule; deterministic pair ordering must be explicit
+at the pair or service layer. The owner service is required before the partition
+is added to a voxel, and the partition returns to that owner service pool from
+`OnRemoveFromVoxel(...)`.
 
 Current static-membership behavior is specific: colliders whose body exists and
 has `Immovable == true` are added to `ContainedStaticObjects`. Other registered

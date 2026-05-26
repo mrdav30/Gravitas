@@ -191,6 +191,24 @@ Do not assume an engine-style integrate-then-collide order. The current
 prototype checks/distributes collisions during `Simulate` and advances bodies in
 `LateSimulate`.
 
+## Replay Contract
+
+For deterministic runs, hosts should treat command application as a separate
+ordered input phase before `context.Simulate()`. Given the same initial context,
+settings, world state, command order, and frame count, Gravitas should replay to
+the same authoritative body, collider, clock, and contact state.
+
+The current alpha order has two important consequences:
+
+- Teleports or transform mutations made before `Simulate()` refresh dynamic
+  collider bounds and can create contacts in that same `Simulate()` call.
+- Forces and accelerations queued before `Simulate()` do not move the body until
+  `LateSimulate()`.
+
+Visualization phases are non-authoritative. Use them to publish interpolated
+positions, rotations, and diagnostic draw data to a renderer or host adapter,
+not to change physics state that must replay.
+
 ## Settings And Environment
 
 Each context owns its own `PhysicsSettings` and `PhysicsEnvironment`.

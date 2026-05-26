@@ -65,6 +65,25 @@ LateVisualize
   Hooks.InvokeLateVisualize
 ```
 
+This order is an alpha contract, not just an implementation detail. Ordered host
+commands should be applied before `Simulate()`. Transform teleports made before
+`Simulate()` are reflected in the same collision distribution pass because
+dynamic-body colliders are refreshed before collisions are checked. Force and
+acceleration commands made before `Simulate()` are stored on the body and
+integrated during `LateSimulate()`. Collision response can mutate authoritative
+body state during `Simulate()`, while body force integration, grounding, and
+post-integration collider refresh happen during `LateSimulate()`.
+
+Lifecycle hooks run after the built-in work for their phase. `Visualize()` and
+`LateVisualize()` are presentation phases: they may update visual interpolation
+state, but they must not mutate authoritative position, rotation, velocity,
+partition membership, or collision state.
+
+The replay expectation is: the same initial context, settings, world data,
+ordered command sequence, and frame count should produce the same authoritative
+body, collider, clock, and contact state across repeated runs. The current
+contract is pinned by `GravitasSimulationPhaseOrderTests`.
+
 `Reset` clears the clock and all context-local service state, then invokes reset
 hooks. `SetFrameRate` and `ApplySettings` update the clock's frame rate and
 invoke frame-rate-change hooks.
@@ -127,10 +146,10 @@ Body movement currently happens in `StiffBody.LateSimulate()`, called by
 `GravitasPhysicsService.LateSimulate()`. Non-kinematic movable bodies process
 forces, update velocities, apply position/rotation changes, run their selected
 ground probe through the context query services, and then update collider
-partition state through `Collider.Simulate()`. `GravitasPhysicsService.Simulate()` also
-performs a pre-distribution collider refresh for dynamic-body colliders so host
-commands that teleport or reposition bodies before `Simulate()` are reflected in
-the same collision distribution pass.
+partition state through `Collider.Simulate()`. `GravitasPhysicsService.Simulate()`
+also performs a pre-distribution collider refresh for dynamic-body colliders so
+host commands that teleport or reposition bodies before `Simulate()` are
+reflected in the same collision distribution pass.
 
 Body initialization does not assume grounded state. After the body collider is
 registered and partitioned, initialization performs an explicit ground probe.

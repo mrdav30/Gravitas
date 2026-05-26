@@ -65,9 +65,9 @@ Meaningful deferred work captured from that plan and the wiki:
   writing new broad-phase/query structures. `SwiftFixedBVH<T>`,
   `SwiftFixedOctree<T>`, `SwiftFixedSpatialHash<T>`, and `FixedBoundVolume`
   are preferred starting points.
-- `SwiftSparseMap<T>` is currently standing in as a sparse-set-like partition
-  membership structure. Revisit when `SwiftSparseSet` exists or if partition
-  iteration/removal benchmarks point to a better fit.
+- `SwiftSparseSet` is the current partition membership structure for dynamic
+  and static collider IDs. Revisit only if partition iteration/removal
+  benchmarks show a better deterministic membership layout.
 
 ## Phase 0: Baseline, Package Hygiene, And Risk Register
 
@@ -83,12 +83,63 @@ Meaningful deferred work captured from that plan and the wiki:
 
 **Tasks:**
 
-- [ ] Run the full `Release` and `ReleaseLean` build/test gate on the current baseline.
-- [ ] Run short smoke benchmarks for `simulation-allocation`, `query-service`, `collision-detection`, `collision-response`, `partition-culling`, and `diagnostics`.
-- [ ] Record which benchmark selections report managed allocation and which are expected to stay at `0 B/op`.
-- [ ] Inspect whether the temporary local GridForge project references are still needed. If the fixed GridForge package is available, validate against the package and remove local-link scaffolding.
-- [ ] Create a compact risk register in this plan with any newly observed failing tests, benchmark regressions, stale docs, or package-version blockers.
-- [ ] Keep `docs/wiki/` unchanged unless the baseline reveals stale claims.
+- [x] Run the full `Release` and `ReleaseLean` build/test gate on the current baseline.
+- [x] Run short smoke benchmarks for `simulation-allocation`, `query-service`, `collision-detection`, `collision-response`, `partition-culling`, and `diagnostics`.
+- [x] Record which benchmark selections report managed allocation and which are expected to stay at `0 B/op`.
+- [x] Inspect whether the temporary local GridForge project references are still needed. If the fixed GridForge package is available, validate against the package and remove local-link scaffolding.
+- [x] Create a compact risk register in this plan with any newly observed failing tests, benchmark regressions, stale docs, or package-version blockers.
+- [x] Keep `docs/wiki/` unchanged unless the baseline reveals stale claims.
+
+**Phase 0 Status - 2026-05-26**
+
+- Package hygiene validated against `FixedMathSharp` `4.0.0`, `SwiftCollections`
+  `4.1.0`, `SwiftCollections.FixedMathSharp` `4.1.0`, and `GridForge`
+  `6.0.5` package references. No temporary local GridForge project references
+  remain in the active project files.
+- Replaced partition membership from `SwiftSparseMap<byte>` to
+  `SwiftSparseSet` now that SwiftCollections exposes the dedicated sparse-set
+  primitive. This removes the dummy value payload while preserving dense ID
+  iteration for partitions and query services.
+- Added assembly-level serial execution for the xUnit project. Allocation and
+  replay guardrails use thread-local allocation counters and shared pool warmup
+  behavior, so they should not run concurrently with unrelated tests.
+- `Release` gate: `dotnet build Gravitas.slnx --configuration Release` and
+  `dotnet test Gravitas.slnx --configuration Release --no-build` passed with
+  134 tests.
+- `ReleaseLean` gate: `dotnet build Gravitas.slnx --configuration ReleaseLean`
+  and `dotnet test Gravitas.slnx --configuration ReleaseLean --no-build`
+  passed with 134 tests.
+- Focused sparse-set validation:
+  `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~PhysicsPartitionPerformanceShapeTests|FullyQualifiedName~QueryService|FullyQualifiedName~Raycast|FullyQualifiedName~Circle"`
+  passed with 21 tests.
+- Benchmark smoke command:
+  `dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0 -- simulation-allocation query-service collision-detection collision-response partition-culling diagnostics --filter "*" -j Short -i --exporters json`
+  completed 24 benchmarks. BenchmarkDotNet could not raise process priority in
+  this sandbox, so treat timings as local smoke evidence only.
+
+**Phase 0 Allocation Notes**
+
+| Selection | Current smoke allocation note |
+| --- | --- |
+| `simulation-allocation` | Most measured methods reported no managed allocation; `GroundingSweptSphereProbeOnly` reported `1 B/op` in the short job and should be watched with explicit allocation tests if it becomes repeatable. |
+| `query-service` | Most query paths reported no managed allocation; `RaycastAcrossTwoOverlappingContexts` reported `1 B/op` in the short job and should be watched with explicit allocation tests if it becomes repeatable. |
+| `collision-detection` | Most methods reported no managed allocation; `CheckCuboidCuboidSatPairs` reported `1 B/op` in the short job while focused SAT allocation tests remain the stronger guardrail. |
+| `collision-response` | `CalculateImpulseForPreparedPairs` reported `1.27 KB/op`; keep this as a Phase 4 solver allocation target. |
+| `partition-culling` | Direct membership churn and culled-pair recheck reported no managed allocation; teleported repartition reported `1 B/op` in the short job and should be rechecked after broader partition scalability work. |
+| `diagnostics` | Disabled and enabled event/debug-draw paths reported no managed allocation. |
+
+**Phase 0 Risk Register**
+
+- `dotnet clean` against the `.slnx` and project files returned a failure exit
+  code without MSBuild errors in this environment. Sequential `dotnet build`
+  commands produced clean artifacts; prefer build/test gates over relying on
+  `dotnet clean` until this is understood.
+- Do not run `Release` and `ReleaseLean` builds/tests concurrently in the same
+  workspace. Parallel configuration builds can cross-contaminate generated
+  `obj` state and surface bogus MemoryPack shim errors.
+- `CollisionResponse` still has a measurable allocation baseline in the short
+  benchmark. Track this in the solver hardening phase instead of hiding it with
+  a weak benchmark.
 
 ## Phase 1: Simulation Phase Order And Replay Contract
 
@@ -106,11 +157,27 @@ Meaningful deferred work captured from that plan and the wiki:
 
 **Tasks:**
 
-- [ ] Add deterministic replay tests that run the same context setup, command sequence, and frame count twice and compare body/collider state.
-- [ ] Add tests that pin when host transform teleports, force commands, kinematic reads, collision distribution, response, body integration, grounding, and visualization state are allowed to mutate authoritative data.
-- [ ] Re-evaluate the current collide-in-`Simulate`, integrate-in-`LateSimulate` order against desired lockstep semantics. Preserve it only if tests and docs make the behavior intentional.
-- [ ] If the order changes, split the work into a focused migration phase before touching the response solver.
-- [ ] Document the final phase order, replay expectations, and non-authoritative visualization boundary.
+- [x] Add deterministic replay tests that run the same context setup, command sequence, and frame count twice and compare body/collider state.
+- [x] Add tests that pin when host transform teleports, force commands, kinematic reads, collision distribution, response, body integration, grounding, and visualization state are allowed to mutate authoritative data.
+- [x] Re-evaluate the current collide-in-`Simulate`, integrate-in-`LateSimulate` order against desired lockstep semantics. Preserve it only if tests and docs make the behavior intentional.
+- [x] If the order changes, split the work into a focused migration phase before touching the response solver. No migration phase was needed because the current order was preserved and pinned.
+- [x] Document the final phase order, replay expectations, and non-authoritative visualization boundary.
+
+**Phase 1 Status - 2026-05-26**
+
+- Added `GravitasSimulationPhaseOrderTests` to pin the current lockstep phase
+  contract without changing production order.
+- Preserved the current alpha order intentionally: host commands before
+  `Simulate()`, dynamic collider refresh and collision distribution in
+  `Simulate()`, active-pair processing plus body force integration/grounding in
+  `LateSimulate()`, and presentation-only visualization afterward.
+- Confirmed pre-`Simulate()` teleports can create same-frame contacts, while
+  pre-`Simulate()` forces do not move bodies until `LateSimulate()`.
+- Confirmed hooks observe built-in work after each phase and visualization does
+  not mutate authoritative body position or velocity.
+- Updated `docs/wiki/RUNTIME_ARCHITECTURE.md` and
+  `docs/wiki/HOST_INTEGRATION.md` with the replay contract and visualization
+  boundary.
 
 ## Phase 2: Collider, Body, And Hierarchy Ownership Cleanup
 
@@ -275,7 +342,7 @@ Meaningful deferred work captured from that plan and the wiki:
 **Tasks:**
 
 - [ ] Validate packaged GridForge partition-provider behavior once the retention fix is released; remove temporary local project references when possible.
-- [ ] Compare `SwiftSparseMap<T>` membership against a future `SwiftSparseSet` or another deterministic sparse membership structure when available.
+- [x] Compare `SwiftSparseMap<T>` membership against a future `SwiftSparseSet` or another deterministic sparse membership structure when available. Phase 0 moved partition membership to `SwiftSparseSet`; continue benchmarking the layout under broader partition/query scale tests.
 - [ ] Revisit active partition ordering and pair candidate ordering for determinism under high churn.
 - [ ] Add stress tests for moving many colliders across grids, repeatedly emptying/refilling partitions, and querying colliders spanning many voxels.
 - [ ] Decide whether query services should remain context-owned mutable services or expose explicit caller-owned/rented query state for reentrancy.

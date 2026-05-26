@@ -540,7 +540,7 @@ public sealed class GravitasRaycastService
     }
 
     private void ProcessColliderListForClosestHit(
-        SwiftSparseMap<byte>? colliderIds,
+        SwiftSparseSet? colliderIds,
         Vector3d origin,
         Vector3d direction,
         ref bool found,
@@ -575,7 +575,7 @@ public sealed class GravitasRaycastService
     }
 
     private void ProcessColliderListForAllHits(
-        SwiftSparseMap<byte>? colliderIds,
+        SwiftSparseSet? colliderIds,
         Vector3d origin,
         Vector3d direction,
         SwiftList<LSRaycastHit> results)
@@ -616,7 +616,7 @@ public sealed class GravitasRaycastService
     }
 
     private void ProcessColliderListForClosestSweepHit(
-        SwiftSparseMap<byte>? colliderIds,
+        SwiftSparseSet? colliderIds,
         Vector3d origin,
         Vector3d direction,
         ref bool found,
@@ -669,7 +669,7 @@ public sealed class GravitasRaycastService
     }
 
     private void ProcessColliderListForAllSweepHits(
-        SwiftSparseMap<byte>? colliderIds,
+        SwiftSparseSet? colliderIds,
         Vector3d origin,
         Vector3d direction,
         SwiftList<LSRaycastHit> results)

@@ -274,7 +274,7 @@ public sealed class GravitasCircleQueryService
     }
 
     private void ProcessColliderListForClosestHit(
-        SwiftSparseMap<byte>? colliderIds,
+        SwiftSparseSet? colliderIds,
         Vector3d position,
         Fixed64 radius,
         ref bool found,
@@ -313,7 +313,7 @@ public sealed class GravitasCircleQueryService
     }
 
     private void ProcessColliderListForDirectionalHit(
-        SwiftSparseMap<byte>? colliderIds,
+        SwiftSparseSet? colliderIds,
         Vector3d position,
         Fixed64 radius,
         Vector3d direction,
@@ -355,7 +355,7 @@ public sealed class GravitasCircleQueryService
     }
 
     private void ProcessColliderListForAllHits(
-        SwiftSparseMap<byte>? colliderIds,
+        SwiftSparseSet? colliderIds,
         Vector3d position,
         Fixed64 radius,
         SwiftList<LSRaycastHit> results)
