@@ -118,7 +118,7 @@ to add or tighten explicit allocation tests before changing the algorithm.
 | `query-service` | `RaycastAll`, `OverlapCircleAll`, directional `OverlapCircleInDirection`, and overlapping-context queries. |
 | `simulation-allocation` | `StiffBody.LateSimulate`, grounding raycast probes, collision partition distribution, and active-pair late simulation. |
 | `collision-detection` | prepared primitive pairs, non-SAT primitive pairs, primitive manifold generation, cuboid face-manifold generation, cuboid SAT, mesh/cylinder, mesh/cuboid, and mesh/mesh checks. |
-| `collision-response` | current primary-contact response solver. This is a tracked non-zero baseline until the solver hardening phase removes or explains the remaining allocation. |
+| `collision-response` | manifold response solver cost across single-contact and face-manifold cases, with pair-count scaling. |
 | `diagnostics` | Disabled/enabled force and torque event hooks plus disabled/enabled collider debug draw capture. |
 | `partition-culling` | dynamic collider repartitioning after teleports, direct partition add/remove churn, and culled-pair invalidation after movement. |
 

@@ -303,7 +303,24 @@ public class StiffBody : IRecordable
     /// Higher values simulate high friction surfaces causing quick stops, while lower values simulate low friction surfaces causing prolonged slides.
     /// The usual range is between 0 (no friction) and 1 (high friction).
     /// </summary>
-    private Fixed64 FrictionCoefficient = Fixed64.One;
+    private Fixed64 _frictionCoefficient = Fixed64.One;
+
+    /// <summary>
+    /// Coulomb friction coefficient used by contact response and grounded motion.
+    /// Values above one are allowed for intentionally high-friction surfaces.
+    /// </summary>
+    public Fixed64 FrictionCoefficient
+    {
+        get => _frictionCoefficient;
+        set
+        {
+            SwiftThrowHelper.ThrowIfArgument(
+                value < Fixed64.Zero,
+                nameof(value),
+                "Friction coefficient cannot be negative.");
+            _frictionCoefficient = value;
+        }
+    }
 
     /// <summary>
     /// Represents the normal force on the object.
@@ -605,7 +622,7 @@ public class StiffBody : IRecordable
         // Object is moving on ground, add the friction force to the accumulated force
         // Adjust the friction with the normal force magnitude
         PhysicsEnvironment environment = Context.Environment;
-        Fixed64 effectiveFriction = FrictionCoefficient;
+        Fixed64 effectiveFriction = _frictionCoefficient;
         if (horizontalSpeed <= environment.FrictionTransitionSpeed)
         {
             Fixed64 proportion = horizontalSpeed / environment.FrictionTransitionSpeed;
@@ -694,7 +711,7 @@ public class StiffBody : IRecordable
 
         // Calculate the friction force and convert it into a torque
         PhysicsEnvironment environment = Context.Environment;
-        Fixed64 effectiveFriction = FrictionCoefficient;
+        Fixed64 effectiveFriction = _frictionCoefficient;
         if (_angularSpeed < environment.FrictionTransitionSpeed)
         {
             Fixed64 proportion = _angularSpeed / environment.FrictionTransitionSpeed;
@@ -1275,7 +1292,7 @@ public class StiffBody : IRecordable
         RecordValues.Look(chronicler, ref _isVelocityConstant, "IsVelocityConstant");
         RecordValues.Look(chronicler, ref LinearDragCoefficient, "LinearDragCoefficient");
         RecordValues.Look(chronicler, ref AngularDragCoefficient, "AngularDragCoefficient");
-        RecordValues.Look(chronicler, ref FrictionCoefficient, "FrictionCoefficient");
+        RecordValues.Look(chronicler, ref _frictionCoefficient, "FrictionCoefficient");
         RecordValues.Look(chronicler, ref _normalForce, "NormalForce");
         RecordValues.Look(chronicler, ref Mass, "Mass");
 

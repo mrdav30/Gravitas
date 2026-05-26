@@ -299,12 +299,40 @@ Meaningful deferred work captured from that plan and the wiki:
 
 **Tasks:**
 
-- [ ] Add solver tests for immovable bodies, kinematic bodies, equal mass exchange, different mass exchange, restitution thresholding, resting contact, slopes, and stacks.
-- [ ] Define normal and tangential impulse equations in fixed-point terms, including units and clamping rules.
-- [ ] Implement deterministic friction impulses after manifold contact data is available.
-- [ ] Add positional stabilization that does not hide narrow-phase penetration-depth bugs.
-- [ ] Benchmark solver cost by contact count and pair count.
-- [ ] Document solver invariants, remaining divergences from real-world physics, and any deliberate simplifications.
+- [x] Add solver tests for immovable bodies, kinematic bodies, equal mass exchange, different mass exchange, restitution thresholding, resting contact, slopes, and stacks.
+- [x] Define normal and tangential impulse equations in fixed-point terms, including units and clamping rules.
+- [x] Implement deterministic friction impulses after manifold contact data is available.
+- [x] Add positional stabilization that does not hide narrow-phase penetration-depth bugs.
+- [x] Benchmark solver cost by contact count and pair count.
+- [x] Document solver invariants, remaining divergences from real-world physics, and any deliberate simplifications.
+
+**Phase 4 Status - 2026-05-26**
+
+- Replaced the primary-contact response path with a fixed-capacity manifold
+  response pass. The solver builds up to four contacts from `ContactManifold`
+  and no longer depends on `PrimaryContact` for physical response.
+- Positional correction remains a solver-side slop/stabilization rule, but the
+  correction is now divided across active contacts so a four-contact face
+  manifold does not over-correct relative to the narrow-phase depth.
+- Normal impulses are computed for all contacts before application. This keeps
+  centered face manifolds from injecting angular velocity because of a single
+  arbitrary corner ordering.
+- Added deterministic Coulomb friction impulses after normal response.
+  `StiffBody.FrictionCoefficient` is now a public validated coefficient shared
+  by contact response and grounded body friction. Pair friction uses the
+  geometric mean and clamps tangent impulse by `normalImpulse * coefficient`.
+- Expanded response tests for different masses, tangential friction, sloped
+  contact normals, and centered stacked face manifolds, alongside the existing
+  immovable, kinematic, equal-mass, restitution-threshold, no-contact, trigger,
+  zero-restitution, off-center angular, and deterministic replay coverage. Added
+  a prepared-contact allocation guard for single-contact and face-manifold
+  response after warmup.
+- Updated the collision-response benchmark to compare single-contact and
+  face-manifold solver cases across pair counts.
+- Documented response equations, units, correction sharing, friction clamping,
+  and remaining alpha simplifications in `docs/wiki/COLLISION_PIPELINE.md`.
+  Static resting friction with cached normal forces remains intentionally
+  deferred to Phase 5 island/warm-start work.
 
 ## Phase 5: Island Solving, Sleep, And Warm Starting
 

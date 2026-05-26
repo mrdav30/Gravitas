@@ -11,8 +11,11 @@ public class CollisionResponseBenchmarks
     private GravitasWorldContext _context;
     private CollisionPair[] _pairs;
 
-    [Params(64)]
+    [Params(16, 64)]
     public int PairCount { get; set; }
+
+    [Params(ResponseContactShape.SingleContact, ResponseContactShape.FaceManifold)]
+    public ResponseContactShape ContactShape { get; set; }
 
     [IterationSetup(Target = nameof(CalculateImpulseForPreparedPairs))]
     public void Setup()
@@ -25,7 +28,7 @@ public class CollisionResponseBenchmarks
         for (int i = 0; i < _pairs.Length; i++)
         {
             Vector3d origin = PositionForPair(i);
-            _pairs[i] = CreateResponsePair(i, origin);
+            _pairs[i] = CreateResponsePair(origin);
             CollisionDetection.DoCollisionCheck(_pairs[i]);
         }
     }
@@ -47,26 +50,13 @@ public class CollisionResponseBenchmarks
         return _pairs.Length;
     }
 
-    private CollisionPair CreateResponsePair(int index, Vector3d origin)
+    private CollisionPair CreateResponsePair(Vector3d origin)
     {
-        return (index & 3) switch
+        return ContactShape switch
         {
-            0 => CreateMovingSphereSpherePair(origin),
-            1 => CreateMovingCuboidSpherePair(origin),
-            2 => CreateMovingCapsuleSpherePair(origin),
+            ResponseContactShape.SingleContact => CreateMovingCuboidSpherePair(origin),
             _ => CreateMovingCuboidCuboidPair(origin),
         };
-    }
-
-    private CollisionPair CreateMovingSphereSpherePair(Vector3d origin)
-    {
-        ScenarioBody<LSSphereCollider> left = CreateBody(new LSSphereCollider(), origin);
-        ScenarioBody<LSSphereCollider> right = CreateBody(
-            new LSSphereCollider(),
-            origin + new Vector3d(Fixed64.Fraction(3, 4), Fixed64.Zero, Fixed64.Zero));
-        Push(left.Body, 60);
-        Push(right.Body, -60);
-        return new CollisionPair(left.Collider, right.Collider);
     }
 
     private CollisionPair CreateMovingCuboidSpherePair(Vector3d origin)
@@ -77,17 +67,6 @@ public class CollisionResponseBenchmarks
             origin + new Vector3d(Fixed64.Fraction(3, 4), Fixed64.Fraction(1, 4), Fixed64.Zero));
         Push(sphere.Body, -60);
         return new CollisionPair(cuboid.Collider, sphere.Collider);
-    }
-
-    private CollisionPair CreateMovingCapsuleSpherePair(Vector3d origin)
-    {
-        ScenarioBody<LSCapsuleCollider> capsule = CreateBody(new LSCapsuleCollider(), origin, preventAngularForces: true);
-        ScenarioBody<LSSphereCollider> sphere = CreateBody(
-            new LSSphereCollider(),
-            origin + new Vector3d(Fixed64.Fraction(3, 4), Fixed64.Zero, Fixed64.Zero));
-        Push(capsule.Body, 60);
-        Push(sphere.Body, -60);
-        return new CollisionPair(capsule.Collider, sphere.Collider);
     }
 
     private CollisionPair CreateMovingCuboidCuboidPair(Vector3d origin)
@@ -101,17 +80,13 @@ public class CollisionResponseBenchmarks
         return new CollisionPair(left.Collider, right.Collider);
     }
 
-    private ScenarioBody<TCollider> CreateBody<TCollider>(
-        TCollider collider,
-        Vector3d position,
-        bool preventAngularForces = false)
+    private ScenarioBody<TCollider> CreateBody<TCollider>(TCollider collider, Vector3d position)
         where TCollider : LSCollider
     {
         var agent = new BenchmarkMatterAgent(_context, position);
         var body = new StiffBody(agent, collider)
         {
-            Mass = Fixed64.One,
-            PreventAngularForces = preventAngularForces
+            Mass = Fixed64.One
         };
 
         body.Initialize(position, FixedQuaternion.Identity);
@@ -142,5 +117,11 @@ public class CollisionResponseBenchmarks
         public StiffBody Body { get; }
 
         public TCollider Collider { get; }
+    }
+
+    public enum ResponseContactShape
+    {
+        SingleContact,
+        FaceManifold
     }
 }

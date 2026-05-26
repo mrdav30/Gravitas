@@ -120,9 +120,9 @@ shape, layer matrix, dynamic/static rules, and sibling relationships. A
 `CollisionPair` then performs fast distance/AABB culling before dispatching to
 `CollisionDetection`. If the narrow phase finds contact, it writes a fixed-size
 `ContactManifold`; if the pair has bodies that should receive physics,
-`CollisionResponse` applies prototype position correction and impulses from the
-manifold's primary contact. Contact events are emitted from the active-pair
-queue during `LateSimulate`.
+`CollisionResponse` applies solver-side position correction, normal impulses,
+and friction impulses across the manifold contacts. Contact events are emitted
+from the active-pair queue during `LateSimulate`.
 
 ## Current Prototype Edges
 
@@ -135,9 +135,10 @@ queue during `LateSimulate`.
 - Mesh raycast overlap and initial mesh/cylinder contact are implemented through
   triangle-level tests. Swept mesh queries and full mesh contact manifolds remain
   future hardening work.
-- Collision response is a prototype and should be treated as an alpha-hardening
-  target, especially around multi-contact solving, position correction, angular
-  response, triggers, restitution, friction, and physically coherent units.
+- Collision response is still an alpha-hardening target. The current manifold
+  solver handles deterministic normal and friction impulses, but static resting
+  friction, warm starting, island solving, continuous collision detection, and
+  mixed-dimension impulse exchange remain future work.
 - Query services use context-owned mutable buffers. Treat them as same-thread,
   fixed-loop services unless they are redesigned for reentrancy.
 - Diagnostics are context-owned and disabled by default. Enabled draw capture can

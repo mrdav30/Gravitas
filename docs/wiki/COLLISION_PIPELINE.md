@@ -2,7 +2,7 @@
 
 Gravitas collision work is split into GridForge-backed broad phase,
 context-local pair management, shape-pair narrow phase, deterministic contact
-manifolds, primary-contact response, and late contact notification.
+manifolds, manifold response, and late contact notification.
 
 ## Broad Phase: Voxel Partitions
 
@@ -260,9 +260,10 @@ Manifold contacts are value types (`ManifoldContact`) with:
 
 Manifolds currently store up to four contacts. When more candidates are offered,
 the manifold keeps the deepest four and breaks depth ties by lower stable contact
-identity. Exposed contact order is stable ascending contact identity, while
-`PrimaryContact` returns the deepest contact for the current alpha response
-solver. Duplicate contact identities update only when the new candidate is
+identity. Exposed contact order is stable ascending contact identity.
+`PrimaryContact` remains a convenience for diagnostics, tests, and callers that
+need one representative contact; the response solver iterates the full
+manifold. Duplicate contact identities update only when the new candidate is
 deeper.
 
 Contact data stores the narrow phase's detected depth without adding a solver
@@ -287,28 +288,38 @@ when detection reports a collision and the pair should perform physics response.
 Pairs with either collider marked as a trigger skip physical response; they can
 still flow through contact notification.
 
-Current non-trigger response behavior is a deterministic primary-contact solver:
+Current non-trigger response behavior is a deterministic fixed-capacity
+manifold solver:
 
-1. choose the manifold's primary contact, then build an explicit solver contact
-   from collider A, collider B, the two contact points, relative contact arms,
-   detected depth, and a normal oriented from A to B.
+1. build up to four explicit solver contacts from the pair manifold, collider
+   bodies, contact points, relative contact arms, detected depth, and normals
+   oriented from collider A to collider B.
 2. treat `Immovable` and `IsKinematic` bodies as infinite mass for response.
 3. apply immediate positional correction only for depth above
    `CollisionResponse.PenetrationSlop`; the correction is distributed by
-   inverse mass and scaled by `PenetrationCorrectionPercent`.
-4. compute contact velocity from linear velocity plus angular velocity at each
-   relative contact arm.
-5. skip impulse when the bodies are already separating along the contact normal.
-6. compute a normal impulse using inverse mass, inverse inertia, contact arms,
-   and the combined restitution.
-7. apply direct velocity deltas to movable bodies, plus angular velocity deltas
-   when angular forces are enabled.
+   inverse mass, scaled by `PenetrationCorrectionPercent`, and divided across
+   the active manifold contacts so a four-contact face does not correct four
+   times as far as the detected penetration.
+4. compute normal contact velocity from linear velocity plus angular velocity at
+   each relative contact arm.
+5. compute normal impulse scalars for all contacts before applying them. This
+   keeps symmetric face manifolds from injecting spin through whichever corner
+   happens to be visited first.
+6. skip normal impulse when the bodies are already separating along the contact
+   normal.
+7. apply direct normal velocity deltas to movable bodies, plus angular velocity
+   deltas when angular forces are enabled.
+8. compute tangential contact velocity after normal impulses, then apply a
+   Coulomb friction impulse along the tangent. The tangent impulse is clamped to
+   `normalImpulse * frictionCoefficient`, where the pair coefficient is the
+   geometric mean of the two body coefficients.
 
 When diagnostics are enabled, the pair emits contact and response events in the
-same deterministic order as collision processing: `Contact`, then
-`ResponseImpulse`, then body velocity-delta events produced by the applied
-response. The diagnostics stream is observational only; it does not change pair
-ordering, contact data, or response behavior.
+same deterministic order as collision processing: `Contact`, one
+`ResponseImpulse` event for each applied normal impulse, then body velocity-delta
+events produced by normal and friction response. The diagnostics stream is
+observational only; it does not change pair ordering, contact data, or response
+behavior.
 
 Response units and invariants:
 
@@ -322,15 +333,19 @@ Response units and invariants:
   low-bounce participant can dampen the pair.
 - closing speeds at or below `RestitutionVelocityThreshold` use zero
   restitution to avoid resting-contact bounce.
+- `StiffBody.FrictionCoefficient` is a non-negative Coulomb coefficient. Values
+  above one are allowed for intentional high-friction materials.
+- friction impulses oppose tangential contact motion and are clamped by the
+  normal impulse. Static resting friction without a normal impulse cache is not
+  modeled yet.
 - penetration depth is a world distance from narrow phase; response slop is a
   solver invariant, not contact data.
-- drag, friction, and angular damping remain integration/body behavior for now;
-  tangential friction impulses are deferred until the multi-contact solver uses
-  the full manifold.
+- drag and angular damping remain integration/body behavior; contact friction is
+  handled by the response solver.
 
-This is still the first alpha milestone, not a full response engine. Friction
-impulses, continuous collision detection, warm starting, island solving, and
-2D/3D mixed-dimension exchange rules remain future work.
+This is still the first alpha milestone, not a full response engine. Static
+friction for resting stacks, continuous collision detection, warm starting,
+island solving, and 2D/3D mixed-dimension exchange rules remain future work.
 
 ## Contact Notifications
 

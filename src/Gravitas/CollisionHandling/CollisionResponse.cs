@@ -1,10 +1,11 @@
-﻿using FixedMathSharp;
+using FixedMathSharp;
 using Gravitas.Colliders;
+using System.Runtime.CompilerServices;
 
 namespace Gravitas.CollisionHandling;
 
 /// <summary>
-/// Solves the current primary-contact collision response for one collision pair.
+/// Solves deterministic contact response for one collision pair manifold.
 /// </summary>
 public static class CollisionResponse
 {
@@ -28,21 +29,46 @@ public static class CollisionResponse
     public static readonly Fixed64 RestitutionVelocityThreshold = (Fixed64)0.25f;
 
     /// <summary>
-    /// Applies positional correction and a normal impulse for the collision
-    /// pair's current contact.
+    /// Applies positional correction, normal impulses, and Coulomb friction for
+    /// the collision pair's current deterministic contact manifold.
     /// </summary>
     public static void CalculateImpulse(CollisionPair pair)
     {
-        if (!TryCreateContact(pair, out SolverContact contact))
+        if (!TryCreateBodyPair(pair, out ResponseBody bodyA, out ResponseBody bodyB))
             return;
 
-        ApplyPositionCorrection(contact);
-        ApplyVelocityImpulse(pair, contact);
+        SolverContactBuffer contacts = BuildContactBuffer(pair, bodyA, bodyB);
+        if (contacts.Count == 0)
+            return;
+
+        Fixed64 contactShare = Fixed64.One / (Fixed64)contacts.Count;
+        for (int i = 0; i < contacts.Count; i++)
+            ApplyPositionCorrection(contacts.GetContact(i), contactShare);
+
+        for (int i = 0; i < contacts.Count; i++)
+        {
+            Fixed64 impulseScalar = ComputeNormalImpulseScalar(
+                contacts.GetContact(i),
+                out Fixed64 normalVelocity);
+            contacts.SetNormalImpulse(i, impulseScalar * contactShare, normalVelocity);
+        }
+
+        for (int i = 0; i < contacts.Count; i++)
+            ApplyNormalImpulse(
+                pair,
+                contacts.GetContact(i),
+                contacts.GetNormalImpulse(i),
+                contacts.GetNormalVelocity(i));
+
+        for (int i = 0; i < contacts.Count; i++)
+            ApplyFrictionImpulse(contacts.GetContact(i), contacts.GetNormalImpulse(i));
     }
 
-    private static bool TryCreateContact(CollisionPair pair, out SolverContact contact)
+    private static bool TryCreateBodyPair(CollisionPair pair, out ResponseBody bodyA, out ResponseBody bodyB)
     {
-        contact = default;
+        bodyA = default;
+        bodyB = default;
+
         if (pair.ColliderA.IsTrigger || pair.ColliderB.IsTrigger)
             return false;
 
@@ -52,14 +78,34 @@ public static class CollisionResponse
         if (!pair.Manifold.HasContact)
             return false;
 
-        ManifoldContact manifoldContact = pair.Manifold.PrimaryContact;
+        bodyA = ResponseBody.Create(pair.ColliderA);
+        bodyB = ResponseBody.Create(pair.ColliderB);
+        return bodyA.InverseMass + bodyB.InverseMass > Fixed64.Zero;
+    }
+
+    private static SolverContactBuffer BuildContactBuffer(CollisionPair pair, ResponseBody bodyA, ResponseBody bodyB)
+    {
+        SolverContactBuffer contacts = default;
+        for (int i = 0; i < pair.Manifold.Count; i++)
+        {
+            if (TryCreateContact(pair, bodyA, bodyB, i, out SolverContact contact))
+                contacts.Add(contact);
+        }
+
+        return contacts;
+    }
+
+    private static bool TryCreateContact(
+        CollisionPair pair,
+        ResponseBody bodyA,
+        ResponseBody bodyB,
+        int contactIndex,
+        out SolverContact contact)
+    {
+        contact = default;
+        ManifoldContact manifoldContact = pair.Manifold[contactIndex];
         Vector3d normal = ResolveContactNormal(manifoldContact.Normal, pair.ColliderB.Center - pair.ColliderA.Center);
         if (normal == Vector3d.Zero)
-            return false;
-
-        ResponseBody bodyA = ResponseBody.Create(pair.ColliderA);
-        ResponseBody bodyB = ResponseBody.Create(pair.ColliderB);
-        if (bodyA.InverseMass + bodyB.InverseMass <= Fixed64.Zero)
             return false;
 
         contact = new SolverContact(
@@ -74,7 +120,7 @@ public static class CollisionResponse
         return true;
     }
 
-    private static void ApplyPositionCorrection(SolverContact contact)
+    private static void ApplyPositionCorrection(SolverContact contact, Fixed64 contactShare)
     {
         Fixed64 correctionDepth = contact.Depth - PenetrationSlop;
         if (correctionDepth <= Fixed64.Zero)
@@ -84,28 +130,33 @@ public static class CollisionResponse
         if (totalInverseMass <= Fixed64.Zero)
             return;
 
-        Vector3d correction = contact.Normal * (correctionDepth * PenetrationCorrectionPercent / totalInverseMass);
+        Vector3d correction = contact.Normal
+            * (correctionDepth * PenetrationCorrectionPercent * contactShare / totalInverseMass);
         contact.A.Body.ApplyCollisionPositionCorrection(-correction * contact.A.InverseMass);
         contact.B.Body.ApplyCollisionPositionCorrection(correction * contact.B.InverseMass);
     }
 
-    private static void ApplyVelocityImpulse(CollisionPair pair, SolverContact contact)
+    private static Fixed64 ComputeNormalImpulseScalar(SolverContact contact, out Fixed64 normalVelocity)
     {
-        Vector3d velocityA = contact.A.Body.LinearVelocity + Vector3d.Cross(contact.A.Body.AngularVelocity, contact.RelativeA);
-        Vector3d velocityB = contact.B.Body.LinearVelocity + Vector3d.Cross(contact.B.Body.AngularVelocity, contact.RelativeB);
-        Fixed64 normalVelocity = Vector3d.Dot(velocityB - velocityA, contact.Normal);
-
+        normalVelocity = Vector3d.Dot(ComputeRelativeVelocity(contact), contact.Normal);
         if (normalVelocity >= Fixed64.Zero)
-            return;
+            return Fixed64.Zero;
 
-        Fixed64 denominator = contact.TotalInverseMass
-            + ComputeAngularDenominator(contact.A, contact.RelativeA, contact.Normal)
-            + ComputeAngularDenominator(contact.B, contact.RelativeB, contact.Normal);
+        Fixed64 denominator = ComputeImpulseDenominator(contact, contact.Normal);
         if (denominator <= Fixed64.Epsilon)
-            return;
+            return Fixed64.Zero;
 
         Fixed64 restitution = ResolveRestitution(contact, -normalVelocity);
         Fixed64 impulseScalar = -(Fixed64.One + restitution) * normalVelocity / denominator;
+        return impulseScalar > Fixed64.Zero ? impulseScalar : Fixed64.Zero;
+    }
+
+    private static void ApplyNormalImpulse(
+        CollisionPair pair,
+        SolverContact contact,
+        Fixed64 impulseScalar,
+        Fixed64 normalVelocity)
+    {
         if (impulseScalar <= Fixed64.Zero)
             return;
 
@@ -115,15 +166,64 @@ public static class CollisionResponse
         ApplyImpulse(contact.B, impulse, contact.RelativeB);
     }
 
-    private static Fixed64 ComputeAngularDenominator(ResponseBody body, Vector3d relativeContactPoint, Vector3d normal)
+    private static void ApplyFrictionImpulse(SolverContact contact, Fixed64 normalImpulseScalar)
+    {
+        if (normalImpulseScalar <= Fixed64.Zero)
+            return;
+
+        Fixed64 frictionCoefficient = ResolveFrictionCoefficient(contact);
+        if (frictionCoefficient <= Fixed64.Zero)
+            return;
+
+        Vector3d relativeVelocity = ComputeRelativeVelocity(contact);
+        Vector3d tangentVelocity = relativeVelocity - contact.Normal * Vector3d.Dot(relativeVelocity, contact.Normal);
+        if (tangentVelocity.SqrMagnitude <= Fixed64.Epsilon)
+            return;
+
+        Vector3d tangent = tangentVelocity.Normal;
+        Fixed64 denominator = ComputeImpulseDenominator(contact, tangent);
+        if (denominator <= Fixed64.Epsilon)
+            return;
+
+        Fixed64 tangentVelocityMagnitude = Vector3d.Dot(relativeVelocity, tangent);
+        Fixed64 impulseScalar = -tangentVelocityMagnitude / denominator;
+        Fixed64 maxFrictionImpulse = normalImpulseScalar * frictionCoefficient;
+        impulseScalar = FixedMath.Clamp(impulseScalar, -maxFrictionImpulse, maxFrictionImpulse);
+        if (impulseScalar == Fixed64.Zero)
+            return;
+
+        Vector3d impulse = tangent * impulseScalar;
+        ApplyImpulse(contact.A, -impulse, contact.RelativeA);
+        ApplyImpulse(contact.B, impulse, contact.RelativeB);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Vector3d ComputeRelativeVelocity(SolverContact contact)
+    {
+        Vector3d velocityA = contact.A.Body.LinearVelocity
+            + Vector3d.Cross(contact.A.Body.AngularVelocity, contact.RelativeA);
+        Vector3d velocityB = contact.B.Body.LinearVelocity
+            + Vector3d.Cross(contact.B.Body.AngularVelocity, contact.RelativeB);
+        return velocityB - velocityA;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Fixed64 ComputeImpulseDenominator(SolverContact contact, Vector3d axis)
+    {
+        return contact.TotalInverseMass
+            + ComputeAngularDenominator(contact.A, contact.RelativeA, axis)
+            + ComputeAngularDenominator(contact.B, contact.RelativeB, axis);
+    }
+
+    private static Fixed64 ComputeAngularDenominator(ResponseBody body, Vector3d relativeContactPoint, Vector3d axis)
     {
         if (!body.CanRotate)
             return Fixed64.Zero;
 
         Vector3d angular = Vector3d.Cross(
-            body.InverseInertiaTensor * Vector3d.Cross(relativeContactPoint, normal),
+            body.InverseInertiaTensor * Vector3d.Cross(relativeContactPoint, axis),
             relativeContactPoint);
-        Fixed64 denominator = Vector3d.Dot(angular, normal);
+        Fixed64 denominator = Vector3d.Dot(angular, axis);
         return denominator > Fixed64.Zero ? denominator : Fixed64.Zero;
     }
 
@@ -152,6 +252,14 @@ public static class CollisionResponse
         return FixedMath.Clamp(restitution, Fixed64.Zero, Fixed64.One);
     }
 
+    private static Fixed64 ResolveFrictionCoefficient(SolverContact contact)
+    {
+        Fixed64 frictionProduct = contact.A.Body.FrictionCoefficient * contact.B.Body.FrictionCoefficient;
+        return frictionProduct > Fixed64.Zero
+            ? FixedMath.Sqrt(frictionProduct)
+            : Fixed64.Zero;
+    }
+
     private static Vector3d ResolveContactNormal(Vector3d normal, Vector3d fallbackDirection)
     {
         Vector3d resolved = normal.SqrMagnitude > Fixed64.Epsilon
@@ -167,6 +275,101 @@ public static class CollisionResponse
             && Vector3d.Dot(resolved, fallbackDirection) < Fixed64.Zero
                 ? -resolved
                 : resolved;
+    }
+
+    private struct SolverContactBuffer
+    {
+        private SolverContact _contact0;
+        private SolverContact _contact1;
+        private SolverContact _contact2;
+        private SolverContact _contact3;
+        private Fixed64 _normalImpulse0;
+        private Fixed64 _normalImpulse1;
+        private Fixed64 _normalImpulse2;
+        private Fixed64 _normalImpulse3;
+        private Fixed64 _normalVelocity0;
+        private Fixed64 _normalVelocity1;
+        private Fixed64 _normalVelocity2;
+        private Fixed64 _normalVelocity3;
+
+        public int Count { get; private set; }
+
+        public void Add(SolverContact contact)
+        {
+            if (Count >= ContactManifold.MaxContactCount)
+                return;
+
+            switch (Count)
+            {
+                case 0:
+                    _contact0 = contact;
+                    break;
+                case 1:
+                    _contact1 = contact;
+                    break;
+                case 2:
+                    _contact2 = contact;
+                    break;
+                default:
+                    _contact3 = contact;
+                    break;
+            }
+
+            Count++;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public SolverContact GetContact(int index) =>
+            index switch
+            {
+                0 => _contact0,
+                1 => _contact1,
+                2 => _contact2,
+                _ => _contact3
+            };
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public Fixed64 GetNormalImpulse(int index) =>
+            index switch
+            {
+                0 => _normalImpulse0,
+                1 => _normalImpulse1,
+                2 => _normalImpulse2,
+                _ => _normalImpulse3
+            };
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public Fixed64 GetNormalVelocity(int index) =>
+            index switch
+            {
+                0 => _normalVelocity0,
+                1 => _normalVelocity1,
+                2 => _normalVelocity2,
+                _ => _normalVelocity3
+            };
+
+        public void SetNormalImpulse(int index, Fixed64 impulse, Fixed64 normalVelocity)
+        {
+            switch (index)
+            {
+                case 0:
+                    _normalImpulse0 = impulse;
+                    _normalVelocity0 = normalVelocity;
+                    break;
+                case 1:
+                    _normalImpulse1 = impulse;
+                    _normalVelocity1 = normalVelocity;
+                    break;
+                case 2:
+                    _normalImpulse2 = impulse;
+                    _normalVelocity2 = normalVelocity;
+                    break;
+                default:
+                    _normalImpulse3 = impulse;
+                    _normalVelocity3 = normalVelocity;
+                    break;
+            }
+        }
     }
 
     private readonly struct SolverContact
@@ -212,15 +415,12 @@ public static class CollisionResponse
 
     private readonly struct ResponseBody
     {
-        private ResponseBody(LSCollider collider, StiffBody body, Fixed64 inverseMass, Fixed3x3 inverseInertiaTensor)
+        private ResponseBody(StiffBody body, Fixed64 inverseMass, Fixed3x3 inverseInertiaTensor)
         {
-            Collider = collider;
             Body = body;
             InverseMass = inverseMass;
             InverseInertiaTensor = inverseInertiaTensor;
         }
-
-        public LSCollider Collider { get; }
 
         public StiffBody Body { get; }
 
@@ -241,7 +441,7 @@ public static class CollisionResponse
                 ? body.InverseInteriaTensor
                 : Fixed3x3.Zero;
 
-            return new ResponseBody(collider, body, inverseMass, inverseInertiaTensor);
+            return new ResponseBody(body, inverseMass, inverseInertiaTensor);
         }
     }
 }

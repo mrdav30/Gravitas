@@ -3,6 +3,7 @@ using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Tests.Support;
+using System;
 using Xunit;
 
 namespace Gravitas.Tests.CollisionHandlingTests;
@@ -87,6 +88,29 @@ public sealed class CollisionResponseInvariantTests
 
         AssertNear(left.Body.LinearVelocity.x, Fixed64.Zero);
         AssertNear(right.Body.LinearVelocity.x, Fixed64.Zero);
+    }
+
+    [Fact]
+    public void CalculateImpulse_WithDifferentMasses_ShouldApplySmallerVelocityDeltaToHeavierBody()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> heavy = scenario.CreateSphere(
+            PhysicsScenarioBuilder.Vector(0, 0, 0),
+            mass: (Fixed64)4);
+        ScenarioBody<LSSphereCollider> light = scenario.CreateSphere(
+            PhysicsScenarioBuilder.Vector(Fixed64.Fraction(3, 4), Fixed64.Zero, Fixed64.Zero),
+            mass: Fixed64.One);
+        Push(heavy.Body, 60);
+        Push(light.Body, -60);
+        CollisionPair pair = CreateDetectedPair(scenario, heavy.Collider, light.Collider);
+        Fixed64 heavyVelocityBefore = heavy.Body.LinearVelocity.x;
+        Fixed64 lightVelocityBefore = light.Body.LinearVelocity.x;
+
+        CollisionResponse.CalculateImpulse(pair);
+
+        Fixed64 heavyDelta = (heavy.Body.LinearVelocity.x - heavyVelocityBefore).Abs();
+        Fixed64 lightDelta = (light.Body.LinearVelocity.x - lightVelocityBefore).Abs();
+        heavyDelta.Should().BeLessThan(lightDelta);
     }
 
     [Fact]
@@ -221,6 +245,48 @@ public sealed class CollisionResponseInvariantTests
     }
 
     [Fact]
+    public void CalculateImpulse_WithTangentialVelocity_ShouldApplyDeterministicFrictionImpulse()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSCuboidCollider> wall = scenario.CreateCuboid(
+            PhysicsScenarioBuilder.Vector(0, 0, 0),
+            immovable: true);
+        ScenarioBody<LSSphereCollider> mover = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(
+            Fixed64.Fraction(3, 4),
+            Fixed64.Zero,
+            Fixed64.Zero));
+        mover.Body.AddLinearImpulse(new Vector3d((Fixed64)(-60), Fixed64.Zero, (Fixed64)30));
+        CollisionPair pair = CreateDetectedPair(scenario, wall.Collider, mover.Collider);
+        Fixed64 tangentialSpeedBefore = mover.Body.LinearVelocity.z.Abs();
+
+        CollisionResponse.CalculateImpulse(pair);
+
+        mover.Body.LinearVelocity.z.Abs().Should().BeLessThan(tangentialSpeedBefore);
+    }
+
+    [Fact]
+    public void CalculateImpulse_WithSlopedContactNormal_ShouldResolveAgainstContactPlane()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        Vector3d normal = new Vector3d(Fixed64.One, Fixed64.One, Fixed64.Zero).Normal;
+        Vector3d tangent = new Vector3d(-normal.y, normal.x, Fixed64.Zero).Normal;
+        ScenarioBody<LSSphereCollider> slope = scenario.CreateSphere(
+            PhysicsScenarioBuilder.Vector(0, 0, 0),
+            immovable: true);
+        ScenarioBody<LSSphereCollider> mover = scenario.CreateSphere(normal * Fixed64.Fraction(3, 4));
+        CollisionPair pair = scenario.CreatePair(slope.Collider, mover.Collider);
+        mover.Body.AddLinearImpulse((-normal * (Fixed64)60) + (tangent * (Fixed64)30));
+        pair.Manifold.SetContact(pair.ColliderA.Center, pair.ColliderB.Center, Fixed64.Fraction(1, 10), normal);
+        Fixed64 tangentialSpeedBefore = Vector3d.Dot(mover.Body.LinearVelocity, tangent).Abs();
+
+        CollisionResponse.CalculateImpulse(pair);
+
+        Fixed64 normalSpeedAfter = Vector3d.Dot(mover.Body.LinearVelocity, normal);
+        normalSpeedAfter.Should().BeGreaterThanOrEqualTo(Fixed64.Zero);
+        Vector3d.Dot(mover.Body.LinearVelocity, tangent).Abs().Should().BeLessThan(tangentialSpeedBefore);
+    }
+
+    [Fact]
     public void CalculateImpulse_WithOffCenterContact_ShouldApplyAngularImpulse()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
@@ -235,6 +301,59 @@ public sealed class CollisionResponseInvariantTests
         CollisionResponse.CalculateImpulse(pair);
 
         cuboid.Body.AngularVelocity.Should().NotBe(Vector3d.Zero);
+    }
+
+    [Fact]
+    public void CalculateImpulse_WithCenteredFaceManifold_ShouldNotIntroduceAngularVelocity()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSCuboidCollider> floor = scenario.CreateCuboid(
+            PhysicsScenarioBuilder.Vector(0, 0, 0),
+            immovable: true);
+        ScenarioBody<LSCuboidCollider> box = scenario.CreateCuboid(
+            PhysicsScenarioBuilder.Vector(Fixed64.Zero, Fixed64.Fraction(3, 4), Fixed64.Zero));
+        box.Body.AddLinearImpulse(new Vector3d(Fixed64.Zero, (Fixed64)(-60), Fixed64.Zero));
+        CollisionPair pair = CreateDetectedPair(scenario, floor.Collider, box.Collider);
+        pair.Manifold.Count.Should().Be(ContactManifold.MaxContactCount);
+
+        CollisionResponse.CalculateImpulse(pair);
+
+        box.Body.AngularVelocity.Should().Be(Vector3d.Zero);
+    }
+
+    [Fact]
+    public void CalculateImpulse_ShouldNotAllocateForPreparedContactsAfterWarmup()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSCuboidCollider> wall = scenario.CreateCuboid(
+            PhysicsScenarioBuilder.Vector(0, 0, 0),
+            immovable: true);
+        ScenarioBody<LSSphereCollider> sphere = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(
+            Fixed64.Fraction(3, 4),
+            Fixed64.Zero,
+            Fixed64.Zero));
+        CollisionPair singleContactPair = CreateDetectedPair(scenario, wall.Collider, sphere.Collider);
+        sphere.Body.AddLinearImpulse(new Vector3d((Fixed64)(-60), Fixed64.Zero, (Fixed64)30));
+        CollisionResponse.CalculateImpulse(singleContactPair);
+
+        ScenarioBody<LSCuboidCollider> floor = scenario.CreateCuboid(
+            PhysicsScenarioBuilder.Vector(4, 0, 0),
+            immovable: true);
+        ScenarioBody<LSCuboidCollider> box = scenario.CreateCuboid(new Vector3d((Fixed64)4, Fixed64.Fraction(3, 4), Fixed64.Zero));
+        CollisionPair facePair = CreateDetectedPair(scenario, floor.Collider, box.Collider);
+        box.Body.AddLinearImpulse(new Vector3d(Fixed64.Zero, (Fixed64)(-60), Fixed64.Zero));
+        CollisionResponse.CalculateImpulse(facePair);
+
+        sphere.Body.AddLinearImpulse(new Vector3d((Fixed64)(-60), Fixed64.Zero, (Fixed64)30));
+        box.Body.AddLinearImpulse(new Vector3d(Fixed64.Zero, (Fixed64)(-60), Fixed64.Zero));
+
+        long allocatedBytes = MeasureAllocatedBytes(() =>
+        {
+            CollisionResponse.CalculateImpulse(singleContactPair);
+            CollisionResponse.CalculateImpulse(facePair);
+        });
+
+        allocatedBytes.Should().Be(0);
     }
 
     private static CollisionPair CreateDetectedPair(
@@ -281,6 +400,17 @@ public sealed class CollisionResponseInvariantTests
     private static void AssertNear(Fixed64 actual, Fixed64 expected)
     {
         (actual - expected).Abs().Should().BeLessThan(Tolerance);
+    }
+
+    private static long MeasureAllocatedBytes(Action action)
+    {
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+
+        long before = GC.GetAllocatedBytesForCurrentThread();
+        action();
+        return GC.GetAllocatedBytesForCurrentThread() - before;
     }
 
     private readonly record struct ResponseState(
