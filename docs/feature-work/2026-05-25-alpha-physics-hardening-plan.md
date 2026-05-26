@@ -341,11 +341,14 @@ Meaningful deferred work captured from that plan and the wiki:
 **Files:**
 
 - Modify: `src/Gravitas/Core/GravitasPhysicsService.cs`
+- Modify: `src/Gravitas/Core/GravitasCollisionService.cs`
 - Modify: `src/Gravitas/CollisionHandling/CollisionPair.cs`
+- Modify: `src/Gravitas/Partitions/PhysicsPartition.cs`
 - Potentially create: `src/Gravitas/CollisionHandling/Solver/PhysicsIsland.cs`
 - Potentially create: `src/Gravitas/CollisionHandling/Solver/IslandBuilder.cs`
 - Modify: `src/Gravitas/Core/StiffBody.cs`
 - Modify: `tests/Gravitas.Tests/CollisionHandling`
+- Modify: `tests/Gravitas.Tests/Partitions`
 - Modify: `tests/Gravitas.Benchmarks/Core`
 - Modify: `docs/wiki/COLLISION_PIPELINE.md`
 
@@ -353,9 +356,27 @@ Meaningful deferred work captured from that plan and the wiki:
 
 - [ ] Define deterministic island membership, island ordering, pair ordering inside an island, and body wake/sleep rules.
 - [ ] Add tests for stacked bodies, body wake-up after impulse, sleeping body ignored by solver until disturbed, and stable island ordering across repeated runs.
+- [ ] Add per-partition awake dynamic membership or awake-count state so `PhysicsPartition.Distribute()` can skip pair generation when a voxel contains no awake dynamic bodies.
+- [ ] Keep sleeping bodies in normal dynamic partition membership so raycasts, overlap queries, wake propagation, contact exits, and future island rebuilds can still find them.
+- [ ] Define deterministic wake reasons: force, impulse, collision with an awake body, kinematic motion, host transform teleport, shape/bounds mutation, and explicit host wake.
 - [ ] Add warm-start storage keyed by stable pair/manifold contact identity.
 - [ ] Ensure sleeping and warm starting never skip collision events or trigger/contact notifications incorrectly.
-- [ ] Benchmark large resting scenes before and after island/sleep changes.
+- [ ] Benchmark large resting scenes before and after island/sleep changes, including partitions with only sleeping dynamic bodies.
+
+**Design Notes:**
+
+- Adapt the old acceleration-structure sleeping-object note to Gravitas'
+  current GridForge voxel broad phase first: `PhysicsPartition` is flat voxel
+  membership, so Phase 5 should introduce partition-local awake gating rather
+  than recursive tree propagation.
+- Sleeping should be a deterministic solver/broad-phase optimization, not a
+  visibility rule. Sleeping bodies remain queryable and partitioned; only
+  collision pair generation/solver work can be skipped when no awake dynamic
+  body can disturb the partition.
+- Island sleep should only occur when every dynamic body in the island remains
+  under explicit linear/angular thresholds for the configured frame window. A
+  wake event should wake the body and deterministically wake affected island or
+  contact-connected neighbors.
 
 ## Phase 6: Continuous Collision Detection And Swept Mesh Policy
 
@@ -428,6 +449,11 @@ Meaningful deferred work captured from that plan and the wiki:
 - [ ] Validate packaged GridForge partition-provider behavior once the retention fix is released; remove temporary local project references when possible.
 - [x] Compare `SwiftSparseMap<T>` membership against a future `SwiftSparseSet` or another deterministic sparse membership structure when available. Phase 0 moved partition membership to `SwiftSparseSet`; continue benchmarking the layout under broader partition/query scale tests.
 - [ ] Revisit active partition ordering and pair candidate ordering for determinism under high churn.
+- [ ] If Phase 8 introduces a hierarchical broad phase, spatial tree, or nested
+  acceleration structure above GridForge voxels, revisit awake-state propagation
+  from child nodes to parent nodes. A branch with no awake dynamic descendants
+  should be skippable during pair generation, but only if tests prove sleeping
+  bodies remain visible to queries, wake propagation, and contact lifecycle.
 - [ ] Add stress tests for moving many colliders across grids, repeatedly emptying/refilling partitions, and querying colliders spanning many voxels.
 - [ ] Decide whether query services should remain context-owned mutable services or expose explicit caller-owned/rented query state for reentrancy.
 - [ ] Compare custom ray/segment workers against `FixedRay` for any first-hit or non-allocation query paths where the downstream primitive now fits.
