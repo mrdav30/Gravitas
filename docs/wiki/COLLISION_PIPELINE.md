@@ -1,8 +1,8 @@
 # Collision Pipeline
 
 Gravitas collision work is split into GridForge-backed broad phase,
-context-local pair management, shape-pair narrow phase, single-contact
-response, and late contact notification.
+context-local pair management, shape-pair narrow phase, deterministic contact
+manifolds, primary-contact response, and late contact notification.
 
 ## Broad Phase: Voxel Partitions
 
@@ -172,20 +172,20 @@ not equal to the current service version, then stamps the pair with that version
 1. reject inactive pairs or inactive colliders.
 2. queue the pair for active-pair maintenance if this is the first update after
    activation.
-3. invalidate culling if either collider changed position, rotation, partition
-   state, or broad-phase version since the last pair check.
+3. invalidate culling if either collider changed partition state or
+   broad-phase version since the last pair check.
 4. either run collision work immediately or decrement the cull counter.
 
 Fast rejection happens before narrow phase:
 
 - squared distance between collider centers is checked against combined bounds
   scope.
-- collider AABB bounds must intersect.
+- collider AABB bounds must inclusively overlap so zero-depth touching contacts
+  can reach narrow phase.
 
 If a pair was colliding on the previous check, it can reuse that state only
-while both colliders keep the same position, rotation, and broad-phase version.
-Shape or bounds changes must re-run narrow phase even when object transforms did
-not move.
+while both colliders keep the same broad-phase version. Shape or bounds changes
+must re-run narrow phase even when object transforms did not move.
 
 If the pair is not colliding, `CalculateCullScore()` combines distance,
 relative velocity, and time-since-last-collision into a frame countdown.
@@ -209,7 +209,7 @@ Current shape support:
 | Cuboid/Sphere | closest cuboid surface point to sphere center. |
 | AABox/Capsule | closest capsule line point to box center, then box surface point. |
 | OBBox/Capsule | separating axes from cuboid/capsule support. |
-| Cuboid/Cuboid | AABB overlap for axis-aligned boxes, SAT for oriented boxes. |
+| Cuboid/Cuboid | axis-aligned face/edge/stack manifolds for AABoxes, SAT primary contacts for oriented boxes. |
 | Cylinder/Sphere | finite cylinder closest surface against sphere radius. |
 | Cylinder/Capsule | finite-cylinder projection axes against capsule segment/radius projection. |
 | Cylinder/Cylinder | finite-cylinder projection axes, preserving flat cap separation. |
@@ -241,30 +241,44 @@ mesh/cylinder triangle buffer, and SAT axis sets for one world context. This is
 intentionally not static: concurrent worlds keep isolated scratch, while repeated
 checks in the same world avoid per-check object-info construction and pool
 rent/release churn. Short `collision-detection` benchmark smoke currently
-reports no managed allocation for the aggregate primitive path, non-SAT
-primitive path, cuboid/cuboid SAT, mesh/cylinder, mesh/cuboid, and mesh/mesh
-paths after warmup.
+reports on aggregate primitive checks, single-contact primitive manifold
+generation, axis-aligned cuboid face-manifold generation, cuboid/cuboid SAT,
+mesh/cylinder, mesh/cuboid, and mesh/mesh paths after warmup.
 
 ## Contact Data
 
-The narrow phase writes a `ContactPoint`:
+The narrow phase writes a `ContactManifold` owned by the `CollisionPair`.
+Manifold contacts are value types (`ManifoldContact`) with:
 
-- validity flag indicating narrow-phase contact data is present.
+- stable contact identity derived from the unordered pair of world-space contact
+  points.
 - point on collider A.
 - point on collider B.
 - penetration depth.
-- normal.
+- normal oriented from collider A toward collider B.
 - optional immovable collision direction.
 
-`ContactPoint.SetContactPoint(...)` stores the narrow phase's detected depth
-without adding a solver margin. Touching contacts can therefore have zero depth,
-and any stabilization margin belongs to the response solver rather than hidden
-inside contact data.
+Manifolds currently store up to four contacts. When more candidates are offered,
+the manifold keeps the deepest four and breaks depth ties by lower stable contact
+identity. Exposed contact order is stable ascending contact identity, while
+`PrimaryContact` returns the deepest contact for the current alpha response
+solver. Duplicate contact identities update only when the new candidate is
+deeper.
 
-`ContactPoint.HasContact` distinguishes unset contact data from legitimate
+Contact data stores the narrow phase's detected depth without adding a solver
+margin. Touching contacts can therefore have zero depth, and any stabilization
+margin belongs to the response solver rather than hidden inside contact data.
+`ContactManifold.HasContact` distinguishes unset contact data from legitimate
 zero-valued fields, such as touching contacts with zero depth or contact points
-at the origin. The response solver ignores pairs whose contact data has not been
+at the origin. The response solver ignores pairs whose manifold has not been
 written by narrow phase.
+
+Axis-aligned cuboid/cuboid detection now generates up to four contacts for
+face-overlap and stacked/touching faces. Edge contact reduction naturally drops
+duplicate corners and can produce two contacts; corner contact can produce one.
+Sphere, capsule, cylinder, oriented cuboid SAT, and mesh paths currently write a
+single manifold contact. Full mesh contact manifolds remain deferred to the mesh
+policy phase.
 
 ## Response
 
@@ -273,11 +287,11 @@ when detection reports a collision and the pair should perform physics response.
 Pairs with either collider marked as a trigger skip physical response; they can
 still flow through contact notification.
 
-Current non-trigger response behavior is a deterministic single-contact solver:
+Current non-trigger response behavior is a deterministic primary-contact solver:
 
-1. build an explicit contact from collider A, collider B, the two contact
-   points, relative contact arms, detected depth, and a normal oriented from A
-   to B.
+1. choose the manifold's primary contact, then build an explicit solver contact
+   from collider A, collider B, the two contact points, relative contact arms,
+   detected depth, and a normal oriented from A to B.
 2. treat `Immovable` and `IsKinematic` bodies as infinite mass for response.
 3. apply immediate positional correction only for depth above
    `CollisionResponse.PenetrationSlop`; the correction is distributed by
@@ -311,12 +325,12 @@ Response units and invariants:
 - penetration depth is a world distance from narrow phase; response slop is a
   solver invariant, not contact data.
 - drag, friction, and angular damping remain integration/body behavior for now;
-  tangential friction impulses are deferred until contact manifolds and stable
-  stacking are designed.
+  tangential friction impulses are deferred until the multi-contact solver uses
+  the full manifold.
 
-This is still the first alpha milestone, not a full response engine. Contact
-manifolds, friction impulses, continuous collision detection, warm starting,
-island solving, and 2D/3D mixed-dimension exchange rules remain future work.
+This is still the first alpha milestone, not a full response engine. Friction
+impulses, continuous collision detection, warm starting, island solving, and
+2D/3D mixed-dimension exchange rules remain future work.
 
 ## Contact Notifications
 

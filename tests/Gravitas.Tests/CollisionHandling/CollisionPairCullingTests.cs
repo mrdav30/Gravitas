@@ -21,7 +21,7 @@ public sealed class CollisionPairCullingTests
         ClearPartitionFlags(first.Collider, second.Collider);
         pair.UpdateCollision();
 
-        pair.ContactPoint.HasContact.Should().BeFalse();
+        pair.Manifold.HasContact.Should().BeFalse();
         pair.CullCounter.Should().BeGreaterThan(0);
 
         ClearPartitionFlags(first.Collider, second.Collider);
@@ -31,7 +31,7 @@ public sealed class CollisionPairCullingTests
 
         pair.UpdateCollision();
 
-        pair.ContactPoint.HasContact.Should().BeTrue();
+        pair.Manifold.HasContact.Should().BeTrue();
         pair.CullCounter.Should().Be(0);
     }
 
@@ -89,7 +89,7 @@ public sealed class CollisionPairCullingTests
         CollisionPair pair = scenario.CreatePair(first.Collider, second.Collider);
 
         pair.UpdateCollision();
-        pair.ContactPoint.HasContact.Should().BeTrue();
+        pair.Manifold.HasContact.Should().BeTrue();
         ClearBodyChangeFlags(first.Body, second.Body);
         ClearPartitionFlags(first.Collider, second.Collider);
 
@@ -99,7 +99,22 @@ public sealed class CollisionPairCullingTests
 
         pair.UpdateCollision();
 
-        pair.ContactPoint.HasContact.Should().BeFalse();
+        pair.Manifold.HasContact.Should().BeFalse();
+    }
+
+    [Fact]
+    public void UpdateCollision_WithTouchingCuboids_ShouldKeepZeroDepthContact()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSCuboidCollider> first = scenario.CreateCuboid(PhysicsScenarioBuilder.Vector(0, 0, 0));
+        ScenarioBody<LSCuboidCollider> second = scenario.CreateCuboid(PhysicsScenarioBuilder.Vector(1, 0, 0));
+        CollisionPair pair = scenario.CreatePair(first.Collider, second.Collider);
+        ClearPartitionFlags(first.Collider, second.Collider);
+
+        pair.UpdateCollision();
+
+        pair.Manifold.HasContact.Should().BeTrue();
+        pair.Manifold.PrimaryContact.Depth.Should().Be(Fixed64.Zero);
     }
 
     private static void ClearPartitionFlags(LSCollider first, LSCollider second)

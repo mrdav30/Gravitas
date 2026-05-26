@@ -4,7 +4,7 @@ using Gravitas.Colliders;
 namespace Gravitas.CollisionHandling;
 
 /// <summary>
-/// Solves the current single-contact collision response for one collision pair.
+/// Solves the current primary-contact collision response for one collision pair.
 /// </summary>
 public static class CollisionResponse
 {
@@ -33,14 +33,14 @@ public static class CollisionResponse
     /// </summary>
     public static void CalculateImpulse(CollisionPair pair)
     {
-        if (!TryCreateContact(pair, out SingleContact contact))
+        if (!TryCreateContact(pair, out SolverContact contact))
             return;
 
         ApplyPositionCorrection(contact);
         ApplyVelocityImpulse(pair, contact);
     }
 
-    private static bool TryCreateContact(CollisionPair pair, out SingleContact contact)
+    private static bool TryCreateContact(CollisionPair pair, out SolverContact contact)
     {
         contact = default;
         if (pair.ColliderA.IsTrigger || pair.ColliderB.IsTrigger)
@@ -49,10 +49,11 @@ public static class CollisionResponse
         if (pair.ColliderA.Body == null || pair.ColliderB.Body == null)
             return false;
 
-        if (!pair.ContactPoint.HasContact)
+        if (!pair.Manifold.HasContact)
             return false;
 
-        Vector3d normal = ResolveContactNormal(pair.ContactPoint.Normal, pair.ColliderB.Center - pair.ColliderA.Center);
+        ManifoldContact manifoldContact = pair.Manifold.PrimaryContact;
+        Vector3d normal = ResolveContactNormal(manifoldContact.Normal, pair.ColliderB.Center - pair.ColliderA.Center);
         if (normal == Vector3d.Zero)
             return false;
 
@@ -61,19 +62,19 @@ public static class CollisionResponse
         if (bodyA.InverseMass + bodyB.InverseMass <= Fixed64.Zero)
             return false;
 
-        contact = new SingleContact(
+        contact = new SolverContact(
             bodyA,
             bodyB,
-            pair.ContactPoint.RelativeA,
-            pair.ContactPoint.RelativeB,
-            pair.ContactPoint.RelativeA - pair.ColliderA.Center,
-            pair.ContactPoint.RelativeB - pair.ColliderB.Center,
-            pair.ContactPoint.Depth,
+            manifoldContact.PointA,
+            manifoldContact.PointB,
+            manifoldContact.PointA - pair.ColliderA.Center,
+            manifoldContact.PointB - pair.ColliderB.Center,
+            manifoldContact.Depth,
             normal);
         return true;
     }
 
-    private static void ApplyPositionCorrection(SingleContact contact)
+    private static void ApplyPositionCorrection(SolverContact contact)
     {
         Fixed64 correctionDepth = contact.Depth - PenetrationSlop;
         if (correctionDepth <= Fixed64.Zero)
@@ -88,7 +89,7 @@ public static class CollisionResponse
         contact.B.Body.ApplyCollisionPositionCorrection(correction * contact.B.InverseMass);
     }
 
-    private static void ApplyVelocityImpulse(CollisionPair pair, SingleContact contact)
+    private static void ApplyVelocityImpulse(CollisionPair pair, SolverContact contact)
     {
         Vector3d velocityA = contact.A.Body.LinearVelocity + Vector3d.Cross(contact.A.Body.AngularVelocity, contact.RelativeA);
         Vector3d velocityB = contact.B.Body.LinearVelocity + Vector3d.Cross(contact.B.Body.AngularVelocity, contact.RelativeB);
@@ -140,7 +141,7 @@ public static class CollisionResponse
         body.Body.ApplyCollisionAngularVelocityDelta(angularVelocityDelta);
     }
 
-    private static Fixed64 ResolveRestitution(SingleContact contact, Fixed64 closingSpeed)
+    private static Fixed64 ResolveRestitution(SolverContact contact, Fixed64 closingSpeed)
     {
         if (closingSpeed <= RestitutionVelocityThreshold)
             return Fixed64.Zero;
@@ -168,9 +169,9 @@ public static class CollisionResponse
                 : resolved;
     }
 
-    private readonly struct SingleContact
+    private readonly struct SolverContact
     {
-        public SingleContact(
+        public SolverContact(
             ResponseBody bodyA,
             ResponseBody bodyB,
             Vector3d pointA,

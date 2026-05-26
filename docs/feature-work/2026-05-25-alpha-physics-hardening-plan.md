@@ -245,9 +245,9 @@ Meaningful deferred work captured from that plan and the wiki:
 
 **Files:**
 
-- Modify: `src/Gravitas/CollisionHandling/Support/ContactPoint.cs`
-- Potentially create: `src/Gravitas/CollisionHandling/Support/ContactManifold.cs`
-- Potentially create: `src/Gravitas/CollisionHandling/Support/ManifoldContact.cs`
+- Remove: `src/Gravitas/CollisionHandling/Support/ContactPoint.cs`
+- Create: `src/Gravitas/CollisionHandling/Support/ContactManifold.cs`
+- Create: `src/Gravitas/CollisionHandling/Support/ManifoldContact.cs`
 - Modify: `src/Gravitas/CollisionHandling/CollisionPair.cs`
 - Modify: `src/Gravitas/CollisionHandling/CollisionDetection.cs`
 - Modify: `tests/Gravitas.Tests/CollisionHandling`
@@ -256,12 +256,32 @@ Meaningful deferred work captured from that plan and the wiki:
 
 **Tasks:**
 
-- [ ] Define deterministic manifold identity, contact ordering, maximum contact count, point lifetime, and reduction policy.
-- [ ] Add tests for zero-depth touching contacts, stacked contacts, edge/face contacts, reversed pair ordering, and stable contact order across repeated runs.
-- [ ] Start with primitive pairs where manifold candidates are easiest to reason about: sphere/sphere, cuboid/sphere, cuboid/cuboid, capsule/capsule, and cylinder/cylinder.
-- [ ] Keep legacy single-contact behavior as an internal compatibility path only while tests transition, then remove it if the manifold path fully replaces it.
-- [ ] Add benchmarks that compare single-contact and manifold generation cost by shape family.
-- [ ] Document manifold limits and known unsupported mesh manifold behavior.
+- [x] Define deterministic manifold identity, contact ordering, maximum contact count, point lifetime, and reduction policy.
+- [x] Add tests for zero-depth touching contacts, stacked contacts, edge/face contacts, reversed pair ordering, and stable contact order across repeated runs.
+- [x] Start with primitive pairs where manifold candidates are easiest to reason about: sphere/sphere, cuboid/sphere, cuboid/cuboid, capsule/capsule, and cylinder/cylinder.
+- [x] Keep legacy single-contact behavior as an internal compatibility path only while tests transition, then remove it if the manifold path fully replaces it.
+- [x] Add benchmarks that compare single-contact and manifold generation cost by shape family.
+- [x] Document manifold limits and known unsupported mesh manifold behavior.
+
+**Phase 3 Status - 2026-05-26**
+
+- Replaced `ContactPoint` with `ContactManifold` and `ManifoldContact`.
+  Collision pairs now own fixed-capacity manifold state directly; the stale
+  single-contact API was removed instead of left as a compatibility bridge.
+- Manifolds store up to four contacts, sort exposed contacts by stable contact
+  identity, retain the deepest four candidates, and expose `PrimaryContact` for
+  the current alpha response solver.
+- Axis-aligned cuboid/cuboid detection now generates deterministic face, edge,
+  and stacked/touching manifolds, including zero-depth contacts. The pair
+  broad-phase gate now uses inclusive AABB overlap so runtime pair updates do
+  not drop touching contacts before narrow phase.
+- Sphere, capsule, cylinder, oriented cuboid SAT, and mesh paths now write one
+  manifold contact. Full mesh contact manifolds remain deferred to Phase 7 mesh
+  policy work.
+- Collision response and diagnostics consume the manifold primary contact. Full
+  multi-contact solving, friction, and warm-start use remain Phase 4/5 work.
+- Added manifold-focused tests and collision-detection benchmark methods for
+  primitive manifold generation and cuboid face-manifold generation.
 
 ## Phase 4: Response Solver, Friction, Restitution, And Stabilization
 

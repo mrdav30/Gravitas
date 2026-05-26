@@ -12,6 +12,7 @@ public class CollisionDetectionBenchmarks
     private GravitasWorldContext _context;
     private CollisionPair[] _pairs;
     private CollisionPair[] _primitivePairs;
+    private CollisionPair[] _cuboidFacePairs;
     private CollisionPair[] _cuboidSatPairs;
     private CollisionPair[] _meshCylinderPairs;
     private CollisionPair[] _meshCuboidPairs;
@@ -35,6 +36,7 @@ public class CollisionDetectionBenchmarks
         }
 
         _primitivePairs = CreatePairSet(CreatePrimitivePair);
+        _cuboidFacePairs = CreatePairSet(CreateCuboidFacePair);
         _cuboidSatPairs = CreatePairSet(CreateCuboidSatPair);
         _meshCylinderPairs = CreatePairSet(CreateMeshCylinderPair);
         _meshCuboidPairs = CreatePairSet(CreateMeshCuboidPair);
@@ -48,6 +50,7 @@ public class CollisionDetectionBenchmarks
         _context = null;
         _pairs = null;
         _primitivePairs = null;
+        _cuboidFacePairs = null;
         _cuboidSatPairs = null;
         _meshCylinderPairs = null;
         _meshCuboidPairs = null;
@@ -64,6 +67,18 @@ public class CollisionDetectionBenchmarks
     public int CheckNonSatPrimitivePairs()
     {
         return CountCollisions(_primitivePairs);
+    }
+
+    [Benchmark]
+    public int GeneratePrimitiveManifolds()
+    {
+        return CountManifoldContacts(_primitivePairs);
+    }
+
+    [Benchmark]
+    public int GenerateCuboidFaceManifolds()
+    {
+        return CountManifoldContacts(_cuboidFacePairs);
     }
 
     [Benchmark]
@@ -100,6 +115,18 @@ public class CollisionDetectionBenchmarks
         }
 
         return collisionCount;
+    }
+
+    private static int CountManifoldContacts(CollisionPair[] pairs)
+    {
+        int contactCount = 0;
+        for (int i = 0; i < pairs.Length; i++)
+        {
+            if (CollisionDetection.DoCollisionCheck(pairs[i]))
+                contactCount += pairs[i].Manifold.Count;
+        }
+
+        return contactCount;
     }
 
     private CollisionPair[] CreatePairSet(Func<int, Vector3d, CollisionPair> pairFactory)
@@ -171,6 +198,13 @@ public class CollisionDetectionBenchmarks
                 CreateCuboid(origin),
                 CreateCylinder(origin + new Vector3d(Fixed64.Half, Fixed64.Zero, Fixed64.Zero))),
         };
+    }
+
+    private CollisionPair CreateCuboidFacePair(int index, Vector3d origin)
+    {
+        return new CollisionPair(
+            CreateCuboid(origin),
+            CreateCuboid(origin + new Vector3d(Fixed64.Fraction(3, 4), Fixed64.Zero, Fixed64.Zero)));
     }
 
     private CollisionPair CreateCuboidSatPair(int index, Vector3d origin)

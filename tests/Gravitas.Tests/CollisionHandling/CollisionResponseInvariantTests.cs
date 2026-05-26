@@ -12,21 +12,21 @@ public sealed class CollisionResponseInvariantTests
     private static readonly Fixed64 Tolerance = Fixed64.Fraction(1, 1_000_000);
 
     [Fact]
-    public void ContactPoint_ShouldStoreDetectionDepthWithoutSolverMargin()
+    public void ContactManifold_ShouldStoreDetectionDepthWithoutSolverMargin()
     {
-        var contact = new ContactPoint();
+        var manifold = new ContactManifold();
         Fixed64 smallDepth = Fixed64.Fraction(1, 1_000);
 
-        contact.HasContact.Should().BeFalse();
+        manifold.HasContact.Should().BeFalse();
 
-        contact.SetContactPoint(Vector3d.Zero, Vector3d.Right, smallDepth, Vector3d.Right);
+        manifold.SetContact(Vector3d.Zero, Vector3d.Right, smallDepth, Vector3d.Right);
 
-        contact.HasContact.Should().BeTrue();
-        contact.Depth.Should().Be(smallDepth);
+        manifold.HasContact.Should().BeTrue();
+        manifold.PrimaryContact.Depth.Should().Be(smallDepth);
 
-        contact.Reset();
+        manifold.Reset();
 
-        contact.HasContact.Should().BeFalse();
+        manifold.HasContact.Should().BeFalse();
     }
 
     [Fact]
@@ -120,13 +120,13 @@ public sealed class CollisionResponseInvariantTests
         Vector3d leftStart = left.Body.Position3d;
         Vector3d rightStart = right.Body.Position3d;
 
-        pair.ContactPoint.SetContactPoint(left.Collider.Center, right.Collider.Center, Fixed64.Fraction(1, 1_000), Vector3d.Right);
+        pair.Manifold.SetContact(left.Collider.Center, right.Collider.Center, Fixed64.Fraction(1, 1_000), Vector3d.Right);
         CollisionResponse.CalculateImpulse(pair);
 
         left.Body.Position3d.Should().Be(leftStart);
         right.Body.Position3d.Should().Be(rightStart);
 
-        pair.ContactPoint.SetContactPoint(left.Collider.Center, right.Collider.Center, Fixed64.Fraction(1, 10), Vector3d.Right);
+        pair.Manifold.SetContact(left.Collider.Center, right.Collider.Center, Fixed64.Fraction(1, 10), Vector3d.Right);
         CollisionResponse.CalculateImpulse(pair);
 
         left.Body.Position3d.x.Should().BeLessThan(leftStart.x);
@@ -265,7 +265,7 @@ public sealed class CollisionResponseInvariantTests
         for (int i = 0; i < 8; i++)
         {
             CollisionPair pair = scenario.CreatePair(left.Collider, right.Collider);
-            pair.ContactPoint.SetContactPoint(left.Collider.Center, right.Collider.Center, Fixed64.Fraction(1, 20), Vector3d.Right);
+            pair.Manifold.SetContact(left.Collider.Center, right.Collider.Center, Fixed64.Fraction(1, 20), Vector3d.Right);
             CollisionResponse.CalculateImpulse(pair);
         }
 

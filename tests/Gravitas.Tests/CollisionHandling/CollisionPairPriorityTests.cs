@@ -22,7 +22,7 @@ public sealed class CollisionPairPriorityTests
         pair.ColliderA.Should().BeSameAs(fast.Collider);
         pair.ColliderB.Should().BeSameAs(slow.Collider);
         CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
-        pair.ContactPoint.Normal.Should().Be(-Vector3d.Right);
+        pair.Manifold.PrimaryContact.Normal.Should().Be(-Vector3d.Right);
     }
 
     [Fact]
@@ -38,6 +38,6 @@ public sealed class CollisionPairPriorityTests
         pair.ColliderA.Should().BeSameAs(slowCuboid.Collider);
         pair.ColliderB.Should().BeSameAs(fastSphere.Collider);
         CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
-        pair.ContactPoint.Normal.Should().Be(Vector3d.Right);
+        pair.Manifold.PrimaryContact.Normal.Should().Be(Vector3d.Right);
     }
 }

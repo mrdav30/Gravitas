@@ -118,10 +118,11 @@ dynamic objects. During `Simulate`, active partitions distribute candidate
 pairs. `GravitasPhysicsService` filters candidates by context, active state,
 shape, layer matrix, dynamic/static rules, and sibling relationships. A
 `CollisionPair` then performs fast distance/AABB culling before dispatching to
-`CollisionDetection`. If the narrow phase finds a contact, it writes a
-`ContactPoint`; if the pair has bodies that should receive physics,
-`CollisionResponse` applies prototype position correction and impulses. Contact
-events are emitted from the active-pair queue during `LateSimulate`.
+`CollisionDetection`. If the narrow phase finds contact, it writes a fixed-size
+`ContactManifold`; if the pair has bodies that should receive physics,
+`CollisionResponse` applies prototype position correction and impulses from the
+manifold's primary contact. Contact events are emitted from the active-pair
+queue during `LateSimulate`.
 
 ## Current Prototype Edges
 
@@ -135,8 +136,8 @@ events are emitted from the active-pair queue during `LateSimulate`.
   triangle-level tests. Swept mesh queries and full mesh contact manifolds remain
   future hardening work.
 - Collision response is a prototype and should be treated as an alpha-hardening
-  target, especially around contact manifolds, position correction, angular
-  response, triggers, restitution, and physically coherent units.
+  target, especially around multi-contact solving, position correction, angular
+  response, triggers, restitution, friction, and physically coherent units.
 - Query services use context-owned mutable buffers. Treat them as same-thread,
   fixed-loop services unless they are redesigned for reentrancy.
 - Diagnostics are context-owned and disabled by default. Enabled draw capture can

@@ -3,6 +3,7 @@ using Gravitas.Colliders;
 using GridForge.Grids;
 using SwiftCollections;
 using System;
+using System.Runtime.CompilerServices;
 
 
 namespace Gravitas.CollisionHandling;
@@ -51,7 +52,7 @@ public class CollisionPair
     private bool _isColliding;
     private bool _isCollidingChanged;
 
-    public ContactPoint ContactPoint { get; private set; } = new();
+    public ContactManifold Manifold { get; } = new();
 
     public CollisionPair(LSCollider c1, LSCollider c2) => Initialize(c1, c2);
 
@@ -155,7 +156,7 @@ public class CollisionPair
             ProcessCollision();
             RefreshBroadPhaseVersions();
             if (_isCollidingChanged && !_isColliding)
-                ContactPoint.Reset();
+                Manifold.Reset();
 
             HandleCullingIfNotColliding();
             return;
@@ -183,11 +184,12 @@ public class CollisionPair
         {
             _isCollidingChanged = _isColliding;
             _isColliding = false;
+            Manifold.Reset();
             return;
         }
 
         bool result = CheckCollision();
-        if (result && ContactPoint.HasContact)
+        if (result && Manifold.HasContact)
             Context.Diagnostics.EmitContact(this, result);
 
         if (result ^ _isColliding)
@@ -250,9 +252,9 @@ public class CollisionPair
     public void SetImmovableDirection(Vector3d directionA, Vector3d directionB)
     {
         if (ColliderA.Body?.Immovable == true)
-            ContactPoint.SetImmovableDirection(directionA);
+            Manifold.SetImmovableDirection(directionA);
         else if (ColliderB.Body?.Immovable == true)
-            ContactPoint.SetImmovableDirection(directionB);
+            Manifold.SetImmovableDirection(directionB);
     }
 
     private bool ShouldPerformCollisionCheck()
@@ -263,8 +265,19 @@ public class CollisionPair
         _fastDistance = Vector3d.SqrDistance(ColliderA.Center, ColliderB.Center);
         if (_fastDistance > _fastCollideDistance)
             return false;
-        // otherwise check if the boxes intersect, and if they do a more detailed collision check should be performed
-        return ColliderA.Bounds.Intersects(ColliderB.Bounds);
+        // Inclusive bounds overlap preserves zero-depth touching contacts for the manifold pass.
+        return BoundsOverlapInclusive(ColliderA, ColliderB);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool BoundsOverlapInclusive(LSCollider colliderA, LSCollider colliderB)
+    {
+        return colliderA.BoundsMin.x <= colliderB.BoundsMax.x
+            && colliderA.BoundsMax.x >= colliderB.BoundsMin.x
+            && colliderA.BoundsMin.y <= colliderB.BoundsMax.y
+            && colliderA.BoundsMax.y >= colliderB.BoundsMin.y
+            && colliderA.BoundsMin.z <= colliderB.BoundsMax.z
+            && colliderA.BoundsMax.z >= colliderB.BoundsMin.z;
     }
 
     private void CalculateCullScore()
@@ -309,7 +322,7 @@ public class CollisionPair
 
     public void Reset()
     {
-        ContactPoint.Reset();
+        Manifold.Reset();
         _isColliding = false;
         _isPooledForDeactivation = false;
     }

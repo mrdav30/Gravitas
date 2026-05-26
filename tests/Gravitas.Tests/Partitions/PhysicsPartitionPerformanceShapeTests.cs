@@ -26,7 +26,7 @@ public sealed class PhysicsPartitionPerformanceShapeTests
         second.Collider.Bounds.Center.Should().Be(teleportedPosition);
         second.Collider.PartitionChanged.Should().BeTrue();
         first.Collider.TryGetCollisionPair(second.Collider.Id, out CollisionPair? pair).Should().BeTrue();
-        pair!.ContactPoint.HasContact.Should().BeTrue();
+        pair!.Manifold.HasContact.Should().BeTrue();
     }
 
     [Fact]

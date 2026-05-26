@@ -34,7 +34,7 @@ public sealed class GravitasSimulationPhaseOrderTests
 
         second.Body.Position3d.Should().Be(teleportedPosition);
         first.Collider.TryGetCollisionPair(second.Collider.Id, out CollisionPair? pair).Should().BeTrue();
-        pair!.ContactPoint.HasContact.Should().BeTrue();
+        pair!.Manifold.HasContact.Should().BeTrue();
         pair.LastFrame.Should().Be(scenario.Context.FrameCount);
     }
 
@@ -94,7 +94,7 @@ public sealed class GravitasSimulationPhaseOrderTests
             () =>
             {
                 simulateHookSawContact = first.Collider.TryGetCollisionPair(second.Collider.Id, out CollisionPair? pair)
-                    && pair!.ContactPoint.HasContact
+                    && pair!.Manifold.HasContact
                     && scenario.Context.FrameCount == 1;
             });
         using IDisposable lateSimulateHook = scenario.Context.RegisterOnLateSimulate(
@@ -140,6 +140,7 @@ public sealed class GravitasSimulationPhaseOrderTests
         }
 
         left.Collider.TryGetCollisionPair(right.Collider.Id, out CollisionPair? pair);
+        bool hasContact = pair?.Manifold.HasContact ?? false;
         return new SimulationSnapshot(
             scenario.Context.FrameCount,
             scenario.Context.TotalTime,
@@ -149,8 +150,8 @@ public sealed class GravitasSimulationPhaseOrderTests
             right.Body.LinearVelocity,
             left.Collider.Bounds.Center,
             right.Collider.Bounds.Center,
-            pair?.ContactPoint.HasContact ?? false,
-            pair?.ContactPoint.Depth ?? Fixed64.Zero);
+            hasContact,
+            hasContact ? pair!.Manifold.PrimaryContact.Depth : Fixed64.Zero);
     }
 
     private readonly record struct SimulationSnapshot(

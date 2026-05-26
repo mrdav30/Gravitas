@@ -334,17 +334,22 @@ public sealed class GravitasDiagnosticSink
         if (!Enabled)
             return;
 
+        ManifoldContact contact = pair.Manifold.HasContact
+            ? pair.Manifold.PrimaryContact
+            : default;
+
         AddEvent(
             GravitasDiagnosticEventKind.Contact,
             colliderAId: pair.ColliderA.Id,
             colliderBId: pair.ColliderB.Id,
             colliderAType: pair.ColliderA.Shape,
             colliderBType: pair.ColliderB.Shape,
-            pointA: pair.ContactPoint.RelativeA,
-            pointB: pair.ContactPoint.RelativeB,
-            vector: pair.ContactPoint.Normal,
-            scalarA: pair.ContactPoint.Depth,
-            hit: hit && pair.ContactPoint.HasContact);
+            pointA: contact.PointA,
+            pointB: contact.PointB,
+            vector: contact.Normal,
+            scalarA: contact.Depth,
+            dataA: pair.Manifold.Count,
+            hit: hit && pair.Manifold.HasContact);
     }
 
     internal void EmitResponseImpulse(CollisionPair pair, Vector3d impulse, Fixed64 normalVelocity)
@@ -358,8 +363,8 @@ public sealed class GravitasDiagnosticSink
             colliderBId: pair.ColliderB.Id,
             colliderAType: pair.ColliderA.Shape,
             colliderBType: pair.ColliderB.Shape,
-            pointA: pair.ContactPoint.RelativeA,
-            pointB: pair.ContactPoint.RelativeB,
+            pointA: pair.Manifold.PrimaryContact.PointA,
+            pointB: pair.Manifold.PrimaryContact.PointB,
             vector: impulse,
             scalarA: impulse.Magnitude,
             scalarB: normalVelocity,
