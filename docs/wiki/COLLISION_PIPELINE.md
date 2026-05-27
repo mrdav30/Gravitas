@@ -106,12 +106,42 @@ space only after the collider is bound to runtime state, so rotated meshes
 refresh bounds from transformed vertices instead of copying stale constructor
 bounds.
 
-Alpha mesh policy is conservative: non-convex meshes should be decomposed into
-convex sub-meshes offline or during initialization, not during per-frame
-collision. Mesh ray overlap and initial mesh/cylinder contact are
+Alpha mesh policy is conservative but not anti-non-convex: non-convex collider
+support should come through static triangle meshes or explicit compound /
+decomposed-convex shapes, not through raw movable triangle soup during per-frame
+collision. Mesh ray overlap, mesh/cuboid, mesh/cylinder, and mesh/mesh paths are
 triangle-backed and covered by focused tests, but dynamic mesh behavior,
 arbitrary mesh contact manifolds, and swept mesh queries remain hardening
 targets.
+
+Mesh policy work should keep these boundaries explicit:
+
+- Static triangle meshes are useful for level/world geometry, but should not be
+  treated as a blanket answer for movable non-convex bodies.
+- Convex mesh and compound/decomposed-convex mesh support are the preferred
+  route for dynamic mesh-like bodies in alpha.
+- A future compound collider should present one collider identity to hosts and
+  one body to the solver, while internally ordering primitive or convex-mesh
+  parts by stable part IDs. Its policy must define aggregate bounds, mass,
+  inertia, trigger/contact events, CCD proxy behavior, and debug draw output.
+- Automatic convex decomposition is deferred unless the chosen algorithm is
+  deterministic, bounded, tested on pathological input, and benchmarked. Ear
+  clipping is a 2D polygon triangulation/partitioning tool, not a complete 3D
+  convex decomposition strategy.
+- Mesh simplification and collision LOD should be host/offline data for alpha.
+  Runtime simplification must not alter authoritative collision geometry during
+  a simulation frame.
+- The old Unity Mesh Simplifier package is useful as reference material for
+  quadric-error simplification, smart vertex linking, and preservation options,
+  but should not be copied into the runtime without a fixed-point deterministic
+  porting plan.
+- Rigid dynamic meshes can rebuild transformed vertices, bounds, and triangle
+  BVH from fixed transforms. Deformable or breakable topology changes require a
+  separate invalidation/rebuild contract before support is claimed.
+- `PhysicsMesh.CalculateInertiaTensor(...)` is currently an approximation. Any
+  replacement should define whether the mesh is a thin shell, closed volume, or
+  decomposed set of solids, then prove expected fixed-point values on simple
+  reference meshes.
 
 ## Continuous Collision Detection
 

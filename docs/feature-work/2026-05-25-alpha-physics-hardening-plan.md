@@ -505,16 +505,142 @@ Meaningful deferred work captured from that plan and the wiki:
   Phase 6 CCD except as a reminder that physics normals must be deterministic
   geometry data, not renderer smoothing data.
 
-## Phase 7: Mesh Collider Alpha Policy And Dynamic Mesh Boundaries
+## Phase 7A: Mesh Collider Alpha Policy And Local-Space BVH
 
-**Purpose:** Keep mesh support useful without letting arbitrary dynamic non-convex mesh behavior become an unbounded alpha blocker.
+**Purpose:** Keep mesh support useful, make convex/concave intent explicit, and
+remove the current rigid-mesh movement cost before hardening more mesh behavior.
+This phase may add small policy/scaffold seams for compound support, but it
+should not implement `LSCompoundCollider`.
 
 **Files:**
 
 - Modify: `src/Gravitas/Colliders/Support/PhysicsMesh/PhysicsMesh.cs`
 - Modify: `src/Gravitas/Colliders/Primitives/LSMeshCollider.cs`
 - Modify: `src/Gravitas/CollisionHandling/CollisionDetection.cs`
+- Modify: `src/Gravitas/Raycasting/RaycastSegmentWorker.cs`
 - Potentially create: `src/Gravitas/Colliders/Support/PhysicsMesh/ConvexMeshPolicy.cs`
+- Potentially create: `src/Gravitas/Colliders/Support/PhysicsMesh/MeshColliderPolicy.cs`
+- Potentially create: `src/Gravitas/Colliders/Support/PhysicsMesh/MeshColliderMode.cs`
+- Modify: `tests/Gravitas.Tests/Colliders`
+- Modify: `tests/Gravitas.Tests/CollisionHandling`
+- Modify: `tests/Gravitas.Tests/Raycasting`
+- Modify: `tests/Gravitas.Benchmarks/Colliders`
+- Reference only: `F:\gamedevrepos\SoulsClone\Library\PackageCache\com.whinarn.unitymeshsimplifier@d741912bfe`
+- Modify: `docs/wiki/COLLISION_PIPELINE.md`
+
+**Tasks:**
+
+- [ ] Define alpha shape policy terminology. Mesh modes should use `Convex` and
+  `Concave`; `Compound` should mean a separate `LSCompoundCollider` strategy,
+  not a mesh mode. Keep `non-convex` as internal validation language for the
+  wider set of topology problems such as concavity, open meshes, disconnected
+  islands, self-intersection, non-manifold edges, holes, and winding issues.
+- [ ] Add an explicit mesh-collider mode or policy. Do not silently infer convex
+  versus concave behavior except for cheap validation that proves a declared mode
+  is invalid. Developer intent should drive runtime policy.
+- [ ] Define the alpha boundary: static/kinematic concave triangle meshes are
+  acceptable collision data, convex meshes are the preferred dynamic mesh shape,
+  and dynamic concave behavior should route through compound/decomposed-convex
+  data unless a raw dynamic concave triangle-mesh policy is explicitly proven.
+- [ ] Decide whether alpha accepts only host/offline decomposed convex pieces for
+  concave meshes, or whether Gravitas should own deterministic convex
+  decomposition later. Do not implement automatic decomposition in 7A unless the
+  algorithm, determinism contract, tests, and benchmarks are all explicit.
+- [ ] If 7A needs compound-related seams, keep them neutral and minimal:
+  declared mesh modes, decomposed-convex policy names, and tests that prove raw
+  dynamic concave meshes route to a future compound/decomposition path instead of
+  silently behaving like convex meshes.
+- [ ] Refactor rigid mesh movement toward local-space acceleration ownership:
+  build local vertices, local triangle normals, local bounds, and local triangle
+  BVH once; update only transform, inverse transform, and conservative world
+  bounds when the mesh moves; rebuild the BVH only when local vertex or triangle
+  topology changes.
+- [ ] Update mesh query and narrow-phase callers to transform world-space query
+  shapes into mesh-local space, query the local triangle BVH, and transform final
+  contact points/normals back to world space. Rotation-only normal transforms are
+  enough for the current scale model; any future non-uniform mesh scale needs an
+  inverse-transpose normal policy.
+- [ ] Benchmark dynamic mesh movement before and after the local-space BVH
+  refactor. The expected win is avoiding O(triangle count) BVH rebuilds on rigid
+  translation/rotation.
+- [ ] Add tests for invalid mesh input, declared mesh-mode validation, rotated
+  mesh bounds, dynamic mesh movement without triangle BVH rebuild, mesh/collider
+  contact order, and concave/non-convex policy enforcement.
+- [ ] Add policy tests proving raw dynamic concave meshes are either rejected,
+  treated as static-only, or converted into declared convex/compound sub-shapes
+  by initialization-time data. Runtime per-frame decomposition is out of scope
+  for alpha.
+- [ ] Review `PhysicsMesh.CalculateInertiaTensor(...)` and decide the alpha contract: keep the current triangle-area-weighted approximation with documentation, or replace it with a deterministic thin-triangle/shell or tetrahedral volume approximation. Any replacement needs fixed-value tests on known simple meshes and benchmark coverage.
+- [ ] Decide whether the mesh edge cache remains required after manifold work. Remove it only if tests and benchmarks prove face normals/on-demand edges cover all callers.
+- [ ] Review the old `UnityMeshSimplifier` package and the prototype
+  `MeshSimplificationHelper` for design context without vendoring Unity-specific
+  runtime code into Gravitas. If temporary scratch notes are created under
+  `docs/feature-work/prototype`, remove them before closing the task unless the
+  user explicitly asks to keep or force-add them.
+- [ ] Decide mesh simplification/LOD policy. Prefer host/offline simplification
+  for alpha; any Gravitas-owned runtime simplifier must be deterministic,
+  fixed-point, bounded, benchmarked, and must not change collision truth during a
+  simulation frame.
+- [ ] Decide dynamic mesh update boundaries: rigid transformed meshes should not
+  rebuild local BVH/topology data, while deformable/breakable topology or vertex
+  updates require explicit invalidation, deterministic rebuild ordering, and
+  separate tests before support is claimed.
+- [ ] Add benchmark coverage for mesh construction, BVH build, triangle query windows, dynamic mesh repartitioning, and mesh contact generation.
+- [ ] Document the mesh policy in host-facing terms so engine adapters know what data to provide.
+
+**Design Notes:**
+
+- Public mesh terminology should prefer `Convex` and `Concave`. `Compound` is a
+  collider composition strategy, not a mesh classification. Concave meshes are
+  non-convex, but non-convex is broader than concavity and includes invalid or
+  unsupported topology. Use `non-convex` in validation notes only when the wider
+  meaning is intentional.
+- Concave mesh support should remain part of the long-term design, similar to
+  the behavior users expect from engines such as Unity. The alpha boundary is
+  raw movable concave triangle soup, not concave colliders as a concept.
+- Decomposing a concave mesh into convex pieces can feed a later compound
+  collider model. For 7A, host/offline decomposition is safer than runtime
+  automatic decomposition unless Gravitas owns a deterministic, bounded,
+  benchmarked algorithm.
+- Ear clipping is useful for triangulating or partitioning 2D polygons, but it
+  is not sufficient as a general 3D non-convex mesh decomposition strategy. If
+  Gravitas eventually owns automatic 3D convex decomposition, evaluate a
+  deterministic VHACD-style or exact convex partition approach against tests and
+  benchmark budgets.
+- The scratch note about mesh overlap being only bounds-based appears stale:
+  current mesh ray overlap is triangle-backed, and mesh/cuboid, mesh/cylinder,
+  and mesh/mesh collision paths already use triangle candidates/SAT-style
+  checks. 7A should harden and classify those paths rather than assume no mesh
+  collision exists.
+- Visual mesh normals, smoothing, simplification, and render LOD are not
+  automatically physics data. Physics mesh normals and simplified collision
+  geometry must be deterministic inputs or deterministic preprocessing outputs.
+- Current `PhysicsMesh.UpdatePosition(...)` transforms every vertex, invalidates
+  normals, rebuilds the triangle BVH, and updates bounds for rigid movement.
+  That is acceptable prototype behavior, but it is the wrong target for dynamic
+  meshes. The preferred design is a local-space BVH with query/collision inputs
+  transformed into mesh-local coordinates and final outputs transformed back to
+  world space.
+- The old Unity Mesh Simplifier package is useful context because it uses a
+  quadric-error-style simplification pipeline with smart vertex linking and
+  preservation flags. It should stay reference material for now: the package is
+  Unity/float/double oriented, so a Gravitas simplifier would need a deliberate
+  fixed-point port with deterministic tie-breakers and benchmark gates.
+
+## Phase 7B: Compound Collider Policy And Scaffold
+
+**Purpose:** Define `LSCompoundCollider` as a special-case collider composition
+strategy without bloating mesh-policy work. Implement only the minimal scaffold
+needed for alpha if the design remains contained; otherwise produce a follow-up
+implementation plan before Phase 8.
+
+**Files:**
+
+- Potentially create: `src/Gravitas/Colliders/Primitives/LSCompoundCollider.cs`
+- Potentially create: `src/Gravitas/Colliders/Support/Compound`
+- Potentially modify: `src/Gravitas/Colliders/LSCollider.cs`
+- Potentially modify: `src/Gravitas/CollisionHandling/CollisionDetection.cs`
+- Potentially modify: `src/Gravitas/Diagnostics`
 - Modify: `tests/Gravitas.Tests/Colliders`
 - Modify: `tests/Gravitas.Tests/CollisionHandling`
 - Modify: `tests/Gravitas.Benchmarks/Colliders`
@@ -522,11 +648,50 @@ Meaningful deferred work captured from that plan and the wiki:
 
 **Tasks:**
 
-- [ ] Define alpha mesh categories: static triangle mesh, convex mesh, decomposed convex mesh, and unsupported dynamic non-convex mesh.
-- [ ] Add tests for invalid mesh input, rotated mesh bounds, dynamic mesh movement, mesh/collider contact order, and non-convex policy enforcement.
-- [ ] Decide whether the mesh edge cache remains required after manifold work. Remove it only if tests and benchmarks prove face normals/on-demand edges cover all callers.
-- [ ] Add benchmark coverage for mesh construction, BVH build, triangle query windows, dynamic mesh repartitioning, and mesh contact generation.
-- [ ] Document the mesh policy in host-facing terms so engine adapters know what data to provide.
+- [ ] Decide whether 7B implements an initial runtime type or only writes the
+  policy and follow-up plan. If implemented, keep it narrow: one public collider
+  identity/body/layer, stable part IDs, deterministic part ordering, aggregate
+  bounds, and part-local transforms.
+- [ ] Define compound parts as internal collider-like shape parts, not
+  independent host colliders or parent/child objects. They may reuse collider
+  shape logic, but the compound owns registration, broad-phase identity, event
+  surface, body binding, and lifecycle.
+- [ ] Define the supported alpha part set. Prefer primitives and convex meshes
+  for dynamic bodies. Concave mesh parts, if allowed, should follow the same
+  static/kinematic restrictions as standalone concave meshes.
+- [ ] Define compound/decomposed-convex collision rules before exposing an API:
+  aggregate mass/inertia policy, part-level broad-phase behavior, pair identity,
+  contact manifold reduction, trigger/contact event surface, parent/child
+  filtering behavior, CCD proxy behavior, and debug draw representation.
+- [ ] Define deterministic contact reduction for overlapping compound parts.
+  Internal part overlap is acceptable, but a single opposing collider should not
+  receive arbitrary duplicate contacts. Prefer stable part ordering plus a
+  physically meaningful best-contact/manifold reduction over "first contact
+  found" behavior.
+- [ ] Add tests for part ordering, aggregate bounds, overlapping internal parts,
+  single external event emission, parent/child hierarchy separation, debug draw
+  output, and deterministic contact selection.
+- [ ] Add benchmarks for compound-vs-primitive pair checks and broad-phase
+  repartitioning when a compound's aggregate bounds span many voxels.
+- [ ] Document the difference between compound colliders and parent/child
+  collider hierarchy in `docs/wiki/COLLISION_PIPELINE.md`.
+
+**Design Notes:**
+
+- A compound collider is the likely bridge: it behaves like one collider to the
+  host and one body to the solver, but internally contains deterministic
+  primitive and convex-mesh parts, with possible concave-mesh parts only under a
+  declared policy. This is similar in spirit to parent/child collider
+  composition, but should have one collider ID, one broad-phase owner, stable
+  part ordering, and explicit aggregate mass/inertia rules.
+- A compound collider is not the same as a parent/child collider hierarchy. A
+  parent/child hierarchy can represent separate host objects, such as a warrior
+  and a held sword. A compound collider represents one physical collider whose
+  shape is approximated by multiple internal parts.
+- A compound collider can provide practical support for concave/non-convex
+  meshes when the concave shape is represented as multiple deterministic parts.
+  It does not automatically make arbitrary raw concave triangle meshes dynamic-
+  safe; each part still needs a declared policy and stable collision ordering.
 
 ## Phase 8: Broad-Phase And Query State Scalability
 
