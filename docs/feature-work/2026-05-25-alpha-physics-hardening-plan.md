@@ -437,22 +437,55 @@ Meaningful deferred work captured from that plan and the wiki:
 
 - Modify: `src/Gravitas/Raycasting/SweptSphereQueryWorker.cs`
 - Potentially create: `src/Gravitas/CollisionHandling/Continuous`
+- Potentially create: `src/Gravitas/CollisionHandling/Continuous/ContinuousCollisionMode.cs`
 - Modify: `src/Gravitas/CollisionHandling/CollisionDetection.cs`
 - Modify: `src/Gravitas/Core/StiffBody.cs`
+- Potentially modify: `src/Gravitas/Settings/PhysicsSettings.cs`
 - Modify: `tests/Gravitas.Tests/Raycasting`
 - Modify: `tests/Gravitas.Tests/CollisionHandling`
 - Modify: `tests/Gravitas.Benchmarks/Raycasting`
+- Modify: `tests/Gravitas.Benchmarks/Core`
 - Modify: `docs/wiki/QUERY_SERVICES.md`
 - Modify: `docs/wiki/COLLISION_PIPELINE.md`
 
 **Tasks:**
 
 - [ ] Decide whether CCD lives in collision detection, body integration, or a dedicated continuous-collision service.
+- [ ] Define the CCD activation policy. Current recommendation: do not run CCD for every body by default; use an explicit per-body or per-collider policy with an optional `Auto` mode and a context default. This keeps deterministic response ordering and hot-path cost visible to hosts while still making fast-projectile setup ergonomic.
 - [ ] Add tunneling tests for fast sphere/capsule/cuboid/cylinder bodies against thin static geometry.
+- [ ] Add tests proving discrete bodies still use the existing integration path while CCD-enabled bodies sweep from current position to proposed position.
+- [ ] Hook CCD after velocity/acceleration integration computes the intended frame displacement and before `StiffBody` commits authoritative position. The candidate sweep should use `startPosition -> startPosition + velocity * DeltaTime`, then clamp/adjust movement at the earliest deterministic time of impact.
 - [ ] Define time-of-impact ordering and response handoff for multiple hits in one frame.
+- [ ] Start with fast dynamic primitives against static, bodyless, immovable, or kinematic targets. Dynamic-vs-dynamic CCD requires relative velocity and pairwise TOI ordering; include it only if the phase can cover tests and benchmarks without weakening the alpha contract.
 - [ ] Decide the alpha policy for swept mesh targets: unsupported, triangle-sweep query path, convex-decomposed mesh path, or dedicated CCD mesh path.
 - [ ] If mesh sweep is implemented, require triangle candidate acceleration tests and benchmarks before enabling it broadly.
+- [ ] Keep visual mesh-normal smoothing separate from physics. Physics CCD should use deterministic triangle planes/face normals/contact geometry; chunk seam smoothing or vertex-normal transfer belongs in mesh preprocessing or renderer-facing data, not collision truth.
 - [ ] Document the CCD contract and any excluded shape pairs.
+
+**Design Notes:**
+
+- CCD exists to prevent fast bodies from tunneling between fixed ticks; it
+  should not replace ordinary discrete collision for every body. Always-on CCD
+  would add broad-phase sweeps, time-of-impact sorting, and response-order
+  branches to normal bodies that do not need it.
+- Prefer a policy shape such as `Inherit`, `Discrete`, `Continuous`, and
+  possibly `Auto`. `Inherit` can read a context default, `Discrete` preserves the
+  current path, `Continuous` forces CCD, and `Auto` can later enable CCD when
+  the intended displacement is large relative to collider thickness, radius,
+  voxel size, or a configured threshold. Do not add every mode unless tests and
+  benchmarks justify it.
+- The old "draw a line from current position to new position" note maps to the
+  intended center sweep for the current frame. For extended shapes, use the
+  appropriate swept volume or conservative support sweep rather than a naked
+  center ray where that would miss edge/corner tunneling.
+- The old "relative velocities" note is valid for dynamic-vs-dynamic CCD. For
+  alpha, static/kinematic targets are the safer first boundary; relative-motion
+  CCD should be added only with deterministic TOI tie-breakers and replay tests.
+- The old mesh-normal note appears to describe visual smoothing across chunked
+  mesh seams. It is relevant to Phase 7 mesh policy only if Gravitas starts
+  storing or deriving mesh normals for contact generation. It should not drive
+  Phase 6 CCD except as a reminder that physics normals must be deterministic
+  geometry data, not renderer smoothing data.
 
 ## Phase 7: Mesh Collider Alpha Policy And Dynamic Mesh Boundaries
 
