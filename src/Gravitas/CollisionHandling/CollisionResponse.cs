@@ -58,7 +58,16 @@ public static class CollisionResponse
                 contacts.GetNormalVelocity(i));
 
         for (int i = 0; i < contacts.Count; i++)
-            ApplyFrictionImpulse(contacts.GetContact(i), contacts.GetNormalImpulse(i));
+            contacts.SetTangentImpulse(i, ApplyFrictionImpulse(contacts.GetContact(i), contacts.GetNormalImpulse(i)));
+
+        for (int i = 0; i < contacts.Count; i++)
+        {
+            SolverContact contact = contacts.GetContact(i);
+            pair.StoreWarmStartImpulse(
+                contact.ContactId,
+                contacts.GetNormalImpulse(i),
+                contacts.GetTangentImpulse(i));
+        }
     }
 
     private static bool TryCreateBodyPair(CollisionPair pair, out ResponseBody bodyA, out ResponseBody bodyB)
@@ -106,6 +115,7 @@ public static class CollisionResponse
             return false;
 
         contact = new SolverContact(
+            manifoldContact.ContactId,
             bodyA,
             bodyB,
             manifoldContact.PointA,
@@ -163,35 +173,36 @@ public static class CollisionResponse
         ApplyImpulse(contact.B, impulse, contact.RelativeB);
     }
 
-    private static void ApplyFrictionImpulse(SolverContact contact, Fixed64 normalImpulseScalar)
+    private static Fixed64 ApplyFrictionImpulse(SolverContact contact, Fixed64 normalImpulseScalar)
     {
         if (normalImpulseScalar <= Fixed64.Zero)
-            return;
+            return Fixed64.Zero;
 
         Fixed64 frictionCoefficient = ResolveFrictionCoefficient(contact);
         if (frictionCoefficient <= Fixed64.Zero)
-            return;
+            return Fixed64.Zero;
 
         Vector3d relativeVelocity = ComputeRelativeVelocity(contact);
         Vector3d tangentVelocity = relativeVelocity - contact.Normal * Vector3d.Dot(relativeVelocity, contact.Normal);
         if (tangentVelocity.SqrMagnitude <= Fixed64.Epsilon)
-            return;
+            return Fixed64.Zero;
 
         Vector3d tangent = tangentVelocity.Normal;
         Fixed64 denominator = ComputeImpulseDenominator(contact, tangent);
         if (denominator <= Fixed64.Epsilon)
-            return;
+            return Fixed64.Zero;
 
         Fixed64 tangentVelocityMagnitude = Vector3d.Dot(relativeVelocity, tangent);
         Fixed64 impulseScalar = -tangentVelocityMagnitude / denominator;
         Fixed64 maxFrictionImpulse = normalImpulseScalar * frictionCoefficient;
         impulseScalar = FixedMath.Clamp(impulseScalar, -maxFrictionImpulse, maxFrictionImpulse);
         if (impulseScalar == Fixed64.Zero)
-            return;
+            return Fixed64.Zero;
 
         Vector3d impulse = tangent * impulseScalar;
         ApplyImpulse(contact.A, -impulse, contact.RelativeA);
         ApplyImpulse(contact.B, impulse, contact.RelativeB);
+        return impulseScalar;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

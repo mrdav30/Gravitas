@@ -9,6 +9,7 @@ namespace Gravitas.CollisionHandling;
 internal readonly struct SolverContact
 {
     public SolverContact(
+        ulong contactId,
         ResponseBody bodyA,
         ResponseBody bodyB,
         Vector3d pointA,
@@ -18,6 +19,7 @@ internal readonly struct SolverContact
         Fixed64 depth,
         Vector3d normal)
     {
+        ContactId = contactId;
         A = bodyA;
         B = bodyB;
         PointA = pointA;
@@ -27,6 +29,8 @@ internal readonly struct SolverContact
         Depth = depth;
         Normal = normal;
     }
+
+    public ulong ContactId { get; }
 
     public ResponseBody A { get; }
 

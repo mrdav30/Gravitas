@@ -18,11 +18,21 @@ public class PhysicsPartition : IVoxelPartition
     /// </summary>
     public SwiftSparseSet? ContainedDynamicObjects;
 
+    /// <summary>
+    /// Stores the subset of dynamic collider IDs whose bodies can currently drive collision work.
+    /// </summary>
+    public SwiftSparseSet? ContainedAwakeDynamicObjects;
+
     public SwiftSparseSet? ContainedStaticObjects;
 
     public int ActivationId { get; private set; }
 
     public bool IsAllocated => ActivationId != -1;
+
+    /// <summary>
+    /// Gets the number of awake dynamic IDs currently in this partition.
+    /// </summary>
+    public int AwakeDynamicObjectCount => ContainedAwakeDynamicObjects?.Count ?? 0;
 
     public GravitasCollisionService Owner
     {
@@ -53,20 +63,26 @@ public class PhysicsPartition : IVoxelPartition
     public void Distribute()
     {
         int dynamicCount = ContainedDynamicObjects?.Count ?? 0;
-        if (ContainedDynamicObjects == null || dynamicCount == 0)
+        int awakeDynamicCount = ContainedAwakeDynamicObjects?.Count ?? 0;
+        if (ContainedDynamicObjects == null || dynamicCount == 0 || ContainedAwakeDynamicObjects == null || awakeDynamicCount == 0)
             return;
 
         int staticCount = ContainedStaticObjects?.Count ?? 0;
 
-        // only distribute when there are dynamic objects on the same partition
-        for (int j = 0; j < dynamicCount; j++)
+        // Sleeping bodies stay query-visible in dynamic membership, while awake membership gates solver work.
+        for (int j = 0; j < awakeDynamicCount; j++)
         {
-            int id1 = ContainedDynamicObjects.DenseKeys[j];
-            for (int k = j + 1; k < dynamicCount; k++)
+            int id1 = ContainedAwakeDynamicObjects.DenseKeys[j];
+            for (int k = 0; k < dynamicCount; k++)
             {
                 int id2 = ContainedDynamicObjects.DenseKeys[k];
-                if (id1 != id2)
-                    ProcessPair(id1, id2);
+                if (id1 == id2)
+                    continue;
+
+                if (ContainsAwakeDynamicObject(id2) && id2 < id1)
+                    continue;
+
+                ProcessPair(id1, id2);
             }
 
             for (int k = 0; k < staticCount; k++)
@@ -96,6 +112,8 @@ public class PhysicsPartition : IVoxelPartition
         if (!ContainedDynamicObjects.Add(item))
             return;
 
+        SetDynamicObjectAwake(item, IsDynamicObjectAwake(item));
+
         if (ContainedDynamicObjects.Count == 1)
             ActivationId = Owner.ActivatePartition(this);
     }
@@ -114,6 +132,8 @@ public class PhysicsPartition : IVoxelPartition
             return;
         }
 
+        ContainedAwakeDynamicObjects?.Remove(item);
+
         if (ContainedDynamicObjects?.Count > 0)
             return;
 
@@ -126,6 +146,38 @@ public class PhysicsPartition : IVoxelPartition
     {
         if (ContainedStaticObjects?.Remove(item) != true)
             GravitasLogger.DebugChannel.Info($"Static item not removed - {item}");
+    }
+
+    /// <summary>
+    /// Returns true when the supplied dynamic collider ID is marked awake in this partition.
+    /// </summary>
+    public bool ContainsAwakeDynamicObject(int item) => ContainedAwakeDynamicObjects?.Contains(item) == true;
+
+    /// <summary>
+    /// Updates the awake dynamic subset for a collider already present in dynamic membership.
+    /// </summary>
+    public void SetDynamicObjectAwake(int item, bool awake)
+    {
+        if (ContainedDynamicObjects?.Contains(item) != true)
+            return;
+
+        if (awake)
+        {
+            ContainedAwakeDynamicObjects ??= new();
+            ContainedAwakeDynamicObjects.Add(item);
+            return;
+        }
+
+        ContainedAwakeDynamicObjects?.Remove(item);
+    }
+
+    private bool IsDynamicObjectAwake(int item)
+    {
+        if (!Owner.Context.Physics.TryGetColliderById(item, out Gravitas.Colliders.LSCollider? collider))
+            return true;
+
+        StiffBody? body = collider!.Body;
+        return body == null || body.IsAwakeForCollision;
     }
 
     public void OnRemoveFromVoxel(Voxel voxel)
@@ -147,6 +199,7 @@ public class PhysicsPartition : IVoxelPartition
     internal void ResetForPool()
     {
         ContainedDynamicObjects?.Clear();
+        ContainedAwakeDynamicObjects?.Clear();
         ContainedStaticObjects?.Clear();
 
         if (ActivationId != -1)

@@ -54,6 +54,8 @@ public class CollisionPair
 
     public ContactManifold Manifold { get; } = new();
 
+    private ContactWarmStartCache _warmStart;
+
     public CollisionPair(LSCollider c1, LSCollider c2) => Initialize(c1, c2);
 
     /// <summary>
@@ -185,6 +187,7 @@ public class CollisionPair
             _isCollidingChanged = _isColliding;
             _isColliding = false;
             Manifold.Reset();
+            _warmStart.Clear();
             return;
         }
 
@@ -198,10 +201,33 @@ public class CollisionPair
             _isCollidingChanged = true;
         }
 
-        if (!result || !_doPhysics)
+        if (!result || !Manifold.HasContact)
+        {
+            _warmStart.Clear();
+            return;
+        }
+
+        if (!_doPhysics)
             return;
 
+        WakeSleepingBodiesForCollision();
         CollisionResponse.CalculateImpulse(this);
+    }
+
+    private void WakeSleepingBodiesForCollision()
+    {
+        StiffBody? bodyA = ColliderA.Body;
+        StiffBody? bodyB = ColliderB.Body;
+        if (bodyA == null || bodyB == null)
+            return;
+
+        bool bodyAAwake = bodyA.IsAwakeForCollision;
+        bool bodyBAwake = bodyB.IsAwakeForCollision;
+
+        if (bodyA.IsSleeping && bodyBAwake)
+            bodyA.Wake();
+        if (bodyB.IsSleeping && bodyAAwake)
+            bodyB.Wake();
     }
 
     public void NotifyCollidersOfContact()
@@ -220,6 +246,18 @@ public class CollisionPair
 
         if (CullCounter >= 0)  //  A Negative cull counter means a Body is preventing culling
             CalculateCullScore();
+    }
+
+    internal bool TryPreserveSleepingRestingContact()
+    {
+        if (!_isColliding || !Manifold.HasContact)
+            return false;
+
+        if (ColliderA.Body?.IsSleeping != true && ColliderB.Body?.IsSleeping != true)
+            return false;
+
+        LastCollidedFrame = Context.FrameCount;
+        return true;
     }
 
     private bool CheckCollision()
@@ -323,9 +361,16 @@ public class CollisionPair
     public void Reset()
     {
         Manifold.Reset();
+        _warmStart.Clear();
         _isColliding = false;
         _isPooledForDeactivation = false;
     }
+
+    internal void StoreWarmStartImpulse(ulong contactId, Fixed64 normalImpulse, Fixed64 tangentImpulse) =>
+        _warmStart.Set(contactId, normalImpulse, tangentImpulse);
+
+    internal bool TryGetWarmStartImpulse(ulong contactId, out ContactWarmStartImpulse impulse) =>
+        _warmStart.TryGet(contactId, out impulse);
 
     /// <summary>
     /// Deactivates the CollisionPair.

@@ -466,7 +466,11 @@ public abstract class LSCollider : IRecordable
     protected abstract void BuildShape();
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    protected void MarkShapeDirty() => _runtimeShapeState.MarkDirty();
+    protected void MarkShapeDirty()
+    {
+        _runtimeShapeState.MarkDirty();
+        _body?.Wake();
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void MarkBroadPhaseChanged() => _partitionState.MarkBroadPhaseChanged();
@@ -708,7 +712,7 @@ public abstract class LSCollider : IRecordable
         RecordValues.Look(chronicler, ref _offset, "Offset", Vector3d.Zero);
         RecordValues.Look(chronicler, ref _radius, "Radius", Fixed64.Half);
         RecordValues.Look(chronicler, ref _size, "Size", Vector3d.One);
-        MarkShapeDirty();
+        _runtimeShapeState.MarkDirty();
     }
 
     #endregion

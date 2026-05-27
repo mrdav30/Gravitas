@@ -23,7 +23,7 @@ pairs, queries, and coroutines remain context-local.
 | Service | Owned state |
 | --- | --- |
 | `GravitasPhysicsService` | Dynamic body bucket, collider ID table, reusable collider IDs, collision-pair pool, active collision-pair queue, simulation switch. |
-| `GravitasCollisionService` | Active partition bucket, inactive partition pool, duplicate voxel checker, collision distribution version, cull distributor. |
+| `GravitasCollisionService` | Active partition bucket, inactive partition pool, duplicate voxel checker, partition awake-state refresh, collision distribution version, cull distributor. |
 | `GravitasRaycastService` | 3D segment worker, swept-sphere worker, intersection buffer, duplicate voxel checker, duplicate collider checker, query version. |
 | `GravitasCircleQueryService` | Duplicate collider checker and query version for X/Z circle overlap/proximity queries. |
 | `GravitasCoroutineService` | Active lockstep coroutine bucket and context-bound wait instruction factories. |
@@ -140,6 +140,7 @@ contexts. These checks are core invariants.
 - mass and inverse mass.
 - inertia tensor and inverse inertia tensor.
 - grounding state and ground probe settings.
+- deterministic sleep state, sleep thresholds, and wake handling.
 - Chronicler record data.
 
 Body movement currently happens in `StiffBody.LateSimulate()`, called by
@@ -162,6 +163,14 @@ grounded bodies can skip repeated simulation probes for a short frame window,
 but movement of the last hit platform invalidates that guard. Ground probes
 accept bodyless colliders, immovable bodies, and kinematic bodies as ground;
 ordinary movable dynamic bodies are ignored.
+
+Sleeping is body-owned and deterministic. A dynamic non-kinematic body can sleep
+after linear and angular speed remain below configured thresholds for the body
+sleep window. Sleep clears accumulated runtime motion state but leaves the
+collider partitioned. Wake stimuli include force, impulse, collision with an
+awake body, kinematic motion, host teleports, shape mutation, and explicit host
+wake; waking updates awake membership in every current partition for that
+collider.
 
 Kinematic bodies read their host transforms during `LateSimulate`, update
 authoritative body position/rotation from those transforms, and then update

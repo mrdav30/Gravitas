@@ -16,6 +16,10 @@ internal struct SolverContactBuffer
     private Fixed64 _normalImpulse1;
     private Fixed64 _normalImpulse2;
     private Fixed64 _normalImpulse3;
+    private Fixed64 _tangentImpulse0;
+    private Fixed64 _tangentImpulse1;
+    private Fixed64 _tangentImpulse2;
+    private Fixed64 _tangentImpulse3;
     private Fixed64 _normalVelocity0;
     private Fixed64 _normalVelocity1;
     private Fixed64 _normalVelocity2;
@@ -77,6 +81,16 @@ internal struct SolverContactBuffer
             _ => _normalVelocity3
         };
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public Fixed64 GetTangentImpulse(int index) =>
+        index switch
+        {
+            0 => _tangentImpulse0,
+            1 => _tangentImpulse1,
+            2 => _tangentImpulse2,
+            _ => _tangentImpulse3
+        };
+
     public void SetNormalImpulse(int index, Fixed64 impulse, Fixed64 normalVelocity)
     {
         switch (index)
@@ -96,6 +110,25 @@ internal struct SolverContactBuffer
             default:
                 _normalImpulse3 = impulse;
                 _normalVelocity3 = normalVelocity;
+                break;
+        }
+    }
+
+    public void SetTangentImpulse(int index, Fixed64 impulse)
+    {
+        switch (index)
+        {
+            case 0:
+                _tangentImpulse0 = impulse;
+                break;
+            case 1:
+                _tangentImpulse1 = impulse;
+                break;
+            case 2:
+                _tangentImpulse2 = impulse;
+                break;
+            default:
+                _tangentImpulse3 = impulse;
                 break;
         }
     }

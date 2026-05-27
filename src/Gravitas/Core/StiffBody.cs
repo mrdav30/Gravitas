@@ -253,6 +253,82 @@ public class StiffBody : IRecordable
 
     public bool IsAtRest => _linearVelocity.IsZero && _angularVelocity.IsZero;
 
+    private bool _isSleeping;
+    private int _sleepFrameCount;
+    private bool _sleepEnabled = true;
+    private int _sleepFrameThreshold = 16;
+    private Fixed64 _sleepLinearSpeedThreshold = (Fixed64)0.001f;
+    private Fixed64 _sleepAngularSpeedThreshold = (Fixed64)0.001f;
+
+    /// <summary>
+    /// Gets whether this dynamic body is currently excluded from solver work until a deterministic wake event occurs.
+    /// </summary>
+    public bool IsSleeping => _isSleeping;
+
+    /// <summary>
+    /// Enables deterministic sleep evaluation for this body.
+    /// </summary>
+    public bool SleepEnabled
+    {
+        get => _sleepEnabled;
+        set
+        {
+            if (_sleepEnabled == value)
+                return;
+
+            _sleepEnabled = value;
+            if (!value)
+                Wake();
+        }
+    }
+
+    /// <summary>
+    /// Number of consecutive fixed frames below sleep thresholds required before the body sleeps.
+    /// </summary>
+    public int SleepFrameThreshold
+    {
+        get => _sleepFrameThreshold;
+        set
+        {
+            SwiftThrowHelper.ThrowIfNegative(value, nameof(value));
+            _sleepFrameThreshold = value;
+        }
+    }
+
+    /// <summary>
+    /// Linear speed at or below which the body can count toward sleeping.
+    /// </summary>
+    public Fixed64 SleepLinearSpeedThreshold
+    {
+        get => _sleepLinearSpeedThreshold;
+        set
+        {
+            SwiftThrowHelper.ThrowIfArgument(
+                value < Fixed64.Zero,
+                nameof(value),
+                "Sleep linear speed threshold cannot be negative.");
+            _sleepLinearSpeedThreshold = value;
+        }
+    }
+
+    /// <summary>
+    /// Angular speed at or below which the body can count toward sleeping.
+    /// </summary>
+    public Fixed64 SleepAngularSpeedThreshold
+    {
+        get => _sleepAngularSpeedThreshold;
+        set
+        {
+            SwiftThrowHelper.ThrowIfArgument(
+                value < Fixed64.Zero,
+                nameof(value),
+                "Sleep angular speed threshold cannot be negative.");
+            _sleepAngularSpeedThreshold = value;
+        }
+    }
+
+    internal bool IsAwakeForCollision => Active && !Immovable && !IsSleeping;
+
     // LinearVelocity magnitude
     private Fixed64 _linearSpeed;
     public Fixed64 LinearSpeed => _linearSpeed;
@@ -415,7 +491,10 @@ public class StiffBody : IRecordable
         _linearVelocity = Vector3d.Zero;
         _angularVelocity = Vector3d.Zero;
         _linearSpeed = Fixed64.Zero;
+        _angularSpeed = Fixed64.Zero;
         _normalForce = Vector3d.Zero;
+        _isSleeping = false;
+        _sleepFrameCount = 0;
 
         _isGrounded = false;
         _skipGroundingCheck = false;
@@ -463,7 +542,12 @@ public class StiffBody : IRecordable
         // if we can't move...then we don't and ignore any forces
         if (!Immovable)
         {
-            ProcessMovable();
+            if (!IsSleeping)
+            {
+                ProcessMovable();
+                UpdateSleepState();
+            }
+
             Collider!.Simulate();
         }
 
@@ -477,13 +561,101 @@ public class StiffBody : IRecordable
     private void UpdateKinematicPositionAndRotation()
     {
         Vector3d kinematicPosition = _positionTransform.Position;
+        if (Position3d != kinematicPosition)
+            Wake();
+
         Position2d = kinematicPosition.ToVector2d();
         HeightPos = kinematicPosition.y;
         SetVisualPosition(kinematicPosition);
 
         FixedQuaternion kinematicRotation = _rotationTransform.Rotation;
+        if (Rotation != kinematicRotation)
+            Wake();
+
         Rotation = kinematicRotation;
         SetVisualRotation(kinematicRotation);
+    }
+
+    /// <summary>
+    /// Puts the body to sleep and keeps it partitioned for queries and deterministic wake propagation.
+    /// </summary>
+    public void Sleep()
+    {
+        if (!CanSleep)
+            return;
+
+        _sleepFrameCount = _sleepFrameThreshold;
+        ClearMotionForSleep();
+        if (_isSleeping)
+            return;
+
+        _isSleeping = true;
+        RefreshPartitionAwakeState();
+    }
+
+    /// <summary>
+    /// Wakes a sleeping body because a deterministic simulation or host stimulus changed its state.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void Wake()
+    {
+        _sleepFrameCount = 0;
+        if (!_isSleeping)
+            return;
+
+        _isSleeping = false;
+        RefreshPartitionAwakeState();
+    }
+
+    private bool CanSleep => Active && SleepEnabled && !Immovable && !IsKinematic;
+
+    private void UpdateSleepState()
+    {
+        if (!CanSleep)
+        {
+            _sleepFrameCount = 0;
+            return;
+        }
+
+        if (_linearSpeed > SleepLinearSpeedThreshold || _angularSpeed > SleepAngularSpeedThreshold)
+        {
+            _sleepFrameCount = 0;
+            return;
+        }
+
+        if (_sleepFrameCount < _sleepFrameThreshold)
+            _sleepFrameCount++;
+
+        if (_sleepFrameCount >= _sleepFrameThreshold)
+            Sleep();
+    }
+
+    private void ClearMotionForSleep()
+    {
+        _linearVelocity = Vector3d.Zero;
+        _linearDirection = Vector3d.Zero;
+        _linearAccelerationStore = Vector3d.Zero;
+        _deltaAcceleration = Vector3d.Zero;
+        _linearAcceleration = Vector3d.Zero;
+        _linearSpeed = Fixed64.Zero;
+        _angularVelocity = Vector3d.Zero;
+        _angularDirection = Vector3d.Zero;
+        _deltaTorque = Vector3d.Zero;
+        _angularAccelerationStore = Vector3d.Zero;
+        _angularAcceleration = Vector3d.Zero;
+        _angularSpeed = Fixed64.Zero;
+        _impulseStore = Vector3d.Zero;
+        _positionCorrection = Vector2d.Zero;
+        _timeScaledAcceleration = Vector3d.Zero;
+        _timeScaledDeceleration = Vector3d.Zero;
+        _decelerating = false;
+        _isVelocityConstant = true;
+    }
+
+    private void RefreshPartitionAwakeState()
+    {
+        if (Collider is { IsPartitioned: true })
+            Context.Collisions.RefreshPartitionAwakeState(Collider);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -501,6 +673,9 @@ public class StiffBody : IRecordable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void AddTorque(Vector3d torque)
     {
+        if (torque != Vector3d.Zero)
+            Wake();
+
         _deltaTorque += torque * _inverseInertiaTensor;
         Context.Diagnostics.EmitTorqueDelta(this, torque);
     }
@@ -508,6 +683,9 @@ public class StiffBody : IRecordable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void AddForce(Vector3d force)
     {
+        if (force != Vector3d.Zero)
+            Wake();
+
         Vector3d accelerationDelta = force * InverseMass;
         _deltaAcceleration += accelerationDelta;
         Context.Diagnostics.EmitForceDelta(this, force, accelerationDelta);
@@ -517,6 +695,9 @@ public class StiffBody : IRecordable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void AddLinearImpulse(Vector3d impulse)
     {
+        if (impulse != Vector3d.Zero)
+            Wake();
+
         _impulseStore += (impulse * InverseMass) * Context.DeltaTime;
         // testing immediate reaction for collisions...
         UpdateLinearVelocity();
@@ -526,6 +707,9 @@ public class StiffBody : IRecordable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void AddAngularImpulse(Vector3d impulse)
     {
+        if (impulse != Vector3d.Zero)
+            Wake();
+
         if (!AngularForcesHalted)
             _angularVelocity += (impulse * _inverseInertiaTensor) * Context.DeltaTime;
     }
@@ -535,6 +719,7 @@ public class StiffBody : IRecordable
         if (Immovable || IsKinematic || velocityDelta == Vector3d.Zero)
             return;
 
+        Wake();
         Vector3d lastVelocity = _linearVelocity;
         _linearVelocity += velocityDelta;
         RefreshLinearMotionState(lastVelocity);
@@ -546,6 +731,7 @@ public class StiffBody : IRecordable
         if (AngularForcesHalted || IsKinematic || velocityDelta == Vector3d.Zero)
             return;
 
+        Wake();
         Vector3d lastVelocity = _angularVelocity;
         _angularVelocity += velocityDelta;
         RefreshAngularMotionState(lastVelocity);
@@ -557,20 +743,38 @@ public class StiffBody : IRecordable
         if (Immovable || IsKinematic || positionCorrection == Vector3d.Zero)
             return;
 
-        SetPosition(Position3d + positionCorrection);
+        Position3d += positionCorrection;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void SetPosition(Vector3d position) => Position3d = position;
+    public void SetPosition(Vector3d position)
+    {
+        if (Position3d != position)
+            Wake();
+
+        Position3d = position;
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void AddPositionCorrection(Vector3d positionCorrection) => _positionCorrection += positionCorrection.ToVector2d();
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void SetHeight(Fixed64 height) => HeightPos = height;
+    public void SetHeight(Fixed64 height)
+    {
+        if (HeightPos != height)
+            Wake();
+
+        HeightPos = height;
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void SetRotation(FixedQuaternion quaternion) => Rotation = quaternion;
+    public void SetRotation(FixedQuaternion quaternion)
+    {
+        if (Rotation != quaternion)
+            Wake();
+
+        Rotation = quaternion;
+    }
 
     private void ProcessMovable()
     {
@@ -1225,6 +1429,9 @@ public class StiffBody : IRecordable
         _linearVelocity = Vector3d.Zero;
         _angularVelocity = Vector3d.Zero;
         _linearSpeed = Fixed64.Zero;
+        _angularSpeed = Fixed64.Zero;
+        _isSleeping = false;
+        _sleepFrameCount = 0;
         _normalForce = Vector3d.Zero;
 
         Position2d = position.ToVector2d();
@@ -1279,6 +1486,12 @@ public class StiffBody : IRecordable
         RecordValues.Look(chronicler, ref _angularVelocity, "AngularVelocity");
         RecordValues.Look(chronicler, ref _angularDirection, "AngularDirection");
         RecordValues.Look(chronicler, ref RestitutionCoefficient, "RestitutionCoefficient");
+        RecordValues.Look(chronicler, ref _isSleeping, "IsSleeping");
+        RecordValues.Look(chronicler, ref _sleepFrameCount, "SleepFrameCount");
+        RecordValues.Look(chronicler, ref _sleepEnabled, "SleepEnabled", true);
+        RecordValues.Look(chronicler, ref _sleepFrameThreshold, "SleepFrameThreshold", 16);
+        RecordValues.Look(chronicler, ref _sleepLinearSpeedThreshold, "SleepLinearSpeedThreshold", (Fixed64)0.001f);
+        RecordValues.Look(chronicler, ref _sleepAngularSpeedThreshold, "SleepAngularSpeedThreshold", (Fixed64)0.001f);
         RecordValues.Look(chronicler, ref _linearSpeed, "LinearSpeed");
         RecordValues.Look(chronicler, ref _linearAccelerationStore, "LinearAccelerationStore");
         RecordValues.Look(chronicler, ref _deltaAcceleration, "DeltaAcceleration");

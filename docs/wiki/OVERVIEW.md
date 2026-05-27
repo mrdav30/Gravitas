@@ -78,12 +78,12 @@ flowchart TD
 | --- | --- |
 | `GravitasWorldContext` | Owns one active `GridWorld` plus all context-local runtime services. |
 | `IMatterAgent` | Host boundary. Supplies context, fixed transform, hierarchy state, and interaction state. |
-| `StiffBody` | Simulated body state: position, rotation, velocity, acceleration, mass, grounding, impulses, interpolation, and Chronicler record data. |
+| `StiffBody` | Simulated body state: position, rotation, velocity, acceleration, mass, grounding, impulses, sleep/wake state, interpolation, and Chronicler record data. |
 | `LSCollider` | Base collider state: shape, bounds, layer, trigger/contact events, partition coordinates, pair references, and context binding. |
 | `GravitasPhysicsService` | Body/collider registration, context-local collider IDs, collision-pair pooling, simulation phases, and visualization phases. |
 | `GravitasCollisionService` | GridForge-backed broad-phase partitioning, active partition tracking, partition pooling, and collision distribution versioning. |
-| `PhysicsPartition` | Voxel partition payload containing collider IDs and distributing candidate pairs. |
-| `CollisionPair` | Pair identity, culling state, contact state, narrow-phase dispatch, response dispatch, and contact notification state. |
+| `PhysicsPartition` | Voxel partition payload containing collider IDs, awake dynamic membership, and candidate pair distribution. |
+| `CollisionPair` | Pair identity, culling state, contact state, warm-start cache, narrow-phase dispatch, response dispatch, and contact notification state. |
 | `CollisionDetection` | Shape-pair narrow-phase collision checks and contact generation. |
 | `CollisionResponse` | Prototype position correction and impulse response for colliding bodies. |
 | `GravitasRaycastService` | Context-local raycast and swept-sphere buffers, candidate gathering, duplicate suppression, and hit ordering. |
@@ -114,15 +114,18 @@ flowchart TD
 Colliders calculate bounds and are mapped into GridForge voxels by
 `GravitasCollisionService`. Each occupied voxel can hold a `PhysicsPartition`.
 Partitions store context-local collider IDs and are active when they contain
-dynamic objects. During `Simulate`, active partitions distribute candidate
-pairs. `GravitasPhysicsService` filters candidates by context, active state,
-shape, layer matrix, dynamic/static rules, and sibling relationships. A
-`CollisionPair` then performs fast distance/AABB culling before dispatching to
+dynamic objects. During `Simulate`, active partitions distribute candidates from
+awake dynamic membership so fully sleeping partitions can skip pair generation
+without removing sleeping colliders from queries or contact lifecycle.
+`GravitasPhysicsService` filters candidates by context, active state, shape,
+layer matrix, dynamic/static rules, and sibling relationships. A `CollisionPair`
+then performs fast distance/AABB culling before dispatching to
 `CollisionDetection`. If the narrow phase finds contact, it writes a fixed-size
 `ContactManifold`; if the pair has bodies that should receive physics,
 `CollisionResponse` applies solver-side position correction, normal impulses,
-and friction impulses across the manifold contacts. Contact events are emitted
-from the active-pair queue during `LateSimulate`.
+and friction impulses across the manifold contacts, then stores pair-local
+warm-start impulse data by contact identity. Contact events are emitted from the
+active-pair queue during `LateSimulate`.
 
 ## Current Prototype Edges
 
@@ -137,8 +140,9 @@ from the active-pair queue during `LateSimulate`.
   future hardening work.
 - Collision response is still an alpha-hardening target. The current manifold
   solver handles deterministic normal and friction impulses, but static resting
-  friction, warm starting, island solving, continuous collision detection, and
-  mixed-dimension impulse exchange remain future work.
+  friction, true warm-start impulse application, explicit island solving,
+  continuous collision detection, and mixed-dimension impulse exchange remain
+  future work.
 - Query services use context-owned mutable buffers. Treat them as same-thread,
   fixed-loop services unless they are redesigned for reentrancy.
 - Diagnostics are context-owned and disabled by default. Enabled draw capture can

@@ -35,6 +35,10 @@ is added to a voxel, and the partition returns to that owner service pool from
 Current static-membership behavior is specific: colliders whose body exists and
 has `Immovable == true` are added to `ContainedStaticObjects`. Other registered
 colliders are added to `ContainedDynamicObjects`, including bodyless colliders.
+Dynamic partitions also keep `ContainedAwakeDynamicObjects`, a second sparse set
+for dynamic collider IDs whose bodies are currently awake for collision work.
+Sleeping bodies stay in normal dynamic membership so queries, wake propagation,
+pair cleanup, and contact lifecycle can still find them.
 
 ## Collider Runtime Shape State
 
@@ -53,6 +57,8 @@ Mutating `LocalOffset`, `Radius`, or `Size` marks the runtime shape dirty.
 Changing host/body scale, position, or rotation is detected from the snapshot on
 the next `Simulate()` call. If the snapshot has not changed, the collider skips
 the rebuild and keeps its existing partition state.
+Shape mutation wakes a sleeping bound body before the broad phase refreshes, so
+changed bounds cannot remain hidden behind a sleeping partition entry.
 
 Partition state tracks grid coordinates, previous snapped grid bounds,
 partition-change flags, and broad-phase versioning together. Query state tracks
@@ -123,10 +129,13 @@ pairs.
 
 `PhysicsPartition.Distribute()` checks:
 
-- every dynamic/dynamic pair in that partition.
-- every dynamic/static pair in that partition.
+- every awake dynamic against the other dynamic IDs in that partition.
+- every awake dynamic against the static IDs in that partition.
 
-Static/static pairs are not distributed.
+If a partition contains no awake dynamic IDs, distribution returns before pair
+generation. Static/static pairs are not distributed. This is the current alpha
+sleep optimization: it is partition-local and flat, not a recursive island or
+tree-propagation system.
 
 ## Pair Creation And Filtering
 
@@ -288,6 +297,11 @@ when detection reports a collision and the pair should perform physics response.
 Pairs with either collider marked as a trigger skip physical response; they can
 still flow through contact notification.
 
+When an awake dynamic body collides with a sleeping dynamic body, the pair wakes
+the sleeping body before response. If every dynamic body in the partition is
+sleeping, pair generation is skipped until a deterministic wake reason changes
+one of those bodies or its shape state.
+
 Current non-trigger response behavior is a deterministic fixed-capacity
 manifold solver:
 
@@ -313,6 +327,8 @@ manifold solver:
    Coulomb friction impulse along the tangent. The tangent impulse is clamped to
    `normalImpulse * frictionCoefficient`, where the pair coefficient is the
    geometric mean of the two body coefficients.
+9. store the solved normal and tangent impulse scalars in a fixed-size
+   pair-local warm-start cache keyed by stable manifold contact identity.
 
 When diagnostics are enabled, the pair emits contact and response events in the
 same deterministic order as collision processing: `Contact`, one
@@ -336,16 +352,42 @@ Response units and invariants:
 - `StiffBody.FrictionCoefficient` is a non-negative Coulomb coefficient. Values
   above one are allowed for intentional high-friction materials.
 - friction impulses oppose tangential contact motion and are clamped by the
-  normal impulse. Static resting friction without a normal impulse cache is not
-  modeled yet.
+  normal impulse. Pair-local warm-start storage now records normal and tangent
+  impulses by contact identity; applying cached impulses as a true warm-started
+  iterative solve remains a later solver hardening step.
 - penetration depth is a world distance from narrow phase; response slop is a
   solver invariant, not contact data.
 - drag and angular damping remain integration/body behavior; contact friction is
   handled by the response solver.
 
 This is still the first alpha milestone, not a full response engine. Static
-friction for resting stacks, continuous collision detection, warm starting,
-island solving, and 2D/3D mixed-dimension exchange rules remain future work.
+friction for resting stacks, continuous collision detection, full iterative
+warm-start application, explicit island solving, and 2D/3D mixed-dimension
+exchange rules remain future work.
+
+## Body Sleep And Wake
+
+`StiffBody` owns deterministic sleep state. A dynamic non-kinematic body can
+sleep after its linear and angular speeds remain at or below explicit thresholds
+for `SleepFrameThreshold` fixed frames. Sleeping clears accumulated force,
+impulse, velocity, torque, acceleration, and pending position-correction state,
+but does not remove the collider from GridForge partitions.
+
+Current deterministic wake stimuli are:
+
+- explicit host wake through `Wake()`.
+- non-zero force.
+- non-zero linear impulse.
+- non-zero angular impulse or torque.
+- collision with an awake body.
+- kinematic host motion.
+- host transform teleport.
+- collider shape mutation.
+
+Waking refreshes the collider's awake membership across its current partitions.
+For now, this is a flat voxel-partition optimization. A future explicit island
+builder should use the same wake rules, then expand them across connected
+contacts when island-wide sleep is introduced.
 
 ## Contact Notifications
 
@@ -357,6 +399,10 @@ time they update. During `context.LateSimulate()`,
 - emits ongoing contact notifications when the pair is still active and not
   culled.
 - keeps active pairs queued for future maintenance.
+
+Sleeping contact pairs are preserved while their manifold is still known to be
+colliding. This prevents a resting sleeping contact from aging out and emitting
+a false contact exit simply because its partition skipped pair generation.
 
 `LSCollider.NotifyContact(...)` emits:
 

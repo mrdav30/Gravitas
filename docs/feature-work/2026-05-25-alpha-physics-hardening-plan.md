@@ -354,14 +354,14 @@ Meaningful deferred work captured from that plan and the wiki:
 
 **Tasks:**
 
-- [ ] Define deterministic island membership, island ordering, pair ordering inside an island, and body wake/sleep rules.
-- [ ] Add tests for stacked bodies, body wake-up after impulse, sleeping body ignored by solver until disturbed, and stable island ordering across repeated runs.
-- [ ] Add per-partition awake dynamic membership or awake-count state so `PhysicsPartition.Distribute()` can skip pair generation when a voxel contains no awake dynamic bodies.
-- [ ] Keep sleeping bodies in normal dynamic partition membership so raycasts, overlap queries, wake propagation, contact exits, and future island rebuilds can still find them.
-- [ ] Define deterministic wake reasons: force, impulse, collision with an awake body, kinematic motion, host transform teleport, shape/bounds mutation, and explicit host wake.
-- [ ] Add warm-start storage keyed by stable pair/manifold contact identity.
-- [ ] Ensure sleeping and warm starting never skip collision events or trigger/contact notifications incorrectly.
-- [ ] Benchmark large resting scenes before and after island/sleep changes, including partitions with only sleeping dynamic bodies.
+- [x] Define deterministic island membership, island ordering, pair ordering inside an island, and body wake/sleep rules.
+- [x] Add tests for stacked bodies, body wake-up after impulse, sleeping body ignored by solver until disturbed, and stable island ordering across repeated runs.
+- [x] Add per-partition awake dynamic membership or awake-count state so `PhysicsPartition.Distribute()` can skip pair generation when a voxel contains no awake dynamic bodies.
+- [x] Keep sleeping bodies in normal dynamic partition membership so raycasts, overlap queries, wake propagation, contact exits, and future island rebuilds can still find them.
+- [x] Define deterministic wake stimuli: force, impulse, collision with an awake body, kinematic motion, host transform teleport, shape/bounds mutation, and explicit host wake.
+- [x] Add warm-start storage keyed by stable pair/manifold contact identity.
+- [x] Ensure sleeping and warm starting never skip collision events or trigger/contact notifications incorrectly.
+- [x] Benchmark large resting scenes before and after island/sleep changes, including partitions with only sleeping dynamic bodies.
 
 **Design Notes:**
 
@@ -377,6 +377,57 @@ Meaningful deferred work captured from that plan and the wiki:
   under explicit linear/angular thresholds for the configured frame window. A
   wake event should wake the body and deterministically wake affected island or
   contact-connected neighbors.
+
+**Phase 5 Status - 2026-05-26**
+
+- Added deterministic body sleep state to `StiffBody`: configurable sleep
+  enablement, frame window, linear/angular speed thresholds, explicit
+  `Sleep()`, and `Wake()`. Sleep clears accumulated motion
+  state while leaving the collider partitioned.
+- Defined deterministic wake stimuli in docs and tests without exposing unused
+  wake-reason API: explicit host wake, force, linear impulse, angular impulse,
+  collision, kinematic motion, transform teleport, and shape mutation.
+  Force/impulse/teleport/shape/collision paths now wake sleeping bodies before
+  mutation or response.
+- Follow-up review removed the unused `StiffBodyWakeReason` enum and simplified
+  `Wake()` so Phase 5 does not leave speculative diagnostics/island-propagation
+  scaffolding in the public API.
+- Added `PhysicsPartition.ContainedAwakeDynamicObjects` and awake-count helpers.
+  Partitions still keep all sleeping bodies in `ContainedDynamicObjects`, but
+  `Distribute()` now returns early when a voxel has no awake dynamic IDs and
+  distributes awake dynamic IDs against dynamic/static membership otherwise.
+- Added collision-service awake-state refresh so body wake/sleep transitions
+  update every partition currently occupied by the collider.
+- Preserved sleeping resting contacts in the active-pair queue so a fully
+  sleeping contact does not age out and emit a false contact exit while its
+  partition legitimately skips pair generation.
+- Added fixed-size pair-local warm-start storage keyed by stable manifold
+  contact identity. The current solver records normal and tangent impulse
+  scalars; applying cached impulses as a true iterative warm start remains a
+  later solver hardening task.
+- Defined the alpha "island" boundary as the current flat GridForge partition
+  candidate set plus awake dynamic membership. No explicit graph island builder
+  was introduced in this phase because the current solver still resolves pairs
+  immediately during partition distribution. A future explicit island solver
+  should build from the same body wake rules and pair/contact identities.
+- Added focused tests for sleep window behavior, wake stimuli, shape mutation
+  wake, stacked resting body sleep, sleeping-only partition skip, awake-vs-
+  sleeping pair processing, contact-enter preservation, sleeping resting
+  contact retention, repeated contact ordering, and warm-start storage/reset.
+- Added `DistributeSleepingOnlyDynamicPartition` to the partition-culling
+  benchmarks to watch the no-awake-dynamic branch. Short local smoke reported
+  about `6.24 ns` mean and no managed allocation for 64 sleeping dynamic IDs;
+  BenchmarkDotNet could not raise process priority in this sandbox, so treat
+  timing as smoke evidence only.
+- Updated `docs/wiki/COLLISION_PIPELINE.md`,
+  `docs/wiki/RUNTIME_ARCHITECTURE.md`, and `docs/wiki/OVERVIEW.md` with the
+  sleep/awake partition and warm-start storage behavior.
+- Verification passed:
+  `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~CollisionHandlingTests|FullyQualifiedName~PhysicsPartition|FullyQualifiedName~StiffBody"`
+  passed with 86 tests; `dotnet test Gravitas.slnx --configuration Release --no-restore`
+  passed with 169 tests; `dotnet test Gravitas.slnx --configuration ReleaseLean --no-restore`
+  passed with 169 tests. The `ReleaseLean` test command emitted the existing
+  MemoryPack shim `CS0436` warnings while still completing successfully.
 
 ## Phase 6: Continuous Collision Detection And Swept Mesh Policy
 

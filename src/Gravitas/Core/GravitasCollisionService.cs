@@ -293,6 +293,45 @@ public sealed class GravitasCollisionService
         return true;
     }
 
+    internal void RefreshPartitionAwakeState(LSCollider collider)
+    {
+        SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
+        SwiftThrowHelper.ThrowIfArgument(
+            !ReferenceEquals(collider.Context, _context),
+            nameof(collider),
+            "Collider must belong to this collision service context.");
+
+        if (!collider.IsPartitioned || collider.PartitionCoordinates == null)
+            return;
+
+        StiffBody? body = collider.Body;
+        if (body == null || body.Immovable)
+            return;
+
+        bool awake = body.IsAwakeForCollision;
+        GridWorld world = _context.World;
+
+        try
+        {
+            for (int i = 0; i < collider.PartitionCoordinates.Count; i++)
+            {
+                WorldVoxelIndex coordinate = collider.PartitionCoordinates[i];
+                if (!world.TryGetVoxel(coordinate, out Voxel? voxel)
+                    || !_redundancyChecker.Add(voxel!.SpawnToken)
+                    || !voxel.TryGetPartition(out PhysicsPartition? partition))
+                {
+                    continue;
+                }
+
+                partition!.SetDynamicObjectAwake(collider.Id, awake);
+            }
+        }
+        finally
+        {
+            _redundancyChecker.Clear();
+        }
+    }
+
     internal void CheckAndDistributeCollisions()
     {
         Version++;

@@ -17,6 +17,9 @@ public class PartitionCullingBenchmarks
     private GravitasWorldContext _churnContext;
     private PhysicsPartition _churnPartition;
 
+    private GravitasWorldContext _sleepContext;
+    private PhysicsPartition _sleepingPartition;
+
     private GravitasWorldContext _cullContext;
     private StiffBody _cullBody;
     private LSCollider _cullCollider;
@@ -43,6 +46,14 @@ public class PartitionCullingBenchmarks
         for (int i = 0; i < ColliderCount; i++)
             _churnPartition.AddDynamicObject(i);
 
+        _sleepContext = BenchmarkPhysicsScene.CreateContext(4);
+        _sleepingPartition = _sleepContext.Collisions.RentPartition();
+        for (int i = 0; i < ColliderCount; i++)
+        {
+            _sleepingPartition.AddDynamicObject(i);
+            _sleepingPartition.SetDynamicObjectAwake(i, awake: false);
+        }
+
         _cullContext = BenchmarkPhysicsScene.CreateContext(gridExtent);
         StiffBody firstBody = CreateDynamicSphere(_cullContext, new Vector3d(Fixed64.Zero, Fixed64.Zero, Fixed64.Zero));
         _cullBody = CreateDynamicSphere(_cullContext, new Vector3d((Fixed64)8, Fixed64.Zero, Fixed64.Zero));
@@ -56,6 +67,7 @@ public class PartitionCullingBenchmarks
     {
         _repartitionContext.Dispose();
         _churnContext.Dispose();
+        _sleepContext.Dispose();
         _cullContext.Dispose();
 
         _repartitionContext = null;
@@ -63,6 +75,8 @@ public class PartitionCullingBenchmarks
         _repartitionBasePositions = null;
         _churnContext = null;
         _churnPartition = null;
+        _sleepContext = null;
+        _sleepingPartition = null;
         _cullContext = null;
         _cullBody = null;
         _cullCollider = null;
@@ -94,6 +108,13 @@ public class PartitionCullingBenchmarks
             _churnPartition.AddDynamicObject(i);
 
         return _churnPartition.ContainedDynamicObjects?.Count ?? 0;
+    }
+
+    [Benchmark]
+    public int DistributeSleepingOnlyDynamicPartition()
+    {
+        _sleepContext.Collisions.CheckAndDistributeCollisions();
+        return _sleepingPartition.AwakeDynamicObjectCount;
     }
 
     [Benchmark]
