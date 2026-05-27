@@ -103,15 +103,35 @@ public sealed class RaycastSegmentWorker
 
     public bool CheckMeshOverlaps(LSMeshCollider meshCollider, ref SwiftList<Vector3d> outputIntersectionPoints)
     {
+        Vector3d localOrigin = meshCollider.Mesh.ConvertWorldToLocal(_cachedOrigin);
+        Vector3d localEnd = meshCollider.Mesh.ConvertWorldToLocal(_cachedEnd);
+        Vector3d localSegment = localEnd - localOrigin;
+        Fixed64 localSegmentLengthSqr = localSegment.SqrMagnitude;
+        Fixed64 localSegmentLength = localSegmentLengthSqr == Fixed64.Zero ? Fixed64.Zero : localSegment.Magnitude;
+        Vector3d localSegmentDirection = localSegmentLength == Fixed64.Zero ? Vector3d.Zero : localSegment / localSegmentLength;
+
         _meshTriangleBuffer.FastClear();
-        meshCollider.Mesh.TriangleBVH.Query(CreateSegmentBounds(), _meshTriangleBuffer);
+        meshCollider.Mesh.GetTrianglesInLocalBounds(CreateSegmentBounds(localOrigin, localEnd), _meshTriangleBuffer);
         bool intersects = false;
         for (int i = 0; i < _meshTriangleBuffer.Count; i++)
         {
             int triangleIndex = _meshTriangleBuffer[i];
-            meshCollider.Mesh.GetTriangleVertices(triangleIndex, out Vector3d first, out Vector3d second, out Vector3d third);
-            if (!TryAddTriangleIntersection(first, second, third, meshCollider.Mesh.FaceNormals[triangleIndex], ref outputIntersectionPoints))
+            meshCollider.Mesh.GetLocalTriangleVertices(triangleIndex, out Vector3d first, out Vector3d second, out Vector3d third);
+            if (!TryAddLocalTriangleIntersection(
+                    meshCollider.Mesh,
+                    first,
+                    second,
+                    third,
+                    meshCollider.Mesh.FaceNormals[triangleIndex],
+                    localOrigin,
+                    localEnd,
+                    localSegmentDirection,
+                    localSegmentLength,
+                    localSegmentLengthSqr,
+                    ref outputIntersectionPoints))
+            {
                 continue;
+            }
 
             intersects = true;
             if (!_calculateIntersections)
@@ -296,56 +316,62 @@ public sealed class RaycastSegmentWorker
         return true;
     }
 
-    private bool TryAddTriangleIntersection(
+    private bool TryAddLocalTriangleIntersection(
+        PhysicsMesh mesh,
         Vector3d first,
         Vector3d second,
         Vector3d third,
         Vector3d normal,
+        Vector3d localOrigin,
+        Vector3d localEnd,
+        Vector3d localSegmentDirection,
+        Fixed64 localSegmentLength,
+        Fixed64 localSegmentLengthSqr,
         ref SwiftList<Vector3d> outputIntersectionPoints)
     {
-        if (_segmentLengthSqr == Fixed64.Zero)
+        if (localSegmentLengthSqr == Fixed64.Zero)
         {
-            if (Vector3d.Dot(_cachedOrigin - first, normal).Abs() > Fixed64.Epsilon
-                || !MeshUtils.IsPointInTrianglePlane(first, second, third, normal, _cachedOrigin))
+            if (Vector3d.Dot(localOrigin - first, normal).Abs() > Fixed64.Epsilon
+                || !MeshUtils.IsPointInTrianglePlane(first, second, third, normal, localOrigin))
             {
                 return false;
             }
 
-            AddTriangleIntersectionPoint(_cachedOrigin, ref outputIntersectionPoints);
+            AddTriangleIntersectionPoint(mesh.ConvertLocalToWorld(localOrigin), ref outputIntersectionPoints);
             return true;
         }
 
-        Fixed64 denominator = Vector3d.Dot(normal, _segmentDirection);
+        Fixed64 denominator = Vector3d.Dot(normal, localSegmentDirection);
         if (denominator.Abs() <= Fixed64.Epsilon)
         {
-            if (Vector3d.Dot(_cachedOrigin - first, normal).Abs() > Fixed64.Epsilon)
+            if (Vector3d.Dot(localOrigin - first, normal).Abs() > Fixed64.Epsilon)
                 return false;
 
             bool found = false;
-            if (MeshUtils.IsPointInTrianglePlane(first, second, third, normal, _cachedOrigin))
+            if (MeshUtils.IsPointInTrianglePlane(first, second, third, normal, localOrigin))
             {
-                AddTriangleIntersectionPoint(_cachedOrigin, ref outputIntersectionPoints);
+                AddTriangleIntersectionPoint(mesh.ConvertLocalToWorld(localOrigin), ref outputIntersectionPoints);
                 found = true;
             }
 
-            if (MeshUtils.IsPointInTrianglePlane(first, second, third, normal, _cachedEnd))
+            if (MeshUtils.IsPointInTrianglePlane(first, second, third, normal, localEnd))
             {
-                AddTriangleIntersectionPoint(_cachedEnd, ref outputIntersectionPoints);
+                AddTriangleIntersectionPoint(mesh.ConvertLocalToWorld(localEnd), ref outputIntersectionPoints);
                 found = true;
             }
 
             return found;
         }
 
-        Fixed64 distance = Vector3d.Dot(first - _cachedOrigin, normal) / denominator;
-        if (distance < Fixed64.Zero || distance > _segmentLength)
+        Fixed64 distance = Vector3d.Dot(first - localOrigin, normal) / denominator;
+        if (distance < Fixed64.Zero || distance > localSegmentLength)
             return false;
 
-        Vector3d point = _cachedOrigin + _segmentDirection * distance;
-        if (!MeshUtils.IsPointInTrianglePlane(first, second, third, normal, point))
+        Vector3d localPoint = localOrigin + localSegmentDirection * distance;
+        if (!MeshUtils.IsPointInTrianglePlane(first, second, third, normal, localPoint))
             return false;
 
-        AddTriangleIntersectionPoint(point, ref outputIntersectionPoints);
+        AddTriangleIntersectionPoint(mesh.ConvertLocalToWorld(localPoint), ref outputIntersectionPoints);
         return true;
     }
 
@@ -363,10 +389,10 @@ public sealed class RaycastSegmentWorker
         outputIntersectionPoints.Add(point);
     }
 
-    private FixedBoundVolume CreateSegmentBounds()
+    private static FixedBoundVolume CreateSegmentBounds(Vector3d origin, Vector3d end)
     {
-        Vector3d min = Vector3d.Min(_cachedOrigin, _cachedEnd);
-        Vector3d max = Vector3d.Max(_cachedOrigin, _cachedEnd);
+        Vector3d min = Vector3d.Min(origin, end);
+        Vector3d max = Vector3d.Max(origin, end);
         return new FixedBoundVolume(min, max);
     }
 

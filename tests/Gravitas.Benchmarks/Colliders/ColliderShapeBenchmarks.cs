@@ -14,6 +14,8 @@ public class ColliderShapeBenchmarks
     private StiffBody[] _bodies;
     private Vector3d[] _meshVertices;
     private int[] _meshTriangles;
+    private LSMeshCollider _meshCollider;
+    private StiffBody _meshBody;
     private SwiftList<int> _meshHits;
     private int _tick;
 
@@ -57,6 +59,18 @@ public class ColliderShapeBenchmarks
         };
         _meshTriangles = new[] { 0, 1, 2, 1, 3, 2 };
         _meshHits = new SwiftList<int>(2);
+
+        var meshAgent = new BenchmarkMatterAgent(_context, Vector3d.Zero);
+        _meshCollider = new LSMeshCollider(_meshVertices, _meshTriangles);
+        _meshBody = new StiffBody(meshAgent, _meshCollider)
+        {
+            Mass = Fixed64.One,
+            PreventAngularForces = true
+        };
+
+        _meshBody.Initialize(Vector3d.Zero, FixedQuaternion.Identity);
+        _meshCollider.Simulate();
+        _meshCollider.GetTrianglesInBounds(new FixedBoundVolume(Vector3d.Zero, Vector3d.One), _meshHits);
     }
 
     [GlobalCleanup]
@@ -68,6 +82,8 @@ public class ColliderShapeBenchmarks
         _bodies = null;
         _meshVertices = null;
         _meshTriangles = null;
+        _meshCollider = null;
+        _meshBody = null;
         _meshHits = null;
     }
 
@@ -108,5 +124,22 @@ public class ColliderShapeBenchmarks
             new FixedBoundVolume(Vector3d.Zero, Vector3d.One),
             _meshHits);
         return _meshHits.Count;
+    }
+
+    [Benchmark]
+    public int MoveMeshRuntimeShapeStateAndQueryTriangles()
+    {
+        Vector3d position = (_tick & 1) == 0
+            ? Vector3d.Zero
+            : new Vector3d(Fixed64.Half, Fixed64.Zero, Fixed64.Zero);
+
+        _meshBody.SetPosition(position);
+        _meshCollider.Simulate();
+        _meshCollider.GetTrianglesInBounds(
+            new FixedBoundVolume(position, position + Vector3d.One),
+            _meshHits);
+
+        _tick++;
+        return _meshHits.Count + _meshCollider.Mesh.TriangleBvhBuildCount;
     }
 }

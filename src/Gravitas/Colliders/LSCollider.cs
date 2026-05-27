@@ -293,6 +293,7 @@ public abstract class LSCollider : IRecordable
     private void InitCore(IMatterAgent agent)
     {
         SwiftThrowHelper.ThrowIfNull(agent, nameof(agent));
+        OnBeforeInitialize(agent);
 
         _queryState.Reset();
 
@@ -308,6 +309,8 @@ public abstract class LSCollider : IRecordable
 
         InitialPartition();
     }
+
+    protected virtual void OnBeforeInitialize(IMatterAgent agent) { }
 
     protected virtual void OnInitialize()
     {

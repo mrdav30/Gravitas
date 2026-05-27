@@ -17,13 +17,28 @@ public class LSMeshCollider : LSCollider
 
     public PhysicsMesh Mesh { get; private set; }
 
+    public MeshColliderMode Mode => Mesh.Mode;
+
     public LSMeshCollider(Vector3d[] vertices, int[] triangles)
+        : this(vertices, triangles, MeshColliderMode.Convex)
     {
-        Mesh = new PhysicsMesh(vertices, triangles, Vector3d.Zero, FixedQuaternion.Identity);
+    }
+
+    public LSMeshCollider(Vector3d[] vertices, int[] triangles, MeshColliderMode mode)
+    {
+        Mesh = new PhysicsMesh(vertices, triangles, Vector3d.Zero, FixedQuaternion.Identity, mode);
         _offset = Mesh.LocalBounds.Center;
         _size = Mesh.LocalBounds.Proportions;
         _radius = _size.Magnitude * Fixed64.Half;
         SetBounds(Mesh.Bounds);
+    }
+
+    protected override void OnBeforeInitialize(IMatterAgent agent)
+    {
+        SwiftThrowHelper.ThrowIfTrue(
+            MeshColliderPolicy.RequiresConvexDecomposition(Mode, Body),
+            nameof(LSMeshCollider),
+            "Explicit concave mesh colliders cannot be initialized as dynamic bodies. Use a convex mesh, kinematic/static concave mesh, or a decomposed convex/compound representation.");
     }
 
     protected override void OnInitialize()
@@ -59,8 +74,7 @@ public class LSMeshCollider : LSCollider
 
     public void GetTrianglesInBounds(FixedBoundVolume queryBounds, SwiftList<int> result)
     {
-        result.FastClear();
-        Mesh.TriangleBVH.Query(queryBounds, result);
+        Mesh.GetTrianglesInWorldBounds(queryBounds, result);
     }
 
     public override Vector3d ClosestPointOnSurface(Vector3d queryPoint)
@@ -78,8 +92,7 @@ public class LSMeshCollider : LSCollider
     {
         Vector3d boundedPoint = Bounds.ClosestPointOnSurface(queryPoint);
         FixedBoundVolume queryBounds = CreateQueryBounds(boundedPoint, GetMeshQueryHalfExtent());
-        triangleBuffer.FastClear();
-        Mesh.TriangleBVH.Query(queryBounds, triangleBuffer);
+        Mesh.GetTrianglesInWorldBounds(queryBounds, triangleBuffer);
         return TryFindClosestPointToTriangles(triangleBuffer, queryPoint, out closest, out normal);
     }
 
@@ -107,7 +120,7 @@ public class LSMeshCollider : LSCollider
         {
             int index = indices[i]; // index of the triangle
             Mesh.GetTriangleVertices(index, out Vector3d first, out Vector3d second, out Vector3d third);
-            Vector3d faceNormal = Mesh.FaceNormals[index];
+            Vector3d faceNormal = Mesh.GetFaceNormalWorld(index);
             Vector3d pointOnTriangle = MeshUtils.ClosestPointOnTriangle(first, second, third, faceNormal, point);
             Fixed64 distance = Vector3d.SqrDistance(point, pointOnTriangle);
             if (distance < minDistance)
@@ -136,13 +149,14 @@ public class LSMeshCollider : LSCollider
         Vector3d nearestPoint = closestPoint;
 
         // Iterate through all vertices of the mesh to find the closest point
-        for (int i = 0; i < Mesh.Vertices.Length; i++)
+        for (int i = 0; i < Mesh.VertexCount; i++)
         {
-            Fixed64 distance = Vector3d.SqrDistance(Mesh.Vertices[i], point);
+            Vector3d worldVertex = Mesh.GetVertexWorld(i);
+            Fixed64 distance = Vector3d.SqrDistance(worldVertex, point);
             if (distance >= minDistance) continue;
 
             minDistance = distance;
-            nearestPoint = Mesh.Vertices[i];
+            nearestPoint = worldVertex;
         }
 
         return nearestPoint;

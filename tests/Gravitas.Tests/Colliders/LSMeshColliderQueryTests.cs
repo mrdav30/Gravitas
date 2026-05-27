@@ -2,7 +2,9 @@ using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.Raycasting;
+using Gravitas.Tests.Support;
 using SwiftCollections;
+using SwiftCollections.Query;
 using Xunit;
 
 namespace Gravitas.Tests.Colliders;
@@ -53,6 +55,21 @@ public sealed class LSMeshColliderQueryTests
     }
 
     [Fact]
+    public void ClosestPointOnSurface_ShouldQueryMovedMeshInLocalBVHSpace()
+    {
+        using var scenario = PhysicsScenarioBuilder.Create();
+        var body = scenario.CreateBody(
+            CreateTriangleMesh(),
+            new Vector3d((Fixed64)6, Fixed64.Zero, Fixed64.Zero),
+            FixedQuaternion.Identity);
+
+        Vector3d closest = body.Collider.ClosestPointOnSurface(
+            new Vector3d((Fixed64)6 + Fixed64.Fraction(3, 4), Fixed64.Fraction(3, 4), (Fixed64)2));
+
+        closest.Should().Be(new Vector3d((Fixed64)6 + Fixed64.Half, Fixed64.Half, Fixed64.Zero));
+    }
+
+    [Fact]
     public void GetNearbyTriangles_ShouldUseDominantBoundsAxis()
     {
         LSMeshCollider mesh = CreateZDominantMesh();
@@ -63,6 +80,36 @@ public sealed class LSMeshColliderQueryTests
         indices.Count.Should().Be(2);
         ContainsTriangleIndex(indices, 0).Should().BeTrue();
         ContainsTriangleIndex(indices, 1).Should().BeTrue();
+    }
+
+    [Fact]
+    public void GetTrianglesInBounds_ShouldQueryMovedMeshWithoutRebuildingTriangleBVH()
+    {
+        using var scenario = PhysicsScenarioBuilder.Create();
+        var body = scenario.CreateBody(
+            CreateTriangleMesh(),
+            new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero),
+            FixedQuaternion.Identity);
+        var indices = new SwiftList<int>();
+
+        body.Collider.GetTrianglesInBounds(
+            new FixedBoundVolume(
+                new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero),
+                new Vector3d((Fixed64)6, Fixed64.One, Fixed64.Zero)),
+            indices);
+        int buildCount = body.Collider.Mesh.TriangleBvhBuildCount;
+
+        body.Body.SetPosition(new Vector3d((Fixed64)8, Fixed64.Zero, Fixed64.Zero));
+        body.Collider.Simulate();
+        body.Collider.GetTrianglesInBounds(
+            new FixedBoundVolume(
+                new Vector3d((Fixed64)8, Fixed64.Zero, Fixed64.Zero),
+                new Vector3d((Fixed64)9, Fixed64.One, Fixed64.Zero)),
+            indices);
+
+        indices.Count.Should().Be(1);
+        indices[0].Should().Be(0);
+        body.Collider.Mesh.TriangleBvhBuildCount.Should().Be(buildCount);
     }
 
     private static LSMeshCollider CreateTriangleMesh() =>

@@ -530,63 +530,98 @@ should not implement `LSCompoundCollider`.
 
 **Tasks:**
 
-- [ ] Define alpha shape policy terminology. Mesh modes should use `Convex` and
+- [x] Define alpha shape policy terminology. Mesh modes should use `Convex` and
   `Concave`; `Compound` should mean a separate `LSCompoundCollider` strategy,
   not a mesh mode. Keep `non-convex` as internal validation language for the
   wider set of topology problems such as concavity, open meshes, disconnected
   islands, self-intersection, non-manifold edges, holes, and winding issues.
-- [ ] Add an explicit mesh-collider mode or policy. Do not silently infer convex
+- [x] Add an explicit mesh-collider mode or policy. Do not silently infer convex
   versus concave behavior except for cheap validation that proves a declared mode
   is invalid. Developer intent should drive runtime policy.
-- [ ] Define the alpha boundary: static/kinematic concave triangle meshes are
+- [x] Define the alpha boundary: static/kinematic concave triangle meshes are
   acceptable collision data, convex meshes are the preferred dynamic mesh shape,
   and dynamic concave behavior should route through compound/decomposed-convex
   data unless a raw dynamic concave triangle-mesh policy is explicitly proven.
-- [ ] Decide whether alpha accepts only host/offline decomposed convex pieces for
+- [x] Decide whether alpha accepts only host/offline decomposed convex pieces for
   concave meshes, or whether Gravitas should own deterministic convex
   decomposition later. Do not implement automatic decomposition in 7A unless the
   algorithm, determinism contract, tests, and benchmarks are all explicit.
-- [ ] If 7A needs compound-related seams, keep them neutral and minimal:
+- [x] If 7A needs compound-related seams, keep them neutral and minimal:
   declared mesh modes, decomposed-convex policy names, and tests that prove raw
   dynamic concave meshes route to a future compound/decomposition path instead of
   silently behaving like convex meshes.
-- [ ] Refactor rigid mesh movement toward local-space acceleration ownership:
+- [x] Refactor rigid mesh movement toward local-space acceleration ownership:
   build local vertices, local triangle normals, local bounds, and local triangle
   BVH once; update only transform, inverse transform, and conservative world
   bounds when the mesh moves; rebuild the BVH only when local vertex or triangle
   topology changes.
-- [ ] Update mesh query and narrow-phase callers to transform world-space query
+- [x] Update mesh query and narrow-phase callers to transform world-space query
   shapes into mesh-local space, query the local triangle BVH, and transform final
   contact points/normals back to world space. Rotation-only normal transforms are
   enough for the current scale model; any future non-uniform mesh scale needs an
   inverse-transpose normal policy.
-- [ ] Benchmark dynamic mesh movement before and after the local-space BVH
+- [x] Benchmark dynamic mesh movement before and after the local-space BVH
   refactor. The expected win is avoiding O(triangle count) BVH rebuilds on rigid
   translation/rotation.
-- [ ] Add tests for invalid mesh input, declared mesh-mode validation, rotated
+- [x] Add tests for invalid mesh input, declared mesh-mode validation, rotated
   mesh bounds, dynamic mesh movement without triangle BVH rebuild, mesh/collider
   contact order, and concave/non-convex policy enforcement.
-- [ ] Add policy tests proving raw dynamic concave meshes are either rejected,
+- [x] Add policy tests proving raw dynamic concave meshes are either rejected,
   treated as static-only, or converted into declared convex/compound sub-shapes
   by initialization-time data. Runtime per-frame decomposition is out of scope
   for alpha.
-- [ ] Review `PhysicsMesh.CalculateInertiaTensor(...)` and decide the alpha contract: keep the current triangle-area-weighted approximation with documentation, or replace it with a deterministic thin-triangle/shell or tetrahedral volume approximation. Any replacement needs fixed-value tests on known simple meshes and benchmark coverage.
-- [ ] Decide whether the mesh edge cache remains required after manifold work. Remove it only if tests and benchmarks prove face normals/on-demand edges cover all callers.
-- [ ] Review the old `UnityMeshSimplifier` package and the prototype
+- [x] Review `PhysicsMesh.CalculateInertiaTensor(...)` and decide the alpha contract: keep the current triangle-area-weighted approximation with documentation, or replace it with a deterministic thin-triangle/shell or tetrahedral volume approximation. Any replacement needs fixed-value tests on known simple meshes and benchmark coverage.
+- [x] Decide whether the mesh edge cache remains required after manifold work. Remove it only if tests and benchmarks prove face normals/on-demand edges cover all callers.
+- [x] Review the old `UnityMeshSimplifier` package and the prototype
   `MeshSimplificationHelper` for design context without vendoring Unity-specific
   runtime code into Gravitas. If temporary scratch notes are created under
   `docs/feature-work/prototype`, remove them before closing the task unless the
   user explicitly asks to keep or force-add them.
-- [ ] Decide mesh simplification/LOD policy. Prefer host/offline simplification
+- [x] Decide mesh simplification/LOD policy. Prefer host/offline simplification
   for alpha; any Gravitas-owned runtime simplifier must be deterministic,
   fixed-point, bounded, benchmarked, and must not change collision truth during a
   simulation frame.
-- [ ] Decide dynamic mesh update boundaries: rigid transformed meshes should not
+- [x] Decide dynamic mesh update boundaries: rigid transformed meshes should not
   rebuild local BVH/topology data, while deformable/breakable topology or vertex
   updates require explicit invalidation, deterministic rebuild ordering, and
   separate tests before support is claimed.
-- [ ] Add benchmark coverage for mesh construction, BVH build, triangle query windows, dynamic mesh repartitioning, and mesh contact generation.
-- [ ] Document the mesh policy in host-facing terms so engine adapters know what data to provide.
+- [x] Add benchmark coverage for mesh construction, BVH build, triangle query windows, dynamic mesh repartitioning, and mesh contact generation.
+- [x] Document the mesh policy in host-facing terms so engine adapters know what data to provide.
+
+**Phase 7A Status - 2026-05-27**
+
+- Added explicit `MeshColliderMode` values for `Convex` and `Concave`, with
+  `MeshColliderPolicy` centralizing the alpha rule that movable dynamic concave
+  meshes require a decomposed-convex/compound representation instead of silently
+  behaving like convex meshes.
+- Kept automatic deterministic convex decomposition out of 7A because no
+  algorithm, determinism contract, pathological-shape tests, or benchmark budget
+  has been proven yet. The policy seam preserves the goal of Gravitas-owned
+  deterministic decomposition while keeping host/offline decomposed pieces as
+  the fallback path for 7B compound work.
+- Refactored `PhysicsMesh` to keep vertices, triangle normals, areas, bounds,
+  and triangle BVH in local mesh space. Rigid movement now updates transform,
+  inverse transform, lazy world vertices, and conservative world bounds without
+  rebuilding the triangle BVH.
+- Updated mesh triangle queries, mesh ray overlap, SAT mesh object data,
+  mesh-cylinder contact generation, closest-surface lookup, support-point lookup,
+  diagnostics, and inertia tensor behavior around the local-space mesh model.
+- Kept mesh edge caches for now. They are local-space topology data and should
+  only be removed in a later pass if tests and benchmarks prove on-demand edge
+  handling covers all callers.
+- Added focused tests for explicit mesh modes, dynamic concave rejection,
+  kinematic concave acceptance, local-space BVH rebuild stability, moved-mesh
+  world queries, moved-mesh closest-surface lookup, rotated mesh bounds, ray
+  intersections, collision shape pairs, diagnostics, and local-geometry inertia
+  tensors.
+- Added `MoveMeshRuntimeShapeStateAndQueryTriangles` benchmark coverage to
+  compare rigid mesh movement/query cost after the local-space BVH refactor.
+  The short smoke selected the benchmark successfully and measured the new path,
+  but still reported `216 B/op`. Treat that as Phase 8 query
+  scratch/data-structure follow-up rather than hiding it inside mesh policy work.
+- Updated `docs/wiki/COLLISION_PIPELINE.md` with explicit mesh modes,
+  local-space BVH ownership, concave dynamic-body policy, and simplification /
+  decomposition boundaries.
 
 **Design Notes:**
 
@@ -615,10 +650,9 @@ should not implement `LSCompoundCollider`.
 - Visual mesh normals, smoothing, simplification, and render LOD are not
   automatically physics data. Physics mesh normals and simplified collision
   geometry must be deterministic inputs or deterministic preprocessing outputs.
-- Current `PhysicsMesh.UpdatePosition(...)` transforms every vertex, invalidates
-  normals, rebuilds the triangle BVH, and updates bounds for rigid movement.
-  That is acceptable prototype behavior, but it is the wrong target for dynamic
-  meshes. The preferred design is a local-space BVH with query/collision inputs
+- Before 7A, `PhysicsMesh.UpdatePosition(...)` transformed every vertex,
+  invalidated normals, rebuilt the triangle BVH, and updated bounds for rigid
+  movement. The 7A target is a local-space BVH with query/collision inputs
   transformed into mesh-local coordinates and final outputs transformed back to
   world space.
 - The old Unity Mesh Simplifier package is useful context because it uses a
@@ -724,6 +758,12 @@ implementation plan before Phase 8.
 - [ ] Add stress tests for moving many colliders across grids, repeatedly emptying/refilling partitions, and querying colliders spanning many voxels.
 - [ ] Decide whether query services should remain context-owned mutable services or expose explicit caller-owned/rented query state for reentrancy.
 - [ ] Compare custom ray/segment workers against `FixedRay` for any first-hit or non-allocation query paths where the downstream primitive now fits.
+- [ ] Investigate the small managed allocation reported by the Phase 7A
+  `MoveMeshRuntimeShapeStateAndQueryTriangles` benchmark (`216 B/op` in the
+  2026-05-27 short smoke). Confirm whether it comes from
+  `SwiftFixedBVH<T>.Query(...)` scratch ownership, interface dispatch, or
+  Gravitas call-site state, then either fix the hot path or capture the
+  downstream SwiftCollections change needed.
 - [ ] Keep all-hit query paths caller-buffered and benchmarked.
 
 ## Phase 9: First-Class 2D Physics Foundation

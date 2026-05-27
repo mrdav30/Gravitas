@@ -29,13 +29,13 @@ internal sealed class MeshObjectInfo : CollisionObjectInfo
         for (int i = 0; i < TriangleIndices.Count; i++)
         {
             int index = TriangleIndices[i];
-            axisSet.Add(Collider.Mesh.FaceNormals[index]);
+            axisSet.Add(Collider.Mesh.GetFaceNormalWorld(index));
 
             for (int n = 0; n < 3; n++)
             {
-                int vertexIndex = Collider.Mesh.Triangles[index * 3 + n];
+                int vertexIndex = Collider.Mesh.GetTriangleVertexIndex(index, n);
                 if (_processedVertices.Add(vertexIndex))
-                    UniqueVertices.Add(Collider.Mesh.Vertices[vertexIndex]);
+                    UniqueVertices.Add(Collider.Mesh.GetVertexWorld(vertexIndex));
             }
         }
     }

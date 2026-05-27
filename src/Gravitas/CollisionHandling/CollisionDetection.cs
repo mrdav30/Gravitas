@@ -917,7 +917,7 @@ public static class CollisionDetection
         {
             int triangleIndex = triangleBuffer[i];
             mesh.Mesh.GetTriangleVertices(triangleIndex, out Vector3d first, out Vector3d second, out Vector3d third);
-            Vector3d faceNormal = mesh.Mesh.FaceNormals[triangleIndex];
+            Vector3d faceNormal = mesh.Mesh.GetFaceNormalWorld(triangleIndex);
             Vector3d candidatePointOnMesh = MeshUtils.ClosestPointOnTriangle(first, second, third, faceNormal, cylinder.Center);
             if (!IsPointInsideCylinder(cylinder, candidatePointOnMesh))
                 continue;

@@ -17,36 +17,55 @@ namespace Gravitas.Colliders
         /// </summary>
         public const int MaxTriangleCount = 131072;
 
-        // Holds all the vertices in local space that make up the mesh
-        private Vector3d[] _localVertices;
+        private readonly Vector3d[] _localVertices;
 
-        private Vector3d[] _vertices;
+        private readonly Vector3d[] _worldVertices;
+        private bool _worldVerticesValid;
+
         /// <summary>
-        /// Holds all the vertices transformed to world space
+        /// Holds all vertices transformed to world space. Prefer point-specific helpers on hot paths.
         /// </summary>
-        public Vector3d[] Vertices => _vertices;
+        public Vector3d[] Vertices
+        {
+            get
+            {
+                EnsureWorldVertices();
+                return _worldVertices;
+            }
+        }
 
-        private int[] _triangles;
         /// <summary>
-        /// Holds all the triangles that make up the mesh in the form of indices to the vertices array
+        /// Holds the source vertices in local mesh space.
+        /// </summary>
+        internal Vector3d[] LocalVertices => _localVertices;
+
+        /// <summary>
+        /// Number of vertices in the immutable local mesh topology.
+        /// </summary>
+        public int VertexCount => _localVertices.Length;
+
+        private readonly int[] _triangles;
+        /// <summary>
+        /// Holds all the triangles that make up the mesh in the form of indices to the vertices array.
         /// example: Triangles[0-3] = 4,2,3 means that the first triangle of the mesh is made up of the vertices _vertices[4], _vertices[2], _vertices[3]
         /// </summary>
         public int[] Triangles => _triangles;
 
-        private int _triangleCount;
+        private readonly int _triangleCount;
         public int TriangleCount => _triangleCount;
 
-        // Holds all the normals for the triangles, which are tied to the triangles array at the same index
-        // example: Normals[0] = (0, 1, 0) means that the normal of Triangles[0-3] is (0, 1, 0)
+        public MeshColliderMode Mode { get; }
+
         private bool _faceNormalsValid;
         private readonly Vector3d[] _faceNormals;
+        /// <summary>
+        /// Holds triangle normals in local mesh space.
+        /// </summary>
         public Vector3d[] FaceNormals => !_faceNormalsValid
             ? CalculateFaceNormals()
             : _faceNormals;
 
-        // Holds all the edges that make up a triangle in the form of indices to the vertices array
-        // example: _edges[0] = [0,1,1,2,2,0] means that these vertices for the first triangle of the mesh make up the edges _vertices[0]-_vertices[1], _vertices[1]-_vertices[2], _vertices[2]-_vertices[0]
-        private int[][] _edges;
+        private readonly int[][] _edges;
 
         private bool _edgesNormalsValid;
         private readonly Vector3d[] _edgeNormals;
@@ -63,24 +82,29 @@ namespace Gravitas.Colliders
         public Fixed3x3 Tensor { get; private set; }
 
         private bool _triangleBVHValid;
-        private SwiftFixedBVH<int> _triangleBVH;
+        private int _triangleBvhBuildCount;
+        private readonly SwiftFixedBVH<int> _triangleBVH;
+
+        /// <summary>
+        /// Triangle acceleration structure in local mesh space.
+        /// </summary>
         public SwiftFixedBVH<int> TriangleBVH => !_triangleBVHValid
             ? UpdateTriangleBVH()
             : _triangleBVH;
 
-        public Fixed4x4 _transformationMatrix;
+        public int TriangleBvhBuildCount => _triangleBvhBuildCount;
+
+        private FixedQuaternion _rotation = FixedQuaternion.Identity;
+
+        private Fixed4x4 _transformationMatrix;
         public Fixed4x4 TransformationMatrix
         {
             get => _transformationMatrix;
             private set
             {
                 _transformationMatrix = value;
-
-                // Invalidate all cached data that depends on the position of the vertices in world space
                 _inverseMatrixValid = false;
-                _edgesNormalsValid = false;
-                _faceNormalsValid = false;
-                _triangleBVHValid = false;
+                _worldVerticesValid = false;
             }
         }
 
@@ -103,7 +127,7 @@ namespace Gravitas.Colliders
         private BoundingBox _bounds;
         public BoundingBox Bounds => _bounds;
 
-        private BoundingBox _localBounds;
+        private readonly BoundingBox _localBounds;
 
         /// <summary>
         /// Axis-aligned bounds of the source vertices in local mesh space.
@@ -111,12 +135,24 @@ namespace Gravitas.Colliders
         public BoundingBox LocalBounds => _localBounds;
 
         public PhysicsMesh(Vector3d[] vertices, int[] triangles, Vector3d position, FixedQuaternion rotation)
+            : this(vertices, triangles, position, rotation, MeshColliderMode.Convex)
         {
+        }
+
+        public PhysicsMesh(
+            Vector3d[] vertices,
+            int[] triangles,
+            Vector3d position,
+            FixedQuaternion rotation,
+            MeshColliderMode mode)
+        {
+            ValidateMode(mode);
             ValidateInput(vertices, triangles);
 
+            Mode = mode;
             _localVertices = new Vector3d[vertices.Length];
             Array.Copy(vertices, _localVertices, vertices.Length);
-            _vertices = new Vector3d[vertices.Length];
+            _worldVertices = new Vector3d[vertices.Length];
             _triangles = new int[triangles.Length];
             Array.Copy(triangles, _triangles, triangles.Length);
             _triangleCount = triangles.Length / 3; // 3 vertices per triangle
@@ -125,7 +161,6 @@ namespace Gravitas.Colliders
             _edges = new int[TriangleCount][];
             _edgeNormals = new Vector3d[TriangleCount * 3]; // 3 edges per triangle
 
-            // unless the mesh changes, the total area & areas of the triangles will never change
             _faceAreas = new Fixed64[TriangleCount];
             _totalArea = Fixed64.Zero;
 
@@ -139,8 +174,7 @@ namespace Gravitas.Colliders
                 int index1 = _triangles[i * 3 + 1];
                 int index2 = _triangles[i * 3 + 2];
 
-                // Store the edges of the triangle for querying normals, and the normals of the edges
-                _edges[i] = new int[] { index0, index1, index1, index2, index2, index0 };
+                _edges[i] = new[] { index0, index1, index1, index2, index2, index0 };
                 _faceAreas[i] = CalculateTriangleArea(
                     _localVertices[index0],
                     _localVertices[index1],
@@ -155,21 +189,32 @@ namespace Gravitas.Colliders
         public void UpdatePosition(Vector3d position, FixedQuaternion rotation)
         {
             UpdateTransformationMatrix(position, rotation);
-            UpdateTriangleBVH();
-            CalculateFaceNormals();
             UpdateBounds();
         }
 
         private void UpdateTransformationMatrix(Vector3d position, FixedQuaternion rotation)
         {
+            _rotation = rotation;
             TransformationMatrix = Fixed4x4.TranslateRotateScale(position, rotation, Vector3d.One);
-            UpdateTransformedVertices();
         }
 
-        private void UpdateTransformedVertices()
+        private void EnsureWorldVertices()
         {
+            if (_worldVerticesValid)
+                return;
+
             for (int i = 0; i < _localVertices.Length; i++)
-                _vertices[i] = TransformationMatrix * _localVertices[i];
+                _worldVertices[i] = TransformLocalPoint(_localVertices[i]);
+
+            _worldVerticesValid = true;
+        }
+
+        private static void ValidateMode(MeshColliderMode mode)
+        {
+            SwiftThrowHelper.ThrowIfArgument(
+                mode != MeshColliderMode.Convex && mode != MeshColliderMode.Concave,
+                nameof(mode),
+                "Unsupported mesh collider mode.");
         }
 
         private static void ValidateInput(Vector3d[] vertices, int[] triangles)
@@ -209,7 +254,6 @@ namespace Gravitas.Colliders
                 throw new ArgumentOutOfRangeException(paramName, index, "Triangle index is outside the vertex array.");
         }
 
-        // Calculate the area of the triangle using cross product
         private static Fixed64 CalculateTriangleAreaStatic(
             Vector3d startEdgeA,
             Vector3d endEdgeA,
@@ -230,7 +274,7 @@ namespace Gravitas.Colliders
                 {
                     int edgeStart = _edges[i][n * 2];
                     int edgeEnd = _edges[i][n * 2 + 1];
-                    _edgeNormals[i * 3 + n] = (_vertices[edgeEnd] - _vertices[edgeStart]).Normal;
+                    _edgeNormals[i * 3 + n] = (_localVertices[edgeEnd] - _localVertices[edgeStart]).Normal;
                 }
             }
 
@@ -245,7 +289,7 @@ namespace Gravitas.Colliders
                 int index0 = _triangles[i * 3];
                 int index1 = _triangles[i * 3 + 1];
                 int index2 = _triangles[i * 3 + 2];
-                _faceNormals[i] = Vector3d.Cross(_vertices[index1] - _vertices[index0], _vertices[index2] - _vertices[index0]).Normal;
+                _faceNormals[i] = Vector3d.Cross(_localVertices[index1] - _localVertices[index0], _localVertices[index2] - _localVertices[index0]).Normal;
             }
 
             _faceNormalsValid = true;
@@ -260,19 +304,19 @@ namespace Gravitas.Colliders
                 int index0 = _triangles[i * 3];
                 int index1 = _triangles[i * 3 + 1];
                 int index2 = _triangles[i * 3 + 2];
-                Vector3d min = Vector3d.Min(Vector3d.Min(_vertices[index0], _vertices[index1]), _vertices[index2]);
-                Vector3d max = Vector3d.Max(Vector3d.Max(_vertices[index0], _vertices[index1]), _vertices[index2]);
-                // Store the starting index of the triangle for querying positions
+                Vector3d min = Vector3d.Min(Vector3d.Min(_localVertices[index0], _localVertices[index1]), _localVertices[index2]);
+                Vector3d max = Vector3d.Max(Vector3d.Max(_localVertices[index0], _localVertices[index1]), _localVertices[index2]);
                 _triangleBVH.Insert(i, new FixedBoundVolume(min, max));
             }
 
+            _triangleBvhBuildCount++;
             _triangleBVHValid = true;
             return _triangleBVH;
         }
 
         private void UpdateBounds()
         {
-            _bounds = CalculateBounds(_vertices);
+            _bounds = CalculateTransformedBounds(_localBounds, TransformationMatrix);
         }
 
         private static BoundingBox CalculateBounds(Vector3d[] vertices)
@@ -288,6 +332,40 @@ namespace Gravitas.Colliders
             return new BoundingBox((min + max) * Fixed64.Half, max - min);
         }
 
+        private static BoundingBox CalculateTransformedBounds(BoundingBox localBounds, Fixed4x4 transform)
+        {
+            FixedBoundVolume volume = TransformBounds(localBounds.Min, localBounds.Max, transform);
+            return new BoundingBox((volume.Min + volume.Max) * Fixed64.Half, volume.Max - volume.Min);
+        }
+
+        private static FixedBoundVolume TransformBounds(Vector3d min, Vector3d max, Fixed4x4 transform)
+        {
+            Vector3d first = transform * min;
+            Vector3d transformedMin = first;
+            Vector3d transformedMax = first;
+
+            IncludeTransformedCorner(new Vector3d(max.x, min.y, min.z), transform, ref transformedMin, ref transformedMax);
+            IncludeTransformedCorner(new Vector3d(min.x, max.y, min.z), transform, ref transformedMin, ref transformedMax);
+            IncludeTransformedCorner(new Vector3d(max.x, max.y, min.z), transform, ref transformedMin, ref transformedMax);
+            IncludeTransformedCorner(new Vector3d(min.x, min.y, max.z), transform, ref transformedMin, ref transformedMax);
+            IncludeTransformedCorner(new Vector3d(max.x, min.y, max.z), transform, ref transformedMin, ref transformedMax);
+            IncludeTransformedCorner(new Vector3d(min.x, max.y, max.z), transform, ref transformedMin, ref transformedMax);
+            IncludeTransformedCorner(max, transform, ref transformedMin, ref transformedMax);
+
+            return new FixedBoundVolume(transformedMin, transformedMax);
+        }
+
+        private static void IncludeTransformedCorner(
+            Vector3d corner,
+            Fixed4x4 transform,
+            ref Vector3d min,
+            ref Vector3d max)
+        {
+            Vector3d transformed = transform * corner;
+            min = Vector3d.Min(min, transformed);
+            max = Vector3d.Max(max, transformed);
+        }
+
         public Fixed3x3 CalculateInertiaTensor(Fixed64 mass)
         {
             Fixed3x3 tensor = Fixed3x3.Zero;
@@ -299,9 +377,9 @@ namespace Gravitas.Colliders
                 int index0 = _triangles[i * 3];
                 int index1 = _triangles[i * 3 + 1];
                 int index2 = _triangles[i * 3 + 2];
-                Fixed3x3 triangleTensor = new(_vertices[index0], _vertices[index1], _vertices[index2]);
+                Fixed3x3 triangleTensor = new(_localVertices[index0], _localVertices[index1], _localVertices[index2]);
                 Fixed64 triangleMass = mass * (_faceAreas[i] / _totalArea);
-                triangleTensor *= triangleMass; // Adjust for the mass and volume of the triangle
+                triangleTensor *= triangleMass;
                 tensor += triangleTensor;
             }
 
@@ -309,13 +387,12 @@ namespace Gravitas.Colliders
             return tensor;
         }
 
-        // make sure direction is normalized
         public Fixed64 GetFrontalArea(Vector3d direction)
         {
             Fixed64 totalArea = Fixed64.Zero;
             for (int i = 0; i < FaceNormals.Length; i++)
             {
-                if (Vector3d.Dot(FaceNormals[i], direction) > Fixed64.Zero) // if the triangle faces the direction
+                if (Vector3d.Dot(GetFaceNormalWorld(i), direction) > Fixed64.Zero)
                     totalArea += _faceAreas[i];
             }
 
@@ -326,24 +403,80 @@ namespace Gravitas.Colliders
         {
             GetTriangleVertices(index, out Vector3d first, out Vector3d second, out Vector3d third);
 
-            return new Vector3d[3] {
-                            first,
-                            second,
-                            third
-                        };
+            return new[]
+            {
+                first,
+                second,
+                third
+            };
         }
 
         public void GetTriangleVertices(int index, out Vector3d first, out Vector3d second, out Vector3d third)
         {
+            GetLocalTriangleVertices(index, out Vector3d localFirst, out Vector3d localSecond, out Vector3d localThird);
+            first = TransformLocalPoint(localFirst);
+            second = TransformLocalPoint(localSecond);
+            third = TransformLocalPoint(localThird);
+        }
+
+        public void GetLocalTriangleVertices(int index, out Vector3d first, out Vector3d second, out Vector3d third)
+        {
             SwiftThrowHelper.ThrowIfArrayIndexInvalid(index, _triangleCount, nameof(index));
 
             int triangleIndex = index * 3;
-            first = _vertices[_triangles[triangleIndex]];
-            second = _vertices[_triangles[triangleIndex + 1]];
-            third = _vertices[_triangles[triangleIndex + 2]];
+            first = _localVertices[_triangles[triangleIndex]];
+            second = _localVertices[_triangles[triangleIndex + 1]];
+            third = _localVertices[_triangles[triangleIndex + 2]];
+        }
+
+        public int GetTriangleVertexIndex(int triangleIndex, int vertexOffset)
+        {
+            SwiftThrowHelper.ThrowIfArrayIndexInvalid(triangleIndex, _triangleCount, nameof(triangleIndex));
+            SwiftThrowHelper.ThrowIfArrayIndexInvalid(vertexOffset, 3, nameof(vertexOffset));
+            return _triangles[triangleIndex * 3 + vertexOffset];
+        }
+
+        public Vector3d GetVertexWorld(int index)
+        {
+            SwiftThrowHelper.ThrowIfArrayIndexInvalid(index, _localVertices.Length, nameof(index));
+            return TransformLocalPoint(_localVertices[index]);
+        }
+
+        public Vector3d GetFaceNormalWorld(int index)
+        {
+            SwiftThrowHelper.ThrowIfArrayIndexInvalid(index, _triangleCount, nameof(index));
+            return TransformLocalNormal(FaceNormals[index]);
+        }
+
+        public void GetTrianglesInWorldBounds(FixedBoundVolume worldBounds, SwiftList<int> result)
+        {
+            result.FastClear();
+            FixedBoundVolume localBounds = TransformBounds(worldBounds.Min, worldBounds.Max, InverseTransformationMatrix);
+            TriangleBVH.Query(localBounds, result);
+        }
+
+        public void GetTrianglesInLocalBounds(FixedBoundVolume localBounds, SwiftList<int> result)
+        {
+            result.FastClear();
+            TriangleBVH.Query(localBounds, result);
         }
 
         public Vector3d ConvertWorldToLocal(Vector3d worldPoint) =>
             InverseTransformationMatrix * worldPoint;
+
+        public Vector3d ConvertLocalToWorld(Vector3d localPoint) =>
+            TransformLocalPoint(localPoint);
+
+        public Vector3d ConvertWorldDirectionToLocal(Vector3d worldDirection) =>
+            _rotation.Inverse() * worldDirection;
+
+        public Vector3d ConvertLocalNormalToWorld(Vector3d localNormal) =>
+            TransformLocalNormal(localNormal);
+
+        private Vector3d TransformLocalPoint(Vector3d localPoint) =>
+            TransformationMatrix * localPoint;
+
+        private Vector3d TransformLocalNormal(Vector3d localNormal) =>
+            localNormal == Vector3d.Zero ? Vector3d.Zero : (_rotation * localNormal).Normal;
     }
 }

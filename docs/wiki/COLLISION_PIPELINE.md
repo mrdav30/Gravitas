@@ -100,24 +100,31 @@ can report near-zero scale for 90-degree rotations and collapse derived shape
 state.
 
 Mesh colliders validate vertices and triangle indices at construction time.
-Triangle BVH entries and mesh query bounds use min/max `FixedBoundVolume`
-coordinates. Mesh collider construction transforms vertices from local mesh
-space only after the collider is bound to runtime state, so rotated meshes
-refresh bounds from transformed vertices instead of copying stale constructor
-bounds.
+`MeshColliderMode` declares whether the mesh is intended as `Convex` or
+`Concave`; `Compound` remains a separate future collider-composition strategy,
+not a mesh mode. Runtime policy rejects explicit concave meshes on movable
+dynamic bodies so they cannot silently behave like convex meshes. Static or
+kinematic concave meshes are acceptable triangle collision data.
 
-Alpha mesh policy is conservative but not anti-non-convex: non-convex collider
-support should come through static triangle meshes or explicit compound /
+`PhysicsMesh` now owns source vertices, triangle normals, triangle areas, local
+bounds, and the triangle BVH in local mesh space. Rigid movement updates the
+mesh transform, inverse transform, and conservative world bounds without
+rebuilding the local BVH. Mesh queries and narrow-phase callers transform their
+world-space query bounds or points into local space, query the local BVH, then
+transform final contact points and normals back to world space. The full
+world-vertex array is retained only as an on-demand compatibility view.
+
+Alpha mesh policy is conservative but not anti-concave: concave collider support
+should come through static/kinematic triangle meshes or explicit compound /
 decomposed-convex shapes, not through raw movable triangle soup during per-frame
 collision. Mesh ray overlap, mesh/cuboid, mesh/cylinder, and mesh/mesh paths are
-triangle-backed and covered by focused tests, but dynamic mesh behavior,
-arbitrary mesh contact manifolds, and swept mesh queries remain hardening
-targets.
+triangle-backed and covered by focused tests, but arbitrary mesh contact
+manifolds and swept mesh queries remain hardening targets.
 
 Mesh policy work should keep these boundaries explicit:
 
-- Static triangle meshes are useful for level/world geometry, but should not be
-  treated as a blanket answer for movable non-convex bodies.
+- Static/kinematic concave triangle meshes are useful for level/world geometry,
+  but should not be treated as a blanket answer for movable concave bodies.
 - Convex mesh and compound/decomposed-convex mesh support are the preferred
   route for dynamic mesh-like bodies in alpha.
 - A future compound collider should present one collider identity to hosts and
@@ -135,9 +142,9 @@ Mesh policy work should keep these boundaries explicit:
   quadric-error simplification, smart vertex linking, and preservation options,
   but should not be copied into the runtime without a fixed-point deterministic
   porting plan.
-- Rigid dynamic meshes can rebuild transformed vertices, bounds, and triangle
-  BVH from fixed transforms. Deformable or breakable topology changes require a
-  separate invalidation/rebuild contract before support is claimed.
+- Rigid dynamic meshes should keep local topology and BVH stable while updating
+  only transform-derived state. Deformable or breakable topology changes require
+  a separate invalidation/rebuild contract before support is claimed.
 - `PhysicsMesh.CalculateInertiaTensor(...)` is currently an approximation. Any
   replacement should define whether the mesh is a thin shell, closed volume, or
   decomposed set of solids, then prove expected fixed-point values on simple
