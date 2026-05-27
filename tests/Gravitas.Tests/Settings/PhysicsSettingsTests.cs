@@ -35,6 +35,8 @@ public sealed class PhysicsSettingsTests
         contextB.Settings.CollisionMatrix.Should().BeSameAs(matrixB);
         contextA.Settings.PoolingEnabled.Should().BeFalse();
         contextB.Settings.PoolingEnabled.Should().BeTrue();
+        contextA.Settings.DefaultContinuousCollisionMode.Should().Be(ContinuousCollisionMode.Discrete);
+        contextB.Settings.DefaultContinuousCollisionMode.Should().Be(ContinuousCollisionMode.Discrete);
     }
 
     [Fact]

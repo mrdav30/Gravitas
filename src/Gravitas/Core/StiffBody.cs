@@ -28,6 +28,20 @@ public class StiffBody : IRecordable
     // Position & Rotation updated in LateVisualize to account for animation movement
     public bool IsKinematic = false;
 
+    private ContinuousCollisionMode _continuousCollisionMode = ContinuousCollisionMode.Inherit;
+
+    /// <summary>
+    /// Selects the deterministic tunneling guard used when this body commits frame movement.
+    /// Inherited values resolve through the cached top-parent body before falling back to context settings.
+    /// </summary>
+    public ContinuousCollisionMode ContinuousCollisionMode
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => _continuousCollisionMode;
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        set => _continuousCollisionMode = value;
+    }
+
     private FixedTransform _positionTransform = null!;
     public FixedTransform PositionTransform => _positionTransform;
 
@@ -113,6 +127,7 @@ public class StiffBody : IRecordable
     private const int _groundCheckFrameThreshold = 10;
     private readonly Fixed64 _groundCheckThreshold = (Fixed64)0.01f;
     private readonly SwiftList<LSRaycastHit> _groundProbeHits = new();
+    private readonly SwiftList<LSRaycastHit> _continuousCollisionHits = new();
 
     public Fixed64 StepOffset = (Fixed64)0.5f;
 
@@ -1002,7 +1017,10 @@ public class StiffBody : IRecordable
 
     private void PositionBasedOnForce()
     {
-        Vector3d velocityVector = Position3d + (_linearVelocity * Context.DeltaTime);
+        Vector3d startPosition = Position3d;
+        Vector3d velocityVector = startPosition + (_linearVelocity * Context.DeltaTime);
+        TryResolveContinuousCollision(startPosition, ref velocityVector);
+
         Vector2d velocityAxis = velocityVector.ToVector2d();
 
         // Find out how much we need to push towards the ground to avoid loosing grounding
@@ -1018,6 +1036,114 @@ public class StiffBody : IRecordable
         //  Apply the force
         Position2d = _positionCorrection + velocityAxis;
         _positionCorrection = Vector2d.Zero;
+    }
+
+    private bool TryResolveContinuousCollision(Vector3d startPosition, ref Vector3d proposedPosition)
+    {
+        if (!ShouldUseContinuousCollision(out ContinuousCollisionMode mode))
+            return false;
+
+        Vector3d displacement = proposedPosition - startPosition;
+        if (displacement.SqrMagnitude <= Fixed64.Epsilon)
+            return false;
+
+        Fixed64 proxyRadius = ResolveContinuousCollisionProxyRadius();
+        if (proxyRadius <= Fixed64.Epsilon
+            || (mode == ContinuousCollisionMode.Auto && displacement.SqrMagnitude <= proxyRadius * proxyRadius))
+        {
+            return false;
+        }
+
+        int hitCount = Context.Raycasts.SweepSphereAll(
+            startPosition,
+            proposedPosition,
+            proxyRadius,
+            PhysicsLayerMask.All,
+            _continuousCollisionHits,
+            Collider);
+
+        for (int i = 0; i < hitCount; i++)
+        {
+            LSRaycastHit hit = _continuousCollisionHits[i];
+            if (!IsValidContinuousCollisionHit(hit))
+                continue;
+
+            proposedPosition = startPosition + displacement.Normal * hit.Distance;
+            RemoveClosingContinuousCollisionVelocity(hit.Normal);
+            return true;
+        }
+
+        return false;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private bool ShouldUseContinuousCollision(out ContinuousCollisionMode mode)
+    {
+        mode = ResolveContinuousCollisionMode();
+        return mode == ContinuousCollisionMode.Continuous || mode == ContinuousCollisionMode.Auto;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private ContinuousCollisionMode ResolveContinuousCollisionMode()
+    {
+        ContinuousCollisionMode mode = _continuousCollisionMode;
+        if (mode != ContinuousCollisionMode.Inherit)
+            return mode;
+
+        StiffBody? parentBody = Collider.TopParent?.Body;
+        if (parentBody != null && parentBody._continuousCollisionMode != ContinuousCollisionMode.Inherit)
+            return parentBody._continuousCollisionMode;
+
+        mode = Context.Settings.DefaultContinuousCollisionMode;
+        return mode == ContinuousCollisionMode.Inherit
+            ? ContinuousCollisionMode.Discrete
+            : mode;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private Fixed64 ResolveContinuousCollisionProxyRadius()
+    {
+        return Collider switch
+        {
+            LSSphereCollider sphere => sphere.ScaledRadius,
+            LSCapsuleCollider capsule => capsule.ScaledRadius,
+            LSCylinderCollider cylinder => cylinder.ScaledRadius,
+            LSCuboidCollider cuboid => FixedMath.Min(
+                cuboid.Bounds.Scope.x,
+                FixedMath.Min(cuboid.Bounds.Scope.y, cuboid.Bounds.Scope.z)),
+            _ => Fixed64.Zero
+        };
+    }
+
+    private bool IsValidContinuousCollisionHit(LSRaycastHit hit)
+    {
+        LSCollider? hitCollider = hit.Collider;
+        if (hitCollider == null
+            || ReferenceEquals(hitCollider, Collider)
+            || hitCollider.IsTrigger
+            || hitCollider.IsSibling(Collider)
+            || Context.Physics.IsLayerCollisionDisabled(Collider.Layer, hitCollider.Layer))
+        {
+            return false;
+        }
+
+        StiffBody? hitBody = hitCollider.Body;
+        return hitBody == null || hitBody.Immovable || hitBody.IsKinematic;
+    }
+
+    private void RemoveClosingContinuousCollisionVelocity(Vector3d normal)
+    {
+        if (normal.SqrMagnitude <= Fixed64.Epsilon)
+            return;
+
+        Fixed64 closingSpeed = Vector3d.Dot(_linearVelocity, normal);
+        if (closingSpeed >= Fixed64.Zero)
+            return;
+
+        Vector3d lastVelocity = _linearVelocity;
+        _linearVelocity -= normal * closingSpeed;
+        RefreshLinearMotionState(lastVelocity);
+        Context.Diagnostics.EmitLinearVelocityDelta(this, lastVelocity, _linearVelocity);
     }
 
     private void RotationBasedOnTorque()
@@ -1492,6 +1618,7 @@ public class StiffBody : IRecordable
         RecordValues.Look(chronicler, ref _sleepFrameThreshold, "SleepFrameThreshold", 16);
         RecordValues.Look(chronicler, ref _sleepLinearSpeedThreshold, "SleepLinearSpeedThreshold", (Fixed64)0.001f);
         RecordValues.Look(chronicler, ref _sleepAngularSpeedThreshold, "SleepAngularSpeedThreshold", (Fixed64)0.001f);
+        RecordValues.Look(chronicler, ref _continuousCollisionMode, "ContinuousCollisionMode", ContinuousCollisionMode.Inherit);
         RecordValues.Look(chronicler, ref _linearSpeed, "LinearSpeed");
         RecordValues.Look(chronicler, ref _linearAccelerationStore, "LinearAccelerationStore");
         RecordValues.Look(chronicler, ref _deltaAcceleration, "DeltaAcceleration");

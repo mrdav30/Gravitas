@@ -29,7 +29,7 @@ The unit test project now has focused runtime, settings, query, partition, and c
 - Deterministic runtime math through `Fixed64`, `Vector2d`, `Vector3d`, and `FixedQuaternion`.
 - Engine-agnostic host boundary through `IMatterAgent` instead of direct renderer, ECS, or Unity coupling.
 - Grid-backed broad-phase partitioning through `GridForge` `GridWorld`, voxel tracing, and `PhysicsPartition`.
-- Runtime systems for bodies, colliders, collision pairs, collision detection/response, raycasts, circlecasts, and physics settings.
+- Runtime systems for bodies, colliders, collision pairs, collision detection/response, opt-in CCD, raycasts, circlecasts, and physics settings.
 - A future direction toward first-class 2D physics and mixed 2D/3D simulations where 2D and 3D bodies can interact through explicit dimensional rules.
 
 ## Install
@@ -93,7 +93,7 @@ Typical integration creates or attaches a context, initializes bodies and collid
 | Collision handling | Shape-pair checks, contact data, collision pairs, and response logic | [`src/Gravitas/CollisionHandling`](src/Gravitas/CollisionHandling) |
 | Partitions | GridForge-backed physics partitions used by collision distribution | [`src/Gravitas/Partitions`](src/Gravitas/Partitions) |
 | Raycasting | Raycast and circlecast query support | [`src/Gravitas/Raycasting`](src/Gravitas/Raycasting) |
-| Settings | Frame rate, collision matrix, pooling switch, and settings save helpers | [`src/Gravitas/Settings`](src/Gravitas/Settings) |
+| Settings | Frame rate, collision matrix, pooling switch, CCD defaults, and settings save helpers | [`src/Gravitas/Settings`](src/Gravitas/Settings) |
 | Support | Fixed transforms, layers, lifecycle hooks, coroutines, and transient state helpers | [`src/Gravitas/Support`](src/Gravitas/Support) |
 
 ## Repository Map

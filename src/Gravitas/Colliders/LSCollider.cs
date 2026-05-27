@@ -276,6 +276,7 @@ public abstract class LSCollider : IRecordable
     public bool IsParent => _hierarchyState.IsParent;
     public int ParentId => _hierarchyState.ParentId;
     public LSCollider? Parent => _hierarchyState.Parent;
+    internal LSCollider? TopParent => _hierarchyState.TopParent;
     internal int HierarchyChildCount => _hierarchyState.ChildCount;
 
     #endregion

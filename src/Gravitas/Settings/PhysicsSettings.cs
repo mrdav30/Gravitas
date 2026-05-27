@@ -34,6 +34,11 @@ public sealed class PhysicsSettings
 
     public PhysicsLayerMask GroundCheckLayerMask { get; set; }
 
+    /// <summary>
+    /// Gets or sets the default tunneling policy used by bodies configured to inherit from the context.
+    /// </summary>
+    public ContinuousCollisionMode DefaultContinuousCollisionMode { get; set; } = ContinuousCollisionMode.Discrete;
+
     public PhysicsSettings(
         int? frameRate,
         bool[,]? collisionMatrix,

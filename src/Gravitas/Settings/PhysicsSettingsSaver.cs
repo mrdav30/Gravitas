@@ -22,6 +22,8 @@ public sealed partial class PhysicsSettingsSaver : DefaultSaver
 
     public int? GroundCheckLayerMaskBits;
 
+    public ContinuousCollisionMode? DefaultContinuousCollisionMode;
+
     [NonSerialized]
     [MemoryPackIgnore]
     private GravitasWorldContext? _context;
@@ -38,13 +40,20 @@ public sealed partial class PhysicsSettingsSaver : DefaultSaver
         context.ApplySettings(CreateSettings());
     }
 
-    public PhysicsSettings CreateSettings() =>
-        new(
+    public PhysicsSettings CreateSettings()
+    {
+        var settings = new PhysicsSettings(
             FrameRate,
             CreateCollisionMatrix(),
             GroundCheckLayerMaskBits.HasValue
                 ? new PhysicsLayerMask(GroundCheckLayerMaskBits.Value)
                 : null);
+
+        if (DefaultContinuousCollisionMode.HasValue)
+            settings.DefaultContinuousCollisionMode = DefaultContinuousCollisionMode.Value;
+
+        return settings;
+    }
 
     protected override void OnEarlyApply()
     {

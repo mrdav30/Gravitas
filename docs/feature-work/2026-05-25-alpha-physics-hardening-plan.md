@@ -450,17 +450,35 @@ Meaningful deferred work captured from that plan and the wiki:
 
 **Tasks:**
 
-- [ ] Decide whether CCD lives in collision detection, body integration, or a dedicated continuous-collision service.
-- [ ] Define the CCD activation policy. Current recommendation: do not run CCD for every body by default; use an explicit per-body or per-collider policy with an optional `Auto` mode and a context default. This keeps deterministic response ordering and hot-path cost visible to hosts while still making fast-projectile setup ergonomic.
-- [ ] Add tunneling tests for fast sphere/capsule/cuboid/cylinder bodies against thin static geometry.
-- [ ] Add tests proving discrete bodies still use the existing integration path while CCD-enabled bodies sweep from current position to proposed position.
-- [ ] Hook CCD after velocity/acceleration integration computes the intended frame displacement and before `StiffBody` commits authoritative position. The candidate sweep should use `startPosition -> startPosition + velocity * DeltaTime`, then clamp/adjust movement at the earliest deterministic time of impact.
-- [ ] Define time-of-impact ordering and response handoff for multiple hits in one frame.
-- [ ] Start with fast dynamic primitives against static, bodyless, immovable, or kinematic targets. Dynamic-vs-dynamic CCD requires relative velocity and pairwise TOI ordering; include it only if the phase can cover tests and benchmarks without weakening the alpha contract.
-- [ ] Decide the alpha policy for swept mesh targets: unsupported, triangle-sweep query path, convex-decomposed mesh path, or dedicated CCD mesh path.
-- [ ] If mesh sweep is implemented, require triangle candidate acceleration tests and benchmarks before enabling it broadly.
-- [ ] Keep visual mesh-normal smoothing separate from physics. Physics CCD should use deterministic triangle planes/face normals/contact geometry; chunk seam smoothing or vertex-normal transfer belongs in mesh preprocessing or renderer-facing data, not collision truth.
-- [ ] Document the CCD contract and any excluded shape pairs.
+- [x] Decide whether CCD lives in collision detection, body integration, or a dedicated continuous-collision service.
+- [x] Define the CCD activation policy. Current recommendation: do not run CCD for every body by default; use an explicit per-body or per-collider policy with an optional `Auto` mode and a context default. This keeps deterministic response ordering and hot-path cost visible to hosts while still making fast-projectile setup ergonomic.
+- [x] Add tunneling tests for fast sphere/capsule/cuboid/cylinder bodies against thin static geometry.
+- [x] Add tests proving discrete bodies still use the existing integration path while CCD-enabled bodies sweep from current position to proposed position.
+- [x] Hook CCD after velocity/acceleration integration computes the intended frame displacement and before `StiffBody` commits authoritative position. The candidate sweep should use `startPosition -> startPosition + velocity * DeltaTime`, then clamp/adjust movement at the earliest deterministic time of impact.
+- [x] Define time-of-impact ordering and response handoff for multiple hits in one frame.
+- [x] Start with fast dynamic primitives against static, bodyless, immovable, or kinematic targets. Dynamic-vs-dynamic CCD requires relative velocity and pairwise TOI ordering; include it only if the phase can cover tests and benchmarks without weakening the alpha contract.
+- [x] Decide the alpha policy for swept mesh targets: unsupported, triangle-sweep query path, convex-decomposed mesh path, or dedicated CCD mesh path.
+- [x] If mesh sweep is implemented, require triangle candidate acceleration tests and benchmarks before enabling it broadly. Mesh sweep was not implemented in Phase 6, so this requirement carries into Phase 7 if mesh CCD becomes part of the mesh alpha policy.
+- [x] Keep visual mesh-normal smoothing separate from physics. Physics CCD should use deterministic triangle planes/face normals/contact geometry; chunk seam smoothing or vertex-normal transfer belongs in mesh preprocessing or renderer-facing data, not collision truth.
+- [x] Document the CCD contract and any excluded shape pairs.
+
+**Phase 6 Result:**
+
+- CCD now lives in `StiffBody` movement commit as an explicit body/context
+  policy. `PhysicsSettings.DefaultContinuousCollisionMode` defaults to
+  `Discrete`, while `StiffBody.ContinuousCollisionMode` defaults to `Inherit`.
+  `Inherit` resolves through the precomputed top-parent body policy before
+  falling back to the context default.
+- `Continuous` always sweeps when displacement and proxy radius are valid.
+  `Auto` sweeps when intended frame displacement exceeds the collider proxy
+  radius.
+- The alpha path uses a swept-sphere proxy for sphere, capsule, cuboid, and
+  cylinder movers against non-trigger bodyless, immovable, or kinematic targets.
+  It clamps to the earliest deterministic TOI and removes only closing normal
+  velocity.
+- Dynamic-vs-dynamic CCD and swept mesh targets remain intentionally deferred.
+  They belong with relative-velocity ordering, deterministic TOI tie-breakers,
+  and Phase 7 mesh policy work.
 
 **Design Notes:**
 

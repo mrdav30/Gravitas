@@ -16,6 +16,8 @@ internal struct ColliderHierarchyState
 
     public LSCollider? Parent { get; private set; }
 
+    public LSCollider? TopParent { get; private set; }
+
     public int ChildCount => _children?.Count ?? 0;
 
     public SwiftHashSet<int>? Children => _children;
@@ -27,6 +29,7 @@ internal struct ColliderHierarchyState
         IsChild = !isParent;
         ParentId = -1;
         Parent = null;
+        TopParent = null;
         _children?.Clear();
     }
 
@@ -55,6 +58,7 @@ internal struct ColliderHierarchyState
         }
 
         Parent = parent;
+        TopParent = topParent;
         ParentId = topParent.Id;
         IsChild = true;
         if (topParentChanged)
@@ -71,6 +75,7 @@ internal struct ColliderHierarchyState
         }
 
         Parent = null;
+        TopParent = null;
         ParentId = -1;
         IsChild = !_configuredAsParent;
     }
@@ -79,6 +84,7 @@ internal struct ColliderHierarchyState
     public void ClearParentReference()
     {
         Parent = null;
+        TopParent = null;
         ParentId = -1;
         IsChild = !_configuredAsParent;
     }

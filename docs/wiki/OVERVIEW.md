@@ -141,8 +141,8 @@ active-pair queue during `LateSimulate`.
 - Collision response is still an alpha-hardening target. The current manifold
   solver handles deterministic normal and friction impulses, but static resting
   friction, true warm-start impulse application, explicit island solving,
-  continuous collision detection, and mixed-dimension impulse exchange remain
-  future work.
+  dynamic-vs-dynamic CCD, and mixed-dimension impulse exchange remain future
+  work.
 - Query services use context-owned mutable buffers. Treat them as same-thread,
   fixed-loop services unless they are redesigned for reentrancy.
 - Diagnostics are context-owned and disabled by default. Enabled draw capture can

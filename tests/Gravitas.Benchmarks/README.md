@@ -69,6 +69,7 @@ Start with hot paths that can be isolated and repeated deterministically:
 - `GravitasCollisionService` partitioning and partition cleanup.
 - `CollisionDetection` shape-pair checks.
 - `CollisionResponse` contact resolution.
+- continuous collision detection policy and swept movement cost.
 - collider shape-state rebuilds, capsule derived state, and mesh validation/BVH construction.
 - `GravitasRaycastService` and `GravitasCircleQueryService` query gathering, filtering, and result ordering.
 - Mesh collider preprocessing and convex mesh limits.
@@ -102,7 +103,7 @@ BenchmarkDotNet writes results to `BenchmarkDotNet.Artifacts/results/` by defaul
 For quick allocation checks around the current steady-state hot paths, run:
 
 ```bash
-dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0 -- query-service simulation-allocation collision-detection collision-response partition-culling diagnostics --filter "*" -j Short -i --exporters json
+dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0 -- query-service simulation-allocation continuous-collision collision-detection collision-response partition-culling diagnostics --filter "*" -j Short -i --exporters json
 ```
 
 The short in-process job is not canonical timing evidence, but it is useful for
@@ -117,6 +118,7 @@ to add or tighten explicit allocation tests before changing the algorithm.
 | --- | --- |
 | `query-service` | `RaycastAll`, `OverlapCircleAll`, directional `OverlapCircleInDirection`, and overlapping-context queries. |
 | `simulation-allocation` | `StiffBody.LateSimulate`, grounding raycast probes, collision partition distribution, and active-pair late simulation. |
+| `continuous-collision` | Discrete fast body movement baseline and opt-in CCD sweep/clamp against thin static geometry. |
 | `collision-detection` | prepared primitive pairs, non-SAT primitive pairs, primitive manifold generation, cuboid face-manifold generation, cuboid SAT, mesh/cylinder, mesh/cuboid, and mesh/mesh checks. |
 | `collision-response` | manifold response solver cost across single-contact and face-manifold cases, with pair-count scaling. |
 | `diagnostics` | Disabled/enabled force and torque event hooks plus disabled/enabled collider debug draw capture. |

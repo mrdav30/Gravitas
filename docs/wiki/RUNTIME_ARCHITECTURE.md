@@ -218,9 +218,9 @@ bounds and partition membership.
 
 ## Settings And Environment
 
-`PhysicsSettings` holds the frame rate, collision matrix, pooling switch, and
-ground-check layer mask. The collision matrix uses `true` for collide and
-`false` for ignore.
+`PhysicsSettings` holds the frame rate, collision matrix, pooling switch,
+ground-check layer mask, and default continuous-collision mode. The collision
+matrix uses `true` for collide and `false` for ignore.
 
 `PhysicsEnvironment` holds physical and culling values such as gravity, air
 density, speed caps, friction transition speed, damping, and culling scores.

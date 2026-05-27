@@ -28,6 +28,23 @@ public sealed class ColliderOwnershipStateTests
     }
 
     [Fact]
+    public void ExplicitParentBinding_ShouldCacheTopParentForDescendants()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> topParent = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
+        ScenarioBody<LSSphereCollider> middleParent = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(1, 0, 0));
+        ScenarioBody<LSSphereCollider> child = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(2, 0, 0));
+
+        middleParent.Collider.SetParent(topParent.Collider);
+        child.Collider.SetParent(middleParent.Collider);
+
+        middleParent.Collider.TopParent.Should().BeSameAs(topParent.Collider);
+        child.Collider.TopParent.Should().BeSameAs(topParent.Collider);
+        child.Collider.Parent.Should().BeSameAs(middleParent.Collider);
+        child.Collider.ParentId.Should().Be(topParent.Collider.Id);
+    }
+
+    [Fact]
     public void DeactivateOwnedPairSide_ShouldRemovePairAndHolderReferences()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();

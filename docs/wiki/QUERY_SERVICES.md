@@ -80,6 +80,12 @@ targets. Mesh targets are intentionally excluded for now; mesh sweep needs a
 triangle sweep policy and acceleration strategy beyond static ray/overlap
 queries.
 
+`StiffBody` continuous collision detection reuses this service as an opt-in
+movement sweep. Body CCD passes the moving collider as `excludedCollider`, uses
+the all-hit path so later valid static targets can be found after ignored
+dynamic targets, and consumes the same deterministic distance/collider-ID
+ordering as host-facing swept-sphere queries.
+
 ## Circle Overlap Queries
 
 `GravitasCircleQueryService` exposes:

@@ -113,6 +113,38 @@ triangle-backed and covered by focused tests, but dynamic mesh behavior,
 arbitrary mesh contact manifolds, and swept mesh queries remain hardening
 targets.
 
+## Continuous Collision Detection
+
+CCD is body-owned and opt-in. `PhysicsSettings.DefaultContinuousCollisionMode`
+defaults to `Discrete`; `StiffBody.ContinuousCollisionMode` defaults to
+`Inherit`, so existing bodies keep the discrete integration path unless the host
+sets a context default, enables a body explicitly, or assigns a top-level parent
+body with an explicit CCD mode. `ColliderHierarchyState` caches the top parent
+when parent relationships are bound, so `Inherit` can check the parent policy in
+constant time before falling back to the context default.
+
+The alpha CCD path runs during `StiffBody` position integration, after velocity
+and acceleration have produced an intended frame displacement and before the
+authoritative position is committed. It uses a conservative swept-sphere proxy
+derived from the moving collider:
+
+- sphere, capsule, and cylinder use their scaled radius.
+- cuboid uses the smallest world-space bounds half extent.
+
+`Continuous` always sweeps when the proxy radius and displacement are non-zero.
+`Auto` sweeps only when the intended displacement is larger than the proxy
+radius. When a hit is accepted, the body clamps to the earliest swept center
+time of impact and removes only the closing component of linear velocity,
+preserving tangential velocity for later discrete response work.
+
+Accepted CCD targets are non-trigger bodyless colliders, immovable bodies, and
+kinematic bodies whose layers are allowed by the context collision matrix and
+whose hierarchy is not excluded. Ordinary dynamic-vs-dynamic CCD is
+intentionally deferred; it needs relative-velocity TOI ordering, pair
+tie-breakers, and replay tests before it becomes part of the alpha contract.
+Mesh targets are also excluded from swept-sphere CCD until Phase 7 defines the
+mesh alpha policy.
+
 ## Active Partitions
 
 A partition becomes active when its dynamic membership transitions from empty to
@@ -361,9 +393,9 @@ Response units and invariants:
   handled by the response solver.
 
 This is still the first alpha milestone, not a full response engine. Static
-friction for resting stacks, continuous collision detection, full iterative
-warm-start application, explicit island solving, and 2D/3D mixed-dimension
-exchange rules remain future work.
+friction for resting stacks, dynamic-vs-dynamic CCD, full iterative warm-start
+application, explicit island solving, and 2D/3D mixed-dimension exchange rules
+remain future work.
 
 ## Body Sleep And Wake
 
