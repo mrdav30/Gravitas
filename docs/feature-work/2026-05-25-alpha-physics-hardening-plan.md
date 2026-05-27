@@ -539,17 +539,17 @@ should not implement `LSCompoundCollider`.
   versus concave behavior except for cheap validation that proves a declared mode
   is invalid. Developer intent should drive runtime policy.
 - [x] Define the alpha boundary: static/kinematic concave triangle meshes are
-  acceptable collision data, convex meshes are the preferred dynamic mesh shape,
-  and dynamic concave behavior should route through compound/decomposed-convex
-  data unless a raw dynamic concave triangle-mesh policy is explicitly proven.
-- [x] Decide whether alpha accepts only host/offline decomposed convex pieces for
-  concave meshes, or whether Gravitas should own deterministic convex
-  decomposition later. Do not implement automatic decomposition in 7A unless the
-  algorithm, determinism contract, tests, and benchmarks are all explicit.
+  acceptable collision data under the temporary 7A gate, but full static,
+  kinematic, and dynamic concave support remains Phase 7B work. Convex meshes
+  are the only mesh mode that 7A treats as dynamic-ready.
+- [x] Decide that 7A does not claim true concave support. Deterministic
+  Gravitas-owned convex decomposition and host/offline decomposed convex pieces
+  belong to the dedicated concave mesh work in Phase 7B, not to the compound
+  collider API in Phase 7C.
 - [x] If 7A needs compound-related seams, keep them neutral and minimal:
-  declared mesh modes, decomposed-convex policy names, and tests that prove raw
-  dynamic concave meshes route to a future compound/decomposition path instead of
-  silently behaving like convex meshes.
+  declared mesh modes and policy names only. Do not route concave support
+  through compound colliders; Phase 7B owns concave narrow-phase behavior and any
+  decomposition internals.
 - [x] Refactor rigid mesh movement toward local-space acceleration ownership:
   build local vertices, local triangle normals, local bounds, and local triangle
   BVH once; update only transform, inverse transform, and conservative world
@@ -566,10 +566,9 @@ should not implement `LSCompoundCollider`.
 - [x] Add tests for invalid mesh input, declared mesh-mode validation, rotated
   mesh bounds, dynamic mesh movement without triangle BVH rebuild, mesh/collider
   contact order, and concave/non-convex policy enforcement.
-- [x] Add policy tests proving raw dynamic concave meshes are either rejected,
-  treated as static-only, or converted into declared convex/compound sub-shapes
-  by initialization-time data. Runtime per-frame decomposition is out of scope
-  for alpha.
+- [x] Add temporary policy tests proving raw dynamic concave meshes are rejected
+  in 7A instead of silently behaving like convex meshes. Phase 7B will replace
+  this temporary guard with real dynamic concave support.
 - [x] Review `PhysicsMesh.CalculateInertiaTensor(...)` and decide the alpha contract: keep the current triangle-area-weighted approximation with documentation, or replace it with a deterministic thin-triangle/shell or tetrahedral volume approximation. Any replacement needs fixed-value tests on known simple meshes and benchmark coverage.
 - [x] Decide whether the mesh edge cache remains required after manifold work. Remove it only if tests and benchmarks prove face normals/on-demand edges cover all callers.
 - [x] Review the old `UnityMeshSimplifier` package and the prototype
@@ -591,14 +590,13 @@ should not implement `LSCompoundCollider`.
 **Phase 7A Status - 2026-05-27**
 
 - Added explicit `MeshColliderMode` values for `Convex` and `Concave`, with
-  `MeshColliderPolicy` centralizing the alpha rule that movable dynamic concave
-  meshes require a decomposed-convex/compound representation instead of silently
-  behaving like convex meshes.
+  `MeshColliderPolicy` centralizing a temporary 7A guard that prevents movable
+  dynamic concave meshes from silently behaving like convex meshes.
 - Kept automatic deterministic convex decomposition out of 7A because no
   algorithm, determinism contract, pathological-shape tests, or benchmark budget
-  has been proven yet. The policy seam preserves the goal of Gravitas-owned
-  deterministic decomposition while keeping host/offline decomposed pieces as
-  the fallback path for 7B compound work.
+  has been proven yet. Phase 7B owns the next pass: true concave narrow phase,
+  dynamic concave support, Gravitas-owned deterministic decomposition where
+  feasible, and host/offline decomposed convex pieces as a fallback.
 - Refactored `PhysicsMesh` to keep vertices, triangle normals, areas, bounds,
   and triangle BVH in local mesh space. Rigid movement now updates transform,
   inverse transform, lazy world vertices, and conservative world bounds without
@@ -632,11 +630,14 @@ should not implement `LSCompoundCollider`.
   meaning is intentional.
 - Concave mesh support should remain part of the long-term design, similar to
   the behavior users expect from engines such as Unity. The alpha boundary is
-  raw movable concave triangle soup, not concave colliders as a concept.
-- Decomposing a concave mesh into convex pieces can feed a later compound
-  collider model. For 7A, host/offline decomposition is safer than runtime
-  automatic decomposition unless Gravitas owns a deterministic, bounded,
-  benchmarked algorithm.
+  not Unity's restriction: Gravitas should support concave meshes against every
+  supported collider class, including dynamic concave bodies, once Phase 7B
+  proves the behavior with tests and benchmarks.
+- Decomposing a concave mesh into convex pieces is concave mesh implementation
+  detail, not compound collider behavior. Host/offline decomposed convex pieces
+  are an acceptable fallback input for concave mesh acceleration, while
+  Gravitas-owned automatic decomposition must be deterministic, bounded,
+  benchmarked, and tested before it is claimed.
 - Ear clipping is useful for triangulating or partitioning 2D polygons, but it
   is not sufficient as a general 3D non-convex mesh decomposition strategy. If
   Gravitas eventually owns automatic 3D convex decomposition, evaluate a
@@ -661,12 +662,119 @@ should not implement `LSCompoundCollider`.
   Unity/float/double oriented, so a Gravitas simplifier would need a deliberate
   fixed-point port with deterministic tie-breakers and benchmark gates.
 
-## Phase 7B: Compound Collider Policy And Scaffold
+## Phase 7B: Concave Mesh Collision Contract And Decomposition
+
+**Purpose:** Turn `MeshColliderMode.Concave` from declaration into a real
+deterministic collision contract. Concave mesh colliders should collide with
+every supported collider class, including other concave meshes and dynamic
+concave bodies, when tests and benchmarks prove the behavior.
+
+**Execution Order:** Run this phase before Phase 7C. Compound colliders should
+not become the escape hatch for concave mesh support.
+
+**Files:**
+
+- Modify: `src/Gravitas/Colliders/Primitives/LSMeshCollider.cs`
+- Modify: `src/Gravitas/Colliders/Support/PhysicsMesh/PhysicsMesh.cs`
+- Modify: `src/Gravitas/Colliders/Support/PhysicsMesh/MeshColliderPolicy.cs`
+- Potentially create: `src/Gravitas/Colliders/Support/PhysicsMesh/MeshConcavityAnalyzer.cs`
+- Potentially create: `src/Gravitas/Colliders/Support/PhysicsMesh/MeshConvexDecomposition.cs`
+- Potentially create: `src/Gravitas/Colliders/Support/PhysicsMesh/MeshTriangleContactGenerator.cs`
+- Potentially create: `src/Gravitas/CollisionHandling/Support/Context/MeshTriangleContactContext.cs`
+- Modify: `src/Gravitas/CollisionHandling/CollisionDetection.cs`
+- Modify: `src/Gravitas/CollisionHandling/Support/Context/MeshObjectInfo.cs`
+- Modify: `src/Gravitas/Raycasting/RaycastSegmentWorker.cs` only if concave ray
+  behavior exposes stale convex assumptions.
+- Modify: `tests/Gravitas.Tests/Colliders/PhysicsMeshTests.cs`
+- Create or modify: `tests/Gravitas.Tests/Colliders/MeshColliderModeTests.cs`
+- Create or modify: `tests/Gravitas.Tests/CollisionHandling/ConcaveMeshCollisionTests.cs`
+- Modify: `tests/Gravitas.Tests/CollisionHandling/CollisionDetectionShapePairTests.cs`
+- Modify: `tests/Gravitas.Benchmarks/Colliders/ColliderShapeBenchmarks.cs`
+- Modify: `tests/Gravitas.Benchmarks/CollisionHandling/CollisionDetectionBenchmarks.cs`
+- Modify: `docs/wiki/COLLISION_PIPELINE.md`
+
+**Tasks:**
+
+- [ ] Define the mesh-mode runtime contract in code and docs. `Convex` mesh can
+  use whole-shape convex assumptions where valid; `Concave` mesh must use
+  triangle-set or decomposed-convex logic and must not project the whole mesh as
+  one convex polytope.
+- [ ] Replace the temporary dynamic-concave rejection with a real policy.
+  `MeshColliderMode.Concave` must be allowed for bodyless, immovable,
+  kinematic, and dynamic bodies once the narrow phase below is implemented.
+- [ ] Add deterministic mesh fixtures under the test project rather than relying
+  on imported engine meshes. Include at minimum:
+  - a closed convex tetrahedron or cube mesh for convex-control tests.
+  - an open concave inside-corner mesh made from three perpendicular quads so
+    sphere/capsule/cylinder/cuboid contacts can be checked against floor and
+    wall triangles.
+  - a concave notch or U-channel mesh with reentrant geometry so tests prove the
+    collider is not being treated as one convex hull.
+  - two small concave meshes whose triangle sets overlap at a deterministic
+    edge or face so concave-vs-concave ordering can be pinned.
+- [ ] Add failing tests before implementation for declared `Concave` meshes:
+  static/bodyless, immovable, kinematic, and dynamic initialization should all be
+  legal, and the dynamic body should still repartition through the local-BVH
+  movement path without rebuilding triangle topology.
+- [ ] Add concave-vs-primitive narrow-phase tests for sphere, capsule, cuboid,
+  and cylinder. Each shape pair needs at least one hit against an interior
+  concave feature, one hit against an exterior face, one edge-touch case, and
+  one separated case.
+- [ ] Add concave-vs-mesh tests for concave-vs-convex, convex-vs-concave, and
+  concave-vs-concave. These tests must verify stable contact normals, stable
+  contact IDs or deterministic point ordering where applicable, and reversed
+  dispatch behavior.
+- [ ] Add simulation-level tests for dynamic concave bodies. At minimum, move a
+  dynamic concave mesh into a primitive collider and move a primitive collider
+  into a dynamic concave mesh; both should produce deterministic contacts and
+  physically coherent response direction.
+- [ ] Split mesh narrow phase where necessary. Whole-mesh SAT is acceptable only
+  for convex mesh paths. Concave paths should gather candidate triangles from
+  the local BVH, run deterministic triangle-vs-shape or triangle-vs-triangle
+  checks, then reduce contacts using stable depth, distance, triangle index,
+  vertex index, and collider ID tie-breakers.
+- [ ] Keep all-hit/candidate buffers caller-owned or context-owned. Concave
+  triangle gathering and contact reduction must avoid per-frame allocations
+  after warmup.
+- [ ] Add or update allocation guard tests for concave mesh pair checks after
+  warmup. Allocation tests should cover at least concave-vs-cuboid,
+  concave-vs-cylinder, and concave-vs-concave.
+- [ ] Add benchmark coverage for concave candidate gathering, concave-vs-primitive
+  narrow phase, concave-vs-convex mesh, concave-vs-concave mesh, dynamic concave
+  movement/repartitioning, and any decomposition preprocessing.
+- [ ] Implement host/offline decomposed convex-piece support as a concave mesh
+  data path, not as `LSCompoundCollider`. The owning `LSMeshCollider` should
+  still present one collider ID, one body binding, one event surface, and one
+  broad-phase identity.
+- [ ] Attempt Gravitas-owned deterministic convex decomposition only behind an
+  explicit, test-backed API or preprocessing mode. The algorithm must have
+  deterministic ordering, deterministic tie-breakers, bounded failure behavior,
+  tests on pathological input, and benchmark coverage. If the algorithm cannot
+  decompose a mesh safely, it must return a deterministic failure/result code
+  rather than silently changing collision truth.
+- [ ] Update `docs/wiki/COLLISION_PIPELINE.md` after code lands so it no longer
+  describes dynamic concave meshes as routed through compound colliders.
+
+**Acceptance Bar:**
+
+- Do not claim concave support until the unit tests prove every supported
+  collider pair involving `MeshColliderMode.Concave`.
+- Do not claim dynamic concave support until at least one simulation-level test
+  proves deterministic movement, pair generation, contact normal direction, and
+  response behavior for a dynamic concave body.
+- Do not claim deterministic convex decomposition until decomposition outputs
+  are stable across repeated runs and benchmarked against raw triangle narrow
+  phase on the same fixtures.
+- Do not use compound colliders to satisfy concave mesh requirements. Compound
+  colliders remain a separate composition feature.
+
+## Phase 7C: Compound Collider Policy And Scaffold
 
 **Purpose:** Define `LSCompoundCollider` as a special-case collider composition
 strategy without bloating mesh-policy work. Implement only the minimal scaffold
 needed for alpha if the design remains contained; otherwise produce a follow-up
-implementation plan before Phase 8.
+implementation plan before Phase 8. Phase 7C should execute after Phase 7B so
+compound behavior does not absorb unresolved concave mesh responsibilities.
 
 **Files:**
 
@@ -682,7 +790,7 @@ implementation plan before Phase 8.
 
 **Tasks:**
 
-- [ ] Decide whether 7B implements an initial runtime type or only writes the
+- [ ] Decide whether 7C implements an initial runtime type or only writes the
   policy and follow-up plan. If implemented, keep it narrow: one public collider
   identity/body/layer, stable part IDs, deterministic part ordering, aggregate
   bounds, and part-local transforms.
@@ -690,10 +798,11 @@ implementation plan before Phase 8.
   independent host colliders or parent/child objects. They may reuse collider
   shape logic, but the compound owns registration, broad-phase identity, event
   surface, body binding, and lifecycle.
-- [ ] Define the supported alpha part set. Prefer primitives and convex meshes
-  for dynamic bodies. Concave mesh parts, if allowed, should follow the same
-  static/kinematic restrictions as standalone concave meshes.
-- [ ] Define compound/decomposed-convex collision rules before exposing an API:
+- [ ] Define the supported alpha part set as primitives plus declared `Convex`
+  mesh parts only. `Concave` mesh parts are not allowed inside
+  `LSCompoundCollider`; concave mesh decomposition belongs to `LSMeshCollider`
+  internals from Phase 7B.
+- [ ] Define compound collision rules before exposing an API:
   aggregate mass/inertia policy, part-level broad-phase behavior, pair identity,
   contact manifold reduction, trigger/contact event surface, parent/child
   filtering behavior, CCD proxy behavior, and debug draw representation.
@@ -703,8 +812,8 @@ implementation plan before Phase 8.
   physically meaningful best-contact/manifold reduction over "first contact
   found" behavior.
 - [ ] Add tests for part ordering, aggregate bounds, overlapping internal parts,
-  single external event emission, parent/child hierarchy separation, debug draw
-  output, and deterministic contact selection.
+  rejection of concave mesh parts, single external event emission, parent/child
+  hierarchy separation, debug draw output, and deterministic contact selection.
 - [ ] Add benchmarks for compound-vs-primitive pair checks and broad-phase
   repartitioning when a compound's aggregate bounds span many voxels.
 - [ ] Document the difference between compound colliders and parent/child
@@ -712,20 +821,21 @@ implementation plan before Phase 8.
 
 **Design Notes:**
 
-- A compound collider is the likely bridge: it behaves like one collider to the
-  host and one body to the solver, but internally contains deterministic
-  primitive and convex-mesh parts, with possible concave-mesh parts only under a
-  declared policy. This is similar in spirit to parent/child collider
-  composition, but should have one collider ID, one broad-phase owner, stable
-  part ordering, and explicit aggregate mass/inertia rules.
+- A compound collider behaves like one collider to the host and one body to the
+  solver, but internally contains deterministic primitive and declared convex
+  mesh parts. Concave mesh parts are excluded so compound behavior stays a
+  composition feature instead of becoming the concave-mesh decomposition system.
+  This is similar in spirit to parent/child collider composition, but should
+  have one collider ID, one broad-phase owner, stable part ordering, and
+  explicit aggregate mass/inertia rules.
 - A compound collider is not the same as a parent/child collider hierarchy. A
   parent/child hierarchy can represent separate host objects, such as a warrior
   and a held sword. A compound collider represents one physical collider whose
   shape is approximated by multiple internal parts.
-- A compound collider can provide practical support for concave/non-convex
-  meshes when the concave shape is represented as multiple deterministic parts.
-  It does not automatically make arbitrary raw concave triangle meshes dynamic-
-  safe; each part still needs a declared policy and stable collision ordering.
+- Compound colliders can approximate complex shapes with multiple primitives or
+  convex meshes, but they are not the concave mesh fallback. Raw concave triangle
+  meshes and decomposed concave-mesh internals are owned by `LSMeshCollider` and
+  the Phase 7B concave contract.
 
 ## Phase 8: Broad-Phase And Query State Scalability
 
