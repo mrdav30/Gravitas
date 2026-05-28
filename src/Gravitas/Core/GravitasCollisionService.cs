@@ -3,6 +3,7 @@ using Gravitas.Colliders;
 using GridForge.Grids;
 using GridForge.Spatial;
 using SwiftCollections;
+using System.Collections.Generic;
 
 namespace Gravitas;
 
@@ -12,15 +13,22 @@ namespace Gravitas;
 public sealed class GravitasCollisionService
 {
     private const int DefaultPartitionPoolCapacity = 1024;
+    private static readonly PhysicsPartitionOrderComparer PartitionOrderComparer = new();
 
     private readonly GravitasWorldContext _context;
     private readonly SwiftBucket<PhysicsPartition> _activePartitions = new();
     private readonly SwiftStack<PhysicsPartition> _inactivePartitionPool = new(DefaultPartitionPoolCapacity);
     private readonly SwiftHashSet<int> _redundancyChecker = new();
     private readonly SwiftHashSet<ushort> _processedGrids = new();
+    private readonly SwiftList<PhysicsPartition> _retainedPartitions = new();
+    private readonly SwiftList<PhysicsPartition> _distributionPartitions = new();
+    private readonly SwiftList<int> _distributionDynamicIds = new();
+    private readonly SwiftList<int> _distributionAwakeDynamicIds = new();
+    private readonly SwiftList<int> _distributionStaticIds = new();
     private readonly object _cullDistributorLock = new();
 
     private int _cullDistributor;
+    private int _retainedPartitionRetirementCursor;
 
     /// <summary>
     /// Initializes a new collision service for the supplied context.
@@ -52,6 +60,8 @@ public sealed class GravitasCollisionService
     /// </summary>
     public int InactivePartitionCount => _inactivePartitionPool.Count;
 
+    internal int RetainedPartitionCount => _retainedPartitions.Count;
+
     internal int CullDistributor
     {
         get
@@ -71,12 +81,79 @@ public sealed class GravitasCollisionService
     /// </summary>
     public void Reset()
     {
+        ClearRetainedPartitions();
         _activePartitions.Clear();
         _redundancyChecker.Clear();
         _processedGrids.Clear();
+        _distributionPartitions.FastClear();
+        _distributionDynamicIds.FastClear();
+        _distributionAwakeDynamicIds.FastClear();
+        _distributionStaticIds.FastClear();
         _inactivePartitionPool.Clear();
         Version = 1;
         _cullDistributor = 0;
+        _retainedPartitionRetirementCursor = 0;
+    }
+
+    private void ClearRetainedPartitions()
+    {
+        for (int i = 0; i < _retainedPartitions.Count; i++)
+        {
+            PhysicsPartition partition = _retainedPartitions[i];
+            if (partition.IsOwnedBy(this))
+                partition.ResetRetainedMembership();
+        }
+    }
+
+    private void TrackRetainedPartition(PhysicsPartition partition)
+    {
+        SwiftThrowHelper.ThrowIfNull(partition, nameof(partition));
+        SwiftThrowHelper.ThrowIfArgument(
+            partition.RetainedIndex >= 0,
+            nameof(partition),
+            "PhysicsPartition is already tracked as retained.");
+
+        partition.SetRetainedIndex(_retainedPartitions.Count);
+        _retainedPartitions.Add(partition);
+    }
+
+    private void UntrackRetainedPartition(PhysicsPartition partition)
+    {
+        int index = FindRetainedPartitionIndex(partition);
+        if (index < 0)
+        {
+            partition.ClearRetainedIndex();
+            return;
+        }
+
+        int lastIndex = _retainedPartitions.Count - 1;
+        if (index != lastIndex)
+        {
+            PhysicsPartition movedPartition = _retainedPartitions[lastIndex];
+            _retainedPartitions[index] = movedPartition;
+            movedPartition.SetRetainedIndex(index);
+        }
+
+        _retainedPartitions.RemoveAt(lastIndex);
+        partition.ClearRetainedIndex();
+
+        if (_retainedPartitionRetirementCursor > index)
+            _retainedPartitionRetirementCursor--;
+        if (_retainedPartitionRetirementCursor >= _retainedPartitions.Count)
+            _retainedPartitionRetirementCursor = 0;
+    }
+
+    private int FindRetainedPartitionIndex(PhysicsPartition partition)
+    {
+        int index = partition.RetainedIndex;
+        if ((uint)index < (uint)_retainedPartitions.Count && ReferenceEquals(_retainedPartitions[index], partition))
+            return index;
+
+        for (int i = 0; i < _retainedPartitions.Count; i++)
+            if (ReferenceEquals(_retainedPartitions[i], partition))
+                return i;
+
+        return -1;
     }
 
     /// <summary>
@@ -205,6 +282,8 @@ public sealed class GravitasCollisionService
                 ReleasePartition(partition);
                 return;
             }
+
+            TrackRetainedPartition(partition);
         }
 
         partitionedCoordinates.Add(voxel.WorldIndex);
@@ -281,11 +360,9 @@ public sealed class GravitasCollisionService
             else
                 partition!.RemoveDynamicObject(collider.Id);
 
-            if ((partition!.ContainedDynamicObjects?.Count ?? 0) == 0
-                && (partition.ContainedStaticObjects?.Count ?? 0) == 0)
-            {
-                voxel.TryRemovePartition<PhysicsPartition>();
-            }
+            // Keep the voxel partition attached after it becomes empty. Re-adding
+            // the same partition type through GridForge carries metadata overhead,
+            // while an empty PhysicsPartition is inactive and query-invisible.
         }
 
         _redundancyChecker.Clear();
@@ -336,8 +413,108 @@ public sealed class GravitasCollisionService
     {
         Version++;
 
+        _distributionPartitions.FastClear();
         foreach (PhysicsPartition partition in _activePartitions)
-            partition.Distribute();
+            _distributionPartitions.Add(partition);
+
+        _distributionPartitions.Sort(PartitionOrderComparer);
+
+        for (int i = 0; i < _distributionPartitions.Count; i++)
+        {
+            _distributionPartitions[i].Distribute(
+                _distributionDynamicIds,
+                _distributionAwakeDynamicIds,
+                _distributionStaticIds);
+        }
+
+        RetireExpiredRetainedPartitions();
+    }
+
+    private void RetireExpiredRetainedPartitions()
+    {
+        int budget = _context.Settings.RetainedPartitionRetirementSweepBudget;
+        if (budget <= 0 || _retainedPartitions.Count == 0)
+            return;
+
+        int inspected = 0;
+        while (inspected < budget && _retainedPartitions.Count > 0)
+        {
+            if (_retainedPartitionRetirementCursor >= _retainedPartitions.Count)
+                _retainedPartitionRetirementCursor = 0;
+
+            PhysicsPartition partition = _retainedPartitions[_retainedPartitionRetirementCursor];
+            inspected++;
+
+            if (!ShouldRetireRetainedPartition(partition))
+            {
+                _retainedPartitionRetirementCursor++;
+                continue;
+            }
+
+            if (!RetireRetainedPartition(partition))
+                _retainedPartitionRetirementCursor++;
+        }
+    }
+
+    private bool ShouldRetireRetainedPartition(PhysicsPartition partition)
+    {
+        if (!partition.IsOwnedBy(this) || !partition.IsEmpty || partition.IsAllocated || partition.EmptySinceFrame < 0)
+            return false;
+
+        int idleFrames = _context.FrameCount - partition.EmptySinceFrame;
+        return idleFrames >= _context.Settings.RetainedPartitionTimeToKillFrames;
+    }
+
+    private bool RetireRetainedPartition(PhysicsPartition partition)
+    {
+        if (!_context.World.TryGetVoxel(partition.WorldIndex, out Voxel? voxel))
+        {
+            ReleasePartition(partition);
+            return true;
+        }
+
+        if (!voxel!.TryGetPartition(out PhysicsPartition? attachedPartition)
+            || !ReferenceEquals(attachedPartition, partition))
+        {
+            ReleasePartition(partition);
+            return true;
+        }
+
+        return voxel.TryRemovePartition<PhysicsPartition>();
+    }
+
+    private sealed class PhysicsPartitionOrderComparer : IComparer<PhysicsPartition>
+    {
+        public int Compare(PhysicsPartition? left, PhysicsPartition? right)
+        {
+            if (ReferenceEquals(left, right))
+                return 0;
+            if (left == null)
+                return -1;
+            if (right == null)
+                return 1;
+
+            WorldVoxelIndex leftIndex = left.WorldIndex;
+            WorldVoxelIndex rightIndex = right.WorldIndex;
+
+            int compare = leftIndex.GridIndex.CompareTo(rightIndex.GridIndex);
+            if (compare != 0)
+                return compare;
+
+            compare = leftIndex.GridSpawnToken.CompareTo(rightIndex.GridSpawnToken);
+            if (compare != 0)
+                return compare;
+
+            compare = leftIndex.VoxelIndex.x.CompareTo(rightIndex.VoxelIndex.x);
+            if (compare != 0)
+                return compare;
+
+            compare = leftIndex.VoxelIndex.y.CompareTo(rightIndex.VoxelIndex.y);
+            if (compare != 0)
+                return compare;
+
+            return leftIndex.VoxelIndex.z.CompareTo(rightIndex.VoxelIndex.z);
+        }
     }
 
     internal int ActivatePartition(PhysicsPartition partition)
@@ -376,6 +553,7 @@ public sealed class GravitasCollisionService
             nameof(partition),
             "Partition must be released through its owning collision service.");
 
+        UntrackRetainedPartition(partition);
         partition.ResetForPool();
         _inactivePartitionPool.Push(partition);
     }

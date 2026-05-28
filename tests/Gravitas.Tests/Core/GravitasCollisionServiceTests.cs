@@ -49,11 +49,10 @@ public sealed class GravitasCollisionServiceTests
     }
 
     [Fact]
-    public void ClearPartitionedObject_ShouldReleaseEmptyPartitionsOnlyOnce()
+    public void ClearPartitionedObject_ShouldRetainEmptyPartitionsWithoutPoolingTwice()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         LSSphereCollider collider = CreateDynamicSphere(context);
-        int partitionCount = collider.PartitionCoordinates!.Count;
         int inactiveBeforeClear = context.Collisions.InactivePartitionCount;
 
         context.Collisions.ClearPartitionedObject(collider, force: true).Should().BeTrue();
@@ -61,8 +60,15 @@ public sealed class GravitasCollisionServiceTests
         context.Collisions.ClearPartitionedObject(collider, force: true).Should().BeTrue();
 
         context.Collisions.ActivePartitionCount.Should().Be(0);
-        inactiveAfterClear.Should().Be(inactiveBeforeClear + partitionCount);
+        inactiveAfterClear.Should().Be(inactiveBeforeClear);
         context.Collisions.InactivePartitionCount.Should().Be(inactiveAfterClear);
+        for (int i = 0; i < collider.PartitionCoordinates!.Count; i++)
+        {
+            context.World.TryGetVoxel(collider.PartitionCoordinates[i], out Voxel? voxel).Should().BeTrue();
+            voxel!.TryGetPartition(out PhysicsPartition? partition).Should().BeTrue();
+            partition!.ContainedDynamicObjects!.Count.Should().Be(0);
+            partition.IsAllocated.Should().BeFalse();
+        }
     }
 
     [Fact]

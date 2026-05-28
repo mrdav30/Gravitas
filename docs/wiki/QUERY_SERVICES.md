@@ -53,6 +53,8 @@ mesh triangle BVH before testing candidate triangles. `FixedRay` was reviewed
 during this pass, but the service keeps a custom segment worker because the
 query path needs all segment intersection points, caller-owned buffers, and
 bounded segment distance rather than the first forward hit on an infinite ray.
+Duplicate suppression is covered for colliders whose broad-phase bounds span
+many voxels; the all-hit path should still report one hit per collider.
 
 ## Swept Sphere Queries
 
@@ -123,6 +125,10 @@ The candidate path is:
 query origin to the hit point and by maximum hit-point distance. It is not a
 swept circle or swept sphere query.
 
+Duplicate suppression is also covered for large colliders that appear in many
+voxel partitions. Circle queries remain X/Z overlap/proximity queries; use
+swept-sphere queries for deterministic swept movement.
+
 ## Layer Mask Semantics
 
 Queries accept `PhysicsLayerMask layerMask`. This is an include mask:
@@ -167,5 +173,5 @@ null body.
 - keep query benchmarks allocation-free as result ordering, filters, and shape
   support expand.
 - add shape-specific query tests for every collider type.
-- decide whether query services remain single-threaded or move to explicit
-  query state objects.
+- revisit explicit query state objects only when a real host requires
+  concurrent queries against one context.

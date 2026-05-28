@@ -92,11 +92,40 @@ public sealed class GravitasCircleQueryServiceTests
         hitInfo.Distance.Should().Be((Fixed64)1.5f);
     }
 
+    [Fact]
+    public void OverlapCircleAll_WithColliderSpanningManyVoxels_ShouldReturnSingleColliderHit()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSSphereCollider collider = CreateLargeDynamicSphere(context, Vector3d.Zero);
+        var hits = new SwiftList<LSRaycastHit>();
+
+        int count = context.CircleQueries
+            .OverlapCircleAll(Vector3d.Zero, (Fixed64)4, IncludeLayerZero, hits);
+
+        count.Should().Be(1);
+        hits[0].Collider.Should().BeSameAs(collider);
+    }
+
+
     private static LSSphereCollider CreateDynamicSphere(GravitasWorldContext context, Vector3d position)
     {
         EnsureGrid(context);
         var agent = new TestMatterAgent(context);
         var collider = new LSSphereCollider();
+        var body = new StiffBody(agent, collider)
+        {
+            Mass = Fixed64.One
+        };
+
+        body.Initialize(position, FixedQuaternion.Identity);
+        return collider;
+    }
+
+    private static LSSphereCollider CreateLargeDynamicSphere(GravitasWorldContext context, Vector3d position)
+    {
+        EnsureGrid(context);
+        var agent = new TestMatterAgent(context);
+        var collider = new LSSphereCollider { Radius = (Fixed64)3 };
         var body = new StiffBody(agent, collider)
         {
             Mass = Fixed64.One

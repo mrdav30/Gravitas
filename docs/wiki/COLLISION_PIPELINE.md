@@ -23,14 +23,28 @@ into one bounds/shape rebuild.
 7. stores the collider's `WorldVoxelIndex`.
 8. adds the collider ID to the partition dynamic or static membership set.
 
+When a collider leaves a voxel, Gravitas removes the collider ID from the
+partition but keeps the empty `PhysicsPartition` attached to that voxel. Empty
+partitions are inactive and query-invisible, while future movement back into
+the same voxel can reuse the existing partition without going through
+GridForge's partition add path again. Empty retained partitions are not kept
+forever: `PhysicsSettings.RetainedPartitionTimeToKillFrames` controls the
+deterministic frame window, and
+`PhysicsSettings.RetainedPartitionRetirementSweepBudget` bounds how many
+retained partitions the collision service checks per distribution step. Expired
+empty partitions are removed from their voxels and returned to the
+context-local partition pool. `GravitasWorldContext.Reset()` clears retained
+partition membership before collider IDs are reused.
+
 `PhysicsPartition` is a GridForge voxel partition payload. It stores
 context-local collider IDs, not collider references. Dynamic and static
 membership uses `SwiftSparseSet`: lookups and removals are keyed by collider ID,
 while dense-key storage keeps partition iteration compact. Do not treat dense-key
 order as a semantic ordering rule; deterministic pair ordering must be explicit
 at the pair or service layer. The owner service is required before the partition
-is added to a voxel, and the partition returns to that owner service pool from
-`OnRemoveFromVoxel(...)`.
+is added to a voxel. The partition returns to that owner service pool when
+GridForge removes the voxel partition itself, either through retained-partition
+retirement or world/grid cleanup.
 
 Current static-membership behavior is specific: colliders whose body exists and
 has `Immovable == true` are added to `ContainedStaticObjects`. Other registered
@@ -116,10 +130,11 @@ bodyless, immovable, kinematic, and dynamic bodies.
 `PhysicsMesh` now owns source vertices, triangle normals, triangle areas, local
 bounds, and the triangle BVH in local mesh space. Rigid movement updates the
 mesh transform, inverse transform, and conservative world bounds without
-rebuilding the local BVH. Mesh queries and narrow-phase callers transform their
-world-space query bounds or points into local space, query the local BVH, then
-transform final contact points and normals back to world space. The full
-world-vertex array is retained only as an on-demand compatibility view.
+rebuilding the local BVH or allocating new bounds after warmup. Mesh queries and
+narrow-phase callers transform their world-space query bounds or points into
+local space, query the local BVH, then transform final contact points and
+normals back to world space. The full world-vertex array is retained only as an
+on-demand compatibility view.
 
 Alpha mesh policy is explicit rather than Unity-compatible by default: concave
 meshes collide as triangle sets instead of being treated as one convex hull.
@@ -204,13 +219,22 @@ registered dynamic-body colliders refresh bounds and partition membership. This
 pre-distribution pass catches host command teleports or direct body moves made
 between frames. It then calls
 `GravitasCollisionService.CheckAndDistributeCollisions()`. The collision service
-increments its `Version` and asks each active partition to distribute candidate
-pairs.
+increments its `Version`, copies active partitions into a reusable buffer, sorts
+them by `WorldVoxelIndex`, and asks each active partition to distribute
+candidate pairs.
 
 `PhysicsPartition.Distribute()` checks:
 
 - every awake dynamic against the other dynamic IDs in that partition.
 - every awake dynamic against the static IDs in that partition.
+
+The dynamic, awake-dynamic, and static sparse-set keys are copied into
+context-owned buffers and sorted by collider ID before pair generation. This
+keeps pair/contact ordering stable even when movement churn changes sparse-set
+dense storage order. `SwiftSortedList` is not used for these scratch buffers:
+its `AddRange` path still copies source items into a temporary array and then
+merges sorted data, while the current reusable `SwiftList` buffers bulk-copy
+and sort without adding another persistent membership structure.
 
 If a partition contains no awake dynamic IDs, distribution returns before pair
 generation. Static/static pairs are not distributed. This is the current alpha

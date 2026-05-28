@@ -10,6 +10,10 @@ public sealed class PhysicsSettings
 
     public const int MaxLayers = 32;
 
+    public const int DefaultRetainedPartitionTimeToKillFrames = DefaultFrameRate * 10;
+
+    public const int DefaultRetainedPartitionRetirementSweepBudget = 64;
+
     /// <summary>
     /// Legacy prototype example ground-check include mask. Hosts should configure
     /// this explicitly for their own layer model.
@@ -33,6 +37,37 @@ public sealed class PhysicsSettings
     public bool PoolingEnabled { get; set; } = true;
 
     public PhysicsLayerMask GroundCheckLayerMask { get; set; }
+
+    private int _retainedPartitionTimeToKillFrames = DefaultRetainedPartitionTimeToKillFrames;
+    private int _retainedPartitionRetirementSweepBudget = DefaultRetainedPartitionRetirementSweepBudget;
+
+    /// <summary>
+    /// Gets or sets how many simulation frames an empty voxel partition should stay attached for fast reuse.
+    /// A value of zero retires eligible partitions on the next retirement sweep.
+    /// </summary>
+    public int RetainedPartitionTimeToKillFrames
+    {
+        get => _retainedPartitionTimeToKillFrames;
+        set
+        {
+            SwiftThrowHelper.ThrowIfNegative(value, nameof(value));
+            _retainedPartitionTimeToKillFrames = value;
+        }
+    }
+
+    /// <summary>
+    /// Gets or sets the maximum retained partitions checked for retirement during one collision distribution step.
+    /// A value of zero disables retirement sweeps.
+    /// </summary>
+    public int RetainedPartitionRetirementSweepBudget
+    {
+        get => _retainedPartitionRetirementSweepBudget;
+        set
+        {
+            SwiftThrowHelper.ThrowIfNegative(value, nameof(value));
+            _retainedPartitionRetirementSweepBudget = value;
+        }
+    }
 
     /// <summary>
     /// Gets or sets the default tunneling policy used by bodies configured to inherit from the context.

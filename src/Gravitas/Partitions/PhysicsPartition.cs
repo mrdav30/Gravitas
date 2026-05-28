@@ -2,12 +2,23 @@
 using GridForge.Grids;
 using GridForge.Spatial;
 using SwiftCollections;
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 
 namespace Gravitas;
 
 public class PhysicsPartition : IVoxelPartition
 {
+    private sealed class IntAscendingComparer : IComparer<int>
+    {
+        public int Compare(int left, int right) => left.CompareTo(right);
+    }
+
+    private static readonly IntAscendingComparer ColliderIdComparer = new();
+
     private GravitasCollisionService? _owner;
+    private int _emptySinceFrame = -1;
+    private int _retainedIndex = -1;
 
     public WorldVoxelIndex WorldIndex { get; set; }
 
@@ -28,6 +39,12 @@ public class PhysicsPartition : IVoxelPartition
     public int ActivationId { get; private set; }
 
     public bool IsAllocated => ActivationId != -1;
+
+    internal bool IsEmpty => (ContainedDynamicObjects?.Count ?? 0) == 0 && (ContainedStaticObjects?.Count ?? 0) == 0;
+
+    internal int EmptySinceFrame => _emptySinceFrame;
+
+    internal int RetainedIndex => _retainedIndex;
 
     /// <summary>
     /// Gets the number of awake dynamic IDs currently in this partition.
@@ -60,22 +77,27 @@ public class PhysicsPartition : IVoxelPartition
 
     public void OnChange() { }
 
-    public void Distribute()
+    internal void Distribute(
+        SwiftList<int> dynamicIds,
+        SwiftList<int> awakeDynamicIds,
+        SwiftList<int> staticIds)
     {
         int dynamicCount = ContainedDynamicObjects?.Count ?? 0;
         int awakeDynamicCount = ContainedAwakeDynamicObjects?.Count ?? 0;
         if (ContainedDynamicObjects == null || dynamicCount == 0 || ContainedAwakeDynamicObjects == null || awakeDynamicCount == 0)
             return;
 
-        int staticCount = ContainedStaticObjects?.Count ?? 0;
+        CopySortedIds(ContainedDynamicObjects, dynamicIds);
+        CopySortedIds(ContainedAwakeDynamicObjects, awakeDynamicIds);
+        CopySortedIds(ContainedStaticObjects, staticIds);
 
         // Sleeping bodies stay query-visible in dynamic membership, while awake membership gates solver work.
-        for (int j = 0; j < awakeDynamicCount; j++)
+        for (int j = 0; j < awakeDynamicIds.Count; j++)
         {
-            int id1 = ContainedAwakeDynamicObjects.DenseKeys[j];
-            for (int k = 0; k < dynamicCount; k++)
+            int id1 = awakeDynamicIds[j];
+            for (int k = 0; k < dynamicIds.Count; k++)
             {
-                int id2 = ContainedDynamicObjects.DenseKeys[k];
+                int id2 = dynamicIds[k];
                 if (id1 == id2)
                     continue;
 
@@ -85,12 +107,24 @@ public class PhysicsPartition : IVoxelPartition
                 ProcessPair(id1, id2);
             }
 
-            for (int k = 0; k < staticCount; k++)
+            for (int k = 0; k < staticIds.Count; k++)
             {
-                int id2 = ContainedStaticObjects!.DenseKeys[k];
+                int id2 = staticIds[k];
                 ProcessPair(id1, id2);
             }
         }
+    }
+
+    private static void CopySortedIds(SwiftSparseSet? source, SwiftList<int> destination)
+    {
+        destination.FastClear();
+        if (source == null)
+            return;
+
+        for (int i = 0; i < source.Count; i++)
+            destination.Add(source.DenseKeys[i]);
+
+        destination.Sort(ColliderIdComparer);
     }
 
     private void ProcessPair(int id1, int id2)
@@ -112,6 +146,7 @@ public class PhysicsPartition : IVoxelPartition
         if (!ContainedDynamicObjects.Add(item))
             return;
 
+        MarkOccupied();
         SetDynamicObjectAwake(item, IsDynamicObjectAwake(item));
 
         if (ContainedDynamicObjects.Count == 1)
@@ -121,7 +156,8 @@ public class PhysicsPartition : IVoxelPartition
     public void AddStaticObject(int item)
     {
         ContainedStaticObjects ??= new();
-        ContainedStaticObjects.Add(item);
+        if (ContainedStaticObjects.Add(item))
+            MarkOccupied();
     }
 
     public void RemoveDynamicObject(int item)
@@ -140,12 +176,18 @@ public class PhysicsPartition : IVoxelPartition
         // If there are no more dynamic objects, we can deactivate the partition to save on future checks until it's needed again.
         Owner.DeactivatePartition(ActivationId);
         ActivationId = -1;
+        MarkEmptyIfUnoccupied();
     }
 
     public void RemoveStaticObject(int item)
     {
         if (ContainedStaticObjects?.Remove(item) != true)
+        {
             GravitasLogger.DebugChannel.Info($"Static item not removed - {item}");
+            return;
+        }
+
+        MarkEmptyIfUnoccupied();
     }
 
     /// <summary>
@@ -196,6 +238,27 @@ public class PhysicsPartition : IVoxelPartition
         _owner = owner;
     }
 
+    internal bool IsOwnedBy(GravitasCollisionService owner) => ReferenceEquals(_owner, owner);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal void SetRetainedIndex(int index)
+    {
+        SwiftThrowHelper.ThrowIfNegative(index, nameof(index));
+        _retainedIndex = index;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal void ClearRetainedIndex() => _retainedIndex = -1;
+
+    internal void ResetRetainedMembership()
+    {
+        ContainedDynamicObjects?.Clear();
+        ContainedAwakeDynamicObjects?.Clear();
+        ContainedStaticObjects?.Clear();
+        ActivationId = -1;
+        MarkEmpty(_owner?.Context.FrameCount ?? 0);
+    }
+
     internal void ResetForPool()
     {
         ContainedDynamicObjects?.Clear();
@@ -208,7 +271,22 @@ public class PhysicsPartition : IVoxelPartition
         _owner = null;
         ActivationId = -1;
         IsPartitioned = false;
+        _emptySinceFrame = -1;
+        _retainedIndex = -1;
     }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void MarkOccupied() => _emptySinceFrame = -1;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void MarkEmptyIfUnoccupied()
+    {
+        if (IsEmpty && _emptySinceFrame < 0)
+            MarkEmpty(Owner.Context.FrameCount);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void MarkEmpty(int frame) => _emptySinceFrame = frame;
 
     /// <summary>
     /// Sets the parent index for the current voxel in the world.

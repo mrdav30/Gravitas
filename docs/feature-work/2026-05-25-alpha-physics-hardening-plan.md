@@ -247,10 +247,10 @@ Meaningful deferred work captured from that plan and the wiki:
 **Files:**
 
 - Remove: `src/Gravitas/CollisionHandling/Support/ContactPoint.cs`
-- Create: `src/Gravitas/CollisionHandling/Support/ContactManifold.cs`
-- Create: `src/Gravitas/CollisionHandling/Support/ManifoldContact.cs`
-- Modify: `src/Gravitas/CollisionHandling/CollisionPair.cs`
-- Modify: `src/Gravitas/CollisionHandling/CollisionDetection.cs`
+- Create: `src/Gravitas/CollisionHandling/Contacts/ContactManifold.cs`
+- Create: `src/Gravitas/CollisionHandling/Contacts/ManifoldContact.cs`
+- Modify: `src/Gravitas/CollisionHandling/Pairs/CollisionPair.cs`
+- Modify: `src/Gravitas/CollisionHandling/Detection/CollisionDetection.cs`
 - Modify: `tests/Gravitas.Tests/CollisionHandling`
 - Modify: `tests/Gravitas.Benchmarks/CollisionHandling`
 - Modify: `docs/wiki/COLLISION_PIPELINE.md`
@@ -290,7 +290,7 @@ Meaningful deferred work captured from that plan and the wiki:
 
 **Files:**
 
-- Modify: `src/Gravitas/CollisionHandling/CollisionResponse.cs`
+- Modify: `src/Gravitas/CollisionHandling/Response/CollisionResponse.cs`
 - Potentially create: `src/Gravitas/CollisionHandling/Solver`
 - Modify: `src/Gravitas/Core/StiffBody.cs`
 - Modify: `src/Gravitas/Settings/PhysicsSettings.cs`
@@ -343,7 +343,7 @@ Meaningful deferred work captured from that plan and the wiki:
 
 - Modify: `src/Gravitas/Core/GravitasPhysicsService.cs`
 - Modify: `src/Gravitas/Core/GravitasCollisionService.cs`
-- Modify: `src/Gravitas/CollisionHandling/CollisionPair.cs`
+- Modify: `src/Gravitas/CollisionHandling/Pairs/CollisionPair.cs`
 - Modify: `src/Gravitas/Partitions/PhysicsPartition.cs`
 - Potentially create: `src/Gravitas/CollisionHandling/Solver/PhysicsIsland.cs`
 - Potentially create: `src/Gravitas/CollisionHandling/Solver/IslandBuilder.cs`
@@ -439,7 +439,7 @@ Meaningful deferred work captured from that plan and the wiki:
 - Modify: `src/Gravitas/Raycasting/SweptSphereQueryWorker.cs`
 - Potentially create: `src/Gravitas/CollisionHandling/Continuous`
 - Potentially create: `src/Gravitas/CollisionHandling/Continuous/ContinuousCollisionMode.cs`
-- Modify: `src/Gravitas/CollisionHandling/CollisionDetection.cs`
+- Modify: `src/Gravitas/CollisionHandling/Detection/CollisionDetection.cs`
 - Modify: `src/Gravitas/Core/StiffBody.cs`
 - Potentially modify: `src/Gravitas/Settings/PhysicsSettings.cs`
 - Modify: `tests/Gravitas.Tests/Raycasting`
@@ -517,7 +517,7 @@ should not implement `LSCompoundCollider`.
 
 - Modify: `src/Gravitas/Colliders/Support/PhysicsMesh/PhysicsMesh.cs`
 - Modify: `src/Gravitas/Colliders/Primitives/LSMeshCollider.cs`
-- Modify: `src/Gravitas/CollisionHandling/CollisionDetection.cs`
+- Modify: `src/Gravitas/CollisionHandling/Detection/CollisionDetection.cs`
 - Modify: `src/Gravitas/Raycasting/RaycastSegmentWorker.cs`
 - Potentially create: `src/Gravitas/Colliders/Support/PhysicsMesh/ConvexMeshPolicy.cs`
 - Potentially create: `src/Gravitas/Colliders/Support/PhysicsMesh/MeshColliderPolicy.cs`
@@ -682,10 +682,10 @@ not become the escape hatch for concave mesh support.
 - Delete: `src/Gravitas/Colliders/Support/PhysicsMesh/MeshColliderPolicy.cs`
 - Potentially create: `src/Gravitas/Colliders/Support/PhysicsMesh/MeshConcavityAnalyzer.cs`
 - Potentially create: `src/Gravitas/Colliders/Support/PhysicsMesh/MeshConvexDecomposition.cs`
-- Create: `src/Gravitas/CollisionHandling/Support/MeshTriangleContactGenerator.cs`
-- Potentially create: `src/Gravitas/CollisionHandling/Support/Context/MeshTriangleContactContext.cs`
-- Modify: `src/Gravitas/CollisionHandling/CollisionDetection.cs`
-- Modify: `src/Gravitas/CollisionHandling/Support/Context/MeshObjectInfo.cs`
+- Create: `src/Gravitas/CollisionHandling/Detection/Mesh/MeshTriangleContactGenerator.cs`
+- Potentially create: `src/Gravitas/CollisionHandling/Detection/Context/MeshTriangleContactContext.cs`
+- Modify: `src/Gravitas/CollisionHandling/Detection/CollisionDetection.cs`
+- Modify: `src/Gravitas/CollisionHandling/Detection/Context/MeshObjectInfo.cs`
 - Modify: `src/Gravitas/Raycasting/RaycastSegmentWorker.cs` only if concave ray
   behavior exposes stale convex assumptions.
 - Modify: `tests/Gravitas.Tests/Colliders/PhysicsMeshTests.cs`
@@ -830,7 +830,7 @@ not absorb unresolved concave mesh responsibilities.
 - Potentially create: `src/Gravitas/Colliders/Primitives/LSCompoundCollider.cs`
 - Potentially create: `src/Gravitas/Colliders/Support/Compound`
 - Potentially modify: `src/Gravitas/Colliders/LSCollider.cs`
-- Potentially modify: `src/Gravitas/CollisionHandling/CollisionDetection.cs`
+- Potentially modify: `src/Gravitas/CollisionHandling/Detection/CollisionDetection.cs`
 - Potentially modify: `src/Gravitas/Diagnostics`
 - Modify: `tests/Gravitas.Tests/Colliders`
 - Modify: `tests/Gravitas.Tests/CollisionHandling`
@@ -926,24 +926,84 @@ not absorb unresolved concave mesh responsibilities.
 
 **Tasks:**
 
-- [ ] Validate packaged GridForge partition-provider behavior once the retention fix is released; remove temporary local project references when possible.
+- [x] Validate packaged GridForge partition-provider behavior once the retention fix is released; remove temporary local project references when possible.
 - [x] Compare `SwiftSparseMap<T>` membership against a future `SwiftSparseSet` or another deterministic sparse membership structure when available. Phase 0 moved partition membership to `SwiftSparseSet`; continue benchmarking the layout under broader partition/query scale tests.
-- [ ] Revisit active partition ordering and pair candidate ordering for determinism under high churn.
-- [ ] If Phase 8 introduces a hierarchical broad phase, spatial tree, or nested
+- [x] Revisit active partition ordering and pair candidate ordering for determinism under high churn.
+- [x] If Phase 8 introduces a hierarchical broad phase, spatial tree, or nested
   acceleration structure above GridForge voxels, revisit awake-state propagation
   from child nodes to parent nodes. A branch with no awake dynamic descendants
   should be skippable during pair generation, but only if tests prove sleeping
   bodies remain visible to queries, wake propagation, and contact lifecycle.
-- [ ] Add stress tests for moving many colliders across grids, repeatedly emptying/refilling partitions, and querying colliders spanning many voxels.
-- [ ] Decide whether query services should remain context-owned mutable services or expose explicit caller-owned/rented query state for reentrancy.
-- [ ] Compare custom ray/segment workers against `FixedRay` for any first-hit or non-allocation query paths where the downstream primitive now fits.
-- [ ] Investigate the small managed allocation reported by the Phase 7A
+- [x] Add stress tests for moving many colliders across grids, repeatedly emptying/refilling partitions, and querying colliders spanning many voxels.
+- [x] Decide whether query services should remain context-owned mutable services or expose explicit caller-owned/rented query state for reentrancy.
+- [x] Compare custom ray/segment workers against `FixedRay` for any first-hit or non-allocation query paths where the downstream primitive now fits.
+- [x] Add deterministic frame-based time-to-kill for retained empty `PhysicsPartition` instances so long-running simulations do not keep every touched voxel partition forever.
+- [x] Investigate the small managed allocation reported by the Phase 7A
   `MoveMeshRuntimeShapeStateAndQueryTriangles` benchmark (`216 B/op` in the
   2026-05-27 short smoke). Confirm whether it comes from
   `SwiftFixedBVH<T>.Query(...)` scratch ownership, interface dispatch, or
   Gravitas call-site state, then either fix the hot path or capture the
   downstream SwiftCollections change needed.
-- [ ] Keep all-hit query paths caller-buffered and benchmarked.
+- [x] Keep all-hit query paths caller-buffered and benchmarked.
+
+**Phase 8 Implementation Notes:**
+
+- Validated package references against `GridForge` `6.0.5`,
+  `SwiftCollections` `4.1.0`, and `SwiftCollections.FixedMathSharp` `4.1.0`
+  with no temporary local project references in the active project files.
+- Kept empty `PhysicsPartition` instances attached to their GridForge voxels
+  after the last collider leaves. The partition becomes inactive and
+  query-invisible, but future collider churn within the retained window reuses
+  the same partition instead of paying the successful
+  `Voxel.TryAddPartition(...)` path again.
+- Added `PhysicsSettings.RetainedPartitionTimeToKillFrames` and
+  `PhysicsSettings.RetainedPartitionRetirementSweepBudget`. Empty retained
+  partitions now expire through a deterministic frame-based, bounded sweep and
+  return to the context-local partition pool.
+- Added retained-partition reset cleanup so `GravitasWorldContext.Reset()`
+  clears collider ID membership and activation state from voxel-retained
+  partitions before physics IDs can be reused.
+- Made active partition traversal deterministic by copying active partitions to
+  a context-owned buffer, sorting by `WorldVoxelIndex`, and distributing pairs
+  from sorted collider-ID buffers. This removes sparse-set dense-order churn
+  from contact ordering.
+- Reorganized `src/Gravitas/CollisionHandling` into source-layout subdomains:
+  `Detection`, `Detection/Context`, `Detection/Mesh`, `Detection/Sat`,
+  `Pairs`, `Contacts`, `Response`, and `Continuous`. Namespaces were left
+  unchanged.
+- Reviewed `SwiftSortedList` for distribution scratch buffers. Even with
+  `AddRange`, it copies source items into a temporary array and merges into the
+  sorted list, so the current reusable `SwiftList` bulk-copy plus sort path is
+  the better non-allocation default unless benchmarks show persistent sorted
+  membership is worth the mutation cost.
+- Added tests for different partition churn orders, retained empty partitions,
+  frame-based partition retirement, reset cleanup, and duplicate suppression
+  when ray/circle queries touch a collider spanning many voxels.
+- Investigated the `216 B/op` mesh movement/query benchmark allocation. The
+  source was Gravitas call-site state: mesh bounds created a new
+  `BoundingBox` on each rigid movement and repartitioning detached/re-added
+  empty voxel partitions. `PhysicsMesh` now mutates warmed bounds in place, and
+  retained voxel partitions remove the repartition add cost. The focused
+  allocation guard reports zero bytes after warmup.
+- The first short benchmark rerun exposed an `AccessViolationException` in the
+  mesh bounds transform helper under BenchmarkDotNet's unrolled hot loop. The
+  helper now transforms each corner in the caller frame and only passes the
+  transformed point into the min/max accumulator. A rerun completed with
+  `MoveMeshRuntimeShapeStateAndQueryTriangles` at about `1.957 us` and no
+  managed allocation reported.
+- No hierarchical broad phase was introduced in this phase, so awake-state
+  propagation beyond flat GridForge voxel partitions remains deferred.
+- Query services remain context-owned mutable services for alpha. They are
+  single-threaded by contract; concurrent query job/state objects remain a
+  future redesign only if host requirements demand them.
+- `FixedRay` was reviewed as the downstream primitive comparison point. The
+  current custom segment worker remains the better alpha fit because Gravitas
+  needs bounded segment queries, all-hit intersection buffers, starting-inside
+  behavior, mesh triangle candidate handling, and deterministic caller-buffered
+  result ordering.
+- Split `CollisionDetection` into shape-focused partial files so future
+  narrow-phase work can target sphere, capsule, cuboid, cylinder, compound, and
+  mesh paths without navigating a 1200-line monolith.
 
 ## Phase 9: First-Class 2D Physics Foundation
 

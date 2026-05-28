@@ -125,6 +125,7 @@ namespace Gravitas.Colliders
         }
 
         private BoundingBox _bounds;
+        private bool _boundsInitialized;
         public BoundingBox Bounds => _bounds;
 
         private readonly BoundingBox _localBounds;
@@ -316,7 +317,15 @@ namespace Gravitas.Colliders
 
         private void UpdateBounds()
         {
-            _bounds = CalculateTransformedBounds(_localBounds, TransformationMatrix);
+            FixedBoundVolume volume = TransformBounds(_localBounds.Min, _localBounds.Max, TransformationMatrix);
+            if (!_boundsInitialized)
+            {
+                _bounds = new BoundingBox((volume.Min + volume.Max) * Fixed64.Half, volume.Max - volume.Min);
+                _boundsInitialized = true;
+                return;
+            }
+
+            _bounds.SetMinMax(volume.Min, volume.Max);
         }
 
         private static BoundingBox CalculateBounds(Vector3d[] vertices)
@@ -332,36 +341,28 @@ namespace Gravitas.Colliders
             return new BoundingBox((min + max) * Fixed64.Half, max - min);
         }
 
-        private static BoundingBox CalculateTransformedBounds(BoundingBox localBounds, Fixed4x4 transform)
-        {
-            FixedBoundVolume volume = TransformBounds(localBounds.Min, localBounds.Max, transform);
-            return new BoundingBox((volume.Min + volume.Max) * Fixed64.Half, volume.Max - volume.Min);
-        }
-
         private static FixedBoundVolume TransformBounds(Vector3d min, Vector3d max, Fixed4x4 transform)
         {
             Vector3d first = transform * min;
             Vector3d transformedMin = first;
             Vector3d transformedMax = first;
 
-            IncludeTransformedCorner(new Vector3d(max.x, min.y, min.z), transform, ref transformedMin, ref transformedMax);
-            IncludeTransformedCorner(new Vector3d(min.x, max.y, min.z), transform, ref transformedMin, ref transformedMax);
-            IncludeTransformedCorner(new Vector3d(max.x, max.y, min.z), transform, ref transformedMin, ref transformedMax);
-            IncludeTransformedCorner(new Vector3d(min.x, min.y, max.z), transform, ref transformedMin, ref transformedMax);
-            IncludeTransformedCorner(new Vector3d(max.x, min.y, max.z), transform, ref transformedMin, ref transformedMax);
-            IncludeTransformedCorner(new Vector3d(min.x, max.y, max.z), transform, ref transformedMin, ref transformedMax);
-            IncludeTransformedCorner(max, transform, ref transformedMin, ref transformedMax);
+            IncludeTransformedPoint(transform * new Vector3d(max.x, min.y, min.z), ref transformedMin, ref transformedMax);
+            IncludeTransformedPoint(transform * new Vector3d(min.x, max.y, min.z), ref transformedMin, ref transformedMax);
+            IncludeTransformedPoint(transform * new Vector3d(max.x, max.y, min.z), ref transformedMin, ref transformedMax);
+            IncludeTransformedPoint(transform * new Vector3d(min.x, min.y, max.z), ref transformedMin, ref transformedMax);
+            IncludeTransformedPoint(transform * new Vector3d(max.x, min.y, max.z), ref transformedMin, ref transformedMax);
+            IncludeTransformedPoint(transform * new Vector3d(min.x, max.y, max.z), ref transformedMin, ref transformedMax);
+            IncludeTransformedPoint(transform * max, ref transformedMin, ref transformedMax);
 
             return new FixedBoundVolume(transformedMin, transformedMax);
         }
 
-        private static void IncludeTransformedCorner(
-            Vector3d corner,
-            Fixed4x4 transform,
+        private static void IncludeTransformedPoint(
+            Vector3d transformed,
             ref Vector3d min,
             ref Vector3d max)
         {
-            Vector3d transformed = transform * corner;
             min = Vector3d.Min(min, transformed);
             max = Vector3d.Max(max, transformed);
         }

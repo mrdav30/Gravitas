@@ -153,6 +153,20 @@ public sealed class GravitasRaycastServiceTests
         contextB.Raycasts.Version.Should().Be(versionBBefore + 1);
     }
 
+    [Fact]
+    public void RaycastAll_WithColliderSpanningManyVoxels_ShouldReturnSingleColliderHit()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSSphereCollider collider = CreateLargeDynamicSphere(context, Vector3d.Zero);
+        var hits = new SwiftList<LSRaycastHit>();
+
+        int count = context.Raycasts
+            .RaycastAll(Vector(-4, 0, 0), Vector(4, 0, 0), IncludeLayerZero, hits);
+
+        count.Should().Be(1);
+        hits[0].Collider.Should().BeSameAs(collider);
+    }
+
     private static Vector3d Vector(int x, int y, int z) => new((Fixed64)x, (Fixed64)y, (Fixed64)z);
 
     private static LSSphereCollider CreateDynamicSphere(GravitasWorldContext context, Vector3d position)
@@ -163,6 +177,12 @@ public sealed class GravitasRaycastServiceTests
     private static LSCylinderCollider CreateDynamicCylinder(GravitasWorldContext context, Vector3d position)
     {
         return CreateDynamicCollider(context, new LSCylinderCollider(), position);
+    }
+
+    private static LSSphereCollider CreateLargeDynamicSphere(GravitasWorldContext context, Vector3d position)
+    {
+        var collider = new LSSphereCollider { Radius = (Fixed64)3 };
+        return CreateDynamicCollider(context, collider, position);
     }
 
     private static TCollider CreateDynamicCollider<TCollider>(GravitasWorldContext context, TCollider collider, Vector3d position)

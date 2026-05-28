@@ -24,6 +24,10 @@ public sealed partial class PhysicsSettingsSaver : DefaultSaver
 
     public ContinuousCollisionMode? DefaultContinuousCollisionMode;
 
+    public int? RetainedPartitionTimeToKillFrames;
+
+    public int? RetainedPartitionRetirementSweepBudget;
+
     [NonSerialized]
     [MemoryPackIgnore]
     private GravitasWorldContext? _context;
@@ -51,6 +55,10 @@ public sealed partial class PhysicsSettingsSaver : DefaultSaver
 
         if (DefaultContinuousCollisionMode.HasValue)
             settings.DefaultContinuousCollisionMode = DefaultContinuousCollisionMode.Value;
+        if (RetainedPartitionTimeToKillFrames.HasValue)
+            settings.RetainedPartitionTimeToKillFrames = RetainedPartitionTimeToKillFrames.Value;
+        if (RetainedPartitionRetirementSweepBudget.HasValue)
+            settings.RetainedPartitionRetirementSweepBudget = RetainedPartitionRetirementSweepBudget.Value;
 
         return settings;
     }
