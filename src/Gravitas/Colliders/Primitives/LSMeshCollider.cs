@@ -2,6 +2,7 @@
 using Gravitas.Raycasting;
 using SwiftCollections;
 using SwiftCollections.Query;
+using System.Runtime.CompilerServices;
 
 namespace Gravitas.Colliders;
 
@@ -33,20 +34,11 @@ public class LSMeshCollider : LSCollider
         SetBounds(Mesh.Bounds);
     }
 
-    protected override void OnBeforeInitialize(IMatterAgent agent)
+    public override Fixed64 ScaledRadius
     {
-        SwiftThrowHelper.ThrowIfTrue(
-            MeshColliderPolicy.RequiresConvexDecomposition(Mode, Body),
-            nameof(LSMeshCollider),
-            "Explicit concave mesh colliders cannot be initialized as dynamic bodies. Use a convex mesh, kinematic/static concave mesh, or a decomposed convex/compound representation.");
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => Bounds.Scope.Magnitude;
     }
-
-    protected override void OnInitialize()
-    {
-        base.OnInitialize();
-    }
-
-    public override Fixed64 ScaledRadius => Bounds.Scope.Magnitude;
 
     protected override void RebuildRuntimeShape()
     {
@@ -96,9 +88,11 @@ public class LSMeshCollider : LSCollider
         return TryFindClosestPointToTriangles(triangleBuffer, queryPoint, out closest, out normal);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private Fixed64 GetMeshQueryHalfExtent() =>
         FixedMath.Max(FixedMath.Max(Bounds.Scope.x, Bounds.Scope.y), Bounds.Scope.z);
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static FixedBoundVolume CreateQueryBounds(Vector3d center, Fixed64 halfExtent)
     {
         Vector3d extents = Vector3d.One * halfExtent;
@@ -167,6 +161,7 @@ public class LSMeshCollider : LSCollider
         return worker.CheckMeshOverlaps(this, ref outputIntersectionPoints);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Vector3d OrientNormalTowardPoint(Vector3d normal, Vector3d targetDirection)
     {
         if (targetDirection.SqrMagnitude <= Fixed64.Epsilon)

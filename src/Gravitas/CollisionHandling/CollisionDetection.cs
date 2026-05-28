@@ -3,6 +3,7 @@ using Gravitas.Colliders;
 using SwiftCollections;
 using SwiftCollections.Pool;
 using SwiftCollections.Query;
+using System.Runtime.CompilerServices;
 
 namespace Gravitas.CollisionHandling;
 
@@ -698,6 +699,7 @@ public static class CollisionDetection
         return true;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Fixed64 ComputeMinimumProjectionOverlap(FixedRange projectionA, FixedRange projectionB)
     {
         Fixed64 pushALeft = projectionA.Max - projectionB.Min;
@@ -706,6 +708,7 @@ public static class CollisionDetection
         return overlap > Fixed64.Zero ? overlap : Fixed64.Zero;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool TryNormalizeAxis(Vector3d axis, out Vector3d normalizedAxis)
     {
         Fixed64 magnitudeSqr = axis.SqrMagnitude;
@@ -719,6 +722,7 @@ public static class CollisionDetection
         return true;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Vector3d ResolveNormal(Vector3d delta, Vector3d fallback)
     {
         if (delta.SqrMagnitude > Fixed64.Epsilon)
@@ -730,12 +734,14 @@ public static class CollisionDetection
         return Vector3d.Right;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Vector3d OrientNormal(Vector3d normal, Vector3d desiredDirection)
     {
         Vector3d resolved = ResolveNormal(normal, desiredDirection);
         return Vector3d.Dot(resolved, desiredDirection) < Fixed64.Zero ? -resolved : resolved;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool TryGetPairColliders<TFirst, TSecond>(
         CollisionPair pair,
         out TFirst first,
@@ -762,6 +768,7 @@ public static class CollisionDetection
         return false;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void SetContactInPairOrder(
         CollisionPair pair,
         LSCollider first,
@@ -808,20 +815,27 @@ public static class CollisionDetection
     /// <returns>True if colliders intersect, otherwise false</returns>
     public static bool DoMeshSphereCheck(CollisionPair pair)
     {
-        if (pair.ColliderA is not LSMeshCollider meshCollider || pair.ColliderB is not LSSphereCollider)
+        if (pair.ColliderA is not LSMeshCollider meshCollider || pair.ColliderB is not LSSphereCollider sphere)
             return false;
 
-        Vector3d closestPointOnMesh = meshCollider.ClosestPointOnSurface(pair.ColliderB.Center);
-        Vector3d penetrationVector = pair.ColliderB.Center - closestPointOnMesh;
-        if (penetrationVector.SqrMagnitude > pair.ColliderB.ScaledRadiusSqr)
+        if (meshCollider.Mode == MeshColliderMode.Concave)
+            return MeshTriangleContactGenerator.TryBuildMeshSphereManifold(
+                pair,
+                meshCollider,
+                sphere,
+                pair.Context.CollisionScratch.MeshTriangleCandidatesA);
+
+        Vector3d closestPointOnMesh = meshCollider.ClosestPointOnSurface(sphere.Center);
+        Vector3d penetrationVector = sphere.Center - closestPointOnMesh;
+        if (penetrationVector.SqrMagnitude > sphere.ScaledRadiusSqr)
             return false; // No collision if the distance squared is greater than the radius squared
                           // remove sphere's radius to find the actual depth
 
         Vector3d penetrationNormal = penetrationVector.Normal;
         pair.Manifold.SetContact(
             closestPointOnMesh,
-            pair.ColliderB.Center - penetrationNormal * pair.ColliderB.ScaledRadius,
-            penetrationVector.Magnitude - pair.ColliderB.ScaledRadius,
+            sphere.Center - penetrationNormal * sphere.ScaledRadius,
+            penetrationVector.Magnitude - sphere.ScaledRadius,
             penetrationNormal
         );
 
@@ -832,6 +846,13 @@ public static class CollisionDetection
     {
         if (pair.ColliderA is not LSMeshCollider mesh || pair.ColliderB is not LSCapsuleCollider capsule)
             return false;
+
+        if (mesh.Mode == MeshColliderMode.Concave)
+            return MeshTriangleContactGenerator.TryBuildMeshCapsuleManifold(
+                pair,
+                mesh,
+                capsule,
+                pair.Context.CollisionScratch.MeshTriangleCandidatesA);
 
         // Calculate the closest point on the capsule line segment to the mesh center
         Vector3d closestPointOnCapsuleLine = Vector3d.ClosestPointOnLineSegment(capsule.LineSegmentStart, capsule.LineSegmentEnd, mesh.Center);
@@ -859,6 +880,16 @@ public static class CollisionDetection
 
     private static bool DoMeshCuboidCheck(CollisionPair pair)
     {
+        if (pair.ColliderA is LSMeshCollider { Mode: MeshColliderMode.Concave } mesh
+            && pair.ColliderB is LSCuboidCollider cuboid)
+        {
+            return MeshTriangleContactGenerator.TryBuildMeshCuboidManifold(
+                pair,
+                mesh,
+                cuboid,
+                pair.Context.CollisionScratch.MeshTriangleCandidatesA);
+        }
+
         if (!TestMeshCuboidColliders(pair, out CollisionResult? output))
             return false;
 
@@ -877,6 +908,13 @@ public static class CollisionDetection
     {
         if (!TryGetPairColliders(pair, out LSMeshCollider mesh, out LSCylinderCollider cylinder))
             return false;
+
+        if (mesh.Mode == MeshColliderMode.Concave)
+            return MeshTriangleContactGenerator.TryBuildMeshCylinderManifold(
+                pair,
+                mesh,
+                cylinder,
+                pair.Context.CollisionScratch.MeshTriangleCandidatesA);
 
         SwiftList<int> nearbyTriangles = pair.Context.CollisionScratch.MeshCylinderTriangles;
         if (!TryFindMeshCylinderContact(
@@ -986,6 +1024,18 @@ public static class CollisionDetection
     /// <returns>true if the colliders intersect; otherwise, false.</returns>
     private static bool DoMeshesCheck(CollisionPair pair)
     {
+        if (pair.ColliderA is LSMeshCollider meshA
+            && pair.ColliderB is LSMeshCollider meshB
+            && (meshA.Mode == MeshColliderMode.Concave || meshB.Mode == MeshColliderMode.Concave))
+        {
+            return MeshTriangleContactGenerator.TryBuildMeshMeshManifold(
+                pair,
+                meshA,
+                meshB,
+                pair.Context.CollisionScratch.MeshTriangleCandidatesA,
+                pair.Context.CollisionScratch.MeshTriangleCandidatesB);
+        }
+
         // Test for intersection between the meshes using separating axis theorem
         if (!TestMeshColliders(pair, out CollisionResult? output))
             return false;
@@ -1058,6 +1108,7 @@ public static class CollisionDetection
         return true;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool IsPointInsideCylinder(LSCylinderCollider cylinder, Vector3d point)
     {
         Vector3d local = cylinder.Rotation.Inverse() * (point - cylinder.Center);

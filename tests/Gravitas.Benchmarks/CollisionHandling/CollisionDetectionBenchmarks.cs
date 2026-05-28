@@ -17,6 +17,9 @@ public class CollisionDetectionBenchmarks
     private CollisionPair[] _meshCylinderPairs;
     private CollisionPair[] _meshCuboidPairs;
     private CollisionPair[] _meshMeshPairs;
+    private CollisionPair[] _concaveMeshCylinderPairs;
+    private CollisionPair[] _concaveMeshCuboidPairs;
+    private CollisionPair[] _concaveMeshMeshPairs;
 
     [Params(64)]
     public int PairCount { get; set; }
@@ -41,6 +44,9 @@ public class CollisionDetectionBenchmarks
         _meshCylinderPairs = CreatePairSet(CreateMeshCylinderPair);
         _meshCuboidPairs = CreatePairSet(CreateMeshCuboidPair);
         _meshMeshPairs = CreatePairSet(CreateMeshMeshPair);
+        _concaveMeshCylinderPairs = CreatePairSet(CreateConcaveMeshCylinderPair);
+        _concaveMeshCuboidPairs = CreatePairSet(CreateConcaveMeshCuboidPair);
+        _concaveMeshMeshPairs = CreatePairSet(CreateConcaveMeshMeshPair);
     }
 
     [GlobalCleanup]
@@ -55,6 +61,9 @@ public class CollisionDetectionBenchmarks
         _meshCylinderPairs = null;
         _meshCuboidPairs = null;
         _meshMeshPairs = null;
+        _concaveMeshCylinderPairs = null;
+        _concaveMeshCuboidPairs = null;
+        _concaveMeshMeshPairs = null;
     }
 
     [Benchmark]
@@ -103,6 +112,24 @@ public class CollisionDetectionBenchmarks
     public int CheckMeshMeshPairs()
     {
         return CountCollisions(_meshMeshPairs);
+    }
+
+    [Benchmark]
+    public int CheckConcaveMeshCylinderPairs()
+    {
+        return CountCollisions(_concaveMeshCylinderPairs);
+    }
+
+    [Benchmark]
+    public int CheckConcaveMeshCuboidPairs()
+    {
+        return CountCollisions(_concaveMeshCuboidPairs);
+    }
+
+    [Benchmark]
+    public int CheckConcaveMeshMeshPairs()
+    {
+        return CountCollisions(_concaveMeshMeshPairs);
     }
 
     private static int CountCollisions(CollisionPair[] pairs)
@@ -235,6 +262,27 @@ public class CollisionDetectionBenchmarks
             CreateMeshFloor(origin + new Vector3d(Fixed64.Half, Fixed64.Zero, Fixed64.Zero)));
     }
 
+    private CollisionPair CreateConcaveMeshCylinderPair(int index, Vector3d origin)
+    {
+        return new CollisionPair(
+            CreateConcaveUChannel(origin),
+            CreateCylinder(origin + new Vector3d(Fixed64.Fraction(7, 4), Fixed64.One, (Fixed64)2)));
+    }
+
+    private CollisionPair CreateConcaveMeshCuboidPair(int index, Vector3d origin)
+    {
+        return new CollisionPair(
+            CreateConcaveUChannel(origin),
+            CreateCuboid(origin + new Vector3d(Fixed64.Fraction(7, 4), Fixed64.One, (Fixed64)2)));
+    }
+
+    private CollisionPair CreateConcaveMeshMeshPair(int index, Vector3d origin)
+    {
+        return new CollisionPair(
+            CreateConcaveUChannel(origin),
+            CreateInsideCornerMesh(origin));
+    }
+
     private LSSphereCollider CreateSphere(Vector3d position) =>
         CreateBody(new LSSphereCollider(), position).Collider;
 
@@ -260,6 +308,67 @@ public class CollisionDetectionBenchmarks
                 new[] { 0, 2, 1, 1, 2, 3 }),
             position,
             preventAngularForces: true).Collider;
+
+    private LSMeshCollider CreateConcaveUChannel(Vector3d position) =>
+        CreateBody(
+            new LSMeshCollider(
+                CreateUChannelVertices(),
+                new[]
+                {
+                    0, 1, 2, 2, 1, 3,
+                    4, 5, 6, 6, 5, 7,
+                    8, 9, 10, 10, 9, 11
+                },
+                MeshColliderMode.Concave),
+            position,
+            preventAngularForces: true).Collider;
+
+    private LSMeshCollider CreateInsideCornerMesh(Vector3d position) =>
+        CreateBody(
+            new LSMeshCollider(
+                new[]
+                {
+                    new Vector3d(Fixed64.Zero, Fixed64.Zero, Fixed64.Zero),
+                    new Vector3d((Fixed64)4, Fixed64.Zero, Fixed64.Zero),
+                    new Vector3d(Fixed64.Zero, Fixed64.Zero, (Fixed64)4),
+                    new Vector3d((Fixed64)4, Fixed64.Zero, (Fixed64)4),
+                    new Vector3d(Fixed64.Zero, Fixed64.Zero, Fixed64.Zero),
+                    new Vector3d(Fixed64.Zero, (Fixed64)4, Fixed64.Zero),
+                    new Vector3d(Fixed64.Zero, Fixed64.Zero, (Fixed64)4),
+                    new Vector3d(Fixed64.Zero, (Fixed64)4, (Fixed64)4),
+                    new Vector3d(Fixed64.Zero, Fixed64.Zero, Fixed64.Zero),
+                    new Vector3d((Fixed64)4, Fixed64.Zero, Fixed64.Zero),
+                    new Vector3d(Fixed64.Zero, (Fixed64)4, Fixed64.Zero),
+                    new Vector3d((Fixed64)4, (Fixed64)4, Fixed64.Zero)
+                },
+                new[] { 0, 2, 1, 1, 2, 3, 4, 5, 6, 6, 5, 7, 8, 9, 10, 10, 9, 11 },
+                MeshColliderMode.Concave),
+            position,
+            preventAngularForces: true).Collider;
+
+    private static Vector3d[] CreateUChannelVertices()
+    {
+        Fixed64 left = (Fixed64)(-2);
+        Fixed64 right = (Fixed64)2;
+        Fixed64 height = (Fixed64)2;
+        Fixed64 depth = (Fixed64)4;
+
+        return new[]
+        {
+            new Vector3d(left, Fixed64.Zero, Fixed64.Zero),
+            new Vector3d(left, height, Fixed64.Zero),
+            new Vector3d(left, Fixed64.Zero, depth),
+            new Vector3d(left, height, depth),
+            new Vector3d(right, Fixed64.Zero, Fixed64.Zero),
+            new Vector3d(right, Fixed64.Zero, depth),
+            new Vector3d(right, height, Fixed64.Zero),
+            new Vector3d(right, height, depth),
+            new Vector3d(left, Fixed64.Zero, Fixed64.Zero),
+            new Vector3d(right, Fixed64.Zero, Fixed64.Zero),
+            new Vector3d(left, height, Fixed64.Zero),
+            new Vector3d(right, height, Fixed64.Zero)
+        };
+    }
 
     private ScenarioBody<TCollider> CreateBody<TCollider>(
         TCollider collider,

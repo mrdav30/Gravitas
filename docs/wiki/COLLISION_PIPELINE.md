@@ -102,9 +102,9 @@ state.
 Mesh colliders validate vertices and triangle indices at construction time.
 `MeshColliderMode` declares whether the mesh is intended as `Convex` or
 `Concave`; `Compound` remains a separate future collider-composition strategy,
-not a mesh mode. Runtime policy rejects explicit concave meshes on movable
-dynamic bodies so they cannot silently behave like convex meshes. Static or
-kinematic concave meshes are acceptable triangle collision data.
+not a mesh mode. Convex meshes may use whole-shape convex assumptions where
+valid. Concave meshes are explicit triangle collision data and are legal for
+bodyless, immovable, kinematic, and dynamic bodies.
 
 `PhysicsMesh` now owns source vertices, triangle normals, triangle areas, local
 bounds, and the triangle BVH in local mesh space. Rigid movement updates the
@@ -114,24 +114,26 @@ world-space query bounds or points into local space, query the local BVH, then
 transform final contact points and normals back to world space. The full
 world-vertex array is retained only as an on-demand compatibility view.
 
-Alpha mesh policy is conservative but not anti-concave: concave collider support
-should come through static/kinematic triangle meshes or explicit compound /
-decomposed-convex shapes, not through raw movable triangle soup during per-frame
-collision. Mesh ray overlap, mesh/cuboid, mesh/cylinder, and mesh/mesh paths are
-triangle-backed and covered by focused tests, but arbitrary mesh contact
-manifolds and swept mesh queries remain hardening targets.
+Alpha mesh policy is explicit rather than Unity-compatible by default: concave
+meshes collide as triangle sets instead of being treated as one convex hull.
+The concave narrow phase gathers local-BVH triangle candidates, runs
+triangle-vs-shape or triangle-vs-triangle checks, and reduces contacts through
+the pair-owned `ContactManifold`. Dynamic concave meshes keep topology and the
+local BVH stable while rigid movement updates transform-derived state only.
 
 Mesh policy work should keep these boundaries explicit:
 
-- Static/kinematic concave triangle meshes are useful for level/world geometry,
-  but should not be treated as a blanket answer for movable concave bodies.
-- Convex mesh and compound/decomposed-convex mesh support are the preferred
-  route for dynamic mesh-like bodies in alpha.
+- Concave triangle meshes are supported for static, kinematic, immovable, and
+  dynamic bodies, but they should be chosen deliberately because candidate
+  count scales with local triangle density.
+- Convex mesh paths remain free to use whole-shape convex tests where valid.
 - A future compound collider should present one collider identity to hosts and
   one body to the solver, while internally ordering primitive or convex-mesh
   parts by stable part IDs. Its policy must define aggregate bounds, mass,
   inertia, trigger/contact events, CCD proxy behavior, and debug draw output.
-- Automatic convex decomposition is deferred unless the chosen algorithm is
+- Host/offline convex decomposition should feed explicit convex mesh data or a
+  future mesh-piece data path without changing the owning collider identity.
+  Automatic convex decomposition is not claimed unless the chosen algorithm is
   deterministic, bounded, tested on pathological input, and benchmarked. Ear
   clipping is a 2D polygon triangulation/partitioning tool, not a complete 3D
   convex decomposition strategy.
@@ -292,11 +294,11 @@ Current shape support:
 | Cylinder/Capsule | finite-cylinder projection axes against capsule segment/radius projection. |
 | Cylinder/Cylinder | finite-cylinder projection axes, preserving flat cap separation. |
 | Cuboid/Cylinder | cuboid vertex projection against finite-cylinder projection. |
-| Mesh/Sphere | closest mesh surface point to sphere center. |
-| Mesh/Capsule | closest capsule line point to mesh surface. |
-| Mesh/Cuboid | mesh/cuboid SAT using nearby mesh triangles. |
-| Mesh/Cylinder | triangle-BVH candidate scan against finite cylinder volume. |
-| Mesh/Mesh | mesh/mesh SAT using nearby mesh triangles. |
+| Mesh/Sphere | convex mesh uses closest surface point; concave mesh gathers triangle candidates against the sphere bounds. |
+| Mesh/Capsule | convex mesh uses closest surface from the capsule line seed; concave mesh uses segment-vs-triangle closest points. |
+| Mesh/Cuboid | convex mesh uses nearby-triangle SAT; concave mesh runs per-triangle SAT against the cuboid. |
+| Mesh/Cylinder | triangle-BVH candidate scan against finite cylinder volume; concave mode writes triangle contacts. |
+| Mesh/Mesh | convex mesh uses nearby-triangle SAT; concave-involved pairs run triangle-vs-triangle candidate checks. |
 
 Current shape-pair matrix:
 
@@ -315,13 +317,14 @@ mesh-to-cylinder direction.
 SAT and mesh candidate paths use context-owned scratch state through
 `GravitasWorldContext`. `CollisionSatScratch` owns the reusable
 `CollisionContext`, cuboid object-info buffers, mesh object-info buffers,
-mesh/cylinder triangle buffer, and SAT axis sets for one world context. This is
+mesh/cylinder triangle buffer, concave triangle candidate buffers, and SAT axis
+sets for one world context. This is
 intentionally not static: concurrent worlds keep isolated scratch, while repeated
 checks in the same world avoid per-check object-info construction and pool
 rent/release churn. Short `collision-detection` benchmark smoke currently
 reports on aggregate primitive checks, single-contact primitive manifold
 generation, axis-aligned cuboid face-manifold generation, cuboid/cuboid SAT,
-mesh/cylinder, mesh/cuboid, and mesh/mesh paths after warmup.
+mesh/cylinder, mesh/cuboid, mesh/mesh, and concave mesh paths after warmup.
 
 ## Contact Data
 
@@ -355,9 +358,10 @@ written by narrow phase.
 Axis-aligned cuboid/cuboid detection now generates up to four contacts for
 face-overlap and stacked/touching faces. Edge contact reduction naturally drops
 duplicate corners and can produce two contacts; corner contact can produce one.
-Sphere, capsule, cylinder, oriented cuboid SAT, and mesh paths currently write a
-single manifold contact. Full mesh contact manifolds remain deferred to the mesh
-policy phase.
+Sphere, capsule, cylinder, and oriented cuboid SAT paths currently write a
+single manifold contact. Axis-aligned cuboids and concave mesh paths can write
+multiple contacts, capped by the manifold's deterministic four-contact
+reduction.
 
 ## Response
 

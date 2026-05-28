@@ -50,6 +50,7 @@ Meaningful deferred work captured from that plan and the wiki:
 | Prior plan recommendations | `LSCollider` owns too many responsibilities. | Phase 2 |
 | Prior plan recommendations | Consume the next fixed GridForge package and revisit partition allocation without local project-link scaffolding. | Phase 0 and Phase 8 |
 | Prior plan recommendations | Prefer FixedMathSharp geometry and SwiftCollections fixed-query structures before adding local spatial math. | All algorithm phases |
+| Phase 7B implementation review | Host/offline decomposed convex pieces and Gravitas-owned convex decomposition are optional mesh-policy backlog items, not Phase 7B or Phase 7C blockers. The local-BVH triangle path is the alpha runtime baseline unless benchmarks or solver-quality work prove a need to revisit. | Mesh Decomposition Backlog |
 
 ## Downstream Library And Package Notes
 
@@ -590,8 +591,9 @@ should not implement `LSCompoundCollider`.
 **Phase 7A Status - 2026-05-27**
 
 - Added explicit `MeshColliderMode` values for `Convex` and `Concave`, with
-  `MeshColliderPolicy` centralizing a temporary 7A guard that prevents movable
-  dynamic concave meshes from silently behaving like convex meshes.
+  `MeshColliderPolicy` centralizing a temporary 7A guard that prevented movable
+  dynamic concave meshes from silently behaving like convex meshes. Phase 7B
+  removed this guard after adding triangle-level concave narrow phase coverage.
 - Kept automatic deterministic convex decomposition out of 7A because no
   algorithm, determinism contract, pathological-shape tests, or benchmark budget
   has been proven yet. Phase 7B owns the next pass: true concave narrow phase,
@@ -607,11 +609,12 @@ should not implement `LSCompoundCollider`.
 - Kept mesh edge caches for now. They are local-space topology data and should
   only be removed in a later pass if tests and benchmarks prove on-demand edge
   handling covers all callers.
-- Added focused tests for explicit mesh modes, dynamic concave rejection,
-  kinematic concave acceptance, local-space BVH rebuild stability, moved-mesh
-  world queries, moved-mesh closest-surface lookup, rotated mesh bounds, ray
-  intersections, collision shape pairs, diagnostics, and local-geometry inertia
-  tensors.
+- Added focused tests for explicit mesh modes, the temporary dynamic concave
+  rejection, kinematic concave acceptance, local-space BVH rebuild stability,
+  moved-mesh world queries, moved-mesh closest-surface lookup, rotated mesh
+  bounds, ray intersections, collision shape pairs, diagnostics, and
+  local-geometry inertia tensors. The temporary rejection test was replaced by
+  Phase 7B dynamic concave acceptance coverage.
 - Added `MoveMeshRuntimeShapeStateAndQueryTriangles` benchmark coverage to
   compare rigid mesh movement/query cost after the local-space BVH refactor.
   The short smoke selected the benchmark successfully and measured the new path,
@@ -676,10 +679,10 @@ not become the escape hatch for concave mesh support.
 
 - Modify: `src/Gravitas/Colliders/Primitives/LSMeshCollider.cs`
 - Modify: `src/Gravitas/Colliders/Support/PhysicsMesh/PhysicsMesh.cs`
-- Modify: `src/Gravitas/Colliders/Support/PhysicsMesh/MeshColliderPolicy.cs`
+- Delete: `src/Gravitas/Colliders/Support/PhysicsMesh/MeshColliderPolicy.cs`
 - Potentially create: `src/Gravitas/Colliders/Support/PhysicsMesh/MeshConcavityAnalyzer.cs`
 - Potentially create: `src/Gravitas/Colliders/Support/PhysicsMesh/MeshConvexDecomposition.cs`
-- Potentially create: `src/Gravitas/Colliders/Support/PhysicsMesh/MeshTriangleContactGenerator.cs`
+- Create: `src/Gravitas/CollisionHandling/Support/MeshTriangleContactGenerator.cs`
 - Potentially create: `src/Gravitas/CollisionHandling/Support/Context/MeshTriangleContactContext.cs`
 - Modify: `src/Gravitas/CollisionHandling/CollisionDetection.cs`
 - Modify: `src/Gravitas/CollisionHandling/Support/Context/MeshObjectInfo.cs`
@@ -695,14 +698,14 @@ not become the escape hatch for concave mesh support.
 
 **Tasks:**
 
-- [ ] Define the mesh-mode runtime contract in code and docs. `Convex` mesh can
+- [x] Define the mesh-mode runtime contract in code and docs. `Convex` mesh can
   use whole-shape convex assumptions where valid; `Concave` mesh must use
   triangle-set or decomposed-convex logic and must not project the whole mesh as
   one convex polytope.
-- [ ] Replace the temporary dynamic-concave rejection with a real policy.
+- [x] Replace the temporary dynamic-concave rejection with a real policy.
   `MeshColliderMode.Concave` must be allowed for bodyless, immovable,
   kinematic, and dynamic bodies once the narrow phase below is implemented.
-- [ ] Add deterministic mesh fixtures under the test project rather than relying
+- [x] Add deterministic mesh fixtures under the test project rather than relying
   on imported engine meshes. Include at minimum:
   - a closed convex tetrahedron or cube mesh for convex-control tests.
   - an open concave inside-corner mesh made from three perpendicular quads so
@@ -712,48 +715,96 @@ not become the escape hatch for concave mesh support.
     collider is not being treated as one convex hull.
   - two small concave meshes whose triangle sets overlap at a deterministic
     edge or face so concave-vs-concave ordering can be pinned.
-- [ ] Add failing tests before implementation for declared `Concave` meshes:
+- [x] Add failing tests before implementation for declared `Concave` meshes:
   static/bodyless, immovable, kinematic, and dynamic initialization should all be
   legal, and the dynamic body should still repartition through the local-BVH
   movement path without rebuilding triangle topology.
-- [ ] Add concave-vs-primitive narrow-phase tests for sphere, capsule, cuboid,
+- [x] Add concave-vs-primitive narrow-phase tests for sphere, capsule, cuboid,
   and cylinder. Each shape pair needs at least one hit against an interior
   concave feature, one hit against an exterior face, one edge-touch case, and
   one separated case.
-- [ ] Add concave-vs-mesh tests for concave-vs-convex, convex-vs-concave, and
+- [x] Add concave-vs-mesh tests for concave-vs-convex, convex-vs-concave, and
   concave-vs-concave. These tests must verify stable contact normals, stable
   contact IDs or deterministic point ordering where applicable, and reversed
   dispatch behavior.
-- [ ] Add simulation-level tests for dynamic concave bodies. At minimum, move a
+- [x] Add simulation-level tests for dynamic concave bodies. At minimum, move a
   dynamic concave mesh into a primitive collider and move a primitive collider
   into a dynamic concave mesh; both should produce deterministic contacts and
   physically coherent response direction.
-- [ ] Split mesh narrow phase where necessary. Whole-mesh SAT is acceptable only
+- [x] Split mesh narrow phase where necessary. Whole-mesh SAT is acceptable only
   for convex mesh paths. Concave paths should gather candidate triangles from
   the local BVH, run deterministic triangle-vs-shape or triangle-vs-triangle
   checks, then reduce contacts using stable depth, distance, triangle index,
   vertex index, and collider ID tie-breakers.
-- [ ] Keep all-hit/candidate buffers caller-owned or context-owned. Concave
+- [x] Keep all-hit/candidate buffers caller-owned or context-owned. Concave
   triangle gathering and contact reduction must avoid per-frame allocations
   after warmup.
-- [ ] Add or update allocation guard tests for concave mesh pair checks after
+- [x] Add or update allocation guard tests for concave mesh pair checks after
   warmup. Allocation tests should cover at least concave-vs-cuboid,
   concave-vs-cylinder, and concave-vs-concave.
-- [ ] Add benchmark coverage for concave candidate gathering, concave-vs-primitive
-  narrow phase, concave-vs-convex mesh, concave-vs-concave mesh, dynamic concave
-  movement/repartitioning, and any decomposition preprocessing.
-- [ ] Implement host/offline decomposed convex-piece support as a concave mesh
-  data path, not as `LSCompoundCollider`. The owning `LSMeshCollider` should
-  still present one collider ID, one body binding, one event surface, and one
-  broad-phase identity.
-- [ ] Attempt Gravitas-owned deterministic convex decomposition only behind an
-  explicit, test-backed API or preprocessing mode. The algorithm must have
-  deterministic ordering, deterministic tie-breakers, bounded failure behavior,
-  tests on pathological input, and benchmark coverage. If the algorithm cannot
-  decompose a mesh safely, it must return a deterministic failure/result code
-  rather than silently changing collision truth.
-- [ ] Update `docs/wiki/COLLISION_PIPELINE.md` after code lands so it no longer
+- [x] Add benchmark coverage for concave candidate gathering, concave-vs-primitive
+  narrow phase, concave-vs-convex mesh, concave-vs-concave mesh, and dynamic
+  concave movement/repartitioning. Decomposition preprocessing remains
+  unclaimed until a real decomposition data model lands.
+- [x] Decide decomposition follow-up policy. The local-BVH triangle-set concave
+  path is the alpha runtime baseline. Host/offline decomposed convex pieces and
+  Gravitas-owned deterministic convex decomposition are not Phase 7B or Phase
+  7C blockers; keep them in the mesh decomposition backlog and revisit only
+  when benchmarks, mass/inertia work, or contact-manifold quality prove they
+  would outperform or materially improve the triangle path.
+- [x] Update `docs/wiki/COLLISION_PIPELINE.md` after code lands so it no longer
   describes dynamic concave meshes as routed through compound colliders.
+
+**Phase 7B Implementation Notes:**
+
+- Added triangle-level concave narrow phase through
+  `MeshTriangleContactGenerator`, using local-BVH candidate gathering and
+  context-owned buffers rather than whole-mesh convex projection.
+- Removed the temporary `MeshColliderPolicy` dynamic-concave rejection.
+  `MeshColliderMode.Concave` is now legal for bodyless, immovable, kinematic,
+  and dynamic meshes.
+- Added deterministic fixtures for a convex cube, an inside-corner concave mesh,
+  a U-channel concave mesh, and overlapping mesh cases.
+- Added unit coverage for concave-vs-sphere, capsule, cuboid, cylinder,
+  convex mesh, concave mesh, dynamic movement, local-BVH stability, and warm
+  allocation behavior.
+- Added benchmark coverage for concave mesh/cuboid, mesh/cylinder, mesh/mesh,
+  and dynamic concave mesh movement/query paths.
+- Short BenchmarkDotNet smoke executed the new `*Concave*` benchmarks. Treat the
+  timings as non-canonical. Explicit allocation guard tests report zero
+  allocations for warmed concave collision checks; the short in-process
+  benchmark still reports small non-zero allocation noise on concave mesh/cuboid
+  and mesh/mesh plus the existing 216 B/op dynamic mesh movement/query signal.
+- Did not add a half-wired public decomposition API in this phase. Runtime
+  concave support is currently the raw triangle-set path. Host/offline
+  decomposed convex-piece data and Gravitas-owned volumetric convex
+  decomposition remain explicit follow-up work; they should land only with a
+  real data model, tests, and benchmarks so the API surface does not get muddy.
+
+**Mesh Decomposition Backlog:**
+
+These are retained for context, but they are not Phase 7B completion work and
+should not be treated as required before Phase 7C. The current local-BVH
+triangle-set implementation is the alpha baseline until evidence says
+otherwise.
+
+- [ ] Evaluate host/offline decomposed convex-piece support as an optional
+  `LSMeshCollider` data path only if benchmarks show the raw triangle path is
+  too expensive for representative dense or contact-heavy concave meshes, or if
+  closed-volume mass/inertia/manifold work needs convex chunks. The owning mesh
+  must still present one collider ID, one body binding, one event surface, and
+  one broad-phase identity. This must not be implemented as `LSCompoundCollider`
+  or as internal collider identity leakage.
+- [ ] Evaluate Gravitas-owned deterministic convex decomposition as R&D only if
+  Gravitas needs an engine-agnostic asset-prep path. Any implementation must be
+  explicit preprocessing, not implicit runtime mutation; it needs deterministic
+  ordering, deterministic tie-breakers, bounded failure/result codes,
+  pathological mesh tests, and benchmarks against the raw local-BVH triangle
+  path before it can be claimed useful.
+- [ ] Before implementing either backlog item, create comparison fixtures for
+  raw triangle-BVH concave collision versus decomposed convex pieces across
+  dense concave meshes, dynamic concave bodies, contact-heavy corners/channels,
+  and closed-volume inertia/mass scenarios.
 
 **Acceptance Bar:**
 
@@ -771,10 +822,8 @@ not become the escape hatch for concave mesh support.
 ## Phase 7C: Compound Collider Policy And Scaffold
 
 **Purpose:** Define `LSCompoundCollider` as a special-case collider composition
-strategy without bloating mesh-policy work. Implement only the minimal scaffold
-needed for alpha if the design remains contained; otherwise produce a follow-up
-implementation plan before Phase 8. Phase 7C should execute after Phase 7B so
-compound behavior does not absorb unresolved concave mesh responsibilities.
+strategy. Phase 7C should execute after Phase 7B so compound behavior does 
+not absorb unresolved concave mesh responsibilities.
 
 **Files:**
 
@@ -790,8 +839,7 @@ compound behavior does not absorb unresolved concave mesh responsibilities.
 
 **Tasks:**
 
-- [ ] Decide whether 7C implements an initial runtime type or only writes the
-  policy and follow-up plan. If implemented, keep it narrow: one public collider
+- [ ] Implement an initial runtime type and try to keep it narrow: one public collider
   identity/body/layer, stable part IDs, deterministic part ordering, aggregate
   bounds, and part-local transforms.
 - [ ] Define compound parts as internal collider-like shape parts, not

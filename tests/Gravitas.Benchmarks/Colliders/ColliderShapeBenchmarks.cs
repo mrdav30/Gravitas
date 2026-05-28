@@ -17,6 +17,9 @@ public class ColliderShapeBenchmarks
     private LSMeshCollider _meshCollider;
     private StiffBody _meshBody;
     private SwiftList<int> _meshHits;
+    private LSMeshCollider _concaveMeshCollider;
+    private StiffBody _concaveMeshBody;
+    private SwiftList<int> _concaveMeshHits;
     private int _tick;
 
     [Params(64)]
@@ -71,6 +74,30 @@ public class ColliderShapeBenchmarks
         _meshBody.Initialize(Vector3d.Zero, FixedQuaternion.Identity);
         _meshCollider.Simulate();
         _meshCollider.GetTrianglesInBounds(new FixedBoundVolume(Vector3d.Zero, Vector3d.One), _meshHits);
+
+        _concaveMeshHits = new SwiftList<int>(8);
+        var concaveAgent = new BenchmarkMatterAgent(_context, Vector3d.Zero);
+        _concaveMeshCollider = new LSMeshCollider(
+            CreateUChannelVertices(),
+            new[]
+            {
+                0, 1, 2, 2, 1, 3,
+                4, 5, 6, 6, 5, 7,
+                8, 9, 10, 10, 9, 11
+            },
+            MeshColliderMode.Concave);
+        _concaveMeshBody = new StiffBody(concaveAgent, _concaveMeshCollider)
+        {
+            Mass = Fixed64.One,
+            PreventAngularForces = true
+        };
+        _concaveMeshBody.Initialize(Vector3d.Zero, FixedQuaternion.Identity);
+        _concaveMeshCollider.Simulate();
+        _concaveMeshCollider.GetTrianglesInBounds(
+            new FixedBoundVolume(
+                new Vector3d(Fixed64.Fraction(3, 2), Fixed64.Zero, Fixed64.One),
+                new Vector3d((Fixed64)3, (Fixed64)2, (Fixed64)3)),
+            _concaveMeshHits);
     }
 
     [GlobalCleanup]
@@ -85,6 +112,9 @@ public class ColliderShapeBenchmarks
         _meshCollider = null;
         _meshBody = null;
         _meshHits = null;
+        _concaveMeshCollider = null;
+        _concaveMeshBody = null;
+        _concaveMeshHits = null;
     }
 
     [Benchmark]
@@ -141,5 +171,48 @@ public class ColliderShapeBenchmarks
 
         _tick++;
         return _meshHits.Count + _meshCollider.Mesh.TriangleBvhBuildCount;
+    }
+
+    [Benchmark]
+    public int MoveDynamicConcaveMeshAndQueryTriangles()
+    {
+        Vector3d position = (_tick & 1) == 0
+            ? Vector3d.Zero
+            : new Vector3d(Fixed64.Half, Fixed64.Zero, Fixed64.Zero);
+
+        _concaveMeshBody.SetPosition(position);
+        _concaveMeshCollider.Simulate();
+        _concaveMeshCollider.GetTrianglesInBounds(
+            new FixedBoundVolume(
+                position + new Vector3d(Fixed64.Fraction(3, 2), Fixed64.Zero, Fixed64.One),
+                position + new Vector3d((Fixed64)3, (Fixed64)2, (Fixed64)3)),
+            _concaveMeshHits);
+
+        _tick++;
+        return _concaveMeshHits.Count + _concaveMeshCollider.Mesh.TriangleBvhBuildCount;
+    }
+
+    private static Vector3d[] CreateUChannelVertices()
+    {
+        Fixed64 left = (Fixed64)(-2);
+        Fixed64 right = (Fixed64)2;
+        Fixed64 height = (Fixed64)2;
+        Fixed64 depth = (Fixed64)4;
+
+        return new[]
+        {
+            new Vector3d(left, Fixed64.Zero, Fixed64.Zero),
+            new Vector3d(left, height, Fixed64.Zero),
+            new Vector3d(left, Fixed64.Zero, depth),
+            new Vector3d(left, height, depth),
+            new Vector3d(right, Fixed64.Zero, Fixed64.Zero),
+            new Vector3d(right, Fixed64.Zero, depth),
+            new Vector3d(right, height, Fixed64.Zero),
+            new Vector3d(right, height, depth),
+            new Vector3d(left, Fixed64.Zero, Fixed64.Zero),
+            new Vector3d(right, Fixed64.Zero, Fixed64.Zero),
+            new Vector3d(left, height, Fixed64.Zero),
+            new Vector3d(right, height, Fixed64.Zero)
+        };
     }
 }

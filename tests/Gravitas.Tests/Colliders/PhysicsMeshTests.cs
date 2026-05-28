@@ -128,7 +128,7 @@ public sealed class PhysicsMeshTests
     }
 
     [Fact]
-    public void ConcaveMesh_ShouldRejectDynamicBodyInitialization()
+    public void ConcaveMesh_ShouldAllowDynamicBodyInitialization()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         var collider = new LSMeshCollider(
@@ -136,13 +136,13 @@ public sealed class PhysicsMeshTests
             ValidTriangles(),
             MeshColliderMode.Concave);
 
-        Action create = () => scenario.CreateBody(
+        ScenarioBody<LSMeshCollider> body = scenario.CreateBody(
             collider,
             Vector3d.Zero,
             FixedQuaternion.Identity);
 
-        create.Should().Throw<InvalidOperationException>()
-            .WithMessage("*concave*dynamic*");
+        body.Collider.Mode.Should().Be(MeshColliderMode.Concave);
+        body.Body.IsKinematic.Should().BeFalse();
     }
 
     [Fact]

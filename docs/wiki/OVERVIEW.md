@@ -135,9 +135,9 @@ active-pair queue during `LateSimulate`.
   complete 2D physics model.
 - Cylinder collision and query behavior is implemented for the current finite
   cylinder model, but needs continued edge-case hardening.
-- Mesh raycast overlap and initial mesh/cylinder contact are implemented through
-  triangle-level tests. Swept mesh queries and full mesh contact manifolds remain
-  future hardening work.
+- Mesh raycast overlap and concave mesh narrow phase are implemented through
+  triangle-level tests. Swept mesh queries and richer mesh contact clipping
+  remain future hardening work.
 - Collision response is still an alpha-hardening target. The current manifold
   solver handles deterministic normal and friction impulses, but static resting
   friction, true warm-start impulse application, explicit island solving,
