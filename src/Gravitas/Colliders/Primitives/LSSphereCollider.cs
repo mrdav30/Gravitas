@@ -12,11 +12,16 @@ public class LSSphereCollider : LSCollider
 
     protected override void OnInitialize()
     {
-        Fixed64 diameter = ScaledRadius * 2;
+        Fixed64 diameter = _radius * 2;
         _size = new Vector3d(diameter, diameter, diameter);
         base.OnInitialize();
     }
 
+    protected override void OnRadiusChanged()
+    {
+        Fixed64 diameter = _radius * 2;
+        _size = new Vector3d(diameter, diameter, diameter);
+    }
 
     protected override void BuildShape() =>
         Area = FixedMath.PI * ScaledRadiusSqr;  // The area of a circle is pi times the radius squared (A = π r²)

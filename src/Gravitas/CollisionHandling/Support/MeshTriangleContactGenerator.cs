@@ -13,7 +13,7 @@ namespace Gravitas.CollisionHandling;
 internal static class MeshTriangleContactGenerator
 {
     public static bool TryBuildMeshSphereManifold(
-        CollisionPair pair,
+        CollisionWorkItem pair,
         LSMeshCollider mesh,
         LSSphereCollider sphere,
         SwiftList<int> triangleBuffer)
@@ -26,7 +26,7 @@ internal static class MeshTriangleContactGenerator
     }
 
     public static bool TryBuildMeshCapsuleManifold(
-        CollisionPair pair,
+        CollisionWorkItem pair,
         LSMeshCollider mesh,
         LSCapsuleCollider capsule,
         SwiftList<int> triangleBuffer)
@@ -43,7 +43,7 @@ internal static class MeshTriangleContactGenerator
     }
 
     public static bool TryBuildMeshCuboidManifold(
-        CollisionPair pair,
+        CollisionWorkItem pair,
         LSMeshCollider mesh,
         LSCuboidCollider cuboid,
         SwiftList<int> triangleBuffer)
@@ -56,7 +56,7 @@ internal static class MeshTriangleContactGenerator
     }
 
     public static bool TryBuildMeshCylinderManifold(
-        CollisionPair pair,
+        CollisionWorkItem pair,
         LSMeshCollider mesh,
         LSCylinderCollider cylinder,
         SwiftList<int> triangleBuffer)
@@ -69,7 +69,7 @@ internal static class MeshTriangleContactGenerator
     }
 
     public static bool TryBuildMeshMeshManifold(
-        CollisionPair pair,
+        CollisionWorkItem pair,
         LSMeshCollider meshA,
         LSMeshCollider meshB,
         SwiftList<int> triangleBufferA,
@@ -102,7 +102,7 @@ internal static class MeshTriangleContactGenerator
     }
 
     private static void TryAddSphereTriangleContact(
-        CollisionPair pair,
+        CollisionWorkItem pair,
         LSMeshCollider mesh,
         int triangleIndex,
         LSSphereCollider sphere)
@@ -125,7 +125,7 @@ internal static class MeshTriangleContactGenerator
     }
 
     private static void TryAddCapsuleTriangleContact(
-        CollisionPair pair,
+        CollisionWorkItem pair,
         LSMeshCollider mesh,
         int triangleIndex,
         LSCapsuleCollider capsule)
@@ -154,7 +154,7 @@ internal static class MeshTriangleContactGenerator
     }
 
     private static void TryAddCuboidTriangleContact(
-        CollisionPair pair,
+        CollisionWorkItem pair,
         LSMeshCollider mesh,
         int triangleIndex,
         LSCuboidCollider cuboid)
@@ -169,7 +169,7 @@ internal static class MeshTriangleContactGenerator
     }
 
     private static void TryAddCylinderTriangleContact(
-        CollisionPair pair,
+        CollisionWorkItem pair,
         LSMeshCollider mesh,
         int triangleIndex,
         LSCylinderCollider cylinder)
@@ -470,7 +470,7 @@ internal static class MeshTriangleContactGenerator
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void AddContactInPairOrder(
-        CollisionPair pair,
+        CollisionWorkItem pair,
         LSCollider first,
         Vector3d pointOnFirst,
         LSCollider second,

@@ -101,7 +101,10 @@ context.Diagnostics.CapturePoint(point, Fixed64.Half, GravitasDiagnosticColor.Re
 ```
 
 `CaptureCollider(...)` emits one command for primitive colliders and one
-`WireTriangle` command per mesh triangle. Large meshes can therefore generate a
+`WireTriangle` command per mesh triangle. Compound colliders emit one command
+per internal part using the owning compound collider ID and
+`ColliderType.Compound`, so host renderers can draw the approximation without
+treating parts as registered colliders. Large meshes can therefore generate a
 large command buffer; hosts should reserve capacity or choose filtered capture
 when inspecting dense mesh scenes.
 

@@ -116,6 +116,7 @@ public class LSCuboidCollider : LSCollider
         _faceCentroids = new Vector3d[FaceDefinitions.Length];
         _edgeVertices = new int[EdgeDefinitions.Length][];
         _edgeDirections = new Vector3d[EdgeDefinitions.Length];
+        _orientedBounds = new BoundingBox(Vector3d.Zero, Vector3d.One);
     }
 
     protected override void OnInitialize()

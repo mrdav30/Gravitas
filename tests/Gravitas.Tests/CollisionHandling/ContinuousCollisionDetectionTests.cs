@@ -97,7 +97,8 @@ public sealed class ContinuousCollisionDetectionTests
     [InlineData(TestColliderShape.Capsule)]
     [InlineData(TestColliderShape.Cuboid)]
     [InlineData(TestColliderShape.Cylinder)]
-    public void ContinuousMode_ShouldPreventFastPrimitiveTunnelingThroughThinStaticGeometry(TestColliderShape shape)
+    [InlineData(TestColliderShape.Compound)]
+    public void ContinuousMode_ShouldPreventFastColliderTunnelingThroughThinStaticGeometry(TestColliderShape shape)
     {
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();
         CreateStaticWall(scenario, Fixed64.Zero);
@@ -234,6 +235,12 @@ public sealed class ContinuousCollisionDetectionTests
             TestColliderShape.Capsule => ToTuple(scenario.CreateCapsule(new Vector3d((Fixed64)(-2), Fixed64.Zero, Fixed64.Zero))),
             TestColliderShape.Cuboid => ToTuple(scenario.CreateCuboid(new Vector3d((Fixed64)(-2), Fixed64.Zero, Fixed64.Zero))),
             TestColliderShape.Cylinder => ToTuple(scenario.CreateCylinder(new Vector3d((Fixed64)(-2), Fixed64.Zero, Fixed64.Zero))),
+            TestColliderShape.Compound => ToTuple(scenario.CreateBody(
+                new LSCompoundCollider(
+                    new CompoundColliderPart(new LSSphereCollider { LocalOffset = new Vector3d(-Fixed64.One, Fixed64.Zero, Fixed64.Zero) }),
+                    new CompoundColliderPart(new LSSphereCollider { LocalOffset = new Vector3d(Fixed64.One, Fixed64.Zero, Fixed64.Zero) })),
+                new Vector3d((Fixed64)(-2), Fixed64.Zero, Fixed64.Zero),
+                FixedQuaternion.Identity)),
             _ => throw new System.ArgumentOutOfRangeException(nameof(shape), shape, null)
         };
     }
@@ -256,6 +263,7 @@ public sealed class ContinuousCollisionDetectionTests
         Sphere,
         Capsule,
         Cuboid,
-        Cylinder
+        Cylinder,
+        Compound
     }
 }

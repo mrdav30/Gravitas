@@ -79,6 +79,14 @@ time. When a parent collider deactivates, its child bindings are cleared before
 the parent collider ID returns to the reusable ID pool, preventing stale
 hierarchy IDs from suppressing collisions against future unrelated colliders.
 
+`LSCompoundCollider` is different from hierarchy binding. A parent/child
+relationship links independently registered colliders that may represent
+separate host objects. A compound collider owns internal geometry parts under
+one collider ID, one body binding, one broad-phase entry, and one contact/event
+surface. Compound parts are not registered with `GravitasPhysicsService`, cannot
+be parented independently, and are scanned in stable part order by the owning
+compound collider.
+
 Capsules rebuild their hemisphere centers, cylinder height, area, and segment
 endpoints together. Short capsules collapse to a sphere-like segment and use a
 sphere inertia fallback instead of producing a zero diagonal for the capsule's
@@ -101,9 +109,8 @@ state.
 
 Mesh colliders validate vertices and triangle indices at construction time.
 `MeshColliderMode` declares whether the mesh is intended as `Convex` or
-`Concave`; `Compound` remains a separate future collider-composition strategy,
-not a mesh mode. Convex meshes may use whole-shape convex assumptions where
-valid. Concave meshes are explicit triangle collision data and are legal for
+`Concave`. Convex meshes may use whole-shape convex assumptions where valid.
+Concave meshes are explicit triangle collision data and are legal for
 bodyless, immovable, kinematic, and dynamic bodies.
 
 `PhysicsMesh` now owns source vertices, triangle normals, triangle areas, local
@@ -127,10 +134,12 @@ Mesh policy work should keep these boundaries explicit:
   dynamic bodies, but they should be chosen deliberately because candidate
   count scales with local triangle density.
 - Convex mesh paths remain free to use whole-shape convex tests where valid.
-- A future compound collider should present one collider identity to hosts and
-  one body to the solver, while internally ordering primitive or convex-mesh
-  parts by stable part IDs. Its policy must define aggregate bounds, mass,
-  inertia, trigger/contact events, CCD proxy behavior, and debug draw output.
+- Compound colliders present one collider identity to hosts and one body to the
+  solver, while internally ordering primitive or convex-mesh parts by stable
+  part index. They aggregate part bounds, approximate mass/inertia from the
+  parts, emit one event surface, and draw part geometry through the owning
+  collider ID. Concave mesh parts are rejected; concave behavior belongs to
+  `LSMeshCollider`.
 - Host/offline convex decomposition should feed explicit convex mesh data or a
   future mesh-piece data path without changing the owning collider identity.
   Automatic convex decomposition is not claimed unless the chosen algorithm is
@@ -299,16 +308,18 @@ Current shape support:
 | Mesh/Cuboid | convex mesh uses nearby-triangle SAT; concave mesh runs per-triangle SAT against the cuboid. |
 | Mesh/Cylinder | triangle-BVH candidate scan against finite cylinder volume; concave mode writes triangle contacts. |
 | Mesh/Mesh | convex mesh uses nearby-triangle SAT; concave-involved pairs run triangle-vs-triangle candidate checks. |
+| Compound/* | stable part-order scan, existing part-vs-shape narrow phase, and pair-owned manifold reduction. |
 
 Current shape-pair matrix:
 
-| A / B | Sphere | Capsule | Cuboid | Cylinder | Mesh |
-| --- | --- | --- | --- | --- | --- |
-| Sphere | Supported | Supported | Supported | Supported | Supported |
-| Capsule | Supported | Supported | Supported | Supported | Supported |
-| Cuboid | Supported | Supported | Supported | Supported | Supported |
-| Cylinder | Supported | Supported | Supported | Supported | Supported |
-| Mesh | Supported | Supported | Supported | Supported | Supported |
+| A / B | Sphere | Capsule | Cuboid | Cylinder | Mesh | Compound |
+| --- | --- | --- | --- | --- | --- | --- |
+| Sphere | Supported | Supported | Supported | Supported | Supported | Supported |
+| Capsule | Supported | Supported | Supported | Supported | Supported | Supported |
+| Cuboid | Supported | Supported | Supported | Supported | Supported | Supported |
+| Cylinder | Supported | Supported | Supported | Supported | Supported | Supported |
+| Mesh | Supported | Supported | Supported | Supported | Supported | Supported |
+| Compound | Supported | Supported | Supported | Supported | Supported | Supported |
 
 `Cuboid` covers both `AABox` and `OBBox` dispatch. `Cylinder/Mesh` is
 normalized to `Mesh/Cylinder` by pair priority so contact data is written in the
@@ -324,7 +335,8 @@ checks in the same world avoid per-check object-info construction and pool
 rent/release churn. Short `collision-detection` benchmark smoke currently
 reports on aggregate primitive checks, single-contact primitive manifold
 generation, axis-aligned cuboid face-manifold generation, cuboid/cuboid SAT,
-mesh/cylinder, mesh/cuboid, mesh/mesh, and concave mesh paths after warmup.
+mesh/cylinder, mesh/cuboid, mesh/mesh, compound/primitive, and concave mesh paths
+after warmup.
 
 ## Contact Data
 

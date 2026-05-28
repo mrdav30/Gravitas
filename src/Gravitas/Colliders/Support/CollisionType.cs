@@ -18,6 +18,7 @@
         Mesh_Capsule,
         Mesh_Cuboid,
         Mesh_Cylinder,
-        Mesh_Mesh
+        Mesh_Mesh,
+        Compound
     }
 }

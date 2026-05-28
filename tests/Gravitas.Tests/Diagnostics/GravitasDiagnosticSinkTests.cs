@@ -99,9 +99,15 @@ public sealed class GravitasDiagnosticSinkTests
         ScenarioBody<LSCapsuleCollider> capsule = scenario.CreateCapsule(PhysicsScenarioBuilder.Vector(2, 0, 0));
         ScenarioBody<LSCuboidCollider> cuboid = scenario.CreateCuboid(PhysicsScenarioBuilder.Vector(4, 0, 0), PhysicsScenarioBuilder.Yaw(35));
         ScenarioBody<LSCylinderCollider> cylinder = scenario.CreateCylinder(PhysicsScenarioBuilder.Vector(6, 0, 0));
+        ScenarioBody<LSCompoundCollider> compound = scenario.CreateBody(
+            new LSCompoundCollider(
+                new CompoundColliderPart(new LSSphereCollider { LocalOffset = new Vector3d(-Fixed64.One, Fixed64.Zero, Fixed64.Zero) }),
+                new CompoundColliderPart(new LSCuboidCollider { LocalOffset = new Vector3d(Fixed64.One, Fixed64.Zero, Fixed64.Zero) })),
+            PhysicsScenarioBuilder.Vector(8, 0, 0),
+            FixedQuaternion.Identity);
         ScenarioBody<LSMeshCollider> mesh = scenario.CreateBody(
             CreateTriangleMesh(),
-            PhysicsScenarioBuilder.Vector(8, 0, 0),
+            PhysicsScenarioBuilder.Vector(10, 0, 0),
             FixedQuaternion.Identity);
 
         scenario.Context.Diagnostics.Enable(eventCapacity: 4, drawCommandCapacity: 16);
@@ -109,6 +115,7 @@ public sealed class GravitasDiagnosticSinkTests
         scenario.Context.Diagnostics.CaptureCollider(capsule.Collider, GravitasDiagnosticColor.Green);
         scenario.Context.Diagnostics.CaptureCollider(cuboid.Collider, GravitasDiagnosticColor.Yellow);
         scenario.Context.Diagnostics.CaptureCollider(cylinder.Collider, GravitasDiagnosticColor.Red);
+        scenario.Context.Diagnostics.CaptureCollider(compound.Collider, GravitasDiagnosticColor.Blue);
         scenario.Context.Diagnostics.CaptureCollider(mesh.Collider, GravitasDiagnosticColor.White);
         scenario.Context.Diagnostics.CaptureLine(
             PhysicsScenarioBuilder.Vector(0, 0, 0),
@@ -125,26 +132,32 @@ public sealed class GravitasDiagnosticSinkTests
             GravitasDiagnosticColor.Red);
 
         ReadOnlySpan<GravitasDebugDrawCommand> commands = scenario.Context.Diagnostics.DrawCommands;
-        commands.Length.Should().Be(8);
+        commands.Length.Should().Be(10);
         commands[0].Kind.Should().Be(GravitasDebugDrawKind.WireSphere);
         commands[0].ColliderId.Should().Be(sphere.Collider.Id);
         commands[1].Kind.Should().Be(GravitasDebugDrawKind.WireCapsule);
         commands[2].Kind.Should().Be(GravitasDebugDrawKind.WireBox);
         commands[2].Rotation.Should().Be(cuboid.Collider.Rotation);
         commands[3].Kind.Should().Be(GravitasDebugDrawKind.WireCylinder);
-        commands[4].Kind.Should().Be(GravitasDebugDrawKind.WireTriangle);
-        commands[4].PointA.Should().Be(mesh.Collider.Mesh.Vertices[0]);
-        commands[4].PointB.Should().Be(mesh.Collider.Mesh.Vertices[1]);
-        commands[4].PointC.Should().Be(mesh.Collider.Mesh.Vertices[2]);
-        commands[5].Kind.Should().Be(GravitasDebugDrawKind.Line);
-        commands[5].Start.Should().Be(PhysicsScenarioBuilder.Vector(0, 0, 0));
-        commands[5].End.Should().Be(PhysicsScenarioBuilder.Vector(1, 0, 0));
-        commands[6].Kind.Should().Be(GravitasDebugDrawKind.Ray);
-        commands[6].Start.Should().Be(PhysicsScenarioBuilder.Vector(1, 0, 0));
-        commands[6].End.Should().Be(PhysicsScenarioBuilder.Vector(1, 0, 2));
-        commands[7].Kind.Should().Be(GravitasDebugDrawKind.Point);
-        commands[7].Center.Should().Be(PhysicsScenarioBuilder.Vector(2, 0, 0));
-        commands[7].Radius.Should().Be(Fixed64.Half);
+        commands[4].Kind.Should().Be(GravitasDebugDrawKind.WireSphere);
+        commands[4].ColliderId.Should().Be(compound.Collider.Id);
+        commands[4].ColliderType.Should().Be(ColliderType.Compound);
+        commands[5].Kind.Should().Be(GravitasDebugDrawKind.WireBox);
+        commands[5].ColliderId.Should().Be(compound.Collider.Id);
+        commands[5].ColliderType.Should().Be(ColliderType.Compound);
+        commands[6].Kind.Should().Be(GravitasDebugDrawKind.WireTriangle);
+        commands[6].PointA.Should().Be(mesh.Collider.Mesh.Vertices[0]);
+        commands[6].PointB.Should().Be(mesh.Collider.Mesh.Vertices[1]);
+        commands[6].PointC.Should().Be(mesh.Collider.Mesh.Vertices[2]);
+        commands[7].Kind.Should().Be(GravitasDebugDrawKind.Line);
+        commands[7].Start.Should().Be(PhysicsScenarioBuilder.Vector(0, 0, 0));
+        commands[7].End.Should().Be(PhysicsScenarioBuilder.Vector(1, 0, 0));
+        commands[8].Kind.Should().Be(GravitasDebugDrawKind.Ray);
+        commands[8].Start.Should().Be(PhysicsScenarioBuilder.Vector(1, 0, 0));
+        commands[8].End.Should().Be(PhysicsScenarioBuilder.Vector(1, 0, 2));
+        commands[9].Kind.Should().Be(GravitasDebugDrawKind.Point);
+        commands[9].Center.Should().Be(PhysicsScenarioBuilder.Vector(2, 0, 0));
+        commands[9].Radius.Should().Be(Fixed64.Half);
     }
 
     private static long MeasureAllocatedBytes(Action action)

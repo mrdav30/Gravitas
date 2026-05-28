@@ -25,6 +25,8 @@ internal sealed class CollisionSatScratch
 
     public SwiftList<int> MeshTriangleCandidatesB { get; } = new(16);
 
+    public ContactManifold CompoundPartManifold { get; } = new();
+
     public CollisionContext PrepareCuboids(
         LSCuboidCollider cuboidA,
         Vector3d pointA,

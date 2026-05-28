@@ -13,6 +13,7 @@ public static class ColliderSettings
             ColliderType.AABox => 2,
             ColliderType.OBBox => 2,
             ColliderType.Mesh => 3,
+            ColliderType.Compound => 4,
             _ => -1
         };
 
@@ -25,6 +26,7 @@ public static class ColliderSettings
             {(ColliderType.Sphere, ColliderType.Capsule), CollisionType.Capsule_Sphere},
             {(ColliderType.Sphere, ColliderType.Cylinder), CollisionType.Cylinder_Sphere},
             {(ColliderType.Sphere, ColliderType.Mesh), CollisionType.Mesh_Sphere},
+            {(ColliderType.Sphere, ColliderType.Compound), CollisionType.Compound},
             // Capsule
             {(ColliderType.Capsule, ColliderType.Sphere), CollisionType.Capsule_Sphere},
             {(ColliderType.Capsule, ColliderType.AABox), CollisionType.AABox_Capsule},
@@ -32,6 +34,7 @@ public static class ColliderSettings
             {(ColliderType.Capsule, ColliderType.Capsule), CollisionType.Capsule_Capsule},
             {(ColliderType.Capsule, ColliderType.Cylinder), CollisionType.Cylinder_Capsule},
             {(ColliderType.Capsule, ColliderType.Mesh), CollisionType.Mesh_Capsule},
+            {(ColliderType.Capsule, ColliderType.Compound), CollisionType.Compound},
             // AABox
             {(ColliderType.AABox, ColliderType.Sphere), CollisionType.Cuboid_Sphere},
             {(ColliderType.AABox, ColliderType.AABox), CollisionType.Cuboid_Cuboid},
@@ -39,6 +42,7 @@ public static class ColliderSettings
             {(ColliderType.AABox, ColliderType.Capsule), CollisionType.AABox_Capsule},
             {(ColliderType.AABox, ColliderType.Cylinder), CollisionType.Cuboid_Cylinder},
             {(ColliderType.AABox, ColliderType.Mesh), CollisionType.Mesh_Cuboid},
+            {(ColliderType.AABox, ColliderType.Compound), CollisionType.Compound},
             // OBBox
             {(ColliderType.OBBox, ColliderType.Sphere), CollisionType.Cuboid_Sphere},
             {(ColliderType.OBBox, ColliderType.AABox), CollisionType.Cuboid_Cuboid},
@@ -46,6 +50,7 @@ public static class ColliderSettings
             {(ColliderType.OBBox, ColliderType.Capsule), CollisionType.OBBox_Capsule},
             {(ColliderType.OBBox, ColliderType.Cylinder), CollisionType.Cuboid_Cylinder},
             {(ColliderType.OBBox, ColliderType.Mesh), CollisionType.Mesh_Cuboid},
+            {(ColliderType.OBBox, ColliderType.Compound), CollisionType.Compound},
             // Cylinder
             {(ColliderType.Cylinder, ColliderType.Sphere), CollisionType.Cylinder_Sphere},
             {(ColliderType.Cylinder, ColliderType.Capsule), CollisionType.Cylinder_Capsule},
@@ -53,6 +58,7 @@ public static class ColliderSettings
             {(ColliderType.Cylinder, ColliderType.OBBox), CollisionType.Cuboid_Cylinder},
             {(ColliderType.Cylinder, ColliderType.Cylinder), CollisionType.Cylinder_Cylinder},
             {(ColliderType.Cylinder, ColliderType.Mesh), CollisionType.Mesh_Cylinder},
+            {(ColliderType.Cylinder, ColliderType.Compound), CollisionType.Compound},
             // Mesh
             {(ColliderType.Mesh, ColliderType.Sphere), CollisionType.Mesh_Sphere},
             {(ColliderType.Mesh, ColliderType.AABox), CollisionType.Mesh_Cuboid},
@@ -60,6 +66,15 @@ public static class ColliderSettings
             {(ColliderType.Mesh, ColliderType.Capsule), CollisionType.Mesh_Capsule},
             {(ColliderType.Mesh, ColliderType.Cylinder), CollisionType.Mesh_Cylinder},
             {(ColliderType.Mesh, ColliderType.Mesh), CollisionType.Mesh_Mesh},
+            {(ColliderType.Mesh, ColliderType.Compound), CollisionType.Compound},
+            // Compound
+            {(ColliderType.Compound, ColliderType.Sphere), CollisionType.Compound},
+            {(ColliderType.Compound, ColliderType.Capsule), CollisionType.Compound},
+            {(ColliderType.Compound, ColliderType.AABox), CollisionType.Compound},
+            {(ColliderType.Compound, ColliderType.OBBox), CollisionType.Compound},
+            {(ColliderType.Compound, ColliderType.Cylinder), CollisionType.Compound},
+            {(ColliderType.Compound, ColliderType.Mesh), CollisionType.Compound},
+            {(ColliderType.Compound, ColliderType.Compound), CollisionType.Compound},
         };
 
     public static CollisionType GetCollisionType(ColliderType type1, ColliderType type2)

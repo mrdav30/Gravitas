@@ -12,7 +12,11 @@ public static class CollisionDetection
     public static bool DoCollisionCheck(CollisionPair pair)
     {
         pair.Manifold.BeginUpdate(pair.Context.FrameCount);
+        return DoCollisionCheck(CollisionWorkItem.Create(pair));
+    }
 
+    internal static bool DoCollisionCheck(CollisionWorkItem pair)
+    {
         return pair.CollisionType switch
         {
             CollisionType.None => false,
@@ -32,13 +36,14 @@ public static class CollisionDetection
             CollisionType.Mesh_Cuboid => DoMeshCuboidCheck(pair),
             CollisionType.Mesh_Cylinder => DoMeshCylinderCheck(pair),
             CollisionType.Mesh_Mesh => DoMeshesCheck(pair),
+            CollisionType.Compound => DoCompoundCheck(pair),
             _ => false,
         };
     }
 
     #region Sphere
 
-    private static bool DoSpheresCheck(CollisionPair pair)
+    private static bool DoSpheresCheck(CollisionWorkItem pair)
     {
         Vector3d penetrationVector = pair.ColliderB.Center - pair.ColliderA.Center;
         if (penetrationVector.SqrMagnitude > (pair.ColliderA.ScaledRadius + pair.ColliderB.ScaledRadius) * (pair.ColliderA.ScaledRadius + pair.ColliderB.ScaledRadius))
@@ -59,7 +64,7 @@ public static class CollisionDetection
 
     #region Capsule
 
-    private static bool DoCapsuleSphereCheck(CollisionPair pair)
+    private static bool DoCapsuleSphereCheck(CollisionWorkItem pair)
     {
         if (pair.ColliderA is not LSCapsuleCollider capsule || pair.ColliderB is not LSSphereCollider sphere)
             return false;
@@ -80,7 +85,7 @@ public static class CollisionDetection
         return true;
     }
 
-    private static bool DoCapsulesCheck(CollisionPair pair)
+    private static bool DoCapsulesCheck(CollisionWorkItem pair)
     {
         if (pair.ColliderA is not LSCapsuleCollider capsule1 || pair.ColliderB is not LSCapsuleCollider capsule2)
             return false;
@@ -135,7 +140,7 @@ public static class CollisionDetection
 
     #region Cuboid
 
-    private static bool DoCuboidSphereCheck(CollisionPair pair)
+    private static bool DoCuboidSphereCheck(CollisionWorkItem pair)
     {
         if (pair.ColliderA is not LSCuboidCollider cuboid || pair.ColliderB is not LSSphereCollider)
             return false;
@@ -161,7 +166,7 @@ public static class CollisionDetection
         return true;
     }
 
-    private static bool DoAABoxCapsuleCheck(CollisionPair pair)
+    private static bool DoAABoxCapsuleCheck(CollisionWorkItem pair)
     {
         if (pair.ColliderA is not LSCuboidCollider aabb || pair.ColliderB is not LSCapsuleCollider capsule)
             return false;
@@ -187,7 +192,7 @@ public static class CollisionDetection
         return true;
     }
 
-    private static bool DoOBBoxCapsuleCheck(CollisionPair pair)
+    private static bool DoOBBoxCapsuleCheck(CollisionWorkItem pair)
     {
         if (pair.ColliderA is not LSCuboidCollider obb || pair.ColliderB is not LSCapsuleCollider capsule)
             return false;
@@ -259,7 +264,7 @@ public static class CollisionDetection
     /// Checks for collisions between two poly-poly colliders.
     /// </summary>
     /// <returns>true if a collision is detected, false otherwise.</returns>
-    private static bool DoCuboidsCheck(CollisionPair pair)
+    private static bool DoCuboidsCheck(CollisionWorkItem pair)
     {
         if (pair.ColliderA is not LSCuboidCollider cuboidA || pair.ColliderB is not LSCuboidCollider cuboidB)
             return false;
@@ -310,7 +315,7 @@ public static class CollisionDetection
     }
 
     private static bool TryBuildAxisAlignedCuboidManifold(
-        CollisionPair pair,
+        CollisionWorkItem pair,
         LSCuboidCollider cuboidA,
         LSCuboidCollider cuboidB)
     {
@@ -412,7 +417,7 @@ public static class CollisionDetection
 
     #region Cylinder
 
-    private static bool DoCylinderSphereCheck(CollisionPair pair)
+    private static bool DoCylinderSphereCheck(CollisionWorkItem pair)
     {
         if (!TryGetPairColliders(pair, out LSCylinderCollider cylinder, out LSSphereCollider sphere))
             return false;
@@ -437,7 +442,7 @@ public static class CollisionDetection
         return true;
     }
 
-    private static bool DoCylinderCapsuleCheck(CollisionPair pair)
+    private static bool DoCylinderCapsuleCheck(CollisionWorkItem pair)
     {
         if (!TryGetPairColliders(pair, out LSCylinderCollider cylinder, out LSCapsuleCollider capsule))
             return false;
@@ -463,7 +468,7 @@ public static class CollisionDetection
         return true;
     }
 
-    private static bool DoCylindersCheck(CollisionPair pair)
+    private static bool DoCylindersCheck(CollisionWorkItem pair)
     {
         if (pair.ColliderA is not LSCylinderCollider cylinderA || pair.ColliderB is not LSCylinderCollider cylinderB)
             return false;
@@ -482,7 +487,7 @@ public static class CollisionDetection
         return true;
     }
 
-    private static bool DoCuboidCylinderCheck(CollisionPair pair)
+    private static bool DoCuboidCylinderCheck(CollisionWorkItem pair)
     {
         if (!TryGetPairColliders(pair, out LSCuboidCollider cuboid, out LSCylinderCollider cylinder))
             return false;
@@ -743,7 +748,7 @@ public static class CollisionDetection
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool TryGetPairColliders<TFirst, TSecond>(
-        CollisionPair pair,
+        CollisionWorkItem pair,
         out TFirst first,
         out TSecond second)
         where TFirst : LSCollider
@@ -770,7 +775,7 @@ public static class CollisionDetection
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void SetContactInPairOrder(
-        CollisionPair pair,
+        CollisionWorkItem pair,
         LSCollider first,
         Vector3d pointOnFirst,
         LSCollider second,
@@ -788,6 +793,144 @@ public static class CollisionDetection
             pair.Manifold.SetContact(pointOnSecond, pointOnFirst, depth, -normalFirstToSecond);
     }
 
+    #endregion
+
+    #region Compound
+
+    private static bool DoCompoundCheck(CollisionWorkItem pair)
+    {
+        if (pair.ColliderA is LSCompoundCollider compoundA
+            && pair.ColliderB is LSCompoundCollider compoundB)
+        {
+            return DoCompoundCompoundCheck(pair, compoundA, compoundB);
+        }
+
+        if (pair.ColliderA is LSCompoundCollider firstCompound)
+            return DoCompoundOtherCheck(pair, firstCompound, pair.ColliderB);
+
+        if (pair.ColliderB is LSCompoundCollider secondCompound)
+            return DoCompoundOtherCheck(pair, secondCompound, pair.ColliderA);
+
+        return false;
+    }
+
+    private static bool DoCompoundOtherCheck(
+        CollisionWorkItem pair,
+        LSCompoundCollider compound,
+        LSCollider other)
+    {
+        bool collided = false;
+        for (int i = 0; i < compound.PartCount; i++)
+        {
+            LSCollider part = compound.GetPartCollider(i);
+            collided |= TryBuildCompoundPartContact(pair, part, other);
+        }
+
+        return collided && pair.Manifold.HasContact;
+    }
+
+    private static bool DoCompoundCompoundCheck(
+        CollisionWorkItem pair,
+        LSCompoundCollider compoundA,
+        LSCompoundCollider compoundB)
+    {
+        bool collided = false;
+        for (int i = 0; i < compoundA.PartCount; i++)
+        {
+            LSCollider partA = compoundA.GetPartCollider(i);
+            for (int j = 0; j < compoundB.PartCount; j++)
+                collided |= TryBuildCompoundPartContact(pair, partA, compoundB.GetPartCollider(j));
+        }
+
+        return collided && pair.Manifold.HasContact;
+    }
+
+    private static bool TryBuildCompoundPartContact(
+        CollisionWorkItem ownerPair,
+        LSCollider first,
+        LSCollider second)
+    {
+        if (!BoundsOverlapInclusive(first, second))
+            return false;
+
+        OrderPartPairForDetection(first, second, out LSCollider colliderA, out LSCollider colliderB);
+        CollisionType collisionType = ColliderSettings.GetCollisionType(colliderA.Shape, colliderB.Shape);
+        if (collisionType == CollisionType.None || collisionType == CollisionType.Compound)
+            return false;
+
+        ContactManifold scratch = ownerPair.Context.CollisionScratch.CompoundPartManifold;
+        scratch.BeginUpdate(ownerPair.Context.FrameCount);
+        var partPair = new CollisionWorkItem(ownerPair.Context, colliderA, colliderB, collisionType, scratch);
+        if (!DoCollisionCheck(partPair) || !scratch.HasContact)
+            return false;
+
+        AddCompoundPartContactsInOwnerOrder(ownerPair, partPair);
+        return true;
+    }
+
+    private static void AddCompoundPartContactsInOwnerOrder(
+        CollisionWorkItem ownerPair,
+        CollisionWorkItem partPair)
+    {
+        bool addInPartOrder = BelongsToOwnerSide(partPair.ColliderA, ownerPair.ColliderA);
+        bool flip = !addInPartOrder && BelongsToOwnerSide(partPair.ColliderA, ownerPair.ColliderB);
+        if (!addInPartOrder && !flip)
+            return;
+
+        ContactManifold scratch = partPair.Manifold;
+        for (int i = 0; i < scratch.Count; i++)
+        {
+            ManifoldContact contact = scratch[i];
+            if (addInPartOrder)
+            {
+                ownerPair.Manifold.AddContact(contact.PointA, contact.PointB, contact.Depth, contact.Normal);
+                continue;
+            }
+
+            ownerPair.Manifold.AddContact(contact.PointB, contact.PointA, contact.Depth, -contact.Normal);
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void OrderPartPairForDetection(
+        LSCollider first,
+        LSCollider second,
+        out LSCollider colliderA,
+        out LSCollider colliderB)
+    {
+        if (first.Priority >= second.Priority)
+        {
+            colliderA = first;
+            colliderB = second;
+            return;
+        }
+
+        colliderA = second;
+        colliderB = first;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool BelongsToOwnerSide(LSCollider candidate, LSCollider ownerSide)
+    {
+        if (ReferenceEquals(candidate, ownerSide))
+            return true;
+
+        return ownerSide is LSCompoundCollider compound && compound.ContainsPartCollider(candidate);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool BoundsOverlapInclusive(LSCollider colliderA, LSCollider colliderB)
+    {
+        return colliderA.BoundsMin.x <= colliderB.BoundsMax.x
+            && colliderA.BoundsMax.x >= colliderB.BoundsMin.x
+            && colliderA.BoundsMin.y <= colliderB.BoundsMax.y
+            && colliderA.BoundsMax.y >= colliderB.BoundsMin.y
+            && colliderA.BoundsMin.z <= colliderB.BoundsMax.z
+            && colliderA.BoundsMax.z >= colliderB.BoundsMin.z;
+    }
+
+    #endregion
+
     private readonly struct AxisPenetration
     {
         public AxisPenetration(Vector3d axis, Fixed64 depth)
@@ -804,8 +947,6 @@ public static class CollisionDetection
         public bool HasValue { get; }
     }
 
-    #endregion
-
     #region Mesh
 
     /// <summary>
@@ -814,6 +955,12 @@ public static class CollisionDetection
     /// <param name="pair"></param>
     /// <returns>True if colliders intersect, otherwise false</returns>
     public static bool DoMeshSphereCheck(CollisionPair pair)
+    {
+        pair.Manifold.BeginUpdate(pair.Context.FrameCount);
+        return DoMeshSphereCheck(CollisionWorkItem.Create(pair));
+    }
+
+    private static bool DoMeshSphereCheck(CollisionWorkItem pair)
     {
         if (pair.ColliderA is not LSMeshCollider meshCollider || pair.ColliderB is not LSSphereCollider sphere)
             return false;
@@ -842,7 +989,7 @@ public static class CollisionDetection
         return true;
     }
 
-    private static bool DoMeshCapsuleCheck(CollisionPair pair)
+    private static bool DoMeshCapsuleCheck(CollisionWorkItem pair)
     {
         if (pair.ColliderA is not LSMeshCollider mesh || pair.ColliderB is not LSCapsuleCollider capsule)
             return false;
@@ -878,7 +1025,7 @@ public static class CollisionDetection
         return true;
     }
 
-    private static bool DoMeshCuboidCheck(CollisionPair pair)
+    private static bool DoMeshCuboidCheck(CollisionWorkItem pair)
     {
         if (pair.ColliderA is LSMeshCollider { Mode: MeshColliderMode.Concave } mesh
             && pair.ColliderB is LSCuboidCollider cuboid)
@@ -904,7 +1051,7 @@ public static class CollisionDetection
         return true;
     }
 
-    private static bool DoMeshCylinderCheck(CollisionPair pair)
+    private static bool DoMeshCylinderCheck(CollisionWorkItem pair)
     {
         if (!TryGetPairColliders(pair, out LSMeshCollider mesh, out LSCylinderCollider cylinder))
             return false;
@@ -980,7 +1127,7 @@ public static class CollisionDetection
     /// Tests if there are any separating axes between a cuboid and a mesh using the given axis vectors.
     /// </summary>
     /// <returns>true if no separating axis is found, false otherwise.</returns>
-    private static bool TestMeshCuboidColliders(CollisionPair pair, out CollisionResult? output)
+    private static bool TestMeshCuboidColliders(CollisionWorkItem pair, out CollisionResult? output)
     {
         output = null;
 
@@ -1022,7 +1169,7 @@ public static class CollisionDetection
     /// </summary>
     /// <param name="pair">The pair of colliders to test for collision.</param>
     /// <returns>true if the colliders intersect; otherwise, false.</returns>
-    private static bool DoMeshesCheck(CollisionPair pair)
+    private static bool DoMeshesCheck(CollisionWorkItem pair)
     {
         if (pair.ColliderA is LSMeshCollider meshA
             && pair.ColliderB is LSMeshCollider meshB
@@ -1053,7 +1200,7 @@ public static class CollisionDetection
         return true;
     }
 
-    private static bool TestMeshColliders(CollisionPair pair, out CollisionResult? output)
+    private static bool TestMeshColliders(CollisionWorkItem pair, out CollisionResult? output)
     {
         output = null;
 

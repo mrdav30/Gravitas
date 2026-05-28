@@ -20,6 +20,7 @@ public class CollisionDetectionBenchmarks
     private CollisionPair[] _concaveMeshCylinderPairs;
     private CollisionPair[] _concaveMeshCuboidPairs;
     private CollisionPair[] _concaveMeshMeshPairs;
+    private CollisionPair[] _compoundSpherePairs;
 
     [Params(64)]
     public int PairCount { get; set; }
@@ -47,6 +48,7 @@ public class CollisionDetectionBenchmarks
         _concaveMeshCylinderPairs = CreatePairSet(CreateConcaveMeshCylinderPair);
         _concaveMeshCuboidPairs = CreatePairSet(CreateConcaveMeshCuboidPair);
         _concaveMeshMeshPairs = CreatePairSet(CreateConcaveMeshMeshPair);
+        _compoundSpherePairs = CreatePairSet(CreateCompoundSpherePair);
     }
 
     [GlobalCleanup]
@@ -64,6 +66,7 @@ public class CollisionDetectionBenchmarks
         _concaveMeshCylinderPairs = null;
         _concaveMeshCuboidPairs = null;
         _concaveMeshMeshPairs = null;
+        _compoundSpherePairs = null;
     }
 
     [Benchmark]
@@ -130,6 +133,18 @@ public class CollisionDetectionBenchmarks
     public int CheckConcaveMeshMeshPairs()
     {
         return CountCollisions(_concaveMeshMeshPairs);
+    }
+
+    [Benchmark]
+    public int CheckCompoundSpherePairs()
+    {
+        return CountCollisions(_compoundSpherePairs);
+    }
+
+    [Benchmark]
+    public int GenerateCompoundManifolds()
+    {
+        return CountManifoldContacts(_compoundSpherePairs);
     }
 
     private static int CountCollisions(CollisionPair[] pairs)
@@ -283,6 +298,13 @@ public class CollisionDetectionBenchmarks
             CreateInsideCornerMesh(origin));
     }
 
+    private CollisionPair CreateCompoundSpherePair(int index, Vector3d origin)
+    {
+        return new CollisionPair(
+            CreateCompound(origin),
+            CreateSphere(origin + new Vector3d(Fixed64.Fraction(3, 2), Fixed64.Zero, Fixed64.Zero)));
+    }
+
     private LSSphereCollider CreateSphere(Vector3d position) =>
         CreateBody(new LSSphereCollider(), position).Collider;
 
@@ -294,6 +316,14 @@ public class CollisionDetectionBenchmarks
 
     private LSCylinderCollider CreateCylinder(Vector3d position) =>
         CreateBody(new LSCylinderCollider(), position).Collider;
+
+    private LSCompoundCollider CreateCompound(Vector3d position) =>
+        CreateBody(
+            new LSCompoundCollider(
+                new CompoundColliderPart(new LSSphereCollider { LocalOffset = new Vector3d(-Fixed64.One, Fixed64.Zero, Fixed64.Zero) }),
+                new CompoundColliderPart(new LSSphereCollider { LocalOffset = new Vector3d(Fixed64.One, Fixed64.Zero, Fixed64.Zero) })),
+            position,
+            preventAngularForces: true).Collider;
 
     private LSMeshCollider CreateMeshFloor(Vector3d position) =>
         CreateBody(

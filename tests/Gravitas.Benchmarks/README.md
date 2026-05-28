@@ -70,7 +70,7 @@ Start with hot paths that can be isolated and repeated deterministically:
 - `CollisionDetection` shape-pair checks.
 - `CollisionResponse` contact resolution.
 - continuous collision detection policy and swept movement cost.
-- collider shape-state rebuilds, capsule derived state, and mesh validation/BVH construction.
+- collider shape-state rebuilds, capsule derived state, compound aggregate bounds, and mesh validation/BVH construction.
 - `GravitasRaycastService` and `GravitasCircleQueryService` query gathering, filtering, and result ordering.
 - Mesh collider preprocessing and convex mesh limits.
 - Pooling and allocation behavior for collision pairs, partitions, and temporary collections.
@@ -119,7 +119,7 @@ to add or tighten explicit allocation tests before changing the algorithm.
 | `query-service` | `RaycastAll`, `OverlapCircleAll`, directional `OverlapCircleInDirection`, and overlapping-context queries. |
 | `simulation-allocation` | `StiffBody.LateSimulate`, grounding raycast probes, collision partition distribution, and active-pair late simulation. |
 | `continuous-collision` | Discrete fast body movement baseline and opt-in CCD sweep/clamp against thin static geometry. |
-| `collision-detection` | prepared primitive pairs, non-SAT primitive pairs, primitive manifold generation, cuboid face-manifold generation, cuboid SAT, mesh/cylinder, mesh/cuboid, and mesh/mesh checks. |
+| `collision-detection` | prepared primitive pairs, non-SAT primitive pairs, primitive manifold generation, cuboid face-manifold generation, cuboid SAT, mesh/cylinder, mesh/cuboid, mesh/mesh, and compound/primitive checks. |
 | `collision-response` | manifold response solver cost across single-contact and face-manifold cases, with pair-count scaling. |
 | `diagnostics` | Disabled/enabled force and torque event hooks plus disabled/enabled collider debug draw capture. |
 | `partition-culling` | dynamic collider repartitioning after teleports, direct partition add/remove churn, and culled-pair invalidation after movement. |

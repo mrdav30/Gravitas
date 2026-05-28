@@ -47,6 +47,10 @@ public abstract class LSCollider : IRecordable
     private StiffBody? _body;
     public StiffBody? Body => _body;
 
+    private LSCompoundCollider? _compoundOwner;
+    private FixedQuaternion _compoundLocalRotation = FixedQuaternion.Identity;
+    private Vector3d _compoundLocalScale = Vector3d.One;
+
     private readonly ColliderRuntimeShapeState _runtimeShapeState = new();
     private ColliderPartitionState _partitionState;
     private ColliderQueryState _queryState;
@@ -55,30 +59,48 @@ public abstract class LSCollider : IRecordable
 
     internal uint RuntimeShapeVersion => _runtimeShapeState.RuntimeVersion;
 
+    internal bool HasHostBinding => _body != null || _agent != null;
+
+    internal LSCompoundCollider? CompoundOwner => _compoundOwner;
+
     public virtual Vector3d Position
     {
-        get => Body?.Position3d
+        get => _compoundOwner?.Position
+            ?? Body?.Position3d
             ?? _agent?.Transform.Position
             ?? throw new InvalidOperationException("Collider has no body or static transform.");
         set
         {
+            SwiftThrowHelper.ThrowIfTrue(
+                _compoundOwner != null,
+                nameof(Position),
+                "Compound collider parts inherit position from their owning compound collider.");
+
             if (_agent == null || _agent.Transform.Position == value)
                 return;
             _agent.Transform.Position = value;
         }
     }
 
-    public Fixed64 HeightPos => Body?.HeightPos
+    public Fixed64 HeightPos => _compoundOwner?.HeightPos
+        ?? Body?.HeightPos
         ?? _agent?.Transform.Position.y
         ?? throw new InvalidOperationException("Collider has no body or static transform.");
 
     public virtual FixedQuaternion Rotation
     {
-        get => Body?.Rotation
+        get => _compoundOwner != null
+            ? _compoundOwner.Rotation * _compoundLocalRotation
+            : Body?.Rotation
             ?? _agent?.Transform.Rotation
             ?? throw new InvalidOperationException("Collider has no body or static transform.");
         set
         {
+            SwiftThrowHelper.ThrowIfTrue(
+                _compoundOwner != null,
+                nameof(Rotation),
+                "Compound collider parts inherit rotation from their owning compound collider.");
+
             if (_agent == null || _agent.Transform.Rotation == value)
                 return;
             _agent.Transform.Rotation = value;
@@ -90,7 +112,8 @@ public abstract class LSCollider : IRecordable
 
     public GridWorld? World => _context?.World ?? _agent?.Context.World;
 
-    public FixedTransform Transform => Body?.PositionTransform
+    public FixedTransform Transform => _compoundOwner?.Transform
+        ?? Body?.PositionTransform
         ?? _agent?.Transform
         ?? throw new InvalidOperationException("Collider has no body or static transform.");
 
@@ -212,7 +235,9 @@ public abstract class LSCollider : IRecordable
 
     #region Grid & Partition Bounds
 
-    public virtual Vector3d LocalScale => Transform.LossyScale;
+    public virtual Vector3d LocalScale => _compoundOwner != null
+        ? Vector3d.Scale(_compoundOwner.LocalScale, _compoundLocalScale)
+        : Transform.LossyScale;
 
     public virtual Vector3d ScaledSize => Vector3d.Scale(_size, LocalScale);
 
@@ -283,12 +308,16 @@ public abstract class LSCollider : IRecordable
 
     public void Initialize(StiffBody body)
     {
+        ThrowIfCompoundPartLifecycle(nameof(Initialize));
         _body = body;
         InitCore(body.Agent);
     }
 
-    public void InitializeWithNoBody(IMatterAgent agent) =>
+    public void InitializeWithNoBody(IMatterAgent agent)
+    {
+        ThrowIfCompoundPartLifecycle(nameof(InitializeWithNoBody));
         InitCore(agent);
+    }
 
     private void InitCore(IMatterAgent agent)
     {
@@ -340,6 +369,7 @@ public abstract class LSCollider : IRecordable
     // Even if the collider is inactive, if the body is active, the collider will be updated
     public void Simulate()
     {
+        ThrowIfCompoundPartLifecycle(nameof(Simulate));
         PartitionChanged = false;
         if (!IsActive)
             return;
@@ -377,16 +407,19 @@ public abstract class LSCollider : IRecordable
 
     public void SetParent(LSCollider parent)
     {
+        ThrowIfCompoundPartLifecycle(nameof(SetParent));
         _hierarchyState.SetParent(this, parent);
     }
 
     public void ClearParent()
     {
+        ThrowIfCompoundPartLifecycle(nameof(ClearParent));
         _hierarchyState.ClearParent(this);
     }
 
     public void AddChild(int id)
     {
+        ThrowIfCompoundPartLifecycle(nameof(AddChild));
         if (_hierarchyState.AddChild(id) != true)
         {
             GravitasLogger.Channel.Warn($"Collider with ID {id} is already a child.");
@@ -396,6 +429,7 @@ public abstract class LSCollider : IRecordable
 
     public void RemoveChild(int id)
     {
+        ThrowIfCompoundPartLifecycle(nameof(RemoveChild));
         if (_hierarchyState.RemoveChild(id) != true)
         {
             GravitasLogger.Channel.Warn($"Cannot remove. Collider with ID {id} is not a child.");
@@ -449,6 +483,18 @@ public abstract class LSCollider : IRecordable
         _boundsInitialized = true;
     }
 
+    protected void SetBoundsMinMax(Vector3d min, Vector3d max)
+    {
+        if (!_boundsInitialized)
+        {
+            _bounds = new BoundingBox((min + max) * Fixed64.Half, max - min);
+            _boundsInitialized = true;
+            return;
+        }
+
+        _bounds.SetMinMax(min, max);
+    }
+
     private void CalculateBoundLimits()
     {
         if (Rotation == FixedQuaternion.Identity || Shape == ColliderType.Mesh)
@@ -473,6 +519,12 @@ public abstract class LSCollider : IRecordable
     protected void MarkShapeDirty()
     {
         _runtimeShapeState.MarkDirty();
+        if (_compoundOwner != null)
+        {
+            _compoundOwner.MarkShapeDirty();
+            return;
+        }
+
         _body?.Wake();
     }
 
@@ -530,7 +582,11 @@ public abstract class LSCollider : IRecordable
             OnContactExit?.Invoke(other.Body);
     }
 
-    public void SetStatus(bool status) => _active = status;
+    public void SetStatus(bool status)
+    {
+        ThrowIfCompoundPartLifecycle(nameof(SetStatus));
+        _active = status;
+    }
 
     /// <summary>
     /// The point on the surface of the capsule that's nearest to the given point
@@ -612,6 +668,7 @@ public abstract class LSCollider : IRecordable
 
     public void Deactivate()
     {
+        ThrowIfCompoundPartLifecycle(nameof(Deactivate));
         if (IsPartitioned)
         {
             Context.Collisions.ClearPartitionedObject(this, true);
@@ -684,6 +741,53 @@ public abstract class LSCollider : IRecordable
             nameof(context),
             "Collider is already bound to a different GravitasWorldContext.");
         _context = context;
+    }
+
+    internal void BindCompoundPart(
+        LSCompoundCollider owner,
+        FixedQuaternion localRotation,
+        Vector3d localScale,
+        GravitasWorldContext context)
+    {
+        SwiftThrowHelper.ThrowIfNull(owner, nameof(owner));
+        SwiftThrowHelper.ThrowIfArgument(
+            HasHostBinding,
+            nameof(owner),
+            "Compound collider parts cannot be initialized as standalone colliders.");
+        SwiftThrowHelper.ThrowIfArgument(
+            _compoundOwner != null && !ReferenceEquals(_compoundOwner, owner),
+            nameof(owner),
+            "Compound collider part is already owned by another compound collider.");
+
+        _compoundOwner = owner;
+        _compoundLocalRotation = localRotation;
+        _compoundLocalScale = localScale;
+        BindContext(context);
+        RebuildRuntimeShapeState();
+    }
+
+    internal void ReserveCompoundPart(LSCompoundCollider owner)
+    {
+        SwiftThrowHelper.ThrowIfNull(owner, nameof(owner));
+        SwiftThrowHelper.ThrowIfArgument(
+            HasHostBinding,
+            nameof(owner),
+            "Compound collider parts cannot be initialized as standalone colliders.");
+        SwiftThrowHelper.ThrowIfArgument(
+            _compoundOwner != null && !ReferenceEquals(_compoundOwner, owner),
+            nameof(owner),
+            "Compound collider part is already owned by another compound collider.");
+
+        _compoundOwner = owner;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void ThrowIfCompoundPartLifecycle(string operation)
+    {
+        SwiftThrowHelper.ThrowIfTrue(
+            _compoundOwner != null,
+            operation,
+            "Compound collider parts are geometry owned by LSCompoundCollider and cannot run standalone lifecycle operations.");
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

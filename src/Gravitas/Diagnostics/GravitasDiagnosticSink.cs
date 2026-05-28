@@ -127,6 +127,9 @@ public sealed class GravitasDiagnosticSink
                     height: cylinder.Height,
                     color: color);
                 break;
+            case LSCompoundCollider compound:
+                CaptureCompoundParts(compound, color);
+                break;
             case LSMeshCollider mesh:
                 CaptureMeshTriangles(mesh, color);
                 break;
@@ -381,6 +384,81 @@ public sealed class GravitasDiagnosticSink
                 GravitasDebugDrawKind.WireTriangle,
                 mesh.Id,
                 mesh.Shape,
+                pointA: first,
+                pointB: second,
+                pointC: third,
+                color: color);
+        }
+    }
+
+    private void CaptureCompoundParts(LSCompoundCollider compound, GravitasDiagnosticColor color)
+    {
+        for (int i = 0; i < compound.PartCount; i++)
+        {
+            LSCollider part = compound.GetPartCollider(i);
+            switch (part)
+            {
+                case LSSphereCollider sphere:
+                    AddDrawCommand(
+                        GravitasDebugDrawKind.WireSphere,
+                        compound.Id,
+                        compound.Shape,
+                        center: sphere.Center,
+                        radius: sphere.ScaledRadius,
+                        color: color);
+                    break;
+                case LSCapsuleCollider capsule:
+                    AddDrawCommand(
+                        GravitasDebugDrawKind.WireCapsule,
+                        compound.Id,
+                        compound.Shape,
+                        center: capsule.Center,
+                        rotation: capsule.Rotation,
+                        radius: capsule.ScaledRadius,
+                        height: capsule.ScaledSize.y,
+                        color: color);
+                    break;
+                case LSCuboidCollider cuboid:
+                    AddDrawCommand(
+                        GravitasDebugDrawKind.WireBox,
+                        compound.Id,
+                        compound.Shape,
+                        center: cuboid.Center,
+                        size: cuboid.ScaledSize,
+                        rotation: cuboid.Rotation,
+                        color: color);
+                    break;
+                case LSCylinderCollider cylinder:
+                    AddDrawCommand(
+                        GravitasDebugDrawKind.WireCylinder,
+                        compound.Id,
+                        compound.Shape,
+                        center: cylinder.Center,
+                        rotation: cylinder.Rotation,
+                        radius: cylinder.ScaledRadius,
+                        height: cylinder.Height,
+                        color: color);
+                    break;
+                case LSMeshCollider mesh:
+                    CaptureCompoundMeshTriangles(compound, mesh, color);
+                    break;
+            }
+        }
+    }
+
+    private void CaptureCompoundMeshTriangles(
+        LSCompoundCollider compound,
+        LSMeshCollider mesh,
+        GravitasDiagnosticColor color)
+    {
+        int triangleCount = mesh.Mesh.TriangleCount;
+        for (int i = 0; i < triangleCount; i++)
+        {
+            mesh.Mesh.GetTriangleVertices(i, out Vector3d first, out Vector3d second, out Vector3d third);
+            AddDrawCommand(
+                GravitasDebugDrawKind.WireTriangle,
+                compound.Id,
+                compound.Shape,
                 pointA: first,
                 pointB: second,
                 pointC: third,

@@ -20,6 +20,8 @@ public class ColliderShapeBenchmarks
     private LSMeshCollider _concaveMeshCollider;
     private StiffBody _concaveMeshBody;
     private SwiftList<int> _concaveMeshHits;
+    private LSCompoundCollider _compoundCollider;
+    private StiffBody _compoundBody;
     private int _tick;
 
     [Params(64)]
@@ -98,6 +100,20 @@ public class ColliderShapeBenchmarks
                 new Vector3d(Fixed64.Fraction(3, 2), Fixed64.Zero, Fixed64.One),
                 new Vector3d((Fixed64)3, (Fixed64)2, (Fixed64)3)),
             _concaveMeshHits);
+
+        var compoundAgent = new BenchmarkMatterAgent(_context, Vector3d.Zero);
+        _compoundCollider = new LSCompoundCollider(
+            new CompoundColliderPart(new LSSphereCollider { LocalOffset = new Vector3d((Fixed64)(-2), Fixed64.Zero, Fixed64.Zero) }),
+            new CompoundColliderPart(new LSSphereCollider { LocalOffset = new Vector3d(Fixed64.Zero, Fixed64.Zero, Fixed64.Zero) }),
+            new CompoundColliderPart(new LSSphereCollider { LocalOffset = new Vector3d((Fixed64)2, Fixed64.Zero, Fixed64.Zero) }),
+            new CompoundColliderPart(new LSCuboidCollider { LocalOffset = new Vector3d(Fixed64.Zero, Fixed64.Zero, (Fixed64)2) }));
+        _compoundBody = new StiffBody(compoundAgent, _compoundCollider)
+        {
+            Mass = Fixed64.One,
+            PreventAngularForces = true
+        };
+        _compoundBody.Initialize(Vector3d.Zero, FixedQuaternion.Identity);
+        _compoundCollider.Simulate();
     }
 
     [GlobalCleanup]
@@ -115,6 +131,8 @@ public class ColliderShapeBenchmarks
         _concaveMeshCollider = null;
         _concaveMeshBody = null;
         _concaveMeshHits = null;
+        _compoundCollider = null;
+        _compoundBody = null;
     }
 
     [Benchmark]
@@ -190,6 +208,20 @@ public class ColliderShapeBenchmarks
 
         _tick++;
         return _concaveMeshHits.Count + _concaveMeshCollider.Mesh.TriangleBvhBuildCount;
+    }
+
+    [Benchmark]
+    public int MoveCompoundRuntimeShapeStateAcrossPartitions()
+    {
+        Vector3d position = (_tick & 1) == 0
+            ? Vector3d.Zero
+            : new Vector3d(Fixed64.Half, Fixed64.Zero, Fixed64.Half);
+
+        _compoundBody.SetPosition(position);
+        _compoundCollider.Simulate();
+
+        _tick++;
+        return (_compoundCollider.PartitionCoordinates?.Count ?? 0) + (int)_compoundCollider.RuntimeShapeVersion;
     }
 
     private static Vector3d[] CreateUChannelVertices()

@@ -54,6 +54,30 @@ public sealed class StiffBodyGroundProbeModeTests
     }
 
     [Fact]
+    public void CheckGround_AutoMode_ShouldUseSweptSphereForCompoundBodies()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        CreateGround(
+            scenario,
+            new PhysicsLayer(1),
+            center: new Vector3d((Fixed64)1.25f, -Fixed64.Half, Fixed64.Zero),
+            size: new Vector3d((Fixed64)2, Fixed64.One, (Fixed64)2));
+        scenario.Context.Settings.GroundCheckLayerMask = PhysicsLayerMask.FromLayer(1);
+        ScenarioBody<LSCompoundCollider> body = scenario.CreateBody(
+            new LSCompoundCollider(
+                new CompoundColliderPart(new LSSphereCollider { LocalOffset = new Vector3d(-Fixed64.One, Fixed64.Zero, Fixed64.Zero) }),
+                new CompoundColliderPart(new LSSphereCollider { LocalOffset = new Vector3d(Fixed64.One, Fixed64.Zero, Fixed64.Zero) })),
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+
+        body.Body.GroundProbeMode.Should().Be(GroundProbeMode.Auto);
+        body.Body.CheckGround();
+
+        body.Body.IsGrounded.Should().BeTrue();
+        body.Body.HitPoint.y.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
     public void CheckGround_SweptSphereMode_ShouldHonorLayerMaskAndSelfExclusion()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();

@@ -1111,6 +1111,9 @@ public class StiffBody : IRecordable
             LSCuboidCollider cuboid => FixedMath.Min(
                 cuboid.Bounds.Scope.x,
                 FixedMath.Min(cuboid.Bounds.Scope.y, cuboid.Bounds.Scope.z)),
+            LSCompoundCollider compound => FixedMath.Min(
+                compound.Bounds.Scope.x,
+                FixedMath.Min(compound.Bounds.Scope.y, compound.Bounds.Scope.z)),
             _ => Fixed64.Zero
         };
     }
@@ -1431,6 +1434,7 @@ public class StiffBody : IRecordable
             || Collider is LSCapsuleCollider
             || Collider is LSCylinderCollider
             || (Collider is LSCuboidCollider && ResolveGroundProbeRadius() > Fixed64.Fraction(1, 8))
+            || (Collider is LSCompoundCollider && ResolveGroundProbeRadius() > Fixed64.Fraction(1, 8))
                 ? GroundProbeMode.SweptSphere
                 : GroundProbeMode.Ray;
     }
@@ -1446,6 +1450,7 @@ public class StiffBody : IRecordable
             LSCapsuleCollider capsule => capsule.ScaledRadius,
             LSCylinderCollider cylinder => cylinder.ScaledRadius,
             LSCuboidCollider cuboid => FixedMath.Min(cuboid.Bounds.Scope.x, cuboid.Bounds.Scope.z),
+            LSCompoundCollider compound => FixedMath.Min(compound.Bounds.Scope.x, compound.Bounds.Scope.z),
             _ => Fixed64.Zero
         };
     }

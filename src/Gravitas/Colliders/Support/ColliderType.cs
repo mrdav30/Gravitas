@@ -8,6 +8,7 @@
         OBBox,
         Capsule,
         Cylinder,
-        Mesh
+        Mesh,
+        Compound
     }
 }

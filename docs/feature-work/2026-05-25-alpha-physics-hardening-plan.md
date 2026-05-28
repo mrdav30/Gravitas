@@ -839,33 +839,54 @@ not absorb unresolved concave mesh responsibilities.
 
 **Tasks:**
 
-- [ ] Implement an initial runtime type and try to keep it narrow: one public collider
+- [x] Implement an initial runtime type and try to keep it narrow: one public collider
   identity/body/layer, stable part IDs, deterministic part ordering, aggregate
   bounds, and part-local transforms.
-- [ ] Define compound parts as internal collider-like shape parts, not
+- [x] Define compound parts as internal collider-like shape parts, not
   independent host colliders or parent/child objects. They may reuse collider
   shape logic, but the compound owns registration, broad-phase identity, event
   surface, body binding, and lifecycle.
-- [ ] Define the supported alpha part set as primitives plus declared `Convex`
+- [x] Define the supported alpha part set as primitives plus declared `Convex`
   mesh parts only. `Concave` mesh parts are not allowed inside
   `LSCompoundCollider`; concave mesh decomposition belongs to `LSMeshCollider`
   internals from Phase 7B.
-- [ ] Define compound collision rules before exposing an API:
+- [x] Define compound collision rules before exposing an API:
   aggregate mass/inertia policy, part-level broad-phase behavior, pair identity,
   contact manifold reduction, trigger/contact event surface, parent/child
   filtering behavior, CCD proxy behavior, and debug draw representation.
-- [ ] Define deterministic contact reduction for overlapping compound parts.
+- [x] Define deterministic contact reduction for overlapping compound parts.
   Internal part overlap is acceptable, but a single opposing collider should not
   receive arbitrary duplicate contacts. Prefer stable part ordering plus a
   physically meaningful best-contact/manifold reduction over "first contact
   found" behavior.
-- [ ] Add tests for part ordering, aggregate bounds, overlapping internal parts,
+- [x] Add tests for part ordering, aggregate bounds, overlapping internal parts,
   rejection of concave mesh parts, single external event emission, parent/child
   hierarchy separation, debug draw output, and deterministic contact selection.
-- [ ] Add benchmarks for compound-vs-primitive pair checks and broad-phase
+- [x] Add benchmarks for compound-vs-primitive pair checks and broad-phase
   repartitioning when a compound's aggregate bounds span many voxels.
-- [ ] Document the difference between compound colliders and parent/child
+- [x] Document the difference between compound colliders and parent/child
   collider hierarchy in `docs/wiki/COLLISION_PIPELINE.md`.
+
+**Implementation Notes:**
+
+- Added `LSCompoundCollider` and `CompoundColliderPart`. The owning compound is
+  the only registered collider identity; parts are context-bound geometry only.
+- Part order is constructor order, and part IDs are stable zero-based indices.
+- Supported alpha parts are primitives and `LSMeshCollider` with
+  `MeshColliderMode.Convex`. Nested compounds and concave mesh parts are
+  rejected.
+- Narrow phase dispatches compound pairs through existing part-vs-shape checks
+  with context-owned scratch manifold state. The owning pair manifold performs
+  stable deepest-contact reduction and duplicate suppression through contact
+  identity ordering.
+- Aggregate bounds drive broad-phase partitioning. Compound CCD uses the
+  aggregate bounds' smallest half extent as the swept-sphere proxy, matching the
+  conservative cuboid proxy style.
+- Debug draw emits part geometry with the owning compound collider ID and
+  `ColliderType.Compound`, leaving host renderers engine-agnostic.
+- Aggregate inertia is an alpha approximation: part tensors are area-weighted
+  and offset through a diagonal parallel-axis term. Revisit this when mass,
+  center-of-mass, and closed-volume policy are hardened.
 
 **Design Notes:**
 
