@@ -19,6 +19,7 @@
 - `docs/wiki/QUERY_SERVICES.md`
 - `docs/wiki/HOST_INTEGRATION.md`
 - `docs/wiki/DIAGNOSTICS.md`
+- `docs/wiki/DIMENSIONS.md`
 - `src/Gravitas/Runtime/GravitasWorldContext.cs`
 - `src/Gravitas/Core/GravitasPhysicsService.cs`
 - `src/Gravitas/Core/StiffBody.cs`
@@ -1047,22 +1048,22 @@ runtime costs.
 
 **Tasks:**
 
-- [ ] **Phase 9A - Dimension contract:** Write `docs/wiki/DIMENSIONS.md`
+- [x] **Phase 9A - Dimension contract:** Write `docs/wiki/DIMENSIONS.md`
   defining 2D axes, units, coordinate embedding, rotation model, gravity model,
   body state, collider shape set, query behavior, serialization expectations,
   and the explicit boundary that mixed 2D/3D is Phase 10.
-- [ ] **Phase 9A - Architecture decision:** Decide and document the shared
+- [x] **Phase 9A - Architecture decision:** Decide and document the shared
   engine model: common identity/lifecycle where useful, but dimension-specific
   body motion/state, shape data, broad-phase bounds, narrow-phase detection, and
   solver paths. Avoid separate engines that recreate the Unity Box2D/PhysX
   split, and avoid mode flags that bloat current 3D hot paths.
-- [ ] **Phase 9B - Body and collider responsibility split:** Audit
+- [x] **Phase 9B - Body and collider responsibility split:** Audit
   `StiffBody` and `LSCollider` for baked 3D/y-up/XZ-ground assumptions. Create
   seams for physical body state versus visual presentation state and for
   collider identity versus dimension-specific shape logic. If `LSCollider`
   remains the public base, primitive geometry should move toward focused shape
   support types rather than more abstract-class bloat.
-- [ ] **Phase 9B - Bounds and broad phase:** Define how pure 2D bounds map to
+- [x] **Phase 9B - Bounds and broad phase:** Define how pure 2D bounds map to
   broad-phase storage. Prefer `BoundingArea`/`FixedBoundVolume` and
   SwiftCollections fixed query structures where they fit; document any custom
   path if 2D needs a leaner dedicated bound representation.
@@ -1087,6 +1088,25 @@ runtime costs.
 - [ ] Update `docs/wiki/OVERVIEW.md`, `RUNTIME_ARCHITECTURE.md`,
   `COLLISION_PIPELINE.md`, and `QUERY_SERVICES.md` to describe the pure 2D
   model and explicitly defer mixed 2D/3D interaction to Phase 10.
+
+**Phase 9A-9B Status - 2026-05-28**
+
+- Added `PhysicsDimension` as the shared body/collider dimensionality contract.
+  Current production colliders remain explicitly `ThreeD`; future 2D collider
+  families should override the dimension instead of reusing 3D primitive shape
+  caches with ignored axes.
+- Added `StiffBody.Dimension` with supported-value validation, post-initialize
+  immutability, Chronicler state recording, and body/collider dimension
+  mismatch rejection before body initialization mutates runtime state.
+- Added `Physics2DBounds` as the alpha broad-phase bridge for pure 2D X/Y bounds
+  into current fixed `FixedBoundVolume` storage slabs. The storage slab is not a
+  mixed-dimension physical thickness contract.
+- Added focused tests for dimension defaults, unsupported dimension values,
+  body/collider mismatch rejection, and deterministic 2D bounds projection.
+- Added `docs/wiki/DIMENSIONS.md` and updated overview, runtime architecture,
+  collision pipeline, and query service docs with the Phase 9A/9B boundary.
+  Phase 9C/9D still own real 2D shapes, 2D narrow phase, 2D response, 2D
+  queries, replay, and benchmarks.
 
 ## Phase 10: Mixed 2D/3D Interaction Model
 

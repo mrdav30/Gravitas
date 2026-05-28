@@ -132,6 +132,7 @@ contexts. These checks are core invariants.
 
 `StiffBody` owns:
 
+- simulation dimension through `PhysicsDimension`.
 - position as `Vector2d` ground position plus height, exposed as `Position3d`.
 - rotation and derived basis vectors.
 - visual position/rotation interpolation buffers.
@@ -164,6 +165,14 @@ but movement of the last hit platform invalidates that guard. Ground probes
 accept bodyless colliders, immovable bodies, and kinematic bodies as ground;
 ordinary movable dynamic bodies are ignored.
 
+Body dimension is authoritative setup state. `StiffBody.Dimension` defaults to
+`PhysicsDimension.ThreeD`, rejects unsupported values, and cannot change after
+initialization. Initialization also requires the bound collider to declare the
+same dimension. This prevents temporary 3D colliders from becoming the hidden
+implementation path for pure 2D bodies. The existing position-as-ground-plus-
+height fields still belong to the current 3D y-up body model; pure 2D motion
+state is Phase 9 follow-up work.
+
 Sleeping is body-owned and deterministic. A dynamic non-kinematic body can sleep
 after linear and angular speed remain below configured thresholds for the body
 sleep window. Sleep clears accumulated runtime motion state but leaves the
@@ -190,6 +199,7 @@ target.
 - optional `StiffBody` binding or host-only `IMatterAgent`.
 - active/trigger state.
 - layer index.
+- simulation dimension through `PhysicsDimension`.
 - shape type and shape priority.
 - local offset, scale-derived size, radius, area, bounds, and runtime-shape
   versioning.
@@ -215,6 +225,10 @@ Dynamic colliders are updated by their bodies during the simulation phases.
 Bodyless/static colliders are not owned by the dynamic body bucket, so a host
 that moves one after initialization must call `collider.Simulate()` to refresh
 bounds and partition membership.
+
+Current primitive colliders declare `PhysicsDimension.ThreeD`. Future pure 2D
+colliders should override `LSCollider.Dimension` and own 2D shape caches
+directly rather than reusing 3D sphere/cuboid/capsule state with ignored axes.
 
 ## Settings And Environment
 

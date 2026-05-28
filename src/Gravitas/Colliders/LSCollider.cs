@@ -176,6 +176,15 @@ public abstract class LSCollider : IRecordable
     public abstract ColliderType Shape { get; }
     public abstract int Priority { get; }
 
+    /// <summary>
+    /// Gets the simulation dimensionality owned by this collider's shape data.
+    /// </summary>
+    public virtual PhysicsDimension Dimension
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => PhysicsDimension.ThreeD;
+    }
+
     protected Fixed64 _radius = Fixed64.Half;
 
     /// <summary>

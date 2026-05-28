@@ -5,6 +5,11 @@ services. They use the same GridForge-backed partitions as collision detection,
 resolve collider IDs through the owning `GravitasPhysicsService`, and suppress
 duplicate hits when a collider appears in multiple voxels.
 
+The current services are 3D or 3D-ground-plane services. Phase 9 pure 2D query
+work should introduce explicit 2D segment/overlap workers over `Vector2d`
+shape data instead of routing through the existing 3D raycast path or the X/Z
+circle query service by accident.
+
 ## Raycasts
 
 `GravitasRaycastService` exposes:
@@ -126,8 +131,9 @@ query origin to the hit point and by maximum hit-point distance. It is not a
 swept circle or swept sphere query.
 
 Duplicate suppression is also covered for large colliders that appear in many
-voxel partitions. Circle queries remain X/Z overlap/proximity queries; use
-swept-sphere queries for deterministic swept movement.
+voxel partitions. Circle queries remain X/Z overlap/proximity queries for the
+current 3D grounding model; they are not the pure 2D query API. Use
+swept-sphere queries for deterministic 3D swept movement.
 
 ## Layer Mask Semantics
 

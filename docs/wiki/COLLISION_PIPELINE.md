@@ -4,6 +4,21 @@ Gravitas collision work is split into GridForge-backed broad phase,
 context-local pair management, shape-pair narrow phase, deterministic contact
 manifolds, manifold response, and late contact notification.
 
+## Dimension Boundary
+
+Current collision handling is still the 3D runtime path. Bodies and colliders
+now declare a `PhysicsDimension`, and body initialization rejects dimension
+mismatches before registration. This is an intentional guardrail for Phase 9:
+future pure 2D circle, AABB, and convex-polygon colliders should route into 2D
+broad-phase, narrow-phase, manifold, and solver paths rather than being treated
+as 3D colliders with one ignored axis.
+
+`Physics2DBounds` provides the first broad-phase bridge for pure 2D bounds. It
+keeps authoritative X/Y extents in `BoundingArea` and projects them into a
+deterministic `FixedBoundVolume` slab for the current fixed query structures.
+That slab is storage metadata only. It is not the finite physical thickness
+needed for mixed 2D/3D collision; mixed exchange rules remain Phase 10 work.
+
 ## Broad Phase: Voxel Partitions
 
 When a collider initializes, moves, rotates, changes scale, or changes local

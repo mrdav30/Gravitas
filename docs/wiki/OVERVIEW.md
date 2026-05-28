@@ -21,6 +21,8 @@ systems connect and where the current prototype needs hardening.
 - Read [Collision Pipeline](COLLISION_PIPELINE.md) when changing broad-phase
   partitioning, collision pairs, narrow-phase detection, contact data, or
   response behavior.
+- Read [Dimensions](DIMENSIONS.md) when changing 2D, 3D, or future mixed 2D/3D
+  body, collider, bounds, collision, response, or query behavior.
 - Read [Query Services](QUERY_SERVICES.md) when changing raycasts, circle
   overlap queries, hit ordering, layer filtering, or query allocation behavior.
 - Read [Diagnostics](DIAGNOSTICS.md) when changing diagnostic events, debug draw
@@ -80,6 +82,8 @@ flowchart TD
 | `IMatterAgent` | Host boundary. Supplies context, fixed transform, hierarchy state, and interaction state. |
 | `StiffBody` | Simulated body state: position, rotation, velocity, acceleration, mass, grounding, impulses, sleep/wake state, interpolation, and Chronicler record data. |
 | `LSCollider` | Base collider state: shape, bounds, layer, trigger/contact events, partition coordinates, pair references, and context binding. |
+| `PhysicsDimension` | Declares whether a body or collider belongs to the first-class 2D or 3D simulation domain. |
+| `Physics2DBounds` | Projects pure 2D X/Y bounds into a deterministic fixed broad-phase storage slab. |
 | `GravitasPhysicsService` | Body/collider registration, context-local collider IDs, collision-pair pooling, simulation phases, and visualization phases. |
 | `GravitasCollisionService` | GridForge-backed broad-phase partitioning, active partition tracking, partition pooling, and collision distribution versioning. |
 | `PhysicsPartition` | Voxel partition payload containing collider IDs, awake dynamic membership, and candidate pair distribution. |
@@ -129,10 +133,11 @@ active-pair queue during `LateSimulate`.
 
 ## Current Prototype Edges
 
-- The library is currently 3D-focused. First-class 2D and mixed 2D/3D
-  interactions are design goals, not current guarantees.
-- `StiffBody` has a split 2D ground position plus height, but that is not a
-  complete 2D physics model.
+- The library is currently 3D-focused. Phase 9 has started the explicit
+  dimension contract, but pure 2D shapes, 2D narrow phase, 2D response, and
+  mixed 2D/3D interactions are not current guarantees.
+- `StiffBody` has a split 2D ground position plus height for the existing 3D
+  y-up model, but that is not the pure 2D body model.
 - Cylinder collision and query behavior is implemented for the current finite
   cylinder model, but needs continued edge-case hardening.
 - Mesh raycast overlap and concave mesh narrow phase are implemented through
@@ -159,6 +164,7 @@ active-pair queue during `LateSimulate`.
 | Collision broad phase | [`GravitasCollisionService.cs`](../../src/Gravitas/Core/GravitasCollisionService.cs), [`PhysicsPartition.cs`](../../src/Gravitas/Partitions/PhysicsPartition.cs) |
 | Colliders | [`LSCollider.cs`](../../src/Gravitas/Colliders/LSCollider.cs), [`Primitives`](../../src/Gravitas/Colliders/Primitives) |
 | Collision handling | [`CollisionPair.cs`](../../src/Gravitas/CollisionHandling/Pairs/CollisionPair.cs), [`CollisionDetection.cs`](../../src/Gravitas/CollisionHandling/Detection/CollisionDetection.cs), [`CollisionResponse.cs`](../../src/Gravitas/CollisionHandling/Response/CollisionResponse.cs) |
+| Dimensions | [`Dimensions`](../../src/Gravitas/Dimensions), [`DIMENSIONS.md`](DIMENSIONS.md) |
 | Queries | [`GravitasRaycastService.cs`](../../src/Gravitas/Raycasting/GravitasRaycastService.cs), [`GravitasCircleQueryService.cs`](../../src/Gravitas/Raycasting/GravitasCircleQueryService.cs), [`RaycastSegmentWorker.cs`](../../src/Gravitas/Raycasting/RaycastSegmentWorker.cs) |
 | Diagnostics | [`Diagnostics`](../../src/Gravitas/Diagnostics) |
 | Tests and examples | [`tests/Gravitas.Tests`](../../tests/Gravitas.Tests), [`tests/Gravitas.Benchmarks`](../../tests/Gravitas.Benchmarks) |
