@@ -1007,13 +1007,38 @@ not absorb unresolved concave mesh responsibilities.
 
 ## Phase 9: First-Class 2D Physics Foundation
 
-**Purpose:** Stop treating 2D as accidental 3D flattening and define the first explicit 2D runtime model.
+**Purpose:** Stop treating 2D as accidental 3D flattening and build a working
+pure-2D simulation slice with first-class 2D body, shape, collision, response,
+query, and replay contracts. Mixed 2D/3D interaction is intentionally Phase 10
+work.
+
+**Completion Target:** By the end of Phase 9, Gravitas should support a pure 2D
+simulation path for circle, axis-aligned box, and convex polygon colliders with
+deterministic integration, broad-phase bounds, narrow-phase contacts, response,
+queries, replay tests, and benchmark coverage. The implementation must not
+layer 2D as accidental X/Z-only 3D behavior or make 2D pay unnecessary 3D
+runtime costs.
+
+**Reference Context:**
+
+- Old deterministic prototype reference:
+  `F:\gamedevrepos\LockstepFramework-develop\Core\Simulation\Physics\Core`,
+  especially `LSBodyOverlapCheck.cs`, `LSBody.cs`, and `CollisionPair.cs`.
+  Use this for shape vocabulary and test inspiration, not as code to port.
+- Current downstream primitives to review before custom math:
+  `FixedMathSharp.Geometry.BoundingArea`, `FixedMathSharp.FixedRay`,
+  `SwiftCollections.FixedMathSharp.Query.FixedBoundVolume`, and
+  `SwiftFixedSpatialHash<T>`.
 
 **Files:**
 
 - Potentially create: `src/Gravitas/Dimensions`
+- Potentially create: `docs/wiki/DIMENSIONS.md`
 - Potentially modify: `src/Gravitas/Core/StiffBody.cs`
-- Potentially modify: `src/Gravitas/Colliders`
+- Potentially modify: `src/Gravitas/Colliders/LSCollider.cs`
+- Potentially create: `src/Gravitas/Colliders/Primitives2D`
+- Potentially create or modify: `src/Gravitas/CollisionHandling/Detection`
+- Potentially create or modify: `src/Gravitas/Raycasting`
 - Modify: `tests/Gravitas.Tests`
 - Modify: `tests/Gravitas.Benchmarks`
 - Modify: `docs/wiki/OVERVIEW.md`
@@ -1022,15 +1047,51 @@ not absorb unresolved concave mesh responsibilities.
 
 **Tasks:**
 
-- [ ] Write a design note that defines 2D axes, units, body state, collider shape set, rotation model, gravity model, and solver differences.
-- [ ] Decide whether 2D uses separate body/collider types, dimension-specific strategies, or shared types with explicit dimension modes.
-- [ ] Add tests for pure 2D deterministic integration, collision detection, response, queries, and replay before exposing public APIs.
-- [ ] Avoid leaking X/Z-ground-plane assumptions into 2D naming.
-- [ ] Benchmark 2D paths separately from 3D paths so 2D does not inherit unnecessary 3D costs.
+- [ ] **Phase 9A - Dimension contract:** Write `docs/wiki/DIMENSIONS.md`
+  defining 2D axes, units, coordinate embedding, rotation model, gravity model,
+  body state, collider shape set, query behavior, serialization expectations,
+  and the explicit boundary that mixed 2D/3D is Phase 10.
+- [ ] **Phase 9A - Architecture decision:** Decide and document the shared
+  engine model: common identity/lifecycle where useful, but dimension-specific
+  body motion/state, shape data, broad-phase bounds, narrow-phase detection, and
+  solver paths. Avoid separate engines that recreate the Unity Box2D/PhysX
+  split, and avoid mode flags that bloat current 3D hot paths.
+- [ ] **Phase 9B - Body and collider responsibility split:** Audit
+  `StiffBody` and `LSCollider` for baked 3D/y-up/XZ-ground assumptions. Create
+  seams for physical body state versus visual presentation state and for
+  collider identity versus dimension-specific shape logic. If `LSCollider`
+  remains the public base, primitive geometry should move toward focused shape
+  support types rather than more abstract-class bloat.
+- [ ] **Phase 9B - Bounds and broad phase:** Define how pure 2D bounds map to
+  broad-phase storage. Prefer `BoundingArea`/`FixedBoundVolume` and
+  SwiftCollections fixed query structures where they fit; document any custom
+  path if 2D needs a leaner dedicated bound representation.
+- [ ] **Phase 9C - 2D shape foundation:** Add first-class shape support for
+  circle, axis-aligned box, and convex polygon. Treat polygon concavity as an
+  explicit unsupported/validation case for the first slice rather than silently
+  accepting ambiguous shape truth.
+- [ ] **Phase 9C - 2D narrow phase and queries:** Add deterministic
+  circle/circle, circle/AABB, AABB/AABB, circle/convex-polygon,
+  AABB/convex-polygon, and convex-polygon/convex-polygon detection. Add
+  2D-specific ray/segment or overlap query behavior without routing through
+  unnecessary 3D workers.
+- [ ] **Phase 9D - Pure 2D integration and response:** Add tests and
+  implementation for pure 2D deterministic integration, contact manifolds,
+  response, trigger/contact events, sleep/wake behavior, and replay. Do not
+  claim mixed 2D/3D collision support in this phase.
+- [ ] **Phase 9D - Verification and benchmarks:** Add focused 2D unit tests,
+  deterministic replay tests, and 2D benchmark selections for integration,
+  broad-phase membership, narrow-phase shape pairs, response, and queries.
+  Benchmark 2D separately from 3D so regressions and unnecessary 3D costs are
+  visible.
+- [ ] Update `docs/wiki/OVERVIEW.md`, `RUNTIME_ARCHITECTURE.md`,
+  `COLLISION_PIPELINE.md`, and `QUERY_SERVICES.md` to describe the pure 2D
+  model and explicitly defer mixed 2D/3D interaction to Phase 10.
 
 ## Phase 10: Mixed 2D/3D Interaction Model
 
-**Purpose:** Define how 2D and 3D bodies coexist before any mixed collision API ships.
+**Purpose:** Define how 2D and 3D bodies coexist, collide, exchange impulses,
+and integrate together after Phase 9 provides a working pure-2D slice.
 
 **Files:**
 
@@ -1043,8 +1104,15 @@ not absorb unresolved concave mesh responsibilities.
 
 **Tasks:**
 
-- [ ] Define the mixed-dimension embedding rule: plane, thickness, projection volume, contact manifold shape, and impulse exchange.
-- [ ] Add design tests for 3D sphere/cuboid/capsule/cylinder bodies interacting with 2D circles/boxes/polygons under the chosen rule.
+- [ ] Define the mixed-dimension embedding rule: plane, thickness, projection
+  volume, contact manifold shape, and impulse exchange. The rule must make 2D
+  bodies physically interact with 3D bodies without routing through separate
+  engines.
+- [ ] Add design tests for 3D sphere/cuboid/capsule/cylinder bodies interacting
+  with 2D circles/AABBs/convex polygons under the chosen rule.
+- [ ] Add integration and response tests for mixed contacts, including
+  immovable/kinematic bodies, triggers, sleeping bodies, and stable contact
+  ordering.
 - [ ] Decide whether mixed 2D/3D is an alpha feature, experimental feature flag, or documented post-alpha target.
 - [ ] Document unsupported combinations explicitly rather than letting them fall through to accidental 3D behavior.
 
