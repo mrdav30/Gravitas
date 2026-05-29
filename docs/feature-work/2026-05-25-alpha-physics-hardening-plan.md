@@ -1017,8 +1017,10 @@ work.
 simulation path for circle, axis-aligned box, and convex polygon colliders with
 deterministic integration, broad-phase bounds, narrow-phase contacts, response,
 queries, replay tests, and benchmark coverage. The implementation must not
-layer 2D as accidental X/Z-only 3D behavior or make 2D pay unnecessary 3D
-runtime costs.
+layer 2D as reused 3D primitive code with one axis ignored or make 2D pay
+unnecessary 3D runtime costs. After the Phase 9C/9D review, Phase 9 remains
+open until the 2D runtime contract cleanup and GridForge-backed broad-phase
+hardening below are complete.
 
 **Reference Context:**
 
@@ -1088,6 +1090,14 @@ runtime costs.
 - [x] Update `docs/wiki/OVERVIEW.md`, `RUNTIME_ARCHITECTURE.md`,
   `COLLISION_PIPELINE.md`, and `QUERY_SERVICES.md` to describe the pure 2D
   model and explicitly defer mixed 2D/3D interaction to Phase 10.
+- [ ] **Phase 9E - 2D runtime contract cleanup:** Align pure 2D host binding,
+  runtime toggles, type-system boundaries, transform projection, folder layout,
+  and parity tests before broad-phase scale work.
+- [ ] **Phase 9F - GridForge-backed 2D broad phase:** Replace the alpha
+  sweep-and-prune runtime path with a partitioned 2D broad phase that shares
+  GridForge world/voxel identity, keeps queries caller-buffered, and proves
+  scale behavior with tests and benchmarks. Keep mixed 2D/3D collision itself
+  deferred to Phase 10.
 
 **Phase 9A-9B Status - 2026-05-28**
 
@@ -1098,9 +1108,11 @@ runtime costs.
 - Added `StiffBody.Dimension` with supported-value validation, post-initialize
   immutability, Chronicler state recording, and body/collider dimension
   mismatch rejection before body initialization mutates runtime state.
-- Added `Physics2DBounds` as the alpha broad-phase bridge for pure 2D X/Y bounds
-  into current fixed `FixedBoundVolume` storage slabs. The storage slab is not a
-  mixed-dimension physical thickness contract.
+- Added `Physics2DBounds` as the alpha broad-phase bridge for pure 2D X/Z
+  bounds into fixed `FixedBoundVolume` storage. Later Phase 9E/9F refinement
+  should remove that abstraction unless a tiny private transient helper proves
+  useful; it must not become a public 2D physical-thickness or storage-slab
+  contract.
 - Added focused tests for dimension defaults, unsupported dimension values,
   body/collider mismatch rejection, and deterministic 2D bounds projection.
 - Added `docs/wiki/DIMENSIONS.md` and updated overview, runtime architecture,
@@ -1152,6 +1164,220 @@ runtime costs.
   `RUNTIME_ARCHITECTURE.md`, `COLLISION_PIPELINE.md`, and
   `QUERY_SERVICES.md` with the pure 2D alpha model and Phase 10 mixed-dimension
   boundary.
+
+## Phase 9E: 2D Runtime Contract Cleanup
+
+**Purpose:** Make the pure 2D runtime feel like the same engine-facing API as
+the 3D runtime, while removing dimension scaffolding that no longer earns its
+keep. This phase should keep mixed 2D/3D disabled and focus on host contracts,
+source layout, lifecycle parity, and tests.
+
+**Files:**
+
+- Modify: `src/Gravitas/Runtime/GravitasWorldContext.cs`
+- Modify: `src/Gravitas/Settings/PhysicsSettings.cs`
+- Potentially create: `src/Gravitas/Settings/PhysicsRuntimeMode.cs`
+- Modify: `src/Gravitas/Core/StiffBody2D.cs` after moving it from the current
+  `src/Gravitas/Physics2D` folder.
+- Modify: `src/Gravitas/Colliders/Primitives2D/LSCollider2D.cs`
+- Delete: `src/Gravitas/Dimensions/PhysicsDimension.cs`
+- Delete: `src/Gravitas/Dimensions/PhysicsDimensionRules.cs`
+- Delete: `src/Gravitas/Dimensions/Physics2DBounds.cs` unless Phase 9F proves
+  a tiny private transient helper is needed. Do not keep it as a public or
+  long-lived configuration abstraction.
+- Move: `src/Gravitas/Physics2D/GravitasPhysics2DService.cs` to
+  `src/Gravitas/Core/GravitasPhysics2DService.cs`
+- Move: `src/Gravitas/Physics2D/CollisionDetection2D.cs` to
+  `src/Gravitas/CollisionHandling/Detection/CollisionDetection2D.cs`
+- Move: `src/Gravitas/Physics2D/CollisionPair2D.cs` to
+  `src/Gravitas/CollisionHandling/Pairs/CollisionPair2D.cs`
+- Move: `src/Gravitas/Physics2D/Contact2D.cs` to
+  `src/Gravitas/CollisionHandling/Contacts/Contact2D.cs`
+- Move: `src/Gravitas/Physics2D/CollisionResponse2D.cs` to
+  `src/Gravitas/CollisionHandling/Response/CollisionResponse2D.cs`
+- Move: `src/Gravitas/Physics2D/Physics2DHit.cs` and
+  `src/Gravitas/Physics2D/Physics2DHitSorter.cs` to the query/raycasting
+  domain.
+- Modify: `tests/Gravitas.Tests/Physics2D`
+- Modify: `tests/Gravitas.Tests/Core`
+- Modify: `tests/Gravitas.Benchmarks/Physics2D`
+- Modify: `docs/wiki/DIMENSIONS.md`
+- Modify: `docs/wiki/RUNTIME_ARCHITECTURE.md`
+- Modify: `docs/wiki/HOST_INTEGRATION.md`
+- Modify: `docs/wiki/COLLISION_PIPELINE.md`
+- Modify: `docs/wiki/QUERY_SERVICES.md`
+
+**Tasks:**
+
+- [ ] Add a context-level runtime mode with explicit `TwoD` and `ThreeD`
+  options only. Do not add `Mixed` until Phase 10 defines the embedding and
+  impulse-exchange policy.
+- [ ] Update `GravitasWorldContext.Simulate()`, `LateSimulate()`,
+  `Visualize()`, and `LateVisualize()` so the disabled dimensional runtime path
+  is skipped entirely. Pure 2D should not pay 3D service cost, and pure 3D
+  should not pay 2D service cost.
+- [ ] Add runtime-mode tests proving `TwoD` skips 3D simulation/visualization
+  work, `ThreeD` skips 2D simulation work, and the active mode still advances
+  the shared deterministic clock and hooks correctly.
+- [ ] Change `StiffBody2D` construction to use `IMatterAgent` as the required
+  host bridge, matching the 3D body contract. The body should derive its
+  `GravitasWorldContext` from `agent.Context`, keep the agent reference, and
+  use the agent's `FixedTransform` for host-facing kinematic and visual
+  synchronization.
+- [ ] Add `LSCollider2D.InitializeWithNoBody(IMatterAgent)` parity for bodyless
+  static/trigger 2D colliders. Bodyless 2D colliders must still bind to the
+  host agent, context, layer, trigger/contact surface, and broad-phase service.
+- [ ] Define and document pure 2D transform projection explicitly. Gravitas'
+  stack convention is X/Z planar physics: `Vector2d.x` maps from
+  `Vector3d.x`, `Vector2d.y` maps from `Vector3d.z`, and `Vector3d.y` remains
+  vertical height or future embedding metadata. `Vector3d.ToVector2d()` is
+  correct for this convention and should be preferred when converting 3D world
+  positions to pure 2D planar positions.
+- [ ] Add 2D kinematic tests proving host transform movement updates the 2D
+  body deterministically, refreshes collider bounds/query visibility, and does
+  not mutate disabled runtime paths.
+- [ ] Add bodyless static 2D collider tests for collision, trigger events,
+  layer filtering, query visibility, deactivation cleanup, and reset cleanup.
+- [ ] Add same-agent or explicit hierarchy exclusion tests for 2D colliders.
+  The final rule should match the engine-agnostic 3D host-bound hierarchy
+  contract without walking host transform trees at simulation time.
+- [ ] Remove `PhysicsDimension` and `PhysicsDimensionRules`. The runtime should
+  use concrete body/collider types to distinguish 2D and 3D. Update tests and
+  docs so mixed behavior is described as a future policy between concrete types,
+  not as a third dimension enum value.
+- [ ] Reorganize the current `src/Gravitas/Physics2D` files into the same
+  subdomain layout as their 3D counterparts. Avoid namespace churn unless it
+  reduces real API ambiguity.
+- [ ] Remove `Physics2DBounds` unless the Phase 9F implementation proves a
+  tiny private transient helper is needed. Prefer direct collider-bounds to
+  GridForge planar coverage flow over another configuration-shaped abstraction.
+- [ ] Update `docs/wiki` pages and benchmark docs to reflect the final 2D host
+  contract, runtime mode behavior, transform projection, and source layout.
+- [ ] Run focused 2D/core tests, full `Release` build/test, full `ReleaseLean`
+  build/test, and a short `physics-2d` benchmark smoke before closing this
+  phase.
+
+**Acceptance Bar:**
+
+- The public 2D body/collider creation flow should feel like the 3D flow:
+  host code supplies an `IMatterAgent`, not a raw context.
+- `PhysicsDimension` must be gone from production, tests, and docs unless a
+  concrete mixed-dimension design reintroduces a better concept later.
+- Runtime mode tests must prove disabled dimensional paths do not run.
+- 2D kinematic, bodyless, trigger, layer, hierarchy, query, and replay behavior
+  must remain deterministic after the source-layout cleanup.
+
+## Phase 9F: GridForge-Backed 2D Broad Phase And Scale Gate
+
+**Purpose:** Replace the current pure 2D sweep-and-prune runtime path with a
+partitioned broad phase that can scale beyond small correctness scenes and can
+later participate in mixed 2D/3D interaction through shared GridForge
+world/voxel identity.
+
+**Design Direction:**
+
+- Start by defining the Gravitas-side 2D broad-phase contract cleanly: X/Z
+  planar coverage, stable collider IDs, stable voxel/partition identity,
+  deterministic
+  active partition ordering, awake-dynamic gating, retained empty partition
+  cleanup, duplicate suppression, and caller-buffered query candidate gathering.
+- Use GridForge as the single voxel world model. Do not add a separate 2D grid
+  type, 2D GridForge engine, or Gravitas-only grid stand-in. Gravitas should
+  use the host-provided `GridWorld` configured for the simulation shape, then
+  ask GridForge for deterministic X/Z planar voxel coverage.
+- Avoid introducing `Physics2DBounds` as another configuration-shaped
+  abstraction. Collider bounds should flow directly into GridForge planar
+  coverage helpers or, if absolutely necessary, a private transient calculation.
+- If the Gravitas implementation starts reimplementing GridForge traversal by
+  hand or paying unnecessary 3D grid costs, local-link `../GridForge` and add
+  the smallest reusable primitive there.
+- GridForge helper work should improve the existing world model for planar and
+  volume use. It should not fork GridForge into separate 2D and 3D concepts.
+
+**Files:**
+
+- Modify: `src/Gravitas/Core/GravitasPhysics2DService.cs`
+- Potentially create: `src/Gravitas/Core/GravitasCollision2DService.cs`
+- Potentially create: `src/Gravitas/Partitions/PhysicsPartition2D.cs`
+- Potentially create: `src/Gravitas/Colliders/Support/Collider2DPartitionState.cs`
+- Delete or avoid: `src/Gravitas/Dimensions/Physics2DBounds.cs` unless a tiny
+  private transient helper survives profiling and code review.
+- Modify: `src/Gravitas/Settings/PhysicsSettings.cs` if 2D partition retention,
+  sweep budget, or cell sizing needs settings.
+- Modify: `tests/Gravitas.Tests/Physics2D`
+- Modify: `tests/Gravitas.Tests/Partitions`
+- Modify: `tests/Gravitas.Benchmarks/Physics2D`
+- Modify: `docs/wiki/COLLISION_PIPELINE.md`
+- Modify: `docs/wiki/QUERY_SERVICES.md`
+- Modify: `docs/wiki/RUNTIME_ARCHITECTURE.md`
+- Potentially local-link and modify: `../GridForge/src/GridForge`
+- Do not commit temporary local project references unless the user explicitly
+  asks to keep them.
+
+**Tasks:**
+
+- [ ] Add benchmark baselines for the current sweep-and-prune path using
+  representative 2D scene shapes: sparse thousands, dense clusters, moving
+  churn, sleeping-heavy scenes, query-heavy scenes, and broad colliders that
+  span many cells.
+- [ ] Add correctness tests that pin current pure 2D pair ordering, query
+  ordering, layer filtering, deactivation cleanup, sleeping/static behavior,
+  and replay before changing the broad phase.
+- [ ] Design `PhysicsPartition2D` around collider IDs, not collider references.
+  It should mirror the useful 3D partition lessons: dynamic/static membership,
+  awake-dynamic membership, deterministic sorted distribution, retained empty
+  partition cleanup, and reset safety before IDs can be reused.
+- [ ] Implement 2D collider partition state so movement, rotation, local shape
+  edits, activation, deactivation, and reset update partition membership without
+  scanning every collider every frame.
+- [ ] Replace pair generation in `GravitasPhysics2DService.Simulate()` with
+  partition-driven candidate distribution. The sweep-and-prune path may remain
+  only as a benchmark baseline during the phase; remove it from runtime once the
+  partition path is proven correct and faster or complexity-safer.
+- [ ] Keep 2D query APIs caller-buffered. `OverlapCircleAll` should gather
+  candidates from relevant 2D partitions, suppress duplicates for colliders
+  spanning multiple voxels/cells, filter by layer mask, run exact shape checks,
+  and sort by deterministic hit ordering.
+- [ ] Add tests for large 2D colliders spanning many cells, duplicate
+  suppression, retained empty 2D partitions, partition time-to-kill, reset
+  cleanup, sleeping partition skips, and wake propagation.
+- [ ] Benchmark the partition path against the sweep-and-prune baseline for
+  sparse, dense, moving, sleeping-heavy, and query-heavy scenes. Keep timings as
+  evidence, not truth, unless the scenario represents a real alpha workload.
+- [ ] If current GridForge helpers make 2D broad-phase implementation awkward,
+  local-link `../GridForge` and evaluate adding one or more narrowly scoped
+  helpers:
+  - deterministic X/Z planar bounds scan over `GridWorld`/`VoxelGrid`;
+  - plane-aware or axis-projection voxel coverage helpers over the existing
+    GridForge grid model;
+  - covered voxel/partition enumeration that avoids Gravitas duplicating
+    GridForge traversal;
+  - clearer planar-use docs or names where GridForge already supports the use
+    case but the API wording implies volume-only behavior.
+- [ ] If GridForge changes are needed, validate GridForge directly with its
+  focused tests plus `Release`/`ReleaseLean` build/test gates before validating
+  Gravitas against the local link.
+- [ ] After package-local validation, remove any temporary project references
+  from Gravitas unless the user asks to keep them for the hardening window.
+- [ ] Update `docs/wiki` to describe the final 2D broad-phase path, including
+  which pieces are storage projection versus physical 2D semantics.
+
+**Acceptance Bar:**
+
+- Pure 2D collision distribution must no longer scan every active collider
+  against every other active collider for normal runtime simulation.
+- Tests must prove deterministic pair ordering, query ordering, duplicate
+  suppression, retained partition cleanup, and replay under high collider
+  counts and movement churn.
+- Benchmarks must compare the previous sweep-and-prune baseline to the
+  GridForge-backed path. If sweep-and-prune remains faster for small scenes,
+  document the crossover and keep the runtime choice explicit.
+- No fake 3D thickness, storage slab, or `Physics2DBounds` abstraction may leak
+  into public pure 2D APIs. Pure 2D semantics are X/Z planar until Phase 10
+  defines physical mixed 2D/3D interaction.
+- If GridForge changes are required, they must be minimal, reusable outside
+  Gravitas, deterministic, and validated in GridForge before Gravitas relies on
+  them.
 
 ## Phase 10: Mixed 2D/3D Interaction Model
 
