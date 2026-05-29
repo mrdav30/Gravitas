@@ -20,7 +20,7 @@ Gravitas is an engine-agnostic fixed-point physics prototype for simulation-heav
 
 ## Prototype Status
 
-Gravitas is preparing for alpha. The current library is intentionally experimental, 3D-focused, and not API-stable. Heavy redesigns are expected where they improve deterministic behavior, physics correctness, runtime complexity, or engine-agnostic integration.
+Gravitas is preparing for alpha. The current library is intentionally experimental and not API-stable. The 3D path is still the deepest slice, while pure 2D now has a first-class runtime foundation. Heavy redesigns are expected where they improve deterministic behavior, physics correctness, runtime complexity, or engine-agnostic integration.
 
 The unit test project now has focused runtime, settings, query, partition, and coroutine coverage. The benchmark project has initial context lifecycle, registration/partitioning, and query-service benchmarks. Use this README as current orientation, and use [AGENTS.md](AGENTS.md) for detailed contributor guidance.
 
@@ -28,9 +28,9 @@ The unit test project now has focused runtime, settings, query, partition, and c
 
 - Deterministic runtime math through `Fixed64`, `Vector2d`, `Vector3d`, and `FixedQuaternion`.
 - Engine-agnostic host boundary through `IMatterAgent` instead of direct renderer, ECS, or Unity coupling.
-- Grid-backed broad-phase partitioning through `GridForge` `GridWorld`, voxel tracing, and `PhysicsPartition`.
-- Runtime systems for bodies, colliders, collision pairs, collision detection/response, opt-in CCD, raycasts, circlecasts, and physics settings.
-- A future direction toward first-class 2D physics and mixed 2D/3D simulations where 2D and 3D bodies can interact through explicit dimensional rules.
+- Grid-backed broad-phase partitioning through `GridForge` `GridWorld`, voxel tracing, `PhysicsPartition`, and `PhysicsPartition2D`.
+- Runtime systems for 3D and pure 2D bodies, colliders, collision pairs, collision detection/response, opt-in CCD, raycasts, circlecasts, 2D overlap queries, and physics settings.
+- A future direction toward mixed 2D/3D simulations where 2D and 3D bodies can interact through explicit dimensional rules.
 
 ## Install
 
@@ -76,11 +76,12 @@ Gravitas is now centered around explicit world-context ownership:
 1. A host creates or attaches a `GravitasWorldContext`, which owns an explicit `GridForge.Grids.GridWorld`.
 2. Host objects expose deterministic transform and world context access through `IMatterAgent`.
 3. `GravitasWorldContext` owns fixed-step clock state, settings, physical environment values, lifecycle hooks, and context-local services.
-4. `GravitasPhysicsService` owns body/collider registration, collider ID lookup, collision-pair pooling, and physics lifecycle work for one context.
-5. `GravitasCollisionService` maps colliders into GridForge voxels and activates `PhysicsPartition` instances for collision checks.
-6. `GravitasRaycastService`, `GravitasCircleQueryService`, and `GravitasCoroutineService` own query and coroutine state per context.
-7. `StiffBody` owns simulated body state such as position, rotation, velocity, acceleration, mass, drag, friction, grounding, and Chronicler state recording.
-8. `LSCollider` and primitive collider types own shape data, bounds, layers, trigger/contact events, and GridForge partition coordinates.
+4. `GravitasPhysicsService` owns 3D body/collider registration, collider ID lookup, collision-pair pooling, and physics lifecycle work for one context.
+5. `GravitasPhysics2DService` owns pure 2D registration, pair state, response, and overlap-circle queries for one context.
+6. `GravitasCollisionService` and `GravitasCollision2DService` map colliders into GridForge voxels and activate partition payloads for collision checks.
+7. `GravitasRaycastService`, `GravitasCircleQueryService`, and `GravitasCoroutineService` own query and coroutine state per context.
+8. `StiffBody` and `StiffBody2D` own simulated body state and Chronicler state recording for their runtime path.
+9. `LSCollider` and `LSCollider2D` primitive collider types own shape data, bounds, layers, trigger/contact events, and GridForge partition coordinates.
 
 Typical integration creates or attaches a context, initializes bodies and colliders against agents bound to that context, then advances the simulation through `Simulate()`, `LateSimulate()`, `Visualize()`, and `LateVisualize()` according to the host's fixed-frame loop.
 

@@ -1093,7 +1093,7 @@ hardening below are complete.
 - [x] **Phase 9E - 2D runtime contract cleanup:** Align pure 2D host binding,
   runtime toggles, type-system boundaries, transform projection, folder layout,
   and parity tests before broad-phase scale work.
-- [ ] **Phase 9F - GridForge-backed 2D broad phase:** Replace the alpha
+- [x] **Phase 9F - GridForge-backed 2D broad phase:** Replace the alpha
   sweep-and-prune runtime path with a partitioned 2D broad phase that shares
   GridForge world/voxel identity, keeps queries caller-buffered, and proves
   scale behavior with tests and benchmarks. Keep mixed 2D/3D collision itself
@@ -1336,35 +1336,35 @@ world/voxel identity.
 
 **Tasks:**
 
-- [ ] Add benchmark baselines for the current sweep-and-prune path using
+- [x] Add benchmark baselines for the current sweep-and-prune path using
   representative 2D scene shapes: sparse thousands, dense clusters, moving
   churn, sleeping-heavy scenes, query-heavy scenes, and broad colliders that
   span many cells.
-- [ ] Add correctness tests that pin current pure 2D pair ordering, query
+- [x] Add correctness tests that pin current pure 2D pair ordering, query
   ordering, layer filtering, deactivation cleanup, sleeping/static behavior,
   and replay before changing the broad phase.
-- [ ] Design `PhysicsPartition2D` around collider IDs, not collider references.
+- [x] Design `PhysicsPartition2D` around collider IDs, not collider references.
   It should mirror the useful 3D partition lessons: dynamic/static membership,
   awake-dynamic membership, deterministic sorted distribution, retained empty
   partition cleanup, and reset safety before IDs can be reused.
-- [ ] Implement 2D collider partition state so movement, rotation, local shape
+- [x] Implement 2D collider partition state so movement, rotation, local shape
   edits, activation, deactivation, and reset update partition membership without
   scanning every collider every frame.
-- [ ] Replace pair generation in `GravitasPhysics2DService.Simulate()` with
+- [x] Replace pair generation in `GravitasPhysics2DService.Simulate()` with
   partition-driven candidate distribution. The sweep-and-prune path may remain
   only as a benchmark baseline during the phase; remove it from runtime once the
   partition path is proven correct and faster or complexity-safer.
-- [ ] Keep 2D query APIs caller-buffered. `OverlapCircleAll` should gather
+- [x] Keep 2D query APIs caller-buffered. `OverlapCircleAll` should gather
   candidates from relevant 2D partitions, suppress duplicates for colliders
   spanning multiple voxels/cells, filter by layer mask, run exact shape checks,
   and sort by deterministic hit ordering.
-- [ ] Add tests for large 2D colliders spanning many cells, duplicate
+- [x] Add tests for large 2D colliders spanning many cells, duplicate
   suppression, retained empty 2D partitions, partition time-to-kill, reset
   cleanup, sleeping partition skips, and wake propagation.
-- [ ] Benchmark the partition path against the sweep-and-prune baseline for
+- [x] Benchmark the partition path against the sweep-and-prune baseline for
   sparse, dense, moving, sleeping-heavy, and query-heavy scenes. Keep timings as
   evidence, not truth, unless the scenario represents a real alpha workload.
-- [ ] If current GridForge helpers make 2D broad-phase implementation awkward,
+- [x] If current GridForge helpers make 2D broad-phase implementation awkward,
   local-link `../GridForge` and evaluate adding one or more narrowly scoped
   helpers:
   - deterministic X/Z planar bounds scan over `GridWorld`/`VoxelGrid`;
@@ -1374,12 +1374,12 @@ world/voxel identity.
     GridForge traversal;
   - clearer planar-use docs or names where GridForge already supports the use
     case but the API wording implies volume-only behavior.
-- [ ] If GridForge changes are needed, validate GridForge directly with its
+- [x] If GridForge changes are needed, validate GridForge directly with its
   focused tests plus `Release`/`ReleaseLean` build/test gates before validating
   Gravitas against the local link.
-- [ ] After package-local validation, remove any temporary project references
+- [x] After package-local validation, remove any temporary project references
   from Gravitas unless the user asks to keep them for the hardening window.
-- [ ] Update `docs/wiki` to describe the final 2D broad-phase path, including
+- [x] Update `docs/wiki` to describe the final 2D broad-phase path, including
   which pieces are storage projection versus physical 2D semantics.
 
 **Acceptance Bar:**
@@ -1398,6 +1398,43 @@ world/voxel identity.
 - If GridForge changes are required, they must be minimal, reusable outside
   Gravitas, deterministic, and validated in GridForge before Gravitas relies on
   them.
+
+**Phase 9F Status - 2026-05-29**
+
+- Added `GravitasCollision2DService` and `PhysicsPartition2D` as the pure 2D
+  GridForge-backed broad phase. Runtime 2D simulation no longer sorts and scans
+  every active collider; it distributes candidates from active 2D voxel
+  partitions.
+- `PhysicsPartition2D` stores collider IDs in static, dynamic, and awake
+  dynamic sparse sets. Bodyless 2D colliders and immovable 2D bodies are static
+  members; movable 2D bodies are dynamic members.
+- Added `Collider2DPartitionState` to track 2D partition coordinates and snapped
+  X/Z grid bounds. Body movement, kinematic host motion, bodyless collider
+  `Simulate()`, shape edits, activation, deactivation, and reset now refresh
+  partition membership without a service-wide collider scan.
+- `OverlapCircleAll` remains caller-buffered but gathers candidates from
+  relevant `PhysicsPartition2D` payloads, suppresses duplicate collider IDs,
+  filters layers and bounds, runs exact 2D shape checks, and sorts hits by the
+  existing deterministic hit order.
+- Pure 2D partition storage uses the internal GridForge Y=0 plane only as broad
+  phase identity. No public `Physics2DBounds`, fake physical thickness, or slab
+  configuration was introduced.
+- GridForge package APIs were sufficient for this phase; no local GridForge
+  project link or upstream GridForge changes were needed.
+- Added focused partition-broad-phase tests for sparse scenes, duplicate query
+  suppression, movement churn, retained partition TTK, sleeping skips, wake
+  propagation, replay, and preserving existing resting solid contacts when a
+  partition becomes sleep-gated.
+- Added physics-2D benchmark sweep baselines next to the GridForge-backed
+  runtime methods so future runs can compare the old sweep shape against the
+  partition path.
+- Short `physics-2d` benchmark smoke completed. The partition-backed query path
+  is already competitive on larger query scenes, but the dense overlapping-pair
+  benchmark still shows higher time and allocation cost than the old sweep
+  baseline. Treat that as a Phase 10 carry-in optimization target before making
+  broad performance claims about dense 2D collision response.
+- Focused 2D tests, full `Release` tests, full `ReleaseLean` tests, sequential
+  `Release` build, and focused `physics-2d` benchmark smoke completed locally.
 
 ## Phase 10: Mixed 2D/3D Interaction Model
 

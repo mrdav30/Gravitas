@@ -89,8 +89,6 @@ public sealed class Physics2DQueryTests
 
     private static GravitasWorldContext Create2DContext()
     {
-        GravitasWorldContext context = GravitasWorldContext.CreateOwned();
-        context.Settings.RuntimeMode = PhysicsRuntimeMode.TwoD;
-        return context;
+        return Physics2DTestWorld.CreateContext();
     }
 }

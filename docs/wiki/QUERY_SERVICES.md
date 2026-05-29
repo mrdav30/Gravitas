@@ -152,14 +152,16 @@ convert from a `FixedTransform`, use `Vector3d.ToVector2d()` so world X maps to
 
 The candidate path is:
 
-1. rebuild current 2D collider bounds into the service broad-phase buffer.
-2. sort colliders by `MinX`.
-3. scan until candidate `MinX` exceeds the query circle `MaxX`.
-4. reject inactive colliders, layer-mask misses, and Y-separated bounds.
-5. ask each 2D shape for its closest point to the query center.
-6. include the collider when that closest point lies within the query radius or
+1. project the query circle's X/Z bounds into private GridForge storage on the
+   pure 2D Y=0 partition plane.
+2. scan covered GridForge spatial cells and voxels.
+3. inspect `PhysicsPartition2D` payloads and copy static/dynamic collider IDs.
+4. suppress duplicate collider IDs when a broad collider spans several voxels.
+5. reject inactive colliders, layer-mask misses, and separated 2D bounds.
+6. ask each 2D shape for its closest point to the query center.
+7. include the collider when that closest point lies within the query radius or
    the shape contains the query center.
-7. sort hits by distance and collider ID.
+8. sort hits by distance and collider ID.
 
 Current hit data is `Physics2DHit`: collider, optional body, point, normal, and
 distance. Segment/ray queries, AABB queries, and polygon queries remain future

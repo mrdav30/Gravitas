@@ -23,19 +23,24 @@ mixed-dimension embedding metadata, not a pure 2D collision axis.
 state, and caller-buffered overlap query output local to one
 `GravitasWorldContext`.
 
-The current 2D broad phase is a lean sweep-and-prune pass:
+The current 2D broad phase is GridForge-backed:
 
-1. rebuild active 2D collider shape bounds.
-2. copy colliders into a reusable sorted buffer.
-3. sort by collider `MinX`, with collider ID as the tie-breaker.
-4. sweep forward until candidate `MinX` exceeds the current collider `MaxX`.
-5. filter by Y bounds and the context collision matrix before narrow-phase
-   dispatch.
+1. rebuild a 2D collider's `BoundingArea` when body motion, kinematic host
+   motion, explicit bodyless collider refresh, or shape input edits change it.
+2. project the collider's X/Z bounds into private GridForge storage on the Y=0
+   plane.
+3. scan covered GridForge spatial cells and voxels.
+4. attach or reuse a `PhysicsPartition2D` payload on each covered voxel.
+5. store collider IDs in static, dynamic, and awake-dynamic sparse sets.
+6. distribute candidate pairs from active partitions in deterministic
+   voxel/order and collider-ID order.
+7. suppress duplicate pair work when broad colliders share several voxels.
+8. run layer filtering and exact 2D narrow-phase dispatch.
 
-This keeps the first 2D slice independent from the 3D GridForge voxel partition
-path. If a fixed 2D spatial hash, BVH, or GridForge-backed 2D partition proves
-faster for representative scenes, it should replace this pass behind focused
-benchmarks and replay tests.
+The Y=0 storage plane is not physical thickness and does not claim mixed
+2D/3D interaction. It is a deterministic broad-phase identity that lets pure
+2D and 3D use the same host-owned `GridWorld` model until Phase 10 defines a
+real embedding and impulse-exchange policy.
 
 `CollisionDetection2D` currently supports:
 
@@ -109,6 +114,14 @@ Dynamic partitions also keep `ContainedAwakeDynamicObjects`, a second sparse set
 for dynamic collider IDs whose bodies are currently awake for collision work.
 Sleeping bodies stay in normal dynamic membership so queries, wake propagation,
 pair cleanup, and contact lifecycle can still find them.
+
+`PhysicsPartition2D` mirrors the same ID-first lessons for pure 2D. Bodyless
+2D colliders and immovable 2D bodies are static members. Movable 2D bodies are
+dynamic members, and only awake dynamic IDs activate pair distribution. Sleeping
+2D bodies remain query-visible in dynamic membership, but partitions with no
+awake dynamic IDs skip solver work. Empty 2D partitions are retained, retired by
+the same deterministic TTK settings, and returned to the 2D collision service's
+partition pool through GridForge voxel removal.
 
 ## Collider Runtime Shape State
 

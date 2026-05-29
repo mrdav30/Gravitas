@@ -23,8 +23,9 @@ pairs, queries, and coroutines remain context-local.
 | Service | Owned state |
 | --- | --- |
 | `GravitasPhysicsService` | Dynamic body bucket, collider ID table, reusable collider IDs, collision-pair pool, active collision-pair queue, simulation switch. |
-| `GravitasPhysics2DService` | Pure 2D dynamic body bucket, monotonic collider ID table, sweep-and-prune broad-phase buffers, 2D pair pool, layer-filtered narrow-phase/response processing, overlap-circle query buffers, simulation switch. |
+| `GravitasPhysics2DService` | Pure 2D dynamic body bucket, monotonic collider ID table, 2D pair pool, layer-filtered narrow-phase/response processing, overlap-circle query buffers, simulation switch. |
 | `GravitasCollisionService` | Active partition bucket, inactive partition pool, duplicate voxel checker, partition awake-state refresh, collision distribution version, cull distributor. |
+| `GravitasCollision2DService` | GridForge-backed pure 2D partition bucket, inactive partition pool, duplicate voxel checker, awake dynamic membership refresh, 2D collision distribution version, retained partition cleanup. |
 | `GravitasRaycastService` | 3D segment worker, swept-sphere worker, intersection buffer, duplicate voxel checker, duplicate collider checker, query version. |
 | `GravitasCircleQueryService` | Duplicate collider checker and query version for X/Z circle overlap/proximity queries. |
 | `GravitasCoroutineService` | Active lockstep coroutine bucket and context-bound wait instruction factories. |
@@ -47,9 +48,8 @@ Simulate
     Collisions.CheckAndDistributeCollisions
   If RuntimeMode == TwoD:
     Physics2D.Simulate
-    Rebuild active 2D collider bounds
-    Sort 2D colliders by MinX
-    Process overlapping 2D candidate pairs
+    Collisions2D.CheckAndDistributeCollisions
+    Process overlapping 2D partition candidate pairs
   Coroutines.Simulate
   Hooks.InvokeSimulate
 
@@ -257,9 +257,12 @@ Current 3D primitive colliders derive from `LSCollider`. Pure 2D colliders
 derive from `LSCollider2D`; `LSCircleCollider2D`, `LSAABBoxCollider2D`, and
 `LSPolygonCollider2D` own their own 2D bounds, support points, closest-point
 math, and shape validation. They are registered with `GravitasPhysics2DService`,
-not with the 3D `GravitasPhysicsService`. Bodyless 2D colliders bind through
+partition through `GravitasCollision2DService`, and do not register with the 3D
+`GravitasPhysicsService`. Bodyless 2D colliders bind through
 `InitializeWithNoBody(IMatterAgent)` and use the same X/Z transform projection
-for query and trigger visibility.
+for query and trigger visibility. Pure 2D partition storage uses GridForge
+voxels on the internal Y=0 storage plane; that is a deterministic broad-phase
+identity, not physical 3D thickness.
 
 ## Settings And Environment
 
@@ -297,8 +300,9 @@ multi-context safe.
 - Collision pairs cannot cross context boundaries.
 - Pure 2D bodies and colliders are simulated by `GravitasPhysics2DService`;
   2D/3D contacts are not produced until a mixed-dimension policy exists.
-- Partition ownership is through `GravitasCollisionService`; partitions are
-  returned to the owning service pool through voxel removal.
+- Partition ownership is through `GravitasCollisionService` for 3D and
+  `GravitasCollision2DService` for pure 2D; partitions are returned to the
+  owning service pool through voxel removal.
 - Query services resolve collider IDs through their owning context only.
 - Diagnostic events and draw commands describe one context only; body and
   collider IDs are not global.

@@ -80,6 +80,8 @@ public sealed class StiffBody2D : IRecordable
 
     public bool IsSleeping => _isSleeping;
 
+    internal bool IsAwakeForCollision => Active && !Immovable && !IsSleeping;
+
     public void Initialize(Vector2d position, Fixed64 rotation = default, bool isDynamic = true)
     {
         SwiftThrowHelper.ThrowIfTrue(Active, nameof(StiffBody2D), "2D body is already initialized.");
@@ -135,6 +137,7 @@ public sealed class StiffBody2D : IRecordable
         _linearAccelerationStore = Vector2d.Zero;
         _deltaAcceleration = Vector2d.Zero;
         _linearSpeed = Fixed64.Zero;
+        Context.Collisions2D.RefreshPartitionAwakeState(Collider);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -142,6 +145,8 @@ public sealed class StiffBody2D : IRecordable
     {
         _sleepFrameCount = 0;
         _isSleeping = false;
+        if (Active)
+            Context.Collisions2D.RefreshPartitionAwakeState(Collider);
     }
 
     internal void LateSimulate()

@@ -61,6 +61,7 @@ flowchart TD
     Context --> Physics["GravitasPhysicsService"]
     Context --> Physics2D["GravitasPhysics2DService"]
     Context --> Collisions["GravitasCollisionService"]
+    Context --> Collisions2D["GravitasCollision2DService"]
     Context --> Raycasts["GravitasRaycastService"]
     Context --> CircleQueries["GravitasCircleQueryService"]
     Context --> Coroutines["GravitasCoroutineService"]
@@ -72,7 +73,9 @@ flowchart TD
     Physics2D --> Body2D["StiffBody2D"]
     Physics2D --> Collider2D["LSCollider2D"]
     Collisions --> Partition["PhysicsPartition"]
+    Collisions2D --> Partition2D["PhysicsPartition2D"]
     Partition --> World
+    Partition2D --> World
     Collider --> Pair["CollisionPair"]
     Pair --> Detection["CollisionDetection"]
     Pair --> Response["CollisionResponse"]
@@ -90,8 +93,9 @@ flowchart TD
 | `LSCollider2D` | Base pure 2D collider state for circle, axis-aligned box, and convex polygon shapes. |
 | `PhysicsRuntimeMode` | Selects whether a context advances the pure 2D or 3D runtime path. Mixed mode is intentionally deferred. |
 | `GravitasPhysicsService` | Body/collider registration, context-local collider IDs, collision-pair pooling, simulation phases, and visualization phases. |
-| `GravitasPhysics2DService` | Pure 2D registration, collider IDs, sweep-and-prune broad phase, narrow phase, response, events, and overlap-circle queries. |
+| `GravitasPhysics2DService` | Pure 2D registration, collider IDs, narrow phase, response, events, and overlap-circle query API. |
 | `GravitasCollisionService` | GridForge-backed broad-phase partitioning, active partition tracking, partition pooling, and collision distribution versioning. |
+| `GravitasCollision2DService` | GridForge-backed pure 2D X/Z broad-phase partitioning, active partition tracking, partition pooling, duplicate suppression, and collision distribution versioning. |
 | `PhysicsPartition` | Voxel partition payload containing collider IDs, awake dynamic membership, and candidate pair distribution. |
 | `CollisionPair` | Pair identity, culling state, contact state, warm-start cache, narrow-phase dispatch, response dispatch, and contact notification state. |
 | `CollisionDetection` | Shape-pair narrow-phase collision checks and contact generation. |

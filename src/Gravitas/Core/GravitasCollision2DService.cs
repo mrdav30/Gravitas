@@ -1,0 +1,696 @@
+using FixedMathSharp;
+using Gravitas.Colliders;
+using Gravitas.Support;
+using GridForge.Grids;
+using GridForge.Spatial;
+using SwiftCollections;
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+
+namespace Gravitas;
+
+/// <summary>
+/// Owns GridForge-backed pure 2D collision partitioning state for one context.
+/// </summary>
+public sealed class GravitasCollision2DService
+{
+    private const int DefaultPartitionPoolCapacity = 1024;
+    private static readonly PhysicsPartition2DOrderComparer PartitionOrderComparer = new();
+    private static readonly Collider2DIdComparer ColliderIdComparer = new();
+
+    private readonly GravitasWorldContext _context;
+    private readonly SwiftBucket<PhysicsPartition2D> _activePartitions = new();
+    private readonly SwiftStack<PhysicsPartition2D> _inactivePartitionPool = new(DefaultPartitionPoolCapacity);
+    private readonly SwiftHashSet<int> _redundancyChecker = new();
+    private readonly SwiftHashSet<ushort> _processedGrids = new();
+    private readonly SwiftList<PhysicsPartition2D> _retainedPartitions = new();
+    private readonly SwiftList<PhysicsPartition2D> _distributionPartitions = new();
+    private readonly SwiftList<int> _distributionDynamicIds = new();
+    private readonly SwiftList<int> _distributionAwakeDynamicIds = new();
+    private readonly SwiftList<int> _distributionStaticIds = new();
+    private readonly SwiftList<PhysicsPartition2D> _queryPartitions = new();
+    private readonly SwiftList<int> _queryColliderIds = new();
+    private readonly SwiftHashSet<int> _queryDuplicateColliderIds = new();
+
+    private int _retainedPartitionRetirementCursor;
+
+    public GravitasCollision2DService(GravitasWorldContext context)
+    {
+        SwiftThrowHelper.ThrowIfNull(context, nameof(context));
+        _context = context;
+    }
+
+    public GravitasWorldContext Context => _context;
+
+    public uint Version { get; private set; } = 1;
+
+    public int ActivePartitionCount => _activePartitions.Count;
+
+    public int InactivePartitionCount => _inactivePartitionPool.Count;
+
+    internal int RetainedPartitionCount => _retainedPartitions.Count;
+
+    public void Reset()
+    {
+        ClearRetainedPartitions();
+        _activePartitions.Clear();
+        _redundancyChecker.Clear();
+        _processedGrids.Clear();
+        _distributionPartitions.FastClear();
+        _distributionDynamicIds.FastClear();
+        _distributionAwakeDynamicIds.FastClear();
+        _distributionStaticIds.FastClear();
+        _queryPartitions.FastClear();
+        _queryColliderIds.FastClear();
+        _queryDuplicateColliderIds.Clear();
+        _inactivePartitionPool.Clear();
+        Version = 1;
+        _retainedPartitionRetirementCursor = 0;
+    }
+
+    public void Deactivate() => Reset();
+
+    internal bool RefreshColliderPartition(LSCollider2D collider)
+    {
+        SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
+        SwiftThrowHelper.ThrowIfArgument(
+            !ReferenceEquals(collider.Context, _context),
+            nameof(collider),
+            "2D collider must belong to this collision service context.");
+
+        if (!collider.IsActive)
+        {
+            if (collider.IsPartitioned)
+                ClearPartitionedCollider(collider, force: true);
+
+            return false;
+        }
+
+        GetSnappedPlanarBounds(collider, out Vector2d snappedMin, out Vector2d snappedMax);
+        if (collider.MatchesPartitionGridBounds(snappedMin, snappedMax))
+            return false;
+
+        if (collider.IsPartitioned)
+            ClearPartitionedCollider(collider, force: true);
+
+        return PartitionCollider(collider, snappedMin, snappedMax);
+    }
+
+    internal bool PartitionCollider(LSCollider2D collider)
+    {
+        GetSnappedPlanarBounds(collider, out Vector2d snappedMin, out Vector2d snappedMax);
+        return PartitionCollider(collider, snappedMin, snappedMax);
+    }
+
+    private bool PartitionCollider(LSCollider2D collider, Vector2d snappedMin, Vector2d snappedMax)
+    {
+        SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
+        SwiftThrowHelper.ThrowIfArgument(
+            !ReferenceEquals(collider.Context, _context),
+            nameof(collider),
+            "2D collider must belong to this collision service context.");
+
+        if (collider.IsPartitioned || !collider.IsActive)
+            return false;
+
+        SwiftList<WorldVoxelIndex> partitionedCoordinates = collider.GetOrCreatePartitionCoordinates();
+        partitionedCoordinates.FastClear();
+
+        try
+        {
+            PartitionCoveredVoxels(collider, snappedMin, snappedMax, partitionedCoordinates);
+            if (partitionedCoordinates.Count == 0)
+                return false;
+
+            collider.MarkPartitioned(snappedMin, snappedMax);
+            return true;
+        }
+        finally
+        {
+            _redundancyChecker.Clear();
+            _processedGrids.Clear();
+        }
+    }
+
+    internal bool ClearPartitionedCollider(LSCollider2D collider, bool force = false)
+    {
+        SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
+        SwiftThrowHelper.ThrowIfArgument(
+            !ReferenceEquals(collider.Context, _context),
+            nameof(collider),
+            "2D collider must belong to this collision service context.");
+
+        if (!collider.IsPartitioned)
+            return false;
+
+        GetSnappedPlanarBounds(collider, out Vector2d snappedMin, out Vector2d snappedMax);
+        if (!force && collider.MatchesPartitionGridBounds(snappedMin, snappedMax))
+            return false;
+
+        SwiftList<WorldVoxelIndex>? coordinates = collider.PartitionCoordinates;
+        if (coordinates == null)
+            return false;
+
+        GridWorld world = _context.World;
+        bool isStatic = IsStaticCollider(collider);
+        try
+        {
+            for (int i = 0; i < coordinates.Count; i++)
+            {
+                WorldVoxelIndex coordinate = coordinates[i];
+                if (!world.TryGetVoxel(coordinate, out Voxel? voxel)
+                    || !_redundancyChecker.Add(voxel!.SpawnToken)
+                    || !voxel.TryGetPartition(out PhysicsPartition2D? partition))
+                {
+                    continue;
+                }
+
+                if (isStatic)
+                    partition!.RemoveStaticObject(collider.Id);
+                else
+                    partition!.RemoveDynamicObject(collider.Id);
+            }
+        }
+        finally
+        {
+            _redundancyChecker.Clear();
+        }
+
+        collider.MarkUnpartitioned();
+        collider.ClearPartitionCoordinates();
+        return true;
+    }
+
+    internal void RefreshPartitionAwakeState(LSCollider2D collider)
+    {
+        SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
+        SwiftThrowHelper.ThrowIfArgument(
+            !ReferenceEquals(collider.Context, _context),
+            nameof(collider),
+            "2D collider must belong to this collision service context.");
+
+        if (!collider.IsPartitioned || collider.PartitionCoordinates == null)
+            return;
+
+        StiffBody2D? body = collider.Body;
+        if (body == null || body.Immovable)
+            return;
+
+        bool awake = body.IsAwakeForCollision;
+        GridWorld world = _context.World;
+
+        try
+        {
+            for (int i = 0; i < collider.PartitionCoordinates.Count; i++)
+            {
+                WorldVoxelIndex coordinate = collider.PartitionCoordinates[i];
+                if (!world.TryGetVoxel(coordinate, out Voxel? voxel)
+                    || !_redundancyChecker.Add(voxel!.SpawnToken)
+                    || !voxel.TryGetPartition(out PhysicsPartition2D? partition))
+                {
+                    continue;
+                }
+
+                partition!.SetDynamicObjectAwake(collider.Id, awake);
+            }
+        }
+        finally
+        {
+            _redundancyChecker.Clear();
+        }
+    }
+
+    internal void CheckAndDistributeCollisions()
+    {
+        Version++;
+
+        _distributionPartitions.FastClear();
+        foreach (PhysicsPartition2D partition in _activePartitions)
+            _distributionPartitions.Add(partition);
+
+        _distributionPartitions.Sort(PartitionOrderComparer);
+
+        for (int i = 0; i < _distributionPartitions.Count; i++)
+        {
+            _distributionPartitions[i].Distribute(
+                _distributionDynamicIds,
+                _distributionAwakeDynamicIds,
+                _distributionStaticIds);
+        }
+
+        RetireExpiredRetainedPartitions();
+    }
+
+    internal void CollectOverlapCircleCandidates(
+        Vector2d center,
+        Fixed64 radius,
+        PhysicsLayerMask layerMask,
+        SwiftList<LSCollider2D> candidates)
+    {
+        candidates.FastClear();
+        _queryDuplicateColliderIds.Clear();
+
+        Vector2d min = new(center.x - radius, center.y - radius);
+        Vector2d max = new(center.x + radius, center.y + radius);
+
+        CollectCoveredPartitions(min, max, _queryPartitions);
+        _queryPartitions.Sort(PartitionOrderComparer);
+
+        for (int i = 0; i < _queryPartitions.Count; i++)
+        {
+            PhysicsPartition2D partition = _queryPartitions[i];
+            partition.CopyAllColliderIds(_queryColliderIds);
+            for (int j = 0; j < _queryColliderIds.Count; j++)
+            {
+                int colliderId = _queryColliderIds[j];
+                if (!_queryDuplicateColliderIds.Add(colliderId))
+                    continue;
+
+                if (!_context.Physics2D.TryGetColliderById(colliderId, out LSCollider2D? collider)
+                    || !collider!.IsActive
+                    || !layerMask.Includes(collider.Layer)
+                    || collider.MaxX < min.x
+                    || collider.MinX > max.x
+                    || collider.MaxY < min.y
+                    || collider.MinY > max.y)
+                {
+                    continue;
+                }
+
+                candidates.Add(collider);
+            }
+        }
+
+        candidates.Sort(ColliderIdComparer);
+        _queryDuplicateColliderIds.Clear();
+    }
+
+    private void CollectCoveredPartitions(
+        Vector2d min,
+        Vector2d max,
+        SwiftList<PhysicsPartition2D> partitions)
+    {
+        partitions.FastClear();
+        (Vector2d snappedMin, Vector2d snappedMax) = SnapPlanarBounds(min, max);
+
+        try
+        {
+            PartitionCoveredCells(
+                snappedMin,
+                snappedMax,
+                (currentGrid, position, voxelSize) =>
+                {
+                    if (!currentGrid.TryGetVoxel(position, out Voxel? voxel)
+                        || !_redundancyChecker.Add(voxel!.SpawnToken)
+                        || !IsPlanarPositionInBounds(min, max, voxelSize, voxel.WorldPosition)
+                        || !voxel.TryGetPartition(out PhysicsPartition2D? partition)
+                        || partition!.IsEmpty)
+                    {
+                        return;
+                    }
+
+                    partitions.Add(partition);
+                });
+        }
+        finally
+        {
+            _redundancyChecker.Clear();
+            _processedGrids.Clear();
+        }
+    }
+
+    private void PartitionCoveredVoxels(
+        LSCollider2D collider,
+        Vector2d snappedMin,
+        Vector2d snappedMax,
+        SwiftList<WorldVoxelIndex> partitionedCoordinates)
+    {
+        PartitionCoveredCells(
+            snappedMin,
+            snappedMax,
+            (currentGrid, position, voxelSize) => TryPartitionVoxel(
+                currentGrid,
+                collider,
+                partitionedCoordinates,
+                position,
+                voxelSize));
+    }
+
+    private void PartitionCoveredCells(
+        Vector2d snappedMin,
+        Vector2d snappedMax,
+        VoxelVisitor visitor)
+    {
+        GridWorld world = _context.World;
+        Vector3d snappedMin3 = ToWorldStoragePosition(snappedMin);
+        Vector3d snappedMax3 = ToWorldStoragePosition(snappedMax);
+
+        GetSpatialCellBounds(
+            world,
+            snappedMin3,
+            snappedMax3,
+            out int xMin,
+            out int yMin,
+            out int zMin,
+            out int xMax,
+            out int yMax,
+            out int zMax);
+
+        for (int z = zMin; z <= zMax; z++)
+        {
+            for (int y = yMin; y <= yMax; y++)
+            {
+                for (int x = xMin; x <= xMax; x++)
+                {
+                    int cellIndex = SwiftHashTools.CombineHashCodes(x, y, z);
+                    if (!world.SpatialGridHash.TryGetValue(cellIndex, out SwiftHashSet<ushort> gridList))
+                        continue;
+
+                    foreach (ushort gridIndex in gridList)
+                    {
+                        if (!world.ActiveGrids.IsAllocated(gridIndex) || !_processedGrids.Add(gridIndex))
+                            continue;
+
+                        VoxelGrid currentGrid = world.ActiveGrids[gridIndex];
+                        VisitGridPlanarVoxels(currentGrid, snappedMin, snappedMax, visitor);
+                    }
+                }
+            }
+        }
+    }
+
+    private void VisitGridPlanarVoxels(
+        VoxelGrid currentGrid,
+        Vector2d snappedMin,
+        Vector2d snappedMax,
+        VoxelVisitor visitor)
+    {
+        Fixed64 voxelSize = _context.World.VoxelSize;
+        for (Fixed64 x = snappedMin.x; x <= snappedMax.x; x += voxelSize)
+        {
+            for (Fixed64 z = snappedMin.y; z <= snappedMax.y; z += voxelSize)
+                visitor(currentGrid, new Vector3d(x, Fixed64.Zero, z), voxelSize);
+        }
+    }
+
+    private void TryPartitionVoxel(
+        VoxelGrid currentGrid,
+        LSCollider2D collider,
+        SwiftList<WorldVoxelIndex> partitionedCoordinates,
+        Vector3d position,
+        Fixed64 voxelSize)
+    {
+        if (!currentGrid.TryGetVoxel(position, out Voxel? voxel)
+            || !_redundancyChecker.Add(voxel!.SpawnToken)
+            || !collider.IsPositionInPlanarBounds(voxelSize, voxel.WorldPosition))
+        {
+            return;
+        }
+
+        if (!voxel.TryGetPartition(out PhysicsPartition2D? partition))
+        {
+            partition = RentPartition();
+            if (!voxel.TryAddPartition(partition))
+            {
+                ReleasePartition(partition);
+                return;
+            }
+
+            TrackRetainedPartition(partition);
+        }
+
+        partitionedCoordinates.Add(voxel.WorldIndex);
+        if (IsStaticCollider(collider))
+            partition!.AddStaticObject(collider.Id);
+        else
+            partition!.AddDynamicObject(collider.Id);
+    }
+
+    private void GetSnappedPlanarBounds(LSCollider2D collider, out Vector2d snappedMin, out Vector2d snappedMax)
+    {
+        (snappedMin, snappedMax) = SnapPlanarBounds(
+            new Vector2d(collider.MinX, collider.MinY),
+            new Vector2d(collider.MaxX, collider.MaxY));
+    }
+
+    private (Vector2d min, Vector2d max) SnapPlanarBounds(Vector2d min, Vector2d max)
+    {
+        Fixed64 padding = _context.World.VoxelSize * Fixed64.Half;
+        Vector3d boundsMin = new(min.x - padding, Fixed64.Zero, min.y - padding);
+        Vector3d boundsMax = new(max.x + padding, Fixed64.Zero, max.y + padding);
+        (Vector3d snappedMin, Vector3d snappedMax) = _context.World.SnapBoundsToVoxelSize(boundsMin, boundsMax);
+        return (new Vector2d(snappedMin.x, snappedMin.z), new Vector2d(snappedMax.x, snappedMax.z));
+    }
+
+    private static void GetSpatialCellBounds(
+        GridWorld world,
+        Vector3d min,
+        Vector3d max,
+        out int xMin,
+        out int yMin,
+        out int zMin,
+        out int xMax,
+        out int yMax,
+        out int zMax)
+    {
+        SnapToSpatialGrid(world, min, out xMin, out yMin, out zMin);
+        SnapToSpatialGrid(world, max, out xMax, out yMax, out zMax);
+
+        if (xMin > xMax)
+            (xMin, xMax) = (xMax, xMin);
+        if (yMin > yMax)
+            (yMin, yMax) = (yMax, yMin);
+        if (zMin > zMax)
+            (zMin, zMax) = (zMax, zMin);
+    }
+
+    private static void SnapToSpatialGrid(GridWorld world, Vector3d position, out int x, out int y, out int z)
+    {
+        x = (position.x.Abs() / world.SpatialGridCellSize).FloorToInt() * position.x.Sign();
+        y = (position.y.Abs() / world.SpatialGridCellSize).FloorToInt() * position.y.Sign();
+        z = (position.z.Abs() / world.SpatialGridCellSize).FloorToInt() * position.z.Sign();
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Vector3d ToWorldStoragePosition(Vector2d position) =>
+        new(position.x, Fixed64.Zero, position.y);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool IsPlanarPositionInBounds(Vector2d min, Vector2d max, Fixed64 voxelSize, Vector3d worldPosition)
+    {
+        Fixed64 padding = voxelSize * Fixed64.Half;
+        return worldPosition.x >= min.x - padding
+            && worldPosition.x <= max.x + padding
+            && worldPosition.z >= min.y - padding
+            && worldPosition.z <= max.y + padding;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool IsStaticCollider(LSCollider2D collider) => collider.Body == null || collider.Body.Immovable;
+
+    private void ClearRetainedPartitions()
+    {
+        for (int i = 0; i < _retainedPartitions.Count; i++)
+        {
+            PhysicsPartition2D partition = _retainedPartitions[i];
+            if (partition.IsOwnedBy(this))
+                partition.ResetRetainedMembership();
+        }
+    }
+
+    private void TrackRetainedPartition(PhysicsPartition2D partition)
+    {
+        SwiftThrowHelper.ThrowIfNull(partition, nameof(partition));
+        SwiftThrowHelper.ThrowIfArgument(
+            partition.RetainedIndex >= 0,
+            nameof(partition),
+            "PhysicsPartition2D is already tracked as retained.");
+
+        partition.SetRetainedIndex(_retainedPartitions.Count);
+        _retainedPartitions.Add(partition);
+    }
+
+    private void UntrackRetainedPartition(PhysicsPartition2D partition)
+    {
+        int index = FindRetainedPartitionIndex(partition);
+        if (index < 0)
+        {
+            partition.ClearRetainedIndex();
+            return;
+        }
+
+        int lastIndex = _retainedPartitions.Count - 1;
+        if (index != lastIndex)
+        {
+            PhysicsPartition2D movedPartition = _retainedPartitions[lastIndex];
+            _retainedPartitions[index] = movedPartition;
+            movedPartition.SetRetainedIndex(index);
+        }
+
+        _retainedPartitions.RemoveAt(lastIndex);
+        partition.ClearRetainedIndex();
+
+        if (_retainedPartitionRetirementCursor > index)
+            _retainedPartitionRetirementCursor--;
+        if (_retainedPartitionRetirementCursor >= _retainedPartitions.Count)
+            _retainedPartitionRetirementCursor = 0;
+    }
+
+    private int FindRetainedPartitionIndex(PhysicsPartition2D partition)
+    {
+        int index = partition.RetainedIndex;
+        if ((uint)index < (uint)_retainedPartitions.Count && ReferenceEquals(_retainedPartitions[index], partition))
+            return index;
+
+        for (int i = 0; i < _retainedPartitions.Count; i++)
+            if (ReferenceEquals(_retainedPartitions[i], partition))
+                return i;
+
+        return -1;
+    }
+
+    private void RetireExpiredRetainedPartitions()
+    {
+        int budget = _context.Settings.RetainedPartitionRetirementSweepBudget;
+        if (budget <= 0 || _retainedPartitions.Count == 0)
+            return;
+
+        int inspected = 0;
+        while (inspected < budget && _retainedPartitions.Count > 0)
+        {
+            if (_retainedPartitionRetirementCursor >= _retainedPartitions.Count)
+                _retainedPartitionRetirementCursor = 0;
+
+            PhysicsPartition2D partition = _retainedPartitions[_retainedPartitionRetirementCursor];
+            inspected++;
+
+            if (!ShouldRetireRetainedPartition(partition))
+            {
+                _retainedPartitionRetirementCursor++;
+                continue;
+            }
+
+            if (!RetireRetainedPartition(partition))
+                _retainedPartitionRetirementCursor++;
+        }
+    }
+
+    private bool ShouldRetireRetainedPartition(PhysicsPartition2D partition)
+    {
+        if (!partition.IsOwnedBy(this) || !partition.IsEmpty || partition.IsAllocated || partition.EmptySinceFrame < 0)
+            return false;
+
+        int idleFrames = _context.FrameCount - partition.EmptySinceFrame;
+        return idleFrames >= _context.Settings.RetainedPartitionTimeToKillFrames;
+    }
+
+    private bool RetireRetainedPartition(PhysicsPartition2D partition)
+    {
+        if (!_context.World.TryGetVoxel(partition.WorldIndex, out Voxel? voxel))
+        {
+            ReleasePartition(partition);
+            return true;
+        }
+
+        if (!voxel!.TryGetPartition(out PhysicsPartition2D? attachedPartition)
+            || !ReferenceEquals(attachedPartition, partition))
+        {
+            ReleasePartition(partition);
+            return true;
+        }
+
+        return voxel.TryRemovePartition<PhysicsPartition2D>();
+    }
+
+    internal int ActivatePartition(PhysicsPartition2D partition)
+    {
+        SwiftThrowHelper.ThrowIfNull(partition, nameof(partition));
+        SwiftThrowHelper.ThrowIfArgument(
+            !ReferenceEquals(partition.Owner, this),
+            nameof(partition),
+            "2D partition must belong to this collision service.");
+
+        return _activePartitions.Add(partition);
+    }
+
+    internal void DeactivatePartition(int activationId)
+    {
+        if (activationId < 0)
+            return;
+
+        _activePartitions.TryRemoveAt(activationId);
+    }
+
+    internal PhysicsPartition2D RentPartition()
+    {
+        PhysicsPartition2D partition = _inactivePartitionPool.Count > 0
+            ? _inactivePartitionPool.Pop()
+            : new PhysicsPartition2D();
+        partition.SetOwner(this);
+        return partition;
+    }
+
+    internal void ReleasePartition(PhysicsPartition2D partition)
+    {
+        SwiftThrowHelper.ThrowIfNull(partition, nameof(partition));
+        SwiftThrowHelper.ThrowIfArgument(
+            !ReferenceEquals(partition.Owner, this),
+            nameof(partition),
+            "2D partition must be released through its owning collision service.");
+
+        UntrackRetainedPartition(partition);
+        partition.ResetForPool();
+        _inactivePartitionPool.Push(partition);
+    }
+
+    private delegate void VoxelVisitor(VoxelGrid currentGrid, Vector3d position, Fixed64 voxelSize);
+
+    private sealed class PhysicsPartition2DOrderComparer : IComparer<PhysicsPartition2D>
+    {
+        public int Compare(PhysicsPartition2D? left, PhysicsPartition2D? right)
+        {
+            if (ReferenceEquals(left, right))
+                return 0;
+            if (left == null)
+                return -1;
+            if (right == null)
+                return 1;
+
+            WorldVoxelIndex leftIndex = left.WorldIndex;
+            WorldVoxelIndex rightIndex = right.WorldIndex;
+
+            int compare = leftIndex.GridIndex.CompareTo(rightIndex.GridIndex);
+            if (compare != 0)
+                return compare;
+
+            compare = leftIndex.GridSpawnToken.CompareTo(rightIndex.GridSpawnToken);
+            if (compare != 0)
+                return compare;
+
+            compare = leftIndex.VoxelIndex.x.CompareTo(rightIndex.VoxelIndex.x);
+            if (compare != 0)
+                return compare;
+
+            compare = leftIndex.VoxelIndex.z.CompareTo(rightIndex.VoxelIndex.z);
+            if (compare != 0)
+                return compare;
+
+            return leftIndex.VoxelIndex.y.CompareTo(rightIndex.VoxelIndex.y);
+        }
+    }
+
+    private sealed class Collider2DIdComparer : IComparer<LSCollider2D>
+    {
+        public int Compare(LSCollider2D? left, LSCollider2D? right)
+        {
+            if (ReferenceEquals(left, right))
+                return 0;
+            if (left == null)
+                return -1;
+            if (right == null)
+                return 1;
+
+            return left.Id.CompareTo(right.Id);
+        }
+    }
+}

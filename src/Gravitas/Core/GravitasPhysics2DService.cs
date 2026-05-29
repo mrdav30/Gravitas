@@ -14,7 +14,9 @@ public sealed class GravitasPhysics2DService
     private readonly GravitasWorldContext _context;
     private readonly SwiftBucket<StiffBody2D> _dynamicBodies = new();
     private readonly SwiftList<LSCollider2D> _colliders = new();
-    private readonly SwiftList<LSCollider2D> _sortedColliders = new();
+    private readonly SwiftDictionary<int, LSCollider2D> _collidersById = new();
+    private readonly SwiftHashSet<ulong> _processedPairKeys = new();
+    private readonly SwiftList<LSCollider2D> _queryCandidates = new();
     private readonly SwiftDictionary<ulong, CollisionPair2D> _pairs = new();
     private readonly SwiftList<ulong> _pairsToRemove = new();
     private readonly SwiftStack<CollisionPair2D> _cachedPairs = new();
@@ -31,6 +33,10 @@ public sealed class GravitasPhysics2DService
     public int ColliderCount => _colliders.Count;
 
     public bool SimulatePhysics { get; set; } = true;
+
+    internal int LastBroadPhaseCandidateCount { get; private set; }
+
+    internal int LastQueryCandidateCount { get; private set; }
 
     internal void AssimilateBody(StiffBody2D body, bool isDynamic)
     {
@@ -59,6 +65,8 @@ public sealed class GravitasPhysics2DService
 
         collider.SetPhysicsState(_nextColliderId++, _colliders.Count);
         _colliders.Add(collider);
+        _collidersById.Add(collider.Id, collider);
+        _context.Collisions2D.PartitionCollider(collider);
     }
 
     internal void DessimilateBody(StiffBody2D body)
@@ -75,7 +83,9 @@ public sealed class GravitasPhysics2DService
     {
         SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
         RemovePairsForCollider(collider);
+        _context.Collisions2D.ClearPartitionedCollider(collider, force: true);
         RemoveCollider(collider);
+        _collidersById.Remove(collider.Id);
         collider.ClearPhysicsState();
     }
 
@@ -84,27 +94,10 @@ public sealed class GravitasPhysics2DService
         if (!SimulatePhysics)
             return;
 
-        PrepareBroadPhase();
+        LastBroadPhaseCandidateCount = 0;
+        _processedPairKeys.Clear();
         int frame = _context.FrameCount;
-
-        for (int i = 0; i < _sortedColliders.Count; i++)
-        {
-            LSCollider2D first = _sortedColliders[i];
-            if (!first.IsActive)
-                continue;
-
-            for (int j = i + 1; j < _sortedColliders.Count; j++)
-            {
-                LSCollider2D second = _sortedColliders[j];
-                if (second.MinX > first.MaxX)
-                    break;
-                if (!second.IsActive || !BoundsOverlapY(first, second))
-                    continue;
-
-                ProcessCandidate(first, second, frame);
-            }
-        }
-
+        _context.Collisions2D.CheckAndDistributeCollisions();
         CleanupUntouchedPairs(frame);
     }
 
@@ -121,12 +114,16 @@ public sealed class GravitasPhysics2DService
     {
         _dynamicBodies.Clear();
         _colliders.FastClear();
-        _sortedColliders.FastClear();
+        _collidersById.Clear();
+        _processedPairKeys.Clear();
+        _queryCandidates.FastClear();
         _pairs.Clear();
         _pairsToRemove.FastClear();
         _cachedPairs.Clear();
         _nextColliderId = 1;
         BodyCount = 0;
+        LastBroadPhaseCandidateCount = 0;
+        LastQueryCandidateCount = 0;
     }
 
     /// <summary>
@@ -152,24 +149,11 @@ public sealed class GravitasPhysics2DService
         SwiftThrowHelper.ThrowIfArgument(radius < Fixed64.Zero, nameof(radius), "2D query radius cannot be negative.");
 
         results.FastClear();
-        Fixed64 minX = center.x - radius;
-        Fixed64 maxX = center.x + radius;
-        Fixed64 minY = center.y - radius;
-        Fixed64 maxY = center.y + radius;
-
-        PrepareBroadPhase();
-        for (int i = 0; i < _sortedColliders.Count; i++)
+        _context.Collisions2D.CollectOverlapCircleCandidates(center, radius, layerMask, _queryCandidates);
+        LastQueryCandidateCount = _queryCandidates.Count;
+        for (int i = 0; i < _queryCandidates.Count; i++)
         {
-            LSCollider2D collider = _sortedColliders[i];
-            if (collider.MinX > maxX)
-                break;
-            if (!collider.IsActive
-                || !layerMask.Includes(collider.Layer)
-                || collider.MaxX < minX
-                || collider.MinY > maxY
-                || collider.MaxY < minY)
-                continue;
-
+            LSCollider2D collider = _queryCandidates[i];
             if (CollisionDetection2D.TryOverlapCircle(center, radius, collider, out Physics2DHit hit))
                 results.Add(hit);
         }
@@ -178,20 +162,25 @@ public sealed class GravitasPhysics2DService
         return results.Count;
     }
 
-    private void PrepareBroadPhase()
+    internal bool TryGetColliderById(int colliderId, out LSCollider2D? collider)
     {
-        _sortedColliders.FastClear();
-        for (int i = 0; i < _colliders.Count; i++)
-        {
-            LSCollider2D collider = _colliders[i];
-            if (!collider.IsActive)
-                continue;
+        return _collidersById.TryGetValue(colliderId, out collider);
+    }
 
-            collider.Rebuild();
-            _sortedColliders.Add(collider);
+    internal void ProcessPartitionCandidate(int firstId, int secondId)
+    {
+        ulong key = CreatePairKey(firstId, secondId);
+        if (!_processedPairKeys.Add(key))
+            return;
+
+        if (!_collidersById.TryGetValue(firstId, out LSCollider2D? first)
+            || !_collidersById.TryGetValue(secondId, out LSCollider2D? second))
+        {
+            return;
         }
 
-        SortCollidersByMinX(_sortedColliders);
+        LastBroadPhaseCandidateCount++;
+        ProcessCandidate(first!, second!, _context.FrameCount);
     }
 
     private void ProcessCandidate(LSCollider2D first, LSCollider2D second, int frame)
@@ -233,6 +222,9 @@ public sealed class GravitasPhysics2DService
             if (pair.LastFrame == frame)
                 continue;
 
+            if (TryKeepRestingPair(pair, frame))
+                continue;
+
             pair.MarkSeparated();
             _pairsToRemove.Add(pairEntry.Key);
         }
@@ -245,6 +237,25 @@ public sealed class GravitasPhysics2DService
 
             _pairs.Remove(key);
         }
+    }
+
+    private bool TryKeepRestingPair(CollisionPair2D pair, int frame)
+    {
+        LSCollider2D first = pair.ColliderA;
+        LSCollider2D second = pair.ColliderB;
+        if (!first.IsActive
+            || !second.IsActive
+            || first.IsTrigger
+            || second.IsTrigger
+            || HasAwakeMovableParticipant(first, second)
+            || IsLayerCollisionDisabled(first.Layer, second.Layer)
+            || !CollisionDetection2D.TryCollide(first, second, out _))
+        {
+            return false;
+        }
+
+        pair.MarkResting(frame);
+        return true;
     }
 
     private CollisionPair2D CreatePair(LSCollider2D first, LSCollider2D second)
@@ -325,93 +336,11 @@ public sealed class GravitasPhysics2DService
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool BoundsOverlapY(LSCollider2D first, LSCollider2D second) =>
-        first.MinY <= second.MaxY && first.MaxY >= second.MinY;
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static ulong CreatePairKey(int firstId, int secondId)
     {
         if (firstId > secondId)
             (firstId, secondId) = (secondId, firstId);
 
         return ((ulong)(uint)firstId << 32) | (uint)secondId;
-    }
-
-    private static void SortCollidersByMinX(SwiftList<LSCollider2D> colliders)
-    {
-        if (colliders.Count < 2)
-            return;
-
-        QuickSortColliders(colliders, 0, colliders.Count - 1);
-    }
-
-    private static void QuickSortColliders(SwiftList<LSCollider2D> colliders, int left, int right)
-    {
-        while (left < right)
-        {
-            if (right - left <= 16)
-            {
-                InsertionSortColliders(colliders, left, right);
-                return;
-            }
-
-            int i = left;
-            int j = right;
-            LSCollider2D pivot = colliders[left + ((right - left) / 2)];
-            while (i <= j)
-            {
-                while (CompareByMinX(colliders[i], pivot) < 0)
-                    i++;
-                while (CompareByMinX(colliders[j], pivot) > 0)
-                    j--;
-
-                if (i > j)
-                    continue;
-
-                if (i != j)
-                    (colliders[i], colliders[j]) = (colliders[j], colliders[i]);
-
-                i++;
-                j--;
-            }
-
-            if (j - left < right - i)
-            {
-                if (left < j)
-                    QuickSortColliders(colliders, left, j);
-
-                left = i;
-            }
-            else
-            {
-                if (i < right)
-                    QuickSortColliders(colliders, i, right);
-
-                right = j;
-            }
-        }
-    }
-
-    private static void InsertionSortColliders(SwiftList<LSCollider2D> colliders, int left, int right)
-    {
-        for (int i = left + 1; i <= right; i++)
-        {
-            LSCollider2D value = colliders[i];
-            int index = i - 1;
-            while (index >= left && CompareByMinX(colliders[index], value) > 0)
-            {
-                colliders[index + 1] = colliders[index];
-                index--;
-            }
-
-            colliders[index + 1] = value;
-        }
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static int CompareByMinX(LSCollider2D left, LSCollider2D right)
-    {
-        int min = left.MinX.CompareTo(right.MinX);
-        return min != 0 ? min : left.Id.CompareTo(right.Id);
     }
 }

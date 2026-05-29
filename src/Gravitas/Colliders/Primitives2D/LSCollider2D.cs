@@ -1,4 +1,5 @@
 using FixedMathSharp;
+using GridForge.Spatial;
 using Gravitas.Support;
 using SwiftCollections;
 using System.Runtime.CompilerServices;
@@ -20,6 +21,7 @@ public abstract class LSCollider2D
     private PhysicsLayer _layer = new();
     private Vector2d _localOffset;
     private BoundingArea _bounds;
+    private Collider2DPartitionState _partitionState;
 
     public delegate void Body2DCollisionFunc(StiffBody2D other);
     public delegate void Trigger2DCollisionFunc(LSCollider2D other);
@@ -53,6 +55,12 @@ public abstract class LSCollider2D
 
     internal int ServiceIndex => _serviceIndex;
 
+    internal bool IsPartitioned => _partitionState.IsPartitioned;
+
+    internal SwiftList<WorldVoxelIndex>? PartitionCoordinates => _partitionState.Coordinates;
+
+    internal uint BroadPhaseVersion => _partitionState.BroadPhaseVersion;
+
     public StiffBody2D? Body => _body;
 
     public IMatterAgent Agent
@@ -85,8 +93,20 @@ public abstract class LSCollider2D
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get => _isActive;
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        set => _isActive = value;
+        set
+        {
+            if (_isActive == value)
+                return;
+
+            _isActive = value;
+            if (_context == null || _id < 0)
+                return;
+
+            if (_isActive)
+                _context.Collisions2D.RefreshColliderPartition(this);
+            else
+                _context.Collisions2D.ClearPartitionedCollider(this, force: true);
+        }
     }
 
     public bool IsTrigger
@@ -178,6 +198,8 @@ public abstract class LSCollider2D
 
     internal void ClearPhysicsState()
     {
+        _partitionState.MarkUnpartitioned();
+        _partitionState.ClearCoordinates();
         _id = -1;
         _serviceIndex = -1;
     }
@@ -201,8 +223,53 @@ public abstract class LSCollider2D
         ClearBindingState();
     }
 
+    public void Simulate()
+    {
+        if (!IsActive)
+            return;
+
+        Rebuild();
+    }
+
+    internal void Rebuild()
+    {
+        RebuildShape();
+        if (_context != null && _id >= 0)
+            _context.Collisions2D.RefreshColliderPartition(this);
+    }
+
+    internal SwiftList<WorldVoxelIndex> GetOrCreatePartitionCoordinates()
+    {
+        _partitionState.Coordinates ??= new();
+        return _partitionState.Coordinates;
+    }
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal void Rebuild() => RebuildShape();
+    internal bool MatchesPartitionGridBounds(Vector2d min, Vector2d max) =>
+        _partitionState.MatchesGridBounds(min, max);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal void MarkPartitioned(Vector2d min, Vector2d max)
+    {
+        _partitionState.SetPreviousGridBounds(min, max);
+        _partitionState.MarkPartitioned();
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal void MarkUnpartitioned() => _partitionState.MarkUnpartitioned();
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal void ClearPartitionCoordinates() => _partitionState.ClearCoordinates();
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal bool IsPositionInPlanarBounds(Fixed64 voxelSize, Vector3d worldPosition)
+    {
+        Fixed64 padding = voxelSize * Fixed64.Half;
+        return worldPosition.x >= MinX - padding
+            && worldPosition.x <= MaxX + padding
+            && worldPosition.z >= MinY - padding
+            && worldPosition.z <= MaxY + padding;
+    }
 
     internal void NotifyContact(LSCollider2D other, bool isColliding, bool isChanged)
     {

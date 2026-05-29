@@ -113,9 +113,15 @@ The current runtime uses explicit world-context ownership:
 - `GravitasPhysicsService` owns context-local dynamic body registration,
   collider IDs, collider lookup, collision-pair pooling, active pair processing,
   and physics lifecycle phases.
+- `GravitasPhysics2DService` owns pure 2D body and collider registration,
+  collider IDs, 2D pair pooling, response/event processing, and caller-buffered
+  overlap-circle query APIs for one context.
 - `GravitasCollisionService` maps colliders into GridForge voxels through
   `GridWorld` spatial hash and active-grid access, `WorldVoxelIndex`, and
   `PhysicsPartition`, using `SwiftCollections` pools and duplicate-check sets.
+- `GravitasCollision2DService` maps pure 2D X/Z bounds into GridForge voxels
+  through `PhysicsPartition2D`, using the internal Y=0 storage plane as
+  deterministic broad-phase identity rather than physical thickness.
 - `GravitasRaycastService` and `GravitasCircleQueryService` own query workers,
   intersection state, candidate gathering, filtering, and result ordering for
   one context. Raycasts are 3D segment queries; circle queries are X/Z overlap
@@ -129,12 +135,15 @@ The current runtime uses explicit world-context ownership:
 - `StiffBody` owns simulated body state: position, rotation, visual
   interpolation state, velocity, acceleration, drag, friction, grounding,
   transforms, and Chronicler state recording.
+- `StiffBody2D` owns pure 2D body state: X/Z-projected position, scalar yaw,
+  linear velocity, force integration, sleep/wake state, and Chronicler state
+  recording.
 - `IMatterAgent` is the host boundary. Hosts provide a `GravitasWorldContext`,
   a `FixedTransform`, hierarchy information, and interaction state without tying
   Gravitas to a game engine.
-- `LSCollider` and primitive subclasses own shape state, bounds, layers,
-  trigger/contact events, GridForge partition coordinates, and collision-pair
-  references.
+- `LSCollider` and `LSCollider2D` primitive subclasses own shape state, bounds,
+  layers, trigger/contact events, GridForge partition coordinates, and
+  collision-pair references.
 - `CollisionDetection`, `CollisionResponse`, `CollisionPair`, `ContactPoint`,
   and context structs form the narrow-phase and response layer.
 
@@ -169,8 +178,10 @@ for visualization and host-facing presentation only.
 
 ## 2D, 3D, And Mixed-Dimension Direction
 
-Gravitas is currently 3D-focused. Some body state already separates a 2D ground
-position from height, but that is not the same as a complete 2D physics model.
+Gravitas still has deeper 3D coverage, but pure 2D now has a first-class
+runtime path through `StiffBody2D`, `LSCollider2D`,
+`GravitasPhysics2DService`, `GravitasCollision2DService`, and
+`PhysicsPartition2D`.
 
 When adding or redesigning dimension-sensitive behavior:
 

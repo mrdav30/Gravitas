@@ -107,9 +107,7 @@ public sealed class StiffBody2DHostContractTests
 
     private static GravitasWorldContext Create2DContext()
     {
-        GravitasWorldContext context = GravitasWorldContext.CreateOwned();
-        context.Settings.RuntimeMode = PhysicsRuntimeMode.TwoD;
-        return context;
+        return Physics2DTestWorld.CreateContext();
     }
 
     private static StiffBody2D CreateDynamicCircle(GravitasWorldContext context, Vector2d position)

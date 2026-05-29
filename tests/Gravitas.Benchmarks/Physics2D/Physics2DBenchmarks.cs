@@ -1,7 +1,9 @@
 using BenchmarkDotNet.Attributes;
 using FixedMathSharp;
 using Gravitas.Colliders;
+using GridForge.Configuration;
 using SwiftCollections;
+using System.Runtime.CompilerServices;
 
 namespace Gravitas.Benchmarks;
 
@@ -14,10 +16,13 @@ public class Physics2DBenchmarks
     private GravitasWorldContext _detectionContext;
     private SwiftList<StiffBody2D> _integrationBodies;
     private SwiftList<StiffBody2D> _collisionBodies;
+    private SwiftList<LSCollider2D> _sweepCollisionColliders;
+    private SwiftList<LSCollider2D> _sweepQueryColliders;
+    private SwiftList<LSCollider2D> _sweepSortedColliders;
     private SwiftList<Physics2DHit> _queryHits;
     private PreparedPair2D[] _shapePairs;
 
-    [Params(64)]
+    [Params(64, 1024)]
     public int BodyCount { get; set; }
 
     [GlobalSetup]
@@ -28,11 +33,14 @@ public class Physics2DBenchmarks
         _queryContext = GravitasWorldContext.CreateOwned();
         _detectionContext = GravitasWorldContext.CreateOwned();
         _integrationContext.Settings.RuntimeMode = PhysicsRuntimeMode.TwoD;
-        _collisionContext.Settings.RuntimeMode = PhysicsRuntimeMode.TwoD;
-        _queryContext.Settings.RuntimeMode = PhysicsRuntimeMode.TwoD;
-        _detectionContext.Settings.RuntimeMode = PhysicsRuntimeMode.TwoD;
+        Configure2DContext(_collisionContext, BodyCount);
+        Configure2DContext(_queryContext, BodyCount);
+        Configure2DContext(_detectionContext, BodyCount);
         _integrationBodies = new SwiftList<StiffBody2D>(BodyCount);
         _collisionBodies = new SwiftList<StiffBody2D>(BodyCount);
+        _sweepCollisionColliders = new SwiftList<LSCollider2D>(BodyCount * 2);
+        _sweepQueryColliders = new SwiftList<LSCollider2D>(BodyCount);
+        _sweepSortedColliders = new SwiftList<LSCollider2D>(BodyCount * 2);
         _queryHits = new SwiftList<Physics2DHit>(BodyCount);
         _shapePairs = new PreparedPair2D[BodyCount];
 
@@ -40,8 +48,9 @@ public class Physics2DBenchmarks
         {
             Vector2d position = PositionForIndex(i, spacing: (Fixed64)3);
             StiffBody2D body = CreateBody(_integrationContext, new LSCircleCollider2D(Fixed64.Half), position, immovable: false);
+            StiffBody2D queryBody = CreateBody(_queryContext, CreateShape(i), position, immovable: true);
             _integrationBodies.Add(body);
-            _ = CreateBody(_queryContext, CreateShape(i), position, immovable: true);
+            _sweepQueryColliders.Add(queryBody.Collider);
             _shapePairs[i] = CreatePreparedPair(i);
         }
 
@@ -49,8 +58,10 @@ public class Physics2DBenchmarks
         {
             Vector2d position = PositionForIndex(i, spacing: (Fixed64)2);
             StiffBody2D dynamicBody = CreateBody(_collisionContext, new LSCircleCollider2D(Fixed64.Half), position, immovable: false);
-            _ = CreateBody(_collisionContext, new LSCircleCollider2D(Fixed64.Half), position + new Vector2d(Fixed64.Half, Fixed64.Zero), immovable: true);
+            StiffBody2D staticBody = CreateBody(_collisionContext, new LSCircleCollider2D(Fixed64.Half), position + new Vector2d(Fixed64.Half, Fixed64.Zero), immovable: true);
             _collisionBodies.Add(dynamicBody);
+            _sweepCollisionColliders.Add(dynamicBody.Collider);
+            _sweepCollisionColliders.Add(staticBody.Collider);
         }
     }
 
@@ -68,6 +79,9 @@ public class Physics2DBenchmarks
         _detectionContext = null;
         _integrationBodies = null;
         _collisionBodies = null;
+        _sweepCollisionColliders = null;
+        _sweepQueryColliders = null;
+        _sweepSortedColliders = null;
         _queryHits = null;
         _shapePairs = null;
     }
@@ -80,6 +94,33 @@ public class Physics2DBenchmarks
 
         _integrationContext.Physics2D.LateSimulate();
         return _integrationContext.Physics2D.BodyCount;
+    }
+
+    [Benchmark]
+    public int ResolveOverlappingCirclePairs_SweepBaseline()
+    {
+        for (int i = 0; i < _collisionBodies.Count; i++)
+            _collisionBodies[i].SetPosition(PositionForIndex(i, spacing: (Fixed64)2));
+
+        PrepareSweep(_sweepCollisionColliders, _sweepSortedColliders);
+        int collisionCount = 0;
+        for (int i = 0; i < _sweepSortedColliders.Count; i++)
+        {
+            LSCollider2D first = _sweepSortedColliders[i];
+            for (int j = i + 1; j < _sweepSortedColliders.Count; j++)
+            {
+                LSCollider2D second = _sweepSortedColliders[j];
+                if (second.MinX > first.MaxX)
+                    break;
+                if (second.MinY > first.MaxY || second.MaxY < first.MinY)
+                    continue;
+
+                if (CollisionDetection2D.TryCollide(first, second, out _))
+                    collisionCount++;
+            }
+        }
+
+        return collisionCount;
     }
 
     [Benchmark]
@@ -107,12 +148,70 @@ public class Physics2DBenchmarks
     }
 
     [Benchmark]
+    public int OverlapCircleAll_SweepBaseline()
+    {
+        Vector2d center = new((Fixed64)12, (Fixed64)12);
+        Fixed64 radius = (Fixed64)18;
+        Fixed64 minX = center.x - radius;
+        Fixed64 maxX = center.x + radius;
+        Fixed64 minY = center.y - radius;
+        Fixed64 maxY = center.y + radius;
+        PrepareSweep(_sweepQueryColliders, _sweepSortedColliders);
+
+        int count = 0;
+        for (int i = 0; i < _sweepSortedColliders.Count; i++)
+        {
+            LSCollider2D collider = _sweepSortedColliders[i];
+            if (collider.MinX > maxX)
+                break;
+            if (collider.MaxX < minX
+                || collider.MinY > maxY
+                || collider.MaxY < minY)
+            {
+                continue;
+            }
+
+            if (CollisionDetection2D.TryOverlapCircle(center, radius, collider, out _))
+                count++;
+        }
+
+        return count;
+    }
+
+    [Benchmark]
     public int OverlapCircleAll()
     {
         return _queryContext.Physics2D.OverlapCircleAll(
             new Vector2d((Fixed64)12, (Fixed64)12),
             (Fixed64)18,
             _queryHits);
+    }
+
+    private static void Configure2DContext(GravitasWorldContext context, int bodyCount)
+    {
+        context.Settings.RuntimeMode = PhysicsRuntimeMode.TwoD;
+        int extent = bodyCount <= 64 ? 64 : 512;
+        context.World.TryAddGrid(
+            new GridConfiguration(
+                new Vector3d((Fixed64)(-16), Fixed64.Zero, (Fixed64)(-16)),
+                new Vector3d((Fixed64)extent, Fixed64.Zero, (Fixed64)extent)),
+            out _);
+    }
+
+    private static void PrepareSweep(SwiftList<LSCollider2D> source, SwiftList<LSCollider2D> sorted)
+    {
+        sorted.FastClear();
+        for (int i = 0; i < source.Count; i++)
+        {
+            LSCollider2D collider = source[i];
+            if (!collider.IsActive)
+                continue;
+
+            collider.Rebuild();
+            sorted.Add(collider);
+        }
+
+        SortCollidersByMinX(sorted);
     }
 
     private PreparedPair2D CreatePreparedPair(int index)
@@ -161,6 +260,84 @@ public class Physics2DBenchmarks
         int x = index % width;
         int y = index / width;
         return new Vector2d((Fixed64)x * spacing, (Fixed64)y * spacing);
+    }
+
+    private static void SortCollidersByMinX(SwiftList<LSCollider2D> colliders)
+    {
+        if (colliders.Count < 2)
+            return;
+
+        QuickSortColliders(colliders, 0, colliders.Count - 1);
+    }
+
+    private static void QuickSortColliders(SwiftList<LSCollider2D> colliders, int left, int right)
+    {
+        while (left < right)
+        {
+            if (right - left <= 16)
+            {
+                InsertionSortColliders(colliders, left, right);
+                return;
+            }
+
+            int i = left;
+            int j = right;
+            LSCollider2D pivot = colliders[left + ((right - left) / 2)];
+            while (i <= j)
+            {
+                while (CompareByMinX(colliders[i], pivot) < 0)
+                    i++;
+                while (CompareByMinX(colliders[j], pivot) > 0)
+                    j--;
+
+                if (i > j)
+                    continue;
+
+                if (i != j)
+                    (colliders[i], colliders[j]) = (colliders[j], colliders[i]);
+
+                i++;
+                j--;
+            }
+
+            if (j - left < right - i)
+            {
+                if (left < j)
+                    QuickSortColliders(colliders, left, j);
+
+                left = i;
+            }
+            else
+            {
+                if (i < right)
+                    QuickSortColliders(colliders, i, right);
+
+                right = j;
+            }
+        }
+    }
+
+    private static void InsertionSortColliders(SwiftList<LSCollider2D> colliders, int left, int right)
+    {
+        for (int i = left + 1; i <= right; i++)
+        {
+            LSCollider2D value = colliders[i];
+            int index = i - 1;
+            while (index >= left && CompareByMinX(colliders[index], value) > 0)
+            {
+                colliders[index + 1] = colliders[index];
+                index--;
+            }
+
+            colliders[index + 1] = value;
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static int CompareByMinX(LSCollider2D left, LSCollider2D right)
+    {
+        int min = left.MinX.CompareTo(right.MinX);
+        return min != 0 ? min : left.Id.CompareTo(right.Id);
     }
 
     private readonly struct PreparedPair2D

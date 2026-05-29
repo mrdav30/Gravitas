@@ -65,15 +65,19 @@ axis-aligned by design.
 
 ## Broad Phase Status
 
-The current pure 2D broad phase is still the alpha sweep-and-prune path inside
-`GravitasPhysics2DService`: active 2D colliders rebuild their
-`FixedMathSharp.BoundingArea`, sort by `MinX` with collider ID tie-breakers,
-then filter planar bounds before 2D narrow-phase dispatch.
+The current pure 2D broad phase is GridForge-backed. `LSCollider2D` rebuilds
+its `FixedMathSharp.BoundingArea` when body motion, host transform refresh, or
+shape inputs change, then `GravitasCollision2DService` maps the X/Z bounds into
+`PhysicsPartition2D` payloads attached to GridForge voxels. Partitions store
+collider IDs, split static and dynamic membership, keep a separate awake
+dynamic set, and distribute candidates in sorted deterministic order.
+
+Pure 2D partition storage uses the internal Y=0 GridForge plane. This is only a
+stable voxel identity for broad-phase lookup; it is not a public 3D slab,
+thickness, or mixed-dimension contact rule.
 
 `Physics2DBounds` has been removed. Do not add another public bounds/config
-bridge for pure 2D. Phase 9F should move broad-phase scale work toward
-GridForge-backed X/Z planar coverage while keeping any storage projection
-private and non-physical.
+bridge for pure 2D.
 
 ## Queries
 
@@ -85,6 +89,7 @@ context.Physics2D.OverlapCircleAll(center, radius, layerMask, results);
 ```
 
 Both overloads write into the caller-owned `SwiftList<Physics2DHit>`, run
+GridForge-backed partition candidate gathering with duplicate suppression, run
 layer-mask and exact 2D shape checks, and sort by deterministic hit ordering.
 
 The existing `GravitasCircleQueryService` is a 3D X/Z ground-plane proximity

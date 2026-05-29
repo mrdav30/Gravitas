@@ -40,6 +40,7 @@ public sealed class GravitasWorldContext : IDisposable
         CollisionScratch = new CollisionSatScratch();
         Diagnostics = new GravitasDiagnosticSink(this);
         Collisions = new GravitasCollisionService(this);
+        Collisions2D = new GravitasCollision2DService(this);
         Physics = new GravitasPhysicsService(this);
         Physics2D = new GravitasPhysics2DService(this);
         Raycasts = new GravitasRaycastService(this);
@@ -66,6 +67,11 @@ public sealed class GravitasWorldContext : IDisposable
     /// Gets this context's world-local collision partitioning service.
     /// </summary>
     public GravitasCollisionService Collisions { get; }
+
+    /// <summary>
+    /// Gets this context's world-local pure 2D collision partitioning service.
+    /// </summary>
+    public GravitasCollision2DService Collisions2D { get; }
 
     /// <summary>
     /// Gets this context's world-local physics registration and pair service.
@@ -317,6 +323,7 @@ public sealed class GravitasWorldContext : IDisposable
         ThrowIfDisposed();
         _clock.Reset();
         Collisions.Reset();
+        Collisions2D.Reset();
         Physics.Reset();
         Physics2D.Reset();
         Raycasts.Reset();

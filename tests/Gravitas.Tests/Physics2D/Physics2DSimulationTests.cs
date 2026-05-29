@@ -178,10 +178,7 @@ public sealed class Physics2DSimulationTests
 
     private static GravitasWorldContext CreateContext(int frameRate)
     {
-        GravitasWorldContext context = GravitasWorldContext.CreateOwned();
-        context.SetFrameRate(frameRate);
-        context.Settings.RuntimeMode = PhysicsRuntimeMode.TwoD;
-        return context;
+        return Physics2DTestWorld.CreateContext(frameRate);
     }
 
     private static StiffBody2D CreateCircle(GravitasWorldContext context, Vector2d position, bool immovable)
