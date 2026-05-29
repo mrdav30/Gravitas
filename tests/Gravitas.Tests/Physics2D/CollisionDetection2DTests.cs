@@ -1,6 +1,8 @@
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
+using Gravitas.Support;
+using Gravitas.Tests.Support;
 using Xunit;
 
 namespace Gravitas.Tests.Physics2D;
@@ -16,7 +18,7 @@ public sealed class CollisionDetection2DTests
     [InlineData(Collider2DType.ConvexPolygon, Collider2DType.ConvexPolygon)]
     public void TryCollide_ShouldSupportRequiredShapePairs(Collider2DType firstType, Collider2DType secondType)
     {
-        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        using GravitasWorldContext context = Create2DContext();
         LSCollider2D first = CreateCollider(firstType);
         LSCollider2D second = CreateCollider(secondType);
         _ = CreateBody(context, first, new Vector2d(Fixed64.Zero, Fixed64.Zero));
@@ -32,7 +34,7 @@ public sealed class CollisionDetection2DTests
     [Fact]
     public void TryCollide_WithSeparatedPolygons_ShouldReturnFalse()
     {
-        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        using GravitasWorldContext context = Create2DContext();
         LSCollider2D first = CreateCollider(Collider2DType.ConvexPolygon);
         LSCollider2D second = CreateCollider(Collider2DType.ConvexPolygon);
         _ = CreateBody(context, first, new Vector2d(Fixed64.Zero, Fixed64.Zero));
@@ -44,13 +46,22 @@ public sealed class CollisionDetection2DTests
 
     private static StiffBody2D CreateBody(GravitasWorldContext context, LSCollider2D collider, Vector2d position)
     {
-        var body = new StiffBody2D(context, collider)
+        var transform = new FixedTransform(new Vector3d(position.x, Fixed64.Zero, position.y), FixedQuaternion.Identity, Vector3d.One);
+        var agent = new TestMatterAgent(context, transform);
+        var body = new StiffBody2D(agent, collider)
         {
             Mass = Fixed64.One,
             Immovable = true
         };
         body.Initialize(position);
         return body;
+    }
+
+    private static GravitasWorldContext Create2DContext()
+    {
+        GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        context.Settings.RuntimeMode = PhysicsRuntimeMode.TwoD;
+        return context;
     }
 
     private static LSCollider2D CreateCollider(Collider2DType type) =>

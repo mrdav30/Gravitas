@@ -41,10 +41,12 @@ Current context methods run in this order:
 ```text
 Simulate
   Clock.Simulate
-  Physics.Simulate
+  If RuntimeMode == ThreeD:
+    Physics.Simulate
     PrepareCollisionPartitions for dynamic-body colliders
     Collisions.CheckAndDistributeCollisions
-  Physics2D.Simulate
+  If RuntimeMode == TwoD:
+    Physics2D.Simulate
     Rebuild active 2D collider bounds
     Sort 2D colliders by MinX
     Process overlapping 2D candidate pairs
@@ -53,21 +55,25 @@ Simulate
 
 LateSimulate
   Clock.LateSimulate
-  Physics.LateSimulate
+  If RuntimeMode == ThreeD:
+    Physics.LateSimulate
     ProcessActiveCollisionPairs
     StiffBody.LateSimulate for dynamic bodies
-  Physics2D.LateSimulate
+  If RuntimeMode == TwoD:
+    Physics2D.LateSimulate
     StiffBody2D.LateSimulate for dynamic 2D bodies
   Hooks.InvokeLateSimulate
 
 Visualize
   Clock.Visualize
-  Physics.Visualize
+  If RuntimeMode == ThreeD:
+    Physics.Visualize
     StiffBody.OnVisualize for dynamic bodies
   Hooks.InvokeVisualize
 
 LateVisualize
-  Physics.LateVisualize
+  If RuntimeMode == ThreeD:
+    Physics.LateVisualize
     StiffBody.LateVisualize for dynamic bodies
   Hooks.InvokeLateVisualize
 ```
@@ -91,6 +97,12 @@ The replay expectation is: the same initial context, settings, world data,
 ordered command sequence, and frame count should produce the same authoritative
 body, collider, clock, and contact state across repeated runs. The current
 contract is pinned by `GravitasSimulationPhaseOrderTests`.
+
+`PhysicsSettings.RuntimeMode` selects exactly one authoritative dimensional
+runtime path for the context: `ThreeD` runs the 3D service and skips the 2D
+service, while `TwoD` runs the pure 2D service and skips the 3D service.
+`Mixed` is intentionally absent until Phase 10 defines the embedding and impulse
+exchange policy.
 
 `Reset` clears the clock and all context-local service state, then invokes reset
 hooks. `SetFrameRate` and `ApplySettings` update the clock's frame rate and
@@ -140,7 +152,6 @@ contexts. These checks are core invariants.
 
 `StiffBody` owns:
 
-- simulation dimension through `PhysicsDimension`.
 - position as `Vector2d` ground position plus height, exposed as `Position3d`.
 - rotation and derived basis vectors.
 - visual position/rotation interpolation buffers.
@@ -173,12 +184,11 @@ but movement of the last hit platform invalidates that guard. Ground probes
 accept bodyless colliders, immovable bodies, and kinematic bodies as ground;
 ordinary movable dynamic bodies are ignored.
 
-Body dimension is authoritative setup state. `StiffBody.Dimension` defaults to
-`PhysicsDimension.ThreeD`, rejects unsupported values, and cannot change after
-initialization. Initialization also requires the bound collider to declare the
-same dimension. This prevents temporary 3D colliders from becoming the hidden
-implementation path for pure 2D bodies. The existing position-as-ground-plus-
-height fields still belong to the current 3D y-up body model.
+`StiffBody` is the 3D body model. Pure 2D behavior uses `StiffBody2D` instead
+of a dimension flag on `StiffBody`. This prevents temporary 3D colliders from
+becoming the hidden implementation path for pure 2D bodies. The existing
+position-as-ground-plus-height fields still belong to the current 3D y-up body
+model.
 
 Sleeping is body-owned and deterministic. A dynamic non-kinematic body can sleep
 after linear and angular speed remain below configured thresholds for the body
@@ -198,12 +208,16 @@ authoritative rotation. With a positive interpolation speed, each visualize call
 speed-limits from the current presentation rotation toward the authoritative
 target.
 
-`StiffBody2D` owns the pure 2D body model. It uses `Vector2d` position,
-`Vector2d` linear velocity, scalar rotation, 2D gravity, 2D force integration,
-sleep/wake state, and Chronicler record data. It intentionally has no y-up
-ground probe, height split, visual interpolation state, or 3D inertia tensor.
-`GravitasPhysics2DService.Simulate()` runs 2D contact response and events;
-`GravitasPhysics2DService.LateSimulate()` integrates active movable 2D bodies.
+`StiffBody2D` owns the pure 2D body model. It is constructed from an
+`IMatterAgent`, uses the agent context and transform bridge, and stores
+`Vector2d` position, `Vector2d` linear velocity, scalar rotation, 2D gravity,
+2D force integration, sleep/wake state, and Chronicler record data. Pure 2D
+positions use world X/Z projection: `Vector2d.x = Vector3d.x` and
+`Vector2d.y = Vector3d.z`. Kinematic 2D bodies read their agent transform during
+`LateSimulate`. It intentionally has no y-up ground probe, height split, visual
+interpolation state, or 3D inertia tensor. `GravitasPhysics2DService.Simulate()`
+runs 2D contact response and events; `GravitasPhysics2DService.LateSimulate()`
+integrates active movable 2D bodies.
 
 ## Collider State
 
@@ -213,7 +227,6 @@ ground probe, height split, visual interpolation state, or 3D inertia tensor.
 - optional `StiffBody` binding or host-only `IMatterAgent`.
 - active/trigger state.
 - layer index.
-- simulation dimension through `PhysicsDimension`.
 - shape type and shape priority.
 - local offset, scale-derived size, radius, area, bounds, and runtime-shape
   versioning.
@@ -240,17 +253,19 @@ Bodyless/static colliders are not owned by the dynamic body bucket, so a host
 that moves one after initialization must call `collider.Simulate()` to refresh
 bounds and partition membership.
 
-Current 3D primitive colliders declare `PhysicsDimension.ThreeD`. Pure 2D
-colliders derive from `LSCollider2D`; `LSCircleCollider2D`,
-`LSAABBoxCollider2D`, and `LSPolygonCollider2D` own their own 2D bounds, support
-points, closest-point math, and shape validation. They are registered with
-`GravitasPhysics2DService`, not with the 3D `GravitasPhysicsService`.
+Current 3D primitive colliders derive from `LSCollider`. Pure 2D colliders
+derive from `LSCollider2D`; `LSCircleCollider2D`, `LSAABBoxCollider2D`, and
+`LSPolygonCollider2D` own their own 2D bounds, support points, closest-point
+math, and shape validation. They are registered with `GravitasPhysics2DService`,
+not with the 3D `GravitasPhysicsService`. Bodyless 2D colliders bind through
+`InitializeWithNoBody(IMatterAgent)` and use the same X/Z transform projection
+for query and trigger visibility.
 
 ## Settings And Environment
 
-`PhysicsSettings` holds the frame rate, collision matrix, pooling switch,
-ground-check layer mask, and default continuous-collision mode. The collision
-matrix uses `true` for collide and `false` for ignore.
+`PhysicsSettings` holds the frame rate, runtime mode, collision matrix, pooling
+switch, ground-check layer mask, and default continuous-collision mode. The
+collision matrix uses `true` for collide and `false` for ignore.
 
 `PhysicsEnvironment` holds physical and culling values such as gravity, air
 density, speed caps, friction transition speed, damping, and culling scores.

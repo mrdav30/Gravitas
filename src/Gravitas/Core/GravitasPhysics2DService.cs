@@ -46,7 +46,17 @@ public sealed class GravitasPhysics2DService
             BodyCount++;
         }
 
-        LSCollider2D collider = body.Collider;
+        AssimilateCollider(body.Collider);
+    }
+
+    internal void AssimilateCollider(LSCollider2D collider)
+    {
+        SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
+        SwiftThrowHelper.ThrowIfArgument(
+            !ReferenceEquals(collider.Context, _context),
+            nameof(collider),
+            "2D collider must belong to this physics service context.");
+
         collider.SetPhysicsState(_nextColliderId++, _colliders.Count);
         _colliders.Add(collider);
     }
@@ -58,6 +68,12 @@ public sealed class GravitasPhysics2DService
             BodyCount--;
 
         LSCollider2D collider = body.Collider;
+        DessimilateCollider(collider);
+    }
+
+    internal void DessimilateCollider(LSCollider2D collider)
+    {
+        SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
         RemovePairsForCollider(collider);
         RemoveCollider(collider);
         collider.ClearPhysicsState();
@@ -180,6 +196,9 @@ public sealed class GravitasPhysics2DService
 
     private void ProcessCandidate(LSCollider2D first, LSCollider2D second, int frame)
     {
+        if (ReferenceEquals(first.AgentOrNull, second.AgentOrNull))
+            return;
+
         if (IsLayerCollisionDisabled(first.Layer, second.Layer))
             return;
 

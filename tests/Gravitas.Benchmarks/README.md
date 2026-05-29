@@ -70,8 +70,8 @@ Start with hot paths that can be isolated and repeated deterministically:
 - `CollisionDetection` shape-pair checks.
 - `CollisionResponse` contact resolution.
 - continuous collision detection policy and swept movement cost.
-- pure 2D integration, sweep-and-prune broad phase, narrow-phase pairs,
-  response, and overlap queries.
+- pure 2D host-agent setup, runtime-mode gated integration, sweep-and-prune
+  broad phase, narrow-phase pairs, response, and overlap queries.
 - collider shape-state rebuilds, capsule derived state, compound aggregate bounds, and mesh validation/BVH construction.
 - `GravitasRaycastService` and `GravitasCircleQueryService` query gathering, filtering, and result ordering.
 - Mesh collider preprocessing and convex mesh limits.

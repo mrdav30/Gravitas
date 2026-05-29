@@ -2,6 +2,7 @@ using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.Support;
+using Gravitas.Tests.Support;
 using SwiftCollections;
 using Xunit;
 
@@ -13,7 +14,8 @@ public sealed class Physics2DSimulationTests
     public void LateSimulate_ShouldIntegratePure2DForceVelocityAndPosition()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 4);
-        var body = new StiffBody2D(context, new LSCircleCollider2D(Fixed64.Half))
+        var agent = new TestMatterAgent(context);
+        var body = new StiffBody2D(agent, new LSCircleCollider2D(Fixed64.Half))
         {
             Mass = (Fixed64)2
         };
@@ -178,12 +180,15 @@ public sealed class Physics2DSimulationTests
     {
         GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         context.SetFrameRate(frameRate);
+        context.Settings.RuntimeMode = PhysicsRuntimeMode.TwoD;
         return context;
     }
 
     private static StiffBody2D CreateCircle(GravitasWorldContext context, Vector2d position, bool immovable)
     {
-        var body = new StiffBody2D(context, new LSCircleCollider2D(Fixed64.Half))
+        var transform = new FixedTransform(new Vector3d(position.x, Fixed64.Zero, position.y), FixedQuaternion.Identity, Vector3d.One);
+        var agent = new TestMatterAgent(context, transform);
+        var body = new StiffBody2D(agent, new LSCircleCollider2D(Fixed64.Half))
         {
             Mass = Fixed64.One,
             Immovable = immovable

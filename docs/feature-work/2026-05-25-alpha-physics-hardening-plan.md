@@ -1090,7 +1090,7 @@ hardening below are complete.
 - [x] Update `docs/wiki/OVERVIEW.md`, `RUNTIME_ARCHITECTURE.md`,
   `COLLISION_PIPELINE.md`, and `QUERY_SERVICES.md` to describe the pure 2D
   model and explicitly defer mixed 2D/3D interaction to Phase 10.
-- [ ] **Phase 9E - 2D runtime contract cleanup:** Align pure 2D host binding,
+- [x] **Phase 9E - 2D runtime contract cleanup:** Align pure 2D host binding,
   runtime toggles, type-system boundaries, transform projection, folder layout,
   and parity tests before broad-phase scale work.
 - [ ] **Phase 9F - GridForge-backed 2D broad phase:** Replace the alpha
@@ -1209,51 +1209,51 @@ source layout, lifecycle parity, and tests.
 
 **Tasks:**
 
-- [ ] Add a context-level runtime mode with explicit `TwoD` and `ThreeD`
+- [x] Add a context-level runtime mode with explicit `TwoD` and `ThreeD`
   options only. Do not add `Mixed` until Phase 10 defines the embedding and
   impulse-exchange policy.
-- [ ] Update `GravitasWorldContext.Simulate()`, `LateSimulate()`,
+- [x] Update `GravitasWorldContext.Simulate()`, `LateSimulate()`,
   `Visualize()`, and `LateVisualize()` so the disabled dimensional runtime path
   is skipped entirely. Pure 2D should not pay 3D service cost, and pure 3D
   should not pay 2D service cost.
-- [ ] Add runtime-mode tests proving `TwoD` skips 3D simulation/visualization
+- [x] Add runtime-mode tests proving `TwoD` skips 3D simulation/visualization
   work, `ThreeD` skips 2D simulation work, and the active mode still advances
   the shared deterministic clock and hooks correctly.
-- [ ] Change `StiffBody2D` construction to use `IMatterAgent` as the required
+- [x] Change `StiffBody2D` construction to use `IMatterAgent` as the required
   host bridge, matching the 3D body contract. The body should derive its
   `GravitasWorldContext` from `agent.Context`, keep the agent reference, and
   use the agent's `FixedTransform` for host-facing kinematic and visual
   synchronization.
-- [ ] Add `LSCollider2D.InitializeWithNoBody(IMatterAgent)` parity for bodyless
+- [x] Add `LSCollider2D.InitializeWithNoBody(IMatterAgent)` parity for bodyless
   static/trigger 2D colliders. Bodyless 2D colliders must still bind to the
   host agent, context, layer, trigger/contact surface, and broad-phase service.
-- [ ] Define and document pure 2D transform projection explicitly. Gravitas'
+- [x] Define and document pure 2D transform projection explicitly. Gravitas'
   stack convention is X/Z planar physics: `Vector2d.x` maps from
   `Vector3d.x`, `Vector2d.y` maps from `Vector3d.z`, and `Vector3d.y` remains
   vertical height or future embedding metadata. `Vector3d.ToVector2d()` is
   correct for this convention and should be preferred when converting 3D world
   positions to pure 2D planar positions.
-- [ ] Add 2D kinematic tests proving host transform movement updates the 2D
+- [x] Add 2D kinematic tests proving host transform movement updates the 2D
   body deterministically, refreshes collider bounds/query visibility, and does
   not mutate disabled runtime paths.
-- [ ] Add bodyless static 2D collider tests for collision, trigger events,
+- [x] Add bodyless static 2D collider tests for collision, trigger events,
   layer filtering, query visibility, deactivation cleanup, and reset cleanup.
-- [ ] Add same-agent or explicit hierarchy exclusion tests for 2D colliders.
+- [x] Add same-agent or explicit hierarchy exclusion tests for 2D colliders.
   The final rule should match the engine-agnostic 3D host-bound hierarchy
   contract without walking host transform trees at simulation time.
-- [ ] Remove `PhysicsDimension` and `PhysicsDimensionRules`. The runtime should
+- [x] Remove `PhysicsDimension` and `PhysicsDimensionRules`. The runtime should
   use concrete body/collider types to distinguish 2D and 3D. Update tests and
   docs so mixed behavior is described as a future policy between concrete types,
   not as a third dimension enum value.
-- [ ] Reorganize the current `src/Gravitas/Physics2D` files into the same
+- [x] Reorganize the current `src/Gravitas/Physics2D` files into the same
   subdomain layout as their 3D counterparts. Avoid namespace churn unless it
   reduces real API ambiguity.
-- [ ] Remove `Physics2DBounds` unless the Phase 9F implementation proves a
+- [x] Remove `Physics2DBounds` unless the Phase 9F implementation proves a
   tiny private transient helper is needed. Prefer direct collider-bounds to
   GridForge planar coverage flow over another configuration-shaped abstraction.
-- [ ] Update `docs/wiki` pages and benchmark docs to reflect the final 2D host
+- [x] Update `docs/wiki` pages and benchmark docs to reflect the final 2D host
   contract, runtime mode behavior, transform projection, and source layout.
-- [ ] Run focused 2D/core tests, full `Release` build/test, full `ReleaseLean`
+- [x] Run focused 2D/core tests, full `Release` build/test, full `ReleaseLean`
   build/test, and a short `physics-2d` benchmark smoke before closing this
   phase.
 
@@ -1266,6 +1266,26 @@ source layout, lifecycle parity, and tests.
 - Runtime mode tests must prove disabled dimensional paths do not run.
 - 2D kinematic, bodyless, trigger, layer, hierarchy, query, and replay behavior
   must remain deterministic after the source-layout cleanup.
+
+**Phase 9E Status - 2026-05-29**
+
+- Added `PhysicsRuntimeMode.TwoD` and `ThreeD` on `PhysicsSettings`; context
+  simulation and visualization phases now advance only the enabled dimensional
+  service while keeping the shared clock, coroutines, and hooks active.
+- Changed `StiffBody2D` construction to require `IMatterAgent`, derive context
+  from `agent.Context`, and project kinematic host transforms through the X/Z
+  convention.
+- Added bodyless 2D collider binding through
+  `LSCollider2D.InitializeWithNoBody(IMatterAgent)`, including query visibility,
+  static collision response, and same-agent collision suppression.
+- Removed `PhysicsDimension`, `PhysicsDimensionRules`, and `Physics2DBounds`.
+  Pure 2D collider bounds now use `FixedMathSharp.BoundingArea` directly.
+- Moved 2D runtime files beside their 3D counterparts:
+  `StiffBody2D` and `GravitasPhysics2DService` moved to `Core`, 2D detection,
+  pairs, contacts, and response moved under `CollisionHandling`, and
+  `Physics2DHit` moved under `Raycasting`.
+- Updated tests, benchmarks, and `docs/wiki` for runtime mode, host-agent 2D
+  setup, X/Z projection, source layout, and the removal of dimension scaffolding.
 
 ## Phase 9F: GridForge-Backed 2D Broad Phase And Scale Gate
 

@@ -21,17 +21,18 @@ public sealed class StiffBody2D : IRecordable
     private bool _isDynamic;
     private int _sleepFrameCount;
 
-    public StiffBody2D(GravitasWorldContext context, LSCollider2D collider)
+    public StiffBody2D(IMatterAgent agent, LSCollider2D collider)
     {
-        SwiftThrowHelper.ThrowIfNull(context, nameof(context));
+        SwiftThrowHelper.ThrowIfNull(agent, nameof(agent));
         SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
-        Context = context;
+        Agent = agent;
+        Context = agent.Context;
         Collider = collider;
     }
 
-    public GravitasWorldContext Context { get; }
+    public IMatterAgent Agent { get; }
 
-    public PhysicsDimension Dimension => PhysicsDimension.TwoD;
+    public GravitasWorldContext Context { get; }
 
     public LSCollider2D Collider { get; }
 
@@ -82,8 +83,6 @@ public sealed class StiffBody2D : IRecordable
     public void Initialize(Vector2d position, Fixed64 rotation = default, bool isDynamic = true)
     {
         SwiftThrowHelper.ThrowIfTrue(Active, nameof(StiffBody2D), "2D body is already initialized.");
-        PhysicsDimensionRules.ThrowIfUnsupported(Dimension, nameof(Dimension));
-        SwiftThrowHelper.ThrowIfArgument(Collider.Dimension != Dimension, nameof(Collider), "Body and collider must use the same simulation dimension.");
 
         _position = position;
         _rotation = rotation;
@@ -150,6 +149,9 @@ public sealed class StiffBody2D : IRecordable
         if (!Active)
             return;
 
+        if (IsKinematic)
+            UpdateKinematicPositionAndRotation();
+
         if (!CanMove)
         {
             _linearAccelerationStore = Vector2d.Zero;
@@ -170,6 +172,20 @@ public sealed class StiffBody2D : IRecordable
         Collider.Rebuild();
 
         UpdateSleepState();
+    }
+
+    private void UpdateKinematicPositionAndRotation()
+    {
+        Vector2d kinematicPosition = Agent.Transform.Position.ToVector2d();
+        Fixed64 kinematicRotation = FixedMath.DegToRad(Agent.Transform.EulerAngles.y);
+        bool changed = _position != kinematicPosition || _rotation != kinematicRotation;
+        if (!changed)
+            return;
+
+        Wake();
+        _position = kinematicPosition;
+        _rotation = kinematicRotation;
+        Collider.Rebuild();
     }
 
     internal void ApplyCollisionPositionCorrection(Vector2d positionCorrection)
@@ -205,6 +221,7 @@ public sealed class StiffBody2D : IRecordable
         DynamicId = -1;
         Collider.IsActive = false;
         Collider.ClearPhysicsState();
+        Collider.ClearBindingState();
     }
 
     private bool CanSleep => SleepEnabled && CanMove;

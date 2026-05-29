@@ -85,11 +85,10 @@ flowchart TD
 | `GravitasWorldContext` | Owns one active `GridWorld` plus all context-local runtime services. |
 | `IMatterAgent` | Host boundary. Supplies context, fixed transform, hierarchy state, and interaction state. |
 | `StiffBody` | Simulated body state: position, rotation, velocity, acceleration, mass, grounding, impulses, sleep/wake state, interpolation, and Chronicler record data. |
-| `StiffBody2D` | Pure 2D body state: X/Y position, scalar rotation, linear velocity, force integration, gravity, sleep/wake state, and Chronicler record data. |
+| `StiffBody2D` | Pure 2D body state: X/Z-projected position, scalar rotation, linear velocity, force integration, gravity, sleep/wake state, host agent binding, and Chronicler record data. |
 | `LSCollider` | Base collider state: shape, bounds, layer, trigger/contact events, partition coordinates, pair references, and context binding. |
 | `LSCollider2D` | Base pure 2D collider state for circle, axis-aligned box, and convex polygon shapes. |
-| `PhysicsDimension` | Declares whether a body or collider belongs to the first-class 2D or 3D simulation domain. |
-| `Physics2DBounds` | Projects pure 2D X/Y bounds into a deterministic fixed broad-phase storage slab. |
+| `PhysicsRuntimeMode` | Selects whether a context advances the pure 2D or 3D runtime path. Mixed mode is intentionally deferred. |
 | `GravitasPhysicsService` | Body/collider registration, context-local collider IDs, collision-pair pooling, simulation phases, and visualization phases. |
 | `GravitasPhysics2DService` | Pure 2D registration, collider IDs, sweep-and-prune broad phase, narrow phase, response, events, and overlap-circle queries. |
 | `GravitasCollisionService` | GridForge-backed broad-phase partitioning, active partition tracking, partition pooling, and collision distribution versioning. |
@@ -120,12 +119,13 @@ flowchart TD
 8. On pooling, despawn, session reset, or shutdown, the host deactivates objects
    and disposes or resets the context.
 
-Pure 2D scenes use the same context and clock but create `LSCollider2D` shapes
-and `StiffBody2D` bodies, then run through `context.Physics2D`. The current 2D
-path supports circles, axis-aligned boxes, convex polygons, deterministic
-collision response, contact events, sleep/wake behavior, replay tests, and
-overlap-circle queries. Mixed 2D/3D contacts are intentionally not part of this
-flow yet.
+Pure 2D scenes use the same context and clock, set
+`context.Settings.RuntimeMode` to `PhysicsRuntimeMode.TwoD`, then create
+`LSCollider2D` shapes and `StiffBody2D` bodies from host `IMatterAgent`
+instances. The current 2D path supports circles, axis-aligned boxes, convex
+polygons, bodyless static/trigger colliders, deterministic collision response,
+contact events, sleep/wake behavior, replay tests, and overlap-circle queries.
+Mixed 2D/3D contacts are intentionally not part of this flow yet.
 
 ## Collision In One Breath
 
@@ -176,13 +176,12 @@ active-pair queue during `LateSimulate`.
 | Area | Files |
 | --- | --- |
 | Context and lifecycle | [`GravitasWorldContext.cs`](../../src/Gravitas/Runtime/GravitasWorldContext.cs), [`GravitasClock.cs`](../../src/Gravitas/Runtime/GravitasClock.cs), [`GravitasLifecycleHooks.cs`](../../src/Gravitas/Runtime/GravitasLifecycleHooks.cs) |
-| Host boundary and bodies | [`IMatterAgent.cs`](../../src/Gravitas/Core/IMatterAgent.cs), [`StiffBody.cs`](../../src/Gravitas/Core/StiffBody.cs), [`StiffBody2D.cs`](../../src/Gravitas/Physics2D/StiffBody2D.cs) |
-| Physics service | [`GravitasPhysicsService.cs`](../../src/Gravitas/Core/GravitasPhysicsService.cs) |
-| 2D physics service | [`Physics2D`](../../src/Gravitas/Physics2D), [`Primitives2D`](../../src/Gravitas/Colliders/Primitives2D) |
+| Host boundary and bodies | [`IMatterAgent.cs`](../../src/Gravitas/Core/IMatterAgent.cs), [`StiffBody.cs`](../../src/Gravitas/Core/StiffBody.cs), [`StiffBody2D.cs`](../../src/Gravitas/Core/StiffBody2D.cs) |
+| Physics services | [`GravitasPhysicsService.cs`](../../src/Gravitas/Core/GravitasPhysicsService.cs), [`GravitasPhysics2DService.cs`](../../src/Gravitas/Core/GravitasPhysics2DService.cs) |
 | Collision broad phase | [`GravitasCollisionService.cs`](../../src/Gravitas/Core/GravitasCollisionService.cs), [`PhysicsPartition.cs`](../../src/Gravitas/Partitions/PhysicsPartition.cs) |
 | Colliders | [`LSCollider.cs`](../../src/Gravitas/Colliders/LSCollider.cs), [`Primitives`](../../src/Gravitas/Colliders/Primitives), [`Primitives2D`](../../src/Gravitas/Colliders/Primitives2D) |
-| Collision handling | [`CollisionPair.cs`](../../src/Gravitas/CollisionHandling/Pairs/CollisionPair.cs), [`CollisionDetection.cs`](../../src/Gravitas/CollisionHandling/Detection/CollisionDetection.cs), [`CollisionResponse.cs`](../../src/Gravitas/CollisionHandling/Response/CollisionResponse.cs) |
-| Dimensions | [`Dimensions`](../../src/Gravitas/Dimensions), [`DIMENSIONS.md`](DIMENSIONS.md) |
-| Queries | [`GravitasRaycastService.cs`](../../src/Gravitas/Raycasting/GravitasRaycastService.cs), [`GravitasCircleQueryService.cs`](../../src/Gravitas/Raycasting/GravitasCircleQueryService.cs), [`RaycastSegmentWorker.cs`](../../src/Gravitas/Raycasting/RaycastSegmentWorker.cs) |
+| Collision handling | [`CollisionPair.cs`](../../src/Gravitas/CollisionHandling/Pairs/CollisionPair.cs), [`CollisionPair2D.cs`](../../src/Gravitas/CollisionHandling/Pairs/CollisionPair2D.cs), [`CollisionDetection.cs`](../../src/Gravitas/CollisionHandling/Detection/CollisionDetection.cs), [`CollisionDetection2D.cs`](../../src/Gravitas/CollisionHandling/Detection/CollisionDetection2D.cs), [`CollisionResponse.cs`](../../src/Gravitas/CollisionHandling/Response/CollisionResponse.cs), [`CollisionResponse2D.cs`](../../src/Gravitas/CollisionHandling/Response/CollisionResponse2D.cs) |
+| 2D/3D direction | [`DIMENSIONS.md`](DIMENSIONS.md) |
+| Queries | [`GravitasRaycastService.cs`](../../src/Gravitas/Raycasting/GravitasRaycastService.cs), [`GravitasCircleQueryService.cs`](../../src/Gravitas/Raycasting/GravitasCircleQueryService.cs), [`Physics2DHit.cs`](../../src/Gravitas/Raycasting/Physics2DHit.cs), [`RaycastSegmentWorker.cs`](../../src/Gravitas/Raycasting/RaycastSegmentWorker.cs) |
 | Diagnostics | [`Diagnostics`](../../src/Gravitas/Diagnostics) |
 | Tests and examples | [`tests/Gravitas.Tests`](../../tests/Gravitas.Tests), [`tests/Gravitas.Benchmarks`](../../tests/Gravitas.Benchmarks) |

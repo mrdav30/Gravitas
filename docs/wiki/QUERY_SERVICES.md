@@ -146,6 +146,10 @@ The service clears the caller-provided `SwiftList<Physics2DHit>`, writes hits
 into it, returns the hit count, and sorts by surface distance with collider ID
 as the deterministic tie-breaker.
 
+Pure 2D query positions are `Vector2d` values in the X/Z plane. When hosts
+convert from a `FixedTransform`, use `Vector3d.ToVector2d()` so world X maps to
+2D X and world Z maps to 2D Y.
+
 The candidate path is:
 
 1. rebuild current 2D collider bounds into the service broad-phase buffer.

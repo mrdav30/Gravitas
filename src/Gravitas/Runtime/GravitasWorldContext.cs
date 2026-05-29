@@ -260,8 +260,11 @@ public sealed class GravitasWorldContext : IDisposable
     {
         ThrowIfDisposed();
         _clock.Simulate();
-        Physics.Simulate();
-        Physics2D.Simulate();
+        if (Settings.RuntimeMode == PhysicsRuntimeMode.ThreeD)
+            Physics.Simulate();
+        else
+            Physics2D.Simulate();
+
         Coroutines.Simulate();
         _hooks.InvokeSimulate();
     }
@@ -273,8 +276,11 @@ public sealed class GravitasWorldContext : IDisposable
     {
         ThrowIfDisposed();
         _clock.LateSimulate();
-        Physics.LateSimulate();
-        Physics2D.LateSimulate();
+        if (Settings.RuntimeMode == PhysicsRuntimeMode.ThreeD)
+            Physics.LateSimulate();
+        else
+            Physics2D.LateSimulate();
+
         _hooks.InvokeLateSimulate();
     }
 
@@ -285,7 +291,9 @@ public sealed class GravitasWorldContext : IDisposable
     {
         ThrowIfDisposed();
         _clock.Visualize();
-        Physics.Visualize();
+        if (Settings.RuntimeMode == PhysicsRuntimeMode.ThreeD)
+            Physics.Visualize();
+
         _hooks.InvokeVisualize();
     }
 
@@ -295,7 +303,9 @@ public sealed class GravitasWorldContext : IDisposable
     public void LateVisualize()
     {
         ThrowIfDisposed();
-        Physics.LateVisualize();
+        if (Settings.RuntimeMode == PhysicsRuntimeMode.ThreeD)
+            Physics.LateVisualize();
+
         _hooks.InvokeLateVisualize();
     }
 

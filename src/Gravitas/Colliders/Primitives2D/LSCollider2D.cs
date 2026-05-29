@@ -11,6 +11,7 @@ namespace Gravitas.Colliders;
 public abstract class LSCollider2D
 {
     private StiffBody2D? _body;
+    private IMatterAgent? _agent;
     private GravitasWorldContext? _context;
     private int _id = -1;
     private int _serviceIndex = -1;
@@ -18,7 +19,7 @@ public abstract class LSCollider2D
     private bool _isTrigger;
     private PhysicsLayer _layer = new();
     private Vector2d _localOffset;
-    private Physics2DBounds _bounds;
+    private BoundingArea _bounds;
 
     public delegate void Body2DCollisionFunc(StiffBody2D other);
     public delegate void Trigger2DCollisionFunc(LSCollider2D other);
@@ -53,6 +54,20 @@ public abstract class LSCollider2D
     internal int ServiceIndex => _serviceIndex;
 
     public StiffBody2D? Body => _body;
+
+    public IMatterAgent Agent
+    {
+        get
+        {
+            SwiftThrowHelper.ThrowIfTrue(
+                _agent == null,
+                nameof(LSCollider2D),
+                "2D collider is not bound to an IMatterAgent.");
+            return _agent!;
+        }
+    }
+
+    internal IMatterAgent? AgentOrNull => _agent;
 
     public GravitasWorldContext Context
     {
@@ -93,12 +108,6 @@ public abstract class LSCollider2D
         set => _layer = value;
     }
 
-    public PhysicsDimension Dimension
-    {
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        get => PhysicsDimension.TwoD;
-    }
-
     public abstract Collider2DType Shape { get; }
 
     public Vector2d LocalOffset
@@ -115,27 +124,40 @@ public abstract class LSCollider2D
         }
     }
 
-    public Vector2d Position => _body?.Position ?? Vector2d.Zero;
+    public Vector2d Position => _body?.Position ?? _agent?.Transform.Position.ToVector2d() ?? Vector2d.Zero;
 
-    public Fixed64 Rotation => _body?.Rotation ?? Fixed64.Zero;
+    public Fixed64 Rotation => _body?.Rotation ?? ResolveAgentRotation();
 
     public Vector2d Center => Position + Rotate(LocalOffset, Rotation);
 
-    public Physics2DBounds Bounds => _bounds;
+    public BoundingArea Bounds => _bounds;
 
-    public Fixed64 MinX => _bounds.Area.MinX;
+    public Fixed64 MinX => _bounds.MinX;
 
-    public Fixed64 MaxX => _bounds.Area.MaxX;
+    public Fixed64 MaxX => _bounds.MaxX;
 
-    public Fixed64 MinY => _bounds.Area.MinY;
+    public Fixed64 MinY => _bounds.MinY;
 
-    public Fixed64 MaxY => _bounds.Area.MaxY;
+    public Fixed64 MaxY => _bounds.MaxY;
 
     internal void Initialize(StiffBody2D body)
     {
         SwiftThrowHelper.ThrowIfNull(body, nameof(body));
+        InitCore(body.Agent, body);
+    }
+
+    public void InitializeWithNoBody(IMatterAgent agent)
+    {
+        InitCore(agent, null);
+        Context.Physics2D.AssimilateCollider(this);
+    }
+
+    private void InitCore(IMatterAgent agent, StiffBody2D? body)
+    {
+        SwiftThrowHelper.ThrowIfNull(agent, nameof(agent));
         _body = body;
-        _context = body.Context;
+        _agent = agent;
+        _context = agent.Context;
         _isActive = true;
         Rebuild();
     }
@@ -158,6 +180,25 @@ public abstract class LSCollider2D
     {
         _id = -1;
         _serviceIndex = -1;
+    }
+
+    internal void ClearBindingState()
+    {
+        _body = null;
+        _agent = null;
+        _context = null;
+    }
+
+    public void Deactivate()
+    {
+        if (!_isActive)
+            return;
+
+        if (_context != null && _id >= 0)
+            _context.Physics2D.DessimilateCollider(this);
+
+        _isActive = false;
+        ClearBindingState();
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -204,11 +245,20 @@ public abstract class LSCollider2D
 
     protected abstract void RebuildShape();
 
-    protected void SetBounds(Physics2DBounds bounds) => _bounds = bounds;
+    protected void SetBounds(BoundingArea bounds) => _bounds = bounds;
 
     protected void SetBoundsFromMinMax(Vector2d min, Vector2d max)
     {
-        SetBounds(Physics2DBounds.FromMinMax(min, max, Fixed64.Zero, Fixed64.Zero));
+        SetBounds(new BoundingArea(
+            new Vector3d(min.x, min.y, Fixed64.Zero),
+            new Vector3d(max.x, max.y, Fixed64.Zero)));
+    }
+
+    private Fixed64 ResolveAgentRotation()
+    {
+        return _agent == null
+            ? Fixed64.Zero
+            : FixedMath.DegToRad(_agent.Transform.EulerAngles.y);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

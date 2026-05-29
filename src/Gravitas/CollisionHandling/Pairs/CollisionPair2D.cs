@@ -65,11 +65,11 @@ internal sealed class CollisionPair2D
     {
         StiffBody2D? bodyA = ColliderA.Body;
         StiffBody2D? bodyB = ColliderB.Body;
-        if (bodyA == null || bodyB == null)
+        if (bodyA == null && bodyB == null)
             return;
 
-        Fixed64 inverseMassA = bodyA.CanMove ? bodyA.InverseMass : Fixed64.Zero;
-        Fixed64 inverseMassB = bodyB.CanMove ? bodyB.InverseMass : Fixed64.Zero;
+        Fixed64 inverseMassA = bodyA?.CanMove == true ? bodyA.InverseMass : Fixed64.Zero;
+        Fixed64 inverseMassB = bodyB?.CanMove == true ? bodyB.InverseMass : Fixed64.Zero;
         Fixed64 totalInverseMass = inverseMassA + inverseMassB;
         if (totalInverseMass <= Fixed64.Zero)
             return;
@@ -85,8 +85,8 @@ internal sealed class CollisionPair2D
     }
 
     private static void ApplyPositionCorrection(
-        StiffBody2D bodyA,
-        StiffBody2D bodyB,
+        StiffBody2D? bodyA,
+        StiffBody2D? bodyB,
         Vector2d normal,
         Fixed64 depth,
         Fixed64 inverseMassA,
@@ -98,24 +98,28 @@ internal sealed class CollisionPair2D
             return;
 
         Vector2d correction = normal * (correctionDepth * CollisionResponse2D.PenetrationCorrectionPercent / totalInverseMass);
-        bodyA.ApplyCollisionPositionCorrection(-correction * inverseMassA);
-        bodyB.ApplyCollisionPositionCorrection(correction * inverseMassB);
+        bodyA?.ApplyCollisionPositionCorrection(-correction * inverseMassA);
+        bodyB?.ApplyCollisionPositionCorrection(correction * inverseMassB);
     }
 
     private static void ApplyVelocityImpulse(
-        StiffBody2D bodyA,
-        StiffBody2D bodyB,
+        StiffBody2D? bodyA,
+        StiffBody2D? bodyB,
         Vector2d normal,
         Fixed64 inverseMassA,
         Fixed64 inverseMassB,
         Fixed64 totalInverseMass)
     {
-        Vector2d relativeVelocity = bodyB.LinearVelocity - bodyA.LinearVelocity;
+        Vector2d velocityA = bodyA?.LinearVelocity ?? Vector2d.Zero;
+        Vector2d velocityB = bodyB?.LinearVelocity ?? Vector2d.Zero;
+        Vector2d relativeVelocity = velocityB - velocityA;
         Fixed64 normalVelocity = Vector2d.Dot(relativeVelocity, normal);
         if (normalVelocity >= Fixed64.Zero)
             return;
 
-        Fixed64 restitution = FixedMath.Min(bodyA.RestitutionCoefficient, bodyB.RestitutionCoefficient);
+        Fixed64 restitution = bodyA != null && bodyB != null
+            ? FixedMath.Min(bodyA.RestitutionCoefficient, bodyB.RestitutionCoefficient)
+            : Fixed64.Zero;
         if (-normalVelocity <= CollisionResponse2D.RestitutionVelocityThreshold)
             restitution = Fixed64.Zero;
 
@@ -124,8 +128,8 @@ internal sealed class CollisionPair2D
             return;
 
         Vector2d impulse = normal * impulseScalar;
-        bodyA.ApplyCollisionLinearVelocityDelta(-impulse * inverseMassA);
-        bodyB.ApplyCollisionLinearVelocityDelta(impulse * inverseMassB);
+        bodyA?.ApplyCollisionLinearVelocityDelta(-impulse * inverseMassA);
+        bodyB?.ApplyCollisionLinearVelocityDelta(impulse * inverseMassB);
     }
 
     private void WakeBodies()

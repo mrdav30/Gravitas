@@ -27,6 +27,10 @@ public class Physics2DBenchmarks
         _collisionContext = GravitasWorldContext.CreateOwned();
         _queryContext = GravitasWorldContext.CreateOwned();
         _detectionContext = GravitasWorldContext.CreateOwned();
+        _integrationContext.Settings.RuntimeMode = PhysicsRuntimeMode.TwoD;
+        _collisionContext.Settings.RuntimeMode = PhysicsRuntimeMode.TwoD;
+        _queryContext.Settings.RuntimeMode = PhysicsRuntimeMode.TwoD;
+        _detectionContext.Settings.RuntimeMode = PhysicsRuntimeMode.TwoD;
         _integrationBodies = new SwiftList<StiffBody2D>(BodyCount);
         _collisionBodies = new SwiftList<StiffBody2D>(BodyCount);
         _queryHits = new SwiftList<Physics2DHit>(BodyCount);
@@ -127,7 +131,8 @@ public class Physics2DBenchmarks
         Vector2d position,
         bool immovable)
     {
-        var body = new StiffBody2D(context, collider)
+        var agent = new BenchmarkMatterAgent(context, new Vector3d(position.x, Fixed64.Zero, position.y));
+        var body = new StiffBody2D(agent, collider)
         {
             Mass = Fixed64.One,
             Immovable = immovable

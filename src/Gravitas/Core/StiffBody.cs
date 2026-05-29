@@ -30,26 +30,6 @@ public class StiffBody : IRecordable
 
     private ContinuousCollisionMode _continuousCollisionMode = ContinuousCollisionMode.Inherit;
 
-    private PhysicsDimension _dimension = PhysicsDimension.ThreeD;
-
-    /// <summary>
-    /// Gets or sets the simulation dimensionality owned by this body.
-    /// </summary>
-    public PhysicsDimension Dimension
-    {
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        get => _dimension;
-        set
-        {
-            PhysicsDimensionRules.ThrowIfUnsupported(value, nameof(value));
-            SwiftThrowHelper.ThrowIfTrue(
-                Active,
-                nameof(Dimension),
-                "Body simulation dimension cannot change after initialization.");
-            _dimension = value;
-        }
-    }
-
     /// <summary>
     /// Selects the deterministic tunneling guard used when this body commits frame movement.
     /// Inherited values resolve through the cached top-parent body before falling back to context settings.
@@ -509,15 +489,6 @@ public class StiffBody : IRecordable
         _isSet = true;
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private void ThrowIfColliderDimensionMismatch()
-    {
-        SwiftThrowHelper.ThrowIfArgument(
-            Collider.Dimension != Dimension,
-            nameof(Collider),
-            "Body and collider must use the same simulation dimension.");
-    }
-
     public void Initialize(
         Vector3d startPosition,
         FixedQuaternion startRotation,
@@ -528,8 +499,6 @@ public class StiffBody : IRecordable
             GravitasLogger.Channel.Error($"StiffBody must be set up with an agent and collider before initialization.");
             return;
         }
-
-        ThrowIfColliderDimensionMismatch();
 
         Active = true;
 
@@ -1612,8 +1581,6 @@ public class StiffBody : IRecordable
         RecordValues.Look(chronicler, ref Debug, "Debug");
         RecordValues.Look(chronicler, ref Active, "Active");
         RecordValues.Look(chronicler, ref Immovable, "Immovable");
-        RecordValues.Look(chronicler, ref _dimension, "Dimension");
-        PhysicsDimensionRules.ThrowIfUnsupported(_dimension, "Dimension");
         RecordValues.Look(chronicler, ref _positionTransform, "PositionTransform");
         RecordValues.Look(chronicler, ref _rotationTransform, "RotationTransform");
         RecordValues.Look(chronicler, ref _positionChangedBuffer, "PositionChangedBuffer");

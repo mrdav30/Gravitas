@@ -4,19 +4,17 @@ Gravitas collision work is split into GridForge-backed broad phase,
 context-local pair management, shape-pair narrow phase, deterministic contact
 manifolds, manifold response, and late contact notification.
 
-## Dimension Boundary
+## 2D And 3D Boundary
 
-The original collision handling path is the 3D runtime path. Bodies and
-colliders declare a `PhysicsDimension`, and body initialization rejects
-dimension mismatches before registration. Pure 2D bodies and colliders now route
-through `GravitasPhysics2DService` instead of being treated as 3D colliders with
-one ignored axis.
+The original collision handling path is the 3D runtime path. `StiffBody` and
+`LSCollider` route through `GravitasPhysicsService`; `StiffBody2D` and
+`LSCollider2D` route through `GravitasPhysics2DService`. The active path is
+selected by `PhysicsSettings.RuntimeMode`, so pure 2D scenes do not advance 3D
+pair distribution or visualization work.
 
-`Physics2DBounds` provides the first broad-phase bridge for pure 2D bounds. It
-keeps authoritative X/Y extents in `BoundingArea` and projects them into a
-deterministic `FixedBoundVolume` slab for the current fixed query structures.
-That slab is storage metadata only. It is not the finite physical thickness
-needed for mixed 2D/3D collision; mixed exchange rules remain Phase 10 work.
+Pure 2D uses X/Z host projection: world `Vector3d.x` maps to `Vector2d.x` and
+world `Vector3d.z` maps to `Vector2d.y`. World `Vector3d.y` is height or future
+mixed-dimension embedding metadata, not a pure 2D collision axis.
 
 ## Pure 2D Collision Path
 
@@ -29,7 +27,7 @@ The current 2D broad phase is a lean sweep-and-prune pass:
 
 1. rebuild active 2D collider shape bounds.
 2. copy colliders into a reusable sorted buffer.
-3. sort by `Physics2DBounds.Area.MinX`, with collider ID as the tie-breaker.
+3. sort by collider `MinX`, with collider ID as the tie-breaker.
 4. sweep forward until candidate `MinX` exceeds the current collider `MaxX`.
 5. filter by Y bounds and the context collision matrix before narrow-phase
    dispatch.
@@ -55,12 +53,12 @@ claimed yet.
 
 `CollisionPair2D` applies simple deterministic one-pass response for the alpha
 slice: positional correction to penetration slop, normal impulse when bodies are
-closing, wake propagation from awake movable bodies, trigger enter/exit events,
-and contact enter/stay/exit events. If a solid pair has no awake movable
-participant, the existing pair is kept alive as resting state without applying
-response or waking a sleeping body. It does not yet claim a full 2D friction
-solver, angular impulses, richer contact manifolds, or mixed 2D/3D impulse
-exchange.
+closing, static response against bodyless colliders, wake propagation from awake
+movable bodies, trigger enter/exit events, and contact enter/stay/exit events.
+If a solid pair has no awake movable participant, the existing pair is kept
+alive as resting state without applying response or waking a sleeping body. It
+does not yet claim a full 2D friction solver, angular impulses, richer contact
+manifolds, or mixed 2D/3D impulse exchange.
 
 ## Broad Phase: Voxel Partitions
 

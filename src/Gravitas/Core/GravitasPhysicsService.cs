@@ -122,6 +122,7 @@ public sealed class GravitasPhysicsService
     /// </summary>
     public void LateVisualize()
     {
+        // TODO: we may not need this...
         int peak = _dynamicBodies.PeakCount;
         for (int i = 0; i < peak; i++)
         {

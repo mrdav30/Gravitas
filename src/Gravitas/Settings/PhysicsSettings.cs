@@ -40,6 +40,7 @@ public sealed class PhysicsSettings
 
     private int _retainedPartitionTimeToKillFrames = DefaultRetainedPartitionTimeToKillFrames;
     private int _retainedPartitionRetirementSweepBudget = DefaultRetainedPartitionRetirementSweepBudget;
+    private PhysicsRuntimeMode _runtimeMode = PhysicsRuntimeMode.ThreeD;
 
     /// <summary>
     /// Gets or sets how many simulation frames an empty voxel partition should stay attached for fast reuse.
@@ -73,6 +74,22 @@ public sealed class PhysicsSettings
     /// Gets or sets the default tunneling policy used by bodies configured to inherit from the context.
     /// </summary>
     public ContinuousCollisionMode DefaultContinuousCollisionMode { get; set; } = ContinuousCollisionMode.Discrete;
+
+    /// <summary>
+    /// Gets or sets which dimensional physics service this context should advance.
+    /// </summary>
+    public PhysicsRuntimeMode RuntimeMode
+    {
+        get => _runtimeMode;
+        set
+        {
+            SwiftThrowHelper.ThrowIfArgument(
+                value != PhysicsRuntimeMode.TwoD && value != PhysicsRuntimeMode.ThreeD,
+                nameof(value),
+                "Physics runtime mode must be either TwoD or ThreeD.");
+            _runtimeMode = value;
+        }
+    }
 
     public PhysicsSettings(
         int? frameRate,

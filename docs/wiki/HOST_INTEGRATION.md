@@ -149,6 +149,24 @@ Initialization binds the body and collider to `agent.Context`, allocates a
 context-local body slot, allocates a context-local collider ID, calculates shape
 runtime data, and partitions the collider.
 
+Pure 2D scenes use the same host-agent shape, but select the 2D runtime path and
+create 2D body/collider types:
+
+```csharp
+context.Settings.RuntimeMode = PhysicsRuntimeMode.TwoD;
+
+LSCircleCollider2D collider = new(Fixed64.Half);
+StiffBody2D body = new(agent, collider)
+{
+    Mass = Fixed64.One
+};
+
+body.Initialize(agent.Transform.Position.ToVector2d(), isDynamic: true);
+```
+
+The 2D projection uses the LSF X/Z convention: world X maps to 2D X and world Z
+maps to 2D Y. World Y is height or future embedding metadata.
+
 ## Static Collider Setup
 
 Use `InitializeWithNoBody(...)` for bodyless host geometry. This registers and
@@ -162,12 +180,18 @@ floor.InitializeWithNoBody(agent);
 ```
 
 An immovable `StiffBody` is different from a bodyless collider. Immovable bodies
-are placed in the partition static list. Bodyless colliders are still registered
-as colliders and can participate in queries and candidate generation, but pair
-creation still requires at least one collider in the pair to have a body.
-If a bodyless collider moves after initialization, the host must call
+are placed in the partition static list. Bodyless 3D colliders are still
+registered as colliders and can participate in queries and candidate generation,
+but 3D pair creation still requires at least one collider in the pair to have a
+body. Bodyless 2D colliders bind through
+`LSCollider2D.InitializeWithNoBody(IMatterAgent)` and can participate in
+queries, trigger events, layer filtering, cleanup, and static collision
+response.
+
+If a bodyless 3D collider moves after initialization, the host must call
 `floor.Simulate()` after mutating its transform so bounds and partition
-membership are refreshed.
+membership are refreshed. Pure 2D bodyless colliders currently rebuild from
+their agent transform during the 2D broad-phase pass.
 
 ## Fixed Loop
 
@@ -191,14 +215,16 @@ and call the visualization phases from the render/update loop.
 
 Current service order matters:
 
-- `context.Simulate()` advances the clock, distributes collisions, advances
-  lockstep coroutines, then invokes simulate hooks.
-- `context.LateSimulate()` marks visualization accumulation for reset, processes
-  active collision-pair notifications/culling, advances dynamic bodies, updates
-  collider partitions through body simulation, then invokes late-simulate hooks.
-- `context.Visualize()` advances interpolation accumulation, updates body visual
-  transforms, then invokes visualize hooks.
-- `context.LateVisualize()` runs body late-visualize hooks and context hooks.
+- `context.Simulate()` advances the clock, runs only the enabled dimensional
+  collision path, advances lockstep coroutines, then invokes simulate hooks.
+- `context.LateSimulate()` marks visualization accumulation for reset, runs
+  only the enabled dimensional body integration path, then invokes
+  late-simulate hooks.
+- `context.Visualize()` advances interpolation accumulation, updates 3D body
+  visual transforms only when `RuntimeMode` is `ThreeD`, then invokes visualize
+  hooks.
+- `context.LateVisualize()` runs 3D body late-visualize hooks only when
+  `RuntimeMode` is `ThreeD`, then invokes context hooks.
 
 Do not assume an engine-style integrate-then-collide order. The current
 prototype checks/distributes collisions during `Simulate` and advances bodies in
