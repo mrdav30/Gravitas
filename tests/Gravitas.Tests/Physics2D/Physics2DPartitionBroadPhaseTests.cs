@@ -5,6 +5,7 @@ using Gravitas.Support;
 using Gravitas.Tests.Support;
 using GridForge.Configuration;
 using SwiftCollections;
+using System;
 using Xunit;
 
 namespace Gravitas.Tests.Physics2D;
@@ -134,6 +135,33 @@ public sealed class Physics2DPartitionBroadPhaseTests
         second.Should().Be(first);
     }
 
+    [Fact]
+    public void Simulate_WithDenseOverlappingPairs_ShouldNotAllocateAfterWarmup()
+    {
+        using GravitasWorldContext context = CreateContext(extent: 128);
+        var bodies = new SwiftList<StiffBody2D>();
+        for (int i = 0; i < 64; i++)
+        {
+            Vector2d position = PositionForIndex(i, spacing: (Fixed64)2);
+            bodies.Add(CreateCircle(context, position, immovable: false));
+            _ = CreateCircle(context, position + new Vector2d(Fixed64.Half, Fixed64.Zero), immovable: true);
+        }
+
+        for (int i = 0; i < 3; i++)
+        {
+            ResetBodyPositions(bodies);
+            context.Simulate();
+        }
+
+        long allocatedBytes = MeasureAllocatedBytes(() =>
+        {
+            ResetBodyPositions(bodies);
+            context.Simulate();
+        });
+
+        allocatedBytes.Should().Be(0);
+    }
+
     private static ReplayResult RunReplayScenario()
     {
         using GravitasWorldContext context = CreateContext(extent: 256, frameRate: 8);
@@ -192,6 +220,31 @@ public sealed class Physics2DPartitionBroadPhaseTests
         };
         body.Initialize(position);
         return body;
+    }
+
+    private static Vector2d PositionForIndex(int index, Fixed64 spacing)
+    {
+        int width = 8;
+        int x = index % width;
+        int y = index / width;
+        return new Vector2d((Fixed64)x * spacing, (Fixed64)y * spacing);
+    }
+
+    private static void ResetBodyPositions(SwiftList<StiffBody2D> bodies)
+    {
+        for (int i = 0; i < bodies.Count; i++)
+            bodies[i].SetPosition(PositionForIndex(i, spacing: (Fixed64)2));
+    }
+
+    private static long MeasureAllocatedBytes(Action action)
+    {
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+
+        long before = GC.GetAllocatedBytesForCurrentThread();
+        action();
+        return GC.GetAllocatedBytesForCurrentThread() - before;
     }
 
     private readonly record struct ReplayResult(

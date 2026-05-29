@@ -299,6 +299,8 @@ public sealed class GravitasWorldContext : IDisposable
         _clock.Visualize();
         if (Settings.RuntimeMode == PhysicsRuntimeMode.ThreeD)
             Physics.Visualize();
+        else
+            Physics2D.Visualize();
 
         _hooks.InvokeVisualize();
     }
@@ -311,6 +313,8 @@ public sealed class GravitasWorldContext : IDisposable
         ThrowIfDisposed();
         if (Settings.RuntimeMode == PhysicsRuntimeMode.ThreeD)
             Physics.LateVisualize();
+        else
+            Physics2D.LateVisualize();
 
         _hooks.InvokeLateVisualize();
     }

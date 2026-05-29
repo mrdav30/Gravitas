@@ -88,12 +88,12 @@ flowchart TD
 | `GravitasWorldContext` | Owns one active `GridWorld` plus all context-local runtime services. |
 | `IMatterAgent` | Host boundary. Supplies context, fixed transform, hierarchy state, and interaction state. |
 | `StiffBody` | Simulated body state: position, rotation, velocity, acceleration, mass, grounding, impulses, sleep/wake state, interpolation, and Chronicler record data. |
-| `StiffBody2D` | Pure 2D body state: X/Z-projected position, scalar rotation, linear velocity, force integration, gravity, sleep/wake state, host agent binding, and Chronicler record data. |
+| `StiffBody2D` | Pure 2D body state: X/Z-projected position, scalar rotation, linear velocity, force integration, gravity, sleep/wake state, host agent binding, visualization publishing, and Chronicler record data. |
 | `LSCollider` | Base collider state: shape, bounds, layer, trigger/contact events, partition coordinates, pair references, and context binding. |
 | `LSCollider2D` | Base pure 2D collider state for circle, axis-aligned box, and convex polygon shapes. |
 | `PhysicsRuntimeMode` | Selects whether a context advances the pure 2D or 3D runtime path. Mixed mode is intentionally deferred. |
 | `GravitasPhysicsService` | Body/collider registration, context-local collider IDs, collision-pair pooling, simulation phases, and visualization phases. |
-| `GravitasPhysics2DService` | Pure 2D registration, collider IDs, narrow phase, response, events, and overlap-circle query API. |
+| `GravitasPhysics2DService` | Pure 2D registration, collider IDs, narrow phase, response, events, visualization publishing, overlap-circle queries, and segment raycasts. |
 | `GravitasCollisionService` | GridForge-backed broad-phase partitioning, active partition tracking, partition pooling, and collision distribution versioning. |
 | `GravitasCollision2DService` | GridForge-backed pure 2D X/Z broad-phase partitioning, active partition tracking, partition pooling, duplicate suppression, and collision distribution versioning. |
 | `PhysicsPartition` | Voxel partition payload containing collider IDs, awake dynamic membership, and candidate pair distribution. |
@@ -128,7 +128,8 @@ Pure 2D scenes use the same context and clock, set
 `LSCollider2D` shapes and `StiffBody2D` bodies from host `IMatterAgent`
 instances. The current 2D path supports circles, axis-aligned boxes, convex
 polygons, bodyless static/trigger colliders, deterministic collision response,
-contact events, sleep/wake behavior, replay tests, and overlap-circle queries.
+contact events, sleep/wake behavior, replay tests, overlap-circle queries, and
+segment raycasts.
 Mixed 2D/3D contacts are intentionally not part of this flow yet.
 
 ## Collision In One Breath

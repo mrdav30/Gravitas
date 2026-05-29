@@ -15,9 +15,9 @@ those concrete types, not a third dimension value.
 `GravitasWorldContext` advances:
 
 - `PhysicsRuntimeMode.ThreeD` advances `GravitasPhysicsService` and skips
-  `GravitasPhysics2DService`.
+  `GravitasPhysics2DService` simulation and visualization.
 - `PhysicsRuntimeMode.TwoD` advances `GravitasPhysics2DService` and skips
-  `GravitasPhysicsService`.
+  `GravitasPhysicsService` simulation and visualization.
 
 The context clock, coroutines, diagnostics, and lifecycle hooks remain shared.
 This lets pure 2D simulations use the same host loop without paying 3D
@@ -38,6 +38,11 @@ Pure 2D uses the LSF stack's X/Z planar convention:
 
 Pure 2D body motion has no `HeightPos`, ground probe, step offset, or grounded
 platform state. Those belong to the current 3D y-up body model.
+
+Dynamic 2D bodies publish their authoritative planar position and yaw rotation
+back to the host `FixedTransform` during `Visualize()` when the context is in
+`PhysicsRuntimeMode.TwoD`. The host transform's vertical `Vector3d.y` value is
+preserved because it is not part of pure 2D physics.
 
 ## 2D Bodies And Colliders
 
@@ -86,11 +91,15 @@ Pure 2D queries live on `GravitasPhysics2DService`:
 ```csharp
 context.Physics2D.OverlapCircleAll(center, radius, results);
 context.Physics2D.OverlapCircleAll(center, radius, layerMask, results);
+context.Physics2D.Raycast(start, end, out Physics2DHit hit);
+context.Physics2D.RaycastAll(start, end, layerMask, results);
 ```
 
-Both overloads write into the caller-owned `SwiftList<Physics2DHit>`, run
-GridForge-backed partition candidate gathering with duplicate suppression, run
-layer-mask and exact 2D shape checks, and sort by deterministic hit ordering.
+All-hit overloads write into caller-owned `SwiftList<Physics2DHit>` buffers,
+run GridForge-backed partition candidate gathering with duplicate suppression,
+run layer-mask and exact 2D shape checks, and sort by deterministic hit
+ordering. `Raycast` returns the closest segment hit from `start` to `end` using
+the same distance and collider-ID ordering as `RaycastAll`.
 
 The existing `GravitasCircleQueryService` is a 3D X/Z ground-plane proximity
 query. It is not the pure 2D query API.

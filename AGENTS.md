@@ -114,8 +114,9 @@ The current runtime uses explicit world-context ownership:
   collider IDs, collider lookup, collision-pair pooling, active pair processing,
   and physics lifecycle phases.
 - `GravitasPhysics2DService` owns pure 2D body and collider registration,
-  collider IDs, 2D pair pooling, response/event processing, and caller-buffered
-  overlap-circle query APIs for one context.
+  collider IDs, 2D pair pooling, response/event processing, visualization
+  transform publishing, and caller-buffered overlap-circle/raycast query APIs
+  for one context.
 - `GravitasCollisionService` maps colliders into GridForge voxels through
   `GridWorld` spatial hash and active-grid access, `WorldVoxelIndex`, and
   `PhysicsPartition`, using `SwiftCollections` pools and duplicate-check sets.
@@ -125,8 +126,9 @@ The current runtime uses explicit world-context ownership:
 - `GravitasRaycastService` and `GravitasCircleQueryService` own query workers,
   intersection state, candidate gathering, filtering, and result ordering for
   one context. Raycasts are 3D segment queries; circle queries are X/Z overlap
-  and proximity queries, not swept casts. All-hit paths should write into
-  caller-owned hit buffers.
+  and proximity queries, not swept casts. Pure 2D raycasts live on
+  `GravitasPhysics2DService`. All-hit paths should write into caller-owned hit
+  buffers.
 - `GravitasCoroutineService` owns lockstep coroutine state and context-bound
   wait instructions for one context.
 - `GravitasDiagnosticSink` owns disabled-by-default diagnostic event and debug
@@ -136,8 +138,8 @@ The current runtime uses explicit world-context ownership:
   interpolation state, velocity, acceleration, drag, friction, grounding,
   transforms, and Chronicler state recording.
 - `StiffBody2D` owns pure 2D body state: X/Z-projected position, scalar yaw,
-  linear velocity, force integration, sleep/wake state, and Chronicler state
-  recording.
+  linear velocity, force integration, sleep/wake state, visualization transform
+  publishing, and Chronicler state recording.
 - `IMatterAgent` is the host boundary. Hosts provide a `GravitasWorldContext`,
   a `FixedTransform`, hierarchy information, and interaction state without tying
   Gravitas to a game engine.

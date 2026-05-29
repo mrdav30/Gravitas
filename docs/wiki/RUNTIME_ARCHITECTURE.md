@@ -69,12 +69,18 @@ Visualize
   If RuntimeMode == ThreeD:
     Physics.Visualize
     StiffBody.OnVisualize for dynamic bodies
+  If RuntimeMode == TwoD:
+    Physics2D.Visualize
+    StiffBody2D.OnVisualize for dynamic 2D bodies
   Hooks.InvokeVisualize
 
 LateVisualize
   If RuntimeMode == ThreeD:
     Physics.LateVisualize
     StiffBody.LateVisualize for dynamic bodies
+  If RuntimeMode == TwoD:
+    Physics2D.LateVisualize
+    StiffBody2D.LateVisualize for dynamic 2D bodies
   Hooks.InvokeLateVisualize
 ```
 
@@ -217,7 +223,9 @@ positions use world X/Z projection: `Vector2d.x = Vector3d.x` and
 `LateSimulate`. It intentionally has no y-up ground probe, height split, visual
 interpolation state, or 3D inertia tensor. `GravitasPhysics2DService.Simulate()`
 runs 2D contact response and events; `GravitasPhysics2DService.LateSimulate()`
-integrates active movable 2D bodies.
+integrates active movable 2D bodies; `GravitasPhysics2DService.Visualize()`
+publishes dynamic 2D position and yaw rotation back to the host transform while
+preserving host vertical height.
 
 ## Collider State
 

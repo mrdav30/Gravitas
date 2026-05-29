@@ -1098,6 +1098,16 @@ hardening below are complete.
   GridForge world/voxel identity, keeps queries caller-buffered, and proves
   scale behavior with tests and benchmarks. Keep mixed 2D/3D collision itself
   deferred to Phase 10.
+- [x] **Phase 9G - 2D dense pair hardening:** Remove avoidable dense-scene
+  overhead from the GridForge-backed 2D broad phase before Phase 10. In
+  particular, partition traversal must not be invalidated by response-time
+  repartitioning, hot duplicate/pair state must retain warmed capacity, and
+  the `physics-2d` benchmarks should show the dense-pair path moving toward the
+  sweep baseline without sacrificing partition scale behavior.
+- [x] **Phase 9H - 2D host polish and query parity:** Add pure 2D visualization
+  transform publishing and a caller-buffered deterministic `Raycast2D` path
+  backed by the same 2D partition/query rules. Keep mixed 2D/3D collision
+  deferred to Phase 10.
 
 **Phase 9A-9B Status - 2026-05-28**
 
@@ -1430,11 +1440,157 @@ world/voxel identity.
   partition path.
 - Short `physics-2d` benchmark smoke completed. The partition-backed query path
   is already competitive on larger query scenes, but the dense overlapping-pair
-  benchmark still shows higher time and allocation cost than the old sweep
-  baseline. Treat that as a Phase 10 carry-in optimization target before making
-  broad performance claims about dense 2D collision response.
+  benchmark showed avoidable response-time partition refresh and duplicate
+  candidate overhead. That became the Phase 9G target before making broad
+  performance claims about dense 2D collision response.
 - Focused 2D tests, full `Release` tests, full `ReleaseLean` tests, sequential
   `Release` build, and focused `physics-2d` benchmark smoke completed locally.
+
+## Phase 9G: 2D Dense Pair Hardening
+
+**Purpose:** Make the partition-backed pure 2D collision path scale without
+paying avoidable dense-scene overhead before mixed 2D/3D adds more moving parts.
+
+**Files:**
+
+- Modify: `src/Gravitas/Core/GravitasCollision2DService.cs`
+- Modify: `src/Gravitas/Core/GravitasPhysics2DService.cs`
+- Modify: `src/Gravitas/CollisionHandling/Pairs/CollisionPair2D.cs`
+- Modify: `src/Gravitas/Core/StiffBody2D.cs`
+- Modify: `src/Gravitas/Colliders/Primitives2D/LSCollider2D.cs`
+- Modify: `tests/Gravitas.Tests/Physics2D`
+- Modify: `tests/Gravitas.Benchmarks/Physics2D/Physics2DBenchmarks.cs`
+
+**Tasks:**
+
+- [x] Add or update tests proving 2D collision response does not mutate
+  GridForge partition membership while `PhysicsPartition2D` is distributing
+  candidates.
+- [x] Defer partition refreshes caused by 2D response until after the active
+  partition distribution pass completes, while still refreshing query-visible
+  state before control returns to the host.
+- [x] Avoid redundant awake-state refreshes when `StiffBody2D.Wake()` is called
+  on an already-awake body.
+- [x] Keep warmed duplicate/pair/query buffers sized for dense scenes instead
+  of allocating on every simulate.
+- [x] Rerun the focused dense-pair benchmark before and after the change. If
+  partition-backed dense response remains slower than sweep in tiny/dense
+  scenes, document whether the remaining cost is real partition fan-out,
+  collision response cost, or benchmark setup churn.
+
+**Acceptance Bar:**
+
+- Dense 2D pair simulation should not repartition colliders during partition
+  distribution.
+- Focused tests must cover response-time movement, duplicate suppression, and
+  deterministic replay.
+- `physics-2d` dense-pair benchmark results must improve or clearly identify
+  the next real bottleneck with evidence.
+
+**Phase 9G Status - 2026-05-29**
+
+- Added a steady-state allocation regression test proving dense 2D response
+  does not allocate after warmup.
+- Deferred response-time 2D partition refreshes while
+  `PhysicsPartition2D.Distribute(...)` is walking active partitions. Deferred
+  membership is refreshed before the next simulation distribution or before
+  any 2D query gathers candidates, preserving query-visible state.
+- Kept partition candidate, query, duplicate, and pair buffers warmed instead
+  of rebuilding capacity every frame.
+- Avoided redundant awake-partition refresh when `StiffBody2D.Wake()` is called
+  for an already-awake body.
+- Moved cheap same-agent, layer-mask, and 2D bounds rejection ahead of the
+  frame duplicate-pair set so dense partition fan-out does not hash impossible
+  pairs.
+- Added deterministic first-shared-partition gating for pairs emitted from
+  multiple covered voxels. The frame duplicate set remains as a cross-grid
+  safety net.
+- Short `physics-2d` dense-pair benchmark evidence:
+  - Before Phase 9G: 64-body partition response was about `503.6 us` with
+    `34,049 B/op`; 1024-body partition response was about `21.9 ms` with
+    `585,088 B/op`.
+  - After deferred refresh, non-allocating sorts, cheap prefilters, and
+    first-shared-partition gating: 64-body partition response was about
+    `129.4 us` with no reported managed allocation; 1024-body partition
+    response was about `4.97 ms` with `8 B/op` short-job noise.
+  - The 1024-body detection-only sweep baseline in the same short job was about
+    `2.53 ms` with `4 B/op` short-job noise. That baseline does not own pair
+    lifecycle or response, so the
+    remaining gap should be treated as solver/pair-service cost rather than a
+    broad-phase allocation failure.
+
+## Phase 9H: 2D Host Polish And Query Parity
+
+**Purpose:** Round out the pure 2D host contract before Phase 10 by publishing
+2D body state back to host transforms during visualization and by adding a
+first-class 2D raycast query.
+
+**Files:**
+
+- Modify: `src/Gravitas/Runtime/GravitasWorldContext.cs`
+- Modify: `src/Gravitas/Core/GravitasPhysics2DService.cs`
+- Modify: `src/Gravitas/Core/StiffBody2D.cs`
+- Modify: `src/Gravitas/CollisionHandling/Detection/CollisionDetection2D.cs`
+- Modify: `src/Gravitas/Raycasting/Physics2DHit.cs`
+- Modify: `tests/Gravitas.Tests/Physics2D`
+- Modify: `docs/wiki/DIMENSIONS.md`
+- Modify: `docs/wiki/HOST_INTEGRATION.md`
+- Modify: `docs/wiki/QUERY_SERVICES.md`
+
+**Tasks:**
+
+- [x] Add `GravitasPhysics2DService.Visualize()` and hook it from
+  `GravitasWorldContext.Visualize()` when `PhysicsRuntimeMode.TwoD` is active.
+- [x] Add `StiffBody2D.OnVisualize()` so dynamic 2D body position/rotation is
+  projected back into `IMatterAgent.Transform` using the X/Z planar convention
+  while preserving host vertical height.
+- [x] Add tests proving pure 2D visualize updates dynamic body transforms and
+  does not run when the context is in 3D mode.
+- [x] Add `Raycast2D` and `Raycast2DAll` style APIs on the pure 2D service,
+  with caller-owned result buffers, layer masks, duplicate suppression for
+  multi-voxel colliders, stable hit ordering, and deterministic start-inside
+  behavior.
+- [x] Add tests for circle, AABB, polygon, layer filtering, hit ordering,
+  zero-length segments, and collider-spanning-many-voxels duplicate
+  suppression.
+- [x] Update wiki/query docs with the final pure 2D query surface.
+
+**Acceptance Bar:**
+
+- Host adapters can call `Visualize()` in pure 2D mode and receive updated
+  `FixedTransform` position/rotation without touching authoritative simulation
+  state.
+- 2D raycasts must use pure 2D shape math and the GridForge-backed 2D
+  partition path, not the 3D raycast service.
+- Query results must be caller-buffered and deterministically ordered.
+
+**Phase 9H Status - 2026-05-29**
+
+- `GravitasWorldContext.Visualize()` and `LateVisualize()` now call the pure 2D
+  service only when `PhysicsRuntimeMode.TwoD` is active.
+- `StiffBody2D.OnVisualize()` projects authoritative 2D X/Z position and yaw
+  rotation back into the host `FixedTransform` while preserving host vertical
+  height.
+- Added pure 2D segment raycast APIs on `GravitasPhysics2DService`:
+  `Raycast(start, end, out hit)`, `Raycast(start, end, layerMask, out hit)`,
+  `RaycastAll(start, end, results)`, and
+  `RaycastAll(start, end, layerMask, results)`.
+- 2D raycasts gather candidates through `GravitasCollision2DService`, use pure
+  2D shape math for circles, AABBs, and convex polygons, handle starting inside
+  colliders deterministically, skip zero-length segments, and sort all-hit
+  results by distance plus collider ID.
+- Added tests for transform publishing, runtime-mode gating, hit ordering,
+  start-inside behavior, layer filtering, zero-length segments, and duplicate
+  suppression for multi-voxel 2D colliders.
+- Added `RaycastAll` and `RaycastAll_SweepBaseline` coverage to
+  `Physics2DBenchmarks`.
+- Hardened the shared 2D GridForge coverage scanner so query paths skip
+  out-of-bounds grid positions before calling `VoxelGrid.TryGetVoxel(...)` and
+  no longer allocate captured visitor delegates per query.
+- Short `physics-2d` raycast benchmark evidence: 64-body `RaycastAll` reported
+  about `29.0 us` with no managed allocation; 1024-body partition-backed
+  `RaycastAll` reported about `29.4 us` with no managed allocation versus the
+  detection-only sweep baseline at about `520.8 us`.
 
 ## Phase 10: Mixed 2D/3D Interaction Model
 

@@ -2,20 +2,12 @@ using Gravitas.Colliders;
 using GridForge.Grids;
 using GridForge.Spatial;
 using SwiftCollections;
-using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
 namespace Gravitas;
 
 public sealed class PhysicsPartition2D : IVoxelPartition
 {
-    private sealed class IntAscendingComparer : IComparer<int>
-    {
-        public int Compare(int left, int right) => left.CompareTo(right);
-    }
-
-    private static readonly IntAscendingComparer ColliderIdComparer = new();
-
     private GravitasCollision2DService? _owner;
     private int _emptySinceFrame = -1;
     private int _retainedIndex = -1;
@@ -97,11 +89,11 @@ public sealed class PhysicsPartition2D : IVoxelPartition
                 if (ContainsAwakeDynamicObject(id2) && id2 < id1)
                     continue;
 
-                Owner.Context.Physics2D.ProcessPartitionCandidate(id1, id2);
+                Owner.Context.Physics2D.ProcessPartitionCandidate(id1, id2, WorldIndex);
             }
 
             for (int k = 0; k < staticIds.Count; k++)
-                Owner.Context.Physics2D.ProcessPartitionCandidate(id1, staticIds[k]);
+                Owner.Context.Physics2D.ProcessPartitionCandidate(id1, staticIds[k], WorldIndex);
         }
     }
 
@@ -110,14 +102,14 @@ public sealed class PhysicsPartition2D : IVoxelPartition
         destination.FastClear();
         CopyIds(ContainedDynamicObjects, destination);
         CopyIds(ContainedStaticObjects, destination);
-        destination.Sort(ColliderIdComparer);
+        SortIds(destination);
     }
 
     private static void CopySortedIds(SwiftSparseSet? source, SwiftList<int> destination)
     {
         destination.FastClear();
         CopyIds(source, destination);
-        destination.Sort(ColliderIdComparer);
+        SortIds(destination);
     }
 
     private static void CopyIds(SwiftSparseSet? source, SwiftList<int> destination)
@@ -127,6 +119,22 @@ public sealed class PhysicsPartition2D : IVoxelPartition
 
         for (int i = 0; i < source.Count; i++)
             destination.Add(source.DenseKeys[i]);
+    }
+
+    private static void SortIds(SwiftList<int> ids)
+    {
+        for (int i = 1; i < ids.Count; i++)
+        {
+            int value = ids[i];
+            int index = i - 1;
+            while (index >= 0 && ids[index] > value)
+            {
+                ids[index + 1] = ids[index];
+                index--;
+            }
+
+            ids[index + 1] = value;
+        }
     }
 
     public void AddDynamicObject(int item)

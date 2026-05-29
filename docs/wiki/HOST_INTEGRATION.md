@@ -246,7 +246,10 @@ The current alpha order has two important consequences:
 
 Visualization phases are non-authoritative. Use them to publish interpolated
 positions, rotations, and diagnostic draw data to a renderer or host adapter,
-not to change physics state that must replay.
+not to change physics state that must replay. In pure 2D mode,
+`context.Visualize()` publishes dynamic `StiffBody2D` X/Z position and yaw
+rotation back to each agent transform while preserving the host transform's
+vertical height.
 
 ## Settings And Environment
 
@@ -300,9 +303,17 @@ int sweepHitCount = context.Raycasts.SweepSphereAll(
     layerMask,
     sweepHits,
     excludedCollider: null);
+
+SwiftList<Physics2DHit> planarHits = new();
+int planarHitCount = context.Physics2D.RaycastAll(
+    start2D,
+    end2D,
+    layerMask,
+    planarHits);
 ```
 
-All-hit query APIs use caller-owned `SwiftList<LSRaycastHit>` buffers. They
+All-hit query APIs use caller-owned buffers. The 3D query services write
+`LSRaycastHit` values, while pure 2D queries write `Physics2DHit` values. They
 clear the supplied list, write sorted hits into it, and return the count so hot
 query loops do not allocate enumerators or temporary hit lists.
 

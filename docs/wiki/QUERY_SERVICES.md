@@ -1,7 +1,7 @@
 # Query Services
 
 Raycasts, swept-sphere queries, 3D-ground-plane circle queries, and pure 2D
-overlap queries are context-owned services. The 3D services use the same
+overlap/raycast queries are context-owned services. The 3D services use the same
 GridForge-backed partitions as 3D collision detection, resolve collider IDs
 through the owning `GravitasPhysicsService`, and suppress duplicate hits when a
 collider appears in multiple voxels.
@@ -135,22 +135,27 @@ voxel partitions. Circle queries remain X/Z overlap/proximity queries for the
 current 3D grounding model; they are not the pure 2D query API. Use
 swept-sphere queries for deterministic 3D swept movement.
 
-## Pure 2D Overlap Queries
+## Pure 2D Queries
 
 `GravitasPhysics2DService` exposes:
 
 - `OverlapCircleAll(center, radius, results)`
 - `OverlapCircleAll(center, radius, layerMask, results)`
+- `Raycast(start, end, out hit)`
+- `Raycast(start, end, layerMask, out hit)`
+- `RaycastAll(start, end, results)`
+- `RaycastAll(start, end, layerMask, results)`
 
-The service clears the caller-provided `SwiftList<Physics2DHit>`, writes hits
-into it, returns the hit count, and sorts by surface distance with collider ID
-as the deterministic tie-breaker.
+All-hit methods clear the caller-provided `SwiftList<Physics2DHit>`, write hits
+into it, return the hit count, and sort by distance with collider ID as the
+deterministic tie-breaker. Closest-hit `Raycast` overloads use the same
+ordering and return the first hit through an `out Physics2DHit`.
 
 Pure 2D query positions are `Vector2d` values in the X/Z plane. When hosts
 convert from a `FixedTransform`, use `Vector3d.ToVector2d()` so world X maps to
 2D X and world Z maps to 2D Y.
 
-The candidate path is:
+The overlap-circle candidate path is:
 
 1. project the query circle's X/Z bounds into private GridForge storage on the
    pure 2D Y=0 partition plane.
@@ -163,9 +168,16 @@ The candidate path is:
    the shape contains the query center.
 8. sort hits by distance and collider ID.
 
+The segment raycast path projects the segment's 2D bounds into the same
+GridForge-backed candidate gatherer, then runs deterministic shape math against
+circle, AABB, and convex polygon colliders. Zero-length segments return no
+hits. Starting inside a collider returns a zero-distance hit. A collider that
+spans multiple voxels is still reported once because candidate gathering
+suppresses duplicate collider IDs before exact shape testing.
+
 Current hit data is `Physics2DHit`: collider, optional body, point, normal, and
-distance. Segment/ray queries, AABB queries, and polygon queries remain future
-2D query hardening work.
+distance. AABB and polygon area-query APIs remain future 2D query hardening
+work.
 
 ## Layer Mask Semantics
 
@@ -211,7 +223,7 @@ null body.
 - keep query benchmarks allocation-free as result ordering, filters, and shape
   support expand.
 - add shape-specific query tests for every collider type.
-- add pure 2D segment/ray, AABB, and polygon query APIs once the shape math and
+- add pure 2D AABB and polygon area-query APIs once the shape math and
   benchmark contract justify the public surface.
 - revisit explicit query state objects only when a real host requires
   concurrent queries against one context.

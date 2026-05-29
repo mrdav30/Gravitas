@@ -29,7 +29,7 @@ The unit test project now has focused runtime, settings, query, partition, and c
 - Deterministic runtime math through `Fixed64`, `Vector2d`, `Vector3d`, and `FixedQuaternion`.
 - Engine-agnostic host boundary through `IMatterAgent` instead of direct renderer, ECS, or Unity coupling.
 - Grid-backed broad-phase partitioning through `GridForge` `GridWorld`, voxel tracing, `PhysicsPartition`, and `PhysicsPartition2D`.
-- Runtime systems for 3D and pure 2D bodies, colliders, collision pairs, collision detection/response, opt-in CCD, raycasts, circlecasts, 2D overlap queries, and physics settings.
+- Runtime systems for 3D and pure 2D bodies, colliders, collision pairs, collision detection/response, opt-in CCD, raycasts, circlecasts, pure 2D overlap/raycast queries, and physics settings.
 - A future direction toward mixed 2D/3D simulations where 2D and 3D bodies can interact through explicit dimensional rules.
 
 ## Install
@@ -77,7 +77,7 @@ Gravitas is now centered around explicit world-context ownership:
 2. Host objects expose deterministic transform and world context access through `IMatterAgent`.
 3. `GravitasWorldContext` owns fixed-step clock state, settings, physical environment values, lifecycle hooks, and context-local services.
 4. `GravitasPhysicsService` owns 3D body/collider registration, collider ID lookup, collision-pair pooling, and physics lifecycle work for one context.
-5. `GravitasPhysics2DService` owns pure 2D registration, pair state, response, and overlap-circle queries for one context.
+5. `GravitasPhysics2DService` owns pure 2D registration, pair state, response, visualization publishing, overlap-circle queries, and segment raycasts for one context.
 6. `GravitasCollisionService` and `GravitasCollision2DService` map colliders into GridForge voxels and activate partition payloads for collision checks.
 7. `GravitasRaycastService`, `GravitasCircleQueryService`, and `GravitasCoroutineService` own query and coroutine state per context.
 8. `StiffBody` and `StiffBody2D` own simulated body state and Chronicler state recording for their runtime path.

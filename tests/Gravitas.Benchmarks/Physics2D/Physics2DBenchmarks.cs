@@ -187,6 +187,46 @@ public class Physics2DBenchmarks
             _queryHits);
     }
 
+    [Benchmark]
+    public int RaycastAll_SweepBaseline()
+    {
+        Vector2d start = new((Fixed64)(-8), (Fixed64)12);
+        Vector2d end = new((Fixed64)64, (Fixed64)12);
+        Fixed64 minX = FixedMath.Min(start.x, end.x);
+        Fixed64 maxX = FixedMath.Max(start.x, end.x);
+        Fixed64 minY = FixedMath.Min(start.y, end.y);
+        Fixed64 maxY = FixedMath.Max(start.y, end.y);
+        PrepareSweep(_sweepQueryColliders, _sweepSortedColliders);
+
+        int count = 0;
+        for (int i = 0; i < _sweepSortedColliders.Count; i++)
+        {
+            LSCollider2D collider = _sweepSortedColliders[i];
+            if (collider.MinX > maxX)
+                break;
+            if (collider.MaxX < minX
+                || collider.MinY > maxY
+                || collider.MaxY < minY)
+            {
+                continue;
+            }
+
+            if (CollisionDetection2D.TryRaycast(start, end, collider, out _))
+                count++;
+        }
+
+        return count;
+    }
+
+    [Benchmark]
+    public int RaycastAll()
+    {
+        return _queryContext.Physics2D.RaycastAll(
+            new Vector2d((Fixed64)(-8), (Fixed64)12),
+            new Vector2d((Fixed64)64, (Fixed64)12),
+            _queryHits);
+    }
+
     private static void Configure2DContext(GravitasWorldContext context, int bodyCount)
     {
         context.Settings.RuntimeMode = PhysicsRuntimeMode.TwoD;

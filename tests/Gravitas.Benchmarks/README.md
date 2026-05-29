@@ -72,7 +72,7 @@ Start with hot paths that can be isolated and repeated deterministically:
 - continuous collision detection policy and swept movement cost.
 - pure 2D host-agent setup, runtime-mode gated integration, GridForge-backed
   broad phase, sweep baselines, narrow-phase pairs, response, and overlap
-  queries.
+  and raycast queries.
 - collider shape-state rebuilds, capsule derived state, compound aggregate bounds, and mesh validation/BVH construction.
 - `GravitasRaycastService` and `GravitasCircleQueryService` query gathering, filtering, and result ordering.
 - Mesh collider preprocessing and convex mesh limits.
@@ -126,7 +126,7 @@ to add or tighten explicit allocation tests before changing the algorithm.
 | `collision-response` | manifold response solver cost across single-contact and face-manifold cases, with pair-count scaling. |
 | `diagnostics` | Disabled/enabled force and torque event hooks plus disabled/enabled collider debug draw capture. |
 | `partition-culling` | dynamic collider repartitioning after teleports, direct partition add/remove churn, and culled-pair invalidation after movement. |
-| `physics-2d` | pure 2D body integration, GridForge-backed 2D partition response, sweep baseline comparisons, required 2D shape-pair checks, and `OverlapCircleAll`. |
+| `physics-2d` | pure 2D body integration, GridForge-backed 2D partition response, sweep baseline comparisons, required 2D shape-pair checks, `OverlapCircleAll`, and `RaycastAll`. |
 
 Collider shape work has a focused selection:
 

@@ -1,6 +1,7 @@
 using Chronicler;
 using FixedMathSharp;
 using Gravitas.Colliders;
+using Gravitas.Support;
 using SwiftCollections;
 using System.Runtime.CompilerServices;
 
@@ -143,9 +144,10 @@ public sealed class StiffBody2D : IRecordable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Wake()
     {
+        bool wasSleeping = _isSleeping;
         _sleepFrameCount = 0;
         _isSleeping = false;
-        if (Active)
+        if (Active && wasSleeping)
             Context.Collisions2D.RefreshPartitionAwakeState(Collider);
     }
 
@@ -178,6 +180,22 @@ public sealed class StiffBody2D : IRecordable
 
         UpdateSleepState();
     }
+
+    internal void OnVisualize()
+    {
+        if (!Active || IsKinematic)
+            return;
+
+        FixedTransform transform = Agent.Transform;
+        Vector3d currentPosition = transform.Position;
+        transform.Position = new Vector3d(_position.x, currentPosition.y, _position.y);
+        transform.Rotation = FixedQuaternion.FromEulerAnglesInDegrees(
+            Fixed64.Zero,
+            FixedMath.RadToDeg(_rotation),
+            Fixed64.Zero);
+    }
+
+    internal void LateVisualize() { }
 
     private void UpdateKinematicPositionAndRotation()
     {

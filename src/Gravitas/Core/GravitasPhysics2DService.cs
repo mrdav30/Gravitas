@@ -1,6 +1,7 @@
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.Support;
+using GridForge.Spatial;
 using SwiftCollections;
 using System.Runtime.CompilerServices;
 
@@ -95,6 +96,7 @@ public sealed class GravitasPhysics2DService
             return;
 
         LastBroadPhaseCandidateCount = 0;
+        EnsureFrameCapacity();
         _processedPairKeys.Clear();
         int frame = _context.FrameCount;
         _context.Collisions2D.CheckAndDistributeCollisions();
@@ -108,6 +110,18 @@ public sealed class GravitasPhysics2DService
 
         foreach (StiffBody2D body in _dynamicBodies)
             body.LateSimulate();
+    }
+
+    public void Visualize()
+    {
+        foreach (StiffBody2D body in _dynamicBodies)
+            body.OnVisualize();
+    }
+
+    public void LateVisualize()
+    {
+        foreach (StiffBody2D body in _dynamicBodies)
+            body.LateVisualize();
     }
 
     public void Reset()
@@ -162,25 +176,170 @@ public sealed class GravitasPhysics2DService
         return results.Count;
     }
 
+    /// <summary>
+    /// Finds the closest pure 2D collider hit by the segment from <paramref name="start"/> to <paramref name="end"/>.
+    /// </summary>
+    public bool Raycast(Vector2d start, Vector2d end, out Physics2DHit hit)
+    {
+        return Raycast(start, end, PhysicsLayerMask.All, out hit);
+    }
+
+    /// <summary>
+    /// Finds the closest pure 2D collider on an included layer hit by the segment.
+    /// </summary>
+    public bool Raycast(Vector2d start, Vector2d end, PhysicsLayerMask layerMask, out Physics2DHit hit)
+    {
+        Vector2d segment = end - start;
+        if (segment.SqrMagnitude == Fixed64.Zero)
+        {
+            hit = default;
+            return false;
+        }
+
+        _context.Collisions2D.CollectBoundsCandidates(
+            CreateMin(start, end),
+            CreateMax(start, end),
+            layerMask,
+            _queryCandidates);
+
+        LastQueryCandidateCount = _queryCandidates.Count;
+        bool found = false;
+        Physics2DHit closest = default;
+        for (int i = 0; i < _queryCandidates.Count; i++)
+        {
+            if (!CollisionDetection2D.TryRaycast(start, end, _queryCandidates[i], out Physics2DHit candidate)
+                || (found && !Physics2DHitSorter.ComesBefore(candidate, closest)))
+            {
+                continue;
+            }
+
+            closest = candidate;
+            found = true;
+        }
+
+        hit = closest;
+        return found;
+    }
+
+    /// <summary>
+    /// Writes all pure 2D colliders hit by the segment into <paramref name="results"/>.
+    /// </summary>
+    public int RaycastAll(Vector2d start, Vector2d end, SwiftList<Physics2DHit> results)
+    {
+        return RaycastAll(start, end, PhysicsLayerMask.All, results);
+    }
+
+    /// <summary>
+    /// Writes all pure 2D colliders on included layers hit by the segment into <paramref name="results"/>.
+    /// </summary>
+    public int RaycastAll(Vector2d start, Vector2d end, PhysicsLayerMask layerMask, SwiftList<Physics2DHit> results)
+    {
+        SwiftThrowHelper.ThrowIfNull(results, nameof(results));
+
+        results.FastClear();
+        Vector2d segment = end - start;
+        if (segment.SqrMagnitude == Fixed64.Zero)
+        {
+            LastQueryCandidateCount = 0;
+            return 0;
+        }
+
+        _context.Collisions2D.CollectBoundsCandidates(
+            CreateMin(start, end),
+            CreateMax(start, end),
+            layerMask,
+            _queryCandidates);
+
+        LastQueryCandidateCount = _queryCandidates.Count;
+        for (int i = 0; i < _queryCandidates.Count; i++)
+            if (CollisionDetection2D.TryRaycast(start, end, _queryCandidates[i], out Physics2DHit hit))
+                results.Add(hit);
+
+        Physics2DHitSorter.SortByDistance(results);
+        return results.Count;
+    }
+
     internal bool TryGetColliderById(int colliderId, out LSCollider2D? collider)
     {
         return _collidersById.TryGetValue(colliderId, out collider);
     }
 
-    internal void ProcessPartitionCandidate(int firstId, int secondId)
+    internal void ProcessPartitionCandidate(int firstId, int secondId, WorldVoxelIndex partitionIndex)
     {
-        ulong key = CreatePairKey(firstId, secondId);
-        if (!_processedPairKeys.Add(key))
-            return;
-
         if (!_collidersById.TryGetValue(firstId, out LSCollider2D? first)
             || !_collidersById.TryGetValue(secondId, out LSCollider2D? second))
         {
             return;
         }
 
+        if (ReferenceEquals(first!.AgentOrNull, second!.AgentOrNull)
+            || IsLayerCollisionDisabled(first.Layer, second.Layer)
+            || !CollisionDetection2D.BoundsOverlap(first, second)
+            || !IsCanonicalSharedPartition(first, second, partitionIndex))
+        {
+            return;
+        }
+
+        ulong key = CreatePairKey(firstId, secondId);
+        if (!_processedPairKeys.Add(key))
+            return;
+
         LastBroadPhaseCandidateCount++;
-        ProcessCandidate(first!, second!, _context.FrameCount);
+        ProcessCandidate(first, second, _context.FrameCount);
+    }
+
+    private static bool IsCanonicalSharedPartition(LSCollider2D first, LSCollider2D second, WorldVoxelIndex currentIndex)
+    {
+        SwiftList<WorldVoxelIndex>? firstCoordinates = first.PartitionCoordinates;
+        SwiftList<WorldVoxelIndex>? secondCoordinates = second.PartitionCoordinates;
+        if (firstCoordinates == null || secondCoordinates == null)
+            return true;
+
+        if (!TryGetMinimumVoxelIndexForGrid(firstCoordinates, currentIndex, out VoxelIndex firstMin)
+            || !TryGetMinimumVoxelIndexForGrid(secondCoordinates, currentIndex, out VoxelIndex secondMin))
+        {
+            return true;
+        }
+
+        VoxelIndex current = currentIndex.VoxelIndex;
+        return current.x == Max(firstMin.x, secondMin.x)
+            && current.z == Max(firstMin.z, secondMin.z)
+            && current.y == Max(firstMin.y, secondMin.y);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static int Max(int first, int second) => first >= second ? first : second;
+
+    private static bool TryGetMinimumVoxelIndexForGrid(
+        SwiftList<WorldVoxelIndex> coordinates,
+        WorldVoxelIndex gridIdentity,
+        out VoxelIndex minimum)
+    {
+        minimum = default;
+        bool found = false;
+        for (int i = 0; i < coordinates.Count; i++)
+        {
+            WorldVoxelIndex candidate = coordinates[i];
+            if (candidate.GridIndex != gridIdentity.GridIndex || candidate.GridSpawnToken != gridIdentity.GridSpawnToken)
+                continue;
+
+            VoxelIndex voxel = candidate.VoxelIndex;
+            if (!found)
+            {
+                minimum = voxel;
+                found = true;
+                continue;
+            }
+
+            if (voxel.x < minimum.x)
+                minimum.x = voxel.x;
+            if (voxel.z < minimum.z)
+                minimum.z = voxel.z;
+            if (voxel.y < minimum.y)
+                minimum.y = voxel.y;
+        }
+
+        return found;
     }
 
     private void ProcessCandidate(LSCollider2D first, LSCollider2D second, int frame)
@@ -315,6 +474,26 @@ public sealed class GravitasPhysics2DService
 
         _colliders.RemoveAt(lastIndex);
     }
+
+    private void EnsureFrameCapacity()
+    {
+        int colliderCount = _colliders.Count;
+        if (colliderCount <= 0)
+            return;
+
+        int expectedPairKeyCapacity = colliderCount * 4;
+        _processedPairKeys.EnsureCapacity(expectedPairKeyCapacity);
+        _pairsToRemove.EnsureCapacity(colliderCount);
+        _queryCandidates.EnsureCapacity(colliderCount);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Vector2d CreateMin(Vector2d first, Vector2d second) =>
+        new(FixedMath.Min(first.x, second.x), FixedMath.Min(first.y, second.y));
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Vector2d CreateMax(Vector2d first, Vector2d second) =>
+        new(FixedMath.Max(first.x, second.x), FixedMath.Max(first.y, second.y));
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool HasAwakeMovableParticipant(LSCollider2D first, LSCollider2D second) =>

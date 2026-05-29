@@ -20,6 +20,8 @@ internal static class Physics2DHitSorter
         }
     }
 
+    public static bool ComesBefore(Physics2DHit left, Physics2DHit right) => Compare(left, right) < 0;
+
     private static int Compare(Physics2DHit left, Physics2DHit right)
     {
         int distance = left.Distance.CompareTo(right.Distance);

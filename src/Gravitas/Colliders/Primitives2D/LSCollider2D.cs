@@ -235,7 +235,7 @@ public abstract class LSCollider2D
     {
         RebuildShape();
         if (_context != null && _id >= 0)
-            _context.Collisions2D.RefreshColliderPartition(this);
+            _context.Collisions2D.RefreshColliderPartitionAfterShapeChange(this);
     }
 
     internal SwiftList<WorldVoxelIndex> GetOrCreatePartitionCoordinates()

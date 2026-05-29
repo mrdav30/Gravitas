@@ -55,6 +55,48 @@ public sealed class StiffBody2DHostContractTests
     }
 
     [Fact]
+    public void Visualize_WithDynamic2DBody_ShouldPublishPlanarStateToHostTransform()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        var transform = new FixedTransform(new Vector3d(Fixed64.Zero, (Fixed64)9, Fixed64.Zero), FixedQuaternion.Identity, Vector3d.One);
+        var agent = new TestMatterAgent(context, transform);
+        var body = new StiffBody2D(agent, new LSCircleCollider2D(Fixed64.Half))
+        {
+            Mass = Fixed64.One
+        };
+        body.Initialize(Vector2d.Zero);
+
+        body.SetPosition(new Vector2d((Fixed64)4, (Fixed64)6));
+        body.SetRotation(FixedMath.DegToRad((Fixed64)90));
+        context.Visualize();
+
+        transform.Position.Should().Be(new Vector3d((Fixed64)4, (Fixed64)9, (Fixed64)6));
+        FixedQuaternion.Angle(
+            transform.Rotation,
+            FixedQuaternion.FromEulerAnglesInDegrees(Fixed64.Zero, (Fixed64)90, Fixed64.Zero))
+            .Should().BeLessThan(Fixed64.Epsilon);
+    }
+
+    [Fact]
+    public void Visualize_WhenRuntimeModeIsThreeD_ShouldNotPublish2DTransform()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        context.Settings.RuntimeMode = PhysicsRuntimeMode.ThreeD;
+        var transform = new FixedTransform(new Vector3d(Fixed64.Zero, (Fixed64)9, Fixed64.Zero), FixedQuaternion.Identity, Vector3d.One);
+        var agent = new TestMatterAgent(context, transform);
+        var body = new StiffBody2D(agent, new LSCircleCollider2D(Fixed64.Half))
+        {
+            Mass = Fixed64.One
+        };
+        body.Initialize(Vector2d.Zero);
+
+        body.SetPosition(new Vector2d((Fixed64)4, (Fixed64)6));
+        context.Visualize();
+
+        transform.Position.Should().Be(new Vector3d(Fixed64.Zero, (Fixed64)9, Fixed64.Zero));
+    }
+
+    [Fact]
     public void InitializeWithNoBody_ShouldBindStaticColliderToAgentAndQueries()
     {
         using GravitasWorldContext context = Create2DContext();

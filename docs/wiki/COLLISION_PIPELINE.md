@@ -20,7 +20,8 @@ mixed-dimension embedding metadata, not a pure 2D collision axis.
 
 `GravitasPhysics2DService` owns the alpha pure 2D path for `StiffBody2D` and
 `LSCollider2D`. It keeps 2D collider IDs, 2D body registration, reusable pair
-state, and caller-buffered overlap query output local to one
+state, visualization publishing, and caller-buffered overlap/raycast query
+output local to one
 `GravitasWorldContext`.
 
 The current 2D broad phase is GridForge-backed:
@@ -34,8 +35,11 @@ The current 2D broad phase is GridForge-backed:
 5. store collider IDs in static, dynamic, and awake-dynamic sparse sets.
 6. distribute candidate pairs from active partitions in deterministic
    voxel/order and collider-ID order.
-7. suppress duplicate pair work when broad colliders share several voxels.
-8. run layer filtering and exact 2D narrow-phase dispatch.
+7. suppress duplicate pair work when broad colliders share several voxels by
+   routing each pair through its deterministic first shared partition before
+   the frame duplicate-pair set.
+8. run same-agent, layer, and bounds filtering before exact 2D narrow-phase
+   dispatch.
 
 The Y=0 storage plane is not physical thickness and does not claim mixed
 2D/3D interaction. It is a deterministic broad-phase identity that lets pure
