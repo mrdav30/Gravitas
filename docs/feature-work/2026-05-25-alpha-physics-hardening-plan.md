@@ -1681,6 +1681,163 @@ collision semantics.
   environment's priority-elevation warning even after the attempted
   `cap_sys_nice` fix, but all 21 benchmark cases executed and exported.
 
+## Phase 9J: 2D Collider State And Dispatch Parity
+
+**Purpose:** Bring pure 2D collider state management, pair ownership, hierarchy
+exclusion, and collision dispatch up to the same architectural standard as the
+hardened 3D path before mixed 2D/3D work starts. This phase should avoid
+copying 3D state types into parallel 2D-only versions when the existing state is
+dimension-agnostic or can be generalized cleanly.
+
+**Reuse Guidance:**
+
+- Reuse `ColliderQueryState` directly if it still only carries query stamps and
+  no spatial dimensionality.
+- Reuse or generalize `ColliderHierarchyState` instead of duplicating it. It has
+  no inherent 3D data, but its current type references may need a narrow shared
+  abstraction, small generic wrapper, or focused overloads.
+- Reuse the dirty/version semantics from `ColliderRuntimeShapeState`. If the
+  3D `ColliderShapeSnapshot` payload makes direct reuse awkward, prefer a small
+  shared snapshot-comparer pattern plus a focused 2D snapshot over a copy/paste
+  class with drift-prone logic.
+- Reuse or generalize `ColliderPairState` if doing so keeps pair tracking clear.
+  A focused 2D pair state is acceptable only if the 3D `CollisionPair` typing
+  makes a shared implementation more complex than the behavior it saves.
+- Keep `Collider2DPartitionState` 2D-specific unless the 3D and 2D partition
+  coordinate state can share behavior without hiding X/Z projection rules.
+
+**Files:**
+
+- Modify: `src/Gravitas/Colliders/Primitives2D/LSCollider2D.cs`
+- Modify: `src/Gravitas/Colliders/Support/ColliderQueryState.cs`
+- Potentially modify/generalize:
+  `src/Gravitas/Colliders/Support/ColliderHierarchyState.cs`
+- Potentially modify/generalize:
+  `src/Gravitas/Colliders/Support/ColliderPairState.cs`
+- Potentially modify/generalize:
+  `src/Gravitas/Colliders/Support/ColliderRuntimeShapeState.cs`
+- Potentially create:
+  `src/Gravitas/Colliders/Support/Collider2DShapeSnapshot.cs`
+- Potentially create:
+  `src/Gravitas/Colliders/Support/ColliderSettings2D.cs`
+- Potentially create:
+  `src/Gravitas/CollisionHandling/Detection/CollisionType2D.cs`
+- Modify: `src/Gravitas/CollisionHandling/Pairs/CollisionPair2D.cs`
+- Modify: `src/Gravitas/CollisionHandling/Detection/CollisionDetection2D.cs`
+- Modify: `src/Gravitas/Core/GravitasPhysics2DService.cs`
+- Modify: `tests/Gravitas.Tests/Physics2D`
+- Modify: `tests/Gravitas.Benchmarks/Physics2D/Physics2DBenchmarks.cs`
+- Modify: `docs/wiki`
+
+**Tasks:**
+
+- [ ] Add focused tests first for 2D collider state behavior: unchanged
+  colliders should skip shape rebuild/partition refresh work, position or
+  rotation changes should dirty the runtime shape, shape mutations should dirty
+  bounds, and query stamps should suppress duplicate candidates deterministically.
+- [ ] Reuse `ColliderQueryState` in `LSCollider2D` and generalize/reuse
+  `ColliderHierarchyState`, `ColliderPairState`, and runtime-shape dirty state
+  only where that keeps the code smaller and clearer than a 2D-specific copy.
+- [ ] Add `LSCollider2D.Priority` and a compact 2D collider-settings dispatch
+  table so shape ordering and pair ordering are explicit instead of inferred
+  from type-check conditionals.
+- [ ] Add `CollisionType2D` and route `CollisionDetection2D.TryCollide(...)`
+  through a resolved work item or collision type, matching the 3D dispatch
+  pattern closely enough that new 2D shape pairs do not grow conditional soup.
+- [ ] Refactor `CollisionPair2D` to store deterministic collider order,
+  resolved collision type, and any pair-state links needed for cheap removal
+  from involved colliders.
+- [ ] Add 2D hierarchy/self-exclusion parity for same-agent, parent/child, and
+  sibling relationships using shared hierarchy state where practical.
+- [ ] Use 2D pair state to avoid broad O(total-pairs) removal scans when a
+  collider leaves the simulation or changes identity.
+- [ ] Keep disabled paths allocation-conscious and avoid LINQ/iterator
+  allocations in per-frame, per-pair, or per-collider paths.
+- [ ] Update 2D benchmarks to cover collider churn, pair cleanup, and dense
+  collision dispatch after the state refactor.
+- [ ] Update `docs/wiki` if the 2D collider lifecycle, hierarchy exclusions, or
+  collision dispatch model changes.
+- [ ] Run focused 2D tests, full `Release`, full `ReleaseLean`, relevant
+  benchmarks, and `git diff --check`.
+
+**Acceptance Bar:**
+
+- 2D collider state uses shared dimension-free helpers where practical and only
+  introduces 2D-specific state where the payload is genuinely dimensional.
+- Unchanged 2D colliders do not rebuild runtime shape state or refresh
+  partition coverage every frame.
+- 2D pair cleanup scales with pairs owned by the affected colliders where pair
+  state is available, not with every active 2D pair.
+- 2D collision dispatch is driven by a resolved collision type/work item rather
+  than public type-check conditionals.
+- Same-agent, parent/child, and sibling exclusion behavior is covered for 2D.
+- Tests and benchmarks demonstrate the refactor did not regress deterministic
+  2D contact ordering or broad-phase behavior.
+
+## Phase 9K: 2D Continuous Collision
+
+**Purpose:** Add pure 2D continuous collision detection through the existing
+`ContinuousCollisionMode` concept so fast 2D bodies do not tunnel through
+static or kinematic 2D colliders before mixed 2D/3D integration begins.
+
+**Files:**
+
+- Modify: `src/Gravitas/Core/StiffBody2D.cs`
+- Modify: `src/Gravitas/Queries/GravitasQuery2DService.cs`
+- Potentially modify/create:
+  `src/Gravitas/Queries/QueryDetection2D.cs`
+- Modify: `src/Gravitas/Settings/PhysicsSettings.cs` only if the existing
+  context default cannot be reused cleanly.
+- Potentially create:
+  `tests/Gravitas.Tests/Physics2D/ContinuousCollision2DTests.cs`
+- Modify: `tests/Gravitas.Benchmarks/Physics2D/Physics2DBenchmarks.cs`
+- Modify: `docs/wiki/QUERY_SERVICES.md`
+- Modify: `docs/wiki/RUNTIME_ARCHITECTURE.md`
+
+**Tasks:**
+
+- [ ] Add `ContinuousCollisionMode` support to `StiffBody2D`, defaulting to
+  `Inherit`, and include it in Chronicler state recording if body state
+  recording already covers the equivalent 3D property.
+- [ ] Resolve the effective 2D CCD mode from the body, then applicable hierarchy
+  state when available from Phase 9J, then the context default. Final unresolved
+  `Inherit` should behave as `Discrete`.
+- [ ] Add caller-buffered `Query2D.SweepCircle(...)` and
+  `Query2D.SweepCircleAll(...)` APIs with deterministic ordering, layer
+  filtering, trigger filtering, self/hierarchy exclusion, and duplicate
+  suppression.
+- [ ] Use a conservative deterministic proxy radius per shape: circle radius,
+  AABB half-diagonal, and polygon maximum local/world vertex distance from the
+  collider center.
+- [ ] In `StiffBody2D.LateSimulate`, compute the proposed movement, resolve CCD
+  mode before expensive query setup, sweep when required, and commit the clipped
+  position before publishing visualization state.
+- [ ] Implement `Auto` mode so it only sweeps when displacement squared exceeds
+  the deterministic proxy-radius threshold; keep `Discrete` behavior unchanged.
+- [ ] Start with static/kinematic target coverage, mirroring the current 3D CCD
+  maturity, and document dynamic-vs-dynamic CCD as a later hardening target if
+  not solved in this phase.
+- [ ] Add tests for fast circle-vs-circle, circle-vs-AABB, and circle-vs-polygon
+  tunneling prevention, plus no-hit, zero-displacement, layer filtering,
+  trigger filtering, self-exclusion, and deterministic hit ordering.
+- [ ] Add benchmark coverage for 2D CCD cost in no-hit, sparse-hit, and
+  dense-hit scenes.
+- [ ] Update query/runtime wiki docs for the 2D sweep contract and CCD limits.
+- [ ] Run focused 2D CCD tests, full `Release`, full `ReleaseLean`, relevant
+  benchmarks, and `git diff --check`.
+
+**Acceptance Bar:**
+
+- `StiffBody2D` exposes and records effective CCD behavior consistently with
+  the 3D body path.
+- Fast 2D movers do not tunnel through covered static or kinematic 2D targets
+  under `Continuous` mode.
+- `Auto` mode avoids sweep work below the proxy threshold and performs sweep
+  work above it.
+- `Discrete` mode remains unchanged and covered by tests.
+- 2D sweep queries are caller-buffered, deterministic, and discoverable through
+  `GravitasWorldContext.Query2D`.
+
 ## Phase 10: Mixed 2D/3D Interaction Model
 
 **Purpose:** Define how 2D and 3D bodies coexist, collide, exchange impulses,
