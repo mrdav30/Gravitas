@@ -1,14 +1,14 @@
 # Query Services
 
-Raycasts, swept-sphere queries, and circle-overlap queries are context-owned
-services. They use the same GridForge-backed partitions as collision detection,
-resolve collider IDs through the owning `GravitasPhysicsService`, and suppress
-duplicate hits when a collider appears in multiple voxels.
+Raycasts, swept-sphere queries, 3D-ground-plane circle queries, and pure 2D
+overlap queries are context-owned services. The 3D services use the same
+GridForge-backed partitions as 3D collision detection, resolve collider IDs
+through the owning `GravitasPhysicsService`, and suppress duplicate hits when a
+collider appears in multiple voxels.
 
-The current services are 3D or 3D-ground-plane services. Phase 9 pure 2D query
-work should introduce explicit 2D segment/overlap workers over `Vector2d`
-shape data instead of routing through the existing 3D raycast path or the X/Z
-circle query service by accident.
+Pure 2D queries live on `GravitasPhysics2DService` and operate over
+`Vector2d` shape data. They should not route through the existing 3D raycast
+path or the X/Z circle query service by accident.
 
 ## Raycasts
 
@@ -135,6 +135,32 @@ voxel partitions. Circle queries remain X/Z overlap/proximity queries for the
 current 3D grounding model; they are not the pure 2D query API. Use
 swept-sphere queries for deterministic 3D swept movement.
 
+## Pure 2D Overlap Queries
+
+`GravitasPhysics2DService` exposes:
+
+- `OverlapCircleAll(center, radius, results)`
+- `OverlapCircleAll(center, radius, layerMask, results)`
+
+The service clears the caller-provided `SwiftList<Physics2DHit>`, writes hits
+into it, returns the hit count, and sorts by surface distance with collider ID
+as the deterministic tie-breaker.
+
+The candidate path is:
+
+1. rebuild current 2D collider bounds into the service broad-phase buffer.
+2. sort colliders by `MinX`.
+3. scan until candidate `MinX` exceeds the query circle `MaxX`.
+4. reject inactive colliders, layer-mask misses, and Y-separated bounds.
+5. ask each 2D shape for its closest point to the query center.
+6. include the collider when that closest point lies within the query radius or
+   the shape contains the query center.
+7. sort hits by distance and collider ID.
+
+Current hit data is `Physics2DHit`: collider, optional body, point, normal, and
+distance. Segment/ray queries, AABB queries, and polygon queries remain future
+2D query hardening work.
+
 ## Layer Mask Semantics
 
 Queries accept `PhysicsLayerMask layerMask`. This is an include mask:
@@ -179,5 +205,7 @@ null body.
 - keep query benchmarks allocation-free as result ordering, filters, and shape
   support expand.
 - add shape-specific query tests for every collider type.
+- add pure 2D segment/ray, AABB, and polygon query APIs once the shape math and
+  benchmark contract justify the public surface.
 - revisit explicit query state objects only when a real host requires
   concurrent queries against one context.

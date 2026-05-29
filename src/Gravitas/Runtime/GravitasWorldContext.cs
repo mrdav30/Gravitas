@@ -41,6 +41,7 @@ public sealed class GravitasWorldContext : IDisposable
         Diagnostics = new GravitasDiagnosticSink(this);
         Collisions = new GravitasCollisionService(this);
         Physics = new GravitasPhysicsService(this);
+        Physics2D = new GravitasPhysics2DService(this);
         Raycasts = new GravitasRaycastService(this);
         CircleQueries = new GravitasCircleQueryService(this);
         Coroutines = new GravitasCoroutineService(this);
@@ -70,6 +71,11 @@ public sealed class GravitasWorldContext : IDisposable
     /// Gets this context's world-local physics registration and pair service.
     /// </summary>
     public GravitasPhysicsService Physics { get; }
+
+    /// <summary>
+    /// Gets this context's world-local pure 2D physics service.
+    /// </summary>
+    public GravitasPhysics2DService Physics2D { get; }
 
     /// <summary>
     /// Gets this context's world-local raycast query service.
@@ -255,6 +261,7 @@ public sealed class GravitasWorldContext : IDisposable
         ThrowIfDisposed();
         _clock.Simulate();
         Physics.Simulate();
+        Physics2D.Simulate();
         Coroutines.Simulate();
         _hooks.InvokeSimulate();
     }
@@ -267,6 +274,7 @@ public sealed class GravitasWorldContext : IDisposable
         ThrowIfDisposed();
         _clock.LateSimulate();
         Physics.LateSimulate();
+        Physics2D.LateSimulate();
         _hooks.InvokeLateSimulate();
     }
 
@@ -300,6 +308,7 @@ public sealed class GravitasWorldContext : IDisposable
         _clock.Reset();
         Collisions.Reset();
         Physics.Reset();
+        Physics2D.Reset();
         Raycasts.Reset();
         CircleQueries.Reset();
         Coroutines.Reset();

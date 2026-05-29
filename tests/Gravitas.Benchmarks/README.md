@@ -70,6 +70,8 @@ Start with hot paths that can be isolated and repeated deterministically:
 - `CollisionDetection` shape-pair checks.
 - `CollisionResponse` contact resolution.
 - continuous collision detection policy and swept movement cost.
+- pure 2D integration, sweep-and-prune broad phase, narrow-phase pairs,
+  response, and overlap queries.
 - collider shape-state rebuilds, capsule derived state, compound aggregate bounds, and mesh validation/BVH construction.
 - `GravitasRaycastService` and `GravitasCircleQueryService` query gathering, filtering, and result ordering.
 - Mesh collider preprocessing and convex mesh limits.
@@ -103,7 +105,7 @@ BenchmarkDotNet writes results to `BenchmarkDotNet.Artifacts/results/` by defaul
 For quick allocation checks around the current steady-state hot paths, run:
 
 ```bash
-dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0 -- query-service simulation-allocation continuous-collision collision-detection collision-response partition-culling diagnostics --filter "*" -j Short -i --exporters json
+dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0 -- query-service simulation-allocation continuous-collision collision-detection collision-response partition-culling diagnostics physics-2d --filter "*" -j Short -i --exporters json
 ```
 
 The short in-process job is not canonical timing evidence, but it is useful for
@@ -123,6 +125,7 @@ to add or tighten explicit allocation tests before changing the algorithm.
 | `collision-response` | manifold response solver cost across single-contact and face-manifold cases, with pair-count scaling. |
 | `diagnostics` | Disabled/enabled force and torque event hooks plus disabled/enabled collider debug draw capture. |
 | `partition-culling` | dynamic collider repartitioning after teleports, direct partition add/remove churn, and culled-pair invalidation after movement. |
+| `physics-2d` | pure 2D body integration, overlapping circle-pair response, required 2D shape-pair checks, and `OverlapCircleAll`. |
 
 Collider shape work has a focused selection:
 

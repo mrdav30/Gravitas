@@ -45,7 +45,7 @@ Meaningful deferred work captured from that plan and the wiki:
 | `docs/wiki/COLLISION_PIPELINE.md` | Contact manifolds, friction impulses, continuous collision detection, warm starting, island solving, mixed 2D/3D exchange rules. | Phases 3-6, 9-10 |
 | `docs/wiki/COLLISION_PIPELINE.md` | Dynamic mesh behavior, arbitrary mesh contact manifolds, swept mesh queries. | Phases 3, 6, 7 |
 | `docs/wiki/QUERY_SERVICES.md` | Swept mesh support policy, shape-specific query tests, query reentrancy/job state. | Phases 6 and 8 |
-| `docs/wiki/OVERVIEW.md` | First-class 2D and mixed 2D/3D are goals, not current guarantees. | Phases 9-10 |
+| `docs/wiki/OVERVIEW.md` | First-class pure 2D support and mixed 2D/3D interaction needed explicit contracts instead of accidental flattened-3D behavior. | Phases 9-10 |
 | `docs/wiki/DIAGNOSTICS.md` | Generic diagnostic payloads may need richer typed events; host adapters remain outside core. | Phase 12 |
 | `docs/wiki/HOST_INTEGRATION.md` | Serialization is populate-existing-shell behavior and remains experimental. | Phase 11 |
 | Prior plan recommendations | `LSCollider` owns too many responsibilities. | Phase 2 |
@@ -1067,34 +1067,34 @@ runtime costs.
   broad-phase storage. Prefer `BoundingArea`/`FixedBoundVolume` and
   SwiftCollections fixed query structures where they fit; document any custom
   path if 2D needs a leaner dedicated bound representation.
-- [ ] **Phase 9C - 2D shape foundation:** Add first-class shape support for
+- [x] **Phase 9C - 2D shape foundation:** Add first-class shape support for
   circle, axis-aligned box, and convex polygon. Treat polygon concavity as an
   explicit unsupported/validation case for the first slice rather than silently
   accepting ambiguous shape truth.
-- [ ] **Phase 9C - 2D narrow phase and queries:** Add deterministic
+- [x] **Phase 9C - 2D narrow phase and queries:** Add deterministic
   circle/circle, circle/AABB, AABB/AABB, circle/convex-polygon,
   AABB/convex-polygon, and convex-polygon/convex-polygon detection. Add
   2D-specific ray/segment or overlap query behavior without routing through
   unnecessary 3D workers.
-- [ ] **Phase 9D - Pure 2D integration and response:** Add tests and
+- [x] **Phase 9D - Pure 2D integration and response:** Add tests and
   implementation for pure 2D deterministic integration, contact manifolds,
   response, trigger/contact events, sleep/wake behavior, and replay. Do not
   claim mixed 2D/3D collision support in this phase.
-- [ ] **Phase 9D - Verification and benchmarks:** Add focused 2D unit tests,
+- [x] **Phase 9D - Verification and benchmarks:** Add focused 2D unit tests,
   deterministic replay tests, and 2D benchmark selections for integration,
   broad-phase membership, narrow-phase shape pairs, response, and queries.
   Benchmark 2D separately from 3D so regressions and unnecessary 3D costs are
   visible.
-- [ ] Update `docs/wiki/OVERVIEW.md`, `RUNTIME_ARCHITECTURE.md`,
+- [x] Update `docs/wiki/OVERVIEW.md`, `RUNTIME_ARCHITECTURE.md`,
   `COLLISION_PIPELINE.md`, and `QUERY_SERVICES.md` to describe the pure 2D
   model and explicitly defer mixed 2D/3D interaction to Phase 10.
 
 **Phase 9A-9B Status - 2026-05-28**
 
 - Added `PhysicsDimension` as the shared body/collider dimensionality contract.
-  Current production colliders remain explicitly `ThreeD`; future 2D collider
-  families should override the dimension instead of reusing 3D primitive shape
-  caches with ignored axes.
+  At the 9A/9B checkpoint, production colliders remained explicitly `ThreeD`;
+  the follow-up 2D collider family needed to own 2D shape data instead of
+  reusing 3D primitive shape caches with ignored axes.
 - Added `StiffBody.Dimension` with supported-value validation, post-initialize
   immutability, Chronicler state recording, and body/collider dimension
   mismatch rejection before body initialization mutates runtime state.
@@ -1105,8 +1105,53 @@ runtime costs.
   body/collider mismatch rejection, and deterministic 2D bounds projection.
 - Added `docs/wiki/DIMENSIONS.md` and updated overview, runtime architecture,
   collision pipeline, and query service docs with the Phase 9A/9B boundary.
-  Phase 9C/9D still own real 2D shapes, 2D narrow phase, 2D response, 2D
-  queries, replay, and benchmarks.
+  At that point, Phase 9C/9D were planned to add real 2D shapes, 2D narrow
+  phase, 2D response, 2D queries, replay, and benchmarks.
+
+**Phase 9C-9D Status - 2026-05-28**
+
+- Added the pure 2D runtime slice under `src/Gravitas/Physics2D` and
+  `src/Gravitas/Colliders/Primitives2D`: `StiffBody2D`,
+  `GravitasPhysics2DService`, `LSCollider2D`, `LSCircleCollider2D`,
+  `LSAABBoxCollider2D`, `LSPolygonCollider2D`, `CollisionDetection2D`,
+  `CollisionPair2D`, `Contact2D`, and `Physics2DHit`.
+- Wired `GravitasWorldContext.Physics2D` into `Simulate`, `LateSimulate`, and
+  `Reset` while keeping mixed 2D/3D interaction out of Phase 9.
+- Implemented a lean pure 2D sweep-and-prune broad phase sorted by `MinX`, with
+  Y-bounds rejection before deterministic 2D narrow-phase dispatch. This avoids
+  making pure 2D scenes pay for the 3D GridForge partition path until benchmarks
+  justify a different 2D broad-phase structure.
+- Added deterministic 2D collision checks for circle/circle, circle/AABB,
+  AABB/AABB, circle/convex-polygon, AABB/convex-polygon, and
+  convex-polygon/convex-polygon. Concave or collinear polygon input is rejected
+  up front.
+- Added simple pure 2D response and contact lifecycle: position correction to
+  penetration slop, closing-velocity normal impulse, sleep/wake propagation,
+  and contact enter/stay/exit events. Rich 2D manifolds, angular impulses,
+  friction impulses, and mixed-dimension impulse exchange remain future solver
+  work.
+- Added `OverlapCircleAll` as the first explicit pure 2D query API. Results are
+  written into caller-owned `SwiftList<Physics2DHit>` buffers and sorted by
+  surface distance plus collider ID.
+- Added focused tests for 2D shape bounds, convexity validation, rotated
+  polygon vertices, required shape-pair narrow phase, pure 2D overlap query
+  ordering, integration, response, contact events, sleep/wake, and replay.
+- Added `Physics2DBenchmarks` with the `physics-2d`/`2d` benchmark selection
+  covering 2D integration, overlapping-pair response, required shape-pair
+  detection, and `OverlapCircleAll`. The short in-process smoke exposed a
+  broad-phase sort allocation, so the 2D service now uses an allocation-free
+  deterministic in-place sort; the repeat smoke reported no managed allocation
+  for all four 2D benchmark methods.
+- Pre-review hardening tightened the pure 2D lifecycle and filtering contract:
+  collider IDs are monotonic within a context, deactivation swap-removes the
+  collider and immediately separates owned pairs, simulation respects the
+  context collision matrix, `OverlapCircleAll` has a layer-mask overload, trigger
+  enter/exit events mirror the 3D event surface, and solid sleeping/static pairs
+  no longer wake or resolve unless an awake movable body participates.
+- Updated `docs/wiki/DIMENSIONS.md`, `OVERVIEW.md`,
+  `RUNTIME_ARCHITECTURE.md`, `COLLISION_PIPELINE.md`, and
+  `QUERY_SERVICES.md` with the pure 2D alpha model and Phase 10 mixed-dimension
+  boundary.
 
 ## Phase 10: Mixed 2D/3D Interaction Model
 

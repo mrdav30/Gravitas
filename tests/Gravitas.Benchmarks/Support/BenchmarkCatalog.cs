@@ -12,7 +12,10 @@ internal sealed class BenchmarkCatalog
 {
     private static readonly string[] _benchmarkSuffixes = new[] { "Benchmarks", "Benchmark" };
     private static readonly HashSet<string> _selectionQualifiers = new(StringComparer.OrdinalIgnoreCase) { };
-    private static readonly Dictionary<string, string[]> _aliasSynonyms = new(StringComparer.OrdinalIgnoreCase) { };
+    private static readonly Dictionary<string, string[]> _aliasSynonyms = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["physics2-d"] = new[] { "physics-2d", "2d", "physics-two-d" }
+    };
 
     private readonly Dictionary<string, Type[]> _aliasLookup;
     private readonly KeyValuePair<string, Type[]>[] _displayAliases;

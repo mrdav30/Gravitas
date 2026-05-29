@@ -23,6 +23,7 @@ pairs, queries, and coroutines remain context-local.
 | Service | Owned state |
 | --- | --- |
 | `GravitasPhysicsService` | Dynamic body bucket, collider ID table, reusable collider IDs, collision-pair pool, active collision-pair queue, simulation switch. |
+| `GravitasPhysics2DService` | Pure 2D dynamic body bucket, monotonic collider ID table, sweep-and-prune broad-phase buffers, 2D pair pool, layer-filtered narrow-phase/response processing, overlap-circle query buffers, simulation switch. |
 | `GravitasCollisionService` | Active partition bucket, inactive partition pool, duplicate voxel checker, partition awake-state refresh, collision distribution version, cull distributor. |
 | `GravitasRaycastService` | 3D segment worker, swept-sphere worker, intersection buffer, duplicate voxel checker, duplicate collider checker, query version. |
 | `GravitasCircleQueryService` | Duplicate collider checker and query version for X/Z circle overlap/proximity queries. |
@@ -43,6 +44,10 @@ Simulate
   Physics.Simulate
     PrepareCollisionPartitions for dynamic-body colliders
     Collisions.CheckAndDistributeCollisions
+  Physics2D.Simulate
+    Rebuild active 2D collider bounds
+    Sort 2D colliders by MinX
+    Process overlapping 2D candidate pairs
   Coroutines.Simulate
   Hooks.InvokeSimulate
 
@@ -51,6 +56,8 @@ LateSimulate
   Physics.LateSimulate
     ProcessActiveCollisionPairs
     StiffBody.LateSimulate for dynamic bodies
+  Physics2D.LateSimulate
+    StiffBody2D.LateSimulate for dynamic 2D bodies
   Hooks.InvokeLateSimulate
 
 Visualize
@@ -71,8 +78,9 @@ commands should be applied before `Simulate()`. Transform teleports made before
 dynamic-body colliders are refreshed before collisions are checked. Force and
 acceleration commands made before `Simulate()` are stored on the body and
 integrated during `LateSimulate()`. Collision response can mutate authoritative
-body state during `Simulate()`, while body force integration, grounding, and
-post-integration collider refresh happen during `LateSimulate()`.
+body state during `Simulate()`, including the pure 2D response service. Body
+force integration, 3D grounding, and post-integration collider refresh happen
+during `LateSimulate()`.
 
 Lifecycle hooks run after the built-in work for their phase. `Visualize()` and
 `LateVisualize()` are presentation phases: they may update visual interpolation
@@ -170,8 +178,7 @@ Body dimension is authoritative setup state. `StiffBody.Dimension` defaults to
 initialization. Initialization also requires the bound collider to declare the
 same dimension. This prevents temporary 3D colliders from becoming the hidden
 implementation path for pure 2D bodies. The existing position-as-ground-plus-
-height fields still belong to the current 3D y-up body model; pure 2D motion
-state is Phase 9 follow-up work.
+height fields still belong to the current 3D y-up body model.
 
 Sleeping is body-owned and deterministic. A dynamic non-kinematic body can sleep
 after linear and angular speed remain below configured thresholds for the body
@@ -190,6 +197,13 @@ uses clamped frame accumulation between the last visual rotation and the current
 authoritative rotation. With a positive interpolation speed, each visualize call
 speed-limits from the current presentation rotation toward the authoritative
 target.
+
+`StiffBody2D` owns the pure 2D body model. It uses `Vector2d` position,
+`Vector2d` linear velocity, scalar rotation, 2D gravity, 2D force integration,
+sleep/wake state, and Chronicler record data. It intentionally has no y-up
+ground probe, height split, visual interpolation state, or 3D inertia tensor.
+`GravitasPhysics2DService.Simulate()` runs 2D contact response and events;
+`GravitasPhysics2DService.LateSimulate()` integrates active movable 2D bodies.
 
 ## Collider State
 
@@ -226,9 +240,11 @@ Bodyless/static colliders are not owned by the dynamic body bucket, so a host
 that moves one after initialization must call `collider.Simulate()` to refresh
 bounds and partition membership.
 
-Current primitive colliders declare `PhysicsDimension.ThreeD`. Future pure 2D
-colliders should override `LSCollider.Dimension` and own 2D shape caches
-directly rather than reusing 3D sphere/cuboid/capsule state with ignored axes.
+Current 3D primitive colliders declare `PhysicsDimension.ThreeD`. Pure 2D
+colliders derive from `LSCollider2D`; `LSCircleCollider2D`,
+`LSAABBoxCollider2D`, and `LSPolygonCollider2D` own their own 2D bounds, support
+points, closest-point math, and shape validation. They are registered with
+`GravitasPhysics2DService`, not with the 3D `GravitasPhysicsService`.
 
 ## Settings And Environment
 
@@ -264,6 +280,8 @@ multi-context safe.
 - A live `GridWorld` has at most one live `GravitasWorldContext`.
 - Every collider belongs to one context for its active lifetime.
 - Collision pairs cannot cross context boundaries.
+- Pure 2D bodies and colliders are simulated by `GravitasPhysics2DService`;
+  2D/3D contacts are not produced until a mixed-dimension policy exists.
 - Partition ownership is through `GravitasCollisionService`; partitions are
   returned to the owning service pool through voxel removal.
 - Query services resolve collider IDs through their owning context only.

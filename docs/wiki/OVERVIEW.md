@@ -44,6 +44,7 @@ Gravitas owns, per context:
 - fixed-step timing through `GravitasClock`.
 - world-local settings and environment values.
 - dynamic body and collider registration.
+- pure 2D body, collider, pair, response, and query state.
 - collision partitions and collision-pair state.
 - raycast, circle-overlap, and coroutine buffers.
 - swept-sphere query buffers.
@@ -58,6 +59,7 @@ flowchart TD
     Context --> Settings["PhysicsSettings"]
     Context --> Environment["PhysicsEnvironment"]
     Context --> Physics["GravitasPhysicsService"]
+    Context --> Physics2D["GravitasPhysics2DService"]
     Context --> Collisions["GravitasCollisionService"]
     Context --> Raycasts["GravitasRaycastService"]
     Context --> CircleQueries["GravitasCircleQueryService"]
@@ -67,6 +69,8 @@ flowchart TD
     Agent --> Transform["FixedTransform"]
     Physics --> Body["StiffBody"]
     Physics --> Collider["LSCollider"]
+    Physics2D --> Body2D["StiffBody2D"]
+    Physics2D --> Collider2D["LSCollider2D"]
     Collisions --> Partition["PhysicsPartition"]
     Partition --> World
     Collider --> Pair["CollisionPair"]
@@ -81,10 +85,13 @@ flowchart TD
 | `GravitasWorldContext` | Owns one active `GridWorld` plus all context-local runtime services. |
 | `IMatterAgent` | Host boundary. Supplies context, fixed transform, hierarchy state, and interaction state. |
 | `StiffBody` | Simulated body state: position, rotation, velocity, acceleration, mass, grounding, impulses, sleep/wake state, interpolation, and Chronicler record data. |
+| `StiffBody2D` | Pure 2D body state: X/Y position, scalar rotation, linear velocity, force integration, gravity, sleep/wake state, and Chronicler record data. |
 | `LSCollider` | Base collider state: shape, bounds, layer, trigger/contact events, partition coordinates, pair references, and context binding. |
+| `LSCollider2D` | Base pure 2D collider state for circle, axis-aligned box, and convex polygon shapes. |
 | `PhysicsDimension` | Declares whether a body or collider belongs to the first-class 2D or 3D simulation domain. |
 | `Physics2DBounds` | Projects pure 2D X/Y bounds into a deterministic fixed broad-phase storage slab. |
 | `GravitasPhysicsService` | Body/collider registration, context-local collider IDs, collision-pair pooling, simulation phases, and visualization phases. |
+| `GravitasPhysics2DService` | Pure 2D registration, collider IDs, sweep-and-prune broad phase, narrow phase, response, events, and overlap-circle queries. |
 | `GravitasCollisionService` | GridForge-backed broad-phase partitioning, active partition tracking, partition pooling, and collision distribution versioning. |
 | `PhysicsPartition` | Voxel partition payload containing collider IDs, awake dynamic membership, and candidate pair distribution. |
 | `CollisionPair` | Pair identity, culling state, contact state, warm-start cache, narrow-phase dispatch, response dispatch, and contact notification state. |
@@ -113,6 +120,13 @@ flowchart TD
 8. On pooling, despawn, session reset, or shutdown, the host deactivates objects
    and disposes or resets the context.
 
+Pure 2D scenes use the same context and clock but create `LSCollider2D` shapes
+and `StiffBody2D` bodies, then run through `context.Physics2D`. The current 2D
+path supports circles, axis-aligned boxes, convex polygons, deterministic
+collision response, contact events, sleep/wake behavior, replay tests, and
+overlap-circle queries. Mixed 2D/3D contacts are intentionally not part of this
+flow yet.
+
 ## Collision In One Breath
 
 Colliders calculate bounds and are mapped into GridForge voxels by
@@ -133,11 +147,14 @@ active-pair queue during `LateSimulate`.
 
 ## Current Prototype Edges
 
-- The library is currently 3D-focused. Phase 9 has started the explicit
-  dimension contract, but pure 2D shapes, 2D narrow phase, 2D response, and
-  mixed 2D/3D interactions are not current guarantees.
+- The original 3D path remains the mature runtime path. The pure 2D path is an
+  alpha slice with circle, axis-aligned box, convex polygon, overlap-circle
+  query, and simple deterministic response coverage.
 - `StiffBody` has a split 2D ground position plus height for the existing 3D
   y-up model, but that is not the pure 2D body model.
+- Mixed 2D/3D interaction is still future work. Phase 10 must define the
+  embedding rule, finite thickness/projection policy, manifold shape, and
+  impulse exchange before 2D and 3D bodies collide.
 - Cylinder collision and query behavior is implemented for the current finite
   cylinder model, but needs continued edge-case hardening.
 - Mesh raycast overlap and concave mesh narrow phase are implemented through
@@ -159,10 +176,11 @@ active-pair queue during `LateSimulate`.
 | Area | Files |
 | --- | --- |
 | Context and lifecycle | [`GravitasWorldContext.cs`](../../src/Gravitas/Runtime/GravitasWorldContext.cs), [`GravitasClock.cs`](../../src/Gravitas/Runtime/GravitasClock.cs), [`GravitasLifecycleHooks.cs`](../../src/Gravitas/Runtime/GravitasLifecycleHooks.cs) |
-| Host boundary and bodies | [`IMatterAgent.cs`](../../src/Gravitas/Core/IMatterAgent.cs), [`StiffBody.cs`](../../src/Gravitas/Core/StiffBody.cs) |
+| Host boundary and bodies | [`IMatterAgent.cs`](../../src/Gravitas/Core/IMatterAgent.cs), [`StiffBody.cs`](../../src/Gravitas/Core/StiffBody.cs), [`StiffBody2D.cs`](../../src/Gravitas/Physics2D/StiffBody2D.cs) |
 | Physics service | [`GravitasPhysicsService.cs`](../../src/Gravitas/Core/GravitasPhysicsService.cs) |
+| 2D physics service | [`Physics2D`](../../src/Gravitas/Physics2D), [`Primitives2D`](../../src/Gravitas/Colliders/Primitives2D) |
 | Collision broad phase | [`GravitasCollisionService.cs`](../../src/Gravitas/Core/GravitasCollisionService.cs), [`PhysicsPartition.cs`](../../src/Gravitas/Partitions/PhysicsPartition.cs) |
-| Colliders | [`LSCollider.cs`](../../src/Gravitas/Colliders/LSCollider.cs), [`Primitives`](../../src/Gravitas/Colliders/Primitives) |
+| Colliders | [`LSCollider.cs`](../../src/Gravitas/Colliders/LSCollider.cs), [`Primitives`](../../src/Gravitas/Colliders/Primitives), [`Primitives2D`](../../src/Gravitas/Colliders/Primitives2D) |
 | Collision handling | [`CollisionPair.cs`](../../src/Gravitas/CollisionHandling/Pairs/CollisionPair.cs), [`CollisionDetection.cs`](../../src/Gravitas/CollisionHandling/Detection/CollisionDetection.cs), [`CollisionResponse.cs`](../../src/Gravitas/CollisionHandling/Response/CollisionResponse.cs) |
 | Dimensions | [`Dimensions`](../../src/Gravitas/Dimensions), [`DIMENSIONS.md`](DIMENSIONS.md) |
 | Queries | [`GravitasRaycastService.cs`](../../src/Gravitas/Raycasting/GravitasRaycastService.cs), [`GravitasCircleQueryService.cs`](../../src/Gravitas/Raycasting/GravitasCircleQueryService.cs), [`RaycastSegmentWorker.cs`](../../src/Gravitas/Raycasting/RaycastSegmentWorker.cs) |
