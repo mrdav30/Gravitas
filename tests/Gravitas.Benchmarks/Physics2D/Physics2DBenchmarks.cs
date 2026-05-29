@@ -1,6 +1,7 @@
 using BenchmarkDotNet.Attributes;
 using FixedMathSharp;
 using Gravitas.Colliders;
+using Gravitas.Queries;
 using GridForge.Configuration;
 using SwiftCollections;
 using System.Runtime.CompilerServices;
@@ -171,7 +172,7 @@ public class Physics2DBenchmarks
                 continue;
             }
 
-            if (CollisionDetection2D.TryOverlapCircle(center, radius, collider, out _))
+            if (QueryDetection2D.TryOverlapCircle(center, radius, collider, out _))
                 count++;
         }
 
@@ -181,7 +182,7 @@ public class Physics2DBenchmarks
     [Benchmark]
     public int OverlapCircleAll()
     {
-        return _queryContext.Physics2D.OverlapCircleAll(
+        return _queryContext.Query2D.OverlapCircleAll(
             new Vector2d((Fixed64)12, (Fixed64)12),
             (Fixed64)18,
             _queryHits);
@@ -211,7 +212,7 @@ public class Physics2DBenchmarks
                 continue;
             }
 
-            if (CollisionDetection2D.TryRaycast(start, end, collider, out _))
+            if (QueryDetection2D.TryRaycast(start, end, collider, out _))
                 count++;
         }
 
@@ -221,7 +222,7 @@ public class Physics2DBenchmarks
     [Benchmark]
     public int RaycastAll()
     {
-        return _queryContext.Physics2D.RaycastAll(
+        return _queryContext.Query2D.RaycastAll(
             new Vector2d((Fixed64)(-8), (Fixed64)12),
             new Vector2d((Fixed64)64, (Fixed64)12),
             _queryHits);

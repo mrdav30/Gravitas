@@ -1,5 +1,5 @@
 ﻿using FixedMathSharp;
-using Gravitas.Raycasting;
+using Gravitas.Queries;
 using SwiftCollections;
 
 namespace Gravitas.Colliders;

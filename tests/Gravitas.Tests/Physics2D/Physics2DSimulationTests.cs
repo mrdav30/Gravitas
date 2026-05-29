@@ -1,6 +1,7 @@
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
+using Gravitas.Queries;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
 using SwiftCollections;
@@ -62,7 +63,7 @@ public sealed class Physics2DSimulationTests
         left.Deactivate();
 
         var hits = new SwiftList<Physics2DHit>();
-        context.Physics2D.OverlapCircleAll(Vector2d.Zero, (Fixed64)0.1f, hits).Should().Be(0);
+        context.Query2D.OverlapCircleAll(Vector2d.Zero, (Fixed64)0.1f, hits).Should().Be(0);
         context.Physics2D.ColliderCount.Should().Be(1);
         exited.Should().Be(1);
     }

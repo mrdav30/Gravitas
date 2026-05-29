@@ -1,6 +1,6 @@
 using SwiftCollections;
 
-namespace Gravitas;
+namespace Gravitas.Queries;
 
 internal static class Physics2DHitSorter
 {

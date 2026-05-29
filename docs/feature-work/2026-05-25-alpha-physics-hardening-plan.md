@@ -26,7 +26,7 @@
 - `src/Gravitas/Colliders/LSCollider.cs`
 - `src/Gravitas/Colliders/Primitives`
 - `src/Gravitas/CollisionHandling`
-- `src/Gravitas/Raycasting`
+- `src/Gravitas/Queries`
 - `src/Gravitas/Partitions/PhysicsPartition.cs`
 - `tests/Gravitas.Tests`
 - `tests/Gravitas.Benchmarks`
@@ -437,15 +437,15 @@ Meaningful deferred work captured from that plan and the wiki:
 
 **Files:**
 
-- Modify: `src/Gravitas/Raycasting/SweptSphereQueryWorker.cs`
+- Modify: `src/Gravitas/Queries/SweptSphereQueryWorker.cs`
 - Potentially create: `src/Gravitas/CollisionHandling/Continuous`
 - Potentially create: `src/Gravitas/CollisionHandling/Continuous/ContinuousCollisionMode.cs`
 - Modify: `src/Gravitas/CollisionHandling/Detection/CollisionDetection.cs`
 - Modify: `src/Gravitas/Core/StiffBody.cs`
 - Potentially modify: `src/Gravitas/Settings/PhysicsSettings.cs`
-- Modify: `tests/Gravitas.Tests/Raycasting`
+- Modify: `tests/Gravitas.Tests/Queries`
 - Modify: `tests/Gravitas.Tests/CollisionHandling`
-- Modify: `tests/Gravitas.Benchmarks/Raycasting`
+- Modify: `tests/Gravitas.Benchmarks/Queries`
 - Modify: `tests/Gravitas.Benchmarks/Core`
 - Modify: `docs/wiki/QUERY_SERVICES.md`
 - Modify: `docs/wiki/COLLISION_PIPELINE.md`
@@ -519,13 +519,13 @@ should not implement `LSCompoundCollider`.
 - Modify: `src/Gravitas/Colliders/Support/PhysicsMesh/PhysicsMesh.cs`
 - Modify: `src/Gravitas/Colliders/Primitives/LSMeshCollider.cs`
 - Modify: `src/Gravitas/CollisionHandling/Detection/CollisionDetection.cs`
-- Modify: `src/Gravitas/Raycasting/RaycastSegmentWorker.cs`
+- Modify: `src/Gravitas/Queries/RaycastSegmentWorker.cs`
 - Potentially create: `src/Gravitas/Colliders/Support/PhysicsMesh/ConvexMeshPolicy.cs`
 - Potentially create: `src/Gravitas/Colliders/Support/PhysicsMesh/MeshColliderPolicy.cs`
 - Potentially create: `src/Gravitas/Colliders/Support/PhysicsMesh/MeshColliderMode.cs`
 - Modify: `tests/Gravitas.Tests/Colliders`
 - Modify: `tests/Gravitas.Tests/CollisionHandling`
-- Modify: `tests/Gravitas.Tests/Raycasting`
+- Modify: `tests/Gravitas.Tests/Queries`
 - Modify: `tests/Gravitas.Benchmarks/Colliders`
 - Reference only: `F:\gamedevrepos\SoulsClone\Library\PackageCache\com.whinarn.unitymeshsimplifier@d741912bfe`
 - Modify: `docs/wiki/COLLISION_PIPELINE.md`
@@ -687,7 +687,7 @@ not become the escape hatch for concave mesh support.
 - Potentially create: `src/Gravitas/CollisionHandling/Detection/Context/MeshTriangleContactContext.cs`
 - Modify: `src/Gravitas/CollisionHandling/Detection/CollisionDetection.cs`
 - Modify: `src/Gravitas/CollisionHandling/Detection/Context/MeshObjectInfo.cs`
-- Modify: `src/Gravitas/Raycasting/RaycastSegmentWorker.cs` only if concave ray
+- Modify: `src/Gravitas/Queries/RaycastSegmentWorker.cs` only if concave ray
   behavior exposes stale convex assumptions.
 - Modify: `tests/Gravitas.Tests/Colliders/PhysicsMeshTests.cs`
 - Create or modify: `tests/Gravitas.Tests/Colliders/MeshColliderModeTests.cs`
@@ -915,13 +915,13 @@ not absorb unresolved concave mesh responsibilities.
 
 - Modify: `src/Gravitas/Core/GravitasCollisionService.cs`
 - Modify: `src/Gravitas/Partitions/PhysicsPartition.cs`
-- Modify: `src/Gravitas/Raycasting/GravitasRaycastService.cs`
-- Modify: `src/Gravitas/Raycasting/GravitasCircleQueryService.cs`
-- Potentially create: `src/Gravitas/Raycasting/QueryState`
+- Modify: `src/Gravitas/Queries/GravitasQuery3DService.cs`
+- Modify: `src/Gravitas/Queries/GravitasQuery3DService.cs`
+- Potentially create: `src/Gravitas/Queries/QueryState`
 - Modify: `tests/Gravitas.Tests/Partitions`
-- Modify: `tests/Gravitas.Tests/Raycasting`
+- Modify: `tests/Gravitas.Tests/Queries`
 - Modify: `tests/Gravitas.Benchmarks/Core`
-- Modify: `tests/Gravitas.Benchmarks/Raycasting`
+- Modify: `tests/Gravitas.Benchmarks/Queries`
 - Modify: `docs/wiki/QUERY_SERVICES.md`
 - Modify: `docs/wiki/COLLISION_PIPELINE.md`
 
@@ -1041,7 +1041,7 @@ hardening below are complete.
 - Potentially modify: `src/Gravitas/Colliders/LSCollider.cs`
 - Potentially create: `src/Gravitas/Colliders/Primitives2D`
 - Potentially create or modify: `src/Gravitas/CollisionHandling/Detection`
-- Potentially create or modify: `src/Gravitas/Raycasting`
+- Potentially create or modify: `src/Gravitas/Queries`
 - Modify: `tests/Gravitas.Tests`
 - Modify: `tests/Gravitas.Benchmarks`
 - Modify: `docs/wiki/OVERVIEW.md`
@@ -1108,6 +1108,11 @@ hardening below are complete.
   transform publishing and a caller-buffered deterministic `Raycast2D` path
   backed by the same 2D partition/query rules. Keep mixed 2D/3D collision
   deferred to Phase 10.
+- [ ] **Phase 9I - Query domain consolidation:** Move 2D and 3D raycast,
+  swept-sphere, circle-overlap, hit sorting, and query-detection ownership into
+  a single query domain with explicit `Query2D` and `Query3D` context services.
+  Remove stale query service surfaces rather than preserving compatibility
+  bridges.
 
 **Phase 9A-9B Status - 2026-05-28**
 
@@ -1206,8 +1211,7 @@ source layout, lifecycle parity, and tests.
 - Move: `src/Gravitas/Physics2D/CollisionResponse2D.cs` to
   `src/Gravitas/CollisionHandling/Response/CollisionResponse2D.cs`
 - Move: `src/Gravitas/Physics2D/Physics2DHit.cs` and
-  `src/Gravitas/Physics2D/Physics2DHitSorter.cs` to the query/raycasting
-  domain.
+  `src/Gravitas/Physics2D/Physics2DHitSorter.cs` to the query domain.
 - Modify: `tests/Gravitas.Tests/Physics2D`
 - Modify: `tests/Gravitas.Tests/Core`
 - Modify: `tests/Gravitas.Benchmarks/Physics2D`
@@ -1293,7 +1297,7 @@ source layout, lifecycle parity, and tests.
 - Moved 2D runtime files beside their 3D counterparts:
   `StiffBody2D` and `GravitasPhysics2DService` moved to `Core`, 2D detection,
   pairs, contacts, and response moved under `CollisionHandling`, and
-  `Physics2DHit` moved under `Raycasting`.
+  `Physics2DHit` moved under `Queries`.
 - Updated tests, benchmarks, and `docs/wiki` for runtime mode, host-agent 2D
   setup, X/Z projection, source layout, and the removal of dimension scaffolding.
 
@@ -1531,7 +1535,7 @@ first-class 2D raycast query.
 - Modify: `src/Gravitas/Core/GravitasPhysics2DService.cs`
 - Modify: `src/Gravitas/Core/StiffBody2D.cs`
 - Modify: `src/Gravitas/CollisionHandling/Detection/CollisionDetection2D.cs`
-- Modify: `src/Gravitas/Raycasting/Physics2DHit.cs`
+- Modify: `src/Gravitas/Queries/Physics2DHit.cs`
 - Modify: `tests/Gravitas.Tests/Physics2D`
 - Modify: `docs/wiki/DIMENSIONS.md`
 - Modify: `docs/wiki/HOST_INTEGRATION.md`
@@ -1591,6 +1595,91 @@ first-class 2D raycast query.
   about `29.0 us` with no managed allocation; 1024-body partition-backed
   `RaycastAll` reported about `29.4 us` with no managed allocation versus the
   detection-only sweep baseline at about `520.8 us`.
+
+## Phase 9I: Query Domain Consolidation
+
+**Purpose:** Make query ownership discoverable before mixed 2D/3D work starts.
+The current query surface is split by implementation history: 3D raycasts and
+circle overlaps lived in separate services under the old raycasting domain,
+while pure 2D overlap/raycast methods live on `GravitasPhysics2DService` with
+some query math inside `CollisionDetection2D`. This phase should consolidate
+query-facing API and implementation under a query domain without changing
+collision semantics.
+
+**Files:**
+
+- Rename/move: old `src/Gravitas/Raycasting` files into the broader
+  `src/Gravitas/Queries` domain.
+- Modify: `src/Gravitas/Runtime/GravitasWorldContext.cs`
+- Modify: `src/Gravitas/Core/GravitasPhysics2DService.cs`
+- Modify: `src/Gravitas/CollisionHandling/Detection/CollisionDetection2D.cs`
+- Potentially create: `src/Gravitas/Queries/GravitasQuery2DService.cs`
+- Potentially create: `src/Gravitas/Queries/GravitasQuery3DService*.cs`
+- Potentially create: `src/Gravitas/Queries/QueryDetection2D.cs`
+- Modify: `src/Gravitas/Colliders`
+- Modify: `src/Gravitas/Diagnostics`
+- Modify: `tests/Gravitas.Tests`
+- Modify: `tests/Gravitas.Benchmarks`
+- Modify: `README.md`, `AGENTS.md`, and `docs/wiki`
+
+**Tasks:**
+
+- [x] Add tests or update existing tests to exercise the intended context API:
+  `context.Query2D.Raycast*`, `context.Query2D.OverlapCircleAll*`,
+  `context.Query3D.Raycast*`, `context.Query3D.SweepSphere*`, and
+  `context.Query3D.OverlapCircle*`.
+- [x] Rename the `Raycasting` source folder to a query-domain folder and update
+  namespaces/imports so hit types, hit sorters, workers, and query services are
+  co-located.
+- [x] Replace `GravitasWorldContext.Raycasts` and
+  `GravitasWorldContext.CircleQueries` with one `Query3D` service. Do not leave
+  public compatibility bridges.
+- [x] Move pure 2D query methods and query buffers from
+  `GravitasPhysics2DService` into `Query2D`, leaving `Physics2D` focused on
+  registration, simulation, pair lifecycle, response, and visualization.
+- [x] Move 2D query-specific shape math out of `CollisionDetection2D` into the
+  query domain so collision detection owns contacts and query code owns hits.
+- [x] Keep query results caller-buffered, layer-filtered, duplicate-suppressed,
+  deterministically ordered, and context-owned.
+- [x] Review 3D query traversal while the code is open. Remove avoidable
+  duplication where it is clearly safe, but avoid changing ray/sweep/circle
+  semantics in the same pass.
+- [x] Update benchmarks and docs to describe the consolidated query API and run
+  the focused query/2D benchmark smoke after the `cap_sys_nice` fix.
+- [x] Run focused query tests, full `Release`, full `ReleaseLean`, and
+  `git diff --check` before closing the phase.
+
+**Acceptance Bar:**
+
+- Public query access is discoverable from `GravitasWorldContext` as
+  `Query2D` and `Query3D`; old `Raycasts` and `CircleQueries` surfaces are
+  gone.
+- 2D query methods no longer live on `GravitasPhysics2DService`, and 2D hit
+  math no longer lives in the collision-contact detector.
+- Existing 2D and 3D query behavior remains covered by tests, including layer
+  filtering, duplicate suppression, stable ordering, and zero-length/no-hit
+  behavior.
+- Query benchmarks compile and run with the consolidated API.
+
+**Phase 9I Status - 2026-05-29:**
+
+- Consolidated query-facing APIs under `GravitasWorldContext.Query2D` and
+  `GravitasWorldContext.Query3D`.
+- Moved old `src/Gravitas/Raycasting` files into `src/Gravitas/Queries`, with
+  `GravitasQuery3DService` split into ray/sweep and circle partials.
+- Moved pure 2D overlap-circle/raycast query buffers and methods out of
+  `GravitasPhysics2DService` into `GravitasQuery2DService`.
+- Moved 2D query hit math out of `CollisionDetection2D` into
+  `QueryDetection2D`.
+- Renamed public 3D query hit types from `LSRaycastHit` to `Physics3DHit` and
+  the sorter from `RaycastHitSorter` to `Physics3DHitSorter`.
+- Updated tests, benchmarks, README, AGENTS, and wiki docs to use the
+  consolidated query domain.
+- Verified with focused query/regression tests, full `Release` tests, full
+  `ReleaseLean` tests, `git diff --check`, and a short `physics-2d` plus
+  `query-service` benchmark smoke. BenchmarkDotNet still reports the
+  environment's priority-elevation warning even after the attempted
+  `cap_sys_nice` fix, but all 21 benchmark cases executed and exported.
 
 ## Phase 10: Mixed 2D/3D Interaction Model
 

@@ -4,12 +4,12 @@ using Gravitas.Support;
 using GridForge.Grids;
 using SwiftCollections;
 
-namespace Gravitas.Raycasting;
+namespace Gravitas.Queries;
 
 /// <summary>
-/// Owns raycast query buffers and worker state for one <see cref="GravitasWorldContext"/>.
+/// Owns 3D raycast, swept-sphere, and X/Z circle query buffers for one <see cref="GravitasWorldContext"/>.
 /// </summary>
-public sealed class GravitasRaycastService
+public sealed partial class GravitasQuery3DService
 {
     private readonly GravitasWorldContext _context;
     private readonly RaycastSegmentWorker _worker = new();
@@ -25,7 +25,7 @@ public sealed class GravitasRaycastService
     /// Initializes a new raycast service for the supplied context.
     /// </summary>
     /// <param name="context">The owning world context.</param>
-    public GravitasRaycastService(GravitasWorldContext context)
+    public GravitasQuery3DService(GravitasWorldContext context)
     {
         SwiftThrowHelper.ThrowIfNull(context, nameof(context));
         _context = context;
@@ -37,16 +37,22 @@ public sealed class GravitasRaycastService
     public GravitasWorldContext Context => _context;
 
     /// <summary>
-    /// Gets the context-local raycast query version.
+    /// Gets the context-local raycast/sweep query version.
     /// </summary>
-    public uint Version { get; private set; }
+    public uint RaycastVersion { get; private set; }
+
+    /// <summary>
+    /// Gets the context-local 3D X/Z circle query version.
+    /// </summary>
+    public uint CircleVersion { get; private set; }
 
     /// <summary>
     /// Resets context-local raycast query buffers.
     /// </summary>
     public void Reset()
     {
-        Version = 0;
+        RaycastVersion = 0;
+        CircleVersion = 0;
         _bufferIntersectionPoints.FastClear();
         _redundantColliderCheck.Clear();
         _redundantVoxelCheck.Clear();
@@ -59,7 +65,7 @@ public sealed class GravitasRaycastService
         Vector3d origin,
         Vector3d direction,
         Fixed64 maxDistance,
-        out LSRaycastHit raycastHit,
+        out Physics3DHit raycastHit,
         PhysicsLayerMask layerMask)
     {
         _currentLayerMask = layerMask;
@@ -92,7 +98,7 @@ public sealed class GravitasRaycastService
         Vector3d start3d,
         Vector3d end3d,
         PhysicsLayerMask layerMask,
-        SwiftList<LSRaycastHit> results)
+        SwiftList<Physics3DHit> results)
     {
         SwiftThrowHelper.ThrowIfNull(results, nameof(results));
 
@@ -105,7 +111,7 @@ public sealed class GravitasRaycastService
 
         BeginRaycastTrace(start3d, end3d);
         AddAllHits(start3d, end3d, segment.Normal, results);
-        RaycastHitSorter.SortByDistance(results);
+        Physics3DHitSorter.SortByDistance(results);
         _context.Diagnostics.EmitRayQuery(
             start3d,
             end3d,
@@ -125,7 +131,7 @@ public sealed class GravitasRaycastService
         Fixed64 radius,
         Vector3d direction,
         Fixed64 maxDistance,
-        out LSRaycastHit sweepHit,
+        out Physics3DHit sweepHit,
         PhysicsLayerMask layerMask,
         LSCollider? excludedCollider = null)
     {
@@ -157,7 +163,7 @@ public sealed class GravitasRaycastService
         Vector3d end3d,
         Fixed64 radius,
         PhysicsLayerMask layerMask,
-        SwiftList<LSRaycastHit> results,
+        SwiftList<Physics3DHit> results,
         LSCollider? excludedCollider = null)
     {
         SwiftThrowHelper.ThrowIfNull(results, nameof(results));
@@ -169,7 +175,7 @@ public sealed class GravitasRaycastService
 
         BeginSweepTrace(start3d, end3d, radius, layerMask, excludedCollider);
         AddAllSweepHits(start3d, end3d, segment.Normal, radius, results);
-        RaycastHitSorter.SortByDistance(results);
+        Physics3DHitSorter.SortByDistance(results);
         _context.Diagnostics.EmitRayQuery(
             start3d,
             end3d,
@@ -187,7 +193,7 @@ public sealed class GravitasRaycastService
         _redundantVoxelCheck.Clear();
         _bufferIntersectionPoints.FastClear();
         _currentExcludedCollider = null;
-        Version++;
+        RaycastVersion++;
         _worker.PrepareSegmentCheck(start, end);
     }
 
@@ -202,7 +208,7 @@ public sealed class GravitasRaycastService
         _currentExcludedCollider = excludedCollider;
         _redundantColliderCheck.Clear();
         _redundantVoxelCheck.Clear();
-        Version++;
+        RaycastVersion++;
         _sweepWorker.Prepare(start, end, radius);
     }
 
@@ -212,7 +218,7 @@ public sealed class GravitasRaycastService
         Fixed64 radius,
         PhysicsLayerMask layerMask,
         LSCollider? excludedCollider,
-        out LSRaycastHit sweepHit)
+        out Physics3DHit sweepHit)
     {
         sweepHit = default;
         if (radius <= Fixed64.Zero)
@@ -232,11 +238,11 @@ public sealed class GravitasRaycastService
         Vector3d end,
         Fixed64 radius,
         Vector3d direction,
-        out LSRaycastHit sweepHit)
+        out Physics3DHit sweepHit)
     {
         bool found = false;
         Fixed64 closestDistance = Fixed64.MAX_VALUE;
-        LSRaycastHit closestHit = default;
+        Physics3DHit closestHit = default;
 
         TraceSweepForClosestHit(start, end, radius, direction, ref found, ref closestDistance, ref closestHit);
 
@@ -244,11 +250,11 @@ public sealed class GravitasRaycastService
         return found;
     }
 
-    private bool TryFindClosestHit(Vector3d start, Vector3d end, Vector3d direction, out LSRaycastHit raycastHit)
+    private bool TryFindClosestHit(Vector3d start, Vector3d end, Vector3d direction, out Physics3DHit raycastHit)
     {
         bool found = false;
         Fixed64 closestDistance = Fixed64.MAX_VALUE;
-        LSRaycastHit closestHit = default;
+        Physics3DHit closestHit = default;
 
         TraceLineForClosestHit(start, end, direction, ref found, ref closestDistance, ref closestHit);
 
@@ -256,7 +262,7 @@ public sealed class GravitasRaycastService
         return found;
     }
 
-    private void AddAllHits(Vector3d start, Vector3d end, Vector3d direction, SwiftList<LSRaycastHit> results)
+    private void AddAllHits(Vector3d start, Vector3d end, Vector3d direction, SwiftList<Physics3DHit> results)
     {
         TraceLineForAllHits(start, end, direction, results);
     }
@@ -266,7 +272,7 @@ public sealed class GravitasRaycastService
         Vector3d end,
         Vector3d direction,
         Fixed64 radius,
-        SwiftList<LSRaycastHit> results)
+        SwiftList<Physics3DHit> results)
     {
         TraceSweepForAllHits(start, end, radius, direction, results);
     }
@@ -277,7 +283,7 @@ public sealed class GravitasRaycastService
         Vector3d direction,
         ref bool found,
         ref Fixed64 closestDistance,
-        ref LSRaycastHit closestHit)
+        ref Physics3DHit closestHit)
     {
         PrepareTraceLine(start, end, out Vector3d traceStart, out Vector3d step, out Fixed64 steps);
 
@@ -299,7 +305,7 @@ public sealed class GravitasRaycastService
         Vector3d start,
         Vector3d end,
         Vector3d direction,
-        SwiftList<LSRaycastHit> results)
+        SwiftList<Physics3DHit> results)
     {
         PrepareTraceLine(start, end, out Vector3d traceStart, out Vector3d step, out Fixed64 steps);
 
@@ -322,7 +328,7 @@ public sealed class GravitasRaycastService
         Vector3d direction,
         ref bool found,
         ref Fixed64 closestDistance,
-        ref LSRaycastHit closestHit)
+        ref Physics3DHit closestHit)
     {
         PrepareSweepBounds(start, end, radius, out Vector3d snappedMin, out Vector3d snappedMax);
         GridWorld world = _context.World;
@@ -344,7 +350,7 @@ public sealed class GravitasRaycastService
         Vector3d end,
         Fixed64 radius,
         Vector3d direction,
-        SwiftList<LSRaycastHit> results)
+        SwiftList<Physics3DHit> results)
     {
         PrepareSweepBounds(start, end, radius, out Vector3d snappedMin, out Vector3d snappedMax);
         GridWorld world = _context.World;
@@ -392,7 +398,7 @@ public sealed class GravitasRaycastService
         Vector3d direction,
         ref bool found,
         ref Fixed64 closestDistance,
-        ref LSRaycastHit closestHit)
+        ref Physics3DHit closestHit)
     {
         GridWorld world = _context.World;
         int cellIndex = world.GetSpatialGridKey(tracePosition);
@@ -405,7 +411,8 @@ public sealed class GravitasRaycastService
                 continue;
 
             VoxelGrid currentGrid = world.ActiveGrids[gridIndex];
-            if (!currentGrid.TryGetVoxel(tracePosition, out Voxel? voxel)
+            if (!currentGrid.IsInBounds(tracePosition)
+                || !currentGrid.TryGetVoxel(tracePosition, out Voxel? voxel)
                 || !_redundantVoxelCheck.Add(voxel!.SpawnToken)
                 || !voxel.TryGetPartition(out PhysicsPartition? partition))
             {
@@ -426,7 +433,7 @@ public sealed class GravitasRaycastService
         Vector3d tracePosition,
         Vector3d origin,
         Vector3d direction,
-        SwiftList<LSRaycastHit> results)
+        SwiftList<Physics3DHit> results)
     {
         GridWorld world = _context.World;
         int cellIndex = world.GetSpatialGridKey(tracePosition);
@@ -439,7 +446,8 @@ public sealed class GravitasRaycastService
                 continue;
 
             VoxelGrid currentGrid = world.ActiveGrids[gridIndex];
-            if (!currentGrid.TryGetVoxel(tracePosition, out Voxel? voxel)
+            if (!currentGrid.IsInBounds(tracePosition)
+                || !currentGrid.TryGetVoxel(tracePosition, out Voxel? voxel)
                 || !_redundantVoxelCheck.Add(voxel!.SpawnToken)
                 || !voxel.TryGetPartition(out PhysicsPartition? partition))
             {
@@ -456,7 +464,7 @@ public sealed class GravitasRaycastService
         Vector3d direction,
         ref bool found,
         ref Fixed64 closestDistance,
-        ref LSRaycastHit closestHit)
+        ref Physics3DHit closestHit)
     {
         GridWorld world = _context.World;
         int cellIndex = world.GetSpatialGridKey(tracePosition);
@@ -469,7 +477,8 @@ public sealed class GravitasRaycastService
                 continue;
 
             VoxelGrid currentGrid = world.ActiveGrids[gridIndex];
-            if (!currentGrid.TryGetVoxel(tracePosition, out Voxel? voxel)
+            if (!currentGrid.IsInBounds(tracePosition)
+                || !currentGrid.TryGetVoxel(tracePosition, out Voxel? voxel)
                 || !_redundantVoxelCheck.Add(voxel!.SpawnToken)
                 || !voxel.TryGetPartition(out PhysicsPartition? partition))
             {
@@ -490,7 +499,7 @@ public sealed class GravitasRaycastService
         Vector3d tracePosition,
         Vector3d origin,
         Vector3d direction,
-        SwiftList<LSRaycastHit> results)
+        SwiftList<Physics3DHit> results)
     {
         GridWorld world = _context.World;
         int cellIndex = world.GetSpatialGridKey(tracePosition);
@@ -503,7 +512,8 @@ public sealed class GravitasRaycastService
                 continue;
 
             VoxelGrid currentGrid = world.ActiveGrids[gridIndex];
-            if (!currentGrid.TryGetVoxel(tracePosition, out Voxel? voxel)
+            if (!currentGrid.IsInBounds(tracePosition)
+                || !currentGrid.TryGetVoxel(tracePosition, out Voxel? voxel)
                 || !_redundantVoxelCheck.Add(voxel!.SpawnToken)
                 || !voxel.TryGetPartition(out PhysicsPartition? partition))
             {
@@ -520,7 +530,7 @@ public sealed class GravitasRaycastService
         Vector3d direction,
         ref bool found,
         ref Fixed64 closestDistance,
-        ref LSRaycastHit closestHit)
+        ref Physics3DHit closestHit)
     {
         ProcessColliderListForClosestHit(
             partition.ContainedDynamicObjects,
@@ -545,14 +555,14 @@ public sealed class GravitasRaycastService
         Vector3d direction,
         ref bool found,
         ref Fixed64 closestDistance,
-        ref LSRaycastHit closestHit)
+        ref Physics3DHit closestHit)
     {
         if (colliderIds == null)
             return;
 
         for (int i = colliderIds.Count - 1; i >= 0; i--)
         {
-            if (!TryBuildHitForCollider(colliderIds.DenseKeys[i], origin, direction, out LSRaycastHit hit)
+            if (!TryBuildHitForCollider(colliderIds.DenseKeys[i], origin, direction, out Physics3DHit hit)
                 || hit.Distance >= closestDistance)
             {
                 continue;
@@ -568,7 +578,7 @@ public sealed class GravitasRaycastService
         PhysicsPartition partition,
         Vector3d origin,
         Vector3d direction,
-        SwiftList<LSRaycastHit> results)
+        SwiftList<Physics3DHit> results)
     {
         ProcessColliderListForAllHits(partition.ContainedDynamicObjects, origin, direction, results);
         ProcessColliderListForAllHits(partition.ContainedStaticObjects, origin, direction, results);
@@ -578,14 +588,14 @@ public sealed class GravitasRaycastService
         SwiftSparseSet? colliderIds,
         Vector3d origin,
         Vector3d direction,
-        SwiftList<LSRaycastHit> results)
+        SwiftList<Physics3DHit> results)
     {
         if (colliderIds == null)
             return;
 
         for (int i = colliderIds.Count - 1; i >= 0; i--)
         {
-            if (TryBuildHitForCollider(colliderIds.DenseKeys[i], origin, direction, out LSRaycastHit hit))
+            if (TryBuildHitForCollider(colliderIds.DenseKeys[i], origin, direction, out Physics3DHit hit))
                 results.Add(hit);
         }
     }
@@ -596,7 +606,7 @@ public sealed class GravitasRaycastService
         Vector3d direction,
         ref bool found,
         ref Fixed64 closestDistance,
-        ref LSRaycastHit closestHit)
+        ref Physics3DHit closestHit)
     {
         ProcessColliderListForClosestSweepHit(
             partition.ContainedDynamicObjects,
@@ -621,14 +631,14 @@ public sealed class GravitasRaycastService
         Vector3d direction,
         ref bool found,
         ref Fixed64 closestDistance,
-        ref LSRaycastHit closestHit)
+        ref Physics3DHit closestHit)
     {
         if (colliderIds == null)
             return;
 
         for (int i = colliderIds.Count - 1; i >= 0; i--)
         {
-            if (!TryBuildSweepHitForCollider(colliderIds.DenseKeys[i], origin, direction, out LSRaycastHit hit)
+            if (!TryBuildSweepHitForCollider(colliderIds.DenseKeys[i], origin, direction, out Physics3DHit hit)
                 || !ShouldReplaceClosestSweepHit(hit, found, closestDistance, closestHit))
             {
                 continue;
@@ -641,10 +651,10 @@ public sealed class GravitasRaycastService
     }
 
     private static bool ShouldReplaceClosestSweepHit(
-        LSRaycastHit hit,
+        Physics3DHit hit,
         bool found,
         Fixed64 closestDistance,
-        LSRaycastHit closestHit)
+        Physics3DHit closestHit)
     {
         if (!found)
             return true;
@@ -662,7 +672,7 @@ public sealed class GravitasRaycastService
         PhysicsPartition partition,
         Vector3d origin,
         Vector3d direction,
-        SwiftList<LSRaycastHit> results)
+        SwiftList<Physics3DHit> results)
     {
         ProcessColliderListForAllSweepHits(partition.ContainedDynamicObjects, origin, direction, results);
         ProcessColliderListForAllSweepHits(partition.ContainedStaticObjects, origin, direction, results);
@@ -672,14 +682,14 @@ public sealed class GravitasRaycastService
         SwiftSparseSet? colliderIds,
         Vector3d origin,
         Vector3d direction,
-        SwiftList<LSRaycastHit> results)
+        SwiftList<Physics3DHit> results)
     {
         if (colliderIds == null)
             return;
 
         for (int i = colliderIds.Count - 1; i >= 0; i--)
         {
-            if (TryBuildSweepHitForCollider(colliderIds.DenseKeys[i], origin, direction, out LSRaycastHit hit))
+            if (TryBuildSweepHitForCollider(colliderIds.DenseKeys[i], origin, direction, out Physics3DHit hit))
                 results.Add(hit);
         }
     }
@@ -688,7 +698,7 @@ public sealed class GravitasRaycastService
         int colliderId,
         Vector3d origin,
         Vector3d direction,
-        out LSRaycastHit hit)
+        out Physics3DHit hit)
     {
         hit = default;
         return _context.Physics.TryGetColliderById(colliderId, out LSCollider? current)
@@ -700,7 +710,7 @@ public sealed class GravitasRaycastService
         int colliderId,
         Vector3d origin,
         Vector3d direction,
-        out LSRaycastHit hit)
+        out Physics3DHit hit)
     {
         hit = default;
         return _context.Physics.TryGetColliderById(colliderId, out LSCollider? current)
@@ -712,7 +722,7 @@ public sealed class GravitasRaycastService
         LSCollider collider,
         Vector3d origin,
         Vector3d direction,
-        out LSRaycastHit raycastHit)
+        out Physics3DHit raycastHit)
     {
         Fixed64 closestDistance = Fixed64.MAX_VALUE;
         Vector3d closestIntersection = Vector3d.Zero;
@@ -734,7 +744,7 @@ public sealed class GravitasRaycastService
         }
 
         Vector3d normal = collider.GetNormalAtPoint(closestIntersection);
-        raycastHit = new LSRaycastHit(collider, closestIntersection, normal, closestDistance, direction);
+        raycastHit = new Physics3DHit(collider, closestIntersection, normal, closestDistance, direction);
         return true;
     }
 
@@ -742,7 +752,7 @@ public sealed class GravitasRaycastService
         LSCollider collider,
         Vector3d origin,
         Vector3d direction,
-        out LSRaycastHit sweepHit)
+        out Physics3DHit sweepHit)
     {
         sweepHit = default;
         if (!_sweepWorker.TrySweep(collider, out Vector3d sweepCenter, out Fixed64 distance))
@@ -750,7 +760,7 @@ public sealed class GravitasRaycastService
 
         Vector3d point = GetSweepSurfacePoint(collider, sweepCenter, direction);
         Vector3d normal = ResolveSweepNormal(collider, point, sweepCenter, direction);
-        sweepHit = new LSRaycastHit(collider, point, normal, distance, direction);
+        sweepHit = new Physics3DHit(collider, point, normal, distance, direction);
         return true;
     }
 
@@ -760,13 +770,13 @@ public sealed class GravitasRaycastService
             return false;
 
         if (!_currentLayerMask.Includes(current.Layer)
-            || current.RaycastVersion == Version
+            || current.RaycastVersion == RaycastVersion
             || !_redundantColliderCheck.Add(current.Id))
         {
             return false;
         }
 
-        current.RaycastVersion = Version;
+        current.RaycastVersion = RaycastVersion;
         _bufferIntersectionPoints.FastClear();
         return current.ColliderOverlapsRay(_worker, ref _bufferIntersectionPoints);
     }
@@ -778,13 +788,13 @@ public sealed class GravitasRaycastService
 
         if (ReferenceEquals(current, _currentExcludedCollider)
             || !_currentLayerMask.Includes(current.Layer)
-            || current.RaycastVersion == Version
+            || current.RaycastVersion == RaycastVersion
             || !_redundantColliderCheck.Add(current.Id))
         {
             return false;
         }
 
-        current.RaycastVersion = Version;
+        current.RaycastVersion = RaycastVersion;
         return true;
     }
 

@@ -86,13 +86,13 @@ bridge for pure 2D.
 
 ## Queries
 
-Pure 2D queries live on `GravitasPhysics2DService`:
+Pure 2D queries live on `GravitasWorldContext.Query2D`:
 
 ```csharp
-context.Physics2D.OverlapCircleAll(center, radius, results);
-context.Physics2D.OverlapCircleAll(center, radius, layerMask, results);
-context.Physics2D.Raycast(start, end, out Physics2DHit hit);
-context.Physics2D.RaycastAll(start, end, layerMask, results);
+context.Query2D.OverlapCircleAll(center, radius, results);
+context.Query2D.OverlapCircleAll(center, radius, layerMask, results);
+context.Query2D.Raycast(start, end, out Physics2DHit hit);
+context.Query2D.RaycastAll(start, end, layerMask, results);
 ```
 
 All-hit overloads write into caller-owned `SwiftList<Physics2DHit>` buffers,
@@ -101,7 +101,7 @@ run layer-mask and exact 2D shape checks, and sort by deterministic hit
 ordering. `Raycast` returns the closest segment hit from `start` to `end` using
 the same distance and collider-ID ordering as `RaycastAll`.
 
-The existing `GravitasCircleQueryService` is a 3D X/Z ground-plane proximity
+The existing `GravitasQuery3DService` is a 3D X/Z ground-plane proximity
 query. It is not the pure 2D query API.
 
 ## Mixed 2D/3D Boundary

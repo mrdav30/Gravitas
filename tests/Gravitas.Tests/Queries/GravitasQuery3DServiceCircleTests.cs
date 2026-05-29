@@ -1,16 +1,16 @@
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
-using Gravitas.Raycasting;
+using Gravitas.Queries;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
 using GridForge.Configuration;
 using SwiftCollections;
 using Xunit;
 
-namespace Gravitas.Tests.Raycasting;
+namespace Gravitas.Tests.Queries;
 
-public sealed class GravitasCircleQueryServiceTests
+public sealed class GravitasQuery3DServiceCircleTests
 {
     private static readonly PhysicsLayerMask IncludeLayerZero = PhysicsLayerMask.FromLayer(0);
 
@@ -19,9 +19,9 @@ public sealed class GravitasCircleQueryServiceTests
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         LSSphereCollider collider = CreateDynamicSphere(context, Vector3d.Zero);
-        var hits = new SwiftList<LSRaycastHit>();
+        var hits = new SwiftList<Physics3DHit>();
 
-        int count = context.CircleQueries
+        int count = context.Query3D
             .OverlapCircleAll(Vector3d.Zero, Fixed64.One * 2, IncludeLayerZero, hits);
 
         count.Should().Be(1);
@@ -34,9 +34,9 @@ public sealed class GravitasCircleQueryServiceTests
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         LSSphereCollider near = CreateDynamicSphere(context, new Vector3d(1, 0, 0));
         LSSphereCollider far = CreateDynamicSphere(context, new Vector3d(3, 0, 0));
-        var hits = new SwiftList<LSRaycastHit>();
+        var hits = new SwiftList<Physics3DHit>();
 
-        int count = context.CircleQueries
+        int count = context.Query3D
             .OverlapCircleAll(Vector3d.Zero, (Fixed64)4, IncludeLayerZero, hits);
 
         count.Should().Be(2);
@@ -55,21 +55,21 @@ public sealed class GravitasCircleQueryServiceTests
         using GravitasWorldContext contextB = GravitasWorldContext.CreateOwned();
         LSSphereCollider colliderA = CreateDynamicSphere(contextA, Vector3d.Zero);
         LSSphereCollider colliderB = CreateDynamicSphere(contextB, Vector3d.Zero);
-        var hitsA = new SwiftList<LSRaycastHit>();
-        var hitsB = new SwiftList<LSRaycastHit>();
+        var hitsA = new SwiftList<Physics3DHit>();
+        var hitsB = new SwiftList<Physics3DHit>();
         colliderA.Id.Should().Be(colliderB.Id);
 
-        int countA = contextA.CircleQueries
+        int countA = contextA.Query3D
             .OverlapCircleAll(Vector3d.Zero, Fixed64.One * 2, IncludeLayerZero, hitsA);
-        int countB = contextB.CircleQueries
+        int countB = contextB.Query3D
             .OverlapCircleAll(Vector3d.Zero, Fixed64.One * 2, IncludeLayerZero, hitsB);
 
         countA.Should().Be(1);
         countB.Should().Be(1);
         hitsA[0].Collider.Should().BeSameAs(colliderA);
         hitsB[0].Collider.Should().BeSameAs(colliderB);
-        contextA.CircleQueries.Version.Should().Be(1);
-        contextB.CircleQueries.Version.Should().Be(1);
+        contextA.Query3D.CircleVersion.Should().Be(1);
+        contextB.Query3D.CircleVersion.Should().Be(1);
     }
 
     [Fact]
@@ -79,11 +79,11 @@ public sealed class GravitasCircleQueryServiceTests
         LSSphereCollider right = CreateDynamicSphere(context, new Vector3d(2, 0, 0));
         CreateDynamicSphere(context, new Vector3d(-1, 0, 0));
 
-        bool hit = context.CircleQueries.OverlapCircleInDirection(
+        bool hit = context.Query3D.OverlapCircleInDirection(
             Vector3d.Zero,
             (Fixed64)3,
             Vector3d.Right,
-            out LSRaycastHit hitInfo,
+            out Physics3DHit hitInfo,
             (Fixed64)2,
             IncludeLayerZero);
 
@@ -97,9 +97,9 @@ public sealed class GravitasCircleQueryServiceTests
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         LSSphereCollider collider = CreateLargeDynamicSphere(context, Vector3d.Zero);
-        var hits = new SwiftList<LSRaycastHit>();
+        var hits = new SwiftList<Physics3DHit>();
 
-        int count = context.CircleQueries
+        int count = context.Query3D
             .OverlapCircleAll(Vector3d.Zero, (Fixed64)4, IncludeLayerZero, hits);
 
         count.Should().Be(1);

@@ -1,6 +1,7 @@
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
+using Gravitas.Queries;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
 using SwiftCollections;
@@ -20,7 +21,7 @@ public sealed class Physics2DQueryTests
         _ = CreateCircle(context, new Vector2d((Fixed64)8, Fixed64.Zero));
         var hits = new SwiftList<Physics2DHit>();
 
-        int count = context.Physics2D.OverlapCircleAll(
+        int count = context.Query2D.OverlapCircleAll(
             new Vector2d(Fixed64.Zero, Fixed64.Zero),
             (Fixed64)3,
             hits);
@@ -40,7 +41,7 @@ public sealed class Physics2DQueryTests
         _ = CreateBox(context, new Vector2d((Fixed64)2, Fixed64.Zero), new PhysicsLayer(2));
         var hits = new SwiftList<Physics2DHit>();
 
-        int count = context.Physics2D.OverlapCircleAll(
+        int count = context.Query2D.OverlapCircleAll(
             Vector2d.Zero,
             (Fixed64)4,
             PhysicsLayerMask.FromLayer(1),
@@ -59,7 +60,7 @@ public sealed class Physics2DQueryTests
         StiffBody2D far = CreatePolygon(context, new Vector2d((Fixed64)6, Fixed64.Zero));
         var hits = new SwiftList<Physics2DHit>();
 
-        int count = context.Physics2D.RaycastAll(
+        int count = context.Query2D.RaycastAll(
             new Vector2d((Fixed64)(-3), Fixed64.Zero),
             new Vector2d((Fixed64)8, Fixed64.Zero),
             hits);
@@ -78,7 +79,7 @@ public sealed class Physics2DQueryTests
         using GravitasWorldContext context = Create2DContext();
         StiffBody2D body = CreateCircle(context, Vector2d.Zero);
 
-        bool hit = context.Physics2D.Raycast(
+        bool hit = context.Query2D.Raycast(
             Vector2d.Zero,
             new Vector2d((Fixed64)4, Fixed64.Zero),
             out Physics2DHit rayHit);
@@ -97,7 +98,7 @@ public sealed class Physics2DQueryTests
         StiffBody2D included = CreateBox(context, new Vector2d((Fixed64)2, Fixed64.Zero), new PhysicsLayer(1));
         var hits = new SwiftList<Physics2DHit>();
 
-        int count = context.Physics2D.RaycastAll(
+        int count = context.Query2D.RaycastAll(
             new Vector2d((Fixed64)(-3), Fixed64.Zero),
             new Vector2d((Fixed64)4, Fixed64.Zero),
             PhysicsLayerMask.FromLayer(1),
@@ -114,14 +115,14 @@ public sealed class Physics2DQueryTests
         StiffBody2D body = CreateBox(context, Vector2d.Zero, new PhysicsLayer(), new Vector2d((Fixed64)8, (Fixed64)8));
         var hits = new SwiftList<Physics2DHit>();
 
-        int count = context.Physics2D.RaycastAll(
+        int count = context.Query2D.RaycastAll(
             new Vector2d((Fixed64)(-8), Fixed64.Zero),
             new Vector2d((Fixed64)8, Fixed64.Zero),
             hits);
 
         count.Should().Be(1);
         hits[0].Collider.Should().BeSameAs(body.Collider);
-        context.Physics2D.LastQueryCandidateCount.Should().Be(1);
+        context.Query2D.LastQueryCandidateCount.Should().Be(1);
     }
 
     [Fact]
@@ -131,7 +132,7 @@ public sealed class Physics2DQueryTests
         _ = CreateCircle(context, Vector2d.Zero);
         var hits = new SwiftList<Physics2DHit>();
 
-        int count = context.Physics2D.RaycastAll(Vector2d.Zero, Vector2d.Zero, hits);
+        int count = context.Query2D.RaycastAll(Vector2d.Zero, Vector2d.Zero, hits);
 
         count.Should().Be(0);
         hits.Count.Should().Be(0);
@@ -148,9 +149,9 @@ public sealed class Physics2DQueryTests
         Vector2d start = new((Fixed64)(-8), Fixed64.Zero);
         Vector2d end = new((Fixed64)80, Fixed64.Zero);
         for (int i = 0; i < 3; i++)
-            context.Physics2D.RaycastAll(start, end, hits);
+            context.Query2D.RaycastAll(start, end, hits);
 
-        long allocatedBytes = MeasureAllocatedBytes(() => context.Physics2D.RaycastAll(start, end, hits));
+        long allocatedBytes = MeasureAllocatedBytes(() => context.Query2D.RaycastAll(start, end, hits));
 
         allocatedBytes.Should().Be(0);
     }

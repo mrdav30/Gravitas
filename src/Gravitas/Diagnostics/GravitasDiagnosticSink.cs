@@ -1,7 +1,7 @@
 ﻿using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
-using Gravitas.Raycasting;
+using Gravitas.Queries;
 using SwiftCollections;
 using System;
 
@@ -255,7 +255,7 @@ public sealed class GravitasDiagnosticSink
         Vector3d end,
         Fixed64 radius,
         bool hit,
-        LSRaycastHit raycastHit)
+        Physics3DHit raycastHit)
     {
         if (!Enabled)
             return;
@@ -284,7 +284,7 @@ public sealed class GravitasDiagnosticSink
         int layerMaskBits,
         bool hit,
         int hitCount,
-        LSRaycastHit raycastHit)
+        Physics3DHit raycastHit)
     {
         if (!Enabled)
             return;
@@ -312,7 +312,7 @@ public sealed class GravitasDiagnosticSink
         int layerMaskBits,
         bool hit,
         int hitCount,
-        LSRaycastHit raycastHit)
+        Physics3DHit raycastHit)
     {
         if (!Enabled)
             return;

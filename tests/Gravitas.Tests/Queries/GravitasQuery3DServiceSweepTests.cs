@@ -1,16 +1,16 @@
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
-using Gravitas.Raycasting;
+using Gravitas.Queries;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
 using GridForge.Configuration;
 using SwiftCollections;
 using Xunit;
 
-namespace Gravitas.Tests.Raycasting;
+namespace Gravitas.Tests.Queries;
 
-public sealed class GravitasSweptSphereQueryTests
+public sealed class GravitasQuery3DServiceSweepTests
 {
     private static readonly PhysicsLayerMask IncludeLayerZero = PhysicsLayerMask.FromLayer(0);
 
@@ -20,12 +20,12 @@ public sealed class GravitasSweptSphereQueryTests
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         LSSphereCollider target = CreateDynamicCollider(context, new LSSphereCollider(), Vector3d.Zero);
 
-        bool hit = context.Raycasts.SweepSphere(
+        bool hit = context.Query3D.SweepSphere(
             new Vector3d((Fixed64)(-2), Fixed64.Zero, Fixed64.Zero),
             Fixed64.Half,
             Vector3d.Right,
             (Fixed64)4,
-            out LSRaycastHit sweepHit,
+            out Physics3DHit sweepHit,
             IncludeLayerZero);
 
         hit.Should().BeTrue();
@@ -42,12 +42,12 @@ public sealed class GravitasSweptSphereQueryTests
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         LSSphereCollider target = CreateDynamicCollider(context, new LSSphereCollider(), Vector3d.Zero);
 
-        bool hit = context.Raycasts.SweepSphere(
+        bool hit = context.Query3D.SweepSphere(
             new Vector3d(Fixed64.Fraction(1, 4), Fixed64.Zero, Fixed64.Zero),
             Fixed64.Half,
             Vector3d.Right,
             (Fixed64)2,
-            out LSRaycastHit sweepHit,
+            out Physics3DHit sweepHit,
             IncludeLayerZero);
 
         hit.Should().BeTrue();
@@ -63,9 +63,9 @@ public sealed class GravitasSweptSphereQueryTests
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         LSSphereCollider near = CreateDynamicCollider(context, new LSSphereCollider(), Vector3d.Zero);
         LSSphereCollider far = CreateDynamicCollider(context, new LSSphereCollider(), Vector3d.Right * 2);
-        var hits = new SwiftList<LSRaycastHit>();
+        var hits = new SwiftList<Physics3DHit>();
 
-        int count = context.Raycasts.SweepSphereAll(
+        int count = context.Query3D.SweepSphereAll(
             new Vector3d((Fixed64)(-2), Fixed64.Zero, Fixed64.Zero),
             new Vector3d((Fixed64)4, Fixed64.Zero, Fixed64.Zero),
             Fixed64.Half,
@@ -91,12 +91,12 @@ public sealed class GravitasSweptSphereQueryTests
             new LSSphereCollider(),
             new Vector3d(Fixed64.Zero, Fixed64.Zero, -Fixed64.Fraction(1, 4)));
 
-        bool hit = context.Raycasts.SweepSphere(
+        bool hit = context.Query3D.SweepSphere(
             new Vector3d((Fixed64)(-2), Fixed64.Zero, Fixed64.Zero),
             Fixed64.Fraction(1, 4),
             Vector3d.Right,
             (Fixed64)4,
-            out LSRaycastHit sweepHit,
+            out Physics3DHit sweepHit,
             IncludeLayerZero);
 
         hit.Should().BeTrue();
@@ -112,12 +112,12 @@ public sealed class GravitasSweptSphereQueryTests
         ignoredByMask.Layer = new PhysicsLayer(1);
         LSSphereCollider target = CreateDynamicCollider(context, new LSSphereCollider(), Vector3d.Right * 2);
 
-        bool hit = context.Raycasts.SweepSphere(
+        bool hit = context.Query3D.SweepSphere(
             Vector3d.Zero,
             Fixed64.Half,
             Vector3d.Right,
             (Fixed64)4,
-            out LSRaycastHit sweepHit,
+            out Physics3DHit sweepHit,
             IncludeLayerZero,
             self);
 
@@ -169,19 +169,19 @@ public sealed class GravitasSweptSphereQueryTests
         LSSphereCollider vertical = CreateDynamicCollider(context, new LSSphereCollider(), Vector3d.Zero);
         LSSphereCollider diagonal = CreateDynamicCollider(context, new LSSphereCollider(), new Vector3d((Fixed64)4, Fixed64.Zero, (Fixed64)4));
 
-        bool verticalHit = context.Raycasts.SweepSphere(
+        bool verticalHit = context.Query3D.SweepSphere(
             new Vector3d(Fixed64.Zero, (Fixed64)2, Fixed64.Zero),
             Fixed64.Half,
             Vector3d.Down,
             (Fixed64)4,
-            out LSRaycastHit verticalHitInfo,
+            out Physics3DHit verticalHitInfo,
             IncludeLayerZero);
-        bool diagonalHit = context.Raycasts.SweepSphere(
+        bool diagonalHit = context.Query3D.SweepSphere(
             new Vector3d((Fixed64)2, Fixed64.Zero, (Fixed64)2),
             Fixed64.Half,
             new Vector3d(Fixed64.One, Fixed64.Zero, Fixed64.One),
             (Fixed64)4,
-            out LSRaycastHit diagonalHitInfo,
+            out Physics3DHit diagonalHitInfo,
             IncludeLayerZero);
 
         verticalHit.Should().BeTrue();
@@ -192,12 +192,12 @@ public sealed class GravitasSweptSphereQueryTests
 
     private static void AssertSweepHits(GravitasWorldContext context, Vector3d origin, LSCollider expected)
     {
-        bool hit = context.Raycasts.SweepSphere(
+        bool hit = context.Query3D.SweepSphere(
             origin,
             Fixed64.Fraction(1, 4),
             Vector3d.Right,
             (Fixed64)4,
-            out LSRaycastHit sweepHit,
+            out Physics3DHit sweepHit,
             IncludeLayerZero);
 
         hit.Should().BeTrue();

@@ -23,11 +23,11 @@ pairs, queries, and coroutines remain context-local.
 | Service | Owned state |
 | --- | --- |
 | `GravitasPhysicsService` | Dynamic body bucket, collider ID table, reusable collider IDs, collision-pair pool, active collision-pair queue, simulation switch. |
-| `GravitasPhysics2DService` | Pure 2D dynamic body bucket, monotonic collider ID table, 2D pair pool, layer-filtered narrow-phase/response processing, overlap-circle query buffers, simulation switch. |
+| `GravitasPhysics2DService` | Pure 2D dynamic body bucket, monotonic collider ID table, 2D pair pool, layer-filtered narrow-phase/response processing, visualization publishing, simulation switch. |
 | `GravitasCollisionService` | Active partition bucket, inactive partition pool, duplicate voxel checker, partition awake-state refresh, collision distribution version, cull distributor. |
 | `GravitasCollision2DService` | GridForge-backed pure 2D partition bucket, inactive partition pool, duplicate voxel checker, awake dynamic membership refresh, 2D collision distribution version, retained partition cleanup. |
-| `GravitasRaycastService` | 3D segment worker, swept-sphere worker, intersection buffer, duplicate voxel checker, duplicate collider checker, query version. |
-| `GravitasCircleQueryService` | Duplicate collider checker and query version for X/Z circle overlap/proximity queries. |
+| `GravitasQuery2DService` | Pure 2D query candidate buffer, overlap-circle queries, segment raycasts, duplicate-suppressed partition candidate gathering, hit ordering. |
+| `GravitasQuery3DService` | 3D segment worker, swept-sphere worker, X/Z circle overlap/proximity queries, intersection buffer, duplicate voxel checker, duplicate collider checker, raycast and circle query versions. |
 | `GravitasCoroutineService` | Active lockstep coroutine bucket and context-bound wait instruction factories. |
 | `GravitasDiagnosticSink` | Disabled-by-default diagnostic event buffer and engine-agnostic debug draw command buffer. |
 | `GravitasLifecycleHooks` | Ordered callbacks for simulate, late simulate, visualize, late visualize, reset, and frame-rate change. |

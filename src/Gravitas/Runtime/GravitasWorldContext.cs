@@ -1,7 +1,7 @@
 using FixedMathSharp;
 using Gravitas.CollisionHandling;
 using Gravitas.Diagnostics;
-using Gravitas.Raycasting;
+using Gravitas.Queries;
 using Gravitas.Support;
 using GridForge.Grids;
 using SwiftCollections;
@@ -43,8 +43,8 @@ public sealed class GravitasWorldContext : IDisposable
         Collisions2D = new GravitasCollision2DService(this);
         Physics = new GravitasPhysicsService(this);
         Physics2D = new GravitasPhysics2DService(this);
-        Raycasts = new GravitasRaycastService(this);
-        CircleQueries = new GravitasCircleQueryService(this);
+        Query2D = new GravitasQuery2DService(this);
+        Query3D = new GravitasQuery3DService(this);
         Coroutines = new GravitasCoroutineService(this);
     }
 
@@ -84,14 +84,14 @@ public sealed class GravitasWorldContext : IDisposable
     public GravitasPhysics2DService Physics2D { get; }
 
     /// <summary>
-    /// Gets this context's world-local raycast query service.
+    /// Gets this context's world-local pure 2D query service.
     /// </summary>
-    public GravitasRaycastService Raycasts { get; }
+    public GravitasQuery2DService Query2D { get; }
 
     /// <summary>
-    /// Gets this context's world-local X/Z circle overlap query service.
+    /// Gets this context's world-local 3D query service.
     /// </summary>
-    public GravitasCircleQueryService CircleQueries { get; }
+    public GravitasQuery3DService Query3D { get; }
 
     /// <summary>
     /// Gets this context's world-local lockstep coroutine service.
@@ -330,8 +330,8 @@ public sealed class GravitasWorldContext : IDisposable
         Collisions2D.Reset();
         Physics.Reset();
         Physics2D.Reset();
-        Raycasts.Reset();
-        CircleQueries.Reset();
+        Query2D.Reset();
+        Query3D.Reset();
         Coroutines.Reset();
         Diagnostics.Reset();
         _hooks.InvokeReset();

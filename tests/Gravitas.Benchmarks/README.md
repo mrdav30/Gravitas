@@ -74,7 +74,7 @@ Start with hot paths that can be isolated and repeated deterministically:
   broad phase, sweep baselines, narrow-phase pairs, response, and overlap
   and raycast queries.
 - collider shape-state rebuilds, capsule derived state, compound aggregate bounds, and mesh validation/BVH construction.
-- `GravitasRaycastService` and `GravitasCircleQueryService` query gathering, filtering, and result ordering.
+- `GravitasQuery2DService` and `GravitasQuery3DService` query gathering, filtering, and result ordering.
 - Mesh collider preprocessing and convex mesh limits.
 - Pooling and allocation behavior for collision pairs, partitions, and temporary collections.
 - Diagnostics disabled overhead and enabled capture cost for event hooks and debug draw commands.

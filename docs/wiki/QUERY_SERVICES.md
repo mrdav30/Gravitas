@@ -1,32 +1,33 @@
 # Query Services
 
-Raycasts, swept-sphere queries, 3D-ground-plane circle queries, and pure 2D
-overlap/raycast queries are context-owned services. The 3D services use the same
-GridForge-backed partitions as 3D collision detection, resolve collider IDs
-through the owning `GravitasPhysicsService`, and suppress duplicate hits when a
-collider appears in multiple voxels.
+Queries are split into explicit context-owned 2D and 3D services:
+`GravitasWorldContext.Query2D` and `GravitasWorldContext.Query3D`. The 3D
+service owns raycasts, swept-sphere queries, and X/Z circle overlap/proximity
+queries. It uses the same GridForge-backed partitions as 3D collision
+detection, resolves collider IDs through the owning `GravitasPhysicsService`,
+and suppresses duplicate hits when a collider appears in multiple voxels.
 
-Pure 2D queries live on `GravitasPhysics2DService` and operate over
-`Vector2d` shape data. They should not route through the existing 3D raycast
-path or the X/Z circle query service by accident.
+Pure 2D queries live on `GravitasQuery2DService` and operate over `Vector2d`
+shape data. They should not route through the 3D raycast path or the X/Z circle
+query path by accident.
 
-## Raycasts
+## 3D Raycasts
 
-`GravitasRaycastService` exposes:
+`GravitasQuery3DService` exposes:
 
 - `Raycast(origin, direction, maxDistance, out hit, layerMask)`
 - `RaycastAll(start, end, layerMask, results)`
 
-The raycast service owns:
+The 3D query service owns:
 
 - one `RaycastSegmentWorker`.
 - a reusable intersection-point buffer.
 - one `SweptSphereQueryWorker`.
 - a duplicate collider checker.
 - a duplicate voxel checker.
-- a context-local query `Version`.
+- a context-local `RaycastVersion`.
 
-`RaycastAll` clears the caller-provided `SwiftList<LSRaycastHit>`, writes hits
+`RaycastAll` clears the caller-provided `SwiftList<Physics3DHit>`, writes hits
 into it, returns the hit count, and sorts the results by distance using an
 allocation-free in-place sorter. Keep these result buffers owned by the caller or
 context that issues the query.
@@ -45,13 +46,13 @@ The candidate path is:
 6. filter by layer mask.
 7. skip colliders already checked in this query.
 8. call the collider's `ColliderOverlapsRay(...)`.
-9. build `LSRaycastHit` values from intersection points, normals, and distance.
+9. build `Physics3DHit` values from intersection points, normals, and distance.
 10. sort `RaycastAll` results by distance.
 
 Colliders also store `RaycastVersion`; this is a second duplicate guard scoped
-to the service version.
+to the service's raycast/sweep version.
 
-Raycasts use deterministic 3D segment intersection points. Horizontal,
+3D raycasts use deterministic segment intersection points. Horizontal,
 vertical, diagonal, and starting-inside segments have defined behavior and are
 covered by focused tests. Mesh ray overlap is triangle-level and queries the
 mesh triangle BVH before testing candidate triangles. `FixedRay` was reviewed
@@ -63,7 +64,7 @@ many voxels; the all-hit path should still report one hit per collider.
 
 ## Swept Sphere Queries
 
-`GravitasRaycastService` also exposes true 3D swept-sphere queries:
+`GravitasQuery3DService` also exposes true 3D swept-sphere queries:
 
 - `SweepSphere(origin, radius, direction, maxDistance, out hit, layerMask, excludedCollider)`
 - `SweepSphereAll(start, end, radius, layerMask, results, excludedCollider)`
@@ -95,18 +96,18 @@ ordering as host-facing swept-sphere queries.
 
 ## Circle Overlap Queries
 
-`GravitasCircleQueryService` exposes:
+`GravitasQuery3DService` exposes:
 
 - `OverlapCircle(position, radius, out hit, layerMask)`
 - `OverlapCircleInDirection(position, radius, direction, out hit, maxDistance, layerMask)`
 - `OverlapCircleAll(position, radius, layerMask, results)`
 
-The circle query service owns:
+The 3D query service's circle path owns:
 
 - a duplicate collider checker.
-- a context-local query `Version`.
+- a context-local `CircleVersion`.
 
-`OverlapCircleAll` clears the caller-provided `SwiftList<LSRaycastHit>`, writes
+`OverlapCircleAll` clears the caller-provided `SwiftList<Physics3DHit>`, writes
 hits into it, returns the hit count, and uses the same allocation-free in-place
 sorter as raycasts.
 
@@ -137,7 +138,7 @@ swept-sphere queries for deterministic 3D swept movement.
 
 ## Pure 2D Queries
 
-`GravitasPhysics2DService` exposes:
+`GravitasQuery2DService` exposes:
 
 - `OverlapCircleAll(center, radius, results)`
 - `OverlapCircleAll(center, radius, layerMask, results)`
@@ -204,7 +205,7 @@ query job/state objects owned by the caller or rented from a context-local pool.
 
 ## Hit Data
 
-`LSRaycastHit` is a readonly struct containing:
+`Physics3DHit` is a readonly struct containing:
 
 - `Collider`
 - `Body`

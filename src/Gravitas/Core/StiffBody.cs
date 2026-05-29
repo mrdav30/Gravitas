@@ -1,7 +1,7 @@
 ﻿using Chronicler;
 using FixedMathSharp;
 using Gravitas.Colliders;
-using Gravitas.Raycasting;
+using Gravitas.Queries;
 using Gravitas.Support;
 using GridForge.Grids;
 using SwiftCollections;
@@ -126,8 +126,8 @@ public class StiffBody : IRecordable
     private int _lastGroundCheckFrame = 0;
     private const int _groundCheckFrameThreshold = 10;
     private readonly Fixed64 _groundCheckThreshold = (Fixed64)0.01f;
-    private readonly SwiftList<LSRaycastHit> _groundProbeHits = new();
-    private readonly SwiftList<LSRaycastHit> _continuousCollisionHits = new();
+    private readonly SwiftList<Physics3DHit> _groundProbeHits = new();
+    private readonly SwiftList<Physics3DHit> _continuousCollisionHits = new();
 
     public Fixed64 StepOffset = (Fixed64)0.5f;
 
@@ -1054,7 +1054,7 @@ public class StiffBody : IRecordable
             return false;
         }
 
-        int hitCount = Context.Raycasts.SweepSphereAll(
+        int hitCount = Context.Query3D.SweepSphereAll(
             startPosition,
             proposedPosition,
             proxyRadius,
@@ -1064,7 +1064,7 @@ public class StiffBody : IRecordable
 
         for (int i = 0; i < hitCount; i++)
         {
-            LSRaycastHit hit = _continuousCollisionHits[i];
+            Physics3DHit hit = _continuousCollisionHits[i];
             if (!IsValidContinuousCollisionHit(hit))
                 continue;
 
@@ -1118,7 +1118,7 @@ public class StiffBody : IRecordable
         };
     }
 
-    private bool IsValidContinuousCollisionHit(LSRaycastHit hit)
+    private bool IsValidContinuousCollisionHit(Physics3DHit hit)
     {
         LSCollider? hitCollider = hit.Collider;
         if (hitCollider == null
@@ -1329,7 +1329,7 @@ public class StiffBody : IRecordable
             ? ResolveGroundProbeRadius()
             : Fixed64.Zero;
         Vector3d end = origin + Vector3d.Down * dis;
-        bool foundGround = TryFindGroundHit(mode, radius, origin, dis, out LSRaycastHit hit);
+        bool foundGround = TryFindGroundHit(mode, radius, origin, dis, out Physics3DHit hit);
         Context.Diagnostics.EmitGroundProbe(this, mode, origin, end, radius, foundGround, hit);
 
         if (!foundGround)
@@ -1355,7 +1355,7 @@ public class StiffBody : IRecordable
         Fixed64 radius,
         Vector3d origin,
         Fixed64 distance,
-        out LSRaycastHit hit)
+        out Physics3DHit hit)
     {
         if (mode == GroundProbeMode.SweptSphere && TryFindGroundHitWithSweptSphere(origin, distance, radius, out hit))
             return true;
@@ -1369,13 +1369,13 @@ public class StiffBody : IRecordable
         return TryFindGroundHitWithRay(origin, distance, out hit);
     }
 
-    private bool TryFindGroundHitWithRay(Vector3d origin, Fixed64 distance, out LSRaycastHit hit)
+    private bool TryFindGroundHitWithRay(Vector3d origin, Fixed64 distance, out Physics3DHit hit)
     {
         Vector3d end = origin + Vector3d.Down * distance;
-        int hitCount = Context.Raycasts.RaycastAll(origin, end, Context.Settings.GroundCheckLayerMask, _groundProbeHits);
+        int hitCount = Context.Query3D.RaycastAll(origin, end, Context.Settings.GroundCheckLayerMask, _groundProbeHits);
         for (int i = 0; i < hitCount; i++)
         {
-            LSRaycastHit current = _groundProbeHits[i];
+            Physics3DHit current = _groundProbeHits[i];
             if (!IsValidGroundHit(current))
                 continue;
 
@@ -1387,13 +1387,13 @@ public class StiffBody : IRecordable
         return false;
     }
 
-    private bool TryFindGroundHitWithSweptSphere(Vector3d origin, Fixed64 distance, Fixed64 radius, out LSRaycastHit hit)
+    private bool TryFindGroundHitWithSweptSphere(Vector3d origin, Fixed64 distance, Fixed64 radius, out Physics3DHit hit)
     {
         if (radius <= Fixed64.Epsilon)
             return TryFindGroundHitWithRay(origin, distance, out hit);
 
         Vector3d end = origin + Vector3d.Down * distance;
-        int hitCount = Context.Raycasts.SweepSphereAll(
+        int hitCount = Context.Query3D.SweepSphereAll(
             origin,
             end,
             radius,
@@ -1403,7 +1403,7 @@ public class StiffBody : IRecordable
 
         for (int i = 0; i < hitCount; i++)
         {
-            LSRaycastHit current = _groundProbeHits[i];
+            Physics3DHit current = _groundProbeHits[i];
             if (!IsValidGroundHit(current))
                 continue;
 
@@ -1415,7 +1415,7 @@ public class StiffBody : IRecordable
         return false;
     }
 
-    private bool IsValidGroundHit(LSRaycastHit hit)
+    private bool IsValidGroundHit(Physics3DHit hit)
     {
         LSCollider? hitCollider = hit.Collider;
         if (hitCollider == null || ReferenceEquals(hitCollider, Collider))

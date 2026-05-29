@@ -1,6 +1,7 @@
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
+using Gravitas.Queries;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
 using SwiftCollections;
@@ -51,7 +52,7 @@ public sealed class StiffBody2DHostContractTests
         body.Position.Should().Be(new Vector2d((Fixed64)5, (Fixed64)7));
         body.Collider.Center.Should().Be(new Vector2d((Fixed64)5, (Fixed64)7));
         var hits = new SwiftList<Physics2DHit>();
-        context.Physics2D.OverlapCircleAll(new Vector2d((Fixed64)5, (Fixed64)7), Fixed64.Half, hits).Should().Be(1);
+        context.Query2D.OverlapCircleAll(new Vector2d((Fixed64)5, (Fixed64)7), Fixed64.Half, hits).Should().Be(1);
     }
 
     [Fact]
@@ -111,7 +112,7 @@ public sealed class StiffBody2DHostContractTests
         collider.Center.Should().Be(new Vector2d((Fixed64)4, (Fixed64)6));
         context.Physics2D.ColliderCount.Should().Be(1);
         var hits = new SwiftList<Physics2DHit>();
-        context.Physics2D.OverlapCircleAll(new Vector2d((Fixed64)4, (Fixed64)6), Fixed64.Half, hits).Should().Be(1);
+        context.Query2D.OverlapCircleAll(new Vector2d((Fixed64)4, (Fixed64)6), Fixed64.Half, hits).Should().Be(1);
     }
 
     [Fact]

@@ -1,6 +1,7 @@
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
+using Gravitas.Queries;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
 using GridForge.Configuration;
@@ -40,11 +41,11 @@ public sealed class Physics2DPartitionBroadPhaseTests
             immovable: true);
         var hits = new SwiftList<Physics2DHit>();
 
-        int count = context.Physics2D.OverlapCircleAll(Vector2d.Zero, (Fixed64)6, hits);
+        int count = context.Query2D.OverlapCircleAll(Vector2d.Zero, (Fixed64)6, hits);
 
         count.Should().Be(1);
         hits[0].Collider.Should().BeSameAs(body.Collider);
-        context.Physics2D.LastQueryCandidateCount.Should().Be(1);
+        context.Query2D.LastQueryCandidateCount.Should().Be(1);
     }
 
     [Fact]
@@ -54,12 +55,12 @@ public sealed class Physics2DPartitionBroadPhaseTests
         StiffBody2D body = CreateCircle(context, Vector2d.Zero, immovable: false);
         var hits = new SwiftList<Physics2DHit>();
 
-        context.Physics2D.OverlapCircleAll(Vector2d.Zero, Fixed64.One, hits).Should().Be(1);
+        context.Query2D.OverlapCircleAll(Vector2d.Zero, Fixed64.One, hits).Should().Be(1);
 
         body.SetPosition(new Vector2d((Fixed64)10, Fixed64.Zero));
 
-        context.Physics2D.OverlapCircleAll(Vector2d.Zero, Fixed64.One, hits).Should().Be(0);
-        context.Physics2D.OverlapCircleAll(new Vector2d((Fixed64)10, Fixed64.Zero), Fixed64.One, hits).Should().Be(1);
+        context.Query2D.OverlapCircleAll(Vector2d.Zero, Fixed64.One, hits).Should().Be(0);
+        context.Query2D.OverlapCircleAll(new Vector2d((Fixed64)10, Fixed64.Zero), Fixed64.One, hits).Should().Be(1);
         hits[0].Collider.Should().BeSameAs(body.Collider);
     }
 

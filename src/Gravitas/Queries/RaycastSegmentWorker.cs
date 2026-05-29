@@ -3,7 +3,7 @@ using Gravitas.Colliders;
 using SwiftCollections;
 using SwiftCollections.Query;
 
-namespace Gravitas.Raycasting;
+namespace Gravitas.Queries;
 
 /// <summary>
 /// Stores segment data used by one context-owned raycast service while checking collider overlaps.

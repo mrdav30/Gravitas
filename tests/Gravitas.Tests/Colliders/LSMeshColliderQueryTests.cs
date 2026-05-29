@@ -1,7 +1,7 @@
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
-using Gravitas.Raycasting;
+using Gravitas.Queries;
 using Gravitas.Tests.Support;
 using SwiftCollections;
 using SwiftCollections.Query;

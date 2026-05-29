@@ -1,7 +1,7 @@
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
-using Gravitas.Raycasting;
+using Gravitas.Queries;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
 using GridForge.Configuration;
@@ -59,16 +59,16 @@ public sealed class PhysicsLayerTests
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         LSSphereCollider layerZero = CreateDynamicSphere(context, Vector3d.Zero, new PhysicsLayer(0));
         LSSphereCollider layerOne = CreateDynamicSphere(context, new Vector3d(2, 0, 0), new PhysicsLayer(1));
-        var rayHits = new SwiftList<LSRaycastHit>();
-        var circleHits = new SwiftList<LSRaycastHit>();
+        var rayHits = new SwiftList<Physics3DHit>();
+        var circleHits = new SwiftList<Physics3DHit>();
         PhysicsLayerMask onlyLayerOne = PhysicsLayerMask.FromLayer(1);
 
-        int rayCount = context.Raycasts.RaycastAll(
+        int rayCount = context.Query3D.RaycastAll(
             new Vector3d((Fixed64)(-2), -Fixed64.Fraction(1, 4), Fixed64.Zero),
             new Vector3d((Fixed64)4, Fixed64.Fraction(1, 4), Fixed64.Zero),
             onlyLayerOne,
             rayHits);
-        int circleCount = context.CircleQueries.OverlapCircleAll(
+        int circleCount = context.Query3D.OverlapCircleAll(
             new Vector3d(1, 0, 0),
             (Fixed64)4,
             onlyLayerOne,

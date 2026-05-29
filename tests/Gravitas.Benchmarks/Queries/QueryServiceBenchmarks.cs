@@ -1,6 +1,6 @@
 using BenchmarkDotNet.Attributes;
 using FixedMathSharp;
-using Gravitas.Raycasting;
+using Gravitas.Queries;
 using Gravitas.Support;
 using SwiftCollections;
 
@@ -15,10 +15,10 @@ public class QueryServiceBenchmarks
     private GravitasWorldContext _overlappingContext;
     private Vector3d _rayStart;
     private Vector3d _rayEnd;
-    private SwiftList<LSRaycastHit> _raycastHits;
-    private SwiftList<LSRaycastHit> _overlappingRaycastHits;
-    private SwiftList<LSRaycastHit> _circlecastHits;
-    private SwiftList<LSRaycastHit> _sweepSphereHits;
+    private SwiftList<Physics3DHit> _raycastHits;
+    private SwiftList<Physics3DHit> _overlappingRaycastHits;
+    private SwiftList<Physics3DHit> _circlecastHits;
+    private SwiftList<Physics3DHit> _sweepSphereHits;
 
     [Params(64)]
     public int ColliderCount { get; set; }
@@ -36,10 +36,10 @@ public class QueryServiceBenchmarks
 
         _rayStart = new Vector3d((Fixed64)(-2), Fixed64.Zero, Fixed64.Zero);
         _rayEnd = new Vector3d((Fixed64)(ColliderCount * 2), Fixed64.Zero, Fixed64.Zero);
-        _raycastHits = new SwiftList<LSRaycastHit>(ColliderCount);
-        _overlappingRaycastHits = new SwiftList<LSRaycastHit>(ColliderCount);
-        _circlecastHits = new SwiftList<LSRaycastHit>(ColliderCount);
-        _sweepSphereHits = new SwiftList<LSRaycastHit>(ColliderCount);
+        _raycastHits = new SwiftList<Physics3DHit>(ColliderCount);
+        _overlappingRaycastHits = new SwiftList<Physics3DHit>(ColliderCount);
+        _circlecastHits = new SwiftList<Physics3DHit>(ColliderCount);
+        _sweepSphereHits = new SwiftList<Physics3DHit>(ColliderCount);
     }
 
     [GlobalCleanup]
@@ -61,11 +61,11 @@ public class QueryServiceBenchmarks
 
     [Benchmark]
     public int OverlapCircleAllAcrossPopulatedContext() =>
-        _context.CircleQueries.OverlapCircleAll(Vector3d.Zero, (Fixed64)4, IncludeLayerZero, _circlecastHits);
+        _context.Query3D.OverlapCircleAll(Vector3d.Zero, (Fixed64)4, IncludeLayerZero, _circlecastHits);
 
     [Benchmark]
     public bool DirectionalOverlapCircleAcrossPopulatedContext() =>
-        _context.CircleQueries.OverlapCircleInDirection(
+        _context.Query3D.OverlapCircleInDirection(
             Vector3d.Zero,
             (Fixed64)4,
             Vector3d.Right,
@@ -80,10 +80,10 @@ public class QueryServiceBenchmarks
 
     [Benchmark]
     public int SweepSphereAllAcrossPopulatedContext() =>
-        _context.Raycasts.SweepSphereAll(_rayStart, _rayEnd, Fixed64.Half, IncludeLayerZero, _sweepSphereHits);
+        _context.Query3D.SweepSphereAll(_rayStart, _rayEnd, Fixed64.Half, IncludeLayerZero, _sweepSphereHits);
 
-    private int CountRaycastHits(GravitasWorldContext context, SwiftList<LSRaycastHit> results)
+    private int CountRaycastHits(GravitasWorldContext context, SwiftList<Physics3DHit> results)
     {
-        return context.Raycasts.RaycastAll(_rayStart, _rayEnd, IncludeLayerZero, results);
+        return context.Query3D.RaycastAll(_rayStart, _rayEnd, IncludeLayerZero, results);
     }
 }

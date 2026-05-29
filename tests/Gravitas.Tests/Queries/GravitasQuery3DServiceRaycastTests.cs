@@ -1,16 +1,16 @@
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
-using Gravitas.Raycasting;
+using Gravitas.Queries;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
 using GridForge.Configuration;
 using SwiftCollections;
 using Xunit;
 
-namespace Gravitas.Tests.Raycasting;
+namespace Gravitas.Tests.Queries;
 
-public sealed class GravitasRaycastServiceTests
+public sealed class GravitasQuery3DServiceRaycastTests
 {
     private static readonly PhysicsLayerMask IncludeLayerZero = PhysicsLayerMask.FromLayer(0);
 
@@ -20,9 +20,9 @@ public sealed class GravitasRaycastServiceTests
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         LSSphereCollider near = CreateDynamicSphere(context, new Vector3d(0, 0, 0));
         LSSphereCollider far = CreateDynamicSphere(context, Vector3d.Right * 2);
-        var hits = new SwiftList<LSRaycastHit>();
+        var hits = new SwiftList<Physics3DHit>();
 
-        int count = context.Raycasts
+        int count = context.Query3D
             .RaycastAll(Vector(-2, 0, 0), Vector(4, 0, 0), IncludeLayerZero, hits);
 
         count.Should().Be(2);
@@ -37,23 +37,23 @@ public sealed class GravitasRaycastServiceTests
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         LSSphereCollider collider = CreateDynamicSphere(context, Vector3d.Zero);
 
-        bool horizontalHit = context.Raycasts.Raycast(
+        bool horizontalHit = context.Query3D.Raycast(
             Vector(-2, 0, 0),
             Vector3d.Right,
             (Fixed64)4,
-            out LSRaycastHit horizontal,
+            out Physics3DHit horizontal,
             IncludeLayerZero);
-        bool verticalHit = context.Raycasts.Raycast(
+        bool verticalHit = context.Query3D.Raycast(
             Vector(0, -2, 0),
             Vector3d.Up,
             (Fixed64)4,
-            out LSRaycastHit vertical,
+            out Physics3DHit vertical,
             IncludeLayerZero);
-        bool diagonalHit = context.Raycasts.Raycast(
+        bool diagonalHit = context.Query3D.Raycast(
             Vector(-2, -2, -2),
             new Vector3d(1, 1, 1).Normal,
             (Fixed64)4,
-            out LSRaycastHit diagonal,
+            out Physics3DHit diagonal,
             IncludeLayerZero);
 
         horizontalHit.Should().BeTrue();
@@ -71,11 +71,11 @@ public sealed class GravitasRaycastServiceTests
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         LSSphereCollider collider = CreateDynamicSphere(context, Vector3d.Zero);
 
-        bool hit = context.Raycasts.Raycast(
+        bool hit = context.Query3D.Raycast(
             new Vector3d(Fixed64.Fraction(1, 4), Fixed64.Zero, Fixed64.Zero),
             Vector3d.Right,
             (Fixed64)2,
-            out LSRaycastHit rayHit,
+            out Physics3DHit rayHit,
             IncludeLayerZero);
 
         hit.Should().BeTrue();
@@ -90,17 +90,17 @@ public sealed class GravitasRaycastServiceTests
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         LSCylinderCollider collider = CreateDynamicCylinder(context, Vector3d.Zero);
 
-        bool sideHit = context.Raycasts.Raycast(
+        bool sideHit = context.Query3D.Raycast(
             Vector(-2, 0, 0),
             Vector3d.Right,
             (Fixed64)4,
-            out LSRaycastHit side,
+            out Physics3DHit side,
             IncludeLayerZero);
-        bool capHit = context.Raycasts.Raycast(
+        bool capHit = context.Query3D.Raycast(
             Vector(0, 2, 0),
             -Vector3d.Up,
             (Fixed64)4,
-            out LSRaycastHit cap,
+            out Physics3DHit cap,
             IncludeLayerZero);
 
         sideHit.Should().BeTrue();
@@ -118,9 +118,9 @@ public sealed class GravitasRaycastServiceTests
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         CreateDynamicSphere(context, Vector3d.Zero);
-        var hits = new SwiftList<LSRaycastHit>();
+        var hits = new SwiftList<Physics3DHit>();
 
-        int count = context.Raycasts
+        int count = context.Query3D
             .RaycastAll(Vector(-2, 2, 0), Vector(2, 2, 0), IncludeLayerZero, hits);
 
         count.Should().Be(0);
@@ -134,23 +134,23 @@ public sealed class GravitasRaycastServiceTests
         using GravitasWorldContext contextB = GravitasWorldContext.CreateOwned();
         LSSphereCollider colliderA = CreateDynamicSphere(contextA, new Vector3d(0, 0, 0));
         LSSphereCollider colliderB = CreateDynamicSphere(contextB, new Vector3d(0, 0, 0));
-        var hitsA = new SwiftList<LSRaycastHit>();
-        var hitsB = new SwiftList<LSRaycastHit>();
+        var hitsA = new SwiftList<Physics3DHit>();
+        var hitsB = new SwiftList<Physics3DHit>();
         colliderA.Id.Should().Be(colliderB.Id);
-        uint versionABefore = contextA.Raycasts.Version;
-        uint versionBBefore = contextB.Raycasts.Version;
+        uint versionABefore = contextA.Query3D.RaycastVersion;
+        uint versionBBefore = contextB.Query3D.RaycastVersion;
 
-        int countA = contextA.Raycasts
+        int countA = contextA.Query3D
             .RaycastAll(Vector(-2, 0, 0), Vector(2, 0, 0), IncludeLayerZero, hitsA);
-        int countB = contextB.Raycasts
+        int countB = contextB.Query3D
             .RaycastAll(Vector(-2, 0, 0), Vector(2, 0, 0), IncludeLayerZero, hitsB);
 
         countA.Should().Be(1);
         countB.Should().Be(1);
         hitsA[0].Collider.Should().BeSameAs(colliderA);
         hitsB[0].Collider.Should().BeSameAs(colliderB);
-        contextA.Raycasts.Version.Should().Be(versionABefore + 1);
-        contextB.Raycasts.Version.Should().Be(versionBBefore + 1);
+        contextA.Query3D.RaycastVersion.Should().Be(versionABefore + 1);
+        contextB.Query3D.RaycastVersion.Should().Be(versionBBefore + 1);
     }
 
     [Fact]
@@ -158,9 +158,9 @@ public sealed class GravitasRaycastServiceTests
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         LSSphereCollider collider = CreateLargeDynamicSphere(context, Vector3d.Zero);
-        var hits = new SwiftList<LSRaycastHit>();
+        var hits = new SwiftList<Physics3DHit>();
 
-        int count = context.Raycasts
+        int count = context.Query3D
             .RaycastAll(Vector(-4, 0, 0), Vector(4, 0, 0), IncludeLayerZero, hits);
 
         count.Should().Be(1);

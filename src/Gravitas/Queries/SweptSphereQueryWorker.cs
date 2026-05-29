@@ -1,7 +1,7 @@
 using FixedMathSharp;
 using Gravitas.Colliders;
 
-namespace Gravitas.Raycasting;
+namespace Gravitas.Queries;
 
 /// <summary>
 /// Performs deterministic swept-sphere checks for one prepared segment.

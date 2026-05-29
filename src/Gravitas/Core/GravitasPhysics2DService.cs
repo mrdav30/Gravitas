@@ -17,7 +17,6 @@ public sealed class GravitasPhysics2DService
     private readonly SwiftList<LSCollider2D> _colliders = new();
     private readonly SwiftDictionary<int, LSCollider2D> _collidersById = new();
     private readonly SwiftHashSet<ulong> _processedPairKeys = new();
-    private readonly SwiftList<LSCollider2D> _queryCandidates = new();
     private readonly SwiftDictionary<ulong, CollisionPair2D> _pairs = new();
     private readonly SwiftList<ulong> _pairsToRemove = new();
     private readonly SwiftStack<CollisionPair2D> _cachedPairs = new();
@@ -36,8 +35,6 @@ public sealed class GravitasPhysics2DService
     public bool SimulatePhysics { get; set; } = true;
 
     internal int LastBroadPhaseCandidateCount { get; private set; }
-
-    internal int LastQueryCandidateCount { get; private set; }
 
     internal void AssimilateBody(StiffBody2D body, bool isDynamic)
     {
@@ -130,133 +127,12 @@ public sealed class GravitasPhysics2DService
         _colliders.FastClear();
         _collidersById.Clear();
         _processedPairKeys.Clear();
-        _queryCandidates.FastClear();
         _pairs.Clear();
         _pairsToRemove.FastClear();
         _cachedPairs.Clear();
         _nextColliderId = 1;
         BodyCount = 0;
         LastBroadPhaseCandidateCount = 0;
-        LastQueryCandidateCount = 0;
-    }
-
-    /// <summary>
-    /// Writes all active pure 2D colliders overlapping the query circle into <paramref name="results"/>.
-    /// </summary>
-    /// <returns>The number of hits written to <paramref name="results"/>.</returns>
-    public int OverlapCircleAll(Vector2d center, Fixed64 radius, SwiftList<Physics2DHit> results)
-    {
-        return OverlapCircleAll(center, radius, PhysicsLayerMask.All, results);
-    }
-
-    /// <summary>
-    /// Writes all active pure 2D colliders on included layers that overlap the query circle.
-    /// </summary>
-    /// <returns>The number of hits written to <paramref name="results"/>.</returns>
-    public int OverlapCircleAll(
-        Vector2d center,
-        Fixed64 radius,
-        PhysicsLayerMask layerMask,
-        SwiftList<Physics2DHit> results)
-    {
-        SwiftThrowHelper.ThrowIfNull(results, nameof(results));
-        SwiftThrowHelper.ThrowIfArgument(radius < Fixed64.Zero, nameof(radius), "2D query radius cannot be negative.");
-
-        results.FastClear();
-        _context.Collisions2D.CollectOverlapCircleCandidates(center, radius, layerMask, _queryCandidates);
-        LastQueryCandidateCount = _queryCandidates.Count;
-        for (int i = 0; i < _queryCandidates.Count; i++)
-        {
-            LSCollider2D collider = _queryCandidates[i];
-            if (CollisionDetection2D.TryOverlapCircle(center, radius, collider, out Physics2DHit hit))
-                results.Add(hit);
-        }
-
-        Physics2DHitSorter.SortByDistance(results);
-        return results.Count;
-    }
-
-    /// <summary>
-    /// Finds the closest pure 2D collider hit by the segment from <paramref name="start"/> to <paramref name="end"/>.
-    /// </summary>
-    public bool Raycast(Vector2d start, Vector2d end, out Physics2DHit hit)
-    {
-        return Raycast(start, end, PhysicsLayerMask.All, out hit);
-    }
-
-    /// <summary>
-    /// Finds the closest pure 2D collider on an included layer hit by the segment.
-    /// </summary>
-    public bool Raycast(Vector2d start, Vector2d end, PhysicsLayerMask layerMask, out Physics2DHit hit)
-    {
-        Vector2d segment = end - start;
-        if (segment.SqrMagnitude == Fixed64.Zero)
-        {
-            hit = default;
-            return false;
-        }
-
-        _context.Collisions2D.CollectBoundsCandidates(
-            CreateMin(start, end),
-            CreateMax(start, end),
-            layerMask,
-            _queryCandidates);
-
-        LastQueryCandidateCount = _queryCandidates.Count;
-        bool found = false;
-        Physics2DHit closest = default;
-        for (int i = 0; i < _queryCandidates.Count; i++)
-        {
-            if (!CollisionDetection2D.TryRaycast(start, end, _queryCandidates[i], out Physics2DHit candidate)
-                || (found && !Physics2DHitSorter.ComesBefore(candidate, closest)))
-            {
-                continue;
-            }
-
-            closest = candidate;
-            found = true;
-        }
-
-        hit = closest;
-        return found;
-    }
-
-    /// <summary>
-    /// Writes all pure 2D colliders hit by the segment into <paramref name="results"/>.
-    /// </summary>
-    public int RaycastAll(Vector2d start, Vector2d end, SwiftList<Physics2DHit> results)
-    {
-        return RaycastAll(start, end, PhysicsLayerMask.All, results);
-    }
-
-    /// <summary>
-    /// Writes all pure 2D colliders on included layers hit by the segment into <paramref name="results"/>.
-    /// </summary>
-    public int RaycastAll(Vector2d start, Vector2d end, PhysicsLayerMask layerMask, SwiftList<Physics2DHit> results)
-    {
-        SwiftThrowHelper.ThrowIfNull(results, nameof(results));
-
-        results.FastClear();
-        Vector2d segment = end - start;
-        if (segment.SqrMagnitude == Fixed64.Zero)
-        {
-            LastQueryCandidateCount = 0;
-            return 0;
-        }
-
-        _context.Collisions2D.CollectBoundsCandidates(
-            CreateMin(start, end),
-            CreateMax(start, end),
-            layerMask,
-            _queryCandidates);
-
-        LastQueryCandidateCount = _queryCandidates.Count;
-        for (int i = 0; i < _queryCandidates.Count; i++)
-            if (CollisionDetection2D.TryRaycast(start, end, _queryCandidates[i], out Physics2DHit hit))
-                results.Add(hit);
-
-        Physics2DHitSorter.SortByDistance(results);
-        return results.Count;
     }
 
     internal bool TryGetColliderById(int colliderId, out LSCollider2D? collider)
@@ -484,16 +360,7 @@ public sealed class GravitasPhysics2DService
         int expectedPairKeyCapacity = colliderCount * 4;
         _processedPairKeys.EnsureCapacity(expectedPairKeyCapacity);
         _pairsToRemove.EnsureCapacity(colliderCount);
-        _queryCandidates.EnsureCapacity(colliderCount);
     }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Vector2d CreateMin(Vector2d first, Vector2d second) =>
-        new(FixedMath.Min(first.x, second.x), FixedMath.Min(first.y, second.y));
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Vector2d CreateMax(Vector2d first, Vector2d second) =>
-        new(FixedMath.Max(first.x, second.x), FixedMath.Max(first.y, second.y));
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool HasAwakeMovableParticipant(LSCollider2D first, LSCollider2D second) =>

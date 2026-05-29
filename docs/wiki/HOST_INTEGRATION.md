@@ -271,32 +271,32 @@ in the same process. Frame-derived values such as `DeltaTime`, `FrameCount`, and
 
 ## Queries
 
-Raycasts and circle-overlap queries are context services:
+2D and 3D queries are context services:
 
 ```csharp
-using Gravitas.Raycasting;
+using Gravitas.Queries;
 using Gravitas.Support;
 using SwiftCollections;
 
 PhysicsLayerMask layerMask = PhysicsLayerMask.FromLayer(0);
-SwiftList<LSRaycastHit> circleHits = new();
+SwiftList<Physics3DHit> circleHits = new();
 
-bool hit = context.Raycasts.Raycast(
+bool hit = context.Query3D.Raycast(
     origin,
     direction,
     maxDistance,
-    out LSRaycastHit rayHit,
+    out Physics3DHit rayHit,
     layerMask);
 
-int circleHitCount = context.CircleQueries.OverlapCircleAll(origin, radius, layerMask, circleHits);
+int circleHitCount = context.Query3D.OverlapCircleAll(origin, radius, layerMask, circleHits);
 for (int i = 0; i < circleHitCount; i++)
 {
-    LSRaycastHit circleHit = circleHits[i];
+    Physics3DHit circleHit = circleHits[i];
     // Consume circle-overlap hits.
 }
 
-SwiftList<LSRaycastHit> sweepHits = new();
-int sweepHitCount = context.Raycasts.SweepSphereAll(
+SwiftList<Physics3DHit> sweepHits = new();
+int sweepHitCount = context.Query3D.SweepSphereAll(
     origin,
     origin + direction * maxDistance,
     radius,
@@ -305,15 +305,15 @@ int sweepHitCount = context.Raycasts.SweepSphereAll(
     excludedCollider: null);
 
 SwiftList<Physics2DHit> planarHits = new();
-int planarHitCount = context.Physics2D.RaycastAll(
+int planarHitCount = context.Query2D.RaycastAll(
     start2D,
     end2D,
     layerMask,
     planarHits);
 ```
 
-All-hit query APIs use caller-owned buffers. The 3D query services write
-`LSRaycastHit` values, while pure 2D queries write `Physics2DHit` values. They
+All-hit query APIs use caller-owned buffers. The 3D query service writes
+`Physics3DHit` values, while pure 2D queries write `Physics2DHit` values. They
 clear the supplied list, write sorted hits into it, and return the count so hot
 query loops do not allocate enumerators or temporary hit lists.
 

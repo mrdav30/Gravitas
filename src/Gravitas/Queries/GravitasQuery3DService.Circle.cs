@@ -4,61 +4,27 @@ using Gravitas.Support;
 using GridForge.Grids;
 using SwiftCollections;
 
-namespace Gravitas.Raycasting;
+namespace Gravitas.Queries;
 
 /// <summary>
-/// Owns X/Z circle overlap query buffers and duplicate suppression for one <see cref="GravitasWorldContext"/>.
+/// Owns 3D X/Z circle overlap query behavior for one <see cref="GravitasWorldContext"/>.
 /// </summary>
-public sealed class GravitasCircleQueryService
+public sealed partial class GravitasQuery3DService
 {
-    private readonly GravitasWorldContext _context;
-    private readonly SwiftHashSet<int> _redundantColliderCheck = new();
-
-    private PhysicsLayerMask _currentLayerMask;
-
-    /// <summary>
-    /// Initializes a new circle query service for the supplied context.
-    /// </summary>
-    /// <param name="context">The owning world context.</param>
-    public GravitasCircleQueryService(GravitasWorldContext context)
-    {
-        SwiftThrowHelper.ThrowIfNull(context, nameof(context));
-        _context = context;
-    }
-
-    /// <summary>
-    /// Gets the owning world context.
-    /// </summary>
-    public GravitasWorldContext Context => _context;
-
-    /// <summary>
-    /// Gets the context-local circle query version.
-    /// </summary>
-    public uint Version { get; private set; }
-
-    /// <summary>
-    /// Resets context-local circle query duplicate state.
-    /// </summary>
-    public void Reset()
-    {
-        Version = 0;
-        _redundantColliderCheck.Clear();
-    }
-
     /// <summary>
     /// Finds the closest collider whose surface is inside the supplied X/Z circle radius.
     /// </summary>
     public bool OverlapCircle(
         Vector3d position,
         Fixed64 radius,
-        out LSRaycastHit raycastHit,
+        out Physics3DHit raycastHit,
         PhysicsLayerMask layerMask)
     {
         _currentLayerMask = layerMask;
-        Version++;
+        CircleVersion++;
         _redundantColliderCheck.Clear();
 
-        LSRaycastHit closestHit = default;
+        Physics3DHit closestHit = default;
         Fixed64 closestDist = Fixed64.MAX_VALUE;
         bool found = false;
 
@@ -85,17 +51,17 @@ public sealed class GravitasCircleQueryService
         Vector3d position,
         Fixed64 radius,
         Vector3d direction,
-        out LSRaycastHit raycastHit,
+        out Physics3DHit raycastHit,
         Fixed64 maxDistance,
         PhysicsLayerMask layerMask)
     {
         _currentLayerMask = layerMask;
-        Version++;
+        CircleVersion++;
         _redundantColliderCheck.Clear();
 
         Vector3d normalizedDirection = direction.SqrMagnitude == Fixed64.Zero ? Vector3d.Zero : direction.Normal;
         Fixed64 maxDistanceSqr = maxDistance * maxDistance;
-        LSRaycastHit closestHit = default;
+        Physics3DHit closestHit = default;
         Fixed64 closestDist = Fixed64.MAX_VALUE;
         bool found = false;
 
@@ -129,20 +95,20 @@ public sealed class GravitasCircleQueryService
         Vector3d position,
         Fixed64 radius,
         PhysicsLayerMask layerMask,
-        SwiftList<LSRaycastHit> results)
+        SwiftList<Physics3DHit> results)
     {
         SwiftThrowHelper.ThrowIfNull(results, nameof(results));
 
         _currentLayerMask = layerMask;
-        Version++;
+        CircleVersion++;
 
         results.FastClear();
         _redundantColliderCheck.Clear();
 
         TraceCircleForAllHits(position, radius, results);
 
-        RaycastHitSorter.SortByDistance(results);
-        LSRaycastHit firstHit = results.Count > 0 ? results[0] : default;
+        Physics3DHitSorter.SortByDistance(results);
+        Physics3DHit firstHit = results.Count > 0 ? results[0] : default;
         _context.Diagnostics.EmitCircleQuery(
             position,
             radius,
@@ -160,7 +126,7 @@ public sealed class GravitasCircleQueryService
         Vector3d position,
         Fixed64 radius,
         ref bool found,
-        ref LSRaycastHit closestHit,
+        ref Physics3DHit closestHit,
         ref Fixed64 closestDist)
     {
         Fixed64 xMin = position.x - radius;
@@ -191,7 +157,7 @@ public sealed class GravitasCircleQueryService
         Vector3d direction,
         Fixed64 maxDistanceSqr,
         ref bool found,
-        ref LSRaycastHit closestHit,
+        ref Physics3DHit closestHit,
         ref Fixed64 closestDist)
     {
         Fixed64 xMin = position.x - radius;
@@ -224,7 +190,7 @@ public sealed class GravitasCircleQueryService
         }
     }
 
-    private void TraceCircleForAllHits(Vector3d position, Fixed64 radius, SwiftList<LSRaycastHit> results)
+    private void TraceCircleForAllHits(Vector3d position, Fixed64 radius, SwiftList<Physics3DHit> results)
     {
         Fixed64 xMin = position.x - radius;
         Fixed64 xMax = position.x + radius;
@@ -253,7 +219,7 @@ public sealed class GravitasCircleQueryService
         Vector3d position,
         Fixed64 radius,
         ref bool found,
-        ref LSRaycastHit closestHit,
+        ref Physics3DHit closestHit,
         ref Fixed64 closestDist)
     {
         ProcessColliderListForClosestHit(
@@ -278,7 +244,7 @@ public sealed class GravitasCircleQueryService
         Vector3d position,
         Fixed64 radius,
         ref bool found,
-        ref LSRaycastHit closestHit,
+        ref Physics3DHit closestHit,
         ref Fixed64 closestDist)
     {
         if (colliderIds == null)
@@ -286,7 +252,7 @@ public sealed class GravitasCircleQueryService
 
         for (int i = colliderIds.Count - 1; i >= 0; i--)
         {
-            if (!TryBuildOverlapHit(colliderIds.DenseKeys[i], position, radius, out LSRaycastHit hitInfo)
+            if (!TryBuildOverlapHit(colliderIds.DenseKeys[i], position, radius, out Physics3DHit hitInfo)
                 || hitInfo.Distance >= closestDist)
             {
                 continue;
@@ -305,7 +271,7 @@ public sealed class GravitasCircleQueryService
         Vector3d direction,
         Fixed64 maxDistanceSqr,
         ref bool found,
-        ref LSRaycastHit closestHit,
+        ref Physics3DHit closestHit,
         ref Fixed64 closestDist)
     {
         ProcessColliderListForDirectionalHit(partition.ContainedDynamicObjects, position, radius, direction, maxDistanceSqr, ref found, ref closestHit, ref closestDist);
@@ -319,7 +285,7 @@ public sealed class GravitasCircleQueryService
         Vector3d direction,
         Fixed64 maxDistanceSqr,
         ref bool found,
-        ref LSRaycastHit closestHit,
+        ref Physics3DHit closestHit,
         ref Fixed64 closestDist)
     {
         if (colliderIds == null || direction.SqrMagnitude == Fixed64.Zero)
@@ -327,7 +293,7 @@ public sealed class GravitasCircleQueryService
 
         for (int i = colliderIds.Count - 1; i >= 0; i--)
         {
-            if (!TryBuildOverlapHit(colliderIds.DenseKeys[i], position, radius, out LSRaycastHit hitInfo))
+            if (!TryBuildOverlapHit(colliderIds.DenseKeys[i], position, radius, out Physics3DHit hitInfo))
                 continue;
 
             Vector3d toHit = hitInfo.Point - position;
@@ -348,7 +314,7 @@ public sealed class GravitasCircleQueryService
         PhysicsPartition partition,
         Vector3d position,
         Fixed64 radius,
-        SwiftList<LSRaycastHit> results)
+        SwiftList<Physics3DHit> results)
     {
         ProcessColliderListForAllHits(partition.ContainedDynamicObjects, position, radius, results);
         ProcessColliderListForAllHits(partition.ContainedStaticObjects, position, radius, results);
@@ -358,19 +324,19 @@ public sealed class GravitasCircleQueryService
         SwiftSparseSet? colliderIds,
         Vector3d position,
         Fixed64 radius,
-        SwiftList<LSRaycastHit> results)
+        SwiftList<Physics3DHit> results)
     {
         if (colliderIds == null)
             return;
 
         for (int i = colliderIds.Count - 1; i >= 0; i--)
         {
-            if (TryBuildOverlapHit(colliderIds.DenseKeys[i], position, radius, out LSRaycastHit hitInfo))
+            if (TryBuildOverlapHit(colliderIds.DenseKeys[i], position, radius, out Physics3DHit hitInfo))
                 results.Add(hitInfo);
         }
     }
 
-    private bool TryBuildOverlapHit(int colliderId, Vector3d position, Fixed64 radius, out LSRaycastHit raycastHit)
+    private bool TryBuildOverlapHit(int colliderId, Vector3d position, Fixed64 radius, out Physics3DHit raycastHit)
     {
         raycastHit = default;
         if (!_context.Physics.TryGetColliderById(colliderId, out LSCollider? current))
@@ -378,13 +344,13 @@ public sealed class GravitasCircleQueryService
 
         LSCollider collider = current!;
         if (!_currentLayerMask.Includes(collider.Layer)
-            || collider.CircleQueryVersion == Version
+            || collider.CircleQueryVersion == CircleVersion
             || !_redundantColliderCheck.Add(collider.Id))
         {
             return false;
         }
 
-        collider.CircleQueryVersion = Version;
+        collider.CircleQueryVersion = CircleVersion;
         Fixed64 broadDistance = collider.ScaledRadius + radius;
         if ((collider.Center - position).SqrMagnitude > broadDistance * broadDistance)
             return false;
@@ -396,7 +362,7 @@ public sealed class GravitasCircleQueryService
             return false;
 
         Vector3d normal = collider.GetNormalAtPoint(point);
-        raycastHit = new LSRaycastHit(collider, point, normal, distance, toPoint);
+        raycastHit = new Physics3DHit(collider, point, normal, distance, toPoint);
         return true;
     }
 

@@ -62,8 +62,8 @@ flowchart TD
     Context --> Physics2D["GravitasPhysics2DService"]
     Context --> Collisions["GravitasCollisionService"]
     Context --> Collisions2D["GravitasCollision2DService"]
-    Context --> Raycasts["GravitasRaycastService"]
-    Context --> CircleQueries["GravitasCircleQueryService"]
+    Context --> Query2D["GravitasQuery2DService"]
+    Context --> Query3D["GravitasQuery3DService"]
     Context --> Coroutines["GravitasCoroutineService"]
     Context --> Diagnostics["GravitasDiagnosticSink"]
     Agent["IMatterAgent"] --> Context
@@ -93,15 +93,15 @@ flowchart TD
 | `LSCollider2D` | Base pure 2D collider state for circle, axis-aligned box, and convex polygon shapes. |
 | `PhysicsRuntimeMode` | Selects whether a context advances the pure 2D or 3D runtime path. Mixed mode is intentionally deferred. |
 | `GravitasPhysicsService` | Body/collider registration, context-local collider IDs, collision-pair pooling, simulation phases, and visualization phases. |
-| `GravitasPhysics2DService` | Pure 2D registration, collider IDs, narrow phase, response, events, visualization publishing, overlap-circle queries, and segment raycasts. |
+| `GravitasPhysics2DService` | Pure 2D registration, collider IDs, narrow phase, response, events, and visualization publishing. |
 | `GravitasCollisionService` | GridForge-backed broad-phase partitioning, active partition tracking, partition pooling, and collision distribution versioning. |
 | `GravitasCollision2DService` | GridForge-backed pure 2D X/Z broad-phase partitioning, active partition tracking, partition pooling, duplicate suppression, and collision distribution versioning. |
+| `GravitasQuery2DService` | Pure 2D overlap-circle and segment raycast queries, caller-buffered hit output, duplicate suppression, and hit ordering. |
+| `GravitasQuery3DService` | 3D raycast, swept-sphere, and X/Z circle overlap/proximity queries, caller-buffered hit output, duplicate suppression, and hit ordering. |
 | `PhysicsPartition` | Voxel partition payload containing collider IDs, awake dynamic membership, and candidate pair distribution. |
 | `CollisionPair` | Pair identity, culling state, contact state, warm-start cache, narrow-phase dispatch, response dispatch, and contact notification state. |
 | `CollisionDetection` | Shape-pair narrow-phase collision checks and contact generation. |
 | `CollisionResponse` | Prototype position correction and impulse response for colliding bodies. |
-| `GravitasRaycastService` | Context-local raycast and swept-sphere buffers, candidate gathering, duplicate suppression, and hit ordering. |
-| `GravitasCircleQueryService` | Context-local X/Z circle overlap and proximity query buffers and hit ordering. |
 | `GravitasCoroutineService` | Lockstep coroutine execution and context-bound wait instructions. |
 | `GravitasDiagnosticSink` | Disabled-by-default context diagnostics for deterministic events and engine-agnostic debug draw commands. |
 
@@ -187,6 +187,6 @@ active-pair queue during `LateSimulate`.
 | Colliders | [`LSCollider.cs`](../../src/Gravitas/Colliders/LSCollider.cs), [`Primitives`](../../src/Gravitas/Colliders/Primitives), [`Primitives2D`](../../src/Gravitas/Colliders/Primitives2D) |
 | Collision handling | [`CollisionPair.cs`](../../src/Gravitas/CollisionHandling/Pairs/CollisionPair.cs), [`CollisionPair2D.cs`](../../src/Gravitas/CollisionHandling/Pairs/CollisionPair2D.cs), [`CollisionDetection.cs`](../../src/Gravitas/CollisionHandling/Detection/CollisionDetection.cs), [`CollisionDetection2D.cs`](../../src/Gravitas/CollisionHandling/Detection/CollisionDetection2D.cs), [`CollisionResponse.cs`](../../src/Gravitas/CollisionHandling/Response/CollisionResponse.cs), [`CollisionResponse2D.cs`](../../src/Gravitas/CollisionHandling/Response/CollisionResponse2D.cs) |
 | 2D/3D direction | [`DIMENSIONS.md`](DIMENSIONS.md) |
-| Queries | [`GravitasRaycastService.cs`](../../src/Gravitas/Raycasting/GravitasRaycastService.cs), [`GravitasCircleQueryService.cs`](../../src/Gravitas/Raycasting/GravitasCircleQueryService.cs), [`Physics2DHit.cs`](../../src/Gravitas/Raycasting/Physics2DHit.cs), [`RaycastSegmentWorker.cs`](../../src/Gravitas/Raycasting/RaycastSegmentWorker.cs) |
+| Queries | [`GravitasQuery2DService.cs`](../../src/Gravitas/Queries/GravitasQuery2DService.cs), [`GravitasQuery3DService.Raycast.cs`](../../src/Gravitas/Queries/GravitasQuery3DService.Raycast.cs), [`GravitasQuery3DService.Circle.cs`](../../src/Gravitas/Queries/GravitasQuery3DService.Circle.cs), [`QueryDetection2D.cs`](../../src/Gravitas/Queries/QueryDetection2D.cs) |
 | Diagnostics | [`Diagnostics`](../../src/Gravitas/Diagnostics) |
 | Tests and examples | [`tests/Gravitas.Tests`](../../tests/Gravitas.Tests), [`tests/Gravitas.Benchmarks`](../../tests/Gravitas.Benchmarks) |

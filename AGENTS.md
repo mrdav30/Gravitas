@@ -84,7 +84,7 @@ workflow changes:
 | [`src/Gravitas/Runtime`](src/Gravitas/Runtime) | Explicit world context, deterministic clock, and lifecycle hooks | Start here for host integration changes. |
 | [`src/Gravitas/Colliders`](src/Gravitas/Colliders) | Collider base type, primitive colliders, physics mesh helpers | Shape logic is currently 3D-focused. |
 | [`src/Gravitas/CollisionHandling`](src/Gravitas/CollisionHandling) | Collision detection, response, pairs, contact data | Determinism and ordering are high risk here. |
-| [`src/Gravitas/Raycasting`](src/Gravitas/Raycasting) | Raycast and circlecast support | Keep result ordering stable. |
+| [`src/Gravitas/Queries`](src/Gravitas/Queries) | 2D/3D raycast, swept-sphere, and overlap query support | Keep result ordering stable. |
 | [`src/Gravitas/Diagnostics`](src/Gravitas/Diagnostics) | Context-owned diagnostic events and engine-agnostic debug draw commands | Keep disabled paths allocation-free and renderer-neutral. |
 | [`src/Gravitas/Partitions`](src/Gravitas/Partitions) | GridForge-backed physics partitions | Tied to voxel ownership and pooling. |
 | [`src/Gravitas/Settings`](src/Gravitas/Settings) | Physics settings and save helpers | Includes frame rate and layer collision matrix behavior. |
@@ -115,20 +115,20 @@ The current runtime uses explicit world-context ownership:
   and physics lifecycle phases.
 - `GravitasPhysics2DService` owns pure 2D body and collider registration,
   collider IDs, 2D pair pooling, response/event processing, visualization
-  transform publishing, and caller-buffered overlap-circle/raycast query APIs
-  for one context.
+  transform publishing for one context.
 - `GravitasCollisionService` maps colliders into GridForge voxels through
   `GridWorld` spatial hash and active-grid access, `WorldVoxelIndex`, and
   `PhysicsPartition`, using `SwiftCollections` pools and duplicate-check sets.
 - `GravitasCollision2DService` maps pure 2D X/Z bounds into GridForge voxels
   through `PhysicsPartition2D`, using the internal Y=0 storage plane as
   deterministic broad-phase identity rather than physical thickness.
-- `GravitasRaycastService` and `GravitasCircleQueryService` own query workers,
-  intersection state, candidate gathering, filtering, and result ordering for
-  one context. Raycasts are 3D segment queries; circle queries are X/Z overlap
-  and proximity queries, not swept casts. Pure 2D raycasts live on
-  `GravitasPhysics2DService`. All-hit paths should write into caller-owned hit
-  buffers.
+- `GravitasQuery3DService` owns 3D raycast, swept-sphere, and X/Z
+  overlap/proximity query workers, intersection state, candidate gathering,
+  filtering, and result ordering for one context. X/Z circle queries are not
+  swept casts.
+- `GravitasQuery2DService` owns pure 2D overlap-circle and segment raycast
+  query buffers and hit ordering for one context.
+- All-hit query paths should write into caller-owned hit buffers.
 - `GravitasCoroutineService` owns lockstep coroutine state and context-bound
   wait instructions for one context.
 - `GravitasDiagnosticSink` owns disabled-by-default diagnostic event and debug

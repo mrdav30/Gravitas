@@ -1,11 +1,11 @@
 using SwiftCollections;
 using System.Runtime.CompilerServices;
 
-namespace Gravitas.Raycasting;
+namespace Gravitas.Queries;
 
-internal static class RaycastHitSorter
+internal static class Physics3DHitSorter
 {
-    internal static void SortByDistance(SwiftList<LSRaycastHit> hits)
+    internal static void SortByDistance(SwiftList<Physics3DHit> hits)
     {
         int count = hits.Count;
         if (count < 2)
@@ -21,7 +21,7 @@ internal static class RaycastHitSorter
         }
     }
 
-    private static void SiftDown(SwiftList<LSRaycastHit> hits, int root, int count)
+    private static void SiftDown(SwiftList<Physics3DHit> hits, int root, int count)
     {
         while (true)
         {
@@ -46,7 +46,7 @@ internal static class RaycastHitSorter
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool ComesBefore(LSRaycastHit left, LSRaycastHit right)
+    private static bool ComesBefore(Physics3DHit left, Physics3DHit right)
     {
         int distanceCompare = left.Distance.CompareTo(right.Distance);
         if (distanceCompare != 0)
@@ -56,9 +56,9 @@ internal static class RaycastHitSorter
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void Swap(SwiftList<LSRaycastHit> hits, int left, int right)
+    private static void Swap(SwiftList<Physics3DHit> hits, int left, int right)
     {
-        LSRaycastHit temp = hits[left];
+        Physics3DHit temp = hits[left];
         hits[left] = hits[right];
         hits[right] = temp;
     }

@@ -1,7 +1,7 @@
 ﻿using Chronicler;
 using FixedMathSharp;
 using Gravitas.CollisionHandling;
-using Gravitas.Raycasting;
+using Gravitas.Queries;
 using Gravitas.Support;
 using GridForge.Grids;
 using GridForge.Spatial;

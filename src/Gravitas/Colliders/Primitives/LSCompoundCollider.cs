@@ -1,5 +1,5 @@
 ﻿using FixedMathSharp;
-using Gravitas.Raycasting;
+using Gravitas.Queries;
 using SwiftCollections;
 using System;
 using System.Runtime.CompilerServices;

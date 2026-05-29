@@ -77,9 +77,9 @@ Gravitas is now centered around explicit world-context ownership:
 2. Host objects expose deterministic transform and world context access through `IMatterAgent`.
 3. `GravitasWorldContext` owns fixed-step clock state, settings, physical environment values, lifecycle hooks, and context-local services.
 4. `GravitasPhysicsService` owns 3D body/collider registration, collider ID lookup, collision-pair pooling, and physics lifecycle work for one context.
-5. `GravitasPhysics2DService` owns pure 2D registration, pair state, response, visualization publishing, overlap-circle queries, and segment raycasts for one context.
+5. `GravitasPhysics2DService` owns pure 2D registration, pair state, response, and visualization publishing for one context.
 6. `GravitasCollisionService` and `GravitasCollision2DService` map colliders into GridForge voxels and activate partition payloads for collision checks.
-7. `GravitasRaycastService`, `GravitasCircleQueryService`, and `GravitasCoroutineService` own query and coroutine state per context.
+7. `GravitasQuery2DService`, `GravitasQuery3DService`, and `GravitasCoroutineService` own query and coroutine state per context.
 8. `StiffBody` and `StiffBody2D` own simulated body state and Chronicler state recording for their runtime path.
 9. `LSCollider` and `LSCollider2D` primitive collider types own shape data, bounds, layers, trigger/contact events, and GridForge partition coordinates.
 
@@ -93,7 +93,7 @@ Typical integration creates or attaches a context, initializes bodies and collid
 | Colliders | Collider base class, primitive shapes, mesh support, bounds, and layer behavior | [`src/Gravitas/Colliders`](src/Gravitas/Colliders) |
 | Collision handling | Shape-pair checks, contact data, collision pairs, and response logic | [`src/Gravitas/CollisionHandling`](src/Gravitas/CollisionHandling) |
 | Partitions | GridForge-backed physics partitions used by collision distribution | [`src/Gravitas/Partitions`](src/Gravitas/Partitions) |
-| Raycasting | Raycast and circlecast query support | [`src/Gravitas/Raycasting`](src/Gravitas/Raycasting) |
+| Queries | 2D/3D raycast, swept-sphere, and overlap query support | [`src/Gravitas/Queries`](src/Gravitas/Queries) |
 | Settings | Frame rate, collision matrix, pooling switch, CCD defaults, and settings save helpers | [`src/Gravitas/Settings`](src/Gravitas/Settings) |
 | Support | Fixed transforms, layers, lifecycle hooks, coroutines, and transient state helpers | [`src/Gravitas/Support`](src/Gravitas/Support) |
 

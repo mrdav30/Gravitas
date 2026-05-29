@@ -1,7 +1,7 @@
 using FixedMathSharp;
 using Gravitas.Colliders;
 
-namespace Gravitas;
+namespace Gravitas.Queries;
 
 /// <summary>
 /// Result from a pure 2D query.

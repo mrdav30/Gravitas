@@ -19,13 +19,13 @@ public sealed class ContinuousCollisionDetectionTests
         CreateStaticWall(scenario, Fixed64.Zero);
         (StiffBody body, _) = CreateMover(scenario, TestColliderShape.Sphere);
         DisableGroundQueries(body);
-        uint raycastVersionBeforeImpulse = scenario.Context.Raycasts.Version;
+        uint raycastVersionBeforeImpulse = scenario.Context.Query3D.RaycastVersion;
 
         ApplyFastImpulse(body);
 
         body.Position3d.x.Should().Be((Fixed64)2);
         body.LinearVelocity.x.Should().Be((Fixed64)4);
-        scenario.Context.Raycasts.Version.Should().Be(raycastVersionBeforeImpulse);
+        scenario.Context.Query3D.RaycastVersion.Should().Be(raycastVersionBeforeImpulse);
     }
 
     [Fact]

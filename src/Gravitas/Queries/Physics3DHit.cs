@@ -1,9 +1,9 @@
 ﻿using FixedMathSharp;
 using Gravitas.Colliders;
 
-namespace Gravitas.Raycasting;
+namespace Gravitas.Queries;
 
-public readonly struct LSRaycastHit
+public readonly struct Physics3DHit
 {
     public readonly LSCollider? Collider;
 
@@ -17,7 +17,7 @@ public readonly struct LSRaycastHit
 
     public readonly Vector3d Direction;
 
-    public LSRaycastHit(LSCollider? collider, Vector3d point, Vector3d normal, Fixed64 distance, Vector3d direction)
+    public Physics3DHit(LSCollider? collider, Vector3d point, Vector3d normal, Fixed64 distance, Vector3d direction)
     {
         Collider = collider;
         Body = collider?.Body;
