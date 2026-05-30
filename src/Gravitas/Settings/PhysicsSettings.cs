@@ -14,6 +14,8 @@ public sealed class PhysicsSettings
 
     public const int DefaultRetainedPartitionRetirementSweepBudget = 64;
 
+    public static readonly Fixed64 DefaultMixed2DHalfThickness = Fixed64.Half;
+
     /// <summary>
     /// Legacy prototype example ground-check include mask. Hosts should configure
     /// this explicitly for their own layer model.
@@ -41,6 +43,7 @@ public sealed class PhysicsSettings
     private int _retainedPartitionTimeToKillFrames = DefaultRetainedPartitionTimeToKillFrames;
     private int _retainedPartitionRetirementSweepBudget = DefaultRetainedPartitionRetirementSweepBudget;
     private PhysicsRuntimeMode _runtimeMode = PhysicsRuntimeMode.ThreeD;
+    private Fixed64 _mixed2DHalfThickness = DefaultMixed2DHalfThickness;
 
     /// <summary>
     /// Gets or sets how many simulation frames an empty voxel partition should stay attached for fast reuse.
@@ -76,6 +79,22 @@ public sealed class PhysicsSettings
     public ContinuousCollisionMode DefaultContinuousCollisionMode { get; set; } = ContinuousCollisionMode.Discrete;
 
     /// <summary>
+    /// Gets or sets the default half-thickness used when pure 2D colliders are embedded into mixed 2D/3D contacts.
+    /// </summary>
+    public Fixed64 Mixed2DHalfThickness
+    {
+        get => _mixed2DHalfThickness;
+        set
+        {
+            SwiftThrowHelper.ThrowIfArgument(
+                value <= Fixed64.Zero,
+                nameof(value),
+                "Mixed 2D half-thickness must be greater than zero.");
+            _mixed2DHalfThickness = value;
+        }
+    }
+
+    /// <summary>
     /// Gets or sets which dimensional physics service this context should advance.
     /// </summary>
     public PhysicsRuntimeMode RuntimeMode
@@ -84,9 +103,9 @@ public sealed class PhysicsSettings
         set
         {
             SwiftThrowHelper.ThrowIfArgument(
-                value != PhysicsRuntimeMode.TwoD && value != PhysicsRuntimeMode.ThreeD,
+                !value.IsValid(),
                 nameof(value),
-                "Physics runtime mode must be either TwoD or ThreeD.");
+                "Physics runtime mode must be TwoD, ThreeD, Both, or Mixed.");
             _runtimeMode = value;
         }
     }

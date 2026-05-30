@@ -24,6 +24,7 @@ pairs, queries, and coroutines remain context-local.
 | --- | --- |
 | `GravitasPhysicsService` | Dynamic body bucket, collider ID table, reusable collider IDs, collision-pair pool, active collision-pair queue, simulation switch. |
 | `GravitasPhysics2DService` | Pure 2D dynamic body bucket, monotonic collider ID table, 2D pair pool, pair-reference cleanup, layer/hierarchy-filtered narrow-phase/response processing, visualization publishing, simulation switch. |
+| `GravitasMixedCollisionService` | Phase 10 mixed 2D/3D lifecycle owner. The Phase 10A scaffold tracks the dedicated mixed path; later Phase 10 work adds broad phase, contacts, response, diagnostics, and benchmarks. |
 | `GravitasCollisionService` | Active partition bucket, inactive partition pool, duplicate voxel checker, partition awake-state refresh, collision distribution version, cull distributor. |
 | `GravitasCollision2DService` | GridForge-backed pure 2D partition bucket, inactive partition pool, duplicate voxel checker, awake dynamic membership refresh, 2D collision distribution version, retained partition cleanup. |
 | `GravitasQuery2DService` | Pure 2D query candidate buffer, overlap-circle queries, segment raycasts, swept-circle queries, collider-stamped duplicate suppression, hit ordering. |
@@ -42,45 +43,53 @@ Current context methods run in this order:
 ```text
 Simulate
   Clock.Simulate
-  If RuntimeMode == ThreeD:
+  If RuntimeMode includes ThreeD:
     Physics.Simulate
     PrepareCollisionPartitions for dynamic-body colliders
     Collisions.CheckAndDistributeCollisions
-  If RuntimeMode == TwoD:
+  If RuntimeMode includes TwoD:
     Physics2D.Simulate
     Collisions2D.CheckAndDistributeCollisions
     Process overlapping 2D partition candidate pairs
+  If RuntimeMode == Mixed:
+    MixedCollisions.Simulate
   Coroutines.Simulate
   Hooks.InvokeSimulate
 
 LateSimulate
   Clock.LateSimulate
-  If RuntimeMode == ThreeD:
+  If RuntimeMode includes ThreeD:
     Physics.LateSimulate
     ProcessActiveCollisionPairs
     StiffBody.LateSimulate for dynamic bodies
-  If RuntimeMode == TwoD:
+  If RuntimeMode includes TwoD:
     Physics2D.LateSimulate
     StiffBody2D.LateSimulate for dynamic 2D bodies
+  If RuntimeMode == Mixed:
+    MixedCollisions.LateSimulate
   Hooks.InvokeLateSimulate
 
 Visualize
   Clock.Visualize
-  If RuntimeMode == ThreeD:
+  If RuntimeMode includes ThreeD:
     Physics.Visualize
     StiffBody.OnVisualize for dynamic bodies
-  If RuntimeMode == TwoD:
+  If RuntimeMode includes TwoD:
     Physics2D.Visualize
     StiffBody2D.OnVisualize for dynamic 2D bodies
+  If RuntimeMode == Mixed:
+    MixedCollisions.Visualize
   Hooks.InvokeVisualize
 
 LateVisualize
-  If RuntimeMode == ThreeD:
+  If RuntimeMode includes ThreeD:
     Physics.LateVisualize
     StiffBody.LateVisualize for dynamic bodies
-  If RuntimeMode == TwoD:
+  If RuntimeMode includes TwoD:
     Physics2D.LateVisualize
     StiffBody2D.LateVisualize for dynamic 2D bodies
+  If RuntimeMode == Mixed:
+    MixedCollisions.LateVisualize
   Hooks.InvokeLateVisualize
 ```
 
@@ -104,12 +113,11 @@ ordered command sequence, and frame count should produce the same authoritative
 body, collider, clock, and contact state across repeated runs. The current
 contract is pinned by `GravitasSimulationPhaseOrderTests`.
 
-`PhysicsSettings.RuntimeMode` currently selects exactly one authoritative
-dimensional runtime path for the context: `ThreeD` runs the 3D service and
-skips the 2D service, while `TwoD` runs the pure 2D service and skips the 3D
-service. Phase 10 will convert this to a validated bitmask: `Both` runs pure
-2D and pure 3D side by side without cross-dimensional contacts, while `Mixed`
-adds the embedding, mixed broad phase, and constrained impulse-exchange policy.
+`PhysicsSettings.RuntimeMode` is a validated bitmask with exact public settings
+values: `ThreeD`, `TwoD`, `Both`, and `Mixed`. `Both` runs pure 2D and pure 3D
+side by side without cross-dimensional contacts. `Mixed` runs both pure paths
+plus the dedicated mixed lifecycle path; later Phase 10 work fills in mixed
+embedding, broad phase, contacts, and constrained impulse exchange.
 
 `Reset` clears the clock and all context-local service state, then invokes reset
 hooks. `SetFrameRate` and `ApplySettings` update the clock's frame rate and

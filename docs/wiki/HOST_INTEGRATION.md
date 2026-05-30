@@ -215,16 +215,17 @@ and call the visualization phases from the render/update loop.
 
 Current service order matters:
 
-- `context.Simulate()` advances the clock, runs only the enabled dimensional
-  collision path, advances lockstep coroutines, then invokes simulate hooks.
+- `context.Simulate()` advances the clock, runs each enabled dimensional
+  collision path, runs the mixed lifecycle path only in `Mixed`, advances
+  lockstep coroutines, then invokes simulate hooks.
 - `context.LateSimulate()` marks visualization accumulation for reset, runs
-  only the enabled dimensional body integration path, then invokes
-  late-simulate hooks.
-- `context.Visualize()` advances interpolation accumulation, updates 3D body
-  visual transforms only when `RuntimeMode` is `ThreeD`, then invokes visualize
-  hooks.
-- `context.LateVisualize()` runs 3D body late-visualize hooks only when
-  `RuntimeMode` is `ThreeD`, then invokes context hooks.
+  each enabled dimensional body integration path, runs the mixed lifecycle path
+  only in `Mixed`, then invokes late-simulate hooks.
+- `context.Visualize()` advances interpolation accumulation, updates enabled
+  2D and/or 3D body visual transforms, runs the mixed lifecycle path only in
+  `Mixed`, then invokes visualize hooks.
+- `context.LateVisualize()` runs enabled 2D and/or 3D late-visualize paths,
+  runs the mixed lifecycle path only in `Mixed`, then invokes context hooks.
 
 Do not assume an engine-style integrate-then-collide order. The current
 prototype checks/distributes collisions during `Simulate` and advances bodies in

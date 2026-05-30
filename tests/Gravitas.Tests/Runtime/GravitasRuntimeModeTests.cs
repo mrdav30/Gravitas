@@ -10,6 +10,38 @@ namespace Gravitas.Tests.Runtime;
 
 public sealed class GravitasRuntimeModeTests
 {
+    [Theory]
+    [InlineData(PhysicsRuntimeMode.TwoD)]
+    [InlineData(PhysicsRuntimeMode.ThreeD)]
+    [InlineData(PhysicsRuntimeMode.Both)]
+    [InlineData(PhysicsRuntimeMode.Mixed)]
+    public void RuntimeMode_WithValidBitmaskMode_ShouldAcceptValue(PhysicsRuntimeMode mode)
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+
+        context.Settings.RuntimeMode = mode;
+
+        context.Settings.RuntimeMode.Should().Be(mode);
+    }
+
+    [Theory]
+    [InlineData(PhysicsRuntimeMode.None)]
+    [InlineData((PhysicsRuntimeMode)4)]
+    [InlineData((PhysicsRuntimeMode)5)]
+    [InlineData((PhysicsRuntimeMode)6)]
+    [InlineData((PhysicsRuntimeMode)byte.MaxValue)]
+    public void RuntimeMode_WithInvalidBitmaskMode_ShouldThrow(PhysicsRuntimeMode mode)
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+
+        Action setMode = () => context.Settings.RuntimeMode = mode;
+
+        setMode.Should()
+            .Throw<ArgumentException>()
+            .WithParameterName("value")
+            .WithMessage("*Physics runtime mode*");
+    }
+
     [Fact]
     public void LateSimulate_WithTwoDMode_ShouldSkipThreeDBodiesAndRunTwoDBodies()
     {
@@ -27,6 +59,58 @@ public sealed class GravitasRuntimeModeTests
         scenario.Context.FrameCount.Should().Be(1);
         body3D.Body.Position3d.Should().Be(Vector3d.Zero);
         body2D.Position.Should().Be(new Vector2d(Fixed64.Half, Fixed64.Zero));
+    }
+
+    [Fact]
+    public void LateSimulate_WithBothMode_ShouldRunTwoDAndThreeDBodies()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        scenario.Context.SetFrameRate(4);
+        scenario.Context.Settings.RuntimeMode = PhysicsRuntimeMode.Both;
+        ScenarioBody<LSSphereCollider> body3D = scenario.CreateSphere(Vector3d.Zero, mass: (Fixed64)2);
+        StiffBody2D body2D = Create2DBody(scenario.Context, Vector3d.Zero);
+
+        body3D.Body.AddForce(new Vector3d((Fixed64)8, Fixed64.Zero, Fixed64.Zero));
+        body2D.AddForce(new Vector2d((Fixed64)8, Fixed64.Zero));
+        scenario.Context.Simulate();
+        scenario.Context.LateSimulate();
+
+        scenario.Context.FrameCount.Should().Be(1);
+        body3D.Body.Position3d.x.Should().Be(Fixed64.Fraction(1, 4));
+        body2D.Position.Should().Be(new Vector2d(Fixed64.Half, Fixed64.Zero));
+        scenario.Context.MixedCollisions.SimulateCount.Should().Be(0);
+        scenario.Context.MixedCollisions.LateSimulateCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void RuntimePhases_WithMixedMode_ShouldRunTwoDThreeDAndMixedLifecycle()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        scenario.Context.SetFrameRate(4);
+        scenario.Context.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
+        ScenarioBody<LSSphereCollider> body3D = scenario.CreateSphere(Vector3d.Zero, mass: (Fixed64)2);
+        StiffBody2D body2D = Create2DBody(scenario.Context, Vector3d.Zero);
+
+        body3D.Body.AddForce(new Vector3d((Fixed64)8, Fixed64.Zero, Fixed64.Zero));
+        body2D.AddForce(new Vector2d((Fixed64)8, Fixed64.Zero));
+        scenario.Context.Simulate();
+        scenario.Context.LateSimulate();
+        scenario.Context.Visualize();
+        scenario.Context.LateVisualize();
+
+        body3D.Body.Position3d.x.Should().Be(Fixed64.Fraction(1, 4));
+        body2D.Position.Should().Be(new Vector2d(Fixed64.Half, Fixed64.Zero));
+        scenario.Context.MixedCollisions.SimulateCount.Should().Be(1);
+        scenario.Context.MixedCollisions.LateSimulateCount.Should().Be(1);
+        scenario.Context.MixedCollisions.VisualizeCount.Should().Be(1);
+        scenario.Context.MixedCollisions.LateVisualizeCount.Should().Be(1);
+
+        scenario.Context.Reset();
+
+        scenario.Context.MixedCollisions.SimulateCount.Should().Be(0);
+        scenario.Context.MixedCollisions.LateSimulateCount.Should().Be(0);
+        scenario.Context.MixedCollisions.VisualizeCount.Should().Be(0);
+        scenario.Context.MixedCollisions.LateVisualizeCount.Should().Be(0);
     }
 
     [Fact]

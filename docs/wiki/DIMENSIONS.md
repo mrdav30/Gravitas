@@ -18,13 +18,16 @@ those concrete types, not a third dimension value.
   `GravitasPhysics2DService` simulation and visualization.
 - `PhysicsRuntimeMode.TwoD` advances `GravitasPhysics2DService` and skips
   `GravitasPhysicsService` simulation and visualization.
+- `PhysicsRuntimeMode.Both` advances the pure 2D and pure 3D services side by
+  side without cross-dimensional contacts.
+- `PhysicsRuntimeMode.Mixed` advances both pure services plus the dedicated
+  mixed lifecycle path. Phase 10 broad-phase, contact, response, and diagnostic
+  work fills in the real mixed interaction model.
 
 The context clock, coroutines, diagnostics, and lifecycle hooks remain shared.
 This lets pure 2D simulations use the same host loop without paying 3D
-simulation or visualization cost. Phase 10 will convert the mode into a
-validated bitmask and add `Both` and `Mixed`: `Both` runs pure 2D and pure 3D
-side by side without cross-dimensional contacts, while `Mixed` adds the
-embedding, contact manifolds, broad phase, and constrained impulse exchange.
+simulation or visualization cost. Runtime modes are validated exactly; `None`
+and arbitrary bit combinations are rejected as settings values.
 
 ## Pure 2D Coordinate Contract
 
@@ -86,6 +89,21 @@ thickness, or mixed-dimension contact rule.
 `Physics2DBounds` has been removed. Do not add another public bounds/config
 bridge for pure 2D.
 
+## Mixed 2D Embedding State
+
+`LSCollider2D` now carries the minimal deterministic 3D embedding data needed
+by the mixed runtime path:
+
+- `MixedHalfThicknessOverride` optionally overrides the context default.
+- `PhysicsSettings.Mixed2DHalfThickness` supplies the default positive
+  half-thickness.
+- `MixedSlabCenterY` is cached from the host `FixedTransform.Position.y`.
+- `MixedBounds3D` is a deterministic `BoundingBox` built from the pure X/Z
+  2D bounds plus the cached Y slab.
+
+The mixed 3D bounds do not change pure 2D collision truth or pure 2D partition
+storage. They are the future mixed broad-phase/contact volume only.
+
 ## Queries
 
 Pure 2D queries live on `GravitasWorldContext.Query2D`:
@@ -111,15 +129,16 @@ query. It is not the pure 2D query API.
 
 ## Mixed 2D/3D Direction
 
-Phase 10 is planned as the first mixed runtime implementation. The target model
-is explicit rather than Unity-style separate engines:
+Phase 10 is the first mixed runtime implementation. The target model is explicit
+rather than Unity-style separate engines:
 
-- `PhysicsRuntimeMode.Both` will advance both pure 2D and 3D services without
+- `PhysicsRuntimeMode.Both` advances both pure 2D and 3D services without
   cross-dimensional contacts.
-- `PhysicsRuntimeMode.Mixed` will advance both pure 2D and 3D services plus a
-  dedicated mixed collision path.
-- mixed contacts will embed 2D colliders into 3D as finite X/Z prisms centered
-  on the host transform's Y position.
+- `PhysicsRuntimeMode.Mixed` advances both pure 2D and 3D services plus a
+  dedicated mixed collision lifecycle path. The actual mixed broad phase,
+  contacts, and response are filled in by the remaining Phase 10 work.
+- mixed contacts embed 2D colliders into 3D as finite X/Z prisms centered on
+  the host transform's Y position.
 - 2D bodies remain plane-constrained: planar impulse can move them in X/Z,
   vertical impulse treats them as having infinite constrained mass.
 - mixed broad phase must use GridForge-backed spatial identity and separate 2D

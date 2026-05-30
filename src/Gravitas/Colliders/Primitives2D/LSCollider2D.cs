@@ -21,6 +21,11 @@ public abstract class LSCollider2D : IColliderHierarchyNode<LSCollider2D>
     private PhysicsLayer _layer = new();
     private Vector2d _localOffset;
     private BoundingArea _bounds;
+    private BoundingBox _mixedBounds3D;
+    private Fixed64? _mixedHalfThicknessOverride;
+    private Fixed64 _mixedHalfThickness;
+    private Fixed64 _mixedSlabCenterY;
+    private bool _mixedBoundsInitialized;
     private uint _shapeVersion;
     private readonly ColliderRuntimeShapeState<ColliderShapeSnapshot2D> _runtimeShapeState = new();
     private ColliderPartitionState2D _partitionState;
@@ -196,6 +201,37 @@ public abstract class LSCollider2D : IColliderHierarchyNode<LSCollider2D>
     public Vector2d Center => Position + Rotate(LocalOffset, Rotation);
 
     public BoundingArea Bounds => _bounds;
+
+    internal BoundingBox MixedBounds3D => _mixedBounds3D;
+
+    internal Fixed64 MixedHalfThickness => _mixedHalfThickness;
+
+    internal Fixed64 MixedSlabCenterY => _mixedSlabCenterY;
+
+    /// <summary>
+    /// Gets or sets the optional half-thickness used when this 2D collider is embedded into mixed 2D/3D contacts.
+    /// </summary>
+    public Fixed64? MixedHalfThicknessOverride
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => _mixedHalfThicknessOverride;
+        set
+        {
+            if (value.HasValue)
+            {
+                SwiftThrowHelper.ThrowIfArgument(
+                    value.Value <= Fixed64.Zero,
+                    nameof(value),
+                    "2D mixed half-thickness override must be greater than zero.");
+            }
+
+            if (_mixedHalfThicknessOverride == value)
+                return;
+
+            _mixedHalfThicknessOverride = value;
+            MarkShapeDirty();
+        }
+    }
 
     public Fixed64 MinX => _bounds.MinX;
 
@@ -441,12 +477,42 @@ public abstract class LSCollider2D : IColliderHierarchyNode<LSCollider2D>
             return false;
 
         RebuildShape();
+        RebuildMixedEmbedding(snapshot.MixedSlabCenterY, snapshot.MixedHalfThickness);
         _runtimeShapeState.Commit(snapshot);
         return true;
     }
 
     private ColliderShapeSnapshot2D CaptureShapeSnapshot() =>
-        new(Center, Rotation, _localOffset, _shapeVersion);
+        new(
+            Center,
+            Rotation,
+            _localOffset,
+            _shapeVersion,
+            ResolveMixedSlabCenterY(),
+            ResolveMixedHalfThickness());
+
+    private Fixed64 ResolveMixedHalfThickness() =>
+        _mixedHalfThicknessOverride ?? _context?.Settings.Mixed2DHalfThickness ?? PhysicsSettings.DefaultMixed2DHalfThickness;
+
+    private Fixed64 ResolveMixedSlabCenterY() =>
+        _agent?.Transform.Position.y ?? Fixed64.Zero;
+
+    private void RebuildMixedEmbedding(Fixed64 slabCenterY, Fixed64 halfThickness)
+    {
+        _mixedHalfThickness = halfThickness;
+        _mixedSlabCenterY = slabCenterY;
+
+        Vector3d min = new(MinX, slabCenterY - halfThickness, MinY);
+        Vector3d max = new(MaxX, slabCenterY + halfThickness, MaxY);
+        if (!_mixedBoundsInitialized)
+        {
+            _mixedBounds3D = new BoundingBox((min + max) * Fixed64.Half, max - min);
+            _mixedBoundsInitialized = true;
+            return;
+        }
+
+        _mixedBounds3D.SetMinMax(min, max);
+    }
 
     private void ClearChildParentReferences()
     {

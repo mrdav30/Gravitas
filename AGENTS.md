@@ -116,6 +116,9 @@ The current runtime uses explicit world-context ownership:
 - `GravitasPhysics2DService` owns pure 2D body and collider registration,
   collider IDs, 2D pair pooling, response/event processing, visualization
   transform publishing for one context.
+- `GravitasMixedCollisionService` owns the Phase 10 mixed 2D/3D lifecycle path.
+  `PhysicsRuntimeMode.Mixed` reaches it; `PhysicsRuntimeMode.Both` deliberately
+  runs pure 2D and pure 3D side by side without cross-dimensional contacts.
 - `GravitasCollisionService` maps colliders into GridForge voxels through
   `GridWorld` spatial hash and active-grid access, `WorldVoxelIndex`, and
   `PhysicsPartition`, using `SwiftCollections` pools and duplicate-check sets.
@@ -183,7 +186,14 @@ for visualization and host-facing presentation only.
 Gravitas still has deeper 3D coverage, but pure 2D now has a first-class
 runtime path through `StiffBody2D`, `LSCollider2D`,
 `GravitasPhysics2DService`, `GravitasCollision2DService`, and
-`PhysicsPartition2D`.
+`PhysicsPartition2D`. `PhysicsRuntimeMode` is a validated bitmask:
+`TwoD`, `ThreeD`, `Both`, and `Mixed` are valid settings values. `Both` runs
+pure 2D and pure 3D without mixed contacts; `Mixed` enables the dedicated mixed
+lifecycle path. `LSCollider2D` also caches a mixed `BoundingBox` using
+`PhysicsSettings.Mixed2DHalfThickness`, optional per-collider
+`MixedHalfThicknessOverride`, and the host transform's Y position while the
+rest of Phase 10 fills in broad phase, contacts, response, diagnostics, and
+benchmarks.
 
 When adding or redesigning dimension-sensitive behavior:
 

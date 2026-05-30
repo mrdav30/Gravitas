@@ -43,6 +43,7 @@ public sealed class GravitasWorldContext : IDisposable
         Collisions2D = new GravitasCollision2DService(this);
         Physics = new GravitasPhysicsService(this);
         Physics2D = new GravitasPhysics2DService(this);
+        MixedCollisions = new GravitasMixedCollisionService(this);
         Query2D = new GravitasQuery2DService(this);
         Query3D = new GravitasQuery3DService(this);
         Coroutines = new GravitasCoroutineService(this);
@@ -82,6 +83,8 @@ public sealed class GravitasWorldContext : IDisposable
     /// Gets this context's world-local pure 2D physics service.
     /// </summary>
     public GravitasPhysics2DService Physics2D { get; }
+
+    internal GravitasMixedCollisionService MixedCollisions { get; }
 
     /// <summary>
     /// Gets this context's world-local pure 2D query service.
@@ -266,10 +269,13 @@ public sealed class GravitasWorldContext : IDisposable
     {
         ThrowIfDisposed();
         _clock.Simulate();
-        if (Settings.RuntimeMode == PhysicsRuntimeMode.ThreeD)
+        PhysicsRuntimeMode runtimeMode = Settings.RuntimeMode;
+        if (runtimeMode.Runs3D())
             Physics.Simulate();
-        else
+        if (runtimeMode.Runs2D())
             Physics2D.Simulate();
+        if (runtimeMode.RunsMixedContacts())
+            MixedCollisions.Simulate();
 
         Coroutines.Simulate();
         _hooks.InvokeSimulate();
@@ -282,10 +288,13 @@ public sealed class GravitasWorldContext : IDisposable
     {
         ThrowIfDisposed();
         _clock.LateSimulate();
-        if (Settings.RuntimeMode == PhysicsRuntimeMode.ThreeD)
+        PhysicsRuntimeMode runtimeMode = Settings.RuntimeMode;
+        if (runtimeMode.Runs3D())
             Physics.LateSimulate();
-        else
+        if (runtimeMode.Runs2D())
             Physics2D.LateSimulate();
+        if (runtimeMode.RunsMixedContacts())
+            MixedCollisions.LateSimulate();
 
         _hooks.InvokeLateSimulate();
     }
@@ -297,10 +306,13 @@ public sealed class GravitasWorldContext : IDisposable
     {
         ThrowIfDisposed();
         _clock.Visualize();
-        if (Settings.RuntimeMode == PhysicsRuntimeMode.ThreeD)
+        PhysicsRuntimeMode runtimeMode = Settings.RuntimeMode;
+        if (runtimeMode.Runs3D())
             Physics.Visualize();
-        else
+        if (runtimeMode.Runs2D())
             Physics2D.Visualize();
+        if (runtimeMode.RunsMixedContacts())
+            MixedCollisions.Visualize();
 
         _hooks.InvokeVisualize();
     }
@@ -311,10 +323,13 @@ public sealed class GravitasWorldContext : IDisposable
     public void LateVisualize()
     {
         ThrowIfDisposed();
-        if (Settings.RuntimeMode == PhysicsRuntimeMode.ThreeD)
+        PhysicsRuntimeMode runtimeMode = Settings.RuntimeMode;
+        if (runtimeMode.Runs3D())
             Physics.LateVisualize();
-        else
+        if (runtimeMode.Runs2D())
             Physics2D.LateVisualize();
+        if (runtimeMode.RunsMixedContacts())
+            MixedCollisions.LateVisualize();
 
         _hooks.InvokeLateVisualize();
     }
@@ -330,6 +345,7 @@ public sealed class GravitasWorldContext : IDisposable
         Collisions2D.Reset();
         Physics.Reset();
         Physics2D.Reset();
+        MixedCollisions.Reset();
         Query2D.Reset();
         Query3D.Reset();
         Coroutines.Reset();

@@ -1985,7 +1985,7 @@ decomposes contact impulses into planar X/Z and vertical Y components:
 
 **Implementation Phases:**
 
-- [ ] **Phase 10A - Bitmask runtime contract:** Convert
+- [x] **Phase 10A - Bitmask runtime contract:** Convert
   `PhysicsRuntimeMode` to a validated `[Flags]` bitmask, add `Both` and
   `Mixed`, update settings validation, replace `if ThreeD else TwoD` lifecycle
   branching with direct bitwise helpers, and test all four valid runtime modes.
@@ -1993,7 +1993,7 @@ decomposes contact impulses into planar X/Z and vertical Y components:
   reset, and context-local state without mixed collision distribution or mixed
   response. `Mixed` must do the same plus the dedicated mixed collision path.
   `TwoD` and `ThreeD` behavior and cost boundaries must remain unchanged.
-- [ ] **Phase 10A - Embedding contract:** Add the minimal mixed embedding data
+- [x] **Phase 10A - Embedding contract:** Add the minimal mixed embedding data
   needed by `LSCollider2D`: a positive half-thickness resolved from collider
   override or context default, a cached slab center Y from the host transform,
   and deterministic mixed 3D bounds. Do not reintroduce `PhysicsDimension` or
