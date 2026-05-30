@@ -1,0 +1,247 @@
+using FixedMathSharp;
+using FluentAssertions;
+using Gravitas.Colliders;
+using Gravitas.Support;
+using Gravitas.Tests.Support;
+using SwiftCollections;
+using System;
+using Xunit;
+
+namespace Gravitas.Tests.Physics2D;
+
+public sealed class Collider2DStateParityTests
+{
+    [Fact]
+    public void Simulate_WithUnchangedCollider_ShouldNotAdvanceRuntimeOrBroadPhaseVersions()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        StiffBody2D body = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
+        uint runtimeVersion = body.Collider.RuntimeShapeVersion;
+        uint broadPhaseVersion = body.Collider.BroadPhaseVersion;
+
+        body.Collider.Simulate();
+
+        body.Collider.RuntimeShapeVersion.Should().Be(runtimeVersion);
+        body.Collider.BroadPhaseVersion.Should().Be(broadPhaseVersion);
+    }
+
+    [Fact]
+    public void SetPosition_WithChangedCollider_ShouldAdvanceRuntimeAndBroadPhaseVersionsOnce()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext(extent: 64);
+        StiffBody2D body = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
+        uint runtimeVersion = body.Collider.RuntimeShapeVersion;
+        uint broadPhaseVersion = body.Collider.BroadPhaseVersion;
+
+        body.SetPosition(new Vector2d((Fixed64)8, Fixed64.Zero));
+
+        body.Collider.RuntimeShapeVersion.Should().Be(runtimeVersion + 1);
+        body.Collider.BroadPhaseVersion.Should().BeGreaterThan(broadPhaseVersion);
+
+        uint rebuiltRuntimeVersion = body.Collider.RuntimeShapeVersion;
+        uint rebuiltBroadPhaseVersion = body.Collider.BroadPhaseVersion;
+        body.Collider.Simulate();
+
+        body.Collider.RuntimeShapeVersion.Should().Be(rebuiltRuntimeVersion);
+        body.Collider.BroadPhaseVersion.Should().Be(rebuiltBroadPhaseVersion);
+    }
+
+    [Fact]
+    public void Initialize_ShouldReset2DQueryVersions()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        var collider = new LSCircleCollider2D(Fixed64.Half)
+        {
+            RaycastVersion = 17,
+            CircleQueryVersion = 23
+        };
+
+        _ = CreateStaticCollider(context, collider, Vector2d.Zero);
+
+        collider.RaycastVersion.Should().Be(0);
+        collider.CircleQueryVersion.Should().Be(0);
+    }
+
+    [Fact]
+    public void ShapeMutation_ShouldDirtyRuntimeShapeAndRefreshBoundsOnNextSimulate()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        StiffBody2D body = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
+        var circle = (LSCircleCollider2D)body.Collider;
+        uint runtimeVersion = circle.RuntimeShapeVersion;
+        uint broadPhaseVersion = circle.BroadPhaseVersion;
+
+        circle.Radius = Fixed64.One;
+        circle.Simulate();
+
+        circle.RuntimeShapeVersion.Should().Be(runtimeVersion + 1);
+        circle.BroadPhaseVersion.Should().BeGreaterThan(broadPhaseVersion);
+        circle.MaxX.Should().Be(Fixed64.One);
+        circle.MinX.Should().Be(-Fixed64.One);
+    }
+
+    [Fact]
+    public void ExplicitParentBinding_ShouldSuppressParentChildAndSiblingPairs()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        StiffBody2D parent = CreateBody(context, new LSCircleCollider2D(Fixed64.One), Vector2d.Zero, immovable: false);
+        StiffBody2D firstChild = CreateBody(context, new LSCircleCollider2D(Fixed64.One), new Vector2d(Fixed64.Half, Fixed64.Zero), immovable: false);
+        StiffBody2D secondChild = CreateBody(context, new LSCircleCollider2D(Fixed64.One), new Vector2d(-Fixed64.Half, Fixed64.Zero), immovable: false);
+        StiffBody2D unrelated = CreateBody(context, new LSCircleCollider2D(Fixed64.One), new Vector2d((Fixed64)2, Fixed64.Zero), immovable: false);
+
+        firstChild.Collider.SetParent(parent.Collider);
+        secondChild.Collider.SetParent(parent.Collider);
+
+        context.Physics2D.RequireCollisionPair(parent.Collider, firstChild.Collider).Should().BeFalse();
+        context.Physics2D.RequireCollisionPair(firstChild.Collider, secondChild.Collider).Should().BeFalse();
+        context.Physics2D.RequireCollisionPair(firstChild.Collider, unrelated.Collider).Should().BeTrue();
+        parent.Collider.HierarchyChildCount.Should().Be(2);
+        firstChild.Collider.ParentId.Should().Be(parent.Collider.Id);
+    }
+
+    [Fact]
+    public void DeactivateOwnedPairSide_ShouldRemovePairAndHolderReferences()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        StiffBody2D owner = CreateBody(context, new LSCircleCollider2D(Fixed64.One), Vector2d.Zero, immovable: false);
+        StiffBody2D holder = CreateBody(context, new LSCircleCollider2D(Fixed64.One), Vector2d.Zero, immovable: false);
+        context.Simulate();
+
+        owner.Collider.CollisionPairCount.Should().Be(1);
+        holder.Collider.CollisionPairHolderCount.Should().Be(1);
+
+        owner.Collider.Deactivate();
+
+        owner.Collider.CollisionPairCount.Should().Be(0);
+        holder.Collider.CollisionPairHolderCount.Should().Be(0);
+        context.Physics2D.TryGetColliderById(owner.Collider.Id, out _).Should().BeFalse();
+    }
+
+    [Fact]
+    public void DeactivateHolderSide_ShouldRemoveOwningPairReference()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        StiffBody2D owner = CreateBody(context, new LSCircleCollider2D(Fixed64.One), Vector2d.Zero, immovable: false);
+        StiffBody2D holder = CreateBody(context, new LSCircleCollider2D(Fixed64.One), Vector2d.Zero, immovable: false);
+        context.Simulate();
+
+        holder.Collider.Deactivate();
+
+        owner.Collider.CollisionPairCount.Should().Be(0);
+        holder.Collider.CollisionPairHolderCount.Should().Be(0);
+        context.Physics2D.TryGetColliderById(holder.Collider.Id, out _).Should().BeFalse();
+    }
+
+    [Fact]
+    public void DeactivatePairOwner_AfterWarmup_ShouldNotAllocate()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext(extent: 128);
+        var owners = new SwiftList<StiffBody2D>();
+        for (int i = 0; i < 32; i++)
+        {
+            Vector2d position = new((Fixed64)(i * 2), Fixed64.Zero);
+            StiffBody2D owner = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), position, immovable: false);
+            _ = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), position + new Vector2d(Fixed64.Half, Fixed64.Zero), immovable: true);
+            owners.Add(owner);
+        }
+
+        context.Simulate();
+
+        long allocatedBytes = MeasureAllocatedBytes(() => owners[0].Collider.Deactivate());
+
+        allocatedBytes.Should().Be(0);
+    }
+
+    [Fact]
+    public void DeactivateAllPairOwners_AfterWarmup_ShouldNotAllocate()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext(extent: 128);
+        var owners = new SwiftList<StiffBody2D>();
+        for (int i = 0; i < 32; i++)
+        {
+            Vector2d position = new((Fixed64)(i * 2), Fixed64.Zero);
+            StiffBody2D owner = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), position, immovable: false);
+            _ = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), position + new Vector2d(Fixed64.Half, Fixed64.Zero), immovable: true);
+            owners.Add(owner);
+        }
+
+        context.Simulate();
+
+        long allocatedBytes = MeasureAllocatedBytes(() =>
+        {
+            for (int i = 0; i < owners.Count; i++)
+                owners[i].Collider.Deactivate();
+        });
+
+        allocatedBytes.Should().Be(0);
+    }
+
+    [Fact]
+    public void DeactivateParent_ShouldClearChildHierarchyState()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        StiffBody2D parent = CreateBody(context, new LSCircleCollider2D(Fixed64.One), Vector2d.Zero, immovable: false);
+        StiffBody2D child = CreateBody(context, new LSCircleCollider2D(Fixed64.One), new Vector2d(Fixed64.Half, Fixed64.Zero), immovable: false);
+        child.Collider.SetParent(parent.Collider);
+
+        parent.Collider.Deactivate();
+
+        child.Collider.ParentId.Should().Be(-1);
+        child.Collider.Parent.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData(ColliderType2D.Circle, ColliderType2D.Circle, CollisionType2D.Circle_Circle)]
+    [InlineData(ColliderType2D.Circle, ColliderType2D.AABox, CollisionType2D.Circle_Convex)]
+    [InlineData(ColliderType2D.AABox, ColliderType2D.Circle, CollisionType2D.Convex_Circle)]
+    [InlineData(ColliderType2D.AABox, ColliderType2D.ConvexPolygon, CollisionType2D.Convex_Convex)]
+    public void ColliderSettings2D_ShouldResolveCollisionType(ColliderType2D first, ColliderType2D second, CollisionType2D expected)
+    {
+        ColliderSettings2D.GetCollisionType(first, second).Should().Be(expected);
+    }
+
+    private static StiffBody2D CreateBody(
+        GravitasWorldContext context,
+        LSCollider2D collider,
+        Vector2d position,
+        bool immovable)
+    {
+        var transform = new FixedTransform(
+            new Vector3d(position.x, Fixed64.Zero, position.y),
+            FixedQuaternion.Identity,
+            Vector3d.One);
+        var agent = new TestMatterAgent(context, transform);
+        var body = new StiffBody2D(agent, collider)
+        {
+            Mass = Fixed64.One,
+            Immovable = immovable
+        };
+        body.Initialize(position);
+        return body;
+    }
+
+    private static LSCollider2D CreateStaticCollider(
+        GravitasWorldContext context,
+        LSCollider2D collider,
+        Vector2d position)
+    {
+        var transform = new FixedTransform(
+            new Vector3d(position.x, Fixed64.Zero, position.y),
+            FixedQuaternion.Identity,
+            Vector3d.One);
+        var agent = new TestMatterAgent(context, transform);
+        collider.InitializeWithNoBody(agent);
+        return collider;
+    }
+
+    private static long MeasureAllocatedBytes(Action action)
+    {
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+
+        long before = GC.GetAllocatedBytesForCurrentThread();
+        action();
+        return GC.GetAllocatedBytesForCurrentThread() - before;
+    }
+}

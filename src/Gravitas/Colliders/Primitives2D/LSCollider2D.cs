@@ -9,7 +9,7 @@ namespace Gravitas.Colliders;
 /// <summary>
 /// Base type for pure 2D collider shapes.
 /// </summary>
-public abstract class LSCollider2D
+public abstract class LSCollider2D : IColliderHierarchyNode<LSCollider2D>
 {
     private StiffBody2D? _body;
     private IMatterAgent? _agent;
@@ -21,7 +21,12 @@ public abstract class LSCollider2D
     private PhysicsLayer _layer = new();
     private Vector2d _localOffset;
     private BoundingArea _bounds;
-    private Collider2DPartitionState _partitionState;
+    private uint _shapeVersion;
+    private readonly ColliderRuntimeShapeState<ColliderShapeSnapshot2D> _runtimeShapeState = new();
+    private ColliderPartitionState2D _partitionState;
+    private ColliderQueryState _queryState;
+    private ColliderPairState<CollisionPair2D> _pairState;
+    private ColliderHierarchyState<LSCollider2D> _hierarchyState;
 
     public delegate void Body2DCollisionFunc(StiffBody2D other);
     public delegate void Trigger2DCollisionFunc(LSCollider2D other);
@@ -60,6 +65,16 @@ public abstract class LSCollider2D
     internal SwiftList<WorldVoxelIndex>? PartitionCoordinates => _partitionState.Coordinates;
 
     internal uint BroadPhaseVersion => _partitionState.BroadPhaseVersion;
+
+    internal uint RuntimeShapeVersion => _runtimeShapeState.RuntimeVersion;
+
+    internal int CollisionPairCount => _pairState.CollisionPairCount;
+
+    internal int CollisionPairHolderCount => _pairState.CollisionPairHolderCount;
+
+    internal SwiftDictionary<int, CollisionPair2D>? CollisionPairs => _pairState.CollisionPairs;
+
+    internal SwiftHashSet<int>? CollisionPairHolders => _pairState.CollisionPairHolders;
 
     public StiffBody2D? Body => _body;
 
@@ -128,7 +143,37 @@ public abstract class LSCollider2D
         set => _layer = value;
     }
 
-    public abstract Collider2DType Shape { get; }
+    public abstract ColliderType2D Shape { get; }
+
+    public virtual int Priority => ColliderSettings2D.GetPriority(Shape);
+
+    public uint RaycastVersion
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => _queryState.RaycastVersion;
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        set => _queryState.RaycastVersion = value;
+    }
+
+    public uint CircleQueryVersion
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => _queryState.CircleQueryVersion;
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        set => _queryState.CircleQueryVersion = value;
+    }
+
+    public bool IsChild => _hierarchyState.IsChild;
+
+    public bool IsParent => _hierarchyState.IsParent;
+
+    public int ParentId => _hierarchyState.ParentId;
+
+    public LSCollider2D? Parent => _hierarchyState.Parent;
+
+    internal LSCollider2D? TopParent => _hierarchyState.TopParent;
+
+    internal int HierarchyChildCount => _hierarchyState.ChildCount;
 
     public Vector2d LocalOffset
     {
@@ -140,7 +185,7 @@ public abstract class LSCollider2D
                 return;
 
             _localOffset = value;
-            Rebuild();
+            MarkShapeDirty();
         }
     }
 
@@ -179,7 +224,10 @@ public abstract class LSCollider2D
         _agent = agent;
         _context = agent.Context;
         _isActive = true;
-        Rebuild();
+        _queryState.Reset();
+        _hierarchyState.Initialize(agent.IsParent);
+        _runtimeShapeState.MarkDirty();
+        RebuildRuntimeShapeState();
     }
 
     internal void SetPhysicsState(int id, int serviceIndex)
@@ -200,6 +248,8 @@ public abstract class LSCollider2D
     {
         _partitionState.MarkUnpartitioned();
         _partitionState.ClearCoordinates();
+        _pairState.ClearCollisionPairs();
+        _pairState.ClearCollisionPairHolders();
         _id = -1;
         _serviceIndex = -1;
     }
@@ -219,6 +269,8 @@ public abstract class LSCollider2D
         if (_context != null && _id >= 0)
             _context.Physics2D.DessimilateCollider(this);
 
+        ClearChildParentReferences();
+        ClearParent();
         _isActive = false;
         ClearBindingState();
     }
@@ -231,12 +283,41 @@ public abstract class LSCollider2D
         Rebuild();
     }
 
-    internal void Rebuild()
+    internal bool Rebuild()
     {
-        RebuildShape();
+        if (!RebuildRuntimeShapeState())
+            return false;
+
         if (_context != null && _id >= 0)
-            _context.Collisions2D.RefreshColliderPartitionAfterShapeChange(this);
+            return _context.Collisions2D.RefreshColliderPartitionAfterShapeChange(this);
+
+        return true;
     }
+
+    public void SetParent(LSCollider2D parent) => _hierarchyState.SetParent(this, parent);
+
+    public void ClearParent() => _hierarchyState.ClearParent(this);
+
+    public void AddChild(int id)
+    {
+        if (_hierarchyState.AddChild(id) != true)
+        {
+            GravitasLogger.Channel.Warn($"2D collider with ID {id} is already a child.");
+            return;
+        }
+    }
+
+    public void RemoveChild(int id)
+    {
+        if (_hierarchyState.RemoveChild(id) != true)
+        {
+            GravitasLogger.Channel.Warn($"Cannot remove. 2D collider with ID {id} is not a child.");
+            return;
+        }
+    }
+
+    public bool IsSibling(LSCollider2D other) =>
+        _hierarchyState.ExcludesCollisionWith(other._hierarchyState, Id, other.Id);
 
     internal SwiftList<WorldVoxelIndex> GetOrCreatePartitionCoordinates()
     {
@@ -269,6 +350,39 @@ public abstract class LSCollider2D
             && worldPosition.x <= MaxX + padding
             && worldPosition.z >= MinY - padding
             && worldPosition.z <= MaxY + padding;
+    }
+
+    internal bool TryGetCollisionPair(int otherId, out CollisionPair2D? collisionPair) =>
+        _pairState.TryGetCollisionPair(otherId, out collisionPair);
+
+    internal bool TryAddCollisionPair(int otherId, CollisionPair2D collisionPair)
+    {
+        if (_pairState.TryAddCollisionPair(otherId, collisionPair) != true)
+        {
+            GravitasLogger.Channel.Warn($"2D collision pair with collider ID {otherId} already exists.");
+            return false;
+        }
+
+        return true;
+    }
+
+    internal bool TryRemoveCollisionPair(int otherId, out CollisionPair2D? collisionPair) =>
+        _pairState.TryRemoveCollisionPair(otherId, out collisionPair);
+
+    internal bool TryAddCollisionPairHolder(int otherId) => _pairState.TryAddCollisionPairHolder(otherId);
+
+    internal bool TryRemoveCollisionPairHolder(int otherId) => _pairState.TryRemoveCollisionPairHolder(otherId);
+
+    internal void ClearCollisionPairState()
+    {
+        _pairState.ClearCollisionPairs();
+        _pairState.ClearCollisionPairHolders();
+    }
+
+    internal void ClearRuntimeRelationships()
+    {
+        ClearChildParentReferences();
+        ClearParent();
     }
 
     internal void NotifyContact(LSCollider2D other, bool isColliding, bool isChanged)
@@ -311,6 +425,47 @@ public abstract class LSCollider2D
     internal abstract Vector2d GetVertexUnchecked(int index);
 
     protected abstract void RebuildShape();
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    protected void MarkShapeDirty()
+    {
+        _shapeVersion++;
+        _runtimeShapeState.MarkDirty();
+        _body?.Wake();
+    }
+
+    private bool RebuildRuntimeShapeState()
+    {
+        ColliderShapeSnapshot2D snapshot = CaptureShapeSnapshot();
+        if (!_runtimeShapeState.ShouldRebuild(snapshot))
+            return false;
+
+        RebuildShape();
+        _runtimeShapeState.Commit(snapshot);
+        return true;
+    }
+
+    private ColliderShapeSnapshot2D CaptureShapeSnapshot() =>
+        new(Center, Rotation, _localOffset, _shapeVersion);
+
+    private void ClearChildParentReferences()
+    {
+        SwiftHashSet<int>? children = _hierarchyState.Children;
+        if (children == null || _context == null)
+            return;
+
+        foreach (int childId in children)
+        {
+            if (_context.Physics2D.TryGetColliderById(childId, out LSCollider2D? child))
+                child!._hierarchyState.ClearParentReference();
+        }
+
+        _hierarchyState.ClearChildren();
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    bool IColliderHierarchyNode<LSCollider2D>.TryGetHierarchyColliderById(int id, out LSCollider2D? collider) =>
+        Context.Physics2D.TryGetColliderById(id, out collider);
 
     protected void SetBounds(BoundingArea bounds) => _bounds = bounds;
 

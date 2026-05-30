@@ -17,7 +17,7 @@ public sealed class LSAABBoxCollider2D : LSCollider2D
         Size = size;
     }
 
-    public override Collider2DType Shape => Collider2DType.AABox;
+    public override ColliderType2D Shape => ColliderType2D.AABox;
 
     public Vector2d Size
     {
@@ -29,9 +29,12 @@ public sealed class LSAABBoxCollider2D : LSCollider2D
                 value.x <= Fixed64.Zero || value.y <= Fixed64.Zero,
                 nameof(value),
                 "2D AABB size components must be greater than zero.");
+            if (_size == value)
+                return;
+
             _size = value;
             _halfExtents = value * Fixed64.Half;
-            Rebuild();
+            MarkShapeDirty();
         }
     }
 

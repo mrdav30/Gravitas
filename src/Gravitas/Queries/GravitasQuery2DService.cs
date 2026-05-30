@@ -13,6 +13,8 @@ public sealed class GravitasQuery2DService
 {
     private readonly GravitasWorldContext _context;
     private readonly SwiftList<LSCollider2D> _queryCandidates = new();
+    private uint _circleQueryVersion;
+    private uint _raycastVersion;
 
     /// <summary>
     /// Initializes a pure 2D query service for the supplied context.
@@ -38,6 +40,8 @@ public sealed class GravitasQuery2DService
     {
         _queryCandidates.FastClear();
         LastQueryCandidateCount = 0;
+        _circleQueryVersion = 0;
+        _raycastVersion = 0;
     }
 
     /// <summary>
@@ -64,7 +68,8 @@ public sealed class GravitasQuery2DService
 
         results.FastClear();
         EnsureCandidateCapacity();
-        _context.Collisions2D.CollectOverlapCircleCandidates(center, radius, layerMask, _queryCandidates);
+        uint queryVersion = NextCircleQueryVersion();
+        _context.Collisions2D.CollectOverlapCircleCandidates(center, radius, layerMask, queryVersion, _queryCandidates);
         LastQueryCandidateCount = _queryCandidates.Count;
         for (int i = 0; i < _queryCandidates.Count; i++)
         {
@@ -99,10 +104,13 @@ public sealed class GravitasQuery2DService
         }
 
         EnsureCandidateCapacity();
+        uint queryVersion = NextRaycastVersion();
         _context.Collisions2D.CollectBoundsCandidates(
             CreateMin(start, end),
             CreateMax(start, end),
             layerMask,
+            queryVersion,
+            raycastQuery: true,
             _queryCandidates);
 
         LastQueryCandidateCount = _queryCandidates.Count;
@@ -148,10 +156,13 @@ public sealed class GravitasQuery2DService
         }
 
         EnsureCandidateCapacity();
+        uint queryVersion = NextRaycastVersion();
         _context.Collisions2D.CollectBoundsCandidates(
             CreateMin(start, end),
             CreateMax(start, end),
             layerMask,
+            queryVersion,
+            raycastQuery: true,
             _queryCandidates);
 
         LastQueryCandidateCount = _queryCandidates.Count;
@@ -168,6 +179,24 @@ public sealed class GravitasQuery2DService
         int colliderCount = _context.Physics2D.ColliderCount;
         if (colliderCount > 0)
             _queryCandidates.EnsureCapacity(colliderCount);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private uint NextCircleQueryVersion()
+    {
+        _circleQueryVersion++;
+        if (_circleQueryVersion == 0)
+            _circleQueryVersion = 1;
+        return _circleQueryVersion;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private uint NextRaycastVersion()
+    {
+        _raycastVersion++;
+        if (_raycastVersion == 0)
+            _raycastVersion = 1;
+        return _raycastVersion;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

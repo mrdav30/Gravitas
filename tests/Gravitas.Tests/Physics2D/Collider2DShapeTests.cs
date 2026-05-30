@@ -24,7 +24,7 @@ public sealed class Collider2DShapeTests
 
         body.Initialize(new Vector2d((Fixed64)2, (Fixed64)3));
 
-        collider.Shape.Should().Be(Collider2DType.Circle);
+        collider.Shape.Should().Be(ColliderType2D.Circle);
         collider.Bounds.Min.Should().Be(new Vector3d(Fixed64.One, (Fixed64)2, Fixed64.Zero));
         collider.Bounds.Max.Should().Be(new Vector3d((Fixed64)3, (Fixed64)4, Fixed64.Zero));
     }

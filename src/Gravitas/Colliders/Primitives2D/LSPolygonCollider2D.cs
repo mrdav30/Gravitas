@@ -22,10 +22,10 @@ public sealed class LSPolygonCollider2D : LSCollider2D
         _localVertices = new Vector2d[vertices.Length];
         _worldVertices = new Vector2d[vertices.Length];
         Array.Copy(vertices, _localVertices, vertices.Length);
-        Rebuild();
+        MarkShapeDirty();
     }
 
-    public override Collider2DType Shape => Collider2DType.ConvexPolygon;
+    public override ColliderType2D Shape => ColliderType2D.ConvexPolygon;
 
     public int Count => _worldVertices.Length;
 

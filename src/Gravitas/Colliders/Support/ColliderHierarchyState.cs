@@ -3,7 +3,24 @@ using System.Runtime.CompilerServices;
 
 namespace Gravitas.Colliders;
 
-internal struct ColliderHierarchyState
+internal interface IColliderHierarchyNode<TCollider>
+    where TCollider : class, IColliderHierarchyNode<TCollider>
+{
+    int Id { get; }
+
+    GravitasWorldContext Context { get; }
+
+    TCollider? Parent { get; }
+
+    void AddChild(int id);
+
+    void RemoveChild(int id);
+
+    bool TryGetHierarchyColliderById(int id, out TCollider? collider);
+}
+
+internal struct ColliderHierarchyState<TCollider>
+    where TCollider : class, IColliderHierarchyNode<TCollider>
 {
     private bool _configuredAsParent;
     private SwiftHashSet<int>? _children;
@@ -14,9 +31,9 @@ internal struct ColliderHierarchyState
 
     public int ParentId { get; private set; }
 
-    public LSCollider? Parent { get; private set; }
+    public TCollider? Parent { get; private set; }
 
-    public LSCollider? TopParent { get; private set; }
+    public TCollider? TopParent { get; private set; }
 
     public int ChildCount => _children?.Count ?? 0;
 
@@ -33,7 +50,7 @@ internal struct ColliderHierarchyState
         _children?.Clear();
     }
 
-    public void SetParent(LSCollider owner, LSCollider parent)
+    public void SetParent(TCollider owner, TCollider parent)
     {
         SwiftThrowHelper.ThrowIfNull(parent, nameof(parent));
         SwiftThrowHelper.ThrowIfArgument(
@@ -43,16 +60,15 @@ internal struct ColliderHierarchyState
 
         GravitasWorldContext ownerContext = owner.Context;
         SwiftThrowHelper.ThrowIfArgument(
-            !parent.TryGetBoundContext(out GravitasWorldContext? parentContext)
-                || !ReferenceEquals(ownerContext, parentContext),
+            !ReferenceEquals(ownerContext, parent.Context),
             nameof(parent),
             "Parent collider must belong to the same GravitasWorldContext.");
 
-        LSCollider topParent = FindTopParent(owner, parent);
+        TCollider topParent = FindTopParent(owner, parent);
         bool topParentChanged = ParentId != topParent.Id;
         if (ParentId != -1
             && topParentChanged
-            && ownerContext.Physics.TryGetColliderById(ParentId, out LSCollider? previousParent))
+            && owner.TryGetHierarchyColliderById(ParentId, out TCollider? previousParent))
         {
             previousParent!.RemoveChild(owner.Id);
         }
@@ -65,14 +81,10 @@ internal struct ColliderHierarchyState
             topParent.AddChild(owner.Id);
     }
 
-    public void ClearParent(LSCollider owner)
+    public void ClearParent(TCollider owner)
     {
-        if (ParentId != -1
-            && owner.TryGetBoundContext(out GravitasWorldContext? context)
-            && context!.Physics.TryGetColliderById(ParentId, out LSCollider? previousParent))
-        {
+        if (ParentId != -1 && owner.TryGetHierarchyColliderById(ParentId, out TCollider? previousParent))
             previousParent!.RemoveChild(owner.Id);
-        }
 
         Parent = null;
         TopParent = null;
@@ -118,7 +130,7 @@ internal struct ColliderHierarchyState
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool ExcludesCollisionWith(in ColliderHierarchyState other, int ownerId, int otherId)
+    public bool ExcludesCollisionWith(in ColliderHierarchyState<TCollider> other, int ownerId, int otherId)
     {
         if (ownerId == otherId)
             return true;
@@ -129,9 +141,9 @@ internal struct ColliderHierarchyState
         return ParentId != -1 && ParentId == other.ParentId;
     }
 
-    private static LSCollider FindTopParent(LSCollider owner, LSCollider parent)
+    private static TCollider FindTopParent(TCollider owner, TCollider parent)
     {
-        LSCollider current = parent;
+        TCollider current = parent;
         while (current.Parent != null)
         {
             current = current.Parent;

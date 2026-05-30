@@ -10,13 +10,13 @@ namespace Gravitas.Tests.Physics2D;
 public sealed class CollisionDetection2DTests
 {
     [Theory]
-    [InlineData(Collider2DType.Circle, Collider2DType.Circle)]
-    [InlineData(Collider2DType.Circle, Collider2DType.AABox)]
-    [InlineData(Collider2DType.AABox, Collider2DType.AABox)]
-    [InlineData(Collider2DType.Circle, Collider2DType.ConvexPolygon)]
-    [InlineData(Collider2DType.AABox, Collider2DType.ConvexPolygon)]
-    [InlineData(Collider2DType.ConvexPolygon, Collider2DType.ConvexPolygon)]
-    public void TryCollide_ShouldSupportRequiredShapePairs(Collider2DType firstType, Collider2DType secondType)
+    [InlineData(ColliderType2D.Circle, ColliderType2D.Circle)]
+    [InlineData(ColliderType2D.Circle, ColliderType2D.AABox)]
+    [InlineData(ColliderType2D.AABox, ColliderType2D.AABox)]
+    [InlineData(ColliderType2D.Circle, ColliderType2D.ConvexPolygon)]
+    [InlineData(ColliderType2D.AABox, ColliderType2D.ConvexPolygon)]
+    [InlineData(ColliderType2D.ConvexPolygon, ColliderType2D.ConvexPolygon)]
+    public void TryCollide_ShouldSupportRequiredShapePairs(ColliderType2D firstType, ColliderType2D secondType)
     {
         using GravitasWorldContext context = Create2DContext();
         LSCollider2D first = CreateCollider(firstType);
@@ -35,8 +35,8 @@ public sealed class CollisionDetection2DTests
     public void TryCollide_WithSeparatedPolygons_ShouldReturnFalse()
     {
         using GravitasWorldContext context = Create2DContext();
-        LSCollider2D first = CreateCollider(Collider2DType.ConvexPolygon);
-        LSCollider2D second = CreateCollider(Collider2DType.ConvexPolygon);
+        LSCollider2D first = CreateCollider(ColliderType2D.ConvexPolygon);
+        LSCollider2D second = CreateCollider(ColliderType2D.ConvexPolygon);
         _ = CreateBody(context, first, new Vector2d(Fixed64.Zero, Fixed64.Zero));
         _ = CreateBody(context, second, new Vector2d((Fixed64)5, Fixed64.Zero));
 
@@ -64,12 +64,12 @@ public sealed class CollisionDetection2DTests
         return context;
     }
 
-    private static LSCollider2D CreateCollider(Collider2DType type) =>
+    private static LSCollider2D CreateCollider(ColliderType2D type) =>
         type switch
         {
-            Collider2DType.Circle => new LSCircleCollider2D(Fixed64.One),
-            Collider2DType.AABox => new LSAABBoxCollider2D(new Vector2d((Fixed64)2, (Fixed64)2)),
-            Collider2DType.ConvexPolygon => new LSPolygonCollider2D(
+            ColliderType2D.Circle => new LSCircleCollider2D(Fixed64.One),
+            ColliderType2D.AABox => new LSAABBoxCollider2D(new Vector2d((Fixed64)2, (Fixed64)2)),
+            ColliderType2D.ConvexPolygon => new LSPolygonCollider2D(
                 new Vector2d(-Fixed64.One, -Fixed64.One),
                 new Vector2d(Fixed64.One, -Fixed64.One),
                 new Vector2d(Fixed64.One, Fixed64.One),

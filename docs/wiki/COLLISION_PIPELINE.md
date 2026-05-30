@@ -38,8 +38,8 @@ The current 2D broad phase is GridForge-backed:
 7. suppress duplicate pair work when broad colliders share several voxels by
    routing each pair through its deterministic first shared partition before
    the frame duplicate-pair set.
-8. run same-agent, layer, and bounds filtering before exact 2D narrow-phase
-   dispatch.
+8. run same-agent, explicit hierarchy, layer, and bounds filtering before exact
+   2D narrow-phase dispatch.
 
 The Y=0 storage plane is not physical thickness and does not claim mixed
 2D/3D interaction. It is a deterministic broad-phase identity that lets pure
@@ -58,7 +58,10 @@ real embedding and impulse-exchange policy.
 Circles use center/radius tests and support points. Boxes and polygons use 2D
 separating-axis tests over deterministic vertex order. `LSPolygonCollider2D`
 rejects concave and collinear input up front; concave 2D decomposition is not
-claimed yet.
+claimed yet. `CollisionPair2D` resolves collider priority up front and
+`CollisionDetection2D` dispatches through `CollisionType2D`, so adding a new
+2D shape pair should extend the settings/type table instead of growing public
+type-check conditionals.
 
 `CollisionPair2D` applies simple deterministic one-pass response for the alpha
 slice: positional correction to penetration slop, normal impulse when bodies are
@@ -129,9 +132,10 @@ partition pool through GridForge voxel removal.
 
 ## Collider Runtime Shape State
 
-`LSCollider` separates collider identity and host binding from the dense mutable
-state used by shape rebuilds, partition ownership, query duplicate suppression,
-pair cleanup, and hierarchy filtering. The runtime-shape snapshot watches:
+`LSCollider` and `LSCollider2D` separate collider identity and host binding from
+the dense mutable state used by shape rebuilds, partition ownership, query
+duplicate suppression, pair cleanup, and hierarchy filtering. The 3D
+runtime-shape snapshot watches:
 
 - world-space center.
 - rotation.
@@ -146,6 +150,14 @@ the next `Simulate()` call. If the snapshot has not changed, the collider skips
 the rebuild and keeps its existing partition state.
 Shape mutation wakes a sleeping bound body before the broad phase refreshes, so
 changed bounds cannot remain hidden behind a sleeping partition entry.
+
+Pure 2D colliders use the same state-helper pattern where the payload is
+dimension-free. `ColliderQueryState` is shared directly. Runtime-shape dirtying
+reuses the same version/commit helper with a 2D snapshot payload, while pair and
+hierarchy state are shared generic helpers over the 2D collider and pair types.
+Only partition coordinates remain 2D-specific because they store X/Z planar
+coverage. A 2D collider whose center, rotation, local offset, or shape version
+has not changed skips `BoundingArea` rebuilds and partition refreshes.
 
 Partition state tracks grid coordinates, previous snapped grid bounds,
 partition-change flags, and broad-phase versioning together. Query state tracks

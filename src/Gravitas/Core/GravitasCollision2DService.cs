@@ -16,7 +16,7 @@ public sealed class GravitasCollision2DService
     private const int DefaultPartitionPoolCapacity = 1024;
 
     private readonly GravitasWorldContext _context;
-    private readonly SwiftBucket<PhysicsPartition2D> _activePartitions = new();
+    private readonly SwiftBucket<PhysicsPartition2D> _activePartitions = new(DefaultPartitionPoolCapacity);
     private readonly SwiftStack<PhysicsPartition2D> _inactivePartitionPool = new(DefaultPartitionPoolCapacity);
     private readonly SwiftHashSet<int> _redundancyChecker = new();
     private readonly SwiftHashSet<ushort> _processedGrids = new();
@@ -27,7 +27,6 @@ public sealed class GravitasCollision2DService
     private readonly SwiftList<int> _distributionStaticIds = new();
     private readonly SwiftList<PhysicsPartition2D> _queryPartitions = new();
     private readonly SwiftList<int> _queryColliderIds = new();
-    private readonly SwiftHashSet<int> _queryDuplicateColliderIds = new();
     private readonly SwiftSparseSet _deferredPartitionRefreshIds = new();
 
     private int _retainedPartitionRetirementCursor;
@@ -61,7 +60,6 @@ public sealed class GravitasCollision2DService
         _distributionStaticIds.FastClear();
         _queryPartitions.FastClear();
         _queryColliderIds.FastClear();
-        _queryDuplicateColliderIds.Clear();
         _deferredPartitionRefreshIds.Clear();
         _inactivePartitionPool.Clear();
         Version = 1;
@@ -272,26 +270,27 @@ public sealed class GravitasCollision2DService
         Vector2d center,
         Fixed64 radius,
         PhysicsLayerMask layerMask,
+        uint queryVersion,
         SwiftList<LSCollider2D> candidates)
     {
         candidates.FastClear();
-        _queryDuplicateColliderIds.Clear();
 
         Vector2d min = new(center.x - radius, center.y - radius);
         Vector2d max = new(center.x + radius, center.y + radius);
 
-        CollectBoundsCandidates(min, max, layerMask, candidates);
+        CollectBoundsCandidates(min, max, layerMask, queryVersion, raycastQuery: false, candidates);
     }
 
     internal void CollectBoundsCandidates(
         Vector2d min,
         Vector2d max,
         PhysicsLayerMask layerMask,
+        uint queryVersion,
+        bool raycastQuery,
         SwiftList<LSCollider2D> candidates)
     {
         RefreshDeferredColliderPartitions();
         candidates.FastClear();
-        _queryDuplicateColliderIds.Clear();
 
         CollectCoveredPartitions(min, max, _queryPartitions);
         SortPartitions(_queryPartitions);
@@ -303,11 +302,9 @@ public sealed class GravitasCollision2DService
             for (int j = 0; j < _queryColliderIds.Count; j++)
             {
                 int colliderId = _queryColliderIds[j];
-                if (!_queryDuplicateColliderIds.Add(colliderId))
-                    continue;
-
                 if (!_context.Physics2D.TryGetColliderById(colliderId, out LSCollider2D? collider)
                     || !collider!.IsActive
+                    || IsDuplicateQueryCandidate(collider, queryVersion, raycastQuery)
                     || !layerMask.Includes(collider.Layer)
                     || collider.MaxX < min.x
                     || collider.MinX > max.x
@@ -322,7 +319,25 @@ public sealed class GravitasCollision2DService
         }
 
         SortCollidersById(candidates);
-        _queryDuplicateColliderIds.Clear();
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool IsDuplicateQueryCandidate(LSCollider2D collider, uint queryVersion, bool raycastQuery)
+    {
+        if (raycastQuery)
+        {
+            if (collider.RaycastVersion == queryVersion)
+                return true;
+
+            collider.RaycastVersion = queryVersion;
+            return false;
+        }
+
+        if (collider.CircleQueryVersion == queryVersion)
+            return true;
+
+        collider.CircleQueryVersion = queryVersion;
+        return false;
     }
 
     private void RefreshDeferredColliderPartitions()
@@ -724,9 +739,6 @@ public sealed class GravitasCollision2DService
 
     internal void DeactivatePartition(int activationId)
     {
-        if (activationId < 0)
-            return;
-
         _activePartitions.TryRemoveAt(activationId);
     }
 

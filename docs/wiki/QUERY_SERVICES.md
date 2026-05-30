@@ -162,7 +162,8 @@ The overlap-circle candidate path is:
    pure 2D Y=0 partition plane.
 2. scan covered GridForge spatial cells and voxels.
 3. inspect `PhysicsPartition2D` payloads and copy static/dynamic collider IDs.
-4. suppress duplicate collider IDs when a broad collider spans several voxels.
+4. suppress duplicate collider hits with each collider's 2D query-version
+   stamp when a broad collider spans several voxels.
 5. reject inactive colliders, layer-mask misses, and separated 2D bounds.
 6. ask each 2D shape for its closest point to the query center.
 7. include the collider when that closest point lies within the query radius or
@@ -174,7 +175,7 @@ GridForge-backed candidate gatherer, then runs deterministic shape math against
 circle, AABB, and convex polygon colliders. Zero-length segments return no
 hits. Starting inside a collider returns a zero-distance hit. A collider that
 spans multiple voxels is still reported once because candidate gathering
-suppresses duplicate collider IDs before exact shape testing.
+stamps duplicate collider visits before exact shape testing.
 
 Current hit data is `Physics2DHit`: collider, optional body, point, normal, and
 distance. AABB and polygon area-query APIs remain future 2D query hardening

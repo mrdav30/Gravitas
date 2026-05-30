@@ -5,7 +5,7 @@ using System.Runtime.CompilerServices;
 
 namespace Gravitas.Colliders;
 
-internal struct Collider2DPartitionState
+internal struct ColliderPartitionState2D
 {
     public bool IsPartitioned { get; private set; }
 

@@ -16,7 +16,7 @@ public sealed class LSCircleCollider2D : LSCollider2D
         Radius = radius;
     }
 
-    public override Collider2DType Shape => Collider2DType.Circle;
+    public override ColliderType2D Shape => ColliderType2D.Circle;
 
     public Fixed64 Radius
     {
@@ -25,8 +25,11 @@ public sealed class LSCircleCollider2D : LSCollider2D
         set
         {
             SwiftThrowHelper.ThrowIfArgument(value <= Fixed64.Zero, nameof(value), "2D circle radius must be greater than zero.");
+            if (_radius == value)
+                return;
+
             _radius = value;
-            Rebuild();
+            MarkShapeDirty();
         }
     }
 

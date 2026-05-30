@@ -23,10 +23,10 @@ pairs, queries, and coroutines remain context-local.
 | Service | Owned state |
 | --- | --- |
 | `GravitasPhysicsService` | Dynamic body bucket, collider ID table, reusable collider IDs, collision-pair pool, active collision-pair queue, simulation switch. |
-| `GravitasPhysics2DService` | Pure 2D dynamic body bucket, monotonic collider ID table, 2D pair pool, layer-filtered narrow-phase/response processing, visualization publishing, simulation switch. |
+| `GravitasPhysics2DService` | Pure 2D dynamic body bucket, monotonic collider ID table, 2D pair pool, pair-reference cleanup, layer/hierarchy-filtered narrow-phase/response processing, visualization publishing, simulation switch. |
 | `GravitasCollisionService` | Active partition bucket, inactive partition pool, duplicate voxel checker, partition awake-state refresh, collision distribution version, cull distributor. |
 | `GravitasCollision2DService` | GridForge-backed pure 2D partition bucket, inactive partition pool, duplicate voxel checker, awake dynamic membership refresh, 2D collision distribution version, retained partition cleanup. |
-| `GravitasQuery2DService` | Pure 2D query candidate buffer, overlap-circle queries, segment raycasts, duplicate-suppressed partition candidate gathering, hit ordering. |
+| `GravitasQuery2DService` | Pure 2D query candidate buffer, overlap-circle queries, segment raycasts, collider-stamped duplicate suppression, hit ordering. |
 | `GravitasQuery3DService` | 3D segment worker, swept-sphere worker, X/Z circle overlap/proximity queries, intersection buffer, duplicate voxel checker, duplicate collider checker, raycast and circle query versions. |
 | `GravitasCoroutineService` | Active lockstep coroutine bucket and context-bound wait instruction factories. |
 | `GravitasDiagnosticSink` | Disabled-by-default diagnostic event buffer and engine-agnostic debug draw command buffer. |
@@ -271,6 +271,11 @@ partition through `GravitasCollision2DService`, and do not register with the 3D
 for query and trigger visibility. Pure 2D partition storage uses GridForge
 voxels on the internal Y=0 storage plane; that is a deterministic broad-phase
 identity, not physical 3D thickness.
+`LSCollider2D` shares the dimension-free collider helper pattern used by the 3D
+path: query stamps, generic pair references, generic hierarchy state, and
+runtime-shape dirty/version commits. Its runtime snapshot is 2D-specific only
+where the payload is actually dimensional, and unchanged colliders skip bounds
+and partition refresh work.
 
 ## Settings And Environment
 

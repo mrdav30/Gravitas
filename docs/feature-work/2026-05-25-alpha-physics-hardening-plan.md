@@ -1333,7 +1333,7 @@ world/voxel identity.
 - Modify: `src/Gravitas/Core/GravitasPhysics2DService.cs`
 - Potentially create: `src/Gravitas/Core/GravitasCollision2DService.cs`
 - Potentially create: `src/Gravitas/Partitions/PhysicsPartition2D.cs`
-- Potentially create: `src/Gravitas/Colliders/Support/Collider2DPartitionState.cs`
+- Potentially create: `src/Gravitas/Colliders/Support/ColliderPartitionState2D.cs`
 - Delete or avoid: `src/Gravitas/Dimensions/Physics2DBounds.cs` unless a tiny
   private transient helper survives profiling and code review.
 - Modify: `src/Gravitas/Settings/PhysicsSettings.cs` if 2D partition retention,
@@ -1422,7 +1422,7 @@ world/voxel identity.
 - `PhysicsPartition2D` stores collider IDs in static, dynamic, and awake
   dynamic sparse sets. Bodyless 2D colliders and immovable 2D bodies are static
   members; movable 2D bodies are dynamic members.
-- Added `Collider2DPartitionState` to track 2D partition coordinates and snapped
+- Added `ColliderPartitionState2D` to track 2D partition coordinates and snapped
   X/Z grid bounds. Body movement, kinematic host motion, bodyless collider
   `Simulate()`, shape edits, activation, deactivation, and reset now refresh
   partition membership without a service-wide collider scan.
@@ -1703,7 +1703,7 @@ dimension-agnostic or can be generalized cleanly.
 - Reuse or generalize `ColliderPairState` if doing so keeps pair tracking clear.
   A focused 2D pair state is acceptable only if the 3D `CollisionPair` typing
   makes a shared implementation more complex than the behavior it saves.
-- Keep `Collider2DPartitionState` 2D-specific unless the 3D and 2D partition
+- Keep `ColliderPartitionState2D` 2D-specific unless the 3D and 2D partition
   coordinate state can share behavior without hiding X/Z projection rules.
 
 **Files:**
@@ -1717,7 +1717,7 @@ dimension-agnostic or can be generalized cleanly.
 - Potentially modify/generalize:
   `src/Gravitas/Colliders/Support/ColliderRuntimeShapeState.cs`
 - Potentially create:
-  `src/Gravitas/Colliders/Support/Collider2DShapeSnapshot.cs`
+  `src/Gravitas/Colliders/Support/ColliderShapeSnapshot2D.cs`
 - Potentially create:
   `src/Gravitas/Colliders/Support/ColliderSettings2D.cs`
 - Potentially create:
@@ -1731,33 +1731,33 @@ dimension-agnostic or can be generalized cleanly.
 
 **Tasks:**
 
-- [ ] Add focused tests first for 2D collider state behavior: unchanged
+- [x] Add focused tests first for 2D collider state behavior: unchanged
   colliders should skip shape rebuild/partition refresh work, position or
   rotation changes should dirty the runtime shape, shape mutations should dirty
   bounds, and query stamps should suppress duplicate candidates deterministically.
-- [ ] Reuse `ColliderQueryState` in `LSCollider2D` and generalize/reuse
+- [x] Reuse `ColliderQueryState` in `LSCollider2D` and generalize/reuse
   `ColliderHierarchyState`, `ColliderPairState`, and runtime-shape dirty state
   only where that keeps the code smaller and clearer than a 2D-specific copy.
-- [ ] Add `LSCollider2D.Priority` and a compact 2D collider-settings dispatch
+- [x] Add `LSCollider2D.Priority` and a compact 2D collider-settings dispatch
   table so shape ordering and pair ordering are explicit instead of inferred
   from type-check conditionals.
-- [ ] Add `CollisionType2D` and route `CollisionDetection2D.TryCollide(...)`
+- [x] Add `CollisionType2D` and route `CollisionDetection2D.TryCollide(...)`
   through a resolved work item or collision type, matching the 3D dispatch
   pattern closely enough that new 2D shape pairs do not grow conditional soup.
-- [ ] Refactor `CollisionPair2D` to store deterministic collider order,
+- [x] Refactor `CollisionPair2D` to store deterministic collider order,
   resolved collision type, and any pair-state links needed for cheap removal
   from involved colliders.
-- [ ] Add 2D hierarchy/self-exclusion parity for same-agent, parent/child, and
+- [x] Add 2D hierarchy/self-exclusion parity for same-agent, parent/child, and
   sibling relationships using shared hierarchy state where practical.
-- [ ] Use 2D pair state to avoid broad O(total-pairs) removal scans when a
+- [x] Use 2D pair state to avoid broad O(total-pairs) removal scans when a
   collider leaves the simulation or changes identity.
-- [ ] Keep disabled paths allocation-conscious and avoid LINQ/iterator
+- [x] Keep disabled paths allocation-conscious and avoid LINQ/iterator
   allocations in per-frame, per-pair, or per-collider paths.
-- [ ] Update 2D benchmarks to cover collider churn, pair cleanup, and dense
+- [x] Update 2D benchmarks to cover collider churn, pair cleanup, and dense
   collision dispatch after the state refactor.
-- [ ] Update `docs/wiki` if the 2D collider lifecycle, hierarchy exclusions, or
+- [x] Update `docs/wiki` if the 2D collider lifecycle, hierarchy exclusions, or
   collision dispatch model changes.
-- [ ] Run focused 2D tests, full `Release`, full `ReleaseLean`, relevant
+- [x] Run focused 2D tests, full `Release`, full `ReleaseLean`, relevant
   benchmarks, and `git diff --check`.
 
 **Acceptance Bar:**
@@ -1773,6 +1773,43 @@ dimension-agnostic or can be generalized cleanly.
 - Same-agent, parent/child, and sibling exclusion behavior is covered for 2D.
 - Tests and benchmarks demonstrate the refactor did not regress deterministic
   2D contact ordering or broad-phase behavior.
+
+**Phase 9J Status - 2026-05-29:**
+
+- Reused shared dimension-free collider helpers in the 2D path:
+  `ColliderQueryState`, generic `ColliderHierarchyState<TCollider>`, generic
+  `ColliderPairState<TPair>`, and generic runtime-shape dirty/version state.
+  Only the shape snapshot and partition-coordinate payloads remain 2D-specific.
+- Added `ColliderSettings2D`, `CollisionType2D`, and `CollisionWorkItem2D`.
+  Pure 2D narrow phase now dispatches from a resolved collision type instead of
+  growing public type-check conditionals.
+- `LSCollider2D` now owns runtime-shape versions, query stamps, hierarchy
+  relationships, pair ownership/holder references, and deterministic priority
+  parity with the hardened 3D collider path.
+- `CollisionPair2D` now stores deterministic collider order and resolved
+  collision type. Pair removal during collider deactivation uses the affected
+  collider's owned/holder state instead of scanning all active pairs.
+- Query duplicate suppression now stamps candidate colliders with per-query
+  versions instead of clearing a context hash set per query.
+- Added focused 2D parity tests for unchanged-shape rebuild skipping,
+  shape/position dirtying, query stamp reset, hierarchy exclusions, pair cleanup,
+  and allocation-free warmed pair-owner deactivation.
+- Added `SimulateUnchangedColliders` and dense pair-owner deactivation coverage
+  to the 2D benchmark suite.
+- During allocation hardening, bulk active-partition removal exposed a
+  SwiftCollections issue: `SwiftBucket<T>` could still grow its internal
+  free-index stack after caller preallocation because `SwiftIntStack` grew when
+  requested capacity equaled current capacity. The fix lives in
+  `../SwiftCollections` and Gravitas is temporarily local-linked to validate
+  against that source until a package version carries the fix.
+- Verification completed with focused `Collider2DStateParityTests`, focused
+  pure `Physics2D` tests, full Gravitas unit tests in `Release` and
+  `ReleaseLean`, Gravitas library builds in `Release` and `ReleaseLean`,
+  SwiftCollections `Release` and `ReleaseLean` test gates, two short
+  `physics-2d` benchmark smokes, and `git diff --check`. Because the temporary
+  local SwiftCollections project reference can trigger the known `.slnx`
+  transitive configuration issue, the final Gravitas gates were run at the
+  project level so SwiftCollections built in the matching configuration.
 
 ## Phase 9K: 2D Continuous Collision
 

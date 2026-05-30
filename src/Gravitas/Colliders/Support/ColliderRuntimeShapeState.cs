@@ -1,10 +1,12 @@
-﻿using System.Runtime.CompilerServices;
+﻿using System;
+using System.Runtime.CompilerServices;
 
 namespace Gravitas.Colliders;
 
-internal sealed class ColliderRuntimeShapeState
+internal class ColliderRuntimeShapeState<TSnapshot>
+    where TSnapshot : IEquatable<TSnapshot>
 {
-    private ColliderShapeSnapshot _snapshot;
+    private TSnapshot _snapshot = default!;
     private bool _hasSnapshot;
     private bool _dirty = true;
 
@@ -14,11 +16,11 @@ internal sealed class ColliderRuntimeShapeState
     public void MarkDirty() => _dirty = true;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool ShouldRebuild(in ColliderShapeSnapshot snapshot) =>
-        _dirty || !_hasSnapshot || _snapshot != snapshot;
+    public bool ShouldRebuild(in TSnapshot snapshot) =>
+        _dirty || !_hasSnapshot || !_snapshot.Equals(snapshot);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void Commit(in ColliderShapeSnapshot snapshot)
+    public void Commit(in TSnapshot snapshot)
     {
         _snapshot = snapshot;
         _hasSnapshot = true;

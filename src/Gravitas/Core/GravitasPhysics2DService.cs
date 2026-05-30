@@ -148,8 +148,7 @@ public sealed class GravitasPhysics2DService
             return;
         }
 
-        if (ReferenceEquals(first!.AgentOrNull, second!.AgentOrNull)
-            || IsLayerCollisionDisabled(first.Layer, second.Layer)
+        if (!RequireCollisionPair(first!, second!)
             || !CollisionDetection2D.BoundsOverlap(first, second)
             || !IsCanonicalSharedPartition(first, second, partitionIndex))
         {
@@ -220,14 +219,12 @@ public sealed class GravitasPhysics2DService
 
     private void ProcessCandidate(LSCollider2D first, LSCollider2D second, int frame)
     {
-        if (ReferenceEquals(first.AgentOrNull, second.AgentOrNull))
-            return;
-
-        if (IsLayerCollisionDisabled(first.Layer, second.Layer))
+        if (!RequireCollisionPair(first, second))
             return;
 
         ulong key = CreatePairKey(first.Id, second.Id);
-        if (!CollisionDetection2D.TryCollide(first, second, out Contact2D contact))
+        CollisionWorkItem2D workItem = CreateCollisionWorkItem(first, second);
+        if (!CollisionDetection2D.TryCollide(workItem, out Contact2D contact))
             return;
 
         bool hasPair = _pairs.TryGetValue(key, out CollisionPair2D pair);
@@ -243,9 +240,21 @@ public sealed class GravitasPhysics2DService
         {
             pair = CreatePair(first, second);
             _pairs.Add(key, pair);
+            pair.ColliderA.TryAddCollisionPair(pair.Id2, pair);
+            pair.ColliderB.TryAddCollisionPairHolder(pair.Id1);
         }
 
         pair!.MarkColliding(frame, contact);
+    }
+
+    internal bool RequireCollisionPair(LSCollider2D first, LSCollider2D second)
+    {
+        return first.IsActive && second.IsActive
+            && first.Shape != ColliderType2D.None && second.Shape != ColliderType2D.None
+            && (first.Body != null || second.Body != null)
+            && !ReferenceEquals(first.AgentOrNull, second.AgentOrNull)
+            && !IsLayerCollisionDisabled(first.Layer, second.Layer)
+            && !first.IsSibling(second);
     }
 
     private void CleanupUntouchedPairs(int frame)
@@ -261,6 +270,7 @@ public sealed class GravitasPhysics2DService
                 continue;
 
             pair.MarkSeparated();
+            RemovePairReferences(pair);
             _pairsToRemove.Add(pairEntry.Key);
         }
 
@@ -313,25 +323,39 @@ public sealed class GravitasPhysics2DService
 
     private void RemovePairsForCollider(LSCollider2D collider)
     {
-        _pairsToRemove.FastClear();
-        foreach (var pairEntry in _pairs)
+        SwiftDictionary<int, CollisionPair2D>? collisionPairs = collider.CollisionPairs;
+        if (collisionPairs != null)
         {
-            CollisionPair2D pair = pairEntry.Value;
-            if (!ReferenceEquals(pair.ColliderA, collider) && !ReferenceEquals(pair.ColliderB, collider))
-                continue;
-
-            pair.MarkSeparated();
-            _pairsToRemove.Add(pairEntry.Key);
-        }
-
-        for (int i = 0; i < _pairsToRemove.Count; i++)
-        {
-            ulong key = _pairsToRemove[i];
-            if (_pairs.TryGetValue(key, out CollisionPair2D pair))
+            foreach (var pairEntry in collisionPairs)
+            {
+                CollisionPair2D pair = pairEntry.Value;
+                pair.MarkSeparated();
+                pair.ColliderB.TryRemoveCollisionPairHolder(pair.Id1);
+                _pairs.Remove(CreatePairKey(pair.Id1, pair.Id2));
                 RecyclePair(pair);
-
-            _pairs.Remove(key);
+            }
         }
+
+        SwiftHashSet<int>? collisionPairHolders = collider.CollisionPairHolders;
+        if (collisionPairHolders != null)
+        {
+            foreach (int holderId in collisionPairHolders)
+            {
+                if (!_collidersById.TryGetValue(holderId, out LSCollider2D? holder)
+                    || !holder!.TryRemoveCollisionPair(collider.Id, out CollisionPair2D? pair)
+                    || pair == null)
+                {
+                    continue;
+                }
+
+                pair.MarkSeparated();
+                _pairs.Remove(CreatePairKey(pair.Id1, pair.Id2));
+                RecyclePair(pair);
+            }
+        }
+
+        collider.ClearCollisionPairState();
+        collider.ClearRuntimeRelationships();
     }
 
     private void RemoveCollider(LSCollider2D collider)
@@ -360,6 +384,8 @@ public sealed class GravitasPhysics2DService
         int expectedPairKeyCapacity = colliderCount * 4;
         _processedPairKeys.EnsureCapacity(expectedPairKeyCapacity);
         _pairsToRemove.EnsureCapacity(colliderCount);
+        if (_context.Settings.PoolingEnabled)
+            _cachedPairs.EnsureCapacity(colliderCount);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -379,6 +405,27 @@ public sealed class GravitasPhysics2DService
             return false;
 
         return !matrix[layerIndex1, layerIndex2];
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static CollisionWorkItem2D CreateCollisionWorkItem(LSCollider2D first, LSCollider2D second)
+    {
+        LSCollider2D colliderA = first;
+        LSCollider2D colliderB = second;
+        if (!CollisionPair2D.ShouldFirstColliderLead(colliderA, colliderB))
+            (colliderA, colliderB) = (colliderB, colliderA);
+
+        return new CollisionWorkItem2D(
+            colliderA,
+            colliderB,
+            ColliderSettings2D.GetCollisionType(colliderA.Shape, colliderB.Shape));
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void RemovePairReferences(CollisionPair2D pair)
+    {
+        pair.ColliderA.TryRemoveCollisionPair(pair.Id2, out _);
+        pair.ColliderB.TryRemoveCollisionPairHolder(pair.Id1);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

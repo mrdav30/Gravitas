@@ -11,7 +11,7 @@ using System.Runtime.CompilerServices;
 
 namespace Gravitas.Colliders;
 
-public abstract class LSCollider : IRecordable
+public abstract class LSCollider : IRecordable, IColliderHierarchyNode<LSCollider>
 {
     #region Fields and Properties
 
@@ -51,11 +51,11 @@ public abstract class LSCollider : IRecordable
     private FixedQuaternion _compoundLocalRotation = FixedQuaternion.Identity;
     private Vector3d _compoundLocalScale = Vector3d.One;
 
-    private readonly ColliderRuntimeShapeState _runtimeShapeState = new();
+    private readonly ColliderRuntimeShapeState<ColliderShapeSnapshot> _runtimeShapeState = new();
     private ColliderPartitionState _partitionState;
     private ColliderQueryState _queryState;
-    private ColliderPairState _pairState;
-    private ColliderHierarchyState _hierarchyState;
+    private ColliderPairState<CollisionPair> _pairState;
+    private ColliderHierarchyState<LSCollider> _hierarchyState;
 
     internal uint RuntimeShapeVersion => _runtimeShapeState.RuntimeVersion;
 
@@ -796,6 +796,10 @@ public abstract class LSCollider : IRecordable
         context = _context;
         return context != null;
     }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    bool IColliderHierarchyNode<LSCollider>.TryGetHierarchyColliderById(int id, out LSCollider? collider) =>
+        Context.Physics.TryGetColliderById(id, out collider);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal void SetPhysicsId(int id)

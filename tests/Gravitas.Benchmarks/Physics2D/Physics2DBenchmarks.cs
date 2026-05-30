@@ -15,8 +15,10 @@ public class Physics2DBenchmarks
     private GravitasWorldContext _collisionContext;
     private GravitasWorldContext _queryContext;
     private GravitasWorldContext _detectionContext;
+    private GravitasWorldContext _pairCleanupContext;
     private SwiftList<StiffBody2D> _integrationBodies;
     private SwiftList<StiffBody2D> _collisionBodies;
+    private SwiftList<StiffBody2D> _pairCleanupOwners;
     private SwiftList<LSCollider2D> _sweepCollisionColliders;
     private SwiftList<LSCollider2D> _sweepQueryColliders;
     private SwiftList<LSCollider2D> _sweepSortedColliders;
@@ -73,13 +75,16 @@ public class Physics2DBenchmarks
         _collisionContext.Dispose();
         _queryContext.Dispose();
         _detectionContext.Dispose();
+        _pairCleanupContext?.Dispose();
 
         _integrationContext = null;
         _collisionContext = null;
         _queryContext = null;
         _detectionContext = null;
+        _pairCleanupContext = null;
         _integrationBodies = null;
         _collisionBodies = null;
+        _pairCleanupOwners = null;
         _sweepCollisionColliders = null;
         _sweepQueryColliders = null;
         _sweepSortedColliders = null;
@@ -132,6 +137,54 @@ public class Physics2DBenchmarks
 
         _collisionContext.Physics2D.Simulate();
         return _collisionContext.Physics2D.BodyCount;
+    }
+
+    [Benchmark]
+    public uint SimulateUnchangedColliders()
+    {
+        uint versionTotal = 0;
+        for (int i = 0; i < _sweepQueryColliders.Count; i++)
+        {
+            LSCollider2D collider = _sweepQueryColliders[i];
+            collider.Simulate();
+            versionTotal += collider.RuntimeShapeVersion;
+        }
+
+        return versionTotal;
+    }
+
+    [IterationSetup(Target = nameof(DeactivateOverlappingPairOwners))]
+    public void SetupPairCleanup()
+    {
+        _pairCleanupContext = GravitasWorldContext.CreateOwned();
+        Configure2DContext(_pairCleanupContext, BodyCount);
+        _pairCleanupOwners = new SwiftList<StiffBody2D>(BodyCount);
+        for (int i = 0; i < BodyCount; i++)
+        {
+            Vector2d position = PositionForIndex(i, spacing: (Fixed64)2);
+            StiffBody2D owner = CreateBody(_pairCleanupContext, new LSCircleCollider2D(Fixed64.Half), position, immovable: false);
+            _ = CreateBody(_pairCleanupContext, new LSCircleCollider2D(Fixed64.Half), position + new Vector2d(Fixed64.Half, Fixed64.Zero), immovable: true);
+            _pairCleanupOwners.Add(owner);
+        }
+
+        _pairCleanupContext.Simulate();
+    }
+
+    [IterationCleanup(Target = nameof(DeactivateOverlappingPairOwners))]
+    public void CleanupPairCleanup()
+    {
+        _pairCleanupContext.Dispose();
+        _pairCleanupContext = null;
+        _pairCleanupOwners = null;
+    }
+
+    [Benchmark]
+    public int DeactivateOverlappingPairOwners()
+    {
+        for (int i = 0; i < _pairCleanupOwners.Count; i++)
+            _pairCleanupOwners[i].Collider.Deactivate();
+
+        return _pairCleanupContext.Physics2D.ColliderCount;
     }
 
     [Benchmark]

@@ -15,28 +15,41 @@ public static class CollisionDetection2D
         SwiftThrowHelper.ThrowIfNull(colliderA, nameof(colliderA));
         SwiftThrowHelper.ThrowIfNull(colliderB, nameof(colliderB));
 
+        CollisionType2D collisionType = ColliderSettings2D.GetCollisionType(colliderA.Shape, colliderB.Shape);
+        return TryCollide(new CollisionWorkItem2D(colliderA, colliderB, collisionType), out contact);
+    }
+
+    internal static bool TryCollide(CollisionPair2D pair, out Contact2D contact) =>
+        TryCollide(CollisionWorkItem2D.Create(pair), out contact);
+
+    internal static bool TryCollide(CollisionWorkItem2D item, out Contact2D contact)
+    {
+        LSCollider2D colliderA = item.ColliderA;
+        LSCollider2D colliderB = item.ColliderB;
         if (!BoundsOverlap(colliderA, colliderB))
         {
             contact = default;
             return false;
         }
 
-        if (colliderA is LSCircleCollider2D circleA && colliderB is LSCircleCollider2D circleB)
-            return TryCircleCircle(circleA, circleB, out contact);
-
-        if (colliderA is LSCircleCollider2D circle && colliderB is not LSCircleCollider2D)
-            return TryCircleConvex(circle, colliderB, out contact);
-
-        if (colliderB is LSCircleCollider2D circleOther && colliderA is not LSCircleCollider2D)
+        switch (item.CollisionType)
         {
-            bool result = TryCircleConvex(circleOther, colliderA, out Contact2D reversed);
-            contact = result
-                ? new Contact2D(reversed.PointB, reversed.PointA, -reversed.Normal, reversed.Depth)
-                : default;
-            return result;
+            case CollisionType2D.Circle_Circle:
+                return TryCircleCircle((LSCircleCollider2D)colliderA, (LSCircleCollider2D)colliderB, out contact);
+            case CollisionType2D.Circle_Convex:
+                return TryCircleConvex((LSCircleCollider2D)colliderA, colliderB, out contact);
+            case CollisionType2D.Convex_Circle:
+                bool result = TryCircleConvex((LSCircleCollider2D)colliderB, colliderA, out Contact2D reversed);
+                contact = result
+                    ? new Contact2D(reversed.PointB, reversed.PointA, -reversed.Normal, reversed.Depth)
+                    : default;
+                return result;
+            case CollisionType2D.Convex_Convex:
+                return TryConvexConvex(colliderA, colliderB, out contact);
+            default:
+                contact = default;
+                return false;
         }
-
-        return TryConvexConvex(colliderA, colliderB, out contact);
     }
 
     private static bool TryCircleCircle(LSCircleCollider2D colliderA, LSCircleCollider2D colliderB, out Contact2D contact)

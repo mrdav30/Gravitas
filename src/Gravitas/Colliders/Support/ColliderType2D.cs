@@ -3,7 +3,7 @@ namespace Gravitas.Colliders;
 /// <summary>
 /// Identifies first-class pure 2D collider shapes.
 /// </summary>
-public enum Collider2DType : byte
+public enum ColliderType2D : byte
 {
     None = 0,
     Circle = 1,
