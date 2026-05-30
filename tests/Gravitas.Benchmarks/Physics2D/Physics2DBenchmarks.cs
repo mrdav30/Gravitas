@@ -281,6 +281,36 @@ public class Physics2DBenchmarks
             _queryHits);
     }
 
+    [Benchmark]
+    public int SweepCircleAll_NoHit()
+    {
+        return _queryContext.Query2D.SweepCircleAll(
+            new Vector2d((Fixed64)(-8), (Fixed64)(-8)),
+            new Vector2d((Fixed64)(-4), (Fixed64)(-8)),
+            Fixed64.Half,
+            _queryHits);
+    }
+
+    [Benchmark]
+    public int SweepCircleAll_SparseHit()
+    {
+        return _queryContext.Query2D.SweepCircleAll(
+            new Vector2d((Fixed64)(-8), (Fixed64)12),
+            new Vector2d((Fixed64)64, (Fixed64)12),
+            Fixed64.Half,
+            _queryHits);
+    }
+
+    [Benchmark]
+    public int SweepCircleAll_DenseHit()
+    {
+        return _queryContext.Query2D.SweepCircleAll(
+            new Vector2d((Fixed64)(-8), (Fixed64)12),
+            new Vector2d((Fixed64)64, (Fixed64)12),
+            (Fixed64)18,
+            _queryHits);
+    }
+
     private static void Configure2DContext(GravitasWorldContext context, int bodyCount)
     {
         context.Settings.RuntimeMode = PhysicsRuntimeMode.TwoD;

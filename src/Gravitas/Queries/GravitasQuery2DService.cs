@@ -174,6 +174,123 @@ public sealed class GravitasQuery2DService
         return results.Count;
     }
 
+    /// <summary>
+    /// Finds the closest pure 2D collider hit by sweeping a circle from <paramref name="start"/> to <paramref name="end"/>.
+    /// </summary>
+    public bool SweepCircle(Vector2d start, Vector2d end, Fixed64 radius, out Physics2DHit hit)
+    {
+        return SweepCircle(start, end, radius, PhysicsLayerMask.All, out hit);
+    }
+
+    /// <summary>
+    /// Finds the closest pure 2D collider on an included layer hit by sweeping a circle.
+    /// </summary>
+    public bool SweepCircle(
+        Vector2d start,
+        Vector2d end,
+        Fixed64 radius,
+        PhysicsLayerMask layerMask,
+        out Physics2DHit hit,
+        LSCollider2D? excludedCollider = null,
+        bool includeTriggers = true)
+    {
+        SwiftThrowHelper.ThrowIfArgument(radius <= Fixed64.Zero, nameof(radius), "2D sweep radius must be greater than zero.");
+
+        Vector2d segment = end - start;
+        if (segment.SqrMagnitude <= Fixed64.Epsilon)
+        {
+            LastQueryCandidateCount = 0;
+            hit = default;
+            return false;
+        }
+
+        EnsureCandidateCapacity();
+        uint queryVersion = NextRaycastVersion();
+        _context.Collisions2D.CollectBoundsCandidates(
+            CreateSweepMin(start, end, radius),
+            CreateSweepMax(start, end, radius),
+            layerMask,
+            queryVersion,
+            raycastQuery: true,
+            _queryCandidates);
+
+        LastQueryCandidateCount = _queryCandidates.Count;
+        bool found = false;
+        Physics2DHit closest = default;
+        for (int i = 0; i < _queryCandidates.Count; i++)
+        {
+            LSCollider2D collider = _queryCandidates[i];
+            if (!IsEligibleSweepCandidate(collider, excludedCollider, includeTriggers)
+                || !QueryDetection2D.TrySweepCircle(start, end, radius, collider, out Physics2DHit candidate)
+                || (found && !Physics2DHitSorter.ComesBefore(candidate, closest)))
+            {
+                continue;
+            }
+
+            closest = candidate;
+            found = true;
+        }
+
+        hit = closest;
+        return found;
+    }
+
+    /// <summary>
+    /// Writes all pure 2D colliders hit by sweeping a circle into <paramref name="results"/>.
+    /// </summary>
+    public int SweepCircleAll(Vector2d start, Vector2d end, Fixed64 radius, SwiftList<Physics2DHit> results)
+    {
+        return SweepCircleAll(start, end, radius, PhysicsLayerMask.All, results);
+    }
+
+    /// <summary>
+    /// Writes all pure 2D colliders on included layers hit by sweeping a circle into <paramref name="results"/>.
+    /// </summary>
+    public int SweepCircleAll(
+        Vector2d start,
+        Vector2d end,
+        Fixed64 radius,
+        PhysicsLayerMask layerMask,
+        SwiftList<Physics2DHit> results,
+        LSCollider2D? excludedCollider = null,
+        bool includeTriggers = true)
+    {
+        SwiftThrowHelper.ThrowIfNull(results, nameof(results));
+        SwiftThrowHelper.ThrowIfArgument(radius <= Fixed64.Zero, nameof(radius), "2D sweep radius must be greater than zero.");
+
+        results.FastClear();
+        Vector2d segment = end - start;
+        if (segment.SqrMagnitude <= Fixed64.Epsilon)
+        {
+            LastQueryCandidateCount = 0;
+            return 0;
+        }
+
+        EnsureCandidateCapacity();
+        uint queryVersion = NextRaycastVersion();
+        _context.Collisions2D.CollectBoundsCandidates(
+            CreateSweepMin(start, end, radius),
+            CreateSweepMax(start, end, radius),
+            layerMask,
+            queryVersion,
+            raycastQuery: true,
+            _queryCandidates);
+
+        LastQueryCandidateCount = _queryCandidates.Count;
+        for (int i = 0; i < _queryCandidates.Count; i++)
+        {
+            LSCollider2D collider = _queryCandidates[i];
+            if (IsEligibleSweepCandidate(collider, excludedCollider, includeTriggers)
+                && QueryDetection2D.TrySweepCircle(start, end, radius, collider, out Physics2DHit hit))
+            {
+                results.Add(hit);
+            }
+        }
+
+        Physics2DHitSorter.SortByDistance(results);
+        return results.Count;
+    }
+
     private void EnsureCandidateCapacity()
     {
         int colliderCount = _context.Physics2D.ColliderCount;
@@ -206,4 +323,24 @@ public sealed class GravitasQuery2DService
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Vector2d CreateMax(Vector2d first, Vector2d second) =>
         new(FixedMath.Max(first.x, second.x), FixedMath.Max(first.y, second.y));
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Vector2d CreateSweepMin(Vector2d first, Vector2d second, Fixed64 radius) =>
+        new(FixedMath.Min(first.x, second.x) - radius, FixedMath.Min(first.y, second.y) - radius);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Vector2d CreateSweepMax(Vector2d first, Vector2d second, Fixed64 radius) =>
+        new(FixedMath.Max(first.x, second.x) + radius, FixedMath.Max(first.y, second.y) + radius);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool IsEligibleSweepCandidate(LSCollider2D collider, LSCollider2D? excludedCollider, bool includeTriggers)
+    {
+        if (!includeTriggers && collider.IsTrigger)
+            return false;
+
+        return excludedCollider == null
+            || (!ReferenceEquals(collider, excludedCollider)
+                && !ReferenceEquals(collider.AgentOrNull, excludedCollider.AgentOrNull)
+                && !collider.IsSibling(excludedCollider));
+    }
 }

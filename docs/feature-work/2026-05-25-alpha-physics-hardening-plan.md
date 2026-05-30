@@ -1833,34 +1833,34 @@ static or kinematic 2D colliders before mixed 2D/3D integration begins.
 
 **Tasks:**
 
-- [ ] Add `ContinuousCollisionMode` support to `StiffBody2D`, defaulting to
+- [x] Add `ContinuousCollisionMode` support to `StiffBody2D`, defaulting to
   `Inherit`, and include it in Chronicler state recording if body state
   recording already covers the equivalent 3D property.
-- [ ] Resolve the effective 2D CCD mode from the body, then applicable hierarchy
+- [x] Resolve the effective 2D CCD mode from the body, then applicable hierarchy
   state when available from Phase 9J, then the context default. Final unresolved
   `Inherit` should behave as `Discrete`.
-- [ ] Add caller-buffered `Query2D.SweepCircle(...)` and
+- [x] Add caller-buffered `Query2D.SweepCircle(...)` and
   `Query2D.SweepCircleAll(...)` APIs with deterministic ordering, layer
   filtering, trigger filtering, self/hierarchy exclusion, and duplicate
   suppression.
-- [ ] Use a conservative deterministic proxy radius per shape: circle radius,
+- [x] Use a conservative deterministic proxy radius per shape: circle radius,
   AABB half-diagonal, and polygon maximum local/world vertex distance from the
   collider center.
-- [ ] In `StiffBody2D.LateSimulate`, compute the proposed movement, resolve CCD
+- [x] In `StiffBody2D.LateSimulate`, compute the proposed movement, resolve CCD
   mode before expensive query setup, sweep when required, and commit the clipped
   position before publishing visualization state.
-- [ ] Implement `Auto` mode so it only sweeps when displacement squared exceeds
+- [x] Implement `Auto` mode so it only sweeps when displacement squared exceeds
   the deterministic proxy-radius threshold; keep `Discrete` behavior unchanged.
-- [ ] Start with static/kinematic target coverage, mirroring the current 3D CCD
+- [x] Start with static/kinematic target coverage, mirroring the current 3D CCD
   maturity, and document dynamic-vs-dynamic CCD as a later hardening target if
   not solved in this phase.
-- [ ] Add tests for fast circle-vs-circle, circle-vs-AABB, and circle-vs-polygon
+- [x] Add tests for fast circle-vs-circle, circle-vs-AABB, and circle-vs-polygon
   tunneling prevention, plus no-hit, zero-displacement, layer filtering,
   trigger filtering, self-exclusion, and deterministic hit ordering.
-- [ ] Add benchmark coverage for 2D CCD cost in no-hit, sparse-hit, and
+- [x] Add benchmark coverage for 2D CCD cost in no-hit, sparse-hit, and
   dense-hit scenes.
-- [ ] Update query/runtime wiki docs for the 2D sweep contract and CCD limits.
-- [ ] Run focused 2D CCD tests, full `Release`, full `ReleaseLean`, relevant
+- [x] Update query/runtime wiki docs for the 2D sweep contract and CCD limits.
+- [x] Run focused 2D CCD tests, full `Release`, full `ReleaseLean`, relevant
   benchmarks, and `git diff --check`.
 
 **Acceptance Bar:**
@@ -1874,6 +1874,27 @@ static or kinematic 2D colliders before mixed 2D/3D integration begins.
 - `Discrete` mode remains unchanged and covered by tests.
 - 2D sweep queries are caller-buffered, deterministic, and discoverable through
   `GravitasWorldContext.Query2D`.
+
+**Phase 9K Implementation Notes:**
+
+- `StiffBody2D.ContinuousCollisionMode` now mirrors the 3D body contract and is
+  recorded through Chronicler state. Effective mode resolves from the body, then
+  the cached collider hierarchy top parent when present, then
+  `PhysicsSettings.DefaultContinuousCollisionMode`, with unresolved `Inherit`
+  falling back to `Discrete`.
+- `Query2D.SweepCircle` and `SweepCircleAll` now provide caller-buffered pure 2D
+  swept-circle queries over circles, AABBs, and convex polygons. Query results
+  use deterministic distance/collider-ID ordering and support layer, trigger,
+  self, same-agent, and hierarchy exclusion filters.
+- `StiffBody2D.LateSimulate` computes proposed movement, exits before query work
+  when mode/proxy/displacement rules do not require CCD, and clips movement
+  before committing authoritative position. The initial scope matches 3D CCD
+  maturity: dynamic movers sweep against static, bodyless, immovable, or
+  kinematic 2D targets; dynamic-vs-dynamic TOI remains a later hardening item.
+- Added focused unit coverage for circle, AABB, polygon, default inheritance,
+  `Auto`, `Discrete`, filtering, deterministic result ordering, and warm
+  allocation behavior. Added benchmark coverage for no-hit, sparse-hit, and
+  dense-hit swept-circle query scenes.
 
 ## Phase 10: Mixed 2D/3D Interaction Model
 

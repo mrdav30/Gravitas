@@ -63,6 +63,34 @@ internal static class QueryDetection2D
             : TryRaycastConvex(start, segment, direction, segmentLength, collider, out hit);
     }
 
+    internal static bool TrySweepCircle(
+        Vector2d start,
+        Vector2d end,
+        Fixed64 radius,
+        LSCollider2D collider,
+        out Physics2DHit hit)
+    {
+        Vector2d segment = end - start;
+        Fixed64 segmentLengthSquared = segment.SqrMagnitude;
+        if (segmentLengthSquared <= Fixed64.Epsilon || !SweepBoundsOverlap(start, end, radius, collider))
+        {
+            hit = default;
+            return false;
+        }
+
+        if (TryOverlapCircle(start, radius, collider, out Physics2DHit overlapHit))
+        {
+            hit = new Physics2DHit(collider, start, overlapHit.Normal, Fixed64.Zero);
+            return true;
+        }
+
+        Fixed64 segmentLength = FixedMath.Sqrt(segmentLengthSquared);
+        Vector2d direction = segment / segmentLength;
+        return collider is LSCircleCollider2D circle
+            ? TrySweepCircleCircle(start, direction, segmentLength, radius, circle, out hit)
+            : TrySweepCircleConvex(start, direction, segmentLength, radius, collider, out hit);
+    }
+
     private static bool TryRaycastCircle(
         Vector2d start,
         Vector2d direction,
@@ -99,6 +127,30 @@ internal static class QueryDetection2D
         Vector2d normal = point == circle.Center
             ? ResolveQueryFallbackNormal(point, circle.Center)
             : (point - circle.Center).Normal;
+        hit = new Physics2DHit(circle, point, normal, distance);
+        return true;
+    }
+
+    private static bool TrySweepCircleCircle(
+        Vector2d start,
+        Vector2d direction,
+        Fixed64 segmentLength,
+        Fixed64 radius,
+        LSCircleCollider2D circle,
+        out Physics2DHit hit)
+    {
+        Fixed64 combinedRadius = radius + circle.Radius;
+        if (!TryRaycastCircleDistance(start, direction, segmentLength, circle.Center, combinedRadius, out Fixed64 distance))
+        {
+            hit = default;
+            return false;
+        }
+
+        Vector2d sweptCenter = start + direction * distance;
+        Vector2d normal = sweptCenter == circle.Center
+            ? ResolveQueryFallbackNormal(sweptCenter, circle.Center)
+            : (sweptCenter - circle.Center).Normal;
+        Vector2d point = circle.Center + normal * circle.Radius;
         hit = new Physics2DHit(circle, point, normal, distance);
         return true;
     }
@@ -149,6 +201,175 @@ internal static class QueryDetection2D
         return true;
     }
 
+    private static bool TrySweepCircleConvex(
+        Vector2d start,
+        Vector2d direction,
+        Fixed64 segmentLength,
+        Fixed64 radius,
+        LSCollider2D collider,
+        out Physics2DHit hit)
+    {
+        bool found = false;
+        Fixed64 bestDistance = Fixed64.MAX_VALUE;
+        Vector2d bestPoint = Vector2d.Zero;
+        Vector2d bestNormal = Vector2d.Right;
+
+        int vertexCount = collider.VertexCount;
+        for (int i = 0; i < vertexCount; i++)
+        {
+            Vector2d a = collider.GetVertexUnchecked(i);
+            Vector2d b = collider.GetVertexUnchecked((i + 1) % vertexCount);
+            if (TrySweepCircleEdge(
+                    start,
+                    direction,
+                    segmentLength,
+                    radius,
+                    collider.Center,
+                    a,
+                    b,
+                    out Fixed64 edgeDistance,
+                    out Vector2d edgePoint,
+                    out Vector2d edgeNormal)
+                && (!found || edgeDistance < bestDistance))
+            {
+                found = true;
+                bestDistance = edgeDistance;
+                bestPoint = edgePoint;
+                bestNormal = edgeNormal;
+            }
+
+            if (TrySweepCircleVertex(
+                    start,
+                    direction,
+                    segmentLength,
+                    radius,
+                    a,
+                    out Fixed64 vertexDistance,
+                    out Vector2d vertexNormal)
+                && (!found || vertexDistance < bestDistance))
+            {
+                found = true;
+                bestDistance = vertexDistance;
+                bestPoint = a;
+                bestNormal = vertexNormal;
+            }
+        }
+
+        if (!found)
+        {
+            hit = default;
+            return false;
+        }
+
+        hit = new Physics2DHit(collider, bestPoint, bestNormal, bestDistance);
+        return true;
+    }
+
+    private static bool TrySweepCircleEdge(
+        Vector2d start,
+        Vector2d direction,
+        Fixed64 segmentLength,
+        Fixed64 radius,
+        Vector2d colliderCenter,
+        Vector2d edgeStart,
+        Vector2d edgeEnd,
+        out Fixed64 distance,
+        out Vector2d point,
+        out Vector2d normal)
+    {
+        Vector2d edge = edgeEnd - edgeStart;
+        Fixed64 edgeLengthSquared = edge.SqrMagnitude;
+        if (edgeLengthSquared <= Fixed64.Epsilon)
+        {
+            distance = default;
+            point = default;
+            normal = default;
+            return false;
+        }
+
+        normal = ResolveOutwardEdgeNormal(edgeStart, edge, colliderCenter);
+        Fixed64 startOffset = Vector2d.Dot(start - edgeStart, normal);
+        Fixed64 directionOffset = Vector2d.Dot(direction, normal);
+        if (startOffset <= radius || directionOffset >= -Fixed64.Epsilon)
+        {
+            distance = default;
+            point = default;
+            return false;
+        }
+
+        distance = (radius - startOffset) / directionOffset;
+        if (distance < Fixed64.Zero || distance > segmentLength)
+        {
+            point = default;
+            return false;
+        }
+
+        Vector2d sweptCenter = start + direction * distance;
+        point = sweptCenter - normal * radius;
+        Fixed64 edgeT = Vector2d.Dot(point - edgeStart, edge) / edgeLengthSquared;
+        if (edgeT < Fixed64.Zero || edgeT > Fixed64.One)
+        {
+            distance = default;
+            point = default;
+            normal = default;
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool TrySweepCircleVertex(
+        Vector2d start,
+        Vector2d direction,
+        Fixed64 segmentLength,
+        Fixed64 radius,
+        Vector2d vertex,
+        out Fixed64 distance,
+        out Vector2d normal)
+    {
+        if (!TryRaycastCircleDistance(start, direction, segmentLength, vertex, radius, out distance))
+        {
+            normal = default;
+            return false;
+        }
+
+        Vector2d sweptCenter = start + direction * distance;
+        normal = sweptCenter == vertex
+            ? ResolveQueryFallbackNormal(sweptCenter, vertex)
+            : (sweptCenter - vertex).Normal;
+        return true;
+    }
+
+    private static bool TryRaycastCircleDistance(
+        Vector2d start,
+        Vector2d direction,
+        Fixed64 segmentLength,
+        Vector2d circleCenter,
+        Fixed64 radius,
+        out Fixed64 distance)
+    {
+        Vector2d originFromCenter = start - circleCenter;
+        Fixed64 c = originFromCenter.SqrMagnitude - radius * radius;
+        Fixed64 b = Vector2d.Dot(originFromCenter, direction);
+        if (c > Fixed64.Zero && b > Fixed64.Zero)
+        {
+            distance = default;
+            return false;
+        }
+
+        Fixed64 discriminant = b * b - c;
+        if (discriminant < Fixed64.Zero)
+        {
+            distance = default;
+            return false;
+        }
+
+        distance = -b - FixedMath.Sqrt(discriminant);
+        if (distance < Fixed64.Zero)
+            distance = Fixed64.Zero;
+        return distance <= segmentLength;
+    }
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool SegmentBoundsOverlap(Vector2d start, Vector2d end, LSCollider2D collider)
     {
@@ -156,6 +377,19 @@ internal static class QueryDetection2D
         Fixed64 maxX = FixedMath.Max(start.x, end.x);
         Fixed64 minY = FixedMath.Min(start.y, end.y);
         Fixed64 maxY = FixedMath.Max(start.y, end.y);
+        return maxX >= collider.MinX
+            && minX <= collider.MaxX
+            && maxY >= collider.MinY
+            && minY <= collider.MaxY;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool SweepBoundsOverlap(Vector2d start, Vector2d end, Fixed64 radius, LSCollider2D collider)
+    {
+        Fixed64 minX = FixedMath.Min(start.x, end.x) - radius;
+        Fixed64 maxX = FixedMath.Max(start.x, end.x) + radius;
+        Fixed64 minY = FixedMath.Min(start.y, end.y) - radius;
+        Fixed64 maxY = FixedMath.Max(start.y, end.y) + radius;
         return maxX >= collider.MinX
             && minX <= collider.MaxX
             && maxY >= collider.MinY
@@ -197,5 +431,18 @@ internal static class QueryDetection2D
         return direction.SqrMagnitude > Fixed64.Epsilon
             ? direction.Normal
             : Vector2d.Right;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Vector2d ResolveOutwardEdgeNormal(Vector2d edgeStart, Vector2d edge, Vector2d colliderCenter)
+    {
+        Vector2d normal = edge.LeftHandNormal;
+        if (normal.SqrMagnitude <= Fixed64.Epsilon)
+            return ResolveQueryFallbackNormal(edgeStart, colliderCenter);
+
+        normal = normal.Normal;
+        if (Vector2d.Dot(colliderCenter - edgeStart, normal) > Fixed64.Zero)
+            normal = -normal;
+        return normal;
     }
 }

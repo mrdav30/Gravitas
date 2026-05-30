@@ -146,11 +146,15 @@ swept-sphere queries for deterministic 3D swept movement.
 - `Raycast(start, end, layerMask, out hit)`
 - `RaycastAll(start, end, results)`
 - `RaycastAll(start, end, layerMask, results)`
+- `SweepCircle(start, end, radius, out hit)`
+- `SweepCircle(start, end, radius, layerMask, out hit, excludedCollider, includeTriggers)`
+- `SweepCircleAll(start, end, radius, results)`
+- `SweepCircleAll(start, end, radius, layerMask, results, excludedCollider, includeTriggers)`
 
 All-hit methods clear the caller-provided `SwiftList<Physics2DHit>`, write hits
 into it, return the hit count, and sort by distance with collider ID as the
-deterministic tie-breaker. Closest-hit `Raycast` overloads use the same
-ordering and return the first hit through an `out Physics2DHit`.
+deterministic tie-breaker. Closest-hit `Raycast` and `SweepCircle` overloads use
+the same ordering and return the first hit through an `out Physics2DHit`.
 
 Pure 2D query positions are `Vector2d` values in the X/Z plane. When hosts
 convert from a `FixedTransform`, use `Vector3d.ToVector2d()` so world X maps to
@@ -176,6 +180,12 @@ circle, AABB, and convex polygon colliders. Zero-length segments return no
 hits. Starting inside a collider returns a zero-distance hit. A collider that
 spans multiple voxels is still reported once because candidate gathering
 stamps duplicate collider visits before exact shape testing.
+
+`SweepCircle` uses the same candidate gatherer with the swept circle's expanded
+bounds. It performs deterministic circle-vs-circle and circle-vs-convex-shape
+sweeps, supports layer masks, optional trigger inclusion, and an excluded
+collider for body CCD self/hierarchy filtering. It is the pure 2D equivalent of
+the 3D swept-sphere query path; it is not a mixed 2D/3D bridge.
 
 Current hit data is `Physics2DHit`: collider, optional body, point, normal, and
 distance. AABB and polygon area-query APIs remain future 2D query hardening

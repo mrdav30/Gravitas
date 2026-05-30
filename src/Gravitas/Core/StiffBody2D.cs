@@ -1,6 +1,7 @@
 using Chronicler;
 using FixedMathSharp;
 using Gravitas.Colliders;
+using Gravitas.Queries;
 using Gravitas.Support;
 using SwiftCollections;
 using System.Runtime.CompilerServices;
@@ -21,6 +22,8 @@ public sealed class StiffBody2D : IRecordable
     private bool _isSleeping;
     private bool _isDynamic;
     private int _sleepFrameCount;
+    private ContinuousCollisionMode _continuousCollisionMode = ContinuousCollisionMode.Inherit;
+    private readonly SwiftList<Physics2DHit> _continuousCollisionHits = new();
 
     public StiffBody2D(IMatterAgent agent, LSCollider2D collider)
     {
@@ -44,6 +47,17 @@ public sealed class StiffBody2D : IRecordable
     public bool Immovable { get; set; }
 
     public bool IsKinematic { get; set; }
+
+    /// <summary>
+    /// Selects the deterministic tunneling guard used when this pure 2D body commits frame movement.
+    /// </summary>
+    public ContinuousCollisionMode ContinuousCollisionMode
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => _continuousCollisionMode;
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        set => _continuousCollisionMode = value;
+    }
 
     public Fixed64 Mass { get; set; }
 
@@ -175,7 +189,9 @@ public sealed class StiffBody2D : IRecordable
         _linearAccelerationStore = Vector2d.Zero;
         RefreshLinearSpeed();
 
-        _position += _linearVelocity * Context.DeltaTime;
+        Vector2d proposedPosition = _position + _linearVelocity * Context.DeltaTime;
+        TryResolveContinuousCollision(_position, ref proposedPosition);
+        _position = proposedPosition;
         Collider.Rebuild();
 
         UpdateSleepState();
@@ -227,6 +243,127 @@ public sealed class StiffBody2D : IRecordable
 
         Wake();
         _linearVelocity += velocityDelta;
+        RefreshLinearSpeed();
+    }
+
+    private bool TryResolveContinuousCollision(Vector2d startPosition, ref Vector2d proposedPosition)
+    {
+        if (!ShouldUseContinuousCollision(out ContinuousCollisionMode mode))
+            return false;
+
+        Vector2d displacement = proposedPosition - startPosition;
+        if (displacement.SqrMagnitude <= Fixed64.Epsilon)
+            return false;
+
+        Fixed64 proxyRadius = ResolveContinuousCollisionProxyRadius();
+        if (proxyRadius <= Fixed64.Epsilon
+            || (mode == ContinuousCollisionMode.Auto && displacement.SqrMagnitude <= proxyRadius * proxyRadius))
+        {
+            return false;
+        }
+
+        int hitCount = Context.Query2D.SweepCircleAll(
+            startPosition,
+            proposedPosition,
+            proxyRadius,
+            PhysicsLayerMask.All,
+            _continuousCollisionHits,
+            Collider,
+            includeTriggers: false);
+
+        for (int i = 0; i < hitCount; i++)
+        {
+            Physics2DHit hit = _continuousCollisionHits[i];
+            if (!IsValidContinuousCollisionHit(hit))
+                continue;
+
+            proposedPosition = startPosition + displacement.Normal * hit.Distance;
+            RemoveClosingContinuousCollisionVelocity(hit.Normal);
+            return true;
+        }
+
+        return false;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private bool ShouldUseContinuousCollision(out ContinuousCollisionMode mode)
+    {
+        mode = ResolveContinuousCollisionMode();
+        return mode == ContinuousCollisionMode.Continuous || mode == ContinuousCollisionMode.Auto;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private ContinuousCollisionMode ResolveContinuousCollisionMode()
+    {
+        ContinuousCollisionMode mode = _continuousCollisionMode;
+        if (mode != ContinuousCollisionMode.Inherit)
+            return mode;
+
+        StiffBody2D? parentBody = Collider.TopParent?.Body;
+        if (parentBody != null && parentBody._continuousCollisionMode != ContinuousCollisionMode.Inherit)
+            return parentBody._continuousCollisionMode;
+
+        mode = Context.Settings.DefaultContinuousCollisionMode;
+        return mode == ContinuousCollisionMode.Inherit
+            ? ContinuousCollisionMode.Discrete
+            : mode;
+    }
+
+    private Fixed64 ResolveContinuousCollisionProxyRadius()
+    {
+        return Collider switch
+        {
+            LSCircleCollider2D circle => circle.Radius,
+            LSAABBoxCollider2D box => box.HalfExtents.Magnitude,
+            _ => ResolveConvexContinuousCollisionProxyRadius()
+        };
+    }
+
+    private Fixed64 ResolveConvexContinuousCollisionProxyRadius()
+    {
+        int vertexCount = Collider.VertexCount;
+        if (vertexCount <= 0)
+            return Fixed64.Zero;
+
+        Vector2d center = Collider.Center;
+        Fixed64 bestDistanceSquared = Fixed64.Zero;
+        for (int i = 0; i < vertexCount; i++)
+        {
+            Fixed64 distanceSquared = Vector2d.SqrDistance(center, Collider.GetVertexUnchecked(i));
+            if (distanceSquared > bestDistanceSquared)
+                bestDistanceSquared = distanceSquared;
+        }
+
+        return bestDistanceSquared > Fixed64.Zero
+            ? FixedMath.Sqrt(bestDistanceSquared)
+            : Fixed64.Zero;
+    }
+
+    private bool IsValidContinuousCollisionHit(Physics2DHit hit)
+    {
+        LSCollider2D? hitCollider = hit.Collider;
+        if (hitCollider == null
+            || ReferenceEquals(hitCollider, Collider)
+            || hitCollider.IsTrigger
+            || !Context.Physics2D.RequireCollisionPair(Collider, hitCollider))
+        {
+            return false;
+        }
+
+        StiffBody2D? hitBody = hitCollider.Body;
+        return hitBody == null || hitBody.Immovable || hitBody.IsKinematic;
+    }
+
+    private void RemoveClosingContinuousCollisionVelocity(Vector2d normal)
+    {
+        if (normal.SqrMagnitude <= Fixed64.Epsilon)
+            return;
+
+        Fixed64 closingSpeed = Vector2d.Dot(_linearVelocity, normal);
+        if (closingSpeed >= Fixed64.Zero)
+            return;
+
+        _linearVelocity -= normal * closingSpeed;
         RefreshLinearSpeed();
     }
 
@@ -288,5 +425,6 @@ public sealed class StiffBody2D : IRecordable
         RecordValues.Look(chronicler, ref _linearSpeed, "LinearSpeed");
         RecordValues.Look(chronicler, ref _isSleeping, "IsSleeping");
         RecordValues.Look(chronicler, ref _sleepFrameCount, "SleepFrameCount");
+        RecordValues.Look(chronicler, ref _continuousCollisionMode, "ContinuousCollisionMode", ContinuousCollisionMode.Inherit);
     }
 }

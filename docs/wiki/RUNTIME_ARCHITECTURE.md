@@ -26,7 +26,7 @@ pairs, queries, and coroutines remain context-local.
 | `GravitasPhysics2DService` | Pure 2D dynamic body bucket, monotonic collider ID table, 2D pair pool, pair-reference cleanup, layer/hierarchy-filtered narrow-phase/response processing, visualization publishing, simulation switch. |
 | `GravitasCollisionService` | Active partition bucket, inactive partition pool, duplicate voxel checker, partition awake-state refresh, collision distribution version, cull distributor. |
 | `GravitasCollision2DService` | GridForge-backed pure 2D partition bucket, inactive partition pool, duplicate voxel checker, awake dynamic membership refresh, 2D collision distribution version, retained partition cleanup. |
-| `GravitasQuery2DService` | Pure 2D query candidate buffer, overlap-circle queries, segment raycasts, collider-stamped duplicate suppression, hit ordering. |
+| `GravitasQuery2DService` | Pure 2D query candidate buffer, overlap-circle queries, segment raycasts, swept-circle queries, collider-stamped duplicate suppression, hit ordering. |
 | `GravitasQuery3DService` | 3D segment worker, swept-sphere worker, X/Z circle overlap/proximity queries, intersection buffer, duplicate voxel checker, duplicate collider checker, raycast and circle query versions. |
 | `GravitasCoroutineService` | Active lockstep coroutine bucket and context-bound wait instruction factories. |
 | `GravitasDiagnosticSink` | Disabled-by-default diagnostic event buffer and engine-agnostic debug draw command buffer. |
@@ -221,11 +221,15 @@ target.
 positions use world X/Z projection: `Vector2d.x = Vector3d.x` and
 `Vector2d.y = Vector3d.z`. Kinematic 2D bodies read their agent transform during
 `LateSimulate`. It intentionally has no y-up ground probe, height split, visual
-interpolation state, or 3D inertia tensor. `GravitasPhysics2DService.Simulate()`
-runs 2D contact response and events; `GravitasPhysics2DService.LateSimulate()`
-integrates active movable 2D bodies; `GravitasPhysics2DService.Visualize()`
-publishes dynamic 2D position and yaw rotation back to the host transform while
-preserving host vertical height.
+interpolation state, or 3D inertia tensor. `ContinuousCollisionMode` is shared
+with the 3D body path: `StiffBody2D` resolves body, hierarchy, then context
+settings before committing movement, and uses `Query2D.SweepCircle` to clip fast
+circle-proxy movement against static or kinematic 2D targets. Dynamic-vs-dynamic
+2D CCD remains deferred until deterministic relative-velocity ordering is
+specified. `GravitasPhysics2DService.Simulate()` runs 2D contact response and
+events; `GravitasPhysics2DService.LateSimulate()` integrates active movable 2D
+bodies; `GravitasPhysics2DService.Visualize()` publishes dynamic 2D position and
+yaw rotation back to the host transform while preserving host vertical height.
 
 ## Collider State
 
