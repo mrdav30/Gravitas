@@ -1,7 +1,7 @@
 # 2D, 3D, And Runtime Modes
 
 Gravitas is moving from a 3D-only prototype toward first-class 2D,
-first-class 3D, and eventually mixed 2D/3D interaction. The current contract is
+first-class 3D, and mixed 2D/3D interaction. The current contract is
 type-driven: `StiffBody` and `LSCollider` are the 3D path, while `StiffBody2D`
 and `LSCollider2D` are the pure 2D path.
 
@@ -21,8 +21,10 @@ those concrete types, not a third dimension value.
 
 The context clock, coroutines, diagnostics, and lifecycle hooks remain shared.
 This lets pure 2D simulations use the same host loop without paying 3D
-simulation or visualization cost. `Mixed` is intentionally absent until Phase 10
-defines embedding, contact manifolds, and impulse exchange.
+simulation or visualization cost. Phase 10 will convert the mode into a
+validated bitmask and add `Both` and `Mixed`: `Both` runs pure 2D and pure 3D
+side by side without cross-dimensional contacts, while `Mixed` adds the
+embedding, contact manifolds, broad phase, and constrained impulse exchange.
 
 ## Pure 2D Coordinate Contract
 
@@ -93,26 +95,36 @@ context.Query2D.OverlapCircleAll(center, radius, results);
 context.Query2D.OverlapCircleAll(center, radius, layerMask, results);
 context.Query2D.Raycast(start, end, out Physics2DHit hit);
 context.Query2D.RaycastAll(start, end, layerMask, results);
+context.Query2D.SweepCircle(start, end, radius, out Physics2DHit hit);
+context.Query2D.SweepCircleAll(start, end, radius, layerMask, results);
 ```
 
 All-hit overloads write into caller-owned `SwiftList<Physics2DHit>` buffers,
 run GridForge-backed partition candidate gathering with duplicate suppression,
 run layer-mask and exact 2D shape checks, and sort by deterministic hit
 ordering. `Raycast` returns the closest segment hit from `start` to `end` using
-the same distance and collider-ID ordering as `RaycastAll`.
+the same distance and collider-ID ordering as `RaycastAll`. `SweepCircle` is the
+pure 2D swept movement/query path used by 2D CCD.
 
 The existing `GravitasQuery3DService` is a 3D X/Z ground-plane proximity
 query. It is not the pure 2D query API.
 
-## Mixed 2D/3D Boundary
+## Mixed 2D/3D Direction
 
-Mixed 2D/3D is intentionally Phase 10. It must define:
+Phase 10 is planned as the first mixed runtime implementation. The target model
+is explicit rather than Unity-style separate engines:
 
-- how a 2D plane is embedded in 3D space.
-- whether 2D shapes have finite physical thickness.
-- how 3D contact points project onto 2D manifolds.
-- how impulses and positional correction exchange between 2D and 3D bodies.
-- which shape pairs are supported, experimental, or rejected.
+- `PhysicsRuntimeMode.Both` will advance both pure 2D and 3D services without
+  cross-dimensional contacts.
+- `PhysicsRuntimeMode.Mixed` will advance both pure 2D and 3D services plus a
+  dedicated mixed collision path.
+- mixed contacts will embed 2D colliders into 3D as finite X/Z prisms centered
+  on the host transform's Y position.
+- 2D bodies remain plane-constrained: planar impulse can move them in X/Z,
+  vertical impulse treats them as having infinite constrained mass.
+- mixed broad phase must use GridForge-backed spatial identity and separate 2D
+  and 3D collider ID spaces.
+- unsupported mixed shape pairs must be explicit, tested, and documented.
 
-Until that contract exists, pure 2D and 3D collision dispatch should not fall
-through to accidental mixed behavior.
+Until Phase 10 lands, pure 2D and 3D collision dispatch should not fall through
+to accidental mixed behavior.

@@ -43,8 +43,9 @@ The current 2D broad phase is GridForge-backed:
 
 The Y=0 storage plane is not physical thickness and does not claim mixed
 2D/3D interaction. It is a deterministic broad-phase identity that lets pure
-2D and 3D use the same host-owned `GridWorld` model until Phase 10 defines a
-real embedding and impulse-exchange policy.
+2D and 3D use the same host-owned `GridWorld` model. Phase 10's `Both` mode
+will keep those paths side by side without cross-dimensional contacts; only
+`Mixed` will add a real embedding and impulse-exchange policy.
 
 `CollisionDetection2D` currently supports:
 

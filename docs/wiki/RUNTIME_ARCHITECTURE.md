@@ -104,11 +104,12 @@ ordered command sequence, and frame count should produce the same authoritative
 body, collider, clock, and contact state across repeated runs. The current
 contract is pinned by `GravitasSimulationPhaseOrderTests`.
 
-`PhysicsSettings.RuntimeMode` selects exactly one authoritative dimensional
-runtime path for the context: `ThreeD` runs the 3D service and skips the 2D
-service, while `TwoD` runs the pure 2D service and skips the 3D service.
-`Mixed` is intentionally absent until Phase 10 defines the embedding and impulse
-exchange policy.
+`PhysicsSettings.RuntimeMode` currently selects exactly one authoritative
+dimensional runtime path for the context: `ThreeD` runs the 3D service and
+skips the 2D service, while `TwoD` runs the pure 2D service and skips the 3D
+service. Phase 10 will convert this to a validated bitmask: `Both` runs pure
+2D and pure 3D side by side without cross-dimensional contacts, while `Mixed`
+adds the embedding, mixed broad phase, and constrained impulse-exchange policy.
 
 `Reset` clears the clock and all context-local service state, then invokes reset
 hooks. `SetFrameRate` and `ApplySettings` update the clock's frame rate and

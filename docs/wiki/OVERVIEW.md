@@ -21,7 +21,7 @@ systems connect and where the current prototype needs hardening.
 - Read [Collision Pipeline](COLLISION_PIPELINE.md) when changing broad-phase
   partitioning, collision pairs, narrow-phase detection, contact data, or
   response behavior.
-- Read [Dimensions](DIMENSIONS.md) when changing 2D, 3D, or future mixed 2D/3D
+- Read [Dimensions](DIMENSIONS.md) when changing 2D, 3D, or mixed 2D/3D
   body, collider, bounds, collision, response, or query behavior.
 - Read [Query Services](QUERY_SERVICES.md) when changing raycasts, circle
   overlap queries, hit ordering, layer filtering, or query allocation behavior.
@@ -91,7 +91,7 @@ flowchart TD
 | `StiffBody2D` | Pure 2D body state: X/Z-projected position, scalar rotation, linear velocity, force integration, gravity, sleep/wake state, host agent binding, visualization publishing, and Chronicler record data. |
 | `LSCollider` | Base collider state: shape, bounds, layer, trigger/contact events, partition coordinates, pair references, and context binding. |
 | `LSCollider2D` | Base pure 2D collider state for circle, axis-aligned box, and convex polygon shapes. |
-| `PhysicsRuntimeMode` | Selects whether a context advances the pure 2D or 3D runtime path. Mixed mode is intentionally deferred. |
+| `PhysicsRuntimeMode` | Selects whether a context advances the pure 2D or 3D runtime path today; Phase 10 converts this to a validated bitmask with `Both` and `Mixed`. |
 | `GravitasPhysicsService` | Body/collider registration, context-local collider IDs, collision-pair pooling, simulation phases, and visualization phases. |
 | `GravitasPhysics2DService` | Pure 2D registration, collider IDs, narrow phase, response, events, and visualization publishing. |
 | `GravitasCollisionService` | GridForge-backed broad-phase partitioning, active partition tracking, partition pooling, and collision distribution versioning. |
@@ -128,9 +128,9 @@ Pure 2D scenes use the same context and clock, set
 `LSCollider2D` shapes and `StiffBody2D` bodies from host `IMatterAgent`
 instances. The current 2D path supports circles, axis-aligned boxes, convex
 polygons, bodyless static/trigger colliders, deterministic collision response,
-contact events, sleep/wake behavior, replay tests, overlap-circle queries, and
-segment raycasts.
-Mixed 2D/3D contacts are intentionally not part of this flow yet.
+contact events, sleep/wake behavior, replay tests, overlap-circle queries,
+segment raycasts, and swept-circle queries. Phase 10 adds `Both` for side-by-side
+pure 2D and 3D simulation, then `Mixed` for explicit 2D/3D contacts.
 
 ## Collision In One Breath
 
@@ -157,9 +157,9 @@ active-pair queue during `LateSimulate`.
   query, and simple deterministic response coverage.
 - `StiffBody` has a split 2D ground position plus height for the existing 3D
   y-up model, but that is not the pure 2D body model.
-- Mixed 2D/3D interaction is still future work. Phase 10 must define the
-  embedding rule, finite thickness/projection policy, manifold shape, and
-  impulse exchange before 2D and 3D bodies collide.
+- Mixed 2D/3D interaction is the Phase 10 implementation target. The planned
+  rule embeds 2D shapes as finite 3D prisms for mixed contacts while preserving
+  pure 2D semantics and constraining 2D bodies to planar X/Z response.
 - Cylinder collision and query behavior is implemented for the current finite
   cylinder model, but needs continued edge-case hardening.
 - Mesh raycast overlap and concave mesh narrow phase are implemented through

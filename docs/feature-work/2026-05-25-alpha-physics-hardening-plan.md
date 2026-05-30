@@ -1108,7 +1108,7 @@ hardening below are complete.
   transform publishing and a caller-buffered deterministic `Raycast2D` path
   backed by the same 2D partition/query rules. Keep mixed 2D/3D collision
   deferred to Phase 10.
-- [ ] **Phase 9I - Query domain consolidation:** Move 2D and 3D raycast,
+- [x] **Phase 9I - Query domain consolidation:** Move 2D and 3D raycast,
   swept-sphere, circle-overlap, hit sorting, and query-detection ownership into
   a single query domain with explicit `Query2D` and `Query3D` context services.
   Remove stale query service surfaces rather than preserving compatibility
@@ -1224,7 +1224,7 @@ source layout, lifecycle parity, and tests.
 **Tasks:**
 
 - [x] Add a context-level runtime mode with explicit `TwoD` and `ThreeD`
-  options only. Do not add `Mixed` until Phase 10 defines the embedding and
+  options only. Do not add `Mixed` until Phase 10 implements the embedding and
   impulse-exchange policy.
 - [x] Update `GravitasWorldContext.Simulate()`, `LateSimulate()`,
   `Visualize()`, and `LateVisualize()` so the disabled dimensional runtime path
@@ -1898,31 +1898,204 @@ static or kinematic 2D colliders before mixed 2D/3D integration begins.
 
 ## Phase 10: Mixed 2D/3D Interaction Model
 
-**Purpose:** Define how 2D and 3D bodies coexist, collide, exchange impulses,
-and integrate together after Phase 9 provides a working pure-2D slice.
+**Purpose:** Implement the first deterministic mixed-dimension runtime so 2D
+and 3D bodies can coexist, collide, wake, and exchange constrained impulses in
+one `GravitasWorldContext`. This is an alpha feature goal, not a post-alpha
+placeholder.
+
+**Completion Target:** By the end of Phase 10, `PhysicsRuntimeMode.Both`
+should run the existing pure 2D and pure 3D runtimes in one context without
+cross-dimensional contacts, while `PhysicsRuntimeMode.Mixed` should run both
+dimensional runtimes plus a dedicated mixed collision path. Pure `TwoD` and
+`ThreeD` modes must keep their current costs and behavior. Mixed collision must
+be explicit, deterministic, tested, benchmarked, and documented.
+
+**Runtime Mode Contract:** Convert `PhysicsRuntimeMode` into a validated
+bitmask instead of adding a second runtime-capability enum:
+
+```csharp
+[Flags]
+public enum PhysicsRuntimeMode : byte
+{
+    None = 0,
+    TwoD = 1 << 0,
+    ThreeD = 1 << 1,
+    Both = TwoD | ThreeD,
+    Mixed = Both | (1 << 2)
+}
+```
+
+`None` and arbitrary bit patterns are invalid settings values. The only valid
+public settings choices are `TwoD`, `ThreeD`, `Both`, and `Mixed`. Runtime
+phase checks should use small direct bitwise helpers such as `Runs2D`,
+`Runs3D`, and `RunsMixedContacts`; avoid `Enum.HasFlag` and avoid reintroducing
+a separate `PhysicsDimension` or runtime-rule abstraction.
+
+**Design Decision:** Mixed 2D colliders are embedded into 3D as finite,
+plane-constrained solids for mixed contacts only. The 2D shape still owns its
+authoritative `Vector2d` X/Z state and 2D yaw. For mixed broad phase and
+contacts, each 2D collider gets a deterministic Y-centered slab using the host
+`FixedTransform.Position.y` as the slab center and a positive mixed half
+thickness. Circles become finite vertical cylinders, AABBs become finite
+rectangular prisms, and convex polygons become finite convex prisms. Pure 2D
+collision and query behavior continues to use the existing X/Z 2D path and must
+not pay mixed-mode cost.
+
+**Impulse Rule:** 2D bodies are constrained to their plane. Mixed response
+decomposes contact impulses into planar X/Z and vertical Y components:
+
+- planar impulse and correction can affect both movable 3D and movable 2D
+  bodies according to mass and kinematic/immovable state.
+- vertical impulse and correction affect the 3D body against the 2D slab; the
+  2D body has infinite constrained mass along Y and never gains height.
+- yaw/angular effects on 2D bodies are allowed only from planar contact
+  tangents once the 2D angular model is explicitly implemented. Until then,
+  mixed response should not invent hidden 2D angular state.
 
 **Files:**
 
-- Modify: `docs/wiki/OVERVIEW.md`
-- Modify: `docs/wiki/COLLISION_PIPELINE.md`
-- Potentially create: `docs/wiki/DIMENSIONS.md`
-- Potentially create: `src/Gravitas/Dimensions/MixedDimensionPolicy.cs`
-- Modify: `tests/Gravitas.Tests`
+- Modify: `src/Gravitas/Settings/PhysicsRuntimeMode.cs`
+- Modify: `src/Gravitas/Settings/PhysicsSettings.cs`
+- Modify: `src/Gravitas/Runtime/GravitasWorldContext.cs`
+- Modify: `src/Gravitas/Core/GravitasPhysicsService.cs`
+- Modify: `src/Gravitas/Core/GravitasPhysics2DService.cs`
+- Modify: `src/Gravitas/Core/StiffBody.cs`
+- Modify: `src/Gravitas/Core/StiffBody2D.cs`
+- Modify: `src/Gravitas/Colliders/Primitives/LSCollider.cs`
+- Modify: `src/Gravitas/Colliders/Primitives2D/LSCollider2D.cs`
+- Potentially create: `src/Gravitas/Core/GravitasMixedCollisionService.cs`
+- Potentially create: `src/Gravitas/Partitions/PhysicsMixedPartition.cs`
+- Potentially create: `src/Gravitas/CollisionHandling/Pairs/CollisionPairMixed.cs`
+- Potentially create: `src/Gravitas/CollisionHandling/Contacts/MixedContact.cs`
+- Potentially create: `src/Gravitas/CollisionHandling/Detection/CollisionDetectionMixed.cs`
+- Potentially create:
+  `src/Gravitas/CollisionHandling/Response/CollisionResponseMixed.cs`
+- Potentially create: `src/Gravitas/CollisionHandling/Mixed/MixedColliderKey.cs`
+- Potentially create:
+  `src/Gravitas/CollisionHandling/Mixed/MixedDimensionContactContext.cs`
+- Modify: `src/Gravitas/Queries`
+- Modify: `tests/Gravitas.Tests/Runtime`
+- Create: `tests/Gravitas.Tests/MixedDimensions`
 - Modify: `tests/Gravitas.Benchmarks`
+- Modify: `docs/wiki/OVERVIEW.md`
+- Modify: `docs/wiki/DIMENSIONS.md`
+- Modify: `docs/wiki/RUNTIME_ARCHITECTURE.md`
+- Modify: `docs/wiki/COLLISION_PIPELINE.md`
+- Modify: `docs/wiki/QUERY_SERVICES.md`
 
-**Tasks:**
+**Implementation Phases:**
 
-- [ ] Define the mixed-dimension embedding rule: plane, thickness, projection
-  volume, contact manifold shape, and impulse exchange. The rule must make 2D
-  bodies physically interact with 3D bodies without routing through separate
-  engines.
-- [ ] Add design tests for 3D sphere/cuboid/capsule/cylinder bodies interacting
-  with 2D circles/AABBs/convex polygons under the chosen rule.
-- [ ] Add integration and response tests for mixed contacts, including
-  immovable/kinematic bodies, triggers, sleeping bodies, and stable contact
-  ordering.
-- [ ] Decide whether mixed 2D/3D is an alpha feature, experimental feature flag, or documented post-alpha target.
-- [ ] Document unsupported combinations explicitly rather than letting them fall through to accidental 3D behavior.
+- [ ] **Phase 10A - Bitmask runtime contract:** Convert
+  `PhysicsRuntimeMode` to a validated `[Flags]` bitmask, add `Both` and
+  `Mixed`, update settings validation, replace `if ThreeD else TwoD` lifecycle
+  branching with direct bitwise helpers, and test all four valid runtime modes.
+  `Both` must advance 3D simulation, pure 2D simulation, visualization, hooks,
+  reset, and context-local state without mixed collision distribution or mixed
+  response. `Mixed` must do the same plus the dedicated mixed collision path.
+  `TwoD` and `ThreeD` behavior and cost boundaries must remain unchanged.
+- [ ] **Phase 10A - Embedding contract:** Add the minimal mixed embedding data
+  needed by `LSCollider2D`: a positive half-thickness resolved from collider
+  override or context default, a cached slab center Y from the host transform,
+  and deterministic mixed 3D bounds. Do not reintroduce `PhysicsDimension` or
+  public `Physics2DBounds`.
+- [ ] **Phase 10B - Mixed broad phase:** Add a mixed broad-phase service backed
+  by the existing `GridWorld` and stable voxel identities. Store separate 3D
+  collider IDs and 2D collider IDs so ID spaces never alias. Use awake-dynamic
+  gating, same-agent/hierarchy/layer filtering, deterministic partition
+  ordering, deterministic pair keys, and retained empty partition cleanup. Avoid
+  O(3D * 2D) scans except in tiny test-only helpers.
+- [ ] **Phase 10B - Broad-phase tests and benchmarks:** Add sparse, dense,
+  large-world, sleeping, trigger, layer, hierarchy, and churn tests. Add
+  benchmarks for mixed candidate gathering, pair distribution, and retained
+  partition cleanup at 64, 1024, and larger representative collider counts.
+- [ ] **Phase 10C - Mixed narrow phase primitives:** Add mixed shape tests and
+  detection for 3D sphere, cuboid, capsule, and finite cylinder against 2D
+  circle, AABB, and convex polygon slabs. Cover separated Y slabs, touching slab
+  faces, planar side contacts, edge/corner contacts, starting overlap, rotated
+  3D shapes, rotated 2D convex polygons, and deterministic contact ordering.
+- [ ] **Phase 10C - Mixed narrow phase complex shapes:** Extend mixed detection
+  to 3D compound colliders and mesh colliders only through explicit tested
+  policies. Compound colliders should scan stable part order and emit one mixed
+  pair surface. Mesh support should use local BVH candidate gathering and
+  triangle-level tests; if the triangle policy is not robust enough, record the
+  exact unsupported mesh combinations in this phase's follow-up notes rather
+  than silently falling through.
+- [ ] **Phase 10D - Mixed pair and response model:** Add `CollisionPairMixed`
+  and mixed contacts with stable pair identity, one-sided pair ownership, pooled
+  contacts, wake propagation, resting-pair retention, enter/stay/exit events,
+  and deterministic response order. Keep 2D vertical constraint explicit:
+  planar impulse can move a 2D body, vertical impulse cannot.
+- [ ] **Phase 10D - Response tests:** Add tests for dynamic 3D vs static 2D
+  platform, dynamic 2D pushed by dynamic 3D planar contact, immovable and
+  kinematic participants, bodyless mixed triggers, sleeping wake propagation,
+  same-agent/hierarchy exclusion, layer matrix filtering, and repeated replay
+  determinism.
+- [ ] **Phase 10E - Mixed query and CCD policy:** Decide and implement the
+  smallest discoverable query surface needed for mixed mode. Recommended start:
+  keep `Query2D` and `Query3D` pure by default, then add explicit mixed query
+  APIs or opt-in flags only where tests prove hosts need them. Add 3D swept
+  sphere vs embedded 2D slabs and 2D swept circle vs 3D primitive coverage for
+  CCD after discrete mixed response is stable.
+- [ ] **Phase 10E - Diagnostics and debug draw:** Extend diagnostics so mixed
+  pairs report both collider IDs with dimension tags, mixed contact points,
+  normals, penetration/correction, and constrained impulse components. Debug
+  draw should show the 2D slab/prism used for mixed collision, not just the pure
+  2D outline.
+- [ ] **Phase 10F - Documentation and hardening:** Update wiki pages with the
+  mixed runtime mode, embedding rule, constrained impulse model, supported shape
+  matrix, unsupported combinations, query/CCD contract, and host integration
+  guidance. Add benchmark notes and follow-up actions for any shape pair or
+  solver behavior that remains too expensive or physically weak for alpha.
+- [ ] **Phase 10F - Verification:** Run focused mixed-dimension tests, focused
+  2D and 3D regression tests, full `Release`, full `ReleaseLean`, mixed
+  benchmark smoke, and `git diff --check`.
+
+**Acceptance Bar:**
+
+- `PhysicsRuntimeMode` is a validated bitmask with exact public settings values
+  for `TwoD`, `ThreeD`, `Both`, and `Mixed`; invalid bit combinations are
+  rejected.
+- `PhysicsRuntimeMode.Both` is an implemented runtime path that advances pure
+  2D and pure 3D services without mixed broad phase, mixed queries, mixed
+  response, or cross-dimensional contacts.
+- `PhysicsRuntimeMode.Mixed` is an implemented runtime path, not a dormant enum
+  value.
+- Pure `TwoD` and `ThreeD` modes keep their current behavior and do not run
+  mixed broad phase, mixed queries, or mixed response.
+- Mixed broad phase uses GridForge-backed spatial identity with deterministic
+  ordering and avoids whole-world cross products.
+- 2D colliders expose an explicit finite mixed slab/prism for mixed contacts
+  while preserving pure 2D collision semantics.
+- Mixed pair identity cannot alias 2D and 3D collider IDs.
+- Mixed contacts are deterministic, physically explainable, and preserve the 2D
+  body's plane constraint.
+- Layer, trigger, bodyless, kinematic, immovable, sleeping, same-agent, and
+  hierarchy behavior is covered for mixed pairs.
+- Benchmarks exist for sparse and dense mixed scenes before making performance
+  claims.
+- Unsupported combinations are explicit, tested, and documented.
+
+**Implementation Notes:**
+
+- Do not register `LSCollider2D` as an `LSCollider` or copy it into the 3D
+  collider table. Mixed services should resolve through the owning 2D and 3D
+  services using dimension-tagged keys.
+- Keep runtime-mode checks cheap and explicit. Use direct bitwise tests against
+  the `[Flags]` mode value rather than `Enum.HasFlag`, LINQ, or a second
+  capability enum. `Both` means pure 2D plus pure 3D only; only `Mixed` enables
+  mixed contacts.
+- Do not treat the pure 2D Y=0 partition plane as physical thickness. Mixed
+  embedding uses the host transform Y and mixed half-thickness.
+- Prefer one dedicated mixed service over hidden conditionals inside every pure
+  2D and pure 3D hot path. Shared generic helpers are welcome where they reduce
+  duplication without obscuring dimensional rules.
+- If mixed response ordering between 3D/3D, 2D/2D, and 2D/3D pairs changes body
+  outcomes, make the ordering explicit and test replay stability. A later
+  unified island solver can replace the phase order only with tests and
+  benchmarks.
+- Treat mixed CCD as follow-on work inside Phase 10 after discrete mixed
+  collision is stable. It should reuse the same embedding and pair filtering
+  rules rather than inventing a second mixed-shape interpretation.
 
 ## Phase 11: Serialization, Snapshots, And Deterministic Replay
 
