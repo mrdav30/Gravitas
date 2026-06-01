@@ -2008,6 +2008,24 @@ decomposes contact impulses into planar X/Z and vertical Y components:
   large-world, sleeping, trigger, layer, hierarchy, and churn tests. Add
   benchmarks for mixed candidate gathering, pair distribution, and retained
   partition cleanup at 64, 1024, and larger representative collider counts.
+
+**Phase 10B Result:**
+
+- Added `GravitasMixedCollisionService` as a real mixed broad-phase owner with
+  GridForge-backed `PhysicsMixedPartition` payloads, separate 3D and 2D
+  collider ID spaces, stable `MixedColliderKey` output, duplicate suppression,
+  awake-dynamic gating, layer filtering, same-agent exclusion, and retained
+  empty-partition cleanup.
+- Added separate mixed partition state on `LSCollider` and `LSCollider2D` so
+  mixed membership does not overload the pure 3D or pure 2D partition paths.
+- Added focused tests for sparse, dense, large-world, sleeping, trigger, layer,
+  same-agent, and churn/retained-cleanup behavior. Cross-dimensional hierarchy
+  is currently represented by same-agent exclusion because existing collider
+  hierarchy state is dimension-local; do not claim a public cross-dimensional
+  hierarchy API until a host-level relationship contract exists.
+- Added `MixedBroadPhaseBenchmarks` with sparse gathering, dense gathering, and
+  retained cleanup/churn coverage at 64, 1024, and 4096 colliders.
+  
 - [ ] **Phase 10C - Mixed narrow phase primitives:** Add mixed shape tests and
   detection for 3D sphere, cuboid, capsule, and finite cylinder against 2D
   circle, AABB, and convex polygon slabs. Cover separated Y slabs, touching slab
