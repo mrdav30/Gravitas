@@ -118,9 +118,10 @@ The current runtime uses explicit world-context ownership:
   transform publishing for one context.
 - `GravitasMixedCollisionService` owns the Phase 10 mixed 2D/3D lifecycle path,
   GridForge-backed mixed broad phase, stable 3D/2D candidate keys, awake
-  gating, and retained `PhysicsMixedPartition` cleanup. `PhysicsRuntimeMode.Mixed`
-  reaches it; `PhysicsRuntimeMode.Both` deliberately runs pure 2D and pure 3D
-  side by side without cross-dimensional contacts.
+  gating, mixed pair ownership/response dispatch, and retained
+  `PhysicsMixedPartition` cleanup. `PhysicsRuntimeMode.Mixed` reaches it;
+  `PhysicsRuntimeMode.Both` deliberately runs pure 2D and pure 3D side by side
+  without cross-dimensional contacts.
 - `GravitasCollisionService` maps colliders into GridForge voxels through
   `GridWorld` spatial hash and active-grid access, `WorldVoxelIndex`, and
   `PhysicsPartition`, using `SwiftCollections` pools and duplicate-check sets.
@@ -194,9 +195,12 @@ pure 2D and pure 3D without mixed contacts; `Mixed` enables the dedicated mixed
 lifecycle path. `LSCollider2D` also caches a mixed `BoundingBox` using
 `PhysicsSettings.Mixed2DHalfThickness`, optional per-collider
 `MixedHalfThicknessOverride`, and the host transform's Y position. The mixed
-broad phase now emits deterministic candidate keys through `PhysicsMixedPartition`;
-`CollisionDetectionMixed` currently provides the first 3D sphere versus
-embedded 2D slab contact slice. Mixed response, diagnostics, mixed queries, and
+broad phase emits deterministic candidate keys through `PhysicsMixedPartition`;
+`CollisionDetectionMixed` covers current 3D primitive, compound, and mesh
+colliders against embedded 2D circle, AABB, and convex polygon slabs.
+`CollisionPairMixed` and `CollisionResponseMixed` now provide the first
+constrained impulse model: planar X/Z impulse can move 2D bodies, while vertical
+Y impulse affects only the 3D participant. Mixed diagnostics, mixed queries, and
 CCD remain later Phase 10 work.
 
 When adding or redesigning dimension-sensitive behavior:
@@ -205,9 +209,9 @@ When adding or redesigning dimension-sensitive behavior:
   XZ-ground-plane unless the API explicitly says so.
 - Model 2D as first-class physics behavior, not as accidental 3D with one axis
   ignored.
-- Before implementing mixed 2D/3D collision, define the embedding rule: plane,
-  layer, thickness, projection volume, contact manifold shape, and how 3D bodies
-  exchange impulses with 2D bodies.
+- When extending mixed 2D/3D collision, preserve the embedding rule: finite 2D
+  slabs/prisms centered on host-transform Y, dimension-tagged pair identity,
+  explicit trigger/contact events, and a plane-constrained 2D impulse model.
 - Keep dimensional choices explicit in public APIs and tests.
 - Avoid naming that implies Unity-specific `Rigidbody` behavior. `StiffBody`
   is the current prototype term; future redesigns may rename or split it if that

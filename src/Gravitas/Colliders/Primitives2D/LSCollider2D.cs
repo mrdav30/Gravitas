@@ -36,6 +36,7 @@ public abstract class LSCollider2D : IColliderHierarchyNode
 
     public delegate void Body2DCollisionFunc(StiffBody2D other);
     public delegate void Trigger2DCollisionFunc(LSCollider2D other);
+    public delegate void Mixed2DCollisionFunc(LSCollider other);
 
     /// <summary>
     /// Raised while this collider is touching another collider that owns a 2D body.
@@ -61,6 +62,12 @@ public abstract class LSCollider2D : IColliderHierarchyNode
     /// Raised when this trigger stops overlapping another 2D collider.
     /// </summary>
     public event Trigger2DCollisionFunc? OnTriggerExit;
+
+    public event Mixed2DCollisionFunc? OnMixedContact;
+    public event Mixed2DCollisionFunc? OnMixedContactEnter;
+    public event Mixed2DCollisionFunc? OnMixedContactExit;
+    public event Mixed2DCollisionFunc? OnMixedTriggerEnter;
+    public event Mixed2DCollisionFunc? OnMixedTriggerExit;
 
     public int Id => _id;
 
@@ -499,6 +506,42 @@ public abstract class LSCollider2D : IColliderHierarchyNode
             OnTriggerExit?.Invoke(other);
         if (other.Body != null)
             OnContactExit?.Invoke(other.Body);
+    }
+
+    internal void NotifyMixedContact(LSCollider other, bool isColliding, bool isChanged, bool isTriggerPair)
+    {
+        if (!IsActive)
+            return;
+
+        if (isColliding)
+        {
+            if (isTriggerPair)
+            {
+                if (isChanged && IsTrigger)
+                    OnMixedTriggerEnter?.Invoke(other);
+
+                return;
+            }
+
+            if (isChanged)
+                OnMixedContactEnter?.Invoke(other);
+
+            OnMixedContact?.Invoke(other);
+            return;
+        }
+
+        if (!isChanged)
+            return;
+
+        if (isTriggerPair)
+        {
+            if (IsTrigger)
+                OnMixedTriggerExit?.Invoke(other);
+
+            return;
+        }
+
+        OnMixedContactExit?.Invoke(other);
     }
 
     public abstract bool ContainsPoint(Vector2d point);

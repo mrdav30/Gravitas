@@ -303,6 +303,13 @@ public abstract class LSCollider : IRecordable, IColliderHierarchyNode
     public event TriggerCollisionFunc? OnTriggerEnter;
     public event TriggerCollisionFunc? OnTriggerExit;
 
+    public delegate void MixedCollisionFunc(LSCollider2D other);
+    public event MixedCollisionFunc? OnMixedContact;
+    public event MixedCollisionFunc? OnMixedContactEnter;
+    public event MixedCollisionFunc? OnMixedContactExit;
+    public event MixedCollisionFunc? OnMixedTriggerEnter;
+    public event MixedCollisionFunc? OnMixedTriggerExit;
+
     public bool IsChild => _hierarchyState.IsChild;
     public bool IsParent => _hierarchyState.IsParent;
     public int ParentId => ParentKey.Id;
@@ -583,6 +590,42 @@ public abstract class LSCollider : IRecordable, IColliderHierarchyNode
             OnTriggerExit?.Invoke(other);
         if (other.Body != null)
             OnContactExit?.Invoke(other.Body);
+    }
+
+    internal void NotifyMixedContact(LSCollider2D other, bool isColliding, bool isChanged, bool isTriggerPair)
+    {
+        if (!IsActive)
+            return;
+
+        if (isColliding)
+        {
+            if (isTriggerPair)
+            {
+                if (isChanged && IsTrigger)
+                    OnMixedTriggerEnter?.Invoke(other);
+
+                return;
+            }
+
+            if (isChanged)
+                OnMixedContactEnter?.Invoke(other);
+
+            OnMixedContact?.Invoke(other);
+            return;
+        }
+
+        if (!isChanged)
+            return;
+
+        if (isTriggerPair)
+        {
+            if (IsTrigger)
+                OnMixedTriggerExit?.Invoke(other);
+
+            return;
+        }
+
+        OnMixedContactExit?.Invoke(other);
     }
 
     public void SetStatus(bool status)

@@ -23,9 +23,9 @@ those concrete types, not a third dimension value.
 - `PhysicsRuntimeMode.Mixed` advances both pure services plus the dedicated
   mixed lifecycle and broad-phase path. Mixed narrow phase supports 3D spheres,
   cuboids, capsules, finite cylinders, compound colliders, and mesh colliders
-  against embedded 2D circle, AABB, and convex polygon slabs. Phase 10 response,
-  diagnostic, mixed query, and CCD work fills in the rest of the interaction
-  model.
+  against embedded 2D circle, AABB, and convex polygon slabs. Mixed pair
+  ownership and constrained response are implemented; Phase 10 diagnostic,
+  mixed query, and CCD work fills in the rest of the interaction model.
 
 The context clock, coroutines, diagnostics, and lifecycle hooks remain shared.
 This lets pure 2D simulations use the same host loop without paying 3D
@@ -143,11 +143,17 @@ rather than Unity-style separate engines:
   `PhysicsMixedPartition` and stable 3D/2D candidate keys. Mixed narrow phase
   currently supports 3D spheres, cuboids, capsules, finite cylinders, compound
   colliders, and mesh colliders against embedded 2D circle, AABB, and convex
-  polygon slabs; response is filled in by the remaining Phase 10 work.
+  polygon slabs.
 - mixed contacts embed 2D colliders into 3D as finite X/Z prisms centered on
   the host transform's Y position.
 - 2D bodies remain plane-constrained: planar impulse can move them in X/Z,
   vertical impulse treats them as having infinite constrained mass.
+- `CollisionPairMixed` owns stable mixed pair identity, wake propagation,
+  resting-pair retention, pooled pair reuse, mixed contact enter/stay/exit
+  events, and trigger-only mixed trigger events.
+- `CollisionResponseMixed` applies the first constrained response model:
+  penetration correction, normal impulse, and friction are projected so 2D
+  bodies receive only X/Z correction and velocity deltas.
 - mixed broad phase uses GridForge-backed spatial identity, separate 2D and 3D
   collider ID spaces, awake-dynamic gating, layer filtering, same-agent and
   explicit hierarchy exclusion, and retained empty-partition cleanup.
@@ -156,5 +162,6 @@ rather than Unity-style separate engines:
   services because those ID spaces are intentionally separate.
 - unsupported mixed shape pairs must be explicit, tested, and documented.
 
-Until mixed pair ownership and response land, pure 2D and 3D collision dispatch
-should not fall through to accidental mixed response behavior.
+Pure 2D and 3D collision dispatch should not fall through to accidental mixed
+response behavior. Mixed collision belongs to the explicit mixed service and is
+enabled only by `PhysicsRuntimeMode.Mixed`.

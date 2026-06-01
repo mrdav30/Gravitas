@@ -132,8 +132,8 @@ polygons, bodyless static/trigger colliders, deterministic collision response,
 contact events, sleep/wake behavior, replay tests, overlap-circle queries,
 segment raycasts, and swept-circle queries. `PhysicsRuntimeMode.Both` runs pure
 2D and pure 3D side by side without cross-dimensional contacts, while
-`PhysicsRuntimeMode.Mixed` enables the dedicated mixed lifecycle and broad-phase
-candidate path for Phase 10's remaining contact work.
+`PhysicsRuntimeMode.Mixed` enables the dedicated mixed lifecycle, broad-phase,
+narrow-phase, and constrained response path.
 
 ## Collision In One Breath
 
@@ -167,9 +167,11 @@ active-pair queue during `LateSimulate`.
   broad phase now gathers deterministic GridForge-backed 3D/2D candidate keys,
   and mixed narrow phase covers 3D spheres, cuboids, capsules, and finite
   cylinders plus compound and mesh colliders against embedded 2D circle, AABB,
-  and convex polygon slabs. Remaining Phase 10 work fills in response,
-  diagnostics, mixed queries, and CCD while preserving pure 2D semantics and
-  constraining 2D bodies to planar X/Z response.
+  and convex polygon slabs. Mixed pair ownership and constrained response now
+  support wake propagation, resting-pair retention, mixed contact/trigger
+  events, planar X/Z impulse for 2D bodies, and vertical response against 3D
+  participants only. Remaining Phase 10 work fills in diagnostics, mixed
+  queries, and CCD while preserving pure 2D semantics.
 - Cylinder collision and query behavior is implemented for the current finite
   cylinder model, but needs continued edge-case hardening.
 - Mesh raycast overlap and concave mesh narrow phase are implemented through
@@ -178,8 +180,8 @@ active-pair queue during `LateSimulate`.
 - Collision response is still an alpha-hardening target. The current manifold
   solver handles deterministic normal and friction impulses, but static resting
   friction, true warm-start impulse application, explicit island solving,
-  dynamic-vs-dynamic CCD, and mixed-dimension impulse exchange remain future
-  work.
+  dynamic-vs-dynamic CCD, and richer mixed-dimension solver behavior remain
+  future work.
 - Query services use context-owned mutable buffers. Treat them as same-thread,
   fixed-loop services unless they are redesigned for reentrancy.
 - Diagnostics are context-owned and disabled by default. Enabled draw capture can

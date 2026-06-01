@@ -56,7 +56,12 @@ cylinder, compound, and mesh contacts against embedded 2D circle, AABB, and
 convex polygon slabs. Compound mixed contacts scan owned parts in stable order
 and return one external contact surface. Mesh mixed contacts gather local-BVH
 triangle candidates and test triangles against the embedded 2D slab volume.
-Mixed pair ownership, impulse exchange, diagnostics, mixed queries, and CCD
+`CollisionPairMixed` owns stable 3D/2D pair identity, resting-pair retention,
+wake propagation, mixed contact enter/stay/exit events, trigger-only mixed
+trigger events, and pooled pair reuse. `CollisionResponseMixed` applies the
+first constrained mixed response: planar X/Z correction and impulses can move a
+2D body, while vertical Y correction and impulses treat the 2D body as having
+infinite constrained mass. Mixed diagnostics, mixed queries, and mixed CCD
 remain later Phase 10 work.
 
 `CollisionDetection2D` currently supports:
@@ -83,7 +88,7 @@ movable bodies, trigger enter/exit events, and contact enter/stay/exit events.
 If a solid pair has no awake movable participant, the existing pair is kept
 alive as resting state without applying response or waking a sleeping body. It
 does not yet claim a full 2D friction solver, angular impulses, richer contact
-manifolds, or mixed 2D/3D impulse exchange.
+manifolds, or mixed 2D/3D response ownership.
 
 ## Broad Phase: Voxel Partitions
 
@@ -194,8 +199,8 @@ trees at simulation time. When a parent collider deactivates, its child bindings
 are cleared before the parent collider ID returns to the reusable ID pool,
 preventing stale hierarchy keys from suppressing collisions against future
 unrelated colliders. Mixed 2D/3D hierarchy filtering uses the same state; body
-policy inheritance remains dimension-local until mixed response and mixed CCD
-define a stronger cross-dimensional body contract.
+policy inheritance remains dimension-local until mixed CCD or future island work
+defines a stronger cross-dimensional body contract.
 
 `LSCompoundCollider` is different from hierarchy binding. A parent/child
 relationship links independently registered colliders that may represent

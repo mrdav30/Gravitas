@@ -220,6 +220,7 @@ public sealed class GravitasPhysicsService
             return;
         }
 
+        _context.MixedCollisions.RemovePairsFor3DCollider(collider);
         _context.MixedCollisions.ClearPartitioned3DCollider(collider, force: true);
         _colliders[id] = null;
         _cachedColliderIds.Push(id);

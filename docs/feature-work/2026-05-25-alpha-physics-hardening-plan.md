@@ -1137,8 +1137,8 @@ hardening below are complete.
 - Added simple pure 2D response and contact lifecycle: position correction to
   penetration slop, closing-velocity normal impulse, sleep/wake propagation,
   and contact enter/stay/exit events. Rich 2D manifolds, angular impulses,
-  friction impulses, and mixed-dimension impulse exchange remain future solver
-  work.
+  and friction impulses remain future pure-2D solver work; mixed-dimension
+  impulse exchange was deferred out of Phase 9 and started in Phase 10D.
 - Added `OverlapCircleAll` as the first explicit pure 2D query API. Results are
   written into caller-owned `SwiftList<Physics2DHit>` buffers and sorted by
   surface distance plus collider ID.
@@ -2012,12 +2012,13 @@ decomposes contact impulses into planar X/Z and vertical Y components:
   triangle-level tests; if the triangle policy is not robust enough, record the
   exact unsupported mesh combinations in this phase's follow-up notes rather
   than silently falling through.
-- [ ] **Phase 10D - Mixed pair and response model:** Add `CollisionPairMixed`
-  and mixed contacts with stable pair identity, one-sided pair ownership, pooled
-  contacts, wake propagation, resting-pair retention, enter/stay/exit events,
-  and deterministic response order. Keep 2D vertical constraint explicit:
+- [x] **Phase 10D - Mixed pair and response model:** Add `CollisionPairMixed`
+  and mixed contacts with stable pair identity, one-sided pair ownership,
+  allocation-free value contacts, wake propagation, resting-pair retention,
+  enter/stay/exit events, and deterministic response order. Keep 2D vertical
+  constraint explicit:
   planar impulse can move a 2D body, vertical impulse cannot.
-- [ ] **Phase 10D - Response tests:** Add tests for dynamic 3D vs static 2D
+- [x] **Phase 10D - Response tests:** Add tests for dynamic 3D vs static 2D
   platform, dynamic 2D pushed by dynamic 3D planar contact, immovable and
   kinematic participants, bodyless mixed triggers, sleeping wake propagation,
   same-agent/hierarchy exclusion, layer matrix filtering, and repeated replay
@@ -2184,6 +2185,25 @@ decomposes contact impulses into planar X/Z and vertical Y components:
   mesh/circle slabs, concave mesh/AABB slabs, concave mesh/rotated convex
   polygon slabs, deterministic repeated mesh contacts, and an open U-channel
   gap that proves concave meshes are not treated as whole AABB hulls.
+
+**Phase 10D Result:**
+
+- Added `CollisionPairMixed` as the service-owned mixed pair lifecycle model
+  with stable 3D/2D pair keys, pooled pair reuse, resting-pair retention,
+  wake propagation, enter/stay/exit mixed contact events, trigger-only mixed
+  trigger events, and deterministic candidate processing order.
+- Added `CollisionResponseMixed` for the first constrained mixed impulse model.
+  The solver applies penetration correction, normal impulses, and friction
+  against the mixed contact normal while projecting 2D movement onto X/Z so
+  planar contact can move 2D bodies and vertical contact treats them as having
+  infinite constrained mass along Y.
+- Wired mixed pair removal into 3D and 2D collider dessimilation so active
+  mixed pairs emit separation and return to the pool when either participant
+  leaves the runtime.
+- Added mixed response tests for dynamic 3D on static bodyless 2D slabs,
+  dynamic 3D pushing dynamic 2D bodies, kinematic participants, bodyless mixed
+  triggers, sleeping wake propagation, layer filtering, pair exit/recycling,
+  and replay determinism.
 
 ## Phase 11: Serialization, Snapshots, And Deterministic Replay
 

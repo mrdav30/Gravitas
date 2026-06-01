@@ -81,6 +81,7 @@ public sealed class GravitasPhysics2DService
     {
         SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
         RemovePairsForCollider(collider);
+        _context.MixedCollisions.RemovePairsFor2DCollider(collider);
         _context.MixedCollisions.ClearPartitioned2DCollider(collider, force: true);
         _context.Collisions2D.ClearPartitionedCollider(collider, force: true);
         RemoveCollider(collider);
