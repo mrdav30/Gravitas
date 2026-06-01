@@ -39,6 +39,8 @@ public static class CollisionResponseMixed
         Vector3d relative3D = contact.Point3D - pair.Collider3D.Center;
         ApplyPositionCorrection(body3D, body2D, normal, contact.Depth, inverseMass3D, inverseMass2D, effectiveInverseMass);
         Fixed64 normalImpulse = ApplyNormalImpulse(
+            pair,
+            contact,
             body3D,
             body2D,
             normal,
@@ -77,6 +79,8 @@ public static class CollisionResponseMixed
     }
 
     private static Fixed64 ApplyNormalImpulse(
+        CollisionPairMixed pair,
+        MixedContact contact,
         StiffBody? body3D,
         StiffBody2D? body2D,
         Vector3d normal,
@@ -99,6 +103,7 @@ public static class CollisionResponseMixed
         if (impulseScalar <= Fixed64.Zero)
             return Fixed64.Zero;
 
+        pair.Context.Diagnostics.EmitMixedResponseImpulse(pair, contact, normal * impulseScalar, normalVelocity);
         ApplyImpulse(body3D, body2D, normal, relative3D, inverseMass3D, inverseMass2D, impulseScalar);
         return impulseScalar;
     }

@@ -2023,13 +2023,13 @@ decomposes contact impulses into planar X/Z and vertical Y components:
   kinematic participants, bodyless mixed triggers, sleeping wake propagation,
   same-agent/hierarchy exclusion, layer matrix filtering, and repeated replay
   determinism.
-- [ ] **Phase 10E - Mixed query and CCD policy:** Decide and implement the
+- [x] **Phase 10E - Mixed query and CCD policy:** Decide and implement the
   smallest discoverable query surface needed for mixed mode. Recommended start:
   keep `Query2D` and `Query3D` pure by default, then add explicit mixed query
   APIs or opt-in flags only where tests prove hosts need them. Add 3D swept
-  sphere vs embedded 2D slabs and 2D swept circle vs 3D primitive coverage for
-  CCD after discrete mixed response is stable.
-- [ ] **Phase 10E - Diagnostics and debug draw:** Extend diagnostics so mixed
+  sphere vs embedded 2D slabs and 2D swept circle vs 3D primitive, mesh, and
+  compound target coverage for CCD after discrete mixed response is stable.
+- [x] **Phase 10E - Diagnostics and debug draw:** Extend diagnostics so mixed
   pairs report both collider IDs with dimension tags, mixed contact points,
   normals, penetration/correction, and constrained impulse components. Debug
   draw should show the 2D slab/prism used for mixed collision, not just the pure
@@ -2090,9 +2090,13 @@ decomposes contact impulses into planar X/Z and vertical Y components:
   outcomes, make the ordering explicit and test replay stability. A later
   unified island solver can replace the phase order only with tests and
   benchmarks.
-- Treat mixed CCD as follow-on work inside Phase 10 after discrete mixed
-  collision is stable. It should reuse the same embedding and pair filtering
-  rules rather than inventing a second mixed-shape interpretation.
+- Mixed CCD must reuse the same embedding and pair filtering rules rather than
+  inventing a second mixed-shape interpretation. Phase 10E establishes the
+  3D swept sphere vs embedded 2D slab path and the 2D swept circle vs 3D target
+  path through the shared swept-sphere worker. Mesh targets use triangle
+  candidates from the local-BVH-backed mesh path; compound targets reduce over
+  stable part order while exposing the owning compound collider as the public
+  hit surface.
 
 **Phase Results:**
 
@@ -2204,6 +2208,46 @@ decomposes contact impulses into planar X/Z and vertical Y components:
   dynamic 3D pushing dynamic 2D bodies, kinematic participants, bodyless mixed
   triggers, sleeping wake propagation, layer filtering, pair exit/recycling,
   and replay determinism.
+
+**Phase 10E Result:**
+
+- Added `GravitasQueryMixedService` and exposed it as
+  `GravitasWorldContext.QueryMixed`, keeping pure `Query2D` and `Query3D`
+  query surfaces cross-dimension-free.
+- Added `PhysicsMixedHit` with 3D/2D collider and body references, mixed
+  contact points, the `Normal3DTo2D` invariant, source-oriented CCD helper
+  normals, deterministic hit distance, and stable hit sorting.
+- Added GridForge-backed mixed query candidate gathering through
+  `PhysicsMixedPartition`, with duplicate suppression, layer filtering, bounds
+  filtering, and deterministic collider ID ordering. This avoids falling back
+  to whole-world 2D/3D cross products.
+- Added explicit mixed sweeps for 3D swept spheres against embedded 2D slabs
+  and 2D swept circles against 3D targets. The shared swept-sphere worker now
+  covers sphere, capsule, cuboid, finite cylinder, mesh, and compound targets;
+  mesh sweeps use triangle face, edge, and vertex TOI checks against local-BVH
+  candidates, while compound sweeps reduce deterministic part hits to one
+  owning collider hit.
+- Wired mixed CCD into `StiffBody` and `StiffBody2D` only when
+  `PhysicsRuntimeMode.Mixed` is active. Pure `Both` mode still advances 2D and
+  3D independently without cross-dimensional CCD.
+- Extended diagnostics with dimension-tagged mixed query, mixed contact, and
+  mixed response impulse events. Debug draw can now capture embedded 2D slab
+  geometry through `CaptureMixedCollider(...)`.
+- Added focused Phase 10E tests for pure query isolation, mixed query hits,
+  mesh and compound mixed sweeps, 3D-vs-2D and 2D-vs-3D mixed CCD clamping,
+  mesh/compound mixed CCD target clamping, mixed diagnostic payloads, and mixed
+  debug draw slab commands.
+- Verification: focused mixed/diagnostics tests passed with 52 tests; the
+  mesh/compound mixed-sweep follow-up increased the suite to 360 tests, and
+  full `Release` build/test plus full `ReleaseLean` build/test passed with 360
+  tests. Focused mixed/query coverage also passed. Short benchmark smoke for
+  `diagnostics`, `mixed-broad-phase`, and `query-service` completed.
+  Diagnostics and the 64-collider swept-sphere query smoke reported `0 B/op`;
+  mixed broad-phase still reports the existing dense-scene managed allocation
+  profile.
+  BenchmarkDotNet still could not raise process priority even though
+  `/home/davido/.dotnet/dotnet` has `cap_sys_nice=eip`, so treat short-run
+  timings as local smoke evidence only.
 
 ## Phase 11: Serialization, Snapshots, And Deterministic Replay
 

@@ -29,6 +29,7 @@ pairs, queries, and coroutines remain context-local.
 | `GravitasCollision2DService` | GridForge-backed pure 2D partition bucket, inactive partition pool, duplicate voxel checker, awake dynamic membership refresh, 2D collision distribution version, retained partition cleanup. |
 | `GravitasQuery2DService` | Pure 2D query candidate buffer, overlap-circle queries, segment raycasts, swept-circle queries, collider-stamped duplicate suppression, hit ordering. |
 | `GravitasQuery3DService` | 3D segment worker, swept-sphere worker, X/Z circle overlap/proximity queries, intersection buffer, duplicate voxel checker, duplicate collider checker, raycast and circle query versions. |
+| `GravitasQueryMixedService` | Explicit mixed swept-sphere and swept-circle query buffers, GridForge-backed mixed candidate gathering, duplicate suppression, and `PhysicsMixedHit` ordering. |
 | `GravitasCoroutineService` | Active lockstep coroutine bucket and context-bound wait instruction factories. |
 | `GravitasDiagnosticSink` | Disabled-by-default diagnostic event buffer and engine-agnostic debug draw command buffer. |
 | `GravitasLifecycleHooks` | Ordered callbacks for simulate, late simulate, visualize, late visualize, reset, and frame-rate change. |
@@ -120,8 +121,9 @@ plus the dedicated mixed lifecycle and broad-phase path. Mixed narrow phase
 currently supports 3D spheres, cuboids, capsules, finite cylinders, compound
 colliders, and mesh colliders against embedded 2D circle, AABB, and convex
 polygon slabs. Mixed pair ownership and constrained impulse exchange are
-implemented through `CollisionPairMixed` and `CollisionResponseMixed`; later
-Phase 10 work fills in diagnostics, mixed queries, and CCD policy.
+implemented through `CollisionPairMixed` and `CollisionResponseMixed`. Explicit
+mixed query APIs, mixed CCD hooks, and dimension-tagged diagnostics are part of
+the current mixed alpha path.
 
 `Reset` clears the clock and all context-local service state, then invokes reset
 hooks. `SetFrameRate` and `ApplySettings` update the clock's frame rate and

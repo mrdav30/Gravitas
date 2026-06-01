@@ -147,6 +147,45 @@ public sealed class GravitasQuery3DServiceSweepTests
     }
 
     [Fact]
+    public void SweepSphere_ShouldSupportMeshAndCompoundTargets()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSMeshCollider mesh = CreateDynamicCollider(
+            context,
+            MeshTestFixtures.CreateVerticalQuad(Fixed64.Zero, -Fixed64.One, Fixed64.One),
+            Vector3d.Zero);
+        LSCompoundCollider compound = CreateDynamicCollider(
+            context,
+            new LSCompoundCollider(
+                new CompoundColliderPart(new LSSphereCollider { LocalOffset = new Vector3d((Fixed64)4, Fixed64.Zero, Fixed64.Zero) }),
+                new CompoundColliderPart(new LSSphereCollider { LocalOffset = new Vector3d((Fixed64)8, Fixed64.Zero, Fixed64.Zero) })),
+            Vector3d.Zero);
+
+        bool meshHit = context.Query3D.SweepSphere(
+            new Vector3d((Fixed64)(-3), Fixed64.One, Fixed64.Zero),
+            Fixed64.Half,
+            Vector3d.Right,
+            (Fixed64)6,
+            out Physics3DHit meshSweepHit,
+            IncludeLayerZero);
+        bool compoundHit = context.Query3D.SweepSphere(
+            new Vector3d((Fixed64)2, Fixed64.Zero, Fixed64.Zero),
+            Fixed64.Half,
+            Vector3d.Right,
+            (Fixed64)10,
+            out Physics3DHit compoundSweepHit,
+            IncludeLayerZero);
+
+        meshHit.Should().BeTrue();
+        meshSweepHit.Collider.Should().BeSameAs(mesh);
+        meshSweepHit.Distance.Should().Be(Fixed64.Fraction(5, 2));
+        meshSweepHit.Point.Should().Be(new Vector3d(Fixed64.Zero, Fixed64.One, Fixed64.Zero));
+        compoundHit.Should().BeTrue();
+        compoundSweepHit.Collider.Should().BeSameAs(compound);
+        compoundSweepHit.Distance.Should().Be(Fixed64.One);
+    }
+
+    [Fact]
     public void SweptSphereWorker_ShouldDetectCylinderSideImpact()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();

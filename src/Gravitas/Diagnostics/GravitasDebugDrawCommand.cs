@@ -13,7 +13,9 @@ public readonly struct GravitasDebugDrawCommand
         int sequence,
         GravitasDebugDrawKind kind,
         int colliderId,
+        GravitasColliderDimension colliderDimension,
         ColliderType colliderType,
+        ColliderType2D collider2DType,
         Vector3d start,
         Vector3d end,
         Vector3d center,
@@ -30,7 +32,9 @@ public readonly struct GravitasDebugDrawCommand
         Sequence = sequence;
         Kind = kind;
         ColliderId = colliderId;
+        ColliderDimension = colliderDimension;
         ColliderType = colliderType;
+        Collider2DType = collider2DType;
         Start = start;
         End = end;
         Center = center;
@@ -52,7 +56,11 @@ public readonly struct GravitasDebugDrawCommand
 
     public int ColliderId { get; }
 
+    public GravitasColliderDimension ColliderDimension { get; }
+
     public ColliderType ColliderType { get; }
+
+    public ColliderType2D Collider2DType { get; }
 
     public Vector3d Start { get; }
 

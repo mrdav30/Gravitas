@@ -24,6 +24,7 @@ public sealed class StiffBody2D : IRecordable
     private int _sleepFrameCount;
     private ContinuousCollisionMode _continuousCollisionMode = ContinuousCollisionMode.Inherit;
     private readonly SwiftList<Physics2DHit> _continuousCollisionHits = new();
+    private readonly SwiftList<PhysicsMixedHit> _continuousMixedCollisionHits = new();
 
     public StiffBody2D(IMatterAgent agent, LSCollider2D collider)
     {
@@ -270,18 +271,67 @@ public sealed class StiffBody2D : IRecordable
             _continuousCollisionHits,
             Collider,
             includeTriggers: false);
+        int mixedHitCount = Context.Settings.RuntimeMode.RunsMixedContacts()
+            ? Context.QueryMixed.SweepCircleAgainst3DAll(
+                startPosition,
+                proposedPosition,
+                proxyRadius,
+                Collider.MixedSlabCenterY,
+                Collider.MixedHalfThickness,
+                PhysicsLayerMask.All,
+                _continuousMixedCollisionHits,
+                Collider,
+                includeTriggers: false)
+            : 0;
 
-        for (int i = 0; i < hitCount; i++)
+        bool found2D = TryGetFirstValidContinuousCollisionHit(hitCount, out Physics2DHit hit2D);
+        bool foundMixed = TryGetFirstValidMixedContinuousCollisionHit(mixedHitCount, out PhysicsMixedHit hitMixed);
+        if (found2D && (!foundMixed || hit2D.Distance <= hitMixed.Distance))
         {
-            Physics2DHit hit = _continuousCollisionHits[i];
-            if (!IsValidContinuousCollisionHit(hit))
-                continue;
-
-            proposedPosition = startPosition + displacement.Normal * hit.Distance;
-            RemoveClosingContinuousCollisionVelocity(hit.Normal);
+            proposedPosition = startPosition + displacement.Normal * hit2D.Distance;
+            RemoveClosingContinuousCollisionVelocity(hit2D.Normal);
             return true;
         }
 
+        if (foundMixed)
+        {
+            proposedPosition = startPosition + displacement.Normal * hitMixed.Distance;
+            RemoveClosingContinuousCollisionVelocity(hitMixed.NormalFor2DSource);
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool TryGetFirstValidContinuousCollisionHit(int hitCount, out Physics2DHit hit)
+    {
+        for (int i = 0; i < hitCount; i++)
+        {
+            Physics2DHit candidate = _continuousCollisionHits[i];
+            if (!IsValidContinuousCollisionHit(candidate))
+                continue;
+
+            hit = candidate;
+            return true;
+        }
+
+        hit = default;
+        return false;
+    }
+
+    private bool TryGetFirstValidMixedContinuousCollisionHit(int hitCount, out PhysicsMixedHit hit)
+    {
+        for (int i = 0; i < hitCount; i++)
+        {
+            PhysicsMixedHit candidate = _continuousMixedCollisionHits[i];
+            if (!IsValidMixedContinuousCollisionHit(candidate))
+                continue;
+
+            hit = candidate;
+            return true;
+        }
+
+        hit = default;
         return false;
     }
 
@@ -351,6 +401,20 @@ public sealed class StiffBody2D : IRecordable
         }
 
         StiffBody2D? hitBody = hitCollider.Body;
+        return hitBody == null || hitBody.Immovable || hitBody.IsKinematic;
+    }
+
+    private bool IsValidMixedContinuousCollisionHit(PhysicsMixedHit hit)
+    {
+        LSCollider? hitCollider = hit.Collider3D;
+        if (hitCollider == null
+            || hitCollider.IsTrigger
+            || !Context.MixedCollisions.RequireCollisionPair(hitCollider, Collider))
+        {
+            return false;
+        }
+
+        StiffBody? hitBody = hitCollider.Body;
         return hitBody == null || hitBody.Immovable || hitBody.IsKinematic;
     }
 

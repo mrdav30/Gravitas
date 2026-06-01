@@ -284,6 +284,31 @@ internal sealed class PhysicsMixedPartition : IVoxelPartition
 
     public void SetParentIndex(WorldVoxelIndex parentIndex) => WorldIndex = parentIndex;
 
+    internal void Copy3DColliderIds(SwiftList<int> destination)
+    {
+        destination.FastClear();
+        AppendIds(ContainedDynamic3DObjects, destination);
+        AppendIds(ContainedStatic3DObjects, destination);
+        SortIds(destination);
+    }
+
+    internal void Copy2DColliderIds(SwiftList<int> destination)
+    {
+        destination.FastClear();
+        AppendIds(ContainedDynamic2DObjects, destination);
+        AppendIds(ContainedStatic2DObjects, destination);
+        SortIds(destination);
+    }
+
+    private static void AppendIds(SwiftSparseSet? source, SwiftList<int> destination)
+    {
+        if (source == null)
+            return;
+
+        for (int i = 0; i < source.Count; i++)
+            destination.Add(source.DenseKeys[i]);
+    }
+
     private static void CopySortedIds(SwiftSparseSet? source, SwiftList<int> destination)
     {
         destination.FastClear();

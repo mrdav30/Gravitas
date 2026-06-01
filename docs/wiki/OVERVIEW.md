@@ -64,6 +64,7 @@ flowchart TD
     Context --> Collisions2D["GravitasCollision2DService"]
     Context --> Query2D["GravitasQuery2DService"]
     Context --> Query3D["GravitasQuery3DService"]
+    Context --> QueryMixed["GravitasQueryMixedService"]
     Context --> Coroutines["GravitasCoroutineService"]
     Context --> Diagnostics["GravitasDiagnosticSink"]
     Agent["IMatterAgent"] --> Context
@@ -99,6 +100,7 @@ flowchart TD
 | `GravitasMixedCollisionService` | Mixed 2D/3D lifecycle and broad-phase candidate gathering through `PhysicsMixedPartition`, stable 3D/2D keys, duplicate suppression, and retained partition cleanup. |
 | `GravitasQuery2DService` | Pure 2D overlap-circle and segment raycast queries, caller-buffered hit output, duplicate suppression, and hit ordering. |
 | `GravitasQuery3DService` | 3D raycast, swept-sphere, and X/Z circle overlap/proximity queries, caller-buffered hit output, duplicate suppression, and hit ordering. |
+| `GravitasQueryMixedService` | Explicit mixed 3D/2D swept-sphere and swept-circle queries, GridForge-backed mixed candidate gathering, caller-buffered hit output, and deterministic hit ordering. |
 | `PhysicsPartition` | Voxel partition payload containing collider IDs, awake dynamic membership, and candidate pair distribution. |
 | `CollisionPair` | Pair identity, culling state, contact state, warm-start cache, narrow-phase dispatch, response dispatch, and contact notification state. |
 | `CollisionDetection` | Shape-pair narrow-phase collision checks and contact generation. |
@@ -170,13 +172,15 @@ active-pair queue during `LateSimulate`.
   and convex polygon slabs. Mixed pair ownership and constrained response now
   support wake propagation, resting-pair retention, mixed contact/trigger
   events, planar X/Z impulse for 2D bodies, and vertical response against 3D
-  participants only. Remaining Phase 10 work fills in diagnostics, mixed
-  queries, and CCD while preserving pure 2D semantics.
+  participants only. Mixed query APIs, mixed CCD hooks, dimension-tagged
+  diagnostics, and slab debug draw are now implemented; mixed 2D swept-circle
+  queries cover primitive, mesh, and compound 3D targets while preserving pure
+  2D semantics.
 - Cylinder collision and query behavior is implemented for the current finite
   cylinder model, but needs continued edge-case hardening.
-- Mesh raycast overlap and concave mesh narrow phase are implemented through
-  triangle-level tests. Swept mesh queries and richer mesh contact clipping
-  remain future hardening work.
+- Mesh raycast overlap, sphere sweeps against mesh targets, and concave mesh
+  narrow phase are implemented through triangle-level tests. Richer mesh contact
+  clipping and mesh-as-source swept query families remain future hardening work.
 - Collision response is still an alpha-hardening target. The current manifold
   solver handles deterministic normal and friction impulses, but static resting
   friction, true warm-start impulse application, explicit island solving,
@@ -199,6 +203,6 @@ active-pair queue during `LateSimulate`.
 | Colliders | [`LSCollider.cs`](../../src/Gravitas/Colliders/LSCollider.cs), [`Primitives`](../../src/Gravitas/Colliders/Primitives), [`Primitives2D`](../../src/Gravitas/Colliders/Primitives2D) |
 | Collision handling | [`CollisionPair.cs`](../../src/Gravitas/CollisionHandling/Pairs/CollisionPair.cs), [`CollisionPair2D.cs`](../../src/Gravitas/CollisionHandling/Pairs/CollisionPair2D.cs), [`CollisionDetection.cs`](../../src/Gravitas/CollisionHandling/Detection/CollisionDetection.cs), [`CollisionDetection2D.cs`](../../src/Gravitas/CollisionHandling/Detection/CollisionDetection2D.cs), [`CollisionResponse.cs`](../../src/Gravitas/CollisionHandling/Response/CollisionResponse.cs), [`CollisionResponse2D.cs`](../../src/Gravitas/CollisionHandling/Response/CollisionResponse2D.cs) |
 | 2D/3D direction | [`DIMENSIONS.md`](DIMENSIONS.md) |
-| Queries | [`GravitasQuery2DService.cs`](../../src/Gravitas/Queries/GravitasQuery2DService.cs), [`GravitasQuery3DService.Raycast.cs`](../../src/Gravitas/Queries/GravitasQuery3DService.Raycast.cs), [`GravitasQuery3DService.Circle.cs`](../../src/Gravitas/Queries/GravitasQuery3DService.Circle.cs), [`QueryDetection2D.cs`](../../src/Gravitas/Queries/QueryDetection2D.cs) |
+| Queries | [`GravitasQuery2DService.cs`](../../src/Gravitas/Queries/GravitasQuery2DService.cs), [`GravitasQuery3DService.Raycast.cs`](../../src/Gravitas/Queries/GravitasQuery3DService.Raycast.cs), [`GravitasQuery3DService.Circle.cs`](../../src/Gravitas/Queries/GravitasQuery3DService.Circle.cs), [`GravitasQueryMixedService.cs`](../../src/Gravitas/Queries/GravitasQueryMixedService.cs), [`QueryDetection2D.cs`](../../src/Gravitas/Queries/QueryDetection2D.cs) |
 | Diagnostics | [`Diagnostics`](../../src/Gravitas/Diagnostics) |
 | Tests and examples | [`tests/Gravitas.Tests`](../../tests/Gravitas.Tests), [`tests/Gravitas.Benchmarks`](../../tests/Gravitas.Benchmarks) |

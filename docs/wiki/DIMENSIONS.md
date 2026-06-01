@@ -24,8 +24,9 @@ those concrete types, not a third dimension value.
   mixed lifecycle and broad-phase path. Mixed narrow phase supports 3D spheres,
   cuboids, capsules, finite cylinders, compound colliders, and mesh colliders
   against embedded 2D circle, AABB, and convex polygon slabs. Mixed pair
-  ownership and constrained response are implemented; Phase 10 diagnostic,
-  mixed query, and CCD work fills in the rest of the interaction model.
+  ownership, constrained response, explicit mixed sweeps, mixed CCD hooks, and
+  dimension-tagged diagnostics are implemented. Mixed 2D swept-circle queries
+  cover primitive, mesh, and compound 3D targets.
 
 The context clock, coroutines, diagnostics, and lifecycle hooks remain shared.
 This lets pure 2D simulations use the same host loop without paying 3D
@@ -131,6 +132,17 @@ pure 2D swept movement/query path used by 2D CCD.
 The existing `GravitasQuery3DService` is a 3D X/Z ground-plane proximity
 query. It is not the pure 2D query API.
 
+Explicit mixed queries live on `GravitasWorldContext.QueryMixed`:
+
+```csharp
+context.QueryMixed.SweepSphereAgainst2D(start3D, end3D, radius, mask, out PhysicsMixedHit hit);
+context.QueryMixed.SweepCircleAgainst3D(start2D, end2D, radius, slabY, halfThickness, mask, out PhysicsMixedHit hit);
+```
+
+Pure `Query2D` and `Query3D` stay pure. Mixed CCD uses `QueryMixed` only when
+`PhysicsRuntimeMode.Mixed` is active, so `PhysicsRuntimeMode.Both` can still run
+2D and 3D side by side without cross-dimensional contacts or tunneling guards.
+
 ## Mixed 2D/3D Direction
 
 Phase 10 is the first mixed runtime implementation. The target model is explicit
@@ -157,6 +169,13 @@ rather than Unity-style separate engines:
 - mixed broad phase uses GridForge-backed spatial identity, separate 2D and 3D
   collider ID spaces, awake-dynamic gating, layer filtering, same-agent and
   explicit hierarchy exclusion, and retained empty-partition cleanup.
+- mixed query and CCD policy is explicit. 3D swept spheres can query embedded
+  2D slabs, and 2D swept circles can query 3D primitive, mesh, and compound
+  targets. Pure query services do not accidentally report cross-dimensional
+  hits.
+- mixed diagnostics emit dimension-tagged query, contact, and response impulse
+  events, and debug draw can capture the finite 2D slab geometry used by mixed
+  collision.
 - cross-dimensional hierarchy uses dimension-tagged collider keys in the shared
   hierarchy state. Plain collider IDs must not be compared across 2D and 3D
   services because those ID spaces are intentionally separate.

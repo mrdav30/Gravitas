@@ -1,5 +1,6 @@
 using FixedMathSharp;
 using Gravitas.Colliders;
+using Gravitas.Support;
 using GridForge.Grids;
 using GridForge.Spatial;
 using SwiftCollections;
@@ -29,6 +30,9 @@ internal sealed class GravitasMixedCollisionService
     private readonly SwiftList<int> _distributionAwakeDynamic2DIds = new();
     private readonly SwiftList<int> _distributionStatic2DIds = new();
     private readonly SwiftList<MixedColliderKey> _candidatePairs = new();
+    private readonly SwiftList<PhysicsMixedPartition> _queryPartitions = new();
+    private readonly SwiftList<int> _queryColliderIds = new();
+    private readonly SwiftHashSet<int> _queryColliderRedundancy = new();
     private readonly SwiftDictionary<ulong, CollisionPairMixed> _pairs = new();
     private readonly SwiftList<ulong> _pairsToRemove = new();
     private readonly SwiftStack<CollisionPairMixed> _cachedPairs = new();
@@ -135,6 +139,9 @@ internal sealed class GravitasMixedCollisionService
         _distributionAwakeDynamic2DIds.FastClear();
         _distributionStatic2DIds.FastClear();
         _candidatePairs.FastClear();
+        _queryPartitions.FastClear();
+        _queryColliderIds.FastClear();
+        _queryColliderRedundancy.Clear();
         _pairs.Clear();
         _pairsToRemove.FastClear();
         _cachedPairs.Clear();
@@ -377,6 +384,76 @@ internal sealed class GravitasMixedCollisionService
             return;
 
         _candidatePairs.Add(new MixedColliderKey(collider3DId, collider2DId));
+    }
+
+    internal void Collect2DCandidatesInMixedBounds(
+        Vector3d min,
+        Vector3d max,
+        PhysicsLayerMask layerMask,
+        SwiftList<LSCollider2D> candidates)
+    {
+        SwiftThrowHelper.ThrowIfNull(candidates, nameof(candidates));
+        Refresh2DColliderPartitions();
+        candidates.FastClear();
+        CollectCoveredMixedQueryPartitions(min, max, _queryPartitions);
+        SortPartitions(_queryPartitions);
+        _queryColliderRedundancy.Clear();
+
+        for (int i = 0; i < _queryPartitions.Count; i++)
+        {
+            PhysicsMixedPartition partition = _queryPartitions[i];
+            partition.Copy2DColliderIds(_queryColliderIds);
+            for (int j = 0; j < _queryColliderIds.Count; j++)
+            {
+                int colliderId = _queryColliderIds[j];
+                if (!_queryColliderRedundancy.Add(colliderId)
+                    || !_context.Physics2D.TryGetColliderById(colliderId, out LSCollider2D? collider)
+                    || !Is2DQueryCandidate(collider!, min, max, layerMask))
+                {
+                    continue;
+                }
+
+                candidates.Add(collider!);
+            }
+        }
+
+        _queryColliderRedundancy.Clear();
+        Sort2DCollidersById(candidates);
+    }
+
+    internal void Collect3DCandidatesInMixedBounds(
+        Vector3d min,
+        Vector3d max,
+        PhysicsLayerMask layerMask,
+        SwiftList<LSCollider> candidates)
+    {
+        SwiftThrowHelper.ThrowIfNull(candidates, nameof(candidates));
+        Refresh3DColliderPartitions();
+        candidates.FastClear();
+        CollectCoveredMixedQueryPartitions(min, max, _queryPartitions);
+        SortPartitions(_queryPartitions);
+        _queryColliderRedundancy.Clear();
+
+        for (int i = 0; i < _queryPartitions.Count; i++)
+        {
+            PhysicsMixedPartition partition = _queryPartitions[i];
+            partition.Copy3DColliderIds(_queryColliderIds);
+            for (int j = 0; j < _queryColliderIds.Count; j++)
+            {
+                int colliderId = _queryColliderIds[j];
+                if (!_queryColliderRedundancy.Add(colliderId)
+                    || !_context.Physics.TryGetColliderById(colliderId, out LSCollider? collider)
+                    || !Is3DQueryCandidate(collider!, min, max, layerMask))
+                {
+                    continue;
+                }
+
+                candidates.Add(collider!);
+            }
+        }
+
+        _queryColliderRedundancy.Clear();
+        Sort3DCollidersById(candidates);
     }
 
     internal void RemovePairsFor3DCollider(LSCollider collider)
@@ -722,6 +799,67 @@ internal sealed class GravitasMixedCollisionService
         }
     }
 
+    private void CollectCoveredMixedQueryPartitions(
+        Vector3d min,
+        Vector3d max,
+        SwiftList<PhysicsMixedPartition> partitions)
+    {
+        partitions.FastClear();
+        (Vector3d snappedMin, Vector3d snappedMax) = _context.World.SnapBoundsToVoxelSize(min, max, Fixed64.Half);
+
+        try
+        {
+            ScanCoveredMixedQueryPartitions(snappedMin, snappedMax, min, max, partitions);
+        }
+        finally
+        {
+            _redundancyChecker.Clear();
+            _processedGrids.Clear();
+        }
+    }
+
+    private void ScanCoveredMixedQueryPartitions(
+        Vector3d snappedMin,
+        Vector3d snappedMax,
+        Vector3d queryMin,
+        Vector3d queryMax,
+        SwiftList<PhysicsMixedPartition> partitions)
+    {
+        GridWorld world = _context.World;
+        GetSpatialCellBounds(
+            world,
+            snappedMin,
+            snappedMax,
+            out int xMin,
+            out int yMin,
+            out int zMin,
+            out int xMax,
+            out int yMax,
+            out int zMax);
+
+        for (int z = zMin; z <= zMax; z++)
+        {
+            for (int y = yMin; y <= yMax; y++)
+            {
+                for (int x = xMin; x <= xMax; x++)
+                {
+                    int cellIndex = SwiftHashTools.CombineHashCodes(x, y, z);
+                    if (!world.SpatialGridHash.TryGetValue(cellIndex, out SwiftHashSet<ushort> gridList))
+                        continue;
+
+                    foreach (ushort gridIndex in gridList)
+                    {
+                        if (!world.ActiveGrids.IsAllocated(gridIndex) || !_processedGrids.Add(gridIndex))
+                            continue;
+
+                        VoxelGrid currentGrid = world.ActiveGrids[gridIndex];
+                        VisitGridMixedQueryVoxels(currentGrid, snappedMin, snappedMax, queryMin, queryMax, partitions);
+                    }
+                }
+            }
+        }
+    }
+
     private void VisitGrid3DVoxels(
         VoxelGrid currentGrid,
         LSCollider collider,
@@ -736,6 +874,38 @@ internal sealed class GravitasMixedCollisionService
             {
                 for (Fixed64 z = snappedMin.z; z <= snappedMax.z; z += voxelSize)
                     TryPartition3DVoxel(currentGrid, collider, coordinates, new Vector3d(x, y, z), voxelSize);
+            }
+        }
+    }
+
+    private void VisitGridMixedQueryVoxels(
+        VoxelGrid currentGrid,
+        Vector3d snappedMin,
+        Vector3d snappedMax,
+        Vector3d queryMin,
+        Vector3d queryMax,
+        SwiftList<PhysicsMixedPartition> partitions)
+    {
+        Fixed64 voxelSize = _context.World.VoxelSize;
+        for (Fixed64 x = snappedMin.x; x <= snappedMax.x; x += voxelSize)
+        {
+            for (Fixed64 y = snappedMin.y; y <= snappedMax.y; y += voxelSize)
+            {
+                for (Fixed64 z = snappedMin.z; z <= snappedMax.z; z += voxelSize)
+                {
+                    Vector3d position = new(x, y, z);
+                    if (!currentGrid.IsInBounds(position)
+                        || !currentGrid.TryGetVoxel(position, out Voxel? voxel)
+                        || !_redundancyChecker.Add(voxel!.SpawnToken)
+                        || !IsWorldPositionInBounds(queryMin, queryMax, voxelSize, voxel.WorldPosition)
+                        || !voxel.TryGetPartition(out PhysicsMixedPartition? partition)
+                        || partition!.IsEmpty)
+                    {
+                        continue;
+                    }
+
+                    partitions.Add(partition);
+                }
             }
         }
     }
@@ -882,6 +1052,79 @@ internal sealed class GravitasMixedCollisionService
             && collider3D.BoundsMin.y <= bounds2D.Max.y
             && collider3D.BoundsMax.z >= bounds2D.Min.z
             && collider3D.BoundsMin.z <= bounds2D.Max.z;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool Is2DQueryCandidate(LSCollider2D collider, Vector3d min, Vector3d max, PhysicsLayerMask layerMask)
+    {
+        if (!collider.IsActive || !layerMask.Includes(collider.Layer))
+            return false;
+
+        BoundingBox bounds = collider.MixedBounds3D;
+        return BoundsOverlap(bounds.Min, bounds.Max, min, max);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool Is3DQueryCandidate(LSCollider collider, Vector3d min, Vector3d max, PhysicsLayerMask layerMask)
+    {
+        return collider.IsActive
+            && layerMask.Includes(collider.Layer)
+            && BoundsOverlap(collider.BoundsMin, collider.BoundsMax, min, max);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool BoundsOverlap(Vector3d firstMin, Vector3d firstMax, Vector3d secondMin, Vector3d secondMax)
+    {
+        return firstMax.x >= secondMin.x
+            && firstMin.x <= secondMax.x
+            && firstMax.y >= secondMin.y
+            && firstMin.y <= secondMax.y
+            && firstMax.z >= secondMin.z
+            && firstMin.z <= secondMax.z;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool IsWorldPositionInBounds(Vector3d min, Vector3d max, Fixed64 voxelSize, Vector3d worldPosition)
+    {
+        Fixed64 padding = voxelSize * Fixed64.Half;
+        return worldPosition.x >= min.x - padding
+            && worldPosition.x <= max.x + padding
+            && worldPosition.y >= min.y - padding
+            && worldPosition.y <= max.y + padding
+            && worldPosition.z >= min.z - padding
+            && worldPosition.z <= max.z + padding;
+    }
+
+    private static void Sort2DCollidersById(SwiftList<LSCollider2D> colliders)
+    {
+        for (int i = 1; i < colliders.Count; i++)
+        {
+            LSCollider2D value = colliders[i];
+            int index = i - 1;
+            while (index >= 0 && colliders[index].Id > value.Id)
+            {
+                colliders[index + 1] = colliders[index];
+                index--;
+            }
+
+            colliders[index + 1] = value;
+        }
+    }
+
+    private static void Sort3DCollidersById(SwiftList<LSCollider> colliders)
+    {
+        for (int i = 1; i < colliders.Count; i++)
+        {
+            LSCollider value = colliders[i];
+            int index = i - 1;
+            while (index >= 0 && colliders[index].Id > value.Id)
+            {
+                colliders[index + 1] = colliders[index];
+                index--;
+            }
+
+            colliders[index + 1] = value;
+        }
     }
 
     private void ClearRetainedPartitions()

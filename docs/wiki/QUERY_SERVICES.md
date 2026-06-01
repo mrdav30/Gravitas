@@ -1,15 +1,20 @@
 # Query Services
 
-Queries are split into explicit context-owned 2D and 3D services:
-`GravitasWorldContext.Query2D` and `GravitasWorldContext.Query3D`. The 3D
-service owns raycasts, swept-sphere queries, and X/Z circle overlap/proximity
-queries. It uses the same GridForge-backed partitions as 3D collision
-detection, resolves collider IDs through the owning `GravitasPhysicsService`,
-and suppresses duplicate hits when a collider appears in multiple voxels.
+Queries are split into explicit context-owned 2D, 3D, and mixed services:
+`GravitasWorldContext.Query2D`, `GravitasWorldContext.Query3D`, and
+`GravitasWorldContext.QueryMixed`. The 3D service owns raycasts,
+swept-sphere queries, and X/Z circle overlap/proximity queries. It uses the
+same GridForge-backed partitions as 3D collision detection, resolves collider
+IDs through the owning `GravitasPhysicsService`, and suppresses duplicate hits
+when a collider appears in multiple voxels.
 
 Pure 2D queries live on `GravitasQuery2DService` and operate over `Vector2d`
 shape data. They should not route through the 3D raycast path or the X/Z circle
 query path by accident.
+
+Mixed 2D/3D queries live on `GravitasQueryMixedService` and are always
+explicit. Pure `Query2D` and pure `Query3D` do not report cross-dimensional
+hits.
 
 ## 3D Raycasts
 
@@ -83,10 +88,11 @@ The contract is segment-based and deterministic:
 - hit normal points away from the hit surface toward the swept sphere center
   when that can be resolved, with shape normals as the fallback.
 
-Current swept-sphere support covers sphere, capsule, cuboid, and finite cylinder
-targets. Mesh targets are intentionally excluded for now; mesh sweep needs a
-triangle sweep policy and acceleration strategy beyond static ray/overlap
-queries.
+Current swept-sphere support covers sphere, capsule, cuboid, finite cylinder,
+mesh, and compound targets. Mesh targets query local-BVH triangle candidates,
+then test triangle faces, edges, and vertices for deterministic time of impact.
+Compound targets reduce over owned parts in stable declaration order while the
+public hit remains the owning compound collider.
 
 `StiffBody` continuous collision detection reuses this service as an opt-in
 movement sweep. Body CCD passes the moving collider as `excludedCollider`, uses
@@ -191,6 +197,40 @@ Current hit data is `Physics2DHit`: collider, optional body, point, normal, and
 distance. AABB and polygon area-query APIs remain future 2D query hardening
 work.
 
+## Mixed Queries
+
+`GravitasQueryMixedService` exposes explicit cross-dimensional sweeps:
+
+- `SweepSphereAgainst2D(start, end, radius, layerMask, out hit, excludedCollider, includeTriggers)`
+- `SweepSphereAgainst2DAll(start, end, radius, layerMask, results, excludedCollider, includeTriggers)`
+- `SweepCircleAgainst3D(start, end, radius, slabCenterY, halfThickness, layerMask, out hit, excludedCollider, includeTriggers)`
+- `SweepCircleAgainst3DAll(start, end, radius, slabCenterY, halfThickness, layerMask, results, excludedCollider, includeTriggers)`
+
+The mixed service keeps `Query2D` and `Query3D` pure by design. Use mixed
+queries only when the host explicitly wants cross-dimensional query truth or
+when mixed CCD is enabled through `PhysicsRuntimeMode.Mixed`.
+
+Mixed query candidate gathering uses `PhysicsMixedPartition` payloads attached
+to GridForge voxels. The gatherer refreshes the relevant mixed partition side,
+scans deterministic voxel identities, suppresses duplicate collider IDs, filters
+by layer and bounds, and sorts hits by distance with 3D ID and 2D ID
+tie-breakers.
+
+`SweepSphereAgainst2D` sweeps a 3D sphere center against embedded 2D mixed
+slabs. 2D circles are treated as finite vertical cylinders; AABB and polygon
+slabs use their finite mixed prism bounds for the current alpha query policy.
+
+`SweepCircleAgainst3D` sweeps a pure 2D circle embedded at the supplied slab Y
+center and half-thickness against 3D sphere, capsule, cuboid, finite cylinder,
+mesh, and compound targets through the shared swept-sphere worker. Mesh targets
+use triangle candidate acceleration and exact face/edge/vertex TOI checks;
+compound targets return one hit on the owning compound collider after reducing
+over stable part order.
+
+`StiffBody` and `StiffBody2D` mixed CCD use these APIs only when the context is
+in `PhysicsRuntimeMode.Mixed`. Pure `Both` mode still advances 2D and 3D
+independently and does not run cross-dimensional CCD.
+
 ## Layer Mask Semantics
 
 Queries accept `PhysicsLayerMask layerMask`. This is an include mask:
@@ -227,6 +267,25 @@ query job/state objects owned by the caller or rented from a context-local pool.
 
 `Body` is `collider?.Body`, so static/bodyless hits can have a collider with a
 null body.
+
+`PhysicsMixedHit` is a readonly struct containing:
+
+- `Collider3D`
+- `Collider2D`
+- `Body3D`
+- `Body2D`
+- `Point3D`
+- `Point2D`
+- `Normal3DTo2D`
+- `NormalFor3DSource`
+- `NormalFor2DSource`
+- `Distance`
+- `Direction3D`
+
+`Normal3DTo2D` follows the mixed contact invariant: it points from the 3D side
+toward the embedded 2D volume. CCD source helpers expose the normal orientation
+needed by the moving source so velocity clamping does not have to reinterpret
+the invariant at every call site.
 
 ## Query Hardening Targets
 

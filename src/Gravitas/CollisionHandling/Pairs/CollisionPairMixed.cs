@@ -29,6 +29,8 @@ internal sealed class CollisionPairMixed
 
     public ulong Key { get; private set; }
 
+    public GravitasWorldContext Context => Collider3D.Context;
+
     public int LastFrame { get; private set; } = -1;
 
     public bool IsColliding => _isColliding;
@@ -55,6 +57,7 @@ internal sealed class CollisionPairMixed
         _isTriggerPair = Collider3D.IsTrigger || Collider2D.IsTrigger;
         LastFrame = frame;
 
+        Context.Diagnostics.EmitMixedContact(this, contact, true);
         if (!_isTriggerPair)
         {
             WakeBodies();

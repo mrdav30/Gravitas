@@ -137,6 +137,46 @@ public sealed class GravitasDiagnosticSink
     }
 
     /// <summary>
+    /// Emits engine-agnostic draw commands for the finite 2D slab used by mixed 2D/3D collision.
+    /// </summary>
+    public void CaptureMixedCollider(LSCollider2D collider, GravitasDiagnosticColor color)
+    {
+        if (!Enabled)
+            return;
+
+        SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
+        Vector3d center = new(collider.Center.x, collider.MixedSlabCenterY, collider.Center.y);
+        Fixed64 height = collider.MixedHalfThickness * 2;
+        switch (collider)
+        {
+            case LSCircleCollider2D circle:
+                AddDrawCommand(
+                    GravitasDebugDrawKind.WireCylinder,
+                    circle.Id,
+                    colliderDimension: GravitasColliderDimension.TwoD,
+                    collider2DType: circle.Shape,
+                    center: center,
+                    radius: circle.Radius,
+                    height: height,
+                    color: color);
+                break;
+            case LSAABBoxCollider2D box:
+                AddDrawCommand(
+                    GravitasDebugDrawKind.WireBox,
+                    box.Id,
+                    colliderDimension: GravitasColliderDimension.TwoD,
+                    collider2DType: box.Shape,
+                    center: center,
+                    size: new Vector3d(box.Size.x, height, box.Size.y),
+                    color: color);
+                break;
+            default:
+                CaptureMixedPolygon(collider, color);
+                break;
+        }
+    }
+
+    /// <summary>
     /// Emits an engine-agnostic line draw command.
     /// </summary>
     public void CaptureLine(Vector3d start, Vector3d end, GravitasDiagnosticColor color)
@@ -374,6 +414,83 @@ public sealed class GravitasDiagnosticSink
             hit: true);
     }
 
+    internal void EmitMixedQuery(
+        Vector3d start,
+        Vector3d end,
+        Fixed64 radius,
+        int layerMaskBits,
+        bool hit,
+        int hitCount,
+        PhysicsMixedHit mixedHit)
+    {
+        if (!Enabled)
+            return;
+
+        AddEvent(
+            GravitasDiagnosticEventKind.MixedQuery,
+            colliderAId: mixedHit.Collider3D?.Id ?? -1,
+            colliderBId: mixedHit.Collider2D?.Id ?? -1,
+            colliderADimension: mixedHit.Collider3D == null ? GravitasColliderDimension.None : GravitasColliderDimension.ThreeD,
+            colliderBDimension: mixedHit.Collider2D == null ? GravitasColliderDimension.None : GravitasColliderDimension.TwoD,
+            colliderAType: mixedHit.Collider3D?.Shape ?? ColliderType.None,
+            colliderB2DType: mixedHit.Collider2D?.Shape ?? ColliderType2D.None,
+            start: start,
+            end: end,
+            pointA: mixedHit.Point3D,
+            pointB: mixedHit.Point2D,
+            vector: mixedHit.Normal3DTo2D,
+            scalarA: radius,
+            scalarB: mixedHit.Distance,
+            dataA: layerMaskBits,
+            dataB: hitCount,
+            hit: hit);
+    }
+
+    internal void EmitMixedContact(CollisionPairMixed pair, MixedContact contact, bool hit)
+    {
+        if (!Enabled)
+            return;
+
+        AddEvent(
+            GravitasDiagnosticEventKind.MixedContact,
+            colliderAId: pair.Collider3DId,
+            colliderBId: pair.Collider2DId,
+            colliderADimension: GravitasColliderDimension.ThreeD,
+            colliderBDimension: GravitasColliderDimension.TwoD,
+            colliderAType: pair.Collider3D.Shape,
+            colliderB2DType: pair.Collider2D.Shape,
+            pointA: contact.Point3D,
+            pointB: contact.Point2D,
+            vector: contact.Normal3DTo2D,
+            scalarA: contact.Depth,
+            hit: hit && contact.HasContact);
+    }
+
+    internal void EmitMixedResponseImpulse(
+        CollisionPairMixed pair,
+        MixedContact contact,
+        Vector3d impulse,
+        Fixed64 normalVelocity)
+    {
+        if (!Enabled)
+            return;
+
+        AddEvent(
+            GravitasDiagnosticEventKind.MixedResponseImpulse,
+            colliderAId: pair.Collider3DId,
+            colliderBId: pair.Collider2DId,
+            colliderADimension: GravitasColliderDimension.ThreeD,
+            colliderBDimension: GravitasColliderDimension.TwoD,
+            colliderAType: pair.Collider3D.Shape,
+            colliderB2DType: pair.Collider2D.Shape,
+            pointA: contact.Point3D,
+            pointB: contact.Point2D,
+            vector: impulse,
+            scalarA: impulse.Magnitude,
+            scalarB: normalVelocity,
+            hit: true);
+    }
+
     private void CaptureMeshTriangles(LSMeshCollider mesh, GravitasDiagnosticColor color)
     {
         int triangleCount = mesh.Mesh.TriangleCount;
@@ -466,13 +583,61 @@ public sealed class GravitasDiagnosticSink
         }
     }
 
+    private void CaptureMixedPolygon(LSCollider2D collider, GravitasDiagnosticColor color)
+    {
+        int vertexCount = collider.VertexCount;
+        if (vertexCount <= 0)
+            return;
+
+        Fixed64 topY = collider.MixedSlabCenterY + collider.MixedHalfThickness;
+        Fixed64 bottomY = collider.MixedSlabCenterY - collider.MixedHalfThickness;
+        for (int i = 0; i < vertexCount; i++)
+        {
+            Vector2d current = collider.GetVertexUnchecked(i);
+            Vector2d next = collider.GetVertexUnchecked((i + 1) % vertexCount);
+            Vector3d currentTop = new(current.x, topY, current.y);
+            Vector3d nextTop = new(next.x, topY, next.y);
+            Vector3d currentBottom = new(current.x, bottomY, current.y);
+            Vector3d nextBottom = new(next.x, bottomY, next.y);
+
+            AddDrawCommand(
+                GravitasDebugDrawKind.Line,
+                collider.Id,
+                colliderDimension: GravitasColliderDimension.TwoD,
+                collider2DType: collider.Shape,
+                start: currentTop,
+                end: nextTop,
+                color: color);
+            AddDrawCommand(
+                GravitasDebugDrawKind.Line,
+                collider.Id,
+                colliderDimension: GravitasColliderDimension.TwoD,
+                collider2DType: collider.Shape,
+                start: currentBottom,
+                end: nextBottom,
+                color: color);
+            AddDrawCommand(
+                GravitasDebugDrawKind.Line,
+                collider.Id,
+                colliderDimension: GravitasColliderDimension.TwoD,
+                collider2DType: collider.Shape,
+                start: currentTop,
+                end: currentBottom,
+                color: color);
+        }
+    }
+
     private void AddEvent(
         GravitasDiagnosticEventKind kind,
         int bodyId = -1,
         int colliderAId = -1,
         int colliderBId = -1,
+        GravitasColliderDimension colliderADimension = GravitasColliderDimension.None,
+        GravitasColliderDimension colliderBDimension = GravitasColliderDimension.None,
         ColliderType colliderAType = ColliderType.None,
         ColliderType colliderBType = ColliderType.None,
+        ColliderType2D colliderA2DType = ColliderType2D.None,
+        ColliderType2D colliderB2DType = ColliderType2D.None,
         Vector3d start = default,
         Vector3d end = default,
         Vector3d pointA = default,
@@ -491,8 +656,12 @@ public sealed class GravitasDiagnosticSink
             bodyId,
             colliderAId,
             colliderBId,
+            ResolveDimension(colliderADimension, colliderAType, colliderA2DType),
+            ResolveDimension(colliderBDimension, colliderBType, colliderB2DType),
             colliderAType,
             colliderBType,
+            colliderA2DType,
+            colliderB2DType,
             start,
             end,
             pointA,
@@ -509,6 +678,8 @@ public sealed class GravitasDiagnosticSink
         GravitasDebugDrawKind kind,
         int colliderId = -1,
         ColliderType colliderType = ColliderType.None,
+        GravitasColliderDimension colliderDimension = GravitasColliderDimension.None,
+        ColliderType2D collider2DType = ColliderType2D.None,
         Vector3d start = default,
         Vector3d end = default,
         Vector3d center = default,
@@ -526,7 +697,9 @@ public sealed class GravitasDiagnosticSink
             _drawSequence++,
             kind,
             colliderId,
+            ResolveDimension(colliderDimension, colliderType, collider2DType),
             colliderType,
+            collider2DType,
             start,
             end,
             center,
@@ -538,5 +711,19 @@ public sealed class GravitasDiagnosticSink
             radius,
             height,
             color));
+    }
+
+    private static GravitasColliderDimension ResolveDimension(
+        GravitasColliderDimension dimension,
+        ColliderType colliderType,
+        ColliderType2D collider2DType)
+    {
+        if (dimension != GravitasColliderDimension.None)
+            return dimension;
+        if (colliderType != ColliderType.None)
+            return GravitasColliderDimension.ThreeD;
+        return collider2DType != ColliderType2D.None
+            ? GravitasColliderDimension.TwoD
+            : GravitasColliderDimension.None;
     }
 }

@@ -47,7 +47,9 @@ clears and stops capture.
 | `Kind` | Event payload type. |
 | `BodyId` | Context-local dynamic body ID, or `-1` when not applicable. |
 | `ColliderAId` / `ColliderBId` | Context-local collider IDs, or `-1` when not applicable. |
+| `ColliderADimension` / `ColliderBDimension` | Collider runtime surface: `ThreeD`, `TwoD`, or `None`. |
 | `ColliderAType` / `ColliderBType` | Collider shape types when present. |
+| `ColliderA2DType` / `ColliderB2DType` | 2D collider shape types when present. |
 | `Start` / `End` | Query segment, previous/current velocity, or other pair of vector values. |
 | `PointA` / `PointB` | Contact points, hit point, acceleration delta, or shape-specific point data. |
 | `Vector` | Force, torque, velocity delta, query normal, contact normal, or impulse direction. |
@@ -68,6 +70,9 @@ Current event kinds:
 | `CircleQuery` | Circle overlap queries | `Start` is center, `End` is directional extent when used, `ScalarA` is radius. |
 | `Contact` | `CollisionPair.ProcessCollision()` | Contact points, normal, and depth from narrow phase. |
 | `ResponseImpulse` | `CollisionResponse` | `Vector` is normal impulse, `ScalarA` is impulse magnitude, `ScalarB` is normal velocity. |
+| `MixedQuery` | `GravitasQueryMixedService` | Explicit mixed query segment, layer mask bits, hit count, mixed hit points, normal, and distance. |
+| `MixedContact` | `CollisionPairMixed.MarkColliding(...)` | Dimension-tagged 3D/2D collider IDs, mixed contact points, `Normal3DTo2D`, and penetration depth. |
+| `MixedResponseImpulse` | `CollisionResponseMixed` | Dimension-tagged mixed impulse, impulse magnitude, and normal velocity. |
 
 The stream is scoped to one context. Collider and body IDs are not global and
 must be resolved through the same context that produced the event.
@@ -95,6 +100,7 @@ Use the explicit capture helpers for host-driven overlays:
 
 ```csharp
 context.Diagnostics.CaptureCollider(collider, GravitasDiagnosticColor.Cyan);
+context.Diagnostics.CaptureMixedCollider(collider2D, GravitasDiagnosticColor.Cyan);
 context.Diagnostics.CaptureLine(start, end, GravitasDiagnosticColor.Yellow);
 context.Diagnostics.CaptureRay(origin, direction, maxDistance, GravitasDiagnosticColor.Green);
 context.Diagnostics.CapturePoint(point, Fixed64.Half, GravitasDiagnosticColor.Red);
@@ -107,6 +113,13 @@ per internal part using the owning compound collider ID and
 treating parts as registered colliders. Large meshes can therefore generate a
 large command buffer; hosts should reserve capacity or choose filtered capture
 when inspecting dense mesh scenes.
+
+`CaptureMixedCollider(LSCollider2D, ...)` emits the finite 2D slab/prism used
+by mixed collision rather than only the pure 2D outline. Circles draw as
+vertical wire cylinders, AABBs draw as wire boxes, and polygons draw the top,
+bottom, and vertical slab edges as line commands. These commands set
+`ColliderDimension` to `TwoD` and populate `Collider2DType` so host adapters can
+style embedded 2D debug geometry separately from pure 3D colliders.
 
 ## Host Adapter Pattern
 

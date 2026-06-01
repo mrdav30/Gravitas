@@ -13,5 +13,8 @@ public enum GravitasDiagnosticEventKind : byte
     RayQuery = 6,
     CircleQuery = 7,
     Contact = 8,
-    ResponseImpulse = 9
+    ResponseImpulse = 9,
+    MixedQuery = 10,
+    MixedContact = 11,
+    MixedResponseImpulse = 12
 }

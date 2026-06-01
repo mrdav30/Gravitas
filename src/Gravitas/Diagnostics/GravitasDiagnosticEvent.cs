@@ -15,8 +15,12 @@ public readonly struct GravitasDiagnosticEvent
         int bodyId,
         int colliderAId,
         int colliderBId,
+        GravitasColliderDimension colliderADimension,
+        GravitasColliderDimension colliderBDimension,
         ColliderType colliderAType,
         ColliderType colliderBType,
+        ColliderType2D colliderA2DType,
+        ColliderType2D colliderB2DType,
         Vector3d start,
         Vector3d end,
         Vector3d pointA,
@@ -34,8 +38,12 @@ public readonly struct GravitasDiagnosticEvent
         BodyId = bodyId;
         ColliderAId = colliderAId;
         ColliderBId = colliderBId;
+        ColliderADimension = colliderADimension;
+        ColliderBDimension = colliderBDimension;
         ColliderAType = colliderAType;
         ColliderBType = colliderBType;
+        ColliderA2DType = colliderA2DType;
+        ColliderB2DType = colliderB2DType;
         Start = start;
         End = end;
         PointA = pointA;
@@ -60,9 +68,17 @@ public readonly struct GravitasDiagnosticEvent
 
     public int ColliderBId { get; }
 
+    public GravitasColliderDimension ColliderADimension { get; }
+
+    public GravitasColliderDimension ColliderBDimension { get; }
+
     public ColliderType ColliderAType { get; }
 
     public ColliderType ColliderBType { get; }
+
+    public ColliderType2D ColliderA2DType { get; }
+
+    public ColliderType2D ColliderB2DType { get; }
 
     public Vector3d Start { get; }
 

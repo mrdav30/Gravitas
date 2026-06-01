@@ -61,8 +61,10 @@ wake propagation, mixed contact enter/stay/exit events, trigger-only mixed
 trigger events, and pooled pair reuse. `CollisionResponseMixed` applies the
 first constrained mixed response: planar X/Z correction and impulses can move a
 2D body, while vertical Y correction and impulses treat the 2D body as having
-infinite constrained mass. Mixed diagnostics, mixed queries, and mixed CCD
-remain later Phase 10 work.
+infinite constrained mass. Mixed diagnostics, explicit mixed queries, and
+mixed CCD hooks are implemented. 2D swept-circle mixed CCD uses the shared
+swept-sphere worker, including 3D mesh targets through local-BVH triangle
+candidate TOI checks and compound targets through stable part-order reduction.
 
 `CollisionDetection2D` currently supports:
 

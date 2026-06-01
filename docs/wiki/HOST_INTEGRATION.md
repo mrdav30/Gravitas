@@ -314,12 +314,22 @@ int planarHitCount = context.Query2D.RaycastAll(
     end2D,
     layerMask,
     planarHits);
+
+SwiftList<PhysicsMixedHit> mixedHits = new();
+int mixedHitCount = context.QueryMixed.SweepSphereAgainst2DAll(
+    origin,
+    origin + direction * maxDistance,
+    radius,
+    layerMask,
+    mixedHits,
+    excludedCollider: null);
 ```
 
 All-hit query APIs use caller-owned buffers. The 3D query service writes
-`Physics3DHit` values, while pure 2D queries write `Physics2DHit` values. They
-clear the supplied list, write sorted hits into it, and return the count so hot
-query loops do not allocate enumerators or temporary hit lists.
+`Physics3DHit` values, pure 2D queries write `Physics2DHit` values, and mixed
+queries write `PhysicsMixedHit` values. They clear the supplied list, write
+sorted hits into it, and return the count so hot query loops do not allocate
+enumerators or temporary hit lists.
 
 Query APIs use `PhysicsLayerMask` as an include mask. Use
 `PhysicsLayerMask.FromLayer(...)` for a single layer,

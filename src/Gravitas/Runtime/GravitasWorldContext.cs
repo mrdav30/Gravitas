@@ -46,6 +46,7 @@ public sealed class GravitasWorldContext : IDisposable
         MixedCollisions = new GravitasMixedCollisionService(this);
         Query2D = new GravitasQuery2DService(this);
         Query3D = new GravitasQuery3DService(this);
+        QueryMixed = new GravitasQueryMixedService(this);
         Coroutines = new GravitasCoroutineService(this);
     }
 
@@ -95,6 +96,11 @@ public sealed class GravitasWorldContext : IDisposable
     /// Gets this context's world-local 3D query service.
     /// </summary>
     public GravitasQuery3DService Query3D { get; }
+
+    /// <summary>
+    /// Gets this context's explicit mixed 3D/2D query service.
+    /// </summary>
+    public GravitasQueryMixedService QueryMixed { get; }
 
     /// <summary>
     /// Gets this context's world-local lockstep coroutine service.
@@ -348,6 +354,7 @@ public sealed class GravitasWorldContext : IDisposable
         MixedCollisions.Reset();
         Query2D.Reset();
         Query3D.Reset();
+        QueryMixed.Reset();
         Coroutines.Reset();
         Diagnostics.Reset();
         _hooks.InvokeReset();
