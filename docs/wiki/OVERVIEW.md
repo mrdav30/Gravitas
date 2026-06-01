@@ -96,6 +96,7 @@ flowchart TD
 | `GravitasPhysics2DService` | Pure 2D registration, collider IDs, narrow phase, response, events, and visualization publishing. |
 | `GravitasCollisionService` | GridForge-backed broad-phase partitioning, active partition tracking, partition pooling, and collision distribution versioning. |
 | `GravitasCollision2DService` | GridForge-backed pure 2D X/Z broad-phase partitioning, active partition tracking, partition pooling, duplicate suppression, and collision distribution versioning. |
+| `GravitasMixedCollisionService` | Mixed 2D/3D lifecycle and broad-phase candidate gathering through `PhysicsMixedPartition`, stable 3D/2D keys, duplicate suppression, and retained partition cleanup. |
 | `GravitasQuery2DService` | Pure 2D overlap-circle and segment raycast queries, caller-buffered hit output, duplicate suppression, and hit ordering. |
 | `GravitasQuery3DService` | 3D raycast, swept-sphere, and X/Z circle overlap/proximity queries, caller-buffered hit output, duplicate suppression, and hit ordering. |
 | `PhysicsPartition` | Voxel partition payload containing collider IDs, awake dynamic membership, and candidate pair distribution. |
@@ -131,8 +132,8 @@ polygons, bodyless static/trigger colliders, deterministic collision response,
 contact events, sleep/wake behavior, replay tests, overlap-circle queries,
 segment raycasts, and swept-circle queries. `PhysicsRuntimeMode.Both` runs pure
 2D and pure 3D side by side without cross-dimensional contacts, while
-`PhysicsRuntimeMode.Mixed` enables the dedicated mixed lifecycle path for Phase
-10's remaining contact work.
+`PhysicsRuntimeMode.Mixed` enables the dedicated mixed lifecycle and broad-phase
+candidate path for Phase 10's remaining contact work.
 
 ## Collision In One Breath
 
@@ -162,10 +163,11 @@ active-pair queue during `LateSimulate`.
 - Mixed 2D/3D interaction is the Phase 10 implementation target. The runtime
   now has a `Mixed` lifecycle path and 2D colliders cache finite 3D embedding
   bounds from `PhysicsSettings.Mixed2DHalfThickness`,
-  `MixedHalfThicknessOverride`, and the host transform's Y position. Remaining
-  Phase 10 work fills in broad phase, contacts, response, diagnostics, and
-  benchmarks while preserving pure 2D semantics and constraining 2D bodies to
-  planar X/Z response.
+  `MixedHalfThicknessOverride`, and the host transform's Y position. Mixed
+  broad phase now gathers deterministic GridForge-backed 3D/2D candidate keys;
+  remaining Phase 10 work fills in contacts, response, diagnostics, mixed
+  queries, and CCD while preserving pure 2D semantics and constraining 2D
+  bodies to planar X/Z response.
 - Cylinder collision and query behavior is implemented for the current finite
   cylinder model, but needs continued edge-case hardening.
 - Mesh raycast overlap and concave mesh narrow phase are implemented through

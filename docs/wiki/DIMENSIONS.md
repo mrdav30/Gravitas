@@ -21,8 +21,8 @@ those concrete types, not a third dimension value.
 - `PhysicsRuntimeMode.Both` advances the pure 2D and pure 3D services side by
   side without cross-dimensional contacts.
 - `PhysicsRuntimeMode.Mixed` advances both pure services plus the dedicated
-  mixed lifecycle path. Phase 10 broad-phase, contact, response, and diagnostic
-  work fills in the real mixed interaction model.
+  mixed lifecycle and broad-phase path. Phase 10 contact, response, diagnostic,
+  mixed query, and CCD work fills in the rest of the interaction model.
 
 The context clock, coroutines, diagnostics, and lifecycle hooks remain shared.
 This lets pure 2D simulations use the same host loop without paying 3D
@@ -135,15 +135,20 @@ rather than Unity-style separate engines:
 - `PhysicsRuntimeMode.Both` advances both pure 2D and 3D services without
   cross-dimensional contacts.
 - `PhysicsRuntimeMode.Mixed` advances both pure 2D and 3D services plus a
-  dedicated mixed collision lifecycle path. The actual mixed broad phase,
-  contacts, and response are filled in by the remaining Phase 10 work.
+  dedicated mixed collision lifecycle path. The mixed broad phase uses
+  `PhysicsMixedPartition` and stable 3D/2D candidate keys; contacts and
+  response are filled in by the remaining Phase 10 work.
 - mixed contacts embed 2D colliders into 3D as finite X/Z prisms centered on
   the host transform's Y position.
 - 2D bodies remain plane-constrained: planar impulse can move them in X/Z,
   vertical impulse treats them as having infinite constrained mass.
-- mixed broad phase must use GridForge-backed spatial identity and separate 2D
-  and 3D collider ID spaces.
+- mixed broad phase uses GridForge-backed spatial identity, separate 2D and 3D
+  collider ID spaces, awake-dynamic gating, layer filtering, same-agent
+  exclusion, and retained empty-partition cleanup.
+- cross-dimensional hierarchy filtering currently stops at same-agent exclusion;
+  `LSCollider` and `LSCollider2D` hierarchy state remains dimension-local until
+  a host-level mixed hierarchy contract is designed.
 - unsupported mixed shape pairs must be explicit, tested, and documented.
 
-Until Phase 10 lands, pure 2D and 3D collision dispatch should not fall through
-to accidental mixed behavior.
+Until mixed narrow phase lands, pure 2D and 3D collision dispatch should not
+fall through to accidental mixed contact behavior.

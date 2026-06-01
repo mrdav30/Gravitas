@@ -30,6 +30,7 @@ public abstract class LSCollider : IRecordable, IColliderHierarchyNode<LSCollide
     public int Id => _id;
 
     private IMatterAgent? _agent;
+    internal IMatterAgent? AgentOrNull => _agent;
 
     private GravitasWorldContext? _context;
     public GravitasWorldContext Context
@@ -53,6 +54,7 @@ public abstract class LSCollider : IRecordable, IColliderHierarchyNode<LSCollide
 
     private readonly ColliderRuntimeShapeState<ColliderShapeSnapshot> _runtimeShapeState = new();
     private ColliderPartitionState _partitionState;
+    private ColliderPartitionState _mixedPartitionState;
     private ColliderQueryState _queryState;
     private ColliderPairState<CollisionPair> _pairState;
     private ColliderHierarchyState<LSCollider> _hierarchyState;
@@ -265,6 +267,10 @@ public abstract class LSCollider : IRecordable, IColliderHierarchyNode<LSCollide
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         set => _partitionState.Coordinates = value;
     }
+
+    internal bool IsMixedPartitioned => _mixedPartitionState.IsPartitioned;
+
+    internal SwiftList<WorldVoxelIndex>? MixedPartitionCoordinates => _mixedPartitionState.Coordinates;
 
     #endregion
 
@@ -669,6 +675,9 @@ public abstract class LSCollider : IRecordable, IColliderHierarchyNode<LSCollide
     public void Deactivate()
     {
         ThrowIfCompoundPartLifecycle(nameof(Deactivate));
+        if (IsMixedPartitioned)
+            Context.MixedCollisions.ClearPartitioned3DCollider(this, force: true);
+
         if (IsPartitioned)
         {
             Context.Collisions.ClearPartitionedObject(this, true);
@@ -807,6 +816,31 @@ public abstract class LSCollider : IRecordable, IColliderHierarchyNode<LSCollide
         SwiftThrowHelper.ThrowIfNegative(id, nameof(id));
         _id = id;
     }
+
+    internal SwiftList<WorldVoxelIndex> GetOrCreateMixedPartitionCoordinates()
+    {
+        _mixedPartitionState.Coordinates ??= new();
+        return _mixedPartitionState.Coordinates;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal bool MatchesMixedPartitionGridBounds(Vector3d min, Vector3d max) =>
+        _mixedPartitionState.IsPartitioned
+        && _mixedPartitionState.LastGridBoundsMin == min
+        && _mixedPartitionState.LastGridBoundsMax == max;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal void MarkMixedPartitioned(Vector3d min, Vector3d max)
+    {
+        _mixedPartitionState.SetPreviousGridBounds(min, max);
+        _mixedPartitionState.MarkPartitioned();
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal void MarkMixedUnpartitioned() => _mixedPartitionState.MarkUnpartitioned();
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal void ClearMixedPartitionCoordinates() => _mixedPartitionState.ClearCoordinates();
 
     #region Serialization
 

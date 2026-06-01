@@ -45,10 +45,13 @@ The Y=0 storage plane is not physical thickness and does not claim mixed
 2D/3D interaction. It is a deterministic broad-phase identity that lets pure
 2D and 3D use the same host-owned `GridWorld` model. `PhysicsRuntimeMode.Both`
 keeps those paths side by side without cross-dimensional contacts; only
-`PhysicsRuntimeMode.Mixed` enables the mixed lifecycle path that Phase 10 fills
-with broad phase, contacts, and impulse exchange. The mixed embedding state on
-`LSCollider2D` is a finite 3D `BoundingBox` built from pure 2D X/Z bounds plus
-a positive Y half-thickness centered on the host transform's Y position.
+`PhysicsRuntimeMode.Mixed` enables the mixed lifecycle path. Mixed broad phase
+now uses `PhysicsMixedPartition` payloads attached to GridForge voxels and emits
+stable 3D/2D candidate keys after awake-dynamic, layer, same-agent, duplicate,
+and bounds filtering. The mixed embedding state on `LSCollider2D` is a finite
+3D `BoundingBox` built from pure 2D X/Z bounds plus a positive Y half-thickness
+centered on the host transform's Y position. Mixed contacts and impulse exchange
+remain later Phase 10 work.
 
 `CollisionDetection2D` currently supports:
 

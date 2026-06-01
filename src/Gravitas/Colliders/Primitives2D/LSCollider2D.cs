@@ -29,6 +29,7 @@ public abstract class LSCollider2D : IColliderHierarchyNode<LSCollider2D>
     private uint _shapeVersion;
     private readonly ColliderRuntimeShapeState<ColliderShapeSnapshot2D> _runtimeShapeState = new();
     private ColliderPartitionState2D _partitionState;
+    private ColliderPartitionState _mixedPartitionState;
     private ColliderQueryState _queryState;
     private ColliderPairState<CollisionPair2D> _pairState;
     private ColliderHierarchyState<LSCollider2D> _hierarchyState;
@@ -68,6 +69,10 @@ public abstract class LSCollider2D : IColliderHierarchyNode<LSCollider2D>
     internal bool IsPartitioned => _partitionState.IsPartitioned;
 
     internal SwiftList<WorldVoxelIndex>? PartitionCoordinates => _partitionState.Coordinates;
+
+    internal bool IsMixedPartitioned => _mixedPartitionState.IsPartitioned;
+
+    internal SwiftList<WorldVoxelIndex>? MixedPartitionCoordinates => _mixedPartitionState.Coordinates;
 
     internal uint BroadPhaseVersion => _partitionState.BroadPhaseVersion;
 
@@ -284,6 +289,8 @@ public abstract class LSCollider2D : IColliderHierarchyNode<LSCollider2D>
     {
         _partitionState.MarkUnpartitioned();
         _partitionState.ClearCoordinates();
+        _mixedPartitionState.MarkUnpartitioned();
+        _mixedPartitionState.ClearCoordinates();
         _pairState.ClearCollisionPairs();
         _pairState.ClearCollisionPairHolders();
         _id = -1;
@@ -301,6 +308,9 @@ public abstract class LSCollider2D : IColliderHierarchyNode<LSCollider2D>
     {
         if (!_isActive)
             return;
+
+        if (_context != null && IsMixedPartitioned)
+            _context.MixedCollisions.ClearPartitioned2DCollider(this, force: true);
 
         if (_context != null && _id >= 0)
             _context.Physics2D.DessimilateCollider(this);
@@ -361,9 +371,21 @@ public abstract class LSCollider2D : IColliderHierarchyNode<LSCollider2D>
         return _partitionState.Coordinates;
     }
 
+    internal SwiftList<WorldVoxelIndex> GetOrCreateMixedPartitionCoordinates()
+    {
+        _mixedPartitionState.Coordinates ??= new();
+        return _mixedPartitionState.Coordinates;
+    }
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal bool MatchesPartitionGridBounds(Vector2d min, Vector2d max) =>
         _partitionState.MatchesGridBounds(min, max);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal bool MatchesMixedPartitionGridBounds(Vector3d min, Vector3d max) =>
+        _mixedPartitionState.IsPartitioned
+        && _mixedPartitionState.LastGridBoundsMin == min
+        && _mixedPartitionState.LastGridBoundsMax == max;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal void MarkPartitioned(Vector2d min, Vector2d max)
@@ -373,10 +395,23 @@ public abstract class LSCollider2D : IColliderHierarchyNode<LSCollider2D>
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal void MarkMixedPartitioned(Vector3d min, Vector3d max)
+    {
+        _mixedPartitionState.SetPreviousGridBounds(min, max);
+        _mixedPartitionState.MarkPartitioned();
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal void MarkUnpartitioned() => _partitionState.MarkUnpartitioned();
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal void MarkMixedUnpartitioned() => _mixedPartitionState.MarkUnpartitioned();
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal void ClearPartitionCoordinates() => _partitionState.ClearCoordinates();
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal void ClearMixedPartitionCoordinates() => _mixedPartitionState.ClearCoordinates();
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal bool IsPositionInPlanarBounds(Fixed64 voxelSize, Vector3d worldPosition)
@@ -386,6 +421,18 @@ public abstract class LSCollider2D : IColliderHierarchyNode<LSCollider2D>
             && worldPosition.x <= MaxX + padding
             && worldPosition.z >= MinY - padding
             && worldPosition.z <= MaxY + padding;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal bool IsPositionInMixedBounds(Fixed64 voxelSize, Vector3d worldPosition)
+    {
+        Fixed64 padding = voxelSize * Fixed64.Half;
+        return worldPosition.x >= _mixedBounds3D.Min.x - padding
+            && worldPosition.x <= _mixedBounds3D.Max.x + padding
+            && worldPosition.y >= _mixedBounds3D.Min.y - padding
+            && worldPosition.y <= _mixedBounds3D.Max.y + padding
+            && worldPosition.z >= _mixedBounds3D.Min.z - padding
+            && worldPosition.z <= _mixedBounds3D.Max.z + padding;
     }
 
     internal bool TryGetCollisionPair(int otherId, out CollisionPair2D? collisionPair) =>
