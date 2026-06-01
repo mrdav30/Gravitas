@@ -116,9 +116,11 @@ The current runtime uses explicit world-context ownership:
 - `GravitasPhysics2DService` owns pure 2D body and collider registration,
   collider IDs, 2D pair pooling, response/event processing, visualization
   transform publishing for one context.
-- `GravitasMixedCollisionService` owns the Phase 10 mixed 2D/3D lifecycle path.
-  `PhysicsRuntimeMode.Mixed` reaches it; `PhysicsRuntimeMode.Both` deliberately
-  runs pure 2D and pure 3D side by side without cross-dimensional contacts.
+- `GravitasMixedCollisionService` owns the Phase 10 mixed 2D/3D lifecycle path,
+  GridForge-backed mixed broad phase, stable 3D/2D candidate keys, awake
+  gating, and retained `PhysicsMixedPartition` cleanup. `PhysicsRuntimeMode.Mixed`
+  reaches it; `PhysicsRuntimeMode.Both` deliberately runs pure 2D and pure 3D
+  side by side without cross-dimensional contacts.
 - `GravitasCollisionService` maps colliders into GridForge voxels through
   `GridWorld` spatial hash and active-grid access, `WorldVoxelIndex`, and
   `PhysicsPartition`, using `SwiftCollections` pools and duplicate-check sets.
@@ -191,9 +193,10 @@ runtime path through `StiffBody2D`, `LSCollider2D`,
 pure 2D and pure 3D without mixed contacts; `Mixed` enables the dedicated mixed
 lifecycle path. `LSCollider2D` also caches a mixed `BoundingBox` using
 `PhysicsSettings.Mixed2DHalfThickness`, optional per-collider
-`MixedHalfThicknessOverride`, and the host transform's Y position while the
-rest of Phase 10 fills in broad phase, contacts, response, diagnostics, and
-benchmarks.
+`MixedHalfThicknessOverride`, and the host transform's Y position. The mixed
+broad phase now emits deterministic candidate keys through `PhysicsMixedPartition`;
+contacts, response, diagnostics, mixed queries, and CCD remain later Phase 10
+work.
 
 When adding or redesigning dimension-sensitive behavior:
 

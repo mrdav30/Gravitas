@@ -81,6 +81,7 @@ public sealed class GravitasPhysics2DService
     {
         SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
         RemovePairsForCollider(collider);
+        _context.MixedCollisions.ClearPartitioned2DCollider(collider, force: true);
         _context.Collisions2D.ClearPartitionedCollider(collider, force: true);
         RemoveCollider(collider);
         _collidersById.Remove(collider.Id);
@@ -138,6 +139,18 @@ public sealed class GravitasPhysics2DService
     internal bool TryGetColliderById(int colliderId, out LSCollider2D? collider)
     {
         return _collidersById.TryGetValue(colliderId, out collider);
+    }
+
+    internal bool TryGetColliderByServiceIndex(int serviceIndex, out LSCollider2D? collider)
+    {
+        if (serviceIndex < 0 || serviceIndex >= _colliders.Count)
+        {
+            collider = null;
+            return false;
+        }
+
+        collider = _colliders[serviceIndex];
+        return true;
     }
 
     internal void ProcessPartitionCandidate(int firstId, int secondId, WorldVoxelIndex partitionIndex)

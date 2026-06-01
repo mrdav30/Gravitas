@@ -1998,13 +1998,13 @@ decomposes contact impulses into planar X/Z and vertical Y components:
   override or context default, a cached slab center Y from the host transform,
   and deterministic mixed 3D bounds. Do not reintroduce `PhysicsDimension` or
   public `Physics2DBounds`.
-- [ ] **Phase 10B - Mixed broad phase:** Add a mixed broad-phase service backed
+- [x] **Phase 10B - Mixed broad phase:** Add a mixed broad-phase service backed
   by the existing `GridWorld` and stable voxel identities. Store separate 3D
   collider IDs and 2D collider IDs so ID spaces never alias. Use awake-dynamic
   gating, same-agent/hierarchy/layer filtering, deterministic partition
   ordering, deterministic pair keys, and retained empty partition cleanup. Avoid
   O(3D * 2D) scans except in tiny test-only helpers.
-- [ ] **Phase 10B - Broad-phase tests and benchmarks:** Add sparse, dense,
+- [x] **Phase 10B - Broad-phase tests and benchmarks:** Add sparse, dense,
   large-world, sleeping, trigger, layer, hierarchy, and churn tests. Add
   benchmarks for mixed candidate gathering, pair distribution, and retained
   partition cleanup at 64, 1024, and larger representative collider counts.
@@ -2096,6 +2096,23 @@ decomposes contact impulses into planar X/Z and vertical Y components:
 - Treat mixed CCD as follow-on work inside Phase 10 after discrete mixed
   collision is stable. It should reuse the same embedding and pair filtering
   rules rather than inventing a second mixed-shape interpretation.
+
+**Phase 10B Result:**
+
+- Added `GravitasMixedCollisionService` as a real mixed broad-phase owner with
+  GridForge-backed `PhysicsMixedPartition` payloads, separate 3D and 2D
+  collider ID spaces, stable `MixedColliderKey` output, duplicate suppression,
+  awake-dynamic gating, layer filtering, same-agent exclusion, and retained
+  empty-partition cleanup.
+- Added separate mixed partition state on `LSCollider` and `LSCollider2D` so
+  mixed membership does not overload the pure 3D or pure 2D partition paths.
+- Added focused tests for sparse, dense, large-world, sleeping, trigger, layer,
+  same-agent, and churn/retained-cleanup behavior. Cross-dimensional hierarchy
+  is currently represented by same-agent exclusion because existing collider
+  hierarchy state is dimension-local; do not claim a public cross-dimensional
+  hierarchy API until a host-level relationship contract exists.
+- Added `MixedBroadPhaseBenchmarks` with sparse gathering, dense gathering, and
+  retained cleanup/churn coverage at 64, 1024, and 4096 colliders.
 
 ## Phase 11: Serialization, Snapshots, And Deterministic Replay
 
