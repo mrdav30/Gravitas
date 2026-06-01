@@ -164,10 +164,12 @@ active-pair queue during `LateSimulate`.
   now has a `Mixed` lifecycle path and 2D colliders cache finite 3D embedding
   bounds from `PhysicsSettings.Mixed2DHalfThickness`,
   `MixedHalfThicknessOverride`, and the host transform's Y position. Mixed
-  broad phase now gathers deterministic GridForge-backed 3D/2D candidate keys;
-  remaining Phase 10 work fills in contacts, response, diagnostics, mixed
-  queries, and CCD while preserving pure 2D semantics and constraining 2D
-  bodies to planar X/Z response.
+  broad phase now gathers deterministic GridForge-backed 3D/2D candidate keys,
+  and mixed narrow phase covers 3D spheres, cuboids, capsules, and finite
+  cylinders against embedded 2D circle, AABB, and convex polygon slabs.
+  Remaining Phase 10 work fills in complex-shape policies, response,
+  diagnostics, mixed queries, and CCD while preserving pure 2D semantics and
+  constraining 2D bodies to planar X/Z response.
 - Cylinder collision and query behavior is implemented for the current finite
   cylinder model, but needs continued edge-case hardening.
 - Mesh raycast overlap and concave mesh narrow phase are implemented through

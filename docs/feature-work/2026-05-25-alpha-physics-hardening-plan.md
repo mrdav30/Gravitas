@@ -2000,7 +2000,7 @@ decomposes contact impulses into planar X/Z and vertical Y components:
   circle, AABB, and convex polygon slabs. Cover planar side contacts, separated
   Y slabs, touching slab faces, corner contacts, and deterministic contact
   points/normals for this first primitive slice.
-- [ ] **Phase 10C - Mixed narrow phase remaining primitives:** Add mixed shape
+- [x] **Phase 10C - Mixed narrow phase remaining primitives:** Add mixed shape
   tests and detection for 3D cuboid, capsule, and finite cylinder against 2D
   circle, AABB, and convex polygon slabs. Cover starting overlap, rotated 3D
   shapes, rotated 2D convex polygons, edge/corner contacts, slab face contacts,
@@ -2156,6 +2156,19 @@ decomposes contact impulses into planar X/Z and vertical Y components:
 - Added `MixedContact` and `CollisionDetectionMixed` for the first mixed
   narrow-phase slice: 3D sphere contacts against embedded 2D circle, AABB, and
   convex polygon slabs.
+
+**Phase 10C Slice 2 Result:**
+
+- Extended `CollisionDetectionMixed` to cover 3D cuboid, capsule, and finite
+  cylinder colliders against embedded 2D circle, AABB, and convex polygon
+  slabs.
+- Added SAT-style mixed projection checks for finite 2D circle cylinders and
+  vertical convex prisms, with inclusive face-touch handling and deterministic
+  minimum-penetration axis selection.
+- Added mixed narrow-phase tests for the 3x3 remaining primitive matrix,
+  rotated 3D shapes, rotated 2D convex polygons, starting overlap stability,
+  slab-face contacts, separated Y slabs, and explicit unsupported complex-pair
+  fallback.
 
 ## Phase 11: Serialization, Snapshots, And Deterministic Replay
 

@@ -4,12 +4,72 @@ using Gravitas.Colliders;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
 using GridForge.Configuration;
+using System;
 using Xunit;
 
 namespace Gravitas.Tests.MixedDimensions;
 
 public sealed class MixedNarrowPhaseTests
 {
+    public static TheoryData<string, Func<GravitasWorldContext, LSCollider>, Func<GravitasWorldContext, LSCollider2D>> RemainingPrimitivePairs =>
+        new()
+        {
+            {
+                "Cuboid_Circle",
+                context => CreateCuboid3D(context, new Vector3d(Fixed64.Fraction(3, 4), Fixed64.Zero, Fixed64.Zero)).Collider,
+                context => CreateBody2D(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero).Collider
+            },
+            {
+                "Cuboid_AABox",
+                context => CreateCuboid3D(context, new Vector3d(Fixed64.Fraction(3, 2), Fixed64.Zero, Fixed64.Zero)).Collider,
+                context => CreateBody2D(context, new LSAABBoxCollider2D(new Vector2d((Fixed64)2, (Fixed64)2)), Vector2d.Zero).Collider
+            },
+            {
+                "Cuboid_ConvexPolygon",
+                context => CreateCuboid3D(
+                    context,
+                    new Vector3d(Fixed64.Fraction(13, 10), Fixed64.Zero, Fixed64.Zero),
+                    FixedQuaternion.FromEulerAnglesInDegrees(Fixed64.Zero, (Fixed64)45, Fixed64.Zero)).Collider,
+                context => CreateBody2D(context, CreateSquarePolygon(), Vector2d.Zero, FixedMath.DegToRad((Fixed64)45)).Collider
+            },
+            {
+                "Capsule_Circle",
+                context => CreateCapsule3D(context, new Vector3d(Fixed64.Fraction(3, 4), Fixed64.Zero, Fixed64.Zero)).Collider,
+                context => CreateBody2D(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero).Collider
+            },
+            {
+                "Capsule_AABox",
+                context => CreateCapsule3D(
+                    context,
+                    new Vector3d(Fixed64.Fraction(3, 2), Fixed64.Zero, Fixed64.Zero),
+                    FixedQuaternion.FromEulerAnglesInDegrees(Fixed64.Zero, Fixed64.Zero, (Fixed64)90)).Collider,
+                context => CreateBody2D(context, new LSAABBoxCollider2D(new Vector2d((Fixed64)2, (Fixed64)2)), Vector2d.Zero).Collider
+            },
+            {
+                "Capsule_ConvexPolygon",
+                context => CreateCapsule3D(context, new Vector3d(Fixed64.Fraction(13, 10), Fixed64.Zero, Fixed64.Zero)).Collider,
+                context => CreateBody2D(context, CreateSquarePolygon(), Vector2d.Zero, FixedMath.DegToRad((Fixed64)45)).Collider
+            },
+            {
+                "Cylinder_Circle",
+                context => CreateCylinder3D(context, new Vector3d(Fixed64.Fraction(3, 4), Fixed64.Zero, Fixed64.Zero)).Collider,
+                context => CreateBody2D(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero).Collider
+            },
+            {
+                "Cylinder_AABox",
+                context => CreateCylinder3D(
+                    context,
+                    new Vector3d(Fixed64.Fraction(3, 2), Fixed64.Zero, Fixed64.Zero),
+                    FixedQuaternion.FromEulerAnglesInDegrees(Fixed64.Zero, Fixed64.Zero, (Fixed64)90)).Collider,
+                context => CreateBody2D(context, new LSAABBoxCollider2D(new Vector2d((Fixed64)2, (Fixed64)2)), Vector2d.Zero).Collider
+            },
+            {
+                "Cylinder_ConvexPolygon",
+                context => CreateCylinder3D(context, new Vector3d(Fixed64.Fraction(13, 10), Fixed64.Zero, Fixed64.Zero)).Collider,
+                context => CreateBody2D(context, CreateSquarePolygon(), Vector2d.Zero, FixedMath.DegToRad((Fixed64)45)).Collider
+            }
+        };
+
     [Fact]
     public void SphereCircleSlab_WithPlanarOverlap_ShouldReportDeterministicContact()
     {
@@ -88,6 +148,106 @@ public sealed class MixedNarrowPhaseTests
         contact.Point2D.z.Should().Be(Fixed64.One);
     }
 
+    [Theory]
+    [MemberData(nameof(RemainingPrimitivePairs))]
+    public void RemainingPrimitivePairs_WithRepresentativeOverlap_ShouldReportContact(
+        string caseName,
+        Func<GravitasWorldContext, LSCollider> create3D,
+        Func<GravitasWorldContext, LSCollider2D> create2D)
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        LSCollider collider3D = create3D(context);
+        LSCollider2D collider2D = create2D(context);
+
+        bool collided = CollisionDetectionMixed.TryCollide(collider3D, collider2D, out MixedContact contact);
+
+        collided.Should().BeTrue(caseName);
+        contact.HasContact.Should().BeTrue();
+        contact.Depth.Should().BeGreaterThanOrEqualTo(Fixed64.Zero);
+        contact.Normal3DTo2D.SqrMagnitude.Should().BeGreaterThan(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void CuboidAABoxSlab_WithTouchingFace_ShouldReportZeroDepthContact()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSCuboidCollider> cuboid = CreateCuboid3D(
+            context,
+            new Vector3d(Fixed64.Fraction(3, 2), Fixed64.Zero, Fixed64.Zero));
+        StiffBody2D box = CreateBody2D(context, new LSAABBoxCollider2D(new Vector2d((Fixed64)2, (Fixed64)2)), Vector2d.Zero);
+
+        bool collided = CollisionDetectionMixed.TryCollide(cuboid.Collider, box.Collider, out MixedContact contact);
+
+        collided.Should().BeTrue();
+        contact.Depth.Should().Be(Fixed64.Zero);
+        contact.Normal3DTo2D.Should().Be(-Vector3d.Right);
+        contact.Point3D.x.Should().Be(Fixed64.One);
+        contact.Point2D.x.Should().Be(Fixed64.One);
+    }
+
+    [Fact]
+    public void CylinderAABoxSlab_WithStartingOverlap_ShouldReturnStableContact()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSCylinderCollider> cylinder = CreateCylinder3D(context, Vector3d.Zero);
+        StiffBody2D box = CreateBody2D(context, new LSAABBoxCollider2D(new Vector2d((Fixed64)2, (Fixed64)2)), Vector2d.Zero);
+
+        bool firstCollided = CollisionDetectionMixed.TryCollide(cylinder.Collider, box.Collider, out MixedContact first);
+        bool secondCollided = CollisionDetectionMixed.TryCollide(cylinder.Collider, box.Collider, out MixedContact second);
+
+        firstCollided.Should().BeTrue();
+        secondCollided.Should().BeTrue();
+        first.HasContact.Should().BeTrue();
+        first.Depth.Should().BeGreaterThan(Fixed64.Zero);
+        first.Normal3DTo2D.SqrMagnitude.Should().BeGreaterThan(Fixed64.Zero);
+        second.Point3D.Should().Be(first.Point3D);
+        second.Point2D.Should().Be(first.Point2D);
+        second.Normal3DTo2D.Should().Be(first.Normal3DTo2D);
+        second.Depth.Should().Be(first.Depth);
+    }
+
+    [Fact]
+    public void CapsuleCircleSlab_WithPlanarSideOverlap_ShouldReportContact()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSCapsuleCollider> capsule = CreateCapsule3D(
+            context,
+            new Vector3d(Fixed64.Fraction(3, 4), Fixed64.Zero, Fixed64.Zero));
+        StiffBody2D circle = CreateBody2D(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero);
+
+        bool collided = CollisionDetectionMixed.TryCollide(capsule.Collider, circle.Collider, out MixedContact contact);
+
+        collided.Should().BeTrue();
+        contact.Depth.Should().Be(Fixed64.Fraction(1, 4));
+        contact.Normal3DTo2D.Should().Be(-Vector3d.Right);
+        contact.Point3D.x.Should().Be(Fixed64.Fraction(1, 4));
+        contact.Point2D.x.Should().Be(Fixed64.Half);
+    }
+
+    [Fact]
+    public void CylinderConvexPolygonSlab_WithSeparatedYSlab_ShouldNotCollide()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSCylinderCollider> cylinder = CreateCylinder3D(
+            context,
+            new Vector3d(Fixed64.Zero, (Fixed64)2, Fixed64.Zero));
+        StiffBody2D polygon = CreateBody2D(context, CreateSquarePolygon(), Vector2d.Zero, FixedMath.DegToRad((Fixed64)45));
+
+        CollisionDetectionMixed.TryCollide(cylinder.Collider, polygon.Collider, out MixedContact contact).Should().BeFalse();
+        contact.HasContact.Should().BeFalse();
+    }
+
+    [Fact]
+    public void UnsupportedComplexMixedPair_ShouldReturnNoContact()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSCompoundCollider> compound = CreateCompound3D(context, Vector3d.Zero);
+        StiffBody2D circle = CreateBody2D(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero);
+
+        CollisionDetectionMixed.TryCollide(compound.Collider, circle.Collider, out MixedContact contact).Should().BeFalse();
+        contact.HasContact.Should().BeFalse();
+    }
+
     private static GravitasWorldContext CreateMixedContext()
     {
         GravitasWorldContext context = GravitasWorldContext.CreateOwned();
@@ -102,17 +262,69 @@ public sealed class MixedNarrowPhaseTests
 
     private static ScenarioBody<LSSphereCollider> CreateSphere3D(GravitasWorldContext context, Vector3d position)
     {
-        var agent = new TestMatterAgent(context, new FixedTransform(position, FixedQuaternion.Identity, Vector3d.One));
-        var collider = new LSSphereCollider();
+        return CreateBody3D(context, new LSSphereCollider(), position, FixedQuaternion.Identity);
+    }
+
+    private static ScenarioBody<LSCuboidCollider> CreateCuboid3D(
+        GravitasWorldContext context,
+        Vector3d position,
+        FixedQuaternion? rotation = null)
+    {
+        return CreateBody3D(context, new LSCuboidCollider(), position, rotation ?? FixedQuaternion.Identity);
+    }
+
+    private static ScenarioBody<LSCapsuleCollider> CreateCapsule3D(
+        GravitasWorldContext context,
+        Vector3d position,
+        FixedQuaternion? rotation = null)
+    {
+        var collider = new LSCapsuleCollider
+        {
+            Size = new Vector3d(Fixed64.One, (Fixed64)3, Fixed64.One)
+        };
+        return CreateBody3D(context, collider, position, rotation ?? FixedQuaternion.Identity);
+    }
+
+    private static ScenarioBody<LSCylinderCollider> CreateCylinder3D(
+        GravitasWorldContext context,
+        Vector3d position,
+        FixedQuaternion? rotation = null)
+    {
+        var collider = new LSCylinderCollider
+        {
+            Size = new Vector3d(Fixed64.One, Fixed64.One, Fixed64.One)
+        };
+        return CreateBody3D(context, collider, position, rotation ?? FixedQuaternion.Identity);
+    }
+
+    private static ScenarioBody<LSCompoundCollider> CreateCompound3D(GravitasWorldContext context, Vector3d position)
+    {
+        var collider = new LSCompoundCollider(
+            new CompoundColliderPart(new LSSphereCollider()));
+        return CreateBody3D(context, collider, position, FixedQuaternion.Identity);
+    }
+
+    private static ScenarioBody<TCollider> CreateBody3D<TCollider>(
+        GravitasWorldContext context,
+        TCollider collider,
+        Vector3d position,
+        FixedQuaternion rotation)
+        where TCollider : LSCollider
+    {
+        var agent = new TestMatterAgent(context, new FixedTransform(position, rotation, Vector3d.One));
         var body = new StiffBody(agent, collider)
         {
             Mass = Fixed64.One
         };
-        body.Initialize(position, FixedQuaternion.Identity);
-        return new ScenarioBody<LSSphereCollider>(body, collider);
+        body.Initialize(position, rotation);
+        return new ScenarioBody<TCollider>(body, collider);
     }
 
-    private static StiffBody2D CreateBody2D(GravitasWorldContext context, LSCollider2D collider, Vector2d position)
+    private static StiffBody2D CreateBody2D(
+        GravitasWorldContext context,
+        LSCollider2D collider,
+        Vector2d position,
+        Fixed64 rotation = default)
     {
         var agent = new TestMatterAgent(
             context,
@@ -121,7 +333,14 @@ public sealed class MixedNarrowPhaseTests
         {
             Mass = Fixed64.One
         };
-        body.Initialize(position);
+        body.Initialize(position, rotation);
         return body;
     }
+
+    private static LSPolygonCollider2D CreateSquarePolygon() =>
+        new(
+            new Vector2d(-Fixed64.One, -Fixed64.One),
+            new Vector2d(Fixed64.One, -Fixed64.One),
+            new Vector2d(Fixed64.One, Fixed64.One),
+            new Vector2d(-Fixed64.One, Fixed64.One));
 }

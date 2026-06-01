@@ -116,10 +116,11 @@ contract is pinned by `GravitasSimulationPhaseOrderTests`.
 `PhysicsSettings.RuntimeMode` is a validated bitmask with exact public settings
 values: `ThreeD`, `TwoD`, `Both`, and `Mixed`. `Both` runs pure 2D and pure 3D
 side by side without cross-dimensional contacts. `Mixed` runs both pure paths
-plus the dedicated mixed lifecycle and broad-phase path. The first mixed narrow
-phase slice supports 3D spheres against embedded 2D circle, AABB, and convex
-polygon slabs; later Phase 10 work fills in broader primitive coverage,
-constrained impulse exchange, diagnostics, mixed queries, and CCD policy.
+plus the dedicated mixed lifecycle and broad-phase path. Mixed narrow phase
+currently supports 3D spheres, cuboids, capsules, and finite cylinders against
+embedded 2D circle, AABB, and convex polygon slabs; later Phase 10 work fills
+in complex-shape policies, constrained impulse exchange, diagnostics, mixed
+queries, and CCD policy.
 
 `Reset` clears the clock and all context-local service state, then invokes reset
 hooks. `SetFrameRate` and `ApplySettings` update the clock's frame rate and
