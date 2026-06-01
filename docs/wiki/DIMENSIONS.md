@@ -21,10 +21,11 @@ those concrete types, not a third dimension value.
 - `PhysicsRuntimeMode.Both` advances the pure 2D and pure 3D services side by
   side without cross-dimensional contacts.
 - `PhysicsRuntimeMode.Mixed` advances both pure services plus the dedicated
-  mixed lifecycle and broad-phase path. The first mixed narrow-phase slice
-  supports 3D sphere contacts against embedded 2D circle, AABB, and convex
-  polygon slabs. Phase 10 response, diagnostic, mixed query, and CCD work fills
-  in the rest of the interaction model.
+  mixed lifecycle and broad-phase path. Mixed narrow phase supports 3D spheres,
+  cuboids, capsules, finite cylinders, compound colliders, and mesh colliders
+  against embedded 2D circle, AABB, and convex polygon slabs. Phase 10 response,
+  diagnostic, mixed query, and CCD work fills in the rest of the interaction
+  model.
 
 The context clock, coroutines, diagnostics, and lifecycle hooks remain shared.
 This lets pure 2D simulations use the same host loop without paying 3D
@@ -140,9 +141,9 @@ rather than Unity-style separate engines:
 - `PhysicsRuntimeMode.Mixed` advances both pure 2D and 3D services plus a
   dedicated mixed collision lifecycle path. The mixed broad phase uses
   `PhysicsMixedPartition` and stable 3D/2D candidate keys. Mixed narrow phase
-  currently supports 3D spheres, cuboids, capsules, and finite cylinders
-  against embedded 2D circle, AABB, and convex polygon slabs; complex shapes and
-  response are filled in by the remaining Phase 10 work.
+  currently supports 3D spheres, cuboids, capsules, finite cylinders, compound
+  colliders, and mesh colliders against embedded 2D circle, AABB, and convex
+  polygon slabs; response is filled in by the remaining Phase 10 work.
 - mixed contacts embed 2D colliders into 3D as finite X/Z prisms centered on
   the host transform's Y position.
 - 2D bodies remain plane-constrained: planar impulse can move them in X/Z,

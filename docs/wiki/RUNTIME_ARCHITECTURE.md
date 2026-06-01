@@ -117,10 +117,10 @@ contract is pinned by `GravitasSimulationPhaseOrderTests`.
 values: `ThreeD`, `TwoD`, `Both`, and `Mixed`. `Both` runs pure 2D and pure 3D
 side by side without cross-dimensional contacts. `Mixed` runs both pure paths
 plus the dedicated mixed lifecycle and broad-phase path. Mixed narrow phase
-currently supports 3D spheres, cuboids, capsules, and finite cylinders against
-embedded 2D circle, AABB, and convex polygon slabs; later Phase 10 work fills
-in complex-shape policies, constrained impulse exchange, diagnostics, mixed
-queries, and CCD policy.
+currently supports 3D spheres, cuboids, capsules, finite cylinders, compound
+colliders, and mesh colliders against embedded 2D circle, AABB, and convex
+polygon slabs; later Phase 10 work fills in constrained impulse exchange,
+diagnostics, mixed queries, and CCD policy.
 
 `Reset` clears the clock and all context-local service state, then invokes reset
 hooks. `SetFrameRate` and `ApplySettings` update the clock's frame rate and

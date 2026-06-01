@@ -51,10 +51,13 @@ stable 3D/2D candidate keys after awake-dynamic, layer, same-agent, explicit
 hierarchy, duplicate, and bounds filtering. The mixed embedding state on
 `LSCollider2D` is a finite 3D `BoundingBox` built from pure 2D X/Z bounds plus a
 positive Y half-thickness centered on the host transform's Y position.
-`CollisionDetectionMixed` currently supports 3D sphere, cuboid, capsule, and
-finite cylinder contacts against embedded 2D circle, AABB, and convex polygon
-slabs. Mixed pair ownership, impulse exchange, diagnostics, mixed queries,
-complex-shape mixed contacts, and CCD remain later Phase 10 work.
+`CollisionDetectionMixed` currently supports 3D sphere, cuboid, capsule, finite
+cylinder, compound, and mesh contacts against embedded 2D circle, AABB, and
+convex polygon slabs. Compound mixed contacts scan owned parts in stable order
+and return one external contact surface. Mesh mixed contacts gather local-BVH
+triangle candidates and test triangles against the embedded 2D slab volume.
+Mixed pair ownership, impulse exchange, diagnostics, mixed queries, and CCD
+remain later Phase 10 work.
 
 `CollisionDetection2D` currently supports:
 

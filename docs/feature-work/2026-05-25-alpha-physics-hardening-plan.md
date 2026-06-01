@@ -2005,7 +2005,7 @@ decomposes contact impulses into planar X/Z and vertical Y components:
   circle, AABB, and convex polygon slabs. Cover starting overlap, rotated 3D
   shapes, rotated 2D convex polygons, edge/corner contacts, slab face contacts,
   unsupported pair fallback, and deterministic contact ordering.
-- [ ] **Phase 10C - Mixed narrow phase complex shapes:** Extend mixed detection
+- [x] **Phase 10C - Mixed narrow phase complex shapes:** Extend mixed detection
   to 3D compound colliders and mesh colliders only through explicit tested
   policies. Compound colliders should scan stable part order and emit one mixed
   pair surface. Mesh support should use local BVH candidate gathering and
@@ -2169,6 +2169,21 @@ decomposes contact impulses into planar X/Z and vertical Y components:
   rotated 3D shapes, rotated 2D convex polygons, starting overlap stability,
   slab-face contacts, separated Y slabs, and explicit unsupported complex-pair
   fallback.
+
+**Phase 10C Slice 3 Result:**
+
+- Extended `CollisionDetectionMixed` to support compound colliders through
+  stable declaration-order part scans while returning one external mixed
+  contact surface for the owning compound collider.
+- Added mesh-vs-embedded-2D support through `LSMeshCollider` local-BVH triangle
+  candidate gathering and triangle-level checks against finite circle cylinders
+  and vertical convex prisms.
+- Split mixed complex-shape support into focused files under
+  `src/Gravitas/CollisionHandling/Detection/Mixed`.
+- Added mixed narrow-phase tests for compound part contact selection, convex
+  mesh/circle slabs, concave mesh/AABB slabs, concave mesh/rotated convex
+  polygon slabs, deterministic repeated mesh contacts, and an open U-channel
+  gap that proves concave meshes are not treated as whole AABB hulls.
 
 ## Phase 11: Serialization, Snapshots, And Deterministic Replay
 

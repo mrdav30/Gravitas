@@ -166,8 +166,8 @@ active-pair queue during `LateSimulate`.
   `MixedHalfThicknessOverride`, and the host transform's Y position. Mixed
   broad phase now gathers deterministic GridForge-backed 3D/2D candidate keys,
   and mixed narrow phase covers 3D spheres, cuboids, capsules, and finite
-  cylinders against embedded 2D circle, AABB, and convex polygon slabs.
-  Remaining Phase 10 work fills in complex-shape policies, response,
+  cylinders plus compound and mesh colliders against embedded 2D circle, AABB,
+  and convex polygon slabs. Remaining Phase 10 work fills in response,
   diagnostics, mixed queries, and CCD while preserving pure 2D semantics and
   constraining 2D bodies to planar X/Z response.
 - Cylinder collision and query behavior is implemented for the current finite

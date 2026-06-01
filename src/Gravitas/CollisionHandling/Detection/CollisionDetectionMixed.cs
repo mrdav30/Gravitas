@@ -9,7 +9,7 @@ namespace Gravitas;
 /// <summary>
 /// Deterministic mixed 2D/3D narrow-phase collision checks.
 /// </summary>
-public static class CollisionDetectionMixed
+public static partial class CollisionDetectionMixed
 {
     public static bool TryCollide(LSCollider collider3D, LSCollider2D collider2D, out MixedContact contact)
     {
@@ -28,6 +28,8 @@ public static class CollisionDetectionMixed
             ColliderType.AABox or ColliderType.OBBox => TryCuboidEmbedded2D((LSCuboidCollider)collider3D, collider2D, out contact),
             ColliderType.Capsule => TryCapsuleEmbedded2D((LSCapsuleCollider)collider3D, collider2D, out contact),
             ColliderType.Cylinder => TryCylinderEmbedded2D((LSCylinderCollider)collider3D, collider2D, out contact),
+            ColliderType.Mesh => TryMeshEmbedded2D((LSMeshCollider)collider3D, collider2D, out contact),
+            ColliderType.Compound => TryCompoundEmbedded2D((LSCompoundCollider)collider3D, collider2D, out contact),
             _ => NoContact(out contact)
         };
     }
@@ -796,19 +798,4 @@ public static class CollisionDetectionMixed
         return false;
     }
 
-    private readonly struct MixedAxisPenetration
-    {
-        public MixedAxisPenetration(Vector3d axis, Fixed64 depth)
-        {
-            Axis = axis;
-            Depth = depth;
-            HasValue = true;
-        }
-
-        public Vector3d Axis { get; }
-
-        public Fixed64 Depth { get; }
-
-        public bool HasValue { get; }
-    }
 }

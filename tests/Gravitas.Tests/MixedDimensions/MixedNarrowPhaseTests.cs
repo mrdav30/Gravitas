@@ -238,13 +238,91 @@ public sealed class MixedNarrowPhaseTests
     }
 
     [Fact]
-    public void UnsupportedComplexMixedPair_ShouldReturnNoContact()
+    public void CompoundCircleSlab_WithSeparatedFirstPart_ShouldUseLaterPartContact()
     {
         using GravitasWorldContext context = CreateMixedContext();
         ScenarioBody<LSCompoundCollider> compound = CreateCompound3D(context, Vector3d.Zero);
         StiffBody2D circle = CreateBody2D(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero);
 
-        CollisionDetectionMixed.TryCollide(compound.Collider, circle.Collider, out MixedContact contact).Should().BeFalse();
+        bool collided = CollisionDetectionMixed.TryCollide(compound.Collider, circle.Collider, out MixedContact contact);
+
+        collided.Should().BeTrue();
+        contact.HasContact.Should().BeTrue();
+        contact.Depth.Should().Be(Fixed64.Fraction(1, 4));
+        contact.Normal3DTo2D.Should().Be(-Vector3d.Right);
+        contact.Point3D.x.Should().Be(Fixed64.Fraction(1, 4));
+        contact.Point2D.x.Should().Be(Fixed64.Half);
+    }
+
+    [Fact]
+    public void ConvexMeshCircleSlab_WithTriangleCandidateOverlap_ShouldReportContact()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSMeshCollider> mesh = CreateMesh3D(
+            context,
+            MeshTestFixtures.CreateConvexCube(),
+            new Vector3d(Fixed64.Fraction(3, 4), Fixed64.Zero, Fixed64.Zero));
+        StiffBody2D circle = CreateBody2D(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero);
+
+        bool collided = CollisionDetectionMixed.TryCollide(mesh.Collider, circle.Collider, out MixedContact contact);
+
+        collided.Should().BeTrue();
+        contact.HasContact.Should().BeTrue();
+        contact.Depth.Should().BeGreaterThanOrEqualTo(Fixed64.Zero);
+        contact.Normal3DTo2D.SqrMagnitude.Should().BeGreaterThan(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void ConcaveMeshAABoxSlab_WithInsideCornerFeature_ShouldReportStableContact()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSMeshCollider> mesh = CreateMesh3D(context, MeshTestFixtures.CreateInsideCorner(), Vector3d.Zero);
+        StiffBody2D box = CreateBody2D(
+            context,
+            new LSAABBoxCollider2D(new Vector2d(Fixed64.Half, Fixed64.Half)),
+            new Vector2d(Fixed64.Fraction(1, 4), Fixed64.Fraction(1, 4)));
+
+        bool firstCollided = CollisionDetectionMixed.TryCollide(mesh.Collider, box.Collider, out MixedContact first);
+        bool secondCollided = CollisionDetectionMixed.TryCollide(mesh.Collider, box.Collider, out MixedContact second);
+
+        firstCollided.Should().BeTrue();
+        secondCollided.Should().BeTrue();
+        first.HasContact.Should().BeTrue();
+        first.Depth.Should().BeGreaterThanOrEqualTo(Fixed64.Zero);
+        first.Normal3DTo2D.SqrMagnitude.Should().BeGreaterThan(Fixed64.Zero);
+        second.Point3D.Should().Be(first.Point3D);
+        second.Point2D.Should().Be(first.Point2D);
+        second.Normal3DTo2D.Should().Be(first.Normal3DTo2D);
+        second.Depth.Should().Be(first.Depth);
+    }
+
+    [Fact]
+    public void ConcaveMeshConvexPolygonSlab_WithRotatedPolygonFeature_ShouldReportContact()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSMeshCollider> mesh = CreateMesh3D(context, MeshTestFixtures.CreateInsideCorner(), Vector3d.Zero);
+        StiffBody2D polygon = CreateBody2D(
+            context,
+            CreateSquarePolygon(),
+            new Vector2d(Fixed64.Fraction(1, 4), Fixed64.Fraction(1, 4)),
+            FixedMath.DegToRad((Fixed64)45));
+
+        bool collided = CollisionDetectionMixed.TryCollide(mesh.Collider, polygon.Collider, out MixedContact contact);
+
+        collided.Should().BeTrue();
+        contact.HasContact.Should().BeTrue();
+        contact.Depth.Should().BeGreaterThanOrEqualTo(Fixed64.Zero);
+        contact.Normal3DTo2D.SqrMagnitude.Should().BeGreaterThan(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void ConcaveMeshCircleSlab_InOpenChannelGap_ShouldNotCollideWithHullOnly()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSMeshCollider> mesh = CreateMesh3D(context, MeshTestFixtures.CreateUChannel(), Vector3d.Zero);
+        StiffBody2D circle = CreateBody2D(context, new LSCircleCollider2D(Fixed64.Fraction(1, 4)), new Vector2d(Fixed64.Zero, (Fixed64)2));
+
+        CollisionDetectionMixed.TryCollide(mesh.Collider, circle.Collider, out MixedContact contact).Should().BeFalse();
         contact.HasContact.Should().BeFalse();
     }
 
@@ -300,8 +378,18 @@ public sealed class MixedNarrowPhaseTests
     private static ScenarioBody<LSCompoundCollider> CreateCompound3D(GravitasWorldContext context, Vector3d position)
     {
         var collider = new LSCompoundCollider(
-            new CompoundColliderPart(new LSSphereCollider()));
+            new CompoundColliderPart(new LSSphereCollider { LocalOffset = new Vector3d((Fixed64)(-4), Fixed64.Zero, Fixed64.Zero) }),
+            new CompoundColliderPart(new LSSphereCollider { LocalOffset = new Vector3d(Fixed64.Fraction(3, 4), Fixed64.Zero, Fixed64.Zero) }));
         return CreateBody3D(context, collider, position, FixedQuaternion.Identity);
+    }
+
+    private static ScenarioBody<LSMeshCollider> CreateMesh3D(
+        GravitasWorldContext context,
+        LSMeshCollider collider,
+        Vector3d position,
+        FixedQuaternion? rotation = null)
+    {
+        return CreateBody3D(context, collider, position, rotation ?? FixedQuaternion.Identity);
     }
 
     private static ScenarioBody<TCollider> CreateBody3D<TCollider>(
