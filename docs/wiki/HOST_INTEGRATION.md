@@ -61,8 +61,11 @@ owner, but hierarchy collision filtering is bound explicitly on colliders. Hosts
 that need parent-child or sibling collision suppression should initialize the
 colliders first, then call `childCollider.SetParent(parentCollider)`.
 `SetParent(...)` walks the collider-parent chain to the top collider and stores
-the top parent ID on the child, so sibling filtering does not depend on Unity
-`transform.parent` or any other engine hierarchy object.
+the top parent as a dimension-tagged collider key on the child, so sibling
+filtering does not depend on Unity `transform.parent` or any other engine
+hierarchy object. Mixed mode can bind a 2D collider under a 3D collider, or a
+3D collider under a 2D collider, without aliasing the separate collider ID
+tables.
 
 ```csharp
 weaponCollider.SetParent(characterCollider);

@@ -47,11 +47,14 @@ The Y=0 storage plane is not physical thickness and does not claim mixed
 keeps those paths side by side without cross-dimensional contacts; only
 `PhysicsRuntimeMode.Mixed` enables the mixed lifecycle path. Mixed broad phase
 now uses `PhysicsMixedPartition` payloads attached to GridForge voxels and emits
-stable 3D/2D candidate keys after awake-dynamic, layer, same-agent, duplicate,
-and bounds filtering. The mixed embedding state on `LSCollider2D` is a finite
-3D `BoundingBox` built from pure 2D X/Z bounds plus a positive Y half-thickness
-centered on the host transform's Y position. Mixed contacts and impulse exchange
-remain later Phase 10 work.
+stable 3D/2D candidate keys after awake-dynamic, layer, same-agent, explicit
+hierarchy, duplicate, and bounds filtering. The mixed embedding state on
+`LSCollider2D` is a finite 3D `BoundingBox` built from pure 2D X/Z bounds plus a
+positive Y half-thickness centered on the host transform's Y position.
+`CollisionDetectionMixed` currently provides the first narrow-phase slice:
+3D spheres against embedded 2D circle, AABB, and convex polygon slabs. Mixed
+pair ownership, impulse exchange, diagnostics, mixed queries, and CCD remain
+later Phase 10 work.
 
 `CollisionDetection2D` currently supports:
 
@@ -160,11 +163,14 @@ changed bounds cannot remain hidden behind a sleeping partition entry.
 
 Pure 2D colliders use the same state-helper pattern where the payload is
 dimension-free. `ColliderQueryState` is shared directly. Runtime-shape dirtying
-reuses the same version/commit helper with a 2D snapshot payload, while pair and
-hierarchy state are shared generic helpers over the 2D collider and pair types.
-Only partition coordinates remain 2D-specific because they store X/Z planar
-coverage. A 2D collider whose center, rotation, local offset, or shape version
-has not changed skips `BoundingArea` rebuilds and partition refreshes.
+reuses the same version/commit helper with a 2D snapshot payload, while pair
+state uses the same generic helper over 2D collision pairs. Hierarchy state is
+shared across 2D and 3D through dimension-tagged `ColliderHierarchyKey` values,
+so cross-dimensional parent/child and sibling filters do not alias plain
+collider IDs. Only partition coordinates remain 2D-specific because they store
+X/Z planar coverage. A 2D collider whose center, rotation, local offset, or
+shape version has not changed skips `BoundingArea` rebuilds and partition
+refreshes.
 
 Partition state tracks grid coordinates, previous snapped grid bounds,
 partition-change flags, and broad-phase versioning together. Query state tracks
@@ -179,11 +185,14 @@ observe the broad-phase version change.
 
 Hierarchy state is explicit. Hosts call `child.SetParent(parent)` after collider
 initialization when two colliders belong to the same engine object or aggregate
-body and should not collide with each other. Gravitas stores the top parent
-collider ID for filtering; it does not walk host transform trees at simulation
-time. When a parent collider deactivates, its child bindings are cleared before
-the parent collider ID returns to the reusable ID pool, preventing stale
-hierarchy IDs from suppressing collisions against future unrelated colliders.
+body and should not collide with each other. Gravitas stores the top parent as a
+dimension-tagged collider key for filtering; it does not walk host transform
+trees at simulation time. When a parent collider deactivates, its child bindings
+are cleared before the parent collider ID returns to the reusable ID pool,
+preventing stale hierarchy keys from suppressing collisions against future
+unrelated colliders. Mixed 2D/3D hierarchy filtering uses the same state; body
+policy inheritance remains dimension-local until mixed response and mixed CCD
+define a stronger cross-dimensional body contract.
 
 `LSCompoundCollider` is different from hierarchy binding. A parent/child
 relationship links independently registered colliders that may represent

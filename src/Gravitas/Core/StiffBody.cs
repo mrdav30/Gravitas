@@ -1090,7 +1090,7 @@ public class StiffBody : IRecordable
         if (mode != ContinuousCollisionMode.Inherit)
             return mode;
 
-        StiffBody? parentBody = Collider.TopParent?.Body;
+        StiffBody? parentBody = Collider.TopParent3D?.Body;
         if (parentBody != null && parentBody._continuousCollisionMode != ContinuousCollisionMode.Inherit)
             return parentBody._continuousCollisionMode;
 

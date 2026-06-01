@@ -187,7 +187,8 @@ public sealed class Collider2DStateParityTests
         parent.Collider.Deactivate();
 
         child.Collider.ParentId.Should().Be(-1);
-        child.Collider.Parent.Should().BeNull();
+        child.Collider.Parent2D.Should().BeNull();
+        child.Collider.Parent3D.Should().BeNull();
     }
 
     [Theory]

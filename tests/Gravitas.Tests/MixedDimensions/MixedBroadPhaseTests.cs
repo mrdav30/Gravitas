@@ -120,6 +120,53 @@ public sealed class MixedBroadPhaseTests
     }
 
     [Fact]
+    public void Simulate_WithMixedParentChildHierarchy_ShouldSuppressCandidate()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSSphereCollider> parent3D = CreateSphere3D(context, Vector3d.Zero, immovable: false);
+        StiffBody2D child2D = CreateCircle2D(context, Vector2d.Zero, immovable: false);
+
+        child2D.Collider.SetParent(parent3D.Collider);
+
+        context.Simulate();
+
+        context.MixedCollisions.LastBroadPhaseCandidateCount.Should().Be(0);
+        parent3D.Collider.HierarchyChildCount.Should().Be(1);
+        child2D.Collider.Parent3D.Should().BeSameAs(parent3D.Collider);
+        child2D.Collider.Parent2D.Should().BeNull();
+        child2D.Collider.TopParent3D.Should().BeSameAs(parent3D.Collider);
+        child2D.Collider.TopParent2D.Should().BeNull();
+        child2D.Collider.ParentKey.Should().Be(parent3D.Collider.HierarchyKey);
+    }
+
+    [Fact]
+    public void Simulate_WithMixedSiblingHierarchy_ShouldSuppressCandidate()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        StiffBody2D parent2D = CreateCircle2D(context, new Vector2d((Fixed64)8, Fixed64.Zero), immovable: true);
+        ScenarioBody<LSSphereCollider> child3D = CreateSphere3D(context, Vector3d.Zero, immovable: false);
+        StiffBody2D child2D = CreateCircle2D(context, Vector2d.Zero, immovable: false);
+
+        child3D.Collider.SetParent(parent2D.Collider);
+        child2D.Collider.SetParent(parent2D.Collider);
+
+        context.Simulate();
+
+        context.MixedCollisions.LastBroadPhaseCandidateCount.Should().Be(0);
+        parent2D.Collider.HierarchyChildCount.Should().Be(2);
+        child3D.Collider.Parent2D.Should().BeSameAs(parent2D.Collider);
+        child3D.Collider.Parent3D.Should().BeNull();
+        child3D.Collider.TopParent2D.Should().BeSameAs(parent2D.Collider);
+        child3D.Collider.TopParent3D.Should().BeNull();
+        child3D.Collider.ParentKey.Should().Be(parent2D.Collider.HierarchyKey);
+        child2D.Collider.Parent2D.Should().BeSameAs(parent2D.Collider);
+        child2D.Collider.Parent3D.Should().BeNull();
+        child2D.Collider.TopParent2D.Should().BeSameAs(parent2D.Collider);
+        child2D.Collider.TopParent3D.Should().BeNull();
+        child2D.Collider.ParentKey.Should().Be(parent2D.Collider.HierarchyKey);
+    }
+
+    [Fact]
     public void Simulate_WithRetainedMixedPartitions_ShouldRetireAndPoolAfterTtk()
     {
         using GravitasWorldContext context = CreateMixedContext();

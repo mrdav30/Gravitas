@@ -193,7 +193,7 @@ Meaningful deferred work captured from that plan and the wiki:
 - Create: `src/Gravitas/Colliders/Support/ColliderPartitionState.cs`
 - Create: `src/Gravitas/Colliders/Support/ColliderQueryState.cs`
 - Create: `src/Gravitas/Colliders/Support/ColliderPairState.cs`
-- Create: `src/Gravitas/Colliders/Support/ColliderHierarchyState.cs`
+- Create: `src/Gravitas/Colliders/Support/Hierarchy/ColliderHierarchyState.cs`
 - Modify: `tests/Gravitas.Tests/Colliders`
 - Modify: `tests/Gravitas.Benchmarks/Colliders`
 - Modify: `docs/wiki/RUNTIME_ARCHITECTURE.md`
@@ -463,24 +463,6 @@ Meaningful deferred work captured from that plan and the wiki:
 - [x] If mesh sweep is implemented, require triangle candidate acceleration tests and benchmarks before enabling it broadly. Mesh sweep was not implemented in Phase 6, so this requirement carries into Phase 7 if mesh CCD becomes part of the mesh alpha policy.
 - [x] Keep visual mesh-normal smoothing separate from physics. Physics CCD should use deterministic triangle planes/face normals/contact geometry; chunk seam smoothing or vertex-normal transfer belongs in mesh preprocessing or renderer-facing data, not collision truth.
 - [x] Document the CCD contract and any excluded shape pairs.
-
-**Phase 6 Result:**
-
-- CCD now lives in `StiffBody` movement commit as an explicit body/context
-  policy. `PhysicsSettings.DefaultContinuousCollisionMode` defaults to
-  `Discrete`, while `StiffBody.ContinuousCollisionMode` defaults to `Inherit`.
-  `Inherit` resolves through the precomputed top-parent body policy before
-  falling back to the context default.
-- `Continuous` always sweeps when displacement and proxy radius are valid.
-  `Auto` sweeps when intended frame displacement exceeds the collider proxy
-  radius.
-- The alpha path uses a swept-sphere proxy for sphere, capsule, cuboid, and
-  cylinder movers against non-trigger bodyless, immovable, or kinematic targets.
-  It clamps to the earliest deterministic TOI and removes only closing normal
-  velocity.
-- Dynamic-vs-dynamic CCD and swept mesh targets remain intentionally deferred.
-  They belong with relative-velocity ordering, deterministic TOI tie-breakers,
-  and Phase 7 mesh policy work.
 
 **Design Notes:**
 
@@ -1711,7 +1693,7 @@ dimension-agnostic or can be generalized cleanly.
 - Modify: `src/Gravitas/Colliders/Primitives2D/LSCollider2D.cs`
 - Modify: `src/Gravitas/Colliders/Support/ColliderQueryState.cs`
 - Potentially modify/generalize:
-  `src/Gravitas/Colliders/Support/ColliderHierarchyState.cs`
+  `src/Gravitas/Colliders/Support/Hierarchy/ColliderHierarchyState.cs`
 - Potentially modify/generalize:
   `src/Gravitas/Colliders/Support/ColliderPairState.cs`
 - Potentially modify/generalize:
@@ -1777,7 +1759,7 @@ dimension-agnostic or can be generalized cleanly.
 **Phase 9J Status - 2026-05-29:**
 
 - Reused shared dimension-free collider helpers in the 2D path:
-  `ColliderQueryState`, generic `ColliderHierarchyState<TCollider>`, generic
+  `ColliderQueryState`, dimension-tagged `ColliderHierarchyState`, generic
   `ColliderPairState<TPair>`, and generic runtime-shape dirty/version state.
   Only the shape snapshot and partition-coordinate payloads remain 2D-specific.
 - Added `ColliderSettings2D`, `CollisionType2D`, and `CollisionWorkItem2D`.
@@ -2009,28 +1991,20 @@ decomposes contact impulses into planar X/Z and vertical Y components:
   benchmarks for mixed candidate gathering, pair distribution, and retained
   partition cleanup at 64, 1024, and larger representative collider counts.
 
-**Phase 10B Result:**
-
-- Added `GravitasMixedCollisionService` as a real mixed broad-phase owner with
-  GridForge-backed `PhysicsMixedPartition` payloads, separate 3D and 2D
-  collider ID spaces, stable `MixedColliderKey` output, duplicate suppression,
-  awake-dynamic gating, layer filtering, same-agent exclusion, and retained
-  empty-partition cleanup.
-- Added separate mixed partition state on `LSCollider` and `LSCollider2D` so
-  mixed membership does not overload the pure 3D or pure 2D partition paths.
-- Added focused tests for sparse, dense, large-world, sleeping, trigger, layer,
-  same-agent, and churn/retained-cleanup behavior. Cross-dimensional hierarchy
-  is currently represented by same-agent exclusion because existing collider
-  hierarchy state is dimension-local; do not claim a public cross-dimensional
-  hierarchy API until a host-level relationship contract exists.
-- Added `MixedBroadPhaseBenchmarks` with sparse gathering, dense gathering, and
-  retained cleanup/churn coverage at 64, 1024, and 4096 colliders.
-  
-- [ ] **Phase 10C - Mixed narrow phase primitives:** Add mixed shape tests and
-  detection for 3D sphere, cuboid, capsule, and finite cylinder against 2D
-  circle, AABB, and convex polygon slabs. Cover separated Y slabs, touching slab
-  faces, planar side contacts, edge/corner contacts, starting overlap, rotated
-  3D shapes, rotated 2D convex polygons, and deterministic contact ordering.
+- [x] **Phase 10C - Slice 1: Mixed hierarchy keys and sphere/slab narrow phase:**
+  Refactor `ColliderHierarchyState` around dimension-tagged
+  `ColliderHierarchyKey` values so 2D and 3D collider ID spaces cannot alias in
+  parent/child or sibling filtering. Add mixed `SetParent(...)` overloads,
+  mixed broad-phase hierarchy exclusion tests, `MixedContact`, and
+  `CollisionDetectionMixed` support for 3D sphere contacts against embedded 2D
+  circle, AABB, and convex polygon slabs. Cover planar side contacts, separated
+  Y slabs, touching slab faces, corner contacts, and deterministic contact
+  points/normals for this first primitive slice.
+- [ ] **Phase 10C - Mixed narrow phase remaining primitives:** Add mixed shape
+  tests and detection for 3D cuboid, capsule, and finite cylinder against 2D
+  circle, AABB, and convex polygon slabs. Cover starting overlap, rotated 3D
+  shapes, rotated 2D convex polygons, edge/corner contacts, slab face contacts,
+  unsupported pair fallback, and deterministic contact ordering.
 - [ ] **Phase 10C - Mixed narrow phase complex shapes:** Extend mixed detection
   to 3D compound colliders and mesh colliders only through explicit tested
   policies. Compound colliders should scan stable part order and emit one mixed
@@ -2107,6 +2081,10 @@ decomposes contact impulses into planar X/Z and vertical Y components:
 - Prefer one dedicated mixed service over hidden conditionals inside every pure
   2D and pure 3D hot path. Shared generic helpers are welcome where they reduce
   duplication without obscuring dimensional rules.
+- Mixed hierarchy should use the existing collider hierarchy state with
+  dimension-tagged keys. Do not reintroduce plain collider-ID comparisons for
+  cross-dimensional filtering, because 2D and 3D collider ID spaces are
+  intentionally separate and may alias numerically.
 - If mixed response ordering between 3D/3D, 2D/2D, and 2D/3D pairs changes body
   outcomes, make the ordering explicit and test replay stability. A later
   unified island solver can replace the phase order only with tests and
@@ -2114,6 +2092,38 @@ decomposes contact impulses into planar X/Z and vertical Y components:
 - Treat mixed CCD as follow-on work inside Phase 10 after discrete mixed
   collision is stable. It should reuse the same embedding and pair filtering
   rules rather than inventing a second mixed-shape interpretation.
+
+**Phase Results:**
+
+**Phase 6 Result:**
+
+- CCD now lives in `StiffBody` movement commit as an explicit body/context
+  policy. `PhysicsSettings.DefaultContinuousCollisionMode` defaults to
+  `Discrete`, while `StiffBody.ContinuousCollisionMode` defaults to `Inherit`.
+  `Inherit` resolves through the precomputed top-parent body policy before
+  falling back to the context default.
+- `Continuous` always sweeps when displacement and proxy radius are valid.
+  `Auto` sweeps when intended frame displacement exceeds the collider proxy
+  radius.
+- The alpha path uses a swept-sphere proxy for sphere, capsule, cuboid, and
+  cylinder movers against non-trigger bodyless, immovable, or kinematic targets.
+  It clamps to the earliest deterministic TOI and removes only closing normal
+  velocity.
+- Dynamic-vs-dynamic CCD and swept mesh targets remain intentionally deferred.
+  They belong with relative-velocity ordering, deterministic TOI tie-breakers,
+  and Phase 7 mesh policy work.
+
+**Phase 10A Result:**
+
+- Converted `PhysicsRuntimeMode` into the validated bitmask runtime contract
+  with exact `ThreeD`, `TwoD`, `Both`, and `Mixed` settings values.
+- Added `PhysicsRuntimeMode.Both` as a pure 2D plus pure 3D execution path
+  without mixed collision lifecycle work.
+- Added the explicit mixed embedding state on `LSCollider2D` using context
+  default half-thickness, optional collider override, host-transform Y center,
+  and deterministic mixed 3D bounds.
+- Updated runtime-mode tests and docs so pure 2D, pure 3D, both, and mixed
+  service execution boundaries are explicit.
 
 **Phase 10B Result:**
 
@@ -2126,11 +2136,26 @@ decomposes contact impulses into planar X/Z and vertical Y components:
   mixed membership does not overload the pure 3D or pure 2D partition paths.
 - Added focused tests for sparse, dense, large-world, sleeping, trigger, layer,
   same-agent, and churn/retained-cleanup behavior. Cross-dimensional hierarchy
-  is currently represented by same-agent exclusion because existing collider
-  hierarchy state is dimension-local; do not claim a public cross-dimensional
-  hierarchy API until a host-level relationship contract exists.
+  filtering was deferred to the first Phase 10C slice so it could be handled by
+  refactoring the shared collider hierarchy state instead of adding a parallel
+  mixed-only relationship bridge.
 - Added `MixedBroadPhaseBenchmarks` with sparse gathering, dense gathering, and
   retained cleanup/churn coverage at 64, 1024, and 4096 colliders.
+
+**Phase 10C Slice 1 Result:**
+
+- Split hierarchy support into focused files under
+  `src/Gravitas/Colliders/Support/Hierarchy`.
+- Refactored `ColliderHierarchyState` around dimension-tagged
+  `ColliderHierarchyKey` values so mixed parent/child and sibling filtering
+  cannot alias plain 2D and 3D collider IDs.
+- Added honest dimension-specific parent accessors on `LSCollider` and
+  `LSCollider2D` (`Parent3D`, `Parent2D`, `TopParent3D`, `TopParent2D`) plus
+  internal `ParentKey` and `TopParentKey` for deterministic mixed filtering.
+- Added mixed hierarchy exclusion coverage for parent/child and sibling pairs.
+- Added `MixedContact` and `CollisionDetectionMixed` for the first mixed
+  narrow-phase slice: 3D sphere contacts against embedded 2D circle, AABB, and
+  convex polygon slabs.
 
 ## Phase 11: Serialization, Snapshots, And Deterministic Replay
 

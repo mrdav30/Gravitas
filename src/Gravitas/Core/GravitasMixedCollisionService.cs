@@ -370,6 +370,7 @@ internal sealed class GravitasMixedCollisionService
             && collider3D.Shape != ColliderType.None && collider2D.Shape != ColliderType2D.None
             && (collider3D.Body != null || collider2D.Body != null)
             && !ReferenceEquals(collider3D.AgentOrNull, collider2D.AgentOrNull)
+            && !collider3D.ExcludesMixedCollisionWith(collider2D)
             && !_context.Physics.IsLayerCollisionDisabled(collider3D.Layer, collider2D.Layer);
     }
 

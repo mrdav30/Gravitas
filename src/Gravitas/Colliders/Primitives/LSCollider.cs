@@ -11,7 +11,7 @@ using System.Runtime.CompilerServices;
 
 namespace Gravitas.Colliders;
 
-public abstract class LSCollider : IRecordable, IColliderHierarchyNode<LSCollider>
+public abstract class LSCollider : IRecordable, IColliderHierarchyNode
 {
     #region Fields and Properties
 
@@ -57,7 +57,7 @@ public abstract class LSCollider : IRecordable, IColliderHierarchyNode<LSCollide
     private ColliderPartitionState _mixedPartitionState;
     private ColliderQueryState _queryState;
     private ColliderPairState<CollisionPair> _pairState;
-    private ColliderHierarchyState<LSCollider> _hierarchyState;
+    private ColliderHierarchyState _hierarchyState;
 
     internal uint RuntimeShapeVersion => _runtimeShapeState.RuntimeVersion;
 
@@ -305,10 +305,18 @@ public abstract class LSCollider : IRecordable, IColliderHierarchyNode<LSCollide
 
     public bool IsChild => _hierarchyState.IsChild;
     public bool IsParent => _hierarchyState.IsParent;
-    public int ParentId => _hierarchyState.ParentId;
-    public LSCollider? Parent => _hierarchyState.Parent;
-    internal LSCollider? TopParent => _hierarchyState.TopParent;
+    public int ParentId => ParentKey.Id;
+    public LSCollider? Parent3D => _hierarchyState.Parent as LSCollider;
+    public LSCollider2D? Parent2D => _hierarchyState.Parent as LSCollider2D;
+    internal LSCollider? TopParent3D => _hierarchyState.TopParent as LSCollider;
+    internal LSCollider2D? TopParent2D => _hierarchyState.TopParent as LSCollider2D;
     internal int HierarchyChildCount => _hierarchyState.ChildCount;
+    internal ColliderHierarchyKey HierarchyKey => Id >= 0 ? ColliderHierarchyKey.Create3D(Id) : ColliderHierarchyKey.None;
+    internal ColliderHierarchyKey ParentKey => _hierarchyState.ParentKey;
+    internal ColliderHierarchyKey TopParentKey => _hierarchyState.TopParentKey;
+    internal ColliderHierarchyState HierarchyState => _hierarchyState;
+    ColliderHierarchyKey IColliderHierarchyNode.HierarchyKey => HierarchyKey;
+    IColliderHierarchyNode? IColliderHierarchyNode.HierarchyParent => _hierarchyState.Parent;
 
     #endregion
 
@@ -417,36 +425,25 @@ public abstract class LSCollider : IRecordable, IColliderHierarchyNode<LSCollide
         _hierarchyState.SetParent(this, parent);
     }
 
+    public void SetParent(LSCollider2D parent)
+    {
+        ThrowIfCompoundPartLifecycle(nameof(SetParent));
+        _hierarchyState.SetParent(this, parent);
+    }
+
     public void ClearParent()
     {
         ThrowIfCompoundPartLifecycle(nameof(ClearParent));
         _hierarchyState.ClearParent(this);
     }
 
-    public void AddChild(int id)
-    {
-        ThrowIfCompoundPartLifecycle(nameof(AddChild));
-        if (_hierarchyState.AddChild(id) != true)
-        {
-            GravitasLogger.Channel.Warn($"Collider with ID {id} is already a child.");
-            return;
-        }
-    }
-
-    public void RemoveChild(int id)
-    {
-        ThrowIfCompoundPartLifecycle(nameof(RemoveChild));
-        if (_hierarchyState.RemoveChild(id) != true)
-        {
-            GravitasLogger.Channel.Warn($"Cannot remove. Collider with ID {id} is not a child.");
-            return;
-        }
-    }
-
     public bool IsSibling(LSCollider other)
     {
-        return _hierarchyState.ExcludesCollisionWith(other._hierarchyState, Id, other.Id);
+        return _hierarchyState.ExcludesCollisionWith(other._hierarchyState, HierarchyKey, other.HierarchyKey);
     }
+
+    internal bool ExcludesMixedCollisionWith(LSCollider2D other) =>
+        _hierarchyState.ExcludesCollisionWith(other.HierarchyState, HierarchyKey, other.HierarchyKey);
 
     private bool RebuildRuntimeShapeState()
     {
@@ -728,14 +725,15 @@ public abstract class LSCollider : IRecordable, IColliderHierarchyNode<LSCollide
 
     private void ClearChildParentReferences()
     {
-        SwiftHashSet<int>? children = _hierarchyState.Children;
+        SwiftHashSet<ulong>? children = _hierarchyState.Children;
         if (children == null)
             return;
 
-        foreach (int childId in children)
+        foreach (ulong childPackedKey in children)
         {
-            if (Context.Physics.TryGetColliderById(childId, out LSCollider? child))
-                child!._hierarchyState.ClearParentReference();
+            ColliderHierarchyKey childKey = ColliderHierarchyKey.FromPacked(childPackedKey);
+            if (((IColliderHierarchyNode)this).TryGetHierarchyColliderByKey(childKey, out IColliderHierarchyNode? child))
+                child!.ClearParentReference();
         }
 
         _hierarchyState.ClearChildren();
@@ -806,9 +804,42 @@ public abstract class LSCollider : IRecordable, IColliderHierarchyNode<LSCollide
         return context != null;
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    bool IColliderHierarchyNode<LSCollider>.TryGetHierarchyColliderById(int id, out LSCollider? collider) =>
-        Context.Physics.TryGetColliderById(id, out collider);
+    void IColliderHierarchyNode.AddChild(ColliderHierarchyKey key)
+    {
+        ThrowIfCompoundPartLifecycle(nameof(IColliderHierarchyNode.AddChild));
+        if (_hierarchyState.AddChild(key) != true)
+            GravitasLogger.Channel.Warn($"Collider hierarchy key {key.Packed} is already a child.");
+    }
+
+    void IColliderHierarchyNode.RemoveChild(ColliderHierarchyKey key)
+    {
+        ThrowIfCompoundPartLifecycle(nameof(IColliderHierarchyNode.RemoveChild));
+        if (_hierarchyState.RemoveChild(key) != true)
+            GravitasLogger.Channel.Warn($"Cannot remove. Collider hierarchy key {key.Packed} is not a child.");
+    }
+
+    void IColliderHierarchyNode.ClearParentReference() => _hierarchyState.ClearParentReference();
+
+    bool IColliderHierarchyNode.TryGetHierarchyColliderByKey(ColliderHierarchyKey key, out IColliderHierarchyNode? collider)
+    {
+        collider = null;
+        if (!key.IsValid || _context == null)
+            return false;
+
+        if (key.Is3D && _context.Physics.TryGetColliderById(key.Id, out LSCollider? collider3D))
+        {
+            collider = collider3D;
+            return true;
+        }
+
+        if (key.Is2D && _context.Physics2D.TryGetColliderById(key.Id, out LSCollider2D? collider2D))
+        {
+            collider = collider2D;
+            return true;
+        }
+
+        return false;
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal void SetPhysicsId(int id)

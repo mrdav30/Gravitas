@@ -24,7 +24,7 @@ pairs, queries, and coroutines remain context-local.
 | --- | --- |
 | `GravitasPhysicsService` | Dynamic body bucket, collider ID table, reusable collider IDs, collision-pair pool, active collision-pair queue, simulation switch. |
 | `GravitasPhysics2DService` | Pure 2D dynamic body bucket, monotonic collider ID table, 2D pair pool, pair-reference cleanup, layer/hierarchy-filtered narrow-phase/response processing, visualization publishing, simulation switch. |
-| `GravitasMixedCollisionService` | Phase 10 mixed 2D/3D lifecycle owner, GridForge-backed mixed broad phase, stable mixed candidate-key buffer, duplicate suppression, awake dynamic membership refresh, retained `PhysicsMixedPartition` cleanup, and lifecycle counters. |
+| `GravitasMixedCollisionService` | Phase 10 mixed 2D/3D lifecycle owner, GridForge-backed mixed broad phase, stable mixed candidate-key buffer, mixed hierarchy filtering, duplicate suppression, awake dynamic membership refresh, retained `PhysicsMixedPartition` cleanup, and lifecycle counters. |
 | `GravitasCollisionService` | Active partition bucket, inactive partition pool, duplicate voxel checker, partition awake-state refresh, collision distribution version, cull distributor. |
 | `GravitasCollision2DService` | GridForge-backed pure 2D partition bucket, inactive partition pool, duplicate voxel checker, awake dynamic membership refresh, 2D collision distribution version, retained partition cleanup. |
 | `GravitasQuery2DService` | Pure 2D query candidate buffer, overlap-circle queries, segment raycasts, swept-circle queries, collider-stamped duplicate suppression, hit ordering. |
@@ -116,9 +116,10 @@ contract is pinned by `GravitasSimulationPhaseOrderTests`.
 `PhysicsSettings.RuntimeMode` is a validated bitmask with exact public settings
 values: `ThreeD`, `TwoD`, `Both`, and `Mixed`. `Both` runs pure 2D and pure 3D
 side by side without cross-dimensional contacts. `Mixed` runs both pure paths
-plus the dedicated mixed lifecycle and broad-phase path; later Phase 10 work
-fills in mixed contacts, constrained impulse exchange, diagnostics, mixed
-queries, and CCD policy.
+plus the dedicated mixed lifecycle and broad-phase path. The first mixed narrow
+phase slice supports 3D spheres against embedded 2D circle, AABB, and convex
+polygon slabs; later Phase 10 work fills in broader primitive coverage,
+constrained impulse exchange, diagnostics, mixed queries, and CCD policy.
 
 `Reset` clears the clock and all context-local service state, then invokes reset
 hooks. `SetFrameRate` and `ApplySettings` update the clock's frame rate and

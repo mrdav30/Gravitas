@@ -21,8 +21,10 @@ those concrete types, not a third dimension value.
 - `PhysicsRuntimeMode.Both` advances the pure 2D and pure 3D services side by
   side without cross-dimensional contacts.
 - `PhysicsRuntimeMode.Mixed` advances both pure services plus the dedicated
-  mixed lifecycle and broad-phase path. Phase 10 contact, response, diagnostic,
-  mixed query, and CCD work fills in the rest of the interaction model.
+  mixed lifecycle and broad-phase path. The first mixed narrow-phase slice
+  supports 3D sphere contacts against embedded 2D circle, AABB, and convex
+  polygon slabs. Phase 10 response, diagnostic, mixed query, and CCD work fills
+  in the rest of the interaction model.
 
 The context clock, coroutines, diagnostics, and lifecycle hooks remain shared.
 This lets pure 2D simulations use the same host loop without paying 3D
@@ -102,7 +104,8 @@ by the mixed runtime path:
   2D bounds plus the cached Y slab.
 
 The mixed 3D bounds do not change pure 2D collision truth or pure 2D partition
-storage. They are the future mixed broad-phase/contact volume only.
+storage. They are the mixed broad-phase and mixed narrow-phase embedding volume
+only.
 
 ## Queries
 
@@ -136,19 +139,21 @@ rather than Unity-style separate engines:
   cross-dimensional contacts.
 - `PhysicsRuntimeMode.Mixed` advances both pure 2D and 3D services plus a
   dedicated mixed collision lifecycle path. The mixed broad phase uses
-  `PhysicsMixedPartition` and stable 3D/2D candidate keys; contacts and
-  response are filled in by the remaining Phase 10 work.
+  `PhysicsMixedPartition` and stable 3D/2D candidate keys. The first narrow
+  phase slice supports 3D spheres against embedded 2D circle, AABB, and convex
+  polygon slabs; broader primitive coverage and response are filled in by the
+  remaining Phase 10 work.
 - mixed contacts embed 2D colliders into 3D as finite X/Z prisms centered on
   the host transform's Y position.
 - 2D bodies remain plane-constrained: planar impulse can move them in X/Z,
   vertical impulse treats them as having infinite constrained mass.
 - mixed broad phase uses GridForge-backed spatial identity, separate 2D and 3D
-  collider ID spaces, awake-dynamic gating, layer filtering, same-agent
-  exclusion, and retained empty-partition cleanup.
-- cross-dimensional hierarchy filtering currently stops at same-agent exclusion;
-  `LSCollider` and `LSCollider2D` hierarchy state remains dimension-local until
-  a host-level mixed hierarchy contract is designed.
+  collider ID spaces, awake-dynamic gating, layer filtering, same-agent and
+  explicit hierarchy exclusion, and retained empty-partition cleanup.
+- cross-dimensional hierarchy uses dimension-tagged collider keys in the shared
+  hierarchy state. Plain collider IDs must not be compared across 2D and 3D
+  services because those ID spaces are intentionally separate.
 - unsupported mixed shape pairs must be explicit, tested, and documented.
 
-Until mixed narrow phase lands, pure 2D and 3D collision dispatch should not
-fall through to accidental mixed contact behavior.
+Until mixed pair ownership and response land, pure 2D and 3D collision dispatch
+should not fall through to accidental mixed response behavior.

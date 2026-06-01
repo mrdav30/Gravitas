@@ -299,7 +299,7 @@ public sealed class StiffBody2D : IRecordable
         if (mode != ContinuousCollisionMode.Inherit)
             return mode;
 
-        StiffBody2D? parentBody = Collider.TopParent?.Body;
+        StiffBody2D? parentBody = Collider.TopParent2D?.Body;
         if (parentBody != null && parentBody._continuousCollisionMode != ContinuousCollisionMode.Inherit)
             return parentBody._continuousCollisionMode;
 

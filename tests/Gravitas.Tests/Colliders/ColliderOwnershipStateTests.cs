@@ -38,9 +38,9 @@ public sealed class ColliderOwnershipStateTests
         middleParent.Collider.SetParent(topParent.Collider);
         child.Collider.SetParent(middleParent.Collider);
 
-        middleParent.Collider.TopParent.Should().BeSameAs(topParent.Collider);
-        child.Collider.TopParent.Should().BeSameAs(topParent.Collider);
-        child.Collider.Parent.Should().BeSameAs(middleParent.Collider);
+        middleParent.Collider.TopParent3D.Should().BeSameAs(topParent.Collider);
+        child.Collider.TopParent3D.Should().BeSameAs(topParent.Collider);
+        child.Collider.Parent3D.Should().BeSameAs(middleParent.Collider);
         child.Collider.ParentId.Should().Be(topParent.Collider.Id);
     }
 
@@ -76,7 +76,8 @@ public sealed class ColliderOwnershipStateTests
 
         replacement.Collider.Id.Should().Be(parentId);
         child.Collider.ParentId.Should().Be(-1);
-        child.Collider.Parent.Should().BeNull();
+        child.Collider.Parent3D.Should().BeNull();
+        child.Collider.Parent2D.Should().BeNull();
         scenario.Context.Physics.RequireCollisionPair(child.Collider, replacement.Collider).Should().BeTrue();
     }
 

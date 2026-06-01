@@ -195,8 +195,9 @@ lifecycle path. `LSCollider2D` also caches a mixed `BoundingBox` using
 `PhysicsSettings.Mixed2DHalfThickness`, optional per-collider
 `MixedHalfThicknessOverride`, and the host transform's Y position. The mixed
 broad phase now emits deterministic candidate keys through `PhysicsMixedPartition`;
-contacts, response, diagnostics, mixed queries, and CCD remain later Phase 10
-work.
+`CollisionDetectionMixed` currently provides the first 3D sphere versus
+embedded 2D slab contact slice. Mixed response, diagnostics, mixed queries, and
+CCD remain later Phase 10 work.
 
 When adding or redesigning dimension-sensitive behavior:
 
