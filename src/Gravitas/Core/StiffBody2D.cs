@@ -481,12 +481,66 @@ public sealed class StiffBody2D : IRecordable
 
     public void RecordData(IChronicler chronicler)
     {
+        bool active = Active;
+        bool immovable = Immovable;
+        bool isKinematic = IsKinematic;
+        Fixed64 mass = Mass;
+        Fixed64 restitutionCoefficient = RestitutionCoefficient;
+        Fixed64 frictionCoefficient = FrictionCoefficient;
+        Vector2d gravity = Gravity;
+        bool sleepEnabled = SleepEnabled;
+        int sleepFrameThreshold = SleepFrameThreshold;
+        Fixed64 sleepLinearSpeedThreshold = SleepLinearSpeedThreshold;
+
+        RecordValues.Look(chronicler, ref active, "Active", false);
+        RecordValues.Look(chronicler, ref immovable, "Immovable", false);
+        RecordValues.Look(chronicler, ref isKinematic, "IsKinematic", false);
         RecordValues.Look(chronicler, ref _position, "Position");
         RecordValues.Look(chronicler, ref _rotation, "Rotation");
         RecordValues.Look(chronicler, ref _linearVelocity, "LinearVelocity");
+        RecordValues.Look(chronicler, ref _linearAccelerationStore, "LinearAccelerationStore");
+        RecordValues.Look(chronicler, ref _deltaAcceleration, "DeltaAcceleration");
         RecordValues.Look(chronicler, ref _linearSpeed, "LinearSpeed");
         RecordValues.Look(chronicler, ref _isSleeping, "IsSleeping");
         RecordValues.Look(chronicler, ref _sleepFrameCount, "SleepFrameCount");
+        RecordValues.Look(chronicler, ref mass, "Mass");
+        RecordValues.Look(chronicler, ref restitutionCoefficient, "RestitutionCoefficient", Fixed64.Half);
+        RecordValues.Look(chronicler, ref frictionCoefficient, "FrictionCoefficient", Fixed64.One);
+        RecordValues.Look(chronicler, ref gravity, "Gravity", Vector2d.Zero);
+        RecordValues.Look(chronicler, ref sleepEnabled, "SleepEnabled", true);
+        RecordValues.Look(chronicler, ref sleepFrameThreshold, "SleepFrameThreshold", 16);
+        RecordValues.Look(chronicler, ref sleepLinearSpeedThreshold, "SleepLinearSpeedThreshold", (Fixed64)0.001f);
         RecordValues.Look(chronicler, ref _continuousCollisionMode, "ContinuousCollisionMode", ContinuousCollisionMode.Inherit);
+
+        if (chronicler.Mode == SerializationMode.Loading)
+        {
+            Active = active;
+            Immovable = immovable;
+            IsKinematic = isKinematic;
+            Mass = mass;
+            RestitutionCoefficient = restitutionCoefficient;
+            FrictionCoefficient = frictionCoefficient;
+            Gravity = gravity;
+            SleepEnabled = sleepEnabled;
+            SleepFrameThreshold = sleepFrameThreshold;
+            SleepLinearSpeedThreshold = sleepLinearSpeedThreshold;
+        }
+
+        Collider.RecordData(chronicler);
+
+        if (chronicler.Mode == SerializationMode.Loading)
+            ApplyLoadedState();
+    }
+
+    private void ApplyLoadedState()
+    {
+        FixedTransform transform = Agent.Transform;
+        Vector3d currentPosition = transform.Position;
+        transform.Position = new Vector3d(_position.x, currentPosition.y, _position.y);
+        transform.Rotation = FixedQuaternion.FromEulerAnglesInDegrees(
+            Fixed64.Zero,
+            FixedMath.RadToDeg(_rotation),
+            Fixed64.Zero);
+        Collider.Rebuild();
     }
 }

@@ -1,4 +1,5 @@
 using FixedMathSharp;
+using Chronicler;
 using SwiftCollections;
 using System.Runtime.CompilerServices;
 
@@ -61,5 +62,16 @@ public sealed class LSCircleCollider2D : LSCollider2D
     {
         Vector2d extents = new(Radius, Radius);
         SetBoundsFromMinMax(Center - extents, Center + extents);
+    }
+
+    protected override void RecordShapeData(IChronicler chronicler)
+    {
+        Fixed64 radius = _radius;
+        RecordValues.Look(chronicler, ref radius, "Radius", Fixed64.Half);
+        if (chronicler.Mode == SerializationMode.Loading)
+        {
+            SwiftThrowHelper.ThrowIfArgument(radius <= Fixed64.Zero, nameof(radius), "2D circle radius must be greater than zero.");
+            _radius = radius;
+        }
     }
 }

@@ -1637,13 +1637,13 @@ public class StiffBody : IRecordable
 
     public void RecordData(IChronicler chronicler)
     {
+        GroundProbeMode groundProbeMode = GroundProbeMode;
+        Fixed64 groundProbeRadius = GroundProbeRadius;
+
         RecordValues.Look(chronicler, ref Debug, "Debug");
         RecordValues.Look(chronicler, ref Active, "Active");
         RecordValues.Look(chronicler, ref Immovable, "Immovable");
-        RecordValues.Look(chronicler, ref _positionTransform, "PositionTransform");
-        RecordValues.Look(chronicler, ref _rotationTransform, "RotationTransform");
-        RecordValues.Look(chronicler, ref _positionChangedBuffer, "PositionChangedBuffer");
-        RecordValues.Look(chronicler, ref _rotationChangedBuffer, "RotationChangedBuffer");
+        RecordValues.Look(chronicler, ref IsKinematic, "IsKinematic", false);
         RecordValues.Look(chronicler, ref _position2dUnmarked, "Position2d");
         RecordValues.Look(chronicler, ref _heightPosUnmarked, "HeightPos");
         RecordValues.Look(chronicler, ref _spawnedPosition, "SpawnedPosition");
@@ -1651,30 +1651,23 @@ public class StiffBody : IRecordable
         RecordValues.Look(chronicler, ref GroundOriginOffset, "GroundOriginOffset");
         RecordValues.Look(chronicler, ref GroundedDistanceRay, "GroundedDistanceRay");
         RecordValues.Look(chronicler, ref GroundDownDistanceOnAir, "GroundDownDistanceOnAir");
+        RecordValues.Look(chronicler, ref groundProbeMode, "GroundProbeMode", GroundProbeMode.Auto);
+        RecordValues.Look(chronicler, ref groundProbeRadius, "GroundProbeRadius");
+        RecordValues.Look(chronicler, ref _skipGroundingCheck, "SkipGroundingCheck", false);
+        RecordValues.Look(chronicler, ref _lastGroundCheckFrame, "LastGroundCheckFrame");
         RecordValues.Look(chronicler, ref StepOffset, "StepOffset");
         RecordValues.Look(chronicler, ref _groundNormal, "GroundNormal");
-        RecordValues.Look(chronicler, ref _hitPlatform, "HitPlatform");
         RecordValues.Look(chronicler, ref _hitPlatformPosition, "HitPlatformPosition");
         RecordValues.Look(chronicler, ref _hitPoint, "HitPoint");
         RecordValues.Look(chronicler, ref _isGrounded, "IsGrounded");
         RecordValues.Look(chronicler, ref _lastGroundedPosition, "LastGroundedPosition");
-        RecordValues.Look(chronicler, ref CanSetVisualPosition, "CanSetVisualPosition");
-        RecordValues.Look(chronicler, ref _visualPosition, "VisualPosition");
-        RecordValues.Look(chronicler, ref _lastVisualPosition, "LastVisualPosition");
         RecordValues.Look(chronicler, ref _rotation, "Rotation");
-        RecordValues.Look(chronicler, ref CanSetVisualRotation, "CanSetVisualRotation");
-        RecordValues.Look(chronicler, ref _visualRotation, "VisualRotation");
-        RecordValues.Look(chronicler, ref _lastVisualRotation, "LastVisualRotation");
         RecordValues.Look(chronicler, ref PreventAngularForces, "PreventAngularForces");
-        RecordValues.Look(chronicler, ref DefaultRotationSpeed, "DefaultRotationSpeed");
-        RecordValues.Look(chronicler, ref InteractionRotationSpeed, "InteractionRotationSpeed");
-        RecordValues.Look(chronicler, ref _rotationSpeed, "RotationSpeed");
-        RecordValues.Look(chronicler, ref _rotationInterpoleSpeed, "RotationInterpoleSpeed");
-        RecordValues.Look(chronicler, ref _settingVisualsCounter, "SettingVisualsCounter");
         RecordValues.Look(chronicler, ref _linearVelocity, "LinearVelocity");
         RecordValues.Look(chronicler, ref _linearDirection, "LinearDirection");
         RecordValues.Look(chronicler, ref _angularVelocity, "AngularVelocity");
         RecordValues.Look(chronicler, ref _angularDirection, "AngularDirection");
+        RecordValues.Look(chronicler, ref _deltaTorque, "DeltaTorque");
         RecordValues.Look(chronicler, ref RestitutionCoefficient, "RestitutionCoefficient");
         RecordValues.Look(chronicler, ref _isSleeping, "IsSleeping");
         RecordValues.Look(chronicler, ref _sleepFrameCount, "SleepFrameCount");
@@ -1690,6 +1683,8 @@ public class StiffBody : IRecordable
         RecordValues.Look(chronicler, ref _angularSpeed, "AngularSpeed");
         RecordValues.Look(chronicler, ref _angularAccelerationStore, "AngularAccelerationStore");
         RecordValues.Look(chronicler, ref _angularAcceleration, "AngularAcceleration");
+        RecordValues.Look(chronicler, ref _impulseStore, "ImpulseStore");
+        RecordValues.Look(chronicler, ref _positionCorrection, "PositionCorrection");
         RecordValues.Look(chronicler, ref _timeScaledAcceleration, "TimeScaledAcceleration");
         RecordValues.Look(chronicler, ref _timeScaledDeceleration, "TimeScaledDeceleration");
         RecordValues.Look(chronicler, ref _decelerating, "Decelerating");
@@ -1700,6 +1695,43 @@ public class StiffBody : IRecordable
         RecordValues.Look(chronicler, ref _normalForce, "NormalForce");
         RecordValues.Look(chronicler, ref Mass, "Mass");
 
+        if (chronicler.Mode == SerializationMode.Loading)
+        {
+            GroundProbeMode = groundProbeMode;
+            GroundProbeRadius = groundProbeRadius;
+            _hitPlatform = null;
+        }
+
         Collider?.RecordData(chronicler);
+
+        if (chronicler.Mode == SerializationMode.Loading)
+            ApplyLoadedState();
+    }
+
+    private void ApplyLoadedState()
+    {
+        _positionTransform.Position = Position3d;
+        _rotationTransform.Rotation = Rotation;
+
+        _positionMutated = false;
+        _positionChangedBuffer = false;
+        _rotationMutated = false;
+        _rotationChangedBuffer = false;
+        _settingVisualsCounter = 0;
+        _rotationSpeed = DefaultRotationSpeed;
+        _rotationInterpoleSpeed = Fixed64.Zero;
+        _visualPosition = Position3d;
+        _lastVisualPosition = Position3d;
+        _visualRotation = Rotation;
+        _lastVisualRotation = Rotation;
+
+        if (!AngularForcesHalted && Collider != null)
+        {
+            _interiaTensor = Collider.CalculateInertiaTensor(Mass);
+            _inverseInertiaTensor = _interiaTensor.InvertDiagonal();
+            UpdateIntertiaTensorOrientation();
+        }
+
+        Collider?.Simulate();
     }
 }

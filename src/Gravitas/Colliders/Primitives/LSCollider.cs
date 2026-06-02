@@ -927,12 +927,38 @@ public abstract class LSCollider : IRecordable, IColliderHierarchyNode
         RecordValues.Look(chronicler, ref _active, "Active", true);
         RecordValues.Look(chronicler, ref _layer, "Layer", new());
         RecordValues.Look(chronicler, ref _isTrigger, "IsTrigger", false);
-        RecordValues.Look(chronicler, ref _id, "Id", -1);
         RecordValues.Look(chronicler, ref _preventCulling, "PreventCulling", false);
         RecordValues.Look(chronicler, ref _offset, "Offset", Vector3d.Zero);
         RecordValues.Look(chronicler, ref _radius, "Radius", Fixed64.Half);
         RecordValues.Look(chronicler, ref _size, "Size", Vector3d.One);
+
+        if (chronicler.Mode == SerializationMode.Loading)
+            ApplyLoadedState();
+        else
+            _runtimeShapeState.MarkDirty();
+    }
+
+    private void ApplyLoadedState()
+    {
         _runtimeShapeState.MarkDirty();
+        RebuildRuntimeShapeState();
+
+        if (_context == null || _compoundOwner != null)
+            return;
+
+        if (!_active)
+        {
+            if (IsPartitioned)
+                _context.Collisions.ClearPartitionedObject(this, force: true);
+            if (IsMixedPartitioned)
+                _context.MixedCollisions.ClearPartitioned3DCollider(this, force: true);
+            return;
+        }
+
+        if (IsPartitioned)
+            UpdatePartition();
+        if (_context.Settings.RuntimeMode.RunsMixedContacts())
+            _context.MixedCollisions.Refresh3DColliderPartition(this);
     }
 
     #endregion

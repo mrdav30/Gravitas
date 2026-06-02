@@ -1,3 +1,4 @@
+using Chronicler;
 using FixedMathSharp;
 using GridForge.Spatial;
 using Gravitas.Support;
@@ -9,7 +10,7 @@ namespace Gravitas.Colliders;
 /// <summary>
 /// Base type for pure 2D collider shapes.
 /// </summary>
-public abstract class LSCollider2D : IColliderHierarchyNode
+public abstract class LSCollider2D : IRecordable, IColliderHierarchyNode
 {
     private StiffBody2D? _body;
     private IMatterAgent? _agent;
@@ -705,5 +706,42 @@ public abstract class LSCollider2D : IColliderHierarchyNode
 
         Fixed64 t = FixedMath.Clamp01(Vector2d.Dot(point - a, segment) / lengthSquared);
         return a + segment * t;
+    }
+
+    public void RecordData(IChronicler chronicler)
+    {
+        RecordValues.Look(chronicler, ref _isActive, "Active", true);
+        RecordValues.Look(chronicler, ref _isTrigger, "IsTrigger", false);
+        RecordValues.Look(chronicler, ref _layer, "Layer", new());
+        RecordValues.Look(chronicler, ref _localOffset, "LocalOffset", Vector2d.Zero);
+        RecordValues.Look(chronicler, ref _mixedHalfThicknessOverride, "MixedHalfThicknessOverride");
+        RecordShapeData(chronicler);
+
+        if (chronicler.Mode == SerializationMode.Loading)
+            ApplyLoadedState();
+    }
+
+    protected virtual void RecordShapeData(IChronicler chronicler) { }
+
+    private void ApplyLoadedState()
+    {
+        _runtimeShapeState.MarkDirty();
+        RebuildRuntimeShapeState();
+
+        if (_context == null || _id < 0)
+            return;
+
+        if (!_isActive)
+        {
+            if (IsPartitioned)
+                _context.Collisions2D.ClearPartitionedCollider(this, force: true);
+            if (IsMixedPartitioned)
+                _context.MixedCollisions.ClearPartitioned2DCollider(this, force: true);
+            return;
+        }
+
+        _context.Collisions2D.RefreshColliderPartition(this);
+        if (_context.Settings.RuntimeMode.RunsMixedContacts())
+            _context.MixedCollisions.Refresh2DColliderPartition(this);
     }
 }

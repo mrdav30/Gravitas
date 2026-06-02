@@ -1,4 +1,5 @@
 using FixedMathSharp;
+using Chronicler;
 using SwiftCollections;
 using System;
 using System.Runtime.CompilerServices;
@@ -10,19 +11,14 @@ namespace Gravitas.Colliders;
 /// </summary>
 public sealed class LSPolygonCollider2D : LSCollider2D
 {
-    private readonly Vector2d[] _localVertices;
-    private readonly Vector2d[] _worldVertices;
+    private Vector2d[] _localVertices;
+    private Vector2d[] _worldVertices;
 
     public LSPolygonCollider2D(params Vector2d[] vertices)
     {
-        SwiftThrowHelper.ThrowIfNull(vertices, nameof(vertices));
-        SwiftThrowHelper.ThrowIfArgument(vertices.Length < 3, nameof(vertices), "2D polygon must contain at least three vertices.");
-        ValidateConvex(vertices);
-
-        _localVertices = new Vector2d[vertices.Length];
-        _worldVertices = new Vector2d[vertices.Length];
-        Array.Copy(vertices, _localVertices, vertices.Length);
-        MarkShapeDirty();
+        _localVertices = Array.Empty<Vector2d>();
+        _worldVertices = Array.Empty<Vector2d>();
+        SetLocalVertices(vertices, markDirty: true);
     }
 
     public override ColliderType2D Shape => ColliderType2D.ConvexPolygon;
@@ -122,6 +118,31 @@ public sealed class LSPolygonCollider2D : LSCollider2D
         }
 
         SetBoundsFromMinMax(min, max);
+    }
+
+    protected override void RecordShapeData(IChronicler chronicler)
+    {
+        Vector2d[] vertices = _localVertices;
+        RecordValues.Look(chronicler, ref vertices, "Vertices", Array.Empty<Vector2d>());
+        if (chronicler.Mode == SerializationMode.Loading && vertices.Length > 0)
+            SetLocalVertices(vertices, markDirty: false);
+    }
+
+    private void SetLocalVertices(Vector2d[] vertices, bool markDirty)
+    {
+        SwiftThrowHelper.ThrowIfNull(vertices, nameof(vertices));
+        SwiftThrowHelper.ThrowIfArgument(vertices.Length < 3, nameof(vertices), "2D polygon must contain at least three vertices.");
+        ValidateConvex(vertices);
+
+        if (_localVertices.Length != vertices.Length)
+        {
+            _localVertices = new Vector2d[vertices.Length];
+            _worldVertices = new Vector2d[vertices.Length];
+        }
+
+        Array.Copy(vertices, _localVertices, vertices.Length);
+        if (markDirty)
+            MarkShapeDirty();
     }
 
     private static void ValidateConvex(Vector2d[] vertices)

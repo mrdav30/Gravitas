@@ -1,6 +1,8 @@
 ﻿using Gravitas.Support;
+using FixedMathSharp;
 using MemoryPack;
 using System;
+using System.Text.Json.Serialization;
 using SwiftCollections;
 
 namespace Gravitas;
@@ -9,6 +11,7 @@ namespace Gravitas;
 [MemoryPackable]
 public partial struct MatrixRow
 {
+    [JsonInclude]
     public bool[] row;
 }
 
@@ -16,17 +19,29 @@ public partial struct MatrixRow
 [MemoryPackable]
 public sealed partial class PhysicsSettingsSaver : DefaultSaver
 {
+    [JsonInclude]
     public int? FrameRate;
 
+    [JsonInclude]
     public MatrixRow[]? CollisionMatrix;
 
+    [JsonInclude]
     public int? GroundCheckLayerMaskBits;
 
+    [JsonInclude]
     public ContinuousCollisionMode? DefaultContinuousCollisionMode;
 
+    [JsonInclude]
     public int? RetainedPartitionTimeToKillFrames;
 
+    [JsonInclude]
     public int? RetainedPartitionRetirementSweepBudget;
+
+    [JsonInclude]
+    public PhysicsRuntimeMode? RuntimeMode;
+
+    [JsonInclude]
+    public Fixed64? Mixed2DHalfThickness;
 
     [NonSerialized]
     [MemoryPackIgnore]
@@ -59,6 +74,10 @@ public sealed partial class PhysicsSettingsSaver : DefaultSaver
             settings.RetainedPartitionTimeToKillFrames = RetainedPartitionTimeToKillFrames.Value;
         if (RetainedPartitionRetirementSweepBudget.HasValue)
             settings.RetainedPartitionRetirementSweepBudget = RetainedPartitionRetirementSweepBudget.Value;
+        if (RuntimeMode.HasValue)
+            settings.RuntimeMode = RuntimeMode.Value;
+        if (Mixed2DHalfThickness.HasValue)
+            settings.Mixed2DHalfThickness = Mixed2DHalfThickness.Value;
 
         return settings;
     }

@@ -240,6 +240,18 @@ events; `GravitasPhysics2DService.LateSimulate()` integrates active movable 2D
 bodies; `GravitasPhysics2DService.Visualize()` publishes dynamic 2D position and
 yaw rotation back to the host transform while preserving host vertical height.
 
+## Serialization And Replay State
+
+Chronicler support follows the stack-wide populate-existing-shell contract.
+The host creates the context, world, agents, transforms, body instances, and
+the correct collider shape types before loading. Chronicler then transfers
+authoritative simulation values into those objects.
+
+Host bindings, context-local service IDs, partition lists, pair tables, query
+buffers, diagnostic buffers, delegates, and visual interpolation state are not
+snapshot identity. Read [Serialization And Replay](SERIALIZATION.md) before
+changing serialized fields, load defaults, or replay tests.
+
 ## Collider State
 
 `LSCollider` owns:

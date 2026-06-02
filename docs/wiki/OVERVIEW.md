@@ -25,6 +25,9 @@ systems connect and where the current prototype needs hardening.
   body, collider, bounds, collision, response, or query behavior.
 - Read [Query Services](QUERY_SERVICES.md) when changing raycasts, circle
   overlap queries, hit ordering, layer filtering, or query allocation behavior.
+- Read [Serialization And Replay](SERIALIZATION.md) when changing Chronicler
+  record data, settings snapshots, populate-existing-shell behavior, or replay
+  validation.
 - Read [Diagnostics](DIAGNOSTICS.md) when changing diagnostic events, debug draw
   commands, host debug adapters, or instrumentation overhead.
 
@@ -88,8 +91,8 @@ flowchart TD
 | --- | --- |
 | `GravitasWorldContext` | Owns one active `GridWorld` plus all context-local runtime services. |
 | `IMatterAgent` | Host boundary. Supplies context, fixed transform, hierarchy state, and interaction state. |
-| `StiffBody` | Simulated body state: position, rotation, velocity, acceleration, mass, grounding, impulses, sleep/wake state, interpolation, and Chronicler record data. |
-| `StiffBody2D` | Pure 2D body state: X/Z-projected position, scalar rotation, linear velocity, force integration, gravity, sleep/wake state, host agent binding, visualization publishing, and Chronicler record data. |
+| `StiffBody` | Simulated 3D body state: position, rotation, velocity, acceleration, mass, grounding, impulses, sleep/wake state, visual publishing, and Chronicler authoritative-state recording. |
+| `StiffBody2D` | Pure 2D body state: X/Z-projected position, scalar rotation, linear velocity, force integration, gravity, sleep/wake state, host agent binding, visualization publishing, and Chronicler authoritative-state recording. |
 | `LSCollider` | Base collider state: shape, bounds, layer, trigger/contact events, partition coordinates, pair references, and context binding. |
 | `LSCollider2D` | Base pure 2D collider state for circle, axis-aligned box, and convex polygon shapes. |
 | `PhysicsRuntimeMode` | Validated bitmask selecting `TwoD`, `ThreeD`, `Both`, or `Mixed` runtime routing. |
@@ -200,9 +203,10 @@ active-pair queue during `LateSimulate`.
 | Host boundary and bodies | [`IMatterAgent.cs`](../../src/Gravitas/Core/IMatterAgent.cs), [`StiffBody.cs`](../../src/Gravitas/Core/StiffBody.cs), [`StiffBody2D.cs`](../../src/Gravitas/Core/StiffBody2D.cs) |
 | Physics services | [`GravitasPhysicsService.cs`](../../src/Gravitas/Core/GravitasPhysicsService.cs), [`GravitasPhysics2DService.cs`](../../src/Gravitas/Core/GravitasPhysics2DService.cs) |
 | Collision broad phase | [`GravitasCollisionService.cs`](../../src/Gravitas/Core/GravitasCollisionService.cs), [`PhysicsPartition.cs`](../../src/Gravitas/Partitions/PhysicsPartition.cs) |
-| Colliders | [`LSCollider.cs`](../../src/Gravitas/Colliders/LSCollider.cs), [`Primitives`](../../src/Gravitas/Colliders/Primitives), [`Primitives2D`](../../src/Gravitas/Colliders/Primitives2D) |
+| Colliders | [`LSCollider.cs`](../../src/Gravitas/Colliders/Primitives/LSCollider.cs), [`Primitives`](../../src/Gravitas/Colliders/Primitives), [`Primitives2D`](../../src/Gravitas/Colliders/Primitives2D) |
 | Collision handling | [`CollisionPair.cs`](../../src/Gravitas/CollisionHandling/Pairs/CollisionPair.cs), [`CollisionPair2D.cs`](../../src/Gravitas/CollisionHandling/Pairs/CollisionPair2D.cs), [`CollisionDetection.cs`](../../src/Gravitas/CollisionHandling/Detection/CollisionDetection.cs), [`CollisionDetection2D.cs`](../../src/Gravitas/CollisionHandling/Detection/CollisionDetection2D.cs), [`CollisionResponse.cs`](../../src/Gravitas/CollisionHandling/Response/CollisionResponse.cs), [`CollisionResponse2D.cs`](../../src/Gravitas/CollisionHandling/Response/CollisionResponse2D.cs) |
 | 2D/3D direction | [`DIMENSIONS.md`](DIMENSIONS.md) |
+| Serialization and replay | [`SERIALIZATION.md`](SERIALIZATION.md), [`StiffBody.cs`](../../src/Gravitas/Core/StiffBody.cs), [`StiffBody2D.cs`](../../src/Gravitas/Core/StiffBody2D.cs), [`PhysicsSettingsSaver.cs`](../../src/Gravitas/Settings/PhysicsSettingsSaver.cs) |
 | Queries | [`GravitasQuery2DService.cs`](../../src/Gravitas/Queries/GravitasQuery2DService.cs), [`GravitasQuery3DService.Raycast.cs`](../../src/Gravitas/Queries/GravitasQuery3DService.Raycast.cs), [`GravitasQuery3DService.Circle.cs`](../../src/Gravitas/Queries/GravitasQuery3DService.Circle.cs), [`GravitasQueryMixedService.cs`](../../src/Gravitas/Queries/GravitasQueryMixedService.cs), [`QueryDetection2D.cs`](../../src/Gravitas/Queries/QueryDetection2D.cs) |
 | Diagnostics | [`Diagnostics`](../../src/Gravitas/Diagnostics) |
 | Tests and examples | [`tests/Gravitas.Tests`](../../tests/Gravitas.Tests), [`tests/Gravitas.Benchmarks`](../../tests/Gravitas.Benchmarks) |

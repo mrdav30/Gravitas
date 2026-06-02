@@ -44,8 +44,10 @@ Read these in order before making non-trivial changes:
    page for the area being changed:
    [`HOST_INTEGRATION.md`](docs/wiki/HOST_INTEGRATION.md),
    [`RUNTIME_ARCHITECTURE.md`](docs/wiki/RUNTIME_ARCHITECTURE.md),
-   [`COLLISION_PIPELINE.md`](docs/wiki/COLLISION_PIPELINE.md), or
-   [`QUERY_SERVICES.md`](docs/wiki/QUERY_SERVICES.md), or
+   [`COLLISION_PIPELINE.md`](docs/wiki/COLLISION_PIPELINE.md),
+   [`DIMENSIONS.md`](docs/wiki/DIMENSIONS.md),
+   [`QUERY_SERVICES.md`](docs/wiki/QUERY_SERVICES.md),
+   [`SERIALIZATION.md`](docs/wiki/SERIALIZATION.md), or
    [`DIAGNOSTICS.md`](docs/wiki/DIAGNOSTICS.md).
 4. [`src/Gravitas/Runtime/GravitasWorldContext.cs`](src/Gravitas/Runtime/GravitasWorldContext.cs),
    [`src/Gravitas/Core/GravitasPhysicsService.cs`](src/Gravitas/Core/GravitasPhysicsService.cs),
@@ -68,8 +70,8 @@ workflow changes:
 
 - [`README.md`](README.md)
 - [`docs/wiki`](docs/wiki), especially when runtime ownership, host
-  integration, collision behavior, query behavior, lifecycle order, or known
-  prototype limitations change.
+  integration, collision behavior, query behavior, serialization/replay
+  behavior, lifecycle order, or known prototype limitations change.
 - [`tests/Gravitas.Tests`](tests/Gravitas.Tests)
 - [`tests/Gravitas.Benchmarks`](tests/Gravitas.Benchmarks) when performance
   claims or hot paths change.
@@ -91,7 +93,7 @@ workflow changes:
 | [`src/Gravitas/Support`](src/Gravitas/Support) | Fixed transforms, layers, lifecycle hooks, coroutine scaffolding, transient state helpers | Keep engine-specific assumptions out. |
 | [`tests/Gravitas.Tests`](tests/Gravitas.Tests) | xUnit v3 test project | Contains focused runtime/settings coverage; expand it alongside behavior changes. |
 | [`tests/Gravitas.Benchmarks`](tests/Gravitas.Benchmarks) | BenchmarkDotNet project | Covers context lifecycle, registration/partitioning, simulation, queries, and diagnostics. |
-| [`docs/wiki`](docs/wiki) | Developer-facing architecture and usage notes | Keep current with runtime, host integration, collision, query, and diagnostics changes. |
+| [`docs/wiki`](docs/wiki) | Developer-facing architecture and usage notes | Keep current with runtime, host integration, collision, query, serialization/replay, and diagnostics changes. |
 | [`docs/feature-work/prototype`](docs/feature-work/prototype) | Historical/prototype Unity-oriented reference code | Useful context, not the source of truth. |
 
 Ignore generated output when reviewing structure:
@@ -364,12 +366,20 @@ Optimization rules:
 
 ## Serialization Status
 
-Serialization is experimental and incomplete.
+Serialization is experimental and alpha-hardening. Read
+[`docs/wiki/SERIALIZATION.md`](docs/wiki/SERIALIZATION.md) before changing
+`RecordData`, settings snapshots, load defaults, or replay tests.
 
 Current behavior observed in source:
 
 - Runtime body and collider state use explicit Chronicler
   `IRecordable.RecordData(...)` methods.
+- Chronicler populates existing host-created shells. It is not a construct from
+  data object factory.
+- Host bindings, `FixedTransform` object identity, context-local collider IDs,
+  service indices, partition coordinates, pair tables, query buffers,
+  diagnostic buffers, delegates, lifecycle hooks, and visual interpolation
+  buffers are not snapshot identity.
 - Settings and layer helpers currently use MemoryPack attributes directly;
   verify the Lean build when touching them.
 - The project has `Release` and `ReleaseLean` configurations. `ReleaseLean`
@@ -383,9 +393,12 @@ Important rules:
 - Host bindings such as engine objects, renderers, and external transforms should
   remain host-owned. Serialize stable state or explicit links, not framework
   objects.
+- Serialized body/collider values should be authoritative simulation state or
+  shape/filter state required for deterministic continuation. Treat
+  presentation-only data and runtime caches as rebuildable.
 - Keep JSON and MemoryPack behavior aligned when both are supported.
 - If serialized fields, defaults, or load semantics change, add tests that cover
-  save and populate flows.
+  save, populate, and replay-continuation flows.
 - When adding MemoryPack-specific code, ensure the Lean package still compiles.
 
 ## Coding Style And Documentation

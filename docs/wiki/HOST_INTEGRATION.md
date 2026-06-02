@@ -378,8 +378,10 @@ dispose the world.
 
 ## Serialization Boundary
 
-`StiffBody` and `LSCollider` implement Chronicler record methods for state
-transfer into existing host-created objects. Treat serialization as populate
-existing runtime shells, not construct arbitrary engine objects from data.
-Host-specific bindings, renderers, and external transforms should remain
-host-owned.
+`StiffBody`, `StiffBody2D`, `LSCollider`, and `LSCollider2D` implement
+Chronicler record methods for state transfer into existing host-created objects.
+Treat serialization as populate-existing-runtime-shell behavior, not
+construct-from-data behavior.
+
+Read [Serialization And Replay](SERIALIZATION.md) before changing serialized
+fields, load defaults, runtime cache rebuilds, or replay tests.

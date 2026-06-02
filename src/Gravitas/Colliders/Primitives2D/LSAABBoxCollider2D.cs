@@ -1,4 +1,5 @@
 using FixedMathSharp;
+using Chronicler;
 using SwiftCollections;
 using System.Runtime.CompilerServices;
 
@@ -70,5 +71,20 @@ public sealed class LSAABBoxCollider2D : LSCollider2D
     protected override void RebuildShape()
     {
         SetBoundsFromMinMax(Center - _halfExtents, Center + _halfExtents);
+    }
+
+    protected override void RecordShapeData(IChronicler chronicler)
+    {
+        Vector2d size = _size;
+        RecordValues.Look(chronicler, ref size, "Size", Vector2d.One);
+        if (chronicler.Mode == SerializationMode.Loading)
+        {
+            SwiftThrowHelper.ThrowIfArgument(
+                size.x <= Fixed64.Zero || size.y <= Fixed64.Zero,
+                nameof(size),
+                "2D AABB size components must be greater than zero.");
+            _size = size;
+            _halfExtents = size * Fixed64.Half;
+        }
     }
 }

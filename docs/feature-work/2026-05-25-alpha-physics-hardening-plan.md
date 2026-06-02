@@ -23,7 +23,7 @@
 - `src/Gravitas/Runtime/GravitasWorldContext.cs`
 - `src/Gravitas/Core/GravitasPhysicsService.cs`
 - `src/Gravitas/Core/StiffBody.cs`
-- `src/Gravitas/Colliders/LSCollider.cs`
+- `src/Gravitas/Colliders/Primitives/LSCollider.cs`
 - `src/Gravitas/Colliders/Primitives`
 - `src/Gravitas/CollisionHandling`
 - `src/Gravitas/Queries`
@@ -190,7 +190,7 @@ Meaningful deferred work captured from that plan and the wiki:
 
 **Files:**
 
-- Modify: `src/Gravitas/Colliders/LSCollider.cs`
+- Modify: `src/Gravitas/Colliders/Primitives/LSCollider.cs`
 - Modify: `src/Gravitas/Core/StiffBody.cs`
 - Already present: `src/Gravitas/Colliders/Support/ColliderRuntimeShapeState.cs`
 - Create: `src/Gravitas/Colliders/Support/ColliderPartitionState.cs`
@@ -833,7 +833,7 @@ not absorb unresolved concave mesh responsibilities.
 
 - Potentially create: `src/Gravitas/Colliders/Primitives/LSCompoundCollider.cs`
 - Potentially create: `src/Gravitas/Colliders/Support/Compound`
-- Potentially modify: `src/Gravitas/Colliders/LSCollider.cs`
+- Potentially modify: `src/Gravitas/Colliders/Primitives/LSCollider.cs`
 - Potentially modify: `src/Gravitas/CollisionHandling/Detection/CollisionDetection.cs`
 - Potentially modify: `src/Gravitas/Diagnostics`
 - Modify: `tests/Gravitas.Tests/Colliders`
@@ -1041,7 +1041,7 @@ hardening below are complete.
 - Potentially create: `src/Gravitas/Dimensions`
 - Potentially create: `docs/wiki/DIMENSIONS.md`
 - Potentially modify: `src/Gravitas/Core/StiffBody.cs`
-- Potentially modify: `src/Gravitas/Colliders/LSCollider.cs`
+- Potentially modify: `src/Gravitas/Colliders/Primitives/LSCollider.cs`
 - Potentially create: `src/Gravitas/Colliders/Primitives2D`
 - Potentially create or modify: `src/Gravitas/CollisionHandling/Detection`
 - Potentially create or modify: `src/Gravitas/Queries`
@@ -2298,20 +2298,64 @@ decomposes contact impulses into planar X/Z and vertical Y components:
 **Files:**
 
 - Modify: `src/Gravitas/Core/StiffBody.cs`
-- Modify: `src/Gravitas/Colliders/LSCollider.cs`
+- Modify: `src/Gravitas/Core/StiffBody2D.cs`
+- Modify: `src/Gravitas/Colliders/Primitives/LSCollider.cs`
+- Modify: `src/Gravitas/Colliders/Primitives2D`
 - Modify: `src/Gravitas/Settings`
-- Potentially create: `tests/Gravitas.Tests/Serialization`
-- Potentially create: `tests/Gravitas.Tests/Replay`
+- Create: `tests/Gravitas.Tests/Serialization`
+- Create: `docs/wiki/SERIALIZATION.md`
 - Modify: `docs/wiki/HOST_INTEGRATION.md`
 - Modify: `docs/wiki/RUNTIME_ARCHITECTURE.md`
+- Modify: `docs/wiki/OVERVIEW.md`
+- Modify: `AGENTS.md`
+- Modify: `README.md`
 
 **Tasks:**
 
-- [ ] Inventory all authoritative runtime state that must survive populate-existing-instance serialization.
-- [ ] Add round-trip tests for body state, collider state, settings, layer matrices, ground probe settings, and collision/query-relevant state.
-- [ ] Add replay tests that serialize at frame N, populate a fresh host-created shell, continue simulation, and compare against uninterrupted simulation.
-- [ ] Verify `ReleaseLean` when touching MemoryPack-adjacent or conditional serialization code.
-- [ ] Document what Gravitas serializes, what the host must bind externally, and what is intentionally presentation-only.
+- [x] Inventory all authoritative runtime state that must survive populate-existing-instance serialization.
+- [x] Add round-trip tests for body state, collider state, settings, layer matrices, ground probe settings, and collision/query-relevant state.
+- [x] Add replay tests that serialize at frame N, populate a fresh host-created shell, continue simulation, and compare against uninterrupted simulation.
+- [x] Verify `ReleaseLean` when touching MemoryPack-adjacent or conditional serialization code.
+- [x] Document what Gravitas serializes, what the host must bind externally, and what is intentionally presentation-only.
+
+**Phase 11 Result:**
+
+- Clarified the Chronicler contract around populate-existing-runtime-shell
+  restores. Host-created `IMatterAgent`, `FixedTransform`, `GridWorld`,
+  concrete body/collider instances, event subscriptions, and engine objects
+  remain outside serialized payload identity.
+- Removed `FixedTransform`, context-local collider ID, and presentation-only 3D
+  visual interpolation state from body/collider snapshot payloads. Loading a
+  body now publishes restored authoritative position/rotation into the existing
+  host transform and resets visual buffers from that authoritative state.
+- Expanded 3D `StiffBody` replay payloads to include missing authoritative
+  state such as kinematic flag, ground probe mode/radius, skip/last ground
+  probe state, pending torque, impulse store, and position correction.
+- Added Chronicler support for `StiffBody2D` and `LSCollider2D`, including
+  circle, AABB, and convex polygon shape-local record hooks. 2D shape loading
+  validates shape data and rebuilds bounds without waking sleeping bodies.
+- Extended `PhysicsSettingsSaver` JSON/MemoryPack state with runtime mode and
+  mixed 2D half-thickness, while preserving existing frame-rate, layer matrix,
+  ground-check mask, CCD default, and partition-retention values.
+- Added `tests/Gravitas.Tests/Serialization` coverage for JSON and MemoryPack
+  round trips in standard builds, Lean-compatible JSON-only coverage, replay
+  continuation after restore, payload exclusion of host/presentation state,
+  settings saver round trip, and no-wake shape restore behavior.
+- Created `docs/wiki/SERIALIZATION.md` as the canonical serialization/replay
+  guide and linked it from `README.md`, `AGENTS.md`, `docs/wiki/OVERVIEW.md`,
+  `HOST_INTEGRATION.md`, and `RUNTIME_ARCHITECTURE.md`.
+- Verification completed:
+  `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter FullyQualifiedName~Gravitas.Tests.Serialization`
+  passed `12/12`;
+  the focused adjacent settings/body/2D batch passed `106/106`;
+  `dotnet build Gravitas.slnx --configuration Release` passed with `0`
+  warnings/errors;
+  `dotnet test Gravitas.slnx --configuration Release --no-build` passed
+  `373/373`;
+  `dotnet build Gravitas.slnx --configuration ReleaseLean` passed with `0`
+  warnings/errors;
+  `dotnet test Gravitas.slnx --configuration ReleaseLean --no-build` passed
+  `368/368`.
 
 ## Phase 12: Diagnostics Payloads, Host Adapters, And Tooling Samples
 
