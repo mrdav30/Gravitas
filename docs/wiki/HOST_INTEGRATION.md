@@ -227,8 +227,8 @@ Current service order matters:
 - `context.Visualize()` advances interpolation accumulation, updates enabled
   2D and/or 3D body visual transforms, runs the mixed lifecycle path only in
   `Mixed`, then invokes visualize hooks.
-- `context.LateVisualize()` runs enabled 2D and/or 3D late-visualize paths,
-  runs the mixed lifecycle path only in `Mixed`, then invokes context hooks.
+- `context.LateVisualize()` invokes context hooks only. Add built-in late
+  presentation work only when there is a real runtime invariant for it.
 
 Do not assume an engine-style integrate-then-collide order. The current
 prototype checks/distributes collisions during `Simulate` and advances bodies in

@@ -29,8 +29,8 @@ The unit test project now has focused runtime, settings, query, partition, and c
 - Deterministic runtime math through `Fixed64`, `Vector2d`, `Vector3d`, and `FixedQuaternion`.
 - Engine-agnostic host boundary through `IMatterAgent` instead of direct renderer, ECS, or Unity coupling.
 - Grid-backed broad-phase partitioning through `GridForge` `GridWorld`, voxel tracing, `PhysicsPartition`, and `PhysicsPartition2D`.
-- Runtime systems for 3D, pure 2D, and early mixed 2D/3D bodies/colliders, collision pairs, collision detection/response, opt-in CCD, raycasts, circlecasts, pure 2D overlap/raycast queries, and physics settings.
-- Mixed 2D/3D simulation work where 2D bodies are embedded as explicit finite slabs/prisms and constrained to X/Z impulse response.
+- Runtime systems for 3D, pure 2D, and mixed 2D/3D bodies/colliders, collision pairs, collision detection/response, opt-in CCD, raycasts, circlecasts, swept queries, pure 2D overlap/raycast queries, and physics settings.
+- Mixed 2D/3D simulation where 2D bodies are embedded as explicit finite slabs/prisms and constrained to X/Z impulse response.
 
 ## Install
 
@@ -80,7 +80,7 @@ Gravitas is now centered around explicit world-context ownership:
 5. `GravitasPhysics2DService` owns pure 2D registration, pair state, response, and visualization publishing for one context.
 6. `GravitasMixedCollisionService` owns the explicit mixed 2D/3D broad-phase, pair lifecycle, and constrained response path when `PhysicsRuntimeMode.Mixed` is active.
 7. `GravitasCollisionService` and `GravitasCollision2DService` map colliders into GridForge voxels and activate partition payloads for collision checks.
-8. `GravitasQuery2DService`, `GravitasQuery3DService`, and `GravitasCoroutineService` own query and coroutine state per context.
+8. `GravitasQuery2DService`, `GravitasQuery3DService`, `GravitasQueryMixedService`, and `GravitasCoroutineService` own query and coroutine state per context.
 9. `StiffBody` and `StiffBody2D` own simulated body state and Chronicler state recording for their runtime path.
 10. `LSCollider` and `LSCollider2D` primitive collider types own shape data, bounds, layers, trigger/contact events, and GridForge partition coordinates.
 
@@ -138,13 +138,15 @@ The benchmark project includes initial physics hot-path measurements for context
 List available benchmark selections:
 
 ```bash
-dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0 -- list
+dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0
+dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll list
 ```
 
 Run all benchmarks once benchmark classes exist:
 
 ```bash
-dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0 -- all
+dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0
+dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll all
 ```
 
 See the [benchmark README](tests/Gravitas.Benchmarks/README.md) for runner details and benchmark authoring notes.

@@ -6,7 +6,7 @@ type-driven: `StiffBody` and `LSCollider` are the 3D path, while `StiffBody2D`
 and `LSCollider2D` are the pure 2D path.
 
 There is no `PhysicsDimension` enum in the runtime. Concrete body and collider
-types define the simulation domain. Mixed behavior will be a policy between
+types define the simulation domain. Mixed behavior is an explicit policy between
 those concrete types, not a third dimension value.
 
 ## Runtime Mode
@@ -49,9 +49,10 @@ Pure 2D body motion has no `HeightPos`, ground probe, step offset, or grounded
 platform state. Those belong to the current 3D y-up body model.
 
 Dynamic 2D bodies publish their authoritative planar position and yaw rotation
-back to the host `FixedTransform` during `Visualize()` when the context is in
-`PhysicsRuntimeMode.TwoD`. The host transform's vertical `Vector3d.y` value is
-preserved because it is not part of pure 2D physics.
+back to the host `FixedTransform` during `Visualize()` whenever the runtime mode
+runs the pure 2D service (`TwoD`, `Both`, or `Mixed`). The host transform's
+vertical `Vector3d.y` value is preserved because it is not part of pure 2D
+physics.
 
 ## 2D Bodies And Colliders
 
@@ -145,8 +146,8 @@ Pure `Query2D` and `Query3D` stay pure. Mixed CCD uses `QueryMixed` only when
 
 ## Mixed 2D/3D Direction
 
-Phase 10 is the first mixed runtime implementation. The target model is explicit
-rather than Unity-style separate engines:
+Phase 10 added the first mixed runtime implementation. The alpha model is
+explicit rather than Unity-style separate engines:
 
 - `PhysicsRuntimeMode.Both` advances both pure 2D and 3D services without
   cross-dimensional contacts.

@@ -118,20 +118,6 @@ public sealed class GravitasPhysicsService
     }
 
     /// <summary>
-    /// Runs this context's late visualization step for dynamic bodies.
-    /// </summary>
-    public void LateVisualize()
-    {
-        // TODO: we may not need this...
-        int peak = _dynamicBodies.PeakCount;
-        for (int i = 0; i < peak; i++)
-        {
-            if (_dynamicBodies.TryGetValue(i, out StiffBody body))
-                body.LateVisualize();
-        }
-    }
-
-    /// <summary>
     /// Clears all context-local physics registration state.
     /// </summary>
     public void Reset()

@@ -117,12 +117,6 @@ public sealed class GravitasPhysics2DService
             body.OnVisualize();
     }
 
-    public void LateVisualize()
-    {
-        foreach (StiffBody2D body in _dynamicBodies)
-            body.LateVisualize();
-    }
-
     public void Reset()
     {
         _dynamicBodies.Clear();

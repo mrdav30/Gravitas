@@ -289,8 +289,8 @@ the invariant at every call site.
 
 ## Query Hardening Targets
 
-- decide whether swept mesh support belongs in the query service or in a
-  dedicated continuous-collision path.
+- harden mesh-as-source swept query families and richer mesh contact clipping
+  without changing the current mesh-target swept-sphere worker contract.
 - keep query benchmarks allocation-free as result ordering, filters, and shape
   support expand.
 - add shape-specific query tests for every collider type.

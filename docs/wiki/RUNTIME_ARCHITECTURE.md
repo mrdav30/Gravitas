@@ -83,14 +83,6 @@ Visualize
   Hooks.InvokeVisualize
 
 LateVisualize
-  If RuntimeMode includes ThreeD:
-    Physics.LateVisualize
-    StiffBody.LateVisualize for dynamic bodies
-  If RuntimeMode includes TwoD:
-    Physics2D.LateVisualize
-    StiffBody2D.LateVisualize for dynamic 2D bodies
-  If RuntimeMode == Mixed:
-    MixedCollisions.LateVisualize
   Hooks.InvokeLateVisualize
 ```
 
@@ -104,10 +96,12 @@ body state during `Simulate()`, including the pure 2D response service. Body
 force integration, 3D grounding, and post-integration collider refresh happen
 during `LateSimulate()`.
 
-Lifecycle hooks run after the built-in work for their phase. `Visualize()` and
-`LateVisualize()` are presentation phases: they may update visual interpolation
-state, but they must not mutate authoritative position, rotation, velocity,
-partition membership, or collision state.
+Lifecycle hooks run after the built-in work for their phase. `Visualize()` is
+the only built-in presentation phase currently used by bodies and services.
+`LateVisualize()` is hook-only until a real presentation invariant needs that
+phase. Presentation phases may update visual interpolation state, but they must
+not mutate authoritative position, rotation, velocity, partition membership, or
+collision state.
 
 The replay expectation is: the same initial context, settings, world data,
 ordered command sequence, and frame count should produce the same authoritative

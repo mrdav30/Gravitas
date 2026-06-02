@@ -324,19 +324,11 @@ public sealed class GravitasWorldContext : IDisposable
     }
 
     /// <summary>
-    /// Runs this context's late-visualization step.
+    /// Runs this context's host-owned late-visualization hook phase.
     /// </summary>
     public void LateVisualize()
     {
         ThrowIfDisposed();
-        PhysicsRuntimeMode runtimeMode = Settings.RuntimeMode;
-        if (runtimeMode.Runs3D())
-            Physics.LateVisualize();
-        if (runtimeMode.Runs2D())
-            Physics2D.LateVisualize();
-        if (runtimeMode.RunsMixedContacts())
-            MixedCollisions.LateVisualize();
-
         _hooks.InvokeLateVisualize();
     }
 

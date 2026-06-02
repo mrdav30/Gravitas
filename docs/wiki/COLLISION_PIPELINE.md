@@ -313,11 +313,12 @@ preserving tangential velocity for later discrete response work.
 
 Accepted CCD targets are non-trigger bodyless colliders, immovable bodies, and
 kinematic bodies whose layers are allowed by the context collision matrix and
-whose hierarchy is not excluded. Ordinary dynamic-vs-dynamic CCD is
-intentionally deferred; it needs relative-velocity TOI ordering, pair
-tie-breakers, and replay tests before it becomes part of the alpha contract.
-Mesh targets are also excluded from swept-sphere CCD until Phase 7 defines the
-mesh alpha policy.
+whose hierarchy is not excluded. Static or kinematic mesh and compound targets
+are covered by the swept-sphere query worker. Moving mesh bodies still have no
+dedicated CCD source proxy; moving compound bodies use the conservative
+aggregate proxy. Ordinary dynamic-vs-dynamic CCD is intentionally deferred; it
+needs relative-velocity TOI ordering, pair tie-breakers, and replay tests before
+it becomes part of the alpha contract.
 
 ## Active Partitions
 
@@ -582,7 +583,7 @@ Response units and invariants:
 
 This is still the first alpha milestone, not a full response engine. Static
 friction for resting stacks, dynamic-vs-dynamic CCD, full iterative warm-start
-application, explicit island solving, and 2D/3D mixed-dimension exchange rules
+application, explicit island solving, and richer mixed-dimension solver behavior
 remain future work.
 
 ## Body Sleep And Wake

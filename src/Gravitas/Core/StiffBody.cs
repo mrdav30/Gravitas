@@ -23,9 +23,8 @@ public class StiffBody : IRecordable
 
     public bool Immovable = false;
 
-    // Controls whether physics affects the rigidbody
-    // If enabled, transform is controlled by animation or script
-    // Position & Rotation updated in LateVisualize to account for animation movement
+    // Controls whether physics affects the rigidbody.
+    // If enabled, transform is controlled by animation or script.
     public bool IsKinematic = false;
 
     private ContinuousCollisionMode _continuousCollisionMode = ContinuousCollisionMode.Inherit;
@@ -1272,8 +1271,6 @@ public class StiffBody : IRecordable
 
         return FixedMath.Clamp01(Context.DeltaTime * _rotationInterpoleSpeed * _rotationSpeed);
     }
-
-    public void LateVisualize() { }
 
     public void Deactivate()
     {

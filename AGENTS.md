@@ -175,7 +175,7 @@ test harness, or another simulation runner.
 | `Simulate` | Fixed-rate simulation step | Perform authoritative deterministic mutation only here or in `LateSimulate`. |
 | `LateSimulate` | End of the same fixed-rate step | Process deterministic deferred queues, pair cleanup, body late simulation, and post-step bookkeeping. |
 | `Visualize` | Render/update frame | Interpolate or publish presentation state. Do not mutate authoritative simulation state. |
-| `LateVisualize` | Late render/update frame | Finish presentation-only work after host transforms/animation have run. |
+| `LateVisualize` | Late render/update frame | Currently hook-only; add built-in presentation work only for a real runtime invariant. |
 | `UpdateGUI` | Host UI/debug draw pass | Keep this outside core physics unless it is diagnostics-only and non-authoritative. |
 | `Deactivate` | Session end, object disable, or object pooling | Release registrations and pooled runtime state so the object/context can be reused or disposed. |
 | `Quit` | Application shutdown | Host concern. Core physics should not require application-lifetime callbacks for correctness. |
@@ -200,8 +200,9 @@ broad phase emits deterministic candidate keys through `PhysicsMixedPartition`;
 colliders against embedded 2D circle, AABB, and convex polygon slabs.
 `CollisionPairMixed` and `CollisionResponseMixed` now provide the first
 constrained impulse model: planar X/Z impulse can move 2D bodies, while vertical
-Y impulse affects only the 3D participant. Mixed diagnostics, mixed queries, and
-CCD remain later Phase 10 work.
+Y impulse affects only the 3D participant. Mixed diagnostics, explicit mixed
+queries, slab debug draw, and mixed CCD hooks are implemented; richer solver
+behavior remains future hardening work.
 
 When adding or redesigning dimension-sensitive behavior:
 
@@ -459,14 +460,22 @@ lifecycle, registration/partitioning, simulation, and query services.
 List available benchmark selections:
 
 ```bash
-dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0 -- list
+dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0
+dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll list
 ```
 
 Run all benchmarks once meaningful benchmark classes exist:
 
 ```bash
-dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0 -- all
+dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0
+dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll all
 ```
+
+On Linux/WSL, prefer running the compiled benchmark DLL through the configured
+`dotnet` host instead of `dotnet run`. `dotnet run` can execute a generated
+apphost that does not inherit capabilities such as `cap_sys_nice`, causing
+BenchmarkDotNet to warn that it cannot raise process priority even when the
+`dotnet` binary itself is configured correctly.
 
 For optimization work, capture a baseline before changing the algorithm and
 compare the same benchmark after the change. Do not treat short-run benchmark

@@ -162,8 +162,8 @@ active-pair queue during `LateSimulate`.
   query, and simple deterministic response coverage.
 - `StiffBody` has a split 2D ground position plus height for the existing 3D
   y-up model, but that is not the pure 2D body model.
-- Mixed 2D/3D interaction is the Phase 10 implementation target. The runtime
-  now has a `Mixed` lifecycle path and 2D colliders cache finite 3D embedding
+- Mixed 2D/3D interaction now has a first alpha implementation. The runtime has
+  a `Mixed` lifecycle path and 2D colliders cache finite 3D embedding
   bounds from `PhysicsSettings.Mixed2DHalfThickness`,
   `MixedHalfThicknessOverride`, and the host transform's Y position. Mixed
   broad phase now gathers deterministic GridForge-backed 3D/2D candidate keys,
@@ -184,7 +184,7 @@ active-pair queue during `LateSimulate`.
 - Collision response is still an alpha-hardening target. The current manifold
   solver handles deterministic normal and friction impulses, but static resting
   friction, true warm-start impulse application, explicit island solving,
-  dynamic-vs-dynamic CCD, and richer mixed-dimension solver behavior remain
+  dynamic-vs-dynamic CCD, and richer mixed solver behavior remain
   future work.
 - Query services use context-owned mutable buffers. Treat them as same-thread,
   fixed-loop services unless they are redesigned for reentrancy.

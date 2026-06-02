@@ -67,8 +67,6 @@ internal sealed class GravitasMixedCollisionService
 
     internal int VisualizeCount { get; private set; }
 
-    internal int LateVisualizeCount { get; private set; }
-
     internal MixedColliderKey GetCandidate(int index) => _candidatePairs[index];
 
     internal void Simulate()
@@ -118,11 +116,6 @@ internal sealed class GravitasMixedCollisionService
         VisualizeCount++;
     }
 
-    internal void LateVisualize()
-    {
-        LateVisualizeCount++;
-    }
-
     internal void Reset()
     {
         ClearRetainedPartitions();
@@ -150,7 +143,6 @@ internal sealed class GravitasMixedCollisionService
         SimulateCount = 0;
         LateSimulateCount = 0;
         VisualizeCount = 0;
-        LateVisualizeCount = 0;
         _retainedPartitionRetirementCursor = 0;
     }
 

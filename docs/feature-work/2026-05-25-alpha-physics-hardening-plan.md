@@ -115,9 +115,12 @@ Meaningful deferred work captured from that plan and the wiki:
   `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~PhysicsPartitionPerformanceShapeTests|FullyQualifiedName~QueryService|FullyQualifiedName~Raycast|FullyQualifiedName~Circle"`
   passed with 21 tests.
 - Benchmark smoke command:
-  `dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0 -- simulation-allocation query-service collision-detection collision-response partition-culling diagnostics --filter "*" -j Short -i --exporters json`
-  completed 24 benchmarks. BenchmarkDotNet could not raise process priority in
-  this sandbox, so treat timings as local smoke evidence only.
+  `dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0`
+  followed by
+  `dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll simulation-allocation query-service collision-detection collision-response partition-culling diagnostics --filter "*" -j Short -i --exporters json`
+  is the current runner pattern. The original Phase 0 smoke completed 24
+  benchmarks before the runner fix; future runs should build first and execute
+  `Gravitas.Benchmarks.dll` through the capped `dotnet` host.
 
 **Phase 0 Allocation Notes**
 
@@ -418,9 +421,9 @@ Meaningful deferred work captured from that plan and the wiki:
   contact retention, repeated contact ordering, and warm-start storage/reset.
 - Added `DistributeSleepingOnlyDynamicPartition` to the partition-culling
   benchmarks to watch the no-awake-dynamic branch. Short local smoke reported
-  about `6.24 ns` mean and no managed allocation for 64 sleeping dynamic IDs;
-  BenchmarkDotNet could not raise process priority in this sandbox, so treat
-  timing as smoke evidence only.
+  about `6.24 ns` mean and no managed allocation for 64 sleeping dynamic IDs.
+  The older smoke used `dotnet run`; future runs should use the built benchmark
+  DLL through the capped `dotnet` host for priority elevation.
 - Updated `docs/wiki/COLLISION_PIPELINE.md`,
   `docs/wiki/RUNTIME_ARCHITECTURE.md`, and `docs/wiki/OVERVIEW.md` with the
   sleep/awake partition and warm-start storage behavior.
@@ -488,6 +491,24 @@ Meaningful deferred work captured from that plan and the wiki:
   storing or deriving mesh normals for contact generation. It should not drive
   Phase 6 CCD except as a reminder that physics normals must be deterministic
   geometry data, not renderer smoothing data.
+
+**Phase 6 Result:**
+
+- CCD now lives in `StiffBody` movement commit as an explicit body/context
+  policy. `PhysicsSettings.DefaultContinuousCollisionMode` defaults to
+  `Discrete`, while `StiffBody.ContinuousCollisionMode` defaults to `Inherit`.
+  `Inherit` resolves through the precomputed top-parent body policy before
+  falling back to the context default.
+- `Continuous` always sweeps when displacement and proxy radius are valid.
+  `Auto` sweeps when intended frame displacement exceeds the collider proxy
+  radius.
+- The alpha path uses a swept-sphere proxy for sphere, capsule, cuboid, and
+  cylinder movers against non-trigger bodyless, immovable, or kinematic targets.
+  It clamps to the earliest deterministic TOI and removes only closing normal
+  velocity.
+- Dynamic-vs-dynamic CCD and swept mesh targets remain intentionally deferred.
+  They belong with relative-velocity ordering, deterministic TOI tie-breakers,
+  and Phase 7 mesh policy work.
 
 ## Phase 7A: Mesh Collider Alpha Policy And Local-Space BVH
 
@@ -1552,8 +1573,9 @@ first-class 2D raycast query.
 
 **Phase 9H Status - 2026-05-29**
 
-- `GravitasWorldContext.Visualize()` and `LateVisualize()` now call the pure 2D
-  service only when `PhysicsRuntimeMode.TwoD` is active.
+- `GravitasWorldContext.Visualize()` now calls the pure 2D service only when
+  `PhysicsRuntimeMode.TwoD` is active. `LateVisualize()` is now a hook-only host
+  phase until a real built-in presentation invariant needs it.
 - `StiffBody2D.OnVisualize()` projects authoritative 2D X/Z position and yaw
   rotation back into the host `FixedTransform` while preserving host vertical
   height.
@@ -1659,9 +1681,10 @@ collision semantics.
   consolidated query domain.
 - Verified with focused query/regression tests, full `Release` tests, full
   `ReleaseLean` tests, `git diff --check`, and a short `physics-2d` plus
-  `query-service` benchmark smoke. BenchmarkDotNet still reports the
-  environment's priority-elevation warning even after the attempted
-  `cap_sys_nice` fix, but all 21 benchmark cases executed and exported.
+  `query-service` benchmark smoke. That older smoke used `dotnet run`, which
+  launches an uncapped apphost; future runs should use the built benchmark DLL
+  through the capped `dotnet` host. All 21 benchmark cases executed and
+  exported.
 
 ## Phase 9J: 2D Collider State And Dispatch Parity
 
@@ -2034,12 +2057,12 @@ decomposes contact impulses into planar X/Z and vertical Y components:
   normals, penetration/correction, and constrained impulse components. Debug
   draw should show the 2D slab/prism used for mixed collision, not just the pure
   2D outline.
-- [ ] **Phase 10F - Documentation and hardening:** Update wiki pages with the
+- [x] **Phase 10F - Documentation and hardening:** Update wiki pages with the
   mixed runtime mode, embedding rule, constrained impulse model, supported shape
   matrix, unsupported combinations, query/CCD contract, and host integration
   guidance. Add benchmark notes and follow-up actions for any shape pair or
   solver behavior that remains too expensive or physically weak for alpha.
-- [ ] **Phase 10F - Verification:** Run focused mixed-dimension tests, focused
+- [x] **Phase 10F - Verification:** Run focused mixed-dimension tests, focused
   2D and 3D regression tests, full `Release`, full `ReleaseLean`, mixed
   benchmark smoke, and `git diff --check`.
 
@@ -2099,24 +2122,6 @@ decomposes contact impulses into planar X/Z and vertical Y components:
   hit surface.
 
 **Phase Results:**
-
-**Phase 6 Result:**
-
-- CCD now lives in `StiffBody` movement commit as an explicit body/context
-  policy. `PhysicsSettings.DefaultContinuousCollisionMode` defaults to
-  `Discrete`, while `StiffBody.ContinuousCollisionMode` defaults to `Inherit`.
-  `Inherit` resolves through the precomputed top-parent body policy before
-  falling back to the context default.
-- `Continuous` always sweeps when displacement and proxy radius are valid.
-  `Auto` sweeps when intended frame displacement exceeds the collider proxy
-  radius.
-- The alpha path uses a swept-sphere proxy for sphere, capsule, cuboid, and
-  cylinder movers against non-trigger bodyless, immovable, or kinematic targets.
-  It clamps to the earliest deterministic TOI and removes only closing normal
-  velocity.
-- Dynamic-vs-dynamic CCD and swept mesh targets remain intentionally deferred.
-  They belong with relative-velocity ordering, deterministic TOI tie-breakers,
-  and Phase 7 mesh policy work.
 
 **Phase 10A Result:**
 
@@ -2245,9 +2250,46 @@ decomposes contact impulses into planar X/Z and vertical Y components:
   Diagnostics and the 64-collider swept-sphere query smoke reported `0 B/op`;
   mixed broad-phase still reports the existing dense-scene managed allocation
   profile.
-  BenchmarkDotNet still could not raise process priority even though
-  `/home/davido/.dotnet/dotnet` has `cap_sys_nice=eip`, so treat short-run
-  timings as local smoke evidence only.
+  Follow-up investigation found the priority warning came from `dotnet run`
+  launching an apphost without the `cap_sys_nice` capability. Future benchmark
+  runs should use the built DLL through `/home/davido/.dotnet/dotnet`.
+
+**Phase 10F Result:**
+
+- Reviewed the full Phase 10 change range (`cea6dc2^..b4e148f`) against the
+  final mixed 2D/3D runtime model. The retained architecture remains a
+  dedicated mixed service plus explicit mixed query surface, not hidden
+  conditionals layered through the pure 2D and 3D services.
+- Updated `AGENTS.md`, `README.md`, and the wiki pages to describe the current
+  mixed alpha contract: `Both` runs pure 2D and pure 3D independently, `Mixed`
+  enables GridForge-backed mixed broad phase, embedded 2D slabs/prisms,
+  constrained response, explicit mixed sweeps, mixed CCD hooks, diagnostics,
+  and slab debug draw.
+- Removed stale docs claiming mixed diagnostics/query/CCD were still later
+  Phase 10 work, clarified that static/kinematic mesh and compound CCD targets
+  are now swept-sphere-worker targets, and kept moving mesh source CCD plus
+  dynamic-vs-dynamic CCD documented as future hardening.
+- Removed the no-op body/service `LateVisualize` paths. The context
+  `LateVisualize()` phase remains as a host hook boundary only.
+- Reviewed a possible dense mixed broad-phase optimization that would skip
+  duplicate awake dynamic/dynamic candidate attempts earlier in
+  `PhysicsMixedPartition.Distribute(...)`. Short BenchmarkDotNet comparison
+  made it worse in this environment, so the change was not retained. Baseline
+  dense smoke was approximately `1.724 ms`, `74.440 ms`, and `211.589 ms` for
+  64, 1024, and 4096 colliders; the attempted branch/set-check variant reported
+  approximately `2.092 ms`, `93.492 ms`, and `229.290 ms`.
+- Verification passed: focused mixed-dimension tests `53/53`, focused
+  2D/query/CCD/runtime regression tests `120/120`, full `Release` build with
+  `0` warnings and `0` errors, full `Release` tests `360/360`, full
+  `ReleaseLean` build with `0` warnings and `0` errors, full `ReleaseLean`
+  tests `360/360`, and `git diff --check`.
+- Current mixed broad-phase benchmark smoke passed for
+  `SparseCandidateGathering` at 64, 1024, and 4096 colliders. The short run
+  reported roughly `999 us / 64 B`, `76.860 ms / 201 B`, and
+  `761.054 ms / 64 B`. Follow-up investigation found that `dotnet run`
+  launched a generated apphost without the `cap_sys_nice` capability; building
+  first and running `Gravitas.Benchmarks.dll` through the capped `dotnet` host
+  avoids the BenchmarkDotNet priority warning.
 
 ## Phase 11: Serialization, Snapshots, And Deterministic Replay
 

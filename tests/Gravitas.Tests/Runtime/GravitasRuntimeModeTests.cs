@@ -4,6 +4,7 @@ using Gravitas.Colliders;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
 using System;
+using System.Reflection;
 using Xunit;
 
 namespace Gravitas.Tests.Runtime;
@@ -103,14 +104,38 @@ public sealed class GravitasRuntimeModeTests
         scenario.Context.MixedCollisions.SimulateCount.Should().Be(1);
         scenario.Context.MixedCollisions.LateSimulateCount.Should().Be(1);
         scenario.Context.MixedCollisions.VisualizeCount.Should().Be(1);
-        scenario.Context.MixedCollisions.LateVisualizeCount.Should().Be(1);
 
         scenario.Context.Reset();
 
         scenario.Context.MixedCollisions.SimulateCount.Should().Be(0);
         scenario.Context.MixedCollisions.LateSimulateCount.Should().Be(0);
         scenario.Context.MixedCollisions.VisualizeCount.Should().Be(0);
-        scenario.Context.MixedCollisions.LateVisualizeCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void LateVisualize_ShouldRemainContextHookOnly()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        int lateVisualizeHooks = 0;
+        using IDisposable hook = scenario.Context.RegisterOnLateVisualize(
+            "RuntimeMode.LateVisualize",
+            0,
+            () => lateVisualizeHooks++);
+
+        scenario.Context.LateVisualize();
+
+        lateVisualizeHooks.Should().Be(1);
+        typeof(GravitasPhysicsService).GetMethod("LateVisualize").Should().BeNull();
+        typeof(GravitasPhysics2DService).GetMethod("LateVisualize").Should().BeNull();
+        typeof(StiffBody).GetMethod("LateVisualize").Should().BeNull();
+        typeof(StiffBody2D)
+            .GetMethod("LateVisualize", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+            .Should()
+            .BeNull();
+        typeof(GravitasMixedCollisionService)
+            .GetMethod("LateVisualize", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+            .Should()
+            .BeNull();
     }
 
     [Fact]

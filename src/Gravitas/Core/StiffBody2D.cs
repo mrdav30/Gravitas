@@ -212,8 +212,6 @@ public sealed class StiffBody2D : IRecordable
             Fixed64.Zero);
     }
 
-    internal void LateVisualize() { }
-
     private void UpdateKinematicPositionAndRotation()
     {
         Vector2d kinematicPosition = Agent.Transform.Position.ToVector2d();

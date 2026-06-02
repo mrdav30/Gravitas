@@ -13,16 +13,28 @@ Avoid measuring `Debug` builds except when diagnosing benchmark setup failures.
 
 ## Running
 
+Build the benchmark runner first, then execute the compiled DLL through the
+configured `dotnet` host:
+
+```bash
+dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0
+```
+
+On Linux/WSL this avoids `dotnet run` launching a generated apphost that does
+not inherit capabilities such as `cap_sys_nice`. When the `dotnet` host is
+configured for elevated process priority, run the built DLL so BenchmarkDotNet
+can use that capability.
+
 ### List available benchmark selections
 
 ```bash
-dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0 -- list
+dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll list
 ```
 
 ### Run all benchmarks
 
 ```bash
-dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0 -- all
+dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll all
 ```
 
 ### Run a selection by alias
@@ -32,13 +44,13 @@ Aliases are derived from benchmark class names. `Benchmarks` or `Benchmark` is s
 For a class named `CollisionDetectionBenchmarks`, the selection alias is `collision-detection`:
 
 ```bash
-dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0 -- collision-detection
+dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll collision-detection
 ```
 
 Multiple aliases can run together:
 
 ```bash
-dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0 -- collision-detection partitioning
+dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll collision-detection partitioning
 ```
 
 ### Forward BenchmarkDotNet arguments
@@ -46,8 +58,8 @@ dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Rel
 Arguments after the selection are forwarded to BenchmarkDotNet:
 
 ```bash
-dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0 -- all --list flat
-dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0 -- collision-detection --filter "*Sphere*"
+dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll all --list flat
+dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll collision-detection --filter "*Sphere*"
 ```
 
 ### Fast development check
@@ -55,7 +67,7 @@ dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Rel
 Use BenchmarkDotNet's short in-process job for quick local smoke runs. This verifies benchmark code compiles and produces plausible output without a full run:
 
 ```bash
-dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0 -- all -j Short -i
+dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll all -j Short -i
 ```
 
 Do not treat short-run numbers as canonical measurements.
@@ -96,7 +108,7 @@ Keep support helpers physics-specific. Remove copied template helpers when they 
 Before starting optimization work, capture a baseline:
 
 ```bash
-dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0 -- all --exporters json
+dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll all --exporters json
 ```
 
 BenchmarkDotNet writes results to `BenchmarkDotNet.Artifacts/results/` by default. Archive the JSON or markdown reports before changing algorithms so regressions can be compared against known results.
@@ -106,7 +118,7 @@ BenchmarkDotNet writes results to `BenchmarkDotNet.Artifacts/results/` by defaul
 For quick allocation checks around the current steady-state hot paths, run:
 
 ```bash
-dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0 -- query-service simulation-allocation continuous-collision collision-detection collision-response partition-culling diagnostics physics-2d mixed-broad-phase --filter "*" -j Short -i --exporters json
+dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll query-service simulation-allocation continuous-collision collision-detection collision-response partition-culling diagnostics physics-2d mixed-broad-phase --filter "*" -j Short -i --exporters json
 ```
 
 The short in-process job is not canonical timing evidence, but it is useful for
@@ -131,7 +143,7 @@ to add or tighten explicit allocation tests before changing the algorithm.
 Collider shape work has a focused selection:
 
 ```bash
-dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0 -- collider-shape --filter "*" -j Short -i --exporters json
+dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll collider-shape --filter "*" -j Short -i --exporters json
 ```
 
 ## CI Guidance
