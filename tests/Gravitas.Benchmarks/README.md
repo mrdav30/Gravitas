@@ -89,7 +89,7 @@ Start with hot paths that can be isolated and repeated deterministically:
 - `GravitasQuery2DService` and `GravitasQuery3DService` query gathering, filtering, and result ordering.
 - Mesh collider preprocessing and convex mesh limits.
 - Pooling and allocation behavior for collision pairs, partitions, and temporary collections.
-- Diagnostics disabled overhead and enabled capture cost for event hooks and debug draw commands.
+- Diagnostics disabled overhead and enabled capture cost for event hooks, primitive debug draw commands, and mesh-heavy debug draw capture.
 
 ## Authoring Guidelines
 
@@ -136,7 +136,7 @@ to add or tighten explicit allocation tests before changing the algorithm.
 | `continuous-collision` | Discrete fast body movement baseline and opt-in CCD sweep/clamp against thin static geometry. |
 | `collision-detection` | prepared primitive pairs, non-SAT primitive pairs, primitive manifold generation, cuboid face-manifold generation, cuboid SAT, mesh/cylinder, mesh/cuboid, mesh/mesh, and compound/primitive checks. |
 | `collision-response` | manifold response solver cost across single-contact and face-manifold cases, with pair-count scaling. |
-| `diagnostics` | Disabled/enabled force and torque event hooks plus disabled/enabled collider debug draw capture. |
+| `diagnostics` | Disabled/enabled force and torque event hooks plus disabled/enabled primitive and mesh collider debug draw capture. |
 | `partition-culling` | dynamic collider repartitioning after teleports, direct partition add/remove churn, and culled-pair invalidation after movement. |
 | `physics-2d` | pure 2D body integration, GridForge-backed 2D partition response, sweep baseline comparisons, required 2D shape-pair checks, `OverlapCircleAll`, and `RaycastAll`. |
 

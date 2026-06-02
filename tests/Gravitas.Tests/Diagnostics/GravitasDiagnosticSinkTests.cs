@@ -92,6 +92,77 @@ public sealed class GravitasDiagnosticSinkTests
     }
 
     [Fact]
+    public void ClearAndDisable_ShouldResetSequencesAndRetainReservedCapacity()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> sphere = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
+
+        scenario.Context.Diagnostics.Enable(eventCapacity: 4, drawCommandCapacity: 4);
+        int eventCapacity = scenario.Context.Diagnostics.EventCapacity;
+        int drawCapacity = scenario.Context.Diagnostics.DrawCommandCapacity;
+
+        sphere.Body.AddForce(new Vector3d(Fixed64.One, Fixed64.Zero, Fixed64.Zero));
+        scenario.Context.Diagnostics.CaptureCollider(sphere.Collider, GravitasDiagnosticColor.Cyan);
+        scenario.Context.Diagnostics.Clear();
+
+        scenario.Context.Diagnostics.EventCount.Should().Be(0);
+        scenario.Context.Diagnostics.DrawCommandCount.Should().Be(0);
+        scenario.Context.Diagnostics.EventCapacity.Should().Be(eventCapacity);
+        scenario.Context.Diagnostics.DrawCommandCapacity.Should().Be(drawCapacity);
+
+        sphere.Body.AddTorque(new Vector3d(Fixed64.Zero, Fixed64.One, Fixed64.Zero));
+        scenario.Context.Diagnostics.CaptureLine(Vector3d.Zero, Vector3d.Right, GravitasDiagnosticColor.Yellow);
+
+        scenario.Context.Diagnostics.Events[0].Sequence.Should().Be(0);
+        scenario.Context.Diagnostics.DrawCommands[0].Sequence.Should().Be(0);
+
+        scenario.Context.Diagnostics.Disable();
+
+        scenario.Context.Diagnostics.Enabled.Should().BeFalse();
+        scenario.Context.Diagnostics.EventCount.Should().Be(0);
+        scenario.Context.Diagnostics.DrawCommandCount.Should().Be(0);
+        scenario.Context.Diagnostics.EventCapacity.Should().Be(eventCapacity);
+        scenario.Context.Diagnostics.DrawCommandCapacity.Should().Be(drawCapacity);
+
+        sphere.Body.AddForce(new Vector3d(Fixed64.One, Fixed64.Zero, Fixed64.Zero));
+        scenario.Context.Diagnostics.CaptureCollider(sphere.Collider, GravitasDiagnosticColor.Cyan);
+
+        scenario.Context.Diagnostics.EventCount.Should().Be(0);
+        scenario.Context.Diagnostics.DrawCommandCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void Diagnostics_ShouldCaptureCurrentContextFrameAndResetPerBufferSequences()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> sphere = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
+
+        scenario.Context.Diagnostics.Enable(eventCapacity: 4, drawCommandCapacity: 4);
+        scenario.Context.Simulate();
+        int firstFrame = scenario.Context.FrameCount;
+
+        sphere.Body.AddForce(new Vector3d(Fixed64.One, Fixed64.Zero, Fixed64.Zero));
+        scenario.Context.Diagnostics.CapturePoint(Vector3d.Zero, Fixed64.Half, GravitasDiagnosticColor.Red);
+
+        scenario.Context.Diagnostics.Events[0].Frame.Should().Be(firstFrame);
+        scenario.Context.Diagnostics.Events[0].Sequence.Should().Be(0);
+        scenario.Context.Diagnostics.DrawCommands[0].Frame.Should().Be(firstFrame);
+        scenario.Context.Diagnostics.DrawCommands[0].Sequence.Should().Be(0);
+
+        scenario.Context.Diagnostics.Clear();
+        scenario.Context.Simulate();
+        int secondFrame = scenario.Context.FrameCount;
+
+        sphere.Body.AddTorque(new Vector3d(Fixed64.Zero, Fixed64.One, Fixed64.Zero));
+        scenario.Context.Diagnostics.CaptureLine(Vector3d.Zero, Vector3d.Right, GravitasDiagnosticColor.Yellow);
+
+        scenario.Context.Diagnostics.Events[0].Frame.Should().Be(secondFrame);
+        scenario.Context.Diagnostics.Events[0].Sequence.Should().Be(0);
+        scenario.Context.Diagnostics.DrawCommands[0].Frame.Should().Be(secondFrame);
+        scenario.Context.Diagnostics.DrawCommands[0].Sequence.Should().Be(0);
+    }
+
+    [Fact]
     public void CaptureCollider_ShouldEmitEngineAgnosticDrawCommands()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
@@ -160,6 +231,31 @@ public sealed class GravitasDiagnosticSinkTests
         commands[9].Radius.Should().Be(Fixed64.Half);
     }
 
+    [Fact]
+    public void CaptureCollider_ShouldEmitOneWireTrianglePerHighVolumeMeshTriangle()
+    {
+        const int quadCount = 128;
+        int expectedTriangles = quadCount * 2;
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSMeshCollider mesh = CreateStripMesh(quadCount);
+        scenario.InitializeStaticCollider(mesh, PhysicsScenarioBuilder.Vector(0, 0, 0));
+
+        scenario.Context.Diagnostics.Enable(eventCapacity: 0, drawCommandCapacity: expectedTriangles);
+        scenario.Context.Diagnostics.CaptureCollider(mesh, GravitasDiagnosticColor.White);
+
+        ReadOnlySpan<GravitasDebugDrawCommand> commands = scenario.Context.Diagnostics.DrawCommands;
+        commands.Length.Should().Be(expectedTriangles);
+        scenario.Context.Diagnostics.DrawCommandCapacity.Should().BeGreaterThanOrEqualTo(expectedTriangles);
+
+        for (int i = 0; i < commands.Length; i++)
+        {
+            commands[i].Kind.Should().Be(GravitasDebugDrawKind.WireTriangle);
+            commands[i].Sequence.Should().Be(i);
+            commands[i].ColliderId.Should().Be(mesh.Id);
+            commands[i].ColliderType.Should().Be(ColliderType.Mesh);
+        }
+    }
+
     private static long MeasureAllocatedBytes(Action action)
     {
         action();
@@ -181,5 +277,31 @@ public sealed class GravitasDiagnosticSinkTests
                 new Vector3d(Fixed64.Zero, Fixed64.Zero, Fixed64.One)
             },
             new[] { 0, 1, 2 });
+    }
+
+    private static LSMeshCollider CreateStripMesh(int quadCount)
+    {
+        var vertices = new Vector3d[(quadCount + 1) * 2];
+        var triangles = new int[quadCount * 6];
+
+        for (int i = 0; i <= quadCount; i++)
+        {
+            vertices[i * 2] = new Vector3d((Fixed64)i, Fixed64.Zero, Fixed64.Zero);
+            vertices[i * 2 + 1] = new Vector3d((Fixed64)i, Fixed64.Zero, Fixed64.One);
+        }
+
+        for (int i = 0; i < quadCount; i++)
+        {
+            int vertex = i * 2;
+            int triangle = i * 6;
+            triangles[triangle] = vertex;
+            triangles[triangle + 1] = vertex + 1;
+            triangles[triangle + 2] = vertex + 2;
+            triangles[triangle + 3] = vertex + 2;
+            triangles[triangle + 4] = vertex + 1;
+            triangles[triangle + 5] = vertex + 3;
+        }
+
+        return new LSMeshCollider(vertices, triangles);
     }
 }

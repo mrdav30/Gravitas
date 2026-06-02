@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+**Status:** Done
+
 **Goal:** Turn the post-backlog prototype into an alpha-ready deterministic physics foundation with stronger simulation contracts, solver behavior, mesh/query policy, dimensional modeling, and replay confidence.
 
 **Architecture:** Work from simulation invariants outward. First lock down frame ordering, replay baselines, and measurement gates; then simplify ownership seams; then harden contact generation, response, CCD, mesh policy, queries, dimensions, serialization, and diagnostics. Each phase should leave source comments clean, `docs/wiki/` current, focused tests in place, and benchmark evidence for any hot-path or algorithmic change.
@@ -787,28 +789,30 @@ not become the escape hatch for concave mesh support.
 
 **Mesh Decomposition Backlog:**
 
-These are retained for context, but they are not Phase 7B completion work and
-should not be treated as required before Phase 7C. The current local-BVH
-triangle-set implementation is the alpha baseline until evidence says
-otherwise.
+These were retained for context, but they were not Phase 7B completion work and
+should not be treated as required before Phase 7C. They are now captured in
+`docs/feature-work/2026-06-01-alpha-physics-follow-up-hardening-plan.md`. The
+current local-BVH triangle-set implementation is the alpha baseline until
+evidence says otherwise.
 
-- [ ] Evaluate host/offline decomposed convex-piece support as an optional
+- [x] Move host/offline decomposed convex-piece support to the follow-up plan as
+  an optional
   `LSMeshCollider` data path only if benchmarks show the raw triangle path is
   too expensive for representative dense or contact-heavy concave meshes, or if
   closed-volume mass/inertia/manifold work needs convex chunks. The owning mesh
   must still present one collider ID, one body binding, one event surface, and
   one broad-phase identity. This must not be implemented as `LSCompoundCollider`
   or as internal collider identity leakage.
-- [ ] Evaluate Gravitas-owned deterministic convex decomposition as R&D only if
-  Gravitas needs an engine-agnostic asset-prep path. Any implementation must be
-  explicit preprocessing, not implicit runtime mutation; it needs deterministic
-  ordering, deterministic tie-breakers, bounded failure/result codes,
-  pathological mesh tests, and benchmarks against the raw local-BVH triangle
-  path before it can be claimed useful.
-- [ ] Before implementing either backlog item, create comparison fixtures for
-  raw triangle-BVH concave collision versus decomposed convex pieces across
-  dense concave meshes, dynamic concave bodies, contact-heavy corners/channels,
-  and closed-volume inertia/mass scenarios.
+- [x] Move Gravitas-owned deterministic convex decomposition to the follow-up
+  plan as R&D only if Gravitas needs an engine-agnostic asset-prep path. Any
+  implementation must be explicit preprocessing, not implicit runtime mutation;
+  it needs deterministic ordering, deterministic tie-breakers, bounded
+  failure/result codes, pathological mesh tests, and benchmarks against the raw
+  local-BVH triangle path before it can be claimed useful.
+- [x] Move comparison fixtures for raw triangle-BVH concave collision versus
+  decomposed convex pieces to the follow-up plan across dense concave meshes,
+  dynamic concave bodies, contact-heavy corners/channels, and closed-volume
+  inertia/mass scenarios.
 
 **Acceptance Bar:**
 
@@ -2371,18 +2375,58 @@ decomposes contact impulses into planar X/Z and vertical Y components:
 
 **Tasks:**
 
-- [ ] Review whether generic `ScalarA`, `ScalarB`, `DataA`, and `DataB` fields are sufficient or whether typed event payload helpers would reduce adapter mistakes.
-- [ ] Add tests for diagnostic frame boundaries, `Clear()`/`Disable()` semantics, capacity preservation, and high-volume mesh capture.
-- [ ] Create renderer-neutral sample adapter docs for Unity-style debug draw, server logs, and replay timeline capture without adding engine references to `src/Gravitas`.
-- [ ] If `SwiftCollections.Observable` is used for tooling projection, keep it outside authoritative runtime paths and benchmark notification cost.
-- [ ] Keep disabled diagnostics at zero managed allocation in benchmark smoke.
+- [x] Review whether generic `ScalarA`, `ScalarB`, `DataA`, and `DataB` fields are sufficient or whether typed event payload helpers would reduce adapter mistakes.
+- [x] Add tests for diagnostic frame boundaries, `Clear()`/`Disable()` semantics, capacity preservation, and high-volume mesh capture.
+- [x] Create renderer-neutral sample adapter docs for Unity-style debug draw, server logs, and replay timeline capture without adding engine references to `src/Gravitas`.
+- [x] If `SwiftCollections.Observable` is used for tooling projection, keep it outside authoritative runtime paths and benchmark notification cost.
+- [x] Keep disabled diagnostics at zero managed allocation in benchmark smoke.
+
+**Phase 12 Result:**
+
+- Kept the alpha diagnostic event payload compact and generic. `ScalarA`,
+  `ScalarB`, `DataA`, and `DataB` remain sufficient while event-kind decoding
+  stays documented; typed diagnostic views were moved to the follow-up plan
+  instead of bloating the capture hot path without adapter evidence.
+- Added internal diagnostic buffer capacity visibility so tests and benchmarks
+  can prove `Enable(...)`, `Clear()`, and `Disable()` retain reservations
+  without exposing mutable collection internals as public API.
+- Added diagnostics tests for frame/sequence boundaries, `Clear()` and
+  `Disable()` semantics, retained event/draw capacity, disabled capture
+  short-circuiting, and high-volume mesh capture emitting one deterministic
+  `WireTriangle` command per mesh triangle.
+- Extended diagnostics benchmarks with disabled/enabled mesh capture scenarios
+  using bodyless static mesh colliders, avoiding irrelevant zero-thickness
+  inertia warnings while measuring the real draw-command capture path.
+- Created `docs/wiki/DIAGNOSTIC_ADAPTERS.md` with renderer-neutral debug draw,
+  structured log, and replay timeline adapter shapes. Linked it from the
+  diagnostics wiki, overview, README, and AGENTS routing guidance.
+- Expanded
+  `docs/feature-work/2026-06-01-alpha-physics-follow-up-hardening-plan.md`
+  with the remaining alpha hardening items from this plan: mesh decomposition
+  policy, dynamic/swept CCD families, and optional typed diagnostic views.
+- Verification completed:
+  `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter FullyQualifiedName~Gravitas.Tests.Diagnostics`
+  passed `7/7`;
+  `dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj --configuration Release -f net8.0`
+  passed with `0` warnings/errors;
+  `dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll diagnostics --filter "*" -j Short -i --exporters json`
+  executed `6` diagnostics benchmarks and reported `Allocated -` for all
+  scenarios;
+  `dotnet build Gravitas.slnx --configuration Release` passed with `0`
+  warnings/errors;
+  `dotnet test Gravitas.slnx --configuration Release --no-build` passed
+  `376/376`;
+  `dotnet build Gravitas.slnx --configuration ReleaseLean` passed with `0`
+  warnings/errors;
+  `dotnet test Gravitas.slnx --configuration ReleaseLean --no-build` passed
+  `371/371`.
 
 ## Verification Gate For Every Phase
 
-- [ ] Run focused tests for the changed subsystem.
-- [ ] Run `dotnet build Gravitas.slnx --configuration Release`.
-- [ ] Run `dotnet test Gravitas.slnx --configuration Release --no-build`.
-- [ ] Run `dotnet build Gravitas.slnx --configuration ReleaseLean` when settings, serialization, package references, or MemoryPack-adjacent code changes.
-- [ ] Run `dotnet test Gravitas.slnx --configuration ReleaseLean` when the Lean build is touched.
-- [ ] Run the relevant benchmark aliases for hot-path, data-structure, query, collision, partition, diagnostics, or solver changes.
-- [ ] Update `docs/wiki/`, `README.md`, benchmark docs, and this plan status when behavior, architecture, or workflow changes.
+- [x] Run focused tests for the changed subsystem.
+- [x] Run `dotnet build Gravitas.slnx --configuration Release`.
+- [x] Run `dotnet test Gravitas.slnx --configuration Release --no-build`.
+- [x] Run `dotnet build Gravitas.slnx --configuration ReleaseLean` when settings, serialization, package references, or MemoryPack-adjacent code changes.
+- [x] Run `dotnet test Gravitas.slnx --configuration ReleaseLean` when the Lean build is touched.
+- [x] Run the relevant benchmark aliases for hot-path, data-structure, query, collision, partition, diagnostics, or solver changes.
+- [x] Update `docs/wiki/`, `README.md`, benchmark docs, and this plan status when behavior, architecture, or workflow changes.

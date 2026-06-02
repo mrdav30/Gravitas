@@ -131,6 +131,9 @@ streams beside lockstep frame data.
 Keep adapters outside `src/Gravitas`. Core runtime code should emit fixed-point
 values, context-local IDs, stable ordering, and shape metadata only.
 
+See [Diagnostic Adapters](DIAGNOSTIC_ADAPTERS.md) for renderer-neutral adapter
+shapes for debug draw, server logs, and replay timeline capture.
+
 ## Performance Rules
 
 - Leave diagnostics disabled in normal hot-path measurements unless the
@@ -148,7 +151,7 @@ values, context-local IDs, stable ordering, and shape metadata only.
 - Diagnostics are same-thread context buffers, matching the current lockstep
   runtime model.
 - Event payloads are intentionally generic. When a subsystem needs richer
-  diagnostics, add a documented event kind instead of overloading fields in a
-  way hosts cannot decode.
+  diagnostics, add a documented event kind or typed adapter helper instead of
+  overloading fields in a way hosts cannot decode.
 - Draw commands are wire/debug descriptions, not mesh generation utilities.
   Hosts remain responsible for actual rendering.

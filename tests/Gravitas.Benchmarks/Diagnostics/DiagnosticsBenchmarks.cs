@@ -1,5 +1,6 @@
 using BenchmarkDotNet.Attributes;
 using FixedMathSharp;
+using Gravitas.Colliders;
 using Gravitas.Diagnostics;
 using SwiftCollections;
 
@@ -11,12 +12,19 @@ public class DiagnosticsBenchmarks
     private GravitasWorldContext _disabledContext;
     private GravitasWorldContext _enabledEventContext;
     private GravitasWorldContext _enabledDrawContext;
+    private GravitasWorldContext _disabledMeshContext;
+    private GravitasWorldContext _enabledMeshContext;
     private SwiftList<StiffBody> _disabledBodies;
     private SwiftList<StiffBody> _enabledEventBodies;
     private SwiftList<StiffBody> _enabledDrawBodies;
+    private LSMeshCollider _disabledMeshCollider;
+    private LSMeshCollider _enabledMeshCollider;
 
     [Params(64)]
     public int ColliderCount { get; set; }
+
+    [Params(128)]
+    public int MeshQuadCount { get; set; }
 
     [GlobalSetup]
     public void Setup()
@@ -36,6 +44,15 @@ public class DiagnosticsBenchmarks
         _enabledDrawBodies = new SwiftList<StiffBody>(ColliderCount);
         BenchmarkPhysicsScene.CreateDynamicSphereGrid(_enabledDrawContext, ColliderCount, _enabledDrawBodies);
         _enabledDrawContext.Diagnostics.Enable(eventCapacity: 0, drawCommandCapacity: ColliderCount);
+
+        int meshExtent = BenchmarkPhysicsScene.GridExtentForLine(MeshQuadCount + 1);
+        int meshTriangleCount = MeshQuadCount * 2;
+        _disabledMeshContext = BenchmarkPhysicsScene.CreateContext(meshExtent);
+        _disabledMeshCollider = CreateStaticMeshCollider(_disabledMeshContext, MeshQuadCount);
+
+        _enabledMeshContext = BenchmarkPhysicsScene.CreateContext(meshExtent);
+        _enabledMeshCollider = CreateStaticMeshCollider(_enabledMeshContext, MeshQuadCount);
+        _enabledMeshContext.Diagnostics.Enable(eventCapacity: 0, drawCommandCapacity: meshTriangleCount);
     }
 
     [GlobalCleanup]
@@ -44,13 +61,19 @@ public class DiagnosticsBenchmarks
         _disabledContext.Dispose();
         _enabledEventContext.Dispose();
         _enabledDrawContext.Dispose();
+        _disabledMeshContext.Dispose();
+        _enabledMeshContext.Dispose();
 
         _disabledContext = null;
         _enabledEventContext = null;
         _enabledDrawContext = null;
+        _disabledMeshContext = null;
+        _enabledMeshContext = null;
         _disabledBodies = null;
         _enabledEventBodies = null;
         _enabledDrawBodies = null;
+        _disabledMeshCollider = null;
+        _enabledMeshCollider = null;
     }
 
     [Benchmark(Baseline = true)]
@@ -83,6 +106,21 @@ public class DiagnosticsBenchmarks
         return _enabledDrawContext.Diagnostics.DrawCommandCount;
     }
 
+    [Benchmark]
+    public int MeshCaptureDiagnosticsDisabled()
+    {
+        _disabledMeshContext.Diagnostics.CaptureCollider(_disabledMeshCollider, GravitasDiagnosticColor.White);
+        return _disabledMeshContext.Diagnostics.DrawCommandCount;
+    }
+
+    [Benchmark]
+    public int MeshCaptureDiagnosticsEnabled()
+    {
+        _enabledMeshContext.Diagnostics.Clear();
+        _enabledMeshContext.Diagnostics.CaptureCollider(_enabledMeshCollider, GravitasDiagnosticColor.White);
+        return _enabledMeshContext.Diagnostics.DrawCommandCount;
+    }
+
     private static void ApplyForceAndTorque(SwiftList<StiffBody> bodies)
     {
         var force = new Vector3d(Fixed64.One, Fixed64.Zero, Fixed64.Zero);
@@ -100,5 +138,40 @@ public class DiagnosticsBenchmarks
     {
         for (int i = 0; i < bodies.Count; i++)
             context.Diagnostics.CaptureCollider(bodies[i].Collider, GravitasDiagnosticColor.Cyan);
+    }
+
+    private static LSMeshCollider CreateStaticMeshCollider(GravitasWorldContext context, int quadCount)
+    {
+        var agent = new BenchmarkMatterAgent(context, Vector3d.Zero);
+        LSMeshCollider collider = CreateStripMesh(quadCount);
+        collider.InitializeWithNoBody(agent);
+
+        return collider;
+    }
+
+    private static LSMeshCollider CreateStripMesh(int quadCount)
+    {
+        var vertices = new Vector3d[(quadCount + 1) * 2];
+        var triangles = new int[quadCount * 6];
+
+        for (int i = 0; i <= quadCount; i++)
+        {
+            vertices[i * 2] = new Vector3d((Fixed64)i, Fixed64.Zero, Fixed64.Zero);
+            vertices[i * 2 + 1] = new Vector3d((Fixed64)i, Fixed64.Zero, Fixed64.One);
+        }
+
+        for (int i = 0; i < quadCount; i++)
+        {
+            int vertex = i * 2;
+            int triangle = i * 6;
+            triangles[triangle] = vertex;
+            triangles[triangle + 1] = vertex + 1;
+            triangles[triangle + 2] = vertex + 2;
+            triangles[triangle + 3] = vertex + 2;
+            triangles[triangle + 4] = vertex + 1;
+            triangles[triangle + 5] = vertex + 3;
+        }
+
+        return new LSMeshCollider(vertices, triangles);
     }
 }

@@ -6,9 +6,10 @@
 
 ## Purpose
 
-Phase 10 established the alpha mixed 2D/3D physics path. This plan captures
-follow-up hardening items discovered during that review without continuing to
-expand the completed alpha hardening plan.
+The alpha hardening plan established the mixed 2D/3D physics path, serialization
+contract, and diagnostic stream. This plan captures follow-up hardening items
+discovered during that review without continuing to expand the completed alpha
+hardening plan.
 
 These are not compatibility tasks. If investigation proves the current shape is
 wrong for deterministic accuracy, complexity, or allocations, prefer the clean
@@ -110,3 +111,110 @@ then apply the rule consistently across 3D, 2D, and mixed services.
   reset.
 - Long-running simulation cleanup behavior is documented and benchmarked.
 
+## Phase 4: Mesh Decomposition And Closed-Volume Policy
+
+**Goal:** Revisit host/offline decomposed convex-piece support and any
+Gravitas-owned deterministic convex decomposition only if evidence shows the
+raw local-BVH triangle path is not enough for alpha-scale concave mesh
+collision, closed-volume mass/inertia work, or contact-heavy scenes.
+
+**Context**
+
+Phase 7B made `MeshColliderMode.Concave` work through raw triangle-set
+narrow-phase using local-BVH candidate gathering. That path is the alpha
+baseline. Decomposed convex pieces are not required for current concave mesh
+collision, and they must not leak internal collider identities or masquerade as
+`LSCompoundCollider` parts.
+
+**Tasks**
+
+- [ ] Build comparison fixtures for raw triangle-BVH concave collision versus
+  decomposed convex pieces across:
+  - dense concave meshes.
+  - dynamic concave bodies.
+  - contact-heavy inside corners and U-channels.
+  - closed-volume inertia and mass scenarios.
+- [ ] Evaluate host/offline decomposed convex-piece support as an optional
+  `LSMeshCollider` data path only if benchmarks or solver-quality tests justify
+  it. The owning mesh must still expose one collider ID, one body binding, one
+  event surface, and one broad-phase identity.
+- [ ] Evaluate Gravitas-owned deterministic convex decomposition as explicit
+  preprocessing R&D only if Gravitas needs an engine-agnostic asset-prep path.
+- [ ] If decomposition is attempted, require deterministic ordering,
+  deterministic tie-breakers, bounded failure/result codes, pathological mesh
+  tests, and benchmarks against the raw local-BVH triangle path.
+- [ ] Document whether decomposition improves collision quality, inertia
+  quality, query cost, or merely adds complexity.
+
+**Exit Criteria**
+
+- Raw triangle-BVH remains the documented baseline unless decomposition has
+  measurable correctness or complexity value.
+- Any decomposition path preserves single-collider external identity.
+- No runtime implicit decomposition mutates mesh collision truth behind the
+  developer's back.
+
+## Phase 5: Dynamic CCD And Swept Mesh Families
+
+**Goal:** Define the next continuous-collision slice beyond the current static
+or kinematic target clipping so fast dynamic bodies, mesh targets, and mixed
+queries have physically explainable deterministic policy.
+
+**Context**
+
+Current CCD support is opt-in/auto and intentionally bounded. 3D and 2D body
+movement can use swept primitive proxies against static or kinematic targets,
+and mixed sweeps include alpha mesh/compound support. Ordinary dynamic-vs-
+dynamic CCD, full swept mesh query families, and richer relative-velocity
+ordering remain future hardening.
+
+**Tasks**
+
+- [ ] Specify deterministic dynamic-vs-dynamic CCD ordering for 3D, pure 2D,
+  and mixed contact paths.
+- [ ] Define how relative velocity, pair priority, body IDs, hierarchy keys,
+  and contact normals break ties.
+- [ ] Add fixtures for tunneling dynamic bodies, opposing high-speed bodies,
+  thin static geometry, and mixed 2D slab interactions.
+- [ ] Investigate shape-specific swept mesh behavior before adding public APIs:
+  ray/segment vs mesh, swept sphere/circle vs mesh, and mesh-as-moving-source.
+- [ ] Benchmark CCD candidate gathering, clip resolution, and false-positive
+  rates before replacing any current conservative proxy.
+
+**Exit Criteria**
+
+- CCD behavior remains explicit and opt-in/auto, not a silent global cost.
+- Dynamic-vs-dynamic CCD has deterministic tie-breakers and tests before it is
+  enabled.
+- Swept mesh APIs are added only with allocation tests and benchmark evidence.
+
+## Phase 6: Typed Diagnostic Views
+
+**Goal:** Keep `GravitasDiagnosticEvent` compact while reducing host adapter
+mistakes if generic fields become difficult to decode.
+
+**Context**
+
+Phase 12 kept the alpha diagnostic event stream generic. `ScalarA`, `ScalarB`,
+`DataA`, and `DataB` are sufficient while every event kind has documented field
+meaning and adapters decode by `GravitasDiagnosticEventKind`. Typed views are a
+tooling convenience, not a reason to bloat the capture hot path.
+
+**Tasks**
+
+- [ ] Inventory repeated event-decoding switch logic in host adapters, samples,
+  or future tooling.
+- [ ] If repetition becomes error-prone, design typed read-only view helpers
+  over existing `GravitasDiagnosticEvent` payloads without changing capture
+  storage.
+- [ ] Add tests for each typed view's field mapping, including mixed-dimension
+  payloads.
+- [ ] Keep helpers outside authoritative runtime loops and benchmark any
+  observable/tooling projection that fans diagnostics out to subscribers.
+
+**Exit Criteria**
+
+- Generic diagnostic capture remains compact and allocation-conscious.
+- Host adapters can decode events without ambiguous field meanings.
+- Any typed helpers are proven by tests and do not alter deterministic event
+  ordering.

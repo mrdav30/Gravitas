@@ -48,7 +48,8 @@ Read these in order before making non-trivial changes:
    [`DIMENSIONS.md`](docs/wiki/DIMENSIONS.md),
    [`QUERY_SERVICES.md`](docs/wiki/QUERY_SERVICES.md),
    [`SERIALIZATION.md`](docs/wiki/SERIALIZATION.md), or
-   [`DIAGNOSTICS.md`](docs/wiki/DIAGNOSTICS.md).
+   [`DIAGNOSTICS.md`](docs/wiki/DIAGNOSTICS.md) and
+   [`DIAGNOSTIC_ADAPTERS.md`](docs/wiki/DIAGNOSTIC_ADAPTERS.md).
 4. [`src/Gravitas/Runtime/GravitasWorldContext.cs`](src/Gravitas/Runtime/GravitasWorldContext.cs),
    [`src/Gravitas/Core/GravitasPhysicsService.cs`](src/Gravitas/Core/GravitasPhysicsService.cs),
    and [`src/Gravitas/Core/StiffBody.cs`](src/Gravitas/Core/StiffBody.cs).

@@ -43,6 +43,10 @@ public sealed class GravitasDiagnosticSink
 
     public int DrawCommandCount => _drawCommands.Count;
 
+    internal int EventCapacity => _events.Capacity;
+
+    internal int DrawCommandCapacity => _drawCommands.Capacity;
+
     /// <summary>
     /// Enables diagnostics and optionally reserves buffer capacity for hot-path capture.
     /// </summary>

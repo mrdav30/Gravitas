@@ -30,6 +30,9 @@ systems connect and where the current prototype needs hardening.
   validation.
 - Read [Diagnostics](DIAGNOSTICS.md) when changing diagnostic events, debug draw
   commands, host debug adapters, or instrumentation overhead.
+- Read [Diagnostic Adapters](DIAGNOSTIC_ADAPTERS.md) when translating
+  diagnostics into engine-specific draw, log, or replay tooling outside the core
+  runtime.
 
 ## Core Mental Model
 
