@@ -23,7 +23,7 @@ public readonly struct CompoundColliderPart
     {
         SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
         SwiftThrowHelper.ThrowIfArgument(
-            localScale.x <= Fixed64.Zero || localScale.y <= Fixed64.Zero || localScale.z <= Fixed64.Zero,
+            localScale.X <= Fixed64.Zero || localScale.Y <= Fixed64.Zero || localScale.Z <= Fixed64.Zero,
             nameof(localScale),
             "Compound collider part scale components must be greater than zero.");
 

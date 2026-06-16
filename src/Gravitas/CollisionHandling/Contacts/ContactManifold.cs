@@ -54,7 +54,7 @@ public sealed class ContactManifold : IEnumerable<ManifoldContact>
     {
         get
         {
-            SwiftThrowHelper.ThrowIfListIndexInvalid(0, _count, "Manifold has no contacts.");
+            SwiftThrowHelper.ThrowIfListIndexInvalid(0, _count);
 
             int bestIndex = 0;
             ManifoldContact best = _contact0;
@@ -78,7 +78,7 @@ public sealed class ContactManifold : IEnumerable<ManifoldContact>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get
         {
-            SwiftThrowHelper.ThrowIfListIndexInvalid(index, _count, "Contact index is out of range.");
+            SwiftThrowHelper.ThrowIfListIndexInvalid(index, _count);
             return GetContactUnchecked(index);
         }
     }
@@ -239,26 +239,26 @@ public sealed class ContactManifold : IEnumerable<ManifoldContact>
             (pointA, pointB) = (pointB, pointA);
 
         ulong hash = 14695981039346656037UL;
-        Mix(ref hash, pointA.x.m_rawValue);
-        Mix(ref hash, pointA.y.m_rawValue);
-        Mix(ref hash, pointA.z.m_rawValue);
-        Mix(ref hash, pointB.x.m_rawValue);
-        Mix(ref hash, pointB.y.m_rawValue);
-        Mix(ref hash, pointB.z.m_rawValue);
+        Mix(ref hash, pointA.X.m_rawValue);
+        Mix(ref hash, pointA.Y.m_rawValue);
+        Mix(ref hash, pointA.Z.m_rawValue);
+        Mix(ref hash, pointB.X.m_rawValue);
+        Mix(ref hash, pointB.Y.m_rawValue);
+        Mix(ref hash, pointB.Z.m_rawValue);
         return hash;
     }
 
     private static int CompareVector(Vector3d left, Vector3d right)
     {
-        int compare = left.x.m_rawValue.CompareTo(right.x.m_rawValue);
+        int compare = left.X.m_rawValue.CompareTo(right.X.m_rawValue);
         if (compare != 0)
             return compare;
 
-        compare = left.y.m_rawValue.CompareTo(right.y.m_rawValue);
+        compare = left.Y.m_rawValue.CompareTo(right.Y.m_rawValue);
         if (compare != 0)
             return compare;
 
-        return left.z.m_rawValue.CompareTo(right.z.m_rawValue);
+        return left.Z.m_rawValue.CompareTo(right.Z.m_rawValue);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

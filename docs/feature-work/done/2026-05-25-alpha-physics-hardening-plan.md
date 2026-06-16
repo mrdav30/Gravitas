@@ -989,7 +989,7 @@ not absorb unresolved concave mesh responsibilities.
   when ray/circle queries touch a collider spanning many voxels.
 - Investigated the `216 B/op` mesh movement/query benchmark allocation. The
   source was Gravitas call-site state: mesh bounds created a new
-  `BoundingBox` on each rigid movement and repartitioning detached/re-added
+  `FixedBoundBox` on each rigid movement and repartitioning detached/re-added
   empty voxel partitions. `PhysicsMesh` now mutates warmed bounds in place, and
   retained voxel partitions remove the repartition add cost. The focused
   allocation guard reports zero bytes after warmup.
@@ -1036,7 +1036,7 @@ hardening below are complete.
   especially `LSBodyOverlapCheck.cs`, `LSBody.cs`, and `CollisionPair.cs`.
   Use this for shape vocabulary and test inspiration, not as code to port.
 - Current downstream primitives to review before custom math:
-  `FixedMathSharp.Geometry.BoundingArea`, `FixedMathSharp.FixedRay`,
+  `FixedMathSharp.Geometry.FixedBoundArea`, `FixedMathSharp.FixedRay`,
   `SwiftCollections.FixedMathSharp.Query.FixedBoundVolume`, and
   `SwiftFixedSpatialHash<T>`.
 
@@ -1073,7 +1073,7 @@ hardening below are complete.
   remains the public base, primitive geometry should move toward focused shape
   support types rather than more abstract-class bloat.
 - [x] **Phase 9B - Bounds and broad phase:** Define how pure 2D bounds map to
-  broad-phase storage. Prefer `BoundingArea`/`FixedBoundVolume` and
+  broad-phase storage. Prefer `FixedBoundArea`/`FixedBoundVolume` and
   SwiftCollections fixed query structures where they fit; document any custom
   path if 2D needs a leaner dedicated bound representation.
 - [x] **Phase 9C - 2D shape foundation:** Add first-class shape support for
@@ -1300,7 +1300,7 @@ source layout, lifecycle parity, and tests.
   `LSCollider2D.InitializeWithNoBody(IMatterAgent)`, including query visibility,
   static collision response, and same-agent collision suppression.
 - Removed `PhysicsDimension`, `PhysicsDimensionRules`, and `Physics2DBounds`.
-  Pure 2D collider bounds now use `FixedMathSharp.BoundingArea` directly.
+  Pure 2D collider bounds now use `FixedMathSharp.FixedBoundArea` directly.
 - Moved 2D runtime files beside their 3D counterparts:
   `StiffBody2D` and `GravitasPhysics2DService` moved to `Core`, 2D detection,
   pairs, contacts, and response moved under `CollisionHandling`, and

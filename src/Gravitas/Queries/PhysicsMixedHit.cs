@@ -70,8 +70,8 @@ public readonly struct PhysicsMixedHit
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get
         {
-            Vector2d normal = new(Normal3DTo2D.x, Normal3DTo2D.z);
-            return normal.SqrMagnitude > Fixed64.Epsilon ? normal.Normal : Vector2d.Zero;
+            Vector2d normal = new(Normal3DTo2D.X, Normal3DTo2D.Z);
+            return normal.MagnitudeSquared > Fixed64.Epsilon ? normal.Normalized : Vector2d.Zero;
         }
     }
 }

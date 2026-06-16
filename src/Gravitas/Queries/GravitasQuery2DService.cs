@@ -96,7 +96,7 @@ public sealed class GravitasQuery2DService
     public bool Raycast(Vector2d start, Vector2d end, PhysicsLayerMask layerMask, out Physics2DHit hit)
     {
         Vector2d segment = end - start;
-        if (segment.SqrMagnitude == Fixed64.Zero)
+        if (segment.MagnitudeSquared == Fixed64.Zero)
         {
             LastQueryCandidateCount = 0;
             hit = default;
@@ -149,7 +149,7 @@ public sealed class GravitasQuery2DService
 
         results.FastClear();
         Vector2d segment = end - start;
-        if (segment.SqrMagnitude == Fixed64.Zero)
+        if (segment.MagnitudeSquared == Fixed64.Zero)
         {
             LastQueryCandidateCount = 0;
             return 0;
@@ -197,7 +197,7 @@ public sealed class GravitasQuery2DService
         SwiftThrowHelper.ThrowIfArgument(radius <= Fixed64.Zero, nameof(radius), "2D sweep radius must be greater than zero.");
 
         Vector2d segment = end - start;
-        if (segment.SqrMagnitude <= Fixed64.Epsilon)
+        if (segment.MagnitudeSquared <= Fixed64.Epsilon)
         {
             LastQueryCandidateCount = 0;
             hit = default;
@@ -260,7 +260,7 @@ public sealed class GravitasQuery2DService
 
         results.FastClear();
         Vector2d segment = end - start;
-        if (segment.SqrMagnitude <= Fixed64.Epsilon)
+        if (segment.MagnitudeSquared <= Fixed64.Epsilon)
         {
             LastQueryCandidateCount = 0;
             return 0;
@@ -318,19 +318,19 @@ public sealed class GravitasQuery2DService
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Vector2d CreateMin(Vector2d first, Vector2d second) =>
-        new(FixedMath.Min(first.x, second.x), FixedMath.Min(first.y, second.y));
+        new(FixedMath.Min(first.X, second.X), FixedMath.Min(first.Y, second.Y));
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Vector2d CreateMax(Vector2d first, Vector2d second) =>
-        new(FixedMath.Max(first.x, second.x), FixedMath.Max(first.y, second.y));
+        new(FixedMath.Max(first.X, second.X), FixedMath.Max(first.Y, second.Y));
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Vector2d CreateSweepMin(Vector2d first, Vector2d second, Fixed64 radius) =>
-        new(FixedMath.Min(first.x, second.x) - radius, FixedMath.Min(first.y, second.y) - radius);
+        new(FixedMath.Min(first.X, second.X) - radius, FixedMath.Min(first.Y, second.Y) - radius);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Vector2d CreateSweepMax(Vector2d first, Vector2d second, Fixed64 radius) =>
-        new(FixedMath.Max(first.x, second.x) + radius, FixedMath.Max(first.y, second.y) + radius);
+        new(FixedMath.Max(first.X, second.X) + radius, FixedMath.Max(first.Y, second.Y) + radius);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool IsEligibleSweepCandidate(LSCollider2D collider, LSCollider2D? excludedCollider, bool includeTriggers)

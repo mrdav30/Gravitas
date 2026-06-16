@@ -1,4 +1,5 @@
 using FixedMathSharp;
+using FixedMathSharp.Bounds;
 using Gravitas.Colliders;
 using SwiftCollections;
 using SwiftCollections.Query;
@@ -95,7 +96,7 @@ public static partial class CollisionDetectionMixed
         if (!CheckTriangleCircleSlabAxis(triangle, circle, Vector3d.Up, ref penetration))
             return false;
 
-        if (!CheckTriangleCircleSlabAxis(triangle, circle, triangle.Normal, ref penetration))
+        if (!CheckTriangleCircleSlabAxis(triangle, circle, triangle.Normalized, ref penetration))
             return false;
 
         for (int i = 0; i < 3; i++)
@@ -122,7 +123,7 @@ public static partial class CollisionDetectionMixed
         if (!CheckTrianglePrismAxis(triangle, prism, Vector3d.Up, ref penetration))
             return false;
 
-        if (!CheckTrianglePrismAxis(triangle, prism, triangle.Normal, ref penetration))
+        if (!CheckTrianglePrismAxis(triangle, prism, triangle.Normalized, ref penetration))
             return false;
 
         for (int i = 0; i < prism.VertexCount; i++)
@@ -141,14 +142,14 @@ public static partial class CollisionDetectionMixed
             for (int j = 0; j < prism.VertexCount; j++)
             {
                 GetPrismEdge(prism, j, out Vector2d edge2D);
-                Vector3d prismEdge = new(edge2D.x, Fixed64.Zero, edge2D.y);
+                Vector3d prismEdge = new(edge2D.X, Fixed64.Zero, edge2D.Y);
                 if (!CheckTrianglePrismAxis(triangle, prism, Vector3d.Cross(triangleEdge, prismEdge), ref penetration))
                     return false;
             }
         }
 
         Vector3d embeddedPoint = GetClosestPointOnEmbeddedVolume(prism, triangle.Center);
-        Vector3d trianglePoint = MeshUtils.ClosestPointOnTriangle(triangle.A, triangle.B, triangle.C, triangle.Normal, embeddedPoint);
+        Vector3d trianglePoint = MeshUtils.ClosestPointOnTriangle(triangle.A, triangle.B, triangle.C, triangle.Normalized, embeddedPoint);
         if (!CheckTrianglePrismAxis(triangle, prism, embeddedPoint - trianglePoint, ref penetration))
             return false;
 
@@ -200,7 +201,7 @@ public static partial class CollisionDetectionMixed
         out MixedContact contact)
     {
         Vector3d embeddedCenter = GetEmbeddedCenter3D(embedded);
-        Vector3d point3D = MeshUtils.ClosestPointOnTriangle(triangle.A, triangle.B, triangle.C, triangle.Normal, embeddedCenter);
+        Vector3d point3D = MeshUtils.ClosestPointOnTriangle(triangle.A, triangle.B, triangle.C, triangle.Normalized, embeddedCenter);
         Vector3d point2D = GetClosestPointOnEmbeddedVolume(embedded, point3D);
         contact = new MixedContact(point3D, point2D, penetration.Axis, penetration.Depth);
     }
@@ -213,18 +214,18 @@ public static partial class CollisionDetectionMixed
         out Vector3d pointOnTriangle)
     {
         pointOnSegment = segmentStart;
-        pointOnTriangle = MeshUtils.ClosestPointOnTriangle(triangle.A, triangle.B, triangle.C, triangle.Normal, segmentStart);
-        Fixed64 bestDistanceSqr = Vector3d.SqrDistance(pointOnSegment, pointOnTriangle);
+        pointOnTriangle = MeshUtils.ClosestPointOnTriangle(triangle.A, triangle.B, triangle.C, triangle.Normalized, segmentStart);
+        Fixed64 bestDistanceSqr = Vector3d.DistanceSquared(pointOnSegment, pointOnTriangle);
 
         Vector3d segment = segmentEnd - segmentStart;
-        Fixed64 denominator = Vector3d.Dot(triangle.Normal, segment);
+        Fixed64 denominator = Vector3d.Dot(triangle.Normalized, segment);
         if (denominator.Abs() > Fixed64.Epsilon)
         {
-            Fixed64 t = Vector3d.Dot(triangle.Normal, triangle.A - segmentStart) / denominator;
+            Fixed64 t = Vector3d.Dot(triangle.Normalized, triangle.A - segmentStart) / denominator;
             if (t >= Fixed64.Zero && t <= Fixed64.One)
             {
                 Vector3d intersection = segmentStart + segment * t;
-                if (MeshUtils.IsPointInTrianglePlane(triangle.A, triangle.B, triangle.C, triangle.Normal, intersection))
+                if (MeshUtils.IsPointInTrianglePlane(triangle.A, triangle.B, triangle.C, triangle.Normalized, intersection))
                 {
                     pointOnSegment = intersection;
                     pointOnTriangle = intersection;
@@ -246,8 +247,8 @@ public static partial class CollisionDetectionMixed
         ref Vector3d pointOnTriangle,
         ref Fixed64 bestDistanceSqr)
     {
-        Vector3d candidate = MeshUtils.ClosestPointOnTriangle(triangle.A, triangle.B, triangle.C, triangle.Normal, point);
-        Fixed64 distanceSqr = Vector3d.SqrDistance(point, candidate);
+        Vector3d candidate = MeshUtils.ClosestPointOnTriangle(triangle.A, triangle.B, triangle.C, triangle.Normalized, point);
+        Fixed64 distanceSqr = Vector3d.DistanceSquared(point, candidate);
         if (distanceSqr >= bestDistanceSqr)
             return;
 
@@ -266,7 +267,7 @@ public static partial class CollisionDetectionMixed
         ref Fixed64 bestDistanceSqr)
     {
         (Vector3d segmentPoint, Vector3d edgePoint) = ClosestPointsOnSegments(segmentStart, segmentEnd, edgeStart, edgeEnd);
-        Fixed64 distanceSqr = Vector3d.SqrDistance(segmentPoint, edgePoint);
+        Fixed64 distanceSqr = Vector3d.DistanceSquared(segmentPoint, edgePoint);
         if (distanceSqr >= bestDistanceSqr)
             return;
 
@@ -313,12 +314,12 @@ public static partial class CollisionDetectionMixed
             Vector3d.Max(Vector3d.Max(first, second), third));
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool BoundsOverlap(FixedBoundVolume first, BoundingBox second) =>
-        first.Max.x >= second.Min.x
-        && first.Min.x <= second.Max.x
-        && first.Max.y >= second.Min.y
-        && first.Min.y <= second.Max.y
-        && first.Max.z >= second.Min.z
-        && first.Min.z <= second.Max.z;
+    private static bool BoundsOverlap(FixedBoundVolume first, FixedBoundBox second) =>
+        first.Max.X >= second.Min.X
+        && first.Min.X <= second.Max.X
+        && first.Max.Y >= second.Min.Y
+        && first.Min.Y <= second.Max.Y
+        && first.Max.Z >= second.Min.Z
+        && first.Min.Z <= second.Max.Z;
 
 }

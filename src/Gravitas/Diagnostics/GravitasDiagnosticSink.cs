@@ -107,7 +107,7 @@ public sealed class GravitasDiagnosticSink
                     center: capsule.Center,
                     rotation: capsule.Rotation,
                     radius: capsule.ScaledRadius,
-                    height: capsule.ScaledSize.y,
+                    height: capsule.ScaledSize.Y,
                     color: color);
                 break;
             case LSCuboidCollider cuboid:
@@ -149,7 +149,7 @@ public sealed class GravitasDiagnosticSink
             return;
 
         SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
-        Vector3d center = new(collider.Center.x, collider.MixedSlabCenterY, collider.Center.y);
+        Vector3d center = new(collider.Center.X, collider.MixedSlabCenterY, collider.Center.Y);
         Fixed64 height = collider.MixedHalfThickness * 2;
         switch (collider)
         {
@@ -171,7 +171,7 @@ public sealed class GravitasDiagnosticSink
                     colliderDimension: GravitasColliderDimension.TwoD,
                     collider2DType: box.Shape,
                     center: center,
-                    size: new Vector3d(box.Size.x, height, box.Size.y),
+                    size: new Vector3d(box.Size.X, height, box.Size.Y),
                     color: color);
                 break;
             default:
@@ -203,9 +203,9 @@ public sealed class GravitasDiagnosticSink
         if (!Enabled)
             return;
 
-        Vector3d end = direction.SqrMagnitude == Fixed64.Zero
+        Vector3d end = direction.MagnitudeSquared == Fixed64.Zero
             ? origin
-            : origin + direction.Normal * length;
+            : origin + direction.Normalized * length;
 
         AddDrawCommand(
             GravitasDebugDrawKind.Ray,
@@ -536,7 +536,7 @@ public sealed class GravitasDiagnosticSink
                         center: capsule.Center,
                         rotation: capsule.Rotation,
                         radius: capsule.ScaledRadius,
-                        height: capsule.ScaledSize.y,
+                        height: capsule.ScaledSize.Y,
                         color: color);
                     break;
                 case LSCuboidCollider cuboid:
@@ -599,10 +599,10 @@ public sealed class GravitasDiagnosticSink
         {
             Vector2d current = collider.GetVertexUnchecked(i);
             Vector2d next = collider.GetVertexUnchecked((i + 1) % vertexCount);
-            Vector3d currentTop = new(current.x, topY, current.y);
-            Vector3d nextTop = new(next.x, topY, next.y);
-            Vector3d currentBottom = new(current.x, bottomY, current.y);
-            Vector3d nextBottom = new(next.x, bottomY, next.y);
+            Vector3d currentTop = new(current.X, topY, current.Y);
+            Vector3d nextTop = new(next.X, topY, next.Y);
+            Vector3d currentBottom = new(current.X, bottomY, current.Y);
+            Vector3d nextBottom = new(next.X, bottomY, next.Y);
 
             AddDrawCommand(
                 GravitasDebugDrawKind.Line,

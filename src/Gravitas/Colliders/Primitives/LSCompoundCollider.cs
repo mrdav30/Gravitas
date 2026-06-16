@@ -167,12 +167,12 @@ public sealed class LSCompoundCollider : LSCollider
     {
         int bestIndex = 0;
         Vector3d closest = _parts[0].Collider.ClosestPointOnSurface(point);
-        Fixed64 bestDistance = Vector3d.SqrDistance(point, closest);
+        Fixed64 bestDistance = Vector3d.DistanceSquared(point, closest);
 
         for (int i = 1; i < _parts.Length; i++)
         {
             Vector3d candidate = _parts[i].Collider.ClosestPointOnSurface(point);
-            Fixed64 distance = Vector3d.SqrDistance(point, candidate);
+            Fixed64 distance = Vector3d.DistanceSquared(point, candidate);
             if (distance >= bestDistance)
                 continue;
 
@@ -185,9 +185,9 @@ public sealed class LSCompoundCollider : LSCollider
 
     private static Fixed3x3 CalculateParallelAxisTensor(Fixed64 mass, Vector3d offset)
     {
-        Fixed64 xSqr = offset.x * offset.x;
-        Fixed64 ySqr = offset.y * offset.y;
-        Fixed64 zSqr = offset.z * offset.z;
+        Fixed64 xSqr = offset.X * offset.X;
+        Fixed64 ySqr = offset.Y * offset.Y;
+        Fixed64 zSqr = offset.Z * offset.Z;
 
         return new Fixed3x3(
             mass * (ySqr + zSqr), Fixed64.Zero, Fixed64.Zero,

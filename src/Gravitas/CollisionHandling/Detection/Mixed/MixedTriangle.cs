@@ -15,7 +15,7 @@ internal readonly struct MixedTriangle
         A = a;
         B = b;
         C = c;
-        Normal = normal;
+        Normalized = normal;
         Bounds = bounds;
         Center = (a + b + c) / (Fixed64)3;
     }
@@ -26,7 +26,7 @@ internal readonly struct MixedTriangle
 
     public Vector3d C { get; }
 
-    public Vector3d Normal { get; }
+    public Vector3d Normalized { get; }
 
     public FixedBoundVolume Bounds { get; }
 

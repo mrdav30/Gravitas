@@ -19,8 +19,8 @@ public readonly struct ManifoldContact
         PointA = pointA;
         PointB = pointB;
         Depth = depth.Abs();
-        Normal = normal.SqrMagnitude > Fixed64.Epsilon
-            ? normal.Normal
+        Normal = normal.MagnitudeSquared > Fixed64.Epsilon
+            ? normal.Normalized
             : Vector3d.Zero;
         ImmovableCollisionDirection = immovableCollisionDirection;
     }

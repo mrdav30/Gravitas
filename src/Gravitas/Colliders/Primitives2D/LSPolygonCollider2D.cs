@@ -59,14 +59,14 @@ public sealed class LSPolygonCollider2D : LSCollider2D
         if (ContainsPoint(point))
             return point;
 
-        Fixed64 bestDistance = Fixed64.MAX_VALUE;
+        Fixed64 bestDistance = Fixed64.MaxValue;
         Vector2d bestPoint = _worldVertices[0];
         for (int i = 0; i < _worldVertices.Length; i++)
         {
             Vector2d a = _worldVertices[i];
             Vector2d b = _worldVertices[(i + 1) % _worldVertices.Length];
             Vector2d candidate = ClosestPointOnSegment(point, a, b);
-            Fixed64 distance = Vector2d.SqrDistance(point, candidate);
+            Fixed64 distance = Vector2d.DistanceSquared(point, candidate);
             if (distance >= bestDistance)
                 continue;
 
@@ -113,8 +113,8 @@ public sealed class LSPolygonCollider2D : LSCollider2D
                 continue;
             }
 
-            min = new Vector2d(FixedMath.Min(min.x, vertex.x), FixedMath.Min(min.y, vertex.y));
-            max = new Vector2d(FixedMath.Max(max.x, vertex.x), FixedMath.Max(max.y, vertex.y));
+            min = new Vector2d(FixedMath.Min(min.X, vertex.X), FixedMath.Min(min.Y, vertex.Y));
+            max = new Vector2d(FixedMath.Max(max.X, vertex.X), FixedMath.Max(max.Y, vertex.Y));
         }
 
         SetBoundsFromMinMax(min, max);

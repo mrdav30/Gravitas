@@ -21,7 +21,7 @@ public static partial class CollisionDetection
 
         Vector3d penetrationVector = pair.ColliderB.Center - closetPointOnBox;
         // Check if the distance from the closest point to the AABB is less than the capsule radius
-        if (penetrationVector.SqrMagnitude > pair.ColliderB.ScaledRadiusSqr)
+        if (penetrationVector.MagnitudeSquared > pair.ColliderB.ScaledRadiusSqr)
             return false; // No collision if the distance squared is greater than the radius squared
                           // remove sphere's radius to find the actual depth
 
@@ -47,7 +47,7 @@ public static partial class CollisionDetection
         Vector3d closestPointOnBox = aabb.ClosestPointOnSurface(closestPointOnCapsuleLine);
         Vector3d penetrationVector = closestPointOnCapsuleLine - closestPointOnBox;
         // Check if the distance from the closest point to the AABB is less than the capsule radius
-        if (penetrationVector.SqrMagnitude > capsule.ScaledRadiusSqr)
+        if (penetrationVector.MagnitudeSquared > capsule.ScaledRadiusSqr)
             return false; // No collision if the distance squared is greater than the radius squared
                           // remove capsule's radius to find the actual depth
 
@@ -121,7 +121,7 @@ public static partial class CollisionDetection
             Vector3d representativePointA = obb.ClosestPointOnSurface(representativePointB);
             // Determine the direction of the overlap
             Fixed64 sign = Vector3d.Dot(axis, representativePointB - representativePointA) < Fixed64.Zero ? -Fixed64.One : Fixed64.One;
-            Fixed64 checkDepth = output.HasValue ? output.Value.Depth : Fixed64.MAX_VALUE;
+            Fixed64 checkDepth = output.HasValue ? output.Value.Depth : Fixed64.MaxValue;
             if (FixedRange.CheckOverlap(axis, obbProjection, capProjection, checkDepth, sign, out (Vector3d Vector, Fixed64 Depth)? axisOverlap))
                 output = axisOverlap;
             ndx++;
@@ -190,9 +190,9 @@ public static partial class CollisionDetection
         LSCuboidCollider cuboidA,
         LSCuboidCollider cuboidB)
     {
-        Fixed64 overlapX = FixedMath.Min(cuboidA.BoundsMax.x, cuboidB.BoundsMax.x) - FixedMath.Max(cuboidA.BoundsMin.x, cuboidB.BoundsMin.x);
-        Fixed64 overlapY = FixedMath.Min(cuboidA.BoundsMax.y, cuboidB.BoundsMax.y) - FixedMath.Max(cuboidA.BoundsMin.y, cuboidB.BoundsMin.y);
-        Fixed64 overlapZ = FixedMath.Min(cuboidA.BoundsMax.z, cuboidB.BoundsMax.z) - FixedMath.Max(cuboidA.BoundsMin.z, cuboidB.BoundsMin.z);
+        Fixed64 overlapX = FixedMath.Min(cuboidA.BoundsMax.X, cuboidB.BoundsMax.X) - FixedMath.Max(cuboidA.BoundsMin.X, cuboidB.BoundsMin.X);
+        Fixed64 overlapY = FixedMath.Min(cuboidA.BoundsMax.Y, cuboidB.BoundsMax.Y) - FixedMath.Max(cuboidA.BoundsMin.Y, cuboidB.BoundsMin.Y);
+        Fixed64 overlapZ = FixedMath.Min(cuboidA.BoundsMax.Z, cuboidB.BoundsMax.Z) - FixedMath.Max(cuboidA.BoundsMin.Z, cuboidB.BoundsMin.Z);
 
         if (overlapX < Fixed64.Zero || overlapY < Fixed64.Zero || overlapZ < Fixed64.Zero)
             return false;
@@ -214,9 +214,9 @@ public static partial class CollisionDetection
 
         Vector3d normal = axis switch
         {
-            0 => new Vector3d(centerDelta.x < Fixed64.Zero ? -Fixed64.One : Fixed64.One, Fixed64.Zero, Fixed64.Zero),
-            1 => new Vector3d(Fixed64.Zero, centerDelta.y < Fixed64.Zero ? -Fixed64.One : Fixed64.One, Fixed64.Zero),
-            _ => new Vector3d(Fixed64.Zero, Fixed64.Zero, centerDelta.z < Fixed64.Zero ? -Fixed64.One : Fixed64.One)
+            0 => new Vector3d(centerDelta.X < Fixed64.Zero ? -Fixed64.One : Fixed64.One, Fixed64.Zero, Fixed64.Zero),
+            1 => new Vector3d(Fixed64.Zero, centerDelta.Y < Fixed64.Zero ? -Fixed64.One : Fixed64.One, Fixed64.Zero),
+            _ => new Vector3d(Fixed64.Zero, Fixed64.Zero, centerDelta.Z < Fixed64.Zero ? -Fixed64.One : Fixed64.One)
         };
 
         AddAxisAlignedCuboidContacts(pair.Manifold, cuboidA, cuboidB, axis, depth, normal);
@@ -231,18 +231,18 @@ public static partial class CollisionDetection
         Fixed64 depth,
         Vector3d normal)
     {
-        Fixed64 minX = FixedMath.Max(cuboidA.BoundsMin.x, cuboidB.BoundsMin.x);
-        Fixed64 maxX = FixedMath.Min(cuboidA.BoundsMax.x, cuboidB.BoundsMax.x);
-        Fixed64 minY = FixedMath.Max(cuboidA.BoundsMin.y, cuboidB.BoundsMin.y);
-        Fixed64 maxY = FixedMath.Min(cuboidA.BoundsMax.y, cuboidB.BoundsMax.y);
-        Fixed64 minZ = FixedMath.Max(cuboidA.BoundsMin.z, cuboidB.BoundsMin.z);
-        Fixed64 maxZ = FixedMath.Min(cuboidA.BoundsMax.z, cuboidB.BoundsMax.z);
+        Fixed64 minX = FixedMath.Max(cuboidA.BoundsMin.X, cuboidB.BoundsMin.X);
+        Fixed64 maxX = FixedMath.Min(cuboidA.BoundsMax.X, cuboidB.BoundsMax.X);
+        Fixed64 minY = FixedMath.Max(cuboidA.BoundsMin.Y, cuboidB.BoundsMin.Y);
+        Fixed64 maxY = FixedMath.Min(cuboidA.BoundsMax.Y, cuboidB.BoundsMax.Y);
+        Fixed64 minZ = FixedMath.Max(cuboidA.BoundsMin.Z, cuboidB.BoundsMin.Z);
+        Fixed64 maxZ = FixedMath.Min(cuboidA.BoundsMax.Z, cuboidB.BoundsMax.Z);
 
         switch (axis)
         {
             case 0:
             {
-                Fixed64 x = normal.x > Fixed64.Zero ? cuboidA.BoundsMax.x : cuboidA.BoundsMin.x;
+                Fixed64 x = normal.X > Fixed64.Zero ? cuboidA.BoundsMax.X : cuboidA.BoundsMin.X;
                 AddCuboidContact(manifold, new Vector3d(x, minY, minZ), normal, depth);
                 AddCuboidContact(manifold, new Vector3d(x, minY, maxZ), normal, depth);
                 AddCuboidContact(manifold, new Vector3d(x, maxY, minZ), normal, depth);
@@ -251,7 +251,7 @@ public static partial class CollisionDetection
             }
             case 1:
             {
-                Fixed64 y = normal.y > Fixed64.Zero ? cuboidA.BoundsMax.y : cuboidA.BoundsMin.y;
+                Fixed64 y = normal.Y > Fixed64.Zero ? cuboidA.BoundsMax.Y : cuboidA.BoundsMin.Y;
                 AddCuboidContact(manifold, new Vector3d(minX, y, minZ), normal, depth);
                 AddCuboidContact(manifold, new Vector3d(minX, y, maxZ), normal, depth);
                 AddCuboidContact(manifold, new Vector3d(maxX, y, minZ), normal, depth);
@@ -260,7 +260,7 @@ public static partial class CollisionDetection
             }
             default:
             {
-                Fixed64 z = normal.z > Fixed64.Zero ? cuboidA.BoundsMax.z : cuboidA.BoundsMin.z;
+                Fixed64 z = normal.Z > Fixed64.Zero ? cuboidA.BoundsMax.Z : cuboidA.BoundsMin.Z;
                 AddCuboidContact(manifold, new Vector3d(minX, minY, z), normal, depth);
                 AddCuboidContact(manifold, new Vector3d(minX, maxY, z), normal, depth);
                 AddCuboidContact(manifold, new Vector3d(maxX, minY, z), normal, depth);

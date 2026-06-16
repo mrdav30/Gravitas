@@ -1,4 +1,5 @@
 using FixedMathSharp;
+using FixedMathSharp.Bounds;
 using Gravitas.Colliders;
 using Gravitas.Support;
 using SwiftCollections;
@@ -69,13 +70,13 @@ public sealed class GravitasQueryMixedService
 
         results.FastClear();
         Vector3d segment = end - start;
-        if (segment.SqrMagnitude <= Fixed64.Epsilon)
+        if (segment.MagnitudeSquared <= Fixed64.Epsilon)
         {
             LastQueryCandidateCount = 0;
             return 0;
         }
 
-        Vector3d direction = segment.Normal;
+        Vector3d direction = segment.Normalized;
         Fixed64 length = segment.Magnitude;
         CreateSweepBounds(start, end, radius, out Vector3d min, out Vector3d max);
         _context.MixedCollisions.Collect2DCandidatesInMixedBounds(min, max, layerMask, _candidates2D);
@@ -151,15 +152,15 @@ public sealed class GravitasQueryMixedService
 
         results.FastClear();
         Vector2d segment = end - start;
-        if (segment.SqrMagnitude <= Fixed64.Epsilon)
+        if (segment.MagnitudeSquared <= Fixed64.Epsilon)
         {
             LastQueryCandidateCount = 0;
             return 0;
         }
 
-        Vector3d start3D = new(start.x, slabCenterY, start.y);
-        Vector3d end3D = new(end.x, slabCenterY, end.y);
-        Vector3d direction = (end3D - start3D).Normal;
+        Vector3d start3D = new(start.X, slabCenterY, start.Y);
+        Vector3d end3D = new(end.X, slabCenterY, end.Y);
+        Vector3d direction = (end3D - start3D).Normalized;
         Fixed64 proxyRadius = FixedMath.Max(radius, halfThickness);
         CreateSweepBounds(start3D, end3D, proxyRadius, out Vector3d min, out Vector3d max);
         _context.MixedCollisions.Collect3DCandidatesInMixedBounds(min, max, layerMask, _candidates3D);
@@ -220,7 +221,7 @@ public sealed class GravitasQueryMixedService
         LSCircleCollider2D circle,
         out PhysicsMixedHit hit)
     {
-        Vector3d center = new(circle.Center.x, circle.MixedSlabCenterY, circle.Center.y);
+        Vector3d center = new(circle.Center.X, circle.MixedSlabCenterY, circle.Center.Y);
         Fixed64 combinedRadius = circle.Radius + radius;
         Fixed64 expandedHalfHeight = circle.MixedHalfThickness + radius;
         Vector3d localStart = start - center;
@@ -232,7 +233,7 @@ public sealed class GravitasQueryMixedService
         }
 
         bool found = false;
-        Fixed64 bestDistance = Fixed64.MAX_VALUE;
+        Fixed64 bestDistance = Fixed64.MaxValue;
         TryKeepEarlierSweep(
             TrySweepCircleSlabSide(localStart, direction, length, combinedRadius, expandedHalfHeight, out Fixed64 sideDistance),
             sideDistance,
@@ -268,7 +269,7 @@ public sealed class GravitasQueryMixedService
         LSCollider2D collider,
         out PhysicsMixedHit hit)
     {
-        BoundingBox bounds = collider.MixedBounds3D;
+        FixedBoundBox bounds = collider.MixedBounds3D;
         Vector3d radiusExtents = Vector3d.One * radius;
         Vector3d min = bounds.Min - radiusExtents;
         Vector3d max = bounds.Max + radiusExtents;
@@ -292,8 +293,8 @@ public sealed class GravitasQueryMixedService
     {
         Vector3d point2D = GetClosestEmbeddedPoint(collider, sweepCenter);
         Vector3d to2D = point2D - sweepCenter;
-        Vector3d normal3DTo2D = to2D.SqrMagnitude > Fixed64.Epsilon
-            ? to2D.Normal
+        Vector3d normal3DTo2D = to2D.MagnitudeSquared > Fixed64.Epsilon
+            ? to2D.Normalized
             : Resolve3DTo2DFallback(collider, sweepCenter, direction);
         Vector3d point3D = sweepCenter + normal3DTo2D * radius;
         return new PhysicsMixedHit(
@@ -318,18 +319,18 @@ public sealed class GravitasQueryMixedService
     {
         Vector3d point3D = GetSweepSurfacePoint(collider, sweepCenter, direction);
         Vector3d to2D = sweepCenter - point3D;
-        Vector3d normal3DTo2D = to2D.SqrMagnitude > Fixed64.Epsilon
-            ? to2D.Normal
-            : direction.SqrMagnitude > Fixed64.Epsilon ? -direction.Normal : Vector3d.Right;
-        Vector2d planarNormal = new(normal3DTo2D.x, normal3DTo2D.z);
-        Vector2d planarPoint = new(sweepCenter.x, sweepCenter.z);
-        if (planarNormal.SqrMagnitude > Fixed64.Epsilon)
-            planarPoint -= planarNormal.Normal * radius;
+        Vector3d normal3DTo2D = to2D.MagnitudeSquared > Fixed64.Epsilon
+            ? to2D.Normalized
+            : direction.MagnitudeSquared > Fixed64.Epsilon ? -direction.Normalized : Vector3d.Right;
+        Vector2d planarNormal = new(normal3DTo2D.X, normal3DTo2D.Z);
+        Vector2d planarPoint = new(sweepCenter.X, sweepCenter.Z);
+        if (planarNormal.MagnitudeSquared > Fixed64.Epsilon)
+            planarPoint -= planarNormal.Normalized * radius;
 
         Vector3d point2D = new(
-            planarPoint.x,
-            ClampAxis(point3D.y, slabCenterY - halfThickness, slabCenterY + halfThickness),
-            planarPoint.y);
+            planarPoint.X,
+            ClampAxis(point3D.Y, slabCenterY - halfThickness, slabCenterY + halfThickness),
+            planarPoint.Y);
         return new PhysicsMixedHit(
             collider,
             sourceCollider,
@@ -342,20 +343,20 @@ public sealed class GravitasQueryMixedService
 
     private static Vector3d GetClosestEmbeddedPoint(LSCollider2D collider, Vector3d sweepCenter)
     {
-        Vector2d closest2D = collider.GetClosestPoint(new Vector2d(sweepCenter.x, sweepCenter.z));
+        Vector2d closest2D = collider.GetClosestPoint(new Vector2d(sweepCenter.X, sweepCenter.Z));
         return new Vector3d(
-            closest2D.x,
+            closest2D.X,
             ClampAxis(
-                sweepCenter.y,
+                sweepCenter.Y,
                 collider.MixedSlabCenterY - collider.MixedHalfThickness,
                 collider.MixedSlabCenterY + collider.MixedHalfThickness),
-            closest2D.y);
+            closest2D.Y);
     }
 
     private static Vector3d GetSweepSurfacePoint(LSCollider collider, Vector3d sweepCenter, Vector3d direction)
     {
         Vector3d centerDelta = sweepCenter - collider.Center;
-        if (centerDelta.SqrMagnitude <= Fixed64.Epsilon)
+        if (centerDelta.MagnitudeSquared <= Fixed64.Epsilon)
             return collider.Center - direction * collider.ScaledRadius;
 
         return collider.ClosestPointOnSurface(sweepCenter);
@@ -363,12 +364,12 @@ public sealed class GravitasQueryMixedService
 
     private static Vector3d Resolve3DTo2DFallback(LSCollider2D collider, Vector3d sweepCenter, Vector3d direction)
     {
-        Vector3d embeddedCenter = new(collider.Center.x, collider.MixedSlabCenterY, collider.Center.y);
+        Vector3d embeddedCenter = new(collider.Center.X, collider.MixedSlabCenterY, collider.Center.Y);
         Vector3d to2D = embeddedCenter - sweepCenter;
-        if (to2D.SqrMagnitude > Fixed64.Epsilon)
-            return to2D.Normal;
+        if (to2D.MagnitudeSquared > Fixed64.Epsilon)
+            return to2D.Normalized;
 
-        return direction.SqrMagnitude > Fixed64.Epsilon ? direction.Normal : Vector3d.Down;
+        return direction.MagnitudeSquared > Fixed64.Epsilon ? direction.Normalized : Vector3d.Down;
     }
 
     private static bool TrySweepBox(
@@ -385,9 +386,9 @@ public sealed class GravitasQueryMixedService
 
         Fixed64 entry = Fixed64.Zero;
         Fixed64 exit = length;
-        if (!ClipSegmentAxis(start.x, direction.x, min.x, max.x, ref entry, ref exit)
-            || !ClipSegmentAxis(start.y, direction.y, min.y, max.y, ref entry, ref exit)
-            || !ClipSegmentAxis(start.z, direction.z, min.z, max.z, ref entry, ref exit))
+        if (!ClipSegmentAxis(start.X, direction.X, min.X, max.X, ref entry, ref exit)
+            || !ClipSegmentAxis(start.Y, direction.Y, min.Y, max.Y, ref entry, ref exit)
+            || !ClipSegmentAxis(start.Z, direction.Z, min.Z, max.Z, ref entry, ref exit))
         {
             return false;
         }
@@ -405,12 +406,12 @@ public sealed class GravitasQueryMixedService
         out Fixed64 distance)
     {
         distance = Fixed64.Zero;
-        Fixed64 a = direction.x * direction.x + direction.z * direction.z;
+        Fixed64 a = direction.X * direction.X + direction.Z * direction.Z;
         if (a <= Fixed64.Epsilon)
             return false;
 
-        Fixed64 b = 2 * (localStart.x * direction.x + localStart.z * direction.z);
-        Fixed64 c = localStart.x * localStart.x + localStart.z * localStart.z - radius * radius;
+        Fixed64 b = 2 * (localStart.X * direction.X + localStart.Z * direction.Z);
+        Fixed64 c = localStart.X * localStart.X + localStart.Z * localStart.Z - radius * radius;
         Fixed64 discriminant = b * b - 4 * a * c;
         if (discriminant < Fixed64.Zero)
             return false;
@@ -420,7 +421,7 @@ public sealed class GravitasQueryMixedService
         Fixed64 first = (-b - root) / denominator;
         Fixed64 second = (-b + root) / denominator;
         bool found = false;
-        Fixed64 best = Fixed64.MAX_VALUE;
+        Fixed64 best = Fixed64.MaxValue;
         TryKeepEarlierSweep(
             IsCircleSlabSideHit(localStart, direction, length, halfHeight, first),
             first,
@@ -445,15 +446,15 @@ public sealed class GravitasQueryMixedService
         out Fixed64 distance)
     {
         distance = Fixed64.Zero;
-        if (direction.y.Abs() <= Fixed64.Epsilon)
+        if (direction.Y.Abs() <= Fixed64.Epsilon)
             return false;
 
-        Fixed64 candidate = (capY - localStart.y) / direction.y;
+        Fixed64 candidate = (capY - localStart.Y) / direction.Y;
         if (candidate < Fixed64.Zero || candidate > length)
             return false;
 
         Vector3d localPoint = localStart + direction * candidate;
-        Fixed64 radialSqr = localPoint.x * localPoint.x + localPoint.z * localPoint.z;
+        Fixed64 radialSqr = localPoint.X * localPoint.X + localPoint.Z * localPoint.Z;
         if (radialSqr > radius * radius + Fixed64.Epsilon)
             return false;
 
@@ -472,21 +473,21 @@ public sealed class GravitasQueryMixedService
         if (distance < Fixed64.Zero || distance > length)
             return false;
 
-        Fixed64 y = localStart.y + direction.y * distance;
+        Fixed64 y = localStart.Y + direction.Y * distance;
         return y >= -halfHeight && y <= halfHeight;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool IsInsideCircleSlab(Vector3d localPoint, Fixed64 radius, Fixed64 halfHeight) =>
-        localPoint.y >= -halfHeight
-        && localPoint.y <= halfHeight
-        && localPoint.x * localPoint.x + localPoint.z * localPoint.z <= radius * radius;
+        localPoint.Y >= -halfHeight
+        && localPoint.Y <= halfHeight
+        && localPoint.X * localPoint.X + localPoint.Z * localPoint.Z <= radius * radius;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool IsInsideBox(Vector3d point, Vector3d min, Vector3d max) =>
-        point.x >= min.x && point.x <= max.x
-        && point.y >= min.y && point.y <= max.y
-        && point.z >= min.z && point.z <= max.z;
+        point.X >= min.X && point.X <= max.X
+        && point.Y >= min.Y && point.Y <= max.Y
+        && point.Z >= min.Z && point.Z <= max.Z;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool ClipSegmentAxis(

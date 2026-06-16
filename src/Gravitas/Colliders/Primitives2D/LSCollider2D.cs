@@ -4,6 +4,7 @@ using GridForge.Spatial;
 using Gravitas.Support;
 using SwiftCollections;
 using System.Runtime.CompilerServices;
+using FixedMathSharp.Bounds;
 
 namespace Gravitas.Colliders;
 
@@ -21,8 +22,8 @@ public abstract class LSCollider2D : IRecordable, IColliderHierarchyNode
     private bool _isTrigger;
     private PhysicsLayer _layer = new();
     private Vector2d _localOffset;
-    private BoundingArea _bounds;
-    private BoundingBox _mixedBounds3D;
+    private FixedBoundArea _bounds;
+    private FixedBoundBox _mixedBounds3D;
     private Fixed64? _mixedHalfThicknessOverride;
     private Fixed64 _mixedHalfThickness;
     private Fixed64 _mixedSlabCenterY;
@@ -229,9 +230,9 @@ public abstract class LSCollider2D : IRecordable, IColliderHierarchyNode
 
     public Vector2d Center => Position + Rotate(LocalOffset, Rotation);
 
-    public BoundingArea Bounds => _bounds;
+    public FixedBoundArea Bounds => _bounds;
 
-    internal BoundingBox MixedBounds3D => _mixedBounds3D;
+    internal FixedBoundBox MixedBounds3D => _mixedBounds3D;
 
     internal Fixed64 MixedHalfThickness => _mixedHalfThickness;
 
@@ -429,22 +430,22 @@ public abstract class LSCollider2D : IRecordable, IColliderHierarchyNode
     internal bool IsPositionInPlanarBounds(Fixed64 voxelSize, Vector3d worldPosition)
     {
         Fixed64 padding = voxelSize * Fixed64.Half;
-        return worldPosition.x >= MinX - padding
-            && worldPosition.x <= MaxX + padding
-            && worldPosition.z >= MinY - padding
-            && worldPosition.z <= MaxY + padding;
+        return worldPosition.X >= MinX - padding
+            && worldPosition.X <= MaxX + padding
+            && worldPosition.Z >= MinY - padding
+            && worldPosition.Z <= MaxY + padding;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal bool IsPositionInMixedBounds(Fixed64 voxelSize, Vector3d worldPosition)
     {
         Fixed64 padding = voxelSize * Fixed64.Half;
-        return worldPosition.x >= _mixedBounds3D.Min.x - padding
-            && worldPosition.x <= _mixedBounds3D.Max.x + padding
-            && worldPosition.y >= _mixedBounds3D.Min.y - padding
-            && worldPosition.y <= _mixedBounds3D.Max.y + padding
-            && worldPosition.z >= _mixedBounds3D.Min.z - padding
-            && worldPosition.z <= _mixedBounds3D.Max.z + padding;
+        return worldPosition.X >= _mixedBounds3D.Min.X - padding
+            && worldPosition.X <= _mixedBounds3D.Max.X + padding
+            && worldPosition.Y >= _mixedBounds3D.Min.Y - padding
+            && worldPosition.Y <= _mixedBounds3D.Max.Y + padding
+            && worldPosition.Z >= _mixedBounds3D.Min.Z - padding
+            && worldPosition.Z <= _mixedBounds3D.Max.Z + padding;
     }
 
     internal bool TryGetCollisionPair(int otherId, out CollisionPair2D? collisionPair) =>
@@ -590,7 +591,7 @@ public abstract class LSCollider2D : IRecordable, IColliderHierarchyNode
         _mixedHalfThicknessOverride ?? _context?.Settings.Mixed2DHalfThickness ?? PhysicsSettings.DefaultMixed2DHalfThickness;
 
     private Fixed64 ResolveMixedSlabCenterY() =>
-        _agent?.Transform.Position.y ?? Fixed64.Zero;
+        _agent?.Transform.Position.Y ?? Fixed64.Zero;
 
     private void RebuildMixedEmbedding(Fixed64 slabCenterY, Fixed64 halfThickness)
     {
@@ -601,7 +602,7 @@ public abstract class LSCollider2D : IRecordable, IColliderHierarchyNode
         Vector3d max = new(MaxX, slabCenterY + halfThickness, MaxY);
         if (!_mixedBoundsInitialized)
         {
-            _mixedBounds3D = new BoundingBox((min + max) * Fixed64.Half, max - min);
+            _mixedBounds3D = new FixedBoundBox((min + max) * Fixed64.Half, max - min);
             _mixedBoundsInitialized = true;
             return;
         }
@@ -660,20 +661,20 @@ public abstract class LSCollider2D : IRecordable, IColliderHierarchyNode
         return false;
     }
 
-    protected void SetBounds(BoundingArea bounds) => _bounds = bounds;
+    protected void SetBounds(FixedBoundArea bounds) => _bounds = bounds;
 
     protected void SetBoundsFromMinMax(Vector2d min, Vector2d max)
     {
-        SetBounds(new BoundingArea(
-            new Vector3d(min.x, min.y, Fixed64.Zero),
-            new Vector3d(max.x, max.y, Fixed64.Zero)));
+        SetBounds(new FixedBoundArea(
+            new Vector3d(min.X, min.Y, Fixed64.Zero),
+            new Vector3d(max.X, max.Y, Fixed64.Zero)));
     }
 
     private Fixed64 ResolveAgentRotation()
     {
         return _agent == null
             ? Fixed64.Zero
-            : FixedMath.DegToRad(_agent.Transform.EulerAngles.y);
+            : FixedMath.DegToRad(_agent.Transform.EulerAngles.Y);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -688,8 +689,8 @@ public abstract class LSCollider2D : IRecordable, IColliderHierarchyNode
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     protected static Vector2d ClampNearZero(Vector2d value)
     {
-        Fixed64 x = value.x.Abs() <= Fixed64.Epsilon ? Fixed64.Zero : value.x;
-        Fixed64 y = value.y.Abs() <= Fixed64.Epsilon ? Fixed64.Zero : value.y;
+        Fixed64 x = value.X.Abs() <= Fixed64.Epsilon ? Fixed64.Zero : value.X;
+        Fixed64 y = value.Y.Abs() <= Fixed64.Epsilon ? Fixed64.Zero : value.Y;
         return new Vector2d(x, y);
     }
 
@@ -700,7 +701,7 @@ public abstract class LSCollider2D : IRecordable, IColliderHierarchyNode
     protected static Vector2d ClosestPointOnSegment(Vector2d point, Vector2d a, Vector2d b)
     {
         Vector2d segment = b - a;
-        Fixed64 lengthSquared = segment.SqrMagnitude;
+        Fixed64 lengthSquared = segment.MagnitudeSquared;
         if (lengthSquared <= Fixed64.Epsilon)
             return a;
 

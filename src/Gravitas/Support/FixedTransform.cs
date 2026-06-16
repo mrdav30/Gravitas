@@ -51,7 +51,7 @@ public class FixedTransform
     public Vector3d EulerAngles
     {
         get => Rotation.EulerAngles;
-        set => Rotation = FixedQuaternion.FromEulerAnglesInDegrees(value.x, value.y, value.z);
+        set => Rotation = FixedQuaternion.FromEulerAnglesInDegrees(value.X, value.Y, value.Z);
     }
 
     public FixedTransform? Parent

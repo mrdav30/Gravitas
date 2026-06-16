@@ -19,7 +19,7 @@ public static partial class CollisionDetection
         Vector3d closestPointOnCapsule = capsule.ClosestPointOnSurface(sphere.Center);
         Vector3d penetrationVector = sphere.Center - closestPointOnCapsule;
         // Check if the distance from the sphere center to the closest point is less than the sum of the radii
-        if (penetrationVector.SqrMagnitude > sphere.ScaledRadiusSqr)
+        if (penetrationVector.MagnitudeSquared > sphere.ScaledRadiusSqr)
             return false; // No collision if the distance squared is greater than the sum of the radii squared
 
         Vector3d penetrationNormal = ResolveNormal(penetrationVector, sphere.Center - capsule.Center);
@@ -44,7 +44,7 @@ public static partial class CollisionDetection
             capsule2.LineSegmentEnd);
         Vector3d centerDelta = closestPointsOnCapsules.Item2 - closestPointsOnCapsules.Item1;
         Fixed64 radiusSum = capsule1.ScaledRadius + capsule2.ScaledRadius;
-        if (centerDelta.SqrMagnitude > radiusSum * radiusSum)
+        if (centerDelta.MagnitudeSquared > radiusSum * radiusSum)
             return false; // No collision if the distance squared is greater than the sum of the radii squared
 
         Fixed64 distance = centerDelta.Magnitude;
@@ -68,8 +68,8 @@ public static partial class CollisionDetection
         Vector3d secondStart,
         Vector3d secondEnd)
     {
-        bool firstDegenerate = (firstEnd - firstStart).SqrMagnitude <= Fixed64.Epsilon;
-        bool secondDegenerate = (secondEnd - secondStart).SqrMagnitude <= Fixed64.Epsilon;
+        bool firstDegenerate = (firstEnd - firstStart).MagnitudeSquared <= Fixed64.Epsilon;
+        bool secondDegenerate = (secondEnd - secondStart).MagnitudeSquared <= Fixed64.Epsilon;
 
         if (firstDegenerate && secondDegenerate)
             return (firstStart, secondStart);

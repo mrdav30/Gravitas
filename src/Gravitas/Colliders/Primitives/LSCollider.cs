@@ -1,5 +1,6 @@
 ﻿using Chronicler;
 using FixedMathSharp;
+using FixedMathSharp.Bounds;
 using Gravitas.CollisionHandling;
 using Gravitas.Queries;
 using Gravitas.Support;
@@ -86,7 +87,7 @@ public abstract class LSCollider : IRecordable, IColliderHierarchyNode
 
     public Fixed64 HeightPos => _compoundOwner?.HeightPos
         ?? Body?.HeightPos
-        ?? _agent?.Transform.Position.y
+        ?? _agent?.Transform.Position.Y
         ?? throw new InvalidOperationException("Collider has no body or static transform.");
 
     public virtual FixedQuaternion Rotation
@@ -208,7 +209,7 @@ public abstract class LSCollider : IRecordable, IColliderHierarchyNode
     /// For boxes, this is half of the diagonal length of the cube
     /// </summary>
     /// <value>The radius.</value>
-    public virtual Fixed64 ScaledRadius => _radius * FixedMath.Max(LocalScale.z, FixedMath.Max(LocalScale.x, LocalScale.y));
+    public virtual Fixed64 ScaledRadius => _radius * FixedMath.Max(LocalScale.Z, FixedMath.Max(LocalScale.X, LocalScale.Y));
 
     public Fixed64 ScaledRadiusSqr => ScaledRadius * ScaledRadius;
 
@@ -238,21 +239,21 @@ public abstract class LSCollider : IRecordable, IColliderHierarchyNode
     #region Grid & Partition Bounds
 
     public virtual Vector3d LocalScale => _compoundOwner != null
-        ? Vector3d.Scale(_compoundOwner.LocalScale, _compoundLocalScale)
+        ? Vector3d.Multiply(_compoundOwner.LocalScale, _compoundLocalScale)
         : Transform.LossyScale;
 
-    public virtual Vector3d ScaledSize => Vector3d.Scale(_size, LocalScale);
+    public virtual Vector3d ScaledSize => Vector3d.Multiply(_size, LocalScale);
 
-    public Vector3d ScaledOffset => Vector3d.Scale(_offset, LocalScale);
+    public Vector3d ScaledOffset => Vector3d.Multiply(_offset, LocalScale);
 
     /// <summary>
     /// Bodies position in world space + collider offset (center) value
     /// </summary>
     public Vector3d Center => Position + (Rotation * ScaledOffset);
 
-    protected BoundingBox _bounds;
+    protected FixedBoundBox _bounds;
     private bool _boundsInitialized;
-    public BoundingBox Bounds => _bounds;
+    public FixedBoundBox Bounds => _bounds;
     public Vector3d BoundsMin => _bounds.Min;
     public Vector3d BoundsMax => _bounds.Max;
 
@@ -476,7 +477,7 @@ public abstract class LSCollider : IRecordable, IColliderHierarchyNode
     {
         if (!_boundsInitialized)
         {
-            _bounds = new BoundingBox(Center, ScaledSize);
+            _bounds = new FixedBoundBox(Center, ScaledSize);
             _boundsInitialized = true;
         }
         else
@@ -487,7 +488,7 @@ public abstract class LSCollider : IRecordable, IColliderHierarchyNode
         CalculateBoundLimits();
     }
 
-    protected void SetBounds(BoundingBox bounds)
+    protected void SetBounds(FixedBoundBox bounds)
     {
         _bounds = bounds;
         _boundsInitialized = true;
@@ -497,7 +498,7 @@ public abstract class LSCollider : IRecordable, IColliderHierarchyNode
     {
         if (!_boundsInitialized)
         {
-            _bounds = new BoundingBox((min + max) * Fixed64.Half, max - min);
+            _bounds = new FixedBoundBox((min + max) * Fixed64.Half, max - min);
             _boundsInitialized = true;
             return;
         }
@@ -548,7 +549,7 @@ public abstract class LSCollider : IRecordable, IColliderHierarchyNode
     private static void ValidateSize(Vector3d value)
     {
         SwiftThrowHelper.ThrowIfArgument(
-            value.x <= Fixed64.Zero || value.y <= Fixed64.Zero || value.z <= Fixed64.Zero,
+            value.X <= Fixed64.Zero || value.Y <= Fixed64.Zero || value.Z <= Fixed64.Zero,
             nameof(value),
             "Collider size components must be greater than zero.");
     }
@@ -656,12 +657,12 @@ public abstract class LSCollider : IRecordable, IColliderHierarchyNode
     /// <returns>True if position within bounds</returns>
     public bool IsPositionInBounds(Fixed64 voxelSize, Vector3d position)
     {
-        return position.x + voxelSize >= BoundsMin.x
-            && position.x - voxelSize <= BoundsMax.x
-            && position.y + voxelSize >= BoundsMin.y
-            && position.y - voxelSize <= BoundsMax.y
-            && position.z + voxelSize >= BoundsMin.z
-            && position.z - voxelSize <= BoundsMax.z;
+        return position.X + voxelSize >= BoundsMin.X
+            && position.X - voxelSize <= BoundsMax.X
+            && position.Y + voxelSize >= BoundsMin.Y
+            && position.Y - voxelSize <= BoundsMax.Y
+            && position.Z + voxelSize >= BoundsMin.Z
+            && position.Z - voxelSize <= BoundsMax.Z;
     }
 
     /// <summary>
@@ -682,7 +683,7 @@ public abstract class LSCollider : IRecordable, IColliderHierarchyNode
         }
 
         (Vector3d min, Vector3d max) = world.SnapBoundsToVoxelSize(BoundsMin, BoundsMax, Fixed64.Half);
-        _partitionState.SetPreviousGridBounds(min, max);
+        _partitionState.SetPreviousGridBounds(BoundsMin, BoundsMax);
     }
 
     internal bool TryGetCollisionPair(int otherId, out CollisionPair? collisionPair) =>

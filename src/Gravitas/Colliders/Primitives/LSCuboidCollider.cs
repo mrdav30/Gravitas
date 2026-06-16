@@ -1,4 +1,5 @@
 ﻿using FixedMathSharp;
+using FixedMathSharp.Bounds;
 using Gravitas.Queries;
 using SwiftCollections;
 
@@ -37,7 +38,7 @@ public class LSCuboidCollider : LSCollider
     /// </summary>
     public Vector3d[] Vertices => _vertices;
 
-    protected BoundingBox _orientedBounds;
+    protected FixedBoundBox _orientedBounds;
 
     protected int[][] _faceVertices = null!;
     /// <summary>
@@ -116,12 +117,12 @@ public class LSCuboidCollider : LSCollider
         _faceCentroids = new Vector3d[FaceDefinitions.Length];
         _edgeVertices = new int[EdgeDefinitions.Length][];
         _edgeDirections = new Vector3d[EdgeDefinitions.Length];
-        _orientedBounds = new BoundingBox(Vector3d.Zero, Vector3d.One);
+        _orientedBounds = new FixedBoundBox(Vector3d.Zero, Vector3d.One);
     }
 
     protected override void OnInitialize()
     {
-        _orientedBounds = new BoundingBox(Center, ScaledSize);
+        _orientedBounds = new FixedBoundBox(Center, ScaledSize);
         base.OnInitialize();
     }
 
@@ -198,7 +199,7 @@ public class LSCuboidCollider : LSCollider
             Vector3d edge2 = Vertices[faceVertices[2]] - first;
 
             // Calculate the normal using cross product
-            _faceNormals[i] = Vector3d.Cross(edge1, edge2).Normal;
+            _faceNormals[i] = Vector3d.Cross(edge1, edge2).Normalized;
         }
     }
 
@@ -247,20 +248,20 @@ public class LSCuboidCollider : LSCollider
 
     // Method to calculate direction of an edge
     public Vector3d GetEdgeDirection(int index) =>
-         GetEdgeDisplacement(index).Normal;
+         GetEdgeDisplacement(index).Normalized;
 
     protected virtual void GenerateArea() =>
         // Area calculation: A = 2lw + 2lh + 2wh
-        Area = 2 * ScaledSize.x * ScaledSize.z + 2 * ScaledSize.x * ScaledSize.y + 2 * ScaledSize.y * ScaledSize.z;
+        Area = 2 * ScaledSize.X * ScaledSize.Z + 2 * ScaledSize.X * ScaledSize.Y + 2 * ScaledSize.Y * ScaledSize.Z;
 
     public override Fixed3x3 CalculateInertiaTensor(Fixed64 mass)
     {
         Vector3d worldScaleSqr = ScaledSize * ScaledSize;
 
         // For a solid box, the inertia tensor is (m/12)*(h^2 + d^2), (m/12)*(w^2 + d^2), (m/12)*(w^2 + h^2) for the diagonal elements
-        Fixed64 xx = (mass / (Fixed64)12) * (worldScaleSqr.y + worldScaleSqr.z);
-        Fixed64 yy = (mass / (Fixed64)12) * (worldScaleSqr.x + worldScaleSqr.z);
-        Fixed64 zz = (mass / (Fixed64)12) * (worldScaleSqr.x + worldScaleSqr.y);
+        Fixed64 xx = (mass / (Fixed64)12) * (worldScaleSqr.Y + worldScaleSqr.Z);
+        Fixed64 yy = (mass / (Fixed64)12) * (worldScaleSqr.X + worldScaleSqr.Z);
+        Fixed64 zz = (mass / (Fixed64)12) * (worldScaleSqr.X + worldScaleSqr.Y);
 
         return new Fixed3x3(
             xx, Fixed64.Zero, Fixed64.Zero,
@@ -272,7 +273,7 @@ public class LSCuboidCollider : LSCollider
     public override Fixed64 GetFrontalArea(Vector3d direction)
     {
         // Normalize the direction vector to get only the direction information
-        direction.Normalize();
+        direction.NormalizeInPlace();
 
         // Get the absolute dot products of the direction with the local axes
         Fixed64 dotX = Vector3d.Dot(direction, _xAxisDirectionVector).Abs();
@@ -313,14 +314,14 @@ public class LSCuboidCollider : LSCollider
 
         // Find the closest point on the edges or vertices
         Vector3d closestPoint = Vertices[faceVertices[0]];
-        Fixed64 minDistanceSquared = (projectedPoint - closestPoint).SqrMagnitude;
+        Fixed64 minDistanceSquared = (projectedPoint - closestPoint).MagnitudeSquared;
 
         for (int i = 0; i < faceVertices.Length; i++)
         {
             Vector3d start = Vertices[faceVertices[i]];
             Vector3d end = Vertices[faceVertices[(i + 1) % faceVertices.Length]];
             Vector3d closestPointOnEdge = ClosestPointOnLineSegment(start, end, projectedPoint);
-            Fixed64 distanceSquared = (projectedPoint - closestPointOnEdge).SqrMagnitude;
+            Fixed64 distanceSquared = (projectedPoint - closestPointOnEdge).MagnitudeSquared;
 
             if (distanceSquared < minDistanceSquared)
             {
@@ -337,7 +338,7 @@ public class LSCuboidCollider : LSCollider
         if (CurrentState == CuboidState.AABox)
             return Bounds.ClosestPointOnSurface(other);
 
-        Fixed64 minDistance = Fixed64.MAX_VALUE;
+        Fixed64 minDistance = Fixed64.MaxValue;
         Vector3d closestPoint = Center;
 
         // Find closest point on faces
@@ -345,7 +346,7 @@ public class LSCuboidCollider : LSCollider
         {
             // Calculate the closest point on the current face
             Vector3d facePoint = ClosestPointOnFace(_faceVertices[i], _faceNormals[i], _faceCentroids[i], other);
-            Fixed64 distance = Vector3d.SqrDistance(facePoint, other);
+            Fixed64 distance = Vector3d.DistanceSquared(facePoint, other);
 
             if (distance < minDistance)
             {
@@ -364,13 +365,13 @@ public class LSCuboidCollider : LSCollider
             Vector3d localToCenter = point - Center;
             Vector3d absLocal = Vector3d.Abs(localToCenter);
 
-            if (absLocal.x > absLocal.y && absLocal.x > absLocal.z)
-                return new Vector3d(localToCenter.x > Fixed64.Zero ? Fixed64.One : -Fixed64.One, Fixed64.Zero, Fixed64.Zero);
+            if (absLocal.X > absLocal.Y && absLocal.X > absLocal.Z)
+                return new Vector3d(localToCenter.X > Fixed64.Zero ? Fixed64.One : -Fixed64.One, Fixed64.Zero, Fixed64.Zero);
 
-            if (absLocal.y > absLocal.z)
-                return new Vector3d(Fixed64.Zero, localToCenter.y > Fixed64.Zero ? Fixed64.One : -Fixed64.One, Fixed64.Zero);
+            if (absLocal.Y > absLocal.Z)
+                return new Vector3d(Fixed64.Zero, localToCenter.Y > Fixed64.Zero ? Fixed64.One : -Fixed64.One, Fixed64.Zero);
 
-            return new Vector3d(Fixed64.Zero, Fixed64.Zero, localToCenter.z > Fixed64.Zero ? Fixed64.One : -Fixed64.One);
+            return new Vector3d(Fixed64.Zero, Fixed64.Zero, localToCenter.Z > Fixed64.Zero ? Fixed64.One : -Fixed64.One);
         }
 
         // Transform the point to local space
@@ -379,22 +380,22 @@ public class LSCuboidCollider : LSCollider
         // Get the local normal as if it's an AABB
         Vector3d localNormal = Vector3d.Abs(localPoint - Center) - Bounds.Scope;
 
-        Vector3d sign = new((localPoint.x - Center.x).Sign(), (localPoint.y - Center.y).Sign(), (localPoint.z - Center.z).Sign());
+        Vector3d sign = new((localPoint.X - Center.X).Sign(), (localPoint.Y - Center.Y).Sign(), (localPoint.Z - Center.Z).Sign());
 
         // Find the component of localNormal with the greatest absolute value
-        if (localNormal.x > localNormal.y)
+        if (localNormal.X > localNormal.Y)
         {
-            if (localNormal.x > localNormal.z)
-                localNormal = new Vector3d(sign.x, Fixed64.Zero, Fixed64.Zero);
+            if (localNormal.X > localNormal.Z)
+                localNormal = new Vector3d(sign.X, Fixed64.Zero, Fixed64.Zero);
             else
-                localNormal = new Vector3d(Fixed64.Zero, Fixed64.Zero, sign.z);
+                localNormal = new Vector3d(Fixed64.Zero, Fixed64.Zero, sign.Z);
         }
         else
         {
-            if (localNormal.y > localNormal.z)
-                localNormal = new Vector3d(Fixed64.Zero, sign.y, Fixed64.Zero);
+            if (localNormal.Y > localNormal.Z)
+                localNormal = new Vector3d(Fixed64.Zero, sign.Y, Fixed64.Zero);
             else
-                localNormal = new Vector3d(Fixed64.Zero, Fixed64.Zero, sign.z);
+                localNormal = new Vector3d(Fixed64.Zero, Fixed64.Zero, sign.Z);
         }
 
         // Transform the normal back to world space
@@ -432,7 +433,7 @@ public class LSCuboidCollider : LSCollider
     protected Vector3d ClosestPointOnLineSegment(Vector3d start, Vector3d end, Vector3d point)
     {
         Vector3d direction = end - start;
-        Fixed64 lengthSquared = direction.SqrMagnitude;
+        Fixed64 lengthSquared = direction.MagnitudeSquared;
         if (lengthSquared == Fixed64.Zero) return start;
 
         Fixed64 t = Vector3d.Dot(point - start, direction) / lengthSquared;

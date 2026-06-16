@@ -26,7 +26,7 @@ output local to one
 
 The current 2D broad phase is GridForge-backed:
 
-1. rebuild a 2D collider's `BoundingArea` when body motion, kinematic host
+1. rebuild a 2D collider's `FixedBoundArea` when body motion, kinematic host
    motion, explicit bodyless collider refresh, or shape input edits change it.
 2. project the collider's X/Z bounds into private GridForge storage on the Y=0
    plane.
@@ -49,7 +49,7 @@ keeps those paths side by side without cross-dimensional contacts; only
 now uses `PhysicsMixedPartition` payloads attached to GridForge voxels and emits
 stable 3D/2D candidate keys after awake-dynamic, layer, same-agent, explicit
 hierarchy, duplicate, and bounds filtering. The mixed embedding state on
-`LSCollider2D` is a finite 3D `BoundingBox` built from pure 2D X/Z bounds plus a
+`LSCollider2D` is a finite 3D `FixedBoundBox` built from pure 2D X/Z bounds plus a
 positive Y half-thickness centered on the host transform's Y position.
 `CollisionDetectionMixed` currently supports 3D sphere, cuboid, capsule, finite
 cylinder, compound, and mesh contacts against embedded 2D circle, AABB, and
@@ -179,7 +179,7 @@ shared across 2D and 3D through dimension-tagged `ColliderHierarchyKey` values,
 so cross-dimensional parent/child and sibling filters do not alias plain
 collider IDs. Only partition coordinates remain 2D-specific because they store
 X/Z planar coverage. A 2D collider whose center, rotation, local offset, or
-shape version has not changed skips `BoundingArea` rebuilds and partition
+shape version has not changed skips `FixedBoundArea` rebuilds and partition
 refreshes.
 
 Partition state tracks grid coordinates, previous snapped grid bounds,

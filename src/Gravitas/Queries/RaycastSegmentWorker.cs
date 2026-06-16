@@ -27,7 +27,7 @@ public sealed class RaycastSegmentWorker
         _cachedEnd = p2;
 
         Vector3d segment = p2 - p1;
-        _segmentLengthSqr = segment.SqrMagnitude;
+        _segmentLengthSqr = segment.MagnitudeSquared;
         _segmentLength = _segmentLengthSqr == Fixed64.Zero ? Fixed64.Zero : segment.Magnitude;
         _segmentDirection = _segmentLength == Fixed64.Zero ? Vector3d.Zero : segment / _segmentLength;
         _calculateIntersections = calculateIntersectionPoints;
@@ -51,14 +51,14 @@ public sealed class RaycastSegmentWorker
         Fixed64 closestParameter = Vector3d.Dot(originToCenter, _segmentDirection);
         closestParameter = FixedMath.Clamp(closestParameter, Fixed64.Zero, _segmentLength);
         Vector3d closestPoint = _cachedOrigin + _segmentDirection * closestParameter;
-        if ((closestPoint - position).SqrMagnitude > sqrRadius)
+        if ((closestPoint - position).MagnitudeSquared > sqrRadius)
             return false;
 
         if (!_calculateIntersections)
             return true;
 
         Vector3d originFromCenter = _cachedOrigin - position;
-        Fixed64 c = originFromCenter.SqrMagnitude - sqrRadius;
+        Fixed64 c = originFromCenter.MagnitudeSquared - sqrRadius;
         if (c <= Fixed64.Zero)
         {
             outputIntersectionPoints.Add(_cachedOrigin);
@@ -106,7 +106,7 @@ public sealed class RaycastSegmentWorker
         Vector3d localOrigin = meshCollider.Mesh.ConvertWorldToLocal(_cachedOrigin);
         Vector3d localEnd = meshCollider.Mesh.ConvertWorldToLocal(_cachedEnd);
         Vector3d localSegment = localEnd - localOrigin;
-        Fixed64 localSegmentLengthSqr = localSegment.SqrMagnitude;
+        Fixed64 localSegmentLengthSqr = localSegment.MagnitudeSquared;
         Fixed64 localSegmentLength = localSegmentLengthSqr == Fixed64.Zero ? Fixed64.Zero : localSegment.Magnitude;
         Vector3d localSegmentDirection = localSegmentLength == Fixed64.Zero ? Vector3d.Zero : localSegment / localSegmentLength;
 
@@ -201,12 +201,12 @@ public sealed class RaycastSegmentWorker
         Fixed64 halfHeight,
         ref SwiftList<Vector3d> outputIntersectionPoints)
     {
-        Fixed64 a = localDirection.x * localDirection.x + localDirection.z * localDirection.z;
+        Fixed64 a = localDirection.X * localDirection.X + localDirection.Z * localDirection.Z;
         if (a <= Fixed64.Epsilon)
             return false;
 
-        Fixed64 b = 2 * (localOrigin.x * localDirection.x + localOrigin.z * localDirection.z);
-        Fixed64 c = localOrigin.x * localOrigin.x + localOrigin.z * localOrigin.z - radiusSqr;
+        Fixed64 b = 2 * (localOrigin.X * localDirection.X + localOrigin.Z * localDirection.Z);
+        Fixed64 c = localOrigin.X * localOrigin.X + localOrigin.Z * localOrigin.Z - radiusSqr;
         Fixed64 discriminant = b * b - 4 * a * c;
         if (discriminant < Fixed64.Zero)
             return false;
@@ -232,15 +232,15 @@ public sealed class RaycastSegmentWorker
         Fixed64 capY,
         ref SwiftList<Vector3d> outputIntersectionPoints)
     {
-        if (localDirection.y.Abs() <= Fixed64.Epsilon)
+        if (localDirection.Y.Abs() <= Fixed64.Epsilon)
             return false;
 
-        Fixed64 distance = (capY - localOrigin.y) / localDirection.y;
+        Fixed64 distance = (capY - localOrigin.Y) / localDirection.Y;
         if (distance < Fixed64.Zero || distance > _segmentLength)
             return false;
 
         Vector3d localPoint = localOrigin + localDirection * distance;
-        Fixed64 radialSqr = localPoint.x * localPoint.x + localPoint.z * localPoint.z;
+        Fixed64 radialSqr = localPoint.X * localPoint.X + localPoint.Z * localPoint.Z;
         if (radialSqr > radiusSqr + Fixed64.Epsilon)
             return false;
 
@@ -262,9 +262,9 @@ public sealed class RaycastSegmentWorker
         Fixed64 entry = Fixed64.Zero;
         Fixed64 exit = _segmentLength;
 
-        if (!ClipSegmentAxis(_cachedOrigin.x, _segmentDirection.x, min.x, max.x, ref entry, ref exit)
-            || !ClipSegmentAxis(_cachedOrigin.y, _segmentDirection.y, min.y, max.y, ref entry, ref exit)
-            || !ClipSegmentAxis(_cachedOrigin.z, _segmentDirection.z, min.z, max.z, ref entry, ref exit))
+        if (!ClipSegmentAxis(_cachedOrigin.X, _segmentDirection.X, min.X, max.X, ref entry, ref exit)
+            || !ClipSegmentAxis(_cachedOrigin.Y, _segmentDirection.Y, min.Y, max.Y, ref entry, ref exit)
+            || !ClipSegmentAxis(_cachedOrigin.Z, _segmentDirection.Z, min.Z, max.Z, ref entry, ref exit))
         {
             return false;
         }
@@ -309,7 +309,7 @@ public sealed class RaycastSegmentWorker
             return false;
 
         Vector3d localPoint = localOrigin + localDirection * distance;
-        if (localPoint.y < -halfHeight || localPoint.y > halfHeight)
+        if (localPoint.Y < -halfHeight || localPoint.Y > halfHeight)
             return false;
 
         AddLocalIntersectionPoint(center, rotation, localPoint, ref outputIntersectionPoints);
@@ -382,7 +382,7 @@ public sealed class RaycastSegmentWorker
 
         for (int i = 0; i < outputIntersectionPoints.Count; i++)
         {
-            if (Vector3d.SqrDistance(outputIntersectionPoints[i], point) <= Fixed64.Epsilon)
+            if (Vector3d.DistanceSquared(outputIntersectionPoints[i], point) <= Fixed64.Epsilon)
                 return;
         }
 
@@ -412,9 +412,9 @@ public sealed class RaycastSegmentWorker
     }
 
     private static bool PointInsideFiniteCylinder(Vector3d localPoint, Fixed64 radiusSqr, Fixed64 halfHeight) =>
-        localPoint.y >= -halfHeight
-        && localPoint.y <= halfHeight
-        && localPoint.x * localPoint.x + localPoint.z * localPoint.z <= radiusSqr;
+        localPoint.Y >= -halfHeight
+        && localPoint.Y <= halfHeight
+        && localPoint.X * localPoint.X + localPoint.Z * localPoint.Z <= radiusSqr;
 
     private void AddLocalIntersectionPoint(
         Vector3d center,
@@ -428,7 +428,7 @@ public sealed class RaycastSegmentWorker
         Vector3d worldPoint = center + rotation * localPoint;
         for (int i = 0; i < outputIntersectionPoints.Count; i++)
         {
-            if (Vector3d.SqrDistance(outputIntersectionPoints[i], worldPoint) <= Fixed64.Epsilon)
+            if (Vector3d.DistanceSquared(outputIntersectionPoints[i], worldPoint) <= Fixed64.Epsilon)
                 return;
         }
 
@@ -440,7 +440,7 @@ public sealed class RaycastSegmentWorker
         Fixed64 sqrRadius,
         ref SwiftList<Vector3d> outputIntersectionPoints)
     {
-        if ((_cachedOrigin - position).SqrMagnitude > sqrRadius)
+        if ((_cachedOrigin - position).MagnitudeSquared > sqrRadius)
             return false;
 
         if (_calculateIntersections)
@@ -454,9 +454,9 @@ public sealed class RaycastSegmentWorker
         Vector3d max,
         ref SwiftList<Vector3d> outputIntersectionPoints)
     {
-        if (_cachedOrigin.x < min.x || _cachedOrigin.x > max.x
-            || _cachedOrigin.y < min.y || _cachedOrigin.y > max.y
-            || _cachedOrigin.z < min.z || _cachedOrigin.z > max.z)
+        if (_cachedOrigin.X < min.X || _cachedOrigin.X > max.X
+            || _cachedOrigin.Y < min.Y || _cachedOrigin.Y > max.Y
+            || _cachedOrigin.Z < min.Z || _cachedOrigin.Z > max.Z)
         {
             return false;
         }

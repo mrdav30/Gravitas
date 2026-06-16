@@ -268,8 +268,8 @@ public sealed class CollisionResponseInvariantTests
     public void CalculateImpulse_WithSlopedContactNormal_ShouldResolveAgainstContactPlane()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
-        Vector3d normal = new Vector3d(Fixed64.One, Fixed64.One, Fixed64.Zero).Normal;
-        Vector3d tangent = new Vector3d(-normal.y, normal.x, Fixed64.Zero).Normal;
+        Vector3d normal = new Vector3d(Fixed64.One, Fixed64.One, Fixed64.Zero).Normalized;
+        Vector3d tangent = new Vector3d(-normal.y, normal.x, Fixed64.Zero).Normalized;
         ScenarioBody<LSSphereCollider> slope = scenario.CreateSphere(
             PhysicsScenarioBuilder.Vector(0, 0, 0),
             immovable: true);

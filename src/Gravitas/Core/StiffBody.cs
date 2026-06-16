@@ -76,8 +76,8 @@ public class StiffBody : IRecordable
         {
             if (Position3d == value)
                 return;
-            _position2dUnmarked.Set(value.x, value.z);
-            _heightPosUnmarked = value.y;
+            _position2dUnmarked.Set(value.X, value.Z);
+            _heightPosUnmarked = value.Y;
             _positionMutated = true;
         }
     }
@@ -519,7 +519,7 @@ public class StiffBody : IRecordable
         _positionChangedBuffer = true;
         _position2dUnmarked = startPosition.ToVector2d();
         _lastGroundedPosition = _lastPosition = _spawnedPosition = startPosition;
-        _heightPosUnmarked = startPosition.y;
+        _heightPosUnmarked = startPosition.Y;
 
         _rotationChangedBuffer = true;
         _rotation = startRotation;
@@ -580,7 +580,7 @@ public class StiffBody : IRecordable
             Wake();
 
         Position2d = kinematicPosition.ToVector2d();
-        HeightPos = kinematicPosition.y;
+        HeightPos = kinematicPosition.Y;
         SetVisualPosition(kinematicPosition);
 
         FixedQuaternion kinematicRotation = _rotationTransform.Rotation;
@@ -833,7 +833,7 @@ public class StiffBody : IRecordable
         if (!_isGrounded)
             return;
 
-        Vector2d horizontalVelocity = new(_linearVelocity.x, _linearVelocity.z);
+        Vector2d horizontalVelocity = new(_linearVelocity.X, _linearVelocity.Z);
         Fixed64 horizontalSpeed = horizontalVelocity.Magnitude;
         if (horizontalSpeed <= Fixed64.Zero)
             return;
@@ -867,10 +867,10 @@ public class StiffBody : IRecordable
 
         // Apply gravity only if not grounded
         if (!IsGrounded)
-            _linearVelocity.y -= environment.Gravity * deltaTime;
+            _linearVelocity.Y -= environment.Gravity * deltaTime;
 
         // Make sure we don't fall any faster than maxFallSpeed. This gives our character a terminal velocity
-        _linearVelocity.y = FixedMath.Max(_linearVelocity.y, -environment.MaxFallSpeed);
+        _linearVelocity.Y = FixedMath.Max(_linearVelocity.Y, -environment.MaxFallSpeed);
 
         RefreshLinearMotionState(lastVelocity);
     }
@@ -883,7 +883,7 @@ public class StiffBody : IRecordable
         {
             if (desiredSpeed > environment.MaxSpeed)
             {
-                _linearVelocity = _linearVelocity.Normal * environment.MaxSpeed;
+                _linearVelocity = _linearVelocity.Normalized * environment.MaxSpeed;
                 _linearSpeed = environment.MaxSpeed;
             }
             else
@@ -897,7 +897,7 @@ public class StiffBody : IRecordable
 
         // Update the direction of the linear velocity, if we're not moving maintain previous direction
         _linearDirection = _linearSpeed > Fixed64.Zero
-            ? _linearVelocity.Normal
+            ? _linearVelocity.Normalized
             : _linearDirection;
         _linearAcceleration = _linearSpeed > Fixed64.Zero
             ? (_linearVelocity - lastVelocity) / Context.DeltaTime
@@ -966,14 +966,14 @@ public class StiffBody : IRecordable
         {
             if (desiredSpeed > environment.MaxSpeed)
             {
-                _angularVelocity = _angularVelocity.Normal * environment.MaxSpeed;
+                _angularVelocity = _angularVelocity.Normalized * environment.MaxSpeed;
                 _angularSpeed = environment.MaxSpeed;
 
             }
             else
             {
                 _angularSpeed = desiredSpeed;
-                _angularDirection = _angularSpeed > Fixed64.Zero ? _angularVelocity.Normal : Vector3d.Zero;
+                _angularDirection = _angularSpeed > Fixed64.Zero ? _angularVelocity.Normalized : Vector3d.Zero;
             }
         }
         else if (desiredSpeed >= Fixed64.Zero)
@@ -1003,7 +1003,7 @@ public class StiffBody : IRecordable
         CheckGroundForSimulation();
 
         if (_isGrounded)
-            HeightPos = HitPoint.y;
+            HeightPos = HitPoint.Y;
         else
             ResetGroundCalculations();
 
@@ -1027,11 +1027,11 @@ public class StiffBody : IRecordable
         // when walking down a step or over a sharp change in slope.
         if (_isGrounded)
         {
-            velocityVector.y -= FixedMath.Max(StepOffset, velocityVector.Magnitude);
+            velocityVector.Y -= FixedMath.Max(StepOffset, velocityVector.Magnitude);
             _lastGroundedPosition = Position3d;
         }
         else
-            HeightPos = velocityVector.y;
+            HeightPos = velocityVector.Y;
 
         //  Apply the force
         Position2d = _positionCorrection + velocityAxis;
@@ -1044,12 +1044,12 @@ public class StiffBody : IRecordable
             return false;
 
         Vector3d displacement = proposedPosition - startPosition;
-        if (displacement.SqrMagnitude <= Fixed64.Epsilon)
+        if (displacement.MagnitudeSquared <= Fixed64.Epsilon)
             return false;
 
         Fixed64 proxyRadius = ResolveContinuousCollisionProxyRadius();
         if (proxyRadius <= Fixed64.Epsilon
-            || (mode == ContinuousCollisionMode.Auto && displacement.SqrMagnitude <= proxyRadius * proxyRadius))
+            || (mode == ContinuousCollisionMode.Auto && displacement.MagnitudeSquared <= proxyRadius * proxyRadius))
         {
             return false;
         }
@@ -1076,14 +1076,14 @@ public class StiffBody : IRecordable
         bool foundMixed = TryGetFirstValidMixedContinuousCollisionHit(mixedHitCount, out PhysicsMixedHit hitMixed);
         if (found3D && (!foundMixed || hit3D.Distance <= hitMixed.Distance))
         {
-            proposedPosition = startPosition + displacement.Normal * hit3D.Distance;
+            proposedPosition = startPosition + displacement.Normalized * hit3D.Distance;
             RemoveClosingContinuousCollisionVelocity(hit3D.Normal);
             return true;
         }
 
         if (foundMixed)
         {
-            proposedPosition = startPosition + displacement.Normal * hitMixed.Distance;
+            proposedPosition = startPosition + displacement.Normalized * hitMixed.Distance;
             RemoveClosingContinuousCollisionVelocity(hitMixed.NormalFor3DSource);
             return true;
         }
@@ -1156,11 +1156,11 @@ public class StiffBody : IRecordable
             LSCapsuleCollider capsule => capsule.ScaledRadius,
             LSCylinderCollider cylinder => cylinder.ScaledRadius,
             LSCuboidCollider cuboid => FixedMath.Min(
-                cuboid.Bounds.Scope.x,
-                FixedMath.Min(cuboid.Bounds.Scope.y, cuboid.Bounds.Scope.z)),
+                cuboid.Bounds.Scope.X,
+                FixedMath.Min(cuboid.Bounds.Scope.Y, cuboid.Bounds.Scope.Z)),
             LSCompoundCollider compound => FixedMath.Min(
-                compound.Bounds.Scope.x,
-                FixedMath.Min(compound.Bounds.Scope.y, compound.Bounds.Scope.z)),
+                compound.Bounds.Scope.X,
+                FixedMath.Min(compound.Bounds.Scope.Y, compound.Bounds.Scope.Z)),
             _ => Fixed64.Zero
         };
     }
@@ -1197,7 +1197,7 @@ public class StiffBody : IRecordable
 
     private void RemoveClosingContinuousCollisionVelocity(Vector3d normal)
     {
-        if (normal.SqrMagnitude <= Fixed64.Epsilon)
+        if (normal.MagnitudeSquared <= Fixed64.Epsilon)
             return;
 
         Fixed64 closingSpeed = Vector3d.Dot(_linearVelocity, normal);
@@ -1213,9 +1213,9 @@ public class StiffBody : IRecordable
     private void RotationBasedOnTorque()
     {
         // Convert angular velocity to a quaternion
-        FixedQuaternion angularVelocityQuaternion = new(_angularVelocity.x, _angularVelocity.y, _angularVelocity.z, Fixed64.Zero);
+        FixedQuaternion angularVelocityQuaternion = new(_angularVelocity.X, _angularVelocity.Y, _angularVelocity.Z, Fixed64.Zero);
         FixedQuaternion spin = angularVelocityQuaternion * Rotation * Fixed64.Half * Context.DeltaTime;
-        Rotation = (Rotation + spin).Normal;
+        Rotation = (Rotation + spin).Normalized;
     }
 
     private void UpdateIntertiaTensorOrientation()
@@ -1377,7 +1377,7 @@ public class StiffBody : IRecordable
         // We want origin to be close to the actor's feet
         Vector3d origin = Position3d;
         // but not to close...
-        origin.y += GroundOriginOffset;
+        origin.Y += GroundOriginOffset;
 
         Fixed64 dis = GroundedDistanceRay;
         if (!IsGrounded)
@@ -1492,8 +1492,8 @@ public class StiffBody : IRecordable
         return Collider is LSSphereCollider
             || Collider is LSCapsuleCollider
             || Collider is LSCylinderCollider
-            || (Collider is LSCuboidCollider && ResolveGroundProbeRadius() > Fixed64.Fraction(1, 8))
-            || (Collider is LSCompoundCollider && ResolveGroundProbeRadius() > Fixed64.Fraction(1, 8))
+            || (Collider is LSCuboidCollider && ResolveGroundProbeRadius() > Fixed64.FromFraction(1, 8))
+            || (Collider is LSCompoundCollider && ResolveGroundProbeRadius() > Fixed64.FromFraction(1, 8))
                 ? GroundProbeMode.SweptSphere
                 : GroundProbeMode.Ray;
     }
@@ -1508,8 +1508,8 @@ public class StiffBody : IRecordable
             LSSphereCollider sphere => sphere.ScaledRadius,
             LSCapsuleCollider capsule => capsule.ScaledRadius,
             LSCylinderCollider cylinder => cylinder.ScaledRadius,
-            LSCuboidCollider cuboid => FixedMath.Min(cuboid.Bounds.Scope.x, cuboid.Bounds.Scope.z),
-            LSCompoundCollider compound => FixedMath.Min(compound.Bounds.Scope.x, compound.Bounds.Scope.z),
+            LSCuboidCollider cuboid => FixedMath.Min(cuboid.Bounds.Scope.X, cuboid.Bounds.Scope.Z),
+            LSCompoundCollider compound => FixedMath.Min(compound.Bounds.Scope.X, compound.Bounds.Scope.Z),
             _ => Fixed64.Zero
         };
     }
@@ -1595,7 +1595,7 @@ public class StiffBody : IRecordable
     /// <returns></returns>
     public Vector3d TransformPoint(Vector3d point)
     {
-        return Position3d + Rotation * Vector3d.Scale(Collider?.ScaledSize ?? Vector3d.One, point);
+        return Position3d + Rotation * Vector3d.Multiply(Collider?.ScaledSize ?? Vector3d.One, point);
     }
 
     /// <summary>
@@ -1610,7 +1610,7 @@ public class StiffBody : IRecordable
         // next negate the rotation (Quaternion.Inverse(rotation)
         Vector3d rotated = Rotation.Inverse() * translated;
         // Finally, negate scaling by dividing 1 by the value
-        return Vector3d.Scale(Vector3d.One / (Collider?.ScaledSize ?? Vector3d.One), rotated);
+        return Vector3d.Multiply(Vector3d.One / (Collider?.ScaledSize ?? Vector3d.One), rotated);
     }
 
     public void ResetPosition(Vector3d position = default, FixedQuaternion rotation = default)
@@ -1625,7 +1625,7 @@ public class StiffBody : IRecordable
         _normalForce = Vector3d.Zero;
 
         Position2d = position.ToVector2d();
-        HeightPos = position.y;
+        HeightPos = position.Y;
         _lastPosition = position;
         _lastVisualPosition = _visualPosition = position;
         _positionTransform.Position = position;

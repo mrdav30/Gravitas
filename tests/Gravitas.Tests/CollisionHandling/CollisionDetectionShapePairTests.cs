@@ -506,7 +506,7 @@ public sealed class CollisionDetectionShapePairTests
         pair.Manifold.HasContact.Should().BeTrue();
         pair.Manifold.PrimaryContact.Depth.Should().BeGreaterThanOrEqualTo(Fixed64.Zero);
         Vector3d centerDelta = pair.ColliderB.Center - pair.ColliderA.Center;
-        if (centerDelta.SqrMagnitude > Fixed64.Epsilon)
+        if (centerDelta.MagnitudeSquared > Fixed64.Epsilon)
             Vector3d.Dot(pair.Manifold.PrimaryContact.Normal, centerDelta).Should().BeGreaterThan(Fixed64.Zero);
         return pair;
     }

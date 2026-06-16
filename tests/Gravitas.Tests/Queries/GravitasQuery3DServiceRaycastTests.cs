@@ -51,7 +51,7 @@ public sealed class GravitasQuery3DServiceRaycastTests
             IncludeLayerZero);
         bool diagonalHit = context.Query3D.Raycast(
             Vector(-2, -2, -2),
-            new Vector3d(1, 1, 1).Normal,
+            new Vector3d(1, 1, 1).Normalized,
             (Fixed64)4,
             out Physics3DHit diagonal,
             IncludeLayerZero);
@@ -109,8 +109,8 @@ public sealed class GravitasQuery3DServiceRaycastTests
         cap.Collider.Should().BeSameAs(collider);
         side.Point.Should().Be(new Vector3d(-Fixed64.Half, Fixed64.Zero, Fixed64.Zero));
         cap.Point.Should().Be(new Vector3d(Fixed64.Zero, Fixed64.Half, Fixed64.Zero));
-        side.Normal.Should().Be(-Vector3d.Right);
-        cap.Normal.Should().Be(Vector3d.Up);
+        side.Normalized.Should().Be(-Vector3d.Right);
+        cap.Normalized.Should().Be(Vector3d.Up);
     }
 
     [Fact]

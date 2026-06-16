@@ -30,7 +30,7 @@
 - `docs/wiki/HOST_INTEGRATION.md`
 - `docs/wiki/COLLISION_PIPELINE.md`
 - `docs/wiki/RUNTIME_ARCHITECTURE.md`
-- `../FixedMathSharp/src/FixedMathSharp/Geometry/Bounds/BoundingBox.cs`
+- `../FixedMathSharp/src/FixedMathSharp/Geometry/Bounds/FixedBoundBox.cs`
 - `../FixedMathSharp/src/FixedMathSharp/Geometry/Bounds/BoundingFrustum.cs`
 - `../FixedMathSharp/src/FixedMathSharp/Geometry/Primitives/FixedPlane.cs`
 - `../FixedMathSharp/src/FixedMathSharp/Geometry/Primitives/FixedRay.cs`

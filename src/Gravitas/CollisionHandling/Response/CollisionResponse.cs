@@ -184,10 +184,10 @@ public static class CollisionResponse
 
         Vector3d relativeVelocity = ComputeRelativeVelocity(contact);
         Vector3d tangentVelocity = relativeVelocity - contact.Normal * Vector3d.Dot(relativeVelocity, contact.Normal);
-        if (tangentVelocity.SqrMagnitude <= Fixed64.Epsilon)
+        if (tangentVelocity.MagnitudeSquared <= Fixed64.Epsilon)
             return Fixed64.Zero;
 
-        Vector3d tangent = tangentVelocity.Normal;
+        Vector3d tangent = tangentVelocity.Normalized;
         Fixed64 denominator = ComputeImpulseDenominator(contact, tangent);
         if (denominator <= Fixed64.Epsilon)
             return Fixed64.Zero;
@@ -270,16 +270,16 @@ public static class CollisionResponse
 
     private static Vector3d ResolveContactNormal(Vector3d normal, Vector3d fallbackDirection)
     {
-        Vector3d resolved = normal.SqrMagnitude > Fixed64.Epsilon
-            ? normal.Normal
-            : fallbackDirection.SqrMagnitude > Fixed64.Epsilon
-                ? fallbackDirection.Normal
+        Vector3d resolved = normal.MagnitudeSquared > Fixed64.Epsilon
+            ? normal.Normalized
+            : fallbackDirection.MagnitudeSquared > Fixed64.Epsilon
+                ? fallbackDirection.Normalized
                 : Vector3d.Zero;
 
         if (resolved == Vector3d.Zero)
             return resolved;
 
-        return fallbackDirection.SqrMagnitude > Fixed64.Epsilon
+        return fallbackDirection.MagnitudeSquared > Fixed64.Epsilon
             && Vector3d.Dot(resolved, fallbackDirection) < Fixed64.Zero
                 ? -resolved
                 : resolved;

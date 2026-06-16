@@ -81,7 +81,7 @@ axis-aligned by design.
 ## Broad Phase Status
 
 The current pure 2D broad phase is GridForge-backed. `LSCollider2D` rebuilds
-its `FixedMathSharp.BoundingArea` when body motion, host transform refresh, or
+its `FixedMathSharp.FixedBoundArea` when body motion, host transform refresh, or
 shape inputs change, then `GravitasCollision2DService` maps the X/Z bounds into
 `PhysicsPartition2D` payloads attached to GridForge voxels. Partitions store
 collider IDs, split static and dynamic membership, keep a separate awake
@@ -103,7 +103,7 @@ by the mixed runtime path:
 - `PhysicsSettings.Mixed2DHalfThickness` supplies the default positive
   half-thickness.
 - `MixedSlabCenterY` is cached from the host `FixedTransform.Position.y`.
-- `MixedBounds3D` is a deterministic `BoundingBox` built from the pure X/Z
+- `MixedBounds3D` is a deterministic `FixedBoundBox` built from the pure X/Z
   2D bounds plus the cached Y slab.
 
 The mixed 3D bounds do not change pure 2D collision truth or pure 2D partition

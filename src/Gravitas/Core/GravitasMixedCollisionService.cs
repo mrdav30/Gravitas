@@ -1,9 +1,11 @@
 using FixedMathSharp;
+using FixedMathSharp.Bounds;
 using Gravitas.Colliders;
 using Gravitas.Support;
 using GridForge.Grids;
 using GridForge.Spatial;
 using SwiftCollections;
+using SwiftCollections.Utility;
 using System.Runtime.CompilerServices;
 
 namespace Gravitas;
@@ -860,11 +862,11 @@ internal sealed class GravitasMixedCollisionService
         SwiftList<WorldVoxelIndex> coordinates)
     {
         Fixed64 voxelSize = _context.World.VoxelSize;
-        for (Fixed64 x = snappedMin.x; x <= snappedMax.x; x += voxelSize)
+        for (Fixed64 x = snappedMin.X; x <= snappedMax.X; x += voxelSize)
         {
-            for (Fixed64 y = snappedMin.y; y <= snappedMax.y; y += voxelSize)
+            for (Fixed64 y = snappedMin.Y; y <= snappedMax.Y; y += voxelSize)
             {
-                for (Fixed64 z = snappedMin.z; z <= snappedMax.z; z += voxelSize)
+                for (Fixed64 z = snappedMin.Z; z <= snappedMax.Z; z += voxelSize)
                     TryPartition3DVoxel(currentGrid, collider, coordinates, new Vector3d(x, y, z), voxelSize);
             }
         }
@@ -879,11 +881,11 @@ internal sealed class GravitasMixedCollisionService
         SwiftList<PhysicsMixedPartition> partitions)
     {
         Fixed64 voxelSize = _context.World.VoxelSize;
-        for (Fixed64 x = snappedMin.x; x <= snappedMax.x; x += voxelSize)
+        for (Fixed64 x = snappedMin.X; x <= snappedMax.X; x += voxelSize)
         {
-            for (Fixed64 y = snappedMin.y; y <= snappedMax.y; y += voxelSize)
+            for (Fixed64 y = snappedMin.Y; y <= snappedMax.Y; y += voxelSize)
             {
-                for (Fixed64 z = snappedMin.z; z <= snappedMax.z; z += voxelSize)
+                for (Fixed64 z = snappedMin.Z; z <= snappedMax.Z; z += voxelSize)
                 {
                     Vector3d position = new(x, y, z);
                     if (!currentGrid.IsInBounds(position)
@@ -910,11 +912,11 @@ internal sealed class GravitasMixedCollisionService
         SwiftList<WorldVoxelIndex> coordinates)
     {
         Fixed64 voxelSize = _context.World.VoxelSize;
-        for (Fixed64 x = snappedMin.x; x <= snappedMax.x; x += voxelSize)
+        for (Fixed64 x = snappedMin.X; x <= snappedMax.X; x += voxelSize)
         {
-            for (Fixed64 y = snappedMin.y; y <= snappedMax.y; y += voxelSize)
+            for (Fixed64 y = snappedMin.Y; y <= snappedMax.Y; y += voxelSize)
             {
-                for (Fixed64 z = snappedMin.z; z <= snappedMax.z; z += voxelSize)
+                for (Fixed64 z = snappedMin.Z; z <= snappedMax.Z; z += voxelSize)
                     TryPartition2DMixedVoxel(currentGrid, collider, coordinates, new Vector3d(x, y, z), voxelSize);
             }
         }
@@ -994,7 +996,7 @@ internal sealed class GravitasMixedCollisionService
 
     private void GetSnapped2DMixedBounds(LSCollider2D collider, out Vector3d snappedMin, out Vector3d snappedMax)
     {
-        BoundingBox bounds = collider.MixedBounds3D;
+        FixedBoundBox bounds = collider.MixedBounds3D;
         (snappedMin, snappedMax) =
             _context.World.SnapBoundsToVoxelSize(bounds.Min, bounds.Max, Fixed64.Half);
     }
@@ -1023,9 +1025,9 @@ internal sealed class GravitasMixedCollisionService
 
     private static void SnapToSpatialGrid(GridWorld world, Vector3d position, out int x, out int y, out int z)
     {
-        x = (position.x.Abs() / world.SpatialGridCellSize).FloorToInt() * position.x.Sign();
-        y = (position.y.Abs() / world.SpatialGridCellSize).FloorToInt() * position.y.Sign();
-        z = (position.z.Abs() / world.SpatialGridCellSize).FloorToInt() * position.z.Sign();
+        x = (position.X.Abs() / world.SpatialGridCellSize).FloorToInt() * position.X.Sign();
+        y = (position.Y.Abs() / world.SpatialGridCellSize).FloorToInt() * position.Y.Sign();
+        z = (position.Z.Abs() / world.SpatialGridCellSize).FloorToInt() * position.Z.Sign();
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1037,13 +1039,13 @@ internal sealed class GravitasMixedCollisionService
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool MixedBoundsOverlap(LSCollider collider3D, LSCollider2D collider2D)
     {
-        BoundingBox bounds2D = collider2D.MixedBounds3D;
-        return collider3D.BoundsMax.x >= bounds2D.Min.x
-            && collider3D.BoundsMin.x <= bounds2D.Max.x
-            && collider3D.BoundsMax.y >= bounds2D.Min.y
-            && collider3D.BoundsMin.y <= bounds2D.Max.y
-            && collider3D.BoundsMax.z >= bounds2D.Min.z
-            && collider3D.BoundsMin.z <= bounds2D.Max.z;
+        FixedBoundBox bounds2D = collider2D.MixedBounds3D;
+        return collider3D.BoundsMax.X >= bounds2D.Min.X
+            && collider3D.BoundsMin.X <= bounds2D.Max.X
+            && collider3D.BoundsMax.Y >= bounds2D.Min.Y
+            && collider3D.BoundsMin.Y <= bounds2D.Max.Y
+            && collider3D.BoundsMax.Z >= bounds2D.Min.Z
+            && collider3D.BoundsMin.Z <= bounds2D.Max.Z;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1052,7 +1054,7 @@ internal sealed class GravitasMixedCollisionService
         if (!collider.IsActive || !layerMask.Includes(collider.Layer))
             return false;
 
-        BoundingBox bounds = collider.MixedBounds3D;
+        FixedBoundBox bounds = collider.MixedBounds3D;
         return BoundsOverlap(bounds.Min, bounds.Max, min, max);
     }
 
@@ -1067,24 +1069,24 @@ internal sealed class GravitasMixedCollisionService
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool BoundsOverlap(Vector3d firstMin, Vector3d firstMax, Vector3d secondMin, Vector3d secondMax)
     {
-        return firstMax.x >= secondMin.x
-            && firstMin.x <= secondMax.x
-            && firstMax.y >= secondMin.y
-            && firstMin.y <= secondMax.y
-            && firstMax.z >= secondMin.z
-            && firstMin.z <= secondMax.z;
+        return firstMax.X >= secondMin.X
+            && firstMin.X <= secondMax.X
+            && firstMax.Y >= secondMin.Y
+            && firstMin.Y <= secondMax.Y
+            && firstMax.Z >= secondMin.Z
+            && firstMin.Z <= secondMax.Z;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool IsWorldPositionInBounds(Vector3d min, Vector3d max, Fixed64 voxelSize, Vector3d worldPosition)
     {
         Fixed64 padding = voxelSize * Fixed64.Half;
-        return worldPosition.x >= min.x - padding
-            && worldPosition.x <= max.x + padding
-            && worldPosition.y >= min.y - padding
-            && worldPosition.y <= max.y + padding
-            && worldPosition.z >= min.z - padding
-            && worldPosition.z <= max.z + padding;
+        return worldPosition.X >= min.X - padding
+            && worldPosition.X <= max.X + padding
+            && worldPosition.Y >= min.Y - padding
+            && worldPosition.Y <= max.Y + padding
+            && worldPosition.Z >= min.Z - padding
+            && worldPosition.Z <= max.Z + padding;
     }
 
     private static void Sort2DCollidersById(SwiftList<LSCollider2D> colliders)

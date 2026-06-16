@@ -36,11 +36,11 @@ public static partial class CollisionDetection
 
         Vector3d closestPointOnMesh = meshCollider.ClosestPointOnSurface(sphere.Center);
         Vector3d penetrationVector = sphere.Center - closestPointOnMesh;
-        if (penetrationVector.SqrMagnitude > sphere.ScaledRadiusSqr)
+        if (penetrationVector.MagnitudeSquared > sphere.ScaledRadiusSqr)
             return false; // No collision if the distance squared is greater than the radius squared
                           // remove sphere's radius to find the actual depth
 
-        Vector3d penetrationNormal = penetrationVector.Normal;
+        Vector3d penetrationNormal = penetrationVector.Normalized;
         pair.Manifold.SetContact(
             closestPointOnMesh,
             sphere.Center - penetrationNormal * sphere.ScaledRadius,
@@ -67,12 +67,12 @@ public static partial class CollisionDetection
         Vector3d closestPointOnCapsuleLine = Vector3d.ClosestPointOnLineSegment(capsule.LineSegmentStart, capsule.LineSegmentEnd, mesh.Center);
         Vector3d closetPointOnMesh = mesh.ClosestPointOnSurface(closestPointOnCapsuleLine);
         // Check if the distance from the closest point to the mesh is less than the capsule radius
-        if ((closetPointOnMesh - closestPointOnCapsuleLine).SqrMagnitude > capsule.ScaledRadiusSqr)
+        if ((closetPointOnMesh - closestPointOnCapsuleLine).MagnitudeSquared > capsule.ScaledRadiusSqr)
             return false; // No collision if the distance squared is greater than the radius squared
                           // remove capsule's radius to find the actual depth
 
         // Use the normal of the triangle where the collision occurs.
-        Vector3d penetrationNormal = (closestPointOnCapsuleLine - closetPointOnMesh).Normal;
+        Vector3d penetrationNormal = (closestPointOnCapsuleLine - closetPointOnMesh).Normalized;
         // penetration vector should be along the normal direction
         Vector3d penetrationVector = penetrationNormal * (capsule.ScaledRadius - Vector3d.Distance(closestPointOnCapsuleLine, closetPointOnMesh));
         // find collision point on the capsule
@@ -107,7 +107,7 @@ public static partial class CollisionDetection
             output.Value.PointsOfContact.Point1,
             output.Value.PointsOfContact.Point2,
             output.Value.AxisPenetration.Depth,
-            output.Value.AxisPenetration.Vector.Normal
+            output.Value.AxisPenetration.Vector.Normalized
         );
 
         return true;
@@ -158,7 +158,7 @@ public static partial class CollisionDetection
 
         mesh.GetTrianglesInBounds(new FixedBoundVolume(cylinder.BoundsMin, cylinder.BoundsMax), triangleBuffer);
         bool found = false;
-        Fixed64 bestDepth = Fixed64.MAX_VALUE;
+        Fixed64 bestDepth = Fixed64.MaxValue;
 
         for (int i = 0; i < triangleBuffer.Count; i++)
         {
@@ -256,7 +256,7 @@ public static partial class CollisionDetection
             output.Value.PointsOfContact.Point1,
             output.Value.PointsOfContact.Point2,
             output.Value.AxisPenetration.Depth,
-            output.Value.AxisPenetration.Vector.Normal
+            output.Value.AxisPenetration.Vector.Normalized
         );
 
         return true;
@@ -321,10 +321,10 @@ public static partial class CollisionDetection
     private static bool IsPointInsideCylinder(LSCylinderCollider cylinder, Vector3d point)
     {
         Vector3d local = cylinder.Rotation.Inverse() * (point - cylinder.Center);
-        Fixed64 radialSqr = local.x * local.x + local.z * local.z;
+        Fixed64 radialSqr = local.X * local.X + local.Z * local.Z;
         return radialSqr <= cylinder.ScaledRadiusSqr + Fixed64.Epsilon
-            && local.y >= -cylinder.HalfHeight - Fixed64.Epsilon
-            && local.y <= cylinder.HalfHeight + Fixed64.Epsilon;
+            && local.Y >= -cylinder.HalfHeight - Fixed64.Epsilon
+            && local.Y <= cylinder.HalfHeight + Fixed64.Epsilon;
     }
 
     #endregion

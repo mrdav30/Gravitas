@@ -56,7 +56,7 @@ public static class CollisionDetection2D
     {
         Vector2d delta = colliderB.Center - colliderA.Center;
         Fixed64 radius = colliderA.Radius + colliderB.Radius;
-        Fixed64 distanceSquared = delta.SqrMagnitude;
+        Fixed64 distanceSquared = delta.MagnitudeSquared;
         if (distanceSquared > radius * radius)
         {
             contact = default;
@@ -76,7 +76,7 @@ public static class CollisionDetection2D
 
     private static bool TryCircleConvex(LSCircleCollider2D circle, LSCollider2D convex, out Contact2D contact)
     {
-        Fixed64 bestOverlap = Fixed64.MAX_VALUE;
+        Fixed64 bestOverlap = Fixed64.MaxValue;
         Vector2d bestAxis = Vector2d.Zero;
 
         for (int i = 0; i < convex.VertexCount; i++)
@@ -91,7 +91,7 @@ public static class CollisionDetection2D
 
         Vector2d closest = convex.GetClosestPoint(circle.Center);
         Vector2d closestAxis = closest - circle.Center;
-        if (closestAxis.SqrMagnitude > Fixed64.Epsilon
+        if (closestAxis.MagnitudeSquared > Fixed64.Epsilon
             && !TryTestAxis(closestAxis, circle, convex, ref bestOverlap, ref bestAxis))
         {
             contact = default;
@@ -110,7 +110,7 @@ public static class CollisionDetection2D
 
     private static bool TryConvexConvex(LSCollider2D colliderA, LSCollider2D colliderB, out Contact2D contact)
     {
-        Fixed64 bestOverlap = Fixed64.MAX_VALUE;
+        Fixed64 bestOverlap = Fixed64.MaxValue;
         Vector2d bestAxis = Vector2d.Zero;
 
         if (!TryTestConvexAxes(colliderA, colliderA, colliderB, ref bestOverlap, ref bestAxis)
@@ -153,10 +153,10 @@ public static class CollisionDetection2D
         ref Fixed64 bestOverlap,
         ref Vector2d bestAxis)
     {
-        if (axis.SqrMagnitude <= Fixed64.Epsilon)
+        if (axis.MagnitudeSquared <= Fixed64.Epsilon)
             return true;
 
-        Vector2d normal = axis.Normal;
+        Vector2d normal = axis.Normalized;
         Project(colliderA, normal, out Fixed64 minA, out Fixed64 maxA);
         Project(colliderB, normal, out Fixed64 minB, out Fixed64 maxB);
         Fixed64 overlap = FixedMath.Min(maxA, maxB) - FixedMath.Max(minA, minB);
@@ -179,10 +179,10 @@ public static class CollisionDetection2D
         ref Fixed64 bestOverlap,
         ref Vector2d bestAxis)
     {
-        if (axis.SqrMagnitude <= Fixed64.Epsilon)
+        if (axis.MagnitudeSquared <= Fixed64.Epsilon)
             return true;
 
-        Vector2d normal = axis.Normal;
+        Vector2d normal = axis.Normalized;
         Fixed64 centerProjection = Vector2d.Dot(circle.Center, normal);
         Fixed64 minA = centerProjection - circle.Radius;
         Fixed64 maxA = centerProjection + circle.Radius;
@@ -225,8 +225,8 @@ public static class CollisionDetection2D
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Vector2d OrientAxis(Vector2d axis, Vector2d direction)
     {
-        Vector2d normal = axis.SqrMagnitude > Fixed64.Epsilon ? axis.Normal : Vector2d.Right;
-        if (direction.SqrMagnitude > Fixed64.Epsilon && Vector2d.Dot(normal, direction) < Fixed64.Zero)
+        Vector2d normal = axis.MagnitudeSquared > Fixed64.Epsilon ? axis.Normalized : Vector2d.Right;
+        if (direction.MagnitudeSquared > Fixed64.Epsilon && Vector2d.Dot(normal, direction) < Fixed64.Zero)
             return -normal;
 
         return normal;

@@ -3,6 +3,7 @@ using Gravitas.Colliders;
 using GridForge.Grids;
 using GridForge.Spatial;
 using SwiftCollections;
+using SwiftCollections.Utility;
 using System.Collections.Generic;
 
 namespace Gravitas;
@@ -250,11 +251,11 @@ public sealed class GravitasCollisionService
         Vector3d snappedMax)
     {
         Fixed64 voxelSize = world.VoxelSize;
-        for (Fixed64 x = snappedMin.x; x <= snappedMax.x; x += voxelSize)
+        for (Fixed64 x = snappedMin.X; x <= snappedMax.X; x += voxelSize)
         {
-            for (Fixed64 y = snappedMin.y; y <= snappedMax.y; y += voxelSize)
+            for (Fixed64 y = snappedMin.Y; y <= snappedMax.Y; y += voxelSize)
             {
-                for (Fixed64 z = snappedMin.z; z <= snappedMax.z; z += voxelSize)
+                for (Fixed64 z = snappedMin.Z; z <= snappedMax.Z; z += voxelSize)
                     TryPartitionVoxel(currentGrid, collider, partitionedCoordinates, new Vector3d(x, y, z), voxelSize);
             }
         }
@@ -317,9 +318,9 @@ public sealed class GravitasCollisionService
 
     private static void SnapToSpatialGrid(GridWorld world, Vector3d position, out int x, out int y, out int z)
     {
-        x = (position.x.Abs() / world.SpatialGridCellSize).FloorToInt() * position.x.Sign();
-        y = (position.y.Abs() / world.SpatialGridCellSize).FloorToInt() * position.y.Sign();
-        z = (position.z.Abs() / world.SpatialGridCellSize).FloorToInt() * position.z.Sign();
+        x = (position.X.Abs() / world.SpatialGridCellSize).FloorToInt() * position.X.Sign();
+        y = (position.Y.Abs() / world.SpatialGridCellSize).FloorToInt() * position.Y.Sign();
+        z = (position.Z.Abs() / world.SpatialGridCellSize).FloorToInt() * position.Z.Sign();
     }
 
     internal bool ClearPartitionedObject(LSCollider collider, bool force = false)

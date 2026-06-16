@@ -205,7 +205,7 @@ public sealed class StiffBody2D : IRecordable
 
         FixedTransform transform = Agent.Transform;
         Vector3d currentPosition = transform.Position;
-        transform.Position = new Vector3d(_position.x, currentPosition.y, _position.y);
+        transform.Position = new Vector3d(_position.X, currentPosition.Y, _position.Y);
         transform.Rotation = FixedQuaternion.FromEulerAnglesInDegrees(
             Fixed64.Zero,
             FixedMath.RadToDeg(_rotation),
@@ -215,7 +215,7 @@ public sealed class StiffBody2D : IRecordable
     private void UpdateKinematicPositionAndRotation()
     {
         Vector2d kinematicPosition = Agent.Transform.Position.ToVector2d();
-        Fixed64 kinematicRotation = FixedMath.DegToRad(Agent.Transform.EulerAngles.y);
+        Fixed64 kinematicRotation = FixedMath.DegToRad(Agent.Transform.EulerAngles.Y);
         bool changed = _position != kinematicPosition || _rotation != kinematicRotation;
         if (!changed)
             return;
@@ -251,12 +251,12 @@ public sealed class StiffBody2D : IRecordable
             return false;
 
         Vector2d displacement = proposedPosition - startPosition;
-        if (displacement.SqrMagnitude <= Fixed64.Epsilon)
+        if (displacement.MagnitudeSquared <= Fixed64.Epsilon)
             return false;
 
         Fixed64 proxyRadius = ResolveContinuousCollisionProxyRadius();
         if (proxyRadius <= Fixed64.Epsilon
-            || (mode == ContinuousCollisionMode.Auto && displacement.SqrMagnitude <= proxyRadius * proxyRadius))
+            || (mode == ContinuousCollisionMode.Auto && displacement.MagnitudeSquared <= proxyRadius * proxyRadius))
         {
             return false;
         }
@@ -286,14 +286,14 @@ public sealed class StiffBody2D : IRecordable
         bool foundMixed = TryGetFirstValidMixedContinuousCollisionHit(mixedHitCount, out PhysicsMixedHit hitMixed);
         if (found2D && (!foundMixed || hit2D.Distance <= hitMixed.Distance))
         {
-            proposedPosition = startPosition + displacement.Normal * hit2D.Distance;
+            proposedPosition = startPosition + displacement.Normalized * hit2D.Distance;
             RemoveClosingContinuousCollisionVelocity(hit2D.Normal);
             return true;
         }
 
         if (foundMixed)
         {
-            proposedPosition = startPosition + displacement.Normal * hitMixed.Distance;
+            proposedPosition = startPosition + displacement.Normalized * hitMixed.Distance;
             RemoveClosingContinuousCollisionVelocity(hitMixed.NormalFor2DSource);
             return true;
         }
@@ -377,7 +377,7 @@ public sealed class StiffBody2D : IRecordable
         Fixed64 bestDistanceSquared = Fixed64.Zero;
         for (int i = 0; i < vertexCount; i++)
         {
-            Fixed64 distanceSquared = Vector2d.SqrDistance(center, Collider.GetVertexUnchecked(i));
+            Fixed64 distanceSquared = Vector2d.DistanceSquared(center, Collider.GetVertexUnchecked(i));
             if (distanceSquared > bestDistanceSquared)
                 bestDistanceSquared = distanceSquared;
         }
@@ -418,7 +418,7 @@ public sealed class StiffBody2D : IRecordable
 
     private void RemoveClosingContinuousCollisionVelocity(Vector2d normal)
     {
-        if (normal.SqrMagnitude <= Fixed64.Epsilon)
+        if (normal.MagnitudeSquared <= Fixed64.Epsilon)
             return;
 
         Fixed64 closingSpeed = Vector2d.Dot(_linearVelocity, normal);
@@ -536,7 +536,7 @@ public sealed class StiffBody2D : IRecordable
     {
         FixedTransform transform = Agent.Transform;
         Vector3d currentPosition = transform.Position;
-        transform.Position = new Vector3d(_position.x, currentPosition.y, _position.y);
+        transform.Position = new Vector3d(_position.X, currentPosition.Y, _position.Y);
         transform.Rotation = FixedQuaternion.FromEulerAnglesInDegrees(
             Fixed64.Zero,
             FixedMath.RadToDeg(_rotation),

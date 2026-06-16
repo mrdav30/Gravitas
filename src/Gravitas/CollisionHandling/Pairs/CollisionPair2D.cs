@@ -112,8 +112,8 @@ internal sealed class CollisionPair2D
         if (totalInverseMass <= Fixed64.Zero)
             return;
 
-        Vector2d normal = contact.Normal.SqrMagnitude > Fixed64.Epsilon
-            ? contact.Normal.Normal
+        Vector2d normal = contact.Normal.MagnitudeSquared > Fixed64.Epsilon
+            ? contact.Normal.Normalized
             : ResolveFallbackNormal();
         if (normal == Vector2d.Zero)
             return;
@@ -189,8 +189,8 @@ internal sealed class CollisionPair2D
     private Vector2d ResolveFallbackNormal()
     {
         Vector2d direction = ColliderB.Center - ColliderA.Center;
-        return direction.SqrMagnitude > Fixed64.Epsilon
-            ? direction.Normal
+        return direction.MagnitudeSquared > Fixed64.Epsilon
+            ? direction.Normalized
             : Vector2d.Right;
     }
 }

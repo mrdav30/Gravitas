@@ -37,23 +37,23 @@ public sealed class LSCircleCollider2D : LSCollider2D
     internal override int VertexCount => 0;
 
     public override bool ContainsPoint(Vector2d point) =>
-        Vector2d.SqrDistance(point, Center) <= Radius * Radius;
+        Vector2d.DistanceSquared(point, Center) <= Radius * Radius;
 
     public override Vector2d GetClosestPoint(Vector2d point)
     {
         Vector2d direction = point - Center;
-        if (direction.SqrMagnitude <= Fixed64.Epsilon)
+        if (direction.MagnitudeSquared <= Fixed64.Epsilon)
             return Center + Vector2d.Right * Radius;
 
-        return Center + direction.Normal * Radius;
+        return Center + direction.Normalized * Radius;
     }
 
     public override Vector2d GetSupportPoint(Vector2d direction)
     {
-        if (direction.SqrMagnitude <= Fixed64.Epsilon)
+        if (direction.MagnitudeSquared <= Fixed64.Epsilon)
             return Center + Vector2d.Right * Radius;
 
-        return Center + direction.Normal * Radius;
+        return Center + direction.Normalized * Radius;
     }
 
     internal override Vector2d GetVertexUnchecked(int index) => Center;

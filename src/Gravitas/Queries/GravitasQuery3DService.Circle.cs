@@ -25,7 +25,7 @@ public sealed partial class GravitasQuery3DService
         _redundantColliderCheck.Clear();
 
         Physics3DHit closestHit = default;
-        Fixed64 closestDist = Fixed64.MAX_VALUE;
+        Fixed64 closestDist = Fixed64.MaxValue;
         bool found = false;
 
         TraceCircleForClosestHit(position, radius, ref found, ref closestHit, ref closestDist);
@@ -59,10 +59,10 @@ public sealed partial class GravitasQuery3DService
         CircleVersion++;
         _redundantColliderCheck.Clear();
 
-        Vector3d normalizedDirection = direction.SqrMagnitude == Fixed64.Zero ? Vector3d.Zero : direction.Normal;
+        Vector3d normalizedDirection = direction.MagnitudeSquared == Fixed64.Zero ? Vector3d.Zero : direction.Normalized;
         Fixed64 maxDistanceSqr = maxDistance * maxDistance;
         Physics3DHit closestHit = default;
-        Fixed64 closestDist = Fixed64.MAX_VALUE;
+        Fixed64 closestDist = Fixed64.MaxValue;
         bool found = false;
 
         TraceCircleForDirectionalHit(
@@ -129,11 +129,11 @@ public sealed partial class GravitasQuery3DService
         ref Physics3DHit closestHit,
         ref Fixed64 closestDist)
     {
-        Fixed64 xMin = position.x - radius;
-        Fixed64 xMax = position.x + radius;
-        Fixed64 y = position.y;
-        Fixed64 zMin = position.z - radius;
-        Fixed64 zMax = position.z + radius;
+        Fixed64 xMin = position.X - radius;
+        Fixed64 xMax = position.X + radius;
+        Fixed64 y = position.Y;
+        Fixed64 zMin = position.Z - radius;
+        Fixed64 zMax = position.Z + radius;
 
         for (Fixed64 x = xMin; x <= xMax; x += _context.World.VoxelSize)
         {
@@ -160,11 +160,11 @@ public sealed partial class GravitasQuery3DService
         ref Physics3DHit closestHit,
         ref Fixed64 closestDist)
     {
-        Fixed64 xMin = position.x - radius;
-        Fixed64 xMax = position.x + radius;
-        Fixed64 y = position.y;
-        Fixed64 zMin = position.z - radius;
-        Fixed64 zMax = position.z + radius;
+        Fixed64 xMin = position.X - radius;
+        Fixed64 xMax = position.X + radius;
+        Fixed64 y = position.Y;
+        Fixed64 zMin = position.Z - radius;
+        Fixed64 zMax = position.Z + radius;
 
         for (Fixed64 x = xMin; x <= xMax; x += _context.World.VoxelSize)
         {
@@ -192,11 +192,11 @@ public sealed partial class GravitasQuery3DService
 
     private void TraceCircleForAllHits(Vector3d position, Fixed64 radius, SwiftList<Physics3DHit> results)
     {
-        Fixed64 xMin = position.x - radius;
-        Fixed64 xMax = position.x + radius;
-        Fixed64 y = position.y;
-        Fixed64 zMin = position.z - radius;
-        Fixed64 zMax = position.z + radius;
+        Fixed64 xMin = position.X - radius;
+        Fixed64 xMax = position.X + radius;
+        Fixed64 y = position.Y;
+        Fixed64 zMin = position.Z - radius;
+        Fixed64 zMax = position.Z + radius;
 
         for (Fixed64 x = xMin; x <= xMax; x += _context.World.VoxelSize)
         {
@@ -288,7 +288,7 @@ public sealed partial class GravitasQuery3DService
         ref Physics3DHit closestHit,
         ref Fixed64 closestDist)
     {
-        if (colliderIds == null || direction.SqrMagnitude == Fixed64.Zero)
+        if (colliderIds == null || direction.MagnitudeSquared == Fixed64.Zero)
             return;
 
         for (int i = colliderIds.Count - 1; i >= 0; i--)
@@ -297,8 +297,8 @@ public sealed partial class GravitasQuery3DService
                 continue;
 
             Vector3d toHit = hitInfo.Point - position;
-            if (toHit.SqrMagnitude > maxDistanceSqr
-                || Vector3d.Dot(toHit.Normal, direction) <= Fixed64.Zero
+            if (toHit.MagnitudeSquared > maxDistanceSqr
+                || Vector3d.Dot(toHit.Normalized, direction) <= Fixed64.Zero
                 || hitInfo.Distance >= closestDist)
             {
                 continue;
@@ -352,7 +352,7 @@ public sealed partial class GravitasQuery3DService
 
         collider.CircleQueryVersion = CircleVersion;
         Fixed64 broadDistance = collider.ScaledRadius + radius;
-        if ((collider.Center - position).SqrMagnitude > broadDistance * broadDistance)
+        if ((collider.Center - position).MagnitudeSquared > broadDistance * broadDistance)
             return false;
 
         Vector3d point = GetClosestSurfacePoint(collider, position);
@@ -368,7 +368,7 @@ public sealed partial class GravitasQuery3DService
 
     private static Vector3d GetClosestSurfacePoint(LSCollider collider, Vector3d position)
     {
-        if ((position - collider.Center).SqrMagnitude == Fixed64.Zero)
+        if ((position - collider.Center).MagnitudeSquared == Fixed64.Zero)
             return collider.Center + Vector3d.Right * collider.ScaledRadius;
 
         return collider.ClosestPointOnSurface(position);

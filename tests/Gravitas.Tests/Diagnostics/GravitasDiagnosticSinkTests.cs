@@ -83,7 +83,7 @@ public sealed class GravitasDiagnosticSinkTests
         events[1].Kind.Should().Be(GravitasDiagnosticEventKind.ResponseImpulse);
         events[1].ColliderAId.Should().Be(pair.ColliderA.Id);
         events[1].ColliderBId.Should().Be(pair.ColliderB.Id);
-        events[1].Vector.SqrMagnitude.Should().BeGreaterThan(Fixed64.Zero);
+        events[1].Vector.MagnitudeSquared.Should().BeGreaterThan(Fixed64.Zero);
         events[2].Kind.Should().Be(GravitasDiagnosticEventKind.LinearVelocityDelta);
         events[3].Kind.Should().Be(GravitasDiagnosticEventKind.LinearVelocityDelta);
 

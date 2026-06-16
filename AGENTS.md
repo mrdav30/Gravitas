@@ -195,7 +195,7 @@ runtime path through `StiffBody2D`, `LSCollider2D`,
 `PhysicsPartition2D`. `PhysicsRuntimeMode` is a validated bitmask:
 `TwoD`, `ThreeD`, `Both`, and `Mixed` are valid settings values. `Both` runs
 pure 2D and pure 3D without mixed contacts; `Mixed` enables the dedicated mixed
-lifecycle path. `LSCollider2D` also caches a mixed `BoundingBox` using
+lifecycle path. `LSCollider2D` also caches a mixed `FixedBoundBox` using
 `PhysicsSettings.Mixed2DHalfThickness`, optional per-collider
 `MixedHalfThicknessOverride`, and the host transform's Y position. The mixed
 broad phase emits deterministic candidate keys through `PhysicsMixedPartition`;
@@ -276,8 +276,8 @@ The main external packages shape how this project should be changed:
 - `FixedMathSharp`: use `Fixed64`, `Vector2d`, `Vector3d`, `Vector4d`,
   `FixedQuaternion`, `Fixed3x3`, `Fixed4x4`, deterministic bounds, and
   geometry primitives. Before hand-rolling spatial math, review
-  `../FixedMathSharp/src/FixedMathSharp/Geometry`, especially `BoundingBox`,
-  `BoundingArea`, `BoundingSphere`, `BoundingFrustum`, `FixedRay`,
+  `../FixedMathSharp/src/FixedMathSharp/Geometry`, especially `FixedBoundBox`,
+  `FixedBoundArea`, `BoundingSphere`, `BoundingFrustum`, `FixedRay`,
   `FixedPlane`, `ContainmentType`, and `FixedPlaneIntersectionType`.
 - `SwiftCollections`: prefer `SwiftBucket`, `SwiftList`, `SwiftQueue`,
   `SwiftStack`, `SwiftHashSet`, object pools, and related low-allocation types in

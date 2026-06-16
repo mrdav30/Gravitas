@@ -135,12 +135,12 @@ public static partial class CollisionDetection
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool BoundsOverlapInclusive(LSCollider colliderA, LSCollider colliderB)
     {
-        return colliderA.BoundsMin.x <= colliderB.BoundsMax.x
-            && colliderA.BoundsMax.x >= colliderB.BoundsMin.x
-            && colliderA.BoundsMin.y <= colliderB.BoundsMax.y
-            && colliderA.BoundsMax.y >= colliderB.BoundsMin.y
-            && colliderA.BoundsMin.z <= colliderB.BoundsMax.z
-            && colliderA.BoundsMax.z >= colliderB.BoundsMin.z;
+        return colliderA.BoundsMin.X <= colliderB.BoundsMax.X
+            && colliderA.BoundsMax.X >= colliderB.BoundsMin.X
+            && colliderA.BoundsMin.Y <= colliderB.BoundsMax.Y
+            && colliderA.BoundsMax.Y >= colliderB.BoundsMin.Y
+            && colliderA.BoundsMin.Z <= colliderB.BoundsMax.Z
+            && colliderA.BoundsMax.Z >= colliderB.BoundsMin.Z;
     }
 
     #endregion

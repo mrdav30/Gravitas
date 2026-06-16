@@ -49,13 +49,13 @@ public static class MeshUtils
         Vector3d point)
     {
         // Check if the point is inside the triangle by checking if the point is to the left of each edge
-        if (Vector3d.Dot(Vector3d.Cross((second - first).Normal, point - first), normal) < Fixed64.Zero)
+        if (Vector3d.Dot(Vector3d.Cross((second - first).Normalized, point - first), normal) < Fixed64.Zero)
             return false;
 
-        if (Vector3d.Dot(Vector3d.Cross((third - second).Normal, point - second), normal) < Fixed64.Zero)
+        if (Vector3d.Dot(Vector3d.Cross((third - second).Normalized, point - second), normal) < Fixed64.Zero)
             return false;
 
-        if (Vector3d.Dot(Vector3d.Cross((first - third).Normal, point - third), normal) < Fixed64.Zero)
+        if (Vector3d.Dot(Vector3d.Cross((first - third).Normalized, point - third), normal) < Fixed64.Zero)
             return false;
 
         return true;
@@ -68,10 +68,10 @@ public static class MeshUtils
         Vector3d point)
     {
         Vector3d closestPoint = ClosestPointOnEdge(first, second, point);
-        Fixed64 minDistanceSquared = Vector3d.SqrDistance(point, closestPoint);
+        Fixed64 minDistanceSquared = Vector3d.DistanceSquared(point, closestPoint);
 
         Vector3d pointOnEdge = ClosestPointOnEdge(second, third, point);
-        Fixed64 distanceSquared = Vector3d.SqrDistance(point, pointOnEdge);
+        Fixed64 distanceSquared = Vector3d.DistanceSquared(point, pointOnEdge);
         if (distanceSquared < minDistanceSquared)
         {
             minDistanceSquared = distanceSquared;
@@ -79,7 +79,7 @@ public static class MeshUtils
         }
 
         pointOnEdge = ClosestPointOnEdge(third, first, point);
-        distanceSquared = Vector3d.SqrDistance(point, pointOnEdge);
+        distanceSquared = Vector3d.DistanceSquared(point, pointOnEdge);
         if (distanceSquared < minDistanceSquared)
             closestPoint = pointOnEdge;
 
@@ -91,7 +91,7 @@ public static class MeshUtils
         Vector3d displacement = end - start;
         // get the projection of the vector from the start of the line to the point onto the line.
         // since the line is not a unit vector, scale this projection by the square of the length of the line.
-        Fixed64 t = Vector3d.Dot(point - start, displacement) / displacement.SqrMagnitude;
+        Fixed64 t = Vector3d.Dot(point - start, displacement) / displacement.MagnitudeSquared;
         if (t < Fixed64.Zero)
             return start; // The point is closer to the start of the line
 

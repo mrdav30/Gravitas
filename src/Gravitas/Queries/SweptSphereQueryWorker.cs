@@ -29,7 +29,7 @@ public sealed class SweptSphereQueryWorker
         _radius = radius;
 
         Vector3d segment = end - start;
-        _lengthSqr = segment.SqrMagnitude;
+        _lengthSqr = segment.MagnitudeSquared;
         _length = _lengthSqr <= Fixed64.Epsilon ? Fixed64.Zero : segment.Magnitude;
         _direction = _length <= Fixed64.Epsilon ? Vector3d.Zero : segment / _length;
     }
@@ -71,14 +71,14 @@ public sealed class SweptSphereQueryWorker
 
         Fixed64 radiusSqr = radius * radius;
         Vector3d startToCenter = _start - center;
-        if (startToCenter.SqrMagnitude <= radiusSqr)
+        if (startToCenter.MagnitudeSquared <= radiusSqr)
         {
             sphereCenterAtImpact = _start;
             return true;
         }
 
         Fixed64 b = Vector3d.Dot(startToCenter, _direction);
-        Fixed64 c = startToCenter.SqrMagnitude - radiusSqr;
+        Fixed64 c = startToCenter.MagnitudeSquared - radiusSqr;
         Fixed64 discriminant = b * b - c;
         if (discriminant < Fixed64.Zero)
             return false;
@@ -102,7 +102,7 @@ public sealed class SweptSphereQueryWorker
         out Fixed64 impactDistance)
     {
         sphereCenterAtImpact = Vector3d.Zero;
-        impactDistance = Fixed64.MAX_VALUE;
+        impactDistance = Fixed64.MaxValue;
 
         Fixed64 radius = capsule.ScaledRadius + _radius;
         bool found = false;
@@ -166,7 +166,7 @@ public sealed class SweptSphereQueryWorker
         out Fixed64 impactDistance)
     {
         sphereCenterAtImpact = Vector3d.Zero;
-        impactDistance = Fixed64.MAX_VALUE;
+        impactDistance = Fixed64.MaxValue;
 
         FixedQuaternion inverseRotation = rotation.Inverse();
         Vector3d localStart = (_start - center) * inverseRotation;
@@ -218,14 +218,14 @@ public sealed class SweptSphereQueryWorker
         out Fixed64 impactDistance)
     {
         sphereCenterAtImpact = Vector3d.Zero;
-        impactDistance = Fixed64.MAX_VALUE;
+        impactDistance = Fixed64.MaxValue;
 
-        Fixed64 a = localDirection.x * localDirection.x + localDirection.z * localDirection.z;
+        Fixed64 a = localDirection.X * localDirection.X + localDirection.Z * localDirection.Z;
         if (a <= Fixed64.Epsilon)
             return false;
 
-        Fixed64 b = 2 * (localStart.x * localDirection.x + localStart.z * localDirection.z);
-        Fixed64 c = localStart.x * localStart.x + localStart.z * localStart.z - radiusSqr;
+        Fixed64 b = 2 * (localStart.X * localDirection.X + localStart.Z * localDirection.Z);
+        Fixed64 c = localStart.X * localStart.X + localStart.Z * localStart.Z - radiusSqr;
         Fixed64 discriminant = b * b - 4 * a * c;
         if (discriminant < Fixed64.Zero)
             return false;
@@ -265,15 +265,15 @@ public sealed class SweptSphereQueryWorker
         sphereCenterAtImpact = Vector3d.Zero;
         impactDistance = Fixed64.Zero;
 
-        if (localDirection.y.Abs() <= Fixed64.Epsilon)
+        if (localDirection.Y.Abs() <= Fixed64.Epsilon)
             return false;
 
-        Fixed64 distance = (capY - localStart.y) / localDirection.y;
+        Fixed64 distance = (capY - localStart.Y) / localDirection.Y;
         if (distance < Fixed64.Zero || distance > _length)
             return false;
 
         Vector3d localPoint = localStart + localDirection * distance;
-        Fixed64 radialSqr = localPoint.x * localPoint.x + localPoint.z * localPoint.z;
+        Fixed64 radialSqr = localPoint.X * localPoint.X + localPoint.Z * localPoint.Z;
         if (radialSqr > radiusSqr + Fixed64.Epsilon)
             return false;
 
@@ -311,7 +311,7 @@ public sealed class SweptSphereQueryWorker
         out Fixed64 impactDistance)
     {
         sphereCenterAtImpact = Vector3d.Zero;
-        impactDistance = Fixed64.MAX_VALUE;
+        impactDistance = Fixed64.MaxValue;
 
         CreateSweepBounds(_start, _end, _radius, out Vector3d min, out Vector3d max);
         mesh.GetTrianglesInBounds(new FixedBoundVolume(min, max), _meshTriangleBuffer);
@@ -322,11 +322,11 @@ public sealed class SweptSphereQueryWorker
             int triangleIndex = _meshTriangleBuffer[i];
             mesh.Mesh.GetTriangleVertices(triangleIndex, out Vector3d first, out Vector3d second, out Vector3d third);
             Vector3d normal = mesh.Mesh.GetFaceNormalWorld(triangleIndex);
-            if (normal.SqrMagnitude <= Fixed64.Epsilon)
+            if (normal.MagnitudeSquared <= Fixed64.Epsilon)
                 continue;
 
             found |= TryKeepEarlierSweep(
-                TrySweepTriangle(first, second, third, normal.Normal, out Vector3d triangleHit, out Fixed64 triangleDistance),
+                TrySweepTriangle(first, second, third, normal.Normalized, out Vector3d triangleHit, out Fixed64 triangleDistance),
                 triangleHit,
                 triangleDistance,
                 ref sphereCenterAtImpact,
@@ -342,7 +342,7 @@ public sealed class SweptSphereQueryWorker
         out Fixed64 impactDistance)
     {
         sphereCenterAtImpact = Vector3d.Zero;
-        impactDistance = Fixed64.MAX_VALUE;
+        impactDistance = Fixed64.MaxValue;
 
         bool found = false;
         for (int i = 0; i < compound.PartCount; i++)
@@ -367,10 +367,10 @@ public sealed class SweptSphereQueryWorker
         out Fixed64 impactDistance)
     {
         sphereCenterAtImpact = Vector3d.Zero;
-        impactDistance = Fixed64.MAX_VALUE;
+        impactDistance = Fixed64.MaxValue;
 
         Vector3d closestAtStart = MeshUtils.ClosestPointOnTriangle(first, second, third, normal, _start);
-        if (Vector3d.SqrDistance(_start, closestAtStart) <= _radius * _radius)
+        if (Vector3d.DistanceSquared(_start, closestAtStart) <= _radius * _radius)
         {
             sphereCenterAtImpact = _start;
             impactDistance = Fixed64.Zero;
@@ -468,10 +468,10 @@ public sealed class SweptSphereQueryWorker
         out Fixed64 impactDistance)
     {
         sphereCenterAtImpact = Vector3d.Zero;
-        impactDistance = Fixed64.MAX_VALUE;
+        impactDistance = Fixed64.MaxValue;
 
         Vector3d edge = edgeEnd - edgeStart;
-        Fixed64 edgeLengthSqr = edge.SqrMagnitude;
+        Fixed64 edgeLengthSqr = edge.MagnitudeSquared;
         if (edgeLengthSqr <= Fixed64.Epsilon)
             return false;
 
@@ -480,12 +480,12 @@ public sealed class SweptSphereQueryWorker
         Vector3d startToEdge = _start - edgeStart;
         Vector3d radialStart = startToEdge - edgeDirection * Vector3d.Dot(startToEdge, edgeDirection);
         Vector3d radialDirection = _direction - edgeDirection * Vector3d.Dot(_direction, edgeDirection);
-        Fixed64 a = radialDirection.SqrMagnitude;
+        Fixed64 a = radialDirection.MagnitudeSquared;
         if (a <= Fixed64.Epsilon)
             return false;
 
         Fixed64 b = 2 * Vector3d.Dot(radialStart, radialDirection);
-        Fixed64 c = radialStart.SqrMagnitude - _radius * _radius;
+        Fixed64 c = radialStart.MagnitudeSquared - _radius * _radius;
         Fixed64 discriminant = b * b - 4 * a * c;
         if (discriminant < Fixed64.Zero)
             return false;
@@ -557,9 +557,9 @@ public sealed class SweptSphereQueryWorker
 
         Fixed64 entry = Fixed64.Zero;
         Fixed64 exit = _length;
-        if (!ClipSegmentAxis(localStart.x, localDirection.x, min.x, max.x, ref entry, ref exit)
-            || !ClipSegmentAxis(localStart.y, localDirection.y, min.y, max.y, ref entry, ref exit)
-            || !ClipSegmentAxis(localStart.z, localDirection.z, min.z, max.z, ref entry, ref exit))
+        if (!ClipSegmentAxis(localStart.X, localDirection.X, min.X, max.X, ref entry, ref exit)
+            || !ClipSegmentAxis(localStart.Y, localDirection.Y, min.Y, max.Y, ref entry, ref exit)
+            || !ClipSegmentAxis(localStart.Z, localDirection.Z, min.Z, max.Z, ref entry, ref exit))
         {
             return false;
         }
@@ -586,7 +586,7 @@ public sealed class SweptSphereQueryWorker
             return false;
 
         Vector3d localPoint = localStart + localDirection * distance;
-        if (localPoint.y < -halfHeight || localPoint.y > halfHeight)
+        if (localPoint.Y < -halfHeight || localPoint.Y > halfHeight)
             return false;
 
         sphereCenterAtImpact = center + rotation * localPoint;
@@ -610,14 +610,14 @@ public sealed class SweptSphereQueryWorker
     }
 
     private static bool IsPointInsideFiniteCylinder(Vector3d localPoint, Fixed64 radiusSqr, Fixed64 halfHeight) =>
-        localPoint.y >= -halfHeight
-        && localPoint.y <= halfHeight
-        && localPoint.x * localPoint.x + localPoint.z * localPoint.z <= radiusSqr;
+        localPoint.Y >= -halfHeight
+        && localPoint.Y <= halfHeight
+        && localPoint.X * localPoint.X + localPoint.Z * localPoint.Z <= radiusSqr;
 
     private static bool IsPointInsideBox(Vector3d localPoint, Vector3d min, Vector3d max) =>
-        localPoint.x >= min.x && localPoint.x <= max.x
-        && localPoint.y >= min.y && localPoint.y <= max.y
-        && localPoint.z >= min.z && localPoint.z <= max.z;
+        localPoint.X >= min.X && localPoint.X <= max.X
+        && localPoint.Y >= min.Y && localPoint.Y <= max.Y
+        && localPoint.Z >= min.Z && localPoint.Z <= max.Z;
 
     private static bool ClipSegmentAxis(
         Fixed64 position,

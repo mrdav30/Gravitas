@@ -9,7 +9,7 @@ public class LSCapsuleCollider : LSCollider
     public override ColliderType Shape => ColliderType.Capsule;
     public override int Priority => ColliderSettings.GetPriority(Shape);
 
-    public override Fixed64 ScaledRadius => _radius * FixedMath.Max(LocalScale.x, LocalScale.z);
+    public override Fixed64 ScaledRadius => _radius * FixedMath.Max(LocalScale.X, LocalScale.Z);
 
     // The local top and bottom center points that define the hemispheres of the capsule
     public Vector3d HemisphereCenterTop { get; private set; }
@@ -22,33 +22,33 @@ public class LSCapsuleCollider : LSCollider
 
     public Vector3d LineSegmentEnd { get; private set; }
 
-    public Vector3d LineDirection => (LineSegmentEnd - LineSegmentStart).Normal;
+    public Vector3d LineDirection => (LineSegmentEnd - LineSegmentStart).Normalized;
 
     protected override void OnInitialize()
     {
         Fixed64 diameter = _radius * 2;
-        _size = new Vector3d(diameter, _size.y, diameter);
+        _size = new Vector3d(diameter, _size.Y, diameter);
         base.OnInitialize();
     }
 
     protected override void OnRadiusChanged()
     {
         Fixed64 diameter = _radius * 2;
-        _size = new Vector3d(diameter, _size.y, diameter);
+        _size = new Vector3d(diameter, _size.Y, diameter);
     }
 
     protected override Vector3d NormalizeSize(Vector3d value) =>
-        new(_radius * 2, value.y, _radius * 2);
+        new(_radius * 2, value.Y, _radius * 2);
 
     protected override void BuildShape()
     {
-        Fixed64 halfCylinderHeight = FixedMath.Max(Fixed64.Zero, (ScaledSize.y * Fixed64.Half) - ScaledRadius);
+        Fixed64 halfCylinderHeight = FixedMath.Max(Fixed64.Zero, (ScaledSize.Y * Fixed64.Half) - ScaledRadius);
         HemisphereCenterBottom = new Vector3d(Fixed64.Zero, -halfCylinderHeight, Fixed64.Zero);
         HemisphereCenterTop = new Vector3d(Fixed64.Zero, halfCylinderHeight, Fixed64.Zero);
         CylinderHeight = halfCylinderHeight * 2;
 
         // Area calculation: A = 2πrh + 2πr^2
-        Area = 2 * FixedMath.PI * ScaledRadius * CylinderHeight + 2 * FixedMath.PI * ScaledRadiusSqr;
+        Area = 2 * Fixed64.Pi * ScaledRadius * CylinderHeight + 2 * Fixed64.Pi * ScaledRadiusSqr;
         UpdateLineSegment();
     }
 
@@ -71,7 +71,7 @@ public class LSCapsuleCollider : LSCollider
     {
         if (CylinderHeight <= Fixed64.Epsilon)
         {
-            Fixed64 sphereDiagonal = Fixed64.Fraction(2, 5) * mass * ScaledRadiusSqr;
+            Fixed64 sphereDiagonal = Fixed64.FromFraction(2, 5) * mass * ScaledRadiusSqr;
             return new Fixed3x3(
                 sphereDiagonal, Fixed64.Zero, Fixed64.Zero,
                 Fixed64.Zero, sphereDiagonal, Fixed64.Zero,
@@ -80,8 +80,8 @@ public class LSCapsuleCollider : LSCollider
         }
 
         // Masses of the cylinder and spheres (proportional to their volumes)
-        Fixed64 cylinderVolume = FixedMath.PI * ScaledRadiusSqr * CylinderHeight;
-        Fixed64 sphereVolume = Fixed64.Fraction(4, 3) * FixedMath.PI * ScaledRadiusSqr * ScaledRadius;
+        Fixed64 cylinderVolume = Fixed64.Pi * ScaledRadiusSqr * CylinderHeight;
+        Fixed64 sphereVolume = Fixed64.FromFraction(4, 3) * Fixed64.Pi * ScaledRadiusSqr * ScaledRadius;
         Fixed64 totalVolume = cylinderVolume + sphereVolume;
         Fixed64 cylinderMass = mass * (cylinderVolume / totalVolume);
         Fixed64 sphereMass = mass - cylinderMass;
@@ -90,11 +90,11 @@ public class LSCapsuleCollider : LSCollider
         Fixed64 d = CylinderHeight / 2;
 
         // Calculating the inertia tensors for the cylinder and the spheres
-        Fixed64 cylinderInertiaY = Fixed64.Fraction(1, 2) * cylinderMass * ScaledRadiusSqr;
-        Fixed64 cylinderInertiaXZ = Fixed64.Fraction(1, 12) * cylinderMass * ((3 * ScaledRadiusSqr) + (CylinderHeight * CylinderHeight));
+        Fixed64 cylinderInertiaY = Fixed64.FromFraction(1, 2) * cylinderMass * ScaledRadiusSqr;
+        Fixed64 cylinderInertiaXZ = Fixed64.FromFraction(1, 12) * cylinderMass * ((3 * ScaledRadiusSqr) + (CylinderHeight * CylinderHeight));
         // Multiply by 2 because there are two hemispheres and apply parallel axis theorem
-        Fixed64 sphereInertiaXZ = (Fixed64.Fraction(2, 5) * sphereMass * ScaledRadiusSqr) + sphereMass * d * d;
-        Fixed64 sphereInertiaY = Fixed64.Fraction(2, 5) * sphereMass * ScaledRadiusSqr;
+        Fixed64 sphereInertiaXZ = (Fixed64.FromFraction(2, 5) * sphereMass * ScaledRadiusSqr) + sphereMass * d * d;
+        Fixed64 sphereInertiaY = Fixed64.FromFraction(2, 5) * sphereMass * ScaledRadiusSqr;
 
         // The total inertia tensor for the capsule
         Fixed64 totalInertia_xz = cylinderInertiaXZ + sphereInertiaXZ;
@@ -114,7 +114,7 @@ public class LSCapsuleCollider : LSCollider
     // then the frontal area would be a rectangle with a semicircle on either end,
     // which would be (2r)*h + πr^2, where h is the height of the cylindrical part of the capsule.
     public override Fixed64 GetFrontalArea(Vector3d direction) =>
-        2 * ScaledRadius * CylinderHeight + FixedMath.PI * ScaledRadiusSqr;
+        2 * ScaledRadius * CylinderHeight + Fixed64.Pi * ScaledRadiusSqr;
 
     public override Vector3d ClosestPointOnSurface(Vector3d other)
     {
@@ -178,7 +178,7 @@ public class LSCapsuleCollider : LSCollider
         Vector3d rotatedPoint = Rotation.Inverse() * (point - Center);
 
         // If the point is on the top hemisphere
-        if (rotatedPoint.y > HemisphereCenterTop.y)
+        if (rotatedPoint.Y > HemisphereCenterTop.Y)
         {
             Vector3d topDirection = rotatedPoint - HemisphereCenterTop;
             Fixed64 topDistance = topDirection.Magnitude;
@@ -188,7 +188,7 @@ public class LSCapsuleCollider : LSCollider
         }
 
         // If the point is on the bottom hemisphere
-        if (rotatedPoint.y < HemisphereCenterBottom.y)
+        if (rotatedPoint.Y < HemisphereCenterBottom.Y)
         {
             Vector3d bottomDirection = rotatedPoint - HemisphereCenterBottom;
             Fixed64 bottomDistance = bottomDirection.Magnitude;
@@ -198,7 +198,7 @@ public class LSCapsuleCollider : LSCollider
         }
 
         // If the point is along the length of the cylinder
-        Vector3d direction = new(rotatedPoint.x, Fixed64.Zero, rotatedPoint.z);
+        Vector3d direction = new(rotatedPoint.X, Fixed64.Zero, rotatedPoint.Z);
         Fixed64 distance = direction.Magnitude;
         return distance > Fixed64.Zero
             ? Rotation * (direction / distance)

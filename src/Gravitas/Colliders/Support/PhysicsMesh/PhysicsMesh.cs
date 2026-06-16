@@ -1,4 +1,5 @@
 ﻿using FixedMathSharp;
+using FixedMathSharp.Bounds;
 using SwiftCollections;
 using SwiftCollections.Query;
 using System;
@@ -124,16 +125,16 @@ namespace Gravitas.Colliders
             }
         }
 
-        private BoundingBox _bounds;
+        private FixedBoundBox _bounds;
         private bool _boundsInitialized;
-        public BoundingBox Bounds => _bounds;
+        public FixedBoundBox Bounds => _bounds;
 
-        private readonly BoundingBox _localBounds;
+        private readonly FixedBoundBox _localBounds;
 
         /// <summary>
         /// Axis-aligned bounds of the source vertices in local mesh space.
         /// </summary>
-        public BoundingBox LocalBounds => _localBounds;
+        public FixedBoundBox LocalBounds => _localBounds;
 
         public PhysicsMesh(Vector3d[] vertices, int[] triangles, Vector3d position, FixedQuaternion rotation)
             : this(vertices, triangles, position, rotation, MeshColliderMode.Convex)
@@ -275,7 +276,7 @@ namespace Gravitas.Colliders
                 {
                     int edgeStart = _edges[i][n * 2];
                     int edgeEnd = _edges[i][n * 2 + 1];
-                    _edgeNormals[i * 3 + n] = (_localVertices[edgeEnd] - _localVertices[edgeStart]).Normal;
+                    _edgeNormals[i * 3 + n] = (_localVertices[edgeEnd] - _localVertices[edgeStart]).Normalized;
                 }
             }
 
@@ -290,7 +291,7 @@ namespace Gravitas.Colliders
                 int index0 = _triangles[i * 3];
                 int index1 = _triangles[i * 3 + 1];
                 int index2 = _triangles[i * 3 + 2];
-                _faceNormals[i] = Vector3d.Cross(_localVertices[index1] - _localVertices[index0], _localVertices[index2] - _localVertices[index0]).Normal;
+                _faceNormals[i] = Vector3d.Cross(_localVertices[index1] - _localVertices[index0], _localVertices[index2] - _localVertices[index0]).Normalized;
             }
 
             _faceNormalsValid = true;
@@ -320,7 +321,7 @@ namespace Gravitas.Colliders
             FixedBoundVolume volume = TransformBounds(_localBounds.Min, _localBounds.Max, TransformationMatrix);
             if (!_boundsInitialized)
             {
-                _bounds = new BoundingBox((volume.Min + volume.Max) * Fixed64.Half, volume.Max - volume.Min);
+                _bounds = new FixedBoundBox((volume.Min + volume.Max) * Fixed64.Half, volume.Max - volume.Min);
                 _boundsInitialized = true;
                 return;
             }
@@ -328,7 +329,7 @@ namespace Gravitas.Colliders
             _bounds.SetMinMax(volume.Min, volume.Max);
         }
 
-        private static BoundingBox CalculateBounds(Vector3d[] vertices)
+        private static FixedBoundBox CalculateBounds(Vector3d[] vertices)
         {
             Vector3d min = vertices[0];
             Vector3d max = vertices[0];
@@ -338,7 +339,7 @@ namespace Gravitas.Colliders
                 max = Vector3d.Max(max, vertices[i]);
             }
 
-            return new BoundingBox((min + max) * Fixed64.Half, max - min);
+            return new FixedBoundBox((min + max) * Fixed64.Half, max - min);
         }
 
         private static FixedBoundVolume TransformBounds(Vector3d min, Vector3d max, Fixed4x4 transform)
@@ -347,12 +348,12 @@ namespace Gravitas.Colliders
             Vector3d transformedMin = first;
             Vector3d transformedMax = first;
 
-            IncludeTransformedPoint(transform * new Vector3d(max.x, min.y, min.z), ref transformedMin, ref transformedMax);
-            IncludeTransformedPoint(transform * new Vector3d(min.x, max.y, min.z), ref transformedMin, ref transformedMax);
-            IncludeTransformedPoint(transform * new Vector3d(max.x, max.y, min.z), ref transformedMin, ref transformedMax);
-            IncludeTransformedPoint(transform * new Vector3d(min.x, min.y, max.z), ref transformedMin, ref transformedMax);
-            IncludeTransformedPoint(transform * new Vector3d(max.x, min.y, max.z), ref transformedMin, ref transformedMax);
-            IncludeTransformedPoint(transform * new Vector3d(min.x, max.y, max.z), ref transformedMin, ref transformedMax);
+            IncludeTransformedPoint(transform * new Vector3d(max.X, min.Y, min.Z), ref transformedMin, ref transformedMax);
+            IncludeTransformedPoint(transform * new Vector3d(min.X, max.Y, min.Z), ref transformedMin, ref transformedMax);
+            IncludeTransformedPoint(transform * new Vector3d(max.X, max.Y, min.Z), ref transformedMin, ref transformedMax);
+            IncludeTransformedPoint(transform * new Vector3d(min.X, min.Y, max.Z), ref transformedMin, ref transformedMax);
+            IncludeTransformedPoint(transform * new Vector3d(max.X, min.Y, max.Z), ref transformedMin, ref transformedMax);
+            IncludeTransformedPoint(transform * new Vector3d(min.X, max.Y, max.Z), ref transformedMin, ref transformedMax);
             IncludeTransformedPoint(transform * max, ref transformedMin, ref transformedMax);
 
             return new FixedBoundVolume(transformedMin, transformedMax);
@@ -478,6 +479,6 @@ namespace Gravitas.Colliders
             TransformationMatrix * localPoint;
 
         private Vector3d TransformLocalNormal(Vector3d localNormal) =>
-            localNormal == Vector3d.Zero ? Vector3d.Zero : (_rotation * localNormal).Normal;
+            localNormal == Vector3d.Zero ? Vector3d.Zero : (_rotation * localNormal).Normalized;
     }
 }

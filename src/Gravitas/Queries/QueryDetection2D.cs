@@ -21,7 +21,7 @@ internal static class QueryDetection2D
         Vector2d closest = collider.GetClosestPoint(center);
         bool containsCenter = collider.ContainsPoint(center);
         Vector2d toCenter = center - closest;
-        Fixed64 distanceSquared = containsCenter ? Fixed64.Zero : toCenter.SqrMagnitude;
+        Fixed64 distanceSquared = containsCenter ? Fixed64.Zero : toCenter.MagnitudeSquared;
         if (distanceSquared > radius * radius)
         {
             hit = default;
@@ -39,7 +39,7 @@ internal static class QueryDetection2D
     internal static bool TryRaycast(Vector2d start, Vector2d end, LSCollider2D collider, out Physics2DHit hit)
     {
         Vector2d segment = end - start;
-        Fixed64 segmentLengthSquared = segment.SqrMagnitude;
+        Fixed64 segmentLengthSquared = segment.MagnitudeSquared;
         if (segmentLengthSquared == Fixed64.Zero || !SegmentBoundsOverlap(start, end, collider))
         {
             hit = default;
@@ -71,7 +71,7 @@ internal static class QueryDetection2D
         out Physics2DHit hit)
     {
         Vector2d segment = end - start;
-        Fixed64 segmentLengthSquared = segment.SqrMagnitude;
+        Fixed64 segmentLengthSquared = segment.MagnitudeSquared;
         if (segmentLengthSquared <= Fixed64.Epsilon || !SweepBoundsOverlap(start, end, radius, collider))
         {
             hit = default;
@@ -99,7 +99,7 @@ internal static class QueryDetection2D
         out Physics2DHit hit)
     {
         Vector2d originFromCenter = start - circle.Center;
-        Fixed64 c = originFromCenter.SqrMagnitude - circle.Radius * circle.Radius;
+        Fixed64 c = originFromCenter.MagnitudeSquared - circle.Radius * circle.Radius;
         Fixed64 b = Vector2d.Dot(originFromCenter, direction);
         if (c > Fixed64.Zero && b > Fixed64.Zero)
         {
@@ -126,7 +126,7 @@ internal static class QueryDetection2D
         Vector2d point = start + direction * distance;
         Vector2d normal = point == circle.Center
             ? ResolveQueryFallbackNormal(point, circle.Center)
-            : (point - circle.Center).Normal;
+            : (point - circle.Center).Normalized;
         hit = new Physics2DHit(circle, point, normal, distance);
         return true;
     }
@@ -149,7 +149,7 @@ internal static class QueryDetection2D
         Vector2d sweptCenter = start + direction * distance;
         Vector2d normal = sweptCenter == circle.Center
             ? ResolveQueryFallbackNormal(sweptCenter, circle.Center)
-            : (sweptCenter - circle.Center).Normal;
+            : (sweptCenter - circle.Center).Normalized;
         Vector2d point = circle.Center + normal * circle.Radius;
         hit = new Physics2DHit(circle, point, normal, distance);
         return true;
@@ -164,7 +164,7 @@ internal static class QueryDetection2D
         out Physics2DHit hit)
     {
         bool found = false;
-        Fixed64 bestT = Fixed64.MAX_VALUE;
+        Fixed64 bestT = Fixed64.MaxValue;
         Vector2d bestPoint = Vector2d.Zero;
         Vector2d bestNormal = Vector2d.Right;
 
@@ -180,15 +180,15 @@ internal static class QueryDetection2D
 
             Vector2d edge = b - a;
             Vector2d normal = edge.LeftHandNormal;
-            if (normal.SqrMagnitude > Fixed64.Epsilon)
-                normal = normal.Normal;
+            if (normal.MagnitudeSquared > Fixed64.Epsilon)
+                normal = normal.Normalized;
             if (Vector2d.Dot(normal, direction) > Fixed64.Zero)
                 normal = -normal;
 
             found = true;
             bestT = t;
             bestPoint = start + segment * t;
-            bestNormal = normal.SqrMagnitude > Fixed64.Epsilon ? normal : ResolveQueryFallbackNormal(bestPoint, collider.Center);
+            bestNormal = normal.MagnitudeSquared > Fixed64.Epsilon ? normal : ResolveQueryFallbackNormal(bestPoint, collider.Center);
         }
 
         if (!found)
@@ -210,7 +210,7 @@ internal static class QueryDetection2D
         out Physics2DHit hit)
     {
         bool found = false;
-        Fixed64 bestDistance = Fixed64.MAX_VALUE;
+        Fixed64 bestDistance = Fixed64.MaxValue;
         Vector2d bestPoint = Vector2d.Zero;
         Vector2d bestNormal = Vector2d.Right;
 
@@ -278,7 +278,7 @@ internal static class QueryDetection2D
         out Vector2d normal)
     {
         Vector2d edge = edgeEnd - edgeStart;
-        Fixed64 edgeLengthSquared = edge.SqrMagnitude;
+        Fixed64 edgeLengthSquared = edge.MagnitudeSquared;
         if (edgeLengthSquared <= Fixed64.Epsilon)
         {
             distance = default;
@@ -336,7 +336,7 @@ internal static class QueryDetection2D
         Vector2d sweptCenter = start + direction * distance;
         normal = sweptCenter == vertex
             ? ResolveQueryFallbackNormal(sweptCenter, vertex)
-            : (sweptCenter - vertex).Normal;
+            : (sweptCenter - vertex).Normalized;
         return true;
     }
 
@@ -349,7 +349,7 @@ internal static class QueryDetection2D
         out Fixed64 distance)
     {
         Vector2d originFromCenter = start - circleCenter;
-        Fixed64 c = originFromCenter.SqrMagnitude - radius * radius;
+        Fixed64 c = originFromCenter.MagnitudeSquared - radius * radius;
         Fixed64 b = Vector2d.Dot(originFromCenter, direction);
         if (c > Fixed64.Zero && b > Fixed64.Zero)
         {
@@ -373,10 +373,10 @@ internal static class QueryDetection2D
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool SegmentBoundsOverlap(Vector2d start, Vector2d end, LSCollider2D collider)
     {
-        Fixed64 minX = FixedMath.Min(start.x, end.x);
-        Fixed64 maxX = FixedMath.Max(start.x, end.x);
-        Fixed64 minY = FixedMath.Min(start.y, end.y);
-        Fixed64 maxY = FixedMath.Max(start.y, end.y);
+        Fixed64 minX = FixedMath.Min(start.X, end.X);
+        Fixed64 maxX = FixedMath.Max(start.X, end.X);
+        Fixed64 minY = FixedMath.Min(start.Y, end.Y);
+        Fixed64 maxY = FixedMath.Max(start.Y, end.Y);
         return maxX >= collider.MinX
             && minX <= collider.MaxX
             && maxY >= collider.MinY
@@ -386,10 +386,10 @@ internal static class QueryDetection2D
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool SweepBoundsOverlap(Vector2d start, Vector2d end, Fixed64 radius, LSCollider2D collider)
     {
-        Fixed64 minX = FixedMath.Min(start.x, end.x) - radius;
-        Fixed64 maxX = FixedMath.Max(start.x, end.x) + radius;
-        Fixed64 minY = FixedMath.Min(start.y, end.y) - radius;
-        Fixed64 maxY = FixedMath.Max(start.y, end.y) + radius;
+        Fixed64 minX = FixedMath.Min(start.X, end.X) - radius;
+        Fixed64 maxX = FixedMath.Max(start.X, end.X) + radius;
+        Fixed64 minY = FixedMath.Min(start.Y, end.Y) - radius;
+        Fixed64 maxY = FixedMath.Max(start.Y, end.Y) + radius;
         return maxX >= collider.MinX
             && minX <= collider.MaxX
             && maxY >= collider.MinY
@@ -428,8 +428,8 @@ internal static class QueryDetection2D
     private static Vector2d ResolveQueryFallbackNormal(Vector2d center, Vector2d colliderCenter)
     {
         Vector2d direction = center - colliderCenter;
-        return direction.SqrMagnitude > Fixed64.Epsilon
-            ? direction.Normal
+        return direction.MagnitudeSquared > Fixed64.Epsilon
+            ? direction.Normalized
             : Vector2d.Right;
     }
 
@@ -437,10 +437,10 @@ internal static class QueryDetection2D
     private static Vector2d ResolveOutwardEdgeNormal(Vector2d edgeStart, Vector2d edge, Vector2d colliderCenter)
     {
         Vector2d normal = edge.LeftHandNormal;
-        if (normal.SqrMagnitude <= Fixed64.Epsilon)
+        if (normal.MagnitudeSquared <= Fixed64.Epsilon)
             return ResolveQueryFallbackNormal(edgeStart, colliderCenter);
 
-        normal = normal.Normal;
+        normal = normal.Normalized;
         if (Vector2d.Dot(colliderCenter - edgeStart, normal) > Fixed64.Zero)
             normal = -normal;
         return normal;

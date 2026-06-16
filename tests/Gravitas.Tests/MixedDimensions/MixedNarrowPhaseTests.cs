@@ -164,7 +164,7 @@ public sealed class MixedNarrowPhaseTests
         collided.Should().BeTrue(caseName);
         contact.HasContact.Should().BeTrue();
         contact.Depth.Should().BeGreaterThanOrEqualTo(Fixed64.Zero);
-        contact.Normal3DTo2D.SqrMagnitude.Should().BeGreaterThan(Fixed64.Zero);
+        contact.Normal3DTo2D.MagnitudeSquared.Should().BeGreaterThan(Fixed64.Zero);
     }
 
     [Fact]
@@ -199,7 +199,7 @@ public sealed class MixedNarrowPhaseTests
         secondCollided.Should().BeTrue();
         first.HasContact.Should().BeTrue();
         first.Depth.Should().BeGreaterThan(Fixed64.Zero);
-        first.Normal3DTo2D.SqrMagnitude.Should().BeGreaterThan(Fixed64.Zero);
+        first.Normal3DTo2D.MagnitudeSquared.Should().BeGreaterThan(Fixed64.Zero);
         second.Point3D.Should().Be(first.Point3D);
         second.Point2D.Should().Be(first.Point2D);
         second.Normal3DTo2D.Should().Be(first.Normal3DTo2D);
@@ -269,7 +269,7 @@ public sealed class MixedNarrowPhaseTests
         collided.Should().BeTrue();
         contact.HasContact.Should().BeTrue();
         contact.Depth.Should().BeGreaterThanOrEqualTo(Fixed64.Zero);
-        contact.Normal3DTo2D.SqrMagnitude.Should().BeGreaterThan(Fixed64.Zero);
+        contact.Normal3DTo2D.MagnitudeSquared.Should().BeGreaterThan(Fixed64.Zero);
     }
 
     [Fact]
@@ -289,7 +289,7 @@ public sealed class MixedNarrowPhaseTests
         secondCollided.Should().BeTrue();
         first.HasContact.Should().BeTrue();
         first.Depth.Should().BeGreaterThanOrEqualTo(Fixed64.Zero);
-        first.Normal3DTo2D.SqrMagnitude.Should().BeGreaterThan(Fixed64.Zero);
+        first.Normal3DTo2D.MagnitudeSquared.Should().BeGreaterThan(Fixed64.Zero);
         second.Point3D.Should().Be(first.Point3D);
         second.Point2D.Should().Be(first.Point2D);
         second.Normal3DTo2D.Should().Be(first.Normal3DTo2D);
@@ -312,7 +312,7 @@ public sealed class MixedNarrowPhaseTests
         collided.Should().BeTrue();
         contact.HasContact.Should().BeTrue();
         contact.Depth.Should().BeGreaterThanOrEqualTo(Fixed64.Zero);
-        contact.Normal3DTo2D.SqrMagnitude.Should().BeGreaterThan(Fixed64.Zero);
+        contact.Normal3DTo2D.MagnitudeSquared.Should().BeGreaterThan(Fixed64.Zero);
     }
 
     [Fact]

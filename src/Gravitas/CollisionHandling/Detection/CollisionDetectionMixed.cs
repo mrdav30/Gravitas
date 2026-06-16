@@ -3,6 +3,7 @@ using Gravitas.CollisionHandling;
 using Gravitas.Colliders;
 using SwiftCollections;
 using System.Runtime.CompilerServices;
+using FixedMathSharp.Bounds;
 
 namespace Gravitas;
 
@@ -37,20 +38,20 @@ public static partial class CollisionDetectionMixed
     private static bool TrySphereEmbedded2D(LSSphereCollider sphere, LSCollider2D embedded, out MixedContact contact)
     {
         Vector3d sphereCenter = sphere.Center;
-        Vector2d planarCenter = new(sphereCenter.x, sphereCenter.z);
-        Fixed64 slabMinY = embedded.MixedBounds3D.Min.y;
-        Fixed64 slabMaxY = embedded.MixedBounds3D.Max.y;
+        Vector2d planarCenter = new(sphereCenter.X, sphereCenter.Z);
+        Fixed64 slabMinY = embedded.MixedBounds3D.Min.Y;
+        Fixed64 slabMaxY = embedded.MixedBounds3D.Max.Y;
         bool planarInside = embedded.ContainsPoint(planarCenter);
-        bool yInside = sphereCenter.y >= slabMinY && sphereCenter.y <= slabMaxY;
+        bool yInside = sphereCenter.Y >= slabMinY && sphereCenter.Y <= slabMaxY;
 
         if (planarInside && yInside)
             return TrySphereFromInsideEmbedded2D(sphere, embedded, planarCenter, slabMinY, slabMaxY, out contact);
 
         Vector2d closestPlanar = planarInside ? planarCenter : embedded.GetClosestPoint(planarCenter);
-        Fixed64 closestY = Clamp(sphereCenter.y, slabMinY, slabMaxY);
-        Vector3d closestEmbeddedPoint = new(closestPlanar.x, closestY, closestPlanar.y);
+        Fixed64 closestY = Clamp(sphereCenter.Y, slabMinY, slabMaxY);
+        Vector3d closestEmbeddedPoint = new(closestPlanar.X, closestY, closestPlanar.Y);
         Vector3d delta = closestEmbeddedPoint - sphereCenter;
-        Fixed64 distanceSquared = delta.SqrMagnitude;
+        Fixed64 distanceSquared = delta.MagnitudeSquared;
         if (distanceSquared > sphere.ScaledRadiusSqr)
         {
             contact = default;
@@ -220,7 +221,7 @@ public static partial class CollisionDetectionMixed
             for (int j = 0; j < prism.VertexCount; j++)
             {
                 GetPrismEdge(prism, j, out Vector2d edge2D);
-                Vector3d edge3D = new(edge2D.x, Fixed64.Zero, edge2D.y);
+                Vector3d edge3D = new(edge2D.X, Fixed64.Zero, edge2D.Y);
                 if (!CheckCuboidPrismAxis(cuboid, prism, Vector3d.Cross(cuboid.EdgeDirections[i], edge3D), ref penetration))
                     return false;
             }
@@ -253,7 +254,7 @@ public static partial class CollisionDetectionMixed
         for (int i = 0; i < prism.VertexCount; i++)
         {
             GetPrismEdge(prism, i, out Vector2d edge2D);
-            Vector3d edge3D = new(edge2D.x, Fixed64.Zero, edge2D.y);
+            Vector3d edge3D = new(edge2D.X, Fixed64.Zero, edge2D.Y);
             if (!CheckCapsulePrismAxis(capsule, prism, GetPlanarEdgeNormal(edge2D), ref penetration))
                 return false;
 
@@ -288,7 +289,7 @@ public static partial class CollisionDetectionMixed
         for (int i = 0; i < prism.VertexCount; i++)
         {
             GetPrismEdge(prism, i, out Vector2d edge2D);
-            Vector3d edge3D = new(edge2D.x, Fixed64.Zero, edge2D.y);
+            Vector3d edge3D = new(edge2D.X, Fixed64.Zero, edge2D.Y);
             if (!CheckCylinderPrismAxis(cylinder, prism, GetPlanarEdgeNormal(edge2D), ref penetration))
                 return false;
 
@@ -456,17 +457,17 @@ public static partial class CollisionDetectionMixed
         out MixedContact contact)
     {
         Vector3d sphereCenter = sphere.Center;
-        Fixed64 minYDistance = sphereCenter.y - slabMinY;
-        Fixed64 maxYDistance = slabMaxY - sphereCenter.y;
+        Fixed64 minYDistance = sphereCenter.Y - slabMinY;
+        Fixed64 maxYDistance = slabMaxY - sphereCenter.Y;
         Fixed64 bestDistance = minYDistance;
         Vector3d normal = -Vector3d.Up;
-        Vector3d embeddedPoint = new(planarCenter.x, slabMinY, planarCenter.y);
+        Vector3d embeddedPoint = new(planarCenter.X, slabMinY, planarCenter.Y);
 
         if (maxYDistance < bestDistance)
         {
             bestDistance = maxYDistance;
             normal = Vector3d.Up;
-            embeddedPoint = new Vector3d(planarCenter.x, slabMaxY, planarCenter.y);
+            embeddedPoint = new Vector3d(planarCenter.X, slabMaxY, planarCenter.Y);
         }
 
         if (TryGetPlanarBoundaryPoint(embedded, planarCenter, out Vector2d planarBoundary, out Fixed64 planarDistance)
@@ -476,8 +477,8 @@ public static partial class CollisionDetectionMixed
             Vector2d planarNormal = planarDistance > Fixed64.Epsilon
                 ? (planarBoundary - planarCenter) / planarDistance
                 : Vector2d.Right;
-            normal = new Vector3d(planarNormal.x, Fixed64.Zero, planarNormal.y);
-            embeddedPoint = new Vector3d(planarBoundary.x, sphereCenter.y, planarBoundary.y);
+            normal = new Vector3d(planarNormal.X, Fixed64.Zero, planarNormal.Y);
+            embeddedPoint = new Vector3d(planarBoundary.X, sphereCenter.Y, planarBoundary.Y);
         }
 
         contact = new MixedContact(
@@ -529,30 +530,30 @@ public static partial class CollisionDetectionMixed
         out Vector2d boundary,
         out Fixed64 distance)
     {
-        Fixed64 distanceMinX = point.x - box.MinX;
-        Fixed64 distanceMaxX = box.MaxX - point.x;
-        Fixed64 distanceMinY = point.y - box.MinY;
-        Fixed64 distanceMaxY = box.MaxY - point.y;
+        Fixed64 distanceMinX = point.X - box.MinX;
+        Fixed64 distanceMaxX = box.MaxX - point.X;
+        Fixed64 distanceMinY = point.Y - box.MinY;
+        Fixed64 distanceMaxY = box.MaxY - point.Y;
 
         distance = distanceMinX;
-        boundary = new Vector2d(box.MinX, point.y);
+        boundary = new Vector2d(box.MinX, point.Y);
 
         if (distanceMaxX < distance)
         {
             distance = distanceMaxX;
-            boundary = new Vector2d(box.MaxX, point.y);
+            boundary = new Vector2d(box.MaxX, point.Y);
         }
 
         if (distanceMinY < distance)
         {
             distance = distanceMinY;
-            boundary = new Vector2d(point.x, box.MinY);
+            boundary = new Vector2d(point.X, box.MinY);
         }
 
         if (distanceMaxY < distance)
         {
             distance = distanceMaxY;
-            boundary = new Vector2d(point.x, box.MaxY);
+            boundary = new Vector2d(point.X, box.MaxY);
         }
 
         return true;
@@ -573,13 +574,13 @@ public static partial class CollisionDetectionMixed
         }
 
         Vector2d bestPoint = convex.GetVertexUnchecked(0);
-        Fixed64 bestDistanceSquared = Fixed64.MAX_VALUE;
+        Fixed64 bestDistanceSquared = Fixed64.MaxValue;
         for (int i = 0; i < vertexCount; i++)
         {
             Vector2d a = convex.GetVertexUnchecked(i);
             Vector2d b = convex.GetVertexUnchecked((i + 1) % vertexCount);
             Vector2d candidate = ClosestPointOnSegment(point, a, b);
-            Fixed64 candidateDistanceSquared = Vector2d.SqrDistance(point, candidate);
+            Fixed64 candidateDistanceSquared = Vector2d.DistanceSquared(point, candidate);
             if (candidateDistanceSquared >= bestDistanceSquared)
                 continue;
 
@@ -594,33 +595,33 @@ public static partial class CollisionDetectionMixed
 
     private static Vector3d GetClosestPointOnEmbeddedVolume(LSCollider2D embedded, Vector3d point)
     {
-        Vector2d planarPoint = new(point.x, point.z);
-        Fixed64 slabMinY = embedded.MixedBounds3D.Min.y;
-        Fixed64 slabMaxY = embedded.MixedBounds3D.Max.y;
+        Vector2d planarPoint = new(point.X, point.Z);
+        Fixed64 slabMinY = embedded.MixedBounds3D.Min.Y;
+        Fixed64 slabMaxY = embedded.MixedBounds3D.Max.Y;
         bool planarInside = embedded.ContainsPoint(planarPoint);
-        bool yInside = point.y >= slabMinY && point.y <= slabMaxY;
+        bool yInside = point.Y >= slabMinY && point.Y <= slabMaxY;
 
         if (!planarInside || !yInside)
         {
             Vector2d closestPlanar = planarInside ? planarPoint : embedded.GetClosestPoint(planarPoint);
-            return new Vector3d(closestPlanar.x, Clamp(point.y, slabMinY, slabMaxY), closestPlanar.y);
+            return new Vector3d(closestPlanar.X, Clamp(point.Y, slabMinY, slabMaxY), closestPlanar.Y);
         }
 
-        Fixed64 minYDistance = point.y - slabMinY;
-        Fixed64 maxYDistance = slabMaxY - point.y;
+        Fixed64 minYDistance = point.Y - slabMinY;
+        Fixed64 maxYDistance = slabMaxY - point.Y;
         Fixed64 bestDistance = minYDistance;
-        Vector3d closest = new(planarPoint.x, slabMinY, planarPoint.y);
+        Vector3d closest = new(planarPoint.X, slabMinY, planarPoint.Y);
 
         if (maxYDistance < bestDistance)
         {
             bestDistance = maxYDistance;
-            closest = new Vector3d(planarPoint.x, slabMaxY, planarPoint.y);
+            closest = new Vector3d(planarPoint.X, slabMaxY, planarPoint.Y);
         }
 
         if (TryGetPlanarBoundaryPoint(embedded, planarPoint, out Vector2d planarBoundary, out Fixed64 planarDistance)
             && planarDistance < bestDistance)
         {
-            closest = new Vector3d(planarBoundary.x, point.y, planarBoundary.y);
+            closest = new Vector3d(planarBoundary.X, point.Y, planarBoundary.Y);
         }
 
         return closest;
@@ -635,14 +636,14 @@ public static partial class CollisionDetectionMixed
     private static FixedRange ProjectPrismOntoAxis(Vector3d axis, LSCollider2D prism)
     {
         Vector2d first = GetPrismVertex(prism, 0);
-        Fixed64 min = ProjectPrismVertex(axis, first, prism.MixedBounds3D.Min.y);
+        Fixed64 min = ProjectPrismVertex(axis, first, prism.MixedBounds3D.Min.Y);
         Fixed64 max = min;
 
         for (int i = 0; i < prism.VertexCount; i++)
         {
             Vector2d vertex = GetPrismVertex(prism, i);
-            Fixed64 bottom = ProjectPrismVertex(axis, vertex, prism.MixedBounds3D.Min.y);
-            Fixed64 top = ProjectPrismVertex(axis, vertex, prism.MixedBounds3D.Max.y);
+            Fixed64 bottom = ProjectPrismVertex(axis, vertex, prism.MixedBounds3D.Min.Y);
+            Fixed64 top = ProjectPrismVertex(axis, vertex, prism.MixedBounds3D.Max.Y);
             if (bottom < min)
                 min = bottom;
             if (bottom > max)
@@ -658,7 +659,7 @@ public static partial class CollisionDetectionMixed
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Fixed64 ProjectPrismVertex(Vector3d axis, Vector2d vertex, Fixed64 y) =>
-        Vector3d.Dot(axis, new Vector3d(vertex.x, y, vertex.y));
+        Vector3d.Dot(axis, new Vector3d(vertex.X, y, vertex.Y));
 
     private static bool CheckProjectedAxis(
         FixedRange projection3D,
@@ -692,7 +693,7 @@ public static partial class CollisionDetectionMixed
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool TryNormalizeAxis(Vector3d axis, out Vector3d normalizedAxis)
     {
-        Fixed64 magnitudeSqr = axis.SqrMagnitude;
+        Fixed64 magnitudeSqr = axis.MagnitudeSquared;
         if (magnitudeSqr <= Fixed64.Epsilon)
         {
             normalizedAxis = Vector3d.Zero;
@@ -706,21 +707,21 @@ public static partial class CollisionDetectionMixed
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Vector3d GetPlanarEdgeNormal(Vector2d edge)
     {
-        Vector2d normal = new(edge.y, -edge.x);
-        return new Vector3d(normal.x, Fixed64.Zero, normal.y);
+        Vector2d normal = new(edge.Y, -edge.X);
+        return new Vector3d(normal.X, Fixed64.Zero, normal.Y);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void GetCircleSlabSegment(LSCircleCollider2D circle, out Vector3d start, out Vector3d end)
     {
         Vector3d center = GetEmbeddedCenter3D(circle);
-        start = new Vector3d(center.x, circle.MixedBounds3D.Min.y, center.z);
-        end = new Vector3d(center.x, circle.MixedBounds3D.Max.y, center.z);
+        start = new Vector3d(center.X, circle.MixedBounds3D.Min.Y, center.Z);
+        end = new Vector3d(center.X, circle.MixedBounds3D.Max.Y, center.Z);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Vector3d GetEmbeddedCenter3D(LSCollider2D embedded) =>
-        new(embedded.Center.x, embedded.MixedSlabCenterY, embedded.Center.y);
+        new(embedded.Center.X, embedded.MixedSlabCenterY, embedded.Center.Y);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void GetPrismEdge(LSCollider2D prism, int index, out Vector2d edge)
@@ -740,8 +741,8 @@ public static partial class CollisionDetectionMixed
         Vector3d secondStart,
         Vector3d secondEnd)
     {
-        bool firstDegenerate = (firstEnd - firstStart).SqrMagnitude <= Fixed64.Epsilon;
-        bool secondDegenerate = (secondEnd - secondStart).SqrMagnitude <= Fixed64.Epsilon;
+        bool firstDegenerate = (firstEnd - firstStart).MagnitudeSquared <= Fixed64.Epsilon;
+        bool secondDegenerate = (secondEnd - secondStart).MagnitudeSquared <= Fixed64.Epsilon;
 
         if (firstDegenerate && secondDegenerate)
             return (firstStart, secondStart);
@@ -759,7 +760,7 @@ public static partial class CollisionDetectionMixed
     private static Vector2d ClosestPointOnSegment(Vector2d point, Vector2d a, Vector2d b)
     {
         Vector2d segment = b - a;
-        Fixed64 lengthSquared = segment.SqrMagnitude;
+        Fixed64 lengthSquared = segment.MagnitudeSquared;
         if (lengthSquared <= Fixed64.Epsilon)
             return a;
 
@@ -769,22 +770,22 @@ public static partial class CollisionDetectionMixed
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool BoundsOverlap(BoundingBox first, BoundingBox second) =>
-        first.Max.x >= second.Min.x
-        && first.Min.x <= second.Max.x
-        && first.Max.y >= second.Min.y
-        && first.Min.y <= second.Max.y
-        && first.Max.z >= second.Min.z
-        && first.Min.z <= second.Max.z;
+    private static bool BoundsOverlap(FixedBoundBox first, FixedBoundBox second) =>
+        first.Max.X >= second.Min.X
+        && first.Min.X <= second.Max.X
+        && first.Max.Y >= second.Min.Y
+        && first.Min.Y <= second.Max.Y
+        && first.Max.Z >= second.Min.Z
+        && first.Min.Z <= second.Max.Z;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Vector3d ResolveFallbackNormal(Vector3d sphereCenter, LSCollider2D embedded)
     {
         Vector3d fallback = new(
-            embedded.Center.x - sphereCenter.x,
-            embedded.MixedSlabCenterY - sphereCenter.y,
-            embedded.Center.y - sphereCenter.z);
-        return fallback.SqrMagnitude > Fixed64.Epsilon ? fallback.Normal : Vector3d.Right;
+            embedded.Center.X - sphereCenter.X,
+            embedded.MixedSlabCenterY - sphereCenter.Y,
+            embedded.Center.Y - sphereCenter.Z);
+        return fallback.MagnitudeSquared > Fixed64.Epsilon ? fallback.Normalized : Vector3d.Right;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

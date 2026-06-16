@@ -69,13 +69,13 @@ public sealed partial class GravitasQuery3DService
         PhysicsLayerMask layerMask)
     {
         _currentLayerMask = layerMask;
-        if (direction.SqrMagnitude == Fixed64.Zero || maxDistance <= Fixed64.Zero)
+        if (direction.MagnitudeSquared == Fixed64.Zero || maxDistance <= Fixed64.Zero)
         {
             raycastHit = default;
             return false;
         }
 
-        Vector3d rayDirection = direction.Normal;
+        Vector3d rayDirection = direction.Normalized;
         Vector3d end = origin + rayDirection * maxDistance;
 
         BeginRaycastTrace(origin, end);
@@ -106,11 +106,11 @@ public sealed partial class GravitasQuery3DService
         results.FastClear();
 
         Vector3d segment = end3d - start3d;
-        if (segment.SqrMagnitude == Fixed64.Zero)
+        if (segment.MagnitudeSquared == Fixed64.Zero)
             return 0;
 
         BeginRaycastTrace(start3d, end3d);
-        AddAllHits(start3d, end3d, segment.Normal, results);
+        AddAllHits(start3d, end3d, segment.Normalized, results);
         Physics3DHitSorter.SortByDistance(results);
         _context.Diagnostics.EmitRayQuery(
             start3d,
@@ -135,13 +135,13 @@ public sealed partial class GravitasQuery3DService
         PhysicsLayerMask layerMask,
         LSCollider? excludedCollider = null)
     {
-        if (direction.SqrMagnitude == Fixed64.Zero || maxDistance <= Fixed64.Zero)
+        if (direction.MagnitudeSquared == Fixed64.Zero || maxDistance <= Fixed64.Zero)
         {
             sweepHit = default;
             return false;
         }
 
-        Vector3d sweepDirection = direction.Normal;
+        Vector3d sweepDirection = direction.Normalized;
         Vector3d end = origin + sweepDirection * maxDistance;
         bool hit = SweepSphere(origin, end, radius, layerMask, excludedCollider, out sweepHit);
         _context.Diagnostics.EmitRayQuery(
@@ -170,11 +170,11 @@ public sealed partial class GravitasQuery3DService
 
         results.FastClear();
         Vector3d segment = end3d - start3d;
-        if (segment.SqrMagnitude == Fixed64.Zero || radius <= Fixed64.Zero)
+        if (segment.MagnitudeSquared == Fixed64.Zero || radius <= Fixed64.Zero)
             return 0;
 
         BeginSweepTrace(start3d, end3d, radius, layerMask, excludedCollider);
-        AddAllSweepHits(start3d, end3d, segment.Normal, radius, results);
+        AddAllSweepHits(start3d, end3d, segment.Normalized, radius, results);
         Physics3DHitSorter.SortByDistance(results);
         _context.Diagnostics.EmitRayQuery(
             start3d,
@@ -225,10 +225,10 @@ public sealed partial class GravitasQuery3DService
             return false;
 
         Vector3d segment = end - start;
-        if (segment.SqrMagnitude == Fixed64.Zero)
+        if (segment.MagnitudeSquared == Fixed64.Zero)
             return false;
 
-        Vector3d direction = segment.Normal;
+        Vector3d direction = segment.Normalized;
         BeginSweepTrace(start, end, radius, layerMask, excludedCollider);
         return TryFindClosestSweepHit(start, end, radius, direction, out sweepHit);
     }
@@ -241,7 +241,7 @@ public sealed partial class GravitasQuery3DService
         out Physics3DHit sweepHit)
     {
         bool found = false;
-        Fixed64 closestDistance = Fixed64.MAX_VALUE;
+        Fixed64 closestDistance = Fixed64.MaxValue;
         Physics3DHit closestHit = default;
 
         TraceSweepForClosestHit(start, end, radius, direction, ref found, ref closestDistance, ref closestHit);
@@ -253,7 +253,7 @@ public sealed partial class GravitasQuery3DService
     private bool TryFindClosestHit(Vector3d start, Vector3d end, Vector3d direction, out Physics3DHit raycastHit)
     {
         bool found = false;
-        Fixed64 closestDistance = Fixed64.MAX_VALUE;
+        Fixed64 closestDistance = Fixed64.MaxValue;
         Physics3DHit closestHit = default;
 
         TraceLineForClosestHit(start, end, direction, ref found, ref closestDistance, ref closestHit);
@@ -333,9 +333,9 @@ public sealed partial class GravitasQuery3DService
         PrepareSweepBounds(start, end, radius, out Vector3d snappedMin, out Vector3d snappedMax);
         GridWorld world = _context.World;
         Fixed64 step = world.VoxelSize;
-        for (Fixed64 x = snappedMin.x; x <= snappedMax.x; x += step)
-            for (Fixed64 y = snappedMin.y; y <= snappedMax.y; y += step)
-                for (Fixed64 z = snappedMin.z; z <= snappedMax.z; z += step)
+        for (Fixed64 x = snappedMin.X; x <= snappedMax.X; x += step)
+            for (Fixed64 y = snappedMin.Y; y <= snappedMax.Y; y += step)
+                for (Fixed64 z = snappedMin.Z; z <= snappedMax.Z; z += step)
                     ProcessSweepPositionForClosestHit(
                         new Vector3d(x, y, z),
                         start,
@@ -355,9 +355,9 @@ public sealed partial class GravitasQuery3DService
         PrepareSweepBounds(start, end, radius, out Vector3d snappedMin, out Vector3d snappedMax);
         GridWorld world = _context.World;
         Fixed64 step = world.VoxelSize;
-        for (Fixed64 x = snappedMin.x; x <= snappedMax.x; x += step)
-            for (Fixed64 y = snappedMin.y; y <= snappedMax.y; y += step)
-                for (Fixed64 z = snappedMin.z; z <= snappedMax.z; z += step)
+        for (Fixed64 x = snappedMin.X; x <= snappedMax.X; x += step)
+            for (Fixed64 y = snappedMin.Y; y <= snappedMax.Y; y += step)
+                for (Fixed64 z = snappedMin.Z; z <= snappedMax.Z; z += step)
                     ProcessSweepPositionForAllHits(
                         new Vector3d(x, y, z),
                         start,
@@ -387,8 +387,8 @@ public sealed partial class GravitasQuery3DService
 
         Vector3d diff = traceEnd - traceStart;
         Vector3d delta = Vector3d.Abs(diff);
-        Fixed64 maxDelta = FixedMath.Max(FixedMath.Max(delta.x, delta.y), delta.z);
-        steps = FixedMath.Ceiling(maxDelta / world.VoxelSize);
+        Fixed64 maxDelta = FixedMath.Max(FixedMath.Max(delta.X, delta.Y), delta.Z);
+        steps = FixedMath.Ceil(maxDelta / world.VoxelSize);
         step = diff / (steps + Fixed64.One);
     }
 
@@ -724,7 +724,7 @@ public sealed partial class GravitasQuery3DService
         Vector3d direction,
         out Physics3DHit raycastHit)
     {
-        Fixed64 closestDistance = Fixed64.MAX_VALUE;
+        Fixed64 closestDistance = Fixed64.MaxValue;
         Vector3d closestIntersection = Vector3d.Zero;
 
         for (int i = _bufferIntersectionPoints.Count - 1; i >= 0; i--)
@@ -737,7 +737,7 @@ public sealed partial class GravitasQuery3DService
             }
         }
 
-        if (closestDistance == Fixed64.MAX_VALUE)
+        if (closestDistance == Fixed64.MaxValue)
         {
             raycastHit = default;
             return false;
@@ -801,7 +801,7 @@ public sealed partial class GravitasQuery3DService
     private static Vector3d GetSweepSurfacePoint(LSCollider collider, Vector3d sweepCenter, Vector3d direction)
     {
         Vector3d centerDelta = sweepCenter - collider.Center;
-        if (centerDelta.SqrMagnitude <= Fixed64.Epsilon)
+        if (centerDelta.MagnitudeSquared <= Fixed64.Epsilon)
             return collider.Center - direction * collider.ScaledRadius;
 
         return collider.ClosestPointOnSurface(sweepCenter);
@@ -815,19 +815,19 @@ public sealed partial class GravitasQuery3DService
     {
         Vector3d fromPointToSweepCenter = sweepCenter - point;
         if ((collider is LSCuboidCollider || collider is LSCylinderCollider)
-            && fromPointToSweepCenter.SqrMagnitude > Fixed64.Epsilon)
+            && fromPointToSweepCenter.MagnitudeSquared > Fixed64.Epsilon)
         {
-            return fromPointToSweepCenter.Normal;
+            return fromPointToSweepCenter.Normalized;
         }
 
         Vector3d normal = collider.GetNormalAtPoint(point);
-        if (normal.SqrMagnitude > Fixed64.Epsilon)
-            return normal.Normal;
+        if (normal.MagnitudeSquared > Fixed64.Epsilon)
+            return normal.Normalized;
 
-        if (fromPointToSweepCenter.SqrMagnitude > Fixed64.Epsilon)
-            return -fromPointToSweepCenter.Normal;
+        if (fromPointToSweepCenter.MagnitudeSquared > Fixed64.Epsilon)
+            return -fromPointToSweepCenter.Normalized;
 
-        return direction.SqrMagnitude > Fixed64.Epsilon ? -direction.Normal : Vector3d.Zero;
+        return direction.MagnitudeSquared > Fixed64.Epsilon ? -direction.Normalized : Vector3d.Zero;
     }
 
     private static Vector3d CreateTraceEndpoint(
@@ -838,9 +838,9 @@ public sealed partial class GravitasQuery3DService
         bool useMinWhenIncreasing)
     {
         return new Vector3d(
-            SelectTraceCoordinate(start.x, end.x, snappedMin.x, snappedMax.x, useMinWhenIncreasing),
-            SelectTraceCoordinate(start.y, end.y, snappedMin.y, snappedMax.y, useMinWhenIncreasing),
-            SelectTraceCoordinate(start.z, end.z, snappedMin.z, snappedMax.z, useMinWhenIncreasing));
+            SelectTraceCoordinate(start.X, end.X, snappedMin.X, snappedMax.X, useMinWhenIncreasing),
+            SelectTraceCoordinate(start.Y, end.Y, snappedMin.Y, snappedMax.Y, useMinWhenIncreasing),
+            SelectTraceCoordinate(start.Z, end.Z, snappedMin.Z, snappedMax.Z, useMinWhenIncreasing));
     }
 
     private static Fixed64 SelectTraceCoordinate(

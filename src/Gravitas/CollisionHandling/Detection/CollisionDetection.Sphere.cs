@@ -14,7 +14,7 @@ public static partial class CollisionDetection
     private static bool DoSpheresCheck(CollisionWorkItem pair)
     {
         Vector3d penetrationVector = pair.ColliderB.Center - pair.ColliderA.Center;
-        if (penetrationVector.SqrMagnitude > (pair.ColliderA.ScaledRadius + pair.ColliderB.ScaledRadius) * (pair.ColliderA.ScaledRadius + pair.ColliderB.ScaledRadius))
+        if (penetrationVector.MagnitudeSquared > (pair.ColliderA.ScaledRadius + pair.ColliderB.ScaledRadius) * (pair.ColliderA.ScaledRadius + pair.ColliderB.ScaledRadius))
             return false; // No collision if the distance squared is greater than the sum of the radii squared
 
         // Calculate the penetration depths and normals

@@ -139,8 +139,8 @@ public sealed class MixedQueryCcdTests
         mixedHit.Should().BeTrue();
         hit.Collider3D.Should().BeSameAs(compound.Collider);
         hit.Distance.Should().Be(Fixed64.Zero);
-        hit.Point3D.SqrMagnitude.Should().BeGreaterThan(Fixed64.Zero);
-        hit.Normal3DTo2D.SqrMagnitude.Should().BeGreaterThan(Fixed64.Zero);
+        hit.Point3D.MagnitudeSquared.Should().BeGreaterThan(Fixed64.Zero);
+        hit.Normal3DTo2D.MagnitudeSquared.Should().BeGreaterThan(Fixed64.Zero);
     }
 
     [Fact]
@@ -239,7 +239,7 @@ public sealed class MixedQueryCcdTests
         events[1].Kind.Should().Be(GravitasDiagnosticEventKind.MixedResponseImpulse);
         events[1].ColliderADimension.Should().Be(GravitasColliderDimension.ThreeD);
         events[1].ColliderBDimension.Should().Be(GravitasColliderDimension.TwoD);
-        events[1].Vector.SqrMagnitude.Should().BeGreaterThan(Fixed64.Zero);
+        events[1].Vector.MagnitudeSquared.Should().BeGreaterThan(Fixed64.Zero);
         events[1].ScalarA.Should().BeGreaterThan(Fixed64.Zero);
     }
 

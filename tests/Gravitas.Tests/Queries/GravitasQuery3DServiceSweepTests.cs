@@ -32,7 +32,7 @@ public sealed class GravitasQuery3DServiceSweepTests
         sweepHit.Collider.Should().BeSameAs(target);
         sweepHit.Distance.Should().Be(Fixed64.One);
         sweepHit.Point.Should().Be(new Vector3d(-Fixed64.Half, Fixed64.Zero, Fixed64.Zero));
-        sweepHit.Normal.Should().Be(-Vector3d.Right);
+        sweepHit.Normalized.Should().Be(-Vector3d.Right);
         sweepHit.Direction.Should().Be(Vector3d.Right);
     }
 
@@ -54,7 +54,7 @@ public sealed class GravitasQuery3DServiceSweepTests
         sweepHit.Collider.Should().BeSameAs(target);
         sweepHit.Distance.Should().Be(Fixed64.Zero);
         sweepHit.Point.Should().Be(new Vector3d(Fixed64.Half, Fixed64.Zero, Fixed64.Zero));
-        sweepHit.Normal.Should().Be(Vector3d.Right);
+        sweepHit.Normalized.Should().Be(Vector3d.Right);
     }
 
     [Fact]

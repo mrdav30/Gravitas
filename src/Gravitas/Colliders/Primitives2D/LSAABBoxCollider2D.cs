@@ -27,7 +27,7 @@ public sealed class LSAABBoxCollider2D : LSCollider2D
         set
         {
             SwiftThrowHelper.ThrowIfArgument(
-                value.x <= Fixed64.Zero || value.y <= Fixed64.Zero,
+                value.X <= Fixed64.Zero || value.Y <= Fixed64.Zero,
                 nameof(value),
                 "2D AABB size components must be greater than zero.");
             if (_size == value)
@@ -44,18 +44,18 @@ public sealed class LSAABBoxCollider2D : LSCollider2D
     internal override int VertexCount => 4;
 
     public override bool ContainsPoint(Vector2d point) =>
-        point.x >= MinX && point.x <= MaxX
-        && point.y >= MinY && point.y <= MaxY;
+        point.X >= MinX && point.X <= MaxX
+        && point.Y >= MinY && point.Y <= MaxY;
 
     public override Vector2d GetClosestPoint(Vector2d point) =>
         new(
-            ClampAxis(point.x, MinX, MaxX),
-            ClampAxis(point.y, MinY, MaxY));
+            ClampAxis(point.X, MinX, MaxX),
+            ClampAxis(point.Y, MinY, MaxY));
 
     public override Vector2d GetSupportPoint(Vector2d direction) =>
         new(
-            direction.x >= Fixed64.Zero ? MaxX : MinX,
-            direction.y >= Fixed64.Zero ? MaxY : MinY);
+            direction.X >= Fixed64.Zero ? MaxX : MinX,
+            direction.Y >= Fixed64.Zero ? MaxY : MinY);
 
     internal override Vector2d GetVertexUnchecked(int index)
     {
@@ -80,7 +80,7 @@ public sealed class LSAABBoxCollider2D : LSCollider2D
         if (chronicler.Mode == SerializationMode.Loading)
         {
             SwiftThrowHelper.ThrowIfArgument(
-                size.x <= Fixed64.Zero || size.y <= Fixed64.Zero,
+                size.X <= Fixed64.Zero || size.Y <= Fixed64.Zero,
                 nameof(size),
                 "2D AABB size components must be greater than zero.");
             _size = size;

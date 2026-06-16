@@ -4,6 +4,7 @@ using Gravitas.Support;
 using GridForge.Grids;
 using GridForge.Spatial;
 using SwiftCollections;
+using SwiftCollections.Utility;
 using System.Runtime.CompilerServices;
 
 namespace Gravitas;
@@ -275,8 +276,8 @@ public sealed class GravitasCollision2DService
     {
         candidates.FastClear();
 
-        Vector2d min = new(center.x - radius, center.y - radius);
-        Vector2d max = new(center.x + radius, center.y + radius);
+        Vector2d min = new(center.X - radius, center.Y - radius);
+        Vector2d max = new(center.X + radius, center.Y + radius);
 
         CollectBoundsCandidates(min, max, layerMask, queryVersion, raycastQuery: false, candidates);
     }
@@ -306,10 +307,10 @@ public sealed class GravitasCollision2DService
                     || !collider!.IsActive
                     || IsDuplicateQueryCandidate(collider, queryVersion, raycastQuery)
                     || !layerMask.Includes(collider.Layer)
-                    || collider.MaxX < min.x
-                    || collider.MinX > max.x
-                    || collider.MaxY < min.y
-                    || collider.MinY > max.y)
+                    || collider.MaxX < min.X
+                    || collider.MinX > max.X
+                    || collider.MaxY < min.Y
+                    || collider.MinY > max.Y)
                 {
                     continue;
                 }
@@ -481,9 +482,9 @@ public sealed class GravitasCollision2DService
         SwiftList<PhysicsPartition2D> partitions)
     {
         Fixed64 voxelSize = _context.World.VoxelSize;
-        for (Fixed64 x = snappedMin.x; x <= snappedMax.x; x += voxelSize)
+        for (Fixed64 x = snappedMin.X; x <= snappedMax.X; x += voxelSize)
         {
-            for (Fixed64 z = snappedMin.y; z <= snappedMax.y; z += voxelSize)
+            for (Fixed64 z = snappedMin.Y; z <= snappedMax.Y; z += voxelSize)
             {
                 Vector3d position = new(x, Fixed64.Zero, z);
                 if (!currentGrid.IsInBounds(position)
@@ -509,9 +510,9 @@ public sealed class GravitasCollision2DService
         SwiftList<WorldVoxelIndex> partitionedCoordinates)
     {
         Fixed64 voxelSize = _context.World.VoxelSize;
-        for (Fixed64 x = snappedMin.x; x <= snappedMax.x; x += voxelSize)
+        for (Fixed64 x = snappedMin.X; x <= snappedMax.X; x += voxelSize)
         {
-            for (Fixed64 z = snappedMin.y; z <= snappedMax.y; z += voxelSize)
+            for (Fixed64 z = snappedMin.Y; z <= snappedMax.Y; z += voxelSize)
                 TryPartitionVoxel(currentGrid, collider, partitionedCoordinates, new Vector3d(x, Fixed64.Zero, z), voxelSize);
         }
     }
@@ -560,10 +561,10 @@ public sealed class GravitasCollision2DService
     private (Vector2d min, Vector2d max) SnapPlanarBounds(Vector2d min, Vector2d max)
     {
         Fixed64 padding = _context.World.VoxelSize * Fixed64.Half;
-        Vector3d boundsMin = new(min.x - padding, Fixed64.Zero, min.y - padding);
-        Vector3d boundsMax = new(max.x + padding, Fixed64.Zero, max.y + padding);
+        Vector3d boundsMin = new(min.X - padding, Fixed64.Zero, min.Y - padding);
+        Vector3d boundsMax = new(max.X + padding, Fixed64.Zero, max.Y + padding);
         (Vector3d snappedMin, Vector3d snappedMax) = _context.World.SnapBoundsToVoxelSize(boundsMin, boundsMax);
-        return (new Vector2d(snappedMin.x, snappedMin.z), new Vector2d(snappedMax.x, snappedMax.z));
+        return (new Vector2d(snappedMin.X, snappedMin.Z), new Vector2d(snappedMax.X, snappedMax.Z));
     }
 
     private static void GetSpatialCellBounds(
@@ -590,23 +591,23 @@ public sealed class GravitasCollision2DService
 
     private static void SnapToSpatialGrid(GridWorld world, Vector3d position, out int x, out int y, out int z)
     {
-        x = (position.x.Abs() / world.SpatialGridCellSize).FloorToInt() * position.x.Sign();
-        y = (position.y.Abs() / world.SpatialGridCellSize).FloorToInt() * position.y.Sign();
-        z = (position.z.Abs() / world.SpatialGridCellSize).FloorToInt() * position.z.Sign();
+        x = (position.X.Abs() / world.SpatialGridCellSize).FloorToInt() * position.X.Sign();
+        y = (position.Y.Abs() / world.SpatialGridCellSize).FloorToInt() * position.Y.Sign();
+        z = (position.Z.Abs() / world.SpatialGridCellSize).FloorToInt() * position.Z.Sign();
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Vector3d ToWorldStoragePosition(Vector2d position) =>
-        new(position.x, Fixed64.Zero, position.y);
+        new(position.X, Fixed64.Zero, position.Y);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool IsPlanarPositionInBounds(Vector2d min, Vector2d max, Fixed64 voxelSize, Vector3d worldPosition)
     {
         Fixed64 padding = voxelSize * Fixed64.Half;
-        return worldPosition.x >= min.x - padding
-            && worldPosition.x <= max.x + padding
-            && worldPosition.z >= min.y - padding
-            && worldPosition.z <= max.y + padding;
+        return worldPosition.X >= min.X - padding
+            && worldPosition.X <= max.X + padding
+            && worldPosition.Z >= min.Y - padding
+            && worldPosition.Z <= max.Y + padding;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

@@ -126,10 +126,10 @@ public static class CollisionResponseMixed
 
         Vector3d relativeVelocity = ComputeRelativeVelocity(body3D, body2D, relative3D);
         Vector3d tangentVelocity = relativeVelocity - normal * Vector3d.Dot(relativeVelocity, normal);
-        if (tangentVelocity.SqrMagnitude <= Fixed64.Epsilon)
+        if (tangentVelocity.MagnitudeSquared <= Fixed64.Epsilon)
             return;
 
-        Vector3d tangent = tangentVelocity.Normal;
+        Vector3d tangent = tangentVelocity.Normalized;
         Fixed64 denominator = inverseMass3D
             + inverseMass2D * GetPlanarScaleSquared(tangent)
             + ComputeAngularDenominator(body3D, relative3D, tangent);
@@ -185,7 +185,7 @@ public static class CollisionResponseMixed
             : body3D.LinearVelocity + Vector3d.Cross(body3D.AngularVelocity, relative3D);
         Vector3d velocity2D = body2D == null
             ? Vector3d.Zero
-            : new Vector3d(body2D.LinearVelocity.x, Fixed64.Zero, body2D.LinearVelocity.y);
+            : new Vector3d(body2D.LinearVelocity.X, Fixed64.Zero, body2D.LinearVelocity.Y);
         return velocity2D - velocity3D;
     }
 
@@ -204,10 +204,10 @@ public static class CollisionResponseMixed
     private static Vector3d ResolveNormal(CollisionPairMixed pair, MixedContact contact)
     {
         Vector3d fallback = ResolveFallbackDirection(pair, contact);
-        if (contact.Normal3DTo2D.SqrMagnitude > Fixed64.Epsilon)
+        if (contact.Normal3DTo2D.MagnitudeSquared > Fixed64.Epsilon)
         {
-            Vector3d normal = contact.Normal3DTo2D.Normal;
-            return fallback.SqrMagnitude > Fixed64.Epsilon && Vector3d.Dot(normal, fallback) < Fixed64.Zero
+            Vector3d normal = contact.Normal3DTo2D.Normalized;
+            return fallback.MagnitudeSquared > Fixed64.Epsilon && Vector3d.Dot(normal, fallback) < Fixed64.Zero
                 ? -normal
                 : normal;
         }
@@ -219,16 +219,16 @@ public static class CollisionResponseMixed
     {
         LSCollider2D collider2D = pair.Collider2D;
         Vector3d embeddedCenter = new(
-            collider2D.Center.x,
+            collider2D.Center.X,
             collider2D.MixedSlabCenterY,
-            collider2D.Center.y);
+            collider2D.Center.Y);
         Vector3d centerDirection = embeddedCenter - pair.Collider3D.Center;
-        if (centerDirection.SqrMagnitude > Fixed64.Epsilon)
-            return centerDirection.Normal;
+        if (centerDirection.MagnitudeSquared > Fixed64.Epsilon)
+            return centerDirection.Normalized;
 
         Vector3d pointDirection = contact.Point2D - contact.Point3D;
-        return pointDirection.SqrMagnitude > Fixed64.Epsilon
-            ? pointDirection.Normal
+        return pointDirection.MagnitudeSquared > Fixed64.Epsilon
+            ? pointDirection.Normalized
             : Vector3d.Zero;
     }
 
@@ -243,10 +243,10 @@ public static class CollisionResponseMixed
         body != null && body.CanMove ? body.InverseMass : Fixed64.Zero;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Fixed64 GetPlanarScaleSquared(Vector3d axis) => axis.x * axis.x + axis.z * axis.z;
+    private static Fixed64 GetPlanarScaleSquared(Vector3d axis) => axis.X * axis.X + axis.Z * axis.Z;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Vector2d ToPlanar(Vector3d axis) => new(axis.x, axis.z);
+    private static Vector2d ToPlanar(Vector3d axis) => new(axis.X, axis.Z);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool CanRotate(StiffBody? body) =>

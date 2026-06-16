@@ -18,7 +18,7 @@ public static partial class CollisionDetection
 
         Vector3d cylinderPoint = cylinder.ClosestPointOnSurface(sphere.Center);
         Vector3d delta = sphere.Center - cylinderPoint;
-        if (delta.SqrMagnitude > sphere.ScaledRadiusSqr)
+        if (delta.MagnitudeSquared > sphere.ScaledRadiusSqr)
             return false;
 
         Fixed64 distance = delta.Magnitude;
@@ -310,7 +310,7 @@ public static partial class CollisionDetection
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool TryNormalizeAxis(Vector3d axis, out Vector3d normalizedAxis)
     {
-        Fixed64 magnitudeSqr = axis.SqrMagnitude;
+        Fixed64 magnitudeSqr = axis.MagnitudeSquared;
         if (magnitudeSqr <= Fixed64.Epsilon)
         {
             normalizedAxis = Vector3d.Zero;
@@ -324,11 +324,11 @@ public static partial class CollisionDetection
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Vector3d ResolveNormal(Vector3d delta, Vector3d fallback)
     {
-        if (delta.SqrMagnitude > Fixed64.Epsilon)
-            return delta.Normal;
+        if (delta.MagnitudeSquared > Fixed64.Epsilon)
+            return delta.Normalized;
 
-        if (fallback.SqrMagnitude > Fixed64.Epsilon)
-            return fallback.Normal;
+        if (fallback.MagnitudeSquared > Fixed64.Epsilon)
+            return fallback.Normalized;
 
         return Vector3d.Right;
     }

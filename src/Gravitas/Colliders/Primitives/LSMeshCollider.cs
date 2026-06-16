@@ -90,7 +90,7 @@ public class LSMeshCollider : LSCollider
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private Fixed64 GetMeshQueryHalfExtent() =>
-        FixedMath.Max(FixedMath.Max(Bounds.Scope.x, Bounds.Scope.y), Bounds.Scope.z);
+        FixedMath.Max(FixedMath.Max(Bounds.Scope.X, Bounds.Scope.Y), Bounds.Scope.Z);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static FixedBoundVolume CreateQueryBounds(Vector3d center, Fixed64 halfExtent)
@@ -105,7 +105,7 @@ public class LSMeshCollider : LSCollider
         out Vector3d closest,
         out Vector3d normal)
     {
-        Fixed64 minDistance = Fixed64.MAX_VALUE;
+        Fixed64 minDistance = Fixed64.MaxValue;
         closest = point;
         normal = Vector3d.Zero;
         bool found = false;
@@ -116,7 +116,7 @@ public class LSMeshCollider : LSCollider
             Mesh.GetTriangleVertices(index, out Vector3d first, out Vector3d second, out Vector3d third);
             Vector3d faceNormal = Mesh.GetFaceNormalWorld(index);
             Vector3d pointOnTriangle = MeshUtils.ClosestPointOnTriangle(first, second, third, faceNormal, point);
-            Fixed64 distance = Vector3d.SqrDistance(point, pointOnTriangle);
+            Fixed64 distance = Vector3d.DistanceSquared(point, pointOnTriangle);
             if (distance < minDistance)
             {
                 minDistance = distance;
@@ -134,19 +134,19 @@ public class LSMeshCollider : LSCollider
     public override Vector3d GetNormalAtPoint(Vector3d point) =>
         TryFindClosestPointOnSurface(point, _triangleQueryBuffer, out _, out Vector3d normal)
             ? normal
-            : (point - Center).Normal;
+            : (point - Center).Normalized;
 
     public Vector3d GetSupportPoint(Vector3d point)
     {
         Vector3d closestPoint = Bounds.ClosestPointOnSurface(point);
-        Fixed64 minDistance = Fixed64.MAX_VALUE;
+        Fixed64 minDistance = Fixed64.MaxValue;
         Vector3d nearestPoint = closestPoint;
 
         // Iterate through all vertices of the mesh to find the closest point
         for (int i = 0; i < Mesh.VertexCount; i++)
         {
             Vector3d worldVertex = Mesh.GetVertexWorld(i);
-            Fixed64 distance = Vector3d.SqrDistance(worldVertex, point);
+            Fixed64 distance = Vector3d.DistanceSquared(worldVertex, point);
             if (distance >= minDistance) continue;
 
             minDistance = distance;
@@ -164,7 +164,7 @@ public class LSMeshCollider : LSCollider
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Vector3d OrientNormalTowardPoint(Vector3d normal, Vector3d targetDirection)
     {
-        if (targetDirection.SqrMagnitude <= Fixed64.Epsilon)
+        if (targetDirection.MagnitudeSquared <= Fixed64.Epsilon)
             return normal;
 
         return Vector3d.Dot(normal, targetDirection) < Fixed64.Zero ? -normal : normal;

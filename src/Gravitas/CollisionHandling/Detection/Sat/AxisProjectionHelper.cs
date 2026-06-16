@@ -34,8 +34,8 @@ public static class AxisProjectionHelper
             Vector3d crossProduct = Vector3d.Cross(edge1, capsule.LineDirection);
             // crossProduct can be zero if the vectors are parallel - we check against a small number to account for floating point error
             // otherwise add the normalized cross product to the list of potential separating axes
-            if (crossProduct.SqrMagnitude <= Fixed64.Epsilon) continue;
-            output.Add(crossProduct.Normal);
+            if (crossProduct.MagnitudeSquared <= Fixed64.Epsilon) continue;
+            output.Add(crossProduct.Normalized);
         }
     }
 
@@ -106,15 +106,15 @@ public static class AxisProjectionHelper
     /// <returns></returns>
     public static FixedRange ProjectSphereOntoAxis(Vector3d axisVector, Vector3d position, Fixed64 radius)
     {
-        Fixed64 centerProjection = axisVector.Dot(position.x, position.y, position.z);
+        Fixed64 centerProjection = axisVector.Dot(position.X, position.Y, position.Z);
         return new FixedRange(centerProjection - radius, centerProjection + radius);
     }
 
     public static FixedRange ProjectCapsuleOntoAxis(Vector3d axisVector, Vector3d startPoint, Vector3d endPoint, Fixed64 radius)
     {
         // Project spherical ends
-        Fixed64 startProjection = axisVector.Dot(startPoint.x, startPoint.y, startPoint.z);
-        Fixed64 endProjection = axisVector.Dot(endPoint.x, endPoint.y, endPoint.z);
+        Fixed64 startProjection = axisVector.Dot(startPoint.X, startPoint.Y, startPoint.Z);
+        Fixed64 endProjection = axisVector.Dot(endPoint.X, endPoint.Y, endPoint.Z);
 
         // Compute the capsule's cylindrical projection range on the axis
         // Cylindrical projection is merely the projections of the end points on the axis.
@@ -136,8 +136,8 @@ public static class AxisProjectionHelper
         Vector3d cylinderAxis,
         Fixed64 radius)
     {
-        Fixed64 startProjection = axisVector.Dot(startPoint.x, startPoint.y, startPoint.z);
-        Fixed64 endProjection = axisVector.Dot(endPoint.x, endPoint.y, endPoint.z);
+        Fixed64 startProjection = axisVector.Dot(startPoint.X, startPoint.Y, startPoint.Z);
+        Fixed64 endProjection = axisVector.Dot(endPoint.X, endPoint.Y, endPoint.Z);
         Fixed64 minSegment = FixedMath.Min(startProjection, endProjection);
         Fixed64 maxSegment = FixedMath.Max(startProjection, endProjection);
 

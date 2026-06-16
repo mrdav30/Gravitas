@@ -91,7 +91,7 @@ internal static class MeshTriangleContactGenerator
 
                 Vector3d pointA = MeshUtils.ClosestPointOnTriangle(first.A, first.B, first.C, first.Normal, second.Center);
                 Vector3d pointB = MeshUtils.ClosestPointOnTriangle(second.A, second.B, second.C, second.Normal, pointA);
-                if (Vector3d.SqrDistance(pointA, pointB) <= Fixed64.Epsilon)
+                if (Vector3d.DistanceSquared(pointA, pointB) <= Fixed64.Epsilon)
                     pointB = pointA - normal * depth;
 
                 AddContactInPairOrder(pair, meshA, pointA, meshB, pointB, depth, normal);
@@ -110,7 +110,7 @@ internal static class MeshTriangleContactGenerator
         GetTriangle(mesh, triangleIndex, out TriangleData triangle);
         Vector3d pointOnMesh = MeshUtils.ClosestPointOnTriangle(triangle.A, triangle.B, triangle.C, triangle.Normal, sphere.Center);
         Vector3d delta = sphere.Center - pointOnMesh;
-        Fixed64 distanceSqr = delta.SqrMagnitude;
+        Fixed64 distanceSqr = delta.MagnitudeSquared;
         if (distanceSqr > sphere.ScaledRadiusSqr + Fixed64.Epsilon)
             return;
 
@@ -139,7 +139,7 @@ internal static class MeshTriangleContactGenerator
             out Vector3d pointOnMesh);
 
         Vector3d delta = pointOnCapsuleLine - pointOnMesh;
-        Fixed64 distanceSqr = delta.SqrMagnitude;
+        Fixed64 distanceSqr = delta.MagnitudeSquared;
         if (distanceSqr > capsule.ScaledRadiusSqr + Fixed64.Epsilon)
             return;
 
@@ -192,7 +192,7 @@ internal static class MeshTriangleContactGenerator
         out Fixed64 depth)
     {
         normal = Vector3d.Zero;
-        depth = Fixed64.MAX_VALUE;
+        depth = Fixed64.MaxValue;
         Vector3d desiredDirection = cuboid.Center - triangle.Center;
 
         for (int i = 0; i < cuboid.FaceNormals.Length; i++)
@@ -215,7 +215,7 @@ internal static class MeshTriangleContactGenerator
             }
         }
 
-        return normal.SqrMagnitude > Fixed64.Epsilon;
+        return normal.MagnitudeSquared > Fixed64.Epsilon;
     }
 
     private static bool TryTestTriangles(
@@ -226,7 +226,7 @@ internal static class MeshTriangleContactGenerator
         out Fixed64 depth)
     {
         normal = Vector3d.Zero;
-        depth = Fixed64.MAX_VALUE;
+        depth = Fixed64.MaxValue;
 
         if (!CheckTriangleTriangleAxis(first, second, first.Normal, desiredDirection, ref normal, ref depth))
             return false;
@@ -251,7 +251,7 @@ internal static class MeshTriangleContactGenerator
             }
         }
 
-        return normal.SqrMagnitude > Fixed64.Epsilon;
+        return normal.MagnitudeSquared > Fixed64.Epsilon;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -263,12 +263,12 @@ internal static class MeshTriangleContactGenerator
         ref Vector3d normal,
         ref Fixed64 depth)
     {
-        if (!TryNormalizeAxis(axis, out Vector3d normalizedAxis))
+        if (!TryNormalizeAxis(axis, out Vector3d NormalAxis))
             return true;
 
-        ProjectTriangle(triangle, normalizedAxis, out Fixed64 minA, out Fixed64 maxA);
-        ProjectVertices(cuboid.Vertices, normalizedAxis, out Fixed64 minB, out Fixed64 maxB);
-        return CheckProjectedAxis(minA, maxA, minB, maxB, normalizedAxis, desiredDirection, ref normal, ref depth);
+        ProjectTriangle(triangle, NormalAxis, out Fixed64 minA, out Fixed64 maxA);
+        ProjectVertices(cuboid.Vertices, NormalAxis, out Fixed64 minB, out Fixed64 maxB);
+        return CheckProjectedAxis(minA, maxA, minB, maxB, NormalAxis, desiredDirection, ref normal, ref depth);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -280,12 +280,12 @@ internal static class MeshTriangleContactGenerator
         ref Vector3d normal,
         ref Fixed64 depth)
     {
-        if (!TryNormalizeAxis(axis, out Vector3d normalizedAxis))
+        if (!TryNormalizeAxis(axis, out Vector3d NormalAxis))
             return true;
 
-        ProjectTriangle(first, normalizedAxis, out Fixed64 minA, out Fixed64 maxA);
-        ProjectTriangle(second, normalizedAxis, out Fixed64 minB, out Fixed64 maxB);
-        return CheckProjectedAxis(minA, maxA, minB, maxB, normalizedAxis, desiredDirection, ref normal, ref depth);
+        ProjectTriangle(first, NormalAxis, out Fixed64 minA, out Fixed64 maxA);
+        ProjectTriangle(second, NormalAxis, out Fixed64 minB, out Fixed64 maxB);
+        return CheckProjectedAxis(minA, maxA, minB, maxB, NormalAxis, desiredDirection, ref normal, ref depth);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -323,7 +323,7 @@ internal static class MeshTriangleContactGenerator
     {
         pointOnSegment = segmentStart;
         pointOnTriangle = MeshUtils.ClosestPointOnTriangle(triangle.A, triangle.B, triangle.C, triangle.Normal, segmentStart);
-        Fixed64 bestDistanceSqr = Vector3d.SqrDistance(pointOnSegment, pointOnTriangle);
+        Fixed64 bestDistanceSqr = Vector3d.DistanceSquared(pointOnSegment, pointOnTriangle);
 
         Vector3d segment = segmentEnd - segmentStart;
         Fixed64 denominator = Vector3d.Dot(triangle.Normal, segment);
@@ -356,7 +356,7 @@ internal static class MeshTriangleContactGenerator
         ref Fixed64 bestDistanceSqr)
     {
         Vector3d candidate = MeshUtils.ClosestPointOnTriangle(triangle.A, triangle.B, triangle.C, triangle.Normal, point);
-        Fixed64 distanceSqr = Vector3d.SqrDistance(point, candidate);
+        Fixed64 distanceSqr = Vector3d.DistanceSquared(point, candidate);
         if (distanceSqr >= bestDistanceSqr)
             return;
 
@@ -375,7 +375,7 @@ internal static class MeshTriangleContactGenerator
         ref Fixed64 bestDistanceSqr)
     {
         (Vector3d segmentPoint, Vector3d edgePoint) = Vector3d.ClosestPointsOnTwoLines(segmentStart, segmentEnd, edgeStart, edgeEnd);
-        Fixed64 distanceSqr = Vector3d.SqrDistance(segmentPoint, edgePoint);
+        Fixed64 distanceSqr = Vector3d.DistanceSquared(segmentPoint, edgePoint);
         if (distanceSqr >= bestDistanceSqr)
             return;
 
@@ -432,16 +432,16 @@ internal static class MeshTriangleContactGenerator
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool TryNormalizeAxis(Vector3d axis, out Vector3d normalizedAxis)
+    private static bool TryNormalizeAxis(Vector3d axis, out Vector3d NormalAxis)
     {
-        Fixed64 magnitudeSqr = axis.SqrMagnitude;
+        Fixed64 magnitudeSqr = axis.MagnitudeSquared;
         if (magnitudeSqr <= Fixed64.Epsilon)
         {
-            normalizedAxis = Vector3d.Zero;
+            NormalAxis = Vector3d.Zero;
             return false;
         }
 
-        normalizedAxis = axis / FixedMath.Sqrt(magnitudeSqr);
+        NormalAxis = axis / FixedMath.Sqrt(magnitudeSqr);
         return true;
     }
 
@@ -449,24 +449,24 @@ internal static class MeshTriangleContactGenerator
     private static bool IsPointInsideCylinder(LSCylinderCollider cylinder, Vector3d point)
     {
         Vector3d local = cylinder.Rotation.Inverse() * (point - cylinder.Center);
-        Fixed64 radialSqr = local.x * local.x + local.z * local.z;
+        Fixed64 radialSqr = local.X * local.X + local.Z * local.Z;
         return radialSqr <= cylinder.ScaledRadiusSqr + Fixed64.Epsilon
-            && local.y >= -cylinder.HalfHeight - Fixed64.Epsilon
-            && local.y <= cylinder.HalfHeight + Fixed64.Epsilon;
+            && local.Y >= -cylinder.HalfHeight - Fixed64.Epsilon
+            && local.Y <= cylinder.HalfHeight + Fixed64.Epsilon;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Vector3d OrientNormal(Vector3d normal, Vector3d desiredDirection)
     {
-        Vector3d resolved = normal.SqrMagnitude > Fixed64.Epsilon
-            ? normal.Normal
+        Vector3d resolved = normal.MagnitudeSquared > Fixed64.Epsilon
+            ? normal.Normalized
             : ResolveNormal(desiredDirection);
         return Vector3d.Dot(resolved, desiredDirection) < Fixed64.Zero ? -resolved : resolved;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Vector3d ResolveNormal(Vector3d direction) =>
-        direction.SqrMagnitude > Fixed64.Epsilon ? direction.Normal : Vector3d.Right;
+        direction.MagnitudeSquared > Fixed64.Epsilon ? direction.Normalized : Vector3d.Right;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void AddContactInPairOrder(

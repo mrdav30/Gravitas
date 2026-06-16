@@ -44,7 +44,7 @@ public sealed class GravitasQuery3DServiceCircleTests
         hits[1].Collider.Should().BeSameAs(far);
         hits[0].Distance.Should().Be(Fixed64.Half);
         hits[0].Point.Should().Be(new Vector3d(Fixed64.Half, Fixed64.Zero, Fixed64.Zero));
-        hits[0].Normal.Should().Be(-Vector3d.Right);
+        hits[0].Normalized.Should().Be(-Vector3d.Right);
         hits[0].Distance.Should().BeLessThan(hits[1].Distance);
     }
 

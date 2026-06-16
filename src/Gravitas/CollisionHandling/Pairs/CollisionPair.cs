@@ -300,7 +300,7 @@ public class CollisionPair
         // Calculate the square distance between the two bounding box centers
         // If the square distance between the centers is greater than the square of the sum of their combine scope,
         // then the bounding boxes do not overlap and no collision check should be performed
-        _fastDistance = Vector3d.SqrDistance(ColliderA.Center, ColliderB.Center);
+        _fastDistance = Vector3d.DistanceSquared(ColliderA.Center, ColliderB.Center);
         if (_fastDistance > _fastCollideDistance)
             return false;
         // Inclusive bounds overlap preserves zero-depth touching contacts for the manifold pass.
@@ -310,12 +310,12 @@ public class CollisionPair
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool BoundsOverlapInclusive(LSCollider colliderA, LSCollider colliderB)
     {
-        return colliderA.BoundsMin.x <= colliderB.BoundsMax.x
-            && colliderA.BoundsMax.x >= colliderB.BoundsMin.x
-            && colliderA.BoundsMin.y <= colliderB.BoundsMax.y
-            && colliderA.BoundsMax.y >= colliderB.BoundsMin.y
-            && colliderA.BoundsMin.z <= colliderB.BoundsMax.z
-            && colliderA.BoundsMax.z >= colliderB.BoundsMin.z;
+        return colliderA.BoundsMin.X <= colliderB.BoundsMax.X
+            && colliderA.BoundsMax.X >= colliderB.BoundsMin.X
+            && colliderA.BoundsMin.Y <= colliderB.BoundsMax.Y
+            && colliderA.BoundsMax.Y >= colliderB.BoundsMin.Y
+            && colliderA.BoundsMin.Z <= colliderB.BoundsMax.Z
+            && colliderA.BoundsMax.Z >= colliderB.BoundsMin.Z;
     }
 
     private void CalculateCullScore()
