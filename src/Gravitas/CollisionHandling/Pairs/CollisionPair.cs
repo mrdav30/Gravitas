@@ -1,5 +1,6 @@
 ﻿using FixedMathSharp;
 using Gravitas.Colliders;
+using Gravitas.Support;
 using GridForge.Grids;
 using SwiftCollections;
 using System;
@@ -354,7 +355,8 @@ public class CollisionPair
         if (distanceMax <= 0)
             return int.MaxValue;
 
-        int step = ((world.VoxelSize + Fixed64.One * 2) * (world.VoxelSize + Fixed64.One * 2) / distanceMax).CeilToInt();
+        Fixed64 cellEdge = GridTopologyMetricUtility.GetRepresentativeCellEdge(world);
+        int step = ((cellEdge + Fixed64.One * 2) * (cellEdge + Fixed64.One * 2) / distanceMax).CeilToInt();
         return Math.Max(1, step);
     }
 

@@ -17,7 +17,6 @@ internal static class BenchmarkEnvironment
 
     public static GridWorld PrepareWorld(
         bool clearAllPools = false,
-        Fixed64? voxelSize = null,
         int spatialGridCellSize = GridWorld.DefaultSpatialGridCellSize)
     {
         SuppressLogging();
@@ -26,13 +25,12 @@ internal static class BenchmarkEnvironment
         if (clearAllPools)
             ClearAllPools();
 
-        _currentWorld = new GridWorld(voxelSize, spatialGridCellSize);
+        _currentWorld = new GridWorld(spatialGridCellSize);
         return _currentWorld;
     }
 
     public static GravitasWorldContext PrepareOwnedContext(
         bool clearAllPools = false,
-        Fixed64? voxelSize = null,
         int spatialGridCellSize = GridWorld.DefaultSpatialGridCellSize)
     {
         SuppressLogging();
@@ -40,7 +38,7 @@ internal static class BenchmarkEnvironment
         if (clearAllPools)
             ClearAllPools();
 
-        return GravitasWorldContext.CreateOwned(voxelSize, spatialGridCellSize);
+        return GravitasWorldContext.CreateOwned(spatialGridCellSize: spatialGridCellSize);
     }
 
     public static void ResetWorld()

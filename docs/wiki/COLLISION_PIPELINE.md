@@ -103,9 +103,9 @@ into one bounds/shape rebuild.
 `GravitasCollisionService.PartitionObject(...)`:
 
 1. validates that the collider belongs to the service context.
-2. snaps collider bounds to the context `GridWorld` voxel size.
-3. scans the covered spatial grid cells and active `VoxelGrid` instances.
-4. suppresses duplicate grid and voxel visits with context-local sets.
+2. asks GridForge `GridTracer.GetCoveredVoxels(...)` for topology-aware voxel coverage.
+3. uses each covered grid's topology metrics as conservative voxel-position padding.
+4. suppresses duplicate voxel visits with context-local sets.
 5. checks that the voxel position falls within the collider bounds.
 6. rents or reuses a `PhysicsPartition` on the voxel.
 7. stores the collider's `WorldVoxelIndex`.
@@ -182,7 +182,7 @@ X/Z planar coverage. A 2D collider whose center, rotation, local offset, or
 shape version has not changed skips `FixedBoundArea` rebuilds and partition
 refreshes.
 
-Partition state tracks grid coordinates, previous snapped grid bounds,
+Partition state tracks grid coordinates, previous broad-phase coverage bounds,
 partition-change flags, and broad-phase versioning together. Query state tracks
 the raycast and circle-query versions used by context-owned query services to
 suppress duplicate collider hits. Pair state owns the one-sided collision-pair

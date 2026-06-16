@@ -427,9 +427,9 @@ public abstract class LSCollider2D : IRecordable, IColliderHierarchyNode
     internal void ClearMixedPartitionCoordinates() => _mixedPartitionState.ClearCoordinates();
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal bool IsPositionInPlanarBounds(Fixed64 voxelSize, Vector3d worldPosition)
+    internal bool IsPositionInPlanarBounds(Fixed64 cellEdge, Vector3d worldPosition)
     {
-        Fixed64 padding = voxelSize * Fixed64.Half;
+        Fixed64 padding = cellEdge * Fixed64.Half;
         return worldPosition.X >= MinX - padding
             && worldPosition.X <= MaxX + padding
             && worldPosition.Z >= MinY - padding
@@ -437,9 +437,9 @@ public abstract class LSCollider2D : IRecordable, IColliderHierarchyNode
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal bool IsPositionInMixedBounds(Fixed64 voxelSize, Vector3d worldPosition)
+    internal bool IsPositionInMixedBounds(Fixed64 cellEdge, Vector3d worldPosition)
     {
-        Fixed64 padding = voxelSize * Fixed64.Half;
+        Fixed64 padding = cellEdge * Fixed64.Half;
         return worldPosition.X >= _mixedBounds3D.Min.X - padding
             && worldPosition.X <= _mixedBounds3D.Max.X + padding
             && worldPosition.Y >= _mixedBounds3D.Min.Y - padding

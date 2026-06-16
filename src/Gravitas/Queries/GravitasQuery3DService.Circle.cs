@@ -1,7 +1,9 @@
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.Support;
+using GridForge;
 using GridForge.Grids;
+using GridForge.Utility;
 using SwiftCollections;
 
 namespace Gravitas.Queries;
@@ -23,6 +25,7 @@ public sealed partial class GravitasQuery3DService
         _currentLayerMask = layerMask;
         CircleVersion++;
         _redundantColliderCheck.Clear();
+        _redundantVoxelCheck.Clear();
 
         Physics3DHit closestHit = default;
         Fixed64 closestDist = Fixed64.MaxValue;
@@ -58,6 +61,7 @@ public sealed partial class GravitasQuery3DService
         _currentLayerMask = layerMask;
         CircleVersion++;
         _redundantColliderCheck.Clear();
+        _redundantVoxelCheck.Clear();
 
         Vector3d normalizedDirection = direction.MagnitudeSquared == Fixed64.Zero ? Vector3d.Zero : direction.Normalized;
         Fixed64 maxDistanceSqr = maxDistance * maxDistance;
@@ -104,6 +108,7 @@ public sealed partial class GravitasQuery3DService
 
         results.FastClear();
         _redundantColliderCheck.Clear();
+        _redundantVoxelCheck.Clear();
 
         TraceCircleForAllHits(position, radius, results);
 
@@ -129,19 +134,14 @@ public sealed partial class GravitasQuery3DService
         ref Physics3DHit closestHit,
         ref Fixed64 closestDist)
     {
-        Fixed64 xMin = position.X - radius;
-        Fixed64 xMax = position.X + radius;
-        Fixed64 y = position.Y;
-        Fixed64 zMin = position.Z - radius;
-        Fixed64 zMax = position.Z + radius;
-
-        for (Fixed64 x = xMin; x <= xMax; x += _context.World.VoxelSize)
+        Vector2d min = new(position.X - radius, position.Z - radius);
+        Vector2d max = new(position.X + radius, position.Z + radius);
+        foreach (GridVoxelSet covered in GridTracer.GetCoveredVoxels(_context.World, min, max, position.Y))
         {
-            for (Fixed64 z = zMin; z <= zMax; z += _context.World.VoxelSize)
+            foreach (Voxel voxel in covered.Voxels)
             {
-                Vector3d castPosition = new(x, y, z);
-                if (!_context.World.TryGetVoxel(castPosition, out Voxel? voxel)
-                    || voxel!.TryGetPartition(out PhysicsPartition? partition) == false)
+                if (!_redundantVoxelCheck.Add(voxel.SpawnToken)
+                    || voxel.TryGetPartition(out PhysicsPartition? partition) == false)
                 {
                     continue;
                 }
@@ -160,19 +160,14 @@ public sealed partial class GravitasQuery3DService
         ref Physics3DHit closestHit,
         ref Fixed64 closestDist)
     {
-        Fixed64 xMin = position.X - radius;
-        Fixed64 xMax = position.X + radius;
-        Fixed64 y = position.Y;
-        Fixed64 zMin = position.Z - radius;
-        Fixed64 zMax = position.Z + radius;
-
-        for (Fixed64 x = xMin; x <= xMax; x += _context.World.VoxelSize)
+        Vector2d min = new(position.X - radius, position.Z - radius);
+        Vector2d max = new(position.X + radius, position.Z + radius);
+        foreach (GridVoxelSet covered in GridTracer.GetCoveredVoxels(_context.World, min, max, position.Y))
         {
-            for (Fixed64 z = zMin; z <= zMax; z += _context.World.VoxelSize)
+            foreach (Voxel voxel in covered.Voxels)
             {
-                Vector3d castPosition = new(x, y, z);
-                if (!_context.World.TryGetVoxel(castPosition, out Voxel? voxel)
-                    || voxel!.TryGetPartition(out PhysicsPartition? partition) == false)
+                if (!_redundantVoxelCheck.Add(voxel.SpawnToken)
+                    || voxel.TryGetPartition(out PhysicsPartition? partition) == false)
                 {
                     continue;
                 }
@@ -192,19 +187,14 @@ public sealed partial class GravitasQuery3DService
 
     private void TraceCircleForAllHits(Vector3d position, Fixed64 radius, SwiftList<Physics3DHit> results)
     {
-        Fixed64 xMin = position.X - radius;
-        Fixed64 xMax = position.X + radius;
-        Fixed64 y = position.Y;
-        Fixed64 zMin = position.Z - radius;
-        Fixed64 zMax = position.Z + radius;
-
-        for (Fixed64 x = xMin; x <= xMax; x += _context.World.VoxelSize)
+        Vector2d min = new(position.X - radius, position.Z - radius);
+        Vector2d max = new(position.X + radius, position.Z + radius);
+        foreach (GridVoxelSet covered in GridTracer.GetCoveredVoxels(_context.World, min, max, position.Y))
         {
-            for (Fixed64 z = zMin; z <= zMax; z += _context.World.VoxelSize)
+            foreach (Voxel voxel in covered.Voxels)
             {
-                Vector3d castPosition = new(x, y, z);
-                if (!_context.World.TryGetVoxel(castPosition, out Voxel? voxel)
-                    || voxel!.TryGetPartition(out PhysicsPartition? partition) == false)
+                if (!_redundantVoxelCheck.Add(voxel.SpawnToken)
+                    || voxel.TryGetPartition(out PhysicsPartition? partition) == false)
                 {
                     continue;
                 }

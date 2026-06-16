@@ -652,17 +652,17 @@ public abstract class LSCollider : IRecordable, IColliderHierarchyNode
     /// <summary>
     /// Checks if position is in the padded bounds of the collider, used for broad phase collision detection
     /// </summary>
-    /// <param name="voxelSize">The size of the voxel to pad the bounds</param>
+    /// <param name="cellPadding">The topology cell edge used to conservatively pad the bounds.</param>
     /// <param name="position">The position to check</param>
     /// <returns>True if position within bounds</returns>
-    public bool IsPositionInBounds(Fixed64 voxelSize, Vector3d position)
+    public bool IsPositionInBounds(Fixed64 cellPadding, Vector3d position)
     {
-        return position.X + voxelSize >= BoundsMin.X
-            && position.X - voxelSize <= BoundsMax.X
-            && position.Y + voxelSize >= BoundsMin.Y
-            && position.Y - voxelSize <= BoundsMax.Y
-            && position.Z + voxelSize >= BoundsMin.Z
-            && position.Z - voxelSize <= BoundsMax.Z;
+        return position.X + cellPadding >= BoundsMin.X
+            && position.X - cellPadding <= BoundsMax.X
+            && position.Y + cellPadding >= BoundsMin.Y
+            && position.Y - cellPadding <= BoundsMax.Y
+            && position.Z + cellPadding >= BoundsMin.Z
+            && position.Z - cellPadding <= BoundsMax.Z;
     }
 
     /// <summary>
@@ -682,7 +682,6 @@ public abstract class LSCollider : IRecordable, IColliderHierarchyNode
             return;
         }
 
-        (Vector3d min, Vector3d max) = world.SnapBoundsToVoxelSize(BoundsMin, BoundsMax, Fixed64.Half);
         _partitionState.SetPreviousGridBounds(BoundsMin, BoundsMax);
     }
 

@@ -44,15 +44,14 @@ sphere calls use the same event kind with `ScalarA` set to the sweep radius and
 The candidate path is:
 
 1. prepare the worker for the 3D query segment.
-2. snap the query bounds to the context `GridWorld` voxel size.
-3. scan the covered spatial grid cells and active `VoxelGrid` instances.
-4. suppress duplicate voxels and inspect each voxel's `PhysicsPartition`.
-5. resolve dynamic and static collider IDs through the context physics service.
-6. filter by layer mask.
-7. skip colliders already checked in this query.
-8. call the collider's `ColliderOverlapsRay(...)`.
-9. build `Physics3DHit` values from intersection points, normals, and distance.
-10. sort `RaycastAll` results by distance.
+2. ask GridForge `GridTracer.TraceLine(...)` or `GetCoveredVoxels(...)` for topology-aware voxel candidates.
+3. suppress duplicate voxels and inspect each voxel's `PhysicsPartition`.
+4. resolve dynamic and static collider IDs through the context physics service.
+5. filter by layer mask.
+6. skip colliders already checked in this query.
+7. call the collider's `ColliderOverlapsRay(...)`.
+8. build `Physics3DHit` values from intersection points, normals, and distance.
+9. sort `RaycastAll` results by distance.
 
 Colliders also store `RaycastVersion`; this is a second duplicate guard scoped
 to the service's raycast/sweep version.

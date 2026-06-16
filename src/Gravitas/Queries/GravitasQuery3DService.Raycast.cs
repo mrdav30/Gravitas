@@ -1,7 +1,9 @@
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.Support;
+using GridForge;
 using GridForge.Grids;
+using GridForge.Utility;
 using SwiftCollections;
 
 namespace Gravitas.Queries;
@@ -285,20 +287,19 @@ public sealed partial class GravitasQuery3DService
         ref Fixed64 closestDistance,
         ref Physics3DHit closestHit)
     {
-        PrepareTraceLine(start, end, out Vector3d traceStart, out Vector3d step, out Fixed64 steps);
-
-        for (Fixed64 i = Fixed64.Zero; i <= steps; i += Fixed64.One)
+        foreach (GridVoxelSet covered in GridTracer.TraceLine(_context.World, start, end))
         {
-            ProcessTracePositionForClosestHit(
-                _context.World.FloorToVoxelSize(traceStart + step * i),
-                start,
-                direction,
-                ref found,
-                ref closestDistance,
-                ref closestHit);
+            foreach (Voxel voxel in covered.Voxels)
+                ProcessTraceVoxelForClosestHit(
+                    voxel,
+                    start,
+                    direction,
+                    ref found,
+                    ref closestDistance,
+                    ref closestHit);
         }
 
-        ProcessTracePositionForClosestHit(end, start, direction, ref found, ref closestDistance, ref closestHit);
+        ProcessTraceEndVoxelForClosestHit(end, start, direction, ref found, ref closestDistance, ref closestHit);
     }
 
     private void TraceLineForAllHits(
@@ -307,18 +308,13 @@ public sealed partial class GravitasQuery3DService
         Vector3d direction,
         SwiftList<Physics3DHit> results)
     {
-        PrepareTraceLine(start, end, out Vector3d traceStart, out Vector3d step, out Fixed64 steps);
-
-        for (Fixed64 i = Fixed64.Zero; i <= steps; i += Fixed64.One)
+        foreach (GridVoxelSet covered in GridTracer.TraceLine(_context.World, start, end))
         {
-            ProcessTracePositionForAllHits(
-                _context.World.FloorToVoxelSize(traceStart + step * i),
-                start,
-                direction,
-                results);
+            foreach (Voxel voxel in covered.Voxels)
+                ProcessTraceVoxelForAllHits(voxel, start, direction, results);
         }
 
-        ProcessTracePositionForAllHits(end, start, direction, results);
+        ProcessTraceEndVoxelForAllHits(end, start, direction, results);
     }
 
     private void TraceSweepForClosestHit(
@@ -330,19 +326,18 @@ public sealed partial class GravitasQuery3DService
         ref Fixed64 closestDistance,
         ref Physics3DHit closestHit)
     {
-        PrepareSweepBounds(start, end, radius, out Vector3d snappedMin, out Vector3d snappedMax);
-        GridWorld world = _context.World;
-        Fixed64 step = world.VoxelSize;
-        for (Fixed64 x = snappedMin.X; x <= snappedMax.X; x += step)
-            for (Fixed64 y = snappedMin.Y; y <= snappedMax.Y; y += step)
-                for (Fixed64 z = snappedMin.Z; z <= snappedMax.Z; z += step)
-                    ProcessSweepPositionForClosestHit(
-                        new Vector3d(x, y, z),
-                        start,
-                        direction,
-                        ref found,
-                        ref closestDistance,
-                        ref closestHit);
+        PrepareSweepBounds(start, end, radius, out Vector3d coverageMin, out Vector3d coverageMax);
+        foreach (GridVoxelSet covered in GridTracer.GetCoveredVoxels(_context.World, coverageMin, coverageMax))
+        {
+            foreach (Voxel voxel in covered.Voxels)
+                ProcessSweepVoxelForClosestHit(
+                    voxel,
+                    start,
+                    direction,
+                    ref found,
+                    ref closestDistance,
+                    ref closestHit);
+        }
     }
 
     private void TraceSweepForAllHits(
@@ -352,176 +347,122 @@ public sealed partial class GravitasQuery3DService
         Vector3d direction,
         SwiftList<Physics3DHit> results)
     {
-        PrepareSweepBounds(start, end, radius, out Vector3d snappedMin, out Vector3d snappedMax);
-        GridWorld world = _context.World;
-        Fixed64 step = world.VoxelSize;
-        for (Fixed64 x = snappedMin.X; x <= snappedMax.X; x += step)
-            for (Fixed64 y = snappedMin.Y; y <= snappedMax.Y; y += step)
-                for (Fixed64 z = snappedMin.Z; z <= snappedMax.Z; z += step)
-                    ProcessSweepPositionForAllHits(
-                        new Vector3d(x, y, z),
-                        start,
-                        direction,
-                        results);
+        PrepareSweepBounds(start, end, radius, out Vector3d coverageMin, out Vector3d coverageMax);
+        foreach (GridVoxelSet covered in GridTracer.GetCoveredVoxels(_context.World, coverageMin, coverageMax))
+        {
+            foreach (Voxel voxel in covered.Voxels)
+                ProcessSweepVoxelForAllHits(voxel, start, direction, results);
+        }
     }
 
     private void PrepareSweepBounds(
         Vector3d start,
         Vector3d end,
         Fixed64 radius,
-        out Vector3d snappedMin,
-        out Vector3d snappedMax)
+        out Vector3d coverageMin,
+        out Vector3d coverageMax)
     {
         Vector3d radiusExtents = Vector3d.One * radius;
-        Vector3d min = Vector3d.Min(start, end) - radiusExtents;
-        Vector3d max = Vector3d.Max(start, end) + radiusExtents;
-        (snappedMin, snappedMax) = _context.World.SnapBoundsToVoxelSize(min, max);
+        coverageMin = Vector3d.Min(start, end) - radiusExtents;
+        coverageMax = Vector3d.Max(start, end) + radiusExtents;
     }
 
-    private void PrepareTraceLine(Vector3d start, Vector3d end, out Vector3d traceStart, out Vector3d step, out Fixed64 steps)
-    {
-        GridWorld world = _context.World;
-        (Vector3d snappedMin, Vector3d snappedMax) = world.SnapBoundsToVoxelSize(start, end);
-        traceStart = CreateTraceEndpoint(start, end, snappedMin, snappedMax, useMinWhenIncreasing: true);
-        Vector3d traceEnd = CreateTraceEndpoint(start, end, snappedMin, snappedMax, useMinWhenIncreasing: false);
-
-        Vector3d diff = traceEnd - traceStart;
-        Vector3d delta = Vector3d.Abs(diff);
-        Fixed64 maxDelta = FixedMath.Max(FixedMath.Max(delta.X, delta.Y), delta.Z);
-        steps = FixedMath.Ceil(maxDelta / world.VoxelSize);
-        step = diff / (steps + Fixed64.One);
-    }
-
-    private void ProcessTracePositionForClosestHit(
-        Vector3d tracePosition,
+    private void ProcessTraceEndVoxelForClosestHit(
+        Vector3d end,
         Vector3d origin,
         Vector3d direction,
         ref bool found,
         ref Fixed64 closestDistance,
         ref Physics3DHit closestHit)
     {
-        GridWorld world = _context.World;
-        int cellIndex = world.GetSpatialGridKey(tracePosition);
-        if (!world.SpatialGridHash.TryGetValue(cellIndex, out SwiftHashSet<ushort> gridList))
-            return;
-
-        foreach (ushort gridIndex in gridList)
-        {
-            if (!world.ActiveGrids.IsAllocated(gridIndex))
-                continue;
-
-            VoxelGrid currentGrid = world.ActiveGrids[gridIndex];
-            if (!currentGrid.IsInBounds(tracePosition)
-                || !currentGrid.TryGetVoxel(tracePosition, out Voxel? voxel)
-                || !_redundantVoxelCheck.Add(voxel!.SpawnToken)
-                || !voxel.TryGetPartition(out PhysicsPartition? partition))
-            {
-                continue;
-            }
-
-            ProcessPartitionForClosestHit(
-                partition!,
-                origin,
-                direction,
-                ref found,
-                ref closestDistance,
-                ref closestHit);
-        }
+        if (_context.World.TryGetVoxel(end, out Voxel? voxel))
+            ProcessTraceVoxelForClosestHit(voxel!, origin, direction, ref found, ref closestDistance, ref closestHit);
     }
 
-    private void ProcessTracePositionForAllHits(
-        Vector3d tracePosition,
+    private void ProcessTraceEndVoxelForAllHits(
+        Vector3d end,
         Vector3d origin,
         Vector3d direction,
         SwiftList<Physics3DHit> results)
     {
-        GridWorld world = _context.World;
-        int cellIndex = world.GetSpatialGridKey(tracePosition);
-        if (!world.SpatialGridHash.TryGetValue(cellIndex, out SwiftHashSet<ushort> gridList))
-            return;
-
-        foreach (ushort gridIndex in gridList)
-        {
-            if (!world.ActiveGrids.IsAllocated(gridIndex))
-                continue;
-
-            VoxelGrid currentGrid = world.ActiveGrids[gridIndex];
-            if (!currentGrid.IsInBounds(tracePosition)
-                || !currentGrid.TryGetVoxel(tracePosition, out Voxel? voxel)
-                || !_redundantVoxelCheck.Add(voxel!.SpawnToken)
-                || !voxel.TryGetPartition(out PhysicsPartition? partition))
-            {
-                continue;
-            }
-
-            ProcessPartitionForAllHits(partition!, origin, direction, results);
-        }
+        if (_context.World.TryGetVoxel(end, out Voxel? voxel))
+            ProcessTraceVoxelForAllHits(voxel!, origin, direction, results);
     }
 
-    private void ProcessSweepPositionForClosestHit(
-        Vector3d tracePosition,
+    private void ProcessTraceVoxelForClosestHit(
+        Voxel voxel,
         Vector3d origin,
         Vector3d direction,
         ref bool found,
         ref Fixed64 closestDistance,
         ref Physics3DHit closestHit)
     {
-        GridWorld world = _context.World;
-        int cellIndex = world.GetSpatialGridKey(tracePosition);
-        if (!world.SpatialGridHash.TryGetValue(cellIndex, out SwiftHashSet<ushort> gridList))
-            return;
-
-        foreach (ushort gridIndex in gridList)
+        if (!_redundantVoxelCheck.Add(voxel.SpawnToken)
+            || !voxel.TryGetPartition(out PhysicsPartition? partition))
         {
-            if (!world.ActiveGrids.IsAllocated(gridIndex))
-                continue;
-
-            VoxelGrid currentGrid = world.ActiveGrids[gridIndex];
-            if (!currentGrid.IsInBounds(tracePosition)
-                || !currentGrid.TryGetVoxel(tracePosition, out Voxel? voxel)
-                || !_redundantVoxelCheck.Add(voxel!.SpawnToken)
-                || !voxel.TryGetPartition(out PhysicsPartition? partition))
-            {
-                continue;
-            }
-
-            ProcessPartitionForClosestSweepHit(
-                partition!,
-                origin,
-                direction,
-                ref found,
-                ref closestDistance,
-                ref closestHit);
+            return;
         }
+
+        ProcessPartitionForClosestHit(
+            partition!,
+            origin,
+            direction,
+            ref found,
+            ref closestDistance,
+            ref closestHit);
     }
 
-    private void ProcessSweepPositionForAllHits(
-        Vector3d tracePosition,
+    private void ProcessTraceVoxelForAllHits(
+        Voxel voxel,
         Vector3d origin,
         Vector3d direction,
         SwiftList<Physics3DHit> results)
     {
-        GridWorld world = _context.World;
-        int cellIndex = world.GetSpatialGridKey(tracePosition);
-        if (!world.SpatialGridHash.TryGetValue(cellIndex, out SwiftHashSet<ushort> gridList))
-            return;
-
-        foreach (ushort gridIndex in gridList)
+        if (!_redundantVoxelCheck.Add(voxel.SpawnToken)
+            || !voxel.TryGetPartition(out PhysicsPartition? partition))
         {
-            if (!world.ActiveGrids.IsAllocated(gridIndex))
-                continue;
-
-            VoxelGrid currentGrid = world.ActiveGrids[gridIndex];
-            if (!currentGrid.IsInBounds(tracePosition)
-                || !currentGrid.TryGetVoxel(tracePosition, out Voxel? voxel)
-                || !_redundantVoxelCheck.Add(voxel!.SpawnToken)
-                || !voxel.TryGetPartition(out PhysicsPartition? partition))
-            {
-                continue;
-            }
-
-            ProcessPartitionForAllSweepHits(partition!, origin, direction, results);
+            return;
         }
+
+        ProcessPartitionForAllHits(partition!, origin, direction, results);
+    }
+
+    private void ProcessSweepVoxelForClosestHit(
+        Voxel voxel,
+        Vector3d origin,
+        Vector3d direction,
+        ref bool found,
+        ref Fixed64 closestDistance,
+        ref Physics3DHit closestHit)
+    {
+        if (!_redundantVoxelCheck.Add(voxel.SpawnToken)
+            || !voxel.TryGetPartition(out PhysicsPartition? partition))
+        {
+            return;
+        }
+
+        ProcessPartitionForClosestSweepHit(
+            partition!,
+            origin,
+            direction,
+            ref found,
+            ref closestDistance,
+            ref closestHit);
+    }
+
+    private void ProcessSweepVoxelForAllHits(
+        Voxel voxel,
+        Vector3d origin,
+        Vector3d direction,
+        SwiftList<Physics3DHit> results)
+    {
+        if (!_redundantVoxelCheck.Add(voxel.SpawnToken)
+            || !voxel.TryGetPartition(out PhysicsPartition? partition))
+        {
+            return;
+        }
+
+        ProcessPartitionForAllSweepHits(partition!, origin, direction, results);
     }
 
     private void ProcessPartitionForClosestHit(
@@ -830,26 +771,4 @@ public sealed partial class GravitasQuery3DService
         return direction.MagnitudeSquared > Fixed64.Epsilon ? -direction.Normalized : Vector3d.Zero;
     }
 
-    private static Vector3d CreateTraceEndpoint(
-        Vector3d start,
-        Vector3d end,
-        Vector3d snappedMin,
-        Vector3d snappedMax,
-        bool useMinWhenIncreasing)
-    {
-        return new Vector3d(
-            SelectTraceCoordinate(start.X, end.X, snappedMin.X, snappedMax.X, useMinWhenIncreasing),
-            SelectTraceCoordinate(start.Y, end.Y, snappedMin.Y, snappedMax.Y, useMinWhenIncreasing),
-            SelectTraceCoordinate(start.Z, end.Z, snappedMin.Z, snappedMax.Z, useMinWhenIncreasing));
-    }
-
-    private static Fixed64 SelectTraceCoordinate(
-        Fixed64 start,
-        Fixed64 end,
-        Fixed64 snappedMin,
-        Fixed64 snappedMax,
-        bool useMinWhenIncreasing)
-    {
-        return (start <= end) == useMinWhenIncreasing ? snappedMin : snappedMax;
-    }
 }

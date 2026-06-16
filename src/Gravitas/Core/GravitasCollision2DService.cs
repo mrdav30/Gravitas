@@ -1,8 +1,10 @@
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.Support;
+using GridForge;
 using GridForge.Grids;
 using GridForge.Spatial;
+using GridForge.Utility;
 using SwiftCollections;
 using SwiftCollections.Utility;
 using System.Runtime.CompilerServices;
@@ -20,7 +22,6 @@ public sealed class GravitasCollision2DService
     private readonly SwiftBucket<PhysicsPartition2D> _activePartitions = new(DefaultPartitionPoolCapacity);
     private readonly SwiftStack<PhysicsPartition2D> _inactivePartitionPool = new(DefaultPartitionPoolCapacity);
     private readonly SwiftHashSet<int> _redundancyChecker = new();
-    private readonly SwiftHashSet<ushort> _processedGrids = new();
     private readonly SwiftList<PhysicsPartition2D> _retainedPartitions = new();
     private readonly SwiftList<PhysicsPartition2D> _distributionPartitions = new();
     private readonly SwiftList<int> _distributionDynamicIds = new();
@@ -54,7 +55,6 @@ public sealed class GravitasCollision2DService
         ClearRetainedPartitions();
         _activePartitions.Clear();
         _redundancyChecker.Clear();
-        _processedGrids.Clear();
         _distributionPartitions.FastClear();
         _distributionDynamicIds.FastClear();
         _distributionAwakeDynamicIds.FastClear();
@@ -86,14 +86,14 @@ public sealed class GravitasCollision2DService
             return false;
         }
 
-        GetSnappedPlanarBounds(collider, out Vector2d snappedMin, out Vector2d snappedMax);
-        if (collider.MatchesPartitionGridBounds(snappedMin, snappedMax))
+        GetPlanarCoverageBounds(collider, out Vector2d coverageMin, out Vector2d coverageMax);
+        if (collider.MatchesPartitionGridBounds(coverageMin, coverageMax))
             return false;
 
         if (collider.IsPartitioned)
             ClearPartitionedCollider(collider, force: true);
 
-        return PartitionCollider(collider, snappedMin, snappedMax);
+        return PartitionCollider(collider, coverageMin, coverageMax);
     }
 
     internal bool RefreshColliderPartitionAfterShapeChange(LSCollider2D collider)
@@ -115,11 +115,11 @@ public sealed class GravitasCollision2DService
 
     internal bool PartitionCollider(LSCollider2D collider)
     {
-        GetSnappedPlanarBounds(collider, out Vector2d snappedMin, out Vector2d snappedMax);
-        return PartitionCollider(collider, snappedMin, snappedMax);
+        GetPlanarCoverageBounds(collider, out Vector2d coverageMin, out Vector2d coverageMax);
+        return PartitionCollider(collider, coverageMin, coverageMax);
     }
 
-    private bool PartitionCollider(LSCollider2D collider, Vector2d snappedMin, Vector2d snappedMax)
+    private bool PartitionCollider(LSCollider2D collider, Vector2d coverageMin, Vector2d coverageMax)
     {
         SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
         SwiftThrowHelper.ThrowIfArgument(
@@ -135,17 +135,16 @@ public sealed class GravitasCollision2DService
 
         try
         {
-            PartitionCoveredVoxels(collider, snappedMin, snappedMax, partitionedCoordinates);
+            PartitionCoveredVoxels(collider, coverageMin, coverageMax, partitionedCoordinates);
             if (partitionedCoordinates.Count == 0)
                 return false;
 
-            collider.MarkPartitioned(snappedMin, snappedMax);
+            collider.MarkPartitioned(coverageMin, coverageMax);
             return true;
         }
         finally
         {
             _redundancyChecker.Clear();
-            _processedGrids.Clear();
         }
     }
 
@@ -160,8 +159,8 @@ public sealed class GravitasCollision2DService
         if (!collider.IsPartitioned)
             return false;
 
-        GetSnappedPlanarBounds(collider, out Vector2d snappedMin, out Vector2d snappedMax);
-        if (!force && collider.MatchesPartitionGridBounds(snappedMin, snappedMax))
+        GetPlanarCoverageBounds(collider, out Vector2d coverageMin, out Vector2d coverageMax);
+        if (!force && collider.MatchesPartitionGridBounds(coverageMin, coverageMax))
             return false;
 
         SwiftList<WorldVoxelIndex>? coordinates = collider.PartitionCoordinates;
@@ -362,172 +361,95 @@ public sealed class GravitasCollision2DService
         SwiftList<PhysicsPartition2D> partitions)
     {
         partitions.FastClear();
-        (Vector2d snappedMin, Vector2d snappedMax) = SnapPlanarBounds(min, max);
-
         try
         {
-            ScanCoveredQueryPartitions(snappedMin, snappedMax, min, max, partitions);
+            ScanCoveredQueryPartitions(min, max, min, max, partitions);
         }
         finally
         {
             _redundancyChecker.Clear();
-            _processedGrids.Clear();
         }
     }
 
     private void PartitionCoveredVoxels(
         LSCollider2D collider,
-        Vector2d snappedMin,
-        Vector2d snappedMax,
+        Vector2d coverageMin,
+        Vector2d coverageMax,
         SwiftList<WorldVoxelIndex> partitionedCoordinates)
     {
-        ScanCoveredColliderVoxels(collider, snappedMin, snappedMax, partitionedCoordinates);
+        ScanCoveredColliderVoxels(collider, coverageMin, coverageMax, partitionedCoordinates);
     }
 
     private void ScanCoveredQueryPartitions(
-        Vector2d snappedMin,
-        Vector2d snappedMax,
+        Vector2d coverageMin,
+        Vector2d coverageMax,
         Vector2d queryMin,
         Vector2d queryMax,
         SwiftList<PhysicsPartition2D> partitions)
     {
         GridWorld world = _context.World;
-        Vector3d snappedMin3 = ToWorldStoragePosition(snappedMin);
-        Vector3d snappedMax3 = ToWorldStoragePosition(snappedMax);
-
-        GetSpatialCellBounds(
+        foreach (GridVoxelSet covered in GridTracer.GetCoveredVoxels(
             world,
-            snappedMin3,
-            snappedMax3,
-            out int xMin,
-            out int yMin,
-            out int zMin,
-            out int xMax,
-            out int yMax,
-            out int zMax);
-
-        for (int z = zMin; z <= zMax; z++)
-        {
-            for (int y = yMin; y <= yMax; y++)
-            {
-                for (int x = xMin; x <= xMax; x++)
-                {
-                    int cellIndex = SwiftHashTools.CombineHashCodes(x, y, z);
-                    if (!world.SpatialGridHash.TryGetValue(cellIndex, out SwiftHashSet<ushort> gridList))
-                        continue;
-
-                    foreach (ushort gridIndex in gridList)
-                    {
-                        if (!world.ActiveGrids.IsAllocated(gridIndex) || !_processedGrids.Add(gridIndex))
-                            continue;
-
-                        VoxelGrid currentGrid = world.ActiveGrids[gridIndex];
-                        VisitGridPlanarVoxelsForQuery(currentGrid, snappedMin, snappedMax, queryMin, queryMax, partitions);
-                    }
-                }
-            }
-        }
+            coverageMin,
+            coverageMax,
+            layerY: Fixed64.Zero))
+            VisitGridPlanarVoxelsForQuery(covered, queryMin, queryMax, partitions);
     }
 
     private void ScanCoveredColliderVoxels(
         LSCollider2D collider,
-        Vector2d snappedMin,
-        Vector2d snappedMax,
+        Vector2d coverageMin,
+        Vector2d coverageMax,
         SwiftList<WorldVoxelIndex> partitionedCoordinates)
     {
         GridWorld world = _context.World;
-        Vector3d snappedMin3 = ToWorldStoragePosition(snappedMin);
-        Vector3d snappedMax3 = ToWorldStoragePosition(snappedMax);
-
-        GetSpatialCellBounds(
+        foreach (GridVoxelSet covered in GridTracer.GetCoveredVoxels(
             world,
-            snappedMin3,
-            snappedMax3,
-            out int xMin,
-            out int yMin,
-            out int zMin,
-            out int xMax,
-            out int yMax,
-            out int zMax);
-
-        for (int z = zMin; z <= zMax; z++)
-        {
-            for (int y = yMin; y <= yMax; y++)
-            {
-                for (int x = xMin; x <= xMax; x++)
-                {
-                    int cellIndex = SwiftHashTools.CombineHashCodes(x, y, z);
-                    if (!world.SpatialGridHash.TryGetValue(cellIndex, out SwiftHashSet<ushort> gridList))
-                        continue;
-
-                    foreach (ushort gridIndex in gridList)
-                    {
-                        if (!world.ActiveGrids.IsAllocated(gridIndex) || !_processedGrids.Add(gridIndex))
-                            continue;
-
-                        VoxelGrid currentGrid = world.ActiveGrids[gridIndex];
-                        VisitGridPlanarVoxelsForCollider(currentGrid, collider, snappedMin, snappedMax, partitionedCoordinates);
-                    }
-                }
-            }
-        }
+            coverageMin,
+            coverageMax,
+            layerY: Fixed64.Zero))
+            VisitGridPlanarVoxelsForCollider(covered, collider, partitionedCoordinates);
     }
 
     private void VisitGridPlanarVoxelsForQuery(
-        VoxelGrid currentGrid,
-        Vector2d snappedMin,
-        Vector2d snappedMax,
+        GridVoxelSet covered,
         Vector2d queryMin,
         Vector2d queryMax,
         SwiftList<PhysicsPartition2D> partitions)
     {
-        Fixed64 voxelSize = _context.World.VoxelSize;
-        for (Fixed64 x = snappedMin.X; x <= snappedMax.X; x += voxelSize)
+        Fixed64 cellPadding = GridTopologyMetricUtility.GetPlanarMaxCellEdge(covered.Grid);
+        foreach (Voxel voxel in covered.Voxels)
         {
-            for (Fixed64 z = snappedMin.Y; z <= snappedMax.Y; z += voxelSize)
+            if (!_redundancyChecker.Add(voxel.SpawnToken)
+                || !IsPlanarPositionInBounds(queryMin, queryMax, cellPadding, voxel.WorldPosition)
+                || !voxel.TryGetPartition(out PhysicsPartition2D? partition)
+                || partition!.IsEmpty)
             {
-                Vector3d position = new(x, Fixed64.Zero, z);
-                if (!currentGrid.IsInBounds(position)
-                    || !currentGrid.TryGetVoxel(position, out Voxel? voxel)
-                    || !_redundancyChecker.Add(voxel!.SpawnToken)
-                    || !IsPlanarPositionInBounds(queryMin, queryMax, voxelSize, voxel.WorldPosition)
-                    || !voxel.TryGetPartition(out PhysicsPartition2D? partition)
-                    || partition!.IsEmpty)
-                {
-                    continue;
-                }
-
-                partitions.Add(partition);
+                continue;
             }
+
+            partitions.Add(partition);
         }
     }
 
     private void VisitGridPlanarVoxelsForCollider(
-        VoxelGrid currentGrid,
+        GridVoxelSet covered,
         LSCollider2D collider,
-        Vector2d snappedMin,
-        Vector2d snappedMax,
         SwiftList<WorldVoxelIndex> partitionedCoordinates)
     {
-        Fixed64 voxelSize = _context.World.VoxelSize;
-        for (Fixed64 x = snappedMin.X; x <= snappedMax.X; x += voxelSize)
-        {
-            for (Fixed64 z = snappedMin.Y; z <= snappedMax.Y; z += voxelSize)
-                TryPartitionVoxel(currentGrid, collider, partitionedCoordinates, new Vector3d(x, Fixed64.Zero, z), voxelSize);
-        }
+        Fixed64 cellPadding = GridTopologyMetricUtility.GetPlanarMaxCellEdge(covered.Grid);
+        foreach (Voxel voxel in covered.Voxels)
+            TryPartitionVoxel(collider, partitionedCoordinates, voxel, cellPadding);
     }
 
     private void TryPartitionVoxel(
-        VoxelGrid currentGrid,
         LSCollider2D collider,
         SwiftList<WorldVoxelIndex> partitionedCoordinates,
-        Vector3d position,
-        Fixed64 voxelSize)
+        Voxel voxel,
+        Fixed64 cellPadding)
     {
-        if (!currentGrid.IsInBounds(position)
-            || !currentGrid.TryGetVoxel(position, out Voxel? voxel)
-            || !_redundancyChecker.Add(voxel!.SpawnToken)
-            || !collider.IsPositionInPlanarBounds(voxelSize, voxel.WorldPosition))
+        if (!_redundancyChecker.Add(voxel.SpawnToken)
+            || !collider.IsPositionInPlanarBounds(cellPadding, voxel.WorldPosition))
         {
             return;
         }
@@ -551,59 +473,16 @@ public sealed class GravitasCollision2DService
             partition!.AddDynamicObject(collider.Id);
     }
 
-    private void GetSnappedPlanarBounds(LSCollider2D collider, out Vector2d snappedMin, out Vector2d snappedMax)
+    private void GetPlanarCoverageBounds(LSCollider2D collider, out Vector2d coverageMin, out Vector2d coverageMax)
     {
-        (snappedMin, snappedMax) = SnapPlanarBounds(
-            new Vector2d(collider.MinX, collider.MinY),
-            new Vector2d(collider.MaxX, collider.MaxY));
-    }
-
-    private (Vector2d min, Vector2d max) SnapPlanarBounds(Vector2d min, Vector2d max)
-    {
-        Fixed64 padding = _context.World.VoxelSize * Fixed64.Half;
-        Vector3d boundsMin = new(min.X - padding, Fixed64.Zero, min.Y - padding);
-        Vector3d boundsMax = new(max.X + padding, Fixed64.Zero, max.Y + padding);
-        (Vector3d snappedMin, Vector3d snappedMax) = _context.World.SnapBoundsToVoxelSize(boundsMin, boundsMax);
-        return (new Vector2d(snappedMin.X, snappedMin.Z), new Vector2d(snappedMax.X, snappedMax.Z));
-    }
-
-    private static void GetSpatialCellBounds(
-        GridWorld world,
-        Vector3d min,
-        Vector3d max,
-        out int xMin,
-        out int yMin,
-        out int zMin,
-        out int xMax,
-        out int yMax,
-        out int zMax)
-    {
-        SnapToSpatialGrid(world, min, out xMin, out yMin, out zMin);
-        SnapToSpatialGrid(world, max, out xMax, out yMax, out zMax);
-
-        if (xMin > xMax)
-            (xMin, xMax) = (xMax, xMin);
-        if (yMin > yMax)
-            (yMin, yMax) = (yMax, yMin);
-        if (zMin > zMax)
-            (zMin, zMax) = (zMax, zMin);
-    }
-
-    private static void SnapToSpatialGrid(GridWorld world, Vector3d position, out int x, out int y, out int z)
-    {
-        x = (position.X.Abs() / world.SpatialGridCellSize).FloorToInt() * position.X.Sign();
-        y = (position.Y.Abs() / world.SpatialGridCellSize).FloorToInt() * position.Y.Sign();
-        z = (position.Z.Abs() / world.SpatialGridCellSize).FloorToInt() * position.Z.Sign();
+        coverageMin = new Vector2d(collider.MinX, collider.MinY);
+        coverageMax = new Vector2d(collider.MaxX, collider.MaxY);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Vector3d ToWorldStoragePosition(Vector2d position) =>
-        new(position.X, Fixed64.Zero, position.Y);
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool IsPlanarPositionInBounds(Vector2d min, Vector2d max, Fixed64 voxelSize, Vector3d worldPosition)
+    private static bool IsPlanarPositionInBounds(Vector2d min, Vector2d max, Fixed64 cellEdge, Vector3d worldPosition)
     {
-        Fixed64 padding = voxelSize * Fixed64.Half;
+        Fixed64 padding = cellEdge * Fixed64.Half;
         return worldPosition.X >= min.X - padding
             && worldPosition.X <= max.X + padding
             && worldPosition.Z >= min.Y - padding

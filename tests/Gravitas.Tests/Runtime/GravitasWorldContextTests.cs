@@ -1,6 +1,8 @@
 using FixedMathSharp;
 using FluentAssertions;
+using GridForge.Configuration;
 using GridForge.Grids;
+using GridForge.Grids.Topology;
 using System;
 using System.Collections.Generic;
 using Xunit;
@@ -17,7 +19,7 @@ public sealed class GravitasWorldContextTests
         using GravitasWorldContext context = GravitasWorldContext.Attach(world);
 
         context.World.Should().BeSameAs(world);
-        context.VoxelSize.Should().Be(world.VoxelSize);
+        context.VoxelSize.Should().Be(GridWorld.DefaultRectangularCellSize);
 
         context.Dispose();
 
@@ -78,11 +80,25 @@ public sealed class GravitasWorldContextTests
         GridWorld world = context.World;
 
         world.IsActive.Should().BeTrue();
-        context.VoxelSize.Should().Be(world.VoxelSize);
+        context.VoxelSize.Should().Be(GridWorld.DefaultRectangularCellSize);
 
         context.Dispose();
 
         world.IsActive.Should().BeFalse();
+    }
+
+    [Fact]
+    public void VoxelSize_ShouldReflectRepresentativeGridTopologyMetric()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        var configuration = new GridConfiguration(
+            new Vector3d(-8, -8, -8),
+            new Vector3d(8, 8, 8),
+            topologyMetrics: GridTopologyMetrics.Rectangular((Fixed64)2, (Fixed64)3, (Fixed64)4));
+
+        context.World.TryAddGrid(configuration, out _).Should().BeTrue();
+
+        context.VoxelSize.Should().Be((Fixed64)4);
     }
 
     [Fact]
