@@ -651,7 +651,7 @@ Implementation notes:
   broad-phase owner membership, contact/event ownership, and diagnostics that
   draw convex mesh parts through the compound owner ID.
 - Runtime automatic decomposition remains intentionally absent. Future
-  simplification/decomposition belongs to the separate Phase 4D tooling plan.
+  simplification/decomposition belongs to the separate Phase 6 tooling plan.
 
 Baseline artifacts captured before source changes:
 
@@ -689,7 +689,92 @@ mesh remains in the pair, the raw triangle cost is still visible, so the docs
 should continue steering complex rendered meshes toward simplified/decomposed
 physics assets rather than runtime concave triangle collision.
 
-**Phase 4D: Mesh Simplification And Decomposition Tooling Plan**
+## Phase 5: Collider Shape Definitions And Authored Compound Data
+
+**Goal:** Split authored collision shape data from runtime collider lifecycle
+state so standalone colliders, compound parts, and future mesh tooling can share
+a compact deterministic shape description without exposing fake child colliders.
+
+**Context**
+
+Phase 4C proved that `LSCompoundCollider` is the right alpha runtime surface for
+authored convex-piece assets: one collider ID, one body binding, one broad-phase
+identity, one event surface, stable part order, and no runtime decomposition.
+The remaining API weakness is that compound pieces are still authored by
+constructing `LSCollider` instances that are then forbidden from normal collider
+lifecycle operations. That shape works internally, but it is overkill for
+serialization, generated/offline data, and the future decomposition toolchain.
+
+Introduce a public data-only `ColliderShapeDefinition` layer for authoritative
+shape input:
+
+```csharp
+ColliderShapeDefinition
+  - shape kind
+  - radius / size / height
+  - convex mesh vertices + triangles + inertia policy
+  - no body, context, id, partition, events, parent, pairs, runtime buffers
+
+CompoundColliderPart
+  - ColliderShapeDefinition Shape
+  - Vector3d LocalOffset
+  - FixedQuaternion LocalRotation
+  - Vector3d LocalScale
+```
+
+The runtime can still materialize private `LSCollider` instances from those
+definitions if that remains the simplest way to reuse existing narrow-phase,
+query, diagnostics, and inertia code. The public compound API should describe
+authored shape data and transforms, not child collider lifecycle objects.
+
+**Tasks**
+
+- [ ] Capture a pre-change benchmark baseline for the relevant Phase 4C rows:
+  authored compound proxy collision, compound manifold generation, dense mesh
+  vs authored compound, and compound runtime shape/partition movement.
+- [ ] Add a deterministic `ColliderShapeDefinition` API with factory helpers
+  for supported alpha runtime shapes:
+  - sphere.
+  - capsule.
+  - cuboid.
+  - finite cylinder.
+  - convex mesh with vertices, triangles, and mesh inertia policy.
+- [ ] Keep concave mesh definitions out of compound parts unless a later phase
+  proves they have coherent one-identity compound semantics.
+- [ ] Add constructor/factory paths from `ColliderShapeDefinition` to standalone
+  runtime colliders, for example `new LSCuboidCollider(definition)` or a focused
+  factory if constructor overloads become ambiguous.
+- [ ] Redesign `CompoundColliderPart` so public authored parts own
+  `ColliderShapeDefinition`, local offset, local rotation, and local scale.
+- [ ] Make `LSCompoundCollider` materialize any internal runtime part colliders
+  privately and deterministically, preserving stable part order and existing
+  collision semantics.
+- [ ] Remove or make internal the public API that exposes compound child
+  collider lifecycle objects, unless a real host-facing use case remains.
+- [ ] Add tests that prove shape definitions:
+  - contain no context/body/id/partition/pair/event state.
+  - can build equivalent standalone colliders.
+  - can build equivalent compound colliders.
+  - keep one public compound collider identity in collision, diagnostics,
+    queries, events, and broad-phase partitions.
+  - reject unsupported nested compound and concave mesh part definitions.
+- [ ] Add serialization/import-export tests for shape definitions if they become
+  directly serializable API surface.
+- [ ] Update docs so Phase 6 tooling knows its runtime export target is
+  `ColliderShapeDefinition[]` plus stable part transforms, not instantiated
+  runtime colliders.
+
+**Exit Criteria**
+
+- Authored compound assets are represented as data-first shape definitions plus
+  transforms.
+- Runtime collider lifecycle state remains private to runtime colliders.
+- Existing Phase 4C authored-compound correctness and benchmark behavior is
+  preserved or improved.
+- Future mesh simplification/decomposition tooling has a clean deterministic
+  output shape before implementation starts.
+
+## Phase 6: Mesh Simplification And Decomposition Tooling Plan
 
 Future Gravitas-owned mesh simplification and decomposition should live in a
 separate solution project/package, not in runtime simulation code. Track that
@@ -705,7 +790,7 @@ tool should expose deterministic failure/result codes, stable ordering, bounded
 settings, and benchmarked quality metrics before its output becomes a
 recommended alpha asset path.
 
-## Phase 5: Dynamic CCD And Swept Mesh Families
+## Phase 7: Dynamic CCD And Swept Mesh Families
 
 **Goal:** Define the next continuous-collision slice beyond the current static
 or kinematic target clipping so fast dynamic bodies, mesh targets, and mixed
@@ -739,7 +824,7 @@ ordering remain future hardening.
   enabled.
 - Swept mesh APIs are added only with allocation tests and benchmark evidence.
 
-## Phase 6: Typed Diagnostic Views
+## Phase 8: Typed Diagnostic Views
 
 **Goal:** Keep `GravitasDiagnosticEvent` compact while reducing host adapter
 mistakes if generic fields become difficult to decode.
