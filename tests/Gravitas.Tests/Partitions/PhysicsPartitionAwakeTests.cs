@@ -140,18 +140,59 @@ public sealed class PhysicsPartitionAwakeTests
     }
 
     [Fact]
-    public void Reset_WithRetainedVoxelPartitions_ShouldClearPartitionMembership()
+    public void Reset_WithRetainedVoxelPartitions_ShouldDetachOwnedVoxelPartitions()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
-        PhysicsPartition partition = GetFirstPartition(scenario, body.Collider);
+        WorldVoxelIndex coordinate = body.Collider.PartitionCoordinates![0];
+        scenario.Context.World.TryGetVoxel(coordinate, out Voxel? voxel).Should().BeTrue();
+        voxel!.TryGetPartition(out PhysicsPartition? partition).Should().BeTrue();
+        scenario.Context.Collisions.RetainedPartitionCount.Should().BeGreaterThan(0);
 
         scenario.Context.Reset();
 
-        partition.ContainedDynamicObjects!.Count.Should().Be(0);
+        scenario.Context.Collisions.RetainedPartitionCount.Should().Be(0);
+        scenario.Context.Collisions.ActivePartitionCount.Should().Be(0);
+        scenario.Context.Collisions.InactivePartitionCount.Should().Be(0);
+        voxel.TryGetPartition<PhysicsPartition>(out _).Should().BeFalse();
+        (partition!.ContainedDynamicObjects?.Count ?? 0).Should().Be(0);
         partition.AwakeDynamicObjectCount.Should().Be(0);
         (partition.ContainedStaticObjects?.Count ?? 0).Should().Be(0);
         partition.IsAllocated.Should().BeFalse();
+
+        ScenarioBody<LSSphereCollider> replacement = scenario.CreateSphere(Vector3d.Zero);
+        WorldVoxelIndex replacementCoordinate = replacement.Collider.PartitionCoordinates![0];
+        scenario.Context.World.TryGetVoxel(replacementCoordinate, out Voxel? replacementVoxel).Should().BeTrue();
+        replacementVoxel!.TryGetPartition(out PhysicsPartition? replacementPartition).Should().BeTrue();
+        replacementPartition!.ContainedDynamicObjects!.Contains(replacement.Collider.Id).Should().BeTrue();
+        scenario.Context.Collisions.RetainedPartitionCount.Should().BeGreaterThan(0);
+    }
+
+    [Fact]
+    public void Reset_WithDenseRetainedVoxelPartitions_ShouldDetachEveryOwnedVoxelPartition()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        var coordinates = new List<WorldVoxelIndex>();
+
+        for (int i = 0; i < 8; i++)
+        {
+            ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(
+                new Vector3d((Fixed64)(i % 4), Fixed64.Zero, (Fixed64)(i / 4)));
+
+            for (int j = 0; j < body.Collider.PartitionCoordinates!.Count; j++)
+                coordinates.Add(body.Collider.PartitionCoordinates[j]);
+        }
+
+        scenario.Context.Collisions.RetainedPartitionCount.Should().BeGreaterThan(1);
+
+        scenario.Context.Reset();
+
+        scenario.Context.Collisions.RetainedPartitionCount.Should().Be(0);
+        for (int i = 0; i < coordinates.Count; i++)
+        {
+            scenario.Context.World.TryGetVoxel(coordinates[i], out Voxel? voxel).Should().BeTrue();
+            voxel!.TryGetPartition<PhysicsPartition>(out _).Should().BeFalse();
+        }
     }
 
     [Fact]

@@ -6,6 +6,7 @@ namespace Gravitas.Benchmarks;
 public class CollisionPartitionBenchmarks
 {
     private GravitasWorldContext _simulateContext;
+    private GravitasWorldContext _resetContext;
 
     [Params(64)]
     public int ColliderCount { get; set; }
@@ -19,11 +20,27 @@ public class CollisionPartitionBenchmarks
         BenchmarkPhysicsScene.CreateDynamicSphereGrid(_simulateContext, ColliderCount);
     }
 
+    [GlobalSetup(Target = nameof(ResetAndReRegisterDynamicSpheres))]
+    public void SetupResetContext()
+    {
+        _resetContext = BenchmarkPhysicsScene.CreateContext(
+            BenchmarkPhysicsScene.GridExtentForGrid(ColliderCount),
+            clearAllPools: true);
+        BenchmarkPhysicsScene.CreateDynamicSphereGrid(_resetContext, ColliderCount);
+    }
+
     [GlobalCleanup(Target = nameof(SimulatePartitionedDynamicSpheres))]
     public void CleanupSimulationContext()
     {
         _simulateContext.Dispose();
         _simulateContext = null;
+    }
+
+    [GlobalCleanup(Target = nameof(ResetAndReRegisterDynamicSpheres))]
+    public void CleanupResetContext()
+    {
+        _resetContext.Dispose();
+        _resetContext = null;
     }
 
     [Benchmark]
@@ -48,5 +65,12 @@ public class CollisionPartitionBenchmarks
         _simulateContext.Simulate();
         _simulateContext.LateSimulate();
         return _simulateContext.FrameCount;
+    }
+
+    [Benchmark]
+    public int ResetAndReRegisterDynamicSpheres()
+    {
+        _resetContext.Reset();
+        return BenchmarkPhysicsScene.CreateDynamicSphereGrid(_resetContext, ColliderCount);
     }
 }

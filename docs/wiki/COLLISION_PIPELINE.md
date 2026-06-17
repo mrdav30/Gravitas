@@ -121,8 +121,10 @@ deterministic frame window, and
 `PhysicsSettings.RetainedPartitionRetirementSweepBudget` bounds how many
 retained partitions the collision service checks per distribution step. Expired
 empty partitions are removed from their voxels and returned to the
-context-local partition pool. `GravitasWorldContext.Reset()` clears retained
-partition membership before collider IDs are reused.
+context-local partition pool. `GravitasWorldContext.Reset()` is a stronger
+session boundary: it detaches retained Gravitas partition payloads from
+GridForge voxels, clears retained tracking, and clears partition pools before
+collider IDs are reused.
 
 `PhysicsPartition` is a GridForge voxel partition payload. It stores
 context-local collider IDs, not collider references. Dynamic and static

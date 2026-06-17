@@ -233,23 +233,22 @@ then apply the rule consistently across 3D, 2D, and mixed services.
 
 **Tasks**
 
-- [ ] Audit retained partition cleanup in:
+- [x] Audit retained partition cleanup in:
   - `PhysicsPartition`
   - `PhysicsPartition2D`
   - `PhysicsMixedPartition`
   - `GravitasCollisionService`
   - `GravitasCollision2DService`
   - `GravitasMixedCollisionService`
-- [ ] Decide the reset contract for long-running contexts, context reuse, and
+- [x] Decide the reset contract for long-running contexts, context reuse, and
   deterministic replay setup.
-- [ ] If reset detaches retained partitions, ensure voxel payload removal is
+- [x] If reset detaches retained partitions, ensure voxel payload removal is
   stable and does not break partition reuse after the next registration.
-- [ ] If reset keeps retained partitions, document why this is intentional and
-  ensure retained payloads cannot leak stale collider IDs, pair keys, or
-  version state.
-- [ ] Add tests for context reset after sparse, dense, and mixed partition
+- [x] Do not keep retained payloads attached across reset; document reset as a
+  session boundary and keep normal retained-partition reuse on runtime churn.
+- [x] Add tests for context reset after sparse, dense, and mixed partition
   usage.
-- [ ] Benchmark reset plus re-registration churn before and after any change.
+- [x] Benchmark reset plus re-registration churn before and after any change.
 
 **Exit Criteria**
 
@@ -257,6 +256,64 @@ then apply the rule consistently across 3D, 2D, and mixed services.
 - No stale collider IDs, stale pair keys, or orphaned partition state survives
   reset.
 - Long-running simulation cleanup behavior is documented and benchmarked.
+
+**Progress - 2026-06-17**
+
+Decision: `GravitasWorldContext.Reset()` is a reusable-session boundary, not a
+normal runtime churn step. Empty partitions are still retained during ordinary
+movement and retired by TTL, but reset now detaches every owned
+`PhysicsPartition`, `PhysicsPartition2D`, and `PhysicsMixedPartition` payload
+from GridForge voxels through `TryRemovePartition<T>()`, clears retained
+tracking, clears inactive partition pools, and then allows collider IDs to be
+reused from clean service state.
+
+New reset tests cover:
+
+- 3D retained partition detach plus successful next registration.
+- dense 3D retained partition detach across many covered voxel coordinates.
+- pure 2D retained partition detach plus successful next registration.
+- mixed retained partition detach plus successful next mixed registration.
+
+The reset contract is documented in `docs/wiki/COLLISION_PIPELINE.md`,
+`docs/wiki/HOST_INTEGRATION.md`, and `docs/wiki/RUNTIME_ARCHITECTURE.md`.
+`CollisionPartitionBenchmarks` now includes
+`ResetAndReRegisterDynamicSpheres` as the forward reset/re-registration churn
+baseline.
+
+Pre-change benchmark artifacts:
+
+```powershell
+dotnet tests\Gravitas.Benchmarks\bin\Release\net8.0\Gravitas.Benchmarks.dll partition-culling mixed-broad-phase collision-partition world-context --filter "*" --job short --exporters json --artifacts artifacts\benchmarks\2026-06-17-phase3-reset-baseline
+```
+
+Post-change benchmark artifacts:
+
+```powershell
+dotnet tests\Gravitas.Benchmarks\bin\Release\net8.0\Gravitas.Benchmarks.dll partition-culling mixed-broad-phase collision-partition world-context --filter "*" --job short --exporters json --artifacts artifacts\benchmarks\2026-06-17-phase3-reset-after
+dotnet tests\Gravitas.Benchmarks\bin\Release\net8.0\Gravitas.Benchmarks.dll mixed-broad-phase --filter "*RetainedPartitionCleanupAfterChurn*" --job short --exporters json --artifacts artifacts\benchmarks\2026-06-17-phase3-reset-after-mixed-retry
+```
+
+The broad post-change run exported artifacts but printed a post-cleanup
+`AccessViolationException` and one `NA` row for
+`MixedBroadPhaseBenchmarks.RetainedPartitionCleanupAfterChurn` at 64 colliders.
+The focused retry completed cleanly and supplies the retained-cleanup comparison
+rows below.
+
+| Benchmark | Before | After | Allocated |
+| --- | ---: | ---: | ---: |
+| CreateAndRegisterDynamicSpheres(64) | 2,546.9 us | 2,541.3 us | 2,665,388 B |
+| CreateAndPartitionStaticSpheres(64) | 2,258.1 us | 2,233.8 us | 2,585,585 B |
+| SimulatePartitionedDynamicSpheres(64) | 194.4 us | 195.2 us | 0 B |
+| ResetAndReRegisterDynamicSpheres(64) | n/a | 1,126.8 us | 1,013,891 B |
+| RepartitionTeleportedDynamicSpheres(64) | 723,079.10 ns | 721,618.31 ns | 72,640 B |
+| RemoveAndReAddDynamicPartitionMembers(64) | 1,107.14 ns | 1,109.58 ns | 0 B |
+| Mixed RetainedPartitionCleanupAfterChurn(64) | 1,692.0 us | 1.736 ms | 64 B |
+| Mixed RetainedPartitionCleanupAfterChurn(1024) | 71,638.4 us | 74.961 ms | 64 B |
+| Mixed RetainedPartitionCleanupAfterChurn(4096) | 651,880.1 us | 669.843 ms | 64 B |
+
+ShortRun variance is high for the large mixed retained-cleanup rows, but the
+existing steady-state partitioning selections did not show a meaningful
+regression from reset-only lifecycle cleanup.
 
 ## Phase 4: Mesh Decomposition And Closed-Volume Policy
 

@@ -123,7 +123,7 @@ internal sealed class GravitasMixedCollisionService
 
     internal void Reset()
     {
-        ClearRetainedPartitions();
+        DetachRetainedPartitions();
         _activePartitions.Clear();
         _inactivePartitionPool.Clear();
         _redundancyChecker.Clear();
@@ -957,13 +957,35 @@ internal sealed class GravitasMixedCollisionService
         }
     }
 
-    private void ClearRetainedPartitions()
+    private void DetachRetainedPartitions()
     {
-        for (int i = 0; i < _retainedPartitions.Count; i++)
+        // Reset is a context boundary; retained GridForge payloads are a runtime cache, not replay state.
+        while (_retainedPartitions.Count > 0)
         {
-            PhysicsMixedPartition partition = _retainedPartitions[i];
-            if (partition.IsOwnedBy(this))
-                partition.ResetRetainedMembership();
+            PhysicsMixedPartition partition = _retainedPartitions[_retainedPartitions.Count - 1];
+            if (!partition.IsOwnedBy(this))
+            {
+                UntrackRetainedPartition(partition);
+                continue;
+            }
+
+            if (_context.World.TryGetVoxel(partition.WorldIndex, out Voxel? voxel)
+                && voxel!.TryGetPartition(out PhysicsMixedPartition? attachedPartition)
+                && ReferenceEquals(attachedPartition, partition))
+            {
+                bool removed = voxel.TryRemovePartition<PhysicsMixedPartition>();
+                SwiftThrowHelper.ThrowIfTrue(
+                    !removed,
+                    nameof(PhysicsMixedPartition),
+                    "Unable to detach retained mixed physics partition from its voxel during reset.");
+
+                if (partition.IsOwnedBy(this))
+                    ReleasePartition(partition);
+
+                continue;
+            }
+
+            ReleasePartition(partition);
         }
     }
 

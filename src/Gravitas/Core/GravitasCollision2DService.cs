@@ -54,7 +54,7 @@ public sealed class GravitasCollision2DService
 
     public void Reset()
     {
-        ClearRetainedPartitions();
+        DetachRetainedPartitions();
         _activePartitions.Clear();
         _redundancyChecker.Clear();
         _coveredVoxels.FastClear();
@@ -492,13 +492,35 @@ public sealed class GravitasCollision2DService
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool IsStaticCollider(LSCollider2D collider) => collider.Body == null || collider.Body.Immovable;
 
-    private void ClearRetainedPartitions()
+    private void DetachRetainedPartitions()
     {
-        for (int i = 0; i < _retainedPartitions.Count; i++)
+        // Reset is a context boundary; retained GridForge payloads are a runtime cache, not replay state.
+        while (_retainedPartitions.Count > 0)
         {
-            PhysicsPartition2D partition = _retainedPartitions[i];
-            if (partition.IsOwnedBy(this))
-                partition.ResetRetainedMembership();
+            PhysicsPartition2D partition = _retainedPartitions[_retainedPartitions.Count - 1];
+            if (!partition.IsOwnedBy(this))
+            {
+                UntrackRetainedPartition(partition);
+                continue;
+            }
+
+            if (_context.World.TryGetVoxel(partition.WorldIndex, out Voxel? voxel)
+                && voxel!.TryGetPartition(out PhysicsPartition2D? attachedPartition)
+                && ReferenceEquals(attachedPartition, partition))
+            {
+                bool removed = voxel.TryRemovePartition<PhysicsPartition2D>();
+                SwiftThrowHelper.ThrowIfTrue(
+                    !removed,
+                    nameof(PhysicsPartition2D),
+                    "Unable to detach retained 2D physics partition from its voxel during reset.");
+
+                if (partition.IsOwnedBy(this))
+                    ReleasePartition(partition);
+
+                continue;
+            }
+
+            ReleasePartition(partition);
         }
     }
 

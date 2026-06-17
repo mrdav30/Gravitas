@@ -5,6 +5,8 @@ using Gravitas.Queries;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
 using GridForge.Configuration;
+using GridForge.Grids;
+using GridForge.Spatial;
 using SwiftCollections;
 using System;
 using Xunit;
@@ -79,6 +81,35 @@ public sealed class Physics2DPartitionBroadPhaseTests
         context.Collisions2D.ActivePartitionCount.Should().Be(0);
         context.Collisions2D.RetainedPartitionCount.Should().BeLessThan(retainedBeforeDeactivate);
         context.Collisions2D.InactivePartitionCount.Should().BeGreaterThan(0);
+    }
+
+    [Fact]
+    public void Reset_WithRetained2DPartitions_ShouldDetachOwnedVoxelPartitions()
+    {
+        using GravitasWorldContext context = CreateContext(extent: 16);
+        StiffBody2D body = CreateCircle(context, Vector2d.Zero, immovable: false);
+        WorldVoxelIndex coordinate = body.Collider.PartitionCoordinates![0];
+        context.World.TryGetVoxel(coordinate, out Voxel? voxel).Should().BeTrue();
+        voxel!.TryGetPartition(out PhysicsPartition2D? partition).Should().BeTrue();
+        context.Collisions2D.RetainedPartitionCount.Should().BeGreaterThan(0);
+
+        context.Reset();
+
+        context.Collisions2D.RetainedPartitionCount.Should().Be(0);
+        context.Collisions2D.ActivePartitionCount.Should().Be(0);
+        context.Collisions2D.InactivePartitionCount.Should().Be(0);
+        voxel.TryGetPartition<PhysicsPartition2D>(out _).Should().BeFalse();
+        (partition!.ContainedDynamicObjects?.Count ?? 0).Should().Be(0);
+        partition.AwakeDynamicObjectCount.Should().Be(0);
+        (partition.ContainedStaticObjects?.Count ?? 0).Should().Be(0);
+        partition.IsAllocated.Should().BeFalse();
+
+        StiffBody2D replacement = CreateCircle(context, Vector2d.Zero, immovable: false);
+        WorldVoxelIndex replacementCoordinate = replacement.Collider.PartitionCoordinates![0];
+        context.World.TryGetVoxel(replacementCoordinate, out Voxel? replacementVoxel).Should().BeTrue();
+        replacementVoxel!.TryGetPartition(out PhysicsPartition2D? replacementPartition).Should().BeTrue();
+        replacementPartition!.ContainedDynamicObjects!.Contains(replacement.Collider.Id).Should().BeTrue();
+        context.Collisions2D.RetainedPartitionCount.Should().BeGreaterThan(0);
     }
 
     [Fact]

@@ -372,9 +372,11 @@ partition membership, removes collision-pair references, clears explicit parent
 binding, returns active pairs to the pool when enabled, and releases the
 collider ID.
 
-Use `context.Reset()` for a reusable session context. Use `context.Dispose()`
-when the context is finished. If the context owns its world, dispose will also
-dispose the world.
+Use `context.Reset()` for a reusable session context. Reset detaches Gravitas
+partition payloads from GridForge voxels and clears context-local runtime state
+while preserving the world and its grids. Use `context.Dispose()` when the
+context is finished. If the context owns its world, dispose will also dispose
+the world.
 
 ## Serialization Boundary
 

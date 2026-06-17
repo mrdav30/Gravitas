@@ -118,7 +118,7 @@ BenchmarkDotNet writes results to `BenchmarkDotNet.Artifacts/results/` by defaul
 For quick allocation checks around the current steady-state hot paths, run:
 
 ```bash
-dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll query-service simulation-allocation continuous-collision collision-detection collision-response partition-culling diagnostics physics-2d mixed-broad-phase --filter "*" -j Short -i --exporters json
+dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll query-service simulation-allocation continuous-collision collision-detection collision-response collision-partition partition-culling diagnostics physics-2d mixed-broad-phase --filter "*" -j Short -i --exporters json
 ```
 
 The short in-process job is not canonical timing evidence, but it is useful for
@@ -134,6 +134,7 @@ to add or tighten explicit allocation tests before changing the algorithm.
 | `query-service` | `RaycastAll`, `OverlapCircleAll`, directional `OverlapCircleInDirection`, and overlapping-context queries. |
 | `simulation-allocation` | `StiffBody.LateSimulate`, grounding raycast probes, collision partition distribution, and active-pair late simulation. |
 | `continuous-collision` | Discrete fast body movement baseline and opt-in CCD sweep/clamp against thin static geometry. |
+| `collision-partition` | dynamic/static registration and partitioning, partitioned simulation, and reset plus dynamic re-registration churn. |
 | `collision-detection` | prepared primitive pairs, non-SAT primitive pairs, primitive manifold generation, cuboid face-manifold generation, cuboid SAT, mesh/cylinder, mesh/cuboid, mesh/mesh, and compound/primitive checks. |
 | `collision-response` | manifold response solver cost across single-contact and face-manifold cases, with pair-count scaling. |
 | `diagnostics` | Disabled/enabled force and torque event hooks plus disabled/enabled primitive and mesh collider debug draw capture. |

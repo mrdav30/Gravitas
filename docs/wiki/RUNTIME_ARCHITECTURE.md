@@ -119,9 +119,10 @@ implemented through `CollisionPairMixed` and `CollisionResponseMixed`. Explicit
 mixed query APIs, mixed CCD hooks, and dimension-tagged diagnostics are part of
 the current mixed alpha path.
 
-`Reset` clears the clock and all context-local service state, then invokes reset
-hooks. `SetFrameRate` and `ApplySettings` update the clock's frame rate and
-invoke frame-rate-change hooks.
+`Reset` clears the clock and context-local service state, detaches retained
+Gravitas partition payloads from GridForge voxels, then invokes reset hooks.
+`SetFrameRate` and `ApplySettings` update the clock's frame rate and invoke
+frame-rate-change hooks.
 
 Diagnostics are context-local and disabled by default. Runtime hooks can emit
 force, query, ground-probe, contact, response, and velocity-delta events through

@@ -4,6 +4,8 @@ using Gravitas.Colliders;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
 using GridForge.Configuration;
+using GridForge.Grids;
+using GridForge.Spatial;
 using SwiftCollections;
 using Xunit;
 
@@ -185,6 +187,45 @@ public sealed class MixedBroadPhaseTests
         context.MixedCollisions.ActivePartitionCount.Should().Be(0);
         context.MixedCollisions.RetainedPartitionCount.Should().BeLessThan(retainedBeforeDeactivate);
         context.MixedCollisions.InactivePartitionCount.Should().BeGreaterThan(0);
+    }
+
+    [Fact]
+    public void Reset_WithRetainedMixedPartitions_ShouldDetachOwnedVoxelPartitions()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(context, Vector3d.Zero, immovable: false);
+        _ = CreateCircle2D(context, Vector2d.Zero, immovable: false);
+
+        context.Simulate();
+
+        WorldVoxelIndex coordinate = body3D.Collider.MixedPartitionCoordinates![0];
+        context.World.TryGetVoxel(coordinate, out Voxel? voxel).Should().BeTrue();
+        voxel!.TryGetPartition(out PhysicsMixedPartition? partition).Should().BeTrue();
+        context.MixedCollisions.RetainedPartitionCount.Should().BeGreaterThan(0);
+
+        context.Reset();
+
+        context.MixedCollisions.RetainedPartitionCount.Should().Be(0);
+        context.MixedCollisions.ActivePartitionCount.Should().Be(0);
+        context.MixedCollisions.InactivePartitionCount.Should().Be(0);
+        voxel.TryGetPartition<PhysicsMixedPartition>(out _).Should().BeFalse();
+        (partition!.ContainedDynamic3DObjects?.Count ?? 0).Should().Be(0);
+        (partition.ContainedAwakeDynamic3DObjects?.Count ?? 0).Should().Be(0);
+        (partition.ContainedStatic3DObjects?.Count ?? 0).Should().Be(0);
+        (partition.ContainedDynamic2DObjects?.Count ?? 0).Should().Be(0);
+        (partition.ContainedAwakeDynamic2DObjects?.Count ?? 0).Should().Be(0);
+        (partition.ContainedStatic2DObjects?.Count ?? 0).Should().Be(0);
+        partition.IsAllocated.Should().BeFalse();
+
+        ScenarioBody<LSSphereCollider> replacement3D = CreateSphere3D(context, Vector3d.Zero, immovable: false);
+        _ = CreateCircle2D(context, Vector2d.Zero, immovable: false);
+        context.Simulate();
+
+        WorldVoxelIndex replacementCoordinate = replacement3D.Collider.MixedPartitionCoordinates![0];
+        context.World.TryGetVoxel(replacementCoordinate, out Voxel? replacementVoxel).Should().BeTrue();
+        replacementVoxel!.TryGetPartition(out PhysicsMixedPartition? replacementPartition).Should().BeTrue();
+        replacementPartition!.ContainedDynamic3DObjects!.Contains(replacement3D.Collider.Id).Should().BeTrue();
+        context.MixedCollisions.RetainedPartitionCount.Should().BeGreaterThan(0);
     }
 
     private static GravitasWorldContext CreateMixedContext(int extent = 32)
