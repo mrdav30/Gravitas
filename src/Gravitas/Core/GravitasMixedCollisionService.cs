@@ -235,8 +235,7 @@ internal sealed class GravitasMixedCollisionService
             {
                 WorldVoxelIndex coordinate = coordinates[i];
                 if (!world.TryGetVoxel(coordinate, out Voxel? voxel)
-                    || !_redundancyChecker.Add(voxel!.SpawnToken)
-                    || !voxel.TryGetPartition(out PhysicsMixedPartition? partition))
+                    || !GridForgeTraversal.TryGetUniquePartition(voxel!, _redundancyChecker, out PhysicsMixedPartition? partition))
                 {
                     continue;
                 }
@@ -279,8 +278,7 @@ internal sealed class GravitasMixedCollisionService
             {
                 WorldVoxelIndex coordinate = coordinates[i];
                 if (!world.TryGetVoxel(coordinate, out Voxel? voxel)
-                    || !_redundancyChecker.Add(voxel!.SpawnToken)
-                    || !voxel.TryGetPartition(out PhysicsMixedPartition? partition))
+                    || !GridForgeTraversal.TryGetUniquePartition(voxel!, _redundancyChecker, out PhysicsMixedPartition? partition))
                 {
                     continue;
                 }
@@ -319,8 +317,7 @@ internal sealed class GravitasMixedCollisionService
             {
                 WorldVoxelIndex coordinate = collider.MixedPartitionCoordinates[i];
                 if (!world.TryGetVoxel(coordinate, out Voxel? voxel)
-                    || !_redundancyChecker.Add(voxel!.SpawnToken)
-                    || !voxel.TryGetPartition(out PhysicsMixedPartition? partition))
+                    || !GridForgeTraversal.TryGetUniquePartition(voxel!, _redundancyChecker, out PhysicsMixedPartition? partition))
                 {
                     continue;
                 }
@@ -352,8 +349,7 @@ internal sealed class GravitasMixedCollisionService
             {
                 WorldVoxelIndex coordinate = collider.MixedPartitionCoordinates[i];
                 if (!world.TryGetVoxel(coordinate, out Voxel? voxel)
-                    || !_redundancyChecker.Add(voxel!.SpawnToken)
-                    || !voxel.TryGetPartition(out PhysicsMixedPartition? partition))
+                    || !GridForgeTraversal.TryGetUniquePartition(voxel!, _redundancyChecker, out PhysicsMixedPartition? partition))
                 {
                     continue;
                 }
@@ -719,28 +715,18 @@ internal sealed class GravitasMixedCollisionService
         Vector3d coverageMax,
         SwiftList<WorldVoxelIndex> coordinates)
     {
+        GridWorld world = _context.World;
         GridTracer.GetCoveredVoxelsInto(
-            _context.World,
+            world,
             coverageMin,
             coverageMax,
             _coveredVoxels,
             _traceScratch,
             Fixed64.Half);
 
-        GridWorld world = _context.World;
-        ushort currentGridIndex = ushort.MaxValue;
-        Fixed64 cellPadding = Fixed64.Zero;
+        var traversal = new GridForgeTraversalState(world, GridForgeTraversalPaddingMode.MaxCellEdge);
         for (int i = 0; i < _coveredVoxels.Count; i++)
-        {
-            Voxel voxel = _coveredVoxels[i];
-            if (voxel.GridIndex != currentGridIndex)
-            {
-                currentGridIndex = voxel.GridIndex;
-                cellPadding = GridTopologyMetricUtility.GetMaxCellEdge(world.ActiveGrids[currentGridIndex]);
-            }
-
-            TryPartition3DVoxel(collider, coordinates, voxel, cellPadding);
-        }
+            TryPartition3DVoxel(collider, coordinates, _coveredVoxels[i], ref traversal);
     }
 
     private void ScanCovered2DMixedVoxels(
@@ -749,28 +735,18 @@ internal sealed class GravitasMixedCollisionService
         Vector3d coverageMax,
         SwiftList<WorldVoxelIndex> coordinates)
     {
+        GridWorld world = _context.World;
         GridTracer.GetCoveredVoxelsInto(
-            _context.World,
+            world,
             coverageMin,
             coverageMax,
             _coveredVoxels,
             _traceScratch,
             Fixed64.Half);
 
-        GridWorld world = _context.World;
-        ushort currentGridIndex = ushort.MaxValue;
-        Fixed64 cellPadding = Fixed64.Zero;
+        var traversal = new GridForgeTraversalState(world, GridForgeTraversalPaddingMode.MaxCellEdge);
         for (int i = 0; i < _coveredVoxels.Count; i++)
-        {
-            Voxel voxel = _coveredVoxels[i];
-            if (voxel.GridIndex != currentGridIndex)
-            {
-                currentGridIndex = voxel.GridIndex;
-                cellPadding = GridTopologyMetricUtility.GetMaxCellEdge(world.ActiveGrids[currentGridIndex]);
-            }
-
-            TryPartition2DMixedVoxel(collider, coordinates, voxel, cellPadding);
-        }
+            TryPartition2DMixedVoxel(collider, coordinates, _coveredVoxels[i], ref traversal);
     }
 
     private void CollectCoveredMixedQueryPartitions(
@@ -812,19 +788,13 @@ internal sealed class GravitasMixedCollisionService
         SwiftList<PhysicsMixedPartition> partitions)
     {
         GridWorld world = _context.World;
-        ushort currentGridIndex = ushort.MaxValue;
-        Fixed64 cellPadding = Fixed64.Zero;
+        var traversal = new GridForgeTraversalState(world, GridForgeTraversalPaddingMode.MaxCellEdge);
         for (int i = 0; i < _coveredVoxels.Count; i++)
         {
             Voxel voxel = _coveredVoxels[i];
-            if (voxel.GridIndex != currentGridIndex)
-            {
-                currentGridIndex = voxel.GridIndex;
-                cellPadding = GridTopologyMetricUtility.GetMaxCellEdge(world.ActiveGrids[currentGridIndex]);
-            }
 
-            if (!_redundancyChecker.Add(voxel.SpawnToken)
-                || !IsWorldPositionInBounds(queryMin, queryMax, cellPadding, voxel.WorldPosition)
+            if (!traversal.TryVisitUnique(voxel, _redundancyChecker, out Fixed64 cellEdge)
+                || !GridForgeTraversal.IsWorldPositionInPaddedBounds(queryMin, queryMax, cellEdge, voxel.WorldPosition)
                 || !voxel.TryGetPartition(out PhysicsMixedPartition? partition)
                 || partition!.IsEmpty)
             {
@@ -839,10 +809,10 @@ internal sealed class GravitasMixedCollisionService
         LSCollider collider,
         SwiftList<WorldVoxelIndex> coordinates,
         Voxel voxel,
-        Fixed64 cellPadding)
+        ref GridForgeTraversalState traversal)
     {
-        if (!_redundancyChecker.Add(voxel.SpawnToken)
-            || !collider.IsPositionInBounds(cellPadding, voxel.WorldPosition))
+        if (!traversal.TryVisitUnique(voxel, _redundancyChecker, out Fixed64 cellEdge)
+            || !collider.IsPositionInBounds(cellEdge, voxel.WorldPosition))
         {
             return;
         }
@@ -859,10 +829,10 @@ internal sealed class GravitasMixedCollisionService
         LSCollider2D collider,
         SwiftList<WorldVoxelIndex> coordinates,
         Voxel voxel,
-        Fixed64 cellPadding)
+        ref GridForgeTraversalState traversal)
     {
-        if (!_redundancyChecker.Add(voxel.SpawnToken)
-            || !collider.IsPositionInMixedBounds(cellPadding, voxel.WorldPosition))
+        if (!traversal.TryVisitUnique(voxel, _redundancyChecker, out Fixed64 cellEdge)
+            || !collider.IsPositionInMixedBounds(cellEdge, voxel.WorldPosition))
         {
             return;
         }
@@ -953,18 +923,6 @@ internal sealed class GravitasMixedCollisionService
             && firstMin.Y <= secondMax.Y
             && firstMax.Z >= secondMin.Z
             && firstMin.Z <= secondMax.Z;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool IsWorldPositionInBounds(Vector3d min, Vector3d max, Fixed64 cellEdge, Vector3d worldPosition)
-    {
-        Fixed64 padding = cellEdge * Fixed64.Half;
-        return worldPosition.X >= min.X - padding
-            && worldPosition.X <= max.X + padding
-            && worldPosition.Y >= min.Y - padding
-            && worldPosition.Y <= max.Y + padding
-            && worldPosition.Z >= min.Z - padding
-            && worldPosition.Z <= max.Z + padding;
     }
 
     private static void Sort2DCollidersById(SwiftList<LSCollider2D> colliders)

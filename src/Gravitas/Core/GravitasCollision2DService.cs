@@ -179,8 +179,7 @@ public sealed class GravitasCollision2DService
             {
                 WorldVoxelIndex coordinate = coordinates[i];
                 if (!world.TryGetVoxel(coordinate, out Voxel? voxel)
-                    || !_redundancyChecker.Add(voxel!.SpawnToken)
-                    || !voxel.TryGetPartition(out PhysicsPartition2D? partition))
+                    || !GridForgeTraversal.TryGetUniquePartition(voxel!, _redundancyChecker, out PhysicsPartition2D? partition))
                 {
                     continue;
                 }
@@ -225,8 +224,7 @@ public sealed class GravitasCollision2DService
             {
                 WorldVoxelIndex coordinate = collider.PartitionCoordinates[i];
                 if (!world.TryGetVoxel(coordinate, out Voxel? voxel)
-                    || !_redundancyChecker.Add(voxel!.SpawnToken)
-                    || !voxel.TryGetPartition(out PhysicsPartition2D? partition))
+                    || !GridForgeTraversal.TryGetUniquePartition(voxel!, _redundancyChecker, out PhysicsPartition2D? partition))
                 {
                     continue;
                 }
@@ -427,19 +425,13 @@ public sealed class GravitasCollision2DService
         Vector2d queryMax,
         SwiftList<PhysicsPartition2D> partitions)
     {
-        ushort currentGridIndex = ushort.MaxValue;
-        Fixed64 cellPadding = Fixed64.Zero;
+        var traversal = new GridForgeTraversalState(world, GridForgeTraversalPaddingMode.PlanarMaxCellEdge);
         for (int i = 0; i < _coveredVoxels.Count; i++)
         {
             Voxel voxel = _coveredVoxels[i];
-            if (voxel.GridIndex != currentGridIndex)
-            {
-                currentGridIndex = voxel.GridIndex;
-                cellPadding = GridTopologyMetricUtility.GetPlanarMaxCellEdge(world.ActiveGrids[currentGridIndex]);
-            }
 
-            if (!_redundancyChecker.Add(voxel.SpawnToken)
-                || !IsPlanarPositionInBounds(queryMin, queryMax, cellPadding, voxel.WorldPosition)
+            if (!traversal.TryVisitUnique(voxel, _redundancyChecker, out Fixed64 cellEdge)
+                || !GridForgeTraversal.IsPlanarPositionInPaddedBounds(queryMin, queryMax, cellEdge, voxel.WorldPosition)
                 || !voxel.TryGetPartition(out PhysicsPartition2D? partition)
                 || partition!.IsEmpty)
             {
@@ -455,29 +447,19 @@ public sealed class GravitasCollision2DService
         LSCollider2D collider,
         SwiftList<WorldVoxelIndex> partitionedCoordinates)
     {
-        ushort currentGridIndex = ushort.MaxValue;
-        Fixed64 cellPadding = Fixed64.Zero;
+        var traversal = new GridForgeTraversalState(world, GridForgeTraversalPaddingMode.PlanarMaxCellEdge);
         for (int i = 0; i < _coveredVoxels.Count; i++)
-        {
-            Voxel voxel = _coveredVoxels[i];
-            if (voxel.GridIndex != currentGridIndex)
-            {
-                currentGridIndex = voxel.GridIndex;
-                cellPadding = GridTopologyMetricUtility.GetPlanarMaxCellEdge(world.ActiveGrids[currentGridIndex]);
-            }
-
-            TryPartitionVoxel(collider, partitionedCoordinates, voxel, cellPadding);
-        }
+            TryPartitionVoxel(collider, partitionedCoordinates, _coveredVoxels[i], ref traversal);
     }
 
     private void TryPartitionVoxel(
         LSCollider2D collider,
         SwiftList<WorldVoxelIndex> partitionedCoordinates,
         Voxel voxel,
-        Fixed64 cellPadding)
+        ref GridForgeTraversalState traversal)
     {
-        if (!_redundancyChecker.Add(voxel.SpawnToken)
-            || !collider.IsPositionInPlanarBounds(cellPadding, voxel.WorldPosition))
+        if (!traversal.TryVisitUnique(voxel, _redundancyChecker, out Fixed64 cellEdge)
+            || !collider.IsPositionInPlanarBounds(cellEdge, voxel.WorldPosition))
         {
             return;
         }
@@ -505,16 +487,6 @@ public sealed class GravitasCollision2DService
     {
         coverageMin = new Vector2d(collider.MinX, collider.MinY);
         coverageMax = new Vector2d(collider.MaxX, collider.MaxY);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool IsPlanarPositionInBounds(Vector2d min, Vector2d max, Fixed64 cellEdge, Vector3d worldPosition)
-    {
-        Fixed64 padding = cellEdge * Fixed64.Half;
-        return worldPosition.X >= min.X - padding
-            && worldPosition.X <= max.X + padding
-            && worldPosition.Z >= min.Y - padding
-            && worldPosition.Z <= max.Y + padding;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

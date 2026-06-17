@@ -140,8 +140,7 @@ public sealed partial class GravitasQuery3DService
         for (int i = 0; i < _coveredVoxels.Count; i++)
         {
             Voxel voxel = _coveredVoxels[i];
-            if (!_redundantVoxelCheck.Add(voxel.SpawnToken)
-                || voxel.TryGetPartition(out PhysicsPartition? partition) == false)
+            if (!GridForgeTraversal.TryGetUniquePartition(voxel, _redundantVoxelCheck, out PhysicsPartition? partition))
             {
                 continue;
             }
@@ -165,8 +164,7 @@ public sealed partial class GravitasQuery3DService
         for (int i = 0; i < _coveredVoxels.Count; i++)
         {
             Voxel voxel = _coveredVoxels[i];
-            if (!_redundantVoxelCheck.Add(voxel.SpawnToken)
-                || voxel.TryGetPartition(out PhysicsPartition? partition) == false)
+            if (!GridForgeTraversal.TryGetUniquePartition(voxel, _redundantVoxelCheck, out PhysicsPartition? partition))
             {
                 continue;
             }
@@ -191,8 +189,7 @@ public sealed partial class GravitasQuery3DService
         for (int i = 0; i < _coveredVoxels.Count; i++)
         {
             Voxel voxel = _coveredVoxels[i];
-            if (!_redundantVoxelCheck.Add(voxel.SpawnToken)
-                || voxel.TryGetPartition(out PhysicsPartition? partition) == false)
+            if (!GridForgeTraversal.TryGetUniquePartition(voxel, _redundantVoxelCheck, out PhysicsPartition? partition))
             {
                 continue;
             }

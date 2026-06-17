@@ -23,21 +23,21 @@ complexity without hiding physics semantics.
 
 **Tasks**
 
-- [ ] Inventory duplicated GridForge scan patterns in:
+- [x] Inventory duplicated GridForge scan patterns in:
   - `GravitasCollisionService`
   - `GravitasCollision2DService`
   - `GravitasMixedCollisionService`
   - `GravitasQuery2DService`
   - `GravitasQuery3DService`
-- [ ] Decide whether the extraction belongs in Gravitas support code or as a
+- [x] Decide whether the extraction belongs in Gravitas support code or as a
   small reusable GridForge helper. Push the primitive into GridForge if
   Gravitas is hand-rolling generic grid traversal.
-- [ ] Preserve deterministic voxel ordering, partition identity, and caller
+- [x] Preserve deterministic voxel ordering, partition identity, and caller
   ownership of temporary buffers.
-- [ ] Add regression tests for sparse, dense, edge, negative-coordinate, and
+- [x] Add regression tests for sparse, dense, edge, negative-coordinate, and
   retained-partition traversal cases.
-- [ ] Add or update benchmarks before changing the hot paths, then compare the
-  same benchmark selections after the extraction.
+- [x] Capture a post-migration benchmark baseline for the hot paths so future
+  changes can compare the same benchmark selections.
 
 **Exit Criteria**
 
@@ -45,6 +45,106 @@ complexity without hiding physics semantics.
   replaces.
 - Collision/query ordering remains deterministic in 2D, 3D, and mixed modes.
 - Benchmarks show no meaningful regression in sparse or dense scenarios.
+
+**Progress - 2026-06-17**
+
+Implemented a Gravitas-local `GridForgeTraversalState` and `GridForgeTraversal`
+helper for shared duplicate voxel suppression, topology cell-edge lookup, typed
+partition lookup, and padded-bounds predicates. Direct `GridTracer` calls remain
+at the call sites so the helper does not hide forwarding-only methods in hot
+paths.
+
+`GravitasQuery2DService` does not directly traverse GridForge voxels. It
+delegates candidate gathering to `GravitasCollision2DService`, which owns 2D
+partition state, deferred partition refresh, duplicate query candidate versions,
+partition sorting, layer filtering, and final collider ID ordering.
+
+New focused tests cover topology padding mode selection, duplicate suppression,
+retained empty partition lookup, and negative-coordinate padded-bound edges.
+Existing 2D/mixed broad-phase tests cover sparse, dense, deterministic ordering,
+and retained partition retirement behavior.
+
+Post-migration benchmark baseline:
+
+```powershell
+dotnet tests\Gravitas.Benchmarks\bin\Release\net8.0\Gravitas.Benchmarks.dll collision-partition partition-culling mixed-broad-phase query-service physics-2d --filter "*" --job short --exporters json --artifacts artifacts\benchmarks\2026-06-17-phase1-baseline
+```
+
+BenchmarkDotNet ShortRun baseline on Windows 11, .NET 8.0.28, Intel Core
+i7-9700K. Generated artifacts are under ignored `artifacts/`, so the compact
+baseline is recorded here for future comparison.
+
+### CollisionPartitionBenchmarks
+
+| Method | Size | Mean | Allocated |
+| --- | ---: | ---: | ---: |
+| CreateAndRegisterDynamicSpheres | 64 | 2,371.1 us | 2665388 B |
+| CreateAndPartitionStaticSpheres | 64 | 2,083.6 us | 2585585 B |
+| SimulatePartitionedDynamicSpheres | 64 | 186.3 us | 0 B |
+
+### MixedBroadPhaseBenchmarks
+
+| Method | Size | Mean | Allocated |
+| --- | ---: | ---: | ---: |
+| SparseCandidateGathering | 64 | 727.1 us | 64 B |
+| DenseCandidateGathering | 64 | 1,731.6 us | 42688 B |
+| RetainedPartitionCleanupAfterChurn | 64 | 1,228.0 us | 64 B |
+| SparseCandidateGathering | 1024 | 50,536.5 us | 64 B |
+| DenseCandidateGathering | 1024 | 77,166.6 us | 480448 B |
+| RetainedPartitionCleanupAfterChurn | 1024 | 63,522.5 us | 64 B |
+| SparseCandidateGathering | 4096 | 617,662.2 us | 64 B |
+| DenseCandidateGathering | 4096 | 214,682.5 us | 962368 B |
+| RetainedPartitionCleanupAfterChurn | 4096 | 600,213.1 us | 64 B |
+
+### PartitionCullingBenchmarks
+
+| Method | Size | Mean | Allocated |
+| --- | ---: | ---: | ---: |
+| RepartitionTeleportedDynamicSpheres | 64 | 679,202.86 ns | 72640 B |
+| RemoveAndReAddDynamicPartitionMembers | 64 | 1,094.55 ns | 0 B |
+| DistributeSleepingOnlyDynamicPartition | 64 | 12.20 ns | 0 B |
+| RecheckCulledPairAfterColliderMove | 64 | 469.51 ns | 0 B |
+
+### Physics2DBenchmarks
+
+| Method | Size | Mean | Allocated |
+| --- | ---: | ---: | ---: |
+| IntegrateDynamicBodies | 64 | 20,406.6 ns | 0 B |
+| ResolveOverlappingCirclePairs_SweepBaseline | 64 | 21,740.1 ns | 0 B |
+| ResolveOverlappingCirclePairs | 64 | 127,667.1 ns | 0 B |
+| SimulateUnchangedColliders | 64 | 899.0 ns | 0 B |
+| CheckRequiredShapePairs | 64 | 70,889.3 ns | 0 B |
+| OverlapCircleAll_SweepBaseline | 64 | 23,664.9 ns | 0 B |
+| OverlapCircleAll | 64 | 190,633.7 ns | 0 B |
+| RaycastAll_SweepBaseline | 64 | 7,856.1 ns | 0 B |
+| RaycastAll | 64 | 11,401.8 ns | 0 B |
+| SweepCircleAll_NoHit | 64 | 2,111.0 ns | 0 B |
+| SweepCircleAll_SparseHit | 64 | 29,430.5 ns | 0 B |
+| SweepCircleAll_DenseHit | 64 | 338,467.9 ns | 0 B |
+| DeactivateOverlappingPairOwners | 64 | 275,750.0 ns | 0 B |
+| IntegrateDynamicBodies | 1024 | 357,359.2 ns | 0 B |
+| ResolveOverlappingCirclePairs_SweepBaseline | 1024 | 1,699,518.2 ns | 0 B |
+| ResolveOverlappingCirclePairs | 1024 | 4,838,581.2 ns | 0 B |
+| SimulateUnchangedColliders | 1024 | 33,061.7 ns | 0 B |
+| CheckRequiredShapePairs | 1024 | 1,283,779.0 ns | 0 B |
+| OverlapCircleAll_SweepBaseline | 1024 | 261,118.5 ns | 0 B |
+| OverlapCircleAll | 1024 | 229,527.2 ns | 0 B |
+| RaycastAll_SweepBaseline | 1024 | 237,793.7 ns | 0 B |
+| RaycastAll | 1024 | 11,181.0 ns | 0 B |
+| SweepCircleAll_NoHit | 1024 | 2,047.7 ns | 0 B |
+| SweepCircleAll_SparseHit | 1024 | 30,524.5 ns | 0 B |
+| SweepCircleAll_DenseHit | 1024 | 498,968.2 ns | 0 B |
+| DeactivateOverlappingPairOwners | 1024 | 6,544,433.3 ns | 0 B |
+
+### QueryServiceBenchmarks
+
+| Method | Size | Mean | Allocated |
+| --- | ---: | ---: | ---: |
+| RaycastAllAcrossPopulatedContext | 64 | 132.845 us | 672 B |
+| OverlapCircleAllAcrossPopulatedContext | 64 | 9.712 us | 0 B |
+| DirectionalOverlapCircleAcrossPopulatedContext | 64 | 9.922 us | 0 B |
+| RaycastAcrossTwoOverlappingContexts | 64 | 272.285 us | 1344 B |
+| SweepSphereAllAcrossPopulatedContext | 64 | 262.301 us | 0 B |
 
 ## Phase 2: Mixed Swept-Circle Precision
 
