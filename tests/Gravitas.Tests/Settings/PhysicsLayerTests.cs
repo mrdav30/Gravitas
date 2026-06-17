@@ -64,8 +64,8 @@ public sealed class PhysicsLayerTests
         PhysicsLayerMask onlyLayerOne = PhysicsLayerMask.FromLayer(1);
 
         int rayCount = context.Query3D.RaycastAll(
-            new Vector3d((Fixed64)(-2), -Fixed64.Fraction(1, 4), Fixed64.Zero),
-            new Vector3d((Fixed64)4, Fixed64.Fraction(1, 4), Fixed64.Zero),
+            new Vector3d((Fixed64)(-2), -Fixed64.FromFraction(1, 4), Fixed64.Zero),
+            new Vector3d((Fixed64)4, Fixed64.FromFraction(1, 4), Fixed64.Zero),
             onlyLayerOne,
             rayHits);
         int circleCount = context.Query3D.OverlapCircleAll(

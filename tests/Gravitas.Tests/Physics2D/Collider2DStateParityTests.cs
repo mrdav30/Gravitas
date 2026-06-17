@@ -208,7 +208,7 @@ public sealed class Collider2DStateParityTests
         bool immovable)
     {
         var transform = new FixedTransform(
-            new Vector3d(position.x, Fixed64.Zero, position.y),
+            new Vector3d(position.X, Fixed64.Zero, position.Y),
             FixedQuaternion.Identity,
             Vector3d.One);
         var agent = new TestMatterAgent(context, transform);
@@ -227,7 +227,7 @@ public sealed class Collider2DStateParityTests
         Vector2d position)
     {
         var transform = new FixedTransform(
-            new Vector3d(position.x, Fixed64.Zero, position.y),
+            new Vector3d(position.X, Fixed64.Zero, position.Y),
             FixedQuaternion.Identity,
             Vector3d.One);
         var agent = new TestMatterAgent(context, transform);

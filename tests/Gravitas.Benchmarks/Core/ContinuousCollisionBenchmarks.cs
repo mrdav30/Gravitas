@@ -12,7 +12,7 @@ public class ContinuousCollisionBenchmarks
     private static readonly Vector3d StartPosition = new((Fixed64)(-2), Fixed64.Zero, Fixed64.Zero);
     private static readonly Vector3d FastImpulse = new((Fixed64)4, Fixed64.Zero, Fixed64.Zero);
     private static readonly Vector3d WallPosition = Vector3d.Zero;
-    private static readonly Vector3d WallSize = new(Fixed64.Fraction(1, 10), (Fixed64)8, (Fixed64)8);
+    private static readonly Vector3d WallSize = new(Fixed64.FromFraction(1, 10), (Fixed64)8, (Fixed64)8);
 
     private GravitasWorldContext _discreteContext;
     private GravitasWorldContext _continuousContext;

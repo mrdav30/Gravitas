@@ -14,7 +14,7 @@ public sealed class CollisionWarmStartTests
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSSphereCollider> left = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
-        ScenarioBody<LSSphereCollider> right = scenario.CreateSphere(new Vector3d(Fixed64.Fraction(3, 4), Fixed64.Zero, Fixed64.Zero));
+        ScenarioBody<LSSphereCollider> right = scenario.CreateSphere(new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
         left.Body.AddLinearImpulse(new Vector3d((Fixed64)60, Fixed64.Zero, Fixed64.Zero));
         right.Body.AddLinearImpulse(new Vector3d((Fixed64)(-60), Fixed64.Zero, Fixed64.Zero));
         CollisionPair pair = scenario.CreatePair(left.Collider, right.Collider);
@@ -32,7 +32,7 @@ public sealed class CollisionWarmStartTests
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSSphereCollider> left = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
-        ScenarioBody<LSSphereCollider> right = scenario.CreateSphere(new Vector3d(Fixed64.Fraction(3, 4), Fixed64.Zero, Fixed64.Zero));
+        ScenarioBody<LSSphereCollider> right = scenario.CreateSphere(new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
         left.Body.AddLinearImpulse(new Vector3d((Fixed64)60, Fixed64.Zero, Fixed64.Zero));
         right.Body.AddLinearImpulse(new Vector3d((Fixed64)(-60), Fixed64.Zero, Fixed64.Zero));
         CollisionPair pair = scenario.CreatePair(left.Collider, right.Collider);

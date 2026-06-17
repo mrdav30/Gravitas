@@ -136,18 +136,17 @@ public sealed partial class GravitasQuery3DService
     {
         Vector2d min = new(position.X - radius, position.Z - radius);
         Vector2d max = new(position.X + radius, position.Z + radius);
-        foreach (GridVoxelSet covered in GridTracer.GetCoveredVoxels(_context.World, min, max, position.Y))
+        GridTracer.GetCoveredVoxelsInto(_context.World, min, max, _coveredVoxels, _traceScratch, layerY: position.Y);
+        for (int i = 0; i < _coveredVoxels.Count; i++)
         {
-            foreach (Voxel voxel in covered.Voxels)
+            Voxel voxel = _coveredVoxels[i];
+            if (!_redundantVoxelCheck.Add(voxel.SpawnToken)
+                || voxel.TryGetPartition(out PhysicsPartition? partition) == false)
             {
-                if (!_redundantVoxelCheck.Add(voxel.SpawnToken)
-                    || voxel.TryGetPartition(out PhysicsPartition? partition) == false)
-                {
-                    continue;
-                }
-
-                ProcessPartitionForClosestHit(partition!, position, radius, ref found, ref closestHit, ref closestDist);
+                continue;
             }
+
+            ProcessPartitionForClosestHit(partition!, position, radius, ref found, ref closestHit, ref closestDist);
         }
     }
 
@@ -162,26 +161,25 @@ public sealed partial class GravitasQuery3DService
     {
         Vector2d min = new(position.X - radius, position.Z - radius);
         Vector2d max = new(position.X + radius, position.Z + radius);
-        foreach (GridVoxelSet covered in GridTracer.GetCoveredVoxels(_context.World, min, max, position.Y))
+        GridTracer.GetCoveredVoxelsInto(_context.World, min, max, _coveredVoxels, _traceScratch, layerY: position.Y);
+        for (int i = 0; i < _coveredVoxels.Count; i++)
         {
-            foreach (Voxel voxel in covered.Voxels)
+            Voxel voxel = _coveredVoxels[i];
+            if (!_redundantVoxelCheck.Add(voxel.SpawnToken)
+                || voxel.TryGetPartition(out PhysicsPartition? partition) == false)
             {
-                if (!_redundantVoxelCheck.Add(voxel.SpawnToken)
-                    || voxel.TryGetPartition(out PhysicsPartition? partition) == false)
-                {
-                    continue;
-                }
-
-                ProcessPartitionForDirectionalHit(
-                    partition!,
-                    position,
-                    radius,
-                    direction,
-                    maxDistanceSqr,
-                    ref found,
-                    ref closestHit,
-                    ref closestDist);
+                continue;
             }
+
+            ProcessPartitionForDirectionalHit(
+                partition!,
+                position,
+                radius,
+                direction,
+                maxDistanceSqr,
+                ref found,
+                ref closestHit,
+                ref closestDist);
         }
     }
 
@@ -189,18 +187,17 @@ public sealed partial class GravitasQuery3DService
     {
         Vector2d min = new(position.X - radius, position.Z - radius);
         Vector2d max = new(position.X + radius, position.Z + radius);
-        foreach (GridVoxelSet covered in GridTracer.GetCoveredVoxels(_context.World, min, max, position.Y))
+        GridTracer.GetCoveredVoxelsInto(_context.World, min, max, _coveredVoxels, _traceScratch, layerY: position.Y);
+        for (int i = 0; i < _coveredVoxels.Count; i++)
         {
-            foreach (Voxel voxel in covered.Voxels)
+            Voxel voxel = _coveredVoxels[i];
+            if (!_redundantVoxelCheck.Add(voxel.SpawnToken)
+                || voxel.TryGetPartition(out PhysicsPartition? partition) == false)
             {
-                if (!_redundantVoxelCheck.Add(voxel.SpawnToken)
-                    || voxel.TryGetPartition(out PhysicsPartition? partition) == false)
-                {
-                    continue;
-                }
-
-                ProcessPartitionForAllHits(partition!, position, radius, results);
+                continue;
             }
+
+            ProcessPartitionForAllHits(partition!, position, radius, results);
         }
     }
 

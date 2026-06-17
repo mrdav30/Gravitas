@@ -24,16 +24,16 @@ public sealed class ConcaveMeshCollisionTests
         CollisionPair wallHit = AssertCollision(
             scenario,
             corner.Collider,
-            scenario.CreateSphere(new Vector3d(Fixed64.Fraction(1, 4), Fixed64.One, (Fixed64)2)).Collider,
+            scenario.CreateSphere(new Vector3d(Fixed64.FromFraction(1, 4), Fixed64.One, (Fixed64)2)).Collider,
             CollisionType.Mesh_Sphere);
-        wallHit.Manifold.PrimaryContact.Normal.x.Should().BeGreaterThan(Fixed64.Zero);
+        wallHit.Manifold.PrimaryContact.Normal.X.Should().BeGreaterThan(Fixed64.Zero);
 
         CollisionPair floorHit = AssertCollision(
             scenario,
             corner.Collider,
-            scenario.CreateSphere(new Vector3d((Fixed64)2, Fixed64.Fraction(1, 4), (Fixed64)2)).Collider,
+            scenario.CreateSphere(new Vector3d((Fixed64)2, Fixed64.FromFraction(1, 4), (Fixed64)2)).Collider,
             CollisionType.Mesh_Sphere);
-        floorHit.Manifold.PrimaryContact.Normal.y.Should().BeGreaterThan(Fixed64.Zero);
+        floorHit.Manifold.PrimaryContact.Normal.Y.Should().BeGreaterThan(Fixed64.Zero);
 
         CollisionPair touching = AssertCollision(
             scenario,
@@ -62,16 +62,16 @@ public sealed class ConcaveMeshCollisionTests
         CollisionPair wallHit = AssertCollision(
             scenario,
             corner.Collider,
-            scenario.CreateBody(CreateTallCapsule(), new Vector3d(Fixed64.Fraction(1, 4), Fixed64.One, (Fixed64)2), FixedQuaternion.Identity).Collider,
+            scenario.CreateBody(CreateTallCapsule(), new Vector3d(Fixed64.FromFraction(1, 4), Fixed64.One, (Fixed64)2), FixedQuaternion.Identity).Collider,
             CollisionType.Mesh_Capsule);
-        wallHit.Manifold.PrimaryContact.Normal.x.Should().BeGreaterThan(Fixed64.Zero);
+        wallHit.Manifold.PrimaryContact.Normal.X.Should().BeGreaterThan(Fixed64.Zero);
 
         CollisionPair floorHit = AssertCollision(
             scenario,
             corner.Collider,
-            scenario.CreateBody(CreateTallCapsule(), new Vector3d((Fixed64)2, Fixed64.Fraction(1, 4), (Fixed64)2), FixedQuaternion.Identity).Collider,
+            scenario.CreateBody(CreateTallCapsule(), new Vector3d((Fixed64)2, Fixed64.FromFraction(1, 4), (Fixed64)2), FixedQuaternion.Identity).Collider,
             CollisionType.Mesh_Capsule);
-        floorHit.Manifold.PrimaryContact.Normal.y.Should().BeGreaterThan(Fixed64.Zero);
+        floorHit.Manifold.PrimaryContact.Normal.Y.Should().BeGreaterThan(Fixed64.Zero);
 
         CollisionPair touching = AssertCollision(
             scenario,
@@ -111,21 +111,21 @@ public sealed class ConcaveMeshCollisionTests
         CollisionPair wallHit = AssertCollision(
             scenario,
             channel.Collider,
-            scenario.CreateCuboid(new Vector3d(Fixed64.Fraction(7, 4), Fixed64.One, (Fixed64)2)).Collider,
+            scenario.CreateCuboid(new Vector3d(Fixed64.FromFraction(7, 4), Fixed64.One, (Fixed64)2)).Collider,
             CollisionType.Mesh_Cuboid);
-        wallHit.Manifold.PrimaryContact.Normal.x.Should().BeLessThan(Fixed64.Zero);
+        wallHit.Manifold.PrimaryContact.Normal.X.Should().BeLessThan(Fixed64.Zero);
 
         CollisionPair floorHit = AssertCollision(
             scenario,
             corner.Collider,
-            scenario.CreateCuboid(new Vector3d((Fixed64)10, Fixed64.Fraction(1, 4), (Fixed64)2)).Collider,
+            scenario.CreateCuboid(new Vector3d((Fixed64)10, Fixed64.FromFraction(1, 4), (Fixed64)2)).Collider,
             CollisionType.Mesh_Cuboid);
-        floorHit.Manifold.PrimaryContact.Normal.y.Should().BeGreaterThan(Fixed64.Zero);
+        floorHit.Manifold.PrimaryContact.Normal.Y.Should().BeGreaterThan(Fixed64.Zero);
 
         CollisionPair touching = AssertCollision(
             scenario,
             channel.Collider,
-            scenario.CreateCuboid(new Vector3d(Fixed64.Fraction(3, 2), Fixed64.One, (Fixed64)2)).Collider,
+            scenario.CreateCuboid(new Vector3d(Fixed64.FromFraction(3, 2), Fixed64.One, (Fixed64)2)).Collider,
             CollisionType.Mesh_Cuboid);
         touching.Manifold.PrimaryContact.Depth.Should().Be(Fixed64.Zero);
     }
@@ -143,16 +143,16 @@ public sealed class ConcaveMeshCollisionTests
         CollisionPair wallHit = AssertCollision(
             scenario,
             corner.Collider,
-            scenario.CreateBody(CreateTallCylinder(), new Vector3d(Fixed64.Fraction(1, 4), Fixed64.One, (Fixed64)2), FixedQuaternion.Identity).Collider,
+            scenario.CreateBody(CreateTallCylinder(), new Vector3d(Fixed64.FromFraction(1, 4), Fixed64.One, (Fixed64)2), FixedQuaternion.Identity).Collider,
             CollisionType.Mesh_Cylinder);
-        wallHit.Manifold.PrimaryContact.Normal.x.Should().BeGreaterThan(Fixed64.Zero);
+        wallHit.Manifold.PrimaryContact.Normal.X.Should().BeGreaterThan(Fixed64.Zero);
 
         CollisionPair floorHit = AssertCollision(
             scenario,
             corner.Collider,
-            scenario.CreateBody(CreateTallCylinder(), new Vector3d((Fixed64)2, Fixed64.Fraction(3, 4), (Fixed64)2), FixedQuaternion.Identity).Collider,
+            scenario.CreateBody(CreateTallCylinder(), new Vector3d((Fixed64)2, Fixed64.FromFraction(3, 4), (Fixed64)2), FixedQuaternion.Identity).Collider,
             CollisionType.Mesh_Cylinder);
-        floorHit.Manifold.PrimaryContact.Normal.y.Should().BeGreaterThan(Fixed64.Zero);
+        floorHit.Manifold.PrimaryContact.Normal.Y.Should().BeGreaterThan(Fixed64.Zero);
 
         CollisionPair touching = AssertCollision(
             scenario,
@@ -209,20 +209,20 @@ public sealed class ConcaveMeshCollisionTests
             PhysicsScenarioBuilder.Vector(0, 0, 0),
             FixedQuaternion.Identity);
         ScenarioBody<LSCuboidCollider> cuboid = scenario.CreateCuboid(
-            new Vector3d(Fixed64.Fraction(7, 4), Fixed64.One, (Fixed64)2),
+            new Vector3d(Fixed64.FromFraction(7, 4), Fixed64.One, (Fixed64)2),
             immovable: true);
         CollisionPair pair = scenario.CreatePair(channel.Collider, cuboid.Collider);
 
         CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
         ManifoldContact first = pair.Manifold.PrimaryContact;
 
-        channel.Body.SetPosition(new Vector3d(Fixed64.Fraction(1, 4), Fixed64.Zero, Fixed64.Zero));
+        channel.Body.SetPosition(new Vector3d(Fixed64.FromFraction(1, 4), Fixed64.Zero, Fixed64.Zero));
         channel.Collider.Simulate();
         cuboid.Body.SetPosition(new Vector3d((Fixed64)2, Fixed64.One, (Fixed64)2));
         cuboid.Collider.Simulate();
 
         CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
-        pair.Manifold.PrimaryContact.Normal.x.Should().Be(first.Normal.x);
+        pair.Manifold.PrimaryContact.Normal.X.Should().Be(first.Normal.X);
         pair.Manifold.PrimaryContact.ContactId.Should().NotBe(0);
     }
 
@@ -237,10 +237,10 @@ public sealed class ConcaveMeshCollisionTests
             immovable: true);
         CollisionPair cuboidPair = scenario.CreatePair(
             channel.Collider,
-            scenario.CreateCuboid(new Vector3d(Fixed64.Fraction(7, 4), Fixed64.One, (Fixed64)2)).Collider);
+            scenario.CreateCuboid(new Vector3d(Fixed64.FromFraction(7, 4), Fixed64.One, (Fixed64)2)).Collider);
         CollisionPair cylinderPair = scenario.CreatePair(
             channel.Collider,
-            scenario.CreateBody(CreateTallCylinder(), new Vector3d(Fixed64.Fraction(7, 4), Fixed64.One, (Fixed64)2), FixedQuaternion.Identity).Collider);
+            scenario.CreateBody(CreateTallCylinder(), new Vector3d(Fixed64.FromFraction(7, 4), Fixed64.One, (Fixed64)2), FixedQuaternion.Identity).Collider);
         CollisionPair meshPair = scenario.CreatePair(
             channel.Collider,
             scenario.CreateBody(MeshTestFixtures.CreateInsideCorner(), PhysicsScenarioBuilder.Vector(0, 0, 0), FixedQuaternion.Identity, immovable: true).Collider);

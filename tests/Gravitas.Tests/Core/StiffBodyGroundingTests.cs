@@ -19,7 +19,7 @@ public sealed class StiffBodyGroundingTests
         ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
 
         body.Body.IsGrounded.Should().BeTrue();
-        body.Body.HitPoint.y.Should().Be(Fixed64.Zero);
+        body.Body.HitPoint.Y.Should().Be(Fixed64.Zero);
         body.Body.GroundNormal.Should().Be(Vector3d.Up);
     }
 
@@ -43,14 +43,14 @@ public sealed class StiffBodyGroundingTests
         scenario.Context.Settings.GroundCheckLayerMask = PhysicsLayerMask.FromLayer(1);
         ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
 
-        ground.Transform.Position = new Vector3d(Fixed64.Zero, -Fixed64.Fraction(1, 4), Fixed64.Zero);
+        ground.Transform.Position = new Vector3d(Fixed64.Zero, -Fixed64.FromFraction(1, 4), Fixed64.Zero);
         ground.Collider.Simulate();
         scenario.Context.Simulate();
         scenario.Context.LateSimulate();
 
         body.Body.IsGrounded.Should().BeTrue();
-        body.Body.HitPoint.y.Should().Be(Fixed64.Fraction(1, 4));
-        body.Body.HeightPos.Should().Be(Fixed64.Fraction(1, 4));
+        body.Body.HitPoint.Y.Should().Be(Fixed64.FromFraction(1, 4));
+        body.Body.HeightPos.Should().Be(Fixed64.FromFraction(1, 4));
     }
 
     [Fact]
@@ -86,7 +86,7 @@ public sealed class StiffBodyGroundingTests
         body.Body.IsGrounded.Should().BeTrue();
         body.Body.GroundNormal.Should().NotBe(Vector3d.Zero);
         body.Body.GroundNormal.Should().NotBe(Vector3d.Up);
-        body.Body.GroundNormal.y.Should().BeGreaterThan(Fixed64.Zero);
+        body.Body.GroundNormal.Y.Should().BeGreaterThan(Fixed64.Zero);
     }
 
     [Fact]

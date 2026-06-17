@@ -18,14 +18,14 @@ public sealed class LSMeshColliderQueryTests
         var worker = new RaycastSegmentWorker();
         var hits = new SwiftList<Vector3d>();
         worker.PrepareSegmentCheck(
-            new Vector3d(Fixed64.Fraction(1, 4), Fixed64.Fraction(1, 4), (Fixed64)(-2)),
-            new Vector3d(Fixed64.Fraction(1, 4), Fixed64.Fraction(1, 4), (Fixed64)2));
+            new Vector3d(Fixed64.FromFraction(1, 4), Fixed64.FromFraction(1, 4), (Fixed64)(-2)),
+            new Vector3d(Fixed64.FromFraction(1, 4), Fixed64.FromFraction(1, 4), (Fixed64)2));
 
         bool hit = mesh.ColliderOverlapsRay(worker, ref hits);
 
         hit.Should().BeTrue();
         hits.Count.Should().Be(1);
-        hits[0].Should().Be(new Vector3d(Fixed64.Fraction(1, 4), Fixed64.Fraction(1, 4), Fixed64.Zero));
+        hits[0].Should().Be(new Vector3d(Fixed64.FromFraction(1, 4), Fixed64.FromFraction(1, 4), Fixed64.Zero));
     }
 
     [Fact]
@@ -35,8 +35,8 @@ public sealed class LSMeshColliderQueryTests
         var worker = new RaycastSegmentWorker();
         var hits = new SwiftList<Vector3d>();
         worker.PrepareSegmentCheck(
-            new Vector3d(Fixed64.Fraction(3, 4), Fixed64.Fraction(3, 4), (Fixed64)(-2)),
-            new Vector3d(Fixed64.Fraction(3, 4), Fixed64.Fraction(3, 4), (Fixed64)2));
+            new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.FromFraction(3, 4), (Fixed64)(-2)),
+            new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.FromFraction(3, 4), (Fixed64)2));
 
         bool hit = mesh.ColliderOverlapsRay(worker, ref hits);
 
@@ -49,7 +49,7 @@ public sealed class LSMeshColliderQueryTests
     {
         LSMeshCollider mesh = CreateTriangleMesh();
 
-        Vector3d normal = mesh.GetNormalAtPoint(new Vector3d(Fixed64.Fraction(1, 4), Fixed64.Fraction(1, 4), Fixed64.One));
+        Vector3d normal = mesh.GetNormalAtPoint(new Vector3d(Fixed64.FromFraction(1, 4), Fixed64.FromFraction(1, 4), Fixed64.One));
 
         normal.Should().Be(Vector3d.Forward);
     }
@@ -64,7 +64,7 @@ public sealed class LSMeshColliderQueryTests
             FixedQuaternion.Identity);
 
         Vector3d closest = body.Collider.ClosestPointOnSurface(
-            new Vector3d((Fixed64)6 + Fixed64.Fraction(3, 4), Fixed64.Fraction(3, 4), (Fixed64)2));
+            new Vector3d((Fixed64)6 + Fixed64.FromFraction(3, 4), Fixed64.FromFraction(3, 4), (Fixed64)2));
 
         closest.Should().Be(new Vector3d((Fixed64)6 + Fixed64.Half, Fixed64.Half, Fixed64.Zero));
     }

@@ -2,6 +2,7 @@ using FixedMathSharp;
 using Gravitas.Colliders;
 using GridForge.Configuration;
 using SwiftCollections;
+using SwiftCollections.Diagnostics;
 using System;
 
 namespace Gravitas.Benchmarks;

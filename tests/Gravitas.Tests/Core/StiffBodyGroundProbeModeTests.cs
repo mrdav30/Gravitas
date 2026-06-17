@@ -30,8 +30,8 @@ public sealed class StiffBodyGroundProbeModeTests
         body.Body.CheckGround();
 
         body.Body.IsGrounded.Should().BeTrue();
-        body.Body.HitPoint.y.Should().Be(Fixed64.Zero);
-        body.Body.GroundNormal.y.Should().BeGreaterThan(Fixed64.Zero);
+        body.Body.HitPoint.Y.Should().Be(Fixed64.Zero);
+        body.Body.GroundNormal.Y.Should().BeGreaterThan(Fixed64.Zero);
     }
 
     [Fact]
@@ -50,7 +50,7 @@ public sealed class StiffBodyGroundProbeModeTests
         body.Body.CheckGround();
 
         body.Body.IsGrounded.Should().BeTrue();
-        body.Body.HitPoint.y.Should().Be(Fixed64.Zero);
+        body.Body.HitPoint.Y.Should().Be(Fixed64.Zero);
     }
 
     [Fact]
@@ -74,7 +74,7 @@ public sealed class StiffBodyGroundProbeModeTests
         body.Body.CheckGround();
 
         body.Body.IsGrounded.Should().BeTrue();
-        body.Body.HitPoint.y.Should().Be(Fixed64.Zero);
+        body.Body.HitPoint.Y.Should().Be(Fixed64.Zero);
     }
 
     [Fact]
@@ -94,7 +94,7 @@ public sealed class StiffBodyGroundProbeModeTests
         body.Body.CheckGround();
 
         body.Body.IsGrounded.Should().BeTrue();
-        body.Body.HitPoint.y.Should().Be(Fixed64.Zero);
+        body.Body.HitPoint.Y.Should().Be(Fixed64.Zero);
     }
 
     [Fact]
@@ -102,7 +102,7 @@ public sealed class StiffBodyGroundProbeModeTests
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         scenario.Context.Settings.GroundCheckLayerMask = PhysicsLayerMask.FromLayer(0);
-        scenario.CreateSphere(new Vector3d(Fixed64.Fraction(3, 4), Fixed64.Zero, Fixed64.Zero));
+        scenario.CreateSphere(new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
         ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
         body.Body.GroundProbeMode = GroundProbeMode.SweptSphere;
 

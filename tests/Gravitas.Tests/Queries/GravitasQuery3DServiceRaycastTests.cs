@@ -72,7 +72,7 @@ public sealed class GravitasQuery3DServiceRaycastTests
         LSSphereCollider collider = CreateDynamicSphere(context, Vector3d.Zero);
 
         bool hit = context.Query3D.Raycast(
-            new Vector3d(Fixed64.Fraction(1, 4), Fixed64.Zero, Fixed64.Zero),
+            new Vector3d(Fixed64.FromFraction(1, 4), Fixed64.Zero, Fixed64.Zero),
             Vector3d.Right,
             (Fixed64)2,
             out Physics3DHit rayHit,
@@ -81,7 +81,7 @@ public sealed class GravitasQuery3DServiceRaycastTests
         hit.Should().BeTrue();
         rayHit.Collider.Should().BeSameAs(collider);
         rayHit.Distance.Should().Be(Fixed64.Zero);
-        rayHit.Point.Should().Be(new Vector3d(Fixed64.Fraction(1, 4), Fixed64.Zero, Fixed64.Zero));
+        rayHit.Point.Should().Be(new Vector3d(Fixed64.FromFraction(1, 4), Fixed64.Zero, Fixed64.Zero));
     }
 
     [Fact]
@@ -109,8 +109,8 @@ public sealed class GravitasQuery3DServiceRaycastTests
         cap.Collider.Should().BeSameAs(collider);
         side.Point.Should().Be(new Vector3d(-Fixed64.Half, Fixed64.Zero, Fixed64.Zero));
         cap.Point.Should().Be(new Vector3d(Fixed64.Zero, Fixed64.Half, Fixed64.Zero));
-        side.Normalized.Should().Be(-Vector3d.Right);
-        cap.Normalized.Should().Be(Vector3d.Up);
+        side.Normal.Should().Be(-Vector3d.Right);
+        cap.Normal.Should().Be(Vector3d.Up);
     }
 
     [Fact]

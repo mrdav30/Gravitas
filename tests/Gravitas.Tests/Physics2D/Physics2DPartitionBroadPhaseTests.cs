@@ -25,7 +25,7 @@ public sealed class Physics2DPartitionBroadPhaseTests
 
         context.Simulate();
 
-        dynamicBody.Position.x.Should().BeLessThan(Fixed64.Zero);
+        dynamicBody.Position.X.Should().BeLessThan(Fixed64.Zero);
         context.Physics2D.LastBroadPhaseCandidateCount.Should().Be(1);
         context.Collisions2D.ActivePartitionCount.Should().BeGreaterThan(0);
     }
@@ -210,7 +210,7 @@ public sealed class Physics2DPartitionBroadPhaseTests
         bool immovable)
     {
         var transform = new FixedTransform(
-            new Vector3d(position.x, Fixed64.Zero, position.y),
+            new Vector3d(position.X, Fixed64.Zero, position.Y),
             FixedQuaternion.Identity,
             Vector3d.One);
         var agent = new TestMatterAgent(context, transform);

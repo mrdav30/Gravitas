@@ -206,10 +206,10 @@ public class Physics2DBenchmarks
     {
         Vector2d center = new((Fixed64)12, (Fixed64)12);
         Fixed64 radius = (Fixed64)18;
-        Fixed64 minX = center.x - radius;
-        Fixed64 maxX = center.x + radius;
-        Fixed64 minY = center.y - radius;
-        Fixed64 maxY = center.y + radius;
+        Fixed64 minX = center.X - radius;
+        Fixed64 maxX = center.X + radius;
+        Fixed64 minY = center.Y - radius;
+        Fixed64 maxY = center.Y + radius;
         PrepareSweep(_sweepQueryColliders, _sweepSortedColliders);
 
         int count = 0;
@@ -246,10 +246,10 @@ public class Physics2DBenchmarks
     {
         Vector2d start = new((Fixed64)(-8), (Fixed64)12);
         Vector2d end = new((Fixed64)64, (Fixed64)12);
-        Fixed64 minX = FixedMath.Min(start.x, end.x);
-        Fixed64 maxX = FixedMath.Max(start.x, end.x);
-        Fixed64 minY = FixedMath.Min(start.y, end.y);
-        Fixed64 maxY = FixedMath.Max(start.y, end.y);
+        Fixed64 minX = FixedMath.Min(start.X, end.X);
+        Fixed64 maxX = FixedMath.Max(start.X, end.X);
+        Fixed64 minY = FixedMath.Min(start.Y, end.Y);
+        Fixed64 maxY = FixedMath.Max(start.Y, end.Y);
         PrepareSweep(_sweepQueryColliders, _sweepSortedColliders);
 
         int count = 0;
@@ -354,7 +354,7 @@ public class Physics2DBenchmarks
         Vector2d position,
         bool immovable)
     {
-        var agent = new BenchmarkMatterAgent(context, new Vector3d(position.x, Fixed64.Zero, position.y));
+        var agent = new BenchmarkMatterAgent(context, new Vector3d(position.X, Fixed64.Zero, position.Y));
         var body = new StiffBody2D(agent, collider)
         {
             Mass = Fixed64.One,

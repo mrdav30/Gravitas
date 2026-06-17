@@ -24,16 +24,16 @@ public sealed class StiffBodySerializationTests
             immovable: true,
             isKinematic: true);
         source.Body.GroundProbeMode = GroundProbeMode.SweptSphere;
-        source.Body.GroundProbeRadius = Fixed64.Fraction(1, 3);
+        source.Body.GroundProbeRadius = Fixed64.FromFraction(1, 3);
         source.Body.SleepEnabled = false;
         source.Body.SleepFrameThreshold = 9;
-        source.Body.SleepLinearSpeedThreshold = Fixed64.Fraction(1, 64);
-        source.Body.SleepAngularSpeedThreshold = Fixed64.Fraction(1, 32);
+        source.Body.SleepLinearSpeedThreshold = Fixed64.FromFraction(1, 64);
+        source.Body.SleepAngularSpeedThreshold = Fixed64.FromFraction(1, 32);
         source.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
-        source.Body.RestitutionCoefficient = Fixed64.Fraction(3, 4);
-        source.Body.FrictionCoefficient = Fixed64.Fraction(5, 4);
-        source.Collider.Radius = Fixed64.Fraction(3, 2);
-        source.Collider.LocalOffset = new Vector3d(Fixed64.Half, Fixed64.Fraction(1, 4), -Fixed64.Half);
+        source.Body.RestitutionCoefficient = Fixed64.FromFraction(3, 4);
+        source.Body.FrictionCoefficient = Fixed64.FromFraction(5, 4);
+        source.Collider.Radius = Fixed64.FromFraction(3, 2);
+        source.Collider.LocalOffset = new Vector3d(Fixed64.Half, Fixed64.FromFraction(1, 4), -Fixed64.Half);
         source.Collider.Layer = new PhysicsLayer(4);
         PhysicsScenarioBuilder.SetTrigger(source.Collider);
         source.Collider.Simulate();
@@ -56,11 +56,11 @@ public sealed class StiffBodySerializationTests
         target.Body.Immovable.Should().BeTrue();
         target.Body.IsKinematic.Should().BeTrue();
         target.Body.GroundProbeMode.Should().Be(GroundProbeMode.SweptSphere);
-        target.Body.GroundProbeRadius.Should().Be(Fixed64.Fraction(1, 3));
+        target.Body.GroundProbeRadius.Should().Be(Fixed64.FromFraction(1, 3));
         target.Body.SleepEnabled.Should().BeFalse();
         target.Body.SleepFrameThreshold.Should().Be(9);
-        target.Body.SleepLinearSpeedThreshold.Should().Be(Fixed64.Fraction(1, 64));
-        target.Body.SleepAngularSpeedThreshold.Should().Be(Fixed64.Fraction(1, 32));
+        target.Body.SleepLinearSpeedThreshold.Should().Be(Fixed64.FromFraction(1, 64));
+        target.Body.SleepAngularSpeedThreshold.Should().Be(Fixed64.FromFraction(1, 32));
         target.Body.ContinuousCollisionMode.Should().Be(ContinuousCollisionMode.Continuous);
         target.Body.RestitutionCoefficient.Should().Be(source.Body.RestitutionCoefficient);
         target.Body.FrictionCoefficient.Should().Be(source.Body.FrictionCoefficient);

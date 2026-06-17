@@ -32,7 +32,7 @@ public sealed class GravitasQuery3DServiceSweepTests
         sweepHit.Collider.Should().BeSameAs(target);
         sweepHit.Distance.Should().Be(Fixed64.One);
         sweepHit.Point.Should().Be(new Vector3d(-Fixed64.Half, Fixed64.Zero, Fixed64.Zero));
-        sweepHit.Normalized.Should().Be(-Vector3d.Right);
+        sweepHit.Normal.Should().Be(-Vector3d.Right);
         sweepHit.Direction.Should().Be(Vector3d.Right);
     }
 
@@ -43,7 +43,7 @@ public sealed class GravitasQuery3DServiceSweepTests
         LSSphereCollider target = CreateDynamicCollider(context, new LSSphereCollider(), Vector3d.Zero);
 
         bool hit = context.Query3D.SweepSphere(
-            new Vector3d(Fixed64.Fraction(1, 4), Fixed64.Zero, Fixed64.Zero),
+            new Vector3d(Fixed64.FromFraction(1, 4), Fixed64.Zero, Fixed64.Zero),
             Fixed64.Half,
             Vector3d.Right,
             (Fixed64)2,
@@ -54,7 +54,7 @@ public sealed class GravitasQuery3DServiceSweepTests
         sweepHit.Collider.Should().BeSameAs(target);
         sweepHit.Distance.Should().Be(Fixed64.Zero);
         sweepHit.Point.Should().Be(new Vector3d(Fixed64.Half, Fixed64.Zero, Fixed64.Zero));
-        sweepHit.Normalized.Should().Be(Vector3d.Right);
+        sweepHit.Normal.Should().Be(Vector3d.Right);
     }
 
     [Fact]
@@ -85,15 +85,15 @@ public sealed class GravitasQuery3DServiceSweepTests
         LSSphereCollider first = CreateDynamicCollider(
             context,
             new LSSphereCollider(),
-            new Vector3d(Fixed64.Zero, Fixed64.Zero, Fixed64.Fraction(1, 4)));
+            new Vector3d(Fixed64.Zero, Fixed64.Zero, Fixed64.FromFraction(1, 4)));
         CreateDynamicCollider(
             context,
             new LSSphereCollider(),
-            new Vector3d(Fixed64.Zero, Fixed64.Zero, -Fixed64.Fraction(1, 4)));
+            new Vector3d(Fixed64.Zero, Fixed64.Zero, -Fixed64.FromFraction(1, 4)));
 
         bool hit = context.Query3D.SweepSphere(
             new Vector3d((Fixed64)(-2), Fixed64.Zero, Fixed64.Zero),
-            Fixed64.Fraction(1, 4),
+            Fixed64.FromFraction(1, 4),
             Vector3d.Right,
             (Fixed64)4,
             out Physics3DHit sweepHit,
@@ -178,7 +178,7 @@ public sealed class GravitasQuery3DServiceSweepTests
 
         meshHit.Should().BeTrue();
         meshSweepHit.Collider.Should().BeSameAs(mesh);
-        meshSweepHit.Distance.Should().Be(Fixed64.Fraction(5, 2));
+        meshSweepHit.Distance.Should().Be(Fixed64.FromFraction(5, 2));
         meshSweepHit.Point.Should().Be(new Vector3d(Fixed64.Zero, Fixed64.One, Fixed64.Zero));
         compoundHit.Should().BeTrue();
         compoundSweepHit.Collider.Should().BeSameAs(compound);
@@ -192,13 +192,13 @@ public sealed class GravitasQuery3DServiceSweepTests
         LSCylinderCollider cylinder = CreateDynamicCollider(context, new LSCylinderCollider(), new Vector3d((Fixed64)8, Fixed64.Zero, Fixed64.Zero));
         var worker = new SweptSphereQueryWorker();
         Vector3d origin = new((Fixed64)6, Fixed64.Zero, Fixed64.Zero);
-        worker.Prepare(origin, origin + Vector3d.Right * (Fixed64)4, Fixed64.Fraction(1, 4));
+        worker.Prepare(origin, origin + Vector3d.Right * (Fixed64)4, Fixed64.FromFraction(1, 4));
 
         bool hit = worker.TrySweep(cylinder, out Vector3d centerAtImpact, out Fixed64 distance);
 
         hit.Should().BeTrue();
-        distance.Should().Be(Fixed64.Fraction(5, 4));
-        centerAtImpact.Should().Be(new Vector3d((Fixed64)7 + Fixed64.Fraction(1, 4), Fixed64.Zero, Fixed64.Zero));
+        distance.Should().Be(Fixed64.FromFraction(5, 4));
+        centerAtImpact.Should().Be(new Vector3d((Fixed64)7 + Fixed64.FromFraction(1, 4), Fixed64.Zero, Fixed64.Zero));
     }
 
     [Fact]
@@ -233,7 +233,7 @@ public sealed class GravitasQuery3DServiceSweepTests
     {
         bool hit = context.Query3D.SweepSphere(
             origin,
-            Fixed64.Fraction(1, 4),
+            Fixed64.FromFraction(1, 4),
             Vector3d.Right,
             (Fixed64)4,
             out Physics3DHit sweepHit,

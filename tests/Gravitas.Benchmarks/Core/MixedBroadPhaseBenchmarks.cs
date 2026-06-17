@@ -32,18 +32,18 @@ public class MixedBroadPhaseBenchmarks
         for (int i = 0; i < ColliderCount; i++)
         {
             Vector2d position = SparsePositionForIndex(i);
-            _ = CreateSphere3D(_sparseContext, new Vector3d(position.x, Fixed64.Zero, position.y), immovable: false);
+            _ = CreateSphere3D(_sparseContext, new Vector3d(position.X, Fixed64.Zero, position.Y), immovable: false);
             _ = CreateCircle2D(_sparseContext, position, immovable: true);
 
             Vector2d churnPosition = position + new Vector2d((Fixed64)16, Fixed64.Zero);
-            _ = CreateSphere3D(_churnContext, new Vector3d(churnPosition.x, Fixed64.Zero, churnPosition.y), immovable: false);
+            _ = CreateSphere3D(_churnContext, new Vector3d(churnPosition.X, Fixed64.Zero, churnPosition.Y), immovable: false);
             _churnBodies2D.Add(CreateCircle2D(_churnContext, churnPosition, immovable: true));
         }
 
         for (int i = 0; i < ColliderCount; i++)
         {
             Vector2d position = DensePositionForIndex(i);
-            _ = CreateSphere3D(_denseContext, new Vector3d(position.x, Fixed64.Zero, position.y), immovable: false);
+            _ = CreateSphere3D(_denseContext, new Vector3d(position.X, Fixed64.Zero, position.Y), immovable: false);
             _ = CreateCircle2D(_denseContext, position, immovable: true);
         }
 
@@ -125,7 +125,7 @@ public class MixedBroadPhaseBenchmarks
 
     private static StiffBody2D CreateCircle2D(GravitasWorldContext context, Vector2d position, bool immovable)
     {
-        var agent = new BenchmarkMatterAgent(context, new Vector3d(position.x, Fixed64.Zero, position.y));
+        var agent = new BenchmarkMatterAgent(context, new Vector3d(position.X, Fixed64.Zero, position.Y));
         var body = new StiffBody2D(agent, new LSCircleCollider2D(Fixed64.Half))
         {
             Mass = Fixed64.One,
@@ -150,7 +150,7 @@ public class MixedBroadPhaseBenchmarks
         int local = index % 4;
         int x = cluster % width;
         int z = cluster / width;
-        Fixed64 localOffset = local == 0 ? Fixed64.Zero : Fixed64.Fraction(local, 8);
+        Fixed64 localOffset = local == 0 ? Fixed64.Zero : Fixed64.FromFraction(local, 8);
         return new Vector2d((Fixed64)(x * 2) + localOffset, (Fixed64)(z * 2));
     }
 

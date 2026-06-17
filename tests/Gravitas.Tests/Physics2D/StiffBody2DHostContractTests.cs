@@ -127,7 +127,7 @@ public sealed class StiffBody2DHostContractTests
 
         context.Simulate();
 
-        dynamicBody.Position.x.Should().BeGreaterThan(Fixed64.Half);
+        dynamicBody.Position.X.Should().BeGreaterThan(Fixed64.Half);
     }
 
     [Fact]
@@ -155,7 +155,7 @@ public sealed class StiffBody2DHostContractTests
 
     private static StiffBody2D CreateDynamicCircle(GravitasWorldContext context, Vector2d position)
     {
-        var transform = new FixedTransform(new Vector3d(position.x, Fixed64.Zero, position.y), FixedQuaternion.Identity, Vector3d.One);
+        var transform = new FixedTransform(new Vector3d(position.X, Fixed64.Zero, position.Y), FixedQuaternion.Identity, Vector3d.One);
         var agent = new TestMatterAgent(context, transform);
         var body = new StiffBody2D(agent, new LSCircleCollider2D(Fixed64.Half))
         {

@@ -19,6 +19,8 @@ public sealed partial class GravitasQuery3DService
     private SwiftList<Vector3d> _bufferIntersectionPoints = new();
     private readonly SwiftHashSet<int> _redundantColliderCheck = new();
     private readonly SwiftHashSet<int> _redundantVoxelCheck = new();
+    private readonly SwiftList<Voxel> _coveredVoxels = new();
+    private readonly GridTraceScratch _traceScratch = new();
 
     private PhysicsLayerMask _currentLayerMask;
     private LSCollider? _currentExcludedCollider;
@@ -58,6 +60,8 @@ public sealed partial class GravitasQuery3DService
         _bufferIntersectionPoints.FastClear();
         _redundantColliderCheck.Clear();
         _redundantVoxelCheck.Clear();
+        _coveredVoxels.FastClear();
+        _traceScratch.Clear();
     }
 
     /// <summary>
@@ -327,17 +331,15 @@ public sealed partial class GravitasQuery3DService
         ref Physics3DHit closestHit)
     {
         PrepareSweepBounds(start, end, radius, out Vector3d coverageMin, out Vector3d coverageMax);
-        foreach (GridVoxelSet covered in GridTracer.GetCoveredVoxels(_context.World, coverageMin, coverageMax))
-        {
-            foreach (Voxel voxel in covered.Voxels)
-                ProcessSweepVoxelForClosestHit(
-                    voxel,
-                    start,
-                    direction,
-                    ref found,
-                    ref closestDistance,
-                    ref closestHit);
-        }
+        GridTracer.GetCoveredVoxelsInto(_context.World, coverageMin, coverageMax, _coveredVoxels, _traceScratch);
+        for (int i = 0; i < _coveredVoxels.Count; i++)
+            ProcessSweepVoxelForClosestHit(
+                _coveredVoxels[i],
+                start,
+                direction,
+                ref found,
+                ref closestDistance,
+                ref closestHit);
     }
 
     private void TraceSweepForAllHits(
@@ -348,11 +350,9 @@ public sealed partial class GravitasQuery3DService
         SwiftList<Physics3DHit> results)
     {
         PrepareSweepBounds(start, end, radius, out Vector3d coverageMin, out Vector3d coverageMax);
-        foreach (GridVoxelSet covered in GridTracer.GetCoveredVoxels(_context.World, coverageMin, coverageMax))
-        {
-            foreach (Voxel voxel in covered.Voxels)
-                ProcessSweepVoxelForAllHits(voxel, start, direction, results);
-        }
+        GridTracer.GetCoveredVoxelsInto(_context.World, coverageMin, coverageMax, _coveredVoxels, _traceScratch);
+        for (int i = 0; i < _coveredVoxels.Count; i++)
+            ProcessSweepVoxelForAllHits(_coveredVoxels[i], start, direction, results);
     }
 
     private void PrepareSweepBounds(

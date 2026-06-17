@@ -95,7 +95,7 @@ public sealed class MixedQueryCcdTests
 
         mixedHit.Should().BeTrue();
         hit.Collider3D.Should().BeSameAs(mesh.Collider);
-        hit.Distance.Should().Be(Fixed64.Fraction(5, 2));
+        hit.Distance.Should().Be(Fixed64.FromFraction(5, 2));
         hit.Point3D.Should().Be(new Vector3d(Fixed64.Zero, Fixed64.One, Fixed64.Zero));
         hit.Normal3DTo2D.Should().Be(-Vector3d.Right);
     }
@@ -157,8 +157,8 @@ public sealed class MixedQueryCcdTests
         context.Simulate();
         context.LateSimulate();
 
-        falling.Body.Position3d.y.Should().BeGreaterThanOrEqualTo(Fixed64.One);
-        falling.Body.LinearVelocity.y.Should().Be(Fixed64.Zero);
+        falling.Body.Position3d.Y.Should().BeGreaterThanOrEqualTo(Fixed64.One);
+        falling.Body.LinearVelocity.Y.Should().Be(Fixed64.Zero);
     }
 
     [Fact]
@@ -173,8 +173,8 @@ public sealed class MixedQueryCcdTests
         context.Simulate();
         context.LateSimulate();
 
-        moving2D.Position.x.Should().BeLessThanOrEqualTo((Fixed64)(-1));
-        moving2D.LinearVelocity.x.Should().Be(Fixed64.Zero);
+        moving2D.Position.X.Should().BeLessThanOrEqualTo((Fixed64)(-1));
+        moving2D.LinearVelocity.X.Should().Be(Fixed64.Zero);
     }
 
     [Fact]
@@ -193,8 +193,8 @@ public sealed class MixedQueryCcdTests
         context.Simulate();
         context.LateSimulate();
 
-        moving2D.Position.x.Should().BeLessThanOrEqualTo(-Fixed64.Half);
-        moving2D.LinearVelocity.x.Should().Be(Fixed64.Zero);
+        moving2D.Position.X.Should().BeLessThanOrEqualTo(-Fixed64.Half);
+        moving2D.LinearVelocity.X.Should().Be(Fixed64.Zero);
     }
 
     [Fact]
@@ -209,8 +209,8 @@ public sealed class MixedQueryCcdTests
         context.Simulate();
         context.LateSimulate();
 
-        moving2D.Position.x.Should().BeLessThanOrEqualTo((Fixed64)(-2));
-        moving2D.LinearVelocity.x.Should().Be(Fixed64.Zero);
+        moving2D.Position.X.Should().BeLessThanOrEqualTo((Fixed64)(-2));
+        moving2D.LinearVelocity.X.Should().Be(Fixed64.Zero);
     }
 
     [Fact]
@@ -219,7 +219,7 @@ public sealed class MixedQueryCcdTests
         using GravitasWorldContext context = CreateMixedContext();
         ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(
             context,
-            new Vector3d(-Fixed64.Fraction(1, 4), Fixed64.Zero, Fixed64.Zero));
+            new Vector3d(-Fixed64.FromFraction(1, 4), Fixed64.Zero, Fixed64.Zero));
         StiffBody2D body2D = CreateCircle2D(context, Vector2d.Zero);
         body3D.Body.ApplyCollisionLinearVelocityDelta(Vector3d.Right);
         context.Diagnostics.Enable(eventCapacity: 16, drawCommandCapacity: 0);
@@ -335,7 +335,7 @@ public sealed class MixedQueryCcdTests
         var collider = new LSCircleCollider2D(Fixed64.Half);
         var agent = new TestMatterAgent(
             context,
-            new FixedTransform(new Vector3d(position.x, Fixed64.Zero, position.y), FixedQuaternion.Identity, Vector3d.One));
+            new FixedTransform(new Vector3d(position.X, Fixed64.Zero, position.Y), FixedQuaternion.Identity, Vector3d.One));
         var body = new StiffBody2D(agent, collider)
         {
             Mass = Fixed64.One,
@@ -350,7 +350,7 @@ public sealed class MixedQueryCcdTests
         var collider = new LSCircleCollider2D(Fixed64.Half);
         var agent = new TestMatterAgent(
             context,
-            new FixedTransform(new Vector3d(position.x, Fixed64.Zero, position.y), FixedQuaternion.Identity, Vector3d.One));
+            new FixedTransform(new Vector3d(position.X, Fixed64.Zero, position.Y), FixedQuaternion.Identity, Vector3d.One));
         collider.InitializeWithNoBody(agent);
         return collider;
     }
@@ -363,7 +363,7 @@ public sealed class MixedQueryCcdTests
         var collider = new LSAABBoxCollider2D(size);
         var agent = new TestMatterAgent(
             context,
-            new FixedTransform(new Vector3d(position.x, Fixed64.Zero, position.y), FixedQuaternion.Identity, Vector3d.One));
+            new FixedTransform(new Vector3d(position.X, Fixed64.Zero, position.Y), FixedQuaternion.Identity, Vector3d.One));
         collider.InitializeWithNoBody(agent);
         return collider;
     }

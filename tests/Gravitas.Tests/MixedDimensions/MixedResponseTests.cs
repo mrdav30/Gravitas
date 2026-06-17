@@ -16,7 +16,7 @@ public sealed class MixedResponseTests
         using GravitasWorldContext context = CreateMixedContext();
         ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(
             context,
-            new Vector3d(Fixed64.Zero, Fixed64.Fraction(3, 4), Fixed64.Zero));
+            new Vector3d(Fixed64.Zero, Fixed64.FromFraction(3, 4), Fixed64.Zero));
         LSCollider2D platform = CreateBodylessBox2D(context, Vector2d.Zero, new Vector2d((Fixed64)4, (Fixed64)4));
         int entered3D = 0;
         int stayed3D = 0;
@@ -34,11 +34,11 @@ public sealed class MixedResponseTests
         };
 
         context.Simulate();
-        Fixed64 resolvedY = body3D.Body.Position3d.y;
+        Fixed64 resolvedY = body3D.Body.Position3d.Y;
         context.Simulate();
 
-        resolvedY.Should().BeGreaterThan(Fixed64.Fraction(3, 4));
-        body3D.Body.Position3d.y.Should().BeGreaterThanOrEqualTo(resolvedY);
+        resolvedY.Should().BeGreaterThan(Fixed64.FromFraction(3, 4));
+        body3D.Body.Position3d.Y.Should().BeGreaterThanOrEqualTo(resolvedY);
         platform.Center.Should().Be(Vector2d.Zero);
         entered3D.Should().Be(1);
         entered2D.Should().Be(1);
@@ -52,14 +52,14 @@ public sealed class MixedResponseTests
         using GravitasWorldContext context = CreateMixedContext();
         ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(
             context,
-            new Vector3d(-Fixed64.Fraction(1, 4), Fixed64.Zero, Fixed64.Zero));
+            new Vector3d(-Fixed64.FromFraction(1, 4), Fixed64.Zero, Fixed64.Zero));
         StiffBody2D body2D = CreateCircle2D(context, Vector2d.Zero);
 
         context.Simulate();
 
-        body3D.Body.Position3d.x.Should().BeLessThan(-Fixed64.Fraction(1, 4));
-        body2D.Position.x.Should().BeGreaterThan(Fixed64.Zero);
-        body2D.Agent.Transform.Position.y.Should().Be(Fixed64.Zero);
+        body3D.Body.Position3d.X.Should().BeLessThan(-Fixed64.FromFraction(1, 4));
+        body2D.Position.X.Should().BeGreaterThan(Fixed64.Zero);
+        body2D.Agent.Transform.Position.Y.Should().Be(Fixed64.Zero);
     }
 
     [Fact]
@@ -68,14 +68,14 @@ public sealed class MixedResponseTests
         using GravitasWorldContext context = CreateMixedContext();
         ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(
             context,
-            new Vector3d(-Fixed64.Fraction(1, 4), Fixed64.Zero, Fixed64.Zero),
+            new Vector3d(-Fixed64.FromFraction(1, 4), Fixed64.Zero, Fixed64.Zero),
             isKinematic: true);
         StiffBody2D body2D = CreateCircle2D(context, Vector2d.Zero);
 
         context.Simulate();
 
-        body3D.Body.Position3d.x.Should().Be(-Fixed64.Fraction(1, 4));
-        body2D.Position.x.Should().BeGreaterThan(Fixed64.Zero);
+        body3D.Body.Position3d.X.Should().Be(-Fixed64.FromFraction(1, 4));
+        body2D.Position.X.Should().BeGreaterThan(Fixed64.Zero);
     }
 
     [Fact]
@@ -104,7 +104,7 @@ public sealed class MixedResponseTests
     public void Simulate_WithAwake3DAgainstSleeping2D_ShouldWakeSleepingParticipant()
     {
         using GravitasWorldContext context = CreateMixedContext();
-        _ = CreateSphere3D(context, new Vector3d(-Fixed64.Fraction(1, 4), Fixed64.Zero, Fixed64.Zero));
+        _ = CreateSphere3D(context, new Vector3d(-Fixed64.FromFraction(1, 4), Fixed64.Zero, Fixed64.Zero));
         StiffBody2D sleeping2D = CreateCircle2D(context, Vector2d.Zero);
         sleeping2D.Sleep();
 
@@ -162,7 +162,7 @@ public sealed class MixedResponseTests
         using GravitasWorldContext context = CreateMixedContext(frameRate: 8);
         ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(
             context,
-            new Vector3d(-Fixed64.Fraction(1, 4), Fixed64.Zero, Fixed64.Zero));
+            new Vector3d(-Fixed64.FromFraction(1, 4), Fixed64.Zero, Fixed64.Zero));
         StiffBody2D body2D = CreateCircle2D(context, Vector2d.Zero);
 
         for (int i = 0; i < 5; i++)
@@ -244,7 +244,7 @@ public sealed class MixedResponseTests
 
         var agent = new TestMatterAgent(
             context,
-            new FixedTransform(new Vector3d(position.x, Fixed64.Zero, position.y), FixedQuaternion.Identity, Vector3d.One));
+            new FixedTransform(new Vector3d(position.X, Fixed64.Zero, position.Y), FixedQuaternion.Identity, Vector3d.One));
         var body = new StiffBody2D(agent, collider)
         {
             Mass = Fixed64.One,
@@ -266,7 +266,7 @@ public sealed class MixedResponseTests
         };
         var agent = new TestMatterAgent(
             context,
-            new FixedTransform(new Vector3d(position.x, Fixed64.Zero, position.y), FixedQuaternion.Identity, Vector3d.One));
+            new FixedTransform(new Vector3d(position.X, Fixed64.Zero, position.Y), FixedQuaternion.Identity, Vector3d.One));
         collider.InitializeWithNoBody(agent);
         return collider;
     }
@@ -279,7 +279,7 @@ public sealed class MixedResponseTests
         var collider = new LSAABBoxCollider2D(size);
         var agent = new TestMatterAgent(
             context,
-            new FixedTransform(new Vector3d(position.x, Fixed64.Zero, position.y), FixedQuaternion.Identity, Vector3d.One));
+            new FixedTransform(new Vector3d(position.X, Fixed64.Zero, position.Y), FixedQuaternion.Identity, Vector3d.One));
         collider.InitializeWithNoBody(agent);
         return collider;
     }

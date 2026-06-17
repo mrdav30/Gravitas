@@ -196,14 +196,14 @@ public sealed class PhysicsMeshTests
             Vector3d.Zero,
             FixedQuaternion.Identity);
 
-        body.Collider.Bounds.Proportions.x.Should().Be((Fixed64)4);
-        body.Collider.Bounds.Proportions.y.Should().Be((Fixed64)2);
+        body.Collider.Bounds.Proportions.X.Should().Be((Fixed64)4);
+        body.Collider.Bounds.Proportions.Y.Should().Be((Fixed64)2);
 
         body.Body.SetRotation(FixedQuaternion.FromEulerAnglesInDegrees(Fixed64.Zero, Fixed64.Zero, (Fixed64)90));
         body.Collider.Simulate();
 
-        AssertNear(body.Collider.Bounds.Proportions.x, (Fixed64)2);
-        AssertNear(body.Collider.Bounds.Proportions.y, (Fixed64)4);
+        AssertNear(body.Collider.Bounds.Proportions.X, (Fixed64)2);
+        AssertNear(body.Collider.Bounds.Proportions.Y, (Fixed64)4);
     }
 
     private static Vector3d[] ValidVertices() =>
@@ -217,5 +217,5 @@ public sealed class PhysicsMeshTests
     private static int[] ValidTriangles() => new[] { 0, 1, 2 };
 
     private static void AssertNear(Fixed64 actual, Fixed64 expected) =>
-        (actual - expected).Abs().Should().BeLessThan(Fixed64.Fraction(1, 1000));
+        (actual - expected).Abs().Should().BeLessThan(Fixed64.FromFraction(1, 1000));
 }

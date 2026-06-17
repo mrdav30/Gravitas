@@ -23,6 +23,8 @@ public sealed class GravitasCollisionService
     private readonly SwiftBucket<PhysicsPartition> _activePartitions = new();
     private readonly SwiftStack<PhysicsPartition> _inactivePartitionPool = new(DefaultPartitionPoolCapacity);
     private readonly SwiftHashSet<int> _redundancyChecker = new();
+    private readonly SwiftList<Voxel> _coveredVoxels = new();
+    private readonly GridTraceScratch _traceScratch = new();
     private readonly SwiftList<PhysicsPartition> _retainedPartitions = new();
     private readonly SwiftList<PhysicsPartition> _distributionPartitions = new();
     private readonly SwiftList<int> _distributionDynamicIds = new();
@@ -87,6 +89,8 @@ public sealed class GravitasCollisionService
         ClearRetainedPartitions();
         _activePartitions.Clear();
         _redundancyChecker.Clear();
+        _coveredVoxels.FastClear();
+        _traceScratch.Clear();
         _distributionPartitions.FastClear();
         _distributionDynamicIds.FastClear();
         _distributionAwakeDynamicIds.FastClear();
@@ -194,15 +198,26 @@ public sealed class GravitasCollisionService
         SwiftList<WorldVoxelIndex> partitionedCoordinates)
     {
         GridWorld world = _context.World;
-        foreach (GridVoxelSet covered in GridTracer.GetCoveredVoxels(
+        GridTracer.GetCoveredVoxelsInto(
             world,
             collider.BoundsMin,
             collider.BoundsMax,
-            Fixed64.Half))
+            _coveredVoxels,
+            _traceScratch,
+            Fixed64.Half);
+
+        ushort currentGridIndex = ushort.MaxValue;
+        Fixed64 cellPadding = Fixed64.Zero;
+        for (int i = 0; i < _coveredVoxels.Count; i++)
         {
-            Fixed64 cellPadding = GridTopologyMetricUtility.GetMaxCellEdge(covered.Grid);
-            foreach (Voxel voxel in covered.Voxels)
-                TryPartitionVoxel(collider, partitionedCoordinates, voxel, cellPadding);
+            Voxel voxel = _coveredVoxels[i];
+            if (voxel.GridIndex != currentGridIndex)
+            {
+                currentGridIndex = voxel.GridIndex;
+                cellPadding = GridTopologyMetricUtility.GetMaxCellEdge(world.ActiveGrids[currentGridIndex]);
+            }
+
+            TryPartitionVoxel(collider, partitionedCoordinates, voxel, cellPadding);
         }
     }
 

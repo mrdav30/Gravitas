@@ -9,7 +9,7 @@ namespace Gravitas.Tests.CollisionHandlingTests;
 
 public sealed class ContinuousCollisionDetectionTests
 {
-    private static readonly Fixed64 WallThickness = Fixed64.Fraction(1, 10);
+    private static readonly Fixed64 WallThickness = Fixed64.FromFraction(1, 10);
     private static readonly Fixed64 ExpectedSphereImpactX = -(Fixed64.Half + WallThickness * Fixed64.Half);
 
     [Fact]
@@ -23,8 +23,8 @@ public sealed class ContinuousCollisionDetectionTests
 
         ApplyFastImpulse(body);
 
-        body.Position3d.x.Should().Be((Fixed64)2);
-        body.LinearVelocity.x.Should().Be((Fixed64)4);
+        body.Position3d.X.Should().Be((Fixed64)2);
+        body.LinearVelocity.X.Should().Be((Fixed64)4);
         scenario.Context.Query3D.RaycastVersion.Should().Be(raycastVersionBeforeImpulse);
     }
 
@@ -38,8 +38,8 @@ public sealed class ContinuousCollisionDetectionTests
 
         ApplyFastImpulse(body);
 
-        body.Position3d.x.Should().Be(ExpectedSphereImpactX);
-        body.LinearVelocity.x.Should().Be(Fixed64.Zero);
+        body.Position3d.X.Should().Be(ExpectedSphereImpactX);
+        body.LinearVelocity.X.Should().Be(Fixed64.Zero);
     }
 
     [Fact]
@@ -53,8 +53,8 @@ public sealed class ContinuousCollisionDetectionTests
 
         ApplyFastImpulse(body);
 
-        body.Position3d.x.Should().Be((Fixed64)2);
-        body.LinearVelocity.x.Should().Be((Fixed64)4);
+        body.Position3d.X.Should().Be((Fixed64)2);
+        body.LinearVelocity.X.Should().Be((Fixed64)4);
     }
 
     [Fact]
@@ -71,8 +71,8 @@ public sealed class ContinuousCollisionDetectionTests
 
         ApplyFastImpulse(body);
 
-        body.Position3d.x.Should().Be(ExpectedSphereImpactX);
-        body.LinearVelocity.x.Should().Be(Fixed64.Zero);
+        body.Position3d.X.Should().Be(ExpectedSphereImpactX);
+        body.LinearVelocity.X.Should().Be(Fixed64.Zero);
     }
 
     [Fact]
@@ -88,8 +88,8 @@ public sealed class ContinuousCollisionDetectionTests
 
         ApplyFastImpulse(body);
 
-        body.Position3d.x.Should().Be((Fixed64)2);
-        body.LinearVelocity.x.Should().Be((Fixed64)4);
+        body.Position3d.X.Should().Be((Fixed64)2);
+        body.LinearVelocity.X.Should().Be((Fixed64)4);
     }
 
     [Theory]
@@ -107,8 +107,8 @@ public sealed class ContinuousCollisionDetectionTests
 
         ApplyFastImpulse(body);
 
-        body.Position3d.x.Should().Be(ExpectedSphereImpactX);
-        body.LinearVelocity.x.Should().Be(Fixed64.Zero);
+        body.Position3d.X.Should().Be(ExpectedSphereImpactX);
+        body.LinearVelocity.X.Should().Be(Fixed64.Zero);
     }
 
     [Fact]
@@ -121,8 +121,8 @@ public sealed class ContinuousCollisionDetectionTests
 
         ApplyFastImpulse(body);
 
-        body.Position3d.x.Should().Be(ExpectedSphereImpactX);
-        body.LinearVelocity.x.Should().Be(Fixed64.Zero);
+        body.Position3d.X.Should().Be(ExpectedSphereImpactX);
+        body.LinearVelocity.X.Should().Be(Fixed64.Zero);
     }
 
     [Fact]
@@ -136,7 +136,7 @@ public sealed class ContinuousCollisionDetectionTests
 
         ApplyFastImpulse(body);
 
-        body.Position3d.x.Should().Be(ExpectedSphereImpactX);
+        body.Position3d.X.Should().Be(ExpectedSphereImpactX);
     }
 
     [Fact]
@@ -149,8 +149,8 @@ public sealed class ContinuousCollisionDetectionTests
 
         body.AddLinearImpulse(new Vector3d((Fixed64)4, Fixed64.Zero, Fixed64.One));
 
-        body.LinearVelocity.x.Should().Be(Fixed64.Zero);
-        body.LinearVelocity.z.Should().Be(Fixed64.One);
+        body.LinearVelocity.X.Should().Be(Fixed64.Zero);
+        body.LinearVelocity.Z.Should().Be(Fixed64.One);
     }
 
     [Fact]
@@ -164,8 +164,8 @@ public sealed class ContinuousCollisionDetectionTests
 
         ApplyFastImpulse(body);
 
-        body.Position3d.x.Should().Be((Fixed64)2);
-        body.LinearVelocity.x.Should().Be((Fixed64)4);
+        body.Position3d.X.Should().Be((Fixed64)2);
+        body.LinearVelocity.X.Should().Be((Fixed64)4);
     }
 
     [Fact]
@@ -185,8 +185,8 @@ public sealed class ContinuousCollisionDetectionTests
 
         ApplyFastImpulse(body);
 
-        body.Position3d.x.Should().Be((Fixed64)2);
-        body.LinearVelocity.x.Should().Be((Fixed64)4);
+        body.Position3d.X.Should().Be((Fixed64)2);
+        body.LinearVelocity.X.Should().Be((Fixed64)4);
     }
 
     [Fact]
@@ -200,8 +200,8 @@ public sealed class ContinuousCollisionDetectionTests
 
         ApplyFastImpulse(body);
 
-        body.Position3d.x.Should().Be((Fixed64)2);
-        body.LinearVelocity.x.Should().Be((Fixed64)4);
+        body.Position3d.X.Should().Be((Fixed64)2);
+        body.LinearVelocity.X.Should().Be((Fixed64)4);
     }
 
     private static PhysicsScenarioBuilder CreateCcdScenario()

@@ -8,7 +8,7 @@ namespace Gravitas.Tests.Core;
 
 public sealed class StiffBodyIntegrationTests
 {
-    private static readonly Fixed64 Tolerance = Fixed64.Fraction(1, 1_000_000);
+    private static readonly Fixed64 Tolerance = Fixed64.FromFraction(1, 1_000_000);
 
     [Fact]
     public void LateSimulate_ShouldIntegrateForceVelocityAndPosition()
@@ -20,7 +20,7 @@ public sealed class StiffBodyIntegrationTests
         scenario.Context.LateSimulate();
 
         body.Body.LinearVelocity.Should().Be(new Vector3d(Fixed64.One, Fixed64.Zero, Fixed64.Zero));
-        body.Body.Position3d.Should().Be(new Vector3d(Fixed64.Fraction(1, 4), Fixed64.Zero, Fixed64.Zero));
+        body.Body.Position3d.Should().Be(new Vector3d(Fixed64.FromFraction(1, 4), Fixed64.Zero, Fixed64.Zero));
         body.Body.IsAtRest.Should().BeFalse();
     }
 
@@ -36,8 +36,8 @@ public sealed class StiffBodyIntegrationTests
         scenario.Context.LateSimulate();
         scenario.Context.LateSimulate();
 
-        body.Body.LinearVelocity.x.Should().Be(Fixed64.Fraction(3, 4));
-        body.Body.Position3d.x.Should().Be(Fixed64.Fraction(7, 16));
+        body.Body.LinearVelocity.X.Should().Be(Fixed64.FromFraction(3, 4));
+        body.Body.Position3d.X.Should().Be(Fixed64.FromFraction(7, 16));
     }
 
     [Fact]
@@ -53,8 +53,8 @@ public sealed class StiffBodyIntegrationTests
         scenario.Context.LateSimulate();
 
         body.Body.IsGrounded.Should().BeTrue();
-        body.Body.LinearVelocity.x.Should().Be(Fixed64.Fraction(3, 4));
-        body.Body.Position3d.x.Should().Be(Fixed64.Fraction(7, 16));
+        body.Body.LinearVelocity.X.Should().Be(Fixed64.FromFraction(3, 4));
+        body.Body.Position3d.X.Should().Be(Fixed64.FromFraction(7, 16));
     }
 
     [Fact]
@@ -66,12 +66,12 @@ public sealed class StiffBodyIntegrationTests
         body.Body.AddTorque(Vector3d.Up);
         scenario.Context.LateSimulate();
 
-        AssertNear(body.Body.AngularVelocity.y, Fixed64.Fraction(3, 2));
+        AssertNear(body.Body.AngularVelocity.Y, Fixed64.FromFraction(3, 2));
 
         scenario.Context.Environment.DampingFactor = Fixed64.Half;
         scenario.Context.LateSimulate();
 
-        AssertNear(body.Body.AngularVelocity.y, Fixed64.Fraction(3, 8));
+        AssertNear(body.Body.AngularVelocity.Y, Fixed64.FromFraction(3, 8));
     }
 
     [Fact]

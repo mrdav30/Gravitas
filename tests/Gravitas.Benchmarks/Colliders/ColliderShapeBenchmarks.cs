@@ -97,7 +97,7 @@ public class ColliderShapeBenchmarks
         _concaveMeshCollider.Simulate();
         _concaveMeshCollider.GetTrianglesInBounds(
             new FixedBoundVolume(
-                new Vector3d(Fixed64.Fraction(3, 2), Fixed64.Zero, Fixed64.One),
+                new Vector3d(Fixed64.FromFraction(3, 2), Fixed64.Zero, Fixed64.One),
                 new Vector3d((Fixed64)3, (Fixed64)2, (Fixed64)3)),
             _concaveMeshHits);
 
@@ -139,7 +139,7 @@ public class ColliderShapeBenchmarks
     public uint RebuildCapsuleRuntimeShapeState()
     {
         bool evenTick = (_tick & 1) == 0;
-        Fixed64 radius = evenTick ? Fixed64.Fraction(1, 4) : Fixed64.Fraction(1, 3);
+        Fixed64 radius = evenTick ? Fixed64.FromFraction(1, 4) : Fixed64.FromFraction(1, 3);
         Fixed64 height = evenTick ? (Fixed64)3 : (Fixed64)4;
         FixedQuaternion rotation = evenTick
             ? FixedQuaternion.Identity
@@ -202,7 +202,7 @@ public class ColliderShapeBenchmarks
         _concaveMeshCollider.Simulate();
         _concaveMeshCollider.GetTrianglesInBounds(
             new FixedBoundVolume(
-                position + new Vector3d(Fixed64.Fraction(3, 2), Fixed64.Zero, Fixed64.One),
+                position + new Vector3d(Fixed64.FromFraction(3, 2), Fixed64.Zero, Fixed64.One),
                 position + new Vector3d((Fixed64)3, (Fixed64)2, (Fixed64)3)),
             _concaveMeshHits);
 

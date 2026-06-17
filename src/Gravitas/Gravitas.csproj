@@ -93,7 +93,7 @@
 		<PackageReference Include="FixedMathSharp" Version="5.0.1" />
 		<PackageReference Include="SwiftCollections" Version="5.0.1" />
 		<PackageReference Include="SwiftCollections.FixedMathSharp" Version="5.0.1" />
-		<PackageReference Include="GridForge" Version="7.0.0" />
+		<PackageReference Include="GridForge" Version="7.1.1" />
 		<PackageReference Include="Chronicler.Core" Version="0.2.0" />
 	</ItemGroup>
 
@@ -101,7 +101,7 @@
 		<PackageReference Include="FixedMathSharp.Lean" Version="5.0.1" />
 		<PackageReference Include="SwiftCollections.Lean" Version="5.0.1" />
 		<PackageReference Include="SwiftCollections.FixedMathSharp.Lean" Version="5.0.1" />
-		<PackageReference Include="GridForge.Lean" Version="7.0.0" />
+		<PackageReference Include="GridForge.Lean" Version="7.1.1" />
 		<PackageReference Include="Chronicler.Core.Lean" Version="0.2.0" />
 	</ItemGroup>
 

@@ -53,8 +53,8 @@ public sealed class GravitasSimulationPhaseOrderTests
 
         scenario.Context.LateSimulate();
 
-        body.Body.Position3d.x.Should().BeGreaterThan(startPosition.x);
-        body.Body.LinearVelocity.x.Should().BeGreaterThan(Fixed64.Zero);
+        body.Body.Position3d.X.Should().BeGreaterThan(startPosition.X);
+        body.Body.LinearVelocity.X.Should().BeGreaterThan(Fixed64.Zero);
     }
 
     [Fact]
@@ -100,7 +100,7 @@ public sealed class GravitasSimulationPhaseOrderTests
         using IDisposable lateSimulateHook = scenario.Context.RegisterOnLateSimulate(
             "PhaseOrder.IntegrationProbe",
             0,
-            () => lateSimulateHookSawIntegratedBody = first.Body.Position3d.x > startPosition.x);
+            () => lateSimulateHookSawIntegratedBody = first.Body.Position3d.X > startPosition.X);
 
         second.Body.SetPosition(teleportedPosition);
         first.Body.AddForce(new Vector3d((Fixed64)12, Fixed64.Zero, Fixed64.Zero));
@@ -119,7 +119,7 @@ public sealed class GravitasSimulationPhaseOrderTests
             PhysicsScenarioBuilder.Vector(0, 0, 0),
             preventAngularForces: true);
         ScenarioBody<LSSphereCollider> right = scenario.CreateSphere(
-            PhysicsScenarioBuilder.Vector(Fixed64.Fraction(3, 4), Fixed64.Zero, Fixed64.Zero),
+            PhysicsScenarioBuilder.Vector(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero),
             preventAngularForces: true);
 
         for (int frame = 0; frame < 6; frame++)

@@ -163,7 +163,7 @@ public sealed class Physics2DQueryTests
 
     private static StiffBody2D CreateCircle(GravitasWorldContext context, Vector2d position, PhysicsLayer layer)
     {
-        var transform = new FixedTransform(new Vector3d(position.x, Fixed64.Zero, position.y), FixedQuaternion.Identity, Vector3d.One);
+        var transform = new FixedTransform(new Vector3d(position.X, Fixed64.Zero, position.Y), FixedQuaternion.Identity, Vector3d.One);
         var agent = new TestMatterAgent(context, transform);
         var body = new StiffBody2D(agent, new LSCircleCollider2D(Fixed64.Half))
         {
@@ -187,7 +187,7 @@ public sealed class Physics2DQueryTests
 
     private static StiffBody2D CreateBox(GravitasWorldContext context, Vector2d position, PhysicsLayer layer, Vector2d size)
     {
-        var transform = new FixedTransform(new Vector3d(position.x, Fixed64.Zero, position.y), FixedQuaternion.Identity, Vector3d.One);
+        var transform = new FixedTransform(new Vector3d(position.X, Fixed64.Zero, position.Y), FixedQuaternion.Identity, Vector3d.One);
         var agent = new TestMatterAgent(context, transform);
         var body = new StiffBody2D(agent, new LSAABBoxCollider2D(size))
         {
@@ -201,7 +201,7 @@ public sealed class Physics2DQueryTests
 
     private static StiffBody2D CreatePolygon(GravitasWorldContext context, Vector2d position)
     {
-        var transform = new FixedTransform(new Vector3d(position.x, Fixed64.Zero, position.y), FixedQuaternion.Identity, Vector3d.One);
+        var transform = new FixedTransform(new Vector3d(position.X, Fixed64.Zero, position.Y), FixedQuaternion.Identity, Vector3d.One);
         var agent = new TestMatterAgent(context, transform);
         var body = new StiffBody2D(
             agent,

@@ -1,4 +1,5 @@
 ﻿using FixedMathSharp;
+using FixedMathSharp.Bounds;
 using GridForge.Configuration;
 
 namespace Gravitas.Benchmarks;

@@ -64,7 +64,7 @@ public class CollisionResponseBenchmarks
         ScenarioBody<LSCuboidCollider> cuboid = CreateBody(new LSCuboidCollider(), origin);
         ScenarioBody<LSSphereCollider> sphere = CreateBody(
             new LSSphereCollider(),
-            origin + new Vector3d(Fixed64.Fraction(3, 4), Fixed64.Fraction(1, 4), Fixed64.Zero));
+            origin + new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.FromFraction(1, 4), Fixed64.Zero));
         Push(sphere.Body, -60);
         return new CollisionPair(cuboid.Collider, sphere.Collider);
     }
@@ -74,7 +74,7 @@ public class CollisionResponseBenchmarks
         ScenarioBody<LSCuboidCollider> left = CreateBody(new LSCuboidCollider(), origin);
         ScenarioBody<LSCuboidCollider> right = CreateBody(
             new LSCuboidCollider(),
-            origin + new Vector3d(Fixed64.Fraction(3, 4), Fixed64.Zero, Fixed64.Zero));
+            origin + new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
         Push(left.Body, 60);
         Push(right.Body, -60);
         return new CollisionPair(left.Collider, right.Collider);

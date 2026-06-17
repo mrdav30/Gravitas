@@ -85,7 +85,7 @@ public sealed class CollisionPairCullingTests
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSSphereCollider> first = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
-        ScenarioBody<LSSphereCollider> second = scenario.CreateSphere(new Vector3d(Fixed64.Fraction(3, 4), Fixed64.Zero, Fixed64.Zero));
+        ScenarioBody<LSSphereCollider> second = scenario.CreateSphere(new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
         CollisionPair pair = scenario.CreatePair(first.Collider, second.Collider);
 
         pair.UpdateCollision();
@@ -93,7 +93,7 @@ public sealed class CollisionPairCullingTests
         ClearBodyChangeFlags(first.Body, second.Body);
         ClearPartitionFlags(first.Collider, second.Collider);
 
-        second.Collider.Radius = Fixed64.Fraction(1, 16);
+        second.Collider.Radius = Fixed64.FromFraction(1, 16);
         second.Collider.Simulate();
         ClearPartitionFlags(first.Collider, second.Collider);
 

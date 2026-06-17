@@ -14,7 +14,7 @@ public sealed class CollisionPairPriorityTests
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSSphereCollider> slow = scenario.CreateSphere(Vector3d.Zero);
-        ScenarioBody<LSSphereCollider> fast = scenario.CreateSphere(Vector3d.Right * Fixed64.Fraction(3, 4));
+        ScenarioBody<LSSphereCollider> fast = scenario.CreateSphere(Vector3d.Right * Fixed64.FromFraction(3, 4));
         fast.Body.ApplyCollisionLinearVelocityDelta(-Vector3d.Right * (Fixed64)4);
 
         CollisionPair pair = scenario.CreatePair(slow.Collider, fast.Collider);
@@ -29,7 +29,7 @@ public sealed class CollisionPairPriorityTests
     public void AssignPriority_WithDifferentPriorities_ShouldKeepShapePriorityAboveLinearSpeed()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
-        ScenarioBody<LSSphereCollider> fastSphere = scenario.CreateSphere(Vector3d.Right * Fixed64.Fraction(3, 4));
+        ScenarioBody<LSSphereCollider> fastSphere = scenario.CreateSphere(Vector3d.Right * Fixed64.FromFraction(3, 4));
         ScenarioBody<LSCuboidCollider> slowCuboid = scenario.CreateCuboid(Vector3d.Zero);
         fastSphere.Body.ApplyCollisionLinearVelocityDelta(-Vector3d.Right * (Fixed64)8);
 

@@ -77,7 +77,7 @@ public sealed class GravitasRuntimeModeTests
         scenario.Context.LateSimulate();
 
         scenario.Context.FrameCount.Should().Be(1);
-        body3D.Body.Position3d.x.Should().Be(Fixed64.Fraction(1, 4));
+        body3D.Body.Position3d.X.Should().Be(Fixed64.FromFraction(1, 4));
         body2D.Position.Should().Be(new Vector2d(Fixed64.Half, Fixed64.Zero));
         scenario.Context.MixedCollisions.SimulateCount.Should().Be(0);
         scenario.Context.MixedCollisions.LateSimulateCount.Should().Be(0);
@@ -99,7 +99,7 @@ public sealed class GravitasRuntimeModeTests
         scenario.Context.Visualize();
         scenario.Context.LateVisualize();
 
-        body3D.Body.Position3d.x.Should().Be(Fixed64.Fraction(1, 4));
+        body3D.Body.Position3d.X.Should().Be(Fixed64.FromFraction(1, 4));
         body2D.Position.Should().Be(new Vector2d(Fixed64.Half, Fixed64.Zero));
         scenario.Context.MixedCollisions.SimulateCount.Should().Be(1);
         scenario.Context.MixedCollisions.LateSimulateCount.Should().Be(1);
@@ -153,7 +153,7 @@ public sealed class GravitasRuntimeModeTests
         scenario.Context.LateSimulate();
 
         scenario.Context.FrameCount.Should().Be(1);
-        body3D.Body.Position3d.x.Should().Be(Fixed64.Fraction(1, 4));
+        body3D.Body.Position3d.X.Should().Be(Fixed64.FromFraction(1, 4));
         body2D.Position.Should().Be(Vector2d.Zero);
     }
 

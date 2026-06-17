@@ -122,7 +122,7 @@ public class PartitionCullingBenchmarks
     {
         Vector3d position = _cullOffset
             ? new Vector3d((Fixed64)8, Fixed64.Zero, Fixed64.Zero)
-            : new Vector3d((Fixed64)8 + Fixed64.Fraction(1, 16), Fixed64.Zero, Fixed64.Zero);
+            : new Vector3d((Fixed64)8 + Fixed64.FromFraction(1, 16), Fixed64.Zero, Fixed64.Zero);
         _cullOffset = !_cullOffset;
 
         _cullBody.SetPosition(position);

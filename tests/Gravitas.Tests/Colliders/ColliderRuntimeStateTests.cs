@@ -18,7 +18,7 @@ public sealed class ColliderRuntimeStateTests
         uint initialVersion = capsule.RuntimeShapeVersion;
 
         capsule.LocalOffset = new Vector3d(Fixed64.Half, Fixed64.Zero, Fixed64.Zero);
-        capsule.Radius = Fixed64.Fraction(1, 4);
+        capsule.Radius = Fixed64.FromFraction(1, 4);
         capsule.Size = new Vector3d(Fixed64.One, (Fixed64)3, Fixed64.One);
         capsuleBody.Body.PositionTransform.Scale = new Vector3d((Fixed64)2, Fixed64.One, Fixed64.One);
         capsuleBody.Body.SetRotation(FixedQuaternion.FromEulerAnglesInDegrees(Fixed64.Zero, Fixed64.Zero, (Fixed64)90));
@@ -55,8 +55,8 @@ public sealed class ColliderRuntimeStateTests
         capsule.LineSegmentStart.Should().Be(capsule.LineSegmentEnd);
 
         Fixed3x3 inertia = capsule.CalculateInertiaTensor(Fixed64.One);
-        inertia.m00.Should().BeGreaterThan(Fixed64.Zero);
-        inertia.m11.Should().Be(inertia.m00);
-        inertia.m22.Should().Be(inertia.m00);
+        inertia.M11.Should().BeGreaterThan(Fixed64.Zero);
+        inertia.M22.Should().Be(inertia.M11);
+        inertia.M33.Should().Be(inertia.M11);
     }
 }

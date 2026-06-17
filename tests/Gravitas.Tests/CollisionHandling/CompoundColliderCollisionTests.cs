@@ -20,7 +20,7 @@ public sealed class CompoundColliderCollisionTests
             FixedQuaternion.Identity,
             preventAngularForces: true);
         ScenarioBody<LSSphereCollider> sphere = scenario.CreateSphere(
-            new Vector3d(Fixed64.Fraction(3, 2), Fixed64.Zero, Fixed64.Zero),
+            new Vector3d(Fixed64.FromFraction(3, 2), Fixed64.Zero, Fixed64.Zero),
             preventAngularForces: true);
         CollisionPair pair = scenario.CreatePair(compound.Collider, sphere.Collider);
 
@@ -29,7 +29,7 @@ public sealed class CompoundColliderCollisionTests
 
         pair.Manifold.HasContact.Should().BeTrue();
         pair.Manifold.Count.Should().Be(1);
-        pair.Manifold.PrimaryContact.Normal.x.Should().BeGreaterThan(Fixed64.Zero);
+        pair.Manifold.PrimaryContact.Normal.X.Should().BeGreaterThan(Fixed64.Zero);
         pair.Manifold.PrimaryContact.Depth.Should().Be(Fixed64.Half);
     }
 

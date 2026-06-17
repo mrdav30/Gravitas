@@ -30,8 +30,8 @@ public sealed class CompoundColliderTests
         scenario.Context.Physics.TryGetColliderById(body.Collider.GetPartCollider(0).Id, out _).Should().BeFalse();
         scenario.Context.Physics.TryGetColliderById(body.Collider.GetPartCollider(1).Id, out _).Should().BeFalse();
 
-        body.Collider.BoundsMin.Should().Be(new Vector3d(-Fixed64.Fraction(3, 2), -Fixed64.Half, -Fixed64.Half));
-        body.Collider.BoundsMax.Should().Be(new Vector3d(Fixed64.Fraction(5, 2), Fixed64.Half, Fixed64.Half));
+        body.Collider.BoundsMin.Should().Be(new Vector3d(-Fixed64.FromFraction(3, 2), -Fixed64.Half, -Fixed64.Half));
+        body.Collider.BoundsMax.Should().Be(new Vector3d(Fixed64.FromFraction(5, 2), Fixed64.Half, Fixed64.Half));
         body.Collider.Center.Should().Be(PhysicsScenarioBuilder.Vector(0, 0, 0));
     }
 

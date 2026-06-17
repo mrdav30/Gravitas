@@ -244,7 +244,7 @@ public sealed class MixedBroadPhaseTests
         PhysicsLayer? layer = null)
     {
         var transform = new FixedTransform(
-            new Vector3d(position.x, Fixed64.Zero, position.y),
+            new Vector3d(position.X, Fixed64.Zero, position.Y),
             FixedQuaternion.Identity,
             Vector3d.One);
         var agent = new TestMatterAgent(context, transform);

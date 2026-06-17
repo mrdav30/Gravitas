@@ -66,7 +66,7 @@ public sealed class QueryContextServiceTests
     private static StiffBody2D CreateStaticCircle2D(GravitasWorldContext context, Vector2d position)
     {
         var transform = new FixedTransform(
-            new Vector3d(position.x, Fixed64.Zero, position.y),
+            new Vector3d(position.X, Fixed64.Zero, position.Y),
             FixedQuaternion.Identity,
             Vector3d.One);
         var agent = new TestMatterAgent(context, transform);

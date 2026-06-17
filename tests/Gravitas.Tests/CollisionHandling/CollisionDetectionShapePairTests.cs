@@ -183,7 +183,7 @@ public sealed class CollisionDetectionShapePairTests
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSCuboidCollider> first = scenario.CreateCuboid(PhysicsScenarioBuilder.Vector(0, 0, 0));
-        ScenarioBody<LSCuboidCollider> second = scenario.CreateCuboid(PhysicsScenarioBuilder.Vector(Fixed64.Fraction(3, 4), Fixed64.Zero, Fixed64.Zero));
+        ScenarioBody<LSCuboidCollider> second = scenario.CreateCuboid(PhysicsScenarioBuilder.Vector(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
 
         CollisionPair forward = AssertCollision(scenario, first.Collider, second.Collider, CollisionType.Cuboid_Cuboid);
         CollisionPair reversed = AssertCollision(scenario, second.Collider, first.Collider, CollisionType.Cuboid_Cuboid);
@@ -198,10 +198,10 @@ public sealed class CollisionDetectionShapePairTests
             ManifoldContact contact = forward.Manifold[i];
             ManifoldContact reversedContact = reversed.Manifold[i];
 
-            contact.Depth.Should().Be(Fixed64.Fraction(1, 4));
+            contact.Depth.Should().Be(Fixed64.FromFraction(1, 4));
             contact.Normal.Should().Be(Vector3d.Right);
-            contact.PointA.x.Should().Be(Fixed64.Half);
-            contact.PointB.x.Should().Be(Fixed64.Fraction(1, 4));
+            contact.PointA.X.Should().Be(Fixed64.Half);
+            contact.PointB.X.Should().Be(Fixed64.FromFraction(1, 4));
 
             reversedContact.PointA.Should().Be(contact.PointB);
             reversedContact.PointB.Should().Be(contact.PointA);
@@ -285,12 +285,12 @@ public sealed class CollisionDetectionShapePairTests
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSCylinderCollider> cylinder = scenario.CreateCylinder(PhysicsScenarioBuilder.Vector(0, 0, 0));
-        ScenarioBody<LSSphereCollider> sideOverlap = scenario.CreateSphere(new Vector3d(Fixed64.Fraction(3, 4), Fixed64.Zero, Fixed64.Zero));
-        ScenarioBody<LSSphereCollider> capOverlap = scenario.CreateSphere(new Vector3d(Fixed64.Zero, Fixed64.Fraction(3, 4), Fixed64.Zero));
+        ScenarioBody<LSSphereCollider> sideOverlap = scenario.CreateSphere(new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
+        ScenarioBody<LSSphereCollider> capOverlap = scenario.CreateSphere(new Vector3d(Fixed64.Zero, Fixed64.FromFraction(3, 4), Fixed64.Zero));
         ScenarioBody<LSCylinderCollider> rotatedCylinder = scenario.CreateCylinder(
             PhysicsScenarioBuilder.Vector(4, 0, 0),
             FixedQuaternion.FromEulerAnglesInDegrees(Fixed64.Zero, Fixed64.Zero, (Fixed64)90));
-        ScenarioBody<LSSphereCollider> rotatedCapOverlap = scenario.CreateSphere(new Vector3d((Fixed64)4 + Fixed64.Fraction(3, 4), Fixed64.Zero, Fixed64.Zero));
+        ScenarioBody<LSSphereCollider> rotatedCapOverlap = scenario.CreateSphere(new Vector3d((Fixed64)4 + Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
         ScenarioBody<LSSphereCollider> separated = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(2, 0, 0));
 
         AssertCollision(scenario, sideOverlap.Collider, cylinder.Collider, CollisionType.Cylinder_Sphere);
@@ -304,7 +304,7 @@ public sealed class CollisionDetectionShapePairTests
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSCylinderCollider> cylinder = scenario.CreateCylinder(PhysicsScenarioBuilder.Vector(0, 0, 0));
-        ScenarioBody<LSCapsuleCollider> overlapping = scenario.CreateCapsule(new Vector3d(Fixed64.Fraction(3, 4), Fixed64.Zero, Fixed64.Zero));
+        ScenarioBody<LSCapsuleCollider> overlapping = scenario.CreateCapsule(new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
         ScenarioBody<LSCapsuleCollider> separated = scenario.CreateCapsule(PhysicsScenarioBuilder.Vector(3, 0, 0));
 
         AssertCollision(scenario, cylinder.Collider, overlapping.Collider, CollisionType.Cylinder_Capsule);
@@ -317,8 +317,8 @@ public sealed class CollisionDetectionShapePairTests
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSCylinderCollider> cylinder = scenario.CreateCylinder(PhysicsScenarioBuilder.Vector(0, 0, 0));
-        ScenarioBody<LSCylinderCollider> sideOverlap = scenario.CreateCylinder(new Vector3d(Fixed64.Fraction(3, 4), Fixed64.Zero, Fixed64.Zero));
-        ScenarioBody<LSCylinderCollider> capSeparated = scenario.CreateCylinder(new Vector3d(Fixed64.Zero, Fixed64.Fraction(5, 4), Fixed64.Zero));
+        ScenarioBody<LSCylinderCollider> sideOverlap = scenario.CreateCylinder(new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
+        ScenarioBody<LSCylinderCollider> capSeparated = scenario.CreateCylinder(new Vector3d(Fixed64.Zero, Fixed64.FromFraction(5, 4), Fixed64.Zero));
         ScenarioBody<LSCylinderCollider> separated = scenario.CreateCylinder(PhysicsScenarioBuilder.Vector(2, 0, 0));
 
         AssertCollision(scenario, cylinder.Collider, sideOverlap.Collider, CollisionType.Cylinder_Cylinder);
@@ -331,7 +331,7 @@ public sealed class CollisionDetectionShapePairTests
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSCuboidCollider> cuboid = scenario.CreateCuboid(PhysicsScenarioBuilder.Vector(0, 0, 0));
-        ScenarioBody<LSCylinderCollider> overlapping = scenario.CreateCylinder(new Vector3d(Fixed64.Fraction(3, 4), Fixed64.Zero, Fixed64.Zero));
+        ScenarioBody<LSCylinderCollider> overlapping = scenario.CreateCylinder(new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
         ScenarioBody<LSCuboidCollider> rotatedCuboid = scenario.CreateCuboid(
             PhysicsScenarioBuilder.Vector(4, 0, 0),
             PhysicsScenarioBuilder.Yaw(45));
@@ -351,20 +351,20 @@ public sealed class CollisionDetectionShapePairTests
             CreateHorizontalPlaneMesh(),
             PhysicsScenarioBuilder.Vector(0, 0, 0),
             FixedQuaternion.Identity);
-        ScenarioBody<LSCylinderCollider> capOverlap = scenario.CreateCylinder(new Vector3d(Fixed64.Zero, Fixed64.Fraction(1, 4), Fixed64.Zero));
+        ScenarioBody<LSCylinderCollider> capOverlap = scenario.CreateCylinder(new Vector3d(Fixed64.Zero, Fixed64.FromFraction(1, 4), Fixed64.Zero));
         ScenarioBody<LSCylinderCollider> capSeparated = scenario.CreateCylinder(new Vector3d(Fixed64.Zero, (Fixed64)2, Fixed64.Zero));
         ScenarioBody<LSMeshCollider> wall = scenario.CreateBody(
             CreateVerticalPlaneMesh(),
             PhysicsScenarioBuilder.Vector(6, 0, 0),
             FixedQuaternion.Identity);
-        ScenarioBody<LSCylinderCollider> sideOverlap = scenario.CreateCylinder(new Vector3d((Fixed64)6 + Fixed64.Fraction(1, 4), Fixed64.Zero, Fixed64.Zero));
+        ScenarioBody<LSCylinderCollider> sideOverlap = scenario.CreateCylinder(new Vector3d((Fixed64)6 + Fixed64.FromFraction(1, 4), Fixed64.Zero, Fixed64.Zero));
 
         CollisionPair capPair = AssertCollision(scenario, floor.Collider, capOverlap.Collider, CollisionType.Mesh_Cylinder);
         CollisionPair sidePair = AssertCollision(scenario, sideOverlap.Collider, wall.Collider, CollisionType.Mesh_Cylinder);
         AssertNoCollision(scenario, floor.Collider, capSeparated.Collider, CollisionType.Mesh_Cylinder);
 
-        capPair.Manifold.PrimaryContact.Normal.y.Should().BeGreaterThan(Fixed64.Zero);
-        sidePair.Manifold.PrimaryContact.Normal.x.Should().BeGreaterThan(Fixed64.Zero);
+        capPair.Manifold.PrimaryContact.Normal.Y.Should().BeGreaterThan(Fixed64.Zero);
+        sidePair.Manifold.PrimaryContact.Normal.X.Should().BeGreaterThan(Fixed64.Zero);
     }
 
     [Fact]
@@ -375,7 +375,7 @@ public sealed class CollisionDetectionShapePairTests
             CreateHorizontalPlaneMesh(),
             PhysicsScenarioBuilder.Vector(0, 0, 0),
             FixedQuaternion.Identity);
-        ScenarioBody<LSCylinderCollider> cylinder = scenario.CreateCylinder(new Vector3d(Fixed64.Zero, Fixed64.Fraction(1, 4), Fixed64.Zero));
+        ScenarioBody<LSCylinderCollider> cylinder = scenario.CreateCylinder(new Vector3d(Fixed64.Zero, Fixed64.FromFraction(1, 4), Fixed64.Zero));
         CollisionPair pair = scenario.CreatePair(floor.Collider, cylinder.Collider);
 
         long allocatedBytes = MeasureAllocatedBytes(() => EnsureCollision(pair));
@@ -403,13 +403,13 @@ public sealed class CollisionDetectionShapePairTests
                 scenario.CreateSphere(new Vector3d((Fixed64)6 + Fixed64.Half, Fixed64.Zero, Fixed64.Zero)).Collider),
             scenario.CreatePair(
                 scenario.CreateCylinder(PhysicsScenarioBuilder.Vector(8, 0, 0)).Collider,
-                scenario.CreateSphere(new Vector3d((Fixed64)8 + Fixed64.Fraction(3, 4), Fixed64.Zero, Fixed64.Zero)).Collider),
+                scenario.CreateSphere(new Vector3d((Fixed64)8 + Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero)).Collider),
             scenario.CreatePair(
                 scenario.CreateCylinder(PhysicsScenarioBuilder.Vector(10, 0, 0)).Collider,
-                scenario.CreateCapsule(new Vector3d((Fixed64)10 + Fixed64.Fraction(3, 4), Fixed64.Zero, Fixed64.Zero)).Collider),
+                scenario.CreateCapsule(new Vector3d((Fixed64)10 + Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero)).Collider),
             scenario.CreatePair(
                 scenario.CreateCylinder(PhysicsScenarioBuilder.Vector(12, 0, 0)).Collider,
-                scenario.CreateCylinder(new Vector3d((Fixed64)12 + Fixed64.Fraction(3, 4), Fixed64.Zero, Fixed64.Zero)).Collider)
+                scenario.CreateCylinder(new Vector3d((Fixed64)12 + Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero)).Collider)
         };
 
         long allocatedBytes = MeasureAllocatedBytes(() =>
@@ -429,13 +429,13 @@ public sealed class CollisionDetectionShapePairTests
             CreateHorizontalPlaneMesh(),
             PhysicsScenarioBuilder.Vector(0, 0, 0),
             FixedQuaternion.Identity);
-        ScenarioBody<LSCuboidCollider> cuboid = scenario.CreateCuboid(new Vector3d(Fixed64.Zero, Fixed64.Fraction(1, 4), Fixed64.Zero));
+        ScenarioBody<LSCuboidCollider> cuboid = scenario.CreateCuboid(new Vector3d(Fixed64.Zero, Fixed64.FromFraction(1, 4), Fixed64.Zero));
 
         CollisionPair forward = AssertCollision(scenario, floor.Collider, cuboid.Collider, CollisionType.Mesh_Cuboid);
         CollisionPair reversed = AssertCollision(scenario, cuboid.Collider, floor.Collider, CollisionType.Mesh_Cuboid);
 
-        forward.Manifold.PrimaryContact.Normal.y.Should().BeGreaterThan(Fixed64.Zero);
-        reversed.Manifold.PrimaryContact.Normal.y.Should().BeGreaterThan(Fixed64.Zero);
+        forward.Manifold.PrimaryContact.Normal.Y.Should().BeGreaterThan(Fixed64.Zero);
+        reversed.Manifold.PrimaryContact.Normal.Y.Should().BeGreaterThan(Fixed64.Zero);
         forward.Manifold.HasContact.Should().BeTrue();
         reversed.Manifold.HasContact.Should().BeTrue();
     }
@@ -466,7 +466,7 @@ public sealed class CollisionDetectionShapePairTests
             CreateHorizontalPlaneMesh(),
             PhysicsScenarioBuilder.Vector(0, 0, 0),
             FixedQuaternion.Identity);
-        ScenarioBody<LSCuboidCollider> cuboid = scenario.CreateCuboid(new Vector3d(Fixed64.Zero, Fixed64.Fraction(1, 4), Fixed64.Zero));
+        ScenarioBody<LSCuboidCollider> cuboid = scenario.CreateCuboid(new Vector3d(Fixed64.Zero, Fixed64.FromFraction(1, 4), Fixed64.Zero));
         CollisionPair pair = scenario.CreatePair(floor.Collider, cuboid.Collider);
 
         long allocatedBytes = MeasureAllocatedBytes(() => EnsureCollision(pair));

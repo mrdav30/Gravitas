@@ -52,7 +52,7 @@ public sealed class MeshTriangleQueryAllocationTests
         collider.GetTrianglesInBounds(
             new FixedBoundVolume(
                 new Vector3d(Fixed64.Half, Fixed64.Zero, Fixed64.Zero),
-                new Vector3d(Fixed64.Fraction(3, 2), Fixed64.One, Fixed64.One)),
+                new Vector3d(Fixed64.FromFraction(3, 2), Fixed64.One, Fixed64.One)),
             results);
         body.Body.SetPosition(Vector3d.Zero);
         collider.Simulate();
@@ -61,7 +61,7 @@ public sealed class MeshTriangleQueryAllocationTests
         Vector3d movedPosition = new(Fixed64.Half, Fixed64.Zero, Fixed64.Zero);
         FixedBoundVolume movedBounds = new(
             new Vector3d(Fixed64.Half, Fixed64.Zero, Fixed64.Zero),
-            new Vector3d(Fixed64.Fraction(3, 2), Fixed64.One, Fixed64.One));
+            new Vector3d(Fixed64.FromFraction(3, 2), Fixed64.One, Fixed64.One));
 
         long setPositionBytes = MeasureAllocatedBytes(() => body.Body.SetPosition(movedPosition));
         long simulateBytes = MeasureAllocatedBytes(collider.Simulate);

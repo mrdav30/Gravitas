@@ -26,7 +26,7 @@ public sealed class Physics2DSimulationTests
         context.LateSimulate();
 
         body.LinearVelocity.Should().Be(new Vector2d(Fixed64.One, Fixed64.Zero));
-        body.Position.Should().Be(new Vector2d(Fixed64.Fraction(1, 4), Fixed64.Zero));
+        body.Position.Should().Be(new Vector2d(Fixed64.FromFraction(1, 4), Fixed64.Zero));
     }
 
     [Fact]
@@ -44,7 +44,7 @@ public sealed class Physics2DSimulationTests
         Vector2d resolvedPosition = left.Position;
         context.Simulate();
 
-        resolvedPosition.x.Should().BeLessThan(Fixed64.Zero);
+        resolvedPosition.X.Should().BeLessThan(Fixed64.Zero);
         left.Position.Should().Be(resolvedPosition);
         entered.Should().Be(1);
         stayed.Should().Be(2);
@@ -184,7 +184,7 @@ public sealed class Physics2DSimulationTests
 
     private static StiffBody2D CreateCircle(GravitasWorldContext context, Vector2d position, bool immovable)
     {
-        var transform = new FixedTransform(new Vector3d(position.x, Fixed64.Zero, position.y), FixedQuaternion.Identity, Vector3d.One);
+        var transform = new FixedTransform(new Vector3d(position.X, Fixed64.Zero, position.Y), FixedQuaternion.Identity, Vector3d.One);
         var agent = new TestMatterAgent(context, transform);
         var body = new StiffBody2D(agent, new LSCircleCollider2D(Fixed64.Half))
         {

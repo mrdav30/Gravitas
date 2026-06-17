@@ -106,8 +106,8 @@ public sealed class GravitasPhysicsServiceTests
         bodyA.AddLinearImpulse(Vector3d.Right);
         bodyB.AddLinearImpulse(Vector3d.Right);
 
-        bodyA.LinearVelocity.x.Should().Be(Fixed64.One / (Fixed64)10);
-        bodyB.LinearVelocity.x.Should().Be(Fixed64.One / (Fixed64)100);
+        bodyA.LinearVelocity.X.Should().Be(Fixed64.One / (Fixed64)10);
+        bodyB.LinearVelocity.X.Should().Be(Fixed64.One / (Fixed64)100);
     }
 
     [Fact]

@@ -22,6 +22,8 @@ public sealed class GravitasCollision2DService
     private readonly SwiftBucket<PhysicsPartition2D> _activePartitions = new(DefaultPartitionPoolCapacity);
     private readonly SwiftStack<PhysicsPartition2D> _inactivePartitionPool = new(DefaultPartitionPoolCapacity);
     private readonly SwiftHashSet<int> _redundancyChecker = new();
+    private readonly SwiftList<Voxel> _coveredVoxels = new();
+    private readonly GridTraceScratch _traceScratch = new();
     private readonly SwiftList<PhysicsPartition2D> _retainedPartitions = new();
     private readonly SwiftList<PhysicsPartition2D> _distributionPartitions = new();
     private readonly SwiftList<int> _distributionDynamicIds = new();
@@ -55,6 +57,8 @@ public sealed class GravitasCollision2DService
         ClearRetainedPartitions();
         _activePartitions.Clear();
         _redundancyChecker.Clear();
+        _coveredVoxels.FastClear();
+        _traceScratch.Clear();
         _distributionPartitions.FastClear();
         _distributionDynamicIds.FastClear();
         _distributionAwakeDynamicIds.FastClear();
@@ -388,12 +392,15 @@ public sealed class GravitasCollision2DService
         SwiftList<PhysicsPartition2D> partitions)
     {
         GridWorld world = _context.World;
-        foreach (GridVoxelSet covered in GridTracer.GetCoveredVoxels(
+        GridTracer.GetCoveredVoxelsInto(
             world,
             coverageMin,
             coverageMax,
-            layerY: Fixed64.Zero))
-            VisitGridPlanarVoxelsForQuery(covered, queryMin, queryMax, partitions);
+            _coveredVoxels,
+            _traceScratch,
+            layerY: Fixed64.Zero);
+
+        VisitPlanarVoxelsForQuery(world, queryMin, queryMax, partitions);
     }
 
     private void ScanCoveredColliderVoxels(
@@ -403,23 +410,34 @@ public sealed class GravitasCollision2DService
         SwiftList<WorldVoxelIndex> partitionedCoordinates)
     {
         GridWorld world = _context.World;
-        foreach (GridVoxelSet covered in GridTracer.GetCoveredVoxels(
+        GridTracer.GetCoveredVoxelsInto(
             world,
             coverageMin,
             coverageMax,
-            layerY: Fixed64.Zero))
-            VisitGridPlanarVoxelsForCollider(covered, collider, partitionedCoordinates);
+            _coveredVoxels,
+            _traceScratch,
+            layerY: Fixed64.Zero);
+
+        VisitPlanarVoxelsForCollider(world, collider, partitionedCoordinates);
     }
 
-    private void VisitGridPlanarVoxelsForQuery(
-        GridVoxelSet covered,
+    private void VisitPlanarVoxelsForQuery(
+        GridWorld world,
         Vector2d queryMin,
         Vector2d queryMax,
         SwiftList<PhysicsPartition2D> partitions)
     {
-        Fixed64 cellPadding = GridTopologyMetricUtility.GetPlanarMaxCellEdge(covered.Grid);
-        foreach (Voxel voxel in covered.Voxels)
+        ushort currentGridIndex = ushort.MaxValue;
+        Fixed64 cellPadding = Fixed64.Zero;
+        for (int i = 0; i < _coveredVoxels.Count; i++)
         {
+            Voxel voxel = _coveredVoxels[i];
+            if (voxel.GridIndex != currentGridIndex)
+            {
+                currentGridIndex = voxel.GridIndex;
+                cellPadding = GridTopologyMetricUtility.GetPlanarMaxCellEdge(world.ActiveGrids[currentGridIndex]);
+            }
+
             if (!_redundancyChecker.Add(voxel.SpawnToken)
                 || !IsPlanarPositionInBounds(queryMin, queryMax, cellPadding, voxel.WorldPosition)
                 || !voxel.TryGetPartition(out PhysicsPartition2D? partition)
@@ -432,14 +450,24 @@ public sealed class GravitasCollision2DService
         }
     }
 
-    private void VisitGridPlanarVoxelsForCollider(
-        GridVoxelSet covered,
+    private void VisitPlanarVoxelsForCollider(
+        GridWorld world,
         LSCollider2D collider,
         SwiftList<WorldVoxelIndex> partitionedCoordinates)
     {
-        Fixed64 cellPadding = GridTopologyMetricUtility.GetPlanarMaxCellEdge(covered.Grid);
-        foreach (Voxel voxel in covered.Voxels)
+        ushort currentGridIndex = ushort.MaxValue;
+        Fixed64 cellPadding = Fixed64.Zero;
+        for (int i = 0; i < _coveredVoxels.Count; i++)
+        {
+            Voxel voxel = _coveredVoxels[i];
+            if (voxel.GridIndex != currentGridIndex)
+            {
+                currentGridIndex = voxel.GridIndex;
+                cellPadding = GridTopologyMetricUtility.GetPlanarMaxCellEdge(world.ActiveGrids[currentGridIndex]);
+            }
+
             TryPartitionVoxel(collider, partitionedCoordinates, voxel, cellPadding);
+        }
     }
 
     private void TryPartitionVoxel(

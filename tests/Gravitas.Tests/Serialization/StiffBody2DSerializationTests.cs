@@ -20,8 +20,8 @@ public sealed class StiffBody2DSerializationTests
         {
             IsTrigger = true,
             Layer = new PhysicsLayer(3),
-            LocalOffset = new Vector2d(Fixed64.Half, Fixed64.Fraction(1, 4)),
-            MixedHalfThicknessOverride = Fixed64.Fraction(3, 2)
+            LocalOffset = new Vector2d(Fixed64.Half, Fixed64.FromFraction(1, 4)),
+            MixedHalfThicknessOverride = Fixed64.FromFraction(3, 2)
         };
         var sourceAgent = new TestMatterAgent(sourceContext);
         var source = new StiffBody2D(sourceAgent, sourceCollider)
@@ -29,15 +29,15 @@ public sealed class StiffBody2DSerializationTests
             Mass = (Fixed64)3,
             Immovable = true,
             IsKinematic = true,
-            RestitutionCoefficient = Fixed64.Fraction(3, 4),
-            FrictionCoefficient = Fixed64.Fraction(5, 4),
+            RestitutionCoefficient = Fixed64.FromFraction(3, 4),
+            FrictionCoefficient = Fixed64.FromFraction(5, 4),
             Gravity = new Vector2d(Fixed64.Zero, (Fixed64)(-2)),
             SleepEnabled = false,
             SleepFrameThreshold = 11,
-            SleepLinearSpeedThreshold = Fixed64.Fraction(1, 128),
+            SleepLinearSpeedThreshold = Fixed64.FromFraction(1, 128),
             ContinuousCollisionMode = ContinuousCollisionMode.Continuous
         };
-        source.Initialize(new Vector2d((Fixed64)5, (Fixed64)(-2)), Fixed64.Fraction(1, 8));
+        source.Initialize(new Vector2d((Fixed64)5, (Fixed64)(-2)), Fixed64.FromFraction(1, 8));
 
         object payload = GravitasSerializationHarness.Serialize(source, transport);
 

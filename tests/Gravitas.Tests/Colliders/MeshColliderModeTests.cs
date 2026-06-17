@@ -52,7 +52,7 @@ public sealed class MeshColliderModeTests
 
         body.Collider.GetTrianglesInBounds(
             new FixedBoundVolume(
-                new Vector3d(Fixed64.Fraction(3, 2), Fixed64.Zero, Fixed64.One),
+                new Vector3d(Fixed64.FromFraction(3, 2), Fixed64.Zero, Fixed64.One),
                 new Vector3d((Fixed64)3, (Fixed64)2, (Fixed64)3)),
             indices);
         int buildCount = body.Collider.Mesh.TriangleBvhBuildCount;
@@ -61,7 +61,7 @@ public sealed class MeshColliderModeTests
         body.Collider.Simulate();
         body.Collider.GetTrianglesInBounds(
             new FixedBoundVolume(
-                new Vector3d((Fixed64)5 + Fixed64.Fraction(3, 2), Fixed64.Zero, Fixed64.One),
+                new Vector3d((Fixed64)5 + Fixed64.FromFraction(3, 2), Fixed64.Zero, Fixed64.One),
                 new Vector3d((Fixed64)8, (Fixed64)2, (Fixed64)3)),
             indices);
 

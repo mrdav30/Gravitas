@@ -74,8 +74,8 @@ public sealed class MixedEmbeddingContractTests
 
         collider.Rebuild();
         collider.MixedSlabCenterY.Should().Be((Fixed64)9);
-        collider.MixedBounds3D.Min.y.Should().Be((Fixed64)9 - Fixed64.Half);
-        collider.MixedBounds3D.Max.y.Should().Be((Fixed64)9 + Fixed64.Half);
+        collider.MixedBounds3D.Min.Y.Should().Be((Fixed64)9 - Fixed64.Half);
+        collider.MixedBounds3D.Max.Y.Should().Be((Fixed64)9 + Fixed64.Half);
     }
 
     [Fact]

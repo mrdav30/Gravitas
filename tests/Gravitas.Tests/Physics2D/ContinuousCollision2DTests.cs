@@ -4,6 +4,8 @@ using Gravitas.Colliders;
 using Gravitas.Queries;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
+using GridForge.Configuration;
+using GridForge.Grids.Topology;
 using SwiftCollections;
 using Xunit;
 
@@ -25,8 +27,8 @@ public sealed class ContinuousCollision2DTests
         mover.AddForce(new Vector2d((Fixed64)10, Fixed64.Zero));
         context.LateSimulate();
 
-        mover.Position.x.Should().Be((Fixed64)4);
-        mover.LinearVelocity.x.Should().Be(Fixed64.Zero);
+        mover.Position.X.Should().Be((Fixed64)4);
+        mover.LinearVelocity.X.Should().Be(Fixed64.Zero);
     }
 
     [Fact]
@@ -41,7 +43,7 @@ public sealed class ContinuousCollision2DTests
         mover.AddForce(new Vector2d((Fixed64)10, Fixed64.Zero));
         context.LateSimulate();
 
-        mover.Position.x.Should().Be((Fixed64)10);
+        mover.Position.X.Should().Be((Fixed64)10);
     }
 
     [Fact]
@@ -59,8 +61,8 @@ public sealed class ContinuousCollision2DTests
         fast.AddForce(new Vector2d((Fixed64)10, Fixed64.Zero));
         context.LateSimulate();
 
-        slow.Position.x.Should().Be(Fixed64.Half);
-        fast.Position.x.Should().Be((Fixed64)4);
+        slow.Position.X.Should().Be(Fixed64.Half);
+        fast.Position.X.Should().Be((Fixed64)4);
     }
 
     [Fact]
@@ -74,7 +76,7 @@ public sealed class ContinuousCollision2DTests
         mover.AddForce(new Vector2d((Fixed64)10, Fixed64.Zero));
         context.LateSimulate();
 
-        mover.Position.x.Should().Be((Fixed64)4);
+        mover.Position.X.Should().Be((Fixed64)4);
     }
 
     [Fact]
@@ -144,6 +146,26 @@ public sealed class ContinuousCollision2DTests
     }
 
     [Fact]
+    public void SweepCircleAll_WithHexGrid_ShouldOrderHitsByDistanceThenColliderId()
+    {
+        using GravitasWorldContext context = CreateHexContext(frameRate: 1);
+        StiffBody2D first = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)4, Fixed64.One), immovable: true);
+        StiffBody2D second = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)4, -Fixed64.One), immovable: true);
+        var hits = new SwiftList<Physics2DHit>();
+
+        int count = context.Query2D.SweepCircleAll(
+            Vector2d.Zero,
+            new Vector2d((Fixed64)8, Fixed64.Zero),
+            Fixed64.Half,
+            hits);
+
+        count.Should().Be(2);
+        hits[0].Distance.Should().Be(hits[1].Distance);
+        hits[0].Collider.Should().BeSameAs(first.Collider);
+        hits[1].Collider.Should().BeSameAs(second.Collider);
+    }
+
+    [Fact]
     public void SweepCircleAll_ShouldReturnNoHitsForZeroDisplacement()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);
@@ -178,6 +200,22 @@ public sealed class ContinuousCollision2DTests
     private static GravitasWorldContext CreateContext(int frameRate, int extent = 32) =>
         Physics2DTestWorld.CreateContext(frameRate, extent);
 
+    private static GravitasWorldContext CreateHexContext(int frameRate, int extent = 32)
+    {
+        GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        context.SetFrameRate(frameRate);
+        context.Settings.RuntimeMode = PhysicsRuntimeMode.TwoD;
+
+        GridConfiguration configuration = new(
+            new Vector3d((Fixed64)(-extent), Fixed64.Zero, (Fixed64)(-extent)),
+            new Vector3d((Fixed64)extent, Fixed64.Zero, (Fixed64)extent),
+            topologyKind: GridTopologyKind.HexPrism,
+            topologyMetrics: GridTopologyMetrics.Hex(Fixed64.One, Fixed64.One, HexOrientation.PointyTop));
+
+        context.World.TryAddGrid(configuration, out _).Should().BeTrue();
+        return context;
+    }
+
     private static StiffBody2D CreateBody(
         GravitasWorldContext context,
         LSCollider2D collider,
@@ -186,7 +224,7 @@ public sealed class ContinuousCollision2DTests
         PhysicsLayer layer = default)
     {
         var transform = new FixedTransform(
-            new Vector3d(position.x, Fixed64.Zero, position.y),
+            new Vector3d(position.X, Fixed64.Zero, position.Y),
             FixedQuaternion.Identity,
             Vector3d.One);
         var agent = new TestMatterAgent(context, transform);

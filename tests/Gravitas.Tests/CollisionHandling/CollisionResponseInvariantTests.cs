@@ -10,13 +10,13 @@ namespace Gravitas.Tests.CollisionHandlingTests;
 
 public sealed class CollisionResponseInvariantTests
 {
-    private static readonly Fixed64 Tolerance = Fixed64.Fraction(1, 1_000_000);
+    private static readonly Fixed64 Tolerance = Fixed64.FromFraction(1, 1_000_000);
 
     [Fact]
     public void ContactManifold_ShouldStoreDetectionDepthWithoutSolverMargin()
     {
         var manifold = new ContactManifold();
-        Fixed64 smallDepth = Fixed64.Fraction(1, 1_000);
+        Fixed64 smallDepth = Fixed64.FromFraction(1, 1_000);
 
         manifold.HasContact.Should().BeFalse();
 
@@ -35,19 +35,19 @@ public sealed class CollisionResponseInvariantTests
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSSphereCollider> left = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
-        ScenarioBody<LSSphereCollider> right = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(Fixed64.Fraction(3, 4), Fixed64.Zero, Fixed64.Zero));
+        ScenarioBody<LSSphereCollider> right = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
         left.Body.RestitutionCoefficient = Fixed64.One;
         right.Body.RestitutionCoefficient = Fixed64.One;
         Push(left.Body, 60);
         Push(right.Body, -60);
         CollisionPair pair = CreateDetectedPair(scenario, left.Collider, right.Collider);
-        Fixed64 leftVelocityBefore = left.Body.LinearVelocity.x;
-        Fixed64 rightVelocityBefore = right.Body.LinearVelocity.x;
+        Fixed64 leftVelocityBefore = left.Body.LinearVelocity.X;
+        Fixed64 rightVelocityBefore = right.Body.LinearVelocity.X;
 
         CollisionResponse.CalculateImpulse(pair);
 
-        AssertNear(left.Body.LinearVelocity.x, rightVelocityBefore);
-        AssertNear(right.Body.LinearVelocity.x, leftVelocityBefore);
+        AssertNear(left.Body.LinearVelocity.X, rightVelocityBefore);
+        AssertNear(right.Body.LinearVelocity.X, leftVelocityBefore);
     }
 
     [Fact]
@@ -55,7 +55,7 @@ public sealed class CollisionResponseInvariantTests
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSSphereCollider> left = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
-        ScenarioBody<LSSphereCollider> right = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(Fixed64.Fraction(3, 4), Fixed64.Zero, Fixed64.Zero));
+        ScenarioBody<LSSphereCollider> right = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
         Push(left.Body, 60);
         Push(right.Body, -60);
         CollisionPair pair = scenario.CreatePair(left.Collider, right.Collider);
@@ -77,7 +77,7 @@ public sealed class CollisionResponseInvariantTests
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSSphereCollider> left = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
-        ScenarioBody<LSSphereCollider> right = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(Fixed64.Fraction(3, 4), Fixed64.Zero, Fixed64.Zero));
+        ScenarioBody<LSSphereCollider> right = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
         left.Body.RestitutionCoefficient = Fixed64.One;
         right.Body.RestitutionCoefficient = Fixed64.One;
         Push(left.Body, 3);
@@ -86,8 +86,8 @@ public sealed class CollisionResponseInvariantTests
 
         CollisionResponse.CalculateImpulse(pair);
 
-        AssertNear(left.Body.LinearVelocity.x, Fixed64.Zero);
-        AssertNear(right.Body.LinearVelocity.x, Fixed64.Zero);
+        AssertNear(left.Body.LinearVelocity.X, Fixed64.Zero);
+        AssertNear(right.Body.LinearVelocity.X, Fixed64.Zero);
     }
 
     [Fact]
@@ -98,18 +98,18 @@ public sealed class CollisionResponseInvariantTests
             PhysicsScenarioBuilder.Vector(0, 0, 0),
             mass: (Fixed64)4);
         ScenarioBody<LSSphereCollider> light = scenario.CreateSphere(
-            PhysicsScenarioBuilder.Vector(Fixed64.Fraction(3, 4), Fixed64.Zero, Fixed64.Zero),
+            PhysicsScenarioBuilder.Vector(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero),
             mass: Fixed64.One);
         Push(heavy.Body, 60);
         Push(light.Body, -60);
         CollisionPair pair = CreateDetectedPair(scenario, heavy.Collider, light.Collider);
-        Fixed64 heavyVelocityBefore = heavy.Body.LinearVelocity.x;
-        Fixed64 lightVelocityBefore = light.Body.LinearVelocity.x;
+        Fixed64 heavyVelocityBefore = heavy.Body.LinearVelocity.X;
+        Fixed64 lightVelocityBefore = light.Body.LinearVelocity.X;
 
         CollisionResponse.CalculateImpulse(pair);
 
-        Fixed64 heavyDelta = (heavy.Body.LinearVelocity.x - heavyVelocityBefore).Abs();
-        Fixed64 lightDelta = (light.Body.LinearVelocity.x - lightVelocityBefore).Abs();
+        Fixed64 heavyDelta = (heavy.Body.LinearVelocity.X - heavyVelocityBefore).Abs();
+        Fixed64 lightDelta = (light.Body.LinearVelocity.X - lightVelocityBefore).Abs();
         heavyDelta.Should().BeLessThan(lightDelta);
     }
 
@@ -120,18 +120,18 @@ public sealed class CollisionResponseInvariantTests
         ScenarioBody<LSSphereCollider> kinematic = scenario.CreateSphere(
             PhysicsScenarioBuilder.Vector(0, 0, 0),
             isKinematic: true);
-        ScenarioBody<LSSphereCollider> movable = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(Fixed64.Fraction(3, 4), Fixed64.Zero, Fixed64.Zero));
+        ScenarioBody<LSSphereCollider> movable = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
         Push(movable.Body, -60);
         CollisionPair pair = CreateDetectedPair(scenario, kinematic.Collider, movable.Collider);
         Vector3d kinematicPositionBefore = kinematic.Body.Position3d;
         Vector3d kinematicVelocityBefore = kinematic.Body.LinearVelocity;
-        Fixed64 movableVelocityBefore = movable.Body.LinearVelocity.x;
+        Fixed64 movableVelocityBefore = movable.Body.LinearVelocity.X;
 
         CollisionResponse.CalculateImpulse(pair);
 
         kinematic.Body.Position3d.Should().Be(kinematicPositionBefore);
         kinematic.Body.LinearVelocity.Should().Be(kinematicVelocityBefore);
-        movable.Body.LinearVelocity.x.Should().BeGreaterThan(movableVelocityBefore);
+        movable.Body.LinearVelocity.X.Should().BeGreaterThan(movableVelocityBefore);
     }
 
     [Fact]
@@ -139,22 +139,22 @@ public sealed class CollisionResponseInvariantTests
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSSphereCollider> left = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
-        ScenarioBody<LSSphereCollider> right = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(Fixed64.Fraction(3, 4), Fixed64.Zero, Fixed64.Zero));
+        ScenarioBody<LSSphereCollider> right = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
         CollisionPair pair = scenario.CreatePair(left.Collider, right.Collider);
         Vector3d leftStart = left.Body.Position3d;
         Vector3d rightStart = right.Body.Position3d;
 
-        pair.Manifold.SetContact(left.Collider.Center, right.Collider.Center, Fixed64.Fraction(1, 1_000), Vector3d.Right);
+        pair.Manifold.SetContact(left.Collider.Center, right.Collider.Center, Fixed64.FromFraction(1, 1_000), Vector3d.Right);
         CollisionResponse.CalculateImpulse(pair);
 
         left.Body.Position3d.Should().Be(leftStart);
         right.Body.Position3d.Should().Be(rightStart);
 
-        pair.Manifold.SetContact(left.Collider.Center, right.Collider.Center, Fixed64.Fraction(1, 10), Vector3d.Right);
+        pair.Manifold.SetContact(left.Collider.Center, right.Collider.Center, Fixed64.FromFraction(1, 10), Vector3d.Right);
         CollisionResponse.CalculateImpulse(pair);
 
-        left.Body.Position3d.x.Should().BeLessThan(leftStart.x);
-        right.Body.Position3d.x.Should().BeGreaterThan(rightStart.x);
+        left.Body.Position3d.X.Should().BeLessThan(leftStart.X);
+        right.Body.Position3d.X.Should().BeGreaterThan(rightStart.X);
     }
 
     [Fact]
@@ -171,17 +171,17 @@ public sealed class CollisionResponseInvariantTests
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSSphereCollider> left = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
-        ScenarioBody<LSSphereCollider> right = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(Fixed64.Fraction(3, 4), Fixed64.Zero, Fixed64.Zero));
+        ScenarioBody<LSSphereCollider> right = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
         Push(left.Body, 60);
         Push(right.Body, -60);
         CollisionPair pair = CreateDetectedPair(scenario, left.Collider, right.Collider);
-        Fixed64 leftVelocityBefore = left.Body.LinearVelocity.x;
-        Fixed64 rightVelocityBefore = right.Body.LinearVelocity.x;
+        Fixed64 leftVelocityBefore = left.Body.LinearVelocity.X;
+        Fixed64 rightVelocityBefore = right.Body.LinearVelocity.X;
 
         CollisionResponse.CalculateImpulse(pair);
 
-        left.Body.LinearVelocity.x.Should().BeLessThan(leftVelocityBefore);
-        right.Body.LinearVelocity.x.Should().BeGreaterThan(rightVelocityBefore);
+        left.Body.LinearVelocity.X.Should().BeLessThan(leftVelocityBefore);
+        right.Body.LinearVelocity.X.Should().BeGreaterThan(rightVelocityBefore);
     }
 
     [Fact]
@@ -191,16 +191,16 @@ public sealed class CollisionResponseInvariantTests
         ScenarioBody<LSSphereCollider> immovable = scenario.CreateSphere(
             PhysicsScenarioBuilder.Vector(0, 0, 0),
             immovable: true);
-        ScenarioBody<LSSphereCollider> movable = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(Fixed64.Fraction(3, 4), Fixed64.Zero, Fixed64.Zero));
+        ScenarioBody<LSSphereCollider> movable = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
         Push(movable.Body, -60);
         CollisionPair pair = CreateDetectedPair(scenario, immovable.Collider, movable.Collider);
         Vector3d immovableVelocityBefore = immovable.Body.LinearVelocity;
-        Fixed64 movableVelocityBefore = movable.Body.LinearVelocity.x;
+        Fixed64 movableVelocityBefore = movable.Body.LinearVelocity.X;
 
         CollisionResponse.CalculateImpulse(pair);
 
         immovable.Body.LinearVelocity.Should().Be(immovableVelocityBefore);
-        movable.Body.LinearVelocity.x.Should().BeGreaterThan(movableVelocityBefore);
+        movable.Body.LinearVelocity.X.Should().BeGreaterThan(movableVelocityBefore);
     }
 
     [Fact]
@@ -208,7 +208,7 @@ public sealed class CollisionResponseInvariantTests
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSSphereCollider> trigger = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
-        ScenarioBody<LSSphereCollider> solid = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(Fixed64.Fraction(3, 4), Fixed64.Zero, Fixed64.Zero));
+        ScenarioBody<LSSphereCollider> solid = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
         PhysicsScenarioBuilder.SetTrigger(trigger.Collider);
         Push(trigger.Body, 60);
         Push(solid.Body, -60);
@@ -227,21 +227,21 @@ public sealed class CollisionResponseInvariantTests
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSSphereCollider> left = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
-        ScenarioBody<LSSphereCollider> right = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(Fixed64.Fraction(3, 4), Fixed64.Zero, Fixed64.Zero));
+        ScenarioBody<LSSphereCollider> right = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
         left.Body.RestitutionCoefficient = Fixed64.Zero;
         right.Body.RestitutionCoefficient = Fixed64.Zero;
         Push(left.Body, 60);
         Push(right.Body, -60);
         CollisionPair pair = CreateDetectedPair(scenario, left.Collider, right.Collider);
-        Fixed64 leftVelocityBefore = left.Body.LinearVelocity.x;
-        Fixed64 rightVelocityBefore = right.Body.LinearVelocity.x;
+        Fixed64 leftVelocityBefore = left.Body.LinearVelocity.X;
+        Fixed64 rightVelocityBefore = right.Body.LinearVelocity.X;
 
         CollisionResponse.CalculateImpulse(pair);
 
-        AssertNear(left.Body.LinearVelocity.x, Fixed64.Zero);
-        AssertNear(right.Body.LinearVelocity.x, Fixed64.Zero);
-        left.Body.LinearVelocity.x.Should().BeLessThan(leftVelocityBefore);
-        right.Body.LinearVelocity.x.Should().BeGreaterThan(rightVelocityBefore);
+        AssertNear(left.Body.LinearVelocity.X, Fixed64.Zero);
+        AssertNear(right.Body.LinearVelocity.X, Fixed64.Zero);
+        left.Body.LinearVelocity.X.Should().BeLessThan(leftVelocityBefore);
+        right.Body.LinearVelocity.X.Should().BeGreaterThan(rightVelocityBefore);
     }
 
     [Fact]
@@ -252,16 +252,16 @@ public sealed class CollisionResponseInvariantTests
             PhysicsScenarioBuilder.Vector(0, 0, 0),
             immovable: true);
         ScenarioBody<LSSphereCollider> mover = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(
-            Fixed64.Fraction(3, 4),
+            Fixed64.FromFraction(3, 4),
             Fixed64.Zero,
             Fixed64.Zero));
         mover.Body.AddLinearImpulse(new Vector3d((Fixed64)(-60), Fixed64.Zero, (Fixed64)30));
         CollisionPair pair = CreateDetectedPair(scenario, wall.Collider, mover.Collider);
-        Fixed64 tangentialSpeedBefore = mover.Body.LinearVelocity.z.Abs();
+        Fixed64 tangentialSpeedBefore = mover.Body.LinearVelocity.Z.Abs();
 
         CollisionResponse.CalculateImpulse(pair);
 
-        mover.Body.LinearVelocity.z.Abs().Should().BeLessThan(tangentialSpeedBefore);
+        mover.Body.LinearVelocity.Z.Abs().Should().BeLessThan(tangentialSpeedBefore);
     }
 
     [Fact]
@@ -269,14 +269,14 @@ public sealed class CollisionResponseInvariantTests
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         Vector3d normal = new Vector3d(Fixed64.One, Fixed64.One, Fixed64.Zero).Normalized;
-        Vector3d tangent = new Vector3d(-normal.y, normal.x, Fixed64.Zero).Normalized;
+        Vector3d tangent = new Vector3d(-normal.Y, normal.X, Fixed64.Zero).Normalized;
         ScenarioBody<LSSphereCollider> slope = scenario.CreateSphere(
             PhysicsScenarioBuilder.Vector(0, 0, 0),
             immovable: true);
-        ScenarioBody<LSSphereCollider> mover = scenario.CreateSphere(normal * Fixed64.Fraction(3, 4));
+        ScenarioBody<LSSphereCollider> mover = scenario.CreateSphere(normal * Fixed64.FromFraction(3, 4));
         CollisionPair pair = scenario.CreatePair(slope.Collider, mover.Collider);
         mover.Body.AddLinearImpulse((-normal * (Fixed64)60) + (tangent * (Fixed64)30));
-        pair.Manifold.SetContact(pair.ColliderA.Center, pair.ColliderB.Center, Fixed64.Fraction(1, 10), normal);
+        pair.Manifold.SetContact(pair.ColliderA.Center, pair.ColliderB.Center, Fixed64.FromFraction(1, 10), normal);
         Fixed64 tangentialSpeedBefore = Vector3d.Dot(mover.Body.LinearVelocity, tangent).Abs();
 
         CollisionResponse.CalculateImpulse(pair);
@@ -292,8 +292,8 @@ public sealed class CollisionResponseInvariantTests
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSCuboidCollider> cuboid = scenario.CreateCuboid(PhysicsScenarioBuilder.Vector(0, 0, 0));
         ScenarioBody<LSSphereCollider> sphere = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(
-            Fixed64.Fraction(3, 4),
-            Fixed64.Fraction(1, 4),
+            Fixed64.FromFraction(3, 4),
+            Fixed64.FromFraction(1, 4),
             Fixed64.Zero));
         Push(sphere.Body, -60);
         CollisionPair pair = CreateDetectedPair(scenario, cuboid.Collider, sphere.Collider);
@@ -311,7 +311,7 @@ public sealed class CollisionResponseInvariantTests
             PhysicsScenarioBuilder.Vector(0, 0, 0),
             immovable: true);
         ScenarioBody<LSCuboidCollider> box = scenario.CreateCuboid(
-            PhysicsScenarioBuilder.Vector(Fixed64.Zero, Fixed64.Fraction(3, 4), Fixed64.Zero));
+            PhysicsScenarioBuilder.Vector(Fixed64.Zero, Fixed64.FromFraction(3, 4), Fixed64.Zero));
         box.Body.AddLinearImpulse(new Vector3d(Fixed64.Zero, (Fixed64)(-60), Fixed64.Zero));
         CollisionPair pair = CreateDetectedPair(scenario, floor.Collider, box.Collider);
         pair.Manifold.Count.Should().Be(ContactManifold.MaxContactCount);
@@ -329,7 +329,7 @@ public sealed class CollisionResponseInvariantTests
             PhysicsScenarioBuilder.Vector(0, 0, 0),
             immovable: true);
         ScenarioBody<LSSphereCollider> sphere = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(
-            Fixed64.Fraction(3, 4),
+            Fixed64.FromFraction(3, 4),
             Fixed64.Zero,
             Fixed64.Zero));
         CollisionPair singleContactPair = CreateDetectedPair(scenario, wall.Collider, sphere.Collider);
@@ -339,7 +339,7 @@ public sealed class CollisionResponseInvariantTests
         ScenarioBody<LSCuboidCollider> floor = scenario.CreateCuboid(
             PhysicsScenarioBuilder.Vector(4, 0, 0),
             immovable: true);
-        ScenarioBody<LSCuboidCollider> box = scenario.CreateCuboid(new Vector3d((Fixed64)4, Fixed64.Fraction(3, 4), Fixed64.Zero));
+        ScenarioBody<LSCuboidCollider> box = scenario.CreateCuboid(new Vector3d((Fixed64)4, Fixed64.FromFraction(3, 4), Fixed64.Zero));
         CollisionPair facePair = CreateDetectedPair(scenario, floor.Collider, box.Collider);
         box.Body.AddLinearImpulse(new Vector3d(Fixed64.Zero, (Fixed64)(-60), Fixed64.Zero));
         CollisionResponse.CalculateImpulse(facePair);
@@ -375,7 +375,7 @@ public sealed class CollisionResponseInvariantTests
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSSphereCollider> left = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
-        ScenarioBody<LSSphereCollider> right = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(Fixed64.Fraction(3, 4), Fixed64.Zero, Fixed64.Zero));
+        ScenarioBody<LSSphereCollider> right = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
         left.Body.RestitutionCoefficient = Fixed64.Half;
         right.Body.RestitutionCoefficient = Fixed64.Half;
         Push(left.Body, 60);
@@ -384,7 +384,7 @@ public sealed class CollisionResponseInvariantTests
         for (int i = 0; i < 8; i++)
         {
             CollisionPair pair = scenario.CreatePair(left.Collider, right.Collider);
-            pair.Manifold.SetContact(left.Collider.Center, right.Collider.Center, Fixed64.Fraction(1, 20), Vector3d.Right);
+            pair.Manifold.SetContact(left.Collider.Center, right.Collider.Center, Fixed64.FromFraction(1, 20), Vector3d.Right);
             CollisionResponse.CalculateImpulse(pair);
         }
 

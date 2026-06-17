@@ -24,7 +24,7 @@ public sealed class PhysicsSettingsSerializationTests
             RetainedPartitionTimeToKillFrames = 120,
             RetainedPartitionRetirementSweepBudget = 8,
             RuntimeMode = PhysicsRuntimeMode.Mixed,
-            Mixed2DHalfThickness = Fixed64.Fraction(3, 2)
+            Mixed2DHalfThickness = Fixed64.FromFraction(3, 2)
         };
 
         string json = JsonSerializer.Serialize(source);
@@ -39,6 +39,6 @@ public sealed class PhysicsSettingsSerializationTests
         settings.RetainedPartitionTimeToKillFrames.Should().Be(120);
         settings.RetainedPartitionRetirementSweepBudget.Should().Be(8);
         settings.RuntimeMode.Should().Be(PhysicsRuntimeMode.Mixed);
-        settings.Mixed2DHalfThickness.Should().Be(Fixed64.Fraction(3, 2));
+        settings.Mixed2DHalfThickness.Should().Be(Fixed64.FromFraction(3, 2));
     }
 }

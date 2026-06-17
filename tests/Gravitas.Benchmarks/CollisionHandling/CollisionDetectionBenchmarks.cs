@@ -210,7 +210,7 @@ public class CollisionDetectionBenchmarks
                 CreateCylinder(origin + new Vector3d(Fixed64.Half, Fixed64.Zero, Fixed64.Zero))),
             _ => new CollisionPair(
                 CreateMeshFloor(origin),
-                CreateCylinder(origin + new Vector3d(Fixed64.Zero, Fixed64.Fraction(1, 4), Fixed64.Zero))),
+                CreateCylinder(origin + new Vector3d(Fixed64.Zero, Fixed64.FromFraction(1, 4), Fixed64.Zero))),
         };
     }
 
@@ -246,7 +246,7 @@ public class CollisionDetectionBenchmarks
     {
         return new CollisionPair(
             CreateCuboid(origin),
-            CreateCuboid(origin + new Vector3d(Fixed64.Fraction(3, 4), Fixed64.Zero, Fixed64.Zero)));
+            CreateCuboid(origin + new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero)));
     }
 
     private CollisionPair CreateCuboidSatPair(int index, Vector3d origin)
@@ -260,14 +260,14 @@ public class CollisionDetectionBenchmarks
     {
         return new CollisionPair(
             CreateMeshFloor(origin),
-            CreateCylinder(origin + new Vector3d(Fixed64.Zero, Fixed64.Fraction(1, 4), Fixed64.Zero)));
+            CreateCylinder(origin + new Vector3d(Fixed64.Zero, Fixed64.FromFraction(1, 4), Fixed64.Zero)));
     }
 
     private CollisionPair CreateMeshCuboidPair(int index, Vector3d origin)
     {
         return new CollisionPair(
             CreateMeshFloor(origin),
-            CreateCuboid(origin + new Vector3d(Fixed64.Zero, Fixed64.Fraction(1, 4), Fixed64.Zero)));
+            CreateCuboid(origin + new Vector3d(Fixed64.Zero, Fixed64.FromFraction(1, 4), Fixed64.Zero)));
     }
 
     private CollisionPair CreateMeshMeshPair(int index, Vector3d origin)
@@ -281,14 +281,14 @@ public class CollisionDetectionBenchmarks
     {
         return new CollisionPair(
             CreateConcaveUChannel(origin),
-            CreateCylinder(origin + new Vector3d(Fixed64.Fraction(7, 4), Fixed64.One, (Fixed64)2)));
+            CreateCylinder(origin + new Vector3d(Fixed64.FromFraction(7, 4), Fixed64.One, (Fixed64)2)));
     }
 
     private CollisionPair CreateConcaveMeshCuboidPair(int index, Vector3d origin)
     {
         return new CollisionPair(
             CreateConcaveUChannel(origin),
-            CreateCuboid(origin + new Vector3d(Fixed64.Fraction(7, 4), Fixed64.One, (Fixed64)2)));
+            CreateCuboid(origin + new Vector3d(Fixed64.FromFraction(7, 4), Fixed64.One, (Fixed64)2)));
     }
 
     private CollisionPair CreateConcaveMeshMeshPair(int index, Vector3d origin)
@@ -302,7 +302,7 @@ public class CollisionDetectionBenchmarks
     {
         return new CollisionPair(
             CreateCompound(origin),
-            CreateSphere(origin + new Vector3d(Fixed64.Fraction(3, 2), Fixed64.Zero, Fixed64.Zero)));
+            CreateSphere(origin + new Vector3d(Fixed64.FromFraction(3, 2), Fixed64.Zero, Fixed64.Zero)));
     }
 
     private LSSphereCollider CreateSphere(Vector3d position) =>

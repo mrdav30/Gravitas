@@ -63,7 +63,7 @@ public sealed class Collider2DShapeTests
             Mass = Fixed64.One
         };
 
-        body.Initialize(new Vector2d((Fixed64)4, (Fixed64)5), FixedMath.PI / (Fixed64)2);
+        body.Initialize(new Vector2d((Fixed64)4, (Fixed64)5), Fixed64.Pi / (Fixed64)2);
 
         collider.GetWorldVertex(0).Should().Be(new Vector2d((Fixed64)5, (Fixed64)4));
         collider.GetWorldVertex(1).Should().Be(new Vector2d((Fixed64)5, (Fixed64)6));

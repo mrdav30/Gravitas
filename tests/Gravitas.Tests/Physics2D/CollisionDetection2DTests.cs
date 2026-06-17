@@ -28,7 +28,7 @@ public sealed class CollisionDetection2DTests
 
         result.Should().BeTrue();
         contact.Depth.Should().BeGreaterThan(Fixed64.Zero);
-        contact.Normal.x.Should().BeGreaterThan(Fixed64.Zero);
+        contact.Normal.X.Should().BeGreaterThan(Fixed64.Zero);
     }
 
     [Fact]
@@ -46,7 +46,7 @@ public sealed class CollisionDetection2DTests
 
     private static StiffBody2D CreateBody(GravitasWorldContext context, LSCollider2D collider, Vector2d position)
     {
-        var transform = new FixedTransform(new Vector3d(position.x, Fixed64.Zero, position.y), FixedQuaternion.Identity, Vector3d.One);
+        var transform = new FixedTransform(new Vector3d(position.X, Fixed64.Zero, position.Y), FixedQuaternion.Identity, Vector3d.One);
         var agent = new TestMatterAgent(context, transform);
         var body = new StiffBody2D(agent, collider)
         {

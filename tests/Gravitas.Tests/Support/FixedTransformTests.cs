@@ -16,9 +16,9 @@ public sealed class FixedTransformTests
             new Vector3d((Fixed64)2, (Fixed64)3, (Fixed64)4));
 
         Vector3d scale = transform.LossyScale;
-        Fixed64 tolerance = Fixed64.Fraction(1, 1_000_000);
-        (scale.x - (Fixed64)2).Abs().Should().BeLessThan(tolerance);
-        (scale.y - (Fixed64)3).Abs().Should().BeLessThan(tolerance);
-        (scale.z - (Fixed64)4).Abs().Should().BeLessThan(tolerance);
+        Fixed64 tolerance = Fixed64.FromFraction(1, 1_000_000);
+        (scale.X - (Fixed64)2).Abs().Should().BeLessThan(tolerance);
+        (scale.Y - (Fixed64)3).Abs().Should().BeLessThan(tolerance);
+        (scale.Z - (Fixed64)4).Abs().Should().BeLessThan(tolerance);
     }
 }
