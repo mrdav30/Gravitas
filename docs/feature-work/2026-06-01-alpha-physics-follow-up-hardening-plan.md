@@ -595,23 +595,23 @@ complex meshes while preserving one host-facing collider identity.
 
 **Tasks**
 
-- [ ] Decide whether authored convex pieces should use existing
+- [x] Decide whether authored convex pieces should use existing
   `LSCompoundCollider`, a mesh-owned internal piece path, or both:
   - `LSCompoundCollider` is already one collider ID, one body binding, one
     broad-phase identity, one event surface, and stable part order.
   - A future mesh-owned piece path may be justified only if public compound
     semantics do not fit baked mesh assets.
-- [ ] Add tests that prove decomposed/authored assets do not leak internal
+- [x] Add tests that prove decomposed/authored assets do not leak internal
   collider IDs, pair ownership, events, diagnostics, hierarchy bindings, or
   broad-phase identities.
-- [ ] Add benchmark fixtures comparing raw concave triangle BVH against authored
+- [x] Add benchmark fixtures comparing raw concave triangle BVH against authored
   convex/compound proxies on dense meshes.
-- [ ] Document the tradeoff:
+- [x] Document the tradeoff:
   - raw triangle BVH is exact and strong for simple concave physics meshes.
   - dense rendered meshes should not be used as physics meshes.
   - complex collision assets should be simplified, decomposed, or authored as
     convex pieces offline.
-- [ ] Keep automatic runtime decomposition out of the simulation path.
+- [x] Keep automatic runtime decomposition out of the simulation path.
 
 **Exit Criteria**
 
@@ -620,6 +620,74 @@ complex meshes while preserving one host-facing collider identity.
 - Docs teach when to choose raw concave mesh collision versus authored compound
   pieces.
 - Runtime never silently decomposes or simplifies authoritative mesh geometry.
+
+**Progress - 2026-06-17**
+
+Decision: authored/offline convex collision assets should use
+`LSCompoundCollider` for alpha. It already has the exact runtime semantics this
+phase needs: one collider ID, one body binding, one broad-phase identity, one
+contact/event surface, stable internal part order, and explicit rejection of
+concave mesh parts. A dedicated mesh-owned internal piece path remains a future
+option only if baked mesh assets need public semantics that compound colliders
+cannot express.
+
+Implementation notes:
+
+- `CompoundColliderPart` now exposes an explicit local offset alongside local
+  rotation and local scale, plus constructors that let generated/offline data
+  author the whole part transform atomically.
+- Existing part construction that sets `collider.LocalOffset` before wrapping a
+  collider is still accepted; the compound part snapshots that offset as the
+  authored transform.
+- `LSCompoundCollider` reapplies the immutable authored part offset during
+  shape rebuilds so internal child collider mutation cannot silently change the
+  baked compound layout.
+- `LSMeshCollider` now applies `LocalOffset` to its `PhysicsMesh` transform by
+  translating the mesh origin relative to `PhysicsMesh.LocalBounds.Center`.
+  This keeps mesh vertices, mesh bounds, collider center, compound aggregation,
+  diagnostics, and triangle queries aligned when convex mesh pieces are
+  offset inside an authored compound.
+- Tests cover one public collider identity, private internal part IDs,
+  broad-phase owner membership, contact/event ownership, and diagnostics that
+  draw convex mesh parts through the compound owner ID.
+- Runtime automatic decomposition remains intentionally absent. Future
+  simplification/decomposition belongs to the separate Phase 4D tooling plan.
+
+Baseline artifacts captured before source changes:
+
+```powershell
+dotnet tests\Gravitas.Benchmarks\bin\Release\net8.0\Gravitas.Benchmarks.dll collision-detection --filter "*CollisionDetectionBenchmarks*" --job short --exporters json --artifacts artifacts\benchmarks\2026-06-17-phase4c-authored-convex-baseline
+dotnet tests\Gravitas.Benchmarks\bin\Release\net8.0\Gravitas.Benchmarks.dll collider-shape --filter "*ColliderShapeBenchmarks*" --job short --exporters json --artifacts artifacts\benchmarks\2026-06-17-phase4c-authored-convex-shape-baseline-rerun
+dotnet tests\Gravitas.Benchmarks\bin\Release\net8.0\Gravitas.Benchmarks.dll collision-detection --filter "*Authored*" --job short --exporters json --artifacts artifacts\benchmarks\2026-06-17-phase4c-authored-proxy-rows-baseline
+```
+
+The first broad `collider-shape` run emitted a BenchmarkDotNet child-process
+`AccessViolationException` after two measured iterations of
+`MoveCompoundRuntimeShapeStateAcrossPartitions`. A focused retry of that row
+and a full rerun completed cleanly, so the usable baseline is the rerun
+artifact above.
+
+Post-change authored proxy artifact:
+
+```powershell
+dotnet tests\Gravitas.Benchmarks\bin\Release\net8.0\Gravitas.Benchmarks.dll collision-detection --filter "*Authored*" --job short --exporters json --artifacts artifacts\benchmarks\2026-06-17-phase4c-authored-proxy-rows-after
+```
+
+Important rows:
+
+| Benchmark | Before | After | Allocated |
+| --- | ---: | ---: | ---: |
+| CheckDenseConcaveMeshMeshPairs | 41,212.1 us | n/a | 0 B |
+| CheckClosedDenseMeshMeshPairs | 298,802.6 us | n/a | 0 B |
+| CheckAuthoredCompoundProxyPairs | 555.1 us | 540.2 us | 0 B |
+| GenerateAuthoredCompoundProxyManifolds | 575.9 us | 573.6 us | 0 B |
+| CheckDenseConcaveMeshAuthoredCompoundProxyPairs | 29,003.2 us | 28,744.0 us | 0 B |
+
+The benchmark signal matches the policy: authored compound proxies are orders of
+magnitude cheaper when both sides avoid dense triangle sets. If a dense concave
+mesh remains in the pair, the raw triangle cost is still visible, so the docs
+should continue steering complex rendered meshes toward simplified/decomposed
+physics assets rather than runtime concave triangle collision.
 
 **Phase 4D: Mesh Simplification And Decomposition Tooling Plan**
 

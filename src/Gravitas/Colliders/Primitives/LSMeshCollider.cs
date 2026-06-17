@@ -65,8 +65,11 @@ public class LSMeshCollider : LSCollider
     protected override void BuildBoundingBox() =>
         SetBounds(Mesh.Bounds);
 
-    protected override void BuildShape() =>
-         Mesh.UpdatePosition(Position, Rotation);
+    protected override void BuildShape()
+    {
+        Vector3d meshOrigin = Position + (Rotation * (LocalOffset - Mesh.LocalBounds.Center));
+        Mesh.UpdatePosition(meshOrigin, Rotation);
+    }
 
     public override Fixed3x3 CalculateInertiaTensor(Fixed64 mass) =>
         Mesh.CalculateInertiaTensor(mass, InertiaPolicy);

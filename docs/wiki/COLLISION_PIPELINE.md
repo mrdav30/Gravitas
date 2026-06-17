@@ -212,7 +212,10 @@ separate host objects. A compound collider owns internal geometry parts under
 one collider ID, one body binding, one broad-phase entry, and one contact/event
 surface. Compound parts are not registered with `GravitasPhysicsService`, cannot
 be parented independently, and are scanned in stable part order by the owning
-compound collider.
+compound collider. `CompoundColliderPart` stores the authored local offset,
+rotation, and scale together; existing collider `LocalOffset` initializers are
+still accepted, but generated/offline asset data should prefer the explicit
+part transform constructor.
 
 Capsules rebuild their hemisphere centers, cylinder height, area, and segment
 endpoints together. Short capsules collapse to a sphere-like segment and use a
@@ -294,9 +297,12 @@ Mesh policy work should keep these boundaries explicit:
   part index. They aggregate part bounds, approximate mass/inertia from the
   parts, emit one event surface, and draw part geometry through the owning
   collider ID. Concave mesh parts are rejected; concave behavior belongs to
-  `LSMeshCollider`.
-- Host/offline convex decomposition should feed explicit convex mesh data or a
-  future mesh-piece data path without changing the owning collider identity.
+  `LSMeshCollider`. Authored/offline decomposed collision assets should use
+  `LSCompoundCollider` for alpha unless a future asset pipeline proves that
+  mesh-owned pieces need different public semantics.
+- Host/offline convex decomposition should feed explicit primitive or convex
+  mesh parts into the owning compound collider without changing the owning
+  collider identity. Runtime automatic decomposition remains out of scope.
   Automatic convex decomposition is not claimed unless the chosen algorithm is
   deterministic, bounded, tested on pathological input, and benchmarked. Ear
   clipping is a 2D polygon triangulation/partitioning tool, not a complete 3D

@@ -89,6 +89,7 @@ public sealed class LSCompoundCollider : LSCollider
         {
             CompoundColliderPart part = _parts[i];
             LSCollider partCollider = part.Collider;
+            partCollider.LocalOffset = part.LocalOffset;
             partCollider.BindCompoundPart(this, part.LocalRotation, part.LocalScale, Context);
 
             if (i == 0)

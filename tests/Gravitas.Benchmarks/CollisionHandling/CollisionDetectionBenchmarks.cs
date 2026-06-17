@@ -26,6 +26,8 @@ public class CollisionDetectionBenchmarks
     private CollisionPair[] _denseConcaveMeshMeshPairs;
     private CollisionPair[] _contactHeavyConcaveMeshMeshPairs;
     private CollisionPair[] _closedDenseMeshMeshPairs;
+    private CollisionPair[] _authoredCompoundProxyPairs;
+    private CollisionPair[] _denseConcaveMeshAuthoredCompoundProxyPairs;
     private CollisionPair[] _compoundSpherePairs;
 
     [Params(64)]
@@ -57,6 +59,8 @@ public class CollisionDetectionBenchmarks
         _denseConcaveMeshMeshPairs = CreatePairSet(CreateDenseConcaveMeshMeshPair);
         _contactHeavyConcaveMeshMeshPairs = CreatePairSet(CreateContactHeavyConcaveMeshMeshPair);
         _closedDenseMeshMeshPairs = CreatePairSet(CreateClosedDenseMeshMeshPair);
+        _authoredCompoundProxyPairs = CreatePairSet(CreateAuthoredCompoundProxyPair);
+        _denseConcaveMeshAuthoredCompoundProxyPairs = CreatePairSet(CreateDenseConcaveMeshAuthoredCompoundProxyPair);
         _compoundSpherePairs = CreatePairSet(CreateCompoundSpherePair);
     }
 
@@ -78,6 +82,8 @@ public class CollisionDetectionBenchmarks
         _denseConcaveMeshMeshPairs = null;
         _contactHeavyConcaveMeshMeshPairs = null;
         _closedDenseMeshMeshPairs = null;
+        _authoredCompoundProxyPairs = null;
+        _denseConcaveMeshAuthoredCompoundProxyPairs = null;
         _compoundSpherePairs = null;
     }
 
@@ -163,6 +169,24 @@ public class CollisionDetectionBenchmarks
     public int CheckClosedDenseMeshMeshPairs()
     {
         return CountCollisions(_closedDenseMeshMeshPairs);
+    }
+
+    [Benchmark]
+    public int CheckAuthoredCompoundProxyPairs()
+    {
+        return CountCollisions(_authoredCompoundProxyPairs);
+    }
+
+    [Benchmark]
+    public int GenerateAuthoredCompoundProxyManifolds()
+    {
+        return CountManifoldContacts(_authoredCompoundProxyPairs);
+    }
+
+    [Benchmark]
+    public int CheckDenseConcaveMeshAuthoredCompoundProxyPairs()
+    {
+        return CountCollisions(_denseConcaveMeshAuthoredCompoundProxyPairs);
     }
 
     [Benchmark]
@@ -349,6 +373,20 @@ public class CollisionDetectionBenchmarks
             CreateClosedDenseConcaveCube(origin + new Vector3d(Fixed64.FromFraction(1, 4), Fixed64.Zero, Fixed64.Zero)));
     }
 
+    private CollisionPair CreateAuthoredCompoundProxyPair(int index, Vector3d origin)
+    {
+        return new CollisionPair(
+            CreateAuthoredUChannelProxy(origin),
+            CreateAuthoredInsideCornerProxy(origin));
+    }
+
+    private CollisionPair CreateDenseConcaveMeshAuthoredCompoundProxyPair(int index, Vector3d origin)
+    {
+        return new CollisionPair(
+            CreateDenseConcaveUChannel(origin),
+            CreateAuthoredInsideCornerProxy(origin));
+    }
+
     private CollisionPair CreateCompoundSpherePair(int index, Vector3d origin)
     {
         return new CollisionPair(
@@ -375,6 +413,39 @@ public class CollisionDetectionBenchmarks
                 new CompoundColliderPart(new LSSphereCollider { LocalOffset = new Vector3d(Fixed64.One, Fixed64.Zero, Fixed64.Zero) })),
             position,
             preventAngularForces: true).Collider;
+
+    private LSCompoundCollider CreateAuthoredUChannelProxy(Vector3d position) =>
+        CreateBody(
+            new LSCompoundCollider(
+                CreateCuboidPart(
+                    new Vector3d((Fixed64)(-2), Fixed64.One, (Fixed64)2),
+                    new Vector3d(Fixed64.FromFraction(1, 4), (Fixed64)2, (Fixed64)4)),
+                CreateCuboidPart(
+                    new Vector3d((Fixed64)2, Fixed64.One, (Fixed64)2),
+                    new Vector3d(Fixed64.FromFraction(1, 4), (Fixed64)2, (Fixed64)4)),
+                CreateCuboidPart(
+                    new Vector3d(Fixed64.Zero, Fixed64.One, Fixed64.Zero),
+                    new Vector3d((Fixed64)4, (Fixed64)2, Fixed64.FromFraction(1, 4)))),
+            position,
+            preventAngularForces: true).Collider;
+
+    private LSCompoundCollider CreateAuthoredInsideCornerProxy(Vector3d position) =>
+        CreateBody(
+            new LSCompoundCollider(
+                CreateCuboidPart(
+                    new Vector3d((Fixed64)2, Fixed64.Zero, (Fixed64)2),
+                    new Vector3d((Fixed64)4, Fixed64.FromFraction(1, 4), (Fixed64)4)),
+                CreateCuboidPart(
+                    new Vector3d(Fixed64.Zero, (Fixed64)2, (Fixed64)2),
+                    new Vector3d(Fixed64.FromFraction(1, 4), (Fixed64)4, (Fixed64)4)),
+                CreateCuboidPart(
+                    new Vector3d((Fixed64)2, (Fixed64)2, Fixed64.Zero),
+                    new Vector3d((Fixed64)4, (Fixed64)4, Fixed64.FromFraction(1, 4)))),
+            position,
+            preventAngularForces: true).Collider;
+
+    private static CompoundColliderPart CreateCuboidPart(Vector3d localOffset, Vector3d size) =>
+        new(new LSCuboidCollider { Size = size }, localOffset);
 
     private LSMeshCollider CreateMeshFloor(Vector3d position) =>
         CreateBody(
