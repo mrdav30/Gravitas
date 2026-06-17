@@ -160,9 +160,11 @@ public sealed class GravitasQueryMixedService
 
         Vector3d start3D = new(start.X, slabCenterY, start.Y);
         Vector3d end3D = new(end.X, slabCenterY, end.Y);
-        Vector3d direction = (end3D - start3D).Normalized;
+        Fixed64 length = segment.Magnitude;
+        Vector2d direction2D = segment / length;
+        Vector3d direction = new(direction2D.X, Fixed64.Zero, direction2D.Y);
         Fixed64 proxyRadius = FixedMath.Max(radius, halfThickness);
-        CreateSweepBounds(start3D, end3D, proxyRadius, out Vector3d min, out Vector3d max);
+        CreateCircleSlabSweepBounds(start, end, radius, slabCenterY, halfThickness, out Vector3d min, out Vector3d max);
         _context.MixedCollisions.Collect3DCandidatesInMixedBounds(min, max, layerMask, _candidates3D);
         LastQueryCandidateCount = _candidates3D.Count;
         _sweepWorker.Prepare(start3D, end3D, proxyRadius);
@@ -171,20 +173,22 @@ public sealed class GravitasQueryMixedService
         {
             LSCollider collider = _candidates3D[i];
             if (!IsEligible3DTarget(collider, excludedCollider, includeTriggers)
-                || !_sweepWorker.TrySweep(collider, out Vector3d centerAtImpact, out Fixed64 distance))
+                || !TrySweepCircleAgainst3DCollider(
+                    collider,
+                    start,
+                    direction2D,
+                    length,
+                    radius,
+                    slabCenterY,
+                    halfThickness,
+                    direction,
+                    excludedCollider,
+                    out PhysicsMixedHit candidate))
             {
                 continue;
             }
 
-            results.Add(BuildCircleAgainst3DHit(
-                collider,
-                centerAtImpact,
-                direction,
-                radius,
-                slabCenterY,
-                halfThickness,
-                distance,
-                excludedCollider));
+            results.Add(candidate);
         }
 
         PhysicsMixedHitSorter.SortByDistance(results);
@@ -199,6 +203,51 @@ public sealed class GravitasQueryMixedService
         return results.Count;
     }
 
+    private bool TrySweepCircleAgainst3DCollider(
+        LSCollider collider,
+        Vector2d start,
+        Vector2d direction2D,
+        Fixed64 length,
+        Fixed64 radius,
+        Fixed64 slabCenterY,
+        Fixed64 halfThickness,
+        Vector3d direction3D,
+        LSCollider2D? sourceCollider,
+        out PhysicsMixedHit hit)
+    {
+        if (collider is LSSphereCollider sphere)
+        {
+            return TrySweepCircleAgainstSphere(
+                start,
+                direction2D,
+                length,
+                radius,
+                slabCenterY,
+                halfThickness,
+                direction3D,
+                sphere,
+                sourceCollider,
+                out hit);
+        }
+
+        if (!_sweepWorker.TrySweep(collider, out Vector3d centerAtImpact, out Fixed64 distance))
+        {
+            hit = default;
+            return false;
+        }
+
+        hit = BuildCircleAgainst3DHit(
+            collider,
+            centerAtImpact,
+            direction3D,
+            radius,
+            slabCenterY,
+            halfThickness,
+            distance,
+            sourceCollider);
+        return true;
+    }
+
     private static bool TrySweepSphereAgainst2D(
         Vector3d start,
         Vector3d direction,
@@ -211,6 +260,91 @@ public sealed class GravitasQueryMixedService
             return TrySweepSphereAgainstCircleSlab(start, direction, length, radius, circle, out hit);
 
         return TrySweepSphereAgainstPrismBounds(start, direction, length, radius, collider, out hit);
+    }
+
+    private static bool TrySweepCircleAgainstSphere(
+        Vector2d start,
+        Vector2d direction,
+        Fixed64 length,
+        Fixed64 radius,
+        Fixed64 slabCenterY,
+        Fixed64 halfThickness,
+        Vector3d direction3D,
+        LSSphereCollider sphere,
+        LSCollider2D? sourceCollider,
+        out PhysicsMixedHit hit)
+    {
+        Fixed64 sphereRadius = sphere.ScaledRadius;
+        Fixed64 verticalExcess = (sphere.Center.Y - slabCenterY).Abs() - halfThickness;
+        if (verticalExcess < Fixed64.Zero)
+            verticalExcess = Fixed64.Zero;
+        if (verticalExcess > sphereRadius)
+        {
+            hit = default;
+            return false;
+        }
+
+        Fixed64 planarSphereRadiusSqr = sphereRadius * sphereRadius - verticalExcess * verticalExcess;
+        if (planarSphereRadiusSqr < Fixed64.Zero)
+            planarSphereRadiusSqr = Fixed64.Zero;
+
+        Fixed64 combinedPlanarRadius = radius + FixedMath.Sqrt(planarSphereRadiusSqr);
+        Vector2d sphereCenter = new(sphere.Center.X, sphere.Center.Z);
+        if (!TrySweepPointInPlane(start, direction, length, sphereCenter, combinedPlanarRadius, out Fixed64 distance))
+        {
+            hit = default;
+            return false;
+        }
+
+        Vector2d center2D = start + direction * distance;
+        Vector3d sweepCenter = new(center2D.X, slabCenterY, center2D.Y);
+        hit = BuildCircleAgainst3DHit(
+            sphere,
+            sweepCenter,
+            direction3D,
+            radius,
+            slabCenterY,
+            halfThickness,
+            distance,
+            sourceCollider);
+        return true;
+    }
+
+    private static bool TrySweepPointInPlane(
+        Vector2d start,
+        Vector2d direction,
+        Fixed64 length,
+        Vector2d point,
+        Fixed64 radius,
+        out Fixed64 distance)
+    {
+        Fixed64 radiusSqr = radius * radius;
+        Vector2d startToPoint = start - point;
+        if (startToPoint.MagnitudeSquared <= radiusSqr)
+        {
+            distance = Fixed64.Zero;
+            return true;
+        }
+
+        Fixed64 b = Vector2d.Dot(startToPoint, direction);
+        Fixed64 c = startToPoint.MagnitudeSquared - radiusSqr;
+        if (c > Fixed64.Zero && b > Fixed64.Zero)
+        {
+            distance = default;
+            return false;
+        }
+
+        Fixed64 discriminant = b * b - c;
+        if (discriminant < Fixed64.Zero)
+        {
+            distance = default;
+            return false;
+        }
+
+        distance = -b - FixedMath.Sqrt(discriminant);
+        if (distance < Fixed64.Zero)
+            distance = Fixed64.Zero;
+        return distance <= length;
     }
 
     private static bool TrySweepSphereAgainstCircleSlab(
@@ -555,6 +689,26 @@ public sealed class GravitasQueryMixedService
         Vector3d radiusExtents = Vector3d.One * radius;
         min = Vector3d.Min(start, end) - radiusExtents;
         max = Vector3d.Max(start, end) + radiusExtents;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void CreateCircleSlabSweepBounds(
+        Vector2d start,
+        Vector2d end,
+        Fixed64 radius,
+        Fixed64 slabCenterY,
+        Fixed64 halfThickness,
+        out Vector3d min,
+        out Vector3d max)
+    {
+        min = new Vector3d(
+            FixedMath.Min(start.X, end.X) - radius,
+            slabCenterY - halfThickness,
+            FixedMath.Min(start.Y, end.Y) - radius);
+        max = new Vector3d(
+            FixedMath.Max(start.X, end.X) + radius,
+            slabCenterY + halfThickness,
+            FixedMath.Max(start.Y, end.Y) + radius);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

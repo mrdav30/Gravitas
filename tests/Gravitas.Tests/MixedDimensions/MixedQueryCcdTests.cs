@@ -75,6 +75,49 @@ public sealed class MixedQueryCcdTests
     }
 
     [Fact]
+    public void SweepCircleAgainst3D_WithTallSlabAndPlanarSeparation_ShouldRejectProxyOnlySphereHit()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        _ = CreateSphere3D(context, Vector3d.Zero, immovable: true);
+        var hits = new SwiftList<PhysicsMixedHit>();
+
+        int count = context.QueryMixed.SweepCircleAgainst3DAll(
+            new Vector2d((Fixed64)(-3), (Fixed64)2),
+            new Vector2d((Fixed64)3, (Fixed64)2),
+            Fixed64.Half,
+            Fixed64.Zero,
+            (Fixed64)2,
+            IncludeLayerZero,
+            hits);
+
+        count.Should().Be(0);
+        hits.Count.Should().Be(0);
+    }
+
+    [Fact]
+    public void SweepCircleAgainst3D_NearSlabCorner_ShouldUseVerticalOverlapToReducePlanarSphereReach()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        _ = CreateSphere3D(
+            context,
+            new Vector3d(Fixed64.Zero, Fixed64.FromFraction(9, 10), Fixed64.Zero),
+            immovable: true);
+        var hits = new SwiftList<PhysicsMixedHit>();
+
+        int count = context.QueryMixed.SweepCircleAgainst3DAll(
+            new Vector2d((Fixed64)(-3), Fixed64.FromFraction(9, 10)),
+            new Vector2d((Fixed64)3, Fixed64.FromFraction(9, 10)),
+            Fixed64.Half,
+            Fixed64.Zero,
+            Fixed64.Half,
+            IncludeLayerZero,
+            hits);
+
+        count.Should().Be(0);
+        hits.Count.Should().Be(0);
+    }
+
+    [Fact]
     public void SweepCircleAgainst3D_ShouldHitMeshTargetThroughTriangleGeometry()
     {
         using GravitasWorldContext context = CreateMixedContext();

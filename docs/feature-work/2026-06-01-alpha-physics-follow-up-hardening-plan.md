@@ -148,35 +148,82 @@ baseline is recorded here for future comparison.
 
 ## Phase 2: Mixed Swept-Circle Precision
 
-**Goal:** Revisit the current mixed 2D-circle vs 3D sweep policy where
-`SweepCircleAgainst3D` uses `max(radius, halfThickness)` as a conservative
-swept-sphere proxy.
+**Goal:** Revisit the mixed 2D-circle vs 3D sweep policy that originally used
+`max(radius, halfThickness)` as a conservative swept-sphere proxy.
 
 **Context**
 
-The current policy is deterministic, simple, and intentionally conservative. It
-can over-report near tall slab corners because it is not a full swept
-prism/capsule-like solver. The current tests pin this alpha behavior; do not
-pretend it is physically exact.
+The original policy was deterministic, simple, and intentionally conservative,
+but it could over-report near tall slab corners because it was not a full swept
+prism/capsule-like solver. Sphere targets now use an exact finite-slab
+projection; other target families still retain the conservative fallback until
+shape-specific solvers are justified.
 
 **Tasks**
 
-- [ ] Add targeted tests that demonstrate current over-report behavior at slab
+- [x] Add targeted tests that demonstrate current over-report behavior at slab
   corners and tall thickness values.
-- [ ] Design a deterministic swept-circle/slab or swept-prism solver that keeps
+- [x] Design a deterministic swept-circle/slab or swept-prism solver that keeps
   stable ordering and explicit failure behavior.
-- [ ] Compare the exact solver against the current swept-sphere proxy for:
+- [x] Compare the exact solver against the current swept-sphere proxy for:
   - correctness on corner/edge cases.
   - false-positive rate.
   - steady-state allocation.
   - sparse and dense query cost.
-- [ ] Keep the proxy path only if it remains the better alpha tradeoff and is
+- [x] Keep the proxy path only if it remains the better alpha tradeoff and is
   clearly documented as conservative.
 
 **Exit Criteria**
 
 - Mixed swept-circle behavior is either made more exact or the conservative
   proxy is retained with explicit tests, docs, and benchmark justification.
+
+**Progress - 2026-06-17**
+
+Implemented the first exact finite-slab solver for
+`SweepCircleAgainst3D` sphere targets. The sphere solver keeps the 2D source as
+a finite vertical slab: vertical overlap determines the sphere's effective
+planar reach, then a deterministic 2D point sweep produces the time of impact.
+This removes false positives where the old `max(radius, halfThickness)`
+swept-sphere proxy inflated horizontal reach for tall slabs or rounded slab
+corner cases.
+
+The broad-phase query bounds now use the swept circle-slab volume instead of the
+proxy sphere radius. Capsule, cuboid, finite cylinder, mesh, and compound
+targets still use the existing conservative swept-sphere worker fallback. That
+fallback remains documented as an alpha tradeoff in `docs/wiki/QUERY_SERVICES.md`
+until shape-specific finite-slab solvers replace it.
+
+New tests:
+
+- `SweepCircleAgainst3D_WithTallSlabAndPlanarSeparation_ShouldRejectProxyOnlySphereHit`
+- `SweepCircleAgainst3D_NearSlabCorner_ShouldUseVerticalOverlapToReducePlanarSphereReach`
+
+New benchmark selection:
+
+- `mixed-query` -> `MixedQueryBenchmarks`
+
+No preserved pre-change mixed-query benchmark existed for the old proxy path, so
+the correctness comparison is covered by red/green false-positive tests and the
+following ShortRun numbers are the forward performance baseline.
+
+Post-change mixed-query benchmark baseline:
+
+```powershell
+dotnet tests\Gravitas.Benchmarks\bin\Release\net8.0\Gravitas.Benchmarks.dll mixed-query --filter "*" --job short --exporters json --artifacts artifacts\benchmarks\2026-06-17-phase2-mixed-query
+```
+
+BenchmarkDotNet ShortRun baseline on Windows 11, .NET 8.0.28, Intel Core
+i7-9700K:
+
+| Method | Size | Mean | Allocated |
+| --- | ---: | ---: | ---: |
+| SweepCircleAgainst3DAll_SparseSphereTargets | 64 | 549.2 us | 0 B |
+| SweepCircleAgainst3DAll_DenseSphereTargets | 64 | 243.5 us | 0 B |
+| SweepCircleAgainst3DAll_CornerProxyMissSphereTargets | 64 | 143.3 us | 0 B |
+| SweepCircleAgainst3DAll_SparseSphereTargets | 1024 | 17,070.5 us | 0 B |
+| SweepCircleAgainst3DAll_DenseSphereTargets | 1024 | 6,885.9 us | 0 B |
+| SweepCircleAgainst3DAll_CornerProxyMissSphereTargets | 1024 | 4,016.7 us | 0 B |
 
 ## Phase 3: Retained Partition Reset Semantics
 

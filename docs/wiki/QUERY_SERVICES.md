@@ -220,11 +220,18 @@ slabs. 2D circles are treated as finite vertical cylinders; AABB and polygon
 slabs use their finite mixed prism bounds for the current alpha query policy.
 
 `SweepCircleAgainst3D` sweeps a pure 2D circle embedded at the supplied slab Y
-center and half-thickness against 3D sphere, capsule, cuboid, finite cylinder,
-mesh, and compound targets through the shared swept-sphere worker. Mesh targets
-use triangle candidate acceleration and exact face/edge/vertex TOI checks;
+center and half-thickness against 3D targets. Sphere targets use an exact
+finite-slab projection: vertical overlap determines the sphere's effective
+planar reach, so tall slabs and slab-corner cases do not inflate the horizontal
+sweep radius. Candidate bounds use the swept slab extents rather than the older
+`max(radius, halfThickness)` proxy.
+
+Capsule, cuboid, finite cylinder, mesh, and compound targets currently retain
+the conservative swept-sphere worker fallback. Mesh targets still use triangle
+candidate acceleration and face/edge/vertex TOI checks within that fallback;
 compound targets return one hit on the owning compound collider after reducing
-over stable part order.
+over stable part order. Treat non-sphere mixed swept-circle hits as alpha
+conservative until shape-specific finite-slab solvers replace the fallback.
 
 `StiffBody` and `StiffBody2D` mixed CCD use these APIs only when the context is
 in `PhysicsRuntimeMode.Mixed`. Pure `Both` mode still advances 2D and 3D
