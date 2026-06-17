@@ -315,48 +315,170 @@ ShortRun variance is high for the large mixed retained-cleanup rows, but the
 existing steady-state partitioning selections did not show a meaningful
 regression from reset-only lifecycle cleanup.
 
-## Phase 4: Mesh Decomposition And Closed-Volume Policy
+## Phase 4: Mesh Volume, Dense Concavity, And Authored Collision Assets
 
-**Goal:** Revisit host/offline decomposed convex-piece support and any
-Gravitas-owned deterministic convex decomposition only if evidence shows the
-raw local-BVH triangle path is not enough for alpha-scale concave mesh
-collision, closed-volume mass/inertia work, or contact-heavy scenes.
+**Goal:** Hardening mesh physics for alpha without turning runtime collision
+into an implicit asset-processing pipeline. Runtime mesh collision should keep
+the raw local-BVH triangle path for simple concave geometry, require meaningful
+closed-volume mass properties for dynamic mesh bodies by default, and give
+users an explicit authored convex-piece path for complex collision assets.
 
 **Context**
 
 Phase 7B made `MeshColliderMode.Concave` work through raw triangle-set
-narrow-phase using local-BVH candidate gathering. That path is the alpha
-baseline. Decomposed convex pieces are not required for current concave mesh
-collision, and they must not leak internal collider identities or masquerade as
-`LSCompoundCollider` parts.
+narrow-phase using local-BVH candidate gathering. The first Phase 4 evaluation
+kept that baseline: the `SwiftFixedBVH<int>` stores triangle bounds in local
+mesh space, rigid movement updates transform-derived state without rebuilding
+topology, and existing tests pin open-channel and inside-corner behavior so
+concave meshes do not collapse into accidental convex hulls.
+
+The current baseline also shows the real pressure point. ShortRun
+`collision-detection` and `collider-shape` artifacts were captured before any
+Phase 4 implementation:
+
+```powershell
+dotnet tests\Gravitas.Benchmarks\bin\Release\net8.0\Gravitas.Benchmarks.dll collider-shape collision-detection --filter "*" --job short --exporters json --artifacts artifacts\benchmarks\2026-06-17-phase4-mesh-policy-baseline
+```
+
+Important rows:
+
+| Method | Size | Mean | Allocated |
+| --- | ---: | ---: | ---: |
+| BuildValidatedMeshTriangleBVH | 64 | 2.031 us | 2944 B |
+| MoveMeshRuntimeShapeStateAndQueryTriangles | 64 | 9.282 us | 0 B |
+| MoveDynamicConcaveMeshAndQueryTriangles | 64 | 41.145 us | 0 B |
+| MoveCompoundRuntimeShapeStateAcrossPartitions | 64 | 28.086 us | 0 B |
+| CheckMeshMeshPairs | 64 | 449.94 us | 0 B |
+| CheckConcaveMeshCuboidPairs | 64 | 1,529.12 us | 0 B |
+| CheckConcaveMeshMeshPairs | 64 | 6,667.72 us | 0 B |
+
+Focused mesh, mixed, and swept-query tests passed under `ReleaseLean`:
+
+```powershell
+dotnet test tests\Gravitas.Tests\Gravitas.Tests.csproj --configuration ReleaseLean --nologo --filter "FullyQualifiedName~ConcaveMesh|FullyQualifiedName~PhysicsMesh|FullyQualifiedName~MeshColliderMode|FullyQualifiedName~LSMeshColliderQuery|FullyQualifiedName~MeshTriangleQueryAllocation|FullyQualifiedName~MixedNarrowPhase|FullyQualifiedName~GravitasQuery3DServiceSweep"
+```
+
+Result: 58 passed, 0 failed.
+
+**Phase 4A: Closed-Volume Mesh Inertia**
+
+**Goal:** Make dynamic mesh mass properties physically meaningful by default.
+Closed-volume inertia is an alpha release requirement; dynamic open/surface
+meshes may remain possible only through an explicit opt-in approximation policy.
 
 **Tasks**
 
-- [ ] Build comparison fixtures for raw triangle-BVH concave collision versus
-  decomposed convex pieces across:
-  - dense concave meshes.
-  - dynamic concave bodies.
-  - contact-heavy inside corners and U-channels.
-  - closed-volume inertia and mass scenarios.
-- [ ] Evaluate host/offline decomposed convex-piece support as an optional
-  `LSMeshCollider` data path only if benchmarks or solver-quality tests justify
-  it. The owning mesh must still expose one collider ID, one body binding, one
-  event surface, and one broad-phase identity.
-- [ ] Evaluate Gravitas-owned deterministic convex decomposition as explicit
-  preprocessing R&D only if Gravitas needs an engine-agnostic asset-prep path.
-- [ ] If decomposition is attempted, require deterministic ordering,
-  deterministic tie-breakers, bounded failure/result codes, pathological mesh
-  tests, and benchmarks against the raw local-BVH triangle path.
-- [ ] Document whether decomposition improves collision quality, inertia
-  quality, query cost, or merely adds complexity.
+- [ ] Define mesh volume policy:
+  - dynamic mesh bodies default to requiring a validated closed volume.
+  - static, bodyless, immovable, and kinematic surface meshes remain legal for
+    collision where existing behavior is correct.
+  - dynamic open/surface meshes require an explicit surface-inertia
+    approximation opt-in or caller-supplied inertia policy.
+- [ ] Add deterministic mesh topology validation for closed-volume eligibility:
+  - every undirected edge has exactly two incident triangles.
+  - triangle winding is consistently oriented or deterministically normalized.
+  - zero-area, non-manifold, boundary, duplicate, and disconnected shell cases
+    return explicit failure reasons.
+- [ ] Implement or specify closed-polyhedron mass properties using fixed-point
+  signed tetrahedral integration over triangle faces.
+- [ ] Add reference tests for cube, rectangular prism, tetrahedron or simple
+  wedge, translated mesh, rotated mesh, reversed winding, open plane, open
+  U-channel, non-manifold edge, and disconnected shells.
+- [ ] Add benchmarks for validation and mass-property generation on small,
+  medium, and dense closed meshes.
+- [ ] Update `docs/wiki/COLLISION_PIPELINE.md` and public XML docs so users
+  understand when mesh inertia is solid-volume truth, explicit approximation,
+  or rejected.
 
 **Exit Criteria**
 
-- Raw triangle-BVH remains the documented baseline unless decomposition has
-  measurable correctness or complexity value.
-- Any decomposition path preserves single-collider external identity.
-- No runtime implicit decomposition mutates mesh collision truth behind the
-  developer's back.
+- Dynamic closed mesh inertia is deterministic, tested against fixed expected
+  values, and independent of rigid movement.
+- Dynamic open/surface mesh inertia is never a silent default.
+- Alpha docs clearly explain the runtime distinction between surface collision
+  data and solid mass properties.
+
+**Phase 4B: Concave Mesh-Mesh Hotspot**
+
+**Goal:** Reduce the dense concave mesh-mesh cost without losing exact triangle
+collision truth for simple meshes where raw BVH remains the right answer.
+
+**Tasks**
+
+- [ ] Add comparison fixtures for simple concave, dense concave, contact-heavy
+  U-channel, inside-corner, closed dense shell, and dynamic concave cases.
+- [ ] Benchmark current triangle-gather mesh-mesh behavior before changing the
+  algorithm.
+- [ ] Evaluate direct BVH-vs-BVH paired traversal for mesh-mesh candidate
+  generation so repeated per-triangle queries are reduced.
+- [ ] Preserve deterministic candidate order, contact identity, manifold
+  reduction, and zero-allocation steady-state behavior.
+- [ ] Compare raw triangle BVH, BVH-vs-BVH traversal, and authored convex-piece
+  collision assets for:
+  - candidate count.
+  - contact correctness.
+  - manifold quality.
+  - dense mesh-mesh cost.
+  - simple mesh overhead.
+- [ ] Document whether the final recommendation is raw triangle BVH, paired BVH
+  traversal, authored decomposition, or a thresholded combination.
+
+**Exit Criteria**
+
+- Concave mesh-mesh has a measured alpha policy instead of an unexamined
+  hotspot.
+- Simple concave meshes keep the exact triangle-BVH path unless a replacement is
+  measurably better without added complexity.
+- Dense/complex collision assets have a documented alternative path.
+
+**Phase 4C: Authored Convex Collision Assets**
+
+**Goal:** Let users choose authored/offline decomposed convex collision data for
+complex meshes while preserving one host-facing collider identity.
+
+**Tasks**
+
+- [ ] Decide whether authored convex pieces should use existing
+  `LSCompoundCollider`, a mesh-owned internal piece path, or both:
+  - `LSCompoundCollider` is already one collider ID, one body binding, one
+    broad-phase identity, one event surface, and stable part order.
+  - A future mesh-owned piece path may be justified only if public compound
+    semantics do not fit baked mesh assets.
+- [ ] Add tests that prove decomposed/authored assets do not leak internal
+  collider IDs, pair ownership, events, diagnostics, hierarchy bindings, or
+  broad-phase identities.
+- [ ] Add benchmark fixtures comparing raw concave triangle BVH against authored
+  convex/compound proxies on dense meshes.
+- [ ] Document the tradeoff:
+  - raw triangle BVH is exact and strong for simple concave physics meshes.
+  - dense rendered meshes should not be used as physics meshes.
+  - complex collision assets should be simplified, decomposed, or authored as
+    convex pieces offline.
+- [ ] Keep automatic runtime decomposition out of the simulation path.
+
+**Exit Criteria**
+
+- Authored convex-piece collision is clear, tested, and externally represented
+  as one collider/body surface.
+- Docs teach when to choose raw concave mesh collision versus authored compound
+  pieces.
+- Runtime never silently decomposes or simplifies authoritative mesh geometry.
+
+**Phase 4D: Mesh Simplification And Decomposition Tooling Plan**
+
+Future Gravitas-owned mesh simplification and decomposition should live in a
+separate solution project/package, not in runtime simulation code. Track that
+effort in
+[`2026-06-17-mesh-tooling-simplification-and-decomposition-plan.md`](2026-06-17-mesh-tooling-simplification-and-decomposition-plan.md).
+
+Research context from CGAL and decomposition literature should inform the
+tooling design, but not create a runtime dependency. Exact convex decomposition
+of closed polyhedra can produce `O(r^2)` convex pieces in the number of reflex
+edges, while approximate convex decomposition can produce fewer, tighter
+runtime shapes by allowing controlled volume over-coverage. Any future Gravitas
+tool should expose deterministic failure/result codes, stable ordering, bounded
+settings, and benchmarked quality metrics before its output becomes a
+recommended alpha asset path.
 
 ## Phase 5: Dynamic CCD And Swept Mesh Families
 
