@@ -4,8 +4,8 @@
     <DataCollectors>
       <DataCollector friendlyName="XPlat code coverage">
         <Configuration>
-          <Format>cobertura</Format>
-          <Include>[Gravitas]*</Include>
+          <Format>cobertura,opencover</Format>
+          <Include>[Gravitas*]*</Include>
           <ExcludeByFile>**/bin/**,**/obj/**,**/*.g.cs,**/MemoryPack.Generator/**/*.cs</ExcludeByFile>
           <ExcludeByAttribute>GeneratedCodeAttribute,CompilerGeneratedAttribute,ExcludeFromCodeCoverageAttribute</ExcludeByAttribute>
           <IncludeTestAssembly>false</IncludeTestAssembly>

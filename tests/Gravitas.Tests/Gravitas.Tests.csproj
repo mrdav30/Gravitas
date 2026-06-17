@@ -8,14 +8,13 @@
 		<IsTestProject>true</IsTestProject>
 		<Configurations>Debug;Release;ReleaseLean</Configurations>
 		<OutputType>Exe</OutputType>
-		<RunSettingsFilePath>$(MSBuildThisFileDirectory)coverlet.runsettings</RunSettingsFilePath>
 	</PropertyGroup>
 	<PropertyGroup Condition="'$(Configuration)' == 'ReleaseLean'">
 		<DefineConstants>$(DefineConstants);GRAVITAS_DISABLE_MEMORYPACK</DefineConstants>
 	</PropertyGroup>
 	<ItemGroup>
 		<ProjectReference Include="..\..\src\Gravitas\Gravitas.csproj" />
-		<PackageReference Include="FixedMathSharp.FluentAssertions" Version="4.0.0" />
+		<PackageReference Include="FixedMathSharp.FluentAssertions" Version="5.0.1" />
 		<PackageReference Include="FluentAssertions" Version="8.10.0" />
 		<PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.5.1" />
 		<PackageReference Include="Moq" Version="4.20.72" />
