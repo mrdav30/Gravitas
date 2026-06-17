@@ -205,7 +205,7 @@ public sealed class ConcaveMeshCollisionTests
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSMeshCollider> channel = scenario.CreateBody(
-            MeshTestFixtures.CreateUChannel(),
+            MeshTestFixtures.CreateUChannel(inertiaPolicy: MeshInertiaPolicy.SurfaceApproximation),
             PhysicsScenarioBuilder.Vector(0, 0, 0),
             FixedQuaternion.Identity);
         ScenarioBody<LSCuboidCollider> cuboid = scenario.CreateCuboid(

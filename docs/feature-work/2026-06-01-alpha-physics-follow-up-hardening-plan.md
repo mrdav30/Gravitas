@@ -368,25 +368,25 @@ meshes may remain possible only through an explicit opt-in approximation policy.
 
 **Tasks**
 
-- [ ] Define mesh volume policy:
+- [x] Define mesh volume policy:
   - dynamic mesh bodies default to requiring a validated closed volume.
   - static, bodyless, immovable, and kinematic surface meshes remain legal for
     collision where existing behavior is correct.
   - dynamic open/surface meshes require an explicit surface-inertia
     approximation opt-in or caller-supplied inertia policy.
-- [ ] Add deterministic mesh topology validation for closed-volume eligibility:
+- [x] Add deterministic mesh topology validation for closed-volume eligibility:
   - every undirected edge has exactly two incident triangles.
   - triangle winding is consistently oriented or deterministically normalized.
   - zero-area, non-manifold, boundary, duplicate, and disconnected shell cases
     return explicit failure reasons.
-- [ ] Implement or specify closed-polyhedron mass properties using fixed-point
+- [x] Implement or specify closed-polyhedron mass properties using fixed-point
   signed tetrahedral integration over triangle faces.
-- [ ] Add reference tests for cube, rectangular prism, tetrahedron or simple
+- [x] Add reference tests for cube, rectangular prism, tetrahedron or simple
   wedge, translated mesh, rotated mesh, reversed winding, open plane, open
   U-channel, non-manifold edge, and disconnected shells.
-- [ ] Add benchmarks for validation and mass-property generation on small,
+- [x] Add benchmarks for validation and mass-property generation on small,
   medium, and dense closed meshes.
-- [ ] Update `docs/wiki/COLLISION_PIPELINE.md` and public XML docs so users
+- [x] Update `docs/wiki/COLLISION_PIPELINE.md` and public XML docs so users
   understand when mesh inertia is solid-volume truth, explicit approximation,
   or rejected.
 
@@ -397,6 +397,91 @@ meshes may remain possible only through an explicit opt-in approximation policy.
 - Dynamic open/surface mesh inertia is never a silent default.
 - Alpha docs clearly explain the runtime distinction between surface collision
   data and solid mass properties.
+
+**Progress - 2026-06-17**
+
+Implemented `MeshInertiaPolicy.RequireClosedVolume` as the default for mesh
+inertia and `MeshInertiaPolicy.SurfaceApproximation` as the explicit legacy
+surface-area approximation path. `StiffBody` now asks colliders for inertia only
+when angular dynamics are active, so bodyless/static, immovable, kinematic, and
+angular-force-disabled mesh surfaces do not get forced through volume
+validation.
+
+`PhysicsMesh.TryGetClosedVolumeMassProperties(...)` validates closed-volume
+eligibility by sorting deterministic triangle and edge uses: triangles cannot be
+duplicated, every undirected edge must have exactly two incident triangles,
+adjacent triangle edge directions must oppose each other, and all triangles must
+belong to one connected shell. Whole-mesh reversed winding is accepted and
+normalized through signed volume. Boundary, duplicate-triangle, non-manifold,
+inconsistent-winding, disconnected-shell, and zero-volume failure states are
+surfaced through `MeshVolumeValidationResult`.
+
+Closed-volume inertia is integrated with fixed-point signed tetrahedra over the
+triangle faces and cached on the immutable mesh topology. Because Gravitas does
+not yet have a body center-of-mass offset model, the runtime tensor remains
+diagonal about the collider reference center (`PhysicsMesh.LocalBounds.Center`);
+`MeshMassProperties.CenterOfMass` is exposed for a future COM-offset hardening
+pass. While touching inertia setup, `StiffBody` now correctly rotates a nonzero
+inverse inertia tensor into the body's initial orientation.
+
+Focused tests cover closed unit-cube inertia, rigid movement invariance,
+reversed winding, explicit open-surface approximation, open plane rejection,
+duplicate-face rejection, non-manifold edge rejection, disconnected
+closed-shell rejection, default dynamic open-mesh rejection,
+bodyless/immovable/kinematic legality, and rotated non-uniform cuboid
+inverse-inertia orientation.
+
+Phase 4A pre-change mesh baseline:
+
+```powershell
+dotnet tests\Gravitas.Benchmarks\bin\Release\net8.0\Gravitas.Benchmarks.dll collider-shape --filter "*Mesh*" --job short --exporters json --artifacts artifacts\benchmarks\2026-06-17-phase4a-closed-volume-inertia-baseline
+```
+
+Forward mass-property benchmark baseline:
+
+```powershell
+dotnet tests\Gravitas.Benchmarks\bin\Release\net8.0\Gravitas.Benchmarks.dll mesh-mass-property --filter "*" --job short --exporters json --artifacts artifacts\benchmarks\2026-06-17-phase4a-closed-volume-inertia-after-duplicate-validation
+```
+
+| Method | Subdivision | Mean | Allocated |
+| --- | ---: | ---: | ---: |
+| BuildValidatedMeshTriangleBVH | n/a | 1.913 us | 2944 B |
+| MoveMeshRuntimeShapeStateAndQueryTriangles | n/a | 9.023 us | 0 B |
+| MoveDynamicConcaveMeshAndQueryTriangles | n/a | 40.513 us | 0 B |
+| BuildAndValidateClosedVolume | 1 | 9.252 us | 10176 B |
+| BuildAndValidateClosedVolume | 8 | 708.406 us | 529327 B |
+| BuildAndValidateClosedVolume | 16 | 2.589 ms | 2111592 B |
+| CalculateCachedClosedVolumeInertiaTensor | 1 | 49.06 ns | 0 B |
+| CalculateCachedClosedVolumeInertiaTensor | 8 | 47.20 ns | 0 B |
+| CalculateCachedClosedVolumeInertiaTensor | 16 | 47.07 ns | 0 B |
+| CalculateSurfaceApproximationInertiaTensor | 1 | 973.95 ns | 0 B |
+| CalculateSurfaceApproximationInertiaTensor | 8 | 66.770 us | 0 B |
+| CalculateSurfaceApproximationInertiaTensor | 16 | 279.786 us | 0 B |
+
+**Captured Phase 4A Follow-Ups**
+
+These are solver/API boundaries observed during Phase 4A and intentionally not
+folded into the closed-volume inertia slice:
+
+- `PhysicsMesh.CalculateInertiaTensor(mass)` is still a shape/topology API; it
+  does not know whether a body is movable, kinematic, immovable, or angular
+  disabled. Phase 4A moved that decision to `StiffBody.RefreshInertiaTensor()`.
+  Future mesh inertia API work should keep body mobility policy at the body or
+  collider-binding boundary rather than making `PhysicsMesh` infer runtime
+  ownership.
+- Gravitas still uses diagonal local inertia tensors and `InvertDiagonal()`.
+  Full tensor inversion, product-of-inertia support, and/or deterministic
+  principal-axis diagonalization are a deeper angular-solver upgrade.
+- Gravitas does not yet model body center-of-mass offsets. Phase 4A exposes
+  `MeshMassProperties.CenterOfMass`, but runtime mesh inertia is still computed
+  about the collider reference center because contact relative points, body
+  transforms, serialization, and parallel-axis behavior all need an explicit COM
+  model before the solver can consume arbitrary mesh COM safely.
+- `StiffBody.InverseMass` is the raw reciprocal of `Mass`; immovable and
+  kinematic bodies are mapped to zero effective inverse mass by response-layer
+  wrappers such as `ResponseBody` and mixed response helpers. Future body/mass
+  cleanup should decide whether to add an explicit effective inverse-mass API or
+  keep every caller responsible for applying mobility gates.
 
 **Phase 4B: Concave Mesh-Mesh Hotspot**
 

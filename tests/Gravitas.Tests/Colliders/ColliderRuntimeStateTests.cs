@@ -59,4 +59,22 @@ public sealed class ColliderRuntimeStateTests
         inertia.M22.Should().Be(inertia.M11);
         inertia.M33.Should().Be(inertia.M11);
     }
+
+    [Fact]
+    public void Initialize_WithRotatedNonUniformCuboid_ShouldRotateInverseInertiaTensor()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        var collider = new LSCuboidCollider
+        {
+            Size = new Vector3d((Fixed64)2, Fixed64.One, (Fixed64)4)
+        };
+
+        ScenarioBody<LSCuboidCollider> body = scenario.CreateBody(
+            collider,
+            Vector3d.Zero,
+            PhysicsScenarioBuilder.Yaw(45));
+
+        body.Body.InverseInteriaTensor.M13.Should().NotBe(Fixed64.Zero);
+        body.Body.InverseInteriaTensor.M31.Should().NotBe(Fixed64.Zero);
+    }
 }

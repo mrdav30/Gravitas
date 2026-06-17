@@ -276,7 +276,10 @@ public sealed class MixedNarrowPhaseTests
     public void ConcaveMeshAABoxSlab_WithInsideCornerFeature_ShouldReportStableContact()
     {
         using GravitasWorldContext context = CreateMixedContext();
-        ScenarioBody<LSMeshCollider> mesh = CreateMesh3D(context, MeshTestFixtures.CreateInsideCorner(), Vector3d.Zero);
+        ScenarioBody<LSMeshCollider> mesh = CreateMesh3D(
+            context,
+            MeshTestFixtures.CreateInsideCorner(inertiaPolicy: MeshInertiaPolicy.SurfaceApproximation),
+            Vector3d.Zero);
         StiffBody2D box = CreateBody2D(
             context,
             new LSAABBoxCollider2D(new Vector2d(Fixed64.Half, Fixed64.Half)),
@@ -300,7 +303,10 @@ public sealed class MixedNarrowPhaseTests
     public void ConcaveMeshConvexPolygonSlab_WithRotatedPolygonFeature_ShouldReportContact()
     {
         using GravitasWorldContext context = CreateMixedContext();
-        ScenarioBody<LSMeshCollider> mesh = CreateMesh3D(context, MeshTestFixtures.CreateInsideCorner(), Vector3d.Zero);
+        ScenarioBody<LSMeshCollider> mesh = CreateMesh3D(
+            context,
+            MeshTestFixtures.CreateInsideCorner(inertiaPolicy: MeshInertiaPolicy.SurfaceApproximation),
+            Vector3d.Zero);
         StiffBody2D polygon = CreateBody2D(
             context,
             CreateSquarePolygon(),
@@ -319,7 +325,10 @@ public sealed class MixedNarrowPhaseTests
     public void ConcaveMeshCircleSlab_InOpenChannelGap_ShouldNotCollideWithHullOnly()
     {
         using GravitasWorldContext context = CreateMixedContext();
-        ScenarioBody<LSMeshCollider> mesh = CreateMesh3D(context, MeshTestFixtures.CreateUChannel(), Vector3d.Zero);
+        ScenarioBody<LSMeshCollider> mesh = CreateMesh3D(
+            context,
+            MeshTestFixtures.CreateUChannel(inertiaPolicy: MeshInertiaPolicy.SurfaceApproximation),
+            Vector3d.Zero);
         StiffBody2D circle = CreateBody2D(context, new LSCircleCollider2D(Fixed64.FromFraction(1, 4)), new Vector2d(Fixed64.Zero, (Fixed64)2));
 
         CollisionDetectionMixed.TryCollide(mesh.Collider, circle.Collider, out MixedContact contact).Should().BeFalse();

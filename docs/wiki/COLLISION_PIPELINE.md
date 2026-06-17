@@ -261,6 +261,25 @@ Mesh policy work should keep these boundaries explicit:
 - Concave triangle meshes are supported for static, kinematic, immovable, and
   dynamic bodies, but they should be chosen deliberately because candidate
   count scales with local triangle density.
+- Dynamic mesh bodies that can rotate require closed-volume inertia by default.
+  `MeshInertiaPolicy.RequireClosedVolume` validates one connected, consistently
+  wound triangle shell where every undirected edge has exactly two incident
+  triangles. Boundary, duplicate-triangle, non-manifold, inconsistent-winding,
+  disconnected-shell, and zero-volume meshes are rejected with explicit
+  `MeshVolumeValidationResult` values. Reversed whole-mesh winding is accepted
+  deterministically.
+- Open or surface-only dynamic meshes must opt in with
+  `MeshInertiaPolicy.SurfaceApproximation` when angular dynamics are enabled.
+  Bodyless, static, immovable, kinematic, and explicitly angular-force-disabled
+  mesh bodies do not consume mesh inertia and remain legal collision surfaces.
+- Closed-volume mesh inertia is integrated with fixed-point signed tetrahedra
+  and cached on the immutable mesh topology. The current solver still uses
+  diagonal inertia about the collider reference center
+  (`PhysicsMesh.LocalBounds.Center`) because body center-of-mass offsets are not
+  modeled yet; `MeshMassProperties.CenterOfMass` exposes the homogeneous COM for
+  a future body-COM hardening pass. Full tensor inversion, products of inertia,
+  and deterministic principal-axis diagonalization are not part of the current
+  alpha solver.
 - Convex mesh paths remain free to use whole-shape convex tests where valid.
 - Compound colliders present one collider identity to hosts and one body to the
   solver, while internally ordering primitive or convex-mesh parts by stable
@@ -284,10 +303,9 @@ Mesh policy work should keep these boundaries explicit:
 - Rigid dynamic meshes should keep local topology and BVH stable while updating
   only transform-derived state. Deformable or breakable topology changes require
   a separate invalidation/rebuild contract before support is claimed.
-- `PhysicsMesh.CalculateInertiaTensor(...)` is currently an approximation. Any
-  replacement should define whether the mesh is a thin shell, closed volume, or
-  decomposed set of solids, then prove expected fixed-point values on simple
-  reference meshes.
+- `PhysicsMesh.CalculateInertiaTensor(...)` defaults to closed-volume mass
+  properties. Callers that knowingly want the legacy surface-area approximation
+  must pass `MeshInertiaPolicy.SurfaceApproximation`.
 
 ## Continuous Collision Detection
 
@@ -563,11 +581,15 @@ behavior.
 Response units and invariants:
 
 - mass is body mass in the same unit model used by `StiffBody`.
-- inverse mass is zero for immovable and kinematic bodies.
+- `StiffBody.InverseMass` is the raw reciprocal of body mass. Collision
+  response maps immovable and kinematic bodies to zero effective inverse mass
+  through response wrappers such as `ResponseBody` and mixed response helpers.
 - linear velocity is world units per second.
 - angular velocity is radians per second around each local/world axis.
-- inertia tensors are diagonal fixed-point approximations supplied by the
-  collider shape and transformed by `StiffBody`.
+- inertia tensors are diagonal fixed-point values supplied by the collider
+  shape and transformed by `StiffBody`. Mesh colliders use cached closed-volume
+  mass properties by default when angular dynamics are enabled, with explicit
+  surface approximation opt-in for open meshes.
 - restitution is clamped to `[0, 1]` and combined by the lower coefficient so a
   low-bounce participant can dampen the pair.
 - closing speeds at or below `RestitutionVelocityThreshold` use zero

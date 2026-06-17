@@ -82,6 +82,10 @@ namespace Gravitas.Colliders
 
         public Fixed3x3 Tensor { get; private set; }
 
+        private bool _closedVolumeMassPropertiesEvaluated;
+        private MeshMassProperties _closedVolumeMassProperties;
+        private MeshVolumeValidationResult _closedVolumeValidationResult;
+
         private bool _triangleBVHValid;
         private int _triangleBvhBuildCount;
         private readonly SwiftFixedBVH<int> _triangleBVH;
@@ -368,7 +372,47 @@ namespace Gravitas.Colliders
             max = Vector3d.Max(max, transformed);
         }
 
-        public Fixed3x3 CalculateInertiaTensor(Fixed64 mass)
+        /// <summary>
+        /// Calculates solid closed-volume inertia for the supplied mass.
+        /// </summary>
+        public Fixed3x3 CalculateInertiaTensor(Fixed64 mass) =>
+            CalculateInertiaTensor(mass, MeshInertiaPolicy.RequireClosedVolume);
+
+        /// <summary>
+        /// Calculates mesh inertia for the supplied mass using the requested policy.
+        /// </summary>
+        public Fixed3x3 CalculateInertiaTensor(Fixed64 mass, MeshInertiaPolicy policy)
+        {
+            switch (policy)
+            {
+                case MeshInertiaPolicy.RequireClosedVolume:
+                    if (!TryGetClosedVolumeMassProperties(out MeshMassProperties properties, out MeshVolumeValidationResult result))
+                        throw new InvalidOperationException($"Mesh inertia requires a validated closed volume. Validation result: {result}.");
+
+                    return properties.UnitMassInertiaTensor * mass;
+
+                case MeshInertiaPolicy.SurfaceApproximation:
+                    return CalculateSurfaceApproximationInertiaTensor(mass);
+
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(policy), policy, "Unsupported mesh inertia policy.");
+            }
+        }
+
+        /// <summary>
+        /// Gets cached closed-volume mass properties when this mesh is a valid closed triangle shell.
+        /// </summary>
+        public bool TryGetClosedVolumeMassProperties(
+            out MeshMassProperties properties,
+            out MeshVolumeValidationResult result)
+        {
+            EnsureClosedVolumeMassProperties();
+            properties = _closedVolumeMassProperties;
+            result = _closedVolumeValidationResult;
+            return result == MeshVolumeValidationResult.Valid;
+        }
+
+        private Fixed3x3 CalculateSurfaceApproximationInertiaTensor(Fixed64 mass)
         {
             Fixed3x3 tensor = Fixed3x3.Zero;
             if (_totalArea <= Fixed64.Zero)
@@ -387,6 +431,218 @@ namespace Gravitas.Colliders
 
             tensor /= _triangleCount;
             return tensor;
+        }
+
+        private void EnsureClosedVolumeMassProperties()
+        {
+            if (_closedVolumeMassPropertiesEvaluated)
+                return;
+
+            _closedVolumeMassPropertiesEvaluated = true;
+
+            if (!ValidateClosedVolumeTopology(out MeshVolumeValidationResult topologyResult))
+            {
+                _closedVolumeValidationResult = topologyResult;
+                _closedVolumeMassProperties = default;
+                return;
+            }
+
+            if (!TryCalculateClosedVolumeMassProperties(out MeshMassProperties properties, out MeshVolumeValidationResult volumeResult))
+            {
+                _closedVolumeValidationResult = volumeResult;
+                _closedVolumeMassProperties = default;
+                return;
+            }
+
+            _closedVolumeValidationResult = MeshVolumeValidationResult.Valid;
+            _closedVolumeMassProperties = properties;
+        }
+
+        private bool ValidateClosedVolumeTopology(out MeshVolumeValidationResult result)
+        {
+            var triangleUses = new TriangleUse[_triangleCount];
+            var edgeUses = new EdgeUse[_triangleCount * 3];
+            int edgeIndex = 0;
+            for (int i = 0; i < _triangleCount; i++)
+            {
+                int triangleIndex = i * 3;
+                int index0 = _triangles[triangleIndex];
+                int index1 = _triangles[triangleIndex + 1];
+                int index2 = _triangles[triangleIndex + 2];
+
+                triangleUses[i] = TriangleUse.Create(index0, index1, index2);
+                edgeUses[edgeIndex++] = EdgeUse.Create(index0, index1, i);
+                edgeUses[edgeIndex++] = EdgeUse.Create(index1, index2, i);
+                edgeUses[edgeIndex++] = EdgeUse.Create(index2, index0, i);
+            }
+
+            if (ContainsDuplicateTriangle(triangleUses))
+            {
+                result = MeshVolumeValidationResult.DuplicateTriangle;
+                return false;
+            }
+
+            Array.Sort(edgeUses, CompareEdgeUses);
+
+            int[] parents = new int[_triangleCount];
+            for (int i = 0; i < parents.Length; i++)
+                parents[i] = i;
+
+            for (int i = 0; i < edgeUses.Length;)
+            {
+                int groupStart = i;
+                EdgeUse first = edgeUses[i++];
+                while (i < edgeUses.Length && edgeUses[i].Key == first.Key)
+                    i++;
+
+                int count = i - groupStart;
+                if (count == 1)
+                {
+                    result = MeshVolumeValidationResult.BoundaryEdge;
+                    return false;
+                }
+
+                if (count > 2)
+                {
+                    result = MeshVolumeValidationResult.NonManifoldEdge;
+                    return false;
+                }
+
+                EdgeUse second = edgeUses[groupStart + 1];
+                if (first.Direction + second.Direction != 0)
+                {
+                    result = MeshVolumeValidationResult.InconsistentWinding;
+                    return false;
+                }
+
+                Union(parents, first.TriangleIndex, second.TriangleIndex);
+            }
+
+            int root = Find(parents, 0);
+            for (int i = 1; i < parents.Length; i++)
+            {
+                if (Find(parents, i) == root)
+                    continue;
+
+                result = MeshVolumeValidationResult.DisconnectedShell;
+                return false;
+            }
+
+            result = MeshVolumeValidationResult.Valid;
+            return true;
+        }
+
+        private bool TryCalculateClosedVolumeMassProperties(
+            out MeshMassProperties properties,
+            out MeshVolumeValidationResult result)
+        {
+            Vector3d reference = _localBounds.Center;
+            Fixed64 signedVolume = Fixed64.Zero;
+            Vector3d firstMoment = Vector3d.Zero;
+            Fixed64 integralX2 = Fixed64.Zero;
+            Fixed64 integralY2 = Fixed64.Zero;
+            Fixed64 integralZ2 = Fixed64.Zero;
+
+            for (int i = 0; i < _triangleCount; i++)
+            {
+                int triangleIndex = i * 3;
+                Vector3d a = _localVertices[_triangles[triangleIndex]] - reference;
+                Vector3d b = _localVertices[_triangles[triangleIndex + 1]] - reference;
+                Vector3d c = _localVertices[_triangles[triangleIndex + 2]] - reference;
+
+                Fixed64 volume = Vector3d.Dot(a, Vector3d.Cross(b, c)) / (Fixed64)6;
+                signedVolume += volume;
+                firstMoment += (a + b + c) * (volume / (Fixed64)4);
+
+                integralX2 += volume * SumSquaredBarycentricProducts(a.X, b.X, c.X) / (Fixed64)10;
+                integralY2 += volume * SumSquaredBarycentricProducts(a.Y, b.Y, c.Y) / (Fixed64)10;
+                integralZ2 += volume * SumSquaredBarycentricProducts(a.Z, b.Z, c.Z) / (Fixed64)10;
+            }
+
+            Fixed64 absoluteVolume = signedVolume.Abs();
+            if (absoluteVolume <= Fixed64.Epsilon)
+            {
+                properties = default;
+                result = MeshVolumeValidationResult.ZeroVolume;
+                return false;
+            }
+
+            Fixed64 orientationSign = signedVolume < Fixed64.Zero ? -Fixed64.One : Fixed64.One;
+            Vector3d centerOfMass = reference + firstMoment / signedVolume;
+            Fixed64 ixx = orientationSign * (integralY2 + integralZ2) / absoluteVolume;
+            Fixed64 iyy = orientationSign * (integralX2 + integralZ2) / absoluteVolume;
+            Fixed64 izz = orientationSign * (integralX2 + integralY2) / absoluteVolume;
+
+            properties = new MeshMassProperties(
+                absoluteVolume,
+                centerOfMass,
+                reference,
+                new Fixed3x3(
+                    ixx, Fixed64.Zero, Fixed64.Zero,
+                    Fixed64.Zero, iyy, Fixed64.Zero,
+                    Fixed64.Zero, Fixed64.Zero, izz));
+            result = MeshVolumeValidationResult.Valid;
+            return true;
+        }
+
+        private static Fixed64 SumSquaredBarycentricProducts(Fixed64 a, Fixed64 b, Fixed64 c) =>
+            (a * a) + (b * b) + (c * c) + (a * b) + (a * c) + (b * c);
+
+        private static int CompareEdgeUses(EdgeUse first, EdgeUse second) =>
+            first.Key < second.Key
+                ? -1
+                : first.Key > second.Key
+                    ? 1
+                    : 0;
+
+        private static bool ContainsDuplicateTriangle(TriangleUse[] triangleUses)
+        {
+            Array.Sort(triangleUses, CompareTriangleUses);
+            for (int i = 1; i < triangleUses.Length; i++)
+            {
+                if (triangleUses[i].Equals(triangleUses[i - 1]))
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static int CompareTriangleUses(TriangleUse first, TriangleUse second)
+        {
+            if (first.A != second.A)
+                return first.A < second.A ? -1 : 1;
+
+            if (first.B != second.B)
+                return first.B < second.B ? -1 : 1;
+
+            if (first.C != second.C)
+                return first.C < second.C ? -1 : 1;
+
+            return 0;
+        }
+
+        private static int Find(int[] parents, int index)
+        {
+            while (parents[index] != index)
+            {
+                parents[index] = parents[parents[index]];
+                index = parents[index];
+            }
+
+            return index;
+        }
+
+        private static void Union(int[] parents, int first, int second)
+        {
+            int firstRoot = Find(parents, first);
+            int secondRoot = Find(parents, second);
+            if (firstRoot == secondRoot)
+                return;
+
+            if (firstRoot < secondRoot)
+                parents[secondRoot] = firstRoot;
+            else
+                parents[firstRoot] = secondRoot;
         }
 
         public Fixed64 GetFrontalArea(Vector3d direction)
@@ -480,5 +736,71 @@ namespace Gravitas.Colliders
 
         private Vector3d TransformLocalNormal(Vector3d localNormal) =>
             localNormal == Vector3d.Zero ? Vector3d.Zero : (_rotation * localNormal).Normalized;
+
+        private readonly struct EdgeUse
+        {
+            private EdgeUse(long key, int direction, int triangleIndex)
+            {
+                Key = key;
+                Direction = direction;
+                TriangleIndex = triangleIndex;
+            }
+
+            public long Key { get; }
+
+            public int Direction { get; }
+
+            public int TriangleIndex { get; }
+
+            public static EdgeUse Create(int start, int end, int triangleIndex)
+            {
+                int min = start < end ? start : end;
+                int max = start < end ? end : start;
+                long key = ((long)min << 32) | (uint)max;
+                int direction = start == min ? 1 : -1;
+                return new EdgeUse(key, direction, triangleIndex);
+            }
+        }
+
+        private readonly struct TriangleUse : IEquatable<TriangleUse>
+        {
+            private TriangleUse(int a, int b, int c)
+            {
+                A = a;
+                B = b;
+                C = c;
+            }
+
+            public int A { get; }
+
+            public int B { get; }
+
+            public int C { get; }
+
+            public static TriangleUse Create(int first, int second, int third)
+            {
+                int a = first;
+                int b = second;
+                int c = third;
+
+                if (a > b)
+                    (a, b) = (b, a);
+                if (b > c)
+                    (b, c) = (c, b);
+                if (a > b)
+                    (a, b) = (b, a);
+
+                return new TriangleUse(a, b, c);
+            }
+
+            public bool Equals(TriangleUse other) =>
+                A == other.A && B == other.B && C == other.C;
+
+            public override bool Equals(object? obj) =>
+                obj is TriangleUse other && Equals(other);
+
+            public override int GetHashCode() =>
+                HashCode.Combine(A, B, C);
+        }
     }
 }

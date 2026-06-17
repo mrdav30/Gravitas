@@ -551,7 +551,9 @@ public sealed class CollisionDetectionShapePairTests
                 new Vector3d((Fixed64)(-2), Fixed64.Zero, (Fixed64)2),
                 new Vector3d((Fixed64)2, Fixed64.Zero, (Fixed64)2)
             },
-            new[] { 0, 2, 1, 1, 2, 3 });
+            new[] { 0, 2, 1, 1, 2, 3 },
+            MeshColliderMode.Convex,
+            MeshInertiaPolicy.SurfaceApproximation);
 
     private static LSMeshCollider CreateVerticalPlaneMesh() =>
         new(
@@ -562,5 +564,7 @@ public sealed class CollisionDetectionShapePairTests
                 new Vector3d(Fixed64.Zero, (Fixed64)2, (Fixed64)(-2)),
                 new Vector3d(Fixed64.Zero, (Fixed64)2, (Fixed64)2)
             },
-            new[] { 0, 2, 1, 1, 2, 3 });
+            new[] { 0, 2, 1, 1, 2, 3 },
+            MeshColliderMode.Convex,
+            MeshInertiaPolicy.SurfaceApproximation);
 }

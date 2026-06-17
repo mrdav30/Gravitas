@@ -20,13 +20,29 @@ public class LSMeshCollider : LSCollider
 
     public MeshColliderMode Mode => Mesh.Mode;
 
+    /// <summary>
+    /// Determines how inertia is derived when this mesh collider is attached to a body with angular dynamics.
+    /// </summary>
+    public MeshInertiaPolicy InertiaPolicy { get; }
+
     public LSMeshCollider(Vector3d[] vertices, int[] triangles)
-        : this(vertices, triangles, MeshColliderMode.Convex)
+        : this(vertices, triangles, MeshColliderMode.Convex, MeshInertiaPolicy.RequireClosedVolume)
     {
     }
 
     public LSMeshCollider(Vector3d[] vertices, int[] triangles, MeshColliderMode mode)
+        : this(vertices, triangles, mode, MeshInertiaPolicy.RequireClosedVolume)
     {
+    }
+
+    public LSMeshCollider(
+        Vector3d[] vertices,
+        int[] triangles,
+        MeshColliderMode mode,
+        MeshInertiaPolicy inertiaPolicy)
+    {
+        ValidateInertiaPolicy(inertiaPolicy);
+        InertiaPolicy = inertiaPolicy;
         Mesh = new PhysicsMesh(vertices, triangles, Vector3d.Zero, FixedQuaternion.Identity, mode);
         _offset = Mesh.LocalBounds.Center;
         _size = Mesh.LocalBounds.Proportions;
@@ -53,7 +69,7 @@ public class LSMeshCollider : LSCollider
          Mesh.UpdatePosition(Position, Rotation);
 
     public override Fixed3x3 CalculateInertiaTensor(Fixed64 mass) =>
-        Mesh.CalculateInertiaTensor(mass);
+        Mesh.CalculateInertiaTensor(mass, InertiaPolicy);
 
     public override Fixed64 GetFrontalArea(Vector3d direction) =>
         Mesh.GetFrontalArea(direction);
@@ -97,6 +113,15 @@ public class LSMeshCollider : LSCollider
     {
         Vector3d extents = Vector3d.One * halfExtent;
         return new FixedBoundVolume(center - extents, center + extents);
+    }
+
+    private static void ValidateInertiaPolicy(MeshInertiaPolicy inertiaPolicy)
+    {
+        SwiftThrowHelper.ThrowIfArgument(
+            inertiaPolicy != MeshInertiaPolicy.RequireClosedVolume &&
+            inertiaPolicy != MeshInertiaPolicy.SurfaceApproximation,
+            nameof(inertiaPolicy),
+            "Unsupported mesh inertia policy.");
     }
 
     private bool TryFindClosestPointToTriangles(

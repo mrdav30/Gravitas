@@ -152,7 +152,11 @@ public sealed class GravitasQuery3DServiceSweepTests
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         LSMeshCollider mesh = CreateDynamicCollider(
             context,
-            MeshTestFixtures.CreateVerticalQuad(Fixed64.Zero, -Fixed64.One, Fixed64.One),
+            MeshTestFixtures.CreateVerticalQuad(
+                Fixed64.Zero,
+                -Fixed64.One,
+                Fixed64.One,
+                inertiaPolicy: MeshInertiaPolicy.SurfaceApproximation),
             Vector3d.Zero);
         LSCompoundCollider compound = CreateDynamicCollider(
             context,

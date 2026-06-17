@@ -120,7 +120,9 @@ public sealed class LSMeshColliderQueryTests
                 Vector3d.Right,
                 Vector3d.Up
             },
-            new[] { 0, 1, 2 });
+            new[] { 0, 1, 2 },
+            MeshColliderMode.Convex,
+            MeshInertiaPolicy.SurfaceApproximation);
 
     private static LSMeshCollider CreateZDominantMesh() =>
         new(
@@ -133,7 +135,9 @@ public sealed class LSMeshColliderQueryTests
                 new Vector3d(Fixed64.One, Fixed64.Zero, (Fixed64)4),
                 new Vector3d(Fixed64.Zero, Fixed64.One, (Fixed64)4)
             },
-            new[] { 0, 1, 2, 3, 4, 5 });
+            new[] { 0, 1, 2, 3, 4, 5 },
+            MeshColliderMode.Convex,
+            MeshInertiaPolicy.SurfaceApproximation);
 
     private static bool ContainsTriangleIndex(SwiftList<int> indices, int triangleIndex)
     {

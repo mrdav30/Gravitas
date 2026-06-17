@@ -276,7 +276,9 @@ public sealed class GravitasDiagnosticSinkTests
                 new Vector3d(Fixed64.One, Fixed64.Zero, Fixed64.Zero),
                 new Vector3d(Fixed64.Zero, Fixed64.Zero, Fixed64.One)
             },
-            new[] { 0, 1, 2 });
+            new[] { 0, 1, 2 },
+            MeshColliderMode.Convex,
+            MeshInertiaPolicy.SurfaceApproximation);
     }
 
     private static LSMeshCollider CreateStripMesh(int quadCount)

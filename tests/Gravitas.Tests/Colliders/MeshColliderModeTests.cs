@@ -12,7 +12,7 @@ namespace Gravitas.Tests.Colliders;
 public sealed class MeshColliderModeTests
 {
     [Fact]
-    public void ConcaveMesh_ShouldInitializeForBodylessImmovableKinematicAndDynamicBodies()
+    public void ConcaveMesh_ShouldInitializeForBodylessImmovableKinematicAndExplicitSurfaceDynamicBodies()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
 
@@ -30,7 +30,7 @@ public sealed class MeshColliderModeTests
             FixedQuaternion.Identity,
             isKinematic: true);
         Action dynamic = () => scenario.CreateBody(
-            MeshTestFixtures.CreateInsideCorner(),
+            MeshTestFixtures.CreateInsideCorner(inertiaPolicy: MeshInertiaPolicy.SurfaceApproximation),
             PhysicsScenarioBuilder.Vector(18, 0, 0),
             FixedQuaternion.Identity);
 
@@ -41,11 +41,25 @@ public sealed class MeshColliderModeTests
     }
 
     [Fact]
+    public void DynamicOpenMesh_WithDefaultInertiaPolicy_ShouldRequireClosedVolume()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+
+        Action dynamic = () => scenario.CreateBody(
+            MeshTestFixtures.CreateInsideCorner(),
+            PhysicsScenarioBuilder.Vector(0, 0, 0),
+            FixedQuaternion.Identity);
+
+        dynamic.Should().Throw<InvalidOperationException>()
+            .WithMessage("*closed volume*");
+    }
+
+    [Fact]
     public void DynamicConcaveMesh_ShouldMoveThroughLocalBvhWithoutRebuildingTopology()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSMeshCollider> body = scenario.CreateBody(
-            MeshTestFixtures.CreateUChannel(),
+            MeshTestFixtures.CreateUChannel(inertiaPolicy: MeshInertiaPolicy.SurfaceApproximation),
             PhysicsScenarioBuilder.Vector(0, 0, 0),
             FixedQuaternion.Identity);
         var indices = new SwiftList<int>();

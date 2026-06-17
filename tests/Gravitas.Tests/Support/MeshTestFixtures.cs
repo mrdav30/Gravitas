@@ -5,7 +5,9 @@ namespace Gravitas.Tests.Support;
 
 internal static class MeshTestFixtures
 {
-    public static LSMeshCollider CreateConvexCube(MeshColliderMode mode = MeshColliderMode.Convex)
+    public static LSMeshCollider CreateConvexCube(
+        MeshColliderMode mode = MeshColliderMode.Convex,
+        MeshInertiaPolicy inertiaPolicy = MeshInertiaPolicy.RequireClosedVolume)
     {
         Fixed64 half = Fixed64.Half;
         var vertices = new[]
@@ -31,10 +33,13 @@ internal static class MeshTestFixtures
                 0, 1, 4, 1, 5, 4,
                 2, 6, 3, 3, 6, 7
             },
-            mode);
+            mode,
+            inertiaPolicy);
     }
 
-    public static LSMeshCollider CreateInsideCorner(MeshColliderMode mode = MeshColliderMode.Concave)
+    public static LSMeshCollider CreateInsideCorner(
+        MeshColliderMode mode = MeshColliderMode.Concave,
+        MeshInertiaPolicy inertiaPolicy = MeshInertiaPolicy.RequireClosedVolume)
     {
         Fixed64 four = (Fixed64)4;
         var vertices = new[]
@@ -63,10 +68,13 @@ internal static class MeshTestFixtures
                 4, 5, 6, 6, 5, 7,
                 8, 9, 10, 10, 9, 11
             },
-            mode);
+            mode,
+            inertiaPolicy);
     }
 
-    public static LSMeshCollider CreateUChannel(MeshColliderMode mode = MeshColliderMode.Concave)
+    public static LSMeshCollider CreateUChannel(
+        MeshColliderMode mode = MeshColliderMode.Concave,
+        MeshInertiaPolicy inertiaPolicy = MeshInertiaPolicy.RequireClosedVolume)
     {
         Fixed64 left = (Fixed64)(-2);
         Fixed64 right = (Fixed64)2;
@@ -99,14 +107,16 @@ internal static class MeshTestFixtures
                 4, 5, 6, 6, 5, 7,
                 8, 9, 10, 10, 9, 11
             },
-            mode);
+            mode,
+            inertiaPolicy);
     }
 
     public static LSMeshCollider CreateVerticalQuad(
         Fixed64 x,
         Fixed64 zMin,
         Fixed64 zMax,
-        MeshColliderMode mode = MeshColliderMode.Convex)
+        MeshColliderMode mode = MeshColliderMode.Convex,
+        MeshInertiaPolicy inertiaPolicy = MeshInertiaPolicy.RequireClosedVolume)
     {
         Fixed64 minY = Fixed64.Zero;
         Fixed64 maxY = (Fixed64)2;
@@ -118,6 +128,6 @@ internal static class MeshTestFixtures
             new Vector3d(x, maxY, zMax)
         };
 
-        return new LSMeshCollider(vertices, new[] { 0, 1, 2, 2, 1, 3 }, mode);
+        return new LSMeshCollider(vertices, new[] { 0, 1, 2, 2, 1, 3 }, mode, inertiaPolicy);
     }
 }

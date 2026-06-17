@@ -537,12 +537,7 @@ public class StiffBody : IRecordable
         Collider!.Initialize(this);
         CheckGround(force: true);
 
-        if (AngularForcesHalted)
-            return;
-
-        _interiaTensor = Collider.CalculateInertiaTensor(Mass);
-        _inverseInertiaTensor = _interiaTensor.InvertDiagonal();
-        UpdateIntertiaTensorOrientation();
+        RefreshInertiaTensor();
     }
 
     public void LateSimulate()
@@ -623,6 +618,8 @@ public class StiffBody : IRecordable
     }
 
     private bool CanSleep => Active && SleepEnabled && !Immovable && !IsKinematic;
+
+    private bool CanUseAngularInertia => !Immovable && !IsKinematic && !PreventAngularForces;
 
     private void UpdateSleepState()
     {
@@ -1220,13 +1217,27 @@ public class StiffBody : IRecordable
 
     private void UpdateIntertiaTensorOrientation()
     {
-        if (_interiaTensor != Fixed3x3.Zero)
+        if (_interiaTensor == Fixed3x3.Zero)
             return;
 
         Fixed3x3 inverseOrientation = Rotation.Conjugate().ToMatrix3x3();
         Fixed3x3 orientation = Rotation.ToMatrix3x3();
 
         _inverseInertiaTensor = orientation * _inverseInertiaTensor * inverseOrientation;
+    }
+
+    private void RefreshInertiaTensor()
+    {
+        if (!CanUseAngularInertia || Collider == null)
+        {
+            _interiaTensor = Fixed3x3.Zero;
+            _inverseInertiaTensor = Fixed3x3.Zero;
+            return;
+        }
+
+        _interiaTensor = Collider.CalculateInertiaTensor(Mass);
+        _inverseInertiaTensor = _interiaTensor.InvertDiagonal();
+        UpdateIntertiaTensorOrientation();
     }
 
     //  gyroscopic precession is a correction to the object's angular velocity based on its rotation
@@ -1725,12 +1736,7 @@ public class StiffBody : IRecordable
         _visualRotation = Rotation;
         _lastVisualRotation = Rotation;
 
-        if (!AngularForcesHalted && Collider != null)
-        {
-            _interiaTensor = Collider.CalculateInertiaTensor(Mass);
-            _inverseInertiaTensor = _interiaTensor.InvertDiagonal();
-            UpdateIntertiaTensorOrientation();
-        }
+        RefreshInertiaTensor();
 
         Collider?.Simulate();
     }
