@@ -255,12 +255,20 @@ The concave narrow phase gathers local-BVH triangle candidates, runs
 triangle-vs-shape or triangle-vs-triangle checks, and reduces contacts through
 the pair-owned `ContactManifold`. Dynamic concave meshes keep topology and the
 local BVH stable while rigid movement updates transform-derived state only.
+For mesh-mesh pairs involving a concave mesh, alpha keeps the raw local-BVH
+triangle-gather path rather than a direct BVH-vs-BVH traversal: Phase 4B
+benchmarks found paired traversal slower with the current conservative bounds
+transforms, while a narrower triangle SAT axis optimization improved the simple
+concave mesh-mesh row without changing candidate truth or steady-state
+allocation behavior.
 
 Mesh policy work should keep these boundaries explicit:
 
 - Concave triangle meshes are supported for static, kinematic, immovable, and
   dynamic bodies, but they should be chosen deliberately because candidate
-  count scales with local triangle density.
+  count scales with local triangle density. Simple authored physics meshes are
+  the intended raw-triangle use case; dense rendered meshes should be
+  simplified, decomposed, or represented as authored convex collision assets.
 - Dynamic mesh bodies that can rotate require closed-volume inertia by default.
   `MeshInertiaPolicy.RequireClosedVolume` validates one connected, consistently
   wound triangle shell where every undirected edge has exactly two incident

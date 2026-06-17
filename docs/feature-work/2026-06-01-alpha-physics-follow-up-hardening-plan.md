@@ -490,22 +490,22 @@ collision truth for simple meshes where raw BVH remains the right answer.
 
 **Tasks**
 
-- [ ] Add comparison fixtures for simple concave, dense concave, contact-heavy
+- [x] Add comparison fixtures for simple concave, dense concave, contact-heavy
   U-channel, inside-corner, closed dense shell, and dynamic concave cases.
-- [ ] Benchmark current triangle-gather mesh-mesh behavior before changing the
+- [x] Benchmark current triangle-gather mesh-mesh behavior before changing the
   algorithm.
-- [ ] Evaluate direct BVH-vs-BVH paired traversal for mesh-mesh candidate
+- [x] Evaluate direct BVH-vs-BVH paired traversal for mesh-mesh candidate
   generation so repeated per-triangle queries are reduced.
-- [ ] Preserve deterministic candidate order, contact identity, manifold
+- [x] Preserve deterministic candidate order, contact identity, manifold
   reduction, and zero-allocation steady-state behavior.
-- [ ] Compare raw triangle BVH, BVH-vs-BVH traversal, and authored convex-piece
+- [x] Compare raw triangle BVH, BVH-vs-BVH traversal, and authored convex-piece
   collision assets for:
   - candidate count.
   - contact correctness.
   - manifold quality.
   - dense mesh-mesh cost.
   - simple mesh overhead.
-- [ ] Document whether the final recommendation is raw triangle BVH, paired BVH
+- [x] Document whether the final recommendation is raw triangle BVH, paired BVH
   traversal, authored decomposition, or a thresholded combination.
 
 **Exit Criteria**
@@ -515,6 +515,78 @@ collision truth for simple meshes where raw BVH remains the right answer.
 - Simple concave meshes keep the exact triangle-BVH path unless a replacement is
   measurably better without added complexity.
 - Dense/complex collision assets have a documented alternative path.
+
+**Progress - 2026-06-17**
+
+Expanded the mesh-mesh comparison fixtures to include dense concave
+U-channel/inside-corner pairs, contact-heavy dense U-channel pairs, and dense
+closed-shell pairs. Focused tests now cover dense same-pair contact identity,
+reversed dense dispatch validity, dynamic concave mesh movement, and
+zero-allocation dense mesh-mesh checks after warmup.
+
+The original raw triangle-gather path remains the alpha runtime policy for
+simple concave meshes. It preserves exact triangle collision truth, stable
+same-pair contact IDs, and zero steady-state allocations. Direct BVH-vs-BVH
+paired traversal was implemented and measured, then rejected: with the current
+SwiftFixedBVH node API it repeatedly transformed internal node bounds and
+expanded too many conservative node pairs, regressing every measured mesh-mesh
+row.
+
+The retained runtime optimization is narrower and safer: triangle-triangle SAT
+now projects onto raw axes first, exits on separation, and only normalizes an
+axis when it can update the stored penetration depth/normal. This keeps the
+same triangle candidates and contact generation while avoiding unnecessary
+fixed-point vector normalization on non-winning axes.
+
+Expanded pre-change baseline:
+
+```powershell
+dotnet tests\Gravitas.Benchmarks\bin\Release\net8.0\Gravitas.Benchmarks.dll collision-detection --filter "*MeshMesh*" --job short --exporters json --artifacts artifacts\benchmarks\2026-06-17-phase4b-meshmesh-expanded-baseline
+```
+
+Rejected paired-BVH traversal measurement:
+
+```powershell
+dotnet tests\Gravitas.Benchmarks\bin\Release\net8.0\Gravitas.Benchmarks.dll collision-detection --filter "*MeshMesh*" --job short --exporters json --artifacts artifacts\benchmarks\2026-06-17-phase4b-meshmesh-paired-bvh-after
+```
+
+Final SAT-axis optimization measurement:
+
+```powershell
+dotnet tests\Gravitas.Benchmarks\bin\Release\net8.0\Gravitas.Benchmarks.dll collision-detection --filter "*MeshMesh*" --job short --exporters json --artifacts artifacts\benchmarks\2026-06-17-phase4b-meshmesh-sat-axis-after
+```
+
+| Method | Before | Paired BVH | Final SAT Axis | Allocated |
+| --- | ---: | ---: | ---: | ---: |
+| CheckMeshMeshPairs | 457.2 us | 470.3 us | 475.1 us | 0 B |
+| CheckConcaveMeshMeshPairs | 7,079.4 us | 10,062.7 us | 5,977.8 us | 0 B |
+| CheckDenseConcaveMeshMeshPairs | 43,289.2 us | 133,113.7 us | 41,422.0 us | 0 B |
+| CheckContactHeavyConcaveMeshMeshPairs | 62,379.6 us | 179,498.2 us | 60,230.7 us | 0 B |
+| CheckClosedDenseMeshMeshPairs | 302,322.0 us | 730,064.6 us | 296,628.3 us | 0 B |
+
+The tiny `CheckMeshMeshPairs` regression is on the convex mesh path and inside
+ShortRun noise for this phase; the optimized code is only used by the
+concave/concave-or-concave/convex triangle manifold path. The main simple
+concave row improved by about 15.6%; dense rows improved modestly because their
+cost is dominated by candidate count and contact-heavy narrow-phase work, not
+axis normalization alone.
+
+**Captured Phase 4B Follow-Ups**
+
+- Dense reversed mesh-mesh dispatch can produce a different reduced set of four
+  contact IDs than the forward pair because contact point generation is
+  directional and manifold reduction keeps only the deepest four contacts. The
+  same pair remains deterministic across repeated checks. Fixing reversed
+  reduced-manifold symmetry should be treated as a manifold-quality/solver
+  policy change, not as a mesh candidate-generation optimization.
+- Direct BVH-vs-BVH traversal should not be reintroduced without a different
+  data path, such as cached transformed node bounds for one mesh pair or a
+  SwiftCollections-level paired traversal API that can avoid repeated
+  conservative bounds transforms.
+- Dense closed-shell mesh-mesh remains far too expensive for complex runtime
+  assets even after the SAT-axis optimization. Phase 4C authored convex
+  collision assets are still the right alpha answer for dense or rendered-mesh
+  collision content.
 
 **Phase 4C: Authored Convex Collision Assets**
 

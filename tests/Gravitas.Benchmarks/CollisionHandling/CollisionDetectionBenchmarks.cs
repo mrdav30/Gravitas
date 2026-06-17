@@ -3,12 +3,15 @@ using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using System;
+using System.Collections.Generic;
 
 namespace Gravitas.Benchmarks;
 
 [MemoryDiagnoser]
 public class CollisionDetectionBenchmarks
 {
+    private const int DenseMeshSubdivision = 3;
+
     private GravitasWorldContext _context;
     private CollisionPair[] _pairs;
     private CollisionPair[] _primitivePairs;
@@ -20,6 +23,9 @@ public class CollisionDetectionBenchmarks
     private CollisionPair[] _concaveMeshCylinderPairs;
     private CollisionPair[] _concaveMeshCuboidPairs;
     private CollisionPair[] _concaveMeshMeshPairs;
+    private CollisionPair[] _denseConcaveMeshMeshPairs;
+    private CollisionPair[] _contactHeavyConcaveMeshMeshPairs;
+    private CollisionPair[] _closedDenseMeshMeshPairs;
     private CollisionPair[] _compoundSpherePairs;
 
     [Params(64)]
@@ -48,6 +54,9 @@ public class CollisionDetectionBenchmarks
         _concaveMeshCylinderPairs = CreatePairSet(CreateConcaveMeshCylinderPair);
         _concaveMeshCuboidPairs = CreatePairSet(CreateConcaveMeshCuboidPair);
         _concaveMeshMeshPairs = CreatePairSet(CreateConcaveMeshMeshPair);
+        _denseConcaveMeshMeshPairs = CreatePairSet(CreateDenseConcaveMeshMeshPair);
+        _contactHeavyConcaveMeshMeshPairs = CreatePairSet(CreateContactHeavyConcaveMeshMeshPair);
+        _closedDenseMeshMeshPairs = CreatePairSet(CreateClosedDenseMeshMeshPair);
         _compoundSpherePairs = CreatePairSet(CreateCompoundSpherePair);
     }
 
@@ -66,6 +75,9 @@ public class CollisionDetectionBenchmarks
         _concaveMeshCylinderPairs = null;
         _concaveMeshCuboidPairs = null;
         _concaveMeshMeshPairs = null;
+        _denseConcaveMeshMeshPairs = null;
+        _contactHeavyConcaveMeshMeshPairs = null;
+        _closedDenseMeshMeshPairs = null;
         _compoundSpherePairs = null;
     }
 
@@ -133,6 +145,24 @@ public class CollisionDetectionBenchmarks
     public int CheckConcaveMeshMeshPairs()
     {
         return CountCollisions(_concaveMeshMeshPairs);
+    }
+
+    [Benchmark]
+    public int CheckDenseConcaveMeshMeshPairs()
+    {
+        return CountCollisions(_denseConcaveMeshMeshPairs);
+    }
+
+    [Benchmark]
+    public int CheckContactHeavyConcaveMeshMeshPairs()
+    {
+        return CountCollisions(_contactHeavyConcaveMeshMeshPairs);
+    }
+
+    [Benchmark]
+    public int CheckClosedDenseMeshMeshPairs()
+    {
+        return CountCollisions(_closedDenseMeshMeshPairs);
     }
 
     [Benchmark]
@@ -298,6 +328,27 @@ public class CollisionDetectionBenchmarks
             CreateInsideCornerMesh(origin));
     }
 
+    private CollisionPair CreateDenseConcaveMeshMeshPair(int index, Vector3d origin)
+    {
+        return new CollisionPair(
+            CreateDenseConcaveUChannel(origin),
+            CreateDenseInsideCornerMesh(origin));
+    }
+
+    private CollisionPair CreateContactHeavyConcaveMeshMeshPair(int index, Vector3d origin)
+    {
+        return new CollisionPair(
+            CreateDenseConcaveUChannel(origin),
+            CreateDenseConcaveUChannel(origin + new Vector3d(Fixed64.FromFraction(1, 4), Fixed64.Zero, Fixed64.Zero)));
+    }
+
+    private CollisionPair CreateClosedDenseMeshMeshPair(int index, Vector3d origin)
+    {
+        return new CollisionPair(
+            CreateClosedDenseConcaveCube(origin),
+            CreateClosedDenseConcaveCube(origin + new Vector3d(Fixed64.FromFraction(1, 4), Fixed64.Zero, Fixed64.Zero)));
+    }
+
     private CollisionPair CreateCompoundSpherePair(int index, Vector3d origin)
     {
         return new CollisionPair(
@@ -376,6 +427,33 @@ public class CollisionDetectionBenchmarks
             position,
             preventAngularForces: true).Collider;
 
+    private LSMeshCollider CreateDenseConcaveUChannel(Vector3d position)
+    {
+        CreateSubdividedUChannel(DenseMeshSubdivision, out Vector3d[] vertices, out int[] triangles);
+        return CreateBody(
+            new LSMeshCollider(vertices, triangles, MeshColliderMode.Concave),
+            position,
+            preventAngularForces: true).Collider;
+    }
+
+    private LSMeshCollider CreateDenseInsideCornerMesh(Vector3d position)
+    {
+        CreateSubdividedInsideCorner(DenseMeshSubdivision, out Vector3d[] vertices, out int[] triangles);
+        return CreateBody(
+            new LSMeshCollider(vertices, triangles, MeshColliderMode.Concave),
+            position,
+            preventAngularForces: true).Collider;
+    }
+
+    private LSMeshCollider CreateClosedDenseConcaveCube(Vector3d position)
+    {
+        CreateSubdividedClosedCube(DenseMeshSubdivision, out Vector3d[] vertices, out int[] triangles);
+        return CreateBody(
+            new LSMeshCollider(vertices, triangles, MeshColliderMode.Concave),
+            position,
+            preventAngularForces: true).Collider;
+    }
+
     private static Vector3d[] CreateUChannelVertices()
     {
         Fixed64 left = (Fixed64)(-2);
@@ -398,6 +476,107 @@ public class CollisionDetectionBenchmarks
             new Vector3d(left, height, Fixed64.Zero),
             new Vector3d(right, height, Fixed64.Zero)
         };
+    }
+
+    private static void CreateSubdividedUChannel(
+        int subdivisions,
+        out Vector3d[] vertices,
+        out int[] triangles)
+    {
+        Fixed64 left = (Fixed64)(-2);
+        Fixed64 right = (Fixed64)2;
+        Fixed64 height = (Fixed64)2;
+        Fixed64 depth = (Fixed64)4;
+        var vertexList = new List<Vector3d>(3 * (subdivisions + 1) * (subdivisions + 1));
+        var triangleList = new List<int>(18 * subdivisions * subdivisions);
+
+        AddSubdividedQuad(vertexList, triangleList, new Vector3d(left, Fixed64.Zero, Fixed64.Zero), new Vector3d(Fixed64.Zero, height, Fixed64.Zero), new Vector3d(Fixed64.Zero, Fixed64.Zero, depth), subdivisions);
+        AddSubdividedQuad(vertexList, triangleList, new Vector3d(right, Fixed64.Zero, Fixed64.Zero), new Vector3d(Fixed64.Zero, Fixed64.Zero, depth), new Vector3d(Fixed64.Zero, height, Fixed64.Zero), subdivisions);
+        AddSubdividedQuad(vertexList, triangleList, new Vector3d(left, Fixed64.Zero, Fixed64.Zero), new Vector3d(right - left, Fixed64.Zero, Fixed64.Zero), new Vector3d(Fixed64.Zero, height, Fixed64.Zero), subdivisions);
+
+        vertices = vertexList.ToArray();
+        triangles = triangleList.ToArray();
+    }
+
+    private static void CreateSubdividedInsideCorner(
+        int subdivisions,
+        out Vector3d[] vertices,
+        out int[] triangles)
+    {
+        Fixed64 four = (Fixed64)4;
+        var vertexList = new List<Vector3d>(3 * (subdivisions + 1) * (subdivisions + 1));
+        var triangleList = new List<int>(18 * subdivisions * subdivisions);
+
+        AddSubdividedQuad(vertexList, triangleList, Vector3d.Zero, new Vector3d(Fixed64.Zero, Fixed64.Zero, four), new Vector3d(four, Fixed64.Zero, Fixed64.Zero), subdivisions);
+        AddSubdividedQuad(vertexList, triangleList, Vector3d.Zero, new Vector3d(Fixed64.Zero, four, Fixed64.Zero), new Vector3d(Fixed64.Zero, Fixed64.Zero, four), subdivisions);
+        AddSubdividedQuad(vertexList, triangleList, Vector3d.Zero, new Vector3d(four, Fixed64.Zero, Fixed64.Zero), new Vector3d(Fixed64.Zero, four, Fixed64.Zero), subdivisions);
+
+        vertices = vertexList.ToArray();
+        triangles = triangleList.ToArray();
+    }
+
+    private static void CreateSubdividedClosedCube(
+        int subdivisions,
+        out Vector3d[] vertices,
+        out int[] triangles)
+    {
+        Fixed64 negative = -Fixed64.One;
+        Fixed64 positive = Fixed64.One;
+        Fixed64 size = (Fixed64)2;
+        var vertexList = new List<Vector3d>(6 * (subdivisions + 1) * (subdivisions + 1));
+        var triangleList = new List<int>(36 * subdivisions * subdivisions);
+
+        AddSubdividedQuad(vertexList, triangleList, new Vector3d(negative, negative, negative), new Vector3d(Fixed64.Zero, size, Fixed64.Zero), new Vector3d(size, Fixed64.Zero, Fixed64.Zero), subdivisions);
+        AddSubdividedQuad(vertexList, triangleList, new Vector3d(negative, negative, positive), new Vector3d(size, Fixed64.Zero, Fixed64.Zero), new Vector3d(Fixed64.Zero, size, Fixed64.Zero), subdivisions);
+        AddSubdividedQuad(vertexList, triangleList, new Vector3d(negative, negative, negative), new Vector3d(Fixed64.Zero, Fixed64.Zero, size), new Vector3d(Fixed64.Zero, size, Fixed64.Zero), subdivisions);
+        AddSubdividedQuad(vertexList, triangleList, new Vector3d(positive, negative, negative), new Vector3d(Fixed64.Zero, size, Fixed64.Zero), new Vector3d(Fixed64.Zero, Fixed64.Zero, size), subdivisions);
+        AddSubdividedQuad(vertexList, triangleList, new Vector3d(negative, negative, negative), new Vector3d(size, Fixed64.Zero, Fixed64.Zero), new Vector3d(Fixed64.Zero, Fixed64.Zero, size), subdivisions);
+        AddSubdividedQuad(vertexList, triangleList, new Vector3d(negative, positive, negative), new Vector3d(Fixed64.Zero, Fixed64.Zero, size), new Vector3d(size, Fixed64.Zero, Fixed64.Zero), subdivisions);
+
+        vertices = vertexList.ToArray();
+        triangles = triangleList.ToArray();
+    }
+
+    private static void AddSubdividedQuad(
+        List<Vector3d> vertices,
+        List<int> triangles,
+        Vector3d origin,
+        Vector3d edgeA,
+        Vector3d edgeB,
+        int subdivisions)
+    {
+        for (int a = 0; a < subdivisions; a++)
+        {
+            Fixed64 a0 = Fixed64.FromFraction(a, subdivisions);
+            Fixed64 a1 = Fixed64.FromFraction(a + 1, subdivisions);
+
+            for (int b = 0; b < subdivisions; b++)
+            {
+                Fixed64 b0 = Fixed64.FromFraction(b, subdivisions);
+                Fixed64 b1 = Fixed64.FromFraction(b + 1, subdivisions);
+                int p00 = AddVertex(vertices, origin + edgeA * a0 + edgeB * b0);
+                int p10 = AddVertex(vertices, origin + edgeA * a1 + edgeB * b0);
+                int p01 = AddVertex(vertices, origin + edgeA * a0 + edgeB * b1);
+                int p11 = AddVertex(vertices, origin + edgeA * a1 + edgeB * b1);
+
+                AddTriangle(triangles, p00, p10, p01);
+                AddTriangle(triangles, p01, p10, p11);
+            }
+        }
+    }
+
+    private static int AddVertex(List<Vector3d> vertices, Vector3d vertex)
+    {
+        int index = vertices.Count;
+        vertices.Add(vertex);
+        return index;
+    }
+
+    private static void AddTriangle(List<int> triangles, int a, int b, int c)
+    {
+        triangles.Add(a);
+        triangles.Add(b);
+        triangles.Add(c);
     }
 
     private ScenarioBody<TCollider> CreateBody<TCollider>(

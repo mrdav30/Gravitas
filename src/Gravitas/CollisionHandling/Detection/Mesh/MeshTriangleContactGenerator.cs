@@ -280,12 +280,13 @@ internal static class MeshTriangleContactGenerator
         ref Vector3d normal,
         ref Fixed64 depth)
     {
-        if (!TryNormalizeAxis(axis, out Vector3d NormalAxis))
+        Fixed64 axisMagnitudeSqr = axis.MagnitudeSquared;
+        if (axisMagnitudeSqr <= Fixed64.Epsilon)
             return true;
 
-        ProjectTriangle(first, NormalAxis, out Fixed64 minA, out Fixed64 maxA);
-        ProjectTriangle(second, NormalAxis, out Fixed64 minB, out Fixed64 maxB);
-        return CheckProjectedAxis(minA, maxA, minB, maxB, NormalAxis, desiredDirection, ref normal, ref depth);
+        ProjectTriangle(first, axis, out Fixed64 minA, out Fixed64 maxA);
+        ProjectTriangle(second, axis, out Fixed64 minB, out Fixed64 maxB);
+        return CheckProjectedTriangleAxis(minA, maxA, minB, maxB, axis, axisMagnitudeSqr, desiredDirection, ref normal, ref depth);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -311,6 +312,38 @@ internal static class MeshTriangleContactGenerator
 
         depth = overlap;
         normal = OrientNormal(axis, desiredDirection);
+        return true;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool CheckProjectedTriangleAxis(
+        Fixed64 minA,
+        Fixed64 maxA,
+        Fixed64 minB,
+        Fixed64 maxB,
+        Vector3d axis,
+        Fixed64 axisMagnitudeSqr,
+        Vector3d desiredDirection,
+        ref Vector3d normal,
+        ref Fixed64 depth)
+    {
+        if (maxA < minB || maxB < minA)
+            return false;
+
+        Fixed64 overlap = FixedMath.Min(maxA - minB, maxB - minA);
+        if (overlap > Fixed64.Zero
+            && depth != Fixed64.MaxValue
+            && overlap * overlap >= depth * depth * axisMagnitudeSqr)
+        {
+            return true;
+        }
+
+        if (overlap < Fixed64.Zero)
+            overlap = Fixed64.Zero;
+
+        Fixed64 axisMagnitude = FixedMath.Sqrt(axisMagnitudeSqr);
+        depth = overlap / axisMagnitude;
+        normal = OrientNormal(axis / axisMagnitude, desiredDirection);
         return true;
     }
 

@@ -201,6 +201,64 @@ public sealed class ConcaveMeshCollisionTests
     }
 
     [Fact]
+    public void ConcaveMeshMesh_ShouldPreserveDenseConcaveContactsAcrossReversedDispatch()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSMeshCollider> channel = scenario.CreateBody(
+            MeshTestFixtures.CreateSubdividedUChannel(3),
+            PhysicsScenarioBuilder.Vector(0, 0, 0),
+            FixedQuaternion.Identity,
+            immovable: true);
+        ScenarioBody<LSMeshCollider> corner = scenario.CreateBody(
+            MeshTestFixtures.CreateSubdividedInsideCorner(3),
+            PhysicsScenarioBuilder.Vector(0, 0, 0),
+            FixedQuaternion.Identity,
+            immovable: true);
+
+        CollisionPair forward = AssertCollision(scenario, channel.Collider, corner.Collider, CollisionType.Mesh_Mesh);
+        CollisionPair reversed = AssertCollision(scenario, corner.Collider, channel.Collider, CollisionType.Mesh_Mesh);
+        ulong[] firstForwardIds = forward.Manifold.Select(contact => contact.ContactId).ToArray();
+
+        CollisionDetection.DoCollisionCheck(forward).Should().BeTrue();
+
+        forward.Manifold.Select(contact => contact.ContactId).Should().BeInAscendingOrder();
+        reversed.Manifold.Select(contact => contact.ContactId).Should().BeInAscendingOrder();
+        forward.Manifold.Select(contact => contact.ContactId).Should().Equal(firstForwardIds);
+        reversed.Manifold.Count.Should().BeGreaterThan(0);
+        reversed.Manifold.PrimaryContact.Depth.Should().BeGreaterThanOrEqualTo(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void DynamicConcaveMeshMesh_ShouldRefreshTriangleCandidatesAfterMovement()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSMeshCollider> channel = scenario.CreateBody(
+            MeshTestFixtures.CreateSubdividedUChannel(2, inertiaPolicy: MeshInertiaPolicy.SurfaceApproximation),
+            PhysicsScenarioBuilder.Vector(0, 0, 0),
+            FixedQuaternion.Identity,
+            preventAngularForces: true);
+        ScenarioBody<LSMeshCollider> corner = scenario.CreateBody(
+            MeshTestFixtures.CreateSubdividedInsideCorner(2),
+            PhysicsScenarioBuilder.Vector(0, 0, 0),
+            FixedQuaternion.Identity,
+            immovable: true);
+        CollisionPair pair = scenario.CreatePair(channel.Collider, corner.Collider);
+
+        CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
+        ulong[] initialIds = pair.Manifold.Select(contact => contact.ContactId).ToArray();
+
+        channel.Body.SetPosition(new Vector3d((Fixed64)8, Fixed64.Zero, Fixed64.Zero));
+        channel.Collider.Simulate();
+        CollisionDetection.DoCollisionCheck(pair).Should().BeFalse();
+        pair.Manifold.Count.Should().Be(0);
+
+        channel.Body.SetPosition(Vector3d.Zero);
+        channel.Collider.Simulate();
+        CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
+        pair.Manifold.Select(contact => contact.ContactId).Should().Equal(initialIds);
+    }
+
+    [Fact]
     public void DynamicConcaveMeshAndPrimitive_ShouldProduceDeterministicContacts()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
@@ -251,6 +309,27 @@ public sealed class ConcaveMeshCollisionTests
             EnsureCollision(cylinderPair);
             EnsureCollision(meshPair);
         });
+
+        allocatedBytes.Should().Be(0);
+    }
+
+    [Fact]
+    public void DenseConcaveMeshMeshChecks_ShouldNotAllocateAfterWarmup()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSMeshCollider> channel = scenario.CreateBody(
+            MeshTestFixtures.CreateSubdividedUChannel(3),
+            PhysicsScenarioBuilder.Vector(0, 0, 0),
+            FixedQuaternion.Identity,
+            immovable: true);
+        ScenarioBody<LSMeshCollider> corner = scenario.CreateBody(
+            MeshTestFixtures.CreateSubdividedInsideCorner(3),
+            PhysicsScenarioBuilder.Vector(0, 0, 0),
+            FixedQuaternion.Identity,
+            immovable: true);
+        CollisionPair pair = scenario.CreatePair(channel.Collider, corner.Collider);
+
+        long allocatedBytes = MeasureAllocatedBytes(() => EnsureCollision(pair));
 
         allocatedBytes.Should().Be(0);
     }
