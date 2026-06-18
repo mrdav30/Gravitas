@@ -350,8 +350,8 @@ public sealed class MixedQueryCcdTests
         bool immovable = false)
     {
         var collider = new LSCompoundCollider(
-            new CompoundColliderPart(new LSSphereCollider { LocalOffset = new Vector3d((Fixed64)(-1), Fixed64.Zero, Fixed64.Zero) }),
-            new CompoundColliderPart(new LSSphereCollider { LocalOffset = new Vector3d((Fixed64)2, Fixed64.Zero, Fixed64.Zero) }));
+            CompoundColliderPart.Sphere(Fixed64.Half, new Vector3d((Fixed64)(-1), Fixed64.Zero, Fixed64.Zero)),
+            CompoundColliderPart.Sphere(Fixed64.Half, new Vector3d((Fixed64)2, Fixed64.Zero, Fixed64.Zero)));
         return CreateBody3D(context, collider, position, immovable: immovable);
     }
 

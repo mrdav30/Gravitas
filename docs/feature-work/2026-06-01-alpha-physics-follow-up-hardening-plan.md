@@ -633,14 +633,14 @@ cannot express.
 
 Implementation notes:
 
-- `CompoundColliderPart` now exposes an explicit local offset alongside local
-  rotation and local scale, plus constructors that let generated/offline data
-  author the whole part transform atomically.
-- Existing part construction that sets `collider.LocalOffset` before wrapping a
-  collider is still accepted; the compound part snapshots that offset as the
-  authored transform.
-- `LSCompoundCollider` reapplies the immutable authored part offset during
-  shape rebuilds so internal child collider mutation cannot silently change the
+- `CompoundColliderPart` originally grew an explicit local offset alongside
+  local rotation and local scale so generated/offline data could author the
+  whole part transform atomically.
+- The Phase 4C collider-wrapper authoring surface has since been superseded by
+  Phase 5 data-only shape definitions. `LSCompoundCollider` now materializes
+  private runtime part colliders from immutable authored part data.
+- `LSCompoundCollider` reapplies the immutable authored part transform during
+  shape rebuilds so private runtime collider mutation cannot silently change the
   baked compound layout.
 - `LSMeshCollider` now applies `LocalOffset` to its `PhysicsMesh` transform by
   translating the mesh origin relative to `PhysicsMesh.LocalBounds.Center`.
@@ -729,38 +729,40 @@ authored shape data and transforms, not child collider lifecycle objects.
 
 **Tasks**
 
-- [ ] Capture a pre-change benchmark baseline for the relevant Phase 4C rows:
+- [x] Capture a pre-change benchmark baseline for the relevant Phase 4C rows:
   authored compound proxy collision, compound manifold generation, dense mesh
   vs authored compound, and compound runtime shape/partition movement.
-- [ ] Add a deterministic `ColliderShapeDefinition` API with factory helpers
+- [x] Add a deterministic `ColliderShapeDefinition` API with factory helpers
   for supported alpha runtime shapes:
   - sphere.
   - capsule.
   - cuboid.
   - finite cylinder.
   - convex mesh with vertices, triangles, and mesh inertia policy.
-- [ ] Keep concave mesh definitions out of compound parts unless a later phase
+- [x] Keep concave mesh definitions out of compound parts unless a later phase
   proves they have coherent one-identity compound semantics.
-- [ ] Add constructor/factory paths from `ColliderShapeDefinition` to standalone
+- [x] Add constructor/factory paths from `ColliderShapeDefinition` to standalone
   runtime colliders, for example `new LSCuboidCollider(definition)` or a focused
   factory if constructor overloads become ambiguous.
-- [ ] Redesign `CompoundColliderPart` so public authored parts own
+- [x] Redesign `CompoundColliderPart` so public authored parts own
   `ColliderShapeDefinition`, local offset, local rotation, and local scale.
-- [ ] Make `LSCompoundCollider` materialize any internal runtime part colliders
+- [x] Make `LSCompoundCollider` materialize any internal runtime part colliders
   privately and deterministically, preserving stable part order and existing
   collision semantics.
-- [ ] Remove or make internal the public API that exposes compound child
+- [x] Remove or make internal the public API that exposes compound child
   collider lifecycle objects, unless a real host-facing use case remains.
-- [ ] Add tests that prove shape definitions:
+- [x] Add tests that prove shape definitions:
   - contain no context/body/id/partition/pair/event state.
   - can build equivalent standalone colliders.
   - can build equivalent compound colliders.
   - keep one public compound collider identity in collision, diagnostics,
     queries, events, and broad-phase partitions.
-  - reject unsupported nested compound and concave mesh part definitions.
-- [ ] Add serialization/import-export tests for shape definitions if they become
-  directly serializable API surface.
-- [ ] Update docs so Phase 6 tooling knows its runtime export target is
+  - keep nested compound and concave mesh out of the definition surface and
+    reject default parts.
+- [x] Do not add built-in serialization transport support for shape definitions
+  yet; they are a data-only runtime construction API that host/tooling asset
+  formats can serialize explicitly.
+- [x] Update docs so Phase 6 tooling knows its runtime export target is
   `ColliderShapeDefinition[]` plus stable part transforms, not instantiated
   runtime colliders.
 
@@ -773,6 +775,75 @@ authored shape data and transforms, not child collider lifecycle objects.
   preserved or improved.
 - Future mesh simplification/decomposition tooling has a clean deterministic
   output shape before implementation starts.
+
+**Progress - 2026-06-17**
+
+Implemented `ColliderShapeDefinition` and `ColliderShapeDefinitionKind` as the
+data-only 3D authoring layer for sphere, capsule, cuboid, finite cylinder, and
+convex mesh shapes. Shape definitions snapshot mesh vertex/index arrays,
+validate primitive dimensions and mesh index ranges, expose stable mesh element
+accessors, and contain no runtime body, context, ID, partition, hierarchy, pair,
+or event state.
+
+Concrete runtime colliders now have definition-based construction paths:
+`LSSphereCollider`, `LSCapsuleCollider`, `LSCuboidCollider`,
+`LSCylinderCollider`, and `LSMeshCollider`. `ColliderShapeDefinition` also has a
+`CreateCollider()` factory for callers that need to materialize an unbound
+runtime collider from data.
+
+`CompoundColliderPart` is now the public authored descriptor:
+`ColliderShapeDefinition Shape`, `LocalOffset`, `LocalRotation`, and
+`LocalScale`. Convenience factories cover sphere, capsule, cuboid, cylinder,
+and convex mesh parts. `LSCompoundCollider` keeps public parts as authored data
+and privately materializes runtime part colliders in stable declaration order so
+existing narrow-phase, query, diagnostics, and inertia behavior is reused
+without exposing fake child-collider lifecycle objects.
+
+Built-in serialization transport support was intentionally not added to
+`ColliderShapeDefinition` in this slice. The type is the deterministic runtime
+construction target; host asset pipelines and future Phase 6 tooling can
+serialize their own asset format into shape definitions and part transforms
+before creating runtime shells.
+
+Baseline artifacts captured before source changes:
+
+```powershell
+dotnet tests\Gravitas.Benchmarks\bin\Release\net8.0\Gravitas.Benchmarks.dll collision-detection --filter "*Authored*" --job short --exporters json --artifacts artifacts\benchmarks\2026-06-17-phase5-shape-definition-authored-baseline
+dotnet tests\Gravitas.Benchmarks\bin\Release\net8.0\Gravitas.Benchmarks.dll collider-shape --filter "*MoveCompoundRuntimeShapeStateAcrossPartitions*" --job short --exporters json --artifacts artifacts\benchmarks\2026-06-17-phase5-shape-definition-compound-shape-baseline
+```
+
+Post-change artifacts:
+
+```powershell
+dotnet tests\Gravitas.Benchmarks\bin\Release\net8.0\Gravitas.Benchmarks.dll collision-detection --filter "*Authored*" --job short --exporters json --artifacts artifacts\benchmarks\2026-06-17-phase5-shape-definition-authored-after
+dotnet tests\Gravitas.Benchmarks\bin\Release\net8.0\Gravitas.Benchmarks.dll collider-shape --filter "*MoveCompoundRuntimeShapeStateAcrossPartitions*" --job short --exporters json --artifacts artifacts\benchmarks\2026-06-17-phase5-shape-definition-compound-shape-after
+```
+
+Important rows:
+
+| Benchmark | Before | After | Allocated |
+| --- | ---: | ---: | ---: |
+| CheckAuthoredCompoundProxyPairs | 582.8 us | 600.0 us | 0 B |
+| GenerateAuthoredCompoundProxyManifolds | 541.2 us | 544.5 us | 0 B |
+| CheckDenseConcaveMeshAuthoredCompoundProxyPairs | 29,683.4 us | 28,513.2 us | 0 B |
+| MoveCompoundRuntimeShapeStateAcrossPartitions | 28.83 us | 28.29 us | 0 B |
+
+The authored compound proxy rows are within ShortRun variance and keep zero
+managed allocation. The shape-movement row is unchanged to slightly better in
+this run, which matches the intended implementation: the new data layer affects
+construction/authoring, while steady-state compound runtime traversal still
+uses the existing materialized part path.
+
+Verification:
+
+```powershell
+dotnet test tests\Gravitas.Tests\Gravitas.Tests.csproj --configuration Release --nologo --no-restore --filter "FullyQualifiedName~ColliderShapeDefinitionTests|FullyQualifiedName~AuthoredConvexCollisionAssetTests|FullyQualifiedName~CompoundColliderTests|FullyQualifiedName~CompoundColliderCollisionTests"
+dotnet test Gravitas.slnx --configuration Release --nologo
+dotnet test Gravitas.slnx --configuration ReleaseLean --nologo
+```
+
+Results: focused Release tests passed 16/16, full Release passed 406/406, and
+full ReleaseLean passed 401/401.
 
 ## Phase 6: Mesh Simplification And Decomposition Tooling Plan
 

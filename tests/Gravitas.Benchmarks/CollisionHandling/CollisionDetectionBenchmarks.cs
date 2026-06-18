@@ -409,8 +409,8 @@ public class CollisionDetectionBenchmarks
     private LSCompoundCollider CreateCompound(Vector3d position) =>
         CreateBody(
             new LSCompoundCollider(
-                new CompoundColliderPart(new LSSphereCollider { LocalOffset = new Vector3d(-Fixed64.One, Fixed64.Zero, Fixed64.Zero) }),
-                new CompoundColliderPart(new LSSphereCollider { LocalOffset = new Vector3d(Fixed64.One, Fixed64.Zero, Fixed64.Zero) })),
+                CompoundColliderPart.Sphere(Fixed64.Half, new Vector3d(-Fixed64.One, Fixed64.Zero, Fixed64.Zero)),
+                CompoundColliderPart.Sphere(Fixed64.Half, new Vector3d(Fixed64.One, Fixed64.Zero, Fixed64.Zero))),
             position,
             preventAngularForces: true).Collider;
 
@@ -445,7 +445,7 @@ public class CollisionDetectionBenchmarks
             preventAngularForces: true).Collider;
 
     private static CompoundColliderPart CreateCuboidPart(Vector3d localOffset, Vector3d size) =>
-        new(new LSCuboidCollider { Size = size }, localOffset);
+        CompoundColliderPart.Cuboid(size, localOffset);
 
     private LSMeshCollider CreateMeshFloor(Vector3d position) =>
         CreateBody(

@@ -6,6 +6,14 @@ namespace Gravitas.Colliders;
 
 public class LSSphereCollider : LSCollider
 {
+    public LSSphereCollider() { }
+
+    public LSSphereCollider(ColliderShapeDefinition definition)
+    {
+        definition.EnsureKind(ColliderShapeDefinitionKind.Sphere);
+        Radius = definition.Radius;
+    }
+
     public override ColliderType Shape => ColliderType.Sphere;
 
     public override int Priority => ColliderSettings.GetPriority(Shape);

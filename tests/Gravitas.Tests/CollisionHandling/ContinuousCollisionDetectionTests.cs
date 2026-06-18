@@ -237,8 +237,8 @@ public sealed class ContinuousCollisionDetectionTests
             TestColliderShape.Cylinder => ToTuple(scenario.CreateCylinder(new Vector3d((Fixed64)(-2), Fixed64.Zero, Fixed64.Zero))),
             TestColliderShape.Compound => ToTuple(scenario.CreateBody(
                 new LSCompoundCollider(
-                    new CompoundColliderPart(new LSSphereCollider { LocalOffset = new Vector3d(-Fixed64.One, Fixed64.Zero, Fixed64.Zero) }),
-                    new CompoundColliderPart(new LSSphereCollider { LocalOffset = new Vector3d(Fixed64.One, Fixed64.Zero, Fixed64.Zero) })),
+                    CompoundColliderPart.Sphere(Fixed64.Half, new Vector3d(-Fixed64.One, Fixed64.Zero, Fixed64.Zero)),
+                    CompoundColliderPart.Sphere(Fixed64.Half, new Vector3d(Fixed64.One, Fixed64.Zero, Fixed64.Zero))),
                 new Vector3d((Fixed64)(-2), Fixed64.Zero, Fixed64.Zero),
                 FixedQuaternion.Identity)),
             _ => throw new System.ArgumentOutOfRangeException(nameof(shape), shape, null)

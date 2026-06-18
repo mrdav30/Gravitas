@@ -1,64 +1,45 @@
-﻿using FixedMathSharp;
-using SwiftCollections;
+using FixedMathSharp;
 using System.Runtime.CompilerServices;
 
 namespace Gravitas.Colliders;
 
 /// <summary>
-/// Declares one geometry part owned by an <see cref="LSCompoundCollider"/>.
+/// Declares one data-only geometry part owned by an
+/// <see cref="LSCompoundCollider"/>.
 /// </summary>
 public readonly struct CompoundColliderPart
 {
-    public CompoundColliderPart(LSCollider collider)
-        : this(collider, collider != null ? collider.LocalOffset : default, FixedQuaternion.Identity, Vector3d.One)
-    {
-    }
+    public CompoundColliderPart(ColliderShapeDefinition shape)
+        : this(shape, Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)
+    { }
 
-    public CompoundColliderPart(LSCollider collider, Vector3d localOffset)
-        : this(collider, localOffset, FixedQuaternion.Identity, Vector3d.One)
-    {
-    }
+    public CompoundColliderPart(ColliderShapeDefinition shape, Vector3d localOffset)
+        : this(shape, localOffset, FixedQuaternion.Identity, Vector3d.One)
+    { }
 
-    public CompoundColliderPart(LSCollider collider, FixedQuaternion localRotation)
-        : this(collider, collider != null ? collider.LocalOffset : default, localRotation, Vector3d.One)
-    {
-    }
-
-    public CompoundColliderPart(LSCollider collider, Vector3d localOffset, FixedQuaternion localRotation)
-        : this(collider, localOffset, localRotation, Vector3d.One)
-    {
-    }
-
-    public CompoundColliderPart(LSCollider collider, FixedQuaternion localRotation, Vector3d localScale)
-        : this(collider, collider != null ? collider.LocalOffset : default, localRotation, localScale)
-    {
-    }
+    public CompoundColliderPart(ColliderShapeDefinition shape, Vector3d localOffset, FixedQuaternion localRotation)
+        : this(shape, localOffset, localRotation, Vector3d.One)
+    { }
 
     public CompoundColliderPart(
-        LSCollider collider,
+        ColliderShapeDefinition shape,
         Vector3d localOffset,
         FixedQuaternion localRotation,
         Vector3d localScale)
     {
-        SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
-        SwiftThrowHelper.ThrowIfArgument(
-            localScale.X <= Fixed64.Zero || localScale.Y <= Fixed64.Zero || localScale.Z <= Fixed64.Zero,
-            nameof(localScale),
-            "Compound collider part scale components must be greater than zero.");
+        shape.EnsureDefined();
+        ValidateScale(localScale);
 
-        collider.LocalOffset = localOffset;
-
-        Collider = collider;
+        Shape = shape;
         LocalOffset = localOffset;
         LocalRotation = localRotation;
         LocalScale = localScale;
     }
 
     /// <summary>
-    /// Gets the part geometry. The part is owned by its compound collider and is
-    /// not registered independently with the physics service.
+    /// Gets the authored data-only shape definition for this part.
     /// </summary>
-    public LSCollider Collider { get; }
+    public ColliderShapeDefinition Shape { get; }
 
     /// <summary>
     /// Gets the deterministic local center offset applied relative to the
@@ -78,9 +59,75 @@ public readonly struct CompoundColliderPart
     /// </summary>
     public Vector3d LocalScale { get; }
 
+    public static CompoundColliderPart Sphere(Fixed64 radius, Vector3d localOffset) =>
+        new(ColliderShapeDefinition.Sphere(radius), localOffset);
+
+    public static CompoundColliderPart Sphere(
+        Fixed64 radius,
+        Vector3d localOffset,
+        FixedQuaternion localRotation,
+        Vector3d localScale) =>
+        new(ColliderShapeDefinition.Sphere(radius), localOffset, localRotation, localScale);
+
+    public static CompoundColliderPart Capsule(Fixed64 radius, Fixed64 height, Vector3d localOffset) =>
+        new(ColliderShapeDefinition.Capsule(radius, height), localOffset);
+
+    public static CompoundColliderPart Capsule(
+        Fixed64 radius,
+        Fixed64 height,
+        Vector3d localOffset,
+        FixedQuaternion localRotation,
+        Vector3d localScale) =>
+        new(ColliderShapeDefinition.Capsule(radius, height), localOffset, localRotation, localScale);
+
+    public static CompoundColliderPart Cuboid(Vector3d size, Vector3d localOffset) =>
+        new(ColliderShapeDefinition.Cuboid(size), localOffset);
+
+    public static CompoundColliderPart Cuboid(
+        Vector3d size,
+        Vector3d localOffset,
+        FixedQuaternion localRotation,
+        Vector3d localScale) =>
+        new(ColliderShapeDefinition.Cuboid(size), localOffset, localRotation, localScale);
+
+    public static CompoundColliderPart Cylinder(Fixed64 radius, Fixed64 height, Vector3d localOffset) =>
+        new(ColliderShapeDefinition.Cylinder(radius, height), localOffset);
+
+    public static CompoundColliderPart Cylinder(
+        Fixed64 radius,
+        Fixed64 height,
+        Vector3d localOffset,
+        FixedQuaternion localRotation,
+        Vector3d localScale) =>
+        new(ColliderShapeDefinition.Cylinder(radius, height), localOffset, localRotation, localScale);
+
+    public static CompoundColliderPart ConvexMesh(
+        Vector3d[] vertices,
+        int[] triangles,
+        Vector3d localOffset,
+        MeshInertiaPolicy inertiaPolicy = MeshInertiaPolicy.RequireClosedVolume) =>
+        new(ColliderShapeDefinition.ConvexMesh(vertices, triangles, inertiaPolicy), localOffset);
+
+    public static CompoundColliderPart ConvexMesh(
+        Vector3d[] vertices,
+        int[] triangles,
+        Vector3d localOffset,
+        FixedQuaternion localRotation,
+        Vector3d localScale,
+        MeshInertiaPolicy inertiaPolicy = MeshInertiaPolicy.RequireClosedVolume) =>
+        new(ColliderShapeDefinition.ConvexMesh(vertices, triangles, inertiaPolicy), localOffset, localRotation, localScale);
+
     internal bool IsDefault
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        get => Collider == null;
+        get => Shape.Kind == ColliderShapeDefinitionKind.Undefined;
+    }
+
+    private static void ValidateScale(Vector3d localScale)
+    {
+        SwiftThrowHelper.ThrowIfArgument(
+            localScale.X <= Fixed64.Zero || localScale.Y <= Fixed64.Zero || localScale.Z <= Fixed64.Zero,
+            nameof(localScale),
+            "Compound collider part scale components must be greater than zero.");
     }
 }

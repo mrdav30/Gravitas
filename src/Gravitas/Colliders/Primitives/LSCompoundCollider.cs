@@ -13,6 +13,7 @@ namespace Gravitas.Colliders;
 public sealed class LSCompoundCollider : LSCollider
 {
     private readonly CompoundColliderPart[] _parts;
+    private readonly LSCollider[] _partColliders;
 
     public LSCompoundCollider(params CompoundColliderPart[] parts)
     {
@@ -20,22 +21,15 @@ public sealed class LSCompoundCollider : LSCollider
         SwiftThrowHelper.ThrowIfArgument(parts.Length == 0, nameof(parts), "Compound collider must contain at least one part.");
 
         for (int i = 0; i < parts.Length; i++)
-        {
             ValidatePart(parts[i]);
-            for (int j = 0; j < i; j++)
-            {
-                SwiftThrowHelper.ThrowIfArgument(
-                    ReferenceEquals(parts[j].Collider, parts[i].Collider),
-                    nameof(parts),
-                    "Compound collider parts cannot reuse the same collider instance.");
-            }
-        }
 
         _parts = new CompoundColliderPart[parts.Length];
+        _partColliders = new LSCollider[parts.Length];
         for (int i = 0; i < parts.Length; i++)
         {
             _parts[i] = parts[i];
-            _parts[i].Collider.ReserveCompoundPart(this);
+            _partColliders[i] = MaterializePartCollider(parts[i]);
+            _partColliders[i].ReserveCompoundPart(this);
         }
     }
 
@@ -71,10 +65,10 @@ public sealed class LSCompoundCollider : LSCollider
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public LSCollider GetPartCollider(int index)
+    internal LSCollider GetPartCollider(int index)
     {
         SwiftThrowHelper.ThrowIfArrayIndexInvalid(index, _parts.Length, nameof(index));
-        return _parts[index].Collider;
+        return _partColliders[index];
     }
 
     protected override void RebuildRuntimeShape() => BuildShape();
@@ -88,7 +82,7 @@ public sealed class LSCompoundCollider : LSCollider
         for (int i = 0; i < _parts.Length; i++)
         {
             CompoundColliderPart part = _parts[i];
-            LSCollider partCollider = part.Collider;
+            LSCollider partCollider = _partColliders[i];
             partCollider.LocalOffset = part.LocalOffset;
             partCollider.BindCompoundPart(this, part.LocalRotation, part.LocalScale, Context);
 
@@ -120,7 +114,7 @@ public sealed class LSCompoundCollider : LSCollider
 
         for (int i = 0; i < _parts.Length; i++)
         {
-            LSCollider part = _parts[i].Collider;
+            LSCollider part = _partColliders[i];
             Fixed64 partMass = totalArea > Fixed64.Zero
                 ? mass * (part.Area / totalArea)
                 : equalPartMass;
@@ -136,27 +130,27 @@ public sealed class LSCompoundCollider : LSCollider
     {
         Fixed64 area = Fixed64.Zero;
         for (int i = 0; i < _parts.Length; i++)
-            area += _parts[i].Collider.GetFrontalArea(direction);
+            area += _partColliders[i].GetFrontalArea(direction);
         return area;
     }
 
     public override Vector3d ClosestPointOnSurface(Vector3d other)
     {
         int bestIndex = FindClosestPartIndex(other);
-        return _parts[bestIndex].Collider.ClosestPointOnSurface(other);
+        return _partColliders[bestIndex].ClosestPointOnSurface(other);
     }
 
     public override Vector3d GetNormalAtPoint(Vector3d point)
     {
         int bestIndex = FindClosestPartIndex(point);
-        return _parts[bestIndex].Collider.GetNormalAtPoint(point);
+        return _partColliders[bestIndex].GetNormalAtPoint(point);
     }
 
     public override bool ColliderOverlapsRay(RaycastSegmentWorker worker, ref SwiftList<Vector3d> outputIntersectionPoints)
     {
         bool hit = false;
         for (int i = 0; i < _parts.Length; i++)
-            hit |= _parts[i].Collider.ColliderOverlapsRay(worker, ref outputIntersectionPoints);
+            hit |= _partColliders[i].ColliderOverlapsRay(worker, ref outputIntersectionPoints);
         return hit;
     }
 
@@ -167,12 +161,12 @@ public sealed class LSCompoundCollider : LSCollider
     private int FindClosestPartIndex(Vector3d point)
     {
         int bestIndex = 0;
-        Vector3d closest = _parts[0].Collider.ClosestPointOnSurface(point);
+        Vector3d closest = _partColliders[0].ClosestPointOnSurface(point);
         Fixed64 bestDistance = Vector3d.DistanceSquared(point, closest);
 
         for (int i = 1; i < _parts.Length; i++)
         {
-            Vector3d candidate = _parts[i].Collider.ClosestPointOnSurface(point);
+            Vector3d candidate = _partColliders[i].ClosestPointOnSurface(point);
             Fixed64 distance = Vector3d.DistanceSquared(point, candidate);
             if (distance >= bestDistance)
                 continue;
@@ -196,22 +190,14 @@ public sealed class LSCompoundCollider : LSCollider
             Fixed64.Zero, Fixed64.Zero, mass * (xSqr + ySqr));
     }
 
-    private static void ValidatePart(CompoundColliderPart part)
+    private static LSCollider MaterializePartCollider(CompoundColliderPart part)
     {
-        SwiftThrowHelper.ThrowIfArgument(part.IsDefault, nameof(part), "Compound collider part cannot be default.");
-
-        LSCollider collider = part.Collider;
-        SwiftThrowHelper.ThrowIfArgument(
-            collider is LSCompoundCollider,
-            nameof(part),
-            "Compound collider parts cannot contain another Compound collider.");
-        SwiftThrowHelper.ThrowIfArgument(
-            collider is LSMeshCollider { Mode: MeshColliderMode.Concave },
-            nameof(part),
-            "Concave mesh colliders cannot be used as compound collider parts.");
-        SwiftThrowHelper.ThrowIfArgument(
-            collider.HasHostBinding || collider.TryGetBoundContext(out _),
-            nameof(part),
-            "Compound collider parts cannot already be initialized or bound to a context.");
+        LSCollider collider = part.Shape.CreateRuntimeCollider();
+        collider.LocalOffset = part.LocalOffset;
+        return collider;
     }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void ValidatePart(CompoundColliderPart part) =>
+        SwiftThrowHelper.ThrowIfArgument(part.IsDefault, nameof(part), "Compound collider part cannot be default.");
 }

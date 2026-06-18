@@ -7,6 +7,18 @@ namespace Gravitas.Tests.Support;
 
 internal static class MeshTestFixtures
 {
+    public static ColliderShapeDefinition CreateDefinition(LSMeshCollider mesh)
+    {
+        if (mesh.Mode != MeshColliderMode.Convex)
+            throw new ArgumentException("Only convex mesh fixtures can be converted to collider shape definitions.", nameof(mesh));
+
+        return ColliderShapeDefinition.ConvexMesh(mesh.Mesh.LocalVertices, mesh.Mesh.Triangles, mesh.InertiaPolicy);
+    }
+
+    public static ColliderShapeDefinition CreateConvexCubeDefinition(
+        MeshInertiaPolicy inertiaPolicy = MeshInertiaPolicy.RequireClosedVolume) =>
+        CreateDefinition(CreateConvexCube(MeshColliderMode.Convex, inertiaPolicy));
+
     public static LSMeshCollider CreateConvexCube(
         MeshColliderMode mode = MeshColliderMode.Convex,
         MeshInertiaPolicy inertiaPolicy = MeshInertiaPolicy.RequireClosedVolume)

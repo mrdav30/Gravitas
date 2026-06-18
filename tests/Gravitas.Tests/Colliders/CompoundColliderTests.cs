@@ -14,8 +14,8 @@ public sealed class CompoundColliderTests
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         var compound = new LSCompoundCollider(
-            new CompoundColliderPart(new LSSphereCollider { LocalOffset = new Vector3d(-Fixed64.One, Fixed64.Zero, Fixed64.Zero) }),
-            new CompoundColliderPart(new LSSphereCollider { LocalOffset = new Vector3d((Fixed64)2, Fixed64.Zero, Fixed64.Zero) }));
+            CompoundColliderPart.Sphere(Fixed64.Half, new Vector3d(-Fixed64.One, Fixed64.Zero, Fixed64.Zero)),
+            CompoundColliderPart.Sphere(Fixed64.Half, new Vector3d((Fixed64)2, Fixed64.Zero, Fixed64.Zero)));
 
         ScenarioBody<LSCompoundCollider> body = scenario.CreateBody(
             compound,
@@ -36,43 +36,19 @@ public sealed class CompoundColliderTests
     }
 
     [Fact]
-    public void Constructor_ShouldRejectConcaveMeshParts()
+    public void Constructor_ShouldRejectDefaultParts()
     {
-        Action act = () => _ = new LSCompoundCollider(
-            new CompoundColliderPart(MeshTestFixtures.CreateInsideCorner(MeshColliderMode.Concave)));
+        Action act = () => _ = new LSCompoundCollider(default(CompoundColliderPart));
 
         act.Should().Throw<ArgumentException>()
-            .WithMessage("*Concave*");
-    }
-
-    [Fact]
-    public void Constructor_ShouldRejectNestedCompoundParts()
-    {
-        var nested = new LSCompoundCollider(new CompoundColliderPart(new LSSphereCollider()));
-
-        Action act = () => _ = new LSCompoundCollider(new CompoundColliderPart(nested));
-
-        act.Should().Throw<ArgumentException>()
-            .WithMessage("*Compound*");
-    }
-
-    [Fact]
-    public void Constructor_ShouldRejectStandaloneInitializedParts()
-    {
-        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
-        ScenarioBody<LSSphereCollider> initialized = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
-
-        Action act = () => _ = new LSCompoundCollider(new CompoundColliderPart(initialized.Collider));
-
-        act.Should().Throw<ArgumentException>()
-            .WithMessage("*initialized*");
+            .WithMessage("*default*");
     }
 
     [Fact]
     public void Constructor_ShouldReservePartsForCompoundLifecycleOnly()
     {
-        var part = new LSSphereCollider();
-        _ = new LSCompoundCollider(new CompoundColliderPart(part));
+        var compound = new LSCompoundCollider(CompoundColliderPart.Sphere(Fixed64.Half, Vector3d.Zero));
+        LSCollider part = compound.GetPartCollider(0);
 
         Action act = part.Simulate;
 
@@ -84,12 +60,12 @@ public sealed class CompoundColliderTests
     public void PartShapeMutation_ShouldRefreshAggregateBounds()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
-        var part = new LSSphereCollider();
-        var compound = new LSCompoundCollider(new CompoundColliderPart(part));
+        var compound = new LSCompoundCollider(CompoundColliderPart.Sphere(Fixed64.Half, Vector3d.Zero));
         ScenarioBody<LSCompoundCollider> body = scenario.CreateBody(
             compound,
             PhysicsScenarioBuilder.Vector(0, 0, 0),
             FixedQuaternion.Identity);
+        var part = (LSSphereCollider)body.Collider.GetPartCollider(0);
 
         part.Radius = Fixed64.One;
         body.Collider.Simulate();

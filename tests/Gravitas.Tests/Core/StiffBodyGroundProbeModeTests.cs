@@ -65,8 +65,8 @@ public sealed class StiffBodyGroundProbeModeTests
         scenario.Context.Settings.GroundCheckLayerMask = PhysicsLayerMask.FromLayer(1);
         ScenarioBody<LSCompoundCollider> body = scenario.CreateBody(
             new LSCompoundCollider(
-                new CompoundColliderPart(new LSSphereCollider { LocalOffset = new Vector3d(-Fixed64.One, Fixed64.Zero, Fixed64.Zero) }),
-                new CompoundColliderPart(new LSSphereCollider { LocalOffset = new Vector3d(Fixed64.One, Fixed64.Zero, Fixed64.Zero) })),
+                CompoundColliderPart.Sphere(Fixed64.Half, new Vector3d(-Fixed64.One, Fixed64.Zero, Fixed64.Zero)),
+                CompoundColliderPart.Sphere(Fixed64.Half, new Vector3d(Fixed64.One, Fixed64.Zero, Fixed64.Zero))),
             Vector3d.Zero,
             FixedQuaternion.Identity);
 

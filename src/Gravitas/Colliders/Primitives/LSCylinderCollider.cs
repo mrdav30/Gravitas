@@ -7,6 +7,15 @@ namespace Gravitas.Colliders;
 
 public class LSCylinderCollider : LSCollider
 {
+    public LSCylinderCollider() { }
+
+    public LSCylinderCollider(ColliderShapeDefinition definition)
+    {
+        definition.EnsureKind(ColliderShapeDefinitionKind.Cylinder);
+        Radius = definition.Radius;
+        Size = definition.Size;
+    }
+
     public override ColliderType Shape => ColliderType.Cylinder;
     public override int Priority => ColliderSettings.GetPriority(Shape);
 

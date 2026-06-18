@@ -22,6 +22,7 @@ Host-created shell:
 - `StiffBody`, `StiffBody2D`, `LSCollider`, and `LSCollider2D` instances.
 - the concrete collider shape type, such as sphere, cuboid, circle, AABB, or
   polygon.
+- private runtime part colliders materialized by `LSCompoundCollider`.
 - renderer, ECS, engine object, networking, pooling, editor, and event
   subscription state.
 
@@ -67,6 +68,13 @@ context-owned and intentionally excluded from snapshots. Loading a bound
 collider rebuilds runtime shape state and refreshes partition membership where
 needed.
 
+`ColliderShapeDefinition` is a data-only authoring/import surface for creating
+runtime 3D colliders and compound parts. It is not a bound runtime shell: it has
+no body, context, collider ID, partition coordinates, pairs, hierarchy state, or
+events. Offline authored compound assets should serialize shape definitions and
+stable part transforms, then let the host create `LSCompoundCollider` runtime
+shells from that data before simulation or replay state is populated.
+
 `LSCollider2D` records pure 2D collider filter and shape state. Circle, AABB,
 and convex polygon colliders record their shape-specific values through
 shape-local hooks rather than a central type switch. Loading shape data validates
@@ -88,7 +96,8 @@ A deterministic replay or rollback restore should follow this shape:
 1. Create or attach a `GravitasWorldContext` with matching settings and
    GridForge world setup.
 2. Create host agents, transforms, bodies, and concrete collider shapes in the
-   same stable order the host expects.
+   same stable order the host expects. Authored compound assets can materialize
+   those shapes from `ColliderShapeDefinition` parts before binding.
 3. Populate settings first when the snapshot includes `PhysicsSettingsSaver`.
 4. Populate body/collider state into those existing shells.
 5. Continue fixed-step simulation from the restored frame using the same ordered

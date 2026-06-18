@@ -120,6 +120,13 @@ public class LSCuboidCollider : LSCollider
         _orientedBounds = new FixedBoundBox(Vector3d.Zero, Vector3d.One);
     }
 
+    public LSCuboidCollider(ColliderShapeDefinition definition)
+        : this()
+    {
+        definition.EnsureKind(ColliderShapeDefinitionKind.Cuboid);
+        Size = definition.Size;
+    }
+
     protected override void OnInitialize()
     {
         _orientedBounds = new FixedBoundBox(Center, ScaledSize);

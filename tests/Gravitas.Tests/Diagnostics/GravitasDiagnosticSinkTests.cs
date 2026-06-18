@@ -172,8 +172,8 @@ public sealed class GravitasDiagnosticSinkTests
         ScenarioBody<LSCylinderCollider> cylinder = scenario.CreateCylinder(PhysicsScenarioBuilder.Vector(6, 0, 0));
         ScenarioBody<LSCompoundCollider> compound = scenario.CreateBody(
             new LSCompoundCollider(
-                new CompoundColliderPart(new LSSphereCollider { LocalOffset = new Vector3d(-Fixed64.One, Fixed64.Zero, Fixed64.Zero) }),
-                new CompoundColliderPart(new LSCuboidCollider { LocalOffset = new Vector3d(Fixed64.One, Fixed64.Zero, Fixed64.Zero) })),
+                CompoundColliderPart.Sphere(Fixed64.Half, new Vector3d(-Fixed64.One, Fixed64.Zero, Fixed64.Zero)),
+                CompoundColliderPart.Cuboid(Vector3d.One, new Vector3d(Fixed64.One, Fixed64.Zero, Fixed64.Zero))),
             PhysicsScenarioBuilder.Vector(8, 0, 0),
             FixedQuaternion.Identity);
         ScenarioBody<LSMeshCollider> mesh = scenario.CreateBody(

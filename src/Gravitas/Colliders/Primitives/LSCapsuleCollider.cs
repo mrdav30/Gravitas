@@ -6,6 +6,15 @@ namespace Gravitas.Colliders;
 
 public class LSCapsuleCollider : LSCollider
 {
+    public LSCapsuleCollider() { }
+
+    public LSCapsuleCollider(ColliderShapeDefinition definition)
+    {
+        definition.EnsureKind(ColliderShapeDefinitionKind.Capsule);
+        Radius = definition.Radius;
+        Size = definition.Size;
+    }
+
     public override ColliderType Shape => ColliderType.Capsule;
     public override int Priority => ColliderSettings.GetPriority(Shape);
 

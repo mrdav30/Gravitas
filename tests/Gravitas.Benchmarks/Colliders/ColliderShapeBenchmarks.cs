@@ -103,10 +103,10 @@ public class ColliderShapeBenchmarks
 
         var compoundAgent = new BenchmarkMatterAgent(_context, Vector3d.Zero);
         _compoundCollider = new LSCompoundCollider(
-            new CompoundColliderPart(new LSSphereCollider { LocalOffset = new Vector3d((Fixed64)(-2), Fixed64.Zero, Fixed64.Zero) }),
-            new CompoundColliderPart(new LSSphereCollider { LocalOffset = new Vector3d(Fixed64.Zero, Fixed64.Zero, Fixed64.Zero) }),
-            new CompoundColliderPart(new LSSphereCollider { LocalOffset = new Vector3d((Fixed64)2, Fixed64.Zero, Fixed64.Zero) }),
-            new CompoundColliderPart(new LSCuboidCollider { LocalOffset = new Vector3d(Fixed64.Zero, Fixed64.Zero, (Fixed64)2) }));
+            CompoundColliderPart.Sphere(Fixed64.Half, new Vector3d((Fixed64)(-2), Fixed64.Zero, Fixed64.Zero)),
+            CompoundColliderPart.Sphere(Fixed64.Half, new Vector3d(Fixed64.Zero, Fixed64.Zero, Fixed64.Zero)),
+            CompoundColliderPart.Sphere(Fixed64.Half, new Vector3d((Fixed64)2, Fixed64.Zero, Fixed64.Zero)),
+            CompoundColliderPart.Cuboid(Vector3d.One, new Vector3d(Fixed64.Zero, Fixed64.Zero, (Fixed64)2)));
         _compoundBody = new StiffBody(compoundAgent, _compoundCollider)
         {
             Mass = Fixed64.One,

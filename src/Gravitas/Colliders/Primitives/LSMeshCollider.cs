@@ -50,6 +50,14 @@ public class LSMeshCollider : LSCollider
         SetBounds(Mesh.Bounds);
     }
 
+    public LSMeshCollider(ColliderShapeDefinition definition)
+        : this(
+            GetVertices(definition),
+            GetTriangles(definition),
+            MeshColliderMode.Convex,
+            GetInertiaPolicy(definition))
+    { }
+
     public override Fixed64 ScaledRadius
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -125,6 +133,24 @@ public class LSMeshCollider : LSCollider
             inertiaPolicy != MeshInertiaPolicy.SurfaceApproximation,
             nameof(inertiaPolicy),
             "Unsupported mesh inertia policy.");
+    }
+
+    private static Vector3d[] GetVertices(ColliderShapeDefinition definition)
+    {
+        definition.EnsureKind(ColliderShapeDefinitionKind.ConvexMesh);
+        return definition.GetMeshVerticesForRuntime();
+    }
+
+    private static int[] GetTriangles(ColliderShapeDefinition definition)
+    {
+        definition.EnsureKind(ColliderShapeDefinitionKind.ConvexMesh);
+        return definition.GetMeshTrianglesForRuntime();
+    }
+
+    private static MeshInertiaPolicy GetInertiaPolicy(ColliderShapeDefinition definition)
+    {
+        definition.EnsureKind(ColliderShapeDefinitionKind.ConvexMesh);
+        return definition.MeshInertiaPolicy;
     }
 
     private bool TryFindClosestPointToTriangles(

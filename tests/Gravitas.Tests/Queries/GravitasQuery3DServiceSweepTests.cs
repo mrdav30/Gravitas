@@ -161,8 +161,8 @@ public sealed class GravitasQuery3DServiceSweepTests
         LSCompoundCollider compound = CreateDynamicCollider(
             context,
             new LSCompoundCollider(
-                new CompoundColliderPart(new LSSphereCollider { LocalOffset = new Vector3d((Fixed64)4, Fixed64.Zero, Fixed64.Zero) }),
-                new CompoundColliderPart(new LSSphereCollider { LocalOffset = new Vector3d((Fixed64)8, Fixed64.Zero, Fixed64.Zero) })),
+                CompoundColliderPart.Sphere(Fixed64.Half, new Vector3d((Fixed64)4, Fixed64.Zero, Fixed64.Zero)),
+                CompoundColliderPart.Sphere(Fixed64.Half, new Vector3d((Fixed64)8, Fixed64.Zero, Fixed64.Zero))),
             Vector3d.Zero);
 
         bool meshHit = context.Query3D.SweepSphere(

@@ -38,8 +38,8 @@ public sealed class CompoundColliderCollisionTests
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         var compoundCollider = new LSCompoundCollider(
-            new CompoundColliderPart(new LSSphereCollider()),
-            new CompoundColliderPart(new LSSphereCollider()));
+            CompoundColliderPart.Sphere(Fixed64.Half, Vector3d.Zero),
+            CompoundColliderPart.Sphere(Fixed64.Half, Vector3d.Zero));
         ScenarioBody<LSCompoundCollider> compound = scenario.CreateBody(
             compoundCollider,
             PhysicsScenarioBuilder.Vector(0, 0, 0),
@@ -65,8 +65,8 @@ public sealed class CompoundColliderCollisionTests
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         var compoundCollider = new LSCompoundCollider(
-            new CompoundColliderPart(new LSSphereCollider()),
-            new CompoundColliderPart(new LSSphereCollider()));
+            CompoundColliderPart.Sphere(Fixed64.Half, Vector3d.Zero),
+            CompoundColliderPart.Sphere(Fixed64.Half, Vector3d.Zero));
         ScenarioBody<LSCompoundCollider> compound = scenario.CreateBody(
             compoundCollider,
             PhysicsScenarioBuilder.Vector(0, 0, 0),
@@ -104,7 +104,7 @@ public sealed class CompoundColliderCollisionTests
     private static LSCompoundCollider CreateTwoSphereCompound()
     {
         return new LSCompoundCollider(
-            new CompoundColliderPart(new LSSphereCollider { LocalOffset = new Vector3d(-Fixed64.One, Fixed64.Zero, Fixed64.Zero) }),
-            new CompoundColliderPart(new LSSphereCollider { LocalOffset = new Vector3d(Fixed64.One, Fixed64.Zero, Fixed64.Zero) }));
+            CompoundColliderPart.Sphere(Fixed64.Half, new Vector3d(-Fixed64.One, Fixed64.Zero, Fixed64.Zero)),
+            CompoundColliderPart.Sphere(Fixed64.Half, new Vector3d(Fixed64.One, Fixed64.Zero, Fixed64.Zero)));
     }
 }

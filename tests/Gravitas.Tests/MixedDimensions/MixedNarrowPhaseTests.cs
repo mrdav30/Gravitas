@@ -387,8 +387,8 @@ public sealed class MixedNarrowPhaseTests
     private static ScenarioBody<LSCompoundCollider> CreateCompound3D(GravitasWorldContext context, Vector3d position)
     {
         var collider = new LSCompoundCollider(
-            new CompoundColliderPart(new LSSphereCollider { LocalOffset = new Vector3d((Fixed64)(-4), Fixed64.Zero, Fixed64.Zero) }),
-            new CompoundColliderPart(new LSSphereCollider { LocalOffset = new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero) }));
+            CompoundColliderPart.Sphere(Fixed64.Half, new Vector3d((Fixed64)(-4), Fixed64.Zero, Fixed64.Zero)),
+            CompoundColliderPart.Sphere(Fixed64.Half, new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero)));
         return CreateBody3D(context, collider, position, FixedQuaternion.Identity);
     }
 
