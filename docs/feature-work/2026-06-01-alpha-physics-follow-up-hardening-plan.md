@@ -1017,6 +1017,18 @@ tool should expose deterministic failure/result codes, stable ordering, bounded
 settings, and benchmarked quality metrics before its output becomes a
 recommended alpha asset path.
 
+**Progress - 2026-06-18**
+
+The Phase 7 tooling plan was captured in a separate document linked above. The plan includes:
+
+- A research summary of exact and approximate convex decomposition methods,
+  including their theoretical complexity, practical performance, and quality
+  tradeoffs.
+- A proposed API design for a Gravitas-owned mesh simplification and decomposition
+  tool, including input/output formats, configuration settings, and deterministic
+  result codes.
+- A roadmap for implementation, testing, and benchmarking before the tool's output is recommended for alpha asset workflows.
+
 ## Phase 8: Dynamic CCD And Swept Mesh Families
 
 **Goal:** Define the next continuous-collision slice beyond the current static
