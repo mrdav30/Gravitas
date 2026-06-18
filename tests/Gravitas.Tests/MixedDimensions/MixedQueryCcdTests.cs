@@ -45,6 +45,26 @@ public sealed class MixedQueryCcdTests
     }
 
     [Fact]
+    public void SweepSphereAgainst2D_ShouldReturnCompound2DOwnerThroughPartGeometry()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        LSCollider2D compound = CreateBodylessCompound2D(context, Vector2d.Zero);
+
+        bool mixedHit = context.QueryMixed.SweepSphereAgainst2D(
+            new Vector3d((Fixed64)(-3), Fixed64.Zero, Fixed64.Zero),
+            new Vector3d((Fixed64)3, Fixed64.Zero, Fixed64.Zero),
+            Fixed64.Half,
+            IncludeLayerZero,
+            out PhysicsMixedHit hit);
+
+        mixedHit.Should().BeTrue();
+        hit.Collider2D.Should().BeSameAs(compound);
+        hit.Collider3D.Should().BeNull();
+        hit.Distance.Should().Be((Fixed64)2);
+        hit.Normal3DTo2D.Should().Be(Vector3d.Right);
+    }
+
+    [Fact]
     public void SweepCircleAgainst3D_ShouldHit3DPrimitiveWithoutChangingPure2DQuerySurface()
     {
         using GravitasWorldContext context = CreateMixedContext();
@@ -404,6 +424,18 @@ public sealed class MixedQueryCcdTests
         Vector2d size)
     {
         var collider = new LSAABBoxCollider2D(size);
+        var agent = new TestMatterAgent(
+            context,
+            new FixedTransform(new Vector3d(position.X, Fixed64.Zero, position.Y), FixedQuaternion.Identity, Vector3d.One));
+        collider.InitializeWithNoBody(agent);
+        return collider;
+    }
+
+    private static LSCollider2D CreateBodylessCompound2D(GravitasWorldContext context, Vector2d position)
+    {
+        var collider = new LSCompoundCollider2D(
+            CompoundColliderPart2D.Circle(Fixed64.Half, Vector2d.Zero),
+            CompoundColliderPart2D.Circle(Fixed64.Half, new Vector2d((Fixed64)4, Fixed64.Zero)));
         var agent = new TestMatterAgent(
             context,
             new FixedTransform(new Vector3d(position.X, Fixed64.Zero, position.Y), FixedQuaternion.Identity, Vector3d.One));

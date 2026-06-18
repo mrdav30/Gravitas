@@ -21,6 +21,14 @@ public sealed class LSPolygonCollider2D : LSCollider2D
         SetLocalVertices(vertices, markDirty: true);
     }
 
+    public LSPolygonCollider2D(ColliderShapeDefinition2D definition)
+    {
+        definition.EnsureKind(ColliderShapeDefinition2DKind.ConvexPolygon);
+        _localVertices = Array.Empty<Vector2d>();
+        _worldVertices = Array.Empty<Vector2d>();
+        SetLocalVertices(definition.GetPolygonVerticesForRuntime(), markDirty: true);
+    }
+
     public override ColliderType2D Shape => ColliderType2D.ConvexPolygon;
 
     public int Count => _worldVertices.Length;
@@ -102,9 +110,10 @@ public sealed class LSPolygonCollider2D : LSCollider2D
         Vector2d max = Vector2d.Zero;
         Fixed64 rotation = Rotation;
         Vector2d center = Center;
+        Vector2d localScale = LocalScale;
         for (int i = 0; i < _localVertices.Length; i++)
         {
-            Vector2d vertex = center + Rotate(_localVertices[i], rotation);
+            Vector2d vertex = center + Rotate(Vector2d.Multiply(_localVertices[i], localScale), rotation);
             _worldVertices[i] = vertex;
             if (i == 0)
             {
@@ -132,7 +141,7 @@ public sealed class LSPolygonCollider2D : LSCollider2D
     {
         SwiftThrowHelper.ThrowIfNull(vertices, nameof(vertices));
         SwiftThrowHelper.ThrowIfArgument(vertices.Length < 3, nameof(vertices), "2D polygon must contain at least three vertices.");
-        ValidateConvex(vertices);
+        ValidateConvexPolygon(vertices);
 
         if (_localVertices.Length != vertices.Length)
         {
@@ -145,8 +154,10 @@ public sealed class LSPolygonCollider2D : LSCollider2D
             MarkShapeDirty();
     }
 
-    private static void ValidateConvex(Vector2d[] vertices)
+    internal static void ValidateConvexPolygon(Vector2d[] vertices)
     {
+        SwiftThrowHelper.ThrowIfArgument(vertices.Length < 3, nameof(vertices), "2D polygon must contain at least three vertices.");
+
         int sign = 0;
         for (int i = 0; i < vertices.Length; i++)
         {

@@ -52,10 +52,11 @@ hierarchy, duplicate, and bounds filtering. The mixed embedding state on
 `LSCollider2D` is a finite 3D `FixedBoundBox` built from pure 2D X/Z bounds plus a
 positive Y half-thickness centered on the host transform's Y position.
 `CollisionDetectionMixed` currently supports 3D sphere, cuboid, capsule, finite
-cylinder, compound, and mesh contacts against embedded 2D circle, AABB, and
-convex polygon slabs. Compound mixed contacts scan owned parts in stable order
-and return one external contact surface. Mesh mixed contacts gather local-BVH
-triangle candidates and test triangles against the embedded 2D slab volume.
+cylinder, compound, and mesh contacts against embedded 2D circle, AABB, convex
+polygon, and compound slabs. Compound mixed contacts scan owned parts in stable
+order and return one external contact surface on either side. Mesh mixed
+contacts gather local-BVH triangle candidates and test triangles against the
+embedded 2D slab volume.
 `CollisionPairMixed` owns stable 3D/2D pair identity, resting-pair retention,
 wake propagation, mixed contact enter/stay/exit events, trigger-only mixed
 trigger events, and pooled pair reuse. `CollisionResponseMixed` applies the
@@ -74,6 +75,8 @@ candidate TOI checks and compound targets through stable part-order reduction.
 - circle/convex polygon.
 - axis-aligned box/convex polygon.
 - convex polygon/convex polygon.
+- compound/primitive or compound/compound, resolved by scanning owned parts in
+  stable declaration order and returning the owner collider identity.
 
 Circles use center/radius tests and support points. Boxes and polygons use 2D
 separating-axis tests over deterministic vertex order. `LSPolygonCollider2D`
@@ -180,9 +183,12 @@ state uses the same generic helper over 2D collision pairs. Hierarchy state is
 shared across 2D and 3D through dimension-tagged `ColliderHierarchyKey` values,
 so cross-dimensional parent/child and sibling filters do not alias plain
 collider IDs. Only partition coordinates remain 2D-specific because they store
-X/Z planar coverage. A 2D collider whose center, rotation, local offset, or
-shape version has not changed skips `FixedBoundArea` rebuilds and partition
-refreshes.
+X/Z planar coverage. A standalone 2D collider whose center, rotation, local
+offset, or shape version has not changed skips `FixedBoundArea` rebuilds and
+partition refreshes. A 2D compound part also includes inherited local scale in
+its private runtime-shape snapshot so authored part scale changes rebuild the
+owning aggregate without adding host-scale lookup cost to ordinary standalone
+2D colliders.
 
 Partition state tracks grid coordinates, previous broad-phase coverage bounds,
 partition-change flags, and broad-phase versioning together. Query state tracks
@@ -218,6 +224,13 @@ rotation, and local scale. `LSCompoundCollider` may materialize private runtime
 part colliders internally to reuse the existing narrow phase, query, diagnostics,
 and inertia code, but those internal colliders are not the authored asset format
 and are not independent runtime identities.
+
+`LSCompoundCollider2D` applies the same authored-data rule to pure 2D. Public
+`CompoundColliderPart2D` values store `ColliderShapeDefinition2D`, local offset,
+local rotation, and local scale. The owner materializes private `LSCollider2D`
+part colliders in stable declaration order, keeps one 2D collider ID, one body
+binding, one broad-phase entry, and one event/query/diagnostic identity, and
+rejects lifecycle operations on the private parts.
 
 Capsules rebuild their hemisphere centers, cylinder height, area, and segment
 endpoints together. Short capsules collapse to a sphere-like segment and use a
@@ -329,20 +342,24 @@ Mesh policy work should keep these boundaries explicit:
 ## Continuous Collision Detection
 
 CCD is body-owned and opt-in. `PhysicsSettings.DefaultContinuousCollisionMode`
-defaults to `Discrete`; `StiffBody.ContinuousCollisionMode` defaults to
-`Inherit`, so existing bodies keep the discrete integration path unless the host
-sets a context default, enables a body explicitly, or assigns a top-level parent
-body with an explicit CCD mode. `ColliderHierarchyState` caches the top parent
-when parent relationships are bound, so `Inherit` can check the parent policy in
-constant time before falling back to the context default.
+defaults to `Discrete`; `StiffBody.ContinuousCollisionMode` and
+`StiffBody2D.ContinuousCollisionMode` default to `Inherit`, so existing bodies
+keep the discrete integration path unless the host sets a context default,
+enables a body explicitly, or assigns a top-level parent body with an explicit
+CCD mode. `ColliderHierarchyState` caches the top parent when parent
+relationships are bound, so `Inherit` can check the parent policy in constant
+time before falling back to the context default.
 
 The alpha CCD path runs during `StiffBody` position integration, after velocity
 and acceleration have produced an intended frame displacement and before the
 authoritative position is committed. It uses a conservative swept-sphere proxy
 derived from the moving collider:
 
-- sphere, capsule, and cylinder use their scaled radius.
-- cuboid uses the smallest world-space bounds half extent.
+- 3D sphere, capsule, and cylinder use their scaled radius.
+- 3D cuboid uses the smallest world-space bounds half extent.
+- 2D circle uses its scaled radius.
+- 2D AABB and convex polygon use a conservative bounds radius.
+- 2D compound uses a conservative aggregate radius over its private parts.
 
 `Continuous` always sweeps when the proxy radius and displacement are non-zero.
 `Auto` sweeps only when the intended displacement is larger than the proxy

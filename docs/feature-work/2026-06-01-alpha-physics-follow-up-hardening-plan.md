@@ -885,25 +885,25 @@ CompoundColliderPart2D
 
 **Tasks**
 
-- [ ] Capture focused 2D collision/query/partition benchmarks before source
+- [x] Capture focused 2D collision/query/partition benchmarks before source
   edits.
-- [ ] Add a deterministic `ColliderShapeDefinition2D` API with factory helpers
+- [x] Add a deterministic `ColliderShapeDefinition2D` API with factory helpers
   for circle, AABB, and convex polygon shapes.
-- [ ] Add definition-based constructors/factories for existing standalone 2D
+- [x] Add definition-based constructors/factories for existing standalone 2D
   colliders without adding runtime lifecycle state to definitions.
-- [ ] Add `CompoundColliderPart2D` as data-only authored part input with stable
+- [x] Add `CompoundColliderPart2D` as data-only authored part input with stable
   local offset, rotation, and scale.
-- [ ] Add `LSCompoundCollider2D` with one public 2D collider ID, one body
+- [x] Add `LSCompoundCollider2D` with one public 2D collider ID, one body
   binding, one event surface, one broad-phase identity, and private runtime part
   colliders materialized in deterministic declaration order.
-- [ ] Extend pure 2D collision settings, narrow-phase dispatch, partitioning,
+- [x] Extend pure 2D collision settings, narrow-phase dispatch, partitioning,
   query services, and result ordering to handle compound 2D colliders without
   exposing child collider lifecycle.
-- [ ] Define and test mixed embedding behavior for 2D compound colliders so
+- [x] Define and test mixed embedding behavior for 2D compound colliders so
   mixed 2D/3D contacts and swept queries use the owning 2D compound identity.
-- [ ] Add diagnostics/debug draw coverage for authored 2D compound parts while
+- [x] Add diagnostics/debug draw coverage for authored 2D compound parts while
   preserving owner collider IDs in emitted events.
-- [ ] Update docs and tests so future CCD and diagnostics phases know that pure
+- [x] Update docs and tests so future CCD and diagnostics phases know that pure
   2D includes compound authored data, not only primitive shapes.
 
 **Exit Criteria**
@@ -916,6 +916,90 @@ CompoundColliderPart2D
 - 2D compound parts never leak public runtime child collider lifecycle objects.
 - Benchmarks show no steady-state allocation regression in 2D collision,
   query, and partition hot paths.
+
+**Progress - 2026-06-18**
+
+Implemented `ColliderShapeDefinition2D` and
+`ColliderShapeDefinition2DKind` as the pure 2D data-only authoring surface for
+circle, axis-aligned box, and convex polygon shapes. Definitions snapshot
+polygon vertices, validate dimensions and convexity, can materialize standalone
+runtime colliders, and contain no body, context, collider ID, partition, pair,
+hierarchy, query, event, or buffer state.
+
+`CompoundColliderPart2D` now mirrors the 3D authored part model with
+`ColliderShapeDefinition2D`, `Vector2d LocalOffset`, `Fixed64 LocalRotation`,
+and `Vector2d LocalScale`. `LSCompoundCollider2D` owns one public 2D collider
+identity and privately materializes deterministic part colliders from those
+definitions. Internal part colliders cannot run standalone lifecycle operations,
+cannot be registered independently, and are scanned in declaration order for
+collision, queries, mixed embedding, CCD proxy radius, and diagnostics.
+
+Pure 2D collision dispatch now includes compound owners through
+`ColliderType2D.Compound` and `CollisionType2D.Compound`. Queries return the
+owning compound collider, not the private part collider, and continue to use
+caller-owned hit buffers and deterministic ordering. Mixed narrow phase,
+mixed swept-sphere queries, and mixed debug draw now treat a 2D compound as an
+embedded slab aggregate while preserving the owner collider ID in emitted hits
+and diagnostic commands.
+
+One benchmark side finding was fixed while measuring Phase 6: the primitive
+2D raycast sweep-baseline benchmark exposed a fixed-point divide-by-zero on
+parallel segment intersection. `QueryDetection2D.TryIntersectSegments` now has
+an explicit zero denominator guard, with a regression test for repeated
+horizontal raycasts through polygon edges.
+
+Baseline artifacts captured before source changes:
+
+```powershell
+dotnet tests\Gravitas.Benchmarks\bin\Release\net8.0\Gravitas.Benchmarks.dll physics2d --filter "*Physics2DBenchmarks*" --job short --exporters json --artifacts artifacts\benchmarks\2026-06-18-phase6-2d-compound-baseline
+dotnet tests\Gravitas.Benchmarks\bin\Release\net8.0\Gravitas.Benchmarks.dll mixed-query --filter "*MixedQueryBenchmarks*" --job short --exporters json --artifacts artifacts\benchmarks\2026-06-18-phase6-2d-compound-mixed-query-baseline
+```
+
+Post-change artifacts:
+
+```powershell
+dotnet tests\Gravitas.Benchmarks\bin\Release\net8.0\Gravitas.Benchmarks.dll Physics2DBenchmarks --filter "*Physics2DBenchmarks*" --job short --exporters json --artifacts artifacts\benchmarks\2026-06-18-phase6-2d-comparable-after-final
+dotnet tests\Gravitas.Benchmarks\bin\Release\net8.0\Gravitas.Benchmarks.dll Physics2DCompoundBenchmarks --filter "*Physics2DCompoundBenchmarks*" --job short --exporters json --artifacts artifacts\benchmarks\2026-06-18-phase6-2d-compound-after-final
+dotnet tests\Gravitas.Benchmarks\bin\Release\net8.0\Gravitas.Benchmarks.dll MixedQueryCompound2DBenchmarks --filter "*MixedQueryCompound2DBenchmarks*" --job short --exporters json --artifacts artifacts\benchmarks\2026-06-18-phase6-mixed-compound2d-after-final
+```
+
+The compound benchmark rows live in separate benchmark classes so existing
+primitive 2D and mixed-query selections remain comparable to their pre-change
+baselines.
+
+Important rows:
+
+| Benchmark | Before | After | Allocated |
+| --- | ---: | ---: | ---: |
+| SimulateUnchangedColliders(64) | 0.922 us | 1.052 us | 0 B |
+| SimulateUnchangedColliders(1024) | 30.454 us | 32.837 us | 0 B |
+| CheckRequiredShapePairs(64) | 79.638 us | 75.334 us | 0 B |
+| CheckRequiredShapePairs(1024) | 1,288.722 us | 1,191.208 us | 0 B |
+| OverlapCircleAll(64) | 200.109 us | 191.973 us | 0 B |
+| OverlapCircleAll(1024) | 234.015 us | 225.887 us | 0 B |
+| SweepCircleAll_SparseHit(64) | 29.716 us | 30.663 us | 0 B |
+| SweepCircleAll_DenseHit(1024) | 493.625 us | 460.360 us | 0 B |
+| SimulateUnchangedCompoundColliders(64) | n/a | 1.094 us | 0 B |
+| CheckCompoundShapePairs(64) | n/a | 146.264 us | 0 B |
+| OverlapCircleAll_CompoundTargets(64) | n/a | 218.421 us | 0 B |
+| SweepCircleAll_CompoundTargets(64) | n/a | 39.014 us | 0 B |
+| SimulateUnchangedCompoundColliders(1024) | n/a | 37.338 us | 0 B |
+| CheckCompoundShapePairs(1024) | n/a | 2,716.276 us | 0 B |
+| OverlapCircleAll_CompoundTargets(1024) | n/a | 275.366 us | 0 B |
+| SweepCircleAll_CompoundTargets(1024) | n/a | 39.179 us | 0 B |
+| SweepSphereAgainst2DAll_Compound2DTargets(64) | n/a | 435.0 us | 0 B |
+| SweepSphereAgainst2DAll_Compound2DTargets(1024) | n/a | 16,803.7 us | 0 B |
+
+Verification:
+
+```powershell
+dotnet test tests\Gravitas.Tests\Gravitas.Tests.csproj --configuration Release --nologo --no-restore --filter "FullyQualifiedName~Physics2DQueryTests|FullyQualifiedName~CompoundCollider2D|FullyQualifiedName~ColliderShapeDefinition2DTests|FullyQualifiedName~ContinuousMode_ShouldUseCompoundOwnerProxyRadius"
+dotnet test Gravitas.slnx --configuration Release --nologo
+dotnet test Gravitas.slnx --configuration ReleaseLean --nologo
+```
+
+Results: focused Release tests passed 21/21, full Release passed 423/423, and
+full ReleaseLean passed 418/418.
 
 ## Phase 7: Mesh Simplification And Decomposition Tooling Plan
 

@@ -3,6 +3,7 @@ using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Diagnostics;
+using Gravitas.Support;
 using Gravitas.Tests.Support;
 using System;
 using Xunit;
@@ -229,6 +230,32 @@ public sealed class GravitasDiagnosticSinkTests
         commands[9].Kind.Should().Be(GravitasDebugDrawKind.Point);
         commands[9].Center.Should().Be(PhysicsScenarioBuilder.Vector(2, 0, 0));
         commands[9].Radius.Should().Be(Fixed64.Half);
+    }
+
+    [Fact]
+    public void CaptureMixedCollider_WithCompound2D_ShouldEmitPartCommandsUsingOwnerId()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        context.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
+        var compound = new LSCompoundCollider2D(
+            CompoundColliderPart2D.Circle(Fixed64.Half, new Vector2d(-Fixed64.One, Fixed64.Zero)),
+            CompoundColliderPart2D.AABBox(Vector2d.One, new Vector2d(Fixed64.One, Fixed64.Zero)));
+        var agent = new TestMatterAgent(
+            context,
+            new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One));
+        compound.InitializeWithNoBody(agent);
+
+        context.Diagnostics.Enable(eventCapacity: 4, drawCommandCapacity: 8);
+        context.Diagnostics.CaptureMixedCollider(compound, GravitasDiagnosticColor.Cyan);
+
+        ReadOnlySpan<GravitasDebugDrawCommand> commands = context.Diagnostics.DrawCommands;
+        commands.Length.Should().Be(2);
+        commands[0].ColliderId.Should().Be(compound.Id);
+        commands[0].ColliderDimension.Should().Be(GravitasColliderDimension.TwoD);
+        commands[0].Collider2DType.Should().Be(ColliderType2D.Compound);
+        commands[1].ColliderId.Should().Be(compound.Id);
+        commands[1].ColliderDimension.Should().Be(GravitasColliderDimension.TwoD);
+        commands[1].Collider2DType.Should().Be(ColliderType2D.Compound);
     }
 
     [Fact]

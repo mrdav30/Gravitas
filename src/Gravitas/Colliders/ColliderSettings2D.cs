@@ -17,6 +17,7 @@ public static class ColliderSettings2D
             ColliderType2D.Circle => 0,
             ColliderType2D.AABox => 1,
             ColliderType2D.ConvexPolygon => 1,
+            ColliderType2D.Compound => 2,
             _ => -1
         };
 
@@ -26,6 +27,9 @@ public static class ColliderSettings2D
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static CollisionType2D GetCollisionType(ColliderType2D type1, ColliderType2D type2)
     {
+        if (type1 == ColliderType2D.Compound || type2 == ColliderType2D.Compound)
+            return CollisionType2D.Compound;
+
         bool firstCircle = type1 == ColliderType2D.Circle;
         bool secondCircle = type2 == ColliderType2D.Circle;
         if (firstCircle && secondCircle)

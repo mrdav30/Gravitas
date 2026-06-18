@@ -361,8 +361,9 @@ public sealed class StiffBody2D : IRecordable
     {
         return Collider switch
         {
-            LSCircleCollider2D circle => circle.Radius,
-            LSAABBoxCollider2D box => box.HalfExtents.Magnitude,
+            LSCircleCollider2D circle => circle.ScaledRadius,
+            LSAABBoxCollider2D box => box.ScaledHalfExtents.Magnitude,
+            LSCompoundCollider2D compound => compound.ScaledRadius,
             _ => ResolveConvexContinuousCollisionProxyRadius()
         };
     }

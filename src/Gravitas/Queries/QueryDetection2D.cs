@@ -18,6 +18,9 @@ internal static class QueryDetection2D
     {
         SwiftThrowHelper.ThrowIfArgument(radius < Fixed64.Zero, nameof(radius), "2D query radius cannot be negative.");
 
+        if (collider is LSCompoundCollider2D compound)
+            return TryOverlapCircleCompound(center, radius, compound, out hit);
+
         Vector2d closest = collider.GetClosestPoint(center);
         bool containsCenter = collider.ContainsPoint(center);
         Vector2d toCenter = center - closest;
@@ -45,6 +48,9 @@ internal static class QueryDetection2D
             hit = default;
             return false;
         }
+
+        if (collider is LSCompoundCollider2D compound)
+            return TryRaycastCompound(start, end, compound, out hit);
 
         Fixed64 segmentLength = FixedMath.Sqrt(segmentLengthSquared);
         Vector2d direction = segment / segmentLength;
@@ -78,6 +84,9 @@ internal static class QueryDetection2D
             return false;
         }
 
+        if (collider is LSCompoundCollider2D compound)
+            return TrySweepCircleCompound(start, end, radius, compound, out hit);
+
         if (TryOverlapCircle(start, radius, collider, out Physics2DHit overlapHit))
         {
             hit = new Physics2DHit(collider, start, overlapHit.Normal, Fixed64.Zero);
@@ -99,7 +108,8 @@ internal static class QueryDetection2D
         out Physics2DHit hit)
     {
         Vector2d originFromCenter = start - circle.Center;
-        Fixed64 c = originFromCenter.MagnitudeSquared - circle.Radius * circle.Radius;
+        Fixed64 scaledRadius = circle.ScaledRadius;
+        Fixed64 c = originFromCenter.MagnitudeSquared - scaledRadius * scaledRadius;
         Fixed64 b = Vector2d.Dot(originFromCenter, direction);
         if (c > Fixed64.Zero && b > Fixed64.Zero)
         {
@@ -139,7 +149,7 @@ internal static class QueryDetection2D
         LSCircleCollider2D circle,
         out Physics2DHit hit)
     {
-        Fixed64 combinedRadius = radius + circle.Radius;
+        Fixed64 combinedRadius = radius + circle.ScaledRadius;
         if (!TryRaycastCircleDistance(start, direction, segmentLength, circle.Center, combinedRadius, out Fixed64 distance))
         {
             hit = default;
@@ -150,8 +160,105 @@ internal static class QueryDetection2D
         Vector2d normal = sweptCenter == circle.Center
             ? ResolveQueryFallbackNormal(sweptCenter, circle.Center)
             : (sweptCenter - circle.Center).Normalized;
-        Vector2d point = circle.Center + normal * circle.Radius;
+        Vector2d point = circle.Center + normal * circle.ScaledRadius;
         hit = new Physics2DHit(circle, point, normal, distance);
+        return true;
+    }
+
+    private static bool TryOverlapCircleCompound(
+        Vector2d center,
+        Fixed64 radius,
+        LSCompoundCollider2D compound,
+        out Physics2DHit hit)
+    {
+        bool found = false;
+        Physics2DHit best = default;
+
+        for (int i = 0; i < compound.PartCount; i++)
+        {
+            LSCollider2D part = compound.GetPartCollider(i);
+            if (!TryOverlapCircle(center, radius, part, out Physics2DHit candidate))
+                continue;
+
+            if (!found || Physics2DHitSorter.ComesBefore(candidate, best))
+            {
+                best = candidate;
+                found = true;
+            }
+        }
+
+        if (!found)
+        {
+            hit = default;
+            return false;
+        }
+
+        hit = new Physics2DHit(compound, best.Point, best.Normal, best.Distance);
+        return true;
+    }
+
+    private static bool TryRaycastCompound(
+        Vector2d start,
+        Vector2d end,
+        LSCompoundCollider2D compound,
+        out Physics2DHit hit)
+    {
+        bool found = false;
+        Physics2DHit best = default;
+
+        for (int i = 0; i < compound.PartCount; i++)
+        {
+            LSCollider2D part = compound.GetPartCollider(i);
+            if (!TryRaycast(start, end, part, out Physics2DHit candidate))
+                continue;
+
+            if (!found || Physics2DHitSorter.ComesBefore(candidate, best))
+            {
+                best = candidate;
+                found = true;
+            }
+        }
+
+        if (!found)
+        {
+            hit = default;
+            return false;
+        }
+
+        hit = new Physics2DHit(compound, best.Point, best.Normal, best.Distance);
+        return true;
+    }
+
+    private static bool TrySweepCircleCompound(
+        Vector2d start,
+        Vector2d end,
+        Fixed64 radius,
+        LSCompoundCollider2D compound,
+        out Physics2DHit hit)
+    {
+        bool found = false;
+        Physics2DHit best = default;
+
+        for (int i = 0; i < compound.PartCount; i++)
+        {
+            LSCollider2D part = compound.GetPartCollider(i);
+            if (!TrySweepCircle(start, end, radius, part, out Physics2DHit candidate))
+                continue;
+
+            if (!found || Physics2DHitSorter.ComesBefore(candidate, best))
+            {
+                best = candidate;
+                found = true;
+            }
+        }
+
+        if (!found)
+        {
+            hit = default;
+            return false;
+        }
+
+        hit = new Physics2DHit(compound, best.Point, best.Normal, best.Distance);
         return true;
     }
 
@@ -405,7 +512,7 @@ internal static class QueryDetection2D
         out Fixed64 rayT)
     {
         Fixed64 denominator = Vector2d.CrossProduct(raySegment, edgeSegment);
-        if (denominator.Abs() <= Fixed64.Epsilon)
+        if (denominator == Fixed64.Zero || denominator.Abs() <= Fixed64.Epsilon)
         {
             rayT = default;
             return false;

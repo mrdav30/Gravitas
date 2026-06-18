@@ -23,10 +23,11 @@ those concrete types, not a third dimension value.
 - `PhysicsRuntimeMode.Mixed` advances both pure services plus the dedicated
   mixed lifecycle and broad-phase path. Mixed narrow phase supports 3D spheres,
   cuboids, capsules, finite cylinders, compound colliders, and mesh colliders
-  against embedded 2D circle, AABB, and convex polygon slabs. Mixed pair
+  against embedded 2D circle, AABB, convex polygon, and compound slabs. Mixed pair
   ownership, constrained response, explicit mixed sweeps, mixed CCD hooks, and
   dimension-tagged diagnostics are implemented. Mixed 2D swept-circle queries
-  cover primitive, mesh, and compound 3D targets.
+  cover primitive, mesh, and compound 3D targets; 3D swept-sphere queries cover
+  primitive and compound 2D targets.
 
 The context clock, coroutines, diagnostics, and lifecycle hooks remain shared.
 This lets pure 2D simulations use the same host loop without paying 3D
@@ -72,11 +73,20 @@ The current pure 2D shape set is:
 - `LSCircleCollider2D`
 - `LSAABBoxCollider2D`
 - `LSPolygonCollider2D`
+- `LSCompoundCollider2D`
 
 `LSPolygonCollider2D` validates convexity and rejects concave or collinear
 input instead of silently accepting ambiguous collision truth. A rotated box
 should be represented as a convex polygon for now; `LSAABBoxCollider2D` remains
 axis-aligned by design.
+
+`ColliderShapeDefinition2D` is the data-only authoring/import surface for
+circle, AABB, and convex polygon shape inputs. `CompoundColliderPart2D` combines
+that definition with local offset, scalar local rotation, and local scale, then
+`LSCompoundCollider2D` materializes private runtime part colliders under one
+public 2D collider identity. Authored 2D compound assets should use those
+definitions rather than treating child runtime colliders as serialized asset
+data.
 
 ## Broad Phase Status
 
@@ -128,7 +138,8 @@ run GridForge-backed partition candidate gathering with duplicate suppression,
 run layer-mask and exact 2D shape checks, and sort by deterministic hit
 ordering. `Raycast` returns the closest segment hit from `start` to `end` using
 the same distance and collider-ID ordering as `RaycastAll`. `SweepCircle` is the
-pure 2D swept movement/query path used by 2D CCD.
+pure 2D swept movement/query path used by 2D CCD. Compound 2D query hits report
+the owning `LSCompoundCollider2D`, not its private part colliders.
 
 The existing `GravitasQuery3DService` is a 3D X/Z ground-plane proximity
 query. It is not the pure 2D query API.
@@ -155,8 +166,8 @@ explicit rather than Unity-style separate engines:
   dedicated mixed collision lifecycle path. The mixed broad phase uses
   `PhysicsMixedPartition` and stable 3D/2D candidate keys. Mixed narrow phase
   currently supports 3D spheres, cuboids, capsules, finite cylinders, compound
-  colliders, and mesh colliders against embedded 2D circle, AABB, and convex
-  polygon slabs.
+  colliders, and mesh colliders against embedded 2D circle, AABB, convex
+  polygon, and compound slabs.
 - mixed contacts embed 2D colliders into 3D as finite X/Z prisms centered on
   the host transform's Y position.
 - 2D bodies remain plane-constrained: planar impulse can move them in X/Z,
@@ -171,9 +182,9 @@ explicit rather than Unity-style separate engines:
   collider ID spaces, awake-dynamic gating, layer filtering, same-agent and
   explicit hierarchy exclusion, and retained empty-partition cleanup.
 - mixed query and CCD policy is explicit. 3D swept spheres can query embedded
-  2D slabs, and 2D swept circles can query 3D primitive, mesh, and compound
-  targets. Pure query services do not accidentally report cross-dimensional
-  hits.
+  2D primitive and compound slabs, and 2D swept circles can query 3D primitive,
+  mesh, and compound targets. Pure query services do not accidentally report
+  cross-dimensional hits.
 - mixed diagnostics emit dimension-tagged query, contact, and response impulse
   events, and debug draw can capture the finite 2D slab geometry used by mixed
   collision.

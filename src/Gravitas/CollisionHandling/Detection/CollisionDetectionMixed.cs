@@ -23,6 +23,9 @@ public static partial class CollisionDetectionMixed
             return false;
         }
 
+        if (collider2D is LSCompoundCollider2D compound2D)
+            return TryEmbeddedCompound2D(collider3D, compound2D, out contact);
+
         return collider3D.Shape switch
         {
             ColliderType.Sphere => TrySphereEmbedded2D((LSSphereCollider)collider3D, collider2D, out contact),
@@ -33,6 +36,37 @@ public static partial class CollisionDetectionMixed
             ColliderType.Compound => TryCompoundEmbedded2D((LSCompoundCollider)collider3D, collider2D, out contact),
             _ => NoContact(out contact)
         };
+    }
+
+    private static bool TryEmbeddedCompound2D(
+        LSCollider collider3D,
+        LSCompoundCollider2D compound2D,
+        out MixedContact contact)
+    {
+        bool found = false;
+        MixedContact best = default;
+
+        for (int i = 0; i < compound2D.PartCount; i++)
+        {
+            LSCollider2D part = compound2D.GetPartCollider(i);
+            if (!BoundsOverlap(collider3D.Bounds, part.MixedBounds3D)
+                || !TryCollide(collider3D, part, out MixedContact candidate))
+            {
+                continue;
+            }
+
+            if (!found || candidate.Depth < best.Depth)
+            {
+                best = candidate;
+                found = true;
+            }
+        }
+
+        if (!found)
+            return NoContact(out contact);
+
+        contact = best;
+        return true;
     }
 
     private static bool TrySphereEmbedded2D(LSSphereCollider sphere, LSCollider2D embedded, out MixedContact contact)
@@ -519,8 +553,9 @@ public static partial class CollisionDetectionMixed
         Vector2d delta = point - circle.Center;
         Fixed64 magnitude = delta.Magnitude;
         Vector2d direction = magnitude > Fixed64.Epsilon ? delta / magnitude : Vector2d.Right;
-        boundary = circle.Center + direction * circle.Radius;
-        distance = circle.Radius - magnitude;
+        Fixed64 radius = circle.ScaledRadius;
+        boundary = circle.Center + direction * radius;
+        distance = radius - magnitude;
         return true;
     }
 
@@ -630,7 +665,7 @@ public static partial class CollisionDetectionMixed
     private static FixedRange ProjectCircleSlabOntoAxis(Vector3d axis, LSCircleCollider2D circle)
     {
         GetCircleSlabSegment(circle, out Vector3d start, out Vector3d end);
-        return AxisProjectionHelper.ProjectCylinderOntoAxis(axis, start, end, Vector3d.Up, circle.Radius);
+        return AxisProjectionHelper.ProjectCylinderOntoAxis(axis, start, end, Vector3d.Up, circle.ScaledRadius);
     }
 
     private static FixedRange ProjectPrismOntoAxis(Vector3d axis, LSCollider2D prism)

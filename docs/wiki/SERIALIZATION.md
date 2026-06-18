@@ -20,9 +20,10 @@ Host-created shell:
 - `IMatterAgent` implementations.
 - `FixedTransform` instances and any engine transform wrappers.
 - `StiffBody`, `StiffBody2D`, `LSCollider`, and `LSCollider2D` instances.
-- the concrete collider shape type, such as sphere, cuboid, circle, AABB, or
-  polygon.
-- private runtime part colliders materialized by `LSCompoundCollider`.
+- the concrete collider shape type, such as sphere, cuboid, circle, AABB,
+  polygon, or compound.
+- private runtime part colliders materialized by `LSCompoundCollider` and
+  `LSCompoundCollider2D`.
 - renderer, ECS, engine object, networking, pooling, editor, and event
   subscription state.
 
@@ -75,11 +76,18 @@ events. Offline authored compound assets should serialize shape definitions and
 stable part transforms, then let the host create `LSCompoundCollider` runtime
 shells from that data before simulation or replay state is populated.
 
+`ColliderShapeDefinition2D` is the matching data-only authoring/import surface
+for pure 2D circle, AABB, and convex polygon shapes. Offline authored 2D
+compound assets should serialize `ColliderShapeDefinition2D` plus
+`CompoundColliderPart2D` local transforms, then let the host create
+`LSCompoundCollider2D` runtime shells before Chronicler populates state.
+
 `LSCollider2D` records pure 2D collider filter and shape state. Circle, AABB,
-and convex polygon colliders record their shape-specific values through
-shape-local hooks rather than a central type switch. Loading shape data validates
-the input and rebuilds bounds without waking a sleeping body just because state
-was populated.
+convex polygon, and compound colliders record their shape-specific values
+through shape-local hooks rather than a central type switch. Compound part
+definitions are host-created shell data, not runtime pair/partition state.
+Loading shape data validates the input and rebuilds bounds without waking a
+sleeping body just because state was populated.
 
 `PhysicsSettingsSaver` records frame rate, collision matrix, ground-check layer
 mask, default CCD mode, retained-partition cleanup settings, runtime mode, and
@@ -96,8 +104,9 @@ A deterministic replay or rollback restore should follow this shape:
 1. Create or attach a `GravitasWorldContext` with matching settings and
    GridForge world setup.
 2. Create host agents, transforms, bodies, and concrete collider shapes in the
-   same stable order the host expects. Authored compound assets can materialize
-   those shapes from `ColliderShapeDefinition` parts before binding.
+   same stable order the host expects. Authored 3D and 2D compound assets can
+   materialize those shapes from `ColliderShapeDefinition` or
+   `ColliderShapeDefinition2D` parts before binding.
 3. Populate settings first when the snapshot includes `PhysicsSettingsSaver`.
 4. Populate body/collider state into those existing shells.
 5. Continue fixed-step simulation from the restored frame using the same ordered

@@ -9,6 +9,7 @@ internal readonly struct ColliderShapeSnapshot2D : IEquatable<ColliderShapeSnaps
     public ColliderShapeSnapshot2D(
         Vector2d center,
         Fixed64 rotation,
+        Vector2d localScale,
         Vector2d localOffset,
         uint shapeVersion,
         Fixed64 mixedSlabCenterY,
@@ -16,6 +17,7 @@ internal readonly struct ColliderShapeSnapshot2D : IEquatable<ColliderShapeSnaps
     {
         Center = center;
         Rotation = rotation;
+        LocalScale = localScale;
         LocalOffset = localOffset;
         ShapeVersion = shapeVersion;
         MixedSlabCenterY = mixedSlabCenterY;
@@ -25,6 +27,8 @@ internal readonly struct ColliderShapeSnapshot2D : IEquatable<ColliderShapeSnaps
     public Vector2d Center { get; }
 
     public Fixed64 Rotation { get; }
+
+    public Vector2d LocalScale { get; }
 
     public Vector2d LocalOffset { get; }
 
@@ -38,6 +42,7 @@ internal readonly struct ColliderShapeSnapshot2D : IEquatable<ColliderShapeSnaps
     public bool Equals(ColliderShapeSnapshot2D other) =>
         Center == other.Center
         && Rotation == other.Rotation
+        && LocalScale == other.LocalScale
         && LocalOffset == other.LocalOffset
         && ShapeVersion == other.ShapeVersion
         && MixedSlabCenterY == other.MixedSlabCenterY
@@ -47,5 +52,5 @@ internal readonly struct ColliderShapeSnapshot2D : IEquatable<ColliderShapeSnaps
         obj is ColliderShapeSnapshot2D other && Equals(other);
 
     public override int GetHashCode() =>
-        HashCode.Combine(Center, Rotation, LocalOffset, ShapeVersion, MixedSlabCenterY, MixedHalfThickness);
+        HashCode.Combine(Center, Rotation, LocalScale, LocalOffset, ShapeVersion, MixedSlabCenterY, MixedHalfThickness);
 }

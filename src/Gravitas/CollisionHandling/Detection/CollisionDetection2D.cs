@@ -46,6 +46,8 @@ public static class CollisionDetection2D
                 return result;
             case CollisionType2D.Convex_Convex:
                 return TryConvexConvex(colliderA, colliderB, out contact);
+            case CollisionType2D.Compound:
+                return TryCompound(colliderA, colliderB, out contact);
             default:
                 contact = default;
                 return false;
@@ -55,7 +57,7 @@ public static class CollisionDetection2D
     private static bool TryCircleCircle(LSCircleCollider2D colliderA, LSCircleCollider2D colliderB, out Contact2D contact)
     {
         Vector2d delta = colliderB.Center - colliderA.Center;
-        Fixed64 radius = colliderA.Radius + colliderB.Radius;
+        Fixed64 radius = colliderA.ScaledRadius + colliderB.ScaledRadius;
         Fixed64 distanceSquared = delta.MagnitudeSquared;
         if (distanceSquared > radius * radius)
         {
@@ -67,8 +69,8 @@ public static class CollisionDetection2D
         Vector2d normal = distance > Fixed64.Zero ? delta / distance : Vector2d.Right;
         Fixed64 depth = radius - distance;
         contact = new Contact2D(
-            colliderA.Center + normal * colliderA.Radius,
-            colliderB.Center - normal * colliderB.Radius,
+            colliderA.Center + normal * colliderA.ScaledRadius,
+            colliderB.Center - normal * colliderB.ScaledRadius,
             normal,
             depth);
         return true;
@@ -184,8 +186,9 @@ public static class CollisionDetection2D
 
         Vector2d normal = axis.Normalized;
         Fixed64 centerProjection = Vector2d.Dot(circle.Center, normal);
-        Fixed64 minA = centerProjection - circle.Radius;
-        Fixed64 maxA = centerProjection + circle.Radius;
+        Fixed64 radius = circle.ScaledRadius;
+        Fixed64 minA = centerProjection - radius;
+        Fixed64 maxA = centerProjection + radius;
         Project(convex, normal, out Fixed64 minB, out Fixed64 maxB);
         Fixed64 overlap = FixedMath.Min(maxA, maxB) - FixedMath.Max(minA, minB);
         if (overlap < Fixed64.Zero)
@@ -197,6 +200,95 @@ public static class CollisionDetection2D
             bestAxis = normal;
         }
 
+        return true;
+    }
+
+    private static bool TryCompound(LSCollider2D colliderA, LSCollider2D colliderB, out Contact2D contact)
+    {
+        if (colliderA is LSCompoundCollider2D compoundA)
+        {
+            if (colliderB is LSCompoundCollider2D compoundB)
+                return TryCompoundCompound(compoundA, compoundB, out contact);
+
+            return TryCompoundOther(compoundA, colliderB, compoundIsA: true, out contact);
+        }
+
+        if (colliderB is LSCompoundCollider2D compound)
+            return TryCompoundOther(compound, colliderA, compoundIsA: false, out contact);
+
+        contact = default;
+        return false;
+    }
+
+    private static bool TryCompoundCompound(
+        LSCompoundCollider2D compoundA,
+        LSCompoundCollider2D compoundB,
+        out Contact2D contact)
+    {
+        bool found = false;
+        Contact2D best = default;
+
+        for (int i = 0; i < compoundA.PartCount; i++)
+        {
+            LSCollider2D partA = compoundA.GetPartCollider(i);
+            for (int j = 0; j < compoundB.PartCount; j++)
+            {
+                LSCollider2D partB = compoundB.GetPartCollider(j);
+                if (!TryCollide(partA, partB, out Contact2D candidate))
+                    continue;
+
+                if (!found || candidate.Depth < best.Depth)
+                {
+                    best = candidate;
+                    found = true;
+                }
+            }
+        }
+
+        if (!found)
+        {
+            contact = default;
+            return false;
+        }
+
+        contact = best;
+        return true;
+    }
+
+    private static bool TryCompoundOther(
+        LSCompoundCollider2D compound,
+        LSCollider2D other,
+        bool compoundIsA,
+        out Contact2D contact)
+    {
+        bool found = false;
+        Contact2D best = default;
+
+        for (int i = 0; i < compound.PartCount; i++)
+        {
+            LSCollider2D part = compound.GetPartCollider(i);
+            Contact2D candidate;
+            bool collided = compoundIsA
+                ? TryCollide(part, other, out candidate)
+                : TryCollide(other, part, out candidate);
+
+            if (!collided)
+                continue;
+
+            if (!found || candidate.Depth < best.Depth)
+            {
+                best = candidate;
+                found = true;
+            }
+        }
+
+        if (!found)
+        {
+            contact = default;
+            return false;
+        }
+
+        contact = best;
         return true;
     }
 

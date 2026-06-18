@@ -8,5 +8,6 @@ public enum ColliderType2D : byte
     None = 0,
     Circle = 1,
     AABox = 2,
-    ConvexPolygon = 3
+    ConvexPolygon = 3,
+    Compound = 4
 }

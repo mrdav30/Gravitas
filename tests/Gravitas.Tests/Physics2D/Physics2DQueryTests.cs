@@ -91,6 +91,23 @@ public sealed class Physics2DQueryTests
     }
 
     [Fact]
+    public void Raycast_WithHorizontalSegmentAcrossPolygonEdges_ShouldNotDivideByZero()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        StiffBody2D body = CreatePolygon(context, Vector2d.Zero);
+        Vector2d start = new((Fixed64)(-3), Fixed64.Zero);
+        Vector2d end = new((Fixed64)3, Fixed64.Zero);
+
+        for (int i = 0; i < 256; i++)
+        {
+            bool hit = QueryDetection2D.TryRaycast(start, end, body.Collider, out Physics2DHit rayHit);
+
+            hit.Should().BeTrue();
+            rayHit.Collider.Should().BeSameAs(body.Collider);
+        }
+    }
+
+    [Fact]
     public void RaycastAll_WithLayerMask_ShouldFilter2DHits()
     {
         using GravitasWorldContext context = Create2DContext();

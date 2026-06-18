@@ -18,6 +18,12 @@ public sealed class LSAABBoxCollider2D : LSCollider2D
         Size = size;
     }
 
+    public LSAABBoxCollider2D(ColliderShapeDefinition2D definition)
+    {
+        definition.EnsureKind(ColliderShapeDefinition2DKind.AABBox);
+        Size = definition.Size;
+    }
+
     public override ColliderType2D Shape => ColliderType2D.AABox;
 
     public Vector2d Size
@@ -40,6 +46,10 @@ public sealed class LSAABBoxCollider2D : LSCollider2D
     }
 
     public Vector2d HalfExtents => _halfExtents;
+
+    public Vector2d ScaledSize => Vector2d.Multiply(_size, LocalScale);
+
+    public Vector2d ScaledHalfExtents => ScaledSize * Fixed64.Half;
 
     internal override int VertexCount => 4;
 
@@ -70,7 +80,8 @@ public sealed class LSAABBoxCollider2D : LSCollider2D
 
     protected override void RebuildShape()
     {
-        SetBoundsFromMinMax(Center - _halfExtents, Center + _halfExtents);
+        Vector2d halfExtents = ScaledHalfExtents;
+        SetBoundsFromMinMax(Center - halfExtents, Center + halfExtents);
     }
 
     protected override void RecordShapeData(IChronicler chronicler)

@@ -256,10 +256,54 @@ public sealed class GravitasQueryMixedService
         LSCollider2D collider,
         out PhysicsMixedHit hit)
     {
+        if (collider is LSCompoundCollider2D compound)
+            return TrySweepSphereAgainstCompound2D(start, direction, length, radius, compound, out hit);
+
         if (collider is LSCircleCollider2D circle)
             return TrySweepSphereAgainstCircleSlab(start, direction, length, radius, circle, out hit);
 
         return TrySweepSphereAgainstPrismBounds(start, direction, length, radius, collider, out hit);
+    }
+
+    private static bool TrySweepSphereAgainstCompound2D(
+        Vector3d start,
+        Vector3d direction,
+        Fixed64 length,
+        Fixed64 radius,
+        LSCompoundCollider2D compound,
+        out PhysicsMixedHit hit)
+    {
+        bool found = false;
+        PhysicsMixedHit best = default;
+
+        for (int i = 0; i < compound.PartCount; i++)
+        {
+            LSCollider2D part = compound.GetPartCollider(i);
+            if (!TrySweepSphereAgainst2D(start, direction, length, radius, part, out PhysicsMixedHit candidate))
+                continue;
+
+            if (!found || PhysicsMixedHitSorter.ComesBefore(candidate, best))
+            {
+                best = candidate;
+                found = true;
+            }
+        }
+
+        if (!found)
+        {
+            hit = default;
+            return false;
+        }
+
+        hit = new PhysicsMixedHit(
+            null,
+            compound,
+            best.Point3D,
+            best.Point2D,
+            best.Normal3DTo2D,
+            best.Distance,
+            best.Direction3D);
+        return true;
     }
 
     private static bool TrySweepCircleAgainstSphere(
@@ -356,7 +400,7 @@ public sealed class GravitasQueryMixedService
         out PhysicsMixedHit hit)
     {
         Vector3d center = new(circle.Center.X, circle.MixedSlabCenterY, circle.Center.Y);
-        Fixed64 combinedRadius = circle.Radius + radius;
+        Fixed64 combinedRadius = circle.ScaledRadius + radius;
         Fixed64 expandedHalfHeight = circle.MixedHalfThickness + radius;
         Vector3d localStart = start - center;
 

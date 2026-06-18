@@ -16,6 +16,9 @@ public abstract class LSCollider2D : IRecordable, IColliderHierarchyNode
     private StiffBody2D? _body;
     private IMatterAgent? _agent;
     private GravitasWorldContext? _context;
+    private LSCompoundCollider2D? _compoundOwner;
+    private Fixed64 _compoundLocalRotation;
+    private Vector2d _compoundLocalScale = Vector2d.One;
     private int _id = -1;
     private int _serviceIndex = -1;
     private bool _isActive = true;
@@ -87,6 +90,10 @@ public abstract class LSCollider2D : IRecordable, IColliderHierarchyNode
 
     internal uint RuntimeShapeVersion => _runtimeShapeState.RuntimeVersion;
 
+    internal bool HasHostBinding => _body != null || _agent != null;
+
+    internal LSCompoundCollider2D? CompoundOwner2D => _compoundOwner;
+
     internal int CollisionPairCount => _pairState.CollisionPairCount;
 
     internal int CollisionPairHolderCount => _pairState.CollisionPairHolderCount;
@@ -129,6 +136,8 @@ public abstract class LSCollider2D : IRecordable, IColliderHierarchyNode
         get => _isActive;
         set
         {
+            ThrowIfCompoundPartLifecycle(nameof(IsActive));
+
             if (_isActive == value)
                 return;
 
@@ -224,11 +233,23 @@ public abstract class LSCollider2D : IRecordable, IColliderHierarchyNode
         }
     }
 
-    public Vector2d Position => _body?.Position ?? _agent?.Transform.Position.ToVector2d() ?? Vector2d.Zero;
+    public Vector2d Position => _compoundOwner != null
+        ? _compoundOwner.Position
+        : ResolveStandalonePosition();
 
-    public Fixed64 Rotation => _body?.Rotation ?? ResolveAgentRotation();
+    public Fixed64 Rotation => _compoundOwner != null
+        ? _compoundOwner.Rotation + _compoundLocalRotation
+        : ResolveStandaloneRotation();
 
-    public Vector2d Center => Position + Rotate(LocalOffset, Rotation);
+    public virtual Vector2d LocalScale => _compoundOwner != null
+        ? Vector2d.Multiply(_compoundOwner.LocalScale, _compoundLocalScale)
+        : Vector2d.One;
+
+    public Vector2d ScaledLocalOffset => _compoundOwner != null
+        ? Vector2d.Multiply(_localOffset, LocalScale)
+        : _localOffset;
+
+    public Vector2d Center => Position + Rotate(ScaledLocalOffset, Rotation);
 
     public FixedBoundArea Bounds => _bounds;
 
@@ -273,12 +294,14 @@ public abstract class LSCollider2D : IRecordable, IColliderHierarchyNode
 
     internal void Initialize(StiffBody2D body)
     {
+        ThrowIfCompoundPartLifecycle(nameof(Initialize));
         SwiftThrowHelper.ThrowIfNull(body, nameof(body));
         InitCore(body.Agent, body);
     }
 
     public void InitializeWithNoBody(IMatterAgent agent)
     {
+        ThrowIfCompoundPartLifecycle(nameof(InitializeWithNoBody));
         InitCore(agent, null);
         Context.Physics2D.AssimilateCollider(this);
     }
@@ -331,6 +354,8 @@ public abstract class LSCollider2D : IRecordable, IColliderHierarchyNode
 
     public void Deactivate()
     {
+        ThrowIfCompoundPartLifecycle(nameof(Deactivate));
+
         if (!_isActive)
             return;
 
@@ -349,6 +374,8 @@ public abstract class LSCollider2D : IRecordable, IColliderHierarchyNode
 
     public void Simulate()
     {
+        ThrowIfCompoundPartLifecycle(nameof(Simulate));
+
         if (!IsActive)
             return;
 
@@ -366,11 +393,23 @@ public abstract class LSCollider2D : IRecordable, IColliderHierarchyNode
         return true;
     }
 
-    public void SetParent(LSCollider2D parent) => _hierarchyState.SetParent(this, parent);
+    public void SetParent(LSCollider2D parent)
+    {
+        ThrowIfCompoundPartLifecycle(nameof(SetParent));
+        _hierarchyState.SetParent(this, parent);
+    }
 
-    public void SetParent(LSCollider parent) => _hierarchyState.SetParent(this, parent);
+    public void SetParent(LSCollider parent)
+    {
+        ThrowIfCompoundPartLifecycle(nameof(SetParent));
+        _hierarchyState.SetParent(this, parent);
+    }
 
-    public void ClearParent() => _hierarchyState.ClearParent(this);
+    public void ClearParent()
+    {
+        ThrowIfCompoundPartLifecycle(nameof(ClearParent));
+        _hierarchyState.ClearParent(this);
+    }
 
     public bool IsSibling(LSCollider2D other) =>
         _hierarchyState.ExcludesCollisionWith(other._hierarchyState, HierarchyKey, other.HierarchyKey);
@@ -563,6 +602,12 @@ public abstract class LSCollider2D : IRecordable, IColliderHierarchyNode
     {
         _shapeVersion++;
         _runtimeShapeState.MarkDirty();
+        if (_compoundOwner != null)
+        {
+            _compoundOwner.MarkShapeDirty();
+            return;
+        }
+
         _body?.Wake();
     }
 
@@ -578,20 +623,50 @@ public abstract class LSCollider2D : IRecordable, IColliderHierarchyNode
         return true;
     }
 
-    private ColliderShapeSnapshot2D CaptureShapeSnapshot() =>
-        new(
-            Center,
-            Rotation,
+    private ColliderShapeSnapshot2D CaptureShapeSnapshot()
+    {
+        if (_compoundOwner != null)
+        {
+            Fixed64 rotation = _compoundOwner.Rotation + _compoundLocalRotation;
+            Vector2d localScale = Vector2d.Multiply(_compoundOwner.LocalScale, _compoundLocalScale);
+            Vector2d center = _compoundOwner.Position + Rotate(Vector2d.Multiply(_localOffset, localScale), rotation);
+            return new(
+                center,
+                rotation,
+                localScale,
+                _localOffset,
+                _shapeVersion,
+                ResolveMixedSlabCenterY(),
+                ResolveMixedHalfThickness());
+        }
+
+        Fixed64 standaloneRotation = ResolveStandaloneRotation();
+        Vector2d standaloneCenter = ResolveStandalonePosition() + Rotate(_localOffset, standaloneRotation);
+        return new(
+            standaloneCenter,
+            standaloneRotation,
+            Vector2d.One,
             _localOffset,
             _shapeVersion,
             ResolveMixedSlabCenterY(),
             ResolveMixedHalfThickness());
+    }
 
     private Fixed64 ResolveMixedHalfThickness() =>
         _mixedHalfThicknessOverride ?? _context?.Settings.Mixed2DHalfThickness ?? PhysicsSettings.DefaultMixed2DHalfThickness;
 
     private Fixed64 ResolveMixedSlabCenterY() =>
         _agent?.Transform.Position.Y ?? Fixed64.Zero;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private Vector2d ResolveStandalonePosition() =>
+        _body?.Position
+        ?? _agent?.Transform.Position.ToVector2d()
+        ?? Vector2d.Zero;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private Fixed64 ResolveStandaloneRotation() =>
+        _body?.Rotation ?? ResolveAgentRotation();
 
     private void RebuildMixedEmbedding(Fixed64 slabCenterY, Fixed64 halfThickness)
     {
@@ -628,12 +703,14 @@ public abstract class LSCollider2D : IRecordable, IColliderHierarchyNode
 
     void IColliderHierarchyNode.AddChild(ColliderHierarchyKey key)
     {
+        ThrowIfCompoundPartLifecycle(nameof(IColliderHierarchyNode.AddChild));
         if (_hierarchyState.AddChild(key) != true)
             GravitasLogger.Channel.Warn($"2D collider hierarchy key {key.Packed} is already a child.");
     }
 
     void IColliderHierarchyNode.RemoveChild(ColliderHierarchyKey key)
     {
+        ThrowIfCompoundPartLifecycle(nameof(IColliderHierarchyNode.RemoveChild));
         if (_hierarchyState.RemoveChild(key) != true)
             GravitasLogger.Channel.Warn($"Cannot remove. 2D collider hierarchy key {key.Packed} is not a child.");
     }
@@ -675,6 +752,64 @@ public abstract class LSCollider2D : IRecordable, IColliderHierarchyNode
         return _agent == null
             ? Fixed64.Zero
             : FixedMath.DegToRad(_agent.Transform.EulerAngles.Y);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal void BindContext(GravitasWorldContext context)
+    {
+        SwiftThrowHelper.ThrowIfNull(context, nameof(context));
+        SwiftThrowHelper.ThrowIfArgument(
+            _context != null && !ReferenceEquals(_context, context),
+            nameof(context),
+            "2D collider is already bound to a different GravitasWorldContext.");
+        _context = context;
+    }
+
+    internal void BindCompoundPart(
+        LSCompoundCollider2D owner,
+        Fixed64 localRotation,
+        Vector2d localScale,
+        GravitasWorldContext context)
+    {
+        SwiftThrowHelper.ThrowIfNull(owner, nameof(owner));
+        SwiftThrowHelper.ThrowIfArgument(
+            HasHostBinding,
+            nameof(owner),
+            "2D compound collider parts cannot be initialized as standalone colliders.");
+        SwiftThrowHelper.ThrowIfArgument(
+            _compoundOwner != null && !ReferenceEquals(_compoundOwner, owner),
+            nameof(owner),
+            "2D compound collider part is already owned by another compound collider.");
+
+        _compoundOwner = owner;
+        _compoundLocalRotation = localRotation;
+        _compoundLocalScale = localScale;
+        BindContext(context);
+        RebuildRuntimeShapeState();
+    }
+
+    internal void ReserveCompoundPart(LSCompoundCollider2D owner)
+    {
+        SwiftThrowHelper.ThrowIfNull(owner, nameof(owner));
+        SwiftThrowHelper.ThrowIfArgument(
+            HasHostBinding,
+            nameof(owner),
+            "2D compound collider parts cannot be initialized as standalone colliders.");
+        SwiftThrowHelper.ThrowIfArgument(
+            _compoundOwner != null && !ReferenceEquals(_compoundOwner, owner),
+            nameof(owner),
+            "2D compound collider part is already owned by another compound collider.");
+
+        _compoundOwner = owner;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void ThrowIfCompoundPartLifecycle(string operation)
+    {
+        SwiftThrowHelper.ThrowIfTrue(
+            _compoundOwner != null,
+            operation,
+            "2D compound collider parts are geometry owned by LSCompoundCollider2D and cannot run standalone lifecycle operations.");
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
