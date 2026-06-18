@@ -1,7 +1,9 @@
+using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Support;
 using SwiftCollections;
+using SwiftCollections.Query;
 using System;
 using System.Runtime.CompilerServices;
 
@@ -23,6 +25,9 @@ public sealed class GravitasPhysicsService
     private SwiftStack<int> _cachedColliderIds = new(DefaultColliderIdSize);
     private SwiftStack<CollisionPair> _cachedCollisionPairs = new();
     private SwiftQueue<CollisionPair> _activeCollisionPairs = new();
+    private readonly DynamicCcdCandidateIndex _continuousCollisionCandidates = new(DefaultBodySize);
+    private readonly SwiftList<int> _continuousCollisionCandidateIds = new(DefaultBodySize);
+    private int _continuousCollisionPreparedToken = int.MinValue;
 
     /// <summary>
     /// Initializes a new physics service for the supplied context.
@@ -89,12 +94,17 @@ public sealed class GravitasPhysicsService
     /// <summary>
     /// Runs this context's late physics step.
     /// </summary>
-    public void LateSimulate()
+    public void LateSimulate() => LateSimulate(continuousCollisionFramePrepared: false);
+
+    internal void LateSimulate(bool continuousCollisionFramePrepared)
     {
         if (!SimulatePhysics)
             return;
 
         ProcessActiveCollisionPairs();
+        if (!continuousCollisionFramePrepared)
+            _context.AdvanceLateSimulateToken();
+
         PrepareContinuousCollisionFrame();
 
         int peak = _dynamicBodies.PeakCount;
@@ -105,15 +115,47 @@ public sealed class GravitasPhysicsService
         }
     }
 
-    private void PrepareContinuousCollisionFrame()
+    internal void PrepareContinuousCollisionFrame()
     {
         int token = _context.LateSimulateToken;
+        if (_continuousCollisionPreparedToken == token)
+            return;
+
+        _continuousCollisionCandidates.Clear();
         int peak = _dynamicBodies.PeakCount;
         for (int i = 0; i < peak; i++)
         {
             if (_dynamicBodies.TryGetValue(i, out StiffBody body))
+            {
                 body.EnsureContinuousCollisionFramePrepared(token);
+                AddContinuousCollisionCandidate(body);
+            }
         }
+
+        _continuousCollisionCandidates.Sort();
+        _continuousCollisionPreparedToken = token;
+    }
+
+    private void AddContinuousCollisionCandidate(StiffBody body)
+    {
+        if (!body.Active
+            || body.Immovable
+            || body.IsKinematic
+            || body.Collider.IsTrigger)
+        {
+            return;
+        }
+
+        Fixed64 radius = body.ResolveContinuousCollisionProxyRadiusForDynamicTarget();
+        if (radius <= Fixed64.Epsilon)
+            return;
+
+        _continuousCollisionCandidates.Add(
+            body.DynamicId,
+            DynamicCcdCandidateIndex.CreateSweptSphereBounds(
+                body.ContinuousCollisionFrameStart,
+                body.ContinuousCollisionFrameDisplacement,
+                radius));
     }
 
     /// <summary>
@@ -141,6 +183,9 @@ public sealed class GravitasPhysicsService
         _cachedColliderIds.FastClear();
         _cachedCollisionPairs.FastClear();
         _activeCollisionPairs.FastClear();
+        _continuousCollisionCandidates.Clear();
+        _continuousCollisionCandidateIds.FastClear();
+        _continuousCollisionPreparedToken = int.MinValue;
 
         PeakColliderCount = 0;
         AssimilatedBodyCount = 0;
@@ -248,6 +293,13 @@ public sealed class GravitasPhysicsService
 
     internal bool TryGetDynamicBody(int dynamicId, out StiffBody body) =>
         _dynamicBodies.TryGetValue(dynamicId, out body);
+
+    internal SwiftList<int> QueryContinuousCollisionCandidates(FixedBoundVolume sourceBounds)
+    {
+        PrepareContinuousCollisionFrame();
+        _continuousCollisionCandidates.Query(sourceBounds, _continuousCollisionCandidateIds);
+        return _continuousCollisionCandidateIds;
+    }
 
     internal CollisionPair? GetCollisionPair(int id1, int id2)
     {

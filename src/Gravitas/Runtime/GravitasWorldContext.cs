@@ -296,17 +296,23 @@ public sealed class GravitasWorldContext : IDisposable
     {
         ThrowIfDisposed();
         _clock.LateSimulate();
-        _lateSimulateToken++;
+        AdvanceLateSimulateToken();
         PhysicsRuntimeMode runtimeMode = Settings.RuntimeMode;
         if (runtimeMode.Runs3D())
-            Physics.LateSimulate();
+            Physics.PrepareContinuousCollisionFrame();
         if (runtimeMode.Runs2D())
-            Physics2D.LateSimulate();
+            Physics2D.PrepareContinuousCollisionFrame();
+        if (runtimeMode.Runs3D())
+            Physics.LateSimulate(continuousCollisionFramePrepared: true);
+        if (runtimeMode.Runs2D())
+            Physics2D.LateSimulate(continuousCollisionFramePrepared: true);
         if (runtimeMode.RunsMixedContacts())
             MixedCollisions.LateSimulate();
 
         _hooks.InvokeLateSimulate();
     }
+
+    internal void AdvanceLateSimulateToken() => _lateSimulateToken++;
 
     /// <summary>
     /// Runs this context's visualization accumulation step.

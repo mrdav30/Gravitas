@@ -1131,6 +1131,125 @@ implementation favors deterministic correctness and simple tie-breaking; it is
 not yet a claim that large all-continuous dynamic crowds have optimal candidate
 gathering cost.
 
+## Phase 8B: Dynamic CCD Candidate Prefilter Scaling
+
+**Goal:** Make dynamic-vs-dynamic CCD scale for large deterministic lockstep
+sims without weakening Phase 8 correctness, determinism, or the explicit
+opt-in/auto CCD contract.
+
+**Context**
+
+Phase 8 deliberately chose the simplest deterministic dynamic CCD model: each
+continuous moving source compares against every registered movable target using
+frame-start relative-motion TOI. That is correct and easy to audit, but the
+dynamic target scan can become the dominant cost when many important dynamic
+bodies are CCD-capable in the same frame. LSF's target is larger than ordinary
+local-player-centric games, so Gravitas should not rely on hosts manually
+avoiding CCD at scale.
+
+The prefilter must be conservative over both sides of motion. A target that
+starts outside the source's swept bounds but moves into it during the frame must
+remain a candidate. Candidate ordering must stay explicit and stable; no hash
+or grid iteration order can become observable physics behavior.
+
+**Tasks**
+
+- [x] Add size-parameter dynamic CCD benchmarks before runtime changes:
+  sparse 3D, dense 3D, sparse 2D, dense 2D, and mixed 3D/2D.
+- [x] Measure current candidate-scan scaling and allocations for representative
+  body counts.
+- [x] Evaluate lower-stack spatial assets first (`GridForge`, then
+  `SwiftCollections.FixedMathSharp`) before introducing Gravitas-specific
+  structures.
+- [x] Implement the smallest deterministic prefilter that materially improves
+  measured scaling:
+  - cache frame-start position and predicted displacement as Phase 8 already
+    does.
+  - build conservative swept proxy bounds for dynamic CCD targets.
+  - gather only target candidates whose swept proxy bounds intersect the source
+    swept proxy bounds.
+  - traverse candidates in stable sorted order before relative TOI checks.
+- [x] Add correctness tests for targets moving into a source sweep from outside
+  the source's start bounds, deterministic tie ordering, disabled layers,
+  triggers, siblings, and mixed dimensional candidates.
+- [x] Re-run the same benchmark selection and document before/after results.
+
+**Exit Criteria**
+
+- Dynamic CCD candidate gathering is proven with size-scaling benchmarks.
+- Sparse scenes avoid scanning unrelated dynamic bodies.
+- Dense scenes preserve Phase 8 correctness and deterministic tie-breaking.
+- Hot-path allocations do not increase after warmup.
+- Docs describe the broad-phase/prefilter policy and remaining limits.
+
+**Progress - 2026-06-18**
+
+Added `DynamicCcdScalingBenchmarks` with sparse/dense 3D, sparse/dense 2D,
+and sparse/dense mixed 3D/2D rows at 64 and 256 total bodies. An initial
+64/256/1024 matrix timed out on the prefilter baseline, so the committed
+benchmark keeps 64/256 as the repeatable comparison set and leaves 1024 as a
+future stress run once the broader mixed path is cheaper.
+
+Lower-stack review found `SwiftFixedSpatialHash<T>` is available and suitable
+for persistent spatial indexing, but Phase 8B's data is a single-frame set of
+already-computed swept proxy bounds. The implemented runtime path therefore
+uses a Gravitas-owned sweep-and-prune candidate index instead of rebuilding a
+hash every late frame. The index stores one swept AABB per eligible movable
+dynamic target, sorts entries by fixed-point bounds and dynamic ID with an
+allocation-free internal heap sort, and queries a conservative X-window
+expanded by the largest target extent before exact relative sphere/circle TOI.
+This preserves deterministic ordering without depending on hash or GridForge
+traversal order.
+
+`GravitasWorldContext.LateSimulate()` now prepares 3D and 2D dynamic CCD
+candidate indices before either dimension moves, which keeps mixed 3D/2D CCD
+from seeing stale opposite-dimension candidates. Service-level lazy preparation
+remains for direct service/body paths such as immediate impulse tests.
+
+Mixed CCD also now uses internal static-only mixed sweep variants before the
+dynamic relative-motion pass. Public mixed queries still include dynamic
+colliders; continuous-collision resolution avoids doing exact static-style
+mixed sweeps against movable dynamics that will be handled by the dynamic CCD
+candidate path.
+
+Baseline:
+
+```powershell
+dotnet tests\Gravitas.Benchmarks\bin\Release\net8.0\Gravitas.Benchmarks.dll dynamic-ccd-scaling --filter "*" --artifacts artifacts\benchmarks\2026-06-18-phase8b-dynamic-ccd-scaling-baseline-corrected --launchCount 1 --warmupCount 1 --iterationCount 5 --unrollFactor 1
+```
+
+Final measured comparison:
+
+```powershell
+dotnet tests\Gravitas.Benchmarks\bin\Release\net8.0\Gravitas.Benchmarks.dll dynamic-ccd-scaling --filter "*" --artifacts artifacts\benchmarks\2026-06-18-phase8b-dynamic-ccd-scaling-post-heap-sort --launchCount 1 --warmupCount 1 --iterationCount 5 --unrollFactor 1
+```
+
+| Method | Bodies | Baseline | Final | Allocated |
+| --- | ---: | ---: | ---: | ---: |
+| Sparse3DDynamicCcd | 64 | 5.736 ms | 2.796 ms | 43008 B |
+| Dense3DDynamicCcd | 64 | 6.583 ms | 3.447 ms | 43008 B |
+| Sparse2DDynamicCcd | 64 | 3.983 ms | 3.191 ms | 0 B |
+| Dense2DDynamicCcd | 64 | 4.419 ms | 3.132 ms | 0 B |
+| SparseMixedDynamicCcd | 64 | 26.147 ms | 25.001 ms | 21504 B |
+| DenseMixedDynamicCcd | 64 | 27.603 ms | 27.892 ms | 21504 B |
+| Sparse3DDynamicCcd | 256 | 30.433 ms | 11.862 ms | 172032 B |
+| Dense3DDynamicCcd | 256 | 32.377 ms | 13.673 ms | 172032 B |
+| Sparse2DDynamicCcd | 256 | 25.111 ms | 13.886 ms | 0 B |
+| Dense2DDynamicCcd | 256 | 29.026 ms | 13.564 ms | 0 B |
+| SparseMixedDynamicCcd | 256 | 130.307 ms | 102.397 ms | 86016 B |
+| DenseMixedDynamicCcd | 256 | 144.508 ms | 132.923 ms | 86016 B |
+
+The pure 3D/2D paths now show the intended scaling improvement without adding
+managed allocations after warmup. Mixed dynamic CCD improves at the larger
+comparison size but remains the next visible hotspot and is noisy in the short
+single-frame benchmark: even with dynamic relative checks prefiltered, mixed
+CCD still pays for opposite-dimension query collection and broader mixed
+embedding work. A partition-level static-only collector experiment was tried
+and rejected for this phase because it pushed kinematic/static classification
+into partition membership without a complete state-transition model. That
+should be revisited only as part of a dedicated mixed broad-phase
+classification pass.
+
 ## Phase 9: Typed Diagnostic Views
 
 **Goal:** Keep `GravitasDiagnosticEvent` compact while reducing host adapter

@@ -308,7 +308,7 @@ public sealed class StiffBody2D : IRecordable
             Collider,
             includeTriggers: false);
         int mixedHitCount = Context.Settings.RuntimeMode.RunsMixedContacts()
-            ? Context.QueryMixed.SweepCircleAgainst3DAll(
+            ? Context.QueryMixed.SweepCircleAgainstStatic3DAll(
                 startPosition,
                 proposedPosition,
                 proxyRadius,
@@ -414,10 +414,12 @@ public sealed class StiffBody2D : IRecordable
         Physics2DHit best = default;
         Fixed64 bestClosingSpeed = Fixed64.Zero;
         int token = Context.LateSimulateToken;
-        int peak = Context.Physics2D.DynamicBodyPeakCount;
-        for (int i = 0; i < peak; i++)
+        SwiftList<int> candidateIds = Context.Physics2D.QueryPlanarContinuousCollisionCandidates(
+            DynamicCcdCandidateIndex.CreateSweptCircleBounds(startPosition, sourceDisplacement, proxyRadius));
+        for (int candidateIndex = 0; candidateIndex < candidateIds.Count; candidateIndex++)
         {
-            if (!Context.Physics2D.TryGetDynamicBody(i, out StiffBody2D target)
+            int dynamicId = candidateIds[candidateIndex];
+            if (!Context.Physics2D.TryGetDynamicBody(dynamicId, out StiffBody2D target)
                 || !IsEligibleDynamicContinuousCollisionTarget(target))
             {
                 continue;
@@ -483,10 +485,12 @@ public sealed class StiffBody2D : IRecordable
         PhysicsMixedHit best = default;
         Fixed64 bestClosingSpeed = Fixed64.Zero;
         int token = Context.LateSimulateToken;
-        int peak = Context.Physics.DynamicBodyPeakCount;
-        for (int i = 0; i < peak; i++)
+        SwiftList<int> candidateIds = Context.Physics.QueryContinuousCollisionCandidates(
+            DynamicCcdCandidateIndex.CreateSweptSphereBounds(sourceStart, sourceDisplacement, sourceRadius));
+        for (int candidateIndex = 0; candidateIndex < candidateIds.Count; candidateIndex++)
         {
-            if (!Context.Physics.TryGetDynamicBody(i, out StiffBody target)
+            int dynamicId = candidateIds[candidateIndex];
+            if (!Context.Physics.TryGetDynamicBody(dynamicId, out StiffBody target)
                 || !IsEligibleDynamicMixed3DTarget(target))
             {
                 continue;

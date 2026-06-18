@@ -104,6 +104,52 @@ public sealed class ContinuousCollision2DTests
     }
 
     [Fact]
+    public void ContinuousMode_WithPlanarDynamicsAtDifferentHostY_ShouldStillClampInPure2D()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        StiffBody2D left = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.Half),
+            new Vector2d((Fixed64)(-5), Fixed64.Zero),
+            immovable: false,
+            hostY: (Fixed64)(-8));
+        StiffBody2D right = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.Half),
+            new Vector2d((Fixed64)5, Fixed64.Zero),
+            immovable: false,
+            hostY: (Fixed64)8);
+        left.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        right.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+
+        left.AddForce(Vector2d.Right * (Fixed64)5);
+        right.AddForce(-Vector2d.Right * (Fixed64)5);
+        context.LateSimulate();
+
+        left.Position.X.Should().BeLessThanOrEqualTo(-Fixed64.Half);
+        right.Position.X.Should().BeGreaterThanOrEqualTo(Fixed64.Half);
+        (right.Position.X - left.Position.X).Should().BeGreaterThanOrEqualTo(Fixed64.One);
+    }
+
+    [Fact]
+    public void Physics2DLateSimulate_DirectCalls_ShouldRefreshDynamicCcdFrame()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1, extent: 128);
+        StiffBody2D mover = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)(-5), Fixed64.Zero), immovable: false);
+        StiffBody2D target = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)100, Fixed64.Zero), immovable: false);
+        mover.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        target.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+
+        context.Physics2D.LateSimulate();
+        target.SetPosition(new Vector2d((Fixed64)5, Fixed64.Zero));
+        mover.AddForce(Vector2d.Right * (Fixed64)10);
+        context.Physics2D.LateSimulate();
+
+        mover.Position.X.Should().BeLessThanOrEqualTo((Fixed64)4);
+        mover.LinearVelocity.X.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
     public void InheritMode_ShouldResolveFromContextDefault()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);
@@ -259,10 +305,11 @@ public sealed class ContinuousCollision2DTests
         LSCollider2D collider,
         Vector2d position,
         bool immovable,
-        PhysicsLayer layer = default)
+        PhysicsLayer layer = default,
+        Fixed64 hostY = default)
     {
         var transform = new FixedTransform(
-            new Vector3d(position.X, Fixed64.Zero, position.Y),
+            new Vector3d(position.X, hostY, position.Y),
             FixedQuaternion.Identity,
             Vector3d.One);
         var agent = new TestMatterAgent(context, transform);

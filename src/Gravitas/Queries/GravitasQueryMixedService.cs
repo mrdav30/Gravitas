@@ -65,6 +65,47 @@ public sealed class GravitasQueryMixedService
         LSCollider? excludedCollider = null,
         bool includeTriggers = true)
     {
+        return SweepSphereAgainst2DAllCore(
+            start,
+            end,
+            radius,
+            layerMask,
+            results,
+            excludedCollider,
+            includeTriggers,
+            staticTargetsOnly: false);
+    }
+
+    internal int SweepSphereAgainstStatic2DAll(
+        Vector3d start,
+        Vector3d end,
+        Fixed64 radius,
+        PhysicsLayerMask layerMask,
+        SwiftList<PhysicsMixedHit> results,
+        LSCollider? excludedCollider = null,
+        bool includeTriggers = true)
+    {
+        return SweepSphereAgainst2DAllCore(
+            start,
+            end,
+            radius,
+            layerMask,
+            results,
+            excludedCollider,
+            includeTriggers,
+            staticTargetsOnly: true);
+    }
+
+    private int SweepSphereAgainst2DAllCore(
+        Vector3d start,
+        Vector3d end,
+        Fixed64 radius,
+        PhysicsLayerMask layerMask,
+        SwiftList<PhysicsMixedHit> results,
+        LSCollider? excludedCollider,
+        bool includeTriggers,
+        bool staticTargetsOnly)
+    {
         SwiftThrowHelper.ThrowIfNull(results, nameof(results));
         SwiftThrowHelper.ThrowIfArgument(radius <= Fixed64.Zero, nameof(radius), "Mixed swept sphere radius must be greater than zero.");
 
@@ -85,7 +126,7 @@ public sealed class GravitasQueryMixedService
         for (int i = 0; i < _candidates2D.Count; i++)
         {
             LSCollider2D collider = _candidates2D[i];
-            if (IsEligible2DTarget(collider, excludedCollider, includeTriggers)
+            if (IsEligible2DTarget(collider, excludedCollider, includeTriggers, staticTargetsOnly)
                 && TrySweepSphereAgainst2D(start, direction, length, radius, collider, out PhysicsMixedHit candidate))
             {
                 results.Add(candidate);
@@ -146,6 +187,55 @@ public sealed class GravitasQueryMixedService
         LSCollider2D? excludedCollider = null,
         bool includeTriggers = true)
     {
+        return SweepCircleAgainst3DAllCore(
+            start,
+            end,
+            radius,
+            slabCenterY,
+            halfThickness,
+            layerMask,
+            results,
+            excludedCollider,
+            includeTriggers,
+            staticTargetsOnly: false);
+    }
+
+    internal int SweepCircleAgainstStatic3DAll(
+        Vector2d start,
+        Vector2d end,
+        Fixed64 radius,
+        Fixed64 slabCenterY,
+        Fixed64 halfThickness,
+        PhysicsLayerMask layerMask,
+        SwiftList<PhysicsMixedHit> results,
+        LSCollider2D? excludedCollider = null,
+        bool includeTriggers = true)
+    {
+        return SweepCircleAgainst3DAllCore(
+            start,
+            end,
+            radius,
+            slabCenterY,
+            halfThickness,
+            layerMask,
+            results,
+            excludedCollider,
+            includeTriggers,
+            staticTargetsOnly: true);
+    }
+
+    private int SweepCircleAgainst3DAllCore(
+        Vector2d start,
+        Vector2d end,
+        Fixed64 radius,
+        Fixed64 slabCenterY,
+        Fixed64 halfThickness,
+        PhysicsLayerMask layerMask,
+        SwiftList<PhysicsMixedHit> results,
+        LSCollider2D? excludedCollider,
+        bool includeTriggers,
+        bool staticTargetsOnly)
+    {
         SwiftThrowHelper.ThrowIfNull(results, nameof(results));
         SwiftThrowHelper.ThrowIfArgument(radius <= Fixed64.Zero, nameof(radius), "Mixed swept circle radius must be greater than zero.");
         SwiftThrowHelper.ThrowIfArgument(halfThickness <= Fixed64.Zero, nameof(halfThickness), "Mixed swept circle half-thickness must be greater than zero.");
@@ -172,7 +262,7 @@ public sealed class GravitasQueryMixedService
         for (int i = 0; i < _candidates3D.Count; i++)
         {
             LSCollider collider = _candidates3D[i];
-            if (!IsEligible3DTarget(collider, excludedCollider, includeTriggers)
+            if (!IsEligible3DTarget(collider, excludedCollider, includeTriggers, staticTargetsOnly)
                 || !TrySweepCircleAgainst3DCollider(
                     collider,
                     start,
@@ -706,10 +796,21 @@ public sealed class GravitasQueryMixedService
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool IsEligible2DTarget(LSCollider2D collider, LSCollider? excludedCollider, bool includeTriggers)
+    private static bool IsEligible2DTarget(
+        LSCollider2D collider,
+        LSCollider? excludedCollider,
+        bool includeTriggers,
+        bool staticTargetsOnly)
     {
         if (!collider.IsActive || (!includeTriggers && collider.IsTrigger))
             return false;
+
+        if (staticTargetsOnly)
+        {
+            StiffBody2D? body = collider.Body;
+            if (body != null && !body.Immovable && !body.IsKinematic)
+                return false;
+        }
 
         return excludedCollider == null
             || (!ReferenceEquals(collider.AgentOrNull, excludedCollider.AgentOrNull)
@@ -717,10 +818,21 @@ public sealed class GravitasQueryMixedService
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool IsEligible3DTarget(LSCollider collider, LSCollider2D? excludedCollider, bool includeTriggers)
+    private static bool IsEligible3DTarget(
+        LSCollider collider,
+        LSCollider2D? excludedCollider,
+        bool includeTriggers,
+        bool staticTargetsOnly)
     {
         if (!collider.IsActive || (!includeTriggers && collider.IsTrigger))
             return false;
+
+        if (staticTargetsOnly)
+        {
+            StiffBody? body = collider.Body;
+            if (body != null && !body.Immovable && !body.IsKinematic)
+                return false;
+        }
 
         return excludedCollider == null
             || (!ReferenceEquals(collider.AgentOrNull, excludedCollider.AgentOrNull)

@@ -213,6 +213,24 @@ public sealed class ContinuousCollisionDetectionTests
     }
 
     [Fact]
+    public void PhysicsLateSimulate_DirectCalls_ShouldRefreshDynamicCcdFrame()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        ScenarioBody<LSSphereCollider> mover = scenario.CreateSphere(new Vector3d((Fixed64)(-5), Fixed64.Zero, Fixed64.Zero));
+        ScenarioBody<LSSphereCollider> target = scenario.CreateSphere(new Vector3d((Fixed64)100, Fixed64.Zero, Fixed64.Zero));
+        mover.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        target.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+
+        scenario.Context.Physics.LateSimulate();
+        target.Body.ResetPosition(new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero), FixedQuaternion.Identity);
+        mover.Body.AddForce(Vector3d.Right * (Fixed64)10);
+        scenario.Context.Physics.LateSimulate();
+
+        mover.Body.Position3d.X.Should().BeLessThanOrEqualTo((Fixed64)4);
+        mover.Body.LinearVelocity.X.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
     public void ContinuousMode_ShouldRespectContextCollisionMatrix()
     {
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();
