@@ -1414,6 +1414,126 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 Result: mixed-dimension focused tests passed 65/65, full `Release` passed
 440/440, and full `ReleaseLean` passed 435/435.
 
+## Phase 8D: Pure CCD Static-Style Collectors And Proxy Policy
+
+**Purpose:** Finish the current CCD hardening pass by checking whether the pure
+2D and 3D CCD paths can reuse the measured mixed-CCD static-style collector
+idea, and by documenting or tightening the conservative proxy policy before
+alpha.
+
+**Context:**
+
+Phase 8B and Phase 8C proved dynamic-vs-dynamic CCD and mixed CCD can scale
+much better when candidate work is explicit and measured. Phase 8C's large win
+came from mixed-specific repeated target partition refresh removal, but its
+kinematic/static membership split remained worth checking for the pure 2D and
+3D paths. Pure partition membership should change only when the benchmark and
+lifecycle tests prove the extra state is justified.
+
+**Files:**
+
+- Potentially modify: `src/Gravitas/Partitions/PhysicsPartition.cs`
+- Potentially modify: `src/Gravitas/Partitions/PhysicsPartition2D.cs`
+- Potentially modify: `src/Gravitas/Core/GravitasCollisionService.cs`
+- Potentially modify: `src/Gravitas/Core/GravitasCollision2DService.cs`
+- Potentially modify: `src/Gravitas/Queries/GravitasQuery3DService.*.cs`
+- Potentially modify: `src/Gravitas/Queries/GravitasQuery2DService.cs`
+- Potentially modify: `src/Gravitas/Core/StiffBody.cs`
+- Potentially modify: `src/Gravitas/Core/StiffBody2D.cs`
+- Modify: `tests/Gravitas.Tests/CollisionHandling` or focused CCD test folders
+- Modify: `tests/Gravitas.Tests/Physics2D`
+- Modify: `tests/Gravitas.Benchmarks/Core/DynamicCcdScalingBenchmarks.cs`
+- Modify: `docs/wiki/COLLISION_PIPELINE.md`
+- Modify: `docs/wiki/QUERY_SERVICES.md`
+
+**Tasks:**
+
+- [x] Capture a fresh pure 2D and pure 3D CCD baseline before runtime changes,
+  using the same batched methodology introduced for mixed Phase 8C where it
+  applies.
+- [x] Split benchmark attribution for pure CCD:
+  - static target collection cost.
+  - dynamic relative-target candidate cost.
+  - exact sweep cost.
+  - final hit ordering and response handoff cost.
+- [x] Evaluate pure static-style CCD collectors that include bodyless,
+  immovable, and kinematic targets while skipping movable dynamic targets.
+- [x] Only split pure `PhysicsPartition` / `PhysicsPartition2D` kinematic ID
+  sets if benchmarks show candidate collection or distribution benefits large
+  enough to justify the added lifecycle state.
+- [x] If kinematic sets are retained, add lifecycle tests for dynamic ->
+  kinematic -> immovable -> dynamic transitions, deactivation, reset, retained
+  partition cleanup, and query visibility in both 2D and 3D.
+- [x] Verify public pure 2D/3D queries still include dynamic, kinematic,
+  bodyless, and immovable colliders according to their existing query contract.
+- [x] Audit CCD proxy-radius behavior for sphere/circle, capsule, cuboid/AABB,
+  cylinder, compound, convex mesh, and concave mesh cases:
+  - identify conservative false-positive cases.
+  - identify any false-negative tunneling risk.
+  - document why each shape family uses its current proxy.
+- [x] Add focused tests for proxy-policy edge cases where the current
+  conservative approximation could be misunderstood by hosts.
+- [x] Improve benchmark guardrails if short-iteration warnings remain noisy:
+  increase operations per invoke, add a larger stress row, or document why a
+  row is only directional evidence.
+- [x] Re-run focused CCD tests, full `Release`, full `ReleaseLean`, and the
+  same benchmark set. Retain only measured optimizations.
+
+**Implementation Notes:**
+
+- Added batched pure CCD benchmark rows for dynamic CCD, static-style query
+  cost, dynamic candidate-index query cost, and dynamic relative-sweep cost.
+  The pre-change baseline was captured under
+  `artifacts/benchmarks/2026-06-18-phase8d-pure-ccd-baseline`. Short-iteration
+  warnings remained, so these rows are directional guardrails rather than
+  canonical release numbers.
+- The first implementation pass used internal static-style query collectors
+  while keeping pure partitions dynamic/static. That improved some 64-body
+  static-query rows, but post-change benchmark rows still showed movable
+  dynamic scanning in the static leg. The retained implementation therefore
+  adds `ContainedKinematicObjects` to both `PhysicsPartition` and
+  `PhysicsPartition2D`.
+- Pure partitions now classify bodyless and immovable colliders as static,
+  kinematic bodies as kinematic, and movable non-kinematic bodies as dynamic.
+  Dynamic membership remains the only membership that activates solver
+  partition work. Static-style CCD collectors copy only kinematic/static IDs,
+  while public pure queries copy dynamic, kinematic, and static IDs.
+- `StiffBody.Immovable`, `StiffBody.IsKinematic`, `StiffBody2D.Immovable`, and
+  `StiffBody2D.IsKinematic` refresh partition mobility when changed on an
+  active body. Collider partition state stores the last mobility kind so clears
+  remove IDs from the bucket they were actually inserted into.
+- Added dynamic -> kinematic -> immovable -> dynamic transition tests for pure
+  3D and pure 2D partitions, plus reset cleanup assertions for the kinematic
+  buckets.
+- Added internal pure static-style swept-sphere and swept-circle collectors for
+  CCD. Public pure query APIs still include movable dynamic, kinematic,
+  immovable, and bodyless colliders.
+- Replaced the 3D non-sphere moving-source proxy policy with a conservative
+  bounds-sphere radius. This can produce earlier CCD stops for elongated
+  capsule, cuboid, cylinder, mesh, and compound movers, but it removes the
+  smallest-axis false-negative risk for wide shapes crossing away from their
+  center path.
+- Post-split benchmark artifacts were captured under
+  `artifacts/benchmarks/2026-06-18-phase8d-pure-ccd-after-partition-split`.
+  Compared with the pre-change baseline, 64-body static-query rows improved
+  across 3D and 2D (`0.82x` to `0.89x` for dense/static rows, `0.86x` for
+  sparse 3D, `0.83x` for sparse 2D). Dense 256-body 3D static query improved
+  (`0.61x`), while sparse 256-body static rows remained noisy or neutral.
+  BenchmarkDotNet still warned that these smoke rows have short iteration
+  times, so treat them as directional regression guardrails.
+
+**Exit Criteria:**
+
+- Pure 2D/3D CCD either gains measured static-style collection improvements or
+  explicitly documents why mixed-only classification is the right alpha choice.
+- Any new pure partition mobility state has complete transition and cleanup
+  tests.
+- CCD proxy behavior is documented as conservative approximation, exact
+  support, or unsupported for each alpha shape family.
+- Benchmarks are stable enough to catch future CCD regressions, or remaining
+  noise is called out with the affected rows.
+- No hot-path managed allocation regression after warmup.
+
 ## Phase 9: Typed Diagnostic Views
 
 **Goal:** Keep `GravitasDiagnosticEvent` compact while reducing host adapter

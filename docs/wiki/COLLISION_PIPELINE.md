@@ -139,21 +139,24 @@ is added to a voxel. The partition returns to that owner service pool when
 GridForge removes the voxel partition itself, either through retained-partition
 retirement or world/grid cleanup.
 
-Current static-membership behavior is specific: colliders whose body exists and
-has `Immovable == true` are added to `ContainedStaticObjects`. Other registered
-colliders are added to `ContainedDynamicObjects`, including bodyless colliders.
-Dynamic partitions also keep `ContainedAwakeDynamicObjects`, a second sparse set
-for dynamic collider IDs whose bodies are currently awake for collision work.
-Sleeping bodies stay in normal dynamic membership so queries, wake propagation,
-pair cleanup, and contact lifecycle can still find them.
+Current mobility membership is explicit: bodyless colliders and colliders whose
+body has `Immovable == true` are added to `ContainedStaticObjects`; bodies with
+`IsKinematic == true` are added to `ContainedKinematicObjects`; movable
+non-kinematic bodies are added to `ContainedDynamicObjects`. Dynamic partitions
+also keep `ContainedAwakeDynamicObjects`, a second sparse set for dynamic
+collider IDs whose bodies are currently awake for collision work. Only dynamic
+membership activates solver partition work. Sleeping bodies stay in normal
+dynamic membership so queries, wake propagation, pair cleanup, and contact
+lifecycle can still find them.
 
 `PhysicsPartition2D` mirrors the same ID-first lessons for pure 2D. Bodyless
-2D colliders and immovable 2D bodies are static members. Movable 2D bodies are
-dynamic members, and only awake dynamic IDs activate pair distribution. Sleeping
-2D bodies remain query-visible in dynamic membership, but partitions with no
-awake dynamic IDs skip solver work. Empty 2D partitions are retained, retired by
-the same deterministic TTK settings, and returned to the 2D collision service's
-partition pool through GridForge voxel removal.
+2D colliders and immovable 2D bodies are static members, kinematic 2D bodies
+are kinematic members, and movable 2D bodies are dynamic members. Only awake
+dynamic IDs activate pair distribution. Sleeping 2D bodies remain query-visible
+in dynamic membership, but partitions with no awake dynamic IDs skip solver
+work. Empty 2D partitions are retained, retired by the same deterministic TTK
+settings, and returned to the 2D collision service's partition pool through
+GridForge voxel removal.
 
 ## Collider Runtime Shape State
 
@@ -191,15 +194,18 @@ owning aggregate without adding host-scale lookup cost to ordinary standalone
 2D colliders.
 
 Partition state tracks grid coordinates, previous broad-phase coverage bounds,
-partition-change flags, and broad-phase versioning together. Query state tracks
-the raycast and circle-query versions used by context-owned query services to
-suppress duplicate collider hits. Pair state owns the one-sided collision-pair
-dictionary and the opposite-side holder set; both are allocated lazily so
-colliders that never form pairs do not pay for pair containers up front.
-Broad-phase versioning advances from committed runtime-shape changes, so
-collision pairs do not need separate collider position/rotation dirty flags.
-If the runtime snapshot changes, bounds/partition state refreshes and pairs
-observe the broad-phase version change.
+last mobility kind, partition-change flags, and broad-phase versioning together.
+Mobility changes such as dynamic -> kinematic -> immovable refresh partition
+state even when bounds do not change, and clears remove collider IDs from the
+bucket they were previously inserted into. Query state tracks the raycast and
+circle-query versions used by context-owned query services to suppress duplicate
+collider hits. Pair state owns the one-sided collision-pair dictionary and the
+opposite-side holder set; both are allocated lazily so colliders that never form
+pairs do not pay for pair containers up front. Broad-phase versioning advances
+from committed runtime-shape changes, so collision pairs do not need separate
+collider position/rotation dirty flags. If the runtime snapshot changes,
+bounds/partition state refreshes and pairs observe the broad-phase version
+change.
 
 Hierarchy state is explicit. Hosts call `child.SetParent(parent)` after collider
 initialization when two colliders belong to the same engine object or aggregate
@@ -355,10 +361,12 @@ acceleration have produced an intended frame displacement and before the
 authoritative position is committed. It uses a conservative swept proxy derived
 from the moving collider:
 
-- 3D sphere, capsule, and cylinder use their scaled radius.
-- 3D cuboid uses the smallest world-space bounds half extent.
-- 3D mesh uses the smallest positive bounds scope as its moving-source proxy.
-- 3D compound uses the smallest world-space aggregate bounds half extent.
+- 3D sphere uses its exact scaled radius.
+- 3D capsule, cuboid, finite cylinder, mesh, and compound movers use the
+  world-bounds sphere radius (`Bounds.Scope.Magnitude`). This is intentionally
+  conservative for elongated or sparse shapes: it can stop early, but it avoids
+  the false-negative tunneling risk of using the smallest bounds axis while the
+  shape's wider portion passes through a target away from the center path.
 - 2D circle uses its scaled radius.
 - 2D AABB and convex polygon use a conservative bounds radius.
 - 2D compound uses a conservative aggregate radius over its private parts.
@@ -376,7 +384,11 @@ compound targets are covered by the query workers, so 3D swept-sphere CCD keeps
 triangle and stable part-order target behavior. Mesh sweep normals are oriented
 against the sweep direction when authored triangle winding would otherwise point
 with the moving source, so closing velocity removal is two-sided and
-deterministic.
+deterministic. Pure 2D and 3D CCD use internal static-style query collectors for
+this leg: public sweep queries still report movable dynamic, kinematic,
+immovable, and bodyless targets, while CCD's static leg copies only
+kinematic/static partition IDs and skips movable dynamics because the
+relative-motion path below owns those candidates.
 
 Dynamic-vs-dynamic CCD uses a frame-start relative-motion model. During
 `LateSimulate`, the physics services cache each movable body's start position
@@ -389,7 +401,9 @@ order.
 
 The dynamic path is intentionally conservative:
 
-- 3D dynamic targets are represented by continuous sphere proxies.
+- 3D dynamic targets are represented by continuous sphere proxies. Sphere
+  targets use their scaled radius; other 3D target shapes use the same
+  conservative bounds radius as moving sources.
 - pure 2D dynamic targets are represented by continuous circle proxies.
 - mixed 2D slabs use the larger of planar radius and mixed half-thickness as
   their 3D proxy radius.

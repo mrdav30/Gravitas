@@ -101,6 +101,7 @@ public sealed class Physics2DPartitionBroadPhaseTests
         voxel.TryGetPartition<PhysicsPartition2D>(out _).Should().BeFalse();
         (partition!.ContainedDynamicObjects?.Count ?? 0).Should().Be(0);
         partition.AwakeDynamicObjectCount.Should().Be(0);
+        (partition.ContainedKinematicObjects?.Count ?? 0).Should().Be(0);
         (partition.ContainedStaticObjects?.Count ?? 0).Should().Be(0);
         partition.IsAllocated.Should().BeFalse();
 
@@ -110,6 +111,36 @@ public sealed class Physics2DPartitionBroadPhaseTests
         replacementVoxel!.TryGetPartition(out PhysicsPartition2D? replacementPartition).Should().BeTrue();
         replacementPartition!.ContainedDynamicObjects!.Contains(replacement.Collider.Id).Should().BeTrue();
         context.Collisions2D.RetainedPartitionCount.Should().BeGreaterThan(0);
+    }
+
+    [Fact]
+    public void MobilityChanges_ShouldMoveColliderBetweenDynamicKinematicAndStaticBuckets()
+    {
+        using GravitasWorldContext context = CreateContext(extent: 16);
+        StiffBody2D body = CreateCircle(context, Vector2d.Zero, immovable: false);
+        int colliderId = body.Collider.Id;
+
+        PhysicsPartition2D partition = GetFirstPartition(context, body.Collider);
+        AssertPartitionMembership(partition, colliderId, dynamic: true, kinematic: false, @static: false);
+
+        body.IsKinematic = true;
+        body.Collider.Simulate();
+
+        partition = GetFirstPartition(context, body.Collider);
+        AssertPartitionMembership(partition, colliderId, dynamic: false, kinematic: true, @static: false);
+
+        body.Immovable = true;
+        body.Collider.Simulate();
+
+        partition = GetFirstPartition(context, body.Collider);
+        AssertPartitionMembership(partition, colliderId, dynamic: false, kinematic: false, @static: true);
+
+        body.IsKinematic = false;
+        body.Immovable = false;
+        body.Collider.Simulate();
+
+        partition = GetFirstPartition(context, body.Collider);
+        AssertPartitionMembership(partition, colliderId, dynamic: true, kinematic: false, @static: false);
     }
 
     [Fact]
@@ -252,6 +283,25 @@ public sealed class Physics2DPartitionBroadPhaseTests
         };
         body.Initialize(position);
         return body;
+    }
+
+    private static PhysicsPartition2D GetFirstPartition(GravitasWorldContext context, LSCollider2D collider)
+    {
+        context.World.TryGetVoxel(collider.PartitionCoordinates![0], out Voxel? voxel).Should().BeTrue();
+        voxel!.TryGetPartition(out PhysicsPartition2D? partition).Should().BeTrue();
+        return partition!;
+    }
+
+    private static void AssertPartitionMembership(
+        PhysicsPartition2D partition,
+        int colliderId,
+        bool dynamic,
+        bool kinematic,
+        bool @static)
+    {
+        (partition.ContainedDynamicObjects?.Contains(colliderId) ?? false).Should().Be(dynamic);
+        (partition.ContainedKinematicObjects?.Contains(colliderId) ?? false).Should().Be(kinematic);
+        (partition.ContainedStaticObjects?.Contains(colliderId) ?? false).Should().Be(@static);
     }
 
     private static Vector2d PositionForIndex(int index, Fixed64 spacing)

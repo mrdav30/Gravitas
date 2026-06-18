@@ -140,6 +140,36 @@ public sealed class PhysicsPartitionAwakeTests
     }
 
     [Fact]
+    public void MobilityChanges_ShouldMoveColliderBetweenDynamicKinematicAndStaticBuckets()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
+        int colliderId = body.Collider.Id;
+
+        PhysicsPartition partition = GetFirstPartition(scenario, body.Collider);
+        AssertPartitionMembership(partition, colliderId, dynamic: true, kinematic: false, @static: false);
+
+        body.Body.IsKinematic = true;
+        body.Collider.Simulate();
+
+        partition = GetFirstPartition(scenario, body.Collider);
+        AssertPartitionMembership(partition, colliderId, dynamic: false, kinematic: true, @static: false);
+
+        body.Body.Immovable = true;
+        body.Collider.Simulate();
+
+        partition = GetFirstPartition(scenario, body.Collider);
+        AssertPartitionMembership(partition, colliderId, dynamic: false, kinematic: false, @static: true);
+
+        body.Body.IsKinematic = false;
+        body.Body.Immovable = false;
+        body.Collider.Simulate();
+
+        partition = GetFirstPartition(scenario, body.Collider);
+        AssertPartitionMembership(partition, colliderId, dynamic: true, kinematic: false, @static: false);
+    }
+
+    [Fact]
     public void Reset_WithRetainedVoxelPartitions_ShouldDetachOwnedVoxelPartitions()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
@@ -157,6 +187,7 @@ public sealed class PhysicsPartitionAwakeTests
         voxel.TryGetPartition<PhysicsPartition>(out _).Should().BeFalse();
         (partition!.ContainedDynamicObjects?.Count ?? 0).Should().Be(0);
         partition.AwakeDynamicObjectCount.Should().Be(0);
+        (partition.ContainedKinematicObjects?.Count ?? 0).Should().Be(0);
         (partition.ContainedStaticObjects?.Count ?? 0).Should().Be(0);
         partition.IsAllocated.Should().BeFalse();
 
@@ -267,6 +298,18 @@ public sealed class PhysicsPartitionAwakeTests
             .Should().BeTrue();
         voxel!.TryGetPartition(out PhysicsPartition? partition).Should().BeTrue();
         return partition!;
+    }
+
+    private static void AssertPartitionMembership(
+        PhysicsPartition partition,
+        int colliderId,
+        bool dynamic,
+        bool kinematic,
+        bool @static)
+    {
+        (partition.ContainedDynamicObjects?.Contains(colliderId) ?? false).Should().Be(dynamic);
+        (partition.ContainedKinematicObjects?.Contains(colliderId) ?? false).Should().Be(kinematic);
+        (partition.ContainedStaticObjects?.Contains(colliderId) ?? false).Should().Be(@static);
     }
 
     private static int[] CaptureContactOrder()

@@ -46,7 +46,7 @@ The candidate path is:
 1. prepare the worker for the 3D query segment.
 2. ask GridForge `GridTracer.TraceLine(...)` or `GetCoveredVoxels(...)` for topology-aware voxel candidates.
 3. suppress duplicate voxels and inspect each voxel's `PhysicsPartition`.
-4. resolve dynamic and static collider IDs through the context physics service.
+4. resolve dynamic, kinematic, and static collider IDs through the context physics service.
 5. filter by layer mask.
 6. skip colliders already checked in this query.
 7. call the collider's `ColliderOverlapsRay(...)`.
@@ -94,10 +94,14 @@ Compound targets reduce over owned parts in stable declaration order while the
 public hit remains the owning compound collider.
 
 `StiffBody` continuous collision detection reuses this service as an opt-in
-movement sweep. Body CCD passes the moving collider as `excludedCollider`, uses
-the all-hit path so later valid static targets can be found after ignored
-dynamic targets, and consumes the same deterministic distance/collider-ID
-ordering as host-facing swept-sphere queries.
+movement sweep. Public `SweepSphere` and `SweepSphereAll` remain all-target
+queries: they can return movable dynamic, kinematic, immovable, and bodyless
+colliders according to the normal layer, trigger, and exclusion filters. Body
+CCD uses an internal static-style swept-sphere collector for its
+static/kinematic leg, so only kinematic/static partition IDs are copied and
+movable dynamics are handled by the separate relative-motion CCD path. The
+internal collector keeps the same deterministic distance/collider-ID ordering
+as host-facing swept-sphere queries for the targets it includes.
 
 ## Circle Overlap Queries
 
@@ -191,6 +195,13 @@ bounds. It performs deterministic circle-vs-circle and circle-vs-convex-shape
 sweeps, supports layer masks, optional trigger inclusion, and an excluded
 collider for body CCD self/hierarchy filtering. It is the pure 2D equivalent of
 the 3D swept-sphere query path; it is not a mixed 2D/3D bridge.
+
+Public pure 2D sweep queries report movable dynamic, kinematic, immovable, and
+bodyless colliders. `StiffBody2D` CCD uses an internal static-style swept-circle
+collector for the static/kinematic leg, mirroring 3D: bodyless, immovable, and
+kinematic targets are included through kinematic/static partition membership,
+while movable dynamic targets are left to the relative dynamic CCD candidate
+index.
 
 Current hit data is `Physics2DHit`: collider, optional body, point, normal, and
 distance. AABB and polygon area-query APIs remain future 2D query hardening

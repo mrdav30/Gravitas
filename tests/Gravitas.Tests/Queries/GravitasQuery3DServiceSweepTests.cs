@@ -79,6 +79,79 @@ public sealed class GravitasQuery3DServiceSweepTests
     }
 
     [Fact]
+    public void SweepSphereAll_ShouldIncludeMovableKinematicImmovableAndBodylessTargets()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSSphereCollider source = CreateDynamicCollider(context, new LSSphereCollider(), new Vector3d((Fixed64)(-4), Fixed64.Zero, Fixed64.Zero));
+        LSSphereCollider movable = CreateDynamicCollider(context, new LSSphereCollider(), Vector3d.Zero);
+        LSSphereCollider kinematic = CreateDynamicCollider(context, new LSSphereCollider(), Vector3d.Right * 2, isKinematic: true);
+        LSSphereCollider immovable = CreateDynamicCollider(context, new LSSphereCollider(), Vector3d.Right * 4, immovable: true);
+        LSSphereCollider bodyless = CreateBodylessCollider(context, Vector3d.Right * 6);
+        var hits = new SwiftList<Physics3DHit>();
+
+        int count = context.Query3D.SweepSphereAll(
+            new Vector3d((Fixed64)(-2), Fixed64.Zero, Fixed64.Zero),
+            new Vector3d((Fixed64)8, Fixed64.Zero, Fixed64.Zero),
+            Fixed64.Half,
+            IncludeLayerZero,
+            hits,
+            source);
+
+        count.Should().Be(4);
+        hits.Should().Contain(hit => ReferenceEquals(hit.Collider, movable));
+        hits.Should().Contain(hit => ReferenceEquals(hit.Collider, kinematic));
+        hits.Should().Contain(hit => ReferenceEquals(hit.Collider, immovable));
+        hits.Should().Contain(hit => ReferenceEquals(hit.Collider, bodyless));
+    }
+
+    [Fact]
+    public void SweepSphereAgainstStaticAll_ShouldSkipMovableDynamicTargets()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSSphereCollider source = CreateDynamicCollider(context, new LSSphereCollider(), new Vector3d((Fixed64)(-4), Fixed64.Zero, Fixed64.Zero));
+        _ = CreateDynamicCollider(context, new LSSphereCollider(), Vector3d.Zero);
+        var hits = new SwiftList<Physics3DHit>();
+
+        int count = context.Query3D.SweepSphereAgainstStaticAll(
+            new Vector3d((Fixed64)(-2), Fixed64.Zero, Fixed64.Zero),
+            new Vector3d((Fixed64)2, Fixed64.Zero, Fixed64.Zero),
+            Fixed64.Half,
+            IncludeLayerZero,
+            hits,
+            source,
+            includeTriggers: false);
+
+        count.Should().Be(0);
+        context.Query3D.LastQueryCandidateCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void SweepSphereAgainstStaticAll_ShouldIncludeKinematicImmovableAndBodylessTargets()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSSphereCollider source = CreateDynamicCollider(context, new LSSphereCollider(), new Vector3d((Fixed64)(-4), Fixed64.Zero, Fixed64.Zero));
+        LSSphereCollider kinematic = CreateDynamicCollider(context, new LSSphereCollider(), Vector3d.Zero, isKinematic: true);
+        LSSphereCollider immovable = CreateDynamicCollider(context, new LSSphereCollider(), Vector3d.Right * 2, immovable: true);
+        LSSphereCollider bodyless = CreateBodylessCollider(context, Vector3d.Right * 4);
+        var hits = new SwiftList<Physics3DHit>();
+
+        int count = context.Query3D.SweepSphereAgainstStaticAll(
+            new Vector3d((Fixed64)(-2), Fixed64.Zero, Fixed64.Zero),
+            new Vector3d((Fixed64)6, Fixed64.Zero, Fixed64.Zero),
+            Fixed64.Half,
+            IncludeLayerZero,
+            hits,
+            source,
+            includeTriggers: false);
+
+        count.Should().Be(3);
+        context.Query3D.LastQueryCandidateCount.Should().Be(3);
+        hits.Should().Contain(hit => ReferenceEquals(hit.Collider, kinematic));
+        hits.Should().Contain(hit => ReferenceEquals(hit.Collider, immovable));
+        hits.Should().Contain(hit => ReferenceEquals(hit.Collider, bodyless));
+    }
+
+    [Fact]
     public void SweepSphere_ShouldBreakClosestHitTiesByColliderId()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
@@ -287,17 +360,31 @@ public sealed class GravitasQuery3DServiceSweepTests
         GravitasWorldContext context,
         TCollider collider,
         Vector3d position,
-        FixedQuaternion? rotation = null)
+        FixedQuaternion? rotation = null,
+        bool immovable = false,
+        bool isKinematic = false)
         where TCollider : LSCollider
     {
         EnsureGrid(context);
         var agent = new TestMatterAgent(context);
         var body = new StiffBody(agent, collider)
         {
-            Mass = Fixed64.One
+            Mass = Fixed64.One,
+            Immovable = immovable,
+            IsKinematic = isKinematic
         };
 
         body.Initialize(position, rotation ?? FixedQuaternion.Identity);
+        return collider;
+    }
+
+    private static LSSphereCollider CreateBodylessCollider(GravitasWorldContext context, Vector3d position)
+    {
+        EnsureGrid(context);
+        var transform = new FixedTransform(position, FixedQuaternion.Identity, Vector3d.One);
+        var agent = new TestMatterAgent(context, transform);
+        var collider = new LSSphereCollider();
+        collider.InitializeWithNoBody(agent);
         return collider;
     }
 

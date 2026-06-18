@@ -91,13 +91,14 @@ public sealed class GravitasCollision2DService
         }
 
         GetPlanarCoverageBounds(collider, out Vector2d coverageMin, out Vector2d coverageMax);
-        if (collider.MatchesPartitionGridBounds(coverageMin, coverageMax))
+        PhysicsPartitionMobilityKind kind = GetMobilityKind(collider);
+        if (collider.MatchesPartitionGridBounds(coverageMin, coverageMax, (int)kind))
             return false;
 
         if (collider.IsPartitioned)
             ClearPartitionedCollider(collider, force: true);
 
-        return PartitionCollider(collider, coverageMin, coverageMax);
+        return PartitionCollider(collider, coverageMin, coverageMax, kind);
     }
 
     internal bool RefreshColliderPartitionAfterShapeChange(LSCollider2D collider)
@@ -125,6 +126,15 @@ public sealed class GravitasCollision2DService
 
     private bool PartitionCollider(LSCollider2D collider, Vector2d coverageMin, Vector2d coverageMax)
     {
+        return PartitionCollider(collider, coverageMin, coverageMax, GetMobilityKind(collider));
+    }
+
+    private bool PartitionCollider(
+        LSCollider2D collider,
+        Vector2d coverageMin,
+        Vector2d coverageMax,
+        PhysicsPartitionMobilityKind kind)
+    {
         SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
         SwiftThrowHelper.ThrowIfArgument(
             !ReferenceEquals(collider.Context, _context),
@@ -139,11 +149,11 @@ public sealed class GravitasCollision2DService
 
         try
         {
-            PartitionCoveredVoxels(collider, coverageMin, coverageMax, partitionedCoordinates);
+            PartitionCoveredVoxels(collider, coverageMin, coverageMax, partitionedCoordinates, kind);
             if (partitionedCoordinates.Count == 0)
                 return false;
 
-            collider.MarkPartitioned(coverageMin, coverageMax);
+            collider.MarkPartitioned(coverageMin, coverageMax, (int)kind);
             return true;
         }
         finally
@@ -164,7 +174,8 @@ public sealed class GravitasCollision2DService
             return false;
 
         GetPlanarCoverageBounds(collider, out Vector2d coverageMin, out Vector2d coverageMax);
-        if (!force && collider.MatchesPartitionGridBounds(coverageMin, coverageMax))
+        PhysicsPartitionMobilityKind currentKind = GetMobilityKind(collider);
+        if (!force && collider.MatchesPartitionGridBounds(coverageMin, coverageMax, (int)currentKind))
             return false;
 
         SwiftList<WorldVoxelIndex>? coordinates = collider.PartitionCoordinates;
@@ -172,7 +183,7 @@ public sealed class GravitasCollision2DService
             return false;
 
         GridWorld world = _context.World;
-        bool isStatic = IsStaticCollider(collider);
+        PhysicsPartitionMobilityKind partitionKind = GetStoredMobilityKind(collider.PartitionKind);
         try
         {
             for (int i = 0; i < coordinates.Count; i++)
@@ -184,10 +195,7 @@ public sealed class GravitasCollision2DService
                     continue;
                 }
 
-                if (isStatic)
-                    partition!.RemoveStaticObject(collider.Id);
-                else
-                    partition!.RemoveDynamicObject(collider.Id);
+                RemoveObject(partition!, collider.Id, partitionKind);
             }
         }
         finally
@@ -212,7 +220,7 @@ public sealed class GravitasCollision2DService
             return;
 
         StiffBody2D? body = collider.Body;
-        if (body == null || body.Immovable)
+        if (body == null || body.Immovable || body.IsKinematic)
             return;
 
         bool awake = body.IsAwakeForCollision;
@@ -289,7 +297,8 @@ public sealed class GravitasCollision2DService
         PhysicsLayerMask layerMask,
         uint queryVersion,
         bool raycastQuery,
-        SwiftList<LSCollider2D> candidates)
+        SwiftList<LSCollider2D> candidates,
+        bool staticStyleOnly = false)
     {
         RefreshDeferredColliderPartitions();
         candidates.FastClear();
@@ -300,12 +309,17 @@ public sealed class GravitasCollision2DService
         for (int i = 0; i < _queryPartitions.Count; i++)
         {
             PhysicsPartition2D partition = _queryPartitions[i];
-            partition.CopyAllColliderIds(_queryColliderIds);
+            if (staticStyleOnly)
+                partition.CopyStaticStyleColliderIds(_queryColliderIds);
+            else
+                partition.CopyAllColliderIds(_queryColliderIds);
+
             for (int j = 0; j < _queryColliderIds.Count; j++)
             {
                 int colliderId = _queryColliderIds[j];
                 if (!_context.Physics2D.TryGetColliderById(colliderId, out LSCollider2D? collider)
                     || !collider!.IsActive
+                    || (staticStyleOnly && !IsStaticStyleCollider(collider))
                     || IsDuplicateQueryCandidate(collider, queryVersion, raycastQuery)
                     || !layerMask.Includes(collider.Layer)
                     || collider.MaxX < min.X
@@ -377,9 +391,10 @@ public sealed class GravitasCollision2DService
         LSCollider2D collider,
         Vector2d coverageMin,
         Vector2d coverageMax,
-        SwiftList<WorldVoxelIndex> partitionedCoordinates)
+        SwiftList<WorldVoxelIndex> partitionedCoordinates,
+        PhysicsPartitionMobilityKind kind)
     {
-        ScanCoveredColliderVoxels(collider, coverageMin, coverageMax, partitionedCoordinates);
+        ScanCoveredColliderVoxels(collider, coverageMin, coverageMax, partitionedCoordinates, kind);
     }
 
     private void ScanCoveredQueryPartitions(
@@ -405,7 +420,8 @@ public sealed class GravitasCollision2DService
         LSCollider2D collider,
         Vector2d coverageMin,
         Vector2d coverageMax,
-        SwiftList<WorldVoxelIndex> partitionedCoordinates)
+        SwiftList<WorldVoxelIndex> partitionedCoordinates,
+        PhysicsPartitionMobilityKind kind)
     {
         GridWorld world = _context.World;
         GridTracer.GetCoveredVoxelsInto(
@@ -416,7 +432,7 @@ public sealed class GravitasCollision2DService
             _traceScratch,
             layerY: Fixed64.Zero);
 
-        VisitPlanarVoxelsForCollider(world, collider, partitionedCoordinates);
+        VisitPlanarVoxelsForCollider(world, collider, partitionedCoordinates, kind);
     }
 
     private void VisitPlanarVoxelsForQuery(
@@ -445,18 +461,20 @@ public sealed class GravitasCollision2DService
     private void VisitPlanarVoxelsForCollider(
         GridWorld world,
         LSCollider2D collider,
-        SwiftList<WorldVoxelIndex> partitionedCoordinates)
+        SwiftList<WorldVoxelIndex> partitionedCoordinates,
+        PhysicsPartitionMobilityKind kind)
     {
         var traversal = new GridForgeTraversalState(world, GridForgeTraversalPaddingMode.PlanarMaxCellEdge);
         for (int i = 0; i < _coveredVoxels.Count; i++)
-            TryPartitionVoxel(collider, partitionedCoordinates, _coveredVoxels[i], ref traversal);
+            TryPartitionVoxel(collider, partitionedCoordinates, _coveredVoxels[i], ref traversal, kind);
     }
 
     private void TryPartitionVoxel(
         LSCollider2D collider,
         SwiftList<WorldVoxelIndex> partitionedCoordinates,
         Voxel voxel,
-        ref GridForgeTraversalState traversal)
+        ref GridForgeTraversalState traversal,
+        PhysicsPartitionMobilityKind kind)
     {
         if (!traversal.TryVisitUnique(voxel, _redundancyChecker, out Fixed64 cellEdge)
             || !collider.IsPositionInPlanarBounds(cellEdge, voxel.WorldPosition))
@@ -477,10 +495,7 @@ public sealed class GravitasCollision2DService
         }
 
         partitionedCoordinates.Add(voxel.WorldIndex);
-        if (IsStaticCollider(collider))
-            partition!.AddStaticObject(collider.Id);
-        else
-            partition!.AddDynamicObject(collider.Id);
+        AddObject(partition!, collider.Id, kind);
     }
 
     private void GetPlanarCoverageBounds(LSCollider2D collider, out Vector2d coverageMin, out Vector2d coverageMax)
@@ -490,7 +505,70 @@ public sealed class GravitasCollision2DService
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool IsStaticCollider(LSCollider2D collider) => collider.Body == null || collider.Body.Immovable;
+    internal int ResolvePartitionKind(LSCollider2D collider) => (int)GetMobilityKind(collider);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static PhysicsPartitionMobilityKind GetMobilityKind(LSCollider2D collider)
+    {
+        StiffBody2D? body = collider.Body;
+        if (body == null || body.Immovable)
+            return PhysicsPartitionMobilityKind.Static;
+
+        return body.IsKinematic ? PhysicsPartitionMobilityKind.Kinematic : PhysicsPartitionMobilityKind.Dynamic;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static PhysicsPartitionMobilityKind GetStoredMobilityKind(int partitionKind)
+    {
+        return partitionKind == (int)PhysicsPartitionMobilityKind.Kinematic
+            ? PhysicsPartitionMobilityKind.Kinematic
+            : partitionKind == (int)PhysicsPartitionMobilityKind.Static
+                ? PhysicsPartitionMobilityKind.Static
+                : PhysicsPartitionMobilityKind.Dynamic;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void AddObject(PhysicsPartition2D partition, int id, PhysicsPartitionMobilityKind kind)
+    {
+        if (kind == PhysicsPartitionMobilityKind.Static)
+        {
+            partition.AddStaticObject(id);
+            return;
+        }
+
+        if (kind == PhysicsPartitionMobilityKind.Kinematic)
+        {
+            partition.AddKinematicObject(id);
+            return;
+        }
+
+        partition.AddDynamicObject(id);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void RemoveObject(PhysicsPartition2D partition, int id, PhysicsPartitionMobilityKind kind)
+    {
+        if (kind == PhysicsPartitionMobilityKind.Static)
+        {
+            partition.RemoveStaticObject(id);
+            return;
+        }
+
+        if (kind == PhysicsPartitionMobilityKind.Kinematic)
+        {
+            partition.RemoveKinematicObject(id);
+            return;
+        }
+
+        partition.RemoveDynamicObject(id);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool IsStaticStyleCollider(LSCollider2D collider)
+    {
+        StiffBody2D? body = collider.Body;
+        return body == null || body.Immovable || body.IsKinematic;
+    }
 
     private void DetachRetainedPartitions()
     {

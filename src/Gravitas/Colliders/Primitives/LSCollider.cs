@@ -269,6 +269,8 @@ public abstract class LSCollider : IRecordable, IColliderHierarchyNode
         set => _partitionState.Coordinates = value;
     }
 
+    internal int PartitionKind => _partitionState.LastPartitionKind;
+
     internal bool IsMixedPartitioned => _mixedPartitionState.IsPartitioned;
 
     internal SwiftList<WorldVoxelIndex>? MixedPartitionCoordinates => _mixedPartitionState.Coordinates;
@@ -404,7 +406,7 @@ public abstract class LSCollider : IRecordable, IColliderHierarchyNode
             return;
         }
 
-        if (RebuildRuntimeShapeState())
+        if (RebuildRuntimeShapeState() || Context.Collisions.IsPartitionRefreshRequired(this))
             UpdatePartition();
     }
 
@@ -684,7 +686,7 @@ public abstract class LSCollider : IRecordable, IColliderHierarchyNode
             return;
         }
 
-        _partitionState.SetPreviousGridBounds(BoundsMin, BoundsMax);
+        _partitionState.SetPreviousGridBounds(BoundsMin, BoundsMax, Context.Collisions.ResolvePartitionKind(this));
     }
 
     internal bool TryGetCollisionPair(int otherId, out CollisionPair? collisionPair) =>
@@ -898,6 +900,26 @@ public abstract class LSCollider : IRecordable, IColliderHierarchyNode
         _mixedPartitionState.Coordinates ??= new();
         return _mixedPartitionState.Coordinates;
     }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal bool MatchesPartitionGridBounds(Vector3d min, Vector3d max, int partitionKind) =>
+        _partitionState.IsPartitioned
+        && _partitionState.LastGridBoundsMin == min
+        && _partitionState.LastGridBoundsMax == max
+        && _partitionState.LastPartitionKind == partitionKind;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal void MarkPartitioned(Vector3d min, Vector3d max, int partitionKind)
+    {
+        _partitionState.SetPreviousGridBounds(min, max, partitionKind);
+        _partitionState.MarkPartitioned();
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal void MarkUnpartitioned() => _partitionState.MarkUnpartitioned();
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal void ClearPartitionCoordinates() => _partitionState.ClearCoordinates();
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal bool MatchesMixedPartitionGridBounds(Vector3d min, Vector3d max, int partitionKind) =>

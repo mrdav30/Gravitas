@@ -49,9 +49,35 @@ public sealed class StiffBody2D : IRecordable
 
     public bool Active { get; private set; }
 
-    public bool Immovable { get; set; }
+    private bool _immovable;
+    public bool Immovable
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => _immovable;
+        set
+        {
+            if (_immovable == value)
+                return;
 
-    public bool IsKinematic { get; set; }
+            _immovable = value;
+            RefreshPartitionMobility();
+        }
+    }
+
+    private bool _isKinematic;
+    public bool IsKinematic
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => _isKinematic;
+        set
+        {
+            if (_isKinematic == value)
+                return;
+
+            _isKinematic = value;
+            RefreshPartitionMobility();
+        }
+    }
 
     /// <summary>
     /// Selects the deterministic tunneling guard used when this pure 2D body commits frame movement.
@@ -194,6 +220,16 @@ public sealed class StiffBody2D : IRecordable
         Context.Collisions2D.RefreshPartitionAwakeState(Collider);
     }
 
+    private void RefreshPartitionMobility()
+    {
+        if (!Active)
+            return;
+
+        Context.Collisions2D.RefreshColliderPartition(Collider);
+        if (Context.Settings.RuntimeMode.RunsMixedContacts())
+            Context.MixedCollisions.Refresh2DColliderPartition(Collider);
+    }
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Wake()
     {
@@ -299,7 +335,7 @@ public sealed class StiffBody2D : IRecordable
             return false;
         }
 
-        int hitCount = Context.Query2D.SweepCircleAll(
+        int hitCount = Context.Query2D.SweepCircleAgainstStaticAll(
             startPosition,
             proposedPosition,
             proxyRadius,
@@ -841,8 +877,8 @@ public sealed class StiffBody2D : IRecordable
         if (chronicler.Mode == SerializationMode.Loading)
         {
             Active = active;
-            Immovable = immovable;
-            IsKinematic = isKinematic;
+            _immovable = immovable;
+            _isKinematic = isKinematic;
             Mass = mass;
             RestitutionCoefficient = restitutionCoefficient;
             FrictionCoefficient = frictionCoefficient;

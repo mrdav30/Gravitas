@@ -5,6 +5,7 @@ using GridForge;
 using GridForge.Grids;
 using GridForge.Utility;
 using SwiftCollections;
+using System.Runtime.CompilerServices;
 
 namespace Gravitas.Queries;
 
@@ -24,6 +25,8 @@ public sealed partial class GravitasQuery3DService
 
     private PhysicsLayerMask _currentLayerMask;
     private LSCollider? _currentExcludedCollider;
+    private bool _currentStaticSweepTargetsOnly;
+    private bool _currentIncludeTriggers;
 
     /// <summary>
     /// Initializes a new raycast service for the supplied context.
@@ -50,6 +53,8 @@ public sealed partial class GravitasQuery3DService
     /// </summary>
     public uint CircleVersion { get; private set; }
 
+    internal int LastQueryCandidateCount { get; private set; }
+
     /// <summary>
     /// Resets context-local raycast query buffers.
     /// </summary>
@@ -57,6 +62,7 @@ public sealed partial class GravitasQuery3DService
     {
         RaycastVersion = 0;
         CircleVersion = 0;
+        LastQueryCandidateCount = 0;
         _bufferIntersectionPoints.FastClear();
         _redundantColliderCheck.Clear();
         _redundantVoxelCheck.Clear();
@@ -77,6 +83,7 @@ public sealed partial class GravitasQuery3DService
         _currentLayerMask = layerMask;
         if (direction.MagnitudeSquared == Fixed64.Zero || maxDistance <= Fixed64.Zero)
         {
+            LastQueryCandidateCount = 0;
             raycastHit = default;
             return false;
         }
@@ -113,7 +120,10 @@ public sealed partial class GravitasQuery3DService
 
         Vector3d segment = end3d - start3d;
         if (segment.MagnitudeSquared == Fixed64.Zero)
+        {
+            LastQueryCandidateCount = 0;
             return 0;
+        }
 
         BeginRaycastTrace(start3d, end3d);
         AddAllHits(start3d, end3d, segment.Normalized, results);
@@ -143,6 +153,7 @@ public sealed partial class GravitasQuery3DService
     {
         if (direction.MagnitudeSquared == Fixed64.Zero || maxDistance <= Fixed64.Zero)
         {
+            LastQueryCandidateCount = 0;
             sweepHit = default;
             return false;
         }
@@ -172,14 +183,58 @@ public sealed partial class GravitasQuery3DService
         SwiftList<Physics3DHit> results,
         LSCollider? excludedCollider = null)
     {
+        return SweepSphereAllCore(
+            start3d,
+            end3d,
+            radius,
+            layerMask,
+            results,
+            excludedCollider,
+            includeTriggers: true,
+            staticTargetsOnly: false);
+    }
+
+    internal int SweepSphereAgainstStaticAll(
+        Vector3d start3d,
+        Vector3d end3d,
+        Fixed64 radius,
+        PhysicsLayerMask layerMask,
+        SwiftList<Physics3DHit> results,
+        LSCollider? excludedCollider = null,
+        bool includeTriggers = true)
+    {
+        return SweepSphereAllCore(
+            start3d,
+            end3d,
+            radius,
+            layerMask,
+            results,
+            excludedCollider,
+            includeTriggers,
+            staticTargetsOnly: true);
+    }
+
+    private int SweepSphereAllCore(
+        Vector3d start3d,
+        Vector3d end3d,
+        Fixed64 radius,
+        PhysicsLayerMask layerMask,
+        SwiftList<Physics3DHit> results,
+        LSCollider? excludedCollider,
+        bool includeTriggers,
+        bool staticTargetsOnly)
+    {
         SwiftThrowHelper.ThrowIfNull(results, nameof(results));
 
         results.FastClear();
         Vector3d segment = end3d - start3d;
         if (segment.MagnitudeSquared == Fixed64.Zero || radius <= Fixed64.Zero)
+        {
+            LastQueryCandidateCount = 0;
             return 0;
+        }
 
-        BeginSweepTrace(start3d, end3d, radius, layerMask, excludedCollider);
+        BeginSweepTrace(start3d, end3d, radius, layerMask, excludedCollider, includeTriggers, staticTargetsOnly);
         AddAllSweepHits(start3d, end3d, segment.Normalized, radius, results);
         Physics3DHitSorter.SortByDistance(results);
         _context.Diagnostics.EmitRayQuery(
@@ -199,6 +254,9 @@ public sealed partial class GravitasQuery3DService
         _redundantVoxelCheck.Clear();
         _bufferIntersectionPoints.FastClear();
         _currentExcludedCollider = null;
+        _currentStaticSweepTargetsOnly = false;
+        _currentIncludeTriggers = true;
+        LastQueryCandidateCount = 0;
         RaycastVersion++;
         _worker.PrepareSegmentCheck(start, end);
     }
@@ -208,12 +266,17 @@ public sealed partial class GravitasQuery3DService
         Vector3d end,
         Fixed64 radius,
         PhysicsLayerMask layerMask,
-        LSCollider? excludedCollider)
+        LSCollider? excludedCollider,
+        bool includeTriggers = true,
+        bool staticTargetsOnly = false)
     {
         _currentLayerMask = layerMask;
         _currentExcludedCollider = excludedCollider;
+        _currentIncludeTriggers = includeTriggers;
+        _currentStaticSweepTargetsOnly = staticTargetsOnly;
         _redundantColliderCheck.Clear();
         _redundantVoxelCheck.Clear();
+        LastQueryCandidateCount = 0;
         RaycastVersion++;
         _sweepWorker.Prepare(start, end, radius);
     }
@@ -228,11 +291,17 @@ public sealed partial class GravitasQuery3DService
     {
         sweepHit = default;
         if (radius <= Fixed64.Zero)
+        {
+            LastQueryCandidateCount = 0;
             return false;
+        }
 
         Vector3d segment = end - start;
         if (segment.MagnitudeSquared == Fixed64.Zero)
+        {
+            LastQueryCandidateCount = 0;
             return false;
+        }
 
         Vector3d direction = segment.Normalized;
         BeginSweepTrace(start, end, radius, layerMask, excludedCollider);
@@ -478,6 +547,14 @@ public sealed partial class GravitasQuery3DService
             ref closestHit);
 
         ProcessColliderListForClosestHit(
+            partition.ContainedKinematicObjects,
+            origin,
+            direction,
+            ref found,
+            ref closestDistance,
+            ref closestHit);
+
+        ProcessColliderListForClosestHit(
             partition.ContainedStaticObjects,
             origin,
             direction,
@@ -518,6 +595,7 @@ public sealed partial class GravitasQuery3DService
         SwiftList<Physics3DHit> results)
     {
         ProcessColliderListForAllHits(partition.ContainedDynamicObjects, origin, direction, results);
+        ProcessColliderListForAllHits(partition.ContainedKinematicObjects, origin, direction, results);
         ProcessColliderListForAllHits(partition.ContainedStaticObjects, origin, direction, results);
     }
 
@@ -545,8 +623,19 @@ public sealed partial class GravitasQuery3DService
         ref Fixed64 closestDistance,
         ref Physics3DHit closestHit)
     {
+        if (!_currentStaticSweepTargetsOnly)
+        {
+            ProcessColliderListForClosestSweepHit(
+                partition.ContainedDynamicObjects,
+                origin,
+                direction,
+                ref found,
+                ref closestDistance,
+                ref closestHit);
+        }
+
         ProcessColliderListForClosestSweepHit(
-            partition.ContainedDynamicObjects,
+            partition.ContainedKinematicObjects,
             origin,
             direction,
             ref found,
@@ -611,7 +700,10 @@ public sealed partial class GravitasQuery3DService
         Vector3d direction,
         SwiftList<Physics3DHit> results)
     {
-        ProcessColliderListForAllSweepHits(partition.ContainedDynamicObjects, origin, direction, results);
+        if (!_currentStaticSweepTargetsOnly)
+            ProcessColliderListForAllSweepHits(partition.ContainedDynamicObjects, origin, direction, results);
+
+        ProcessColliderListForAllSweepHits(partition.ContainedKinematicObjects, origin, direction, results);
         ProcessColliderListForAllSweepHits(partition.ContainedStaticObjects, origin, direction, results);
     }
 
@@ -731,8 +823,22 @@ public sealed partial class GravitasQuery3DService
             return false;
         }
 
+        if (!_currentIncludeTriggers && current.IsTrigger)
+            return false;
+
+        if (_currentStaticSweepTargetsOnly && !IsStaticStyleSweepTarget(current))
+            return false;
+
         current.RaycastVersion = RaycastVersion;
+        LastQueryCandidateCount++;
         return true;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool IsStaticStyleSweepTarget(LSCollider collider)
+    {
+        StiffBody? body = collider.Body;
+        return body == null || body.Immovable || body.IsKinematic;
     }
 
     private static Vector3d GetSweepSurfacePoint(LSCollider collider, Vector3d sweepCenter, Vector3d direction)

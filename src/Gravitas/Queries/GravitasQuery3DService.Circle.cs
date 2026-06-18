@@ -215,6 +215,14 @@ public sealed partial class GravitasQuery3DService
             ref closestDist);
 
         ProcessColliderListForClosestHit(
+            partition.ContainedKinematicObjects,
+            position,
+            radius,
+            ref found,
+            ref closestHit,
+            ref closestDist);
+
+        ProcessColliderListForClosestHit(
             partition.ContainedStaticObjects,
             position,
             radius,
@@ -259,6 +267,7 @@ public sealed partial class GravitasQuery3DService
         ref Fixed64 closestDist)
     {
         ProcessColliderListForDirectionalHit(partition.ContainedDynamicObjects, position, radius, direction, maxDistanceSqr, ref found, ref closestHit, ref closestDist);
+        ProcessColliderListForDirectionalHit(partition.ContainedKinematicObjects, position, radius, direction, maxDistanceSqr, ref found, ref closestHit, ref closestDist);
         ProcessColliderListForDirectionalHit(partition.ContainedStaticObjects, position, radius, direction, maxDistanceSqr, ref found, ref closestHit, ref closestDist);
     }
 
@@ -301,6 +310,7 @@ public sealed partial class GravitasQuery3DService
         SwiftList<Physics3DHit> results)
     {
         ProcessColliderListForAllHits(partition.ContainedDynamicObjects, position, radius, results);
+        ProcessColliderListForAllHits(partition.ContainedKinematicObjects, position, radius, results);
         ProcessColliderListForAllHits(partition.ContainedStaticObjects, position, radius, results);
     }
 

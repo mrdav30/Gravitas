@@ -22,11 +22,37 @@ public class StiffBody : IRecordable
     public int DynamicId => _dynamicId;  // Physics Id, if not set it's assumed the object isn't simulated
     private bool _isSet = false;
 
-    public bool Immovable = false;
+    private bool _immovable;
+    public bool Immovable
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => _immovable;
+        set
+        {
+            if (_immovable == value)
+                return;
+
+            _immovable = value;
+            RefreshPartitionMobility();
+        }
+    }
 
     // Controls whether physics affects the rigidbody.
     // If enabled, transform is controlled by animation or script.
-    public bool IsKinematic = false;
+    private bool _isKinematic;
+    public bool IsKinematic
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => _isKinematic;
+        set
+        {
+            if (_isKinematic == value)
+                return;
+
+            _isKinematic = value;
+            RefreshPartitionMobility();
+        }
+    }
 
     private ContinuousCollisionMode _continuousCollisionMode = ContinuousCollisionMode.Inherit;
     private int _continuousCollisionFrameToken = int.MinValue;
@@ -717,6 +743,18 @@ public class StiffBody : IRecordable
             Context.Collisions.RefreshPartitionAwakeState(Collider);
     }
 
+    private void RefreshPartitionMobility()
+    {
+        if (!Active || Collider == null || !Collider.TryGetBoundContext(out GravitasWorldContext? context))
+            return;
+
+        if (Collider.IsPartitioned)
+            Collider.Simulate();
+
+        if (context!.Settings.RuntimeMode.RunsMixedContacts())
+            context.MixedCollisions.Refresh3DColliderPartition(Collider);
+    }
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void UpdateTimeScaledAcceleration()
     {
@@ -1098,13 +1136,14 @@ public class StiffBody : IRecordable
             return false;
         }
 
-        int hitCount = Context.Query3D.SweepSphereAll(
+        int hitCount = Context.Query3D.SweepSphereAgainstStaticAll(
             startPosition,
             proposedPosition,
             proxyRadius,
             PhysicsLayerMask.All,
             _continuousCollisionHits,
-            Collider);
+            Collider,
+            includeTriggers: false);
         int mixedHitCount = Context.Settings.RuntimeMode.RunsMixedContacts()
             ? Context.QueryMixed.SweepSphereAgainstStatic2DAll(
                 startPosition,
@@ -1484,30 +1523,14 @@ public class StiffBody : IRecordable
         return collider switch
         {
             LSSphereCollider sphere => sphere.ScaledRadius,
-            LSCapsuleCollider capsule => capsule.ScaledRadius,
-            LSCylinderCollider cylinder => cylinder.ScaledRadius,
-            LSCuboidCollider cuboid => FixedMath.Min(
-                cuboid.Bounds.Scope.X,
-                FixedMath.Min(cuboid.Bounds.Scope.Y, cuboid.Bounds.Scope.Z)),
-            LSCompoundCollider compound => FixedMath.Min(
-                compound.Bounds.Scope.X,
-                FixedMath.Min(compound.Bounds.Scope.Y, compound.Bounds.Scope.Z)),
-            LSMeshCollider mesh => ResolveSmallestPositiveScope(mesh.Bounds.Scope),
-            _ => Fixed64.Zero
+            _ => ResolveBoundsProxyRadius(collider)
         };
     }
 
-    private static Fixed64 ResolveSmallestPositiveScope(Vector3d scope)
+    private static Fixed64 ResolveBoundsProxyRadius(LSCollider collider)
     {
-        Fixed64 result = Fixed64.MaxValue;
-        if (scope.X > Fixed64.Epsilon && scope.X < result)
-            result = scope.X;
-        if (scope.Y > Fixed64.Epsilon && scope.Y < result)
-            result = scope.Y;
-        if (scope.Z > Fixed64.Epsilon && scope.Z < result)
-            result = scope.Z;
-
-        return result == Fixed64.MaxValue ? Fixed64.Zero : result;
+        Fixed64 radius = collider.Bounds.Scope.Magnitude;
+        return radius > Fixed64.Epsilon ? radius : Fixed64.Zero;
     }
 
     private bool IsValidContinuousCollisionHit(Physics3DHit hit)
@@ -1998,11 +2021,13 @@ public class StiffBody : IRecordable
     {
         GroundProbeMode groundProbeMode = GroundProbeMode;
         Fixed64 groundProbeRadius = GroundProbeRadius;
+        bool immovable = Immovable;
+        bool isKinematic = IsKinematic;
 
         RecordValues.Look(chronicler, ref Debug, "Debug");
         RecordValues.Look(chronicler, ref Active, "Active");
-        RecordValues.Look(chronicler, ref Immovable, "Immovable");
-        RecordValues.Look(chronicler, ref IsKinematic, "IsKinematic", false);
+        RecordValues.Look(chronicler, ref immovable, "Immovable");
+        RecordValues.Look(chronicler, ref isKinematic, "IsKinematic", false);
         RecordValues.Look(chronicler, ref _position2dUnmarked, "Position2d");
         RecordValues.Look(chronicler, ref _heightPosUnmarked, "HeightPos");
         RecordValues.Look(chronicler, ref _spawnedPosition, "SpawnedPosition");
@@ -2056,6 +2081,8 @@ public class StiffBody : IRecordable
 
         if (chronicler.Mode == SerializationMode.Loading)
         {
+            _immovable = immovable;
+            _isKinematic = isKinematic;
             GroundProbeMode = groundProbeMode;
             GroundProbeRadius = groundProbeRadius;
             _hitPlatform = null;

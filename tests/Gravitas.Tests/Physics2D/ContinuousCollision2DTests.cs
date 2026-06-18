@@ -104,6 +104,40 @@ public sealed class ContinuousCollision2DTests
     }
 
     [Fact]
+    public void ContinuousMode_StaticCollector_ShouldSkipMovableDynamicTargets()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        StiffBody2D left = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)(-5), Fixed64.Zero), immovable: false);
+        StiffBody2D right = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)5, Fixed64.Zero), immovable: false);
+        left.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        right.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+
+        left.AddForce(Vector2d.Right * (Fixed64)5);
+        right.AddForce(-Vector2d.Right * (Fixed64)5);
+        context.LateSimulate();
+
+        context.Query2D.LastQueryCandidateCount.Should().Be(0);
+        left.Position.X.Should().BeLessThanOrEqualTo(-Fixed64.Half);
+        right.Position.X.Should().BeGreaterThanOrEqualTo(Fixed64.Half);
+    }
+
+    [Fact]
+    public void ContinuousMode_StaticCollector_ShouldIncludeKinematicTargets()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        _ = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)5, Fixed64.Zero), immovable: false, isKinematic: true);
+        StiffBody2D mover = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
+        mover.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+
+        mover.AddForce(new Vector2d((Fixed64)10, Fixed64.Zero));
+        context.LateSimulate();
+
+        context.Query2D.LastQueryCandidateCount.Should().Be(1);
+        mover.Position.X.Should().Be((Fixed64)4);
+        mover.LinearVelocity.X.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
     public void ContinuousMode_WithPlanarDynamicsAtDifferentHostY_ShouldStillClampInPure2D()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);
@@ -184,6 +218,80 @@ public sealed class ContinuousCollision2DTests
 
         count.Should().Be(1);
         hits[0].Collider.Should().BeSameAs(far.Collider);
+    }
+
+    [Fact]
+    public void SweepCircleAll_ShouldIncludeMovableKinematicImmovableAndBodylessTargets()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        StiffBody2D source = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)(-4), Fixed64.Zero), immovable: false);
+        StiffBody2D movable = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
+        StiffBody2D kinematic = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)2, Fixed64.Zero), immovable: false, isKinematic: true);
+        StiffBody2D immovable = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)4, Fixed64.Zero), immovable: true);
+        LSCircleCollider2D bodyless = CreateBodylessCircle(context, new Vector2d((Fixed64)6, Fixed64.Zero));
+        var hits = new SwiftList<Physics2DHit>();
+
+        int count = context.Query2D.SweepCircleAll(
+            new Vector2d((Fixed64)(-2), Fixed64.Zero),
+            new Vector2d((Fixed64)8, Fixed64.Zero),
+            Fixed64.Half,
+            PhysicsLayerMask.All,
+            hits,
+            source.Collider,
+            includeTriggers: false);
+
+        count.Should().Be(4);
+        hits.Should().Contain(hit => ReferenceEquals(hit.Collider, movable.Collider));
+        hits.Should().Contain(hit => ReferenceEquals(hit.Collider, kinematic.Collider));
+        hits.Should().Contain(hit => ReferenceEquals(hit.Collider, immovable.Collider));
+        hits.Should().Contain(hit => ReferenceEquals(hit.Collider, bodyless));
+    }
+
+    [Fact]
+    public void SweepCircleAgainstStaticAll_ShouldSkipMovableDynamicTargets()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        StiffBody2D source = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)(-4), Fixed64.Zero), immovable: false);
+        _ = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
+        var hits = new SwiftList<Physics2DHit>();
+
+        int count = context.Query2D.SweepCircleAgainstStaticAll(
+            new Vector2d((Fixed64)(-2), Fixed64.Zero),
+            new Vector2d((Fixed64)2, Fixed64.Zero),
+            Fixed64.Half,
+            PhysicsLayerMask.All,
+            hits,
+            source.Collider,
+            includeTriggers: false);
+
+        count.Should().Be(0);
+        context.Query2D.LastQueryCandidateCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void SweepCircleAgainstStaticAll_ShouldIncludeKinematicImmovableAndBodylessTargets()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        StiffBody2D source = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)(-4), Fixed64.Zero), immovable: false);
+        StiffBody2D kinematic = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false, isKinematic: true);
+        StiffBody2D immovable = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)2, Fixed64.Zero), immovable: true);
+        LSCircleCollider2D bodyless = CreateBodylessCircle(context, new Vector2d((Fixed64)4, Fixed64.Zero));
+        var hits = new SwiftList<Physics2DHit>();
+
+        int count = context.Query2D.SweepCircleAgainstStaticAll(
+            new Vector2d((Fixed64)(-2), Fixed64.Zero),
+            new Vector2d((Fixed64)6, Fixed64.Zero),
+            Fixed64.Half,
+            PhysicsLayerMask.All,
+            hits,
+            source.Collider,
+            includeTriggers: false);
+
+        count.Should().Be(3);
+        context.Query2D.LastQueryCandidateCount.Should().Be(3);
+        hits.Should().Contain(hit => ReferenceEquals(hit.Collider, kinematic.Collider));
+        hits.Should().Contain(hit => ReferenceEquals(hit.Collider, immovable.Collider));
+        hits.Should().Contain(hit => ReferenceEquals(hit.Collider, bodyless));
     }
 
     [Fact]
@@ -306,7 +414,8 @@ public sealed class ContinuousCollision2DTests
         Vector2d position,
         bool immovable,
         PhysicsLayer layer = default,
-        Fixed64 hostY = default)
+        Fixed64 hostY = default,
+        bool isKinematic = false)
     {
         var transform = new FixedTransform(
             new Vector3d(position.X, hostY, position.Y),
@@ -316,11 +425,27 @@ public sealed class ContinuousCollision2DTests
         var body = new StiffBody2D(agent, collider)
         {
             Mass = Fixed64.One,
-            Immovable = immovable
+            Immovable = immovable,
+            IsKinematic = isKinematic
         };
         body.Collider.Layer = layer;
         body.Initialize(position);
         return body;
+    }
+
+    private static LSCircleCollider2D CreateBodylessCircle(
+        GravitasWorldContext context,
+        Vector2d position,
+        Fixed64 hostY = default)
+    {
+        var transform = new FixedTransform(
+            new Vector3d(position.X, hostY, position.Y),
+            FixedQuaternion.Identity,
+            Vector3d.One);
+        var agent = new TestMatterAgent(context, transform);
+        var collider = new LSCircleCollider2D(Fixed64.Half);
+        collider.InitializeWithNoBody(agent);
+        return collider;
     }
 
     private static LSCollider2D CreateCollider(ColliderType2D type) =>

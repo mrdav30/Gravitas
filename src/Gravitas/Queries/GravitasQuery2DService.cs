@@ -255,6 +255,47 @@ public sealed class GravitasQuery2DService
         LSCollider2D? excludedCollider = null,
         bool includeTriggers = true)
     {
+        return SweepCircleAllCore(
+            start,
+            end,
+            radius,
+            layerMask,
+            results,
+            excludedCollider,
+            includeTriggers,
+            staticTargetsOnly: false);
+    }
+
+    internal int SweepCircleAgainstStaticAll(
+        Vector2d start,
+        Vector2d end,
+        Fixed64 radius,
+        PhysicsLayerMask layerMask,
+        SwiftList<Physics2DHit> results,
+        LSCollider2D? excludedCollider = null,
+        bool includeTriggers = true)
+    {
+        return SweepCircleAllCore(
+            start,
+            end,
+            radius,
+            layerMask,
+            results,
+            excludedCollider,
+            includeTriggers,
+            staticTargetsOnly: true);
+    }
+
+    private int SweepCircleAllCore(
+        Vector2d start,
+        Vector2d end,
+        Fixed64 radius,
+        PhysicsLayerMask layerMask,
+        SwiftList<Physics2DHit> results,
+        LSCollider2D? excludedCollider,
+        bool includeTriggers,
+        bool staticTargetsOnly)
+    {
         SwiftThrowHelper.ThrowIfNull(results, nameof(results));
         SwiftThrowHelper.ThrowIfArgument(radius <= Fixed64.Zero, nameof(radius), "2D sweep radius must be greater than zero.");
 
@@ -274,7 +315,8 @@ public sealed class GravitasQuery2DService
             layerMask,
             queryVersion,
             raycastQuery: true,
-            _queryCandidates);
+            _queryCandidates,
+            staticStyleOnly: staticTargetsOnly);
 
         LastQueryCandidateCount = _queryCandidates.Count;
         for (int i = 0; i < _queryCandidates.Count; i++)

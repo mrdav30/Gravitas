@@ -15,6 +15,8 @@ internal struct ColliderPartitionState2D
 
     public Vector2d LastGridBoundsMax { get; private set; }
 
+    public int LastPartitionKind { get; private set; }
+
     public SwiftList<WorldVoxelIndex>? Coordinates;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -31,14 +33,18 @@ internal struct ColliderPartitionState2D
     public void MarkUnpartitioned() => IsPartitioned = false;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool MatchesGridBounds(Vector2d min, Vector2d max) =>
-        IsPartitioned && LastGridBoundsMin == min && LastGridBoundsMax == max;
+    public bool MatchesGridBounds(Vector2d min, Vector2d max, int partitionKind) =>
+        IsPartitioned
+        && LastGridBoundsMin == min
+        && LastGridBoundsMax == max
+        && LastPartitionKind == partitionKind;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void SetPreviousGridBounds(Vector2d min, Vector2d max)
+    public void SetPreviousGridBounds(Vector2d min, Vector2d max, int partitionKind = 0)
     {
         LastGridBoundsMin = min;
         LastGridBoundsMax = max;
+        LastPartitionKind = partitionKind;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

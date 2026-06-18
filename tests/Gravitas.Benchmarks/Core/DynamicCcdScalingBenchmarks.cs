@@ -1,6 +1,7 @@
 using BenchmarkDotNet.Attributes;
 using FixedMathSharp;
 using Gravitas.Colliders;
+using Gravitas.CollisionHandling;
 using Gravitas.Queries;
 using Gravitas.Support;
 using GridForge.Configuration;
@@ -18,6 +19,7 @@ public class DynamicCcdScalingBenchmarks
     private const int SparseSpacing = 8;
     private const int DensePairSpacing = 8;
     private const int MixedSparseOffsetZ = 4;
+    private const int PureBatchFrames = 8;
     private const int MixedBatchFrames = 8;
 
     private static readonly Vector3d Force3D = Vector3d.Right * (Fixed64)2;
@@ -38,6 +40,8 @@ public class DynamicCcdScalingBenchmarks
     private SwiftList<StiffBody2D> _sparseMixed2DBodies;
     private SwiftList<StiffBody> _denseMixed3DBodies;
     private SwiftList<StiffBody2D> _denseMixed2DBodies;
+    private SwiftList<Physics3DHit> _query3DHits;
+    private SwiftList<Physics2DHit> _query2DHits;
     private SwiftList<PhysicsMixedHit> _mixedQueryHits;
 
     private Vector3d[] _sparse3DPositions;
@@ -75,6 +79,8 @@ public class DynamicCcdScalingBenchmarks
         _sparseMixed2DBodies = new SwiftList<StiffBody2D>(mixedPerDimension);
         _denseMixed3DBodies = new SwiftList<StiffBody>(mixedPerDimension);
         _denseMixed2DBodies = new SwiftList<StiffBody2D>(mixedPerDimension);
+        _query3DHits = new SwiftList<Physics3DHit>(BodyCount);
+        _query2DHits = new SwiftList<Physics2DHit>(BodyCount);
         _mixedQueryHits = new SwiftList<PhysicsMixedHit>(mixedPerDimension);
 
         _sparse3DPositions = new Vector3d[BodyCount];
@@ -142,6 +148,8 @@ public class DynamicCcdScalingBenchmarks
         _sparseMixed2DBodies = null;
         _denseMixed3DBodies = null;
         _denseMixed2DBodies = null;
+        _query3DHits = null;
+        _query2DHits = null;
         _mixedQueryHits = null;
         _sparse3DPositions = null;
         _dense3DPositions = null;
@@ -183,6 +191,226 @@ public class DynamicCcdScalingBenchmarks
         Reset2DBodies(_dense2DBodies, _dense2DPositions, pairedDirections: true);
         _dense2DContext.LateSimulate();
         return Sum2D(_dense2DBodies);
+    }
+
+    [Benchmark(OperationsPerInvoke = PureBatchFrames)]
+    public Vector3d SparsePure3DDynamicCcdBatch8()
+    {
+        Vector3d total = Vector3d.Zero;
+        for (int i = 0; i < PureBatchFrames; i++)
+        {
+            Reset3DBodies(_sparse3DBodies, _sparse3DPositions, pairedDirections: false);
+            _sparse3DContext.LateSimulate();
+            total += Sum3D(_sparse3DBodies);
+        }
+
+        return total;
+    }
+
+    [Benchmark(OperationsPerInvoke = PureBatchFrames)]
+    public Vector3d DensePure3DDynamicCcdBatch8()
+    {
+        Vector3d total = Vector3d.Zero;
+        for (int i = 0; i < PureBatchFrames; i++)
+        {
+            Reset3DBodies(_dense3DBodies, _dense3DPositions, pairedDirections: true);
+            _dense3DContext.LateSimulate();
+            total += Sum3D(_dense3DBodies);
+        }
+
+        return total;
+    }
+
+    [Benchmark(OperationsPerInvoke = PureBatchFrames)]
+    public Vector2d SparsePure2DDynamicCcdBatch8()
+    {
+        Vector2d total = Vector2d.Zero;
+        for (int i = 0; i < PureBatchFrames; i++)
+        {
+            Reset2DBodies(_sparse2DBodies, _sparse2DPositions, pairedDirections: false);
+            _sparse2DContext.LateSimulate();
+            total += Sum2D(_sparse2DBodies);
+        }
+
+        return total;
+    }
+
+    [Benchmark(OperationsPerInvoke = PureBatchFrames)]
+    public Vector2d DensePure2DDynamicCcdBatch8()
+    {
+        Vector2d total = Vector2d.Zero;
+        for (int i = 0; i < PureBatchFrames; i++)
+        {
+            Reset2DBodies(_dense2DBodies, _dense2DPositions, pairedDirections: true);
+            _dense2DContext.LateSimulate();
+            total += Sum2D(_dense2DBodies);
+        }
+
+        return total;
+    }
+
+    [Benchmark(OperationsPerInvoke = PureBatchFrames)]
+    public int SparsePure3DStaticQueryBatch8()
+    {
+        int total = 0;
+        for (int i = 0; i < PureBatchFrames; i++)
+        {
+            Reset3DBodyPositions(_sparse3DBodies, _sparse3DPositions);
+            total += SweepPure3DStaticQueries(_sparse3DContext, _sparse3DBodies, _sparse3DPositions, pairedDirections: false);
+        }
+
+        return total;
+    }
+
+    [Benchmark(OperationsPerInvoke = PureBatchFrames)]
+    public int DensePure3DStaticQueryBatch8()
+    {
+        int total = 0;
+        for (int i = 0; i < PureBatchFrames; i++)
+        {
+            Reset3DBodyPositions(_dense3DBodies, _dense3DPositions);
+            total += SweepPure3DStaticQueries(_dense3DContext, _dense3DBodies, _dense3DPositions, pairedDirections: true);
+        }
+
+        return total;
+    }
+
+    [Benchmark(OperationsPerInvoke = PureBatchFrames)]
+    public int SparsePure2DStaticQueryBatch8()
+    {
+        int total = 0;
+        for (int i = 0; i < PureBatchFrames; i++)
+        {
+            Reset2DBodyPositions(_sparse2DBodies, _sparse2DPositions);
+            total += SweepPure2DStaticQueries(_sparse2DContext, _sparse2DBodies, _sparse2DPositions, pairedDirections: false);
+        }
+
+        return total;
+    }
+
+    [Benchmark(OperationsPerInvoke = PureBatchFrames)]
+    public int DensePure2DStaticQueryBatch8()
+    {
+        int total = 0;
+        for (int i = 0; i < PureBatchFrames; i++)
+        {
+            Reset2DBodyPositions(_dense2DBodies, _dense2DPositions);
+            total += SweepPure2DStaticQueries(_dense2DContext, _dense2DBodies, _dense2DPositions, pairedDirections: true);
+        }
+
+        return total;
+    }
+
+    [Benchmark(OperationsPerInvoke = PureBatchFrames)]
+    public int SparsePure3DDynamicCandidateQueryBatch8()
+    {
+        int total = 0;
+        for (int i = 0; i < PureBatchFrames; i++)
+        {
+            Reset3DBodies(_sparse3DBodies, _sparse3DPositions, pairedDirections: false);
+            _sparse3DContext.AdvanceLateSimulateToken();
+            total += QueryPure3DDynamicCandidates(_sparse3DContext, _sparse3DBodies);
+        }
+
+        return total;
+    }
+
+    [Benchmark(OperationsPerInvoke = PureBatchFrames)]
+    public int DensePure3DDynamicCandidateQueryBatch8()
+    {
+        int total = 0;
+        for (int i = 0; i < PureBatchFrames; i++)
+        {
+            Reset3DBodies(_dense3DBodies, _dense3DPositions, pairedDirections: true);
+            _dense3DContext.AdvanceLateSimulateToken();
+            total += QueryPure3DDynamicCandidates(_dense3DContext, _dense3DBodies);
+        }
+
+        return total;
+    }
+
+    [Benchmark(OperationsPerInvoke = PureBatchFrames)]
+    public int SparsePure2DDynamicCandidateQueryBatch8()
+    {
+        int total = 0;
+        for (int i = 0; i < PureBatchFrames; i++)
+        {
+            Reset2DBodies(_sparse2DBodies, _sparse2DPositions, pairedDirections: false);
+            _sparse2DContext.AdvanceLateSimulateToken();
+            total += QueryPure2DDynamicCandidates(_sparse2DContext, _sparse2DBodies);
+        }
+
+        return total;
+    }
+
+    [Benchmark(OperationsPerInvoke = PureBatchFrames)]
+    public int DensePure2DDynamicCandidateQueryBatch8()
+    {
+        int total = 0;
+        for (int i = 0; i < PureBatchFrames; i++)
+        {
+            Reset2DBodies(_dense2DBodies, _dense2DPositions, pairedDirections: true);
+            _dense2DContext.AdvanceLateSimulateToken();
+            total += QueryPure2DDynamicCandidates(_dense2DContext, _dense2DBodies);
+        }
+
+        return total;
+    }
+
+    [Benchmark(OperationsPerInvoke = PureBatchFrames)]
+    public int SparsePure3DDynamicRelativeSweepBatch8()
+    {
+        int total = 0;
+        for (int i = 0; i < PureBatchFrames; i++)
+        {
+            Reset3DBodies(_sparse3DBodies, _sparse3DPositions, pairedDirections: false);
+            _sparse3DContext.AdvanceLateSimulateToken();
+            total += SweepPure3DDynamicRelativeTargets(_sparse3DContext, _sparse3DBodies);
+        }
+
+        return total;
+    }
+
+    [Benchmark(OperationsPerInvoke = PureBatchFrames)]
+    public int DensePure3DDynamicRelativeSweepBatch8()
+    {
+        int total = 0;
+        for (int i = 0; i < PureBatchFrames; i++)
+        {
+            Reset3DBodies(_dense3DBodies, _dense3DPositions, pairedDirections: true);
+            _dense3DContext.AdvanceLateSimulateToken();
+            total += SweepPure3DDynamicRelativeTargets(_dense3DContext, _dense3DBodies);
+        }
+
+        return total;
+    }
+
+    [Benchmark(OperationsPerInvoke = PureBatchFrames)]
+    public int SparsePure2DDynamicRelativeSweepBatch8()
+    {
+        int total = 0;
+        for (int i = 0; i < PureBatchFrames; i++)
+        {
+            Reset2DBodies(_sparse2DBodies, _sparse2DPositions, pairedDirections: false);
+            _sparse2DContext.AdvanceLateSimulateToken();
+            total += SweepPure2DDynamicRelativeTargets(_sparse2DContext, _sparse2DBodies);
+        }
+
+        return total;
+    }
+
+    [Benchmark(OperationsPerInvoke = PureBatchFrames)]
+    public int DensePure2DDynamicRelativeSweepBatch8()
+    {
+        int total = 0;
+        for (int i = 0; i < PureBatchFrames; i++)
+        {
+            Reset2DBodies(_dense2DBodies, _dense2DPositions, pairedDirections: true);
+            _dense2DContext.AdvanceLateSimulateToken();
+            total += SweepPure2DDynamicRelativeTargets(_dense2DContext, _dense2DBodies);
+        }
+
+        return total;
     }
 
     [Benchmark]
@@ -294,6 +522,22 @@ public class DynamicCcdScalingBenchmarks
         }
     }
 
+    private static void Reset3DBodyPositions(SwiftList<StiffBody> bodies, Vector3d[] positions)
+    {
+        for (int i = 0; i < bodies.Count; i++)
+            bodies[i].ResetPosition(positions[i], FixedQuaternion.Identity);
+    }
+
+    private static void Reset2DBodyPositions(SwiftList<StiffBody2D> bodies, Vector2d[] positions)
+    {
+        for (int i = 0; i < bodies.Count; i++)
+        {
+            StiffBody2D body = bodies[i];
+            body.Sleep();
+            body.SetPosition(positions[i]);
+        }
+    }
+
     private static Vector3d Get3DForce(int index, bool pairedDirections) =>
         pairedDirections && (index & 1) == 1 ? -Force3D : Force3D;
 
@@ -364,6 +608,178 @@ public class DynamicCcdScalingBenchmarks
                 includeTriggers: false,
                 cacheTargetPartitions: true);
             total += context.QueryMixed.LastQueryCandidateCount;
+        }
+
+        return total;
+    }
+
+    private int SweepPure3DStaticQueries(
+        GravitasWorldContext context,
+        SwiftList<StiffBody> bodies,
+        Vector3d[] positions,
+        bool pairedDirections)
+    {
+        int total = 0;
+        for (int i = 0; i < bodies.Count; i++)
+        {
+            Vector3d start = positions[i];
+            Vector3d end = start + Get3DForce(i, pairedDirections);
+            total += context.Query3D.SweepSphereAgainstStaticAll(
+                start,
+                end,
+                Fixed64.Half,
+                PhysicsLayerMask.All,
+                _query3DHits,
+                bodies[i].Collider,
+                includeTriggers: false);
+            total += context.Query3D.LastQueryCandidateCount;
+        }
+
+        return total;
+    }
+
+    private int SweepPure2DStaticQueries(
+        GravitasWorldContext context,
+        SwiftList<StiffBody2D> bodies,
+        Vector2d[] positions,
+        bool pairedDirections)
+    {
+        int total = 0;
+        for (int i = 0; i < bodies.Count; i++)
+        {
+            Vector2d start = positions[i];
+            Vector2d end = start + Get2DForce(i, pairedDirections);
+            total += context.Query2D.SweepCircleAgainstStaticAll(
+                start,
+                end,
+                Fixed64.Half,
+                PhysicsLayerMask.All,
+                _query2DHits,
+                bodies[i].Collider,
+                includeTriggers: false);
+            total += context.Query2D.LastQueryCandidateCount;
+        }
+
+        return total;
+    }
+
+    private static int QueryPure3DDynamicCandidates(GravitasWorldContext context, SwiftList<StiffBody> bodies)
+    {
+        int total = 0;
+        context.Physics.PrepareContinuousCollisionFrame();
+        for (int i = 0; i < bodies.Count; i++)
+        {
+            StiffBody body = bodies[i];
+            SwiftList<int> candidates = context.Physics.QueryContinuousCollisionCandidates(
+                DynamicCcdCandidateIndex.CreateSweptSphereBounds(
+                    body.ContinuousCollisionFrameStart,
+                    body.ContinuousCollisionFrameDisplacement,
+                    body.ResolveContinuousCollisionProxyRadiusForDynamicTarget()));
+            total += candidates.Count;
+        }
+
+        return total;
+    }
+
+    private static int QueryPure2DDynamicCandidates(GravitasWorldContext context, SwiftList<StiffBody2D> bodies)
+    {
+        int total = 0;
+        context.Physics2D.PrepareContinuousCollisionFrame();
+        for (int i = 0; i < bodies.Count; i++)
+        {
+            StiffBody2D body = bodies[i];
+            SwiftList<int> candidates = context.Physics2D.QueryPlanarContinuousCollisionCandidates(
+                DynamicCcdCandidateIndex.CreateSweptCircleBounds(
+                    body.ContinuousCollisionFrameStart,
+                    body.ContinuousCollisionFrameDisplacement,
+                    body.ResolveContinuousCollisionProxyRadiusForDynamicTarget()));
+            total += candidates.Count;
+        }
+
+        return total;
+    }
+
+    private static int SweepPure3DDynamicRelativeTargets(GravitasWorldContext context, SwiftList<StiffBody> bodies)
+    {
+        int total = 0;
+        context.Physics.PrepareContinuousCollisionFrame();
+        for (int i = 0; i < bodies.Count; i++)
+        {
+            StiffBody source = bodies[i];
+            Fixed64 sourceRadius = source.ResolveContinuousCollisionProxyRadiusForDynamicTarget();
+            SwiftList<int> candidates = context.Physics.QueryContinuousCollisionCandidates(
+                DynamicCcdCandidateIndex.CreateSweptSphereBounds(
+                    source.ContinuousCollisionFrameStart,
+                    source.ContinuousCollisionFrameDisplacement,
+                    sourceRadius));
+
+            for (int j = 0; j < candidates.Count; j++)
+            {
+                int dynamicId = candidates[j];
+                if (!context.Physics.TryGetDynamicBody(dynamicId, out StiffBody target)
+                    || ReferenceEquals(source, target))
+                {
+                    continue;
+                }
+
+                Fixed64 targetRadius = target.ResolveContinuousCollisionProxyRadiusForDynamicTarget();
+                if (ContinuousCollisionMath.TrySweepRelativeSpheres(
+                        source.ContinuousCollisionFrameStart,
+                        source.ContinuousCollisionFrameDisplacement,
+                        sourceRadius,
+                        target.ContinuousCollisionFrameStart,
+                        target.ContinuousCollisionFrameDisplacement,
+                        targetRadius,
+                        out _,
+                        out _,
+                        out _))
+                {
+                    total++;
+                }
+            }
+        }
+
+        return total;
+    }
+
+    private static int SweepPure2DDynamicRelativeTargets(GravitasWorldContext context, SwiftList<StiffBody2D> bodies)
+    {
+        int total = 0;
+        context.Physics2D.PrepareContinuousCollisionFrame();
+        for (int i = 0; i < bodies.Count; i++)
+        {
+            StiffBody2D source = bodies[i];
+            Fixed64 sourceRadius = source.ResolveContinuousCollisionProxyRadiusForDynamicTarget();
+            SwiftList<int> candidates = context.Physics2D.QueryPlanarContinuousCollisionCandidates(
+                DynamicCcdCandidateIndex.CreateSweptCircleBounds(
+                    source.ContinuousCollisionFrameStart,
+                    source.ContinuousCollisionFrameDisplacement,
+                    sourceRadius));
+
+            for (int j = 0; j < candidates.Count; j++)
+            {
+                int dynamicId = candidates[j];
+                if (!context.Physics2D.TryGetDynamicBody(dynamicId, out StiffBody2D target)
+                    || ReferenceEquals(source, target))
+                {
+                    continue;
+                }
+
+                Fixed64 targetRadius = target.ResolveContinuousCollisionProxyRadiusForDynamicTarget();
+                if (ContinuousCollisionMath.TrySweepRelativeCircles(
+                        source.ContinuousCollisionFrameStart,
+                        source.ContinuousCollisionFrameDisplacement,
+                        sourceRadius,
+                        target.ContinuousCollisionFrameStart,
+                        target.ContinuousCollisionFrameDisplacement,
+                        targetRadius,
+                        out _,
+                        out _,
+                        out _))
+                {
+                    total++;
+                }
+            }
         }
 
         return total;

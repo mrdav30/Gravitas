@@ -7,6 +7,13 @@ using System.Runtime.CompilerServices;
 
 namespace Gravitas;
 
+internal enum PhysicsPartitionMobilityKind
+{
+    Dynamic = 0,
+    Kinematic = 1,
+    Static = 2
+}
+
 public class PhysicsPartition : IVoxelPartition
 {
     private sealed class IntAscendingComparer : IComparer<int>
@@ -34,13 +41,18 @@ public class PhysicsPartition : IVoxelPartition
     /// </summary>
     public SwiftSparseSet? ContainedAwakeDynamicObjects;
 
+    public SwiftSparseSet? ContainedKinematicObjects;
+
     public SwiftSparseSet? ContainedStaticObjects;
 
     public int ActivationId { get; private set; }
 
     public bool IsAllocated => ActivationId != -1;
 
-    internal bool IsEmpty => (ContainedDynamicObjects?.Count ?? 0) == 0 && (ContainedStaticObjects?.Count ?? 0) == 0;
+    internal bool IsEmpty =>
+        (ContainedDynamicObjects?.Count ?? 0) == 0
+        && (ContainedKinematicObjects?.Count ?? 0) == 0
+        && (ContainedStaticObjects?.Count ?? 0) == 0;
 
     internal int EmptySinceFrame => _emptySinceFrame;
 
@@ -89,7 +101,7 @@ public class PhysicsPartition : IVoxelPartition
 
         CopySortedIds(ContainedDynamicObjects, dynamicIds);
         CopySortedIds(ContainedAwakeDynamicObjects, awakeDynamicIds);
-        CopySortedIds(ContainedStaticObjects, staticIds);
+        CopySortedStaticStyleIds(staticIds);
 
         // Sleeping bodies stay query-visible in dynamic membership, while awake membership gates solver work.
         for (int j = 0; j < awakeDynamicIds.Count; j++)
@@ -127,6 +139,40 @@ public class PhysicsPartition : IVoxelPartition
         destination.Sort(ColliderIdComparer);
     }
 
+    private void CopySortedStaticStyleIds(SwiftList<int> destination)
+    {
+        destination.FastClear();
+        CopyIds(ContainedKinematicObjects, destination);
+        CopyIds(ContainedStaticObjects, destination);
+        destination.Sort(ColliderIdComparer);
+    }
+
+    internal void CopyAllColliderIds(SwiftList<int> destination)
+    {
+        destination.FastClear();
+        CopyIds(ContainedDynamicObjects, destination);
+        CopyIds(ContainedKinematicObjects, destination);
+        CopyIds(ContainedStaticObjects, destination);
+        destination.Sort(ColliderIdComparer);
+    }
+
+    internal void CopyStaticStyleColliderIds(SwiftList<int> destination)
+    {
+        destination.FastClear();
+        CopyIds(ContainedKinematicObjects, destination);
+        CopyIds(ContainedStaticObjects, destination);
+        destination.Sort(ColliderIdComparer);
+    }
+
+    private static void CopyIds(SwiftSparseSet? source, SwiftList<int> destination)
+    {
+        if (source == null)
+            return;
+
+        for (int i = 0; i < source.Count; i++)
+            destination.Add(source.DenseKeys[i]);
+    }
+
     private void ProcessPair(int id1, int id2)
     {
         GravitasCollisionService owner = Owner;
@@ -160,6 +206,13 @@ public class PhysicsPartition : IVoxelPartition
             MarkOccupied();
     }
 
+    public void AddKinematicObject(int item)
+    {
+        ContainedKinematicObjects ??= new();
+        if (ContainedKinematicObjects.Add(item))
+            MarkOccupied();
+    }
+
     public void RemoveDynamicObject(int item)
     {
         if (ContainedDynamicObjects?.Remove(item) != true)
@@ -184,6 +237,17 @@ public class PhysicsPartition : IVoxelPartition
         if (ContainedStaticObjects?.Remove(item) != true)
         {
             GravitasLogger.DebugChannel.Info($"Static item not removed - {item}");
+            return;
+        }
+
+        MarkEmptyIfUnoccupied();
+    }
+
+    public void RemoveKinematicObject(int item)
+    {
+        if (ContainedKinematicObjects?.Remove(item) != true)
+        {
+            GravitasLogger.DebugChannel.Info($"Kinematic item not removed - {item}");
             return;
         }
 
@@ -254,6 +318,7 @@ public class PhysicsPartition : IVoxelPartition
     {
         ContainedDynamicObjects?.Clear();
         ContainedAwakeDynamicObjects?.Clear();
+        ContainedKinematicObjects?.Clear();
         ContainedStaticObjects?.Clear();
         ActivationId = -1;
         MarkEmpty(_owner?.Context.FrameCount ?? 0);
@@ -263,6 +328,7 @@ public class PhysicsPartition : IVoxelPartition
     {
         ContainedDynamicObjects?.Clear();
         ContainedAwakeDynamicObjects?.Clear();
+        ContainedKinematicObjects?.Clear();
         ContainedStaticObjects?.Clear();
 
         if (ActivationId != -1)

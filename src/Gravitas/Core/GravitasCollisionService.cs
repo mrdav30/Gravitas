@@ -8,6 +8,7 @@ using GridForge.Utility;
 using SwiftCollections;
 using SwiftCollections.Utility;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 
 namespace Gravitas;
 
@@ -189,6 +190,11 @@ public sealed class GravitasCollisionService
     /// </summary>
     public void Deactivate() => Reset();
 
+    internal bool IsPartitionRefreshRequired(LSCollider collider) =>
+        !collider.MatchesPartitionGridBounds(collider.BoundsMin, collider.BoundsMax, ResolvePartitionKind(collider));
+
+    internal int ResolvePartitionKind(LSCollider collider) => (int)GetMobilityKind(collider);
+
     internal bool PartitionObject(
         LSCollider collider,
         ref SwiftList<WorldVoxelIndex> partitionedCoordinates)
@@ -206,7 +212,7 @@ public sealed class GravitasCollisionService
 
         try
         {
-            PartitionCoveredVoxels(collider, partitionedCoordinates);
+            PartitionCoveredVoxels(collider, partitionedCoordinates, GetMobilityKind(collider));
             return partitionedCoordinates.Count > 0;
         }
         finally
@@ -217,7 +223,8 @@ public sealed class GravitasCollisionService
 
     private void PartitionCoveredVoxels(
         LSCollider collider,
-        SwiftList<WorldVoxelIndex> partitionedCoordinates)
+        SwiftList<WorldVoxelIndex> partitionedCoordinates,
+        PhysicsPartitionMobilityKind kind)
     {
         GridWorld world = _context.World;
         GridTracer.GetCoveredVoxelsInto(
@@ -230,14 +237,15 @@ public sealed class GravitasCollisionService
 
         var traversal = new GridForgeTraversalState(world, GridForgeTraversalPaddingMode.MaxCellEdge);
         for (int i = 0; i < _coveredVoxels.Count; i++)
-            TryPartitionVoxel(collider, partitionedCoordinates, _coveredVoxels[i], ref traversal);
+            TryPartitionVoxel(collider, partitionedCoordinates, _coveredVoxels[i], ref traversal, kind);
     }
 
     private void TryPartitionVoxel(
         LSCollider collider,
         SwiftList<WorldVoxelIndex> partitionedCoordinates,
         Voxel voxel,
-        ref GridForgeTraversalState traversal)
+        ref GridForgeTraversalState traversal,
+        PhysicsPartitionMobilityKind kind)
     {
         if (!traversal.TryVisitUnique(voxel, _redundancyChecker, out Fixed64 cellEdge)
             || !collider.IsPositionInBounds(cellEdge, voxel.WorldPosition))
@@ -258,10 +266,7 @@ public sealed class GravitasCollisionService
         }
 
         partitionedCoordinates.Add(voxel.WorldIndex);
-        if (collider.Body != null && collider.Body.Immovable)
-            partition!.AddStaticObject(collider.Id);
-        else
-            partition!.AddDynamicObject(collider.Id);
+        AddObject(partition!, collider.Id, kind);
     }
 
     internal bool ClearPartitionedObject(LSCollider collider, bool force = false)
@@ -279,10 +284,11 @@ public sealed class GravitasCollisionService
             return false;
         }
 
-        if (!force && collider.LastGridBoundsMin == collider.BoundsMin && collider.LastGridBoundsMax == collider.BoundsMax)
+        PhysicsPartitionMobilityKind currentKind = GetMobilityKind(collider);
+        if (!force && collider.MatchesPartitionGridBounds(collider.BoundsMin, collider.BoundsMax, (int)currentKind))
             return false;
 
-        bool isStatic = collider.Body != null && collider.Body.Immovable;
+        PhysicsPartitionMobilityKind partitionKind = GetStoredMobilityKind(collider.PartitionKind);
 
         for (int i = 0; i < collider.PartitionCoordinates!.Count; i++)
         {
@@ -293,10 +299,7 @@ public sealed class GravitasCollisionService
                 continue;
             }
 
-            if (isStatic)
-                partition!.RemoveStaticObject(collider.Id);
-            else
-                partition!.RemoveDynamicObject(collider.Id);
+            RemoveObject(partition!, collider.Id, partitionKind);
 
             // Keep the voxel partition attached after it becomes empty. Re-adding
             // the same partition type through GridForge carries metadata overhead,
@@ -320,7 +323,7 @@ public sealed class GravitasCollisionService
             return;
 
         StiffBody? body = collider.Body;
-        if (body == null || body.Immovable)
+        if (body == null || body.Immovable || body.IsKinematic)
             return;
 
         bool awake = body.IsAwakeForCollision;
@@ -400,6 +403,62 @@ public sealed class GravitasCollisionService
 
         int idleFrames = _context.FrameCount - partition.EmptySinceFrame;
         return idleFrames >= _context.Settings.RetainedPartitionTimeToKillFrames;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static PhysicsPartitionMobilityKind GetMobilityKind(LSCollider collider)
+    {
+        StiffBody? body = collider.Body;
+        if (body == null || body.Immovable)
+            return PhysicsPartitionMobilityKind.Static;
+
+        return body.IsKinematic ? PhysicsPartitionMobilityKind.Kinematic : PhysicsPartitionMobilityKind.Dynamic;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static PhysicsPartitionMobilityKind GetStoredMobilityKind(int partitionKind)
+    {
+        return partitionKind == (int)PhysicsPartitionMobilityKind.Kinematic
+            ? PhysicsPartitionMobilityKind.Kinematic
+            : partitionKind == (int)PhysicsPartitionMobilityKind.Static
+                ? PhysicsPartitionMobilityKind.Static
+                : PhysicsPartitionMobilityKind.Dynamic;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void AddObject(PhysicsPartition partition, int id, PhysicsPartitionMobilityKind kind)
+    {
+        if (kind == PhysicsPartitionMobilityKind.Static)
+        {
+            partition.AddStaticObject(id);
+            return;
+        }
+
+        if (kind == PhysicsPartitionMobilityKind.Kinematic)
+        {
+            partition.AddKinematicObject(id);
+            return;
+        }
+
+        partition.AddDynamicObject(id);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void RemoveObject(PhysicsPartition partition, int id, PhysicsPartitionMobilityKind kind)
+    {
+        if (kind == PhysicsPartitionMobilityKind.Static)
+        {
+            partition.RemoveStaticObject(id);
+            return;
+        }
+
+        if (kind == PhysicsPartitionMobilityKind.Kinematic)
+        {
+            partition.RemoveKinematicObject(id);
+            return;
+        }
+
+        partition.RemoveDynamicObject(id);
     }
 
     private bool RetireRetainedPartition(PhysicsPartition partition)
