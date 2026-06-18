@@ -325,7 +325,7 @@ users an explicit authored convex-piece path for complex collision assets.
 
 **Context**
 
-Phase 7B made `MeshColliderMode.Concave` work through raw triangle-set
+Earlier mesh work made `MeshColliderMode.Concave` work through raw triangle-set
 narrow-phase using local-BVH candidate gathering. The first Phase 4 evaluation
 kept that baseline: the `SwiftFixedBVH<int>` stores triangle bounds in local
 mesh space, rigid movement updates transform-derived state without rebuilding
@@ -651,7 +651,7 @@ Implementation notes:
   broad-phase owner membership, contact/event ownership, and diagnostics that
   draw convex mesh parts through the compound owner ID.
 - Runtime automatic decomposition remains intentionally absent. Future
-  simplification/decomposition belongs to the separate Phase 6 tooling plan.
+  simplification/decomposition belongs to the separate Phase 7 tooling plan.
 
 Baseline artifacts captured before source changes:
 
@@ -762,7 +762,7 @@ authored shape data and transforms, not child collider lifecycle objects.
 - [x] Do not add built-in serialization transport support for shape definitions
   yet; they are a data-only runtime construction API that host/tooling asset
   formats can serialize explicitly.
-- [x] Update docs so Phase 6 tooling knows its runtime export target is
+- [x] Update docs so Phase 7 tooling knows its runtime export target is
   `ColliderShapeDefinition[]` plus stable part transforms, not instantiated
   runtime colliders.
 
@@ -801,7 +801,7 @@ without exposing fake child-collider lifecycle objects.
 
 Built-in serialization transport support was intentionally not added to
 `ColliderShapeDefinition` in this slice. The type is the deterministic runtime
-construction target; host asset pipelines and future Phase 6 tooling can
+construction target; host asset pipelines and future Phase 7 tooling can
 serialize their own asset format into shape definitions and part transforms
 before creating runtime shells.
 
@@ -845,7 +845,79 @@ dotnet test Gravitas.slnx --configuration ReleaseLean --nologo
 Results: focused Release tests passed 16/16, full Release passed 406/406, and
 full ReleaseLean passed 401/401.
 
-## Phase 6: Mesh Simplification And Decomposition Tooling Plan
+## Phase 6: 2D Shape Definitions And Compound Collider Data
+
+**Goal:** Bring the Phase 5 authored-shape model to pure 2D so 2D standalone
+colliders, 2D compound collision assets, mixed slabs, queries, diagnostics, and
+future tooling do not bake in a primitive-only 2D assumption.
+
+**Context**
+
+Phase 5 hardened 3D authored data by splitting `ColliderShapeDefinition` and
+`CompoundColliderPart` away from runtime `LSCollider` lifecycle state. Pure 2D
+currently has first-class `LSCircleCollider2D`, `LSAABBoxCollider2D`, and
+`LSPolygonCollider2D`, but no data-only shape definition layer and no
+`LSCompoundCollider2D` equivalent. That asymmetry is an alpha API gap: authored
+2D collision assets would still need to instantiate runtime colliders as data,
+and later CCD/diagnostic work could accidentally assume every 2D collider is a
+single primitive.
+
+The 2D model should be a sibling, not a reuse of the 3D definition type. Pure
+2D uses X/Z projection with `Vector2d`, scalar yaw, `FixedBoundArea`, 2D
+collision priorities, and optional mixed slab metadata. A separate
+`ColliderShapeDefinition2D` keeps that contract explicit.
+
+Proposed public data shape:
+
+```csharp
+ColliderShapeDefinition2D
+  - shape kind
+  - radius / size
+  - convex polygon vertices
+  - no body, context, id, partition, events, parent, pairs, runtime buffers
+
+CompoundColliderPart2D
+  - ColliderShapeDefinition2D Shape
+  - Vector2d LocalOffset
+  - Fixed64 LocalRotation
+  - Vector2d LocalScale
+```
+
+**Tasks**
+
+- [ ] Capture focused 2D collision/query/partition benchmarks before source
+  edits.
+- [ ] Add a deterministic `ColliderShapeDefinition2D` API with factory helpers
+  for circle, AABB, and convex polygon shapes.
+- [ ] Add definition-based constructors/factories for existing standalone 2D
+  colliders without adding runtime lifecycle state to definitions.
+- [ ] Add `CompoundColliderPart2D` as data-only authored part input with stable
+  local offset, rotation, and scale.
+- [ ] Add `LSCompoundCollider2D` with one public 2D collider ID, one body
+  binding, one event surface, one broad-phase identity, and private runtime part
+  colliders materialized in deterministic declaration order.
+- [ ] Extend pure 2D collision settings, narrow-phase dispatch, partitioning,
+  query services, and result ordering to handle compound 2D colliders without
+  exposing child collider lifecycle.
+- [ ] Define and test mixed embedding behavior for 2D compound colliders so
+  mixed 2D/3D contacts and swept queries use the owning 2D compound identity.
+- [ ] Add diagnostics/debug draw coverage for authored 2D compound parts while
+  preserving owner collider IDs in emitted events.
+- [ ] Update docs and tests so future CCD and diagnostics phases know that pure
+  2D includes compound authored data, not only primitive shapes.
+
+**Exit Criteria**
+
+- Pure 2D authored collision data has the same lifecycle/data separation that
+  Phase 5 gave 3D.
+- `LSCompoundCollider2D` behaves as one collider for registration, broad-phase
+  membership, events, queries, diagnostics, hierarchy filtering, and mixed
+  identity.
+- 2D compound parts never leak public runtime child collider lifecycle objects.
+- Benchmarks show no steady-state allocation regression in 2D collision,
+  query, and partition hot paths.
+
+## Phase 7: Mesh Simplification And Decomposition Tooling Plan
 
 Future Gravitas-owned mesh simplification and decomposition should live in a
 separate solution project/package, not in runtime simulation code. Track that
@@ -861,7 +933,7 @@ tool should expose deterministic failure/result codes, stable ordering, bounded
 settings, and benchmarked quality metrics before its output becomes a
 recommended alpha asset path.
 
-## Phase 7: Dynamic CCD And Swept Mesh Families
+## Phase 8: Dynamic CCD And Swept Mesh Families
 
 **Goal:** Define the next continuous-collision slice beyond the current static
 or kinematic target clipping so fast dynamic bodies, mesh targets, and mixed
@@ -895,17 +967,18 @@ ordering remain future hardening.
   enabled.
 - Swept mesh APIs are added only with allocation tests and benchmark evidence.
 
-## Phase 8: Typed Diagnostic Views
+## Phase 9: Typed Diagnostic Views
 
 **Goal:** Keep `GravitasDiagnosticEvent` compact while reducing host adapter
 mistakes if generic fields become difficult to decode.
 
 **Context**
 
-Phase 12 kept the alpha diagnostic event stream generic. `ScalarA`, `ScalarB`,
-`DataA`, and `DataB` are sufficient while every event kind has documented field
-meaning and adapters decode by `GravitasDiagnosticEventKind`. Typed views are a
-tooling convenience, not a reason to bloat the capture hot path.
+Earlier diagnostic work kept the alpha diagnostic event stream generic.
+`ScalarA`, `ScalarB`, `DataA`, and `DataB` are sufficient while every event kind
+has documented field meaning and adapters decode by
+`GravitasDiagnosticEventKind`. Typed views are a tooling convenience, not a
+reason to bloat the capture hot path.
 
 **Tasks**
 
