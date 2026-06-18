@@ -1521,6 +1521,10 @@ lifecycle tests prove the extra state is justified.
   (`0.61x`), while sparse 256-body static rows remained noisy or neutral.
   BenchmarkDotNet still warned that these smoke rows have short iteration
   times, so treat them as directional regression guardrails.
+- Captured deeper future CCD work in
+  `docs/feature-work/2026-06-18-continuous-collision-depth-hardening-plan.md`:
+  rotational CCD, exact swept mover proxies, production-grade CCD benchmark
+  signal, and a continuous TOI solver / substep island model.
 
 **Exit Criteria:**
 

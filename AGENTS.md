@@ -27,7 +27,7 @@ Current priorities:
 4. Support engine-agnostic hosts without Unity, renderer, or ECS coupling.
 5. Build toward first-class 3D and 2D support, with an eventual mixed 2D/3D
    simulation model.
-6. Establish unit tests and benchmarks before alpha hardening.
+6. Maintain focused tests and benchmark baselines as alpha hardening proceeds.
 
 ## Start Here
 
@@ -50,14 +50,20 @@ Read these in order before making non-trivial changes:
    [`SERIALIZATION.md`](docs/wiki/SERIALIZATION.md), or
    [`DIAGNOSTICS.md`](docs/wiki/DIAGNOSTICS.md) and
    [`DIAGNOSTIC_ADAPTERS.md`](docs/wiki/DIAGNOSTIC_ADAPTERS.md).
-4. [`src/Gravitas/Runtime/GravitasWorldContext.cs`](src/Gravitas/Runtime/GravitasWorldContext.cs),
+4. The active feature-work plan when a task is part of ongoing hardening,
+   especially
+   [`2026-06-01-alpha-physics-follow-up-hardening-plan.md`](docs/feature-work/2026-06-01-alpha-physics-follow-up-hardening-plan.md),
+   [`2026-06-18-continuous-collision-depth-hardening-plan.md`](docs/feature-work/2026-06-18-continuous-collision-depth-hardening-plan.md),
+   or
+   [`2026-06-17-mesh-tooling-simplification-and-decomposition-plan.md`](docs/feature-work/2026-06-17-mesh-tooling-simplification-and-decomposition-plan.md).
+5. [`src/Gravitas/Runtime/GravitasWorldContext.cs`](src/Gravitas/Runtime/GravitasWorldContext.cs),
    [`src/Gravitas/Core/GravitasPhysicsService.cs`](src/Gravitas/Core/GravitasPhysicsService.cs),
    and [`src/Gravitas/Core/StiffBody.cs`](src/Gravitas/Core/StiffBody.cs).
-5. The relevant source folder under [`src/Gravitas`](src/Gravitas).
-6. The matching test or benchmark area under [`tests`](tests). The unit test
-   project now has focused runtime/settings coverage, so new behavior usually
-   needs matching tests.
-7. [`src/Gravitas/Gravitas.csproj`](src/Gravitas/Gravitas.csproj),
+6. The relevant source folder under [`src/Gravitas`](src/Gravitas).
+7. The matching test or benchmark area under [`tests`](tests). Runtime,
+   collision, partition, query, serialization, CCD, shape definition, and
+   benchmark coverage should move with the behavior being changed.
+8. [`src/Gravitas/Gravitas.csproj`](src/Gravitas/Gravitas.csproj),
    [`tests/Gravitas.Tests/Gravitas.Tests.csproj`](tests/Gravitas.Tests/Gravitas.Tests.csproj),
    and [`tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj`](tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj).
 
@@ -73,6 +79,8 @@ workflow changes:
 - [`docs/wiki`](docs/wiki), especially when runtime ownership, host
   integration, collision behavior, query behavior, serialization/replay
   behavior, lifecycle order, or known prototype limitations change.
+- [`docs/feature-work`](docs/feature-work) when hardening phase progress,
+  deferred decisions, experiment results, or follow-up plans change.
 - [`tests/Gravitas.Tests`](tests/Gravitas.Tests)
 - [`tests/Gravitas.Benchmarks`](tests/Gravitas.Benchmarks) when performance
   claims or hot paths change.
@@ -85,15 +93,15 @@ workflow changes:
 | [`src/Gravitas`](src/Gravitas) | Main library project | Multi-targets `netstandard2.1` and `net8.0`. |
 | [`src/Gravitas/Core`](src/Gravitas/Core) | Context-owned physics service, body state, and host agent interface | Start here for body/registration architecture changes. |
 | [`src/Gravitas/Runtime`](src/Gravitas/Runtime) | Explicit world context, deterministic clock, and lifecycle hooks | Start here for host integration changes. |
-| [`src/Gravitas/Colliders`](src/Gravitas/Colliders) | Collider base type, primitive colliders, physics mesh helpers | Shape logic is currently 3D-focused. |
+| [`src/Gravitas/Colliders`](src/Gravitas/Colliders) | 3D and 2D collider bases, primitive colliders, shape definitions, compound collider data, and physics mesh helpers | Keep authored shape data separate from runtime collider state. |
 | [`src/Gravitas/CollisionHandling`](src/Gravitas/CollisionHandling) | Collision detection, response, pairs, contact data | Determinism and ordering are high risk here. |
 | [`src/Gravitas/Queries`](src/Gravitas/Queries) | 2D/3D raycast, swept-sphere, and overlap query support | Keep result ordering stable. |
 | [`src/Gravitas/Diagnostics`](src/Gravitas/Diagnostics) | Context-owned diagnostic events and engine-agnostic debug draw commands | Keep disabled paths allocation-free and renderer-neutral. |
 | [`src/Gravitas/Partitions`](src/Gravitas/Partitions) | GridForge-backed physics partitions | Tied to voxel ownership and pooling. |
 | [`src/Gravitas/Settings`](src/Gravitas/Settings) | Physics settings and save helpers | Includes frame rate and layer collision matrix behavior. |
 | [`src/Gravitas/Support`](src/Gravitas/Support) | Fixed transforms, layers, lifecycle hooks, coroutine scaffolding, transient state helpers | Keep engine-specific assumptions out. |
-| [`tests/Gravitas.Tests`](tests/Gravitas.Tests) | xUnit v3 test project | Contains focused runtime/settings coverage; expand it alongside behavior changes. |
-| [`tests/Gravitas.Benchmarks`](tests/Gravitas.Benchmarks) | BenchmarkDotNet project | Covers context lifecycle, registration/partitioning, simulation, queries, and diagnostics. |
+| [`tests/Gravitas.Tests`](tests/Gravitas.Tests) | xUnit v3 test project | Covers runtime, settings, collision, partitions, queries, serialization, CCD, and authored shape behavior. |
+| [`tests/Gravitas.Benchmarks`](tests/Gravitas.Benchmarks) | BenchmarkDotNet project | Covers context lifecycle, registration/partitioning, simulation, queries, diagnostics, mixed broad phase, 2D, meshes, and CCD scaling. |
 | [`docs/wiki`](docs/wiki) | Developer-facing architecture and usage notes | Keep current with runtime, host integration, collision, query, serialization/replay, and diagnostics changes. |
 | [`docs/feature-work/prototype`](docs/feature-work/prototype) | Historical/prototype Unity-oriented reference code | Useful context, not the source of truth. |
 
@@ -118,19 +126,25 @@ The current runtime uses explicit world-context ownership:
   and physics lifecycle phases.
 - `GravitasPhysics2DService` owns pure 2D body and collider registration,
   collider IDs, 2D pair pooling, response/event processing, visualization
-  transform publishing for one context.
-- `GravitasMixedCollisionService` owns the Phase 10 mixed 2D/3D lifecycle path,
+  transform publishing, 2D continuous-collision candidate indexing, and
+  mobility-aware partition refresh for one context.
+- `GravitasMixedCollisionService` owns the dedicated mixed 2D/3D lifecycle path,
   GridForge-backed mixed broad phase, stable 3D/2D candidate keys, awake
-  gating, mixed pair ownership/response dispatch, and retained
+  gating, dynamic/kinematic/static mixed partition membership, mixed CCD target
+  collection, mixed pair ownership/response dispatch, and retained
   `PhysicsMixedPartition` cleanup. `PhysicsRuntimeMode.Mixed` reaches it;
   `PhysicsRuntimeMode.Both` deliberately runs pure 2D and pure 3D side by side
   without cross-dimensional contacts.
 - `GravitasCollisionService` maps colliders into GridForge voxels through
   `GridWorld` spatial hash and active-grid access, `WorldVoxelIndex`, and
   `PhysicsPartition`, using `SwiftCollections` pools and duplicate-check sets.
+  Partition membership is mobility aware: bodyless and immovable colliders are
+  static, kinematic colliders are kinematic, and movable non-kinematic colliders
+  are dynamic.
 - `GravitasCollision2DService` maps pure 2D X/Z bounds into GridForge voxels
   through `PhysicsPartition2D`, using the internal Y=0 storage plane as
-  deterministic broad-phase identity rather than physical thickness.
+  deterministic broad-phase identity rather than physical thickness. It follows
+  the same static/kinematic/dynamic partition policy as the 3D service.
 - `GravitasQuery3DService` owns 3D raycast, swept-sphere, and X/Z
   overlap/proximity query workers, intersection state, candidate gathering,
   filtering, and result ordering for one context. X/Z circle queries are not
@@ -145,16 +159,22 @@ The current runtime uses explicit world-context ownership:
   adapters can render or log without engine dependencies.
 - `StiffBody` owns simulated body state: position, rotation, visual
   interpolation state, velocity, acceleration, drag, friction, grounding,
-  transforms, and Chronicler state recording.
+  transforms, opt-in continuous-collision mode, frame-start CCD displacement,
+  and Chronicler state recording.
 - `StiffBody2D` owns pure 2D body state: X/Z-projected position, scalar yaw,
   linear velocity, force integration, sleep/wake state, visualization transform
-  publishing, and Chronicler state recording.
+  publishing, opt-in continuous-collision mode, frame-start CCD displacement,
+  and Chronicler state recording.
 - `IMatterAgent` is the host boundary. Hosts provide a `GravitasWorldContext`,
   a `FixedTransform`, hierarchy information, and interaction state without tying
   Gravitas to a game engine.
 - `LSCollider` and `LSCollider2D` primitive subclasses own shape state, bounds,
   layers, trigger/contact events, GridForge partition coordinates, and
   collision-pair references.
+- `ColliderShapeDefinition`, `ColliderShapeDefinition2D`,
+  `CompoundColliderPart`, and `CompoundColliderPart2D` are authored/data-only
+  shape APIs. They should not own body state, context, collider IDs, partition
+  coordinates, event hooks, runtime pair state, or query buffers.
 - `CollisionDetection`, `CollisionResponse`, `CollisionPair`, `ContactPoint`,
   and context structs form the narrow-phase and response layer.
 
@@ -191,8 +211,9 @@ for visualization and host-facing presentation only.
 
 Gravitas still has deeper 3D coverage, but pure 2D now has a first-class
 runtime path through `StiffBody2D`, `LSCollider2D`,
-`GravitasPhysics2DService`, `GravitasCollision2DService`, and
-`PhysicsPartition2D`. `PhysicsRuntimeMode` is a validated bitmask:
+`GravitasPhysics2DService`, `GravitasCollision2DService`,
+`PhysicsPartition2D`, `ColliderShapeDefinition2D`, `CompoundColliderPart2D`,
+and `LSCompoundCollider2D`. `PhysicsRuntimeMode` is a validated bitmask:
 `TwoD`, `ThreeD`, `Both`, and `Mixed` are valid settings values. `Both` runs
 pure 2D and pure 3D without mixed contacts; `Mixed` enables the dedicated mixed
 lifecycle path. `LSCollider2D` also caches a mixed `FixedBoundBox` using
@@ -204,8 +225,8 @@ colliders against embedded 2D circle, AABB, and convex polygon slabs.
 `CollisionPairMixed` and `CollisionResponseMixed` now provide the first
 constrained impulse model: planar X/Z impulse can move 2D bodies, while vertical
 Y impulse affects only the 3D participant. Mixed diagnostics, explicit mixed
-queries, slab debug draw, and mixed CCD hooks are implemented; richer solver
-behavior remains future hardening work.
+queries, slab debug draw, and mixed CCD target collection are implemented;
+richer solver behavior remains future hardening work.
 
 When adding or redesigning dimension-sensitive behavior:
 
@@ -213,6 +234,9 @@ When adding or redesigning dimension-sensitive behavior:
   XZ-ground-plane unless the API explicitly says so.
 - Model 2D as first-class physics behavior, not as accidental 3D with one axis
   ignored.
+- Watch for counterpart gaps between 2D, 3D, and mixed behavior. If a
+  reasonable parity feature is missing, call it out and decide whether it is
+  worth alpha scope instead of silently accepting the asymmetry.
 - When extending mixed 2D/3D collision, preserve the embedding rule: finite 2D
   slabs/prisms centered on host-transform Y, dimension-tagged pair identity,
   explicit trigger/contact events, and a plane-constrained 2D impulse model.
@@ -268,6 +292,10 @@ partition/query approaches are acceptable if they:
 
 Do not reject a better design just because it is unusual. Do reject clever
 changes that cannot be explained, tested, benchmarked, or made deterministic.
+Treat feature-work plans as living context, not orders to follow blindly: if an
+assumption looks weak, benchmark evidence contradicts it, or a cleaner design
+needs a different phase boundary, raise that before implementing around the
+problem.
 
 ## External Dependencies
 
@@ -300,6 +328,13 @@ The main external packages shape how this project should be changed:
 
 Do not casually replace these with standard floating-point, general-purpose
 collections, or non-deterministic alternatives.
+
+When a lower-stack API change would make Gravitas cleaner or safer, prefer a
+local project reference to the sibling repository over a downstream workaround.
+Apply the reference consistently to the main library, tests, and benchmarks as
+needed, because local project references sometimes need to be explicit in test
+projects as well. Restore package references before release validation unless
+the user explicitly asks to leave local links in place.
 
 ## Determinism Rules
 
@@ -346,6 +381,8 @@ Likely hotspots:
 - narrow-phase shape checks in `CollisionDetection`.
 - contact resolution in `CollisionResponse`.
 - raycast/circlecast candidate gathering, ordering, and filtering.
+- continuous collision candidate indexing, target collection, time-of-impact
+  ordering, and conservative proxy evaluation.
 - mesh collider preprocessing and convex mesh limits.
 
 Optimization rules:
@@ -355,8 +392,9 @@ Optimization rules:
 - Check FixedMathSharp geometry and `SwiftCollections.FixedMathSharp` query
   structures before creating custom bounds, ray, plane, BVH, octree, or spatial
   hash code. If existing primitives are skipped, document why they do not fit.
-- For novel hot-path algorithms, capture a benchmark baseline and explain why
-  the new approach is measurably better or complexity-safer.
+- For hot-path work, capture a benchmark baseline before source changes when no
+  current artifact exists, then compare the same benchmark after the change.
+  Explain why the new path is measurably better or complexity-safer.
 - Pool only when lifetime and ownership are obvious and testable.
 - Clear or return pooled collections on every path, including early exits.
 - Avoid resize spikes in hot paths; if growth is unavoidable, make capacity
@@ -459,17 +497,37 @@ dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release
 
 Important notes:
 
-- `tests/Gravitas.Tests` contains focused runtime/settings coverage. Mirror the
-  source area being changed and add regression tests alongside behavior changes.
+- `tests/Gravitas.Tests` contains focused runtime, settings, collision,
+  partition, query, serialization, CCD, shape-definition, and mixed-dimension
+  coverage. Mirror the source area being changed and add regression tests
+  alongside behavior changes.
 - Building the library produces NuGet packages because `GeneratePackageOnBuild`
   is enabled.
 - CI builds and tests `Release` and `ReleaseLean` on Ubuntu and Windows.
 - Coverage workflow runs the xUnit project with `XPlat Code Coverage`.
 
+## Versioning And Release Workflow
+
+Gravitas uses GitVersion-driven deterministic versioning. The local release
+helper [`.assets/scripts/set-version-and-build.ps1`](.assets/scripts/set-version-and-build.ps1)
+sets the GitVersion environment values and builds the package outputs; CI uses
+the same GitVersion-derived values when building, testing, and publishing.
+
+Release expectations:
+
+- Do not hand-edit package versions for normal releases.
+- Validate both standard and Lean package paths before release-oriented work is
+  considered ready.
+- The repository owner handles commits, tags, package publishing, and GitHub
+  releases unless explicitly asking an agent to do one of those actions.
+- It is fine to prepare semantic commit messages and concise release notes when
+  asked, but do not create the commit, tag, or publish step by default.
+
 ## Benchmark Workflow
 
-The benchmark project contains initial physics-specific coverage for context
-lifecycle, registration/partitioning, simulation, and query services.
+The benchmark project contains physics-specific coverage for context lifecycle,
+registration/partitioning, simulation, queries, diagnostics, mesh paths,
+compound colliders, 2D, mixed broad phase, and CCD scaling.
 
 List available benchmark selections:
 
@@ -478,7 +536,7 @@ dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f 
 dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll list
 ```
 
-Run all benchmarks once meaningful benchmark classes exist:
+Run all benchmark groups when a broad performance pass is needed:
 
 ```bash
 dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0
@@ -497,9 +555,10 @@ results as canonical performance evidence.
 
 ## Test Design Expectations
 
-The existing tests are still early and focused on runtime shell, settings, and
-physics-service behavior. New tests should keep building the foundation for
-deterministic physics behavior.
+The existing tests now cover the main runtime shell, settings, collision,
+partition, query, serialization, shape-definition, CCD, 2D, and mixed-dimension
+paths, but the library is still alpha-hardening. New tests should keep building
+the foundation for deterministic physics behavior.
 
 Prioritize tests for:
 
@@ -511,13 +570,17 @@ Prioritize tests for:
   rotation, transform helpers, rest state, and serialization.
 - collider bounds, local/world transforms, layer filtering, trigger/contact
   events, parent/child collision exclusion, and partition lifecycle.
+- authored `ColliderShapeDefinition` and `ColliderShapeDefinition2D` data,
+  compound part transforms, and runtime materialization boundaries.
 - collision detection for every supported shape pair, including edge-touching,
   full overlap, separated, degenerate, and rotated cases.
 - collision response invariants such as conservation expectations, restitution,
   immovable bodies, kinematic bodies, and angular effects.
-- GridForge partition interactions, voxel snapping, partition reuse, and stale
-  partition cleanup.
+- GridForge partition interactions, voxel snapping, static/kinematic/dynamic
+  membership, partition reuse, and stale partition cleanup.
 - raycast/circlecast ordering and filtering.
+- continuous collision behavior for static targets, kinematic targets, dynamic
+  targets, 2D, 3D, mixed pairs, conservative proxies, and candidate scaling.
 - serialization round trips and populate-existing-instance semantics.
 - deterministic replay: same initial state and inputs must produce the same
   state across repeated runs.
@@ -530,21 +593,25 @@ itself deterministic, documented, and justified by the algorithm.
 For both humans and AI agents, use this order:
 
 1. Read the relevant docs, source files, and project files.
-2. Identify deterministic invariants, simulation phase effects, global/static
+2. Read the active feature-work plan when the change belongs to an alpha
+   hardening phase, and treat it as a living context guide.
+3. Identify deterministic invariants, simulation phase effects, global/static
    state, and pooling ownership.
-3. Decide whether the current design should be preserved or redesigned. Since
+4. For hot-path optimization work, capture a benchmark baseline before source
+   changes if a relevant current artifact does not already exist.
+5. Decide whether the current design should be preserved or redesigned. Since
    alpha compatibility is not required, prefer the clean deterministic design
    over compatibility scaffolding.
-4. Add or update focused tests that pin the intended behavior.
-5. Make the smallest coherent code change that solves the real issue.
-6. Add XML docs or clarifying comments while the code is open.
-7. Run focused tests or at least compile the affected project.
-8. Run the full `Release` suite before closing behavior work.
-9. Run `ReleaseLean` validation when package shape, serialization, or
+6. Add or update focused tests that pin the intended behavior.
+7. Make the smallest coherent code change that solves the real issue.
+8. Add XML docs or clarifying comments while the code is open.
+9. Run focused tests or at least compile the affected project.
+10. Run the full `Release` suite before closing behavior work.
+11. Run `ReleaseLean` validation when package shape, serialization, or
    MemoryPack-related code changed.
-10. Update `docs/wiki`, `README.md`, benchmark docs, or workflow docs if public
-    behavior, developer workflow, system architecture, collision behavior, or
-    query behavior changed.
+12. Update `docs/wiki`, `docs/feature-work`, `README.md`, benchmark docs, or
+    workflow docs if public behavior, developer workflow, system architecture,
+    collision behavior, query behavior, progress, or follow-up context changed.
 
 ## Guidance For AI Agents
 
@@ -554,15 +621,32 @@ If you are an automated coding agent working in this repository:
   and tests.
 - Do not broaden scope from one subsystem into another unless the change truly
   requires it.
+- Do not blindly agree with a feature-work plan or prior note. If evidence,
+  benchmarks, or API shape point to a better design, explain the tradeoff and
+  adjust the plan with the user.
+- Call out scope-adjacent issues, missing 2D/3D/mixed counterparts, and future
+  hardening risks when you notice them. If they are not fixed immediately,
+  capture them in a feature-work plan so they do not get lost.
 - Call out any build or test failures explicitly, with exact file references.
 - Treat context ownership, collider IDs, collision-pair ownership, partition
   reuse, pooled collections, settings, frame ordering, and GridForge world
   ownership as high-risk areas.
+- Treat static/kinematic/dynamic partition membership and CCD candidate
+  collection as high-risk areas; changes here can silently alter collision
+  correctness and scaling.
 - Treat serialization boundaries and load semantics as high-risk areas. Avoid
   silently broadening populate-existing-instance loads into construct-from-data
   behavior.
 - Prefer focused redesigns with tests over patches that preserve flawed
   behavior.
+- For performance work, benchmark before changing hot-path code when no current
+  artifact exists, then rerun the same benchmark after the change.
+- Use local project references to sibling LSF repositories when that produces a
+  better lower-stack API instead of downstream workarounds. Remember to update
+  test and benchmark projects too when local reference resolution requires it.
+- Do not stage, commit, tag, push, publish packages, or create GitHub releases
+  unless explicitly requested. The repository owner normally handles those
+  steps.
 - If you change a public API or behavior, update tests and docs in the same
   pass.
 - If you change runtime architecture, host integration, collision flow, query
