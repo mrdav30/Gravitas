@@ -107,8 +107,17 @@ public sealed class GravitasPhysics2DService
         if (!SimulatePhysics)
             return;
 
+        PrepareContinuousCollisionFrame();
+
         foreach (StiffBody2D body in _dynamicBodies)
             body.LateSimulate();
+    }
+
+    private void PrepareContinuousCollisionFrame()
+    {
+        int token = _context.LateSimulateToken;
+        foreach (StiffBody2D body in _dynamicBodies)
+            body.EnsureContinuousCollisionFramePrepared(token);
     }
 
     public void Visualize()
@@ -147,6 +156,12 @@ public sealed class GravitasPhysics2DService
         collider = _colliders[serviceIndex];
         return true;
     }
+
+    internal int DynamicBodyPeakCount => _dynamicBodies.PeakCount;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal bool TryGetDynamicBody(int dynamicId, out StiffBody2D body) =>
+        _dynamicBodies.TryGetValue(dynamicId, out body);
 
     internal void ProcessPartitionCandidate(int firstId, int secondId, WorldVoxelIndex partitionIndex)
     {

@@ -84,6 +84,26 @@ public sealed class ContinuousCollision2DTests
     }
 
     [Fact]
+    public void ContinuousMode_WithOpposingDynamicBodies_ShouldClampBothAtSharedTimeOfImpact()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        StiffBody2D left = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)(-5), Fixed64.Zero), immovable: false);
+        StiffBody2D right = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)5, Fixed64.Zero), immovable: false);
+        left.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        right.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+
+        left.AddForce(Vector2d.Right * (Fixed64)5);
+        right.AddForce(-Vector2d.Right * (Fixed64)5);
+        context.LateSimulate();
+
+        left.Position.X.Should().BeLessThanOrEqualTo(-Fixed64.Half);
+        right.Position.X.Should().BeGreaterThanOrEqualTo(Fixed64.Half);
+        (right.Position.X - left.Position.X).Should().BeGreaterThanOrEqualTo(Fixed64.One);
+        left.LinearVelocity.X.Should().Be(Fixed64.Zero);
+        right.LinearVelocity.X.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
     public void InheritMode_ShouldResolveFromContextDefault()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);

@@ -277,6 +277,29 @@ public sealed class MixedQueryCcdTests
     }
 
     [Fact]
+    public void LateSimulate_WithMixedDynamicContinuousCollision_ShouldClampBothAtSharedTimeOfImpact()
+    {
+        using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
+        context.Environment.Gravity = Fixed64.Zero;
+        ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(
+            context,
+            new Vector3d((Fixed64)(-5), Fixed64.Zero, Fixed64.Zero));
+        StiffBody2D body2D = CreateCircle2D(context, new Vector2d((Fixed64)5, Fixed64.Zero));
+        body3D.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        body2D.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+
+        body3D.Body.AddForce(Vector3d.Right * (Fixed64)5);
+        body2D.AddForce(-Vector2d.Right * (Fixed64)5);
+        context.LateSimulate();
+
+        body3D.Body.Position3d.X.Should().BeLessThanOrEqualTo(-Fixed64.Half);
+        body2D.Position.X.Should().BeGreaterThanOrEqualTo(Fixed64.Half);
+        (body2D.Position.X - body3D.Body.Position3d.X).Should().BeGreaterThanOrEqualTo(Fixed64.One);
+        body3D.Body.LinearVelocity.X.Should().Be(Fixed64.Zero);
+        body2D.LinearVelocity.X.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
     public void MixedDiagnostics_ShouldRecordContactResponseAndDimensionTaggedPayloads()
     {
         using GravitasWorldContext context = CreateMixedContext();

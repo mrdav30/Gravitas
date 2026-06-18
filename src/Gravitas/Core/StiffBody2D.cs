@@ -1,6 +1,7 @@
 using Chronicler;
 using FixedMathSharp;
 using Gravitas.Colliders;
+using Gravitas.CollisionHandling;
 using Gravitas.Queries;
 using Gravitas.Support;
 using SwiftCollections;
@@ -23,6 +24,9 @@ public sealed class StiffBody2D : IRecordable
     private bool _isDynamic;
     private int _sleepFrameCount;
     private ContinuousCollisionMode _continuousCollisionMode = ContinuousCollisionMode.Inherit;
+    private int _continuousCollisionFrameToken = int.MinValue;
+    private Vector2d _continuousCollisionFrameStart;
+    private Vector2d _continuousCollisionFrameDisplacement;
     private readonly SwiftList<Physics2DHit> _continuousCollisionHits = new();
     private readonly SwiftList<PhysicsMixedHit> _continuousMixedCollisionHits = new();
 
@@ -114,6 +118,40 @@ public sealed class StiffBody2D : IRecordable
         Active = true;
         Collider.Initialize(this);
         Context.Physics2D.AssimilateBody(this, isDynamic);
+    }
+
+    internal Vector2d ContinuousCollisionFrameStart
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => _continuousCollisionFrameStart;
+    }
+
+    internal Vector2d ContinuousCollisionFrameDisplacement
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => _continuousCollisionFrameDisplacement;
+    }
+
+    internal void EnsureContinuousCollisionFramePrepared(int token)
+    {
+        if (_continuousCollisionFrameToken == token)
+            return;
+
+        _continuousCollisionFrameToken = token;
+        _continuousCollisionFrameStart = _position;
+        _continuousCollisionFrameDisplacement = PredictContinuousCollisionDisplacement();
+    }
+
+    private Vector2d PredictContinuousCollisionDisplacement()
+    {
+        if (!CanMove || _isSleeping)
+            return Vector2d.Zero;
+
+        Fixed64 deltaTime = Context.DeltaTime;
+        Vector2d predictedVelocity = _linearVelocity + (_deltaAcceleration + Gravity) * deltaTime;
+        return predictedVelocity.MagnitudeSquared > Fixed64.Epsilon
+            ? predictedVelocity * deltaTime
+            : Vector2d.Zero;
     }
 
     public void AddForce(Vector2d force)
@@ -283,7 +321,31 @@ public sealed class StiffBody2D : IRecordable
             : 0;
 
         bool found2D = TryGetFirstValidContinuousCollisionHit(hitCount, out Physics2DHit hit2D);
+        bool foundDynamic2D = TryGetFirstDynamicContinuousCollisionHit(
+            startPosition,
+            proposedPosition,
+            proxyRadius,
+            out Physics2DHit dynamicHit2D,
+            out Fixed64 dynamicClosingSpeed2D);
+        if (ShouldReplaceContinuousCollisionHit(dynamicHit2D, dynamicClosingSpeed2D, foundDynamic2D, found2D, hit2D, Fixed64.Zero))
+        {
+            hit2D = dynamicHit2D;
+            found2D = true;
+        }
+
         bool foundMixed = TryGetFirstValidMixedContinuousCollisionHit(mixedHitCount, out PhysicsMixedHit hitMixed);
+        bool foundDynamicMixed = TryGetFirstDynamicMixedContinuousCollisionHit(
+            startPosition,
+            proposedPosition,
+            proxyRadius,
+            out PhysicsMixedHit dynamicHitMixed,
+            out Fixed64 dynamicClosingSpeedMixed);
+        if (ShouldReplaceMixedContinuousCollisionHit(dynamicHitMixed, dynamicClosingSpeedMixed, foundDynamicMixed, foundMixed, hitMixed, Fixed64.Zero))
+        {
+            hitMixed = dynamicHitMixed;
+            foundMixed = true;
+        }
+
         if (found2D && (!foundMixed || hit2D.Distance <= hitMixed.Distance))
         {
             proposedPosition = startPosition + displacement.Normalized * hit2D.Distance;
@@ -333,6 +395,258 @@ public sealed class StiffBody2D : IRecordable
         return false;
     }
 
+    private bool TryGetFirstDynamicContinuousCollisionHit(
+        Vector2d startPosition,
+        Vector2d proposedPosition,
+        Fixed64 proxyRadius,
+        out Physics2DHit hit,
+        out Fixed64 closingSpeed)
+    {
+        hit = default;
+        closingSpeed = Fixed64.Zero;
+
+        Vector2d sourceDisplacement = proposedPosition - startPosition;
+        Fixed64 sourceLength = sourceDisplacement.Magnitude;
+        if (sourceLength <= Fixed64.Epsilon)
+            return false;
+
+        bool found = false;
+        Physics2DHit best = default;
+        Fixed64 bestClosingSpeed = Fixed64.Zero;
+        int token = Context.LateSimulateToken;
+        int peak = Context.Physics2D.DynamicBodyPeakCount;
+        for (int i = 0; i < peak; i++)
+        {
+            if (!Context.Physics2D.TryGetDynamicBody(i, out StiffBody2D target)
+                || !IsEligibleDynamicContinuousCollisionTarget(target))
+            {
+                continue;
+            }
+
+            target.EnsureContinuousCollisionFramePrepared(token);
+            Fixed64 targetRadius = target.ResolveContinuousCollisionProxyRadiusForDynamicTarget();
+            if (targetRadius <= Fixed64.Epsilon
+                || !ContinuousCollisionMath.TrySweepRelativeCircles(
+                    startPosition,
+                    sourceDisplacement,
+                    proxyRadius,
+                    target.ContinuousCollisionFrameStart,
+                    target.ContinuousCollisionFrameDisplacement,
+                    targetRadius,
+                    out Fixed64 normalizedTime,
+                    out Vector2d normal,
+                    out Fixed64 candidateClosingSpeed))
+            {
+                continue;
+            }
+
+            Fixed64 distance = sourceLength * normalizedTime;
+            Vector2d sourceCenter = startPosition + sourceDisplacement * normalizedTime;
+            Vector2d targetCenter = target.ContinuousCollisionFrameStart + target.ContinuousCollisionFrameDisplacement * normalizedTime;
+            Vector2d point = ResolveDynamicContactPoint(sourceCenter, targetCenter, normal, targetRadius);
+            var candidate = new Physics2DHit(target.Collider, point, normal, distance);
+            if (!ShouldReplaceContinuousCollisionHit(candidate, candidateClosingSpeed, true, found, best, bestClosingSpeed))
+                continue;
+
+            best = candidate;
+            bestClosingSpeed = candidateClosingSpeed;
+            found = true;
+        }
+
+        hit = best;
+        closingSpeed = bestClosingSpeed;
+        return found;
+    }
+
+    private bool TryGetFirstDynamicMixedContinuousCollisionHit(
+        Vector2d startPosition,
+        Vector2d proposedPosition,
+        Fixed64 proxyRadius,
+        out PhysicsMixedHit hit,
+        out Fixed64 closingSpeed)
+    {
+        hit = default;
+        closingSpeed = Fixed64.Zero;
+
+        if (!Context.Settings.RuntimeMode.RunsMixedContacts())
+            return false;
+
+        Vector2d sourceDisplacement2D = proposedPosition - startPosition;
+        Fixed64 sourceLength = sourceDisplacement2D.Magnitude;
+        if (sourceLength <= Fixed64.Epsilon)
+            return false;
+
+        Vector3d sourceStart = new(startPosition.X, Collider.MixedSlabCenterY, startPosition.Y);
+        Vector3d sourceDisplacement = new(sourceDisplacement2D.X, Fixed64.Zero, sourceDisplacement2D.Y);
+        Fixed64 sourceRadius = FixedMath.Max(proxyRadius, Collider.MixedHalfThickness);
+        bool found = false;
+        PhysicsMixedHit best = default;
+        Fixed64 bestClosingSpeed = Fixed64.Zero;
+        int token = Context.LateSimulateToken;
+        int peak = Context.Physics.DynamicBodyPeakCount;
+        for (int i = 0; i < peak; i++)
+        {
+            if (!Context.Physics.TryGetDynamicBody(i, out StiffBody target)
+                || !IsEligibleDynamicMixed3DTarget(target))
+            {
+                continue;
+            }
+
+            target.EnsureContinuousCollisionFramePrepared(token);
+            Fixed64 targetRadius = target.ResolveContinuousCollisionProxyRadiusForDynamicTarget();
+            if (targetRadius <= Fixed64.Epsilon
+                || !ContinuousCollisionMath.TrySweepRelativeSpheres(
+                    sourceStart,
+                    sourceDisplacement,
+                    sourceRadius,
+                    target.ContinuousCollisionFrameStart,
+                    target.ContinuousCollisionFrameDisplacement,
+                    targetRadius,
+                    out Fixed64 normalizedTime,
+                    out Vector3d normalForSource,
+                    out Fixed64 candidateClosingSpeed))
+            {
+                continue;
+            }
+
+            Fixed64 distance = sourceLength * normalizedTime;
+            Vector3d sourceCenter = sourceStart + sourceDisplacement * normalizedTime;
+            Vector3d targetCenter = target.ContinuousCollisionFrameStart + target.ContinuousCollisionFrameDisplacement * normalizedTime;
+            Vector3d point2D = sourceCenter - normalForSource * sourceRadius;
+            Vector3d point3D = ResolveDynamicContactPoint(sourceCenter, targetCenter, normalForSource, targetRadius);
+            var candidate = new PhysicsMixedHit(
+                target.Collider,
+                null,
+                point3D,
+                point2D,
+                normalForSource,
+                distance,
+                sourceDisplacement.MagnitudeSquared > Fixed64.Epsilon ? sourceDisplacement.Normalized : Vector3d.Zero);
+            if (!ShouldReplaceMixedContinuousCollisionHit(candidate, candidateClosingSpeed, true, found, best, bestClosingSpeed))
+                continue;
+
+            best = candidate;
+            bestClosingSpeed = candidateClosingSpeed;
+            found = true;
+        }
+
+        hit = best;
+        closingSpeed = bestClosingSpeed;
+        return found;
+    }
+
+    private bool IsEligibleDynamicContinuousCollisionTarget(StiffBody2D target)
+    {
+        if (ReferenceEquals(target, this)
+            || !target.Active
+            || target.Immovable
+            || target.IsKinematic
+            || target.Collider.IsTrigger
+            || !Context.Physics2D.RequireCollisionPair(Collider, target.Collider))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private bool IsEligibleDynamicMixed3DTarget(StiffBody target)
+    {
+        return target.Active
+            && !target.Immovable
+            && !target.IsKinematic
+            && !target.Collider.IsTrigger
+            && Context.MixedCollisions.RequireCollisionPair(target.Collider, Collider);
+    }
+
+    private static bool ShouldReplaceContinuousCollisionHit(
+        Physics2DHit candidate,
+        Fixed64 candidateClosingSpeed,
+        bool hasCandidate,
+        bool hasCurrent,
+        Physics2DHit current,
+        Fixed64 currentClosingSpeed)
+    {
+        if (!hasCandidate)
+            return false;
+        if (!hasCurrent)
+            return true;
+
+        int distance = candidate.Distance.CompareTo(current.Distance);
+        if (distance != 0)
+            return distance < 0;
+
+        int closing = candidateClosingSpeed.CompareTo(currentClosingSpeed);
+        if (closing != 0)
+            return closing > 0;
+
+        return candidate.Collider.Id < current.Collider.Id;
+    }
+
+    private static bool ShouldReplaceMixedContinuousCollisionHit(
+        PhysicsMixedHit candidate,
+        Fixed64 candidateClosingSpeed,
+        bool hasCandidate,
+        bool hasCurrent,
+        PhysicsMixedHit current,
+        Fixed64 currentClosingSpeed)
+    {
+        if (!hasCandidate)
+            return false;
+        if (!hasCurrent)
+            return true;
+
+        int distance = candidate.Distance.CompareTo(current.Distance);
+        if (distance != 0)
+            return distance < 0;
+
+        int closing = candidateClosingSpeed.CompareTo(currentClosingSpeed);
+        if (closing != 0)
+            return closing > 0;
+
+        int candidate3D = candidate.Collider3D?.Id ?? -1;
+        int current3D = current.Collider3D?.Id ?? -1;
+        int collider3D = candidate3D.CompareTo(current3D);
+        if (collider3D != 0)
+            return collider3D < 0;
+
+        int candidate2D = candidate.Collider2D?.Id ?? -1;
+        int current2D = current.Collider2D?.Id ?? -1;
+        return candidate2D < current2D;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Vector2d ResolveDynamicContactPoint(
+        Vector2d sourceCenter,
+        Vector2d targetCenter,
+        Vector2d normalForSource,
+        Fixed64 targetRadius)
+    {
+        if (normalForSource.MagnitudeSquared > Fixed64.Epsilon)
+            return targetCenter + normalForSource * targetRadius;
+
+        Vector2d fallback = sourceCenter - targetCenter;
+        return fallback.MagnitudeSquared > Fixed64.Epsilon
+            ? targetCenter + fallback.Normalized * targetRadius
+            : targetCenter;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Vector3d ResolveDynamicContactPoint(
+        Vector3d sourceCenter,
+        Vector3d targetCenter,
+        Vector3d normalForSource,
+        Fixed64 targetRadius)
+    {
+        if (normalForSource.MagnitudeSquared > Fixed64.Epsilon)
+            return targetCenter + normalForSource * targetRadius;
+
+        Vector3d fallback = sourceCenter - targetCenter;
+        return fallback.MagnitudeSquared > Fixed64.Epsilon
+            ? targetCenter + fallback.Normalized * targetRadius
+            : targetCenter;
+    }
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private bool ShouldUseContinuousCollision(out ContinuousCollisionMode mode)
     {
@@ -366,6 +680,12 @@ public sealed class StiffBody2D : IRecordable
             LSCompoundCollider2D compound => compound.ScaledRadius,
             _ => ResolveConvexContinuousCollisionProxyRadius()
         };
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal Fixed64 ResolveContinuousCollisionProxyRadiusForDynamicTarget()
+    {
+        return ResolveContinuousCollisionProxyRadius();
     }
 
     private Fixed64 ResolveConvexContinuousCollisionProxyRadius()

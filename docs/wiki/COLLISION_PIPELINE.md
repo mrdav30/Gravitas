@@ -350,13 +350,15 @@ CCD mode. `ColliderHierarchyState` caches the top parent when parent
 relationships are bound, so `Inherit` can check the parent policy in constant
 time before falling back to the context default.
 
-The alpha CCD path runs during `StiffBody` position integration, after velocity
-and acceleration have produced an intended frame displacement and before the
-authoritative position is committed. It uses a conservative swept-sphere proxy
-derived from the moving collider:
+The alpha CCD path runs during body position integration, after velocity and
+acceleration have produced an intended frame displacement and before the
+authoritative position is committed. It uses a conservative swept proxy derived
+from the moving collider:
 
 - 3D sphere, capsule, and cylinder use their scaled radius.
 - 3D cuboid uses the smallest world-space bounds half extent.
+- 3D mesh uses the smallest positive bounds scope as its moving-source proxy.
+- 3D compound uses the smallest world-space aggregate bounds half extent.
 - 2D circle uses its scaled radius.
 - 2D AABB and convex polygon use a conservative bounds radius.
 - 2D compound uses a conservative aggregate radius over its private parts.
@@ -367,14 +369,35 @@ radius. When a hit is accepted, the body clamps to the earliest swept center
 time of impact and removes only the closing component of linear velocity,
 preserving tangential velocity for later discrete response work.
 
-Accepted CCD targets are non-trigger bodyless colliders, immovable bodies, and
-kinematic bodies whose layers are allowed by the context collision matrix and
-whose hierarchy is not excluded. Static or kinematic mesh and compound targets
-are covered by the swept-sphere query worker. Moving mesh bodies still have no
-dedicated CCD source proxy; moving compound bodies use the conservative
-aggregate proxy. Ordinary dynamic-vs-dynamic CCD is intentionally deferred; it
-needs relative-velocity TOI ordering, pair tie-breakers, and replay tests before
-it becomes part of the alpha contract.
+Static and kinematic CCD targets are non-trigger bodyless colliders, immovable
+bodies, and kinematic bodies whose layers are allowed by the context collision
+matrix and whose hierarchy is not excluded. Static or kinematic mesh and
+compound targets are covered by the query workers, so 3D swept-sphere CCD keeps
+triangle and stable part-order target behavior. Mesh sweep normals are oriented
+against the sweep direction when authored triangle winding would otherwise point
+with the moving source, so closing velocity removal is two-sided and
+deterministic.
+
+Dynamic-vs-dynamic CCD uses a frame-start relative-motion model. During
+`LateSimulate`, the physics services cache each movable body's start position
+and predicted displacement under a context-local late-simulation token before
+any individual body commits movement. A moving source compares the
+static/kinematic query hit with dynamic relative TOI candidates and chooses the
+earliest distance, then higher closing speed, then stable collider ID order.
+This prevents opposing fast bodies from depending on dynamic body iteration
+order.
+
+The dynamic path is intentionally conservative:
+
+- 3D dynamic targets are represented by continuous sphere proxies.
+- pure 2D dynamic targets are represented by continuous circle proxies.
+- mixed 2D slabs use the larger of planar radius and mixed half-thickness as
+  their 3D proxy radius.
+- dynamic mesh and compound bodies are supported as moving proxy bodies rather
+  than exact swept mesh or exact swept compound sources.
+
+Exact moving mesh/compound CCD would require a deeper shape-specific solver and
+benchmark evidence before it should replace the conservative proxy path.
 
 ## Active Partitions
 

@@ -31,6 +31,8 @@ public sealed class GravitasWorldContext : IDisposable
 
     private bool _disposed;
 
+    private int _lateSimulateToken;
+
     private GravitasWorldContext(GridWorld world, bool ownsWorld)
     {
         World = world;
@@ -224,6 +226,8 @@ public sealed class GravitasWorldContext : IDisposable
         }
     }
 
+    internal int LateSimulateToken => _lateSimulateToken;
+
     /// <summary>
     /// Gets this context's visualization accumulation expressed in simulation frames.
     /// </summary>
@@ -292,6 +296,7 @@ public sealed class GravitasWorldContext : IDisposable
     {
         ThrowIfDisposed();
         _clock.LateSimulate();
+        _lateSimulateToken++;
         PhysicsRuntimeMode runtimeMode = Settings.RuntimeMode;
         if (runtimeMode.Runs3D())
             Physics.LateSimulate();
@@ -336,6 +341,7 @@ public sealed class GravitasWorldContext : IDisposable
     public void Reset()
     {
         ThrowIfDisposed();
+        _lateSimulateToken = 0;
         _clock.Reset();
         Collisions.Reset();
         Collisions2D.Reset();

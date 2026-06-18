@@ -95,12 +95,24 @@ public sealed class GravitasPhysicsService
             return;
 
         ProcessActiveCollisionPairs();
+        PrepareContinuousCollisionFrame();
 
         int peak = _dynamicBodies.PeakCount;
         for (int i = 0; i < peak; i++)
         {
             if (_dynamicBodies.TryGetValue(i, out StiffBody body))
                 body.LateSimulate();
+        }
+    }
+
+    private void PrepareContinuousCollisionFrame()
+    {
+        int token = _context.LateSimulateToken;
+        int peak = _dynamicBodies.PeakCount;
+        for (int i = 0; i < peak; i++)
+        {
+            if (_dynamicBodies.TryGetValue(i, out StiffBody body))
+                body.EnsureContinuousCollisionFramePrepared(token);
         }
     }
 
@@ -231,6 +243,11 @@ public sealed class GravitasPhysicsService
         collider = _colliders[id];
         return collider != null;
     }
+
+    internal int DynamicBodyPeakCount => _dynamicBodies.PeakCount;
+
+    internal bool TryGetDynamicBody(int dynamicId, out StiffBody body) =>
+        _dynamicBodies.TryGetValue(dynamicId, out body);
 
     internal CollisionPair? GetCollisionPair(int id1, int id2)
     {

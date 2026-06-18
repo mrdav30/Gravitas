@@ -1039,21 +1039,24 @@ queries have physically explainable deterministic policy.
 
 Current CCD support is opt-in/auto and intentionally bounded. 3D and 2D body
 movement can use swept primitive proxies against static or kinematic targets,
-and mixed sweeps include alpha mesh/compound support. Ordinary dynamic-vs-
-dynamic CCD, full swept mesh query families, and richer relative-velocity
-ordering remain future hardening.
+and mixed sweeps include alpha mesh/compound support. Dynamic-vs-dynamic CCD
+must be deterministic and physically explainable before alpha: simultaneous
+fast movers should clamp at a shared time of impact instead of depending on
+body iteration order. Moving mesh and compound bodies may use conservative
+proxy radii until exact shape-specific swept-source solvers have stronger
+evidence.
 
 **Tasks**
 
-- [ ] Specify deterministic dynamic-vs-dynamic CCD ordering for 3D, pure 2D,
+- [x] Specify deterministic dynamic-vs-dynamic CCD ordering for 3D, pure 2D,
   and mixed contact paths.
-- [ ] Define how relative velocity, pair priority, body IDs, hierarchy keys,
+- [x] Define how relative velocity, pair priority, body IDs, hierarchy keys,
   and contact normals break ties.
-- [ ] Add fixtures for tunneling dynamic bodies, opposing high-speed bodies,
+- [x] Add fixtures for tunneling dynamic bodies, opposing high-speed bodies,
   thin static geometry, and mixed 2D slab interactions.
-- [ ] Investigate shape-specific swept mesh behavior before adding public APIs:
+- [x] Investigate shape-specific swept mesh behavior before adding public APIs:
   ray/segment vs mesh, swept sphere/circle vs mesh, and mesh-as-moving-source.
-- [ ] Benchmark CCD candidate gathering, clip resolution, and false-positive
+- [x] Benchmark CCD candidate gathering, clip resolution, and false-positive
   rates before replacing any current conservative proxy.
 
 **Exit Criteria**
@@ -1062,6 +1065,71 @@ ordering remain future hardening.
 - Dynamic-vs-dynamic CCD has deterministic tie-breakers and tests before it is
   enabled.
 - Swept mesh APIs are added only with allocation tests and benchmark evidence.
+
+**Progress - 2026-06-18**
+
+Implemented deterministic dynamic-vs-dynamic CCD for 3D, pure 2D, and mixed
+3D/2D bodies. `GravitasWorldContext` now owns a late-simulation token so each
+physics service can cache frame-start position and predicted displacement for
+every movable body before sequential body integration mutates any one body. CCD
+then compares static/kinematic query hits with dynamic relative-motion hits and
+chooses the earliest distance, then higher closing speed, then stable collider
+ID order.
+
+The dynamic path intentionally uses conservative moving proxies:
+
+- 3D uses relative sphere/sphere TOI over each collider's continuous proxy
+  radius.
+- 2D uses relative circle/circle TOI over each 2D collider's proxy radius.
+- mixed 3D/2D maps 2D slabs into finite 3D proxy spheres using the larger of
+  planar radius and mixed half-thickness.
+- dynamic mesh and compound bodies are supported as moving proxy bodies, while
+  static/kinematic mesh and compound targets still use the exact existing query
+  workers where available.
+
+No new public swept-mesh API was added. While validating mesh CCD, a query-level
+normal issue surfaced: swept sphere hits against two-sided mesh surfaces could
+return the authored triangle normal even when it pointed with the sweep
+direction. `GravitasQuery3DService` now orients mesh sweep normals against the
+sweep direction so CCD removes closing velocity from both mesh faces
+deterministically.
+
+New tests cover:
+
+- resting dynamic 3D target CCD.
+- opposing dynamic 3D spheres clamping at the shared time of impact.
+- opposing dynamic 2D circles clamping at the shared time of impact.
+- mixed dynamic 3D sphere vs 2D circle CCD.
+- fast sphere vs immovable mesh CCD.
+- mesh swept-sphere normal orientation from both sides.
+
+Phase 8 baseline captured before implementation:
+
+```powershell
+dotnet tests\Gravitas.Benchmarks\bin\Release\net8.0\Gravitas.Benchmarks.dll continuous-collision --filter "*" --artifacts artifacts\benchmarks\2026-06-18-phase8-ccd-baseline --warmupCount 3 --iterationCount 8
+```
+
+Post-change benchmark run:
+
+```powershell
+dotnet tests\Gravitas.Benchmarks\bin\Release\net8.0\Gravitas.Benchmarks.dll continuous-collision --filter "*" --artifacts artifacts\benchmarks\2026-06-18-phase8-ccd-after --warmupCount 3 --iterationCount 8
+```
+
+BenchmarkDotNet on Windows 11, .NET 8.0.28, Intel Core i7-9700K:
+
+| Method | Baseline Mean | After Mean | Allocated |
+| --- | ---: | ---: | ---: |
+| DiscreteFastMove | 2.925 us | 2.882 us | 672 B |
+| ContinuousFastMoveAgainstThinWall | 13.164 us | 12.909 us | 672 B |
+| ContinuousOpposingDynamicSpheres | n/a | 26.144 us | 1344 B |
+| ContinuousFastMoveAgainstImmovableMesh | n/a | 21.704 us | 672 B |
+
+Captured follow-up: if real alpha scenarios enable `Continuous` on many movable
+bodies at once, add a size-parameter CCD benchmark and evaluate a GridForge
+swept-volume candidate prefilter for dynamic relative-motion checks. The current
+implementation favors deterministic correctness and simple tie-breaking; it is
+not yet a claim that large all-continuous dynamic crowds have optimal candidate
+gathering cost.
 
 ## Phase 9: Typed Diagnostic Views
 

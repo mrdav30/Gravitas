@@ -759,7 +759,13 @@ public sealed partial class GravitasQuery3DService
 
         Vector3d normal = collider.GetNormalAtPoint(point);
         if (normal.MagnitudeSquared > Fixed64.Epsilon)
-            return normal.Normalized;
+        {
+            normal = normal.Normalized;
+            if (collider is LSMeshCollider && Vector3d.Dot(normal, direction) > Fixed64.Zero)
+                return -normal;
+
+            return normal;
+        }
 
         if (fromPointToSweepCenter.MagnitudeSquared > Fixed64.Epsilon)
             return -fromPointToSweepCenter.Normalized;

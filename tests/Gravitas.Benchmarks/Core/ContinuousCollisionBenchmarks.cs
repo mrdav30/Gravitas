@@ -16,8 +16,13 @@ public class ContinuousCollisionBenchmarks
 
     private GravitasWorldContext _discreteContext;
     private GravitasWorldContext _continuousContext;
+    private GravitasWorldContext _dynamicContext;
+    private GravitasWorldContext _meshContext;
     private StiffBody _discreteBody;
     private StiffBody _continuousBody;
+    private StiffBody _dynamicLeftBody;
+    private StiffBody _dynamicRightBody;
+    private StiffBody _meshBody;
 
     [GlobalSetup]
     public void Setup()
@@ -29,6 +34,14 @@ public class ContinuousCollisionBenchmarks
         _continuousContext = CreateContext();
         CreateStaticWall(_continuousContext);
         _continuousBody = CreateMovingSphere(_continuousContext, ContinuousCollisionMode.Continuous);
+
+        _dynamicContext = CreateContext();
+        _dynamicLeftBody = CreateMovingSphere(_dynamicContext, ContinuousCollisionMode.Continuous, new Vector3d((Fixed64)(-5), Fixed64.Zero, Fixed64.Zero));
+        _dynamicRightBody = CreateMovingSphere(_dynamicContext, ContinuousCollisionMode.Continuous, new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero));
+
+        _meshContext = CreateContext();
+        CreateImmovableMeshWall(_meshContext);
+        _meshBody = CreateMovingSphere(_meshContext, ContinuousCollisionMode.Continuous);
     }
 
     [GlobalCleanup]
@@ -36,10 +49,17 @@ public class ContinuousCollisionBenchmarks
     {
         _discreteContext.Dispose();
         _continuousContext.Dispose();
+        _dynamicContext.Dispose();
+        _meshContext.Dispose();
         _discreteContext = null;
         _continuousContext = null;
+        _dynamicContext = null;
+        _meshContext = null;
         _discreteBody = null;
         _continuousBody = null;
+        _dynamicLeftBody = null;
+        _dynamicRightBody = null;
+        _meshBody = null;
     }
 
     [Benchmark(Baseline = true)]
@@ -56,6 +76,25 @@ public class ContinuousCollisionBenchmarks
         ResetBody(_continuousBody);
         _continuousBody.AddLinearImpulse(FastImpulse);
         return _continuousBody.Position3d;
+    }
+
+    [Benchmark]
+    public Vector3d ContinuousOpposingDynamicSpheres()
+    {
+        ResetBody(_dynamicLeftBody, new Vector3d((Fixed64)(-5), Fixed64.Zero, Fixed64.Zero));
+        ResetBody(_dynamicRightBody, new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero));
+        _dynamicLeftBody.AddForce(Vector3d.Right * (Fixed64)5);
+        _dynamicRightBody.AddForce(-Vector3d.Right * (Fixed64)5);
+        _dynamicContext.LateSimulate();
+        return _dynamicLeftBody.Position3d + _dynamicRightBody.Position3d;
+    }
+
+    [Benchmark]
+    public Vector3d ContinuousFastMoveAgainstImmovableMesh()
+    {
+        ResetBody(_meshBody);
+        _meshBody.AddLinearImpulse(FastImpulse);
+        return _meshBody.Position3d;
     }
 
     private static GravitasWorldContext CreateContext()
@@ -82,9 +121,35 @@ public class ContinuousCollisionBenchmarks
         collider.InitializeWithNoBody(agent);
     }
 
-    private static StiffBody CreateMovingSphere(GravitasWorldContext context, ContinuousCollisionMode mode)
+    private static void CreateImmovableMeshWall(GravitasWorldContext context)
     {
-        var agent = new BenchmarkMatterAgent(context, StartPosition);
+        var vertices = new[]
+        {
+            new Vector3d(Fixed64.Zero, (Fixed64)(-4), (Fixed64)(-4)),
+            new Vector3d(Fixed64.Zero, (Fixed64)4, (Fixed64)(-4)),
+            new Vector3d(Fixed64.Zero, (Fixed64)(-4), (Fixed64)4),
+            new Vector3d(Fixed64.Zero, (Fixed64)4, (Fixed64)4)
+        };
+        var triangles = new[] { 0, 1, 2, 2, 1, 3 };
+        var agent = new BenchmarkMatterAgent(context, WallPosition);
+        var collider = new LSMeshCollider(vertices, triangles, MeshColliderMode.Convex, MeshInertiaPolicy.SurfaceApproximation);
+        var body = new StiffBody(agent, collider)
+        {
+            Mass = Fixed64.One,
+            Immovable = true,
+            GroundProbeMode = GroundProbeMode.Ray
+        };
+
+        body.Initialize(WallPosition, FixedQuaternion.Identity);
+    }
+
+    private static StiffBody CreateMovingSphere(
+        GravitasWorldContext context,
+        ContinuousCollisionMode mode,
+        Vector3d? startPosition = null)
+    {
+        Vector3d position = startPosition ?? StartPosition;
+        var agent = new BenchmarkMatterAgent(context, position);
         var collider = new LSSphereCollider();
         var body = new StiffBody(agent, collider)
         {
@@ -93,10 +158,10 @@ public class ContinuousCollisionBenchmarks
             GroundProbeMode = GroundProbeMode.Ray
         };
 
-        body.Initialize(StartPosition, FixedQuaternion.Identity);
+        body.Initialize(position, FixedQuaternion.Identity);
         return body;
     }
 
-    private static void ResetBody(StiffBody body) =>
-        body.ResetPosition(StartPosition, FixedQuaternion.Identity);
+    private static void ResetBody(StiffBody body, Vector3d? position = null) =>
+        body.ResetPosition(position ?? StartPosition, FixedQuaternion.Identity);
 }

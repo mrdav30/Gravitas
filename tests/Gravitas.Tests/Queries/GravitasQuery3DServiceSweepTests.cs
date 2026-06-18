@@ -190,6 +190,42 @@ public sealed class GravitasQuery3DServiceSweepTests
     }
 
     [Fact]
+    public void SweepSphere_ShouldOrientMeshNormalsAgainstSweepDirection()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSMeshCollider mesh = CreateDynamicCollider(
+            context,
+            MeshTestFixtures.CreateVerticalQuad(
+                Fixed64.Zero,
+                -Fixed64.One,
+                Fixed64.One,
+                inertiaPolicy: MeshInertiaPolicy.SurfaceApproximation),
+            Vector3d.Zero);
+
+        bool leftHit = context.Query3D.SweepSphere(
+            new Vector3d((Fixed64)(-2), Fixed64.One, Fixed64.Zero),
+            Fixed64.Half,
+            Vector3d.Right,
+            (Fixed64)4,
+            out Physics3DHit leftSweepHit,
+            IncludeLayerZero);
+        bool rightHit = context.Query3D.SweepSphere(
+            new Vector3d((Fixed64)2, Fixed64.One, Fixed64.Zero),
+            Fixed64.Half,
+            -Vector3d.Right,
+            (Fixed64)4,
+            out Physics3DHit rightSweepHit,
+            IncludeLayerZero);
+
+        leftHit.Should().BeTrue();
+        leftSweepHit.Collider.Should().BeSameAs(mesh);
+        leftSweepHit.Normal.Should().Be(-Vector3d.Right);
+        rightHit.Should().BeTrue();
+        rightSweepHit.Collider.Should().BeSameAs(mesh);
+        rightSweepHit.Normal.Should().Be(Vector3d.Right);
+    }
+
+    [Fact]
     public void SweptSphereWorker_ShouldDetectCylinderSideImpact()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();

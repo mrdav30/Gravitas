@@ -140,6 +140,30 @@ public sealed class ContinuousCollisionDetectionTests
     }
 
     [Fact]
+    public void ContinuousMode_ShouldPreventFastSphereTunnelingThroughStaticMesh()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        _ = scenario.CreateBody(
+            MeshTestFixtures.CreateVerticalQuad(
+                Fixed64.Zero,
+                -Fixed64.One,
+                Fixed64.One,
+                MeshColliderMode.Convex,
+                MeshInertiaPolicy.SurfaceApproximation),
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            immovable: true);
+        ScenarioBody<LSSphereCollider> mover = scenario.CreateSphere(new Vector3d((Fixed64)(-2), Fixed64.One, Fixed64.Zero));
+        StiffBody body = mover.Body;
+        body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+
+        ApplyFastImpulse(body);
+
+        body.Position3d.X.Should().BeLessThanOrEqualTo(-Fixed64.Half);
+        body.LinearVelocity.X.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
     public void ContinuousMode_ShouldPreserveTangentialVelocityAfterRemovingClosingVelocity()
     {
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();
@@ -154,7 +178,7 @@ public sealed class ContinuousCollisionDetectionTests
     }
 
     [Fact]
-    public void ContinuousMode_ShouldNotRunDynamicVsDynamicCcdDuringAlpha()
+    public void ContinuousMode_ShouldClampAgainstRestingDynamicBody()
     {
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();
         ScenarioBody<LSCuboidCollider> target = scenario.CreateCuboid(Vector3d.Zero);
@@ -164,8 +188,28 @@ public sealed class ContinuousCollisionDetectionTests
 
         ApplyFastImpulse(body);
 
-        body.Position3d.X.Should().Be((Fixed64)2);
-        body.LinearVelocity.X.Should().Be((Fixed64)4);
+        body.Position3d.X.Should().BeLessThanOrEqualTo(-Fixed64.Half);
+        body.LinearVelocity.X.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void ContinuousMode_WithOpposingDynamicBodies_ShouldClampBothAtSharedTimeOfImpact()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        ScenarioBody<LSSphereCollider> left = scenario.CreateSphere(new Vector3d((Fixed64)(-5), Fixed64.Zero, Fixed64.Zero));
+        ScenarioBody<LSSphereCollider> right = scenario.CreateSphere(new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero));
+        left.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        right.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+
+        left.Body.AddForce(Vector3d.Right * (Fixed64)5);
+        right.Body.AddForce(-Vector3d.Right * (Fixed64)5);
+        scenario.Context.LateSimulate();
+
+        left.Body.Position3d.X.Should().BeLessThanOrEqualTo(-Fixed64.Half);
+        right.Body.Position3d.X.Should().BeGreaterThanOrEqualTo(Fixed64.Half);
+        (right.Body.Position3d.X - left.Body.Position3d.X).Should().BeGreaterThanOrEqualTo(Fixed64.One);
+        left.Body.LinearVelocity.X.Should().Be(Fixed64.Zero);
+        right.Body.LinearVelocity.X.Should().Be(Fixed64.Zero);
     }
 
     [Fact]
