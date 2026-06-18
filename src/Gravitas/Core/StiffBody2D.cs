@@ -317,7 +317,8 @@ public sealed class StiffBody2D : IRecordable
                 PhysicsLayerMask.All,
                 _continuousMixedCollisionHits,
                 Collider,
-                includeTriggers: false)
+                includeTriggers: false,
+                cacheTargetPartitions: true)
             : 0;
 
         bool found2D = TryGetFirstValidContinuousCollisionHit(hitCount, out Physics2DHit hit2D);

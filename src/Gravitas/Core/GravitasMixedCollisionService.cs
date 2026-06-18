@@ -30,9 +30,11 @@ internal sealed class GravitasMixedCollisionService
     private readonly SwiftList<PhysicsMixedPartition> _distributionPartitions = new();
     private readonly SwiftList<int> _distributionDynamic3DIds = new();
     private readonly SwiftList<int> _distributionAwakeDynamic3DIds = new();
+    private readonly SwiftList<int> _distributionKinematic3DIds = new();
     private readonly SwiftList<int> _distributionStatic3DIds = new();
     private readonly SwiftList<int> _distributionDynamic2DIds = new();
     private readonly SwiftList<int> _distributionAwakeDynamic2DIds = new();
+    private readonly SwiftList<int> _distributionKinematic2DIds = new();
     private readonly SwiftList<int> _distributionStatic2DIds = new();
     private readonly SwiftList<MixedColliderKey> _candidatePairs = new();
     private readonly SwiftList<PhysicsMixedPartition> _queryPartitions = new();
@@ -43,6 +45,10 @@ internal sealed class GravitasMixedCollisionService
     private readonly SwiftStack<CollisionPairMixed> _cachedPairs = new();
 
     private int _retainedPartitionRetirementCursor;
+    private int _cached3DQueryRefreshFrame = int.MinValue;
+    private int _cached3DQueryRefreshLateToken = int.MinValue;
+    private int _cached2DQueryRefreshFrame = int.MinValue;
+    private int _cached2DQueryRefreshLateToken = int.MinValue;
 
     internal GravitasMixedCollisionService(GravitasWorldContext context)
     {
@@ -95,9 +101,11 @@ internal sealed class GravitasMixedCollisionService
             _distributionPartitions[i].Distribute(
                 _distributionDynamic3DIds,
                 _distributionAwakeDynamic3DIds,
+                _distributionKinematic3DIds,
                 _distributionStatic3DIds,
                 _distributionDynamic2DIds,
                 _distributionAwakeDynamic2DIds,
+                _distributionKinematic2DIds,
                 _distributionStatic2DIds);
         }
 
@@ -133,9 +141,11 @@ internal sealed class GravitasMixedCollisionService
         _distributionPartitions.FastClear();
         _distributionDynamic3DIds.FastClear();
         _distributionAwakeDynamic3DIds.FastClear();
+        _distributionKinematic3DIds.FastClear();
         _distributionStatic3DIds.FastClear();
         _distributionDynamic2DIds.FastClear();
         _distributionAwakeDynamic2DIds.FastClear();
+        _distributionKinematic2DIds.FastClear();
         _distributionStatic2DIds.FastClear();
         _candidatePairs.FastClear();
         _queryPartitions.FastClear();
@@ -144,6 +154,10 @@ internal sealed class GravitasMixedCollisionService
         _pairs.Clear();
         _pairsToRemove.FastClear();
         _cachedPairs.Clear();
+        _cached3DQueryRefreshFrame = int.MinValue;
+        _cached3DQueryRefreshLateToken = int.MinValue;
+        _cached2DQueryRefreshFrame = int.MinValue;
+        _cached2DQueryRefreshLateToken = int.MinValue;
         Version = 1;
         LastBroadPhaseCandidateCount = 0;
         SimulateCount = 0;
@@ -171,7 +185,8 @@ internal sealed class GravitasMixedCollisionService
         }
 
         Get3DCoverageBounds(collider, out Vector3d coverageMin, out Vector3d coverageMax);
-        if (collider.MatchesMixedPartitionGridBounds(coverageMin, coverageMax))
+        MixedPartitionMobilityKind kind = Get3DMobilityKind(collider);
+        if (collider.MatchesMixedPartitionGridBounds(coverageMin, coverageMax, (int)kind))
         {
             Refresh3DPartitionAwakeState(collider);
             return false;
@@ -201,7 +216,8 @@ internal sealed class GravitasMixedCollisionService
         }
 
         Get2DMixedCoverageBounds(collider, out Vector3d coverageMin, out Vector3d coverageMax);
-        if (collider.MatchesMixedPartitionGridBounds(coverageMin, coverageMax))
+        MixedPartitionMobilityKind kind = Get2DMobilityKind(collider);
+        if (collider.MatchesMixedPartitionGridBounds(coverageMin, coverageMax, (int)kind))
         {
             Refresh2DPartitionAwakeState(collider);
             return false;
@@ -220,7 +236,8 @@ internal sealed class GravitasMixedCollisionService
             return false;
 
         Get3DCoverageBounds(collider, out Vector3d coverageMin, out Vector3d coverageMax);
-        if (!force && collider.MatchesMixedPartitionGridBounds(coverageMin, coverageMax))
+        MixedPartitionMobilityKind currentKind = Get3DMobilityKind(collider);
+        if (!force && collider.MatchesMixedPartitionGridBounds(coverageMin, coverageMax, (int)currentKind))
             return false;
 
         SwiftList<WorldVoxelIndex>? coordinates = collider.MixedPartitionCoordinates;
@@ -228,7 +245,7 @@ internal sealed class GravitasMixedCollisionService
             return false;
 
         GridWorld world = _context.World;
-        bool isStatic = IsStatic3DCollider(collider);
+        MixedPartitionMobilityKind partitionKind = GetStoredMobilityKind(collider.MixedPartitionKind);
         try
         {
             for (int i = 0; i < coordinates.Count; i++)
@@ -240,10 +257,7 @@ internal sealed class GravitasMixedCollisionService
                     continue;
                 }
 
-                if (isStatic)
-                    partition!.RemoveStatic3DObject(collider.Id);
-                else
-                    partition!.RemoveDynamic3DObject(collider.Id);
+                Remove3DObject(partition!, collider.Id, partitionKind);
             }
         }
         finally
@@ -263,7 +277,8 @@ internal sealed class GravitasMixedCollisionService
             return false;
 
         Get2DMixedCoverageBounds(collider, out Vector3d coverageMin, out Vector3d coverageMax);
-        if (!force && collider.MatchesMixedPartitionGridBounds(coverageMin, coverageMax))
+        MixedPartitionMobilityKind currentKind = Get2DMobilityKind(collider);
+        if (!force && collider.MatchesMixedPartitionGridBounds(coverageMin, coverageMax, (int)currentKind))
             return false;
 
         SwiftList<WorldVoxelIndex>? coordinates = collider.MixedPartitionCoordinates;
@@ -271,7 +286,7 @@ internal sealed class GravitasMixedCollisionService
             return false;
 
         GridWorld world = _context.World;
-        bool isStatic = IsStatic2DCollider(collider);
+        MixedPartitionMobilityKind partitionKind = GetStoredMobilityKind(collider.MixedPartitionKind);
         try
         {
             for (int i = 0; i < coordinates.Count; i++)
@@ -283,10 +298,7 @@ internal sealed class GravitasMixedCollisionService
                     continue;
                 }
 
-                if (isStatic)
-                    partition!.RemoveStatic2DObject(collider.Id);
-                else
-                    partition!.RemoveDynamic2DObject(collider.Id);
+                Remove2DObject(partition!, collider.Id, partitionKind);
             }
         }
         finally
@@ -384,10 +396,12 @@ internal sealed class GravitasMixedCollisionService
         Vector3d min,
         Vector3d max,
         PhysicsLayerMask layerMask,
-        SwiftList<LSCollider2D> candidates)
+        SwiftList<LSCollider2D> candidates,
+        bool staticStyleOnly = false,
+        bool cachePartitionRefresh = false)
     {
         SwiftThrowHelper.ThrowIfNull(candidates, nameof(candidates));
-        Refresh2DColliderPartitions();
+        Refresh2DColliderPartitionsForQuery(cachePartitionRefresh);
         candidates.FastClear();
         CollectCoveredMixedQueryPartitions(min, max, _queryPartitions);
         SortPartitions(_queryPartitions);
@@ -396,7 +410,11 @@ internal sealed class GravitasMixedCollisionService
         for (int i = 0; i < _queryPartitions.Count; i++)
         {
             PhysicsMixedPartition partition = _queryPartitions[i];
-            partition.Copy2DColliderIds(_queryColliderIds);
+            if (staticStyleOnly)
+                partition.CopyStaticStyle2DColliderIds(_queryColliderIds);
+            else
+                partition.Copy2DColliderIds(_queryColliderIds);
+
             for (int j = 0; j < _queryColliderIds.Count; j++)
             {
                 int colliderId = _queryColliderIds[j];
@@ -419,10 +437,12 @@ internal sealed class GravitasMixedCollisionService
         Vector3d min,
         Vector3d max,
         PhysicsLayerMask layerMask,
-        SwiftList<LSCollider> candidates)
+        SwiftList<LSCollider> candidates,
+        bool staticStyleOnly = false,
+        bool cachePartitionRefresh = false)
     {
         SwiftThrowHelper.ThrowIfNull(candidates, nameof(candidates));
-        Refresh3DColliderPartitions();
+        Refresh3DColliderPartitionsForQuery(cachePartitionRefresh);
         candidates.FastClear();
         CollectCoveredMixedQueryPartitions(min, max, _queryPartitions);
         SortPartitions(_queryPartitions);
@@ -431,7 +451,11 @@ internal sealed class GravitasMixedCollisionService
         for (int i = 0; i < _queryPartitions.Count; i++)
         {
             PhysicsMixedPartition partition = _queryPartitions[i];
-            partition.Copy3DColliderIds(_queryColliderIds);
+            if (staticStyleOnly)
+                partition.CopyStaticStyle3DColliderIds(_queryColliderIds);
+            else
+                partition.Copy3DColliderIds(_queryColliderIds);
+
             for (int j = 0; j < _queryColliderIds.Count; j++)
             {
                 int colliderId = _queryColliderIds[j];
@@ -655,6 +679,26 @@ internal sealed class GravitasMixedCollisionService
                 Refresh3DColliderPartition(collider!);
     }
 
+    private void Refresh3DColliderPartitionsForQuery(bool cachePartitionRefresh)
+    {
+        if (!cachePartitionRefresh)
+        {
+            Refresh3DColliderPartitions();
+            return;
+        }
+
+        int frame = _context.FrameCount;
+        int lateToken = _context.LateSimulateToken;
+        // CCD batches query stable opposite-dimension targets many times in one late-sim phase.
+        // Cache only the partition refresh; every sweep still gathers and sorts its own hits.
+        if (_cached3DQueryRefreshFrame == frame && _cached3DQueryRefreshLateToken == lateToken)
+            return;
+
+        Refresh3DColliderPartitions();
+        _cached3DQueryRefreshFrame = frame;
+        _cached3DQueryRefreshLateToken = lateToken;
+    }
+
     private void Refresh2DColliderPartitions()
     {
         int count = _context.Physics2D.ColliderCount;
@@ -663,21 +707,42 @@ internal sealed class GravitasMixedCollisionService
                 Refresh2DColliderPartition(collider!);
     }
 
+    private void Refresh2DColliderPartitionsForQuery(bool cachePartitionRefresh)
+    {
+        if (!cachePartitionRefresh)
+        {
+            Refresh2DColliderPartitions();
+            return;
+        }
+
+        int frame = _context.FrameCount;
+        int lateToken = _context.LateSimulateToken;
+        // CCD batches query stable opposite-dimension targets many times in one late-sim phase.
+        // Cache only the partition refresh; every sweep still gathers and sorts its own hits.
+        if (_cached2DQueryRefreshFrame == frame && _cached2DQueryRefreshLateToken == lateToken)
+            return;
+
+        Refresh2DColliderPartitions();
+        _cached2DQueryRefreshFrame = frame;
+        _cached2DQueryRefreshLateToken = lateToken;
+    }
+
     private bool Partition3DCollider(LSCollider collider, Vector3d coverageMin, Vector3d coverageMax)
     {
         if (collider.IsMixedPartitioned || !collider.IsActive)
             return false;
 
+        MixedPartitionMobilityKind kind = Get3DMobilityKind(collider);
         SwiftList<WorldVoxelIndex> coordinates = collider.GetOrCreateMixedPartitionCoordinates();
         coordinates.FastClear();
 
         try
         {
-            ScanCovered3DVoxels(collider, coverageMin, coverageMax, coordinates);
+            ScanCovered3DVoxels(collider, coverageMin, coverageMax, coordinates, kind);
             if (coordinates.Count == 0)
                 return false;
 
-            collider.MarkMixedPartitioned(coverageMin, coverageMax);
+            collider.MarkMixedPartitioned(coverageMin, coverageMax, (int)kind);
             return true;
         }
         finally
@@ -691,16 +756,17 @@ internal sealed class GravitasMixedCollisionService
         if (collider.IsMixedPartitioned || !collider.IsActive)
             return false;
 
+        MixedPartitionMobilityKind kind = Get2DMobilityKind(collider);
         SwiftList<WorldVoxelIndex> coordinates = collider.GetOrCreateMixedPartitionCoordinates();
         coordinates.FastClear();
 
         try
         {
-            ScanCovered2DMixedVoxels(collider, coverageMin, coverageMax, coordinates);
+            ScanCovered2DMixedVoxels(collider, coverageMin, coverageMax, coordinates, kind);
             if (coordinates.Count == 0)
                 return false;
 
-            collider.MarkMixedPartitioned(coverageMin, coverageMax);
+            collider.MarkMixedPartitioned(coverageMin, coverageMax, (int)kind);
             return true;
         }
         finally
@@ -713,7 +779,8 @@ internal sealed class GravitasMixedCollisionService
         LSCollider collider,
         Vector3d coverageMin,
         Vector3d coverageMax,
-        SwiftList<WorldVoxelIndex> coordinates)
+        SwiftList<WorldVoxelIndex> coordinates,
+        MixedPartitionMobilityKind kind)
     {
         GridWorld world = _context.World;
         GridTracer.GetCoveredVoxelsInto(
@@ -726,14 +793,15 @@ internal sealed class GravitasMixedCollisionService
 
         var traversal = new GridForgeTraversalState(world, GridForgeTraversalPaddingMode.MaxCellEdge);
         for (int i = 0; i < _coveredVoxels.Count; i++)
-            TryPartition3DVoxel(collider, coordinates, _coveredVoxels[i], ref traversal);
+            TryPartition3DVoxel(collider, coordinates, _coveredVoxels[i], ref traversal, kind);
     }
 
     private void ScanCovered2DMixedVoxels(
         LSCollider2D collider,
         Vector3d coverageMin,
         Vector3d coverageMax,
-        SwiftList<WorldVoxelIndex> coordinates)
+        SwiftList<WorldVoxelIndex> coordinates,
+        MixedPartitionMobilityKind kind)
     {
         GridWorld world = _context.World;
         GridTracer.GetCoveredVoxelsInto(
@@ -746,7 +814,7 @@ internal sealed class GravitasMixedCollisionService
 
         var traversal = new GridForgeTraversalState(world, GridForgeTraversalPaddingMode.MaxCellEdge);
         for (int i = 0; i < _coveredVoxels.Count; i++)
-            TryPartition2DMixedVoxel(collider, coordinates, _coveredVoxels[i], ref traversal);
+            TryPartition2DMixedVoxel(collider, coordinates, _coveredVoxels[i], ref traversal, kind);
     }
 
     private void CollectCoveredMixedQueryPartitions(
@@ -809,7 +877,8 @@ internal sealed class GravitasMixedCollisionService
         LSCollider collider,
         SwiftList<WorldVoxelIndex> coordinates,
         Voxel voxel,
-        ref GridForgeTraversalState traversal)
+        ref GridForgeTraversalState traversal,
+        MixedPartitionMobilityKind kind)
     {
         if (!traversal.TryVisitUnique(voxel, _redundancyChecker, out Fixed64 cellEdge)
             || !collider.IsPositionInBounds(cellEdge, voxel.WorldPosition))
@@ -819,17 +888,15 @@ internal sealed class GravitasMixedCollisionService
 
         PhysicsMixedPartition partition = GetOrCreatePartition(voxel);
         coordinates.Add(voxel.WorldIndex);
-        if (IsStatic3DCollider(collider))
-            partition.AddStatic3DObject(collider.Id);
-        else
-            partition.AddDynamic3DObject(collider.Id);
+        Add3DObject(partition, collider.Id, kind);
     }
 
     private void TryPartition2DMixedVoxel(
         LSCollider2D collider,
         SwiftList<WorldVoxelIndex> coordinates,
         Voxel voxel,
-        ref GridForgeTraversalState traversal)
+        ref GridForgeTraversalState traversal,
+        MixedPartitionMobilityKind kind)
     {
         if (!traversal.TryVisitUnique(voxel, _redundancyChecker, out Fixed64 cellEdge)
             || !collider.IsPositionInMixedBounds(cellEdge, voxel.WorldPosition))
@@ -839,10 +906,7 @@ internal sealed class GravitasMixedCollisionService
 
         PhysicsMixedPartition partition = GetOrCreatePartition(voxel);
         coordinates.Add(voxel.WorldIndex);
-        if (IsStatic2DCollider(collider))
-            partition.AddStatic2DObject(collider.Id);
-        else
-            partition.AddDynamic2DObject(collider.Id);
+        Add2DObject(partition, collider.Id, kind);
     }
 
     private PhysicsMixedPartition GetOrCreatePartition(Voxel voxel)
@@ -879,10 +943,106 @@ internal sealed class GravitasMixedCollisionService
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool IsStatic3DCollider(LSCollider collider) => collider.Body == null || collider.Body.Immovable;
+    private static MixedPartitionMobilityKind Get3DMobilityKind(LSCollider collider)
+    {
+        StiffBody? body = collider.Body;
+        if (body == null || body.Immovable)
+            return MixedPartitionMobilityKind.Static;
+
+        return body.IsKinematic ? MixedPartitionMobilityKind.Kinematic : MixedPartitionMobilityKind.Dynamic;
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool IsStatic2DCollider(LSCollider2D collider) => collider.Body == null || collider.Body.Immovable;
+    private static MixedPartitionMobilityKind Get2DMobilityKind(LSCollider2D collider)
+    {
+        StiffBody2D? body = collider.Body;
+        if (body == null || body.Immovable)
+            return MixedPartitionMobilityKind.Static;
+
+        return body.IsKinematic ? MixedPartitionMobilityKind.Kinematic : MixedPartitionMobilityKind.Dynamic;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static MixedPartitionMobilityKind GetStoredMobilityKind(int partitionKind)
+    {
+        return partitionKind == (int)MixedPartitionMobilityKind.Kinematic
+            ? MixedPartitionMobilityKind.Kinematic
+            : partitionKind == (int)MixedPartitionMobilityKind.Static
+                ? MixedPartitionMobilityKind.Static
+                : MixedPartitionMobilityKind.Dynamic;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void Add3DObject(PhysicsMixedPartition partition, int id, MixedPartitionMobilityKind kind)
+    {
+        if (kind == MixedPartitionMobilityKind.Static)
+        {
+            partition.AddStatic3DObject(id);
+            return;
+        }
+
+        if (kind == MixedPartitionMobilityKind.Kinematic)
+        {
+            partition.AddKinematic3DObject(id);
+            return;
+        }
+
+        partition.AddDynamic3DObject(id);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void Add2DObject(PhysicsMixedPartition partition, int id, MixedPartitionMobilityKind kind)
+    {
+        if (kind == MixedPartitionMobilityKind.Static)
+        {
+            partition.AddStatic2DObject(id);
+            return;
+        }
+
+        if (kind == MixedPartitionMobilityKind.Kinematic)
+        {
+            partition.AddKinematic2DObject(id);
+            return;
+        }
+
+        partition.AddDynamic2DObject(id);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void Remove3DObject(PhysicsMixedPartition partition, int id, MixedPartitionMobilityKind kind)
+    {
+        if (kind == MixedPartitionMobilityKind.Static)
+        {
+            partition.RemoveStatic3DObject(id);
+            return;
+        }
+
+        if (kind == MixedPartitionMobilityKind.Kinematic)
+        {
+            partition.RemoveKinematic3DObject(id);
+            return;
+        }
+
+        partition.RemoveDynamic3DObject(id);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void Remove2DObject(PhysicsMixedPartition partition, int id, MixedPartitionMobilityKind kind)
+    {
+        if (kind == MixedPartitionMobilityKind.Static)
+        {
+            partition.RemoveStatic2DObject(id);
+            return;
+        }
+
+        if (kind == MixedPartitionMobilityKind.Kinematic)
+        {
+            partition.RemoveKinematic2DObject(id);
+            return;
+        }
+
+        partition.RemoveDynamic2DObject(id);
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool MixedBoundsOverlap(LSCollider collider3D, LSCollider2D collider2D)

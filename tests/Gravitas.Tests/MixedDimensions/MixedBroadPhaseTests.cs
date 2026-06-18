@@ -211,9 +211,11 @@ public sealed class MixedBroadPhaseTests
         voxel.TryGetPartition<PhysicsMixedPartition>(out _).Should().BeFalse();
         (partition!.ContainedDynamic3DObjects?.Count ?? 0).Should().Be(0);
         (partition.ContainedAwakeDynamic3DObjects?.Count ?? 0).Should().Be(0);
+        (partition.ContainedKinematic3DObjects?.Count ?? 0).Should().Be(0);
         (partition.ContainedStatic3DObjects?.Count ?? 0).Should().Be(0);
         (partition.ContainedDynamic2DObjects?.Count ?? 0).Should().Be(0);
         (partition.ContainedAwakeDynamic2DObjects?.Count ?? 0).Should().Be(0);
+        (partition.ContainedKinematic2DObjects?.Count ?? 0).Should().Be(0);
         (partition.ContainedStatic2DObjects?.Count ?? 0).Should().Be(0);
         partition.IsAllocated.Should().BeFalse();
 
@@ -226,6 +228,74 @@ public sealed class MixedBroadPhaseTests
         replacementVoxel!.TryGetPartition(out PhysicsMixedPartition? replacementPartition).Should().BeTrue();
         replacementPartition!.ContainedDynamic3DObjects!.Contains(replacement3D.Collider.Id).Should().BeTrue();
         context.MixedCollisions.RetainedPartitionCount.Should().BeGreaterThan(0);
+    }
+
+    [Fact]
+    public void Simulate_When3DMixedBodyMobilityChanges_ShouldMovePartitionMembershipSets()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(context, Vector3d.Zero, immovable: false);
+        _ = CreateCircle2D(context, Vector2d.Zero, immovable: true);
+
+        context.Simulate();
+        PhysicsMixedPartition partition = GetFirstMixedPartition(context, body3D.Collider.MixedPartitionCoordinates!);
+        ContainsId(partition.ContainedDynamic3DObjects, body3D.Collider.Id).Should().BeTrue();
+
+        body3D.Body.IsKinematic = true;
+        context.Simulate();
+        partition = GetFirstMixedPartition(context, body3D.Collider.MixedPartitionCoordinates!);
+
+        ContainsId(partition.ContainedDynamic3DObjects, body3D.Collider.Id).Should().BeFalse();
+        ContainsId(partition.ContainedKinematic3DObjects, body3D.Collider.Id).Should().BeTrue();
+
+        body3D.Body.IsKinematic = false;
+        body3D.Body.Immovable = true;
+        context.Simulate();
+        partition = GetFirstMixedPartition(context, body3D.Collider.MixedPartitionCoordinates!);
+
+        ContainsId(partition.ContainedKinematic3DObjects, body3D.Collider.Id).Should().BeFalse();
+        ContainsId(partition.ContainedStatic3DObjects, body3D.Collider.Id).Should().BeTrue();
+
+        body3D.Body.Immovable = false;
+        context.Simulate();
+        partition = GetFirstMixedPartition(context, body3D.Collider.MixedPartitionCoordinates!);
+
+        ContainsId(partition.ContainedStatic3DObjects, body3D.Collider.Id).Should().BeFalse();
+        ContainsId(partition.ContainedDynamic3DObjects, body3D.Collider.Id).Should().BeTrue();
+    }
+
+    [Fact]
+    public void Simulate_When2DMixedBodyMobilityChanges_ShouldMovePartitionMembershipSets()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        _ = CreateSphere3D(context, Vector3d.Zero, immovable: false);
+        StiffBody2D body2D = CreateCircle2D(context, Vector2d.Zero, immovable: false);
+
+        context.Simulate();
+        PhysicsMixedPartition partition = GetFirstMixedPartition(context, body2D.Collider.MixedPartitionCoordinates!);
+        ContainsId(partition.ContainedDynamic2DObjects, body2D.Collider.Id).Should().BeTrue();
+
+        body2D.IsKinematic = true;
+        context.Simulate();
+        partition = GetFirstMixedPartition(context, body2D.Collider.MixedPartitionCoordinates!);
+
+        ContainsId(partition.ContainedDynamic2DObjects, body2D.Collider.Id).Should().BeFalse();
+        ContainsId(partition.ContainedKinematic2DObjects, body2D.Collider.Id).Should().BeTrue();
+
+        body2D.IsKinematic = false;
+        body2D.Immovable = true;
+        context.Simulate();
+        partition = GetFirstMixedPartition(context, body2D.Collider.MixedPartitionCoordinates!);
+
+        ContainsId(partition.ContainedKinematic2DObjects, body2D.Collider.Id).Should().BeFalse();
+        ContainsId(partition.ContainedStatic2DObjects, body2D.Collider.Id).Should().BeTrue();
+
+        body2D.Immovable = false;
+        context.Simulate();
+        partition = GetFirstMixedPartition(context, body2D.Collider.MixedPartitionCoordinates!);
+
+        ContainsId(partition.ContainedStatic2DObjects, body2D.Collider.Id).Should().BeFalse();
+        ContainsId(partition.ContainedDynamic2DObjects, body2D.Collider.Id).Should().BeTrue();
     }
 
     private static GravitasWorldContext CreateMixedContext(int extent = 32)
@@ -310,4 +380,15 @@ public sealed class MixedBroadPhaseTests
         body.Initialize(agent.Transform.Position.ToVector2d());
         return body;
     }
+
+    private static PhysicsMixedPartition GetFirstMixedPartition(
+        GravitasWorldContext context,
+        SwiftList<WorldVoxelIndex> coordinates)
+    {
+        context.World.TryGetVoxel(coordinates[0], out Voxel? voxel).Should().BeTrue();
+        voxel!.TryGetPartition(out PhysicsMixedPartition? partition).Should().BeTrue();
+        return partition!;
+    }
+
+    private static bool ContainsId(SwiftSparseSet? set, int id) => set?.Contains(id) == true;
 }

@@ -83,7 +83,8 @@ public sealed class GravitasQueryMixedService
         PhysicsLayerMask layerMask,
         SwiftList<PhysicsMixedHit> results,
         LSCollider? excludedCollider = null,
-        bool includeTriggers = true)
+        bool includeTriggers = true,
+        bool cacheTargetPartitions = false)
     {
         return SweepSphereAgainst2DAllCore(
             start,
@@ -93,7 +94,8 @@ public sealed class GravitasQueryMixedService
             results,
             excludedCollider,
             includeTriggers,
-            staticTargetsOnly: true);
+            staticTargetsOnly: true,
+            cacheTargetPartitions);
     }
 
     private int SweepSphereAgainst2DAllCore(
@@ -104,7 +106,8 @@ public sealed class GravitasQueryMixedService
         SwiftList<PhysicsMixedHit> results,
         LSCollider? excludedCollider,
         bool includeTriggers,
-        bool staticTargetsOnly)
+        bool staticTargetsOnly,
+        bool cacheTargetPartitions = false)
     {
         SwiftThrowHelper.ThrowIfNull(results, nameof(results));
         SwiftThrowHelper.ThrowIfArgument(radius <= Fixed64.Zero, nameof(radius), "Mixed swept sphere radius must be greater than zero.");
@@ -120,7 +123,13 @@ public sealed class GravitasQueryMixedService
         Vector3d direction = segment.Normalized;
         Fixed64 length = segment.Magnitude;
         CreateSweepBounds(start, end, radius, out Vector3d min, out Vector3d max);
-        _context.MixedCollisions.Collect2DCandidatesInMixedBounds(min, max, layerMask, _candidates2D);
+        _context.MixedCollisions.Collect2DCandidatesInMixedBounds(
+            min,
+            max,
+            layerMask,
+            _candidates2D,
+            staticStyleOnly: staticTargetsOnly,
+            cachePartitionRefresh: cacheTargetPartitions);
         LastQueryCandidateCount = _candidates2D.Count;
 
         for (int i = 0; i < _candidates2D.Count; i++)
@@ -209,7 +218,8 @@ public sealed class GravitasQueryMixedService
         PhysicsLayerMask layerMask,
         SwiftList<PhysicsMixedHit> results,
         LSCollider2D? excludedCollider = null,
-        bool includeTriggers = true)
+        bool includeTriggers = true,
+        bool cacheTargetPartitions = false)
     {
         return SweepCircleAgainst3DAllCore(
             start,
@@ -221,7 +231,8 @@ public sealed class GravitasQueryMixedService
             results,
             excludedCollider,
             includeTriggers,
-            staticTargetsOnly: true);
+            staticTargetsOnly: true,
+            cacheTargetPartitions);
     }
 
     private int SweepCircleAgainst3DAllCore(
@@ -234,7 +245,8 @@ public sealed class GravitasQueryMixedService
         SwiftList<PhysicsMixedHit> results,
         LSCollider2D? excludedCollider,
         bool includeTriggers,
-        bool staticTargetsOnly)
+        bool staticTargetsOnly,
+        bool cacheTargetPartitions = false)
     {
         SwiftThrowHelper.ThrowIfNull(results, nameof(results));
         SwiftThrowHelper.ThrowIfArgument(radius <= Fixed64.Zero, nameof(radius), "Mixed swept circle radius must be greater than zero.");
@@ -255,7 +267,13 @@ public sealed class GravitasQueryMixedService
         Vector3d direction = new(direction2D.X, Fixed64.Zero, direction2D.Y);
         Fixed64 proxyRadius = FixedMath.Max(radius, halfThickness);
         CreateCircleSlabSweepBounds(start, end, radius, slabCenterY, halfThickness, out Vector3d min, out Vector3d max);
-        _context.MixedCollisions.Collect3DCandidatesInMixedBounds(min, max, layerMask, _candidates3D);
+        _context.MixedCollisions.Collect3DCandidatesInMixedBounds(
+            min,
+            max,
+            layerMask,
+            _candidates3D,
+            staticStyleOnly: staticTargetsOnly,
+            cachePartitionRefresh: cacheTargetPartitions);
         LastQueryCandidateCount = _candidates3D.Count;
         _sweepWorker.Prepare(start3D, end3D, proxyRadius);
 

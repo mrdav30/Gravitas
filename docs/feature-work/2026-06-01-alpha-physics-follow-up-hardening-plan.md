@@ -1247,8 +1247,8 @@ CCD still pays for opposite-dimension query collection and broader mixed
 embedding work. A partition-level static-only collector experiment was tried
 and rejected for this phase because it pushed kinematic/static classification
 into partition membership without a complete state-transition model. That
-should be revisited only as part of a dedicated mixed broad-phase
-classification pass.
+was revisited in Phase 8C and accepted only after adding explicit
+dynamic/kinematic/static membership state and mobility-transition tests.
 
 ## Phase 8C: Mixed CCD Signal And Shared Query Cost
 
@@ -1285,43 +1285,45 @@ changes, layer changes, and repartitioning.
 
 **Tasks**
 
-- [ ] Capture a fresh mixed CCD baseline before runtime changes. If benchmark
+- [x] Capture a fresh mixed CCD baseline before runtime changes. If benchmark
   methodology changes, re-run the baseline under the new methodology before
   comparing runtime changes.
-- [ ] Stabilize the mixed CCD benchmark signal:
+- [x] Stabilize the mixed CCD benchmark signal:
   - add batched or microbenchmark variants that raise minimum iteration time
     without hiding per-frame reset/setup cost.
-  - keep sparse/dense mixed rows and add 1024-body stress rows once the run
-    time is reasonable.
+  - keep sparse/dense mixed rows and add larger stress rows only when the
+    regular benchmark run budget can absorb them.
   - split full mixed `LateSimulate` cost from candidate collection and exact
     sweep cost so the bottleneck is observable.
   - document BenchmarkDotNet warnings, outliers, and confidence intervals
     alongside mean timings.
-- [ ] Add benchmark-visible internal counters where they improve attribution:
+- [x] Add benchmark-visible internal counters where they improve attribution:
   mixed 2D/3D candidates collected, candidates rejected by static/dynamic
   policy, exact mixed sweeps attempted, dynamic CCD candidates returned, and
-  final hits.
-- [ ] Review lower-stack assets before adding new structures:
+  final hits. Phase 8C used the existing mixed query candidate count and split
+  benchmark rows rather than adding runtime counters to hot paths.
+- [x] Review lower-stack assets before adding new structures:
   `GridForge` traversal/partition APIs, `SwiftFixedBVH<T>`,
   `SwiftFixedSpatialHash<T>`, existing mixed broad-phase benchmarks, and any
   reusable FixedMathSharp bounds helpers.
-- [ ] Implement only the measured highest-impact optimization. Candidate
+- [x] Implement only the measured highest-impact optimization. Candidate
   directions to evaluate:
   - mixed static-only collectors that filter during broad-phase collection
     without unsafe static/dynamic partition membership.
   - a per-frame or retained static mixed candidate index if repeated static
     sweep collection dominates many-CCD-body scenes.
   - shared swept-bound/proxy helpers if duplicated 3D/2D/mixed CCD prep shows
-    up in profiles or allocation counters.
+  up in profiles or allocation counters.
   - shape-specific mixed sweep fast paths if exact mixed narrow phase dominates.
-- [ ] If a proven change also benefits pure 2D or 3D CCD/query paths, apply it
+- [x] If a proven change also benefits pure 2D or 3D CCD/query paths, apply it
   there with separate before/after measurements instead of leaving the shared
-  win on the table.
-- [ ] Add correctness tests for any changed mixed broad-phase or query policy:
+  win on the table. Phase 8C's accepted optimization is mixed-partition
+  specific, so pure 2D/3D CCD was left untouched.
+- [x] Add correctness tests for any changed mixed broad-phase or query policy:
   public mixed queries still include dynamic targets, CCD static-only queries
   include bodyless/immovable/kinematic targets only, triggers/layers/sibling
   filters still apply, and hit ordering remains deterministic.
-- [ ] Re-run focused CCD/mixed tests, full `Release`, full `ReleaseLean`, and
+- [x] Re-run focused CCD/mixed tests, full `Release`, full `ReleaseLean`, and
   the same benchmark set. Update this section with before/after results and
   rejected experiments.
 
@@ -1338,6 +1340,79 @@ changes, layer changes, and repartitioning.
 - Hot-path managed allocations do not increase after warmup.
 - Any new broad-phase classification or indexing state has explicit lifecycle
   tests for activation, deactivation, state changes, and partition cleanup.
+
+**Progress - 2026-06-18**
+
+Captured a fresh Phase 8C baseline before runtime changes and then added
+batched mixed CCD attribution rows. The new benchmark rows keep sparse/dense
+mixed `LateSimulate` coverage while also splitting static 2D-target and static
+3D-target mixed query batches. The first measurement showed the real cost:
+static mixed query collection was roughly 44-46 ms/op at 256 bodies, accounting
+for most of the mixed CCD row.
+
+Implemented explicit mixed partition mobility membership:
+`dynamic`, `kinematic`, and `static` sets now exist for both 3D and 2D collider
+IDs. Public mixed queries still copy every set; static CCD copies only
+kinematic+static sets. Collider mixed partition state stores the last mobility
+kind so dynamic/kinematic/immovable transitions remove IDs from the correct old
+set before repartitioning.
+
+The kinematic/static split hardened correctness but was not the main benchmark
+win by itself. The accepted high-impact optimization is a phase-scoped target
+partition refresh cache for internal static mixed CCD. During one late-sim token
+the first static mixed CCD sweep refreshes the opposite-dimension target
+partitions; subsequent sweeps in the same token reuse that refreshed partition
+state while still performing their own deterministic voxel query, candidate
+dedupe, exact sweep, and hit ordering. Public all-target mixed sweep APIs keep
+their old always-refresh behavior.
+
+Representative short-run benchmark comparison:
+
+```powershell
+dotnet tests\Gravitas.Benchmarks\bin\Release\net8.0\Gravitas.Benchmarks.dll dynamic-ccd-scaling --filter "*Mixed*Batch8*" --artifacts artifacts\benchmarks\2026-06-18-phase8c-mixed-ccd-baseline-batch-attribution --launchCount 1 --warmupCount 1 --iterationCount 7 --unrollFactor 1
+
+dotnet tests\Gravitas.Benchmarks\bin\Release\net8.0\Gravitas.Benchmarks.dll dynamic-ccd-scaling --filter "*Mixed*Batch8*" --artifacts artifacts\benchmarks\2026-06-18-phase8c-mixed-ccd-post-phase-cache --launchCount 1 --warmupCount 1 --iterationCount 7 --unrollFactor 1
+```
+
+| Method | BodyCount | Baseline | Final | Allocated |
+| --- | ---: | ---: | ---: | ---: |
+| SparseMixedDynamicCcdBatch8 | 64 | 7.862 ms | 3.663 ms | 21504 B |
+| DenseMixedDynamicCcdBatch8 | 64 | 7.751 ms | 4.282 ms | 21504 B |
+| SparseMixedStatic2DQueryBatch8 | 64 | 2.250 ms | 923.0 us | 0 B |
+| DenseMixedStatic2DQueryBatch8 | 64 | 2.837 ms | 985.8 us | 0 B |
+| SparseMixedStatic3DQueryBatch8 | 64 | 2.124 ms | 909.8 us | 0 B |
+| DenseMixedStatic3DQueryBatch8 | 64 | 2.586 ms | 1.010 ms | 0 B |
+| SparseMixedDynamicCcdBatch8 | 256 | 95.449 ms | 8.037 ms | 86016 B |
+| DenseMixedDynamicCcdBatch8 | 256 | 106.479 ms | 9.709 ms | 86016 B |
+| SparseMixedStatic2DQueryBatch8 | 256 | 44.639 ms | 2.992 ms | 0 B |
+| DenseMixedStatic2DQueryBatch8 | 256 | 44.568 ms | 2.876 ms | 0 B |
+| SparseMixedStatic3DQueryBatch8 | 256 | 46.017 ms | 2.552 ms | 0 B |
+| DenseMixedStatic3DQueryBatch8 | 256 | 44.548 ms | 2.852 ms | 0 B |
+
+BenchmarkDotNet still reports short-iteration warnings and some noisy
+confidence intervals, so these rows should be treated as directionally strong
+alpha-hardening evidence rather than release-grade performance constants. The
+large 256-body delta is big enough to keep the optimization.
+
+Correctness coverage added:
+
+- static mixed CCD collects kinematic/immovable targets and skips movable
+  dynamic targets for both 3D-source->2D-target and 2D-source->3D-target paths.
+- mixed partition membership moves across dynamic, kinematic, static, and back
+  for both 3D and 2D colliders.
+- cached static mixed CCD refreshes target partitions again on the next late-sim
+  token for both dimensions.
+
+Verification:
+
+```powershell
+dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~MixedDimensions"
+dotnet test Gravitas.slnx --configuration Release
+dotnet test Gravitas.slnx --configuration ReleaseLean
+```
+
+Result: mixed-dimension focused tests passed 65/65, full `Release` passed
+440/440, and full `ReleaseLean` passed 435/435.
 
 ## Phase 9: Typed Diagnostic Views
 

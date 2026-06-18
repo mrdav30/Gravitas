@@ -1113,7 +1113,8 @@ public class StiffBody : IRecordable
                 PhysicsLayerMask.All,
                 _continuousMixedCollisionHits,
                 Collider,
-                includeTriggers: false)
+                includeTriggers: false,
+                cacheTargetPartitions: true)
             : 0;
 
         bool found3D = TryGetFirstValidContinuousCollisionHit(hitCount, out Physics3DHit hit3D);

@@ -300,6 +300,156 @@ public sealed class MixedQueryCcdTests
     }
 
     [Fact]
+    public void SweepSphereAgainstStatic2DAll_ShouldCollectOnlyStaticStyle2DTargets()
+    {
+        using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
+        ScenarioBody<LSSphereCollider> source = CreateSphere3D(
+            context,
+            new Vector3d((Fixed64)(-5), Fixed64.Zero, Fixed64.Zero));
+        StiffBody2D movable = CreateCircle2D(context, new Vector2d(Fixed64.Zero, Fixed64.Zero));
+        StiffBody2D kinematic = CreateCircle2D(
+            context,
+            new Vector2d(Fixed64.Zero, Fixed64.One),
+            immovable: false,
+            isKinematic: true);
+        StiffBody2D immovable = CreateCircle2D(
+            context,
+            new Vector2d(Fixed64.Zero, -Fixed64.One),
+            immovable: true);
+        var hits = new SwiftList<PhysicsMixedHit>();
+
+        int count = context.QueryMixed.SweepSphereAgainstStatic2DAll(
+            new Vector3d((Fixed64)(-5), Fixed64.Zero, Fixed64.Zero),
+            new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero),
+            Fixed64.Half,
+            IncludeLayerZero,
+            hits,
+            source.Collider,
+            includeTriggers: false);
+
+        count.Should().Be(2);
+        context.QueryMixed.LastQueryCandidateCount.Should().Be(2);
+        hits.Should().OnlyContain(hit => !ReferenceEquals(hit.Collider2D, movable.Collider));
+        hits.Should().Contain(hit => ReferenceEquals(hit.Collider2D, kinematic.Collider));
+        hits.Should().Contain(hit => ReferenceEquals(hit.Collider2D, immovable.Collider));
+    }
+
+    [Fact]
+    public void SweepCircleAgainstStatic3DAll_ShouldCollectOnlyStaticStyle3DTargets()
+    {
+        using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
+        StiffBody2D source = CreateCircle2D(context, new Vector2d((Fixed64)(-5), Fixed64.Zero));
+        ScenarioBody<LSSphereCollider> movable = CreateSphere3D(
+            context,
+            new Vector3d(Fixed64.Zero, Fixed64.Zero, Fixed64.Zero));
+        ScenarioBody<LSSphereCollider> kinematic = CreateSphere3D(
+            context,
+            new Vector3d(Fixed64.Zero, Fixed64.Zero, Fixed64.One),
+            isKinematic: true);
+        ScenarioBody<LSSphereCollider> immovable = CreateSphere3D(
+            context,
+            new Vector3d(Fixed64.Zero, Fixed64.Zero, -Fixed64.One),
+            immovable: true);
+        var hits = new SwiftList<PhysicsMixedHit>();
+
+        int count = context.QueryMixed.SweepCircleAgainstStatic3DAll(
+            new Vector2d((Fixed64)(-5), Fixed64.Zero),
+            new Vector2d((Fixed64)5, Fixed64.Zero),
+            Fixed64.Half,
+            Fixed64.Zero,
+            Fixed64.Half,
+            IncludeLayerZero,
+            hits,
+            source.Collider,
+            includeTriggers: false);
+
+        count.Should().Be(2);
+        context.QueryMixed.LastQueryCandidateCount.Should().Be(2);
+        hits.Should().OnlyContain(hit => !ReferenceEquals(hit.Collider3D, movable.Collider));
+        hits.Should().Contain(hit => ReferenceEquals(hit.Collider3D, kinematic.Collider));
+        hits.Should().Contain(hit => ReferenceEquals(hit.Collider3D, immovable.Collider));
+    }
+
+    [Fact]
+    public void SweepSphereAgainstStatic2DAll_WithCachedTargetRefresh_ShouldRefreshOnNextLateToken()
+    {
+        using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
+        ScenarioBody<LSSphereCollider> source = CreateSphere3D(
+            context,
+            new Vector3d((Fixed64)(-5), Fixed64.Zero, Fixed64.Zero));
+        StiffBody2D target = CreateCircle2D(context, Vector2d.Zero, immovable: true);
+        var hits = new SwiftList<PhysicsMixedHit>();
+
+        context.AdvanceLateSimulateToken();
+        int firstCount = context.QueryMixed.SweepSphereAgainstStatic2DAll(
+            new Vector3d((Fixed64)(-5), Fixed64.Zero, Fixed64.Zero),
+            new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero),
+            Fixed64.Half,
+            IncludeLayerZero,
+            hits,
+            source.Collider,
+            includeTriggers: false,
+            cacheTargetPartitions: true);
+
+        target.SetPosition(new Vector2d((Fixed64)20, Fixed64.Zero));
+        context.AdvanceLateSimulateToken();
+        int secondCount = context.QueryMixed.SweepSphereAgainstStatic2DAll(
+            new Vector3d((Fixed64)(-5), Fixed64.Zero, Fixed64.Zero),
+            new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero),
+            Fixed64.Half,
+            IncludeLayerZero,
+            hits,
+            source.Collider,
+            includeTriggers: false,
+            cacheTargetPartitions: true);
+
+        firstCount.Should().Be(1);
+        secondCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void SweepCircleAgainstStatic3DAll_WithCachedTargetRefresh_ShouldRefreshOnNextLateToken()
+    {
+        using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
+        StiffBody2D source = CreateCircle2D(context, new Vector2d((Fixed64)(-5), Fixed64.Zero));
+        ScenarioBody<LSSphereCollider> target = CreateSphere3D(
+            context,
+            Vector3d.Zero,
+            immovable: true);
+        var hits = new SwiftList<PhysicsMixedHit>();
+
+        context.AdvanceLateSimulateToken();
+        int firstCount = context.QueryMixed.SweepCircleAgainstStatic3DAll(
+            new Vector2d((Fixed64)(-5), Fixed64.Zero),
+            new Vector2d((Fixed64)5, Fixed64.Zero),
+            Fixed64.Half,
+            Fixed64.Zero,
+            Fixed64.Half,
+            IncludeLayerZero,
+            hits,
+            source.Collider,
+            includeTriggers: false,
+            cacheTargetPartitions: true);
+
+        target.Body.SetPosition(new Vector3d((Fixed64)20, Fixed64.Zero, Fixed64.Zero));
+        context.AdvanceLateSimulateToken();
+        int secondCount = context.QueryMixed.SweepCircleAgainstStatic3DAll(
+            new Vector2d((Fixed64)(-5), Fixed64.Zero),
+            new Vector2d((Fixed64)5, Fixed64.Zero),
+            Fixed64.Half,
+            Fixed64.Zero,
+            Fixed64.Half,
+            IncludeLayerZero,
+            hits,
+            source.Collider,
+            includeTriggers: false,
+            cacheTargetPartitions: true);
+
+        firstCount.Should().Be(1);
+        secondCount.Should().Be(0);
+    }
+
+    [Fact]
     public void MixedDiagnostics_ShouldRecordContactResponseAndDimensionTaggedPayloads()
     {
         using GravitasWorldContext context = CreateMixedContext();
@@ -373,9 +523,10 @@ public sealed class MixedQueryCcdTests
     private static ScenarioBody<LSSphereCollider> CreateSphere3D(
         GravitasWorldContext context,
         Vector3d position,
-        bool immovable = false)
+        bool immovable = false,
+        bool isKinematic = false)
     {
-        return CreateBody3D(context, new LSSphereCollider(), position, immovable: immovable);
+        return CreateBody3D(context, new LSSphereCollider(), position, immovable: immovable, isKinematic: isKinematic);
     }
 
     private static ScenarioBody<LSMeshCollider> CreateMesh3D(
@@ -402,7 +553,8 @@ public sealed class MixedQueryCcdTests
         GravitasWorldContext context,
         TCollider collider,
         Vector3d position,
-        bool immovable = false)
+        bool immovable = false,
+        bool isKinematic = false)
         where TCollider : LSCollider
     {
         var agent = new TestMatterAgent(context, new FixedTransform(position, FixedQuaternion.Identity, Vector3d.One));
@@ -410,13 +562,18 @@ public sealed class MixedQueryCcdTests
         {
             Mass = Fixed64.One,
             Immovable = immovable,
+            IsKinematic = isKinematic,
             RestitutionCoefficient = Fixed64.Zero
         };
         body.Initialize(position, FixedQuaternion.Identity);
         return new ScenarioBody<TCollider>(body, collider);
     }
 
-    private static StiffBody2D CreateCircle2D(GravitasWorldContext context, Vector2d position)
+    private static StiffBody2D CreateCircle2D(
+        GravitasWorldContext context,
+        Vector2d position,
+        bool immovable = false,
+        bool isKinematic = false)
     {
         var collider = new LSCircleCollider2D(Fixed64.Half);
         var agent = new TestMatterAgent(
@@ -425,6 +582,8 @@ public sealed class MixedQueryCcdTests
         var body = new StiffBody2D(agent, collider)
         {
             Mass = Fixed64.One,
+            Immovable = immovable,
+            IsKinematic = isKinematic,
             RestitutionCoefficient = Fixed64.Zero
         };
         body.Initialize(position);

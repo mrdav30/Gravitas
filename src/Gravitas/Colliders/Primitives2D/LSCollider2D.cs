@@ -86,6 +86,8 @@ public abstract class LSCollider2D : IRecordable, IColliderHierarchyNode
 
     internal SwiftList<WorldVoxelIndex>? MixedPartitionCoordinates => _mixedPartitionState.Coordinates;
 
+    internal int MixedPartitionKind => _mixedPartitionState.LastPartitionKind;
+
     internal uint BroadPhaseVersion => _partitionState.BroadPhaseVersion;
 
     internal uint RuntimeShapeVersion => _runtimeShapeState.RuntimeVersion;
@@ -434,10 +436,11 @@ public abstract class LSCollider2D : IRecordable, IColliderHierarchyNode
         _partitionState.MatchesGridBounds(min, max);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal bool MatchesMixedPartitionGridBounds(Vector3d min, Vector3d max) =>
+    internal bool MatchesMixedPartitionGridBounds(Vector3d min, Vector3d max, int partitionKind) =>
         _mixedPartitionState.IsPartitioned
         && _mixedPartitionState.LastGridBoundsMin == min
-        && _mixedPartitionState.LastGridBoundsMax == max;
+        && _mixedPartitionState.LastGridBoundsMax == max
+        && _mixedPartitionState.LastPartitionKind == partitionKind;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal void MarkPartitioned(Vector2d min, Vector2d max)
@@ -447,9 +450,9 @@ public abstract class LSCollider2D : IRecordable, IColliderHierarchyNode
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal void MarkMixedPartitioned(Vector3d min, Vector3d max)
+    internal void MarkMixedPartitioned(Vector3d min, Vector3d max, int partitionKind)
     {
-        _mixedPartitionState.SetPreviousGridBounds(min, max);
+        _mixedPartitionState.SetPreviousGridBounds(min, max, partitionKind);
         _mixedPartitionState.MarkPartitioned();
     }
 

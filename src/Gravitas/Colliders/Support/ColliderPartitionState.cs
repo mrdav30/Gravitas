@@ -17,6 +17,8 @@ internal struct ColliderPartitionState
 
     public Vector3d LastGridBoundsMax { get; private set; }
 
+    public int LastPartitionKind { get; private set; }
+
     public SwiftList<WorldVoxelIndex>? Coordinates;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -33,10 +35,11 @@ internal struct ColliderPartitionState
     public void MarkUnpartitioned() => IsPartitioned = false;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void SetPreviousGridBounds(Vector3d min, Vector3d max)
+    public void SetPreviousGridBounds(Vector3d min, Vector3d max, int partitionKind = 0)
     {
         LastGridBoundsMin = min;
         LastGridBoundsMax = max;
+        LastPartitionKind = partitionKind;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

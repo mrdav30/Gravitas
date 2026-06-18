@@ -1,6 +1,7 @@
 using BenchmarkDotNet.Attributes;
 using FixedMathSharp;
 using Gravitas.Colliders;
+using Gravitas.Queries;
 using Gravitas.Support;
 using GridForge.Configuration;
 using SwiftCollections;
@@ -17,6 +18,7 @@ public class DynamicCcdScalingBenchmarks
     private const int SparseSpacing = 8;
     private const int DensePairSpacing = 8;
     private const int MixedSparseOffsetZ = 4;
+    private const int MixedBatchFrames = 8;
 
     private static readonly Vector3d Force3D = Vector3d.Right * (Fixed64)2;
     private static readonly Vector2d Force2D = Vector2d.Right * (Fixed64)2;
@@ -36,6 +38,7 @@ public class DynamicCcdScalingBenchmarks
     private SwiftList<StiffBody2D> _sparseMixed2DBodies;
     private SwiftList<StiffBody> _denseMixed3DBodies;
     private SwiftList<StiffBody2D> _denseMixed2DBodies;
+    private SwiftList<PhysicsMixedHit> _mixedQueryHits;
 
     private Vector3d[] _sparse3DPositions;
     private Vector3d[] _dense3DPositions;
@@ -72,6 +75,7 @@ public class DynamicCcdScalingBenchmarks
         _sparseMixed2DBodies = new SwiftList<StiffBody2D>(mixedPerDimension);
         _denseMixed3DBodies = new SwiftList<StiffBody>(mixedPerDimension);
         _denseMixed2DBodies = new SwiftList<StiffBody2D>(mixedPerDimension);
+        _mixedQueryHits = new SwiftList<PhysicsMixedHit>(mixedPerDimension);
 
         _sparse3DPositions = new Vector3d[BodyCount];
         _dense3DPositions = new Vector3d[BodyCount];
@@ -138,6 +142,7 @@ public class DynamicCcdScalingBenchmarks
         _sparseMixed2DBodies = null;
         _denseMixed3DBodies = null;
         _denseMixed2DBodies = null;
+        _mixedQueryHits = null;
         _sparse3DPositions = null;
         _dense3DPositions = null;
         _sparse2DPositions = null;
@@ -198,6 +203,76 @@ public class DynamicCcdScalingBenchmarks
         return Sum3D(_denseMixed3DBodies) + ToVector3D(Sum2D(_denseMixed2DBodies));
     }
 
+    [Benchmark(OperationsPerInvoke = MixedBatchFrames)]
+    public Vector3d SparseMixedDynamicCcdBatch8()
+    {
+        Vector3d total = Vector3d.Zero;
+        for (int i = 0; i < MixedBatchFrames; i++)
+        {
+            Reset3DBodies(_sparseMixed3DBodies, _sparseMixed3DPositions, pairedDirections: false);
+            Reset2DBodies(_sparseMixed2DBodies, _sparseMixed2DPositions, pairedDirections: false);
+            _sparseMixedContext.LateSimulate();
+            total += Sum3D(_sparseMixed3DBodies) + ToVector3D(Sum2D(_sparseMixed2DBodies));
+        }
+
+        return total;
+    }
+
+    [Benchmark(OperationsPerInvoke = MixedBatchFrames)]
+    public Vector3d DenseMixedDynamicCcdBatch8()
+    {
+        Vector3d total = Vector3d.Zero;
+        for (int i = 0; i < MixedBatchFrames; i++)
+        {
+            Reset3DBodies(_denseMixed3DBodies, _denseMixed3DPositions, pairedDirections: false);
+            Reset2DBodies(_denseMixed2DBodies, _denseMixed2DPositions, pairedDirections: true);
+            _denseMixedContext.LateSimulate();
+            total += Sum3D(_denseMixed3DBodies) + ToVector3D(Sum2D(_denseMixed2DBodies));
+        }
+
+        return total;
+    }
+
+    [Benchmark(OperationsPerInvoke = MixedBatchFrames)]
+    public int SparseMixedStatic2DQueryBatch8()
+    {
+        int total = 0;
+        for (int i = 0; i < MixedBatchFrames; i++)
+            total += SweepStatic2DQueries(_sparseMixedContext, _sparseMixed3DBodies, _sparseMixed3DPositions);
+
+        return total;
+    }
+
+    [Benchmark(OperationsPerInvoke = MixedBatchFrames)]
+    public int DenseMixedStatic2DQueryBatch8()
+    {
+        int total = 0;
+        for (int i = 0; i < MixedBatchFrames; i++)
+            total += SweepStatic2DQueries(_denseMixedContext, _denseMixed3DBodies, _denseMixed3DPositions);
+
+        return total;
+    }
+
+    [Benchmark(OperationsPerInvoke = MixedBatchFrames)]
+    public int SparseMixedStatic3DQueryBatch8()
+    {
+        int total = 0;
+        for (int i = 0; i < MixedBatchFrames; i++)
+            total += SweepStatic3DQueries(_sparseMixedContext, _sparseMixed2DBodies, _sparseMixed2DPositions);
+
+        return total;
+    }
+
+    [Benchmark(OperationsPerInvoke = MixedBatchFrames)]
+    public int DenseMixedStatic3DQueryBatch8()
+    {
+        int total = 0;
+        for (int i = 0; i < MixedBatchFrames; i++)
+            total += SweepStatic3DQueries(_denseMixedContext, _denseMixed2DBodies, _denseMixed2DPositions);
+
+        return total;
+    }
+
     private static void Reset3DBodies(SwiftList<StiffBody> bodies, Vector3d[] positions, bool pairedDirections)
     {
         for (int i = 0; i < bodies.Count; i++)
@@ -245,6 +320,54 @@ public class DynamicCcdScalingBenchmarks
 
     private static Vector3d ToVector3D(Vector2d value) =>
         new(value.X, Fixed64.Zero, value.Y);
+
+    private int SweepStatic2DQueries(GravitasWorldContext context, SwiftList<StiffBody> bodies, Vector3d[] positions)
+    {
+        int total = 0;
+        context.AdvanceLateSimulateToken();
+        for (int i = 0; i < bodies.Count; i++)
+        {
+            Vector3d start = positions[i];
+            Vector3d end = start + Force3D;
+            total += context.QueryMixed.SweepSphereAgainstStatic2DAll(
+                start,
+                end,
+                Fixed64.Half,
+                PhysicsLayerMask.All,
+                _mixedQueryHits,
+                bodies[i].Collider,
+                includeTriggers: false,
+                cacheTargetPartitions: true);
+            total += context.QueryMixed.LastQueryCandidateCount;
+        }
+
+        return total;
+    }
+
+    private int SweepStatic3DQueries(GravitasWorldContext context, SwiftList<StiffBody2D> bodies, Vector2d[] positions)
+    {
+        int total = 0;
+        context.AdvanceLateSimulateToken();
+        for (int i = 0; i < bodies.Count; i++)
+        {
+            Vector2d start = positions[i];
+            Vector2d end = start + Force2D;
+            total += context.QueryMixed.SweepCircleAgainstStatic3DAll(
+                start,
+                end,
+                Fixed64.Half,
+                bodies[i].Collider.MixedSlabCenterY,
+                bodies[i].Collider.MixedHalfThickness,
+                PhysicsLayerMask.All,
+                _mixedQueryHits,
+                bodies[i].Collider,
+                includeTriggers: false,
+                cacheTargetPartitions: true);
+            total += context.QueryMixed.LastQueryCandidateCount;
+        }
+
+        return total;
+    }
 
     private static GravitasWorldContext CreateContext3D(int extentX, int extentZ)
     {
