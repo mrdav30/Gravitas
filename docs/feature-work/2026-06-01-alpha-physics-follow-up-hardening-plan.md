@@ -1250,6 +1250,95 @@ into partition membership without a complete state-transition model. That
 should be revisited only as part of a dedicated mixed broad-phase
 classification pass.
 
+## Phase 8C: Mixed CCD Signal And Shared Query Cost
+
+**Goal:** Make mixed 3D/2D CCD measurements reliable enough to optimize from,
+then reduce mixed CCD cost without weakening Phase 8/8B correctness,
+deterministic ordering, or conservative swept-volume candidate policy.
+
+**Context**
+
+Phase 8B removed the obvious dynamic-target scan from 3D, 2D, and mixed CCD.
+The pure 3D/2D benchmark rows now show a strong scaling win, but mixed CCD is
+still the visible hotspot. The 256-body mixed rows improved, while 64-body
+dense mixed was effectively noise, and BenchmarkDotNet still warned that some
+single-frame iterations were too short for a stable signal. That makes Phase
+8C both a measurement-hardening phase and an optimization phase.
+
+Do not start by adding a clever mixed shortcut. First isolate where time is
+actually going:
+
+- mixed benchmark harness variance and short-iteration warning behavior.
+- opposite-dimension candidate collection through the mixed broad phase.
+- static-only CCD paths collecting movable dynamic colliders and filtering
+  after collection.
+- exact mixed sweep dispatch and shape-specific narrow-phase cost.
+- duplicated swept-bound, proxy-radius, and candidate-buffer work across
+  3D, 2D, and mixed continuous collision paths.
+
+The rejected Phase 8B partition-level static-only collector experiment is a
+useful warning, not a dead end. Filtering during collection may be a good
+optimization. Persistently splitting partition membership by static/dynamic
+state is only acceptable if the state-transition model is explicit and tested
+for body activation, deactivation, immovable/kinematic changes, trigger
+changes, layer changes, and repartitioning.
+
+**Tasks**
+
+- [ ] Capture a fresh mixed CCD baseline before runtime changes. If benchmark
+  methodology changes, re-run the baseline under the new methodology before
+  comparing runtime changes.
+- [ ] Stabilize the mixed CCD benchmark signal:
+  - add batched or microbenchmark variants that raise minimum iteration time
+    without hiding per-frame reset/setup cost.
+  - keep sparse/dense mixed rows and add 1024-body stress rows once the run
+    time is reasonable.
+  - split full mixed `LateSimulate` cost from candidate collection and exact
+    sweep cost so the bottleneck is observable.
+  - document BenchmarkDotNet warnings, outliers, and confidence intervals
+    alongside mean timings.
+- [ ] Add benchmark-visible internal counters where they improve attribution:
+  mixed 2D/3D candidates collected, candidates rejected by static/dynamic
+  policy, exact mixed sweeps attempted, dynamic CCD candidates returned, and
+  final hits.
+- [ ] Review lower-stack assets before adding new structures:
+  `GridForge` traversal/partition APIs, `SwiftFixedBVH<T>`,
+  `SwiftFixedSpatialHash<T>`, existing mixed broad-phase benchmarks, and any
+  reusable FixedMathSharp bounds helpers.
+- [ ] Implement only the measured highest-impact optimization. Candidate
+  directions to evaluate:
+  - mixed static-only collectors that filter during broad-phase collection
+    without unsafe static/dynamic partition membership.
+  - a per-frame or retained static mixed candidate index if repeated static
+    sweep collection dominates many-CCD-body scenes.
+  - shared swept-bound/proxy helpers if duplicated 3D/2D/mixed CCD prep shows
+    up in profiles or allocation counters.
+  - shape-specific mixed sweep fast paths if exact mixed narrow phase dominates.
+- [ ] If a proven change also benefits pure 2D or 3D CCD/query paths, apply it
+  there with separate before/after measurements instead of leaving the shared
+  win on the table.
+- [ ] Add correctness tests for any changed mixed broad-phase or query policy:
+  public mixed queries still include dynamic targets, CCD static-only queries
+  include bodyless/immovable/kinematic targets only, triggers/layers/sibling
+  filters still apply, and hit ordering remains deterministic.
+- [ ] Re-run focused CCD/mixed tests, full `Release`, full `ReleaseLean`, and
+  the same benchmark set. Update this section with before/after results and
+  rejected experiments.
+
+**Exit Criteria**
+
+- Mixed CCD has a benchmark signal that is reliable enough to act on, or the
+  remaining noise is explicitly explained and bounded.
+- The retained optimization is supported by measured cost attribution, not just
+  by code-shape suspicion.
+- Mixed CCD improves materially at the representative higher body counts
+  without regressing public mixed query behavior.
+- Pure 2D/3D shared-query improvements are included when the same measured
+  change clearly helps them.
+- Hot-path managed allocations do not increase after warmup.
+- Any new broad-phase classification or indexing state has explicit lifecycle
+  tests for activation, deactivation, state changes, and partition cleanup.
+
 ## Phase 9: Typed Diagnostic Views
 
 **Goal:** Keep `GravitasDiagnosticEvent` compact while reducing host adapter
