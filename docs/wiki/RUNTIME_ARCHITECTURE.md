@@ -244,8 +244,9 @@ arms and scalar moment to apply angular velocity deltas from normal and tangent
 friction impulses. `ContinuousCollisionMode` is shared with the 3D body path:
 `StiffBody2D` resolves body, hierarchy, then context settings before committing
 movement, and uses `Query2D.SweepCircle` to clip fast circle-proxy movement
-against static or kinematic 2D targets. Dynamic-vs-dynamic 2D CCD remains
-deferred until deterministic relative-velocity ordering is specified.
+against static or kinematic 2D targets. Dynamic-vs-dynamic 2D CCD uses
+relative circle sweeps against prepared dynamic target candidates with stable
+time, closing-speed, and collider-ID ordering.
 `GravitasPhysics2DService.Simulate()` runs 2D contact response and events;
 `GravitasPhysics2DService.LateSimulate()` integrates active movable 2D bodies;
 `GravitasPhysics2DService.Visualize()` publishes dynamic 2D position and yaw

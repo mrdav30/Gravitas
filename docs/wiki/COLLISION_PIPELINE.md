@@ -716,9 +716,9 @@ Response units and invariants:
   handled by the response solver.
 
 This is still the first alpha milestone, not a full response engine. Static
-friction for resting stacks, dynamic-vs-dynamic CCD, full iterative warm-start
-application, explicit island solving, and richer mixed-dimension solver behavior
-remain future work.
+friction for resting stacks, full iterative warm-start application, explicit
+island solving, rotational CCD, exact swept polytope support, and richer
+mixed-dimension solver behavior remain future work.
 
 ## Body Sleep And Wake
 

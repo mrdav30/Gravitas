@@ -188,10 +188,10 @@ active-pair queue during `LateSimulate`.
   narrow phase are implemented through triangle-level tests. Richer mesh contact
   clipping and mesh-as-source swept query families remain future hardening work.
 - Collision response is still an alpha-hardening target. The current manifold
-  solver handles deterministic normal and friction impulses, but static resting
-  friction, true warm-start impulse application, explicit island solving,
-  dynamic-vs-dynamic CCD, and richer mixed solver behavior remain
-  future work.
+  solver handles deterministic normal and friction impulses, and dynamic CCD has
+  deterministic relative-motion paths. Static resting friction, true warm-start
+  impulse application, explicit island solving, rotational CCD, exact swept
+  polytope support, and richer mixed solver behavior remain future work.
 - Query services use context-owned mutable buffers. Treat them as same-thread,
   fixed-loop services unless they are redesigned for reentrancy.
 - Diagnostics are context-owned and disabled by default. Enabled draw capture can

@@ -1,54 +1,58 @@
 # Pure 2D Angular Dynamics And Center-Of-Mass Implementation Plan
 
+**Date:** 2026-06-19
+**Status:** Done
+**Owner:** Gravitas runtime/collision hardening
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Give pure 2D bodies the same physically meaningful mass-property boundary as 3D bodies: explicit center of mass, scalar angular inertia, torque, angular impulses, and off-center contact response.
 
-**Architecture:** `StiffBody2D` owns runtime body state and effective solver mobility policy; `LSCollider2D` and primitive/compound subclasses derive geometry mass properties. Pure 2D response consumes body-owned effective mass/moment helpers and keeps X/Z planar physics explicit. Mixed 2D/3D angular effects are handled only after the pure 2D model is stable.
+**Architecture:** `StiffBody2D` owns runtime body state and effective solver mobility policy; `LSCollider2D` and primitive/compound subclasses derive geometry mass properties. Pure 2D response consumes body-owned effective mass/moment helpers and keeps X/Z planar physics explicit. Mixed 2D/3D response consumes the same 2D angular model only from planar X/Z impulse components.
 
 **Tech Stack:** C# 11, FixedMathSharp `Fixed64`/`Vector2d`, Chronicler `IRecordable`, SwiftCollections hot-path buffers, xUnit v3, FluentAssertions, BenchmarkDotNet.
 
 ---
 
-**Date:** 2026-06-19
-**Status:** Workstreams 1-5 implemented / Workstream 6 ready
-**Owner:** Gravitas runtime/collision hardening
-
 ## Purpose
 
-Pure 2D currently supports deterministic planar translation, scalar yaw
-publishing, broad phase, narrow phase, queries, CCD, mixed embedding, and simple
-linear collision response. It does not yet model center-of-mass offsets, scalar
-moment of inertia, torque, angular impulses, or angular collision response.
+Pure 2D now supports deterministic planar translation, scalar yaw publishing,
+broad phase, narrow phase, queries, CCD, mixed embedding, body-owned
+center-of-mass offsets, scalar moment of inertia, torque, angular impulses, and
+angular collision response.
 
-That limitation is acceptable only as an alpha gap. A first-class deterministic
-2D physics engine needs off-center impulses to spin bodies, compound and polygon
-centroids to affect response, and serialization/replay coverage for angular
-state. This plan captures the dedicated 2D work so it does not get folded into
-the 3D mass/inertia workstream as a weak copy of the 3D tensor model.
+This plan closed the alpha gap where pure 2D contacts were linear-only.
+Off-center impulses can spin bodies, compound and polygon centroids affect
+response, and serialization/replay coverage preserves angular state. The 2D
+model remains intentionally scalar around the yaw axis rather than a weak copy
+of the 3D tensor model.
 
 ## Current Baseline
 
 - `StiffBody2D` owns X/Z-projected position, scalar yaw rotation, linear
-  velocity, force integration, sleep/wake state, pure 2D CCD, mixed CCD source
+  velocity, force integration, scalar angular velocity, queued torque
+  acceleration, linear/angular sleep state, pure 2D CCD, mixed CCD source
   handling, visualization publishing, and Chronicler state.
-- `StiffBody2D.Mass` and `InverseMass` are scalar, and Workstream 1 added
-  scalar moment/inverse moment state plus effective inverse mass/moment helpers.
-- `StiffBody2D.CanTranslate` and `CanRotate` now separate linear and angular
-  solver mobility policy.
+- `StiffBody2D.Mass`, `InverseMass`, scalar moment, inverse moment,
+  `EffectiveInverseMass`, and `EffectiveInverseMomentOfInertia` are the
+  body-owned solver mass surface.
+- `StiffBody2D.CanTranslate` and `CanRotate` separate linear and angular solver
+  mobility policy.
 - `LSCollider2D` owns shape state, bounds, local offset, mixed embedding, query
-  state, partition state, pair state, and hierarchy state. It does not expose
-  center-of-mass or moment-of-inertia APIs.
+  state, partition state, pair state, and hierarchy state. It exposes
+  deterministic area, local center-of-mass, and scalar moment APIs for current
+  pure 2D shapes.
 - `LSCircleCollider2D`, `LSAABBoxCollider2D`, `LSPolygonCollider2D`, and
-  `LSCompoundCollider2D` have enough deterministic geometry to derive area,
-  centroid, and scalar inertia.
-- `CollisionPair2D` resolves collision directly in the pair using inverse mass
-  only. It applies penetration correction and a normal impulse, but no contact
-  arm, angular denominator, torque, or friction impulse.
-- `CollisionResponse2D` is only a constants holder. It can become the pure 2D
-  response solver surface without preserving the pair-local implementation.
-- `CollisionResponseMixed` projects impulses into the 2D plane, but currently
-  applies only 2D linear velocity deltas.
+  `LSCompoundCollider2D` derive area, centroid, and scalar inertia in
+  deterministic fixed-point math.
+- `CollisionPair2D` owns pair lifecycle, stable priority, resting/separated
+  state, wake propagation, and notifications. It delegates contact response to
+  `CollisionResponse2D`.
+- `CollisionResponse2D` applies translation-only positional correction,
+  COM-relative normal impulses, and tangent Coulomb friction impulses using
+  body-owned effective inverse mass and scalar inverse moment.
+- `CollisionResponseMixed` projects mixed impulses into the 2D plane and
+  applies 2D linear/angular effects only from planar X/Z impulse components.
 
 ## Design Decisions
 
@@ -333,22 +337,22 @@ not regress unexpectedly.
 
 Tasks:
 
-- [ ] Update `docs/wiki/DIMENSIONS.md` to state that pure 2D bodies own scalar
+- [x] Update `docs/wiki/DIMENSIONS.md` to state that pure 2D bodies own scalar
   angular dynamics around the yaw axis, with X/Z planar COM.
-- [ ] Update `docs/wiki/COLLISION_PIPELINE.md` to describe pure 2D normal and
+- [x] Update `docs/wiki/COLLISION_PIPELINE.md` to describe pure 2D normal and
   friction impulses, COM-relative contact arms, and remaining solver limits.
-- [ ] Update `docs/wiki/SERIALIZATION.md` to list 2D COM, angular velocity,
+- [x] Update `docs/wiki/SERIALIZATION.md` to list 2D COM, angular velocity,
   queued angular acceleration, moment policy, and sleep threshold state.
-- [ ] Add or extend a 2D benchmark in
+- [x] Add or extend a 2D benchmark in
   `tests/Gravitas.Benchmarks/Physics2D/Physics2DBenchmarks.cs` if response
   benchmarks show a measurable cost from angular denominators or friction.
-- [ ] Run the focused Release test project.
+- [x] Run the focused Release test project.
 
 ```bash
 dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release
 ```
 
-- [ ] Run full standard and Lean validation before marking this plan complete.
+- [x] Run full standard and Lean validation before marking this plan complete.
 
 ```bash
 dotnet build Gravitas.slnx --configuration Release
@@ -360,6 +364,18 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 Expected after implementation: Release and ReleaseLean builds/tests pass, and
 docs no longer describe pure 2D response as linear-only.
 
+**Progress 2026-06-19:** Workstream 6 cleaned the plan's stale baseline so it
+describes the implemented 2D angular model instead of the pre-work alpha gap.
+The wiki now documents pure 2D scalar yaw-axis angular dynamics, X/Z
+body-local COM, COM-relative 2D normal/friction impulses, mixed planar-only
+angular response, serialization of 2D angular/COM policy, and remaining solver
+limits. `Physics2DBenchmarks` now includes `ResolveAngularContactPairs`, a
+direct off-center contact response benchmark that exercises angular contact
+velocity, angular denominators, normal impulse, and tangent friction without
+broad-phase noise. Focused Release tests passed 514 tests. Full solution
+validation passed Release build/test and ReleaseLean build/test, with 514
+Release tests and 508 ReleaseLean tests passing.
+
 ## Exit Criteria
 
 - Pure 2D has explicit body-owned COM, scalar inertia, and effective
@@ -370,8 +386,8 @@ docs no longer describe pure 2D response as linear-only.
   serialization are covered by tests.
 - Pure 2D collision response uses COM-relative contact arms and angular impulse
   denominators.
-- Mixed 2D/3D response either explicitly consumes the new 2D angular model or
-  has a documented, tested reason for leaving mixed angular response disabled.
+- Mixed 2D/3D response explicitly consumes the new 2D angular model from planar
+  X/Z impulse components and keeps vertical Y impulse constrained out of 2D.
 - Feature-work status, wiki docs, focused tests, full Release validation, and
   full ReleaseLean validation are updated before this plan moves to
   `docs/feature-work/done`.

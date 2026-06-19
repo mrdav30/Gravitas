@@ -27,7 +27,7 @@ runtime diagonalization.
   force policy are applied by the caller before mesh inertia is requested.
 - Pure 2D center-of-mass, scalar moment, and angular response work is tracked
   separately in
-  [`2026-06-19-pure-2d-angular-dynamics-com-plan.md`](2026-06-19-pure-2d-angular-dynamics-com-plan.md).
+  [`2026-06-19-pure-2d-angular-dynamics-com-plan.md`](done/2026-06-19-pure-2d-angular-dynamics-com-plan.md).
 
 ## Workstream 1: Principal-Axis Offline Tooling Boundary
 

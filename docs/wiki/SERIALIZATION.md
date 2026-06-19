@@ -65,8 +65,11 @@ snapshots restore the body-owned COM state directly.
 `StiffBody2D` records pure 2D authoritative body state, including X/Z-projected
 position, scalar rotation, linear motion, pending force state, scalar angular
 velocity, applied and queued angular acceleration, angular-force policy, mass,
-body-local center-of-mass offset, response coefficients, gravity, sleep state
-and thresholds, CCD mode, and its owned collider state.
+shape-refreshed scalar moment policy, body-local center-of-mass offset, response
+coefficients, gravity, sleep state plus linear and angular sleep thresholds, CCD
+mode, and its owned collider state. Populated snapshots restore explicit COM
+state and then refresh scalar moment/inverse moment from the loaded collider
+shape so deterministic replay continues with the same effective solver mass.
 
 `LSCollider` records 3D collider filter and shape state. Runtime IDs are
 context-owned and intentionally excluded from snapshots. Loading a bound

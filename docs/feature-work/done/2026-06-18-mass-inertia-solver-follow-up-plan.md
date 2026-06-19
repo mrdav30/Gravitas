@@ -17,7 +17,7 @@ the earlier alpha follow-up plan.
 ## Related Follow-Up Work
 
 Pure 2D center-of-mass and angular dynamics are intentionally tracked in
-[`2026-06-19-pure-2d-angular-dynamics-com-plan.md`](../2026-06-19-pure-2d-angular-dynamics-com-plan.md).
+[`2026-06-19-pure-2d-angular-dynamics-com-plan.md`](2026-06-19-pure-2d-angular-dynamics-com-plan.md).
 That plan is deliberately separate so 2D gets a scalar COM/moment model designed
 for its own X/Z planar solver instead of a weak copy of the 3D tensor path.
 

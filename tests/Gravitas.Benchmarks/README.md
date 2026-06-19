@@ -139,7 +139,7 @@ to add or tighten explicit allocation tests before changing the algorithm.
 | `collision-response` | manifold response solver cost across single-contact and face-manifold cases, with pair-count scaling. |
 | `diagnostics` | Disabled/enabled force and torque event hooks plus disabled/enabled primitive and mesh collider debug draw capture. |
 | `partition-culling` | dynamic collider repartitioning after teleports, direct partition add/remove churn, and culled-pair invalidation after movement. |
-| `physics-2d` | pure 2D body integration, GridForge-backed 2D partition response, sweep baseline comparisons, required 2D shape-pair checks, `OverlapCircleAll`, and `RaycastAll`. |
+| `physics-2d` | pure 2D body integration, GridForge-backed 2D partition response, direct angular contact response, sweep baseline comparisons, required 2D shape-pair checks, `OverlapCircleAll`, and `RaycastAll`. |
 
 Collider shape work has a focused selection:
 
