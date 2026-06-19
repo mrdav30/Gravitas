@@ -104,7 +104,7 @@ workflow changes:
 | [`src/Gravitas/Diagnostics`](src/Gravitas/Diagnostics) | Context-owned diagnostic events and engine-agnostic debug draw commands | Keep disabled paths allocation-free and renderer-neutral. |
 | [`src/Gravitas/Partitions`](src/Gravitas/Partitions) | GridForge-backed physics partitions | Tied to voxel ownership and pooling. |
 | [`src/Gravitas/Settings`](src/Gravitas/Settings) | Physics settings and save helpers | Includes frame rate and layer collision matrix behavior. |
-| [`src/Gravitas/Support`](src/Gravitas/Support) | Fixed transforms, layers, lifecycle hooks, coroutine scaffolding, transient state helpers | Keep engine-specific assumptions out. |
+| [`src/Gravitas/Support`](src/Gravitas/Support) | Layers, lifecycle hooks, coroutine scaffolding, transient state helpers | Keep engine-specific assumptions out. |
 | [`tests/Gravitas.Tests`](tests/Gravitas.Tests) | xUnit v3 test project | Covers runtime, settings, collision, partitions, queries, serialization, CCD, and authored shape behavior. |
 | [`tests/Gravitas.Benchmarks`](tests/Gravitas.Benchmarks) | BenchmarkDotNet project | Covers context lifecycle, registration/partitioning, simulation, queries, diagnostics, mixed broad phase, 2D, meshes, and CCD scaling. |
 | [`docs/wiki`](docs/wiki) | Developer-facing architecture and usage notes | Keep current with runtime, host integration, collision, query, serialization/replay, and diagnostics changes. |
@@ -171,7 +171,7 @@ The current runtime uses explicit world-context ownership:
   publishing, opt-in continuous-collision mode, frame-start CCD displacement,
   and Chronicler state recording.
 - `IMatterAgent` is the host boundary. Hosts provide a `GravitasWorldContext`,
-  a `FixedTransform`, hierarchy information, and interaction state without tying
+  a `FixedMathSharp.FixedTransform`, hierarchy information, and interaction state without tying
   Gravitas to a game engine.
 - `LSCollider` and `LSCollider2D` primitive subclasses own shape state, bounds,
   layers, trigger/contact events, GridForge partition coordinates, and
@@ -307,7 +307,7 @@ problem.
 The main external packages shape how this project should be changed:
 
 - `FixedMathSharp`: use `Fixed64`, `Vector2d`, `Vector3d`, `Vector4d`,
-  `FixedQuaternion`, `Fixed3x3`, `Fixed4x4`, deterministic bounds, and
+  `FixedQuaternion`, `FixedTransform`, `Fixed3x3`, `Fixed4x4`, deterministic bounds, and
   geometry primitives. Before hand-rolling spatial math, review
   `../FixedMathSharp/src/FixedMathSharp/Geometry`, especially `FixedBoundBox`,
   `FixedBoundArea`, `BoundingSphere`, `BoundingFrustum`, `FixedRay`,
@@ -420,7 +420,7 @@ Current behavior observed in source:
   `IRecordable.RecordData(...)` methods.
 - Chronicler populates existing host-created shells. It is not a construct from
   data object factory.
-- Host bindings, `FixedTransform` object identity, context-local collider IDs,
+- Host bindings, `FixedMathSharp.FixedTransform` object identity, context-local collider IDs,
   service indices, partition coordinates, pair tables, query buffers,
   diagnostic buffers, delegates, lifecycle hooks, and visual interpolation
   buffers are not snapshot identity.

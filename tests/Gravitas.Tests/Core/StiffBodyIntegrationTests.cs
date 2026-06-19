@@ -153,7 +153,7 @@ public sealed class StiffBodyIntegrationTests
 
     private static void CreateGround(PhysicsScenarioBuilder scenario)
     {
-        var transform = new Gravitas.Support.FixedTransform(
+        var transform = new FixedTransform(
             new Vector3d(Fixed64.Zero, -Fixed64.Half, Fixed64.Zero),
             FixedQuaternion.Identity,
             Vector3d.One);

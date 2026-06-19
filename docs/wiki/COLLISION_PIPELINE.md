@@ -262,10 +262,10 @@ closest-surface queries walk the cached face index data directly rather than
 materializing temporary face vertex arrays, because those queries are used by
 SAT contact seeding.
 
-`FixedTransform.LossyScale` uses basis-vector scale extraction rather than raw
-matrix diagonals. This matters for rotated colliders because diagonal extraction
-can report near-zero scale for 90-degree rotations and collapse derived shape
-state.
+`FixedMathSharp.FixedTransform.LossyScale` uses basis-vector scale extraction
+rather than raw matrix diagonals. This matters for rotated colliders because
+diagonal extraction can report near-zero scale for 90-degree rotations and
+collapse derived shape state.
 
 Mesh colliders validate vertices and triangle indices at construction time.
 `MeshColliderMode` declares whether the mesh is intended as `Convex` or

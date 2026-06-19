@@ -31,8 +31,8 @@ fixed transform without depending on Unity, ECS, rendering, or a specific object
 model.
 
 ```csharp
+using FixedMathSharp;
 using Gravitas;
-using Gravitas.Support;
 
 internal sealed class HostMatterAgent : IMatterAgent
 {
@@ -131,7 +131,6 @@ Dynamic matter usually has a host agent, one collider, and one `StiffBody`.
 using FixedMathSharp;
 using Gravitas;
 using Gravitas.Colliders;
-using Gravitas.Support;
 
 FixedTransform transform = new(
     Vector3d.Zero,

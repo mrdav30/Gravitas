@@ -96,7 +96,7 @@ Typical integration creates or attaches a context, initializes bodies and collid
 | Partitions | GridForge-backed physics partitions used by collision distribution | [`src/Gravitas/Partitions`](src/Gravitas/Partitions) |
 | Queries | 2D/3D raycast, swept-sphere, and overlap query support | [`src/Gravitas/Queries`](src/Gravitas/Queries) |
 | Settings | Frame rate, collision matrix, pooling switch, CCD defaults, and settings save helpers | [`src/Gravitas/Settings`](src/Gravitas/Settings) |
-| Support | Fixed transforms, layers, lifecycle hooks, coroutines, and transient state helpers | [`src/Gravitas/Support`](src/Gravitas/Support) |
+| Support | Layers, lifecycle hooks, coroutines, and transient state helpers | [`src/Gravitas/Support`](src/Gravitas/Support) |
 
 ## Repository Map
 

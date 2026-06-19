@@ -11,7 +11,7 @@
 ---
 
 **Date:** 2026-06-19
-**Status:** Draft / ready for review
+**Status:** In progress / Workstreams 1-2 complete
 **Owner:** LSF lower-stack hardening
 
 ## Purpose
@@ -38,7 +38,9 @@ behavior changes.
 
 ## Current Baseline
 
-- Gravitas owns `src/Gravitas/Support/FixedTransform.cs`.
+- Before Workstream 2, Gravitas owned
+  `src/Gravitas/Support/FixedTransform.cs`; FixedMathSharp now owns the shared
+  `FixedMathSharp.FixedTransform` type.
 - Gravitas owns closed-volume mesh mass-property integration inside
   `src/Gravitas/Colliders/Support/PhysicsMesh/PhysicsMesh.cs`, including
   `SumSquaredBarycentricProducts(...)` and `SumBarycentricProducts(...)`.
@@ -71,16 +73,15 @@ behavior changes.
   `GridWorld`, `VoxelGrid`, topology metrics, and `IVoxelPartition`.
 - Move `DefaultSaver` into Chronicler.Core with the same explicit phase names:
   `Save`, `EarlyApply`, `Apply`, and `LateApply`.
-- During implementation, use local project references to sibling repositories
-  only as needed. Restore package references before release validation unless
-  the owner explicitly asks to keep local project references.
+- During this implementation, keep local project references to sibling
+  repositories. The owner will restore package references as each lower-stack
+  package is released.
 
 ## File Map
 
 ### FixedMathSharp
 
-- Create or modify `../FixedMathSharp/src/FixedMathSharp/FixedTransform.cs`
-  or the equivalent project-approved transform path.
+- Added `../FixedMathSharp/src/FixedMathSharp/Numerics/Matrices/FixedTransform.cs`.
 - Modify `../FixedMathSharp/src/FixedMathSharp/Core/FixedMath.cs` for scalar
   barycentric product helpers if they fit the existing `FixedMath` surface.
 - Create or modify files under
@@ -122,13 +123,13 @@ behavior changes.
 
 Tasks:
 
-- [ ] Verify sibling repositories are available:
+- [x] Verify sibling repositories are available:
 
 ```bash
 Test-Path ..\FixedMathSharp; Test-Path ..\GridForge; Test-Path ..\Chronicler
 ```
 
-- [ ] Read the sibling repository contributor guides and package targets:
+- [x] Read the sibling repository contributor guides and package targets:
 
 ```bash
 Get-Content ..\FixedMathSharp\AGENTS.md
@@ -136,24 +137,34 @@ Get-Content ..\GridForge\AGENTS.md
 Get-Content ..\Chronicler\AGENTS.md
 ```
 
-- [ ] Inspect current target frameworks and package references for all four
+- [x] Inspect current target frameworks and package references for all four
   repositories so moved APIs compile for the lowest supported targets.
 
-- [ ] Decide the exact FixedMathSharp transform namespace and type shape before
+- [x] Decide the exact FixedMathSharp transform namespace and type shape before
   implementation. The default recommendation is a mutable reference type that
   preserves current Gravitas host-publication semantics.
 
-- [ ] Decide the mesh math API names. Recommended starting surface:
+- [x] Decide the mesh math API names. Recommended starting surface:
   `FixedMath.SumSquaredBarycentricProducts(...)`,
   `FixedMath.SumBarycentricProducts(...)`, and a geometry-level helper that
   computes closed-volume mesh mass properties from vertices and triangle
   indices.
 
-- [ ] Record any API name changes directly in this plan before implementation
+- [x] Record any API name changes directly in this plan before implementation
   starts.
 
 Expected result: the lower-stack type names, namespaces, and reference strategy
 are explicit enough that implementation can proceed without guesswork.
+
+Recorded decisions:
+
+- `FixedTransform` lives in namespace `FixedMathSharp` as a mutable reference
+  type backed by `Fixed4x4`.
+- Scalar barycentric product helpers will be added to `FixedMath`.
+- Closed-volume mesh validation and mass-property integration should move under
+  `FixedMathSharp.Geometry.Meshes`; Gravitas keeps `PhysicsMesh`,
+  `MeshInertiaPolicy`, collider limits, bounds/BVH ownership, and runtime
+  integration.
 
 ## Workstream 2: FixedMathSharp Transform Extraction
 
@@ -162,26 +173,26 @@ Gravitas, and future LSF libraries through FixedMathSharp.
 
 Tasks:
 
-- [ ] Add FixedMathSharp tests covering construction from position/rotation/
+- [x] Add FixedMathSharp tests covering construction from position/rotation/
   scale, construction from matrix, position mutation, rotation mutation, scale
   mutation, Euler angle round trip, and optional parent assignment.
 
-- [ ] Move or recreate `FixedTransform` in FixedMathSharp using only
+- [x] Move or recreate `FixedTransform` in FixedMathSharp using only
   FixedMathSharp dependencies.
 
-- [ ] Preserve deterministic matrix-backed behavior:
+- [x] Preserve deterministic matrix-backed behavior:
   - `Position` maps to matrix translation.
   - `Rotation` maps to matrix rotation.
   - `Scale` maps to matrix global scale.
   - `LossyScale` remains a read-only view of matrix scale.
   - `EulerAngles` uses `FixedQuaternion.FromEulerAnglesInDegrees(...)`.
 
-- [ ] Update Gravitas to consume the FixedMathSharp transform type and remove
+- [x] Update Gravitas to consume the FixedMathSharp transform type and remove
   the local Gravitas definition.
 
-- [ ] Run FixedMathSharp tests for the new transform coverage.
+- [x] Run FixedMathSharp tests for the new transform coverage.
 
-- [ ] Run Gravitas focused host/transform tests:
+- [x] Run Gravitas focused host/transform tests:
 
 ```bash
 dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~FixedTransform|FullyQualifiedName~HostContract|FullyQualifiedName~RuntimeMode"
@@ -189,6 +200,21 @@ dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release -
 
 Expected result: Gravitas and FixedMathSharp share one deterministic transform
 type without changing host-agent semantics.
+
+Notes:
+
+- `Fixed4x4.SetGlobalScale(...)` was strengthened while extracting the type so
+  scale mutation preserves translation and rotation instead of inheriting the
+  old diagonal-reset behavior.
+- Local project references were added through Gravitas, GridForge,
+  SwiftCollections, and child test/benchmark projects to keep the sibling build
+  chain coherent until package releases catch up.
+- FixedMathSharp and SwiftCollections now use the same platform-level NuGet
+  assets layout as GridForge so cross-repo solution builds do not look for
+  missing configuration-specific restore assets.
+- `Gravitas.slnx` temporarily includes the linked lower-stack projects so
+  `Release` and `ReleaseLean` solution builds compile the local graph in the
+  requested configuration.
 
 ## Workstream 3: FixedMathSharp Mesh Geometry Math Extraction
 
@@ -334,8 +360,8 @@ dotnet build Gravitas.slnx --configuration ReleaseLean
 dotnet test Gravitas.slnx --configuration ReleaseLean
 ```
 
-- [ ] Restore package references for release validation unless the owner asks to
-  keep local project references.
+- [ ] Keep local project references until the owner restores package references
+  during the lower-stack release sequence.
 
 Expected result: lower-stack APIs are the source of truth, Gravitas has no
 duplicate utility implementations, and Release/ReleaseLean are clean.
