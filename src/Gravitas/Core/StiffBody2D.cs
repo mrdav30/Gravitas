@@ -25,9 +25,14 @@ public sealed class StiffBody2D : IRecordable
     private bool _centerOfMassOffsetExplicit;
     private Fixed64 _momentOfInertia;
     private Fixed64 _inverseMomentOfInertia;
+    private Fixed64 _angularVelocity;
+    private Fixed64 _angularAccelerationStore;
+    private Fixed64 _deltaAngularAcceleration;
+    private Fixed64 _angularSpeed;
     private bool _isSleeping;
     private bool _isDynamic;
     private int _sleepFrameCount;
+    private Fixed64 _sleepAngularSpeedThreshold = (Fixed64)0.001f;
     private ContinuousCollisionMode _continuousCollisionMode = ContinuousCollisionMode.Inherit;
     private int _continuousCollisionFrameToken = int.MinValue;
     private Vector2d _continuousCollisionFrameStart;
@@ -164,6 +169,12 @@ public sealed class StiffBody2D : IRecordable
 
     public Fixed64 InverseMomentOfInertia => _inverseMomentOfInertia;
 
+    public Fixed64 AngularVelocity => _angularVelocity;
+
+    public Fixed64 AngularAcceleration => _angularAccelerationStore;
+
+    public Fixed64 AngularSpeed => _angularSpeed;
+
     /// <summary>
     /// Clears an explicit center-of-mass override and derives the offset from the bound collider again.
     /// </summary>
@@ -201,6 +212,21 @@ public sealed class StiffBody2D : IRecordable
 
     public Fixed64 SleepLinearSpeedThreshold { get; set; } = (Fixed64)0.001f;
 
+    public Fixed64 SleepAngularSpeedThreshold
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => _sleepAngularSpeedThreshold;
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        set
+        {
+            SwiftThrowHelper.ThrowIfArgument(
+                value < Fixed64.Zero,
+                nameof(value),
+                "2D angular sleep threshold cannot be negative.");
+            _sleepAngularSpeedThreshold = value;
+        }
+    }
+
     public bool IsSleeping => _isSleeping;
 
     internal bool IsAwakeForCollision => Active && !Immovable && !IsSleeping;
@@ -215,6 +241,10 @@ public sealed class StiffBody2D : IRecordable
         _linearAccelerationStore = Vector2d.Zero;
         _deltaAcceleration = Vector2d.Zero;
         _linearSpeed = Fixed64.Zero;
+        _angularVelocity = Fixed64.Zero;
+        _angularAccelerationStore = Fixed64.Zero;
+        _deltaAngularAcceleration = Fixed64.Zero;
+        _angularSpeed = Fixed64.Zero;
         _isSleeping = false;
         _isDynamic = isDynamic;
         _sleepFrameCount = 0;
@@ -266,6 +296,25 @@ public sealed class StiffBody2D : IRecordable
         _deltaAcceleration += force * InverseMass;
     }
 
+    public void AddTorque(Fixed64 torque)
+    {
+        if (torque == Fixed64.Zero || !CanRotate)
+            return;
+
+        Wake();
+        _deltaAngularAcceleration += torque * EffectiveInverseMomentOfInertia;
+    }
+
+    public void AddAngularImpulse(Fixed64 impulse)
+    {
+        if (impulse == Fixed64.Zero || !CanRotate)
+            return;
+
+        Wake();
+        _angularVelocity += impulse * EffectiveInverseMomentOfInertia;
+        RefreshAngularSpeed();
+    }
+
     public void SetPosition(Vector2d position)
     {
         if (_position != position)
@@ -295,6 +344,10 @@ public sealed class StiffBody2D : IRecordable
         _linearAccelerationStore = Vector2d.Zero;
         _deltaAcceleration = Vector2d.Zero;
         _linearSpeed = Fixed64.Zero;
+        _angularVelocity = Fixed64.Zero;
+        _angularAccelerationStore = Fixed64.Zero;
+        _deltaAngularAcceleration = Fixed64.Zero;
+        _angularSpeed = Fixed64.Zero;
         Context.Collisions2D.RefreshPartitionAwakeState(Collider);
     }
 
@@ -330,6 +383,8 @@ public sealed class StiffBody2D : IRecordable
         {
             _linearAccelerationStore = Vector2d.Zero;
             _deltaAcceleration = Vector2d.Zero;
+            _angularAccelerationStore = Fixed64.Zero;
+            _deltaAngularAcceleration = Fixed64.Zero;
             return;
         }
 
@@ -341,6 +396,20 @@ public sealed class StiffBody2D : IRecordable
         _linearVelocity += _linearAccelerationStore * Context.DeltaTime;
         _linearAccelerationStore = Vector2d.Zero;
         RefreshLinearSpeed();
+
+        if (CanRotate)
+        {
+            _angularAccelerationStore = _deltaAngularAcceleration;
+            _deltaAngularAcceleration = Fixed64.Zero;
+            _angularVelocity += _angularAccelerationStore * Context.DeltaTime;
+            _rotation += _angularVelocity * Context.DeltaTime;
+            RefreshAngularSpeed();
+        }
+        else
+        {
+            _angularAccelerationStore = Fixed64.Zero;
+            _deltaAngularAcceleration = Fixed64.Zero;
+        }
 
         Vector2d proposedPosition = _position + _linearVelocity * Context.DeltaTime;
         TryResolveContinuousCollision(_position, ref proposedPosition);
@@ -896,7 +965,7 @@ public sealed class StiffBody2D : IRecordable
             return;
         }
 
-        if (_linearSpeed > SleepLinearSpeedThreshold)
+        if (_linearSpeed > SleepLinearSpeedThreshold || _angularSpeed > _sleepAngularSpeedThreshold)
         {
             _sleepFrameCount = 0;
             return;
@@ -916,6 +985,16 @@ public sealed class StiffBody2D : IRecordable
         {
             _linearVelocity = Vector2d.Zero;
             _linearSpeed = Fixed64.Zero;
+        }
+    }
+
+    private void RefreshAngularSpeed()
+    {
+        _angularSpeed = _angularVelocity.Abs();
+        if (_angularSpeed <= Fixed64.Epsilon)
+        {
+            _angularVelocity = Fixed64.Zero;
+            _angularSpeed = Fixed64.Zero;
         }
     }
 
@@ -949,6 +1028,7 @@ public sealed class StiffBody2D : IRecordable
         bool sleepEnabled = SleepEnabled;
         int sleepFrameThreshold = SleepFrameThreshold;
         Fixed64 sleepLinearSpeedThreshold = SleepLinearSpeedThreshold;
+        Fixed64 sleepAngularSpeedThreshold = SleepAngularSpeedThreshold;
 
         RecordValues.Look(chronicler, ref active, "Active", false);
         RecordValues.Look(chronicler, ref immovable, "Immovable", false);
@@ -962,6 +1042,10 @@ public sealed class StiffBody2D : IRecordable
         RecordValues.Look(chronicler, ref _linearAccelerationStore, "LinearAccelerationStore");
         RecordValues.Look(chronicler, ref _deltaAcceleration, "DeltaAcceleration");
         RecordValues.Look(chronicler, ref _linearSpeed, "LinearSpeed");
+        RecordValues.Look(chronicler, ref _angularVelocity, "AngularVelocity");
+        RecordValues.Look(chronicler, ref _angularAccelerationStore, "AngularAccelerationStore");
+        RecordValues.Look(chronicler, ref _deltaAngularAcceleration, "DeltaAngularAcceleration");
+        RecordValues.Look(chronicler, ref _angularSpeed, "AngularSpeed");
         RecordValues.Look(chronicler, ref _isSleeping, "IsSleeping");
         RecordValues.Look(chronicler, ref _sleepFrameCount, "SleepFrameCount");
         RecordValues.Look(chronicler, ref mass, "Mass");
@@ -971,6 +1055,7 @@ public sealed class StiffBody2D : IRecordable
         RecordValues.Look(chronicler, ref sleepEnabled, "SleepEnabled", true);
         RecordValues.Look(chronicler, ref sleepFrameThreshold, "SleepFrameThreshold", 16);
         RecordValues.Look(chronicler, ref sleepLinearSpeedThreshold, "SleepLinearSpeedThreshold", (Fixed64)0.001f);
+        RecordValues.Look(chronicler, ref sleepAngularSpeedThreshold, "SleepAngularSpeedThreshold", (Fixed64)0.001f);
         RecordValues.Look(chronicler, ref _continuousCollisionMode, "ContinuousCollisionMode", ContinuousCollisionMode.Inherit);
 
         if (chronicler.Mode == SerializationMode.Loading)
@@ -985,6 +1070,7 @@ public sealed class StiffBody2D : IRecordable
             SleepEnabled = sleepEnabled;
             SleepFrameThreshold = sleepFrameThreshold;
             SleepLinearSpeedThreshold = sleepLinearSpeedThreshold;
+            SleepAngularSpeedThreshold = sleepAngularSpeedThreshold;
         }
 
         Collider.RecordData(chronicler);

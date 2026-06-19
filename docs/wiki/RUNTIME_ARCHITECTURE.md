@@ -228,17 +228,17 @@ target.
 
 `StiffBody2D` owns the pure 2D body model. It is constructed from an
 `IMatterAgent`, uses the agent context and transform bridge, and stores
-`Vector2d` position, `Vector2d` linear velocity, scalar rotation, 2D gravity,
-2D force integration, body-local/world center of mass, scalar moment of inertia,
-sleep/wake state, and Chronicler record data. Pure 2D positions use world X/Z
-projection: `Vector2d.x = Vector3d.x` and `Vector2d.y = Vector3d.z`.
+`Vector2d` position, `Vector2d` linear velocity, scalar rotation, scalar
+angular velocity/acceleration, 2D gravity, 2D force and torque integration,
+body-local/world center of mass, scalar moment of inertia, sleep/wake state,
+and Chronicler record data. Pure 2D positions use world X/Z projection:
+`Vector2d.x = Vector3d.x` and `Vector2d.y = Vector3d.z`.
 `CanTranslate`, `CanRotate`, `EffectiveInverseMass`, and
 `EffectiveInverseMomentOfInertia` are the 2D body-side solver mobility surface.
 Kinematic 2D bodies read their agent transform during `LateSimulate`. It
 intentionally has no y-up ground probe, height split, visual interpolation
-state, or 3D inertia tensor. Angular velocity, torque, and angular collision
-response remain staged behind the 2D angular dynamics follow-up even though the
-body now owns COM and scalar inertia state. `ContinuousCollisionMode` is shared
+state, or 3D inertia tensor. Angular collision response remains staged behind
+the 2D angular contact solver follow-up. `ContinuousCollisionMode` is shared
 with the 3D body path: `StiffBody2D` resolves body, hierarchy, then context
 settings before committing movement, and uses `Query2D.SweepCircle` to clip fast
 circle-proxy movement against static or kinematic 2D targets. Dynamic-vs-dynamic

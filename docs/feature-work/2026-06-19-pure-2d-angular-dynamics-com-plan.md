@@ -11,7 +11,7 @@
 ---
 
 **Date:** 2026-06-19
-**Status:** Workstreams 1-2 implemented / Workstream 3 ready
+**Status:** Workstreams 1-3 implemented / Workstream 4 ready
 **Owner:** Gravitas runtime/collision hardening
 
 ## Purpose
@@ -172,22 +172,16 @@ Tasks:
 - [x] Add failing tests in
   `tests/Gravitas.Tests/Colliders/Collider2DMassPropertyTests.cs` for circle,
   AABB, convex polygon, and compound COM/moment.
-
 - [x] Add the base mass-property surface to `LSCollider2D`.
-
 - [x] Implement circle mass properties in `LSCircleCollider2D`.
-
 - [x] Implement AABB mass properties in `LSAABBoxCollider2D`.
-
 - [x] Implement convex polygon area, centroid, and moment using scaled local
   vertices plus `ScaledLocalOffset`. Preserve declaration order and reject
   invalid polygons through the existing validation path.
-
 - [x] Implement `LSCompoundCollider2D` aggregation in stable part order. Assign
   each part a mass proportional to `partArea / totalArea`, aggregate COM by
   area-weighted local COM, apply the owning collider's local offset, and
   aggregate moment by asking each part for moment about the compound COM.
-
 - [x] Run focused collider mass-property tests.
 
 ```bash
@@ -215,123 +209,36 @@ same angular state after Chronicler populate.
 
 Tasks:
 
-- [ ] Add failing tests for `AddTorque`, `AddAngularImpulse`, `LateSimulate`
+- [x] Add failing tests for `AddTorque`, `AddAngularImpulse`, `LateSimulate`
   rotation, angular sleep threshold, and shape mutation refreshing moment.
-
-```csharp
-[Fact]
-public void AddAngularImpulse_ShouldChangeAngularVelocityWhenBodyCanRotate()
-{
-    using GravitasWorldContext context = Physics2DTestWorld.CreateContext(frameRate: 8);
-    StiffBody2D body = CreateBody(context, new LSCircleCollider2D(Fixed64.One), mass: (Fixed64)2);
-
-    body.AddAngularImpulse((Fixed64)3);
-
-    body.AngularVelocity.Should().Be((Fixed64)3 * body.EffectiveInverseMomentOfInertia);
-}
-```
-
-- [ ] Add angular state to `StiffBody2D`.
-
-```csharp
-private Fixed64 _angularVelocity;
-private Fixed64 _angularAccelerationStore;
-private Fixed64 _deltaAngularAcceleration;
-private Fixed64 _angularSpeed;
-private Fixed64 _sleepAngularSpeedThreshold = (Fixed64)0.001f;
-
-public Fixed64 AngularVelocity => _angularVelocity;
-public Fixed64 AngularAcceleration => _angularAccelerationStore;
-public Fixed64 AngularSpeed => _angularSpeed;
-public Fixed64 SleepAngularSpeedThreshold
-{
-    get => _sleepAngularSpeedThreshold;
-    set
-    {
-        SwiftThrowHelper.ThrowIfArgument(value < Fixed64.Zero, nameof(value), "2D angular sleep threshold cannot be negative.");
-        _sleepAngularSpeedThreshold = value;
-    }
-}
-```
-
-- [ ] Add torque and angular impulse APIs.
-
-```csharp
-public void AddTorque(Fixed64 torque)
-{
-    if (torque == Fixed64.Zero || !CanRotate)
-        return;
-
-    Wake();
-    _deltaAngularAcceleration += torque * EffectiveInverseMomentOfInertia;
-}
-
-public void AddAngularImpulse(Fixed64 impulse)
-{
-    if (impulse == Fixed64.Zero || !CanRotate)
-        return;
-
-    Wake();
-    _angularVelocity += impulse * EffectiveInverseMomentOfInertia;
-    RefreshAngularSpeed();
-}
-```
-
-- [ ] Integrate angular velocity in `LateSimulate` before publishing rotation.
-
-```csharp
-if (CanRotate)
-{
-    _angularAccelerationStore = _deltaAngularAcceleration;
-    _deltaAngularAcceleration = Fixed64.Zero;
-    _angularVelocity += _angularAccelerationStore * Context.DeltaTime;
-    _rotation += _angularVelocity * Context.DeltaTime;
-    RefreshAngularSpeed();
-}
-else
-{
-    _angularAccelerationStore = Fixed64.Zero;
-    _deltaAngularAcceleration = Fixed64.Zero;
-}
-```
-
-- [ ] Update `Sleep()` and `UpdateSleepState()` so a body sleeps only when both
+- [x] Add angular state to `StiffBody2D`.
+- [x] Add torque and angular impulse APIs.
+- [x] Integrate angular velocity in `LateSimulate` before publishing rotation.
+- [x] Update `Sleep()` and `UpdateSleepState()` so a body sleeps only when both
   linear and angular speed are at or below their thresholds.
-
-```csharp
-if (_linearSpeed > SleepLinearSpeedThreshold || _angularSpeed > SleepAngularSpeedThreshold)
-{
-    _sleepFrameCount = 0;
-    return;
-}
-```
-
-- [ ] Extend `RecordData` and `ApplyLoadedState` for angular state, COM state,
+- [x] Extend `RecordData` and `ApplyLoadedState` for angular state, COM state,
   and scalar moment inputs required for deterministic continuation.
-
-```csharp
-RecordValues.Look(chronicler, ref PreventAngularForces, "PreventAngularForces", false);
-RecordValues.Look(chronicler, ref _localCenterOfMassOffset, "LocalCenterOfMassOffset");
-RecordValues.Look(chronicler, ref _hasExplicitCenterOfMassOffset, "HasExplicitCenterOfMassOffset", false);
-RecordValues.Look(chronicler, ref _angularVelocity, "AngularVelocity");
-RecordValues.Look(chronicler, ref _angularAccelerationStore, "AngularAccelerationStore");
-RecordValues.Look(chronicler, ref _deltaAngularAcceleration, "DeltaAngularAcceleration");
-RecordValues.Look(chronicler, ref _angularSpeed, "AngularSpeed");
-RecordValues.Look(chronicler, ref _sleepAngularSpeedThreshold, "SleepAngularSpeedThreshold", (Fixed64)0.001f);
-```
-
-- [ ] Update `tests/Gravitas.Tests/Serialization/StiffBody2DSerializationTests.cs`
+- [x] Update `tests/Gravitas.Tests/Serialization/StiffBody2DSerializationTests.cs`
   so populate restores COM, angular velocity, queued torque acceleration, sleep
   thresholds, and replay continuation.
-
-- [ ] Run focused body and serialization tests.
+- [x] Run focused body and serialization tests.
 
 ```bash
-dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~StiffBody2DMassPropertiesTests|FullyQualifiedName~StiffBody2DSerializationTests"
+dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~StiffBody2DAngularDynamicsTests|FullyQualifiedName~StiffBody2DSerializationTests"
 ```
 
 Expected after implementation: angular integration and serialization tests pass
 with identical replay state across uninterrupted and restored worlds.
+
+**Progress 2026-06-19:** Workstream 3 added scalar angular velocity,
+angular acceleration, angular speed, angular sleep threshold, `AddTorque`, and
+`AddAngularImpulse` to `StiffBody2D`. `LateSimulate` now integrates queued
+torque through `EffectiveInverseMomentOfInertia`, advances scalar yaw rotation,
+and keeps sleep gated on both linear and angular speed. Sleep clears angular
+runtime motion state. Chronicler now records 2D angular velocity, applied and
+queued angular acceleration, angular speed, and angular sleep threshold so a
+snapshot with queued torque can replay the next fixed step identically after
+populate. Contact-response angular impulses remain scoped to Workstream 4.
 
 ## Workstream 4: Pure 2D Angular Contact Response
 

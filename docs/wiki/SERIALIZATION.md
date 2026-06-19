@@ -63,9 +63,10 @@ Collider geometry can derive a default COM for new shells, but populated
 snapshots restore the body-owned COM state directly.
 
 `StiffBody2D` records pure 2D authoritative body state, including X/Z-projected
-position, scalar rotation, linear motion, pending force state, mass, body-local
-center-of-mass offset, angular-force policy, response coefficients, gravity,
-sleep state, CCD mode, and its owned collider state.
+position, scalar rotation, linear motion, pending force state, scalar angular
+velocity, applied and queued angular acceleration, angular-force policy, mass,
+body-local center-of-mass offset, response coefficients, gravity, sleep state
+and thresholds, CCD mode, and its owned collider state.
 
 `LSCollider` records 3D collider filter and shape state. Runtime IDs are
 context-owned and intentionally excluded from snapshots. Loading a bound

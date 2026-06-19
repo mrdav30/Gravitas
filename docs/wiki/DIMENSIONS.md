@@ -69,6 +69,10 @@ effective inverse moment helpers map immovable, kinematic, inactive,
 non-positive-mass, and angular-force-disabled states to zero solver
 contribution. `StiffBody2D.LocalCenterOfMassOffset` is body-local X/Z state, and
 `WorldCenterOfMass` rotates that offset by the body's scalar rotation.
+`AddAngularImpulse` changes scalar yaw angular velocity immediately, while
+`AddTorque` queues scalar angular acceleration for the next fixed
+`LateSimulate`. Dynamic 2D sleep requires both linear and angular speed to stay
+within their configured thresholds.
 
 `LSCollider2D.InitializeWithNoBody(IMatterAgent)` binds bodyless static or
 trigger colliders to the same host contract. Bodyless 2D colliders register

@@ -35,6 +35,7 @@ public sealed class StiffBody2DSerializationTests
             SleepEnabled = false,
             SleepFrameThreshold = 11,
             SleepLinearSpeedThreshold = Fixed64.FromFraction(1, 128),
+            SleepAngularSpeedThreshold = Fixed64.FromFraction(1, 64),
             ContinuousCollisionMode = ContinuousCollisionMode.Continuous,
             PreventAngularForces = true
         };
@@ -65,6 +66,7 @@ public sealed class StiffBody2DSerializationTests
         target.SleepEnabled.Should().BeFalse();
         target.SleepFrameThreshold.Should().Be(source.SleepFrameThreshold);
         target.SleepLinearSpeedThreshold.Should().Be(source.SleepLinearSpeedThreshold);
+        target.SleepAngularSpeedThreshold.Should().Be(source.SleepAngularSpeedThreshold);
         target.ContinuousCollisionMode.Should().Be(source.ContinuousCollisionMode);
         target.PreventAngularForces.Should().BeTrue();
         target.LocalCenterOfMassOffset.Should().Be(source.LocalCenterOfMassOffset);
@@ -97,6 +99,35 @@ public sealed class StiffBody2DSerializationTests
         restored.Position.Should().Be(uninterrupted.Position);
         restored.LinearVelocity.Should().Be(uninterrupted.LinearVelocity);
         restored.LinearSpeed.Should().Be(uninterrupted.LinearSpeed);
+    }
+
+    [Theory]
+    [MemberData(nameof(Transports))]
+    public void PopulateSnapshot_WithQueuedTorque_ShouldReplaySameNextFrame(GravitasSerializationTransport transport)
+    {
+        using GravitasWorldContext uninterruptedContext = Physics2DTestWorld.CreateContext(frameRate: 8);
+        StiffBody2D uninterrupted = CreateDynamicCircle(uninterruptedContext);
+        uninterrupted.SleepAngularSpeedThreshold = Fixed64.FromFraction(1, 64);
+        uninterrupted.AddAngularImpulse((Fixed64)3);
+        uninterrupted.AddTorque((Fixed64)4);
+
+        object payload = GravitasSerializationHarness.Serialize(uninterrupted, transport);
+
+        using GravitasWorldContext restoredContext = Physics2DTestWorld.CreateContext(frameRate: 8);
+        StiffBody2D restored = CreateDynamicCircle(restoredContext);
+        GravitasSerializationHarness.Populate(restored, payload, transport);
+
+        restored.AngularVelocity.Should().Be(uninterrupted.AngularVelocity);
+        restored.AngularSpeed.Should().Be(uninterrupted.AngularSpeed);
+        restored.SleepAngularSpeedThreshold.Should().Be(uninterrupted.SleepAngularSpeedThreshold);
+
+        uninterruptedContext.LateSimulate();
+        restoredContext.LateSimulate();
+
+        restored.AngularVelocity.Should().Be(uninterrupted.AngularVelocity);
+        restored.AngularAcceleration.Should().Be(uninterrupted.AngularAcceleration);
+        restored.AngularSpeed.Should().Be(uninterrupted.AngularSpeed);
+        restored.Rotation.Should().Be(uninterrupted.Rotation);
     }
 
     [Theory]

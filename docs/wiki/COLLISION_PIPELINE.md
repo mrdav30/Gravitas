@@ -671,8 +671,10 @@ Response units and invariants:
   `StiffBody2D.EffectiveInverseMass`, and
   `StiffBody2D.EffectiveInverseMomentOfInertia` are the pure 2D body-side
   mobility contract. Current pure 2D and mixed response consume only effective
-  inverse mass; angular response will consume the scalar moment surface in the
-  later 2D angular solver workstream.
+  inverse mass; the 2D body integration path already consumes scalar moment for
+  host-applied torque and angular impulses. Contact angular response will
+  consume the same scalar moment surface in the later 2D angular solver
+  workstream.
 - 3D response torque arms are measured from `StiffBody.WorldCenterOfMass`.
   Collider centers remain collision-geometry references for narrow phase,
   culling, and normal fallback; they are not the implicit body COM.
