@@ -355,6 +355,21 @@ public sealed class PhysicsMeshTests
         calculate.Should().NotThrow();
     }
 
+    [Fact]
+    public void CalculateInertiaTensor_WithRequireClosedVolume_ShouldRejectOpenMesh()
+    {
+        var mesh = new PhysicsMesh(
+            ValidVertices(),
+            ValidTriangles(),
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+
+        Action calculate = () => _ = mesh.CalculateInertiaTensor((Fixed64)3, MeshInertiaPolicy.RequireClosedVolume);
+
+        calculate.Should().Throw<InvalidOperationException>()
+            .WithMessage("*BoundaryEdge*");
+    }
+
     [Theory]
     [MemberData(nameof(InvalidClosedVolumeMeshes))]
     public void TryGetClosedVolumeMassProperties_ShouldReturnExplicitFailureReasons(

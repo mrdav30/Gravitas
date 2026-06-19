@@ -1614,7 +1614,7 @@ been pulled into separate feature-work plans:
 - Deeper continuous-collision precision and solver work:
   [`2026-06-18-continuous-collision-depth-hardening-plan.md`](../2026-06-18-continuous-collision-depth-hardening-plan.md).
 - Mass, inertia, effective inverse mass, and body center-of-mass solver work:
-  [`2026-06-18-mass-inertia-solver-follow-up-plan.md`](../2026-06-18-mass-inertia-solver-follow-up-plan.md).
+  [`2026-06-18-mass-inertia-solver-follow-up-plan.md`](2026-06-18-mass-inertia-solver-follow-up-plan.md).
 
 No additional diagnostic deferred work was identified in Phase 9. Typed views
 and visitors cover every current diagnostic event and debug draw kind, and no

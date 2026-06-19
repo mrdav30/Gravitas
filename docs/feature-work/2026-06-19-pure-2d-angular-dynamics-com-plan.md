@@ -11,7 +11,7 @@
 ---
 
 **Date:** 2026-06-19
-**Status:** Backlog / start after the current mass-inertia solver follow-up completes
+**Status:** Backlog / ready after completed 3D mass-inertia solver follow-up
 **Owner:** Gravitas runtime/collision hardening
 
 ## Purpose

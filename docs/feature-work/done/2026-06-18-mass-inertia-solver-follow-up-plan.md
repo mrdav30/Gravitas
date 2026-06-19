@@ -1,7 +1,7 @@
 # Mass, Inertia, And Center-Of-Mass Solver Follow-Up Plan
 
 **Date:** 2026-06-18
-**Status:** Workstreams 1-3 implemented / Workstream 4 backlog
+**Status:** Completed 2026-06-19
 **Owner:** Gravitas runtime/collision hardening
 
 ## Purpose
@@ -11,17 +11,19 @@ by default, while keeping surface inertia behind an explicit opt-in policy. It
 also exposed `MeshMassProperties.CenterOfMass`, but several deeper solver and
 body-model boundaries were intentionally kept out of that slice.
 
-This plan captures those deferred mass/inertia items so the completed alpha
-follow-up plan can move to `docs/feature-work/done` without hiding unfinished
-solver architecture work.
+This completed plan records the mass/inertia solver work that was split out of
+the earlier alpha follow-up plan.
 
-## Related Deferred Work
+## Related Follow-Up Work
 
 Pure 2D center-of-mass and angular dynamics are intentionally tracked in
-[`2026-06-19-pure-2d-angular-dynamics-com-plan.md`](2026-06-19-pure-2d-angular-dynamics-com-plan.md).
-That plan should start after the current 3D/mixed mass-inertia work wraps, so
-2D gets a scalar COM/moment model designed for its own X/Z planar solver instead
-of a weak copy of the 3D tensor path.
+[`2026-06-19-pure-2d-angular-dynamics-com-plan.md`](../2026-06-19-pure-2d-angular-dynamics-com-plan.md).
+That plan is deliberately separate so 2D gets a scalar COM/moment model designed
+for its own X/Z planar solver instead of a weak copy of the 3D tensor path.
+
+Lower-stack principal-axis/offline tooling, optional COM diagnostic marker
+polish, and future richer mesh mass-property payload boundaries are tracked in
+[`2026-06-19-mass-inertia-tooling-and-diagnostics-follow-up-plan.md`](../2026-06-19-mass-inertia-tooling-and-diagnostics-follow-up-plan.md).
 
 ## Current Baseline
 
@@ -103,8 +105,8 @@ inverse inertia property to `InverseInertiaTensor`. Focused coverage lives in
 `tests/Gravitas.Tests/Colliders/PhysicsMeshTests.cs`, and
 `tests/Gravitas.Tests/Serialization/StiffBodySerializationTests.cs`.
 Existing response diagnostics observe the COM-based solver result through
-contact, response impulse, and velocity-delta events. A dedicated debug-draw COM
-marker remains optional diagnostic-adapter polish rather than core solver state.
+contact, response impulse, and velocity-delta events. Dedicated COM marker
+polish is tracked outside this completed solver plan.
 
 ## Workstream 3: Full Tensor And Principal-Axis Support
 
@@ -122,8 +124,8 @@ Tasks:
 - [x] Keep a diagonal fast path for simple primitive and aligned compound shapes.
 - [x] Add tests for rotated non-uniform mass distributions, singular tensors,
   mesh products of inertia, compound products of inertia, and stable world
-  tensor orientation. Deterministic ordering/tie tests are not applicable until
-  a principal-axis diagonalization algorithm is adopted.
+  tensor orientation. Deterministic ordering/tie tests belong with the separate
+  principal-axis tooling follow-up if that evidence-gated work starts.
 
 **Progress 2026-06-19:** Workstream 3 added internal `InertiaTensorMath` with a
 diagonal inversion fast path, deterministic full `Fixed3x3` inversion, singular
@@ -131,8 +133,9 @@ tensor fallback to zero solver inertia, and full parallel-axis tensor shifts.
 Closed mesh mass properties now integrate products of inertia, compound
 colliders preserve off-axis products, and `StiffBody` separates local and
 world-space inertia state to avoid repeated orientation compounding. Runtime
-principal-axis diagonalization was intentionally not adopted; it belongs in
-future FixedMathSharp/offline tooling if a measured need appears. Focused
+principal-axis diagonalization was intentionally not adopted; possible
+FixedMathSharp/offline payload work is tracked outside this completed solver
+plan and remains evidence-gated. Focused
 coverage lives in `tests/Gravitas.Tests/Core/InertiaTensorMathTests.cs`,
 `tests/Gravitas.Tests/Colliders/PhysicsMeshTests.cs`, and
 `tests/Gravitas.Tests/Colliders/ColliderRuntimeStateTests.cs`. Benchmark
@@ -145,18 +148,28 @@ infer body mobility.
 
 Tasks:
 
-- Keep `PhysicsMesh` responsible for geometry-derived mass properties only.
-- Keep movable/kinematic/immovable/angular-force policy at the body or
+- [x] Keep `PhysicsMesh` responsible for geometry-derived mass properties only.
+- [x] Keep movable/kinematic/immovable/angular-force policy at the body or
   collider-binding boundary.
-- If future APIs return richer mass-property structs, make the caller's
-  responsibility for applying mobility gates explicit.
+- [x] Document that richer mass-property payload APIs must make the caller's
+  responsibility for applying mobility gates explicit if they are introduced.
+
+**Progress 2026-06-19:** Workstream 4 confirmed the existing runtime boundary:
+`PhysicsMesh` remains a geometry/topology API and never receives body mobility
+state, while `StiffBody.CanUseAngularInertia` gates immovable, kinematic, and
+angular-force-disabled bodies before collider inertia is requested. Boundary
+coverage now includes default closed-volume rejection for open mesh topology,
+explicit surface-approximation opt-in, and non-rotating body policies that can
+legally bind open mesh collision surfaces without consuming mesh inertia. Any
+future richer mesh mass-property payload work is tracked outside this completed
+solver plan.
 
 ## Exit Criteria
 
 - Response code has one clear effective-mass policy for 3D and mixed contacts.
 - Bodies can represent COM offsets explicitly, deterministically, and with
   serialization coverage.
-- Full tensor support, if adopted, is tested, benchmarked, and keeps a simple
-  diagonal fast path.
+- Full tensor support is tested, benchmarked, and keeps a simple diagonal fast
+  path.
 - `PhysicsMesh` remains a shape/topology source of mass properties, not a body
   mobility policy engine.

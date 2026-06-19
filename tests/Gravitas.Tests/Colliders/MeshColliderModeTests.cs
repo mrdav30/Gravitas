@@ -12,7 +12,7 @@ namespace Gravitas.Tests.Colliders;
 public sealed class MeshColliderModeTests
 {
     [Fact]
-    public void ConcaveMesh_ShouldInitializeForBodylessImmovableKinematicAndExplicitSurfaceDynamicBodies()
+    public void ConcaveMesh_ShouldInitializeForBodylessNonRotatingAndExplicitSurfaceDynamicBodies()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
 
@@ -29,14 +29,20 @@ public sealed class MeshColliderModeTests
             PhysicsScenarioBuilder.Vector(12, 0, 0),
             FixedQuaternion.Identity,
             isKinematic: true);
+        Action angularDisabled = () => scenario.CreateBody(
+            MeshTestFixtures.CreateInsideCorner(),
+            PhysicsScenarioBuilder.Vector(18, 0, 0),
+            FixedQuaternion.Identity,
+            preventAngularForces: true);
         Action dynamic = () => scenario.CreateBody(
             MeshTestFixtures.CreateInsideCorner(inertiaPolicy: MeshInertiaPolicy.SurfaceApproximation),
-            PhysicsScenarioBuilder.Vector(18, 0, 0),
+            PhysicsScenarioBuilder.Vector(24, 0, 0),
             FixedQuaternion.Identity);
 
         bodyless.Should().NotThrow();
         immovable.Should().NotThrow();
         kinematic.Should().NotThrow();
+        angularDisabled.Should().NotThrow();
         dynamic.Should().NotThrow();
     }
 

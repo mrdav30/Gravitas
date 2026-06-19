@@ -54,7 +54,9 @@ Read these in order before making non-trivial changes:
    Recent completed context and current backlog plans include
    [`2026-06-01-alpha-physics-follow-up-hardening-plan.md`](docs/feature-work/done/2026-06-01-alpha-physics-follow-up-hardening-plan.md),
    [`2026-06-18-continuous-collision-depth-hardening-plan.md`](docs/feature-work/2026-06-18-continuous-collision-depth-hardening-plan.md),
-   [`2026-06-18-mass-inertia-solver-follow-up-plan.md`](docs/feature-work/2026-06-18-mass-inertia-solver-follow-up-plan.md),
+   [`2026-06-18-mass-inertia-solver-follow-up-plan.md`](docs/feature-work/done/2026-06-18-mass-inertia-solver-follow-up-plan.md),
+   [`2026-06-19-pure-2d-angular-dynamics-com-plan.md`](docs/feature-work/2026-06-19-pure-2d-angular-dynamics-com-plan.md),
+   [`2026-06-19-mass-inertia-tooling-and-diagnostics-follow-up-plan.md`](docs/feature-work/2026-06-19-mass-inertia-tooling-and-diagnostics-follow-up-plan.md),
    or
    [`2026-06-17-mesh-tooling-simplification-and-decomposition-plan.md`](docs/feature-work/2026-06-17-mesh-tooling-simplification-and-decomposition-plan.md).
 5. [`src/Gravitas/Runtime/GravitasWorldContext.cs`](src/Gravitas/Runtime/GravitasWorldContext.cs),

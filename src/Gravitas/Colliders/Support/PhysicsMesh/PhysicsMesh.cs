@@ -374,12 +374,14 @@ namespace Gravitas.Colliders
 
         /// <summary>
         /// Calculates solid closed-volume inertia for the supplied mass.
+        /// This is a geometry/topology API; callers apply body mobility gates before requesting inertia.
         /// </summary>
         public Fixed3x3 CalculateInertiaTensor(Fixed64 mass) =>
             CalculateInertiaTensor(mass, MeshInertiaPolicy.RequireClosedVolume);
 
         /// <summary>
         /// Calculates mesh inertia for the supplied mass using the requested policy.
+        /// This is a geometry/topology API; callers apply body mobility gates before requesting inertia.
         /// </summary>
         public Fixed3x3 CalculateInertiaTensor(Fixed64 mass, MeshInertiaPolicy policy)
         {
@@ -394,6 +396,7 @@ namespace Gravitas.Colliders
 
         /// <summary>
         /// Calculates mesh inertia for the supplied mass about a specific local reference point.
+        /// This is a geometry/topology API; callers apply body mobility gates before requesting inertia.
         /// </summary>
         public Fixed3x3 CalculateInertiaTensor(Fixed64 mass, MeshInertiaPolicy policy, Vector3d localReferencePoint)
         {

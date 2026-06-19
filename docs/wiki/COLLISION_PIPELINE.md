@@ -344,6 +344,9 @@ Mesh policy work should keep these boundaries explicit:
 - `PhysicsMesh.CalculateInertiaTensor(...)` defaults to closed-volume mass
   properties. Callers that knowingly want the legacy surface-area approximation
   must pass `MeshInertiaPolicy.SurfaceApproximation`.
+- `PhysicsMesh` does not inspect body mobility, kinematic state, or angular
+  force policy. `StiffBody` decides whether angular inertia is needed before it
+  asks the collider/mesh for geometry-derived mass properties.
 
 ## Continuous Collision Detection
 
