@@ -287,9 +287,47 @@ public class StiffBody : IRecordable
     /// </summary>
     private Vector3d _deltaTorque;
 
-    private Fixed3x3 _interiaTensor;
+    private Vector3d _localCenterOfMassOffset;
+    private bool _centerOfMassOffsetExplicit;
+
+    /// <summary>
+    /// Gets or sets the authoritative body-local center-of-mass offset used by response and inertia.
+    /// </summary>
+    public Vector3d LocalCenterOfMassOffset
+    {
+        get => _localCenterOfMassOffset;
+        set
+        {
+            if (_localCenterOfMassOffset == value && _centerOfMassOffsetExplicit)
+                return;
+
+            _localCenterOfMassOffset = value;
+            _centerOfMassOffsetExplicit = true;
+            if (!Active)
+                return;
+
+            Wake();
+            RefreshInertiaTensor();
+        }
+    }
+
+    /// <summary>
+    /// Gets the authoritative world-space center of mass.
+    /// </summary>
+    public Vector3d WorldCenterOfMass => Position3d + (Rotation * _localCenterOfMassOffset);
+
+    /// <summary>
+    /// Clears an explicit center-of-mass override and derives the offset from the bound collider again.
+    /// </summary>
+    public void ResetCenterOfMassFromCollider()
+    {
+        _centerOfMassOffsetExplicit = false;
+        RefreshMassPropertiesFromColliderShape();
+    }
+
+    private Fixed3x3 _inertiaTensor;
     private Fixed3x3 _inverseInertiaTensor;
-    public Fixed3x3 InverseInteriaTensor => _inverseInertiaTensor;
+    public Fixed3x3 InverseInertiaTensor => _inverseInertiaTensor;
 
     /// <summary>
     /// Gets whether solver-side response may translate this body.
@@ -587,9 +625,8 @@ public class StiffBody : IRecordable
 
         _dynamicId = Context.Physics.AssimilateBody(this, isDynamic);
         Collider!.Initialize(this);
+        RefreshMassPropertiesFromColliderShape();
         CheckGround(force: true);
-
-        RefreshInertiaTensor();
     }
 
     internal Vector3d ContinuousCollisionFrameStart
@@ -1115,7 +1152,7 @@ public class StiffBody : IRecordable
         if (AngularForcesHalted && !RotationChangePending)
             return;
 
-        UpdateIntertiaTensorOrientation();
+        UpdateInertiaTensorOrientation();
         ApplyGyroscopicPrecession();
     }
 
@@ -1608,9 +1645,20 @@ public class StiffBody : IRecordable
         Rotation = (Rotation + spin).Normalized;
     }
 
-    private void UpdateIntertiaTensorOrientation()
+    internal void RefreshMassPropertiesFromColliderShape()
     {
-        if (_interiaTensor == Fixed3x3.Zero)
+        if (Collider == null)
+            return;
+
+        if (!_centerOfMassOffsetExplicit)
+            _localCenterOfMassOffset = Collider.CalculateLocalCenterOfMassOffset();
+
+        RefreshInertiaTensor();
+    }
+
+    private void UpdateInertiaTensorOrientation()
+    {
+        if (_inertiaTensor == Fixed3x3.Zero)
             return;
 
         Fixed3x3 inverseOrientation = Rotation.Conjugate().ToMatrix3x3();
@@ -1623,20 +1671,20 @@ public class StiffBody : IRecordable
     {
         if (!CanUseAngularInertia || Collider == null)
         {
-            _interiaTensor = Fixed3x3.Zero;
+            _inertiaTensor = Fixed3x3.Zero;
             _inverseInertiaTensor = Fixed3x3.Zero;
             return;
         }
 
-        _interiaTensor = Collider.CalculateInertiaTensor(Mass);
-        _inverseInertiaTensor = _interiaTensor.InvertDiagonal();
-        UpdateIntertiaTensorOrientation();
+        _inertiaTensor = Collider.CalculateInertiaTensor(Mass, _localCenterOfMassOffset);
+        _inverseInertiaTensor = _inertiaTensor.InvertDiagonal();
+        UpdateInertiaTensorOrientation();
     }
 
     //  gyroscopic precession is a correction to the object's angular velocity based on its rotation
     private void ApplyGyroscopicPrecession()
     {
-        _angularVelocity += _inverseInertiaTensor * Vector3d.Cross(_angularVelocity, _interiaTensor * _angularVelocity) * Context.DeltaTime;
+        _angularVelocity += _inverseInertiaTensor * Vector3d.Cross(_angularVelocity, _inertiaTensor * _angularVelocity) * Context.DeltaTime;
     }
 
     public void OnVisualize()
@@ -2074,6 +2122,8 @@ public class StiffBody : IRecordable
         RecordValues.Look(chronicler, ref _angularVelocity, "AngularVelocity");
         RecordValues.Look(chronicler, ref _angularDirection, "AngularDirection");
         RecordValues.Look(chronicler, ref _deltaTorque, "DeltaTorque");
+        RecordValues.Look(chronicler, ref _localCenterOfMassOffset, "LocalCenterOfMassOffset");
+        RecordValues.Look(chronicler, ref _centerOfMassOffsetExplicit, "CenterOfMassOffsetExplicit", false);
         RecordValues.Look(chronicler, ref RestitutionCoefficient, "RestitutionCoefficient");
         RecordValues.Look(chronicler, ref _isSleeping, "IsSleeping");
         RecordValues.Look(chronicler, ref _sleepFrameCount, "SleepFrameCount");
@@ -2133,7 +2183,7 @@ public class StiffBody : IRecordable
         _visualRotation = Rotation;
         _lastVisualRotation = Rotation;
 
-        RefreshInertiaTensor();
+        RefreshMassPropertiesFromColliderShape();
 
         Collider?.Simulate();
     }

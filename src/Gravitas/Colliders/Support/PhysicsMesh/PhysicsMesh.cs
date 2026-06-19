@@ -383,13 +383,27 @@ namespace Gravitas.Colliders
         /// </summary>
         public Fixed3x3 CalculateInertiaTensor(Fixed64 mass, MeshInertiaPolicy policy)
         {
+            if (policy == MeshInertiaPolicy.RequireClosedVolume
+                && TryGetClosedVolumeMassProperties(out MeshMassProperties properties, out _))
+            {
+                return CalculateInertiaTensor(mass, policy, properties.CenterOfMass);
+            }
+
+            return CalculateInertiaTensor(mass, policy, _localBounds.Center);
+        }
+
+        /// <summary>
+        /// Calculates mesh inertia for the supplied mass about a specific local reference point.
+        /// </summary>
+        public Fixed3x3 CalculateInertiaTensor(Fixed64 mass, MeshInertiaPolicy policy, Vector3d localReferencePoint)
+        {
             switch (policy)
             {
                 case MeshInertiaPolicy.RequireClosedVolume:
                     if (!TryGetClosedVolumeMassProperties(out MeshMassProperties properties, out MeshVolumeValidationResult result))
                         throw new InvalidOperationException($"Mesh inertia requires a validated closed volume. Validation result: {result}.");
 
-                    return properties.UnitMassInertiaTensor * mass;
+                    return properties.CalculateInertiaTensor(mass, localReferencePoint);
 
                 case MeshInertiaPolicy.SurfaceApproximation:
                     return CalculateSurfaceApproximationInertiaTensor(mass);

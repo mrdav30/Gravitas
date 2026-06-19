@@ -661,12 +661,17 @@ Response units and invariants:
 - `StiffBody.CanTranslate`, `StiffBody.CanRotate`, and
   `StiffBody.EffectiveInverseInertiaTensor` are the 3D response mobility
   contract used by both ordinary 3D response and mixed 2D/3D response.
+- 3D response torque arms are measured from `StiffBody.WorldCenterOfMass`.
+  Collider centers remain collision-geometry references for narrow phase,
+  culling, and normal fallback; they are not the implicit body COM.
 - linear velocity is world units per second.
 - angular velocity is radians per second around each local/world axis.
 - inertia tensors are diagonal fixed-point values supplied by the collider
-  shape and transformed by `StiffBody`. Mesh colliders use cached closed-volume
-  mass properties by default when angular dynamics are enabled, with explicit
-  surface approximation opt-in for open meshes.
+  shape for the requested `StiffBody.LocalCenterOfMassOffset` and transformed by
+  `StiffBody`. Mesh colliders use cached closed-volume mass properties by
+  default when angular dynamics are enabled, shift inertia from the mesh
+  reference point to COM with a deterministic diagonal parallel-axis
+  calculation, and keep explicit surface approximation opt-in for open meshes.
 - restitution is clamped to `[0, 1]` and combined by the lower coefficient so a
   low-bounce participant can dampen the pair.
 - closing speeds at or below `RestitutionVelocityThreshold` use zero

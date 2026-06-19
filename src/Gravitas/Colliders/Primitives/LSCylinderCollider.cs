@@ -57,18 +57,19 @@ public class LSCylinderCollider : LSCollider
     protected override Vector3d NormalizeSize(Vector3d value) =>
         new(_radius * 2, value.Y, _radius * 2);
 
-    public override Fixed3x3 CalculateInertiaTensor(Fixed64 mass)
+    public override Fixed3x3 CalculateInertiaTensor(Fixed64 mass, Vector3d localCenterOfMassOffset)
     {
         Fixed64 radiusSqr = ScaledRadiusSqr;
         Fixed64 heightSqr = Height * Height;
         Fixed64 inertiaXZ = Fixed64.FromFraction(1, 12) * mass * ((3 * radiusSqr) + heightSqr);
         Fixed64 inertiaY = Fixed64.Half * mass * radiusSqr;
 
-        return new Fixed3x3(
+        Fixed3x3 tensor = new(
             inertiaXZ, Fixed64.Zero, Fixed64.Zero,
             Fixed64.Zero, inertiaY, Fixed64.Zero,
             Fixed64.Zero, Fixed64.Zero, inertiaXZ
         );
+        return ShiftInertiaTensorFromLocalCenterOfMass(tensor, mass, localCenterOfMassOffset);
     }
 
     public override bool ColliderOverlapsRay(RaycastSegmentWorker worker, ref SwiftList<Vector3d> outputIntersectionPoints)

@@ -173,6 +173,7 @@ contexts. These checks are core invariants.
 - visual position/rotation interpolation buffers.
 - linear and angular velocity, acceleration, impulses, drag, friction, and
   restitution inputs.
+- body-local and world-space center-of-mass state used by inertia and response.
 - mass, raw inverse mass, and solver-effective inverse mass.
 - inertia tensor, raw inverse inertia tensor, and solver-effective inverse
   inertia tensor.

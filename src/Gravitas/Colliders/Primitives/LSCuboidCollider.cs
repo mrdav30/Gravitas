@@ -261,7 +261,7 @@ public class LSCuboidCollider : LSCollider
         // Area calculation: A = 2lw + 2lh + 2wh
         Area = 2 * ScaledSize.X * ScaledSize.Z + 2 * ScaledSize.X * ScaledSize.Y + 2 * ScaledSize.Y * ScaledSize.Z;
 
-    public override Fixed3x3 CalculateInertiaTensor(Fixed64 mass)
+    public override Fixed3x3 CalculateInertiaTensor(Fixed64 mass, Vector3d localCenterOfMassOffset)
     {
         Vector3d worldScaleSqr = ScaledSize * ScaledSize;
 
@@ -270,11 +270,12 @@ public class LSCuboidCollider : LSCollider
         Fixed64 yy = (mass / (Fixed64)12) * (worldScaleSqr.X + worldScaleSqr.Z);
         Fixed64 zz = (mass / (Fixed64)12) * (worldScaleSqr.X + worldScaleSqr.Y);
 
-        return new Fixed3x3(
+        Fixed3x3 tensor = new(
             xx, Fixed64.Zero, Fixed64.Zero,
             Fixed64.Zero, yy, Fixed64.Zero,
             Fixed64.Zero, Fixed64.Zero, zz
         );
+        return ShiftInertiaTensorFromLocalCenterOfMass(tensor, mass, localCenterOfMassOffset);
     }
 
     public override Fixed64 GetFrontalArea(Vector3d direction)

@@ -74,7 +74,7 @@ public sealed class ColliderRuntimeStateTests
             Vector3d.Zero,
             PhysicsScenarioBuilder.Yaw(45));
 
-        body.Body.InverseInteriaTensor.M13.Should().NotBe(Fixed64.Zero);
-        body.Body.InverseInteriaTensor.M31.Should().NotBe(Fixed64.Zero);
+        body.Body.InverseInertiaTensor.M13.Should().NotBe(Fixed64.Zero);
+        body.Body.InverseInertiaTensor.M31.Should().NotBe(Fixed64.Zero);
     }
 }

@@ -1,7 +1,7 @@
 # Mass, Inertia, And Center-Of-Mass Solver Follow-Up Plan
 
 **Date:** 2026-06-18
-**Status:** Workstream 1 implemented / remaining workstreams backlog
+**Status:** Workstreams 1-2 implemented / remaining workstreams backlog
 **Owner:** Gravitas runtime/collision hardening
 
 ## Purpose
@@ -22,12 +22,15 @@ solver architecture work.
   wrappers, not inside `PhysicsMesh`.
 - Runtime inertia tensors are diagonal local tensors inverted with
   `InvertDiagonal()`.
-- `MeshMassProperties.CenterOfMass` is available, but `StiffBody` does not yet
-  have an explicit center-of-mass offset model.
-- Mesh inertia currently uses the collider reference center because contact
-  relative points, transforms, serialization, diagnostics, and the parallel-axis
-  theorem need one coherent body COM contract before arbitrary mesh COM can be
-  consumed safely.
+- `StiffBody.LocalCenterOfMassOffset` is the authoritative 3D body-local COM
+  offset, and `StiffBody.WorldCenterOfMass` is the response-space COM.
+- Collider geometry derives the default body COM through
+  `LSCollider.CalculateLocalCenterOfMassOffset()`. Primitives default to their
+  scaled collider center, compounds use area-weighted part centers, and closed
+  mesh colliders consume `MeshMassProperties.CenterOfMass`.
+- Closed mesh inertia now shifts from `MeshMassProperties.InertiaReferencePoint`
+  to the requested local COM with a deterministic diagonal parallel-axis
+  calculation. Full products of inertia remain Workstream 3 scope.
 - `StiffBody.InverseMass` is the raw reciprocal of `Mass`; immovable and
   kinematic participants now expose zero solver mass through
   `StiffBody.EffectiveInverseMass`.
@@ -68,15 +71,27 @@ serialization, or deterministic transforms.
 
 Tasks:
 
-- Define where COM offset lives: body, collider binding, or shape definition.
-- Apply the offset consistently to contact relative points, torque arms,
+- [x] Define where COM offset lives: body, collider binding, or shape definition.
+- [x] Apply the offset consistently to contact relative points, torque arms,
   inertia transforms, visual transforms, and debug diagnostics.
-- Use the parallel-axis theorem when consuming mesh mass properties whose COM
+- [x] Use the parallel-axis theorem when consuming mesh mass properties whose COM
   differs from the collider reference center.
-- Add Chronicler populate-existing-instance coverage for COM state once it
+- [x] Add Chronicler populate-existing-instance coverage for COM state once it
   becomes authoritative runtime data.
-- Add tests for closed-volume meshes with off-center COM, including collision
+- [x] Add tests for closed-volume meshes with off-center COM, including collision
   impulse angular effects and replay continuation.
+
+**Progress 2026-06-19:** Workstream 2 moved 3D response torque arms and mixed
+3D torque arms to `StiffBody.WorldCenterOfMass`, added authoritative
+`LocalCenterOfMassOffset` Chronicler state, added `ResetCenterOfMassFromCollider`
+for hosts that want to return to derived geometry COM, and renamed the public
+inverse inertia property to `InverseInertiaTensor`. Focused coverage lives in
+`tests/Gravitas.Tests/Core/StiffBodyCenterOfMassTests.cs`,
+`tests/Gravitas.Tests/Colliders/PhysicsMeshTests.cs`, and
+`tests/Gravitas.Tests/Serialization/StiffBodySerializationTests.cs`.
+Existing response diagnostics observe the COM-based solver result through
+contact, response impulse, and velocity-delta events. A dedicated debug-draw COM
+marker remains optional diagnostic-adapter polish rather than core solver state.
 
 ## Workstream 3: Full Tensor And Principal-Axis Support
 

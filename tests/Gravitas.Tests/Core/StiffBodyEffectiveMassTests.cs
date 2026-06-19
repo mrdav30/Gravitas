@@ -19,7 +19,7 @@ public sealed class StiffBodyEffectiveMassTests
         body.Body.CanTranslate.Should().BeTrue();
         body.Body.CanRotate.Should().BeTrue();
         body.Body.EffectiveInverseMass.Should().Be(Fixed64.FromFraction(1, 4));
-        body.Body.EffectiveInverseInertiaTensor.Should().Be(body.Body.InverseInteriaTensor);
+        body.Body.EffectiveInverseInertiaTensor.Should().Be(body.Body.InverseInertiaTensor);
         body.Body.EffectiveInverseInertiaTensor.Should().NotBe(Fixed3x3.Zero);
     }
 

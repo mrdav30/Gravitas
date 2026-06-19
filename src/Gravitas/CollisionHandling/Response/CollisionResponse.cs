@@ -120,8 +120,8 @@ public static class CollisionResponse
             bodyB,
             manifoldContact.PointA,
             manifoldContact.PointB,
-            manifoldContact.PointA - pair.ColliderA.Center,
-            manifoldContact.PointB - pair.ColliderB.Center,
+            manifoldContact.PointA - bodyA.Body.WorldCenterOfMass,
+            manifoldContact.PointB - bodyB.Body.WorldCenterOfMass,
             manifoldContact.Depth,
             normal);
         return true;

@@ -34,16 +34,17 @@ public class LSSphereCollider : LSCollider
     protected override void BuildShape() =>
         Area = Fixed64.Pi * ScaledRadiusSqr;  // The area of a circle is pi times the radius squared (A = π r²)
 
-    public override Fixed3x3 CalculateInertiaTensor(Fixed64 mass)
+    public override Fixed3x3 CalculateInertiaTensor(Fixed64 mass, Vector3d localCenterOfMassOffset)
     {
         // For a solid sphere, the inertia tensor is (2/5)*m*r^2 for the diagonal elements
         Fixed64 diagonalElement = Fixed64.FromFraction(2, 5) * mass * ScaledRadiusSqr;
 
-        return new Fixed3x3(
+        Fixed3x3 tensor = new(
             diagonalElement, Fixed64.Zero, Fixed64.Zero,
             Fixed64.Zero, diagonalElement, Fixed64.Zero,
             Fixed64.Zero, Fixed64.Zero, diagonalElement
         );
+        return ShiftInertiaTensorFromLocalCenterOfMass(tensor, mass, localCenterOfMassOffset);
     }
 
     public override Vector3d ClosestPointOnSurface(Vector3d other)

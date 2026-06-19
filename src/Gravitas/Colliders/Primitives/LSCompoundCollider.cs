@@ -103,7 +103,31 @@ public sealed class LSCompoundCollider : LSCollider
         SetBoundsMinMax(min, max);
     }
 
-    public override Fixed3x3 CalculateInertiaTensor(Fixed64 mass)
+    public override Vector3d CalculateLocalCenterOfMassOffset()
+    {
+        if (_parts.Length == 0)
+            return ScaledOffset;
+
+        Fixed64 totalArea = Area;
+        Fixed64 totalWeight = Fixed64.Zero;
+        Vector3d weightedCenter = Vector3d.Zero;
+        for (int i = 0; i < _parts.Length; i++)
+        {
+            LSCollider part = _partColliders[i];
+            Fixed64 weight = totalArea > Fixed64.Zero
+                ? part.Area / totalArea
+                : Fixed64.One / (Fixed64)_parts.Length;
+
+            totalWeight += weight;
+            weightedCenter += part.CalculateLocalCenterOfMassOffset() * weight;
+        }
+
+        return totalWeight > Fixed64.Zero
+            ? weightedCenter / totalWeight
+            : ScaledOffset;
+    }
+
+    public override Fixed3x3 CalculateInertiaTensor(Fixed64 mass, Vector3d localCenterOfMassOffset)
     {
         if (_parts.Length == 0)
             return Fixed3x3.Zero;
@@ -119,8 +143,9 @@ public sealed class LSCompoundCollider : LSCollider
                 ? mass * (part.Area / totalArea)
                 : equalPartMass;
 
-            tensor += part.CalculateInertiaTensor(partMass);
-            tensor += CalculateParallelAxisTensor(partMass, part.Center - Center);
+            Vector3d partCenterOfMass = part.CalculateLocalCenterOfMassOffset();
+            Fixed3x3 partTensor = part.CalculateInertiaTensor(partMass, partCenterOfMass);
+            tensor += AddParallelAxisTensor(partTensor, partMass, localCenterOfMassOffset - partCenterOfMass);
         }
 
         return tensor;
@@ -176,18 +201,6 @@ public sealed class LSCompoundCollider : LSCollider
         }
 
         return bestIndex;
-    }
-
-    private static Fixed3x3 CalculateParallelAxisTensor(Fixed64 mass, Vector3d offset)
-    {
-        Fixed64 xSqr = offset.X * offset.X;
-        Fixed64 ySqr = offset.Y * offset.Y;
-        Fixed64 zSqr = offset.Z * offset.Z;
-
-        return new Fixed3x3(
-            mass * (ySqr + zSqr), Fixed64.Zero, Fixed64.Zero,
-            Fixed64.Zero, mass * (xSqr + zSqr), Fixed64.Zero,
-            Fixed64.Zero, Fixed64.Zero, mass * (xSqr + ySqr));
     }
 
     private static LSCollider MaterializePartCollider(CompoundColliderPart part)

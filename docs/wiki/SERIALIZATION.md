@@ -31,8 +31,8 @@ Serialized state:
 
 - body position, rotation, velocities, acceleration stores, pending force,
   torque, impulse, and position-correction accumulators.
-- mass, friction, restitution, sleep state, sleep thresholds, CCD mode, and
-  movement flags.
+- mass, local center-of-mass offset, friction, restitution, sleep state, sleep
+  thresholds, CCD mode, and movement flags.
 - 3D grounding state and ground probe configuration.
 - collider active/trigger state, layer, local offset, shape dimensions, 2D
   mixed half-thickness override, and shape-derived inputs.
@@ -57,8 +57,10 @@ authoritative state instead of treated as replay truth.
 
 `StiffBody` records 3D authoritative body state, including position,
 height, rotation, linear/angular motion, pending force and torque state, mass,
-response coefficients, sleep state, CCD mode, and 3D ground probe state. It
-does not record the `FixedTransform` binding.
+local center-of-mass offset, response coefficients, sleep state, CCD mode, and
+3D ground probe state. It does not record the `FixedTransform` binding.
+Collider geometry can derive a default COM for new shells, but populated
+snapshots restore the body-owned COM state directly.
 
 `StiffBody2D` records pure 2D authoritative body state, including X/Z-projected
 position, scalar rotation, linear motion, pending force state, mass, response

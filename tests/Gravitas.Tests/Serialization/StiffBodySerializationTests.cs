@@ -30,6 +30,7 @@ public sealed class StiffBodySerializationTests
         source.Body.SleepLinearSpeedThreshold = Fixed64.FromFraction(1, 64);
         source.Body.SleepAngularSpeedThreshold = Fixed64.FromFraction(1, 32);
         source.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        source.Body.LocalCenterOfMassOffset = new Vector3d(Fixed64.FromFraction(1, 4), Fixed64.FromFraction(1, 8), -Fixed64.FromFraction(1, 2));
         source.Body.RestitutionCoefficient = Fixed64.FromFraction(3, 4);
         source.Body.FrictionCoefficient = Fixed64.FromFraction(5, 4);
         source.Collider.Radius = Fixed64.FromFraction(3, 2);
@@ -62,6 +63,8 @@ public sealed class StiffBodySerializationTests
         target.Body.SleepLinearSpeedThreshold.Should().Be(Fixed64.FromFraction(1, 64));
         target.Body.SleepAngularSpeedThreshold.Should().Be(Fixed64.FromFraction(1, 32));
         target.Body.ContinuousCollisionMode.Should().Be(ContinuousCollisionMode.Continuous);
+        target.Body.LocalCenterOfMassOffset.Should().Be(source.Body.LocalCenterOfMassOffset);
+        target.Body.WorldCenterOfMass.Should().Be(source.Body.WorldCenterOfMass);
         target.Body.RestitutionCoefficient.Should().Be(source.Body.RestitutionCoefficient);
         target.Body.FrictionCoefficient.Should().Be(source.Body.FrictionCoefficient);
         target.Body.PositionTransform.Should().BeSameAs(targetTransform);

@@ -262,6 +262,46 @@ public sealed class PhysicsMeshTests
     }
 
     [Fact]
+    public void CalculateInertiaTensor_ForOffCenterClosedVolume_ShouldShiftReferenceTensorToCenterOfMass()
+    {
+        var mesh = new PhysicsMesh(
+            new[]
+            {
+                Vector3d.Zero,
+                Vector3d.Right,
+                Vector3d.Up,
+                Vector3d.Forward
+            },
+            new[]
+            {
+                1, 2, 3,
+                0, 2, 1,
+                0, 1, 3,
+                0, 3, 2
+            },
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+        mesh.TryGetClosedVolumeMassProperties(
+            out MeshMassProperties properties,
+            out _).Should().BeTrue();
+        Fixed64 mass = (Fixed64)6;
+        Fixed3x3 referenceTensor = properties.UnitMassInertiaTensor * mass;
+        Vector3d referenceOffset = properties.InertiaReferencePoint - properties.CenterOfMass;
+
+        Fixed3x3 tensor = mesh.CalculateInertiaTensor(mass);
+
+        AssertNear(
+            referenceTensor.M11,
+            tensor.M11 + mass * ((referenceOffset.Y * referenceOffset.Y) + (referenceOffset.Z * referenceOffset.Z)));
+        AssertNear(
+            referenceTensor.M22,
+            tensor.M22 + mass * ((referenceOffset.X * referenceOffset.X) + (referenceOffset.Z * referenceOffset.Z)));
+        AssertNear(
+            referenceTensor.M33,
+            tensor.M33 + mass * ((referenceOffset.X * referenceOffset.X) + (referenceOffset.Y * referenceOffset.Y)));
+    }
+
+    [Fact]
     public void CalculateInertiaTensor_WithSurfaceApproximationOptIn_ShouldAllowOpenMesh()
     {
         var mesh = new PhysicsMesh(

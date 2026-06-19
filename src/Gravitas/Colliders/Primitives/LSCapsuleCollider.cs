@@ -76,16 +76,17 @@ public class LSCapsuleCollider : LSCollider
     // Therefore, for the capsule (assuming it's made of the same material throughout),
     // we'll add the inertia of the two hemispheres and the cylinder to get:
     //     I_capsule = I_cylinder + 2 * I_sphere
-    public override Fixed3x3 CalculateInertiaTensor(Fixed64 mass)
+    public override Fixed3x3 CalculateInertiaTensor(Fixed64 mass, Vector3d localCenterOfMassOffset)
     {
         if (CylinderHeight <= Fixed64.Epsilon)
         {
             Fixed64 sphereDiagonal = Fixed64.FromFraction(2, 5) * mass * ScaledRadiusSqr;
-            return new Fixed3x3(
+            Fixed3x3 sphereTensor = new(
                 sphereDiagonal, Fixed64.Zero, Fixed64.Zero,
                 Fixed64.Zero, sphereDiagonal, Fixed64.Zero,
                 Fixed64.Zero, Fixed64.Zero, sphereDiagonal
             );
+            return ShiftInertiaTensorFromLocalCenterOfMass(sphereTensor, mass, localCenterOfMassOffset);
         }
 
         // Masses of the cylinder and spheres (proportional to their volumes)
@@ -109,11 +110,12 @@ public class LSCapsuleCollider : LSCollider
         Fixed64 totalInertia_xz = cylinderInertiaXZ + sphereInertiaXZ;
         Fixed64 totalInertia_y = cylinderInertiaY + sphereInertiaY;
 
-        return new Fixed3x3(
+        Fixed3x3 tensor = new(
             totalInertia_xz, Fixed64.Zero, Fixed64.Zero,
             Fixed64.Zero, totalInertia_y, Fixed64.Zero,
             Fixed64.Zero, Fixed64.Zero, totalInertia_xz
         );
+        return ShiftInertiaTensorFromLocalCenterOfMass(tensor, mass, localCenterOfMassOffset);
     }
 
     // If the capsule is moving in the direction of its main axis,

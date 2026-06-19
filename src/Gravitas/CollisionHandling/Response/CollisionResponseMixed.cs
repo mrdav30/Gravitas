@@ -36,7 +36,7 @@ public static class CollisionResponseMixed
         if (effectiveInverseMass <= Fixed64.Zero)
             return;
 
-        Vector3d relative3D = contact.Point3D - pair.Collider3D.Center;
+        Vector3d relative3D = contact.Point3D - (body3D?.WorldCenterOfMass ?? pair.Collider3D.Center);
         ApplyPositionCorrection(body3D, body2D, normal, contact.Depth, inverseMass3D, inverseMass2D, effectiveInverseMass);
         Fixed64 normalImpulse = ApplyNormalImpulse(
             pair,

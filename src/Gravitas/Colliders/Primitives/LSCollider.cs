@@ -465,6 +465,7 @@ public abstract class LSCollider : IRecordable, IColliderHierarchyNode
 
         RebuildRuntimeShape();
         _runtimeShapeState.Commit(snapshot);
+        _body?.RefreshMassPropertiesFromColliderShape();
         return true;
     }
 
@@ -561,10 +562,40 @@ public abstract class LSCollider : IRecordable, IColliderHierarchyNode
     // default to total area for shapes where frontal area doesn't make sense
     public virtual Fixed64 GetFrontalArea(Vector3d direction) => Area;
 
-    // we're considering the inertial tensor for these shapes to be diagonal matrices with the principal moments of inertia along the diagonal.
-    // The non-diagonal elements of the inertial tensor matrix are zero for these symmetrical shapes,
-    // under the assumption that the center of mass is the reference point and the coordinate axes are principal axes of inertia.
-    public abstract Fixed3x3 CalculateInertiaTensor(Fixed64 mass);
+    /// <summary>
+    /// Calculates the body-local center of mass offset implied by this collider's current shape state.
+    /// </summary>
+    public virtual Vector3d CalculateLocalCenterOfMassOffset() => ScaledOffset;
+
+    /// <summary>
+    /// Calculates the diagonal local inertia tensor for this collider about its derived center of mass.
+    /// </summary>
+    public Fixed3x3 CalculateInertiaTensor(Fixed64 mass) =>
+        CalculateInertiaTensor(mass, CalculateLocalCenterOfMassOffset());
+
+    // Runtime tensors remain diagonal until full tensor support lands. Parallel-axis
+    // shifts therefore keep only diagonal terms and leave products of inertia to Workstream 3.
+    public abstract Fixed3x3 CalculateInertiaTensor(Fixed64 mass, Vector3d localCenterOfMassOffset);
+
+    protected Fixed3x3 ShiftInertiaTensorFromLocalCenterOfMass(
+        Fixed3x3 centerTensor,
+        Fixed64 mass,
+        Vector3d targetLocalOffset) =>
+        AddParallelAxisTensor(centerTensor, mass, targetLocalOffset - CalculateLocalCenterOfMassOffset());
+
+    protected static Fixed3x3 AddParallelAxisTensor(Fixed3x3 tensor, Fixed64 mass, Vector3d offset)
+    {
+        if (mass <= Fixed64.Zero || offset == Vector3d.Zero)
+            return tensor;
+
+        Fixed64 xx = mass * ((offset.Y * offset.Y) + (offset.Z * offset.Z));
+        Fixed64 yy = mass * ((offset.X * offset.X) + (offset.Z * offset.Z));
+        Fixed64 zz = mass * ((offset.X * offset.X) + (offset.Y * offset.Y));
+        tensor.M11 += xx;
+        tensor.M22 += yy;
+        tensor.M33 += zz;
+        return tensor;
+    }
 
     internal void NotifyContact(LSCollider other, bool isColliding, bool isChanged)
     {
