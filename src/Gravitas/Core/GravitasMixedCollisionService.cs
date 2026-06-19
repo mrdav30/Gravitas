@@ -628,7 +628,7 @@ internal sealed class GravitasMixedCollisionService
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool IsAwakeMovable(StiffBody2D? body) =>
-        body != null && body.CanMove && !body.IsSleeping;
+        body != null && body.CanTranslate && !body.IsSleeping;
 
     internal int ActivatePartition(PhysicsMixedPartition partition)
     {

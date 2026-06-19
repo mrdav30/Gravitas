@@ -490,7 +490,7 @@ public sealed class GravitasPhysics2DService
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool IsAwakeMovable(StiffBody2D? body) =>
-        body != null && body.CanMove && !body.IsSleeping;
+        body != null && body.CanTranslate && !body.IsSleeping;
 
     private bool IsLayerCollisionDisabled(PhysicsLayer layer1, PhysicsLayer layer2)
     {

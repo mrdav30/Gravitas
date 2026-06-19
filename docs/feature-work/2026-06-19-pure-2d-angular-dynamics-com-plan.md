@@ -11,7 +11,7 @@
 ---
 
 **Date:** 2026-06-19
-**Status:** Backlog / ready after completed 3D mass-inertia solver follow-up
+**Status:** Workstream 1 implemented / Workstream 2 ready
 **Owner:** Gravitas runtime/collision hardening
 
 ## Purpose
@@ -32,10 +32,10 @@ the 3D mass/inertia workstream as a weak copy of the 3D tensor model.
 - `StiffBody2D` owns X/Z-projected position, scalar yaw rotation, linear
   velocity, force integration, sleep/wake state, pure 2D CCD, mixed CCD source
   handling, visualization publishing, and Chronicler state.
-- `StiffBody2D.Mass` and `InverseMass` are scalar, but there is no scalar moment
-  of inertia or effective inverse moment API.
-- `StiffBody2D.CanMove` currently means "can translate"; there is no separate
-  `CanTranslate`/`CanRotate` contract.
+- `StiffBody2D.Mass` and `InverseMass` are scalar, and Workstream 1 added
+  scalar moment/inverse moment state plus effective inverse mass/moment helpers.
+- `StiffBody2D.CanTranslate` and `CanRotate` now separate linear and angular
+  solver mobility policy.
 - `LSCollider2D` owns shape state, bounds, local offset, mixed embedding, query
   state, partition state, pair state, and hierarchy state. It does not expose
   center-of-mass or moment-of-inertia APIs.
@@ -59,9 +59,9 @@ the 3D mass/inertia workstream as a weak copy of the 3D tensor model.
 - Pure 2D inertia is a scalar moment around the body yaw axis, not a tensor.
 - Shape APIs derive moment about an explicit requested body-local reference
   point so callers cannot confuse collider center, body origin, and COM.
-- `CanMove` should be replaced by explicit `CanTranslate` in runtime code. Do
-  not keep a duplicate public mobility alias when implementing this plan; the
-  project is pre-alpha and API clarity wins.
+- `CanMove` was replaced by explicit `CanTranslate` in runtime code. Do not
+  restore a duplicate public mobility alias; the project is pre-alpha and API
+  clarity wins.
 - `CanRotate`, `EffectiveInverseMass`, and `EffectiveInverseMomentOfInertia`
   belong on `StiffBody2D`, mirroring the 3D effective mass policy while keeping
   the scalar 2D model simple.
@@ -128,145 +128,41 @@ Fixed64 denominator =
 
 Tasks:
 
-- [ ] Add failing tests in
+- [x] Add failing tests in
   `tests/Gravitas.Tests/Core/StiffBody2DMassPropertiesTests.cs` for movable,
   kinematic, immovable, zero-mass, and angular-disabled bodies.
-
-```csharp
-[Fact]
-public void EffectiveMassHelpers_ShouldSeparateTranslationAndRotationPolicy()
-{
-    using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
-    StiffBody2D body = CreateBody(context, new LSCircleCollider2D(Fixed64.One), mass: (Fixed64)2);
-
-    body.CanTranslate.Should().BeTrue();
-    body.CanRotate.Should().BeTrue();
-    body.EffectiveInverseMass.Should().Be(Fixed64.Half);
-    body.EffectiveInverseMomentOfInertia.Should().BeGreaterThan(Fixed64.Zero);
-
-    body.PreventAngularForces = true;
-
-    body.CanTranslate.Should().BeTrue();
-    body.CanRotate.Should().BeFalse();
-    body.EffectiveInverseMomentOfInertia.Should().Be(Fixed64.Zero);
-}
-```
-
-- [ ] Add failing tests for `LocalCenterOfMassOffset`, `WorldCenterOfMass`, and
+- [x] Add failing tests for `LocalCenterOfMassOffset`, `WorldCenterOfMass`, and
   `ResetCenterOfMassFromCollider`.
-
-```csharp
-[Fact]
-public void WorldCenterOfMass_ShouldRotateLocalOffsetAroundBodyPosition()
-{
-    using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
-    StiffBody2D body = CreateBody(context, new LSCircleCollider2D(Fixed64.One), mass: Fixed64.One);
-
-    body.SetPosition(new Vector2d((Fixed64)3, (Fixed64)4));
-    body.SetRotation(FixedMath.DegToRad((Fixed64)90));
-    body.LocalCenterOfMassOffset = new Vector2d((Fixed64)2, Fixed64.Zero);
-
-    body.WorldCenterOfMass.Should().Be(new Vector2d((Fixed64)3, (Fixed64)6));
-}
-```
-
-- [ ] Replace `CanMove` in `StiffBody2D` with explicit `CanTranslate` and
+- [x] Replace `CanMove` in `StiffBody2D` with explicit `CanTranslate` and
   `CanRotate`. Update all pure 2D and mixed callers in the same change.
-
-```csharp
-public bool CanTranslate =>
-    Active && _isDynamic && !Immovable && !IsKinematic && InverseMass > Fixed64.Zero;
-
-public bool CanRotate =>
-    CanTranslate && !PreventAngularForces && _inverseMomentOfInertia > Fixed64.Zero;
-
-public Fixed64 EffectiveInverseMass => CanTranslate ? InverseMass : Fixed64.Zero;
-
-public Fixed64 EffectiveInverseMomentOfInertia =>
-    CanRotate ? _inverseMomentOfInertia : Fixed64.Zero;
-```
-
-- [ ] Convert `Mass` from an auto-property into a setter that refreshes scalar
+- [x] Convert `Mass` from an auto-property into a setter that refreshes scalar
   moment and inverse moment when shape mass properties are available.
-
-```csharp
-private Fixed64 _mass;
-
-public Fixed64 Mass
-{
-    get => _mass;
-    set
-    {
-        _mass = value;
-        RefreshMassPropertiesFromColliderShape();
-    }
-}
-```
-
-- [ ] Add explicit COM and scalar moment state to `StiffBody2D`.
-
-```csharp
-private Vector2d _localCenterOfMassOffset;
-private bool _hasExplicitCenterOfMassOffset;
-private Fixed64 _momentOfInertia;
-private Fixed64 _inverseMomentOfInertia;
-
-public Vector2d LocalCenterOfMassOffset
-{
-    get => _localCenterOfMassOffset;
-    set
-    {
-        _localCenterOfMassOffset = value;
-        _hasExplicitCenterOfMassOffset = true;
-        RefreshMassPropertiesFromColliderShape();
-    }
-}
-
-public Vector2d WorldCenterOfMass =>
-    _position + ClampNearZero(Vector2d.Rotate(_localCenterOfMassOffset, _rotation));
-
-public Fixed64 MomentOfInertia => _momentOfInertia;
-
-public Fixed64 InverseMomentOfInertia => _inverseMomentOfInertia;
-```
-
-- [ ] Add `ResetCenterOfMassFromCollider()` and
+- [x] Add explicit COM and scalar moment state to `StiffBody2D`.
+- [x] Add `ResetCenterOfMassFromCollider()` and
   `RefreshMassPropertiesFromColliderShape()` to derive default COM and moment
   from the bound collider.
-
-```csharp
-public void ResetCenterOfMassFromCollider()
-{
-    _hasExplicitCenterOfMassOffset = false;
-    RefreshMassPropertiesFromColliderShape();
-}
-
-private void RefreshMassPropertiesFromColliderShape()
-{
-    if (Collider == null || _mass <= Fixed64.Zero)
-    {
-        _momentOfInertia = Fixed64.Zero;
-        _inverseMomentOfInertia = Fixed64.Zero;
-        return;
-    }
-
-    if (!_hasExplicitCenterOfMassOffset)
-        _localCenterOfMassOffset = Collider.CalculateLocalCenterOfMassOffset();
-
-    _momentOfInertia = Collider.CalculateMomentOfInertia(_mass, _localCenterOfMassOffset);
-    _inverseMomentOfInertia = _momentOfInertia > Fixed64.Zero
-        ? Fixed64.One / _momentOfInertia
-        : Fixed64.Zero;
-}
-```
-
-- [ ] Run focused body tests.
+- [x] Run focused body tests.
 
 ```bash
 dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter FullyQualifiedName~StiffBody2DMassPropertiesTests
 ```
 
 Expected after implementation: all new body mass-property tests pass.
+
+**Progress 2026-06-19:** Workstream 1 added body-owned
+`LocalCenterOfMassOffset`, `WorldCenterOfMass`, scalar moment/inverse moment,
+`PreventAngularForces`, `CanTranslate`, `CanRotate`, `EffectiveInverseMass`,
+and `EffectiveInverseMomentOfInertia`. Pure 2D and mixed response now consume
+the 2D effective inverse mass surface instead of the removed `CanMove` alias.
+`Mass`, collider shape changes, and COM overrides refresh scalar mass
+properties, and Chronicler records the new body-owned COM/angular-policy state.
+Focused coverage lives in
+`tests/Gravitas.Tests/Core/StiffBody2DMassPropertiesTests.cs` and
+`tests/Gravitas.Tests/Serialization/StiffBody2DSerializationTests.cs`.
+The shared `LSCollider2D` mass-property surface and current shape formula
+implementations were pulled forward to avoid placeholder body inertia;
+Workstream 2 remains open for the dedicated circle, AABB, polygon, and compound
+formula test matrix before the collider API boundary is considered complete.
 
 ## Workstream 2: 2D Collider Mass-Property API
 
@@ -296,7 +192,7 @@ public void Circle_ShouldCalculateMomentAroundRequestedLocalReference()
 }
 ```
 
-- [ ] Add the base mass-property surface to `LSCollider2D`.
+- [x] Add the base mass-property surface to `LSCollider2D`.
 
 ```csharp
 public virtual Vector2d CalculateLocalCenterOfMassOffset() => ScaledLocalOffset;
@@ -315,7 +211,7 @@ protected static Fixed64 ApplyParallelAxis(Fixed64 momentAboutCom, Fixed64 mass,
 }
 ```
 
-- [ ] Implement circle mass properties in `LSCircleCollider2D`.
+- [x] Implement circle mass properties in `LSCircleCollider2D`.
 
 ```csharp
 internal override Fixed64 CalculateAreaForMassProperties() =>
@@ -332,7 +228,7 @@ public override Fixed64 CalculateMomentOfInertia(Fixed64 mass, Vector2d localRef
 }
 ```
 
-- [ ] Implement AABB mass properties in `LSAABBoxCollider2D`.
+- [x] Implement AABB mass properties in `LSAABBoxCollider2D`.
 
 ```csharp
 internal override Fixed64 CalculateAreaForMassProperties()
@@ -352,7 +248,7 @@ public override Fixed64 CalculateMomentOfInertia(Fixed64 mass, Vector2d localRef
 }
 ```
 
-- [ ] Implement convex polygon area, centroid, and moment using scaled local
+- [x] Implement convex polygon area, centroid, and moment using scaled local
   vertices plus `ScaledLocalOffset`. Preserve declaration order and reject
   invalid polygons through the existing validation path.
 
@@ -361,7 +257,7 @@ private Vector2d GetMassPropertyVertex(int index) =>
     ScaledLocalOffset + Vector2d.Multiply(_localVertices[index], LocalScale);
 ```
 
-- [ ] Implement `LSCompoundCollider2D` aggregation in stable part order. Assign
+- [x] Implement `LSCompoundCollider2D` aggregation in stable part order. Assign
   each part a mass proportional to `partArea / totalArea`, aggregate COM by
   area-weighted local COM, and aggregate moment by asking each part for moment
   about the compound COM.

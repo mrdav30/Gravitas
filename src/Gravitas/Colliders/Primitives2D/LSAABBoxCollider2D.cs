@@ -78,6 +78,27 @@ public sealed class LSAABBoxCollider2D : LSCollider2D
         };
     }
 
+    internal override Fixed64 CalculateAreaForMassProperties()
+    {
+        Vector2d scaledSize = ScaledSize;
+        return scaledSize.X * scaledSize.Y;
+    }
+
+    public override Fixed64 CalculateMomentOfInertia(Fixed64 mass, Vector2d localReferencePoint)
+    {
+        if (mass <= Fixed64.Zero)
+            return Fixed64.Zero;
+
+        Vector2d scaledSize = ScaledSize;
+        Fixed64 momentAboutCenterOfMass =
+            mass * ((scaledSize.X * scaledSize.X) + (scaledSize.Y * scaledSize.Y)) / (Fixed64)12;
+        return ApplyParallelAxis(
+            momentAboutCenterOfMass,
+            mass,
+            CalculateLocalCenterOfMassOffset(),
+            localReferencePoint);
+    }
+
     protected override void RebuildShape()
     {
         Vector2d halfExtents = ScaledHalfExtents;

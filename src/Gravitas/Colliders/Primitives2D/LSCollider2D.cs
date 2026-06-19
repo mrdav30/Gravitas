@@ -600,6 +600,24 @@ public abstract class LSCollider2D : IRecordable, IColliderHierarchyNode
 
     internal abstract Vector2d GetVertexUnchecked(int index);
 
+    /// <summary>
+    /// Calculates the body-local center of mass implied by this 2D collider's current shape state.
+    /// </summary>
+    public virtual Vector2d CalculateLocalCenterOfMassOffset() => ScaledLocalOffset;
+
+    /// <summary>
+    /// Calculates the scalar moment of inertia about this collider's derived center of mass.
+    /// </summary>
+    public Fixed64 CalculateMomentOfInertia(Fixed64 mass) =>
+        CalculateMomentOfInertia(mass, CalculateLocalCenterOfMassOffset());
+
+    /// <summary>
+    /// Calculates the scalar moment of inertia about a requested body-local reference point.
+    /// </summary>
+    public abstract Fixed64 CalculateMomentOfInertia(Fixed64 mass, Vector2d localReferencePoint);
+
+    internal abstract Fixed64 CalculateAreaForMassProperties();
+
     protected abstract void RebuildShape();
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -614,6 +632,17 @@ public abstract class LSCollider2D : IRecordable, IColliderHierarchyNode
         }
 
         _body?.Wake();
+        _body?.RefreshMassPropertiesFromColliderShape();
+    }
+
+    protected static Fixed64 ApplyParallelAxis(
+        Fixed64 momentAboutCenterOfMass,
+        Fixed64 mass,
+        Vector2d centerOfMass,
+        Vector2d localReferencePoint)
+    {
+        Vector2d delta = localReferencePoint - centerOfMass;
+        return momentAboutCenterOfMass + mass * delta.MagnitudeSquared;
     }
 
     private bool RebuildRuntimeShapeState()

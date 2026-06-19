@@ -104,6 +104,58 @@ public sealed class LSPolygonCollider2D : LSCollider2D
 
     internal override Vector2d GetVertexUnchecked(int index) => _worldVertices[index];
 
+    public override Vector2d CalculateLocalCenterOfMassOffset()
+    {
+        if (!TryCalculateSignedAreaAndCentroid(out _, out Vector2d centroid))
+            return base.CalculateLocalCenterOfMassOffset();
+
+        return centroid;
+    }
+
+    internal override Fixed64 CalculateAreaForMassProperties()
+    {
+        Fixed64 signedDoubleArea = CalculateSignedDoubleArea();
+        return signedDoubleArea.Abs() * Fixed64.Half;
+    }
+
+    public override Fixed64 CalculateMomentOfInertia(Fixed64 mass, Vector2d localReferencePoint)
+    {
+        if (mass <= Fixed64.Zero
+            || !TryCalculateSignedAreaAndCentroid(out Fixed64 signedDoubleArea, out Vector2d centerOfMass))
+        {
+            return Fixed64.Zero;
+        }
+
+        Fixed64 area = signedDoubleArea.Abs() * Fixed64.Half;
+        if (area <= Fixed64.Zero)
+            return Fixed64.Zero;
+
+        Fixed64 density = mass / area;
+        Fixed64 originIntegral = Fixed64.Zero;
+        for (int i = 0; i < _localVertices.Length; i++)
+        {
+            Vector2d a = GetMassPropertyVertex(i);
+            Vector2d b = GetMassPropertyVertex((i + 1) % _localVertices.Length);
+            Fixed64 cross = Vector2d.CrossProduct(a, b);
+            Fixed64 term =
+                a.MagnitudeSquared +
+                Vector2d.Dot(a, b) +
+                b.MagnitudeSquared;
+            originIntegral += cross * term;
+        }
+
+        Fixed64 momentAboutOrigin = (density * originIntegral).Abs() / (Fixed64)12;
+        Fixed64 momentAboutCenterOfMass = momentAboutOrigin - mass * centerOfMass.MagnitudeSquared;
+        if (momentAboutCenterOfMass < Fixed64.Zero && momentAboutCenterOfMass.Abs() <= Fixed64.Epsilon)
+            momentAboutCenterOfMass = Fixed64.Zero;
+
+        return ApplyParallelAxis(
+            momentAboutCenterOfMass,
+            mass,
+            centerOfMass,
+            localReferencePoint);
+    }
+
     protected override void RebuildShape()
     {
         Vector2d min = Vector2d.Zero;
@@ -177,4 +229,43 @@ public sealed class LSPolygonCollider2D : LSCollider2D
             SwiftThrowHelper.ThrowIfArgument(currentSign != sign, nameof(vertices), "2D polygon must be convex.");
         }
     }
+
+    private Fixed64 CalculateSignedDoubleArea()
+    {
+        Fixed64 signedDoubleArea = Fixed64.Zero;
+        for (int i = 0; i < _localVertices.Length; i++)
+        {
+            Vector2d a = GetMassPropertyVertex(i);
+            Vector2d b = GetMassPropertyVertex((i + 1) % _localVertices.Length);
+            signedDoubleArea += Vector2d.CrossProduct(a, b);
+        }
+
+        return signedDoubleArea;
+    }
+
+    private bool TryCalculateSignedAreaAndCentroid(out Fixed64 signedDoubleArea, out Vector2d centroid)
+    {
+        signedDoubleArea = Fixed64.Zero;
+        Vector2d weightedCentroid = Vector2d.Zero;
+        for (int i = 0; i < _localVertices.Length; i++)
+        {
+            Vector2d a = GetMassPropertyVertex(i);
+            Vector2d b = GetMassPropertyVertex((i + 1) % _localVertices.Length);
+            Fixed64 cross = Vector2d.CrossProduct(a, b);
+            signedDoubleArea += cross;
+            weightedCentroid += (a + b) * cross;
+        }
+
+        if (signedDoubleArea.Abs() <= Fixed64.Epsilon)
+        {
+            centroid = Vector2d.Zero;
+            return false;
+        }
+
+        centroid = weightedCentroid / ((Fixed64)3 * signedDoubleArea);
+        return true;
+    }
+
+    private Vector2d GetMassPropertyVertex(int index) =>
+        ScaledLocalOffset + Vector2d.Multiply(_localVertices[index], LocalScale);
 }

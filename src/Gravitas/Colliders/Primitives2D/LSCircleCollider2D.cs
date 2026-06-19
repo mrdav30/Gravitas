@@ -70,6 +70,19 @@ public sealed class LSCircleCollider2D : LSCollider2D
 
     internal override Vector2d GetVertexUnchecked(int index) => Center;
 
+    internal override Fixed64 CalculateAreaForMassProperties() =>
+        Fixed64.Pi * ScaledRadius * ScaledRadius;
+
+    public override Fixed64 CalculateMomentOfInertia(Fixed64 mass, Vector2d localReferencePoint)
+    {
+        if (mass <= Fixed64.Zero)
+            return Fixed64.Zero;
+
+        Vector2d centerOfMass = CalculateLocalCenterOfMassOffset();
+        Fixed64 momentAboutCenterOfMass = mass * ScaledRadius * ScaledRadius * Fixed64.Half;
+        return ApplyParallelAxis(momentAboutCenterOfMass, mass, centerOfMass, localReferencePoint);
+    }
+
     protected override void RebuildShape()
     {
         Vector2d extents = new(ScaledRadius, ScaledRadius);

@@ -90,10 +90,13 @@ type-check conditionals.
 slice: positional correction to penetration slop, normal impulse when bodies are
 closing, static response against bodyless colliders, wake propagation from awake
 movable bodies, trigger enter/exit events, and contact enter/stay/exit events.
-If a solid pair has no awake movable participant, the existing pair is kept
-alive as resting state without applying response or waking a sleeping body. It
-does not yet claim a full 2D friction solver, angular impulses, richer contact
-manifolds, or mixed 2D/3D response ownership.
+It reads `StiffBody2D.EffectiveInverseMass` so immovable, kinematic, inactive,
+and non-positive-mass bodies remain infinite mass to the solver while raw mass
+and scalar moment values stay inspectable. If a solid pair has no awake movable
+participant, the existing pair is kept alive as resting state without applying
+response or waking a sleeping body. It does not yet claim a full 2D friction
+solver, angular impulses, richer contact manifolds, or mixed 2D/3D response
+ownership.
 
 ## Broad Phase: Voxel Partitions
 
@@ -664,11 +667,20 @@ Response units and invariants:
 - `StiffBody.CanTranslate`, `StiffBody.CanRotate`, and
   `StiffBody.EffectiveInverseInertiaTensor` are the 3D response mobility
   contract used by both ordinary 3D response and mixed 2D/3D response.
+- `StiffBody2D.CanTranslate`, `StiffBody2D.CanRotate`,
+  `StiffBody2D.EffectiveInverseMass`, and
+  `StiffBody2D.EffectiveInverseMomentOfInertia` are the pure 2D body-side
+  mobility contract. Current pure 2D and mixed response consume only effective
+  inverse mass; angular response will consume the scalar moment surface in the
+  later 2D angular solver workstream.
 - 3D response torque arms are measured from `StiffBody.WorldCenterOfMass`.
   Collider centers remain collision-geometry references for narrow phase,
   culling, and normal fallback; they are not the implicit body COM.
 - linear velocity is world units per second.
 - angular velocity is radians per second around each local/world axis.
+- pure 2D scalar rotation is radians around the yaw axis, and
+  `StiffBody2D.WorldCenterOfMass` rotates the body-local COM offset in the X/Z
+  simulation plane.
 - inertia tensors are fixed-point `Fixed3x3` values supplied by the collider
   shape for the requested `StiffBody.LocalCenterOfMassOffset` and transformed by
   `StiffBody`. Primitive and aligned tensors keep a diagonal inversion fast

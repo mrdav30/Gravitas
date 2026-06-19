@@ -35,9 +35,11 @@ public sealed class StiffBody2DSerializationTests
             SleepEnabled = false,
             SleepFrameThreshold = 11,
             SleepLinearSpeedThreshold = Fixed64.FromFraction(1, 128),
-            ContinuousCollisionMode = ContinuousCollisionMode.Continuous
+            ContinuousCollisionMode = ContinuousCollisionMode.Continuous,
+            PreventAngularForces = true
         };
         source.Initialize(new Vector2d((Fixed64)5, (Fixed64)(-2)), Fixed64.FromFraction(1, 8));
+        source.LocalCenterOfMassOffset = new Vector2d(Fixed64.FromFraction(1, 3), -Fixed64.FromFraction(1, 4));
 
         object payload = GravitasSerializationHarness.Serialize(source, transport);
 
@@ -64,6 +66,9 @@ public sealed class StiffBody2DSerializationTests
         target.SleepFrameThreshold.Should().Be(source.SleepFrameThreshold);
         target.SleepLinearSpeedThreshold.Should().Be(source.SleepLinearSpeedThreshold);
         target.ContinuousCollisionMode.Should().Be(source.ContinuousCollisionMode);
+        target.PreventAngularForces.Should().BeTrue();
+        target.LocalCenterOfMassOffset.Should().Be(source.LocalCenterOfMassOffset);
+        target.WorldCenterOfMass.Should().Be(source.WorldCenterOfMass);
         targetCollider.Radius.Should().Be(sourceCollider.Radius);
         targetCollider.IsTrigger.Should().BeTrue();
         targetCollider.Layer.Should().Be(sourceCollider.Layer);

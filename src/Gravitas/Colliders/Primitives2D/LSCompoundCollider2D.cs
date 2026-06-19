@@ -137,6 +137,59 @@ public sealed class LSCompoundCollider2D : LSCollider2D
 
     internal override Vector2d GetVertexUnchecked(int index) => Center;
 
+    public override Vector2d CalculateLocalCenterOfMassOffset()
+    {
+        Fixed64 totalArea = Fixed64.Zero;
+        Vector2d weightedCenter = Vector2d.Zero;
+        for (int i = 0; i < _partColliders.Length; i++)
+        {
+            LSCollider2D partCollider = _partColliders[i];
+            Fixed64 partArea = partCollider.CalculateAreaForMassProperties();
+            if (partArea <= Fixed64.Zero)
+                continue;
+
+            totalArea += partArea;
+            weightedCenter += partCollider.CalculateLocalCenterOfMassOffset() * partArea;
+        }
+
+        return totalArea > Fixed64.Zero
+            ? weightedCenter / totalArea
+            : base.CalculateLocalCenterOfMassOffset();
+    }
+
+    internal override Fixed64 CalculateAreaForMassProperties()
+    {
+        Fixed64 totalArea = Fixed64.Zero;
+        for (int i = 0; i < _partColliders.Length; i++)
+            totalArea += _partColliders[i].CalculateAreaForMassProperties();
+
+        return totalArea;
+    }
+
+    public override Fixed64 CalculateMomentOfInertia(Fixed64 mass, Vector2d localReferencePoint)
+    {
+        if (mass <= Fixed64.Zero)
+            return Fixed64.Zero;
+
+        Fixed64 totalArea = CalculateAreaForMassProperties();
+        if (totalArea <= Fixed64.Zero)
+            return Fixed64.Zero;
+
+        Fixed64 moment = Fixed64.Zero;
+        for (int i = 0; i < _partColliders.Length; i++)
+        {
+            LSCollider2D partCollider = _partColliders[i];
+            Fixed64 partArea = partCollider.CalculateAreaForMassProperties();
+            if (partArea <= Fixed64.Zero)
+                continue;
+
+            Fixed64 partMass = mass * (partArea / totalArea);
+            moment += partCollider.CalculateMomentOfInertia(partMass, localReferencePoint);
+        }
+
+        return moment;
+    }
+
     protected override void RebuildShape()
     {
         Vector2d min = Vector2d.Zero;

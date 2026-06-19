@@ -20,6 +20,11 @@ public sealed class StiffBody2D : IRecordable
     private Vector2d _linearAccelerationStore;
     private Vector2d _deltaAcceleration;
     private Fixed64 _linearSpeed;
+    private Fixed64 _mass;
+    private Vector2d _localCenterOfMassOffset;
+    private bool _centerOfMassOffsetExplicit;
+    private Fixed64 _momentOfInertia;
+    private Fixed64 _inverseMomentOfInertia;
     private bool _isSleeping;
     private bool _isDynamic;
     private int _sleepFrameCount;
@@ -90,11 +95,83 @@ public sealed class StiffBody2D : IRecordable
         set => _continuousCollisionMode = value;
     }
 
-    public Fixed64 Mass { get; set; }
+    public bool PreventAngularForces;
 
-    public Fixed64 InverseMass => Mass > Fixed64.Zero ? Fixed64.One / Mass : Fixed64.Zero;
+    public Fixed64 Mass
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => _mass;
+        set
+        {
+            if (_mass == value)
+                return;
 
-    public bool CanMove => Active && _isDynamic && !Immovable && !IsKinematic && InverseMass > Fixed64.Zero;
+            _mass = value;
+            RefreshMassPropertiesFromColliderShape();
+        }
+    }
+
+    public Fixed64 InverseMass => _mass > Fixed64.Zero ? Fixed64.One / _mass : Fixed64.Zero;
+
+    /// <summary>
+    /// Gets whether solver-side response may translate this pure 2D body.
+    /// </summary>
+    public bool CanTranslate => Active && _isDynamic && !Immovable && !IsKinematic && InverseMass > Fixed64.Zero;
+
+    /// <summary>
+    /// Gets whether solver-side response may rotate this pure 2D body around its yaw axis.
+    /// </summary>
+    public bool CanRotate => CanTranslate && !PreventAngularForces && _inverseMomentOfInertia > Fixed64.Zero;
+
+    /// <summary>
+    /// Gets the inverse mass that should be used by pure 2D and mixed response.
+    /// </summary>
+    public Fixed64 EffectiveInverseMass => CanTranslate ? InverseMass : Fixed64.Zero;
+
+    /// <summary>
+    /// Gets the inverse scalar moment that should be used by pure 2D angular response.
+    /// </summary>
+    public Fixed64 EffectiveInverseMomentOfInertia => CanRotate ? _inverseMomentOfInertia : Fixed64.Zero;
+
+    /// <summary>
+    /// Gets or sets the authoritative body-local center-of-mass offset in the X/Z simulation plane.
+    /// </summary>
+    public Vector2d LocalCenterOfMassOffset
+    {
+        get => _localCenterOfMassOffset;
+        set
+        {
+            if (_localCenterOfMassOffset == value && _centerOfMassOffsetExplicit)
+                return;
+
+            _localCenterOfMassOffset = value;
+            _centerOfMassOffsetExplicit = true;
+            if (!Active)
+                return;
+
+            Wake();
+            RefreshMassPropertiesFromColliderShape();
+        }
+    }
+
+    /// <summary>
+    /// Gets the authoritative world-space center of mass in the X/Z simulation plane.
+    /// </summary>
+    public Vector2d WorldCenterOfMass =>
+        _position + ClampNearZero(Vector2d.Rotate(_localCenterOfMassOffset, _rotation));
+
+    public Fixed64 MomentOfInertia => _momentOfInertia;
+
+    public Fixed64 InverseMomentOfInertia => _inverseMomentOfInertia;
+
+    /// <summary>
+    /// Clears an explicit center-of-mass override and derives the offset from the bound collider again.
+    /// </summary>
+    public void ResetCenterOfMassFromCollider()
+    {
+        _centerOfMassOffsetExplicit = false;
+        RefreshMassPropertiesFromColliderShape();
+    }
 
     public Vector2d Position
     {
@@ -143,6 +220,7 @@ public sealed class StiffBody2D : IRecordable
         _sleepFrameCount = 0;
         Active = true;
         Collider.Initialize(this);
+        RefreshMassPropertiesFromColliderShape();
         Context.Physics2D.AssimilateBody(this, isDynamic);
     }
 
@@ -170,7 +248,7 @@ public sealed class StiffBody2D : IRecordable
 
     private Vector2d PredictContinuousCollisionDisplacement()
     {
-        if (!CanMove || _isSleeping)
+        if (!CanTranslate || _isSleeping)
             return Vector2d.Zero;
 
         Fixed64 deltaTime = Context.DeltaTime;
@@ -248,7 +326,7 @@ public sealed class StiffBody2D : IRecordable
         if (IsKinematic)
             UpdateKinematicPositionAndRotation();
 
-        if (!CanMove)
+        if (!CanTranslate)
         {
             _linearAccelerationStore = Vector2d.Zero;
             _deltaAcceleration = Vector2d.Zero;
@@ -302,7 +380,7 @@ public sealed class StiffBody2D : IRecordable
 
     internal void ApplyCollisionPositionCorrection(Vector2d positionCorrection)
     {
-        if (!CanMove || positionCorrection == Vector2d.Zero)
+        if (!CanTranslate || positionCorrection == Vector2d.Zero)
             return;
 
         _position += positionCorrection;
@@ -311,7 +389,7 @@ public sealed class StiffBody2D : IRecordable
 
     internal void ApplyCollisionLinearVelocityDelta(Vector2d velocityDelta)
     {
-        if (!CanMove || velocityDelta == Vector2d.Zero)
+        if (!CanTranslate || velocityDelta == Vector2d.Zero)
             return;
 
         Wake();
@@ -808,7 +886,7 @@ public sealed class StiffBody2D : IRecordable
         Collider.ClearBindingState();
     }
 
-    private bool CanSleep => SleepEnabled && CanMove;
+    private bool CanSleep => SleepEnabled && CanTranslate;
 
     private void UpdateSleepState()
     {
@@ -841,6 +919,24 @@ public sealed class StiffBody2D : IRecordable
         }
     }
 
+    internal void RefreshMassPropertiesFromColliderShape()
+    {
+        if (!_centerOfMassOffsetExplicit)
+            _localCenterOfMassOffset = Collider.CalculateLocalCenterOfMassOffset();
+
+        if (_mass <= Fixed64.Zero)
+        {
+            _momentOfInertia = Fixed64.Zero;
+            _inverseMomentOfInertia = Fixed64.Zero;
+            return;
+        }
+
+        _momentOfInertia = Collider.CalculateMomentOfInertia(_mass, _localCenterOfMassOffset);
+        _inverseMomentOfInertia = _momentOfInertia > Fixed64.Zero
+            ? Fixed64.One / _momentOfInertia
+            : Fixed64.Zero;
+    }
+
     public void RecordData(IChronicler chronicler)
     {
         bool active = Active;
@@ -859,6 +955,9 @@ public sealed class StiffBody2D : IRecordable
         RecordValues.Look(chronicler, ref isKinematic, "IsKinematic", false);
         RecordValues.Look(chronicler, ref _position, "Position");
         RecordValues.Look(chronicler, ref _rotation, "Rotation");
+        RecordValues.Look(chronicler, ref PreventAngularForces, "PreventAngularForces", false);
+        RecordValues.Look(chronicler, ref _localCenterOfMassOffset, "LocalCenterOfMassOffset");
+        RecordValues.Look(chronicler, ref _centerOfMassOffsetExplicit, "CenterOfMassOffsetExplicit", false);
         RecordValues.Look(chronicler, ref _linearVelocity, "LinearVelocity");
         RecordValues.Look(chronicler, ref _linearAccelerationStore, "LinearAccelerationStore");
         RecordValues.Look(chronicler, ref _deltaAcceleration, "DeltaAcceleration");
@@ -891,7 +990,10 @@ public sealed class StiffBody2D : IRecordable
         Collider.RecordData(chronicler);
 
         if (chronicler.Mode == SerializationMode.Loading)
+        {
+            RefreshMassPropertiesFromColliderShape();
             ApplyLoadedState();
+        }
     }
 
     private void ApplyLoadedState()
@@ -904,5 +1006,13 @@ public sealed class StiffBody2D : IRecordable
             FixedMath.RadToDeg(_rotation),
             Fixed64.Zero);
         Collider.Rebuild();
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Vector2d ClampNearZero(Vector2d value)
+    {
+        Fixed64 x = value.X.Abs() <= Fixed64.Epsilon ? Fixed64.Zero : value.X;
+        Fixed64 y = value.Y.Abs() <= Fixed64.Epsilon ? Fixed64.Zero : value.Y;
+        return new Vector2d(x, y);
     }
 }

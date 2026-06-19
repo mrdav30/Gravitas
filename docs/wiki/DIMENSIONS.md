@@ -63,6 +63,13 @@ host transform bridge. Kinematic 2D bodies read the agent transform during
 `LateSimulate` and project its X/Z position into authoritative `Vector2d`
 state.
 
+2D body mobility is explicit: `CanTranslate` gates linear solver motion,
+`CanRotate` gates scalar yaw-axis rotation, and the effective inverse mass and
+effective inverse moment helpers map immovable, kinematic, inactive,
+non-positive-mass, and angular-force-disabled states to zero solver
+contribution. `StiffBody2D.LocalCenterOfMassOffset` is body-local X/Z state, and
+`WorldCenterOfMass` rotates that offset by the body's scalar rotation.
+
 `LSCollider2D.InitializeWithNoBody(IMatterAgent)` binds bodyless static or
 trigger colliders to the same host contract. Bodyless 2D colliders register
 with `GravitasPhysics2DService`, participate in queries, triggers, layer

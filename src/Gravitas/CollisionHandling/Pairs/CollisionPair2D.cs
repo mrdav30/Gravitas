@@ -106,8 +106,8 @@ internal sealed class CollisionPair2D
         if (bodyA == null && bodyB == null)
             return;
 
-        Fixed64 inverseMassA = bodyA?.CanMove == true ? bodyA.InverseMass : Fixed64.Zero;
-        Fixed64 inverseMassB = bodyB?.CanMove == true ? bodyB.InverseMass : Fixed64.Zero;
+        Fixed64 inverseMassA = bodyA?.EffectiveInverseMass ?? Fixed64.Zero;
+        Fixed64 inverseMassB = bodyB?.EffectiveInverseMass ?? Fixed64.Zero;
         Fixed64 totalInverseMass = inverseMassA + inverseMassB;
         if (totalInverseMass <= Fixed64.Zero)
             return;

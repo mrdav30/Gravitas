@@ -238,7 +238,7 @@ public static class CollisionResponseMixed
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Fixed64 GetInverseMass(StiffBody2D? body) =>
-        body != null && body.CanMove ? body.InverseMass : Fixed64.Zero;
+        body?.EffectiveInverseMass ?? Fixed64.Zero;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Fixed64 GetPlanarScaleSquared(Vector3d axis) => axis.X * axis.X + axis.Z * axis.Z;
