@@ -302,6 +302,46 @@ public sealed class PhysicsMeshTests
     }
 
     [Fact]
+    public void CalculateInertiaTensor_ForClosedTetrahedron_ShouldPreserveProductsOfInertia()
+    {
+        var mesh = new PhysicsMesh(
+            new[]
+            {
+                Vector3d.Zero,
+                Vector3d.Right,
+                Vector3d.Up,
+                Vector3d.Forward
+            },
+            new[]
+            {
+                1, 2, 3,
+                0, 2, 1,
+                0, 1, 3,
+                0, 3, 2
+            },
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+
+        mesh.TryGetClosedVolumeMassProperties(
+            out MeshMassProperties properties,
+            out _).Should().BeTrue();
+        Fixed3x3 centerTensor = mesh.CalculateInertiaTensor(Fixed64.One);
+
+        AssertNear(properties.UnitMassInertiaTensor.M12, Fixed64.FromFraction(-1, 20));
+        AssertNear(properties.UnitMassInertiaTensor.M13, Fixed64.FromFraction(-1, 20));
+        AssertNear(properties.UnitMassInertiaTensor.M23, Fixed64.FromFraction(-1, 20));
+        AssertNear(centerTensor.M11, Fixed64.FromFraction(3, 40));
+        AssertNear(centerTensor.M22, Fixed64.FromFraction(3, 40));
+        AssertNear(centerTensor.M33, Fixed64.FromFraction(3, 40));
+        AssertNear(centerTensor.M12, Fixed64.FromFraction(1, 80));
+        AssertNear(centerTensor.M13, Fixed64.FromFraction(1, 80));
+        AssertNear(centerTensor.M23, Fixed64.FromFraction(1, 80));
+        centerTensor.M21.Should().Be(centerTensor.M12);
+        centerTensor.M31.Should().Be(centerTensor.M13);
+        centerTensor.M32.Should().Be(centerTensor.M23);
+    }
+
+    [Fact]
     public void CalculateInertiaTensor_WithSurfaceApproximationOptIn_ShouldAllowOpenMesh()
     {
         var mesh = new PhysicsMesh(

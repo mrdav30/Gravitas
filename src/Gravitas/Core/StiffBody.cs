@@ -326,6 +326,8 @@ public class StiffBody : IRecordable
     }
 
     private Fixed3x3 _inertiaTensor;
+    private Fixed3x3 _worldInertiaTensor;
+    private Fixed3x3 _inverseLocalInertiaTensor;
     private Fixed3x3 _inverseInertiaTensor;
     public Fixed3x3 InverseInertiaTensor => _inverseInertiaTensor;
 
@@ -1658,13 +1660,18 @@ public class StiffBody : IRecordable
 
     private void UpdateInertiaTensorOrientation()
     {
-        if (_inertiaTensor == Fixed3x3.Zero)
+        if (_inertiaTensor == Fixed3x3.Zero || _inverseLocalInertiaTensor == Fixed3x3.Zero)
+        {
+            _worldInertiaTensor = Fixed3x3.Zero;
+            _inverseInertiaTensor = Fixed3x3.Zero;
             return;
+        }
 
         Fixed3x3 inverseOrientation = Rotation.Conjugate().ToMatrix3x3();
         Fixed3x3 orientation = Rotation.ToMatrix3x3();
 
-        _inverseInertiaTensor = orientation * _inverseInertiaTensor * inverseOrientation;
+        _worldInertiaTensor = orientation * _inertiaTensor * inverseOrientation;
+        _inverseInertiaTensor = orientation * _inverseLocalInertiaTensor * inverseOrientation;
     }
 
     private void RefreshInertiaTensor()
@@ -1672,19 +1679,24 @@ public class StiffBody : IRecordable
         if (!CanUseAngularInertia || Collider == null)
         {
             _inertiaTensor = Fixed3x3.Zero;
+            _worldInertiaTensor = Fixed3x3.Zero;
+            _inverseLocalInertiaTensor = Fixed3x3.Zero;
             _inverseInertiaTensor = Fixed3x3.Zero;
             return;
         }
 
         _inertiaTensor = Collider.CalculateInertiaTensor(Mass, _localCenterOfMassOffset);
-        _inverseInertiaTensor = _inertiaTensor.InvertDiagonal();
+        _inverseLocalInertiaTensor = InertiaTensorMath.InvertForSolver(_inertiaTensor);
         UpdateInertiaTensorOrientation();
     }
 
     //  gyroscopic precession is a correction to the object's angular velocity based on its rotation
     private void ApplyGyroscopicPrecession()
     {
-        _angularVelocity += _inverseInertiaTensor * Vector3d.Cross(_angularVelocity, _inertiaTensor * _angularVelocity) * Context.DeltaTime;
+        if (_worldInertiaTensor == Fixed3x3.Zero || _inverseInertiaTensor == Fixed3x3.Zero)
+            return;
+
+        _angularVelocity += _inverseInertiaTensor * Vector3d.Cross(_angularVelocity, _worldInertiaTensor * _angularVelocity) * Context.DeltaTime;
     }
 
     public void OnVisualize()

@@ -556,6 +556,9 @@ namespace Gravitas.Colliders
             Fixed64 integralX2 = Fixed64.Zero;
             Fixed64 integralY2 = Fixed64.Zero;
             Fixed64 integralZ2 = Fixed64.Zero;
+            Fixed64 integralXY = Fixed64.Zero;
+            Fixed64 integralXZ = Fixed64.Zero;
+            Fixed64 integralYZ = Fixed64.Zero;
 
             for (int i = 0; i < _triangleCount; i++)
             {
@@ -571,6 +574,9 @@ namespace Gravitas.Colliders
                 integralX2 += volume * SumSquaredBarycentricProducts(a.X, b.X, c.X) / (Fixed64)10;
                 integralY2 += volume * SumSquaredBarycentricProducts(a.Y, b.Y, c.Y) / (Fixed64)10;
                 integralZ2 += volume * SumSquaredBarycentricProducts(a.Z, b.Z, c.Z) / (Fixed64)10;
+                integralXY += volume * SumBarycentricProducts(a.X, b.X, c.X, a.Y, b.Y, c.Y) / (Fixed64)20;
+                integralXZ += volume * SumBarycentricProducts(a.X, b.X, c.X, a.Z, b.Z, c.Z) / (Fixed64)20;
+                integralYZ += volume * SumBarycentricProducts(a.Y, b.Y, c.Y, a.Z, b.Z, c.Z) / (Fixed64)20;
             }
 
             Fixed64 absoluteVolume = signedVolume.Abs();
@@ -586,21 +592,38 @@ namespace Gravitas.Colliders
             Fixed64 ixx = orientationSign * (integralY2 + integralZ2) / absoluteVolume;
             Fixed64 iyy = orientationSign * (integralX2 + integralZ2) / absoluteVolume;
             Fixed64 izz = orientationSign * (integralX2 + integralY2) / absoluteVolume;
+            Fixed64 ixy = -orientationSign * integralXY / absoluteVolume;
+            Fixed64 ixz = -orientationSign * integralXZ / absoluteVolume;
+            Fixed64 iyz = -orientationSign * integralYZ / absoluteVolume;
 
             properties = new MeshMassProperties(
                 absoluteVolume,
                 centerOfMass,
                 reference,
                 new Fixed3x3(
-                    ixx, Fixed64.Zero, Fixed64.Zero,
-                    Fixed64.Zero, iyy, Fixed64.Zero,
-                    Fixed64.Zero, Fixed64.Zero, izz));
+                    ixx, ixy, ixz,
+                    ixy, iyy, iyz,
+                    ixz, iyz, izz));
             result = MeshVolumeValidationResult.Valid;
             return true;
         }
 
         private static Fixed64 SumSquaredBarycentricProducts(Fixed64 a, Fixed64 b, Fixed64 c) =>
             (a * a) + (b * b) + (c * c) + (a * b) + (a * c) + (b * c);
+
+        private static Fixed64 SumBarycentricProducts(
+            Fixed64 firstA,
+            Fixed64 firstB,
+            Fixed64 firstC,
+            Fixed64 secondA,
+            Fixed64 secondB,
+            Fixed64 secondC)
+        {
+            Fixed64 firstSum = firstA + firstB + firstC;
+            Fixed64 secondSum = secondA + secondB + secondC;
+            Fixed64 matchingProducts = (firstA * secondA) + (firstB * secondB) + (firstC * secondC);
+            return firstSum * secondSum + matchingProducts;
+        }
 
         private static int CompareEdgeUses(EdgeUse first, EdgeUse second) =>
             first.Key < second.Key

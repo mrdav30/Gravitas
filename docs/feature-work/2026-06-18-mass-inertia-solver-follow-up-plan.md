@@ -1,7 +1,7 @@
 # Mass, Inertia, And Center-Of-Mass Solver Follow-Up Plan
 
 **Date:** 2026-06-18
-**Status:** Workstreams 1-2 implemented / remaining workstreams backlog
+**Status:** Workstreams 1-3 implemented / Workstream 4 backlog
 **Owner:** Gravitas runtime/collision hardening
 
 ## Purpose
@@ -28,17 +28,22 @@ of a weak copy of the 3D tensor path.
 - `PhysicsMesh.CalculateInertiaTensor(mass)` remains a shape/topology API. Body
   mobility policy is applied at `StiffBody.RefreshInertiaTensor()` and response
   wrappers, not inside `PhysicsMesh`.
-- Runtime inertia tensors are diagonal local tensors inverted with
-  `InvertDiagonal()`.
+- Runtime inertia tensors are local `Fixed3x3` tensors. Diagonal tensors use an
+  explicit reciprocal fast path, while tensors with products of inertia use
+  deterministic full `Fixed3x3` inversion.
+- `StiffBody` keeps local inertia, local inverse inertia, world inertia, and
+  world inverse inertia separate so repeated orientation refreshes cannot rotate
+  an already world-space tensor.
 - `StiffBody.LocalCenterOfMassOffset` is the authoritative 3D body-local COM
   offset, and `StiffBody.WorldCenterOfMass` is the response-space COM.
 - Collider geometry derives the default body COM through
   `LSCollider.CalculateLocalCenterOfMassOffset()`. Primitives default to their
   scaled collider center, compounds use area-weighted part centers, and closed
   mesh colliders consume `MeshMassProperties.CenterOfMass`.
-- Closed mesh inertia now shifts from `MeshMassProperties.InertiaReferencePoint`
-  to the requested local COM with a deterministic diagonal parallel-axis
-  calculation. Full products of inertia remain Workstream 3 scope.
+- Closed mesh inertia now integrates products of inertia from fixed-point signed
+  tetrahedra and shifts between reference points with the full parallel-axis
+  tensor. Compound colliders also preserve products of inertia from off-axis
+  part placement.
 - `StiffBody.InverseMass` is the raw reciprocal of `Mass`; immovable and
   kinematic participants now expose zero solver mass through
   `StiffBody.EffectiveInverseMass`.
@@ -108,15 +113,30 @@ justify the extra solver complexity.
 
 Tasks:
 
-- Evaluate deterministic fixed-point full `Fixed3x3` inversion for inertia
+- [x] Evaluate deterministic fixed-point full `Fixed3x3` inversion for inertia
   tensors with products of inertia.
-- Decide whether principal-axis diagonalization belongs in Gravitas, in
+- [x] Decide whether principal-axis diagonalization belongs in Gravitas, in
   FixedMathSharp, or in a tooling/preprocess path.
-- Benchmark full tensor operations against the existing diagonal path before
+- [x] Benchmark full tensor operations against the existing diagonal path before
   replacing any hot response code.
-- Keep a diagonal fast path for simple primitive and aligned compound shapes.
-- Add tests for rotated non-uniform mass distributions, singular tensors, and
-  deterministic ordering/tie cases in any diagonalization algorithm.
+- [x] Keep a diagonal fast path for simple primitive and aligned compound shapes.
+- [x] Add tests for rotated non-uniform mass distributions, singular tensors,
+  mesh products of inertia, compound products of inertia, and stable world
+  tensor orientation. Deterministic ordering/tie tests are not applicable until
+  a principal-axis diagonalization algorithm is adopted.
+
+**Progress 2026-06-19:** Workstream 3 added internal `InertiaTensorMath` with a
+diagonal inversion fast path, deterministic full `Fixed3x3` inversion, singular
+tensor fallback to zero solver inertia, and full parallel-axis tensor shifts.
+Closed mesh mass properties now integrate products of inertia, compound
+colliders preserve off-axis products, and `StiffBody` separates local and
+world-space inertia state to avoid repeated orientation compounding. Runtime
+principal-axis diagonalization was intentionally not adopted; it belongs in
+future FixedMathSharp/offline tooling if a measured need appears. Focused
+coverage lives in `tests/Gravitas.Tests/Core/InertiaTensorMathTests.cs`,
+`tests/Gravitas.Tests/Colliders/PhysicsMeshTests.cs`, and
+`tests/Gravitas.Tests/Colliders/ColliderRuntimeStateTests.cs`. Benchmark
+coverage lives in `tests/Gravitas.Benchmarks/Core/InertiaTensorBenchmarks.cs`.
 
 ## Workstream 4: Mesh Inertia API Boundary
 

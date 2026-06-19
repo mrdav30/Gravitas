@@ -305,13 +305,13 @@ Mesh policy work should keep these boundaries explicit:
   Bodyless, static, immovable, kinematic, and explicitly angular-force-disabled
   mesh bodies do not consume mesh inertia and remain legal collision surfaces.
 - Closed-volume mesh inertia is integrated with fixed-point signed tetrahedra
-  and cached on the immutable mesh topology. The current solver still uses
-  diagonal inertia about the collider reference center
-  (`PhysicsMesh.LocalBounds.Center`) because body center-of-mass offsets are not
-  modeled yet; `MeshMassProperties.CenterOfMass` exposes the homogeneous COM for
-  a future body-COM hardening pass. Full tensor inversion, products of inertia,
-  and deterministic principal-axis diagonalization are not part of the current
-  alpha solver.
+  and cached on the immutable mesh topology. `MeshMassProperties.CenterOfMass`
+  is the homogeneous COM, and `MeshMassProperties.UnitMassInertiaTensor`
+  preserves products of inertia about the cached reference point. Mesh inertia
+  shifts between the reference point, COM, and requested body-local point with
+  the full parallel-axis tensor. Runtime principal-axis diagonalization is not
+  part of the current solver; if needed, it should land in FixedMathSharp or an
+  offline/tooling path with deterministic tie rules and benchmark evidence.
 - Convex mesh paths remain free to use whole-shape convex tests where valid.
 - Compound colliders present one collider identity to hosts and one body to the
   solver, while internally ordering primitive or convex-mesh parts by stable
@@ -666,12 +666,14 @@ Response units and invariants:
   culling, and normal fallback; they are not the implicit body COM.
 - linear velocity is world units per second.
 - angular velocity is radians per second around each local/world axis.
-- inertia tensors are diagonal fixed-point values supplied by the collider
+- inertia tensors are fixed-point `Fixed3x3` values supplied by the collider
   shape for the requested `StiffBody.LocalCenterOfMassOffset` and transformed by
-  `StiffBody`. Mesh colliders use cached closed-volume mass properties by
-  default when angular dynamics are enabled, shift inertia from the mesh
-  reference point to COM with a deterministic diagonal parallel-axis
-  calculation, and keep explicit surface approximation opt-in for open meshes.
+  `StiffBody`. Primitive and aligned tensors keep a diagonal inversion fast
+  path; mesh and compound tensors can preserve products of inertia and use full
+  deterministic inversion. `StiffBody` keeps local and world-space tensor state
+  separate so orientation refreshes are idempotent. Mesh colliders use cached
+  closed-volume mass properties by default when angular dynamics are enabled and
+  keep explicit surface approximation opt-in for open meshes.
 - restitution is clamped to `[0, 1]` and combined by the lower coefficient so a
   low-bounce participant can dampen the pair.
 - closing speeds at or below `RestitutionVelocityThreshold` use zero

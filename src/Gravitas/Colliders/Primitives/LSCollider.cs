@@ -568,13 +568,11 @@ public abstract class LSCollider : IRecordable, IColliderHierarchyNode
     public virtual Vector3d CalculateLocalCenterOfMassOffset() => ScaledOffset;
 
     /// <summary>
-    /// Calculates the diagonal local inertia tensor for this collider about its derived center of mass.
+    /// Calculates the local inertia tensor for this collider about its derived center of mass.
     /// </summary>
     public Fixed3x3 CalculateInertiaTensor(Fixed64 mass) =>
         CalculateInertiaTensor(mass, CalculateLocalCenterOfMassOffset());
 
-    // Runtime tensors remain diagonal until full tensor support lands. Parallel-axis
-    // shifts therefore keep only diagonal terms and leave products of inertia to Workstream 3.
     public abstract Fixed3x3 CalculateInertiaTensor(Fixed64 mass, Vector3d localCenterOfMassOffset);
 
     protected Fixed3x3 ShiftInertiaTensorFromLocalCenterOfMass(
@@ -583,19 +581,8 @@ public abstract class LSCollider : IRecordable, IColliderHierarchyNode
         Vector3d targetLocalOffset) =>
         AddParallelAxisTensor(centerTensor, mass, targetLocalOffset - CalculateLocalCenterOfMassOffset());
 
-    protected static Fixed3x3 AddParallelAxisTensor(Fixed3x3 tensor, Fixed64 mass, Vector3d offset)
-    {
-        if (mass <= Fixed64.Zero || offset == Vector3d.Zero)
-            return tensor;
-
-        Fixed64 xx = mass * ((offset.Y * offset.Y) + (offset.Z * offset.Z));
-        Fixed64 yy = mass * ((offset.X * offset.X) + (offset.Z * offset.Z));
-        Fixed64 zz = mass * ((offset.X * offset.X) + (offset.Y * offset.Y));
-        tensor.M11 += xx;
-        tensor.M22 += yy;
-        tensor.M33 += zz;
-        return tensor;
-    }
+    protected static Fixed3x3 AddParallelAxisTensor(Fixed3x3 tensor, Fixed64 mass, Vector3d offset) =>
+        InertiaTensorMath.AddParallelAxisTensor(tensor, mass, offset);
 
     internal void NotifyContact(LSCollider other, bool isColliding, bool isChanged)
     {

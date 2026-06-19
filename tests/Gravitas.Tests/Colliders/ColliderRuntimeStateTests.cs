@@ -77,4 +77,52 @@ public sealed class ColliderRuntimeStateTests
         body.Body.InverseInertiaTensor.M13.Should().NotBe(Fixed64.Zero);
         body.Body.InverseInertiaTensor.M31.Should().NotBe(Fixed64.Zero);
     }
+
+    [Fact]
+    public void Simulate_WithRotatedNonUniformCuboid_ShouldNotCompoundWorldInverseInertiaOrientation()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        var collider = new LSCuboidCollider
+        {
+            Size = new Vector3d((Fixed64)2, Fixed64.One, (Fixed64)4)
+        };
+        ScenarioBody<LSCuboidCollider> body = scenario.CreateBody(
+            collider,
+            Vector3d.Zero,
+            PhysicsScenarioBuilder.Yaw(45));
+        Fixed3x3 initial = body.Body.InverseInertiaTensor;
+
+        scenario.Context.Simulate();
+        scenario.Context.Simulate();
+
+        body.Body.InverseInertiaTensor.Should().Be(initial);
+    }
+
+    [Fact]
+    public void Initialize_WithOffAxisCompoundParts_ShouldInvertFullInertiaTensor()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        var collider = new LSCompoundCollider(
+            CompoundColliderPart.Sphere(Fixed64.Half, new Vector3d(Fixed64.One, Fixed64.One, Fixed64.Zero)),
+            CompoundColliderPart.Sphere(Fixed64.Half, new Vector3d(-Fixed64.One, -Fixed64.One, Fixed64.Zero)));
+
+        ScenarioBody<LSCompoundCollider> body = scenario.CreateBody(
+            collider,
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            mass: (Fixed64)2);
+        Fixed3x3 localTensor = collider.CalculateInertiaTensor(body.Body.Mass, body.Body.LocalCenterOfMassOffset);
+        Fixed3x3 product = localTensor * body.Body.InverseInertiaTensor;
+
+        localTensor.M12.Should().NotBe(Fixed64.Zero);
+        body.Body.InverseInertiaTensor.M12.Should().NotBe(Fixed64.Zero);
+        AssertNear(product.M11, Fixed64.One);
+        AssertNear(product.M22, Fixed64.One);
+        AssertNear(product.M33, Fixed64.One);
+        AssertNear(product.M12, Fixed64.Zero);
+        AssertNear(product.M21, Fixed64.Zero);
+    }
+
+    private static void AssertNear(Fixed64 actual, Fixed64 expected) =>
+        (actual - expected).Abs().Should().BeLessThan(Fixed64.FromFraction(1, 1000));
 }

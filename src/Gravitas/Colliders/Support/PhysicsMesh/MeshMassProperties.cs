@@ -35,52 +35,21 @@ public readonly struct MeshMassProperties
     public Vector3d InertiaReferencePoint { get; }
 
     /// <summary>
-    /// Solid-volume diagonal inertia tensor for unit mass about <see cref="InertiaReferencePoint"/>.
+    /// Solid-volume inertia tensor for unit mass about <see cref="InertiaReferencePoint"/>.
     /// </summary>
     public Fixed3x3 UnitMassInertiaTensor { get; }
 
     /// <summary>
-    /// Calculates a diagonal inertia tensor for the supplied mass about a local
-    /// point parallel to the mesh center-of-mass axes.
+    /// Calculates an inertia tensor for the supplied mass about a local point
+    /// parallel to the mesh center-of-mass axes.
     /// </summary>
     public Fixed3x3 CalculateInertiaTensor(Fixed64 mass, Vector3d localReferencePoint)
     {
         Fixed3x3 referenceTensor = UnitMassInertiaTensor * mass;
-        Fixed3x3 centerTensor = SubtractParallelAxisTensor(
+        Fixed3x3 centerTensor = InertiaTensorMath.SubtractParallelAxisTensor(
             referenceTensor,
             mass,
             InertiaReferencePoint - CenterOfMass);
-        return AddParallelAxisTensor(centerTensor, mass, localReferencePoint - CenterOfMass);
+        return InertiaTensorMath.AddParallelAxisTensor(centerTensor, mass, localReferencePoint - CenterOfMass);
     }
-
-    private static Fixed3x3 AddParallelAxisTensor(Fixed3x3 tensor, Fixed64 mass, Vector3d offset)
-    {
-        if (mass <= Fixed64.Zero || offset == Vector3d.Zero)
-            return tensor;
-
-        Fixed64 xx = mass * ((offset.Y * offset.Y) + (offset.Z * offset.Z));
-        Fixed64 yy = mass * ((offset.X * offset.X) + (offset.Z * offset.Z));
-        Fixed64 zz = mass * ((offset.X * offset.X) + (offset.Y * offset.Y));
-        tensor.M11 += xx;
-        tensor.M22 += yy;
-        tensor.M33 += zz;
-        return tensor;
-    }
-
-    private static Fixed3x3 SubtractParallelAxisTensor(Fixed3x3 tensor, Fixed64 mass, Vector3d offset)
-    {
-        if (mass <= Fixed64.Zero || offset == Vector3d.Zero)
-            return tensor;
-
-        Fixed64 xx = mass * ((offset.Y * offset.Y) + (offset.Z * offset.Z));
-        Fixed64 yy = mass * ((offset.X * offset.X) + (offset.Z * offset.Z));
-        Fixed64 zz = mass * ((offset.X * offset.X) + (offset.Y * offset.Y));
-        tensor.M11 = ClampInertia(tensor.M11 - xx);
-        tensor.M22 = ClampInertia(tensor.M22 - yy);
-        tensor.M33 = ClampInertia(tensor.M33 - zz);
-        return tensor;
-    }
-
-    private static Fixed64 ClampInertia(Fixed64 value) =>
-        value > Fixed64.Zero ? value : Fixed64.Zero;
 }
