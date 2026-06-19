@@ -173,8 +173,9 @@ contexts. These checks are core invariants.
 - visual position/rotation interpolation buffers.
 - linear and angular velocity, acceleration, impulses, drag, friction, and
   restitution inputs.
-- mass and inverse mass.
-- inertia tensor and inverse inertia tensor.
+- mass, raw inverse mass, and solver-effective inverse mass.
+- inertia tensor, raw inverse inertia tensor, and solver-effective inverse
+  inertia tensor.
 - grounding state and ground probe settings.
 - deterministic sleep state, sleep thresholds, and wake handling.
 - Chronicler record data.

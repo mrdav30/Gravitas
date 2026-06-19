@@ -1,7 +1,7 @@
 # Mass, Inertia, And Center-Of-Mass Solver Follow-Up Plan
 
 **Date:** 2026-06-18
-**Status:** Backlog / future hardening plan
+**Status:** Workstream 1 implemented / remaining workstreams backlog
 **Owner:** Gravitas runtime/collision hardening
 
 ## Purpose
@@ -29,8 +29,12 @@ solver architecture work.
   theorem need one coherent body COM contract before arbitrary mesh COM can be
   consumed safely.
 - `StiffBody.InverseMass` is the raw reciprocal of `Mass`; immovable and
-  kinematic participants are mapped to zero effective inverse mass by response
-  helpers such as `ResponseBody` and mixed response code.
+  kinematic participants now expose zero solver mass through
+  `StiffBody.EffectiveInverseMass`.
+- `StiffBody` owns the 3D effective response policy through `CanTranslate`,
+  `CanRotate`, `EffectiveInverseMass`, and `EffectiveInverseInertiaTensor`.
+  `ResponseBody` and mixed response consume that surface instead of restating
+  3D mobility rules locally.
 
 ## Workstream 1: Explicit Effective Mass API
 
@@ -39,16 +43,23 @@ ownership into mesh/topology APIs.
 
 Tasks:
 
-- Decide whether `StiffBody` should expose explicit effective mass helpers such
+- [x] Decide whether `StiffBody` should expose explicit effective mass helpers such
   as `CanTranslate`, `CanRotate`, `EffectiveInverseMass`, and
   `EffectiveInverseInertiaTensor`.
-- Preserve the current rule that immovable and kinematic bodies behave as
+- [x] Preserve the current rule that immovable and kinematic bodies behave as
   infinite mass in response, even if their raw mass/inertia values remain
   available for inspection or serialization.
-- Update 3D and mixed response code to use the same effective-mass surface if
+- [x] Update 3D and mixed response code to use the same effective-mass surface if
   the API is added.
-- Add tests for movable, kinematic, immovable, and angular-force-disabled
+- [x] Add tests for movable, kinematic, immovable, and angular-force-disabled
   participants.
+
+**Progress 2026-06-19:** Workstream 1 added the explicit 3D body-side effective
+mass API and moved 3D plus mixed response onto it. Focused coverage lives in
+`tests/Gravitas.Tests/Core/StiffBodyEffectiveMassTests.cs`, with existing 3D
+and mixed response suites validating the refactor against solver behavior.
+Non-positive masses are documented as non-translatable in solver policy while
+the raw `InverseMass` value remains available for inspection.
 
 ## Workstream 2: Body Center-Of-Mass Offset Model
 

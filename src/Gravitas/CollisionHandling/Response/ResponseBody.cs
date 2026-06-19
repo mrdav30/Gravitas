@@ -23,16 +23,13 @@ internal readonly struct ResponseBody
 
     public bool CanMove => InverseMass > Fixed64.Zero;
 
-    public bool CanRotate => CanMove && !Body.AngularForcesHalted && !Body.IsKinematic;
+    public bool CanRotate => InverseInertiaTensor != Fixed3x3.Zero;
 
     public static ResponseBody Create(LSCollider collider)
     {
         StiffBody body = collider.Body!;
-        bool movable = !body.Immovable && !body.IsKinematic;
-        Fixed64 inverseMass = movable ? body.InverseMass : Fixed64.Zero;
-        Fixed3x3 inverseInertiaTensor = movable && !body.AngularForcesHalted
-            ? body.InverseInteriaTensor
-            : Fixed3x3.Zero;
+        Fixed64 inverseMass = body.EffectiveInverseMass;
+        Fixed3x3 inverseInertiaTensor = body.EffectiveInverseInertiaTensor;
 
         return new ResponseBody(body, inverseMass, inverseInertiaTensor);
     }

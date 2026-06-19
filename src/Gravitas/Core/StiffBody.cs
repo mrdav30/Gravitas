@@ -292,6 +292,28 @@ public class StiffBody : IRecordable
     public Fixed3x3 InverseInteriaTensor => _inverseInertiaTensor;
 
     /// <summary>
+    /// Gets whether solver-side response may translate this body.
+    /// </summary>
+    public bool CanTranslate => Active && !Immovable && !IsKinematic && InverseMass > Fixed64.Zero;
+
+    /// <summary>
+    /// Gets whether solver-side response may rotate this body.
+    /// </summary>
+    public bool CanRotate => CanTranslate && !PreventAngularForces && _inverseInertiaTensor != Fixed3x3.Zero;
+
+    /// <summary>
+    /// Gets the inverse mass that should be used by collision response.
+    /// Immovable and kinematic bodies expose their raw mass but respond as infinite mass.
+    /// </summary>
+    public Fixed64 EffectiveInverseMass => CanTranslate ? InverseMass : Fixed64.Zero;
+
+    /// <summary>
+    /// Gets the inverse inertia tensor that should be used by collision response.
+    /// Bodies that cannot rotate expose a zero tensor even when raw inertia is available.
+    /// </summary>
+    public Fixed3x3 EffectiveInverseInertiaTensor => CanRotate ? _inverseInertiaTensor : Fixed3x3.Zero;
+
+    /// <summary>
     /// Value between 0 (sticky) and 1 (perfectly elastic collision; i.e. not moving apart)
     /// </summary>
     public Fixed64 RestitutionCoefficient = (Fixed64)0.5f;

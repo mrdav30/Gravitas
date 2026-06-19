@@ -655,8 +655,12 @@ Response units and invariants:
 
 - mass is body mass in the same unit model used by `StiffBody`.
 - `StiffBody.InverseMass` is the raw reciprocal of body mass. Collision
-  response maps immovable and kinematic bodies to zero effective inverse mass
-  through response wrappers such as `ResponseBody` and mixed response helpers.
+  response reads `StiffBody.EffectiveInverseMass`, which maps immovable,
+  kinematic, inactive, and non-positive-mass bodies to zero solver mass while
+  leaving raw mass values inspectable.
+- `StiffBody.CanTranslate`, `StiffBody.CanRotate`, and
+  `StiffBody.EffectiveInverseInertiaTensor` are the 3D response mobility
+  contract used by both ordinary 3D response and mixed 2D/3D response.
 - linear velocity is world units per second.
 - angular velocity is radians per second around each local/world axis.
 - inertia tensors are diagonal fixed-point values supplied by the collider

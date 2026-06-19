@@ -163,7 +163,7 @@ public static class CollisionResponseMixed
             if (CanRotate(body3D))
             {
                 Vector3d angularVelocityDelta =
-                    body3D!.InverseInteriaTensor * Vector3d.Cross(relative3D, impulse3D);
+                    body3D!.EffectiveInverseInertiaTensor * Vector3d.Cross(relative3D, impulse3D);
                 body3D.ApplyCollisionAngularVelocityDelta(angularVelocityDelta);
             }
         }
@@ -195,7 +195,7 @@ public static class CollisionResponseMixed
             return Fixed64.Zero;
 
         Vector3d angular = Vector3d.Cross(
-            body3D!.InverseInteriaTensor * Vector3d.Cross(relativeContactPoint, axis),
+            body3D!.EffectiveInverseInertiaTensor * Vector3d.Cross(relativeContactPoint, axis),
             relativeContactPoint);
         Fixed64 denominator = Vector3d.Dot(angular, axis);
         return denominator > Fixed64.Zero ? denominator : Fixed64.Zero;
@@ -234,9 +234,7 @@ public static class CollisionResponseMixed
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Fixed64 GetInverseMass(StiffBody? body) =>
-        body != null && body.Active && !body.Immovable && !body.IsKinematic && body.InverseMass > Fixed64.Zero
-            ? body.InverseMass
-            : Fixed64.Zero;
+        body?.EffectiveInverseMass ?? Fixed64.Zero;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Fixed64 GetInverseMass(StiffBody2D? body) =>
@@ -250,7 +248,7 @@ public static class CollisionResponseMixed
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool CanRotate(StiffBody? body) =>
-        body != null && body.Active && !body.AngularForcesHalted && !body.IsKinematic;
+        body?.CanRotate == true;
 
     private static Fixed64 ResolveRestitution(StiffBody? body3D, StiffBody2D? body2D, Fixed64 closingSpeed)
     {
