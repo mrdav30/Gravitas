@@ -39,6 +39,32 @@ public sealed class GravitasDiagnosticSink
     /// </summary>
     public ReadOnlySpan<GravitasDebugDrawCommand> DrawCommands => _drawCommands.AsReadOnlySpan();
 
+    /// <summary>
+    /// Dispatches captured events in buffer order to a typed diagnostic visitor.
+    /// </summary>
+    public void DispatchEventsTo(GravitasDiagnosticEventVisitor visitor)
+    {
+        if (visitor == null)
+            throw new ArgumentNullException(nameof(visitor));
+
+        ReadOnlySpan<GravitasDiagnosticEvent> events = Events;
+        for (int i = 0; i < events.Length; i++)
+            events[i].DispatchTo(visitor);
+    }
+
+    /// <summary>
+    /// Dispatches captured draw commands in buffer order to a typed debug draw visitor.
+    /// </summary>
+    public void DispatchDrawCommandsTo(GravitasDebugDrawCommandVisitor visitor)
+    {
+        if (visitor == null)
+            throw new ArgumentNullException(nameof(visitor));
+
+        ReadOnlySpan<GravitasDebugDrawCommand> commands = DrawCommands;
+        for (int i = 0; i < commands.Length; i++)
+            commands[i].DispatchTo(visitor);
+    }
+
     public int EventCount => _events.Count;
 
     public int DrawCommandCount => _drawCommands.Count;

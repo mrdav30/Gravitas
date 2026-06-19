@@ -1,7 +1,7 @@
 # Alpha Physics Follow-Up Hardening Plan
 
 **Date:** 2026-06-01
-**Status:** Draft
+**Status:** Done
 **Owner:** Gravitas runtime/collision hardening
 
 ## Purpose
@@ -1006,7 +1006,7 @@ full ReleaseLean passed 418/418.
 Future Gravitas-owned mesh simplification and decomposition should live in a
 separate solution project/package, not in runtime simulation code. Track that
 effort in
-[`2026-06-17-mesh-tooling-simplification-and-decomposition-plan.md`](2026-06-17-mesh-tooling-simplification-and-decomposition-plan.md).
+[`2026-06-17-mesh-tooling-simplification-and-decomposition-plan.md`](../2026-06-17-mesh-tooling-simplification-and-decomposition-plan.md).
 
 Research context from CGAL and decomposition literature should inform the
 tooling design, but not create a runtime dependency. Exact convex decomposition
@@ -1553,14 +1553,14 @@ reason to bloat the capture hot path.
 
 **Tasks**
 
-- [ ] Inventory repeated event-decoding switch logic in host adapters, samples,
+- [x] Inventory repeated event-decoding switch logic in host adapters, samples,
   or future tooling.
-- [ ] If repetition becomes error-prone, design typed read-only view helpers
+- [x] If repetition becomes error-prone, design typed read-only view helpers
   over existing `GravitasDiagnosticEvent` payloads without changing capture
   storage.
-- [ ] Add tests for each typed view's field mapping, including mixed-dimension
+- [x] Add tests for each typed view's field mapping, including mixed-dimension
   payloads.
-- [ ] Keep helpers outside authoritative runtime loops and benchmark any
+- [x] Keep helpers outside authoritative runtime loops and benchmark any
   observable/tooling projection that fans diagnostics out to subscribers.
 
 **Exit Criteria**
@@ -1569,3 +1569,53 @@ reason to bloat the capture hot path.
 - Host adapters can decode events without ambiguous field meanings.
 - Any typed helpers are proven by tests and do not alter deterministic event
   ordering.
+
+**Progress - 2026-06-18**
+
+Added typed read-only diagnostic event views over the existing compact
+`GravitasDiagnosticEvent` payload. The event struct exposes `TryAs...` helpers
+for every current `GravitasDiagnosticEventKind`:
+`ForceDelta`, `TorqueDelta`, linear and angular velocity deltas, ground probes,
+ray/swept-sphere queries, X/Z circle queries, contacts, response impulses,
+mixed queries, mixed contacts, and mixed response impulses.
+
+A follow-up ergonomics pass added `GravitasDiagnosticEventVisitor`,
+`GravitasDebugDrawCommandVisitor`, event/draw `DispatchTo(...)`, and
+`GravitasDiagnosticSink.DispatchEventsTo(...)` /
+`DispatchDrawCommandsTo(...)`. These are now the preferred host-adapter entry
+points so Unity/Godot/server adapters can override typed visit methods instead
+of guessing which `TryAs...` helper or manual switch belongs to a payload.
+
+The views and visitors do not change capture storage, diagnostic buffering,
+event ordering, draw-command ordering, or disabled-path behavior. They give host
+adapters semantic property names such as `Force`, `AccelerationDelta`,
+`SweepRadius`, `ContactCount`, `Collider3DId`, `Collider2DId`,
+`Normal3DTo2D`, `ImpulseMagnitude`, `Center`, `Radius`, `Rotation`, and
+`PointA` instead of asking every adapter to decode generic fields by hand.
+
+Focused tests cover body-force/torque/velocity event views, query event views,
+contact and response impulse event views, mixed-dimension event views, event
+visitor dispatch, draw-command visitor dispatch, and sink-level dispatch order.
+No observable or subscriber projection was added, so there is no fan-out path to
+benchmark; the helpers are ordinary value wrappers outside authoritative runtime
+loops.
+
+Diagnostic docs now show visitors as the preferred adapter decoding surface
+while keeping the generic event and draw command tables as the storage
+contract.
+
+**Plan Closure - 2026-06-18**
+
+All phases in this follow-up plan are complete. The remaining deferred work has
+been pulled into separate feature-work plans:
+
+- Mesh simplification, validation, and decomposition tooling:
+  [`2026-06-17-mesh-tooling-simplification-and-decomposition-plan.md`](../2026-06-17-mesh-tooling-simplification-and-decomposition-plan.md).
+- Deeper continuous-collision precision and solver work:
+  [`2026-06-18-continuous-collision-depth-hardening-plan.md`](../2026-06-18-continuous-collision-depth-hardening-plan.md).
+- Mass, inertia, effective inverse mass, and body center-of-mass solver work:
+  [`2026-06-18-mass-inertia-solver-follow-up-plan.md`](../2026-06-18-mass-inertia-solver-follow-up-plan.md).
+
+No additional diagnostic deferred work was identified in Phase 9. Typed views
+and visitors cover every current diagnostic event and debug draw kind, and no
+observable/tooling projection was introduced.

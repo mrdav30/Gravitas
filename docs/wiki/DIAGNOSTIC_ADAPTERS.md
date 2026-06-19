@@ -54,37 +54,42 @@ public interface IHostDebugDrawSink
 ```
 
 ```csharp
-public static void FlushDebugDraw(GravitasWorldContext context, IHostDebugDrawSink sink)
+public sealed class HostDebugDrawAdapter : GravitasDebugDrawCommandVisitor
 {
-    foreach (GravitasDebugDrawCommand command in context.Diagnostics.DrawCommands)
+    private readonly IHostDebugDrawSink _sink;
+
+    public HostDebugDrawAdapter(IHostDebugDrawSink sink)
     {
-        switch (command.Kind)
-        {
-            case GravitasDebugDrawKind.Line:
-            case GravitasDebugDrawKind.Ray:
-                sink.DrawLine(command.Start, command.End, command.Color);
-                break;
-            case GravitasDebugDrawKind.Point:
-                sink.DrawPoint(command.Center, command.Radius, command.Color);
-                break;
-            case GravitasDebugDrawKind.WireSphere:
-                sink.DrawWireSphere(command.Center, command.Radius, command.Color);
-                break;
-            case GravitasDebugDrawKind.WireBox:
-                sink.DrawWireBox(command.Center, command.Size, command.Rotation, command.Color);
-                break;
-            case GravitasDebugDrawKind.WireCylinder:
-                sink.DrawWireCylinder(command.Center, command.Radius, command.Height, command.Rotation, command.Color);
-                break;
-            case GravitasDebugDrawKind.WireCapsule:
-                sink.DrawWireCapsule(command.Center, command.Radius, command.Height, command.Rotation, command.Color);
-                break;
-            case GravitasDebugDrawKind.WireTriangle:
-                sink.DrawWireTriangle(command.PointA, command.PointB, command.PointC, command.Color);
-                break;
-        }
+        _sink = sink;
     }
+
+    public override void VisitLine(in GravitasLineDebugDrawView view) =>
+        _sink.DrawLine(view.Start, view.End, view.Color);
+
+    public override void VisitRay(in GravitasRayDebugDrawView view) =>
+        _sink.DrawLine(view.Start, view.End, view.Color);
+
+    public override void VisitPoint(in GravitasPointDebugDrawView view) =>
+        _sink.DrawPoint(view.Center, view.Radius, view.Color);
+
+    public override void VisitWireSphere(in GravitasWireSphereDebugDrawView view) =>
+        _sink.DrawWireSphere(view.Center, view.Radius, view.Color);
+
+    public override void VisitWireBox(in GravitasWireBoxDebugDrawView view) =>
+        _sink.DrawWireBox(view.Center, view.Size, view.Rotation, view.Color);
+
+    public override void VisitWireCylinder(in GravitasWireCylinderDebugDrawView view) =>
+        _sink.DrawWireCylinder(view.Center, view.Radius, view.Height, view.Rotation, view.Color);
+
+    public override void VisitWireCapsule(in GravitasWireCapsuleDebugDrawView view) =>
+        _sink.DrawWireCapsule(view.Center, view.Radius, view.Height, view.Rotation, view.Color);
+
+    public override void VisitWireTriangle(in GravitasWireTriangleDebugDrawView view) =>
+        _sink.DrawWireTriangle(view.PointA, view.PointB, view.PointC, view.Color);
 }
+
+public static void FlushDebugDraw(GravitasWorldContext context, HostDebugDrawAdapter adapter) =>
+    context.Diagnostics.DispatchDrawCommandsTo(adapter);
 ```
 
 2D debug draw in mixed mode is emitted as finite 3D slab geometry. Circles draw
@@ -100,8 +105,9 @@ normal gameplay.
 ## Structured Log Adapter Shape
 
 Server or headless hosts can ignore draw commands and write diagnostic events to
-a deterministic log sink. Keep event decoding table-driven by
-`GravitasDiagnosticEventKind` so generic fields do not become ambiguous.
+a deterministic log sink. Prefer `GravitasDiagnosticEventVisitor` so decoding
+stays centralized in Gravitas instead of repeating generic-field mappings in
+every adapter.
 
 ```csharp
 public interface IHostDiagnosticLogSink
@@ -111,31 +117,35 @@ public interface IHostDiagnosticLogSink
 ```
 
 ```csharp
-public static void FlushEvents(GravitasWorldContext context, IHostDiagnosticLogSink sink)
+public sealed class HostDiagnosticLogAdapter : GravitasDiagnosticEventVisitor
 {
-    foreach (GravitasDiagnosticEvent diagnosticEvent in context.Diagnostics.Events)
-    {
-        string payload = diagnosticEvent.Kind switch
-        {
-            GravitasDiagnosticEventKind.ForceDelta =>
-                $"body={diagnosticEvent.BodyId} force={diagnosticEvent.Vector} accelDelta={diagnosticEvent.PointA}",
-            GravitasDiagnosticEventKind.RayQuery =>
-                $"hit={diagnosticEvent.Hit} collider={diagnosticEvent.ColliderAId} distance={diagnosticEvent.ScalarB}",
-            GravitasDiagnosticEventKind.Contact =>
-                $"a={diagnosticEvent.ColliderAId} b={diagnosticEvent.ColliderBId} depth={diagnosticEvent.ScalarA}",
-            GravitasDiagnosticEventKind.MixedContact =>
-                $"3d={diagnosticEvent.ColliderAId} 2d={diagnosticEvent.ColliderBId} depth={diagnosticEvent.ScalarA}",
-            _ => $"hit={diagnosticEvent.Hit} a={diagnosticEvent.ColliderAId} b={diagnosticEvent.ColliderBId}"
-        };
+    private readonly IHostDiagnosticLogSink _sink;
 
-        sink.Write(diagnosticEvent.Frame, diagnosticEvent.Sequence, diagnosticEvent.Kind, payload);
+    public HostDiagnosticLogAdapter(IHostDiagnosticLogSink sink)
+    {
+        _sink = sink;
     }
+
+    public override void VisitForceDelta(in GravitasForceDeltaDiagnosticView view) =>
+        _sink.Write(view.Frame, view.Sequence, view.Event.Kind, $"body={view.BodyId} force={view.Force} accelDelta={view.AccelerationDelta}");
+
+    public override void VisitRayQuery(in GravitasRayQueryDiagnosticView view) =>
+        _sink.Write(view.Frame, view.Sequence, view.Event.Kind, $"hit={view.Hit} collider={view.HitColliderId} distance={view.Distance}");
+
+    public override void VisitContact(in GravitasContactDiagnosticView view) =>
+        _sink.Write(view.Frame, view.Sequence, view.Event.Kind, $"a={view.ColliderAId} b={view.ColliderBId} depth={view.Depth}");
+
+    public override void VisitMixedContact(in GravitasMixedContactDiagnosticView view) =>
+        _sink.Write(view.Frame, view.Sequence, view.Event.Kind, $"3d={view.Collider3DId} 2d={view.Collider2DId} depth={view.Depth}");
 }
+
+public static void FlushEvents(GravitasWorldContext context, HostDiagnosticLogAdapter adapter) =>
+    context.Diagnostics.DispatchEventsTo(adapter);
 ```
 
 For production logs, prefer a structured payload object over ad hoc strings.
-The important rule is that every adapter branch must treat the event kind as
-the decoder for `ScalarA`, `ScalarB`, `DataA`, and `DataB`.
+The important rule is that adapters should consume semantic typed views instead
+of decoding `ScalarA`, `ScalarB`, `DataA`, and `DataB` directly.
 
 ## Replay Timeline Adapter Shape
 
@@ -188,10 +198,14 @@ The current event struct intentionally uses generic numeric fields:
 - `ScalarA` and `ScalarB` for fixed-point payload values.
 - `DataA` and `DataB` for integer payload values.
 
-That shape keeps the core event stream compact and predictable. It is
-sufficient for alpha as long as each event kind has documented field meanings in
-[`DIAGNOSTICS.md`](DIAGNOSTICS.md) and adapters decode by kind.
+That shape keeps the core event stream compact and predictable. The generic
+payload table in [`DIAGNOSTICS.md`](DIAGNOSTICS.md) remains the storage
+contract, while `GravitasDiagnosticEventVisitor` and typed event views are the
+preferred adapter-facing decode surface. The lower-level `TryAs...` helpers are
+useful for one-off filters over known event kinds, not for full adapter
+dispatch.
 
-If host adapters start repeating error-prone switch logic, add typed adapter
-helpers or typed view structs outside the capture hot path. Do not overload the
-same event kind with new meanings that are not documented and tested.
+Draw commands follow the same pattern: `GravitasDebugDrawCommand` stays compact,
+while `GravitasDebugDrawCommandVisitor` exposes typed draw views for renderer
+adapters. Do not overload the same event or draw kind with new meanings that
+are not documented and tested.

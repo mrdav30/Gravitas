@@ -50,10 +50,11 @@ Read these in order before making non-trivial changes:
    [`SERIALIZATION.md`](docs/wiki/SERIALIZATION.md), or
    [`DIAGNOSTICS.md`](docs/wiki/DIAGNOSTICS.md) and
    [`DIAGNOSTIC_ADAPTERS.md`](docs/wiki/DIAGNOSTIC_ADAPTERS.md).
-4. The active feature-work plan when a task is part of ongoing hardening,
-   especially
-   [`2026-06-01-alpha-physics-follow-up-hardening-plan.md`](docs/feature-work/2026-06-01-alpha-physics-follow-up-hardening-plan.md),
+4. The active feature-work plan when a task is part of ongoing hardening.
+   Recent completed context and current backlog plans include
+   [`2026-06-01-alpha-physics-follow-up-hardening-plan.md`](docs/feature-work/done/2026-06-01-alpha-physics-follow-up-hardening-plan.md),
    [`2026-06-18-continuous-collision-depth-hardening-plan.md`](docs/feature-work/2026-06-18-continuous-collision-depth-hardening-plan.md),
+   [`2026-06-18-mass-inertia-solver-follow-up-plan.md`](docs/feature-work/2026-06-18-mass-inertia-solver-follow-up-plan.md),
    or
    [`2026-06-17-mesh-tooling-simplification-and-decomposition-plan.md`](docs/feature-work/2026-06-17-mesh-tooling-simplification-and-decomposition-plan.md).
 5. [`src/Gravitas/Runtime/GravitasWorldContext.cs`](src/Gravitas/Runtime/GravitasWorldContext.cs),

@@ -77,6 +77,40 @@ Current event kinds:
 The stream is scoped to one context. Collider and body IDs are not global and
 must be resolved through the same context that produced the event.
 
+## Diagnostic Dispatch And Typed Views
+
+`GravitasDiagnosticEvent` remains the compact capture format. Host adapters
+should usually consume events through `GravitasDiagnosticEventVisitor` so they
+do not need to know which `TryAs...` helper matches each
+`GravitasDiagnosticEventKind`:
+
+```csharp
+public sealed class MyDiagnosticAdapter : GravitasDiagnosticEventVisitor
+{
+    public override void VisitMixedContact(in GravitasMixedContactDiagnosticView contact)
+    {
+        // contact.Collider3DId, contact.Collider2DId,
+        // contact.Point3D, contact.Point2D, contact.Normal3DTo2D, contact.Depth
+    }
+}
+
+context.Diagnostics.DispatchEventsTo(adapter);
+```
+
+Available views cover every current event kind:
+`GravitasForceDeltaDiagnosticView`, `GravitasTorqueDeltaDiagnosticView`,
+`GravitasVelocityDeltaDiagnosticView`, `GravitasGroundProbeDiagnosticView`,
+`GravitasRayQueryDiagnosticView`, `GravitasCircleQueryDiagnosticView`,
+`GravitasContactDiagnosticView`, `GravitasResponseImpulseDiagnosticView`,
+`GravitasMixedQueryDiagnosticView`, `GravitasMixedContactDiagnosticView`, and
+`GravitasMixedResponseImpulseDiagnosticView`.
+
+The views are read-only wrappers over the existing event value. Visitors and
+views do not change capture storage, event ordering, diagnostic buffering, or
+disabled-path cost. The lower-level `TryAs...` helpers remain available for
+one-off filters over a known event kind, but visitors are the preferred adapter
+shape.
+
 ## Draw Commands
 
 `GravitasDebugDrawCommand` is the renderer-facing stream. Gravitas emits
@@ -95,6 +129,12 @@ Current draw kinds:
 | `WireCapsule` | `Center`, `Radius`, `Height`, `Rotation`, `Color` |
 | `WireCylinder` | `Center`, `Radius`, `Height`, `Rotation`, `Color` |
 | `WireTriangle` | `PointA`, `PointB`, `PointC`, `Color` |
+
+Host renderers can consume draw commands through
+`GravitasDebugDrawCommandVisitor` and `context.Diagnostics.DispatchDrawCommandsTo(...)`.
+That visitor exposes typed draw views for lines, rays, points, wire spheres,
+boxes, capsules, cylinders, and triangles so adapters do not need to repeat a
+manual command-kind switch.
 
 Use the explicit capture helpers for host-driven overlays:
 
@@ -150,8 +190,8 @@ shapes for debug draw, server logs, and replay timeline capture.
 
 - Diagnostics are same-thread context buffers, matching the current lockstep
   runtime model.
-- Event payloads are intentionally generic. When a subsystem needs richer
-  diagnostics, add a documented event kind or typed adapter helper instead of
-  overloading fields in a way hosts cannot decode.
+- Event storage is intentionally generic. When a subsystem needs richer
+  diagnostics, add a documented event kind or typed view instead of overloading
+  fields in a way hosts cannot decode.
 - Draw commands are wire/debug descriptions, not mesh generation utilities.
   Hosts remain responsible for actual rendering.

@@ -1,5 +1,6 @@
 ﻿using FixedMathSharp;
 using Gravitas.Colliders;
+using System;
 
 namespace Gravitas.Diagnostics;
 
@@ -83,4 +84,44 @@ public readonly struct GravitasDebugDrawCommand
     public Fixed64 Height { get; }
 
     public GravitasDiagnosticColor Color { get; }
+
+    /// <summary>
+    /// Dispatches this draw command to a typed debug draw visitor based on <see cref="Kind"/>.
+    /// </summary>
+    public void DispatchTo(GravitasDebugDrawCommandVisitor visitor)
+    {
+        if (visitor == null)
+            throw new ArgumentNullException(nameof(visitor));
+
+        switch (Kind)
+        {
+            case GravitasDebugDrawKind.Line:
+                visitor.VisitLine(new GravitasLineDebugDrawView(this));
+                break;
+            case GravitasDebugDrawKind.Ray:
+                visitor.VisitRay(new GravitasRayDebugDrawView(this));
+                break;
+            case GravitasDebugDrawKind.Point:
+                visitor.VisitPoint(new GravitasPointDebugDrawView(this));
+                break;
+            case GravitasDebugDrawKind.WireSphere:
+                visitor.VisitWireSphere(new GravitasWireSphereDebugDrawView(this));
+                break;
+            case GravitasDebugDrawKind.WireBox:
+                visitor.VisitWireBox(new GravitasWireBoxDebugDrawView(this));
+                break;
+            case GravitasDebugDrawKind.WireCapsule:
+                visitor.VisitWireCapsule(new GravitasWireCapsuleDebugDrawView(this));
+                break;
+            case GravitasDebugDrawKind.WireCylinder:
+                visitor.VisitWireCylinder(new GravitasWireCylinderDebugDrawView(this));
+                break;
+            case GravitasDebugDrawKind.WireTriangle:
+                visitor.VisitWireTriangle(new GravitasWireTriangleDebugDrawView(this));
+                break;
+            default:
+                visitor.VisitUnknown(this);
+                break;
+        }
+    }
 }

@@ -791,7 +791,7 @@ not become the escape hatch for concave mesh support.
 
 These were retained for context, but they were not Phase 7B completion work and
 should not be treated as required before Phase 7C. They are now captured in
-`docs/feature-work/2026-06-01-alpha-physics-follow-up-hardening-plan.md`. The
+`docs/feature-work/done/2026-06-01-alpha-physics-follow-up-hardening-plan.md`. The
 current local-BVH triangle-set implementation is the alpha baseline until
 evidence says otherwise.
 
@@ -2401,7 +2401,7 @@ decomposes contact impulses into planar X/Z and vertical Y components:
   structured log, and replay timeline adapter shapes. Linked it from the
   diagnostics wiki, overview, README, and AGENTS routing guidance.
 - Expanded
-  `docs/feature-work/2026-06-01-alpha-physics-follow-up-hardening-plan.md`
+  `docs/feature-work/done/2026-06-01-alpha-physics-follow-up-hardening-plan.md`
   with the remaining alpha hardening items from this plan: mesh decomposition
   policy, dynamic/swept CCD families, and optional typed diagnostic views.
 - Verification completed:
