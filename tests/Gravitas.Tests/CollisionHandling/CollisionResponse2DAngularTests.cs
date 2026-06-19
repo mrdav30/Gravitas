@@ -1,0 +1,146 @@
+using FixedMathSharp;
+using FluentAssertions;
+using Gravitas.Colliders;
+using Gravitas.Support;
+using Gravitas.Tests.Support;
+using Xunit;
+
+namespace Gravitas.Tests.Response;
+
+public sealed class CollisionResponse2DAngularTests
+{
+    [Fact]
+    public void OffCenterCollision_ShouldApplyAngularVelocityDelta()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        StiffBody2D moving = CreateBox(context, Vector2d.Zero);
+        StiffBody2D wall = CreateBox(context, new Vector2d((Fixed64)2, Fixed64.Zero), immovable: true);
+        var pair = new CollisionPair2D(moving.Collider, wall.Collider);
+        moving.ApplyCollisionLinearVelocityDelta(new Vector2d((Fixed64)4, Fixed64.Zero));
+
+        pair.MarkColliding(
+            context.FrameCount,
+            new Contact2D(
+                new Vector2d(Fixed64.Zero, Fixed64.One),
+                new Vector2d((Fixed64)2, Fixed64.One),
+                Vector2d.Right,
+                Fixed64.Half));
+
+        moving.AngularVelocity.Should().BeGreaterThan(Fixed64.Zero);
+        wall.AngularVelocity.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void CenteredCollision_ShouldNotIntroduceAngularVelocity()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        StiffBody2D moving = CreateBox(context, Vector2d.Zero);
+        StiffBody2D wall = CreateBox(context, new Vector2d((Fixed64)2, Fixed64.Zero), immovable: true);
+        var pair = new CollisionPair2D(moving.Collider, wall.Collider);
+        moving.ApplyCollisionLinearVelocityDelta(new Vector2d((Fixed64)4, Fixed64.Zero));
+
+        pair.MarkColliding(
+            context.FrameCount,
+            new Contact2D(
+                Vector2d.Zero,
+                new Vector2d((Fixed64)2, Fixed64.Zero),
+                Vector2d.Right,
+                Fixed64.Half));
+
+        moving.AngularVelocity.Should().Be(Fixed64.Zero);
+        wall.AngularVelocity.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void AngularDisabledBody_ShouldKeepLinearResponseAndRejectAngularVelocityDelta()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        StiffBody2D moving = CreateBox(context, Vector2d.Zero);
+        StiffBody2D wall = CreateBox(context, new Vector2d((Fixed64)2, Fixed64.Zero), immovable: true);
+        moving.PreventAngularForces = true;
+        var pair = new CollisionPair2D(moving.Collider, wall.Collider);
+        moving.ApplyCollisionLinearVelocityDelta(new Vector2d((Fixed64)4, Fixed64.Zero));
+
+        pair.MarkColliding(
+            context.FrameCount,
+            new Contact2D(
+                new Vector2d(Fixed64.Zero, Fixed64.One),
+                new Vector2d((Fixed64)2, Fixed64.One),
+                Vector2d.Right,
+                Fixed64.Half));
+
+        moving.LinearVelocity.X.Should().BeLessThan((Fixed64)4);
+        moving.AngularVelocity.Should().Be(Fixed64.Zero);
+    }
+
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void ConstrainedBody_ShouldRejectAngularVelocityDelta(bool immovable, bool isKinematic)
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        StiffBody2D constrained = CreateBox(
+            context,
+            Vector2d.Zero,
+            immovable: immovable,
+            isKinematic: isKinematic);
+        StiffBody2D moving = CreateBox(context, new Vector2d((Fixed64)2, Fixed64.Zero));
+        var pair = new CollisionPair2D(constrained.Collider, moving.Collider);
+        moving.ApplyCollisionLinearVelocityDelta(new Vector2d((Fixed64)(-4), Fixed64.Zero));
+
+        pair.MarkColliding(
+            context.FrameCount,
+            new Contact2D(
+                new Vector2d(Fixed64.Zero, Fixed64.One),
+                new Vector2d((Fixed64)2, Fixed64.One),
+                Vector2d.Right,
+                Fixed64.Half));
+
+        constrained.LinearVelocity.Should().Be(Vector2d.Zero);
+        constrained.AngularVelocity.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void TangentialContactVelocity_ShouldApplyFrictionAndAngularVelocityDelta()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        StiffBody2D moving = CreateBox(context, Vector2d.Zero);
+        StiffBody2D wall = CreateBox(context, new Vector2d((Fixed64)2, Fixed64.Zero), immovable: true);
+        var pair = new CollisionPair2D(moving.Collider, wall.Collider);
+        moving.ApplyCollisionLinearVelocityDelta(new Vector2d((Fixed64)4, (Fixed64)2));
+        Fixed64 tangentialSpeedBefore = moving.LinearVelocity.Y.Abs();
+
+        pair.MarkColliding(
+            context.FrameCount,
+            new Contact2D(
+                Vector2d.Right,
+                new Vector2d((Fixed64)2, Fixed64.Zero),
+                Vector2d.Right,
+                Fixed64.Half));
+
+        moving.LinearVelocity.Y.Abs().Should().BeLessThan(tangentialSpeedBefore);
+        moving.AngularVelocity.Should().NotBe(Fixed64.Zero);
+    }
+
+    private static StiffBody2D CreateBox(
+        GravitasWorldContext context,
+        Vector2d position,
+        bool immovable = false,
+        bool isKinematic = false)
+    {
+        var transform = new FixedTransform(
+            new Vector3d(position.X, Fixed64.Zero, position.Y),
+            FixedQuaternion.Identity,
+            Vector3d.One);
+        var body = new StiffBody2D(
+            new TestMatterAgent(context, transform),
+            new LSAABBoxCollider2D(new Vector2d((Fixed64)2, (Fixed64)2)))
+        {
+            Mass = Fixed64.One,
+            Immovable = immovable,
+            IsKinematic = isKinematic
+        };
+        body.Initialize(position);
+        return body;
+    }
+}

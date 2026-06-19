@@ -11,7 +11,7 @@
 ---
 
 **Date:** 2026-06-19
-**Status:** Workstreams 1-3 implemented / Workstream 4 ready
+**Status:** Workstreams 1-4 implemented / Workstream 5 ready
 **Owner:** Gravitas runtime/collision hardening
 
 ## Purpose
@@ -238,7 +238,7 @@ and keeps sleep gated on both linear and angular speed. Sleep clears angular
 runtime motion state. Chronicler now records 2D angular velocity, applied and
 queued angular acceleration, angular speed, and angular sleep threshold so a
 snapshot with queued torque can replay the next fixed step identically after
-populate. Contact-response angular impulses remain scoped to Workstream 4.
+populate.
 
 ## Workstream 4: Pure 2D Angular Contact Response
 
@@ -247,75 +247,28 @@ point velocity in pure 2D response.
 
 Tasks:
 
-- [ ] Add failing tests in
+- [x] Add failing tests in
   `tests/Gravitas.Tests/CollisionHandling/CollisionResponse2DAngularTests.cs`
   for off-center contacts, centered contacts, angular-disabled bodies,
   kinematic/immovable bodies, and friction.
-
-```csharp
-[Fact]
-public void OffCenterCollision_ShouldApplyAngularVelocityDelta()
-{
-    using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
-    StiffBody2D moving = CreateBox(context, new Vector2d(Fixed64.Zero, Fixed64.One), velocity: new Vector2d(Fixed64.Zero, (Fixed64)(-4)));
-    StiffBody2D target = CreateBox(context, Vector2d.Zero, velocity: Vector2d.Zero);
-
-    context.Simulate();
-
-    moving.AngularVelocity.Should().NotBe(Fixed64.Zero);
-    target.AngularVelocity.Should().NotBe(Fixed64.Zero);
-}
-```
-
-- [ ] Move response math from `CollisionPair2D.Resolve` into
+- [x] Move response math from `CollisionPair2D.Resolve` into
   `CollisionResponse2D.Resolve(CollisionPair2D pair, Contact2D contact)`.
   `CollisionPair2D.MarkColliding` should call the response surface and retain
   pair notification/wake ownership.
-
-```csharp
-if (!ColliderA.IsTrigger && !ColliderB.IsTrigger)
-{
-    CollisionResponse2D.Resolve(this, contact);
-    WakeBodies();
-}
-```
-
-- [ ] Build solver body values from `StiffBody2D.EffectiveInverseMass`,
+- [x] Build solver body values from `StiffBody2D.EffectiveInverseMass`,
   `StiffBody2D.EffectiveInverseMomentOfInertia`, and
   `StiffBody2D.WorldCenterOfMass`.
-
-```csharp
-Vector2d relativeA = contact.PointA - bodyA.WorldCenterOfMass;
-Vector2d relativeB = contact.PointB - bodyB.WorldCenterOfMass;
-```
-
-- [ ] Compute contact point velocity from linear and angular velocity.
-
-```csharp
-private static Vector2d GetVelocityAtContact(StiffBody2D body, Vector2d relativePoint) =>
-    body.LinearVelocity + AngularVelocityAtPoint(relativePoint, body.AngularVelocity);
-```
-
-- [ ] Apply normal impulse to linear and angular velocity. The impulse applied
+- [x] Compute contact point velocity from linear and angular velocity.
+- [x] Apply normal impulse to linear and angular velocity. The impulse applied
   to body A is `-impulse`, and the impulse applied to body B is `impulse`.
-
-```csharp
-bodyA?.ApplyCollisionLinearVelocityDelta(-impulse * inverseMassA);
-bodyA?.ApplyCollisionAngularVelocityDelta(-Vector2d.CrossProduct(relativeA, impulse) * inverseMomentA);
-bodyB?.ApplyCollisionLinearVelocityDelta(impulse * inverseMassB);
-bodyB?.ApplyCollisionAngularVelocityDelta(Vector2d.CrossProduct(relativeB, impulse) * inverseMomentB);
-```
-
-- [ ] Add tangent friction impulse after normal impulse using the same
+- [x] Add tangent friction impulse after normal impulse using the same
   coefficient rule as 3D response: geometric mean for two bodies, single-body
   coefficient when one side is bodyless/static, and clamp by
   `normalImpulse * frictionCoefficient`.
-
-- [ ] Keep positional correction translation-only for this workstream. Angular
+- [x] Keep positional correction translation-only for this workstream. Angular
   position correction requires a deeper manifold/solver iteration model and
   should not be smuggled into the first angular velocity response.
-
-- [ ] Run focused 2D response tests.
+- [x] Run focused 2D response tests.
 
 ```bash
 dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter FullyQualifiedName~CollisionResponse2DAngularTests
@@ -324,6 +277,15 @@ dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release -
 Expected after implementation: off-center contacts change angular velocity,
 centered contacts do not inject spin, and disabled/kinematic/immovable angular
 policy is honored.
+
+**Progress 2026-06-19:** Workstream 4 moved pure 2D response ownership out of
+`CollisionPair2D` and into `CollisionResponse2D.Resolve(...)`, leaving the pair
+responsible for lifecycle, wake propagation, and notifications. Pure 2D contact
+response now computes COM-relative contact arms, contact-point velocity from
+linear plus scalar angular velocity, angular impulse denominators, normal
+linear/angular velocity deltas, and tangent Coulomb friction impulses. Positional
+correction remains translation-only by design. Focused coverage lives in
+`tests/Gravitas.Tests/CollisionHandling/CollisionResponse2DAngularTests.cs`.
 
 ## Workstream 5: Mixed 2D/3D Angular Semantics
 

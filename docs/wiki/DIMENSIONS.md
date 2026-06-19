@@ -72,7 +72,10 @@ contribution. `StiffBody2D.LocalCenterOfMassOffset` is body-local X/Z state, and
 `AddAngularImpulse` changes scalar yaw angular velocity immediately, while
 `AddTorque` queues scalar angular acceleration for the next fixed
 `LateSimulate`. Dynamic 2D sleep requires both linear and angular speed to stay
-within their configured thresholds.
+within their configured thresholds. Pure 2D contact response uses planar
+COM-relative contact arms, scalar inverse moment, normal impulses, and tangent
+Coulomb friction impulses to update both linear velocity and scalar angular
+velocity.
 
 `LSCollider2D.InitializeWithNoBody(IMatterAgent)` binds bodyless static or
 trigger colliders to the same host contract. Bodyless 2D colliders register
@@ -198,7 +201,8 @@ explicit rather than Unity-style separate engines:
   events, and trigger-only mixed trigger events.
 - `CollisionResponseMixed` applies the first constrained response model:
   penetration correction, normal impulse, and friction are projected so 2D
-  bodies receive only X/Z correction and velocity deltas.
+  bodies receive only X/Z correction and planar velocity deltas. Mixed scalar
+  angular response for the 2D participant remains explicit follow-up work.
 - mixed broad phase uses GridForge-backed spatial identity, separate 2D and 3D
   collider ID spaces, awake-dynamic gating, layer filtering, same-agent and
   explicit hierarchy exclusion, and retained empty-partition cleanup.

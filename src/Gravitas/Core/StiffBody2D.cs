@@ -466,6 +466,16 @@ public sealed class StiffBody2D : IRecordable
         RefreshLinearSpeed();
     }
 
+    internal void ApplyCollisionAngularVelocityDelta(Fixed64 velocityDelta)
+    {
+        if (!CanRotate || velocityDelta == Fixed64.Zero)
+            return;
+
+        Wake();
+        _angularVelocity += velocityDelta;
+        RefreshAngularSpeed();
+    }
+
     private bool TryResolveContinuousCollision(Vector2d startPosition, ref Vector2d proposedPosition)
     {
         if (!ShouldUseContinuousCollision(out ContinuousCollisionMode mode))

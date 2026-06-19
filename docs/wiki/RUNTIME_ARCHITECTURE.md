@@ -237,16 +237,17 @@ and Chronicler record data. Pure 2D positions use world X/Z projection:
 `EffectiveInverseMomentOfInertia` are the 2D body-side solver mobility surface.
 Kinematic 2D bodies read their agent transform during `LateSimulate`. It
 intentionally has no y-up ground probe, height split, visual interpolation
-state, or 3D inertia tensor. Angular collision response remains staged behind
-the 2D angular contact solver follow-up. `ContinuousCollisionMode` is shared
-with the 3D body path: `StiffBody2D` resolves body, hierarchy, then context
-settings before committing movement, and uses `Query2D.SweepCircle` to clip fast
-circle-proxy movement against static or kinematic 2D targets. Dynamic-vs-dynamic
-2D CCD remains deferred until deterministic relative-velocity ordering is
-specified. `GravitasPhysics2DService.Simulate()` runs 2D contact response and
-events; `GravitasPhysics2DService.LateSimulate()` integrates active movable 2D
-bodies; `GravitasPhysics2DService.Visualize()` publishes dynamic 2D position and
-yaw rotation back to the host transform while preserving host vertical height.
+state, or 3D inertia tensor. Pure 2D contact response uses COM-relative contact
+arms and scalar moment to apply angular velocity deltas from normal and tangent
+friction impulses. `ContinuousCollisionMode` is shared with the 3D body path:
+`StiffBody2D` resolves body, hierarchy, then context settings before committing
+movement, and uses `Query2D.SweepCircle` to clip fast circle-proxy movement
+against static or kinematic 2D targets. Dynamic-vs-dynamic 2D CCD remains
+deferred until deterministic relative-velocity ordering is specified.
+`GravitasPhysics2DService.Simulate()` runs 2D contact response and events;
+`GravitasPhysics2DService.LateSimulate()` integrates active movable 2D bodies;
+`GravitasPhysics2DService.Visualize()` publishes dynamic 2D position and yaw
+rotation back to the host transform while preserving host vertical height.
 
 ## Serialization And Replay State
 

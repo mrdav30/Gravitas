@@ -86,17 +86,21 @@ claimed yet. `CollisionPair2D` resolves collider priority up front and
 2D shape pair should extend the settings/type table instead of growing public
 type-check conditionals.
 
-`CollisionPair2D` applies simple deterministic one-pass response for the alpha
-slice: positional correction to penetration slop, normal impulse when bodies are
-closing, static response against bodyless colliders, wake propagation from awake
-movable bodies, trigger enter/exit events, and contact enter/stay/exit events.
-It reads `StiffBody2D.EffectiveInverseMass` so immovable, kinematic, inactive,
-and non-positive-mass bodies remain infinite mass to the solver while raw mass
-and scalar moment values stay inspectable. If a solid pair has no awake movable
-participant, the existing pair is kept alive as resting state without applying
-response or waking a sleeping body. It does not yet claim a full 2D friction
-solver, angular impulses, richer contact manifolds, or mixed 2D/3D response
-ownership.
+`CollisionPair2D` owns pure 2D pair lifecycle: stable collider priority,
+wake propagation from awake movable bodies, trigger enter/exit events, and
+contact enter/stay/exit events. Solid response is delegated to
+`CollisionResponse2D`, which applies deterministic one-pass positional
+correction to penetration slop, normal impulse when bodies are closing, and
+tangent Coulomb friction impulse after the normal solve. It reads
+`StiffBody2D.EffectiveInverseMass`,
+`StiffBody2D.EffectiveInverseMomentOfInertia`, and
+`StiffBody2D.WorldCenterOfMass` so immovable, kinematic, inactive,
+non-positive-mass, and angular-disabled bodies remain infinite mass/inertia to
+the solver while raw mass and scalar moment values stay inspectable. If a solid
+pair has no awake movable participant, the existing pair is kept alive as
+resting state without applying response or waking a sleeping body. This is still
+a single-contact alpha solver; richer contact manifolds, warm-started pure 2D
+response, and mixed 2D/3D angular response remain future hardening work.
 
 ## Broad Phase: Voxel Partitions
 
@@ -670,11 +674,11 @@ Response units and invariants:
 - `StiffBody2D.CanTranslate`, `StiffBody2D.CanRotate`,
   `StiffBody2D.EffectiveInverseMass`, and
   `StiffBody2D.EffectiveInverseMomentOfInertia` are the pure 2D body-side
-  mobility contract. Current pure 2D and mixed response consume only effective
-  inverse mass; the 2D body integration path already consumes scalar moment for
-  host-applied torque and angular impulses. Contact angular response will
-  consume the same scalar moment surface in the later 2D angular solver
-  workstream.
+  mobility contract. Pure 2D body integration consumes scalar moment for
+  host-applied torque and angular impulses. Pure 2D contact response consumes
+  the same scalar moment surface for COM-relative normal and friction angular
+  velocity deltas. Mixed response still consumes only the 2D effective inverse
+  mass until mixed angular semantics are implemented explicitly.
 - 3D response torque arms are measured from `StiffBody.WorldCenterOfMass`.
   Collider centers remain collision-geometry references for narrow phase,
   culling, and normal fallback; they are not the implicit body COM.
@@ -698,9 +702,10 @@ Response units and invariants:
 - `StiffBody.FrictionCoefficient` is a non-negative Coulomb coefficient. Values
   above one are allowed for intentional high-friction materials.
 - friction impulses oppose tangential contact motion and are clamped by the
-  normal impulse. Pair-local warm-start storage now records normal and tangent
+  normal impulse. 3D pair-local warm-start storage records normal and tangent
   impulses by contact identity; applying cached impulses as a true warm-started
-  iterative solve remains a later solver hardening step.
+  iterative solve remains a later solver hardening step. Pure 2D response does
+  not yet warm-start tangent impulses.
 - penetration depth is a world distance from narrow phase; response slop is a
   solver invariant, not contact data.
 - drag and angular damping remain integration/body behavior; contact friction is

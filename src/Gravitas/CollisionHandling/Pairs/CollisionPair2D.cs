@@ -1,6 +1,4 @@
-using FixedMathSharp;
 using Gravitas.Colliders;
-using System.Runtime.CompilerServices;
 
 namespace Gravitas;
 
@@ -76,7 +74,7 @@ internal sealed class CollisionPair2D
 
         if (!ColliderA.IsTrigger && !ColliderB.IsTrigger)
         {
-            Resolve(contact);
+            CollisionResponse2D.Resolve(this, contact);
             WakeBodies();
         }
 
@@ -99,77 +97,6 @@ internal sealed class CollisionPair2D
         ColliderB.NotifyContact(ColliderA, false, true);
     }
 
-    private void Resolve(Contact2D contact)
-    {
-        StiffBody2D? bodyA = ColliderA.Body;
-        StiffBody2D? bodyB = ColliderB.Body;
-        if (bodyA == null && bodyB == null)
-            return;
-
-        Fixed64 inverseMassA = bodyA?.EffectiveInverseMass ?? Fixed64.Zero;
-        Fixed64 inverseMassB = bodyB?.EffectiveInverseMass ?? Fixed64.Zero;
-        Fixed64 totalInverseMass = inverseMassA + inverseMassB;
-        if (totalInverseMass <= Fixed64.Zero)
-            return;
-
-        Vector2d normal = contact.Normal.MagnitudeSquared > Fixed64.Epsilon
-            ? contact.Normal.Normalized
-            : ResolveFallbackNormal();
-        if (normal == Vector2d.Zero)
-            return;
-
-        ApplyPositionCorrection(bodyA, bodyB, normal, contact.Depth, inverseMassA, inverseMassB, totalInverseMass);
-        ApplyVelocityImpulse(bodyA, bodyB, normal, inverseMassA, inverseMassB, totalInverseMass);
-    }
-
-    private static void ApplyPositionCorrection(
-        StiffBody2D? bodyA,
-        StiffBody2D? bodyB,
-        Vector2d normal,
-        Fixed64 depth,
-        Fixed64 inverseMassA,
-        Fixed64 inverseMassB,
-        Fixed64 totalInverseMass)
-    {
-        Fixed64 correctionDepth = depth - CollisionResponse2D.PenetrationSlop;
-        if (correctionDepth <= Fixed64.Zero)
-            return;
-
-        Vector2d correction = normal * (correctionDepth * CollisionResponse2D.PenetrationCorrectionPercent / totalInverseMass);
-        bodyA?.ApplyCollisionPositionCorrection(-correction * inverseMassA);
-        bodyB?.ApplyCollisionPositionCorrection(correction * inverseMassB);
-    }
-
-    private static void ApplyVelocityImpulse(
-        StiffBody2D? bodyA,
-        StiffBody2D? bodyB,
-        Vector2d normal,
-        Fixed64 inverseMassA,
-        Fixed64 inverseMassB,
-        Fixed64 totalInverseMass)
-    {
-        Vector2d velocityA = bodyA?.LinearVelocity ?? Vector2d.Zero;
-        Vector2d velocityB = bodyB?.LinearVelocity ?? Vector2d.Zero;
-        Vector2d relativeVelocity = velocityB - velocityA;
-        Fixed64 normalVelocity = Vector2d.Dot(relativeVelocity, normal);
-        if (normalVelocity >= Fixed64.Zero)
-            return;
-
-        Fixed64 restitution = bodyA != null && bodyB != null
-            ? FixedMath.Min(bodyA.RestitutionCoefficient, bodyB.RestitutionCoefficient)
-            : Fixed64.Zero;
-        if (-normalVelocity <= CollisionResponse2D.RestitutionVelocityThreshold)
-            restitution = Fixed64.Zero;
-
-        Fixed64 impulseScalar = -(Fixed64.One + restitution) * normalVelocity / totalInverseMass;
-        if (impulseScalar <= Fixed64.Zero)
-            return;
-
-        Vector2d impulse = normal * impulseScalar;
-        bodyA?.ApplyCollisionLinearVelocityDelta(-impulse * inverseMassA);
-        bodyB?.ApplyCollisionLinearVelocityDelta(impulse * inverseMassB);
-    }
-
     private void WakeBodies()
     {
         StiffBody2D? bodyA = ColliderA.Body;
@@ -183,14 +110,5 @@ internal sealed class CollisionPair2D
             bodyA.Wake();
         if (bodyB.IsSleeping && bodyAAwake)
             bodyB.Wake();
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private Vector2d ResolveFallbackNormal()
-    {
-        Vector2d direction = ColliderB.Center - ColliderA.Center;
-        return direction.MagnitudeSquared > Fixed64.Epsilon
-            ? direction.Normalized
-            : Vector2d.Right;
     }
 }
