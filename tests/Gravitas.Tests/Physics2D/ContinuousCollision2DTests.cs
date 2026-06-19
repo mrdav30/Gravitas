@@ -464,12 +464,5 @@ public sealed class ContinuousCollision2DTests
         };
 
     private static long MeasureAllocatedBytes(System.Action action)
-    {
-        System.GC.Collect();
-        System.GC.WaitForPendingFinalizers();
-        System.GC.Collect();
-        long before = System.GC.GetAllocatedBytesForCurrentThread();
-        action();
-        return System.GC.GetAllocatedBytesForCurrentThread() - before;
-    }
+        => AllocationTestHelper.MeasureSinglePass(action);
 }

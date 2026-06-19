@@ -284,15 +284,7 @@ public sealed class GravitasDiagnosticSinkTests
     }
 
     private static long MeasureAllocatedBytes(Action action)
-    {
-        action();
-
-        long before = GC.GetAllocatedBytesForCurrentThread();
-        for (int i = 0; i < 64; i++)
-            action();
-
-        return GC.GetAllocatedBytesForCurrentThread() - before;
-    }
+        => AllocationTestHelper.MeasureSteadyState(action, warmupIterations: 1);
 
     private static LSMeshCollider CreateTriangleMesh()
     {

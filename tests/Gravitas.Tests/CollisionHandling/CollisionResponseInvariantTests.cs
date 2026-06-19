@@ -403,15 +403,7 @@ public sealed class CollisionResponseInvariantTests
     }
 
     private static long MeasureAllocatedBytes(Action action)
-    {
-        GC.Collect();
-        GC.WaitForPendingFinalizers();
-        GC.Collect();
-
-        long before = GC.GetAllocatedBytesForCurrentThread();
-        action();
-        return GC.GetAllocatedBytesForCurrentThread() - before;
-    }
+        => AllocationTestHelper.MeasureSinglePass(action);
 
     private readonly record struct ResponseState(
         Vector3d LeftPosition,

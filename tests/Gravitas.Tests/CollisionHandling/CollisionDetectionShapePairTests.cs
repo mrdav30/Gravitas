@@ -512,16 +512,7 @@ public sealed class CollisionDetectionShapePairTests
     }
 
     private static long MeasureAllocatedBytes(Action action)
-    {
-        for (int i = 0; i < 128; i++)
-            action();
-
-        long before = GC.GetAllocatedBytesForCurrentThread();
-        for (int i = 0; i < 64; i++)
-            action();
-
-        return GC.GetAllocatedBytesForCurrentThread() - before;
-    }
+        => AllocationTestHelper.MeasureSteadyState(action);
 
     private static void EnsureCollision(CollisionPair pair)
     {
