@@ -63,6 +63,52 @@ public sealed class MixedResponseTests
     }
 
     [Fact]
+    public void Resolve_WithVerticalOnlyMixedImpulse_ShouldNotTranslateOrSpin2DParticipant()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(
+            context,
+            new Vector3d(Fixed64.Zero, -Fixed64.Half, Fixed64.Zero));
+        StiffBody2D body2D = CreateCircle2D(context, Vector2d.Zero);
+        var pair = new CollisionPairMixed(body3D.Collider, body2D.Collider);
+        var contact = new MixedContact(
+            new Vector3d(Fixed64.Zero, -Fixed64.Half, Fixed64.Half),
+            new Vector3d(Fixed64.Zero, Fixed64.Zero, Fixed64.Half),
+            Vector3d.Up,
+            Fixed64.FromFraction(1, 10));
+        body3D.Body.ApplyCollisionLinearVelocityDelta(Vector3d.Up);
+
+        CollisionResponseMixed.Resolve(pair, contact);
+
+        body2D.Position.Should().Be(Vector2d.Zero);
+        body2D.LinearVelocity.Should().Be(Vector2d.Zero);
+        body2D.AngularVelocity.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void Resolve_WithPlanarOffsetMixedImpulse_ShouldSpin2DParticipantAroundCom()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(
+            context,
+            new Vector3d(-Fixed64.Half, Fixed64.Zero, Fixed64.Half));
+        StiffBody2D body2D = CreateCircle2D(context, Vector2d.Zero);
+        var pair = new CollisionPairMixed(body3D.Collider, body2D.Collider);
+        var contact = new MixedContact(
+            new Vector3d(-Fixed64.Half, Fixed64.Zero, Fixed64.Half),
+            new Vector3d(Fixed64.Zero, Fixed64.Zero, Fixed64.Half),
+            Vector3d.Right,
+            Fixed64.FromFraction(1, 10));
+        body3D.Body.ApplyCollisionLinearVelocityDelta(Vector3d.Right);
+
+        CollisionResponseMixed.Resolve(pair, contact);
+
+        body2D.LinearVelocity.X.Should().BeGreaterThan(Fixed64.Zero);
+        body2D.LinearVelocity.Y.Should().Be(Fixed64.Zero);
+        body2D.AngularVelocity.Should().BeLessThan(Fixed64.Zero);
+    }
+
+    [Fact]
     public void Simulate_WithKinematic3DAgainstDynamic2D_ShouldOnlyMove2DParticipant()
     {
         using GravitasWorldContext context = CreateMixedContext();

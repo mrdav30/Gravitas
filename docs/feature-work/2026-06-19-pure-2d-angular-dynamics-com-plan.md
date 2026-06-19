@@ -11,7 +11,7 @@
 ---
 
 **Date:** 2026-06-19
-**Status:** Workstreams 1-4 implemented / Workstream 5 ready
+**Status:** Workstreams 1-5 implemented / Workstream 6 ready
 **Owner:** Gravitas runtime/collision hardening
 
 ## Purpose
@@ -85,8 +85,8 @@ Fixed64 denominator =
     + angularB * angularB * inverseMomentB;
 ```
 
-- Mixed 2D/3D angular response is a separate phase of this plan. The pure 2D
-  solver must pass before mixed applies planar impulses around the 2D COM.
+- Mixed 2D/3D angular response consumes only the planar X/Z impulse component.
+  Vertical Y impulse remains constrained out of the pure 2D body model.
 
 ## File Map
 
@@ -294,18 +294,18 @@ physically explainable under the mixed embedding model.
 
 Tasks:
 
-- [ ] Add mixed response tests proving vertical-only 3D impulses do not spin or
+- [x] Add mixed response tests proving vertical-only 3D impulses do not spin or
   translate a 2D body, while planar impulses at an offset from 2D COM can change
   scalar 2D angular velocity.
-- [ ] Update `CollisionResponseMixed` so the 2D participant uses
+- [x] Update `CollisionResponseMixed` so the 2D participant uses
   `EffectiveInverseMass` and `EffectiveInverseMomentOfInertia`.
-- [ ] Compute the 2D relative contact arm from the planar contact point to
+- [x] Compute the 2D relative contact arm from the planar contact point to
   `StiffBody2D.WorldCenterOfMass`.
-- [ ] Apply scalar 2D angular impulse only from the planar impulse component.
+- [x] Apply scalar 2D angular impulse only from the planar impulse component.
   The vertical Y impulse remains constrained out of the pure 2D body model.
-- [ ] Preserve existing mixed rule: planar X/Z impulse can move the 2D body,
+- [x] Preserve existing mixed rule: planar X/Z impulse can move the 2D body,
   vertical Y impulse treats the 2D participant as infinite constrained mass.
-- [ ] Run focused mixed response tests plus existing mixed CCD/query tests.
+- [x] Run focused mixed response tests plus existing mixed CCD/query tests.
 
 ```bash
 dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~Mixed|FullyQualifiedName~CollisionResponse2DAngularTests"
@@ -313,6 +313,18 @@ dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release -
 
 Expected after implementation: mixed angular behavior is explicit, planar-only,
 and does not change pure 2D or pure 3D pair identity.
+
+**Progress 2026-06-19:** Workstream 5 extended
+`CollisionResponseMixed` so the embedded 2D participant contributes scalar
+angular contact velocity, angular impulse denominator, and angular velocity
+delta from the planar X/Z component of mixed normal and friction impulses.
+The 2D contact arm is measured from the planar mixed contact point to
+`StiffBody2D.WorldCenterOfMass`, using
+`StiffBody2D.EffectiveInverseMass` and
+`StiffBody2D.EffectiveInverseMomentOfInertia` for solver mobility. Vertical
+Y-only impulse still treats the 2D body as having infinite constrained mass and
+cannot translate or spin the 2D participant. Focused coverage lives in
+`tests/Gravitas.Tests/MixedDimensions/MixedResponseTests.cs`.
 
 ## Workstream 6: Docs, Benchmarks, And Release Validation
 

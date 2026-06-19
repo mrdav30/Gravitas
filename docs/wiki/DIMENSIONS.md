@@ -194,15 +194,17 @@ explicit rather than Unity-style separate engines:
   polygon, and compound slabs.
 - mixed contacts embed 2D colliders into 3D as finite X/Z prisms centered on
   the host transform's Y position.
-- 2D bodies remain plane-constrained: planar impulse can move them in X/Z,
-  vertical impulse treats them as having infinite constrained mass.
+- 2D bodies remain plane-constrained: planar impulse can move them in X/Z and
+  can spin them around their scalar yaw axis from the planar COM-relative
+  contact arm; vertical impulse treats them as having infinite constrained
+  mass.
 - `CollisionPairMixed` owns stable mixed pair identity, wake propagation,
   resting-pair retention, pooled pair reuse, mixed contact enter/stay/exit
   events, and trigger-only mixed trigger events.
-- `CollisionResponseMixed` applies the first constrained response model:
+- `CollisionResponseMixed` applies the constrained response model:
   penetration correction, normal impulse, and friction are projected so 2D
-  bodies receive only X/Z correction and planar velocity deltas. Mixed scalar
-  angular response for the 2D participant remains explicit follow-up work.
+  bodies receive only X/Z correction, planar velocity deltas, and scalar angular
+  velocity deltas from the planar impulse component.
 - mixed broad phase uses GridForge-backed spatial identity, separate 2D and 3D
   collider ID spaces, awake-dynamic gating, layer filtering, same-agent and
   explicit hierarchy exclusion, and retained empty-partition cleanup.

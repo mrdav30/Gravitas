@@ -115,9 +115,11 @@ plus the dedicated mixed lifecycle and broad-phase path. Mixed narrow phase
 currently supports 3D spheres, cuboids, capsules, finite cylinders, compound
 colliders, and mesh colliders against embedded 2D circle, AABB, and convex
 polygon slabs. Mixed pair ownership and constrained impulse exchange are
-implemented through `CollisionPairMixed` and `CollisionResponseMixed`. Explicit
-mixed query APIs, mixed CCD hooks, and dimension-tagged diagnostics are part of
-the current mixed alpha path.
+implemented through `CollisionPairMixed` and `CollisionResponseMixed`, including
+planar scalar angular response for embedded 2D bodies while vertical Y impulse
+remains constrained out of the 2D body model. Explicit mixed query APIs, mixed
+CCD hooks, and dimension-tagged diagnostics are part of the current mixed alpha
+path.
 
 `Reset` clears the clock and context-local service state, detaches retained
 Gravitas partition payloads from GridForge voxels, then invokes reset hooks.

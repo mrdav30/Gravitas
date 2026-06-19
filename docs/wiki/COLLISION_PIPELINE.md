@@ -60,12 +60,14 @@ embedded 2D slab volume.
 `CollisionPairMixed` owns stable 3D/2D pair identity, resting-pair retention,
 wake propagation, mixed contact enter/stay/exit events, trigger-only mixed
 trigger events, and pooled pair reuse. `CollisionResponseMixed` applies the
-first constrained mixed response: planar X/Z correction and impulses can move a
-2D body, while vertical Y correction and impulses treat the 2D body as having
-infinite constrained mass. Mixed diagnostics, explicit mixed queries, and
-mixed CCD hooks are implemented. 2D swept-circle mixed CCD uses the shared
-swept-sphere worker, including 3D mesh targets through local-BVH triangle
-candidate TOI checks and compound targets through stable part-order reduction.
+constrained mixed response: planar X/Z correction and impulses can move a
+2D body, planar normal and friction impulse components can spin it around its
+scalar yaw axis from the 2D COM-relative contact arm, and vertical Y correction
+and impulses treat the 2D body as having infinite constrained mass. Mixed
+diagnostics, explicit mixed queries, and mixed CCD hooks are implemented. 2D
+swept-circle mixed CCD uses the shared swept-sphere worker, including 3D mesh
+targets through local-BVH triangle candidate TOI checks and compound targets
+through stable part-order reduction.
 
 `CollisionDetection2D` currently supports:
 
@@ -99,8 +101,8 @@ non-positive-mass, and angular-disabled bodies remain infinite mass/inertia to
 the solver while raw mass and scalar moment values stay inspectable. If a solid
 pair has no awake movable participant, the existing pair is kept alive as
 resting state without applying response or waking a sleeping body. This is still
-a single-contact alpha solver; richer contact manifolds, warm-started pure 2D
-response, and mixed 2D/3D angular response remain future hardening work.
+a single-contact alpha solver; richer contact manifolds and warm-started pure
+2D response remain future hardening work.
 
 ## Broad Phase: Voxel Partitions
 
@@ -677,8 +679,10 @@ Response units and invariants:
   mobility contract. Pure 2D body integration consumes scalar moment for
   host-applied torque and angular impulses. Pure 2D contact response consumes
   the same scalar moment surface for COM-relative normal and friction angular
-  velocity deltas. Mixed response still consumes only the 2D effective inverse
-  mass until mixed angular semantics are implemented explicitly.
+  velocity deltas. Mixed response consumes the same effective mass and scalar
+  moment surface for the embedded 2D participant, but only from planar X/Z
+  impulse components; vertical Y impulse remains constrained out of the 2D
+  body model.
 - 3D response torque arms are measured from `StiffBody.WorldCenterOfMass`.
   Collider centers remain collision-geometry references for narrow phase,
   culling, and normal fallback; they are not the implicit body COM.
