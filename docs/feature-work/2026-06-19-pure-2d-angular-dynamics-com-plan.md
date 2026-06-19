@@ -11,7 +11,7 @@
 ---
 
 **Date:** 2026-06-19
-**Status:** Workstream 1 implemented / Workstream 2 ready
+**Status:** Workstreams 1-2 implemented / Workstream 3 ready
 **Owner:** Gravitas runtime/collision hardening
 
 ## Purpose
@@ -160,9 +160,7 @@ Focused coverage lives in
 `tests/Gravitas.Tests/Core/StiffBody2DMassPropertiesTests.cs` and
 `tests/Gravitas.Tests/Serialization/StiffBody2DSerializationTests.cs`.
 The shared `LSCollider2D` mass-property surface and current shape formula
-implementations were pulled forward to avoid placeholder body inertia;
-Workstream 2 remains open for the dedicated circle, AABB, polygon, and compound
-formula test matrix before the collider API boundary is considered complete.
+implementations were pulled forward to avoid placeholder body inertia.
 
 ## Workstream 2: 2D Collider Mass-Property API
 
@@ -171,103 +169,26 @@ scalar moment about an explicit body-local reference point.
 
 Tasks:
 
-- [ ] Add failing tests in
+- [x] Add failing tests in
   `tests/Gravitas.Tests/Colliders/Collider2DMassPropertyTests.cs` for circle,
   AABB, convex polygon, and compound COM/moment.
 
-```csharp
-[Fact]
-public void Circle_ShouldCalculateMomentAroundRequestedLocalReference()
-{
-    var collider = new LSCircleCollider2D((Fixed64)2)
-    {
-        LocalOffset = new Vector2d((Fixed64)3, Fixed64.Zero)
-    };
-
-    Fixed64 momentAboutCom = collider.CalculateMomentOfInertia((Fixed64)4, collider.CalculateLocalCenterOfMassOffset());
-    Fixed64 momentAboutOrigin = collider.CalculateMomentOfInertia((Fixed64)4, Vector2d.Zero);
-
-    momentAboutCom.Should().Be((Fixed64)8);
-    momentAboutOrigin.Should().Be((Fixed64)44);
-}
-```
-
 - [x] Add the base mass-property surface to `LSCollider2D`.
-
-```csharp
-public virtual Vector2d CalculateLocalCenterOfMassOffset() => ScaledLocalOffset;
-
-public Fixed64 CalculateMomentOfInertia(Fixed64 mass) =>
-    CalculateMomentOfInertia(mass, CalculateLocalCenterOfMassOffset());
-
-public abstract Fixed64 CalculateMomentOfInertia(Fixed64 mass, Vector2d localReferencePoint);
-
-internal abstract Fixed64 CalculateAreaForMassProperties();
-
-protected static Fixed64 ApplyParallelAxis(Fixed64 momentAboutCom, Fixed64 mass, Vector2d centerOfMass, Vector2d localReferencePoint)
-{
-    Vector2d delta = localReferencePoint - centerOfMass;
-    return momentAboutCom + mass * delta.MagnitudeSquared;
-}
-```
 
 - [x] Implement circle mass properties in `LSCircleCollider2D`.
 
-```csharp
-internal override Fixed64 CalculateAreaForMassProperties() =>
-    Fixed64.Pi * ScaledRadius * ScaledRadius;
-
-public override Fixed64 CalculateMomentOfInertia(Fixed64 mass, Vector2d localReferencePoint)
-{
-    if (mass <= Fixed64.Zero)
-        return Fixed64.Zero;
-
-    Vector2d centerOfMass = CalculateLocalCenterOfMassOffset();
-    Fixed64 momentAboutCom = mass * ScaledRadius * ScaledRadius * Fixed64.Half;
-    return ApplyParallelAxis(momentAboutCom, mass, centerOfMass, localReferencePoint);
-}
-```
-
 - [x] Implement AABB mass properties in `LSAABBoxCollider2D`.
-
-```csharp
-internal override Fixed64 CalculateAreaForMassProperties()
-{
-    Vector2d scaledSize = ScaledSize;
-    return scaledSize.X * scaledSize.Y;
-}
-
-public override Fixed64 CalculateMomentOfInertia(Fixed64 mass, Vector2d localReferencePoint)
-{
-    if (mass <= Fixed64.Zero)
-        return Fixed64.Zero;
-
-    Vector2d scaledSize = ScaledSize;
-    Fixed64 momentAboutCom = mass * (scaledSize.X * scaledSize.X + scaledSize.Y * scaledSize.Y) / (Fixed64)12;
-    return ApplyParallelAxis(momentAboutCom, mass, CalculateLocalCenterOfMassOffset(), localReferencePoint);
-}
-```
 
 - [x] Implement convex polygon area, centroid, and moment using scaled local
   vertices plus `ScaledLocalOffset`. Preserve declaration order and reject
   invalid polygons through the existing validation path.
 
-```csharp
-private Vector2d GetMassPropertyVertex(int index) =>
-    ScaledLocalOffset + Vector2d.Multiply(_localVertices[index], LocalScale);
-```
-
 - [x] Implement `LSCompoundCollider2D` aggregation in stable part order. Assign
   each part a mass proportional to `partArea / totalArea`, aggregate COM by
-  area-weighted local COM, and aggregate moment by asking each part for moment
-  about the compound COM.
+  area-weighted local COM, apply the owning collider's local offset, and
+  aggregate moment by asking each part for moment about the compound COM.
 
-```csharp
-Fixed64 partMass = mass * partArea / totalArea;
-moment += partCollider.CalculateMomentOfInertia(partMass, localReferencePoint);
-```
-
-- [ ] Run focused collider mass-property tests.
+- [x] Run focused collider mass-property tests.
 
 ```bash
 dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter FullyQualifiedName~Collider2DMassPropertyTests
@@ -275,6 +196,17 @@ dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release -
 
 Expected after implementation: all circle, AABB, polygon, and compound
 mass-property tests pass.
+
+**Progress 2026-06-19:** Workstream 2 added focused collider coverage for
+circle, AABB, convex polygon, and compound 2D mass properties. The current
+`LSCollider2D` mass-property API now reports local COM, deterministic area, and
+scalar moment about an explicit local reference point for all current pure 2D
+shape types. Compound mass properties aggregate owned private parts in stable
+part order, assign area-proportional part mass, honor the owning collider's
+local offset, and apply authored part local scale and local rotation before
+COM/moment aggregation. The same owner-center rule now drives 2D compound part
+bounds so collision geometry and mass-property geometry use one coordinate
+model.
 
 ## Workstream 3: Angular Integration, Sleep, And Serialization
 

@@ -238,7 +238,7 @@ public abstract class LSCollider2D : IRecordable, IColliderHierarchyNode
     }
 
     public Vector2d Position => _compoundOwner != null
-        ? _compoundOwner.Position
+        ? _compoundOwner.Center
         : ResolveStandalonePosition();
 
     public Fixed64 Rotation => _compoundOwner != null
@@ -603,7 +603,8 @@ public abstract class LSCollider2D : IRecordable, IColliderHierarchyNode
     /// <summary>
     /// Calculates the body-local center of mass implied by this 2D collider's current shape state.
     /// </summary>
-    public virtual Vector2d CalculateLocalCenterOfMassOffset() => ScaledLocalOffset;
+    public virtual Vector2d CalculateLocalCenterOfMassOffset() =>
+        TransformMassPropertyPoint(ScaledLocalOffset);
 
     /// <summary>
     /// Calculates the scalar moment of inertia about this collider's derived center of mass.
@@ -663,7 +664,7 @@ public abstract class LSCollider2D : IRecordable, IColliderHierarchyNode
         {
             Fixed64 rotation = _compoundOwner.Rotation + _compoundLocalRotation;
             Vector2d localScale = Vector2d.Multiply(_compoundOwner.LocalScale, _compoundLocalScale);
-            Vector2d center = _compoundOwner.Position + Rotate(Vector2d.Multiply(_localOffset, localScale), rotation);
+            Vector2d center = _compoundOwner.Center + Rotate(Vector2d.Multiply(_localOffset, localScale), rotation);
             return new(
                 center,
                 rotation,
@@ -822,7 +823,10 @@ public abstract class LSCollider2D : IRecordable, IColliderHierarchyNode
         RebuildRuntimeShapeState();
     }
 
-    internal void ReserveCompoundPart(LSCompoundCollider2D owner)
+    internal void ReserveCompoundPart(
+        LSCompoundCollider2D owner,
+        Fixed64 localRotation,
+        Vector2d localScale)
     {
         SwiftThrowHelper.ThrowIfNull(owner, nameof(owner));
         SwiftThrowHelper.ThrowIfArgument(
@@ -835,6 +839,8 @@ public abstract class LSCollider2D : IRecordable, IColliderHierarchyNode
             "2D compound collider part is already owned by another compound collider.");
 
         _compoundOwner = owner;
+        _compoundLocalRotation = localRotation;
+        _compoundLocalScale = localScale;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -854,6 +860,12 @@ public abstract class LSCollider2D : IRecordable, IColliderHierarchyNode
 
         return ClampNearZero(Vector2d.Rotate(value, radians));
     }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    protected Vector2d TransformMassPropertyPoint(Vector2d localPoint) =>
+        _compoundOwner == null
+            ? localPoint
+            : _compoundOwner.ScaledLocalOffset + Rotate(localPoint, _compoundLocalRotation);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     protected static Vector2d ClampNearZero(Vector2d value)

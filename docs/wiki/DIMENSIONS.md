@@ -87,6 +87,16 @@ input instead of silently accepting ambiguous collision truth. A rotated box
 should be represented as a convex polygon for now; `LSAABBoxCollider2D` remains
 axis-aligned by design.
 
+Each current pure 2D collider also exposes deterministic shape-derived mass
+properties: local center of mass, area, and scalar moment about an explicit
+body-local reference point. Circle, AABB, and convex polygon formulas use their
+scaled local shape data. `LSCompoundCollider2D` aggregates private parts in
+stable part order, assigns area-proportional part mass, applies the owning
+collider's local offset, and honors authored part scale and rotation before
+center-of-mass and moment calculations. Its private part geometry is anchored
+from the owner center, so aggregate bounds/collision geometry and mass-property
+geometry share the same local-coordinate model.
+
 `ColliderShapeDefinition2D` is the data-only authoring/import surface for
 circle, AABB, and convex polygon shape inputs. `CompoundColliderPart2D` combines
 that definition with local offset, scalar local rotation, and local scale, then

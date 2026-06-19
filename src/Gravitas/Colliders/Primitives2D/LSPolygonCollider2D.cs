@@ -267,5 +267,6 @@ public sealed class LSPolygonCollider2D : LSCollider2D
     }
 
     private Vector2d GetMassPropertyVertex(int index) =>
-        ScaledLocalOffset + Vector2d.Multiply(_localVertices[index], LocalScale);
+        TransformMassPropertyPoint(
+            ScaledLocalOffset + Vector2d.Multiply(_localVertices[index], LocalScale));
 }

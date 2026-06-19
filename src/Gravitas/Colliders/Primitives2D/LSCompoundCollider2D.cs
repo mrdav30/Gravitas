@@ -28,7 +28,7 @@ public sealed class LSCompoundCollider2D : LSCollider2D
         {
             _parts[i] = parts[i];
             _partColliders[i] = MaterializePartCollider(parts[i]);
-            _partColliders[i].ReserveCompoundPart(this);
+            _partColliders[i].ReserveCompoundPart(this, parts[i].LocalRotation, parts[i].LocalScale);
         }
     }
 

@@ -57,6 +57,26 @@ public sealed class CompoundCollider2DTests
     }
 
     [Fact]
+    public void Initialize_ShouldApplyOwnerLocalOffsetToAggregateBounds()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        var compound = new LSCompoundCollider2D(
+            CompoundColliderPart2D.Circle(Fixed64.Half, new Vector2d(-Fixed64.One, Fixed64.Zero)),
+            CompoundColliderPart2D.Circle(Fixed64.Half, new Vector2d((Fixed64)2, Fixed64.Zero)))
+        {
+            LocalOffset = new Vector2d((Fixed64)5, (Fixed64)(-2))
+        };
+
+        _ = CreateBody(context, compound, Vector2d.Zero);
+
+        compound.Bounds.MinX.Should().Be(Fixed64.FromFraction(7, 2));
+        compound.Bounds.MaxX.Should().Be(Fixed64.FromFraction(15, 2));
+        compound.Bounds.MinY.Should().Be(-Fixed64.FromFraction(5, 2));
+        compound.Bounds.MaxY.Should().Be(-Fixed64.FromFraction(3, 2));
+        compound.Center.Should().Be(new Vector2d((Fixed64)5, (Fixed64)(-2)));
+    }
+
+    [Fact]
     public void PartShapeMutation_ShouldRefreshAggregateBounds()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
