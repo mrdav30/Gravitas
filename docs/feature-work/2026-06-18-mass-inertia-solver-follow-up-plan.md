@@ -15,6 +15,14 @@ This plan captures those deferred mass/inertia items so the completed alpha
 follow-up plan can move to `docs/feature-work/done` without hiding unfinished
 solver architecture work.
 
+## Related Deferred Work
+
+Pure 2D center-of-mass and angular dynamics are intentionally tracked in
+[`2026-06-19-pure-2d-angular-dynamics-com-plan.md`](2026-06-19-pure-2d-angular-dynamics-com-plan.md).
+That plan should start after the current 3D/mixed mass-inertia work wraps, so
+2D gets a scalar COM/moment model designed for its own X/Z planar solver instead
+of a weak copy of the 3D tensor path.
+
 ## Current Baseline
 
 - `PhysicsMesh.CalculateInertiaTensor(mass)` remains a shape/topology API. Body
