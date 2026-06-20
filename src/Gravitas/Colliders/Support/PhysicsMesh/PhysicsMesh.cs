@@ -18,6 +18,11 @@ namespace Gravitas.Colliders
         /// </summary>
         public const int MaxTriangleCount = 131072;
 
+        private static readonly Fixed64 TetrahedronVolumeDivisor = (Fixed64)6;
+        private static readonly Fixed64 TetrahedronCentroidDivisor = (Fixed64)4;
+        private static readonly Fixed64 SecondMomentIntegralDivisor = (Fixed64)10;
+        private static readonly Fixed64 ProductMomentIntegralDivisor = (Fixed64)20;
+
         private readonly Vector3d[] _localVertices;
 
         private readonly Vector3d[] _worldVertices;
@@ -141,9 +146,7 @@ namespace Gravitas.Colliders
         public FixedBoundBox LocalBounds => _localBounds;
 
         public PhysicsMesh(Vector3d[] vertices, int[] triangles, Vector3d position, FixedQuaternion rotation)
-            : this(vertices, triangles, position, rotation, MeshColliderMode.Convex)
-        {
-        }
+            : this(vertices, triangles, position, rotation, MeshColliderMode.Convex) { }
 
         public PhysicsMesh(
             Vector3d[] vertices,
@@ -152,7 +155,11 @@ namespace Gravitas.Colliders
             FixedQuaternion rotation,
             MeshColliderMode mode)
         {
-            ValidateMode(mode);
+            SwiftThrowHelper.ThrowIfArgument(
+                mode != MeshColliderMode.Convex && mode != MeshColliderMode.Concave,
+                nameof(mode),
+                "Unsupported mesh collider mode.");
+
             ValidateInput(vertices, triangles);
 
             Mode = mode;
@@ -215,14 +222,6 @@ namespace Gravitas.Colliders
             _worldVerticesValid = true;
         }
 
-        private static void ValidateMode(MeshColliderMode mode)
-        {
-            SwiftThrowHelper.ThrowIfArgument(
-                mode != MeshColliderMode.Convex && mode != MeshColliderMode.Concave,
-                nameof(mode),
-                "Unsupported mesh collider mode.");
-        }
-
         private static void ValidateInput(Vector3d[] vertices, int[] triangles)
         {
             SwiftThrowHelper.ThrowIfNull(vertices, nameof(vertices));
@@ -240,37 +239,25 @@ namespace Gravitas.Colliders
                 int index1 = triangles[i * 3 + 1];
                 int index2 = triangles[i * 3 + 2];
 
-                ThrowIfIndexOutOfRange(index0, vertices.Length, nameof(triangles));
-                ThrowIfIndexOutOfRange(index1, vertices.Length, nameof(triangles));
-                ThrowIfIndexOutOfRange(index2, vertices.Length, nameof(triangles));
+                SwiftThrowHelper.ThrowIfArgumentOutOfRange((uint)index0 >= (uint)vertices.Length, vertices.Length, nameof(triangles));
+                SwiftThrowHelper.ThrowIfArgumentOutOfRange((uint)index1 >= (uint)vertices.Length, vertices.Length, nameof(triangles));
+                SwiftThrowHelper.ThrowIfArgumentOutOfRange((uint)index2 >= (uint)vertices.Length, vertices.Length, nameof(triangles));
 
                 SwiftThrowHelper.ThrowIfArgument(
                     index0 == index1 || index1 == index2 || index2 == index0,
                     nameof(triangles),
                     "Triangle indices must be unique within each triangle.");
 
-                Fixed64 area = CalculateTriangleAreaStatic(vertices[index0], vertices[index1], vertices[index0], vertices[index2]);
+                Fixed64 area = CalculateTriangleArea(vertices[index0], vertices[index1], vertices[index0], vertices[index2]);
                 SwiftThrowHelper.ThrowIfArgument(area <= Fixed64.Epsilon, nameof(triangles), "Degenerate triangles are not supported.");
             }
         }
 
-        private static void ThrowIfIndexOutOfRange(int index, int length, string paramName)
-        {
-            if ((uint)index >= (uint)length)
-                throw new ArgumentOutOfRangeException(paramName, index, "Triangle index is outside the vertex array.");
-        }
-
-        private static Fixed64 CalculateTriangleAreaStatic(
+        private static Fixed64 CalculateTriangleArea(
             Vector3d startEdgeA,
             Vector3d endEdgeA,
             Vector3d startEdgeB,
             Vector3d endEdgeB) => Vector3d.Cross(endEdgeA - startEdgeA, endEdgeB - startEdgeB).Magnitude * Fixed64.Half;
-
-        private Fixed64 CalculateTriangleArea(
-            Vector3d startEdgeA,
-            Vector3d endEdgeA,
-            Vector3d startEdgeB,
-            Vector3d endEdgeB) => CalculateTriangleAreaStatic(startEdgeA, endEdgeA, startEdgeB, endEdgeB);
 
         public Vector3d[] CalculateEdgeNormals()
         {
@@ -570,16 +557,17 @@ namespace Gravitas.Colliders
                 Vector3d b = _localVertices[_triangles[triangleIndex + 1]] - reference;
                 Vector3d c = _localVertices[_triangles[triangleIndex + 2]] - reference;
 
-                Fixed64 volume = Vector3d.Dot(a, Vector3d.Cross(b, c)) / (Fixed64)6;
+                Fixed64 volume = Vector3d.Dot(a, Vector3d.Cross(b, c)) / TetrahedronVolumeDivisor;
                 signedVolume += volume;
-                firstMoment += (a + b + c) * (volume / (Fixed64)4);
+                firstMoment += (a + b + c) * (volume / TetrahedronCentroidDivisor);
 
-                integralX2 += volume * SumSquaredBarycentricProducts(a.X, b.X, c.X) / (Fixed64)10;
-                integralY2 += volume * SumSquaredBarycentricProducts(a.Y, b.Y, c.Y) / (Fixed64)10;
-                integralZ2 += volume * SumSquaredBarycentricProducts(a.Z, b.Z, c.Z) / (Fixed64)10;
-                integralXY += volume * SumBarycentricProducts(a.X, b.X, c.X, a.Y, b.Y, c.Y) / (Fixed64)20;
-                integralXZ += volume * SumBarycentricProducts(a.X, b.X, c.X, a.Z, b.Z, c.Z) / (Fixed64)20;
-                integralYZ += volume * SumBarycentricProducts(a.Y, b.Y, c.Y, a.Z, b.Z, c.Z) / (Fixed64)20;
+                Fixed3x3 productSums = Fixed3x3.CreateBarycentricProductSums(a, b, c);
+                integralX2 += volume * productSums.M11 / SecondMomentIntegralDivisor;
+                integralY2 += volume * productSums.M22 / SecondMomentIntegralDivisor;
+                integralZ2 += volume * productSums.M33 / SecondMomentIntegralDivisor;
+                integralXY += volume * productSums.M12 / ProductMomentIntegralDivisor;
+                integralXZ += volume * productSums.M13 / ProductMomentIntegralDivisor;
+                integralYZ += volume * productSums.M23 / ProductMomentIntegralDivisor;
             }
 
             Fixed64 absoluteVolume = signedVolume.Abs();
@@ -609,23 +597,6 @@ namespace Gravitas.Colliders
                     ixz, iyz, izz));
             result = MeshVolumeValidationResult.Valid;
             return true;
-        }
-
-        private static Fixed64 SumSquaredBarycentricProducts(Fixed64 a, Fixed64 b, Fixed64 c) =>
-            (a * a) + (b * b) + (c * c) + (a * b) + (a * c) + (b * c);
-
-        private static Fixed64 SumBarycentricProducts(
-            Fixed64 firstA,
-            Fixed64 firstB,
-            Fixed64 firstC,
-            Fixed64 secondA,
-            Fixed64 secondB,
-            Fixed64 secondC)
-        {
-            Fixed64 firstSum = firstA + firstB + firstC;
-            Fixed64 secondSum = secondA + secondB + secondC;
-            Fixed64 matchingProducts = (firstA * secondA) + (firstB * secondB) + (firstC * secondC);
-            return firstSum * secondSum + matchingProducts;
         }
 
         private static int CompareEdgeUses(EdgeUse first, EdgeUse second) =>

@@ -4,14 +4,14 @@
 
 **Goal:** Move reusable deterministic math, traversal, and save/apply infrastructure out of Gravitas into the correct lower LSF libraries without weakening Gravitas' physics-facing APIs.
 
-**Architecture:** FixedMathSharp should own reusable fixed-point transform and mesh geometry math. GridForge should own grid traversal/topology helpers that reason over `GridWorld`, `VoxelGrid`, and voxel partitions. Chronicler should own the reusable default save/apply phase base. Gravitas keeps physics-specific wrappers, collider ownership, body mobility policy, and runtime service integration.
+**Architecture:** FixedMathSharp should own reusable fixed-point transform and geometry algebra. GridForge should own grid traversal/topology helpers that reason over `GridWorld`, `VoxelGrid`, and voxel partitions. Chronicler should own the reusable default save/apply phase base. Gravitas keeps physics-specific wrappers, collider ownership, body mobility policy, mesh mass-property integration, and runtime service integration.
 
 **Tech Stack:** C# 11, FixedMathSharp `Fixed64`/`Vector3d`/`FixedQuaternion`/`Fixed3x3`, GridForge `GridWorld`/`VoxelGrid`/`IVoxelPartition`, Chronicler.Core, SwiftCollections, xUnit, Gravitas Release/ReleaseLean validation.
 
 ---
 
 **Date:** 2026-06-19
-**Status:** In progress / Workstreams 1-2 complete
+**Status:** In progress / Workstreams 1-3 complete
 **Owner:** LSF lower-stack hardening
 
 ## Purpose
@@ -22,10 +22,10 @@ LSF stack:
 - `FixedTransform` is a deterministic transform shell used by host-agent
   bridges. Trailblazer and future engine-agnostic libraries should not need to
   copy Gravitas to get it.
-- Closed-volume mesh mass-property math contains reusable fixed-point
-  barycentric product helpers and mesh integral formulas. Gravitas should keep
-  the `PhysicsMesh` collider wrapper, but the pure math belongs in
-  FixedMathSharp.
+- Closed-volume mesh mass-property math contains a small amount of reusable
+  fixed-point barycentric product algebra. Gravitas should keep `PhysicsMesh`,
+  mesh volume validation, center-of-mass calculation, and inertia formulas
+  because those are physics mass-property concerns.
 - `GridForgeTraversal` and `GridTopologyMetricUtility` reason about GridForge
   topology and voxel traversal. Gravitas should consume those helpers from
   GridForge instead of owning them locally.
@@ -42,8 +42,8 @@ behavior changes.
   `src/Gravitas/Support/FixedTransform.cs`; FixedMathSharp now owns the shared
   `FixedMathSharp.FixedTransform` type.
 - Gravitas owns closed-volume mesh mass-property integration inside
-  `src/Gravitas/Colliders/Support/PhysicsMesh/PhysicsMesh.cs`, including
-  `SumSquaredBarycentricProducts(...)` and `SumBarycentricProducts(...)`.
+  `src/Gravitas/Colliders/Support/PhysicsMesh/PhysicsMesh.cs`. Only the
+  barycentric product algebra is reusable enough for FixedMathSharp.
 - FixedMathSharp already exposes `FixedMath.BarycentricCoordinate(...)` and
   `Vector3d.BarycentricCoordinates(...)`.
 - Gravitas owns `src/Gravitas/Support/GridForgeTraversal.cs` and
@@ -63,9 +63,11 @@ behavior changes.
 - Keep any parent/host hierarchy semantics minimal and deterministic. If
   `Parent` remains, it should be a simple transform reference, not a scene graph
   or engine object bridge.
-- Move reusable mesh math, not the Gravitas `PhysicsMesh` runtime wrapper.
-  Gravitas still owns collider limits, mesh collider modes, runtime bounds,
-  query acceleration, shape definitions, and body/collider integration.
+- Move reusable barycentric product algebra, not the Gravitas
+  closed-volume mesh mass-property model. Gravitas still owns mesh volume
+  validation, center-of-mass calculation, inertia formulas, collider limits,
+  mesh collider modes, runtime bounds, query acceleration, shape definitions,
+  and body/collider integration.
 - Prefer FixedMathSharp APIs that operate on fixed-point primitives and explicit
   buffers. Avoid APIs that allocate hidden collections in hot paths unless the
   allocation is already part of the current Gravitas caller contract.
@@ -84,9 +86,8 @@ behavior changes.
 - Added `../FixedMathSharp/src/FixedMathSharp/Numerics/Matrices/FixedTransform.cs`.
 - Modify `../FixedMathSharp/src/FixedMathSharp/Core/FixedMath.cs` for scalar
   barycentric product helpers if they fit the existing `FixedMath` surface.
-- Create or modify files under
-  `../FixedMathSharp/src/FixedMathSharp/Geometry` for reusable closed-volume
-  triangle-mesh validation and mass-property math.
+- Modify `../FixedMathSharp/src/FixedMathSharp/Numerics/Matrices/Fixed3x3.cs`
+  for the symmetric barycentric product-sum matrix factory.
 - Add tests under `../FixedMathSharp/tests/FixedMathSharp.Tests`.
 
 ### GridForge
@@ -111,7 +112,7 @@ behavior changes.
   - `src/Gravitas/Support/GridTopologyMetricUtility.cs`
   - `src/Gravitas/Support/DefaultSaver.cs`
 - Modify `src/Gravitas/Colliders/Support/PhysicsMesh/PhysicsMesh.cs` to call
-  FixedMathSharp mesh mass-property helpers.
+  FixedMathSharp barycentric product matrix helpers.
 - Modify usages in `src/Gravitas/Core`, `src/Gravitas/Queries`,
   `src/Gravitas/CollisionHandling`, `src/Gravitas/Settings`, and tests.
 - Update docs in `docs/wiki` and active `docs/feature-work` plans where stack
@@ -144,11 +145,10 @@ Get-Content ..\Chronicler\AGENTS.md
   implementation. The default recommendation is a mutable reference type that
   preserves current Gravitas host-publication semantics.
 
-- [x] Decide the mesh math API names. Recommended starting surface:
+- [x] Decide the reusable geometry API names:
   `FixedMath.SumSquaredBarycentricProducts(...)`,
-  `FixedMath.SumBarycentricProducts(...)`, and a geometry-level helper that
-  computes closed-volume mesh mass properties from vertices and triangle
-  indices.
+  `FixedMath.SumBarycentricProducts(...)`, and
+  `Fixed3x3.CreateBarycentricProductSums(...)`.
 
 - [x] Record any API name changes directly in this plan before implementation
   starts.
@@ -161,10 +161,10 @@ Recorded decisions:
 - `FixedTransform` lives in namespace `FixedMathSharp` as a mutable reference
   type backed by `Fixed4x4`.
 - Scalar barycentric product helpers will be added to `FixedMath`.
-- Closed-volume mesh validation and mass-property integration should move under
-  `FixedMathSharp.Geometry.Meshes`; Gravitas keeps `PhysicsMesh`,
-  `MeshInertiaPolicy`, collider limits, bounds/BVH ownership, and runtime
-  integration.
+- Symmetric barycentric product-sum matrix construction will be added to
+  `Fixed3x3`.
+- Closed-volume mesh validation and mass-property integration should stay in
+  Gravitas. The only Workstream 3 extraction is barycentric product algebra.
 
 ## Workstream 2: FixedMathSharp Transform Extraction
 
@@ -216,54 +216,63 @@ Notes:
   `Release` and `ReleaseLean` solution builds compile the local graph in the
   requested configuration.
 
-## Workstream 3: FixedMathSharp Mesh Geometry Math Extraction
+## Workstream 3: FixedMathSharp Barycentric Product Helper Extraction
 
-**Goal:** Move reusable fixed-point barycentric and closed-volume mesh
-mass-property math into FixedMathSharp while keeping Gravitas' `PhysicsMesh`
-as the physics/collider wrapper.
+**Goal:** Move only reusable fixed-point barycentric product algebra into
+FixedMathSharp while keeping Gravitas' `PhysicsMesh`, mesh validation,
+center-of-mass calculation, and inertia formulas in Gravitas.
 
 Tasks:
 
-- [ ] Add FixedMathSharp tests for:
+- [x] Add FixedMathSharp tests for:
   - `SumSquaredBarycentricProducts(a, b, c)`.
   - `SumBarycentricProducts(firstA, firstB, firstC, secondA, secondB, secondC)`.
-  - closed-volume cube volume, center of mass, and inertia tensor.
-  - zero-volume, boundary, duplicate-triangle, non-manifold, inconsistent
-    winding, and disconnected-shell validation results.
+  - `Fixed3x3.CreateBarycentricProductSums(a, b, c)`.
 
-- [ ] Move scalar barycentric product helpers into FixedMathSharp beside
-  existing barycentric helpers.
+- [x] Move scalar barycentric product helpers into FixedMathSharp beside
+  existing barycentric helpers, and add the symmetric product-sum factory to
+  `Fixed3x3`.
 
-- [ ] Move reusable closed-volume mesh validation and mass-property formulas
-  into FixedMathSharp geometry APIs.
-
-- [ ] Keep Gravitas-specific mesh policy in Gravitas:
+- [x] Keep Gravitas-specific mesh policy in Gravitas:
+  - closed-volume mesh validation.
+  - volume, center-of-mass, and inertia tensor formulas.
   - deterministic vertex/triangle limits.
   - `PhysicsMesh` bounds and query acceleration.
   - `MeshColliderMode`.
   - `MeshInertiaPolicy`.
   - collider shape definition boundaries.
 
-- [ ] Update `PhysicsMesh.TryGetClosedVolumeMassProperties(...)` and
-  `PhysicsMesh.CalculateInertiaTensor(...)` to call the FixedMathSharp helper.
+- [x] Update `PhysicsMesh` closed-volume integration to call the FixedMathSharp
+  symmetric barycentric product-sum matrix helper.
 
-- [ ] Run FixedMathSharp mesh/math tests.
+- [x] Run FixedMathSharp scalar and matrix math tests.
 
-- [ ] Run Gravitas mesh mass-property tests:
+- [x] Run Gravitas mesh mass-property tests:
 
 ```bash
 dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~PhysicsMeshTests|FullyQualifiedName~ColliderRuntimeStateTests"
 ```
 
-- [ ] Run mesh mass-property benchmarks after the code compiles:
+- [x] Run mesh mass-property benchmarks after the code compiles:
 
 ```bash
 dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj --configuration Release -f net8.0
 dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll mesh-mass-property --list flat
 ```
 
-Expected result: FixedMathSharp owns reusable mesh math, while Gravitas behavior
-and tests remain unchanged.
+Expected result: FixedMathSharp owns only reusable barycentric product algebra,
+while Gravitas behavior, mesh mass-property ownership, and tests remain
+unchanged.
+
+Notes:
+
+- Full mesh mass-property extraction was intentionally rejected as too
+  physics-specific for FixedMathSharp. Gravitas continues to own closed-volume
+  validation, center-of-mass, volume, inertia tensor, collider policy, and mesh
+  runtime integration.
+- FixedMathSharp now owns only the barycentric product algebra duplicated by
+  Gravitas' closed-volume integration: scalar primitives on `FixedMath` and the
+  symmetric product-sum matrix factory on `Fixed3x3`.
 
 ## Workstream 4: GridForge Traversal And Topology Extraction
 
@@ -370,10 +379,10 @@ duplicate utility implementations, and Release/ReleaseLean are clean.
 
 - FixedMathSharp exposes the shared deterministic transform shell needed by
   Gravitas and Trailblazer.
-- FixedMathSharp owns reusable barycentric product and closed-volume mesh
-  mass-property math.
+- FixedMathSharp owns reusable barycentric product algebra.
+- Gravitas owns closed-volume mesh validation and mesh mass-property math.
 - Gravitas `PhysicsMesh` remains the collider/runtime wrapper and no longer
-  owns duplicated reusable mesh formulas.
+  owns duplicated reusable barycentric product formulas.
 - GridForge owns traversal and topology metric helpers used by Gravitas.
 - Chronicler owns `DefaultSaver`.
 - Gravitas docs identify the new source-of-truth libraries.
