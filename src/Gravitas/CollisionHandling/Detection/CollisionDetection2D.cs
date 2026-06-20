@@ -9,9 +9,9 @@ namespace Gravitas;
 /// <summary>
 /// Deterministic pure 2D narrow-phase collision checks.
 /// </summary>
-public static class CollisionDetection2D
+internal static class CollisionDetection2D
 {
-    public static bool TryCollide(LSCollider2D colliderA, LSCollider2D colliderB, out Contact2D contact)
+    internal static bool TryCollide(LSCollider2D colliderA, LSCollider2D colliderB, out Contact2D contact)
     {
         SwiftThrowHelper.ThrowIfNull(colliderA, nameof(colliderA));
         SwiftThrowHelper.ThrowIfNull(colliderB, nameof(colliderB));

@@ -164,8 +164,9 @@ active-pair queue during `LateSimulate`.
 ## Current Prototype Edges
 
 - The original 3D path remains the mature runtime path. The pure 2D path is an
-  alpha slice with circle, axis-aligned box, convex polygon, overlap-circle
-  query, and simple deterministic response coverage.
+  alpha slice with circle, axis-aligned box, convex polygon, compound colliders,
+  overlap/raycast/swept-circle queries, two-contact manifolds, scalar angular
+  response, and pair-local warm-started response coverage.
 - `StiffBody` has a split 2D ground position plus height for the existing 3D
   y-up model, but that is not the pure 2D body model.
 - Mixed 2D/3D interaction now has a first alpha implementation. The runtime has
@@ -187,11 +188,12 @@ active-pair queue during `LateSimulate`.
 - Mesh raycast overlap, sphere sweeps against mesh targets, and concave mesh
   narrow phase are implemented through triangle-level tests. Richer mesh contact
   clipping and mesh-as-source swept query families remain future hardening work.
-- Collision response is still an alpha-hardening target. The current manifold
-  solver handles deterministic normal and friction impulses, and dynamic CCD has
-  deterministic relative-motion paths. Static resting friction, true warm-start
-  impulse application, explicit island solving, rotational CCD, exact swept
-  polytope support, and richer mixed solver behavior remain future work.
+- Collision response is still an alpha-hardening target. The current 3D and pure
+  2D manifold solvers handle deterministic normal and friction impulses, pure
+  2D applies pair-local warm-start impulses, and dynamic CCD has deterministic
+  relative-motion paths. Static resting friction, explicit island solving,
+  rotational CCD, exact swept polytope support, 3D true warm-start application,
+  and richer mixed solver behavior remain future work.
 - Query services use context-owned mutable buffers. Treat them as same-thread,
   fixed-loop services unless they are redesigned for reentrancy.
 - Diagnostics are context-owned and disabled by default. Enabled draw capture can

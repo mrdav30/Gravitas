@@ -1,17 +1,7 @@
 # Pure 2D Manifold And Warm-Start Solver Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
-
-**Goal:** Replace pure 2D single-contact response with deterministic 2D contact manifolds, 2D solver helper types, and pair-local warm-started response.
-
-**Architecture:** Pure 2D stays scalar and X/Z planar: contacts use `Vector2d`, bodies expose scalar inverse moment, and rotation remains yaw around the embedded Y axis. `CollisionPair2D` should own manifold and warm-start state, `CollisionDetection2D` should generate stable 2D contact manifolds, and `CollisionResponse2D` should solve bounded manifold contacts through explicit `ResponseBody2D`, `SolverContact2D`, and `SolverContactBuffer2D` helper types.
-
-**Tech Stack:** C# 11, FixedMathSharp `Fixed64`/`Vector2d`, SwiftCollections fixed-capacity/state helpers, xUnit v3, FluentAssertions, BenchmarkDotNet, Gravitas Release/ReleaseLean validation.
-
----
-
 **Date:** 2026-06-19
-**Status:** In progress / Workstream 4 complete
+**Status:** Done
 **Owner:** Gravitas pure 2D solver hardening
 
 ## Purpose
@@ -26,14 +16,14 @@ friction, or warm-started response.
 This plan gives pure 2D its own manifold and solver helper model instead of
 trying to squeeze scalar 2D math through the 3D tensor solver helpers.
 
-## Current Baseline
+## Original Baseline Before This Plan
 
-- `Contact2D` is a single contact with `PointA`, `PointB`, `Normal`, and
+- `Contact2D` was a single contact with `PointA`, `PointB`, `Normal`, and
   `Depth`.
-- `CollisionDetection2D.TryCollide(...)` returns one `Contact2D`.
-- `CollisionPair2D` owns pair priority, resting/separated state, wake
+- `CollisionDetection2D.TryCollide(...)` returned one `Contact2D`.
+- `CollisionPair2D` owned pair priority, resting/separated state, wake
   propagation, and notifications.
-- `CollisionResponse2D.Resolve(CollisionPair2D pair, Contact2D contact)` reads
+- `CollisionResponse2D.Resolve(CollisionPair2D pair, Contact2D contact)` read
   `StiffBody2D.EffectiveInverseMass`,
   `StiffBody2D.EffectiveInverseMomentOfInertia`, and
   `StiffBody2D.WorldCenterOfMass`, then applies one-pass positional correction,
@@ -168,9 +158,9 @@ Tasks:
 internal static bool TryCollide(CollisionPair2D pair, ContactManifold2D manifold, int frame)
 ```
 
-- [x] Keep the public/simple `TryCollide(..., out Contact2D contact)` path as a
-  primary-contact convenience unless review decides to make a breaking API
-  cleanup.
+- [x] Keep `Contact2D` only as an internal primitive-candidate helper and remove
+  it from the public 2D collision API during final cleanup. Public-facing 2D
+  collision semantics should be manifold-first.
 
 - [x] Convert circle/circle and circle/convex paths to write into
   `ContactManifold2D`.
@@ -197,9 +187,9 @@ manifolds without changing response behavior yet.
 Notes:
 
 - Added the internal pair manifold entry point plus a work-item overload used by
-  tests and compound part traversal. The existing single-contact convenience
-  path remains allocation-free for the current simulation loop until
-  pair-owned manifolds land in Workstream 3.
+  tests and compound part traversal. The single-contact `Contact2D` path now
+  exists only as an internal primitive-candidate helper used by the manifold
+  builder.
 - Circle/circle and circle/convex now populate `ContactManifold2D`; reversed
   convex/circle owner order writes reversed points and normal without
   allocating a temporary manifold.
@@ -266,8 +256,6 @@ Notes:
   active candidates and writes detection output directly into
   `pair.Manifold`. Resting-pair preservation refreshes the same manifold before
   `MarkResting(frame)`.
-- `CollisionResponse2D` still resolves only `pair.Manifold.PrimaryContact`
-  until Workstream 4 replaces it with bounded manifold response.
 - Verified TDD red on missing pair-owned manifold/cache APIs, then green with:
 
 ```bash
@@ -372,11 +360,11 @@ hot path unexpectedly.
 
 Tasks:
 
-- [ ] Extend `tests/Gravitas.Benchmarks/Physics2D/Physics2DBenchmarks.cs` with
+- [x] Extend `tests/Gravitas.Benchmarks/Physics2D/Physics2DBenchmarks.cs` with
   benchmark coverage for convex/convex two-contact manifold detection and
   two-contact manifold response.
 
-- [ ] Update `docs/wiki/COLLISION_PIPELINE.md` to describe:
+- [x] Update `docs/wiki/COLLISION_PIPELINE.md` to describe:
   - `ContactManifold2D`.
   - two-contact 2D convex manifolds.
   - pair-owned warm-start cache.
@@ -384,23 +372,23 @@ Tasks:
   - remaining solver limits: no island solver, no static resting friction, and
     no rotational CCD.
 
-- [ ] Update `docs/wiki/DIMENSIONS.md` if public 2D contact semantics change.
+- [x] Update `docs/wiki/DIMENSIONS.md` if public 2D contact semantics change.
 
-- [ ] Run benchmark build/list validation:
+- [x] Run benchmark build/list validation:
 
 ```bash
 dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj --configuration Release -f net8.0
 dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll physics-2d --list flat
 ```
 
-- [ ] Run full Release validation:
+- [x] Run full Release validation:
 
 ```bash
 dotnet build Gravitas.slnx --configuration Release
 dotnet test Gravitas.slnx --configuration Release
 ```
 
-- [ ] Run full ReleaseLean validation:
+- [x] Run full ReleaseLean validation:
 
 ```bash
 dotnet build Gravitas.slnx --configuration ReleaseLean
@@ -409,6 +397,32 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 
 Expected result: docs describe pure 2D as a manifold-capable solver, benchmarks
 cover the new costs, and both package paths pass.
+
+Notes:
+
+- Added `DetectConvexConvexTwoContactManifolds` and
+  `ResolveTwoContactManifoldPairs` to the `physics-2d` benchmark selection, and
+  updated existing 2D and 2D-compound benchmark collision checks to use
+  reusable `ContactManifold2D` state instead of the old single-contact
+  convenience path.
+- Final cleanup demoted `CollisionDetection2D` and `Contact2D` to internal
+  implementation surfaces. `Contact2D` now remains only as a primitive
+  candidate helper inside the 2D manifold builder; public-facing 2D collision
+  semantics are manifold-first.
+- Updated `docs/wiki/COLLISION_PIPELINE.md`, `docs/wiki/DIMENSIONS.md`,
+  `docs/wiki/OVERVIEW.md`, and the benchmark README to describe pure 2D
+  two-contact manifolds, pair-owned warm-start cache, explicit 2D solver helper
+  types, and the remaining solver limits.
+- Verified with:
+
+```bash
+dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj --configuration Release -f net8.0 --nologo
+dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll physics-2d --list flat
+dotnet build Gravitas.slnx --configuration Release --nologo
+dotnet test Gravitas.slnx --configuration Release --nologo
+dotnet build Gravitas.slnx --configuration ReleaseLean --nologo
+dotnet test Gravitas.slnx --configuration ReleaseLean --nologo
+```
 
 ## Exit Criteria
 

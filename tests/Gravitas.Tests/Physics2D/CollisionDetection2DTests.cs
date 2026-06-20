@@ -18,7 +18,7 @@ public sealed class CollisionDetection2DTests
     [InlineData(ColliderType2D.Circle, ColliderType2D.ConvexPolygon)]
     [InlineData(ColliderType2D.AABox, ColliderType2D.ConvexPolygon)]
     [InlineData(ColliderType2D.ConvexPolygon, ColliderType2D.ConvexPolygon)]
-    public void TryCollide_ShouldSupportRequiredShapePairs(ColliderType2D firstType, ColliderType2D secondType)
+    public void TryCollideManifold_ShouldSupportRequiredShapePairs(ColliderType2D firstType, ColliderType2D secondType)
     {
         using GravitasWorldContext context = Create2DContext();
         LSCollider2D first = CreateCollider(firstType);
@@ -26,11 +26,12 @@ public sealed class CollisionDetection2DTests
         _ = CreateBody(context, first, new Vector2d(Fixed64.Zero, Fixed64.Zero));
         _ = CreateBody(context, second, new Vector2d(Fixed64.Half, Fixed64.Zero));
 
-        bool result = CollisionDetection2D.TryCollide(first, second, out Contact2D contact);
+        (bool result, ContactManifold2D manifold) = BuildManifold(first, second);
 
         result.Should().BeTrue();
-        contact.Depth.Should().BeGreaterThan(Fixed64.Zero);
-        contact.Normal.X.Should().BeGreaterThan(Fixed64.Zero);
+        manifold.HasContact.Should().BeTrue();
+        manifold.PrimaryContact.Depth.Should().BeGreaterThan(Fixed64.Zero);
+        manifold.PrimaryContact.Normal.X.Should().BeGreaterThan(Fixed64.Zero);
     }
 
     [Fact]
@@ -42,8 +43,10 @@ public sealed class CollisionDetection2DTests
         _ = CreateBody(context, first, new Vector2d(Fixed64.Zero, Fixed64.Zero));
         _ = CreateBody(context, second, new Vector2d((Fixed64)5, Fixed64.Zero));
 
-        CollisionDetection2D.TryCollide(first, second, out Contact2D contact).Should().BeFalse();
-        contact.HasContact.Should().BeFalse();
+        (bool collided, ContactManifold2D manifold) = BuildManifold(first, second);
+
+        collided.Should().BeFalse();
+        manifold.HasContact.Should().BeFalse();
     }
 
     [Fact]

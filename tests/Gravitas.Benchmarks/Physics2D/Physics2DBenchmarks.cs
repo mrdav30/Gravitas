@@ -1,6 +1,7 @@
 using BenchmarkDotNet.Attributes;
 using FixedMathSharp;
 using Gravitas.Colliders;
+using Gravitas.CollisionHandling;
 using Gravitas.Queries;
 using GridForge.Configuration;
 using SwiftCollections;
@@ -24,11 +25,16 @@ public class Physics2DBenchmarks
     private SwiftList<LSCollider2D> _sweepQueryColliders;
     private SwiftList<LSCollider2D> _sweepSortedColliders;
     private SwiftList<Physics2DHit> _queryHits;
+    private ContactManifold2D _sweepCollisionManifold;
     private PreparedPair2D[] _shapePairs;
     private CollisionPair2D[] _angularResponsePairs;
-    private Contact2D[] _angularResponseContacts;
     private StiffBody2D[] _angularResponseBodies;
     private Vector2d[] _angularResponseVelocities;
+    private CollisionWorkItem2D[] _twoContactDetectionItems;
+    private ContactManifold2D[] _twoContactDetectionManifolds;
+    private CollisionPair2D[] _twoContactResponsePairs;
+    private StiffBody2D[] _twoContactResponseBodies;
+    private Vector2d[] _twoContactResponseVelocities;
 
     [Params(64, 1024)]
     public int BodyCount { get; set; }
@@ -52,11 +58,16 @@ public class Physics2DBenchmarks
         _sweepQueryColliders = new SwiftList<LSCollider2D>(BodyCount);
         _sweepSortedColliders = new SwiftList<LSCollider2D>(BodyCount * 2);
         _queryHits = new SwiftList<Physics2DHit>(BodyCount);
+        _sweepCollisionManifold = new ContactManifold2D();
         _shapePairs = new PreparedPair2D[BodyCount];
         _angularResponsePairs = new CollisionPair2D[BodyCount];
-        _angularResponseContacts = new Contact2D[BodyCount];
         _angularResponseBodies = new StiffBody2D[BodyCount];
         _angularResponseVelocities = new Vector2d[BodyCount];
+        _twoContactDetectionItems = new CollisionWorkItem2D[BodyCount];
+        _twoContactDetectionManifolds = new ContactManifold2D[BodyCount];
+        _twoContactResponsePairs = new CollisionPair2D[BodyCount];
+        _twoContactResponseBodies = new StiffBody2D[BodyCount];
+        _twoContactResponseVelocities = new Vector2d[BodyCount];
 
         for (int i = 0; i < BodyCount; i++)
         {
@@ -70,11 +81,17 @@ public class Physics2DBenchmarks
             _angularResponsePairs[i] = CreateAngularResponsePair(
                 i,
                 out StiffBody2D angularBody,
-                out Vector2d angularVelocity,
-                out Contact2D angularContact);
+                out Vector2d angularVelocity);
             _angularResponseBodies[i] = angularBody;
             _angularResponseVelocities[i] = angularVelocity;
-            _angularResponseContacts[i] = angularContact;
+            _twoContactDetectionItems[i] = CreateTwoContactDetectionItem(i);
+            _twoContactDetectionManifolds[i] = new ContactManifold2D();
+            _twoContactResponsePairs[i] = CreateTwoContactResponsePair(
+                i,
+                out StiffBody2D responseBody,
+                out Vector2d responseVelocity);
+            _twoContactResponseBodies[i] = responseBody;
+            _twoContactResponseVelocities[i] = responseVelocity;
         }
 
         for (int i = 0; i < BodyCount; i++)
@@ -111,11 +128,16 @@ public class Physics2DBenchmarks
         _sweepQueryColliders = null;
         _sweepSortedColliders = null;
         _queryHits = null;
+        _sweepCollisionManifold = null;
         _shapePairs = null;
         _angularResponsePairs = null;
-        _angularResponseContacts = null;
         _angularResponseBodies = null;
         _angularResponseVelocities = null;
+        _twoContactDetectionItems = null;
+        _twoContactDetectionManifolds = null;
+        _twoContactResponsePairs = null;
+        _twoContactResponseBodies = null;
+        _twoContactResponseVelocities = null;
     }
 
     [Benchmark]
@@ -147,8 +169,14 @@ public class Physics2DBenchmarks
                 if (second.MinY > first.MaxY || second.MaxY < first.MinY)
                     continue;
 
-                if (CollisionDetection2D.TryCollide(first, second, out _))
+                CollisionType2D collisionType = ColliderSettings2D.GetCollisionType(first.Shape, second.Shape);
+                if (CollisionDetection2D.TryCollide(
+                    new CollisionWorkItem2D(first, second, collisionType),
+                    _sweepCollisionManifold,
+                    collisionCount))
+                {
                     collisionCount++;
+                }
             }
         }
 
@@ -175,7 +203,39 @@ public class Physics2DBenchmarks
             body.ApplyCollisionAngularVelocityDelta(-body.AngularVelocity);
             body.ApplyCollisionLinearVelocityDelta(_angularResponseVelocities[i] - body.LinearVelocity);
 
-            CollisionResponse2D.Resolve(_angularResponsePairs[i], _angularResponseContacts[i]);
+            CollisionResponse2D.Resolve(_angularResponsePairs[i]);
+            checksum += body.AngularVelocity.m_rawValue;
+        }
+
+        return checksum;
+    }
+
+    [Benchmark]
+    public long DetectConvexConvexTwoContactManifolds()
+    {
+        long checksum = 0;
+        for (int i = 0; i < _twoContactDetectionItems.Length; i++)
+        {
+            ContactManifold2D manifold = _twoContactDetectionManifolds[i];
+            if (CollisionDetection2D.TryCollide(_twoContactDetectionItems[i], manifold, i))
+                checksum += manifold.Count;
+        }
+
+        return checksum;
+    }
+
+    [Benchmark]
+    public long ResolveTwoContactManifoldPairs()
+    {
+        long checksum = 0;
+        for (int i = 0; i < _twoContactResponsePairs.Length; i++)
+        {
+            StiffBody2D body = _twoContactResponseBodies[i];
+            body.ApplyCollisionAngularVelocityDelta(-body.AngularVelocity);
+            body.ApplyCollisionLinearVelocityDelta(_twoContactResponseVelocities[i] - body.LinearVelocity);
+
+            CollisionResponse2D.Resolve(_twoContactResponsePairs[i]);
+            checksum += body.LinearVelocity.X.m_rawValue;
             checksum += body.AngularVelocity.m_rawValue;
         }
 
@@ -237,7 +297,7 @@ public class Physics2DBenchmarks
         for (int i = 0; i < _shapePairs.Length; i++)
         {
             PreparedPair2D pair = _shapePairs[i];
-            if (CollisionDetection2D.TryCollide(pair.ColliderA, pair.ColliderB, out _))
+            if (CollisionDetection2D.TryCollide(pair.WorkItem, pair.Manifold, i))
                 collisionCount++;
         }
 
@@ -388,14 +448,29 @@ public class Physics2DBenchmarks
         Vector2d position = PositionForIndex(index, spacing: (Fixed64)4);
         _ = CreateBody(_detectionContext, colliderA, position, immovable: true);
         _ = CreateBody(_detectionContext, colliderB, position + new Vector2d(Fixed64.Half, Fixed64.Zero), immovable: true);
-        return new PreparedPair2D(colliderA, colliderB);
+        CollisionType2D collisionType = ColliderSettings2D.GetCollisionType(colliderA.Shape, colliderB.Shape);
+        return new PreparedPair2D(new CollisionWorkItem2D(colliderA, colliderB, collisionType));
+    }
+
+    private CollisionWorkItem2D CreateTwoContactDetectionItem(int index)
+    {
+        var first = new LSAABBoxCollider2D(new Vector2d((Fixed64)2, (Fixed64)2));
+        var second = new LSAABBoxCollider2D(new Vector2d((Fixed64)2, (Fixed64)2));
+        Vector2d position = PositionForIndex(index + BodyCount, spacing: (Fixed64)4);
+        _ = CreateBody(_detectionContext, first, position, immovable: true);
+        _ = CreateBody(
+            _detectionContext,
+            second,
+            position + new Vector2d(Fixed64.FromFraction(3, 2), Fixed64.Zero),
+            immovable: true);
+        CollisionType2D collisionType = ColliderSettings2D.GetCollisionType(first.Shape, second.Shape);
+        return new CollisionWorkItem2D(first, second, collisionType);
     }
 
     private CollisionPair2D CreateAngularResponsePair(
         int index,
         out StiffBody2D dynamicBody,
-        out Vector2d resetVelocity,
-        out Contact2D contact)
+        out Vector2d resetVelocity)
     {
         Vector2d position = PositionForIndex(index, spacing: (Fixed64)4);
         dynamicBody = CreateBody(
@@ -416,10 +491,45 @@ public class Physics2DBenchmarks
         bool dynamicIsColliderA = ReferenceEquals(pair.ColliderA.Body, dynamicBody);
         Fixed64 contactOffset = Fixed64.Half;
         Vector2d contactPoint = pair.ColliderA.Center + tangent * contactOffset;
-        contact = new Contact2D(contactPoint, contactPoint, normal, Fixed64.Zero);
+        pair.Manifold.SetContact(contactPoint, contactPoint, Fixed64.Zero, normal);
         resetVelocity = dynamicIsColliderA
             ? normal * (Fixed64)8 + tangent * (Fixed64)2
             : -normal * (Fixed64)8 + tangent * (Fixed64)2;
+        return pair;
+    }
+
+    private CollisionPair2D CreateTwoContactResponsePair(
+        int index,
+        out StiffBody2D dynamicBody,
+        out Vector2d resetVelocity)
+    {
+        Vector2d position = PositionForIndex(index + BodyCount, spacing: (Fixed64)4);
+        dynamicBody = CreateBody(
+            _responseContext,
+            new LSAABBoxCollider2D(new Vector2d((Fixed64)2, (Fixed64)2)),
+            position,
+            immovable: false);
+        StiffBody2D staticBody = CreateBody(
+            _responseContext,
+            new LSAABBoxCollider2D(new Vector2d((Fixed64)2, (Fixed64)2)),
+            position + new Vector2d(Fixed64.FromFraction(3, 2), Fixed64.Zero),
+            immovable: true);
+        var pair = new CollisionPair2D(dynamicBody.Collider, staticBody.Collider);
+
+        Vector2d normal = pair.ColliderB.Center - pair.ColliderA.Center;
+        normal = normal.MagnitudeSquared > Fixed64.Epsilon ? normal.Normalized : Vector2d.Right;
+        Vector2d tangent = new(-normal.Y, normal.X);
+        Vector2d pointA0 = pair.ColliderA.Center + normal + tangent;
+        Vector2d pointA1 = pair.ColliderA.Center + normal - tangent;
+        Vector2d pointB0 = pair.ColliderB.Center - normal + tangent;
+        Vector2d pointB1 = pair.ColliderB.Center - normal - tangent;
+        pair.Manifold.SetContact(pointA0, pointB0, Fixed64.Zero, normal);
+        pair.Manifold.AddContact(pointA1, pointB1, Fixed64.Zero, normal);
+
+        bool dynamicIsColliderA = ReferenceEquals(pair.ColliderA.Body, dynamicBody);
+        resetVelocity = dynamicIsColliderA
+            ? normal * (Fixed64)8 + tangent * (Fixed64)20
+            : -normal * (Fixed64)8 + tangent * (Fixed64)20;
         return pair;
     }
 
@@ -541,14 +651,14 @@ public class Physics2DBenchmarks
 
     private readonly struct PreparedPair2D
     {
-        public PreparedPair2D(LSCollider2D colliderA, LSCollider2D colliderB)
+        public PreparedPair2D(CollisionWorkItem2D workItem)
         {
-            ColliderA = colliderA;
-            ColliderB = colliderB;
+            WorkItem = workItem;
+            Manifold = new ContactManifold2D();
         }
 
-        public LSCollider2D ColliderA { get; }
+        public CollisionWorkItem2D WorkItem { get; }
 
-        public LSCollider2D ColliderB { get; }
+        public ContactManifold2D Manifold { get; }
     }
 }

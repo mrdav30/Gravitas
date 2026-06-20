@@ -89,20 +89,20 @@ claimed yet. `CollisionPair2D` resolves collider priority up front and
 type-check conditionals.
 
 `CollisionPair2D` owns pure 2D pair lifecycle: stable collider priority,
-wake propagation from awake movable bodies, trigger enter/exit events, and
-contact enter/stay/exit events. Solid response is delegated to
-`CollisionResponse2D`, which applies deterministic one-pass positional
-correction to penetration slop, normal impulse when bodies are closing, and
-tangent Coulomb friction impulse after the normal solve. It reads
+pair-owned `ContactManifold2D` state, pair-local warm-start cache, wake
+propagation from awake movable bodies, trigger enter/exit events, and contact
+enter/stay/exit events. Solid response is delegated to `CollisionResponse2D`,
+which builds `ResponseBody2D`, `SolverContact2D`, and `SolverContactBuffer2D`
+state from the current manifold, shares positional correction across active
+contacts, applies cached normal/tangent impulses when contact IDs persist, then
+solves one stable normal pass and one stable tangent-friction pass. It reads
 `StiffBody2D.EffectiveInverseMass`,
 `StiffBody2D.EffectiveInverseMomentOfInertia`, and
 `StiffBody2D.WorldCenterOfMass` so immovable, kinematic, inactive,
 non-positive-mass, and angular-disabled bodies remain infinite mass/inertia to
 the solver while raw mass and scalar moment values stay inspectable. If a solid
 pair has no awake movable participant, the existing pair is kept alive as
-resting state without applying response or waking a sleeping body. This is still
-a single-contact alpha solver; richer contact manifolds and warm-started pure
-2D response remain future hardening work.
+resting state without applying response or waking a sleeping body.
 
 ## Broad Phase: Voxel Partitions
 
@@ -582,7 +582,9 @@ rent/release churn. Short `collision-detection` benchmark smoke currently
 reports on aggregate primitive checks, single-contact primitive manifold
 generation, axis-aligned cuboid face-manifold generation, cuboid/cuboid SAT,
 mesh/cylinder, mesh/cuboid, mesh/mesh, compound/primitive, and concave mesh paths
-after warmup.
+after warmup. The `physics-2d` benchmark selection covers pure 2D shape-pair
+manifold checks, convex/convex two-contact manifold detection, direct
+single-contact angular response, and direct two-contact manifold response.
 
 ## Contact Data
 
@@ -620,6 +622,15 @@ Sphere, capsule, cylinder, and oriented cuboid SAT paths currently write a
 single manifold contact. Axis-aligned cuboids and concave mesh paths can write
 multiple contacts, capped by the manifold's deterministic four-contact
 reduction.
+
+Pure 2D narrow phase writes `ContactManifold2D` into the owning
+`CollisionPair2D`. The 2D manifold is fixed at two contacts because current
+convex 2D face contacts need at most the incident edge endpoints. Circle/circle
+and circle/convex contacts normally produce one contact; convex/convex face
+overlap can produce two; compound 2D contacts scan owned parts in stable
+declaration order and reduce to the deepest two owner-level contacts. The
+single-contact `Contact2D` value remains an internal candidate helper for
+primitive subchecks, not a public response or authoring surface.
 
 ## Response
 
@@ -713,17 +724,19 @@ Response units and invariants:
 - friction impulses oppose tangential contact motion and are clamped by the
   normal impulse. 3D pair-local warm-start storage records normal and tangent
   impulses by contact identity; applying cached impulses as a true warm-started
-  iterative solve remains a later solver hardening step. Pure 2D response does
-  not yet warm-start tangent impulses.
+  iterative solve remains a later 3D solver hardening step. Pure 2D response
+  applies cached normal and tangent impulses before the fresh solve, accumulates
+  and clamps normal impulses at zero, and clamps tangent impulses to the current
+  Coulomb bound so stale cache entries can unwind.
 - penetration depth is a world distance from narrow phase; response slop is a
   solver invariant, not contact data.
 - drag and angular damping remain integration/body behavior; contact friction is
   handled by the response solver.
 
 This is still the first alpha milestone, not a full response engine. Static
-friction for resting stacks, full iterative warm-start application, explicit
-island solving, rotational CCD, exact swept polytope support, and richer
-mixed-dimension solver behavior remain future work.
+friction for resting stacks, multi-iteration island solving, rotational CCD,
+exact swept polytope support, and richer mixed-dimension solver behavior remain
+future work.
 
 ## Body Sleep And Wake
 

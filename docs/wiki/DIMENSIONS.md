@@ -75,7 +75,10 @@ contribution. `StiffBody2D.LocalCenterOfMassOffset` is body-local X/Z state, and
 within their configured thresholds. Pure 2D contact response uses planar
 COM-relative contact arms, scalar inverse moment, normal impulses, and tangent
 Coulomb friction impulses to update both linear velocity and scalar angular
-velocity.
+velocity. Pure 2D collision pairs own a deterministic fixed two-contact
+`ContactManifold2D` and pair-local warm-start cache. Convex/convex face
+contacts can therefore resolve through both incident-edge points, while
+circle/circle and circle/convex contacts remain one-contact manifolds.
 
 `LSCollider2D.InitializeWithNoBody(IMatterAgent)` binds bodyless static or
 trigger colliders to the same host contract. Bodyless 2D colliders register

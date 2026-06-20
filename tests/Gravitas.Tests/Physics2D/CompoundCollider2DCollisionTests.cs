@@ -1,6 +1,7 @@
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
+using Gravitas.CollisionHandling;
 using Gravitas.Queries;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
@@ -21,12 +22,17 @@ public sealed class CompoundCollider2DCollisionTests
         _ = CreateBody(context, compound, Vector2d.Zero);
         StiffBody2D circle = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero);
 
-        bool collided = CollisionDetection2D.TryCollide(compound, circle.Collider, out Contact2D contact);
+        var manifold = new ContactManifold2D();
+        CollisionType2D collisionType = ColliderSettings2D.GetCollisionType(compound.Shape, circle.Collider.Shape);
+        bool collided = CollisionDetection2D.TryCollide(
+            new CollisionWorkItem2D(compound, circle.Collider, collisionType),
+            manifold,
+            frame: 3);
 
         collided.Should().BeTrue();
-        contact.HasContact.Should().BeTrue();
-        contact.Depth.Should().Be(Fixed64.FromFraction(1, 4));
-        contact.Normal.Should().Be(-Vector2d.Right);
+        manifold.HasContact.Should().BeTrue();
+        manifold.PrimaryContact.Depth.Should().Be(Fixed64.FromFraction(1, 4));
+        manifold.PrimaryContact.Normal.Should().Be(-Vector2d.Right);
     }
 
     [Fact]

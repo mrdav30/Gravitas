@@ -1,6 +1,7 @@
 using BenchmarkDotNet.Attributes;
 using FixedMathSharp;
 using Gravitas.Colliders;
+using Gravitas.CollisionHandling;
 using Gravitas.Queries;
 using GridForge.Configuration;
 using SwiftCollections;
@@ -72,7 +73,7 @@ public class Physics2DCompoundBenchmarks
         for (int i = 0; i < _shapePairs.Length; i++)
         {
             PreparedPair2D pair = _shapePairs[i];
-            if (CollisionDetection2D.TryCollide(pair.ColliderA, pair.ColliderB, out _))
+            if (CollisionDetection2D.TryCollide(pair.WorkItem, pair.Manifold, i))
                 collisionCount++;
         }
 
@@ -116,7 +117,8 @@ public class Physics2DCompoundBenchmarks
         Vector2d position = PositionForIndex(index, spacing: (Fixed64)4);
         _ = CreateBody(_detectionContext, colliderA, position, immovable: true);
         _ = CreateBody(_detectionContext, colliderB, position + new Vector2d(Fixed64.Half, Fixed64.Zero), immovable: true);
-        return new PreparedPair2D(colliderA, colliderB);
+        CollisionType2D collisionType = ColliderSettings2D.GetCollisionType(colliderA.Shape, colliderB.Shape);
+        return new PreparedPair2D(new CollisionWorkItem2D(colliderA, colliderB, collisionType));
     }
 
     private static StiffBody2D CreateBody(
@@ -166,14 +168,14 @@ public class Physics2DCompoundBenchmarks
 
     private readonly struct PreparedPair2D
     {
-        public PreparedPair2D(LSCollider2D colliderA, LSCollider2D colliderB)
+        public PreparedPair2D(CollisionWorkItem2D workItem)
         {
-            ColliderA = colliderA;
-            ColliderB = colliderB;
+            WorkItem = workItem;
+            Manifold = new ContactManifold2D();
         }
 
-        public LSCollider2D ColliderA { get; }
+        public CollisionWorkItem2D WorkItem { get; }
 
-        public LSCollider2D ColliderB { get; }
+        public ContactManifold2D Manifold { get; }
     }
 }
