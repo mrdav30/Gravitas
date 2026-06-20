@@ -2,6 +2,7 @@
 using Gravitas.Colliders;
 using Gravitas.Support;
 using GridForge.Grids;
+using GridForge.Grids.Topology;
 using SwiftCollections;
 using System;
 using System.Runtime.CompilerServices;

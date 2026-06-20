@@ -4,6 +4,7 @@ using Gravitas.Diagnostics;
 using Gravitas.Queries;
 using Gravitas.Support;
 using GridForge.Grids;
+using GridForge.Grids.Topology;
 using SwiftCollections;
 using System;
 

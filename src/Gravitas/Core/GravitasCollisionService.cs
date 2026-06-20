@@ -235,7 +235,7 @@ public sealed class GravitasCollisionService
             _traceScratch,
             Fixed64.Half);
 
-        var traversal = new GridForgeTraversalState(world, GridForgeTraversalPaddingMode.MaxCellEdge);
+        var traversal = new GridTraversalState(world, GridTraversalPaddingMode.MaxCellEdge);
         for (int i = 0; i < _coveredVoxels.Count; i++)
             TryPartitionVoxel(collider, partitionedCoordinates, _coveredVoxels[i], ref traversal, kind);
     }
@@ -244,7 +244,7 @@ public sealed class GravitasCollisionService
         LSCollider collider,
         SwiftList<WorldVoxelIndex> partitionedCoordinates,
         Voxel voxel,
-        ref GridForgeTraversalState traversal,
+        ref GridTraversalState traversal,
         PhysicsPartitionMobilityKind kind)
     {
         if (!traversal.TryVisitUnique(voxel, _redundancyChecker, out Fixed64 cellEdge)
@@ -294,7 +294,7 @@ public sealed class GravitasCollisionService
         {
             WorldVoxelIndex coordinate = collider.PartitionCoordinates[i];
             if (!world.TryGetVoxel(coordinate, out Voxel? voxel)
-                || !GridForgeTraversal.TryGetUniquePartition(voxel!, _redundancyChecker, out PhysicsPartition? partition))
+                || !GridTraversal.TryGetUniquePartition(voxel!, _redundancyChecker, out PhysicsPartition? partition))
             {
                 continue;
             }
@@ -335,7 +335,7 @@ public sealed class GravitasCollisionService
             {
                 WorldVoxelIndex coordinate = collider.PartitionCoordinates[i];
                 if (!world.TryGetVoxel(coordinate, out Voxel? voxel)
-                    || !GridForgeTraversal.TryGetUniquePartition(voxel!, _redundancyChecker, out PhysicsPartition? partition))
+                    || !GridTraversal.TryGetUniquePartition(voxel!, _redundancyChecker, out PhysicsPartition? partition))
                 {
                     continue;
                 }

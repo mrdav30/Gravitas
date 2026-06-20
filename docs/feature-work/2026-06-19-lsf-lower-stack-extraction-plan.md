@@ -11,7 +11,7 @@
 ---
 
 **Date:** 2026-06-19
-**Status:** In progress / Workstreams 1-3 complete
+**Status:** In progress / Workstreams 1-4 complete
 **Owner:** LSF lower-stack hardening
 
 ## Purpose
@@ -26,9 +26,9 @@ LSF stack:
   fixed-point barycentric product algebra. Gravitas should keep `PhysicsMesh`,
   mesh volume validation, center-of-mass calculation, and inertia formulas
   because those are physics mass-property concerns.
-- `GridForgeTraversal` and `GridTopologyMetricUtility` reason about GridForge
-  topology and voxel traversal. Gravitas should consume those helpers from
-  GridForge instead of owning them locally.
+- GridForge traversal/topology helpers reason about GridForge topology and
+  voxel traversal. Gravitas now consumes those helpers from GridForge instead
+  of owning them locally.
 - `DefaultSaver` is a general save/apply lifecycle pattern that future LSF
   libraries can reuse through Chronicler.
 
@@ -46,8 +46,9 @@ behavior changes.
   barycentric product algebra is reusable enough for FixedMathSharp.
 - FixedMathSharp already exposes `FixedMath.BarycentricCoordinate(...)` and
   `Vector3d.BarycentricCoordinates(...)`.
-- Gravitas owns `src/Gravitas/Support/GridForgeTraversal.cs` and
-  `src/Gravitas/Support/GridTopologyMetricUtility.cs`.
+- GridForge owns traversal helpers in `GridForge.Utility` and topology metrics
+  in `GridForge.Grids.Topology`; Gravitas no longer owns local traversal or
+  topology helper files.
 - Gravitas owns `src/Gravitas/Support/DefaultSaver.cs`; `PhysicsSettingsSaver`
   derives from it.
 - Gravitas has `Release` and `ReleaseLean` package paths. Lean validation must
@@ -92,9 +93,9 @@ behavior changes.
 
 ### GridForge
 
-- Create or modify GridForge traversal/topology helper files under
-  `../GridForge/src/GridForge`.
-- Add tests under `../GridForge/tests`.
+- Added `../GridForge/src/GridForge/Utility/GridTraversal.cs`.
+- Added `../GridForge/src/GridForge/Grids/Topology/GridTopologyMetricUtility.cs`.
+- Added traversal/topology tests under `../GridForge/tests/GridForge.Tests`.
 
 ### Chronicler
 
@@ -108,8 +109,8 @@ behavior changes.
 
 - Delete or replace local wrappers:
   - `src/Gravitas/Support/FixedTransform.cs`
-  - `src/Gravitas/Support/GridForgeTraversal.cs`
-  - `src/Gravitas/Support/GridTopologyMetricUtility.cs`
+  - `src/Gravitas/Support/GridForgeTraversal.cs` (removed in Workstream 4)
+  - `src/Gravitas/Support/GridTopologyMetricUtility.cs` (removed in Workstream 4)
   - `src/Gravitas/Support/DefaultSaver.cs`
 - Modify `src/Gravitas/Colliders/Support/PhysicsMesh/PhysicsMesh.cs` to call
   FixedMathSharp barycentric product matrix helpers.
@@ -281,25 +282,25 @@ GridForge.
 
 Tasks:
 
-- [ ] Add GridForge tests equivalent to current
+- [x] Add GridForge tests equivalent to current
   `tests/Gravitas.Tests/Support/GridForgeTraversalTests.cs`.
 
-- [ ] Move `GridTopologyMetricUtility` behavior into GridForge with public or
+- [x] Move `GridTopologyMetricUtility` behavior into GridForge with public or
   internal APIs appropriate for GridForge consumers.
 
-- [ ] Move `GridForgeTraversalState`, traversal padding mode, unique-partition
+- [x] Move `GridForgeTraversalState`, traversal padding mode, unique-partition
   lookup, and padded-bounds tests into GridForge.
 
-- [ ] Preserve the distinction between 3D max-cell-edge padding and X/Z planar
+- [x] Preserve the distinction between 3D max-cell-edge padding and X/Z planar
   max-cell-edge padding.
 
-- [ ] Update Gravitas services and queries to consume GridForge-owned helpers.
+- [x] Update Gravitas services and queries to consume GridForge-owned helpers.
 
-- [ ] Remove local Gravitas traversal/topology files after all usages compile.
+- [x] Remove local Gravitas traversal/topology files after all usages compile.
 
-- [ ] Run GridForge traversal tests.
+- [x] Run GridForge traversal tests.
 
-- [ ] Run Gravitas partition/query/CCD focused tests:
+- [x] Run Gravitas partition/query/CCD focused tests:
 
 ```bash
 dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~Partition|FullyQualifiedName~Query|FullyQualifiedName~ContinuousCollision|FullyQualifiedName~Mixed"
@@ -307,6 +308,18 @@ dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release -
 
 Expected result: traversal behavior is unchanged, but GridForge owns the grid
 topology knowledge.
+
+Notes:
+
+- GridForge owns the public traversal surface as `GridTraversal`,
+  `GridTraversalState`, and `GridTraversalPaddingMode` under
+  `GridForge.Utility`. This avoids the stuttered `GridForgeTraversal` name once
+  the helper lives inside GridForge.
+- GridForge owns `GridTopologyMetricUtility` under
+  `GridForge.Grids.Topology`, including full 3D, planar X/Z, and
+  representative world cell-edge measurements.
+- Gravitas no longer carries local traversal/topology helper files or local
+  helper-specific tests; equivalent behavior is covered in GridForge.
 
 ## Workstream 5: Chronicler DefaultSaver Extraction
 
@@ -352,7 +365,7 @@ Tasks:
 - [ ] Verify no stale local type references remain:
 
 ```bash
-rg -n "Gravitas.Support.FixedTransform|class FixedTransform|GridForgeTraversal|GridTopologyMetricUtility|class DefaultSaver" src tests docs
+rg -n "Gravitas.Support.FixedTransform|class FixedTransform|class GridForgeTraversal|class GridTopologyMetricUtility|class DefaultSaver" src tests
 ```
 
 - [ ] Run Gravitas full Release validation:

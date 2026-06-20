@@ -466,7 +466,7 @@ public sealed partial class GravitasQuery3DService
         ref Fixed64 closestDistance,
         ref Physics3DHit closestHit)
     {
-        if (!GridForgeTraversal.TryGetUniquePartition(voxel, _redundantVoxelCheck, out PhysicsPartition? partition))
+        if (!GridTraversal.TryGetUniquePartition(voxel, _redundantVoxelCheck, out PhysicsPartition? partition))
         {
             return;
         }
@@ -486,7 +486,7 @@ public sealed partial class GravitasQuery3DService
         Vector3d direction,
         SwiftList<Physics3DHit> results)
     {
-        if (!GridForgeTraversal.TryGetUniquePartition(voxel, _redundantVoxelCheck, out PhysicsPartition? partition))
+        if (!GridTraversal.TryGetUniquePartition(voxel, _redundantVoxelCheck, out PhysicsPartition? partition))
         {
             return;
         }
@@ -502,7 +502,7 @@ public sealed partial class GravitasQuery3DService
         ref Fixed64 closestDistance,
         ref Physics3DHit closestHit)
     {
-        if (!GridForgeTraversal.TryGetUniquePartition(voxel, _redundantVoxelCheck, out PhysicsPartition? partition))
+        if (!GridTraversal.TryGetUniquePartition(voxel, _redundantVoxelCheck, out PhysicsPartition? partition))
         {
             return;
         }
@@ -522,7 +522,7 @@ public sealed partial class GravitasQuery3DService
         Vector3d direction,
         SwiftList<Physics3DHit> results)
     {
-        if (!GridForgeTraversal.TryGetUniquePartition(voxel, _redundantVoxelCheck, out PhysicsPartition? partition))
+        if (!GridTraversal.TryGetUniquePartition(voxel, _redundantVoxelCheck, out PhysicsPartition? partition))
         {
             return;
         }
