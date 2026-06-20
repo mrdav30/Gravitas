@@ -11,7 +11,7 @@
 ---
 
 **Date:** 2026-06-19
-**Status:** In progress / Workstream 3 complete
+**Status:** In progress / Workstream 4 complete
 **Owner:** Gravitas pure 2D solver hardening
 
 ## Purpose
@@ -283,7 +283,7 @@ response through explicit 2D solver helpers.
 
 Tasks:
 
-- [ ] Add failing response tests for:
+- [x] Add failing response tests for:
   - two symmetric contacts on a box face not injecting angular velocity.
   - off-center single contact still spinning the body.
   - manifold positional correction applying once per pair, not once per contact.
@@ -292,14 +292,14 @@ Tasks:
     contributing zero inverse mass/moment.
   - cached impulses being applied on a repeated contact before the fresh solve.
 
-- [ ] Create `ResponseBody2D` from a collider:
+- [x] Create `ResponseBody2D` from a collider:
   - body reference.
   - effective inverse mass.
   - effective inverse scalar moment.
   - `CanTranslate`.
   - `CanRotate`.
 
-- [ ] Create `SolverContact2D` with:
+- [x] Create `SolverContact2D` with:
   - contact ID.
   - `ResponseBody2D` A/B.
   - point A/B.
@@ -309,10 +309,10 @@ Tasks:
   - tangent.
   - cached normal/tangent impulse values.
 
-- [ ] Create `SolverContactBuffer2D` with fixed capacity matching
+- [x] Create `SolverContactBuffer2D` with fixed capacity matching
   `ContactManifold2D.MaxContactCount`.
 
-- [ ] Update `CollisionResponse2D.Resolve(...)` to:
+- [x] Update `CollisionResponse2D.Resolve(...)` to:
   - build response bodies.
   - build solver contacts from the pair manifold.
   - apply translation-only positional correction shared by contact count.
@@ -321,12 +321,12 @@ Tasks:
   - solve tangent friction impulses in stable contact order.
   - update the pair warm-start cache with final impulse scalars.
 
-- [ ] Keep solver iteration count fixed and internal. Recommended first value:
+- [x] Keep solver iteration count fixed and internal. Recommended first value:
   one warm-start application plus one deterministic normal/friction pass over
   the bounded contacts. Increase only with tests and benchmarks showing the
   physics benefit.
 
-- [ ] Run focused response tests:
+- [x] Run focused response tests:
 
 ```bash
 dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~CollisionResponse2DManifoldTests|FullyQualifiedName~CollisionResponse2DAngularTests"
@@ -334,6 +334,36 @@ dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release -
 
 Expected result: pure 2D response consumes manifolds and warm-start cache while
 preserving the scalar COM/angular behavior from the previous plan.
+
+Notes:
+
+- Added explicit pure 2D response helpers:
+  `ResponseBody2D`, `SolverContact2D`, and `SolverContactBuffer2D`.
+  `ResponseBody2D` uses `StiffBody2D.EffectiveInverseMass` and
+  `EffectiveInverseMomentOfInertia`, so angular-disabled, immovable,
+  kinematic, inactive, and zero-mass bodies contribute zero solver mass/moment.
+- Replaced the legacy primary-contact response path with bounded manifold
+  response. `CollisionResponse2D.Resolve(pair)` now builds solver contacts from
+  `pair.Manifold`, shares positional correction across the active contact
+  count, applies cached normal/tangent impulses first, performs one stable
+  normal pass and one stable tangent-friction pass, and refreshes pair-owned
+  warm-start cache entries by contact ID.
+- Normal impulses are accumulated and clamped at zero after warm start, so
+  stale cache entries can unwind instead of injecting artificial separation.
+  Tangent impulses are likewise clamped to the current Coulomb bound and unwind
+  when the normal impulse falls to zero.
+- Single-contact angular response is preserved through one-contact manifolds;
+  symmetric two-contact box-face response no longer injects artificial angular
+  velocity.
+- Verified with:
+
+```bash
+dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~CollisionResponse2DManifoldTests|FullyQualifiedName~CollisionResponse2DAngularTests" --nologo
+dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~CollisionPair2D|FullyQualifiedName~Physics2DSimulationTests|FullyQualifiedName~Collider2DStateParityTests" --nologo
+dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~CollisionDetection2DTests|FullyQualifiedName~ContactManifold2DTests" --nologo
+dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter FullyQualifiedName~Physics2D --nologo
+dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --nologo
+```
 
 ## Workstream 5: Benchmarks, Docs, And Release Validation
 

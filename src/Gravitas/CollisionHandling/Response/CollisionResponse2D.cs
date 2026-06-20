@@ -1,12 +1,11 @@
 using FixedMathSharp;
-using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using System.Runtime.CompilerServices;
 
 namespace Gravitas;
 
 /// <summary>
-/// Constants for the alpha pure 2D contact response path.
+/// Deterministic pure 2D manifold contact response.
 /// </summary>
 public static class CollisionResponse2D
 {
@@ -18,276 +17,308 @@ public static class CollisionResponse2D
 
     internal static void Resolve(CollisionPair2D pair)
     {
-        if (!pair.Manifold.HasContact)
+        if (!TryCreateBodyPair(pair, out ResponseBody2D bodyA, out ResponseBody2D bodyB))
             return;
 
-        ManifoldContact2D contact = pair.Manifold.PrimaryContact;
-        StiffBody2D? bodyA = pair.ColliderA.Body;
-        StiffBody2D? bodyB = pair.ColliderB.Body;
-        if (bodyA == null && bodyB == null)
+        SolverContactBuffer2D contacts = BuildContactBuffer(pair, bodyA, bodyB);
+        if (contacts.Count == 0)
             return;
 
-        Fixed64 inverseMassA = bodyA?.EffectiveInverseMass ?? Fixed64.Zero;
-        Fixed64 inverseMassB = bodyB?.EffectiveInverseMass ?? Fixed64.Zero;
-        Fixed64 totalInverseMass = inverseMassA + inverseMassB;
-        if (totalInverseMass <= Fixed64.Zero)
-            return;
+        Fixed64 contactShare = Fixed64.One / (Fixed64)contacts.Count;
+        for (int i = 0; i < contacts.Count; i++)
+            ApplyPositionCorrection(contacts.GetContact(i), contactShare);
 
-        Vector2d normal = ResolveNormal(pair.ColliderA, pair.ColliderB, contact.Normal);
-        if (normal == Vector2d.Zero)
-            return;
+        for (int i = 0; i < contacts.Count; i++)
+            ApplyCachedImpulse(contacts.GetContact(i));
 
-        Vector2d relativeA = bodyA == null
-            ? Vector2d.Zero
-            : contact.PointA - bodyA.WorldCenterOfMass;
-        Vector2d relativeB = bodyB == null
-            ? Vector2d.Zero
-            : contact.PointB - bodyB.WorldCenterOfMass;
-        Fixed64 inverseMomentA = bodyA?.EffectiveInverseMomentOfInertia ?? Fixed64.Zero;
-        Fixed64 inverseMomentB = bodyB?.EffectiveInverseMomentOfInertia ?? Fixed64.Zero;
+        for (int i = 0; i < contacts.Count; i++)
+        {
+            SolverContact2D contact = contacts.GetContact(i);
+            Fixed64 normalDelta = ComputeNormalImpulseDelta(
+                contact,
+                out Fixed64 normalVelocity);
+            Fixed64 normalImpulse = FixedMath.Max(
+                Fixed64.Zero,
+                contact.CachedNormalImpulse + normalDelta * contactShare);
+            contacts.SetNormalImpulse(
+                i,
+                normalImpulse,
+                normalVelocity);
+        }
 
-        ApplyPositionCorrection(bodyA, bodyB, normal, contact.Depth, inverseMassA, inverseMassB, totalInverseMass);
-        Fixed64 normalImpulse = ApplyNormalImpulse(
-            bodyA,
-            bodyB,
-            normal,
-            relativeA,
-            relativeB,
-            inverseMassA,
-            inverseMassB,
-            inverseMomentA,
-            inverseMomentB);
-        ApplyFrictionImpulse(
-            bodyA,
-            bodyB,
-            normal,
-            relativeA,
-            relativeB,
-            inverseMassA,
-            inverseMassB,
-            inverseMomentA,
-            inverseMomentB,
-            normalImpulse);
+        for (int i = 0; i < contacts.Count; i++)
+            ApplyNormalImpulse(
+                contacts.GetContact(i),
+                contacts.GetNormalImpulse(i) - contacts.GetContact(i).CachedNormalImpulse);
+
+        for (int i = 0; i < contacts.Count; i++)
+        {
+            Fixed64 tangentImpulse = SolveFrictionImpulse(
+                contacts.GetContact(i),
+                contacts.GetNormalImpulse(i));
+            contacts.SetTangentImpulse(
+                i,
+                tangentImpulse);
+        }
+
+        for (int i = 0; i < contacts.Count; i++)
+        {
+            SolverContact2D contact = contacts.GetContact(i);
+            pair.StoreWarmStartImpulse(
+                contact.ContactId,
+                contacts.GetNormalImpulse(i),
+                contacts.GetTangentImpulse(i));
+        }
     }
 
-    private static void ApplyPositionCorrection(
-        StiffBody2D? bodyA,
-        StiffBody2D? bodyB,
-        Vector2d normal,
-        Fixed64 depth,
-        Fixed64 inverseMassA,
-        Fixed64 inverseMassB,
-        Fixed64 totalInverseMass)
+    private static bool TryCreateBodyPair(
+        CollisionPair2D pair,
+        out ResponseBody2D bodyA,
+        out ResponseBody2D bodyB)
     {
-        Fixed64 correctionDepth = depth - PenetrationSlop;
+        bodyA = default;
+        bodyB = default;
+
+        if (pair.ColliderA.IsTrigger || pair.ColliderB.IsTrigger || !pair.Manifold.HasContact)
+            return false;
+
+        bodyA = ResponseBody2D.Create(pair.ColliderA);
+        bodyB = ResponseBody2D.Create(pair.ColliderB);
+        return bodyA.InverseMass + bodyB.InverseMass > Fixed64.Zero;
+    }
+
+    private static SolverContactBuffer2D BuildContactBuffer(
+        CollisionPair2D pair,
+        ResponseBody2D bodyA,
+        ResponseBody2D bodyB)
+    {
+        SolverContactBuffer2D contacts = default;
+        for (int i = 0; i < pair.Manifold.Count; i++)
+        {
+            if (TryCreateContact(pair, bodyA, bodyB, i, out SolverContact2D contact))
+                contacts.Add(contact);
+        }
+
+        return contacts;
+    }
+
+    private static bool TryCreateContact(
+        CollisionPair2D pair,
+        ResponseBody2D bodyA,
+        ResponseBody2D bodyB,
+        int contactIndex,
+        out SolverContact2D contact)
+    {
+        contact = default;
+        ManifoldContact2D manifoldContact = pair.Manifold[contactIndex];
+        Vector2d normal = ResolveContactNormal(
+            manifoldContact.Normal,
+            pair.ColliderB.Center - pair.ColliderA.Center);
+        if (normal == Vector2d.Zero)
+            return false;
+
+        Fixed64 cachedNormalImpulse = Fixed64.Zero;
+        Fixed64 cachedTangentImpulse = Fixed64.Zero;
+        if (pair.TryGetWarmStartImpulse(manifoldContact.ContactId, out ContactWarmStartImpulse cached))
+        {
+            cachedNormalImpulse = cached.NormalImpulse;
+            cachedTangentImpulse = cached.TangentImpulse;
+        }
+
+        contact = new SolverContact2D(
+            manifoldContact.ContactId,
+            bodyA,
+            bodyB,
+            manifoldContact.PointA,
+            manifoldContact.PointB,
+            bodyA.Body == null ? Vector2d.Zero : manifoldContact.PointA - bodyA.Body.WorldCenterOfMass,
+            bodyB.Body == null ? Vector2d.Zero : manifoldContact.PointB - bodyB.Body.WorldCenterOfMass,
+            manifoldContact.Depth,
+            normal,
+            cachedNormalImpulse,
+            cachedTangentImpulse);
+        return true;
+    }
+
+    private static void ApplyPositionCorrection(SolverContact2D contact, Fixed64 contactShare)
+    {
+        Fixed64 correctionDepth = contact.Depth - PenetrationSlop;
         if (correctionDepth <= Fixed64.Zero)
             return;
 
-        Vector2d correction = normal * (correctionDepth * PenetrationCorrectionPercent / totalInverseMass);
-        bodyA?.ApplyCollisionPositionCorrection(-correction * inverseMassA);
-        bodyB?.ApplyCollisionPositionCorrection(correction * inverseMassB);
+        Fixed64 totalInverseMass = contact.TotalInverseMass;
+        if (totalInverseMass <= Fixed64.Zero)
+            return;
+
+        Vector2d correction = contact.Normal
+            * (correctionDepth * PenetrationCorrectionPercent * contactShare / totalInverseMass);
+        ApplyPositionCorrection(contact.A, -correction * contact.A.InverseMass);
+        ApplyPositionCorrection(contact.B, correction * contact.B.InverseMass);
     }
 
-    private static Fixed64 ApplyNormalImpulse(
-        StiffBody2D? bodyA,
-        StiffBody2D? bodyB,
-        Vector2d normal,
-        Vector2d relativeA,
-        Vector2d relativeB,
-        Fixed64 inverseMassA,
-        Fixed64 inverseMassB,
-        Fixed64 inverseMomentA,
-        Fixed64 inverseMomentB)
+    private static void ApplyCachedImpulse(SolverContact2D contact)
     {
-        Vector2d relativeVelocity = ComputeRelativeVelocity(bodyA, bodyB, relativeA, relativeB);
-        Fixed64 normalVelocity = Vector2d.Dot(relativeVelocity, normal);
-        if (normalVelocity >= Fixed64.Zero)
-            return Fixed64.Zero;
+        if (contact.CachedNormalImpulse == Fixed64.Zero && contact.CachedTangentImpulse == Fixed64.Zero)
+            return;
 
-        Fixed64 denominator =
-            inverseMassA
-            + inverseMassB
-            + ComputeAngularDenominator(relativeA, normal, inverseMomentA)
-            + ComputeAngularDenominator(relativeB, normal, inverseMomentB);
+        Vector2d impulse =
+            contact.Normal * contact.CachedNormalImpulse
+            + contact.Tangent * contact.CachedTangentImpulse;
+        ApplyImpulse(contact, impulse);
+    }
+
+    private static Fixed64 ComputeNormalImpulseDelta(SolverContact2D contact, out Fixed64 normalVelocity)
+    {
+        normalVelocity = Vector2d.Dot(ComputeRelativeVelocity(contact), contact.Normal);
+        Fixed64 denominator = ComputeImpulseDenominator(contact, contact.Normal);
         if (denominator <= Fixed64.Epsilon)
             return Fixed64.Zero;
 
-        Fixed64 restitution = ResolveRestitution(bodyA, bodyB, -normalVelocity);
-        Fixed64 impulseScalar = -(Fixed64.One + restitution) * normalVelocity / denominator;
-        if (impulseScalar <= Fixed64.Zero)
-            return Fixed64.Zero;
-
-        ApplyImpulse(
-            bodyA,
-            bodyB,
-            normal * impulseScalar,
-            relativeA,
-            relativeB,
-            inverseMassA,
-            inverseMassB,
-            inverseMomentA,
-            inverseMomentB);
-        return impulseScalar;
+        Fixed64 restitution = normalVelocity < Fixed64.Zero
+            ? ResolveRestitution(contact, -normalVelocity)
+            : Fixed64.Zero;
+        return -(Fixed64.One + restitution) * normalVelocity / denominator;
     }
 
-    private static void ApplyFrictionImpulse(
-        StiffBody2D? bodyA,
-        StiffBody2D? bodyB,
-        Vector2d normal,
-        Vector2d relativeA,
-        Vector2d relativeB,
-        Fixed64 inverseMassA,
-        Fixed64 inverseMassB,
-        Fixed64 inverseMomentA,
-        Fixed64 inverseMomentB,
-        Fixed64 normalImpulse)
+    private static void ApplyNormalImpulse(SolverContact2D contact, Fixed64 impulseScalar)
     {
-        if (normalImpulse <= Fixed64.Zero)
-            return;
-
-        Fixed64 frictionCoefficient = ResolveFrictionCoefficient(bodyA, bodyB, inverseMassA, inverseMassB);
-        if (frictionCoefficient <= Fixed64.Zero)
-            return;
-
-        Vector2d relativeVelocity = ComputeRelativeVelocity(bodyA, bodyB, relativeA, relativeB);
-        Vector2d tangentVelocity = relativeVelocity - normal * Vector2d.Dot(relativeVelocity, normal);
-        if (tangentVelocity.MagnitudeSquared <= Fixed64.Epsilon)
-            return;
-
-        Vector2d tangent = tangentVelocity.Normalized;
-        Fixed64 denominator =
-            inverseMassA
-            + inverseMassB
-            + ComputeAngularDenominator(relativeA, tangent, inverseMomentA)
-            + ComputeAngularDenominator(relativeB, tangent, inverseMomentB);
-        if (denominator <= Fixed64.Epsilon)
-            return;
-
-        Fixed64 tangentVelocityMagnitude = Vector2d.Dot(relativeVelocity, tangent);
-        Fixed64 impulseScalar = -tangentVelocityMagnitude / denominator;
-        Fixed64 maxFrictionImpulse = normalImpulse * frictionCoefficient;
-        impulseScalar = FixedMath.Clamp(impulseScalar, -maxFrictionImpulse, maxFrictionImpulse);
         if (impulseScalar == Fixed64.Zero)
             return;
 
-        ApplyImpulse(
-            bodyA,
-            bodyB,
-            tangent * impulseScalar,
-            relativeA,
-            relativeB,
-            inverseMassA,
-            inverseMassB,
-            inverseMomentA,
-            inverseMomentB);
+        ApplyImpulse(contact, contact.Normal * impulseScalar);
     }
 
-    private static void ApplyImpulse(
-        StiffBody2D? bodyA,
-        StiffBody2D? bodyB,
-        Vector2d impulse,
-        Vector2d relativeA,
-        Vector2d relativeB,
-        Fixed64 inverseMassA,
-        Fixed64 inverseMassB,
-        Fixed64 inverseMomentA,
-        Fixed64 inverseMomentB)
+    private static Fixed64 SolveFrictionImpulse(SolverContact2D contact, Fixed64 normalImpulseScalar)
     {
-        if (inverseMassA > Fixed64.Zero)
-            bodyA?.ApplyCollisionLinearVelocityDelta(-impulse * inverseMassA);
-        if (inverseMomentA > Fixed64.Zero)
-            bodyA?.ApplyCollisionAngularVelocityDelta(-Vector2d.CrossProduct(relativeA, impulse) * inverseMomentA);
+        Fixed64 frictionCoefficient = ResolveFrictionCoefficient(contact);
+        Fixed64 maxFrictionImpulse = normalImpulseScalar > Fixed64.Zero && frictionCoefficient > Fixed64.Zero
+            ? normalImpulseScalar * frictionCoefficient
+            : Fixed64.Zero;
+        Fixed64 impulseScalar = Fixed64.Zero;
+        if (maxFrictionImpulse > Fixed64.Zero)
+        {
+            Fixed64 tangentVelocity = Vector2d.Dot(ComputeRelativeVelocity(contact), contact.Tangent);
+            Fixed64 denominator = ComputeImpulseDenominator(contact, contact.Tangent);
+            if (tangentVelocity.Abs() > Fixed64.Epsilon && denominator > Fixed64.Epsilon)
+                impulseScalar = -tangentVelocity / denominator;
+        }
 
-        if (inverseMassB > Fixed64.Zero)
-            bodyB?.ApplyCollisionLinearVelocityDelta(impulse * inverseMassB);
-        if (inverseMomentB > Fixed64.Zero)
-            bodyB?.ApplyCollisionAngularVelocityDelta(Vector2d.CrossProduct(relativeB, impulse) * inverseMomentB);
+        Fixed64 accumulated = FixedMath.Clamp(
+            contact.CachedTangentImpulse + impulseScalar,
+            -maxFrictionImpulse,
+            maxFrictionImpulse);
+        impulseScalar = accumulated - contact.CachedTangentImpulse;
+        if (impulseScalar != Fixed64.Zero)
+            ApplyImpulse(contact, contact.Tangent * impulseScalar);
+
+        return accumulated;
     }
 
-    private static Vector2d ComputeRelativeVelocity(
-        StiffBody2D? bodyA,
-        StiffBody2D? bodyB,
-        Vector2d relativeA,
-        Vector2d relativeB)
+    private static void ApplyImpulse(SolverContact2D contact, Vector2d impulse)
     {
-        Vector2d velocityA = bodyA == null
+        ApplyImpulse(contact.A, -impulse, contact.RelativeA);
+        ApplyImpulse(contact.B, impulse, contact.RelativeB);
+    }
+
+    private static void ApplyPositionCorrection(ResponseBody2D body, Vector2d correction)
+    {
+        if (!body.CanTranslate || correction == Vector2d.Zero)
+            return;
+
+        body.Body!.ApplyCollisionPositionCorrection(correction);
+    }
+
+    private static void ApplyImpulse(ResponseBody2D body, Vector2d impulse, Vector2d relativeContactPoint)
+    {
+        if (!body.CanTranslate || impulse == Vector2d.Zero)
+            return;
+
+        body.Body!.ApplyCollisionLinearVelocityDelta(impulse * body.InverseMass);
+
+        if (!body.CanRotate)
+            return;
+
+        Fixed64 angularVelocityDelta =
+            Vector2d.CrossProduct(relativeContactPoint, impulse)
+            * body.InverseMoment;
+        body.Body.ApplyCollisionAngularVelocityDelta(angularVelocityDelta);
+    }
+
+    private static Vector2d ComputeRelativeVelocity(SolverContact2D contact)
+    {
+        Vector2d velocityA = contact.A.Body == null
             ? Vector2d.Zero
-            : GetVelocityAtContact(bodyA, relativeA);
-        Vector2d velocityB = bodyB == null
+            : contact.A.Body.LinearVelocity + AngularVelocityAtPoint(contact.RelativeA, contact.A.Body.AngularVelocity);
+        Vector2d velocityB = contact.B.Body == null
             ? Vector2d.Zero
-            : GetVelocityAtContact(bodyB, relativeB);
+            : contact.B.Body.LinearVelocity + AngularVelocityAtPoint(contact.RelativeB, contact.B.Body.AngularVelocity);
         return velocityB - velocityA;
     }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Vector2d GetVelocityAtContact(StiffBody2D body, Vector2d relativePoint) =>
-        body.LinearVelocity + AngularVelocityAtPoint(relativePoint, body.AngularVelocity);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Vector2d AngularVelocityAtPoint(Vector2d relativePoint, Fixed64 angularVelocity) =>
         new(-angularVelocity * relativePoint.Y, angularVelocity * relativePoint.X);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Fixed64 ComputeAngularDenominator(
-        Vector2d relativePoint,
-        Vector2d axis,
-        Fixed64 inverseMoment)
+    private static Fixed64 ComputeImpulseDenominator(SolverContact2D contact, Vector2d axis)
     {
-        if (inverseMoment <= Fixed64.Zero)
-            return Fixed64.Zero;
-
-        Fixed64 cross = Vector2d.CrossProduct(relativePoint, axis);
-        return cross * cross * inverseMoment;
+        return contact.TotalInverseMass
+            + ComputeAngularDenominator(contact.A, contact.RelativeA, axis)
+            + ComputeAngularDenominator(contact.B, contact.RelativeB, axis);
     }
 
-    private static Fixed64 ResolveRestitution(StiffBody2D? bodyA, StiffBody2D? bodyB, Fixed64 closingSpeed)
+    private static Fixed64 ComputeAngularDenominator(
+        ResponseBody2D body,
+        Vector2d relativeContactPoint,
+        Vector2d axis)
     {
-        if (bodyA == null || bodyB == null || closingSpeed <= RestitutionVelocityThreshold)
+        if (!body.CanRotate)
             return Fixed64.Zero;
 
-        Fixed64 restitution = FixedMath.Min(bodyA.RestitutionCoefficient, bodyB.RestitutionCoefficient);
+        Fixed64 cross = Vector2d.CrossProduct(relativeContactPoint, axis);
+        return cross * cross * body.InverseMoment;
+    }
+
+    private static Fixed64 ResolveRestitution(SolverContact2D contact, Fixed64 closingSpeed)
+    {
+        if (contact.A.Body == null || contact.B.Body == null || closingSpeed <= RestitutionVelocityThreshold)
+            return Fixed64.Zero;
+
+        Fixed64 restitution = FixedMath.Min(
+            contact.A.Body.RestitutionCoefficient,
+            contact.B.Body.RestitutionCoefficient);
         return FixedMath.Clamp(restitution, Fixed64.Zero, Fixed64.One);
     }
 
-    private static Fixed64 ResolveFrictionCoefficient(
-        StiffBody2D? bodyA,
-        StiffBody2D? bodyB,
-        Fixed64 inverseMassA,
-        Fixed64 inverseMassB)
+    private static Fixed64 ResolveFrictionCoefficient(SolverContact2D contact)
     {
-        if (bodyA == null && bodyB == null)
+        if (contact.A.Body == null && contact.B.Body == null)
             return Fixed64.Zero;
-        if (bodyA == null || inverseMassA <= Fixed64.Zero)
-            return bodyB?.FrictionCoefficient ?? Fixed64.Zero;
-        if (bodyB == null || inverseMassB <= Fixed64.Zero)
-            return bodyA.FrictionCoefficient;
+        if (contact.A.Body == null || contact.A.InverseMass <= Fixed64.Zero)
+            return contact.B.Body?.FrictionCoefficient ?? Fixed64.Zero;
+        if (contact.B.Body == null || contact.B.InverseMass <= Fixed64.Zero)
+            return contact.A.Body.FrictionCoefficient;
 
-        Fixed64 frictionProduct = bodyA.FrictionCoefficient * bodyB.FrictionCoefficient;
+        Fixed64 frictionProduct = contact.A.Body.FrictionCoefficient * contact.B.Body.FrictionCoefficient;
         return frictionProduct > Fixed64.Zero
             ? FixedMath.Sqrt(frictionProduct)
             : Fixed64.Zero;
     }
 
-    private static Vector2d ResolveNormal(LSCollider2D colliderA, LSCollider2D colliderB, Vector2d normal)
+    private static Vector2d ResolveContactNormal(Vector2d normal, Vector2d fallbackDirection)
     {
-        Vector2d fallback = ResolveFallbackDirection(colliderA, colliderB);
         Vector2d resolved = normal.MagnitudeSquared > Fixed64.Epsilon
             ? normal.Normalized
-            : fallback;
+            : fallbackDirection.MagnitudeSquared > Fixed64.Epsilon
+                ? fallbackDirection.Normalized
+                : Vector2d.Zero;
 
         if (resolved == Vector2d.Zero)
-            return Vector2d.Right;
+            return resolved;
 
-        return fallback.MagnitudeSquared > Fixed64.Epsilon && Vector2d.Dot(resolved, fallback) < Fixed64.Zero
-            ? -resolved
-            : resolved;
-    }
-
-    private static Vector2d ResolveFallbackDirection(LSCollider2D colliderA, LSCollider2D colliderB)
-    {
-        Vector2d direction = colliderB.Center - colliderA.Center;
-        return direction.MagnitudeSquared > Fixed64.Epsilon
-            ? direction.Normalized
-            : Vector2d.Zero;
+        return fallbackDirection.MagnitudeSquared > Fixed64.Epsilon
+            && Vector2d.Dot(resolved, fallbackDirection) < Fixed64.Zero
+                ? -resolved
+                : resolved;
     }
 }
