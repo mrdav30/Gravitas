@@ -11,7 +11,7 @@
 ---
 
 **Date:** 2026-06-19
-**Status:** In progress / Workstreams 1-4 complete
+**Status:** In progress / Workstreams 1-5 complete
 **Owner:** LSF lower-stack hardening
 
 ## Purpose
@@ -49,8 +49,8 @@ behavior changes.
 - GridForge owns traversal helpers in `GridForge.Utility` and topology metrics
   in `GridForge.Grids.Topology`; Gravitas no longer owns local traversal or
   topology helper files.
-- Gravitas owns `src/Gravitas/Support/DefaultSaver.cs`; `PhysicsSettingsSaver`
-  derives from it.
+- Chronicler owns the shared `DefaultSaver` base in its root `Chronicler`
+  namespace; `PhysicsSettingsSaver` derives from that lower-stack type.
 - Gravitas has `Release` and `ReleaseLean` package paths. Lean validation must
   remain clean after changing references or package boundaries.
 
@@ -99,11 +99,8 @@ behavior changes.
 
 ### Chronicler
 
-- Create or modify the `DefaultSaver` base in
-  `../Chronicler/src/Chronicler.Core` or the current Chronicler.Core source
-  path.
-- Add tests under `../Chronicler/tests` when the repo has a matching test
-  project.
+- Added `../Chronicler/src/Chronicler/Support/DefaultSaver.cs`.
+- Added `../Chronicler/tests/Chronicler.Tests/Support/DefaultSaverTests.cs`.
 
 ### Gravitas
 
@@ -327,20 +324,20 @@ Notes:
 
 Tasks:
 
-- [ ] Add Chronicler tests or compile coverage for a derived saver that observes
+- [x] Add Chronicler tests or compile coverage for a derived saver that observes
   `Save`, `EarlyApply`, `Apply`, and `LateApply` calling the matching protected
   hooks.
 
-- [ ] Move `DefaultSaver` into Chronicler.Core using a namespace that future LSF
+- [x] Move `DefaultSaver` into Chronicler.Core using a namespace that future LSF
   libraries can consume without referencing Gravitas.
 
-- [ ] Update `PhysicsSettingsSaver` to inherit the Chronicler-owned base.
+- [x] Update `PhysicsSettingsSaver` to inherit the Chronicler-owned base.
 
-- [ ] Delete the local Gravitas `DefaultSaver` file.
+- [x] Delete the local Gravitas `DefaultSaver` file.
 
-- [ ] Run Chronicler tests or build validation.
+- [x] Run Chronicler tests or build validation.
 
-- [ ] Run Gravitas settings/serialization tests:
+- [x] Run Gravitas settings/serialization tests:
 
 ```bash
 dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~Settings|FullyQualifiedName~Serialization"
@@ -348,6 +345,17 @@ dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release -
 
 Expected result: Gravitas settings save/apply behavior is unchanged, and
 Chronicler owns the common lifecycle base.
+
+Notes:
+
+- `DefaultSaver` now lives in the root `Chronicler` namespace to match
+  Chronicler's existing public namespace guidance.
+- SwiftCollections is the lowest LSF library in this extraction chain that
+  references Chronicler, so local Chronicler project references were added to
+  SwiftCollections, SwiftCollections tests/benchmarks, Gravitas, and Gravitas
+  tests/benchmarks until package releases catch up. `Gravitas.slnx` also lists
+  the linked Chronicler project for solution-level validation.
+- Serial Release and ReleaseLean validation stayed clean after the extraction.
 
 ## Workstream 6: Gravitas Cleanup, Docs, And Release Validation
 
