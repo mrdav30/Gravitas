@@ -11,7 +11,7 @@
 ---
 
 **Date:** 2026-06-19
-**Status:** In progress / Workstreams 1-5 complete
+**Status:** Done / all workstreams complete
 **Owner:** LSF lower-stack hardening
 
 ## Purpose
@@ -76,9 +76,10 @@ behavior changes.
   `GridWorld`, `VoxelGrid`, topology metrics, and `IVoxelPartition`.
 - Move `DefaultSaver` into Chronicler.Core with the same explicit phase names:
   `Save`, `EarlyApply`, `Apply`, and `LateApply`.
-- During this implementation, keep local project references to sibling
-  repositories. The owner will restore package references as each lower-stack
-  package is released.
+- During implementation, use local project references to sibling repositories
+  when lower-stack APIs have not been released yet. For release validation,
+  Gravitas should return to package references for the released lower-stack
+  packages.
 
 ## File Map
 
@@ -204,15 +205,17 @@ Notes:
 - `Fixed4x4.SetGlobalScale(...)` was strengthened while extracting the type so
   scale mutation preserves translation and rotation instead of inheriting the
   old diagonal-reset behavior.
-- Local project references were added through Gravitas, GridForge,
+- Local project references were added temporarily through Gravitas, GridForge,
   SwiftCollections, and child test/benchmark projects to keep the sibling build
-  chain coherent until package releases catch up.
+  chain coherent until package releases caught up. Final validation restored
+  package references.
 - FixedMathSharp and SwiftCollections now use the same platform-level NuGet
   assets layout as GridForge so cross-repo solution builds do not look for
   missing configuration-specific restore assets.
-- `Gravitas.slnx` temporarily includes the linked lower-stack projects so
-  `Release` and `ReleaseLean` solution builds compile the local graph in the
-  requested configuration.
+- `Gravitas.slnx` temporarily included the linked lower-stack projects so
+  `Release` and `ReleaseLean` solution builds compiled the local graph in the
+  requested configuration. Final validation restored the Gravitas-only solution
+  graph.
 
 ## Workstream 3: FixedMathSharp Barycentric Product Helper Extraction
 
@@ -353,8 +356,8 @@ Notes:
 - SwiftCollections is the lowest LSF library in this extraction chain that
   references Chronicler, so local Chronicler project references were added to
   SwiftCollections, SwiftCollections tests/benchmarks, Gravitas, and Gravitas
-  tests/benchmarks until package releases catch up. `Gravitas.slnx` also lists
-  the linked Chronicler project for solution-level validation.
+  tests/benchmarks until package releases caught up. Final Gravitas validation
+  uses package references again.
 - Serial Release and ReleaseLean validation stayed clean after the extraction.
 
 ## Workstream 6: Gravitas Cleanup, Docs, And Release Validation
@@ -364,37 +367,52 @@ clean.
 
 Tasks:
 
-- [ ] Remove obsolete Gravitas namespaces/usings from source and tests.
+- [x] Remove obsolete Gravitas namespaces/usings from source and tests.
 
-- [ ] Update `README.md`, `AGENTS.md`, and `docs/wiki` where they describe
+- [x] Update `README.md`, `AGENTS.md`, and `docs/wiki` where they describe
   source ownership for transforms, mesh math, GridForge traversal, or saver
   bases.
 
-- [ ] Verify no stale local type references remain:
+- [x] Verify no stale local type references remain:
 
 ```bash
 rg -n "Gravitas.Support.FixedTransform|class FixedTransform|class GridForgeTraversal|class GridTopologyMetricUtility|class DefaultSaver" src tests
 ```
 
-- [ ] Run Gravitas full Release validation:
+- [x] Run Gravitas full Release validation:
 
 ```bash
 dotnet build Gravitas.slnx --configuration Release
 dotnet test Gravitas.slnx --configuration Release
 ```
 
-- [ ] Run Gravitas full ReleaseLean validation:
+- [x] Run Gravitas full ReleaseLean validation:
 
 ```bash
 dotnet build Gravitas.slnx --configuration ReleaseLean
 dotnet test Gravitas.slnx --configuration ReleaseLean
 ```
 
-- [ ] Keep local project references until the owner restores package references
-  during the lower-stack release sequence.
+- [x] Confirm package references are restored after the lower-stack release
+  sequence.
 
 Expected result: lower-stack APIs are the source of truth, Gravitas has no
 duplicate utility implementations, and Release/ReleaseLean are clean.
+
+Notes:
+
+- Removed the duplicate Gravitas-side `FixedTransformTests`; FixedMathSharp owns
+  transform behavior coverage.
+- `README.md`, `AGENTS.md`, and the wiki now state that FixedMathSharp owns the
+  shared transform and barycentric product helpers, GridForge owns traversal and
+  topology metrics, and Chronicler owns `DefaultSaver`.
+- `Gravitas.slnx` contains only Gravitas projects, while the main package uses
+  `FixedMathSharp`/`SwiftCollections` `5.0.2`, `GridForge` `7.1.2`, and
+  `Chronicler.Core` `0.2.1` package references plus matching Lean packages.
+- Validation completed with `dotnet build Gravitas.slnx --configuration Release`,
+  `dotnet test Gravitas.slnx --configuration Release`,
+  `dotnet build Gravitas.slnx --configuration ReleaseLean`, and
+  `dotnet test Gravitas.slnx --configuration ReleaseLean`.
 
 ## Exit Criteria
 

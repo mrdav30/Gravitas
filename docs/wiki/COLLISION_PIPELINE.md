@@ -116,8 +116,10 @@ into one bounds/shape rebuild.
 
 1. validates that the collider belongs to the service context.
 2. asks GridForge `GridTracer.GetCoveredVoxels(...)` for topology-aware voxel coverage.
-3. uses each covered grid's topology metrics as conservative voxel-position padding.
-4. suppresses duplicate voxel visits with context-local sets.
+3. uses GridForge `GridTraversalState` and topology metrics as conservative
+   voxel-position padding.
+4. suppresses duplicate voxel visits with GridForge traversal helpers and
+   context-local sets.
 5. checks that the voxel position falls within the collider bounds.
 6. rents or reuses a `PhysicsPartition` on the voxel.
 7. stores the collider's `WorldVoxelIndex`.
@@ -316,11 +318,14 @@ Mesh policy work should keep these boundaries explicit:
 - Closed-volume mesh inertia is integrated with fixed-point signed tetrahedra
   and cached on the immutable mesh topology. `MeshMassProperties.CenterOfMass`
   is the homogeneous COM, and `MeshMassProperties.UnitMassInertiaTensor`
-  preserves products of inertia about the cached reference point. Mesh inertia
-  shifts between the reference point, COM, and requested body-local point with
-  the full parallel-axis tensor. Runtime principal-axis diagonalization is not
-  part of the current solver; if needed, it should land in FixedMathSharp or an
-  offline/tooling path with deterministic tie rules and benchmark evidence.
+  preserves products of inertia about the cached reference point. Reusable
+  barycentric product algebra comes from FixedMathSharp; Gravitas owns the
+  physics-specific closed-volume validation and inertia integration. Mesh
+  inertia shifts between the reference point, COM, and requested body-local
+  point with the full parallel-axis tensor. Runtime principal-axis
+  diagonalization is not part of the current solver; if needed, it should land
+  in FixedMathSharp or an offline/tooling path with deterministic tie rules and
+  benchmark evidence.
 - Convex mesh paths remain free to use whole-shape convex tests where valid.
 - Compound colliders present one collider identity to hosts and one body to the
   solver, while internally ordering primitive or convex-mesh parts by stable

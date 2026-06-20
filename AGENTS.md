@@ -56,7 +56,7 @@ Read these in order before making non-trivial changes:
    [`2026-06-18-continuous-collision-depth-hardening-plan.md`](docs/feature-work/2026-06-18-continuous-collision-depth-hardening-plan.md),
    [`2026-06-18-mass-inertia-solver-follow-up-plan.md`](docs/feature-work/done/2026-06-18-mass-inertia-solver-follow-up-plan.md),
    [`2026-06-19-pure-2d-angular-dynamics-com-plan.md`](docs/feature-work/done/2026-06-19-pure-2d-angular-dynamics-com-plan.md),
-   [`2026-06-19-lsf-lower-stack-extraction-plan.md`](docs/feature-work/2026-06-19-lsf-lower-stack-extraction-plan.md),
+   [`2026-06-19-lsf-lower-stack-extraction-plan.md`](docs/feature-work/done/2026-06-19-lsf-lower-stack-extraction-plan.md),
    [`2026-06-19-pure-2d-manifold-warm-start-solver-plan.md`](docs/feature-work/2026-06-19-pure-2d-manifold-warm-start-solver-plan.md),
    [`2026-06-19-mass-inertia-tooling-and-diagnostics-follow-up-plan.md`](docs/feature-work/2026-06-19-mass-inertia-tooling-and-diagnostics-follow-up-plan.md),
    or
@@ -307,11 +307,13 @@ problem.
 The main external packages shape how this project should be changed:
 
 - `FixedMathSharp`: use `Fixed64`, `Vector2d`, `Vector3d`, `Vector4d`,
-  `FixedQuaternion`, `FixedTransform`, `Fixed3x3`, `Fixed4x4`, deterministic bounds, and
-  geometry primitives. Before hand-rolling spatial math, review
-  `../FixedMathSharp/src/FixedMathSharp/Geometry`, especially `FixedBoundBox`,
-  `FixedBoundArea`, `BoundingSphere`, `BoundingFrustum`, `FixedRay`,
-  `FixedPlane`, `ContainmentType`, and `FixedPlaneIntersectionType`.
+  `FixedQuaternion`, `FixedTransform`, `Fixed3x3`, `Fixed4x4`, deterministic
+  bounds, geometry primitives, and reusable barycentric product helpers such as
+  `Fixed3x3.CreateBarycentricProductSums(...)`. Before hand-rolling spatial
+  math, review `../FixedMathSharp/src/FixedMathSharp/Geometry`, especially
+  `FixedBoundBox`, `FixedBoundArea`, `BoundingSphere`, `BoundingFrustum`,
+  `FixedRay`, `FixedPlane`, `ContainmentType`, and
+  `FixedPlaneIntersectionType`.
 - `SwiftCollections`: prefer `SwiftBucket`, `SwiftList`, `SwiftQueue`,
   `SwiftStack`, `SwiftHashSet`, object pools, and related low-allocation types in
   runtime or hot-path code. For broad-phase or spatial-query experiments,
@@ -323,10 +325,13 @@ The main external packages shape how this project should be changed:
   not authoritative per-frame simulation paths unless tests and benchmarks prove
   the notification cost and ordering are acceptable.
 - `GridForge`: use explicit `GridWorld` ownership, voxel tracing, world voxel
-  identities, partitions, and spatial queries. Do not reintroduce hidden
-  process-global grid state.
+  identities, partitions, spatial queries, `GridTraversal`,
+  `GridTraversalState`, `GridTraversalPaddingMode`, and
+  `GridTopologyMetricUtility`. Do not reintroduce hidden process-global grid
+  state or duplicate topology/traversal helpers in Gravitas.
 - `Chronicler.Core`: use explicit `IRecordable.RecordData(...)` for runtime
-  state transfer into existing host-created objects.
+  state transfer into existing host-created objects, and use Chronicler's
+  `DefaultSaver` for reusable save/apply phase helpers.
 - `MemoryPack`: standard package support only. Lean builds should avoid direct
   MemoryPack dependencies or isolate them behind `GRAVITAS_DISABLE_MEMORYPACK`
   compatible files.

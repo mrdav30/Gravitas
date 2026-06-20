@@ -13,10 +13,13 @@
 
 Gravitas is an engine-agnostic fixed-point physics prototype for simulation-heavy .NET projects. It is designed to sit above the LSF stack:
 
-- `FixedMathSharp` for deterministic fixed-point math.
+- `FixedMathSharp` for deterministic fixed-point math, transforms, and reusable
+  fixed-point geometry algebra.
 - `SwiftCollections` for low-allocation collections and pools.
-- `GridForge` for explicit voxel worlds and spatial partitioning.
-- `Chronicler.Core` for deterministic state transfer.
+- `GridForge` for explicit voxel worlds, spatial partitioning, and
+  topology-aware traversal helpers.
+- `Chronicler.Core` for deterministic state transfer and shared save/apply
+  lifecycle helpers.
 
 ## Prototype Status
 
