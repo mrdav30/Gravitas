@@ -1,10 +1,13 @@
+using FixedMathSharp;
 using Gravitas.Colliders;
+using Gravitas.CollisionHandling;
 
 namespace Gravitas;
 
 internal sealed class CollisionPair2D
 {
     private bool _isColliding;
+    private ContactWarmStartCache2D _warmStart;
 
     public CollisionPair2D(LSCollider2D colliderA, LSCollider2D colliderB)
     {
@@ -27,14 +30,15 @@ internal sealed class CollisionPair2D
 
     public bool IsColliding => _isColliding;
 
+    public ContactManifold2D Manifold { get; } = new();
+
     public void Initialize(LSCollider2D colliderA, LSCollider2D colliderB)
     {
         AssignPriority(colliderA, colliderB);
         Id1 = ColliderA.Id;
         Id2 = ColliderB.Id;
         CollisionType = ColliderSettings2D.GetCollisionType(ColliderA.Shape, ColliderB.Shape);
-        _isColliding = false;
-        LastFrame = -1;
+        ResetPairState();
     }
 
     private void AssignPriority(LSCollider2D colliderA, LSCollider2D colliderB)
@@ -66,15 +70,18 @@ internal sealed class CollisionPair2D
         return colliderA.Id <= colliderB.Id;
     }
 
-    public void MarkColliding(int frame, Contact2D contact)
+    public void MarkColliding(int frame)
     {
+        if (!Manifold.HasContact)
+            return;
+
         bool changed = !_isColliding;
         _isColliding = true;
         LastFrame = frame;
 
         if (!ColliderA.IsTrigger && !ColliderB.IsTrigger)
         {
-            CollisionResponse2D.Resolve(this, contact);
+            CollisionResponse2D.Resolve(this);
             WakeBodies();
         }
 
@@ -89,12 +96,27 @@ internal sealed class CollisionPair2D
 
     public void MarkSeparated()
     {
-        if (!_isColliding)
+        bool wasColliding = _isColliding;
+        ResetPairState();
+        if (!wasColliding)
             return;
 
-        _isColliding = false;
         ColliderA.NotifyContact(ColliderB, false, true);
         ColliderB.NotifyContact(ColliderA, false, true);
+    }
+
+    internal void StoreWarmStartImpulse(ulong contactId, Fixed64 normalImpulse, Fixed64 tangentImpulse) =>
+        _warmStart.Set(contactId, normalImpulse, tangentImpulse);
+
+    internal bool TryGetWarmStartImpulse(ulong contactId, out ContactWarmStartImpulse impulse) =>
+        _warmStart.TryGet(contactId, out impulse);
+
+    private void ResetPairState()
+    {
+        _isColliding = false;
+        LastFrame = -1;
+        Manifold.Reset();
+        _warmStart.Clear();
     }
 
     private void WakeBodies()

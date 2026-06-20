@@ -11,7 +11,7 @@
 ---
 
 **Date:** 2026-06-19
-**Status:** In progress / Workstream 2 complete
+**Status:** In progress / Workstream 3 complete
 **Owner:** Gravitas pure 2D solver hardening
 
 ## Purpose
@@ -224,7 +224,7 @@ dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release -
 
 Tasks:
 
-- [ ] Add failing pair tests proving:
+- [x] Add failing pair tests proving:
   - `CollisionPair2D` exposes or internally retains a manifold across frames.
   - separated pairs reset active contacts.
   - warm-start cache clears when pairs separate or are reused for different
@@ -232,17 +232,17 @@ Tasks:
   - resting pairs preserve contact identity when narrow phase still reports the
     same contacts.
 
-- [ ] Add `ContactManifold2D` and `ContactWarmStartCache2D` fields to
+- [x] Add `ContactManifold2D` and `ContactWarmStartCache2D` fields to
   `CollisionPair2D`.
 
-- [ ] Change `CollisionPair2D.MarkColliding` to accept or use the pair-owned
+- [x] Change `CollisionPair2D.MarkColliding` to accept or use the pair-owned
   manifold rather than a single `Contact2D`.
 
-- [ ] Keep pair notification and wake ownership in `CollisionPair2D`.
+- [x] Keep pair notification and wake ownership in `CollisionPair2D`.
 
-- [ ] Ensure pair pool reuse calls reset manifold and cache state.
+- [x] Ensure pair pool reuse calls reset manifold and cache state.
 
-- [ ] Run focused pair and 2D simulation tests:
+- [x] Run focused pair and 2D simulation tests:
 
 ```bash
 dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~CollisionPair2D|FullyQualifiedName~Physics2DSimulationTests|FullyQualifiedName~Collider2DStateParityTests"
@@ -250,6 +250,31 @@ dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release -
 
 Expected result: pair lifecycle owns the data needed for manifold response and
 warm starting without changing event semantics.
+
+Notes:
+
+- Added `ContactWarmStartCache2D` as a fixed two-slot cache keyed by
+  `ManifoldContact2D.ContactId`, reusing the existing scalar
+  `ContactWarmStartImpulse` payload.
+- `CollisionPair2D` now owns `ContactManifold2D` and warm-start state. Pair
+  initialization, separation, and pooled reuse clear both manifold and cache.
+- `CollisionPair2D.MarkColliding(frame)` now consumes the pair-owned manifold;
+  the legacy `MarkColliding(frame, Contact2D)` path and the unused
+  `CollisionDetection2D.TryCollide(CollisionPair2D, out Contact2D)` overload
+  were removed.
+- `GravitasPhysics2DService` now creates/reuses a pair before narrow phase for
+  active candidates and writes detection output directly into
+  `pair.Manifold`. Resting-pair preservation refreshes the same manifold before
+  `MarkResting(frame)`.
+- `CollisionResponse2D` still resolves only `pair.Manifold.PrimaryContact`
+  until Workstream 4 replaces it with bounded manifold response.
+- Verified TDD red on missing pair-owned manifold/cache APIs, then green with:
+
+```bash
+dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~CollisionPair2D|FullyQualifiedName~Physics2DSimulationTests|FullyQualifiedName~Collider2DStateParityTests" --nologo
+dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter FullyQualifiedName~Physics2D --nologo
+dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~CollisionResponse2DAngularTests|FullyQualifiedName~CollisionPair2DManifoldTests|FullyQualifiedName~CollisionDetection2DTests|FullyQualifiedName~ContactManifold2DTests" --nologo
+```
 
 ## Workstream 4: 2D Solver Helper Types And Manifold Response
 

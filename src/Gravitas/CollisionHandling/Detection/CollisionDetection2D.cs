@@ -20,9 +20,6 @@ public static class CollisionDetection2D
         return TryCollide(new CollisionWorkItem2D(colliderA, colliderB, collisionType), out contact);
     }
 
-    internal static bool TryCollide(CollisionPair2D pair, out Contact2D contact) =>
-        TryCollide(CollisionWorkItem2D.Create(pair), out contact);
-
     internal static bool TryCollide(CollisionPair2D pair, ContactManifold2D manifold, int frame)
     {
         SwiftThrowHelper.ThrowIfNull(pair, nameof(pair));

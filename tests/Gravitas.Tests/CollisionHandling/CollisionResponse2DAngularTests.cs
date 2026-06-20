@@ -18,13 +18,13 @@ public sealed class CollisionResponse2DAngularTests
         var pair = new CollisionPair2D(moving.Collider, wall.Collider);
         moving.ApplyCollisionLinearVelocityDelta(new Vector2d((Fixed64)4, Fixed64.Zero));
 
-        pair.MarkColliding(
+        MarkColliding(
+            pair,
             context.FrameCount,
-            new Contact2D(
-                new Vector2d(Fixed64.Zero, Fixed64.One),
-                new Vector2d((Fixed64)2, Fixed64.One),
-                Vector2d.Right,
-                Fixed64.Half));
+            new Vector2d(Fixed64.Zero, Fixed64.One),
+            new Vector2d((Fixed64)2, Fixed64.One),
+            Vector2d.Right,
+            Fixed64.Half);
 
         moving.AngularVelocity.Should().BeGreaterThan(Fixed64.Zero);
         wall.AngularVelocity.Should().Be(Fixed64.Zero);
@@ -39,13 +39,13 @@ public sealed class CollisionResponse2DAngularTests
         var pair = new CollisionPair2D(moving.Collider, wall.Collider);
         moving.ApplyCollisionLinearVelocityDelta(new Vector2d((Fixed64)4, Fixed64.Zero));
 
-        pair.MarkColliding(
+        MarkColliding(
+            pair,
             context.FrameCount,
-            new Contact2D(
-                Vector2d.Zero,
-                new Vector2d((Fixed64)2, Fixed64.Zero),
-                Vector2d.Right,
-                Fixed64.Half));
+            Vector2d.Zero,
+            new Vector2d((Fixed64)2, Fixed64.Zero),
+            Vector2d.Right,
+            Fixed64.Half);
 
         moving.AngularVelocity.Should().Be(Fixed64.Zero);
         wall.AngularVelocity.Should().Be(Fixed64.Zero);
@@ -61,13 +61,13 @@ public sealed class CollisionResponse2DAngularTests
         var pair = new CollisionPair2D(moving.Collider, wall.Collider);
         moving.ApplyCollisionLinearVelocityDelta(new Vector2d((Fixed64)4, Fixed64.Zero));
 
-        pair.MarkColliding(
+        MarkColliding(
+            pair,
             context.FrameCount,
-            new Contact2D(
-                new Vector2d(Fixed64.Zero, Fixed64.One),
-                new Vector2d((Fixed64)2, Fixed64.One),
-                Vector2d.Right,
-                Fixed64.Half));
+            new Vector2d(Fixed64.Zero, Fixed64.One),
+            new Vector2d((Fixed64)2, Fixed64.One),
+            Vector2d.Right,
+            Fixed64.Half);
 
         moving.LinearVelocity.X.Should().BeLessThan((Fixed64)4);
         moving.AngularVelocity.Should().Be(Fixed64.Zero);
@@ -88,13 +88,13 @@ public sealed class CollisionResponse2DAngularTests
         var pair = new CollisionPair2D(constrained.Collider, moving.Collider);
         moving.ApplyCollisionLinearVelocityDelta(new Vector2d((Fixed64)(-4), Fixed64.Zero));
 
-        pair.MarkColliding(
+        MarkColliding(
+            pair,
             context.FrameCount,
-            new Contact2D(
-                new Vector2d(Fixed64.Zero, Fixed64.One),
-                new Vector2d((Fixed64)2, Fixed64.One),
-                Vector2d.Right,
-                Fixed64.Half));
+            new Vector2d(Fixed64.Zero, Fixed64.One),
+            new Vector2d((Fixed64)2, Fixed64.One),
+            Vector2d.Right,
+            Fixed64.Half);
 
         constrained.LinearVelocity.Should().Be(Vector2d.Zero);
         constrained.AngularVelocity.Should().Be(Fixed64.Zero);
@@ -110,13 +110,13 @@ public sealed class CollisionResponse2DAngularTests
         moving.ApplyCollisionLinearVelocityDelta(new Vector2d((Fixed64)4, (Fixed64)2));
         Fixed64 tangentialSpeedBefore = moving.LinearVelocity.Y.Abs();
 
-        pair.MarkColliding(
+        MarkColliding(
+            pair,
             context.FrameCount,
-            new Contact2D(
-                Vector2d.Right,
-                new Vector2d((Fixed64)2, Fixed64.Zero),
-                Vector2d.Right,
-                Fixed64.Half));
+            Vector2d.Right,
+            new Vector2d((Fixed64)2, Fixed64.Zero),
+            Vector2d.Right,
+            Fixed64.Half);
 
         moving.LinearVelocity.Y.Abs().Should().BeLessThan(tangentialSpeedBefore);
         moving.AngularVelocity.Should().NotBe(Fixed64.Zero);
@@ -142,5 +142,17 @@ public sealed class CollisionResponse2DAngularTests
         };
         body.Initialize(position);
         return body;
+    }
+
+    private static void MarkColliding(
+        CollisionPair2D pair,
+        int frame,
+        Vector2d pointA,
+        Vector2d pointB,
+        Vector2d normal,
+        Fixed64 depth)
+    {
+        pair.Manifold.SetContact(pointA, pointB, depth, normal);
+        pair.MarkColliding(frame);
     }
 }

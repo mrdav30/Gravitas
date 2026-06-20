@@ -319,28 +319,39 @@ public sealed class GravitasPhysics2DService
             return;
 
         ulong key = CreatePairKey(first.Id, second.Id);
-        CollisionWorkItem2D workItem = CreateCollisionWorkItem(first, second);
-        if (!CollisionDetection2D.TryCollide(workItem, out Contact2D contact))
-            return;
-
         bool hasPair = _pairs.TryGetValue(key, out CollisionPair2D pair);
-        if (!HasAwakeMovableParticipant(first, second) && !first.IsTrigger && !second.IsTrigger)
-        {
-            if (hasPair)
-                pair!.MarkResting(frame);
-
+        bool needsActivePair = HasAwakeMovableParticipant(first, second) || first.IsTrigger || second.IsTrigger;
+        if (!hasPair && !needsActivePair)
             return;
-        }
 
+        bool createdPair = false;
         if (!hasPair)
         {
             pair = CreatePair(first, second);
+            createdPair = true;
+        }
+
+        if (!CollisionDetection2D.TryCollide(pair!, pair!.Manifold, frame))
+        {
+            if (createdPair)
+                RecyclePair(pair);
+            return;
+        }
+
+        if (!needsActivePair)
+        {
+            pair.MarkResting(frame);
+            return;
+        }
+
+        if (createdPair)
+        {
             _pairs.Add(key, pair);
             pair.ColliderA.TryAddCollisionPair(pair.Id2, pair);
             pair.ColliderB.TryAddCollisionPairHolder(pair.Id1);
         }
 
-        pair!.MarkColliding(frame, contact);
+        pair.MarkColliding(frame);
     }
 
     internal bool RequireCollisionPair(LSCollider2D first, LSCollider2D second)
@@ -390,7 +401,7 @@ public sealed class GravitasPhysics2DService
             || second.IsTrigger
             || HasAwakeMovableParticipant(first, second)
             || IsLayerCollisionDisabled(first.Layer, second.Layer)
-            || !CollisionDetection2D.TryCollide(first, second, out _))
+            || !CollisionDetection2D.TryCollide(pair, pair.Manifold, frame))
         {
             return false;
         }
@@ -501,20 +512,6 @@ public sealed class GravitasPhysics2DService
             return false;
 
         return !matrix[layerIndex1, layerIndex2];
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static CollisionWorkItem2D CreateCollisionWorkItem(LSCollider2D first, LSCollider2D second)
-    {
-        LSCollider2D colliderA = first;
-        LSCollider2D colliderB = second;
-        if (!CollisionPair2D.ShouldFirstColliderLead(colliderA, colliderB))
-            (colliderA, colliderB) = (colliderB, colliderA);
-
-        return new CollisionWorkItem2D(
-            colliderA,
-            colliderB,
-            ColliderSettings2D.GetCollisionType(colliderA.Shape, colliderB.Shape));
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

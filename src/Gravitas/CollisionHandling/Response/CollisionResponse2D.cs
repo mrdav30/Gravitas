@@ -1,5 +1,6 @@
 using FixedMathSharp;
 using Gravitas.Colliders;
+using Gravitas.CollisionHandling;
 using System.Runtime.CompilerServices;
 
 namespace Gravitas;
@@ -15,11 +16,12 @@ public static class CollisionResponse2D
 
     public static readonly Fixed64 RestitutionVelocityThreshold = (Fixed64)0.25f;
 
-    internal static void Resolve(CollisionPair2D pair, Contact2D contact)
+    internal static void Resolve(CollisionPair2D pair)
     {
-        if (!contact.HasContact)
+        if (!pair.Manifold.HasContact)
             return;
 
+        ManifoldContact2D contact = pair.Manifold.PrimaryContact;
         StiffBody2D? bodyA = pair.ColliderA.Body;
         StiffBody2D? bodyB = pair.ColliderB.Body;
         if (bodyA == null && bodyB == null)
