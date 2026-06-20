@@ -11,7 +11,7 @@
 ---
 
 **Date:** 2026-06-19
-**Status:** Draft / ready for review
+**Status:** In progress / Workstream 1 complete
 **Owner:** Gravitas pure 2D solver hardening
 
 ## Purpose
@@ -102,7 +102,7 @@ phase or response.
 
 Tasks:
 
-- [ ] Add failing tests in
+- [x] Add failing tests in
   `tests/Gravitas.Tests/CollisionHandling/ContactManifold2DTests.cs` for:
   - empty manifold state.
   - `BeginUpdate(frame)` clearing contacts and recording frame.
@@ -113,22 +113,22 @@ Tasks:
   - sorting exposed contacts by stable contact identity.
   - selecting `PrimaryContact` by deepest depth, then lowest contact ID.
 
-- [ ] Create `ManifoldContact2D` with:
+- [x] Create `ManifoldContact2D` with:
   - `ulong ContactId`.
   - `Vector2d PointA`.
   - `Vector2d PointB`.
   - `Fixed64 Depth`.
   - `Vector2d Normal`.
 
-- [ ] Create `ContactManifold2D` with `MaxContactCount = 2`, two stored contact
+- [x] Create `ContactManifold2D` with `MaxContactCount = 2`, two stored contact
   fields, `Count`, `HasContact`, `LastUpdatedFrame`, indexer, `BeginUpdate`,
   `Reset`, `SetContact`, `AddContact`, and `PrimaryContact`.
 
-- [ ] Use deterministic contact IDs derived from fixed raw contact point values.
+- [x] Use deterministic contact IDs derived from fixed raw contact point values.
   Match the 3D manifold style where practical, but keep the implementation 2D
   and allocation-free.
 
-- [ ] Run the focused manifold tests:
+- [x] Run the focused manifold tests:
 
 ```bash
 dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter FullyQualifiedName~ContactManifold2DTests
@@ -136,6 +136,15 @@ dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release -
 
 Expected result: 2D manifold state is deterministic, fixed-capacity, and tested
 without touching the existing solver.
+
+Notes:
+
+- Added `ManifoldContact2D` and `ContactManifold2D` under
+  `Gravitas.CollisionHandling`. The 2D manifold mirrors the 3D manifold's
+  fixed-storage, deepest-contact replacement, stable ID sorting, and primary
+  contact tie-break behavior with two-contact 2D capacity.
+- Verified TDD red with the missing `ContactManifold2D` type, then green with
+  `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter FullyQualifiedName~ContactManifold2DTests --nologo`.
 
 ## Workstream 2: 2D Narrow-Phase Manifold Generation
 
