@@ -11,7 +11,7 @@
 ---
 
 **Date:** 2026-06-19
-**Status:** In progress / Workstream 1 complete
+**Status:** In progress / Workstream 2 complete
 **Owner:** Gravitas pure 2D solver hardening
 
 ## Purpose
@@ -152,7 +152,7 @@ Notes:
 
 Tasks:
 
-- [ ] Add failing narrow-phase tests for:
+- [x] Add failing narrow-phase tests for:
   - circle/circle producing one contact.
   - circle/convex producing one contact.
   - convex/convex face overlap producing two contacts on the incident edge.
@@ -162,30 +162,30 @@ Tasks:
   - compound/primitive selecting owner-level contacts in stable part order and
     reducing to the deepest two.
 
-- [ ] Add an internal manifold-building entry point, recommended shape:
+- [x] Add an internal manifold-building entry point, recommended shape:
 
 ```csharp
 internal static bool TryCollide(CollisionPair2D pair, ContactManifold2D manifold, int frame)
 ```
 
-- [ ] Keep the public/simple `TryCollide(..., out Contact2D contact)` path as a
+- [x] Keep the public/simple `TryCollide(..., out Contact2D contact)` path as a
   primary-contact convenience unless review decides to make a breaking API
   cleanup.
 
-- [ ] Convert circle/circle and circle/convex paths to write into
+- [x] Convert circle/circle and circle/convex paths to write into
   `ContactManifold2D`.
 
-- [ ] Implement convex/convex clipping:
+- [x] Implement convex/convex clipping:
   - select the minimum-penetration SAT axis as the contact normal.
   - choose a reference edge on the reference collider.
   - choose the most anti-parallel incident edge on the incident collider.
   - clip the incident segment against the reference edge side planes.
   - emit up to two contacts with deterministic IDs.
 
-- [ ] Convert compound paths to collect candidate contacts in stable part order
+- [x] Convert compound paths to collect candidate contacts in stable part order
   and add owner-level contacts to the owner pair manifold.
 
-- [ ] Run focused 2D narrow-phase tests:
+- [x] Run focused 2D narrow-phase tests:
 
 ```bash
 dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~CollisionDetection2DTests|FullyQualifiedName~ContactManifold2DTests"
@@ -193,6 +193,30 @@ dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release -
 
 Expected result: 2D narrow phase can produce deterministic one- or two-contact
 manifolds without changing response behavior yet.
+
+Notes:
+
+- Added the internal pair manifold entry point plus a work-item overload used by
+  tests and compound part traversal. The existing single-contact convenience
+  path remains allocation-free for the current simulation loop until
+  pair-owned manifolds land in Workstream 3.
+- Circle/circle and circle/convex now populate `ContactManifold2D`; reversed
+  convex/circle owner order writes reversed points and normal without
+  allocating a temporary manifold.
+- Convex/convex manifold generation now selects the minimum SAT axis, picks a
+  reference edge, clips the incident edge against side planes, and emits stable
+  owner-level contacts. Edge selection uses the outward `LeftHandNormal` for
+  the current counter-clockwise 2D vertex convention.
+- Compound manifold generation walks parts in authored order and lets the fixed
+  manifold retain the deepest two owner-level contacts. The legacy
+  single-contact compound fallback now selects the deepest candidate instead of
+  the shallowest candidate.
+- Verified TDD red on the missing manifold entry point, then green with:
+
+```bash
+dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~CollisionDetection2DTests|FullyQualifiedName~ContactManifold2DTests" --nologo
+dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter FullyQualifiedName~Physics2D --nologo
+```
 
 ## Workstream 3: Pair-Owned Manifold And Warm-Start State
 
