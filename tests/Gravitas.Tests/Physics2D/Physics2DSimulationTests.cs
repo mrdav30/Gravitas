@@ -40,14 +40,43 @@ public sealed class Physics2DSimulationTests
         left.Collider.OnContactEnter += _ => entered++;
         left.Collider.OnContact += _ => stayed++;
 
-        context.Simulate();
+        Step(context);
         Vector2d resolvedPosition = left.Position;
-        context.Simulate();
+        Step(context);
 
         resolvedPosition.X.Should().BeLessThan(Fixed64.Zero);
         left.Position.Should().Be(resolvedPosition);
         entered.Should().Be(1);
         stayed.Should().Be(2);
+    }
+
+    [Fact]
+    public void LateSimulate_ShouldRefreshMoved2DCollidersAndDistributeContactsAfterIntegration()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 4);
+        StiffBody2D mover = CreateCircle(context, new Vector2d(-Fixed64.FromFraction(5, 4), Fixed64.Zero), immovable: false);
+        StiffBody2D target = CreateCircle(context, Vector2d.Zero, immovable: true);
+        Vector2d startPosition = mover.Position;
+        int entered = 0;
+        mover.Collider.OnContactEnter += other =>
+        {
+            other.Should().BeSameAs(target);
+            entered++;
+        };
+
+        mover.AddForce(new Vector2d((Fixed64)16, Fixed64.Zero));
+        context.Simulate();
+
+        mover.Position.Should().Be(startPosition);
+        mover.Collider.TryGetCollisionPair(target.Collider.Id, out _).Should().BeFalse();
+        entered.Should().Be(0);
+
+        context.LateSimulate();
+
+        mover.Collider.TryGetCollisionPair(target.Collider.Id, out CollisionPair2D? pair).Should().BeTrue();
+        pair!.Manifold.HasContact.Should().BeTrue();
+        pair.LastFrame.Should().Be(context.FrameCount);
+        entered.Should().Be(1);
     }
 
     [Fact]
@@ -59,7 +88,7 @@ public sealed class Physics2DSimulationTests
         int exited = 0;
         left.Collider.OnContactExit += _ => exited++;
 
-        context.Simulate();
+        Step(context);
         left.Deactivate();
 
         var hits = new SwiftList<Physics2DHit>();
@@ -86,7 +115,7 @@ public sealed class Physics2DSimulationTests
         int entered = 0;
         left.Collider.OnContactEnter += _ => entered++;
 
-        context.Simulate();
+        Step(context);
 
         left.Position.Should().Be(Vector2d.Zero);
         entered.Should().Be(0);
@@ -110,8 +139,8 @@ public sealed class Physics2DSimulationTests
         trigger.Collider.OnContact += _ => triggerStayed++;
         trigger.Collider.OnContactEnter += _ => contactEntered++;
 
-        context.Simulate();
-        context.Simulate();
+        Step(context);
+        Step(context);
 
         trigger.Position.Should().Be(Vector2d.Zero);
         triggerEntered.Should().Be(1);
@@ -127,7 +156,7 @@ public sealed class Physics2DSimulationTests
         _ = CreateCircle(context, new Vector2d((Fixed64)0.75f, Fixed64.Zero), immovable: true);
         sleeper.Sleep();
 
-        context.Simulate();
+        Step(context);
 
         sleeper.IsSleeping.Should().BeTrue();
         sleeper.Position.Should().Be(Vector2d.Zero);
@@ -143,7 +172,7 @@ public sealed class Physics2DSimulationTests
         sleeper.Sleep();
         sleeper.IsSleeping.Should().BeTrue();
 
-        context.Simulate();
+        Step(context);
         sleeper.IsSleeping.Should().BeFalse();
 
         sleeper.Sleep();
@@ -180,6 +209,12 @@ public sealed class Physics2DSimulationTests
     private static GravitasWorldContext CreateContext(int frameRate)
     {
         return Physics2DTestWorld.CreateContext(frameRate);
+    }
+
+    private static void Step(GravitasWorldContext context)
+    {
+        context.Simulate();
+        context.LateSimulate();
     }
 
     private static StiffBody2D CreateCircle(GravitasWorldContext context, Vector2d position, bool immovable)

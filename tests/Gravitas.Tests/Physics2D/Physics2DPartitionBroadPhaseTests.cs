@@ -24,7 +24,7 @@ public sealed class Physics2DPartitionBroadPhaseTests
         for (int i = 0; i < 160; i++)
             _ = CreateCircle(context, new Vector2d((Fixed64)(16 + (i * 3)), (Fixed64)32), immovable: true);
 
-        context.Simulate();
+        Step(context);
 
         dynamicBody.Position.X.Should().BeLessThan(Fixed64.Zero);
         context.Physics2D.LastBroadPhaseCandidateCount.Should().Be(1);
@@ -75,7 +75,7 @@ public sealed class Physics2DPartitionBroadPhaseTests
         int retainedBeforeDeactivate = context.Collisions2D.RetainedPartitionCount;
 
         body.Deactivate();
-        context.Simulate();
+        Step(context);
 
         context.Collisions2D.ActivePartitionCount.Should().Be(0);
         context.Collisions2D.RetainedPartitionCount.Should().BeLessThan(retainedBeforeDeactivate);
@@ -150,7 +150,7 @@ public sealed class Physics2DPartitionBroadPhaseTests
         _ = CreateCircle(context, new Vector2d(Fixed64.Half, Fixed64.Zero), immovable: true);
         sleeper.Sleep();
 
-        context.Simulate();
+        Step(context);
 
         sleeper.IsSleeping.Should().BeTrue();
         context.Physics2D.LastBroadPhaseCandidateCount.Should().Be(0);
@@ -165,9 +165,9 @@ public sealed class Physics2DPartitionBroadPhaseTests
         int exited = 0;
         sleeper.Collider.OnContactExit += _ => exited++;
 
-        context.Simulate();
+        Step(context);
         sleeper.Sleep();
-        context.Simulate();
+        Step(context);
 
         sleeper.IsSleeping.Should().BeTrue();
         exited.Should().Be(0);
@@ -182,10 +182,51 @@ public sealed class Physics2DPartitionBroadPhaseTests
         _ = CreateCircle(context, new Vector2d(Fixed64.Half, Fixed64.Zero), immovable: false);
         sleeper.Sleep();
 
-        context.Simulate();
+        Step(context);
 
         sleeper.IsSleeping.Should().BeFalse();
         context.Physics2D.LastBroadPhaseCandidateCount.Should().Be(1);
+    }
+
+    [Fact]
+    public void Simulate_WithConnectedSleepingContactIsland_ShouldWakeWholeIsland()
+    {
+        using GravitasWorldContext context = CreateContext(extent: 16);
+        StiffBody2D far = CreateCircle(context, Vector2d.Zero, immovable: false);
+        StiffBody2D middle = CreateCircle(
+            context,
+            new Vector2d(Fixed64.FromFraction(3, 4), Fixed64.Zero),
+            immovable: false);
+        StiffBody2D driver = CreateCircle(
+            context,
+            new Vector2d(Fixed64.FromFraction(3, 2), Fixed64.Zero),
+            immovable: false);
+        far.SleepFrameThreshold = 64;
+        middle.SleepFrameThreshold = 64;
+        driver.SleepFrameThreshold = 64;
+        driver.SleepEnabled = false;
+
+        Step(context);
+        far.SetPosition(Vector2d.Zero);
+        middle.SetPosition(new Vector2d(Fixed64.FromFraction(3, 4), Fixed64.Zero));
+        driver.SetPosition(new Vector2d(Fixed64.FromFraction(3, 2), Fixed64.Zero));
+        GetPair(far, middle).IsColliding.Should().BeTrue();
+        GetPair(middle, driver).IsColliding.Should().BeTrue();
+        far.Sleep();
+        middle.Sleep();
+        driver.AddForce(Vector2d.Left);
+        driver.IsSleeping.Should().BeFalse();
+
+        Step(context);
+
+        CollisionPair2D farMiddle = GetPair(far, middle);
+        CollisionPair2D middleDriver = GetPair(middle, driver);
+        driver.IsSleeping.Should().BeFalse(
+            $"driver should remain the awake source; sleepEnabled={driver.SleepEnabled}, threshold={driver.SleepFrameThreshold}, velocity={driver.LinearVelocity}, speed={driver.LinearSpeed}");
+        middle.IsSleeping.Should().BeFalse(
+            $"middle should wake through the connected 2D island; velocity={middle.LinearVelocity}, speed={middle.LinearSpeed}");
+        far.IsSleeping.Should().BeFalse(
+            $"far should wake through the pre-existing sleeping edge; velocity={far.LinearVelocity}, speed={far.LinearSpeed}, farMiddleLast={farMiddle.LastFrame}, farMiddleContact={farMiddle.Manifold.HasContact}, middleDriverLast={middleDriver.LastFrame}, middleDriverContact={middleDriver.Manifold.HasContact}");
     }
 
     [Fact]
@@ -212,13 +253,13 @@ public sealed class Physics2DPartitionBroadPhaseTests
         for (int i = 0; i < 3; i++)
         {
             ResetBodyPositions(bodies);
-            context.Simulate();
+            Step(context);
         }
 
         long allocatedBytes = MeasureAllocatedBytes(() =>
         {
             ResetBodyPositions(bodies);
-            context.Simulate();
+            Step(context);
         });
 
         allocatedBytes.Should().Be(0);
@@ -257,6 +298,21 @@ public sealed class Physics2DPartitionBroadPhaseTests
                 new Vector3d((Fixed64)extent, Fixed64.Zero, (Fixed64)extent)),
             out _).Should().BeTrue();
         return context;
+    }
+
+    private static void Step(GravitasWorldContext context)
+    {
+        context.Simulate();
+        context.LateSimulate();
+    }
+
+    private static CollisionPair2D GetPair(StiffBody2D first, StiffBody2D second)
+    {
+        if (first.Collider.TryGetCollisionPair(second.Collider.Id, out CollisionPair2D? firstPair) && firstPair != null)
+            return firstPair;
+
+        second.Collider.TryGetCollisionPair(first.Collider.Id, out CollisionPair2D? secondPair).Should().BeTrue();
+        return secondPair!;
     }
 
     private static StiffBody2D CreateCircle(GravitasWorldContext context, Vector2d position, bool immovable)

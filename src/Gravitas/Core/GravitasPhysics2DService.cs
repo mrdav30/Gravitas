@@ -12,6 +12,7 @@ using Gravitas.Support;
 using GridForge.Spatial;
 using SwiftCollections;
 using SwiftCollections.Query;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
 namespace Gravitas;
@@ -21,6 +22,10 @@ namespace Gravitas;
 /// </summary>
 public sealed class GravitasPhysics2DService
 {
+    private static readonly CollisionPair2DStableKeyComparer ResponsePairComparer = new();
+    private static readonly DiscreteIslandNode2DComparer IslandNodeComparer = new();
+    private static readonly DiscreteIslandConstraint2DComparer IslandConstraintComparer = new();
+
     private readonly GravitasWorldContext _context;
     private readonly SwiftBucket<StiffBody2D> _dynamicBodies = new();
     private readonly SwiftList<LSCollider2D> _colliders = new();
@@ -29,6 +34,11 @@ public sealed class GravitasPhysics2DService
     private readonly SwiftDictionary<ulong, CollisionPair2D> _pairs = new();
     private readonly SwiftList<ulong> _pairsToRemove = new();
     private readonly SwiftStack<CollisionPair2D> _cachedPairs = new();
+    private readonly SwiftList<CollisionPair2D> _discreteResponsePairs = new();
+    private readonly SwiftHashSet<int> _discreteResponseBodyKeys = new();
+    private readonly SwiftList<int> _discreteResponseBodyQueue = new();
+    private readonly SwiftList<DiscreteIslandNode2D> _discreteIslandNodes = new();
+    private readonly SwiftList<DiscreteIslandConstraint2D> _discreteIslandConstraints = new();
     private readonly DynamicCcdCandidateIndex _planarContinuousCollisionCandidates = new();
     private readonly DynamicCcdCandidateIndex _mixedContinuousCollisionCandidates = new();
     private readonly SwiftList<int> _continuousCollisionCandidateIds = new();
@@ -108,11 +118,6 @@ public sealed class GravitasPhysics2DService
             return;
 
         LastBroadPhaseCandidateCount = 0;
-        EnsureFrameCapacity();
-        _processedPairKeys.Clear();
-        int frame = _context.FrameCount;
-        _context.Collisions2D.CheckAndDistributeCollisions();
-        CleanupUntouchedPairs(frame);
     }
 
     public void LateSimulate() => LateSimulate(continuousCollisionFramePrepared: false);
@@ -128,7 +133,36 @@ public sealed class GravitasPhysics2DService
         PrepareContinuousCollisionFrame();
 
         foreach (StiffBody2D body in _dynamicBodies)
-            body.LateSimulate();
+            body.LateSimulate(updateSleepState: false, updateColliderState: false);
+
+        PrepareCollisionPartitions();
+        RunDiscreteCollisionStep();
+        UpdateSleepStatesAfterPhysicsStep();
+    }
+
+    private void PrepareCollisionPartitions()
+    {
+        foreach (StiffBody2D body in _dynamicBodies)
+            body.Collider.Simulate();
+    }
+
+    private void RunDiscreteCollisionStep()
+    {
+        LastBroadPhaseCandidateCount = 0;
+        EnsureFrameCapacity();
+        _processedPairKeys.Clear();
+        _discreteResponsePairs.FastClear();
+        int frame = _context.FrameCount;
+        _context.Collisions2D.CheckAndDistributeCollisions();
+        ExpandDiscreteResponsePairs(frame);
+        SolveDiscreteResponsePairs();
+        CleanupUntouchedPairs(frame);
+    }
+
+    private void UpdateSleepStatesAfterPhysicsStep()
+    {
+        foreach (StiffBody2D body in _dynamicBodies)
+            body.UpdateSleepStateAfterPhysicsStep();
     }
 
     internal void PrepareContinuousCollisionFrame()
@@ -197,6 +231,11 @@ public sealed class GravitasPhysics2DService
         _pairs.Clear();
         _pairsToRemove.FastClear();
         _cachedPairs.Clear();
+        _discreteResponsePairs.FastClear();
+        _discreteResponseBodyKeys.Clear();
+        _discreteResponseBodyQueue.FastClear();
+        _discreteIslandNodes.FastClear();
+        _discreteIslandConstraints.FastClear();
         _planarContinuousCollisionCandidates.Clear();
         _mixedContinuousCollisionCandidates.Clear();
         _continuousCollisionCandidateIds.FastClear();
@@ -327,8 +366,9 @@ public sealed class GravitasPhysics2DService
 
         ulong key = CreatePairKey(first.Id, second.Id);
         bool hasPair = _pairs.TryGetValue(key, out CollisionPair2D pair);
-        bool needsActivePair = HasAwakeMovableParticipant(first, second) || first.IsTrigger || second.IsTrigger;
-        if (!hasPair && !needsActivePair)
+        bool hasAwakeMovableParticipant = HasAwakeMovableParticipant(first, second);
+        bool triggerPair = first.IsTrigger || second.IsTrigger;
+        if (!hasPair && !hasAwakeMovableParticipant && !triggerPair)
             return;
 
         bool createdPair = false;
@@ -345,20 +385,120 @@ public sealed class GravitasPhysics2DService
             return;
         }
 
-        if (!needsActivePair)
+        if (triggerPair)
+        {
+            if (createdPair)
+                RegisterPair(key, pair);
+
+            pair.MarkColliding(frame);
+            return;
+        }
+
+        if (!hasAwakeMovableParticipant)
         {
             pair.MarkResting(frame);
+            _discreteResponsePairs.Add(pair);
             return;
         }
 
         if (createdPair)
+            RegisterPair(key, pair);
+
+        pair.MarkCollidingDeferred(frame);
+        _discreteResponsePairs.Add(pair);
+    }
+
+    private void RegisterPair(ulong key, CollisionPair2D pair)
+    {
+        _pairs.Add(key, pair);
+        pair.ColliderA.TryAddCollisionPair(pair.Id2, pair);
+        pair.ColliderB.TryAddCollisionPairHolder(pair.Id1);
+    }
+
+    private void ExpandDiscreteResponsePairs(int frame)
+    {
+        if (_discreteResponsePairs.Count == 0)
+            return;
+
+        _discreteResponseBodyKeys.Clear();
+        _discreteResponseBodyQueue.FastClear();
+
+        for (int i = 0; i < _discreteResponsePairs.Count; i++)
         {
-            _pairs.Add(key, pair);
-            pair.ColliderA.TryAddCollisionPair(pair.Id2, pair);
-            pair.ColliderB.TryAddCollisionPairHolder(pair.Id1);
+            CollisionPair2D pair = _discreteResponsePairs[i];
+            AddDiscreteResponseBody(pair.ColliderA.Body);
+            AddDiscreteResponseBody(pair.ColliderB.Body);
         }
 
-        pair.MarkColliding(frame);
+        for (int readIndex = 0; readIndex < _discreteResponseBodyQueue.Count; readIndex++)
+        {
+            int dynamicId = _discreteResponseBodyQueue[readIndex];
+            if (!TryGetDynamicBody(dynamicId, out StiffBody2D body))
+                continue;
+
+            AddExistingResponsePairs(body.Collider, frame);
+        }
+    }
+
+    private void AddExistingResponsePairs(LSCollider2D collider, int frame)
+    {
+        SwiftDictionary<int, CollisionPair2D>? ownedPairs = collider.CollisionPairs;
+        if (ownedPairs != null)
+        {
+            foreach (var pairEntry in ownedPairs)
+                TryAddExistingResponsePair(pairEntry.Value, frame);
+        }
+
+        SwiftHashSet<int>? pairHolders = collider.CollisionPairHolders;
+        if (pairHolders == null)
+            return;
+
+        foreach (int holderId in pairHolders)
+        {
+            if (!_collidersById.TryGetValue(holderId, out LSCollider2D? holder)
+                || holder!.TryGetCollisionPair(collider.Id, out CollisionPair2D? pair) != true
+                || pair == null)
+            {
+                continue;
+            }
+
+            TryAddExistingResponsePair(pair, frame);
+        }
+    }
+
+    private void TryAddExistingResponsePair(CollisionPair2D pair, int frame)
+    {
+        ulong key = CreatePairKey(pair.Id1, pair.Id2);
+        if (!_processedPairKeys.Add(key))
+            return;
+
+        LSCollider2D first = pair.ColliderA;
+        LSCollider2D second = pair.ColliderB;
+        if (first.IsTrigger
+            || second.IsTrigger
+            || !RequireCollisionPair(first, second)
+            || !CollisionDetection2D.BoundsOverlap(first, second)
+            || !CollisionDetection2D.TryCollide(pair, pair.Manifold, frame))
+        {
+            return;
+        }
+
+        if (HasAwakeMovableParticipant(first, second))
+            pair.MarkCollidingDeferred(frame);
+        else
+            pair.MarkResting(frame);
+
+        _discreteResponsePairs.Add(pair);
+        AddDiscreteResponseBody(first.Body);
+        AddDiscreteResponseBody(second.Body);
+    }
+
+    private void AddDiscreteResponseBody(StiffBody2D? body)
+    {
+        if (!IsMovableIslandBody(body) || !_discreteResponseBodyKeys.Add(body!.DynamicId))
+            return;
+
+        _discreteResponseBodyQueue.Add(body.DynamicId);
     }
 
     internal bool RequireCollisionPair(LSCollider2D first, LSCollider2D second)
@@ -489,6 +629,263 @@ public sealed class GravitasPhysics2DService
         _colliders.RemoveAt(lastIndex);
     }
 
+    private void SolveDiscreteResponsePairs()
+    {
+        if (_discreteResponsePairs.Count == 0)
+            return;
+
+        if (_discreteResponsePairs.Count == 1)
+        {
+            CollisionPair2D pair = _discreteResponsePairs[0];
+            if (!HasAwakeResponseParticipant(pair))
+                return;
+
+            pair.WakeSleepingBodiesForCollision();
+            CollisionResponse2D.Resolve(pair);
+            return;
+        }
+
+        SortInPlace(_discreteResponsePairs, ResponsePairComparer);
+        BuildDiscreteIslands();
+        if (_discreteIslandConstraints.Count == 0)
+            return;
+
+        SortInPlace(_discreteIslandConstraints, IslandConstraintComparer);
+
+        int start = 0;
+        while (start < _discreteIslandConstraints.Count)
+        {
+            int rootKey = _discreteIslandConstraints[start].RootKey;
+            int end = start + 1;
+            while (end < _discreteIslandConstraints.Count
+                && _discreteIslandConstraints[end].RootKey == rootKey)
+            {
+                end++;
+            }
+
+            if (WakeIslandBodies(rootKey))
+                SolveDiscreteIslandRange(start, end);
+
+            start = end;
+        }
+    }
+
+    private void BuildDiscreteIslands()
+    {
+        _discreteIslandNodes.FastClear();
+        _discreteIslandConstraints.FastClear();
+
+        for (int i = 0; i < _discreteResponsePairs.Count; i++)
+        {
+            CollisionPair2D pair = _discreteResponsePairs[i];
+            AddIslandNodeIfMovable(pair.ColliderA.Body);
+            AddIslandNodeIfMovable(pair.ColliderB.Body);
+        }
+
+        SortAndDeduplicateIslandNodes();
+        if (_discreteIslandNodes.Count == 0)
+            return;
+
+        for (int i = 0; i < _discreteResponsePairs.Count; i++)
+        {
+            CollisionPair2D pair = _discreteResponsePairs[i];
+            int nodeA = FindIslandNode(pair.ColliderA.Body);
+            int nodeB = FindIslandNode(pair.ColliderB.Body);
+            if (nodeA >= 0 && nodeB >= 0)
+                UnionIslandNodes(nodeA, nodeB);
+        }
+
+        CompressIslandRoots();
+
+        for (int i = 0; i < _discreteResponsePairs.Count; i++)
+        {
+            CollisionPair2D pair = _discreteResponsePairs[i];
+            int nodeA = FindIslandNode(pair.ColliderA.Body);
+            int nodeB = FindIslandNode(pair.ColliderB.Body);
+            int rootKey = ResolveConstraintRootKey(nodeA, nodeB);
+            if (rootKey < 0)
+                continue;
+
+            GetStablePairKey(pair, out int minColliderId, out int maxColliderId);
+            _discreteIslandConstraints.Add(new DiscreteIslandConstraint2D(
+                pair,
+                rootKey,
+                minColliderId,
+                maxColliderId));
+        }
+    }
+
+    private void AddIslandNodeIfMovable(StiffBody2D? body)
+    {
+        if (!IsMovableIslandBody(body))
+            return;
+
+        _discreteIslandNodes.Add(new DiscreteIslandNode2D(body!.DynamicId, body));
+    }
+
+    private void SortAndDeduplicateIslandNodes()
+    {
+        if (_discreteIslandNodes.Count == 0)
+            return;
+
+        if (_discreteIslandNodes.Count == 1)
+        {
+            DiscreteIslandNode2D singleNode = _discreteIslandNodes[0];
+            singleNode.ParentIndex = 0;
+            singleNode.RootKey = singleNode.BodyKey;
+            _discreteIslandNodes[0] = singleNode;
+            return;
+        }
+
+        SortInPlace(_discreteIslandNodes, IslandNodeComparer);
+
+        int writeIndex = 0;
+        int previousKey = -1;
+        for (int readIndex = 0; readIndex < _discreteIslandNodes.Count; readIndex++)
+        {
+            DiscreteIslandNode2D node = _discreteIslandNodes[readIndex];
+            if (node.BodyKey == previousKey)
+                continue;
+
+            node.ParentIndex = writeIndex;
+            node.RootKey = node.BodyKey;
+            _discreteIslandNodes[writeIndex++] = node;
+            previousKey = node.BodyKey;
+        }
+
+        while (_discreteIslandNodes.Count > writeIndex)
+            _discreteIslandNodes.RemoveAt(_discreteIslandNodes.Count - 1);
+    }
+
+    private int FindIslandNode(StiffBody2D? body)
+    {
+        if (!IsMovableIslandBody(body))
+            return -1;
+
+        int key = body!.DynamicId;
+        int low = 0;
+        int high = _discreteIslandNodes.Count - 1;
+        while (low <= high)
+        {
+            int mid = low + ((high - low) >> 1);
+            int midKey = _discreteIslandNodes[mid].BodyKey;
+            if (midKey == key)
+                return mid;
+
+            if (midKey < key)
+                low = mid + 1;
+            else
+                high = mid - 1;
+        }
+
+        return -1;
+    }
+
+    private void UnionIslandNodes(int nodeA, int nodeB)
+    {
+        int rootA = FindIslandRoot(nodeA);
+        int rootB = FindIslandRoot(nodeB);
+        if (rootA == rootB)
+            return;
+
+        int keyA = _discreteIslandNodes[rootA].BodyKey;
+        int keyB = _discreteIslandNodes[rootB].BodyKey;
+        int parent = keyA <= keyB ? rootA : rootB;
+        int child = parent == rootA ? rootB : rootA;
+
+        DiscreteIslandNode2D childNode = _discreteIslandNodes[child];
+        childNode.ParentIndex = parent;
+        childNode.RootKey = _discreteIslandNodes[parent].BodyKey;
+        _discreteIslandNodes[child] = childNode;
+    }
+
+    private int FindIslandRoot(int index)
+    {
+        int root = index;
+        while (_discreteIslandNodes[root].ParentIndex != root)
+            root = _discreteIslandNodes[root].ParentIndex;
+
+        while (index != root)
+        {
+            DiscreteIslandNode2D node = _discreteIslandNodes[index];
+            int parent = node.ParentIndex;
+            node.ParentIndex = root;
+            node.RootKey = _discreteIslandNodes[root].BodyKey;
+            _discreteIslandNodes[index] = node;
+            index = parent;
+        }
+
+        return root;
+    }
+
+    private void CompressIslandRoots()
+    {
+        for (int i = 0; i < _discreteIslandNodes.Count; i++)
+        {
+            int root = FindIslandRoot(i);
+            DiscreteIslandNode2D node = _discreteIslandNodes[i];
+            node.RootKey = _discreteIslandNodes[root].BodyKey;
+            _discreteIslandNodes[i] = node;
+        }
+    }
+
+    private int ResolveConstraintRootKey(int nodeA, int nodeB)
+    {
+        if (nodeA >= 0)
+            return _discreteIslandNodes[nodeA].RootKey;
+
+        return nodeB >= 0 ? _discreteIslandNodes[nodeB].RootKey : -1;
+    }
+
+    private bool WakeIslandBodies(int rootKey)
+    {
+        bool hasAwakeBody = false;
+        for (int i = 0; i < _discreteIslandNodes.Count; i++)
+        {
+            DiscreteIslandNode2D node = _discreteIslandNodes[i];
+            if (node.RootKey == rootKey && node.Body.IsAwakeForCollision)
+            {
+                hasAwakeBody = true;
+                break;
+            }
+        }
+
+        if (!hasAwakeBody)
+            return false;
+
+        for (int i = 0; i < _discreteIslandNodes.Count; i++)
+        {
+            DiscreteIslandNode2D node = _discreteIslandNodes[i];
+            if (node.RootKey == rootKey)
+                node.Body.WakeFromCollision();
+        }
+
+        return true;
+    }
+
+    private void SolveDiscreteIslandRange(int start, int end)
+    {
+        if (end - start == 1)
+        {
+            CollisionResponse2D.Resolve(_discreteIslandConstraints[start].Pair);
+            return;
+        }
+
+        int iterations = _context.Settings.DiscreteSolverIterations;
+        for (int iteration = 0; iteration < iterations; iteration++)
+        {
+            bool applyCachedImpulse = iteration == 0;
+            bool applyPositionCorrection = iteration == 0;
+            for (int i = start; i < end; i++)
+            {
+                CollisionResponse2D.Resolve(
+                    _discreteIslandConstraints[i].Pair,
+                    applyCachedImpulse,
+                    applyPositionCorrection);
+            }
+        }
+    }
+
     private void EnsureFrameCapacity()
     {
         int colliderCount = _colliders.Count;
@@ -498,6 +895,11 @@ public sealed class GravitasPhysics2DService
         int expectedPairKeyCapacity = colliderCount * 4;
         _processedPairKeys.EnsureCapacity(expectedPairKeyCapacity);
         _pairsToRemove.EnsureCapacity(colliderCount);
+        _discreteResponsePairs.EnsureCapacity(expectedPairKeyCapacity);
+        _discreteResponseBodyKeys.EnsureCapacity(colliderCount);
+        _discreteResponseBodyQueue.EnsureCapacity(colliderCount);
+        _discreteIslandNodes.EnsureCapacity(colliderCount);
+        _discreteIslandConstraints.EnsureCapacity(expectedPairKeyCapacity);
         if (_context.Settings.PoolingEnabled)
             _cachedPairs.EnsureCapacity(colliderCount);
     }
@@ -507,8 +909,20 @@ public sealed class GravitasPhysics2DService
         IsAwakeMovable(first.Body) || IsAwakeMovable(second.Body);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool HasAwakeResponseParticipant(CollisionPair2D pair) =>
+        IsAwakeIslandBody(pair.ColliderA.Body) || IsAwakeIslandBody(pair.ColliderB.Body);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool IsAwakeMovable(StiffBody2D? body) =>
         body != null && body.CanTranslate && !body.IsSleeping;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool IsMovableIslandBody(StiffBody2D? body) =>
+        body != null && body.DynamicId >= 0 && body.CanTranslate;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool IsAwakeIslandBody(StiffBody2D? body) =>
+        IsMovableIslandBody(body) && body!.IsAwakeForCollision;
 
     private bool IsLayerCollisionDisabled(PhysicsLayer layer1, PhysicsLayer layer2)
     {
@@ -535,5 +949,138 @@ public sealed class GravitasPhysics2DService
             (firstId, secondId) = (secondId, firstId);
 
         return ((ulong)(uint)firstId << 32) | (uint)secondId;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void GetStablePairKey(CollisionPair2D pair, out int minColliderId, out int maxColliderId)
+    {
+        int idA = pair.ColliderA.Id;
+        int idB = pair.ColliderB.Id;
+        if (idA <= idB)
+        {
+            minColliderId = idA;
+            maxColliderId = idB;
+            return;
+        }
+
+        minColliderId = idB;
+        maxColliderId = idA;
+    }
+
+    private static void SortInPlace<T>(SwiftList<T> items, IComparer<T> comparer)
+    {
+        int count = items.Count;
+        if (count <= 1)
+            return;
+
+        for (int start = (count >> 1) - 1; start >= 0; start--)
+            SiftDown(items, comparer, start, count);
+
+        for (int end = count - 1; end > 0; end--)
+        {
+            Swap(items, 0, end);
+            SiftDown(items, comparer, 0, end);
+        }
+    }
+
+    private static void SiftDown<T>(SwiftList<T> items, IComparer<T> comparer, int root, int count)
+    {
+        while (true)
+        {
+            int child = (root << 1) + 1;
+            if (child >= count)
+                return;
+
+            int swapIndex = root;
+            if (comparer.Compare(items[swapIndex], items[child]) < 0)
+                swapIndex = child;
+
+            int right = child + 1;
+            if (right < count && comparer.Compare(items[swapIndex], items[right]) < 0)
+                swapIndex = right;
+
+            if (swapIndex == root)
+                return;
+
+            Swap(items, root, swapIndex);
+            root = swapIndex;
+        }
+    }
+
+    private static void Swap<T>(SwiftList<T> items, int first, int second) =>
+        (items[second], items[first]) = (items[first], items[second]);
+
+    private sealed class CollisionPair2DStableKeyComparer : IComparer<CollisionPair2D>
+    {
+        public int Compare(CollisionPair2D? left, CollisionPair2D? right)
+        {
+            if (ReferenceEquals(left, right))
+                return 0;
+            if (left == null)
+                return -1;
+            if (right == null)
+                return 1;
+
+            GetStablePairKey(left, out int leftMin, out int leftMax);
+            GetStablePairKey(right, out int rightMin, out int rightMax);
+
+            int compare = leftMin.CompareTo(rightMin);
+            return compare != 0 ? compare : leftMax.CompareTo(rightMax);
+        }
+    }
+
+    private sealed class DiscreteIslandNode2DComparer : IComparer<DiscreteIslandNode2D>
+    {
+        public int Compare(DiscreteIslandNode2D left, DiscreteIslandNode2D right) =>
+            left.BodyKey.CompareTo(right.BodyKey);
+    }
+
+    private sealed class DiscreteIslandConstraint2DComparer : IComparer<DiscreteIslandConstraint2D>
+    {
+        public int Compare(DiscreteIslandConstraint2D left, DiscreteIslandConstraint2D right)
+        {
+            int compare = left.RootKey.CompareTo(right.RootKey);
+            if (compare != 0)
+                return compare;
+
+            compare = left.MinColliderId.CompareTo(right.MinColliderId);
+            return compare != 0 ? compare : left.MaxColliderId.CompareTo(right.MaxColliderId);
+        }
+    }
+
+    private struct DiscreteIslandNode2D
+    {
+        public DiscreteIslandNode2D(int bodyKey, StiffBody2D body)
+        {
+            BodyKey = bodyKey;
+            Body = body;
+            ParentIndex = -1;
+            RootKey = bodyKey;
+        }
+
+        public int BodyKey;
+        public StiffBody2D Body;
+        public int ParentIndex;
+        public int RootKey;
+    }
+
+    private readonly struct DiscreteIslandConstraint2D
+    {
+        public DiscreteIslandConstraint2D(
+            CollisionPair2D pair,
+            int rootKey,
+            int minColliderId,
+            int maxColliderId)
+        {
+            Pair = pair;
+            RootKey = rootKey;
+            MinColliderId = minColliderId;
+            MaxColliderId = maxColliderId;
+        }
+
+        public CollisionPair2D Pair { get; }
+        public int RootKey { get; }
+        public int MinColliderId { get; }
+        public int MaxColliderId { get; }
     }
 }

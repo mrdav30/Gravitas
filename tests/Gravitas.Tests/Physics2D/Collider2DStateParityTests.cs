@@ -104,7 +104,7 @@ public sealed class Collider2DStateParityTests
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
         StiffBody2D owner = CreateBody(context, new LSCircleCollider2D(Fixed64.One), Vector2d.Zero, immovable: false);
         StiffBody2D holder = CreateBody(context, new LSCircleCollider2D(Fixed64.One), Vector2d.Zero, immovable: false);
-        context.Simulate();
+        Step(context);
 
         owner.Collider.CollisionPairCount.Should().Be(1);
         holder.Collider.CollisionPairHolderCount.Should().Be(1);
@@ -122,7 +122,7 @@ public sealed class Collider2DStateParityTests
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
         StiffBody2D owner = CreateBody(context, new LSCircleCollider2D(Fixed64.One), Vector2d.Zero, immovable: false);
         StiffBody2D holder = CreateBody(context, new LSCircleCollider2D(Fixed64.One), Vector2d.Zero, immovable: false);
-        context.Simulate();
+        Step(context);
 
         holder.Collider.Deactivate();
 
@@ -144,7 +144,7 @@ public sealed class Collider2DStateParityTests
             owners.Add(owner);
         }
 
-        context.Simulate();
+        Step(context);
 
         long allocatedBytes = MeasureAllocatedBytes(() => owners[0].Collider.Deactivate());
 
@@ -164,7 +164,7 @@ public sealed class Collider2DStateParityTests
             owners.Add(owner);
         }
 
-        context.Simulate();
+        Step(context);
 
         long allocatedBytes = MeasureAllocatedBytes(() =>
         {
@@ -218,6 +218,12 @@ public sealed class Collider2DStateParityTests
         };
         body.Initialize(position);
         return body;
+    }
+
+    private static void Step(GravitasWorldContext context)
+    {
+        context.Simulate();
+        context.LateSimulate();
     }
 
     private static LSCollider2D CreateStaticCollider(

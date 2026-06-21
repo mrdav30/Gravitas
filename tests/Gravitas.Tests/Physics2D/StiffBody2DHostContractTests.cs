@@ -124,7 +124,7 @@ public sealed class StiffBody2DHostContractTests
         staticCollider.InitializeWithNoBody(staticAgent);
         StiffBody2D dynamicBody = CreateDynamicCircle(context, new Vector2d(Fixed64.Half, Fixed64.Zero));
 
-        context.Simulate();
+        Step(context);
 
         dynamicBody.Position.X.Should().BeGreaterThan(Fixed64.Half);
     }
@@ -142,7 +142,7 @@ public sealed class StiffBody2DHostContractTests
 
         first.InitializeWithNoBody(agent);
         second.InitializeWithNoBody(agent);
-        context.Simulate();
+        Step(context);
 
         triggerCount.Should().Be(0);
     }
@@ -150,6 +150,12 @@ public sealed class StiffBody2DHostContractTests
     private static GravitasWorldContext Create2DContext()
     {
         return Physics2DTestWorld.CreateContext();
+    }
+
+    private static void Step(GravitasWorldContext context)
+    {
+        context.Simulate();
+        context.LateSimulate();
     }
 
     private static StiffBody2D CreateDynamicCircle(GravitasWorldContext context, Vector2d position)

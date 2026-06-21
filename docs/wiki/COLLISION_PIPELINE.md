@@ -64,10 +64,13 @@ constrained mixed response: planar X/Z correction and impulses can move a
 2D body, planar normal and friction impulse components can spin it around its
 scalar yaw axis from the 2D COM-relative contact arm, and vertical Y correction
 and impulses treat the 2D body as having infinite constrained mass. Mixed
-diagnostics, explicit mixed queries, and mixed CCD hooks are implemented. 2D
-swept-circle mixed CCD uses the shared swept-sphere worker, including 3D mesh
-targets through local-BVH triangle candidate TOI checks and compound targets
-through stable part-order reduction.
+contacts are processed during `LateSimulate` after both pure 2D and 3D services
+have integrated bodies and refreshed their own collider partitions, so mixed
+response observes post-integration collider positions. Mixed diagnostics,
+explicit mixed queries, and mixed CCD hooks are implemented. 2D swept-circle
+mixed CCD uses the shared swept-sphere worker, including 3D mesh targets through
+local-BVH triangle candidate TOI checks and compound targets through stable
+part-order reduction.
 
 `CollisionDetection2D` currently supports:
 
@@ -485,15 +488,21 @@ A partition becomes active when its dynamic membership transitions from empty to
 non-empty. Active partitions are stored in
 `GravitasCollisionService._activePartitions`.
 
-During the 3D `context.LateSimulate()` path,
+During the pure 3D `context.LateSimulate()` path,
 `GravitasPhysicsService.LateSimulate()` first integrates registered dynamic
 bodies, then refreshes their collider bounds and partition membership once
-before calling `GravitasCollisionService.CheckAndDistributeCollisions()`. This
-post-integration pass catches host command teleports, direct body moves, forces,
-and accelerations made before `Simulate()` in the same fixed step. The collision
-service increments its `Version`, copies active partitions into a reusable
-buffer, sorts them by `WorldVoxelIndex` with an allocation-free in-place sort,
-and asks each active partition to distribute candidate pairs.
+before calling `GravitasCollisionService.CheckAndDistributeCollisions()`. Pure
+2D mirrors that ownership in `GravitasPhysics2DService.LateSimulate()`: 2D
+bodies integrate first, dynamic 2D colliders refresh once, then
+`GravitasCollision2DService.CheckAndDistributeCollisions()` emits candidates
+for the 2D island solver. These post-integration passes catch host command
+teleports, direct body moves, forces, and accelerations made before
+`Simulate()` in the same fixed step.
+
+The collision services increment their distribution versions, copy active
+partitions into reusable buffers, sort by `WorldVoxelIndex` with
+allocation-free in-place sorts, and ask each active partition to distribute
+candidate pairs.
 
 `PhysicsPartition.Distribute()` checks:
 
@@ -515,10 +524,14 @@ If a partition contains no awake dynamic IDs, distribution returns before pair
 generation. Static/static pairs are not distributed. Sleeping dynamic bodies
 remain in dynamic membership, and when an awake body activates a partition the
 partition emits sleeping-connected dynamic links too. The discrete island
-builder then decides wake propagation and response order across the connected
-contact graph. A fully sleeping island that was emitted only because another
-body activated the same broad-phase voxel is not solved, so sleeping body
-positions do not drift from unrelated awake bodies.
+builders then decide wake propagation and response order across the connected
+contact graph. Pure 2D also pulls already-owned resting contacts adjacent to an
+active 2D response body into the temporary island graph before cleanup, so a
+connected sleeping edge is not lost merely because it lives in a neighboring
+partition that had no awake dynamic at distribution time. A fully sleeping
+island that was emitted only because another body activated the same broad-phase
+voxel is not solved, so sleeping body positions do not drift from unrelated
+awake bodies.
 
 ## Pair Creation And Filtering
 
@@ -839,9 +852,10 @@ Current deterministic wake stimuli are:
 - collider shape mutation.
 
 Waking refreshes the collider's awake membership across its current partitions.
-During 3D discrete response, the island builder expands collision wake across
-connected dynamic contacts in deterministic body-ID order so resting connected
-bodies do not remain asleep behind an awake island participant.
+During 3D and pure 2D discrete response, the island builders expand collision
+wake across connected dynamic contacts in deterministic body-ID order so
+resting connected bodies do not remain asleep behind an awake island
+participant.
 
 ## Contact Notifications
 

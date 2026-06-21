@@ -20,7 +20,7 @@ public sealed class MixedBroadPhaseTests
         ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(context, Vector3d.Zero, immovable: false);
         StiffBody2D body2D = CreateCircle2D(context, Vector2d.Zero, immovable: true);
 
-        context.Simulate();
+        Step(context);
 
         context.MixedCollisions.LastBroadPhaseCandidateCount.Should().Be(1);
         MixedColliderKey candidate = context.MixedCollisions.GetCandidate(0);
@@ -38,11 +38,13 @@ public sealed class MixedBroadPhaseTests
 
         for (int i = 0; i < 4; i++)
         {
-            bodies3D.Add(CreateSphere3D(context, Vector3d.Zero, immovable: false));
-            bodies2D.Add(CreateCircle2D(context, Vector2d.Zero, immovable: false));
+            ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(context, Vector3d.Zero, immovable: false);
+            PhysicsScenarioBuilder.SetTrigger(body3D.Collider);
+            bodies3D.Add(body3D);
+            bodies2D.Add(CreateCircle2D(context, Vector2d.Zero, immovable: true));
         }
 
-        context.Simulate();
+        Step(context);
 
         context.MixedCollisions.LastBroadPhaseCandidateCount.Should().Be(16);
         ulong previousKey = 0;
@@ -70,7 +72,7 @@ public sealed class MixedBroadPhaseTests
             _ = CreateCircle2D(context, new Vector2d(offset, (Fixed64)(-48)), immovable: true);
         }
 
-        context.Simulate();
+        Step(context);
 
         context.MixedCollisions.LastBroadPhaseCandidateCount.Should().Be(1);
     }
@@ -84,12 +86,12 @@ public sealed class MixedBroadPhaseTests
         body3D.Body.Sleep();
         body2D.Sleep();
 
-        context.Simulate();
+        Step(context);
 
         context.MixedCollisions.LastBroadPhaseCandidateCount.Should().Be(0);
 
         body3D.Body.Wake();
-        context.Simulate();
+        Step(context);
 
         context.MixedCollisions.LastBroadPhaseCandidateCount.Should().Be(1);
     }
@@ -111,7 +113,7 @@ public sealed class MixedBroadPhaseTests
         var sameAgent3D = CreateSphere3D(context, sharedAgent, immovable: false);
         _ = CreateCircle2D(context, sharedAgent, immovable: true);
 
-        context.Simulate();
+        Step(context);
 
         context.MixedCollisions.LastBroadPhaseCandidateCount.Should().Be(1);
         MixedColliderKey candidate = context.MixedCollisions.GetCandidate(0);
@@ -130,7 +132,7 @@ public sealed class MixedBroadPhaseTests
 
         child2D.Collider.SetParent(parent3D.Collider);
 
-        context.Simulate();
+        Step(context);
 
         context.MixedCollisions.LastBroadPhaseCandidateCount.Should().Be(0);
         parent3D.Collider.HierarchyChildCount.Should().Be(1);
@@ -152,7 +154,7 @@ public sealed class MixedBroadPhaseTests
         child3D.Collider.SetParent(parent2D.Collider);
         child2D.Collider.SetParent(parent2D.Collider);
 
-        context.Simulate();
+        Step(context);
 
         context.MixedCollisions.LastBroadPhaseCandidateCount.Should().Be(0);
         parent2D.Collider.HierarchyChildCount.Should().Be(2);
@@ -177,12 +179,12 @@ public sealed class MixedBroadPhaseTests
         ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(context, Vector3d.Zero, immovable: false);
         StiffBody2D body2D = CreateCircle2D(context, Vector2d.Zero, immovable: false);
 
-        context.Simulate();
+        Step(context);
         int retainedBeforeDeactivate = context.MixedCollisions.RetainedPartitionCount;
 
         body3D.Collider.Deactivate();
         body2D.Collider.Deactivate();
-        context.Simulate();
+        Step(context);
 
         context.MixedCollisions.ActivePartitionCount.Should().Be(0);
         context.MixedCollisions.RetainedPartitionCount.Should().BeLessThan(retainedBeforeDeactivate);
@@ -196,7 +198,7 @@ public sealed class MixedBroadPhaseTests
         ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(context, Vector3d.Zero, immovable: false);
         _ = CreateCircle2D(context, Vector2d.Zero, immovable: false);
 
-        context.Simulate();
+        Step(context);
 
         WorldVoxelIndex coordinate = body3D.Collider.MixedPartitionCoordinates![0];
         context.World.TryGetVoxel(coordinate, out Voxel? voxel).Should().BeTrue();
@@ -221,7 +223,7 @@ public sealed class MixedBroadPhaseTests
 
         ScenarioBody<LSSphereCollider> replacement3D = CreateSphere3D(context, Vector3d.Zero, immovable: false);
         _ = CreateCircle2D(context, Vector2d.Zero, immovable: false);
-        context.Simulate();
+        Step(context);
 
         WorldVoxelIndex replacementCoordinate = replacement3D.Collider.MixedPartitionCoordinates![0];
         context.World.TryGetVoxel(replacementCoordinate, out Voxel? replacementVoxel).Should().BeTrue();
@@ -237,12 +239,12 @@ public sealed class MixedBroadPhaseTests
         ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(context, Vector3d.Zero, immovable: false);
         _ = CreateCircle2D(context, Vector2d.Zero, immovable: true);
 
-        context.Simulate();
+        Step(context);
         PhysicsMixedPartition partition = GetFirstMixedPartition(context, body3D.Collider.MixedPartitionCoordinates!);
         ContainsId(partition.ContainedDynamic3DObjects, body3D.Collider.Id).Should().BeTrue();
 
         body3D.Body.IsKinematic = true;
-        context.Simulate();
+        Step(context);
         partition = GetFirstMixedPartition(context, body3D.Collider.MixedPartitionCoordinates!);
 
         ContainsId(partition.ContainedDynamic3DObjects, body3D.Collider.Id).Should().BeFalse();
@@ -250,14 +252,14 @@ public sealed class MixedBroadPhaseTests
 
         body3D.Body.IsKinematic = false;
         body3D.Body.Immovable = true;
-        context.Simulate();
+        Step(context);
         partition = GetFirstMixedPartition(context, body3D.Collider.MixedPartitionCoordinates!);
 
         ContainsId(partition.ContainedKinematic3DObjects, body3D.Collider.Id).Should().BeFalse();
         ContainsId(partition.ContainedStatic3DObjects, body3D.Collider.Id).Should().BeTrue();
 
         body3D.Body.Immovable = false;
-        context.Simulate();
+        Step(context);
         partition = GetFirstMixedPartition(context, body3D.Collider.MixedPartitionCoordinates!);
 
         ContainsId(partition.ContainedStatic3DObjects, body3D.Collider.Id).Should().BeFalse();
@@ -271,12 +273,12 @@ public sealed class MixedBroadPhaseTests
         _ = CreateSphere3D(context, Vector3d.Zero, immovable: false);
         StiffBody2D body2D = CreateCircle2D(context, Vector2d.Zero, immovable: false);
 
-        context.Simulate();
+        Step(context);
         PhysicsMixedPartition partition = GetFirstMixedPartition(context, body2D.Collider.MixedPartitionCoordinates!);
         ContainsId(partition.ContainedDynamic2DObjects, body2D.Collider.Id).Should().BeTrue();
 
         body2D.IsKinematic = true;
-        context.Simulate();
+        Step(context);
         partition = GetFirstMixedPartition(context, body2D.Collider.MixedPartitionCoordinates!);
 
         ContainsId(partition.ContainedDynamic2DObjects, body2D.Collider.Id).Should().BeFalse();
@@ -284,14 +286,14 @@ public sealed class MixedBroadPhaseTests
 
         body2D.IsKinematic = false;
         body2D.Immovable = true;
-        context.Simulate();
+        Step(context);
         partition = GetFirstMixedPartition(context, body2D.Collider.MixedPartitionCoordinates!);
 
         ContainsId(partition.ContainedKinematic2DObjects, body2D.Collider.Id).Should().BeFalse();
         ContainsId(partition.ContainedStatic2DObjects, body2D.Collider.Id).Should().BeTrue();
 
         body2D.Immovable = false;
-        context.Simulate();
+        Step(context);
         partition = GetFirstMixedPartition(context, body2D.Collider.MixedPartitionCoordinates!);
 
         ContainsId(partition.ContainedStatic2DObjects, body2D.Collider.Id).Should().BeFalse();
@@ -310,12 +312,19 @@ public sealed class MixedBroadPhaseTests
                     { true, false, true }
                 }));
         context.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
+        context.Environment.Gravity = Fixed64.Zero;
         context.World.TryAddGrid(
             new GridConfiguration(
                 new Vector3d((Fixed64)(-extent), (Fixed64)(-4), (Fixed64)(-extent)),
                 new Vector3d((Fixed64)extent, (Fixed64)4, (Fixed64)extent)),
             out _).Should().BeTrue();
         return context;
+    }
+
+    private static void Step(GravitasWorldContext context)
+    {
+        context.Simulate();
+        context.LateSimulate();
     }
 
     private static ScenarioBody<LSSphereCollider> CreateSphere3D(

@@ -33,9 +33,9 @@ public sealed class MixedResponseTests
             entered2D++;
         };
 
-        context.Simulate();
+        Step(context);
         Fixed64 resolvedY = body3D.Body.Position3d.Y;
-        context.Simulate();
+        Step(context);
 
         resolvedY.Should().BeGreaterThan(Fixed64.FromFraction(3, 4));
         body3D.Body.Position3d.Y.Should().BeGreaterThanOrEqualTo(resolvedY);
@@ -55,11 +55,42 @@ public sealed class MixedResponseTests
             new Vector3d(-Fixed64.FromFraction(1, 4), Fixed64.Zero, Fixed64.Zero));
         StiffBody2D body2D = CreateCircle2D(context, Vector2d.Zero);
 
-        context.Simulate();
+        Step(context);
 
         body3D.Body.Position3d.X.Should().BeLessThan(-Fixed64.FromFraction(1, 4));
         body2D.Position.X.Should().BeGreaterThan(Fixed64.Zero);
         body2D.Agent.Transform.Position.Y.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void LateSimulate_ShouldRefreshMovedMixedCollidersAndDistributeContactsAfterIntegration()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        context.Environment.Gravity = Fixed64.Zero;
+        ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(
+            context,
+            new Vector3d(-Fixed64.FromFraction(5, 4), Fixed64.Zero, Fixed64.Zero));
+        StiffBody2D body2D = CreateCircle2D(context, Vector2d.Zero, immovable: true);
+        Vector3d startPosition = body3D.Body.Position3d;
+        int entered = 0;
+        body3D.Collider.OnMixedContactEnter += other =>
+        {
+            other.Should().BeSameAs(body2D.Collider);
+            entered++;
+        };
+
+        body3D.Body.AddForce(new Vector3d((Fixed64)16, Fixed64.Zero, Fixed64.Zero));
+        context.Simulate();
+
+        body3D.Body.Position3d.Should().Be(startPosition);
+        context.MixedCollisions.ActivePairCount.Should().Be(0);
+        entered.Should().Be(0);
+
+        context.LateSimulate();
+
+        body3D.Body.Position3d.X.Should().BeGreaterThan(startPosition.X);
+        context.MixedCollisions.ActivePairCount.Should().Be(1);
+        entered.Should().Be(1);
     }
 
     [Fact]
@@ -118,7 +149,7 @@ public sealed class MixedResponseTests
             isKinematic: true);
         StiffBody2D body2D = CreateCircle2D(context, Vector2d.Zero);
 
-        context.Simulate();
+        Step(context);
 
         body3D.Body.Position3d.X.Should().Be(-Fixed64.FromFraction(1, 4));
         body2D.Position.X.Should().BeGreaterThan(Fixed64.Zero);
@@ -139,7 +170,7 @@ public sealed class MixedResponseTests
         };
         body3D.Collider.OnMixedContactEnter += _ => contactEntered++;
 
-        context.Simulate();
+        Step(context);
 
         body3D.Body.Position3d.Should().Be(Vector3d.Zero);
         triggerEntered.Should().Be(1);
@@ -154,7 +185,7 @@ public sealed class MixedResponseTests
         StiffBody2D sleeping2D = CreateCircle2D(context, Vector2d.Zero);
         sleeping2D.Sleep();
 
-        context.Simulate();
+        Step(context);
 
         sleeping2D.IsSleeping.Should().BeFalse();
     }
@@ -168,7 +199,7 @@ public sealed class MixedResponseTests
         int entered = 0;
         body3D.Collider.OnMixedContactEnter += _ => entered++;
 
-        context.Simulate();
+        Step(context);
 
         context.MixedCollisions.ActivePairCount.Should().Be(0);
         body3D.Body.Position3d.Should().Be(Vector3d.Zero);
@@ -185,9 +216,9 @@ public sealed class MixedResponseTests
         int exited = 0;
         body3D.Collider.OnMixedContactExit += _ => exited++;
 
-        context.Simulate();
+        Step(context);
         body3D.Body.SetPosition(new Vector3d((Fixed64)6, Fixed64.Zero, Fixed64.Zero));
-        context.Simulate();
+        Step(context);
 
         exited.Should().Be(1);
         context.MixedCollisions.ActivePairCount.Should().Be(0);
@@ -227,12 +258,19 @@ public sealed class MixedResponseTests
         GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         context.ApplySettings(new PhysicsSettings(frameRate, null));
         context.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
+        context.Environment.Gravity = Fixed64.Zero;
         context.World.TryAddGrid(
             new GridConfiguration(
                 new Vector3d((Fixed64)(-8), (Fixed64)(-4), (Fixed64)(-8)),
                 new Vector3d((Fixed64)8, (Fixed64)4, (Fixed64)8)),
             out _).Should().BeTrue();
         return context;
+    }
+
+    private static void Step(GravitasWorldContext context)
+    {
+        context.Simulate();
+        context.LateSimulate();
     }
 
     private static GravitasWorldContext CreateMixedContextWithLayerBlock()
@@ -247,6 +285,7 @@ public sealed class MixedResponseTests
                 { true, false, true }
             }));
         context.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
+        context.Environment.Gravity = Fixed64.Zero;
         context.World.TryAddGrid(
             new GridConfiguration(
                 new Vector3d((Fixed64)(-8), (Fixed64)(-4), (Fixed64)(-8)),

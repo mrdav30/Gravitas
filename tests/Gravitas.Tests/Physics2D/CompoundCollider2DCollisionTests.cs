@@ -46,7 +46,7 @@ public sealed class CompoundCollider2DCollisionTests
         int contactCount = 0;
         compound.OnContact += _ => contactCount++;
 
-        context.Physics2D.Simulate();
+        Step(context);
 
         contactCount.Should().Be(1);
         compoundBody.Collider.CollisionPairCount.Should().Be(1);
@@ -106,5 +106,11 @@ public sealed class CompoundCollider2DCollisionTests
         };
         body.Initialize(position);
         return body;
+    }
+
+    private static void Step(GravitasWorldContext context)
+    {
+        context.Simulate();
+        context.LateSimulate();
     }
 }

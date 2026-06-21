@@ -388,7 +388,20 @@ public sealed class StiffBody2D : IRecordable
             Context.Collisions2D.RefreshPartitionAwakeState(Collider);
     }
 
-    internal void LateSimulate()
+    internal void WakeFromCollision()
+    {
+        if (!_isSleeping)
+            return;
+
+        _sleepFrameCount = 0;
+        _isSleeping = false;
+        if (Active)
+            Context.Collisions2D.RefreshPartitionAwakeState(Collider);
+    }
+
+    internal void LateSimulate() => LateSimulate(updateSleepState: true, updateColliderState: true);
+
+    internal void LateSimulate(bool updateSleepState, bool updateColliderState)
     {
         if (!Active)
             return;
@@ -397,7 +410,7 @@ public sealed class StiffBody2D : IRecordable
         LastContinuousCollisionSubstepLimitReached = false;
 
         if (IsKinematic)
-            UpdateKinematicPositionAndRotation();
+            UpdateKinematicPositionAndRotation(updateColliderState);
 
         if (!CanTranslate)
         {
@@ -439,9 +452,17 @@ public sealed class StiffBody2D : IRecordable
         TryResolveRotationalContinuousCollision(startPosition, ref proposedPosition, startRotation, ref proposedRotation);
         _position = proposedPosition;
         _rotation = proposedRotation;
-        Collider.Rebuild();
+        if (updateColliderState)
+            Collider.Rebuild();
 
-        UpdateSleepState();
+        if (updateSleepState)
+            UpdateSleepState();
+    }
+
+    internal void UpdateSleepStateAfterPhysicsStep()
+    {
+        if (Active && !_isSleeping)
+            UpdateSleepState();
     }
 
     internal void OnVisualize()
@@ -458,7 +479,7 @@ public sealed class StiffBody2D : IRecordable
             Fixed64.Zero);
     }
 
-    private void UpdateKinematicPositionAndRotation()
+    private void UpdateKinematicPositionAndRotation(bool updateColliderState)
     {
         Vector2d kinematicPosition = Agent.Transform.Position.ToVector2d();
         Fixed64 kinematicRotation = FixedMath.DegToRad(Agent.Transform.EulerAngles.Y);
@@ -469,7 +490,8 @@ public sealed class StiffBody2D : IRecordable
         Wake();
         _position = kinematicPosition;
         _rotation = kinematicRotation;
-        Collider.Rebuild();
+        if (updateColliderState)
+            Collider.Rebuild();
     }
 
     internal void ApplyCollisionPositionCorrection(Vector2d positionCorrection)
@@ -486,7 +508,7 @@ public sealed class StiffBody2D : IRecordable
         if (!CanTranslate || velocityDelta == Vector2d.Zero)
             return;
 
-        Wake();
+        WakeFromCollision();
         _linearVelocity += velocityDelta;
         RefreshLinearSpeed();
     }
@@ -496,7 +518,7 @@ public sealed class StiffBody2D : IRecordable
         if (!CanRotate || velocityDelta == Fixed64.Zero)
             return;
 
-        Wake();
+        WakeFromCollision();
         _angularVelocity += velocityDelta;
         RefreshAngularSpeed();
     }

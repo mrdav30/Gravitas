@@ -82,16 +82,24 @@ internal sealed class CollisionPair2D
         if (!Manifold.HasContact)
             return;
 
-        bool changed = !_isColliding;
-        _isColliding = true;
-        LastFrame = frame;
+        bool changed = MarkCollidingState(frame);
 
         if (!ColliderA.IsTrigger && !ColliderB.IsTrigger)
         {
             CollisionResponse2D.Resolve(this);
-            WakeBodies();
+            WakeSleepingBodiesForCollision();
         }
 
+        ColliderA.NotifyContact(ColliderB, true, changed);
+        ColliderB.NotifyContact(ColliderA, true, changed);
+    }
+
+    internal void MarkCollidingDeferred(int frame)
+    {
+        if (!Manifold.HasContact)
+            return;
+
+        bool changed = MarkCollidingState(frame);
         ColliderA.NotifyContact(ColliderB, true, changed);
         ColliderB.NotifyContact(ColliderA, true, changed);
     }
@@ -126,7 +134,15 @@ internal sealed class CollisionPair2D
         _warmStart.Clear();
     }
 
-    private void WakeBodies()
+    private bool MarkCollidingState(int frame)
+    {
+        bool changed = !_isColliding;
+        _isColliding = true;
+        LastFrame = frame;
+        return changed;
+    }
+
+    internal void WakeSleepingBodiesForCollision()
     {
         StiffBody2D? bodyA = ColliderA.Body;
         StiffBody2D? bodyB = ColliderB.Body;

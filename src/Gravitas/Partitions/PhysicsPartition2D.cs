@@ -89,20 +89,11 @@ public sealed class PhysicsPartition2D : IVoxelPartition
         CopySortedIds(ContainedAwakeDynamicObjects, awakeDynamicIds);
         CopySortedStaticStyleIds(staticIds);
 
-        for (int j = 0; j < awakeDynamicIds.Count; j++)
+        for (int j = 0; j < dynamicIds.Count; j++)
         {
-            int id1 = awakeDynamicIds[j];
-            for (int k = 0; k < dynamicIds.Count; k++)
-            {
-                int id2 = dynamicIds[k];
-                if (id1 == id2)
-                    continue;
-
-                if (ContainsAwakeDynamicObject(id2) && id2 < id1)
-                    continue;
-
-                Owner.Context.Physics2D.ProcessPartitionCandidate(id1, id2, WorldIndex);
-            }
+            int id1 = dynamicIds[j];
+            for (int k = j + 1; k < dynamicIds.Count; k++)
+                Owner.Context.Physics2D.ProcessPartitionCandidate(id1, dynamicIds[k], WorldIndex);
 
             for (int k = 0; k < staticIds.Count; k++)
                 Owner.Context.Physics2D.ProcessPartitionCandidate(id1, staticIds[k], WorldIndex);

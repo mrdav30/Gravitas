@@ -50,8 +50,12 @@ solver invariants.
   two-axis tangent basis. Cached entries whose normals are no longer compatible
   are ignored and overwritten by the fresh solve.
 - Pure 2D response applies pair-local cached impulses and supports two-contact
-  manifolds.
-- Discrete pair response is flat over active pairs rather than island-built.
+  manifolds. Workstream 3 follow-up moved pure 2D discrete response to the same
+  post-integration service phase as 3D and added deterministic 2D island
+  solving.
+- Mixed response now refreshes and processes mixed contacts during
+  `LateSimulate` after pure 2D and 3D body integration, rather than before body
+  motion in `Simulate`.
 - Cylinder collision/query support exists, but docs still call out edge-case
   hardening for the finite-cylinder model.
 - Mesh narrow phase supports triangle-level contacts, but richer mesh contact
@@ -218,6 +222,22 @@ bodies wake without changing trigger-only or query behavior. Fully sleeping
 islands emitted only because another awake body activated the same partition are
 not solved; they keep contact state visible without mutating sleeping body
 positions.
+
+**2D/Mixed parity follow-up 2026-06-21:** Pure 2D now follows the same
+service-owned post-integration shape as 3D. `GravitasPhysics2DService.Simulate`
+only clears frame counters; `LateSimulate` prepares CCD, integrates
+`StiffBody2D` bodies without per-body collider refresh, refreshes dynamic 2D
+colliders once, distributes 2D partition candidates, solves deterministic
+discrete response islands, preserves connected resting pairs, and updates sleep
+state after response. Existing resting pair-owned contacts adjacent to an active
+2D response body are pulled into the temporary island graph so wake propagation
+does not stop at an awake-partition boundary.
+
+`GravitasMixedCollisionService` now mirrors the fixed-step phase boundary:
+`Simulate` remains counter-only, while `LateSimulate` refreshes mixed partitions
+after pure 2D and 3D integration and then processes mixed contacts. This keeps
+mixed contacts from seeing stale pre-integration collider positions. Full mixed
+island/warm-start quality remains Workstream 5 scope.
 
 The full-step validation exposed a hot-path allocation RCA: the newly exercised
 3D late collision pass still used comparer-based `Array.Sort` through

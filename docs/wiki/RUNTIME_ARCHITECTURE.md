@@ -23,8 +23,8 @@ pairs, queries, and coroutines remain context-local.
 | Service | Owned state |
 | --- | --- |
 | `GravitasPhysicsService` | Dynamic body bucket, collider ID table, reusable collider IDs, collision-pair pool, active collision-pair queue, simulation switch. |
-| `GravitasPhysics2DService` | Pure 2D dynamic body bucket, monotonic collider ID table, 2D pair pool, pair-reference cleanup, layer/hierarchy-filtered narrow-phase/response processing, visualization publishing, simulation switch. |
-| `GravitasMixedCollisionService` | Phase 10 mixed 2D/3D lifecycle owner, GridForge-backed mixed broad phase, stable mixed candidate-key buffer, mixed hierarchy filtering, duplicate suppression, awake dynamic membership refresh, mixed pair/response ownership, retained `PhysicsMixedPartition` cleanup, and lifecycle counters. |
+| `GravitasPhysics2DService` | Pure 2D dynamic body bucket, monotonic collider ID table, 2D pair pool, post-integration collider refresh, deterministic 2D discrete island response, connected resting-pair expansion, pair-reference cleanup, visualization publishing, simulation switch. |
+| `GravitasMixedCollisionService` | Mixed 2D/3D lifecycle owner, GridForge-backed mixed broad phase, stable mixed candidate-key buffer, mixed hierarchy filtering, duplicate suppression, late-phase mixed partition refresh, mixed pair/response ownership, retained `PhysicsMixedPartition` cleanup, and lifecycle counters. |
 | `GravitasCollisionService` | Active partition bucket, inactive partition pool, duplicate voxel checker, partition awake-state refresh, collision distribution version, cull distributor. |
 | `GravitasCollision2DService` | GridForge-backed pure 2D partition bucket, inactive partition pool, duplicate voxel checker, awake dynamic membership refresh, 2D collision distribution version, retained partition cleanup. |
 | `GravitasQuery2DService` | Pure 2D query candidate buffer, overlap-circle queries, segment raycasts, swept-circle queries, collider-stamped duplicate suppression, hit ordering. |
@@ -48,8 +48,6 @@ Simulate
     Physics.Simulate
   If RuntimeMode includes TwoD:
     Physics2D.Simulate
-    Collisions2D.CheckAndDistributeCollisions
-    Process overlapping 2D partition candidate pairs
   If RuntimeMode == Mixed:
     MixedCollisions.Simulate
   Coroutines.Simulate
@@ -70,8 +68,14 @@ LateSimulate
     Physics2D.PrepareContinuousCollisionFrame
     Physics2D.LateSimulate
     StiffBody2D.LateSimulate for dynamic 2D bodies
+    PrepareCollisionPartitions for dynamic 2D colliders
+    Collisions2D.CheckAndDistributeCollisions
+    Solve deterministic 2D discrete response islands
+    Update 2D sleep state after response
   If RuntimeMode == Mixed:
     MixedCollisions.LateSimulate
+    Refresh mixed 3D/2D partitions after pure body integration
+    Process mixed contacts and constrained response
   Hooks.InvokeLateSimulate
 
 Visualize
@@ -93,15 +97,15 @@ LateVisualize
 This order is an alpha contract, not just an implementation detail. Ordered host
 commands should be applied before `Simulate()`. Transform teleports made before
 `Simulate()` are reflected in the same fixed step because dynamic-body
-colliders are refreshed before 3D collisions are distributed in
+colliders are refreshed before collisions are distributed in
 `LateSimulate()`. Force and acceleration commands made before `Simulate()` are
 stored on the body, integrated during `LateSimulate()`, and then included in the
-same post-integration 3D discrete collision pass. Collision response can mutate
-authoritative body state during fixed-step phases: pure 2D response runs in the
-2D simulate service, while 3D discrete response runs after 3D integration in
-`LateSimulate()`. Body force integration, 3D grounding, post-integration
-collider refresh, 3D discrete island response, and 3D sleep-state updates all
-happen during `LateSimulate()`.
+same post-integration discrete collision pass. Collision response can mutate
+authoritative body state during fixed-step phases: pure 2D and 3D discrete
+response both run after their body integration in `LateSimulate()`, and mixed
+contacts run after both pure services have refreshed their colliders. Body force
+integration, 3D grounding, post-integration collider refresh, discrete island
+response, and sleep-state updates all happen during `LateSimulate()`.
 
 Lifecycle hooks run after the built-in work for their phase. `Visualize()` is
 the only built-in presentation phase currently used by bodies and services.

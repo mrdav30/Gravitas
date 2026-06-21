@@ -89,11 +89,22 @@ internal sealed class GravitasMixedCollisionService
     {
         SimulateCount++;
         LastBroadPhaseCandidateCount = 0;
+    }
+
+    internal void LateSimulate()
+    {
+        LateSimulateCount++;
+        ProcessMixedContacts();
+    }
+
+    private void ProcessMixedContacts()
+    {
+        LastBroadPhaseCandidateCount = 0;
         _candidatePairs.FastClear();
         _processedPairKeys.Clear();
 
         Refresh3DColliderPartitions();
-        Refresh2DColliderPartitions();
+        Refresh2DColliderPartitions(rebuildShapes: false);
 
         Version++;
         _distributionPartitions.FastClear();
@@ -122,11 +133,6 @@ internal sealed class GravitasMixedCollisionService
 
         CleanupUntouchedPairs(frame);
         RetireExpiredRetainedPartitions();
-    }
-
-    internal void LateSimulate()
-    {
-        LateSimulateCount++;
     }
 
     internal void Visualize()
@@ -203,7 +209,10 @@ internal sealed class GravitasMixedCollisionService
         return Partition3DCollider(collider, coverageMin, coverageMax);
     }
 
-    internal bool Refresh2DColliderPartition(LSCollider2D collider)
+    internal bool Refresh2DColliderPartition(LSCollider2D collider) =>
+        Refresh2DColliderPartition(collider, rebuildShape: true);
+
+    private bool Refresh2DColliderPartition(LSCollider2D collider, bool rebuildShape)
     {
         SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
         SwiftThrowHelper.ThrowIfArgument(
@@ -211,7 +220,9 @@ internal sealed class GravitasMixedCollisionService
             nameof(collider),
             "2D collider must belong to this mixed collision service context.");
 
-        collider.Rebuild();
+        if (rebuildShape)
+            collider.Rebuild();
+
         if (!collider.IsActive || collider.Shape == ColliderType2D.None)
         {
             if (collider.IsMixedPartitioned)
@@ -704,12 +715,12 @@ internal sealed class GravitasMixedCollisionService
         _cached3DQueryRefreshLateToken = lateToken;
     }
 
-    private void Refresh2DColliderPartitions()
+    private void Refresh2DColliderPartitions(bool rebuildShapes = true)
     {
         int count = _context.Physics2D.ColliderCount;
         for (int i = 0; i < count; i++)
             if (_context.Physics2D.TryGetColliderByServiceIndex(i, out LSCollider2D? collider))
-                Refresh2DColliderPartition(collider!);
+                Refresh2DColliderPartition(collider!, rebuildShapes);
     }
 
     private void Refresh2DColliderPartitionsForQuery(bool cachePartitionRefresh)

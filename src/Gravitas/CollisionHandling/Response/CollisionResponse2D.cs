@@ -22,7 +22,13 @@ public static class CollisionResponse2D
 
     public static readonly Fixed64 RestitutionVelocityThreshold = (Fixed64)0.25f;
 
-    internal static void Resolve(CollisionPair2D pair)
+    internal static void Resolve(CollisionPair2D pair) =>
+        Resolve(pair, applyCachedImpulse: true, applyPositionCorrection: true);
+
+    internal static void Resolve(
+        CollisionPair2D pair,
+        bool applyCachedImpulse,
+        bool applyPositionCorrection)
     {
         if (!TryCreateBodyPair(pair, out ResponseBody2D bodyA, out ResponseBody2D bodyB))
             return;
@@ -32,11 +38,17 @@ public static class CollisionResponse2D
             return;
 
         Fixed64 contactShare = Fixed64.One / (Fixed64)contacts.Count;
-        for (int i = 0; i < contacts.Count; i++)
-            ApplyPositionCorrection(contacts.GetContact(i), contactShare);
+        if (applyPositionCorrection)
+        {
+            for (int i = 0; i < contacts.Count; i++)
+                ApplyPositionCorrection(contacts.GetContact(i), contactShare);
+        }
 
-        for (int i = 0; i < contacts.Count; i++)
-            ApplyCachedImpulse(contacts.GetContact(i));
+        if (applyCachedImpulse)
+        {
+            for (int i = 0; i < contacts.Count; i++)
+                ApplyCachedImpulse(contacts.GetContact(i));
+        }
 
         for (int i = 0; i < contacts.Count; i++)
         {

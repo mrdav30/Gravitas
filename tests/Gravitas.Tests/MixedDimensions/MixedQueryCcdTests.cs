@@ -455,28 +455,30 @@ public sealed class MixedQueryCcdTests
         using GravitasWorldContext context = CreateMixedContext();
         ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(
             context,
-            new Vector3d(-Fixed64.FromFraction(1, 4), Fixed64.Zero, Fixed64.Zero));
+            new Vector3d(Fixed64.Zero, Fixed64.One, Fixed64.Zero));
         StiffBody2D body2D = CreateCircle2D(context, Vector2d.Zero);
-        body3D.Body.ApplyCollisionLinearVelocityDelta(Vector3d.Right);
+        body3D.Body.ApplyCollisionLinearVelocityDelta(Vector3d.Down);
         context.Diagnostics.Enable(eventCapacity: 16, drawCommandCapacity: 0);
 
         context.Simulate();
+        context.LateSimulate();
 
         ReadOnlySpan<GravitasDiagnosticEvent> events = context.Diagnostics.Events;
-        events[0].Kind.Should().Be(GravitasDiagnosticEventKind.MixedContact);
-        events[0].ColliderADimension.Should().Be(GravitasColliderDimension.ThreeD);
-        events[0].ColliderBDimension.Should().Be(GravitasColliderDimension.TwoD);
-        events[0].ColliderAId.Should().Be(body3D.Collider.Id);
-        events[0].ColliderBId.Should().Be(body2D.Collider.Id);
-        events[0].ColliderAType.Should().Be(ColliderType.Sphere);
-        events[0].ColliderB2DType.Should().Be(ColliderType2D.Circle);
-        events[0].ScalarA.Should().BeGreaterThan(Fixed64.Zero);
-        events[0].Hit.Should().BeTrue();
-        events[1].Kind.Should().Be(GravitasDiagnosticEventKind.MixedResponseImpulse);
-        events[1].ColliderADimension.Should().Be(GravitasColliderDimension.ThreeD);
-        events[1].ColliderBDimension.Should().Be(GravitasColliderDimension.TwoD);
-        events[1].Vector.MagnitudeSquared.Should().BeGreaterThan(Fixed64.Zero);
-        events[1].ScalarA.Should().BeGreaterThan(Fixed64.Zero);
+        GravitasDiagnosticEvent mixedContact = FindDiagnosticEvent(events, GravitasDiagnosticEventKind.MixedContact);
+        mixedContact.ColliderADimension.Should().Be(GravitasColliderDimension.ThreeD);
+        mixedContact.ColliderBDimension.Should().Be(GravitasColliderDimension.TwoD);
+        mixedContact.ColliderAId.Should().Be(body3D.Collider.Id);
+        mixedContact.ColliderBId.Should().Be(body2D.Collider.Id);
+        mixedContact.ColliderAType.Should().Be(ColliderType.Sphere);
+        mixedContact.ColliderB2DType.Should().Be(ColliderType2D.Circle);
+        mixedContact.ScalarA.Should().BeGreaterThan(Fixed64.Zero);
+        mixedContact.Hit.Should().BeTrue();
+
+        GravitasDiagnosticEvent mixedImpulse = FindDiagnosticEvent(events, GravitasDiagnosticEventKind.MixedResponseImpulse);
+        mixedImpulse.ColliderADimension.Should().Be(GravitasColliderDimension.ThreeD);
+        mixedImpulse.ColliderBDimension.Should().Be(GravitasColliderDimension.TwoD);
+        mixedImpulse.Vector.MagnitudeSquared.Should().BeGreaterThan(Fixed64.Zero);
+        mixedImpulse.ScalarA.Should().BeGreaterThan(Fixed64.Zero);
     }
 
     [Fact]
@@ -623,5 +625,18 @@ public sealed class MixedQueryCcdTests
             new FixedTransform(new Vector3d(position.X, Fixed64.Zero, position.Y), FixedQuaternion.Identity, Vector3d.One));
         collider.InitializeWithNoBody(agent);
         return collider;
+    }
+
+    private static GravitasDiagnosticEvent FindDiagnosticEvent(
+        ReadOnlySpan<GravitasDiagnosticEvent> events,
+        GravitasDiagnosticEventKind kind)
+    {
+        for (int i = 0; i < events.Length; i++)
+        {
+            if (events[i].Kind == kind)
+                return events[i];
+        }
+
+        throw new InvalidOperationException($"Expected diagnostic event kind {kind}.");
     }
 }

@@ -17,11 +17,11 @@ public sealed class CollisionPair2DManifoldTests
         StiffBody2D other = CreateCircle(context, new Vector2d(Fixed64.Half, Fixed64.Zero), immovable: true);
         trigger.Collider.IsTrigger = true;
 
-        context.Simulate();
+        Step(context);
         CollisionPair2D pair = GetPair(trigger, other);
         ulong contactId = pair.Manifold.PrimaryContact.ContactId;
 
-        context.Simulate();
+        Step(context);
         CollisionPair2D updatedPair = GetPair(trigger, other);
 
         updatedPair.Should().BeSameAs(pair);
@@ -100,6 +100,12 @@ public sealed class CollisionPair2DManifoldTests
 
         second.Collider.TryGetCollisionPair(first.Collider.Id, out CollisionPair2D? secondPair).Should().BeTrue();
         return secondPair!;
+    }
+
+    private static void Step(GravitasWorldContext context)
+    {
+        context.Simulate();
+        context.LateSimulate();
     }
 
     private static StiffBody2D CreateCircle(

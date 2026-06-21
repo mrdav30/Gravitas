@@ -79,6 +79,10 @@ velocity. Pure 2D collision pairs own a deterministic fixed two-contact
 `ContactManifold2D` and pair-local warm-start cache. Convex/convex face
 contacts can therefore resolve through both incident-edge points, while
 circle/circle and circle/convex contacts remain one-contact manifolds.
+Pure 2D discrete response runs after 2D body integration during
+`LateSimulate`: dynamic 2D colliders refresh once, partition candidates are
+distributed, deterministic response islands are solved, connected resting pairs
+can wake through the island graph, and sleep state updates after response.
 
 `LSCollider2D.InitializeWithNoBody(IMatterAgent)` binds bodyless static or
 trigger colliders to the same host contract. Bodyless 2D colliders register
@@ -211,6 +215,8 @@ explicit rather than Unity-style separate engines:
 - mixed broad phase uses GridForge-backed spatial identity, separate 2D and 3D
   collider ID spaces, awake-dynamic gating, layer filtering, same-agent and
   explicit hierarchy exclusion, and retained empty-partition cleanup.
+- mixed contact processing runs during `LateSimulate` after both pure services
+  have integrated bodies and refreshed their own collider partitions.
 - mixed query and CCD policy is explicit. 3D swept spheres can query embedded
   2D primitive and compound slabs, and 2D swept circles can query 3D primitive,
   mesh, and compound targets. Pure query services do not accidentally report
