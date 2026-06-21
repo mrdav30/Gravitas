@@ -20,9 +20,10 @@ public sealed class GravitasSimulationPhaseOrderTests
     }
 
     [Fact]
-    public void Simulate_ShouldRefreshTeleportedCollidersAndDistributeContactsBeforeLateSimulate()
+    public void LateSimulate_ShouldRefreshTeleportedCollidersAndDistributeContactsAfterIntegration()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        scenario.Context.Environment.Gravity = Fixed64.Zero;
         ScenarioBody<LSSphereCollider> first = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
         ScenarioBody<LSSphereCollider> second = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(8, 0, 0));
         PhysicsScenarioBuilder.SetTrigger(second.Collider);
@@ -31,6 +32,7 @@ public sealed class GravitasSimulationPhaseOrderTests
         second.Body.SetPosition(teleportedPosition);
 
         scenario.Context.Simulate();
+        scenario.Context.LateSimulate();
 
         second.Body.Position3d.Should().Be(teleportedPosition);
         first.Collider.TryGetCollisionPair(second.Collider.Id, out CollisionPair? pair).Should().BeTrue();
@@ -85,30 +87,29 @@ public sealed class GravitasSimulationPhaseOrderTests
         PhysicsScenarioBuilder.SetTrigger(second.Collider);
         Vector3d teleportedPosition = new(Fixed64.Half, Fixed64.Zero, Fixed64.Zero);
         Vector3d startPosition = first.Body.Position3d;
-        bool simulateHookSawContact = false;
-        bool lateSimulateHookSawIntegratedBody = false;
+        bool simulateHookRanBeforeContacts = false;
+        bool lateSimulateHookSawSolvedFrame = false;
 
         using IDisposable simulateHook = scenario.Context.RegisterOnSimulate(
             "PhaseOrder.ContactProbe",
             0,
-            () =>
-            {
-                simulateHookSawContact = first.Collider.TryGetCollisionPair(second.Collider.Id, out CollisionPair? pair)
-                    && pair!.Manifold.HasContact
-                    && scenario.Context.FrameCount == 1;
-            });
+            () => simulateHookRanBeforeContacts = !first.Collider.TryGetCollisionPair(second.Collider.Id, out _)
+                && scenario.Context.FrameCount == 1);
         using IDisposable lateSimulateHook = scenario.Context.RegisterOnLateSimulate(
             "PhaseOrder.IntegrationProbe",
             0,
-            () => lateSimulateHookSawIntegratedBody = first.Body.Position3d.X > startPosition.X);
+            () => lateSimulateHookSawSolvedFrame =
+                first.Body.Position3d.X > startPosition.X
+                && first.Collider.TryGetCollisionPair(second.Collider.Id, out CollisionPair? pair)
+                && pair!.Manifold.HasContact);
 
         second.Body.SetPosition(teleportedPosition);
         first.Body.AddForce(new Vector3d((Fixed64)12, Fixed64.Zero, Fixed64.Zero));
         scenario.Context.Simulate();
         scenario.Context.LateSimulate();
 
-        simulateHookSawContact.Should().BeTrue();
-        lateSimulateHookSawIntegratedBody.Should().BeTrue();
+        simulateHookRanBeforeContacts.Should().BeTrue();
+        lateSimulateHookSawSolvedFrame.Should().BeTrue();
     }
 
     private static SimulationSnapshot RunReplayScenario()

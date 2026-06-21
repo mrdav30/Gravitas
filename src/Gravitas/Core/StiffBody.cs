@@ -698,7 +698,11 @@ public class StiffBody : IRecordable
         return predictedVelocity * deltaTime;
     }
 
-    public void LateSimulate()
+    public void LateSimulate() => LateSimulate(updateSleepState: true, updateColliderState: true);
+
+    internal void LateSimulate(bool updateSleepState) => LateSimulate(updateSleepState, updateColliderState: true);
+
+    internal void LateSimulate(bool updateSleepState, bool updateColliderState)
     {
         if (!Active) return;
 
@@ -716,10 +720,12 @@ public class StiffBody : IRecordable
             if (!IsSleeping)
             {
                 ProcessMovable();
-                UpdateSleepState();
+                if (updateSleepState)
+                    UpdateSleepState();
             }
 
-            Collider!.Simulate();
+            if (updateColliderState)
+                Collider!.Simulate();
         }
 
         if (SettingVisuals)
@@ -727,6 +733,12 @@ public class StiffBody : IRecordable
 
         if (PositionChangePending || RotationChangePending)
             OnMoved?.Invoke();
+    }
+
+    internal void UpdateSleepStateAfterPhysicsStep()
+    {
+        if (Active && !Immovable && !IsSleeping)
+            UpdateSleepState();
     }
 
     private void UpdateKinematicPositionAndRotation()
@@ -774,6 +786,16 @@ public class StiffBody : IRecordable
         if (!_isSleeping)
             return;
 
+        _isSleeping = false;
+        RefreshPartitionAwakeState();
+    }
+
+    internal void WakeFromCollision()
+    {
+        if (!_isSleeping)
+            return;
+
+        _sleepFrameCount = 0;
         _isSleeping = false;
         RefreshPartitionAwakeState();
     }
@@ -904,7 +926,7 @@ public class StiffBody : IRecordable
         if (Immovable || IsKinematic || velocityDelta == Vector3d.Zero)
             return;
 
-        Wake();
+        WakeFromCollision();
         Vector3d lastVelocity = _linearVelocity;
         _linearVelocity += velocityDelta;
         RefreshLinearMotionState(lastVelocity);
@@ -916,7 +938,7 @@ public class StiffBody : IRecordable
         if (AngularForcesHalted || IsKinematic || velocityDelta == Vector3d.Zero)
             return;
 
-        Wake();
+        WakeFromCollision();
         Vector3d lastVelocity = _angularVelocity;
         _angularVelocity += velocityDelta;
         RefreshAngularMotionState(lastVelocity);
@@ -2489,6 +2511,7 @@ public class StiffBody : IRecordable
         _angularVelocity = Vector3d.Zero;
         _linearSpeed = Fixed64.Zero;
         _angularSpeed = Fixed64.Zero;
+        bool wasSleeping = _isSleeping;
         _isSleeping = false;
         _sleepFrameCount = 0;
         _normalForce = Vector3d.Zero;
@@ -2502,6 +2525,9 @@ public class StiffBody : IRecordable
 
         _visualRotation = rotation;
         _rotationTransform.Rotation = rotation;
+
+        if (wasSleeping)
+            RefreshPartitionAwakeState();
     }
 
     public void RecordData(IChronicler chronicler)

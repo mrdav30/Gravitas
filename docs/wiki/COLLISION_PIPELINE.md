@@ -485,32 +485,40 @@ A partition becomes active when its dynamic membership transitions from empty to
 non-empty. Active partitions are stored in
 `GravitasCollisionService._activePartitions`.
 
-During `context.Simulate()`, `GravitasPhysicsService.Simulate()` first lets
-registered dynamic-body colliders refresh bounds and partition membership. This
-pre-distribution pass catches host command teleports or direct body moves made
-between frames. It then calls
-`GravitasCollisionService.CheckAndDistributeCollisions()`. The collision service
-increments its `Version`, copies active partitions into a reusable buffer, sorts
-them by `WorldVoxelIndex`, and asks each active partition to distribute
-candidate pairs.
+During the 3D `context.LateSimulate()` path,
+`GravitasPhysicsService.LateSimulate()` first integrates registered dynamic
+bodies, then refreshes their collider bounds and partition membership once
+before calling `GravitasCollisionService.CheckAndDistributeCollisions()`. This
+post-integration pass catches host command teleports, direct body moves, forces,
+and accelerations made before `Simulate()` in the same fixed step. The collision
+service increments its `Version`, copies active partitions into a reusable
+buffer, sorts them by `WorldVoxelIndex` with an allocation-free in-place sort,
+and asks each active partition to distribute candidate pairs.
 
 `PhysicsPartition.Distribute()` checks:
 
-- every awake dynamic against the other dynamic IDs in that partition.
-- every awake dynamic against the static IDs in that partition.
+- every local dynamic-dynamic unordered pair when the partition contains at
+  least one awake dynamic.
+- every local dynamic ID against the static-style IDs in that partition, where
+  static-style includes bodyless, immovable, and kinematic colliders.
 
 The dynamic, awake-dynamic, and static sparse-set keys are copied into
-context-owned buffers and sorted by collider ID before pair generation. This
-keeps pair/contact ordering stable even when movement churn changes sparse-set
-dense storage order. `SwiftSortedList` is not used for these scratch buffers:
-its `AddRange` path still copies source items into a temporary array and then
-merges sorted data, while the current reusable `SwiftList` buffers bulk-copy
-and sort without adding another persistent membership structure.
+context-owned buffers and sorted by collider ID before pair generation with an
+allocation-free insertion sort. This keeps pair/contact ordering stable even
+when movement churn changes sparse-set dense storage order. `SwiftSortedList` is
+not used for these scratch buffers: its `AddRange` path still copies source
+items into a temporary array and then merges sorted data, while the current
+reusable `SwiftList` buffers bulk-copy and sort without adding another
+persistent membership structure.
 
 If a partition contains no awake dynamic IDs, distribution returns before pair
-generation. Static/static pairs are not distributed. This is the current alpha
-sleep optimization: it is partition-local and flat, not a recursive island or
-tree-propagation system.
+generation. Static/static pairs are not distributed. Sleeping dynamic bodies
+remain in dynamic membership, and when an awake body activates a partition the
+partition emits sleeping-connected dynamic links too. The discrete island
+builder then decides wake propagation and response order across the connected
+contact graph. A fully sleeping island that was emitted only because another
+body activated the same broad-phase voxel is not solved, so sleeping body
+positions do not drift from unrelated awake bodies.
 
 ## Pair Creation And Filtering
 
@@ -683,15 +691,26 @@ primitive subchecks, not a public response or authoring surface.
 
 ## Response
 
-`CollisionPair.ProcessCollision()` calls `CollisionResponse.CalculateImpulse(...)`
-when detection reports a collision and the pair should perform physics response.
-Pairs with either collider marked as a trigger skip physical response; they can
-still flow through contact notification.
+`CollisionPair.ProcessCollision()` queues a solid response pair when detection
+reports a collision and the pair should perform physics response. Pairs with
+either collider marked as a trigger skip physical response; they can still flow
+through contact notification.
 
-When an awake dynamic body collides with a sleeping dynamic body, the pair wakes
-the sleeping body before response. If every dynamic body in the partition is
-sleeping, pair generation is skipped until a deterministic wake reason changes
-one of those bodies or its shape state.
+After all active partitions distribute candidates,
+`GravitasCollisionService` sorts queued response pairs by stable collider ID
+pair, builds deterministic body islands keyed by `StiffBody.DynamicId`, skips
+fully sleeping islands, wakes connected sleeping bodies when an island contains
+an awake participant, and then solves constraints in stable island/pair order.
+Single-pair scenes stay on a low-overhead direct response path. Multi-constraint
+islands run a bounded number of response iterations from
+`PhysicsSettings.DiscreteSolverIterations`; cached warm-start impulses and
+positional correction are applied on the first island iteration, then subsequent
+iterations refine velocity response without applying the same correction
+repeatedly.
+
+If every dynamic body in the partition is sleeping, pair generation is skipped
+until a deterministic wake reason changes one of those bodies or its shape
+state.
 
 Current non-trigger response behavior is a deterministic fixed-capacity
 manifold solver:
@@ -791,11 +810,11 @@ Response units and invariants:
 - drag and angular damping remain integration/body behavior; contact friction is
   handled by the response solver.
 
-This is still the first alpha milestone, not a full response engine. Explicit
-discrete islands, multi-iteration stack solving, exact angular TOI, exact swept
-polytope support, and richer mixed-dimension solver behavior remain future
-work. Discrete response, contact clipping, cylinder edge cases, and mixed
-solver quality are tracked in
+This is still the first alpha milestone, not the final response engine. Exact
+angular TOI, exact swept polytope support, cylinder edge-case hardening, richer
+mesh contact clipping, and richer mixed-dimension solver behavior remain future
+work. Contact clipping, cylinder edge cases, and mixed solver quality are
+tracked in
 [`Discrete Response And Contact Quality Hardening`](../feature-work/2026-06-21-discrete-response-and-contact-quality-hardening-plan.md);
 exact CCD reducer work remains in
 [`CCD Exact TOI And Shape Reducers`](../feature-work/2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md).
@@ -820,9 +839,9 @@ Current deterministic wake stimuli are:
 - collider shape mutation.
 
 Waking refreshes the collider's awake membership across its current partitions.
-For now, this is a flat voxel-partition optimization. A future explicit island
-builder should use the same wake rules, then expand them across connected
-contacts when island-wide sleep is introduced.
+During 3D discrete response, the island builder expands collision wake across
+connected dynamic contacts in deterministic body-ID order so resting connected
+bodies do not remain asleep behind an awake island participant.
 
 ## Contact Notifications
 

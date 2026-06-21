@@ -127,6 +127,7 @@ public sealed class ContinuousCollisionDetectionTests
         scenario.InitializeStaticCollider(horizontalWall, new Vector3d((Fixed64)(-1), Fixed64.Zero, (Fixed64)3));
         ScenarioBody<LSSphereCollider> mover = scenario.CreateSphere(new Vector3d((Fixed64)(-2), Fixed64.Zero, Fixed64.Zero));
         mover.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        mover.Body.SleepEnabled = false;
         DisableGroundQueries(mover.Body);
 
         mover.Body.AddForce(new Vector3d((Fixed64)4, Fixed64.Zero, (Fixed64)4));
@@ -179,6 +180,7 @@ public sealed class ContinuousCollisionDetectionTests
         {
             mover.Body.ResetPosition(new Vector3d((Fixed64)(-2), Fixed64.Zero, Fixed64.Zero), FixedQuaternion.Identity);
             mover.Body.AddForce(new Vector3d((Fixed64)4, Fixed64.Zero, (Fixed64)4));
+            scenario.Context.Simulate();
             scenario.Context.LateSimulate();
         }
 
@@ -278,6 +280,7 @@ public sealed class ContinuousCollisionDetectionTests
             Vector3d.Zero,
             FixedQuaternion.Identity);
         blade.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        blade.Body.SleepEnabled = false;
         DisableGroundQueries(blade.Body);
 
         blade.Body.AddForce(Vector3d.Right * (Fixed64)10);
@@ -300,6 +303,7 @@ public sealed class ContinuousCollisionDetectionTests
             Vector3d.Zero,
             FixedQuaternion.Identity);
         blade.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        blade.Body.SleepEnabled = false;
         DisableGroundQueries(blade.Body);
 
         blade.Body.AddForce(Vector3d.Right * (Fixed64)10);
@@ -351,6 +355,7 @@ public sealed class ContinuousCollisionDetectionTests
         {
             blade.Body.ResetPosition(Vector3d.Zero, FixedQuaternion.Identity);
             blade.Body.AddForce(Vector3d.Right * (Fixed64)10);
+            scenario.Context.Simulate();
             scenario.Context.LateSimulate();
         }
 
@@ -436,6 +441,7 @@ public sealed class ContinuousCollisionDetectionTests
         {
             blade.Body.ResetPosition(Vector3d.Zero, FixedQuaternion.Identity);
             blade.Body.AddAngularImpulse(angularImpulse);
+            scenario.Context.Simulate();
             scenario.Context.LateSimulate();
         }
 

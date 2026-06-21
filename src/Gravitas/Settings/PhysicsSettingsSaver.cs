@@ -42,6 +42,9 @@ public sealed partial class PhysicsSettingsSaver : DefaultSaver
     public int? ContinuousCollisionMaxSubsteps;
 
     [JsonInclude]
+    public int? DiscreteSolverIterations;
+
+    [JsonInclude]
     public int? RetainedPartitionTimeToKillFrames;
 
     [JsonInclude]
@@ -82,6 +85,8 @@ public sealed partial class PhysicsSettingsSaver : DefaultSaver
             settings.DefaultContinuousCollisionMode = DefaultContinuousCollisionMode.Value;
         if (ContinuousCollisionMaxSubsteps.HasValue)
             settings.ContinuousCollisionMaxSubsteps = ContinuousCollisionMaxSubsteps.Value;
+        if (DiscreteSolverIterations.HasValue)
+            settings.DiscreteSolverIterations = DiscreteSolverIterations.Value;
         if (RetainedPartitionTimeToKillFrames.HasValue)
             settings.RetainedPartitionTimeToKillFrames = RetainedPartitionTimeToKillFrames.Value;
         if (RetainedPartitionRetirementSweepBudget.HasValue)

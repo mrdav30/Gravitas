@@ -239,14 +239,14 @@ public sealed class PhysicsPartitionAwakeTests
         int inactiveBeforeMove = scenario.Context.Collisions.InactivePartitionCount;
 
         body.Body.SetPosition(new Vector3d((Fixed64)4, Fixed64.Zero, Fixed64.Zero));
-        scenario.Context.Simulate();
+        AdvancePhysicsStep(scenario);
         originalVoxel.TryGetPartition(out PhysicsPartition? retainedPartition).Should().BeTrue();
         retainedPartition.Should().BeSameAs(originalPartition);
 
-        scenario.Context.Simulate();
+        AdvancePhysicsStep(scenario);
         originalVoxel.TryGetPartition<PhysicsPartition>(out _).Should().BeTrue();
 
-        scenario.Context.Simulate();
+        AdvancePhysicsStep(scenario);
 
         originalVoxel.TryGetPartition<PhysicsPartition>(out _).Should().BeFalse();
         scenario.Context.Collisions.InactivePartitionCount.Should().BeGreaterThan(inactiveBeforeMove);
@@ -264,10 +264,10 @@ public sealed class PhysicsPartitionAwakeTests
         originalVoxel!.TryGetPartition(out PhysicsPartition? originalPartition).Should().BeTrue();
 
         body.Body.SetPosition(new Vector3d((Fixed64)4, Fixed64.Zero, Fixed64.Zero));
-        scenario.Context.Simulate();
+        AdvancePhysicsStep(scenario);
         body.Body.SetPosition(Vector3d.Zero);
-        scenario.Context.Simulate();
-        scenario.Context.Simulate();
+        AdvancePhysicsStep(scenario);
+        AdvancePhysicsStep(scenario);
 
         originalVoxel.TryGetPartition(out PhysicsPartition? reusedPartition).Should().BeTrue();
         reusedPartition.Should().BeSameAs(originalPartition);
@@ -310,6 +310,12 @@ public sealed class PhysicsPartitionAwakeTests
         (partition.ContainedDynamicObjects?.Contains(colliderId) ?? false).Should().Be(dynamic);
         (partition.ContainedKinematicObjects?.Contains(colliderId) ?? false).Should().Be(kinematic);
         (partition.ContainedStaticObjects?.Contains(colliderId) ?? false).Should().Be(@static);
+    }
+
+    private static void AdvancePhysicsStep(PhysicsScenarioBuilder scenario)
+    {
+        scenario.Context.Simulate();
+        scenario.Context.LateSimulate();
     }
 
     private static int[] CaptureContactOrder()

@@ -62,6 +62,7 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 | Signal | Status | Priority | Tracking |
 | --- | --- | --- | --- |
 | 3D full-runtime CCD allocation | Open | High | This backlog |
+| Grounding raycast probe allocation | Open | Medium | This backlog |
 | 3D shape-exact false-positive cost | Open | Medium | This backlog |
 | Pure 2D dynamic CCD candidate asymmetry | Open | Medium | This backlog |
 
@@ -75,6 +76,18 @@ full-runtime rows allocating about `172,032 B/op` at `256` bodies and
 `688,138 B/op` at `1024` bodies. Pure 2D full-runtime rows and CCD attribution
 rows were effectively allocation-clean.
 
+**Update 2026-06-21:** Discrete response Workstream 3 reproduced the related
+steady-state CCD guardrail failures in xUnit after the 3D full-step phase order
+started exercising collision distribution during measured CCD frames. Root cause
+was comparer-based `Array.Sort` through `SwiftList.Sort` in the collision
+distribution/island hot path. Gravitas now uses allocation-free in-place sorts
+for active partitions, island buffers, and per-partition collider ID copies.
+The focused Release allocation guardrails for 3D substep, shape-exact
+translational, and rotational CCD now pass under full `Simulate` +
+`LateSimulate` measurement. `simulation-allocation` smoke also reported `0 B/op`
+for `CollisionPartitionDistributionOnly` and
+`ActivePairProcessingLateSimulate`.
+
 **Initial read:** The allocation is likely outside core CCD query/index/sweep
 math. Suspect reset, host-transform publish, partition refresh,
 collision-pair lifecycle, or another 3D full-runtime phase.
@@ -83,10 +96,11 @@ collision-pair lifecycle, or another 3D full-runtime phase.
 simulations need predictable frame cost and should not introduce GC pressure
 that scales with body count.
 
-**Next isolation step:** Reproduce the allocation in a focused xUnit guardrail
-using `AllocationTestHelper.MeasureSteadyState`, then split measurement into
-reset-only, `LateSimulate`-only, and reset-plus-`LateSimulate` actions before
-changing runtime source.
+**Next isolation step:** Re-run the original `continuous-collision-evidence`
+rows after the Workstream 3 sort fix. If non-zero allocation remains, split the
+remaining full-runtime measurement into reset, host-transform publish,
+continuous target preparation, body late-simulate, and collision distribution
+sub-actions before changing runtime source.
 
 **Likely files:**
 
@@ -101,6 +115,42 @@ changing runtime source.
 **Closure criteria:** The allocation source is identified and either removed or
 documented as benchmark-only. A test or benchmark row prevents the same signal
 from becoming invisible.
+
+## Signal: Grounding Raycast Probe Allocation
+
+**Discovered:** 2026-06-21
+
+**Evidence:** During Discrete Response Workstream 3 verification, the Release
+`simulation-allocation` BenchmarkDotNet smoke reported
+`GroundingRaycastProbeOnly` at about `181.8 us` and `43,008 B/op` for
+`64` colliders. The same run reported no managed allocation for
+`StiffBodyLateSimulateOnly`, `GroundingSweptSphereProbeOnly`,
+`CollisionPartitionDistributionOnly`, and
+`ActivePairProcessingLateSimulate`.
+
+**Initial read:** This appears separate from the discrete island work and the
+collision distribution sort RCA. It likely belongs to the raycast-backed ground
+probe or one of the query result/candidate paths used by that benchmark row.
+
+**Why it matters:** Automatic raycast grounding is a recurring body hot path.
+If this allocation is repeatable outside BenchmarkDotNet noise, grounded 3D
+bodies can create avoidable GC pressure.
+
+**Next isolation step:** Reproduce with a focused
+`AllocationTestHelper.MeasureSteadyState` guardrail around one raycast-grounded
+body, then split automatic grounding into query candidate gathering, result
+ordering, self-filtering, and grounded-state update.
+
+**Likely files:**
+
+- `src/Gravitas/Core/StiffBody.cs`
+- `src/Gravitas/Queries/GravitasQuery3DService.Raycast.cs`
+- `tests/Gravitas.Benchmarks/Core/SimulationAllocationBenchmarks.cs`
+- `tests/Gravitas.Tests/Core/StiffBodyGroundingTests.cs`
+
+**Closure criteria:** The row is explained by benchmark-only setup, eliminated
+in the runtime path, or documented as an intentional allocation with a stronger
+host-facing alternative such as manual grounding.
 
 ## Signal: 3D Shape-Exact False-Positive Cost
 
@@ -193,8 +243,10 @@ Promote a signal from this backlog into a dedicated dated plan when it has:
 
 ## Current Recommendation
 
-Start with the 3D full-runtime CCD allocation signal before optimizing the other
-signals. If the allocation source is in transform publishing, partition refresh,
-or pair lifecycle, it may also affect the shape-exact and mixed full-runtime
-rows. After allocation is explained, revisit the remaining benchmark signals
-with fresh evidence so their costs are easier to interpret.
+Re-run the `continuous-collision-evidence` rows after the Workstream 3
+allocation-free sort fix before optimizing the remaining CCD cost signals. If
+the original full-runtime CCD allocation is gone, close or downgrade that signal
+and move to the grounding raycast allocation RCA because it now has the clearest
+repeatable managed-allocation evidence in the simulation-allocation smoke. After
+allocation sources are explained, revisit the shape-exact and 2D dynamic CCD
+cost signals with fresh evidence so their timings are easier to interpret.

@@ -38,7 +38,16 @@ public static class CollisionResponse
     /// Applies positional correction, normal impulses, and Coulomb friction for
     /// the collision pair's current deterministic contact manifold.
     /// </summary>
-    public static void CalculateImpulse(CollisionPair pair)
+    public static void CalculateImpulse(CollisionPair pair) =>
+        CalculateImpulse(
+            pair,
+            applyCachedImpulse: true,
+            applyPositionCorrection: true);
+
+    internal static void CalculateImpulse(
+        CollisionPair pair,
+        bool applyCachedImpulse,
+        bool applyPositionCorrection)
     {
         if (!TryCreateBodyPair(pair, out ResponseBody bodyA, out ResponseBody bodyB))
             return;
@@ -48,11 +57,17 @@ public static class CollisionResponse
             return;
 
         Fixed64 contactShare = Fixed64.One / (Fixed64)contacts.Count;
-        for (int i = 0; i < contacts.Count; i++)
-            ApplyPositionCorrection(contacts.GetContact(i), contactShare);
+        if (applyPositionCorrection)
+        {
+            for (int i = 0; i < contacts.Count; i++)
+                ApplyPositionCorrection(contacts.GetContact(i), contactShare);
+        }
 
-        for (int i = 0; i < contacts.Count; i++)
-            ApplyCachedImpulse(contacts.GetContact(i));
+        if (applyCachedImpulse)
+        {
+            for (int i = 0; i < contacts.Count; i++)
+                ApplyCachedImpulse(contacts.GetContact(i));
+        }
 
         for (int i = 0; i < contacts.Count; i++)
         {

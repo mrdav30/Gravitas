@@ -10,7 +10,7 @@ namespace Gravitas.Tests.Partitions;
 public sealed class PhysicsPartitionPerformanceShapeTests
 {
     [Fact]
-    public void Simulate_ShouldRepartitionTeleportedDynamicBodiesBeforeCollisionDistribution()
+    public void LateSimulate_ShouldRepartitionTeleportedDynamicBodiesBeforeCollisionDistribution()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSSphereCollider> first = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
@@ -22,8 +22,10 @@ public sealed class PhysicsPartitionPerformanceShapeTests
         second.Body.SetPosition(teleportedPosition);
 
         scenario.Context.Simulate();
+        scenario.Context.LateSimulate();
 
-        second.Collider.Bounds.Center.Should().Be(teleportedPosition);
+        second.Collider.Bounds.Center.X.Should().Be(teleportedPosition.X);
+        second.Collider.Bounds.Center.Z.Should().Be(teleportedPosition.Z);
         second.Collider.PartitionChanged.Should().BeTrue();
         first.Collider.TryGetCollisionPair(second.Collider.Id, out CollisionPair? pair).Should().BeTrue();
         pair!.Manifold.HasContact.Should().BeTrue();

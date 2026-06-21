@@ -15,6 +15,12 @@ using System.Runtime.CompilerServices;
 
 namespace Gravitas.CollisionHandling;
 
+internal enum CollisionResponseDispatchMode
+{
+    Immediate,
+    Deferred
+}
+
 /// <summary>
 /// Handles collision pairs between various types of colliders using the Separating Axis Theorem and maintains related state information.
 /// </summary>
@@ -148,7 +154,11 @@ public class CollisionPair
     /// Checks and distributes collisions between colliders.
     /// Called by Partition Manager every fixed update if 2 colliders are on the same partion.
     /// </summary>
-    public void UpdateCollision()
+    public void UpdateCollision() => UpdateCollision(CollisionResponseDispatchMode.Immediate);
+
+    internal void UpdateCollisionDeferred() => UpdateCollision(CollisionResponseDispatchMode.Deferred);
+
+    private void UpdateCollision(CollisionResponseDispatchMode responseMode)
     {
         if (!IsCollisionPairActive())
             return;
@@ -162,7 +172,7 @@ public class CollisionPair
 
         if (_preventCulling || CullCounter <= 0)
         {
-            ProcessCollision();
+            ProcessCollision(responseMode);
             RefreshBroadPhaseVersions();
             if (_isCollidingChanged && !_isColliding)
                 Manifold.Reset();
@@ -187,7 +197,7 @@ public class CollisionPair
         _isPooledForDeactivation = true;
     }
 
-    private void ProcessCollision()
+    private void ProcessCollision(CollisionResponseDispatchMode responseMode)
     {
         if (!ShouldPerformCollisionCheck())
         {
@@ -217,11 +227,17 @@ public class CollisionPair
         if (!_doPhysics)
             return;
 
+        if (responseMode == CollisionResponseDispatchMode.Deferred)
+        {
+            Context.Collisions.QueueDiscreteResponsePair(this);
+            return;
+        }
+
         WakeSleepingBodiesForCollision();
         CollisionResponse.CalculateImpulse(this);
     }
 
-    private void WakeSleepingBodiesForCollision()
+    internal void WakeSleepingBodiesForCollision()
     {
         StiffBody? bodyA = ColliderA.Body;
         StiffBody? bodyB = ColliderB.Body;

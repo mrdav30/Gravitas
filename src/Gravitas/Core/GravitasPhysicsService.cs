@@ -87,9 +87,6 @@ public sealed class GravitasPhysicsService
     {
         if (!SimulatePhysics)
             return;
-
-        PrepareCollisionPartitions();
-        _context.Collisions.CheckAndDistributeCollisions();
     }
 
     private void PrepareCollisionPartitions()
@@ -108,7 +105,6 @@ public sealed class GravitasPhysicsService
         if (!SimulatePhysics)
             return;
 
-        ProcessActiveCollisionPairs();
         if (!continuousCollisionFramePrepared)
             _context.AdvanceLateSimulateToken();
 
@@ -118,7 +114,22 @@ public sealed class GravitasPhysicsService
         for (int i = 0; i < peak; i++)
         {
             if (_dynamicBodies.TryGetValue(i, out StiffBody body))
-                body.LateSimulate();
+                body.LateSimulate(updateSleepState: false, updateColliderState: false);
+        }
+
+        PrepareCollisionPartitions();
+        _context.Collisions.CheckAndDistributeCollisions();
+        ProcessActiveCollisionPairs();
+        UpdateSleepStatesAfterPhysicsStep();
+    }
+
+    private void UpdateSleepStatesAfterPhysicsStep()
+    {
+        int peak = _dynamicBodies.PeakCount;
+        for (int i = 0; i < peak; i++)
+        {
+            if (_dynamicBodies.TryGetValue(i, out StiffBody body))
+                body.UpdateSleepStateAfterPhysicsStep();
         }
     }
 
@@ -322,7 +333,8 @@ public sealed class GravitasPhysicsService
         if (!RequireCollisionPair(collider1, collider2))
             return null;
 
-        if (!collider1.TryGetCollisionPair(collider2.Id, out CollisionPair? pair))
+        if (!collider1.TryGetCollisionPair(collider2.Id, out CollisionPair? pair)
+            && !collider2.TryGetCollisionPair(collider1.Id, out pair))
         {
             pair = CreatePair(collider1, collider2);
             pair.ColliderA.TryAddCollisionPair(pair.ColliderB.Id, pair);
@@ -364,8 +376,8 @@ public sealed class GravitasPhysicsService
         if (!pair.Active)
             return;
 
-        if (!TryRemovePairReferences(pair))
-            DeactivateAndPoolPair(pair);
+        TryRemovePairReferences(pair);
+        DeactivateAndPoolPair(pair);
     }
 
     internal void DeactivateAndPoolPair(CollisionPair pair)

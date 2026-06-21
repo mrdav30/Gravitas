@@ -181,16 +181,50 @@ islands, island-wide wake, or multi-iteration stabilization.
 
 **Tasks**
 
-- [ ] Add tests for connected bodies where solving pairs independently produces
+- [x] Add tests for connected bodies where solving pairs independently produces
   order-sensitive drift or incomplete wake propagation.
-- [ ] Introduce an island builder keyed by stable body/collider IDs and pair
+- [x] Introduce an island builder keyed by stable body/collider IDs and pair
   keys, with explicit ordering for bodies, contacts, and constraints.
-- [ ] Add a bounded multi-iteration solve path for islands that need
+- [x] Add a bounded multi-iteration solve path for islands that need
   stabilization.
-- [ ] Connect island-wide wake/sleep to existing wake reasons without changing
+- [x] Connect island-wide wake/sleep to existing wake reasons without changing
   pure query or trigger-only behavior.
-- [ ] Keep single-pair scenes on a low-overhead path when island solving is not
+- [x] Keep single-pair scenes on a low-overhead path when island solving is not
   needed.
+
+**Progress 2026-06-21:** Workstream 3 moved the 3D discrete response pass to
+post-integration `LateSimulate`: dynamic bodies integrate first, service-owned
+dynamic collider partitions refresh once, active partitions distribute
+candidates, queued solid pairs are solved, active-pair maintenance runs, and
+sleep state updates after response. Direct `StiffBody.LateSimulate()` remains
+self-contained for callers outside the service path.
+
+`GravitasCollisionService` now owns deterministic discrete island assembly.
+Queued response pairs are ordered by stable collider ID pair. Movable island
+nodes are keyed by `StiffBody.DynamicId`, union roots pick the lower stable
+body key, and constraints are solved in root-key then pair-key order.
+Single-pair scenes bypass island construction and keep the direct response path.
+Multi-constraint islands run the bounded
+`PhysicsSettings.DiscreteSolverIterations` count; cached warm-start impulses
+and positional correction apply on the first iteration, with later iterations
+refining velocity response without repeating the positional correction.
+
+`PhysicsPartition.Distribute()` now emits all local dynamic-dynamic links and
+all dynamic/static-style links when at least one dynamic collider in the
+partition is awake. Sleeping bodies stay query-visible and can now participate
+in a connected island when an awake body activates that partition. Island wake
+uses the existing deterministic collision wake path so connected sleeping
+bodies wake without changing trigger-only or query behavior. Fully sleeping
+islands emitted only because another awake body activated the same partition are
+not solved; they keep contact state visible without mutating sleeping body
+positions.
+
+The full-step validation exposed a hot-path allocation RCA: the newly exercised
+3D late collision pass still used comparer-based `Array.Sort` through
+`SwiftList.Sort` on partition and island buffers. Those sorts were replaced
+with allocation-free in-place sorting in the collision service and per-partition
+collider-ID copies, restoring the CCD no-allocation assertions under the real
+full fixed-step path.
 
 ## Workstream 4: Cylinder And Mesh Contact Geometry
 

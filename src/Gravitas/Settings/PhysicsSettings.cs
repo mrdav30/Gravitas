@@ -23,6 +23,8 @@ public sealed class PhysicsSettings
 
     public const int DefaultContinuousCollisionMaxSubsteps = 4;
 
+    public const int DefaultDiscreteSolverIterations = 6;
+
     public static readonly Fixed64 DefaultMixed2DHalfThickness = Fixed64.Half;
 
     /// <summary>
@@ -52,6 +54,7 @@ public sealed class PhysicsSettings
     private int _retainedPartitionTimeToKillFrames = DefaultRetainedPartitionTimeToKillFrames;
     private int _retainedPartitionRetirementSweepBudget = DefaultRetainedPartitionRetirementSweepBudget;
     private int _continuousCollisionMaxSubsteps = DefaultContinuousCollisionMaxSubsteps;
+    private int _discreteSolverIterations = DefaultDiscreteSolverIterations;
     private PhysicsRuntimeMode _runtimeMode = PhysicsRuntimeMode.ThreeD;
     private Fixed64 _mixed2DHalfThickness = DefaultMixed2DHalfThickness;
 
@@ -98,6 +101,20 @@ public sealed class PhysicsSettings
         {
             SwiftThrowHelper.ThrowIfNegativeOrZero(value, nameof(value));
             _continuousCollisionMaxSubsteps = value;
+        }
+    }
+
+    /// <summary>
+    /// Gets or sets the bounded projected-impulse iteration count used for multi-contact 3D discrete islands.
+    /// Single-pair scenes stay on the direct one-pass response path.
+    /// </summary>
+    public int DiscreteSolverIterations
+    {
+        get => _discreteSolverIterations;
+        set
+        {
+            SwiftThrowHelper.ThrowIfNegativeOrZero(value, nameof(value));
+            _discreteSolverIterations = value;
         }
     }
 

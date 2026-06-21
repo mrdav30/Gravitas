@@ -9,7 +9,6 @@ using Gravitas.CollisionHandling;
 using GridForge.Grids;
 using GridForge.Spatial;
 using SwiftCollections;
-using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
 namespace Gravitas;
@@ -23,13 +22,6 @@ internal enum PhysicsPartitionMobilityKind
 
 public class PhysicsPartition : IVoxelPartition
 {
-    private sealed class IntAscendingComparer : IComparer<int>
-    {
-        public int Compare(int left, int right) => left.CompareTo(right);
-    }
-
-    private static readonly IntAscendingComparer ColliderIdComparer = new();
-
     private GravitasCollisionService? _owner;
     private int _emptySinceFrame = -1;
     private int _retainedIndex = -1;
@@ -110,21 +102,14 @@ public class PhysicsPartition : IVoxelPartition
         CopySortedIds(ContainedAwakeDynamicObjects, awakeDynamicIds);
         CopySortedStaticStyleIds(staticIds);
 
-        // Sleeping bodies stay query-visible in dynamic membership, while awake membership gates solver work.
-        for (int j = 0; j < awakeDynamicIds.Count; j++)
+        // Sleeping bodies stay query-visible in dynamic membership, while awake membership gates partition work.
+        // Once an active partition is selected, all local dynamic links are emitted so the discrete
+        // island builder can wake and solve connected bodies in a stable graph instead of a flat pair pass.
+        for (int j = 0; j < dynamicIds.Count; j++)
         {
-            int id1 = awakeDynamicIds[j];
-            for (int k = 0; k < dynamicIds.Count; k++)
-            {
-                int id2 = dynamicIds[k];
-                if (id1 == id2)
-                    continue;
-
-                if (ContainsAwakeDynamicObject(id2) && id2 < id1)
-                    continue;
-
-                ProcessPair(id1, id2);
-            }
+            int id1 = dynamicIds[j];
+            for (int k = j + 1; k < dynamicIds.Count; k++)
+                ProcessPair(id1, dynamicIds[k]);
 
             for (int k = 0; k < staticIds.Count; k++)
             {
@@ -143,7 +128,7 @@ public class PhysicsPartition : IVoxelPartition
         for (int i = 0; i < source.Count; i++)
             destination.Add(source.DenseKeys[i]);
 
-        destination.Sort(ColliderIdComparer);
+        SortColliderIdsIfNeeded(destination);
     }
 
     private void CopySortedStaticStyleIds(SwiftList<int> destination)
@@ -151,7 +136,7 @@ public class PhysicsPartition : IVoxelPartition
         destination.FastClear();
         CopyIds(ContainedKinematicObjects, destination);
         CopyIds(ContainedStaticObjects, destination);
-        destination.Sort(ColliderIdComparer);
+        SortColliderIdsIfNeeded(destination);
     }
 
     internal void CopyAllColliderIds(SwiftList<int> destination)
@@ -160,7 +145,7 @@ public class PhysicsPartition : IVoxelPartition
         CopyIds(ContainedDynamicObjects, destination);
         CopyIds(ContainedKinematicObjects, destination);
         CopyIds(ContainedStaticObjects, destination);
-        destination.Sort(ColliderIdComparer);
+        SortColliderIdsIfNeeded(destination);
     }
 
     internal void CopyStaticStyleColliderIds(SwiftList<int> destination)
@@ -168,7 +153,7 @@ public class PhysicsPartition : IVoxelPartition
         destination.FastClear();
         CopyIds(ContainedKinematicObjects, destination);
         CopyIds(ContainedStaticObjects, destination);
-        destination.Sort(ColliderIdComparer);
+        SortColliderIdsIfNeeded(destination);
     }
 
     private static void CopyIds(SwiftSparseSet? source, SwiftList<int> destination)
@@ -178,6 +163,22 @@ public class PhysicsPartition : IVoxelPartition
 
         for (int i = 0; i < source.Count; i++)
             destination.Add(source.DenseKeys[i]);
+    }
+
+    private static void SortColliderIdsIfNeeded(SwiftList<int> ids)
+    {
+        for (int i = 1; i < ids.Count; i++)
+        {
+            int value = ids[i];
+            int j = i - 1;
+            while (j >= 0 && ids[j] > value)
+            {
+                ids[j + 1] = ids[j];
+                j--;
+            }
+
+            ids[j + 1] = value;
+        }
     }
 
     private void ProcessPair(int id1, int id2)
@@ -190,7 +191,7 @@ public class PhysicsPartition : IVoxelPartition
             return;
 
         pair.PartitionVersion = owner.Version;
-        pair.UpdateCollision();
+        pair.UpdateCollisionDeferred();
     }
 
     public void AddDynamicObject(int item)

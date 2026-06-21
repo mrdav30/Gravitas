@@ -148,18 +148,22 @@ narrow-phase, and constrained response path.
 Colliders calculate bounds and are mapped into GridForge voxels by
 `GravitasCollisionService`. Each occupied voxel can hold a `PhysicsPartition`.
 Partitions store context-local collider IDs and are active when they contain
-dynamic objects. During `Simulate`, active partitions distribute candidates from
-awake dynamic membership so fully sleeping partitions can skip pair generation
-without removing sleeping colliders from queries or contact lifecycle.
+dynamic objects. During the 3D `LateSimulate` path, dynamic bodies integrate,
+their colliders refresh partition membership, and active partitions distribute
+candidates from awake dynamic membership so fully sleeping partitions can skip
+pair generation without removing sleeping colliders from queries or contact
+lifecycle.
 `GravitasPhysicsService` filters candidates by context, active state, shape,
 layer matrix, dynamic/static rules, and sibling relationships. A `CollisionPair`
 then performs fast distance/AABB culling before dispatching to
 `CollisionDetection`. If the narrow phase finds contact, it writes a fixed-size
-`ContactManifold`; if the pair has bodies that should receive physics,
-`CollisionResponse` applies solver-side position correction, normal impulses,
-and friction impulses across the manifold contacts, then stores pair-local
-warm-start impulse data by contact identity. Contact events are emitted from the
-active-pair queue during `LateSimulate`.
+`ContactManifold`; if the pair has bodies that should receive physics, the 3D
+discrete response pass orders pairs into deterministic islands, applies cached
+warm-start impulses, runs bounded response iterations where needed, applies
+solver-side position correction, normal impulses, and friction impulses across
+the manifold contacts, then stores pair-local warm-start impulse data by contact
+identity. Contact events are emitted from the active-pair queue during
+`LateSimulate`.
 
 ## Current Prototype Edges
 
@@ -189,11 +193,12 @@ active-pair queue during `LateSimulate`.
   narrow phase are implemented through triangle-level tests. Richer mesh contact
   clipping and mesh-as-source swept query families remain future hardening work.
 - Collision response is still an alpha-hardening target. The current 3D and pure
-  2D manifold solvers handle deterministic normal and friction impulses, pure
-  2D applies pair-local warm-start impulses, and dynamic CCD has deterministic
-  relative-motion paths. Static resting friction, explicit island solving,
-  exact angular TOI, exact swept polytope support, 3D true warm-start
-  application, and richer mixed solver behavior remain future work.
+  2D manifold solvers handle deterministic normal and friction impulses, 3D and
+  pure 2D apply compatible pair-local warm-start impulses, and 3D discrete
+  response builds deterministic islands with bounded multi-iteration solving.
+  Cylinder contact edge cases, richer mesh contact clipping, exact angular TOI,
+  exact swept polytope support, and richer mixed solver behavior remain future
+  work.
 - Query services use context-owned mutable buffers. Treat them as same-thread,
   fixed-loop services unless they are redesigned for reentrancy.
 - Diagnostics are context-owned and disabled by default. Enabled draw capture can

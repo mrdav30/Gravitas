@@ -46,8 +46,6 @@ Simulate
   Clock.Simulate
   If RuntimeMode includes ThreeD:
     Physics.Simulate
-    PrepareCollisionPartitions for dynamic-body colliders
-    Collisions.CheckAndDistributeCollisions
   If RuntimeMode includes TwoD:
     Physics2D.Simulate
     Collisions2D.CheckAndDistributeCollisions
@@ -60,10 +58,16 @@ Simulate
 LateSimulate
   Clock.LateSimulate
   If RuntimeMode includes ThreeD:
+    Physics.PrepareContinuousCollisionFrame
     Physics.LateSimulate
-    ProcessActiveCollisionPairs
     StiffBody.LateSimulate for dynamic bodies
+    PrepareCollisionPartitions for dynamic-body colliders
+    Collisions.CheckAndDistributeCollisions
+    Solve deterministic discrete response islands
+    ProcessActiveCollisionPairs
+    Update 3D sleep state after response
   If RuntimeMode includes TwoD:
+    Physics2D.PrepareContinuousCollisionFrame
     Physics2D.LateSimulate
     StiffBody2D.LateSimulate for dynamic 2D bodies
   If RuntimeMode == Mixed:
@@ -88,13 +92,16 @@ LateVisualize
 
 This order is an alpha contract, not just an implementation detail. Ordered host
 commands should be applied before `Simulate()`. Transform teleports made before
-`Simulate()` are reflected in the same collision distribution pass because
-dynamic-body colliders are refreshed before collisions are checked. Force and
-acceleration commands made before `Simulate()` are stored on the body and
-integrated during `LateSimulate()`. Collision response can mutate authoritative
-body state during `Simulate()`, including the pure 2D response service. Body
-force integration, 3D grounding, and post-integration collider refresh happen
-during `LateSimulate()`.
+`Simulate()` are reflected in the same fixed step because dynamic-body
+colliders are refreshed before 3D collisions are distributed in
+`LateSimulate()`. Force and acceleration commands made before `Simulate()` are
+stored on the body, integrated during `LateSimulate()`, and then included in the
+same post-integration 3D discrete collision pass. Collision response can mutate
+authoritative body state during fixed-step phases: pure 2D response runs in the
+2D simulate service, while 3D discrete response runs after 3D integration in
+`LateSimulate()`. Body force integration, 3D grounding, post-integration
+collider refresh, 3D discrete island response, and 3D sleep-state updates all
+happen during `LateSimulate()`.
 
 Lifecycle hooks run after the built-in work for their phase. `Visualize()` is
 the only built-in presentation phase currently used by bodies and services.
@@ -186,11 +193,12 @@ contexts. These checks are core invariants.
 Body movement currently happens in `StiffBody.LateSimulate()`, called by
 `GravitasPhysicsService.LateSimulate()`. Non-kinematic movable bodies process
 forces, update velocities, apply position/rotation changes, run their selected
-ground probe through the context query services, and then update collider
-partition state through `Collider.Simulate()`. `GravitasPhysicsService.Simulate()`
-also performs a pre-distribution collider refresh for dynamic-body colliders so
-host commands that teleport or reposition bodies before `Simulate()` are
-reflected in the same collision distribution pass.
+ground probe through the context query services, and then the service refreshes
+dynamic collider partition state once before distributing 3D collision pairs.
+Direct `StiffBody.LateSimulate()` calls remain self-contained and refresh the
+bound collider themselves. `GravitasPhysicsService.Simulate()` is intentionally
+lightweight; service-owned 3D broad-phase refresh and discrete response happen
+after body integration in `LateSimulate()`.
 
 Body initialization does not assume grounded state. After the body collider is
 registered and partitioned, initialization performs an explicit ground probe.

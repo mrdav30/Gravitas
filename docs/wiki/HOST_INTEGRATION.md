@@ -217,21 +217,24 @@ and call the visualization phases from the render/update loop.
 
 Current service order matters:
 
-- `context.Simulate()` advances the clock, runs each enabled dimensional
-  collision path, runs the mixed lifecycle path only in `Mixed`, advances
-  lockstep coroutines, then invokes simulate hooks.
-- `context.LateSimulate()` marks visualization accumulation for reset, runs
-  each enabled dimensional body integration path, runs the mixed lifecycle path
-  only in `Mixed`, then invokes late-simulate hooks.
+- `context.Simulate()` advances the clock, runs enabled simulate-phase services,
+  runs the mixed lifecycle path only in `Mixed`, advances lockstep coroutines,
+  then invokes simulate hooks.
+- `context.LateSimulate()` marks visualization accumulation for reset. In the
+  3D path it prepares dynamic CCD state, integrates dynamic bodies, refreshes
+  dynamic collider partitions, distributes and solves discrete contacts, updates
+  active pair/contact maintenance, and updates sleep state after response. It
+  also runs each enabled 2D/mixed late-simulate path, then invokes
+  late-simulate hooks.
 - `context.Visualize()` advances interpolation accumulation, updates enabled
   2D and/or 3D body visual transforms, runs the mixed lifecycle path only in
   `Mixed`, then invokes visualize hooks.
 - `context.LateVisualize()` invokes context hooks only. Add built-in late
   presentation work only when there is a real runtime invariant for it.
 
-Do not assume an engine-style integrate-then-collide order. The current
-prototype checks/distributes collisions during `Simulate` and advances bodies in
-`LateSimulate`.
+For the 3D path, the fixed-step order is integrate-then-collide inside
+`LateSimulate`: queued forces affect motion before the discrete collision pass
+for that same frame.
 
 ## Replay Contract
 
@@ -243,9 +246,10 @@ the same authoritative body, collider, clock, and contact state.
 The current alpha order has two important consequences:
 
 - Teleports or transform mutations made before `Simulate()` refresh dynamic
-  collider bounds and can create contacts in that same `Simulate()` call.
-- Forces and accelerations queued before `Simulate()` do not move the body until
-  `LateSimulate()`.
+  collider bounds and can create contacts in that same fixed step's
+  `LateSimulate()` call.
+- Forces and accelerations queued before `Simulate()` move the body during
+  `LateSimulate()` before the 3D discrete collision pass runs.
 
 Visualization phases are non-authoritative. Use them to publish interpolated
 positions, rotations, and diagnostic draw data to a renderer or host adapter,

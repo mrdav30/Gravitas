@@ -50,7 +50,7 @@ public sealed class ColliderOwnershipStateTests
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSSphereCollider> owner = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
         ScenarioBody<LSSphereCollider> holder = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
-        scenario.Context.Simulate();
+        AdvancePhysicsStep(scenario);
 
         owner.Collider.CollisionPairCount.Should().Be(1);
         holder.Collider.CollisionPairHolderCount.Should().Be(1);
@@ -87,7 +87,7 @@ public sealed class ColliderOwnershipStateTests
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSSphereCollider> owner = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
         ScenarioBody<LSSphereCollider> holder = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
-        scenario.Context.Simulate();
+        AdvancePhysicsStep(scenario);
 
         holder.Collider.Deactivate();
 
@@ -136,5 +136,11 @@ public sealed class ColliderOwnershipStateTests
 
         collider.RaycastVersion.Should().Be(0);
         collider.CircleQueryVersion.Should().Be(0);
+    }
+
+    private static void AdvancePhysicsStep(PhysicsScenarioBuilder scenario)
+    {
+        scenario.Context.Simulate();
+        scenario.Context.LateSimulate();
     }
 }
