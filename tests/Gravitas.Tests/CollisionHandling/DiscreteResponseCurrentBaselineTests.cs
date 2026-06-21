@@ -10,15 +10,6 @@ namespace Gravitas.Tests.CollisionHandlingTests;
 public sealed class DiscreteResponseCurrentBaselineTests
 {
     [Fact]
-    public void CurrentBaseline_Stored3DWarmStartImpulse_ShouldNotAffectFreshSinglePairSolve()
-    {
-        ResponseState withoutCachedImpulse = RunSinglePairResponse(preloadWarmStart: false);
-        ResponseState withCachedImpulse = RunSinglePairResponse(preloadWarmStart: true);
-
-        withCachedImpulse.Should().Be(withoutCachedImpulse);
-    }
-
-    [Fact]
     public void CurrentBaseline_RestingStackUnderGravity_ShouldRemainAwakeOverShortWindow()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
@@ -78,40 +69,4 @@ public sealed class DiscreteResponseCurrentBaselineTests
         pair.Manifold.Count.Should().Be(1);
         pair.Manifold.PrimaryContact.Normal.Y.Should().BeGreaterThan(Fixed64.Zero);
     }
-
-    private static ResponseState RunSinglePairResponse(bool preloadWarmStart)
-    {
-        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
-        ScenarioBody<LSCuboidCollider> wall = scenario.CreateCuboid(
-            PhysicsScenarioBuilder.Vector(0, 0, 0),
-            immovable: true);
-        ScenarioBody<LSSphereCollider> mover = scenario.CreateSphere(new Vector3d(
-            Fixed64.FromFraction(3, 4),
-            Fixed64.Zero,
-            Fixed64.Zero));
-        mover.Body.AddLinearImpulse(new Vector3d((Fixed64)(-60), Fixed64.Zero, (Fixed64)30));
-        CollisionPair pair = scenario.CreatePair(wall.Collider, mover.Collider);
-        CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
-
-        if (preloadWarmStart)
-            pair.StoreWarmStartImpulse(pair.Manifold.PrimaryContact.ContactId, (Fixed64)16, (Fixed64)8);
-
-        CollisionResponse.CalculateImpulse(pair);
-
-        return new ResponseState(
-            wall.Body.Position3d,
-            mover.Body.Position3d,
-            wall.Body.LinearVelocity,
-            mover.Body.LinearVelocity,
-            wall.Body.AngularVelocity,
-            mover.Body.AngularVelocity);
-    }
-
-    private readonly record struct ResponseState(
-        Vector3d WallPosition,
-        Vector3d MoverPosition,
-        Vector3d WallVelocity,
-        Vector3d MoverVelocity,
-        Vector3d WallAngularVelocity,
-        Vector3d MoverAngularVelocity);
 }

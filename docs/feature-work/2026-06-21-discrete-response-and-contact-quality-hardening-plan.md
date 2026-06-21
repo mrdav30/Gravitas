@@ -19,10 +19,12 @@
 The current response layer is much stronger than the early prototype: 3D and
 pure 2D contacts have deterministic manifolds, friction impulses, material
 coefficients, and pair-local warm-start storage. Pure 2D now applies cached
-normal and tangent impulses before the fresh solve. 3D still records cached
-impulses without applying them as a true warm-started solve, resting-stack
-static friction is still shallow, discrete island solving is not explicit, and
-mixed response is intentionally constrained.
+normal and tangent impulses before the fresh solve. Workstream 2 brought 3D
+single-pair warm-starting up to the same standard with normal-compatible cache
+reuse and a two-axis tangent basis. Resting-stack quality still needs explicit
+discrete islands and bounded multi-iteration solving, cylinder edge cases and
+mesh contact clipping still need hardening, and mixed response is intentionally
+constrained.
 
 Those are not acceptable as loose wiki caveats for a first-class deterministic
 physics engine. They should be driven by tests, benchmark signal, and explicit
@@ -41,10 +43,12 @@ solver invariants.
 
 ## Current Baseline
 
-- 3D contacts store pair-local cached normal and tangent impulses by contact
-  identity.
-- 3D response applies fresh normal/friction impulses, but does not yet apply
-  cached impulses as a true warm-started iterative solve.
+- 3D contacts store pair-local cached normal and two-axis tangent impulses by
+  contact identity and the contact normal used by the previous solve.
+- 3D response applies compatible cached impulses before the fresh solve,
+  accumulates/clamps normal impulses, and solves friction over a deterministic
+  two-axis tangent basis. Cached entries whose normals are no longer compatible
+  are ignored and overwritten by the fresh solve.
 - Pure 2D response applies pair-local cached impulses and supports two-contact
   manifolds.
 - Discrete pair response is flat over active pairs rather than island-built.
@@ -88,8 +92,9 @@ solver invariants.
 without changing runtime solver behavior. The new
 `DiscreteResponseCurrentBaselineTests` file records that:
 
-- stored 3D warm-start impulses do not affect the current fresh single-pair
-  solve, confirming 3D warm-start is storage-only today.
+- stored 3D warm-start impulses did not affect the fresh single-pair solve
+  before Workstream 2, confirming the original storage-only behavior. That
+  stale baseline test was removed when 3D warm-start application landed.
 - a short 3D cuboid stack under gravity remains awake and drifts, preserving
   evidence for the resting-friction/warm-start workstream.
 - cylinder rim contact currently reduces to one near-zero-depth contact.
@@ -105,7 +110,7 @@ Current response inventory:
 
 | Path | Current Behavior |
 | --- | --- |
-| 3D response | `CollisionPair` owns one four-contact `ContactManifold`, pair-local `ContactWarmStartCache`, and priority/speed/candidate-order collider ordering. `CollisionResponse` applies positional correction, fresh normal impulses, dynamic Coulomb friction from the current tangent velocity, then stores normal/tangent impulse scalars by contact identity. It does not read cached impulses before solving. Sleeping body wake happens before response when the opposite participant is awake. |
+| 3D response | `CollisionPair` owns one four-contact `ContactManifold`, pair-local `ContactWarmStartCache`, and priority/speed/candidate-order collider ordering. Workstream 2 updated `CollisionResponse` to apply normal-compatible cached impulses before solving, accumulate/clamp normal impulses, solve friction over a deterministic two-axis tangent basis, then store normal/tangent impulse scalars and the solved normal by contact identity. Sleeping body wake happens before response when the opposite participant is awake. |
 | Pure 2D response | `CollisionPair2D` owns a two-contact `ContactManifold2D` and `ContactWarmStartCache2D`. `CollisionResponse2D` reads cached normal/tangent impulses, applies them before the fresh solve, accumulates/clamps normal impulses, clamps tangent impulses to the current Coulomb bound, and stores the refreshed cache. Pair ordering uses priority, speed, then collider ID. Wake happens through pair handling after solid response. |
 | Mixed response | `CollisionPairMixed` owns stable 3D/2D identity and a single `MixedContact` input. It has no pair-local warm-start cache or manifold reduction. `CollisionResponseMixed` applies constrained 3D/2D positional correction, normal impulse, and friction: planar X/Z impulse can move and yaw the 2D body, while vertical Y response is constrained out of the 2D participant. Wake happens before mixed response. |
 
@@ -131,16 +136,41 @@ dynamic-friction oriented and does not fully stabilize resting stacks.
 
 **Tasks**
 
-- [ ] Add tests where a 3D resting stack settles faster or avoids jitter only
-  when cached impulses are applied safely.
-- [ ] Add tests where stale cached impulses unwind instead of injecting energy
+- [x] Add tests where persistent 3D resting contacts avoid tangential jitter
+  only when cached impulses are applied safely. Connected multi-body stack
+  settling remains Workstream 3 because flat pair iteration should not be
+  misrepresented as an island solver.
+- [x] Add tests where stale cached impulses unwind instead of injecting energy
   after contact normals or IDs change.
-- [ ] Apply cached normal and tangent impulses before the fresh 3D solve,
+- [x] Apply cached normal and tangent impulses before the fresh 3D solve,
   following the pure 2D accumulated-impulse rules where they fit 3D.
-- [ ] Introduce explicit static-friction behavior for near-resting tangential
+- [x] Introduce explicit static-friction behavior for near-resting tangential
   motion, with deterministic thresholds and material combination rules.
-- [ ] Re-run existing restitution, friction, and replay tests after each solver
+- [x] Re-run existing restitution, friction, and replay tests after each solver
   change.
+
+**Progress 2026-06-21:** Workstream 2 updated 3D response to consume the
+pair-local warm-start cache. Solver contacts now derive a deterministic 3D
+tangent frame from the contact normal and carry cached normal, primary tangent,
+and secondary tangent impulses. `ContactWarmStartImpulse` stores the previous
+normal so 3D cache entries are reused only when the current normal remains
+compatible (`63/64` fixed dot-product threshold); changed normals or changed
+contact IDs fall back to a fresh solve.
+
+Normal impulses now follow accumulated-impulse behavior: compatible cached
+normal impulses are applied before the solve, positive fresh normal deltas are
+distributed across manifold contacts, and negative stale-cache deltas can unwind
+the full per-contact cached contribution without being reduced by face-manifold
+contact share. Friction solves over the two tangent axes as a Coulomb disk. The
+existing single `FrictionCoefficient` remains the material coefficient and is
+combined by geometric mean; it acts as both the static sticking bound for
+near-resting tangential motion and the sliding clamp when the requested tangent
+impulse exceeds that bound.
+
+Tests now cover persistent resting-load friction, stale cached impulse unwind,
+normal-incompatible cache rejection, warm-start storage/reset, and the existing
+restitution/friction/response invariants. The Workstream 1 storage-only
+baseline was removed because it described behavior that no longer exists.
 
 ## Workstream 3: Deterministic Discrete Island Model
 
@@ -204,8 +234,8 @@ behavior remains future hardening.
 
 ## Done Criteria
 
-- 3D cached impulses are either applied safely or documented with evidence for
-  why they remain storage-only.
+- 3D cached impulses are applied safely with normal-compatible reuse and stale
+  cache unwind tests.
 - Resting friction behavior has correctness tests, replay coverage, and clear
   thresholds.
 - Discrete islands have stable ordering, bounded iteration, and wake/sleep

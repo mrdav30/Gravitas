@@ -707,26 +707,34 @@ manifold solver:
    times as far as the detected penetration.
 4. compute normal contact velocity from linear velocity plus angular velocity at
    each relative contact arm.
-5. compute normal impulse scalars for all contacts before applying them. This
-   keeps symmetric face manifolds from injecting spin through whichever corner
-   happens to be visited first.
-6. skip normal impulse when the bodies are already separating along the contact
-   normal.
-7. apply direct normal velocity deltas to movable bodies, plus angular velocity
-   deltas when angular forces are enabled.
-8. compute tangential contact velocity after normal impulses, then apply a
-   Coulomb friction impulse along the tangent. The tangent impulse is clamped to
+5. apply compatible cached normal and tangent impulses from the pair-local
+   warm-start cache before the fresh solve. A 3D cache entry stores the previous
+   solve normal and is reused only while that normal remains compatible with the
+   current contact normal.
+6. compute normal impulse deltas for all contacts before applying them. Positive
+   fresh deltas are shared across manifold contacts so symmetric face manifolds
+   do not over-respond, while negative stale-cache deltas can remove the full
+   per-contact cached contribution.
+7. accumulate and clamp normal impulses at zero, then apply only the delta from
+   the cached value. This lets stale normal impulses unwind instead of injecting
+   separating energy.
+8. solve friction over a deterministic two-axis tangent frame derived from the
+   contact normal. The accumulated tangent pair is clamped as a Coulomb disk by
    `normalImpulse * frictionCoefficient`, where the pair coefficient is the
    geometric mean of the two body coefficients.
-9. store the solved normal and tangent impulse scalars in a fixed-size
-   pair-local warm-start cache keyed by stable manifold contact identity.
+9. use the same single `FrictionCoefficient` as the current static sticking
+   bound for near-resting tangential motion and the sliding clamp when the
+   requested tangent impulse exceeds that bound.
+10. store the solved normal, primary tangent, secondary tangent, and contact
+    normal in a fixed-size pair-local warm-start cache keyed by stable manifold
+    contact identity.
 
 When diagnostics are enabled, the pair emits contact and response events in the
 same deterministic order as collision processing: `Contact`, one
-`ResponseImpulse` event for each applied normal impulse, then body velocity-delta
-events produced by normal and friction response. The diagnostics stream is
-observational only; it does not change pair ordering, contact data, or response
-behavior.
+`ResponseImpulse` event for each fresh normal-solve delta, then body
+velocity-delta events produced by cached warm-start, normal, and friction
+response. The diagnostics stream is observational only; it does not change pair
+ordering, contact data, or response behavior.
 
 Response units and invariants:
 
@@ -771,9 +779,10 @@ Response units and invariants:
 - `StiffBody.FrictionCoefficient` is a non-negative Coulomb coefficient. Values
   above one are allowed for intentional high-friction materials.
 - friction impulses oppose tangential contact motion and are clamped by the
-  normal impulse. 3D pair-local warm-start storage records normal and tangent
-  impulses by contact identity; applying cached impulses as a true warm-started
-  iterative solve remains a later 3D solver hardening step. Pure 2D response
+  normal impulse. 3D pair-local warm-start storage records solved normal,
+  primary tangent, secondary tangent, and contact normal values by contact
+  identity; cached entries are applied before the fresh solve only when the
+  current normal remains compatible with the stored normal. Pure 2D response
   applies cached normal and tangent impulses before the fresh solve, accumulates
   and clamps normal impulses at zero, and clamps tangent impulses to the current
   Coulomb bound so stale cache entries can unwind.
@@ -782,11 +791,11 @@ Response units and invariants:
 - drag and angular damping remain integration/body behavior; contact friction is
   handled by the response solver.
 
-This is still the first alpha milestone, not a full response engine. Static
-friction for resting stacks, multi-iteration island solving, exact angular TOI,
-exact swept polytope support, and richer mixed-dimension solver behavior remain
-future work. Discrete response, contact clipping, cylinder edge cases, and
-mixed solver quality are tracked in
+This is still the first alpha milestone, not a full response engine. Explicit
+discrete islands, multi-iteration stack solving, exact angular TOI, exact swept
+polytope support, and richer mixed-dimension solver behavior remain future
+work. Discrete response, contact clipping, cylinder edge cases, and mixed
+solver quality are tracked in
 [`Discrete Response And Contact Quality Hardening`](../feature-work/2026-06-21-discrete-response-and-contact-quality-hardening-plan.md);
 exact CCD reducer work remains in
 [`CCD Exact TOI And Shape Reducers`](../feature-work/2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md).

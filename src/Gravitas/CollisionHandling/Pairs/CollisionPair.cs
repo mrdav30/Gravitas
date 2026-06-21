@@ -374,8 +374,13 @@ public class CollisionPair
         _isPooledForDeactivation = false;
     }
 
-    internal void StoreWarmStartImpulse(ulong contactId, Fixed64 normalImpulse, Fixed64 tangentImpulse) =>
-        _warmStart.Set(contactId, normalImpulse, tangentImpulse);
+    internal void StoreWarmStartImpulse(
+        ulong contactId,
+        Vector3d normal,
+        Fixed64 normalImpulse,
+        Fixed64 tangentImpulse,
+        Fixed64 secondaryTangentImpulse = default) =>
+        _warmStart.Set(contactId, normal, normalImpulse, tangentImpulse, secondaryTangentImpulse);
 
     internal bool TryGetWarmStartImpulse(ulong contactId, out ContactWarmStartImpulse impulse) =>
         _warmStart.TryGet(contactId, out impulse);

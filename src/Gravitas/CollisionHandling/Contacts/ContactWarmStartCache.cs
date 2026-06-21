@@ -11,7 +11,7 @@ using System.Runtime.CompilerServices;
 namespace Gravitas.CollisionHandling;
 
 /// <summary>
-/// Fixed-size warm-start cache keyed by stable manifold contact identity.
+/// Fixed-size 3D warm-start cache keyed by stable manifold contact identity.
 /// </summary>
 internal struct ContactWarmStartCache
 {
@@ -39,9 +39,14 @@ internal struct ContactWarmStartCache
         _impulse3 = default;
     }
 
-    public void Set(ulong contactId, Fixed64 normalImpulse, Fixed64 tangentImpulse)
+    public void Set(
+        ulong contactId,
+        Vector3d normal,
+        Fixed64 normalImpulse,
+        Fixed64 tangentImpulse,
+        Fixed64 secondaryTangentImpulse = default)
     {
-        ContactWarmStartImpulse impulse = new(normalImpulse, tangentImpulse);
+        ContactWarmStartImpulse impulse = new(normal, normalImpulse, tangentImpulse, secondaryTangentImpulse);
         for (int i = 0; i < Count; i++)
         {
             if (GetContactId(i) != contactId)

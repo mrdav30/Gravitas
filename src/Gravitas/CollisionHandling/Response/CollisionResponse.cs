@@ -32,6 +32,8 @@ public static class CollisionResponse
     /// </summary>
     public static readonly Fixed64 RestitutionVelocityThreshold = (Fixed64)0.25f;
 
+    private static readonly Fixed64 WarmStartNormalCompatibilityThreshold = Fixed64.FromFraction(63, 64);
+
     /// <summary>
     /// Applies positional correction, normal impulses, and Coulomb friction for
     /// the collision pair's current deterministic contact manifold.
@@ -50,30 +52,53 @@ public static class CollisionResponse
             ApplyPositionCorrection(contacts.GetContact(i), contactShare);
 
         for (int i = 0; i < contacts.Count; i++)
+            ApplyCachedImpulse(contacts.GetContact(i));
+
+        for (int i = 0; i < contacts.Count; i++)
         {
-            Fixed64 impulseScalar = ComputeNormalImpulseScalar(
-                contacts.GetContact(i),
+            SolverContact contact = contacts.GetContact(i);
+            Fixed64 normalDelta = ComputeNormalImpulseDelta(
+                contact,
                 out Fixed64 normalVelocity);
-            contacts.SetNormalImpulse(i, impulseScalar * contactShare, normalVelocity);
+            Fixed64 scaledNormalDelta = normalDelta > Fixed64.Zero
+                ? normalDelta * contactShare
+                : normalDelta;
+            Fixed64 normalImpulse = FixedMath.Max(
+                Fixed64.Zero,
+                contact.CachedNormalImpulse + scaledNormalDelta);
+            contacts.SetNormalImpulse(i, normalImpulse, normalVelocity);
         }
 
         for (int i = 0; i < contacts.Count; i++)
+        {
+            SolverContact contact = contacts.GetContact(i);
             ApplyNormalImpulse(
                 pair,
-                contacts.GetContact(i),
-                contacts.GetNormalImpulse(i),
+                contact,
+                contacts.GetNormalImpulse(i) - contact.CachedNormalImpulse,
                 contacts.GetNormalVelocity(i));
+        }
 
         for (int i = 0; i < contacts.Count; i++)
-            contacts.SetTangentImpulse(i, ApplyFrictionImpulse(contacts.GetContact(i), contacts.GetNormalImpulse(i)));
+        {
+            SolverContact contact = contacts.GetContact(i);
+            SolveFrictionImpulse(
+                contact,
+                FixedMath.Max(contacts.GetNormalImpulse(i), contact.CachedNormalImpulse),
+                out Fixed64 tangentImpulse,
+                out Fixed64 secondaryTangentImpulse);
+            contacts.SetTangentImpulse(i, tangentImpulse, secondaryTangentImpulse);
+        }
 
         for (int i = 0; i < contacts.Count; i++)
         {
             SolverContact contact = contacts.GetContact(i);
             pair.StoreWarmStartImpulse(
                 contact.ContactId,
+                contact.Normal,
                 contacts.GetNormalImpulse(i),
-                contacts.GetTangentImpulse(i));
+                contacts.GetTangentImpulse(i),
+                contacts.GetSecondaryTangentImpulse(i));
         }
     }
 
@@ -121,6 +146,19 @@ public static class CollisionResponse
         if (normal == Vector3d.Zero)
             return false;
 
+        Fixed64 cachedNormalImpulse = Fixed64.Zero;
+        Fixed64 cachedTangentImpulse = Fixed64.Zero;
+        Fixed64 cachedSecondaryTangentImpulse = Fixed64.Zero;
+        if (pair.TryGetWarmStartImpulse(manifoldContact.ContactId, out ContactWarmStartImpulse cached))
+        {
+            if (IsWarmStartCompatible(cached.Normal, normal))
+            {
+                cachedNormalImpulse = cached.NormalImpulse;
+                cachedTangentImpulse = cached.TangentImpulse;
+                cachedSecondaryTangentImpulse = cached.SecondaryTangentImpulse;
+            }
+        }
+
         contact = new SolverContact(
             manifoldContact.ContactId,
             bodyA,
@@ -130,7 +168,10 @@ public static class CollisionResponse
             manifoldContact.PointA - bodyA.Body.WorldCenterOfMass,
             manifoldContact.PointB - bodyB.Body.WorldCenterOfMass,
             manifoldContact.Depth,
-            normal);
+            normal,
+            cachedNormalImpulse,
+            cachedTangentImpulse,
+            cachedSecondaryTangentImpulse);
         return true;
     }
 
@@ -150,19 +191,34 @@ public static class CollisionResponse
         contact.B.Body.ApplyCollisionPositionCorrection(correction * contact.B.InverseMass);
     }
 
-    private static Fixed64 ComputeNormalImpulseScalar(SolverContact contact, out Fixed64 normalVelocity)
+    private static void ApplyCachedImpulse(SolverContact contact)
+    {
+        if (contact.CachedNormalImpulse == Fixed64.Zero
+            && contact.CachedTangentImpulse == Fixed64.Zero
+            && contact.CachedSecondaryTangentImpulse == Fixed64.Zero)
+        {
+            return;
+        }
+
+        Vector3d impulse =
+            contact.Normal * contact.CachedNormalImpulse
+            + contact.Tangent * contact.CachedTangentImpulse
+            + contact.SecondaryTangent * contact.CachedSecondaryTangentImpulse;
+        ApplyImpulse(contact.A, -impulse, contact.RelativeA);
+        ApplyImpulse(contact.B, impulse, contact.RelativeB);
+    }
+
+    private static Fixed64 ComputeNormalImpulseDelta(SolverContact contact, out Fixed64 normalVelocity)
     {
         normalVelocity = Vector3d.Dot(ComputeRelativeVelocity(contact), contact.Normal);
-        if (normalVelocity >= Fixed64.Zero)
-            return Fixed64.Zero;
-
         Fixed64 denominator = ComputeImpulseDenominator(contact, contact.Normal);
         if (denominator <= Fixed64.Epsilon)
             return Fixed64.Zero;
 
-        Fixed64 restitution = ResolveRestitution(contact, -normalVelocity);
-        Fixed64 impulseScalar = -(Fixed64.One + restitution) * normalVelocity / denominator;
-        return impulseScalar > Fixed64.Zero ? impulseScalar : Fixed64.Zero;
+        Fixed64 restitution = normalVelocity < Fixed64.Zero
+            ? ResolveRestitution(contact, -normalVelocity)
+            : Fixed64.Zero;
+        return -(Fixed64.One + restitution) * normalVelocity / denominator;
     }
 
     private static void ApplyNormalImpulse(
@@ -171,7 +227,7 @@ public static class CollisionResponse
         Fixed64 impulseScalar,
         Fixed64 normalVelocity)
     {
-        if (impulseScalar <= Fixed64.Zero)
+        if (impulseScalar == Fixed64.Zero)
             return;
 
         Vector3d impulse = contact.Normal * impulseScalar;
@@ -180,36 +236,93 @@ public static class CollisionResponse
         ApplyImpulse(contact.B, impulse, contact.RelativeB);
     }
 
-    private static Fixed64 ApplyFrictionImpulse(SolverContact contact, Fixed64 normalImpulseScalar)
+    private static void SolveFrictionImpulse(
+        SolverContact contact,
+        Fixed64 normalImpulseScalar,
+        out Fixed64 tangentImpulse,
+        out Fixed64 secondaryTangentImpulse)
     {
-        if (normalImpulseScalar <= Fixed64.Zero)
-            return Fixed64.Zero;
+        tangentImpulse = Fixed64.Zero;
+        secondaryTangentImpulse = Fixed64.Zero;
 
         Fixed64 frictionCoefficient = ResolveFrictionCoefficient(contact);
-        if (frictionCoefficient <= Fixed64.Zero)
-            return Fixed64.Zero;
+        Fixed64 maxFrictionImpulse = normalImpulseScalar > Fixed64.Zero && frictionCoefficient > Fixed64.Zero
+            ? normalImpulseScalar * frictionCoefficient
+            : Fixed64.Zero;
+        if (maxFrictionImpulse <= Fixed64.Zero)
+        {
+            ApplyFrictionDelta(contact, -contact.CachedTangentImpulse, -contact.CachedSecondaryTangentImpulse);
+            return;
+        }
 
         Vector3d relativeVelocity = ComputeRelativeVelocity(contact);
-        Vector3d tangentVelocity = relativeVelocity - contact.Normal * Vector3d.Dot(relativeVelocity, contact.Normal);
-        if (tangentVelocity.MagnitudeSquared <= Fixed64.Epsilon)
+        Fixed64 tangentDelta = ComputeTangentImpulseDelta(contact, relativeVelocity, contact.Tangent);
+        Fixed64 secondaryTangentDelta = ComputeTangentImpulseDelta(contact, relativeVelocity, contact.SecondaryTangent);
+        tangentImpulse = contact.CachedTangentImpulse + tangentDelta;
+        secondaryTangentImpulse = contact.CachedSecondaryTangentImpulse + secondaryTangentDelta;
+        ClampTangentImpulsePair(
+            ref tangentImpulse,
+            ref secondaryTangentImpulse,
+            maxFrictionImpulse);
+
+        ApplyFrictionDelta(
+            contact,
+            tangentImpulse - contact.CachedTangentImpulse,
+            secondaryTangentImpulse - contact.CachedSecondaryTangentImpulse);
+    }
+
+    private static Fixed64 ComputeTangentImpulseDelta(
+        SolverContact contact,
+        Vector3d relativeVelocity,
+        Vector3d tangent)
+    {
+        Fixed64 tangentVelocity = Vector3d.Dot(relativeVelocity, tangent);
+        if (tangentVelocity.Abs() <= Fixed64.Epsilon)
             return Fixed64.Zero;
 
-        Vector3d tangent = tangentVelocity.Normalized;
         Fixed64 denominator = ComputeImpulseDenominator(contact, tangent);
-        if (denominator <= Fixed64.Epsilon)
-            return Fixed64.Zero;
+        return denominator > Fixed64.Epsilon
+            ? -tangentVelocity / denominator
+            : Fixed64.Zero;
+    }
 
-        Fixed64 tangentVelocityMagnitude = Vector3d.Dot(relativeVelocity, tangent);
-        Fixed64 impulseScalar = -tangentVelocityMagnitude / denominator;
-        Fixed64 maxFrictionImpulse = normalImpulseScalar * frictionCoefficient;
-        impulseScalar = FixedMath.Clamp(impulseScalar, -maxFrictionImpulse, maxFrictionImpulse);
-        if (impulseScalar == Fixed64.Zero)
-            return Fixed64.Zero;
+    private static void ApplyFrictionDelta(
+        SolverContact contact,
+        Fixed64 tangentDelta,
+        Fixed64 secondaryTangentDelta)
+    {
+        if (tangentDelta == Fixed64.Zero && secondaryTangentDelta == Fixed64.Zero)
+            return;
 
-        Vector3d impulse = tangent * impulseScalar;
+        Vector3d impulse =
+            contact.Tangent * tangentDelta
+            + contact.SecondaryTangent * secondaryTangentDelta;
         ApplyImpulse(contact.A, -impulse, contact.RelativeA);
         ApplyImpulse(contact.B, impulse, contact.RelativeB);
-        return impulseScalar;
+    }
+
+    private static void ClampTangentImpulsePair(
+        ref Fixed64 tangentImpulse,
+        ref Fixed64 secondaryTangentImpulse,
+        Fixed64 maxMagnitude)
+    {
+        Fixed64 magnitudeSquared = tangentImpulse * tangentImpulse
+            + secondaryTangentImpulse * secondaryTangentImpulse;
+        Fixed64 maxMagnitudeSquared = maxMagnitude * maxMagnitude;
+        if (magnitudeSquared <= maxMagnitudeSquared)
+            return;
+
+        Fixed64 magnitude = FixedMath.Sqrt(magnitudeSquared);
+        if (magnitude <= Fixed64.Epsilon)
+        {
+            tangentImpulse = Fixed64.Zero;
+            secondaryTangentImpulse = Fixed64.Zero;
+            return;
+        }
+
+        Fixed64 scale = maxMagnitude / magnitude;
+        tangentImpulse *= scale;
+        secondaryTangentImpulse *= scale;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -274,6 +387,10 @@ public static class CollisionResponse
             ? FixedMath.Sqrt(frictionProduct)
             : Fixed64.Zero;
     }
+
+    private static bool IsWarmStartCompatible(Vector3d cachedNormal, Vector3d normal) =>
+        cachedNormal.MagnitudeSquared > Fixed64.Epsilon
+        && Vector3d.Dot(cachedNormal, normal) >= WarmStartNormalCompatibilityThreshold;
 
     private static Vector3d ResolveContactNormal(Vector3d normal, Vector3d fallbackDirection)
     {
