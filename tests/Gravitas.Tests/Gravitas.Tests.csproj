@@ -33,6 +33,9 @@
 		</PackageReference>
 	</ItemGroup>
 	<ItemGroup>
+		<Compile Include="..\Gravitas.SharedBenchmarkSupport\ContinuousCollisionBenchmarkLayout.cs" Link="Support\ContinuousCollisionBenchmarkLayout.cs" />
+	</ItemGroup>
+	<ItemGroup>
 		<None Remove=".gitignore" />
 	</ItemGroup>
 </Project>

@@ -72,6 +72,25 @@ dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll all 
 
 Do not treat short-run numbers as canonical measurements.
 
+### Continuous collision evidence
+
+`dynamic-ccd-scaling` keeps short CCD regression rows. Use the heavier
+`continuous-collision-evidence` selection when collecting CCD performance
+evidence for pure 2D, pure 3D, mixed full-runtime CCD, static query, dynamic
+candidate-index, relative sweep, and shape-exact attribution:
+
+```bash
+dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll continuous-collision-evidence --filter "*Evidence*" --exporters json
+```
+
+These rows are intentionally manual for now; do not wire them into CI until the
+repo-wide benchmark publication/gating strategy is settled.
+
+Rows with `FullRuntime` in the method name include benchmark reset,
+host-transform publish, and simulation cost. Prefer the attribution rows when
+you need allocation-focused signal for CCD query, candidate-index, or relative
+sweep internals.
+
 ## Suggested Benchmark Areas
 
 Start with hot paths that can be isolated and repeated deterministically:
@@ -82,6 +101,9 @@ Start with hot paths that can be isolated and repeated deterministically:
 - `CollisionDetection` shape-pair checks.
 - `CollisionResponse` contact resolution.
 - continuous collision detection policy and swept movement cost.
+- production CCD evidence through pure 2D, pure 3D, mixed full-runtime,
+  static query, dynamic candidate-index, dynamic relative sweep, and shape-exact
+  false-positive scenarios.
 - pure 2D host-agent setup, runtime-mode gated integration, GridForge-backed
   broad phase, sweep baselines, narrow-phase pairs, response, and overlap
   and raycast queries.
@@ -140,6 +162,10 @@ to add or tighten explicit allocation tests before changing the algorithm.
 | `diagnostics` | Disabled/enabled force and torque event hooks plus disabled/enabled primitive and mesh collider debug draw capture. |
 | `partition-culling` | dynamic collider repartitioning after teleports, direct partition add/remove churn, and culled-pair invalidation after movement. |
 | `physics-2d` | pure 2D body integration, GridForge-backed 2D partition response, direct angular contact response, direct two-contact manifold response, convex/convex two-contact manifold detection, sweep baseline comparisons, required 2D shape-pair checks, `OverlapCircleAll`, and `RaycastAll`. |
+
+`continuous-collision-evidence` is intentionally omitted from the allocation
+smoke command because it is a heavier manual evidence selection rather than a
+fast local guardrail.
 
 Collider shape work has a focused selection:
 

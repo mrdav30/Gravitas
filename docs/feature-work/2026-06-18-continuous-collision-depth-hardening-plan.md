@@ -1,7 +1,7 @@
 # Continuous Collision Depth Hardening Plan
 
 **Date:** 2026-06-18
-**Status:** Active / Workstream 2 complete
+**Status:** Active / Workstream 3 complete
 **Owner:** Gravitas runtime/collision hardening
 
 ## Purpose
@@ -348,10 +348,43 @@ one focused determinism test for any reusable benchmark scene generator:
 - Separate rows for pure 2D, pure 3D, and mixed so regressions are attributable.
 - Size parameters that include small gameplay scenes and large lockstep scenes.
 
+**Implementation Notes - 2026-06-21**
+
+Workstream 3 now separates quick CCD scaling smoke rows from heavier manual CCD
+evidence rows. `DynamicCcdScalingBenchmarks` remains the fast regression
+selection, while `ContinuousCollisionEvidenceBenchmarks` provides primary
+performance evidence with larger size parameters and `OperationsPerInvoke = 64`.
+
+- Added a shared deterministic CCD benchmark layout under
+  `tests/Gravitas.SharedBenchmarkSupport` and linked it into both the benchmark
+  and test projects. A focused test now verifies repeated descriptor generation
+  produces stable positions, collider ordinals, and layer assignments.
+- Extracted reusable CCD benchmark context creation, body creation, reset, sum,
+  static-query attribution, dynamic candidate-index attribution, and relative
+  sweep helpers into benchmark support files. The dynamic CCD scaling benchmark
+  now uses a fixture instead of owning duplicate setup/query plumbing.
+- Added production evidence rows for pure 3D, pure 2D, mixed full-runtime CCD,
+  static query attribution, dynamic candidate-index attribution, dynamic
+  relative sweep attribution, and shape-exact false-positive scenes.
+- A full short in-process evidence smoke completed all 28 rows without the old
+  `MinIterationTime` warning. Full-runtime 3D and mixed rows intentionally
+  include benchmark reset/host-transform publish cost; the attribution rows
+  isolate the CCD query/index/sweep paths and are the cleaner allocation signal.
+- Removed the unused copied `BenchmarkScenarioFactory` helper and simplified the
+  benchmark alias catalog by deleting an empty qualifier hook.
+- CI benchmark execution remains intentionally deferred. For now these rows are
+  manual evidence runs while repo-wide benchmark publishing/gating is still
+  being evaluated.
+
+Remaining work stays outside this workstream: benchmark publishing/gating,
+external baseline storage/comparison tooling, and host-visible CCD counters if
+the engine later needs runtime diagnostics rather than benchmark-only
+attribution.
+
 **Likely Files**
 
 - `tests/Gravitas.Benchmarks/Core/DynamicCcdScalingBenchmarks.cs`
-- `tests/Gravitas.Benchmarks/Core/SimulationBenchmarks.cs`
+- `tests/Gravitas.Benchmarks/Core/ContinuousCollisionEvidenceBenchmarks.cs`
 - `tests/Gravitas.Benchmarks/Support/*`
 - `tests/Gravitas.Tests/Support/*` if scene generation is shared with tests.
 - `docs/wiki/DIAGNOSTICS.md` if CCD counters become host-visible diagnostics.

@@ -11,7 +11,6 @@ namespace Gravitas.Benchmarks;
 internal sealed class BenchmarkCatalog
 {
     private static readonly string[] _benchmarkSuffixes = new[] { "Benchmarks", "Benchmark" };
-    private static readonly HashSet<string> _selectionQualifiers = new(StringComparer.OrdinalIgnoreCase) { };
     private static readonly Dictionary<string, string[]> _aliasSynonyms = new(StringComparer.OrdinalIgnoreCase)
     {
         ["physics2-d"] = new[] { "physics-2d", "2d", "physics-two-d" }
@@ -42,20 +41,10 @@ internal sealed class BenchmarkCatalog
             string strippedName = StripBenchmarkSuffix(benchmarkType.Name);
             string[] words = SplitWords(strippedName);
             string specificAlias = string.Join("-", words.Select(word => word.ToLowerInvariant()));
-            string selectionAlias = GetSelectionAlias(words);
 
             AddHiddenAlias(aliasLookup, benchmarkType.Name, benchmarkType);
             AddHiddenAlias(aliasLookup, strippedName, benchmarkType);
             AddDisplayAlias(aliasLookup, displayAliases, specificAlias, benchmarkType);
-
-            if (!string.Equals(selectionAlias, specificAlias, StringComparison.OrdinalIgnoreCase))
-                AddDisplayAlias(aliasLookup, displayAliases, selectionAlias, benchmarkType);
-
-            if (_aliasSynonyms.TryGetValue(selectionAlias, out string[] selectionSynonyms))
-            {
-                foreach (string synonym in selectionSynonyms)
-                    AddDisplayAlias(aliasLookup, displayAliases, synonym, benchmarkType);
-            }
 
             if (_aliasSynonyms.TryGetValue(specificAlias, out string[] specificSynonyms))
             {
@@ -166,14 +155,6 @@ internal sealed class BenchmarkCatalog
         }
 
         return typeName;
-    }
-
-    private static string GetSelectionAlias(string[] words)
-    {
-        if (words.Length > 1 && _selectionQualifiers.Contains(words[words.Length - 1]))
-            return string.Join("-", words.Take(words.Length - 1).Select(word => word.ToLowerInvariant()));
-
-        return string.Join("-", words.Select(word => word.ToLowerInvariant()));
     }
 
     private static string[] SplitWords(string value)

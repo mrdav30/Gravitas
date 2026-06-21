@@ -18,6 +18,9 @@
     <!-- The Test SDK is required only for the VSTest Adapter to work -->
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\Gravitas.SharedBenchmarkSupport\ContinuousCollisionBenchmarkLayout.cs" Link="Support\ContinuousCollisionBenchmarkLayout.cs" />
+  </ItemGroup>
+  <ItemGroup>
     <None Remove=".gitignore" />
   </ItemGroup>
 </Project>
