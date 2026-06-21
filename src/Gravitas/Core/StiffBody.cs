@@ -71,6 +71,16 @@ public class StiffBody : IRecordable
         set => _continuousCollisionMode = value;
     }
 
+    /// <summary>
+    /// Gets the number of continuous-collision impacts consumed by the most recent late simulation step.
+    /// </summary>
+    public int LastContinuousCollisionSubstepCount { get; private set; }
+
+    /// <summary>
+    /// Gets whether the most recent late simulation step reached the configured continuous-collision substep limit.
+    /// </summary>
+    public bool LastContinuousCollisionSubstepLimitReached { get; private set; }
+
     private FixedTransform _positionTransform = null!;
     public FixedTransform PositionTransform => _positionTransform;
 
@@ -680,6 +690,9 @@ public class StiffBody : IRecordable
     {
         if (!Active) return;
 
+        LastContinuousCollisionSubstepCount = 0;
+        LastContinuousCollisionSubstepLimitReached = false;
+
         _lastPosition = Position3d;
 
         if (IsKinematic)
@@ -1187,6 +1200,9 @@ public class StiffBody : IRecordable
 
     private bool TryResolveContinuousCollision(Vector3d startPosition, ref Vector3d proposedPosition)
     {
+        LastContinuousCollisionSubstepCount = 0;
+        LastContinuousCollisionSubstepLimitReached = false;
+
         if (!ShouldUseContinuousCollision(out ContinuousCollisionMode mode))
             return false;
 
@@ -1201,66 +1217,150 @@ public class StiffBody : IRecordable
             return false;
         }
 
-        int hitCount = Context.Query3D.SweepSphereAgainstStaticAll(
-            startPosition,
-            proposedPosition,
-            proxyRadius,
-            PhysicsLayerMask.All,
-            _continuousCollisionHits,
-            Collider,
-            includeTriggers: false);
-        int mixedHitCount = Context.Settings.RuntimeMode.RunsMixedContacts()
-            ? Context.QueryMixed.SweepSphereAgainstStatic2DAll(
+        bool resolved = false;
+        Vector3d currentPosition = startPosition;
+        Fixed64 remainingTime = Context.DeltaTime;
+        Fixed64 elapsedTime = Fixed64.Zero;
+        int maxSubsteps = Context.Settings.ContinuousCollisionMaxSubsteps;
+        for (int substep = 0; substep < maxSubsteps; substep++)
+        {
+            Vector3d segmentDisplacement = _linearVelocity * remainingTime;
+            Fixed64 segmentLength = segmentDisplacement.Magnitude;
+            if (segmentLength <= Fixed64.Epsilon)
+                break;
+
+            Vector3d segmentEnd = currentPosition + segmentDisplacement;
+            Fixed64 elapsedFraction = elapsedTime / Context.DeltaTime;
+            Fixed64 remainingFraction = remainingTime / Context.DeltaTime;
+            if (!TryGetFirstContinuousCollisionHit(
+                    currentPosition,
+                    segmentEnd,
+                    proxyRadius,
+                    elapsedFraction,
+                    remainingFraction,
+                    out Vector3d hitNormal,
+                    out Fixed64 hitDistance))
+            {
+                currentPosition = segmentEnd;
+                break;
+            }
+
+            Fixed64 hitTime = FixedMath.Clamp01(hitDistance / segmentLength);
+            currentPosition += segmentDisplacement.Normalized * hitDistance;
+            Vector3d previousVelocity = _linearVelocity;
+            RemoveClosingContinuousCollisionVelocity(hitNormal);
+            LastContinuousCollisionSubstepCount++;
+            resolved = true;
+
+            Fixed64 consumedTime = remainingTime * hitTime;
+            remainingTime -= consumedTime;
+            elapsedTime += consumedTime;
+            if (remainingTime <= Fixed64.Epsilon || _linearVelocity.MagnitudeSquared <= Fixed64.Epsilon)
+                break;
+
+            if (LastContinuousCollisionSubstepCount >= maxSubsteps)
+            {
+                LastContinuousCollisionSubstepLimitReached = true;
+                break;
+            }
+
+            if (hitTime <= Fixed64.Epsilon && previousVelocity == _linearVelocity)
+                break;
+        }
+
+        proposedPosition = currentPosition;
+        return resolved;
+    }
+
+    private bool TryGetFirstContinuousCollisionHit(
+        Vector3d startPosition,
+        Vector3d proposedPosition,
+        Fixed64 proxyRadius,
+        Fixed64 elapsedFrameFraction,
+        Fixed64 remainingFrameFraction,
+        out Vector3d normal,
+        out Fixed64 distance)
+    {
+        Vector3d originalPosition = Position3d;
+        bool originalPositionMutated = _positionMutated;
+        try
+        {
+            Position3d = startPosition;
+            Collider.RebuildRuntimeShapeOnly(refreshMassProperties: false);
+
+            int hitCount = Context.Query3D.SweepSphereAgainstStaticAll(
                 startPosition,
                 proposedPosition,
                 proxyRadius,
                 PhysicsLayerMask.All,
-                _continuousMixedCollisionHits,
+                _continuousCollisionHits,
                 Collider,
-                includeTriggers: false,
-                cacheTargetPartitions: true)
-            : 0;
+                includeTriggers: false);
+            int mixedHitCount = Context.Settings.RuntimeMode.RunsMixedContacts()
+                ? Context.QueryMixed.SweepSphereAgainstStatic2DAll(
+                    startPosition,
+                    proposedPosition,
+                    proxyRadius,
+                    PhysicsLayerMask.All,
+                    _continuousMixedCollisionHits,
+                    Collider,
+                    includeTriggers: false,
+                    cacheTargetPartitions: true)
+                : 0;
 
-        bool found3D = TryGetFirstValidContinuousCollisionHit(startPosition, proposedPosition, hitCount, out Physics3DHit hit3D);
-        bool foundDynamic3D = TryGetFirstDynamicContinuousCollisionHit(
-            startPosition,
-            proposedPosition,
-            proxyRadius,
-            out Physics3DHit dynamicHit3D,
-            out Fixed64 dynamicClosingSpeed3D);
-        if (ShouldReplaceContinuousCollisionHit(dynamicHit3D, dynamicClosingSpeed3D, foundDynamic3D, found3D, hit3D, Fixed64.Zero))
+            bool found3D = TryGetFirstValidContinuousCollisionHit(startPosition, proposedPosition, hitCount, out Physics3DHit hit3D);
+            bool foundDynamic3D = TryGetFirstDynamicContinuousCollisionHit(
+                startPosition,
+                proposedPosition,
+                proxyRadius,
+                elapsedFrameFraction,
+                remainingFrameFraction,
+                out Physics3DHit dynamicHit3D,
+                out Fixed64 dynamicClosingSpeed3D);
+            if (ShouldReplaceContinuousCollisionHit(dynamicHit3D, dynamicClosingSpeed3D, foundDynamic3D, found3D, hit3D, Fixed64.Zero))
+            {
+                hit3D = dynamicHit3D;
+                found3D = true;
+            }
+
+            bool foundMixed = TryGetFirstValidMixedContinuousCollisionHit(startPosition, proposedPosition, mixedHitCount, out PhysicsMixedHit hitMixed);
+            bool foundDynamicMixed = TryGetFirstDynamicMixedContinuousCollisionHit(
+                startPosition,
+                proposedPosition,
+                proxyRadius,
+                elapsedFrameFraction,
+                remainingFrameFraction,
+                out PhysicsMixedHit dynamicHitMixed,
+                out Fixed64 dynamicClosingSpeedMixed);
+            if (ShouldReplaceMixedContinuousCollisionHit(dynamicHitMixed, dynamicClosingSpeedMixed, foundDynamicMixed, foundMixed, hitMixed, Fixed64.Zero))
+            {
+                hitMixed = dynamicHitMixed;
+                foundMixed = true;
+            }
+
+            if (found3D && (!foundMixed || hit3D.Distance <= hitMixed.Distance))
+            {
+                normal = hit3D.Normal;
+                distance = hit3D.Distance;
+                return true;
+            }
+
+            if (foundMixed)
+            {
+                normal = hitMixed.NormalFor3DSource;
+                distance = hitMixed.Distance;
+                return true;
+            }
+        }
+        finally
         {
-            hit3D = dynamicHit3D;
-            found3D = true;
+            Position3d = originalPosition;
+            Collider.RebuildRuntimeShapeOnly(refreshMassProperties: false);
+            _positionMutated = originalPositionMutated;
         }
 
-        bool foundMixed = TryGetFirstValidMixedContinuousCollisionHit(mixedHitCount, out PhysicsMixedHit hitMixed);
-        bool foundDynamicMixed = TryGetFirstDynamicMixedContinuousCollisionHit(
-            startPosition,
-            proposedPosition,
-            proxyRadius,
-            out PhysicsMixedHit dynamicHitMixed,
-            out Fixed64 dynamicClosingSpeedMixed);
-        if (ShouldReplaceMixedContinuousCollisionHit(dynamicHitMixed, dynamicClosingSpeedMixed, foundDynamicMixed, foundMixed, hitMixed, Fixed64.Zero))
-        {
-            hitMixed = dynamicHitMixed;
-            foundMixed = true;
-        }
-
-        if (found3D && (!foundMixed || hit3D.Distance <= hitMixed.Distance))
-        {
-            proposedPosition = startPosition + displacement.Normalized * hit3D.Distance;
-            RemoveClosingContinuousCollisionVelocity(hit3D.Normal);
-            return true;
-        }
-
-        if (foundMixed)
-        {
-            proposedPosition = startPosition + displacement.Normalized * hitMixed.Distance;
-            RemoveClosingContinuousCollisionVelocity(hitMixed.NormalFor3DSource);
-            return true;
-        }
-
+        normal = Vector3d.Zero;
+        distance = Fixed64.Zero;
         return false;
     }
 
@@ -1288,6 +1388,9 @@ public class StiffBody : IRecordable
             else
                 refined = candidate;
 
+            if (!IsClosingContinuousCollisionHit(displacement, refined.Normal))
+                continue;
+
             if (found && !ContinuousCollisionHitComesBefore(refined, best))
                 continue;
 
@@ -1299,12 +1402,18 @@ public class StiffBody : IRecordable
         return found;
     }
 
-    private bool TryGetFirstValidMixedContinuousCollisionHit(int hitCount, out PhysicsMixedHit hit)
+    private bool TryGetFirstValidMixedContinuousCollisionHit(
+        Vector3d startPosition,
+        Vector3d proposedPosition,
+        int hitCount,
+        out PhysicsMixedHit hit)
     {
+        Vector3d displacement = proposedPosition - startPosition;
         for (int i = 0; i < hitCount; i++)
         {
             PhysicsMixedHit candidate = _continuousMixedCollisionHits[i];
-            if (!IsValidMixedContinuousCollisionHit(candidate))
+            if (!IsValidMixedContinuousCollisionHit(candidate)
+                || !IsClosingContinuousCollisionHit(displacement, candidate.NormalFor3DSource))
                 continue;
 
             hit = candidate;
@@ -1360,6 +1469,8 @@ public class StiffBody : IRecordable
         Vector3d startPosition,
         Vector3d proposedPosition,
         Fixed64 proxyRadius,
+        Fixed64 elapsedFrameFraction,
+        Fixed64 remainingFrameFraction,
         out Physics3DHit hit,
         out Fixed64 closingSpeed)
     {
@@ -1388,14 +1499,17 @@ public class StiffBody : IRecordable
             }
 
             target.EnsureContinuousCollisionFramePrepared(token);
+            Vector3d targetStart = target.ContinuousCollisionFrameStart
+                + target.ContinuousCollisionFrameDisplacement * elapsedFrameFraction;
+            Vector3d targetDisplacement = target.ContinuousCollisionFrameDisplacement * remainingFrameFraction;
             Fixed64 targetRadius = ResolveContinuousCollisionProxyRadius(target.Collider);
             if (targetRadius <= Fixed64.Epsilon
                 || !ContinuousCollisionMath.TrySweepRelativeSpheres(
                     startPosition,
                     sourceDisplacement,
                     proxyRadius,
-                    target.ContinuousCollisionFrameStart,
-                    target.ContinuousCollisionFrameDisplacement,
+                    targetStart,
+                    targetDisplacement,
                     targetRadius,
                     out Fixed64 normalizedTime,
                     out Vector3d normal,
@@ -1406,7 +1520,7 @@ public class StiffBody : IRecordable
 
             Fixed64 distance = sourceLength * normalizedTime;
             Vector3d sourceCenter = startPosition + sourceDisplacement * normalizedTime;
-            Vector3d targetCenter = target.ContinuousCollisionFrameStart + target.ContinuousCollisionFrameDisplacement * normalizedTime;
+            Vector3d targetCenter = targetStart + targetDisplacement * normalizedTime;
             Vector3d point = ResolveDynamicContactPoint(sourceCenter, targetCenter, normal, targetRadius);
             var candidate = new Physics3DHit(target.Collider, point, normal, distance, sourceDirection);
             if (!ShouldReplaceContinuousCollisionHit(candidate, candidateClosingSpeed, true, found, best, bestClosingSpeed))
@@ -1426,6 +1540,8 @@ public class StiffBody : IRecordable
         Vector3d startPosition,
         Vector3d proposedPosition,
         Fixed64 proxyRadius,
+        Fixed64 elapsedFrameFraction,
+        Fixed64 remainingFrameFraction,
         out PhysicsMixedHit hit,
         out Fixed64 closingSpeed)
     {
@@ -1463,8 +1579,9 @@ public class StiffBody : IRecordable
             if (targetRadius <= Fixed64.Epsilon)
                 continue;
 
-            Vector2d targetStart2D = target.ContinuousCollisionFrameStart;
-            Vector2d targetDisplacement2D = target.ContinuousCollisionFrameDisplacement;
+            Vector2d targetStart2D = target.ContinuousCollisionFrameStart
+                + target.ContinuousCollisionFrameDisplacement * elapsedFrameFraction;
+            Vector2d targetDisplacement2D = target.ContinuousCollisionFrameDisplacement * remainingFrameFraction;
             Vector3d targetStart = new(targetStart2D.X, target.Collider.MixedSlabCenterY, targetStart2D.Y);
             Vector3d targetDisplacement = new(targetDisplacement2D.X, Fixed64.Zero, targetDisplacement2D.Y);
             if (!ContinuousCollisionMath.TrySweepRelativeSpheres(
@@ -1661,6 +1778,11 @@ public class StiffBody : IRecordable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private bool IsValidContinuousCollisionHit(Physics3DHit hit) =>
         IsValidContinuousCollisionTarget(hit.Collider);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool IsClosingContinuousCollisionHit(Vector3d displacement, Vector3d normal) =>
+        normal.MagnitudeSquared > Fixed64.Epsilon
+        && Vector3d.Dot(displacement, normal) < -Fixed64.Epsilon;
 
     private bool IsValidContinuousCollisionTarget(LSCollider? hitCollider)
     {

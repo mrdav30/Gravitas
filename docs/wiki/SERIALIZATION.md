@@ -97,9 +97,10 @@ Loading shape data validates the input and rebuilds bounds without waking a
 sleeping body just because state was populated.
 
 `PhysicsSettingsSaver` records frame rate, collision matrix, ground-check layer
-mask, default CCD mode, retained-partition cleanup settings, runtime mode, and
-mixed 2D half-thickness. Applying it owns a new `PhysicsSettings` instance for
-the target context and synchronizes the context clock.
+mask, default CCD mode, CCD substep limit, retained-partition cleanup settings,
+runtime mode, and mixed 2D half-thickness. Applying it owns a new
+`PhysicsSettings` instance for the target context and synchronizes the context
+clock.
 
 `PhysicsLayer` and `PhysicsLayerMask` still use direct JSON/MemoryPack-friendly
 field annotations because they are small value helpers, not Chronicler graphs.

@@ -91,6 +91,17 @@ host-transform publish, and simulation cost. Prefer the attribution rows when
 you need allocation-focused signal for CCD query, candidate-index, or relative
 sweep internals.
 
+### Continuous collision substeps
+
+Use `continuous-collision-substep` when comparing the bounded same-frame TOI
+solver. The selection runs pure 2D and pure 3D two-contact static scenes with
+`ContinuousCollisionMaxSubsteps` values of `1`, `2`, and `4`, so the old
+first-hit clamp shape remains measurable as the `1`-substep configuration:
+
+```bash
+dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll continuous-collision-substep --filter "*Substep*" --exporters json
+```
+
 ## Suggested Benchmark Areas
 
 Start with hot paths that can be isolated and repeated deterministically:
@@ -104,6 +115,8 @@ Start with hot paths that can be isolated and repeated deterministically:
 - production CCD evidence through pure 2D, pure 3D, mixed full-runtime,
   static query, dynamic candidate-index, dynamic relative sweep, and shape-exact
   false-positive scenarios.
+- bounded CCD substep solving through one-substep, two-substep, and default
+  multi-substep two-contact scenes.
 - pure 2D host-agent setup, runtime-mode gated integration, GridForge-backed
   broad phase, sweep baselines, narrow-phase pairs, response, and overlap
   and raycast queries.
@@ -163,9 +176,9 @@ to add or tighten explicit allocation tests before changing the algorithm.
 | `partition-culling` | dynamic collider repartitioning after teleports, direct partition add/remove churn, and culled-pair invalidation after movement. |
 | `physics-2d` | pure 2D body integration, GridForge-backed 2D partition response, direct angular contact response, direct two-contact manifold response, convex/convex two-contact manifold detection, sweep baseline comparisons, required 2D shape-pair checks, `OverlapCircleAll`, and `RaycastAll`. |
 
-`continuous-collision-evidence` is intentionally omitted from the allocation
-smoke command because it is a heavier manual evidence selection rather than a
-fast local guardrail.
+`continuous-collision-evidence` and `continuous-collision-substep` are
+intentionally omitted from the allocation smoke command because they are heavier
+manual evidence selections rather than fast local guardrails.
 
 Collider shape work has a focused selection:
 

@@ -116,6 +116,82 @@ public sealed class ContinuousCollisionDetectionTests
     }
 
     [Fact]
+    public void ContinuousMode_ShouldConsumeRemainingFrameTimeAfterSlidingIntoSecondStaticContact()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        CreateStaticWall(scenario, Fixed64.Zero);
+        LSCuboidCollider horizontalWall = new()
+        {
+            Size = new Vector3d((Fixed64)8, (Fixed64)8, WallThickness)
+        };
+        scenario.InitializeStaticCollider(horizontalWall, new Vector3d((Fixed64)(-1), Fixed64.Zero, (Fixed64)3));
+        ScenarioBody<LSSphereCollider> mover = scenario.CreateSphere(new Vector3d((Fixed64)(-2), Fixed64.Zero, Fixed64.Zero));
+        mover.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        DisableGroundQueries(mover.Body);
+
+        mover.Body.AddForce(new Vector3d((Fixed64)4, Fixed64.Zero, (Fixed64)4));
+        scenario.Context.LateSimulate();
+
+        mover.Body.Position3d.X.Should().BeLessThanOrEqualTo(ExpectedSphereImpactX);
+        mover.Body.Position3d.Z.Should().BeGreaterThanOrEqualTo(Fixed64.FromFraction(49, 20));
+        mover.Body.LinearVelocity.Should().Be(Vector3d.Zero);
+    }
+
+    [Fact]
+    public void ContinuousMode_WithSubstepLimit_ShouldExposeDeterministicLimitState()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        scenario.Context.Settings.ContinuousCollisionMaxSubsteps = 1;
+        CreateStaticWall(scenario, Fixed64.Zero);
+        LSCuboidCollider horizontalWall = new()
+        {
+            Size = new Vector3d((Fixed64)8, (Fixed64)8, WallThickness)
+        };
+        scenario.InitializeStaticCollider(horizontalWall, new Vector3d((Fixed64)(-1), Fixed64.Zero, (Fixed64)3));
+        ScenarioBody<LSSphereCollider> mover = scenario.CreateSphere(new Vector3d((Fixed64)(-2), Fixed64.Zero, Fixed64.Zero));
+        mover.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        DisableGroundQueries(mover.Body);
+
+        mover.Body.AddForce(new Vector3d((Fixed64)4, Fixed64.Zero, (Fixed64)4));
+        scenario.Context.LateSimulate();
+
+        mover.Body.LastContinuousCollisionSubstepCount.Should().Be(1);
+        mover.Body.LastContinuousCollisionSubstepLimitReached.Should().BeTrue();
+        mover.Body.Position3d.Z.Should().BeLessThan(Fixed64.FromFraction(49, 20));
+        mover.Body.LinearVelocity.Z.Should().Be((Fixed64)4);
+    }
+
+    [Fact]
+    public void ContinuousMode_SubstepPath_ShouldNotAllocateAfterWarmup()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        CreateStaticWall(scenario, Fixed64.Zero);
+        LSCuboidCollider horizontalWall = new()
+        {
+            Size = new Vector3d((Fixed64)8, (Fixed64)8, WallThickness)
+        };
+        scenario.InitializeStaticCollider(horizontalWall, new Vector3d((Fixed64)(-1), Fixed64.Zero, (Fixed64)3));
+        ScenarioBody<LSSphereCollider> mover = scenario.CreateSphere(new Vector3d((Fixed64)(-2), Fixed64.Zero, Fixed64.Zero));
+        mover.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        DisableGroundQueries(mover.Body);
+
+        void SimulateSubstepCcd()
+        {
+            mover.Body.ResetPosition(new Vector3d((Fixed64)(-2), Fixed64.Zero, Fixed64.Zero), FixedQuaternion.Identity);
+            mover.Body.AddForce(new Vector3d((Fixed64)4, Fixed64.Zero, (Fixed64)4));
+            scenario.Context.LateSimulate();
+        }
+
+        long allocatedBytes = AllocationTestHelper.MeasureSteadyState(
+            SimulateSubstepCcd,
+            warmupIterations: 16,
+            stabilizationIterations: 4,
+            measurementIterations: 8);
+
+        allocatedBytes.Should().Be(0);
+    }
+
+    [Fact]
     public void AutoMode_ShouldSweepWhenFrameDisplacementExceedsColliderProxyRadius()
     {
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();

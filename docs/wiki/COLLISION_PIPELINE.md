@@ -373,7 +373,7 @@ CCD mode. `ColliderHierarchyState` caches the top parent when parent
 relationships are bound, so `Inherit` can check the parent policy in constant
 time before falling back to the context default.
 
-The alpha CCD path runs during body position integration, after velocity and
+The CCD path runs during body position integration, after velocity and
 acceleration have produced an intended frame displacement and before the
 authoritative position is committed. It first uses a swept proxy derived from
 the moving collider:
@@ -407,9 +407,16 @@ reducers have dedicated tests and benchmark evidence.
 
 `Continuous` always sweeps when the proxy radius and displacement are non-zero.
 `Auto` sweeps only when the intended displacement is larger than the proxy
-radius. When a hit is accepted, the body clamps to the earliest swept center
-time of impact and removes only the closing component of linear velocity,
-preserving tangential velocity for later discrete response work.
+radius. When a hit is accepted, the body advances to the earliest swept center
+time of impact, removes only the closing component of linear velocity, and then
+continues through the remaining frame time with the updated tangential velocity.
+`PhysicsSettings.ContinuousCollisionMaxSubsteps` bounds this same-frame TOI
+consumption; the default is `PhysicsSettings.DefaultContinuousCollisionMaxSubsteps`.
+`StiffBody.LastContinuousCollisionSubstepCount`,
+`StiffBody.LastContinuousCollisionSubstepLimitReached`,
+`StiffBody2D.LastContinuousCollisionSubstepCount`, and
+`StiffBody2D.LastContinuousCollisionSubstepLimitReached` expose the most recent
+step's bounded-solver status for deterministic diagnostics.
 
 Rotational CCD is layered onto the same body-owned opt-in contract for dynamic
 2D and 3D bodies. When a body has angular displacement for the frame, Gravitas
@@ -426,8 +433,8 @@ velocity component along the accepted contact normal.
 The current rotational path is intentionally conservative. It covers dynamic
 angular sources against static-style targets, while kinematic bodies participate
 as targets at their current pose. Host-driven kinematic rotation as an active
-swept source, shape-exact angular time-of-impact solvers, and multi-impact CCD
-solver islands remain future hardening work.
+swept source, shape-exact angular time-of-impact solvers, and global
+service-level CCD island solving remain future hardening work.
 
 Static and kinematic CCD targets are non-trigger bodyless colliders, immovable
 bodies, and kinematic bodies whose layers are allowed by the context collision
@@ -449,7 +456,9 @@ any individual body commits movement. A moving source compares the
 static/kinematic query hit with dynamic relative TOI candidates and chooses the
 earliest distance, then higher closing speed, then stable collider ID order.
 This prevents opposing fast bodies from depending on dynamic body iteration
-order.
+order. When bounded substeps continue after an earlier hit, dynamic target
+prediction is sampled from the same frame-start displacement at the elapsed
+frame fraction, then swept only through the remaining frame fraction.
 
 The dynamic path is intentionally conservative:
 

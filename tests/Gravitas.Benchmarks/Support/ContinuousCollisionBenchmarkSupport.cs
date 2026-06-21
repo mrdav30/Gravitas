@@ -13,6 +13,8 @@ internal static class ContinuousCollisionBenchmarkSupport
 {
     public static readonly Vector3d Force3D = Vector3d.Right * (Fixed64)2;
     public static readonly Vector2d Force2D = Vector2d.Right * (Fixed64)2;
+    public static readonly Vector3d SubstepForce3D = new((Fixed64)4, Fixed64.Zero, (Fixed64)4);
+    public static readonly Vector2d SubstepForce2D = new((Fixed64)4, (Fixed64)4);
 
     public static GravitasWorldContext CreateContext3D(int extentX, int extentZ)
     {
@@ -115,10 +117,34 @@ internal static class ContinuousCollisionBenchmarkSupport
         body.Initialize(position, FixedQuaternion.Identity);
     }
 
+    public static void CreateStaticCuboid3D(GravitasWorldContext context, Vector3d position, Vector3d size)
+    {
+        var agent = new BenchmarkMatterAgent(context, position);
+        var body = new StiffBody(agent, new LSCuboidCollider { Size = size })
+        {
+            Immovable = true,
+            Mass = Fixed64.One
+        };
+
+        body.Initialize(position, FixedQuaternion.Identity);
+    }
+
     public static void CreateStaticCircle2D(GravitasWorldContext context, Vector2d position)
     {
         var agent = new BenchmarkMatterAgent(context, position.ToVector3d(Fixed64.Zero));
         var body = new StiffBody2D(agent, new LSCircleCollider2D(Fixed64.FromFraction(1, 4)))
+        {
+            Immovable = true,
+            Mass = Fixed64.One
+        };
+
+        body.Initialize(position);
+    }
+
+    public static void CreateStaticAabb2D(GravitasWorldContext context, Vector2d position, Vector2d size)
+    {
+        var agent = new BenchmarkMatterAgent(context, position.ToVector3d(Fixed64.Zero));
+        var body = new StiffBody2D(agent, new LSAABBoxCollider2D(size))
         {
             Immovable = true,
             Mass = Fixed64.One
@@ -137,6 +163,16 @@ internal static class ContinuousCollisionBenchmarkSupport
         }
     }
 
+    public static void Reset3DBodies(SwiftList<StiffBody> bodies, Vector3d[] positions, Vector3d force)
+    {
+        for (int i = 0; i < bodies.Count; i++)
+        {
+            StiffBody body = bodies[i];
+            body.ResetPosition(positions[i], FixedQuaternion.Identity);
+            body.AddForce(force);
+        }
+    }
+
     public static void Reset2DBodies(SwiftList<StiffBody2D> bodies, Vector2d[] positions, bool pairedDirections)
     {
         for (int i = 0; i < bodies.Count; i++)
@@ -145,6 +181,17 @@ internal static class ContinuousCollisionBenchmarkSupport
             body.Sleep();
             body.SetPosition(positions[i]);
             body.AddForce(Get2DForce(i, pairedDirections));
+        }
+    }
+
+    public static void Reset2DBodies(SwiftList<StiffBody2D> bodies, Vector2d[] positions, Vector2d force)
+    {
+        for (int i = 0; i < bodies.Count; i++)
+        {
+            StiffBody2D body = bodies[i];
+            body.Sleep();
+            body.SetPosition(positions[i]);
+            body.AddForce(force);
         }
     }
 

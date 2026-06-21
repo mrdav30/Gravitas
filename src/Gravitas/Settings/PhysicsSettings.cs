@@ -14,6 +14,8 @@ public sealed class PhysicsSettings
 
     public const int DefaultRetainedPartitionRetirementSweepBudget = 64;
 
+    public const int DefaultContinuousCollisionMaxSubsteps = 4;
+
     public static readonly Fixed64 DefaultMixed2DHalfThickness = Fixed64.Half;
 
     /// <summary>
@@ -42,6 +44,7 @@ public sealed class PhysicsSettings
 
     private int _retainedPartitionTimeToKillFrames = DefaultRetainedPartitionTimeToKillFrames;
     private int _retainedPartitionRetirementSweepBudget = DefaultRetainedPartitionRetirementSweepBudget;
+    private int _continuousCollisionMaxSubsteps = DefaultContinuousCollisionMaxSubsteps;
     private PhysicsRuntimeMode _runtimeMode = PhysicsRuntimeMode.ThreeD;
     private Fixed64 _mixed2DHalfThickness = DefaultMixed2DHalfThickness;
 
@@ -77,6 +80,19 @@ public sealed class PhysicsSettings
     /// Gets or sets the default tunneling policy used by bodies configured to inherit from the context.
     /// </summary>
     public ContinuousCollisionMode DefaultContinuousCollisionMode { get; set; } = ContinuousCollisionMode.Discrete;
+
+    /// <summary>
+    /// Gets or sets the maximum same-frame continuous-collision impacts one body may consume.
+    /// </summary>
+    public int ContinuousCollisionMaxSubsteps
+    {
+        get => _continuousCollisionMaxSubsteps;
+        set
+        {
+            SwiftThrowHelper.ThrowIfNegativeOrZero(value, nameof(value));
+            _continuousCollisionMaxSubsteps = value;
+        }
+    }
 
     /// <summary>
     /// Gets or sets the default half-thickness used when pure 2D colliders are embedded into mixed 2D/3D contacts.

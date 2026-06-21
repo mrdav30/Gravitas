@@ -1,7 +1,7 @@
 # Continuous Collision Depth Hardening Plan
 
 **Date:** 2026-06-18
-**Status:** Active / Workstream 3 complete
+**Status:** Active / Workstream 4 complete
 **Owner:** Gravitas runtime/collision hardening
 
 ## Purpose
@@ -37,13 +37,14 @@ Current runtime CCD is frame-local:
   bounds-sphere proxy; sphere targets are then reduced through a reversed
   swept-sphere check against the moving source shape when supported by the
   existing 3D sweep worker.
-- accepted hits clamp movement to the earliest time of impact and remove the
-  closing velocity component; ordinary discrete response handles later contact
+- accepted translational hits advance to the earliest time of impact, remove the
+  closing velocity component, and continue through a bounded number of remaining
+  same-frame substeps before ordinary discrete response handles resting contact
   resolution.
 
-That is a good deterministic alpha contract, but it does not yet claim
+That is a good deterministic release-boundary contract, but it does not yet claim
 full shape-exact swept polytope support, kinematic-host active angular casts,
-production-grade benchmark stability, or a full continuous solver island model.
+production benchmark gating, or a global continuous solver island model.
 
 ## Guiding Rules
 
@@ -439,9 +440,10 @@ substep island model in tests/benchmarks before changing the default runtime
 path. Promote only if it improves correctness without unacceptable allocation or
 time-complexity growth.
 
-The likely alpha-compatible path is to keep the current first-hit clamp as the
-default and add a future explicit advanced CCD solver mode if the deeper model
-proves its cost.
+The implementation path should strengthen `Continuous` itself rather than
+adding a weaker legacy/advanced split. `Continuous` should be the first-class
+bounded TOI solver contract, while `Auto` should use the same solver after it
+decides the frame displacement needs CCD.
 
 **Tests To Add First**
 
@@ -470,12 +472,59 @@ proves its cost.
 - `src/Gravitas/Core/GravitasPhysicsService.cs`
 - `src/Gravitas/Core/GravitasPhysics2DService.cs`
 - `src/Gravitas/Core/GravitasMixedCollisionService.cs`
+- `src/Gravitas/Settings/PhysicsSettings.cs`
+- `src/Gravitas/Settings/PhysicsSettingsSaver.cs`
 - `src/Gravitas/CollisionHandling/Response/*`
 - `src/Gravitas/CollisionHandling/Pairs/*`
 - `tests/Gravitas.Tests/CollisionHandling/ContinuousCollisionDetectionTests.cs`
 - `tests/Gravitas.Tests/Physics2D/ContinuousCollision2DTests.cs`
 - `tests/Gravitas.Tests/MixedDimensions/MixedQueryCcdTests.cs`
+- `tests/Gravitas.Tests/Settings/*`
+- `tests/Gravitas.Tests/Serialization/PhysicsSettingsSerializationTests.cs`
 - `tests/Gravitas.Benchmarks/Core/DynamicCcdScalingBenchmarks.cs`
+- `tests/Gravitas.Benchmarks/Core/ContinuousCollisionSubstepBenchmarks.cs`
+
+**Implementation Notes - 2026-06-21**
+
+Workstream 4 upgraded `Continuous` and `Auto` from single-hit clamping to a
+bounded body-owned TOI substep solver for pure 2D, pure 3D, and the existing
+mixed candidate comparison path.
+
+- `PhysicsSettings.ContinuousCollisionMaxSubsteps` now controls the deterministic
+  same-frame impact budget, with
+  `PhysicsSettings.DefaultContinuousCollisionMaxSubsteps` defaulting to `4`.
+- On each accepted translational hit, the body advances to the TOI, removes only
+  the closing component of linear velocity, consumes that portion of frame time,
+  and continues sweeping the remaining segment with the updated velocity.
+- Dynamic target prediction is segment-aware: later substeps sample target
+  frame-start displacement at the elapsed frame fraction and sweep only through
+  the remaining frame fraction.
+- Exact mover refinement now samples the moving collider's runtime shape at the
+  intermediate substep start before evaluating the next sweep. This prevents
+  convex/AABB/compound mover reduction from accidentally using frame-start shape
+  state after an earlier hit.
+- `StiffBody.LastContinuousCollisionSubstepCount`,
+  `StiffBody.LastContinuousCollisionSubstepLimitReached`,
+  `StiffBody2D.LastContinuousCollisionSubstepCount`, and
+  `StiffBody2D.LastContinuousCollisionSubstepLimitReached` expose deterministic
+  last-step solver status for diagnostics and tests.
+- Focused 2D and 3D regressions now cover same-frame two-contact sliding,
+  bounded-limit reporting, and zero-allocation steady-state substep paths. 2D
+  also covers intermediate-shape sampling for non-circle movers.
+- `ContinuousCollisionSubstepBenchmarks` adds two-contact pure 2D and pure 3D
+  rows across `1`, `2`, and `4` max-substep settings, preserving the first-hit
+  clamp shape as measurable evidence without keeping it as the default runtime
+  behavior.
+- A short in-process substep benchmark smoke completed all 12 new rows. The run
+  is useful as setup validation, not canonical timing evidence. It also repeated
+  the already-tracked 3D full-runtime allocation shape, so allocation RCA stays
+  in the benchmark-signal backlog rather than broadening this workstream.
+
+Remaining work is narrower than the original research question: global
+service-level CCD island solving, exact dynamic mesh/compound relative TOI,
+kinematic bodies as active swept sources, and mixed-specific island response
+remain future hardening work if benchmark evidence or game scenarios justify
+the added complexity.
 
 ## Recommended Order
 
@@ -504,7 +553,9 @@ A workstream can graduate into an active implementation phase when it has:
 
 ## Current Recommendation
 
-Do not reopen CCD for another immediate alpha-blocking implementation phase
-unless a concrete game scenario requires one of these guarantees before alpha.
-The current CCD contract is strong enough to proceed with other hardening work,
-and this plan preserves the deeper context for the next dedicated CCD pass.
+The core CCD hardening workstreams in this plan are complete. Do not reopen CCD
+for another broad implementation phase unless benchmark evidence or a concrete
+game scenario requires global islands, exact dynamic mesh/compound relative TOI,
+or mixed-specific continuous response before release. Smaller measured concerns
+should be tracked in
+`docs/feature-work/2026-06-21-benchmark-signal-hardening-backlog-plan.md`.

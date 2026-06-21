@@ -1,5 +1,6 @@
 using FixedMathSharp;
 using FluentAssertions;
+using System;
 using Xunit;
 
 namespace Gravitas.Tests.Settings;
@@ -37,6 +38,8 @@ public sealed class PhysicsSettingsTests
         contextB.Settings.PoolingEnabled.Should().BeTrue();
         contextA.Settings.DefaultContinuousCollisionMode.Should().Be(ContinuousCollisionMode.Discrete);
         contextB.Settings.DefaultContinuousCollisionMode.Should().Be(ContinuousCollisionMode.Discrete);
+        contextA.Settings.ContinuousCollisionMaxSubsteps.Should().Be(PhysicsSettings.DefaultContinuousCollisionMaxSubsteps);
+        contextB.Settings.ContinuousCollisionMaxSubsteps.Should().Be(PhysicsSettings.DefaultContinuousCollisionMaxSubsteps);
     }
 
     [Fact]
@@ -50,5 +53,17 @@ public sealed class PhysicsSettingsTests
         context.FrameRate.Should().Be(48);
         context.DeltaTime.Should().Be(Fixed64.One / (Fixed64)48);
         context.InvDeltaTime.Should().Be(Fixed64.One / context.DeltaTime);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void ContinuousCollisionMaxSubsteps_ShouldRejectNonPositiveValues(int value)
+    {
+        var settings = PhysicsSettings.DefaultSettings();
+
+        Action action = () => settings.ContinuousCollisionMaxSubsteps = value;
+
+        action.Should().Throw<ArgumentException>().WithParameterName("value");
     }
 }

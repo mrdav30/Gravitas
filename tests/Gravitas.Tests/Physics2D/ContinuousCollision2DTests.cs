@@ -33,6 +33,133 @@ public sealed class ContinuousCollision2DTests
     }
 
     [Fact]
+    public void ContinuousMode_ShouldConsumeRemainingFrameTimeAfterSlidingIntoSecondStaticContact()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        StiffBody2D mover = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.Half),
+            new Vector2d((Fixed64)(-2), Fixed64.Zero),
+            immovable: false);
+        _ = CreateBody(
+            context,
+            new LSAABBoxCollider2D(new Vector2d(Fixed64.FromFraction(1, 10), (Fixed64)8)),
+            Vector2d.Zero,
+            immovable: true);
+        _ = CreateBody(
+            context,
+            new LSAABBoxCollider2D(new Vector2d((Fixed64)8, Fixed64.FromFraction(1, 10))),
+            new Vector2d((Fixed64)(-1), (Fixed64)3),
+            immovable: true);
+        mover.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+
+        mover.AddForce(new Vector2d((Fixed64)4, (Fixed64)4));
+        context.LateSimulate();
+
+        mover.Position.X.Should().BeLessThan(Fixed64.Zero);
+        mover.Position.Y.Should().BeGreaterThanOrEqualTo(Fixed64.FromFraction(49, 20));
+        mover.LinearVelocity.Should().Be(Vector2d.Zero);
+    }
+
+    [Fact]
+    public void ContinuousMode_SubstepPath_ShouldEvaluateMoverShapeAtIntermediateTimeOfImpact()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        StiffBody2D mover = CreateBody(
+            context,
+            new LSAABBoxCollider2D(Vector2d.One),
+            new Vector2d((Fixed64)(-2), Fixed64.Zero),
+            immovable: false);
+        _ = CreateBody(
+            context,
+            new LSAABBoxCollider2D(new Vector2d(Fixed64.FromFraction(1, 10), (Fixed64)8)),
+            Vector2d.Zero,
+            immovable: true);
+        _ = CreateBody(
+            context,
+            new LSAABBoxCollider2D(new Vector2d(Fixed64.One, Fixed64.FromFraction(1, 10))),
+            new Vector2d(Fixed64.FromFraction(-11, 20), (Fixed64)3),
+            immovable: true);
+        mover.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+
+        mover.AddForce(new Vector2d((Fixed64)4, (Fixed64)4));
+        context.LateSimulate();
+
+        mover.Position.X.Should().BeLessThan(Fixed64.Zero);
+        mover.Position.Y.Should().BeGreaterThanOrEqualTo(Fixed64.FromFraction(49, 20));
+        mover.LinearVelocity.Should().Be(Vector2d.Zero);
+    }
+
+    [Fact]
+    public void ContinuousMode_WithSubstepLimit_ShouldExposeDeterministicLimitState()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        context.Settings.ContinuousCollisionMaxSubsteps = 1;
+        StiffBody2D mover = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.Half),
+            new Vector2d((Fixed64)(-2), Fixed64.Zero),
+            immovable: false);
+        _ = CreateBody(
+            context,
+            new LSAABBoxCollider2D(new Vector2d(Fixed64.FromFraction(1, 10), (Fixed64)8)),
+            Vector2d.Zero,
+            immovable: true);
+        _ = CreateBody(
+            context,
+            new LSAABBoxCollider2D(new Vector2d((Fixed64)8, Fixed64.FromFraction(1, 10))),
+            new Vector2d((Fixed64)(-1), (Fixed64)3),
+            immovable: true);
+        mover.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+
+        mover.AddForce(new Vector2d((Fixed64)4, (Fixed64)4));
+        context.LateSimulate();
+
+        mover.LastContinuousCollisionSubstepCount.Should().Be(1);
+        mover.LastContinuousCollisionSubstepLimitReached.Should().BeTrue();
+        mover.Position.Y.Should().BeLessThan(Fixed64.FromFraction(49, 20));
+        mover.LinearVelocity.Y.Should().Be((Fixed64)4);
+    }
+
+    [Fact]
+    public void ContinuousMode_SubstepPath_ShouldNotAllocateAfterWarmup()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        StiffBody2D mover = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.Half),
+            new Vector2d((Fixed64)(-2), Fixed64.Zero),
+            immovable: false);
+        _ = CreateBody(
+            context,
+            new LSAABBoxCollider2D(new Vector2d(Fixed64.FromFraction(1, 10), (Fixed64)8)),
+            Vector2d.Zero,
+            immovable: true);
+        _ = CreateBody(
+            context,
+            new LSAABBoxCollider2D(new Vector2d((Fixed64)8, Fixed64.FromFraction(1, 10))),
+            new Vector2d((Fixed64)(-1), (Fixed64)3),
+            immovable: true);
+        mover.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+
+        void SimulateSubstepCcd()
+        {
+            mover.Sleep();
+            mover.SetPosition(new Vector2d((Fixed64)(-2), Fixed64.Zero));
+            mover.AddForce(new Vector2d((Fixed64)4, (Fixed64)4));
+            context.LateSimulate();
+        }
+
+        long allocatedBytes = AllocationTestHelper.MeasureSteadyState(
+            SimulateSubstepCcd,
+            warmupIterations: 16,
+            stabilizationIterations: 4,
+            measurementIterations: 8);
+
+        allocatedBytes.Should().Be(0);
+    }
+
+    [Fact]
     public void ContinuousMode_ShouldUseCompoundOwnerProxyRadius()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);
