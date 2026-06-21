@@ -11,7 +11,7 @@
 ---
 
 **Date:** 2026-06-21
-**Status:** Backlog / alpha candidate
+**Status:** Pre-alpha release blocker
 **Owner:** Gravitas collision/query hardening
 
 ## Purpose

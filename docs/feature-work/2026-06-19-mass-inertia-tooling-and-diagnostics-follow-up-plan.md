@@ -1,7 +1,7 @@
 # Mass Inertia Tooling And Diagnostics Follow-Up Plan
 
 **Date:** 2026-06-19
-**Status:** Backlog / evidence-gated
+**Status:** Post-alpha / evidence-gated
 **Owner:** Gravitas runtime/collision hardening, with possible FixedMathSharp tooling support
 
 ## Purpose

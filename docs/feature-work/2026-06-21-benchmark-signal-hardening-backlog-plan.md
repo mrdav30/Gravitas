@@ -11,7 +11,7 @@
 ---
 
 **Date:** 2026-06-21
-**Status:** Backlog / living signal bucket
+**Status:** Pre-alpha release blocker / evidence closure
 **Owner:** Gravitas benchmark and runtime hardening
 
 ## Purpose

@@ -11,7 +11,7 @@
 ---
 
 **Date:** 2026-06-21
-**Status:** Backlog / alpha candidate
+**Status:** Post-alpha / evidence-gated
 **Owner:** Gravitas benchmark/diagnostics hardening
 
 ## Purpose

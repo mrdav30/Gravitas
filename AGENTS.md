@@ -51,7 +51,9 @@ Read these in order before making non-trivial changes:
    [`DIAGNOSTICS.md`](docs/wiki/DIAGNOSTICS.md) and
    [`DIAGNOSTIC_ADAPTERS.md`](docs/wiki/DIAGNOSTIC_ADAPTERS.md).
 4. The active feature-work plan when a task is part of ongoing hardening.
-   Recent completed context and current backlog plans include
+   Start with [`feature-work-overview.md`](docs/feature-work/feature-work-overview.md)
+   for alpha release scope and recommended ordering. Recent completed context
+   and current backlog plans include
    [`2026-06-01-alpha-physics-follow-up-hardening-plan.md`](docs/feature-work/done/2026-06-01-alpha-physics-follow-up-hardening-plan.md),
    [`2026-06-18-continuous-collision-depth-hardening-plan.md`](docs/feature-work/done/2026-06-18-continuous-collision-depth-hardening-plan.md),
    [`2026-06-18-mass-inertia-solver-follow-up-plan.md`](docs/feature-work/done/2026-06-18-mass-inertia-solver-follow-up-plan.md),
