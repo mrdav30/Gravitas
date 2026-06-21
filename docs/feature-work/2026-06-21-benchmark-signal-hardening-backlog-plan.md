@@ -339,8 +339,9 @@ dedicated plan only when it spans a subsystem or needs multi-week design work.
   `1024` bodies. This is currently expected because mixed mode exercises both
   dimensions and the mixed broad phase. Revisit if the gap grows after the 3D
   allocation RCA or if mixed CCD becomes an immediate alpha target.
-- Benchmark publishing, external baseline storage, and CI gating remain outside
-  this plan until the multi-repository benchmark workflow is chosen.
+- Benchmark publishing, external baseline storage, CI gating, and host-visible
+  CCD counters are tracked in
+  [`2026-06-21-benchmark-publishing-and-ccd-diagnostics-plan.md`](2026-06-21-benchmark-publishing-and-ccd-diagnostics-plan.md).
 
 **Tasks**
 

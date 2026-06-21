@@ -1522,7 +1522,7 @@ lifecycle tests prove the extra state is justified.
   BenchmarkDotNet still warned that these smoke rows have short iteration
   times, so treat them as directional regression guardrails.
 - Captured deeper future CCD work in
-  `docs/feature-work/2026-06-18-continuous-collision-depth-hardening-plan.md`:
+  `docs/feature-work/done/2026-06-18-continuous-collision-depth-hardening-plan.md`:
   rotational CCD, exact swept mover proxies, production-grade CCD benchmark
   signal, and a continuous TOI solver / substep island model.
 
@@ -1612,7 +1612,7 @@ been pulled into separate feature-work plans:
 - Mesh simplification, validation, and decomposition tooling:
   [`2026-06-17-mesh-tooling-simplification-and-decomposition-plan.md`](../2026-06-17-mesh-tooling-simplification-and-decomposition-plan.md).
 - Deeper continuous-collision precision and solver work:
-  [`2026-06-18-continuous-collision-depth-hardening-plan.md`](../2026-06-18-continuous-collision-depth-hardening-plan.md).
+  [`2026-06-18-continuous-collision-depth-hardening-plan.md`](2026-06-18-continuous-collision-depth-hardening-plan.md).
 - Mass, inertia, effective inverse mass, and body center-of-mass solver work:
   [`2026-06-18-mass-inertia-solver-follow-up-plan.md`](2026-06-18-mass-inertia-solver-follow-up-plan.md).
 

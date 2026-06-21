@@ -1,7 +1,7 @@
 # Continuous Collision Depth Hardening Plan
 
 **Date:** 2026-06-18
-**Status:** Active / Workstream 4 complete
+**Status:** Done
 **Owner:** Gravitas runtime/collision hardening
 
 ## Purpose
@@ -42,9 +42,9 @@ Current runtime CCD is frame-local:
   same-frame substeps before ordinary discrete response handles resting contact
   resolution.
 
-That is a good deterministic release-boundary contract, but it does not yet claim
-full shape-exact swept polytope support, kinematic-host active angular casts,
-production benchmark gating, or a global continuous solver island model.
+That is a good deterministic release-boundary contract. Remaining first-class
+CCD hardening concerns have been split into dedicated follow-up plans rather
+than staying as loose notes in this document.
 
 ## Guiding Rules
 
@@ -158,10 +158,12 @@ avoids shape-specific angular casts until benchmarks show a need for them.
 - Benchmark rows now cover angular CCD with no angular motion, sparse angular
   movers, and dense angular movers for pure 2D and pure 3D CCD scaling.
 
-Remaining work stays in later CCD phases: kinematic host rotation as an active
-swept source, exact shape-specific angular time-of-impact solvers, explicit
-compound-part angular benchmark scenes, and continuous solver-island handling
-for multiple CCD impacts in one frame.
+Remaining work has been split into follow-up plans: kinematic host rotation as
+an active swept source lives in the active swept-source plan, exact
+shape-specific angular time-of-impact solvers live in the exact TOI/reducer
+plan, explicit compound/mesh benchmark signal lives in the benchmark-signal
+backlog, and continuous solver-island handling lives in the service-level
+island plan.
 
 **Likely Files**
 
@@ -269,9 +271,10 @@ without changing the public CCD mode contract.
 - Benchmark rows now cover false-positive-heavy 2D and 3D shape-exact CCD
   scenes through `DynamicCcdScalingBenchmarks`.
 
-Remaining work stays in later CCD phases: exact 3D reducers against non-sphere
-primitive targets, exact dynamic-vs-dynamic shape reducers, mixed-dimension
-shape-exact reducers, and mesh-specific production benchmark decisions.
+Remaining exact-reducer work has been split into the exact TOI/reducer plan:
+exact 3D reducers against non-sphere primitive targets, exact
+dynamic-vs-dynamic shape reducers, mixed-dimension shape-exact reducers, and
+mesh/compound reducer policy.
 
 **Likely Files**
 
@@ -373,14 +376,13 @@ performance evidence with larger size parameters and `OperationsPerInvoke = 64`.
   isolate the CCD query/index/sweep paths and are the cleaner allocation signal.
 - Removed the unused copied `BenchmarkScenarioFactory` helper and simplified the
   benchmark alias catalog by deleting an empty qualifier hook.
-- CI benchmark execution remains intentionally deferred. For now these rows are
-  manual evidence runs while repo-wide benchmark publishing/gating is still
-  being evaluated.
+- CI benchmark execution is tracked by the benchmark publishing and CCD
+  diagnostics plan. For now these rows are manual evidence runs while repo-wide
+  benchmark publishing/gating is still being evaluated.
 
-Remaining work stays outside this workstream: benchmark publishing/gating,
-external baseline storage/comparison tooling, and host-visible CCD counters if
-the engine later needs runtime diagnostics rather than benchmark-only
-attribution.
+Remaining benchmark platform work has been split into the benchmark publishing
+and CCD diagnostics plan: benchmark publishing/gating, external baseline
+storage/comparison tooling, and host-visible CCD counters.
 
 **Likely Files**
 
@@ -520,11 +522,11 @@ mixed candidate comparison path.
   the already-tracked 3D full-runtime allocation shape, so allocation RCA stays
   in the benchmark-signal backlog rather than broadening this workstream.
 
-Remaining work is narrower than the original research question: global
-service-level CCD island solving, exact dynamic mesh/compound relative TOI,
-kinematic bodies as active swept sources, and mixed-specific island response
-remain future hardening work if benchmark evidence or game scenarios justify
-the added complexity.
+Remaining work is narrower than the original research question and has been
+split into dedicated follow-up plans: global service-level CCD island solving
+and mixed-specific island response live in the service-level island plan, exact
+dynamic mesh/compound relative TOI lives in the exact TOI/reducer plan, and
+kinematic bodies as active swept sources live in the active swept-source plan.
 
 ## Recommended Order
 
@@ -551,11 +553,28 @@ A workstream can graduate into an active implementation phase when it has:
   behavior.
 - full `Release` and `ReleaseLean` validation after implementation.
 
-## Current Recommendation
+## Plan Closure - 2026-06-21
 
-The core CCD hardening workstreams in this plan are complete. Do not reopen CCD
-for another broad implementation phase unless benchmark evidence or a concrete
-game scenario requires global islands, exact dynamic mesh/compound relative TOI,
-or mixed-specific continuous response before release. Smaller measured concerns
-should be tracked in
-`docs/feature-work/2026-06-21-benchmark-signal-hardening-backlog-plan.md`.
+All four workstreams in this CCD depth plan are complete:
+
+- rotational CCD.
+- shape-exact swept mover proxies.
+- production-grade CCD benchmark signal.
+- bounded continuous TOI substep solving for `Continuous` and `Auto`.
+
+Deferred CCD work has been extracted into dedicated feature-work plans:
+
+- Active kinematic translation/rotation as swept CCD sources:
+  [`2026-06-21-ccd-active-swept-sources-plan.md`](../2026-06-21-ccd-active-swept-sources-plan.md).
+- Shape-exact angular TOI, exact dynamic relative reducers, mesh/compound
+  reducer policy, and mixed shape reducers:
+  [`2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md`](../2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md).
+- Global service-level CCD islands and mixed-specific island response:
+  [`2026-06-21-ccd-service-level-island-solver-plan.md`](../2026-06-21-ccd-service-level-island-solver-plan.md).
+- Benchmark publishing/gating, external baseline comparison, and host-visible
+  CCD counters:
+  [`2026-06-21-benchmark-publishing-and-ccd-diagnostics-plan.md`](../2026-06-21-benchmark-publishing-and-ccd-diagnostics-plan.md).
+
+Measured runtime performance concerns should continue to land in
+[`2026-06-21-benchmark-signal-hardening-backlog-plan.md`](../2026-06-21-benchmark-signal-hardening-backlog-plan.md)
+until they are ready for a focused implementation workstream.

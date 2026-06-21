@@ -434,7 +434,11 @@ The current rotational path is intentionally conservative. It covers dynamic
 angular sources against static-style targets, while kinematic bodies participate
 as targets at their current pose. Host-driven kinematic rotation as an active
 swept source, shape-exact angular time-of-impact solvers, and global
-service-level CCD island solving remain future hardening work.
+service-level CCD island solving are tracked as alpha-candidate follow-up plans:
+[`CCD Active Swept Sources`](../feature-work/2026-06-21-ccd-active-swept-sources-plan.md),
+[`CCD Exact TOI And Shape Reducers`](../feature-work/2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md),
+and
+[`CCD Service-Level Island Solver`](../feature-work/2026-06-21-ccd-service-level-island-solver-plan.md).
 
 Static and kinematic CCD targets are non-trigger bodyless colliders, immovable
 bodies, and kinematic bodies whose layers are allowed by the context collision
