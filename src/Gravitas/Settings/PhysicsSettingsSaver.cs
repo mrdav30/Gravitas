@@ -1,10 +1,16 @@
-﻿using Chronicler;
+﻿//=======================================================================
+// PhysicsSettingsSaver.cs
+//=======================================================================
+// MIT License, Copyright (c) 2026–present David Oravsky (mrdav30)
+// See LICENSE file in the project root for full license information.
+//=======================================================================
+
+using Chronicler;
 using FixedMathSharp;
 using Gravitas.Support;
 using MemoryPack;
 using System;
 using System.Text.Json.Serialization;
-using SwiftCollections;
 
 namespace Gravitas;
 

@@ -5,7 +5,6 @@ using Gravitas.Tests.Support;
 using GridForge.Configuration;
 using GridForge.Grids;
 using GridForge.Spatial;
-using System;
 using Xunit;
 
 namespace Gravitas.Tests.Core;

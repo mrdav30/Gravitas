@@ -2,7 +2,6 @@ using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
-using Gravitas.Support;
 using Gravitas.Tests.Support;
 using Xunit;
 

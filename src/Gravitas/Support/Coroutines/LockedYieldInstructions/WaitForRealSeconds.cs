@@ -1,11 +1,14 @@
-﻿using FixedMathSharp;
-using SwiftCollections;
+﻿//=======================================================================
+// WaitForRealSeconds.cs
+//=======================================================================
+// MIT License, Copyright (c) 2026–present David Oravsky (mrdav30)
+// See LICENSE file in the project root for full license information.
+//=======================================================================
+
+using FixedMathSharp;
 
 namespace Gravitas.Support;
 
-/// <summary>
-/// src - https://stackoverflow.com/questions/30056471/how-to-make-the-script-wait-sleep-in-a-simple-way-in-unity
-/// </summary>
 public struct WaitForRealSeconds : ILockedYieldInstruction
 {
     private readonly GravitasWorldContext _context;

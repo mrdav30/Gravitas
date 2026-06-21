@@ -1,10 +1,12 @@
-﻿using SwiftCollections;
+﻿//=======================================================================
+// WaitForFrames.cs
+//=======================================================================
+// MIT License, Copyright (c) 2026–present David Oravsky (mrdav30)
+// See LICENSE file in the project root for full license information.
+//=======================================================================
 
 namespace Gravitas.Support;
 
-/// <summary>
-/// src - https://forum.unity.com/threads/coroutine-wait-x-frames-not-seconds.550168/
-/// </summary>
 public readonly struct WaitForFrames : ILockedYieldInstruction
 {
     private readonly GravitasWorldContext _context;

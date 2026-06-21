@@ -1,7 +1,6 @@
 using BenchmarkDotNet.Attributes;
 using FixedMathSharp;
 using SwiftCollections;
-using System;
 using static Gravitas.Benchmarks.ContinuousCollisionBenchmarkSupport;
 
 namespace Gravitas.Benchmarks;

@@ -1,7 +1,6 @@
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
-using Gravitas.Support;
 using Gravitas.Tests.Support;
 using SwiftCollections;
 using System;

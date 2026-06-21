@@ -1,9 +1,14 @@
-﻿using FixedMathSharp;
+﻿//=======================================================================
+// CollisionPair.cs
+//=======================================================================
+// MIT License, Copyright (c) 2026–present David Oravsky (mrdav30)
+// See LICENSE file in the project root for full license information.
+//=======================================================================
+
+using FixedMathSharp;
 using Gravitas.Colliders;
-using Gravitas.Support;
 using GridForge.Grids;
 using GridForge.Grids.Topology;
-using SwiftCollections;
 using System;
 using System.Runtime.CompilerServices;
 

@@ -1,9 +1,14 @@
-﻿using FixedMathSharp;
+﻿//=======================================================================
+// CollisionDetection.Cuboid.cs
+//=======================================================================
+// MIT License, Copyright (c) 2026–present David Oravsky (mrdav30)
+// See LICENSE file in the project root for full license information.
+//=======================================================================
+
+using FixedMathSharp;
 using Gravitas.Colliders;
 using SwiftCollections;
 using SwiftCollections.Pool;
-using SwiftCollections.Query;
-using System.Runtime.CompilerServices;
 
 namespace Gravitas.CollisionHandling;
 
@@ -241,32 +246,32 @@ public static partial class CollisionDetection
         switch (axis)
         {
             case 0:
-            {
-                Fixed64 x = normal.X > Fixed64.Zero ? cuboidA.BoundsMax.X : cuboidA.BoundsMin.X;
-                AddCuboidContact(manifold, new Vector3d(x, minY, minZ), normal, depth);
-                AddCuboidContact(manifold, new Vector3d(x, minY, maxZ), normal, depth);
-                AddCuboidContact(manifold, new Vector3d(x, maxY, minZ), normal, depth);
-                AddCuboidContact(manifold, new Vector3d(x, maxY, maxZ), normal, depth);
-                break;
-            }
+                {
+                    Fixed64 x = normal.X > Fixed64.Zero ? cuboidA.BoundsMax.X : cuboidA.BoundsMin.X;
+                    AddCuboidContact(manifold, new Vector3d(x, minY, minZ), normal, depth);
+                    AddCuboidContact(manifold, new Vector3d(x, minY, maxZ), normal, depth);
+                    AddCuboidContact(manifold, new Vector3d(x, maxY, minZ), normal, depth);
+                    AddCuboidContact(manifold, new Vector3d(x, maxY, maxZ), normal, depth);
+                    break;
+                }
             case 1:
-            {
-                Fixed64 y = normal.Y > Fixed64.Zero ? cuboidA.BoundsMax.Y : cuboidA.BoundsMin.Y;
-                AddCuboidContact(manifold, new Vector3d(minX, y, minZ), normal, depth);
-                AddCuboidContact(manifold, new Vector3d(minX, y, maxZ), normal, depth);
-                AddCuboidContact(manifold, new Vector3d(maxX, y, minZ), normal, depth);
-                AddCuboidContact(manifold, new Vector3d(maxX, y, maxZ), normal, depth);
-                break;
-            }
+                {
+                    Fixed64 y = normal.Y > Fixed64.Zero ? cuboidA.BoundsMax.Y : cuboidA.BoundsMin.Y;
+                    AddCuboidContact(manifold, new Vector3d(minX, y, minZ), normal, depth);
+                    AddCuboidContact(manifold, new Vector3d(minX, y, maxZ), normal, depth);
+                    AddCuboidContact(manifold, new Vector3d(maxX, y, minZ), normal, depth);
+                    AddCuboidContact(manifold, new Vector3d(maxX, y, maxZ), normal, depth);
+                    break;
+                }
             default:
-            {
-                Fixed64 z = normal.Z > Fixed64.Zero ? cuboidA.BoundsMax.Z : cuboidA.BoundsMin.Z;
-                AddCuboidContact(manifold, new Vector3d(minX, minY, z), normal, depth);
-                AddCuboidContact(manifold, new Vector3d(minX, maxY, z), normal, depth);
-                AddCuboidContact(manifold, new Vector3d(maxX, minY, z), normal, depth);
-                AddCuboidContact(manifold, new Vector3d(maxX, maxY, z), normal, depth);
-                break;
-            }
+                {
+                    Fixed64 z = normal.Z > Fixed64.Zero ? cuboidA.BoundsMax.Z : cuboidA.BoundsMin.Z;
+                    AddCuboidContact(manifold, new Vector3d(minX, minY, z), normal, depth);
+                    AddCuboidContact(manifold, new Vector3d(minX, maxY, z), normal, depth);
+                    AddCuboidContact(manifold, new Vector3d(maxX, minY, z), normal, depth);
+                    AddCuboidContact(manifold, new Vector3d(maxX, maxY, z), normal, depth);
+                    break;
+                }
         }
     }
 

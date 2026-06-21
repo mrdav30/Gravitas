@@ -1,4 +1,11 @@
-﻿using System.Collections.Generic;
+﻿//=======================================================================
+// LSCoroutine.cs
+//=======================================================================
+// MIT License, Copyright (c) 2026–present David Oravsky (mrdav30)
+// See LICENSE file in the project root for full license information.
+//=======================================================================
+
+using System.Collections.Generic;
 
 namespace Gravitas.Support;
 

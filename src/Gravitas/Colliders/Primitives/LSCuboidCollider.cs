@@ -1,8 +1,15 @@
-﻿using System.Runtime.CompilerServices;
+﻿//=======================================================================
+// LSCuboidCollider.cs
+//=======================================================================
+// MIT License, Copyright (c) 2026–present David Oravsky (mrdav30)
+// See LICENSE file in the project root for full license information.
+//=======================================================================
+
 using FixedMathSharp;
 using FixedMathSharp.Bounds;
 using Gravitas.Queries;
 using SwiftCollections;
+using System.Runtime.CompilerServices;
 
 namespace Gravitas.Colliders;
 

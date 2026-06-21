@@ -1,7 +1,13 @@
-﻿using FixedMathSharp;
+﻿//=======================================================================
+// CollisionDetection.Mesh.cs
+//=======================================================================
+// MIT License, Copyright (c) 2026–present David Oravsky (mrdav30)
+// See LICENSE file in the project root for full license information.
+//=======================================================================
+
+using FixedMathSharp;
 using Gravitas.Colliders;
 using SwiftCollections;
-using SwiftCollections.Pool;
 using SwiftCollections.Query;
 using System.Runtime.CompilerServices;
 

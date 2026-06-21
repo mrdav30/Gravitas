@@ -1,12 +1,17 @@
+//=======================================================================
+// GravitasCollision2DService.cs
+//=======================================================================
+// MIT License, Copyright (c) 2026–present David Oravsky (mrdav30)
+// See LICENSE file in the project root for full license information.
+//=======================================================================
+
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.Support;
-using GridForge;
 using GridForge.Grids;
 using GridForge.Spatial;
 using GridForge.Utility;
 using SwiftCollections;
-using SwiftCollections.Utility;
 using System.Runtime.CompilerServices;
 
 namespace Gravitas;
