@@ -1,7 +1,7 @@
 # Continuous Collision Depth Hardening Plan
 
 **Date:** 2026-06-18
-**Status:** Backlog / future hardening plan
+**Status:** Active / Workstream 1 complete
 **Owner:** Gravitas runtime/collision hardening
 
 ## Purpose
@@ -18,7 +18,7 @@ measured cost, and deterministic ordering before it graduates into runtime code.
 
 ## Current CCD Baseline
 
-Current runtime CCD is translational and frame-local:
+Current runtime CCD is frame-local:
 
 - moving bodies prepare frame-start displacement before late integration mutates
   individual bodies.
@@ -26,6 +26,9 @@ Current runtime CCD is translational and frame-local:
 - dynamic-vs-dynamic CCD uses relative motion against prepared dynamic target
   candidates.
 - mixed CCD uses dedicated mixed query paths and partition refresh caching.
+- dynamic 2D and 3D angular CCD uses conservative angular candidate bounds and
+  deterministic bounded pose samples that are verified through the existing
+  exact narrow-phase before a contact is accepted.
 - 3D sphere and 2D circle movers use exact radius proxies.
 - 3D non-sphere movers use a conservative bounds-sphere proxy.
 - 2D AABB, convex polygon, and compound movers use conservative bounds radii.
@@ -33,9 +36,9 @@ Current runtime CCD is translational and frame-local:
   closing velocity component; ordinary discrete response handles later contact
   resolution.
 
-That is a good deterministic alpha contract, but it does not claim rotational
-CCD, exact swept polytope support, production-grade benchmark stability, or a
-full continuous solver island model.
+That is a good deterministic alpha contract, but it does not yet claim
+shape-exact swept polytope support, kinematic-host active angular casts,
+production-grade benchmark stability, or a full continuous solver island model.
 
 ## Guiding Rules
 
@@ -124,6 +127,35 @@ bounds in typical lockstep scenes.
 - Angular CCD enabled with sparse angular movers.
 - Angular CCD enabled with dense angular movers.
 - Compound angular CCD with many private parts.
+
+**Implementation Notes - 2026-06-20**
+
+Workstream 1 chose conservative angular candidate bounds plus bounded
+deterministic pose samples as the first runtime model. This keeps the
+implementation inside the existing opt-in `ContinuousCollisionMode` contract and
+avoids shape-specific angular casts until benchmarks show a need for them.
+
+- 2D and 3D dynamic angular sources gather static-style targets with a
+  conservative angular radius, then sample up to a fixed maximum number of
+  angular substeps. Each sampled pose rebuilds local runtime shape state and
+  uses the existing narrow-phase before accepting a contact.
+- Accepted rotational hits clamp to the previous safe sample and stop angular
+  motion for the frame. Linear closing velocity is removed using the accepted
+  contact normal so tangential motion can still be handled by the ordinary
+  response path.
+- Focused regressions now cover a rotating 2D thin polygon crossing a circle,
+  a rotating 3D long cuboid crossing a sphere, no-hit angular near misses in
+  both dimensions, and a rotated cuboid/sphere closest-point narrow-phase bug
+  found while hardening the 3D case.
+- 2D and 3D rotational CCD late-simulate paths now have allocation guardrails
+  that require zero managed allocations after warmup.
+- Benchmark rows now cover angular CCD with no angular motion, sparse angular
+  movers, and dense angular movers for pure 2D and pure 3D CCD scaling.
+
+Remaining work stays in later CCD phases: kinematic host rotation as an active
+swept source, exact shape-specific angular time-of-impact solvers, explicit
+compound-part angular benchmark scenes, and continuous solver-island handling
+for multiple CCD impacts in one frame.
 
 **Likely Files**
 

@@ -127,6 +127,110 @@ public sealed partial class GravitasQuery3DService
         return results.Count;
     }
 
+    internal int OverlapSphereAgainstStaticAll(
+        Vector3d position,
+        Fixed64 radius,
+        PhysicsLayerMask layerMask,
+        SwiftList<Physics3DHit> results,
+        LSCollider? excludedCollider = null,
+        bool includeTriggers = true)
+    {
+        SwiftThrowHelper.ThrowIfNull(results, nameof(results));
+
+        results.FastClear();
+        if (radius <= Fixed64.Zero)
+        {
+            LastQueryCandidateCount = 0;
+            return 0;
+        }
+
+        _currentLayerMask = layerMask;
+        _currentExcludedCollider = excludedCollider;
+        _currentIncludeTriggers = includeTriggers;
+        _currentStaticSweepTargetsOnly = true;
+        CircleVersion++;
+        LastQueryCandidateCount = 0;
+        _redundantColliderCheck.Clear();
+        _redundantVoxelCheck.Clear();
+
+        Vector3d min = new(position.X - radius, position.Y - radius, position.Z - radius);
+        Vector3d max = new(position.X + radius, position.Y + radius, position.Z + radius);
+        GridTracer.GetCoveredVoxelsInto(_context.World, min, max, _coveredVoxels, _traceScratch);
+        for (int i = 0; i < _coveredVoxels.Count; i++)
+        {
+            Voxel voxel = _coveredVoxels[i];
+            if (!GridTraversal.TryGetUniquePartition(voxel, _redundantVoxelCheck, out PhysicsPartition? partition))
+                continue;
+
+            ProcessPartitionForAllSphereHits(partition!, position, radius, results);
+        }
+
+        Physics3DHitSorter.SortByDistance(results);
+        return results.Count;
+    }
+
+    private void ProcessPartitionForAllSphereHits(
+        PhysicsPartition partition,
+        Vector3d position,
+        Fixed64 radius,
+        SwiftList<Physics3DHit> results)
+    {
+        if (!_currentStaticSweepTargetsOnly)
+            ProcessColliderListForAllSphereHits(partition.ContainedDynamicObjects, position, radius, results);
+
+        ProcessColliderListForAllSphereHits(partition.ContainedKinematicObjects, position, radius, results);
+        ProcessColliderListForAllSphereHits(partition.ContainedStaticObjects, position, radius, results);
+    }
+
+    private void ProcessColliderListForAllSphereHits(
+        SwiftSparseSet? colliderIds,
+        Vector3d position,
+        Fixed64 radius,
+        SwiftList<Physics3DHit> results)
+    {
+        if (colliderIds == null)
+            return;
+
+        for (int i = colliderIds.Count - 1; i >= 0; i--)
+            if (TryBuildOverlapSphereHit(colliderIds.DenseKeys[i], position, radius, out Physics3DHit hitInfo))
+                results.Add(hitInfo);
+    }
+
+    private bool TryBuildOverlapSphereHit(int colliderId, Vector3d position, Fixed64 radius, out Physics3DHit hit)
+    {
+        hit = default;
+        if (!_context.Physics.TryGetColliderById(colliderId, out LSCollider? current))
+            return false;
+
+        LSCollider collider = current!;
+        if (ReferenceEquals(collider, _currentExcludedCollider)
+            || !_currentLayerMask.Includes(collider.Layer)
+            || collider.CircleQueryVersion == CircleVersion
+            || !_redundantColliderCheck.Add(collider.Id)
+            || (!_currentIncludeTriggers && collider.IsTrigger)
+            || (_currentStaticSweepTargetsOnly && !IsStaticStyleSweepTarget(collider)))
+        {
+            return false;
+        }
+
+        collider.CircleQueryVersion = CircleVersion;
+        LastQueryCandidateCount++;
+
+        Fixed64 broadDistance = collider.ScaledRadius + radius;
+        if ((collider.Center - position).MagnitudeSquared > broadDistance * broadDistance)
+            return false;
+
+        Vector3d point = GetClosestSurfacePoint(collider, position);
+        Vector3d toPoint = point - position;
+        Fixed64 distance = toPoint.Magnitude;
+        if (distance > radius)
+            return false;
+
+        Vector3d normal = collider.GetNormalAtPoint(point);
+        hit = new Physics3DHit(collider, point, normal, distance, toPoint);
+        return true;
+    }
+
     private void TraceCircleForClosestHit(
         Vector3d position,
         Fixed64 radius,

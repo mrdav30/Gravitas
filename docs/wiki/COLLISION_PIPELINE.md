@@ -394,6 +394,24 @@ radius. When a hit is accepted, the body clamps to the earliest swept center
 time of impact and removes only the closing component of linear velocity,
 preserving tangential velocity for later discrete response work.
 
+Rotational CCD is layered onto the same body-owned opt-in contract for dynamic
+2D and 3D bodies. When a body has angular displacement for the frame, Gravitas
+builds a conservative angular candidate radius, gathers static-style targets,
+and samples a bounded deterministic sequence of intermediate poses. Each sample
+refreshes runtime shape state and uses the ordinary exact narrow-phase before a
+rotational contact is accepted. The sample count is derived from angular
+displacement, capped by `ContinuousCollisionMath.MaxRotationalSubsteps`, and
+uses a fixed angular step target so replay does not depend on platform timing or
+collection order. Accepted rotational hits clamp the body to the previous safe
+pose, stop angular motion for the frame, and remove only the linear closing
+velocity component along the accepted contact normal.
+
+The current rotational path is intentionally conservative. It covers dynamic
+angular sources against static-style targets, while kinematic bodies participate
+as targets at their current pose. Host-driven kinematic rotation as an active
+swept source, shape-exact angular time-of-impact solvers, and multi-impact CCD
+solver islands remain future hardening work.
+
 Static and kinematic CCD targets are non-trigger bodyless colliders, immovable
 bodies, and kinematic bodies whose layers are allowed by the context collision
 matrix and whose hierarchy is not excluded. Static or kinematic mesh and

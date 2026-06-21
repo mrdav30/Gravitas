@@ -63,13 +63,40 @@ public sealed class GravitasQuery2DService
         PhysicsLayerMask layerMask,
         SwiftList<Physics2DHit> results)
     {
+        return OverlapCircleAllCore(center, radius, layerMask, results, staticTargetsOnly: false);
+    }
+
+    internal int OverlapCircleAgainstStaticAll(
+        Vector2d center,
+        Fixed64 radius,
+        PhysicsLayerMask layerMask,
+        SwiftList<Physics2DHit> results)
+    {
+        return OverlapCircleAllCore(center, radius, layerMask, results, staticTargetsOnly: true);
+    }
+
+    private int OverlapCircleAllCore(
+        Vector2d center,
+        Fixed64 radius,
+        PhysicsLayerMask layerMask,
+        SwiftList<Physics2DHit> results,
+        bool staticTargetsOnly)
+    {
         SwiftThrowHelper.ThrowIfNull(results, nameof(results));
         SwiftThrowHelper.ThrowIfArgument(radius < Fixed64.Zero, nameof(radius), "2D query radius cannot be negative.");
 
         results.FastClear();
         EnsureCandidateCapacity();
         uint queryVersion = NextCircleQueryVersion();
-        _context.Collisions2D.CollectOverlapCircleCandidates(center, radius, layerMask, queryVersion, _queryCandidates);
+        _context.Collisions2D.CollectBoundsCandidates(
+            new Vector2d(center.X - radius, center.Y - radius),
+            new Vector2d(center.X + radius, center.Y + radius),
+            layerMask,
+            queryVersion,
+            raycastQuery: false,
+            _queryCandidates,
+            staticStyleOnly: staticTargetsOnly);
+
         LastQueryCandidateCount = _queryCandidates.Count;
         for (int i = 0; i < _queryCandidates.Count; i++)
         {

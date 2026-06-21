@@ -1,4 +1,5 @@
-﻿using FixedMathSharp;
+﻿using System.Runtime.CompilerServices;
+using FixedMathSharp;
 using FixedMathSharp.Bounds;
 using Gravitas.Queries;
 using SwiftCollections;
@@ -154,7 +155,7 @@ public class LSCuboidCollider : LSCollider
         {
             if (CurrentState != CuboidState.AABox)
             {
-                _vertices[i] = _orientedBounds.Vertices[i].Rotate(_bounds.Center, Rotation);
+                _vertices[i] = _orientedBounds.Vertices[i].Rotate(Center, Rotation);
                 continue;
             }
 
@@ -346,25 +347,71 @@ public class LSCuboidCollider : LSCollider
         if (CurrentState == CuboidState.AABox)
             return Bounds.ClosestPointOnSurface(other);
 
-        Fixed64 minDistance = Fixed64.MaxValue;
-        Vector3d closestPoint = Center;
+        Vector3d axisX = Rotation.Rotate(Vector3d.Right);
+        Vector3d axisY = Rotation.Rotate(Vector3d.Up);
+        Vector3d axisZ = Rotation.Rotate(Vector3d.Forward);
+        Vector3d halfExtents = ScaledSize * Fixed64.Half;
+        Vector3d delta = other - Center;
+        Fixed64 x = FixedMath.Clamp(Vector3d.Dot(delta, axisX), -halfExtents.X, halfExtents.X);
+        Fixed64 y = FixedMath.Clamp(Vector3d.Dot(delta, axisY), -halfExtents.Y, halfExtents.Y);
+        Fixed64 z = FixedMath.Clamp(Vector3d.Dot(delta, axisZ), -halfExtents.Z, halfExtents.Z);
 
-        // Find closest point on faces
-        for (int i = 0; i < _faceVertices.Length; i++)
+        if (IsPointInsideOrientedBounds(delta, x, y, z, axisX, axisY, axisZ))
+            SnapInsidePointToNearestFace(ref x, ref y, ref z, halfExtents.X, halfExtents.Y, halfExtents.Z);
+
+        return Center
+            + axisX * x
+            + axisY * y
+            + axisZ * z;
+    }
+
+    private static bool IsPointInsideOrientedBounds(
+        Vector3d delta,
+        Fixed64 x,
+        Fixed64 y,
+        Fixed64 z,
+        Vector3d axisX,
+        Vector3d axisY,
+        Vector3d axisZ)
+    {
+        Vector3d closestDelta =
+            axisX * x
+            + axisY * y
+            + axisZ * z;
+
+        return (closestDelta - delta).MagnitudeSquared <= Fixed64.Epsilon;
+    }
+
+    private static void SnapInsidePointToNearestFace(
+        ref Fixed64 x,
+        ref Fixed64 y,
+        ref Fixed64 z,
+        Fixed64 halfX,
+        Fixed64 halfY,
+        Fixed64 halfZ)
+    {
+        Fixed64 distanceX = halfX - x.Abs();
+        Fixed64 distanceY = halfY - y.Abs();
+        Fixed64 distanceZ = halfZ - z.Abs();
+
+        if (distanceX <= distanceY && distanceX <= distanceZ)
         {
-            // Calculate the closest point on the current face
-            Vector3d facePoint = ClosestPointOnFace(_faceVertices[i], _faceNormals[i], _faceCentroids[i], other);
-            Fixed64 distance = Vector3d.DistanceSquared(facePoint, other);
-
-            if (distance < minDistance)
-            {
-                minDistance = distance;
-                closestPoint = facePoint;
-            }
+            x = SignedHalfExtent(x, halfX);
+            return;
         }
 
-        return closestPoint;
+        if (distanceY <= distanceZ)
+        {
+            y = SignedHalfExtent(y, halfY);
+            return;
+        }
+
+        z = SignedHalfExtent(z, halfZ);
     }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Fixed64 SignedHalfExtent(Fixed64 coordinate, Fixed64 halfExtent) =>
+        coordinate < Fixed64.Zero ? -halfExtent : halfExtent;
 
     public override Vector3d GetNormalAtPoint(Vector3d point)
     {

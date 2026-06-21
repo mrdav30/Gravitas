@@ -166,6 +166,90 @@ public sealed class ContinuousCollision2DTests
     }
 
     [Fact]
+    public void ContinuousMode_ShouldClampRotatingThinPolygonBeforeAngularTunnelingThroughStaticCircle()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        var bladeCollider = new LSPolygonCollider2D(
+            new Vector2d((Fixed64)(-3), Fixed64.FromFraction(-1, 10)),
+            new Vector2d((Fixed64)3, Fixed64.FromFraction(-1, 10)),
+            new Vector2d((Fixed64)3, Fixed64.FromFraction(1, 10)),
+            new Vector2d((Fixed64)(-3), Fixed64.FromFraction(1, 10)));
+        StiffBody2D blade = CreateBody(context, bladeCollider, Vector2d.Zero, immovable: false);
+        _ = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.FromFraction(1, 4)),
+            new Vector2d((Fixed64)2, (Fixed64)2),
+            immovable: true);
+        blade.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+
+        blade.AddAngularImpulse(FixedMath.DegToRad((Fixed64)90) / blade.EffectiveInverseMomentOfInertia);
+        context.LateSimulate();
+
+        blade.Rotation.Should().BeLessThan(FixedMath.DegToRad((Fixed64)90));
+        blade.AngularVelocity.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void ContinuousMode_ShouldNotClampRotatingThinPolygonForAngularNearMiss()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        var bladeCollider = new LSPolygonCollider2D(
+            new Vector2d((Fixed64)(-3), Fixed64.FromFraction(-1, 10)),
+            new Vector2d((Fixed64)3, Fixed64.FromFraction(-1, 10)),
+            new Vector2d((Fixed64)3, Fixed64.FromFraction(1, 10)),
+            new Vector2d((Fixed64)(-3), Fixed64.FromFraction(1, 10)));
+        StiffBody2D blade = CreateBody(context, bladeCollider, Vector2d.Zero, immovable: false);
+        _ = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.FromFraction(1, 4)),
+            new Vector2d((Fixed64)2, (Fixed64)(-2)),
+            immovable: true);
+        blade.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+
+        Fixed64 angularVelocity = FixedMath.DegToRad((Fixed64)90);
+        blade.AddAngularImpulse(angularVelocity / blade.EffectiveInverseMomentOfInertia);
+        context.LateSimulate();
+
+        blade.Rotation.Should().Be(angularVelocity);
+        blade.AngularVelocity.Should().Be(angularVelocity);
+    }
+
+    [Fact]
+    public void ContinuousMode_RotationalPath_ShouldNotAllocateAfterWarmup()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        var bladeCollider = new LSPolygonCollider2D(
+            new Vector2d((Fixed64)(-3), Fixed64.FromFraction(-1, 10)),
+            new Vector2d((Fixed64)3, Fixed64.FromFraction(-1, 10)),
+            new Vector2d((Fixed64)3, Fixed64.FromFraction(1, 10)),
+            new Vector2d((Fixed64)(-3), Fixed64.FromFraction(1, 10)));
+        StiffBody2D blade = CreateBody(context, bladeCollider, Vector2d.Zero, immovable: false);
+        _ = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.FromFraction(1, 4)),
+            new Vector2d((Fixed64)2, (Fixed64)2),
+            immovable: true);
+        blade.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        Fixed64 angularImpulse = FixedMath.DegToRad((Fixed64)90) / blade.EffectiveInverseMomentOfInertia;
+
+        void SimulateRotationalCcd()
+        {
+            blade.SetPosition(Vector2d.Zero);
+            blade.SetRotation(Fixed64.Zero);
+            blade.AddAngularImpulse(angularImpulse);
+            context.LateSimulate();
+        }
+
+        long allocatedBytes = AllocationTestHelper.MeasureSteadyState(
+            SimulateRotationalCcd,
+            warmupIterations: 16,
+            stabilizationIterations: 4,
+            measurementIterations: 8);
+
+        allocatedBytes.Should().Be(0);
+    }
+
+    [Fact]
     public void Physics2DLateSimulate_DirectCalls_ShouldRefreshDynamicCcdFrame()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1, extent: 128);

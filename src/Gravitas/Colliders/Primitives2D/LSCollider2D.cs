@@ -397,6 +397,9 @@ public abstract class LSCollider2D : IRecordable, IColliderHierarchyNode
         return true;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal bool RebuildRuntimeShapeOnly() => RebuildRuntimeShapeState();
+
     public void SetParent(LSCollider2D parent)
     {
         ThrowIfCompoundPartLifecycle(nameof(SetParent));

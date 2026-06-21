@@ -250,6 +250,90 @@ public class DynamicCcdScalingBenchmarks
     }
 
     [Benchmark(OperationsPerInvoke = PureBatchFrames)]
+    public Vector3d SparsePure3DAngularCcdNoAngularMotionBatch8()
+    {
+        Vector3d total = Vector3d.Zero;
+        for (int i = 0; i < PureBatchFrames; i++)
+        {
+            Reset3DAngularBodies(_sparse3DBodies, _sparse3DPositions, angularMotion: false);
+            _sparse3DContext.LateSimulate();
+            total += Sum3D(_sparse3DBodies);
+        }
+
+        return total;
+    }
+
+    [Benchmark(OperationsPerInvoke = PureBatchFrames)]
+    public Vector3d SparsePure3DAngularCcdBatch8()
+    {
+        Vector3d total = Vector3d.Zero;
+        for (int i = 0; i < PureBatchFrames; i++)
+        {
+            Reset3DAngularBodies(_sparse3DBodies, _sparse3DPositions, angularMotion: true);
+            _sparse3DContext.LateSimulate();
+            total += Sum3D(_sparse3DBodies);
+        }
+
+        return total;
+    }
+
+    [Benchmark(OperationsPerInvoke = PureBatchFrames)]
+    public Vector3d DensePure3DAngularCcdBatch8()
+    {
+        Vector3d total = Vector3d.Zero;
+        for (int i = 0; i < PureBatchFrames; i++)
+        {
+            Reset3DAngularBodies(_dense3DBodies, _dense3DPositions, angularMotion: true);
+            _dense3DContext.LateSimulate();
+            total += Sum3D(_dense3DBodies);
+        }
+
+        return total;
+    }
+
+    [Benchmark(OperationsPerInvoke = PureBatchFrames)]
+    public Vector2d SparsePure2DAngularCcdNoAngularMotionBatch8()
+    {
+        Vector2d total = Vector2d.Zero;
+        for (int i = 0; i < PureBatchFrames; i++)
+        {
+            Reset2DAngularBodies(_sparse2DBodies, _sparse2DPositions, angularMotion: false);
+            _sparse2DContext.LateSimulate();
+            total += Sum2D(_sparse2DBodies);
+        }
+
+        return total;
+    }
+
+    [Benchmark(OperationsPerInvoke = PureBatchFrames)]
+    public Vector2d SparsePure2DAngularCcdBatch8()
+    {
+        Vector2d total = Vector2d.Zero;
+        for (int i = 0; i < PureBatchFrames; i++)
+        {
+            Reset2DAngularBodies(_sparse2DBodies, _sparse2DPositions, angularMotion: true);
+            _sparse2DContext.LateSimulate();
+            total += Sum2D(_sparse2DBodies);
+        }
+
+        return total;
+    }
+
+    [Benchmark(OperationsPerInvoke = PureBatchFrames)]
+    public Vector2d DensePure2DAngularCcdBatch8()
+    {
+        Vector2d total = Vector2d.Zero;
+        for (int i = 0; i < PureBatchFrames; i++)
+        {
+            Reset2DAngularBodies(_dense2DBodies, _dense2DPositions, angularMotion: true);
+            _dense2DContext.LateSimulate();
+            total += Sum2D(_dense2DBodies);
+        }
+
+        return total;
+    }
+
+    [Benchmark(OperationsPerInvoke = PureBatchFrames)]
     public int SparsePure3DStaticQueryBatch8()
     {
         int total = 0;
@@ -535,6 +619,30 @@ public class DynamicCcdScalingBenchmarks
             StiffBody2D body = bodies[i];
             body.Sleep();
             body.SetPosition(positions[i]);
+        }
+    }
+
+    private static void Reset3DAngularBodies(SwiftList<StiffBody> bodies, Vector3d[] positions, bool angularMotion)
+    {
+        for (int i = 0; i < bodies.Count; i++)
+        {
+            StiffBody body = bodies[i];
+            body.ResetPosition(positions[i], FixedQuaternion.Identity);
+            if (angularMotion)
+                body.AddAngularImpulse(Vector3d.Up);
+        }
+    }
+
+    private static void Reset2DAngularBodies(SwiftList<StiffBody2D> bodies, Vector2d[] positions, bool angularMotion)
+    {
+        for (int i = 0; i < bodies.Count; i++)
+        {
+            StiffBody2D body = bodies[i];
+            body.Sleep();
+            body.SetPosition(positions[i]);
+            body.SetRotation(Fixed64.Zero);
+            if (angularMotion)
+                body.AddAngularImpulse(Fixed64.One);
         }
     }
 

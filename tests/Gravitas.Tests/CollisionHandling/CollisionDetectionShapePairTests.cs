@@ -144,6 +144,27 @@ public sealed class CollisionDetectionShapePairTests
     }
 
     [Fact]
+    public void CuboidSphere_ShouldDetectRotatedOverlap()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSCuboidCollider> cuboid = scenario.CreateBody(
+            new LSCuboidCollider
+            {
+                Size = new Vector3d((Fixed64)6, Fixed64.One, Fixed64.FromFraction(1, 5))
+            },
+            Vector3d.Zero,
+            PhysicsScenarioBuilder.Yaw(45));
+        ScenarioBody<LSSphereCollider> overlapping = scenario.CreateSphere(
+            new Vector3d(Fixed64.FromFraction(3, 2), Fixed64.Zero, Fixed64.FromFraction(-5, 4)));
+
+        cuboid.Collider.Shape.Should().Be(ColliderType.OBBox);
+        Vector3d.Distance(
+            cuboid.Collider.ClosestPointOnSurface(overlapping.Collider.Center),
+            overlapping.Collider.Center).Should().BeLessThanOrEqualTo(overlapping.Collider.ScaledRadius);
+        AssertCollision(scenario, cuboid.Collider, overlapping.Collider, CollisionType.Cuboid_Sphere);
+    }
+
+    [Fact]
     public void CuboidCapsule_ShouldDetectAxisAlignedAndRotatedOverlap()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();

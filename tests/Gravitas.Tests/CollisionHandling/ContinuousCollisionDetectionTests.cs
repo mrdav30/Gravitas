@@ -190,6 +190,91 @@ public sealed class ContinuousCollisionDetectionTests
     }
 
     [Fact]
+    public void ContinuousMode_ShouldClampRotatingLongCuboidBeforeAngularTunnelingThroughStaticSphere()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        scenario.Context.Environment.DampingFactor = Fixed64.Zero;
+        _ = scenario.CreateStaticSphere(new Vector3d(Fixed64.FromFraction(3, 2), Fixed64.Zero, Fixed64.FromFraction(-5, 4)));
+        ScenarioBody<LSCuboidCollider> blade = scenario.CreateBody(
+            new LSCuboidCollider
+            {
+                Size = new Vector3d((Fixed64)6, Fixed64.One, Fixed64.FromFraction(1, 5))
+            },
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+        blade.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        DisableGroundQueries(blade.Body);
+
+        Fixed64 angularVelocity = FixedMath.DegToRad((Fixed64)90);
+        blade.Body.AddAngularImpulse(Vector3d.Up * (angularVelocity / blade.Body.EffectiveInverseInertiaTensor.M22));
+        scenario.Context.LateSimulate();
+
+        FixedQuaternion fullTurn = FixedQuaternion.FromEulerAnglesInDegrees(
+            Fixed64.Zero,
+            (Fixed64)90,
+            Fixed64.Zero);
+        FixedQuaternion.Angle(blade.Body.Rotation, fullTurn).Should().BeGreaterThan(Fixed64.Zero);
+        blade.Body.AngularVelocity.Should().Be(Vector3d.Zero);
+    }
+
+    [Fact]
+    public void ContinuousMode_ShouldNotClampRotatingLongCuboidForAngularNearMiss()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        scenario.Context.Environment.DampingFactor = Fixed64.Zero;
+        _ = scenario.CreateStaticSphere(new Vector3d(Fixed64.FromFraction(3, 2), Fixed64.Zero, Fixed64.FromFraction(5, 4)));
+        ScenarioBody<LSCuboidCollider> blade = scenario.CreateBody(
+            new LSCuboidCollider
+            {
+                Size = new Vector3d((Fixed64)6, Fixed64.One, Fixed64.FromFraction(1, 5))
+            },
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+        blade.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        DisableGroundQueries(blade.Body);
+
+        Fixed64 angularVelocity = FixedMath.DegToRad((Fixed64)90);
+        blade.Body.AddAngularImpulse(Vector3d.Up * (angularVelocity / blade.Body.EffectiveInverseInertiaTensor.M22));
+        scenario.Context.LateSimulate();
+
+        blade.Body.AngularVelocity.Y.Should().Be(angularVelocity);
+    }
+
+    [Fact]
+    public void ContinuousMode_RotationalPath_ShouldNotAllocateAfterWarmup()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        scenario.Context.Environment.DampingFactor = Fixed64.Zero;
+        _ = scenario.CreateStaticSphere(new Vector3d(Fixed64.FromFraction(3, 2), Fixed64.Zero, Fixed64.FromFraction(-5, 4)));
+        ScenarioBody<LSCuboidCollider> blade = scenario.CreateBody(
+            new LSCuboidCollider
+            {
+                Size = new Vector3d((Fixed64)6, Fixed64.One, Fixed64.FromFraction(1, 5))
+            },
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+        blade.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        DisableGroundQueries(blade.Body);
+        Fixed64 angularVelocity = FixedMath.DegToRad((Fixed64)90);
+        Vector3d angularImpulse = Vector3d.Up * (angularVelocity / blade.Body.EffectiveInverseInertiaTensor.M22);
+
+        void SimulateRotationalCcd()
+        {
+            blade.Body.ResetPosition(Vector3d.Zero, FixedQuaternion.Identity);
+            blade.Body.AddAngularImpulse(angularImpulse);
+            scenario.Context.LateSimulate();
+        }
+
+        long allocatedBytes = AllocationTestHelper.MeasureSteadyState(
+            SimulateRotationalCcd,
+            warmupIterations: 16,
+            stabilizationIterations: 4,
+            measurementIterations: 8);
+
+        allocatedBytes.Should().Be(0);
+    }
+
+    [Fact]
     public void ContinuousMode_ShouldPreserveTangentialVelocityAfterRemovingClosingVelocity()
     {
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();

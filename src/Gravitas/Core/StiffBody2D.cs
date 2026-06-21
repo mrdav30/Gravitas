@@ -397,12 +397,14 @@ public sealed class StiffBody2D : IRecordable
         _linearAccelerationStore = Vector2d.Zero;
         RefreshLinearSpeed();
 
+        Fixed64 startRotation = _rotation;
+        Fixed64 proposedRotation = startRotation;
         if (CanRotate)
         {
             _angularAccelerationStore = _deltaAngularAcceleration;
             _deltaAngularAcceleration = Fixed64.Zero;
             _angularVelocity += _angularAccelerationStore * Context.DeltaTime;
-            _rotation += _angularVelocity * Context.DeltaTime;
+            proposedRotation += _angularVelocity * Context.DeltaTime;
             RefreshAngularSpeed();
         }
         else
@@ -411,9 +413,12 @@ public sealed class StiffBody2D : IRecordable
             _deltaAngularAcceleration = Fixed64.Zero;
         }
 
-        Vector2d proposedPosition = _position + _linearVelocity * Context.DeltaTime;
-        TryResolveContinuousCollision(_position, ref proposedPosition);
+        Vector2d startPosition = _position;
+        Vector2d proposedPosition = startPosition + _linearVelocity * Context.DeltaTime;
+        TryResolveContinuousCollision(startPosition, ref proposedPosition);
+        TryResolveRotationalContinuousCollision(startPosition, ref proposedPosition, startRotation, ref proposedRotation);
         _position = proposedPosition;
+        _rotation = proposedRotation;
         Collider.Rebuild();
 
         UpdateSleepState();
@@ -552,6 +557,90 @@ public sealed class StiffBody2D : IRecordable
             proposedPosition = startPosition + displacement.Normalized * hitMixed.Distance;
             RemoveClosingContinuousCollisionVelocity(hitMixed.NormalFor2DSource);
             return true;
+        }
+
+        return false;
+    }
+
+    private bool TryResolveRotationalContinuousCollision(
+        Vector2d startPosition,
+        ref Vector2d proposedPosition,
+        Fixed64 startRotation,
+        ref Fixed64 proposedRotation)
+    {
+        if (!CanRotate || !ShouldUseContinuousCollision(out ContinuousCollisionMode mode))
+            return false;
+
+        Fixed64 angularDelta = proposedRotation - startRotation;
+        Fixed64 angularDistance = angularDelta.Abs();
+        if (angularDistance <= Fixed64.Epsilon)
+            return false;
+
+        Fixed64 proxyRadius = ResolveContinuousCollisionProxyRadius();
+        Fixed64 angularArcLength = angularDistance * proxyRadius;
+        if (proxyRadius <= Fixed64.Epsilon
+            || angularArcLength <= Fixed64.Epsilon
+            || (mode == ContinuousCollisionMode.Auto && angularArcLength <= proxyRadius))
+        {
+            return false;
+        }
+
+        Vector2d displacement = proposedPosition - startPosition;
+        int hitCount = displacement.MagnitudeSquared <= Fixed64.Epsilon
+            ? Context.Query2D.OverlapCircleAgainstStaticAll(
+                startPosition,
+                proxyRadius,
+                PhysicsLayerMask.All,
+                _continuousCollisionHits)
+            : Context.Query2D.SweepCircleAgainstStaticAll(
+                startPosition,
+                proposedPosition,
+                proxyRadius,
+                PhysicsLayerMask.All,
+                _continuousCollisionHits,
+                Collider,
+                includeTriggers: false);
+
+        if (hitCount == 0)
+            return false;
+
+        int stepCount = ContinuousCollisionMath.ResolveRotationalSubstepCount(angularDelta);
+        if (stepCount <= 0)
+            return false;
+
+        Vector2d originalPosition = _position;
+        Fixed64 originalRotation = _rotation;
+        try
+        {
+            for (int step = 1; step <= stepCount; step++)
+            {
+                Fixed64 sampleTime = (Fixed64)step / (Fixed64)stepCount;
+                _position = startPosition + displacement * sampleTime;
+                _rotation = startRotation + angularDelta * sampleTime;
+                Collider.RebuildRuntimeShapeOnly();
+
+                for (int hitIndex = 0; hitIndex < hitCount; hitIndex++)
+                {
+                    LSCollider2D? target = _continuousCollisionHits[hitIndex].Collider;
+                    if (!IsValidContinuousCollisionTarget(target)
+                        || !CollisionDetection2D.TryCollide(Collider, target!, out Contact2D contact))
+                    {
+                        continue;
+                    }
+
+                    Fixed64 safeTime = (Fixed64)(step - 1) / (Fixed64)stepCount;
+                    proposedPosition = startPosition + displacement * safeTime;
+                    proposedRotation = startRotation + angularDelta * safeTime;
+                    StopRotationalContinuousCollision(contact.Normal);
+                    return true;
+                }
+            }
+        }
+        finally
+        {
+            _position = originalPosition;
+            _rotation = originalRotation;
+            Collider.RebuildRuntimeShapeOnly();
         }
 
         return false;
@@ -906,9 +995,12 @@ public sealed class StiffBody2D : IRecordable
             : Fixed64.Zero;
     }
 
-    private bool IsValidContinuousCollisionHit(Physics2DHit hit)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private bool IsValidContinuousCollisionHit(Physics2DHit hit) =>
+        IsValidContinuousCollisionTarget(hit.Collider);
+
+    private bool IsValidContinuousCollisionTarget(LSCollider2D? hitCollider)
     {
-        LSCollider2D? hitCollider = hit.Collider;
         if (hitCollider == null
             || ReferenceEquals(hitCollider, Collider)
             || hitCollider.IsTrigger
@@ -946,6 +1038,15 @@ public sealed class StiffBody2D : IRecordable
 
         _linearVelocity -= normal * closingSpeed;
         RefreshLinearSpeed();
+    }
+
+    private void StopRotationalContinuousCollision(Vector2d contactNormal)
+    {
+        _angularVelocity = Fixed64.Zero;
+        _angularAccelerationStore = Fixed64.Zero;
+        _deltaAngularAcceleration = Fixed64.Zero;
+        RefreshAngularSpeed();
+        RemoveClosingContinuousCollisionVelocity(contactNormal);
     }
 
     /// <summary>

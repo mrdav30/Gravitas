@@ -457,7 +457,7 @@ public abstract class LSCollider : IRecordable, IColliderHierarchyNode
     internal bool ExcludesMixedCollisionWith(LSCollider2D other) =>
         _hierarchyState.ExcludesCollisionWith(other.HierarchyState, HierarchyKey, other.HierarchyKey);
 
-    private bool RebuildRuntimeShapeState()
+    private bool RebuildRuntimeShapeState(bool refreshMassProperties = true)
     {
         ColliderShapeSnapshot snapshot = CaptureShapeSnapshot();
         if (!_runtimeShapeState.ShouldRebuild(snapshot))
@@ -465,9 +465,14 @@ public abstract class LSCollider : IRecordable, IColliderHierarchyNode
 
         RebuildRuntimeShape();
         _runtimeShapeState.Commit(snapshot);
-        _body?.RefreshMassPropertiesFromColliderShape();
+        if (refreshMassProperties)
+            _body?.RefreshMassPropertiesFromColliderShape();
         return true;
     }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal bool RebuildRuntimeShapeOnly(bool refreshMassProperties = true) =>
+        RebuildRuntimeShapeState(refreshMassProperties);
 
     protected virtual void RebuildRuntimeShape()
     {

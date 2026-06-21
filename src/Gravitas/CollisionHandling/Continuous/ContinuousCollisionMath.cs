@@ -5,6 +5,26 @@ namespace Gravitas.CollisionHandling;
 
 internal static class ContinuousCollisionMath
 {
+    private const int MaxRotationalSubsteps = 16;
+    private static readonly Fixed64 MaxRotationalStepRadians = FixedMath.DegToRad((Fixed64)15);
+
+    public static int ResolveRotationalSubstepCount(Fixed64 angularDisplacement)
+    {
+        Fixed64 angularDistance = angularDisplacement.Abs();
+        if (angularDistance <= Fixed64.Epsilon)
+            return 0;
+
+        int steps = 1;
+        Fixed64 covered = MaxRotationalStepRadians;
+        while (covered < angularDistance && steps < MaxRotationalSubsteps)
+        {
+            covered += MaxRotationalStepRadians;
+            steps++;
+        }
+
+        return steps;
+    }
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool TrySweepRelativeSpheres(
         Vector3d sourceStart,

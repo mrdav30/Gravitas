@@ -158,6 +158,7 @@ public class StiffBody : IRecordable
     private readonly SwiftList<Physics3DHit> _groundProbeHits = new();
     private readonly SwiftList<Physics3DHit> _continuousCollisionHits = new();
     private readonly SwiftList<PhysicsMixedHit> _continuousMixedCollisionHits = new();
+    private readonly ContactManifold _rotationalContinuousCollisionManifold = new();
 
     public Fixed64 StepOffset = (Fixed64)0.5f;
 
@@ -1139,9 +1140,11 @@ public class StiffBody : IRecordable
         //_positionCorrection = Vector2d.Zero;
 
         //// if (_linearSpeed > Fixed64.Zero)
+        Vector3d rotationalCcdStartPosition = Position3d;
         PositionBasedOnForce();
+        Vector3d rotationalCcdProposedPosition = Position3d;
         if (!AngularForcesHalted && _angularSpeed > Fixed64.Zero)
-            RotationBasedOnTorque();
+            RotationBasedOnTorque(rotationalCcdStartPosition, rotationalCcdProposedPosition);
 
         CheckGroundForSimulation();
 
@@ -1594,9 +1597,12 @@ public class StiffBody : IRecordable
         return radius > Fixed64.Epsilon ? radius : Fixed64.Zero;
     }
 
-    private bool IsValidContinuousCollisionHit(Physics3DHit hit)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private bool IsValidContinuousCollisionHit(Physics3DHit hit) =>
+        IsValidContinuousCollisionTarget(hit.Collider);
+
+    private bool IsValidContinuousCollisionTarget(LSCollider? hitCollider)
     {
-        LSCollider? hitCollider = hit.Collider;
         if (hitCollider == null
             || ReferenceEquals(hitCollider, Collider)
             || hitCollider.IsTrigger
@@ -1639,12 +1645,162 @@ public class StiffBody : IRecordable
         Context.Diagnostics.EmitLinearVelocityDelta(this, lastVelocity, _linearVelocity);
     }
 
-    private void RotationBasedOnTorque()
+    private bool TryResolveRotationalContinuousCollision(
+        Vector3d startPosition,
+        ref Vector3d proposedPosition,
+        FixedQuaternion startRotation,
+        ref FixedQuaternion proposedRotation)
     {
-        // Convert angular velocity to a quaternion
+        if (!CanRotate || !ShouldUseContinuousCollision(out ContinuousCollisionMode mode))
+            return false;
+
+        Fixed64 angularDistance = _angularSpeed * Context.DeltaTime;
+        if (angularDistance <= Fixed64.Epsilon)
+            return false;
+
+        Fixed64 proxyRadius = ResolveContinuousCollisionProxyRadius();
+        Fixed64 angularArcLength = angularDistance * proxyRadius;
+        if (proxyRadius <= Fixed64.Epsilon
+            || angularArcLength <= Fixed64.Epsilon
+            || (mode == ContinuousCollisionMode.Auto && angularArcLength <= proxyRadius))
+        {
+            return false;
+        }
+
+        Vector3d displacement = proposedPosition - startPosition;
+        int hitCount = displacement.MagnitudeSquared <= Fixed64.Epsilon
+            ? Context.Query3D.OverlapSphereAgainstStaticAll(
+                startPosition,
+                proxyRadius,
+                PhysicsLayerMask.All,
+                _continuousCollisionHits,
+                Collider,
+                includeTriggers: false)
+            : Context.Query3D.SweepSphereAgainstStaticAll(
+                startPosition,
+                proposedPosition,
+                proxyRadius,
+                PhysicsLayerMask.All,
+                _continuousCollisionHits,
+                Collider,
+                includeTriggers: false);
+
+        if (hitCount == 0)
+            return false;
+
+        int stepCount = ContinuousCollisionMath.ResolveRotationalSubstepCount(angularDistance);
+        if (stepCount <= 0)
+            return false;
+
+        Vector3d originalPosition = Position3d;
+        FixedQuaternion originalRotation = Rotation;
+        bool originalPositionMutated = _positionMutated;
+        bool originalRotationMutated = _rotationMutated;
+        try
+        {
+            for (int step = 1; step <= stepCount; step++)
+            {
+                Fixed64 sampleTime = (Fixed64)step / (Fixed64)stepCount;
+                Position3d = startPosition + displacement * sampleTime;
+                Rotation = IntegrateAngularRotation(startRotation, Context.DeltaTime * sampleTime);
+                Collider.RebuildRuntimeShapeOnly(refreshMassProperties: false);
+
+                for (int hitIndex = 0; hitIndex < hitCount; hitIndex++)
+                {
+                    LSCollider? target = _continuousCollisionHits[hitIndex].Collider;
+                    if (!TrySampleRotationalContinuousCollision(target, out Vector3d contactNormal))
+                        continue;
+
+                    Fixed64 safeTime = (Fixed64)(step - 1) / (Fixed64)stepCount;
+                    proposedPosition = startPosition + displacement * safeTime;
+                    proposedRotation = IntegrateAngularRotation(startRotation, Context.DeltaTime * safeTime);
+                    StopRotationalContinuousCollision(contactNormal);
+                    return true;
+                }
+            }
+        }
+        finally
+        {
+            Position3d = originalPosition;
+            Rotation = originalRotation;
+            Collider.RebuildRuntimeShapeOnly(refreshMassProperties: false);
+            _positionMutated = originalPositionMutated;
+            _rotationMutated = originalRotationMutated;
+        }
+
+        return false;
+    }
+
+    private bool TrySampleRotationalContinuousCollision(LSCollider? target, out Vector3d contactNormal)
+    {
+        contactNormal = Vector3d.Zero;
+        if (!IsValidContinuousCollisionTarget(target))
+            return false;
+
+        OrderRotationalContinuousCollisionPair(target!, out LSCollider colliderA, out LSCollider colliderB, out bool sourceIsA);
+        CollisionType collisionType = ColliderSettings.GetCollisionType(colliderA.Shape, colliderB.Shape);
+        if (collisionType == CollisionType.None)
+            return false;
+
+        _rotationalContinuousCollisionManifold.BeginUpdate(Context.FrameCount);
+        var workItem = new CollisionWorkItem(Context, colliderA, colliderB, collisionType, _rotationalContinuousCollisionManifold);
+        if (!CollisionDetection.DoCollisionCheck(workItem) || !_rotationalContinuousCollisionManifold.HasContact)
+            return false;
+
+        contactNormal = _rotationalContinuousCollisionManifold.PrimaryContact.Normal;
+        if (!sourceIsA)
+            contactNormal = -contactNormal;
+
+        return true;
+    }
+
+    private void OrderRotationalContinuousCollisionPair(
+        LSCollider target,
+        out LSCollider colliderA,
+        out LSCollider colliderB,
+        out bool sourceIsA)
+    {
+        if (Collider.Priority >= target.Priority)
+        {
+            colliderA = Collider;
+            colliderB = target;
+            sourceIsA = true;
+            return;
+        }
+
+        colliderA = target;
+        colliderB = Collider;
+        sourceIsA = false;
+    }
+
+    private FixedQuaternion IntegrateAngularRotation(FixedQuaternion startRotation, Fixed64 deltaTime)
+    {
         FixedQuaternion angularVelocityQuaternion = new(_angularVelocity.X, _angularVelocity.Y, _angularVelocity.Z, Fixed64.Zero);
-        FixedQuaternion spin = angularVelocityQuaternion * Rotation * Fixed64.Half * Context.DeltaTime;
-        Rotation = (Rotation + spin).Normalized;
+        FixedQuaternion spin = angularVelocityQuaternion * startRotation * Fixed64.Half * deltaTime;
+        return (startRotation + spin).Normalized;
+    }
+
+    private void StopRotationalContinuousCollision(Vector3d contactNormal)
+    {
+        Vector3d lastVelocity = _angularVelocity;
+        _angularVelocity = Vector3d.Zero;
+        _angularDirection = Vector3d.Zero;
+        _angularAccelerationStore = Vector3d.Zero;
+        _angularAcceleration = Vector3d.Zero;
+        _deltaTorque = Vector3d.Zero;
+        RefreshAngularMotionState(lastVelocity);
+        Context.Diagnostics.EmitAngularVelocityDelta(this, lastVelocity, _angularVelocity);
+        RemoveClosingContinuousCollisionVelocity(contactNormal);
+    }
+
+    private void RotationBasedOnTorque(Vector3d startPosition, Vector3d proposedPosition)
+    {
+        FixedQuaternion startRotation = Rotation;
+        FixedQuaternion proposedRotation = IntegrateAngularRotation(startRotation, Context.DeltaTime);
+        TryResolveRotationalContinuousCollision(startPosition, ref proposedPosition, startRotation, ref proposedRotation);
+        Position3d = proposedPosition;
+        Rotation = proposedRotation;
+        Collider.RebuildRuntimeShapeOnly();
     }
 
     internal void RefreshMassPropertiesFromColliderShape()
