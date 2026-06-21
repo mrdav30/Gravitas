@@ -689,7 +689,9 @@ public sealed class StiffBody2D : IRecordable
                 startPosition,
                 proxyRadius,
                 PhysicsLayerMask.All,
-                _continuousCollisionHits)
+                _continuousCollisionHits,
+                Collider,
+                includeTriggers: false)
             : Context.Query2D.SweepCircleAgainstStaticAll(
                 startPosition,
                 proposedPosition,

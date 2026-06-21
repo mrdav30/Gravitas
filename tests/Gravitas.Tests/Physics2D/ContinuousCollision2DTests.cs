@@ -634,6 +634,30 @@ public sealed class ContinuousCollision2DTests
     }
 
     [Fact]
+    public void OverlapCircleAgainstStaticAll_ShouldApplyExcludedHierarchyAndTriggerFilters()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        StiffBody2D parent = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: true);
+        StiffBody2D child = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: true);
+        StiffBody2D trigger = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)2, Fixed64.Zero), immovable: true);
+        StiffBody2D included = CreateBody(context, new LSAABBoxCollider2D(Vector2d.One), new Vector2d((Fixed64)4, Fixed64.Zero), immovable: true);
+        child.Collider.SetParent(parent.Collider);
+        trigger.Collider.IsTrigger = true;
+        var hits = new SwiftList<Physics2DHit>();
+
+        int count = context.Query2D.OverlapCircleAgainstStaticAll(
+            Vector2d.Zero,
+            (Fixed64)5,
+            PhysicsLayerMask.All,
+            hits,
+            child.Collider,
+            includeTriggers: false);
+
+        count.Should().Be(1);
+        hits.Should().ContainSingle(hit => ReferenceEquals(hit.Collider, included.Collider));
+    }
+
+    [Fact]
     public void SweepCircleAll_ShouldApplyLayerAndTriggerFilters()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);

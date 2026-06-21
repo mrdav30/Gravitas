@@ -70,9 +70,18 @@ public sealed class GravitasQuery2DService
         Vector2d center,
         Fixed64 radius,
         PhysicsLayerMask layerMask,
-        SwiftList<Physics2DHit> results)
+        SwiftList<Physics2DHit> results,
+        LSCollider2D? excludedCollider = null,
+        bool includeTriggers = true)
     {
-        return OverlapCircleAllCore(center, radius, layerMask, results, staticTargetsOnly: true);
+        return OverlapCircleAllCore(
+            center,
+            radius,
+            layerMask,
+            results,
+            staticTargetsOnly: true,
+            excludedCollider: excludedCollider,
+            includeTriggers: includeTriggers);
     }
 
     private int OverlapCircleAllCore(
@@ -80,7 +89,9 @@ public sealed class GravitasQuery2DService
         Fixed64 radius,
         PhysicsLayerMask layerMask,
         SwiftList<Physics2DHit> results,
-        bool staticTargetsOnly)
+        bool staticTargetsOnly,
+        LSCollider2D? excludedCollider = null,
+        bool includeTriggers = true)
     {
         SwiftThrowHelper.ThrowIfNull(results, nameof(results));
         SwiftThrowHelper.ThrowIfArgument(radius < Fixed64.Zero, nameof(radius), "2D query radius cannot be negative.");
@@ -101,8 +112,11 @@ public sealed class GravitasQuery2DService
         for (int i = 0; i < _queryCandidates.Count; i++)
         {
             LSCollider2D collider = _queryCandidates[i];
-            if (QueryDetection2D.TryOverlapCircle(center, radius, collider, out Physics2DHit hit))
+            if (IsEligibleSweepCandidate(collider, excludedCollider, includeTriggers)
+                && QueryDetection2D.TryOverlapCircle(center, radius, collider, out Physics2DHit hit))
+            {
                 results.Add(hit);
+            }
         }
 
         Physics2DHitSorter.SortByDistance(results);
