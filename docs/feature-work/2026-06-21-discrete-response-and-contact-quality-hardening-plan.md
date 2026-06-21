@@ -73,16 +73,53 @@ solver invariants.
 
 **Tasks**
 
-- [ ] Inventory current 3D, 2D, and mixed response paths, including cached
+- [x] Inventory current 3D, 2D, and mixed response paths, including cached
   impulse storage, tangent basis selection, contact IDs, pair ordering, and
   sleep/wake hooks.
-- [ ] Add or update tests that expose the current limitations: resting-stack
+- [x] Add or update tests that expose the current limitations: resting-stack
   drift, stale 3D cached impulses, same-island wake propagation, cylinder
   edge-touching, and mesh clipping ambiguity.
-- [ ] Add benchmark rows only where runtime cost is expected to change:
+- [x] Add benchmark rows only where runtime cost is expected to change:
   dense resting contacts, cylinder-heavy scenes, mesh-contact scenes, and mixed
   response scenes.
-- [ ] Document the baseline before changing solver behavior.
+- [x] Document the baseline before changing solver behavior.
+
+**Progress 2026-06-21:** Workstream 1 added a current-baseline evidence slice
+without changing runtime solver behavior. The new
+`DiscreteResponseCurrentBaselineTests` file records that:
+
+- stored 3D warm-start impulses do not affect the current fresh single-pair
+  solve, confirming 3D warm-start is storage-only today.
+- a short 3D cuboid stack under gravity remains awake and drifts, preserving
+  evidence for the resting-friction/warm-start workstream.
+- cylinder rim contact currently reduces to one near-zero-depth contact.
+- mesh/cuboid face contact through a triangle mesh currently reduces to one
+  triangle-level contact instead of a clipped contact surface.
+
+Same-island wake propagation was not locked in as a current-baseline unit test:
+the flat partition path can wake direct contacts, and a meaningful island test
+should assert the desired connected-body behavior in Workstream 3 before the
+island builder is introduced.
+
+Current response inventory:
+
+| Path | Current Behavior |
+| --- | --- |
+| 3D response | `CollisionPair` owns one four-contact `ContactManifold`, pair-local `ContactWarmStartCache`, and priority/speed/candidate-order collider ordering. `CollisionResponse` applies positional correction, fresh normal impulses, dynamic Coulomb friction from the current tangent velocity, then stores normal/tangent impulse scalars by contact identity. It does not read cached impulses before solving. Sleeping body wake happens before response when the opposite participant is awake. |
+| Pure 2D response | `CollisionPair2D` owns a two-contact `ContactManifold2D` and `ContactWarmStartCache2D`. `CollisionResponse2D` reads cached normal/tangent impulses, applies them before the fresh solve, accumulates/clamps normal impulses, clamps tangent impulses to the current Coulomb bound, and stores the refreshed cache. Pair ordering uses priority, speed, then collider ID. Wake happens through pair handling after solid response. |
+| Mixed response | `CollisionPairMixed` owns stable 3D/2D identity and a single `MixedContact` input. It has no pair-local warm-start cache or manifold reduction. `CollisionResponseMixed` applies constrained 3D/2D positional correction, normal impulse, and friction: planar X/Z impulse can move and yaw the 2D body, while vertical Y response is constrained out of the 2D participant. Wake happens before mixed response. |
+
+Benchmark evidence rows were expanded before solver changes:
+
+- `collision-response` now covers `SingleContact`, `FaceManifold`,
+  `RestingFaceManifold`, `CylinderContact`, and `MeshContact` prepared 3D pairs
+  at `16` and `64` pairs.
+- `mixed-collision-response` covers prepared mixed sphere/circle response at
+  `16` and `64` pairs.
+
+The short in-process benchmark smoke executed successfully for the new rows,
+but emitted BenchmarkDotNet minimum-iteration-time warnings. Treat that run as
+setup validation, not canonical performance evidence.
 
 ## Workstream 2: 3D Warm-Start And Resting Friction
 

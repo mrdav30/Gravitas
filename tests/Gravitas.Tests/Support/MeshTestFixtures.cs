@@ -51,6 +51,21 @@ internal static class MeshTestFixtures
             inertiaPolicy);
     }
 
+    public static LSMeshCollider CreateConvexQuadFloor(
+        MeshColliderMode mode = MeshColliderMode.Convex,
+        MeshInertiaPolicy inertiaPolicy = MeshInertiaPolicy.SurfaceApproximation) =>
+        new(
+            new[]
+            {
+                new Vector3d((Fixed64)(-2), Fixed64.Zero, (Fixed64)(-2)),
+                new Vector3d((Fixed64)2, Fixed64.Zero, (Fixed64)(-2)),
+                new Vector3d((Fixed64)(-2), Fixed64.Zero, (Fixed64)2),
+                new Vector3d((Fixed64)2, Fixed64.Zero, (Fixed64)2)
+            },
+            new[] { 0, 2, 1, 1, 2, 3 },
+            mode,
+            inertiaPolicy);
+
     public static LSMeshCollider CreateInsideCorner(
         MeshColliderMode mode = MeshColliderMode.Concave,
         MeshInertiaPolicy inertiaPolicy = MeshInertiaPolicy.RequireClosedVolume)

@@ -110,7 +110,8 @@ Start with hot paths that can be isolated and repeated deterministically:
 - `GravitasPhysicsService` body/collider registration and collision-pair ownership.
 - `GravitasCollisionService` partitioning and partition cleanup.
 - `CollisionDetection` shape-pair checks.
-- `CollisionResponse` contact resolution.
+- `CollisionResponse` contact resolution across primitive, resting, cylinder,
+  mesh, and mixed-dimension prepared contacts.
 - continuous collision detection policy and swept movement cost.
 - production CCD evidence through pure 2D, pure 3D, mixed full-runtime,
   static query, dynamic candidate-index, dynamic relative sweep, and shape-exact
@@ -153,7 +154,7 @@ BenchmarkDotNet writes results to `BenchmarkDotNet.Artifacts/results/` by defaul
 For quick allocation checks around the current steady-state hot paths, run:
 
 ```bash
-dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll query-service simulation-allocation continuous-collision collision-detection collision-response collision-partition partition-culling diagnostics physics-2d mixed-broad-phase --filter "*" -j Short -i --exporters json
+dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll query-service simulation-allocation continuous-collision collision-detection collision-response mixed-collision-response collision-partition partition-culling diagnostics physics-2d mixed-broad-phase --filter "*" -j Short -i --exporters json
 ```
 
 The short in-process job is not canonical timing evidence, but it is useful for
@@ -171,7 +172,8 @@ to add or tighten explicit allocation tests before changing the algorithm.
 | `continuous-collision` | Discrete fast body movement baseline and opt-in CCD sweep/clamp against thin static geometry. |
 | `collision-partition` | dynamic/static registration and partitioning, partitioned simulation, and reset plus dynamic re-registration churn. |
 | `collision-detection` | prepared primitive pairs, non-SAT primitive pairs, primitive manifold generation, cuboid face-manifold generation, cuboid SAT, mesh/cylinder, mesh/cuboid, mesh/mesh, and compound/primitive checks. |
-| `collision-response` | manifold response solver cost across single-contact and face-manifold cases, with pair-count scaling. |
+| `collision-response` | manifold response solver cost across single-contact, face-manifold, resting face-manifold, cylinder-contact, and mesh-contact prepared pairs, with pair-count scaling. |
+| `mixed-collision-response` | constrained mixed 3D/2D response cost for prepared sphere/circle contacts, with pair-count scaling. |
 | `diagnostics` | Disabled/enabled force and torque event hooks plus disabled/enabled primitive and mesh collider debug draw capture. |
 | `partition-culling` | dynamic collider repartitioning after teleports, direct partition add/remove churn, and culled-pair invalidation after movement. |
 | `physics-2d` | pure 2D body integration, GridForge-backed 2D partition response, direct angular contact response, direct two-contact manifold response, convex/convex two-contact manifold detection, sweep baseline comparisons, required 2D shape-pair checks, `OverlapCircleAll`, and `RaycastAll`. |
