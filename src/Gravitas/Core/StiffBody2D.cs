@@ -519,7 +519,7 @@ public sealed class StiffBody2D : IRecordable
                 cacheTargetPartitions: true)
             : 0;
 
-        bool found2D = TryGetFirstValidContinuousCollisionHit(hitCount, out Physics2DHit hit2D);
+        bool found2D = TryGetFirstValidContinuousCollisionHit(startPosition, proposedPosition, hitCount, out Physics2DHit hit2D);
         bool foundDynamic2D = TryGetFirstDynamicContinuousCollisionHit(
             startPosition,
             proposedPosition,
@@ -646,20 +646,33 @@ public sealed class StiffBody2D : IRecordable
         return false;
     }
 
-    private bool TryGetFirstValidContinuousCollisionHit(int hitCount, out Physics2DHit hit)
+    private bool TryGetFirstValidContinuousCollisionHit(
+        Vector2d startPosition,
+        Vector2d proposedPosition,
+        int hitCount,
+        out Physics2DHit hit)
     {
+        Vector2d displacement = proposedPosition - startPosition;
+        bool found = false;
+        Physics2DHit best = default;
         for (int i = 0; i < hitCount; i++)
         {
             Physics2DHit candidate = _continuousCollisionHits[i];
             if (!IsValidContinuousCollisionHit(candidate))
                 continue;
 
-            hit = candidate;
-            return true;
+            if (!QueryDetection2D.TrySweepMoverShape(Collider, displacement, candidate.Collider, out Physics2DHit refined))
+                continue;
+
+            if (found && !Physics2DHitSorter.ComesBefore(refined, best))
+                continue;
+
+            best = refined;
+            found = true;
         }
 
-        hit = default;
-        return false;
+        hit = best;
+        return found;
     }
 
     private bool TryGetFirstValidMixedContinuousCollisionHit(int hitCount, out PhysicsMixedHit hit)

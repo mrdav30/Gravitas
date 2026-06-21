@@ -29,6 +29,8 @@ public class DynamicCcdScalingBenchmarks
     private GravitasWorldContext _dense3DContext;
     private GravitasWorldContext _sparse2DContext;
     private GravitasWorldContext _dense2DContext;
+    private GravitasWorldContext _shapeExact3DContext;
+    private GravitasWorldContext _shapeExact2DContext;
     private GravitasWorldContext _sparseMixedContext;
     private GravitasWorldContext _denseMixedContext;
 
@@ -36,6 +38,8 @@ public class DynamicCcdScalingBenchmarks
     private SwiftList<StiffBody> _dense3DBodies;
     private SwiftList<StiffBody2D> _sparse2DBodies;
     private SwiftList<StiffBody2D> _dense2DBodies;
+    private SwiftList<StiffBody> _shapeExact3DBodies;
+    private SwiftList<StiffBody2D> _shapeExact2DBodies;
     private SwiftList<StiffBody> _sparseMixed3DBodies;
     private SwiftList<StiffBody2D> _sparseMixed2DBodies;
     private SwiftList<StiffBody> _denseMixed3DBodies;
@@ -48,6 +52,8 @@ public class DynamicCcdScalingBenchmarks
     private Vector3d[] _dense3DPositions;
     private Vector2d[] _sparse2DPositions;
     private Vector2d[] _dense2DPositions;
+    private Vector3d[] _shapeExact3DPositions;
+    private Vector2d[] _shapeExact2DPositions;
     private Vector3d[] _sparseMixed3DPositions;
     private Vector2d[] _sparseMixed2DPositions;
     private Vector3d[] _denseMixed3DPositions;
@@ -64,6 +70,8 @@ public class DynamicCcdScalingBenchmarks
         _dense3DContext = CreateContext3D(ExtentForDense(BodyCount), ExtentForDenseRows(BodyCount));
         _sparse2DContext = CreateContext2D(ExtentForSparse(BodyCount), ExtentForSparseRows(BodyCount));
         _dense2DContext = CreateContext2D(ExtentForDense(BodyCount), ExtentForDenseRows(BodyCount));
+        _shapeExact3DContext = CreateContext3D(ExtentForSparse(BodyCount), ExtentForSparseRows(BodyCount) + 8);
+        _shapeExact2DContext = CreateContext2D(ExtentForSparse(BodyCount), ExtentForSparseRows(BodyCount) + 8);
         _sparseMixedContext = CreateMixedContext(
             ExtentForSparse(mixedPerDimension),
             MixedSparseOffsetZ + ExtentForSparseRows(mixedPerDimension));
@@ -75,6 +83,8 @@ public class DynamicCcdScalingBenchmarks
         _dense3DBodies = new SwiftList<StiffBody>(BodyCount);
         _sparse2DBodies = new SwiftList<StiffBody2D>(BodyCount);
         _dense2DBodies = new SwiftList<StiffBody2D>(BodyCount);
+        _shapeExact3DBodies = new SwiftList<StiffBody>(BodyCount);
+        _shapeExact2DBodies = new SwiftList<StiffBody2D>(BodyCount);
         _sparseMixed3DBodies = new SwiftList<StiffBody>(mixedPerDimension);
         _sparseMixed2DBodies = new SwiftList<StiffBody2D>(mixedPerDimension);
         _denseMixed3DBodies = new SwiftList<StiffBody>(mixedPerDimension);
@@ -87,6 +97,8 @@ public class DynamicCcdScalingBenchmarks
         _dense3DPositions = new Vector3d[BodyCount];
         _sparse2DPositions = new Vector2d[BodyCount];
         _dense2DPositions = new Vector2d[BodyCount];
+        _shapeExact3DPositions = new Vector3d[BodyCount];
+        _shapeExact2DPositions = new Vector2d[BodyCount];
         _sparseMixed3DPositions = new Vector3d[mixedPerDimension];
         _sparseMixed2DPositions = new Vector2d[mixedPerDimension];
         _denseMixed3DPositions = new Vector3d[mixedPerDimension];
@@ -106,6 +118,13 @@ public class DynamicCcdScalingBenchmarks
             _dense3DBodies.Add(CreateSphere3D(_dense3DContext, dense3D));
             _sparse2DBodies.Add(CreateCircle2D(_sparse2DContext, sparse2D));
             _dense2DBodies.Add(CreateCircle2D(_dense2DContext, dense2D));
+
+            _shapeExact3DPositions[i] = sparse3D;
+            _shapeExact2DPositions[i] = sparse2D;
+            _shapeExact3DBodies.Add(CreateThinCuboid3D(_shapeExact3DContext, sparse3D));
+            _shapeExact2DBodies.Add(CreateThinPolygon2D(_shapeExact2DContext, sparse2D));
+            CreateStaticSphere3D(_shapeExact3DContext, sparse3D + new Vector3d((Fixed64)4, Fixed64.FromFraction(5, 2), Fixed64.Zero));
+            CreateStaticCircle2D(_shapeExact2DContext, sparse2D + new Vector2d((Fixed64)4, Fixed64.FromFraction(5, 2)));
         }
 
         for (int i = 0; i < mixedPerDimension; i++)
@@ -132,18 +151,24 @@ public class DynamicCcdScalingBenchmarks
         _dense3DContext.Dispose();
         _sparse2DContext.Dispose();
         _dense2DContext.Dispose();
+        _shapeExact3DContext.Dispose();
+        _shapeExact2DContext.Dispose();
         _sparseMixedContext.Dispose();
         _denseMixedContext.Dispose();
         _sparse3DContext = null;
         _dense3DContext = null;
         _sparse2DContext = null;
         _dense2DContext = null;
+        _shapeExact3DContext = null;
+        _shapeExact2DContext = null;
         _sparseMixedContext = null;
         _denseMixedContext = null;
         _sparse3DBodies = null;
         _dense3DBodies = null;
         _sparse2DBodies = null;
         _dense2DBodies = null;
+        _shapeExact3DBodies = null;
+        _shapeExact2DBodies = null;
         _sparseMixed3DBodies = null;
         _sparseMixed2DBodies = null;
         _denseMixed3DBodies = null;
@@ -155,6 +180,8 @@ public class DynamicCcdScalingBenchmarks
         _dense3DPositions = null;
         _sparse2DPositions = null;
         _dense2DPositions = null;
+        _shapeExact3DPositions = null;
+        _shapeExact2DPositions = null;
         _sparseMixed3DPositions = null;
         _sparseMixed2DPositions = null;
         _denseMixed3DPositions = null;
@@ -328,6 +355,34 @@ public class DynamicCcdScalingBenchmarks
             Reset2DAngularBodies(_dense2DBodies, _dense2DPositions, angularMotion: true);
             _dense2DContext.LateSimulate();
             total += Sum2D(_dense2DBodies);
+        }
+
+        return total;
+    }
+
+    [Benchmark(OperationsPerInvoke = PureBatchFrames)]
+    public Vector3d SparsePure3DShapeExactCcdFalsePositiveBatch8()
+    {
+        Vector3d total = Vector3d.Zero;
+        for (int i = 0; i < PureBatchFrames; i++)
+        {
+            Reset3DBodies(_shapeExact3DBodies, _shapeExact3DPositions, pairedDirections: false);
+            _shapeExact3DContext.LateSimulate();
+            total += Sum3D(_shapeExact3DBodies);
+        }
+
+        return total;
+    }
+
+    [Benchmark(OperationsPerInvoke = PureBatchFrames)]
+    public Vector2d SparsePure2DShapeExactCcdFalsePositiveBatch8()
+    {
+        Vector2d total = Vector2d.Zero;
+        for (int i = 0; i < PureBatchFrames; i++)
+        {
+            Reset2DBodies(_shapeExact2DBodies, _shapeExact2DPositions, pairedDirections: false);
+            _shapeExact2DContext.LateSimulate();
+            total += Sum2D(_shapeExact2DBodies);
         }
 
         return total;
@@ -967,6 +1022,66 @@ public class DynamicCcdScalingBenchmarks
 
         body.Initialize(position);
         return body;
+    }
+
+    private static StiffBody CreateThinCuboid3D(GravitasWorldContext context, Vector3d position)
+    {
+        var agent = new BenchmarkMatterAgent(context, position);
+        var body = new StiffBody(
+            agent,
+            new LSCuboidCollider
+            {
+                Size = new Vector3d((Fixed64)6, Fixed64.FromFraction(1, 5), Fixed64.FromFraction(1, 5))
+            })
+        {
+            ContinuousCollisionMode = ContinuousCollisionMode.Continuous,
+            Mass = Fixed64.One
+        };
+
+        body.Initialize(position, FixedQuaternion.Identity);
+        return body;
+    }
+
+    private static StiffBody2D CreateThinPolygon2D(GravitasWorldContext context, Vector2d position)
+    {
+        var agent = new BenchmarkMatterAgent(context, new Vector3d(position.X, Fixed64.Zero, position.Y));
+        var collider = new LSPolygonCollider2D(
+            new Vector2d((Fixed64)(-3), Fixed64.FromFraction(-1, 10)),
+            new Vector2d((Fixed64)3, Fixed64.FromFraction(-1, 10)),
+            new Vector2d((Fixed64)3, Fixed64.FromFraction(1, 10)),
+            new Vector2d((Fixed64)(-3), Fixed64.FromFraction(1, 10)));
+        var body = new StiffBody2D(agent, collider)
+        {
+            ContinuousCollisionMode = ContinuousCollisionMode.Continuous,
+            Mass = Fixed64.One
+        };
+
+        body.Initialize(position);
+        return body;
+    }
+
+    private static void CreateStaticSphere3D(GravitasWorldContext context, Vector3d position)
+    {
+        var agent = new BenchmarkMatterAgent(context, position);
+        var body = new StiffBody(agent, new LSSphereCollider { Radius = Fixed64.FromFraction(1, 4) })
+        {
+            Immovable = true,
+            Mass = Fixed64.One
+        };
+
+        body.Initialize(position, FixedQuaternion.Identity);
+    }
+
+    private static void CreateStaticCircle2D(GravitasWorldContext context, Vector2d position)
+    {
+        var agent = new BenchmarkMatterAgent(context, new Vector3d(position.X, Fixed64.Zero, position.Y));
+        var body = new StiffBody2D(agent, new LSCircleCollider2D(Fixed64.FromFraction(1, 4)))
+        {
+            Immovable = true,
+            Mass = Fixed64.One
+        };
+
+        body.Initialize(position);
     }
 
     private static Vector3d Sparse3DPosition(int index)

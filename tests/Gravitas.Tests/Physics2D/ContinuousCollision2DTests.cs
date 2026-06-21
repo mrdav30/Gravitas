@@ -215,6 +215,134 @@ public sealed class ContinuousCollision2DTests
     }
 
     [Fact]
+    public void ContinuousMode_ShouldNotClampThinPolygonWhenBoundsProxyHitsButSweptShapeMisses()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        var bladeCollider = new LSPolygonCollider2D(
+            new Vector2d((Fixed64)(-3), Fixed64.FromFraction(-1, 10)),
+            new Vector2d((Fixed64)3, Fixed64.FromFraction(-1, 10)),
+            new Vector2d((Fixed64)3, Fixed64.FromFraction(1, 10)),
+            new Vector2d((Fixed64)(-3), Fixed64.FromFraction(1, 10)));
+        StiffBody2D blade = CreateBody(context, bladeCollider, Vector2d.Zero, immovable: false);
+        _ = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.FromFraction(1, 4)),
+            new Vector2d((Fixed64)4, Fixed64.FromFraction(5, 2)),
+            immovable: true);
+        blade.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+
+        blade.AddForce(new Vector2d((Fixed64)10, Fixed64.Zero));
+        context.LateSimulate();
+
+        blade.Position.X.Should().Be((Fixed64)10);
+        blade.LinearVelocity.X.Should().Be((Fixed64)10);
+    }
+
+    [Fact]
+    public void ContinuousMode_ShouldNotClampThinAabbWhenBoundsProxyHitsButSweptShapeMisses()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        StiffBody2D blade = CreateBody(
+            context,
+            new LSAABBoxCollider2D(new Vector2d((Fixed64)6, Fixed64.FromFraction(1, 5))),
+            Vector2d.Zero,
+            immovable: false);
+        _ = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.FromFraction(1, 4)),
+            new Vector2d((Fixed64)4, Fixed64.FromFraction(5, 2)),
+            immovable: true);
+        blade.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+
+        blade.AddForce(new Vector2d((Fixed64)10, Fixed64.Zero));
+        context.LateSimulate();
+
+        blade.Position.X.Should().Be((Fixed64)10);
+        blade.LinearVelocity.X.Should().Be((Fixed64)10);
+    }
+
+    [Fact]
+    public void ContinuousMode_ShouldClampThinPolygonWhenSweptShapeHitsStaticCircle()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        var bladeCollider = new LSPolygonCollider2D(
+            new Vector2d((Fixed64)(-3), Fixed64.FromFraction(-1, 10)),
+            new Vector2d((Fixed64)3, Fixed64.FromFraction(-1, 10)),
+            new Vector2d((Fixed64)3, Fixed64.FromFraction(1, 10)),
+            new Vector2d((Fixed64)(-3), Fixed64.FromFraction(1, 10)));
+        StiffBody2D blade = CreateBody(context, bladeCollider, Vector2d.Zero, immovable: false);
+        _ = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.FromFraction(1, 4)),
+            new Vector2d((Fixed64)4, Fixed64.Zero),
+            immovable: true);
+        blade.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+
+        blade.AddForce(new Vector2d((Fixed64)10, Fixed64.Zero));
+        context.LateSimulate();
+
+        blade.Position.X.Should().BeLessThan((Fixed64)10);
+        blade.LinearVelocity.X.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void ContinuousMode_ShouldNotClampCompoundWhenAggregateProxyHitsButPartsMiss()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        var compound = new LSCompoundCollider2D(
+            CompoundColliderPart2D.Circle(Fixed64.Half, new Vector2d((Fixed64)(-3), Fixed64.Zero)),
+            CompoundColliderPart2D.Circle(Fixed64.Half, new Vector2d((Fixed64)3, Fixed64.Zero)));
+        StiffBody2D mover = CreateBody(context, compound, Vector2d.Zero, immovable: false);
+        _ = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.FromFraction(1, 4)),
+            new Vector2d((Fixed64)4, Fixed64.FromFraction(5, 2)),
+            immovable: true);
+        mover.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+
+        mover.AddForce(new Vector2d((Fixed64)10, Fixed64.Zero));
+        context.LateSimulate();
+
+        mover.Position.X.Should().Be((Fixed64)10);
+        mover.LinearVelocity.X.Should().Be((Fixed64)10);
+    }
+
+    [Fact]
+    public void ContinuousMode_ShapeExactTranslationalPath_ShouldNotAllocateAfterWarmup()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        var bladeCollider = new LSPolygonCollider2D(
+            new Vector2d((Fixed64)(-3), Fixed64.FromFraction(-1, 10)),
+            new Vector2d((Fixed64)3, Fixed64.FromFraction(-1, 10)),
+            new Vector2d((Fixed64)3, Fixed64.FromFraction(1, 10)),
+            new Vector2d((Fixed64)(-3), Fixed64.FromFraction(1, 10)));
+        StiffBody2D blade = CreateBody(context, bladeCollider, Vector2d.Zero, immovable: false);
+        _ = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.FromFraction(1, 4)),
+            new Vector2d((Fixed64)4, Fixed64.FromFraction(5, 2)),
+            immovable: true);
+        blade.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+
+        void SimulateShapeExactCcd()
+        {
+            blade.Sleep();
+            blade.SetPosition(Vector2d.Zero);
+            blade.SetRotation(Fixed64.Zero);
+            blade.AddForce(new Vector2d((Fixed64)10, Fixed64.Zero));
+            context.LateSimulate();
+        }
+
+        long allocatedBytes = AllocationTestHelper.MeasureSteadyState(
+            SimulateShapeExactCcd,
+            warmupIterations: 16,
+            stabilizationIterations: 4,
+            measurementIterations: 8);
+
+        allocatedBytes.Should().Be(0);
+    }
+
+    [Fact]
     public void ContinuousMode_RotationalPath_ShouldNotAllocateAfterWarmup()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);

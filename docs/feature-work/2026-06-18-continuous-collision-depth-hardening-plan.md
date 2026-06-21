@@ -1,7 +1,7 @@
 # Continuous Collision Depth Hardening Plan
 
 **Date:** 2026-06-18
-**Status:** Active / Workstream 1 complete
+**Status:** Active / Workstream 2 complete
 **Owner:** Gravitas runtime/collision hardening
 
 ## Purpose
@@ -30,14 +30,19 @@ Current runtime CCD is frame-local:
   deterministic bounded pose samples that are verified through the existing
   exact narrow-phase before a contact is accepted.
 - 3D sphere and 2D circle movers use exact radius proxies.
-- 3D non-sphere movers use a conservative bounds-sphere proxy.
-- 2D AABB, convex polygon, and compound movers use conservative bounds radii.
+- static-style 2D CCD gathers AABB, convex polygon, and compound movers with
+  conservative bounds radii, then reduces supported candidates with exact
+  translated-shape sweeps before accepting a hit.
+- static-style 3D CCD gathers non-sphere movers with a conservative
+  bounds-sphere proxy; sphere targets are then reduced through a reversed
+  swept-sphere check against the moving source shape when supported by the
+  existing 3D sweep worker.
 - accepted hits clamp movement to the earliest time of impact and remove the
   closing velocity component; ordinary discrete response handles later contact
   resolution.
 
 That is a good deterministic alpha contract, but it does not yet claim
-shape-exact swept polytope support, kinematic-host active angular casts,
+full shape-exact swept polytope support, kinematic-host active angular casts,
 production-grade benchmark stability, or a full continuous solver island model.
 
 ## Guiding Rules
@@ -236,6 +241,36 @@ benchmarks. Each exact solver must preserve:
 - False-positive-heavy scenes where exact movers should reduce response work.
 - Compound part count scaling.
 - Mesh mover query cost if mesh exact support is attempted.
+
+**Implementation Notes - 2026-06-20**
+
+Workstream 2 kept conservative proxy sweeps as the candidate-gathering stage and
+added exact candidate reduction only where it materially removes false positives
+without changing the public CCD mode contract.
+
+- Pure 2D static-style CCD now refines every candidate with exact translated
+  mover sweeps. Circles reuse existing swept-circle logic, convex/AABB movers
+  use deterministic swept SAT against convex targets, convex movers against
+  circles use the existing circle sweep in reverse, and 2D compounds reduce
+  through private parts while preserving owner-level target identity.
+- Pure 3D static-style CCD now refines sphere targets by sweeping the target
+  sphere backward against the moving source collider with the existing
+  `SweptSphereQueryWorker`. This gives exact false-positive rejection for
+  cuboid, capsule, cylinder, mesh, and compound movers against static-style
+  sphere targets without duplicating 3D shape math.
+- Unsupported 3D target shapes, mixed CCD, and dynamic-vs-dynamic CCD still use
+  the conservative proxy path. That fallback is intentional until exact
+  relative-motion and mixed-shape reducers have tests and benchmark evidence.
+- Focused regressions now cover 2D thin polygon/AABB false positives, a 2D
+  compound aggregate-radius false positive, true 2D polygon hits, 3D thin
+  cuboid/capsule false positives against spheres, true 3D cuboid hits, and
+  allocation-free 2D/3D exact translational CCD after warmup.
+- Benchmark rows now cover false-positive-heavy 2D and 3D shape-exact CCD
+  scenes through `DynamicCcdScalingBenchmarks`.
+
+Remaining work stays in later CCD phases: exact 3D reducers against non-sphere
+primitive targets, exact dynamic-vs-dynamic shape reducers, mixed-dimension
+shape-exact reducers, and mesh-specific production benchmark decisions.
 
 **Likely Files**
 

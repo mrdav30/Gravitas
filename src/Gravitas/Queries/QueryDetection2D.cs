@@ -1,4 +1,5 @@
 using FixedMathSharp;
+using Gravitas.CollisionHandling;
 using Gravitas.Colliders;
 using SwiftCollections;
 using System.Runtime.CompilerServices;
@@ -98,6 +99,36 @@ internal static class QueryDetection2D
         return collider is LSCircleCollider2D circle
             ? TrySweepCircleCircle(start, direction, segmentLength, radius, circle, out hit)
             : TrySweepCircleConvex(start, direction, segmentLength, radius, collider, out hit);
+    }
+
+    internal static bool TrySweepMoverShape(
+        LSCollider2D mover,
+        Vector2d displacement,
+        LSCollider2D target,
+        out Physics2DHit hit)
+    {
+        SwiftThrowHelper.ThrowIfNull(mover, nameof(mover));
+        SwiftThrowHelper.ThrowIfNull(target, nameof(target));
+
+        if (displacement.MagnitudeSquared <= Fixed64.Epsilon)
+        {
+            hit = default;
+            return false;
+        }
+
+        if (mover is LSCompoundCollider2D moverCompound)
+            return TrySweepMoverCompound(moverCompound, displacement, target, out hit);
+
+        if (target is LSCompoundCollider2D targetCompound)
+            return TrySweepMoverAgainstCompound(mover, displacement, targetCompound, out hit);
+
+        if (mover is LSCircleCollider2D circle)
+            return TrySweepCircle(circle.Center, circle.Center + displacement, circle.ScaledRadius, target, out hit);
+
+        if (target is LSCircleCollider2D targetCircle)
+            return TrySweepConvexMoverAgainstCircle(mover, displacement, targetCircle, out hit);
+
+        return TrySweepConvexMoverAgainstConvex(mover, displacement, target, out hit);
     }
 
     private static bool TryRaycastCircle(
@@ -262,6 +293,64 @@ internal static class QueryDetection2D
         return true;
     }
 
+    private static bool TrySweepMoverCompound(
+        LSCompoundCollider2D mover,
+        Vector2d displacement,
+        LSCollider2D target,
+        out Physics2DHit hit)
+    {
+        bool found = false;
+        Physics2DHit best = default;
+
+        for (int i = 0; i < mover.PartCount; i++)
+        {
+            LSCollider2D part = mover.GetPartCollider(i);
+            if (!TrySweepMoverShape(part, displacement, target, out Physics2DHit candidate))
+                continue;
+
+            if (!found || Physics2DHitSorter.ComesBefore(candidate, best))
+            {
+                best = candidate;
+                found = true;
+            }
+        }
+
+        hit = best;
+        return found;
+    }
+
+    private static bool TrySweepMoverAgainstCompound(
+        LSCollider2D mover,
+        Vector2d displacement,
+        LSCompoundCollider2D target,
+        out Physics2DHit hit)
+    {
+        bool found = false;
+        Physics2DHit best = default;
+
+        for (int i = 0; i < target.PartCount; i++)
+        {
+            LSCollider2D part = target.GetPartCollider(i);
+            if (!TrySweepMoverShape(mover, displacement, part, out Physics2DHit candidate))
+                continue;
+
+            if (!found || candidate.Distance < best.Distance)
+            {
+                best = candidate;
+                found = true;
+            }
+        }
+
+        if (!found)
+        {
+            hit = default;
+            return false;
+        }
+
+        hit = new Physics2DHit(target, best.Point, best.Normal, best.Distance);
+        return true;
+    }
+
     private static bool TryRaycastConvex(
         Vector2d start,
         Vector2d segment,
@@ -372,6 +461,79 @@ internal static class QueryDetection2D
         return true;
     }
 
+    private static bool TrySweepConvexMoverAgainstCircle(
+        LSCollider2D mover,
+        Vector2d displacement,
+        LSCircleCollider2D target,
+        out Physics2DHit hit)
+    {
+        if (CollisionDetection2D.TryCollide(mover, target, out Contact2D overlap))
+        {
+            Vector2d normal = -overlap.Normal;
+            hit = new Physics2DHit(target, target.Center + normal * target.ScaledRadius, normal, Fixed64.Zero);
+            return true;
+        }
+
+        if (!TrySweepCircle(
+                target.Center,
+                target.Center - displacement,
+                target.ScaledRadius,
+                mover,
+                out Physics2DHit reverseHit))
+        {
+            hit = default;
+            return false;
+        }
+
+        Vector2d hitNormal = -reverseHit.Normal;
+        hit = new Physics2DHit(
+            target,
+            target.Center + hitNormal * target.ScaledRadius,
+            hitNormal,
+            reverseHit.Distance);
+        return true;
+    }
+
+    private static bool TrySweepConvexMoverAgainstConvex(
+        LSCollider2D mover,
+        Vector2d displacement,
+        LSCollider2D target,
+        out Physics2DHit hit)
+    {
+        if (CollisionDetection2D.TryCollide(mover, target, out Contact2D overlap))
+        {
+            hit = new Physics2DHit(target, overlap.PointB, -overlap.Normal, Fixed64.Zero);
+            return true;
+        }
+
+        Fixed64 segmentLength = displacement.Magnitude;
+        if (segmentLength <= Fixed64.Epsilon)
+        {
+            hit = default;
+            return false;
+        }
+
+        Fixed64 entryTime = Fixed64.Zero;
+        Fixed64 exitTime = Fixed64.One;
+        Vector2d entryNormal = ResolveQueryFallbackNormal(mover.Center, target.Center);
+
+        if (!TrySweepConvexAxes(mover, mover, target, displacement, ref entryTime, ref exitTime, ref entryNormal)
+            || !TrySweepConvexAxes(target, mover, target, displacement, ref entryTime, ref exitTime, ref entryNormal)
+            || entryTime > Fixed64.One
+            || exitTime < Fixed64.Zero)
+        {
+            hit = default;
+            return false;
+        }
+
+        if (entryTime < Fixed64.Zero)
+            entryTime = Fixed64.Zero;
+
+        Vector2d point = target.GetSupportPoint(entryNormal);
+        hit = new Physics2DHit(target, point, entryNormal, segmentLength * entryTime);
+        return true;
+    }
+
     private static bool TrySweepCircleEdge(
         Vector2d start,
         Vector2d direction,
@@ -475,6 +637,82 @@ internal static class QueryDetection2D
         if (distance < Fixed64.Zero)
             distance = Fixed64.Zero;
         return distance <= segmentLength;
+    }
+
+    private static bool TrySweepConvexAxes(
+        LSCollider2D axisSource,
+        LSCollider2D mover,
+        LSCollider2D target,
+        Vector2d displacement,
+        ref Fixed64 entryTime,
+        ref Fixed64 exitTime,
+        ref Vector2d entryNormal)
+    {
+        int vertexCount = axisSource.VertexCount;
+        for (int i = 0; i < vertexCount; i++)
+        {
+            Vector2d edge = axisSource.GetVertexUnchecked((i + 1) % vertexCount) - axisSource.GetVertexUnchecked(i);
+            Vector2d axis = edge.RightHandNormal;
+            if (axis.MagnitudeSquared <= Fixed64.Epsilon)
+                continue;
+
+            axis = axis.Normalized;
+            ProjectConvex(mover, axis, out Fixed64 moverMin, out Fixed64 moverMax);
+            ProjectConvex(target, axis, out Fixed64 targetMin, out Fixed64 targetMax);
+
+            Fixed64 velocity = Vector2d.Dot(displacement, axis);
+            if (velocity.Abs() <= Fixed64.Epsilon)
+            {
+                if (moverMax < targetMin || targetMax < moverMin)
+                    return false;
+
+                continue;
+            }
+
+            Fixed64 axisEntry;
+            Fixed64 axisExit;
+            Vector2d axisNormal;
+            if (velocity > Fixed64.Zero)
+            {
+                axisEntry = (targetMin - moverMax) / velocity;
+                axisExit = (targetMax - moverMin) / velocity;
+                axisNormal = -axis;
+            }
+            else
+            {
+                axisEntry = (targetMax - moverMin) / velocity;
+                axisExit = (targetMin - moverMax) / velocity;
+                axisNormal = axis;
+            }
+
+            if (axisEntry > entryTime)
+            {
+                entryTime = axisEntry;
+                entryNormal = axisNormal;
+            }
+
+            if (axisExit < exitTime)
+                exitTime = axisExit;
+
+            if (entryTime > exitTime)
+                return false;
+        }
+
+        return true;
+    }
+
+    private static void ProjectConvex(LSCollider2D collider, Vector2d axis, out Fixed64 min, out Fixed64 max)
+    {
+        min = Vector2d.Dot(collider.GetVertexUnchecked(0), axis);
+        max = min;
+        for (int i = 1; i < collider.VertexCount; i++)
+        {
+            Fixed64 projection = Vector2d.Dot(collider.GetVertexUnchecked(i), axis);
+            if (projection < min)
+                min = projection;
+            else if (projection > max)
+                max = projection;
+        }
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

@@ -375,8 +375,8 @@ time before falling back to the context default.
 
 The alpha CCD path runs during body position integration, after velocity and
 acceleration have produced an intended frame displacement and before the
-authoritative position is committed. It uses a conservative swept proxy derived
-from the moving collider:
+authoritative position is committed. It first uses a swept proxy derived from
+the moving collider:
 
 - 3D sphere uses its exact scaled radius.
 - 3D capsule, cuboid, finite cylinder, mesh, and compound movers use the
@@ -387,6 +387,23 @@ from the moving collider:
 - 2D circle uses its scaled radius.
 - 2D AABB and convex polygon use a conservative bounds radius.
 - 2D compound uses a conservative aggregate radius over its private parts.
+
+For static-style targets, supported movers then run an exact reduction pass
+before the proxy hit can be accepted:
+
+- pure 2D circles reuse swept-circle tests, convex/AABB movers use deterministic
+  swept SAT against convex targets, convex movers against circles reuse the
+  circle sweep in reverse, and 2D compounds reduce through private parts while
+  keeping the compound target identity.
+- pure 3D sphere targets are reduced by sweeping the target sphere backward
+  against the moving source collider with `SweptSphereQueryWorker`. This covers
+  3D cuboid, capsule, cylinder, mesh, and compound movers for sphere-target
+  false-positive rejection without duplicating 3D shape math.
+
+Unsupported 3D target shapes, dynamic-vs-dynamic CCD, and mixed CCD continue to
+use the conservative proxy result. Those paths prefer false-positive early
+stops over false-negative tunneling until exact relative-motion and mixed-shape
+reducers have dedicated tests and benchmark evidence.
 
 `Continuous` always sweeps when the proxy radius and displacement are non-zero.
 `Auto` sweeps only when the intended displacement is larger than the proxy
@@ -445,8 +462,9 @@ The dynamic path is intentionally conservative:
 - dynamic mesh and compound bodies are supported as moving proxy bodies rather
   than exact swept mesh or exact swept compound sources.
 
-Exact moving mesh/compound CCD would require a deeper shape-specific solver and
-benchmark evidence before it should replace the conservative proxy path.
+Exact dynamic mesh/compound CCD and exact non-sphere 3D target reducers require
+deeper shape-specific solvers and benchmark evidence before they should replace
+the conservative proxy path.
 
 ## Active Partitions
 

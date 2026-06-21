@@ -159,6 +159,7 @@ public class StiffBody : IRecordable
     private readonly SwiftList<Physics3DHit> _continuousCollisionHits = new();
     private readonly SwiftList<PhysicsMixedHit> _continuousMixedCollisionHits = new();
     private readonly ContactManifold _rotationalContinuousCollisionManifold = new();
+    private readonly SweptSphereQueryWorker _shapeExactContinuousSweepWorker = new();
 
     public Fixed64 StepOffset = (Fixed64)0.5f;
 
@@ -1220,7 +1221,7 @@ public class StiffBody : IRecordable
                 cacheTargetPartitions: true)
             : 0;
 
-        bool found3D = TryGetFirstValidContinuousCollisionHit(hitCount, out Physics3DHit hit3D);
+        bool found3D = TryGetFirstValidContinuousCollisionHit(startPosition, proposedPosition, hitCount, out Physics3DHit hit3D);
         bool foundDynamic3D = TryGetFirstDynamicContinuousCollisionHit(
             startPosition,
             proposedPosition,
@@ -1263,20 +1264,39 @@ public class StiffBody : IRecordable
         return false;
     }
 
-    private bool TryGetFirstValidContinuousCollisionHit(int hitCount, out Physics3DHit hit)
+    private bool TryGetFirstValidContinuousCollisionHit(
+        Vector3d startPosition,
+        Vector3d proposedPosition,
+        int hitCount,
+        out Physics3DHit hit)
     {
+        Vector3d displacement = proposedPosition - startPosition;
+        Vector3d direction = displacement.MagnitudeSquared > Fixed64.Epsilon ? displacement.Normalized : Vector3d.Zero;
+        bool found = false;
+        Physics3DHit best = default;
         for (int i = 0; i < hitCount; i++)
         {
             Physics3DHit candidate = _continuousCollisionHits[i];
             if (!IsValidContinuousCollisionHit(candidate))
                 continue;
 
-            hit = candidate;
-            return true;
+            Physics3DHit refined;
+            if (TryRefineShapeExactContinuousCollisionHit(candidate, displacement, direction, out Physics3DHit exactHit, out bool exactSupported))
+                refined = exactHit;
+            else if (exactSupported)
+                continue;
+            else
+                refined = candidate;
+
+            if (found && !ContinuousCollisionHitComesBefore(refined, best))
+                continue;
+
+            best = refined;
+            found = true;
         }
 
-        hit = default;
-        return false;
+        hit = best;
+        return found;
     }
 
     private bool TryGetFirstValidMixedContinuousCollisionHit(int hitCount, out PhysicsMixedHit hit)
@@ -1293,6 +1313,47 @@ public class StiffBody : IRecordable
 
         hit = default;
         return false;
+    }
+
+    private bool TryRefineShapeExactContinuousCollisionHit(
+        Physics3DHit candidate,
+        Vector3d displacement,
+        Vector3d direction,
+        out Physics3DHit refined,
+        out bool exactSupported)
+    {
+        refined = default;
+        exactSupported = false;
+        if (candidate.Collider is not LSSphereCollider targetSphere
+            || displacement.MagnitudeSquared <= Fixed64.Epsilon)
+        {
+            return false;
+        }
+
+        exactSupported = true;
+        Vector3d reverseStart = targetSphere.Center;
+        Vector3d reverseEnd = targetSphere.Center - displacement;
+        _shapeExactContinuousSweepWorker.Prepare(reverseStart, reverseEnd, targetSphere.ScaledRadius);
+        if (!_shapeExactContinuousSweepWorker.TrySweep(Collider, out Vector3d reverseCenterAtImpact, out Fixed64 distance))
+            return false;
+
+        Vector3d sourcePoint = Collider.ClosestPointOnSurface(reverseCenterAtImpact);
+        Vector3d normalDelta = sourcePoint - reverseCenterAtImpact;
+        Vector3d normal = normalDelta.MagnitudeSquared > Fixed64.Epsilon
+            ? normalDelta.Normalized
+            : -direction;
+        Vector3d point = targetSphere.Center + normal * targetSphere.ScaledRadius;
+        refined = new Physics3DHit(targetSphere, point, normal, distance, direction);
+        return true;
+    }
+
+    private static bool ContinuousCollisionHitComesBefore(Physics3DHit left, Physics3DHit right)
+    {
+        int distanceCompare = left.Distance.CompareTo(right.Distance);
+        if (distanceCompare != 0)
+            return distanceCompare < 0;
+
+        return (left.Collider?.Id ?? -1) < (right.Collider?.Id ?? -1);
     }
 
     private bool TryGetFirstDynamicContinuousCollisionHit(
