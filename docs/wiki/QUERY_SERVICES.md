@@ -243,6 +243,8 @@ candidate acceleration and face/edge/vertex TOI checks within that fallback;
 compound targets return one hit on the owning compound collider after reducing
 over stable part order. Treat non-sphere mixed swept-circle hits as alpha
 conservative until shape-specific finite-slab solvers replace the fallback.
+This follow-up is tracked in
+[`Query And Mixed Swept Shape Hardening`](../feature-work/2026-06-21-query-and-mixed-swept-shape-hardening-plan.md).
 
 `StiffBody` and `StiffBody2D` mixed CCD use these APIs only when the context is
 in `PhysicsRuntimeMode.Mixed`. Pure `Both` mode still advances 2D and 3D
@@ -305,6 +307,10 @@ needed by the moving source so velocity clamping does not have to reinterpret
 the invariant at every call site.
 
 ## Query Hardening Targets
+
+These are tracked in
+[`Query And Mixed Swept Shape Hardening`](../feature-work/2026-06-21-query-and-mixed-swept-shape-hardening-plan.md)
+unless another active plan explicitly takes ownership.
 
 - harden mesh-as-source swept query families and richer mesh contact clipping
   without changing the current mesh-target swept-sphere worker contract.

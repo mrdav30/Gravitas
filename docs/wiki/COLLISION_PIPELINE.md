@@ -783,9 +783,13 @@ Response units and invariants:
   handled by the response solver.
 
 This is still the first alpha milestone, not a full response engine. Static
-friction for resting stacks, multi-iteration island solving, rotational CCD,
+friction for resting stacks, multi-iteration island solving, exact angular TOI,
 exact swept polytope support, and richer mixed-dimension solver behavior remain
-future work.
+future work. Discrete response, contact clipping, cylinder edge cases, and
+mixed solver quality are tracked in
+[`Discrete Response And Contact Quality Hardening`](../feature-work/2026-06-21-discrete-response-and-contact-quality-hardening-plan.md);
+exact CCD reducer work remains in
+[`CCD Exact TOI And Shape Reducers`](../feature-work/2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md).
 
 ## Body Sleep And Wake
 

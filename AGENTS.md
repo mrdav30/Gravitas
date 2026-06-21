@@ -62,6 +62,8 @@ Read these in order before making non-trivial changes:
    [`2026-06-21-ccd-active-swept-sources-plan.md`](docs/feature-work/2026-06-21-ccd-active-swept-sources-plan.md),
    [`2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md`](docs/feature-work/2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md),
    [`2026-06-21-ccd-service-level-island-solver-plan.md`](docs/feature-work/2026-06-21-ccd-service-level-island-solver-plan.md),
+   [`2026-06-21-discrete-response-and-contact-quality-hardening-plan.md`](docs/feature-work/2026-06-21-discrete-response-and-contact-quality-hardening-plan.md),
+   [`2026-06-21-query-and-mixed-swept-shape-hardening-plan.md`](docs/feature-work/2026-06-21-query-and-mixed-swept-shape-hardening-plan.md),
    [`2026-06-21-benchmark-publishing-and-ccd-diagnostics-plan.md`](docs/feature-work/2026-06-21-benchmark-publishing-and-ccd-diagnostics-plan.md),
    [`2026-06-21-benchmark-signal-hardening-backlog-plan.md`](docs/feature-work/2026-06-21-benchmark-signal-hardening-backlog-plan.md),
    or

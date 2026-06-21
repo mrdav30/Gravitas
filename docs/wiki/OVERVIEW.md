@@ -192,8 +192,8 @@ active-pair queue during `LateSimulate`.
   2D manifold solvers handle deterministic normal and friction impulses, pure
   2D applies pair-local warm-start impulses, and dynamic CCD has deterministic
   relative-motion paths. Static resting friction, explicit island solving,
-  rotational CCD, exact swept polytope support, 3D true warm-start application,
-  and richer mixed solver behavior remain future work.
+  exact angular TOI, exact swept polytope support, 3D true warm-start
+  application, and richer mixed solver behavior remain future work.
 - Query services use context-owned mutable buffers. Treat them as same-thread,
   fixed-loop services unless they are redesigned for reentrancy.
 - Diagnostics are context-owned and disabled by default. Enabled draw capture can
