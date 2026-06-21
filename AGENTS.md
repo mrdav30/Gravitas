@@ -50,26 +50,14 @@ Read these in order before making non-trivial changes:
    [`SERIALIZATION.md`](docs/wiki/SERIALIZATION.md), or
    [`DIAGNOSTICS.md`](docs/wiki/DIAGNOSTICS.md) and
    [`DIAGNOSTIC_ADAPTERS.md`](docs/wiki/DIAGNOSTIC_ADAPTERS.md).
-4. The active feature-work plan when a task is part of ongoing hardening.
-   Start with [`feature-work-overview.md`](docs/feature-work/feature-work-overview.md)
-   for alpha release scope and recommended ordering. Recent completed context
-   and current backlog plans include
-   [`2026-06-01-alpha-physics-follow-up-hardening-plan.md`](docs/feature-work/done/2026-06-01-alpha-physics-follow-up-hardening-plan.md),
-   [`2026-06-18-continuous-collision-depth-hardening-plan.md`](docs/feature-work/done/2026-06-18-continuous-collision-depth-hardening-plan.md),
-   [`2026-06-18-mass-inertia-solver-follow-up-plan.md`](docs/feature-work/done/2026-06-18-mass-inertia-solver-follow-up-plan.md),
-   [`2026-06-19-pure-2d-angular-dynamics-com-plan.md`](docs/feature-work/done/2026-06-19-pure-2d-angular-dynamics-com-plan.md),
-   [`2026-06-19-lsf-lower-stack-extraction-plan.md`](docs/feature-work/done/2026-06-19-lsf-lower-stack-extraction-plan.md),
-   [`2026-06-19-pure-2d-manifold-warm-start-solver-plan.md`](docs/feature-work/done/2026-06-19-pure-2d-manifold-warm-start-solver-plan.md),
-   [`2026-06-19-mass-inertia-tooling-and-diagnostics-follow-up-plan.md`](docs/feature-work/2026-06-19-mass-inertia-tooling-and-diagnostics-follow-up-plan.md),
-   [`2026-06-21-ccd-active-swept-sources-plan.md`](docs/feature-work/2026-06-21-ccd-active-swept-sources-plan.md),
-   [`2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md`](docs/feature-work/2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md),
-   [`2026-06-21-ccd-service-level-island-solver-plan.md`](docs/feature-work/2026-06-21-ccd-service-level-island-solver-plan.md),
-   [`2026-06-21-discrete-response-and-contact-quality-hardening-plan.md`](docs/feature-work/2026-06-21-discrete-response-and-contact-quality-hardening-plan.md),
-   [`2026-06-21-query-and-mixed-swept-shape-hardening-plan.md`](docs/feature-work/2026-06-21-query-and-mixed-swept-shape-hardening-plan.md),
-   [`2026-06-21-benchmark-publishing-and-ccd-diagnostics-plan.md`](docs/feature-work/2026-06-21-benchmark-publishing-and-ccd-diagnostics-plan.md),
-   [`2026-06-21-benchmark-signal-hardening-backlog-plan.md`](docs/feature-work/2026-06-21-benchmark-signal-hardening-backlog-plan.md),
-   or
-   [`2026-06-17-mesh-tooling-simplification-and-decomposition-plan.md`](docs/feature-work/2026-06-17-mesh-tooling-simplification-and-decomposition-plan.md).
+4. Feature-work coordination docs when a task is part of ongoing hardening:
+   - [`feature-work-overview.md`](docs/feature-work/feature-work-overview.md)
+     for alpha release scope, recommended ordering, and links to active plans.
+   - [`benchmark-signal-hardening-backlog.md`](docs/feature-work/benchmark-signal-hardening-backlog.md)
+     for measured benchmark, allocation, scaling, and profiler signals.
+   - [`issue-tracker.md`](docs/feature-work/issue-tracker.md) for
+     out-of-scope bugs, correctness risks, doc defects, and RCA items that
+     should not be buried inside feature plans.
 5. [`src/Gravitas/Runtime/GravitasWorldContext.cs`](src/Gravitas/Runtime/GravitasWorldContext.cs),
    [`src/Gravitas/Core/GravitasPhysicsService.cs`](src/Gravitas/Core/GravitasPhysicsService.cs),
    and [`src/Gravitas/Core/StiffBody.cs`](src/Gravitas/Core/StiffBody.cs).
@@ -645,7 +633,8 @@ If you are an automated coding agent working in this repository:
   adjust the plan with the user.
 - Call out scope-adjacent issues, missing 2D/3D/mixed counterparts, and future
   hardening risks when you notice them. If they are not fixed immediately,
-  capture them in a feature-work plan so they do not get lost.
+  capture them in the appropriate feature-work plan, benchmark backlog, or issue
+  tracker so they do not get lost.
 - Call out any build or test failures explicitly, with exact file references.
 - Treat context ownership, collider IDs, collision-pair ownership, partition
   reuse, pooled collections, settings, frame ordering, and GridForge world

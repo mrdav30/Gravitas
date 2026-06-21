@@ -23,7 +23,7 @@ evaluated. Those are release-readiness concerns, not runtime CCD algorithm work,
 so they belong in a separate plan.
 
 This plan is distinct from
-`2026-06-21-benchmark-signal-hardening-backlog-plan.md`: that document tracks
+`benchmark-signal-hardening-backlog.md`: that document tracks
 measured runtime signals to investigate. This one tracks the evidence pipeline
 that makes future performance and CCD diagnostics trustworthy.
 

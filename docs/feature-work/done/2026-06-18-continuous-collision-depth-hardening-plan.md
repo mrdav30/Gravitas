@@ -576,5 +576,5 @@ Deferred CCD work has been extracted into dedicated feature-work plans:
   [`2026-06-21-benchmark-publishing-and-ccd-diagnostics-plan.md`](../2026-06-21-benchmark-publishing-and-ccd-diagnostics-plan.md).
 
 Measured runtime performance concerns should continue to land in
-[`2026-06-21-benchmark-signal-hardening-backlog-plan.md`](../2026-06-21-benchmark-signal-hardening-backlog-plan.md)
+[`benchmark-signal-hardening-backlog.md`](../benchmark-signal-hardening-backlog.md)
 until they are ready for a focused implementation workstream.

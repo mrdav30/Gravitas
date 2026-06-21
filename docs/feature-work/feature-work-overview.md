@@ -17,8 +17,8 @@ with evidence.
 
 ## Pre-Alpha Release Blockers
 
-These plans should be completed, or explicitly closed with evidence, before the
-alpha release.
+These plans and evergreen closure trackers should be completed, or explicitly
+closed with evidence, before the alpha release.
 
 1. [`Discrete Response And Contact Quality Hardening`](2026-06-21-discrete-response-and-contact-quality-hardening-plan.md)
    - Contact response is the most visible runtime quality signal. Resting
@@ -38,9 +38,13 @@ alpha release.
 5. [`CCD Service-Level Island Solver`](2026-06-21-ccd-service-level-island-solver-plan.md)
    - Dense, chained, same-TOI, and mixed continuous contacts need a deterministic
      service-level model where body-owned substeps are insufficient.
-6. [`Benchmark Signal Hardening Backlog`](2026-06-21-benchmark-signal-hardening-backlog-plan.md)
+6. [`Benchmark Signal Hardening Backlog`](benchmark-signal-hardening-backlog.md)
    - Measured allocation or runtime-cost signals must be reproduced, resolved,
      or closed with a no-change decision before alpha.
+7. [`Feature Work Issue Tracker`](issue-tracker.md)
+   - Bugs, correctness risks, documentation defects, and feature-work-discovered
+     issues should be triaged, tested, and committed independently from feature
+     design plans.
 
 ## Post-Alpha / Evidence-Gated
 
