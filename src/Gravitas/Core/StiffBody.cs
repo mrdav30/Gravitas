@@ -145,6 +145,11 @@ public class StiffBody : IRecordable
 
     private bool _skipGroundingCheck = false;
 
+    /// <summary>
+    /// Selects whether Gravitas probes for ground automatically or preserves host-supplied grounding state.
+    /// </summary>
+    public GroundingMode GroundingMode { get; private set; } = GroundingMode.Automatic;
+
     // how close to the actor's feet (or whatever touches the ground) do we check for grounding
     public Fixed64 GroundOriginOffset = (Fixed64)0.5f;
 
@@ -2149,6 +2154,52 @@ public class StiffBody : IRecordable
         Context.Coroutines.StartCoroutine(SkipGroundingCoroutine(secs));
     }
 
+    /// <summary>
+    /// Gives the host ownership of grounded state and disables automatic ground probes.
+    /// </summary>
+    public void UseManualGrounding(bool clearGrounding = true)
+    {
+        GroundingMode = GroundingMode.Manual;
+        _skipGroundingCheck = false;
+        if (clearGrounding)
+            ClearGrounding();
+    }
+
+    /// <summary>
+    /// Returns grounded-state ownership to Gravitas and optionally refreshes the automatic probe immediately.
+    /// </summary>
+    public void UseAutomaticGrounding(bool checkGroundImmediately = true)
+    {
+        GroundingMode = GroundingMode.Automatic;
+        if (checkGroundImmediately && Active)
+            CheckGround(force: true);
+    }
+
+    /// <summary>
+    /// Sets host-owned grounded state for manual grounding sources such as deterministic heightmaps.
+    /// </summary>
+    public void SetManualGrounding(Vector3d hitPoint, Vector3d groundNormal, FixedTransform? hitPlatform = null)
+    {
+        SwiftThrowHelper.ThrowIfArgument(
+            groundNormal.MagnitudeSquared <= Fixed64.Epsilon,
+            nameof(groundNormal),
+            "Manual grounding normal must be non-zero.");
+
+        GroundingMode = GroundingMode.Manual;
+        _skipGroundingCheck = false;
+        SetGroundingState(hitPoint, groundNormal.Normalized, hitPlatform);
+    }
+
+    /// <summary>
+    /// Clears host-owned grounded state while leaving automatic probes disabled.
+    /// </summary>
+    public void ClearManualGrounding()
+    {
+        GroundingMode = GroundingMode.Manual;
+        _skipGroundingCheck = false;
+        ClearGrounding();
+    }
+
     private IEnumerator<ILockedYieldInstruction> SkipGroundingCoroutine(Fixed64 secs)
     {
         yield return Context.Coroutines.WaitForRealSeconds(secs);
@@ -2161,6 +2212,9 @@ public class StiffBody : IRecordable
 
     private void CheckGround(bool force)
     {
+        if (GroundingMode == GroundingMode.Manual)
+            return;
+
         if (_skipGroundingCheck || World is null)
         {
             ClearGrounding();
@@ -2200,16 +2254,7 @@ public class StiffBody : IRecordable
             return;
         }
 
-        _hitPlatform = hit.Collider?.Transform;
-        _hitPlatformPosition = _hitPlatform?.Position ?? Vector3d.Zero;
-        _hitPoint = hit.Point;
-        _groundNormal = hit.Normal;
-
-        Vector3d weightVector = Weight * Vector3d.Down;
-        Fixed64 weightInNormalDirection = Vector3d.Dot(weightVector, _groundNormal);
-        _normalForce = weightInNormalDirection * _groundNormal;
-
-        IsGrounded = true;
+        SetGroundingState(hit.Point, hit.Normal, hit.Collider?.Transform);
     }
 
     private bool TryFindGroundHit(
@@ -2321,6 +2366,20 @@ public class StiffBody : IRecordable
     {
         IsGrounded = false;
         ResetGroundCalculations();
+    }
+
+    private void SetGroundingState(Vector3d hitPoint, Vector3d groundNormal, FixedTransform? hitPlatform)
+    {
+        _hitPlatform = hitPlatform;
+        _hitPlatformPosition = _hitPlatform?.Position ?? Vector3d.Zero;
+        _hitPoint = hitPoint;
+        _groundNormal = groundNormal;
+
+        Vector3d weightVector = Weight * Vector3d.Down;
+        Fixed64 weightInNormalDirection = Vector3d.Dot(weightVector, _groundNormal);
+        _normalForce = weightInNormalDirection * _groundNormal;
+
+        IsGrounded = true;
     }
 
     private void ResetGroundCalculations()
@@ -2440,6 +2499,7 @@ public class StiffBody : IRecordable
 
     public void RecordData(IChronicler chronicler)
     {
+        GroundingMode groundingMode = GroundingMode;
         GroundProbeMode groundProbeMode = GroundProbeMode;
         Fixed64 groundProbeRadius = GroundProbeRadius;
         bool immovable = Immovable;
@@ -2456,6 +2516,7 @@ public class StiffBody : IRecordable
         RecordValues.Look(chronicler, ref GroundOriginOffset, "GroundOriginOffset");
         RecordValues.Look(chronicler, ref GroundedDistanceRay, "GroundedDistanceRay");
         RecordValues.Look(chronicler, ref GroundDownDistanceOnAir, "GroundDownDistanceOnAir");
+        RecordValues.Look(chronicler, ref groundingMode, "GroundingMode", GroundingMode.Automatic);
         RecordValues.Look(chronicler, ref groundProbeMode, "GroundProbeMode", GroundProbeMode.Auto);
         RecordValues.Look(chronicler, ref groundProbeRadius, "GroundProbeRadius");
         RecordValues.Look(chronicler, ref _skipGroundingCheck, "SkipGroundingCheck", false);
@@ -2506,6 +2567,7 @@ public class StiffBody : IRecordable
         {
             _immovable = immovable;
             _isKinematic = isKinematic;
+            GroundingMode = groundingMode;
             GroundProbeMode = groundProbeMode;
             GroundProbeRadius = groundProbeRadius;
             _hitPlatform = null;

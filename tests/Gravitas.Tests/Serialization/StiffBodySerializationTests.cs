@@ -99,6 +99,29 @@ public sealed class StiffBodySerializationTests
         restored.Body.Rotation.Should().Be(uninterrupted.Body.Rotation);
     }
 
+    [Theory]
+    [MemberData(nameof(Transports))]
+    public void Populate_ShouldRestoreManualGroundingAuthority(GravitasSerializationTransport transport)
+    {
+        using PhysicsScenarioBuilder sourceScenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> source = sourceScenario.CreateSphere(Vector3d.Zero);
+        Vector3d hitPoint = new(Fixed64.Zero, Fixed64.FromFraction(5, 4), Fixed64.Zero);
+        source.Body.SetManualGrounding(hitPoint, Vector3d.Up);
+
+        object payload = GravitasSerializationHarness.Serialize(source.Body, transport);
+
+        using PhysicsScenarioBuilder targetScenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> target = targetScenario.CreateSphere(Vector3d.Zero);
+
+        GravitasSerializationHarness.Populate(target.Body, payload, transport);
+        target.Body.CheckGround();
+
+        target.Body.GroundingMode.Should().Be(GroundingMode.Manual);
+        target.Body.IsGrounded.Should().BeTrue();
+        target.Body.HitPoint.Should().Be(hitPoint);
+        target.Body.GroundNormal.Should().Be(Vector3d.Up);
+    }
+
     [Fact]
     public void JsonSnapshot_ShouldExcludeHostBindingsAndPresentationOnlyVisualState()
     {

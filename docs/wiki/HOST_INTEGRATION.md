@@ -343,6 +343,18 @@ explicitly for their own layer model before relying on grounding behavior.
 is registered, so bodies only start grounded when the configured ground mask
 actually hits suitable geometry.
 
+`StiffBody.GroundingMode` controls who owns grounded state:
+
+- `Automatic` is the default. Gravitas updates `IsGrounded`, `HitPoint`,
+  `GroundNormal`, `HitPlatform`, and normal-force cache from deterministic ground
+  probes.
+- `Manual` disables automatic probes. Hosts can call
+  `UseManualGrounding(...)`, `SetManualGrounding(...)`,
+  `ClearManualGrounding()`, and `UseAutomaticGrounding(...)` when deterministic
+  heightmaps or another host-owned ground source should drive grounded state
+  without paying query cost. While in manual mode, the host is responsible for
+  keeping `IsGrounded` state current.
+
 Each body selects its probe shape through `GroundProbeMode`:
 
 - `Ray` preserves the sorted raycast/self-exclusion behavior.

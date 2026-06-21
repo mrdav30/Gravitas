@@ -71,6 +71,79 @@ public sealed class StiffBodyGroundingTests
     }
 
     [Fact]
+    public void UseManualGrounding_ShouldDisableAutomaticProbeAndLeaveBodyAirborne()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        CreateGround(scenario, new PhysicsLayer(1));
+        scenario.Context.Settings.GroundCheckLayerMask = PhysicsLayerMask.FromLayer(1);
+        ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
+
+        body.Body.UseManualGrounding();
+        scenario.Context.Simulate();
+        scenario.Context.LateSimulate();
+
+        body.Body.GroundingMode.Should().Be(GroundingMode.Manual);
+        body.Body.IsGrounded.Should().BeFalse();
+        body.Body.HitPoint.Should().Be(Vector3d.Zero);
+        body.Body.GroundNormal.Should().Be(Vector3d.Zero);
+    }
+
+    [Fact]
+    public void SetManualGrounding_ShouldPreserveHostGroundStateDuringSimulation()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        CreateGround(scenario, new PhysicsLayer(1));
+        scenario.Context.Settings.GroundCheckLayerMask = PhysicsLayerMask.FromLayer(1);
+        ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
+        Vector3d heightmapPoint = new(Fixed64.Zero, Fixed64.FromFraction(3, 2), Fixed64.Zero);
+
+        body.Body.SetManualGrounding(heightmapPoint, Vector3d.Up);
+        scenario.Context.Simulate();
+        scenario.Context.LateSimulate();
+
+        body.Body.GroundingMode.Should().Be(GroundingMode.Manual);
+        body.Body.IsGrounded.Should().BeTrue();
+        body.Body.HitPoint.Should().Be(heightmapPoint);
+        body.Body.GroundNormal.Should().Be(Vector3d.Up);
+        body.Body.HeightPos.Should().Be(heightmapPoint.Y);
+    }
+
+    [Fact]
+    public void ClearManualGrounding_ShouldKeepAutomaticProbeDisabled()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        CreateGround(scenario, new PhysicsLayer(1));
+        scenario.Context.Settings.GroundCheckLayerMask = PhysicsLayerMask.FromLayer(1);
+        ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
+
+        body.Body.SetManualGrounding(new Vector3d(Fixed64.Zero, Fixed64.One, Fixed64.Zero), Vector3d.Up);
+        body.Body.ClearManualGrounding();
+        scenario.Context.Simulate();
+        scenario.Context.LateSimulate();
+
+        body.Body.GroundingMode.Should().Be(GroundingMode.Manual);
+        body.Body.IsGrounded.Should().BeFalse();
+        body.Body.HitPoint.Should().Be(Vector3d.Zero);
+        body.Body.GroundNormal.Should().Be(Vector3d.Zero);
+    }
+
+    [Fact]
+    public void UseAutomaticGrounding_ShouldResumeProbeOwnedGrounding()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        CreateGround(scenario, new PhysicsLayer(1));
+        scenario.Context.Settings.GroundCheckLayerMask = PhysicsLayerMask.FromLayer(1);
+        ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
+
+        body.Body.SetManualGrounding(new Vector3d(Fixed64.Zero, Fixed64.One, Fixed64.Zero), Vector3d.Up);
+        body.Body.UseAutomaticGrounding();
+
+        body.Body.GroundingMode.Should().Be(GroundingMode.Automatic);
+        body.Body.IsGrounded.Should().BeTrue();
+        body.Body.HitPoint.Y.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
     public void CheckGround_ShouldStoreSlopeNormal()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();

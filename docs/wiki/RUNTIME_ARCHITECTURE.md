@@ -204,6 +204,14 @@ but movement of the last hit platform invalidates that guard. Ground probes
 accept bodyless colliders, immovable bodies, and kinematic bodies as ground;
 ordinary movable dynamic bodies are ignored.
 
+Hosts can switch `StiffBody.GroundingMode` to manual through
+`UseManualGrounding(...)`, `SetManualGrounding(...)`, or
+`ClearManualGrounding()`. Manual grounding preserves the supplied grounded
+state through simulation and skips automatic probes until
+`UseAutomaticGrounding(...)` returns ownership to Gravitas. This is intended for
+deterministic heightmaps or host-owned terrain systems where probing collider
+geometry every frame is unnecessary.
+
 `StiffBody` is the 3D body model. Pure 2D behavior uses `StiffBody2D` instead
 of a dimension flag on `StiffBody`. This prevents temporary 3D colliders from
 becoming the hidden implementation path for pure 2D bodies. The existing
