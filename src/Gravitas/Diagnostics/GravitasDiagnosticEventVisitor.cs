@@ -26,6 +26,8 @@ public abstract class GravitasDiagnosticEventVisitor
 
     public virtual void VisitCircleQuery(in GravitasCircleQueryDiagnosticView view) { }
 
+    public virtual void VisitQuerySummary(in GravitasQuerySummaryDiagnosticView view) { }
+
     public virtual void VisitContact(in GravitasContactDiagnosticView view) { }
 
     public virtual void VisitResponseImpulse(in GravitasResponseImpulseDiagnosticView view) { }

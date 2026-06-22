@@ -85,6 +85,11 @@ mixed CCD routes through the same mixed query reducers as public
 `SweepCircleAgainst3D`: sphere, cuboid, world-Y capsule, and world-Y finite
 cylinder targets use finite-slab reducers, while mesh, compound, and unsupported
 rotated capsule/cylinder targets remain explicit conservative fallbacks.
+When diagnostics are enabled, mixed queries also emit `QuerySummary` events with
+exact attempt, accepted hit, fallback hit, and rejected fallback counts.
+Remaining mixed finite-slab reducer promotion is tracked in the feature-work
+[`Mixed Query Finite-Slab Reducer Completion`](../feature-work/2026-06-22-mixed-query-finite-slab-reducer-completion-plan.md)
+plan rather than as an implicit wiki caveat.
 
 `CollisionDetection2D` currently supports:
 

@@ -24,5 +24,6 @@ public enum GravitasDiagnosticEventKind : byte
     MixedQuery = 10,
     MixedContact = 11,
     MixedResponseImpulse = 12,
-    MixedResponseIsland = 13
+    MixedResponseIsland = 13,
+    QuerySummary = 14
 }

@@ -6,6 +6,7 @@
 //=======================================================================
 
 using SwiftCollections;
+using System.Runtime.CompilerServices;
 
 namespace Gravitas.Queries;
 
@@ -13,22 +14,47 @@ internal static class PhysicsMixedHitSorter
 {
     internal static void SortByDistance(SwiftList<PhysicsMixedHit> hits)
     {
-        for (int i = 1; i < hits.Count; i++)
-        {
-            PhysicsMixedHit value = hits[i];
-            int index = i - 1;
-            while (index >= 0 && Compare(hits[index], value) > 0)
-            {
-                hits[index + 1] = hits[index];
-                index--;
-            }
+        int count = hits.Count;
+        if (count < 2)
+            return;
 
-            hits[index + 1] = value;
+        for (int root = (count / 2) - 1; root >= 0; root--)
+            SiftDown(hits, root, count);
+
+        for (int end = count - 1; end > 0; end--)
+        {
+            Swap(hits, 0, end);
+            SiftDown(hits, 0, end);
         }
     }
 
     internal static bool ComesBefore(PhysicsMixedHit left, PhysicsMixedHit right) => Compare(left, right) < 0;
 
+    private static void SiftDown(SwiftList<PhysicsMixedHit> hits, int root, int count)
+    {
+        while (true)
+        {
+            int child = (root * 2) + 1;
+            if (child >= count)
+                return;
+
+            int swapIndex = root;
+            if (ComesBefore(hits[swapIndex], hits[child]))
+                swapIndex = child;
+
+            int right = child + 1;
+            if (right < count && ComesBefore(hits[swapIndex], hits[right]))
+                swapIndex = right;
+
+            if (swapIndex == root)
+                return;
+
+            Swap(hits, root, swapIndex);
+            root = swapIndex;
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static int Compare(PhysicsMixedHit left, PhysicsMixedHit right)
     {
         int distance = left.Distance.CompareTo(right.Distance);
@@ -44,5 +70,13 @@ internal static class PhysicsMixedHitSorter
         int left2D = left.Collider2D?.Id ?? -1;
         int right2D = right.Collider2D?.Id ?? -1;
         return left2D.CompareTo(right2D);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void Swap(SwiftList<PhysicsMixedHit> hits, int left, int right)
+    {
+        PhysicsMixedHit temp = hits[left];
+        hits[left] = hits[right];
+        hits[right] = temp;
     }
 }

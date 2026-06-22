@@ -85,6 +85,24 @@ public sealed class GravitasQuery3DServiceRaycastTests
     }
 
     [Fact]
+    public void Raycast_WithEqualDistanceHits_ShouldUseColliderIdTieBreaker()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSSphereCollider first = CreateDynamicSphere(context, Vector3d.Zero);
+        _ = CreateDynamicSphere(context, Vector3d.Zero);
+
+        bool hit = context.Query3D.Raycast(
+            Vector(-2, 0, 0),
+            Vector3d.Right,
+            (Fixed64)4,
+            out Physics3DHit rayHit,
+            IncludeLayerZero);
+
+        hit.Should().BeTrue();
+        rayHit.Collider.Should().BeSameAs(first);
+    }
+
+    [Fact]
     public void Raycast_ShouldHitCylinderSideAndCaps()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();

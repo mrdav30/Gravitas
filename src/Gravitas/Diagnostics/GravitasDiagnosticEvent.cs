@@ -139,6 +139,9 @@ public readonly struct GravitasDiagnosticEvent
             case GravitasDiagnosticEventKind.CircleQuery:
                 visitor.VisitCircleQuery(new GravitasCircleQueryDiagnosticView(this));
                 break;
+            case GravitasDiagnosticEventKind.QuerySummary:
+                visitor.VisitQuerySummary(new GravitasQuerySummaryDiagnosticView(this));
+                break;
             case GravitasDiagnosticEventKind.Contact:
                 visitor.VisitContact(new GravitasContactDiagnosticView(this));
                 break;
@@ -261,6 +264,21 @@ public readonly struct GravitasDiagnosticEvent
         if (Kind == GravitasDiagnosticEventKind.CircleQuery)
         {
             view = new GravitasCircleQueryDiagnosticView(this);
+            return true;
+        }
+
+        view = default;
+        return false;
+    }
+
+    /// <summary>
+    /// Tries to decode this event as a query quality summary diagnostic view.
+    /// </summary>
+    public bool TryAsQuerySummary(out GravitasQuerySummaryDiagnosticView view)
+    {
+        if (Kind == GravitasDiagnosticEventKind.QuerySummary)
+        {
+            view = new GravitasQuerySummaryDiagnosticView(this);
             return true;
         }
 

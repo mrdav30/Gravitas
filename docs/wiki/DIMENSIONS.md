@@ -227,7 +227,8 @@ explicit rather than Unity-style separate engines:
 - mixed query and CCD policy is explicit. 3D swept spheres can query embedded
   2D primitive and compound slabs, and 2D swept circles can query 3D primitive,
   mesh, and compound targets. `PhysicsMixedHit.ReducerKind` labels exact hits
-  separately from conservative fallback hits. Pure query services do not
+  separately from conservative fallback hits. Mixed query diagnostics also emit
+  `QuerySummary` reducer counters when enabled. Pure query services do not
   accidentally report cross-dimensional hits.
 - mixed diagnostics emit dimension-tagged query, contact, and response impulse
   events, and debug draw can capture the finite 2D slab geometry used by mixed

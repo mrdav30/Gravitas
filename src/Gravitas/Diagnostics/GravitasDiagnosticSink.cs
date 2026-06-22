@@ -412,6 +412,32 @@ public sealed class GravitasDiagnosticSink
             hit: hit);
     }
 
+    internal void EmitQuerySummary(
+        GravitasColliderDimension sourceDimension,
+        GravitasColliderDimension targetDimension,
+        Vector3d start,
+        Vector3d end,
+        int exactReducerAttempts,
+        int acceptedHits,
+        int fallbackHits,
+        int rejectedConservativeCandidates)
+    {
+        if (!Enabled)
+            return;
+
+        AddEvent(
+            GravitasDiagnosticEventKind.QuerySummary,
+            colliderADimension: sourceDimension,
+            colliderBDimension: targetDimension,
+            start: start,
+            end: end,
+            scalarA: (Fixed64)fallbackHits,
+            scalarB: (Fixed64)rejectedConservativeCandidates,
+            dataA: exactReducerAttempts,
+            dataB: acceptedHits,
+            hit: fallbackHits > 0 || rejectedConservativeCandidates > 0);
+    }
+
     internal void EmitContact(CollisionPair pair, bool hit)
     {
         if (!Enabled)

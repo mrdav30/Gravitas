@@ -183,6 +183,29 @@ public sealed class GravitasDiagnosticEventViewTests
         circleView.LayerMaskBits.Should().Be(0x24);
         circleView.HitCount.Should().Be(4);
         circleView.Hit.Should().BeTrue();
+
+        GravitasDiagnosticEvent querySummaryEvent = CreateEvent(
+            GravitasDiagnosticEventKind.QuerySummary,
+            colliderADimension: GravitasColliderDimension.TwoD,
+            colliderBDimension: GravitasColliderDimension.ThreeD,
+            start: start,
+            end: end,
+            scalarA: (Fixed64)2,
+            scalarB: (Fixed64)1,
+            dataA: 5,
+            dataB: 3,
+            hit: true);
+
+        querySummaryEvent.TryAsQuerySummary(out GravitasQuerySummaryDiagnosticView summaryView).Should().BeTrue();
+        summaryView.SourceDimension.Should().Be(GravitasColliderDimension.TwoD);
+        summaryView.TargetDimension.Should().Be(GravitasColliderDimension.ThreeD);
+        summaryView.Start.Should().Be(start);
+        summaryView.End.Should().Be(end);
+        summaryView.ExactReducerAttempts.Should().Be(5);
+        summaryView.AcceptedHits.Should().Be(3);
+        summaryView.FallbackHits.Should().Be(2);
+        summaryView.RejectedConservativeCandidates.Should().Be(1);
+        summaryView.HasConservativeFallback.Should().BeTrue();
     }
 
     [Fact]
@@ -365,6 +388,7 @@ public sealed class GravitasDiagnosticEventViewTests
         CreateEvent(GravitasDiagnosticEventKind.GroundProbe, dataA: (int)GroundProbeMode.Ray).DispatchTo(visitor);
         CreateEvent(GravitasDiagnosticEventKind.RayQuery, scalarA: Fixed64.Half).DispatchTo(visitor);
         CreateEvent(GravitasDiagnosticEventKind.CircleQuery, scalarA: Fixed64.One).DispatchTo(visitor);
+        CreateEvent(GravitasDiagnosticEventKind.QuerySummary, dataA: 3, dataB: 2).DispatchTo(visitor);
         CreateEvent(GravitasDiagnosticEventKind.Contact, dataA: 2, hit: true).DispatchTo(visitor);
         CreateEvent(GravitasDiagnosticEventKind.ResponseImpulse, vector: Vector3d.Left).DispatchTo(visitor);
         CreateEvent(GravitasDiagnosticEventKind.MixedQuery, colliderADimension: GravitasColliderDimension.ThreeD, colliderBDimension: GravitasColliderDimension.TwoD).DispatchTo(visitor);
@@ -381,6 +405,7 @@ public sealed class GravitasDiagnosticEventViewTests
             nameof(RecordingDiagnosticEventVisitor.VisitGroundProbe),
             nameof(RecordingDiagnosticEventVisitor.VisitRayQuery),
             nameof(RecordingDiagnosticEventVisitor.VisitCircleQuery),
+            nameof(RecordingDiagnosticEventVisitor.VisitQuerySummary),
             nameof(RecordingDiagnosticEventVisitor.VisitContact),
             nameof(RecordingDiagnosticEventVisitor.VisitResponseImpulse),
             nameof(RecordingDiagnosticEventVisitor.VisitMixedQuery),
@@ -494,6 +519,9 @@ public sealed class GravitasDiagnosticEventViewTests
 
         public override void VisitCircleQuery(in GravitasCircleQueryDiagnosticView view) =>
             Route.Add(nameof(VisitCircleQuery));
+
+        public override void VisitQuerySummary(in GravitasQuerySummaryDiagnosticView view) =>
+            Route.Add(nameof(VisitQuerySummary));
 
         public override void VisitContact(in GravitasContactDiagnosticView view) =>
             Route.Add(nameof(VisitContact));

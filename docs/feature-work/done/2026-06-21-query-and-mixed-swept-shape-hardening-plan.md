@@ -11,7 +11,7 @@
 ---
 
 **Date:** 2026-06-21
-**Status:** Pre-alpha release blocker
+**Status:** Done
 **Owner:** Gravitas query and swept-shape hardening
 
 ## Purpose
@@ -33,13 +33,13 @@ and known not to create false negatives.
 
 ## Relationship To Existing Plans
 
-- [`2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md`](2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md)
+- [`2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md`](../2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md)
   owns exact CCD reducer promotion for continuous-collision internals.
 - This plan owns public query API shape, pure 2D query parity, mixed finite-slab
   swept-circle exactness, and primitive/convex mesh/compound source query
   support. CCD should reuse any exact reducers produced here rather than
   maintaining a second policy.
-- [`2026-06-21-discrete-response-and-contact-quality-hardening-plan.md`](done/2026-06-21-discrete-response-and-contact-quality-hardening-plan.md)
+- [`2026-06-21-discrete-response-and-contact-quality-hardening-plan.md`](2026-06-21-discrete-response-and-contact-quality-hardening-plan.md)
   owns contact response after query/narrow phase has produced hits.
 
 ## Current Baseline
@@ -228,14 +228,32 @@ compound source rows.
 
 **Tasks**
 
-- [ ] Add optional diagnostic counters for query fallback hits, exact reducer
+- [x] Add optional diagnostic counters for query fallback hits, exact reducer
   attempts, accepted hits, and rejected conservative candidates where they help
   hosts debug query quality.
-- [ ] Update `docs/wiki/QUERY_SERVICES.md`, `docs/wiki/COLLISION_PIPELINE.md`,
+- [x] Update `docs/wiki/QUERY_SERVICES.md`, `docs/wiki/COLLISION_PIPELINE.md`,
   and `docs/wiki/DIMENSIONS.md` with the final support matrix.
-- [ ] Add or update benchmarks for every new public query family and exact mixed
+- [x] Add or update benchmarks for every new public query family and exact mixed
   reducer.
-- [ ] Validate `Release` and `ReleaseLean` after runtime query changes.
+- [x] Validate `Release` and `ReleaseLean` after runtime query changes.
+
+**Progress 2026-06-22:** Workstream 5 added `QuerySummary` diagnostics through
+`GravitasQuerySummaryDiagnosticView`, emitted candidate-level reducer counters
+from mixed query paths, and kept disabled diagnostics on the existing early
+return path. Final review hardening also centralized deterministic query
+ordering: closest 3D raycasts now use the same distance/collider-ID tie-break as
+all-hit raycasts and sweeps, 2D and mixed all-hit sorters now use allocation-free
+heap sorting instead of duplicated insertion sorts, mixed single-hit queries now
+keep the best candidate directly instead of filling and sorting all results, and
+convex sweep reducer ties now use authored compound part or mesh triangle order
+before collapsing hits back to owner identity.
+
+Docs were updated across query, collision, dimensions, and diagnostics pages,
+including the missing `Physics2DHit` hit-data entry and the final query
+diagnostic surface. Remaining mixed swept-circle finite-slab reducer work for
+mesh, compound, rotated capsule, and rotated finite-cylinder targets, plus
+high-vertex convex mesh source benchmark signal, was extracted to
+[`2026-06-22-mixed-query-finite-slab-reducer-completion-plan.md`](../2026-06-22-mixed-query-finite-slab-reducer-completion-plan.md).
 
 ## Done Criteria
 
@@ -248,3 +266,7 @@ compound source rows.
   rejected.
 - Public query docs distinguish exact support from conservative fallback.
 - All new recurring query paths are allocation-free after warmup.
+
+## Completion
+
+Completed 2026-06-22 and moved to `docs/feature-work/done`.

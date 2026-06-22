@@ -35,7 +35,7 @@ names an internal CCD proxy.
 
 | Surface | Source shape | Target shapes | Reducer policy | Ordering key | Allocation behavior |
 | --- | --- | --- | --- | --- | --- |
-| `Query3D.Raycast`, `RaycastAll` | bounded 3D segment | sphere, capsule, cuboid, finite cylinder, mesh, compound | `Exact`; mesh targets query triangle BVH candidates, compound targets keep owner identity | all-hit: distance, collider ID; closest: nearest deterministic candidate | service-owned scratch, caller-owned all-hit buffer |
+| `Query3D.Raycast`, `RaycastAll` | bounded 3D segment | sphere, capsule, cuboid, finite cylinder, mesh, compound | `Exact`; mesh targets query triangle BVH candidates, compound targets keep owner identity | distance, collider ID | service-owned scratch, caller-owned all-hit buffer |
 | `Query3D.SweepSphere`, `SweepSphereAll` | 3D sphere | sphere, capsule, cuboid, finite cylinder, mesh, compound | `Exact` swept-sphere reducers in `SweptSphereQueryWorker`; mesh uses triangle face/edge/vertex TOI, compound reduces stable part order | distance, collider ID | service-owned scratch, caller-owned all-hit buffer |
 | `Query3D.SweepCapsule`, `SweepCapsuleAll`, `SweepCuboid`, `SweepCuboidAll`, `SweepCylinder`, `SweepCylinderAll` | registered capsule, cuboid, or finite-cylinder collider at its current pose plus a displacement | sphere, capsule, cuboid, finite cylinder, convex mesh, concave mesh target triangles, compound | `Exact` support-mapped conservative advancement; source collider is skipped; concave mesh targets reduce triangle candidates to owner collider hits | distance, collider ID | service-owned scratch, caller-owned all-hit buffer |
 | `Query3D.SweepConvexMesh`, `SweepConvexMeshAll` | convex `LSMeshCollider` at its current pose plus a displacement | sphere, capsule, cuboid, finite cylinder, convex mesh, concave mesh target triangles, compound | `Exact` support-mapped conservative advancement; concave source meshes throw; concave mesh targets reduce triangle candidates to owner collider hits | distance, collider ID | service-owned scratch, caller-owned all-hit buffer |
@@ -61,13 +61,6 @@ names an internal CCD proxy.
 | `StiffBody2D` dynamic 2D CCD | dynamic candidate index plus relative sweep | dynamic proxy circles | movable dynamic 2D bodies | conservative proxy until dynamic-vs-dynamic 2D CCD ordering/reducer work expands |
 | `StiffBody2D` mixed static 3D CCD | `QueryMixed.SweepCircleAgainstStatic3DAll` | embedded 2D circle slab | bodyless, immovable, kinematic 3D colliders | same `ReducerKind` policy as public `SweepCircleAgainst3D` |
 | `StiffBody2D` mixed dynamic 3D CCD | mixed dynamic candidate index plus relative sweep | embedded 2D proxy sphere against 3D proxy sphere | movable dynamic 3D bodies | `ConservativeFallback` |
-
-### Remaining Query Follow-Up
-
-- Mixed finite-slab reducers for mesh, compound, and rotated capsule/cylinder
-  targets: medium value and potentially high false-positive severity, but high
-  benchmark cost. Implement after primitive mixed reducers produce stable
-  policy and benchmark signal.
 
 ### Mesh-Source Query Boundary
 
@@ -115,8 +108,10 @@ The 3D query service owns:
 
 `RaycastAll` clears the caller-provided `SwiftList<Physics3DHit>`, writes hits
 into it, returns the hit count, and sorts the results by distance using an
-allocation-free in-place sorter. Keep these result buffers owned by the caller or
-context that issues the query.
+allocation-free in-place heap sorter. Closest-hit raycasts use the same
+distance/collider-ID ordering, so equal-distance hits do not depend on partition
+or sparse-set traversal order. Keep all-hit result buffers owned by the caller
+or context that issues the query.
 
 When diagnostics are enabled, raycast calls emit a `RayQuery` event. Swept
 sphere calls use the same event kind with `ScalarA` set to the sweep radius and
@@ -341,8 +336,9 @@ when mixed CCD is enabled through `PhysicsRuntimeMode.Mixed`.
 Mixed query candidate gathering uses `PhysicsMixedPartition` payloads attached
 to GridForge voxels. The gatherer refreshes the relevant mixed partition side,
 scans deterministic voxel identities, suppresses duplicate collider IDs, filters
-by layer and bounds, and sorts hits by distance with 3D ID and 2D ID
-tie-breakers.
+by layer and bounds, and orders hits by distance with 3D ID and 2D ID
+tie-breakers. Single-hit mixed queries keep the best candidate directly with
+the same ordering rule; all-hit overloads sort the caller-owned result buffer.
 
 `SweepSphereAgainst2D` sweeps a 3D sphere center against embedded 2D mixed
 slabs. 2D circles are treated as finite vertical cylinders; AABB and polygon
@@ -370,6 +366,12 @@ reducing over stable part order. The fallback now uses a circumsphere radius for
 the source slab, so it can report earlier or extra hits but is not allowed to
 miss a finite-slab corner case. Hits accepted through these fallback paths
 report `PhysicsQueryReducerKind.ConservativeFallback`.
+
+When diagnostics are enabled, mixed queries emit both `MixedQuery` and
+`QuerySummary` events. `MixedQuery` reports the closest mixed hit and accepted
+hit count. `QuerySummary` reports candidate-level exact reducer attempts,
+accepted hits, fallback hits, and rejected conservative fallback candidates so
+hosts can inspect query quality without reverse-engineering reducer labels.
 
 `StiffBody` and `StiffBody2D` mixed CCD use these APIs only when the context is
 in `PhysicsRuntimeMode.Mixed`. Pure `Both` mode still advances 2D and 3D
@@ -412,6 +414,17 @@ query job/state objects owned by the caller or rented from a context-local pool.
 `Body` is `collider?.Body`, so static/bodyless hits can have a collider with a
 null body.
 
+`Physics2DHit` is a readonly struct containing:
+
+- `Collider`
+- `Body`
+- `Point`
+- `Normal`
+- `Distance`
+
+`Body` is `collider.Body`, so bodyless/static 2D query hits can have a collider
+with a null body.
+
 `PhysicsMixedHit` is a readonly struct containing:
 
 - `Collider3D`
@@ -437,15 +450,13 @@ hit came from a safe conservative proxy or bounds reducer.
 
 ## Query Hardening Targets
 
-These are tracked in
-[`Query And Mixed Swept Shape Hardening`](../feature-work/2026-06-21-query-and-mixed-swept-shape-hardening-plan.md)
-unless another active plan explicitly takes ownership.
+The completed
+[`Query And Mixed Swept Shape Hardening`](../feature-work/done/2026-06-21-query-and-mixed-swept-shape-hardening-plan.md)
+plan owns the current public query API shape, 2D query parity, convex source
+sweeps, fallback labels, and query diagnostics. Remaining mixed finite-slab
+exactness and convex mesh source scaling work is tracked in
+[`Mixed Query Finite-Slab Reducer Completion`](../feature-work/2026-06-22-mixed-query-finite-slab-reducer-completion-plan.md).
 
-- keep concave/raw mesh-source query APIs out of the public surface while
-  preserving explicit primitive, convex mesh, and authored compound source
-  sweeps.
-- keep query benchmarks allocation-free as result ordering, filters, and shape
-  support expand.
-- add shape-specific query tests for every collider type.
-- revisit explicit query state objects only when a real host requires
-  concurrent queries against one context.
+Longer-term query state objects remain evidence-gated: introduce caller-owned or
+pooled query job/state objects only when a real host needs concurrent queries
+against one context.

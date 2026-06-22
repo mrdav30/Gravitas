@@ -986,7 +986,7 @@ public sealed partial class GravitasQuery3DService
         for (int i = colliderIds.Count - 1; i >= 0; i--)
         {
             if (!TryBuildHitForCollider(colliderIds.DenseKeys[i], origin, direction, out Physics3DHit hit)
-                || hit.Distance >= closestDistance)
+                || !ShouldReplaceClosestHit(hit, found, closestHit))
             {
                 continue;
             }
@@ -1074,7 +1074,7 @@ public sealed partial class GravitasQuery3DService
         for (int i = colliderIds.Count - 1; i >= 0; i--)
         {
             if (!TryBuildSweepHitForCollider(colliderIds.DenseKeys[i], origin, direction, out Physics3DHit hit)
-                || !ShouldReplaceClosestSweepHit(hit, found, closestDistance, closestHit))
+                || !ShouldReplaceClosestHit(hit, found, closestHit))
             {
                 continue;
             }
@@ -1085,23 +1085,8 @@ public sealed partial class GravitasQuery3DService
         }
     }
 
-    private static bool ShouldReplaceClosestSweepHit(
-        Physics3DHit hit,
-        bool found,
-        Fixed64 closestDistance,
-        Physics3DHit closestHit)
-    {
-        if (!found)
-            return true;
-
-        int distanceCompare = hit.Distance.CompareTo(closestDistance);
-        if (distanceCompare != 0)
-            return distanceCompare < 0;
-
-        int hitId = hit.Collider?.Id ?? -1;
-        int closestId = closestHit.Collider?.Id ?? -1;
-        return hitId < closestId;
-    }
+    private static bool ShouldReplaceClosestHit(Physics3DHit hit, bool found, Physics3DHit closestHit) =>
+        !found || Physics3DHitSorter.ComesBefore(hit, closestHit);
 
     private void ProcessPartitionForAllSweepHits(
         PhysicsPartition partition,
@@ -1178,7 +1163,7 @@ public sealed partial class GravitasQuery3DService
         for (int i = colliderIds.Count - 1; i >= 0; i--)
         {
             if (!TryBuildConvexSweepHitForCollider(colliderIds.DenseKeys[i], out Physics3DHit hit)
-                || !ShouldReplaceClosestSweepHit(hit, found, closestDistance, closestHit))
+                || !ShouldReplaceClosestHit(hit, found, closestHit))
             {
                 continue;
             }

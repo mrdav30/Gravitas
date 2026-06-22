@@ -203,6 +203,38 @@ public readonly struct GravitasCircleQueryDiagnosticView
 }
 
 /// <summary>
+/// Typed read-only view over query reducer quality counters.
+/// </summary>
+public readonly struct GravitasQuerySummaryDiagnosticView
+{
+    internal GravitasQuerySummaryDiagnosticView(GravitasDiagnosticEvent diagnosticEvent) => Event = diagnosticEvent;
+
+    public GravitasDiagnosticEvent Event { get; }
+
+    public int Frame => Event.Frame;
+
+    public int Sequence => Event.Sequence;
+
+    public GravitasColliderDimension SourceDimension => Event.ColliderADimension;
+
+    public GravitasColliderDimension TargetDimension => Event.ColliderBDimension;
+
+    public Vector3d Start => Event.Start;
+
+    public Vector3d End => Event.End;
+
+    public int ExactReducerAttempts => Event.DataA;
+
+    public int AcceptedHits => Event.DataB;
+
+    public int FallbackHits => (int)Event.ScalarA;
+
+    public int RejectedConservativeCandidates => (int)Event.ScalarB;
+
+    public bool HasConservativeFallback => FallbackHits > 0 || RejectedConservativeCandidates > 0;
+}
+
+/// <summary>
 /// Typed read-only view over a 3D contact diagnostic event.
 /// </summary>
 public readonly struct GravitasContactDiagnosticView

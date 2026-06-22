@@ -83,6 +83,7 @@ internal sealed class ConvexSweepQueryWorker
         hit = default;
         bool found = false;
         Fixed64 closestDistance = Fixed64.MaxValue;
+        int closestPartIndex = int.MaxValue;
 
         for (int i = 0; i < source.PartCount; i++)
         {
@@ -92,13 +93,14 @@ internal sealed class ConvexSweepQueryWorker
                     $"Compound swept query sources do not support {part.GetType().Name} parts.");
 
             if (!TrySweepSourceShape(CreateColliderShape(part, Vector3d.Zero), target, out Physics3DHit candidate)
-                || !ComesBefore(candidate, found, closestDistance, hit))
+                || !ComesBeforeReducerCandidate(candidate, i, found, closestDistance, closestPartIndex, hit))
             {
                 continue;
             }
 
             hit = candidate;
             closestDistance = candidate.Distance;
+            closestPartIndex = i;
             found = true;
         }
 
@@ -121,20 +123,24 @@ internal sealed class ConvexSweepQueryWorker
     private bool TrySweepTargetCompound(ConvexShape sourceShape, LSCompoundCollider compound, out Physics3DHit hit)
     {
         hit = default;
+        Physics3DHit bestPartHit = default;
         bool found = false;
         Fixed64 closestDistance = Fixed64.MaxValue;
+        int closestPartIndex = int.MaxValue;
 
         for (int i = 0; i < compound.PartCount; i++)
         {
             LSCollider part = compound.GetPartCollider(i);
             if (!TrySweepSourceShape(sourceShape, part, out Physics3DHit partHit)
-                || !ComesBefore(partHit, found, closestDistance, hit))
+                || !ComesBeforeReducerCandidate(partHit, i, found, closestDistance, closestPartIndex, bestPartHit))
             {
                 continue;
             }
 
+            bestPartHit = partHit;
             hit = new Physics3DHit(compound, partHit.Point, partHit.Normal, partHit.Distance, partHit.Direction);
             closestDistance = partHit.Distance;
+            closestPartIndex = i;
             found = true;
         }
 
@@ -146,21 +152,24 @@ internal sealed class ConvexSweepQueryWorker
         hit = default;
         bool found = false;
         Fixed64 closestDistance = Fixed64.MaxValue;
+        int closestTriangleIndex = int.MaxValue;
 
         CreateSweptSourceBounds(sourceShape, out Vector3d min, out Vector3d max);
         mesh.GetTrianglesInBounds(new FixedBoundVolume(min, max), _triangleCandidates);
 
         for (int i = 0; i < _triangleCandidates.Count; i++)
         {
-            ConvexShape triangle = CreateTriangleShape(mesh, _triangleCandidates[i]);
+            int triangleIndex = _triangleCandidates[i];
+            ConvexShape triangle = CreateTriangleShape(mesh, triangleIndex);
             if (!TrySweepConvexTarget(sourceShape, triangle, mesh, out Physics3DHit candidate)
-                || !ComesBefore(candidate, found, closestDistance, hit))
+                || !ComesBeforeReducerCandidate(candidate, triangleIndex, found, closestDistance, closestTriangleIndex, hit))
             {
                 continue;
             }
 
             hit = candidate;
             closestDistance = candidate.Distance;
+            closestTriangleIndex = triangleIndex;
             found = true;
         }
 
@@ -572,7 +581,13 @@ internal sealed class ConvexSweepQueryWorker
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool ComesBefore(Physics3DHit hit, bool found, Fixed64 closestDistance, Physics3DHit closestHit)
+    private static bool ComesBeforeReducerCandidate(
+        Physics3DHit hit,
+        int candidateOrdinal,
+        bool found,
+        Fixed64 closestDistance,
+        int closestOrdinal,
+        Physics3DHit closestHit)
     {
         if (!found)
             return true;
@@ -581,7 +596,11 @@ internal sealed class ConvexSweepQueryWorker
         if (distanceCompare != 0)
             return distanceCompare < 0;
 
-        return (hit.Collider?.Id ?? -1) < (closestHit.Collider?.Id ?? -1);
+        int colliderCompare = (hit.Collider?.Id ?? -1).CompareTo(closestHit.Collider?.Id ?? -1);
+        if (colliderCompare != 0)
+            return colliderCompare < 0;
+
+        return candidateOrdinal < closestOrdinal;
     }
 
     private static ArgumentException CreateConcaveSourceException(LSMeshCollider source) =>

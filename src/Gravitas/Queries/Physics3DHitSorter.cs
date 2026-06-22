@@ -53,7 +53,7 @@ internal static class Physics3DHitSorter
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool ComesBefore(Physics3DHit left, Physics3DHit right)
+    internal static bool ComesBefore(Physics3DHit left, Physics3DHit right)
     {
         int distanceCompare = left.Distance.CompareTo(right.Distance);
         if (distanceCompare != 0)

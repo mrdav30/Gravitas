@@ -492,6 +492,47 @@ public sealed class MixedQueryCcdTests
     }
 
     [Fact]
+    public void MixedQueryDiagnostics_ShouldRecordReducerQualityCounters()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        _ = CreateSphere3D(context, Vector3d.Zero, immovable: true);
+        _ = CreateMesh3D(
+            context,
+            MeshTestFixtures.CreateVerticalQuad((Fixed64)2, -Fixed64.One, Fixed64.One),
+            Vector3d.Zero,
+            immovable: true);
+        var hits = new SwiftList<PhysicsMixedHit>();
+        context.Diagnostics.Enable(eventCapacity: 4, drawCommandCapacity: 0);
+
+        int count = context.QueryMixed.SweepCircleAgainst3DAll(
+            new Vector2d((Fixed64)(-3), Fixed64.Zero),
+            new Vector2d((Fixed64)4, Fixed64.Zero),
+            Fixed64.Half,
+            Fixed64.One,
+            Fixed64.Half,
+            IncludeLayerZero,
+            hits);
+
+        count.Should().Be(2);
+        ReadOnlySpan<GravitasDiagnosticEvent> events = context.Diagnostics.Events;
+        FindDiagnosticEvent(events, GravitasDiagnosticEventKind.MixedQuery)
+            .TryAsMixedQuery(out GravitasMixedQueryDiagnosticView queryView)
+            .Should()
+            .BeTrue();
+        queryView.HitCount.Should().Be(2);
+
+        GravitasDiagnosticEvent summaryEvent = FindDiagnosticEvent(events, GravitasDiagnosticEventKind.QuerySummary);
+        summaryEvent.TryAsQuerySummary(out GravitasQuerySummaryDiagnosticView summary).Should().BeTrue();
+        summary.SourceDimension.Should().Be(GravitasColliderDimension.TwoD);
+        summary.TargetDimension.Should().Be(GravitasColliderDimension.ThreeD);
+        summary.ExactReducerAttempts.Should().Be(1);
+        summary.AcceptedHits.Should().Be(2);
+        summary.FallbackHits.Should().Be(1);
+        summary.RejectedConservativeCandidates.Should().Be(0);
+        summary.HasConservativeFallback.Should().BeTrue();
+    }
+
+    [Fact]
     public void SweepCircleAgainst3D_WithStartingOverlapInsideCompoundPart_ShouldReturnStableHit()
     {
         using GravitasWorldContext context = CreateMixedContext();
