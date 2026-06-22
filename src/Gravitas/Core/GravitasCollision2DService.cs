@@ -35,7 +35,6 @@ public sealed class GravitasCollision2DService
     private readonly SwiftList<PhysicsPartition2D> _retainedPartitions = new();
     private readonly SwiftList<PhysicsPartition2D> _distributionPartitions = new();
     private readonly SwiftList<int> _distributionDynamicIds = new();
-    private readonly SwiftList<int> _distributionAwakeDynamicIds = new();
     private readonly SwiftList<int> _distributionStaticIds = new();
     private readonly SwiftList<PhysicsPartition2D> _queryPartitions = new();
     private readonly SwiftList<int> _queryColliderIds = new();
@@ -69,7 +68,6 @@ public sealed class GravitasCollision2DService
         _traceScratch.Clear();
         _distributionPartitions.FastClear();
         _distributionDynamicIds.FastClear();
-        _distributionAwakeDynamicIds.FastClear();
         _distributionStaticIds.FastClear();
         _queryPartitions.FastClear();
         _queryColliderIds.FastClear();
@@ -272,7 +270,6 @@ public sealed class GravitasCollision2DService
             {
                 _distributionPartitions[i].Distribute(
                     _distributionDynamicIds,
-                    _distributionAwakeDynamicIds,
                     _distributionStaticIds);
             }
         }

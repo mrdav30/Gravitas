@@ -485,6 +485,22 @@ public sealed class CollisionDetectionShapePairTests
     }
 
     [Fact]
+    public void MeshSphere_WithSphereCenterOnConvexSurface_ShouldUseFaceNormalAndPositiveDepth()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSMeshCollider> floor = scenario.CreateBody(
+            CreateHorizontalPlaneMesh(),
+            PhysicsScenarioBuilder.Vector(0, 0, 0),
+            FixedQuaternion.Identity);
+        ScenarioBody<LSSphereCollider> sphere = scenario.CreateSphere(Vector3d.Zero);
+
+        CollisionPair pair = AssertCollision(scenario, floor.Collider, sphere.Collider, CollisionType.Mesh_Sphere);
+
+        pair.Manifold.PrimaryContact.Depth.Should().Be(Fixed64.Half);
+        pair.Manifold.PrimaryContact.Normal.Should().Be(Vector3d.Up);
+    }
+
+    [Fact]
     public void PrimitiveManifoldChecks_ShouldNotAllocateAfterWarmup()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();

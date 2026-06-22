@@ -80,6 +80,12 @@ internal sealed class CollisionPairMixed
         LastFrame = frame;
     }
 
+    public void MarkResting(int frame, MixedContact contact)
+    {
+        Contact = contact;
+        LastFrame = frame;
+    }
+
     public void MarkSeparated()
     {
         if (!_isColliding)

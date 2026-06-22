@@ -375,3 +375,24 @@ loop row in addition to the prepared single-pass pair row.
 - `dotnet test Gravitas.slnx --configuration Release`
 - `dotnet test Gravitas.slnx --configuration ReleaseLean`
 - `dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll mixed-collision-response --filter "*ResolvePreparedMixedIslandIterations*" --job Dry`
+
+## Post-Completion Review 2026-06-22
+
+Reviewed commits `2b206465cab43837c21e6e9daa1e788f85cf4851`
+through `618457884dca770ce388134360167e96824a3d6d` for parity,
+correctness, deferred work, and performance follow-up.
+
+- Fixed mixed-dimension island parity so retained sleeping mixed links can
+  bridge an awake connected island, while brand-new sleeping/sleeping links
+  still exit before mixed narrow phase.
+- Removed unused awake-dynamic distribution scratch sorting from 3D, 2D, and
+  mixed partition distribution. Awake membership still gates active partition
+  work, but active partitions no longer copy/sort lists that no loop consumes.
+- Fixed the older convex mesh/sphere zero-distance edge by using the closest
+  triangle surface normal when the sphere center lies on the mesh surface, and
+  corrected the penetration-depth calculation for that path.
+
+No additional untracked deferred work remained in this plan. CCD service-level
+island timing, exact angular TOI/polytope support, mixed swept-shape query
+fallbacks, and lower-stack allocation-free sorting are already captured by the
+active feature-work backlog/plans.

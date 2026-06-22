@@ -40,17 +40,29 @@ public static partial class CollisionDetection
                 sphere,
                 pair.Context.CollisionScratch.MeshTriangleCandidatesA);
 
-        Vector3d closestPointOnMesh = meshCollider.ClosestPointOnSurface(sphere.Center);
+        Vector3d closestPointOnMesh = meshCollider.TryFindClosestPointOnSurface(
+            sphere.Center,
+            pair.Context.CollisionScratch.MeshTriangleCandidatesA,
+            out Vector3d closest,
+            out Vector3d surfaceNormal)
+                ? closest
+                : meshCollider.Bounds.ClosestPointOnSurface(sphere.Center);
         Vector3d penetrationVector = sphere.Center - closestPointOnMesh;
-        if (penetrationVector.MagnitudeSquared > sphere.ScaledRadiusSqr)
+        Fixed64 distanceSquared = penetrationVector.MagnitudeSquared;
+        if (distanceSquared > sphere.ScaledRadiusSqr)
             return false; // No collision if the distance squared is greater than the radius squared
                           // remove sphere's radius to find the actual depth
 
-        Vector3d penetrationNormal = penetrationVector.Normalized;
+        Fixed64 distance = distanceSquared <= Fixed64.Epsilon
+            ? Fixed64.Zero
+            : FixedMath.Sqrt(distanceSquared);
+        Vector3d penetrationNormal = distance > Fixed64.Epsilon
+            ? penetrationVector / distance
+            : OrientNormal(surfaceNormal, sphere.Center - meshCollider.Center);
         pair.Manifold.SetContact(
             closestPointOnMesh,
             sphere.Center - penetrationNormal * sphere.ScaledRadius,
-            penetrationVector.Magnitude - sphere.ScaledRadius,
+            sphere.ScaledRadius - distance,
             penetrationNormal
         );
 

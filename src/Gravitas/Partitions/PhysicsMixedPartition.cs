@@ -101,11 +101,9 @@ internal sealed class PhysicsMixedPartition : IVoxelPartition
 
     internal void Distribute(
         SwiftList<int> dynamic3DIds,
-        SwiftList<int> awakeDynamic3DIds,
         SwiftList<int> kinematic3DIds,
         SwiftList<int> static3DIds,
         SwiftList<int> dynamic2DIds,
-        SwiftList<int> awakeDynamic2DIds,
         SwiftList<int> kinematic2DIds,
         SwiftList<int> static2DIds)
     {
@@ -119,18 +117,16 @@ internal sealed class PhysicsMixedPartition : IVoxelPartition
             return;
 
         CopySortedIds(ContainedDynamic3DObjects, dynamic3DIds);
-        CopySortedIds(ContainedAwakeDynamic3DObjects, awakeDynamic3DIds);
         CopySortedIds(ContainedKinematic3DObjects, kinematic3DIds);
         CopySortedIds(ContainedStatic3DObjects, static3DIds);
         CopySortedIds(ContainedDynamic2DObjects, dynamic2DIds);
-        CopySortedIds(ContainedAwakeDynamic2DObjects, awakeDynamic2DIds);
         CopySortedIds(ContainedKinematic2DObjects, kinematic2DIds);
         CopySortedIds(ContainedStatic2DObjects, static2DIds);
 
         GravitasMixedCollisionService owner = Owner;
-        for (int i = 0; i < awakeDynamic3DIds.Count; i++)
+        for (int i = 0; i < dynamic3DIds.Count; i++)
         {
-            int id3D = awakeDynamic3DIds[i];
+            int id3D = dynamic3DIds[i];
             for (int j = 0; j < dynamic2DIds.Count; j++)
                 owner.ProcessPartitionCandidate(id3D, dynamic2DIds[j]);
 
@@ -141,12 +137,9 @@ internal sealed class PhysicsMixedPartition : IVoxelPartition
                 owner.ProcessPartitionCandidate(id3D, static2DIds[j]);
         }
 
-        for (int i = 0; i < awakeDynamic2DIds.Count; i++)
+        for (int i = 0; i < dynamic2DIds.Count; i++)
         {
-            int id2D = awakeDynamic2DIds[i];
-            for (int j = 0; j < dynamic3DIds.Count; j++)
-                owner.ProcessPartitionCandidate(dynamic3DIds[j], id2D);
-
+            int id2D = dynamic2DIds[i];
             for (int j = 0; j < kinematic3DIds.Count; j++)
                 owner.ProcessPartitionCandidate(kinematic3DIds[j], id2D);
 

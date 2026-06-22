@@ -67,13 +67,16 @@ and impulses treat the 2D body as having infinite constrained mass.
 
 Mixed contacts are processed during `LateSimulate` after both pure 2D and 3D
 services have integrated bodies and refreshed their own collider partitions, so
-mixed response observes post-integration collider positions. Non-trigger mixed
-pairs are collected into a dedicated mixed response graph keyed by stable
-dimension-tagged body IDs. Mixed islands are solved inside
-`GravitasMixedCollisionService` in deterministic pair-key order for
-`PhysicsSettings.DiscreteSolverIterations`; they do not merge into the pure 3D
-or pure 2D discrete island solvers. `PhysicsRuntimeMode.Both` remains isolated
-and never creates mixed contacts.
+mixed response observes post-integration collider positions. Active mixed
+partitions emit deterministic cross-dimension candidate links for dynamic
+members once any local dynamic participant is awake; brand-new sleeping/sleeping
+links still exit before mixed narrow phase, while retained resting links can
+bridge a connected mixed island. Non-trigger mixed pairs are collected into a
+dedicated mixed response graph keyed by stable dimension-tagged body IDs. Mixed
+islands are solved inside `GravitasMixedCollisionService` in deterministic
+pair-key order for `PhysicsSettings.DiscreteSolverIterations`; they do not
+merge into the pure 3D or pure 2D discrete island solvers.
+`PhysicsRuntimeMode.Both` remains isolated and never creates mixed contacts.
 
 Mixed diagnostics, explicit mixed queries, and mixed CCD hooks are implemented.
 2D swept-circle mixed CCD uses the shared swept-sphere worker, including 3D mesh

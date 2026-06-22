@@ -90,7 +90,6 @@ public class PhysicsPartition : IVoxelPartition
 
     internal void Distribute(
         SwiftList<int> dynamicIds,
-        SwiftList<int> awakeDynamicIds,
         SwiftList<int> staticIds)
     {
         int dynamicCount = ContainedDynamicObjects?.Count ?? 0;
@@ -99,7 +98,6 @@ public class PhysicsPartition : IVoxelPartition
             return;
 
         CopySortedIds(ContainedDynamicObjects, dynamicIds);
-        CopySortedIds(ContainedAwakeDynamicObjects, awakeDynamicIds);
         CopySortedStaticStyleIds(staticIds);
 
         // Sleeping bodies stay query-visible in dynamic membership, while awake membership gates partition work.

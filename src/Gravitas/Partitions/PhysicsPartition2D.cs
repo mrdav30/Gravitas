@@ -77,7 +77,6 @@ public sealed class PhysicsPartition2D : IVoxelPartition
 
     internal void Distribute(
         SwiftList<int> dynamicIds,
-        SwiftList<int> awakeDynamicIds,
         SwiftList<int> staticIds)
     {
         int dynamicCount = ContainedDynamicObjects?.Count ?? 0;
@@ -86,7 +85,6 @@ public sealed class PhysicsPartition2D : IVoxelPartition
             return;
 
         CopySortedIds(ContainedDynamicObjects, dynamicIds);
-        CopySortedIds(ContainedAwakeDynamicObjects, awakeDynamicIds);
         CopySortedStaticStyleIds(staticIds);
 
         for (int j = 0; j < dynamicIds.Count; j++)

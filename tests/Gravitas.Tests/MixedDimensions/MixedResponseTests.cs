@@ -210,6 +210,34 @@ public sealed class MixedResponseTests
     }
 
     [Fact]
+    public void Simulate_WithSleepingMixedLinkInAwakeIsland_ShouldWakeConnectedSleepingBodies()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSSphereCollider> awake3D = CreateSphere3D(
+            context,
+            new Vector3d(-Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
+        ScenarioBody<LSSphereCollider> sleeping3D = CreateSphere3D(
+            context,
+            new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
+        StiffBody2D bridge2D = CreateCircle2D(context, Vector2d.Zero);
+
+        Step(context);
+        context.MixedCollisions.ActivePairCount.Should().Be(2);
+
+        awake3D.Body.SetPosition(new Vector3d(-Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
+        sleeping3D.Body.SetPosition(new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
+        bridge2D.SetPosition(Vector2d.Zero);
+        sleeping3D.Body.Sleep();
+        bridge2D.Sleep();
+        awake3D.Body.AddLinearImpulse(Vector3d.Right);
+
+        Step(context);
+
+        bridge2D.IsSleeping.Should().BeFalse();
+        sleeping3D.Body.IsSleeping.Should().BeFalse();
+    }
+
+    [Fact]
     public void Simulate_WithRuntimeModeBoth_ShouldNotCreateMixedPairsOrDiagnostics()
     {
         using GravitasWorldContext context = CreateMixedContext();

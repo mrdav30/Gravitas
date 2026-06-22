@@ -42,11 +42,9 @@ internal sealed class GravitasMixedCollisionService
     private readonly SwiftList<PhysicsMixedPartition> _retainedPartitions = new();
     private readonly SwiftList<PhysicsMixedPartition> _distributionPartitions = new();
     private readonly SwiftList<int> _distributionDynamic3DIds = new();
-    private readonly SwiftList<int> _distributionAwakeDynamic3DIds = new();
     private readonly SwiftList<int> _distributionKinematic3DIds = new();
     private readonly SwiftList<int> _distributionStatic3DIds = new();
     private readonly SwiftList<int> _distributionDynamic2DIds = new();
-    private readonly SwiftList<int> _distributionAwakeDynamic2DIds = new();
     private readonly SwiftList<int> _distributionKinematic2DIds = new();
     private readonly SwiftList<int> _distributionStatic2DIds = new();
     private readonly SwiftList<MixedColliderKey> _candidatePairs = new();
@@ -128,11 +126,9 @@ internal sealed class GravitasMixedCollisionService
         {
             _distributionPartitions[i].Distribute(
                 _distributionDynamic3DIds,
-                _distributionAwakeDynamic3DIds,
                 _distributionKinematic3DIds,
                 _distributionStatic3DIds,
                 _distributionDynamic2DIds,
-                _distributionAwakeDynamic2DIds,
                 _distributionKinematic2DIds,
                 _distributionStatic2DIds);
         }
@@ -164,11 +160,9 @@ internal sealed class GravitasMixedCollisionService
         _traceScratch.Clear();
         _distributionPartitions.FastClear();
         _distributionDynamic3DIds.FastClear();
-        _distributionAwakeDynamic3DIds.FastClear();
         _distributionKinematic3DIds.FastClear();
         _distributionStatic3DIds.FastClear();
         _distributionDynamic2DIds.FastClear();
-        _distributionAwakeDynamic2DIds.FastClear();
         _distributionKinematic2DIds.FastClear();
         _distributionStatic2DIds.FastClear();
         _candidatePairs.FastClear();
@@ -555,8 +549,7 @@ internal sealed class GravitasMixedCollisionService
         if (!_context.Physics.TryGetColliderById(candidate.Collider3DId, out LSCollider? collider3D)
             || !_context.Physics2D.TryGetColliderById(candidate.Collider2DId, out LSCollider2D? collider2D)
             || !RequireCollisionPair(collider3D!, collider2D!)
-            || !MixedBoundsOverlap(collider3D!, collider2D!)
-            || !CollisionDetectionMixed.TryCollide(collider3D!, collider2D!, out MixedContact contact))
+            || !MixedBoundsOverlap(collider3D!, collider2D!))
         {
             return;
         }
@@ -565,10 +558,20 @@ internal sealed class GravitasMixedCollisionService
         LSCollider2D resolved2D = collider2D!;
         bool hasPair = _pairs.TryGetValue(candidate.Key, out CollisionPairMixed pair);
         bool triggerPair = resolved3D.IsTrigger || resolved2D.IsTrigger;
-        if (!triggerPair && !HasAwakeMovableParticipant(resolved3D, resolved2D))
+        bool hasAwakeMovableParticipant = HasAwakeMovableParticipant(resolved3D, resolved2D);
+        if (!hasPair && !triggerPair && !hasAwakeMovableParticipant)
+            return;
+
+        if (!CollisionDetectionMixed.TryCollide(resolved3D, resolved2D, out MixedContact contact))
+            return;
+
+        if (!triggerPair && !hasAwakeMovableParticipant)
         {
             if (hasPair)
-                pair!.MarkResting(frame);
+            {
+                pair!.MarkResting(frame, contact);
+                _mixedResponsePairs.Add(pair);
+            }
 
             return;
         }
@@ -660,6 +663,9 @@ internal sealed class GravitasMixedCollisionService
         if (_mixedResponsePairs.Count == 1)
         {
             CollisionPairMixed pair = _mixedResponsePairs[0];
+            if (!HasAwakeResponseParticipant(pair))
+                return;
+
             pair.WakeSleepingBodiesForCollision();
             CollisionResponseMixed.Resolve(pair, pair.Contact);
             return;
@@ -936,6 +942,10 @@ internal sealed class GravitasMixedCollisionService
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool HasAwakeMovableParticipant(LSCollider collider3D, LSCollider2D collider2D) =>
         IsAwakeMovable(collider3D.Body) || IsAwakeMovable(collider2D.Body);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool HasAwakeResponseParticipant(CollisionPairMixed pair) =>
+        IsAwakeMovable(pair.Collider3D.Body) || IsAwakeMovable(pair.Collider2D.Body);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool IsAwakeMovable(StiffBody? body) =>
