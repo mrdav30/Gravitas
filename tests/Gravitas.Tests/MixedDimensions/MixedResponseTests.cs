@@ -1,9 +1,11 @@
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
+using Gravitas.Diagnostics;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
 using GridForge.Configuration;
+using System;
 using Xunit;
 
 namespace Gravitas.Tests.MixedDimensions;
@@ -140,6 +142,89 @@ public sealed class MixedResponseTests
     }
 
     [Fact]
+    public void Resolve_WithPlanarVerticalMixedImpulse_ShouldConstrain2DVerticalAndMove3D()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(
+            context,
+            new Vector3d(-Fixed64.Half, -Fixed64.FromFraction(1, 4), Fixed64.Half));
+        StiffBody2D body2D = CreateCircle2D(context, Vector2d.Zero);
+        var pair = new CollisionPairMixed(body3D.Collider, body2D.Collider);
+        var contact = new MixedContact(
+            new Vector3d(-Fixed64.Half, -Fixed64.FromFraction(1, 4), Fixed64.Half),
+            new Vector3d(Fixed64.Zero, Fixed64.Zero, Fixed64.Half),
+            new Vector3d(Fixed64.One, Fixed64.One, Fixed64.Zero).Normalized,
+            Fixed64.FromFraction(1, 5));
+        body3D.Body.ApplyCollisionLinearVelocityDelta(new Vector3d(Fixed64.One, Fixed64.One, Fixed64.Zero));
+
+        CollisionResponseMixed.Resolve(pair, contact);
+
+        body3D.Body.Position3d.Y.Should().BeLessThan(-Fixed64.FromFraction(1, 4));
+        body2D.Agent.Transform.Position.Y.Should().Be(Fixed64.Zero);
+        body2D.LinearVelocity.X.Should().BeGreaterThan(Fixed64.Zero);
+        body2D.LinearVelocity.Y.Should().Be(Fixed64.Zero);
+        body2D.AngularVelocity.Should().BeLessThan(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void Simulate_WithMixedResponseDiagnostics_ShouldRecordSinglePairIterationMetadata()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        context.Diagnostics.Enable(eventCapacity: 16, drawCommandCapacity: 0);
+        ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(
+            context,
+            new Vector3d(-Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
+        _ = CreateCircle2D(context, Vector2d.Zero);
+        body3D.Body.AddLinearImpulse(Vector3d.Right);
+
+        Step(context);
+
+        GravitasMixedResponseImpulseDiagnosticView impulse = FindFirstMixedImpulse(context);
+        impulse.Iteration.Should().Be(0);
+        impulse.IterationLimit.Should().Be(1);
+    }
+
+    [Fact]
+    public void Simulate_WithConnectedMixedPairs_ShouldSolveDedicatedMixedIslandAndReportIterationCap()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        context.Settings.DiscreteSolverIterations = 3;
+        context.Diagnostics.Enable(eventCapacity: 64, drawCommandCapacity: 0);
+        ScenarioBody<LSSphereCollider> left3D = CreateSphere3D(
+            context,
+            new Vector3d(-Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
+        ScenarioBody<LSSphereCollider> right3D = CreateSphere3D(
+            context,
+            new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
+        _ = CreateCircle2D(context, Vector2d.Zero);
+        left3D.Body.AddLinearImpulse(Vector3d.Right);
+        right3D.Body.AddLinearImpulse(Vector3d.Left);
+
+        Step(context);
+
+        GravitasMixedResponseIslandDiagnosticView island = FindFirstMixedIsland(context);
+        island.ConstraintCount.Should().Be(2);
+        island.IterationCount.Should().Be(3);
+        island.ReachedIterationLimit.Should().BeTrue();
+        FindMaxMixedImpulseIterationLimit(context).Should().Be(3);
+    }
+
+    [Fact]
+    public void Simulate_WithRuntimeModeBoth_ShouldNotCreateMixedPairsOrDiagnostics()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        context.Settings.RuntimeMode = PhysicsRuntimeMode.Both;
+        context.Diagnostics.Enable(eventCapacity: 16, drawCommandCapacity: 0);
+        _ = CreateSphere3D(context, Vector3d.Zero);
+        _ = CreateCircle2D(context, Vector2d.Zero);
+
+        Step(context);
+
+        context.MixedCollisions.ActivePairCount.Should().Be(0);
+        CountMixedEvents(context).Should().Be(0);
+    }
+
+    [Fact]
     public void Simulate_WithKinematic3DAgainstDynamic2D_ShouldOnlyMove2DParticipant()
     {
         using GravitasWorldContext context = CreateMixedContext();
@@ -271,6 +356,57 @@ public sealed class MixedResponseTests
     {
         context.Simulate();
         context.LateSimulate();
+    }
+
+    private static GravitasMixedResponseImpulseDiagnosticView FindFirstMixedImpulse(GravitasWorldContext context)
+    {
+        ReadOnlySpan<GravitasDiagnosticEvent> events = context.Diagnostics.Events;
+        for (int i = 0; i < events.Length; i++)
+            if (events[i].TryAsMixedResponseImpulse(out GravitasMixedResponseImpulseDiagnosticView view))
+                return view;
+
+        throw new InvalidOperationException("Expected a mixed response impulse diagnostic event.");
+    }
+
+    private static GravitasMixedResponseIslandDiagnosticView FindFirstMixedIsland(GravitasWorldContext context)
+    {
+        ReadOnlySpan<GravitasDiagnosticEvent> events = context.Diagnostics.Events;
+        for (int i = 0; i < events.Length; i++)
+            if (events[i].TryAsMixedResponseIsland(out GravitasMixedResponseIslandDiagnosticView view))
+                return view;
+
+        throw new InvalidOperationException("Expected a mixed response island diagnostic event.");
+    }
+
+    private static int FindMaxMixedImpulseIterationLimit(GravitasWorldContext context)
+    {
+        int max = 0;
+        ReadOnlySpan<GravitasDiagnosticEvent> events = context.Diagnostics.Events;
+        for (int i = 0; i < events.Length; i++)
+            if (events[i].TryAsMixedResponseImpulse(out GravitasMixedResponseImpulseDiagnosticView view)
+                && view.IterationLimit > max)
+            {
+                max = view.IterationLimit;
+            }
+
+        return max;
+    }
+
+    private static int CountMixedEvents(GravitasWorldContext context)
+    {
+        int count = 0;
+        ReadOnlySpan<GravitasDiagnosticEvent> events = context.Diagnostics.Events;
+        for (int i = 0; i < events.Length; i++)
+        {
+            if (events[i].Kind == GravitasDiagnosticEventKind.MixedContact
+                || events[i].Kind == GravitasDiagnosticEventKind.MixedResponseImpulse
+                || events[i].Kind == GravitasDiagnosticEventKind.MixedResponseIsland)
+            {
+                count++;
+            }
+        }
+
+        return count;
     }
 
     private static GravitasWorldContext CreateMixedContextWithLayerBlock()

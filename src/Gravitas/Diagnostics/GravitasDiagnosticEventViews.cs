@@ -384,4 +384,30 @@ public readonly struct GravitasMixedResponseImpulseDiagnosticView
     public Fixed64 ImpulseMagnitude => Event.ScalarA;
 
     public Fixed64 NormalVelocity => Event.ScalarB;
+
+    public int Iteration => Event.DataA;
+
+    public int IterationLimit => Event.DataB;
+}
+
+/// <summary>
+/// Typed read-only view over a mixed 3D/2D response-island diagnostic event.
+/// </summary>
+public readonly struct GravitasMixedResponseIslandDiagnosticView
+{
+    internal GravitasMixedResponseIslandDiagnosticView(GravitasDiagnosticEvent diagnosticEvent) => Event = diagnosticEvent;
+
+    public GravitasDiagnosticEvent Event { get; }
+
+    public int Frame => Event.Frame;
+
+    public int Sequence => Event.Sequence;
+
+    public int RootKey => Event.BodyId;
+
+    public int ConstraintCount => Event.DataA;
+
+    public int IterationCount => Event.DataB;
+
+    public bool ReachedIterationLimit => Event.Hit;
 }

@@ -510,7 +510,9 @@ public sealed class GravitasDiagnosticSink
         CollisionPairMixed pair,
         MixedContact contact,
         Vector3d impulse,
-        Fixed64 normalVelocity)
+        Fixed64 normalVelocity,
+        int iteration,
+        int iterationLimit)
     {
         if (!Enabled)
             return;
@@ -528,7 +530,26 @@ public sealed class GravitasDiagnosticSink
             vector: impulse,
             scalarA: impulse.Magnitude,
             scalarB: normalVelocity,
+            dataA: iteration,
+            dataB: iterationLimit,
             hit: true);
+    }
+
+    internal void EmitMixedResponseIsland(
+        int rootKey,
+        int constraintCount,
+        int iterationCount,
+        bool reachedIterationLimit)
+    {
+        if (!Enabled)
+            return;
+
+        AddEvent(
+            GravitasDiagnosticEventKind.MixedResponseIsland,
+            bodyId: rootKey,
+            dataA: constraintCount,
+            dataB: iterationCount,
+            hit: reachedIterationLimit);
     }
 
     private void CaptureMeshTriangles(LSMeshCollider mesh, GravitasDiagnosticColor color)

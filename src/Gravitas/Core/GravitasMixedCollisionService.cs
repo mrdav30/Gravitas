@@ -26,6 +26,9 @@ internal sealed class GravitasMixedCollisionService
     private const int DefaultPartitionPoolCapacity = 1024;
     private static readonly PhysicsMixedPartitionOrderComparer PartitionOrderComparer = new();
     private static readonly MixedColliderKeyComparer CandidatePairComparer = new();
+    private static readonly MixedResponsePairComparer ResponsePairComparer = new();
+    private static readonly MixedIslandNodeComparer IslandNodeComparer = new();
+    private static readonly MixedIslandConstraintComparer IslandConstraintComparer = new();
     private static readonly Collider2DIdComparer Collider2DIdOrderComparer = new();
     private static readonly Collider3DIdComparer Collider3DIdOrderComparer = new();
 
@@ -53,6 +56,9 @@ internal sealed class GravitasMixedCollisionService
     private readonly SwiftDictionary<ulong, CollisionPairMixed> _pairs = new();
     private readonly SwiftList<ulong> _pairsToRemove = new();
     private readonly SwiftStack<CollisionPairMixed> _cachedPairs = new();
+    private readonly SwiftList<CollisionPairMixed> _mixedResponsePairs = new();
+    private readonly SwiftList<MixedIslandNode> _mixedIslandNodes = new();
+    private readonly SwiftList<MixedIslandConstraint> _mixedIslandConstraints = new();
 
     private int _retainedPartitionRetirementCursor;
     private int _cached3DQueryRefreshFrame = int.MinValue;
@@ -106,6 +112,7 @@ internal sealed class GravitasMixedCollisionService
     {
         LastBroadPhaseCandidateCount = 0;
         _candidatePairs.FastClear();
+        _mixedResponsePairs.FastClear();
         _processedPairKeys.Clear();
 
         Refresh3DColliderPartitions();
@@ -136,6 +143,7 @@ internal sealed class GravitasMixedCollisionService
         for (int i = 0; i < _candidatePairs.Count; i++)
             ProcessCandidate(_candidatePairs[i], frame);
 
+        SolveMixedResponsePairs();
         CleanupUntouchedPairs(frame);
         RetireExpiredRetainedPartitions();
     }
@@ -170,6 +178,9 @@ internal sealed class GravitasMixedCollisionService
         _pairs.Clear();
         _pairsToRemove.FastClear();
         _cachedPairs.Clear();
+        _mixedResponsePairs.FastClear();
+        _mixedIslandNodes.FastClear();
+        _mixedIslandConstraints.FastClear();
         _cached3DQueryRefreshFrame = int.MinValue;
         _cached3DQueryRefreshLateToken = int.MinValue;
         _cached2DQueryRefreshFrame = int.MinValue;
@@ -569,6 +580,8 @@ internal sealed class GravitasMixedCollisionService
         }
 
         pair!.MarkColliding(frame, contact);
+        if (!triggerPair)
+            _mixedResponsePairs.Add(pair);
     }
 
     private void CleanupUntouchedPairs(int frame)
@@ -639,6 +652,287 @@ internal sealed class GravitasMixedCollisionService
             _cachedPairs.Push(pair);
     }
 
+    private void SolveMixedResponsePairs()
+    {
+        if (_mixedResponsePairs.Count == 0)
+            return;
+
+        if (_mixedResponsePairs.Count == 1)
+        {
+            CollisionPairMixed pair = _mixedResponsePairs[0];
+            pair.WakeSleepingBodiesForCollision();
+            CollisionResponseMixed.Resolve(pair, pair.Contact);
+            return;
+        }
+
+        SwiftListSortUtility.SortInPlace(_mixedResponsePairs, ResponsePairComparer);
+        BuildMixedIslands();
+        if (_mixedIslandConstraints.Count == 0)
+            return;
+
+        SwiftListSortUtility.SortInPlace(_mixedIslandConstraints, IslandConstraintComparer);
+
+        int start = 0;
+        while (start < _mixedIslandConstraints.Count)
+        {
+            int rootKey = _mixedIslandConstraints[start].RootKey;
+            int end = start + 1;
+            while (end < _mixedIslandConstraints.Count
+                && _mixedIslandConstraints[end].RootKey == rootKey)
+            {
+                end++;
+            }
+
+            if (WakeMixedIslandBodies(rootKey))
+                SolveMixedIslandRange(rootKey, start, end);
+
+            start = end;
+        }
+    }
+
+    private void BuildMixedIslands()
+    {
+        _mixedIslandNodes.FastClear();
+        _mixedIslandConstraints.FastClear();
+
+        for (int i = 0; i < _mixedResponsePairs.Count; i++)
+        {
+            CollisionPairMixed pair = _mixedResponsePairs[i];
+            AddMixedIslandNodeIfMovable(pair.Collider3D.Body);
+            AddMixedIslandNodeIfMovable(pair.Collider2D.Body);
+        }
+
+        SortAndDeduplicateMixedIslandNodes();
+        if (_mixedIslandNodes.Count == 0)
+            return;
+
+        for (int i = 0; i < _mixedResponsePairs.Count; i++)
+        {
+            CollisionPairMixed pair = _mixedResponsePairs[i];
+            int node3D = FindMixedIslandNode(pair.Collider3D.Body);
+            int node2D = FindMixedIslandNode(pair.Collider2D.Body);
+            if (node3D >= 0 && node2D >= 0)
+                UnionMixedIslandNodes(node3D, node2D);
+        }
+
+        CompressMixedIslandRoots();
+
+        for (int i = 0; i < _mixedResponsePairs.Count; i++)
+        {
+            CollisionPairMixed pair = _mixedResponsePairs[i];
+            int node3D = FindMixedIslandNode(pair.Collider3D.Body);
+            int node2D = FindMixedIslandNode(pair.Collider2D.Body);
+            int rootKey = ResolveMixedConstraintRootKey(node3D, node2D);
+            if (rootKey < 0)
+                continue;
+
+            _mixedIslandConstraints.Add(new MixedIslandConstraint(pair, rootKey, pair.Key));
+        }
+    }
+
+    private void AddMixedIslandNodeIfMovable(StiffBody? body)
+    {
+        if (!IsMovableMixedIslandBody(body))
+            return;
+
+        _mixedIslandNodes.Add(new MixedIslandNode(Create3DBodyKey(body!), body!, null));
+    }
+
+    private void AddMixedIslandNodeIfMovable(StiffBody2D? body)
+    {
+        if (!IsMovableMixedIslandBody(body))
+            return;
+
+        _mixedIslandNodes.Add(new MixedIslandNode(Create2DBodyKey(body!), null, body!));
+    }
+
+    private void SortAndDeduplicateMixedIslandNodes()
+    {
+        if (_mixedIslandNodes.Count == 0)
+            return;
+
+        if (_mixedIslandNodes.Count == 1)
+        {
+            MixedIslandNode singleNode = _mixedIslandNodes[0];
+            singleNode.ParentIndex = 0;
+            singleNode.RootKey = singleNode.BodyKey;
+            _mixedIslandNodes[0] = singleNode;
+            return;
+        }
+
+        SwiftListSortUtility.SortInPlace(_mixedIslandNodes, IslandNodeComparer);
+
+        int writeIndex = 0;
+        int previousKey = -1;
+        for (int readIndex = 0; readIndex < _mixedIslandNodes.Count; readIndex++)
+        {
+            MixedIslandNode node = _mixedIslandNodes[readIndex];
+            if (node.BodyKey == previousKey)
+                continue;
+
+            node.ParentIndex = writeIndex;
+            node.RootKey = node.BodyKey;
+            _mixedIslandNodes[writeIndex++] = node;
+            previousKey = node.BodyKey;
+        }
+
+        while (_mixedIslandNodes.Count > writeIndex)
+            _mixedIslandNodes.RemoveAt(_mixedIslandNodes.Count - 1);
+    }
+
+    private int FindMixedIslandNode(StiffBody? body)
+    {
+        if (!IsMovableMixedIslandBody(body))
+            return -1;
+
+        return FindMixedIslandNode(Create3DBodyKey(body!));
+    }
+
+    private int FindMixedIslandNode(StiffBody2D? body)
+    {
+        if (!IsMovableMixedIslandBody(body))
+            return -1;
+
+        return FindMixedIslandNode(Create2DBodyKey(body!));
+    }
+
+    private int FindMixedIslandNode(int key)
+    {
+        int low = 0;
+        int high = _mixedIslandNodes.Count - 1;
+        while (low <= high)
+        {
+            int mid = low + ((high - low) >> 1);
+            int midKey = _mixedIslandNodes[mid].BodyKey;
+            if (midKey == key)
+                return mid;
+
+            if (midKey < key)
+                low = mid + 1;
+            else
+                high = mid - 1;
+        }
+
+        return -1;
+    }
+
+    private void UnionMixedIslandNodes(int nodeA, int nodeB)
+    {
+        int rootA = FindMixedIslandRoot(nodeA);
+        int rootB = FindMixedIslandRoot(nodeB);
+        if (rootA == rootB)
+            return;
+
+        int keyA = _mixedIslandNodes[rootA].BodyKey;
+        int keyB = _mixedIslandNodes[rootB].BodyKey;
+        int parent = keyA <= keyB ? rootA : rootB;
+        int child = parent == rootA ? rootB : rootA;
+
+        MixedIslandNode childNode = _mixedIslandNodes[child];
+        childNode.ParentIndex = parent;
+        childNode.RootKey = _mixedIslandNodes[parent].BodyKey;
+        _mixedIslandNodes[child] = childNode;
+    }
+
+    private int FindMixedIslandRoot(int index)
+    {
+        int root = index;
+        while (_mixedIslandNodes[root].ParentIndex != root)
+            root = _mixedIslandNodes[root].ParentIndex;
+
+        while (index != root)
+        {
+            MixedIslandNode node = _mixedIslandNodes[index];
+            int parent = node.ParentIndex;
+            node.ParentIndex = root;
+            node.RootKey = _mixedIslandNodes[root].BodyKey;
+            _mixedIslandNodes[index] = node;
+            index = parent;
+        }
+
+        return root;
+    }
+
+    private void CompressMixedIslandRoots()
+    {
+        for (int i = 0; i < _mixedIslandNodes.Count; i++)
+        {
+            int root = FindMixedIslandRoot(i);
+            MixedIslandNode node = _mixedIslandNodes[i];
+            node.RootKey = _mixedIslandNodes[root].BodyKey;
+            _mixedIslandNodes[i] = node;
+        }
+    }
+
+    private int ResolveMixedConstraintRootKey(int node3D, int node2D)
+    {
+        if (node3D >= 0)
+            return _mixedIslandNodes[node3D].RootKey;
+
+        return node2D >= 0 ? _mixedIslandNodes[node2D].RootKey : -1;
+    }
+
+    private bool WakeMixedIslandBodies(int rootKey)
+    {
+        bool hasAwakeBody = false;
+        for (int i = 0; i < _mixedIslandNodes.Count; i++)
+        {
+            MixedIslandNode node = _mixedIslandNodes[i];
+            if (node.RootKey == rootKey && node.IsAwakeForCollision)
+            {
+                hasAwakeBody = true;
+                break;
+            }
+        }
+
+        if (!hasAwakeBody)
+            return false;
+
+        for (int i = 0; i < _mixedIslandNodes.Count; i++)
+        {
+            MixedIslandNode node = _mixedIslandNodes[i];
+            if (node.RootKey == rootKey)
+                node.WakeFromCollision();
+        }
+
+        return true;
+    }
+
+    private void SolveMixedIslandRange(int rootKey, int start, int end)
+    {
+        if (end - start == 1)
+        {
+            CollisionPairMixed pair = _mixedIslandConstraints[start].Pair;
+            CollisionResponseMixed.Resolve(pair, pair.Contact);
+            return;
+        }
+
+        int iterationLimit = _context.Settings.DiscreteSolverIterations;
+        int iterationsUsed = 0;
+        for (int iteration = 0; iteration < iterationLimit; iteration++)
+        {
+            bool applyPositionCorrection = iteration == 0;
+            for (int i = start; i < end; i++)
+            {
+                CollisionPairMixed pair = _mixedIslandConstraints[i].Pair;
+                CollisionResponseMixed.Resolve(
+                    pair,
+                    pair.Contact,
+                    iteration,
+                    iterationLimit,
+                    applyPositionCorrection);
+            }
+
+            iterationsUsed = iteration + 1;
+        }
+
+        _context.Diagnostics.EmitMixedResponseIsland(
+            rootKey,
+            end - start,
+            iterationsUsed,
+            iterationsUsed >= iterationLimit);
+    }
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool HasAwakeMovableParticipant(LSCollider collider3D, LSCollider2D collider2D) =>
         IsAwakeMovable(collider3D.Body) || IsAwakeMovable(collider2D.Body);
@@ -650,6 +944,22 @@ internal sealed class GravitasMixedCollisionService
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool IsAwakeMovable(StiffBody2D? body) =>
         body != null && body.CanTranslate && !body.IsSleeping;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool IsMovableMixedIslandBody(StiffBody? body) =>
+        body != null && body.DynamicId >= 0 && body.CanTranslate;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool IsMovableMixedIslandBody(StiffBody2D? body) =>
+        body != null && body.DynamicId >= 0 && body.CanTranslate;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static int Create3DBodyKey(StiffBody body) =>
+        body.DynamicId << 1;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static int Create2DBodyKey(StiffBody2D body) =>
+        (body.DynamicId << 1) | 1;
 
     internal int ActivatePartition(PhysicsMixedPartition partition)
     {
@@ -1282,6 +1592,39 @@ internal sealed class GravitasMixedCollisionService
             left.Key.CompareTo(right.Key);
     }
 
+    private sealed class MixedResponsePairComparer : IComparer<CollisionPairMixed>
+    {
+        public int Compare(CollisionPairMixed? left, CollisionPairMixed? right)
+        {
+            if (ReferenceEquals(left, right))
+                return 0;
+            if (left == null)
+                return -1;
+            if (right == null)
+                return 1;
+
+            return left.Key.CompareTo(right.Key);
+        }
+    }
+
+    private sealed class MixedIslandNodeComparer : IComparer<MixedIslandNode>
+    {
+        public int Compare(MixedIslandNode left, MixedIslandNode right) =>
+            left.BodyKey.CompareTo(right.BodyKey);
+    }
+
+    private sealed class MixedIslandConstraintComparer : IComparer<MixedIslandConstraint>
+    {
+        public int Compare(MixedIslandConstraint left, MixedIslandConstraint right)
+        {
+            int compare = left.RootKey.CompareTo(right.RootKey);
+            if (compare != 0)
+                return compare;
+
+            return left.PairKey.CompareTo(right.PairKey);
+        }
+    }
+
     private sealed class Collider2DIdComparer : IComparer<LSCollider2D>
     {
         public int Compare(LSCollider2D? left, LSCollider2D? right)
@@ -1310,5 +1653,57 @@ internal sealed class GravitasMixedCollisionService
 
             return left.Id.CompareTo(right.Id);
         }
+    }
+
+    private struct MixedIslandNode
+    {
+        public MixedIslandNode(int bodyKey, StiffBody? body3D, StiffBody2D? body2D)
+        {
+            BodyKey = bodyKey;
+            Body3D = body3D;
+            Body2D = body2D;
+            ParentIndex = -1;
+            RootKey = bodyKey;
+        }
+
+        public int BodyKey { get; }
+
+        public StiffBody? Body3D { get; }
+
+        public StiffBody2D? Body2D { get; }
+
+        public int ParentIndex { get; set; }
+
+        public int RootKey { get; set; }
+
+        public bool IsAwakeForCollision =>
+            Body3D?.IsAwakeForCollision ?? Body2D!.IsAwakeForCollision;
+
+        public void WakeFromCollision()
+        {
+            if (Body3D != null)
+            {
+                Body3D.WakeFromCollision();
+                return;
+            }
+
+            Body2D!.WakeFromCollision();
+        }
+    }
+
+    private readonly struct MixedIslandConstraint
+    {
+        public MixedIslandConstraint(CollisionPairMixed pair, int rootKey, ulong pairKey)
+        {
+            Pair = pair;
+            RootKey = rootKey;
+            PairKey = pairKey;
+        }
+
+        public CollisionPairMixed Pair { get; }
+
+        public int RootKey { get; }
+
+        public ulong PairKey { get; }
     }
 }

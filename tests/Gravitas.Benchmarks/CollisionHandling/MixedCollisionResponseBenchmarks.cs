@@ -48,6 +48,27 @@ public class MixedCollisionResponseBenchmarks
         return _pairs.Length;
     }
 
+    [Benchmark]
+    public int ResolvePreparedMixedIslandIterations()
+    {
+        int iterationLimit = _context.Settings.DiscreteSolverIterations;
+        for (int iteration = 0; iteration < iterationLimit; iteration++)
+        {
+            bool applyPositionCorrection = iteration == 0;
+            for (int i = 0; i < _pairs.Length; i++)
+            {
+                CollisionResponseMixed.Resolve(
+                    _pairs[i],
+                    _contacts[i],
+                    iteration,
+                    iterationLimit,
+                    applyPositionCorrection);
+            }
+        }
+
+        return _pairs.Length * iterationLimit;
+    }
+
     private void CreateResponsePair(Vector3d origin, int index)
     {
         ScenarioBody<LSSphereCollider> sphere = CreateBody(

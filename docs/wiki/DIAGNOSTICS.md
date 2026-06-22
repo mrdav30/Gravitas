@@ -72,7 +72,8 @@ Current event kinds:
 | `ResponseImpulse` | `CollisionResponse` | `Vector` is normal impulse, `ScalarA` is impulse magnitude, `ScalarB` is normal velocity. |
 | `MixedQuery` | `GravitasQueryMixedService` | Explicit mixed query segment, layer mask bits, hit count, mixed hit points, normal, and distance. |
 | `MixedContact` | `CollisionPairMixed.MarkColliding(...)` | Dimension-tagged 3D/2D collider IDs, mixed contact points, `Normal3DTo2D`, and penetration depth. |
-| `MixedResponseImpulse` | `CollisionResponseMixed` | Dimension-tagged mixed impulse, impulse magnitude, and normal velocity. |
+| `MixedResponseImpulse` | `CollisionResponseMixed` | Dimension-tagged mixed impulse, impulse magnitude, normal velocity, solve iteration, and iteration cap. |
+| `MixedResponseIsland` | `GravitasMixedCollisionService` | Mixed island root key, constraint count, iterations used, and whether the configured cap was reached. |
 
 The stream is scoped to one context. Collider and body IDs are not global and
 must be resolved through the same context that produced the event.
@@ -103,7 +104,8 @@ Available views cover every current event kind:
 `GravitasRayQueryDiagnosticView`, `GravitasCircleQueryDiagnosticView`,
 `GravitasContactDiagnosticView`, `GravitasResponseImpulseDiagnosticView`,
 `GravitasMixedQueryDiagnosticView`, `GravitasMixedContactDiagnosticView`, and
-`GravitasMixedResponseImpulseDiagnosticView`.
+`GravitasMixedResponseImpulseDiagnosticView`, and
+`GravitasMixedResponseIslandDiagnosticView`.
 
 The views are read-only wrappers over the existing event value. Visitors and
 views do not change capture storage, event ordering, diagnostic buffering, or

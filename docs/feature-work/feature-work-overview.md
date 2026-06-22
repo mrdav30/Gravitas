@@ -20,31 +20,33 @@ with evidence.
 These plans and evergreen closure trackers should be completed, or explicitly
 closed with evidence, before the alpha release.
 
-1. [`Discrete Response And Contact Quality Hardening`](2026-06-21-discrete-response-and-contact-quality-hardening-plan.md)
-   - Contact response is the most visible runtime quality signal. Resting
-     friction, 3D warm-start application, discrete islands, cylinder/mesh
-     contact quality, and mixed response coherence should be addressed before
-     release.
-2. [`Query And Mixed Swept Shape Hardening`](2026-06-21-query-and-mixed-swept-shape-hardening-plan.md)
+1. [`Query And Mixed Swept Shape Hardening`](2026-06-21-query-and-mixed-swept-shape-hardening-plan.md)
    - Public query truth and mixed finite-slab swept behavior need exact support
      or explicit fallback policy before users build gameplay on them.
-3. [`CCD Active Swept Sources`](2026-06-21-ccd-active-swept-sources-plan.md)
+2. [`CCD Active Swept Sources`](2026-06-21-ccd-active-swept-sources-plan.md)
    - Host-driven kinematic movement and rotation should be first-class swept
      sources rather than passive targets only.
-4. [`CCD Exact TOI And Shape Reducers`](2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md)
+3. [`CCD Exact TOI And Shape Reducers`](2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md)
    - Remaining conservative reductions should become exact where the correctness
      gain justifies the cost, with deterministic fallback policy for unsupported
      shape families.
-5. [`CCD Service-Level Island Solver`](2026-06-21-ccd-service-level-island-solver-plan.md)
+4. [`CCD Service-Level Island Solver`](2026-06-21-ccd-service-level-island-solver-plan.md)
    - Dense, chained, same-TOI, and mixed continuous contacts need a deterministic
      service-level model where body-owned substeps are insufficient.
-6. [`Benchmark Signal Hardening Backlog`](benchmark-signal-hardening-backlog.md)
+5. [`Benchmark Signal Hardening Backlog`](benchmark-signal-hardening-backlog.md)
    - Measured allocation or runtime-cost signals must be reproduced, resolved,
      or closed with a no-change decision before alpha.
-7. [`Feature Work Issue Tracker`](issue-tracker.md)
+6. [`Feature Work Issue Tracker`](issue-tracker.md)
    - Bugs, correctness risks, documentation defects, and feature-work-discovered
      issues should be triaged, tested, and committed independently from feature
      design plans.
+
+## Recently Completed
+
+- [`Discrete Response And Contact Quality Hardening`](done/2026-06-21-discrete-response-and-contact-quality-hardening-plan.md)
+  - Completed 2026-06-22. Resting friction, 3D warm-start application,
+    deterministic discrete islands, cylinder/mesh contact quality, and mixed
+    response islands are now covered by tests, docs, and benchmark signal.
 
 ## Post-Alpha / Evidence-Gated
 
@@ -64,14 +66,13 @@ first alpha release.
 
 ## Recommended Execution Order
 
-1. Discrete response and contact quality.
-2. Query and mixed swept shape hardening.
-3. CCD active swept sources.
-4. CCD exact TOI and shape reducers.
-5. CCD service-level island solver.
-6. Benchmark signal closure pass.
+1. Query and mixed swept shape hardening.
+2. CCD active swept sources.
+3. CCD exact TOI and shape reducers.
+4. CCD service-level island solver.
+5. Benchmark signal closure pass.
 
-This order starts with the solver behavior users feel immediately, then hardens
-the query/sweep surface they build on, then finishes CCD source coverage,
-precision, and island-level behavior. Benchmark signals remain a closure pass so
-measured hot-path risks do not survive into alpha.
+This order now starts with the query/sweep surface users build on, then
+finishes CCD source coverage, precision, and island-level behavior. Benchmark
+signals remain a closure pass so measured hot-path risks do not survive into
+alpha.

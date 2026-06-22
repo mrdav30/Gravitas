@@ -173,7 +173,7 @@ to add or tighten explicit allocation tests before changing the algorithm.
 | `collision-partition` | dynamic/static registration and partitioning, partitioned simulation, and reset plus dynamic re-registration churn. |
 | `collision-detection` | prepared primitive pairs, non-SAT primitive pairs, primitive manifold generation, cuboid face-manifold generation, cuboid SAT, mesh/cylinder, mesh/cuboid, mesh/mesh, and compound/primitive checks. |
 | `collision-response` | manifold response solver cost across single-contact, face-manifold, resting face-manifold, cylinder-contact, and mesh-contact prepared pairs, with pair-count scaling. |
-| `mixed-collision-response` | constrained mixed 3D/2D response cost for prepared sphere/circle contacts, with pair-count scaling. |
+| `mixed-collision-response` | constrained mixed 3D/2D response cost for prepared sphere/circle contacts, including single-pass pairs and bounded mixed-iteration loops. |
 | `diagnostics` | Disabled/enabled force and torque event hooks plus disabled/enabled primitive and mesh collider debug draw capture. |
 | `partition-culling` | dynamic collider repartitioning after teleports, direct partition add/remove churn, and culled-pair invalidation after movement. |
 | `physics-2d` | pure 2D body integration, GridForge-backed 2D partition response, direct angular contact response, direct two-contact manifold response, convex/convex two-contact manifold detection, sweep baseline comparisons, required 2D shape-pair checks, `OverlapCircleAll`, and `RaycastAll`. |

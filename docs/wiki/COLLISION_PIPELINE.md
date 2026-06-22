@@ -63,14 +63,22 @@ trigger events, and pooled pair reuse. `CollisionResponseMixed` applies the
 constrained mixed response: planar X/Z correction and impulses can move a
 2D body, planar normal and friction impulse components can spin it around its
 scalar yaw axis from the 2D COM-relative contact arm, and vertical Y correction
-and impulses treat the 2D body as having infinite constrained mass. Mixed
-contacts are processed during `LateSimulate` after both pure 2D and 3D services
-have integrated bodies and refreshed their own collider partitions, so mixed
-response observes post-integration collider positions. Mixed diagnostics,
-explicit mixed queries, and mixed CCD hooks are implemented. 2D swept-circle
-mixed CCD uses the shared swept-sphere worker, including 3D mesh targets through
-local-BVH triangle candidate TOI checks and compound targets through stable
-part-order reduction.
+and impulses treat the 2D body as having infinite constrained mass.
+
+Mixed contacts are processed during `LateSimulate` after both pure 2D and 3D
+services have integrated bodies and refreshed their own collider partitions, so
+mixed response observes post-integration collider positions. Non-trigger mixed
+pairs are collected into a dedicated mixed response graph keyed by stable
+dimension-tagged body IDs. Mixed islands are solved inside
+`GravitasMixedCollisionService` in deterministic pair-key order for
+`PhysicsSettings.DiscreteSolverIterations`; they do not merge into the pure 3D
+or pure 2D discrete island solvers. `PhysicsRuntimeMode.Both` remains isolated
+and never creates mixed contacts.
+
+Mixed diagnostics, explicit mixed queries, and mixed CCD hooks are implemented.
+2D swept-circle mixed CCD uses the shared swept-sphere worker, including 3D mesh
+targets through local-BVH triangle candidate TOI checks and compound targets
+through stable part-order reduction.
 
 `CollisionDetection2D` currently supports:
 
@@ -827,10 +835,8 @@ Response units and invariants:
   handled by the response solver.
 
 This is still the first alpha milestone, not the final response engine. Exact
-angular TOI, exact swept polytope support, and richer mixed-dimension solver
-behavior remain future work. Mixed solver quality is tracked in
-[`Discrete Response And Contact Quality Hardening`](../feature-work/2026-06-21-discrete-response-and-contact-quality-hardening-plan.md);
-exact CCD reducer work remains in
+angular TOI and exact swept polytope support remain future work. Exact CCD
+reducer work remains in
 [`CCD Exact TOI And Shape Reducers`](../feature-work/2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md).
 
 ## Body Sleep And Wake

@@ -41,6 +41,10 @@ internal sealed class CollisionPairMixed
 
     public bool IsColliding => _isColliding;
 
+    public bool IsTriggerPair => _isTriggerPair;
+
+    public MixedContact Contact { get; private set; }
+
     public void Initialize(LSCollider collider3D, LSCollider2D collider2D)
     {
         SwiftThrowHelper.ThrowIfNull(collider3D, nameof(collider3D));
@@ -54,6 +58,7 @@ internal sealed class CollisionPairMixed
         LastFrame = -1;
         _isColliding = false;
         _isTriggerPair = collider3D.IsTrigger || collider2D.IsTrigger;
+        Contact = default;
     }
 
     public void MarkColliding(int frame, MixedContact contact)
@@ -61,14 +66,10 @@ internal sealed class CollisionPairMixed
         bool changed = !_isColliding;
         _isColliding = true;
         _isTriggerPair = Collider3D.IsTrigger || Collider2D.IsTrigger;
+        Contact = contact;
         LastFrame = frame;
 
         Context.Diagnostics.EmitMixedContact(this, contact, true);
-        if (!_isTriggerPair)
-        {
-            WakeBodies();
-            CollisionResponseMixed.Resolve(this, contact);
-        }
 
         Collider3D.NotifyMixedContact(Collider2D, true, changed, _isTriggerPair);
         Collider2D.NotifyMixedContact(Collider3D, true, changed, _isTriggerPair);
@@ -85,12 +86,13 @@ internal sealed class CollisionPairMixed
             return;
 
         _isColliding = false;
+        Contact = default;
         Collider3D.NotifyMixedContact(Collider2D, false, true, _isTriggerPair);
         Collider2D.NotifyMixedContact(Collider3D, false, true, _isTriggerPair);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private void WakeBodies()
+    internal void WakeSleepingBodiesForCollision()
     {
         StiffBody? body3D = Collider3D.Body;
         StiffBody2D? body2D = Collider2D.Body;

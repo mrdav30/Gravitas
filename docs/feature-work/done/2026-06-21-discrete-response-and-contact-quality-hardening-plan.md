@@ -11,7 +11,7 @@
 ---
 
 **Date:** 2026-06-21
-**Status:** Pre-alpha release blocker
+**Status:** Done
 **Owner:** Gravitas response and contact hardening
 
 ## Purpose
@@ -22,9 +22,9 @@ coefficients, and pair-local warm-start storage. Pure 2D now applies cached
 normal and tangent impulses before the fresh solve. Workstream 2 brought 3D
 single-pair warm-starting up to the same standard with normal-compatible cache
 reuse and a two-axis tangent basis. Resting-stack quality now has explicit
-discrete islands and bounded multi-iteration solving, and cylinder/mesh contact
-geometry has first-class cap/face manifold coverage. Mixed response remains
-intentionally constrained.
+discrete islands and bounded multi-iteration solving, cylinder/mesh contact
+geometry has first-class cap/face manifold coverage, and mixed response has a
+dedicated dimension-bridging island model.
 
 Those are not acceptable as loose wiki caveats for a first-class deterministic
 physics engine. They should be driven by tests, benchmark signal, and explicit
@@ -65,7 +65,10 @@ solver invariants.
   triangle candidates for convex and concave meshes before falling back to
   representative contacts where needed.
 - Mixed response applies planar X/Z impulse and angular yaw impulse to 2D
-  bodies while constraining vertical response to the 3D participant.
+  bodies while constraining vertical response to the 3D participant. It now
+  collects non-trigger mixed pairs into dedicated mixed islands solved in stable
+  pair-key order for `PhysicsSettings.DiscreteSolverIterations`; mixed islands
+  deliberately do not merge into pure 3D or pure 2D island solvers.
 
 ## Guiding Rules
 
@@ -122,15 +125,15 @@ Current response inventory:
 | --- | --- |
 | 3D response | `CollisionPair` owns one four-contact `ContactManifold`, pair-local `ContactWarmStartCache`, and priority/speed/candidate-order collider ordering. Workstream 2 updated `CollisionResponse` to apply normal-compatible cached impulses before solving, accumulate/clamp normal impulses, solve friction over a deterministic two-axis tangent basis, then store normal/tangent impulse scalars and the solved normal by contact identity. Sleeping body wake happens before response when the opposite participant is awake. |
 | Pure 2D response | `CollisionPair2D` owns a two-contact `ContactManifold2D` and `ContactWarmStartCache2D`. `CollisionResponse2D` reads cached normal/tangent impulses, applies them before the fresh solve, accumulates/clamps normal impulses, clamps tangent impulses to the current Coulomb bound, and stores the refreshed cache. Pair ordering uses priority, speed, then collider ID. Wake happens through pair handling after solid response. |
-| Mixed response | `CollisionPairMixed` owns stable 3D/2D identity and a single `MixedContact` input. It has no pair-local warm-start cache or manifold reduction. `CollisionResponseMixed` applies constrained 3D/2D positional correction, normal impulse, and friction: planar X/Z impulse can move and yaw the 2D body, while vertical Y response is constrained out of the 2D participant. Wake happens before mixed response. |
+| Mixed response | `CollisionPairMixed` owns stable 3D/2D identity, retained contact state, trigger/contact notification, and pair pooling. `GravitasMixedCollisionService` collects non-trigger mixed pairs into a dedicated island graph keyed by dimension-tagged body IDs, wakes connected mixed participants, and solves constraints in root-key then mixed pair-key order. `CollisionResponseMixed` applies constrained 3D/2D positional correction, normal impulse, and friction: planar X/Z impulse can move and yaw the 2D body, while vertical Y response is constrained out of the 2D participant. |
 
 Benchmark evidence rows were expanded before solver changes:
 
 - `collision-response` now covers `SingleContact`, `FaceManifold`,
   `RestingFaceManifold`, `CylinderContact`, and `MeshContact` prepared 3D pairs
   at `16` and `64` pairs.
-- `mixed-collision-response` covers prepared mixed sphere/circle response at
-  `16` and `64` pairs.
+- `mixed-collision-response` covers prepared mixed sphere/circle response and
+  bounded mixed-iteration loops at `16` and `64` pairs.
 
 The short in-process benchmark smoke executed successfully for the new rows,
 but emitted BenchmarkDotNet minimum-iteration-time warnings. Treat that run as
@@ -242,8 +245,8 @@ does not stop at an awake-partition boundary.
 `GravitasMixedCollisionService` now mirrors the fixed-step phase boundary:
 `Simulate` remains counter-only, while `LateSimulate` refreshes mixed partitions
 after pure 2D and 3D integration and then processes mixed contacts. This keeps
-mixed contacts from seeing stale pre-integration collider positions. Full mixed
-island/warm-start quality remains Workstream 5 scope.
+mixed contacts from seeing stale pre-integration collider positions. Workstream
+5 later completed the dedicated mixed response island model.
 
 The full-step validation exposed a hot-path allocation RCA in the newly
 exercised 3D late collision pass. That originally required local
@@ -312,20 +315,47 @@ separately from boolean hit checks.
 
 **Problem**
 
-Mixed response correctly constrains vertical 2D motion, but richer mixed solver
-behavior remains future hardening.
+Mixed response needed a first-class deterministic policy for contacts that
+bridge pure 3D and pure 2D bodies without blurring the explicit runtime-mode
+boundary.
 
 **Tasks**
 
-- [ ] Add tests for mixed resting contacts where planar impulse, yaw torque,
+- [x] Add tests for mixed resting contacts where planar impulse, yaw torque,
   vertical constraint, and 3D participant motion interact.
-- [ ] Decide whether mixed response should participate in discrete islands with
+- [x] Decide whether mixed response should participate in discrete islands with
   pure 3D contacts, pure 2D contacts, or a dedicated mixed island type.
-- [ ] Preserve `PhysicsRuntimeMode.Both` isolation from mixed response work.
-- [ ] Add diagnostics for mixed response iteration count and cap hits if mixed
+- [x] Preserve `PhysicsRuntimeMode.Both` isolation from mixed response work.
+- [x] Add diagnostics for mixed response iteration count and cap hits if mixed
   islands become iterative.
-- [ ] Document unsupported mixed solver behavior explicitly instead of leaving
+- [x] Document unsupported mixed solver behavior explicitly instead of leaving
   it as an implementation accident.
+
+**Progress 2026-06-22:** Workstream 5 promoted mixed response from direct
+pair-local solving to a dedicated mixed island model. Mixed response does not
+participate in pure 3D or pure 2D islands: `PhysicsRuntimeMode.Mixed` keeps the
+bridge inside `GravitasMixedCollisionService`, while `PhysicsRuntimeMode.Both`
+continues to run pure 2D and pure 3D side by side with no mixed contacts.
+
+`CollisionPairMixed` now retains the current `MixedContact` and notification
+state, while the service collects non-trigger mixed pairs into response
+constraints sorted by stable mixed pair key. Movable 3D and 2D bodies use
+dimension-tagged body keys in a deterministic union-find graph. Connected mixed
+islands wake through existing collision wake paths and solve for the configured
+`PhysicsSettings.DiscreteSolverIterations` cap; positional correction is
+applied only on the first island iteration, while later iterations refine
+velocity response.
+
+`CollisionResponseMixed` now exposes an iteration-aware internal solve path and
+returns whether an impulse was applied. Mixed impulse diagnostics record the
+iteration and iteration cap. A new `MixedResponseIsland` diagnostic reports the
+island root key, constraint count, iterations used, and whether the configured
+cap was reached. Tests cover planar impulse, yaw torque, vertical 2D
+constraint, 3D participant correction, single-pair iteration metadata,
+connected mixed-island cap reporting, and `Both` mode isolation.
+
+The `mixed-collision-response` benchmark now includes a bounded mixed-iteration
+loop row in addition to the prepared single-pass pair row.
 
 ## Done Criteria
 
@@ -337,4 +367,11 @@ behavior remains future hardening.
   tests.
 - Cylinder and mesh contact edge cases have regression coverage and benchmark
   signal where hot-path cost changes.
-- Mixed response limitations are resolved or documented as explicit policy.
+- Mixed response uses a dedicated island policy, exposes iteration diagnostics,
+  and keeps pure `Both` mode isolated from mixed contacts.
+
+## Final Validation
+
+- `dotnet test Gravitas.slnx --configuration Release`
+- `dotnet test Gravitas.slnx --configuration ReleaseLean`
+- `dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll mixed-collision-response --filter "*ResolvePreparedMixedIslandIterations*" --job Dry`

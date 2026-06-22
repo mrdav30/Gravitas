@@ -322,6 +322,8 @@ public sealed class GravitasDiagnosticEventViewTests
             vector: impulse,
             scalarA: impulse.Magnitude,
             scalarB: (Fixed64)(-3),
+            dataA: 2,
+            dataB: 4,
             hit: true);
 
         mixedImpulseEvent.TryAsMixedResponseImpulse(out GravitasMixedResponseImpulseDiagnosticView impulseView).Should().BeTrue();
@@ -334,6 +336,21 @@ public sealed class GravitasDiagnosticEventViewTests
         impulseView.Impulse.Should().Be(impulse);
         impulseView.ImpulseMagnitude.Should().Be(impulse.Magnitude);
         impulseView.NormalVelocity.Should().Be((Fixed64)(-3));
+        impulseView.Iteration.Should().Be(2);
+        impulseView.IterationLimit.Should().Be(4);
+
+        GravitasDiagnosticEvent mixedIslandEvent = CreateEvent(
+            GravitasDiagnosticEventKind.MixedResponseIsland,
+            bodyId: 123,
+            dataA: 3,
+            dataB: 4,
+            hit: true);
+
+        mixedIslandEvent.TryAsMixedResponseIsland(out GravitasMixedResponseIslandDiagnosticView islandView).Should().BeTrue();
+        islandView.RootKey.Should().Be(123);
+        islandView.ConstraintCount.Should().Be(3);
+        islandView.IterationCount.Should().Be(4);
+        islandView.ReachedIterationLimit.Should().BeTrue();
     }
 
     [Fact]
@@ -353,6 +370,7 @@ public sealed class GravitasDiagnosticEventViewTests
         CreateEvent(GravitasDiagnosticEventKind.MixedQuery, colliderADimension: GravitasColliderDimension.ThreeD, colliderBDimension: GravitasColliderDimension.TwoD).DispatchTo(visitor);
         CreateEvent(GravitasDiagnosticEventKind.MixedContact, scalarA: Fixed64.Half).DispatchTo(visitor);
         CreateEvent(GravitasDiagnosticEventKind.MixedResponseImpulse, vector: Vector3d.Down).DispatchTo(visitor);
+        CreateEvent(GravitasDiagnosticEventKind.MixedResponseIsland, bodyId: 7).DispatchTo(visitor);
         CreateEvent((GravitasDiagnosticEventKind)250).DispatchTo(visitor);
 
         visitor.Route.Should().Equal(
@@ -368,6 +386,7 @@ public sealed class GravitasDiagnosticEventViewTests
             nameof(RecordingDiagnosticEventVisitor.VisitMixedQuery),
             nameof(RecordingDiagnosticEventVisitor.VisitMixedContact),
             nameof(RecordingDiagnosticEventVisitor.VisitMixedResponseImpulse),
+            nameof(RecordingDiagnosticEventVisitor.VisitMixedResponseIsland),
             nameof(RecordingDiagnosticEventVisitor.VisitUnknown));
         visitor.LastForce.Force.Should().Be(Vector3d.Right);
         visitor.LastMixedContact.Depth.Should().Be(Fixed64.Half);
@@ -493,6 +512,9 @@ public sealed class GravitasDiagnosticEventViewTests
 
         public override void VisitMixedResponseImpulse(in GravitasMixedResponseImpulseDiagnosticView view) =>
             Route.Add(nameof(VisitMixedResponseImpulse));
+
+        public override void VisitMixedResponseIsland(in GravitasMixedResponseIslandDiagnosticView view) =>
+            Route.Add(nameof(VisitMixedResponseIsland));
 
         public override void VisitUnknown(in GravitasDiagnosticEvent diagnosticEvent)
         {

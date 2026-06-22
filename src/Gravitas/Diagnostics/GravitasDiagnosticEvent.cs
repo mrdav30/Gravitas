@@ -154,6 +154,9 @@ public readonly struct GravitasDiagnosticEvent
             case GravitasDiagnosticEventKind.MixedResponseImpulse:
                 visitor.VisitMixedResponseImpulse(new GravitasMixedResponseImpulseDiagnosticView(this));
                 break;
+            case GravitasDiagnosticEventKind.MixedResponseIsland:
+                visitor.VisitMixedResponseIsland(new GravitasMixedResponseIslandDiagnosticView(this));
+                break;
             default:
                 visitor.VisitUnknown(this);
                 break;
@@ -333,6 +336,21 @@ public readonly struct GravitasDiagnosticEvent
         if (Kind == GravitasDiagnosticEventKind.MixedResponseImpulse)
         {
             view = new GravitasMixedResponseImpulseDiagnosticView(this);
+            return true;
+        }
+
+        view = default;
+        return false;
+    }
+
+    /// <summary>
+    /// Tries to decode this event as a mixed 3D/2D response-island diagnostic view.
+    /// </summary>
+    public bool TryAsMixedResponseIsland(out GravitasMixedResponseIslandDiagnosticView view)
+    {
+        if (Kind == GravitasDiagnosticEventKind.MixedResponseIsland)
+        {
+            view = new GravitasMixedResponseIslandDiagnosticView(this);
             return true;
         }
 

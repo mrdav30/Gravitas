@@ -198,8 +198,9 @@ identity. Contact events are emitted from the active-pair queue during
   2D manifold solvers handle deterministic normal and friction impulses, 3D and
   pure 2D apply compatible pair-local warm-start impulses, and 3D discrete
   response builds deterministic islands with bounded multi-iteration solving.
-  Exact angular TOI, exact swept polytope support, and richer mixed solver
-  behavior remain future work.
+  Mixed response builds dedicated dimension-bridging islands without merging
+  them into pure 2D or 3D islands. Exact angular TOI and exact swept polytope
+  support remain future work.
 - Query services use context-owned mutable buffers. Treat them as same-thread,
   fixed-loop services unless they are redesigned for reentrancy.
 - Diagnostics are context-owned and disabled by default. Enabled draw capture can

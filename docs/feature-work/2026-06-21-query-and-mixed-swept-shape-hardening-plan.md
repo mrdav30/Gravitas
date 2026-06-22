@@ -36,7 +36,7 @@ and known not to create false negatives.
 - This plan owns public query API shape, pure 2D query parity, mixed finite-slab
   swept-circle exactness, and mesh-as-source query families. CCD should reuse
   any exact reducers produced here rather than maintaining a second policy.
-- [`2026-06-21-discrete-response-and-contact-quality-hardening-plan.md`](2026-06-21-discrete-response-and-contact-quality-hardening-plan.md)
+- [`2026-06-21-discrete-response-and-contact-quality-hardening-plan.md`](done/2026-06-21-discrete-response-and-contact-quality-hardening-plan.md)
   owns contact response after query/narrow phase has produced hits.
 
 ## Current Baseline
