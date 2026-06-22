@@ -48,6 +48,58 @@ internal static class BenchmarkPhysicsScene
         return context.Physics.AssimilatedBodyCount;
     }
 
+    public static LSMeshCollider CreateDynamicConvexCube(GravitasWorldContext context, Vector3d position)
+    {
+        LSMeshCollider collider = CreateConvexCubeMesh();
+        CreateDynamicBody(context, collider, position);
+        return collider;
+    }
+
+    public static LSCapsuleCollider CreateDynamicCapsule(
+        GravitasWorldContext context,
+        Vector3d position,
+        FixedQuaternion rotation)
+    {
+        var collider = new LSCapsuleCollider { Size = new Vector3d(Fixed64.One, (Fixed64)3, Fixed64.One) };
+        CreateDynamicBody(context, collider, position, rotation);
+        return collider;
+    }
+
+    public static LSCuboidCollider CreateDynamicCuboid(GravitasWorldContext context, Vector3d position)
+    {
+        var collider = new LSCuboidCollider();
+        CreateDynamicBody(context, collider, position);
+        return collider;
+    }
+
+    public static LSCylinderCollider CreateDynamicCylinder(
+        GravitasWorldContext context,
+        Vector3d position,
+        FixedQuaternion rotation)
+    {
+        var collider = new LSCylinderCollider { Size = new Vector3d(Fixed64.One, (Fixed64)3, Fixed64.One) };
+        CreateDynamicBody(context, collider, position, rotation);
+        return collider;
+    }
+
+    public static LSCompoundCollider CreateDynamicConvexMeshCompound(GravitasWorldContext context, Vector3d position)
+    {
+        CreateConvexCubeTopology(out Vector3d[] vertices, out int[] triangles);
+        var collider = new LSCompoundCollider(
+            CompoundColliderPart.ConvexMesh(
+                vertices,
+                triangles,
+                new Vector3d(-Fixed64.Half, Fixed64.Zero, Fixed64.Zero),
+                MeshInertiaPolicy.SurfaceApproximation),
+            CompoundColliderPart.ConvexMesh(
+                vertices,
+                triangles,
+                new Vector3d(Fixed64.Half, Fixed64.Zero, Fixed64.Zero),
+                MeshInertiaPolicy.SurfaceApproximation));
+        CreateDynamicBody(context, collider, position);
+        return collider;
+    }
+
     public static int CreateOverlappingDynamicSpherePairs(GravitasWorldContext context, int pairCount)
     {
         for (int i = 0; i < pairCount; i++)
@@ -73,6 +125,18 @@ internal static class BenchmarkPhysicsScene
         return context.Physics.AssimilatedColliderCount;
     }
 
+    public static int CreateStaticMeshWallLine(GravitasWorldContext context, int count)
+    {
+        for (int i = 0; i < count; i++)
+        {
+            var agent = new BenchmarkMatterAgent(context, new Vector3d(i * DefaultSpacing, 0, 0));
+            LSMeshCollider collider = CreateVerticalQuadMesh();
+            collider.InitializeWithNoBody(agent);
+        }
+
+        return context.Physics.AssimilatedColliderCount;
+    }
+
     public static int GridExtentForLine(int count) =>
         Math.Max(DefaultGridPadding * 2, count * DefaultSpacing + DefaultGridPadding);
 
@@ -85,15 +149,75 @@ internal static class BenchmarkPhysicsScene
 
     private static StiffBody CreateDynamicSphere(GravitasWorldContext context, Vector3d position)
     {
+        return CreateDynamicBody(context, new LSSphereCollider(), position);
+    }
+
+    private static StiffBody CreateDynamicBody(
+        GravitasWorldContext context,
+        LSCollider collider,
+        Vector3d position,
+        FixedQuaternion? rotation = null)
+    {
         var agent = new BenchmarkMatterAgent(context, position);
-        var collider = new LSSphereCollider();
         var body = new StiffBody(agent, collider)
         {
             Mass = Fixed64.One
         };
 
-        body.Initialize(position, FixedQuaternion.Identity);
+        body.Initialize(position, rotation ?? FixedQuaternion.Identity);
         return body;
+    }
+
+    private static LSMeshCollider CreateConvexCubeMesh()
+    {
+        CreateConvexCubeTopology(out Vector3d[] vertices, out int[] triangles);
+        return new LSMeshCollider(
+            vertices,
+            triangles,
+            MeshColliderMode.Convex,
+            MeshInertiaPolicy.SurfaceApproximation);
+    }
+
+    private static void CreateConvexCubeTopology(out Vector3d[] vertices, out int[] triangles)
+    {
+        Fixed64 half = Fixed64.Half;
+        vertices = new[]
+        {
+            new Vector3d(-half, -half, -half),
+            new Vector3d(half, -half, -half),
+            new Vector3d(-half, half, -half),
+            new Vector3d(half, half, -half),
+            new Vector3d(-half, -half, half),
+            new Vector3d(half, -half, half),
+            new Vector3d(-half, half, half),
+            new Vector3d(half, half, half)
+        };
+        triangles = new[]
+        {
+            0, 2, 1, 1, 2, 3,
+            4, 5, 6, 5, 7, 6,
+            0, 4, 2, 2, 4, 6,
+            1, 3, 5, 5, 3, 7,
+            0, 1, 4, 1, 5, 4,
+            2, 6, 3, 3, 6, 7
+        };
+    }
+
+    private static LSMeshCollider CreateVerticalQuadMesh()
+    {
+        var vertices = new[]
+        {
+            new Vector3d(Fixed64.Zero, -Fixed64.One, -Fixed64.One),
+            new Vector3d(Fixed64.Zero, Fixed64.One, -Fixed64.One),
+            new Vector3d(Fixed64.Zero, -Fixed64.One, Fixed64.One),
+            new Vector3d(Fixed64.Zero, Fixed64.One, Fixed64.One)
+        };
+        var triangles = new[] { 0, 1, 2, 2, 1, 3 };
+        return new LSMeshCollider(
+            vertices,
+            triangles,
+            MeshColliderMode.Convex,
+            MeshInertiaPolicy.SurfaceApproximation);
     }
 
     private static Vector3d PositionForGridIndex(int index)

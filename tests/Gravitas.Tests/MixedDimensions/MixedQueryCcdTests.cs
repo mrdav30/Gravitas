@@ -358,7 +358,7 @@ public sealed class MixedQueryCcdTests
     }
 
     [Fact]
-    public void PublicQuerySurface_ShouldNotExposeMeshAsSourceSweepsBeforePolicyImplementation()
+    public void PublicQuerySurface_ShouldExposeOnlyExplicitConvexMeshSourceSweeps()
     {
         Type[] services =
         {
@@ -366,6 +366,7 @@ public sealed class MixedQueryCcdTests
             typeof(GravitasQuery3DService),
             typeof(GravitasQueryMixedService)
         };
+        string[] allowedMeshSourceMethods = { "SweepConvexMesh", "SweepConvexMeshAll" };
 
         foreach (Type service in services)
         {
@@ -374,12 +375,26 @@ public sealed class MixedQueryCcdTests
                 | System.Reflection.BindingFlags.Public
                 | System.Reflection.BindingFlags.DeclaredOnly))
             {
-                method.Name.Contains("Mesh", StringComparison.Ordinal).Should().BeFalse();
-                method
-                    .GetParameters()
-                    .Should()
-                    .NotContain(parameter => parameter.ParameterType == typeof(LSMeshCollider)
-                        || parameter.ParameterType.Name.Contains("Mesh", StringComparison.Ordinal));
+                method.Name.Should().NotBe("SweepMesh");
+                method.Name.Should().NotBe("SweepMeshAll");
+                method.Name.Contains("Concave", StringComparison.Ordinal).Should().BeFalse();
+
+                bool acceptsMeshCollider = false;
+                bool acceptsRawMesh = false;
+                foreach (System.Reflection.ParameterInfo parameter in method.GetParameters())
+                {
+                    acceptsMeshCollider |= parameter.ParameterType == typeof(LSMeshCollider);
+                    acceptsRawMesh |= parameter.ParameterType == typeof(PhysicsMesh)
+                        || parameter.ParameterType == typeof(Vector3d[])
+                        || parameter.ParameterType == typeof(int[]);
+                }
+
+                acceptsRawMesh.Should().BeFalse();
+                if (!acceptsMeshCollider)
+                    continue;
+
+                service.Should().Be(typeof(GravitasQuery3DService));
+                allowedMeshSourceMethods.Should().Contain(method.Name);
             }
         }
     }

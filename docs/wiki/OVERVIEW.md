@@ -193,7 +193,11 @@ identity. Contact events are emitted from the active-pair queue during
 - Mesh raycast overlap, sphere sweeps against mesh targets, and concave mesh
   narrow phase are implemented through triangle-level tests. Mesh/cuboid and
   mesh/cylinder face/cap contacts now clip stable support contacts to authored
-  triangles; mesh-as-source swept query families remain future hardening work.
+  triangles. Capsule, cuboid, finite-cylinder, convex mesh, and authored
+  compound sources have explicit 3D swept query APIs; concave mesh sources and
+  raw mesh source queries are rejected because they hide unbounded
+  source-triangle expansion. Hosts that need concave-looking movers should use
+  offline convex decomposition into stable `LSCompoundCollider` parts.
 - Collision response is still an alpha-hardening target. The current 3D and pure
   2D manifold solvers handle deterministic normal and friction impulses, 3D and
   pure 2D apply compatible pair-local warm-start impulses, and 3D discrete

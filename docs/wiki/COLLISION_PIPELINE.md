@@ -354,6 +354,14 @@ Mesh policy work should keep these boundaries explicit:
   Authored/offline decomposed collision assets should use `LSCompoundCollider`
   for alpha unless a future asset pipeline proves that mesh-owned pieces need
   different public semantics.
+- Mesh colliders are supported as collision shapes and as raycast and
+  swept-sphere query targets. Capsule, cuboid, finite-cylinder, convex mesh,
+  and authored compound sources also have explicit 3D swept query APIs.
+  `SweptSphereQueryWorker.TrySweep(LSCollider collider, ...)` is the inverse
+  relationship: it sweeps a prepared sphere source against a target collider.
+  The intentionally unsupported high-risk case is exact concave
+  mesh-as-source sweeping or automatic runtime decomposition, which can hide
+  unbounded source-triangle expansion behind a simple query call.
 - Host/offline convex decomposition should feed explicit primitive or convex
   mesh `ColliderShapeDefinition` parts into the owning compound collider without
   changing the owning collider identity. Runtime automatic decomposition remains
