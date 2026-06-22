@@ -9,6 +9,7 @@ using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.Support;
 using SwiftCollections;
+using System;
 using System.Runtime.CompilerServices;
 
 namespace Gravitas.Queries;
@@ -20,7 +21,7 @@ public sealed class GravitasQuery2DService
 {
     private readonly GravitasWorldContext _context;
     private readonly SwiftList<LSCollider2D> _queryCandidates = new();
-    private uint _circleQueryVersion;
+    private uint _overlapQueryVersion;
     private uint _raycastVersion;
 
     /// <summary>
@@ -47,7 +48,7 @@ public sealed class GravitasQuery2DService
     {
         _queryCandidates.FastClear();
         LastQueryCandidateCount = 0;
-        _circleQueryVersion = 0;
+        _overlapQueryVersion = 0;
         _raycastVersion = 0;
     }
 
@@ -91,6 +92,153 @@ public sealed class GravitasQuery2DService
             includeTriggers: includeTriggers);
     }
 
+    /// <summary>
+    /// Finds the closest active pure 2D collider overlapping the supplied query circle.
+    /// </summary>
+    public bool OverlapCircle(Vector2d center, Fixed64 radius, out Physics2DHit hit)
+    {
+        return OverlapCircle(center, radius, PhysicsLayerMask.All, out hit);
+    }
+
+    /// <summary>
+    /// Finds the closest active pure 2D collider on an included layer overlapping the supplied query circle.
+    /// </summary>
+    public bool OverlapCircle(Vector2d center, Fixed64 radius, PhysicsLayerMask layerMask, out Physics2DHit hit)
+    {
+        SwiftThrowHelper.ThrowIfArgument(radius < Fixed64.Zero, nameof(radius), "2D query radius cannot be negative.");
+
+        EnsureCandidateCapacity();
+        uint queryVersion = NextOverlapQueryVersion();
+        _context.Collisions2D.CollectBoundsCandidates(
+            new Vector2d(center.X - radius, center.Y - radius),
+            new Vector2d(center.X + radius, center.Y + radius),
+            layerMask,
+            queryVersion,
+            raycastQuery: false,
+            _queryCandidates);
+
+        LastQueryCandidateCount = _queryCandidates.Count;
+        bool found = false;
+        Physics2DHit closest = default;
+        for (int i = 0; i < _queryCandidates.Count; i++)
+        {
+            if (!QueryDetection2D.TryOverlapCircle(center, radius, _queryCandidates[i], out Physics2DHit candidate)
+                || (found && !Physics2DHitSorter.ComesBefore(candidate, closest)))
+            {
+                continue;
+            }
+
+            closest = candidate;
+            found = true;
+        }
+
+        hit = closest;
+        return found;
+    }
+
+    /// <summary>
+    /// Finds the closest active pure 2D collider overlapping the supplied axis-aligned box.
+    /// </summary>
+    public bool OverlapAabb(Vector2d center, Vector2d size, out Physics2DHit hit)
+    {
+        return OverlapAabb(center, size, PhysicsLayerMask.All, out hit);
+    }
+
+    /// <summary>
+    /// Finds the closest active pure 2D collider on an included layer overlapping the supplied axis-aligned box.
+    /// </summary>
+    public bool OverlapAabb(Vector2d center, Vector2d size, PhysicsLayerMask layerMask, out Physics2DHit hit)
+    {
+        QueryDetection2D.ValidateAabbSize(size);
+        Vector2d halfExtents = size * Fixed64.Half;
+        Span<Vector2d> vertices = stackalloc Vector2d[4];
+        CreateAabbVertices(center, halfExtents, vertices);
+        return OverlapAreaCore(
+            vertices,
+            center,
+            center - halfExtents,
+            center + halfExtents,
+            layerMask,
+            out hit);
+    }
+
+    /// <summary>
+    /// Writes all active pure 2D colliders overlapping the supplied axis-aligned box into <paramref name="results"/>.
+    /// </summary>
+    /// <returns>The number of hits written to <paramref name="results"/>.</returns>
+    public int OverlapAabbAll(Vector2d center, Vector2d size, SwiftList<Physics2DHit> results)
+    {
+        return OverlapAabbAll(center, size, PhysicsLayerMask.All, results);
+    }
+
+    /// <summary>
+    /// Writes all active pure 2D colliders on included layers that overlap the supplied axis-aligned box.
+    /// </summary>
+    /// <returns>The number of hits written to <paramref name="results"/>.</returns>
+    public int OverlapAabbAll(
+        Vector2d center,
+        Vector2d size,
+        PhysicsLayerMask layerMask,
+        SwiftList<Physics2DHit> results)
+    {
+        SwiftThrowHelper.ThrowIfNull(results, nameof(results));
+        QueryDetection2D.ValidateAabbSize(size);
+        Vector2d halfExtents = size * Fixed64.Half;
+        Span<Vector2d> vertices = stackalloc Vector2d[4];
+        CreateAabbVertices(center, halfExtents, vertices);
+        return OverlapAreaAllCore(
+            vertices,
+            center,
+            center - halfExtents,
+            center + halfExtents,
+            layerMask,
+            results);
+    }
+
+    /// <summary>
+    /// Finds the closest active pure 2D collider overlapping the supplied convex polygon.
+    /// </summary>
+    public bool OverlapPolygon(ReadOnlySpan<Vector2d> vertices, out Physics2DHit hit)
+    {
+        return OverlapPolygon(vertices, PhysicsLayerMask.All, out hit);
+    }
+
+    /// <summary>
+    /// Finds the closest active pure 2D collider on an included layer overlapping the supplied convex polygon.
+    /// </summary>
+    public bool OverlapPolygon(ReadOnlySpan<Vector2d> vertices, PhysicsLayerMask layerMask, out Physics2DHit hit)
+    {
+        QueryDetection2D.ValidateConvexQueryPolygon(vertices);
+        Vector2d center = QueryDetection2D.CalculateAverageCenter(vertices);
+        CalculateAreaBounds(vertices, out Vector2d min, out Vector2d max);
+        return OverlapAreaCore(vertices, center, min, max, layerMask, out hit);
+    }
+
+    /// <summary>
+    /// Writes all active pure 2D colliders overlapping the supplied convex polygon into <paramref name="results"/>.
+    /// </summary>
+    /// <returns>The number of hits written to <paramref name="results"/>.</returns>
+    public int OverlapPolygonAll(ReadOnlySpan<Vector2d> vertices, SwiftList<Physics2DHit> results)
+    {
+        return OverlapPolygonAll(vertices, PhysicsLayerMask.All, results);
+    }
+
+    /// <summary>
+    /// Writes all active pure 2D colliders on included layers that overlap the supplied convex polygon.
+    /// </summary>
+    /// <returns>The number of hits written to <paramref name="results"/>.</returns>
+    public int OverlapPolygonAll(
+        ReadOnlySpan<Vector2d> vertices,
+        PhysicsLayerMask layerMask,
+        SwiftList<Physics2DHit> results)
+    {
+        SwiftThrowHelper.ThrowIfNull(results, nameof(results));
+        QueryDetection2D.ValidateConvexQueryPolygon(vertices);
+        Vector2d center = QueryDetection2D.CalculateAverageCenter(vertices);
+        CalculateAreaBounds(vertices, out Vector2d min, out Vector2d max);
+        return OverlapAreaAllCore(vertices, center, min, max, layerMask, results);
+    }
+
     private int OverlapCircleAllCore(
         Vector2d center,
         Fixed64 radius,
@@ -105,7 +253,7 @@ public sealed class GravitasQuery2DService
 
         results.FastClear();
         EnsureCandidateCapacity();
-        uint queryVersion = NextCircleQueryVersion();
+        uint queryVersion = NextOverlapQueryVersion();
         _context.Collisions2D.CollectBoundsCandidates(
             new Vector2d(center.X - radius, center.Y - radius),
             new Vector2d(center.X + radius, center.Y + radius),
@@ -125,6 +273,71 @@ public sealed class GravitasQuery2DService
                 results.Add(hit);
             }
         }
+
+        Physics2DHitSorter.SortByDistance(results);
+        return results.Count;
+    }
+
+    private bool OverlapAreaCore(
+        ReadOnlySpan<Vector2d> vertices,
+        Vector2d center,
+        Vector2d min,
+        Vector2d max,
+        PhysicsLayerMask layerMask,
+        out Physics2DHit hit)
+    {
+        EnsureCandidateCapacity();
+        uint queryVersion = NextOverlapQueryVersion();
+        _context.Collisions2D.CollectBoundsCandidates(
+            min,
+            max,
+            layerMask,
+            queryVersion,
+            raycastQuery: false,
+            _queryCandidates);
+
+        LastQueryCandidateCount = _queryCandidates.Count;
+        bool found = false;
+        Physics2DHit closest = default;
+        for (int i = 0; i < _queryCandidates.Count; i++)
+        {
+            if (!QueryDetection2D.TryOverlapPolygon(vertices, center, _queryCandidates[i], out Physics2DHit candidate)
+                || (found && !Physics2DHitSorter.ComesBefore(candidate, closest)))
+            {
+                continue;
+            }
+
+            closest = candidate;
+            found = true;
+        }
+
+        hit = closest;
+        return found;
+    }
+
+    private int OverlapAreaAllCore(
+        ReadOnlySpan<Vector2d> vertices,
+        Vector2d center,
+        Vector2d min,
+        Vector2d max,
+        PhysicsLayerMask layerMask,
+        SwiftList<Physics2DHit> results)
+    {
+        results.FastClear();
+        EnsureCandidateCapacity();
+        uint queryVersion = NextOverlapQueryVersion();
+        _context.Collisions2D.CollectBoundsCandidates(
+            min,
+            max,
+            layerMask,
+            queryVersion,
+            raycastQuery: false,
+            _queryCandidates);
+
+        LastQueryCandidateCount = _queryCandidates.Count;
+        for (int i = 0; i < _queryCandidates.Count; i++)
+            if (QueryDetection2D.TryOverlapPolygon(vertices, center, _queryCandidates[i], out Physics2DHit hit))
+                results.Add(hit);
 
         Physics2DHitSorter.SortByDistance(results);
         return results.Count;
@@ -389,12 +602,12 @@ public sealed class GravitasQuery2DService
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private uint NextCircleQueryVersion()
+    private uint NextOverlapQueryVersion()
     {
-        _circleQueryVersion++;
-        if (_circleQueryVersion == 0)
-            _circleQueryVersion = 1;
-        return _circleQueryVersion;
+        _overlapQueryVersion++;
+        if (_overlapQueryVersion == 0)
+            _overlapQueryVersion = 1;
+        return _overlapQueryVersion;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -421,6 +634,27 @@ public sealed class GravitasQuery2DService
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Vector2d CreateSweepMax(Vector2d first, Vector2d second, Fixed64 radius) =>
         new(FixedMath.Max(first.X, second.X) + radius, FixedMath.Max(first.Y, second.Y) + radius);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void CreateAabbVertices(Vector2d center, Vector2d halfExtents, Span<Vector2d> vertices)
+    {
+        vertices[0] = center - halfExtents;
+        vertices[1] = new Vector2d(center.X + halfExtents.X, center.Y - halfExtents.Y);
+        vertices[2] = center + halfExtents;
+        vertices[3] = new Vector2d(center.X - halfExtents.X, center.Y + halfExtents.Y);
+    }
+
+    private static void CalculateAreaBounds(ReadOnlySpan<Vector2d> vertices, out Vector2d min, out Vector2d max)
+    {
+        min = vertices[0];
+        max = min;
+        for (int i = 1; i < vertices.Length; i++)
+        {
+            Vector2d vertex = vertices[i];
+            min = new Vector2d(FixedMath.Min(min.X, vertex.X), FixedMath.Min(min.Y, vertex.Y));
+            max = new Vector2d(FixedMath.Max(max.X, vertex.X), FixedMath.Max(max.Y, vertex.Y));
+        }
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool IsEligibleSweepCandidate(LSCollider2D collider, LSCollider2D? excludedCollider, bool includeTriggers)

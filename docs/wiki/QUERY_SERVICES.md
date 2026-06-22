@@ -37,7 +37,8 @@ names an internal CCD proxy.
 | `Query3D.Raycast`, `RaycastAll` | bounded 3D segment | sphere, capsule, cuboid, finite cylinder, mesh, compound | `Exact`; mesh targets query triangle BVH candidates, compound targets keep owner identity | all-hit: distance, collider ID; closest: nearest deterministic candidate | service-owned scratch, caller-owned all-hit buffer |
 | `Query3D.SweepSphere`, `SweepSphereAll` | 3D sphere | sphere, capsule, cuboid, finite cylinder, mesh, compound | `Exact` swept-sphere reducers in `SweptSphereQueryWorker`; mesh uses triangle face/edge/vertex TOI, compound reduces stable part order | distance, collider ID | service-owned scratch, caller-owned all-hit buffer |
 | `Query3D.OverlapCircle`, `OverlapCircleInDirection`, `OverlapCircleAll` | X/Z circle proximity query | 3D colliders through closest-surface projection | `Exact` for the current X/Z proximity contract; this is not swept movement | distance, collider ID for all-hit | service-owned scratch, caller-owned all-hit buffer |
-| `Query2D.OverlapCircleAll` | 2D circle | circle, AABB, convex polygon, compound | `Exact`; compound reports owner once through stable part reduction | distance, collider ID | service-owned scratch, caller-owned all-hit buffer |
+| `Query2D.OverlapCircle`, `OverlapCircleAll` | 2D circle | circle, AABB, convex polygon, compound | `Exact`; compound reports owner once through stable part reduction | distance, collider ID | service-owned scratch, caller-owned all-hit buffer |
+| `Query2D.OverlapAabb`, `OverlapAabbAll`, `OverlapPolygon`, `OverlapPolygonAll` | 2D AABB or convex polygon area | circle, AABB, convex polygon, compound | `Exact` SAT/closest-point area overlap; compound reports owner once through stable part reduction | distance, collider ID | service-owned scratch, caller-owned all-hit buffer |
 | `Query2D.Raycast`, `RaycastAll` | 2D segment | circle, AABB, convex polygon, compound | `Exact`; zero-length segments return no hit, starting-inside returns distance zero | distance, collider ID | service-owned scratch, caller-owned all-hit buffer |
 | `Query2D.SweepCircle`, `SweepCircleAll` | 2D circle | circle, AABB, convex polygon, compound | `Exact` circle-source sweep reducers; compound reports owner once through earliest part | distance, collider ID | service-owned scratch, caller-owned all-hit buffer |
 | `QueryMixed.SweepSphereAgainst2D`, `SweepSphereAgainst2DAll` | 3D sphere | 2D circle slab, AABB slab, convex polygon slab, compound slab | circle slab: `Exact`; AABB/polygon prism bounds: `ConservativeFallback`; compound preserves the winning part label | distance, 3D collider ID, 2D collider ID | service-owned scratch, caller-owned all-hit buffer |
@@ -59,22 +60,15 @@ names an internal CCD proxy.
 
 ### Missing Query Families Ranked For Follow-Up
 
-1. Pure 2D AABB area queries: high end-user value for box-authored gameplay
-   queries, medium false-positive severity when approximated by circles, and
-   low-to-medium benchmark cost because existing 2D bounds and SAT helpers can
-   be reused.
-2. Pure 2D convex polygon area queries: high value for authored polygon zones,
-   high false-positive severity when approximated by circles/AABBs, and medium
-   benchmark cost due vertex projection and compound part reduction.
-3. Mixed finite-slab swept-circle reducers for cuboid, capsule, and finite
+1. Mixed finite-slab swept-circle reducers for cuboid, capsule, and finite
    cylinder targets: high value for mixed CCD/query truth, high false-positive
    severity because the current swept-sphere fallback can report early or extra
    hits, and medium benchmark cost if primitive reducers stay specialized.
-4. Mesh-as-source swept query families: medium-to-high end-user value for mesh
+2. Mesh-as-source swept query families: medium-to-high end-user value for mesh
    movers, but high benchmark risk and unbounded runtime cost for concave
    meshes. Runtime policy should prefer authored convex decomposition or compound
    source colliders until measured runtime mesh source reducers are justified.
-5. Mixed finite-slab reducers for mesh and compound targets: medium value and
+3. Mixed finite-slab reducers for mesh and compound targets: medium value and
    potentially high false-positive severity, but high benchmark cost. Implement
    after primitive mixed reducers produce stable policy and benchmark signal.
 
@@ -211,8 +205,18 @@ swept-sphere queries for deterministic 3D swept movement.
 
 `GravitasQuery2DService` exposes:
 
+- `OverlapCircle(center, radius, out hit)`
+- `OverlapCircle(center, radius, layerMask, out hit)`
 - `OverlapCircleAll(center, radius, results)`
 - `OverlapCircleAll(center, radius, layerMask, results)`
+- `OverlapAabb(center, size, out hit)`
+- `OverlapAabb(center, size, layerMask, out hit)`
+- `OverlapAabbAll(center, size, results)`
+- `OverlapAabbAll(center, size, layerMask, results)`
+- `OverlapPolygon(vertices, out hit)`
+- `OverlapPolygon(vertices, layerMask, out hit)`
+- `OverlapPolygonAll(vertices, results)`
+- `OverlapPolygonAll(vertices, layerMask, results)`
 - `Raycast(start, end, out hit)`
 - `Raycast(start, end, layerMask, out hit)`
 - `RaycastAll(start, end, results)`
@@ -224,8 +228,9 @@ swept-sphere queries for deterministic 3D swept movement.
 
 All-hit methods clear the caller-provided `SwiftList<Physics2DHit>`, write hits
 into it, return the hit count, and sort by distance with collider ID as the
-deterministic tie-breaker. Closest-hit `Raycast` and `SweepCircle` overloads use
-the same ordering and return the first hit through an `out Physics2DHit`.
+deterministic tie-breaker. Closest-hit overlap, `Raycast`, and `SweepCircle`
+overloads use the same ordering and return the first hit through an
+`out Physics2DHit`.
 
 Pure 2D query positions are `Vector2d` values in the X/Z plane. When hosts
 convert from a `FixedTransform`, use `Vector3d.ToVector2d()` so world X maps to
@@ -244,6 +249,13 @@ The overlap-circle candidate path is:
 7. include the collider when that closest point lies within the query radius or
    the shape contains the query center.
 8. sort hits by distance and collider ID.
+
+`OverlapAabb` and `OverlapPolygon` use the same GridForge-backed candidate
+gatherer with the query area's 2D bounds, then run exact fixed-point SAT and
+closest-point checks against circle, AABB, convex polygon, and compound targets.
+Polygon query vertices must be convex and non-collinear; edge-touching counts as
+overlap. The service validates and computes area bounds once before candidate
+testing so repeated candidate checks do not allocate or rebuild query shapes.
 
 The segment raycast path projects the segment's 2D bounds into the same
 GridForge-backed candidate gatherer, then runs deterministic shape math against
@@ -266,8 +278,7 @@ while movable dynamic targets are left to the relative dynamic CCD candidate
 index.
 
 Current hit data is `Physics2DHit`: collider, optional body, point, normal, and
-distance. AABB and polygon area-query APIs remain future 2D query hardening
-work.
+distance.
 
 ## Mixed Queries
 
@@ -386,7 +397,5 @@ unless another active plan explicitly takes ownership.
 - keep query benchmarks allocation-free as result ordering, filters, and shape
   support expand.
 - add shape-specific query tests for every collider type.
-- add pure 2D AABB and polygon area-query APIs once the shape math and
-  benchmark contract justify the public surface.
 - revisit explicit query state objects only when a real host requires
   concurrent queries against one context.

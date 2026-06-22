@@ -7,6 +7,7 @@
 
 using FixedMathSharp;
 using Gravitas.Colliders;
+using System;
 using System.Runtime.CompilerServices;
 
 namespace Gravitas.Queries;
@@ -43,6 +44,56 @@ internal static class QueryDetection2D
             : ResolveQueryFallbackNormal(center, collider.Center);
         hit = new Physics2DHit(collider, closest, normal, distance);
         return true;
+    }
+
+    internal static bool TryOverlapPolygon(
+        ReadOnlySpan<Vector2d> vertices,
+        Vector2d center,
+        LSCollider2D collider,
+        out Physics2DHit hit)
+    {
+        return TryOverlapConvexArea(center, vertices, collider, out hit);
+    }
+
+    internal static void ValidateAabbSize(Vector2d size)
+    {
+        SwiftThrowHelper.ThrowIfArgument(
+            size.X <= Fixed64.Zero || size.Y <= Fixed64.Zero,
+            nameof(size),
+            "2D AABB query size components must be greater than zero.");
+    }
+
+    internal static void ValidateConvexQueryPolygon(ReadOnlySpan<Vector2d> vertices)
+    {
+        SwiftThrowHelper.ThrowIfArgument(vertices.Length < 3, nameof(vertices), "2D polygon query must contain at least three vertices.");
+
+        int sign = 0;
+        for (int i = 0; i < vertices.Length; i++)
+        {
+            Vector2d a = vertices[i];
+            Vector2d b = vertices[(i + 1) % vertices.Length];
+            Vector2d c = vertices[(i + 2) % vertices.Length];
+            Fixed64 cross = Vector2d.CrossProduct(b - a, c - b);
+            SwiftThrowHelper.ThrowIfArgument(cross.Abs() <= Fixed64.Epsilon, nameof(vertices), "2D polygon query vertices must not be collinear.");
+
+            int currentSign = cross > Fixed64.Zero ? 1 : -1;
+            if (sign == 0)
+            {
+                sign = currentSign;
+                continue;
+            }
+
+            SwiftThrowHelper.ThrowIfArgument(currentSign != sign, nameof(vertices), "2D polygon query must be convex.");
+        }
+    }
+
+    internal static Vector2d CalculateAverageCenter(ReadOnlySpan<Vector2d> vertices)
+    {
+        Vector2d center = Vector2d.Zero;
+        for (int i = 0; i < vertices.Length; i++)
+            center += vertices[i];
+
+        return center / (Fixed64)vertices.Length;
     }
 
     internal static bool TryRaycast(Vector2d start, Vector2d end, LSCollider2D collider, out Physics2DHit hit)
@@ -231,6 +282,203 @@ internal static class QueryDetection2D
 
         hit = new Physics2DHit(compound, best.Point, best.Normal, best.Distance);
         return true;
+    }
+
+    private static bool TryOverlapConvexArea(
+        Vector2d center,
+        ReadOnlySpan<Vector2d> vertices,
+        LSCollider2D collider,
+        out Physics2DHit hit)
+    {
+        if (collider is LSCompoundCollider2D compound)
+            return TryOverlapConvexAreaCompound(center, vertices, compound, out hit);
+
+        bool overlaps = collider is LSCircleCollider2D circle
+            ? TryOverlapConvexAreaCircle(vertices, circle)
+            : TryOverlapConvexAreaConvex(vertices, collider);
+        if (!overlaps)
+        {
+            hit = default;
+            return false;
+        }
+
+        hit = BuildAreaOverlapHit(center, collider);
+        return true;
+    }
+
+    private static bool TryOverlapConvexAreaCompound(
+        Vector2d center,
+        ReadOnlySpan<Vector2d> vertices,
+        LSCompoundCollider2D compound,
+        out Physics2DHit hit)
+    {
+        bool found = false;
+        Physics2DHit best = default;
+        for (int i = 0; i < compound.PartCount; i++)
+        {
+            LSCollider2D part = compound.GetPartCollider(i);
+            if (!TryOverlapConvexArea(center, vertices, part, out Physics2DHit candidate))
+                continue;
+
+            if (!found || Physics2DHitSorter.ComesBefore(candidate, best))
+            {
+                best = candidate;
+                found = true;
+            }
+        }
+
+        if (!found)
+        {
+            hit = default;
+            return false;
+        }
+
+        hit = new Physics2DHit(compound, best.Point, best.Normal, best.Distance);
+        return true;
+    }
+
+    private static bool TryOverlapConvexAreaCircle(ReadOnlySpan<Vector2d> vertices, LSCircleCollider2D circle)
+    {
+        for (int i = 0; i < vertices.Length; i++)
+        {
+            Vector2d edge = vertices[(i + 1) % vertices.Length] - vertices[i];
+            if (!TryTestAreaCircleAxis(edge.RightHandNormal, vertices, circle))
+                return false;
+        }
+
+        Vector2d closest = ClosestPointOnConvexArea(circle.Center, vertices);
+        Vector2d circleAxis = closest - circle.Center;
+        return circleAxis.MagnitudeSquared <= Fixed64.Epsilon
+            || TryTestAreaCircleAxis(circleAxis, vertices, circle);
+    }
+
+    private static bool TryOverlapConvexAreaConvex(ReadOnlySpan<Vector2d> vertices, LSCollider2D collider)
+    {
+        for (int i = 0; i < vertices.Length; i++)
+        {
+            Vector2d edge = vertices[(i + 1) % vertices.Length] - vertices[i];
+            if (!TryTestAreaConvexAxis(edge.RightHandNormal, vertices, collider))
+                return false;
+        }
+
+        for (int i = 0; i < collider.VertexCount; i++)
+        {
+            Vector2d edge = collider.GetVertexUnchecked((i + 1) % collider.VertexCount) - collider.GetVertexUnchecked(i);
+            if (!TryTestAreaConvexAxis(edge.RightHandNormal, vertices, collider))
+                return false;
+        }
+
+        return true;
+    }
+
+    private static Physics2DHit BuildAreaOverlapHit(Vector2d center, LSCollider2D collider)
+    {
+        Vector2d point = collider.ContainsPoint(center)
+            ? center
+            : collider.GetClosestPoint(center);
+        Vector2d delta = center - point;
+        Fixed64 distanceSquared = delta.MagnitudeSquared;
+        Fixed64 distance = distanceSquared > Fixed64.Zero ? FixedMath.Sqrt(distanceSquared) : Fixed64.Zero;
+        Vector2d normal = distance > Fixed64.Zero
+            ? delta / distance
+            : ResolveQueryFallbackNormal(center, collider.Center);
+        return new Physics2DHit(collider, point, normal, distance);
+    }
+
+    private static bool TryTestAreaCircleAxis(Vector2d axis, ReadOnlySpan<Vector2d> vertices, LSCircleCollider2D circle)
+    {
+        if (axis.MagnitudeSquared <= Fixed64.Epsilon)
+            return true;
+
+        axis = axis.Normalized;
+        ProjectVertices(vertices, axis, out Fixed64 areaMin, out Fixed64 areaMax);
+        Fixed64 circleCenter = Vector2d.Dot(circle.Center, axis);
+        Fixed64 circleMin = circleCenter - circle.ScaledRadius;
+        Fixed64 circleMax = circleCenter + circle.ScaledRadius;
+        return areaMax >= circleMin && circleMax >= areaMin;
+    }
+
+    private static bool TryTestAreaConvexAxis(Vector2d axis, ReadOnlySpan<Vector2d> vertices, LSCollider2D collider)
+    {
+        if (axis.MagnitudeSquared <= Fixed64.Epsilon)
+            return true;
+
+        axis = axis.Normalized;
+        ProjectVertices(vertices, axis, out Fixed64 areaMin, out Fixed64 areaMax);
+        ProjectConvex(collider, axis, out Fixed64 colliderMin, out Fixed64 colliderMax);
+        return areaMax >= colliderMin && colliderMax >= areaMin;
+    }
+
+    private static void ProjectVertices(ReadOnlySpan<Vector2d> vertices, Vector2d axis, out Fixed64 min, out Fixed64 max)
+    {
+        min = Vector2d.Dot(vertices[0], axis);
+        max = min;
+        for (int i = 1; i < vertices.Length; i++)
+        {
+            Fixed64 projection = Vector2d.Dot(vertices[i], axis);
+            if (projection < min)
+                min = projection;
+            else if (projection > max)
+                max = projection;
+        }
+    }
+
+    private static Vector2d ClosestPointOnConvexArea(Vector2d point, ReadOnlySpan<Vector2d> vertices)
+    {
+        if (ContainsPointInConvexArea(point, vertices))
+            return point;
+
+        Fixed64 bestDistance = Fixed64.MaxValue;
+        Vector2d bestPoint = vertices[0];
+        for (int i = 0; i < vertices.Length; i++)
+        {
+            Vector2d candidate = ClosestPointOnSegment(point, vertices[i], vertices[(i + 1) % vertices.Length]);
+            Fixed64 distance = Vector2d.DistanceSquared(point, candidate);
+            if (distance >= bestDistance)
+                continue;
+
+            bestDistance = distance;
+            bestPoint = candidate;
+        }
+
+        return bestPoint;
+    }
+
+    private static bool ContainsPointInConvexArea(Vector2d point, ReadOnlySpan<Vector2d> vertices)
+    {
+        bool hasPositive = false;
+        bool hasNegative = false;
+        for (int i = 0; i < vertices.Length; i++)
+        {
+            Vector2d a = vertices[i];
+            Vector2d b = vertices[(i + 1) % vertices.Length];
+            Fixed64 cross = Vector2d.CrossProduct(b - a, point - a);
+            if (cross > Fixed64.Epsilon)
+                hasPositive = true;
+            else if (cross < -Fixed64.Epsilon)
+                hasNegative = true;
+
+            if (hasPositive && hasNegative)
+                return false;
+        }
+
+        return true;
+    }
+
+    private static Vector2d ClosestPointOnSegment(Vector2d point, Vector2d a, Vector2d b)
+    {
+        Vector2d segment = b - a;
+        Fixed64 lengthSquared = segment.MagnitudeSquared;
+        if (lengthSquared <= Fixed64.Epsilon)
+            return a;
+
+        Fixed64 t = Vector2d.Dot(point - a, segment) / lengthSquared;
+        if (t <= Fixed64.Zero)
+            return a;
+        if (t >= Fixed64.One)
+            return b;
+
+        return a + segment * t;
     }
 
     private static bool TryRaycastCompound(

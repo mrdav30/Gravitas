@@ -156,8 +156,13 @@ only.
 Pure 2D queries live on `GravitasWorldContext.Query2D`:
 
 ```csharp
+context.Query2D.OverlapCircle(center, radius, out Physics2DHit circleHit);
 context.Query2D.OverlapCircleAll(center, radius, results);
 context.Query2D.OverlapCircleAll(center, radius, layerMask, results);
+context.Query2D.OverlapAabb(center, size, out Physics2DHit areaHit);
+context.Query2D.OverlapAabbAll(center, size, layerMask, results);
+context.Query2D.OverlapPolygon(vertices, out Physics2DHit polygonHit);
+context.Query2D.OverlapPolygonAll(vertices, layerMask, results);
 context.Query2D.Raycast(start, end, out Physics2DHit hit);
 context.Query2D.RaycastAll(start, end, layerMask, results);
 context.Query2D.SweepCircle(start, end, radius, out Physics2DHit hit);
@@ -167,10 +172,12 @@ context.Query2D.SweepCircleAll(start, end, radius, layerMask, results);
 All-hit overloads write into caller-owned `SwiftList<Physics2DHit>` buffers,
 run GridForge-backed partition candidate gathering with duplicate suppression,
 run layer-mask and exact 2D shape checks, and sort by deterministic hit
-ordering. `Raycast` returns the closest segment hit from `start` to `end` using
-the same distance and collider-ID ordering as `RaycastAll`. `SweepCircle` is the
-pure 2D swept movement/query path used by 2D CCD. Compound 2D query hits report
-the owning `LSCompoundCollider2D`, not its private part colliders.
+ordering. `OverlapAabb` and `OverlapPolygon` run exact fixed-point 2D area
+checks against circle, AABB, convex polygon, and compound colliders. `Raycast`
+returns the closest segment hit from `start` to `end` using the same distance
+and collider-ID ordering as `RaycastAll`. `SweepCircle` is the pure 2D swept
+movement/query path used by 2D CCD. Compound 2D query hits report the owning
+`LSCompoundCollider2D`, not its private part colliders.
 
 The existing `GravitasQuery3DService` is a 3D X/Z ground-plane proximity
 query. It is not the pure 2D query API.

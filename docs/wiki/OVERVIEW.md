@@ -137,9 +137,9 @@ Pure 2D scenes use the same context and clock, set
 `LSCollider2D` shapes and `StiffBody2D` bodies from host `IMatterAgent`
 instances. The current 2D path supports circles, axis-aligned boxes, convex
 polygons, bodyless static/trigger colliders, deterministic collision response,
-contact events, sleep/wake behavior, replay tests, overlap-circle queries,
-segment raycasts, and swept-circle queries. `PhysicsRuntimeMode.Both` runs pure
-2D and pure 3D side by side without cross-dimensional contacts, while
+contact events, sleep/wake behavior, replay tests, circle/AABB/polygon overlap
+queries, segment raycasts, and swept-circle queries. `PhysicsRuntimeMode.Both`
+runs pure 2D and pure 3D side by side without cross-dimensional contacts, while
 `PhysicsRuntimeMode.Mixed` enables the dedicated mixed lifecycle, broad-phase,
 narrow-phase, and constrained response path.
 
@@ -169,8 +169,8 @@ identity. Contact events are emitted from the active-pair queue during
 
 - The original 3D path remains the mature runtime path. The pure 2D path is an
   alpha slice with circle, axis-aligned box, convex polygon, compound colliders,
-  overlap/raycast/swept-circle queries, two-contact manifolds, scalar angular
-  response, and pair-local warm-started response coverage.
+  exact area/raycast/swept-circle queries, two-contact manifolds, scalar
+  angular response, and pair-local warm-started response coverage.
 - `StiffBody` has a split 2D ground position plus height for the existing 3D
   y-up model, but that is not the pure 2D body model.
 - Mixed 2D/3D interaction now has a first alpha implementation. The runtime has

@@ -5,6 +5,7 @@ using Gravitas.CollisionHandling;
 using Gravitas.Queries;
 using GridForge.Configuration;
 using SwiftCollections;
+using System;
 using System.Runtime.CompilerServices;
 
 namespace Gravitas.Benchmarks;
@@ -342,6 +343,28 @@ public class Physics2DBenchmarks
             new Vector2d((Fixed64)12, (Fixed64)12),
             (Fixed64)18,
             _queryHits);
+    }
+
+    [Benchmark]
+    public int OverlapAabbAll()
+    {
+        return _queryContext.Query2D.OverlapAabbAll(
+            new Vector2d((Fixed64)12, (Fixed64)12),
+            new Vector2d((Fixed64)36, (Fixed64)36),
+            _queryHits);
+    }
+
+    [Benchmark]
+    public int OverlapPolygonAll()
+    {
+        ReadOnlySpan<Vector2d> vertices = stackalloc Vector2d[]
+        {
+            new Vector2d((Fixed64)(-6), (Fixed64)(-4)),
+            new Vector2d((Fixed64)30, (Fixed64)(-4)),
+            new Vector2d((Fixed64)34, (Fixed64)24),
+            new Vector2d((Fixed64)(-2), (Fixed64)28)
+        };
+        return _queryContext.Query2D.OverlapPolygonAll(vertices, _queryHits);
     }
 
     [Benchmark]

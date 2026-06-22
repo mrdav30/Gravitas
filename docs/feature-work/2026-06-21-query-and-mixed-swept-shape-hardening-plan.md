@@ -17,12 +17,11 @@
 ## Purpose
 
 The query services are now context-owned and deterministic, with 3D raycast,
-swept-sphere, X/Z area queries, pure 2D overlap/raycast/swept-circle, and mixed
-2D/3D swept APIs. The remaining gaps are sharper: pure 2D does not yet expose
-AABB or polygon area-query APIs, mesh-as-source swept query families are still
-future hardening, and mixed swept-circle queries are exact for 3D sphere targets
-but conservative for cuboid, capsule, finite cylinder, mesh, and compound
-targets.
+swept-sphere, X/Z area queries, pure 2D circle/AABB/polygon
+overlap/raycast/swept-circle APIs, and mixed 2D/3D swept APIs. The remaining
+gaps are sharper: mesh-as-source swept query families are still future
+hardening, and mixed swept-circle queries are exact for 3D sphere targets but
+conservative for cuboid, capsule, finite cylinder, mesh, and compound targets.
 
 For a first-class physics engine, those limitations need explicit reducer
 policy, tests, benchmarks, and docs. A public query API that works by
@@ -43,9 +42,9 @@ and known not to create false negatives.
 
 - 3D query services expose raycast, swept-sphere, overlap-circle, and
   proximity-style X/Z queries with caller-owned hit buffers.
-- Pure 2D query services expose overlap-circle, segment raycast, swept-circle,
-  and static-style swept-circle collectors used by 2D CCD.
-- Pure 2D AABB and polygon area-query APIs remain future work.
+- Pure 2D query services expose circle, AABB, and convex polygon overlap
+  queries, segment raycasts, swept-circle queries, and static-style
+  swept-circle collectors used by 2D CCD.
 - Mixed `SweepSphereAgainst2D` treats 2D shapes as finite slabs/prisms.
 - Mixed `SweepCircleAgainst3D` uses an exact finite-slab projection for 3D
   sphere targets.
@@ -97,27 +96,43 @@ mesh-as-source sweep APIs until Workstream 4 chooses a benchmark-backed runtime
 policy. Missing query families were ranked for follow-up: pure 2D AABB area
 queries, pure 2D convex polygon area queries, mixed primitive finite-slab
 swept-circle reducers, mesh-as-source sweeps, and mixed mesh/compound finite
-slab reducers.
+slab reducers. Workstream 2 closes the pure 2D AABB and convex polygon area
+query entries.
 
 ## Workstream 2: Pure 2D Area Query Parity
 
 **Problem**
 
-Pure 2D has overlap-circle and segment raycasts, but lacks AABB and convex
+Pure 2D had overlap-circle and segment raycasts, but lacked AABB and convex
 polygon area-query APIs. Hosts that already author 2D boxes or polygons should
 not need to approximate every area query with a circle.
 
 **Tasks**
 
-- [ ] Add tests for `OverlapAabb2D` style queries against circle, AABB, convex
+- [x] Add tests for `OverlapAabb2D` style queries against circle, AABB, convex
   polygon, and compound colliders.
-- [ ] Add tests for convex polygon area queries, including separated,
+- [x] Add tests for convex polygon area queries, including separated,
   edge-touching, full-overlap, and compound-part cases.
-- [ ] Reuse `QueryDetection2D` and existing collision SAT helpers where they
+- [x] Reuse `QueryDetection2D` and existing collision SAT helpers where they
   preserve deterministic ordering and avoid allocations.
-- [ ] Expose single-hit and all-hit APIs with caller-owned `SwiftList` buffers,
+- [x] Expose single-hit and all-hit APIs with caller-owned `SwiftList` buffers,
   matching existing 2D query naming and layer/trigger semantics.
-- [ ] Update query docs and benchmarks for 2D area-query parity.
+- [x] Update query docs and benchmarks for 2D area-query parity.
+
+**Progress 2026-06-22:** Workstream 2 added exact pure 2D AABB and convex
+polygon area queries through `GravitasQuery2DService.OverlapAabb`,
+`OverlapAabbAll`, `OverlapPolygon`, and `OverlapPolygonAll`, and closed the
+legacy closest-hit gap with `OverlapCircle`. The service
+validates area inputs once, gathers GridForge-backed 2D bounds candidates, runs
+allocation-free fixed-point SAT/closest-point checks in `QueryDetection2D`, and
+sorts all-hit buffers by distance then collider ID. Compound targets reduce to
+their owning `LSCompoundCollider2D` through stable best-part selection.
+
+Focused coverage now includes AABB queries against circle, AABB, convex
+polygon, and compound-style scenes, polygon queries for separated,
+edge-touching, full-overlap, closest-hit, and compound owner behavior, and an
+after-warmup allocation guard for both area-query families. Query docs and 2D
+benchmark rows were updated for general and compound target scenes.
 
 ## Workstream 3: Mixed Finite-Slab Swept-Circle Solvers
 
