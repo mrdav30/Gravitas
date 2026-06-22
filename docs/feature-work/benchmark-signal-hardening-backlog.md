@@ -65,6 +65,7 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 | Grounding raycast probe allocation | Open | Medium | This backlog |
 | 3D shape-exact false-positive cost | Open | Medium | This backlog |
 | Pure 2D dynamic CCD candidate asymmetry | Open | Medium | This backlog |
+| SwiftCollections sort hot-path allocation | Mitigated in Gravitas, lower-stack open | Medium | This backlog |
 
 ## Signal: 3D Full-Runtime CCD Allocation
 
@@ -79,9 +80,10 @@ rows were effectively allocation-clean.
 **Update 2026-06-21:** Discrete response Workstream 3 reproduced the related
 steady-state CCD guardrail failures in xUnit after the 3D full-step phase order
 started exercising collision distribution during measured CCD frames. Root cause
-was comparer-based `Array.Sort` through `SwiftList.Sort` in the collision
-distribution/island hot path. Gravitas now uses allocation-free in-place sorts
-for active partitions, island buffers, and per-partition collider ID copies.
+was comparer-based `Array.Sort` through package sorting in the collision
+distribution/island hot path. Gravitas now uses a centralized allocation-free
+runtime sort helper for active partitions, island buffers, and per-partition
+collider ID copies.
 The focused Release allocation guardrails for 3D substep, shape-exact
 translational, and rotational CCD now pass under full `Simulate` +
 `LateSimulate` measurement. `simulation-allocation` smoke also reported `0 B/op`
@@ -115,6 +117,50 @@ sub-actions before changing runtime source.
 **Closure criteria:** The allocation source is identified and either removed or
 documented as benchmark-only. A test or benchmark row prevents the same signal
 from becoming invisible.
+
+## Signal: SwiftCollections Sort Hot-Path Allocation
+
+**Discovered:** 2026-06-22
+
+**Evidence:** During the post-SwiftCollections v5.1.0 Workstream 3 cleanup,
+replacing Gravitas' local sort helpers with package
+`SwiftList<T>.SortInPlace(...)` and `SwiftSparseSet.CopySortedKeysTo(...)`
+caused the Release allocation guardrails to fail. The full suite reported
+recurring allocations in 3D CCD, pure 2D CCD, pure 2D broad phase, and 2D
+query tests. The isolated
+`Physics2DQueryTests.RaycastAll_ShouldNotAllocateAfterWarmup` test reproduced
+the issue at `128 B` after warmup.
+
+**Mitigation:** Gravitas now centralizes measured hot-path ordering through
+`SwiftListSortUtility`, a reusable allocation-free heap sort over caller-owned
+`SwiftList<T>` buffers. Partition single-source copies use
+`SwiftSparseSet.CopyKeysTo(...)` followed by the same no-allocation sorter;
+merged buckets append and sort once. The package sort APIs remain acceptable
+for non-simulation setup paths such as lifecycle hook registration.
+
+**Why it matters:** `SwiftCollections` is the lower-stack collection layer for
+LSF. Its scratch-buffer sort APIs should be safe for deterministic physics hot
+paths so consumers do not need local workarounds.
+
+**Next isolation step:** Fix and measure `SwiftList<T>.SortInPlace(...)` and
+`CopySortedKeysTo(...)` in SwiftCollections so they avoid recurring managed
+allocation, then replace `SwiftListSortUtility` usages in Gravitas and rerun
+the Release and ReleaseLean allocation guardrails.
+
+**Likely files:**
+
+- `../SwiftCollections/src/SwiftCollections/Collection/SwiftList.cs`
+- `../SwiftCollections/src/SwiftCollections/Collection/SwiftSparseSet.cs`
+- `src/Gravitas/Support/SwiftListSortUtility.cs`
+- `src/Gravitas/Core/GravitasCollisionService.cs`
+- `src/Gravitas/Core/GravitasPhysics2DService.cs`
+- `src/Gravitas/Core/GravitasCollision2DService.cs`
+- `src/Gravitas/Core/GravitasMixedCollisionService.cs`
+- `src/Gravitas/Partitions/*Partition*.cs`
+
+**Closure criteria:** SwiftCollections provides no-recurring-allocation sort
+and sorted-key copy APIs, Gravitas removes `SwiftListSortUtility`, and the
+same allocation guardrails pass under Release and ReleaseLean.
 
 ## Signal: Grounding Raycast Probe Allocation
 
@@ -244,9 +290,10 @@ Promote a signal from this backlog into a dedicated dated plan when it has:
 ## Current Recommendation
 
 Re-run the `continuous-collision-evidence` rows after the Workstream 3
-allocation-free sort fix before optimizing the remaining CCD cost signals. If
-the original full-runtime CCD allocation is gone, close or downgrade that signal
-and move to the grounding raycast allocation RCA because it now has the clearest
-repeatable managed-allocation evidence in the simulation-allocation smoke. After
-allocation sources are explained, revisit the shape-exact and 2D dynamic CCD
-cost signals with fresh evidence so their timings are easier to interpret.
+centralized no-allocation sort fix before optimizing the remaining CCD cost
+signals. If the original full-runtime CCD allocation is gone, close or downgrade
+that signal and move to the grounding raycast allocation RCA because it now has
+the clearest repeatable managed-allocation evidence in the simulation-allocation
+smoke. After allocation sources are explained, revisit the shape-exact and 2D
+dynamic CCD cost signals with fresh evidence so their timings are easier to
+interpret.

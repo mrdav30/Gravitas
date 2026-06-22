@@ -121,14 +121,14 @@ public class PhysicsPartition : IVoxelPartition
 
     private static void CopySortedIds(SwiftSparseSet? source, SwiftList<int> destination)
     {
-        destination.FastClear();
         if (source == null)
+        {
+            destination.FastClear();
             return;
+        }
 
-        for (int i = 0; i < source.Count; i++)
-            destination.Add(source.DenseKeys[i]);
-
-        SortColliderIdsIfNeeded(destination);
+        source.CopyKeysTo(destination);
+        SwiftListSortUtility.SortAscendingInPlace(destination);
     }
 
     private void CopySortedStaticStyleIds(SwiftList<int> destination)
@@ -136,7 +136,7 @@ public class PhysicsPartition : IVoxelPartition
         destination.FastClear();
         CopyIds(ContainedKinematicObjects, destination);
         CopyIds(ContainedStaticObjects, destination);
-        SortColliderIdsIfNeeded(destination);
+        SwiftListSortUtility.SortAscendingInPlace(destination);
     }
 
     internal void CopyAllColliderIds(SwiftList<int> destination)
@@ -145,7 +145,7 @@ public class PhysicsPartition : IVoxelPartition
         CopyIds(ContainedDynamicObjects, destination);
         CopyIds(ContainedKinematicObjects, destination);
         CopyIds(ContainedStaticObjects, destination);
-        SortColliderIdsIfNeeded(destination);
+        SwiftListSortUtility.SortAscendingInPlace(destination);
     }
 
     internal void CopyStaticStyleColliderIds(SwiftList<int> destination)
@@ -153,7 +153,7 @@ public class PhysicsPartition : IVoxelPartition
         destination.FastClear();
         CopyIds(ContainedKinematicObjects, destination);
         CopyIds(ContainedStaticObjects, destination);
-        SortColliderIdsIfNeeded(destination);
+        SwiftListSortUtility.SortAscendingInPlace(destination);
     }
 
     private static void CopyIds(SwiftSparseSet? source, SwiftList<int> destination)
@@ -163,22 +163,6 @@ public class PhysicsPartition : IVoxelPartition
 
         for (int i = 0; i < source.Count; i++)
             destination.Add(source.DenseKeys[i]);
-    }
-
-    private static void SortColliderIdsIfNeeded(SwiftList<int> ids)
-    {
-        for (int i = 1; i < ids.Count; i++)
-        {
-            int value = ids[i];
-            int j = i - 1;
-            while (j >= 0 && ids[j] > value)
-            {
-                ids[j + 1] = ids[j];
-                j--;
-            }
-
-            ids[j + 1] = value;
-        }
     }
 
     private void ProcessPair(int id1, int id2)

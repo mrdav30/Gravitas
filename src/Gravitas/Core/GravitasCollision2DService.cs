@@ -12,6 +12,7 @@ using GridForge.Grids;
 using GridForge.Spatial;
 using GridForge.Utility;
 using SwiftCollections;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
 namespace Gravitas;
@@ -22,6 +23,8 @@ namespace Gravitas;
 public sealed class GravitasCollision2DService
 {
     private const int DefaultPartitionPoolCapacity = 1024;
+    private static readonly PhysicsPartition2DOrderComparer PartitionOrderComparer = new();
+    private static readonly Collider2DIdComparer ColliderIdComparer = new();
 
     private readonly GravitasWorldContext _context;
     private readonly SwiftBucket<PhysicsPartition2D> _activePartitions = new(DefaultPartitionPoolCapacity);
@@ -260,7 +263,7 @@ public sealed class GravitasCollision2DService
         foreach (PhysicsPartition2D partition in _activePartitions)
             _distributionPartitions.Add(partition);
 
-        SortPartitions(_distributionPartitions);
+        SwiftListSortUtility.SortInPlace(_distributionPartitions, PartitionOrderComparer);
 
         _isDistributing = true;
         try
@@ -309,7 +312,7 @@ public sealed class GravitasCollision2DService
         candidates.FastClear();
 
         CollectCoveredPartitions(min, max, _queryPartitions);
-        SortPartitions(_queryPartitions);
+        SwiftListSortUtility.SortInPlace(_queryPartitions, PartitionOrderComparer);
 
         for (int i = 0; i < _queryPartitions.Count; i++)
         {
@@ -339,7 +342,7 @@ public sealed class GravitasCollision2DService
             }
         }
 
-        SortCollidersById(candidates);
+        SwiftListSortUtility.SortInPlace(candidates, ColliderIdComparer);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -749,169 +752,52 @@ public sealed class GravitasCollision2DService
         _inactivePartitionPool.Push(partition);
     }
 
-    private static void SortPartitions(SwiftList<PhysicsPartition2D> partitions)
+    private sealed class PhysicsPartition2DOrderComparer : IComparer<PhysicsPartition2D>
     {
-        if (partitions.Count < 2)
-            return;
-
-        QuickSortPartitions(partitions, 0, partitions.Count - 1);
-    }
-
-    private static void QuickSortPartitions(SwiftList<PhysicsPartition2D> partitions, int left, int right)
-    {
-        while (left < right)
+        public int Compare(PhysicsPartition2D? left, PhysicsPartition2D? right)
         {
-            if (right - left <= 16)
-            {
-                InsertionSortPartitions(partitions, left, right);
-                return;
-            }
+            if (ReferenceEquals(left, right))
+                return 0;
+            if (left == null)
+                return -1;
+            if (right == null)
+                return 1;
 
-            int i = left;
-            int j = right;
-            PhysicsPartition2D pivot = partitions[left + ((right - left) / 2)];
-            while (i <= j)
-            {
-                while (ComparePartitions(partitions[i], pivot) < 0)
-                    i++;
-                while (ComparePartitions(partitions[j], pivot) > 0)
-                    j--;
+            WorldVoxelIndex leftIndex = left.WorldIndex;
+            WorldVoxelIndex rightIndex = right.WorldIndex;
 
-                if (i > j)
-                    continue;
+            int compare = leftIndex.GridIndex.CompareTo(rightIndex.GridIndex);
+            if (compare != 0)
+                return compare;
 
-                if (i != j)
-                    (partitions[i], partitions[j]) = (partitions[j], partitions[i]);
+            compare = leftIndex.GridSpawnToken.CompareTo(rightIndex.GridSpawnToken);
+            if (compare != 0)
+                return compare;
 
-                i++;
-                j--;
-            }
+            compare = leftIndex.VoxelIndex.x.CompareTo(rightIndex.VoxelIndex.x);
+            if (compare != 0)
+                return compare;
 
-            if (j - left < right - i)
-            {
-                if (left < j)
-                    QuickSortPartitions(partitions, left, j);
+            compare = leftIndex.VoxelIndex.z.CompareTo(rightIndex.VoxelIndex.z);
+            if (compare != 0)
+                return compare;
 
-                left = i;
-            }
-            else
-            {
-                if (i < right)
-                    QuickSortPartitions(partitions, i, right);
-
-                right = j;
-            }
+            return leftIndex.VoxelIndex.y.CompareTo(rightIndex.VoxelIndex.y);
         }
     }
 
-    private static void InsertionSortPartitions(SwiftList<PhysicsPartition2D> partitions, int left, int right)
+    private sealed class Collider2DIdComparer : IComparer<LSCollider2D>
     {
-        for (int i = left + 1; i <= right; i++)
+        public int Compare(LSCollider2D? left, LSCollider2D? right)
         {
-            PhysicsPartition2D value = partitions[i];
-            int index = i - 1;
-            while (index >= left && ComparePartitions(partitions[index], value) > 0)
-            {
-                partitions[index + 1] = partitions[index];
-                index--;
-            }
+            if (ReferenceEquals(left, right))
+                return 0;
+            if (left == null)
+                return -1;
+            if (right == null)
+                return 1;
 
-            partitions[index + 1] = value;
+            return left.Id.CompareTo(right.Id);
         }
-    }
-
-    private static void SortCollidersById(SwiftList<LSCollider2D> colliders)
-    {
-        if (colliders.Count < 2)
-            return;
-
-        QuickSortCollidersById(colliders, 0, colliders.Count - 1);
-    }
-
-    private static void QuickSortCollidersById(SwiftList<LSCollider2D> colliders, int left, int right)
-    {
-        while (left < right)
-        {
-            if (right - left <= 16)
-            {
-                InsertionSortCollidersById(colliders, left, right);
-                return;
-            }
-
-            int i = left;
-            int j = right;
-            LSCollider2D pivot = colliders[left + ((right - left) / 2)];
-            while (i <= j)
-            {
-                while (colliders[i].Id < pivot.Id)
-                    i++;
-                while (colliders[j].Id > pivot.Id)
-                    j--;
-
-                if (i > j)
-                    continue;
-
-                if (i != j)
-                    (colliders[i], colliders[j]) = (colliders[j], colliders[i]);
-
-                i++;
-                j--;
-            }
-
-            if (j - left < right - i)
-            {
-                if (left < j)
-                    QuickSortCollidersById(colliders, left, j);
-
-                left = i;
-            }
-            else
-            {
-                if (i < right)
-                    QuickSortCollidersById(colliders, i, right);
-
-                right = j;
-            }
-        }
-    }
-
-    private static void InsertionSortCollidersById(SwiftList<LSCollider2D> colliders, int left, int right)
-    {
-        for (int i = left + 1; i <= right; i++)
-        {
-            LSCollider2D value = colliders[i];
-            int index = i - 1;
-            while (index >= left && colliders[index].Id > value.Id)
-            {
-                colliders[index + 1] = colliders[index];
-                index--;
-            }
-
-            colliders[index + 1] = value;
-        }
-    }
-
-    private static int ComparePartitions(PhysicsPartition2D left, PhysicsPartition2D right)
-    {
-        WorldVoxelIndex leftIndex = left.WorldIndex;
-        WorldVoxelIndex rightIndex = right.WorldIndex;
-
-        int compare = leftIndex.GridIndex.CompareTo(rightIndex.GridIndex);
-        if (compare != 0)
-            return compare;
-
-        compare = leftIndex.GridSpawnToken.CompareTo(rightIndex.GridSpawnToken);
-        if (compare != 0)
-            return compare;
-
-        compare = leftIndex.VoxelIndex.x.CompareTo(rightIndex.VoxelIndex.x);
-        if (compare != 0)
-            return compare;
-
-        compare = leftIndex.VoxelIndex.z.CompareTo(rightIndex.VoxelIndex.z);
-        if (compare != 0)
-            return compare;
-
-        return leftIndex.VoxelIndex.y.CompareTo(rightIndex.VoxelIndex.y);
     }
 }

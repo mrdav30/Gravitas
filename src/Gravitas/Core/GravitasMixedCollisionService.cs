@@ -13,6 +13,7 @@ using GridForge.Grids;
 using GridForge.Spatial;
 using GridForge.Utility;
 using SwiftCollections;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
 namespace Gravitas;
@@ -23,6 +24,10 @@ namespace Gravitas;
 internal sealed class GravitasMixedCollisionService
 {
     private const int DefaultPartitionPoolCapacity = 1024;
+    private static readonly PhysicsMixedPartitionOrderComparer PartitionOrderComparer = new();
+    private static readonly MixedColliderKeyComparer CandidatePairComparer = new();
+    private static readonly Collider2DIdComparer Collider2DIdOrderComparer = new();
+    private static readonly Collider3DIdComparer Collider3DIdOrderComparer = new();
 
     private readonly GravitasWorldContext _context;
     private readonly SwiftBucket<PhysicsMixedPartition> _activePartitions = new(DefaultPartitionPoolCapacity);
@@ -111,7 +116,7 @@ internal sealed class GravitasMixedCollisionService
         foreach (PhysicsMixedPartition partition in _activePartitions)
             _distributionPartitions.Add(partition);
 
-        SortPartitions(_distributionPartitions);
+        SwiftListSortUtility.SortInPlace(_distributionPartitions, PartitionOrderComparer);
         for (int i = 0; i < _distributionPartitions.Count; i++)
         {
             _distributionPartitions[i].Distribute(
@@ -125,7 +130,7 @@ internal sealed class GravitasMixedCollisionService
                 _distributionStatic2DIds);
         }
 
-        SortCandidatePairs(_candidatePairs);
+        SwiftListSortUtility.SortInPlace(_candidatePairs, CandidatePairComparer);
         LastBroadPhaseCandidateCount = _candidatePairs.Count;
         int frame = _context.FrameCount;
         for (int i = 0; i < _candidatePairs.Count; i++)
@@ -420,7 +425,7 @@ internal sealed class GravitasMixedCollisionService
         Refresh2DColliderPartitionsForQuery(cachePartitionRefresh);
         candidates.FastClear();
         CollectCoveredMixedQueryPartitions(min, max, _queryPartitions);
-        SortPartitions(_queryPartitions);
+        SwiftListSortUtility.SortInPlace(_queryPartitions, PartitionOrderComparer);
         _queryColliderRedundancy.Clear();
 
         for (int i = 0; i < _queryPartitions.Count; i++)
@@ -446,7 +451,7 @@ internal sealed class GravitasMixedCollisionService
         }
 
         _queryColliderRedundancy.Clear();
-        Sort2DCollidersById(candidates);
+        SwiftListSortUtility.SortInPlace(candidates, Collider2DIdOrderComparer);
     }
 
     internal void Collect3DCandidatesInMixedBounds(
@@ -461,7 +466,7 @@ internal sealed class GravitasMixedCollisionService
         Refresh3DColliderPartitionsForQuery(cachePartitionRefresh);
         candidates.FastClear();
         CollectCoveredMixedQueryPartitions(min, max, _queryPartitions);
-        SortPartitions(_queryPartitions);
+        SwiftListSortUtility.SortInPlace(_queryPartitions, PartitionOrderComparer);
         _queryColliderRedundancy.Clear();
 
         for (int i = 0; i < _queryPartitions.Count; i++)
@@ -487,7 +492,7 @@ internal sealed class GravitasMixedCollisionService
         }
 
         _queryColliderRedundancy.Clear();
-        Sort3DCollidersById(candidates);
+        SwiftListSortUtility.SortInPlace(candidates, Collider3DIdOrderComparer);
     }
 
     internal void RemovePairsFor3DCollider(LSCollider collider)
@@ -1101,38 +1106,6 @@ internal sealed class GravitasMixedCollisionService
             && firstMin.Z <= secondMax.Z;
     }
 
-    private static void Sort2DCollidersById(SwiftList<LSCollider2D> colliders)
-    {
-        for (int i = 1; i < colliders.Count; i++)
-        {
-            LSCollider2D value = colliders[i];
-            int index = i - 1;
-            while (index >= 0 && colliders[index].Id > value.Id)
-            {
-                colliders[index + 1] = colliders[index];
-                index--;
-            }
-
-            colliders[index + 1] = value;
-        }
-    }
-
-    private static void Sort3DCollidersById(SwiftList<LSCollider> colliders)
-    {
-        for (int i = 1; i < colliders.Count; i++)
-        {
-            LSCollider value = colliders[i];
-            int index = i - 1;
-            while (index >= 0 && colliders[index].Id > value.Id)
-            {
-                colliders[index + 1] = colliders[index];
-                index--;
-            }
-
-            colliders[index + 1] = value;
-        }
-    }
-
     private void DetachRetainedPartitions()
     {
         // Reset is a context boundary; retained GridForge payloads are a runtime cache, not replay state.
@@ -1269,169 +1242,73 @@ internal sealed class GravitasMixedCollisionService
         return voxel.TryRemovePartition<PhysicsMixedPartition>();
     }
 
-    private static void SortPartitions(SwiftList<PhysicsMixedPartition> partitions)
+    private sealed class PhysicsMixedPartitionOrderComparer : IComparer<PhysicsMixedPartition>
     {
-        if (partitions.Count < 2)
-            return;
-
-        QuickSortPartitions(partitions, 0, partitions.Count - 1);
-    }
-
-    private static void QuickSortPartitions(SwiftList<PhysicsMixedPartition> partitions, int left, int right)
-    {
-        while (left < right)
+        public int Compare(PhysicsMixedPartition? left, PhysicsMixedPartition? right)
         {
-            if (right - left <= 16)
-            {
-                InsertionSortPartitions(partitions, left, right);
-                return;
-            }
+            if (ReferenceEquals(left, right))
+                return 0;
+            if (left == null)
+                return -1;
+            if (right == null)
+                return 1;
 
-            int i = left;
-            int j = right;
-            PhysicsMixedPartition pivot = partitions[left + ((right - left) / 2)];
-            while (i <= j)
-            {
-                while (ComparePartitions(partitions[i], pivot) < 0)
-                    i++;
-                while (ComparePartitions(partitions[j], pivot) > 0)
-                    j--;
+            WorldVoxelIndex leftIndex = left.WorldIndex;
+            WorldVoxelIndex rightIndex = right.WorldIndex;
 
-                if (i > j)
-                    continue;
+            int compare = leftIndex.GridIndex.CompareTo(rightIndex.GridIndex);
+            if (compare != 0)
+                return compare;
 
-                if (i != j)
-                    (partitions[i], partitions[j]) = (partitions[j], partitions[i]);
+            compare = leftIndex.GridSpawnToken.CompareTo(rightIndex.GridSpawnToken);
+            if (compare != 0)
+                return compare;
 
-                i++;
-                j--;
-            }
+            compare = leftIndex.VoxelIndex.x.CompareTo(rightIndex.VoxelIndex.x);
+            if (compare != 0)
+                return compare;
 
-            if (j - left < right - i)
-            {
-                if (left < j)
-                    QuickSortPartitions(partitions, left, j);
+            compare = leftIndex.VoxelIndex.y.CompareTo(rightIndex.VoxelIndex.y);
+            if (compare != 0)
+                return compare;
 
-                left = i;
-            }
-            else
-            {
-                if (i < right)
-                    QuickSortPartitions(partitions, i, right);
-
-                right = j;
-            }
+            return leftIndex.VoxelIndex.z.CompareTo(rightIndex.VoxelIndex.z);
         }
     }
 
-    private static void InsertionSortPartitions(SwiftList<PhysicsMixedPartition> partitions, int left, int right)
+    private sealed class MixedColliderKeyComparer : IComparer<MixedColliderKey>
     {
-        for (int i = left + 1; i <= right; i++)
-        {
-            PhysicsMixedPartition value = partitions[i];
-            int index = i - 1;
-            while (index >= left && ComparePartitions(partitions[index], value) > 0)
-            {
-                partitions[index + 1] = partitions[index];
-                index--;
-            }
+        public int Compare(MixedColliderKey left, MixedColliderKey right) =>
+            left.Key.CompareTo(right.Key);
+    }
 
-            partitions[index + 1] = value;
+    private sealed class Collider2DIdComparer : IComparer<LSCollider2D>
+    {
+        public int Compare(LSCollider2D? left, LSCollider2D? right)
+        {
+            if (ReferenceEquals(left, right))
+                return 0;
+            if (left == null)
+                return -1;
+            if (right == null)
+                return 1;
+
+            return left.Id.CompareTo(right.Id);
         }
     }
 
-    private static int ComparePartitions(PhysicsMixedPartition left, PhysicsMixedPartition right)
+    private sealed class Collider3DIdComparer : IComparer<LSCollider>
     {
-        WorldVoxelIndex leftIndex = left.WorldIndex;
-        WorldVoxelIndex rightIndex = right.WorldIndex;
-
-        int compare = leftIndex.GridIndex.CompareTo(rightIndex.GridIndex);
-        if (compare != 0)
-            return compare;
-
-        compare = leftIndex.GridSpawnToken.CompareTo(rightIndex.GridSpawnToken);
-        if (compare != 0)
-            return compare;
-
-        compare = leftIndex.VoxelIndex.x.CompareTo(rightIndex.VoxelIndex.x);
-        if (compare != 0)
-            return compare;
-
-        compare = leftIndex.VoxelIndex.y.CompareTo(rightIndex.VoxelIndex.y);
-        if (compare != 0)
-            return compare;
-
-        return leftIndex.VoxelIndex.z.CompareTo(rightIndex.VoxelIndex.z);
-    }
-
-    private static void SortCandidatePairs(SwiftList<MixedColliderKey> pairs)
-    {
-        if (pairs.Count < 2)
-            return;
-
-        QuickSortCandidatePairs(pairs, 0, pairs.Count - 1);
-    }
-
-    private static void QuickSortCandidatePairs(SwiftList<MixedColliderKey> pairs, int left, int right)
-    {
-        while (left < right)
+        public int Compare(LSCollider? left, LSCollider? right)
         {
-            if (right - left <= 16)
-            {
-                InsertionSortCandidatePairs(pairs, left, right);
-                return;
-            }
+            if (ReferenceEquals(left, right))
+                return 0;
+            if (left == null)
+                return -1;
+            if (right == null)
+                return 1;
 
-            int i = left;
-            int j = right;
-            MixedColliderKey pivot = pairs[left + ((right - left) / 2)];
-            while (i <= j)
-            {
-                while (pairs[i].Key < pivot.Key)
-                    i++;
-                while (pairs[j].Key > pivot.Key)
-                    j--;
-
-                if (i > j)
-                    continue;
-
-                if (i != j)
-                    (pairs[i], pairs[j]) = (pairs[j], pairs[i]);
-
-                i++;
-                j--;
-            }
-
-            if (j - left < right - i)
-            {
-                if (left < j)
-                    QuickSortCandidatePairs(pairs, left, j);
-
-                left = i;
-            }
-            else
-            {
-                if (i < right)
-                    QuickSortCandidatePairs(pairs, i, right);
-
-                right = j;
-            }
-        }
-    }
-
-    private static void InsertionSortCandidatePairs(SwiftList<MixedColliderKey> pairs, int left, int right)
-    {
-        for (int i = left + 1; i <= right; i++)
-        {
-            MixedColliderKey value = pairs[i];
-            int index = i - 1;
-            while (index >= left && pairs[index].Key > value.Key)
-            {
-                pairs[index + 1] = pairs[index];
-                index--;
-            }
-
-            pairs[index + 1] = value;
+            return left.Id.CompareTo(right.Id);
         }
     }
 }

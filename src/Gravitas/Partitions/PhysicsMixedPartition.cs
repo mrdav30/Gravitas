@@ -354,7 +354,7 @@ internal sealed class PhysicsMixedPartition : IVoxelPartition
         AppendIds(ContainedDynamic3DObjects, destination);
         AppendIds(ContainedKinematic3DObjects, destination);
         AppendIds(ContainedStatic3DObjects, destination);
-        SortIds(destination);
+        SwiftListSortUtility.SortAscendingInPlace(destination);
     }
 
     internal void Copy2DColliderIds(SwiftList<int> destination)
@@ -363,7 +363,7 @@ internal sealed class PhysicsMixedPartition : IVoxelPartition
         AppendIds(ContainedDynamic2DObjects, destination);
         AppendIds(ContainedKinematic2DObjects, destination);
         AppendIds(ContainedStatic2DObjects, destination);
-        SortIds(destination);
+        SwiftListSortUtility.SortAscendingInPlace(destination);
     }
 
     internal void CopyStaticStyle3DColliderIds(SwiftList<int> destination)
@@ -371,7 +371,7 @@ internal sealed class PhysicsMixedPartition : IVoxelPartition
         destination.FastClear();
         AppendIds(ContainedKinematic3DObjects, destination);
         AppendIds(ContainedStatic3DObjects, destination);
-        SortIds(destination);
+        SwiftListSortUtility.SortAscendingInPlace(destination);
     }
 
     internal void CopyStaticStyle2DColliderIds(SwiftList<int> destination)
@@ -379,7 +379,7 @@ internal sealed class PhysicsMixedPartition : IVoxelPartition
         destination.FastClear();
         AppendIds(ContainedKinematic2DObjects, destination);
         AppendIds(ContainedStatic2DObjects, destination);
-        SortIds(destination);
+        SwiftListSortUtility.SortAscendingInPlace(destination);
     }
 
     private static void AppendIds(SwiftSparseSet? source, SwiftList<int> destination)
@@ -393,30 +393,14 @@ internal sealed class PhysicsMixedPartition : IVoxelPartition
 
     private static void CopySortedIds(SwiftSparseSet? source, SwiftList<int> destination)
     {
-        destination.FastClear();
         if (source == null)
-            return;
-
-        for (int i = 0; i < source.Count; i++)
-            destination.Add(source.DenseKeys[i]);
-
-        SortIds(destination);
-    }
-
-    private static void SortIds(SwiftList<int> ids)
-    {
-        for (int i = 1; i < ids.Count; i++)
         {
-            int value = ids[i];
-            int index = i - 1;
-            while (index >= 0 && ids[index] > value)
-            {
-                ids[index + 1] = ids[index];
-                index--;
-            }
-
-            ids[index + 1] = value;
+            destination.FastClear();
+            return;
         }
+
+        source.CopyKeysTo(destination);
+        SwiftListSortUtility.SortAscendingInPlace(destination);
     }
 
     private bool IsDynamic3DObjectAwake(int id)

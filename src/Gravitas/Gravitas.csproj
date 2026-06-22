@@ -91,17 +91,17 @@
 	<ItemGroup Condition="'$(DisableMemoryPack)' != 'true'">
 		<PackageReference Include="MemoryPack" Version="1.21.4" />
 		<PackageReference Include="FixedMathSharp" Version="5.0.2" />
-		<PackageReference Include="SwiftCollections" Version="5.0.2" />
-		<PackageReference Include="SwiftCollections.FixedMathSharp" Version="5.0.2" />
-		<PackageReference Include="GridForge" Version="7.1.2" />
+		<PackageReference Include="SwiftCollections" Version="5.1.0" />
+		<PackageReference Include="SwiftCollections.FixedMathSharp" Version="5.1.0" />
+		<PackageReference Include="GridForge" Version="7.1.3" />
 		<PackageReference Include="Chronicler.Core" Version="0.2.1" />
 	</ItemGroup>
 
 	<ItemGroup Condition="'$(DisableMemoryPack)' == 'true'">
 		<PackageReference Include="FixedMathSharp.Lean" Version="5.0.2" />
-		<PackageReference Include="SwiftCollections.Lean" Version="5.0.2" />
-		<PackageReference Include="SwiftCollections.FixedMathSharp.Lean" Version="5.0.2" />
-		<PackageReference Include="GridForge.Lean" Version="7.1.2" />
+		<PackageReference Include="SwiftCollections.Lean" Version="5.1.0" />
+		<PackageReference Include="SwiftCollections.FixedMathSharp.Lean" Version="5.1.0" />
+		<PackageReference Include="GridForge.Lean" Version="7.1.3" />
 		<PackageReference Include="Chronicler.Core.Lean" Version="0.2.1" />
 	</ItemGroup>
 

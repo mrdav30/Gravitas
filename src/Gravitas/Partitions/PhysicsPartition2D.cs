@@ -106,7 +106,7 @@ public sealed class PhysicsPartition2D : IVoxelPartition
         CopyIds(ContainedDynamicObjects, destination);
         CopyIds(ContainedKinematicObjects, destination);
         CopyIds(ContainedStaticObjects, destination);
-        SortIds(destination);
+        SwiftListSortUtility.SortAscendingInPlace(destination);
     }
 
     internal void CopyStaticStyleColliderIds(SwiftList<int> destination)
@@ -114,14 +114,19 @@ public sealed class PhysicsPartition2D : IVoxelPartition
         destination.FastClear();
         CopyIds(ContainedKinematicObjects, destination);
         CopyIds(ContainedStaticObjects, destination);
-        SortIds(destination);
+        SwiftListSortUtility.SortAscendingInPlace(destination);
     }
 
     private static void CopySortedIds(SwiftSparseSet? source, SwiftList<int> destination)
     {
-        destination.FastClear();
-        CopyIds(source, destination);
-        SortIds(destination);
+        if (source == null)
+        {
+            destination.FastClear();
+            return;
+        }
+
+        source.CopyKeysTo(destination);
+        SwiftListSortUtility.SortAscendingInPlace(destination);
     }
 
     private void CopySortedStaticStyleIds(SwiftList<int> destination)
@@ -129,7 +134,7 @@ public sealed class PhysicsPartition2D : IVoxelPartition
         destination.FastClear();
         CopyIds(ContainedKinematicObjects, destination);
         CopyIds(ContainedStaticObjects, destination);
-        SortIds(destination);
+        SwiftListSortUtility.SortAscendingInPlace(destination);
     }
 
     private static void CopyIds(SwiftSparseSet? source, SwiftList<int> destination)
@@ -139,22 +144,6 @@ public sealed class PhysicsPartition2D : IVoxelPartition
 
         for (int i = 0; i < source.Count; i++)
             destination.Add(source.DenseKeys[i]);
-    }
-
-    private static void SortIds(SwiftList<int> ids)
-    {
-        for (int i = 1; i < ids.Count; i++)
-        {
-            int value = ids[i];
-            int index = i - 1;
-            while (index >= 0 && ids[index] > value)
-            {
-                ids[index + 1] = ids[index];
-                index--;
-            }
-
-            ids[index + 1] = value;
-        }
     }
 
     public void AddDynamicObject(int item)

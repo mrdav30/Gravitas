@@ -50,7 +50,7 @@ public class LifecycleHookHandler
             }
 
             hooks.Add(new OrderedLifecycleHook(owner, order, callback));
-            hooks.Sort(CompareHook());
+            hooks.SortInPlace(CompareHook());
         }
 
         return new LifecycleHookRegistration(() => UnregisterHook(hooks, owner));

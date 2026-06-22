@@ -239,12 +239,25 @@ after pure 2D and 3D integration and then processes mixed contacts. This keeps
 mixed contacts from seeing stale pre-integration collider positions. Full mixed
 island/warm-start quality remains Workstream 5 scope.
 
-The full-step validation exposed a hot-path allocation RCA: the newly exercised
-3D late collision pass still used comparer-based `Array.Sort` through
-`SwiftList.Sort` on partition and island buffers. Those sorts were replaced
-with allocation-free in-place sorting in the collision service and per-partition
-collider-ID copies, restoring the CCD no-allocation assertions under the real
-full fixed-step path.
+The full-step validation exposed a hot-path allocation RCA in the newly
+exercised 3D late collision pass. That originally required local
+allocation-free sort helpers in Gravitas because SwiftCollections did not yet
+offer the needed reusable scratch-buffer sorting API.
+
+**SwiftCollections v5.1.0 cleanup 2026-06-22:** After Gravitas moved to
+SwiftCollections v5.1.0 and GridForge v7.1.3, the 3D, pure 2D, and mixed
+Workstream 3 ordering paths were reviewed for lower-stack sorting reuse.
+Verification showed the package `SwiftList<T>.SortInPlace(...)` and
+`SwiftSparseSet.CopySortedKeysTo(...)` paths still allocate through the current
+`Array.Sort` implementation in Gravitas' measured simulation/query hot paths.
+
+Gravitas now uses one centralized internal `SwiftListSortUtility` for
+allocation-free hot-path ordering instead of separate service-local heap,
+quicksort, and insertion-sort helpers. Single-source partition ID copies use
+`SwiftSparseSet.CopyKeysTo(...)` followed by the same no-allocation sorter;
+merged ID buckets append then sort the caller-owned scratch list once. This
+preserves partition, collider, pair, and island ordering semantics while
+leaving the lower-stack package allocation gap visible for follow-up.
 
 ## Workstream 4: Cylinder And Mesh Contact Geometry
 

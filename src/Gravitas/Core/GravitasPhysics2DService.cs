@@ -645,12 +645,12 @@ public sealed class GravitasPhysics2DService
             return;
         }
 
-        SortInPlace(_discreteResponsePairs, ResponsePairComparer);
+        SwiftListSortUtility.SortInPlace(_discreteResponsePairs, ResponsePairComparer);
         BuildDiscreteIslands();
         if (_discreteIslandConstraints.Count == 0)
             return;
 
-        SortInPlace(_discreteIslandConstraints, IslandConstraintComparer);
+        SwiftListSortUtility.SortInPlace(_discreteIslandConstraints, IslandConstraintComparer);
 
         int start = 0;
         while (start < _discreteIslandConstraints.Count)
@@ -737,7 +737,7 @@ public sealed class GravitasPhysics2DService
             return;
         }
 
-        SortInPlace(_discreteIslandNodes, IslandNodeComparer);
+        SwiftListSortUtility.SortInPlace(_discreteIslandNodes, IslandNodeComparer);
 
         int writeIndex = 0;
         int previousKey = -1;
@@ -966,49 +966,6 @@ public sealed class GravitasPhysics2DService
         minColliderId = idB;
         maxColliderId = idA;
     }
-
-    private static void SortInPlace<T>(SwiftList<T> items, IComparer<T> comparer)
-    {
-        int count = items.Count;
-        if (count <= 1)
-            return;
-
-        for (int start = (count >> 1) - 1; start >= 0; start--)
-            SiftDown(items, comparer, start, count);
-
-        for (int end = count - 1; end > 0; end--)
-        {
-            Swap(items, 0, end);
-            SiftDown(items, comparer, 0, end);
-        }
-    }
-
-    private static void SiftDown<T>(SwiftList<T> items, IComparer<T> comparer, int root, int count)
-    {
-        while (true)
-        {
-            int child = (root << 1) + 1;
-            if (child >= count)
-                return;
-
-            int swapIndex = root;
-            if (comparer.Compare(items[swapIndex], items[child]) < 0)
-                swapIndex = child;
-
-            int right = child + 1;
-            if (right < count && comparer.Compare(items[swapIndex], items[right]) < 0)
-                swapIndex = right;
-
-            if (swapIndex == root)
-                return;
-
-            Swap(items, root, swapIndex);
-            root = swapIndex;
-        }
-    }
-
-    private static void Swap<T>(SwiftList<T> items, int first, int second) =>
-        (items[second], items[first]) = (items[first], items[second]);
 
     private sealed class CollisionPair2DStableKeyComparer : IComparer<CollisionPair2D>
     {
