@@ -20,8 +20,10 @@ The query services are now context-owned and deterministic, with 3D raycast,
 swept-sphere, X/Z area queries, pure 2D circle/AABB/polygon
 overlap/raycast/swept-circle APIs, and mixed 2D/3D swept APIs. The remaining
 gaps are sharper: mesh-as-source swept query families are still future
-hardening, and mixed swept-circle queries are exact for 3D sphere targets but
-conservative for cuboid, capsule, finite cylinder, mesh, and compound targets.
+hardening, and mixed swept-circle queries now have exact primitive finite-slab
+reducers for sphere, cuboid, world-Y capsule, and world-Y finite-cylinder
+targets while mesh, compound, and unsupported rotated curved primitives remain
+explicit conservative fallbacks.
 
 For a first-class physics engine, those limitations need explicit reducer
 policy, tests, benchmarks, and docs. A public query API that works by
@@ -46,11 +48,11 @@ and known not to create false negatives.
   queries, segment raycasts, swept-circle queries, and static-style
   swept-circle collectors used by 2D CCD.
 - Mixed `SweepSphereAgainst2D` treats 2D shapes as finite slabs/prisms.
-- Mixed `SweepCircleAgainst3D` uses an exact finite-slab projection for 3D
-  sphere targets.
-- Mixed swept-circle against capsule, cuboid, finite cylinder, mesh, and
-  compound targets still uses the conservative swept-sphere worker fallback,
-  now labeled on `PhysicsMixedHit.ReducerKind`.
+- Mixed `SweepCircleAgainst3D` uses exact finite-slab reducers for 3D sphere,
+  cuboid, world-Y capsule, and world-Y finite-cylinder targets.
+- Mixed swept-circle against mesh, compound, rotated capsule, and rotated
+  finite-cylinder targets still uses an explicit conservative swept-sphere
+  fallback labeled on `PhysicsMixedHit.ReducerKind`.
 - Mesh targets are supported for raycast/sphere-sweep target queries through
   triangle candidates, but mesh-as-source swept query families remain future
   hardening.
@@ -145,16 +147,31 @@ false-positive hits.
 
 **Tasks**
 
-- [ ] Add red tests for cuboid, capsule, and finite-cylinder targets where the
+- [x] Add red tests for cuboid, capsule, and finite-cylinder targets where the
   conservative fallback reports a hit that finite-slab geometry should reject
   or report later.
-- [ ] Implement exact finite-slab reducers for cuboid, capsule, and finite
+- [x] Implement exact finite-slab reducers for cuboid, capsule, and finite
   cylinder targets before considering mesh or compound expansion.
-- [ ] Preserve current sphere exact behavior and result ordering.
-- [ ] Route mixed 2D CCD through the same finite-slab reducers used by public
+- [x] Preserve current sphere exact behavior and result ordering.
+- [x] Route mixed 2D CCD through the same finite-slab reducers used by public
   `QueryMixed` APIs.
-- [ ] Add benchmark rows for dense mixed swept-circle scenes, including false
+- [x] Add benchmark rows for dense mixed swept-circle scenes, including false
   positives, accepted hits, and candidate counts.
+
+**Progress 2026-06-22:** Workstream 3 promoted mixed
+`SweepCircleAgainst3D` primitive targets away from the accidental generic
+swept-sphere proxy. Sphere behavior remains exact. Cuboid targets now clip the
+target box against the source slab's Y interval, build a deterministic X/Z
+convex projection, and sweep the source circle against that projection without
+allocations. World-Y capsule and finite-cylinder targets use exact
+vertical-interval reducers; unsupported rotated capsule/cylinder targets remain
+explicit `ConservativeFallback` paths until a measured rotated curved-surface
+solver is justified. Mesh and compound targets also remain labeled fallback, now
+using a circumsphere source proxy so fallback paths cannot miss finite-slab
+corner cases. Focused mixed query/CCD tests cover exact primitive reducer labels,
+tall-slab report-later cases, proxy-only rejection, and fallback labeling.
+`MixedQueryBenchmarks` now includes dense cuboid, capsule, and cylinder
+swept-circle rows plus candidate-count rows.
 
 ## Workstream 4: Mesh-As-Source Swept Query Families
 
@@ -193,7 +210,8 @@ naively scans triangles or hides convex decomposition inside runtime queries.
 ## Done Criteria
 
 - Pure 2D exposes area-query parity for AABB and convex polygon use cases.
-- Mixed swept-circle against primitive 3D targets no longer relies on accidental
+- Mixed swept-circle against promoted primitive 3D targets (sphere, cuboid,
+  world-Y capsule, and world-Y finite cylinder) no longer relies on accidental
   generic sphere proxy behavior.
 - Mesh-as-source query policy is explicit, tested, documented, and benchmarked
   before any expensive runtime expansion.

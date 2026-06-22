@@ -42,7 +42,7 @@ names an internal CCD proxy.
 | `Query2D.Raycast`, `RaycastAll` | 2D segment | circle, AABB, convex polygon, compound | `Exact`; zero-length segments return no hit, starting-inside returns distance zero | distance, collider ID | service-owned scratch, caller-owned all-hit buffer |
 | `Query2D.SweepCircle`, `SweepCircleAll` | 2D circle | circle, AABB, convex polygon, compound | `Exact` circle-source sweep reducers; compound reports owner once through earliest part | distance, collider ID | service-owned scratch, caller-owned all-hit buffer |
 | `QueryMixed.SweepSphereAgainst2D`, `SweepSphereAgainst2DAll` | 3D sphere | 2D circle slab, AABB slab, convex polygon slab, compound slab | circle slab: `Exact`; AABB/polygon prism bounds: `ConservativeFallback`; compound preserves the winning part label | distance, 3D collider ID, 2D collider ID | service-owned scratch, caller-owned all-hit buffer |
-| `QueryMixed.SweepCircleAgainst3D`, `SweepCircleAgainst3DAll` | 2D circle embedded in a finite Y slab | 3D sphere, capsule, cuboid, finite cylinder, mesh, compound | sphere: `Exact`; capsule/cuboid/cylinder/mesh/compound: `ConservativeFallback` via swept-sphere worker until finite-slab reducers replace it | distance, 3D collider ID, 2D collider ID | service-owned scratch, caller-owned all-hit buffer |
+| `QueryMixed.SweepCircleAgainst3D`, `SweepCircleAgainst3DAll` | 2D circle embedded in a finite Y slab | 3D sphere, capsule, cuboid, finite cylinder, mesh, compound | sphere/cuboid/world-Y capsule/world-Y cylinder: `Exact`; unsupported rotated capsule/cylinder, mesh, and compound: `ConservativeFallback` | distance, 3D collider ID, 2D collider ID | service-owned scratch, caller-owned all-hit buffer |
 | Mesh-as-source sweeps | mesh, convex decomposition, or compound-authored mesh source | 2D, 3D, or mixed targets | `NotSupported` as a public runtime query surface for now | none | no public API |
 
 ### Internal CCD Query Surface
@@ -60,17 +60,14 @@ names an internal CCD proxy.
 
 ### Missing Query Families Ranked For Follow-Up
 
-1. Mixed finite-slab swept-circle reducers for cuboid, capsule, and finite
-   cylinder targets: high value for mixed CCD/query truth, high false-positive
-   severity because the current swept-sphere fallback can report early or extra
-   hits, and medium benchmark cost if primitive reducers stay specialized.
-2. Mesh-as-source swept query families: medium-to-high end-user value for mesh
+1. Mesh-as-source swept query families: medium-to-high end-user value for mesh
    movers, but high benchmark risk and unbounded runtime cost for concave
    meshes. Runtime policy should prefer authored convex decomposition or compound
    source colliders until measured runtime mesh source reducers are justified.
-3. Mixed finite-slab reducers for mesh and compound targets: medium value and
-   potentially high false-positive severity, but high benchmark cost. Implement
-   after primitive mixed reducers produce stable policy and benchmark signal.
+2. Mixed finite-slab reducers for mesh, compound, and rotated capsule/cylinder
+   targets: medium value and potentially high false-positive severity, but high
+   benchmark cost. Implement after primitive mixed reducers produce stable
+   policy and benchmark signal.
 
 ## 3D Raycasts
 
@@ -310,17 +307,21 @@ through AABB or polygon prism bounds report
 center and half-thickness against 3D targets. Sphere targets use an exact
 finite-slab projection: vertical overlap determines the sphere's effective
 planar reach, so tall slabs and slab-corner cases do not inflate the horizontal
-sweep radius. Candidate bounds use the swept slab extents rather than the older
-`max(radius, halfThickness)` proxy.
+sweep radius. Cuboid targets project the cuboid portion intersecting the slab's
+Y interval into X/Z and sweep the source circle against that convex projection,
+so rotated cuboids do not rely on the generic sphere proxy. World-Y capsule and
+finite-cylinder targets use exact vertical-interval reducers: capsule cap reach
+is reduced by slab interval distance, while finite cylinders require interval
+overlap before the planar circle sweep is accepted.
 
-Capsule, cuboid, finite cylinder, mesh, and compound targets currently retain
-the conservative swept-sphere worker fallback. Mesh targets still use triangle
-candidate acceleration and face/edge/vertex TOI checks within that fallback;
-compound targets return one hit on the owning compound collider after reducing
-over stable part order. Non-sphere mixed swept-circle hits report
-`PhysicsQueryReducerKind.ConservativeFallback` until shape-specific finite-slab
-solvers replace the fallback. This follow-up is tracked in
-[`Query And Mixed Swept Shape Hardening`](../feature-work/2026-06-21-query-and-mixed-swept-shape-hardening-plan.md).
+Mesh, compound, rotated capsule, and rotated finite-cylinder targets currently
+retain the conservative swept-sphere worker fallback. Mesh targets still use
+triangle candidate acceleration and face/edge/vertex TOI checks within that
+fallback; compound targets return one hit on the owning compound collider after
+reducing over stable part order. The fallback now uses a circumsphere radius for
+the source slab, so it can report earlier or extra hits but is not allowed to
+miss a finite-slab corner case. Hits accepted through these fallback paths
+report `PhysicsQueryReducerKind.ConservativeFallback`.
 
 `StiffBody` and `StiffBody2D` mixed CCD use these APIs only when the context is
 in `PhysicsRuntimeMode.Mixed`. Pure `Both` mode still advances 2D and 3D

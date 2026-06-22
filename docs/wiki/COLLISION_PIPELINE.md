@@ -81,9 +81,10 @@ merge into the pure 3D or pure 2D discrete island solvers.
 Mixed diagnostics, explicit mixed queries, and mixed CCD hooks are implemented.
 Mixed query hits expose `PhysicsMixedHit.ReducerKind` so hosts can distinguish
 exact finite-slab reducers from safe conservative fallbacks. 2D swept-circle
-mixed CCD currently uses the shared swept-sphere worker for non-sphere 3D
-targets, including mesh targets through local-BVH triangle candidate TOI checks
-and compound targets through stable part-order reduction.
+mixed CCD routes through the same mixed query reducers as public
+`SweepCircleAgainst3D`: sphere, cuboid, world-Y capsule, and world-Y finite
+cylinder targets use finite-slab reducers, while mesh, compound, and unsupported
+rotated capsule/cylinder targets remain explicit conservative fallbacks.
 
 `CollisionDetection2D` currently supports:
 
@@ -416,10 +417,11 @@ before the proxy hit can be accepted:
   3D cuboid, capsule, cylinder, mesh, and compound movers for sphere-target
   false-positive rejection without duplicating 3D shape math.
 
-Unsupported 3D target shapes, dynamic-vs-dynamic CCD, and mixed CCD continue to
-use the conservative proxy result. Those paths prefer false-positive early
-stops over false-negative tunneling until exact relative-motion and mixed-shape
-reducers have dedicated tests and benchmark evidence.
+Unsupported 3D target shapes, dynamic-vs-dynamic CCD, and mixed CCD paths
+without exact reducers continue to use conservative proxy results. Those paths
+prefer false-positive early stops over false-negative tunneling until exact
+relative-motion and mixed-shape reducers have dedicated tests and benchmark
+evidence.
 
 `Continuous` always sweeps when the proxy radius and displacement are non-zero.
 `Auto` sweeps only when the intended displacement is larger than the proxy
