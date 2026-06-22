@@ -79,9 +79,11 @@ merge into the pure 3D or pure 2D discrete island solvers.
 `PhysicsRuntimeMode.Both` remains isolated and never creates mixed contacts.
 
 Mixed diagnostics, explicit mixed queries, and mixed CCD hooks are implemented.
-2D swept-circle mixed CCD uses the shared swept-sphere worker, including 3D mesh
-targets through local-BVH triangle candidate TOI checks and compound targets
-through stable part-order reduction.
+Mixed query hits expose `PhysicsMixedHit.ReducerKind` so hosts can distinguish
+exact finite-slab reducers from safe conservative fallbacks. 2D swept-circle
+mixed CCD currently uses the shared swept-sphere worker for non-sphere 3D
+targets, including mesh targets through local-BVH triangle candidate TOI checks
+and compound targets through stable part-order reduction.
 
 `CollisionDetection2D` currently supports:
 

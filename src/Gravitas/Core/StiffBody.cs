@@ -1643,6 +1643,7 @@ public class StiffBody : IRecordable
                 point3D,
                 point2D,
                 -normalForSource,
+                PhysicsQueryReducerKind.ConservativeFallback,
                 distance,
                 sourceDirection);
             if (!ShouldReplaceMixedContinuousCollisionHit(candidate, candidateClosingSpeed, true, found, best, bestClosingSpeed))

@@ -186,7 +186,7 @@ identity. Contact events are emitted from the active-pair queue during
   participants only. Mixed query APIs, mixed CCD hooks, dimension-tagged
   diagnostics, and slab debug draw are now implemented; mixed 2D swept-circle
   queries cover primitive, mesh, and compound 3D targets while preserving pure
-  2D semantics.
+  2D semantics and labeling exact versus conservative fallback hits.
 - Cylinder collision and query behavior is implemented for the current finite
   cylinder model. Cap/face contact manifolds preserve flat finite-cylinder
   behavior; side/rim contacts remain representative finite-cylinder contacts.

@@ -22,6 +22,7 @@ public readonly struct PhysicsMixedHit
         Vector3d point3D,
         Vector3d point2D,
         Vector3d normal3DTo2D,
+        PhysicsQueryReducerKind reducerKind,
         Fixed64 distance,
         Vector3d direction3D)
     {
@@ -32,6 +33,7 @@ public readonly struct PhysicsMixedHit
         Point3D = point3D;
         Point2D = point2D;
         Normal3DTo2D = normal3DTo2D;
+        ReducerKind = reducerKind;
         Distance = distance;
         Direction3D = direction3D;
     }
@@ -52,6 +54,11 @@ public readonly struct PhysicsMixedHit
     /// Normal pointing from the 3D collider or swept 3D source toward the embedded 2D volume.
     /// </summary>
     public Vector3d Normal3DTo2D { get; }
+
+    /// <summary>
+    /// Gets whether this mixed query hit was produced by an exact shape reducer or a conservative fallback.
+    /// </summary>
+    public PhysicsQueryReducerKind ReducerKind { get; }
 
     /// <summary>
     /// Distance travelled by the swept source center before impact.

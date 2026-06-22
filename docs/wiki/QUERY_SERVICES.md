@@ -16,6 +16,68 @@ Mixed 2D/3D queries live on `GravitasQueryMixedService` and are always
 explicit. Pure `Query2D` and pure `Query3D` do not report cross-dimensional
 hits.
 
+## Query Surface Inventory And Fallback Policy
+
+Reducer labels used below:
+
+- `Exact`: the accepted hit is produced by shape math that matches the
+  documented source and target geometry.
+- `ConservativeFallback`: the accepted hit is produced by a fallback that is
+  allowed to report earlier or extra hits, but must not create false negatives.
+- `NotSupported`: no runtime public API exists for the source/target family.
+
+Mixed query hits expose this through `PhysicsMixedHit.ReducerKind`. Pure 2D and
+3D query paths currently expose only exact public hits, except where the table
+names an internal CCD proxy.
+
+### Public Query Surface
+
+| Surface | Source shape | Target shapes | Reducer policy | Ordering key | Allocation behavior |
+| --- | --- | --- | --- | --- | --- |
+| `Query3D.Raycast`, `RaycastAll` | bounded 3D segment | sphere, capsule, cuboid, finite cylinder, mesh, compound | `Exact`; mesh targets query triangle BVH candidates, compound targets keep owner identity | all-hit: distance, collider ID; closest: nearest deterministic candidate | service-owned scratch, caller-owned all-hit buffer |
+| `Query3D.SweepSphere`, `SweepSphereAll` | 3D sphere | sphere, capsule, cuboid, finite cylinder, mesh, compound | `Exact` swept-sphere reducers in `SweptSphereQueryWorker`; mesh uses triangle face/edge/vertex TOI, compound reduces stable part order | distance, collider ID | service-owned scratch, caller-owned all-hit buffer |
+| `Query3D.OverlapCircle`, `OverlapCircleInDirection`, `OverlapCircleAll` | X/Z circle proximity query | 3D colliders through closest-surface projection | `Exact` for the current X/Z proximity contract; this is not swept movement | distance, collider ID for all-hit | service-owned scratch, caller-owned all-hit buffer |
+| `Query2D.OverlapCircleAll` | 2D circle | circle, AABB, convex polygon, compound | `Exact`; compound reports owner once through stable part reduction | distance, collider ID | service-owned scratch, caller-owned all-hit buffer |
+| `Query2D.Raycast`, `RaycastAll` | 2D segment | circle, AABB, convex polygon, compound | `Exact`; zero-length segments return no hit, starting-inside returns distance zero | distance, collider ID | service-owned scratch, caller-owned all-hit buffer |
+| `Query2D.SweepCircle`, `SweepCircleAll` | 2D circle | circle, AABB, convex polygon, compound | `Exact` circle-source sweep reducers; compound reports owner once through earliest part | distance, collider ID | service-owned scratch, caller-owned all-hit buffer |
+| `QueryMixed.SweepSphereAgainst2D`, `SweepSphereAgainst2DAll` | 3D sphere | 2D circle slab, AABB slab, convex polygon slab, compound slab | circle slab: `Exact`; AABB/polygon prism bounds: `ConservativeFallback`; compound preserves the winning part label | distance, 3D collider ID, 2D collider ID | service-owned scratch, caller-owned all-hit buffer |
+| `QueryMixed.SweepCircleAgainst3D`, `SweepCircleAgainst3DAll` | 2D circle embedded in a finite Y slab | 3D sphere, capsule, cuboid, finite cylinder, mesh, compound | sphere: `Exact`; capsule/cuboid/cylinder/mesh/compound: `ConservativeFallback` via swept-sphere worker until finite-slab reducers replace it | distance, 3D collider ID, 2D collider ID | service-owned scratch, caller-owned all-hit buffer |
+| Mesh-as-source sweeps | mesh, convex decomposition, or compound-authored mesh source | 2D, 3D, or mixed targets | `NotSupported` as a public runtime query surface for now | none | no public API |
+
+### Internal CCD Query Surface
+
+| Owner | Query path | Source proxy | Target set | Reducer policy |
+| --- | --- | --- | --- | --- |
+| `StiffBody` static/kinematic 3D CCD | `Query3D.SweepSphereAgainstStaticAll` | source collider proxy sphere, then shape-exact validation where supported | bodyless, immovable, kinematic 3D colliders | public swept-sphere hit is exact for target geometry; source-shape refinement runs for target spheres |
+| `StiffBody` dynamic 3D CCD | dynamic candidate index plus relative sweep | source and target dynamic proxy spheres | movable dynamic 3D bodies | conservative proxy; exact dynamic shape reducers are owned by the CCD hardening plan |
+| `StiffBody` mixed static 2D CCD | `QueryMixed.SweepSphereAgainstStatic2DAll` | 3D sphere source | bodyless, immovable, kinematic 2D slabs | same `ReducerKind` policy as public `SweepSphereAgainst2D` |
+| `StiffBody` mixed dynamic 2D CCD | mixed dynamic candidate index plus relative sweep | 3D proxy sphere against 2D mixed proxy sphere | movable dynamic 2D bodies | `ConservativeFallback` |
+| `StiffBody2D` static/kinematic 2D CCD | `Query2D.SweepCircleAgainstStaticAll` plus mover-shape refinement | source circle sweep, refined by mover shape when needed | bodyless, immovable, kinematic 2D colliders | exact for current pure 2D sweep contract |
+| `StiffBody2D` dynamic 2D CCD | dynamic candidate index plus relative sweep | dynamic proxy circles | movable dynamic 2D bodies | conservative proxy until dynamic-vs-dynamic 2D CCD ordering/reducer work expands |
+| `StiffBody2D` mixed static 3D CCD | `QueryMixed.SweepCircleAgainstStatic3DAll` | embedded 2D circle slab | bodyless, immovable, kinematic 3D colliders | same `ReducerKind` policy as public `SweepCircleAgainst3D` |
+| `StiffBody2D` mixed dynamic 3D CCD | mixed dynamic candidate index plus relative sweep | embedded 2D proxy sphere against 3D proxy sphere | movable dynamic 3D bodies | `ConservativeFallback` |
+
+### Missing Query Families Ranked For Follow-Up
+
+1. Pure 2D AABB area queries: high end-user value for box-authored gameplay
+   queries, medium false-positive severity when approximated by circles, and
+   low-to-medium benchmark cost because existing 2D bounds and SAT helpers can
+   be reused.
+2. Pure 2D convex polygon area queries: high value for authored polygon zones,
+   high false-positive severity when approximated by circles/AABBs, and medium
+   benchmark cost due vertex projection and compound part reduction.
+3. Mixed finite-slab swept-circle reducers for cuboid, capsule, and finite
+   cylinder targets: high value for mixed CCD/query truth, high false-positive
+   severity because the current swept-sphere fallback can report early or extra
+   hits, and medium benchmark cost if primitive reducers stay specialized.
+4. Mesh-as-source swept query families: medium-to-high end-user value for mesh
+   movers, but high benchmark risk and unbounded runtime cost for concave
+   meshes. Runtime policy should prefer authored convex decomposition or compound
+   source colliders until measured runtime mesh source reducers are justified.
+5. Mixed finite-slab reducers for mesh and compound targets: medium value and
+   potentially high false-positive severity, but high benchmark cost. Implement
+   after primitive mixed reducers produce stable policy and benchmark signal.
+
 ## 3D Raycasts
 
 `GravitasQuery3DService` exposes:
@@ -228,7 +290,10 @@ tie-breakers.
 
 `SweepSphereAgainst2D` sweeps a 3D sphere center against embedded 2D mixed
 slabs. 2D circles are treated as finite vertical cylinders; AABB and polygon
-slabs use their finite mixed prism bounds for the current alpha query policy.
+slabs use their finite mixed prism bounds for the current query policy. Hits
+against 2D circle slabs report `PhysicsQueryReducerKind.Exact`; hits accepted
+through AABB or polygon prism bounds report
+`PhysicsQueryReducerKind.ConservativeFallback`.
 
 `SweepCircleAgainst3D` sweeps a pure 2D circle embedded at the supplied slab Y
 center and half-thickness against 3D targets. Sphere targets use an exact
@@ -241,9 +306,9 @@ Capsule, cuboid, finite cylinder, mesh, and compound targets currently retain
 the conservative swept-sphere worker fallback. Mesh targets still use triangle
 candidate acceleration and face/edge/vertex TOI checks within that fallback;
 compound targets return one hit on the owning compound collider after reducing
-over stable part order. Treat non-sphere mixed swept-circle hits as alpha
-conservative until shape-specific finite-slab solvers replace the fallback.
-This follow-up is tracked in
+over stable part order. Non-sphere mixed swept-circle hits report
+`PhysicsQueryReducerKind.ConservativeFallback` until shape-specific finite-slab
+solvers replace the fallback. This follow-up is tracked in
 [`Query And Mixed Swept Shape Hardening`](../feature-work/2026-06-21-query-and-mixed-swept-shape-hardening-plan.md).
 
 `StiffBody` and `StiffBody2D` mixed CCD use these APIs only when the context is
@@ -298,13 +363,17 @@ null body.
 - `Normal3DTo2D`
 - `NormalFor3DSource`
 - `NormalFor2DSource`
+- `ReducerKind`
 - `Distance`
 - `Direction3D`
 
 `Normal3DTo2D` follows the mixed contact invariant: it points from the 3D side
 toward the embedded 2D volume. CCD source helpers expose the normal orientation
 needed by the moving source so velocity clamping does not have to reinterpret
-the invariant at every call site.
+the invariant at every call site. `ReducerKind` is
+`PhysicsQueryReducerKind.Exact` when the hit was accepted by shape-specific
+mixed query math and `PhysicsQueryReducerKind.ConservativeFallback` when the
+hit came from a safe conservative proxy or bounds reducer.
 
 ## Query Hardening Targets
 

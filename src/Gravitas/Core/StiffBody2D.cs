@@ -966,6 +966,7 @@ public sealed class StiffBody2D : IRecordable
                 point3D,
                 point2D,
                 normalForSource,
+                PhysicsQueryReducerKind.ConservativeFallback,
                 distance,
                 sourceDisplacement.MagnitudeSquared > Fixed64.Epsilon ? sourceDisplacement.Normalized : Vector3d.Zero);
             if (!ShouldReplaceMixedContinuousCollisionHit(candidate, candidateClosingSpeed, true, found, best, bestClosingSpeed))

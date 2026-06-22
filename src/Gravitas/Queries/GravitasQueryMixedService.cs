@@ -358,6 +358,7 @@ public sealed class GravitasQueryMixedService
             radius,
             slabCenterY,
             halfThickness,
+            PhysicsQueryReducerKind.ConservativeFallback,
             distance,
             sourceCollider);
         return true;
@@ -416,6 +417,7 @@ public sealed class GravitasQueryMixedService
             best.Point3D,
             best.Point2D,
             best.Normal3DTo2D,
+            best.ReducerKind,
             best.Distance,
             best.Direction3D);
         return true;
@@ -464,6 +466,7 @@ public sealed class GravitasQueryMixedService
             radius,
             slabCenterY,
             halfThickness,
+            PhysicsQueryReducerKind.Exact,
             distance,
             sourceCollider);
         return true;
@@ -521,7 +524,13 @@ public sealed class GravitasQueryMixedService
 
         if (IsInsideCircleSlab(localStart, combinedRadius, expandedHalfHeight))
         {
-            hit = BuildSphereAgainst2DHit(circle, start, radius, Fixed64.Zero, direction);
+            hit = BuildSphereAgainst2DHit(
+                circle,
+                start,
+                radius,
+                PhysicsQueryReducerKind.Exact,
+                Fixed64.Zero,
+                direction);
             return true;
         }
 
@@ -550,7 +559,13 @@ public sealed class GravitasQueryMixedService
         }
 
         Vector3d sweepCenter = start + direction * bestDistance;
-        hit = BuildSphereAgainst2DHit(circle, sweepCenter, radius, bestDistance, direction);
+        hit = BuildSphereAgainst2DHit(
+            circle,
+            sweepCenter,
+            radius,
+            PhysicsQueryReducerKind.Exact,
+            bestDistance,
+            direction);
         return true;
     }
 
@@ -573,7 +588,13 @@ public sealed class GravitasQueryMixedService
         }
 
         Vector3d sweepCenter = start + direction * distance;
-        hit = BuildSphereAgainst2DHit(collider, sweepCenter, radius, distance, direction);
+        hit = BuildSphereAgainst2DHit(
+            collider,
+            sweepCenter,
+            radius,
+            PhysicsQueryReducerKind.ConservativeFallback,
+            distance,
+            direction);
         return true;
     }
 
@@ -581,6 +602,7 @@ public sealed class GravitasQueryMixedService
         LSCollider2D collider,
         Vector3d sweepCenter,
         Fixed64 radius,
+        PhysicsQueryReducerKind reducerKind,
         Fixed64 distance,
         Vector3d direction)
     {
@@ -596,6 +618,7 @@ public sealed class GravitasQueryMixedService
             point3D,
             point2D,
             normal3DTo2D,
+            reducerKind,
             distance,
             direction);
     }
@@ -607,6 +630,7 @@ public sealed class GravitasQueryMixedService
         Fixed64 radius,
         Fixed64 slabCenterY,
         Fixed64 halfThickness,
+        PhysicsQueryReducerKind reducerKind,
         Fixed64 distance,
         LSCollider2D? sourceCollider)
     {
@@ -630,6 +654,7 @@ public sealed class GravitasQueryMixedService
             point3D,
             point2D,
             normal3DTo2D,
+            reducerKind,
             distance,
             direction);
     }

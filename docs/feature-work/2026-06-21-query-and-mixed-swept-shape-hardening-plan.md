@@ -50,7 +50,8 @@ and known not to create false negatives.
 - Mixed `SweepCircleAgainst3D` uses an exact finite-slab projection for 3D
   sphere targets.
 - Mixed swept-circle against capsule, cuboid, finite cylinder, mesh, and
-  compound targets still uses the conservative swept-sphere worker fallback.
+  compound targets still uses the conservative swept-sphere worker fallback,
+  now labeled on `PhysicsMixedHit.ReducerKind`.
 - Mesh targets are supported for raycast/sphere-sweep target queries through
   triangle candidates, but mesh-as-source swept query families remain future
   hardening.
@@ -73,14 +74,30 @@ and known not to create false negatives.
 
 **Tasks**
 
-- [ ] Inventory every public query and internal CCD query path, including
+- [x] Inventory every public query and internal CCD query path, including
   source shape, target shape, exact reducer, conservative fallback, ordering
   key, and allocation behavior.
-- [ ] Add tests that distinguish exact shape truth from accepted conservative
+- [x] Add tests that distinguish exact shape truth from accepted conservative
   fallback for mixed swept-circle and mesh-as-source families.
-- [ ] Update query docs with an explicit support matrix and fallback labels.
-- [ ] Rank missing query families by end-user value, false-positive severity,
+- [x] Update query docs with an explicit support matrix and fallback labels.
+- [x] Rank missing query families by end-user value, false-positive severity,
   and benchmark cost before implementing new reducers.
+
+**Progress 2026-06-22:** Workstream 1 established the explicit query surface
+inventory in `docs/wiki/QUERY_SERVICES.md`, covering public query APIs and
+internal CCD query paths with source shape, target shape, reducer policy,
+ordering key, and allocation ownership. Mixed query hits now expose
+`PhysicsMixedHit.ReducerKind`, with `Exact` used for current finite-slab
+reducers and `ConservativeFallback` used for prism/proxy reducers that can
+return early or extra hits without false negatives.
+
+Focused tests now assert exact mixed sphere/circle behavior, conservative
+fallback labeling for non-sphere/prism mixed paths, and the absence of public
+mesh-as-source sweep APIs until Workstream 4 chooses a benchmark-backed runtime
+policy. Missing query families were ranked for follow-up: pure 2D AABB area
+queries, pure 2D convex polygon area queries, mixed primitive finite-slab
+swept-circle reducers, mesh-as-source sweeps, and mixed mesh/compound finite
+slab reducers.
 
 ## Workstream 2: Pure 2D Area Query Parity
 
