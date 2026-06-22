@@ -170,6 +170,9 @@ internal static class MeshTriangleContactGenerator
         if (!TryTestTriangleCuboid(triangle, cuboid, out Vector3d normal, out Fixed64 depth))
             return;
 
+        if (TryAddCuboidFaceContacts(pair, mesh, triangle, cuboid, normal, depth))
+            return;
+
         Vector3d pointOnMesh = MeshUtils.ClosestPointOnTriangle(triangle.A, triangle.B, triangle.C, triangle.Normal, cuboid.Center);
         Vector3d pointOnCuboid = pointOnMesh - normal * depth;
         AddContactInPairOrder(pair, mesh, pointOnMesh, cuboid, pointOnCuboid, depth, normal);
@@ -182,13 +185,95 @@ internal static class MeshTriangleContactGenerator
         LSCylinderCollider cylinder)
     {
         GetTriangle(mesh, triangleIndex, out TriangleData triangle);
+        Vector3d normal = OrientNormal(triangle.Normal, cylinder.Center - triangle.Center);
+        if (TryAddCylinderCapTriangleContacts(pair, mesh, triangle, cylinder, normal))
+            return;
+
         Vector3d pointOnMesh = MeshUtils.ClosestPointOnTriangle(triangle.A, triangle.B, triangle.C, triangle.Normal, cylinder.Center);
         if (!IsPointInsideCylinder(cylinder, pointOnMesh))
             return;
 
         Vector3d pointOnCylinder = cylinder.ClosestPointOnSurface(pointOnMesh);
         Fixed64 depth = Vector3d.Distance(pointOnMesh, pointOnCylinder);
-        Vector3d normal = OrientNormal(triangle.Normal, cylinder.Center - pointOnMesh);
+        AddContactInPairOrder(pair, mesh, pointOnMesh, cylinder, pointOnCylinder, depth, normal);
+    }
+
+    private static bool TryAddCuboidFaceContacts(
+        CollisionWorkItem pair,
+        LSMeshCollider mesh,
+        TriangleData triangle,
+        LSCuboidCollider cuboid,
+        Vector3d normal,
+        Fixed64 depth)
+    {
+        Fixed64 minProjection = Fixed64.MaxValue;
+        for (int i = 0; i < cuboid.Vertices.Length; i++)
+        {
+            Fixed64 projection = Vector3d.Dot(cuboid.Vertices[i], normal);
+            if (projection < minProjection)
+                minProjection = projection;
+        }
+
+        int initialCount = pair.Manifold.Count;
+        for (int i = 0; i < cuboid.Vertices.Length; i++)
+        {
+            Vector3d pointOnCuboid = cuboid.Vertices[i];
+            if (Vector3d.Dot(pointOnCuboid, normal) > minProjection + Fixed64.Epsilon)
+                continue;
+
+            Vector3d pointOnMesh = pointOnCuboid + normal * depth;
+            if (!MeshUtils.IsPointInTrianglePlane(triangle.A, triangle.B, triangle.C, triangle.Normal, pointOnMesh))
+                continue;
+
+            AddContactInPairOrder(pair, mesh, pointOnMesh, cuboid, pointOnCuboid, depth, normal);
+        }
+
+        return pair.Manifold.Count > initialCount;
+    }
+
+    private static bool TryAddCylinderCapTriangleContacts(
+        CollisionWorkItem pair,
+        LSMeshCollider mesh,
+        TriangleData triangle,
+        LSCylinderCollider cylinder,
+        Vector3d normal)
+    {
+        if (!CylinderContactGeometry.IsAxisAligned(normal, cylinder.LineDirection))
+            return false;
+
+        Vector3d capCenter = CylinderContactGeometry.GetCapCenter(cylinder, -normal);
+        Fixed64 signedDistance = Vector3d.Dot(capCenter - triangle.A, normal);
+        if (signedDistance > Fixed64.Epsilon)
+            return false;
+
+        Fixed64 depth = signedDistance < Fixed64.Zero ? -signedDistance : Fixed64.Zero;
+        int initialCount = pair.Manifold.Count;
+        CylinderContactGeometry.GetCapBasis(cylinder, out Vector3d tangentA, out Vector3d tangentB);
+        AddCylinderCapTriangleContact(pair, mesh, triangle, cylinder, capCenter + tangentA * cylinder.ScaledRadius, depth, normal);
+        AddCylinderCapTriangleContact(pair, mesh, triangle, cylinder, capCenter - tangentA * cylinder.ScaledRadius, depth, normal);
+        AddCylinderCapTriangleContact(pair, mesh, triangle, cylinder, capCenter + tangentB * cylinder.ScaledRadius, depth, normal);
+        AddCylinderCapTriangleContact(pair, mesh, triangle, cylinder, capCenter - tangentB * cylinder.ScaledRadius, depth, normal);
+
+        if (pair.Manifold.Count > initialCount)
+            return true;
+
+        AddCylinderCapTriangleContact(pair, mesh, triangle, cylinder, capCenter, depth, normal);
+        return pair.Manifold.Count > initialCount;
+    }
+
+    private static void AddCylinderCapTriangleContact(
+        CollisionWorkItem pair,
+        LSMeshCollider mesh,
+        TriangleData triangle,
+        LSCylinderCollider cylinder,
+        Vector3d pointOnCylinder,
+        Fixed64 depth,
+        Vector3d normal)
+    {
+        Vector3d pointOnMesh = pointOnCylinder + normal * depth;
+        if (!MeshUtils.IsPointInTrianglePlane(triangle.A, triangle.B, triangle.C, triangle.Normal, pointOnMesh))
+            return;
+
         AddContactInPairOrder(pair, mesh, pointOnMesh, cylinder, pointOnCylinder, depth, normal);
     }
 

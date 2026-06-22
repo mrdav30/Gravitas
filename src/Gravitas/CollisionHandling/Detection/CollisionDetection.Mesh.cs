@@ -95,26 +95,33 @@ public static partial class CollisionDetection
 
     private static bool DoMeshCuboidCheck(CollisionWorkItem pair)
     {
-        if (pair.ColliderA is LSMeshCollider { Mode: MeshColliderMode.Concave } mesh
-            && pair.ColliderB is LSCuboidCollider cuboid)
+        if (!TryGetPairColliders(pair, out LSMeshCollider mesh, out LSCuboidCollider cuboid))
+            return false;
+
+        if (MeshTriangleContactGenerator.TryBuildMeshCuboidManifold(
+            pair,
+            mesh,
+            cuboid,
+            pair.Context.CollisionScratch.MeshTriangleCandidatesA))
         {
-            return MeshTriangleContactGenerator.TryBuildMeshCuboidManifold(
-                pair,
-                mesh,
-                cuboid,
-                pair.Context.CollisionScratch.MeshTriangleCandidatesA);
+            return true;
         }
 
-        if (!TestMeshCuboidColliders(pair, out CollisionResult? output))
+        if (mesh.Mode == MeshColliderMode.Concave)
+            return false;
+
+        if (!TestMeshCuboidColliders(pair, mesh, cuboid, out CollisionResult? output))
             return false;
 
         if (!output.HasValue) return false; // Check if axisPenetration was found
-        pair.Manifold.SetContact(
+        SetContactInPairOrder(
+            pair,
+            mesh,
             output.Value.PointsOfContact.Point1,
+            cuboid,
             output.Value.PointsOfContact.Point2,
             output.Value.AxisPenetration.Depth,
-            output.Value.AxisPenetration.Vector.Normalized
-        );
+            output.Value.AxisPenetration.Vector.Normalized);
 
         return true;
     }
@@ -124,12 +131,17 @@ public static partial class CollisionDetection
         if (!TryGetPairColliders(pair, out LSMeshCollider mesh, out LSCylinderCollider cylinder))
             return false;
 
+        if (MeshTriangleContactGenerator.TryBuildMeshCylinderManifold(
+            pair,
+            mesh,
+            cylinder,
+            pair.Context.CollisionScratch.MeshTriangleCandidatesA))
+        {
+            return true;
+        }
+
         if (mesh.Mode == MeshColliderMode.Concave)
-            return MeshTriangleContactGenerator.TryBuildMeshCylinderManifold(
-                pair,
-                mesh,
-                cylinder,
-                pair.Context.CollisionScratch.MeshTriangleCandidatesA);
+            return false;
 
         SwiftList<int> nearbyTriangles = pair.Context.CollisionScratch.MeshCylinderTriangles;
         if (!TryFindMeshCylinderContact(
@@ -195,12 +207,13 @@ public static partial class CollisionDetection
     /// Tests if there are any separating axes between a cuboid and a mesh using the given axis vectors.
     /// </summary>
     /// <returns>true if no separating axis is found, false otherwise.</returns>
-    private static bool TestMeshCuboidColliders(CollisionWorkItem pair, out CollisionResult? output)
+    private static bool TestMeshCuboidColliders(
+        CollisionWorkItem pair,
+        LSMeshCollider mesh,
+        LSCuboidCollider cuboid,
+        out CollisionResult? output)
     {
         output = null;
-
-        if (pair.ColliderA is not LSMeshCollider mesh || pair.ColliderB is not LSCuboidCollider cuboid)
-            return false;
 
         (Vector3d PointA, Vector3d PointB) = FindInitialPointsOfContact(mesh, cuboid);
         if (!pair.Context.CollisionScratch.TryPrepareMeshCuboid(mesh, PointA, cuboid, PointB, out CollisionContext data))

@@ -617,12 +617,12 @@ Current shape support:
 | Cuboid/Cuboid | axis-aligned face/edge/stack manifolds for AABoxes, SAT primary contacts for oriented boxes. |
 | Cylinder/Sphere | finite cylinder closest surface against sphere radius. |
 | Cylinder/Capsule | finite-cylinder projection axes against capsule segment/radius projection. |
-| Cylinder/Cylinder | finite-cylinder projection axes, preserving flat cap separation. |
-| Cuboid/Cylinder | cuboid vertex projection against finite-cylinder projection. |
+| Cylinder/Cylinder | finite-cylinder projection axes, preserving flat cap separation; parallel cap overlap emits a four-contact cap manifold. |
+| Cuboid/Cylinder | cuboid vertex projection against finite-cylinder projection; cuboid face/cylinder cap overlap emits a four-contact manifold. |
 | Mesh/Sphere | convex mesh uses closest surface point; concave mesh gathers triangle candidates against the sphere bounds. |
 | Mesh/Capsule | convex mesh uses closest surface from the capsule line seed; concave mesh uses segment-vs-triangle closest points. |
-| Mesh/Cuboid | convex mesh uses nearby-triangle SAT; concave mesh runs per-triangle SAT against the cuboid. |
-| Mesh/Cylinder | triangle-BVH candidate scan against finite cylinder volume; concave mode writes triangle contacts. |
+| Mesh/Cuboid | triangle-BVH candidate scan runs per-triangle SAT against the cuboid and clips cuboid support-face contacts to authored triangles. |
+| Mesh/Cylinder | triangle-BVH candidate scan tests finite cylinder volume and clips cap contacts to authored triangles; side/rim cases keep representative finite-cylinder contacts. |
 | Mesh/Mesh | convex mesh uses nearby-triangle SAT; concave-involved pairs run triangle-vs-triangle candidate checks. |
 | Compound/* | stable part-order scan, existing part-vs-shape narrow phase, and pair-owned manifold reduction. |
 
@@ -650,9 +650,10 @@ intentionally not static: concurrent worlds keep isolated scratch, while repeate
 checks in the same world avoid per-check object-info construction and pool
 rent/release churn. Short `collision-detection` benchmark smoke currently
 reports on aggregate primitive checks, single-contact primitive manifold
-generation, axis-aligned cuboid face-manifold generation, cuboid/cuboid SAT,
-mesh/cylinder, mesh/cuboid, mesh/mesh, compound/primitive, and concave mesh paths
-after warmup. The `physics-2d` benchmark selection covers pure 2D shape-pair
+generation, cylinder cap-manifold generation, axis-aligned cuboid
+face-manifold generation, cuboid/cuboid SAT, mesh/cylinder and mesh/cuboid
+manifold generation, mesh/mesh, compound/primitive, and concave mesh paths after
+warmup. The `physics-2d` benchmark selection covers pure 2D shape-pair
 manifold checks, convex/convex two-contact manifold detection, direct
 single-contact angular response, and direct two-contact manifold response.
 
@@ -685,13 +686,15 @@ zero-valued fields, such as touching contacts with zero depth or contact points
 at the origin. The response solver ignores pairs whose manifold has not been
 written by narrow phase.
 
-Axis-aligned cuboid/cuboid detection now generates up to four contacts for
+Axis-aligned cuboid/cuboid detection generates up to four contacts for
 face-overlap and stacked/touching faces. Edge contact reduction naturally drops
 duplicate corners and can produce two contacts; corner contact can produce one.
-Sphere, capsule, cylinder, and oriented cuboid SAT paths currently write a
-single manifold contact. Axis-aligned cuboids and concave mesh paths can write
-multiple contacts, capped by the manifold's deterministic four-contact
-reduction.
+Parallel cylinder/cylinder cap overlap and cuboid/cylinder face-cap overlap
+also emit four deterministic cap contacts. Mesh/cuboid and mesh/cylinder paths
+preserve authored triangle candidate order and can write clipped multi-contact
+surfaces for face/cap overlaps. Sphere, capsule, cylinder side/rim, and
+oriented cuboid SAT paths still write representative single contacts when the
+geometry does not describe a stable support face.
 
 Pure 2D narrow phase writes `ContactManifold2D` into the owning
 `CollisionPair2D`. The 2D manifold is fixed at two contacts because current
@@ -824,10 +827,8 @@ Response units and invariants:
   handled by the response solver.
 
 This is still the first alpha milestone, not the final response engine. Exact
-angular TOI, exact swept polytope support, cylinder edge-case hardening, richer
-mesh contact clipping, and richer mixed-dimension solver behavior remain future
-work. Contact clipping, cylinder edge cases, and mixed solver quality are
-tracked in
+angular TOI, exact swept polytope support, and richer mixed-dimension solver
+behavior remain future work. Mixed solver quality is tracked in
 [`Discrete Response And Contact Quality Hardening`](../feature-work/2026-06-21-discrete-response-and-contact-quality-hardening-plan.md);
 exact CCD reducer work remains in
 [`CCD Exact TOI And Shape Reducers`](../feature-work/2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md).

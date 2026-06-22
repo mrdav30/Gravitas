@@ -74,6 +74,9 @@ public static partial class CollisionDetection
         if (!TestCylinderCylinderSeparatingAxes(cylinderA, cylinderB, out AxisPenetration penetration))
             return false;
 
+        if (TryAddCylinderCylinderCapContacts(pair, cylinderA, cylinderB, penetration))
+            return true;
+
         Vector3d cylinderAPoint = cylinderA.ClosestPointOnSurface(cylinderB.Center);
         Vector3d cylinderBPoint = cylinderB.ClosestPointOnSurface(cylinderAPoint);
         pair.Manifold.SetContact(
@@ -93,6 +96,9 @@ public static partial class CollisionDetection
         if (!TestCuboidCylinderSeparatingAxes(cuboid, cylinder, out AxisPenetration penetration))
             return false;
 
+        if (TryAddCuboidCylinderCapContacts(pair, cuboid, cylinder, penetration))
+            return true;
+
         Vector3d cuboidPoint = cuboid.ClosestPointOnSurface(cylinder.Center);
         Vector3d cylinderPoint = cylinder.ClosestPointOnSurface(cuboidPoint);
         SetContactInPairOrder(
@@ -105,6 +111,77 @@ public static partial class CollisionDetection
             penetration.Axis);
 
         return true;
+    }
+
+    private static bool TryAddCylinderCylinderCapContacts(
+        CollisionWorkItem pair,
+        LSCylinderCollider cylinderA,
+        LSCylinderCollider cylinderB,
+        AxisPenetration penetration)
+    {
+        if (!CylinderContactGeometry.IsAxisAligned(penetration.Axis, cylinderA.LineDirection)
+            || !CylinderContactGeometry.IsAxisAligned(penetration.Axis, cylinderB.LineDirection))
+        {
+            return false;
+        }
+
+        Vector3d capCenter = CylinderContactGeometry.GetCapCenter(cylinderA, penetration.Axis);
+        CylinderContactGeometry.GetCapBasis(cylinderA, out Vector3d tangentA, out Vector3d tangentB);
+        AddCylinderCylinderCapContact(pair, capCenter + tangentA * cylinderA.ScaledRadius, penetration);
+        AddCylinderCylinderCapContact(pair, capCenter - tangentA * cylinderA.ScaledRadius, penetration);
+        AddCylinderCylinderCapContact(pair, capCenter + tangentB * cylinderA.ScaledRadius, penetration);
+        AddCylinderCylinderCapContact(pair, capCenter - tangentB * cylinderA.ScaledRadius, penetration);
+        return pair.Manifold.HasContact;
+    }
+
+    private static bool TryAddCuboidCylinderCapContacts(
+        CollisionWorkItem pair,
+        LSCuboidCollider cuboid,
+        LSCylinderCollider cylinder,
+        AxisPenetration penetration)
+    {
+        if (!CylinderContactGeometry.IsAxisAligned(penetration.Axis, cylinder.LineDirection))
+            return false;
+
+        Vector3d capCenter = CylinderContactGeometry.GetCapCenter(cylinder, -penetration.Axis);
+        CylinderContactGeometry.GetCapBasis(cylinder, out Vector3d tangentA, out Vector3d tangentB);
+        AddCuboidCylinderCapContact(pair, cuboid, cylinder, capCenter + tangentA * cylinder.ScaledRadius, penetration);
+        AddCuboidCylinderCapContact(pair, cuboid, cylinder, capCenter - tangentA * cylinder.ScaledRadius, penetration);
+        AddCuboidCylinderCapContact(pair, cuboid, cylinder, capCenter + tangentB * cylinder.ScaledRadius, penetration);
+        AddCuboidCylinderCapContact(pair, cuboid, cylinder, capCenter - tangentB * cylinder.ScaledRadius, penetration);
+        return pair.Manifold.HasContact;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void AddCylinderCylinderCapContact(
+        CollisionWorkItem pair,
+        Vector3d pointOnA,
+        AxisPenetration penetration)
+    {
+        pair.Manifold.AddContact(
+            pointOnA,
+            pointOnA - penetration.Axis * penetration.Depth,
+            penetration.Depth,
+            penetration.Axis);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void AddCuboidCylinderCapContact(
+        CollisionWorkItem pair,
+        LSCuboidCollider cuboid,
+        LSCylinderCollider cylinder,
+        Vector3d pointOnCylinder,
+        AxisPenetration penetration)
+    {
+        Vector3d pointOnCuboid = pointOnCylinder + penetration.Axis * penetration.Depth;
+        AddContactInPairOrder(
+            pair,
+            cuboid,
+            pointOnCuboid,
+            cylinder,
+            pointOnCylinder,
+            penetration.Depth,
+            penetration.Axis);
     }
 
     private static bool TestCylinderCapsuleSeparatingAxes(
@@ -389,6 +466,26 @@ public static partial class CollisionDetection
 
         if (ReferenceEquals(pair.ColliderA, second))
             pair.Manifold.SetContact(pointOnSecond, pointOnFirst, depth, -normalFirstToSecond);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void AddContactInPairOrder(
+        CollisionWorkItem pair,
+        LSCollider first,
+        Vector3d pointOnFirst,
+        LSCollider second,
+        Vector3d pointOnSecond,
+        Fixed64 depth,
+        Vector3d normalFirstToSecond)
+    {
+        if (ReferenceEquals(pair.ColliderA, first))
+        {
+            pair.Manifold.AddContact(pointOnFirst, pointOnSecond, depth, normalFirstToSecond);
+            return;
+        }
+
+        if (ReferenceEquals(pair.ColliderA, second))
+            pair.Manifold.AddContact(pointOnSecond, pointOnFirst, depth, -normalFirstToSecond);
     }
 
     #endregion

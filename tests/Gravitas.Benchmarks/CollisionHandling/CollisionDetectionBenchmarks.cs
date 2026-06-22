@@ -15,6 +15,7 @@ public class CollisionDetectionBenchmarks
     private GravitasWorldContext _context;
     private CollisionPair[] _pairs;
     private CollisionPair[] _primitivePairs;
+    private CollisionPair[] _cylinderCapPairs;
     private CollisionPair[] _cuboidFacePairs;
     private CollisionPair[] _cuboidSatPairs;
     private CollisionPair[] _meshCylinderPairs;
@@ -48,6 +49,7 @@ public class CollisionDetectionBenchmarks
         }
 
         _primitivePairs = CreatePairSet(CreatePrimitivePair);
+        _cylinderCapPairs = CreatePairSet(CreateCylinderCapPair);
         _cuboidFacePairs = CreatePairSet(CreateCuboidFacePair);
         _cuboidSatPairs = CreatePairSet(CreateCuboidSatPair);
         _meshCylinderPairs = CreatePairSet(CreateMeshCylinderPair);
@@ -71,6 +73,7 @@ public class CollisionDetectionBenchmarks
         _context = null;
         _pairs = null;
         _primitivePairs = null;
+        _cylinderCapPairs = null;
         _cuboidFacePairs = null;
         _cuboidSatPairs = null;
         _meshCylinderPairs = null;
@@ -106,6 +109,12 @@ public class CollisionDetectionBenchmarks
     }
 
     [Benchmark]
+    public int GenerateCylinderCapManifolds()
+    {
+        return CountManifoldContacts(_cylinderCapPairs);
+    }
+
+    [Benchmark]
     public int GenerateCuboidFaceManifolds()
     {
         return CountManifoldContacts(_cuboidFacePairs);
@@ -124,9 +133,21 @@ public class CollisionDetectionBenchmarks
     }
 
     [Benchmark]
+    public int GenerateMeshCylinderManifolds()
+    {
+        return CountManifoldContacts(_meshCylinderPairs);
+    }
+
+    [Benchmark]
     public int CheckMeshCuboidPairs()
     {
         return CountCollisions(_meshCuboidPairs);
+    }
+
+    [Benchmark]
+    public int GenerateMeshCuboidManifolds()
+    {
+        return CountManifoldContacts(_meshCuboidPairs);
     }
 
     [Benchmark]
@@ -301,6 +322,21 @@ public class CollisionDetectionBenchmarks
         return new CollisionPair(
             CreateCuboid(origin),
             CreateCuboid(origin + new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero)));
+    }
+
+    private CollisionPair CreateCylinderCapPair(int index, Vector3d origin)
+    {
+        Vector3d upper = origin + new Vector3d(Fixed64.Zero, Fixed64.FromFraction(3, 4), Fixed64.Zero);
+        if ((index & 1) == 0)
+        {
+            return new CollisionPair(
+                CreateCylinder(origin),
+                CreateCylinder(upper));
+        }
+
+        return new CollisionPair(
+            CreateCuboid(origin),
+            CreateCylinder(upper));
     }
 
     private CollisionPair CreateCuboidSatPair(int index, Vector3d origin)

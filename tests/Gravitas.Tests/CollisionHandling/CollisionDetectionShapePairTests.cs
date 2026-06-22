@@ -321,6 +321,25 @@ public sealed class CollisionDetectionShapePairTests
     }
 
     [Fact]
+    public void CylinderSphere_RimOverlap_ShouldUseFiniteRimNormalAndDepth()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        Fixed64 rimAxisOffset = Fixed64.Half * FixedMath.Sqrt(Fixed64.Half);
+        ScenarioBody<LSCylinderCollider> cylinder = scenario.CreateCylinder(PhysicsScenarioBuilder.Vector(0, 0, 0));
+        ScenarioBody<LSSphereCollider> sphere = scenario.CreateSphere(new Vector3d(
+            Fixed64.Half + rimAxisOffset - Fixed64.FromFraction(1, 16),
+            Fixed64.Half + rimAxisOffset - Fixed64.FromFraction(1, 16),
+            Fixed64.Zero));
+
+        CollisionPair pair = AssertCollision(scenario, cylinder.Collider, sphere.Collider, CollisionType.Cylinder_Sphere);
+
+        pair.Manifold.Count.Should().Be(1);
+        pair.Manifold.PrimaryContact.Depth.Should().BeGreaterThan(Fixed64.Zero);
+        pair.Manifold.PrimaryContact.Normal.X.Should().BeGreaterThan(Fixed64.Zero);
+        pair.Manifold.PrimaryContact.Normal.Y.Should().BeGreaterThan(Fixed64.Zero);
+    }
+
+    [Fact]
     public void CylinderCapsule_ShouldDetectOverlapSeparationAndReversedDispatch()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
@@ -348,6 +367,24 @@ public sealed class CollisionDetectionShapePairTests
     }
 
     [Fact]
+    public void CylinderCylinder_ParallelCapOverlap_ShouldGenerateFourStableContacts()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSCylinderCollider> bottom = scenario.CreateCylinder(PhysicsScenarioBuilder.Vector(0, 0, 0));
+        ScenarioBody<LSCylinderCollider> top = scenario.CreateCylinder(new Vector3d(Fixed64.Zero, Fixed64.FromFraction(3, 4), Fixed64.Zero));
+
+        CollisionPair pair = AssertCollision(scenario, bottom.Collider, top.Collider, CollisionType.Cylinder_Cylinder);
+
+        pair.Manifold.Count.Should().Be(ContactManifold.MaxContactCount);
+        pair.Manifold.Select(contact => contact.ContactId).Should().BeInAscendingOrder();
+        for (int i = 0; i < pair.Manifold.Count; i++)
+        {
+            pair.Manifold[i].Depth.Should().Be(Fixed64.FromFraction(1, 4));
+            pair.Manifold[i].Normal.Should().Be(Vector3d.Up);
+        }
+    }
+
+    [Fact]
     public void CuboidCylinder_ShouldDetectAxisAlignedRotatedAndSeparated()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
@@ -362,6 +399,26 @@ public sealed class CollisionDetectionShapePairTests
         AssertCollision(scenario, cuboid.Collider, overlapping.Collider, CollisionType.Cuboid_Cylinder);
         AssertCollision(scenario, rotatedCuboid.Collider, rotatedOverlap.Collider, CollisionType.Cuboid_Cylinder);
         AssertNoCollision(scenario, cuboid.Collider, separated.Collider, CollisionType.Cuboid_Cylinder);
+    }
+
+    [Fact]
+    public void CuboidCylinder_CapFaceOverlap_ShouldGenerateFourStableContacts()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSCuboidCollider> floor = scenario.CreateCuboid(PhysicsScenarioBuilder.Vector(0, 0, 0));
+        ScenarioBody<LSCylinderCollider> cylinder = scenario.CreateCylinder(new Vector3d(Fixed64.Zero, Fixed64.FromFraction(3, 4), Fixed64.Zero));
+
+        CollisionPair pair = AssertCollision(scenario, floor.Collider, cylinder.Collider, CollisionType.Cuboid_Cylinder);
+
+        pair.Manifold.Count.Should().Be(ContactManifold.MaxContactCount);
+        pair.Manifold.Select(contact => contact.ContactId).Should().BeInAscendingOrder();
+        for (int i = 0; i < pair.Manifold.Count; i++)
+        {
+            pair.Manifold[i].Depth.Should().Be(Fixed64.FromFraction(1, 4));
+            pair.Manifold[i].Normal.Should().Be(Vector3d.Up);
+            pair.Manifold[i].PointA.Y.Should().Be(Fixed64.Half);
+            pair.Manifold[i].PointB.Y.Should().Be(Fixed64.FromFraction(1, 4));
+        }
     }
 
     [Fact]
@@ -386,6 +443,29 @@ public sealed class CollisionDetectionShapePairTests
 
         capPair.Manifold.PrimaryContact.Normal.Y.Should().BeGreaterThan(Fixed64.Zero);
         sidePair.Manifold.PrimaryContact.Normal.X.Should().BeGreaterThan(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void MeshCylinder_CapFaceOverlap_ShouldGenerateFourStableContacts()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSMeshCollider> floor = scenario.CreateBody(
+            CreateHorizontalPlaneMesh(),
+            PhysicsScenarioBuilder.Vector(0, 0, 0),
+            FixedQuaternion.Identity);
+        ScenarioBody<LSCylinderCollider> cylinder = scenario.CreateCylinder(new Vector3d(Fixed64.Zero, Fixed64.FromFraction(1, 4), Fixed64.Zero));
+
+        CollisionPair pair = AssertCollision(scenario, floor.Collider, cylinder.Collider, CollisionType.Mesh_Cylinder);
+
+        pair.Manifold.Count.Should().Be(ContactManifold.MaxContactCount);
+        pair.Manifold.Select(contact => contact.ContactId).Should().BeInAscendingOrder();
+        for (int i = 0; i < pair.Manifold.Count; i++)
+        {
+            pair.Manifold[i].Depth.Should().Be(Fixed64.FromFraction(1, 4));
+            pair.Manifold[i].Normal.Should().Be(Vector3d.Up);
+            pair.Manifold[i].PointA.Y.Should().Be(Fixed64.Zero);
+            pair.Manifold[i].PointB.Y.Should().Be(-Fixed64.FromFraction(1, 4));
+        }
     }
 
     [Fact]
@@ -459,6 +539,34 @@ public sealed class CollisionDetectionShapePairTests
         reversed.Manifold.PrimaryContact.Normal.Y.Should().BeGreaterThan(Fixed64.Zero);
         forward.Manifold.HasContact.Should().BeTrue();
         reversed.Manifold.HasContact.Should().BeTrue();
+    }
+
+    [Fact]
+    public void MeshCuboid_FaceOverlap_ShouldGenerateFourClippedContacts()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSMeshCollider> floor = scenario.CreateBody(
+            CreateHorizontalPlaneMesh(),
+            PhysicsScenarioBuilder.Vector(0, 0, 0),
+            FixedQuaternion.Identity);
+        ScenarioBody<LSCuboidCollider> cuboid = scenario.CreateCuboid(new Vector3d(Fixed64.Zero, Fixed64.FromFraction(1, 4), Fixed64.Zero));
+
+        CollisionPair forward = AssertCollision(scenario, floor.Collider, cuboid.Collider, CollisionType.Mesh_Cuboid);
+        CollisionPair reversed = AssertCollision(scenario, cuboid.Collider, floor.Collider, CollisionType.Mesh_Cuboid);
+
+        forward.Manifold.Count.Should().Be(ContactManifold.MaxContactCount);
+        reversed.Manifold.Count.Should().Be(ContactManifold.MaxContactCount);
+        forward.Manifold.Select(contact => contact.ContactId).Should().Equal(reversed.Manifold.Select(contact => contact.ContactId));
+        forward.Manifold.Select(contact => contact.ContactId).Should().BeInAscendingOrder();
+
+        for (int i = 0; i < forward.Manifold.Count; i++)
+        {
+            ManifoldContact contact = forward.Manifold[i];
+            contact.Depth.Should().Be(Fixed64.FromFraction(1, 4));
+            contact.Normal.Should().Be(Vector3d.Up);
+            contact.PointA.Y.Should().Be(Fixed64.Zero);
+            contact.PointB.Y.Should().Be(-Fixed64.FromFraction(1, 4));
+        }
     }
 
     [Fact]

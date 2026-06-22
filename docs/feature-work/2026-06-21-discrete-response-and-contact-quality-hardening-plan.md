@@ -21,10 +21,10 @@ pure 2D contacts have deterministic manifolds, friction impulses, material
 coefficients, and pair-local warm-start storage. Pure 2D now applies cached
 normal and tangent impulses before the fresh solve. Workstream 2 brought 3D
 single-pair warm-starting up to the same standard with normal-compatible cache
-reuse and a two-axis tangent basis. Resting-stack quality still needs explicit
-discrete islands and bounded multi-iteration solving, cylinder edge cases and
-mesh contact clipping still need hardening, and mixed response is intentionally
-constrained.
+reuse and a two-axis tangent basis. Resting-stack quality now has explicit
+discrete islands and bounded multi-iteration solving, and cylinder/mesh contact
+geometry has first-class cap/face manifold coverage. Mixed response remains
+intentionally constrained.
 
 Those are not acceptable as loose wiki caveats for a first-class deterministic
 physics engine. They should be driven by tests, benchmark signal, and explicit
@@ -56,10 +56,14 @@ solver invariants.
 - Mixed response now refreshes and processes mixed contacts during
   `LateSimulate` after pure 2D and 3D body integration, rather than before body
   motion in `Simulate`.
-- Cylinder collision/query support exists, but docs still call out edge-case
-  hardening for the finite-cylinder model.
-- Mesh narrow phase supports triangle-level contacts, but richer mesh contact
-  clipping remains future work.
+- Cylinder collision/query support preserves the finite flat-capped cylinder
+  model. Parallel cylinder cap overlap and cuboid/cylinder face-cap overlap now
+  emit four-contact cap manifolds, while side/rim cases stay on representative
+  finite-cylinder contacts.
+- Mesh narrow phase preserves authored triangle identity for mesh/cuboid and
+  mesh/cylinder contacts. Face/cap overlaps now clip stable support contacts to
+  triangle candidates for convex and concave meshes before falling back to
+  representative contacts where needed.
 - Mixed response applies planar X/Z impulse and angular yaw impulse to 2D
   bodies while constraining vertical response to the 3D participant.
 
@@ -101,9 +105,11 @@ without changing runtime solver behavior. The new
   stale baseline test was removed when 3D warm-start application landed.
 - a short 3D cuboid stack under gravity remains awake and drifts, preserving
   evidence for the resting-friction/warm-start workstream.
-- cylinder rim contact currently reduces to one near-zero-depth contact.
-- mesh/cuboid face contact through a triangle mesh currently reduces to one
-  triangle-level contact instead of a clipped contact surface.
+- the original cylinder rim current-baseline case was converted into positive
+  rim-overlap regression coverage during Workstream 4.
+- the original mesh/cuboid single-contact current-baseline test was retired
+  during Workstream 4 because mesh/cuboid face overlap now produces a clipped
+  four-contact surface.
 
 Same-island wake propagation was not locked in as a current-baseline unit test:
 the flat partition path can wake direct contacts, and a meaningful island test
@@ -269,16 +275,38 @@ across edge/cap/side transitions.
 
 **Tasks**
 
-- [ ] Add cylinder edge-case tests for sphere, capsule, cuboid, cylinder, mesh,
+- [x] Add cylinder edge-case tests for sphere, capsule, cuboid, cylinder, mesh,
   and mixed embedded-2D slab contacts.
-- [ ] Add mesh contact clipping tests where a triangle-level hit should produce
+- [x] Add mesh contact clipping tests where a triangle-level hit should produce
   a stable contact surface rather than a noisy point or ambiguous normal.
-- [ ] Harden finite-cylinder cap, side, and rim contact selection without
+- [x] Harden finite-cylinder cap, side, and rim contact selection without
   treating cylinders as capsules.
-- [ ] Preserve mesh triangle candidate ordering and authored collider identity
+- [x] Preserve mesh triangle candidate ordering and authored collider identity
   when multiple clipped contacts reduce to an external contact surface.
-- [ ] Add benchmarks for cylinder-heavy and mesh-contact-heavy scenes before
+- [x] Add benchmarks for cylinder-heavy and mesh-contact-heavy scenes before
   expanding clipping complexity.
+
+**Progress 2026-06-22:** Workstream 4 hardened cylinder and mesh contact
+geometry without changing the finite-cylinder model into a capsule
+approximation. Cylinder/sphere rim overlap now has explicit positive-depth
+coverage with finite rim normals. Parallel cylinder/cylinder cap overlap and
+cuboid/cylinder face-cap overlap generate four stable cap contacts using a
+deterministic cap tangent basis; side/rim fallbacks remain representative
+single contacts.
+
+Mesh/cuboid and mesh/cylinder detection now routes convex and concave meshes
+through the triangle candidate manifold generator first. Cuboid support-face
+vertices are clipped to authored triangle planes, and cylinder cap contacts are
+sampled deterministically on the active cap then clipped to triangle candidates.
+Convex mesh paths keep their older SAT/representative fallback only when the
+triangle path cannot produce a contact; concave paths stay triangle-owned.
+Tests cover mesh/cuboid clipped four-contact surfaces, mesh/cylinder cap
+surfaces, pair reversal, contact ID ordering, and allocation-free warm paths.
+
+`collision-detection` benchmark signal now includes
+`GenerateCylinderCapManifolds`, `GenerateMeshCylinderManifolds`, and
+`GenerateMeshCuboidManifolds` so the new contact-heavy paths are measured
+separately from boolean hit checks.
 
 ## Workstream 5: Mixed-Dimension Response Quality
 

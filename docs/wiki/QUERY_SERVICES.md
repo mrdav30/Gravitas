@@ -312,8 +312,8 @@ These are tracked in
 [`Query And Mixed Swept Shape Hardening`](../feature-work/2026-06-21-query-and-mixed-swept-shape-hardening-plan.md)
 unless another active plan explicitly takes ownership.
 
-- harden mesh-as-source swept query families and richer mesh contact clipping
-  without changing the current mesh-target swept-sphere worker contract.
+- harden mesh-as-source swept query families without changing the current
+  mesh-target swept-sphere worker contract.
 - keep query benchmarks allocation-free as result ordering, filters, and shape
   support expand.
 - add shape-specific query tests for every collider type.

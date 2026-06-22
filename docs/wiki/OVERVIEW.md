@@ -188,17 +188,18 @@ identity. Contact events are emitted from the active-pair queue during
   queries cover primitive, mesh, and compound 3D targets while preserving pure
   2D semantics.
 - Cylinder collision and query behavior is implemented for the current finite
-  cylinder model, but needs continued edge-case hardening.
+  cylinder model. Cap/face contact manifolds preserve flat finite-cylinder
+  behavior; side/rim contacts remain representative finite-cylinder contacts.
 - Mesh raycast overlap, sphere sweeps against mesh targets, and concave mesh
-  narrow phase are implemented through triangle-level tests. Richer mesh contact
-  clipping and mesh-as-source swept query families remain future hardening work.
+  narrow phase are implemented through triangle-level tests. Mesh/cuboid and
+  mesh/cylinder face/cap contacts now clip stable support contacts to authored
+  triangles; mesh-as-source swept query families remain future hardening work.
 - Collision response is still an alpha-hardening target. The current 3D and pure
   2D manifold solvers handle deterministic normal and friction impulses, 3D and
   pure 2D apply compatible pair-local warm-start impulses, and 3D discrete
   response builds deterministic islands with bounded multi-iteration solving.
-  Cylinder contact edge cases, richer mesh contact clipping, exact angular TOI,
-  exact swept polytope support, and richer mixed solver behavior remain future
-  work.
+  Exact angular TOI, exact swept polytope support, and richer mixed solver
+  behavior remain future work.
 - Query services use context-owned mutable buffers. Treat them as same-thread,
   fixed-loop services unless they are redesigned for reentrancy.
 - Diagnostics are context-owned and disabled by default. Enabled draw capture can

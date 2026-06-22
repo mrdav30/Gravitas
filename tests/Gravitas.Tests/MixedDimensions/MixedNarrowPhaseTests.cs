@@ -206,6 +206,25 @@ public sealed class MixedNarrowPhaseTests
     }
 
     [Fact]
+    public void CylinderCircleSlab_WithPlanarRimOverlap_ShouldReportFiniteCylinderContact()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSCylinderCollider> cylinder = CreateCylinder3D(
+            context,
+            new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
+        StiffBody2D circle = CreateBody2D(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero);
+
+        bool collided = CollisionDetectionMixed.TryCollide(cylinder.Collider, circle.Collider, out MixedContact contact);
+
+        collided.Should().BeTrue();
+        contact.HasContact.Should().BeTrue();
+        contact.Depth.Should().Be(Fixed64.FromFraction(1, 4));
+        contact.Normal3DTo2D.Should().Be(-Vector3d.Right);
+        contact.Point3D.X.Should().Be(Fixed64.FromFraction(1, 4));
+        contact.Point2D.X.Should().Be(Fixed64.Half);
+    }
+
+    [Fact]
     public void CapsuleCircleSlab_WithPlanarSideOverlap_ShouldReportContact()
     {
         using GravitasWorldContext context = CreateMixedContext();
