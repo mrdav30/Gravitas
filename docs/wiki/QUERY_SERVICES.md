@@ -46,7 +46,7 @@ names an internal CCD proxy.
 | `Query2D.Raycast`, `RaycastAll` | 2D segment | circle, AABB, convex polygon, compound | `Exact`; zero-length segments return no hit, starting-inside returns distance zero | distance, collider ID | service-owned scratch, caller-owned all-hit buffer |
 | `Query2D.SweepCircle`, `SweepCircleAll` | 2D circle | circle, AABB, convex polygon, compound | `Exact` circle-source sweep reducers; compound reports owner once through earliest part | distance, collider ID | service-owned scratch, caller-owned all-hit buffer |
 | `QueryMixed.SweepSphereAgainst2D`, `SweepSphereAgainst2DAll` | 3D sphere | 2D circle slab, AABB slab, convex polygon slab, compound slab | circle slab: `Exact`; AABB/polygon prism bounds: `ConservativeFallback`; compound preserves the winning part label | distance, 3D collider ID, 2D collider ID | service-owned scratch, caller-owned all-hit buffer |
-| `QueryMixed.SweepCircleAgainst3D`, `SweepCircleAgainst3DAll` | 2D circle embedded in a finite Y slab | 3D sphere, capsule, cuboid, finite cylinder, mesh, compound | sphere, cuboid, capsule, and finite-cylinder targets: `Exact`; mesh and compound: `ConservativeFallback` | distance, 3D collider ID, 2D collider ID | service-owned scratch, caller-owned all-hit buffer |
+| `QueryMixed.SweepCircleAgainst3D`, `SweepCircleAgainst3DAll` | 2D circle embedded in a finite Y slab | 3D sphere, capsule, cuboid, finite cylinder, mesh, compound | `Exact`; mesh targets clip triangle candidates to the finite slab before X/Z projection, and compound targets reduce supported parts in authored order | distance, 3D collider ID, 2D collider ID | service-owned scratch, caller-owned all-hit buffer |
 | Concave/raw mesh-source sweeps | concave `LSMeshCollider` or raw mesh as the moving query source | 2D, 3D, or mixed targets | `NotSupported`; use offline convex decomposition into supported `LSCompoundCollider` parts | none | no raw mesh-source query API |
 
 ### Internal CCD Query Surface
@@ -361,14 +361,13 @@ finite-cylinder targets use deterministic finite-slab projection reducers, so
 the moving 2D circle is tested against the target volume actually intersecting
 the slab rather than a circumsphere proxy.
 
-Mesh and compound targets currently retain the conservative swept-sphere worker
-fallback. Mesh targets still use triangle candidate acceleration and
-face/edge/vertex TOI checks within that fallback; compound targets return one
-hit on the owning compound collider after reducing over stable part order. The
-fallback uses a circumsphere radius for the source slab, so it can report
-earlier or extra hits but is not allowed to miss a finite-slab corner case. Hits
-accepted through these fallback paths report
-`PhysicsQueryReducerKind.ConservativeFallback`.
+Mesh targets query triangle BVH candidates, sort triangle indices, clip each
+world-space triangle to the slab Y interval, project the clipped polygon into
+X/Z, and sweep against that projected point, segment, or convex polygon.
+Accepted mesh hits report the owning `LSMeshCollider` with
+`PhysicsQueryReducerKind.Exact`. Compound targets reduce exact supported parts
+in authored part order and report one owner hit on the `LSCompoundCollider`;
+equal-distance part hits keep the earlier authored part.
 
 When diagnostics are enabled, mixed queries emit both `MixedQuery` and
 `QuerySummary` events. `MixedQuery` reports the closest mixed hit and accepted
@@ -456,8 +455,8 @@ hit came from a safe conservative proxy or bounds reducer.
 The completed
 [`Query And Mixed Swept Shape Hardening`](../feature-work/done/2026-06-21-query-and-mixed-swept-shape-hardening-plan.md)
 plan owns the current public query API shape, 2D query parity, convex source
-sweeps, fallback labels, and query diagnostics. Remaining mixed finite-slab
-exactness and convex mesh source scaling work is tracked in
+sweeps, fallback labels, and query diagnostics. Remaining convex mesh source
+scaling work is tracked in
 [`Mixed Query Finite-Slab Reducer Completion`](../feature-work/2026-06-22-mixed-query-finite-slab-reducer-completion-plan.md).
 
 Longer-term query state objects remain evidence-gated: introduce caller-owned or

@@ -11,6 +11,7 @@ using Gravitas.Colliders;
 using Gravitas.Diagnostics;
 using Gravitas.Support;
 using SwiftCollections;
+using SwiftCollections.Query;
 using System;
 using System.Runtime.CompilerServices;
 
@@ -24,7 +25,7 @@ public sealed class GravitasQueryMixedService
     private readonly GravitasWorldContext _context;
     private readonly SwiftList<LSCollider2D> _candidates2D = new();
     private readonly SwiftList<LSCollider> _candidates3D = new();
-    private readonly SweptSphereQueryWorker _sweepWorker = new();
+    private readonly SwiftList<int> _meshTriangleCandidates = new();
 
     public GravitasQueryMixedService(GravitasWorldContext context)
     {
@@ -40,6 +41,7 @@ public sealed class GravitasQueryMixedService
     {
         _candidates2D.FastClear();
         _candidates3D.FastClear();
+        _meshTriangleCandidates.FastClear();
         LastQueryCandidateCount = 0;
     }
 
@@ -383,7 +385,6 @@ public sealed class GravitasQueryMixedService
         Fixed64 length = segment.Magnitude;
         Vector2d direction2D = segment / length;
         Vector3d direction = new(direction2D.X, Fixed64.Zero, direction2D.Y);
-        Fixed64 proxyRadius = FixedMath.Sqrt(radius * radius + halfThickness * halfThickness);
         CreateCircleSlabSweepBounds(start, end, radius, slabCenterY, halfThickness, out Vector3d min, out Vector3d max);
         _context.MixedCollisions.Collect3DCandidatesInMixedBounds(
             min,
@@ -393,7 +394,6 @@ public sealed class GravitasQueryMixedService
             staticStyleOnly: staticTargetsOnly,
             cachePartitionRefresh: cacheTargetPartitions);
         LastQueryCandidateCount = _candidates3D.Count;
-        _sweepWorker.Prepare(start3D, end3D, proxyRadius);
         bool captureReducerDiagnostics = _context.Diagnostics.Enabled;
         QueryReducerCounters reducerCounters = default;
         bool found = false;
@@ -479,7 +479,6 @@ public sealed class GravitasQueryMixedService
         Fixed64 length = segment.Magnitude;
         Vector2d direction2D = segment / length;
         Vector3d direction = new(direction2D.X, Fixed64.Zero, direction2D.Y);
-        Fixed64 proxyRadius = FixedMath.Sqrt(radius * radius + halfThickness * halfThickness);
         CreateCircleSlabSweepBounds(start, end, radius, slabCenterY, halfThickness, out Vector3d min, out Vector3d max);
         _context.MixedCollisions.Collect3DCandidatesInMixedBounds(
             min,
@@ -489,7 +488,6 @@ public sealed class GravitasQueryMixedService
             staticStyleOnly: staticTargetsOnly,
             cachePartitionRefresh: cacheTargetPartitions);
         LastQueryCandidateCount = _candidates3D.Count;
-        _sweepWorker.Prepare(start3D, end3D, proxyRadius);
         bool captureReducerDiagnostics = _context.Diagnostics.Enabled;
         QueryReducerCounters reducerCounters = default;
 
@@ -706,23 +704,14 @@ public sealed class GravitasQueryMixedService
                 return found;
         }
 
-        if (!_sweepWorker.TrySweep(collider, out Vector3d centerAtImpact, out Fixed64 distance))
-        {
-            hit = default;
-            return false;
-        }
+        if (collider is LSMeshCollider mesh)
+            return TrySweepCircleAgainstMesh(start, direction2D, length, radius, slabCenterY, halfThickness, direction3D, mesh, sourceCollider, out hit);
 
-        hit = BuildCircleAgainst3DHit(
-            collider,
-            centerAtImpact,
-            direction3D,
-            radius,
-            slabCenterY,
-            halfThickness,
-            PhysicsQueryReducerKind.ConservativeFallback,
-            distance,
-            sourceCollider);
-        return true;
+        if (collider is LSCompoundCollider compound)
+            return TrySweepCircleAgainstCompound3D(start, direction2D, length, radius, slabCenterY, halfThickness, direction3D, compound, sourceCollider, out hit);
+
+        hit = default;
+        return false;
     }
 
     private static PhysicsQueryReducerKind ClassifySweepSphereAgainst2DReducer(LSCollider2D collider)
@@ -749,8 +738,20 @@ public sealed class GravitasQueryMixedService
         if (collider is LSSphereCollider
             || collider is LSCuboidCollider
             || collider is LSCapsuleCollider
-            || collider is LSCylinderCollider)
+            || collider is LSCylinderCollider
+            || collider is LSMeshCollider)
         {
+            return PhysicsQueryReducerKind.Exact;
+        }
+
+        if (collider is LSCompoundCollider compound)
+        {
+            for (int i = 0; i < compound.PartCount; i++)
+            {
+                if (ClassifySweepCircleAgainst3DReducer(compound.GetPartCollider(i)) == PhysicsQueryReducerKind.ConservativeFallback)
+                    return PhysicsQueryReducerKind.ConservativeFallback;
+            }
+
             return PhysicsQueryReducerKind.Exact;
         }
 
@@ -973,6 +974,139 @@ public sealed class GravitasQueryMixedService
         return true;
     }
 
+    private bool TrySweepCircleAgainstMesh(
+        Vector2d start,
+        Vector2d direction,
+        Fixed64 length,
+        Fixed64 radius,
+        Fixed64 slabCenterY,
+        Fixed64 halfThickness,
+        Vector3d direction3D,
+        LSMeshCollider mesh,
+        LSCollider2D? sourceCollider,
+        out PhysicsMixedHit hit)
+    {
+        CreateCircleSlabSweepBounds(
+            start,
+            start + direction * length,
+            radius,
+            slabCenterY,
+            halfThickness,
+            out Vector3d min,
+            out Vector3d max);
+        mesh.GetTrianglesInBounds(new FixedBoundVolume(min, max), _meshTriangleCandidates);
+        SwiftListSortUtility.SortAscendingInPlace(_meshTriangleCandidates);
+
+        Fixed64 slabMinY = slabCenterY - halfThickness;
+        Fixed64 slabMaxY = slabCenterY + halfThickness;
+        bool found = false;
+        Fixed64 bestDistance = Fixed64.MaxValue;
+        PhysicsMixedHit best = default;
+
+        for (int i = 0; i < _meshTriangleCandidates.Count; i++)
+        {
+            int triangleIndex = _meshTriangleCandidates[i];
+            mesh.Mesh.GetTriangleVertices(triangleIndex, out Vector3d first, out Vector3d second, out Vector3d third);
+            if (!TrySweepCircleAgainstTriangleProjection(
+                start,
+                direction,
+                length,
+                radius,
+                slabMinY,
+                slabMaxY,
+                first,
+                second,
+                third,
+                out Fixed64 distance,
+                out Vector3d point3D))
+            {
+                continue;
+            }
+
+            if (found && distance >= bestDistance)
+                continue;
+
+            Vector2d center2D = start + direction * distance;
+            Vector3d sweepCenter = new(center2D.X, slabCenterY, center2D.Y);
+            best = BuildCircleAgainst3DHit(
+                mesh,
+                point3D,
+                sweepCenter,
+                direction3D,
+                radius,
+                slabCenterY,
+                halfThickness,
+                PhysicsQueryReducerKind.Exact,
+                distance,
+                sourceCollider);
+            bestDistance = distance;
+            found = true;
+        }
+
+        hit = best;
+        return found;
+    }
+
+    private bool TrySweepCircleAgainstCompound3D(
+        Vector2d start,
+        Vector2d direction,
+        Fixed64 length,
+        Fixed64 radius,
+        Fixed64 slabCenterY,
+        Fixed64 halfThickness,
+        Vector3d direction3D,
+        LSCompoundCollider compound,
+        LSCollider2D? sourceCollider,
+        out PhysicsMixedHit hit)
+    {
+        bool found = false;
+        Fixed64 bestDistance = Fixed64.MaxValue;
+        PhysicsMixedHit best = default;
+
+        for (int i = 0; i < compound.PartCount; i++)
+        {
+            LSCollider part = compound.GetPartCollider(i);
+            if (!TrySweepCircleAgainst3DCollider(
+                part,
+                start,
+                direction,
+                length,
+                radius,
+                slabCenterY,
+                halfThickness,
+                direction3D,
+                sourceCollider,
+                out PhysicsMixedHit candidate))
+            {
+                continue;
+            }
+
+            if (found && candidate.Distance >= bestDistance)
+                continue;
+
+            best = candidate;
+            bestDistance = candidate.Distance;
+            found = true;
+        }
+
+        if (!found)
+        {
+            hit = default;
+            return false;
+        }
+
+        hit = new PhysicsMixedHit(
+            compound,
+            sourceCollider,
+            best.Point3D,
+            best.Point2D,
+            best.Normal3DTo2D,
+            best.ReducerKind,
+            best.Distance,
+            best.Direction3D);
+        return true;
+    }
+
     private static bool TryBuildCircleAgainstPlanarCircleTargetHit(
         Vector2d start,
         Vector2d direction,
@@ -1152,6 +1286,212 @@ public sealed class GravitasQueryMixedService
             distance = Fixed64.Zero;
         return distance <= length;
     }
+
+    private static bool TrySweepCircleAgainstTriangleProjection(
+        Vector2d start,
+        Vector2d direction,
+        Fixed64 length,
+        Fixed64 radius,
+        Fixed64 slabMinY,
+        Fixed64 slabMaxY,
+        Vector3d first,
+        Vector3d second,
+        Vector3d third,
+        out Fixed64 distance,
+        out Vector3d point3D)
+    {
+        Span<Vector3d> clipped = stackalloc Vector3d[8];
+        if (!TryClipTriangleToSlab(first, second, third, slabMinY, slabMaxY, clipped, out int clippedCount))
+        {
+            distance = default;
+            point3D = default;
+            return false;
+        }
+
+        Span<Vector2d> projection = stackalloc Vector2d[8];
+        int projectionCount = 0;
+        for (int i = 0; i < clippedCount; i++)
+            TryAddUniqueProjectionPoint(projection, ref projectionCount, ToPlanar(clipped[i]));
+
+        if (projectionCount == 0)
+        {
+            distance = default;
+            point3D = default;
+            return false;
+        }
+
+        BuildConvexHullInPlace(projection, ref projectionCount);
+        if (!TrySweepCircleAgainstConvexProjection(
+            start,
+            direction,
+            length,
+            radius,
+            projection.Slice(0, projectionCount),
+            out distance))
+        {
+            point3D = default;
+            return false;
+        }
+
+        Vector2d center2D = start + direction * distance;
+        point3D = FindClosestPointOnClippedProjection(
+            clipped.Slice(0, clippedCount),
+            center2D,
+            (slabMinY + slabMaxY) * Fixed64.Half);
+        return true;
+    }
+
+    private static bool TryClipTriangleToSlab(
+        Vector3d first,
+        Vector3d second,
+        Vector3d third,
+        Fixed64 slabMinY,
+        Fixed64 slabMaxY,
+        Span<Vector3d> clipped,
+        out int clippedCount)
+    {
+        Span<Vector3d> source = stackalloc Vector3d[8];
+        Span<Vector3d> intermediate = stackalloc Vector3d[8];
+        source[0] = first;
+        source[1] = second;
+        source[2] = third;
+
+        ClipPolygonAgainstYPlane(source, 3, intermediate, slabMinY, keepAbove: true, out int minClipCount);
+        if (minClipCount == 0)
+        {
+            clippedCount = 0;
+            return false;
+        }
+
+        ClipPolygonAgainstYPlane(intermediate, minClipCount, clipped, slabMaxY, keepAbove: false, out clippedCount);
+        return clippedCount > 0;
+    }
+
+    private static void ClipPolygonAgainstYPlane(
+        ReadOnlySpan<Vector3d> input,
+        int inputCount,
+        Span<Vector3d> output,
+        Fixed64 planeY,
+        bool keepAbove,
+        out int outputCount)
+    {
+        outputCount = 0;
+        if (inputCount == 0)
+            return;
+
+        Vector3d previous = input[inputCount - 1];
+        bool previousInside = IsInsideYPlane(previous, planeY, keepAbove);
+        for (int i = 0; i < inputCount; i++)
+        {
+            Vector3d current = input[i];
+            bool currentInside = IsInsideYPlane(current, planeY, keepAbove);
+            if (currentInside)
+            {
+                if (!previousInside && TryIntersectYPlane(previous, current, planeY, out Vector3d intersection))
+                    AddClippedPoint(output, ref outputCount, intersection);
+
+                AddClippedPoint(output, ref outputCount, current);
+            }
+            else if (previousInside && TryIntersectYPlane(previous, current, planeY, out Vector3d intersection))
+            {
+                AddClippedPoint(output, ref outputCount, intersection);
+            }
+
+            previous = current;
+            previousInside = currentInside;
+        }
+
+        if (outputCount > 1 && PointsEquivalent(output[0], output[outputCount - 1]))
+            outputCount--;
+    }
+
+    private static Vector3d FindClosestPointOnClippedProjection(
+        ReadOnlySpan<Vector3d> polygon,
+        Vector2d point,
+        Fixed64 referenceY)
+    {
+        Vector3d best = polygon[0];
+        Fixed64 bestDistanceSqr = (ToPlanar(best) - point).MagnitudeSquared;
+        Fixed64 bestYDistance = (best.Y - referenceY).Abs();
+
+        for (int i = 0; i < polygon.Length; i++)
+        {
+            Vector3d first = polygon[i];
+            Vector3d second = polygon[(i + 1) % polygon.Length];
+            Vector2d first2D = ToPlanar(first);
+            Vector2d second2D = ToPlanar(second);
+            Vector2d edge = second2D - first2D;
+            Fixed64 edgeLengthSqr = edge.MagnitudeSquared;
+            Vector3d candidate;
+            if (edgeLengthSqr <= Fixed64.Epsilon)
+            {
+                Fixed64 firstYDistance = (first.Y - referenceY).Abs();
+                Fixed64 secondYDistance = (second.Y - referenceY).Abs();
+                candidate = firstYDistance <= secondYDistance ? first : second;
+            }
+            else
+            {
+                Fixed64 t = Vector2d.Dot(point - first2D, edge) / edgeLengthSqr;
+                t = FixedMath.Clamp01(t);
+                candidate = first + (second - first) * t;
+            }
+
+            Fixed64 distanceSqr = (ToPlanar(candidate) - point).MagnitudeSquared;
+            Fixed64 yDistance = (candidate.Y - referenceY).Abs();
+            if (distanceSqr > bestDistanceSqr
+                || (distanceSqr == bestDistanceSqr && yDistance >= bestYDistance))
+            {
+                continue;
+            }
+
+            best = candidate;
+            bestDistanceSqr = distanceSqr;
+            bestYDistance = yDistance;
+        }
+
+        return best;
+    }
+
+    private static bool TryIntersectYPlane(Vector3d first, Vector3d second, Fixed64 planeY, out Vector3d intersection)
+    {
+        Fixed64 deltaY = second.Y - first.Y;
+        if (deltaY.Abs() <= Fixed64.Epsilon)
+        {
+            intersection = default;
+            return false;
+        }
+
+        Fixed64 t = (planeY - first.Y) / deltaY;
+        if (t < -Fixed64.Epsilon || t > Fixed64.One + Fixed64.Epsilon)
+        {
+            intersection = default;
+            return false;
+        }
+
+        t = FixedMath.Clamp01(t);
+        intersection = first + (second - first) * t;
+        return true;
+    }
+
+    private static void AddClippedPoint(Span<Vector3d> points, ref int count, Vector3d point)
+    {
+        if (count > 0 && PointsEquivalent(points[count - 1], point))
+            return;
+
+        if (count < points.Length)
+            points[count++] = point;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool IsInsideYPlane(Vector3d point, Fixed64 planeY, bool keepAbove) =>
+        keepAbove ? point.Y >= planeY : point.Y <= planeY;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool PointsEquivalent(Vector3d first, Vector3d second) =>
+        (first - second).MagnitudeSquared <= Fixed64.Epsilon;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Vector2d ToPlanar(Vector3d point) => new(point.X, point.Z);
 
     private static bool TryBuildCuboidSlabProjection(
         LSCuboidCollider cuboid,
@@ -1613,6 +1953,31 @@ public sealed class GravitasQueryMixedService
         LSCollider2D? sourceCollider)
     {
         Vector3d point3D = GetSweepSurfacePoint(collider, sweepCenter, direction);
+        return BuildCircleAgainst3DHit(
+            collider,
+            point3D,
+            sweepCenter,
+            direction,
+            radius,
+            slabCenterY,
+            halfThickness,
+            reducerKind,
+            distance,
+            sourceCollider);
+    }
+
+    private static PhysicsMixedHit BuildCircleAgainst3DHit(
+        LSCollider collider,
+        Vector3d point3D,
+        Vector3d sweepCenter,
+        Vector3d direction,
+        Fixed64 radius,
+        Fixed64 slabCenterY,
+        Fixed64 halfThickness,
+        PhysicsQueryReducerKind reducerKind,
+        Fixed64 distance,
+        LSCollider2D? sourceCollider)
+    {
         Vector3d to2D = sweepCenter - point3D;
         Vector3d normal3DTo2D = to2D.MagnitudeSquared > Fixed64.Epsilon
             ? to2D.Normalized

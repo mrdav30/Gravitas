@@ -83,11 +83,12 @@ Mixed query hits expose `PhysicsMixedHit.ReducerKind` so hosts can distinguish
 exact finite-slab reducers from safe conservative fallbacks. 2D swept-circle
 mixed CCD routes through the same mixed query reducers as public
 `SweepCircleAgainst3D`: sphere, cuboid, capsule, and finite-cylinder targets
-use finite-slab reducers, while mesh and compound targets remain explicit
-conservative fallbacks.
+use finite-slab reducers. Mesh targets clip candidate triangles to the finite
+slab before X/Z projection, and compound targets reduce exact supported parts in
+authored order.
 When diagnostics are enabled, mixed queries also emit `QuerySummary` events with
 exact attempt, accepted hit, fallback hit, and rejected fallback counts.
-Remaining mixed finite-slab reducer promotion is tracked in the feature-work
+Remaining mixed query hardening is tracked in the feature-work
 [`Mixed Query Finite-Slab Reducer Completion`](../feature-work/2026-06-22-mixed-query-finite-slab-reducer-completion-plan.md)
 plan rather than as an implicit wiki caveat.
 

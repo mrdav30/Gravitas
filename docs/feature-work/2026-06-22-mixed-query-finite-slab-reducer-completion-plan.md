@@ -29,8 +29,8 @@ and CCD services.
 At the start of this plan, `QueryMixed.SweepCircleAgainst3D` was exact for 3D
 spheres, cuboids, world-Y capsules, and world-Y finite cylinders. Mesh,
 compound, rotated capsule, and rotated finite-cylinder targets still used a
-labeled `ConservativeFallback` path. That fallback is safe from false
-negatives, but it can report earlier or extra hits in dense mixed scenes.
+labeled `ConservativeFallback` path. That fallback was safe from false
+negatives, but it could report earlier or extra hits in dense mixed scenes.
 
 For alpha, that policy should either become exact for the current runtime shape
 families or remain explicitly justified by benchmark evidence and documented
@@ -72,21 +72,40 @@ does not carry hidden follow-up work.
   clipped to the slab Y interval.
 - World-Y capsule/cylinder paths still use the cheaper vertical-interval
   reducers.
-- Mesh and compound target fallback policy remains owned by Workstream 2.
+- Mesh and compound target fallback policy was closed by Workstream 2.
 
 ## Workstream 2: Mesh And Compound Target Finite-Slab Reducers
 
+**Status:** Done.
+
 **Tasks**
 
-- [ ] Add tests that distinguish finite-slab truth from current fallback hits
+- [x] Add tests that distinguish finite-slab truth from current fallback hits
   for mesh triangle targets and authored compound targets.
-- [ ] Implement exact finite-slab reducers against mesh triangle candidates,
+- [x] Implement exact finite-slab reducers against mesh triangle candidates,
   reducing hits back to the owning mesh collider with stable triangle ordering.
-- [ ] Implement compound target reduction over supported parts in authored part
+- [x] Implement compound target reduction over supported parts in authored part
   order, preserving one owner hit and deterministic tie-breaks.
-- [ ] Share reducer policy with mixed static CCD collectors.
-- [ ] Benchmark mesh and compound mixed sweeps at sparse, dense, and
+- [x] Share reducer policy with mixed static CCD collectors.
+- [x] Benchmark mesh and compound mixed sweeps at sparse, dense, and
   false-positive-heavy scales.
+
+**Implementation notes**
+
+- Mesh target reducers now query triangle BVH candidates, sort candidate
+  triangle indices, clip each world-space triangle to the query slab Y interval,
+  project the clipped polygon into X/Z, and sweep the source circle against the
+  resulting point, segment, or convex polygon.
+- Mesh hits reduce to the owning `LSMeshCollider`; equal-distance triangle hits
+  keep the lower authored triangle index.
+- Compound target reducers iterate private parts in authored order, preserve one
+  owner hit on the `LSCompoundCollider`, and keep the earlier part on
+  equal-distance ties.
+- `SweepCircleAgainstStatic3DAll` uses the same reducer path as public
+  `SweepCircleAgainst3DAll`, so mixed static CCD no longer receives mesh or
+  compound circumsphere-proxy hits for this source family.
+- Benchmark rows now cover sparse, dense, and false-positive-heavy mesh and
+  compound target sweeps.
 
 ## Workstream 3: Convex Mesh Source Scaling Signal
 

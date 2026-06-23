@@ -22,6 +22,12 @@ public class MixedQueryBenchmarks
     private GravitasWorldContext _denseCylinderContext;
     private GravitasWorldContext _denseRotatedCapsuleContext;
     private GravitasWorldContext _denseRotatedCylinderContext;
+    private GravitasWorldContext _sparseMeshContext;
+    private GravitasWorldContext _denseMeshContext;
+    private GravitasWorldContext _falsePositiveMeshContext;
+    private GravitasWorldContext _sparseCompoundContext;
+    private GravitasWorldContext _denseCompoundContext;
+    private GravitasWorldContext _falsePositiveCompoundContext;
     private SwiftList<PhysicsMixedHit> _hits;
     private Vector2d _sparseEnd;
     private Vector2d _denseEnd;
@@ -44,12 +50,19 @@ public class MixedQueryBenchmarks
         _denseCylinderContext = CreateMixedContext(denseExtentX, 16);
         _denseRotatedCapsuleContext = CreateMixedContext(denseExtentX, 16);
         _denseRotatedCylinderContext = CreateMixedContext(denseExtentX, 16);
+        _sparseMeshContext = CreateMixedContext(sparseExtentX, 16);
+        _denseMeshContext = CreateMixedContext(denseExtentX, 16);
+        _falsePositiveMeshContext = CreateMixedContext(denseExtentX, 16);
+        _sparseCompoundContext = CreateMixedContext(sparseExtentX, 16);
+        _denseCompoundContext = CreateMixedContext(denseExtentX, 16);
+        _falsePositiveCompoundContext = CreateMixedContext(denseExtentX, 16);
         _hits = new SwiftList<PhysicsMixedHit>(ColliderCount);
         FixedQuaternion rotatedCurvedTarget = FixedQuaternion.FromEulerAnglesInDegrees(Fixed64.Zero, Fixed64.Zero, (Fixed64)90);
 
         for (int i = 0; i < ColliderCount; i++)
         {
             Vector3d densePosition = new((Fixed64)i, Fixed64.Zero, DenseZForIndex(i));
+            Vector3d sparsePosition = new((Fixed64)(i * 3), Fixed64.Zero, Fixed64.Zero);
             _ = CreateSphere3D(_sparseContext, new Vector3d((Fixed64)(i * 3), Fixed64.Zero, Fixed64.Zero));
             _ = CreateSphere3D(_denseContext, densePosition);
             _ = CreateSphere3D(
@@ -74,6 +87,12 @@ public class MixedQueryBenchmarks
                 new LSCylinderCollider { Size = new Vector3d(Fixed64.One, (Fixed64)3, Fixed64.One) },
                 densePosition,
                 rotatedCurvedTarget);
+            _ = CreateStatic3D(_sparseMeshContext, CreateVerticalQuadMesh(), sparsePosition);
+            _ = CreateStatic3D(_denseMeshContext, CreateVerticalQuadMesh(), densePosition);
+            _ = CreateStatic3D(_falsePositiveMeshContext, CreateSlabClippedProxyOnlyTriangleMesh(), densePosition);
+            _ = CreateStatic3D(_sparseCompoundContext, CreateCompoundTarget(), sparsePosition);
+            _ = CreateStatic3D(_denseCompoundContext, CreateCompoundTarget(), densePosition);
+            _ = CreateStatic3D(_falsePositiveCompoundContext, CreateProxyOnlyCompoundTarget(), densePosition);
         }
 
         _sparseContext.Simulate();
@@ -84,6 +103,12 @@ public class MixedQueryBenchmarks
         _denseCylinderContext.Simulate();
         _denseRotatedCapsuleContext.Simulate();
         _denseRotatedCylinderContext.Simulate();
+        _sparseMeshContext.Simulate();
+        _denseMeshContext.Simulate();
+        _falsePositiveMeshContext.Simulate();
+        _sparseCompoundContext.Simulate();
+        _denseCompoundContext.Simulate();
+        _falsePositiveCompoundContext.Simulate();
 
         _sparseEnd = new Vector2d((Fixed64)(ColliderCount * 3), Fixed64.Zero);
         _denseEnd = new Vector2d((Fixed64)ColliderCount, Fixed64.Zero);
@@ -101,6 +126,12 @@ public class MixedQueryBenchmarks
         _denseCylinderContext?.Dispose();
         _denseRotatedCapsuleContext?.Dispose();
         _denseRotatedCylinderContext?.Dispose();
+        _sparseMeshContext?.Dispose();
+        _denseMeshContext?.Dispose();
+        _falsePositiveMeshContext?.Dispose();
+        _sparseCompoundContext?.Dispose();
+        _denseCompoundContext?.Dispose();
+        _falsePositiveCompoundContext?.Dispose();
         _sparseContext = null;
         _denseContext = null;
         _cornerMissContext = null;
@@ -109,6 +140,12 @@ public class MixedQueryBenchmarks
         _denseCylinderContext = null;
         _denseRotatedCapsuleContext = null;
         _denseRotatedCylinderContext = null;
+        _sparseMeshContext = null;
+        _denseMeshContext = null;
+        _falsePositiveMeshContext = null;
+        _sparseCompoundContext = null;
+        _denseCompoundContext = null;
+        _falsePositiveCompoundContext = null;
         _hits = null;
     }
 
@@ -216,6 +253,84 @@ public class MixedQueryBenchmarks
         return _denseRotatedCylinderContext.QueryMixed.LastQueryCandidateCount;
     }
 
+    [Benchmark]
+    public int SweepCircleAgainst3DAll_SparseMeshTargets()
+    {
+        return SweepCircleAgainst3D(_sparseMeshContext, _sparseEnd);
+    }
+
+    [Benchmark]
+    public int SweepCircleAgainst3DAll_SparseMeshTargets_CandidateCount()
+    {
+        _ = SweepCircleAgainst3D(_sparseMeshContext, _sparseEnd);
+        return _sparseMeshContext.QueryMixed.LastQueryCandidateCount;
+    }
+
+    [Benchmark]
+    public int SweepCircleAgainst3DAll_DenseMeshTargets()
+    {
+        return SweepCircleAgainst3D(_denseMeshContext, _denseEnd);
+    }
+
+    [Benchmark]
+    public int SweepCircleAgainst3DAll_DenseMeshTargets_CandidateCount()
+    {
+        _ = SweepCircleAgainst3D(_denseMeshContext, _denseEnd);
+        return _denseMeshContext.QueryMixed.LastQueryCandidateCount;
+    }
+
+    [Benchmark]
+    public int SweepCircleAgainst3DAll_FalsePositiveMeshTargets()
+    {
+        return SweepCircleAgainst3D(_falsePositiveMeshContext, _denseEnd);
+    }
+
+    [Benchmark]
+    public int SweepCircleAgainst3DAll_FalsePositiveMeshTargets_CandidateCount()
+    {
+        _ = SweepCircleAgainst3D(_falsePositiveMeshContext, _denseEnd);
+        return _falsePositiveMeshContext.QueryMixed.LastQueryCandidateCount;
+    }
+
+    [Benchmark]
+    public int SweepCircleAgainst3DAll_SparseCompoundTargets()
+    {
+        return SweepCircleAgainst3D(_sparseCompoundContext, _sparseEnd);
+    }
+
+    [Benchmark]
+    public int SweepCircleAgainst3DAll_SparseCompoundTargets_CandidateCount()
+    {
+        _ = SweepCircleAgainst3D(_sparseCompoundContext, _sparseEnd);
+        return _sparseCompoundContext.QueryMixed.LastQueryCandidateCount;
+    }
+
+    [Benchmark]
+    public int SweepCircleAgainst3DAll_DenseCompoundTargets()
+    {
+        return SweepCircleAgainst3D(_denseCompoundContext, _denseEnd);
+    }
+
+    [Benchmark]
+    public int SweepCircleAgainst3DAll_DenseCompoundTargets_CandidateCount()
+    {
+        _ = SweepCircleAgainst3D(_denseCompoundContext, _denseEnd);
+        return _denseCompoundContext.QueryMixed.LastQueryCandidateCount;
+    }
+
+    [Benchmark]
+    public int SweepCircleAgainst3DAll_FalsePositiveCompoundTargets()
+    {
+        return SweepCircleAgainst3D(_falsePositiveCompoundContext, _denseEnd);
+    }
+
+    [Benchmark]
+    public int SweepCircleAgainst3DAll_FalsePositiveCompoundTargets_CandidateCount()
+    {
+        _ = SweepCircleAgainst3D(_falsePositiveCompoundContext, _denseEnd);
+        return _falsePositiveCompoundContext.QueryMixed.LastQueryCandidateCount;
+    }
+
     private static GravitasWorldContext CreateMixedContext(int extentX, int extentZ, bool clearAllPools = false)
     {
         GravitasWorldContext context = BenchmarkEnvironment.PrepareOwnedContext(clearAllPools);
@@ -257,9 +372,14 @@ public class MixedQueryBenchmarks
 
     private int SweepCircleAgainstDensePrimitive3D(GravitasWorldContext context)
     {
+        return SweepCircleAgainst3D(context, _denseEnd);
+    }
+
+    private int SweepCircleAgainst3D(GravitasWorldContext context, Vector2d end)
+    {
         return context.QueryMixed.SweepCircleAgainst3DAll(
             new Vector2d((Fixed64)(-2), Fixed64.Zero),
-            _denseEnd,
+            end,
             Fixed64.Half,
             Fixed64.Zero,
             Fixed64.Half,
@@ -277,5 +397,63 @@ public class MixedQueryBenchmarks
             2 => -Fixed64.FromFraction(1, 4),
             _ => Fixed64.FromFraction(3, 4)
         };
+    }
+
+    private static LSMeshCollider CreateVerticalQuadMesh()
+    {
+        Fixed64 minY = -Fixed64.One;
+        Fixed64 maxY = Fixed64.One;
+        Fixed64 zMin = -Fixed64.Half;
+        Fixed64 zMax = Fixed64.Half;
+        return new LSMeshCollider(
+            new[]
+            {
+                new Vector3d(Fixed64.Zero, minY, zMin),
+                new Vector3d(Fixed64.Zero, maxY, zMin),
+                new Vector3d(Fixed64.Zero, minY, zMax),
+                new Vector3d(Fixed64.Zero, maxY, zMax)
+            },
+            new[] { 0, 1, 2, 2, 1, 3 },
+            MeshColliderMode.Convex,
+            MeshInertiaPolicy.SurfaceApproximation);
+    }
+
+    private static LSMeshCollider CreateSlabClippedProxyOnlyTriangleMesh()
+    {
+        GetSlabClippedProxyOnlyTriangle(out Vector3d[] vertices, out int[] triangles);
+        return new LSMeshCollider(vertices, triangles, MeshColliderMode.Convex, MeshInertiaPolicy.SurfaceApproximation);
+    }
+
+    private static LSCompoundCollider CreateCompoundTarget()
+    {
+        return new LSCompoundCollider(
+            CompoundColliderPart.Sphere(Fixed64.Half, Vector3d.Zero),
+            CompoundColliderPart.Cuboid(
+                Vector3d.One,
+                new Vector3d(Fixed64.One, Fixed64.Zero, Fixed64.Zero)));
+    }
+
+    private static LSCompoundCollider CreateProxyOnlyCompoundTarget()
+    {
+        GetSlabClippedProxyOnlyTriangle(out Vector3d[] vertices, out int[] triangles);
+        return new LSCompoundCollider(
+            CompoundColliderPart.ConvexMesh(
+                vertices,
+                triangles,
+                Vector3d.Zero,
+                FixedQuaternion.Identity,
+                Vector3d.One,
+                MeshInertiaPolicy.SurfaceApproximation));
+    }
+
+    private static void GetSlabClippedProxyOnlyTriangle(out Vector3d[] vertices, out int[] triangles)
+    {
+        vertices = new[]
+        {
+            new Vector3d(Fixed64.Zero, -Fixed64.One, Fixed64.FromFraction(49, 100)),
+            new Vector3d(Fixed64.Zero, Fixed64.One, Fixed64.FromFraction(71, 100)),
+            new Vector3d(Fixed64.Zero, -Fixed64.One, Fixed64.One)
+        };
+        triangles = new[] { 0, 1, 2 };
     }
 }
