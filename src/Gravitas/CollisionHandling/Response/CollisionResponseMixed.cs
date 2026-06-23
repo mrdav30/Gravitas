@@ -9,7 +9,7 @@ using FixedMathSharp;
 using Gravitas.Colliders;
 using System.Runtime.CompilerServices;
 
-namespace Gravitas;
+namespace Gravitas.CollisionHandling;
 
 /// <summary>
 /// Solves deterministic mixed 3D/2D contact response with the 2D body constrained to its X/Z plane.

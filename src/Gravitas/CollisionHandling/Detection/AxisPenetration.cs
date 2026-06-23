@@ -1,22 +1,17 @@
-//=======================================================================
-// MixedAxisPenetration.cs
+﻿//=======================================================================
+// CollisionDetection.Support.cs
 //=======================================================================
 // MIT License, Copyright (c) 2026–present David Oravsky (mrdav30)
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
 using FixedMathSharp;
-using System.Runtime.CompilerServices;
 
-namespace Gravitas;
+namespace Gravitas.CollisionHandling;
 
-/// <summary>
-/// Deterministic minimum-penetration axis selected by mixed narrow-phase SAT checks.
-/// </summary>
-internal readonly struct MixedAxisPenetration
+internal readonly struct AxisPenetration
 {
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public MixedAxisPenetration(Vector3d axis, Fixed64 depth)
+    public AxisPenetration(Vector3d axis, Fixed64 depth)
     {
         Axis = axis;
         Depth = depth;

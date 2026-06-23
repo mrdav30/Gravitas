@@ -174,7 +174,7 @@ does not carry hidden follow-up work.
   public mixed query fallback is the opposite source direction.
 - Exact AABB, polygon, and compound slab reducers for
   `QueryMixed.SweepSphereAgainst2D` were extracted into
-  [`Mixed Sphere Against 2D Slab Reducer Completion`](../2026-06-23-mixed-sphere-2d-slab-reducer-completion-plan.md).
+  [`Mixed Sphere Against 2D Slab Reducer Completion`](2026-06-23-mixed-sphere-2d-slab-reducer-completion-plan.md).
 - Mesh triangle-level finite-slab benchmark attribution was captured in
   [`benchmark-signal-hardening-backlog.md`](../benchmark-signal-hardening-backlog.md)
   instead of broadening this close-out pass.

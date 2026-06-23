@@ -23,33 +23,33 @@ mixed query and CCD services.
 ---
 
 **Date:** 2026-06-23
-**Status:** Pre-alpha release blocker
+**Status:** Done 2026-06-23
 **Owner:** Gravitas query and mixed CCD hardening
 
 ## Purpose
 
 `QueryMixed.SweepCircleAgainst3D` now has exact finite-slab reducers for the
 supported 3D target families, including rotated curved primitives, mesh
-targets, and compound targets. The remaining public mixed query fallback is the
-opposite source direction: `QueryMixed.SweepSphereAgainst2D` is exact for 2D
-circle slabs, but AABB and convex polygon slabs still accept conservative mixed
-prism-bound hits.
+targets, and compound targets. At plan start, the opposite source direction
+still had one public mixed query fallback: `QueryMixed.SweepSphereAgainst2D`
+was exact for 2D circle slabs, but AABB and convex polygon slabs still accepted
+conservative mixed prism-bound hits.
 
-That policy is safe from false negatives, but it can report earlier or extra
-hits when a 3D sphere passes near the prism volume without actually intersecting
-the embedded 2D shape's finite slab. For alpha, that remaining public fallback
-needs its own tests, reducer design, benchmark signal, and docs instead of being
-buried in the completed mixed swept-circle reducer plan.
+That old policy was safe from false negatives, but it could report earlier or
+extra hits when a 3D sphere passed near the prism volume without actually
+intersecting the embedded 2D shape's finite slab. For alpha, that public
+fallback needed its own tests, reducer design, benchmark signal, and docs
+instead of being buried in the completed mixed swept-circle reducer plan.
 
 ## Relationship To Existing Plans
 
-- [`2026-06-22-mixed-query-finite-slab-reducer-completion-plan.md`](done/2026-06-22-mixed-query-finite-slab-reducer-completion-plan.md)
+- [`2026-06-22-mixed-query-finite-slab-reducer-completion-plan.md`](2026-06-22-mixed-query-finite-slab-reducer-completion-plan.md)
   completed exact `SweepCircleAgainst3D` target reducers and convex mesh source
   scaling signal.
-- [`2026-06-21-query-and-mixed-swept-shape-hardening-plan.md`](done/2026-06-21-query-and-mixed-swept-shape-hardening-plan.md)
+- [`2026-06-21-query-and-mixed-swept-shape-hardening-plan.md`](2026-06-21-query-and-mixed-swept-shape-hardening-plan.md)
   established public mixed query labels, query diagnostics, and convex source
   API boundaries.
-- [`2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md`](2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md)
+- [`2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md`](../2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md)
   owns broader continuous-collision exact TOI promotion. This plan should feed
   mixed static 3D-sphere-against-2D reducer policy into CCD, but it does not own
   dynamic mixed CCD island or relative-motion design.
@@ -71,60 +71,84 @@ buried in the completed mixed swept-circle reducer plan.
 
 **Tasks**
 
-- [ ] Inventory every `SweepSphereAgainst2D` path that can still accept
+- [x] Inventory every `SweepSphereAgainst2D` path that can still accept
   `ConservativeFallback`.
-- [ ] Add red tests where AABB and convex polygon prism bounds report a hit that
+- [x] Add red tests where AABB and convex polygon prism bounds report a hit that
   the exact finite 2D shape slab should reject.
-- [ ] Add true-hit tests for direct face, edge, corner, starting-overlap, and
+- [x] Add true-hit tests for direct face, edge, corner, starting-overlap, and
   vertical-grazing cases.
-- [ ] Add compound tests for multiple parts at different distances and
+- [x] Add compound tests for multiple parts at different distances and
   equal-distance authored part ordering.
-- [ ] Add benchmark rows or diagnostics that attribute candidate count, exact
+- [x] Add benchmark rows or diagnostics that attribute candidate count, exact
   attempts, accepted hits, fallback hits, and rejected conservative candidates.
+
+**Result:** Public closest/all-hit queries and mixed static 2D CCD share the
+same `TrySweepSphereAgainst2DCandidate` policy. Red tests now cover AABB and
+polygon proxy misses, accepted side/edge/cap cases, starting overlap, compound
+owner identity, and equal-distance authored part order. Query diagnostics assert
+exact attempt, accepted hit, fallback hit, and rejected conservative counters.
+Benchmark rows expose dense and false-positive-heavy AABB, polygon, and
+compound target workloads plus candidate counts.
 
 ## Workstream 2: AABB Slab Reducer
 
 **Tasks**
 
-- [ ] Implement a deterministic swept-sphere reducer against finite 2D AABB
+- [x] Implement a deterministic swept-sphere reducer against finite 2D AABB
   slabs.
-- [ ] Preserve cheap vertical-interval and planar-distance rejection before
+- [x] Preserve cheap vertical-interval and planar-distance rejection before
   expensive exact work.
-- [ ] Keep result points and normals consistent with mixed contact/query
+- [x] Keep result points and normals consistent with mixed contact/query
   orientation rules.
-- [ ] Route mixed static CCD sphere-source collectors through the same reducer
+- [x] Route mixed static CCD sphere-source collectors through the same reducer
   policy where applicable.
-- [ ] Prove no managed allocation after warmup for accepted, rejected, and
+- [x] Prove no managed allocation after warmup for accepted, rejected, and
   all-hit AABB slab query paths.
+
+**Result:** AABB slabs now use exact finite-prism shape casts: starting overlap,
+cap faces, side faces, and prism edges are tested without accepting expanded
+bounds-only hits. Result construction uses shared embedded-slab closest-point
+geometry so starting-inside normals resolve to a real slab boundary.
 
 ## Workstream 3: Convex Polygon And Compound Slab Reducers
 
 **Tasks**
 
-- [ ] Implement exact swept-sphere reduction against finite convex polygon
+- [x] Implement exact swept-sphere reduction against finite convex polygon
   slabs, including segment and vertex feature cases.
-- [ ] Reuse FixedMathSharp geometry helpers where they fit; document any custom
+- [x] Reuse FixedMathSharp geometry helpers where they fit; document any custom
   fixed-point math invariants.
-- [ ] Reduce compound 2D targets over supported parts in authored order and
+- [x] Reduce compound 2D targets over supported parts in authored order and
   report one owner hit.
-- [ ] Add false-positive-heavy polygon and compound benchmark rows before
+- [x] Add false-positive-heavy polygon and compound benchmark rows before
   optimizing reducer internals.
-- [ ] Preserve `PhysicsMixedHit.ReducerKind` and `QuerySummary` counter
+- [x] Preserve `PhysicsMixedHit.ReducerKind` and `QuerySummary` counter
   semantics.
+
+**Result:** Convex polygon slabs share the exact finite-prism reducer with
+AABB slabs by walking stable collider vertices. Compound 2D sweeps reduce
+private parts in authored order, keep owner identity, and use strict distance
+replacement so equal-distance ties keep the earlier part. Supported AABB,
+polygon, circle, and compound slab hits are now labeled `Exact`.
 
 ## Workstream 4: Docs, Diagnostics, And Release Validation
 
 **Tasks**
 
-- [ ] Update `docs/wiki/QUERY_SERVICES.md`, `COLLISION_PIPELINE.md`, and
+- [x] Update `docs/wiki/QUERY_SERVICES.md`, `COLLISION_PIPELINE.md`, and
   `DIMENSIONS.md` with the final exact/fallback policy.
-- [ ] Ensure diagnostics distinguish exact attempts, accepted hits, fallback
+- [x] Ensure diagnostics distinguish exact attempts, accepted hits, fallback
   hits, and rejected conservative candidates for this source direction.
-- [ ] Update benchmark backlog entries or close them with evidence.
-- [ ] Validate Release and ReleaseLean builds/tests.
-- [ ] Move this plan to `docs/feature-work/done` once the remaining
+- [x] Update benchmark backlog entries or close them with evidence.
+- [x] Validate Release and ReleaseLean builds/tests.
+- [x] Move this plan to `docs/feature-work/done` once the remaining
   `SweepSphereAgainst2D` public fallback is closed or explicitly rejected with
   evidence.
+
+**Result:** Wiki docs now describe exact public/static-CCD mixed reducers for
+3D sphere sources against supported 2D slab targets. No new deferred work was
+found; proxy-based dynamic mixed CCD remains owned by the broader CCD plans.
+Validation evidence is recorded in the final implementation summary.
 
 ## Done Criteria
 

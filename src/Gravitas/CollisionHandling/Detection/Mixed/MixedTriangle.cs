@@ -9,7 +9,7 @@ using FixedMathSharp;
 using SwiftCollections.Query;
 using System.Runtime.CompilerServices;
 
-namespace Gravitas;
+namespace Gravitas.CollisionHandling;
 
 /// <summary>
 /// World-space triangle data used by mixed mesh-vs-slab checks.

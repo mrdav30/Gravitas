@@ -11,7 +11,7 @@ using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using System.Runtime.CompilerServices;
 
-namespace Gravitas;
+namespace Gravitas.CollisionHandling;
 
 /// <summary>
 /// Deterministic mixed 2D/3D narrow-phase collision checks.
@@ -113,7 +113,7 @@ public static partial class CollisionDetectionMixed
     private static bool TryCuboidEmbedded2D(LSCuboidCollider cuboid, LSCollider2D embedded, out MixedContact contact)
     {
         bool collided = embedded.Shape == ColliderType2D.Circle
-            ? TryTestCuboidCircleSlab(cuboid, (LSCircleCollider2D)embedded, out MixedAxisPenetration penetration)
+            ? TryTestCuboidCircleSlab(cuboid, (LSCircleCollider2D)embedded, out AxisPenetration penetration)
             : TryTestCuboidPrism(cuboid, embedded, out penetration);
 
         return collided
@@ -124,7 +124,7 @@ public static partial class CollisionDetectionMixed
     private static bool TryCapsuleEmbedded2D(LSCapsuleCollider capsule, LSCollider2D embedded, out MixedContact contact)
     {
         bool collided = embedded.Shape == ColliderType2D.Circle
-            ? TryTestCapsuleCircleSlab(capsule, (LSCircleCollider2D)embedded, out MixedAxisPenetration penetration)
+            ? TryTestCapsuleCircleSlab(capsule, (LSCircleCollider2D)embedded, out AxisPenetration penetration)
             : TryTestCapsulePrism(capsule, embedded, out penetration);
 
         return collided
@@ -135,7 +135,7 @@ public static partial class CollisionDetectionMixed
     private static bool TryCylinderEmbedded2D(LSCylinderCollider cylinder, LSCollider2D embedded, out MixedContact contact)
     {
         bool collided = embedded.Shape == ColliderType2D.Circle
-            ? TryTestCylinderCircleSlab(cylinder, (LSCircleCollider2D)embedded, out MixedAxisPenetration penetration)
+            ? TryTestCylinderCircleSlab(cylinder, (LSCircleCollider2D)embedded, out AxisPenetration penetration)
             : TryTestCylinderPrism(cylinder, embedded, out penetration);
 
         return collided
@@ -146,7 +146,7 @@ public static partial class CollisionDetectionMixed
     private static bool TryTestCuboidCircleSlab(
         LSCuboidCollider cuboid,
         LSCircleCollider2D circle,
-        out MixedAxisPenetration penetration)
+        out AxisPenetration penetration)
     {
         penetration = default;
 
@@ -177,7 +177,7 @@ public static partial class CollisionDetectionMixed
     private static bool TryTestCapsuleCircleSlab(
         LSCapsuleCollider capsule,
         LSCircleCollider2D circle,
-        out MixedAxisPenetration penetration)
+        out AxisPenetration penetration)
     {
         penetration = default;
         GetCircleSlabSegment(circle, out Vector3d circleStart, out Vector3d circleEnd);
@@ -205,7 +205,7 @@ public static partial class CollisionDetectionMixed
     private static bool TryTestCylinderCircleSlab(
         LSCylinderCollider cylinder,
         LSCircleCollider2D circle,
-        out MixedAxisPenetration penetration)
+        out AxisPenetration penetration)
     {
         penetration = default;
         GetCircleSlabSegment(circle, out Vector3d circleStart, out Vector3d circleEnd);
@@ -233,7 +233,7 @@ public static partial class CollisionDetectionMixed
     private static bool TryTestCuboidPrism(
         LSCuboidCollider cuboid,
         LSCollider2D prism,
-        out MixedAxisPenetration penetration)
+        out AxisPenetration penetration)
     {
         penetration = default;
 
@@ -267,7 +267,7 @@ public static partial class CollisionDetectionMixed
             }
         }
 
-        Vector3d embeddedPoint = GetClosestPointOnEmbeddedVolume(prism, cuboid.Center);
+        Vector3d embeddedPoint = MixedEmbedded2DGeometry.GetClosestPointOnEmbeddedVolume(prism, cuboid.Center);
         Vector3d cuboidPoint = cuboid.ClosestPointOnSurface(embeddedPoint);
         if (!CheckCuboidPrismAxis(cuboid, prism, embeddedPoint - cuboidPoint, ref penetration))
             return false;
@@ -278,7 +278,7 @@ public static partial class CollisionDetectionMixed
     private static bool TryTestCapsulePrism(
         LSCapsuleCollider capsule,
         LSCollider2D prism,
-        out MixedAxisPenetration penetration)
+        out AxisPenetration penetration)
     {
         penetration = default;
 
@@ -303,7 +303,7 @@ public static partial class CollisionDetectionMixed
         }
 
         Vector3d linePoint = Vector3d.ClosestPointOnLineSegment(GetEmbeddedCenter3D(prism), capsule.LineSegmentStart, capsule.LineSegmentEnd);
-        Vector3d embeddedPoint = GetClosestPointOnEmbeddedVolume(prism, linePoint);
+        Vector3d embeddedPoint = MixedEmbedded2DGeometry.GetClosestPointOnEmbeddedVolume(prism, linePoint);
         if (!CheckCapsulePrismAxis(capsule, prism, embeddedPoint - linePoint, ref penetration))
             return false;
 
@@ -313,7 +313,7 @@ public static partial class CollisionDetectionMixed
     private static bool TryTestCylinderPrism(
         LSCylinderCollider cylinder,
         LSCollider2D prism,
-        out MixedAxisPenetration penetration)
+        out AxisPenetration penetration)
     {
         penetration = default;
 
@@ -338,7 +338,7 @@ public static partial class CollisionDetectionMixed
         }
 
         Vector3d linePoint = Vector3d.ClosestPointOnLineSegment(GetEmbeddedCenter3D(prism), cylinder.LineSegmentStart, cylinder.LineSegmentEnd);
-        Vector3d embeddedPoint = GetClosestPointOnEmbeddedVolume(prism, linePoint);
+        Vector3d embeddedPoint = MixedEmbedded2DGeometry.GetClosestPointOnEmbeddedVolume(prism, linePoint);
         if (!CheckCylinderPrismAxis(cylinder, prism, embeddedPoint - linePoint, ref penetration))
             return false;
 
@@ -349,7 +349,7 @@ public static partial class CollisionDetectionMixed
         LSCuboidCollider cuboid,
         LSCircleCollider2D circle,
         Vector3d axis,
-        ref MixedAxisPenetration penetration)
+        ref AxisPenetration penetration)
     {
         if (!TryNormalizeAxis(axis, out Vector3d normalizedAxis))
             return true;
@@ -364,7 +364,7 @@ public static partial class CollisionDetectionMixed
         LSCapsuleCollider capsule,
         LSCircleCollider2D circle,
         Vector3d axis,
-        ref MixedAxisPenetration penetration)
+        ref AxisPenetration penetration)
     {
         if (!TryNormalizeAxis(axis, out Vector3d normalizedAxis))
             return true;
@@ -382,7 +382,7 @@ public static partial class CollisionDetectionMixed
         LSCylinderCollider cylinder,
         LSCircleCollider2D circle,
         Vector3d axis,
-        ref MixedAxisPenetration penetration)
+        ref AxisPenetration penetration)
     {
         if (!TryNormalizeAxis(axis, out Vector3d normalizedAxis))
             return true;
@@ -401,7 +401,7 @@ public static partial class CollisionDetectionMixed
         LSCuboidCollider cuboid,
         LSCollider2D prism,
         Vector3d axis,
-        ref MixedAxisPenetration penetration)
+        ref AxisPenetration penetration)
     {
         if (!TryNormalizeAxis(axis, out Vector3d normalizedAxis))
             return true;
@@ -416,7 +416,7 @@ public static partial class CollisionDetectionMixed
         LSCapsuleCollider capsule,
         LSCollider2D prism,
         Vector3d axis,
-        ref MixedAxisPenetration penetration)
+        ref AxisPenetration penetration)
     {
         if (!TryNormalizeAxis(axis, out Vector3d normalizedAxis))
             return true;
@@ -434,7 +434,7 @@ public static partial class CollisionDetectionMixed
         LSCylinderCollider cylinder,
         LSCollider2D prism,
         Vector3d axis,
-        ref MixedAxisPenetration penetration)
+        ref AxisPenetration penetration)
     {
         if (!TryNormalizeAxis(axis, out Vector3d normalizedAxis))
             return true;
@@ -452,12 +452,12 @@ public static partial class CollisionDetectionMixed
     private static bool BuildCuboidContact(
         LSCuboidCollider cuboid,
         LSCollider2D embedded,
-        MixedAxisPenetration penetration,
+        AxisPenetration penetration,
         out MixedContact contact)
     {
-        Vector3d reference = GetClosestPointOnEmbeddedVolume(embedded, cuboid.Center);
+        Vector3d reference = MixedEmbedded2DGeometry.GetClosestPointOnEmbeddedVolume(embedded, cuboid.Center);
         Vector3d point3D = cuboid.ClosestPointOnSurface(reference);
-        Vector3d point2D = GetClosestPointOnEmbeddedVolume(embedded, point3D);
+        Vector3d point2D = MixedEmbedded2DGeometry.GetClosestPointOnEmbeddedVolume(embedded, point3D);
         contact = new MixedContact(point3D, point2D, penetration.Axis, penetration.Depth);
         return true;
     }
@@ -465,12 +465,12 @@ public static partial class CollisionDetectionMixed
     private static bool BuildCapsuleContact(
         LSCapsuleCollider capsule,
         LSCollider2D embedded,
-        MixedAxisPenetration penetration,
+        AxisPenetration penetration,
         out MixedContact contact)
     {
         Vector3d linePoint = Vector3d.ClosestPointOnLineSegment(GetEmbeddedCenter3D(embedded), capsule.LineSegmentStart, capsule.LineSegmentEnd);
         Vector3d point3D = linePoint + penetration.Axis * capsule.ScaledRadius;
-        Vector3d point2D = GetClosestPointOnEmbeddedVolume(embedded, point3D);
+        Vector3d point2D = MixedEmbedded2DGeometry.GetClosestPointOnEmbeddedVolume(embedded, point3D);
         contact = new MixedContact(point3D, point2D, penetration.Axis, penetration.Depth);
         return true;
     }
@@ -478,12 +478,12 @@ public static partial class CollisionDetectionMixed
     private static bool BuildCylinderContact(
         LSCylinderCollider cylinder,
         LSCollider2D embedded,
-        MixedAxisPenetration penetration,
+        AxisPenetration penetration,
         out MixedContact contact)
     {
-        Vector3d reference = GetClosestPointOnEmbeddedVolume(embedded, cylinder.Center);
+        Vector3d reference = MixedEmbedded2DGeometry.GetClosestPointOnEmbeddedVolume(embedded, cylinder.Center);
         Vector3d point3D = cylinder.ClosestPointOnSurface(reference);
-        Vector3d point2D = GetClosestPointOnEmbeddedVolume(embedded, point3D);
+        Vector3d point2D = MixedEmbedded2DGeometry.GetClosestPointOnEmbeddedVolume(embedded, point3D);
         contact = new MixedContact(point3D, point2D, penetration.Axis, penetration.Depth);
         return true;
     }
@@ -510,7 +510,7 @@ public static partial class CollisionDetectionMixed
             embeddedPoint = new Vector3d(planarCenter.X, slabMaxY, planarCenter.Y);
         }
 
-        if (TryGetPlanarBoundaryPoint(embedded, planarCenter, out Vector2d planarBoundary, out Fixed64 planarDistance)
+        if (MixedEmbedded2DGeometry.TryGetPlanarBoundaryPoint(embedded, planarCenter, out Vector2d planarBoundary, out Fixed64 planarDistance)
             && planarDistance < bestDistance)
         {
             bestDistance = planarDistance;
@@ -527,145 +527,6 @@ public static partial class CollisionDetectionMixed
             normal,
             sphere.ScaledRadius + bestDistance);
         return true;
-    }
-
-    private static bool TryGetPlanarBoundaryPoint(
-        LSCollider2D embedded,
-        Vector2d point,
-        out Vector2d boundary,
-        out Fixed64 distance)
-    {
-        switch (embedded.Shape)
-        {
-            case ColliderType2D.Circle:
-                return TryGetCircleBoundary((LSCircleCollider2D)embedded, point, out boundary, out distance);
-            case ColliderType2D.AABox:
-                return TryGetAABoxBoundary((LSAABBoxCollider2D)embedded, point, out boundary, out distance);
-            case ColliderType2D.ConvexPolygon:
-                return TryGetConvexBoundary(embedded, point, out boundary, out distance);
-            default:
-                boundary = default;
-                distance = Fixed64.Zero;
-                return false;
-        }
-    }
-
-    private static bool TryGetCircleBoundary(
-        LSCircleCollider2D circle,
-        Vector2d point,
-        out Vector2d boundary,
-        out Fixed64 distance)
-    {
-        Vector2d delta = point - circle.Center;
-        Fixed64 magnitude = delta.Magnitude;
-        Vector2d direction = magnitude > Fixed64.Epsilon ? delta / magnitude : Vector2d.Right;
-        Fixed64 radius = circle.ScaledRadius;
-        boundary = circle.Center + direction * radius;
-        distance = radius - magnitude;
-        return true;
-    }
-
-    private static bool TryGetAABoxBoundary(
-        LSAABBoxCollider2D box,
-        Vector2d point,
-        out Vector2d boundary,
-        out Fixed64 distance)
-    {
-        Fixed64 distanceMinX = point.X - box.MinX;
-        Fixed64 distanceMaxX = box.MaxX - point.X;
-        Fixed64 distanceMinY = point.Y - box.MinY;
-        Fixed64 distanceMaxY = box.MaxY - point.Y;
-
-        distance = distanceMinX;
-        boundary = new Vector2d(box.MinX, point.Y);
-
-        if (distanceMaxX < distance)
-        {
-            distance = distanceMaxX;
-            boundary = new Vector2d(box.MaxX, point.Y);
-        }
-
-        if (distanceMinY < distance)
-        {
-            distance = distanceMinY;
-            boundary = new Vector2d(point.X, box.MinY);
-        }
-
-        if (distanceMaxY < distance)
-        {
-            distance = distanceMaxY;
-            boundary = new Vector2d(point.X, box.MaxY);
-        }
-
-        return true;
-    }
-
-    private static bool TryGetConvexBoundary(
-        LSCollider2D convex,
-        Vector2d point,
-        out Vector2d boundary,
-        out Fixed64 distance)
-    {
-        int vertexCount = convex.VertexCount;
-        if (vertexCount <= 0)
-        {
-            boundary = default;
-            distance = Fixed64.Zero;
-            return false;
-        }
-
-        Vector2d bestPoint = convex.GetVertexUnchecked(0);
-        Fixed64 bestDistanceSquared = Fixed64.MaxValue;
-        for (int i = 0; i < vertexCount; i++)
-        {
-            Vector2d a = convex.GetVertexUnchecked(i);
-            Vector2d b = convex.GetVertexUnchecked((i + 1) % vertexCount);
-            Vector2d candidate = ClosestPointOnSegment(point, a, b);
-            Fixed64 candidateDistanceSquared = Vector2d.DistanceSquared(point, candidate);
-            if (candidateDistanceSquared >= bestDistanceSquared)
-                continue;
-
-            bestDistanceSquared = candidateDistanceSquared;
-            bestPoint = candidate;
-        }
-
-        boundary = bestPoint;
-        distance = bestDistanceSquared > Fixed64.Epsilon ? FixedMath.Sqrt(bestDistanceSquared) : Fixed64.Zero;
-        return true;
-    }
-
-    private static Vector3d GetClosestPointOnEmbeddedVolume(LSCollider2D embedded, Vector3d point)
-    {
-        Vector2d planarPoint = new(point.X, point.Z);
-        Fixed64 slabMinY = embedded.MixedBounds3D.Min.Y;
-        Fixed64 slabMaxY = embedded.MixedBounds3D.Max.Y;
-        bool planarInside = embedded.ContainsPoint(planarPoint);
-        bool yInside = point.Y >= slabMinY && point.Y <= slabMaxY;
-
-        if (!planarInside || !yInside)
-        {
-            Vector2d closestPlanar = planarInside ? planarPoint : embedded.GetClosestPoint(planarPoint);
-            return new Vector3d(closestPlanar.X, Clamp(point.Y, slabMinY, slabMaxY), closestPlanar.Y);
-        }
-
-        Fixed64 minYDistance = point.Y - slabMinY;
-        Fixed64 maxYDistance = slabMaxY - point.Y;
-        Fixed64 bestDistance = minYDistance;
-        Vector3d closest = new(planarPoint.X, slabMinY, planarPoint.Y);
-
-        if (maxYDistance < bestDistance)
-        {
-            bestDistance = maxYDistance;
-            closest = new Vector3d(planarPoint.X, slabMaxY, planarPoint.Y);
-        }
-
-        if (TryGetPlanarBoundaryPoint(embedded, planarPoint, out Vector2d planarBoundary, out Fixed64 planarDistance)
-            && planarDistance < bestDistance)
-        {
-            closest = new Vector3d(planarBoundary.X, point.Y, planarBoundary.Y);
-        }
-
-        return closest;
     }
 
     private static FixedRange ProjectCircleSlabOntoAxis(Vector3d axis, LSCircleCollider2D circle)
@@ -707,7 +568,7 @@ public static partial class CollisionDetectionMixed
         FixedRange projection2D,
         Vector3d axis,
         Vector3d displacement3DTo2D,
-        ref MixedAxisPenetration penetration)
+        ref AxisPenetration penetration)
     {
         if (projection3D.Max < projection2D.Min || projection2D.Max < projection3D.Min)
             return false;
@@ -716,7 +577,7 @@ public static partial class CollisionDetectionMixed
         if (!penetration.HasValue || depth < penetration.Depth)
         {
             Vector3d orientedAxis = Vector3d.Dot(axis, displacement3DTo2D) < Fixed64.Zero ? -axis : axis;
-            penetration = new MixedAxisPenetration(orientedAxis, depth);
+            penetration = new AxisPenetration(orientedAxis, depth);
         }
 
         return true;
@@ -795,19 +656,6 @@ public static partial class CollisionDetectionMixed
             return (Vector3d.ClosestPointOnLineSegment(secondStart, firstStart, firstEnd), secondStart);
 
         return Vector3d.ClosestPointsOnTwoLines(firstStart, firstEnd, secondStart, secondEnd);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Vector2d ClosestPointOnSegment(Vector2d point, Vector2d a, Vector2d b)
-    {
-        Vector2d segment = b - a;
-        Fixed64 lengthSquared = segment.MagnitudeSquared;
-        if (lengthSquared <= Fixed64.Epsilon)
-            return a;
-
-        Fixed64 t = Vector2d.Dot(point - a, segment) / lengthSquared;
-        t = Clamp(t, Fixed64.Zero, Fixed64.One);
-        return a + segment * t;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

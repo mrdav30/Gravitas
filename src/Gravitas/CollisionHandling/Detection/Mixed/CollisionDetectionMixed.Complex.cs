@@ -12,7 +12,7 @@ using SwiftCollections;
 using SwiftCollections.Query;
 using System.Runtime.CompilerServices;
 
-namespace Gravitas;
+namespace Gravitas.CollisionHandling;
 
 public static partial class CollisionDetectionMixed
 {
@@ -55,7 +55,7 @@ public static partial class CollisionDetectionMixed
         {
             GetMeshTriangle(mesh, triangleBuffer[i], out MixedTriangle triangle);
             if (!BoundsOverlap(triangle.Bounds, embedded.MixedBounds3D)
-                || !TryTriangleEmbedded2D(triangle, embedded, out MixedAxisPenetration penetration))
+                || !TryTriangleEmbedded2D(triangle, embedded, out AxisPenetration penetration))
             {
                 continue;
             }
@@ -78,7 +78,7 @@ public static partial class CollisionDetectionMixed
     private static bool TryTriangleEmbedded2D(
         MixedTriangle triangle,
         LSCollider2D embedded,
-        out MixedAxisPenetration penetration)
+        out AxisPenetration penetration)
     {
         switch (embedded.Shape)
         {
@@ -96,7 +96,7 @@ public static partial class CollisionDetectionMixed
     private static bool TryTestTriangleCircleSlab(
         MixedTriangle triangle,
         LSCircleCollider2D circle,
-        out MixedAxisPenetration penetration)
+        out AxisPenetration penetration)
     {
         penetration = default;
 
@@ -123,7 +123,7 @@ public static partial class CollisionDetectionMixed
     private static bool TryTestTrianglePrism(
         MixedTriangle triangle,
         LSCollider2D prism,
-        out MixedAxisPenetration penetration)
+        out AxisPenetration penetration)
     {
         penetration = default;
 
@@ -155,7 +155,7 @@ public static partial class CollisionDetectionMixed
             }
         }
 
-        Vector3d embeddedPoint = GetClosestPointOnEmbeddedVolume(prism, triangle.Center);
+        Vector3d embeddedPoint = MixedEmbedded2DGeometry.GetClosestPointOnEmbeddedVolume(prism, triangle.Center);
         Vector3d trianglePoint = MeshUtils.ClosestPointOnTriangle(triangle.A, triangle.B, triangle.C, triangle.Normalized, embeddedPoint);
         if (!CheckTrianglePrismAxis(triangle, prism, embeddedPoint - trianglePoint, ref penetration))
             return false;
@@ -167,7 +167,7 @@ public static partial class CollisionDetectionMixed
         MixedTriangle triangle,
         LSCircleCollider2D circle,
         Vector3d axis,
-        ref MixedAxisPenetration penetration)
+        ref AxisPenetration penetration)
     {
         if (!TryNormalizeAxis(axis, out Vector3d normalizedAxis))
             return true;
@@ -186,7 +186,7 @@ public static partial class CollisionDetectionMixed
         MixedTriangle triangle,
         LSCollider2D prism,
         Vector3d axis,
-        ref MixedAxisPenetration penetration)
+        ref AxisPenetration penetration)
     {
         if (!TryNormalizeAxis(axis, out Vector3d normalizedAxis))
             return true;
@@ -204,12 +204,12 @@ public static partial class CollisionDetectionMixed
     private static void BuildMeshContact(
         LSCollider2D embedded,
         MixedTriangle triangle,
-        MixedAxisPenetration penetration,
+        AxisPenetration penetration,
         out MixedContact contact)
     {
         Vector3d embeddedCenter = GetEmbeddedCenter3D(embedded);
         Vector3d point3D = MeshUtils.ClosestPointOnTriangle(triangle.A, triangle.B, triangle.C, triangle.Normalized, embeddedCenter);
-        Vector3d point2D = GetClosestPointOnEmbeddedVolume(embedded, point3D);
+        Vector3d point2D = MixedEmbedded2DGeometry.GetClosestPointOnEmbeddedVolume(embedded, point3D);
         contact = new MixedContact(point3D, point2D, penetration.Axis, penetration.Depth);
     }
 

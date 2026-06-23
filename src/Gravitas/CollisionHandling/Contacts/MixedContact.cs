@@ -7,7 +7,7 @@
 
 using FixedMathSharp;
 
-namespace Gravitas;
+namespace Gravitas.CollisionHandling;
 
 /// <summary>
 /// Contact generated between one 3D collider and one embedded 2D collider.

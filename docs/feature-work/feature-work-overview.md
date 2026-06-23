@@ -20,29 +20,31 @@ with evidence.
 These plans and evergreen closure trackers should be completed, or explicitly
 closed with evidence, before the alpha release.
 
-1. [`Mixed Sphere Against 2D Slab Reducer Completion`](2026-06-23-mixed-sphere-2d-slab-reducer-completion-plan.md)
-   - The remaining public mixed query fallback is `SweepSphereAgainst2D`
-     AABB/polygon slab exactness, plus compound reduction over those parts.
-2. [`CCD Active Swept Sources`](2026-06-21-ccd-active-swept-sources-plan.md)
+1. [`CCD Active Swept Sources`](2026-06-21-ccd-active-swept-sources-plan.md)
    - Host-driven kinematic movement and rotation should be first-class swept
      sources rather than passive targets only.
-3. [`CCD Exact TOI And Shape Reducers`](2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md)
+2. [`CCD Exact TOI And Shape Reducers`](2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md)
    - Remaining conservative reductions should become exact where the correctness
      gain justifies the cost, with deterministic fallback policy for unsupported
      shape families.
-4. [`CCD Service-Level Island Solver`](2026-06-21-ccd-service-level-island-solver-plan.md)
+3. [`CCD Service-Level Island Solver`](2026-06-21-ccd-service-level-island-solver-plan.md)
    - Dense, chained, same-TOI, and mixed continuous contacts need a deterministic
      service-level model where body-owned substeps are insufficient.
-5. [`Benchmark Signal Hardening Backlog`](benchmark-signal-hardening-backlog.md)
+4. [`Benchmark Signal Hardening Backlog`](benchmark-signal-hardening-backlog.md)
    - Measured allocation or runtime-cost signals must be reproduced, resolved,
      or closed with a no-change decision before alpha.
-6. [`Feature Work Issue Tracker`](issue-tracker.md)
+5. [`Feature Work Issue Tracker`](issue-tracker.md)
    - Bugs, correctness risks, documentation defects, and feature-work-discovered
      issues should be triaged, tested, and committed independently from feature
      design plans.
 
 ## Recently Completed
 
+- [`Mixed Sphere Against 2D Slab Reducer Completion`](done/2026-06-23-mixed-sphere-2d-slab-reducer-completion-plan.md)
+  - Completed 2026-06-23. `SweepSphereAgainst2D` now uses exact finite-slab
+    reducers for 2D circle, AABB, convex polygon, and supported compound
+    targets; static mixed CCD shares that policy, diagnostics label the path as
+    exact, and dense/false-positive benchmark rows cover the source direction.
 - [`Mixed Query Finite-Slab Reducer Completion`](done/2026-06-22-mixed-query-finite-slab-reducer-completion-plan.md)
   - Completed 2026-06-23. Rotated capsule/cylinder, mesh, and compound target
     reducers for `SweepCircleAgainst3D` are exact; convex mesh source scaling is
@@ -76,13 +78,12 @@ first alpha release.
 
 ## Recommended Execution Order
 
-1. Mixed sphere against 2D slab reducer completion.
-2. CCD active swept sources.
-3. CCD exact TOI and shape reducers.
-4. CCD service-level island solver.
-5. Benchmark signal closure pass.
+1. CCD active swept sources.
+2. CCD exact TOI and shape reducers.
+3. CCD service-level island solver.
+4. Benchmark signal closure pass.
 
-This order now closes the last public mixed query fallback direction, then
-finishes CCD source coverage, precision, and island-level behavior. Benchmark
+This order now focuses on CCD source coverage, precision, and island-level
+behavior after public mixed query fallback directions were closed. Benchmark
 signals remain a closure pass so measured hot-path risks do not survive into
 alpha.

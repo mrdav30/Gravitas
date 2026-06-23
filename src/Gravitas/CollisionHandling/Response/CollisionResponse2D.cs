@@ -6,10 +6,9 @@
 //=======================================================================
 
 using FixedMathSharp;
-using Gravitas.CollisionHandling;
 using System.Runtime.CompilerServices;
 
-namespace Gravitas;
+namespace Gravitas.CollisionHandling;
 
 /// <summary>
 /// Deterministic pure 2D manifold contact response.

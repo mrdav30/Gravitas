@@ -8,6 +8,7 @@
 using FixedMathSharp;
 using FixedMathSharp.Bounds;
 using Gravitas.Colliders;
+using Gravitas.CollisionHandling;
 using Gravitas.Support;
 using GridForge.Grids;
 using GridForge.Spatial;

@@ -8,7 +8,7 @@
 using Gravitas.Colliders;
 using System.Runtime.CompilerServices;
 
-namespace Gravitas;
+namespace Gravitas.CollisionHandling;
 
 /// <summary>
 /// Owns one stable mixed 3D/2D collision pair identity and contact lifecycle.

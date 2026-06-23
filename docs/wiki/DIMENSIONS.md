@@ -27,8 +27,8 @@ those concrete types, not a third dimension value.
   ownership, constrained response, explicit mixed sweeps, mixed CCD hooks, and
   dimension-tagged diagnostics are implemented. Mixed 2D swept-circle queries
   cover primitive, mesh, and compound 3D targets; 3D swept-sphere queries cover
-  primitive and compound 2D targets, with circle slabs exact and AABB/polygon
-  slab exactness tracked separately.
+  primitive and compound 2D targets with exact circle, AABB, convex polygon,
+  and supported compound slab reducers.
 
 The context clock, coroutines, diagnostics, and lifecycle hooks remain shared.
 This lets pure 2D simulations use the same host loop without paying 3D
@@ -229,12 +229,12 @@ explicit rather than Unity-style separate engines:
   2D primitive and compound slabs, and 2D swept circles can query 3D primitive,
   mesh, and compound targets. Current `SweepCircleAgainst3D` target reducers are
   exact for supported 3D target families, including slab-clipped mesh triangle
-  targets and authored compound targets. Current `SweepSphereAgainst2D` circle
-  slabs are exact, while AABB and polygon slab hits still use explicit
-  conservative fallback pending exact reducer work. `PhysicsMixedHit.ReducerKind`
-  labels exact hits separately from conservative fallback hits. Mixed query
-  diagnostics also emit `QuerySummary` reducer counters when enabled. Pure query
-  services do not accidentally report cross-dimensional hits.
+  targets and authored compound targets. Current `SweepSphereAgainst2D` target
+  reducers are exact for 2D circle, AABB, convex polygon, and supported
+  compound slabs. `PhysicsMixedHit.ReducerKind` labels exact hits separately
+  from conservative fallback hits on proxy-based dynamic CCD paths. Mixed query
+  diagnostics also emit `QuerySummary` reducer counters when enabled. Pure
+  query services do not accidentally report cross-dimensional hits.
 - mixed diagnostics emit dimension-tagged query, contact, and response impulse
   events, and debug draw can capture the finite 2D slab geometry used by mixed
   collision.

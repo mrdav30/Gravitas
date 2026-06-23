@@ -8,7 +8,7 @@
 using Gravitas.Colliders;
 using System.Runtime.CompilerServices;
 
-namespace Gravitas;
+namespace Gravitas.CollisionHandling;
 
 internal readonly struct CollisionWorkItem2D
 {

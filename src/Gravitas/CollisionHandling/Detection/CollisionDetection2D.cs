@@ -10,7 +10,7 @@ using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using System.Runtime.CompilerServices;
 
-namespace Gravitas;
+namespace Gravitas.CollisionHandling;
 
 /// <summary>
 /// Deterministic pure 2D narrow-phase collision checks.
