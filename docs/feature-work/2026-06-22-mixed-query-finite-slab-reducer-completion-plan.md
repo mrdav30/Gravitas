@@ -109,17 +109,40 @@ does not carry hidden follow-up work.
 
 ## Workstream 3: Convex Mesh Source Scaling Signal
 
+**Status:** Done.
+
 **Tasks**
 
-- [ ] Add a high-vertex convex mesh source benchmark beyond the current cube
+- [x] Add a high-vertex convex mesh source benchmark beyond the current cube
   source row.
-- [ ] Measure whether per-support full-vertex scans are acceptable for alpha
+- [x] Measure whether per-support full-vertex scans are acceptable for alpha
   query workloads.
-- [ ] If measured cost is high, prototype deterministic support acceleration or
+- [x] If measured cost is high, prototype deterministic support acceleration or
   cached directional support data without introducing floating-point or
   platform-order dependence.
-- [ ] Keep concave mesh sources unsupported; hosts should use authored convex
+- [x] Keep concave mesh sources unsupported; hosts should use authored convex
   decomposition into `LSCompoundCollider` parts.
+
+**Implementation notes**
+
+- `QueryServiceBenchmarks` now includes
+  `SweepConvexMeshAllAcrossSphereTargets_HighVertexSource`, using a
+  subdivision-16 closed convex cube source against the existing 64-sphere target
+  line.
+- Short-run BenchmarkDotNet signal showed the original full transform-per-
+  support scan at `64.237 ms/op` for the high-vertex row versus `1.366 ms/op`
+  for the cube source row.
+- `PhysicsMesh` now builds an exact deterministic support tree for high-vertex
+  convex meshes. Support lookup prunes local vertex bounds by fixed-point
+  projection, preserves lower source-vertex index for ties, and transforms only
+  the winning support vertex to world space.
+- After support-tree acceleration, the final short-run signal measured
+  `2.858 ms/op` for the high-vertex source row and `1.106 ms/op` for the cube
+  source row, both with zero managed allocation. Treat these short-run numbers
+  as local scaling evidence, not canonical release baselines.
+- Concave mesh sources remain intentionally rejected. Hosts should author
+  concave-looking movers as stable `LSCompoundCollider` convex decomposition
+  parts.
 
 ## Workstream 4: Diagnostics, Docs, And Validation
 

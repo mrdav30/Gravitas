@@ -38,7 +38,7 @@ names an internal CCD proxy.
 | `Query3D.Raycast`, `RaycastAll` | bounded 3D segment | sphere, capsule, cuboid, finite cylinder, mesh, compound | `Exact`; mesh targets query triangle BVH candidates, compound targets keep owner identity | distance, collider ID | service-owned scratch, caller-owned all-hit buffer |
 | `Query3D.SweepSphere`, `SweepSphereAll` | 3D sphere | sphere, capsule, cuboid, finite cylinder, mesh, compound | `Exact` swept-sphere reducers in `SweptSphereQueryWorker`; mesh uses triangle face/edge/vertex TOI, compound reduces stable part order | distance, collider ID | service-owned scratch, caller-owned all-hit buffer |
 | `Query3D.SweepCapsule`, `SweepCapsuleAll`, `SweepCuboid`, `SweepCuboidAll`, `SweepCylinder`, `SweepCylinderAll` | registered capsule, cuboid, or finite-cylinder collider at its current pose plus a displacement | sphere, capsule, cuboid, finite cylinder, convex mesh, concave mesh target triangles, compound | `Exact` support-mapped conservative advancement; source collider is skipped; concave mesh targets reduce triangle candidates to owner collider hits | distance, collider ID | service-owned scratch, caller-owned all-hit buffer |
-| `Query3D.SweepConvexMesh`, `SweepConvexMeshAll` | convex `LSMeshCollider` at its current pose plus a displacement | sphere, capsule, cuboid, finite cylinder, convex mesh, concave mesh target triangles, compound | `Exact` support-mapped conservative advancement; concave source meshes throw; concave mesh targets reduce triangle candidates to owner collider hits | distance, collider ID | service-owned scratch, caller-owned all-hit buffer |
+| `Query3D.SweepConvexMesh`, `SweepConvexMeshAll` | convex `LSMeshCollider` at its current pose plus a displacement | sphere, capsule, cuboid, finite cylinder, convex mesh, concave mesh target triangles, compound | `Exact` support-mapped conservative advancement; high-vertex convex sources use deterministic support-tree pruning; concave source meshes throw; concave mesh targets reduce triangle candidates to owner collider hits | distance, collider ID | service-owned scratch, caller-owned all-hit buffer |
 | `Query3D.SweepCompound`, `SweepCompoundAll` | authored `LSCompoundCollider` made from supported convex 3D parts | sphere, capsule, cuboid, finite cylinder, convex mesh, concave mesh target triangles, compound | `Exact` per-part convex source reduction with stable authored part order; unsupported or concave mesh source parts throw | distance, collider ID | service-owned scratch, caller-owned all-hit buffer |
 | `Query3D.OverlapCircle`, `OverlapCircleInDirection`, `OverlapCircleAll` | X/Z circle proximity query | 3D colliders through closest-surface projection | `Exact` for the current X/Z proximity contract; this is not swept movement | distance, collider ID for all-hit | service-owned scratch, caller-owned all-hit buffer |
 | `Query2D.OverlapCircle`, `OverlapCircleAll` | 2D circle | circle, AABB, convex polygon, compound | `Exact`; compound reports owner once through stable part reduction | distance, collider ID | service-owned scratch, caller-owned all-hit buffer |
@@ -188,6 +188,9 @@ sources. The source collider is skipped automatically, `excludedCollider` can
 skip an additional collider, and all-hit overloads retain caller-owned result
 buffers plus distance/collider-ID ordering. Concave mesh sources are rejected;
 author concave-looking movers as stable `LSCompoundCollider` convex parts.
+High-vertex convex mesh sources use a fixed-point support tree over local
+vertices to prune support lookup while preserving exact full-scan results and
+stable lower-source-vertex tie breaks.
 
 `StiffBody` continuous collision detection reuses this service as an opt-in
 movement sweep. Public `SweepSphere` and `SweepSphereAll` remain all-target
@@ -455,8 +458,8 @@ hit came from a safe conservative proxy or bounds reducer.
 The completed
 [`Query And Mixed Swept Shape Hardening`](../feature-work/done/2026-06-21-query-and-mixed-swept-shape-hardening-plan.md)
 plan owns the current public query API shape, 2D query parity, convex source
-sweeps, fallback labels, and query diagnostics. Remaining convex mesh source
-scaling work is tracked in
+sweeps, fallback labels, and query diagnostics. Remaining mixed finite-slab
+reducer completion and release validation work is tracked in
 [`Mixed Query Finite-Slab Reducer Completion`](../feature-work/2026-06-22-mixed-query-finite-slab-reducer-completion-plan.md).
 
 Longer-term query state objects remain evidence-gated: introduce caller-owned or

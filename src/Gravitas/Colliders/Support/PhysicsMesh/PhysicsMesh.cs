@@ -10,11 +10,16 @@ using FixedMathSharp.Bounds;
 using SwiftCollections;
 using SwiftCollections.Query;
 using System;
+using System.Collections.Generic;
 
 namespace Gravitas.Colliders
 {
     public class PhysicsMesh
     {
+        private const int SupportTreeVertexThreshold = 32;
+        private const int SupportTreeLeafVertexCount = 8;
+        private const int SupportTreeStackCapacity = 64;
+
         /// <summary>
         /// Maximum accepted vertex count for deterministic runtime mesh construction.
         /// </summary>
@@ -34,6 +39,9 @@ namespace Gravitas.Colliders
 
         private readonly Vector3d[] _worldVertices;
         private bool _worldVerticesValid;
+        private readonly int[]? _supportVertexIndices;
+        private readonly SupportTreeNode[]? _supportTreeNodes;
+        private int _supportTreeNodeCount;
 
         /// <summary>
         /// Holds all vertices transformed to world space. Prefer point-specific helpers on hot paths.
@@ -185,6 +193,12 @@ namespace Gravitas.Colliders
             _totalArea = Fixed64.Zero;
 
             _localBounds = CalculateBounds(_localVertices);
+            if (Mode == MeshColliderMode.Convex && _localVertices.Length > SupportTreeVertexThreshold)
+            {
+                _supportVertexIndices = CreateSupportVertexIndices(_localVertices.Length);
+                _supportTreeNodes = new SupportTreeNode[(2 * _localVertices.Length) - 1];
+                _supportTreeNodeCount = BuildSupportTreeNode(0, _localVertices.Length);
+            }
 
             UpdateTransformationMatrix(position, rotation);
 
@@ -718,6 +732,216 @@ namespace Gravitas.Colliders
             return TransformLocalPoint(_localVertices[index]);
         }
 
+        /// <summary>
+        /// Finds the world-space vertex with the greatest projection onto
+        /// <paramref name="direction"/>, preserving source vertex order for ties.
+        /// </summary>
+        public Vector3d GetSupportVertexWorld(Vector3d direction)
+        {
+            if (_supportTreeNodes != null && _supportVertexIndices != null)
+                return GetAcceleratedSupportVertexWorld(direction);
+
+            EnsureWorldVertices();
+
+            Vector3d best = _worldVertices[0];
+            Fixed64 bestProjection = Vector3d.Dot(best, direction);
+            for (int i = 1; i < _worldVertices.Length; i++)
+            {
+                Vector3d vertex = _worldVertices[i];
+                Fixed64 projection = Vector3d.Dot(vertex, direction);
+                if (projection <= bestProjection)
+                    continue;
+
+                bestProjection = projection;
+                best = vertex;
+            }
+
+            return best;
+        }
+
+        private Vector3d GetAcceleratedSupportVertexWorld(Vector3d direction)
+        {
+            Vector3d localDirection = ConvertWorldDirectionToLocal(direction);
+            int supportIndex = FindSupportVertexIndex(localDirection);
+            return TransformLocalPoint(_localVertices[supportIndex]);
+        }
+
+        private int FindSupportVertexIndex(Vector3d localDirection)
+        {
+            int bestIndex = 0;
+            Fixed64 bestProjection = Vector3d.Dot(_localVertices[0], localDirection);
+            Span<int> stack = stackalloc int[SupportTreeStackCapacity];
+            int stackCount = 0;
+            stack[stackCount++] = 0;
+
+            while (stackCount > 0)
+            {
+                int nodeIndex = stack[--stackCount];
+                SupportTreeNode node = _supportTreeNodes![nodeIndex];
+                Fixed64 upperProjection = GetBoundsMaxProjection(node.Min, node.Max, localDirection);
+                int upperComparison = upperProjection.CompareTo(bestProjection);
+                if (upperComparison < 0 || (upperComparison == 0 && node.MinVertexIndex >= bestIndex))
+                    continue;
+
+                if (node.IsLeaf)
+                {
+                    SearchSupportLeaf(node, localDirection, ref bestIndex, ref bestProjection);
+                    continue;
+                }
+
+                SupportTreeNode left = _supportTreeNodes[node.Left];
+                SupportTreeNode right = _supportTreeNodes[node.Right];
+                Fixed64 leftProjection = GetBoundsMaxProjection(left.Min, left.Max, localDirection);
+                Fixed64 rightProjection = GetBoundsMaxProjection(right.Min, right.Max, localDirection);
+
+                if (ComesBeforeSupportNode(left, leftProjection, right, rightProjection))
+                {
+                    PushSupportNode(right, rightProjection, bestIndex, bestProjection, stack, ref stackCount);
+                    PushSupportNode(left, leftProjection, bestIndex, bestProjection, stack, ref stackCount);
+                    continue;
+                }
+
+                PushSupportNode(left, leftProjection, bestIndex, bestProjection, stack, ref stackCount);
+                PushSupportNode(right, rightProjection, bestIndex, bestProjection, stack, ref stackCount);
+            }
+
+            return bestIndex;
+        }
+
+        private void SearchSupportLeaf(
+            SupportTreeNode node,
+            Vector3d localDirection,
+            ref int bestIndex,
+            ref Fixed64 bestProjection)
+        {
+            for (int i = 0; i < node.Count; i++)
+            {
+                int vertexIndex = _supportVertexIndices![node.Start + i];
+                Vector3d vertex = _localVertices[vertexIndex];
+                Fixed64 projection = Vector3d.Dot(vertex, localDirection);
+                int projectionComparison = projection.CompareTo(bestProjection);
+                if (projectionComparison < 0 || (projectionComparison == 0 && vertexIndex >= bestIndex))
+                    continue;
+
+                bestProjection = projection;
+                bestIndex = vertexIndex;
+            }
+        }
+
+        private static void PushSupportNode(
+            SupportTreeNode node,
+            Fixed64 upperProjection,
+            int bestIndex,
+            Fixed64 bestProjection,
+            Span<int> stack,
+            ref int stackCount)
+        {
+            int upperComparison = upperProjection.CompareTo(bestProjection);
+            if (upperComparison < 0 || (upperComparison == 0 && node.MinVertexIndex >= bestIndex))
+                return;
+
+            stack[stackCount++] = node.Index;
+        }
+
+        private static bool ComesBeforeSupportNode(
+            SupportTreeNode left,
+            Fixed64 leftProjection,
+            SupportTreeNode right,
+            Fixed64 rightProjection)
+        {
+            int projectionComparison = leftProjection.CompareTo(rightProjection);
+            if (projectionComparison != 0)
+                return projectionComparison > 0;
+
+            return left.MinVertexIndex < right.MinVertexIndex;
+        }
+
+        private int BuildSupportTreeNode(int start, int count)
+        {
+            int nodeIndex = _supportTreeNodeCount;
+            _supportTreeNodeCount++;
+
+            CalculateSupportRangeBounds(start, count, out Vector3d min, out Vector3d max, out int minVertexIndex);
+            if (count <= SupportTreeLeafVertexCount)
+            {
+                _supportTreeNodes![nodeIndex] = SupportTreeNode.CreateLeaf(
+                    nodeIndex,
+                    min,
+                    max,
+                    start,
+                    count,
+                    minVertexIndex);
+                return nodeIndex;
+            }
+
+            int axis = GetDominantAxis(max - min);
+            Array.Sort(
+                _supportVertexIndices!,
+                start,
+                count,
+                new SupportVertexIndexComparer(_localVertices, axis));
+
+            int leftCount = count / 2;
+            int rightCount = count - leftCount;
+            int leftIndex = BuildSupportTreeNode(start, leftCount);
+            int rightIndex = BuildSupportTreeNode(start + leftCount, rightCount);
+            _supportTreeNodes![nodeIndex] = SupportTreeNode.CreateBranch(
+                nodeIndex,
+                min,
+                max,
+                leftIndex,
+                rightIndex,
+                minVertexIndex);
+            return nodeIndex;
+        }
+
+        private void CalculateSupportRangeBounds(
+            int start,
+            int count,
+            out Vector3d min,
+            out Vector3d max,
+            out int minVertexIndex)
+        {
+            int firstIndex = _supportVertexIndices![start];
+            minVertexIndex = firstIndex;
+            min = _localVertices[firstIndex];
+            max = min;
+            for (int i = 1; i < count; i++)
+            {
+                int vertexIndex = _supportVertexIndices[start + i];
+                Vector3d vertex = _localVertices[vertexIndex];
+                min = Vector3d.Min(min, vertex);
+                max = Vector3d.Max(max, vertex);
+                if (vertexIndex < minVertexIndex)
+                    minVertexIndex = vertexIndex;
+            }
+        }
+
+        private static int[] CreateSupportVertexIndices(int vertexCount)
+        {
+            var indices = new int[vertexCount];
+            for (int i = 0; i < indices.Length; i++)
+                indices[i] = i;
+
+            return indices;
+        }
+
+        private static int GetDominantAxis(Vector3d extents)
+        {
+            if (extents.X >= extents.Y && extents.X >= extents.Z)
+                return 0;
+
+            return extents.Y >= extents.Z ? 1 : 2;
+        }
+
+        private static Fixed64 GetBoundsMaxProjection(Vector3d min, Vector3d max, Vector3d direction)
+        {
+            Fixed64 x = direction.X >= Fixed64.Zero ? max.X : min.X;
+            Fixed64 y = direction.Y >= Fixed64.Zero ? max.Y : min.Y;
+            Fixed64 z = direction.Z >= Fixed64.Zero ? max.Z : min.Z;
+            return (x * direction.X) + (y * direction.Y) + (z * direction.Z);
+        }
+
         public Vector3d GetFaceNormalWorld(int index)
         {
             SwiftThrowHelper.ThrowIfArrayIndexInvalid(index, _triangleCount, nameof(index));
@@ -819,6 +1043,98 @@ namespace Gravitas.Colliders
 
             public override int GetHashCode() =>
                 HashCode.Combine(A, B, C);
+        }
+
+        private readonly struct SupportTreeNode
+        {
+            private SupportTreeNode(
+                int index,
+                Vector3d min,
+                Vector3d max,
+                int left,
+                int right,
+                int start,
+                int count,
+                int minVertexIndex)
+            {
+                Index = index;
+                Min = min;
+                Max = max;
+                Left = left;
+                Right = right;
+                Start = start;
+                Count = count;
+                MinVertexIndex = minVertexIndex;
+            }
+
+            public int Index { get; }
+
+            public Vector3d Min { get; }
+
+            public Vector3d Max { get; }
+
+            public int Left { get; }
+
+            public int Right { get; }
+
+            public int Start { get; }
+
+            public int Count { get; }
+
+            public int MinVertexIndex { get; }
+
+            public bool IsLeaf => Count > 0;
+
+            public static SupportTreeNode CreateLeaf(
+                int index,
+                Vector3d min,
+                Vector3d max,
+                int start,
+                int count,
+                int minVertexIndex) =>
+                new(index, min, max, -1, -1, start, count, minVertexIndex);
+
+            public static SupportTreeNode CreateBranch(
+                int index,
+                Vector3d min,
+                Vector3d max,
+                int left,
+                int right,
+                int minVertexIndex) =>
+                new(index, min, max, left, right, 0, 0, minVertexIndex);
+        }
+
+        private sealed class SupportVertexIndexComparer : IComparer<int>
+        {
+            private readonly Vector3d[] _vertices;
+            private readonly int _axis;
+
+            public SupportVertexIndexComparer(Vector3d[] vertices, int axis)
+            {
+                _vertices = vertices;
+                _axis = axis;
+            }
+
+            public int Compare(int first, int second)
+            {
+                Fixed64 firstValue = GetAxisValue(_vertices[first], _axis);
+                Fixed64 secondValue = GetAxisValue(_vertices[second], _axis);
+                int valueComparison = firstValue.CompareTo(secondValue);
+                if (valueComparison != 0)
+                    return valueComparison;
+
+                return first.CompareTo(second);
+            }
+
+            private static Fixed64 GetAxisValue(Vector3d vertex, int axis)
+            {
+                return axis switch
+                {
+                    0 => vertex.X,
+                    1 => vertex.Y,
+                    _ => vertex.Z
+                };
+            }
         }
     }
 }

@@ -10,6 +10,8 @@ namespace Gravitas.Benchmarks;
 [MemoryDiagnoser]
 public class QueryServiceBenchmarks
 {
+    private const int HighVertexMeshSubdivision = 16;
+
     private static readonly PhysicsLayerMask IncludeLayerZero = PhysicsLayerMask.FromLayer(0);
 
     private GravitasWorldContext _context;
@@ -19,11 +21,13 @@ public class QueryServiceBenchmarks
     private GravitasWorldContext _cuboidSourceContext;
     private GravitasWorldContext _cylinderSourceContext;
     private GravitasWorldContext _convexMeshSourceContext;
+    private GravitasWorldContext _highVertexConvexMeshSourceContext;
     private GravitasWorldContext _compoundSourceContext;
     private LSCapsuleCollider _capsuleSource;
     private LSCuboidCollider _cuboidSource;
     private LSCylinderCollider _cylinderSource;
     private LSMeshCollider _convexMeshSource;
+    private LSMeshCollider _highVertexConvexMeshSource;
     private LSCompoundCollider _compoundSource;
     private Vector3d _rayStart;
     private Vector3d _rayEnd;
@@ -37,6 +41,7 @@ public class QueryServiceBenchmarks
     private SwiftList<Physics3DHit> _cuboidSourceHits;
     private SwiftList<Physics3DHit> _cylinderSourceHits;
     private SwiftList<Physics3DHit> _convexMeshSourceHits;
+    private SwiftList<Physics3DHit> _highVertexConvexMeshSourceHits;
     private SwiftList<Physics3DHit> _compoundSourceHits;
 
     [Params(64)]
@@ -84,6 +89,13 @@ public class QueryServiceBenchmarks
             _convexMeshSourceContext,
             new Vector3d((Fixed64)(-3), Fixed64.Zero, Fixed64.Zero));
 
+        _highVertexConvexMeshSourceContext = BenchmarkPhysicsScene.CreateContext(extent);
+        BenchmarkPhysicsScene.CreateDynamicSphereLine(_highVertexConvexMeshSourceContext, ColliderCount);
+        _highVertexConvexMeshSource = BenchmarkPhysicsScene.CreateDynamicSubdividedConvexCube(
+            _highVertexConvexMeshSourceContext,
+            new Vector3d((Fixed64)(-3), Fixed64.Zero, Fixed64.Zero),
+            HighVertexMeshSubdivision);
+
         _compoundSourceContext = BenchmarkPhysicsScene.CreateContext(extent);
         BenchmarkPhysicsScene.CreateDynamicSphereLine(_compoundSourceContext, ColliderCount);
         _compoundSource = BenchmarkPhysicsScene.CreateDynamicConvexMeshCompound(
@@ -102,6 +114,7 @@ public class QueryServiceBenchmarks
         _cuboidSourceHits = new SwiftList<Physics3DHit>(ColliderCount);
         _cylinderSourceHits = new SwiftList<Physics3DHit>(ColliderCount);
         _convexMeshSourceHits = new SwiftList<Physics3DHit>(ColliderCount);
+        _highVertexConvexMeshSourceHits = new SwiftList<Physics3DHit>(ColliderCount);
         _compoundSourceHits = new SwiftList<Physics3DHit>(ColliderCount);
     }
 
@@ -115,6 +128,7 @@ public class QueryServiceBenchmarks
         _cuboidSourceContext.Dispose();
         _cylinderSourceContext.Dispose();
         _convexMeshSourceContext.Dispose();
+        _highVertexConvexMeshSourceContext.Dispose();
         _compoundSourceContext.Dispose();
         _context = null;
         _overlappingContext = null;
@@ -126,8 +140,10 @@ public class QueryServiceBenchmarks
         _cuboidSource = null;
         _cylinderSource = null;
         _convexMeshSourceContext = null;
+        _highVertexConvexMeshSourceContext = null;
         _compoundSourceContext = null;
         _convexMeshSource = null;
+        _highVertexConvexMeshSource = null;
         _compoundSource = null;
         _raycastHits = null;
         _overlappingRaycastHits = null;
@@ -138,6 +154,7 @@ public class QueryServiceBenchmarks
         _cuboidSourceHits = null;
         _cylinderSourceHits = null;
         _convexMeshSourceHits = null;
+        _highVertexConvexMeshSourceHits = null;
         _compoundSourceHits = null;
     }
 
@@ -203,6 +220,14 @@ public class QueryServiceBenchmarks
             _sourceSweepDisplacement,
             IncludeLayerZero,
             _convexMeshSourceHits);
+
+    [Benchmark]
+    public int SweepConvexMeshAllAcrossSphereTargets_HighVertexSource() =>
+        _highVertexConvexMeshSourceContext.Query3D.SweepConvexMeshAll(
+            _highVertexConvexMeshSource,
+            _sourceSweepDisplacement,
+            IncludeLayerZero,
+            _highVertexConvexMeshSourceHits);
 
     [Benchmark]
     public int SweepCompoundAllAcrossSphereTargets() =>

@@ -116,6 +116,37 @@ public sealed class PhysicsMeshTests
     }
 
     [Fact]
+    public void GetSupportVertexWorld_ShouldMatchStableWorldVertexScan()
+    {
+        PhysicsMesh mesh = MeshTestFixtures.CreateConvexCube().Mesh;
+        PhysicsMesh denseMesh = MeshTestFixtures.CreateSubdividedInsideCorner(
+            4,
+            MeshColliderMode.Convex,
+            MeshInertiaPolicy.SurfaceApproximation).Mesh;
+        Vector3d[] directions =
+        {
+            Vector3d.Right,
+            Vector3d.Left,
+            Vector3d.Up,
+            Vector3d.Forward,
+            new Vector3d(Fixed64.One, Fixed64.One, Fixed64.Zero).Normalized
+        };
+
+        AssertSupportMatchesStableScan(mesh, directions);
+        AssertSupportMatchesStableScan(denseMesh, directions);
+
+        mesh.UpdatePosition(
+            new Vector3d((Fixed64)3, Fixed64.One, (Fixed64)(-2)),
+            FixedQuaternion.FromEulerAnglesInDegrees(Fixed64.Zero, Fixed64.Zero, (Fixed64)90));
+        denseMesh.UpdatePosition(
+            new Vector3d((Fixed64)(-2), (Fixed64)3, Fixed64.One),
+            FixedQuaternion.FromEulerAnglesInDegrees(Fixed64.Zero, (Fixed64)45, Fixed64.Zero));
+
+        AssertSupportMatchesStableScan(mesh, directions);
+        AssertSupportMatchesStableScan(denseMesh, directions);
+    }
+
+    [Fact]
     public void Constructor_ShouldStoreExplicitMeshColliderMode()
     {
         var collider = new LSMeshCollider(
@@ -427,6 +458,30 @@ public sealed class PhysicsMeshTests
         };
 
     private static int[] ValidTriangles() => new[] { 0, 1, 2 };
+
+    private static void AssertSupportMatchesStableScan(PhysicsMesh mesh, Vector3d[] directions)
+    {
+        foreach (Vector3d direction in directions)
+            mesh.GetSupportVertexWorld(direction).Should().Be(ScanSupportWithGetVertexWorld(mesh, direction));
+    }
+
+    private static Vector3d ScanSupportWithGetVertexWorld(PhysicsMesh mesh, Vector3d direction)
+    {
+        Vector3d best = mesh.GetVertexWorld(0);
+        Fixed64 bestProjection = Vector3d.Dot(best, direction);
+        for (int i = 1; i < mesh.VertexCount; i++)
+        {
+            Vector3d vertex = mesh.GetVertexWorld(i);
+            Fixed64 projection = Vector3d.Dot(vertex, direction);
+            if (projection <= bestProjection)
+                continue;
+
+            bestProjection = projection;
+            best = vertex;
+        }
+
+        return best;
+    }
 
     public static TheoryData<Vector3d[], int[], MeshVolumeValidationResult> InvalidClosedVolumeMeshes()
     {

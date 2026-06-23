@@ -726,23 +726,9 @@ internal sealed class ConvexSweepQueryWorker
             return cylinder.Center + cylinder.Rotation * new Vector3d(radialSupport.X, y, radialSupport.Z);
         }
 
-        private static Vector3d SupportMesh(LSMeshCollider mesh, Vector3d direction)
-        {
-            Vector3d best = mesh.Mesh.GetVertexWorld(0);
-            Fixed64 bestProjection = Vector3d.Dot(best, direction);
-            for (int i = 1; i < mesh.Mesh.VertexCount; i++)
-            {
-                Vector3d vertex = mesh.Mesh.GetVertexWorld(i);
-                Fixed64 projection = Vector3d.Dot(vertex, direction);
-                if (projection <= bestProjection)
-                    continue;
-
-                bestProjection = projection;
-                best = vertex;
-            }
-
-            return best;
-        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static Vector3d SupportMesh(LSMeshCollider mesh, Vector3d direction) =>
+            mesh.Mesh.GetSupportVertexWorld(direction);
 
         private static Vector3d SupportVertices(Vector3d[] vertices, Vector3d direction)
         {

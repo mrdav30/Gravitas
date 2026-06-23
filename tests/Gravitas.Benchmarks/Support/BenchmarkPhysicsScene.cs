@@ -4,6 +4,7 @@ using GridForge.Configuration;
 using SwiftCollections;
 using SwiftCollections.Diagnostics;
 using System;
+using System.Collections.Generic;
 
 namespace Gravitas.Benchmarks;
 
@@ -51,6 +52,21 @@ internal static class BenchmarkPhysicsScene
     public static LSMeshCollider CreateDynamicConvexCube(GravitasWorldContext context, Vector3d position)
     {
         LSMeshCollider collider = CreateConvexCubeMesh();
+        CreateDynamicBody(context, collider, position);
+        return collider;
+    }
+
+    public static LSMeshCollider CreateDynamicSubdividedConvexCube(
+        GravitasWorldContext context,
+        Vector3d position,
+        int subdivision)
+    {
+        CreateSubdividedClosedCubeTopology(subdivision, out Vector3d[] vertices, out int[] triangles);
+        var collider = new LSMeshCollider(
+            vertices,
+            triangles,
+            MeshColliderMode.Convex,
+            MeshInertiaPolicy.SurfaceApproximation);
         CreateDynamicBody(context, collider, position);
         return collider;
     }
@@ -147,6 +163,49 @@ internal static class BenchmarkPhysicsScene
         return Math.Max(DefaultGridPadding * 2, maxDimension);
     }
 
+    public static void CreateSubdividedClosedCubeTopology(
+        int subdivision,
+        out Vector3d[] vertices,
+        out int[] triangles)
+    {
+        if (subdivision <= 0)
+            throw new ArgumentOutOfRangeException(nameof(subdivision), subdivision, "Subdivision count must be greater than zero.");
+
+        var vertexLookup = new Dictionary<long, int>();
+        var vertexList = new List<Vector3d>(6 * (subdivision + 1) * (subdivision + 1));
+        var triangleList = new List<int>(36 * subdivision * subdivision);
+
+        for (int x = 0; x < subdivision; x++)
+        {
+            for (int y = 0; y < subdivision; y++)
+            {
+                AddQuadZ(vertexLookup, vertexList, triangleList, x, y, 0, subdivision, false);
+                AddQuadZ(vertexLookup, vertexList, triangleList, x, y, subdivision, subdivision, true);
+            }
+        }
+
+        for (int y = 0; y < subdivision; y++)
+        {
+            for (int z = 0; z < subdivision; z++)
+            {
+                AddQuadX(vertexLookup, vertexList, triangleList, 0, y, z, subdivision, false);
+                AddQuadX(vertexLookup, vertexList, triangleList, subdivision, y, z, subdivision, true);
+            }
+        }
+
+        for (int x = 0; x < subdivision; x++)
+        {
+            for (int z = 0; z < subdivision; z++)
+            {
+                AddQuadY(vertexLookup, vertexList, triangleList, x, 0, z, subdivision, false);
+                AddQuadY(vertexLookup, vertexList, triangleList, x, subdivision, z, subdivision, true);
+            }
+        }
+
+        vertices = vertexList.ToArray();
+        triangles = triangleList.ToArray();
+    }
+
     private static StiffBody CreateDynamicSphere(GravitasWorldContext context, Vector3d position)
     {
         return CreateDynamicBody(context, new LSSphereCollider(), position);
@@ -201,6 +260,112 @@ internal static class BenchmarkPhysicsScene
             0, 1, 4, 1, 5, 4,
             2, 6, 3, 3, 6, 7
         };
+    }
+
+    private static void AddQuadZ(
+        Dictionary<long, int> lookup,
+        List<Vector3d> vertices,
+        List<int> triangles,
+        int x,
+        int y,
+        int z,
+        int subdivision,
+        bool positive)
+    {
+        int a = GetSubdividedCubeVertex(lookup, vertices, x, y, z, subdivision);
+        int b = GetSubdividedCubeVertex(lookup, vertices, x + 1, y, z, subdivision);
+        int c = GetSubdividedCubeVertex(lookup, vertices, x, y + 1, z, subdivision);
+        int d = GetSubdividedCubeVertex(lookup, vertices, x + 1, y + 1, z, subdivision);
+
+        if (positive)
+        {
+            AddTriangle(triangles, a, b, c);
+            AddTriangle(triangles, b, d, c);
+            return;
+        }
+
+        AddTriangle(triangles, a, c, b);
+        AddTriangle(triangles, b, c, d);
+    }
+
+    private static void AddQuadX(
+        Dictionary<long, int> lookup,
+        List<Vector3d> vertices,
+        List<int> triangles,
+        int x,
+        int y,
+        int z,
+        int subdivision,
+        bool positive)
+    {
+        int a = GetSubdividedCubeVertex(lookup, vertices, x, y, z, subdivision);
+        int b = GetSubdividedCubeVertex(lookup, vertices, x, y + 1, z, subdivision);
+        int c = GetSubdividedCubeVertex(lookup, vertices, x, y, z + 1, subdivision);
+        int d = GetSubdividedCubeVertex(lookup, vertices, x, y + 1, z + 1, subdivision);
+
+        if (positive)
+        {
+            AddTriangle(triangles, a, b, c);
+            AddTriangle(triangles, c, b, d);
+            return;
+        }
+
+        AddTriangle(triangles, a, c, b);
+        AddTriangle(triangles, b, c, d);
+    }
+
+    private static void AddQuadY(
+        Dictionary<long, int> lookup,
+        List<Vector3d> vertices,
+        List<int> triangles,
+        int x,
+        int y,
+        int z,
+        int subdivision,
+        bool positive)
+    {
+        int a = GetSubdividedCubeVertex(lookup, vertices, x, y, z, subdivision);
+        int b = GetSubdividedCubeVertex(lookup, vertices, x + 1, y, z, subdivision);
+        int c = GetSubdividedCubeVertex(lookup, vertices, x, y, z + 1, subdivision);
+        int d = GetSubdividedCubeVertex(lookup, vertices, x + 1, y, z + 1, subdivision);
+
+        if (positive)
+        {
+            AddTriangle(triangles, a, c, b);
+            AddTriangle(triangles, b, c, d);
+            return;
+        }
+
+        AddTriangle(triangles, a, b, c);
+        AddTriangle(triangles, b, d, c);
+    }
+
+    private static int GetSubdividedCubeVertex(
+        Dictionary<long, int> lookup,
+        List<Vector3d> vertices,
+        int x,
+        int y,
+        int z,
+        int subdivision)
+    {
+        long key = ((long)x << 42) | ((long)y << 21) | (uint)z;
+        if (lookup.TryGetValue(key, out int index))
+            return index;
+
+        Fixed64 fx = Fixed64.FromFraction(x, subdivision) - Fixed64.Half;
+        Fixed64 fy = Fixed64.FromFraction(y, subdivision) - Fixed64.Half;
+        Fixed64 fz = Fixed64.FromFraction(z, subdivision) - Fixed64.Half;
+        index = vertices.Count;
+        vertices.Add(new Vector3d(fx, fy, fz));
+        lookup.Add(key, index);
+        return index;
+    }
+
+    private static void AddTriangle(List<int> triangles, int a, int b, int c)
+    {
+        triangles.Add(a);
+        triangles.Add(b);
+        triangles.Add(c);
     }
 
     private static LSMeshCollider CreateVerticalQuadMesh()
