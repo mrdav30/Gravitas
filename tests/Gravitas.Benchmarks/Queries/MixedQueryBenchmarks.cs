@@ -20,6 +20,8 @@ public class MixedQueryBenchmarks
     private GravitasWorldContext _denseCuboidContext;
     private GravitasWorldContext _denseCapsuleContext;
     private GravitasWorldContext _denseCylinderContext;
+    private GravitasWorldContext _denseRotatedCapsuleContext;
+    private GravitasWorldContext _denseRotatedCylinderContext;
     private SwiftList<PhysicsMixedHit> _hits;
     private Vector2d _sparseEnd;
     private Vector2d _denseEnd;
@@ -40,7 +42,10 @@ public class MixedQueryBenchmarks
         _denseCuboidContext = CreateMixedContext(denseExtentX, 16);
         _denseCapsuleContext = CreateMixedContext(denseExtentX, 16);
         _denseCylinderContext = CreateMixedContext(denseExtentX, 16);
+        _denseRotatedCapsuleContext = CreateMixedContext(denseExtentX, 16);
+        _denseRotatedCylinderContext = CreateMixedContext(denseExtentX, 16);
         _hits = new SwiftList<PhysicsMixedHit>(ColliderCount);
+        FixedQuaternion rotatedCurvedTarget = FixedQuaternion.FromEulerAnglesInDegrees(Fixed64.Zero, Fixed64.Zero, (Fixed64)90);
 
         for (int i = 0; i < ColliderCount; i++)
         {
@@ -59,6 +64,16 @@ public class MixedQueryBenchmarks
                 _denseCylinderContext,
                 new LSCylinderCollider { Size = new Vector3d(Fixed64.One, (Fixed64)3, Fixed64.One) },
                 densePosition);
+            _ = CreateStatic3D(
+                _denseRotatedCapsuleContext,
+                new LSCapsuleCollider { Size = new Vector3d(Fixed64.One, (Fixed64)3, Fixed64.One) },
+                densePosition,
+                rotatedCurvedTarget);
+            _ = CreateStatic3D(
+                _denseRotatedCylinderContext,
+                new LSCylinderCollider { Size = new Vector3d(Fixed64.One, (Fixed64)3, Fixed64.One) },
+                densePosition,
+                rotatedCurvedTarget);
         }
 
         _sparseContext.Simulate();
@@ -67,6 +82,8 @@ public class MixedQueryBenchmarks
         _denseCuboidContext.Simulate();
         _denseCapsuleContext.Simulate();
         _denseCylinderContext.Simulate();
+        _denseRotatedCapsuleContext.Simulate();
+        _denseRotatedCylinderContext.Simulate();
 
         _sparseEnd = new Vector2d((Fixed64)(ColliderCount * 3), Fixed64.Zero);
         _denseEnd = new Vector2d((Fixed64)ColliderCount, Fixed64.Zero);
@@ -82,12 +99,16 @@ public class MixedQueryBenchmarks
         _denseCuboidContext?.Dispose();
         _denseCapsuleContext?.Dispose();
         _denseCylinderContext?.Dispose();
+        _denseRotatedCapsuleContext?.Dispose();
+        _denseRotatedCylinderContext?.Dispose();
         _sparseContext = null;
         _denseContext = null;
         _cornerMissContext = null;
         _denseCuboidContext = null;
         _denseCapsuleContext = null;
         _denseCylinderContext = null;
+        _denseRotatedCapsuleContext = null;
+        _denseRotatedCylinderContext = null;
         _hits = null;
     }
 
@@ -169,6 +190,32 @@ public class MixedQueryBenchmarks
         return _denseCylinderContext.QueryMixed.LastQueryCandidateCount;
     }
 
+    [Benchmark]
+    public int SweepCircleAgainst3DAll_DenseRotatedCapsuleTargets()
+    {
+        return SweepCircleAgainstDensePrimitive3D(_denseRotatedCapsuleContext);
+    }
+
+    [Benchmark]
+    public int SweepCircleAgainst3DAll_DenseRotatedCapsuleTargets_CandidateCount()
+    {
+        _ = SweepCircleAgainstDensePrimitive3D(_denseRotatedCapsuleContext);
+        return _denseRotatedCapsuleContext.QueryMixed.LastQueryCandidateCount;
+    }
+
+    [Benchmark]
+    public int SweepCircleAgainst3DAll_DenseRotatedCylinderTargets()
+    {
+        return SweepCircleAgainstDensePrimitive3D(_denseRotatedCylinderContext);
+    }
+
+    [Benchmark]
+    public int SweepCircleAgainst3DAll_DenseRotatedCylinderTargets_CandidateCount()
+    {
+        _ = SweepCircleAgainstDensePrimitive3D(_denseRotatedCylinderContext);
+        return _denseRotatedCylinderContext.QueryMixed.LastQueryCandidateCount;
+    }
+
     private static GravitasWorldContext CreateMixedContext(int extentX, int extentZ, bool clearAllPools = false)
     {
         GravitasWorldContext context = BenchmarkEnvironment.PrepareOwnedContext(clearAllPools);
@@ -190,15 +237,21 @@ public class MixedQueryBenchmarks
         return CreateStatic3D(context, new LSSphereCollider(), position);
     }
 
-    private static StiffBody CreateStatic3D(GravitasWorldContext context, LSCollider collider, Vector3d position)
+    private static StiffBody CreateStatic3D(
+        GravitasWorldContext context,
+        LSCollider collider,
+        Vector3d position,
+        FixedQuaternion? rotation = null)
     {
         var agent = new BenchmarkMatterAgent(context, position);
+        FixedQuaternion startRotation = rotation ?? FixedQuaternion.Identity;
+        agent.Transform.Rotation = startRotation;
         var body = new StiffBody(agent, collider)
         {
             Mass = Fixed64.One,
             Immovable = true
         };
-        body.Initialize(position, FixedQuaternion.Identity);
+        body.Initialize(position, startRotation);
         return body;
     }
 

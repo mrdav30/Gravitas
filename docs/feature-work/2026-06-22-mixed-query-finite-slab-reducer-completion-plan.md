@@ -26,11 +26,11 @@ and CCD services.
 
 ## Purpose
 
-`QueryMixed.SweepCircleAgainst3D` is exact for 3D spheres, cuboids,
-world-Y capsules, and world-Y finite cylinders. Mesh, compound, rotated
-capsule, and rotated finite-cylinder targets still use a labeled
-`ConservativeFallback` path. That fallback is safe from false negatives, but it
-can report earlier or extra hits in dense mixed scenes.
+At the start of this plan, `QueryMixed.SweepCircleAgainst3D` was exact for 3D
+spheres, cuboids, world-Y capsules, and world-Y finite cylinders. Mesh,
+compound, rotated capsule, and rotated finite-cylinder targets still used a
+labeled `ConservativeFallback` path. That fallback is safe from false
+negatives, but it can report earlier or extra hits in dense mixed scenes.
 
 For alpha, that policy should either become exact for the current runtime shape
 families or remain explicitly justified by benchmark evidence and documented
@@ -51,16 +51,28 @@ does not carry hidden follow-up work.
 
 ## Workstream 1: Rotated Curved Target Finite-Slab Reducers
 
+**Status:** Done.
+
 **Tasks**
 
-- [ ] Add red tests for rotated capsule and rotated finite-cylinder targets
+- [x] Add red tests for rotated capsule and rotated finite-cylinder targets
   where the circumsphere fallback reports an early or extra hit.
-- [ ] Research and implement deterministic fixed-point reducers for a 2D circle
+- [x] Research and implement deterministic fixed-point reducers for a 2D circle
   slab swept against arbitrarily oriented capsules and finite cylinders.
-- [ ] Preserve world-Y capsule/cylinder fast paths and exact labels.
-- [ ] Keep `ConservativeFallback` only for cases that remain deliberately
+- [x] Preserve world-Y capsule/cylinder fast paths and exact labels.
+- [x] Keep `ConservativeFallback` only for cases that remain deliberately
   unsupported after measured evidence.
-- [ ] Add benchmark rows for dense rotated capsule/cylinder mixed sweeps.
+- [x] Add benchmark rows for dense rotated capsule/cylinder mixed sweeps.
+
+**Implementation notes**
+
+- Rotated capsule and finite-cylinder targets now use deterministic
+  finite-slab projection support reducers instead of the mixed circumsphere
+  fallback. The reducer sweeps the 2D circle in X/Z against the target volume
+  clipped to the slab Y interval.
+- World-Y capsule/cylinder paths still use the cheaper vertical-interval
+  reducers.
+- Mesh and compound target fallback policy remains owned by Workstream 2.
 
 ## Workstream 2: Mesh And Compound Target Finite-Slab Reducers
 

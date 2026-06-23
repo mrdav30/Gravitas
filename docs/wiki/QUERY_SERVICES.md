@@ -46,7 +46,7 @@ names an internal CCD proxy.
 | `Query2D.Raycast`, `RaycastAll` | 2D segment | circle, AABB, convex polygon, compound | `Exact`; zero-length segments return no hit, starting-inside returns distance zero | distance, collider ID | service-owned scratch, caller-owned all-hit buffer |
 | `Query2D.SweepCircle`, `SweepCircleAll` | 2D circle | circle, AABB, convex polygon, compound | `Exact` circle-source sweep reducers; compound reports owner once through earliest part | distance, collider ID | service-owned scratch, caller-owned all-hit buffer |
 | `QueryMixed.SweepSphereAgainst2D`, `SweepSphereAgainst2DAll` | 3D sphere | 2D circle slab, AABB slab, convex polygon slab, compound slab | circle slab: `Exact`; AABB/polygon prism bounds: `ConservativeFallback`; compound preserves the winning part label | distance, 3D collider ID, 2D collider ID | service-owned scratch, caller-owned all-hit buffer |
-| `QueryMixed.SweepCircleAgainst3D`, `SweepCircleAgainst3DAll` | 2D circle embedded in a finite Y slab | 3D sphere, capsule, cuboid, finite cylinder, mesh, compound | sphere/cuboid/world-Y capsule/world-Y cylinder: `Exact`; unsupported rotated capsule/cylinder, mesh, and compound: `ConservativeFallback` | distance, 3D collider ID, 2D collider ID | service-owned scratch, caller-owned all-hit buffer |
+| `QueryMixed.SweepCircleAgainst3D`, `SweepCircleAgainst3DAll` | 2D circle embedded in a finite Y slab | 3D sphere, capsule, cuboid, finite cylinder, mesh, compound | sphere, cuboid, capsule, and finite-cylinder targets: `Exact`; mesh and compound: `ConservativeFallback` | distance, 3D collider ID, 2D collider ID | service-owned scratch, caller-owned all-hit buffer |
 | Concave/raw mesh-source sweeps | concave `LSMeshCollider` or raw mesh as the moving query source | 2D, 3D, or mixed targets | `NotSupported`; use offline convex decomposition into supported `LSCompoundCollider` parts | none | no raw mesh-source query API |
 
 ### Internal CCD Query Surface
@@ -354,18 +354,21 @@ planar reach, so tall slabs and slab-corner cases do not inflate the horizontal
 sweep radius. Cuboid targets project the cuboid portion intersecting the slab's
 Y interval into X/Z and sweep the source circle against that convex projection,
 so rotated cuboids do not rely on the generic sphere proxy. World-Y capsule and
-finite-cylinder targets use exact vertical-interval reducers: capsule cap reach
-is reduced by slab interval distance, while finite cylinders require interval
-overlap before the planar circle sweep is accepted.
+finite-cylinder targets use exact vertical-interval fast paths: capsule cap
+reach is reduced by slab interval distance, while finite cylinders require
+interval overlap before the planar circle sweep is accepted. Rotated capsule and
+finite-cylinder targets use deterministic finite-slab projection reducers, so
+the moving 2D circle is tested against the target volume actually intersecting
+the slab rather than a circumsphere proxy.
 
-Mesh, compound, rotated capsule, and rotated finite-cylinder targets currently
-retain the conservative swept-sphere worker fallback. Mesh targets still use
-triangle candidate acceleration and face/edge/vertex TOI checks within that
-fallback; compound targets return one hit on the owning compound collider after
-reducing over stable part order. The fallback now uses a circumsphere radius for
-the source slab, so it can report earlier or extra hits but is not allowed to
-miss a finite-slab corner case. Hits accepted through these fallback paths
-report `PhysicsQueryReducerKind.ConservativeFallback`.
+Mesh and compound targets currently retain the conservative swept-sphere worker
+fallback. Mesh targets still use triangle candidate acceleration and
+face/edge/vertex TOI checks within that fallback; compound targets return one
+hit on the owning compound collider after reducing over stable part order. The
+fallback uses a circumsphere radius for the source slab, so it can report
+earlier or extra hits but is not allowed to miss a finite-slab corner case. Hits
+accepted through these fallback paths report
+`PhysicsQueryReducerKind.ConservativeFallback`.
 
 When diagnostics are enabled, mixed queries emit both `MixedQuery` and
 `QuerySummary` events. `MixedQuery` reports the closest mixed hit and accepted

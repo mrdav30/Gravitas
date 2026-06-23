@@ -82,9 +82,9 @@ Mixed diagnostics, explicit mixed queries, and mixed CCD hooks are implemented.
 Mixed query hits expose `PhysicsMixedHit.ReducerKind` so hosts can distinguish
 exact finite-slab reducers from safe conservative fallbacks. 2D swept-circle
 mixed CCD routes through the same mixed query reducers as public
-`SweepCircleAgainst3D`: sphere, cuboid, world-Y capsule, and world-Y finite
-cylinder targets use finite-slab reducers, while mesh, compound, and unsupported
-rotated capsule/cylinder targets remain explicit conservative fallbacks.
+`SweepCircleAgainst3D`: sphere, cuboid, capsule, and finite-cylinder targets
+use finite-slab reducers, while mesh and compound targets remain explicit
+conservative fallbacks.
 When diagnostics are enabled, mixed queries also emit `QuerySummary` events with
 exact attempt, accepted hit, fallback hit, and rejected fallback counts.
 Remaining mixed finite-slab reducer promotion is tracked in the feature-work
