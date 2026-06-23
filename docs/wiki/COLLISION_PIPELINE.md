@@ -441,21 +441,21 @@ before the proxy hit can be accepted:
 
 Unsupported source families and mixed dynamic CCD paths without exact reducers
 continue to use conservative proxy results. Those paths prefer false-positive
-early stops over false-negative tunneling until the service-level CCD island
-model can advance cross-service contacts without order-dependent velocity
-handoff.
+early stops over false-negative tunneling, but accepted dynamic hits use the
+same service-level handoff queue as exact pure-dimension hits so target velocity
+and remaining-time advancement stay deterministic.
 
 `Continuous` always sweeps when the proxy radius and displacement are non-zero.
 `Auto` sweeps only when the intended displacement is larger than the proxy
 radius. When a hit is accepted, the body advances to the earliest swept center
 time of impact, removes only the closing component of linear velocity, and then
 continues through the remaining frame time with the updated tangential velocity.
-`PhysicsSettings.ContinuousCollisionMaxSubsteps` bounds this same-frame TOI
-consumption; the default is `PhysicsSettings.DefaultContinuousCollisionMaxSubsteps`.
-`StiffBody.LastContinuousCollisionSubstepCount`,
-`StiffBody.LastContinuousCollisionSubstepLimitReached`,
-`StiffBody2D.LastContinuousCollisionSubstepCount`, and
-`StiffBody2D.LastContinuousCollisionSubstepLimitReached` expose the most recent
+`PhysicsSettings.ContinuousCollisionMaxToiIterations` bounds this same-frame TOI
+consumption; the default is `PhysicsSettings.DefaultContinuousCollisionMaxToiIterations`.
+`StiffBody.LastContinuousCollisionToiIterationCount`,
+`StiffBody.LastContinuousCollisionToiIterationLimitReached`,
+`StiffBody2D.LastContinuousCollisionToiIterationCount`, and
+`StiffBody2D.LastContinuousCollisionToiIterationLimitReached` expose the most recent
 step's bounded-solver status for deterministic diagnostics.
 
 Rotational CCD is layered onto the same body-owned opt-in contract for dynamic
@@ -473,8 +473,9 @@ closing velocity component along the accepted contact normal.
 
 The current rotational path covers dynamic angular sources against static-style
 targets and host-driven kinematic rotation as an active swept source against
-static-style targets. Global service-level CCD island solving remains tracked in
-[`CCD Service-Level Island Solver`](../feature-work/2026-06-21-ccd-service-level-island-solver-plan.md).
+static-style targets. Translational dynamic hits are handed off through the
+service-level CCD queue; rotational CCD remains body-owned and static-style
+target focused.
 
 Static and kinematic CCD targets are non-trigger bodyless colliders, immovable
 bodies, and kinematic bodies whose layers are allowed by the context collision
@@ -496,7 +497,7 @@ any individual body commits movement. A moving source compares the
 static/kinematic query hit with dynamic relative TOI candidates and chooses the
 earliest distance, then higher closing speed, then stable collider ID order.
 This prevents opposing fast bodies from depending on dynamic body iteration
-order. When bounded substeps continue after an earlier hit, dynamic target
+order. When bounded TOI iterations continue after an earlier hit, dynamic target
 prediction is sampled from the same frame-start displacement at the elapsed
 frame fraction, then swept only through the remaining frame fraction.
 
@@ -504,12 +505,13 @@ Kinematic active-source CCD uses the same target ordering. Static-style hits
 clip the kinematic body to the earliest safe pose and write the clipped pose
 back to the bound transform, because bodyless, immovable, and kinematic targets
 cannot receive solver correction. Dynamic candidates at or before that first
-static blocker receive deterministic positional correction plus wake for the
-remaining swept distance. If no static blocker exists, the kinematic source
-keeps the host-requested target pose after pushing dynamic targets. Velocity
-transfer is deliberately left to the service-level CCD island plan so dynamic
-targets do not receive order-dependent same-frame integration when the source
-and target belong to different service phases.
+static blocker receive deterministic velocity handoff at the accepted TOI and
+are advanced through the remaining frame time by the owning 2D or 3D service. If
+the target has already run in the current service pass, it is queued for bounded
+same-frame continuation; if it has not, the pending handoff is consumed when its
+own service reaches it. Handoff continuation ignores the initiating kinematic
+source for that segment so the target does not immediately collide with the same
+source treated as a final-pose static obstacle.
 
 Dynamic relative CCD keeps proxy sweeps as the broad candidate stage, then
 validates supported pure-dimension candidates with exact mover-shape reducers:
@@ -520,10 +522,11 @@ validates supported pure-dimension candidates with exact mover-shape reducers:
   through bounded triangle candidates; concave mesh sources remain unsupported.
 - pure 2D dynamic CCD uses exact relative mover-shape sweeps for circle, AABB,
   convex polygon, and compound movers and targets.
-- mixed dynamic CCD keeps the conservative relative proxy path. Mixed dynamic
-  targets use the larger of planar radius and mixed half-thickness as their 3D
-  proxy radius, and exact cross-dimension velocity transfer remains part of the
-  service-level CCD island plan.
+- mixed dynamic CCD keeps the conservative relative proxy path when no
+  shape-exact mixed reducer exists. Mixed dynamic targets use the larger of
+  planar radius and mixed half-thickness as their 3D proxy radius, then accepted
+  hits exchange planar/3D velocity through the same bounded service-level
+  handoff queues as pure dynamic CCD.
 
 ## Active Partitions
 
@@ -869,10 +872,10 @@ Response units and invariants:
 - drag and angular damping remain integration/body behavior; contact friction is
   handled by the response solver.
 
-This is still the first alpha milestone, not the final response engine. The
-remaining CCD response boundary is service-level island advancement for dense
-same-frame contacts and mixed dynamic velocity handoff, tracked in
-[`CCD Service-Level Island Solver`](../feature-work/2026-06-21-ccd-service-level-island-solver-plan.md).
+This is still the first alpha milestone, not the final response engine. Dense
+same-frame CCD contact chains are handled by bounded service-level handoff
+queues; future response hardening should focus on measured contact-quality or
+shape-reducer gaps rather than a missing cross-service velocity handoff.
 
 ## Body Sleep And Wake
 

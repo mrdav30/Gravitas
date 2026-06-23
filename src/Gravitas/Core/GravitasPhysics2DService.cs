@@ -42,6 +42,9 @@ public sealed class GravitasPhysics2DService
     private readonly DynamicCcdCandidateIndex _planarContinuousCollisionCandidates = new();
     private readonly DynamicCcdCandidateIndex _mixedContinuousCollisionCandidates = new();
     private readonly SwiftList<int> _continuousCollisionCandidateIds = new();
+    private readonly SwiftHashSet<int> _processedContinuousCollisionBodyIds = new();
+    private readonly SwiftHashSet<int> _queuedContinuousCollisionHandoffIds = new();
+    private readonly SwiftList<int> _continuousCollisionHandoffQueue = new();
     private int _continuousCollisionPreparedToken = int.MinValue;
     private int _nextColliderId = 1;
 
@@ -58,6 +61,12 @@ public sealed class GravitasPhysics2DService
     public bool SimulatePhysics { get; set; } = true;
 
     internal int LastBroadPhaseCandidateCount { get; private set; }
+
+    internal int LastContinuousCollisionIslandCount { get; private set; }
+
+    internal int LastContinuousCollisionIslandIterationCount { get; private set; }
+
+    internal bool LastContinuousCollisionIslandLimitReached { get; private set; }
 
     internal void AssimilateBody(StiffBody2D body, bool isDynamic)
     {
@@ -131,10 +140,15 @@ public sealed class GravitasPhysics2DService
             _context.AdvanceLateSimulateToken();
 
         PrepareContinuousCollisionFrame();
+        BeginContinuousCollisionHandoffFrame();
 
         foreach (StiffBody2D body in _dynamicBodies)
+        {
             body.LateSimulate(updateSleepState: false, updateColliderState: false);
+            _processedContinuousCollisionBodyIds.Add(body.DynamicId);
+        }
 
+        ProcessQueuedContinuousCollisionHandoffs();
         PrepareCollisionPartitions();
         RunDiscreteCollisionStep();
         UpdateSleepStatesAfterPhysicsStep();
@@ -239,10 +253,16 @@ public sealed class GravitasPhysics2DService
         _planarContinuousCollisionCandidates.Clear();
         _mixedContinuousCollisionCandidates.Clear();
         _continuousCollisionCandidateIds.FastClear();
+        _processedContinuousCollisionBodyIds.Clear();
+        _queuedContinuousCollisionHandoffIds.Clear();
+        _continuousCollisionHandoffQueue.FastClear();
         _continuousCollisionPreparedToken = int.MinValue;
         _nextColliderId = 1;
         BodyCount = 0;
         LastBroadPhaseCandidateCount = 0;
+        LastContinuousCollisionIslandCount = 0;
+        LastContinuousCollisionIslandIterationCount = 0;
+        LastContinuousCollisionIslandLimitReached = false;
     }
 
     internal bool TryGetColliderById(int colliderId, out LSCollider2D? collider)
@@ -280,6 +300,74 @@ public sealed class GravitasPhysics2DService
         PrepareContinuousCollisionFrame();
         _mixedContinuousCollisionCandidates.Query(sourceBounds, _continuousCollisionCandidateIds);
         return _continuousCollisionCandidateIds;
+    }
+
+    internal void QueueContinuousCollisionHandoff(StiffBody2D body)
+    {
+        int dynamicId = body.DynamicId;
+        if (dynamicId < 0
+            || !_processedContinuousCollisionBodyIds.Contains(dynamicId)
+            || !_queuedContinuousCollisionHandoffIds.Add(dynamicId))
+        {
+            return;
+        }
+
+        _continuousCollisionHandoffQueue.Add(dynamicId);
+    }
+
+    internal bool ProcessQueuedContinuousCollisionHandoffs() =>
+        ProcessQueuedContinuousCollisionHandoffs(_context.Settings.ContinuousCollisionMaxToiIterations) > 0;
+
+    internal int ProcessQueuedContinuousCollisionHandoffs(int iterationBudget)
+    {
+        if (_continuousCollisionHandoffQueue.Count == 0)
+            return 0;
+
+        if (iterationBudget <= 0)
+        {
+            LastContinuousCollisionIslandLimitReached = true;
+            ClearContinuousCollisionHandoffQueue();
+            return 0;
+        }
+
+        int readIndex = 0;
+        int iterations = 0;
+        bool processed = false;
+        while (readIndex < _continuousCollisionHandoffQueue.Count && iterations < iterationBudget)
+        {
+            int dynamicId = _continuousCollisionHandoffQueue[readIndex++];
+            if (!TryGetDynamicBody(dynamicId, out StiffBody2D body))
+                continue;
+
+            if (body.TryConsumeContinuousCollisionHandoff(updateSleepState: false, updateColliderState: false))
+            {
+                processed = true;
+                iterations++;
+            }
+        }
+
+        if (processed)
+            LastContinuousCollisionIslandCount++;
+
+        LastContinuousCollisionIslandIterationCount += iterations;
+        LastContinuousCollisionIslandLimitReached |= readIndex < _continuousCollisionHandoffQueue.Count;
+        ClearContinuousCollisionHandoffQueue();
+        return iterations;
+    }
+
+    private void BeginContinuousCollisionHandoffFrame()
+    {
+        _processedContinuousCollisionBodyIds.Clear();
+        ClearContinuousCollisionHandoffQueue();
+        LastContinuousCollisionIslandCount = 0;
+        LastContinuousCollisionIslandIterationCount = 0;
+        LastContinuousCollisionIslandLimitReached = false;
+    }
+
+    private void ClearContinuousCollisionHandoffQueue()
+    {
+        _queuedContinuousCollisionHandoffIds.Clear();
+        _continuousCollisionHandoffQueue.FastClear();
     }
 
     internal void ProcessPartitionCandidate(int firstId, int secondId, WorldVoxelIndex partitionIndex)

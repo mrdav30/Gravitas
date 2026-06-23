@@ -314,10 +314,45 @@ public sealed class GravitasWorldContext : IDisposable
             Physics.LateSimulate(continuousCollisionFramePrepared: true);
         if (runtimeMode.Runs2D())
             Physics2D.LateSimulate(continuousCollisionFramePrepared: true);
+        ProcessQueuedContinuousCollisionHandoffs(runtimeMode);
         if (runtimeMode.RunsMixedContacts())
             MixedCollisions.LateSimulate();
 
         _hooks.InvokeLateSimulate();
+    }
+
+    private void ProcessQueuedContinuousCollisionHandoffs(PhysicsRuntimeMode runtimeMode)
+    {
+        int iterationLimit = Settings.ContinuousCollisionMaxToiIterations;
+        int remainingIterations = iterationLimit;
+        for (int iteration = 0; iteration < iterationLimit && remainingIterations > 0; iteration++)
+        {
+            int processedIterations = 0;
+            if (runtimeMode.Runs3D())
+            {
+                int usedIterations = Physics.ProcessQueuedContinuousCollisionHandoffs(remainingIterations);
+                processedIterations += usedIterations;
+                remainingIterations -= usedIterations;
+            }
+
+            if (remainingIterations > 0 && runtimeMode.Runs2D())
+            {
+                int usedIterations = Physics2D.ProcessQueuedContinuousCollisionHandoffs(remainingIterations);
+                processedIterations += usedIterations;
+                remainingIterations -= usedIterations;
+            }
+
+            if (processedIterations == 0)
+                return;
+        }
+
+        if (remainingIterations > 0)
+            return;
+
+        if (runtimeMode.Runs3D())
+            Physics.ProcessQueuedContinuousCollisionHandoffs(iterationBudget: 0);
+        if (runtimeMode.Runs2D())
+            Physics2D.ProcessQueuedContinuousCollisionHandoffs(iterationBudget: 0);
     }
 
     internal void AdvanceLateSimulateToken() => _lateSimulateToken++;

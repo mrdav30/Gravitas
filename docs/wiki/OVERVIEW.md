@@ -205,8 +205,8 @@ identity. Contact events are emitted from the active-pair queue during
   Mixed response builds dedicated dimension-bridging islands without merging
   them into pure 2D or 3D islands. Body-owned CCD now has shape-exact
   static-style, rotational, and pure-dynamic relative reducers for supported 2D
-  and 3D families; service-level CCD island solving remains the alpha blocker
-  for dense same-frame contacts and mixed dynamic velocity handoff.
+  and 3D families, while service-level CCD handoff queues advance chained
+  dynamic TOI contacts and mixed dynamic velocity transfer across pure services.
 - Query services use context-owned mutable buffers. Treat them as same-thread,
   fixed-loop services unless they are redesigned for reentrancy.
 - Diagnostics are context-owned and disabled by default. Enabled draw capture can

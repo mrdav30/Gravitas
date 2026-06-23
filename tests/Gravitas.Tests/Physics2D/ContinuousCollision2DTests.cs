@@ -62,7 +62,7 @@ public sealed class ContinuousCollision2DTests
     }
 
     [Fact]
-    public void ContinuousMode_SubstepPath_ShouldEvaluateMoverShapeAtIntermediateTimeOfImpact()
+    public void ContinuousMode_ToiIterationPath_ShouldEvaluateMoverShapeAtIntermediateTimeOfImpact()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);
         StiffBody2D mover = CreateBody(
@@ -91,10 +91,10 @@ public sealed class ContinuousCollision2DTests
     }
 
     [Fact]
-    public void ContinuousMode_WithSubstepLimit_ShouldExposeDeterministicLimitState()
+    public void ContinuousMode_WithToiIterationLimit_ShouldExposeDeterministicLimitState()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);
-        context.Settings.ContinuousCollisionMaxSubsteps = 1;
+        context.Settings.ContinuousCollisionMaxToiIterations = 1;
         StiffBody2D mover = CreateBody(
             context,
             new LSCircleCollider2D(Fixed64.Half),
@@ -115,14 +115,14 @@ public sealed class ContinuousCollision2DTests
         mover.AddForce(new Vector2d((Fixed64)4, (Fixed64)4));
         context.LateSimulate();
 
-        mover.LastContinuousCollisionSubstepCount.Should().Be(1);
-        mover.LastContinuousCollisionSubstepLimitReached.Should().BeTrue();
+        mover.LastContinuousCollisionToiIterationCount.Should().Be(1);
+        mover.LastContinuousCollisionToiIterationLimitReached.Should().BeTrue();
         mover.Position.Y.Should().BeLessThan(Fixed64.FromFraction(49, 20));
         mover.LinearVelocity.Y.Should().Be((Fixed64)4);
     }
 
     [Fact]
-    public void ContinuousMode_SubstepPath_ShouldNotAllocateAfterWarmup()
+    public void ContinuousMode_ToiIterationPath_ShouldNotAllocateAfterWarmup()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);
         StiffBody2D mover = CreateBody(
@@ -142,7 +142,7 @@ public sealed class ContinuousCollision2DTests
             immovable: true);
         mover.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
 
-        void SimulateSubstepCcd()
+        void SimulateToiIterationCcd()
         {
             mover.Sleep();
             mover.SetPosition(new Vector2d((Fixed64)(-2), Fixed64.Zero));
@@ -151,7 +151,7 @@ public sealed class ContinuousCollision2DTests
         }
 
         long allocatedBytes = AllocationTestHelper.MeasureSteadyState(
-            SimulateSubstepCcd,
+            SimulateToiIterationCcd,
             warmupIterations: 16,
             stabilizationIterations: 4,
             measurementIterations: 8);
@@ -226,8 +226,56 @@ public sealed class ContinuousCollision2DTests
         left.Position.X.Should().BeLessThanOrEqualTo(-Fixed64.Half);
         right.Position.X.Should().BeGreaterThanOrEqualTo(Fixed64.Half);
         (right.Position.X - left.Position.X).Should().BeGreaterThanOrEqualTo(Fixed64.One);
-        left.LinearVelocity.X.Should().Be(Fixed64.Zero);
-        right.LinearVelocity.X.Should().Be(Fixed64.Zero);
+        left.LinearVelocity.X.Should().BeLessThanOrEqualTo(Fixed64.Zero);
+        right.LinearVelocity.X.Should().BeGreaterThanOrEqualTo(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void ContinuousMode_WithChainedDynamicBodies_ShouldWakeAndContinueConnectedIsland()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        StiffBody2D middle = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
+        StiffBody2D receiver = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)2, Fixed64.Zero), immovable: false);
+        StiffBody2D driver = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)(-5), Fixed64.Zero), immovable: false);
+        driver.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        middle.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        receiver.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        middle.Sleep();
+        receiver.Sleep();
+
+        driver.AddForce(Vector2d.Right * (Fixed64)10);
+        context.LateSimulate();
+
+        middle.IsSleeping.Should().BeFalse();
+        receiver.IsSleeping.Should().BeFalse();
+        receiver.Position.X.Should().BeGreaterThan((Fixed64)2);
+        middle.Position.X.Should().BeLessThanOrEqualTo(receiver.Position.X - Fixed64.One);
+        driver.Position.X.Should().BeLessThanOrEqualTo(middle.Position.X - Fixed64.One);
+        context.Physics2D.LastContinuousCollisionIslandCount.Should().Be(1);
+        context.Physics2D.LastContinuousCollisionIslandIterationCount.Should().Be(2);
+        context.Physics2D.LastContinuousCollisionIslandLimitReached.Should().BeFalse();
+    }
+
+    [Fact]
+    public void ContinuousMode_WithChainedDynamicBodiesAndQueueLimit_ShouldExposeServiceLimitState()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        context.Settings.ContinuousCollisionMaxToiIterations = 1;
+        StiffBody2D middle = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
+        StiffBody2D receiver = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)2, Fixed64.Zero), immovable: false);
+        StiffBody2D driver = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)(-5), Fixed64.Zero), immovable: false);
+        driver.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        middle.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        receiver.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        middle.Sleep();
+        receiver.Sleep();
+
+        driver.AddForce(Vector2d.Right * (Fixed64)10);
+        context.LateSimulate();
+
+        context.Physics2D.LastContinuousCollisionIslandCount.Should().Be(1);
+        context.Physics2D.LastContinuousCollisionIslandIterationCount.Should().Be(1);
+        context.Physics2D.LastContinuousCollisionIslandLimitReached.Should().BeTrue();
     }
 
     [Fact]
@@ -306,11 +354,11 @@ public sealed class ContinuousCollision2DTests
         context.LateSimulate();
 
         source.Position.X.Should().BeLessThanOrEqualTo(-Fixed64.One);
-        source.LastContinuousCollisionSubstepCount.Should().Be(1);
+        source.LastContinuousCollisionToiIterationCount.Should().Be(1);
     }
 
     [Fact]
-    public void ContinuousMode_WithFastKinematic2DHostTranslation_ShouldPushDynamicTarget()
+    public void ContinuousMode_WithFastKinematic2DHostTranslation_ShouldTransferVelocityToDynamicTarget()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);
         StiffBody2D target = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
@@ -327,10 +375,38 @@ public sealed class ContinuousCollision2DTests
         context.LateSimulate();
 
         source.Position.X.Should().Be((Fixed64)5);
-        target.Position.X.Should().BeGreaterThan(Fixed64.Zero);
-        target.Position.X.Should().BeLessThanOrEqualTo(Fixed64.FromFraction(61, 10));
-        source.LastContinuousCollisionSubstepCount.Should().Be(1);
+        target.Position.X.Should().BeGreaterThan(source.Position.X);
+        target.LinearVelocity.X.Should().BeGreaterThan(Fixed64.Zero);
+        source.LastContinuousCollisionToiIterationCount.Should().Be(1);
         target.IsSleeping.Should().BeFalse();
+    }
+
+    [Fact]
+    public void ContinuousMode_WithFastKinematic2DHostTranslation_ShouldRelayDynamicHandoffThroughChain()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        StiffBody2D receiver = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)2, Fixed64.Zero), immovable: false);
+        StiffBody2D middle = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
+        receiver.Sleep();
+        middle.Sleep();
+        StiffBody2D source = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.Half),
+            new Vector2d((Fixed64)(-5), Fixed64.Zero),
+            immovable: false,
+            isKinematic: true);
+        source.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+
+        source.Agent.Transform.Position = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
+        context.LateSimulate();
+
+        middle.IsSleeping.Should().BeFalse();
+        receiver.IsSleeping.Should().BeFalse();
+        middle.LinearVelocity.X.Should().BeGreaterThan(Fixed64.Zero);
+        receiver.LinearVelocity.X.Should().BeGreaterThan(Fixed64.Zero);
+        receiver.Position.X.Should().BeGreaterThan((Fixed64)2);
+        context.Physics2D.LastContinuousCollisionIslandIterationCount.Should().Be(2);
+        context.Physics2D.LastContinuousCollisionIslandLimitReached.Should().BeFalse();
     }
 
     [Fact]
@@ -354,7 +430,8 @@ public sealed class ContinuousCollision2DTests
         source.Position.X.Should().BeLessThan((Fixed64)7);
         source.Position.X.Should().BeLessThanOrEqualTo((Fixed64)2);
         target.Position.X.Should().BeGreaterThan((Fixed64)(-1));
-        source.LastContinuousCollisionSubstepCount.Should().Be(1);
+        target.Position.X.Should().BeLessThanOrEqualTo((Fixed64)2);
+        source.LastContinuousCollisionToiIterationCount.Should().Be(1);
         target.IsSleeping.Should().BeFalse();
     }
 
@@ -459,7 +536,7 @@ public sealed class ContinuousCollision2DTests
         context.LateSimulate();
 
         blade.Rotation.Should().BeLessThan(FixedMath.DegToRad((Fixed64)90));
-        blade.LastContinuousCollisionSubstepCount.Should().Be(1);
+        blade.LastContinuousCollisionToiIterationCount.Should().Be(1);
     }
 
     [Fact]
@@ -694,8 +771,11 @@ public sealed class ContinuousCollision2DTests
         mover.AddForce(Vector2d.Right * (Fixed64)10);
         context.Physics2D.LateSimulate();
 
-        mover.Position.X.Should().BeLessThanOrEqualTo((Fixed64)4);
-        mover.LinearVelocity.X.Should().Be(Fixed64.Zero);
+        mover.Position.X.Should().BeLessThan(target.Position.X);
+        mover.LinearVelocity.X.Should().BeGreaterThanOrEqualTo(Fixed64.Zero);
+        mover.LinearVelocity.X.Should().BeLessThan((Fixed64)10);
+        target.Position.X.Should().BeGreaterThan((Fixed64)5);
+        target.LinearVelocity.X.Should().BeGreaterThan(Fixed64.Zero);
     }
 
     [Fact]

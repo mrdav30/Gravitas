@@ -1253,12 +1253,43 @@ public sealed class MixedQueryCcdTests
         body3D.Body.Position3d.X.Should().BeLessThanOrEqualTo(-Fixed64.Half);
         body2D.Position.X.Should().BeGreaterThanOrEqualTo(Fixed64.Half);
         (body2D.Position.X - body3D.Body.Position3d.X).Should().BeGreaterThanOrEqualTo(Fixed64.One);
-        body3D.Body.LinearVelocity.X.Should().Be(Fixed64.Zero);
-        body2D.LinearVelocity.X.Should().Be(Fixed64.Zero);
+        body3D.Body.LinearVelocity.X.Should().BeLessThanOrEqualTo(Fixed64.Zero);
+        body2D.LinearVelocity.X.Should().BeGreaterThanOrEqualTo(Fixed64.Zero);
     }
 
     [Fact]
-    public void LateSimulate_WithKinematic3DSourceCrossingDynamic2DSlab_ShouldPush2DTargetAtSweptToi()
+    public void LateSimulate_WithMixedDynamicChain_ShouldRelayHandoffAcrossServicesDeterministically()
+    {
+        using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
+        context.Environment.Gravity = Fixed64.Zero;
+        ScenarioBody<LSSphereCollider> receiver = CreateSphere3D(
+            context,
+            new Vector3d((Fixed64)2, Fixed64.Zero, Fixed64.Zero));
+        StiffBody2D middle = CreateCircle2D(context, Vector2d.Zero);
+        ScenarioBody<LSSphereCollider> driver = CreateSphere3D(
+            context,
+            new Vector3d((Fixed64)(-5), Fixed64.Zero, Fixed64.Zero));
+        driver.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        middle.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        receiver.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        middle.Sleep();
+        receiver.Body.Sleep();
+
+        driver.Body.AddForce(Vector3d.Right * (Fixed64)10);
+        context.LateSimulate();
+
+        middle.IsSleeping.Should().BeFalse();
+        receiver.Body.IsSleeping.Should().BeFalse();
+        receiver.Body.Position3d.X.Should().BeGreaterThan((Fixed64)2);
+        (receiver.Body.Position3d.X - middle.Position.X).Should().BeGreaterThan(Fixed64.FromFraction(19, 20));
+        (middle.Position.X - driver.Body.Position3d.X).Should().BeGreaterThan(Fixed64.FromFraction(19, 20));
+        context.Physics.LastContinuousCollisionIslandCount.Should().Be(1);
+        context.Physics.LastContinuousCollisionIslandIterationCount.Should().BeGreaterThanOrEqualTo(1);
+        context.Physics.LastContinuousCollisionIslandLimitReached.Should().BeFalse();
+    }
+
+    [Fact]
+    public void LateSimulate_WithKinematic3DSourceCrossingDynamic2DSlab_ShouldTransferVelocityAtSweptToi()
     {
         using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
         context.Environment.Gravity = Fixed64.Zero;
@@ -1269,19 +1300,21 @@ public sealed class MixedQueryCcdTests
             new Vector3d((Fixed64)(-5), Fixed64.Zero, Fixed64.Zero),
             isKinematic: true);
         source.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        source.Body.RestitutionCoefficient = Fixed64.Half;
+        target.RestitutionCoefficient = Fixed64.Half;
 
         source.Body.Agent.Transform.Position = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
         context.LateSimulate();
 
         source.Body.Position3d.X.Should().Be((Fixed64)5);
-        source.Body.LastContinuousCollisionSubstepCount.Should().Be(1);
+        source.Body.LastContinuousCollisionToiIterationCount.Should().Be(1);
         target.Position.X.Should().BeGreaterThan(Fixed64.Zero);
-        target.Position.X.Should().BeLessThanOrEqualTo(Fixed64.FromFraction(61, 10));
+        target.LinearVelocity.X.Should().BeGreaterThan(Fixed64.Zero);
         target.IsSleeping.Should().BeFalse();
     }
 
     [Fact]
-    public void LateSimulate_WithKinematic2DSourceCrossingDynamic3DTarget_ShouldPush3DTargetAtSweptToi()
+    public void LateSimulate_WithKinematic2DSourceCrossingDynamic3DTarget_ShouldTransferVelocityAtSweptToi()
     {
         using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
         context.Environment.Gravity = Fixed64.Zero;
@@ -1292,15 +1325,18 @@ public sealed class MixedQueryCcdTests
             new Vector2d((Fixed64)(-5), Fixed64.Zero),
             isKinematic: true);
         source.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        source.RestitutionCoefficient = Fixed64.Half;
+        target.Body.RestitutionCoefficient = Fixed64.Half;
 
         source.Agent.Transform.Position = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
-        context.LateSimulate();
+        RunPureServicesThroughContinuousCollisionHandoffs(context);
 
         source.Position.X.Should().Be((Fixed64)5);
-        source.LastContinuousCollisionSubstepCount.Should().Be(1);
+        source.LastContinuousCollisionToiIterationCount.Should().Be(1);
         target.Body.Position3d.X.Should().BeGreaterThan(Fixed64.Zero);
-        target.Body.Position3d.X.Should().BeLessThanOrEqualTo(Fixed64.FromFraction(61, 10));
+        target.Body.LinearVelocity.X.Should().BeGreaterThan(Fixed64.Zero);
         target.Body.IsSleeping.Should().BeFalse();
+        context.Physics.LastContinuousCollisionIslandIterationCount.Should().Be(1);
     }
 
     [Fact]
@@ -1524,6 +1560,17 @@ public sealed class MixedQueryCcdTests
                 new Vector3d((Fixed64)8, (Fixed64)4, (Fixed64)8)),
             out _).Should().BeTrue();
         return context;
+    }
+
+    private static void RunPureServicesThroughContinuousCollisionHandoffs(GravitasWorldContext context)
+    {
+        context.AdvanceLateSimulateToken();
+        context.Physics.PrepareContinuousCollisionFrame();
+        context.Physics2D.PrepareContinuousCollisionFrame();
+        context.Physics.LateSimulate(continuousCollisionFramePrepared: true);
+        context.Physics2D.LateSimulate(continuousCollisionFramePrepared: true);
+        context.Physics.ProcessQueuedContinuousCollisionHandoffs(context.Settings.ContinuousCollisionMaxToiIterations);
+        context.Physics2D.ProcessQueuedContinuousCollisionHandoffs(context.Settings.ContinuousCollisionMaxToiIterations);
     }
 
     private static ScenarioBody<LSSphereCollider> CreateSphere3D(

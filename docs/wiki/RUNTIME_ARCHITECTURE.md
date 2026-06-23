@@ -22,8 +22,8 @@ pairs, queries, and coroutines remain context-local.
 
 | Service | Owned state |
 | --- | --- |
-| `GravitasPhysicsService` | Dynamic body bucket, collider ID table, reusable collider IDs, collision-pair pool, active collision-pair queue, simulation switch. |
-| `GravitasPhysics2DService` | Pure 2D dynamic body bucket, monotonic collider ID table, 2D pair pool, post-integration collider refresh, deterministic 2D discrete island response, connected resting-pair expansion, pair-reference cleanup, visualization publishing, simulation switch. |
+| `GravitasPhysicsService` | Dynamic body bucket, collider ID table, reusable collider IDs, collision-pair pool, active collision-pair queue, 3D CCD frame cache, processed-body handoff queue, handoff diagnostics, simulation switch. |
+| `GravitasPhysics2DService` | Pure 2D dynamic body bucket, monotonic collider ID table, 2D pair pool, 2D CCD frame cache, processed-body handoff queue, handoff diagnostics, post-integration collider refresh, deterministic 2D discrete island response, connected resting-pair expansion, pair-reference cleanup, visualization publishing, simulation switch. |
 | `GravitasMixedCollisionService` | Mixed 2D/3D lifecycle owner, GridForge-backed mixed broad phase, stable mixed candidate-key buffer, mixed hierarchy filtering, duplicate suppression, late-phase mixed partition refresh, mixed pair/response ownership, retained `PhysicsMixedPartition` cleanup, and lifecycle counters. |
 | `GravitasCollisionService` | Active partition bucket, inactive partition pool, duplicate voxel checker, partition awake-state refresh, collision distribution version, cull distributor. |
 | `GravitasCollision2DService` | GridForge-backed pure 2D partition bucket, inactive partition pool, duplicate voxel checker, awake dynamic membership refresh, 2D collision distribution version, retained partition cleanup. |
@@ -55,23 +55,29 @@ Simulate
 
 LateSimulate
   Clock.LateSimulate
+  Advance deterministic late-simulate token
   If RuntimeMode includes ThreeD:
     Physics.PrepareContinuousCollisionFrame
+  If RuntimeMode includes TwoD:
+    Physics2D.PrepareContinuousCollisionFrame
+  If RuntimeMode includes ThreeD:
     Physics.LateSimulate
     StiffBody.LateSimulate for dynamic bodies
+    Process already-processed 3D CCD handoff queue
     PrepareCollisionPartitions for dynamic-body colliders
     Collisions.CheckAndDistributeCollisions
     Solve deterministic discrete response islands
     ProcessActiveCollisionPairs
     Update 3D sleep state after response
   If RuntimeMode includes TwoD:
-    Physics2D.PrepareContinuousCollisionFrame
     Physics2D.LateSimulate
     StiffBody2D.LateSimulate for dynamic 2D bodies
+    Process already-processed 2D CCD handoff queue
     PrepareCollisionPartitions for dynamic 2D colliders
     Collisions2D.CheckAndDistributeCollisions
     Solve deterministic 2D discrete response islands
     Update 2D sleep state after response
+  Process cross-service queued CCD handoffs with the remaining TOI budget
   If RuntimeMode == Mixed:
     MixedCollisions.LateSimulate
     Refresh mixed 3D/2D partitions after pure body integration

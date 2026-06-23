@@ -97,7 +97,7 @@ Loading shape data validates the input and rebuilds bounds without waking a
 sleeping body just because state was populated.
 
 `PhysicsSettingsSaver` records frame rate, collision matrix, ground-check layer
-mask, default CCD mode, CCD substep limit, retained-partition cleanup settings,
+mask, default CCD mode, CCD TOI iteration limit, retained-partition cleanup settings,
 runtime mode, and mixed 2D half-thickness. Applying it owns a new
 `PhysicsSettings` instance for the target context and synchronizes the context
 clock.

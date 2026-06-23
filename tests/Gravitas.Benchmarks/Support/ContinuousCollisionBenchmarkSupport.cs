@@ -15,8 +15,8 @@ internal static class ContinuousCollisionBenchmarkSupport
     public static readonly Vector2d Force2D = Vector2d.Right * (Fixed64)2;
     public static readonly Vector3d ShapeExactDynamicForce3D = Vector3d.Right * (Fixed64)10;
     public static readonly Vector2d ShapeExactDynamicForce2D = Vector2d.Right * (Fixed64)10;
-    public static readonly Vector3d SubstepForce3D = new((Fixed64)4, Fixed64.Zero, (Fixed64)4);
-    public static readonly Vector2d SubstepForce2D = new((Fixed64)4, (Fixed64)4);
+    public static readonly Vector3d ToiIterationForce3D = new((Fixed64)4, Fixed64.Zero, (Fixed64)4);
+    public static readonly Vector2d ToiIterationForce2D = new((Fixed64)4, (Fixed64)4);
 
     public static GravitasWorldContext CreateContext3D(int extentX, int extentZ)
     {

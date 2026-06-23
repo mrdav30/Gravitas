@@ -140,10 +140,10 @@ public sealed class ContinuousCollisionDetectionTests
     }
 
     [Fact]
-    public void ContinuousMode_WithSubstepLimit_ShouldExposeDeterministicLimitState()
+    public void ContinuousMode_WithToiIterationLimit_ShouldExposeDeterministicLimitState()
     {
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();
-        scenario.Context.Settings.ContinuousCollisionMaxSubsteps = 1;
+        scenario.Context.Settings.ContinuousCollisionMaxToiIterations = 1;
         CreateStaticWall(scenario, Fixed64.Zero);
         LSCuboidCollider horizontalWall = new()
         {
@@ -157,14 +157,14 @@ public sealed class ContinuousCollisionDetectionTests
         mover.Body.AddForce(new Vector3d((Fixed64)4, Fixed64.Zero, (Fixed64)4));
         scenario.Context.LateSimulate();
 
-        mover.Body.LastContinuousCollisionSubstepCount.Should().Be(1);
-        mover.Body.LastContinuousCollisionSubstepLimitReached.Should().BeTrue();
+        mover.Body.LastContinuousCollisionToiIterationCount.Should().Be(1);
+        mover.Body.LastContinuousCollisionToiIterationLimitReached.Should().BeTrue();
         mover.Body.Position3d.Z.Should().BeLessThan(Fixed64.FromFraction(49, 20));
         mover.Body.LinearVelocity.Z.Should().Be((Fixed64)4);
     }
 
     [Fact]
-    public void ContinuousMode_SubstepPath_ShouldNotAllocateAfterWarmup()
+    public void ContinuousMode_ToiIterationPath_ShouldNotAllocateAfterWarmup()
     {
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();
         CreateStaticWall(scenario, Fixed64.Zero);
@@ -177,7 +177,7 @@ public sealed class ContinuousCollisionDetectionTests
         mover.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
         DisableGroundQueries(mover.Body);
 
-        void SimulateSubstepCcd()
+        void SimulateToiIterationCcd()
         {
             mover.Body.ResetPosition(new Vector3d((Fixed64)(-2), Fixed64.Zero, Fixed64.Zero), FixedQuaternion.Identity);
             mover.Body.AddForce(new Vector3d((Fixed64)4, Fixed64.Zero, (Fixed64)4));
@@ -186,7 +186,7 @@ public sealed class ContinuousCollisionDetectionTests
         }
 
         long allocatedBytes = AllocationTestHelper.MeasureSteadyState(
-            SimulateSubstepCcd,
+            SimulateToiIterationCcd,
             warmupIterations: 16,
             stabilizationIterations: 4,
             measurementIterations: 8);
@@ -529,8 +529,11 @@ public sealed class ContinuousCollisionDetectionTests
 
         ApplyFastImpulse(body);
 
-        body.Position3d.X.Should().BeLessThanOrEqualTo(-Fixed64.Half);
-        body.LinearVelocity.X.Should().Be(Fixed64.Zero);
+        body.Position3d.X.Should().BeLessThan(Fixed64.Half);
+        body.LinearVelocity.X.Should().BeGreaterThanOrEqualTo(Fixed64.Zero);
+        body.LinearVelocity.X.Should().BeLessThan((Fixed64)4);
+        target.Body.LinearVelocity.X.Should().BeGreaterThan(Fixed64.Zero);
+        target.Body.IsSleeping.Should().BeFalse();
     }
 
     [Fact]
@@ -551,8 +554,62 @@ public sealed class ContinuousCollisionDetectionTests
         left.Body.Position3d.X.Should().BeLessThanOrEqualTo(-Fixed64.Half);
         right.Body.Position3d.X.Should().BeGreaterThanOrEqualTo(Fixed64.Half);
         (right.Body.Position3d.X - left.Body.Position3d.X).Should().BeGreaterThanOrEqualTo(Fixed64.One);
-        left.Body.LinearVelocity.X.Should().Be(Fixed64.Zero);
-        right.Body.LinearVelocity.X.Should().Be(Fixed64.Zero);
+        left.Body.LinearVelocity.X.Should().BeLessThanOrEqualTo(Fixed64.Zero);
+        right.Body.LinearVelocity.X.Should().BeGreaterThanOrEqualTo(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void ContinuousMode_WithChainedDynamicBodies_ShouldWakeAndContinueConnectedIsland()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        ScenarioBody<LSSphereCollider> middle = scenario.CreateSphere(Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> receiver = scenario.CreateSphere(new Vector3d((Fixed64)2, Fixed64.Zero, Fixed64.Zero));
+        ScenarioBody<LSSphereCollider> driver = scenario.CreateSphere(new Vector3d((Fixed64)(-5), Fixed64.Zero, Fixed64.Zero));
+        driver.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        middle.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        receiver.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        DisableGroundQueries(driver.Body);
+        DisableGroundQueries(middle.Body);
+        DisableGroundQueries(receiver.Body);
+        middle.Body.Sleep();
+        receiver.Body.Sleep();
+
+        driver.Body.AddForce(Vector3d.Right * (Fixed64)10);
+        scenario.Context.LateSimulate();
+
+        middle.Body.IsSleeping.Should().BeFalse();
+        receiver.Body.IsSleeping.Should().BeFalse();
+        receiver.Body.Position3d.X.Should().BeGreaterThan((Fixed64)2);
+        middle.Body.Position3d.X.Should().BeLessThanOrEqualTo(receiver.Body.Position3d.X - Fixed64.One);
+        driver.Body.Position3d.X.Should().BeLessThanOrEqualTo(middle.Body.Position3d.X - Fixed64.One);
+        scenario.Context.Physics.LastContinuousCollisionIslandCount.Should().Be(1);
+        scenario.Context.Physics.LastContinuousCollisionIslandIterationCount.Should().Be(2);
+        scenario.Context.Physics.LastContinuousCollisionIslandLimitReached.Should().BeFalse();
+    }
+
+    [Fact]
+    public void ContinuousMode_WithChainedDynamicBodiesAndQueueLimit_ShouldExposeServiceLimitState()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        scenario.Context.Settings.ContinuousCollisionMaxToiIterations = 1;
+        ScenarioBody<LSSphereCollider> middle = scenario.CreateSphere(Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> receiver = scenario.CreateSphere(new Vector3d((Fixed64)2, Fixed64.Zero, Fixed64.Zero));
+        ScenarioBody<LSSphereCollider> driver = scenario.CreateSphere(new Vector3d((Fixed64)(-5), Fixed64.Zero, Fixed64.Zero));
+        driver.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        middle.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        receiver.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        DisableGroundQueries(driver.Body);
+        DisableGroundQueries(middle.Body);
+        DisableGroundQueries(receiver.Body);
+        middle.Body.Sleep();
+        receiver.Body.Sleep();
+
+        driver.Body.AddForce(Vector3d.Right * (Fixed64)10);
+        scenario.Context.LateSimulate();
+
+        scenario.Context.Physics.LastContinuousCollisionIslandCount.Should().Be(1);
+        scenario.Context.Physics.LastContinuousCollisionIslandIterationCount.Should().Be(1);
+        scenario.Context.Physics.LastContinuousCollisionIslandLimitReached.Should().BeTrue();
     }
 
     [Fact]
@@ -608,8 +665,11 @@ public sealed class ContinuousCollisionDetectionTests
         scenario.Context.LateSimulate();
 
         mover.Body.Position3d.X.Should().BeLessThan((Fixed64)4);
-        mover.Body.LinearVelocity.X.Should().Be(Fixed64.Zero);
-        target.Body.IsSleeping.Should().BeTrue();
+        mover.Body.LinearVelocity.X.Should().BeGreaterThanOrEqualTo(Fixed64.Zero);
+        mover.Body.LinearVelocity.X.Should().BeLessThan((Fixed64)10);
+        target.Body.IsSleeping.Should().BeFalse();
+        target.Body.LinearVelocity.X.Should().BeGreaterThan(Fixed64.Zero);
+        target.Body.Position3d.X.Should().BeGreaterThan((Fixed64)4);
     }
 
     [Fact]
@@ -695,11 +755,11 @@ public sealed class ContinuousCollisionDetectionTests
         scenario.Context.LateSimulate();
 
         source.Body.Position3d.X.Should().BeLessThanOrEqualTo(-Fixed64.One);
-        source.Body.LastContinuousCollisionSubstepCount.Should().Be(1);
+        source.Body.LastContinuousCollisionToiIterationCount.Should().Be(1);
     }
 
     [Fact]
-    public void ContinuousMode_WithFastKinematicHostTranslation_ShouldPushDynamicTarget()
+    public void ContinuousMode_WithFastKinematicHostTranslation_ShouldTransferVelocityToDynamicTarget()
     {
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();
         ScenarioBody<LSSphereCollider> target = scenario.CreateSphere(Vector3d.Zero);
@@ -713,10 +773,35 @@ public sealed class ContinuousCollisionDetectionTests
         scenario.Context.LateSimulate();
 
         source.Body.Position3d.X.Should().Be((Fixed64)5);
-        target.Body.Position3d.X.Should().BeGreaterThan(Fixed64.Zero);
-        target.Body.Position3d.X.Should().BeLessThanOrEqualTo(Fixed64.FromFraction(61, 10));
-        source.Body.LastContinuousCollisionSubstepCount.Should().Be(1);
+        target.Body.Position3d.X.Should().BeGreaterThan(source.Body.Position3d.X);
+        target.Body.LinearVelocity.X.Should().BeGreaterThan(Fixed64.Zero);
+        source.Body.LastContinuousCollisionToiIterationCount.Should().Be(1);
         target.Body.IsSleeping.Should().BeFalse();
+    }
+
+    [Fact]
+    public void ContinuousMode_WithFastKinematicHostTranslation_ShouldRelayDynamicHandoffThroughChain()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        ScenarioBody<LSSphereCollider> receiver = scenario.CreateSphere(new Vector3d((Fixed64)2, Fixed64.Zero, Fixed64.Zero));
+        ScenarioBody<LSSphereCollider> middle = scenario.CreateSphere(Vector3d.Zero);
+        receiver.Body.Sleep();
+        middle.Body.Sleep();
+        ScenarioBody<LSSphereCollider> source = scenario.CreateSphere(
+            new Vector3d((Fixed64)(-5), Fixed64.Zero, Fixed64.Zero),
+            isKinematic: true);
+        source.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+
+        source.Body.Agent.Transform.Position = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
+        scenario.Context.LateSimulate();
+
+        middle.Body.IsSleeping.Should().BeFalse();
+        receiver.Body.IsSleeping.Should().BeFalse();
+        middle.Body.LinearVelocity.X.Should().BeGreaterThan(Fixed64.Zero);
+        receiver.Body.LinearVelocity.X.Should().BeGreaterThan(Fixed64.Zero);
+        receiver.Body.Position3d.X.Should().BeGreaterThan((Fixed64)2);
+        scenario.Context.Physics.LastContinuousCollisionIslandIterationCount.Should().Be(2);
+        scenario.Context.Physics.LastContinuousCollisionIslandLimitReached.Should().BeFalse();
     }
 
     [Fact]
@@ -737,7 +822,8 @@ public sealed class ContinuousCollisionDetectionTests
         source.Body.Position3d.X.Should().BeLessThan((Fixed64)7);
         source.Body.Position3d.X.Should().BeLessThanOrEqualTo((Fixed64)2);
         target.Body.Position3d.X.Should().BeGreaterThan((Fixed64)(-1));
-        source.Body.LastContinuousCollisionSubstepCount.Should().Be(1);
+        target.Body.Position3d.X.Should().BeLessThanOrEqualTo((Fixed64)2);
+        source.Body.LastContinuousCollisionToiIterationCount.Should().Be(1);
         target.Body.IsSleeping.Should().BeFalse();
     }
 
@@ -764,7 +850,7 @@ public sealed class ContinuousCollisionDetectionTests
         scenario.Context.LateSimulate();
 
         FixedQuaternion.Angle(blade.Body.Rotation, fullTurn).Should().BeGreaterThan(Fixed64.Zero);
-        blade.Body.LastContinuousCollisionSubstepCount.Should().Be(1);
+        blade.Body.LastContinuousCollisionToiIterationCount.Should().Be(1);
     }
 
     [Fact]
@@ -856,8 +942,11 @@ public sealed class ContinuousCollisionDetectionTests
         mover.Body.AddForce(Vector3d.Right * (Fixed64)10);
         scenario.Context.Physics.LateSimulate();
 
-        mover.Body.Position3d.X.Should().BeLessThanOrEqualTo((Fixed64)4);
-        mover.Body.LinearVelocity.X.Should().Be(Fixed64.Zero);
+        mover.Body.Position3d.X.Should().BeLessThan(target.Body.Position3d.X);
+        mover.Body.LinearVelocity.X.Should().BeGreaterThanOrEqualTo(Fixed64.Zero);
+        mover.Body.LinearVelocity.X.Should().BeLessThan((Fixed64)10);
+        target.Body.Position3d.X.Should().BeGreaterThan((Fixed64)5);
+        target.Body.LinearVelocity.X.Should().BeGreaterThan(Fixed64.Zero);
     }
 
     [Fact]

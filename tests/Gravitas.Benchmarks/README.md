@@ -98,15 +98,15 @@ Shape-exact rows include static 3D non-sphere target false positives, static
 spheres or circles find a candidate but the real mover shape rejects the
 contact.
 
-### Continuous collision substeps
+### Continuous collision TOI iterations
 
-Use `continuous-collision-substep` when comparing the bounded same-frame TOI
+Use `continuous-collision-toi-iteration` when comparing the bounded same-frame TOI
 solver. The selection runs pure 2D and pure 3D two-contact static scenes with
-`ContinuousCollisionMaxSubsteps` values of `1`, `2`, and `4`, so the old
-first-hit clamp shape remains measurable as the `1`-substep configuration:
+`ContinuousCollisionMaxToiIterations` values of `1`, `2`, and `4`, so the old
+first-hit clamp shape remains measurable as the `1`-iteration configuration:
 
 ```bash
-dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll continuous-collision-substep --filter "*Substep*" --exporters json
+dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll continuous-collision-toi-iteration --filter "*ToiIteration*" --exporters json
 ```
 
 ## Suggested Benchmark Areas
@@ -125,8 +125,8 @@ Start with hot paths that can be isolated and repeated deterministically:
   false-positive scenarios, including dynamic 3D/2D relative shape rejection.
 - kinematic active CCD source scaling through no-hit, first-hit, dense-hit,
   rotational, and mixed source rows.
-- bounded CCD substep solving through one-substep, two-substep, and default
-  multi-substep two-contact scenes.
+- bounded CCD TOI iteration solving through one-iteration, two-iteration, and default
+  multi-iteration two-contact scenes.
 - pure 2D host-agent setup, runtime-mode gated integration, GridForge-backed
   broad phase, sweep baselines, narrow-phase pairs, response, and overlap
   and raycast queries.
@@ -188,7 +188,7 @@ to add or tighten explicit allocation tests before changing the algorithm.
 | `partition-culling` | dynamic collider repartitioning after teleports, direct partition add/remove churn, and culled-pair invalidation after movement. |
 | `physics-2d` | pure 2D body integration, GridForge-backed 2D partition response, direct angular contact response, direct two-contact manifold response, convex/convex two-contact manifold detection, sweep baseline comparisons, required 2D shape-pair checks, `OverlapCircleAll`, and `RaycastAll`. |
 
-`continuous-collision-evidence` and `continuous-collision-substep` are
+`continuous-collision-evidence` and `continuous-collision-toi-iteration` are
 intentionally omitted from the allocation smoke command because they are heavier
 manual evidence selections rather than fast local guardrails.
 

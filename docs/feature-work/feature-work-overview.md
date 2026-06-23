@@ -20,31 +20,33 @@ with evidence.
 These plans and evergreen closure trackers should be completed, or explicitly
 closed with evidence, before the alpha release.
 
-1. [`CCD Service-Level Island Solver`](2026-06-21-ccd-service-level-island-solver-plan.md)
-   - Dense, chained, same-TOI, and mixed continuous contacts need a deterministic
-     service-level model where body-owned substeps are insufficient.
-2. [`Benchmark Signal Hardening Backlog`](benchmark-signal-hardening-backlog.md)
+1. [`Benchmark Signal Hardening Backlog`](benchmark-signal-hardening-backlog.md)
    - Measured allocation or runtime-cost signals must be reproduced, resolved,
      or closed with a no-change decision before alpha.
-3. [`Feature Work Issue Tracker`](issue-tracker.md)
+2. [`Feature Work Issue Tracker`](issue-tracker.md)
    - Bugs, correctness risks, documentation defects, and feature-work-discovered
      issues should be triaged, tested, and committed independently from feature
      design plans.
 
 ## Recently Completed
 
+- [`CCD Service-Level Island Solver`](done/2026-06-21-ccd-service-level-island-solver-plan.md)
+  - Completed 2026-06-23. Pure 3D, pure 2D, and mixed dynamic CCD now use
+    service-owned processed-body handoff queues for chained TOI contacts,
+    cross-service velocity transfer, bounded continuation, cap diagnostics, and
+    active kinematic-source velocity handoff.
 - [`CCD Exact TOI And Shape Reducers`](done/2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md)
   - Completed 2026-06-23. Body-owned CCD now refines static-style 3D
     non-sphere targets with supported convex-source reducers, bracketed
     rotational CCD with fixed-iteration exact narrow-phase bisection, and pure
     2D/3D dynamic relative proxy candidates with exact mover-shape validation
-    where supported. Mixed dynamic CCD remains in the service-level island
-    plan for cross-dimension advancement and velocity handoff.
+    where supported. Mixed dynamic CCD uses the service-level handoff queues
+    added by the completed island-solver plan.
 - [`CCD Active Swept Sources`](done/2026-06-21-ccd-active-swept-sources-plan.md)
   - Completed 2026-06-23. Host-driven kinematic 2D/3D translation and rotation
     now run as active CCD sources; static-style blockers clip the source,
-    dynamic pure/mixed targets receive deterministic wake plus positional
-    correction, and benchmark/docs coverage was added under
+    dynamic pure/mixed targets receive deterministic velocity handoff through
+    the completed service-level queue, and benchmark/docs coverage was added under
     `kinematic-active-ccd-scaling`.
 - [`Mixed Sphere Against 2D Slab Reducer Completion`](done/2026-06-23-mixed-sphere-2d-slab-reducer-completion-plan.md)
   - Completed 2026-06-23. `SweepSphereAgainst2D` now uses exact finite-slab
@@ -84,10 +86,9 @@ first alpha release.
 
 ## Recommended Execution Order
 
-1. CCD service-level island solver.
-2. Benchmark signal closure pass.
+1. Benchmark signal closure pass.
 
-This order now focuses on island-level CCD behavior after public mixed query
+This order now focuses on benchmark signal closure after public mixed query
 fallback directions, active kinematic source coverage, and exact body-owned CCD
 reducers were closed. Benchmark signals remain a closure pass so measured
 hot-path risks do not survive into alpha.

@@ -79,6 +79,21 @@ Current event kinds:
 The stream is scoped to one context. Collider and body IDs are not global and
 must be resolved through the same context that produced the event.
 
+## CCD Service Counters
+
+Continuous-collision handoff diagnostics are exposed as service counters rather
+than diagnostic events. `GravitasPhysicsService` reports
+`LastContinuousCollisionIslandCount`,
+`LastContinuousCollisionIslandIterationCount`, and
+`LastContinuousCollisionIslandLimitReached`; `GravitasPhysics2DService` mirrors
+the same counters internally for pure 2D tests and service-level validation.
+The body-owned bounded solver still reports
+`LastContinuousCollisionToiIterationCount` and
+`LastContinuousCollisionToiIterationLimitReached` on `StiffBody` and
+`StiffBody2D`. These counters are deterministic frame-local state intended for
+tuning, tests, and host diagnostics without adding event-buffer traffic to the
+hot path.
+
 ## Diagnostic Dispatch And Typed Views
 
 `GravitasDiagnosticEvent` remains the compact capture format. Host adapters

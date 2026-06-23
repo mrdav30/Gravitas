@@ -484,7 +484,7 @@ decides the frame displacement needs CCD.
 - `tests/Gravitas.Tests/Settings/*`
 - `tests/Gravitas.Tests/Serialization/PhysicsSettingsSerializationTests.cs`
 - `tests/Gravitas.Benchmarks/Core/DynamicCcdScalingBenchmarks.cs`
-- `tests/Gravitas.Benchmarks/Core/ContinuousCollisionSubstepBenchmarks.cs`
+- `tests/Gravitas.Benchmarks/Core/ContinuousCollisionToiIterationBenchmarks.cs`
 
 **Implementation Notes - 2026-06-21**
 
@@ -492,9 +492,9 @@ Workstream 4 upgraded `Continuous` and `Auto` from single-hit clamping to a
 bounded body-owned TOI substep solver for pure 2D, pure 3D, and the existing
 mixed candidate comparison path.
 
-- `PhysicsSettings.ContinuousCollisionMaxSubsteps` now controls the deterministic
+- `PhysicsSettings.ContinuousCollisionMaxToiIterations` now controls the deterministic
   same-frame impact budget, with
-  `PhysicsSettings.DefaultContinuousCollisionMaxSubsteps` defaulting to `4`.
+  `PhysicsSettings.DefaultContinuousCollisionMaxToiIterations` defaulting to `4`.
 - On each accepted translational hit, the body advances to the TOI, removes only
   the closing component of linear velocity, consumes that portion of frame time,
   and continues sweeping the remaining segment with the updated velocity.
@@ -505,15 +505,15 @@ mixed candidate comparison path.
   intermediate substep start before evaluating the next sweep. This prevents
   convex/AABB/compound mover reduction from accidentally using frame-start shape
   state after an earlier hit.
-- `StiffBody.LastContinuousCollisionSubstepCount`,
-  `StiffBody.LastContinuousCollisionSubstepLimitReached`,
-  `StiffBody2D.LastContinuousCollisionSubstepCount`, and
-  `StiffBody2D.LastContinuousCollisionSubstepLimitReached` expose deterministic
+- `StiffBody.LastContinuousCollisionToiIterationCount`,
+  `StiffBody.LastContinuousCollisionToiIterationLimitReached`,
+  `StiffBody2D.LastContinuousCollisionToiIterationCount`, and
+  `StiffBody2D.LastContinuousCollisionToiIterationLimitReached` expose deterministic
   last-step solver status for diagnostics and tests.
 - Focused 2D and 3D regressions now cover same-frame two-contact sliding,
   bounded-limit reporting, and zero-allocation steady-state substep paths. 2D
   also covers intermediate-shape sampling for non-circle movers.
-- `ContinuousCollisionSubstepBenchmarks` adds two-contact pure 2D and pure 3D
+- `ContinuousCollisionToiIterationBenchmarks` adds two-contact pure 2D and pure 3D
   rows across `1`, `2`, and `4` max-substep settings, preserving the first-hit
   clamp shape as measurable evidence without keeping it as the default runtime
   behavior.
@@ -570,7 +570,7 @@ Deferred CCD work has been extracted into dedicated feature-work plans:
   mesh/compound reducer policy, and mixed shape-reducer boundaries:
   [`2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md`](2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md).
 - Global service-level CCD islands and mixed-specific island response:
-  [`2026-06-21-ccd-service-level-island-solver-plan.md`](../2026-06-21-ccd-service-level-island-solver-plan.md).
+  [`2026-06-21-ccd-service-level-island-solver-plan.md`](2026-06-21-ccd-service-level-island-solver-plan.md).
 - Benchmark publishing/gating, external baseline comparison, and host-visible
   CCD counters:
   [`2026-06-21-benchmark-publishing-and-ccd-diagnostics-plan.md`](../2026-06-21-benchmark-publishing-and-ccd-diagnostics-plan.md).

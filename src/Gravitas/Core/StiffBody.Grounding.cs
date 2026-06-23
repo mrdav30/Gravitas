@@ -1,0 +1,328 @@
+//=======================================================================
+// StiffBody.Grounding.cs
+//=======================================================================
+// MIT License, Copyright (c) 2026-present David Oravsky (mrdav30)
+// See LICENSE file in the project root for full license information.
+//=======================================================================
+
+using FixedMathSharp;
+using Gravitas.Colliders;
+using Gravitas.Queries;
+using Gravitas.Support;
+using SwiftCollections;
+using System;
+using System.Collections.Generic;
+
+namespace Gravitas;
+
+public partial class StiffBody
+{
+    #region Grounding
+
+    private bool _skipGroundingCheck = false;
+
+    /// <summary>
+    /// Selects whether Gravitas probes for ground automatically or preserves host-supplied grounding state.
+    /// </summary>
+    public GroundingMode GroundingMode { get; private set; } = GroundingMode.Automatic;
+
+    // how close to the actor's feet (or whatever touches the ground) do we check for grounding
+    public Fixed64 GroundOriginOffset = (Fixed64)0.5f;
+
+    public Fixed64 GroundedDistanceRay = (Fixed64)0.5f;
+
+    public Fixed64 GroundDownDistanceOnAir = (Fixed64)0.5f;
+
+    /// <summary>
+    /// Selects the deterministic query primitive used for ground checks.
+    /// </summary>
+    public GroundProbeMode GroundProbeMode { get; set; } = GroundProbeMode.Auto;
+
+    /// <summary>
+    /// Optional explicit radius for swept-sphere ground probes. A zero value derives the radius from the collider.
+    /// </summary>
+    public Fixed64 GroundProbeRadius { get; set; }
+
+    private int _lastGroundCheckFrame = 0;
+    private const int _groundCheckFrameThreshold = 10;
+    private readonly Fixed64 _groundCheckThreshold = (Fixed64)0.01f;
+    private readonly SwiftList<Physics3DHit> _groundProbeHits = new();
+
+    public Fixed64 StepOffset = (Fixed64)0.5f;
+
+    private Vector3d _groundNormal = Vector3d.Zero;
+    public Vector3d GroundNormal => _groundNormal;
+
+    private FixedTransform? _hitPlatform;
+    public FixedTransform? HitPlatform { get => _hitPlatform; set => _hitPlatform = value; }
+
+    private Vector3d _hitPlatformPosition;
+
+    private Vector3d _hitPoint;
+    public Vector3d HitPoint => _hitPoint;
+
+    public Action<bool>? OnGrounded;
+
+    private bool _isGrounded;
+    public bool IsGrounded
+    {
+        get => _isGrounded;
+        private set
+        {
+            if (_isGrounded == value)
+                return;
+            _isGrounded = value;
+            OnGrounded?.Invoke(value);
+        }
+    }
+
+    private Vector3d _lastGroundedPosition;
+    public Vector3d LastGroundedPosition => _lastGroundedPosition;
+
+    #endregion
+
+    public void SkipGrounding(Fixed64 secs)
+    {
+        _skipGroundingCheck = true;
+        ClearGrounding();
+        Context.Coroutines.StartCoroutine(SkipGroundingCoroutine(secs));
+    }
+
+    /// <summary>
+    /// Gives the host ownership of grounded state and disables automatic ground probes.
+    /// </summary>
+    public void UseManualGrounding(bool clearGrounding = true)
+    {
+        GroundingMode = GroundingMode.Manual;
+        _skipGroundingCheck = false;
+        if (clearGrounding)
+            ClearGrounding();
+    }
+
+    /// <summary>
+    /// Returns grounded-state ownership to Gravitas and optionally refreshes the automatic probe immediately.
+    /// </summary>
+    public void UseAutomaticGrounding(bool checkGroundImmediately = true)
+    {
+        GroundingMode = GroundingMode.Automatic;
+        if (checkGroundImmediately && Active)
+            CheckGround(force: true);
+    }
+
+    /// <summary>
+    /// Sets host-owned grounded state for manual grounding sources such as deterministic heightmaps.
+    /// </summary>
+    public void SetManualGrounding(Vector3d hitPoint, Vector3d groundNormal, FixedTransform? hitPlatform = null)
+    {
+        SwiftThrowHelper.ThrowIfArgument(
+            groundNormal.MagnitudeSquared <= Fixed64.Epsilon,
+            nameof(groundNormal),
+            "Manual grounding normal must be non-zero.");
+
+        GroundingMode = GroundingMode.Manual;
+        _skipGroundingCheck = false;
+        SetGroundingState(hitPoint, groundNormal.Normalized, hitPlatform);
+    }
+
+    /// <summary>
+    /// Clears host-owned grounded state while leaving automatic probes disabled.
+    /// </summary>
+    public void ClearManualGrounding()
+    {
+        GroundingMode = GroundingMode.Manual;
+        _skipGroundingCheck = false;
+        ClearGrounding();
+    }
+
+    private IEnumerator<ILockedYieldInstruction> SkipGroundingCoroutine(Fixed64 secs)
+    {
+        yield return Context.Coroutines.WaitForRealSeconds(secs);
+        _skipGroundingCheck = false;
+    }
+
+    public void CheckGround() => CheckGround(force: true);
+
+    private void CheckGroundForSimulation() => CheckGround(force: false);
+
+    private void CheckGround(bool force)
+    {
+        if (GroundingMode == GroundingMode.Manual)
+            return;
+
+        if (_skipGroundingCheck || World is null)
+        {
+            ClearGrounding();
+            return;
+        }
+
+        // Only perform SphereCast if enough frames have passed
+        bool hitPlatformMoved = _hitPlatform != null && _hitPlatform.Position != _hitPlatformPosition;
+        bool frameGuard = !force
+            && !hitPlatformMoved
+            && Vector3d.Distance(_lastPosition, Position3d) < _groundCheckThreshold
+            && Context.FrameCount - _lastGroundCheckFrame < _groundCheckFrameThreshold;
+        if (frameGuard)
+            return;
+
+        _lastGroundCheckFrame = Context.FrameCount;
+        // We want origin to be close to the actor's feet
+        Vector3d origin = Position3d;
+        // but not to close...
+        origin.Y += GroundOriginOffset;
+
+        Fixed64 dis = GroundedDistanceRay;
+        if (!IsGrounded)
+            dis = GroundDownDistanceOnAir;
+
+        GroundProbeMode mode = ResolveGroundProbeMode();
+        Fixed64 radius = mode == GroundProbeMode.SweptSphere
+            ? ResolveGroundProbeRadius()
+            : Fixed64.Zero;
+        Vector3d end = origin + Vector3d.Down * dis;
+        bool foundGround = TryFindGroundHit(mode, radius, origin, dis, out Physics3DHit hit);
+        Context.Diagnostics.EmitGroundProbe(this, mode, origin, end, radius, foundGround, hit);
+
+        if (!foundGround)
+        {
+            ClearGrounding();
+            return;
+        }
+
+        SetGroundingState(hit.Point, hit.Normal, hit.Collider?.Transform);
+    }
+
+    private bool TryFindGroundHit(
+        GroundProbeMode mode,
+        Fixed64 radius,
+        Vector3d origin,
+        Fixed64 distance,
+        out Physics3DHit hit)
+    {
+        if (mode == GroundProbeMode.SweptSphere && TryFindGroundHitWithSweptSphere(origin, distance, radius, out hit))
+            return true;
+
+        if (mode == GroundProbeMode.SweptSphere)
+        {
+            hit = default;
+            return false;
+        }
+
+        return TryFindGroundHitWithRay(origin, distance, out hit);
+    }
+
+    private bool TryFindGroundHitWithRay(Vector3d origin, Fixed64 distance, out Physics3DHit hit)
+    {
+        Vector3d end = origin + Vector3d.Down * distance;
+        int hitCount = Context.Query3D.RaycastAll(origin, end, Context.Settings.GroundCheckLayerMask, _groundProbeHits);
+        for (int i = 0; i < hitCount; i++)
+        {
+            Physics3DHit current = _groundProbeHits[i];
+            if (!IsValidGroundHit(current))
+                continue;
+
+            hit = current;
+            return true;
+        }
+
+        hit = default;
+        return false;
+    }
+
+    private bool TryFindGroundHitWithSweptSphere(Vector3d origin, Fixed64 distance, Fixed64 radius, out Physics3DHit hit)
+    {
+        if (radius <= Fixed64.Epsilon)
+            return TryFindGroundHitWithRay(origin, distance, out hit);
+
+        Vector3d end = origin + Vector3d.Down * distance;
+        int hitCount = Context.Query3D.SweepSphereAll(
+            origin,
+            end,
+            radius,
+            Context.Settings.GroundCheckLayerMask,
+            _groundProbeHits,
+            Collider);
+
+        for (int i = 0; i < hitCount; i++)
+        {
+            Physics3DHit current = _groundProbeHits[i];
+            if (!IsValidGroundHit(current))
+                continue;
+
+            hit = current;
+            return true;
+        }
+
+        hit = default;
+        return false;
+    }
+
+    private bool IsValidGroundHit(Physics3DHit hit)
+    {
+        LSCollider? hitCollider = hit.Collider;
+        if (hitCollider == null || ReferenceEquals(hitCollider, Collider))
+            return false;
+
+        StiffBody? hitBody = hitCollider.Body;
+        return hitBody == null || hitBody.Immovable || hitBody.IsKinematic;
+    }
+
+    private GroundProbeMode ResolveGroundProbeMode()
+    {
+        if (GroundProbeMode != GroundProbeMode.Auto)
+            return GroundProbeMode;
+
+        return Collider is LSSphereCollider
+            || Collider is LSCapsuleCollider
+            || Collider is LSCylinderCollider
+            || (Collider is LSCuboidCollider && ResolveGroundProbeRadius() > Fixed64.FromFraction(1, 8))
+            || (Collider is LSCompoundCollider && ResolveGroundProbeRadius() > Fixed64.FromFraction(1, 8))
+                ? GroundProbeMode.SweptSphere
+                : GroundProbeMode.Ray;
+    }
+
+    private Fixed64 ResolveGroundProbeRadius()
+    {
+        if (GroundProbeRadius > Fixed64.Zero)
+            return GroundProbeRadius;
+
+        return Collider switch
+        {
+            LSSphereCollider sphere => sphere.ScaledRadius,
+            LSCapsuleCollider capsule => capsule.ScaledRadius,
+            LSCylinderCollider cylinder => cylinder.ScaledRadius,
+            LSCuboidCollider cuboid => FixedMath.Min(cuboid.Bounds.Scope.X, cuboid.Bounds.Scope.Z),
+            LSCompoundCollider compound => FixedMath.Min(compound.Bounds.Scope.X, compound.Bounds.Scope.Z),
+            _ => Fixed64.Zero
+        };
+    }
+
+    private void ClearGrounding()
+    {
+        IsGrounded = false;
+        ResetGroundCalculations();
+    }
+
+    private void SetGroundingState(Vector3d hitPoint, Vector3d groundNormal, FixedTransform? hitPlatform)
+    {
+        _hitPlatform = hitPlatform;
+        _hitPlatformPosition = _hitPlatform?.Position ?? Vector3d.Zero;
+        _hitPoint = hitPoint;
+        _groundNormal = groundNormal;
+
+        Vector3d weightVector = Weight * Vector3d.Down;
+        Fixed64 weightInNormalDirection = Vector3d.Dot(weightVector, _groundNormal);
+        _normalForce = weightInNormalDirection * _groundNormal;
+
+        IsGrounded = true;
+    }
+
+    private void ResetGroundCalculations()
+    {
+        _hitPlatform = null;
+        _hitPlatformPosition = Vector3d.Zero;
+        _hitPoint = Vector3d.Zero;
+        _groundNormal = Vector3d.Zero;
+        _normalForce = Vector3d.Zero;
+    }
+
+}

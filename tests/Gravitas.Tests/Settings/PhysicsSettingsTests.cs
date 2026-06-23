@@ -38,8 +38,8 @@ public sealed class PhysicsSettingsTests
         contextB.Settings.PoolingEnabled.Should().BeTrue();
         contextA.Settings.DefaultContinuousCollisionMode.Should().Be(ContinuousCollisionMode.Discrete);
         contextB.Settings.DefaultContinuousCollisionMode.Should().Be(ContinuousCollisionMode.Discrete);
-        contextA.Settings.ContinuousCollisionMaxSubsteps.Should().Be(PhysicsSettings.DefaultContinuousCollisionMaxSubsteps);
-        contextB.Settings.ContinuousCollisionMaxSubsteps.Should().Be(PhysicsSettings.DefaultContinuousCollisionMaxSubsteps);
+        contextA.Settings.ContinuousCollisionMaxToiIterations.Should().Be(PhysicsSettings.DefaultContinuousCollisionMaxToiIterations);
+        contextB.Settings.ContinuousCollisionMaxToiIterations.Should().Be(PhysicsSettings.DefaultContinuousCollisionMaxToiIterations);
         contextA.Settings.DiscreteSolverIterations.Should().Be(PhysicsSettings.DefaultDiscreteSolverIterations);
         contextB.Settings.DiscreteSolverIterations.Should().Be(PhysicsSettings.DefaultDiscreteSolverIterations);
     }
@@ -60,11 +60,11 @@ public sealed class PhysicsSettingsTests
     [Theory]
     [InlineData(0)]
     [InlineData(-1)]
-    public void ContinuousCollisionMaxSubsteps_ShouldRejectNonPositiveValues(int value)
+    public void ContinuousCollisionMaxToiIterations_ShouldRejectNonPositiveValues(int value)
     {
         var settings = PhysicsSettings.DefaultSettings();
 
-        Action action = () => settings.ContinuousCollisionMaxSubsteps = value;
+        Action action = () => settings.ContinuousCollisionMaxToiIterations = value;
 
         action.Should().Throw<ArgumentException>().WithParameterName("value");
     }

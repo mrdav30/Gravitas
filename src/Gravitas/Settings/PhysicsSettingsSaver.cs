@@ -1,4 +1,4 @@
-﻿//=======================================================================
+//=======================================================================
 // PhysicsSettingsSaver.cs
 //=======================================================================
 // MIT License, Copyright (c) 2026–present David Oravsky (mrdav30)
@@ -39,7 +39,7 @@ public sealed partial class PhysicsSettingsSaver : DefaultSaver
     public ContinuousCollisionMode? DefaultContinuousCollisionMode;
 
     [JsonInclude]
-    public int? ContinuousCollisionMaxSubsteps;
+    public int? ContinuousCollisionMaxToiIterations;
 
     [JsonInclude]
     public int? DiscreteSolverIterations;
@@ -83,8 +83,8 @@ public sealed partial class PhysicsSettingsSaver : DefaultSaver
 
         if (DefaultContinuousCollisionMode.HasValue)
             settings.DefaultContinuousCollisionMode = DefaultContinuousCollisionMode.Value;
-        if (ContinuousCollisionMaxSubsteps.HasValue)
-            settings.ContinuousCollisionMaxSubsteps = ContinuousCollisionMaxSubsteps.Value;
+        if (ContinuousCollisionMaxToiIterations.HasValue)
+            settings.ContinuousCollisionMaxToiIterations = ContinuousCollisionMaxToiIterations.Value;
         if (DiscreteSolverIterations.HasValue)
             settings.DiscreteSolverIterations = DiscreteSolverIterations.Value;
         if (RetainedPartitionTimeToKillFrames.HasValue)

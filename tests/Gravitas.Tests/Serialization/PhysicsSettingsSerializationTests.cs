@@ -21,7 +21,7 @@ public sealed class PhysicsSettingsSerializationTests
             },
             GroundCheckLayerMaskBits = PhysicsLayerMask.FromLayer(2).Bits,
             DefaultContinuousCollisionMode = ContinuousCollisionMode.Auto,
-            ContinuousCollisionMaxSubsteps = 7,
+            ContinuousCollisionMaxToiIterations = 7,
             DiscreteSolverIterations = 11,
             RetainedPartitionTimeToKillFrames = 120,
             RetainedPartitionRetirementSweepBudget = 8,
@@ -38,7 +38,7 @@ public sealed class PhysicsSettingsSerializationTests
         settings.CollisionMatrix[0, 1].Should().BeFalse();
         settings.GroundCheckLayerMask.Should().Be(PhysicsLayerMask.FromLayer(2));
         settings.DefaultContinuousCollisionMode.Should().Be(ContinuousCollisionMode.Auto);
-        settings.ContinuousCollisionMaxSubsteps.Should().Be(7);
+        settings.ContinuousCollisionMaxToiIterations.Should().Be(7);
         settings.DiscreteSolverIterations.Should().Be(11);
         settings.RetainedPartitionTimeToKillFrames.Should().Be(120);
         settings.RetainedPartitionRetirementSweepBudget.Should().Be(8);

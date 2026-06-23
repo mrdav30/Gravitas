@@ -1,4 +1,4 @@
-﻿//=======================================================================
+//=======================================================================
 // PhysicsSettings.cs
 //=======================================================================
 // MIT License, Copyright (c) 2026–present David Oravsky (mrdav30)
@@ -21,7 +21,7 @@ public sealed class PhysicsSettings
 
     public const int DefaultRetainedPartitionRetirementSweepBudget = 64;
 
-    public const int DefaultContinuousCollisionMaxSubsteps = 4;
+    public const int DefaultContinuousCollisionMaxToiIterations = 4;
 
     public const int DefaultDiscreteSolverIterations = 6;
 
@@ -53,7 +53,7 @@ public sealed class PhysicsSettings
 
     private int _retainedPartitionTimeToKillFrames = DefaultRetainedPartitionTimeToKillFrames;
     private int _retainedPartitionRetirementSweepBudget = DefaultRetainedPartitionRetirementSweepBudget;
-    private int _continuousCollisionMaxSubsteps = DefaultContinuousCollisionMaxSubsteps;
+    private int _continuousCollisionMaxToiIterations = DefaultContinuousCollisionMaxToiIterations;
     private int _discreteSolverIterations = DefaultDiscreteSolverIterations;
     private PhysicsRuntimeMode _runtimeMode = PhysicsRuntimeMode.ThreeD;
     private Fixed64 _mixed2DHalfThickness = DefaultMixed2DHalfThickness;
@@ -92,15 +92,15 @@ public sealed class PhysicsSettings
     public ContinuousCollisionMode DefaultContinuousCollisionMode { get; set; } = ContinuousCollisionMode.Discrete;
 
     /// <summary>
-    /// Gets or sets the maximum same-frame continuous-collision impacts one body may consume.
+    /// Gets or sets the maximum same-frame continuous-collision TOI iterations one body or handoff queue may consume.
     /// </summary>
-    public int ContinuousCollisionMaxSubsteps
+    public int ContinuousCollisionMaxToiIterations
     {
-        get => _continuousCollisionMaxSubsteps;
+        get => _continuousCollisionMaxToiIterations;
         set
         {
             SwiftThrowHelper.ThrowIfNegativeOrZero(value, nameof(value));
-            _continuousCollisionMaxSubsteps = value;
+            _continuousCollisionMaxToiIterations = value;
         }
     }
 
