@@ -478,6 +478,34 @@ Contributor expectations:
 - Keep engine-specific and editor-only ideas in docs, samples, or host adapters,
   not in the core library.
 
+### File Organization And Navigation
+
+Large source files are a maintainability and reviewability risk in this
+codebase. Treat `1000` lines as a hard warning threshold, not a normal target.
+When a file approaches that size, look for an intentional split before adding
+more behavior.
+
+Preferred split order:
+
+1. Move reusable, state-independent policy or math into focused internal helper
+   types in the subsystem that owns the concept.
+2. Move cohesive runtime ownership into a context-owned service when it can be
+   expressed through a clear API without exposing large private state bags.
+3. Use partial classes for behavior that truly belongs to the same runtime type
+   and depends tightly on its private authoritative state.
+
+When using partials, keep them organized by responsibility rather than by
+chronology. For dimensional counterparts such as `StiffBody` and `StiffBody2D`,
+prefer partial parity (`Motion`, `Serialization`, `ContinuousCollision.*`, and
+similar slices) unless the physics model is intentionally asymmetric, such as
+3D-only grounding. Do not create a service just to avoid a partial if the
+service would mostly shuttle private body state around.
+
+Reduce duplicate code when the shared behavior is genuinely type-neutral,
+deterministic, and allocation-free. Do not force a shared abstraction when the
+2D, 3D, or mixed implementations need different physical semantics or when the
+abstraction would hide ordering, units, or mutation rules.
+
 ## Testing Workflow
 
 Use these baseline commands:
@@ -609,14 +637,17 @@ For both humans and AI agents, use this order:
 5. Decide whether the current design should be preserved or redesigned. Since
    alpha compatibility is not required, prefer the clean deterministic design
    over compatibility scaffolding.
-6. Add or update focused tests that pin the intended behavior.
-7. Make the smallest coherent code change that solves the real issue.
-8. Add XML docs or clarifying comments while the code is open.
-9. Run focused tests or at least compile the affected project.
-10. Run the full `Release` suite before closing behavior work.
-11. Run `ReleaseLean` validation when package shape, serialization, or
+6. Check whether touched files are approaching the `1000` line warning
+   threshold, and split by helper, service, or responsibility-based partial
+   before adding more behavior.
+7. Add or update focused tests that pin the intended behavior.
+8. Make the smallest coherent code change that solves the real issue.
+9. Add XML docs or clarifying comments while the code is open.
+10. Run focused tests or at least compile the affected project.
+11. Run the full `Release` suite before closing behavior work.
+12. Run `ReleaseLean` validation when package shape, serialization, or
    MemoryPack-related code changed.
-12. Update `docs/wiki`, `docs/feature-work`, `README.md`, benchmark docs, or
+13. Update `docs/wiki`, `docs/feature-work`, `README.md`, benchmark docs, or
     workflow docs if public behavior, developer workflow, system architecture,
     collision behavior, query behavior, progress, or follow-up context changed.
 
@@ -647,6 +678,9 @@ If you are an automated coding agent working in this repository:
   behavior.
 - Prefer focused redesigns with tests over patches that preserve flawed
   behavior.
+- Keep files navigable. If a touched file is near or above `1000` lines,
+  consider a focused helper, context-owned service, or responsibility-based
+  partial split as part of the same change.
 - For performance work, benchmark before changing hot-path code when no current
   artifact exists, then rerun the same benchmark after the change.
 - Use local project references to sibling LSF repositories when that produces a
