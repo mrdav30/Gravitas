@@ -510,6 +510,87 @@ public sealed class MixedQueryCcdTests
     }
 
     [Fact]
+    public void SweepSphereAgainst2D_WithRejectedPrismCandidate_ShouldReportFallbackDiagnostics()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        _ = CreateBodylessBox2D(
+            context,
+            new Vector2d(Fixed64.Zero, (Fixed64)3),
+            Vector2d.One);
+        var hits = new SwiftList<PhysicsMixedHit>();
+        context.Diagnostics.Enable(eventCapacity: 4, drawCommandCapacity: 0);
+
+        int count = context.QueryMixed.SweepSphereAgainst2DAll(
+            new Vector3d((Fixed64)(-3), Fixed64.Zero, (Fixed64)(-3)),
+            new Vector3d((Fixed64)3, Fixed64.Zero, (Fixed64)3),
+            Fixed64.Half,
+            IncludeLayerZero,
+            hits);
+
+        count.Should().Be(0);
+        context.QueryMixed.LastQueryCandidateCount.Should().Be(1);
+        ReadOnlySpan<GravitasDiagnosticEvent> events = context.Diagnostics.Events;
+        FindDiagnosticEvent(events, GravitasDiagnosticEventKind.MixedQuery)
+            .TryAsMixedQuery(out GravitasMixedQueryDiagnosticView queryView)
+            .Should()
+            .BeTrue();
+        queryView.Hit.Should().BeFalse();
+        queryView.HitCount.Should().Be(0);
+
+        GravitasDiagnosticEvent summaryEvent = FindDiagnosticEvent(events, GravitasDiagnosticEventKind.QuerySummary);
+        summaryEvent.TryAsQuerySummary(out GravitasQuerySummaryDiagnosticView summary).Should().BeTrue();
+        summary.SourceDimension.Should().Be(GravitasColliderDimension.ThreeD);
+        summary.TargetDimension.Should().Be(GravitasColliderDimension.TwoD);
+        summary.ExactReducerAttempts.Should().Be(0);
+        summary.AcceptedHits.Should().Be(0);
+        summary.FallbackHits.Should().Be(0);
+        summary.RejectedConservativeCandidates.Should().Be(1);
+        summary.HasConservativeFallback.Should().BeTrue();
+    }
+
+    [Fact]
+    public void SweepSphereAgainst2D_WithAcceptedPrismCandidate_ShouldReportFallbackDiagnostics()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        LSCollider2D target = CreateBodylessBox2D(
+            context,
+            Vector2d.Zero,
+            new Vector2d((Fixed64)4, (Fixed64)4));
+        var hits = new SwiftList<PhysicsMixedHit>();
+        context.Diagnostics.Enable(eventCapacity: 4, drawCommandCapacity: 0);
+
+        int count = context.QueryMixed.SweepSphereAgainst2DAll(
+            new Vector3d(Fixed64.Zero, (Fixed64)3, Fixed64.Zero),
+            new Vector3d(Fixed64.Zero, (Fixed64)(-3), Fixed64.Zero),
+            Fixed64.Half,
+            IncludeLayerZero,
+            hits);
+
+        count.Should().Be(1);
+        hits.Count.Should().Be(1);
+        hits[0].Collider2D.Should().BeSameAs(target);
+        hits[0].ReducerKind.Should().Be(PhysicsQueryReducerKind.ConservativeFallback);
+
+        ReadOnlySpan<GravitasDiagnosticEvent> events = context.Diagnostics.Events;
+        FindDiagnosticEvent(events, GravitasDiagnosticEventKind.MixedQuery)
+            .TryAsMixedQuery(out GravitasMixedQueryDiagnosticView queryView)
+            .Should()
+            .BeTrue();
+        queryView.Hit.Should().BeTrue();
+        queryView.HitCount.Should().Be(1);
+
+        GravitasDiagnosticEvent summaryEvent = FindDiagnosticEvent(events, GravitasDiagnosticEventKind.QuerySummary);
+        summaryEvent.TryAsQuerySummary(out GravitasQuerySummaryDiagnosticView summary).Should().BeTrue();
+        summary.SourceDimension.Should().Be(GravitasColliderDimension.ThreeD);
+        summary.TargetDimension.Should().Be(GravitasColliderDimension.TwoD);
+        summary.ExactReducerAttempts.Should().Be(0);
+        summary.AcceptedHits.Should().Be(1);
+        summary.FallbackHits.Should().Be(1);
+        summary.RejectedConservativeCandidates.Should().Be(0);
+        summary.HasConservativeFallback.Should().BeTrue();
+    }
+
+    [Fact]
     public void PublicQuerySurface_ShouldExposeOnlyExplicitConvexMeshSourceSweeps()
     {
         Type[] services =

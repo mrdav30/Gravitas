@@ -66,6 +66,7 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 | 3D shape-exact false-positive cost | Open | Medium | This backlog |
 | Pure 2D dynamic CCD candidate asymmetry | Open | Medium | This backlog |
 | SwiftCollections sort hot-path allocation | Mitigated in Gravitas, lower-stack open | Medium | This backlog |
+| Mixed mesh finite-slab triangle scaling signal | Open | Medium | This backlog |
 
 ## Signal: 3D Full-Runtime CCD Allocation
 
@@ -161,6 +162,48 @@ the Release and ReleaseLean allocation guardrails.
 **Closure criteria:** SwiftCollections provides no-recurring-allocation sort
 and sorted-key copy APIs, Gravitas removes `SwiftListSortUtility`, and the
 same allocation guardrails pass under Release and ReleaseLean.
+
+## Signal: Mixed Mesh Finite-Slab Triangle Scaling Signal
+
+**Discovered:** 2026-06-23
+
+**Evidence:** During mixed finite-slab reducer close-out review,
+`MixedQueryBenchmarks` covered mesh target scaling mostly through collider
+candidate count. The mesh fixtures were tiny triangle sets, so dense mesh
+triangle candidate scanning, triangle clipping, and per-triangle reducer cost
+could regress without a dedicated row making that cost visible.
+
+**Update 2026-06-23:** The mixed mesh target reducer no longer sorts triangle
+candidate buffers before scanning. It now preserves deterministic lower
+authored triangle-index tie-breaks by tracking the best triangle index directly,
+removing the avoidable per-mesh `O(k log k)` step.
+
+**Update 2026-06-23:** A short in-process `mixed-query --filter
+"*MeshTargets*" -j Short -i` smoke completed successfully. MemoryDiagnoser
+reported no managed allocation for some mesh rows, but tiny per-op values on
+some candidate-count and 1024-collider rows (`1 B/op` to `20 B/op`). Treat this
+as additional evidence that a focused triangle-level allocation/scaling
+guardrail is useful before treating the mixed mesh reducer path as closed.
+
+**Why it matters:** Mesh-backed mixed queries are attractive for level
+geometry. Collider-count benchmarks do not necessarily expose triangle-level
+cost, especially when one mesh collider can own many candidate triangles.
+
+**Next isolation step:** Add a mixed query benchmark with high-triangle mesh
+targets and false-positive-heavy slabs. If runtime diagnostics need to explain
+the row, expose a benchmark-only or durable mesh-triangle candidate counter
+without adding disabled-path cost.
+
+**Likely files:**
+
+- `src/Gravitas/Queries/GravitasQueryMixedService.cs`
+- `tests/Gravitas.Benchmarks/Queries/MixedQueryBenchmarks.cs`
+- `tests/Gravitas.Benchmarks/Support/BenchmarkPhysicsScene.cs`
+
+**Closure criteria:** Benchmarks expose mixed mesh finite-slab cost by triangle
+candidate volume, not only by collider count. Any future optimization preserves
+owner identity, lower triangle-index tie-breaks, and zero managed allocation
+after warmup.
 
 ## Signal: Grounding Raycast Probe Allocation
 

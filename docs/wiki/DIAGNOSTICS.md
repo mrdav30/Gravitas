@@ -68,7 +68,7 @@ Current event kinds:
 | `GroundProbe` | `StiffBody.CheckGround(...)` | `Start`/`End` are probe segment, `ScalarA` is probe radius, `DataA` is `GroundProbeMode`. |
 | `RayQuery` | Raycast and swept-sphere queries | `ScalarA` is sweep radius, `DataA` is layer mask bits, `DataB` is hit count. |
 | `CircleQuery` | Circle overlap queries | `Start` is center, `End` is directional extent when used, `ScalarA` is radius. |
-| `QuerySummary` | Query reducer quality diagnostics | `DataA` is exact reducer attempts, `DataB` is accepted hits, `ScalarA` is fallback hits, and `ScalarB` is rejected conservative candidates. |
+| `QuerySummary` | Query reducer quality diagnostics | `DataA` is eligible top-level exact reducer attempts, `DataB` is accepted hits, `ScalarA` is fallback hits, and `ScalarB` is rejected conservative candidates. |
 | `Contact` | `CollisionPair.ProcessCollision()` | Contact points, normal, and depth from narrow phase. |
 | `ResponseImpulse` | `CollisionResponse` | `Vector` is normal impulse, `ScalarA` is impulse magnitude, `ScalarB` is normal velocity. |
 | `MixedQuery` | `GravitasQueryMixedService` | Explicit mixed query segment, layer mask bits, hit count, mixed hit points, normal, and distance. |
@@ -110,10 +110,12 @@ Available views cover every current event kind:
 `GravitasMixedResponseIslandDiagnosticView`.
 
 `GravitasQuerySummaryDiagnosticView` is currently emitted by mixed query paths
-when diagnostics are enabled. It reports candidate-level exact reducer attempts,
-accepted hits, fallback hits, and rejected conservative fallback candidates so
-hosts can inspect exact-versus-conservative query quality beside the ordinary
-`MixedQuery` hit event.
+when diagnostics are enabled. It reports eligible top-level exact reducer
+candidate attempts, accepted hits, fallback hits, and rejected conservative
+fallback candidates so hosts can inspect exact-versus-conservative query quality
+beside the ordinary `MixedQuery` hit event. Exact attempts are counted after
+eligibility filtering; private compound part attempts are folded into the owning
+candidate and are not counted independently.
 
 The views are read-only wrappers over the existing event value. Visitors and
 views do not change capture storage, event ordering, diagnostic buffering, or

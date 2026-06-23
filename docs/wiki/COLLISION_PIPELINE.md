@@ -87,10 +87,13 @@ use finite-slab reducers. Mesh targets clip candidate triangles to the finite
 slab before X/Z projection, and compound targets reduce exact supported parts in
 authored order.
 When diagnostics are enabled, mixed queries also emit `QuerySummary` events with
-exact attempt, accepted hit, fallback hit, and rejected fallback counts.
-Remaining mixed query hardening is tracked in the feature-work
-[`Mixed Query Finite-Slab Reducer Completion`](../feature-work/2026-06-22-mixed-query-finite-slab-reducer-completion-plan.md)
-plan rather than as an implicit wiki caveat.
+eligible top-level exact attempt, accepted hit, fallback hit, and rejected
+fallback counts. The completed
+[`Mixed Query Finite-Slab Reducer Completion`](../feature-work/done/2026-06-22-mixed-query-finite-slab-reducer-completion-plan.md)
+plan closed the `SweepCircleAgainst3D` target reducer family. The remaining
+public mixed query fallback is the opposite source direction:
+`SweepSphereAgainst2D` AABB and polygon slab reducers are tracked in
+[`Mixed Sphere Against 2D Slab Reducer Completion`](../feature-work/2026-06-23-mixed-sphere-2d-slab-reducer-completion-plan.md).
 
 `CollisionDetection2D` currently supports:
 

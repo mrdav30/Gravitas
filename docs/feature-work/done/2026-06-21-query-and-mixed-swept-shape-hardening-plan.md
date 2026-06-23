@@ -253,7 +253,7 @@ including the missing `Physics2DHit` hit-data entry and the final query
 diagnostic surface. Remaining mixed swept-circle finite-slab reducer work for
 mesh, compound, rotated capsule, and rotated finite-cylinder targets, plus
 high-vertex convex mesh source benchmark signal, was extracted to
-[`2026-06-22-mixed-query-finite-slab-reducer-completion-plan.md`](../2026-06-22-mixed-query-finite-slab-reducer-completion-plan.md).
+[`2026-06-22-mixed-query-finite-slab-reducer-completion-plan.md`](2026-06-22-mixed-query-finite-slab-reducer-completion-plan.md).
 
 ## Done Criteria
 

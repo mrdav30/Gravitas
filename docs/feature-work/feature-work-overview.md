@@ -20,9 +20,9 @@ with evidence.
 These plans and evergreen closure trackers should be completed, or explicitly
 closed with evidence, before the alpha release.
 
-1. [`Mixed Query Finite-Slab Reducer Completion`](2026-06-22-mixed-query-finite-slab-reducer-completion-plan.md)
-   - Remaining mixed swept-circle fallback target families need exact reducers
-     or benchmark-backed no-change decisions before alpha.
+1. [`Mixed Sphere Against 2D Slab Reducer Completion`](2026-06-23-mixed-sphere-2d-slab-reducer-completion-plan.md)
+   - The remaining public mixed query fallback is `SweepSphereAgainst2D`
+     AABB/polygon slab exactness, plus compound reduction over those parts.
 2. [`CCD Active Swept Sources`](2026-06-21-ccd-active-swept-sources-plan.md)
    - Host-driven kinematic movement and rotation should be first-class swept
      sources rather than passive targets only.
@@ -43,6 +43,11 @@ closed with evidence, before the alpha release.
 
 ## Recently Completed
 
+- [`Mixed Query Finite-Slab Reducer Completion`](done/2026-06-22-mixed-query-finite-slab-reducer-completion-plan.md)
+  - Completed 2026-06-23. Rotated capsule/cylinder, mesh, and compound target
+    reducers for `SweepCircleAgainst3D` are exact; convex mesh source scaling is
+    accelerated by deterministic support-tree pruning; mixed query diagnostics,
+    docs, and benchmark signal were refreshed.
 - [`Query And Mixed Swept Shape Hardening`](done/2026-06-21-query-and-mixed-swept-shape-hardening-plan.md)
   - Completed 2026-06-22. Public 2D area-query parity, mixed primitive
     finite-slab reducers, convex/compound source sweeps, explicit
@@ -71,13 +76,13 @@ first alpha release.
 
 ## Recommended Execution Order
 
-1. Mixed query finite-slab reducer completion.
+1. Mixed sphere against 2D slab reducer completion.
 2. CCD active swept sources.
 3. CCD exact TOI and shape reducers.
 4. CCD service-level island solver.
 5. Benchmark signal closure pass.
 
-This order now closes the remaining mixed query exactness and benchmark signal
-from the completed query work, then finishes CCD source coverage, precision, and
-island-level behavior. Benchmark signals remain a closure pass so measured
-hot-path risks do not survive into alpha.
+This order now closes the last public mixed query fallback direction, then
+finishes CCD source coverage, precision, and island-level behavior. Benchmark
+signals remain a closure pass so measured hot-path risks do not survive into
+alpha.

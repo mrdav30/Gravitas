@@ -45,8 +45,8 @@ names an internal CCD proxy.
 | `Query2D.OverlapAabb`, `OverlapAabbAll`, `OverlapPolygon`, `OverlapPolygonAll` | 2D AABB or convex polygon area | circle, AABB, convex polygon, compound | `Exact` SAT/closest-point area overlap; compound reports owner once through stable part reduction | distance, collider ID | service-owned scratch, caller-owned all-hit buffer |
 | `Query2D.Raycast`, `RaycastAll` | 2D segment | circle, AABB, convex polygon, compound | `Exact`; zero-length segments return no hit, starting-inside returns distance zero | distance, collider ID | service-owned scratch, caller-owned all-hit buffer |
 | `Query2D.SweepCircle`, `SweepCircleAll` | 2D circle | circle, AABB, convex polygon, compound | `Exact` circle-source sweep reducers; compound reports owner once through earliest part | distance, collider ID | service-owned scratch, caller-owned all-hit buffer |
-| `QueryMixed.SweepSphereAgainst2D`, `SweepSphereAgainst2DAll` | 3D sphere | 2D circle slab, AABB slab, convex polygon slab, compound slab | circle slab: `Exact`; AABB/polygon prism bounds: `ConservativeFallback`; compound preserves the winning part label | distance, 3D collider ID, 2D collider ID | service-owned scratch, caller-owned all-hit buffer |
-| `QueryMixed.SweepCircleAgainst3D`, `SweepCircleAgainst3DAll` | 2D circle embedded in a finite Y slab | 3D sphere, capsule, cuboid, finite cylinder, mesh, compound | `Exact`; mesh targets clip triangle candidates to the finite slab before X/Z projection, and compound targets reduce supported parts in authored order | distance, 3D collider ID, 2D collider ID | service-owned scratch, caller-owned all-hit buffer |
+| `QueryMixed.SweepSphereAgainst2D`, `SweepSphereAgainst2DAll` | 3D sphere | 2D circle slab, AABB slab, convex polygon slab, compound slab | circle slab: `Exact`; AABB/polygon prism bounds: `ConservativeFallback` pending exact slab reducers; compound preserves the winning part label | distance, 3D collider ID, 2D collider ID | service-owned scratch, caller-owned all-hit buffer |
+| `QueryMixed.SweepCircleAgainst3D`, `SweepCircleAgainst3DAll` | 2D circle embedded in a finite Y slab | 3D sphere, capsule, cuboid, finite cylinder, mesh, compound | `Exact`; mesh targets scan triangle candidates with lower authored triangle-index tie-breaks, and compound targets reduce supported parts in authored order | distance, 3D collider ID, 2D collider ID | service-owned scratch, caller-owned all-hit buffer |
 | Concave/raw mesh-source sweeps | concave `LSMeshCollider` or raw mesh as the moving query source | 2D, 3D, or mixed targets | `NotSupported`; use offline convex decomposition into supported `LSCompoundCollider` parts | none | no raw mesh-source query API |
 
 ### Internal CCD Query Surface
@@ -348,7 +348,9 @@ slabs. 2D circles are treated as finite vertical cylinders; AABB and polygon
 slabs use their finite mixed prism bounds for the current query policy. Hits
 against 2D circle slabs report `PhysicsQueryReducerKind.Exact`; hits accepted
 through AABB or polygon prism bounds report
-`PhysicsQueryReducerKind.ConservativeFallback`.
+`PhysicsQueryReducerKind.ConservativeFallback`. Exact AABB, polygon, and
+compound slab reducers for this 3D-sphere-source direction are tracked in
+[`Mixed Sphere Against 2D Slab Reducer Completion`](../feature-work/2026-06-23-mixed-sphere-2d-slab-reducer-completion-plan.md).
 
 `SweepCircleAgainst3D` sweeps a pure 2D circle embedded at the supplied slab Y
 center and half-thickness against 3D targets. Sphere targets use an exact
@@ -364,19 +366,22 @@ finite-cylinder targets use deterministic finite-slab projection reducers, so
 the moving 2D circle is tested against the target volume actually intersecting
 the slab rather than a circumsphere proxy.
 
-Mesh targets query triangle BVH candidates, sort triangle indices, clip each
-world-space triangle to the slab Y interval, project the clipped polygon into
-X/Z, and sweep against that projected point, segment, or convex polygon.
-Accepted mesh hits report the owning `LSMeshCollider` with
-`PhysicsQueryReducerKind.Exact`. Compound targets reduce exact supported parts
-in authored part order and report one owner hit on the `LSCompoundCollider`;
-equal-distance part hits keep the earlier authored part.
+Mesh targets query triangle BVH candidates, clip each world-space triangle to
+the slab Y interval, project the clipped polygon into X/Z, and sweep against
+that projected point, segment, or convex polygon. Accepted mesh hits report the
+owning `LSMeshCollider` with `PhysicsQueryReducerKind.Exact`; equal-distance
+triangle hits keep the lower authored triangle index without sorting the
+candidate buffer. Compound targets reduce exact supported parts in authored
+part order and report one owner hit on the `LSCompoundCollider`; equal-distance
+part hits keep the earlier authored part.
 
 When diagnostics are enabled, mixed queries emit both `MixedQuery` and
 `QuerySummary` events. `MixedQuery` reports the closest mixed hit and accepted
-hit count. `QuerySummary` reports candidate-level exact reducer attempts,
-accepted hits, fallback hits, and rejected conservative fallback candidates so
-hosts can inspect query quality without reverse-engineering reducer labels.
+hit count. `QuerySummary` reports eligible top-level exact reducer candidate
+attempts, accepted hits, fallback hits, and rejected conservative fallback
+candidates so hosts can inspect query quality without reverse-engineering
+reducer labels. Private compound part attempts are folded into the owning
+candidate and are not counted independently.
 
 `StiffBody` and `StiffBody2D` mixed CCD use these APIs only when the context is
 in `PhysicsRuntimeMode.Mixed`. Pure `Both` mode still advances 2D and 3D
@@ -458,9 +463,12 @@ hit came from a safe conservative proxy or bounds reducer.
 The completed
 [`Query And Mixed Swept Shape Hardening`](../feature-work/done/2026-06-21-query-and-mixed-swept-shape-hardening-plan.md)
 plan owns the current public query API shape, 2D query parity, convex source
-sweeps, fallback labels, and query diagnostics. Remaining mixed finite-slab
-reducer completion and release validation work is tracked in
-[`Mixed Query Finite-Slab Reducer Completion`](../feature-work/2026-06-22-mixed-query-finite-slab-reducer-completion-plan.md).
+sweeps, fallback labels, and query diagnostics. The completed
+[`Mixed Query Finite-Slab Reducer Completion`](../feature-work/done/2026-06-22-mixed-query-finite-slab-reducer-completion-plan.md)
+plan closed exact `SweepCircleAgainst3D` target reducers and convex mesh source
+scaling. The remaining public mixed query fallback is the opposite source
+direction, tracked in
+[`Mixed Sphere Against 2D Slab Reducer Completion`](../feature-work/2026-06-23-mixed-sphere-2d-slab-reducer-completion-plan.md).
 
 Longer-term query state objects remain evidence-gated: introduce caller-owned or
 pooled query job/state objects only when a real host needs concurrent queries

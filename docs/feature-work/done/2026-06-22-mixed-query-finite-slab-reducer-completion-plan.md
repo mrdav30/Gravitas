@@ -21,7 +21,7 @@ and CCD services.
 ---
 
 **Date:** 2026-06-22
-**Status:** Pre-alpha release blocker
+**Status:** Done
 **Owner:** Gravitas query and mixed CCD hardening
 
 ## Purpose
@@ -39,13 +39,13 @@ does not carry hidden follow-up work.
 
 ## Relationship To Existing Plans
 
-- [`2026-06-21-query-and-mixed-swept-shape-hardening-plan.md`](done/2026-06-21-query-and-mixed-swept-shape-hardening-plan.md)
+- [`2026-06-21-query-and-mixed-swept-shape-hardening-plan.md`](2026-06-21-query-and-mixed-swept-shape-hardening-plan.md)
   established public query parity, convex source APIs, fallback labels, query
   diagnostics, and release validation.
-- [`2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md`](2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md)
+- [`2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md`](../2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md)
   owns broader CCD exact time-of-impact promotion. CCD should consume reducers
   produced here instead of duplicating mixed query math.
-- [`benchmark-signal-hardening-backlog.md`](benchmark-signal-hardening-backlog.md)
+- [`benchmark-signal-hardening-backlog.md`](../benchmark-signal-hardening-backlog.md)
   remains the place for measured benchmark regressions. This plan owns the
   first-class reducer work and the benchmark rows needed to judge it.
 
@@ -92,12 +92,12 @@ does not carry hidden follow-up work.
 
 **Implementation notes**
 
-- Mesh target reducers now query triangle BVH candidates, sort candidate
-  triangle indices, clip each world-space triangle to the query slab Y interval,
-  project the clipped polygon into X/Z, and sweep the source circle against the
-  resulting point, segment, or convex polygon.
+- Mesh target reducers now query triangle BVH candidates, clip each world-space
+  triangle to the query slab Y interval, project the clipped polygon into X/Z,
+  and sweep the source circle against the resulting point, segment, or convex
+  polygon.
 - Mesh hits reduce to the owning `LSMeshCollider`; equal-distance triangle hits
-  keep the lower authored triangle index.
+  keep the lower authored triangle index without sorting the candidate buffer.
 - Compound target reducers iterate private parts in authored order, preserve one
   owner hit on the `LSCompoundCollider`, and keep the earlier part on
   equal-distance ties.
@@ -146,15 +146,38 @@ does not carry hidden follow-up work.
 
 ## Workstream 4: Diagnostics, Docs, And Validation
 
+**Status:** Done.
+
 **Tasks**
 
-- [ ] Ensure `GravitasQuerySummaryDiagnosticView` remains accurate for exact
+- [x] Ensure `GravitasQuerySummaryDiagnosticView` remains accurate for exact
   attempt, accepted hit, fallback hit, and rejected fallback candidate counts.
-- [ ] Update `docs/wiki/QUERY_SERVICES.md`, `COLLISION_PIPELINE.md`, and
+- [x] Update `docs/wiki/QUERY_SERVICES.md`, `COLLISION_PIPELINE.md`, and
   `DIMENSIONS.md` with final exact/fallback policy.
-- [ ] Validate Release and ReleaseLean builds/tests.
-- [ ] Move this plan to `docs/feature-work/done` when all remaining mixed query
-  reducer work is closed or intentionally rejected with evidence.
+- [x] Validate Release and ReleaseLean builds/tests.
+- [x] Move this plan to `docs/feature-work/done` when all mixed query reducer
+  work owned by this plan is closed or intentionally extracted.
+
+**Implementation notes**
+
+- Mixed query diagnostic emission now uses a shared helper so closest and
+  all-hit mixed query paths emit `MixedQuery` and `QuerySummary` with identical
+  counter semantics.
+- Added diagnostics regression coverage for accepted and rejected conservative
+  `SweepSphereAgainst2D` prism-bound candidates.
+- Removed the per-mesh triangle-candidate sort from the mixed mesh target
+  reducer. Equal-distance hits now preserve lower authored triangle index by
+  tracking the best triangle index directly, avoiding an unnecessary `O(k log k)`
+  step in the hot path.
+- Wiki docs now state the final policy for this plan: `SweepCircleAgainst3D`
+  target reducers are exact for supported 3D target families; the remaining
+  public mixed query fallback is the opposite source direction.
+- Exact AABB, polygon, and compound slab reducers for
+  `QueryMixed.SweepSphereAgainst2D` were extracted into
+  [`Mixed Sphere Against 2D Slab Reducer Completion`](../2026-06-23-mixed-sphere-2d-slab-reducer-completion-plan.md).
+- Mesh triangle-level finite-slab benchmark attribution was captured in
+  [`benchmark-signal-hardening-backlog.md`](../benchmark-signal-hardening-backlog.md)
+  instead of broadening this close-out pass.
 
 ## Done Criteria
 

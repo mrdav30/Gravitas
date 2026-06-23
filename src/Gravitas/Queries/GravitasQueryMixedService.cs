@@ -177,24 +177,18 @@ public sealed class GravitasQueryMixedService
         }
 
         hit = found ? best : default;
-        _context.Diagnostics.EmitMixedQuery(
+        EmitMixedSweepDiagnostics(
+            GravitasColliderDimension.ThreeD,
+            GravitasColliderDimension.TwoD,
             start,
             end,
             radius,
             layerMask.Bits,
             found,
             reducerCounters.AcceptedHits,
-            hit);
-        if (captureReducerDiagnostics)
-            _context.Diagnostics.EmitQuerySummary(
-                GravitasColliderDimension.ThreeD,
-                GravitasColliderDimension.TwoD,
-                start,
-                end,
-                reducerCounters.ExactReducerAttempts,
-                reducerCounters.AcceptedHits,
-                reducerCounters.FallbackHits,
-                reducerCounters.RejectedConservativeCandidates);
+            hit,
+            captureReducerDiagnostics,
+            reducerCounters);
         return found;
     }
 
@@ -254,24 +248,18 @@ public sealed class GravitasQueryMixedService
         }
 
         PhysicsMixedHitSorter.SortByDistance(results);
-        _context.Diagnostics.EmitMixedQuery(
+        EmitMixedSweepDiagnostics(
+            GravitasColliderDimension.ThreeD,
+            GravitasColliderDimension.TwoD,
             start,
             end,
             radius,
             layerMask.Bits,
             results.Count > 0,
             results.Count,
-            results.Count > 0 ? results[0] : default);
-        if (captureReducerDiagnostics)
-            _context.Diagnostics.EmitQuerySummary(
-                GravitasColliderDimension.ThreeD,
-                GravitasColliderDimension.TwoD,
-                start,
-                end,
-                reducerCounters.ExactReducerAttempts,
-                reducerCounters.AcceptedHits,
-                reducerCounters.FallbackHits,
-                reducerCounters.RejectedConservativeCandidates);
+            results.Count > 0 ? results[0] : default,
+            captureReducerDiagnostics,
+            reducerCounters);
         return results.Count;
     }
 
@@ -428,24 +416,18 @@ public sealed class GravitasQueryMixedService
         }
 
         hit = found ? best : default;
-        _context.Diagnostics.EmitMixedQuery(
+        EmitMixedSweepDiagnostics(
+            GravitasColliderDimension.TwoD,
+            GravitasColliderDimension.ThreeD,
             start3D,
             end3D,
             radius,
             layerMask.Bits,
             found,
             reducerCounters.AcceptedHits,
-            hit);
-        if (captureReducerDiagnostics)
-            _context.Diagnostics.EmitQuerySummary(
-                GravitasColliderDimension.TwoD,
-                GravitasColliderDimension.ThreeD,
-                start3D,
-                end3D,
-                reducerCounters.ExactReducerAttempts,
-                reducerCounters.AcceptedHits,
-                reducerCounters.FallbackHits,
-                reducerCounters.RejectedConservativeCandidates);
+            hit,
+            captureReducerDiagnostics,
+            reducerCounters);
         return found;
     }
 
@@ -516,25 +498,55 @@ public sealed class GravitasQueryMixedService
         }
 
         PhysicsMixedHitSorter.SortByDistance(results);
-        _context.Diagnostics.EmitMixedQuery(
+        EmitMixedSweepDiagnostics(
+            GravitasColliderDimension.TwoD,
+            GravitasColliderDimension.ThreeD,
             start3D,
             end3D,
             radius,
             layerMask.Bits,
             results.Count > 0,
             results.Count,
-            results.Count > 0 ? results[0] : default);
-        if (captureReducerDiagnostics)
-            _context.Diagnostics.EmitQuerySummary(
-                GravitasColliderDimension.TwoD,
-                GravitasColliderDimension.ThreeD,
-                start3D,
-                end3D,
-                reducerCounters.ExactReducerAttempts,
-                reducerCounters.AcceptedHits,
-                reducerCounters.FallbackHits,
-                reducerCounters.RejectedConservativeCandidates);
+            results.Count > 0 ? results[0] : default,
+            captureReducerDiagnostics,
+            reducerCounters);
         return results.Count;
+    }
+
+    private void EmitMixedSweepDiagnostics(
+        GravitasColliderDimension sourceDimension,
+        GravitasColliderDimension targetDimension,
+        Vector3d start,
+        Vector3d end,
+        Fixed64 radius,
+        int layerMaskBits,
+        bool found,
+        int hitCount,
+        PhysicsMixedHit hit,
+        bool captureReducerDiagnostics,
+        QueryReducerCounters reducerCounters)
+    {
+        _context.Diagnostics.EmitMixedQuery(
+            start,
+            end,
+            radius,
+            layerMaskBits,
+            found,
+            hitCount,
+            hit);
+
+        if (!captureReducerDiagnostics)
+            return;
+
+        _context.Diagnostics.EmitQuerySummary(
+            sourceDimension,
+            targetDimension,
+            start,
+            end,
+            reducerCounters.ExactReducerAttempts,
+            reducerCounters.AcceptedHits,
+            reducerCounters.FallbackHits,
+            reducerCounters.RejectedConservativeCandidates);
     }
 
     private static bool TrySweepSphereAgainst2DCandidate(
@@ -995,12 +1007,12 @@ public sealed class GravitasQueryMixedService
             out Vector3d min,
             out Vector3d max);
         mesh.GetTrianglesInBounds(new FixedBoundVolume(min, max), _meshTriangleCandidates);
-        SwiftListSortUtility.SortAscendingInPlace(_meshTriangleCandidates);
 
         Fixed64 slabMinY = slabCenterY - halfThickness;
         Fixed64 slabMaxY = slabCenterY + halfThickness;
         bool found = false;
         Fixed64 bestDistance = Fixed64.MaxValue;
+        int bestTriangleIndex = int.MaxValue;
         PhysicsMixedHit best = default;
 
         for (int i = 0; i < _meshTriangleCandidates.Count; i++)
@@ -1023,8 +1035,12 @@ public sealed class GravitasQueryMixedService
                 continue;
             }
 
-            if (found && distance >= bestDistance)
+            if (found
+                && (distance > bestDistance
+                    || (distance == bestDistance && triangleIndex >= bestTriangleIndex)))
+            {
                 continue;
+            }
 
             Vector2d center2D = start + direction * distance;
             Vector3d sweepCenter = new(center2D.X, slabCenterY, center2D.Y);
@@ -1040,6 +1056,7 @@ public sealed class GravitasQueryMixedService
                 distance,
                 sourceCollider);
             bestDistance = distance;
+            bestTriangleIndex = triangleIndex;
             found = true;
         }
 
