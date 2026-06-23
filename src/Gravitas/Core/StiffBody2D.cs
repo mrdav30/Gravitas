@@ -8,9 +8,7 @@
 using Chronicler;
 using FixedMathSharp;
 using Gravitas.Colliders;
-using Gravitas.CollisionHandling;
 using Gravitas.Queries;
-using Gravitas.Support;
 using SwiftCollections;
 using System.Runtime.CompilerServices;
 
@@ -275,52 +273,6 @@ public sealed partial class StiffBody2D : IRecordable
         Context.Physics2D.AssimilateBody(this, isDynamic);
     }
 
-
-    public void AddForce(Vector2d force)
-    {
-        if (force != Vector2d.Zero)
-            Wake();
-
-        _deltaAcceleration += force * InverseMass;
-    }
-
-    public void AddTorque(Fixed64 torque)
-    {
-        if (torque == Fixed64.Zero || !CanRotate)
-            return;
-
-        Wake();
-        _deltaAngularAcceleration += torque * EffectiveInverseMomentOfInertia;
-    }
-
-    public void AddAngularImpulse(Fixed64 impulse)
-    {
-        if (impulse == Fixed64.Zero || !CanRotate)
-            return;
-
-        Wake();
-        _angularVelocity += impulse * EffectiveInverseMomentOfInertia;
-        RefreshAngularSpeed();
-    }
-
-    public void SetPosition(Vector2d position)
-    {
-        if (_position != position)
-            Wake();
-
-        _position = position;
-        Collider.Rebuild();
-    }
-
-    public void SetRotation(Fixed64 rotation)
-    {
-        if (_rotation != rotation)
-            Wake();
-
-        _rotation = rotation;
-        Collider.Rebuild();
-    }
-
     public void Sleep()
     {
         if (!CanSleep)
@@ -337,16 +289,6 @@ public sealed partial class StiffBody2D : IRecordable
         _deltaAngularAcceleration = Fixed64.Zero;
         _angularSpeed = Fixed64.Zero;
         Context.Collisions2D.RefreshPartitionAwakeState(Collider);
-    }
-
-    private void RefreshPartitionMobility()
-    {
-        if (!Active)
-            return;
-
-        Context.Collisions2D.RefreshColliderPartition(Collider);
-        if (Context.Settings.RuntimeMode.RunsMixedContacts())
-            Context.MixedCollisions.Refresh2DColliderPartition(Collider);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -489,17 +431,6 @@ public sealed partial class StiffBody2D : IRecordable
             Collider.Rebuild();
     }
 
-
-    internal void ApplyCollisionPositionCorrection(Vector2d positionCorrection)
-    {
-        if (!CanTranslate || positionCorrection == Vector2d.Zero)
-            return;
-
-        _position += positionCorrection;
-        Collider.Rebuild();
-    }
-
-
     /// <summary>
     /// Removes this body and its collider from the pure 2D runtime service.
     /// </summary>
@@ -515,152 +446,5 @@ public sealed partial class StiffBody2D : IRecordable
         Collider.IsActive = false;
         Collider.ClearPhysicsState();
         Collider.ClearBindingState();
-    }
-
-    private bool CanSleep => SleepEnabled && CanTranslate;
-
-    private void UpdateSleepState()
-    {
-        if (!CanSleep)
-        {
-            _sleepFrameCount = 0;
-            return;
-        }
-
-        if (_linearSpeed > SleepLinearSpeedThreshold || _angularSpeed > _sleepAngularSpeedThreshold)
-        {
-            _sleepFrameCount = 0;
-            return;
-        }
-
-        if (_sleepFrameCount < SleepFrameThreshold)
-            _sleepFrameCount++;
-
-        if (_sleepFrameCount >= SleepFrameThreshold)
-            Sleep();
-    }
-
-    private void RefreshLinearSpeed()
-    {
-        _linearSpeed = _linearVelocity.Magnitude;
-        if (_linearSpeed <= Fixed64.Epsilon)
-        {
-            _linearVelocity = Vector2d.Zero;
-            _linearSpeed = Fixed64.Zero;
-        }
-    }
-
-    private void RefreshAngularSpeed()
-    {
-        _angularSpeed = _angularVelocity.Abs();
-        if (_angularSpeed <= Fixed64.Epsilon)
-        {
-            _angularVelocity = Fixed64.Zero;
-            _angularSpeed = Fixed64.Zero;
-        }
-    }
-
-    internal void RefreshMassPropertiesFromColliderShape()
-    {
-        if (!_centerOfMassOffsetExplicit)
-            _localCenterOfMassOffset = Collider.CalculateLocalCenterOfMassOffset();
-
-        if (_mass <= Fixed64.Zero)
-        {
-            _momentOfInertia = Fixed64.Zero;
-            _inverseMomentOfInertia = Fixed64.Zero;
-            return;
-        }
-
-        _momentOfInertia = Collider.CalculateMomentOfInertia(_mass, _localCenterOfMassOffset);
-        _inverseMomentOfInertia = _momentOfInertia > Fixed64.Zero
-            ? Fixed64.One / _momentOfInertia
-            : Fixed64.Zero;
-    }
-
-    public void RecordData(IChronicler chronicler)
-    {
-        bool active = Active;
-        bool immovable = Immovable;
-        bool isKinematic = IsKinematic;
-        Fixed64 mass = Mass;
-        Fixed64 restitutionCoefficient = RestitutionCoefficient;
-        Fixed64 frictionCoefficient = FrictionCoefficient;
-        Vector2d gravity = Gravity;
-        bool sleepEnabled = SleepEnabled;
-        int sleepFrameThreshold = SleepFrameThreshold;
-        Fixed64 sleepLinearSpeedThreshold = SleepLinearSpeedThreshold;
-        Fixed64 sleepAngularSpeedThreshold = SleepAngularSpeedThreshold;
-
-        RecordValues.Look(chronicler, ref active, "Active", false);
-        RecordValues.Look(chronicler, ref immovable, "Immovable", false);
-        RecordValues.Look(chronicler, ref isKinematic, "IsKinematic", false);
-        RecordValues.Look(chronicler, ref _position, "Position");
-        RecordValues.Look(chronicler, ref _rotation, "Rotation");
-        RecordValues.Look(chronicler, ref PreventAngularForces, "PreventAngularForces", false);
-        RecordValues.Look(chronicler, ref _localCenterOfMassOffset, "LocalCenterOfMassOffset");
-        RecordValues.Look(chronicler, ref _centerOfMassOffsetExplicit, "CenterOfMassOffsetExplicit", false);
-        RecordValues.Look(chronicler, ref _linearVelocity, "LinearVelocity");
-        RecordValues.Look(chronicler, ref _linearAccelerationStore, "LinearAccelerationStore");
-        RecordValues.Look(chronicler, ref _deltaAcceleration, "DeltaAcceleration");
-        RecordValues.Look(chronicler, ref _linearSpeed, "LinearSpeed");
-        RecordValues.Look(chronicler, ref _angularVelocity, "AngularVelocity");
-        RecordValues.Look(chronicler, ref _angularAccelerationStore, "AngularAccelerationStore");
-        RecordValues.Look(chronicler, ref _deltaAngularAcceleration, "DeltaAngularAcceleration");
-        RecordValues.Look(chronicler, ref _angularSpeed, "AngularSpeed");
-        RecordValues.Look(chronicler, ref _isSleeping, "IsSleeping");
-        RecordValues.Look(chronicler, ref _sleepFrameCount, "SleepFrameCount");
-        RecordValues.Look(chronicler, ref mass, "Mass");
-        RecordValues.Look(chronicler, ref restitutionCoefficient, "RestitutionCoefficient", Fixed64.Half);
-        RecordValues.Look(chronicler, ref frictionCoefficient, "FrictionCoefficient", Fixed64.One);
-        RecordValues.Look(chronicler, ref gravity, "Gravity", Vector2d.Zero);
-        RecordValues.Look(chronicler, ref sleepEnabled, "SleepEnabled", true);
-        RecordValues.Look(chronicler, ref sleepFrameThreshold, "SleepFrameThreshold", 16);
-        RecordValues.Look(chronicler, ref sleepLinearSpeedThreshold, "SleepLinearSpeedThreshold", (Fixed64)0.001f);
-        RecordValues.Look(chronicler, ref sleepAngularSpeedThreshold, "SleepAngularSpeedThreshold", (Fixed64)0.001f);
-        RecordValues.Look(chronicler, ref _continuousCollisionMode, "ContinuousCollisionMode", ContinuousCollisionMode.Inherit);
-
-        if (chronicler.Mode == SerializationMode.Loading)
-        {
-            Active = active;
-            _immovable = immovable;
-            _isKinematic = isKinematic;
-            Mass = mass;
-            RestitutionCoefficient = restitutionCoefficient;
-            FrictionCoefficient = frictionCoefficient;
-            Gravity = gravity;
-            SleepEnabled = sleepEnabled;
-            SleepFrameThreshold = sleepFrameThreshold;
-            SleepLinearSpeedThreshold = sleepLinearSpeedThreshold;
-            SleepAngularSpeedThreshold = sleepAngularSpeedThreshold;
-        }
-
-        Collider.RecordData(chronicler);
-
-        if (chronicler.Mode == SerializationMode.Loading)
-        {
-            RefreshMassPropertiesFromColliderShape();
-            ApplyLoadedState();
-        }
-    }
-
-    private void ApplyLoadedState()
-    {
-        FixedTransform transform = Agent.Transform;
-        Vector3d currentPosition = transform.Position;
-        transform.Position = new Vector3d(_position.X, currentPosition.Y, _position.Y);
-        transform.Rotation = FixedQuaternion.FromEulerAnglesInDegrees(
-            Fixed64.Zero,
-            FixedMath.RadToDeg(_rotation),
-            Fixed64.Zero);
-        Collider.Rebuild();
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Vector2d ClampNearZero(Vector2d value)
-    {
-        Fixed64 x = value.X.Abs() <= Fixed64.Epsilon ? Fixed64.Zero : value.X;
-        Fixed64 y = value.Y.Abs() <= Fixed64.Epsilon ? Fixed64.Zero : value.Y;
-        return new Vector2d(x, y);
     }
 }

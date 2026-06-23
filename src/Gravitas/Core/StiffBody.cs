@@ -10,11 +10,9 @@ using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Queries;
-using Gravitas.Support;
 using GridForge.Grids;
 using SwiftCollections;
 using System;
-using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
 namespace Gravitas;
