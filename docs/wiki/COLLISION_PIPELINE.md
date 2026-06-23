@@ -433,12 +433,17 @@ before the proxy hit can be accepted:
   against the moving source collider with `SweptSphereQueryWorker`. This covers
   3D cuboid, capsule, cylinder, mesh, and compound movers for sphere-target
   false-positive rejection without duplicating 3D shape math.
+- supported 3D convex movers, convex meshes, and compounds made from supported
+  convex parts use the same support-mapped source sweeps as public `Query3D`
+  collider-source sweeps. Concave mesh targets reduce triangle candidates back
+  to the owning mesh collider; concave mesh sources remain unsupported and
+  should be authored as stable convex compound parts.
 
-Unsupported 3D target shapes, dynamic-vs-dynamic CCD, and mixed CCD paths
-without exact reducers continue to use conservative proxy results. Those paths
-prefer false-positive early stops over false-negative tunneling until exact
-relative-motion and mixed-shape reducers have dedicated tests and benchmark
-evidence.
+Unsupported source families and mixed dynamic CCD paths without exact reducers
+continue to use conservative proxy results. Those paths prefer false-positive
+early stops over false-negative tunneling until the service-level CCD island
+model can advance cross-service contacts without order-dependent velocity
+handoff.
 
 `Continuous` always sweeps when the proxy radius and displacement are non-zero.
 `Auto` sweeps only when the intended displacement is larger than the proxy
@@ -458,20 +463,17 @@ Rotational CCD is layered onto the same body-owned opt-in contract for dynamic
 builds a conservative angular candidate radius, gathers static-style targets,
 and samples a bounded deterministic sequence of intermediate poses. Each sample
 refreshes runtime shape state and uses the ordinary exact narrow-phase before a
-rotational contact is accepted. The sample count is derived from angular
+rotational contact is bracketed. The sample count is derived from angular
 displacement, capped by `ContinuousCollisionMath.MaxRotationalSubsteps`, and
 uses a fixed angular step target so replay does not depend on platform timing or
-collection order. Accepted rotational hits clamp the body to the previous safe
-pose, stop angular motion for the frame, and remove only the linear closing
-velocity component along the accepted contact normal.
+collection order. The first hit bracket is refined with a fixed-iteration
+bisection over exact narrow-phase checks before the accepted rotational hit
+clamps the body, stops angular motion for the frame, and removes only the linear
+closing velocity component along the accepted contact normal.
 
-The current rotational path is intentionally conservative. It covers dynamic
-angular sources against static-style targets and host-driven kinematic rotation
-as an active swept source against static-style targets. Shape-exact angular
-time-of-impact solvers and global service-level CCD island solving are tracked
-as alpha-candidate follow-up plans:
-[`CCD Exact TOI And Shape Reducers`](../feature-work/2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md)
-and
+The current rotational path covers dynamic angular sources against static-style
+targets and host-driven kinematic rotation as an active swept source against
+static-style targets. Global service-level CCD island solving remains tracked in
 [`CCD Service-Level Island Solver`](../feature-work/2026-06-21-ccd-service-level-island-solver-plan.md).
 
 Static and kinematic CCD targets are non-trigger bodyless colliders, immovable
@@ -509,20 +511,19 @@ transfer is deliberately left to the service-level CCD island plan so dynamic
 targets do not receive order-dependent same-frame integration when the source
 and target belong to different service phases.
 
-The dynamic path is intentionally conservative:
+Dynamic relative CCD keeps proxy sweeps as the broad candidate stage, then
+validates supported pure-dimension candidates with exact mover-shape reducers:
 
-- 3D dynamic targets are represented by continuous sphere proxies. Sphere
-  targets use their scaled radius; other 3D target shapes use the same
-  conservative bounds radius as moving sources.
-- pure 2D dynamic targets are represented by continuous circle proxies.
-- mixed 2D slabs use the larger of planar radius and mixed half-thickness as
-  their 3D proxy radius.
-- dynamic mesh and compound bodies are supported as moving proxy bodies rather
-  than exact swept mesh or exact swept compound sources.
-
-Exact dynamic mesh/compound CCD and exact non-sphere 3D target reducers require
-deeper shape-specific solvers and benchmark evidence before they should replace
-the conservative proxy path.
+- pure 3D dynamic CCD supports exact source-sphere sweeps, target-sphere reverse
+  sweeps, convex primitive movers, convex mesh movers, and compounds made from
+  supported convex parts against dynamic 3D targets. Concave mesh targets reduce
+  through bounded triangle candidates; concave mesh sources remain unsupported.
+- pure 2D dynamic CCD uses exact relative mover-shape sweeps for circle, AABB,
+  convex polygon, and compound movers and targets.
+- mixed dynamic CCD keeps the conservative relative proxy path. Mixed dynamic
+  targets use the larger of planar radius and mixed half-thickness as their 3D
+  proxy radius, and exact cross-dimension velocity transfer remains part of the
+  service-level CCD island plan.
 
 ## Active Partitions
 
@@ -868,10 +869,10 @@ Response units and invariants:
 - drag and angular damping remain integration/body behavior; contact friction is
   handled by the response solver.
 
-This is still the first alpha milestone, not the final response engine. Exact
-angular TOI and exact swept polytope support remain future work. Exact CCD
-reducer work remains in
-[`CCD Exact TOI And Shape Reducers`](../feature-work/2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md).
+This is still the first alpha milestone, not the final response engine. The
+remaining CCD response boundary is service-level island advancement for dense
+same-frame contacts and mixed dynamic velocity handoff, tracked in
+[`CCD Service-Level Island Solver`](../feature-work/2026-06-21-ccd-service-level-island-solver-plan.md).
 
 ## Body Sleep And Wake
 

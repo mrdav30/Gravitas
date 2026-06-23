@@ -93,6 +93,11 @@ host-transform publish, and simulation cost. Prefer the attribution rows when
 you need allocation-focused signal for CCD query, candidate-index, or relative
 sweep internals.
 
+Shape-exact rows include static 3D non-sphere target false positives, static
+2D false positives, and dynamic 3D/2D relative false positives where proxy
+spheres or circles find a candidate but the real mover shape rejects the
+contact.
+
 ### Continuous collision substeps
 
 Use `continuous-collision-substep` when comparing the bounded same-frame TOI
@@ -117,7 +122,7 @@ Start with hot paths that can be isolated and repeated deterministically:
 - continuous collision detection policy and swept movement cost.
 - production CCD evidence through pure 2D, pure 3D, mixed full-runtime,
   static query, dynamic candidate-index, dynamic relative sweep, and shape-exact
-  false-positive scenarios.
+  false-positive scenarios, including dynamic 3D/2D relative shape rejection.
 - kinematic active CCD source scaling through no-hit, first-hit, dense-hit,
   rotational, and mixed source rows.
 - bounded CCD substep solving through one-substep, two-substep, and default

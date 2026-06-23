@@ -64,6 +64,7 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 | 3D full-runtime CCD allocation | Open | High | This backlog |
 | Grounding raycast probe allocation | Open | Medium | This backlog |
 | 3D shape-exact false-positive cost | Open | Medium | This backlog |
+| 3D dynamic shape-exact BDN allocation signal | Open | Medium | This backlog |
 | Pure 2D dynamic CCD candidate asymmetry | Open | Medium | This backlog |
 | SwiftCollections sort hot-path allocation | Mitigated in Gravitas, lower-stack open | Medium | This backlog |
 | Mixed mesh finite-slab triangle scaling signal | Open | Medium | This backlog |
@@ -272,6 +273,47 @@ candidates before optimizing reducer logic.
 **Closure criteria:** The row is explained by candidate volume, reducer cost, or
 a specific runtime hotspot. If optimized, correctness coverage proves no
 false-negative risk was introduced.
+
+## Signal: 3D Dynamic Shape-Exact BDN Allocation Signal
+
+**Discovered:** 2026-06-23
+
+**Evidence:** The short in-process
+`dynamic-ccd-scaling --filter "*DynamicShapeExact*" -j Short -i` smoke reported
+`SparsePure3DDynamicShapeExactCcdFalsePositiveBatch8` allocation scaling with
+body count: about `43,008 B/op` at `64` bodies and `172,110 B/op` at `256`
+bodies. The matching 2D rows reported only `42 B/op` runner noise.
+
+**Counter-evidence:** The focused xUnit guard
+`ContinuousMode_DynamicRelativeShapeExactPath_ShouldNotAllocateAfterWarmup`
+passes with `0` allocated bytes after warmup for the same thin-cuboid dynamic
+relative false-positive shape family. This suggests the BDN signal may come
+from batched fixture reset, first-use candidate/pair growth, or another
+full-context phase rather than the exact reducer call itself.
+
+**Why it matters:** Dynamic 3D CCD is an alpha hot path. A scaling BDN
+allocation signal should be either explained as benchmark-only setup or removed
+from the runtime path before release confidence.
+
+**Next isolation step:** Add an allocation guard or benchmark attribution that
+splits the `DynamicShapeExact3D` fixture into reset, dynamic candidate query,
+exact reducer validation, body `LateSimulate`, pair cleanup, and sum-return
+work. Compare a warmed multi-body xUnit guard against the BDN row to identify
+whether MemoryDiagnoser is seeing steady-state runtime allocation or benchmark
+fixture churn.
+
+**Likely files:**
+
+- `src/Gravitas/Core/StiffBody.cs`
+- `src/Gravitas/Queries/ConvexSweepQueryWorker.cs`
+- `tests/Gravitas.Tests/CollisionHandling/ContinuousCollisionDetectionTests.cs`
+- `tests/Gravitas.Benchmarks/Core/DynamicCcdScalingBenchmarks.cs`
+- `tests/Gravitas.Benchmarks/Support/ContinuousCollisionBenchmarkFixture.cs`
+- `tests/Gravitas.Benchmarks/Support/ContinuousCollisionBenchmarkSupport.cs`
+
+**Closure criteria:** The multi-body BDN allocation is traced to benchmark-only
+setup and documented, or a runtime/benchmark support fix removes it while the
+focused xUnit allocation guard remains green.
 
 ## Signal: Pure 2D Dynamic CCD Candidate Asymmetry
 

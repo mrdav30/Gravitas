@@ -565,10 +565,10 @@ All four workstreams in this CCD depth plan are complete:
 Deferred CCD work has been extracted into dedicated feature-work plans:
 
 - Active kinematic translation/rotation as swept CCD sources:
-  [`2026-06-21-ccd-active-swept-sources-plan.md`](../2026-06-21-ccd-active-swept-sources-plan.md).
-- Shape-exact angular TOI, exact dynamic relative reducers, mesh/compound
-  reducer policy, and mixed shape reducers:
-  [`2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md`](../2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md).
+  [`2026-06-21-ccd-active-swept-sources-plan.md`](2026-06-21-ccd-active-swept-sources-plan.md).
+- Shape-exact angular TOI refinement, exact dynamic relative reducers,
+  mesh/compound reducer policy, and mixed shape-reducer boundaries:
+  [`2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md`](2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md).
 - Global service-level CCD islands and mixed-specific island response:
   [`2026-06-21-ccd-service-level-island-solver-plan.md`](../2026-06-21-ccd-service-level-island-solver-plan.md).
 - Benchmark publishing/gating, external baseline comparison, and host-visible

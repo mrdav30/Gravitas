@@ -65,6 +65,7 @@ public class StiffBody : IRecordable
     private int _continuousCollisionFrameToken = int.MinValue;
     private Vector3d _continuousCollisionFrameStart;
     private Vector3d _continuousCollisionFrameDisplacement;
+    private FixedQuaternion _continuousCollisionFrameRotation;
 
     /// <summary>
     /// Selects the deterministic tunneling guard used when this body commits frame movement.
@@ -182,6 +183,8 @@ public class StiffBody : IRecordable
     private readonly SwiftList<PhysicsMixedHit> _continuousMixedCollisionHits = new();
     private readonly ContactManifold _rotationalContinuousCollisionManifold = new();
     private readonly SweptSphereQueryWorker _shapeExactContinuousSweepWorker = new();
+    private readonly ConvexSweepQueryWorker _shapeExactContinuousConvexSweepWorker = new();
+    private static readonly Fixed64 ShapeExactContinuousContactSlop = Fixed64.FromFraction(1, 2048);
 
     public Fixed64 StepOffset = (Fixed64)0.5f;
 
@@ -667,6 +670,12 @@ public class StiffBody : IRecordable
         get => _continuousCollisionFrameDisplacement;
     }
 
+    internal FixedQuaternion ContinuousCollisionFrameRotation
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => _continuousCollisionFrameRotation;
+    }
+
     internal void EnsureContinuousCollisionFramePrepared(int token)
     {
         if (_continuousCollisionFrameToken == token)
@@ -675,6 +684,7 @@ public class StiffBody : IRecordable
         _continuousCollisionFrameToken = token;
         _continuousCollisionFrameStart = Position3d;
         _continuousCollisionFrameDisplacement = PredictContinuousCollisionDisplacement();
+        _continuousCollisionFrameRotation = Rotation;
     }
 
     private Vector3d PredictContinuousCollisionDisplacement()
@@ -754,7 +764,7 @@ public class StiffBody : IRecordable
 
         Vector3d resolvedPosition = kinematicPosition;
         FixedQuaternion resolvedRotation = kinematicRotation;
-        CaptureKinematicContinuousCollisionFrame(startPosition, kinematicPosition);
+        CaptureKinematicContinuousCollisionFrame(startPosition, kinematicPosition, startRotation);
         TryResolveKinematicContinuousCollision(startPosition, ref resolvedPosition);
         TryResolveKinematicRotationalContinuousCollision(startPosition, ref resolvedPosition, startRotation, ref resolvedRotation);
 
@@ -771,11 +781,15 @@ public class StiffBody : IRecordable
         SetVisualRotation(resolvedRotation);
     }
 
-    private void CaptureKinematicContinuousCollisionFrame(Vector3d startPosition, Vector3d targetPosition)
+    private void CaptureKinematicContinuousCollisionFrame(
+        Vector3d startPosition,
+        Vector3d targetPosition,
+        FixedQuaternion startRotation)
     {
         _continuousCollisionFrameToken = Context.LateSimulateToken;
         _continuousCollisionFrameStart = startPosition;
         _continuousCollisionFrameDisplacement = targetPosition - startPosition;
+        _continuousCollisionFrameRotation = startRotation;
     }
 
     private bool TryResolveKinematicContinuousCollision(Vector3d startPosition, ref Vector3d proposedPosition)
@@ -923,14 +937,16 @@ public class StiffBody : IRecordable
             }
 
             target.EnsureContinuousCollisionFramePrepared(token);
+            Vector3d targetStart = target.ContinuousCollisionFrameStart;
+            Vector3d targetDisplacement = target.ContinuousCollisionFrameDisplacement;
             Fixed64 targetRadius = ResolveContinuousCollisionProxyRadius(target.Collider);
             if (targetRadius <= Fixed64.Epsilon
                 || !ContinuousCollisionMath.TrySweepRelativeSpheres(
                     startPosition,
                     sourceDisplacement,
                     proxyRadius,
-                    target.ContinuousCollisionFrameStart,
-                    target.ContinuousCollisionFrameDisplacement,
+                    targetStart,
+                    targetDisplacement,
                     targetRadius,
                     out Fixed64 normalizedTime,
                     out Vector3d normal,
@@ -938,6 +954,25 @@ public class StiffBody : IRecordable
             {
                 continue;
             }
+
+            if (TryGetExactDynamicRelativeContinuousCollisionHit(
+                    target,
+                    startPosition,
+                    sourceDisplacement,
+                    targetStart,
+                    targetDisplacement,
+                    sourceLength,
+                    out Physics3DHit exactHit,
+                    out _,
+                    out bool exactSupported))
+            {
+                normal = exactHit.Normal;
+                normalizedTime = sourceLength > Fixed64.Epsilon
+                    ? FixedMath.Clamp01(exactHit.Distance / sourceLength)
+                    : normalizedTime;
+            }
+            else if (exactSupported)
+                continue;
 
             Fixed64 distance = sourceLength * normalizedTime;
             if (distance > maxDistance)
@@ -1807,13 +1842,38 @@ public class StiffBody : IRecordable
     {
         refined = default;
         exactSupported = false;
-        if (candidate.Collider is not LSSphereCollider targetSphere
-            || displacement.MagnitudeSquared <= Fixed64.Epsilon)
-        {
+        LSCollider? target = candidate.Collider;
+        if (target == null || displacement.MagnitudeSquared <= Fixed64.Epsilon)
             return false;
-        }
+
+        if (Collider is LSSphereCollider)
+            return false;
+
+        if (target is LSSphereCollider targetSphere)
+            return TryRefineContinuousCollisionAgainstTargetSphere(targetSphere, displacement, direction, out refined, out exactSupported);
+
+        if (!IsExactConvexSourceSupported(Collider))
+            return false;
 
         exactSupported = true;
+        PrepareExactConvexSourceSweep(displacement);
+        if (!_shapeExactContinuousConvexSweepWorker.TrySweepPreparedSource(target, out Physics3DHit convexHit))
+            return false;
+
+        refined = ApplyShapeExactContinuousContactSlop(convexHit);
+        return true;
+    }
+
+    private bool TryRefineContinuousCollisionAgainstTargetSphere(
+        LSSphereCollider targetSphere,
+        Vector3d displacement,
+        Vector3d direction,
+        out Physics3DHit refined,
+        out bool exactSupported)
+    {
+        exactSupported = true;
+        refined = default;
+
         Vector3d reverseStart = targetSphere.Center;
         Vector3d reverseEnd = targetSphere.Center - displacement;
         _shapeExactContinuousSweepWorker.Prepare(reverseStart, reverseEnd, targetSphere.ScaledRadius);
@@ -1827,6 +1887,55 @@ public class StiffBody : IRecordable
             : -direction;
         Vector3d point = targetSphere.Center + normal * targetSphere.ScaledRadius;
         refined = new Physics3DHit(targetSphere, point, normal, distance, direction);
+        return true;
+    }
+
+    private static Physics3DHit ApplyShapeExactContinuousContactSlop(Physics3DHit hit)
+    {
+        Fixed64 distance = hit.Distance > ShapeExactContinuousContactSlop
+            ? hit.Distance - ShapeExactContinuousContactSlop
+            : Fixed64.Zero;
+        return new Physics3DHit(hit.Collider, hit.Point, hit.Normal, distance, hit.Direction);
+    }
+
+    private void PrepareExactConvexSourceSweep(Vector3d displacement)
+    {
+        switch (Collider)
+        {
+            case LSMeshCollider mesh:
+                _shapeExactContinuousConvexSweepWorker.PrepareConvexMeshSource(mesh, displacement);
+                return;
+            case LSCompoundCollider compound:
+                _shapeExactContinuousConvexSweepWorker.PrepareCompoundSource(compound, displacement);
+                return;
+            default:
+                _shapeExactContinuousConvexSweepWorker.PreparePrimitiveSource(Collider, displacement);
+                return;
+        }
+    }
+
+    private static bool IsExactConvexSourceSupported(LSCollider collider)
+    {
+        return collider switch
+        {
+            LSSphereCollider => true,
+            LSCapsuleCollider => true,
+            LSCuboidCollider => true,
+            LSCylinderCollider => true,
+            LSMeshCollider { Mode: MeshColliderMode.Convex } => true,
+            LSCompoundCollider compound => AreExactConvexCompoundPartsSupported(compound),
+            _ => false
+        };
+    }
+
+    private static bool AreExactConvexCompoundPartsSupported(LSCompoundCollider compound)
+    {
+        for (int i = 0; i < compound.PartCount; i++)
+        {
+            if (!IsExactConvexSourceSupported(compound.GetPartCollider(i)))
+                return false;
+        }
+
         return true;
     }
 
@@ -1892,11 +2001,34 @@ public class StiffBody : IRecordable
                 continue;
             }
 
-            Fixed64 distance = sourceLength * normalizedTime;
-            Vector3d sourceCenter = startPosition + sourceDisplacement * normalizedTime;
-            Vector3d targetCenter = targetStart + targetDisplacement * normalizedTime;
-            Vector3d point = ResolveDynamicContactPoint(sourceCenter, targetCenter, normal, targetRadius);
-            var candidate = new Physics3DHit(target.Collider, point, normal, distance, sourceDirection);
+            Physics3DHit candidate;
+            if (TryGetExactDynamicRelativeContinuousCollisionHit(
+                    target,
+                    startPosition,
+                    sourceDisplacement,
+                    targetStart,
+                    targetDisplacement,
+                    sourceLength,
+                    out Physics3DHit exactHit,
+                    out Fixed64 exactClosingSpeed,
+                    out bool exactSupported))
+            {
+                candidate = exactHit;
+                candidateClosingSpeed = exactClosingSpeed;
+            }
+            else if (exactSupported)
+            {
+                continue;
+            }
+            else
+            {
+                Fixed64 distance = sourceLength * normalizedTime;
+                Vector3d sourceCenter = startPosition + sourceDisplacement * normalizedTime;
+                Vector3d targetCenter = targetStart + targetDisplacement * normalizedTime;
+                Vector3d point = ResolveDynamicContactPoint(sourceCenter, targetCenter, normal, targetRadius);
+                candidate = new Physics3DHit(target.Collider, point, normal, distance, sourceDirection);
+            }
+
             if (!ShouldReplaceContinuousCollisionHit(candidate, candidateClosingSpeed, true, found, best, bestClosingSpeed))
                 continue;
 
@@ -1908,6 +2040,161 @@ public class StiffBody : IRecordable
         hit = best;
         closingSpeed = bestClosingSpeed;
         return found;
+    }
+
+    private bool TryGetExactDynamicRelativeContinuousCollisionHit(
+        StiffBody target,
+        Vector3d sourceStart,
+        Vector3d sourceDisplacement,
+        Vector3d targetStart,
+        Vector3d targetDisplacement,
+        Fixed64 sourceLength,
+        out Physics3DHit hit,
+        out Fixed64 closingSpeed,
+        out bool exactSupported)
+    {
+        hit = default;
+        closingSpeed = Fixed64.Zero;
+        exactSupported = false;
+
+        Vector3d relativeDisplacement = sourceDisplacement - targetDisplacement;
+        Fixed64 relativeLength = relativeDisplacement.Magnitude;
+        if (relativeLength <= Fixed64.Epsilon || sourceLength <= Fixed64.Epsilon)
+            return false;
+
+        Vector3d relativeDirection = relativeDisplacement / relativeLength;
+        Vector3d sourceDirection = sourceDisplacement / sourceLength;
+        Vector3d originalSourcePosition = Position3d;
+        FixedQuaternion originalSourceRotation = Rotation;
+        bool originalSourcePositionMutated = _positionMutated;
+        bool originalSourceRotationMutated = _rotationMutated;
+        Vector3d originalTargetPosition = target.Position3d;
+        FixedQuaternion originalTargetRotation = target.Rotation;
+        bool originalTargetPositionMutated = target._positionMutated;
+        bool originalTargetRotationMutated = target._rotationMutated;
+
+        try
+        {
+            Position3d = sourceStart;
+            target.Position3d = targetStart;
+            target.Rotation = target.ContinuousCollisionFrameRotation;
+            Collider.RebuildRuntimeShapeOnly(refreshMassProperties: false);
+            target.Collider.RebuildRuntimeShapeOnly(refreshMassProperties: false);
+
+            Physics3DHit relativeHit;
+            if (Collider is LSSphereCollider sourceSphere)
+            {
+                exactSupported = true;
+                if (!TrySweepRelativeSourceSphere(sourceSphere, target.Collider, relativeDisplacement, relativeDirection, out relativeHit))
+                    return false;
+            }
+            else if (target.Collider is LSSphereCollider targetSphere)
+            {
+                if (!TryRefineContinuousCollisionAgainstTargetSphere(targetSphere, relativeDisplacement, relativeDirection, out relativeHit, out exactSupported))
+                    return false;
+            }
+            else if (IsExactConvexSourceSupported(Collider))
+            {
+                exactSupported = true;
+                PrepareExactConvexSourceSweep(relativeDisplacement);
+                if (!_shapeExactContinuousConvexSweepWorker.TrySweepPreparedSource(target.Collider, out Physics3DHit convexHit))
+                    return false;
+
+                relativeHit = ApplyShapeExactContinuousContactSlop(convexHit);
+            }
+            else
+            {
+                return false;
+            }
+
+            closingSpeed = -Vector3d.Dot(relativeDisplacement, relativeHit.Normal);
+            if (closingSpeed <= Fixed64.Epsilon)
+                return false;
+
+            Fixed64 normalizedTime = FixedMath.Clamp01(relativeHit.Distance / relativeLength);
+            hit = new Physics3DHit(
+                target.Collider,
+                relativeHit.Point + targetDisplacement * normalizedTime,
+                relativeHit.Normal,
+                sourceLength * normalizedTime,
+                sourceDirection);
+            return true;
+        }
+        finally
+        {
+            Position3d = originalSourcePosition;
+            Rotation = originalSourceRotation;
+            target.Position3d = originalTargetPosition;
+            target.Rotation = originalTargetRotation;
+            target.Collider.RebuildRuntimeShapeOnly(refreshMassProperties: false);
+            Collider.RebuildRuntimeShapeOnly(refreshMassProperties: false);
+            target._positionMutated = originalTargetPositionMutated;
+            target._rotationMutated = originalTargetRotationMutated;
+            _positionMutated = originalSourcePositionMutated;
+            _rotationMutated = originalSourceRotationMutated;
+        }
+    }
+
+    private bool TrySweepRelativeSourceSphere(
+        LSSphereCollider sourceSphere,
+        LSCollider target,
+        Vector3d relativeDisplacement,
+        Vector3d relativeDirection,
+        out Physics3DHit hit)
+    {
+        hit = default;
+        _shapeExactContinuousSweepWorker.Prepare(
+            sourceSphere.Center,
+            sourceSphere.Center + relativeDisplacement,
+            sourceSphere.ScaledRadius);
+        if (!_shapeExactContinuousSweepWorker.TrySweep(target, out Vector3d sphereCenterAtImpact, out Fixed64 distance))
+            return false;
+
+        Vector3d point = ResolveSweptSphereContinuousPoint(target, sphereCenterAtImpact, relativeDirection);
+        Vector3d normal = ResolveSweptSphereContinuousNormal(target, point, sphereCenterAtImpact, relativeDirection);
+        hit = new Physics3DHit(target, point, normal, distance, relativeDirection);
+        return true;
+    }
+
+    private static Vector3d ResolveSweptSphereContinuousPoint(
+        LSCollider target,
+        Vector3d sphereCenterAtImpact,
+        Vector3d direction)
+    {
+        Vector3d centerDelta = sphereCenterAtImpact - target.Center;
+        if (centerDelta.MagnitudeSquared <= Fixed64.Epsilon)
+            return target.Center - direction * target.ScaledRadius;
+
+        return target.ClosestPointOnSurface(sphereCenterAtImpact);
+    }
+
+    private static Vector3d ResolveSweptSphereContinuousNormal(
+        LSCollider target,
+        Vector3d point,
+        Vector3d sphereCenterAtImpact,
+        Vector3d direction)
+    {
+        Vector3d fromPointToSphereCenter = sphereCenterAtImpact - point;
+        if ((target is LSCuboidCollider || target is LSCylinderCollider)
+            && fromPointToSphereCenter.MagnitudeSquared > Fixed64.Epsilon)
+        {
+            return fromPointToSphereCenter.Normalized;
+        }
+
+        Vector3d normal = target.GetNormalAtPoint(point);
+        if (normal.MagnitudeSquared > Fixed64.Epsilon)
+        {
+            normal = normal.Normalized;
+            if (target is LSMeshCollider && Vector3d.Dot(normal, direction) > Fixed64.Zero)
+                return -normal;
+
+            return normal;
+        }
+
+        if (fromPointToSphereCenter.MagnitudeSquared > Fixed64.Epsilon)
+            return fromPointToSphereCenter.Normalized;
+
+        return direction.MagnitudeSquared > Fixed64.Epsilon ? -direction.Normalized : Vector3d.Zero;
     }
 
     private bool TryGetFirstDynamicMixedContinuousCollisionHit(
@@ -2258,23 +2545,53 @@ public class StiffBody : IRecordable
         {
             for (int step = 1; step <= stepCount; step++)
             {
+                Fixed64 lowerTime = (Fixed64)(step - 1) / (Fixed64)stepCount;
                 Fixed64 sampleTime = (Fixed64)step / (Fixed64)stepCount;
-                Position3d = startPosition + displacement * sampleTime;
-                Rotation = IntegrateAngularRotation(startRotation, Context.DeltaTime * sampleTime);
-                Collider.RebuildRuntimeShapeOnly(refreshMassProperties: false);
+                bool foundSampleHit = false;
+                Fixed64 bestSafeTime = Fixed64.Zero;
+                int bestTargetId = int.MaxValue;
+                Vector3d bestContactNormal = Vector3d.Zero;
 
                 for (int hitIndex = 0; hitIndex < hitCount; hitIndex++)
                 {
+                    SampleDynamicRotationalContinuousPose(startPosition, displacement, startRotation, sampleTime);
                     LSCollider? target = _continuousCollisionHits[hitIndex].Collider;
                     if (!TrySampleRotationalContinuousCollision(target, out Vector3d contactNormal))
                         continue;
 
-                    Fixed64 safeTime = (Fixed64)(step - 1) / (Fixed64)stepCount;
-                    proposedPosition = startPosition + displacement * safeTime;
-                    proposedRotation = IntegrateAngularRotation(startRotation, Context.DeltaTime * safeTime);
-                    StopRotationalContinuousCollision(contactNormal);
-                    return true;
+                    LSCollider targetCollider = target!;
+                    Fixed64 safeTime = RefineDynamicRotationalContinuousCollisionSafeTime(
+                        targetCollider,
+                        startPosition,
+                        displacement,
+                        startRotation,
+                        lowerTime,
+                        sampleTime,
+                        contactNormal,
+                        out Vector3d refinedNormal);
+                    if (!ShouldReplaceRotationalContinuousCollisionHit(
+                            safeTime,
+                            targetCollider.Id,
+                            foundSampleHit,
+                            bestSafeTime,
+                            bestTargetId))
+                    {
+                        continue;
+                    }
+
+                    foundSampleHit = true;
+                    bestSafeTime = safeTime;
+                    bestTargetId = targetCollider.Id;
+                    bestContactNormal = refinedNormal;
                 }
+
+                if (!foundSampleHit)
+                    continue;
+
+                proposedPosition = startPosition + displacement * bestSafeTime;
+                proposedRotation = IntegrateAngularRotation(startRotation, Context.DeltaTime * bestSafeTime);
+                StopRotationalContinuousCollision(bestContactNormal);
+                return true;
             }
         }
         finally
@@ -2336,6 +2653,7 @@ public class StiffBody : IRecordable
         if (stepCount <= 0)
             return false;
 
+        FixedQuaternion targetRotation = proposedRotation;
         Vector3d originalPosition = Position3d;
         FixedQuaternion originalRotation = Rotation;
         bool originalPositionMutated = _positionMutated;
@@ -2344,23 +2662,52 @@ public class StiffBody : IRecordable
         {
             for (int step = 1; step <= stepCount; step++)
             {
+                Fixed64 lowerTime = (Fixed64)(step - 1) / (Fixed64)stepCount;
                 Fixed64 sampleTime = (Fixed64)step / (Fixed64)stepCount;
-                Position3d = startPosition + displacement * sampleTime;
-                Rotation = FixedQuaternion.Slerp(startRotation, proposedRotation, sampleTime).Normalized;
-                Collider.RebuildRuntimeShapeOnly(refreshMassProperties: false);
+                bool foundSampleHit = false;
+                Fixed64 bestSafeTime = Fixed64.Zero;
+                int bestTargetId = int.MaxValue;
 
                 for (int hitIndex = 0; hitIndex < hitCount; hitIndex++)
                 {
+                    SampleKinematicRotationalContinuousPose(startPosition, displacement, startRotation, targetRotation, sampleTime);
                     LSCollider? target = _continuousCollisionHits[hitIndex].Collider;
-                    if (!TrySampleRotationalContinuousCollision(target, out _))
+                    if (!TrySampleRotationalContinuousCollision(target, out Vector3d contactNormal))
                         continue;
 
-                    Fixed64 safeTime = (Fixed64)(step - 1) / (Fixed64)stepCount;
-                    proposedPosition = startPosition + displacement * safeTime;
-                    proposedRotation = FixedQuaternion.Slerp(startRotation, proposedRotation, safeTime).Normalized;
-                    LastContinuousCollisionSubstepCount++;
-                    return true;
+                    LSCollider targetCollider = target!;
+                    Fixed64 safeTime = RefineKinematicRotationalContinuousCollisionSafeTime(
+                        targetCollider,
+                        startPosition,
+                        displacement,
+                        startRotation,
+                        targetRotation,
+                        lowerTime,
+                        sampleTime,
+                        contactNormal,
+                        out _);
+                    if (!ShouldReplaceRotationalContinuousCollisionHit(
+                            safeTime,
+                            targetCollider.Id,
+                            foundSampleHit,
+                            bestSafeTime,
+                            bestTargetId))
+                    {
+                        continue;
+                    }
+
+                    foundSampleHit = true;
+                    bestSafeTime = safeTime;
+                    bestTargetId = targetCollider.Id;
                 }
+
+                if (!foundSampleHit)
+                    continue;
+
+                proposedPosition = startPosition + displacement * bestSafeTime;
+                proposedRotation = FixedQuaternion.Slerp(startRotation, targetRotation, bestSafeTime).Normalized;
+                LastContinuousCollisionSubstepCount++;
+                return true;
             }
         }
         finally
@@ -2373,6 +2720,111 @@ public class StiffBody : IRecordable
         }
 
         return false;
+    }
+
+    private void SampleDynamicRotationalContinuousPose(
+        Vector3d startPosition,
+        Vector3d displacement,
+        FixedQuaternion startRotation,
+        Fixed64 sampleTime)
+    {
+        Position3d = startPosition + displacement * sampleTime;
+        Rotation = IntegrateAngularRotation(startRotation, Context.DeltaTime * sampleTime);
+        Collider.RebuildRuntimeShapeOnly(refreshMassProperties: false);
+    }
+
+    private void SampleKinematicRotationalContinuousPose(
+        Vector3d startPosition,
+        Vector3d displacement,
+        FixedQuaternion startRotation,
+        FixedQuaternion targetRotation,
+        Fixed64 sampleTime)
+    {
+        Position3d = startPosition + displacement * sampleTime;
+        Rotation = FixedQuaternion.Slerp(startRotation, targetRotation, sampleTime).Normalized;
+        Collider.RebuildRuntimeShapeOnly(refreshMassProperties: false);
+    }
+
+    private Fixed64 RefineDynamicRotationalContinuousCollisionSafeTime(
+        LSCollider target,
+        Vector3d startPosition,
+        Vector3d displacement,
+        FixedQuaternion startRotation,
+        Fixed64 lowerTime,
+        Fixed64 upperTime,
+        Vector3d upperContactNormal,
+        out Vector3d contactNormal)
+    {
+        Fixed64 safeTime = lowerTime;
+        Fixed64 hitTime = upperTime;
+        contactNormal = upperContactNormal;
+
+        for (int iteration = 0; iteration < ContinuousCollisionMath.RotationalToiRefinementIterations; iteration++)
+        {
+            Fixed64 sampleTime = (safeTime + hitTime) * Fixed64.Half;
+            SampleDynamicRotationalContinuousPose(startPosition, displacement, startRotation, sampleTime);
+            if (TrySampleRotationalContinuousCollision(target, out Vector3d sampleContactNormal))
+            {
+                hitTime = sampleTime;
+                contactNormal = sampleContactNormal;
+            }
+            else
+            {
+                safeTime = sampleTime;
+            }
+        }
+
+        return safeTime;
+    }
+
+    private Fixed64 RefineKinematicRotationalContinuousCollisionSafeTime(
+        LSCollider target,
+        Vector3d startPosition,
+        Vector3d displacement,
+        FixedQuaternion startRotation,
+        FixedQuaternion targetRotation,
+        Fixed64 lowerTime,
+        Fixed64 upperTime,
+        Vector3d upperContactNormal,
+        out Vector3d contactNormal)
+    {
+        Fixed64 safeTime = lowerTime;
+        Fixed64 hitTime = upperTime;
+        contactNormal = upperContactNormal;
+
+        for (int iteration = 0; iteration < ContinuousCollisionMath.RotationalToiRefinementIterations; iteration++)
+        {
+            Fixed64 sampleTime = (safeTime + hitTime) * Fixed64.Half;
+            SampleKinematicRotationalContinuousPose(startPosition, displacement, startRotation, targetRotation, sampleTime);
+            if (TrySampleRotationalContinuousCollision(target, out Vector3d sampleContactNormal))
+            {
+                hitTime = sampleTime;
+                contactNormal = sampleContactNormal;
+            }
+            else
+            {
+                safeTime = sampleTime;
+            }
+        }
+
+        return safeTime;
+    }
+
+    private static bool ShouldReplaceRotationalContinuousCollisionHit(
+        Fixed64 candidateSafeTime,
+        int candidateTargetId,
+        bool hasCurrent,
+        Fixed64 currentSafeTime,
+        int currentTargetId)
+    {
+        if (!hasCurrent)
+            return true;
+
+        int timeCompare = candidateSafeTime.CompareTo(currentSafeTime);
+        if (timeCompare != 0)
+            return timeCompare < 0;
+
+        return candidateTargetId < currentTargetId;
     }
 
     private static Fixed64 ResolveKinematicAngularDistanceRadians(FixedQuaternion startRotation, FixedQuaternion proposedRotation)

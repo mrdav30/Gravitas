@@ -393,6 +393,6 @@ correctness, deferred work, and performance follow-up.
   corrected the penetration-depth calculation for that path.
 
 No additional untracked deferred work remained in this plan. CCD service-level
-island timing, exact angular TOI/polytope support, mixed swept-shape query
-fallbacks, and lower-stack allocation-free sorting are already captured by the
-active feature-work backlog/plans.
+island timing, completed exact CCD reducer work, mixed swept-shape query
+fallback closure, and lower-stack allocation-free sorting are already captured
+by feature-work backlog/plans or completed feature-work records.

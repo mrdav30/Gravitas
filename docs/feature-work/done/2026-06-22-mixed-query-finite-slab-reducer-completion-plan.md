@@ -42,7 +42,7 @@ does not carry hidden follow-up work.
 - [`2026-06-21-query-and-mixed-swept-shape-hardening-plan.md`](2026-06-21-query-and-mixed-swept-shape-hardening-plan.md)
   established public query parity, convex source APIs, fallback labels, query
   diagnostics, and release validation.
-- [`2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md`](../2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md)
+- [`2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md`](2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md)
   owns broader CCD exact time-of-impact promotion. CCD should consume reducers
   produced here instead of duplicating mixed query math.
 - [`benchmark-signal-hardening-backlog.md`](../benchmark-signal-hardening-backlog.md)

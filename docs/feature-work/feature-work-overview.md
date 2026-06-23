@@ -20,23 +20,26 @@ with evidence.
 These plans and evergreen closure trackers should be completed, or explicitly
 closed with evidence, before the alpha release.
 
-1. [`CCD Exact TOI And Shape Reducers`](2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md)
-   - Remaining conservative reductions should become exact where the correctness
-     gain justifies the cost, with deterministic fallback policy for unsupported
-     shape families.
-2. [`CCD Service-Level Island Solver`](2026-06-21-ccd-service-level-island-solver-plan.md)
+1. [`CCD Service-Level Island Solver`](2026-06-21-ccd-service-level-island-solver-plan.md)
    - Dense, chained, same-TOI, and mixed continuous contacts need a deterministic
      service-level model where body-owned substeps are insufficient.
-3. [`Benchmark Signal Hardening Backlog`](benchmark-signal-hardening-backlog.md)
+2. [`Benchmark Signal Hardening Backlog`](benchmark-signal-hardening-backlog.md)
    - Measured allocation or runtime-cost signals must be reproduced, resolved,
      or closed with a no-change decision before alpha.
-4. [`Feature Work Issue Tracker`](issue-tracker.md)
+3. [`Feature Work Issue Tracker`](issue-tracker.md)
    - Bugs, correctness risks, documentation defects, and feature-work-discovered
      issues should be triaged, tested, and committed independently from feature
      design plans.
 
 ## Recently Completed
 
+- [`CCD Exact TOI And Shape Reducers`](done/2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md)
+  - Completed 2026-06-23. Body-owned CCD now refines static-style 3D
+    non-sphere targets with supported convex-source reducers, bracketed
+    rotational CCD with fixed-iteration exact narrow-phase bisection, and pure
+    2D/3D dynamic relative proxy candidates with exact mover-shape validation
+    where supported. Mixed dynamic CCD remains in the service-level island
+    plan for cross-dimension advancement and velocity handoff.
 - [`CCD Active Swept Sources`](done/2026-06-21-ccd-active-swept-sources-plan.md)
   - Completed 2026-06-23. Host-driven kinematic 2D/3D translation and rotation
     now run as active CCD sources; static-style blockers clip the source,
@@ -81,11 +84,10 @@ first alpha release.
 
 ## Recommended Execution Order
 
-1. CCD exact TOI and shape reducers.
-2. CCD service-level island solver.
-3. Benchmark signal closure pass.
+1. CCD service-level island solver.
+2. Benchmark signal closure pass.
 
-This order now focuses on CCD precision and island-level behavior after public
-mixed query fallback directions and active kinematic source coverage were
-closed. Benchmark signals remain a closure pass so measured hot-path risks do
-not survive into alpha.
+This order now focuses on island-level CCD behavior after public mixed query
+fallback directions, active kinematic source coverage, and exact body-owned CCD
+reducers were closed. Benchmark signals remain a closure pass so measured
+hot-path risks do not survive into alpha.

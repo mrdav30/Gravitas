@@ -230,6 +230,34 @@ public class DynamicCcdScalingBenchmarks
     }
 
     [Benchmark(OperationsPerInvoke = PureBatchFrames)]
+    public Vector3d SparsePure3DDynamicShapeExactCcdFalsePositiveBatch8()
+    {
+        Vector3d total = Vector3d.Zero;
+        for (int i = 0; i < PureBatchFrames; i++)
+        {
+            Reset3DDynamicShapeExactBodies(_fixture.DynamicShapeExact3DBodies, _fixture.DynamicShapeExact3DPositions);
+            _fixture.DynamicShapeExact3DContext.LateSimulate();
+            total += Sum3D(_fixture.DynamicShapeExact3DBodies);
+        }
+
+        return total;
+    }
+
+    [Benchmark(OperationsPerInvoke = PureBatchFrames)]
+    public Vector2d SparsePure2DDynamicShapeExactCcdFalsePositiveBatch8()
+    {
+        Vector2d total = Vector2d.Zero;
+        for (int i = 0; i < PureBatchFrames; i++)
+        {
+            Reset2DDynamicShapeExactBodies(_fixture.DynamicShapeExact2DBodies, _fixture.DynamicShapeExact2DPositions);
+            _fixture.DynamicShapeExact2DContext.LateSimulate();
+            total += Sum2D(_fixture.DynamicShapeExact2DBodies);
+        }
+
+        return total;
+    }
+
+    [Benchmark(OperationsPerInvoke = PureBatchFrames)]
     public int SparsePure3DStaticQueryBatch8()
     {
         int total = 0;

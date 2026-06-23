@@ -231,6 +231,31 @@ public sealed class ContinuousCollision2DTests
     }
 
     [Fact]
+    public void ContinuousMode_DynamicRelativePath_ShouldNotClampThinAabbWhenProxyCirclesHitButShapesMiss()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        StiffBody2D blade = CreateBody(
+            context,
+            new LSAABBoxCollider2D(new Vector2d((Fixed64)6, Fixed64.FromFraction(1, 5))),
+            Vector2d.Zero,
+            immovable: false);
+        StiffBody2D target = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.FromFraction(1, 4)),
+            new Vector2d((Fixed64)4, Fixed64.FromFraction(5, 2)),
+            immovable: false);
+        target.Sleep();
+        blade.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        target.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+
+        blade.AddForce(new Vector2d((Fixed64)10, Fixed64.Zero));
+        context.LateSimulate();
+
+        blade.Position.X.Should().Be((Fixed64)10);
+        blade.LinearVelocity.X.Should().Be((Fixed64)10);
+    }
+
+    [Fact]
     public void ContinuousMode_StaticCollector_ShouldSkipMovableDynamicTargets()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);
@@ -382,6 +407,31 @@ public sealed class ContinuousCollision2DTests
         context.LateSimulate();
 
         blade.Rotation.Should().BeLessThan(FixedMath.DegToRad((Fixed64)90));
+        blade.AngularVelocity.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void ContinuousMode_ShouldRefineRotatingThinPolygonAngularToiBeyondPreviousSample()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        var bladeCollider = new LSPolygonCollider2D(
+            new Vector2d((Fixed64)(-3), Fixed64.FromFraction(-1, 10)),
+            new Vector2d((Fixed64)3, Fixed64.FromFraction(-1, 10)),
+            new Vector2d((Fixed64)3, Fixed64.FromFraction(1, 10)),
+            new Vector2d((Fixed64)(-3), Fixed64.FromFraction(1, 10)));
+        StiffBody2D blade = CreateBody(context, bladeCollider, Vector2d.Zero, immovable: false);
+        _ = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.FromFraction(1, 4)),
+            new Vector2d(Fixed64.FromFraction(29, 10), Fixed64.FromFraction(13, 20)),
+            immovable: true);
+        blade.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+
+        Fixed64 angularVelocity = FixedMath.DegToRad((Fixed64)90);
+        blade.AddAngularImpulse(angularVelocity / blade.EffectiveInverseMomentOfInertia);
+        context.LateSimulate();
+
+        blade.Rotation.Should().BeGreaterThan(FixedMath.DegToRad((Fixed64)1));
         blade.AngularVelocity.Should().Be(Fixed64.Zero);
     }
 

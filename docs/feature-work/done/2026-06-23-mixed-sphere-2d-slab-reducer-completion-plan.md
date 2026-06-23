@@ -49,7 +49,7 @@ instead of being buried in the completed mixed swept-circle reducer plan.
 - [`2026-06-21-query-and-mixed-swept-shape-hardening-plan.md`](2026-06-21-query-and-mixed-swept-shape-hardening-plan.md)
   established public mixed query labels, query diagnostics, and convex source
   API boundaries.
-- [`2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md`](../2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md)
+- [`2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md`](2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md)
   owns broader continuous-collision exact TOI promotion. This plan should feed
   mixed static 3D-sphere-against-2D reducer policy into CCD, but it does not own
   dynamic mixed CCD island or relative-motion design.

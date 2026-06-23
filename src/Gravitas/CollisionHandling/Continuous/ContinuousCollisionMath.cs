@@ -13,6 +13,7 @@ namespace Gravitas.CollisionHandling;
 internal static class ContinuousCollisionMath
 {
     private const int MaxRotationalSubsteps = 16;
+    public const int RotationalToiRefinementIterations = 12;
     private static readonly Fixed64 MaxRotationalStepRadians = FixedMath.DegToRad((Fixed64)15);
 
     public static int ResolveRotationalSubstepCount(Fixed64 angularDisplacement)

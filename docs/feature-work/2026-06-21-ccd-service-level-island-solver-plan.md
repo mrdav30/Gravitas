@@ -27,6 +27,8 @@ advanced, resolved, and continued under one deterministic ordering contract.
 
 - Each body resolves its own continuous hits during `LateSimulate`.
 - Dynamic target prediction is segment-aware for body-owned substeps.
+- Supported pure 2D and pure 3D dynamic candidates use exact relative
+  mover-shape reducers after conservative proxy candidate gathering.
 - Same-frame sliding through multiple static contacts is supported within a
   bounded per-body substep budget.
 - Mixed candidates can be compared, but mixed-specific island response is not

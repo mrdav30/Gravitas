@@ -33,7 +33,7 @@ and known not to create false negatives.
 
 ## Relationship To Existing Plans
 
-- [`2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md`](../2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md)
+- [`2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md`](2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md)
   owns exact CCD reducer promotion for continuous-collision internals.
 - This plan owns public query API shape, pure 2D query parity, mixed finite-slab
   swept-circle exactness, and primitive/convex mesh/compound source query

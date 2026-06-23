@@ -31,6 +31,12 @@ internal sealed class ContinuousCollisionBenchmarkFixture : IDisposable
         ShapeExact2DContext = ContinuousCollisionBenchmarkSupport.CreateContext2D(
             ContinuousCollisionBenchmarkLayout.SparseExtentX(bodyCount),
             ContinuousCollisionBenchmarkLayout.SparseExtentZ(bodyCount) + 8);
+        DynamicShapeExact3DContext = ContinuousCollisionBenchmarkSupport.CreateContext3D(
+            ContinuousCollisionBenchmarkLayout.SparseExtentX(bodyCount),
+            ContinuousCollisionBenchmarkLayout.SparseExtentZ(bodyCount) + 8);
+        DynamicShapeExact2DContext = ContinuousCollisionBenchmarkSupport.CreateContext2D(
+            ContinuousCollisionBenchmarkLayout.SparseExtentX(bodyCount),
+            ContinuousCollisionBenchmarkLayout.SparseExtentZ(bodyCount) + 8);
         SparseMixedContext = ContinuousCollisionBenchmarkSupport.CreateMixedContext(
             ContinuousCollisionBenchmarkLayout.SparseExtentX(mixedPerDimension),
             ContinuousCollisionBenchmarkLayout.MixedSparseOffsetZ + ContinuousCollisionBenchmarkLayout.SparseExtentZ(mixedPerDimension));
@@ -44,6 +50,8 @@ internal sealed class ContinuousCollisionBenchmarkFixture : IDisposable
         Dense2DBodies = new SwiftList<StiffBody2D>(bodyCount);
         ShapeExact3DBodies = new SwiftList<StiffBody>(bodyCount);
         ShapeExact2DBodies = new SwiftList<StiffBody2D>(bodyCount);
+        DynamicShapeExact3DBodies = new SwiftList<StiffBody>(bodyCount * 2);
+        DynamicShapeExact2DBodies = new SwiftList<StiffBody2D>(bodyCount * 2);
         SparseMixed3DBodies = new SwiftList<StiffBody>(mixedPerDimension);
         SparseMixed2DBodies = new SwiftList<StiffBody2D>(mixedPerDimension);
         DenseMixed3DBodies = new SwiftList<StiffBody>(mixedPerDimension);
@@ -58,6 +66,8 @@ internal sealed class ContinuousCollisionBenchmarkFixture : IDisposable
         Dense2DPositions = new Vector2d[bodyCount];
         ShapeExact3DPositions = new Vector3d[bodyCount];
         ShapeExact2DPositions = new Vector2d[bodyCount];
+        DynamicShapeExact3DPositions = new Vector3d[bodyCount * 2];
+        DynamicShapeExact2DPositions = new Vector2d[bodyCount * 2];
         SparseMixed3DPositions = new Vector3d[mixedPerDimension];
         SparseMixed2DPositions = new Vector2d[mixedPerDimension];
         DenseMixed3DPositions = new Vector3d[mixedPerDimension];
@@ -81,6 +91,10 @@ internal sealed class ContinuousCollisionBenchmarkFixture : IDisposable
 
     public GravitasWorldContext ShapeExact2DContext { get; }
 
+    public GravitasWorldContext DynamicShapeExact3DContext { get; }
+
+    public GravitasWorldContext DynamicShapeExact2DContext { get; }
+
     public GravitasWorldContext SparseMixedContext { get; }
 
     public GravitasWorldContext DenseMixedContext { get; }
@@ -96,6 +110,10 @@ internal sealed class ContinuousCollisionBenchmarkFixture : IDisposable
     public SwiftList<StiffBody> ShapeExact3DBodies { get; }
 
     public SwiftList<StiffBody2D> ShapeExact2DBodies { get; }
+
+    public SwiftList<StiffBody> DynamicShapeExact3DBodies { get; }
+
+    public SwiftList<StiffBody2D> DynamicShapeExact2DBodies { get; }
 
     public SwiftList<StiffBody> SparseMixed3DBodies { get; }
 
@@ -123,6 +141,10 @@ internal sealed class ContinuousCollisionBenchmarkFixture : IDisposable
 
     public Vector2d[] ShapeExact2DPositions { get; }
 
+    public Vector3d[] DynamicShapeExact3DPositions { get; }
+
+    public Vector2d[] DynamicShapeExact2DPositions { get; }
+
     public Vector3d[] SparseMixed3DPositions { get; }
 
     public Vector2d[] SparseMixed2DPositions { get; }
@@ -139,6 +161,8 @@ internal sealed class ContinuousCollisionBenchmarkFixture : IDisposable
         Dense2DContext.Dispose();
         ShapeExact3DContext.Dispose();
         ShapeExact2DContext.Dispose();
+        DynamicShapeExact3DContext.Dispose();
+        DynamicShapeExact2DContext.Dispose();
         SparseMixedContext.Dispose();
         DenseMixedContext.Dispose();
     }
@@ -164,12 +188,29 @@ internal sealed class ContinuousCollisionBenchmarkFixture : IDisposable
             ShapeExact2DPositions[i] = sparse2D;
             ShapeExact3DBodies.Add(ContinuousCollisionBenchmarkSupport.CreateThinCuboid3D(ShapeExact3DContext, sparse3D));
             ShapeExact2DBodies.Add(ContinuousCollisionBenchmarkSupport.CreateThinPolygon2D(ShapeExact2DContext, sparse2D));
-            ContinuousCollisionBenchmarkSupport.CreateStaticSphere3D(
+            ContinuousCollisionBenchmarkSupport.CreateStaticCuboid3D(
                 ShapeExact3DContext,
-                sparse3D + new Vector3d((Fixed64)4, Fixed64.FromFraction(5, 2), Fixed64.Zero));
+                sparse3D + new Vector3d((Fixed64)4, Fixed64.FromFraction(5, 2), Fixed64.Zero),
+                Vector3d.One);
             ContinuousCollisionBenchmarkSupport.CreateStaticCircle2D(
                 ShapeExact2DContext,
                 sparse2D + new Vector2d((Fixed64)4, Fixed64.FromFraction(5, 2)));
+
+            int dynamicShapeSourceIndex = i * 2;
+            int dynamicShapeTargetIndex = dynamicShapeSourceIndex + 1;
+            Vector3d dynamicSource3D = sparse3D;
+            Vector3d dynamicTarget3D = sparse3D + new Vector3d((Fixed64)4, Fixed64.FromFraction(5, 2), Fixed64.Zero);
+            DynamicShapeExact3DPositions[dynamicShapeSourceIndex] = dynamicSource3D;
+            DynamicShapeExact3DPositions[dynamicShapeTargetIndex] = dynamicTarget3D;
+            DynamicShapeExact3DBodies.Add(ContinuousCollisionBenchmarkSupport.CreateThinCuboid3D(DynamicShapeExact3DContext, dynamicSource3D));
+            DynamicShapeExact3DBodies.Add(ContinuousCollisionBenchmarkSupport.CreateSphere3D(DynamicShapeExact3DContext, dynamicTarget3D));
+
+            Vector2d dynamicSource = sparse2D;
+            Vector2d dynamicTarget = sparse2D + new Vector2d((Fixed64)4, Fixed64.FromFraction(5, 2));
+            DynamicShapeExact2DPositions[dynamicShapeSourceIndex] = dynamicSource;
+            DynamicShapeExact2DPositions[dynamicShapeTargetIndex] = dynamicTarget;
+            DynamicShapeExact2DBodies.Add(ContinuousCollisionBenchmarkSupport.CreateThinPolygon2D(DynamicShapeExact2DContext, dynamicSource));
+            DynamicShapeExact2DBodies.Add(ContinuousCollisionBenchmarkSupport.CreateCircle2D(DynamicShapeExact2DContext, dynamicTarget));
         }
     }
 

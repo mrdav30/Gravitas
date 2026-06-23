@@ -232,4 +232,32 @@ public class ContinuousCollisionEvidenceBenchmarks
 
         return total;
     }
+
+    [Benchmark(OperationsPerInvoke = EvidenceFrames)]
+    public Vector3d Pure3DFullRuntimeDynamicShapeExactFalsePositiveEvidence()
+    {
+        Vector3d total = Vector3d.Zero;
+        for (int i = 0; i < EvidenceFrames; i++)
+        {
+            Reset3DDynamicShapeExactBodies(_fixture.DynamicShapeExact3DBodies, _fixture.DynamicShapeExact3DPositions);
+            _fixture.DynamicShapeExact3DContext.LateSimulate();
+            total += Sum3D(_fixture.DynamicShapeExact3DBodies);
+        }
+
+        return total;
+    }
+
+    [Benchmark(OperationsPerInvoke = EvidenceFrames)]
+    public Vector2d Pure2DFullRuntimeDynamicShapeExactFalsePositiveEvidence()
+    {
+        Vector2d total = Vector2d.Zero;
+        for (int i = 0; i < EvidenceFrames; i++)
+        {
+            Reset2DDynamicShapeExactBodies(_fixture.DynamicShapeExact2DBodies, _fixture.DynamicShapeExact2DPositions);
+            _fixture.DynamicShapeExact2DContext.LateSimulate();
+            total += Sum2D(_fixture.DynamicShapeExact2DBodies);
+        }
+
+        return total;
+    }
 }

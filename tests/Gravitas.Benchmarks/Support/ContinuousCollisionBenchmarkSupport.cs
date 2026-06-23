@@ -13,6 +13,8 @@ internal static class ContinuousCollisionBenchmarkSupport
 {
     public static readonly Vector3d Force3D = Vector3d.Right * (Fixed64)2;
     public static readonly Vector2d Force2D = Vector2d.Right * (Fixed64)2;
+    public static readonly Vector3d ShapeExactDynamicForce3D = Vector3d.Right * (Fixed64)10;
+    public static readonly Vector2d ShapeExactDynamicForce2D = Vector2d.Right * (Fixed64)10;
     public static readonly Vector3d SubstepForce3D = new((Fixed64)4, Fixed64.Zero, (Fixed64)4);
     public static readonly Vector2d SubstepForce2D = new((Fixed64)4, (Fixed64)4);
 
@@ -192,6 +194,32 @@ internal static class ContinuousCollisionBenchmarkSupport
             body.Sleep();
             body.SetPosition(positions[i]);
             body.AddForce(force);
+        }
+    }
+
+    public static void Reset2DDynamicShapeExactBodies(SwiftList<StiffBody2D> bodies, Vector2d[] positions)
+    {
+        for (int i = 0; i < bodies.Count; i++)
+        {
+            StiffBody2D body = bodies[i];
+            body.Sleep();
+            body.SetPosition(positions[i]);
+            body.SetRotation(Fixed64.Zero);
+            if ((i & 1) == 0)
+                body.AddForce(ShapeExactDynamicForce2D);
+        }
+    }
+
+    public static void Reset3DDynamicShapeExactBodies(SwiftList<StiffBody> bodies, Vector3d[] positions)
+    {
+        for (int i = 0; i < bodies.Count; i++)
+        {
+            StiffBody body = bodies[i];
+            body.ResetPosition(positions[i], FixedQuaternion.Identity);
+            if ((i & 1) == 0)
+                body.AddForce(ShapeExactDynamicForce3D);
+            else
+                body.Sleep();
         }
     }
 

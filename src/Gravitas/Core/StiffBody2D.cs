@@ -44,6 +44,7 @@ public sealed class StiffBody2D : IRecordable
     private int _continuousCollisionFrameToken = int.MinValue;
     private Vector2d _continuousCollisionFrameStart;
     private Vector2d _continuousCollisionFrameDisplacement;
+    private Fixed64 _continuousCollisionFrameRotation;
     private readonly SwiftList<Physics2DHit> _continuousCollisionHits = new();
     private readonly SwiftList<PhysicsMixedHit> _continuousMixedCollisionHits = new();
 
@@ -283,6 +284,12 @@ public sealed class StiffBody2D : IRecordable
         get => _continuousCollisionFrameDisplacement;
     }
 
+    internal Fixed64 ContinuousCollisionFrameRotation
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => _continuousCollisionFrameRotation;
+    }
+
     internal void EnsureContinuousCollisionFramePrepared(int token)
     {
         if (_continuousCollisionFrameToken == token)
@@ -291,6 +298,7 @@ public sealed class StiffBody2D : IRecordable
         _continuousCollisionFrameToken = token;
         _continuousCollisionFrameStart = _position;
         _continuousCollisionFrameDisplacement = PredictContinuousCollisionDisplacement();
+        _continuousCollisionFrameRotation = _rotation;
     }
 
     private Vector2d PredictContinuousCollisionDisplacement()
@@ -491,7 +499,7 @@ public sealed class StiffBody2D : IRecordable
         Wake();
         Vector2d resolvedPosition = kinematicPosition;
         Fixed64 resolvedRotation = kinematicRotation;
-        CaptureKinematicContinuousCollisionFrame(startPosition, kinematicPosition);
+        CaptureKinematicContinuousCollisionFrame(startPosition, kinematicPosition, startRotation);
         TryResolveKinematicContinuousCollision(startPosition, ref resolvedPosition);
         TryResolveKinematicRotationalContinuousCollision(startPosition, ref resolvedPosition, startRotation, ref resolvedRotation);
 
@@ -515,11 +523,12 @@ public sealed class StiffBody2D : IRecordable
             Collider.Rebuild();
     }
 
-    private void CaptureKinematicContinuousCollisionFrame(Vector2d startPosition, Vector2d targetPosition)
+    private void CaptureKinematicContinuousCollisionFrame(Vector2d startPosition, Vector2d targetPosition, Fixed64 startRotation)
     {
         _continuousCollisionFrameToken = Context.LateSimulateToken;
         _continuousCollisionFrameStart = startPosition;
         _continuousCollisionFrameDisplacement = targetPosition - startPosition;
+        _continuousCollisionFrameRotation = startRotation;
     }
 
     private bool TryResolveKinematicContinuousCollision(Vector2d startPosition, ref Vector2d proposedPosition)
@@ -679,6 +688,28 @@ public sealed class StiffBody2D : IRecordable
                     out Fixed64 normalizedTime,
                     out Vector2d normal,
                     out _))
+            {
+                continue;
+            }
+
+            Vector2d targetStart = target.ContinuousCollisionFrameStart;
+            Vector2d targetDisplacement = target.ContinuousCollisionFrameDisplacement;
+            if (TryGetExactDynamicRelativeContinuousCollisionHit(
+                    target,
+                    startPosition,
+                    sourceDisplacement,
+                    targetStart,
+                    targetDisplacement,
+                    sourceLength,
+                    out Physics2DHit exactHit,
+                    out _))
+            {
+                normal = exactHit.Normal;
+                normalizedTime = sourceLength > Fixed64.Epsilon
+                    ? FixedMath.Clamp01(exactHit.Distance / sourceLength)
+                    : normalizedTime;
+            }
+            else
             {
                 continue;
             }
@@ -1082,26 +1113,54 @@ public sealed class StiffBody2D : IRecordable
         {
             for (int step = 1; step <= stepCount; step++)
             {
+                Fixed64 lowerTime = (Fixed64)(step - 1) / (Fixed64)stepCount;
                 Fixed64 sampleTime = (Fixed64)step / (Fixed64)stepCount;
-                _position = startPosition + displacement * sampleTime;
-                _rotation = startRotation + angularDelta * sampleTime;
-                Collider.RebuildRuntimeShapeOnly();
+                bool foundSampleHit = false;
+                Fixed64 bestSafeTime = Fixed64.Zero;
+                int bestTargetId = int.MaxValue;
+                Contact2D bestContact = default;
 
                 for (int hitIndex = 0; hitIndex < hitCount; hitIndex++)
                 {
+                    SampleRotationalContinuousPose(startPosition, displacement, startRotation, angularDelta, sampleTime);
                     LSCollider2D? target = _continuousCollisionHits[hitIndex].Collider;
-                    if (!IsValidContinuousCollisionTarget(target)
-                        || !CollisionDetection2D.TryCollide(Collider, target!, out Contact2D contact))
+                    if (!TrySampleRotationalContinuousCollision(target, out Contact2D contact))
+                        continue;
+
+                    LSCollider2D targetCollider = target!;
+                    Fixed64 safeTime = RefineRotationalContinuousCollisionSafeTime(
+                        targetCollider,
+                        startPosition,
+                        displacement,
+                        startRotation,
+                        angularDelta,
+                        lowerTime,
+                        sampleTime,
+                        contact,
+                        out Contact2D refinedContact);
+                    if (!ShouldReplaceRotationalContinuousCollisionHit(
+                            safeTime,
+                            targetCollider.Id,
+                            foundSampleHit,
+                            bestSafeTime,
+                            bestTargetId))
                     {
                         continue;
                     }
 
-                    Fixed64 safeTime = (Fixed64)(step - 1) / (Fixed64)stepCount;
-                    proposedPosition = startPosition + displacement * safeTime;
-                    proposedRotation = startRotation + angularDelta * safeTime;
-                    StopRotationalContinuousCollision(contact.Normal);
-                    return true;
+                    foundSampleHit = true;
+                    bestSafeTime = safeTime;
+                    bestTargetId = targetCollider.Id;
+                    bestContact = refinedContact;
                 }
+
+                if (!foundSampleHit)
+                    continue;
+
+                proposedPosition = startPosition + displacement * bestSafeTime;
+                proposedRotation = startRotation + angularDelta * bestSafeTime;
+                StopRotationalContinuousCollision(bestContact.Normal);
+                return true;
             }
         }
         finally
@@ -1168,26 +1227,52 @@ public sealed class StiffBody2D : IRecordable
         {
             for (int step = 1; step <= stepCount; step++)
             {
+                Fixed64 lowerTime = (Fixed64)(step - 1) / (Fixed64)stepCount;
                 Fixed64 sampleTime = (Fixed64)step / (Fixed64)stepCount;
-                _position = startPosition + displacement * sampleTime;
-                _rotation = startRotation + angularDelta * sampleTime;
-                Collider.RebuildRuntimeShapeOnly();
+                bool foundSampleHit = false;
+                Fixed64 bestSafeTime = Fixed64.Zero;
+                int bestTargetId = int.MaxValue;
 
                 for (int hitIndex = 0; hitIndex < hitCount; hitIndex++)
                 {
+                    SampleRotationalContinuousPose(startPosition, displacement, startRotation, angularDelta, sampleTime);
                     LSCollider2D? target = _continuousCollisionHits[hitIndex].Collider;
-                    if (!IsValidContinuousCollisionTarget(target)
-                        || !CollisionDetection2D.TryCollide(Collider, target!, out _))
+                    if (!TrySampleRotationalContinuousCollision(target, out Contact2D contact))
+                        continue;
+
+                    LSCollider2D targetCollider = target!;
+                    Fixed64 safeTime = RefineRotationalContinuousCollisionSafeTime(
+                        targetCollider,
+                        startPosition,
+                        displacement,
+                        startRotation,
+                        angularDelta,
+                        lowerTime,
+                        sampleTime,
+                        contact,
+                        out _);
+                    if (!ShouldReplaceRotationalContinuousCollisionHit(
+                            safeTime,
+                            targetCollider.Id,
+                            foundSampleHit,
+                            bestSafeTime,
+                            bestTargetId))
                     {
                         continue;
                     }
 
-                    Fixed64 safeTime = (Fixed64)(step - 1) / (Fixed64)stepCount;
-                    proposedPosition = startPosition + displacement * safeTime;
-                    proposedRotation = startRotation + angularDelta * safeTime;
-                    LastContinuousCollisionSubstepCount++;
-                    return true;
+                    foundSampleHit = true;
+                    bestSafeTime = safeTime;
+                    bestTargetId = targetCollider.Id;
                 }
+
+                if (!foundSampleHit)
+                    continue;
+
+                proposedPosition = startPosition + displacement * bestSafeTime;
+                proposedRotation = startRotation + angularDelta * bestSafeTime;
+                LastContinuousCollisionSubstepCount++;
+                return true;
             }
         }
         finally
@@ -1198,6 +1283,79 @@ public sealed class StiffBody2D : IRecordable
         }
 
         return false;
+    }
+
+    private void SampleRotationalContinuousPose(
+        Vector2d startPosition,
+        Vector2d displacement,
+        Fixed64 startRotation,
+        Fixed64 angularDelta,
+        Fixed64 sampleTime)
+    {
+        _position = startPosition + displacement * sampleTime;
+        _rotation = startRotation + angularDelta * sampleTime;
+        Collider.RebuildRuntimeShapeOnly();
+    }
+
+    private bool TrySampleRotationalContinuousCollision(LSCollider2D? target, out Contact2D contact)
+    {
+        if (!IsValidContinuousCollisionTarget(target))
+        {
+            contact = default;
+            return false;
+        }
+
+        return CollisionDetection2D.TryCollide(Collider, target!, out contact);
+    }
+
+    private Fixed64 RefineRotationalContinuousCollisionSafeTime(
+        LSCollider2D target,
+        Vector2d startPosition,
+        Vector2d displacement,
+        Fixed64 startRotation,
+        Fixed64 angularDelta,
+        Fixed64 lowerTime,
+        Fixed64 upperTime,
+        Contact2D upperContact,
+        out Contact2D contact)
+    {
+        Fixed64 safeTime = lowerTime;
+        Fixed64 hitTime = upperTime;
+        contact = upperContact;
+
+        for (int iteration = 0; iteration < ContinuousCollisionMath.RotationalToiRefinementIterations; iteration++)
+        {
+            Fixed64 sampleTime = (safeTime + hitTime) * Fixed64.Half;
+            SampleRotationalContinuousPose(startPosition, displacement, startRotation, angularDelta, sampleTime);
+            if (TrySampleRotationalContinuousCollision(target, out Contact2D sampleContact))
+            {
+                hitTime = sampleTime;
+                contact = sampleContact;
+            }
+            else
+            {
+                safeTime = sampleTime;
+            }
+        }
+
+        return safeTime;
+    }
+
+    private static bool ShouldReplaceRotationalContinuousCollisionHit(
+        Fixed64 candidateSafeTime,
+        int candidateTargetId,
+        bool hasCurrent,
+        Fixed64 currentSafeTime,
+        int currentTargetId)
+    {
+        if (!hasCurrent)
+            return true;
+
+        int timeCompare = candidateSafeTime.CompareTo(currentSafeTime);
+        if (timeCompare != 0)
+            return timeCompare < 0;
+
+        return candidateTargetId < currentTargetId;
     }
 
     private bool TryGetFirstValidContinuousCollisionHit(
@@ -1297,18 +1455,26 @@ public sealed class StiffBody2D : IRecordable
                     targetStart,
                     targetDisplacement,
                     targetRadius,
-                    out Fixed64 normalizedTime,
-                    out Vector2d normal,
+                    out _,
+                    out _,
+                    out _))
+            {
+                continue;
+            }
+
+            if (!TryGetExactDynamicRelativeContinuousCollisionHit(
+                    target,
+                    startPosition,
+                    sourceDisplacement,
+                    targetStart,
+                    targetDisplacement,
+                    sourceLength,
+                    out Physics2DHit candidate,
                     out Fixed64 candidateClosingSpeed))
             {
                 continue;
             }
 
-            Fixed64 distance = sourceLength * normalizedTime;
-            Vector2d sourceCenter = startPosition + sourceDisplacement * normalizedTime;
-            Vector2d targetCenter = targetStart + targetDisplacement * normalizedTime;
-            Vector2d point = ResolveDynamicContactPoint(sourceCenter, targetCenter, normal, targetRadius);
-            var candidate = new Physics2DHit(target.Collider, point, normal, distance);
             if (!ShouldReplaceContinuousCollisionHit(candidate, candidateClosingSpeed, true, found, best, bestClosingSpeed))
                 continue;
 
@@ -1320,6 +1486,63 @@ public sealed class StiffBody2D : IRecordable
         hit = best;
         closingSpeed = bestClosingSpeed;
         return found;
+    }
+
+    private bool TryGetExactDynamicRelativeContinuousCollisionHit(
+        StiffBody2D target,
+        Vector2d sourceStart,
+        Vector2d sourceDisplacement,
+        Vector2d targetStart,
+        Vector2d targetDisplacement,
+        Fixed64 sourceLength,
+        out Physics2DHit hit,
+        out Fixed64 closingSpeed)
+    {
+        hit = default;
+        closingSpeed = Fixed64.Zero;
+
+        Vector2d relativeDisplacement = sourceDisplacement - targetDisplacement;
+        Fixed64 relativeLength = relativeDisplacement.Magnitude;
+        if (relativeLength <= Fixed64.Epsilon || sourceLength <= Fixed64.Epsilon)
+            return false;
+
+        Vector2d originalSourcePosition = _position;
+        Fixed64 originalSourceRotation = _rotation;
+        Vector2d originalTargetPosition = target._position;
+        Fixed64 originalTargetRotation = target._rotation;
+        try
+        {
+            _position = sourceStart;
+            target._position = targetStart;
+            target._rotation = target.ContinuousCollisionFrameRotation;
+            Collider.RebuildRuntimeShapeOnly();
+            target.Collider.RebuildRuntimeShapeOnly();
+
+            if (!QueryDetection2D.TrySweepMoverShape(Collider, relativeDisplacement, target.Collider, out Physics2DHit relativeHit))
+                return false;
+
+            closingSpeed = -Vector2d.Dot(relativeDisplacement, relativeHit.Normal);
+            if (closingSpeed <= Fixed64.Epsilon)
+                return false;
+
+            Fixed64 normalizedTime = FixedMath.Clamp01(relativeHit.Distance / relativeLength);
+            Vector2d point = relativeHit.Point + targetDisplacement * normalizedTime;
+            hit = new Physics2DHit(
+                target.Collider,
+                point,
+                relativeHit.Normal,
+                sourceLength * normalizedTime);
+            return true;
+        }
+        finally
+        {
+            _position = originalSourcePosition;
+            _rotation = originalSourceRotation;
+            target._position = originalTargetPosition;
+            target._rotation = originalTargetRotation;
+            target.Collider.RebuildRuntimeShapeOnly();
+            Collider.RebuildRuntimeShapeOnly();
+        }
     }
 
     private bool TryGetFirstDynamicMixedContinuousCollisionHit(

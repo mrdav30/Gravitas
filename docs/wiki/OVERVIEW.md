@@ -105,7 +105,7 @@ flowchart TD
 | `GravitasCollision2DService` | GridForge-backed pure 2D X/Z broad-phase partitioning, active partition tracking, partition pooling, duplicate suppression, and collision distribution versioning. |
 | `GravitasMixedCollisionService` | Mixed 2D/3D lifecycle and broad-phase candidate gathering through `PhysicsMixedPartition`, stable 3D/2D keys, duplicate suppression, and retained partition cleanup. |
 | `GravitasQuery2DService` | Pure 2D overlap-circle and segment raycast queries, caller-buffered hit output, duplicate suppression, and hit ordering. |
-| `GravitasQuery3DService` | 3D raycast, swept-sphere, and X/Z circle overlap/proximity queries, caller-buffered hit output, duplicate suppression, and hit ordering. |
+| `GravitasQuery3DService` | 3D raycast, swept-sphere, convex-source sweep, and X/Z circle overlap/proximity queries, caller-buffered hit output, duplicate suppression, and hit ordering. |
 | `GravitasQueryMixedService` | Explicit mixed 3D/2D swept-sphere and swept-circle queries, GridForge-backed mixed candidate gathering, caller-buffered hit output, and deterministic hit ordering. |
 | `PhysicsPartition` | Voxel partition payload containing collider IDs, awake dynamic membership, and candidate pair distribution. |
 | `CollisionPair` | Pair identity, culling state, contact state, warm-start cache, narrow-phase dispatch, response dispatch, and contact notification state. |
@@ -203,8 +203,10 @@ identity. Contact events are emitted from the active-pair queue during
   pure 2D apply compatible pair-local warm-start impulses, and 3D discrete
   response builds deterministic islands with bounded multi-iteration solving.
   Mixed response builds dedicated dimension-bridging islands without merging
-  them into pure 2D or 3D islands. Exact angular TOI and exact swept polytope
-  support remain future work.
+  them into pure 2D or 3D islands. Body-owned CCD now has shape-exact
+  static-style, rotational, and pure-dynamic relative reducers for supported 2D
+  and 3D families; service-level CCD island solving remains the alpha blocker
+  for dense same-frame contacts and mixed dynamic velocity handoff.
 - Query services use context-owned mutable buffers. Treat them as same-thread,
   fixed-loop services unless they are redesigned for reentrancy.
 - Diagnostics are context-owned and disabled by default. Enabled draw capture can

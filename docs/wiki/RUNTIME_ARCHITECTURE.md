@@ -28,7 +28,7 @@ pairs, queries, and coroutines remain context-local.
 | `GravitasCollisionService` | Active partition bucket, inactive partition pool, duplicate voxel checker, partition awake-state refresh, collision distribution version, cull distributor. |
 | `GravitasCollision2DService` | GridForge-backed pure 2D partition bucket, inactive partition pool, duplicate voxel checker, awake dynamic membership refresh, 2D collision distribution version, retained partition cleanup. |
 | `GravitasQuery2DService` | Pure 2D query candidate buffer, overlap-circle queries, segment raycasts, swept-circle queries, collider-stamped duplicate suppression, hit ordering. |
-| `GravitasQuery3DService` | 3D segment worker, swept-sphere worker, X/Z circle overlap/proximity queries, intersection buffer, duplicate voxel checker, duplicate collider checker, raycast and circle query versions. |
+| `GravitasQuery3DService` | 3D segment worker, swept-sphere worker, convex-source sweep worker, X/Z circle overlap/proximity queries, intersection buffer, duplicate voxel checker, duplicate collider checker, raycast and circle query versions. |
 | `GravitasQueryMixedService` | Explicit mixed swept-sphere and swept-circle query buffers, GridForge-backed mixed candidate gathering, duplicate suppression, and `PhysicsMixedHit` ordering. |
 | `GravitasCoroutineService` | Active lockstep coroutine bucket and context-bound wait instruction factories. |
 | `GravitasDiagnosticSink` | Disabled-by-default diagnostic event buffer and engine-agnostic debug draw command buffer. |
@@ -269,9 +269,11 @@ moment to apply angular velocity deltas from normal and tangent friction
 impulses. `ContinuousCollisionMode` is shared with the 3D body path:
 `StiffBody2D` resolves body, hierarchy, then context settings before committing
 movement, uses `Query2D.SweepCircle` to clip fast circle-proxy movement against
-static or kinematic 2D targets, and uses prepared dynamic target candidates for
-relative circle sweeps. Dynamic-vs-dynamic and kinematic-source 2D CCD preserve
-stable time, closing-speed, and collider-ID ordering.
+static or kinematic 2D targets, refines supported movers with exact 2D
+shape-sweep reducers, and uses prepared dynamic target candidates for exact
+relative mover-shape validation after proxy candidate gathering.
+Dynamic-vs-dynamic and kinematic-source 2D CCD preserve stable time,
+closing-speed, and collider-ID ordering.
 `GravitasPhysics2DService.Simulate()` runs 2D contact response and events;
 `GravitasPhysics2DService.LateSimulate()` integrates active movable 2D bodies;
 `GravitasPhysics2DService.Visualize()` publishes dynamic 2D position and yaw
