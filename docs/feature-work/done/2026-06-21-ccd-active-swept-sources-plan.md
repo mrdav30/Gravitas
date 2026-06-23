@@ -11,7 +11,7 @@
 ---
 
 **Date:** 2026-06-21
-**Status:** Pre-alpha release blocker
+**Status:** Done 2026-06-23
 **Owner:** Gravitas runtime/collision hardening
 
 ## Purpose
@@ -61,13 +61,13 @@ old and new poses are not exposed as a CCD source contract.
 
 **Tasks**
 
-- [ ] Add failing tests proving a fast kinematic 2D body can currently pass
+- [x] Add failing tests proving a fast kinematic 2D body can currently pass
   through a dynamic/static target without active CCD source handling.
-- [ ] Add equivalent 3D and mixed-dimension proof tests.
-- [ ] Design explicit frame-start/host-target pose state for kinematic bodies.
-- [ ] Preserve existing serialization rules: host transform identity remains
+- [x] Add equivalent 3D and mixed-dimension proof tests.
+- [x] Design explicit frame-start/host-target pose state for kinematic bodies.
+- [x] Preserve existing serialization rules: host transform identity remains
   host-owned and is not snapshot identity.
-- [ ] Document fixed-step host obligations for kinematic CCD source movement.
+- [x] Document fixed-step host obligations for kinematic CCD source movement.
 
 ## Workstream 2: Pure 2D And Pure 3D Active Kinematic Sweeps
 
@@ -79,14 +79,14 @@ response handoff rules.
 
 **Tasks**
 
-- [ ] Implement pure 2D kinematic active sweeps for translational host movement.
-- [ ] Implement pure 3D kinematic active sweeps for translational host movement.
-- [ ] Add active kinematic rotation sampling using the same conservative
+- [x] Implement pure 2D kinematic active sweeps for translational host movement.
+- [x] Implement pure 3D kinematic active sweeps for translational host movement.
+- [x] Add active kinematic rotation sampling using the same conservative
   angular candidate model as dynamic rotational CCD.
-- [ ] Ensure dynamic bodies hit by a kinematic source receive deterministic
+- [x] Ensure dynamic bodies hit by a kinematic source receive deterministic
   wake and velocity/correction behavior consistent with infinite-mass
   kinematic response.
-- [ ] Add allocation guardrails for repeated active kinematic CCD frames.
+- [x] Add allocation guardrails for repeated active kinematic CCD frames.
 
 ## Workstream 3: Mixed-Dimension Kinematic Sources
 
@@ -97,23 +97,23 @@ sources can move vertically while 2D response is plane-constrained.
 
 **Tasks**
 
-- [ ] Add mixed tests for fast kinematic 3D sources crossing 2D dynamic slabs.
-- [ ] Add mixed tests for fast kinematic 2D slab sources crossing 3D dynamic
+- [x] Add mixed tests for fast kinematic 3D sources crossing 2D dynamic slabs.
+- [x] Add mixed tests for fast kinematic 2D slab sources crossing 3D dynamic
   targets.
-- [ ] Preserve `PhysicsRuntimeMode.Mixed` identity and keep `Both` as separate
+- [x] Preserve `PhysicsRuntimeMode.Mixed` identity and keep `Both` as separate
   pure 2D/3D simulation without mixed contacts.
-- [ ] Keep vertical impulse/correction constrained by existing mixed response
+- [x] Keep vertical impulse/correction constrained by existing mixed response
   rules until the CCD island plan changes that model.
 
 ## Workstream 4: Benchmarks, Docs, And Release Validation
 
 **Tasks**
 
-- [ ] Add benchmark rows for no-hit, first-hit, dense-hit, and rotational
+- [x] Add benchmark rows for no-hit, first-hit, dense-hit, and rotational
   kinematic active CCD sources.
-- [ ] Update `docs/wiki/COLLISION_PIPELINE.md` and host integration docs with
+- [x] Update `docs/wiki/COLLISION_PIPELINE.md` and host integration docs with
   the new kinematic source contract.
-- [ ] Run focused CCD tests, full `Release`, full `ReleaseLean`, and relevant
+- [x] Run focused CCD tests, full `Release`, full `ReleaseLean`, and relevant
   benchmark smoke rows.
 
 ## Done Criteria

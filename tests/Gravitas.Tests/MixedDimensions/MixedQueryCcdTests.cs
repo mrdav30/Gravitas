@@ -1258,6 +1258,52 @@ public sealed class MixedQueryCcdTests
     }
 
     [Fact]
+    public void LateSimulate_WithKinematic3DSourceCrossingDynamic2DSlab_ShouldPush2DTargetAtSweptToi()
+    {
+        using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
+        context.Environment.Gravity = Fixed64.Zero;
+        StiffBody2D target = CreateCircle2D(context, Vector2d.Zero);
+        target.Sleep();
+        ScenarioBody<LSSphereCollider> source = CreateSphere3D(
+            context,
+            new Vector3d((Fixed64)(-5), Fixed64.Zero, Fixed64.Zero),
+            isKinematic: true);
+        source.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+
+        source.Body.Agent.Transform.Position = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
+        context.LateSimulate();
+
+        source.Body.Position3d.X.Should().Be((Fixed64)5);
+        source.Body.LastContinuousCollisionSubstepCount.Should().Be(1);
+        target.Position.X.Should().BeGreaterThan(Fixed64.Zero);
+        target.Position.X.Should().BeLessThanOrEqualTo(Fixed64.FromFraction(61, 10));
+        target.IsSleeping.Should().BeFalse();
+    }
+
+    [Fact]
+    public void LateSimulate_WithKinematic2DSourceCrossingDynamic3DTarget_ShouldPush3DTargetAtSweptToi()
+    {
+        using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
+        context.Environment.Gravity = Fixed64.Zero;
+        ScenarioBody<LSSphereCollider> target = CreateSphere3D(context, Vector3d.Zero);
+        target.Body.Sleep();
+        StiffBody2D source = CreateCircle2D(
+            context,
+            new Vector2d((Fixed64)(-5), Fixed64.Zero),
+            isKinematic: true);
+        source.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+
+        source.Agent.Transform.Position = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
+        context.LateSimulate();
+
+        source.Position.X.Should().Be((Fixed64)5);
+        source.LastContinuousCollisionSubstepCount.Should().Be(1);
+        target.Body.Position3d.X.Should().BeGreaterThan(Fixed64.Zero);
+        target.Body.Position3d.X.Should().BeLessThanOrEqualTo(Fixed64.FromFraction(61, 10));
+        target.Body.IsSleeping.Should().BeFalse();
+    }
+
+    [Fact]
     public void SweepSphereAgainstStatic2DAll_ShouldCollectOnlyStaticStyle2DTargets()
     {
         using GravitasWorldContext context = CreateMixedContext(frameRate: 1);

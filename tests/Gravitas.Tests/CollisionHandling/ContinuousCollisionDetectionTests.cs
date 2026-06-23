@@ -3,6 +3,7 @@ using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
+using GridForge.Configuration;
 using Xunit;
 
 namespace Gravitas.Tests.CollisionHandlingTests;
@@ -539,6 +540,167 @@ public sealed class ContinuousCollisionDetectionTests
     }
 
     [Fact]
+    public void ContinuousMode_WithFastKinematicHostTranslation_ShouldClampBeforeStaticTarget()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        _ = scenario.CreateStaticSphere(Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> source = scenario.CreateSphere(
+            new Vector3d((Fixed64)(-5), Fixed64.Zero, Fixed64.Zero),
+            isKinematic: true);
+        source.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+
+        source.Body.Agent.Transform.Position = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
+        scenario.Context.LateSimulate();
+
+        source.Body.Position3d.X.Should().BeLessThanOrEqualTo(-Fixed64.One);
+        source.Body.LastContinuousCollisionSubstepCount.Should().Be(1);
+    }
+
+    [Fact]
+    public void ContinuousMode_WithFastKinematicHostTranslation_ShouldPushDynamicTarget()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        ScenarioBody<LSSphereCollider> target = scenario.CreateSphere(Vector3d.Zero);
+        target.Body.Sleep();
+        ScenarioBody<LSSphereCollider> source = scenario.CreateSphere(
+            new Vector3d((Fixed64)(-5), Fixed64.Zero, Fixed64.Zero),
+            isKinematic: true);
+        source.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+
+        source.Body.Agent.Transform.Position = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
+        scenario.Context.LateSimulate();
+
+        source.Body.Position3d.X.Should().Be((Fixed64)5);
+        target.Body.Position3d.X.Should().BeGreaterThan(Fixed64.Zero);
+        target.Body.Position3d.X.Should().BeLessThanOrEqualTo(Fixed64.FromFraction(61, 10));
+        source.Body.LastContinuousCollisionSubstepCount.Should().Be(1);
+        target.Body.IsSleeping.Should().BeFalse();
+    }
+
+    [Fact]
+    public void ContinuousMode_WithFastKinematicHostTranslation_ShouldStillClampAtStaticAfterDynamicPush()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        ScenarioBody<LSSphereCollider> target = scenario.CreateSphere(new Vector3d((Fixed64)(-1), Fixed64.Zero, Fixed64.Zero));
+        target.Body.Sleep();
+        _ = scenario.CreateStaticSphere(new Vector3d((Fixed64)3, Fixed64.Zero, Fixed64.Zero));
+        ScenarioBody<LSSphereCollider> source = scenario.CreateSphere(
+            new Vector3d((Fixed64)(-5), Fixed64.Zero, Fixed64.Zero),
+            isKinematic: true);
+        source.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+
+        source.Body.Agent.Transform.Position = new Vector3d((Fixed64)7, Fixed64.Zero, Fixed64.Zero);
+        scenario.Context.LateSimulate();
+
+        source.Body.Position3d.X.Should().BeLessThan((Fixed64)7);
+        source.Body.Position3d.X.Should().BeLessThanOrEqualTo((Fixed64)2);
+        target.Body.Position3d.X.Should().BeGreaterThan((Fixed64)(-1));
+        source.Body.LastContinuousCollisionSubstepCount.Should().Be(1);
+        target.Body.IsSleeping.Should().BeFalse();
+    }
+
+    [Fact]
+    public void ContinuousMode_WithKinematicHostRotation_ShouldClampBeforeAngularTunnelingThroughStaticSphere()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        _ = scenario.CreateStaticSphere(new Vector3d(Fixed64.FromFraction(3, 2), Fixed64.Zero, Fixed64.FromFraction(-5, 4)));
+        ScenarioBody<LSCuboidCollider> blade = scenario.CreateBody(
+            new LSCuboidCollider
+            {
+                Size = new Vector3d((Fixed64)6, Fixed64.One, Fixed64.FromFraction(1, 5))
+            },
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            isKinematic: true);
+        blade.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+
+        FixedQuaternion fullTurn = FixedQuaternion.FromEulerAnglesInDegrees(
+            Fixed64.Zero,
+            (Fixed64)90,
+            Fixed64.Zero);
+        blade.Body.Agent.Transform.Rotation = fullTurn;
+        scenario.Context.LateSimulate();
+
+        FixedQuaternion.Angle(blade.Body.Rotation, fullTurn).Should().BeGreaterThan(Fixed64.Zero);
+        blade.Body.LastContinuousCollisionSubstepCount.Should().Be(1);
+    }
+
+    [Fact]
+    public void ContinuousMode_KinematicActiveSourcePath_ShouldNotAllocateAfterWarmup()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        _ = scenario.CreateStaticSphere(Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> source = scenario.CreateSphere(
+            new Vector3d((Fixed64)(-5), Fixed64.Zero, Fixed64.Zero),
+            isKinematic: true);
+        source.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+
+        void SimulateKinematicCcd()
+        {
+            source.Body.ResetPosition(new Vector3d((Fixed64)(-5), Fixed64.Zero, Fixed64.Zero), FixedQuaternion.Identity);
+            source.Body.Agent.Transform.Position = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
+            scenario.Context.Simulate();
+            scenario.Context.LateSimulate();
+        }
+
+        long allocatedBytes = AllocationTestHelper.MeasureSteadyState(
+            SimulateKinematicCcd,
+            warmupIterations: 16,
+            stabilizationIterations: 4,
+            measurementIterations: 8);
+
+        allocatedBytes.Should().Be(0);
+    }
+
+    [Fact]
+    public void ContinuousMode_KinematicActiveSourceBatch_ShouldNotAllocateAfterWarmup()
+    {
+        const int BodyCount = 256;
+        const int Columns = 16;
+        const int Spacing = 8;
+        const int GridExtent = 96;
+        Vector3d displacement = new((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
+        var sources = new StiffBody[BodyCount];
+        var positions = new Vector3d[BodyCount];
+
+        using GravitasWorldContext context = CreateOwnedCcdContext(GridExtent);
+        for (int i = 0; i < BodyCount; i++)
+        {
+            int column = i % Columns;
+            int row = i / Columns;
+            var position = new Vector3d(
+                (Fixed64)((column * Spacing) - ((Columns * Spacing) / 2)),
+                Fixed64.Zero,
+                (Fixed64)((row * Spacing) - ((Columns * Spacing) / 2)));
+            positions[i] = position;
+            sources[i] = CreateKinematicCcdSphere(context, position);
+            _ = CreateStaticCcdSphere(context, position + new Vector3d((Fixed64)3, Fixed64.Zero, Fixed64.Zero));
+        }
+
+        void SimulateKinematicCcdBatch()
+        {
+            for (int i = 0; i < sources.Length; i++)
+            {
+                StiffBody source = sources[i];
+                Vector3d position = positions[i];
+                source.ResetPosition(position, FixedQuaternion.Identity);
+                source.Agent.Transform.Position = position + displacement;
+            }
+
+            context.Simulate();
+            context.LateSimulate();
+        }
+
+        long allocatedBytes = AllocationTestHelper.MeasureSteadyState(
+            SimulateKinematicCcdBatch,
+            warmupIterations: 16,
+            stabilizationIterations: 4,
+            measurementIterations: 4);
+
+        allocatedBytes.Should().Be(0);
+    }
+
+    [Fact]
     public void PhysicsLateSimulate_DirectCalls_ShouldRefreshDynamicCcdFrame()
     {
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();
@@ -602,6 +764,52 @@ public sealed class ContinuousCollisionDetectionTests
         scenario.Context.Environment.MaxSpeed = (Fixed64)16;
         scenario.Context.Environment.MaxFallSpeed = (Fixed64)16;
         return scenario;
+    }
+
+    private static GravitasWorldContext CreateOwnedCcdContext(int extent)
+    {
+        GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        context.SetFrameRate(1);
+        context.Environment.Gravity = Fixed64.Zero;
+        context.Environment.AirDensity = Fixed64.Zero;
+        context.Environment.MinSpeed = Fixed64.Zero;
+        context.Environment.MaxSpeed = (Fixed64)16;
+        context.Environment.MaxFallSpeed = (Fixed64)16;
+        var configuration = new GridConfiguration(
+            new Vector3d((Fixed64)(-extent), (Fixed64)(-extent), (Fixed64)(-extent)),
+            new Vector3d((Fixed64)extent, (Fixed64)extent, (Fixed64)extent));
+
+        context.World.TryAddGrid(configuration, out _).Should().BeTrue();
+        return context;
+    }
+
+    private static StiffBody CreateKinematicCcdSphere(GravitasWorldContext context, Vector3d position)
+    {
+        var transform = new FixedTransform(position, FixedQuaternion.Identity, Vector3d.One);
+        var body = new StiffBody(new TestMatterAgent(context, transform), new LSSphereCollider())
+        {
+            ContinuousCollisionMode = ContinuousCollisionMode.Continuous,
+            IsKinematic = true,
+            Mass = Fixed64.One
+        };
+
+        body.Initialize(position, FixedQuaternion.Identity);
+        return body;
+    }
+
+    private static StiffBody CreateStaticCcdSphere(GravitasWorldContext context, Vector3d position)
+    {
+        var transform = new FixedTransform(position, FixedQuaternion.Identity, Vector3d.One);
+        var body = new StiffBody(
+            new TestMatterAgent(context, transform),
+            new LSSphereCollider { Radius = Fixed64.FromFraction(1, 4) })
+        {
+            Immovable = true,
+            Mass = Fixed64.One
+        };
+
+        body.Initialize(position, FixedQuaternion.Identity);
+        return body;
     }
 
     private static LSCuboidCollider CreateStaticWall(PhysicsScenarioBuilder scenario, Fixed64 x)

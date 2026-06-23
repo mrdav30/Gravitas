@@ -406,8 +406,11 @@ time before falling back to the context default.
 
 The CCD path runs during body position integration, after velocity and
 acceleration have produced an intended frame displacement and before the
-authoritative position is committed. It first uses a swept proxy derived from
-the moving collider:
+authoritative position is committed. Kinematic bodies use the same fixed-step
+window: their frame-start pose is captured before the host transform is read,
+then the host-requested target pose is treated as the swept source target for
+that late-simulate step. The path first uses a swept proxy derived from the
+moving collider:
 
 - 3D sphere uses its exact scaled radius.
 - 3D capsule, cuboid, finite cylinder, mesh, and compound movers use the
@@ -463,12 +466,11 @@ pose, stop angular motion for the frame, and remove only the linear closing
 velocity component along the accepted contact normal.
 
 The current rotational path is intentionally conservative. It covers dynamic
-angular sources against static-style targets, while kinematic bodies participate
-as targets at their current pose. Host-driven kinematic rotation as an active
-swept source, shape-exact angular time-of-impact solvers, and global
-service-level CCD island solving are tracked as alpha-candidate follow-up plans:
-[`CCD Active Swept Sources`](../feature-work/2026-06-21-ccd-active-swept-sources-plan.md),
-[`CCD Exact TOI And Shape Reducers`](../feature-work/2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md),
+angular sources against static-style targets and host-driven kinematic rotation
+as an active swept source against static-style targets. Shape-exact angular
+time-of-impact solvers and global service-level CCD island solving are tracked
+as alpha-candidate follow-up plans:
+[`CCD Exact TOI And Shape Reducers`](../feature-work/2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md)
 and
 [`CCD Service-Level Island Solver`](../feature-work/2026-06-21-ccd-service-level-island-solver-plan.md).
 
@@ -495,6 +497,17 @@ This prevents opposing fast bodies from depending on dynamic body iteration
 order. When bounded substeps continue after an earlier hit, dynamic target
 prediction is sampled from the same frame-start displacement at the elapsed
 frame fraction, then swept only through the remaining frame fraction.
+
+Kinematic active-source CCD uses the same target ordering. Static-style hits
+clip the kinematic body to the earliest safe pose and write the clipped pose
+back to the bound transform, because bodyless, immovable, and kinematic targets
+cannot receive solver correction. Dynamic candidates at or before that first
+static blocker receive deterministic positional correction plus wake for the
+remaining swept distance. If no static blocker exists, the kinematic source
+keeps the host-requested target pose after pushing dynamic targets. Velocity
+transfer is deliberately left to the service-level CCD island plan so dynamic
+targets do not receive order-dependent same-frame integration when the source
+and target belong to different service phases.
 
 The dynamic path is intentionally conservative:
 

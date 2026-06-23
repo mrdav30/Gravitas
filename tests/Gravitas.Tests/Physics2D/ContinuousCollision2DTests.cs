@@ -265,6 +265,75 @@ public sealed class ContinuousCollision2DTests
     }
 
     [Fact]
+    public void ContinuousMode_WithFastKinematic2DHostTranslation_ShouldClampBeforeStaticTarget()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        _ = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: true);
+        StiffBody2D source = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.Half),
+            new Vector2d((Fixed64)(-5), Fixed64.Zero),
+            immovable: false,
+            isKinematic: true);
+        source.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+
+        source.Agent.Transform.Position = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
+        context.LateSimulate();
+
+        source.Position.X.Should().BeLessThanOrEqualTo(-Fixed64.One);
+        source.LastContinuousCollisionSubstepCount.Should().Be(1);
+    }
+
+    [Fact]
+    public void ContinuousMode_WithFastKinematic2DHostTranslation_ShouldPushDynamicTarget()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        StiffBody2D target = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
+        target.Sleep();
+        StiffBody2D source = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.Half),
+            new Vector2d((Fixed64)(-5), Fixed64.Zero),
+            immovable: false,
+            isKinematic: true);
+        source.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+
+        source.Agent.Transform.Position = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
+        context.LateSimulate();
+
+        source.Position.X.Should().Be((Fixed64)5);
+        target.Position.X.Should().BeGreaterThan(Fixed64.Zero);
+        target.Position.X.Should().BeLessThanOrEqualTo(Fixed64.FromFraction(61, 10));
+        source.LastContinuousCollisionSubstepCount.Should().Be(1);
+        target.IsSleeping.Should().BeFalse();
+    }
+
+    [Fact]
+    public void ContinuousMode_WithFastKinematic2DHostTranslation_ShouldStillClampAtStaticAfterDynamicPush()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        StiffBody2D target = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)(-1), Fixed64.Zero), immovable: false);
+        target.Sleep();
+        _ = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)3, Fixed64.Zero), immovable: true);
+        StiffBody2D source = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.Half),
+            new Vector2d((Fixed64)(-5), Fixed64.Zero),
+            immovable: false,
+            isKinematic: true);
+        source.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+
+        source.Agent.Transform.Position = new Vector3d((Fixed64)7, Fixed64.Zero, Fixed64.Zero);
+        context.LateSimulate();
+
+        source.Position.X.Should().BeLessThan((Fixed64)7);
+        source.Position.X.Should().BeLessThanOrEqualTo((Fixed64)2);
+        target.Position.X.Should().BeGreaterThan((Fixed64)(-1));
+        source.LastContinuousCollisionSubstepCount.Should().Be(1);
+        target.IsSleeping.Should().BeFalse();
+    }
+
+    [Fact]
     public void ContinuousMode_WithPlanarDynamicsAtDifferentHostY_ShouldStillClampInPure2D()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);
@@ -314,6 +383,63 @@ public sealed class ContinuousCollision2DTests
 
         blade.Rotation.Should().BeLessThan(FixedMath.DegToRad((Fixed64)90));
         blade.AngularVelocity.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void ContinuousMode_WithKinematic2DHostRotation_ShouldClampBeforeAngularTunnelingThroughStaticCircle()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        var bladeCollider = new LSPolygonCollider2D(
+            new Vector2d((Fixed64)(-3), Fixed64.FromFraction(-1, 10)),
+            new Vector2d((Fixed64)3, Fixed64.FromFraction(-1, 10)),
+            new Vector2d((Fixed64)3, Fixed64.FromFraction(1, 10)),
+            new Vector2d((Fixed64)(-3), Fixed64.FromFraction(1, 10)));
+        StiffBody2D blade = CreateBody(context, bladeCollider, Vector2d.Zero, immovable: false, isKinematic: true);
+        _ = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.FromFraction(1, 4)),
+            new Vector2d((Fixed64)2, (Fixed64)2),
+            immovable: true);
+        blade.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+
+        blade.Agent.Transform.Rotation = FixedQuaternion.FromEulerAnglesInDegrees(
+            Fixed64.Zero,
+            (Fixed64)90,
+            Fixed64.Zero);
+        context.LateSimulate();
+
+        blade.Rotation.Should().BeLessThan(FixedMath.DegToRad((Fixed64)90));
+        blade.LastContinuousCollisionSubstepCount.Should().Be(1);
+    }
+
+    [Fact]
+    public void ContinuousMode_Kinematic2DActiveSourcePath_ShouldNotAllocateAfterWarmup()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        _ = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: true);
+        StiffBody2D source = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.Half),
+            new Vector2d((Fixed64)(-5), Fixed64.Zero),
+            immovable: false,
+            isKinematic: true);
+        source.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+
+        void SimulateKinematicCcd()
+        {
+            source.SetPosition(new Vector2d((Fixed64)(-5), Fixed64.Zero));
+            source.Agent.Transform.Position = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
+            context.Simulate();
+            context.LateSimulate();
+        }
+
+        long allocatedBytes = AllocationTestHelper.MeasureSteadyState(
+            SimulateKinematicCcd,
+            warmupIterations: 16,
+            stabilizationIterations: 4,
+            measurementIterations: 8);
+
+        allocatedBytes.Should().Be(0);
     }
 
     [Fact]

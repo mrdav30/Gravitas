@@ -221,11 +221,11 @@ Current service order matters:
   runs the mixed lifecycle path only in `Mixed`, advances lockstep coroutines,
   then invokes simulate hooks.
 - `context.LateSimulate()` marks visualization accumulation for reset. In the
-  3D path it prepares dynamic CCD state, integrates dynamic bodies, refreshes
-  dynamic collider partitions, distributes and solves discrete contacts, updates
-  active pair/contact maintenance, and updates sleep state after response. It
-  also runs each enabled 2D/mixed late-simulate path, then invokes
-  late-simulate hooks.
+  3D path it prepares CCD frame state, integrates dynamic bodies, evaluates
+  host-driven kinematic active sweeps, refreshes dynamic collider partitions,
+  distributes and solves discrete contacts, updates active pair/contact
+  maintenance, and updates sleep state after response. It also runs each
+  enabled 2D/mixed late-simulate path, then invokes late-simulate hooks.
 - `context.Visualize()` advances interpolation accumulation, updates enabled
   2D and/or 3D body visual transforms, runs the mixed lifecycle path only in
   `Mixed`, then invokes visualize hooks.
@@ -235,6 +235,15 @@ Current service order matters:
 For the 3D path, the fixed-step order is integrate-then-collide inside
 `LateSimulate`: queued forces affect motion before the discrete collision pass
 for that same frame.
+
+For kinematic CCD, hosts must write deterministic target transforms before
+`context.LateSimulate()`. Gravitas captures the body pose at the start of the
+late step, reads the host transform as the requested target, and sweeps between
+those two poses when `ContinuousCollisionMode` resolves to `Continuous` or
+`Auto`. Dynamic targets crossed before the first static-style blocker are woken
+and position-corrected as if hit by an infinite-mass source. The first
+static-style blocker clips the kinematic pose and updates the bound transform to
+the clipped value so render and physics state do not diverge.
 
 ## Replay Contract
 

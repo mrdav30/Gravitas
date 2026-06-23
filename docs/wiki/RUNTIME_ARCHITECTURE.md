@@ -238,9 +238,13 @@ awake body, kinematic motion, host teleports, shape mutation, and explicit host
 wake; waking updates awake membership in every current partition for that
 collider.
 
-Kinematic bodies read their host transforms during `LateSimulate`, update
-authoritative body position/rotation from those transforms, and then update
-visual values.
+Kinematic bodies read their host transforms during `LateSimulate`. When CCD is
+enabled, the body records its frame-start pose before the host read, treats the
+host transform as the requested target pose, and sweeps between those poses as
+an active source. Dynamic targets crossed before the first static-style blocker
+are woken and position-corrected; the first static-style blocker clips the
+kinematic pose and writes the clipped pose back to the bound transform. With CCD
+disabled, kinematic bodies commit the host transform directly.
 
 Visual rotation has two modes. With no rotation interpolation speed, Gravitas
 uses clamped frame accumulation between the last visual rotation and the current
@@ -257,16 +261,17 @@ and Chronicler record data. Pure 2D positions use world X/Z projection:
 `Vector2d.x = Vector3d.x` and `Vector2d.y = Vector3d.z`.
 `CanTranslate`, `CanRotate`, `EffectiveInverseMass`, and
 `EffectiveInverseMomentOfInertia` are the 2D body-side solver mobility surface.
-Kinematic 2D bodies read their agent transform during `LateSimulate`. It
-intentionally has no y-up ground probe, height split, visual interpolation
-state, or 3D inertia tensor. Pure 2D contact response uses COM-relative contact
-arms and scalar moment to apply angular velocity deltas from normal and tangent
-friction impulses. `ContinuousCollisionMode` is shared with the 3D body path:
+Kinematic 2D bodies read their agent transform during `LateSimulate` and use
+the same active-source CCD contract in the X/Z plane. It intentionally has no
+y-up ground probe, height split, visual interpolation state, or 3D inertia
+tensor. Pure 2D contact response uses COM-relative contact arms and scalar
+moment to apply angular velocity deltas from normal and tangent friction
+impulses. `ContinuousCollisionMode` is shared with the 3D body path:
 `StiffBody2D` resolves body, hierarchy, then context settings before committing
-movement, and uses `Query2D.SweepCircle` to clip fast circle-proxy movement
-against static or kinematic 2D targets. Dynamic-vs-dynamic 2D CCD uses
-relative circle sweeps against prepared dynamic target candidates with stable
-time, closing-speed, and collider-ID ordering.
+movement, uses `Query2D.SweepCircle` to clip fast circle-proxy movement against
+static or kinematic 2D targets, and uses prepared dynamic target candidates for
+relative circle sweeps. Dynamic-vs-dynamic and kinematic-source 2D CCD preserve
+stable time, closing-speed, and collider-ID ordering.
 `GravitasPhysics2DService.Simulate()` runs 2D contact response and events;
 `GravitasPhysics2DService.LateSimulate()` integrates active movable 2D bodies;
 `GravitasPhysics2DService.Visualize()` publishes dynamic 2D position and yaw

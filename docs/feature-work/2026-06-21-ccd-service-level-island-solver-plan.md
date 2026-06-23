@@ -31,6 +31,9 @@ advanced, resolved, and continued under one deterministic ordering contract.
   bounded per-body substep budget.
 - Mixed candidates can be compared, but mixed-specific island response is not
   modeled.
+- Kinematic active sources wake and position-correct dynamic targets during the
+  body-owned pass; velocity handoff remains an island concern so targets are
+  not integrated twice when source and target service phases differ.
 - Ordinary discrete pair response remains the resting-contact and manifold
   authority after CCD clamps/velocity changes.
 
@@ -80,8 +83,9 @@ advanced, resolved, and continued under one deterministic ordering contract.
 - [ ] Specify how sleeping bodies join or ignore CCD islands.
 - [ ] Preserve existing wake stimuli unless tests prove an island-specific wake
   rule is required.
-- [ ] Treat immovable and kinematic participants as infinite mass in response
-  unless the active-kinematic-source plan has supplied a stronger contract.
+- [ ] Treat immovable and kinematic participants as infinite mass in response,
+  including active-source velocity handoff from kinematic movers to dynamic
+  targets once all island participants advance at shared TOI.
 - [ ] Add replay tests proving repeated runs produce identical island outcomes.
 
 ## Workstream 4: Mixed-Dimension Island Response

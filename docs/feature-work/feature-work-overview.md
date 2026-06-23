@@ -20,26 +20,29 @@ with evidence.
 These plans and evergreen closure trackers should be completed, or explicitly
 closed with evidence, before the alpha release.
 
-1. [`CCD Active Swept Sources`](2026-06-21-ccd-active-swept-sources-plan.md)
-   - Host-driven kinematic movement and rotation should be first-class swept
-     sources rather than passive targets only.
-2. [`CCD Exact TOI And Shape Reducers`](2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md)
+1. [`CCD Exact TOI And Shape Reducers`](2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md)
    - Remaining conservative reductions should become exact where the correctness
      gain justifies the cost, with deterministic fallback policy for unsupported
      shape families.
-3. [`CCD Service-Level Island Solver`](2026-06-21-ccd-service-level-island-solver-plan.md)
+2. [`CCD Service-Level Island Solver`](2026-06-21-ccd-service-level-island-solver-plan.md)
    - Dense, chained, same-TOI, and mixed continuous contacts need a deterministic
      service-level model where body-owned substeps are insufficient.
-4. [`Benchmark Signal Hardening Backlog`](benchmark-signal-hardening-backlog.md)
+3. [`Benchmark Signal Hardening Backlog`](benchmark-signal-hardening-backlog.md)
    - Measured allocation or runtime-cost signals must be reproduced, resolved,
      or closed with a no-change decision before alpha.
-5. [`Feature Work Issue Tracker`](issue-tracker.md)
+4. [`Feature Work Issue Tracker`](issue-tracker.md)
    - Bugs, correctness risks, documentation defects, and feature-work-discovered
      issues should be triaged, tested, and committed independently from feature
      design plans.
 
 ## Recently Completed
 
+- [`CCD Active Swept Sources`](done/2026-06-21-ccd-active-swept-sources-plan.md)
+  - Completed 2026-06-23. Host-driven kinematic 2D/3D translation and rotation
+    now run as active CCD sources; static-style blockers clip the source,
+    dynamic pure/mixed targets receive deterministic wake plus positional
+    correction, and benchmark/docs coverage was added under
+    `kinematic-active-ccd-scaling`.
 - [`Mixed Sphere Against 2D Slab Reducer Completion`](done/2026-06-23-mixed-sphere-2d-slab-reducer-completion-plan.md)
   - Completed 2026-06-23. `SweepSphereAgainst2D` now uses exact finite-slab
     reducers for 2D circle, AABB, convex polygon, and supported compound
@@ -78,12 +81,11 @@ first alpha release.
 
 ## Recommended Execution Order
 
-1. CCD active swept sources.
-2. CCD exact TOI and shape reducers.
-3. CCD service-level island solver.
-4. Benchmark signal closure pass.
+1. CCD exact TOI and shape reducers.
+2. CCD service-level island solver.
+3. Benchmark signal closure pass.
 
-This order now focuses on CCD source coverage, precision, and island-level
-behavior after public mixed query fallback directions were closed. Benchmark
-signals remain a closure pass so measured hot-path risks do not survive into
-alpha.
+This order now focuses on CCD precision and island-level behavior after public
+mixed query fallback directions and active kinematic source coverage were
+closed. Benchmark signals remain a closure pass so measured hot-path risks do
+not survive into alpha.
