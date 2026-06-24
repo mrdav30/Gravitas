@@ -185,6 +185,27 @@ public sealed class GravitasQuery3DServiceRaycastTests
         hits[0].Collider.Should().BeSameAs(collider);
     }
 
+    [Fact]
+    public void RaycastAll_ShouldNotAllocateAfterWarmup()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSSphereCollider near = CreateDynamicSphere(context, Vector3d.Zero);
+        LSSphereCollider far = CreateDynamicSphere(context, Vector3d.Right * 2);
+        var hits = new SwiftList<Physics3DHit>();
+
+        int count = context.Query3D
+            .RaycastAll(Vector(-2, 0, 0), Vector(4, 0, 0), IncludeLayerZero, hits);
+
+        count.Should().Be(2);
+        hits[0].Collider.Should().BeSameAs(near);
+        hits[1].Collider.Should().BeSameAs(far);
+
+        long allocatedBytes = AllocationTestHelper.MeasureSteadyState(
+            () => context.Query3D.RaycastAll(Vector(-2, 0, 0), Vector(4, 0, 0), IncludeLayerZero, hits));
+
+        allocatedBytes.Should().Be(0);
+    }
+
     private static Vector3d Vector(int x, int y, int z) => new((Fixed64)x, (Fixed64)y, (Fixed64)z);
 
     private static LSSphereCollider CreateDynamicSphere(GravitasWorldContext context, Vector3d position)

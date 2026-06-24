@@ -61,66 +61,13 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 
 | Signal | Status | Priority | Tracking |
 | --- | --- | --- | --- |
-| 3D full-runtime CCD allocation | Open | High | This backlog |
-| Grounding raycast probe allocation | Open | Medium | This backlog |
 | 3D shape-exact false-positive cost | Open | Medium | This backlog |
 | 3D dynamic shape-exact BDN allocation signal | Open | Medium | This backlog |
 | Pure 2D dynamic CCD candidate asymmetry | Open | Medium | This backlog |
 | SwiftCollections sort hot-path allocation | Mitigated in Gravitas, lower-stack open | Medium | This backlog |
 | Mixed mesh finite-slab triangle scaling signal | Open | Medium | This backlog |
 
-## Signal: 3D Full-Runtime CCD Allocation
-
-**Discovered:** 2026-06-21
-
-**Evidence:** The short in-process
-`continuous-collision-evidence` BenchmarkDotNet smoke reported pure 3D
-full-runtime rows allocating about `172,032 B/op` at `256` bodies and
-`688,138 B/op` at `1024` bodies. Pure 2D full-runtime rows and CCD attribution
-rows were effectively allocation-clean.
-
-**Update 2026-06-21:** Discrete response Workstream 3 reproduced the related
-steady-state CCD guardrail failures in xUnit after the 3D full-step phase order
-started exercising collision distribution during measured CCD frames. Root cause
-was comparer-based `Array.Sort` through package sorting in the collision
-distribution/island hot path. Gravitas now uses a centralized allocation-free
-runtime sort helper for active partitions, island buffers, and per-partition
-collider ID copies.
-The focused Release allocation guardrails for 3D substep, shape-exact
-translational, and rotational CCD now pass under full `Simulate` +
-`LateSimulate` measurement. `simulation-allocation` smoke also reported `0 B/op`
-for `CollisionPartitionDistributionOnly` and
-`ActivePairProcessingLateSimulate`.
-
-**Initial read:** The allocation is likely outside core CCD query/index/sweep
-math. Suspect reset, host-transform publish, partition refresh,
-collision-pair lifecycle, or another 3D full-runtime phase.
-
-**Why it matters:** CCD is a hot-path feature for fast movers. Lockstep
-simulations need predictable frame cost and should not introduce GC pressure
-that scales with body count.
-
-**Next isolation step:** Re-run the original `continuous-collision-evidence`
-rows after the Workstream 3 sort fix. If non-zero allocation remains, split the
-remaining full-runtime measurement into reset, host-transform publish,
-continuous target preparation, body late-simulate, and collision distribution
-sub-actions before changing runtime source.
-
-**Likely files:**
-
-- `src/Gravitas/Core/StiffBody.cs`
-- `src/Gravitas/Core/GravitasPhysicsService.cs`
-- `src/Gravitas/CollisionHandling/Pairs/*`
-- `src/Gravitas/Partitions/*`
-- `tests/Gravitas.Tests/Support/AllocationTestHelper.cs`
-- `tests/Gravitas.SharedBenchmarkSupport/ContinuousCollisionBenchmarkLayout.cs`
-- `tests/Gravitas.Benchmarks/Core/ContinuousCollisionEvidenceBenchmarks.cs`
-
-**Closure criteria:** The allocation source is identified and either removed or
-documented as benchmark-only. A test or benchmark row prevents the same signal
-from becoming invisible.
-
-## Signal: SwiftCollections Sort Hot-Path Allocation
+### Signal: SwiftCollections Sort Hot-Path Allocation
 
 **Discovered:** 2026-06-22
 
@@ -164,7 +111,7 @@ the Release and ReleaseLean allocation guardrails.
 and sorted-key copy APIs, Gravitas removes `SwiftListSortUtility`, and the
 same allocation guardrails pass under Release and ReleaseLean.
 
-## Signal: Mixed Mesh Finite-Slab Triangle Scaling Signal
+### Signal: Mixed Mesh Finite-Slab Triangle Scaling Signal
 
 **Discovered:** 2026-06-23
 
@@ -206,43 +153,7 @@ candidate volume, not only by collider count. Any future optimization preserves
 owner identity, lower triangle-index tie-breaks, and zero managed allocation
 after warmup.
 
-## Signal: Grounding Raycast Probe Allocation
-
-**Discovered:** 2026-06-21
-
-**Evidence:** During Discrete Response Workstream 3 verification, the Release
-`simulation-allocation` BenchmarkDotNet smoke reported
-`GroundingRaycastProbeOnly` at about `181.8 us` and `43,008 B/op` for
-`64` colliders. The same run reported no managed allocation for
-`StiffBodyLateSimulateOnly`, `GroundingSweptSphereProbeOnly`,
-`CollisionPartitionDistributionOnly`, and
-`ActivePairProcessingLateSimulate`.
-
-**Initial read:** This appears separate from the discrete island work and the
-collision distribution sort RCA. It likely belongs to the raycast-backed ground
-probe or one of the query result/candidate paths used by that benchmark row.
-
-**Why it matters:** Automatic raycast grounding is a recurring body hot path.
-If this allocation is repeatable outside BenchmarkDotNet noise, grounded 3D
-bodies can create avoidable GC pressure.
-
-**Next isolation step:** Reproduce with a focused
-`AllocationTestHelper.MeasureSteadyState` guardrail around one raycast-grounded
-body, then split automatic grounding into query candidate gathering, result
-ordering, self-filtering, and grounded-state update.
-
-**Likely files:**
-
-- `src/Gravitas/Core/StiffBody.cs`
-- `src/Gravitas/Queries/GravitasQuery3DService.Raycast.cs`
-- `tests/Gravitas.Benchmarks/Core/SimulationAllocationBenchmarks.cs`
-- `tests/Gravitas.Tests/Core/StiffBodyGroundingTests.cs`
-
-**Closure criteria:** The row is explained by benchmark-only setup, eliminated
-in the runtime path, or documented as an intentional allocation with a stronger
-host-facing alternative such as manual grounding.
-
-## Signal: 3D Shape-Exact False-Positive Cost
+### Signal: 3D Shape-Exact False-Positive Cost
 
 **Discovered:** 2026-06-21
 
@@ -274,7 +185,7 @@ candidates before optimizing reducer logic.
 a specific runtime hotspot. If optimized, correctness coverage proves no
 false-negative risk was introduced.
 
-## Signal: 3D Dynamic Shape-Exact BDN Allocation Signal
+### Signal: 3D Dynamic Shape-Exact BDN Allocation Signal
 
 **Discovered:** 2026-06-23
 
@@ -315,7 +226,7 @@ fixture churn.
 setup and documented, or a runtime/benchmark support fix removes it while the
 focused xUnit allocation guard remains green.
 
-## Signal: Pure 2D Dynamic CCD Candidate Asymmetry
+### Signal: Pure 2D Dynamic CCD Candidate Asymmetry
 
 **Discovered:** 2026-06-21
 
@@ -352,6 +263,143 @@ helpers for repeated work.
 or a specific 2D hot path. Any optimization preserves stable candidate ordering
 and duplicate suppression.
 
+## Closed Signals
+
+| Signal | Status | Closed | Resolution |
+| --- | --- | --- | --- |
+| 3D full-runtime CCD allocation | Closed | 2026-06-23 | GridForge allocation-free line tracing plus Gravitas 3D raycast adoption |
+| Grounding raycast probe allocation | Closed | 2026-06-23 | Same raycast trace fix removed automatic ray-grounding allocation |
+
+### Signal: 3D Full-Runtime CCD Allocation
+
+**Discovered:** 2026-06-21
+
+**Status:** Closed 2026-06-23
+
+**Evidence:** The short in-process
+`continuous-collision-evidence` BenchmarkDotNet smoke reported pure 3D
+full-runtime rows allocating about `172,032 B/op` at `256` bodies and
+`688,138 B/op` at `1024` bodies. Pure 2D full-runtime rows and CCD attribution
+rows were effectively allocation-clean.
+
+**Update 2026-06-21:** Discrete response Workstream 3 reproduced the related
+steady-state CCD guardrail failures in xUnit after the 3D full-step phase order
+started exercising collision distribution during measured CCD frames. Root cause
+was comparer-based `Array.Sort` through package sorting in the collision
+distribution/island hot path. Gravitas now uses a centralized allocation-free
+runtime sort helper for active partitions, island buffers, and per-partition
+collider ID copies.
+The focused Release allocation guardrails for 3D substep, shape-exact
+translational, and rotational CCD now pass under full `Simulate` +
+`LateSimulate` measurement. `simulation-allocation` smoke also reported `0 B/op`
+for `CollisionPartitionDistributionOnly` and
+`ActivePairProcessingLateSimulate`.
+
+**Initial read:** The allocation is likely outside core CCD query/index/sweep
+math. Suspect reset, host-transform publish, partition refresh,
+collision-pair lifecycle, or another 3D full-runtime phase.
+
+**Why it matters:** CCD is a hot-path feature for fast movers. Lockstep
+simulations need predictable frame cost and should not introduce GC pressure
+that scales with body count.
+
+**Completed isolation:** The original rows were rerun after the Workstream 3
+sort fix. Temporary attribution rows split reset, force setup, and late
+simulation enough to identify the moving-frame raycast grounding path.
+
+**RCA 2026-06-23:** The remaining allocation was not CCD-specific. The
+full-runtime 3D CCD evidence bodies moved each frame with automatic ray
+grounding enabled, and `StiffBody` grounding called `Query3D.RaycastAll`.
+The raycast service still used GridForge's enumerable `GridTracer.TraceLine`
+path, which allocated iterator/mapping state per ray. Reset, force setup, and
+non-moving late simulation attribution were allocation-clean.
+
+**Resolution 2026-06-23:** GridForge now exposes caller-owned
+`GridTracer.TraceLineInto(...)` overloads backed by `GridTraceScratch`.
+`GravitasQuery3DService` uses that allocation-free trace buffer for closest-hit
+and all-hit raycasts. A focused 3D `RaycastAll` allocation guard now protects
+the path.
+
+**Validation 2026-06-23:** Re-running the original
+`continuous-collision-evidence --filter "*Pure3DFullRuntime*DynamicCcdEvidence*"
+-j Short -i` smoke reduced:
+
+- `Pure3DFullRuntimeNoHitDynamicCcdEvidence`, `256` bodies:
+  `168 KB/op` -> `0 B/op`.
+- `Pure3DFullRuntimeDenseHitDynamicCcdEvidence`, `256` bodies:
+  `168.01 KB/op` -> `15 B/op`.
+- `Pure3DFullRuntimeNoHitDynamicCcdEvidence`, `1024` bodies:
+  `672.01 KB/op` -> `15 B/op`.
+- `Pure3DFullRuntimeDenseHitDynamicCcdEvidence`, `1024` bodies:
+  `672.01 KB/op` -> `15 B/op`.
+
+The remaining `15 B/op` values were not reproduced by the focused xUnit
+allocation guard and are treated as BenchmarkDotNet in-process measurement
+noise unless a future guardrail reproduces them.
+
+**Likely files:**
+
+- `src/Gravitas/Core/StiffBody.cs`
+- `src/Gravitas/Core/GravitasPhysicsService.cs`
+- `src/Gravitas/CollisionHandling/Pairs/*`
+- `src/Gravitas/Partitions/*`
+- `tests/Gravitas.Tests/Support/AllocationTestHelper.cs`
+- `tests/Gravitas.SharedBenchmarkSupport/ContinuousCollisionBenchmarkLayout.cs`
+- `tests/Gravitas.Benchmarks/Core/ContinuousCollisionEvidenceBenchmarks.cs`
+
+**Closure criteria:** Met. The allocation source was removed, the original
+benchmark rows were rerun, and a 3D `RaycastAll` allocation guard protects the
+runtime path.
+
+### Signal: Grounding Raycast Probe Allocation
+
+**Discovered:** 2026-06-21
+
+**Status:** Closed 2026-06-23
+
+**Evidence:** During Discrete Response Workstream 3 verification, the Release
+`simulation-allocation` BenchmarkDotNet smoke reported
+`GroundingRaycastProbeOnly` at about `181.8 us` and `43,008 B/op` for
+`64` colliders. The same run reported no managed allocation for
+`StiffBodyLateSimulateOnly`, `GroundingSweptSphereProbeOnly`,
+`CollisionPartitionDistributionOnly`, and
+`ActivePairProcessingLateSimulate`.
+
+**Initial read:** This appears separate from the discrete island work and the
+collision distribution sort RCA. It likely belongs to the raycast-backed ground
+probe or one of the query result/candidate paths used by that benchmark row.
+
+**Why it matters:** Automatic raycast grounding is a recurring body hot path.
+If this allocation is repeatable outside BenchmarkDotNet noise, grounded 3D
+bodies can create avoidable GC pressure.
+
+**Completed isolation:** The focused 3D raycast allocation guard and grounding
+benchmark confirmed the automatic ray-grounding allocation came from the shared
+raycast trace path.
+
+**RCA 2026-06-23:** This was the same root cause as the remaining 3D
+full-runtime CCD allocation: automatic ray grounding used `Query3D.RaycastAll`,
+which depended on the enumerable GridForge line-trace path.
+
+**Resolution 2026-06-23:** Gravitas 3D raycasts now use GridForge's
+caller-owned `TraceLineInto(...)` path. The grounding row no longer allocates
+after warmup.
+
+**Validation 2026-06-23:** Re-running
+`simulation-allocation --filter "*Grounding*" -j Short -i` reported
+`GroundingRaycastProbeOnly` at `164.9 us` and `0 B/op` for `64` colliders.
+`GroundingSweptSphereProbeOnly` also remained allocation-clean.
+
+**Likely files:**
+
+- `src/Gravitas/Core/StiffBody.cs`
+- `src/Gravitas/Queries/GravitasQuery3DService.Raycast.cs`
+- `tests/Gravitas.Benchmarks/Core/SimulationAllocationBenchmarks.cs`
+- `tests/Gravitas.Tests/Core/StiffBodyGroundingTests.cs`
+
+**Closure criteria:** Met. The runtime allocation was eliminated and the 3D
+raycast path now has a focused xUnit allocation guard.
+
 ## Watch Items
 
 - Mixed full-runtime CCD rows were heavier than pure 2D or pure 3D rows at
@@ -374,11 +422,7 @@ Promote a signal from this backlog into a dedicated dated plan when it has:
 
 ## Current Recommendation
 
-Re-run the `continuous-collision-evidence` rows after the Workstream 3
-centralized no-allocation sort fix before optimizing the remaining CCD cost
-signals. If the original full-runtime CCD allocation is gone, close or downgrade
-that signal and move to the grounding raycast allocation RCA because it now has
-the clearest repeatable managed-allocation evidence in the simulation-allocation
-smoke. After allocation sources are explained, revisit the shape-exact and 2D
-dynamic CCD cost signals with fresh evidence so their timings are easier to
-interpret.
+With the shared 3D raycast/grounding allocation root cause closed, revisit the
+shape-exact and pure 2D dynamic CCD cost signals with fresh evidence. Capture
+candidate counts before optimizing timings so reducer cost, candidate volume,
+and benchmark fixture behavior do not get conflated.
