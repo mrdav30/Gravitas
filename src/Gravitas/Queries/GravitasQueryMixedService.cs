@@ -38,12 +38,14 @@ public sealed class GravitasQueryMixedService
 
     internal int LastQueryCandidateCount { get; private set; }
 
+    internal int LastMeshTriangleCandidateCount { get; private set; }
+
     public void Reset()
     {
         _candidates2D.FastClear();
         _candidates3D.FastClear();
         _meshTriangleCandidates.FastClear();
-        LastQueryCandidateCount = 0;
+        ResetLastQueryCounters();
     }
 
     /// <summary>
@@ -131,7 +133,7 @@ public sealed class GravitasQueryMixedService
         Vector3d segment = end - start;
         if (segment.MagnitudeSquared <= Fixed64.Epsilon)
         {
-            LastQueryCandidateCount = 0;
+            ResetLastQueryCounters();
             hit = default;
             return false;
         }
@@ -147,6 +149,7 @@ public sealed class GravitasQueryMixedService
             staticStyleOnly: staticTargetsOnly,
             cachePartitionRefresh: cacheTargetPartitions);
         LastQueryCandidateCount = _candidates2D.Count;
+        LastMeshTriangleCandidateCount = 0;
         bool captureReducerDiagnostics = _context.Diagnostics.Enabled;
         QueryReducerCounters reducerCounters = default;
         bool found = false;
@@ -211,7 +214,7 @@ public sealed class GravitasQueryMixedService
         Vector3d segment = end - start;
         if (segment.MagnitudeSquared <= Fixed64.Epsilon)
         {
-            LastQueryCandidateCount = 0;
+            ResetLastQueryCounters();
             return 0;
         }
 
@@ -226,6 +229,7 @@ public sealed class GravitasQueryMixedService
             staticStyleOnly: staticTargetsOnly,
             cachePartitionRefresh: cacheTargetPartitions);
         LastQueryCandidateCount = _candidates2D.Count;
+        LastMeshTriangleCandidateCount = 0;
         bool captureReducerDiagnostics = _context.Diagnostics.Enabled;
         QueryReducerCounters reducerCounters = default;
 
@@ -364,7 +368,7 @@ public sealed class GravitasQueryMixedService
         Vector2d segment = end - start;
         if (segment.MagnitudeSquared <= Fixed64.Epsilon)
         {
-            LastQueryCandidateCount = 0;
+            ResetLastQueryCounters();
             hit = default;
             return false;
         }
@@ -383,6 +387,7 @@ public sealed class GravitasQueryMixedService
             staticStyleOnly: staticTargetsOnly,
             cachePartitionRefresh: cacheTargetPartitions);
         LastQueryCandidateCount = _candidates3D.Count;
+        LastMeshTriangleCandidateCount = 0;
         bool captureReducerDiagnostics = _context.Diagnostics.Enabled;
         QueryReducerCounters reducerCounters = default;
         bool found = false;
@@ -453,7 +458,7 @@ public sealed class GravitasQueryMixedService
         Vector2d segment = end - start;
         if (segment.MagnitudeSquared <= Fixed64.Epsilon)
         {
-            LastQueryCandidateCount = 0;
+            ResetLastQueryCounters();
             return 0;
         }
 
@@ -471,6 +476,7 @@ public sealed class GravitasQueryMixedService
             staticStyleOnly: staticTargetsOnly,
             cachePartitionRefresh: cacheTargetPartitions);
         LastQueryCandidateCount = _candidates3D.Count;
+        LastMeshTriangleCandidateCount = 0;
         bool captureReducerDiagnostics = _context.Diagnostics.Enabled;
         QueryReducerCounters reducerCounters = default;
 
@@ -1012,6 +1018,7 @@ public sealed class GravitasQueryMixedService
             out Vector3d min,
             out Vector3d max);
         mesh.GetTrianglesInBounds(new FixedBoundVolume(min, max), _meshTriangleCandidates);
+        LastMeshTriangleCandidateCount += _meshTriangleCandidates.Count;
 
         Fixed64 slabMinY = slabCenterY - halfThickness;
         Fixed64 slabMaxY = slabCenterY + halfThickness;
@@ -2582,6 +2589,13 @@ public sealed class GravitasQueryMixedService
 
         found = true;
         bestDistance = candidateDistance;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void ResetLastQueryCounters()
+    {
+        LastQueryCandidateCount = 0;
+        LastMeshTriangleCandidateCount = 0;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

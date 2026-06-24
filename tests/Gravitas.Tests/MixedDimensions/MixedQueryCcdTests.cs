@@ -898,6 +898,40 @@ public sealed class MixedQueryCcdTests
     }
 
     [Fact]
+    public void SweepCircleAgainst3D_WithMeshTarget_ShouldReportTriangleCandidateCount()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        _ = CreateMesh3D(
+            context,
+            MeshTestFixtures.CreateVerticalQuad(Fixed64.Zero, -Fixed64.One, Fixed64.One),
+            Vector3d.Zero,
+            immovable: true);
+        var hits = new SwiftList<PhysicsMixedHit>();
+
+        int count = context.QueryMixed.SweepCircleAgainst3DAll(
+            new Vector2d((Fixed64)(-3), Fixed64.Zero),
+            new Vector2d((Fixed64)3, Fixed64.Zero),
+            Fixed64.Half,
+            Fixed64.One,
+            Fixed64.Half,
+            IncludeLayerZero,
+            hits);
+
+        count.Should().Be(1);
+        context.QueryMixed.LastQueryCandidateCount.Should().Be(1);
+        context.QueryMixed.LastMeshTriangleCandidateCount.Should().Be(2);
+
+        _ = context.QueryMixed.SweepSphereAgainst2DAll(
+            new Vector3d((Fixed64)(-3), Fixed64.One, Fixed64.Zero),
+            new Vector3d((Fixed64)3, Fixed64.One, Fixed64.Zero),
+            Fixed64.Half,
+            IncludeLayerZero,
+            hits);
+
+        context.QueryMixed.LastMeshTriangleCandidateCount.Should().Be(0);
+    }
+
+    [Fact]
     public void SweepCircleAgainst3D_WithMeshTriangleProxyOnlyHit_ShouldRejectFiniteSlabMiss()
     {
         using GravitasWorldContext context = CreateMixedContext();

@@ -64,6 +64,8 @@ public sealed partial class GravitasQuery3DService
 
     internal int LastQueryCandidateCount { get; private set; }
 
+    internal int LastMeshTriangleCandidateCount { get; private set; }
+
     /// <summary>
     /// Resets context-local raycast query buffers.
     /// </summary>
@@ -71,7 +73,7 @@ public sealed partial class GravitasQuery3DService
     {
         RaycastVersion = 0;
         CircleVersion = 0;
-        LastQueryCandidateCount = 0;
+        ResetLastQueryCounters();
         _bufferIntersectionPoints.FastClear();
         _redundantColliderCheck.Clear();
         _redundantVoxelCheck.Clear();
@@ -92,7 +94,7 @@ public sealed partial class GravitasQuery3DService
         _currentLayerMask = layerMask;
         if (direction.MagnitudeSquared == Fixed64.Zero || maxDistance <= Fixed64.Zero)
         {
-            LastQueryCandidateCount = 0;
+            ResetLastQueryCounters();
             raycastHit = default;
             return false;
         }
@@ -130,7 +132,7 @@ public sealed partial class GravitasQuery3DService
         Vector3d segment = end3d - start3d;
         if (segment.MagnitudeSquared == Fixed64.Zero)
         {
-            LastQueryCandidateCount = 0;
+            ResetLastQueryCounters();
             return 0;
         }
 
@@ -162,7 +164,7 @@ public sealed partial class GravitasQuery3DService
     {
         if (direction.MagnitudeSquared == Fixed64.Zero || maxDistance <= Fixed64.Zero)
         {
-            LastQueryCandidateCount = 0;
+            ResetLastQueryCounters();
             sweepHit = default;
             return false;
         }
@@ -494,7 +496,7 @@ public sealed partial class GravitasQuery3DService
         Vector3d segment = end3d - start3d;
         if (segment.MagnitudeSquared == Fixed64.Zero || radius <= Fixed64.Zero)
         {
-            LastQueryCandidateCount = 0;
+            ResetLastQueryCounters();
             return 0;
         }
 
@@ -523,7 +525,7 @@ public sealed partial class GravitasQuery3DService
         sweepHit = default;
         if (displacement.MagnitudeSquared <= Fixed64.Epsilon)
         {
-            LastQueryCandidateCount = 0;
+            ResetLastQueryCounters();
             return false;
         }
 
@@ -552,7 +554,7 @@ public sealed partial class GravitasQuery3DService
         results.FastClear();
         if (displacement.MagnitudeSquared <= Fixed64.Epsilon)
         {
-            LastQueryCandidateCount = 0;
+            ResetLastQueryCounters();
             return 0;
         }
 
@@ -584,7 +586,7 @@ public sealed partial class GravitasQuery3DService
         _currentStaticSweepTargetsOnly = staticTargetsOnly;
         _redundantColliderCheck.Clear();
         _redundantVoxelCheck.Clear();
-        LastQueryCandidateCount = 0;
+        ResetLastQueryCounters();
         RaycastVersion++;
     }
 
@@ -597,7 +599,7 @@ public sealed partial class GravitasQuery3DService
         _currentSweepSourceCollider = null;
         _currentStaticSweepTargetsOnly = false;
         _currentIncludeTriggers = true;
-        LastQueryCandidateCount = 0;
+        ResetLastQueryCounters();
         RaycastVersion++;
         _worker.PrepareSegmentCheck(start, end);
     }
@@ -618,7 +620,7 @@ public sealed partial class GravitasQuery3DService
         _currentStaticSweepTargetsOnly = staticTargetsOnly;
         _redundantColliderCheck.Clear();
         _redundantVoxelCheck.Clear();
-        LastQueryCandidateCount = 0;
+        ResetLastQueryCounters();
         RaycastVersion++;
         _sweepWorker.Prepare(start, end, radius);
     }
@@ -634,14 +636,14 @@ public sealed partial class GravitasQuery3DService
         sweepHit = default;
         if (radius <= Fixed64.Zero)
         {
-            LastQueryCandidateCount = 0;
+            ResetLastQueryCounters();
             return false;
         }
 
         Vector3d segment = end - start;
         if (segment.MagnitudeSquared == Fixed64.Zero)
         {
-            LastQueryCandidateCount = 0;
+            ResetLastQueryCounters();
             return false;
         }
 
@@ -1240,9 +1242,15 @@ public sealed partial class GravitasQuery3DService
     private bool TryBuildConvexSweepHitForCollider(int colliderId, out Physics3DHit hit)
     {
         hit = default;
-        return _context.Physics.TryGetColliderById(colliderId, out LSCollider? current)
-            && IsSweepCandidate(current)
-            && _convexSweepWorker.TrySweepPreparedSource(current!, out hit);
+        if (!_context.Physics.TryGetColliderById(colliderId, out LSCollider? current)
+            || !IsSweepCandidate(current))
+        {
+            return false;
+        }
+
+        bool found = _convexSweepWorker.TrySweepPreparedSource(current!, out hit);
+        LastMeshTriangleCandidateCount += _convexSweepWorker.LastMeshTriangleCandidateCount;
+        return found;
     }
 
     private bool TryBuildHit(
@@ -1282,13 +1290,22 @@ public sealed partial class GravitasQuery3DService
         out Physics3DHit sweepHit)
     {
         sweepHit = default;
-        if (!_sweepWorker.TrySweep(collider, out Vector3d sweepCenter, out Fixed64 distance))
+        bool found = _sweepWorker.TrySweep(collider, out Vector3d sweepCenter, out Fixed64 distance);
+        LastMeshTriangleCandidateCount += _sweepWorker.LastMeshTriangleCandidateCount;
+        if (!found)
             return false;
 
         Vector3d point = GetSweepSurfacePoint(collider, sweepCenter, direction);
         Vector3d normal = ResolveSweepNormal(collider, point, sweepCenter, direction);
         sweepHit = new Physics3DHit(collider, point, normal, distance, direction);
         return true;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void ResetLastQueryCounters()
+    {
+        LastQueryCandidateCount = 0;
+        LastMeshTriangleCandidateCount = 0;
     }
 
     private bool DoesCurrentColliderIntersectRay(LSCollider? current)

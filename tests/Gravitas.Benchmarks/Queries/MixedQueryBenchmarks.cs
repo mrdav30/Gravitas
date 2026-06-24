@@ -3,9 +3,7 @@ using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.Queries;
 using Gravitas.Support;
-using GridForge.Configuration;
 using SwiftCollections;
-using System;
 
 namespace Gravitas.Benchmarks;
 
@@ -42,20 +40,20 @@ public class MixedQueryBenchmarks
         int sparseExtentX = 16 + (ColliderCount * 3);
         int denseExtentX = 16 + ColliderCount;
 
-        _sparseContext = CreateMixedContext(sparseExtentX, 16, clearAllPools: true);
-        _denseContext = CreateMixedContext(denseExtentX, 16);
-        _cornerMissContext = CreateMixedContext(denseExtentX, 16);
-        _denseCuboidContext = CreateMixedContext(denseExtentX, 16);
-        _denseCapsuleContext = CreateMixedContext(denseExtentX, 16);
-        _denseCylinderContext = CreateMixedContext(denseExtentX, 16);
-        _denseRotatedCapsuleContext = CreateMixedContext(denseExtentX, 16);
-        _denseRotatedCylinderContext = CreateMixedContext(denseExtentX, 16);
-        _sparseMeshContext = CreateMixedContext(sparseExtentX, 16);
-        _denseMeshContext = CreateMixedContext(denseExtentX, 16);
-        _falsePositiveMeshContext = CreateMixedContext(denseExtentX, 16);
-        _sparseCompoundContext = CreateMixedContext(sparseExtentX, 16);
-        _denseCompoundContext = CreateMixedContext(denseExtentX, 16);
-        _falsePositiveCompoundContext = CreateMixedContext(denseExtentX, 16);
+        _sparseContext = BenchmarkPhysicsScene.CreateMixedContext(sparseExtentX, 16, clearAllPools: true);
+        _denseContext = BenchmarkPhysicsScene.CreateMixedContext(denseExtentX, 16);
+        _cornerMissContext = BenchmarkPhysicsScene.CreateMixedContext(denseExtentX, 16);
+        _denseCuboidContext = BenchmarkPhysicsScene.CreateMixedContext(denseExtentX, 16);
+        _denseCapsuleContext = BenchmarkPhysicsScene.CreateMixedContext(denseExtentX, 16);
+        _denseCylinderContext = BenchmarkPhysicsScene.CreateMixedContext(denseExtentX, 16);
+        _denseRotatedCapsuleContext = BenchmarkPhysicsScene.CreateMixedContext(denseExtentX, 16);
+        _denseRotatedCylinderContext = BenchmarkPhysicsScene.CreateMixedContext(denseExtentX, 16);
+        _sparseMeshContext = BenchmarkPhysicsScene.CreateMixedContext(sparseExtentX, 16);
+        _denseMeshContext = BenchmarkPhysicsScene.CreateMixedContext(denseExtentX, 16);
+        _falsePositiveMeshContext = BenchmarkPhysicsScene.CreateMixedContext(denseExtentX, 16);
+        _sparseCompoundContext = BenchmarkPhysicsScene.CreateMixedContext(sparseExtentX, 16);
+        _denseCompoundContext = BenchmarkPhysicsScene.CreateMixedContext(denseExtentX, 16);
+        _falsePositiveCompoundContext = BenchmarkPhysicsScene.CreateMixedContext(denseExtentX, 16);
         _hits = new SwiftList<PhysicsMixedHit>(ColliderCount);
         FixedQuaternion rotatedCurvedTarget = FixedQuaternion.FromEulerAnglesInDegrees(Fixed64.Zero, Fixed64.Zero, (Fixed64)90);
 
@@ -329,22 +327,6 @@ public class MixedQueryBenchmarks
     {
         _ = SweepCircleAgainst3D(_falsePositiveCompoundContext, _denseEnd);
         return _falsePositiveCompoundContext.QueryMixed.LastQueryCandidateCount;
-    }
-
-    private static GravitasWorldContext CreateMixedContext(int extentX, int extentZ, bool clearAllPools = false)
-    {
-        GravitasWorldContext context = BenchmarkEnvironment.PrepareOwnedContext(clearAllPools);
-        context.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
-        if (!context.World.TryAddGrid(
-            new GridConfiguration(
-                new Vector3d((Fixed64)(-8), (Fixed64)(-4), (Fixed64)(-8)),
-                new Vector3d((Fixed64)extentX, (Fixed64)4, (Fixed64)extentZ)),
-            out _))
-        {
-            throw new InvalidOperationException("Unable to create mixed query benchmark grid.");
-        }
-
-        return context;
     }
 
     private static StiffBody CreateSphere3D(GravitasWorldContext context, Vector3d position)

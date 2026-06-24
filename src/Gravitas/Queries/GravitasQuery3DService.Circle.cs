@@ -30,6 +30,7 @@ public sealed partial class GravitasQuery3DService
     {
         _currentLayerMask = layerMask;
         CircleVersion++;
+        ResetLastQueryCounters();
         _redundantColliderCheck.Clear();
         _redundantVoxelCheck.Clear();
 
@@ -66,6 +67,7 @@ public sealed partial class GravitasQuery3DService
     {
         _currentLayerMask = layerMask;
         CircleVersion++;
+        ResetLastQueryCounters();
         _redundantColliderCheck.Clear();
         _redundantVoxelCheck.Clear();
 
@@ -111,6 +113,7 @@ public sealed partial class GravitasQuery3DService
 
         _currentLayerMask = layerMask;
         CircleVersion++;
+        ResetLastQueryCounters();
 
         results.FastClear();
         _redundantColliderCheck.Clear();
@@ -146,7 +149,7 @@ public sealed partial class GravitasQuery3DService
         results.FastClear();
         if (radius <= Fixed64.Zero)
         {
-            LastQueryCandidateCount = 0;
+            ResetLastQueryCounters();
             return 0;
         }
 
@@ -155,7 +158,7 @@ public sealed partial class GravitasQuery3DService
         _currentIncludeTriggers = includeTriggers;
         _currentStaticSweepTargetsOnly = true;
         CircleVersion++;
-        LastQueryCandidateCount = 0;
+        ResetLastQueryCounters();
         _redundantColliderCheck.Clear();
         _redundantVoxelCheck.Clear();
 
@@ -455,6 +458,7 @@ public sealed partial class GravitasQuery3DService
         }
 
         collider.CircleQueryVersion = CircleVersion;
+        LastQueryCandidateCount++;
         Fixed64 broadDistance = collider.ScaledRadius + radius;
         if ((collider.Center - position).MagnitudeSquared > broadDistance * broadDistance)
             return false;

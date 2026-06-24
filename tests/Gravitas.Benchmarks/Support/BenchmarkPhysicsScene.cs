@@ -1,5 +1,6 @@
 using FixedMathSharp;
 using Gravitas.Colliders;
+using Gravitas.Support;
 using GridForge.Configuration;
 using SwiftCollections;
 using SwiftCollections.Diagnostics;
@@ -18,6 +19,21 @@ internal static class BenchmarkPhysicsScene
     {
         GravitasWorldContext context = BenchmarkEnvironment.PrepareOwnedContext(clearAllPools);
         AddGrid(context, gridExtent);
+        return context;
+    }
+
+    public static GravitasWorldContext CreateMixedContext(int extentX, int extentZ, bool clearAllPools = false)
+    {
+        GravitasWorldContext context = BenchmarkEnvironment.PrepareOwnedContext(clearAllPools);
+        context.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
+        SwiftThrowHelper.ThrowIfTrue(
+            !context.World.TryAddGrid(
+                new GridConfiguration(
+                    new Vector3d((Fixed64)(-8), (Fixed64)(-4), (Fixed64)(-8)),
+                    new Vector3d((Fixed64)extentX, (Fixed64)4, (Fixed64)extentZ)),
+                out _),
+            message: "Unable to add mixed benchmark GridForge grid.");
+
         return context;
     }
 
@@ -131,12 +147,7 @@ internal static class BenchmarkPhysicsScene
     public static int CreateStaticSphereGrid(GravitasWorldContext context, int count)
     {
         for (int i = 0; i < count; i++)
-        {
-            Vector3d position = PositionForGridIndex(i);
-            var agent = new BenchmarkMatterAgent(context, position);
-            var collider = new LSSphereCollider();
-            collider.InitializeWithNoBody(agent);
-        }
+            CreateStaticCollider(context, new LSSphereCollider(), PositionForGridIndex(i));
 
         return context.Physics.AssimilatedColliderCount;
     }
@@ -144,13 +155,102 @@ internal static class BenchmarkPhysicsScene
     public static int CreateStaticMeshWallLine(GravitasWorldContext context, int count)
     {
         for (int i = 0; i < count; i++)
-        {
-            var agent = new BenchmarkMatterAgent(context, new Vector3d(i * DefaultSpacing, 0, 0));
-            LSMeshCollider collider = CreateVerticalQuadMesh();
-            collider.InitializeWithNoBody(agent);
-        }
+            CreateStaticCollider(context, CreateVerticalQuadMesh(), new Vector3d(i * DefaultSpacing, 0, 0));
 
         return context.Physics.AssimilatedColliderCount;
+    }
+
+    public static TCollider CreateStaticCollider<TCollider>(
+        GravitasWorldContext context,
+        TCollider collider,
+        Vector3d position)
+        where TCollider : LSCollider
+    {
+        var agent = new BenchmarkMatterAgent(context, position);
+        collider.InitializeWithNoBody(agent);
+        return collider;
+    }
+
+    public static LSMeshCollider CreateSubdividedVerticalQuadMesh(
+        int subdivision,
+        MeshColliderMode mode = MeshColliderMode.Convex)
+    {
+        SwiftThrowHelper.ThrowIfArgument(
+            subdivision <= 0,
+            nameof(subdivision),
+            "Subdivision count must be greater than zero.");
+
+        int width = subdivision + 1;
+        var vertices = new Vector3d[width * width];
+        var triangles = new int[subdivision * subdivision * 6];
+
+        for (int y = 0; y <= subdivision; y++)
+        {
+            Fixed64 vertexY = Fixed64.FromFraction(y, subdivision) - Fixed64.Half;
+            for (int z = 0; z <= subdivision; z++)
+            {
+                Fixed64 vertexZ = Fixed64.FromFraction(z, subdivision) - Fixed64.Half;
+                vertices[(y * width) + z] = new Vector3d(Fixed64.Zero, vertexY, vertexZ);
+            }
+        }
+
+        int triangleOffset = 0;
+        for (int y = 0; y < subdivision; y++)
+        {
+            for (int z = 0; z < subdivision; z++)
+            {
+                int lowerLeft = (y * width) + z;
+                int lowerRight = lowerLeft + 1;
+                int upperLeft = ((y + 1) * width) + z;
+                int upperRight = upperLeft + 1;
+
+                AddTriangle(triangles, ref triangleOffset, lowerLeft, upperLeft, lowerRight);
+                AddTriangle(triangles, ref triangleOffset, lowerRight, upperLeft, upperRight);
+            }
+        }
+
+        return new LSMeshCollider(
+            vertices,
+            triangles,
+            mode,
+            MeshInertiaPolicy.SurfaceApproximation);
+    }
+
+    public static LSMeshCollider CreateRepeatedSlabClippedProxyOnlyTriangleMesh(int triangleCount)
+    {
+        SwiftThrowHelper.ThrowIfArgument(
+            triangleCount <= 0,
+            nameof(triangleCount),
+            "Triangle count must be greater than zero.");
+
+        var vertices = new Vector3d[triangleCount * 3];
+        var triangles = new int[triangleCount * 3];
+        for (int i = 0; i < triangleCount; i++)
+        {
+            int vertexOffset = i * 3;
+            vertices[vertexOffset] = new Vector3d(
+                Fixed64.Zero,
+                -Fixed64.One,
+                Fixed64.FromFraction(49, 100));
+            vertices[vertexOffset + 1] = new Vector3d(
+                Fixed64.Zero,
+                Fixed64.One,
+                Fixed64.FromFraction(71, 100));
+            vertices[vertexOffset + 2] = new Vector3d(
+                Fixed64.Zero,
+                -Fixed64.One,
+                Fixed64.One);
+
+            triangles[vertexOffset] = vertexOffset;
+            triangles[vertexOffset + 1] = vertexOffset + 1;
+            triangles[vertexOffset + 2] = vertexOffset + 2;
+        }
+
+        return new LSMeshCollider(
+            vertices,
+            triangles,
+            MeshColliderMode.Concave,
+            MeshInertiaPolicy.SurfaceApproximation);
     }
 
     public static int GridExtentForLine(int count) =>
@@ -366,6 +466,13 @@ internal static class BenchmarkPhysicsScene
         triangles.Add(a);
         triangles.Add(b);
         triangles.Add(c);
+    }
+
+    private static void AddTriangle(int[] triangles, ref int offset, int a, int b, int c)
+    {
+        triangles[offset++] = a;
+        triangles[offset++] = b;
+        triangles[offset++] = c;
     }
 
     private static LSMeshCollider CreateVerticalQuadMesh()

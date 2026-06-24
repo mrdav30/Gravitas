@@ -62,7 +62,6 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 | Signal | Status | Priority | Tracking |
 | --- | --- | --- | --- |
 | SwiftCollections sort hot-path allocation | Mitigated in Gravitas, lower-stack open | Medium | This backlog |
-| Mixed mesh finite-slab triangle scaling signal | Open | Medium | This backlog |
 
 ### Signal: SwiftCollections Sort Hot-Path Allocation
 
@@ -108,9 +107,22 @@ the Release and ReleaseLean allocation guardrails.
 and sorted-key copy APIs, Gravitas removes `SwiftListSortUtility`, and the
 same allocation guardrails pass under Release and ReleaseLean.
 
+## Closed Signals
+
+| Signal | Status | Closed | Resolution |
+| --- | --- | --- | --- |
+| Mixed mesh finite-slab triangle scaling signal | Closed | 2026-06-24 | Mixed and pure 3D query services now expose mesh-triangle candidate counts, dedicated triangle-volume benchmarks cover dense and false-positive mesh targets, and pure 3D convex-source mesh sweeps use ordered lower-bound triangle candidates |
+| Pure 2D dynamic CCD candidate asymmetry | Closed | 2026-06-23 | 2D now uses a planar candidate index, skips mixed CCD indexing outside mixed mode, and benchmark resets use 2D reset parity |
+| 3D shape-exact false-positive cost | Closed | 2026-06-23 | Static CCD now uses exact-source sweeps for non-sphere convex movers before conservative sphere fallback refinement |
+| 3D dynamic shape-exact BDN allocation signal | Closed | 2026-06-23 | Shared exact-sweep bounds prefilters removed the scaling allocation/time signal from 3D dynamic false-positive rows |
+| 3D full-runtime CCD allocation | Closed | 2026-06-23 | GridForge allocation-free line tracing plus Gravitas 3D raycast adoption |
+| Grounding raycast probe allocation | Closed | 2026-06-23 | Same raycast trace fix removed automatic ray-grounding allocation |
+
 ### Signal: Mixed Mesh Finite-Slab Triangle Scaling Signal
 
 **Discovered:** 2026-06-23
+
+**Status:** Closed 2026-06-24
 
 **Evidence:** During mixed finite-slab reducer close-out review,
 `MixedQueryBenchmarks` covered mesh target scaling mostly through collider
@@ -118,47 +130,73 @@ candidate count. The mesh fixtures were tiny triangle sets, so dense mesh
 triangle candidate scanning, triangle clipping, and per-triangle reducer cost
 could regress without a dedicated row making that cost visible.
 
-**Update 2026-06-23:** The mixed mesh target reducer no longer sorts triangle
-candidate buffers before scanning. It now preserves deterministic lower
-authored triangle-index tie-breaks by tracking the best triangle index directly,
-removing the avoidable per-mesh `O(k log k)` step.
+**RCA 2026-06-24:** The mixed reducer itself was not hiding an obvious stronger
+hot-path algorithm. A speculative sorted/lower-bound candidate pass improved
+some dense-hit rows but regressed false-positive-heavy slabs, and a more
+conservative hybrid pass still added cost without enough pruning. The final
+mixed path keeps authored triangle scan order, tracks the best lower triangle
+index directly, and uses the new benchmark/counter coverage as the guardrail.
 
-**Update 2026-06-23:** A short in-process `mixed-query --filter
-"*MeshTargets*" -j Short -i` smoke completed successfully. MemoryDiagnoser
-reported no managed allocation for some mesh rows, but tiny per-op values on
-some candidate-count and 1024-collider rows (`1 B/op` to `20 B/op`). Treat this
-as additional evidence that a focused triangle-level allocation/scaling
-guardrail is useful before treating the mixed mesh reducer path as closed.
+The carryover pure 3D review did find a real mesh reducer bottleneck:
+convex-source sweeps against concave mesh targets scanned exact triangle
+reducers in raw candidate order. Ordering concave target triangle candidates by
+a deterministic sweep lower bound lets the worker stop once the current best
+TOI cannot be beaten by remaining triangles.
 
-**Why it matters:** Mesh-backed mixed queries are attractive for level
-geometry. Collider-count benchmarks do not necessarily expose triangle-level
-cost, especially when one mesh collider can own many candidate triangles.
+**Resolution 2026-06-24:**
 
-**Next isolation step:** Add a mixed query benchmark with high-triangle mesh
-targets and false-positive-heavy slabs. If runtime diagnostics need to explain
-the row, expose a benchmark-only or durable mesh-triangle candidate counter
-without adding disabled-path cost.
+- `GravitasQueryMixedService` now exposes a context-owned
+  `LastMeshTriangleCandidateCount` for mixed mesh-target sweeps.
+- `GravitasQuery3DService`, `SweptSphereQueryWorker`, and
+  `ConvexSweepQueryWorker` expose matching 3D mesh-triangle candidate counts.
+- `MixedMeshTriangleScalingBenchmarks` measures dense and false-positive
+  mixed mesh targets by triangle volume rather than collider count.
+- `MeshQuery3DTriangleScalingBenchmarks` measures pure 3D swept-sphere mesh
+  targets and convex-source sweeps against dense concave mesh targets.
+- `ConvexSweepQueryWorker` now sorts concave mesh target triangles by
+  deterministic lower-bound TOI and authored triangle index, then exits once
+  remaining triangles cannot beat the current best hit.
+
+**Validation 2026-06-24:** Re-running
+`mixed-mesh-triangle-scaling --filter "*TriangleMeshTarget*" -j Short -i`
+reported predictable triangle-volume scaling with no recurring managed
+allocation:
+
+- Dense mixed target: `139.4 us` at `128` triangles, `514.2 us` at `512`
+  triangles, and `2.031 ms` at `2048` triangles.
+- False-positive mixed target: `136.6 us` at `128` triangles, `520.8 us` at
+  `512` triangles, and `2.089 ms` at `2048` triangles.
+
+Re-running
+`mesh-query3-d-triangle-scaling --filter "*TriangleMeshTarget*" -j Short -i`
+after the pure 3D carryover optimization reported:
+
+- Swept-sphere dense mesh targets remain a tracked linear path: `550.1 us`,
+  `2.145 ms`, and `8.638 ms` for `128`, `512`, and `2048` triangles.
+- Convex-source sweeps against dense concave mesh targets improved from the
+  pre-change baseline of about `12.465 ms`, `207.777 ms`, and `3.137 s` to
+  `125.4 us`, `441.1 us`, and `1.658 ms` at the same triangle counts.
+
+Focused mixed/3D query tests and the benchmark project build passed after the
+change.
 
 **Likely files:**
 
 - `src/Gravitas/Queries/GravitasQueryMixedService.cs`
-- `tests/Gravitas.Benchmarks/Queries/MixedQueryBenchmarks.cs`
+- `src/Gravitas/Queries/GravitasQuery3DService.Raycast.cs`
+- `src/Gravitas/Queries/GravitasQuery3DService.Circle.cs`
+- `src/Gravitas/Queries/ConvexSweepQueryWorker.cs`
+- `src/Gravitas/Queries/SweptSphereQueryWorker.cs`
+- `tests/Gravitas.Tests/MixedDimensions/MixedQueryCcdTests.cs`
+- `tests/Gravitas.Tests/Queries/GravitasQuery3DServiceSweepTests.cs`
+- `tests/Gravitas.Benchmarks/Queries/MixedMeshTriangleScalingBenchmarks.cs`
+- `tests/Gravitas.Benchmarks/Queries/MeshQuery3DTriangleScalingBenchmarks.cs`
 - `tests/Gravitas.Benchmarks/Support/BenchmarkPhysicsScene.cs`
 
-**Closure criteria:** Benchmarks expose mixed mesh finite-slab cost by triangle
-candidate volume, not only by collider count. Any future optimization preserves
-owner identity, lower triangle-index tie-breaks, and zero managed allocation
-after warmup.
-
-## Closed Signals
-
-| Signal | Status | Closed | Resolution |
-| --- | --- | --- | --- |
-| Pure 2D dynamic CCD candidate asymmetry | Closed | 2026-06-23 | 2D now uses a planar candidate index, skips mixed CCD indexing outside mixed mode, and benchmark resets use 2D reset parity |
-| 3D shape-exact false-positive cost | Closed | 2026-06-23 | Static CCD now uses exact-source sweeps for non-sphere convex movers before conservative sphere fallback refinement |
-| 3D dynamic shape-exact BDN allocation signal | Closed | 2026-06-23 | Shared exact-sweep bounds prefilters removed the scaling allocation/time signal from 3D dynamic false-positive rows |
-| 3D full-runtime CCD allocation | Closed | 2026-06-23 | GridForge allocation-free line tracing plus Gravitas 3D raycast adoption |
-| Grounding raycast probe allocation | Closed | 2026-06-23 | Same raycast trace fix removed automatic ray-grounding allocation |
+**Closure criteria:** Met. Benchmarks expose mesh finite-slab and 3D mesh sweep
+cost by triangle candidate volume, not only collider count. Mixed keeps stable
+authored triangle tie-breaks without speculative reducer overhead, and pure 3D
+now avoids the measured convex-source concave-mesh triangle-order bottleneck.
 
 ### Signal: Pure 2D Dynamic CCD Candidate Asymmetry
 
@@ -480,6 +518,14 @@ raycast path now has a focused xUnit allocation guard.
   `1024` bodies. This is currently expected because mixed mode exercises both
   dimensions and the mixed broad phase. Revisit if the gap grows after the 3D
   allocation RCA or if mixed CCD becomes an immediate alpha target.
+- Pure 3D swept-sphere dense mesh target rows are now visible through
+  `MeshQuery3DTriangleScalingBenchmarks` and still scale linearly with triangle
+  candidate volume: `550.1 us`, `2.145 ms`, and `8.638 ms` at `128`, `512`,
+  and `2048` triangles. The lower-bound ordering optimization was adopted only
+  for convex-source sweeps against concave mesh targets, where it proved a real
+  bottleneck reduction. Revisit swept-sphere mesh pruning if host workloads need
+  many analytic sphere casts against dense single-mesh colliders rather than
+  partitioned/decomposed mesh geometry.
 - Benchmark publishing, external baseline storage, CI gating, and host-visible
   CCD counters are tracked in
   [`2026-06-21-benchmark-publishing-and-ccd-diagnostics-plan.md`](2026-06-21-benchmark-publishing-and-ccd-diagnostics-plan.md).
@@ -496,9 +542,8 @@ Promote a signal from this backlog into a dedicated dated plan when it has:
 
 ## Current Recommendation
 
-With the runtime CCD allocation, grounding, shape-exact false-positive, and
-pure 2D dynamic candidate-asymmetry signals closed, the remaining active
-benchmark-facing items are the SwiftCollections lower-stack sort gap and mixed
-mesh finite-slab triangle scaling. Prefer the mixed mesh signal for the next
-Gravitas-local pass; keep the SwiftCollections item open until the lower-stack
-sort APIs can replace `SwiftListSortUtility` without allocation regressions.
+With the runtime CCD allocation, grounding, shape-exact false-positive, pure 2D
+dynamic candidate-asymmetry, and mixed mesh triangle-scaling signals closed,
+the remaining active benchmark-facing item is the SwiftCollections lower-stack
+sort gap. Keep that item open until the lower-stack sort APIs can replace
+`SwiftListSortUtility` without allocation regressions.

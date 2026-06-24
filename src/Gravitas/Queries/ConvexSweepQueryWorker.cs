@@ -10,6 +10,7 @@ using Gravitas.Colliders;
 using SwiftCollections;
 using SwiftCollections.Query;
 using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
 namespace Gravitas.Queries;
@@ -26,9 +27,11 @@ internal sealed class ConvexSweepQueryWorker
     private static readonly Fixed64 DistanceToleranceSqr = DistanceTolerance * DistanceTolerance;
     private static readonly Fixed64 SweepContactTolerance = Fixed64.FromFraction(1, 4096);
     private static readonly Fixed64 ProgressToleranceSqr = DistanceToleranceSqr;
+    private static readonly SweepTriangleCandidateComparer SweepTriangleComparer = new();
 
     private readonly SupportPoint[] _simplex = new SupportPoint[4];
     private readonly SwiftList<int> _triangleCandidates = new(16);
+    private readonly SwiftList<SweepTriangleCandidate> _sweepTriangleCandidates = new(16);
 
     private LSCollider? _source;
     private Vector3d _displacement;
@@ -36,6 +39,8 @@ internal sealed class ConvexSweepQueryWorker
     private Vector3d _sweptSourceBoundsMin;
     private Vector3d _sweptSourceBoundsMax;
     private Fixed64 _length;
+
+    internal int LastMeshTriangleCandidateCount { get; private set; }
 
     public void PrepareConvexMeshSource(LSMeshCollider source, Vector3d displacement)
     {
@@ -62,6 +67,7 @@ internal sealed class ConvexSweepQueryWorker
 
     public bool TrySweepPreparedSource(LSCollider target, out Physics3DHit hit)
     {
+        LastMeshTriangleCandidateCount = 0;
         hit = default;
         if (_source == null
             || _length <= Fixed64.Epsilon
@@ -172,10 +178,22 @@ internal sealed class ConvexSweepQueryWorker
 
         CreateSweptSourceBounds(sourceShape, out Vector3d min, out Vector3d max);
         mesh.GetTrianglesInBounds(new FixedBoundVolume(min, max), _triangleCandidates);
+        LastMeshTriangleCandidateCount += _triangleCandidates.Count;
+        BuildOrderedSweepTriangleCandidates(sourceShape, mesh);
 
-        for (int i = 0; i < _triangleCandidates.Count; i++)
+        for (int i = 0; i < _sweepTriangleCandidates.Count; i++)
         {
-            int triangleIndex = _triangleCandidates[i];
+            SweepTriangleCandidate sweepCandidate = _sweepTriangleCandidates[i];
+            if (RemainingSweepTrianglesCannotBeat(
+                sweepCandidate,
+                found,
+                closestDistance,
+                closestTriangleIndex))
+            {
+                break;
+            }
+
+            int triangleIndex = sweepCandidate.TriangleIndex;
             ConvexShape triangle = CreateTriangleShape(mesh, triangleIndex);
             if (!TrySweepConvexTarget(sourceShape, triangle, mesh, out Physics3DHit candidate)
                 || !ComesBeforeReducerCandidate(candidate, triangleIndex, found, closestDistance, closestTriangleIndex, hit))
@@ -190,6 +208,50 @@ internal sealed class ConvexSweepQueryWorker
         }
 
         return found;
+    }
+
+    private void BuildOrderedSweepTriangleCandidates(ConvexShape sourceShape, LSMeshCollider mesh)
+    {
+        _sweepTriangleCandidates.FastClear();
+        for (int i = 0; i < _triangleCandidates.Count; i++)
+        {
+            int triangleIndex = _triangleCandidates[i];
+            ConvexShape triangle = CreateTriangleShape(mesh, triangleIndex);
+            Fixed64 lowerBound = ComputeSweepLowerBound(sourceShape, triangle);
+            if (lowerBound <= _length + SweepContactTolerance)
+                _sweepTriangleCandidates.Add(new SweepTriangleCandidate(triangleIndex, lowerBound));
+        }
+
+        SwiftListSortUtility.SortInPlace(_sweepTriangleCandidates, SweepTriangleComparer);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private Fixed64 ComputeSweepLowerBound(ConvexShape sourceShape, ConvexShape targetShape)
+    {
+        Vector3d sourceFront = sourceShape.Support(_direction);
+        Vector3d targetBack = targetShape.Support(-_direction);
+        Fixed64 lowerBound = Vector3d.Dot(targetBack - sourceFront, _direction) - SweepContactTolerance;
+        return lowerBound > Fixed64.Zero ? lowerBound : Fixed64.Zero;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool RemainingSweepTrianglesCannotBeat(
+        SweepTriangleCandidate candidate,
+        bool found,
+        Fixed64 closestDistance,
+        int closestTriangleIndex)
+    {
+        if (!found)
+            return false;
+
+        if (candidate.LowerBound > closestDistance + DistanceTolerance)
+            return true;
+
+        // Conservative advancement accepts contacts inside SweepContactTolerance;
+        // once the best lower-index triangle is already at that recognized TOI,
+        // later same-bound triangles cannot win the deterministic tie-break.
+        return closestTriangleIndex < candidate.TriangleIndex
+            && closestDistance <= candidate.LowerBound + SweepContactTolerance;
     }
 
     private bool TrySweepConvexTarget(
@@ -796,6 +858,31 @@ internal sealed class ConvexSweepQueryWorker
         public Vector3d PointB { get; }
 
         public Vector3d Point { get; }
+    }
+
+    private readonly struct SweepTriangleCandidate
+    {
+        public SweepTriangleCandidate(int triangleIndex, Fixed64 lowerBound)
+        {
+            TriangleIndex = triangleIndex;
+            LowerBound = lowerBound;
+        }
+
+        public int TriangleIndex { get; }
+
+        public Fixed64 LowerBound { get; }
+    }
+
+    private sealed class SweepTriangleCandidateComparer : IComparer<SweepTriangleCandidate>
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public int Compare(SweepTriangleCandidate left, SweepTriangleCandidate right)
+        {
+            int lowerBoundCompare = left.LowerBound.CompareTo(right.LowerBound);
+            return lowerBoundCompare != 0
+                ? lowerBoundCompare
+                : left.TriangleIndex.CompareTo(right.TriangleIndex);
+        }
     }
 
     private readonly struct GjkResult

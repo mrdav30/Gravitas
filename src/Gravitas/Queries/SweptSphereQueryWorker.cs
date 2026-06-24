@@ -29,6 +29,9 @@ public sealed class SweptSphereQueryWorker
     private Fixed64 _length;
     private Fixed64 _lengthSqr;
     private Fixed64 _radius;
+    private int _sweepDepth;
+
+    internal int LastMeshTriangleCandidateCount { get; private set; }
 
     /// <summary>
     /// Prepares this worker for a swept sphere from <paramref name="start"/> to <paramref name="end"/>.
@@ -60,25 +63,36 @@ public sealed class SweptSphereQueryWorker
         out Vector3d sphereCenterAtImpact,
         out Fixed64 impactDistance)
     {
+        if (_sweepDepth == 0)
+            LastMeshTriangleCandidateCount = 0;
+
+        _sweepDepth++;
         sphereCenterAtImpact = Vector3d.Zero;
         impactDistance = Fixed64.Zero;
 
-        if (_length <= Fixed64.Epsilon
-            || !SweepBoundsUtility.OverlapsInclusive(_sweptBoundsMin, _sweptBoundsMax, collider.BoundsMin, collider.BoundsMax))
+        try
         {
-            return false;
-        }
+            if (_length <= Fixed64.Epsilon
+                || !SweepBoundsUtility.OverlapsInclusive(_sweptBoundsMin, _sweptBoundsMax, collider.BoundsMin, collider.BoundsMax))
+            {
+                return false;
+            }
 
-        return collider switch
+            return collider switch
+            {
+                LSSphereCollider sphere => TrySweepSphere(sphere.Center, sphere.ScaledRadius + _radius, out sphereCenterAtImpact, out impactDistance),
+                LSCapsuleCollider capsule => TrySweepCapsule(capsule, out sphereCenterAtImpact, out impactDistance),
+                LSCuboidCollider cuboid => TrySweepCuboid(cuboid, out sphereCenterAtImpact, out impactDistance),
+                LSCylinderCollider cylinder => TrySweepCylinder(cylinder, out sphereCenterAtImpact, out impactDistance),
+                LSMeshCollider mesh => TrySweepMesh(mesh, out sphereCenterAtImpact, out impactDistance),
+                LSCompoundCollider compound => TrySweepCompound(compound, out sphereCenterAtImpact, out impactDistance),
+                _ => false
+            };
+        }
+        finally
         {
-            LSSphereCollider sphere => TrySweepSphere(sphere.Center, sphere.ScaledRadius + _radius, out sphereCenterAtImpact, out impactDistance),
-            LSCapsuleCollider capsule => TrySweepCapsule(capsule, out sphereCenterAtImpact, out impactDistance),
-            LSCuboidCollider cuboid => TrySweepCuboid(cuboid, out sphereCenterAtImpact, out impactDistance),
-            LSCylinderCollider cylinder => TrySweepCylinder(cylinder, out sphereCenterAtImpact, out impactDistance),
-            LSMeshCollider mesh => TrySweepMesh(mesh, out sphereCenterAtImpact, out impactDistance),
-            LSCompoundCollider compound => TrySweepCompound(compound, out sphereCenterAtImpact, out impactDistance),
-            _ => false
-        };
+            _sweepDepth--;
+        }
     }
 
     private bool TrySweepSphere(
@@ -336,6 +350,7 @@ public sealed class SweptSphereQueryWorker
 
         CreateSweepBounds(_start, _end, _radius, out Vector3d min, out Vector3d max);
         mesh.GetTrianglesInBounds(new FixedBoundVolume(min, max), _meshTriangleBuffer);
+        LastMeshTriangleCandidateCount += _meshTriangleBuffer.Count;
 
         bool found = false;
         for (int i = 0; i < _meshTriangleBuffer.Count; i++)

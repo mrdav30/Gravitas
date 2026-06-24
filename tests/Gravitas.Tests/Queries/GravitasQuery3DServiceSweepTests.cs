@@ -301,6 +301,35 @@ public sealed class GravitasQuery3DServiceSweepTests
     }
 
     [Fact]
+    public void SweepSphereAll_WithMeshTarget_ShouldReportTriangleCandidateCount()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        _ = CreateDynamicCollider(
+            context,
+            MeshTestFixtures.CreateVerticalQuad(
+                Fixed64.Zero,
+                -Fixed64.One,
+                Fixed64.One,
+                inertiaPolicy: MeshInertiaPolicy.SurfaceApproximation),
+            Vector3d.Zero);
+        var hits = new SwiftList<Physics3DHit>();
+
+        int count = context.Query3D.SweepSphereAll(
+            new Vector3d((Fixed64)(-3), Fixed64.One, Fixed64.Zero),
+            new Vector3d((Fixed64)3, Fixed64.One, Fixed64.Zero),
+            Fixed64.Half,
+            IncludeLayerZero,
+            hits);
+
+        count.Should().Be(1);
+        context.Query3D.LastQueryCandidateCount.Should().Be(1);
+        context.Query3D.LastMeshTriangleCandidateCount.Should().Be(2);
+
+        _ = context.Query3D.OverlapCircleAll(Vector3d.Zero, (Fixed64)2, IncludeLayerZero, hits);
+        context.Query3D.LastMeshTriangleCandidateCount.Should().Be(0);
+    }
+
+    [Fact]
     public void SweepConvexMesh_ShouldHitSphereTargetAsSource()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
@@ -467,6 +496,8 @@ public sealed class GravitasQuery3DServiceSweepTests
         hits[0].Distance.Should().Be(Fixed64.FromFraction(7, 2));
         hits[1].Collider.Should().BeSameAs(far);
         hits[1].Distance.Should().Be(Fixed64.FromFraction(11, 2));
+        context.Query3D.LastQueryCandidateCount.Should().Be(2);
+        context.Query3D.LastMeshTriangleCandidateCount.Should().Be(4);
     }
 
     [Fact]

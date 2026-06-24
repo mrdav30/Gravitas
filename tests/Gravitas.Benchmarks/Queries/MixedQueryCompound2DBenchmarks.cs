@@ -3,9 +3,7 @@ using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.Queries;
 using Gravitas.Support;
-using GridForge.Configuration;
 using SwiftCollections;
-using System;
 
 namespace Gravitas.Benchmarks;
 
@@ -33,12 +31,12 @@ public class MixedQueryCompound2DBenchmarks
     public void Setup()
     {
         int extentX = 16 + ColliderCount;
-        _denseAabbContext = CreateMixedContext(extentX, 16);
-        _falsePositiveAabbContext = CreateMixedContext(extentX, 16);
-        _densePolygonContext = CreateMixedContext(extentX, 16);
-        _falsePositivePolygonContext = CreateMixedContext(extentX, 16);
-        _denseCompoundContext = CreateMixedContext(extentX, 16);
-        _falsePositiveCompoundContext = CreateMixedContext(extentX, 16);
+        _denseAabbContext = BenchmarkPhysicsScene.CreateMixedContext(extentX, 16);
+        _falsePositiveAabbContext = BenchmarkPhysicsScene.CreateMixedContext(extentX, 16);
+        _densePolygonContext = BenchmarkPhysicsScene.CreateMixedContext(extentX, 16);
+        _falsePositivePolygonContext = BenchmarkPhysicsScene.CreateMixedContext(extentX, 16);
+        _denseCompoundContext = BenchmarkPhysicsScene.CreateMixedContext(extentX, 16);
+        _falsePositiveCompoundContext = BenchmarkPhysicsScene.CreateMixedContext(extentX, 16);
         _hits = new SwiftList<PhysicsMixedHit>(ColliderCount);
 
         for (int i = 0; i < ColliderCount; i++)
@@ -165,22 +163,6 @@ public class MixedQueryCompound2DBenchmarks
     {
         _ = SweepSphereAgainst2D(_falsePositiveCompoundContext, _falsePositiveStart, _falsePositiveEnd);
         return _falsePositiveCompoundContext.QueryMixed.LastQueryCandidateCount;
-    }
-
-    private static GravitasWorldContext CreateMixedContext(int extentX, int extentZ)
-    {
-        GravitasWorldContext context = BenchmarkEnvironment.PrepareOwnedContext();
-        context.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
-        if (!context.World.TryAddGrid(
-            new GridConfiguration(
-                new Vector3d((Fixed64)(-8), (Fixed64)(-4), (Fixed64)(-8)),
-                new Vector3d((Fixed64)extentX, (Fixed64)4, (Fixed64)extentZ)),
-            out _))
-        {
-            throw new InvalidOperationException("Unable to create mixed compound query benchmark grid.");
-        }
-
-        return context;
     }
 
     private int SweepSphereAgainst2D(GravitasWorldContext context, Vector3d start, Vector3d end)
