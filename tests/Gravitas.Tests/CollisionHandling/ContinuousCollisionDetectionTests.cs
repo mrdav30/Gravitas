@@ -673,6 +673,33 @@ public sealed class ContinuousCollisionDetectionTests
     }
 
     [Fact]
+    public void ContinuousMode_DynamicRelativeShapeExactPath_ShouldNotClampWhenBoundsProxyHitsButSweptShapeMissesSphere()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        ScenarioBody<LSCuboidCollider> mover = scenario.CreateBody(
+            new LSCuboidCollider
+            {
+                Size = new Vector3d((Fixed64)6, Fixed64.FromFraction(1, 5), Fixed64.FromFraction(1, 5))
+            },
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+        ScenarioBody<LSSphereCollider> target = scenario.CreateSphere(
+            new Vector3d((Fixed64)4, Fixed64.FromFraction(5, 2), Fixed64.Zero));
+        mover.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        DisableGroundQueries(mover.Body);
+        DisableGroundQueries(target.Body);
+
+        target.Body.Sleep();
+        mover.Body.AddForce(Vector3d.Right * (Fixed64)10);
+        scenario.Context.LateSimulate();
+
+        mover.Body.Position3d.X.Should().Be((Fixed64)10);
+        mover.Body.LinearVelocity.X.Should().Be((Fixed64)10);
+        target.Body.IsSleeping.Should().BeTrue();
+        target.Body.LinearVelocity.Should().Be(Vector3d.Zero);
+    }
+
+    [Fact]
     public void ContinuousMode_DynamicRelativeShapeExactPath_ShouldNotAllocateAfterWarmup()
     {
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();

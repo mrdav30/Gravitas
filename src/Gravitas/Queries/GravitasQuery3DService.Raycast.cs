@@ -223,6 +223,28 @@ public sealed partial class GravitasQuery3DService
             staticTargetsOnly: true);
     }
 
+    internal int SweepExactSourceAgainstStaticAll(
+        LSCollider source,
+        Vector3d displacement,
+        PhysicsLayerMask layerMask,
+        SwiftList<Physics3DHit> results,
+        LSCollider? excludedCollider = null,
+        bool includeTriggers = true)
+    {
+        SwiftThrowHelper.ThrowIfNull(source, nameof(source));
+        SwiftThrowHelper.ThrowIfNull(results, nameof(results));
+        EnsureSourceBelongsToContext(source);
+        PrepareConvexSweepSource(source, displacement);
+        return SweepPreparedConvexSourceAll(
+            source,
+            displacement,
+            layerMask,
+            results,
+            excludedCollider,
+            includeTriggers,
+            staticTargetsOnly: true);
+    }
+
     /// <summary>
     /// Sweeps a capsule source by <paramref name="displacement"/> and returns the closest 3D target hit.
     /// </summary>
@@ -524,7 +546,8 @@ public sealed partial class GravitasQuery3DService
         PhysicsLayerMask layerMask,
         SwiftList<Physics3DHit> results,
         LSCollider? excludedCollider,
-        bool includeTriggers)
+        bool includeTriggers,
+        bool staticTargetsOnly = false)
     {
         results.FastClear();
         if (displacement.MagnitudeSquared <= Fixed64.Epsilon)
@@ -533,7 +556,7 @@ public sealed partial class GravitasQuery3DService
             return 0;
         }
 
-        BeginConvexSweepTrace(source, layerMask, excludedCollider, includeTriggers);
+        BeginConvexSweepTrace(source, layerMask, excludedCollider, includeTriggers, staticTargetsOnly);
         AddAllConvexSweepHits(source, displacement, results);
         Physics3DHitSorter.SortByDistance(results);
         _context.Diagnostics.EmitRayQuery(
@@ -551,13 +574,14 @@ public sealed partial class GravitasQuery3DService
         LSCollider source,
         PhysicsLayerMask layerMask,
         LSCollider? excludedCollider,
-        bool includeTriggers)
+        bool includeTriggers,
+        bool staticTargetsOnly = false)
     {
         _currentLayerMask = layerMask;
         _currentExcludedCollider = excludedCollider;
         _currentSweepSourceCollider = source;
         _currentIncludeTriggers = includeTriggers;
-        _currentStaticSweepTargetsOnly = false;
+        _currentStaticSweepTargetsOnly = staticTargetsOnly;
         _redundantColliderCheck.Clear();
         _redundantVoxelCheck.Clear();
         LastQueryCandidateCount = 0;
@@ -1103,11 +1127,14 @@ public sealed partial class GravitasQuery3DService
         ref Fixed64 closestDistance,
         ref Physics3DHit closestHit)
     {
-        ProcessColliderListForClosestConvexSweepHit(
-            partition.ContainedDynamicObjects,
-            ref found,
-            ref closestDistance,
-            ref closestHit);
+        if (!_currentStaticSweepTargetsOnly)
+        {
+            ProcessColliderListForClosestConvexSweepHit(
+                partition.ContainedDynamicObjects,
+                ref found,
+                ref closestDistance,
+                ref closestHit);
+        }
 
         ProcessColliderListForClosestConvexSweepHit(
             partition.ContainedKinematicObjects,
@@ -1126,7 +1153,9 @@ public sealed partial class GravitasQuery3DService
         PhysicsPartition partition,
         SwiftList<Physics3DHit> results)
     {
-        ProcessColliderListForAllConvexSweepHits(partition.ContainedDynamicObjects, results);
+        if (!_currentStaticSweepTargetsOnly)
+            ProcessColliderListForAllConvexSweepHits(partition.ContainedDynamicObjects, results);
+
         ProcessColliderListForAllConvexSweepHits(partition.ContainedKinematicObjects, results);
         ProcessColliderListForAllConvexSweepHits(partition.ContainedStaticObjects, results);
     }
@@ -1310,6 +1339,22 @@ public sealed partial class GravitasQuery3DService
             !ReferenceEquals(source.Context, _context),
             nameof(source),
             "Sweep source collider must belong to this query service context.");
+    }
+
+    private void PrepareConvexSweepSource(LSCollider source, Vector3d displacement)
+    {
+        switch (source)
+        {
+            case LSMeshCollider mesh:
+                _convexSweepWorker.PrepareConvexMeshSource(mesh, displacement);
+                return;
+            case LSCompoundCollider compound:
+                _convexSweepWorker.PrepareCompoundSource(compound, displacement);
+                return;
+            default:
+                _convexSweepWorker.PreparePrimitiveSource(source, displacement);
+                return;
+        }
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

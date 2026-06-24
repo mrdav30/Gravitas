@@ -79,14 +79,11 @@ public partial class StiffBody
             Position3d = startPosition;
             Collider.RebuildRuntimeShapeOnly(refreshMassProperties: false);
 
-            int hitCount = Context.Query3D.SweepSphereAgainstStaticAll(
+            int hitCount = QueryStaticContinuousCollisionHits(
                 startPosition,
                 proposedPosition,
                 proxyRadius,
-                PhysicsLayerMask.All,
-                _continuousCollisionHits,
-                Collider,
-                includeTriggers: false);
+                out bool staticHitsAreShapeExact);
             int mixedHitCount = Context.Settings.RuntimeMode.RunsMixedContacts()
                 ? Context.QueryMixed.SweepSphereAgainstStatic2DAll(
                     startPosition,
@@ -99,7 +96,12 @@ public partial class StiffBody
                     cacheTargetPartitions: true)
                 : 0;
 
-            bool found3D = TryGetFirstValidContinuousCollisionHit(startPosition, proposedPosition, hitCount, out Physics3DHit hit3D);
+            bool found3D = TryGetFirstValidContinuousCollisionHit(
+                startPosition,
+                proposedPosition,
+                hitCount,
+                staticHitsAreShapeExact,
+                out Physics3DHit hit3D);
             bool foundMixed = TryGetFirstValidMixedContinuousCollisionHit(startPosition, proposedPosition, mixedHitCount, out PhysicsMixedHit hitMixed);
             if (found3D && (!foundMixed || hit3D.Distance <= hitMixed.Distance))
             {

@@ -33,6 +33,8 @@ internal sealed class ConvexSweepQueryWorker
     private LSCollider? _source;
     private Vector3d _displacement;
     private Vector3d _direction;
+    private Vector3d _sweptSourceBoundsMin;
+    private Vector3d _sweptSourceBoundsMax;
     private Fixed64 _length;
 
     public void PrepareConvexMeshSource(LSMeshCollider source, Vector3d displacement)
@@ -61,8 +63,12 @@ internal sealed class ConvexSweepQueryWorker
     public bool TrySweepPreparedSource(LSCollider target, out Physics3DHit hit)
     {
         hit = default;
-        if (_source == null || _length <= Fixed64.Epsilon)
+        if (_source == null
+            || _length <= Fixed64.Epsilon
+            || !SweepBoundsUtility.OverlapsInclusive(_sweptSourceBoundsMin, _sweptSourceBoundsMax, target.BoundsMin, target.BoundsMax))
+        {
             return false;
+        }
 
         if (_source is LSCompoundCollider compound)
             return TrySweepCompoundSource(compound, target, out hit);
@@ -76,6 +82,13 @@ internal sealed class ConvexSweepQueryWorker
         _displacement = displacement;
         _length = displacement.Magnitude;
         _direction = _length <= Fixed64.Epsilon ? Vector3d.Zero : displacement / _length;
+        SweepBoundsUtility.CreateSweptBounds(
+            source.BoundsMin,
+            source.BoundsMax,
+            displacement,
+            SweepContactTolerance,
+            out _sweptSourceBoundsMin,
+            out _sweptSourceBoundsMax);
     }
 
     private bool TrySweepCompoundSource(LSCompoundCollider source, LSCollider target, out Physics3DHit hit)
@@ -110,6 +123,9 @@ internal sealed class ConvexSweepQueryWorker
     private bool TrySweepSourceShape(ConvexShape sourceShape, LSCollider target, out Physics3DHit hit)
     {
         hit = default;
+
+        if (!CanSweptSourceShapeReachTarget(sourceShape, target))
+            return false;
 
         if (target is LSCompoundCollider compound)
             return TrySweepTargetCompound(sourceShape, compound, out hit);
@@ -576,8 +592,26 @@ internal sealed class ConvexSweepQueryWorker
     private void CreateSweptSourceBounds(ConvexShape sourceShape, out Vector3d min, out Vector3d max)
     {
         sourceShape.GetBounds(out Vector3d sourceMin, out Vector3d sourceMax);
-        min = Vector3d.Min(sourceMin, sourceMin + _displacement);
-        max = Vector3d.Max(sourceMax, sourceMax + _displacement);
+        SweepBoundsUtility.CreateSweptBounds(
+            sourceMin,
+            sourceMax,
+            _displacement,
+            SweepContactTolerance,
+            out min,
+            out max);
+    }
+
+    private bool CanSweptSourceShapeReachTarget(ConvexShape sourceShape, LSCollider target)
+    {
+        sourceShape.GetBounds(out Vector3d sourceMin, out Vector3d sourceMax);
+        SweepBoundsUtility.CreateSweptBounds(
+            sourceMin,
+            sourceMax,
+            _displacement,
+            SweepContactTolerance,
+            out Vector3d min,
+            out Vector3d max);
+        return SweepBoundsUtility.OverlapsInclusive(min, max, target.BoundsMin, target.BoundsMax);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

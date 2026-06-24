@@ -61,8 +61,6 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 
 | Signal | Status | Priority | Tracking |
 | --- | --- | --- | --- |
-| 3D shape-exact false-positive cost | Open | Medium | This backlog |
-| 3D dynamic shape-exact BDN allocation signal | Open | Medium | This backlog |
 | Pure 2D dynamic CCD candidate asymmetry | Open | Medium | This backlog |
 | SwiftCollections sort hot-path allocation | Mitigated in Gravitas, lower-stack open | Medium | This backlog |
 | Mixed mesh finite-slab triangle scaling signal | Open | Medium | This backlog |
@@ -153,79 +151,6 @@ candidate volume, not only by collider count. Any future optimization preserves
 owner identity, lower triangle-index tie-breaks, and zero managed allocation
 after warmup.
 
-### Signal: 3D Shape-Exact False-Positive Cost
-
-**Discovered:** 2026-06-21
-
-**Evidence:** The short in-process
-`continuous-collision-evidence` BenchmarkDotNet smoke reported
-`Pure3DFullRuntimeShapeExactFalsePositiveEvidence` at about `97.3 ms/op` for
-`1024` bodies, while the 2D equivalent was about `28.7 ms/op`.
-
-**Initial read:** The 3D exact-reduction path may be doing too much work per
-conservative false positive, or the scene may be intentionally expensive.
-
-**Why it matters:** Shape-exact CCD should reduce conservative false positives
-without making non-sphere 3D movers a broad hidden cost in dense scenes.
-
-**Next isolation step:** Add or use benchmark attribution that separates
-candidate gathering, exact reduction, accepted hits, and rejected conservative
-candidates before optimizing reducer logic.
-
-**Likely files:**
-
-- `src/Gravitas/CollisionHandling/Continuous/*`
-- `src/Gravitas/Queries/GravitasQuery3DService.*.cs`
-- `src/Gravitas/CollisionHandling/Detection/*`
-- `tests/Gravitas.Tests/CollisionHandling/ContinuousCollisionDetectionTests.cs`
-- `tests/Gravitas.Benchmarks/Core/ContinuousCollisionEvidenceBenchmarks.cs`
-- `tests/Gravitas.Benchmarks/Support/ContinuousCollisionBenchmarkSupport.cs`
-
-**Closure criteria:** The row is explained by candidate volume, reducer cost, or
-a specific runtime hotspot. If optimized, correctness coverage proves no
-false-negative risk was introduced.
-
-### Signal: 3D Dynamic Shape-Exact BDN Allocation Signal
-
-**Discovered:** 2026-06-23
-
-**Evidence:** The short in-process
-`dynamic-ccd-scaling --filter "*DynamicShapeExact*" -j Short -i` smoke reported
-`SparsePure3DDynamicShapeExactCcdFalsePositiveBatch8` allocation scaling with
-body count: about `43,008 B/op` at `64` bodies and `172,110 B/op` at `256`
-bodies. The matching 2D rows reported only `42 B/op` runner noise.
-
-**Counter-evidence:** The focused xUnit guard
-`ContinuousMode_DynamicRelativeShapeExactPath_ShouldNotAllocateAfterWarmup`
-passes with `0` allocated bytes after warmup for the same thin-cuboid dynamic
-relative false-positive shape family. This suggests the BDN signal may come
-from batched fixture reset, first-use candidate/pair growth, or another
-full-context phase rather than the exact reducer call itself.
-
-**Why it matters:** Dynamic 3D CCD is an alpha hot path. A scaling BDN
-allocation signal should be either explained as benchmark-only setup or removed
-from the runtime path before release confidence.
-
-**Next isolation step:** Add an allocation guard or benchmark attribution that
-splits the `DynamicShapeExact3D` fixture into reset, dynamic candidate query,
-exact reducer validation, body `LateSimulate`, pair cleanup, and sum-return
-work. Compare a warmed multi-body xUnit guard against the BDN row to identify
-whether MemoryDiagnoser is seeing steady-state runtime allocation or benchmark
-fixture churn.
-
-**Likely files:**
-
-- `src/Gravitas/Core/StiffBody.cs`
-- `src/Gravitas/Queries/ConvexSweepQueryWorker.cs`
-- `tests/Gravitas.Tests/CollisionHandling/ContinuousCollisionDetectionTests.cs`
-- `tests/Gravitas.Benchmarks/Core/DynamicCcdScalingBenchmarks.cs`
-- `tests/Gravitas.Benchmarks/Support/ContinuousCollisionBenchmarkFixture.cs`
-- `tests/Gravitas.Benchmarks/Support/ContinuousCollisionBenchmarkSupport.cs`
-
-**Closure criteria:** The multi-body BDN allocation is traced to benchmark-only
-setup and documented, or a runtime/benchmark support fix removes it while the
-focused xUnit allocation guard remains green.
-
 ### Signal: Pure 2D Dynamic CCD Candidate Asymmetry
 
 **Discovered:** 2026-06-21
@@ -267,8 +192,117 @@ and duplicate suppression.
 
 | Signal | Status | Closed | Resolution |
 | --- | --- | --- | --- |
+| 3D shape-exact false-positive cost | Closed | 2026-06-23 | Static CCD now uses exact-source sweeps for non-sphere convex movers before conservative sphere fallback refinement |
+| 3D dynamic shape-exact BDN allocation signal | Closed | 2026-06-23 | Shared exact-sweep bounds prefilters removed the scaling allocation/time signal from 3D dynamic false-positive rows |
 | 3D full-runtime CCD allocation | Closed | 2026-06-23 | GridForge allocation-free line tracing plus Gravitas 3D raycast adoption |
 | Grounding raycast probe allocation | Closed | 2026-06-23 | Same raycast trace fix removed automatic ray-grounding allocation |
+
+### Signal: 3D Shape-Exact False-Positive Cost
+
+**Discovered:** 2026-06-21
+
+**Status:** Closed 2026-06-23
+
+**Evidence:** The short in-process
+`continuous-collision-evidence` BenchmarkDotNet smoke reported
+`Pure3DFullRuntimeShapeExactFalsePositiveEvidence` as a standout cost compared
+with the matching pure 2D row.
+
+**RCA 2026-06-23:** The dominant cost was not the final GJK-style exact
+reducer in isolation. Static 3D CCD first gathered hits through the conservative
+swept-sphere proxy even for non-sphere exact-capable sources, then refined
+every proxy hit afterward. In false-positive-heavy scenes, that made the broad
+proxy path manufacture work that the source-shape sweep could reject earlier.
+The exact sweep workers also lacked a cheap swept-bounds overlap prefilter, so
+obviously disjoint target bounds could still enter the shape reducer.
+
+**Resolution 2026-06-23:** 3D static CCD now collects non-sphere convex-source
+hits through `GravitasQuery3DService.SweepExactSourceAgainstStaticAll(...)`.
+That keeps source shape information during candidate collection and reserves
+the old swept-sphere path for sphere or unsupported sources. Shared swept-bounds
+prefilters reject disjoint sphere and convex-source targets before entering
+per-shape reducer logic.
+
+**Validation 2026-06-23:** Re-running
+`continuous-collision-evidence --filter "*ShapeExactFalsePositiveEvidence*"
+-j Short -i` reduced:
+
+- `Pure3DFullRuntimeShapeExactFalsePositiveEvidence`, `256` bodies:
+  `37.816 ms` -> `19.744 ms`.
+- `Pure3DFullRuntimeShapeExactFalsePositiveEvidence`, `1024` bodies:
+  `174.326 ms` -> `99.561 ms`.
+
+The focused `ContinuousCollisionDetectionTests` and
+`GravitasQuery3DServiceSweepTests` filter passed after the change.
+
+**Likely files:**
+
+- `src/Gravitas/Core/StiffBody.ContinuousCollision.Hits.cs`
+- `src/Gravitas/Core/StiffBody.ContinuousCollision.Kinematic.cs`
+- `src/Gravitas/Queries/ConvexSweepQueryWorker.cs`
+- `src/Gravitas/Queries/GravitasQuery3DService.Raycast.cs`
+- `src/Gravitas/Queries/SweepBoundsUtility.cs`
+- `src/Gravitas/Queries/SweptSphereQueryWorker.cs`
+- `tests/Gravitas.Tests/CollisionHandling/ContinuousCollisionDetectionTests.cs`
+
+**Closure criteria:** Met. The row is explained by conservative proxy overwork,
+the runtime path was optimized without weakening exact-source correctness, and
+focused CCD/query tests plus before/after benchmarks validate the change.
+
+### Signal: 3D Dynamic Shape-Exact BDN Allocation Signal
+
+**Discovered:** 2026-06-23
+
+**Status:** Closed 2026-06-23
+
+**Evidence:** The short in-process
+`dynamic-ccd-scaling --filter "*DynamicShapeExact*" -j Short -i` smoke reported
+`SparsePure3DDynamicShapeExactCcdFalsePositiveBatch8` allocation scaling with
+body count: about `43,008 B/op` at `64` bodies and `172,110 B/op` at `256`
+bodies. The matching 2D rows reported only tiny in-process runner noise.
+
+**Counter-evidence:** The focused xUnit guard
+`ContinuousMode_DynamicRelativeShapeExactPath_ShouldNotAllocateAfterWarmup`
+passed with `0` allocated bytes after warmup for the same thin-cuboid dynamic
+relative false-positive shape family.
+
+**RCA 2026-06-23:** The dynamic row exercised the same false-positive-heavy
+exact-source reducer path as the static signal. The allocation scaling did not
+reproduce in the focused runtime guard, and after the exact-source swept-bounds
+prefilters landed, the BDN row no longer showed the large per-body allocation
+slope. The remaining `78 B/op` at `256` bodies matches the tiny in-process
+runner noise also reported by the 2D rows in the same run.
+
+**Resolution 2026-06-23:** `ConvexSweepQueryWorker` now computes a padded
+swept-source bounds interval during `Prepare(...)` and skips disjoint collider,
+compound-part, and concave-mesh triangle candidates before exact reducer work.
+`SweptSphereQueryWorker` uses the same shared bounds utility for sphere-source
+sweeps.
+
+**Validation 2026-06-23:** Re-running
+`dynamic-ccd-scaling --filter "*DynamicShapeExact*" -j Short -i` reported:
+
+- `SparsePure3DDynamicShapeExactCcdFalsePositiveBatch8`, `64` bodies:
+  `7.736 ms`, `0 B/op`.
+- `SparsePure3DDynamicShapeExactCcdFalsePositiveBatch8`, `256` bodies:
+  `29.332 ms`, `78 B/op`.
+
+The same run reported `42 B/op` and `78 B/op` for the matching 2D rows, so the
+remaining values are treated as BenchmarkDotNet in-process measurement noise
+unless a future focused allocation guard reproduces them.
+
+**Likely files:**
+
+- `src/Gravitas/Queries/ConvexSweepQueryWorker.cs`
+- `src/Gravitas/Queries/SweepBoundsUtility.cs`
+- `src/Gravitas/Queries/SweptSphereQueryWorker.cs`
+- `tests/Gravitas.Tests/CollisionHandling/ContinuousCollisionDetectionTests.cs`
+- `tests/Gravitas.Benchmarks/Core/DynamicCcdScalingBenchmarks.cs`
+
+**Closure criteria:** Met. The scaling allocation signal was removed from the
+benchmark row, the dynamic false-positive xUnit allocation guard remains green,
+and the remaining BDN byte counts match runner noise rather than a runtime
+allocation slope.
 
 ### Signal: 3D Full-Runtime CCD Allocation
 
@@ -422,7 +456,8 @@ Promote a signal from this backlog into a dedicated dated plan when it has:
 
 ## Current Recommendation
 
-With the shared 3D raycast/grounding allocation root cause closed, revisit the
-shape-exact and pure 2D dynamic CCD cost signals with fresh evidence. Capture
-candidate counts before optimizing timings so reducer cost, candidate volume,
-and benchmark fixture behavior do not get conflated.
+With the 3D full-runtime allocation, grounding raycast allocation, and 3D
+shape-exact false-positive signals closed, the next runtime-facing benchmark
+signal is pure 2D dynamic CCD candidate asymmetry. Capture candidate counts
+before optimizing timings so reducer cost, candidate volume, and benchmark
+fixture behavior do not get conflated.

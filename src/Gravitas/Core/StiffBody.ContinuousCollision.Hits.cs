@@ -35,14 +35,11 @@ public partial class StiffBody
             Position3d = startPosition;
             Collider.RebuildRuntimeShapeOnly(refreshMassProperties: false);
 
-            int hitCount = Context.Query3D.SweepSphereAgainstStaticAll(
+            int hitCount = QueryStaticContinuousCollisionHits(
                 startPosition,
                 proposedPosition,
                 proxyRadius,
-                PhysicsLayerMask.All,
-                _continuousCollisionHits,
-                Collider,
-                includeTriggers: false);
+                out bool staticHitsAreShapeExact);
             int mixedHitCount = Context.Settings.RuntimeMode.RunsMixedContacts()
                 ? Context.QueryMixed.SweepSphereAgainstStatic2DAll(
                     startPosition,
@@ -55,7 +52,12 @@ public partial class StiffBody
                     cacheTargetPartitions: true)
                 : 0;
 
-            bool found3D = TryGetFirstValidContinuousCollisionHit(startPosition, proposedPosition, hitCount, out Physics3DHit hit3D);
+            bool found3D = TryGetFirstValidContinuousCollisionHit(
+                startPosition,
+                proposedPosition,
+                hitCount,
+                staticHitsAreShapeExact,
+                out Physics3DHit hit3D);
             ContinuousCollisionTargetKind hit3DKind = found3D
                 ? ContinuousCollisionTargetKind.Static3D
                 : ContinuousCollisionTargetKind.None;
@@ -132,6 +134,7 @@ public partial class StiffBody
         Vector3d startPosition,
         Vector3d proposedPosition,
         int hitCount,
+        bool hitsAreShapeExact,
         out Physics3DHit hit)
     {
         Vector3d displacement = proposedPosition - startPosition;
@@ -145,7 +148,9 @@ public partial class StiffBody
                 continue;
 
             Physics3DHit refined;
-            if (TryRefineShapeExactContinuousCollisionHit(candidate, displacement, direction, out Physics3DHit exactHit, out bool exactSupported))
+            if (hitsAreShapeExact)
+                refined = ApplyShapeExactContinuousContactSlop(candidate);
+            else if (TryRefineShapeExactContinuousCollisionHit(candidate, displacement, direction, out Physics3DHit exactHit, out bool exactSupported))
                 refined = exactHit;
             else if (exactSupported)
                 continue;
@@ -164,6 +169,36 @@ public partial class StiffBody
 
         hit = best;
         return found;
+    }
+
+    private int QueryStaticContinuousCollisionHits(
+        Vector3d startPosition,
+        Vector3d proposedPosition,
+        Fixed64 proxyRadius,
+        out bool hitsAreShapeExact)
+    {
+        Vector3d displacement = proposedPosition - startPosition;
+        if (Collider is not LSSphereCollider && IsExactConvexSourceSupported(Collider))
+        {
+            hitsAreShapeExact = true;
+            return Context.Query3D.SweepExactSourceAgainstStaticAll(
+                Collider,
+                displacement,
+                PhysicsLayerMask.All,
+                _continuousCollisionHits,
+                Collider,
+                includeTriggers: false);
+        }
+
+        hitsAreShapeExact = false;
+        return Context.Query3D.SweepSphereAgainstStaticAll(
+            startPosition,
+            proposedPosition,
+            proxyRadius,
+            PhysicsLayerMask.All,
+            _continuousCollisionHits,
+            Collider,
+            includeTriggers: false);
     }
 
     private bool TryGetFirstValidMixedContinuousCollisionHit(

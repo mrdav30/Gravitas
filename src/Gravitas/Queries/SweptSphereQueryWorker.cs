@@ -17,11 +17,15 @@ namespace Gravitas.Queries;
 /// </summary>
 public sealed class SweptSphereQueryWorker
 {
+    private static readonly Fixed64 BoundsTolerance = Fixed64.FromFraction(1, 4096);
+
     private readonly SwiftList<int> _meshTriangleBuffer = new();
 
     private Vector3d _start;
     private Vector3d _end;
     private Vector3d _direction;
+    private Vector3d _sweptBoundsMin;
+    private Vector3d _sweptBoundsMax;
     private Fixed64 _length;
     private Fixed64 _lengthSqr;
     private Fixed64 _radius;
@@ -39,6 +43,13 @@ public sealed class SweptSphereQueryWorker
         _lengthSqr = segment.MagnitudeSquared;
         _length = _lengthSqr <= Fixed64.Epsilon ? Fixed64.Zero : segment.Magnitude;
         _direction = _length <= Fixed64.Epsilon ? Vector3d.Zero : segment / _length;
+        SweepBoundsUtility.CreateSweptSphereBounds(
+            start,
+            end,
+            radius,
+            BoundsTolerance,
+            out _sweptBoundsMin,
+            out _sweptBoundsMax);
     }
 
     /// <summary>
@@ -52,8 +63,11 @@ public sealed class SweptSphereQueryWorker
         sphereCenterAtImpact = Vector3d.Zero;
         impactDistance = Fixed64.Zero;
 
-        if (_length <= Fixed64.Epsilon)
+        if (_length <= Fixed64.Epsilon
+            || !SweepBoundsUtility.OverlapsInclusive(_sweptBoundsMin, _sweptBoundsMax, collider.BoundsMin, collider.BoundsMax))
+        {
             return false;
+        }
 
         return collider switch
         {
