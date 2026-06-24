@@ -273,6 +273,35 @@ public sealed partial class StiffBody2D : IRecordable
         Context.Physics2D.AssimilateBody(this, isDynamic);
     }
 
+    /// <summary>
+    /// Resets authoritative 2D pose and clears accumulated linear/angular motion for deterministic fixture reuse.
+    /// </summary>
+    /// <param name="position">The new X/Z-plane position.</param>
+    /// <param name="rotation">The new yaw rotation in radians.</param>
+    public void ResetPosition(Vector2d position = default, Fixed64 rotation = default)
+    {
+        _linearVelocity = Vector2d.Zero;
+        _linearAccelerationStore = Vector2d.Zero;
+        _deltaAcceleration = Vector2d.Zero;
+        _linearSpeed = Fixed64.Zero;
+        _angularVelocity = Fixed64.Zero;
+        _angularAccelerationStore = Fixed64.Zero;
+        _deltaAngularAcceleration = Fixed64.Zero;
+        _angularSpeed = Fixed64.Zero;
+        bool wasSleeping = _isSleeping;
+        _isSleeping = false;
+        _sleepFrameCount = 0;
+        _position = position;
+        _rotation = rotation;
+
+        if (!Active)
+            return;
+
+        Collider.Rebuild();
+        if (wasSleeping)
+            Context.Collisions2D.RefreshPartitionAwakeState(Collider);
+    }
+
     public void Sleep()
     {
         if (!CanSleep)

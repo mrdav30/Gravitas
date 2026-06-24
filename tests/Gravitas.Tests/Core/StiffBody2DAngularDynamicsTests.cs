@@ -91,6 +91,30 @@ public sealed class StiffBody2DAngularDynamicsTests
         body.AngularVelocity.Should().Be((Fixed64)2);
     }
 
+    [Fact]
+    public void ResetPosition_ShouldReturnMovingBodyToRest()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext(frameRate: 4);
+        StiffBody2D body = CreateBody(context, new LSCircleCollider2D(Fixed64.One), mass: (Fixed64)2);
+
+        body.AddForce(new Vector2d((Fixed64)4, Fixed64.Zero));
+        body.AddAngularImpulse(Fixed64.One);
+        context.LateSimulate();
+
+        body.LinearSpeed.Should().BeGreaterThan(Fixed64.Zero);
+        body.AngularSpeed.Should().BeGreaterThan(Fixed64.Zero);
+
+        body.ResetPosition(new Vector2d((Fixed64)3, (Fixed64)4), Fixed64.Half);
+
+        body.Position.Should().Be(new Vector2d((Fixed64)3, (Fixed64)4));
+        body.Rotation.Should().Be(Fixed64.Half);
+        body.LinearVelocity.Should().Be(Vector2d.Zero);
+        body.LinearSpeed.Should().Be(Fixed64.Zero);
+        body.AngularVelocity.Should().Be(Fixed64.Zero);
+        body.AngularSpeed.Should().Be(Fixed64.Zero);
+        body.IsSleeping.Should().BeFalse();
+    }
+
     private static StiffBody2D CreateBody(
         GravitasWorldContext context,
         LSCollider2D collider,

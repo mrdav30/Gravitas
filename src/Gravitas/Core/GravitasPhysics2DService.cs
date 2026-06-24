@@ -39,13 +39,14 @@ public sealed class GravitasPhysics2DService
     private readonly SwiftList<int> _discreteResponseBodyQueue = new();
     private readonly SwiftList<DiscreteIslandNode2D> _discreteIslandNodes = new();
     private readonly SwiftList<DiscreteIslandConstraint2D> _discreteIslandConstraints = new();
-    private readonly DynamicCcdCandidateIndex _planarContinuousCollisionCandidates = new();
+    private readonly DynamicCcdCandidateIndex2D _planarContinuousCollisionCandidates = new();
     private readonly DynamicCcdCandidateIndex _mixedContinuousCollisionCandidates = new();
     private readonly SwiftList<int> _continuousCollisionCandidateIds = new();
     private readonly SwiftHashSet<int> _processedContinuousCollisionBodyIds = new();
     private readonly SwiftHashSet<int> _queuedContinuousCollisionHandoffIds = new();
     private readonly SwiftList<int> _continuousCollisionHandoffQueue = new();
     private int _continuousCollisionPreparedToken = int.MinValue;
+    private bool _continuousCollisionPreparedMixedIndex;
     private int _nextColliderId = 1;
 
     public GravitasPhysics2DService(GravitasWorldContext context)
@@ -182,23 +183,30 @@ public sealed class GravitasPhysics2DService
     internal void PrepareContinuousCollisionFrame()
     {
         int token = _context.LateSimulateToken;
-        if (_continuousCollisionPreparedToken == token)
+        bool buildMixedIndex = _context.Settings.RuntimeMode.RunsMixedContacts();
+        if (_continuousCollisionPreparedToken == token
+            && _continuousCollisionPreparedMixedIndex == buildMixedIndex)
+        {
             return;
+        }
 
         _planarContinuousCollisionCandidates.Clear();
         _mixedContinuousCollisionCandidates.Clear();
         foreach (StiffBody2D body in _dynamicBodies)
         {
             body.EnsureContinuousCollisionFramePrepared(token);
-            AddContinuousCollisionCandidate(body);
+            AddContinuousCollisionCandidate(body, buildMixedIndex);
         }
 
         _planarContinuousCollisionCandidates.Sort();
-        _mixedContinuousCollisionCandidates.Sort();
+        if (buildMixedIndex)
+            _mixedContinuousCollisionCandidates.Sort();
+
         _continuousCollisionPreparedToken = token;
+        _continuousCollisionPreparedMixedIndex = buildMixedIndex;
     }
 
-    private void AddContinuousCollisionCandidate(StiffBody2D body)
+    private void AddContinuousCollisionCandidate(StiffBody2D body, bool buildMixedIndex)
     {
         if (!body.Active
             || body.Immovable
@@ -214,10 +222,13 @@ public sealed class GravitasPhysics2DService
 
         _planarContinuousCollisionCandidates.Add(
             body.DynamicId,
-            DynamicCcdCandidateIndex.CreateSweptCircleBounds(
+            DynamicCcdCandidateIndex2D.CreateSweptCircleBounds(
                 body.ContinuousCollisionFrameStart,
                 body.ContinuousCollisionFrameDisplacement,
                 planarRadius));
+
+        if (!buildMixedIndex)
+            return;
 
         Vector2d mixedStart2D = body.ContinuousCollisionFrameStart;
         Vector2d mixedDisplacement2D = body.ContinuousCollisionFrameDisplacement;
@@ -257,6 +268,7 @@ public sealed class GravitasPhysics2DService
         _queuedContinuousCollisionHandoffIds.Clear();
         _continuousCollisionHandoffQueue.FastClear();
         _continuousCollisionPreparedToken = int.MinValue;
+        _continuousCollisionPreparedMixedIndex = false;
         _nextColliderId = 1;
         BodyCount = 0;
         LastBroadPhaseCandidateCount = 0;
@@ -288,7 +300,7 @@ public sealed class GravitasPhysics2DService
     internal bool TryGetDynamicBody(int dynamicId, out StiffBody2D body) =>
         _dynamicBodies.TryGetValue(dynamicId, out body);
 
-    internal SwiftList<int> QueryPlanarContinuousCollisionCandidates(FixedBoundVolume sourceBounds)
+    internal SwiftList<int> QueryPlanarContinuousCollisionCandidates(DynamicCcdPlanarBounds sourceBounds)
     {
         PrepareContinuousCollisionFrame();
         _planarContinuousCollisionCandidates.Query(sourceBounds, _continuousCollisionCandidateIds);
@@ -297,6 +309,12 @@ public sealed class GravitasPhysics2DService
 
     internal SwiftList<int> QueryMixedContinuousCollisionCandidates(FixedBoundVolume sourceBounds)
     {
+        if (!_context.Settings.RuntimeMode.RunsMixedContacts())
+        {
+            _continuousCollisionCandidateIds.FastClear();
+            return _continuousCollisionCandidateIds;
+        }
+
         PrepareContinuousCollisionFrame();
         _mixedContinuousCollisionCandidates.Query(sourceBounds, _continuousCollisionCandidateIds);
         return _continuousCollisionCandidateIds;

@@ -157,7 +157,7 @@ public sealed partial class StiffBody2D
         bool pushed = false;
         int token = Context.LateSimulateToken;
         SwiftList<int> candidateIds = Context.Physics2D.QueryPlanarContinuousCollisionCandidates(
-            DynamicCcdCandidateIndex.CreateSweptCircleBounds(startPosition, sourceDisplacement, proxyRadius));
+            DynamicCcdCandidateIndex2D.CreateSweptCircleBounds(startPosition, sourceDisplacement, proxyRadius));
         for (int candidateIndex = 0; candidateIndex < candidateIds.Count; candidateIndex++)
         {
             int dynamicId = candidateIds[candidateIndex];

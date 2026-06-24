@@ -180,8 +180,7 @@ internal static class ContinuousCollisionBenchmarkSupport
         for (int i = 0; i < bodies.Count; i++)
         {
             StiffBody2D body = bodies[i];
-            body.Sleep();
-            body.SetPosition(positions[i]);
+            body.ResetPosition(positions[i]);
             body.AddForce(Get2DForce(i, pairedDirections));
         }
     }
@@ -191,8 +190,7 @@ internal static class ContinuousCollisionBenchmarkSupport
         for (int i = 0; i < bodies.Count; i++)
         {
             StiffBody2D body = bodies[i];
-            body.Sleep();
-            body.SetPosition(positions[i]);
+            body.ResetPosition(positions[i]);
             body.AddForce(force);
         }
     }
@@ -202,11 +200,11 @@ internal static class ContinuousCollisionBenchmarkSupport
         for (int i = 0; i < bodies.Count; i++)
         {
             StiffBody2D body = bodies[i];
-            body.Sleep();
-            body.SetPosition(positions[i]);
-            body.SetRotation(Fixed64.Zero);
+            body.ResetPosition(positions[i]);
             if ((i & 1) == 0)
                 body.AddForce(ShapeExactDynamicForce2D);
+            else
+                body.Sleep();
         }
     }
 
@@ -233,9 +231,7 @@ internal static class ContinuousCollisionBenchmarkSupport
     {
         for (int i = 0; i < bodies.Count; i++)
         {
-            StiffBody2D body = bodies[i];
-            body.Sleep();
-            body.SetPosition(positions[i]);
+            bodies[i].ResetPosition(positions[i]);
         }
     }
 
@@ -255,9 +251,7 @@ internal static class ContinuousCollisionBenchmarkSupport
         for (int i = 0; i < bodies.Count; i++)
         {
             StiffBody2D body = bodies[i];
-            body.Sleep();
-            body.SetPosition(positions[i]);
-            body.SetRotation(Fixed64.Zero);
+            body.ResetPosition(positions[i]);
             if (angularMotion)
                 body.AddAngularImpulse(Fixed64.One);
         }
@@ -421,7 +415,7 @@ internal static class ContinuousCollisionBenchmarkSupport
         {
             StiffBody2D body = bodies[i];
             SwiftList<int> candidates = context.Physics2D.QueryPlanarContinuousCollisionCandidates(
-                DynamicCcdCandidateIndex.CreateSweptCircleBounds(
+                DynamicCcdCandidateIndex2D.CreateSweptCircleBounds(
                     body.ContinuousCollisionFrameStart,
                     body.ContinuousCollisionFrameDisplacement,
                     body.ResolveContinuousCollisionProxyRadiusForDynamicTarget()));
@@ -483,7 +477,7 @@ internal static class ContinuousCollisionBenchmarkSupport
             StiffBody2D source = bodies[i];
             Fixed64 sourceRadius = source.ResolveContinuousCollisionProxyRadiusForDynamicTarget();
             SwiftList<int> candidates = context.Physics2D.QueryPlanarContinuousCollisionCandidates(
-                DynamicCcdCandidateIndex.CreateSweptCircleBounds(
+                DynamicCcdCandidateIndex2D.CreateSweptCircleBounds(
                     source.ContinuousCollisionFrameStart,
                     source.ContinuousCollisionFrameDisplacement,
                     sourceRadius));

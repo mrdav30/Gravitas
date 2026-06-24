@@ -61,7 +61,6 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 
 | Signal | Status | Priority | Tracking |
 | --- | --- | --- | --- |
-| Pure 2D dynamic CCD candidate asymmetry | Open | Medium | This backlog |
 | SwiftCollections sort hot-path allocation | Mitigated in Gravitas, lower-stack open | Medium | This backlog |
 | Mixed mesh finite-slab triangle scaling signal | Open | Medium | This backlog |
 
@@ -151,9 +150,21 @@ candidate volume, not only by collider count. Any future optimization preserves
 owner identity, lower triangle-index tie-breaks, and zero managed allocation
 after warmup.
 
+## Closed Signals
+
+| Signal | Status | Closed | Resolution |
+| --- | --- | --- | --- |
+| Pure 2D dynamic CCD candidate asymmetry | Closed | 2026-06-23 | 2D now uses a planar candidate index, skips mixed CCD indexing outside mixed mode, and benchmark resets use 2D reset parity |
+| 3D shape-exact false-positive cost | Closed | 2026-06-23 | Static CCD now uses exact-source sweeps for non-sphere convex movers before conservative sphere fallback refinement |
+| 3D dynamic shape-exact BDN allocation signal | Closed | 2026-06-23 | Shared exact-sweep bounds prefilters removed the scaling allocation/time signal from 3D dynamic false-positive rows |
+| 3D full-runtime CCD allocation | Closed | 2026-06-23 | GridForge allocation-free line tracing plus Gravitas 3D raycast adoption |
+| Grounding raycast probe allocation | Closed | 2026-06-23 | Same raycast trace fix removed automatic ray-grounding allocation |
+
 ### Signal: Pure 2D Dynamic CCD Candidate Asymmetry
 
 **Discovered:** 2026-06-21
+
+**Status:** Closed 2026-06-23
 
 **Evidence:** The short in-process
 `continuous-collision-evidence` BenchmarkDotNet smoke reported
@@ -161,41 +172,70 @@ after warmup.
 `1024` bodies, compared to about `1.47 ms/op` for 3D. The 2D relative-sweep
 attribution row was also higher than 3D.
 
-**Initial read:** Pure 2D candidate gathering may have avoidable overhead, or
-the evidence scene may produce more 2D candidates than the comparable 3D scene.
+**Fresh baseline 2026-06-23:** Re-running
+`continuous-collision-evidence --filter "*Dynamic*AttributionEvidence*" -j
+Short -i` reproduced the signal:
 
-**Why it matters:** Dynamic-vs-dynamic 2D CCD is important for fast top-down
-games, projectiles, character controllers, and deterministic RTS-style
-simulation. Pure planar CCD should be understood before richer 2D CCD behavior
-is layered on top.
+- `Pure2DDynamicCandidateIndexAttributionEvidence`, `256` bodies:
+  `598.731 us` versus 3D `277.042 us`.
+- `Pure2DDynamicCandidateIndexAttributionEvidence`, `1024` bodies:
+  `4.709 ms` versus 3D `1.524 ms`.
+- `Pure2DDynamicRelativeSweepAttributionEvidence`, `1024` bodies:
+  `4.782 ms` versus 3D `3.631 ms`.
 
-**Next isolation step:** Normalize candidate counts between the 2D and 3D
-evidence scenes before optimizing. If counts are comparable, inspect
-`DynamicCcdCandidateIndex`, 2D partition traversal, and 2D relative sweep
-helpers for repeated work.
+**RCA 2026-06-23:** The dense benchmark layout was not accidentally stacking
+3D Y layers into the 2D plane; both dense scenes are planar. The signal had
+three concrete causes:
+
+- Pure `TwoD` contexts built both the planar 2D candidate index and the mixed
+  2D-as-3D slab candidate index even though mixed CCD can only run in
+  `PhysicsRuntimeMode.Mixed`.
+- Planar 2D candidate gathering reused the 3D `FixedBoundVolume` index, forcing
+  a dead Y axis, `Vector3d` bound construction, and extra comparisons into the
+  2D hot path.
+- The evidence fixture reset 2D bodies with `Sleep()` followed by
+  `SetPosition(...)`, which churned partition awake state and collider rebuilds
+  before every attribution query. 3D already had a single `ResetPosition(...)`
+  fixture reset path.
+
+**Resolution 2026-06-23:** `GravitasPhysics2DService` now builds the mixed
+dynamic CCD index only when the runtime mode actually runs mixed contacts.
+Pure planar CCD uses `DynamicCcdCandidateIndex2D` and `DynamicCcdPlanarBounds`
+instead of projecting circles into a 3D `FixedBoundVolume`. `StiffBody2D`
+gained `ResetPosition(...)` parity with 3D, and the continuous-collision
+benchmark fixture now uses it for deterministic 2D reset/setup without
+sleep/wake churn.
+
+**Validation 2026-06-23:** Re-running the same attribution benchmark reduced:
+
+- `Pure2DDynamicCandidateIndexAttributionEvidence`, `256` bodies:
+  `598.731 us` -> `92.281 us`.
+- `Pure2DDynamicCandidateIndexAttributionEvidence`, `1024` bodies:
+  `4.709 ms` -> `615.603 us`.
+- `Pure2DDynamicRelativeSweepAttributionEvidence`, `256` bodies:
+  `590.845 us` -> `139.723 us`.
+- `Pure2DDynamicRelativeSweepAttributionEvidence`, `1024` bodies:
+  `4.782 ms` -> `718.256 us`.
+
+MemoryDiagnoser reported no recurring managed allocation in the 2D rows; the
+remaining `1 B/op` at `1024` is treated as in-process runner noise unless a
+focused allocation guard reproduces it.
 
 **Likely files:**
 
 - `src/Gravitas/CollisionHandling/Continuous/DynamicCcdCandidateIndex.cs`
 - `src/Gravitas/Core/GravitasPhysics2DService.cs`
-- `src/Gravitas/CollisionHandling/Detection/*2D*`
-- `src/Gravitas/Queries/GravitasQuery2DService.cs`
+- `src/Gravitas/Core/StiffBody2D.cs`
+- `src/Gravitas/Core/StiffBody2D.ContinuousCollision.Hits.cs`
+- `src/Gravitas/Core/StiffBody2D.ContinuousCollision.Kinematic.cs`
 - `tests/Gravitas.Tests/CollisionHandling/DynamicCcdCandidateIndexTests.cs`
-- `tests/Gravitas.Tests/Physics2D/ContinuousCollision2DTests.cs`
-- `tests/Gravitas.Benchmarks/Core/ContinuousCollisionEvidenceBenchmarks.cs`
+- `tests/Gravitas.Tests/Core/StiffBody2DAngularDynamicsTests.cs`
+- `tests/Gravitas.Benchmarks/Support/ContinuousCollisionBenchmarkSupport.cs`
 
-**Closure criteria:** The 2D/3D attribution gap is explained by candidate volume
-or a specific 2D hot path. Any optimization preserves stable candidate ordering
-and duplicate suppression.
-
-## Closed Signals
-
-| Signal | Status | Closed | Resolution |
-| --- | --- | --- | --- |
-| 3D shape-exact false-positive cost | Closed | 2026-06-23 | Static CCD now uses exact-source sweeps for non-sphere convex movers before conservative sphere fallback refinement |
-| 3D dynamic shape-exact BDN allocation signal | Closed | 2026-06-23 | Shared exact-sweep bounds prefilters removed the scaling allocation/time signal from 3D dynamic false-positive rows |
-| 3D full-runtime CCD allocation | Closed | 2026-06-23 | GridForge allocation-free line tracing plus Gravitas 3D raycast adoption |
-| Grounding raycast probe allocation | Closed | 2026-06-23 | Same raycast trace fix removed automatic ray-grounding allocation |
+**Closure criteria:** Met. The gap is explained by mixed-index overwork,
+planar-vs-3D index shape, and benchmark reset asymmetry. The runtime path now
+keeps 2D planar candidate ordering stable with duplicate suppression preserved,
+and the attribution benchmark no longer shows a 2D candidate-gathering penalty.
 
 ### Signal: 3D Shape-Exact False-Positive Cost
 
@@ -456,8 +496,9 @@ Promote a signal from this backlog into a dedicated dated plan when it has:
 
 ## Current Recommendation
 
-With the 3D full-runtime allocation, grounding raycast allocation, and 3D
-shape-exact false-positive signals closed, the next runtime-facing benchmark
-signal is pure 2D dynamic CCD candidate asymmetry. Capture candidate counts
-before optimizing timings so reducer cost, candidate volume, and benchmark
-fixture behavior do not get conflated.
+With the runtime CCD allocation, grounding, shape-exact false-positive, and
+pure 2D dynamic candidate-asymmetry signals closed, the remaining active
+benchmark-facing items are the SwiftCollections lower-stack sort gap and mixed
+mesh finite-slab triangle scaling. Prefer the mixed mesh signal for the next
+Gravitas-local pass; keep the SwiftCollections item open until the lower-stack
+sort APIs can replace `SwiftListSortUtility` without allocation regressions.
