@@ -93,7 +93,7 @@ Typical integration creates or attaches a context, initializes bodies and collid
 
 | Area | What it does | Start here |
 | --- | --- | --- |
-| Core runtime | Context-owned physics service, body state, and host agent boundary | [`src/Gravitas/Core`](src/Gravitas/Core) and [`src/Gravitas/Runtime`](src/Gravitas/Runtime) |
+| Core runtime | Context-owned physics services, body state, and host agent boundary | [`src/Gravitas/Core`](src/Gravitas/Core), dimensional Core subfolders, and [`src/Gravitas/Runtime`](src/Gravitas/Runtime) |
 | Colliders | Collider base classes, primitive shapes, mesh support, authored shape definitions, compound colliders, bounds, and layer behavior | [`src/Gravitas/Colliders`](src/Gravitas/Colliders) |
 | Collision handling | Shape-pair checks, contact data, collision pairs, and response logic | [`src/Gravitas/CollisionHandling`](src/Gravitas/CollisionHandling) |
 | Partitions | GridForge-backed physics partitions used by collision distribution | [`src/Gravitas/Partitions`](src/Gravitas/Partitions) |

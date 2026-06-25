@@ -106,10 +106,10 @@ while preserving the allocation contract.
 - `../SwiftCollections/src/SwiftCollections/Collection/SwiftSortedList.cs`
 - `../SwiftCollections/src/SwiftCollections/Utility/SwiftArraySortHelper.cs`
 - `../SwiftCollections/src/SwiftCollections/Collection/SwiftSparseSet.cs`
-- `src/Gravitas/Core/GravitasCollisionService.cs`
-- `src/Gravitas/Core/GravitasPhysics2DService.cs`
-- `src/Gravitas/Core/GravitasCollision2DService.cs`
-- `src/Gravitas/Core/GravitasMixedCollisionService.cs`
+- `src/Gravitas/Core/3D/GravitasCollisionService.cs`
+- `src/Gravitas/Core/2D/GravitasPhysics2DService.cs`
+- `src/Gravitas/Core/2D/GravitasCollision2DService.cs`
+- `src/Gravitas/Core/Mixed/GravitasMixedCollisionService.cs`
 - `src/Gravitas/Partitions/*Partition*.cs`
 
 **Closure evidence:** SwiftCollections focused allocation guardrails and full
@@ -274,10 +274,10 @@ focused allocation guard reproduces it.
 **Likely files:**
 
 - `src/Gravitas/CollisionHandling/Continuous/DynamicCcdCandidateIndex.cs`
-- `src/Gravitas/Core/GravitasPhysics2DService.cs`
-- `src/Gravitas/Core/StiffBody2D.cs`
-- `src/Gravitas/Core/StiffBody2D.ContinuousCollision.Hits.cs`
-- `src/Gravitas/Core/StiffBody2D.ContinuousCollision.Kinematic.cs`
+- `src/Gravitas/Core/2D/GravitasPhysics2DService.cs`
+- `src/Gravitas/Core/2D/StiffBody2D.cs`
+- `src/Gravitas/Core/2D/StiffBody2D.ContinuousCollision.Hits.cs`
+- `src/Gravitas/Core/2D/StiffBody2D.ContinuousCollision.Kinematic.cs`
 - `tests/Gravitas.Tests/CollisionHandling/DynamicCcdCandidateIndexTests.cs`
 - `tests/Gravitas.Tests/Core/StiffBody2DAngularDynamicsTests.cs`
 - `tests/Gravitas.Benchmarks/Support/ContinuousCollisionBenchmarkSupport.cs`
@@ -327,8 +327,8 @@ The focused `ContinuousCollisionDetectionTests` and
 
 **Likely files:**
 
-- `src/Gravitas/Core/StiffBody.ContinuousCollision.Hits.cs`
-- `src/Gravitas/Core/StiffBody.ContinuousCollision.Kinematic.cs`
+- `src/Gravitas/Core/3D/StiffBody.ContinuousCollision.Hits.cs`
+- `src/Gravitas/Core/3D/StiffBody.ContinuousCollision.Kinematic.cs`
 - `src/Gravitas/Queries/ConvexSweepQueryWorker.cs`
 - `src/Gravitas/Queries/GravitasQuery3DService.Raycast.cs`
 - `src/Gravitas/Queries/SweepBoundsUtility.cs`
@@ -463,8 +463,8 @@ noise unless a future guardrail reproduces them.
 
 **Likely files:**
 
-- `src/Gravitas/Core/StiffBody.cs`
-- `src/Gravitas/Core/GravitasPhysicsService.cs`
+- `src/Gravitas/Core/3D/StiffBody.cs`
+- `src/Gravitas/Core/3D/GravitasPhysicsService.cs`
 - `src/Gravitas/CollisionHandling/Pairs/*`
 - `src/Gravitas/Partitions/*`
 - `tests/Gravitas.Tests/Support/AllocationTestHelper.cs`
@@ -516,7 +516,7 @@ after warmup.
 
 **Likely files:**
 
-- `src/Gravitas/Core/StiffBody.cs`
+- `src/Gravitas/Core/3D/StiffBody.cs`
 - `src/Gravitas/Queries/GravitasQuery3DService.Raycast.cs`
 - `tests/Gravitas.Benchmarks/Core/SimulationAllocationBenchmarks.cs`
 - `tests/Gravitas.Tests/Core/StiffBodyGroundingTests.cs`

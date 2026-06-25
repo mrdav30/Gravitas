@@ -43,7 +43,7 @@ public sealed class PhysicsPartitionAwakeTests
     }
 
     [Fact]
-    public void Distribute_WithAwakeDynamicAgainstSleepingDynamic_ShouldProcessPairAndWakeSleepingBody()
+    public void Distribute_WithAwakeDynamicAgainstSleepingDynamic_ShouldCreatePairWithoutWakingSleepingBody()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSSphereCollider> awake = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
@@ -54,7 +54,7 @@ public sealed class PhysicsPartitionAwakeTests
 
         awake.Collider.TryGetCollisionPair(sleeping.Collider.Id, out CollisionPair? pair).Should().BeTrue();
         pair!.Manifold.HasContact.Should().BeTrue();
-        sleeping.Body.IsSleeping.Should().BeFalse();
+        sleeping.Body.IsSleeping.Should().BeTrue();
     }
 
     [Fact]
@@ -275,7 +275,7 @@ public sealed class PhysicsPartitionAwakeTests
     }
 
     [Fact]
-    public void CheckAndDistributeCollisions_ShouldRetireNoMoreThanPartitionRetirementBudget()
+    public void RetireExpiredRetainedPartitions_ShouldRetireNoMoreThanPartitionRetirementBudget()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         scenario.Context.Settings.RetainedPartitionTimeToKillFrames = 0;
@@ -286,7 +286,7 @@ public sealed class PhysicsPartitionAwakeTests
         int inactiveBeforeClear = scenario.Context.Collisions.InactivePartitionCount;
 
         scenario.Context.Collisions.ClearPartitionedObject(body.Collider, force: true).Should().BeTrue();
-        scenario.Context.Collisions.CheckAndDistributeCollisions();
+        scenario.Context.Collisions.RetireExpiredRetainedPartitions();
 
         scenario.Context.Collisions.RetainedPartitionCount.Should().Be(retainedBeforeClear - 1);
         scenario.Context.Collisions.InactivePartitionCount.Should().Be(inactiveBeforeClear + 1);

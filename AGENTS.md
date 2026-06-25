@@ -59,8 +59,8 @@ Read these in order before making non-trivial changes:
      out-of-scope bugs, correctness risks, doc defects, and RCA items that
      should not be buried inside feature plans.
 5. [`src/Gravitas/Runtime/GravitasWorldContext.cs`](src/Gravitas/Runtime/GravitasWorldContext.cs),
-   [`src/Gravitas/Core/GravitasPhysicsService.cs`](src/Gravitas/Core/GravitasPhysicsService.cs),
-   and [`src/Gravitas/Core/StiffBody.cs`](src/Gravitas/Core/StiffBody.cs).
+   [`src/Gravitas/Core/3D/GravitasPhysicsService.cs`](src/Gravitas/Core/3D/GravitasPhysicsService.cs),
+   and [`src/Gravitas/Core/3D/StiffBody.cs`](src/Gravitas/Core/3D/StiffBody.cs).
 6. The relevant source folder under [`src/Gravitas`](src/Gravitas).
 7. The matching test or benchmark area under [`tests`](tests). Runtime,
    collision, partition, query, serialization, CCD, shape definition, and
@@ -93,7 +93,10 @@ workflow changes:
 | Path | Purpose | Notes |
 | --- | --- | --- |
 | [`src/Gravitas`](src/Gravitas) | Main library project | Multi-targets `netstandard2.1` and `net8.0`. |
-| [`src/Gravitas/Core`](src/Gravitas/Core) | Context-owned physics service, body state, and host agent interface | Start here for body/registration architecture changes. |
+| [`src/Gravitas/Core`](src/Gravitas/Core) | Shared host agent interface plus dimensional runtime folders | Start here for body/registration architecture changes. |
+| [`src/Gravitas/Core/3D`](src/Gravitas/Core/3D) | 3D body, physics, collision, grounding, and inertia ownership | Keep 3D-only behavior out of pure 2D services. |
+| [`src/Gravitas/Core/2D`](src/Gravitas/Core/2D) | Pure 2D body, physics, collision, and planar CCD ownership | Keep 2D semantics first-class rather than accidental 3D projection. |
+| [`src/Gravitas/Core/Mixed`](src/Gravitas/Core/Mixed) | Dedicated mixed 2D/3D broad-phase, pair, and response lifecycle | Mixed mode is separate from `Both` and should stay explicit. |
 | [`src/Gravitas/Runtime`](src/Gravitas/Runtime) | Explicit world context, deterministic clock, and lifecycle hooks | Start here for host integration changes. |
 | [`src/Gravitas/Colliders`](src/Gravitas/Colliders) | 3D and 2D collider bases, primitive colliders, shape definitions, compound collider data, and physics mesh helpers | Keep authored shape data separate from runtime collider state. |
 | [`src/Gravitas/CollisionHandling`](src/Gravitas/CollisionHandling) | Collision detection, response, pairs, contact data | Determinism and ordering are high risk here. |
