@@ -247,12 +247,20 @@ public static class CollisionResponseMixed
     {
         Vector3d velocity3D = body3D == null
             ? Vector3d.Zero
-            : body3D.LinearVelocity + Vector3d.Cross(body3D.AngularVelocity, relative3D);
+            : ResolveLinearVelocity(body3D) + Vector3d.Cross(body3D.AngularVelocity, relative3D);
         Vector3d velocity2D = body2D == null
             ? Vector3d.Zero
-            : (body2D.LinearVelocity + AngularVelocityAtPoint(relative2D, body2D.AngularVelocity)).ToVector3d(Fixed64.Zero);
+            : (ResolveLinearVelocity(body2D) + AngularVelocityAtPoint(relative2D, body2D.AngularVelocity)).ToVector3d(Fixed64.Zero);
         return velocity2D - velocity3D;
     }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Vector3d ResolveLinearVelocity(StiffBody body) =>
+        body.IsKinematic ? body.ResolveContinuousCollisionFrameVelocity() : body.LinearVelocity;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Vector2d ResolveLinearVelocity(StiffBody2D body) =>
+        body.IsKinematic ? body.ResolveContinuousCollisionFrameVelocity() : body.LinearVelocity;
 
     private static Fixed64 ComputeAngularDenominator(StiffBody? body3D, Vector3d relativeContactPoint, Vector3d axis)
     {

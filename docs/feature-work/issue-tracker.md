@@ -40,32 +40,33 @@ runtime and tests.
 
 ## Active Issues
 
-### Mixed Discrete Response Can Reverse Restitution-Heavy Kinematic CCD Handoff Velocity
-
-**Discovered:** 2026-06-23  
-**Source:** CCD service-level island solver validation  
-**Status:** Needs investigation  
-**Affected area:** `CollisionResponseMixed`, mixed CCD handoff tests,
-`GravitasMixedCollisionService` full-frame response ordering
-
-During kinematic active-source CCD validation, the isolated pure-service
-handoff from a kinematic 2D source into a dynamic 3D target correctly transferred
-positive target velocity. When the same setup used a full mixed `LateSimulate`
-with high restitution, the later mixed discrete response could cancel or reverse
-the final observable 3D target velocity after the target settled against the
-stopped 2D source. Inelastic resting contact can legitimately zero the velocity,
-but restitution-heavy reversal should be investigated as a possible mixed normal
-orientation or resting-response issue.
-
-Recommended verification:
-
-- Add a focused full-frame mixed test for kinematic 2D source versus dynamic 3D
-  target with restitution enabled.
-- Compare the post-CCD pre-mixed-response handoff velocity against the final
-  mixed response velocity.
-- Verify the symmetric 3D source versus 2D target case so the fix does not
-  create asymmetric mixed response behavior.
+- None currently.
 
 ## Resolved Issues
 
-- None currently.
+### Mixed Discrete Response Can Reverse Restitution-Heavy Kinematic CCD Handoff Velocity
+
+**Discovered:** 2026-06-23  
+**Resolved:** 2026-06-25  
+**Source:** CCD service-level island solver validation  
+**Affected area:** `CollisionResponseMixed`, mixed CCD handoff tests,
+`GravitasMixedCollisionService` full-frame response ordering
+
+RCA: the isolated pure-service CCD handoff was correct, but the later full-frame
+mixed discrete response read kinematic participants through stored dynamic
+`LinearVelocity`. Kinematic bodies keep that velocity at zero and expose their
+deterministic host movement through the current continuous-collision frame
+displacement instead. With restitution enabled, the same-frame mixed response
+therefore compared a fast handed-off 3D target against a seemingly stationary
+2D source and could apply a backward bounce.
+
+Fix: `CollisionResponseMixed` now resolves kinematic participants through their
+current frame displacement velocity while still treating them as infinite-mass
+participants for impulse application.
+
+Verification:
+
+- Added full-frame mixed regression coverage for a kinematic 2D source crossing
+  a dynamic 3D target with restitution enabled.
+- Verified existing symmetric kinematic mixed-source cases.
+- Ran the mixed-dimension test suite.

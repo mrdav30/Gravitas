@@ -1374,6 +1374,31 @@ public sealed class MixedQueryCcdTests
     }
 
     [Fact]
+    public void LateSimulate_WithKinematic2DSourceCrossingDynamic3DTarget_ShouldPreserveHandoffVelocityAfterMixedResponse()
+    {
+        using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
+        context.Environment.Gravity = Fixed64.Zero;
+        ScenarioBody<LSSphereCollider> target = CreateSphere3D(context, Vector3d.Zero);
+        target.Body.Sleep();
+        StiffBody2D source = CreateCircle2D(
+            context,
+            new Vector2d((Fixed64)(-5), Fixed64.Zero),
+            isKinematic: true);
+        source.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        source.RestitutionCoefficient = Fixed64.One;
+        target.Body.RestitutionCoefficient = Fixed64.One;
+
+        source.Agent.Transform.Position = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
+        context.LateSimulate();
+
+        source.Position.X.Should().Be((Fixed64)5);
+        source.LastContinuousCollisionToiIterationCount.Should().Be(1);
+        target.Body.Position3d.X.Should().BeGreaterThan(Fixed64.Zero);
+        target.Body.LinearVelocity.X.Should().BeGreaterThan(Fixed64.Zero);
+        target.Body.IsSleeping.Should().BeFalse();
+    }
+
+    [Fact]
     public void SweepSphereAgainstStatic2DAll_ShouldCollectOnlyStaticStyle2DTargets()
     {
         using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
