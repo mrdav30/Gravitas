@@ -6,7 +6,7 @@ emits deterministic `GravitasDiagnosticEvent` values and
 translate those streams into engine-specific overlays, logs, captures, or replay
 tools outside `src/Gravitas`.
 
-Keep adapter code in the host, samples, or tooling projects. Do not add Unity,
+Keep adapter code in the host, samples, or tooling projects. Do not add engine-specific,
 renderer, file-system, networking, or editor dependencies to the Gravitas core
 library to make diagnostics easier to display.
 

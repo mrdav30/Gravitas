@@ -11,7 +11,7 @@
 
 **Deterministic physics for lockstep simulations and games.**
 
-Gravitas is an engine-agnostic fixed-point physics prototype for simulation-heavy .NET projects. It is designed to sit above the LSF stack:
+Gravitas is an engine-agnostic fixed-point physics library for simulation-heavy .NET projects. It is designed to sit above the LSF stack:
 
 - `FixedMathSharp` for deterministic fixed-point math, transforms, and reusable
   fixed-point geometry algebra.
@@ -21,16 +21,16 @@ Gravitas is an engine-agnostic fixed-point physics prototype for simulation-heav
 - `Chronicler.Core` for deterministic state transfer and shared save/apply
   lifecycle helpers.
 
-## Prototype Status
+## Project Status
 
-Gravitas is preparing for alpha. The current library is intentionally experimental and not API-stable. The 3D path is still the deepest slice, while pure 2D now has a first-class runtime foundation. Heavy redesigns are expected where they improve deterministic behavior, physics correctness, runtime complexity, or engine-agnostic integration.
+Gravitas is under active first-public-release hardening and is not API-stable while deterministic behavior, physics correctness, runtime complexity, and engine-agnostic integration are refined. The 3D path is the deepest slice, with first-class pure 2D and mixed 2D/3D runtime paths.
 
-The unit test project now has focused runtime, settings, query, partition, and coroutine coverage. The benchmark project has initial context lifecycle, registration/partitioning, and query-service benchmarks. Use this README as current orientation, and use [AGENTS.md](AGENTS.md) for detailed contributor guidance.
+The unit test project includes focused runtime, settings, query, partition, coroutine, collision, CCD, serialization, 2D, and mixed-dimension coverage. The benchmark project covers context lifecycle, registration, partitioning, simulation, queries, diagnostics, mesh paths, mixed broad phase, and CCD scaling. Use this README as current orientation, and use [AGENTS.md](AGENTS.md) for detailed contributor guidance.
 
 ## Why Gravitas?
 
 - Deterministic runtime math through `Fixed64`, `Vector2d`, `Vector3d`, and `FixedQuaternion`.
-- Engine-agnostic host boundary through `IMatterAgent` instead of direct renderer, ECS, or Unity coupling.
+- Engine-agnostic host boundary through `IMatterAgent` instead of direct renderer or ECS coupling.
 - Grid-backed broad-phase partitioning through `GridForge` `GridWorld`, voxel tracing, `PhysicsPartition`, and `PhysicsPartition2D`.
 - Runtime systems for 3D, pure 2D, and mixed 2D/3D bodies/colliders, authored shape definitions, compound collision assets, collision pairs, collision detection/response, opt-in CCD, raycasts, circlecasts, swept queries, pure 2D overlap/raycast queries, and physics settings.
 - Mixed 2D/3D simulation where 2D bodies are embedded as explicit finite slabs/prisms and constrained to X/Z impulse response.
@@ -74,7 +74,7 @@ For local development against the repository, reference the project directly:
 
 ## Mental Model
 
-Gravitas is now centered around explicit world-context ownership:
+Gravitas is centered around explicit world-context ownership:
 
 1. A host creates or attaches a `GravitasWorldContext`, which owns an explicit `GridForge.Grids.GridWorld`.
 2. Host objects expose deterministic transform and world context access through `IMatterAgent`.
@@ -108,7 +108,6 @@ Typical integration creates or attaches a context, initializes bodies and collid
 | [`src/Gravitas`](src/Gravitas) | Main library project. |
 | [`tests/Gravitas.Tests`](tests/Gravitas.Tests) | xUnit v3 test project with focused runtime/settings/query coverage. |
 | [`tests/Gravitas.Benchmarks`](tests/Gravitas.Benchmarks) | BenchmarkDotNet project scaffold and benchmark runner. |
-| [`docs/feature-work/prototype`](docs/feature-work/prototype) | Historical Unity-oriented prototype/reference code. Not the source of truth. |
 | [`.github/workflows`](.github/workflows) | CI, coverage, release, NuGet publish, Discord, and wiki-sync workflows. |
 
 ## Build And Test
@@ -136,7 +135,7 @@ Release builds generate NuGet packages because `GeneratePackageOnBuild` is enabl
 
 ## Benchmarks
 
-The benchmark project includes initial physics hot-path measurements for context lifecycle, body/collider registration, partitioning, simulation, query services, and diagnostics.
+The benchmark project includes physics hot-path measurements for context lifecycle, body/collider registration, partitioning, simulation, query services, diagnostics, mesh paths, mixed broad phase, and CCD scaling.
 
 List available benchmark selections:
 
@@ -158,7 +157,6 @@ See the [benchmark README](tests/Gravitas.Benchmarks/README.md) for runner detai
 
 - [AGENTS.md](AGENTS.md) is the main contributor guide for deterministic, performance-sensitive, and physics-design work.
 - [`docs/wiki/OVERVIEW.md`](docs/wiki/OVERVIEW.md) is the developer-facing architecture guide for context ownership, host integration, collisions, queries, serialization/replay, diagnostics, and host diagnostic adapters.
-- [`docs/feature-work/prototype`](docs/feature-work/prototype) contains historical prototype code and Unity-oriented reference material.
 
 If behavior changes, keep code, tests, this README, and benchmark documentation aligned.
 

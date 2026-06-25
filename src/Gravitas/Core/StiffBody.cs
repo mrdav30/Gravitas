@@ -822,8 +822,6 @@ public partial class StiffBody : IRecordable
             _decelerating = true;
     }
 
-
-    // https://forum.unity.com/threads/getting-impact-force-not-just-velocity.23746/
     // https://www2.chem.wisc.edu/deptfiles/genchem/netorial/modules/thermodynamics/energy/energy2.htm
     /// <summary>
     /// Energy possessed by an object in motion that describes things like how long it will take to stop

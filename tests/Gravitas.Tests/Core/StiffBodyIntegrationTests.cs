@@ -1,6 +1,7 @@
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
+using Gravitas.Support;
 using Gravitas.Tests.Support;
 using Xunit;
 
@@ -141,13 +142,17 @@ public sealed class StiffBodyIntegrationTests
     private static PhysicsScenarioBuilder CreateIntegrationScenario(int frameRate)
     {
         PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
-        scenario.Context.SetFrameRate(frameRate);
+        var settings = new PhysicsSettings(frameRate, null, PhysicsLayerMask.FromLayer(1));
+
+        scenario.Context.ApplySettings(settings);
+
         scenario.Context.Environment.Gravity = Fixed64.Zero;
         scenario.Context.Environment.AirDensity = Fixed64.Zero;
         scenario.Context.Environment.MinSpeed = Fixed64.Zero;
         scenario.Context.Environment.MaxSpeed = (Fixed64)100;
         scenario.Context.Environment.MaxFallSpeed = (Fixed64)100;
         scenario.Context.Environment.DampingFactor = Fixed64.Zero;
+
         return scenario;
     }
 
@@ -160,6 +165,7 @@ public sealed class StiffBodyIntegrationTests
         var agent = new TestMatterAgent(scenario.Context, transform);
         var collider = new LSCuboidCollider
         {
+            Layer = new PhysicsLayer(1),
             Size = new Vector3d((Fixed64)8, Fixed64.One, (Fixed64)8)
         };
 

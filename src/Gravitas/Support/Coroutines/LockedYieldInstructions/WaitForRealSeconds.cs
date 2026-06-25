@@ -9,6 +9,9 @@ using FixedMathSharp;
 
 namespace Gravitas.Support;
 
+/// <summary>
+/// A coroutine yield instruction that waits for a specified number of real-time seconds, using the GravitasWorldContext's delta time for accumulation.
+/// </summary>
 public struct WaitForRealSeconds : ILockedYieldInstruction
 {
     private readonly GravitasWorldContext _context;

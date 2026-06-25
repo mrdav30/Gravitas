@@ -100,7 +100,7 @@ LateVisualize
   Hooks.InvokeLateVisualize
 ```
 
-This order is an alpha contract, not just an implementation detail. Ordered host
+This order is a runtime contract, not just an implementation detail. Ordered host
 commands should be applied before `Simulate()`. Transform teleports made before
 `Simulate()` are reflected in the same fixed step because dynamic-body
 colliders are refreshed before collisions are distributed in
@@ -129,14 +129,13 @@ contract is pinned by `GravitasSimulationPhaseOrderTests`.
 values: `ThreeD`, `TwoD`, `Both`, and `Mixed`. `Both` runs pure 2D and pure 3D
 side by side without cross-dimensional contacts. `Mixed` runs both pure paths
 plus the dedicated mixed lifecycle and broad-phase path. Mixed narrow phase
-currently supports 3D spheres, cuboids, capsules, finite cylinders, compound
+supports 3D spheres, cuboids, capsules, finite cylinders, compound
 colliders, and mesh colliders against embedded 2D circle, AABB, and convex
 polygon slabs. Mixed pair ownership and constrained impulse exchange are
 implemented through `CollisionPairMixed` and `CollisionResponseMixed`, including
 planar scalar angular response for embedded 2D bodies while vertical Y impulse
 remains constrained out of the 2D body model. Explicit mixed query APIs, mixed
-CCD hooks, and dimension-tagged diagnostics are part of the current mixed alpha
-path.
+CCD hooks, and dimension-tagged diagnostics are part of the mixed path.
 
 `Reset` clears the clock and context-local service state, detaches retained
 Gravitas partition payloads from GridForge voxels, then invokes reset hooks.

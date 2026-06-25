@@ -7,6 +7,9 @@
 
 namespace Gravitas.Support;
 
+/// <summary>
+/// A coroutine yield instruction that waits until the next Gravitas simulation frame.
+/// </summary>
 public readonly struct WaitForNextSimulate : ILockedYieldInstruction
 {
     private readonly GravitasWorldContext _context;

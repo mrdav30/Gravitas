@@ -7,6 +7,9 @@
 
 namespace Gravitas.Support;
 
+/// <summary>
+/// A coroutine yield instruction that waits for a specified number of Gravitas simulation frames.
+/// </summary>
 public readonly struct WaitForFrames : ILockedYieldInstruction
 {
     private readonly GravitasWorldContext _context;

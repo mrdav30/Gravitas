@@ -15,6 +15,86 @@ namespace Gravitas;
 public sealed class PhysicsEnvironment
 {
     /// <summary>
+    /// Standard gravitational acceleration in world units per second squared.
+    /// </summary>
+    public static readonly Fixed64 DefaultGravity = (Fixed64)9.8f;
+
+    /// <summary>
+    /// Standard air density used by drag calculations.
+    /// </summary>
+    public static readonly Fixed64 DefaultAirDensity = (Fixed64)1.225f;
+
+    /// <summary>
+    /// Minimum speed treated as meaningful motion by the standard environment.
+    /// </summary>
+    public static readonly Fixed64 DefaultMinSpeed = (Fixed64)0.00001f;
+
+    /// <summary>
+    /// Maximum linear or angular speed used by the standard environment.
+    /// </summary>
+    public static readonly Fixed64 DefaultMaxSpeed = (Fixed64)7f;
+
+    /// <summary>
+    /// Maximum downward fall speed used by the standard environment.
+    /// </summary>
+    public static readonly Fixed64 DefaultMaxFallSpeed = DefaultGravity;
+
+    /// <summary>
+    /// Speed threshold used when transitioning friction behavior in the standard environment.
+    /// </summary>
+    public static readonly Fixed64 DefaultFrictionTransitionSpeed = (Fixed64)0.2f;
+
+    /// <summary>
+    /// Motion deceleration multiplier used by the standard environment.
+    /// </summary>
+    public static readonly Fixed64 DefaultDecelerationMultiplier = (Fixed64)10f;
+
+    /// <summary>
+    /// Angular velocity damping factor used by the standard environment.
+    /// </summary>
+    public static readonly Fixed64 DefaultDampingFactor = (Fixed64)0.95f;
+
+    /// <summary>
+    /// Frame-rate divisor used to derive the default maximum distance-based
+    /// collision-culling score.
+    /// </summary>
+    public static readonly int DefaultCullDistanceFrameDivisor = 3;
+
+    /// <summary>
+    /// Distance threshold whose square becomes the default fast-collision
+    /// preservation threshold.
+    /// </summary>
+    public static readonly int DefaultCullFastDistance = 4;
+
+    /// <summary>
+    /// Squared distance below which the standard environment preserves fast
+    /// collision checks.
+    /// </summary>
+    public static readonly Fixed64 DefaultCullFastDistanceMax =
+        Fixed64.One * DefaultCullFastDistance * (Fixed64.One * DefaultCullFastDistance);
+
+    /// <summary>
+    /// Velocity step used by standard collision culling.
+    /// </summary>
+    public static readonly int DefaultCullVelocityStep = 2;
+
+    /// <summary>
+    /// Maximum velocity-based collision-culling score used by the standard environment.
+    /// </summary>
+    public static readonly int DefaultCullVelocityMax = 4;
+
+    /// <summary>
+    /// Frame-rate multiplier used to derive the default collision-culling time step.
+    /// </summary>
+    public static readonly int DefaultCullTimeStepFrameMultiplier = 3;
+
+    /// <summary>
+    /// Frame-rate divisor used to derive the default maximum time-based
+    /// collision-culling score.
+    /// </summary>
+    public static readonly int DefaultCullTimeMaxFrameDivisor = 5;
+
+    /// <summary>
     /// One pound is equal to this many Newtons.
     /// </summary>
     public static readonly Fixed64 PoundToNewton = (Fixed64)4.44822162f;
@@ -130,7 +210,7 @@ public sealed class PhysicsEnvironment
     }
 
     /// <summary>
-    /// Creates environment values matching the legacy Gravitas defaults.
+    /// Creates environment values for the standard Gravitas runtime defaults.
     /// </summary>
     /// <param name="frameRate">Frame rate used to initialize frame-derived culling thresholds.</param>
     /// <returns>A new environment instance.</returns>
@@ -139,19 +219,19 @@ public sealed class PhysicsEnvironment
         SwiftThrowHelper.ThrowIfNegativeOrZero(frameRate, nameof(frameRate));
 
         return new PhysicsEnvironment(
-            gravity: (Fixed64)9.8f,
-            airDensity: (Fixed64)1.225f,
-            minSpeed: (Fixed64)0.00001f,
-            maxSpeed: (Fixed64)7f,
-            maxFallSpeed: (Fixed64)9.8f,
-            frictionTransitionSpeed: (Fixed64)0.2f,
-            decelerationMultiplier: (Fixed64)10f,
-            dampingFactor: (Fixed64)0.95f,
-            cullDistanceMax: frameRate / 3,
-            cullFastDistanceMax: Fixed64.One * 4 * (Fixed64.One * 4),
-            cullVelocityStep: 2,
-            cullVelocityMax: 4,
-            cullTimeStep: frameRate * 3,
-            cullTimeMax: frameRate / 5);
+            gravity: DefaultGravity,
+            airDensity: DefaultAirDensity,
+            minSpeed: DefaultMinSpeed,
+            maxSpeed: DefaultMaxSpeed,
+            maxFallSpeed: DefaultMaxFallSpeed,
+            frictionTransitionSpeed: DefaultFrictionTransitionSpeed,
+            decelerationMultiplier: DefaultDecelerationMultiplier,
+            dampingFactor: DefaultDampingFactor,
+            cullDistanceMax: frameRate / DefaultCullDistanceFrameDivisor,
+            cullFastDistanceMax: DefaultCullFastDistanceMax,
+            cullVelocityStep: DefaultCullVelocityStep,
+            cullVelocityMax: DefaultCullVelocityMax,
+            cullTimeStep: frameRate * DefaultCullTimeStepFrameMultiplier,
+            cullTimeMax: frameRate / DefaultCullTimeMaxFrameDivisor);
     }
 }

@@ -1,15 +1,16 @@
 # Gravitas Overview
 
-Gravitas is a deterministic, engine-agnostic physics prototype for lockstep
+Gravitas is a deterministic, engine-agnostic physics library for lockstep
 simulations. It is built on fixed-point math, explicit GridForge worlds, and
-context-owned runtime services. The important post-refactor rule is simple:
-there is no process-wide physics world. A simulation happens inside a
+context-owned runtime services. The important runtime rule is simple: there is
+no process-wide physics world. A simulation happens inside a
 `GravitasWorldContext`, and every body, collider, partition, query, coroutine,
 and clock value belongs to that context.
 
 This wiki is written for developers working on or integrating the library. The
 public surface should stay lean; most of the useful context is how the internal
-systems connect and where the current prototype needs hardening.
+systems connect, which runtime contracts are intentional, and which boundaries
+are explicit design choices rather than accidental gaps.
 
 ## Reading Path
 
@@ -110,7 +111,7 @@ flowchart TD
 | `PhysicsPartition` | Voxel partition payload containing collider IDs, awake dynamic membership, and candidate pair distribution. |
 | `CollisionPair` | Pair identity, culling state, contact state, warm-start cache, narrow-phase dispatch, response dispatch, and contact notification state. |
 | `CollisionDetection` | Shape-pair narrow-phase collision checks and contact generation. |
-| `CollisionResponse` | Prototype position correction and impulse response for colliding bodies. |
+| `CollisionResponse` | Deterministic manifold position correction, normal impulse, friction, and warm-started response for colliding bodies. |
 | `GravitasCoroutineService` | Lockstep coroutine execution and context-bound wait instructions. |
 | `GravitasDiagnosticSink` | Disabled-by-default context diagnostics for deterministic events and engine-agnostic debug draw commands. |
 
@@ -165,26 +166,26 @@ the manifold contacts, then stores pair-local warm-start impulse data by contact
 identity. Contact events are emitted from the active-pair queue during
 `LateSimulate`.
 
-## Current Prototype Edges
+## Current Runtime Boundaries
 
-- The original 3D path remains the mature runtime path. The pure 2D path is an
-  alpha slice with circle, axis-aligned box, convex polygon, compound colliders,
-  exact area/raycast/swept-circle queries, two-contact manifolds, scalar
-  angular response, and pair-local warm-started response coverage.
-- `StiffBody` has a split 2D ground position plus height for the existing 3D
+- The 3D path remains the deepest runtime path. The pure 2D path
+  supports circle, axis-aligned box, convex polygon, compound colliders, exact
+  area/raycast/swept-circle queries, two-contact manifolds, scalar angular
+  response, and pair-local warm-started response coverage.
+- `StiffBody` has a split 2D ground position plus height for the 3D
   y-up model, but that is not the pure 2D body model.
-- Mixed 2D/3D interaction now has a first alpha implementation. The runtime has
-  a `Mixed` lifecycle path and 2D colliders cache finite 3D embedding
-  bounds from `PhysicsSettings.Mixed2DHalfThickness`,
+- Mixed 2D/3D interaction has a dedicated runtime implementation. The runtime
+  has a `Mixed` lifecycle path and 2D colliders cache finite 3D embedding bounds
+  from `PhysicsSettings.Mixed2DHalfThickness`,
   `MixedHalfThicknessOverride`, and the host transform's Y position. Mixed
-  broad phase now gathers deterministic GridForge-backed 3D/2D candidate keys,
+  broad phase gathers deterministic GridForge-backed 3D/2D candidate keys,
   and mixed narrow phase covers 3D spheres, cuboids, capsules, and finite
   cylinders plus compound and mesh colliders against embedded 2D circle, AABB,
-  and convex polygon slabs. Mixed pair ownership and constrained response now
+  and convex polygon slabs. Mixed pair ownership and constrained response
   support wake propagation, resting-pair retention, mixed contact/trigger
   events, planar X/Z impulse for 2D bodies, and vertical response against 3D
   participants only. Mixed query APIs, mixed CCD hooks, dimension-tagged
-  diagnostics, and slab debug draw are now implemented; mixed 2D swept-circle
+  diagnostics, and slab debug draw are implemented; mixed 2D swept-circle
   queries cover primitive, mesh, and compound 3D targets while preserving pure
   2D semantics and labeling exact versus conservative fallback hits.
 - Cylinder collision and query behavior is implemented for the current finite
@@ -192,21 +193,21 @@ identity. Contact events are emitted from the active-pair queue during
   behavior; side/rim contacts remain representative finite-cylinder contacts.
 - Mesh raycast overlap, sphere sweeps against mesh targets, and concave mesh
   narrow phase are implemented through triangle-level tests. Mesh/cuboid and
-  mesh/cylinder face/cap contacts now clip stable support contacts to authored
+  mesh/cylinder face/cap contacts clip stable support contacts to authored
   triangles. Capsule, cuboid, finite-cylinder, convex mesh, and authored
   compound sources have explicit 3D swept query APIs; concave mesh sources and
   raw mesh source queries are rejected because they hide unbounded
   source-triangle expansion. Hosts that need concave-looking movers should use
   offline convex decomposition into stable `LSCompoundCollider` parts.
-- Collision response is still an alpha-hardening target. The current 3D and pure
-  2D manifold solvers handle deterministic normal and friction impulses, 3D and
-  pure 2D apply compatible pair-local warm-start impulses, and 3D discrete
-  response builds deterministic islands with bounded multi-iteration solving.
-  Mixed response builds dedicated dimension-bridging islands without merging
-  them into pure 2D or 3D islands. Body-owned CCD now has shape-exact
-  static-style, rotational, and pure-dynamic relative reducers for supported 2D
-  and 3D families, while service-level CCD handoff queues advance chained
-  dynamic TOI contacts and mixed dynamic velocity transfer across pure services.
+- Collision response has deterministic 3D, pure 2D, and mixed response paths.
+  The 3D and pure 2D manifold solvers handle normal and friction impulses,
+  compatible pair-local warm-start impulses, deterministic response islands, and
+  bounded multi-iteration solving where needed. Mixed response builds dedicated
+  dimension-bridging islands without merging them into pure 2D or 3D islands.
+  Body-owned CCD has shape-exact static-style, rotational, and pure-dynamic
+  relative reducers for supported 2D and 3D families, while service-level CCD
+  handoff queues advance chained dynamic TOI contacts and mixed dynamic velocity
+  transfer across pure services.
 - Query services use context-owned mutable buffers. Treat them as same-thread,
   fixed-loop services unless they are redesigned for reentrancy.
 - Diagnostics are context-owned and disabled by default. Enabled draw capture can

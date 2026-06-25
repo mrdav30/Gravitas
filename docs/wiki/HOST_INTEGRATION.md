@@ -6,7 +6,7 @@ phases at deterministic points.
 
 ## Lifecycle Contract
 
-Use the old LSF lifecycle names as a mental model, not as Unity-specific API:
+Use the LSF lifecycle names as a mental model, not as engine-specific APIs:
 
 | Phase | Host responsibility | Gravitas call |
 | --- | --- | --- |
@@ -27,7 +27,7 @@ should not be used to apply gameplay commands or physics corrections.
 ## Minimal Host Agent
 
 The host provides `IMatterAgent` so Gravitas can bind an object to a context and
-fixed transform without depending on Unity, ECS, rendering, or a specific object
+fixed transform without depending on an engine, ECS, rendering, or a specific object
 model.
 
 ```csharp
@@ -62,7 +62,7 @@ that need parent-child or sibling collision suppression should initialize the
 colliders first, then call `childCollider.SetParent(parentCollider)`.
 `SetParent(...)` walks the collider-parent chain to the top collider and stores
 the top parent as a dimension-tagged collider key on the child, so sibling
-filtering does not depend on Unity `transform.parent` or any other engine
+filtering does not depend on an engine `transform.parent` or any other engine
 hierarchy object. Mixed mode can bind a 2D collider under a 3D collider, or a
 3D collider under a 2D collider, without aliasing the separate collider ID
 tables.
@@ -252,7 +252,7 @@ ordered input phase before `context.Simulate()`. Given the same initial context,
 settings, world state, command order, and frame count, Gravitas should replay to
 the same authoritative body, collider, clock, and contact state.
 
-The current alpha order has two important consequences:
+The current runtime order has two important consequences:
 
 - Teleports or transform mutations made before `Simulate()` refresh dynamic
   collider bounds and can create contacts in that same fixed step's
@@ -349,9 +349,8 @@ Query APIs use `PhysicsLayerMask` as an include mask. Use
 `PhysicsLayerMask.All` for every layer, and `PhysicsLayerMask.None` when no
 collider should be included.
 
-Ground checks use `context.Settings.GroundCheckLayerMask`. The default preserves
-old prototype example exclusions only as a starting point; hosts should set this
-explicitly for their own layer model before relying on grounding behavior.
+Ground checks use `context.Settings.GroundCheckLayerMask`. Hosts need to set
+this explicitly for their own layer model before relying on grounding behavior.
 `StiffBody.Initialize(...)` performs an initial ground probe after the collider
 is registered, so bodies only start grounded when the configured ground mask
 actually hits suitable geometry.

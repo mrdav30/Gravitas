@@ -2,7 +2,7 @@
 
 Gravitas diagnostics are context-owned, deterministic, and engine-agnostic.
 They are meant to expose physics state for debug drawing, logs, replay tooling,
-or server-side inspection without linking the core library to Unity, an editor,
+or server-side inspection without linking the core library to an engine, an editor,
 or a renderer.
 
 Diagnostics are disabled by default. When disabled, runtime hooks return before
@@ -124,7 +124,7 @@ Available views cover every current event kind:
 `GravitasMixedResponseImpulseDiagnosticView`, and
 `GravitasMixedResponseIslandDiagnosticView`.
 
-`GravitasQuerySummaryDiagnosticView` is currently emitted by mixed query paths
+`GravitasQuerySummaryDiagnosticView` is emitted by mixed query paths
 when diagnostics are enabled. It reports eligible top-level exact reducer
 candidate attempts, accepted hits, fallback hits, and rejected conservative
 fallback candidates so hosts can inspect exact-versus-conservative query quality
@@ -190,7 +190,7 @@ style embedded 2D debug geometry separately from pure 3D colliders.
 
 ## Host Adapter Pattern
 
-A Unity adapter might translate draw commands into `Debug.DrawLine`, `Gizmos`,
+A Host adapter might translate draw commands into `Debug.DrawLine`, `Gizmos`,
 or `Handles`. A server adapter might ignore draw commands and only export the
 event stream as structured logs. A replay/debugger adapter might store both
 streams beside lockstep frame data.

@@ -6,7 +6,7 @@ manifolds, manifold response, and late contact notification.
 
 ## 2D And 3D Boundary
 
-The original collision handling path is the 3D runtime path. `StiffBody` and
+The 3D collision handling path routes `StiffBody` and
 `LSCollider` route through `GravitasPhysicsService`; `StiffBody2D` and
 `LSCollider2D` route through `GravitasPhysics2DService`. The active path is
 selected by `PhysicsSettings.RuntimeMode`, so pure 2D scenes do not advance 3D
@@ -18,13 +18,13 @@ mixed-dimension embedding metadata, not a pure 2D collision axis.
 
 ## Pure 2D Collision Path
 
-`GravitasPhysics2DService` owns the alpha pure 2D path for `StiffBody2D` and
+`GravitasPhysics2DService` owns the pure 2D path for `StiffBody2D` and
 `LSCollider2D`. It keeps 2D collider IDs, 2D body registration, reusable pair
 state, visualization publishing, and caller-buffered overlap/raycast query
 output local to one
 `GravitasWorldContext`.
 
-The current 2D broad phase is GridForge-backed:
+The 2D broad phase is GridForge-backed:
 
 1. rebuild a 2D collider's `FixedBoundArea` when body motion, kinematic host
    motion, explicit bodyless collider refresh, or shape input edits change it.
@@ -45,13 +45,13 @@ The Y=0 storage plane is not physical thickness and does not claim mixed
 2D/3D interaction. It is a deterministic broad-phase identity that lets pure
 2D and 3D use the same host-owned `GridWorld` model. `PhysicsRuntimeMode.Both`
 keeps those paths side by side without cross-dimensional contacts; only
-`PhysicsRuntimeMode.Mixed` enables the mixed lifecycle path. Mixed broad phase
-now uses `PhysicsMixedPartition` payloads attached to GridForge voxels and emits
+`PhysicsRuntimeMode.Mixed` enables the mixed lifecycle path. The mixed broad
+phase uses `PhysicsMixedPartition` payloads attached to GridForge voxels and emits
 stable 3D/2D candidate keys after awake-dynamic, layer, same-agent, explicit
 hierarchy, duplicate, and bounds filtering. The mixed embedding state on
 `LSCollider2D` is a finite 3D `FixedBoundBox` built from pure 2D X/Z bounds plus a
 positive Y half-thickness centered on the host transform's Y position.
-`CollisionDetectionMixed` currently supports 3D sphere, cuboid, capsule, finite
+`CollisionDetectionMixed` supports 3D sphere, cuboid, capsule, finite
 cylinder, compound, and mesh contacts against embedded 2D circle, AABB, convex
 polygon, and compound slabs. Compound mixed contacts scan owned parts in stable
 order and return one external contact surface on either side. Mesh mixed
@@ -92,7 +92,7 @@ When diagnostics are enabled, mixed queries also emit `QuerySummary` events with
 eligible top-level exact attempt, accepted hit, fallback hit, and rejected
 fallback counts.
 
-`CollisionDetection2D` currently supports:
+`CollisionDetection2D` supports:
 
 - circle/circle.
 - circle/axis-aligned box.
@@ -249,8 +249,9 @@ trees at simulation time. When a parent collider deactivates, its child bindings
 are cleared before the parent collider ID returns to the reusable ID pool,
 preventing stale hierarchy keys from suppressing collisions against future
 unrelated colliders. Mixed 2D/3D hierarchy filtering uses the same state; body
-policy inheritance remains dimension-local until mixed CCD or future island work
-defines a stronger cross-dimensional body contract.
+policy inheritance remains dimension-local by design. Mixed CCD and mixed
+response use explicit cross-service pair and handoff contracts rather than
+implicitly inheriting parent body policy across dimensions.
 
 `LSCompoundCollider` is different from hierarchy binding. A parent/child
 relationship links independently registered colliders that may represent
@@ -298,7 +299,7 @@ Mesh colliders validate vertices and triangle indices at construction time.
 Concave meshes are explicit triangle collision data and are legal for
 bodyless, immovable, kinematic, and dynamic bodies.
 
-`PhysicsMesh` now owns source vertices, triangle normals, triangle areas, local
+`PhysicsMesh` owns source vertices, triangle normals, triangle areas, local
 bounds, and the triangle BVH in local mesh space. Rigid movement updates the
 mesh transform, inverse transform, and conservative world bounds without
 rebuilding the local BVH or allocating new bounds after warmup. Mesh queries and
@@ -307,18 +308,22 @@ local space, query the local BVH, then transform final contact points and
 normals back to world space. The full world-vertex array is retained only as an
 on-demand compatibility view.
 
-Alpha mesh policy is explicit rather than Unity-compatible by default: concave
+Mesh policy is explicit rather than engine-compatible by default: concave
 meshes collide as triangle sets instead of being treated as one convex hull.
 The concave narrow phase gathers local-BVH triangle candidates, runs
 triangle-vs-shape or triangle-vs-triangle checks, and reduces contacts through
 the pair-owned `ContactManifold`. Dynamic concave meshes keep topology and the
 local BVH stable while rigid movement updates transform-derived state only.
-For mesh-mesh pairs involving a concave mesh, alpha keeps the raw local-BVH
-triangle-gather path rather than a direct BVH-vs-BVH traversal: Phase 4B
-benchmarks found paired traversal slower with the current conservative bounds
-transforms, while a narrower triangle SAT axis optimization improved the simple
-concave mesh-mesh row without changing candidate truth or steady-state
-allocation behavior.
+
+For mesh-mesh pairs involving a concave mesh, Gravitas keeps the raw local-BVH
+triangle-gather path rather than a direct BVH-vs-BVH traversal. This policy
+preserves exact triangle candidate truth, stable same-pair contact IDs, and
+zero steady-state allocations after warmup. With the current BVH node API, a
+paired traversal has to transform conservative internal bounds and can expand
+too many node pairs to beat the simpler gather path. The retained optimization
+keeps candidate generation unchanged and reduces triangle-triangle SAT work by
+testing raw axes first, normalizing only axes that can improve the stored
+penetration depth and contact normal.
 
 Mesh policy work should keep these boundaries explicit:
 
@@ -358,8 +363,8 @@ Mesh policy work should keep these boundaries explicit:
   than pre-instantiated child `LSCollider` objects. Concave mesh parts are not a
   compound authoring surface; concave behavior belongs to `LSMeshCollider`.
   Authored/offline decomposed collision assets should use `LSCompoundCollider`
-  for alpha unless a future asset pipeline proves that mesh-owned pieces need
-  different public semantics.
+  unless a future asset pipeline proves that mesh-owned pieces need different
+  public semantics.
 - Mesh colliders are supported as collision shapes and as raycast and
   swept-sphere query targets. Capsule, cuboid, finite-cylinder, convex mesh,
   and authored compound sources also have explicit 3D swept query APIs.
@@ -376,18 +381,14 @@ Mesh policy work should keep these boundaries explicit:
   deterministic, bounded, tested on pathological input, and benchmarked. Ear
   clipping is a 2D polygon triangulation/partitioning tool, not a complete 3D
   convex decomposition strategy.
-- Mesh simplification and collision LOD should be host/offline data for alpha.
+- Mesh simplification and collision LOD should be host/offline data.
   Runtime simplification must not alter authoritative collision geometry during
   a simulation frame.
-- The old Unity Mesh Simplifier package is useful as reference material for
-  quadric-error simplification, smart vertex linking, and preservation options,
-  but should not be copied into the runtime without a fixed-point deterministic
-  porting plan.
 - Rigid dynamic meshes should keep local topology and BVH stable while updating
   only transform-derived state. Deformable or breakable topology changes require
   a separate invalidation/rebuild contract before support is claimed.
 - `PhysicsMesh.CalculateInertiaTensor(...)` defaults to closed-volume mass
-  properties. Callers that knowingly want the legacy surface-area approximation
+  properties. Callers that knowingly want the surface-area-weighted approximation
   must pass `MeshInertiaPolicy.SurfaceApproximation`.
 - `PhysicsMesh` does not inspect body mobility, kinematic state, or angular
   force policy. `StiffBody` decides whether angular inertia is needed before it
@@ -872,10 +873,11 @@ Response units and invariants:
 - drag and angular damping remain integration/body behavior; contact friction is
   handled by the response solver.
 
-This is still the first alpha milestone, not the final response engine. Dense
-same-frame CCD contact chains are handled by bounded service-level handoff
-queues; future response hardening should focus on measured contact-quality or
-shape-reducer gaps rather than a missing cross-service velocity handoff.
+Dense same-frame CCD contact chains are handled by bounded service-level
+handoff queues, including cross-service mixed velocity transfer. Additional
+response work should be evidence-driven: measured contact-quality regressions,
+new shape families, or reducer gaps should enter the feature-work trackers
+rather than live as vague wiki caveats.
 
 ## Body Sleep And Wake
 

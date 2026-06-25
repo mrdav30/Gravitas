@@ -13,21 +13,21 @@ simulations and games. It sits in the LSF stack after:
 4. `Gravitas` - deterministic physics, collision, raycasting, and simulation
    orchestration.
 
-This repository is still an experimental prototype preparing for alpha. Expect
-heavy redesigns where correctness, deterministic behavior, physical plausibility,
-or hot-path complexity demands them. Backward compatibility is not required
-unless the user explicitly asks for it. Do not preserve weak APIs with adapters
-or band-aid layers when a clean redesign is the right engineering move.
+This repository is in first-public-release hardening. Expect heavy redesigns
+where correctness, deterministic behavior, physical plausibility, or hot-path
+complexity demands them. Backward compatibility is not required unless the user
+explicitly asks for it. Do not preserve weak APIs with adapters or band-aid
+layers when a clean redesign is the right engineering move.
 
 Current priorities:
 
 1. Preserve deterministic behavior first.
 2. Correct physics and collision behavior before broad refactors.
 3. Keep runtime hot paths low-complexity and allocation-conscious from the start.
-4. Support engine-agnostic hosts without Unity, renderer, or ECS coupling.
+4. Support engine-agnostic hosts without renderer or ECS coupling.
 5. Build toward first-class 3D and 2D support, with an eventual mixed 2D/3D
    simulation model.
-6. Maintain focused tests and benchmark baselines as alpha hardening proceeds.
+6. Maintain focused tests and benchmark baselines as release hardening proceeds.
 
 ## Start Here
 
@@ -52,7 +52,7 @@ Read these in order before making non-trivial changes:
    [`DIAGNOSTIC_ADAPTERS.md`](docs/wiki/DIAGNOSTIC_ADAPTERS.md).
 4. Feature-work coordination docs when a task is part of ongoing hardening:
    - [`feature-work-overview.md`](docs/feature-work/feature-work-overview.md)
-     for alpha release scope, recommended ordering, and links to active plans.
+     for release scope, recommended ordering, and links to active plans.
    - [`benchmark-signal-hardening-backlog.md`](docs/feature-work/benchmark-signal-hardening-backlog.md)
      for measured benchmark, allocation, scaling, and profiler signals.
    - [`issue-tracker.md`](docs/feature-work/issue-tracker.md) for
@@ -72,7 +72,7 @@ Read these in order before making non-trivial changes:
 ## Source Of Truth
 
 When code, README, and generated docs disagree, prefer the code and project
-files. Keep docs honest as the prototype sheds older copied scaffolding.
+files. Keep docs honest as the library sheds outdated copied scaffolding.
 
 Keep these aligned whenever behavior, public API, package shape, or developer
 workflow changes:
@@ -80,7 +80,7 @@ workflow changes:
 - [`README.md`](README.md)
 - [`docs/wiki`](docs/wiki), especially when runtime ownership, host
   integration, collision behavior, query behavior, serialization/replay
-  behavior, lifecycle order, or known prototype limitations change.
+  behavior, lifecycle order, or known runtime boundaries change.
 - [`docs/feature-work`](docs/feature-work) when hardening phase progress,
   deferred decisions, experiment results, or follow-up plans change.
 - [`tests/Gravitas.Tests`](tests/Gravitas.Tests)
@@ -105,7 +105,6 @@ workflow changes:
 | [`tests/Gravitas.Tests`](tests/Gravitas.Tests) | xUnit v3 test project | Covers runtime, settings, collision, partitions, queries, serialization, CCD, and authored shape behavior. |
 | [`tests/Gravitas.Benchmarks`](tests/Gravitas.Benchmarks) | BenchmarkDotNet project | Covers context lifecycle, registration/partitioning, simulation, queries, diagnostics, mixed broad phase, 2D, meshes, and CCD scaling. |
 | [`docs/wiki`](docs/wiki) | Developer-facing architecture and usage notes | Keep current with runtime, host integration, collision, query, serialization/replay, and diagnostics changes. |
-| [`docs/feature-work/prototype`](docs/feature-work/prototype) | Historical/prototype Unity-oriented reference code | Useful context, not the source of truth. |
 
 Ignore generated output when reviewing structure:
 
@@ -180,15 +179,14 @@ The current runtime uses explicit world-context ownership:
 - `CollisionDetection`, `CollisionResponse`, `CollisionPair`, `ContactPoint`,
   and context structs form the narrow-phase and response layer.
 
-Treat this as a working prototype, not final architecture. Context ownership,
-collider IDs, partition reuse, collision-pair ownership, and simulation phase
-ordering are high-risk areas.
+Treat this architecture as intentionally evolvable. Context ownership, collider
+IDs, partition reuse, collision-pair ownership, and simulation phase ordering
+are high-risk areas.
 
 ## Lockstep Host Lifecycle
 
-The old LSF Unity prototype mapped the lockstep loop onto Unity callbacks, but
-the important contract is engine-agnostic. Hosts own the outer loop; Gravitas
-should expose deterministic phases that can be called from Unity, a server, a
+The important contract is an engine-agnostic lockstep loop. Hosts own the outer loop; Gravitas
+should expose deterministic phases that can be called from a server, a
 test harness, or another simulation runner.
 
 | Phase | Typical host timing | Gravitas expectation |
@@ -211,7 +209,7 @@ for visualization and host-facing presentation only.
 
 ## 2D, 3D, And Mixed-Dimension Direction
 
-Gravitas still has deeper 3D coverage, but pure 2D now has a first-class
+Gravitas still has deeper 3D coverage, but pure 2D has a first-class
 runtime path through `StiffBody2D`, `LSCollider2D`,
 `GravitasPhysics2DService`, `GravitasCollision2DService`,
 `PhysicsPartition2D`, `ColliderShapeDefinition2D`, `CompoundColliderPart2D`,
@@ -224,9 +222,9 @@ lifecycle path. `LSCollider2D` also caches a mixed `FixedBoundBox` using
 broad phase emits deterministic candidate keys through `PhysicsMixedPartition`;
 `CollisionDetectionMixed` covers current 3D primitive, compound, and mesh
 colliders against embedded 2D circle, AABB, and convex polygon slabs.
-`CollisionPairMixed` and `CollisionResponseMixed` now provide the first
-constrained impulse model: planar X/Z impulse can move 2D bodies, while vertical
-Y impulse affects only the 3D participant. Mixed diagnostics, explicit mixed
+`CollisionPairMixed` and `CollisionResponseMixed` provide the constrained
+impulse model: planar X/Z impulse can move 2D bodies, while vertical Y impulse
+affects only the 3D participant. Mixed diagnostics, explicit mixed
 queries, slab debug draw, and mixed CCD target collection are implemented;
 richer solver behavior remains future hardening work.
 
@@ -238,13 +236,13 @@ When adding or redesigning dimension-sensitive behavior:
   ignored.
 - Watch for counterpart gaps between 2D, 3D, and mixed behavior. If a
   reasonable parity feature is missing, call it out and decide whether it is
-  worth alpha scope instead of silently accepting the asymmetry.
+  worth release scope instead of silently accepting the asymmetry.
 - When extending mixed 2D/3D collision, preserve the embedding rule: finite 2D
   slabs/prisms centered on host-transform Y, dimension-tagged pair identity,
   explicit trigger/contact events, and a plane-constrained 2D impulse model.
 - Keep dimensional choices explicit in public APIs and tests.
-- Avoid naming that implies Unity-specific `Rigidbody` behavior. `StiffBody`
-  is the current prototype term; future redesigns may rename or split it if that
+- Avoid naming that implies engine-specific behavior. `StiffBody`
+  is the current term; future redesigns may rename or split it if that
   clarifies body semantics.
 
 ## Physics Quality Bar
@@ -412,7 +410,8 @@ Optimization rules:
 
 ## Serialization Status
 
-Serialization is experimental and alpha-hardening. Read
+Serialization is explicit deterministic state-transfer infrastructure under
+release hardening. Read
 [`docs/wiki/SERIALIZATION.md`](docs/wiki/SERIALIZATION.md) before changing
 `RecordData`, settings snapshots, load defaults, or replay tests.
 
@@ -458,8 +457,8 @@ Observed project conventions:
 - XML documentation output is generated for the library, while `.editorconfig`
   silences `CS1591`.
 - Namespace-folder matching is not enforced.
-- Source files currently mix region-heavy prototype style with newer
-  context-owned service code. Match nearby style for focused edits.
+- Source files may still mix older region-heavy style with context-owned service
+  code. Match nearby style for focused edits.
 
 Contributor expectations:
 
@@ -590,10 +589,9 @@ results as canonical performance evidence.
 
 ## Test Design Expectations
 
-The existing tests now cover the main runtime shell, settings, collision,
-partition, query, serialization, shape-definition, CCD, 2D, and mixed-dimension
-paths, but the library is still alpha-hardening. New tests should keep building
-the foundation for deterministic physics behavior.
+The test suite covers the main runtime shell, settings, collision, partition,
+query, serialization, shape-definition, CCD, 2D, and mixed-dimension paths. New
+tests should keep building the foundation for deterministic physics behavior.
 
 Prioritize tests for:
 
@@ -628,15 +626,15 @@ itself deterministic, documented, and justified by the algorithm.
 For both humans and AI agents, use this order:
 
 1. Read the relevant docs, source files, and project files.
-2. Read the active feature-work plan when the change belongs to an alpha
+2. Read the active feature-work plan when the change belongs to a release
    hardening phase, and treat it as a living context guide.
 3. Identify deterministic invariants, simulation phase effects, global/static
    state, and pooling ownership.
 4. For hot-path optimization work, capture a benchmark baseline before source
    changes if a relevant current artifact does not already exist.
 5. Decide whether the current design should be preserved or redesigned. Since
-   alpha compatibility is not required, prefer the clean deterministic design
-   over compatibility scaffolding.
+   backward compatibility is not required unless requested, prefer the clean
+   deterministic design over compatibility scaffolding.
 6. Check whether touched files are approaching the `1000` line warning
    threshold, and split by helper, service, or responsibility-based partial
    before adding more behavior.
@@ -692,7 +690,7 @@ If you are an automated coding agent working in this repository:
 - If you change a public API or behavior, update tests and docs in the same
   pass.
 - If you change runtime architecture, host integration, collision flow, query
-  behavior, lifecycle order, or known prototype limitations, update the matching
+  behavior, lifecycle order, or known runtime boundaries, update the matching
   page under `docs/wiki`.
 - If you add comments, comment the invariant or reason, not the syntax.
 - Do not leave generic helpers buried inside unrelated classes when they can

@@ -1,9 +1,8 @@
 # 2D, 3D, And Runtime Modes
 
-Gravitas is moving from a 3D-only prototype toward first-class 2D,
-first-class 3D, and mixed 2D/3D interaction. The current contract is
-type-driven: `StiffBody` and `LSCollider` are the 3D path, while `StiffBody2D`
-and `LSCollider2D` are the pure 2D path.
+Gravitas supports first-class 3D, first-class pure 2D, and explicit mixed 2D/3D
+interaction. The current contract is type-driven: `StiffBody` and `LSCollider`
+are the 3D path, while `StiffBody2D` and `LSCollider2D` are the pure 2D path.
 
 There is no `PhysicsDimension` enum in the runtime. Concrete body and collider
 types define the simulation domain. Mixed behavior is an explicit policy between
@@ -99,8 +98,8 @@ The current pure 2D shape set is:
 
 `LSPolygonCollider2D` validates convexity and rejects concave or collinear
 input instead of silently accepting ambiguous collision truth. A rotated box
-should be represented as a convex polygon for now; `LSAABBoxCollider2D` remains
-axis-aligned by design.
+should use a convex polygon; `LSAABBoxCollider2D` remains axis-aligned by
+design.
 
 Each current pure 2D collider also exposes deterministic shape-derived mass
 properties: local center of mass, area, and scalar moment about an explicit
@@ -133,12 +132,12 @@ Pure 2D partition storage uses the internal Y=0 GridForge plane. This is only a
 stable voxel identity for broad-phase lookup; it is not a public 3D slab,
 thickness, or mixed-dimension contact rule.
 
-`Physics2DBounds` has been removed. Do not add another public bounds/config
-bridge for pure 2D.
+Pure 2D does not expose a public bounds/config bridge. Keep bounds ownership on
+`LSCollider2D` and runtime services.
 
 ## Mixed 2D Embedding State
 
-`LSCollider2D` now carries the minimal deterministic 3D embedding data needed
+`LSCollider2D` carries the minimal deterministic 3D embedding data needed
 by the mixed runtime path:
 
 - `MixedHalfThicknessOverride` optionally overrides the context default.
@@ -196,15 +195,14 @@ Pure `Query2D` and `Query3D` stay pure. Mixed CCD uses `QueryMixed` only when
 
 ## Mixed 2D/3D Direction
 
-Phase 10 added the first mixed runtime implementation. The alpha model is
-explicit rather than Unity-style separate engines:
+The mixed runtime model is explicit rather than separate dimension engines:
 
 - `PhysicsRuntimeMode.Both` advances both pure 2D and 3D services without
   cross-dimensional contacts.
 - `PhysicsRuntimeMode.Mixed` advances both pure 2D and 3D services plus a
   dedicated mixed collision lifecycle path. The mixed broad phase uses
   `PhysicsMixedPartition` and stable 3D/2D candidate keys. Mixed narrow phase
-  currently supports 3D spheres, cuboids, capsules, finite cylinders, compound
+  supports 3D spheres, cuboids, capsules, finite cylinders, compound
   colliders, and mesh colliders against embedded 2D circle, AABB, convex
   polygon, and compound slabs.
 - mixed contacts embed 2D colliders into 3D as finite X/Z prisms centered on

@@ -1,6 +1,6 @@
 # Benchmark Signal Hardening Backlog
 
-**Status:** Active
+**Status:** Evergreen intake
 **Owner:** Gravitas benchmark and runtime hardening
 
 ## Purpose
@@ -77,14 +77,14 @@ query tests. The isolated
 `Physics2DQueryTests.RaycastAll_ShouldNotAllocateAfterWarmup` test reproduced
 the issue at `128 B` after warmup.
 
-**Resolution:** SwiftCollections now owns the allocation-free sort primitive.
+**Resolution:** SwiftCollections owns the allocation-free sort primitive.
 `SwiftList<T>.SortInPlace(...)` routes default ordering through the optimized
 BCL default-comparer path, custom class/interface comparers through an
 allocation-free introsort, and struct comparers through a no-boxing generic
 introsort. `SwiftSortedList<T>` bulk-load, known-count `IReadOnlyCollection<T>`
 range insertion, and `SetComparer(...)` use the same lower-stack helper without
 recurring managed sort allocations. Gravitas removed
-`src/Gravitas/Support/SwiftListSortUtility.cs` and now calls
+`src/Gravitas/Support/SwiftListSortUtility.cs` and calls
 `SwiftList<T>.SortInPlace(...)` or `SwiftSparseSet.CopySortedKeysTo(...)`
 directly from runtime ordering paths.
 
@@ -123,9 +123,9 @@ pass, and the Gravitas simulation allocation benchmark smoke rows remain at
 | Signal | Status | Closed | Resolution |
 | --- | --- | --- | --- |
 | SwiftCollections sort hot-path allocation | Closed | 2026-06-24 | SwiftCollections owns allocation-free sort and sorted-key APIs; Gravitas removed `SwiftListSortUtility` |
-| Mixed mesh finite-slab triangle scaling signal | Closed | 2026-06-24 | Mixed and pure 3D query services now expose mesh-triangle candidate counts, dedicated triangle-volume benchmarks cover dense and false-positive mesh targets, and pure 3D convex-source mesh sweeps use ordered lower-bound triangle candidates |
-| Pure 2D dynamic CCD candidate asymmetry | Closed | 2026-06-23 | 2D now uses a planar candidate index, skips mixed CCD indexing outside mixed mode, and benchmark resets use 2D reset parity |
-| 3D shape-exact false-positive cost | Closed | 2026-06-23 | Static CCD now uses exact-source sweeps for non-sphere convex movers before conservative sphere fallback refinement |
+| Mixed mesh finite-slab triangle scaling signal | Closed | 2026-06-24 | Mixed and pure 3D query services expose mesh-triangle candidate counts, dedicated triangle-volume benchmarks cover dense and false-positive mesh targets, and pure 3D convex-source mesh sweeps use ordered lower-bound triangle candidates |
+| Pure 2D dynamic CCD candidate asymmetry | Closed | 2026-06-23 | 2D uses a planar candidate index, skips mixed CCD indexing outside mixed mode, and benchmark resets use 2D reset parity |
+| 3D shape-exact false-positive cost | Closed | 2026-06-23 | Static CCD uses exact-source sweeps for non-sphere convex movers before conservative sphere fallback refinement |
 | 3D dynamic shape-exact BDN allocation signal | Closed | 2026-06-23 | Shared exact-sweep bounds prefilters removed the scaling allocation/time signal from 3D dynamic false-positive rows |
 | 3D full-runtime CCD allocation | Closed | 2026-06-23 | GridForge allocation-free line tracing plus Gravitas 3D raycast adoption |
 | Grounding raycast probe allocation | Closed | 2026-06-23 | Same raycast trace fix removed automatic ray-grounding allocation |
@@ -157,7 +157,7 @@ TOI cannot be beaten by remaining triangles.
 
 **Resolution 2026-06-24:**
 
-- `GravitasQueryMixedService` now exposes a context-owned
+- `GravitasQueryMixedService` exposes a context-owned
   `LastMeshTriangleCandidateCount` for mixed mesh-target sweeps.
 - `GravitasQuery3DService`, `SweptSphereQueryWorker`, and
   `ConvexSweepQueryWorker` expose matching 3D mesh-triangle candidate counts.
@@ -165,7 +165,7 @@ TOI cannot be beaten by remaining triangles.
   mixed mesh targets by triangle volume rather than collider count.
 - `MeshQuery3DTriangleScalingBenchmarks` measures pure 3D swept-sphere mesh
   targets and convex-source sweeps against dense concave mesh targets.
-- `ConvexSweepQueryWorker` now sorts concave mesh target triangles by
+- `ConvexSweepQueryWorker` sorts concave mesh target triangles by
   deterministic lower-bound TOI and authored triangle index, then exits once
   remaining triangles cannot beat the current best hit.
 
@@ -208,7 +208,7 @@ change.
 **Closure criteria:** Met. Benchmarks expose mesh finite-slab and 3D mesh sweep
 cost by triangle candidate volume, not only collider count. Mixed keeps stable
 authored triangle tie-breaks without speculative reducer overhead, and pure 3D
-now avoids the measured convex-source concave-mesh triangle-order bottleneck.
+avoids the measured convex-source concave-mesh triangle-order bottleneck.
 
 ### Signal: Pure 2D Dynamic CCD Candidate Asymmetry
 
@@ -248,12 +248,12 @@ three concrete causes:
   before every attribution query. 3D already had a single `ResetPosition(...)`
   fixture reset path.
 
-**Resolution 2026-06-23:** `GravitasPhysics2DService` now builds the mixed
+**Resolution 2026-06-23:** `GravitasPhysics2DService` builds the mixed
 dynamic CCD index only when the runtime mode actually runs mixed contacts.
 Pure planar CCD uses `DynamicCcdCandidateIndex2D` and `DynamicCcdPlanarBounds`
 instead of projecting circles into a 3D `FixedBoundVolume`. `StiffBody2D`
 gained `ResetPosition(...)` parity with 3D, and the continuous-collision
-benchmark fixture now uses it for deterministic 2D reset/setup without
+benchmark fixture uses it for deterministic 2D reset/setup without
 sleep/wake churn.
 
 **Validation 2026-06-23:** Re-running the same attribution benchmark reduced:
@@ -283,7 +283,7 @@ focused allocation guard reproduces it.
 - `tests/Gravitas.Benchmarks/Support/ContinuousCollisionBenchmarkSupport.cs`
 
 **Closure criteria:** Met. The gap is explained by mixed-index overwork,
-planar-vs-3D index shape, and benchmark reset asymmetry. The runtime path now
+planar-vs-3D index shape, and benchmark reset asymmetry. The runtime path
 keeps 2D planar candidate ordering stable with duplicate suppression preserved,
 and the attribution benchmark no longer shows a 2D candidate-gathering penalty.
 
@@ -306,7 +306,7 @@ proxy path manufacture work that the source-shape sweep could reject earlier.
 The exact sweep workers also lacked a cheap swept-bounds overlap prefilter, so
 obviously disjoint target bounds could still enter the shape reducer.
 
-**Resolution 2026-06-23:** 3D static CCD now collects non-sphere convex-source
+**Resolution 2026-06-23:** 3D static CCD collects non-sphere convex-source
 hits through `GravitasQuery3DService.SweepExactSourceAgainstStaticAll(...)`.
 That keeps source shape information during candidate collection and reserves
 the old swept-sphere path for sphere or unsupported sources. Shared swept-bounds
@@ -363,7 +363,7 @@ prefilters landed, the BDN row no longer showed the large per-body allocation
 slope. The remaining `78 B/op` at `256` bodies matches the tiny in-process
 runner noise also reported by the 2D rows in the same run.
 
-**Resolution 2026-06-23:** `ConvexSweepQueryWorker` now computes a padded
+**Resolution 2026-06-23:** `ConvexSweepQueryWorker` computes a padded
 swept-source bounds interval during `Prepare(...)` and skips disjoint collider,
 compound-part, and concave-mesh triangle candidates before exact reducer work.
 `SweptSphereQueryWorker` uses the same shared bounds utility for sphere-source
@@ -410,11 +410,11 @@ rows were effectively allocation-clean.
 steady-state CCD guardrail failures in xUnit after the 3D full-step phase order
 started exercising collision distribution during measured CCD frames. Root cause
 was comparer-based `Array.Sort` through package sorting in the collision
-distribution/island hot path. Gravitas now uses a centralized allocation-free
+distribution/island hot path. Gravitas uses a centralized allocation-free
 runtime sort helper for active partitions, island buffers, and per-partition
 collider ID copies.
 The focused Release allocation guardrails for 3D substep, shape-exact
-translational, and rotational CCD now pass under full `Simulate` +
+translational, and rotational CCD pass under full `Simulate` +
 `LateSimulate` measurement. `simulation-allocation` smoke also reported `0 B/op`
 for `CollisionPartitionDistributionOnly` and
 `ActivePairProcessingLateSimulate`.
@@ -438,10 +438,10 @@ The raycast service still used GridForge's enumerable `GridTracer.TraceLine`
 path, which allocated iterator/mapping state per ray. Reset, force setup, and
 non-moving late simulation attribution were allocation-clean.
 
-**Resolution 2026-06-23:** GridForge now exposes caller-owned
+**Resolution 2026-06-23:** GridForge exposes caller-owned
 `GridTracer.TraceLineInto(...)` overloads backed by `GridTraceScratch`.
 `GravitasQuery3DService` uses that allocation-free trace buffer for closest-hit
-and all-hit raycasts. A focused 3D `RaycastAll` allocation guard now protects
+and all-hit raycasts. A focused 3D `RaycastAll` allocation guard protects
 the path.
 
 **Validation 2026-06-23:** Re-running the original
@@ -505,7 +505,7 @@ raycast trace path.
 full-runtime CCD allocation: automatic ray grounding used `Query3D.RaycastAll`,
 which depended on the enumerable GridForge line-trace path.
 
-**Resolution 2026-06-23:** Gravitas 3D raycasts now use GridForge's
+**Resolution 2026-06-23:** Gravitas 3D raycasts use GridForge's
 caller-owned `TraceLineInto(...)` path. The grounding row no longer allocates
 after warmup.
 
@@ -522,15 +522,15 @@ after warmup.
 - `tests/Gravitas.Tests/Core/StiffBodyGroundingTests.cs`
 
 **Closure criteria:** Met. The runtime allocation was eliminated and the 3D
-raycast path now has a focused xUnit allocation guard.
+raycast path has a focused xUnit allocation guard.
 
 ## Watch Items
 
 - Mixed full-runtime CCD rows were heavier than pure 2D or pure 3D rows at
-  `1024` bodies. This is currently expected because mixed mode exercises both
+  `1024` bodies. This is expected because mixed mode exercises both
   dimensions and the mixed broad phase. Revisit if the gap grows after the 3D
-  allocation RCA or if mixed CCD becomes an immediate alpha target.
-- Pure 3D swept-sphere dense mesh target rows are now visible through
+  allocation RCA or if mixed CCD becomes an immediate release-critical target.
+- Pure 3D swept-sphere dense mesh target rows are visible through
   `MeshQuery3DTriangleScalingBenchmarks` and still scale linearly with triangle
   candidate volume: `550.1 us`, `2.145 ms`, and `8.638 ms` at `128`, `512`,
   and `2048` triangles. The lower-bound ordering optimization was adopted only

@@ -11,7 +11,7 @@ using System.Collections;
 namespace Gravitas.Support;
 
 /// <summary>
-/// Repurposed from Unity's CustomYieldInstruction
+/// A coroutine yield instruction that is locked to a GravitasWorldContext and can be used in a deterministic simulation.
 /// </summary>
 public interface ILockedYieldInstruction : IEnumerator, IDisposable
 {

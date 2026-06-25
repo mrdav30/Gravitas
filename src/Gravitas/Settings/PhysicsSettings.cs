@@ -27,18 +27,7 @@ public sealed class PhysicsSettings
 
     public static readonly Fixed64 DefaultMixed2DHalfThickness = Fixed64.Half;
 
-    /// <summary>
-    /// Legacy prototype example ground-check include mask. Hosts should configure
-    /// this explicitly for their own layer model.
-    /// </summary>
-    public static readonly PhysicsLayerMask DefaultGroundCheckLayerMask = PhysicsLayerMask.Excluding(
-        new PhysicsLayer(8),
-        new PhysicsLayer(10),
-        new PhysicsLayer(7),
-        new PhysicsLayer(11),
-        new PhysicsLayer(12),
-        new PhysicsLayer(17),
-        new PhysicsLayer(15));
+    public static readonly PhysicsLayerMask DefaultGroundCheckLayerMask = PhysicsLayerMask.FromLayer(new PhysicsLayer(0));
 
     public int FrameRate { get; private set; }
 
