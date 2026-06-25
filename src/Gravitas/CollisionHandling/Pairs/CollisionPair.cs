@@ -229,7 +229,7 @@ public class CollisionPair
 
         if (responseMode == CollisionResponseDispatchMode.Deferred)
         {
-            Context.Collisions.QueueDiscreteResponsePair(this);
+            Context.Physics.QueueDiscreteResponsePair(this);
             return;
         }
 

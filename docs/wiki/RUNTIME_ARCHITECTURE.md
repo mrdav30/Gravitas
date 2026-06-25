@@ -22,7 +22,7 @@ pairs, queries, and coroutines remain context-local.
 
 | Service | Owned state |
 | --- | --- |
-| `GravitasPhysicsService` | Dynamic body bucket, collider ID table, reusable collider IDs, collision-pair pool, active collision-pair queue, 3D CCD frame cache, processed-body handoff queue, handoff diagnostics, simulation switch. |
+| `GravitasPhysicsService` | Dynamic body bucket, collider ID table, reusable collider IDs, collision-pair pool, active collision-pair queue, 3D CCD frame cache, processed-body handoff queue, handoff diagnostics, deterministic 3D discrete island response, sleep-state updates, simulation switch. |
 | `GravitasPhysics2DService` | Pure 2D dynamic body bucket, monotonic collider ID table, 2D pair pool, 2D CCD frame cache, processed-body handoff queue, handoff diagnostics, post-integration collider refresh, deterministic 2D discrete island response, connected resting-pair expansion, pair-reference cleanup, visualization publishing, simulation switch. |
 | `GravitasMixedCollisionService` | Mixed 2D/3D lifecycle owner, GridForge-backed mixed broad phase, stable mixed candidate-key buffer, mixed hierarchy filtering, duplicate suppression, late-phase mixed partition refresh, mixed pair/response ownership, retained `PhysicsMixedPartition` cleanup, and lifecycle counters. |
 | `GravitasCollisionService` | Active partition bucket, inactive partition pool, duplicate voxel checker, partition awake-state refresh, collision distribution version, cull distributor. |
@@ -67,6 +67,7 @@ LateSimulate
     PrepareCollisionPartitions for dynamic-body colliders
     Collisions.CheckAndDistributeCollisions
     Solve deterministic discrete response islands
+    Retire retained 3D collision partitions
     ProcessActiveCollisionPairs
     Update 3D sleep state after response
   If RuntimeMode includes TwoD:
@@ -76,6 +77,7 @@ LateSimulate
     PrepareCollisionPartitions for dynamic 2D colliders
     Collisions2D.CheckAndDistributeCollisions
     Solve deterministic 2D discrete response islands
+    Retire retained 2D collision partitions
     Update 2D sleep state after response
   Process cross-service queued CCD handoffs with the remaining TOI budget
   If RuntimeMode == Mixed:

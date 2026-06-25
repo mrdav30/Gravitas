@@ -172,6 +172,7 @@ public sealed class GravitasPhysics2DService
         ExpandDiscreteResponsePairs(frame);
         SolveDiscreteResponsePairs();
         CleanupUntouchedPairs(frame);
+        _context.Collisions2D.RetireExpiredRetainedPartitions();
     }
 
     private void UpdateSleepStatesAfterPhysicsStep()

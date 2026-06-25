@@ -277,8 +277,6 @@ public sealed class GravitasCollision2DService
         {
             _isDistributing = false;
         }
-
-        RetireExpiredRetainedPartitions();
     }
 
     internal void CollectOverlapCircleCandidates(
@@ -658,7 +656,7 @@ public sealed class GravitasCollision2DService
         return -1;
     }
 
-    private void RetireExpiredRetainedPartitions()
+    internal void RetireExpiredRetainedPartitions()
     {
         int budget = _context.Settings.RetainedPartitionRetirementSweepBudget;
         if (budget <= 0 || _retainedPartitions.Count == 0)
