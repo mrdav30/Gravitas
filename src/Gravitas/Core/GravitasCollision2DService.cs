@@ -261,7 +261,7 @@ public sealed class GravitasCollision2DService
         foreach (PhysicsPartition2D partition in _activePartitions)
             _distributionPartitions.Add(partition);
 
-        SwiftListSortUtility.SortInPlace(_distributionPartitions, PartitionOrderComparer);
+        _distributionPartitions.SortInPlace(PartitionOrderComparer);
 
         _isDistributing = true;
         try
@@ -309,7 +309,7 @@ public sealed class GravitasCollision2DService
         candidates.FastClear();
 
         CollectCoveredPartitions(min, max, _queryPartitions);
-        SwiftListSortUtility.SortInPlace(_queryPartitions, PartitionOrderComparer);
+        _queryPartitions.SortInPlace(PartitionOrderComparer);
 
         for (int i = 0; i < _queryPartitions.Count; i++)
         {
@@ -339,7 +339,7 @@ public sealed class GravitasCollision2DService
             }
         }
 
-        SwiftListSortUtility.SortInPlace(candidates, ColliderIdComparer);
+        candidates.SortInPlace(ColliderIdComparer);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

@@ -222,7 +222,7 @@ internal sealed class ConvexSweepQueryWorker
                 _sweepTriangleCandidates.Add(new SweepTriangleCandidate(triangleIndex, lowerBound));
         }
 
-        SwiftListSortUtility.SortInPlace(_sweepTriangleCandidates, SweepTriangleComparer);
+        _sweepTriangleCandidates.SortInPlace(SweepTriangleComparer);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

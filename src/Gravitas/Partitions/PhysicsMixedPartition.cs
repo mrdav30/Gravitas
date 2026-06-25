@@ -347,7 +347,7 @@ internal sealed class PhysicsMixedPartition : IVoxelPartition
         AppendIds(ContainedDynamic3DObjects, destination);
         AppendIds(ContainedKinematic3DObjects, destination);
         AppendIds(ContainedStatic3DObjects, destination);
-        SwiftListSortUtility.SortAscendingInPlace(destination);
+        destination.SortInPlace();
     }
 
     internal void Copy2DColliderIds(SwiftList<int> destination)
@@ -356,7 +356,7 @@ internal sealed class PhysicsMixedPartition : IVoxelPartition
         AppendIds(ContainedDynamic2DObjects, destination);
         AppendIds(ContainedKinematic2DObjects, destination);
         AppendIds(ContainedStatic2DObjects, destination);
-        SwiftListSortUtility.SortAscendingInPlace(destination);
+        destination.SortInPlace();
     }
 
     internal void CopyStaticStyle3DColliderIds(SwiftList<int> destination)
@@ -364,7 +364,7 @@ internal sealed class PhysicsMixedPartition : IVoxelPartition
         destination.FastClear();
         AppendIds(ContainedKinematic3DObjects, destination);
         AppendIds(ContainedStatic3DObjects, destination);
-        SwiftListSortUtility.SortAscendingInPlace(destination);
+        destination.SortInPlace();
     }
 
     internal void CopyStaticStyle2DColliderIds(SwiftList<int> destination)
@@ -372,7 +372,7 @@ internal sealed class PhysicsMixedPartition : IVoxelPartition
         destination.FastClear();
         AppendIds(ContainedKinematic2DObjects, destination);
         AppendIds(ContainedStatic2DObjects, destination);
-        SwiftListSortUtility.SortAscendingInPlace(destination);
+        destination.SortInPlace();
     }
 
     private static void AppendIds(SwiftSparseSet? source, SwiftList<int> destination)
@@ -392,8 +392,7 @@ internal sealed class PhysicsMixedPartition : IVoxelPartition
             return;
         }
 
-        source.CopyKeysTo(destination);
-        SwiftListSortUtility.SortAscendingInPlace(destination);
+        source.CopySortedKeysTo(destination);
     }
 
     private bool IsDynamic3DObjectAwake(int id)

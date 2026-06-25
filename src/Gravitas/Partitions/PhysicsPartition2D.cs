@@ -104,7 +104,7 @@ public sealed class PhysicsPartition2D : IVoxelPartition
         CopyIds(ContainedDynamicObjects, destination);
         CopyIds(ContainedKinematicObjects, destination);
         CopyIds(ContainedStaticObjects, destination);
-        SwiftListSortUtility.SortAscendingInPlace(destination);
+        destination.SortInPlace();
     }
 
     internal void CopyStaticStyleColliderIds(SwiftList<int> destination)
@@ -112,7 +112,7 @@ public sealed class PhysicsPartition2D : IVoxelPartition
         destination.FastClear();
         CopyIds(ContainedKinematicObjects, destination);
         CopyIds(ContainedStaticObjects, destination);
-        SwiftListSortUtility.SortAscendingInPlace(destination);
+        destination.SortInPlace();
     }
 
     private static void CopySortedIds(SwiftSparseSet? source, SwiftList<int> destination)
@@ -123,8 +123,7 @@ public sealed class PhysicsPartition2D : IVoxelPartition
             return;
         }
 
-        source.CopyKeysTo(destination);
-        SwiftListSortUtility.SortAscendingInPlace(destination);
+        source.CopySortedKeysTo(destination);
     }
 
     private void CopySortedStaticStyleIds(SwiftList<int> destination)
@@ -132,7 +131,7 @@ public sealed class PhysicsPartition2D : IVoxelPartition
         destination.FastClear();
         CopyIds(ContainedKinematicObjects, destination);
         CopyIds(ContainedStaticObjects, destination);
-        SwiftListSortUtility.SortAscendingInPlace(destination);
+        destination.SortInPlace();
     }
 
     private static void CopyIds(SwiftSparseSet? source, SwiftList<int> destination)

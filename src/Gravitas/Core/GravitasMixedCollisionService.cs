@@ -122,7 +122,7 @@ internal sealed class GravitasMixedCollisionService
         foreach (PhysicsMixedPartition partition in _activePartitions)
             _distributionPartitions.Add(partition);
 
-        SwiftListSortUtility.SortInPlace(_distributionPartitions, PartitionOrderComparer);
+        _distributionPartitions.SortInPlace(PartitionOrderComparer);
         for (int i = 0; i < _distributionPartitions.Count; i++)
         {
             _distributionPartitions[i].Distribute(
@@ -134,7 +134,7 @@ internal sealed class GravitasMixedCollisionService
                 _distributionStatic2DIds);
         }
 
-        SwiftListSortUtility.SortInPlace(_candidatePairs, CandidatePairComparer);
+        _candidatePairs.SortInPlace(CandidatePairComparer);
         LastBroadPhaseCandidateCount = _candidatePairs.Count;
         int frame = _context.FrameCount;
         for (int i = 0; i < _candidatePairs.Count; i++)
@@ -431,7 +431,7 @@ internal sealed class GravitasMixedCollisionService
         Refresh2DColliderPartitionsForQuery(cachePartitionRefresh);
         candidates.FastClear();
         CollectCoveredMixedQueryPartitions(min, max, _queryPartitions);
-        SwiftListSortUtility.SortInPlace(_queryPartitions, PartitionOrderComparer);
+        _queryPartitions.SortInPlace(PartitionOrderComparer);
         _queryColliderRedundancy.Clear();
 
         for (int i = 0; i < _queryPartitions.Count; i++)
@@ -457,7 +457,7 @@ internal sealed class GravitasMixedCollisionService
         }
 
         _queryColliderRedundancy.Clear();
-        SwiftListSortUtility.SortInPlace(candidates, Collider2DIdOrderComparer);
+        candidates.SortInPlace(Collider2DIdOrderComparer);
     }
 
     internal void Collect3DCandidatesInMixedBounds(
@@ -472,7 +472,7 @@ internal sealed class GravitasMixedCollisionService
         Refresh3DColliderPartitionsForQuery(cachePartitionRefresh);
         candidates.FastClear();
         CollectCoveredMixedQueryPartitions(min, max, _queryPartitions);
-        SwiftListSortUtility.SortInPlace(_queryPartitions, PartitionOrderComparer);
+        _queryPartitions.SortInPlace(PartitionOrderComparer);
         _queryColliderRedundancy.Clear();
 
         for (int i = 0; i < _queryPartitions.Count; i++)
@@ -498,7 +498,7 @@ internal sealed class GravitasMixedCollisionService
         }
 
         _queryColliderRedundancy.Clear();
-        SwiftListSortUtility.SortInPlace(candidates, Collider3DIdOrderComparer);
+        candidates.SortInPlace(Collider3DIdOrderComparer);
     }
 
     internal void RemovePairsFor3DCollider(LSCollider collider)
@@ -672,12 +672,12 @@ internal sealed class GravitasMixedCollisionService
             return;
         }
 
-        SwiftListSortUtility.SortInPlace(_mixedResponsePairs, ResponsePairComparer);
+        _mixedResponsePairs.SortInPlace(ResponsePairComparer);
         BuildMixedIslands();
         if (_mixedIslandConstraints.Count == 0)
             return;
 
-        SwiftListSortUtility.SortInPlace(_mixedIslandConstraints, IslandConstraintComparer);
+        _mixedIslandConstraints.SortInPlace(IslandConstraintComparer);
 
         int start = 0;
         while (start < _mixedIslandConstraints.Count)
@@ -767,7 +767,7 @@ internal sealed class GravitasMixedCollisionService
             return;
         }
 
-        SwiftListSortUtility.SortInPlace(_mixedIslandNodes, IslandNodeComparer);
+        _mixedIslandNodes.SortInPlace(IslandNodeComparer);
 
         int writeIndex = 0;
         int previousKey = -1;

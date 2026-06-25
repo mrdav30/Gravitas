@@ -61,11 +61,12 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 
 | Signal | Status | Priority | Tracking |
 | --- | --- | --- | --- |
-| SwiftCollections sort hot-path allocation | Mitigated in Gravitas, lower-stack open | Medium | This backlog |
+| _None_ | All current benchmark signals closed | - | Add new measured signals here |
 
-### Signal: SwiftCollections Sort Hot-Path Allocation
+### Closed Signal: SwiftCollections Sort Hot-Path Allocation
 
 **Discovered:** 2026-06-22
+**Closed:** 2026-06-24
 
 **Evidence:** During the post-SwiftCollections v5.1.0 Workstream 3 cleanup,
 replacing Gravitas' local sort helpers with package
@@ -76,41 +77,52 @@ query tests. The isolated
 `Physics2DQueryTests.RaycastAll_ShouldNotAllocateAfterWarmup` test reproduced
 the issue at `128 B` after warmup.
 
-**Mitigation:** Gravitas now centralizes measured hot-path ordering through
-`SwiftListSortUtility`, a reusable allocation-free heap sort over caller-owned
-`SwiftList<T>` buffers. Partition single-source copies use
-`SwiftSparseSet.CopyKeysTo(...)` followed by the same no-allocation sorter;
-merged buckets append and sort once. The package sort APIs remain acceptable
-for non-simulation setup paths such as lifecycle hook registration.
+**Resolution:** SwiftCollections now owns the allocation-free sort primitive.
+`SwiftList<T>.SortInPlace(...)` routes default ordering through the optimized
+BCL default-comparer path, custom class/interface comparers through an
+allocation-free introsort, and struct comparers through a no-boxing generic
+introsort. `SwiftSortedList<T>` bulk-load, known-count `IReadOnlyCollection<T>`
+range insertion, and `SetComparer(...)` use the same lower-stack helper without
+recurring managed sort allocations. Gravitas removed
+`src/Gravitas/Support/SwiftListSortUtility.cs` and now calls
+`SwiftList<T>.SortInPlace(...)` or `SwiftSparseSet.CopySortedKeysTo(...)`
+directly from runtime ordering paths.
 
 **Why it matters:** `SwiftCollections` is the lower-stack collection layer for
 LSF. Its scratch-buffer sort APIs should be safe for deterministic physics hot
 paths so consumers do not need local workarounds.
 
-**Next isolation step:** Fix and measure `SwiftList<T>.SortInPlace(...)` and
-`CopySortedKeysTo(...)` in SwiftCollections so they avoid recurring managed
-allocation, then replace `SwiftListSortUtility` usages in Gravitas and rerun
-the Release and ReleaseLean allocation guardrails.
+**Benchmark signal:** Short-run comparer benchmarks show the tradeoff:
+`List<T>.Sort(custom class comparer)` remains faster but allocates `64 B/op`,
+while `SwiftList<T>.SortInPlace(custom class comparer)` allocates `0 B/op`.
+For struct comparers, `List<T>.Sort(struct comparer)` measured about
+`12.136 ms` at `100000` integers with `88 B/op`; the Swift struct-comparer
+path measured about `13.089 ms` with `0 B/op`, closing most of the CPU gap
+while preserving the allocation contract.
 
-**Likely files:**
+**Touched files:**
 
 - `../SwiftCollections/src/SwiftCollections/Collection/SwiftList.cs`
+- `../SwiftCollections/src/SwiftCollections/Collection/SwiftSortedList.cs`
+- `../SwiftCollections/src/SwiftCollections/Utility/SwiftArraySortHelper.cs`
 - `../SwiftCollections/src/SwiftCollections/Collection/SwiftSparseSet.cs`
-- `src/Gravitas/Support/SwiftListSortUtility.cs`
 - `src/Gravitas/Core/GravitasCollisionService.cs`
 - `src/Gravitas/Core/GravitasPhysics2DService.cs`
 - `src/Gravitas/Core/GravitasCollision2DService.cs`
 - `src/Gravitas/Core/GravitasMixedCollisionService.cs`
 - `src/Gravitas/Partitions/*Partition*.cs`
 
-**Closure criteria:** SwiftCollections provides no-recurring-allocation sort
-and sorted-key copy APIs, Gravitas removes `SwiftListSortUtility`, and the
-same allocation guardrails pass under Release and ReleaseLean.
+**Closure evidence:** SwiftCollections focused allocation guardrails and full
+Release/ReleaseLean test suites pass, GridForge and Gravitas validate through
+local project references, Gravitas Release/ReleaseLean allocation guardrails
+pass, and the Gravitas simulation allocation benchmark smoke rows remain at
+`0 B/op`.
 
 ## Closed Signals
 
 | Signal | Status | Closed | Resolution |
 | --- | --- | --- | --- |
+| SwiftCollections sort hot-path allocation | Closed | 2026-06-24 | SwiftCollections owns allocation-free sort and sorted-key APIs; Gravitas removed `SwiftListSortUtility` |
 | Mixed mesh finite-slab triangle scaling signal | Closed | 2026-06-24 | Mixed and pure 3D query services now expose mesh-triangle candidate counts, dedicated triangle-volume benchmarks cover dense and false-positive mesh targets, and pure 3D convex-source mesh sweeps use ordered lower-bound triangle candidates |
 | Pure 2D dynamic CCD candidate asymmetry | Closed | 2026-06-23 | 2D now uses a planar candidate index, skips mixed CCD indexing outside mixed mode, and benchmark resets use 2D reset parity |
 | 3D shape-exact false-positive cost | Closed | 2026-06-23 | Static CCD now uses exact-source sweeps for non-sphere convex movers before conservative sphere fallback refinement |
@@ -543,7 +555,7 @@ Promote a signal from this backlog into a dedicated dated plan when it has:
 ## Current Recommendation
 
 With the runtime CCD allocation, grounding, shape-exact false-positive, pure 2D
-dynamic candidate-asymmetry, and mixed mesh triangle-scaling signals closed,
-the remaining active benchmark-facing item is the SwiftCollections lower-stack
-sort gap. Keep that item open until the lower-stack sort APIs can replace
-`SwiftListSortUtility` without allocation regressions.
+dynamic candidate-asymmetry, mixed mesh triangle-scaling, and SwiftCollections
+sort signals closed, this backlog has no active benchmark-facing items. Keep it
+as the intake bucket for future measured signals; promote broader work into a
+dated feature plan when the scope outgrows a focused patch.

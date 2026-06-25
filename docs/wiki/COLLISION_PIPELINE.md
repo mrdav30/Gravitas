@@ -559,12 +559,12 @@ candidate pairs.
 
 The dynamic, awake-dynamic, and static sparse-set keys are copied into
 context-owned buffers and sorted by collider ID before pair generation with an
-allocation-free insertion sort. This keeps pair/contact ordering stable even
-when movement churn changes sparse-set dense storage order. `SwiftSortedList` is
-not used for these scratch buffers: its `AddRange` path still copies source
-items into a temporary array and then merges sorted data, while the current
-reusable `SwiftList` buffers bulk-copy and sort without adding another
-persistent membership structure.
+allocation-free `SwiftList<T>.SortInPlace(...)` or
+`SwiftSparseSet.CopySortedKeysTo(...)` path from SwiftCollections. This keeps
+pair/contact ordering stable even when movement churn changes sparse-set dense
+storage order. `SwiftSortedList` remains a persistent sorted-membership
+collection; transient per-frame scratch ordering stays in reusable `SwiftList`
+buffers so the services do not add another membership structure.
 
 If a partition contains no awake dynamic IDs, distribution returns before pair
 generation. Static/static pairs are not distributed. Sleeping dynamic bodies

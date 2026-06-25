@@ -370,7 +370,7 @@ public sealed class GravitasCollisionService
         foreach (PhysicsPartition partition in _activePartitions)
             _distributionPartitions.Add(partition);
 
-        SwiftListSortUtility.SortInPlace(_distributionPartitions, PartitionOrderComparer);
+        _distributionPartitions.SortInPlace(PartitionOrderComparer);
 
         for (int i = 0; i < _distributionPartitions.Count; i++)
         {
@@ -405,12 +405,12 @@ public sealed class GravitasCollisionService
             return;
         }
 
-        SwiftListSortUtility.SortInPlace(_discreteResponsePairs, ResponsePairComparer);
+        _discreteResponsePairs.SortInPlace(ResponsePairComparer);
         BuildDiscreteIslands();
         if (_discreteIslandConstraints.Count == 0)
             return;
 
-        SwiftListSortUtility.SortInPlace(_discreteIslandConstraints, IslandConstraintComparer);
+        _discreteIslandConstraints.SortInPlace(IslandConstraintComparer);
 
         int start = 0;
         while (start < _discreteIslandConstraints.Count)
@@ -497,7 +497,7 @@ public sealed class GravitasCollisionService
             return;
         }
 
-        SwiftListSortUtility.SortInPlace(_discreteIslandNodes, IslandNodeComparer);
+        _discreteIslandNodes.SortInPlace(IslandNodeComparer);
 
         int writeIndex = 0;
         int previousKey = -1;
