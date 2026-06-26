@@ -358,6 +358,18 @@ collision matrix uses `true` for collide and `false` for ignore.
 density, speed caps, friction transition speed, damping, and culling scores.
 Environment values are mutable per context.
 
+`StiffBody` drag is a deterministic body-integration model, not a full
+aerodynamic solver. The current linear drag path uses the body's drag
+coefficient, `PhysicsEnvironment.AirDensity`, collider frontal area, and current
+speed to accumulate acceleration opposite motion. The standard aerodynamic drag
+equation is quadratic in speed, `D = 1/2 * rho * V^2 * Cd * A`; NASA's
+[Beginner's Guide to Aerodynamics](https://www.grc.nasa.gov/www/k-12/VirtualAero/BottleRocket/airplane/dragco.html)
+notes that drag coefficient values depend on reference area and flow
+conditions. Gravitas should not silently reinterpret the current linear
+coefficient as a physical aerodynamic `Cd`. If full quadratic drag is needed,
+it should be a deliberate body/environment hardening pass with tests,
+benchmarks, and clear units.
+
 ## Lifecycle Hooks
 
 Lifecycle hooks are internal context registrations. Each hook has an owner name

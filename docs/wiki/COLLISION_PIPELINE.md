@@ -111,6 +111,13 @@ claimed yet. `CollisionPair2D` resolves collider priority up front and
 2D shape pair should extend the settings/type table instead of growing public
 type-check conditionals.
 
+The separating-axis invariant is the broad rule behind every convex SAT path:
+if a candidate axis projects two convex shapes into non-overlapping intervals,
+the shapes cannot be colliding. A collision is possible only when every tested
+required axis overlaps. Candidate axes must be generated and tested in stable
+order, and contact normals must be oriented by the pair convention rather than
+by ad hoc shape-pair sign fixes.
+
 `CollisionPair2D` owns pure 2D pair lifecycle: stable collider priority,
 pair-owned `ContactManifold2D` state, pair-local warm-start cache, wake
 propagation from awake movable bodies, trigger enter/exit events, and contact
@@ -191,6 +198,31 @@ in dynamic membership, but partitions with no awake dynamic IDs skip solver
 work. Empty 2D partitions are retained, retired by the same deterministic TTK
 settings, and returned to the 2D collision service's partition pool through
 GridForge voxel removal.
+
+Large-object-count optimization stays inside deterministic broad-phase and
+solver ownership:
+
+- spatial partitioning is GridForge-backed voxel partitioning with retained
+  `PhysicsPartition` and `PhysicsPartition2D` payloads.
+- broad phase uses collider bounds, mobility buckets, awake-dynamic sets,
+  duplicate-pair suppression, hierarchy filtering, layer filtering, and explicit
+  local collider filtering where configured.
+- narrow phase runs only after broad-phase candidate reduction and then uses the
+  exact shape-pair path for the current collider families.
+- temporal coherence is captured through retained collision pairs,
+  pair-owned manifolds, warm-start impulses, retained partitions, sleep state,
+  and CCD frame caches.
+- authoritative collision detection is not asynchronous. Hosts can run several
+  independent contexts on separate threads, but one context's collision and
+  response phases must keep a stable observable order.
+- object-importance throttling is not a runtime collision policy. Pair culling
+  may delay checks only for non-colliding retained pairs according to stable
+  distance, velocity, age, and size scores; it must not skip active contacts or
+  nearby candidate pairs because a host considers an object less important.
+- collision LOD is authored data, not camera-distance runtime mutation. A host
+  or offline tool may choose simpler fixed collision shapes for a simulation,
+  but Gravitas should not change authoritative collision geometry during a run
+  based on renderer distance or presentation priority.
 
 ## Collider Runtime Shape State
 
@@ -874,6 +906,14 @@ Response units and invariants:
   solver invariant, not contact data.
 - drag and angular damping remain integration/body behavior; contact friction is
   handled by the response solver.
+
+Contact impulses follow the oriented normal written by narrow phase. Response
+applies equal and opposite impulses to the two participants according to that
+normal, effective mass, inertia, and body mobility. Sphere/sphere,
+sphere/capsule, capsule/capsule, and other shape pairs should not need
+shape-specific "add versus subtract" impulse rules. If a pair appears to need a
+sign exception, the first thing to audit is normal orientation and pair
+priority, not response impulse polarity.
 
 Dense same-frame CCD contact chains are handled by bounded service-level
 handoff queues, including cross-service mixed velocity transfer. Additional
