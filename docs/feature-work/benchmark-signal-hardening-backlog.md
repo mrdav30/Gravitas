@@ -110,7 +110,7 @@ while preserving the allocation contract.
 - `src/Gravitas/Core/2D/GravitasPhysics2DService.cs`
 - `src/Gravitas/Core/2D/GravitasCollision2DService.cs`
 - `src/Gravitas/Core/Mixed/GravitasMixedCollisionService.cs`
-- `src/Gravitas/Partitions/*Partition*.cs`
+- `src/Gravitas/Partitions/*/*Partition*.cs`
 
 **Closure evidence:** SwiftCollections focused allocation guardrails and full
 Release/ReleaseLean test suites pass, GridForge and Gravitas validate through
@@ -194,11 +194,11 @@ change.
 
 **Likely files:**
 
-- `src/Gravitas/Queries/GravitasQueryMixedService.cs`
-- `src/Gravitas/Queries/GravitasQuery3DService.Raycast.cs`
-- `src/Gravitas/Queries/GravitasQuery3DService.Circle.cs`
-- `src/Gravitas/Queries/ConvexSweepQueryWorker.cs`
-- `src/Gravitas/Queries/SweptSphereQueryWorker.cs`
+- `src/Gravitas/Queries/Mixed/GravitasQueryMixedService.cs`
+- `src/Gravitas/Queries/3D/GravitasQuery3DService.Raycast.cs`
+- `src/Gravitas/Queries/3D/GravitasQuery3DService.Circle.cs`
+- `src/Gravitas/Queries/3D/Sweeps/ConvexSweepQueryWorker.cs`
+- `src/Gravitas/Queries/3D/Sweeps/SweptSphereQueryWorker.cs`
 - `tests/Gravitas.Tests/MixedDimensions/MixedQueryCcdTests.cs`
 - `tests/Gravitas.Tests/Queries/GravitasQuery3DServiceSweepTests.cs`
 - `tests/Gravitas.Benchmarks/Queries/MixedMeshTriangleScalingBenchmarks.cs`
@@ -329,10 +329,10 @@ The focused `ContinuousCollisionDetectionTests` and
 
 - `src/Gravitas/Core/3D/StiffBody.ContinuousCollision.Hits.cs`
 - `src/Gravitas/Core/3D/StiffBody.ContinuousCollision.Kinematic.cs`
-- `src/Gravitas/Queries/ConvexSweepQueryWorker.cs`
-- `src/Gravitas/Queries/GravitasQuery3DService.Raycast.cs`
-- `src/Gravitas/Queries/SweepBoundsUtility.cs`
-- `src/Gravitas/Queries/SweptSphereQueryWorker.cs`
+- `src/Gravitas/Queries/3D/Sweeps/ConvexSweepQueryWorker.cs`
+- `src/Gravitas/Queries/3D/GravitasQuery3DService.Raycast.cs`
+- `src/Gravitas/Queries/3D/Sweeps/SweepBoundsUtility.cs`
+- `src/Gravitas/Queries/3D/Sweeps/SweptSphereQueryWorker.cs`
 - `tests/Gravitas.Tests/CollisionHandling/ContinuousCollisionDetectionTests.cs`
 
 **Closure criteria:** Met. The row is explained by conservative proxy overwork,
@@ -383,9 +383,9 @@ unless a future focused allocation guard reproduces them.
 
 **Likely files:**
 
-- `src/Gravitas/Queries/ConvexSweepQueryWorker.cs`
-- `src/Gravitas/Queries/SweepBoundsUtility.cs`
-- `src/Gravitas/Queries/SweptSphereQueryWorker.cs`
+- `src/Gravitas/Queries/3D/Sweeps/ConvexSweepQueryWorker.cs`
+- `src/Gravitas/Queries/3D/Sweeps/SweepBoundsUtility.cs`
+- `src/Gravitas/Queries/3D/Sweeps/SweptSphereQueryWorker.cs`
 - `tests/Gravitas.Tests/CollisionHandling/ContinuousCollisionDetectionTests.cs`
 - `tests/Gravitas.Benchmarks/Core/DynamicCcdScalingBenchmarks.cs`
 
@@ -517,7 +517,7 @@ after warmup.
 **Likely files:**
 
 - `src/Gravitas/Core/3D/StiffBody.cs`
-- `src/Gravitas/Queries/GravitasQuery3DService.Raycast.cs`
+- `src/Gravitas/Queries/3D/GravitasQuery3DService.Raycast.cs`
 - `tests/Gravitas.Benchmarks/Core/SimulationAllocationBenchmarks.cs`
 - `tests/Gravitas.Tests/Core/StiffBodyGroundingTests.cs`
 
