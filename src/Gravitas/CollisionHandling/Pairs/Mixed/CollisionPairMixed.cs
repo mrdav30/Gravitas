@@ -13,7 +13,7 @@ namespace Gravitas.CollisionHandling;
 /// <summary>
 /// Owns one stable mixed 3D/2D collision pair identity and contact lifecycle.
 /// </summary>
-internal sealed class CollisionPairMixed
+internal sealed partial class CollisionPairMixed
 {
     private bool _isColliding;
     private bool _isTriggerPair;

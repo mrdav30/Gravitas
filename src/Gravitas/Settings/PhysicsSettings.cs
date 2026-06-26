@@ -11,7 +11,7 @@ using SwiftCollections;
 
 namespace Gravitas;
 
-public sealed class PhysicsSettings
+public sealed partial class PhysicsSettings
 {
     public const int DefaultFrameRate = 32;
 

@@ -70,6 +70,18 @@ internal struct ContactWarmStartCache2D
         return false;
     }
 
+    internal ulong GetContactIdForReplayHash(int index)
+    {
+        SwiftThrowHelper.ThrowIfArrayIndexInvalid(index, Count, nameof(index));
+        return GetContactId(index);
+    }
+
+    internal ContactWarmStartImpulse GetImpulseForReplayHash(int index)
+    {
+        SwiftThrowHelper.ThrowIfArrayIndexInvalid(index, Count, nameof(index));
+        return GetImpulseUnchecked(index);
+    }
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private ulong GetContactId(int index) => index == 0 ? _contactId0 : _contactId1;
 

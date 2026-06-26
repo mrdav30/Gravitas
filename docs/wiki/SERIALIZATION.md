@@ -126,6 +126,19 @@ compare runtime-owned service IDs or partition list identities; compare
 authoritative body/collider values and externally observable collision/query
 behavior.
 
+`GravitasWorldContext.ComputeReplayHash()` is the preferred compact conformance
+signal for replay and rollback tests. After Chronicler populates existing
+runtime shells, the restored context should produce the same per-frame
+`GravitasReplayHash` sequence as the uninterrupted context when both receive
+the same subsequent inputs. The authoritative hash follows the same boundary as
+`IRecordable.RecordData(...)`: serialized continuation state is included, while
+host-owned bindings and rebuildable runtime caches are excluded. Active
+cross-frame CCD handoff state remains authoritative because it can affect the
+next fixed step. Rebuildable CCD frame snapshots, query scratch data, diagnostic
+buffers, visual interpolation state, and drift-debug counters are available
+only through `GravitasReplayHashMode.AuthoritativeWithSolverCaches` when they
+are useful for RCA.
+
 ## Transport Notes
 
 Standard `Release` builds include MemoryPack support through the standard

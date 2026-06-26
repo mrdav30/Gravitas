@@ -18,7 +18,7 @@ namespace Gravitas.Colliders;
 /// <summary>
 /// Base type for pure 2D collider shapes.
 /// </summary>
-public abstract class LSCollider2D : IRecordable, IColliderHierarchyNode
+public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
 {
     private SolidBody2D? _body;
     private IMatterAgent? _agent;

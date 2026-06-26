@@ -2,7 +2,7 @@
 
 This project is the BenchmarkDotNet scaffold for Gravitas physics hot paths.
 
-The runner, alias catalog, and deterministic fixture helpers are in place. Initial benchmark classes cover context lifecycle, registration/partitioning, simulation, query-service paths, and diagnostics.
+The runner, alias catalog, and deterministic fixture helpers are in place. Benchmark classes cover context lifecycle, registration/partitioning, simulation, query-service paths, replay hashing, and diagnostics.
 
 ## Requirements
 
@@ -114,6 +114,8 @@ dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll cont
 Start with hot paths that can be isolated and repeated deterministically:
 
 - `GravitasWorldContext` simulation phases and service phase ordering.
+- `GravitasWorldContext.ComputeReplayHash(...)` conformance signal cost across
+  sparse 3D, dense 3D, pure 2D, mixed, and solver-cache modes.
 - `GravitasPhysicsService` body/collider registration and collision-pair ownership.
 - `GravitasCollisionService` partitioning and partition cleanup.
 - `CollisionDetection` shape-pair checks.
@@ -163,7 +165,7 @@ BenchmarkDotNet writes results to `BenchmarkDotNet.Artifacts/results/` by defaul
 For quick allocation checks around the current steady-state hot paths, run:
 
 ```bash
-dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll query-service simulation-allocation continuous-collision collision-detection collision-response mixed-collision-response collision-partition partition-culling diagnostics physics-2d mixed-broad-phase --filter "*" -j Short -i --exporters json
+dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll query-service simulation-allocation continuous-collision collision-detection collision-response mixed-collision-response collision-partition partition-culling diagnostics physics-2d mixed-broad-phase replay-hash --filter "*" -j Short -i --exporters json
 ```
 
 The short in-process job is not canonical timing evidence, but it is useful for
@@ -187,6 +189,7 @@ to add or tighten explicit allocation tests before changing the algorithm.
 | `diagnostics` | Disabled/enabled force and torque event hooks plus disabled/enabled primitive and mesh collider debug draw capture. |
 | `partition-culling` | dynamic collider repartitioning after teleports, direct partition add/remove churn, and culled-pair invalidation after movement. |
 | `physics-2d` | pure 2D body integration, GridForge-backed 2D partition response, direct angular contact response, direct two-contact manifold response, convex/convex two-contact manifold detection, sweep baseline comparisons, required 2D shape-pair checks, `OverlapCircleAll`, and `RaycastAll`. |
+| `replay-hash` | deterministic authoritative replay hash cost for sparse 3D, dense 3D, pure 2D, mixed, and cache-inclusive solver/hash modes. |
 
 `continuous-collision-evidence` and `continuous-collision-toi-iteration` are
 intentionally omitted from the allocation smoke command because they are heavier

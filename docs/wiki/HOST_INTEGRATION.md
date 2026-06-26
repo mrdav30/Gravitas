@@ -252,6 +252,26 @@ ordered input phase before `context.Simulate()`. Given the same initial context,
 settings, world state, command order, and frame count, Gravitas should replay to
 the same authoritative body, collider, clock, and contact state.
 
+Hosts can compute a compact deterministic frame hash after a fixed step and
+compare that value across peers, servers, replay runners, or restored snapshots:
+
+```csharp
+context.Simulate();
+context.LateSimulate();
+
+GravitasReplayHash hash = context.ComputeReplayHash();
+SendFrameHashToLockstepPeer(context.FrameCount, hash);
+```
+
+`ComputeReplayHash()` hashes context settings, physical environment values,
+clock state, body state, collider shape/filter state, retained
+continuation-affecting pair/contact state, and active CCD handoff state. It
+does not hash host object identity, delegates, diagnostics buffers, debug draw
+commands, query scratch buffers, or visualization interpolation caches. Use
+`GravitasReplayHashMode.AuthoritativeWithSolverCaches` when investigating drift
+inside solver/cache state that is useful for RCA but not part of the ordinary
+authoritative continuation contract.
+
 The current runtime order has two important consequences:
 
 - Teleports or transform mutations made before `Simulate()` refresh dynamic

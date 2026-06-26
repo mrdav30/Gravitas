@@ -11,7 +11,7 @@ using Gravitas.CollisionHandling;
 
 namespace Gravitas;
 
-internal sealed class CollisionPair2D
+internal sealed partial class CollisionPair2D
 {
     private bool _isColliding;
     private ContactWarmStartCache2D _warmStart;

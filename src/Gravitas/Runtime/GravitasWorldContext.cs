@@ -249,6 +249,24 @@ public sealed class GravitasWorldContext : IDisposable
     }
 
     /// <summary>
+    /// Computes a deterministic fixed-width hash of this context's replay-relevant physics state.
+    /// </summary>
+    /// <param name="mode">Selects whether diagnostic solver/cache state is included in addition to authoritative state.</param>
+    /// <returns>A deterministic hash suitable for lockstep replay conformance checks.</returns>
+    /// <remarks>
+    /// The hash includes context settings, environment values, body state, collider shape/filter state,
+    /// retained pair/contact state, and continuation-affecting CCD handoff state. It excludes host object
+    /// identity, delegates, diagnostics buffers, debug draw data, query scratch buffers, and visualization
+    /// interpolation caches.
+    /// </remarks>
+    public GravitasReplayHash ComputeReplayHash(
+        GravitasReplayHashMode mode = GravitasReplayHashMode.Authoritative)
+    {
+        ThrowIfDisposed();
+        return GravitasReplayHashService.Compute(this, mode);
+    }
+
+    /// <summary>
     /// Attaches a context to a host-owned <see cref="GridWorld"/>.
     /// </summary>
     /// <param name="world">The active world to bind.</param>

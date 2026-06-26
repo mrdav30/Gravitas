@@ -33,6 +33,7 @@ pairs, queries, and coroutines remain context-local.
 | `GravitasCoroutineService` | Active lockstep coroutine bucket and context-bound wait instruction factories. |
 | `GravitasDiagnosticSink` | Disabled-by-default diagnostic event buffer and engine-agnostic debug draw command buffer. |
 | `GravitasLifecycleHooks` | Ordered callbacks for simulate, late simulate, visualize, late visualize, reset, and frame-rate change. |
+| `GravitasReplayHashService` | Internal fixed-order replay hash writer used by `GravitasWorldContext.ComputeReplayHash(...)`. It reads authoritative context, body, collider, pair, contact, and active handoff state without mutating simulation state. |
 
 The split is intentional: host code should mostly see the context and a few
 domain objects, while mutable implementation details stay inside services.
@@ -126,6 +127,13 @@ The replay expectation is: the same initial context, settings, world data,
 ordered command sequence, and frame count should produce the same authoritative
 body, collider, clock, and contact state across repeated runs. The current
 contract is pinned by `GravitasSimulationPhaseOrderTests`.
+`GravitasWorldContext.ComputeReplayHash()` exposes the same expectation as a
+fixed-width `GravitasReplayHash` that hosts and tests can compare frame by
+frame. `Authoritative` mode follows the Chronicler continuation boundary and
+excludes host identity, query scratch buffers, diagnostics, visual
+interpolation, and rebuildable per-frame CCD caches. Use
+`AuthoritativeWithSolverCaches` for drift RCA when solver caches and diagnostic
+cache counts need to be part of the signal.
 
 `PhysicsSettings.RuntimeMode` is a validated bitmask with exact public settings
 values: `ThreeD`, `TwoD`, `Both`, and `Mixed`. `Both` runs pure 2D and pure 3D
@@ -297,6 +305,11 @@ Host bindings, context-local service IDs, partition lists, pair tables, query
 buffers, diagnostic buffers, delegates, and visual interpolation state are not
 snapshot identity. Read [Serialization And Replay](SERIALIZATION.md) before
 changing serialized fields, load defaults, or replay tests.
+Replay hashing is built around this same boundary: values recorded by
+`SolidBody`, `SolidBody2D`, `LSCollider`, and `LSCollider2D` are authoritative
+when they affect deterministic continuation, while context-owned IDs, retained
+pair/contact state, and active CCD handoffs are hashed by the context services
+that own their ordering.
 
 ## Collider State
 

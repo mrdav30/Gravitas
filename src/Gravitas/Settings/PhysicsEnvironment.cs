@@ -12,7 +12,7 @@ namespace Gravitas;
 /// <summary>
 /// Stores world-local physical environment values used by deterministic simulation.
 /// </summary>
-public sealed class PhysicsEnvironment
+public sealed partial class PhysicsEnvironment
 {
     /// <summary>
     /// Standard gravitational acceleration in world units per second squared.

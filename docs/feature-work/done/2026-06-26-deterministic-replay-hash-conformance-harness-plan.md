@@ -11,7 +11,7 @@
 ---
 
 **Date:** 2026-06-26  
-**Status:** Planned  
+**Status:** Done  
 **Owner:** Gravitas determinism/replay hardening
 
 ## Purpose
@@ -108,12 +108,12 @@ hashed safely.
 
 **Tasks**
 
-- [ ] Add `src/Gravitas/Determinism/GravitasReplayHash.cs`.
-- [ ] Add `src/Gravitas/Determinism/GravitasReplayHashMode.cs`.
-- [ ] Add `src/Gravitas/Determinism/GravitasReplayHashWriter.cs`.
-- [ ] Use a documented fixed algorithm such as two-lane FNV-1a 64-bit or a
+- [x] Add `src/Gravitas/Determinism/GravitasReplayHash.cs`.
+- [x] Add `src/Gravitas/Determinism/GravitasReplayHashMode.cs`.
+- [x] Add `src/Gravitas/Determinism/GravitasReplayHashWriter.cs`.
+- [x] Use a documented fixed algorithm such as two-lane FNV-1a 64-bit or a
   similarly simple deterministic integer mixer.
-- [ ] Add explicit writer methods for:
+- [x] Add explicit writer methods for:
   - `bool`
   - `byte`
   - `int`
@@ -130,12 +130,12 @@ hashed safely.
   - `Fixed3x3`
   - `PhysicsLayer`
   - `PhysicsLayerMask`
-- [ ] Verify the FixedMathSharp raw-value API and hash that raw value directly.
+- [x] Verify the FixedMathSharp raw-value API and hash that raw value directly.
   If no public raw-value member exists, add a lower-stack FixedMathSharp helper
   rather than hashing formatted text.
-- [ ] Prefix every logical section with a stable ASCII section tag and version
+- [x] Prefix every logical section with a stable ASCII section tag and version
   integer.
-- [ ] Add tests in
+- [x] Add tests in
   `tests/Gravitas.Tests/Determinism/GravitasReplayHashWriterTests.cs` proving:
   - equal values produce equal hashes.
   - different section order produces different hashes.
@@ -157,28 +157,28 @@ identity and rebuildable caches.
 
 **Tasks**
 
-- [ ] Add `src/Gravitas/Determinism/IGravitasReplayHashContributor.cs` if an
-  interface keeps contributors clean without forcing public API noise.
-- [ ] Add hash contribution methods for `PhysicsSettings` and
+- [x] Decide not to add `IGravitasReplayHashContributor`; internal partial
+  contributors kept the public API quieter.
+- [x] Add hash contribution methods for `PhysicsSettings` and
   `PhysicsEnvironment`.
-- [ ] Add 3D body contribution for authoritative fields currently recorded by
+- [x] Add 3D body contribution for authoritative fields currently recorded by
   `SolidBody.Serialization.cs`.
-- [ ] Add pure 2D body contribution for authoritative fields currently recorded
+- [x] Add pure 2D body contribution for authoritative fields currently recorded
   by `SolidBody2D.Serialization.cs`.
-- [ ] Add 3D collider contribution for:
+- [x] Add 3D collider contribution for:
   - collider ID.
   - active/trigger/layer/filter state.
   - hierarchy keys.
   - shape kind and shape values.
   - runtime shape version values that affect future simulation.
-- [ ] Add pure 2D collider contribution with matching 2D and mixed-slab state.
-- [ ] Add compound and mesh contribution through stable authored part and
+- [x] Add pure 2D collider contribution with matching 2D and mixed-slab state.
+- [x] Add compound and mesh contribution through stable authored part and
   triangle order.
-- [ ] Exclude host delegates, diagnostics, visual interpolation buffers, object
+- [x] Exclude host delegates, diagnostics, visual interpolation buffers, object
   references, query scratch buffers, and partition scratch buffers.
-- [ ] Add tests proving two equivalent scenes built with different object
+- [x] Add tests proving two equivalent scenes built with different object
   allocation order hash the same after IDs and registration order are aligned.
-- [ ] Add tests proving a single authoritative field change changes the hash.
+- [x] Add tests proving a single authoritative field change changes the hash.
 
 **Done Criteria**
 
@@ -196,7 +196,7 @@ without becoming noisy.
 
 **Tasks**
 
-- [ ] Audit 3D, pure 2D, and mixed service fields for continuation impact:
+- [x] Audit 3D, pure 2D, and mixed service fields for continuation impact:
   - active pair warm-start state.
   - retained collision pairs.
   - retained partitions.
@@ -204,18 +204,18 @@ without becoming noisy.
   - processed-body handoff queues.
   - query scratch buffers.
   - diagnostic buffers.
-- [ ] Include continuation-affecting state in `Authoritative`.
-- [ ] Include optional solver/cache state in
+- [x] Include continuation-affecting state in `Authoritative`.
+- [x] Include optional solver/cache state in
   `AuthoritativeWithSolverCaches` only when it helps diagnose drift.
-- [ ] Hash active collision pairs in sorted pair-key order.
-- [ ] Hash warm-start contact impulses by stable contact ID order.
-- [ ] Hash CCD handoff counters and queue state only if they can cross frame
+- [x] Hash active collision pairs in sorted pair-key order.
+- [x] Hash warm-start contact impulses by stable contact ID order.
+- [x] Hash CCD handoff counters and queue state only if they can cross frame
   boundaries.
-- [ ] Exclude query counters such as `LastQueryCandidateCount` from
+- [x] Exclude query counters such as `LastQueryCandidateCount` from
   `Authoritative`.
-- [ ] Add tests where pair registration churn still yields stable hashes when
+- [x] Add tests where pair registration churn still yields stable hashes when
   authoritative state is equal.
-- [ ] Add tests where stale warm-start state changes
+- [x] Add tests where stale warm-start state changes
   `AuthoritativeWithSolverCaches` but not `Authoritative` if the cache is
   rebuildable.
 
@@ -235,30 +235,31 @@ across repeated and restored execution.
 
 **Tasks**
 
-- [ ] Add `tests/Gravitas.Tests/Determinism/ReplayConformanceHarness.cs`.
-- [ ] Add a `ReplayHashTrace` test helper that stores one hash per frame in a
+- [x] Add `tests/Gravitas.Tests/Determinism/ReplayConformanceHarness.cs`.
+- [x] Add a `ReplayHashTrace` test helper that stores one hash per frame in a
   `SwiftList<GravitasReplayHash>` or array.
-- [ ] Add helpers for:
+- [x] Add helpers for:
   - repeated run conformance.
   - save/populate-at-frame conformance.
   - ReleaseLean-compatible JSON-only conformance when MemoryPack is disabled.
-- [ ] Add 3D conformance scenarios:
+- [x] Add 3D conformance scenarios:
   - resting stack with warm-started friction.
   - dynamic CCD with one handoff.
   - kinematic active-source CCD.
   - mesh or compound contact.
-- [ ] Add pure 2D conformance scenarios:
+- [x] Add pure 2D conformance scenarios:
   - angular contact response.
   - manifold warm-start.
   - dynamic CCD.
-  - planned 2D grounding once implemented.
-- [ ] Add mixed conformance scenarios:
+  - planned 2D grounding once implemented by
+    `2026-06-26-pure-2d-grounding-and-support-plan.md`.
+- [x] Add mixed conformance scenarios:
   - mixed dynamic response.
   - mixed static and dynamic CCD.
   - mixed query calls between simulation frames that mutate query caches.
-- [ ] Add save/populate tests that compare hashes from restored and
+- [x] Add save/populate tests that compare hashes from restored and
   uninterrupted scenes for at least 16 frames after restore.
-- [ ] Keep fixtures deterministic and independent from wall-clock time.
+- [x] Keep fixtures deterministic and independent from wall-clock time.
 
 **Done Criteria**
 
@@ -275,17 +276,15 @@ depending on test-only helpers.
 
 **Tasks**
 
-- [ ] Expose the final hash API from `GravitasWorldContext`.
-- [ ] Add XML docs that describe included and excluded state.
-- [ ] Add a small sample in `docs/wiki/HOST_INTEGRATION.md` showing frame hash
+- [x] Expose the final hash API from `GravitasWorldContext`.
+- [x] Add XML docs that describe included and excluded state.
+- [x] Add a small sample in `docs/wiki/HOST_INTEGRATION.md` showing frame hash
   comparison between peers.
-- [ ] Update `docs/wiki/SERIALIZATION.md` with hash-based replay conformance.
-- [ ] Update `docs/wiki/RUNTIME_ARCHITECTURE.md` with the hash service or
+- [x] Update `docs/wiki/SERIALIZATION.md` with hash-based replay conformance.
+- [x] Update `docs/wiki/RUNTIME_ARCHITECTURE.md` with the hash service or
   helper location.
-- [ ] Update `docs/wiki/DIAGNOSTICS.md` only if the hash is also emitted as an
-  optional diagnostic event. Prefer keeping it as a direct host call unless an
-  event has a concrete use.
-- [ ] Add allocation tests proving repeated `ComputeReplayHash(...)` calls
+- [x] Keep replay hashing as a direct host call; no diagnostics event was added.
+- [x] Add allocation tests proving repeated `ComputeReplayHash(...)` calls
   allocate `0` bytes after warmup for representative 3D, pure 2D, and mixed
   scenes.
 
@@ -304,21 +303,21 @@ validation must cover standard and Lean builds.
 
 **Tasks**
 
-- [ ] Add benchmark rows under `tests/Gravitas.Benchmarks`:
+- [x] Add benchmark rows under `tests/Gravitas.Benchmarks`:
   - `replay-hash-3d-sparse`
   - `replay-hash-3d-dense`
   - `replay-hash-2d-sparse`
   - `replay-hash-mixed`
   - `replay-hash-with-solver-caches`
-- [ ] Record candidate/body/contact counts in benchmark setup so results are
+- [x] Record candidate/body/contact counts in benchmark setup so results are
   interpretable.
-- [ ] Run focused determinism tests:
+- [x] Run focused determinism tests:
   `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter Determinism`
-- [ ] Run full validation:
+- [x] Run full validation:
   `dotnet test Gravitas.slnx --configuration Release`
-- [ ] Run Lean validation:
+- [x] Run Lean validation:
   `dotnet test Gravitas.slnx --configuration ReleaseLean`
-- [ ] Run benchmark smoke:
+- [x] Run benchmark smoke:
   `dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll replay-hash --filter "*" -j Short -i`
 
 **Done Criteria**

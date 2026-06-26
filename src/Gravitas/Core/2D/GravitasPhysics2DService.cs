@@ -231,6 +231,8 @@ public sealed partial class GravitasPhysics2DService
 
     internal int DynamicBodyPeakCount => _dynamicBodies.PeakCount;
 
+    internal int NextColliderIdForReplayHash => _nextColliderId;
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal bool TryGetDynamicBody(int dynamicId, out SolidBody2D body) =>
         _dynamicBodies.TryGetValue(dynamicId, out body);

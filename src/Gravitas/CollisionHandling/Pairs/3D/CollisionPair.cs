@@ -24,7 +24,7 @@ internal enum CollisionResponseDispatchMode
 /// <summary>
 /// Handles collision pairs between various types of colliders using the Separating Axis Theorem and maintains related state information.
 /// </summary>
-public class CollisionPair
+public partial class CollisionPair
 {
     public bool Debug = true;
 

@@ -19,7 +19,7 @@ using System.Runtime.CompilerServices;
 
 namespace Gravitas.Colliders;
 
-public abstract class LSCollider : IRecordable, IColliderHierarchyNode
+public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode
 {
     #region Fields and Properties
 
