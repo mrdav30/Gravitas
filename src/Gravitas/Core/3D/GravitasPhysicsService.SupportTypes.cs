@@ -14,7 +14,7 @@ namespace Gravitas;
 public sealed partial class GravitasPhysicsService
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool IsMovableIslandBody(StiffBody? body) =>
+    private static bool IsMovableIslandBody(SolidBody? body) =>
         body != null && body.DynamicId >= 0 && body.CanTranslate;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -22,7 +22,7 @@ public sealed partial class GravitasPhysicsService
         IsAwakeIslandBody(pair.ColliderA.Body) || IsAwakeIslandBody(pair.ColliderB.Body);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool IsAwakeIslandBody(StiffBody? body) =>
+    private static bool IsAwakeIslandBody(SolidBody? body) =>
         IsMovableIslandBody(body) && body!.IsAwakeForCollision;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -81,7 +81,7 @@ public sealed partial class GravitasPhysicsService
 
     private struct DiscreteIslandNode
     {
-        public DiscreteIslandNode(int bodyKey, StiffBody body)
+        public DiscreteIslandNode(int bodyKey, SolidBody body)
         {
             BodyKey = bodyKey;
             Body = body;
@@ -90,7 +90,7 @@ public sealed partial class GravitasPhysicsService
         }
 
         public int BodyKey;
-        public StiffBody Body;
+        public SolidBody Body;
         public int ParentIndex;
         public int RootKey;
     }

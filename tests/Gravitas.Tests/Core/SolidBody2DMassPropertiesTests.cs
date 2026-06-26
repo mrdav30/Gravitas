@@ -6,13 +6,13 @@ using Xunit;
 
 namespace Gravitas.Tests.Core;
 
-public sealed class StiffBody2DMassPropertiesTests
+public sealed class SolidBody2DMassPropertiesTests
 {
     [Fact]
     public void EffectiveMassHelpers_ShouldSeparateTranslationAndRotationPolicy()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
-        StiffBody2D body = CreateBody(context, new LSCircleCollider2D(Fixed64.One), mass: (Fixed64)2);
+        SolidBody2D body = CreateBody(context, new LSCircleCollider2D(Fixed64.One), mass: (Fixed64)2);
 
         body.CanTranslate.Should().BeTrue();
         body.CanRotate.Should().BeTrue();
@@ -36,7 +36,7 @@ public sealed class StiffBody2DMassPropertiesTests
         bool isKinematic)
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
-        StiffBody2D body = CreateBody(
+        SolidBody2D body = CreateBody(
             context,
             new LSCircleCollider2D(Fixed64.One),
             mass: (Fixed64)2,
@@ -55,7 +55,7 @@ public sealed class StiffBody2DMassPropertiesTests
     public void EffectiveMassHelpers_ForZeroMassBody_ShouldDisableSolverMotion()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
-        StiffBody2D body = CreateBody(context, new LSCircleCollider2D(Fixed64.One), mass: Fixed64.Zero);
+        SolidBody2D body = CreateBody(context, new LSCircleCollider2D(Fixed64.One), mass: Fixed64.Zero);
 
         body.InverseMass.Should().Be(Fixed64.Zero);
         body.MomentOfInertia.Should().Be(Fixed64.Zero);
@@ -69,7 +69,7 @@ public sealed class StiffBody2DMassPropertiesTests
     public void MassSetter_ShouldRefreshScalarMomentFromColliderShape()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
-        StiffBody2D body = CreateBody(context, new LSCircleCollider2D((Fixed64)2), mass: (Fixed64)2);
+        SolidBody2D body = CreateBody(context, new LSCircleCollider2D((Fixed64)2), mass: (Fixed64)2);
 
         body.MomentOfInertia.Should().Be((Fixed64)4);
 
@@ -88,7 +88,7 @@ public sealed class StiffBody2DMassPropertiesTests
             LocalOffset = new Vector2d((Fixed64)2, Fixed64.Half)
         };
 
-        StiffBody2D body = CreateBody(context, collider, mass: Fixed64.One);
+        SolidBody2D body = CreateBody(context, collider, mass: Fixed64.One);
 
         body.LocalCenterOfMassOffset.Should().Be(collider.ScaledLocalOffset);
         body.WorldCenterOfMass.Should().Be(collider.ScaledLocalOffset);
@@ -98,7 +98,7 @@ public sealed class StiffBody2DMassPropertiesTests
     public void WorldCenterOfMass_ShouldRotateLocalOffsetAroundBodyPosition()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
-        StiffBody2D body = CreateBody(context, new LSCircleCollider2D(Fixed64.One), mass: Fixed64.One);
+        SolidBody2D body = CreateBody(context, new LSCircleCollider2D(Fixed64.One), mass: Fixed64.One);
 
         body.SetPosition(new Vector2d((Fixed64)3, (Fixed64)4));
         body.SetRotation(FixedMath.DegToRad((Fixed64)90));
@@ -115,7 +115,7 @@ public sealed class StiffBody2DMassPropertiesTests
         {
             LocalOffset = new Vector2d(Fixed64.Half, Fixed64.Zero)
         };
-        StiffBody2D body = CreateBody(context, collider, mass: Fixed64.One);
+        SolidBody2D body = CreateBody(context, collider, mass: Fixed64.One);
         body.LocalCenterOfMassOffset = new Vector2d(Fixed64.Zero, (Fixed64)3);
 
         body.ResetCenterOfMassFromCollider();
@@ -123,7 +123,7 @@ public sealed class StiffBody2DMassPropertiesTests
         body.LocalCenterOfMassOffset.Should().Be(collider.ScaledLocalOffset);
     }
 
-    private static StiffBody2D CreateBody(
+    private static SolidBody2D CreateBody(
         GravitasWorldContext context,
         LSCollider2D collider,
         Fixed64 mass,
@@ -131,7 +131,7 @@ public sealed class StiffBody2DMassPropertiesTests
         bool isKinematic = false,
         bool isDynamic = true)
     {
-        var body = new StiffBody2D(new TestMatterAgent(context), collider)
+        var body = new SolidBody2D(new TestMatterAgent(context), collider)
         {
             Mass = mass,
             Immovable = immovable,

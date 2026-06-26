@@ -13,7 +13,7 @@ public class MixedBroadPhaseBenchmarks
     private GravitasWorldContext _sparseContext;
     private GravitasWorldContext _denseContext;
     private GravitasWorldContext _churnContext;
-    private SwiftList<StiffBody2D> _churnBodies2D;
+    private SwiftList<SolidBody2D> _churnBodies2D;
     private bool _churnToggle;
 
     [Params(64, 1024, 4096)]
@@ -27,7 +27,7 @@ public class MixedBroadPhaseBenchmarks
         _sparseContext = CreateMixedContext(extentX, extentZ, clearAllPools: true);
         _denseContext = CreateMixedContext(64, 64);
         _churnContext = CreateMixedContext(extentX + 64, extentZ + 64);
-        _churnBodies2D = new SwiftList<StiffBody2D>(ColliderCount);
+        _churnBodies2D = new SwiftList<SolidBody2D>(ColliderCount);
 
         for (int i = 0; i < ColliderCount; i++)
         {
@@ -110,11 +110,11 @@ public class MixedBroadPhaseBenchmarks
         return context;
     }
 
-    private static StiffBody CreateSphere3D(GravitasWorldContext context, Vector3d position, bool immovable)
+    private static SolidBody CreateSphere3D(GravitasWorldContext context, Vector3d position, bool immovable)
     {
         var agent = new BenchmarkMatterAgent(context, position);
         var collider = new LSSphereCollider();
-        var body = new StiffBody(agent, collider)
+        var body = new SolidBody(agent, collider)
         {
             Mass = Fixed64.One,
             Immovable = immovable
@@ -123,10 +123,10 @@ public class MixedBroadPhaseBenchmarks
         return body;
     }
 
-    private static StiffBody2D CreateCircle2D(GravitasWorldContext context, Vector2d position, bool immovable)
+    private static SolidBody2D CreateCircle2D(GravitasWorldContext context, Vector2d position, bool immovable)
     {
         var agent = new BenchmarkMatterAgent(context, new Vector3d(position.X, Fixed64.Zero, position.Y));
-        var body = new StiffBody2D(agent, new LSCircleCollider2D(Fixed64.Half))
+        var body = new SolidBody2D(agent, new LSCircleCollider2D(Fixed64.Half))
         {
             Mass = Fixed64.One,
             Immovable = immovable

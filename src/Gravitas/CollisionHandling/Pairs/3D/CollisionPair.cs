@@ -1,4 +1,4 @@
-﻿//=======================================================================
+//=======================================================================
 // CollisionPair.cs
 //=======================================================================
 // MIT License, Copyright (c) 2026–present David Oravsky (mrdav30)
@@ -239,8 +239,8 @@ public class CollisionPair
 
     internal void WakeSleepingBodiesForCollision()
     {
-        StiffBody? bodyA = ColliderA.Body;
-        StiffBody? bodyB = ColliderB.Body;
+        SolidBody? bodyA = ColliderA.Body;
+        SolidBody? bodyB = ColliderB.Body;
         if (bodyA == null || bodyB == null)
             return;
 

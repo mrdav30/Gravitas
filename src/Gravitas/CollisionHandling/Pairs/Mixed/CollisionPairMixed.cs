@@ -100,8 +100,8 @@ internal sealed class CollisionPairMixed
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal void WakeSleepingBodiesForCollision()
     {
-        StiffBody? body3D = Collider3D.Body;
-        StiffBody2D? body2D = Collider2D.Body;
+        SolidBody? body3D = Collider3D.Body;
+        SolidBody2D? body2D = Collider2D.Body;
         if (body3D == null || body2D == null)
             return;
 

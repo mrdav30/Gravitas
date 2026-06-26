@@ -10,7 +10,7 @@ namespace Gravitas.Benchmarks;
 public class PartitionCullingBenchmarks
 {
     private GravitasWorldContext _repartitionContext;
-    private SwiftList<StiffBody> _repartitionBodies;
+    private SwiftList<SolidBody> _repartitionBodies;
     private SwiftList<Vector3d> _repartitionBasePositions;
     private bool _repartitionOffset;
 
@@ -21,7 +21,7 @@ public class PartitionCullingBenchmarks
     private PhysicsPartition _sleepingPartition;
 
     private GravitasWorldContext _cullContext;
-    private StiffBody _cullBody;
+    private SolidBody _cullBody;
     private LSCollider _cullCollider;
     private CollisionPair _cullPair;
     private bool _cullOffset;
@@ -35,7 +35,7 @@ public class PartitionCullingBenchmarks
         int gridExtent = BenchmarkPhysicsScene.GridExtentForGrid(ColliderCount);
 
         _repartitionContext = BenchmarkPhysicsScene.CreateContext(gridExtent, clearAllPools: true);
-        _repartitionBodies = new SwiftList<StiffBody>(ColliderCount);
+        _repartitionBodies = new SwiftList<SolidBody>(ColliderCount);
         _repartitionBasePositions = new SwiftList<Vector3d>(ColliderCount);
         BenchmarkPhysicsScene.CreateDynamicSphereGrid(_repartitionContext, ColliderCount, _repartitionBodies);
         for (int i = 0; i < _repartitionBodies.Count; i++)
@@ -55,7 +55,7 @@ public class PartitionCullingBenchmarks
         }
 
         _cullContext = BenchmarkPhysicsScene.CreateContext(gridExtent);
-        StiffBody firstBody = CreateDynamicSphere(_cullContext, new Vector3d(Fixed64.Zero, Fixed64.Zero, Fixed64.Zero));
+        SolidBody firstBody = CreateDynamicSphere(_cullContext, new Vector3d(Fixed64.Zero, Fixed64.Zero, Fixed64.Zero));
         _cullBody = CreateDynamicSphere(_cullContext, new Vector3d((Fixed64)8, Fixed64.Zero, Fixed64.Zero));
         _cullCollider = _cullBody.Collider;
         _cullPair = new CollisionPair(firstBody.Collider, _cullCollider);
@@ -131,11 +131,11 @@ public class PartitionCullingBenchmarks
         return _cullPair.CullCounter;
     }
 
-    private static StiffBody CreateDynamicSphere(GravitasWorldContext context, Vector3d position)
+    private static SolidBody CreateDynamicSphere(GravitasWorldContext context, Vector3d position)
     {
         var agent = new BenchmarkMatterAgent(context, position);
         var collider = new LSSphereCollider();
-        var body = new StiffBody(agent, collider)
+        var body = new SolidBody(agent, collider)
         {
             Mass = Fixed64.One
         };

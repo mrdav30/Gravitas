@@ -62,7 +62,7 @@ LateSimulate
     Physics2D.PrepareContinuousCollisionFrame
   If RuntimeMode includes ThreeD:
     Physics.LateSimulate
-    StiffBody.LateSimulate for dynamic bodies
+    SolidBody.LateSimulate for dynamic bodies
     Process already-processed 3D CCD handoff queue
     PrepareCollisionPartitions for dynamic-body colliders
     Collisions.CheckAndDistributeCollisions
@@ -72,7 +72,7 @@ LateSimulate
     Update 3D sleep state after response
   If RuntimeMode includes TwoD:
     Physics2D.LateSimulate
-    StiffBody2D.LateSimulate for dynamic 2D bodies
+    SolidBody2D.LateSimulate for dynamic 2D bodies
     Process already-processed 2D CCD handoff queue
     PrepareCollisionPartitions for dynamic 2D colliders
     Collisions2D.CheckAndDistributeCollisions
@@ -90,10 +90,10 @@ Visualize
   Clock.Visualize
   If RuntimeMode includes ThreeD:
     Physics.Visualize
-    StiffBody.OnVisualize for dynamic bodies
+    SolidBody.OnVisualize for dynamic bodies
   If RuntimeMode includes TwoD:
     Physics2D.Visualize
-    StiffBody2D.OnVisualize for dynamic 2D bodies
+    SolidBody2D.OnVisualize for dynamic 2D bodies
   If RuntimeMode == Mixed:
     MixedCollisions.Visualize
   Hooks.InvokeVisualize
@@ -171,7 +171,7 @@ frame-accumulated visual interpolation cannot overshoot its target.
 
 ## Registration Model
 
-Dynamic bodies are stored in a `SwiftBucket<StiffBody>`. Their `DynamicId` is
+Dynamic bodies are stored in a `SwiftBucket<SolidBody>`. Their `DynamicId` is
 the bucket index returned by `GravitasPhysicsService.AssimilateBody(...)`.
 
 Colliders are stored in a context-local `LSCollider?[]` table. Collider IDs
@@ -180,13 +180,13 @@ Because IDs are context-local, two different contexts can both have collider ID
 `1` without ambiguity. All lookups must go through the owning context's
 `GravitasPhysicsService.TryGetColliderById(...)`.
 
-`StiffBody.Setup(...)` requires the agent and collider to belong to the same
+`SolidBody.Setup(...)` requires the agent and collider to belong to the same
 context. `CollisionPair.Initialize(...)` rejects colliders from different
 contexts. These checks are core invariants.
 
 ## Body State
 
-`StiffBody` owns:
+`SolidBody` owns:
 
 - position as `Vector2d` ground position plus height, exposed as `Position3d`.
 - rotation and derived basis vectors.
@@ -201,12 +201,12 @@ contexts. These checks are core invariants.
 - deterministic sleep state, sleep thresholds, and wake handling.
 - Chronicler record data.
 
-Body movement currently happens in `StiffBody.LateSimulate()`, called by
+Body movement currently happens in `SolidBody.LateSimulate()`, called by
 `GravitasPhysicsService.LateSimulate()`. Non-kinematic movable bodies process
 forces, update velocities, apply position/rotation changes, run their selected
 ground probe through the context query services, and then the service refreshes
 dynamic collider partition state once before distributing 3D collision pairs.
-Direct `StiffBody.LateSimulate()` calls remain self-contained and refresh the
+Direct `SolidBody.LateSimulate()` calls remain self-contained and refresh the
 bound collider themselves. `GravitasPhysicsService.Simulate()` is intentionally
 lightweight; service-owned 3D broad-phase refresh and discrete response happen
 after body integration in `LateSimulate()`.
@@ -223,7 +223,7 @@ but movement of the last hit platform invalidates that guard. Ground probes
 accept bodyless colliders, immovable bodies, and kinematic bodies as ground;
 ordinary movable dynamic bodies are ignored.
 
-Hosts can switch `StiffBody.GroundingMode` to manual through
+Hosts can switch `SolidBody.GroundingMode` to manual through
 `UseManualGrounding(...)`, `SetManualGrounding(...)`, or
 `ClearManualGrounding()`. Manual grounding preserves the supplied grounded
 state through simulation and skips automatic probes until
@@ -231,8 +231,8 @@ state through simulation and skips automatic probes until
 deterministic heightmaps or host-owned terrain systems where probing collider
 geometry every frame is unnecessary.
 
-`StiffBody` is the 3D body model. Pure 2D behavior uses `StiffBody2D` instead
-of a dimension flag on `StiffBody`. This prevents temporary 3D colliders from
+`SolidBody` is the 3D body model. Pure 2D behavior uses `SolidBody2D` instead
+of a dimension flag on `SolidBody`. This prevents temporary 3D colliders from
 becoming the hidden implementation path for pure 2D bodies. The existing
 position-as-ground-plus-height fields still belong to the current 3D y-up body
 model.
@@ -259,7 +259,7 @@ authoritative rotation. With a positive interpolation speed, each visualize call
 speed-limits from the current presentation rotation toward the authoritative
 target.
 
-`StiffBody2D` owns the pure 2D body model. It is constructed from an
+`SolidBody2D` owns the pure 2D body model. It is constructed from an
 `IMatterAgent`, uses the agent context and transform bridge, and stores
 `Vector2d` position, `Vector2d` linear velocity, scalar rotation, scalar
 angular velocity/acceleration, 2D gravity, 2D force and torque integration,
@@ -274,7 +274,7 @@ y-up ground probe, height split, visual interpolation state, or 3D inertia
 tensor. Pure 2D contact response uses COM-relative contact arms and scalar
 moment to apply angular velocity deltas from normal and tangent friction
 impulses. `ContinuousCollisionMode` is shared with the 3D body path:
-`StiffBody2D` resolves body, hierarchy, then context settings before committing
+`SolidBody2D` resolves body, hierarchy, then context settings before committing
 movement, uses `Query2D.SweepCircle` to clip fast circle-proxy movement against
 static or kinematic 2D targets, refines supported movers with exact 2D
 shape-sweep reducers, and uses prepared dynamic target candidates for exact
@@ -303,7 +303,7 @@ changing serialized fields, load defaults, or replay tests.
 `LSCollider` owns:
 
 - context binding and context-local ID.
-- optional `StiffBody` binding or host-only `IMatterAgent`.
+- optional `SolidBody` binding or host-only `IMatterAgent`.
 - active/trigger state.
 - layer index.
 - shape type and shape priority.
@@ -358,7 +358,7 @@ collision matrix uses `true` for collide and `false` for ignore.
 density, speed caps, friction transition speed, damping, and culling scores.
 Environment values are mutable per context.
 
-`StiffBody` drag is a deterministic body-integration model, not a full
+`SolidBody` drag is a deterministic body-integration model, not a full
 aerodynamic solver. The current linear drag path uses the body's drag
 coefficient, `PhysicsEnvironment.AirDensity`, collider frontal area, and current
 speed to accumulate acceleration opposite motion. The standard aerodynamic drag

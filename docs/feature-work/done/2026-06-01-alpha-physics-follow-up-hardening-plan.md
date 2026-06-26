@@ -402,7 +402,7 @@ meshes may remain possible only through an explicit opt-in approximation policy.
 
 Implemented `MeshInertiaPolicy.RequireClosedVolume` as the default for mesh
 inertia and `MeshInertiaPolicy.SurfaceApproximation` as the explicit legacy
-surface-area approximation path. `StiffBody` now asks colliders for inertia only
+surface-area approximation path. `SolidBody` now asks colliders for inertia only
 when angular dynamics are active, so bodyless/static, immovable, kinematic, and
 angular-force-disabled mesh surfaces do not get forced through volume
 validation.
@@ -421,7 +421,7 @@ triangle faces and cached on the immutable mesh topology. Because Gravitas does
 not yet have a body center-of-mass offset model, the runtime tensor remains
 diagonal about the collider reference center (`PhysicsMesh.LocalBounds.Center`);
 `MeshMassProperties.CenterOfMass` is exposed for a future COM-offset hardening
-pass. While touching inertia setup, `StiffBody` now correctly rotates a nonzero
+pass. While touching inertia setup, `SolidBody` now correctly rotates a nonzero
 inverse inertia tensor into the body's initial orientation.
 
 Focused tests cover closed unit-cube inertia, rigid movement invariance,
@@ -465,7 +465,7 @@ folded into the closed-volume inertia slice:
 
 - `PhysicsMesh.CalculateInertiaTensor(mass)` is still a shape/topology API; it
   does not know whether a body is movable, kinematic, immovable, or angular
-  disabled. Phase 4A moved that decision to `StiffBody.RefreshInertiaTensor()`.
+  disabled. Phase 4A moved that decision to `SolidBody.RefreshInertiaTensor()`.
   Future mesh inertia API work should keep body mobility policy at the body or
   collider-binding boundary rather than making `PhysicsMesh` infer runtime
   ownership.
@@ -477,7 +477,7 @@ folded into the closed-volume inertia slice:
   about the collider reference center because contact relative points, body
   transforms, serialization, and parallel-axis behavior all need an explicit COM
   model before the solver can consume arbitrary mesh COM safely.
-- `StiffBody.InverseMass` is the raw reciprocal of `Mass`; immovable and
+- `SolidBody.InverseMass` is the raw reciprocal of `Mass`; immovable and
   kinematic bodies are mapped to zero effective inverse mass by response-layer
   wrappers such as `ResponseBody` and mixed response helpers. Future body/mass
   cleanup should decide whether to add an explicit effective inverse-mass API or
@@ -1438,8 +1438,8 @@ lifecycle tests prove the extra state is justified.
 - Potentially modify: `src/Gravitas/Core/GravitasCollision2DService.cs`
 - Potentially modify: `src/Gravitas/Queries/GravitasQuery3DService.*.cs`
 - Potentially modify: `src/Gravitas/Queries/GravitasQuery2DService.cs`
-- Potentially modify: `src/Gravitas/Core/StiffBody.cs`
-- Potentially modify: `src/Gravitas/Core/StiffBody2D.cs`
+- Potentially modify: `src/Gravitas/Core/SolidBody.cs`
+- Potentially modify: `src/Gravitas/Core/SolidBody2D.cs`
 - Modify: `tests/Gravitas.Tests/CollisionHandling` or focused CCD test folders
 - Modify: `tests/Gravitas.Tests/Physics2D`
 - Modify: `tests/Gravitas.Benchmarks/Core/DynamicCcdScalingBenchmarks.cs`
@@ -1498,8 +1498,8 @@ lifecycle tests prove the extra state is justified.
   Dynamic membership remains the only membership that activates solver
   partition work. Static-style CCD collectors copy only kinematic/static IDs,
   while public pure queries copy dynamic, kinematic, and static IDs.
-- `StiffBody.Immovable`, `StiffBody.IsKinematic`, `StiffBody2D.Immovable`, and
-  `StiffBody2D.IsKinematic` refresh partition mobility when changed on an
+- `SolidBody.Immovable`, `SolidBody.IsKinematic`, `SolidBody2D.Immovable`, and
+  `SolidBody2D.IsKinematic` refresh partition mobility when changed on an
   active body. Collider partition state stores the last mobility kind so clears
   remove IDs from the bucket they were actually inserted into.
 - Added dynamic -> kinematic -> immovable -> dynamic transition tests for pure

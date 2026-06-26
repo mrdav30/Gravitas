@@ -18,7 +18,7 @@ public sealed class ContinuousCollisionDetectionTests
     {
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();
         CreateStaticWall(scenario, Fixed64.Zero);
-        (StiffBody body, _) = CreateMover(scenario, TestColliderShape.Sphere);
+        (SolidBody body, _) = CreateMover(scenario, TestColliderShape.Sphere);
         DisableGroundQueries(body);
         uint raycastVersionBeforeImpulse = scenario.Context.Query3D.RaycastVersion;
 
@@ -35,7 +35,7 @@ public sealed class ContinuousCollisionDetectionTests
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();
         scenario.Context.Settings.DefaultContinuousCollisionMode = ContinuousCollisionMode.Continuous;
         CreateStaticWall(scenario, Fixed64.Zero);
-        (StiffBody body, _) = CreateMover(scenario, TestColliderShape.Sphere);
+        (SolidBody body, _) = CreateMover(scenario, TestColliderShape.Sphere);
 
         ApplyFastImpulse(body);
 
@@ -49,7 +49,7 @@ public sealed class ContinuousCollisionDetectionTests
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();
         scenario.Context.Settings.DefaultContinuousCollisionMode = ContinuousCollisionMode.Continuous;
         CreateStaticWall(scenario, Fixed64.Zero);
-        (StiffBody body, _) = CreateMover(scenario, TestColliderShape.Sphere);
+        (SolidBody body, _) = CreateMover(scenario, TestColliderShape.Sphere);
         body.ContinuousCollisionMode = ContinuousCollisionMode.Discrete;
 
         ApplyFastImpulse(body);
@@ -65,7 +65,7 @@ public sealed class ContinuousCollisionDetectionTests
         CreateStaticWall(scenario, Fixed64.Zero);
         ScenarioBody<LSSphereCollider> topParent = scenario.CreateSphere(new Vector3d((Fixed64)(-8), Fixed64.Zero, Fixed64.Zero));
         ScenarioBody<LSSphereCollider> middleParent = scenario.CreateSphere(new Vector3d((Fixed64)(-7), Fixed64.Zero, Fixed64.Zero));
-        (StiffBody body, LSCollider collider) = CreateMover(scenario, TestColliderShape.Sphere);
+        (SolidBody body, LSCollider collider) = CreateMover(scenario, TestColliderShape.Sphere);
         topParent.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
         middleParent.Collider.SetParent(topParent.Collider);
         collider.SetParent(middleParent.Collider);
@@ -83,7 +83,7 @@ public sealed class ContinuousCollisionDetectionTests
         scenario.Context.Settings.DefaultContinuousCollisionMode = ContinuousCollisionMode.Continuous;
         CreateStaticWall(scenario, Fixed64.Zero);
         ScenarioBody<LSSphereCollider> parent = scenario.CreateSphere(new Vector3d((Fixed64)(-8), Fixed64.Zero, Fixed64.Zero));
-        (StiffBody body, LSCollider collider) = CreateMover(scenario, TestColliderShape.Sphere);
+        (SolidBody body, LSCollider collider) = CreateMover(scenario, TestColliderShape.Sphere);
         parent.Body.ContinuousCollisionMode = ContinuousCollisionMode.Discrete;
         collider.SetParent(parent.Collider);
 
@@ -103,7 +103,7 @@ public sealed class ContinuousCollisionDetectionTests
     {
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();
         CreateStaticWall(scenario, Fixed64.Zero);
-        (StiffBody body, _) = CreateMover(scenario, shape);
+        (SolidBody body, _) = CreateMover(scenario, shape);
         body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
 
         ApplyFastImpulse(body);
@@ -199,7 +199,7 @@ public sealed class ContinuousCollisionDetectionTests
     {
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();
         CreateStaticWall(scenario, Fixed64.Zero);
-        (StiffBody body, _) = CreateMover(scenario, TestColliderShape.Sphere);
+        (SolidBody body, _) = CreateMover(scenario, TestColliderShape.Sphere);
         body.ContinuousCollisionMode = ContinuousCollisionMode.Auto;
 
         ApplyFastImpulse(body);
@@ -214,7 +214,7 @@ public sealed class ContinuousCollisionDetectionTests
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();
         CreateStaticWall(scenario, Fixed64.Zero);
         CreateStaticWall(scenario, Fixed64.One);
-        (StiffBody body, _) = CreateMover(scenario, TestColliderShape.Sphere);
+        (SolidBody body, _) = CreateMover(scenario, TestColliderShape.Sphere);
         body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
 
         ApplyFastImpulse(body);
@@ -237,7 +237,7 @@ public sealed class ContinuousCollisionDetectionTests
             FixedQuaternion.Identity,
             immovable: true);
         ScenarioBody<LSSphereCollider> mover = scenario.CreateSphere(new Vector3d((Fixed64)(-2), Fixed64.One, Fixed64.Zero));
-        StiffBody body = mover.Body;
+        SolidBody body = mover.Body;
         body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
 
         ApplyFastImpulse(body);
@@ -509,7 +509,7 @@ public sealed class ContinuousCollisionDetectionTests
     {
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();
         CreateStaticWall(scenario, Fixed64.Zero);
-        (StiffBody body, _) = CreateMover(scenario, TestColliderShape.Sphere);
+        (SolidBody body, _) = CreateMover(scenario, TestColliderShape.Sphere);
         body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
 
         body.AddLinearImpulse(new Vector3d((Fixed64)4, Fixed64.Zero, Fixed64.One));
@@ -524,7 +524,7 @@ public sealed class ContinuousCollisionDetectionTests
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();
         ScenarioBody<LSCuboidCollider> target = scenario.CreateCuboid(Vector3d.Zero);
         target.Collider.Size = new Vector3d(WallThickness, (Fixed64)8, (Fixed64)8);
-        (StiffBody body, _) = CreateMover(scenario, TestColliderShape.Sphere);
+        (SolidBody body, _) = CreateMover(scenario, TestColliderShape.Sphere);
         body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
 
         ApplyFastImpulse(body);
@@ -915,7 +915,7 @@ public sealed class ContinuousCollisionDetectionTests
         const int Spacing = 8;
         const int GridExtent = 96;
         Vector3d displacement = new((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
-        var sources = new StiffBody[BodyCount];
+        var sources = new SolidBody[BodyCount];
         var positions = new Vector3d[BodyCount];
 
         using GravitasWorldContext context = CreateOwnedCcdContext(GridExtent);
@@ -936,7 +936,7 @@ public sealed class ContinuousCollisionDetectionTests
         {
             for (int i = 0; i < sources.Length; i++)
             {
-                StiffBody source = sources[i];
+                SolidBody source = sources[i];
                 Vector3d position = positions[i];
                 source.ResetPosition(position, FixedQuaternion.Identity);
                 source.Agent.Transform.Position = position + displacement;
@@ -988,7 +988,7 @@ public sealed class ContinuousCollisionDetectionTests
         scenario.Context.ApplySettings(new PhysicsSettings(1, matrix, PhysicsLayerMask.None));
         LSCuboidCollider wall = CreateStaticWall(scenario, Fixed64.Zero);
         wall.Layer = new PhysicsLayer(1);
-        (StiffBody body, _) = CreateMover(scenario, TestColliderShape.Sphere);
+        (SolidBody body, _) = CreateMover(scenario, TestColliderShape.Sphere);
         body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
 
         ApplyFastImpulse(body);
@@ -1003,7 +1003,7 @@ public sealed class ContinuousCollisionDetectionTests
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();
         LSCuboidCollider trigger = CreateStaticWall(scenario, Fixed64.Zero);
         PhysicsScenarioBuilder.SetTrigger(trigger);
-        (StiffBody body, _) = CreateMover(scenario, TestColliderShape.Sphere);
+        (SolidBody body, _) = CreateMover(scenario, TestColliderShape.Sphere);
         body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
 
         ApplyFastImpulse(body);
@@ -1041,10 +1041,10 @@ public sealed class ContinuousCollisionDetectionTests
         return context;
     }
 
-    private static StiffBody CreateKinematicCcdSphere(GravitasWorldContext context, Vector3d position)
+    private static SolidBody CreateKinematicCcdSphere(GravitasWorldContext context, Vector3d position)
     {
         var transform = new FixedTransform(position, FixedQuaternion.Identity, Vector3d.One);
-        var body = new StiffBody(new TestMatterAgent(context, transform), new LSSphereCollider())
+        var body = new SolidBody(new TestMatterAgent(context, transform), new LSSphereCollider())
         {
             ContinuousCollisionMode = ContinuousCollisionMode.Continuous,
             IsKinematic = true,
@@ -1055,10 +1055,10 @@ public sealed class ContinuousCollisionDetectionTests
         return body;
     }
 
-    private static StiffBody CreateStaticCcdSphere(GravitasWorldContext context, Vector3d position)
+    private static SolidBody CreateStaticCcdSphere(GravitasWorldContext context, Vector3d position)
     {
         var transform = new FixedTransform(position, FixedQuaternion.Identity, Vector3d.One);
-        var body = new StiffBody(
+        var body = new SolidBody(
             new TestMatterAgent(context, transform),
             new LSSphereCollider { Radius = Fixed64.FromFraction(1, 4) })
         {
@@ -1081,7 +1081,7 @@ public sealed class ContinuousCollisionDetectionTests
         return wall;
     }
 
-    private static (StiffBody Body, LSCollider Collider) CreateMover(PhysicsScenarioBuilder scenario, TestColliderShape shape)
+    private static (SolidBody Body, LSCollider Collider) CreateMover(PhysicsScenarioBuilder scenario, TestColliderShape shape)
     {
         return shape switch
         {
@@ -1099,14 +1099,14 @@ public sealed class ContinuousCollisionDetectionTests
         };
     }
 
-    private static (StiffBody Body, LSCollider Collider) ToTuple<TCollider>(ScenarioBody<TCollider> scenarioBody)
+    private static (SolidBody Body, LSCollider Collider) ToTuple<TCollider>(ScenarioBody<TCollider> scenarioBody)
         where TCollider : LSCollider =>
         (scenarioBody.Body, scenarioBody.Collider);
 
-    private static void ApplyFastImpulse(StiffBody body) =>
+    private static void ApplyFastImpulse(SolidBody body) =>
         body.AddLinearImpulse(new Vector3d((Fixed64)4, Fixed64.Zero, Fixed64.Zero));
 
-    private static void DisableGroundQueries(StiffBody body)
+    private static void DisableGroundQueries(SolidBody body)
     {
         body.GroundedDistanceRay = Fixed64.Zero;
         body.GroundDownDistanceOnAir = Fixed64.Zero;

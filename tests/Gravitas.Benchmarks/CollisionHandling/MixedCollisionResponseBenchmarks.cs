@@ -74,7 +74,7 @@ public class MixedCollisionResponseBenchmarks
         ScenarioBody<LSSphereCollider> sphere = CreateBody(
             new LSSphereCollider(),
             origin + new Vector3d(Fixed64.FromFraction(-1, 4), Fixed64.Zero, Fixed64.Zero));
-        StiffBody2D circle = CreateCircle2D(new Vector2d(origin.X, origin.Z));
+        SolidBody2D circle = CreateCircle2D(new Vector2d(origin.X, origin.Z));
         sphere.Body.AddLinearImpulse(new Vector3d((Fixed64)30, Fixed64.Zero, Fixed64.Zero));
 
         if (!CollisionDetectionMixed.TryCollide(sphere.Collider, circle.Collider, out MixedContact contact))
@@ -88,7 +88,7 @@ public class MixedCollisionResponseBenchmarks
         where TCollider : LSCollider
     {
         var agent = new BenchmarkMatterAgent(_context, position);
-        var body = new StiffBody(agent, collider)
+        var body = new SolidBody(agent, collider)
         {
             Mass = Fixed64.One
         };
@@ -97,12 +97,12 @@ public class MixedCollisionResponseBenchmarks
         return new ScenarioBody<TCollider>(body, collider);
     }
 
-    private StiffBody2D CreateCircle2D(Vector2d position)
+    private SolidBody2D CreateCircle2D(Vector2d position)
     {
         var agent = new BenchmarkMatterAgent(
             _context,
             new Vector3d(position.X, Fixed64.Zero, position.Y));
-        var body = new StiffBody2D(agent, new LSCircleCollider2D(Fixed64.Half))
+        var body = new SolidBody2D(agent, new LSCircleCollider2D(Fixed64.Half))
         {
             Mass = Fixed64.One
         };
@@ -120,13 +120,13 @@ public class MixedCollisionResponseBenchmarks
     private readonly struct ScenarioBody<TCollider>
         where TCollider : LSCollider
     {
-        public ScenarioBody(StiffBody body, TCollider collider)
+        public ScenarioBody(SolidBody body, TCollider collider)
         {
             Body = body;
             Collider = collider;
         }
 
-        public StiffBody Body { get; }
+        public SolidBody Body { get; }
 
         public TCollider Collider { get; }
     }

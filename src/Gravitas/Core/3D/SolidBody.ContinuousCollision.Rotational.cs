@@ -1,5 +1,5 @@
 //=======================================================================
-// StiffBody.ContinuousCollision.Rotational.cs
+// SolidBody.ContinuousCollision.Rotational.cs
 //=======================================================================
 // MIT License, Copyright (c) 2026-present David Oravsky (mrdav30)
 // See LICENSE file in the project root for full license information.
@@ -12,7 +12,7 @@ using Gravitas.Support;
 
 namespace Gravitas;
 
-public partial class StiffBody
+public partial class SolidBody
 {
     private bool TryResolveRotationalContinuousCollision(
         Vector3d startPosition,

@@ -1,4 +1,4 @@
-﻿//=======================================================================
+//=======================================================================
 // Physics3DHit.cs
 //=======================================================================
 // MIT License, Copyright (c) 2026–present David Oravsky (mrdav30)
@@ -14,7 +14,7 @@ public readonly struct Physics3DHit
 {
     public readonly LSCollider? Collider;
 
-    public readonly StiffBody? Body;
+    public readonly SolidBody? Body;
 
     public readonly Vector3d Point;
 

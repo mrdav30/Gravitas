@@ -19,7 +19,7 @@ Host-created shell:
 - `GravitasWorldContext` and its `GridWorld`.
 - `IMatterAgent` implementations.
 - `FixedTransform` instances and any engine transform wrappers.
-- `StiffBody`, `StiffBody2D`, `LSCollider`, and `LSCollider2D` instances.
+- `SolidBody`, `SolidBody2D`, `LSCollider`, and `LSCollider2D` instances.
 - the concrete collider shape type, such as sphere, cuboid, circle, AABB,
   polygon, or compound.
 - private runtime part colliders materialized by `LSCompoundCollider` and
@@ -55,14 +55,14 @@ authoritative state instead of treated as replay truth.
 
 ## Current Recordable Types
 
-`StiffBody` records 3D authoritative body state, including position,
+`SolidBody` records 3D authoritative body state, including position,
 height, rotation, linear/angular motion, pending force and torque state, mass,
 local center-of-mass offset, response coefficients, sleep state, CCD mode, and
 3D ground probe state. It does not record the `FixedTransform` binding.
 Collider geometry can derive a default COM for new shells, but populated
 snapshots restore the body-owned COM state directly.
 
-`StiffBody2D` records pure 2D authoritative body state, including X/Z-projected
+`SolidBody2D` records pure 2D authoritative body state, including X/Z-projected
 position, scalar rotation, linear motion, pending force state, scalar angular
 velocity, applied and queued angular acceleration, angular-force policy, mass,
 shape-refreshed scalar moment policy, body-local center-of-mass offset, response

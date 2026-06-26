@@ -1,5 +1,5 @@
 //=======================================================================
-// StiffBody2D.ContinuousCollision.Kinematic.cs
+// SolidBody2D.ContinuousCollision.Kinematic.cs
 //=======================================================================
 // MIT License, Copyright (c) 2026-present David Oravsky (mrdav30)
 // See LICENSE file in the project root for full license information.
@@ -13,7 +13,7 @@ using SwiftCollections;
 
 namespace Gravitas;
 
-public sealed partial class StiffBody2D
+public sealed partial class SolidBody2D
 {
     private void CaptureKinematicContinuousCollisionFrame(Vector2d startPosition, Vector2d targetPosition, Fixed64 startRotation)
     {
@@ -161,7 +161,7 @@ public sealed partial class StiffBody2D
         for (int candidateIndex = 0; candidateIndex < candidateIds.Count; candidateIndex++)
         {
             int dynamicId = candidateIds[candidateIndex];
-            if (!Context.Physics2D.TryGetDynamicBody(dynamicId, out StiffBody2D target)
+            if (!Context.Physics2D.TryGetDynamicBody(dynamicId, out SolidBody2D target)
                 || !IsEligibleDynamicContinuousCollisionTarget(target))
             {
                 continue;
@@ -253,7 +253,7 @@ public sealed partial class StiffBody2D
         for (int candidateIndex = 0; candidateIndex < candidateIds.Count; candidateIndex++)
         {
             int dynamicId = candidateIds[candidateIndex];
-            if (!Context.Physics.TryGetDynamicBody(dynamicId, out StiffBody target)
+            if (!Context.Physics.TryGetDynamicBody(dynamicId, out SolidBody target)
                 || !IsEligibleDynamicMixed3DTarget(target))
             {
                 continue;
@@ -301,7 +301,7 @@ public sealed partial class StiffBody2D
     }
 
     private bool ApplyKinematicContinuousCollisionHandoff(
-        StiffBody2D target,
+        SolidBody2D target,
         Vector2d sourceDisplacement,
         Vector2d normalForSource,
         Vector2d targetPositionAtImpact,
@@ -345,7 +345,7 @@ public sealed partial class StiffBody2D
     }
 
     private bool ApplyKinematicContinuousCollisionHandoff(
-        StiffBody target,
+        SolidBody target,
         Vector2d sourceDisplacement,
         Vector2d normalForSource,
         Vector3d targetPositionAtImpact,

@@ -125,7 +125,7 @@ work for that area.
 
 ## Dynamic Body Setup
 
-Dynamic matter usually has a host agent, one collider, and one `StiffBody`.
+Dynamic matter usually has a host agent, one collider, and one `SolidBody`.
 
 ```csharp
 using FixedMathSharp;
@@ -139,7 +139,7 @@ FixedTransform transform = new(
 
 HostMatterAgent agent = new(context, transform);
 LSSphereCollider collider = new();
-StiffBody body = new(agent, collider)
+SolidBody body = new(agent, collider)
 {
     Mass = Fixed64.One
 };
@@ -158,7 +158,7 @@ create 2D body/collider types:
 context.Settings.RuntimeMode = PhysicsRuntimeMode.TwoD;
 
 LSCircleCollider2D collider = new(Fixed64.Half);
-StiffBody2D body = new(agent, collider)
+SolidBody2D body = new(agent, collider)
 {
     Mass = Fixed64.One
 };
@@ -181,7 +181,7 @@ LSCuboidCollider floor = new();
 floor.InitializeWithNoBody(agent);
 ```
 
-An immovable `StiffBody` is different from a bodyless collider. Immovable bodies
+An immovable `SolidBody` is different from a bodyless collider. Immovable bodies
 are placed in the partition static list. Bodyless 3D colliders are still
 registered as colliders and can participate in queries and candidate generation,
 but 3D pair creation still requires at least one collider in the pair to have a
@@ -263,7 +263,7 @@ The current runtime order has two important consequences:
 Visualization phases are non-authoritative. Use them to publish interpolated
 positions, rotations, and diagnostic draw data to a renderer or host adapter,
 not to change physics state that must replay. In pure 2D mode,
-`context.Visualize()` publishes dynamic `StiffBody2D` X/Z position and yaw
+`context.Visualize()` publishes dynamic `SolidBody2D` X/Z position and yaw
 rotation back to each agent transform while preserving the host transform's
 vertical height.
 
@@ -351,11 +351,11 @@ collider should be included.
 
 Ground checks use `context.Settings.GroundCheckLayerMask`. Hosts need to set
 this explicitly for their own layer model before relying on grounding behavior.
-`StiffBody.Initialize(...)` performs an initial ground probe after the collider
+`SolidBody.Initialize(...)` performs an initial ground probe after the collider
 is registered, so bodies only start grounded when the configured ground mask
 actually hits suitable geometry.
 
-`StiffBody.GroundingMode` controls who owns grounded state:
+`SolidBody.GroundingMode` controls who owns grounded state:
 
 - `Automatic` is the default. Gravitas updates `IsGrounded`, `HitPoint`,
   `GroundNormal`, `HitPlatform`, and normal-force cache from deterministic ground
@@ -389,7 +389,7 @@ body.Deactivate();
 floor.Deactivate();
 ```
 
-`StiffBody.Deactivate()` deactivates the collider, removes the body from the
+`SolidBody.Deactivate()` deactivates the collider, removes the body from the
 physics service, and clears the dynamic ID. `LSCollider.Deactivate()` clears
 partition membership, removes collision-pair references, clears explicit parent
 binding, returns active pairs to the pool when enabled, and releases the
@@ -403,7 +403,7 @@ the world.
 
 ## Serialization Boundary
 
-`StiffBody`, `StiffBody2D`, `LSCollider`, and `LSCollider2D` implement
+`SolidBody`, `SolidBody2D`, `LSCollider`, and `LSCollider2D` implement
 Chronicler record methods for state transfer into existing host-created objects.
 Treat serialization as populate-existing-runtime-shell behavior, not
 construct-from-data behavior.

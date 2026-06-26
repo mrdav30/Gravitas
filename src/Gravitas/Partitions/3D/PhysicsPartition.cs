@@ -1,4 +1,4 @@
-﻿//=======================================================================
+//=======================================================================
 // PhysicsPartition.cs
 //=======================================================================
 // MIT License, Copyright (c) 2026–present David Oravsky (mrdav30)
@@ -271,7 +271,7 @@ public class PhysicsPartition : IVoxelPartition
         if (!Owner.Context.Physics.TryGetColliderById(item, out Gravitas.Colliders.LSCollider? collider))
             return true;
 
-        StiffBody? body = collider!.Body;
+        SolidBody? body = collider!.Body;
         return body == null || body.IsAwakeForCollision;
     }
 

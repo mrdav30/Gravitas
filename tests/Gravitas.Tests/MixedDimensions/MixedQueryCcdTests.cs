@@ -1222,7 +1222,7 @@ public sealed class MixedQueryCcdTests
         using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
         context.Settings.DefaultContinuousCollisionMode = ContinuousCollisionMode.Continuous;
         _ = CreateSphere3D(context, Vector3d.Zero, immovable: true);
-        StiffBody2D moving2D = CreateCircle2D(context, new Vector2d((Fixed64)(-3), Fixed64.Zero));
+        SolidBody2D moving2D = CreateCircle2D(context, new Vector2d((Fixed64)(-3), Fixed64.Zero));
 
         moving2D.AddForce(Vector2d.Right * (Fixed64)10);
         context.Simulate();
@@ -1242,7 +1242,7 @@ public sealed class MixedQueryCcdTests
             MeshTestFixtures.CreateVerticalQuad(Fixed64.Zero, -Fixed64.One, Fixed64.One),
             Vector3d.Zero,
             immovable: true);
-        StiffBody2D moving2D = CreateCircle2D(context, new Vector2d((Fixed64)(-3), Fixed64.Zero));
+        SolidBody2D moving2D = CreateCircle2D(context, new Vector2d((Fixed64)(-3), Fixed64.Zero));
 
         moving2D.AddForce(Vector2d.Right * (Fixed64)10);
         context.Simulate();
@@ -1258,7 +1258,7 @@ public sealed class MixedQueryCcdTests
         using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
         context.Settings.DefaultContinuousCollisionMode = ContinuousCollisionMode.Continuous;
         _ = CreateCompound3D(context, Vector3d.Zero, immovable: true);
-        StiffBody2D moving2D = CreateCircle2D(context, new Vector2d((Fixed64)(-3), Fixed64.Zero));
+        SolidBody2D moving2D = CreateCircle2D(context, new Vector2d((Fixed64)(-3), Fixed64.Zero));
 
         moving2D.AddForce(Vector2d.Right * (Fixed64)10);
         context.Simulate();
@@ -1276,7 +1276,7 @@ public sealed class MixedQueryCcdTests
         ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(
             context,
             new Vector3d((Fixed64)(-5), Fixed64.Zero, Fixed64.Zero));
-        StiffBody2D body2D = CreateCircle2D(context, new Vector2d((Fixed64)5, Fixed64.Zero));
+        SolidBody2D body2D = CreateCircle2D(context, new Vector2d((Fixed64)5, Fixed64.Zero));
         body3D.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
         body2D.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
 
@@ -1299,7 +1299,7 @@ public sealed class MixedQueryCcdTests
         ScenarioBody<LSSphereCollider> receiver = CreateSphere3D(
             context,
             new Vector3d((Fixed64)2, Fixed64.Zero, Fixed64.Zero));
-        StiffBody2D middle = CreateCircle2D(context, Vector2d.Zero);
+        SolidBody2D middle = CreateCircle2D(context, Vector2d.Zero);
         ScenarioBody<LSSphereCollider> driver = CreateSphere3D(
             context,
             new Vector3d((Fixed64)(-5), Fixed64.Zero, Fixed64.Zero));
@@ -1327,7 +1327,7 @@ public sealed class MixedQueryCcdTests
     {
         using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
         context.Environment.Gravity = Fixed64.Zero;
-        StiffBody2D target = CreateCircle2D(context, Vector2d.Zero);
+        SolidBody2D target = CreateCircle2D(context, Vector2d.Zero);
         target.Sleep();
         ScenarioBody<LSSphereCollider> source = CreateSphere3D(
             context,
@@ -1354,7 +1354,7 @@ public sealed class MixedQueryCcdTests
         context.Environment.Gravity = Fixed64.Zero;
         ScenarioBody<LSSphereCollider> target = CreateSphere3D(context, Vector3d.Zero);
         target.Body.Sleep();
-        StiffBody2D source = CreateCircle2D(
+        SolidBody2D source = CreateCircle2D(
             context,
             new Vector2d((Fixed64)(-5), Fixed64.Zero),
             isKinematic: true);
@@ -1380,7 +1380,7 @@ public sealed class MixedQueryCcdTests
         context.Environment.Gravity = Fixed64.Zero;
         ScenarioBody<LSSphereCollider> target = CreateSphere3D(context, Vector3d.Zero);
         target.Body.Sleep();
-        StiffBody2D source = CreateCircle2D(
+        SolidBody2D source = CreateCircle2D(
             context,
             new Vector2d((Fixed64)(-5), Fixed64.Zero),
             isKinematic: true);
@@ -1405,13 +1405,13 @@ public sealed class MixedQueryCcdTests
         ScenarioBody<LSSphereCollider> source = CreateSphere3D(
             context,
             new Vector3d((Fixed64)(-5), Fixed64.Zero, Fixed64.Zero));
-        StiffBody2D movable = CreateCircle2D(context, new Vector2d(Fixed64.Zero, Fixed64.Zero));
-        StiffBody2D kinematic = CreateCircle2D(
+        SolidBody2D movable = CreateCircle2D(context, new Vector2d(Fixed64.Zero, Fixed64.Zero));
+        SolidBody2D kinematic = CreateCircle2D(
             context,
             new Vector2d(Fixed64.Zero, Fixed64.One),
             immovable: false,
             isKinematic: true);
-        StiffBody2D immovable = CreateCircle2D(
+        SolidBody2D immovable = CreateCircle2D(
             context,
             new Vector2d(Fixed64.Zero, -Fixed64.One),
             immovable: true);
@@ -1437,7 +1437,7 @@ public sealed class MixedQueryCcdTests
     public void SweepCircleAgainstStatic3DAll_ShouldCollectOnlyStaticStyle3DTargets()
     {
         using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
-        StiffBody2D source = CreateCircle2D(context, new Vector2d((Fixed64)(-5), Fixed64.Zero));
+        SolidBody2D source = CreateCircle2D(context, new Vector2d((Fixed64)(-5), Fixed64.Zero));
         ScenarioBody<LSSphereCollider> movable = CreateSphere3D(
             context,
             new Vector3d(Fixed64.Zero, Fixed64.Zero, Fixed64.Zero));
@@ -1476,7 +1476,7 @@ public sealed class MixedQueryCcdTests
         ScenarioBody<LSSphereCollider> source = CreateSphere3D(
             context,
             new Vector3d((Fixed64)(-5), Fixed64.Zero, Fixed64.Zero));
-        StiffBody2D target = CreateCircle2D(context, Vector2d.Zero, immovable: true);
+        SolidBody2D target = CreateCircle2D(context, Vector2d.Zero, immovable: true);
         var hits = new SwiftList<PhysicsMixedHit>();
 
         context.AdvanceLateSimulateToken();
@@ -1510,7 +1510,7 @@ public sealed class MixedQueryCcdTests
     public void SweepCircleAgainstStatic3DAll_WithCachedTargetRefresh_ShouldRefreshOnNextLateToken()
     {
         using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
-        StiffBody2D source = CreateCircle2D(context, new Vector2d((Fixed64)(-5), Fixed64.Zero));
+        SolidBody2D source = CreateCircle2D(context, new Vector2d((Fixed64)(-5), Fixed64.Zero));
         ScenarioBody<LSSphereCollider> target = CreateSphere3D(
             context,
             Vector3d.Zero,
@@ -1555,7 +1555,7 @@ public sealed class MixedQueryCcdTests
         ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(
             context,
             new Vector3d(Fixed64.Zero, Fixed64.One, Fixed64.Zero));
-        StiffBody2D body2D = CreateCircle2D(context, Vector2d.Zero);
+        SolidBody2D body2D = CreateCircle2D(context, Vector2d.Zero);
         body3D.Body.ApplyCollisionLinearVelocityDelta(Vector3d.Down);
         context.Diagnostics.Enable(eventCapacity: 16, drawCommandCapacity: 0);
 
@@ -1760,7 +1760,7 @@ public sealed class MixedQueryCcdTests
     {
         FixedQuaternion startRotation = rotation ?? FixedQuaternion.Identity;
         var agent = new TestMatterAgent(context, new FixedTransform(position, startRotation, Vector3d.One));
-        var body = new StiffBody(agent, collider)
+        var body = new SolidBody(agent, collider)
         {
             Mass = Fixed64.One,
             Immovable = immovable,
@@ -1771,7 +1771,7 @@ public sealed class MixedQueryCcdTests
         return new ScenarioBody<TCollider>(body, collider);
     }
 
-    private static StiffBody2D CreateCircle2D(
+    private static SolidBody2D CreateCircle2D(
         GravitasWorldContext context,
         Vector2d position,
         bool immovable = false,
@@ -1781,7 +1781,7 @@ public sealed class MixedQueryCcdTests
         var agent = new TestMatterAgent(
             context,
             new FixedTransform(new Vector3d(position.X, Fixed64.Zero, position.Y), FixedQuaternion.Identity, Vector3d.One));
-        var body = new StiffBody2D(agent, collider)
+        var body = new SolidBody2D(agent, collider)
         {
             Mass = Fixed64.One,
             Immovable = immovable,

@@ -14,8 +14,8 @@ public sealed class CollisionPair2DManifoldTests
     public void Simulate_WithPersistentTriggerPair_ShouldUpdatePairOwnedManifoldAcrossFrames()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
-        StiffBody2D trigger = CreateCircle(context, Vector2d.Zero, immovable: false);
-        StiffBody2D other = CreateCircle(context, new Vector2d(Fixed64.Half, Fixed64.Zero), immovable: true);
+        SolidBody2D trigger = CreateCircle(context, Vector2d.Zero, immovable: false);
+        SolidBody2D other = CreateCircle(context, new Vector2d(Fixed64.Half, Fixed64.Zero), immovable: true);
         trigger.Collider.IsTrigger = true;
 
         Step(context);
@@ -36,8 +36,8 @@ public sealed class CollisionPair2DManifoldTests
     public void MarkSeparated_ShouldResetPairOwnedManifoldAndWarmStartState()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
-        StiffBody2D first = CreateCircle(context, Vector2d.Zero, immovable: true);
-        StiffBody2D second = CreateCircle(context, new Vector2d(Fixed64.Half, Fixed64.Zero), immovable: true);
+        SolidBody2D first = CreateCircle(context, Vector2d.Zero, immovable: true);
+        SolidBody2D second = CreateCircle(context, new Vector2d(Fixed64.Half, Fixed64.Zero), immovable: true);
         first.Collider.IsTrigger = true;
         var pair = new CollisionPair2D(first.Collider, second.Collider);
         CollisionDetection2D.TryCollide(pair, pair.Manifold, frame: 7).Should().BeTrue();
@@ -57,9 +57,9 @@ public sealed class CollisionPair2DManifoldTests
     public void Initialize_ForReusedPairWithDifferentColliderIds_ShouldResetManifoldAndWarmStartState()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
-        StiffBody2D first = CreateCircle(context, Vector2d.Zero, immovable: true);
-        StiffBody2D second = CreateCircle(context, new Vector2d(Fixed64.Half, Fixed64.Zero), immovable: true);
-        StiffBody2D third = CreateCircle(context, new Vector2d((Fixed64)2, Fixed64.Zero), immovable: true);
+        SolidBody2D first = CreateCircle(context, Vector2d.Zero, immovable: true);
+        SolidBody2D second = CreateCircle(context, new Vector2d(Fixed64.Half, Fixed64.Zero), immovable: true);
+        SolidBody2D third = CreateCircle(context, new Vector2d((Fixed64)2, Fixed64.Zero), immovable: true);
         var pair = new CollisionPair2D(first.Collider, second.Collider);
         CollisionDetection2D.TryCollide(pair, pair.Manifold, frame: 7).Should().BeTrue();
         ulong contactId = pair.Manifold.PrimaryContact.ContactId;
@@ -78,8 +78,8 @@ public sealed class CollisionPair2DManifoldTests
     public void MarkResting_AfterSameManifoldCheck_ShouldPreserveContactIdentity()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
-        StiffBody2D first = CreateBox(context, Vector2d.Zero, immovable: true);
-        StiffBody2D second = CreateBox(context, new Vector2d(Fixed64.FromFraction(3, 2), Fixed64.Zero), immovable: true);
+        SolidBody2D first = CreateBox(context, Vector2d.Zero, immovable: true);
+        SolidBody2D second = CreateBox(context, new Vector2d(Fixed64.FromFraction(3, 2), Fixed64.Zero), immovable: true);
         var pair = new CollisionPair2D(first.Collider, second.Collider);
         CollisionDetection2D.TryCollide(pair, pair.Manifold, frame: 1).Should().BeTrue();
         ulong[] contactIds = pair.Manifold.Select(static contact => contact.ContactId).ToArray();
@@ -94,7 +94,7 @@ public sealed class CollisionPair2DManifoldTests
         pair.Manifold.Select(static contact => contact.ContactId).Should().Equal(contactIds);
     }
 
-    private static CollisionPair2D GetPair(StiffBody2D first, StiffBody2D second)
+    private static CollisionPair2D GetPair(SolidBody2D first, SolidBody2D second)
     {
         if (first.Collider.TryGetCollisionPair(second.Collider.Id, out CollisionPair2D? firstPair) && firstPair != null)
             return firstPair;
@@ -109,12 +109,12 @@ public sealed class CollisionPair2DManifoldTests
         context.LateSimulate();
     }
 
-    private static StiffBody2D CreateCircle(
+    private static SolidBody2D CreateCircle(
         GravitasWorldContext context,
         Vector2d position,
         bool immovable)
     {
-        var body = new StiffBody2D(
+        var body = new SolidBody2D(
             new TestMatterAgent(context, CreateTransform(position)),
             new LSCircleCollider2D(Fixed64.Half))
         {
@@ -125,12 +125,12 @@ public sealed class CollisionPair2DManifoldTests
         return body;
     }
 
-    private static StiffBody2D CreateBox(
+    private static SolidBody2D CreateBox(
         GravitasWorldContext context,
         Vector2d position,
         bool immovable)
     {
-        var body = new StiffBody2D(
+        var body = new SolidBody2D(
             new TestMatterAgent(context, CreateTransform(position)),
             new LSAABBoxCollider2D(new Vector2d((Fixed64)2, (Fixed64)2)))
         {

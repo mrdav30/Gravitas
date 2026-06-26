@@ -24,7 +24,7 @@
 - `docs/wiki/DIMENSIONS.md`
 - `src/Gravitas/Runtime/GravitasWorldContext.cs`
 - `src/Gravitas/Core/GravitasPhysicsService.cs`
-- `src/Gravitas/Core/StiffBody.cs`
+- `src/Gravitas/Core/SolidBody.cs`
 - `src/Gravitas/Colliders/Primitives/LSCollider.cs`
 - `src/Gravitas/Colliders/Primitives`
 - `src/Gravitas/CollisionHandling`
@@ -156,7 +156,7 @@ Meaningful deferred work captured from that plan and the wiki:
 
 - Modify: `src/Gravitas/Runtime/GravitasWorldContext.cs`
 - Modify: `src/Gravitas/Core/GravitasPhysicsService.cs`
-- Modify: `src/Gravitas/Core/StiffBody.cs`
+- Modify: `src/Gravitas/Core/SolidBody.cs`
 - Modify: `tests/Gravitas.Tests/Runtime`
 - Modify: `tests/Gravitas.Tests/Core`
 - Modify: `docs/wiki/RUNTIME_ARCHITECTURE.md`
@@ -188,12 +188,12 @@ Meaningful deferred work captured from that plan and the wiki:
 
 ## Phase 2: Collider, Body, And Hierarchy Ownership Cleanup
 
-**Purpose:** Reduce `LSCollider` and `StiffBody` responsibility density before manifold and solver work depends on those seams.
+**Purpose:** Reduce `LSCollider` and `SolidBody` responsibility density before manifold and solver work depends on those seams.
 
 **Files:**
 
 - Modify: `src/Gravitas/Colliders/Primitives/LSCollider.cs`
-- Modify: `src/Gravitas/Core/StiffBody.cs`
+- Modify: `src/Gravitas/Core/SolidBody.cs`
 - Already present: `src/Gravitas/Colliders/Support/ColliderRuntimeShapeState.cs`
 - Create: `src/Gravitas/Colliders/Support/ColliderPartitionState.cs`
 - Create: `src/Gravitas/Colliders/Support/ColliderQueryState.cs`
@@ -298,7 +298,7 @@ Meaningful deferred work captured from that plan and the wiki:
 
 - Modify: `src/Gravitas/CollisionHandling/Response/CollisionResponse.cs`
 - Potentially create: `src/Gravitas/CollisionHandling/Solver`
-- Modify: `src/Gravitas/Core/StiffBody.cs`
+- Modify: `src/Gravitas/Core/SolidBody.cs`
 - Modify: `src/Gravitas/Settings/PhysicsSettings.cs`
 - Modify: `tests/Gravitas.Tests/CollisionHandling`
 - Modify: `tests/Gravitas.Benchmarks/CollisionHandling`
@@ -325,7 +325,7 @@ Meaningful deferred work captured from that plan and the wiki:
   centered face manifolds from injecting angular velocity because of a single
   arbitrary corner ordering.
 - Added deterministic Coulomb friction impulses after normal response.
-  `StiffBody.FrictionCoefficient` is now a public validated coefficient shared
+  `SolidBody.FrictionCoefficient` is now a public validated coefficient shared
   by contact response and grounded body friction. Pair friction uses the
   geometric mean and clamps tangent impulse by `normalImpulse * coefficient`.
 - Expanded response tests for different masses, tangential friction, sloped
@@ -353,7 +353,7 @@ Meaningful deferred work captured from that plan and the wiki:
 - Modify: `src/Gravitas/Partitions/PhysicsPartition.cs`
 - Potentially create: `src/Gravitas/CollisionHandling/Solver/PhysicsIsland.cs`
 - Potentially create: `src/Gravitas/CollisionHandling/Solver/IslandBuilder.cs`
-- Modify: `src/Gravitas/Core/StiffBody.cs`
+- Modify: `src/Gravitas/Core/SolidBody.cs`
 - Modify: `tests/Gravitas.Tests/CollisionHandling`
 - Modify: `tests/Gravitas.Tests/Partitions`
 - Modify: `tests/Gravitas.Benchmarks/Core`
@@ -387,7 +387,7 @@ Meaningful deferred work captured from that plan and the wiki:
 
 **Phase 5 Status - 2026-05-26**
 
-- Added deterministic body sleep state to `StiffBody`: configurable sleep
+- Added deterministic body sleep state to `SolidBody`: configurable sleep
   enablement, frame window, linear/angular speed thresholds, explicit
   `Sleep()`, and `Wake()`. Sleep clears accumulated motion
   state while leaving the collider partitioned.
@@ -396,7 +396,7 @@ Meaningful deferred work captured from that plan and the wiki:
   collision, kinematic motion, transform teleport, and shape mutation.
   Force/impulse/teleport/shape/collision paths now wake sleeping bodies before
   mutation or response.
-- Follow-up review removed the unused `StiffBodyWakeReason` enum and simplified
+- Follow-up review removed the unused `SolidBodyWakeReason` enum and simplified
   `Wake()` so Phase 5 does not leave speculative diagnostics/island-propagation
   scaffolding in the public API.
 - Added `PhysicsPartition.ContainedAwakeDynamicObjects` and awake-count helpers.
@@ -430,7 +430,7 @@ Meaningful deferred work captured from that plan and the wiki:
   `docs/wiki/RUNTIME_ARCHITECTURE.md`, and `docs/wiki/OVERVIEW.md` with the
   sleep/awake partition and warm-start storage behavior.
 - Verification passed:
-  `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~CollisionHandlingTests|FullyQualifiedName~PhysicsPartition|FullyQualifiedName~StiffBody"`
+  `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~CollisionHandlingTests|FullyQualifiedName~PhysicsPartition|FullyQualifiedName~SolidBody"`
   passed with 86 tests; `dotnet test Gravitas.slnx --configuration Release --no-restore`
   passed with 169 tests; `dotnet test Gravitas.slnx --configuration ReleaseLean --no-restore`
   passed with 169 tests. The `ReleaseLean` test command emitted the existing
@@ -446,7 +446,7 @@ Meaningful deferred work captured from that plan and the wiki:
 - Potentially create: `src/Gravitas/CollisionHandling/Continuous`
 - Potentially create: `src/Gravitas/CollisionHandling/Continuous/ContinuousCollisionMode.cs`
 - Modify: `src/Gravitas/CollisionHandling/Detection/CollisionDetection.cs`
-- Modify: `src/Gravitas/Core/StiffBody.cs`
+- Modify: `src/Gravitas/Core/SolidBody.cs`
 - Potentially modify: `src/Gravitas/Settings/PhysicsSettings.cs`
 - Modify: `tests/Gravitas.Tests/Queries`
 - Modify: `tests/Gravitas.Tests/CollisionHandling`
@@ -461,7 +461,7 @@ Meaningful deferred work captured from that plan and the wiki:
 - [x] Define the CCD activation policy. Current recommendation: do not run CCD for every body by default; use an explicit per-body or per-collider policy with an optional `Auto` mode and a context default. This keeps deterministic response ordering and hot-path cost visible to hosts while still making fast-projectile setup ergonomic.
 - [x] Add tunneling tests for fast sphere/capsule/cuboid/cylinder bodies against thin static geometry.
 - [x] Add tests proving discrete bodies still use the existing integration path while CCD-enabled bodies sweep from current position to proposed position.
-- [x] Hook CCD after velocity/acceleration integration computes the intended frame displacement and before `StiffBody` commits authoritative position. The candidate sweep should use `startPosition -> startPosition + velocity * DeltaTime`, then clamp/adjust movement at the earliest deterministic time of impact.
+- [x] Hook CCD after velocity/acceleration integration computes the intended frame displacement and before `SolidBody` commits authoritative position. The candidate sweep should use `startPosition -> startPosition + velocity * DeltaTime`, then clamp/adjust movement at the earliest deterministic time of impact.
 - [x] Define time-of-impact ordering and response handoff for multiple hits in one frame.
 - [x] Start with fast dynamic primitives against static, bodyless, immovable, or kinematic targets. Dynamic-vs-dynamic CCD requires relative velocity and pairwise TOI ordering; include it only if the phase can cover tests and benchmarks without weakening the alpha contract.
 - [x] Decide the alpha policy for swept mesh targets: unsupported, triangle-sweep query path, convex-decomposed mesh path, or dedicated CCD mesh path.
@@ -496,9 +496,9 @@ Meaningful deferred work captured from that plan and the wiki:
 
 **Phase 6 Result:**
 
-- CCD now lives in `StiffBody` movement commit as an explicit body/context
+- CCD now lives in `SolidBody` movement commit as an explicit body/context
   policy. `PhysicsSettings.DefaultContinuousCollisionMode` defaults to
-  `Discrete`, while `StiffBody.ContinuousCollisionMode` defaults to `Inherit`.
+  `Discrete`, while `SolidBody.ContinuousCollisionMode` defaults to `Inherit`.
   `Inherit` resolves through the precomputed top-parent body policy before
   falling back to the context default.
 - `Continuous` always sweeps when displacement and proxy radius are valid.
@@ -1044,7 +1044,7 @@ hardening below are complete.
 
 - Potentially create: `src/Gravitas/Dimensions`
 - Potentially create: `docs/wiki/DIMENSIONS.md`
-- Potentially modify: `src/Gravitas/Core/StiffBody.cs`
+- Potentially modify: `src/Gravitas/Core/SolidBody.cs`
 - Potentially modify: `src/Gravitas/Colliders/Primitives/LSCollider.cs`
 - Potentially create: `src/Gravitas/Colliders/Primitives2D`
 - Potentially create or modify: `src/Gravitas/CollisionHandling/Detection`
@@ -1067,7 +1067,7 @@ hardening below are complete.
   solver paths. Avoid separate engines that recreate the Unity Box2D/PhysX
   split, and avoid mode flags that bloat current 3D hot paths.
 - [x] **Phase 9B - Body and collider responsibility split:** Audit
-  `StiffBody` and `LSCollider` for baked 3D/y-up/XZ-ground assumptions. Create
+  `SolidBody` and `LSCollider` for baked 3D/y-up/XZ-ground assumptions. Create
   seams for physical body state versus visual presentation state and for
   collider identity versus dimension-specific shape logic. If `LSCollider`
   remains the public base, primitive geometry should move toward focused shape
@@ -1127,7 +1127,7 @@ hardening below are complete.
   At the 9A/9B checkpoint, production colliders remained explicitly `ThreeD`;
   the follow-up 2D collider family needed to own 2D shape data instead of
   reusing 3D primitive shape caches with ignored axes.
-- Added `StiffBody.Dimension` with supported-value validation, post-initialize
+- Added `SolidBody.Dimension` with supported-value validation, post-initialize
   immutability, Chronicler state recording, and body/collider dimension
   mismatch rejection before body initialization mutates runtime state.
 - Added `Physics2DBounds` as the alpha broad-phase bridge for pure 2D X/Z
@@ -1145,7 +1145,7 @@ hardening below are complete.
 **Phase 9C-9D Status - 2026-05-28**
 
 - Added the pure 2D runtime slice under `src/Gravitas/Physics2D` and
-  `src/Gravitas/Colliders/Primitives2D`: `StiffBody2D`,
+  `src/Gravitas/Colliders/Primitives2D`: `SolidBody2D`,
   `GravitasPhysics2DService`, `LSCollider2D`, `LSCircleCollider2D`,
   `LSAABBoxCollider2D`, `LSPolygonCollider2D`, `CollisionDetection2D`,
   `CollisionPair2D`, `Contact2D`, and `Physics2DHit`.
@@ -1199,7 +1199,7 @@ source layout, lifecycle parity, and tests.
 - Modify: `src/Gravitas/Runtime/GravitasWorldContext.cs`
 - Modify: `src/Gravitas/Settings/PhysicsSettings.cs`
 - Potentially create: `src/Gravitas/Settings/PhysicsRuntimeMode.cs`
-- Modify: `src/Gravitas/Core/StiffBody2D.cs` after moving it from the current
+- Modify: `src/Gravitas/Core/SolidBody2D.cs` after moving it from the current
   `src/Gravitas/Physics2D` folder.
 - Modify: `src/Gravitas/Colliders/Primitives2D/LSCollider2D.cs`
 - Delete: `src/Gravitas/Dimensions/PhysicsDimension.cs`
@@ -1240,7 +1240,7 @@ source layout, lifecycle parity, and tests.
 - [x] Add runtime-mode tests proving `TwoD` skips 3D simulation/visualization
   work, `ThreeD` skips 2D simulation work, and the active mode still advances
   the shared deterministic clock and hooks correctly.
-- [x] Change `StiffBody2D` construction to use `IMatterAgent` as the required
+- [x] Change `SolidBody2D` construction to use `IMatterAgent` as the required
   host bridge, matching the 3D body contract. The body should derive its
   `GravitasWorldContext` from `agent.Context`, keep the agent reference, and
   use the agent's `FixedTransform` for host-facing kinematic and visual
@@ -1293,7 +1293,7 @@ source layout, lifecycle parity, and tests.
 - Added `PhysicsRuntimeMode.TwoD` and `ThreeD` on `PhysicsSettings`; context
   simulation and visualization phases now advance only the enabled dimensional
   service while keeping the shared clock, coroutines, and hooks active.
-- Changed `StiffBody2D` construction to require `IMatterAgent`, derive context
+- Changed `SolidBody2D` construction to require `IMatterAgent`, derive context
   from `agent.Context`, and project kinematic host transforms through the X/Z
   convention.
 - Added bodyless 2D collider binding through
@@ -1302,7 +1302,7 @@ source layout, lifecycle parity, and tests.
 - Removed `PhysicsDimension`, `PhysicsDimensionRules`, and `Physics2DBounds`.
   Pure 2D collider bounds now use `FixedMathSharp.FixedBoundArea` directly.
 - Moved 2D runtime files beside their 3D counterparts:
-  `StiffBody2D` and `GravitasPhysics2DService` moved to `Core`, 2D detection,
+  `SolidBody2D` and `GravitasPhysics2DService` moved to `Core`, 2D detection,
   pairs, contacts, and response moved under `CollisionHandling`, and
   `Physics2DHit` moved under `Queries`.
 - Updated tests, benchmarks, and `docs/wiki` for runtime mode, host-agent 2D
@@ -1467,7 +1467,7 @@ paying avoidable dense-scene overhead before mixed 2D/3D adds more moving parts.
 - Modify: `src/Gravitas/Core/GravitasCollision2DService.cs`
 - Modify: `src/Gravitas/Core/GravitasPhysics2DService.cs`
 - Modify: `src/Gravitas/CollisionHandling/Pairs/CollisionPair2D.cs`
-- Modify: `src/Gravitas/Core/StiffBody2D.cs`
+- Modify: `src/Gravitas/Core/SolidBody2D.cs`
 - Modify: `src/Gravitas/Colliders/Primitives2D/LSCollider2D.cs`
 - Modify: `tests/Gravitas.Tests/Physics2D`
 - Modify: `tests/Gravitas.Benchmarks/Physics2D/Physics2DBenchmarks.cs`
@@ -1480,7 +1480,7 @@ paying avoidable dense-scene overhead before mixed 2D/3D adds more moving parts.
 - [x] Defer partition refreshes caused by 2D response until after the active
   partition distribution pass completes, while still refreshing query-visible
   state before control returns to the host.
-- [x] Avoid redundant awake-state refreshes when `StiffBody2D.Wake()` is called
+- [x] Avoid redundant awake-state refreshes when `SolidBody2D.Wake()` is called
   on an already-awake body.
 - [x] Keep warmed duplicate/pair/query buffers sized for dense scenes instead
   of allocating on every simulate.
@@ -1508,7 +1508,7 @@ paying avoidable dense-scene overhead before mixed 2D/3D adds more moving parts.
   any 2D query gathers candidates, preserving query-visible state.
 - Kept partition candidate, query, duplicate, and pair buffers warmed instead
   of rebuilding capacity every frame.
-- Avoided redundant awake-partition refresh when `StiffBody2D.Wake()` is called
+- Avoided redundant awake-partition refresh when `SolidBody2D.Wake()` is called
   for an already-awake body.
 - Moved cheap same-agent, layer-mask, and 2D bounds rejection ahead of the
   frame duplicate-pair set so dense partition fan-out does not hash impossible
@@ -1540,7 +1540,7 @@ first-class 2D raycast query.
 
 - Modify: `src/Gravitas/Runtime/GravitasWorldContext.cs`
 - Modify: `src/Gravitas/Core/GravitasPhysics2DService.cs`
-- Modify: `src/Gravitas/Core/StiffBody2D.cs`
+- Modify: `src/Gravitas/Core/SolidBody2D.cs`
 - Modify: `src/Gravitas/CollisionHandling/Detection/CollisionDetection2D.cs`
 - Modify: `src/Gravitas/Queries/Physics2DHit.cs`
 - Modify: `tests/Gravitas.Tests/Physics2D`
@@ -1552,7 +1552,7 @@ first-class 2D raycast query.
 
 - [x] Add `GravitasPhysics2DService.Visualize()` and hook it from
   `GravitasWorldContext.Visualize()` when `PhysicsRuntimeMode.TwoD` is active.
-- [x] Add `StiffBody2D.OnVisualize()` so dynamic 2D body position/rotation is
+- [x] Add `SolidBody2D.OnVisualize()` so dynamic 2D body position/rotation is
   projected back into `IMatterAgent.Transform` using the X/Z planar convention
   while preserving host vertical height.
 - [x] Add tests proving pure 2D visualize updates dynamic body transforms and
@@ -1580,7 +1580,7 @@ first-class 2D raycast query.
 - `GravitasWorldContext.Visualize()` now calls the pure 2D service only when
   `PhysicsRuntimeMode.TwoD` is active. `LateVisualize()` is now a hook-only host
   phase until a real built-in presentation invariant needs it.
-- `StiffBody2D.OnVisualize()` projects authoritative 2D X/Z position and yaw
+- `SolidBody2D.OnVisualize()` projects authoritative 2D X/Z position and yaw
   rotation back into the host `FixedTransform` while preserving host vertical
   height.
 - Added pure 2D segment raycast APIs on `GravitasPhysics2DService`:
@@ -1828,7 +1828,7 @@ static or kinematic 2D colliders before mixed 2D/3D integration begins.
 
 **Files:**
 
-- Modify: `src/Gravitas/Core/StiffBody2D.cs`
+- Modify: `src/Gravitas/Core/SolidBody2D.cs`
 - Modify: `src/Gravitas/Queries/GravitasQuery2DService.cs`
 - Potentially modify/create:
   `src/Gravitas/Queries/QueryDetection2D.cs`
@@ -1842,7 +1842,7 @@ static or kinematic 2D colliders before mixed 2D/3D integration begins.
 
 **Tasks:**
 
-- [x] Add `ContinuousCollisionMode` support to `StiffBody2D`, defaulting to
+- [x] Add `ContinuousCollisionMode` support to `SolidBody2D`, defaulting to
   `Inherit`, and include it in Chronicler state recording if body state
   recording already covers the equivalent 3D property.
 - [x] Resolve the effective 2D CCD mode from the body, then applicable hierarchy
@@ -1855,7 +1855,7 @@ static or kinematic 2D colliders before mixed 2D/3D integration begins.
 - [x] Use a conservative deterministic proxy radius per shape: circle radius,
   AABB half-diagonal, and polygon maximum local/world vertex distance from the
   collider center.
-- [x] In `StiffBody2D.LateSimulate`, compute the proposed movement, resolve CCD
+- [x] In `SolidBody2D.LateSimulate`, compute the proposed movement, resolve CCD
   mode before expensive query setup, sweep when required, and commit the clipped
   position before publishing visualization state.
 - [x] Implement `Auto` mode so it only sweeps when displacement squared exceeds
@@ -1874,7 +1874,7 @@ static or kinematic 2D colliders before mixed 2D/3D integration begins.
 
 **Acceptance Bar:**
 
-- `StiffBody2D` exposes and records effective CCD behavior consistently with
+- `SolidBody2D` exposes and records effective CCD behavior consistently with
   the 3D body path.
 - Fast 2D movers do not tunnel through covered static or kinematic 2D targets
   under `Continuous` mode.
@@ -1886,7 +1886,7 @@ static or kinematic 2D colliders before mixed 2D/3D integration begins.
 
 **Phase 9K Implementation Notes:**
 
-- `StiffBody2D.ContinuousCollisionMode` now mirrors the 3D body contract and is
+- `SolidBody2D.ContinuousCollisionMode` now mirrors the 3D body contract and is
   recorded through Chronicler state. Effective mode resolves from the body, then
   the cached collider hierarchy top parent when present, then
   `PhysicsSettings.DefaultContinuousCollisionMode`, with unresolved `Inherit`
@@ -1895,7 +1895,7 @@ static or kinematic 2D colliders before mixed 2D/3D integration begins.
   swept-circle queries over circles, AABBs, and convex polygons. Query results
   use deterministic distance/collider-ID ordering and support layer, trigger,
   self, same-agent, and hierarchy exclusion filters.
-- `StiffBody2D.LateSimulate` computes proposed movement, exits before query work
+- `SolidBody2D.LateSimulate` computes proposed movement, exits before query work
   when mode/proxy/displacement rules do not require CCD, and clips movement
   before committing authoritative position. The initial scope matches 3D CCD
   maturity: dynamic movers sweep against static, bodyless, immovable, or
@@ -1968,8 +1968,8 @@ decomposes contact impulses into planar X/Z and vertical Y components:
 - Modify: `src/Gravitas/Runtime/GravitasWorldContext.cs`
 - Modify: `src/Gravitas/Core/GravitasPhysicsService.cs`
 - Modify: `src/Gravitas/Core/GravitasPhysics2DService.cs`
-- Modify: `src/Gravitas/Core/StiffBody.cs`
-- Modify: `src/Gravitas/Core/StiffBody2D.cs`
+- Modify: `src/Gravitas/Core/SolidBody.cs`
+- Modify: `src/Gravitas/Core/SolidBody2D.cs`
 - Modify: `src/Gravitas/Colliders/Primitives/LSCollider.cs`
 - Modify: `src/Gravitas/Colliders/Primitives2D/LSCollider2D.cs`
 - Potentially create: `src/Gravitas/Core/GravitasMixedCollisionService.cs`
@@ -2236,7 +2236,7 @@ decomposes contact impulses into planar X/Z and vertical Y components:
   mesh sweeps use triangle face, edge, and vertex TOI checks against local-BVH
   candidates, while compound sweeps reduce deterministic part hits to one
   owning collider hit.
-- Wired mixed CCD into `StiffBody` and `StiffBody2D` only when
+- Wired mixed CCD into `SolidBody` and `SolidBody2D` only when
   `PhysicsRuntimeMode.Mixed` is active. Pure `Both` mode still advances 2D and
   3D independently without cross-dimensional CCD.
 - Extended diagnostics with dimension-tagged mixed query, mixed contact, and
@@ -2301,8 +2301,8 @@ decomposes contact impulses into planar X/Z and vertical Y components:
 
 **Files:**
 
-- Modify: `src/Gravitas/Core/StiffBody.cs`
-- Modify: `src/Gravitas/Core/StiffBody2D.cs`
+- Modify: `src/Gravitas/Core/SolidBody.cs`
+- Modify: `src/Gravitas/Core/SolidBody2D.cs`
 - Modify: `src/Gravitas/Colliders/Primitives/LSCollider.cs`
 - Modify: `src/Gravitas/Colliders/Primitives2D`
 - Modify: `src/Gravitas/Settings`
@@ -2332,10 +2332,10 @@ decomposes contact impulses into planar X/Z and vertical Y components:
   visual interpolation state from body/collider snapshot payloads. Loading a
   body now publishes restored authoritative position/rotation into the existing
   host transform and resets visual buffers from that authoritative state.
-- Expanded 3D `StiffBody` replay payloads to include missing authoritative
+- Expanded 3D `SolidBody` replay payloads to include missing authoritative
   state such as kinematic flag, ground probe mode/radius, skip/last ground
   probe state, pending torque, impulse store, and position correction.
-- Added Chronicler support for `StiffBody2D` and `LSCollider2D`, including
+- Added Chronicler support for `SolidBody2D` and `LSCollider2D`, including
   circle, AABB, and convex polygon shape-local record hooks. 2D shape loading
   validates shape data and rebuilds bounds without waking sleeping bodies.
 - Extended `PhysicsSettingsSaver` JSON/MemoryPack state with runtime mode and

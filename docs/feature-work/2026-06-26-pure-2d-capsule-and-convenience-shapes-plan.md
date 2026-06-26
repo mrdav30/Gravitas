@@ -119,7 +119,7 @@ without creating a second way to represent triangles.
 **Problem**
 
 Capsules need shape-derived area, center of mass, and scalar moment of inertia
-so `StiffBody2D` response remains physically explainable.
+so `SolidBody2D` response remains physically explainable.
 
 **Tasks**
 
@@ -142,7 +142,7 @@ so `StiffBody2D` response remains physically explainable.
 
 - Capsule mass properties are deterministic and covered by formula tests.
 - Serialization preserves capsule shape state and runtime continuation.
-- Shape-derived COM integrates with the existing `StiffBody2D` mass-property
+- Shape-derived COM integrates with the existing `SolidBody2D` mass-property
   pipeline.
 
 ## Workstream 3: 2D Collision Detection And Contact Manifolds

@@ -1,4 +1,4 @@
-﻿//=======================================================================
+//=======================================================================
 // GravitasDiagnosticSink.cs
 //=======================================================================
 // MIT License, Copyright (c) 2026–present David Oravsky (mrdav30)
@@ -267,7 +267,7 @@ public sealed class GravitasDiagnosticSink
 
     internal void Reset() => Clear();
 
-    internal void EmitForceDelta(StiffBody body, Vector3d force, Vector3d accelerationDelta)
+    internal void EmitForceDelta(SolidBody body, Vector3d force, Vector3d accelerationDelta)
     {
         if (!Enabled)
             return;
@@ -282,7 +282,7 @@ public sealed class GravitasDiagnosticSink
             scalarA: force.Magnitude);
     }
 
-    internal void EmitTorqueDelta(StiffBody body, Vector3d torque)
+    internal void EmitTorqueDelta(SolidBody body, Vector3d torque)
     {
         if (!Enabled)
             return;
@@ -296,7 +296,7 @@ public sealed class GravitasDiagnosticSink
             scalarA: torque.Magnitude);
     }
 
-    internal void EmitLinearVelocityDelta(StiffBody body, Vector3d before, Vector3d after)
+    internal void EmitLinearVelocityDelta(SolidBody body, Vector3d before, Vector3d after)
     {
         if (!Enabled)
             return;
@@ -312,7 +312,7 @@ public sealed class GravitasDiagnosticSink
             scalarA: after.Magnitude);
     }
 
-    internal void EmitAngularVelocityDelta(StiffBody body, Vector3d before, Vector3d after)
+    internal void EmitAngularVelocityDelta(SolidBody body, Vector3d before, Vector3d after)
     {
         if (!Enabled)
             return;
@@ -329,7 +329,7 @@ public sealed class GravitasDiagnosticSink
     }
 
     internal void EmitGroundProbe(
-        StiffBody body,
+        SolidBody body,
         GroundProbeMode mode,
         Vector3d origin,
         Vector3d end,

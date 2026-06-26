@@ -7,7 +7,7 @@ using Xunit;
 
 namespace Gravitas.Tests.Serialization;
 
-public sealed class StiffBodySerializationTests
+public sealed class SolidBodySerializationTests
 {
     public static TheoryData<GravitasSerializationTransport> Transports => GravitasSerializationTransportCases.All();
 

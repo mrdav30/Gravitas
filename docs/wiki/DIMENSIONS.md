@@ -1,8 +1,8 @@
 # 2D, 3D, And Runtime Modes
 
 Gravitas supports first-class 3D, first-class pure 2D, and explicit mixed 2D/3D
-interaction. The current contract is type-driven: `StiffBody` and `LSCollider`
-are the 3D path, while `StiffBody2D` and `LSCollider2D` are the pure 2D path.
+interaction. The current contract is type-driven: `SolidBody` and `LSCollider`
+are the 3D path, while `SolidBody2D` and `LSCollider2D` are the pure 2D path.
 
 There is no `PhysicsDimension` enum in the runtime. Concrete body and collider
 types define the simulation domain. Mixed behavior is an explicit policy between
@@ -57,7 +57,7 @@ physics.
 
 ## 2D Bodies And Colliders
 
-`StiffBody2D` is created with an `IMatterAgent` and an `LSCollider2D`, matching
+`SolidBody2D` is created with an `IMatterAgent` and an `LSCollider2D`, matching
 the host-facing shape of the 3D body API. The agent supplies the context and
 host transform bridge. Kinematic 2D bodies read the agent transform during
 `LateSimulate` and project its X/Z position into authoritative `Vector2d`
@@ -67,7 +67,7 @@ state.
 `CanRotate` gates scalar yaw-axis rotation, and the effective inverse mass and
 effective inverse moment helpers map immovable, kinematic, inactive,
 non-positive-mass, and angular-force-disabled states to zero solver
-contribution. `StiffBody2D.LocalCenterOfMassOffset` is body-local X/Z state, and
+contribution. `SolidBody2D.LocalCenterOfMassOffset` is body-local X/Z state, and
 `WorldCenterOfMass` rotates that offset by the body's scalar rotation.
 `AddAngularImpulse` changes scalar yaw angular velocity immediately, while
 `AddTorque` queues scalar angular acceleration for the next fixed

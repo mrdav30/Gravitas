@@ -4,7 +4,7 @@
 
 **Goal:** Add first-class pure 2D grounded-state support that matches Gravitas' 3D grounding quality bar while preserving the X/Z planar 2D coordinate contract.
 
-**Architecture:** Treat pure 2D grounding as planar support, not world-Y height. `StiffBody2D` should expose `IsGrounded`-style state and automatic/manual/disabled ownership, derive automatic support from 2D contacts and deterministic in-plane probes, and keep host-owned height or visual Y outside pure 2D physics.
+**Architecture:** Treat pure 2D grounding as planar support, not world-Y height. `SolidBody2D` should expose `IsGrounded`-style state and automatic/manual/disabled ownership, derive automatic support from 2D contacts and deterministic in-plane probes, and keep host-owned height or visual Y outside pure 2D physics.
 
 **Tech Stack:** .NET 8, xUnit v3, BenchmarkDotNet where hot-path signal is needed, FixedMathSharp `Vector2d`/`Fixed64`, SwiftCollections buffers, Gravitas 2D collision/query/response services, Chronicler explicit state recording.
 
@@ -34,18 +34,18 @@ contract remains:
 This plan adds planar support semantics: a 2D body is grounded when it has a
 valid support normal in the 2D plane, either from contact manifolds or from a
 deterministic in-plane probe. The public API should still use `IsGrounded` for
-parity with `StiffBody`; docs can describe the underlying model as 2D support.
+parity with `SolidBody`; docs can describe the underlying model as 2D support.
 
 ## Current Baseline
 
-- `StiffBody` owns 3D grounding in
-  `src/Gravitas/Core/3D/StiffBody.Grounding.cs`.
+- `SolidBody` owns 3D grounding in
+  `src/Gravitas/Core/3D/SolidBody.Grounding.cs`.
 - `GroundingMode` currently supports `Automatic` and `Manual`.
 - `GroundProbeMode` currently supports 3D `Auto`, `Ray`, and `SweptSphere`
   probes.
-- `StiffBody2D` has no grounding partial, no grounded state, and no ground
+- `SolidBody2D` has no grounding partial, no grounded state, and no ground
   probe buffer.
-- `StiffBody2D.LateSimulate(...)` always integrates `Gravity` into planar
+- `SolidBody2D.LateSimulate(...)` always integrates `Gravity` into planar
   velocity.
 - Pure 2D discrete response runs after body integration in
   `GravitasPhysics2DService.LateSimulate(...)`.
@@ -59,7 +59,7 @@ parity with `StiffBody`; docs can describe the underlying model as 2D support.
 ## Non-Goals
 
 - Do not add `HeightPos`, 3D step offset, 3D platform state, visual
-  interpolation, or world-Y heightmap ownership to `StiffBody2D`.
+  interpolation, or world-Y heightmap ownership to `SolidBody2D`.
 - Do not make pure 2D bodies depend on `GravitasQuery3DService` or mixed slab
   queries for ordinary 2D grounding.
 - Do not expose duplicate public names for the same concept. Prefer
@@ -95,7 +95,7 @@ is:
   - `Auto`: derive ray versus swept-circle from shape/probe radius.
   - `Ray`: use a segment raycast along the planar down direction.
   - `SweptCircle`: use a swept-circle probe along the planar down direction.
-- Add `src/Gravitas/Core/2D/StiffBody2D.Grounding.cs` with:
+- Add `src/Gravitas/Core/2D/SolidBody2D.Grounding.cs` with:
   - `GroundingMode GroundingMode`
   - `GroundProbeMode2D GroundProbeMode`
   - `bool IsGrounded`
@@ -144,8 +144,8 @@ The first step is to define mode, probe, direction, and state ownership cleanly.
   weakening 3D behavior.
 - [ ] Add `GroundProbeMode2D` instead of overloading 3D `GroundProbeMode` with
   shape names that do not fit 2D.
-- [ ] Add `StiffBody2D.Grounding.cs` as a focused partial. Keep the root
-  `StiffBody2D.cs` file as state ownership and broad body configuration.
+- [ ] Add `SolidBody2D.Grounding.cs` as a focused partial. Keep the root
+  `SolidBody2D.cs` file as state ownership and broad body configuration.
 - [ ] Define planar up/down behavior explicitly:
   - if gravity-derived mode is chosen, use `-Gravity.Normalized` when gravity is
     non-zero.
@@ -159,7 +159,7 @@ The first step is to define mode, probe, direction, and state ownership cleanly.
 
 **Done Criteria**
 
-- `StiffBody2D` exposes a clear, dimension-correct grounding state surface.
+- `SolidBody2D` exposes a clear, dimension-correct grounding state surface.
 - Disabled, manual, and automatic ownership are distinct and tested.
 - No 2D API suggests that pure 2D owns world-Y height.
 
@@ -230,7 +230,7 @@ before contact is rebuilt or immediately after tiny separations.
     identity.
 - [ ] Add a body-owned `SwiftList<Physics2DHit>` probe buffer.
 - [ ] Implement `CheckGround()` and simulation-time `CheckGroundForSimulation()`
-  for `StiffBody2D`.
+  for `SolidBody2D`.
 - [ ] Use `Context.Query2D.RaycastAll(...)` for `GroundProbeMode2D.Ray`.
 - [ ] Use `Context.Query2D.SweepCircleAgainstStaticAll(...)` or an equivalent
   internal static-target collector for `GroundProbeMode2D.SweptCircle`.
@@ -267,7 +267,7 @@ breaking CCD, sleep, or deterministic service ordering.
   - slope tangential gravity remains possible when the configured model allows
     it.
   - leaving ground restores full gravity.
-- [ ] Update `StiffBody2D.LateSimulate(...)` to remove the into-ground component
+- [ ] Update `SolidBody2D.LateSimulate(...)` to remove the into-ground component
   of gravity/acceleration when grounded rather than relying on positional
   correction every frame.
 - [ ] Clamp residual velocity into the support normal when support is active and
@@ -299,7 +299,7 @@ allocating when disabled.
 
 **Tasks**
 
-- [ ] Update `StiffBody2D.Serialization.cs` to record:
+- [ ] Update `SolidBody2D.Serialization.cs` to record:
   - grounding mode.
   - probe mode.
   - configured up direction or gravity-derived mode.
@@ -339,7 +339,7 @@ allocating when disabled.
 
 ## Final Done Criteria
 
-- `StiffBody2D` has first-class grounded-state parity with `StiffBody` where the
+- `SolidBody2D` has first-class grounded-state parity with `SolidBody` where the
   concepts overlap.
 - Automatic 2D grounding works from current-frame contacts and deterministic
   in-plane probes.

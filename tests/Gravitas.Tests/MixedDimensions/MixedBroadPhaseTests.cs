@@ -18,7 +18,7 @@ public sealed class MixedBroadPhaseTests
     {
         using GravitasWorldContext context = CreateMixedContext();
         ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(context, Vector3d.Zero, immovable: false);
-        StiffBody2D body2D = CreateCircle2D(context, Vector2d.Zero, immovable: true);
+        SolidBody2D body2D = CreateCircle2D(context, Vector2d.Zero, immovable: true);
 
         Step(context);
 
@@ -34,7 +34,7 @@ public sealed class MixedBroadPhaseTests
     {
         using GravitasWorldContext context = CreateMixedContext();
         var bodies3D = new SwiftList<ScenarioBody<LSSphereCollider>>();
-        var bodies2D = new SwiftList<StiffBody2D>();
+        var bodies2D = new SwiftList<SolidBody2D>();
 
         for (int i = 0; i < 4; i++)
         {
@@ -82,7 +82,7 @@ public sealed class MixedBroadPhaseTests
     {
         using GravitasWorldContext context = CreateMixedContext();
         ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(context, Vector3d.Zero, immovable: false);
-        StiffBody2D body2D = CreateCircle2D(context, Vector2d.Zero, immovable: false);
+        SolidBody2D body2D = CreateCircle2D(context, Vector2d.Zero, immovable: false);
         body3D.Body.Sleep();
         body2D.Sleep();
 
@@ -101,7 +101,7 @@ public sealed class MixedBroadPhaseTests
     {
         using GravitasWorldContext context = CreateMixedContext();
         var allowed3D = CreateSphere3D(context, Vector3d.Zero, immovable: false);
-        StiffBody2D trigger2D = CreateCircle2D(context, Vector2d.Zero, immovable: true);
+        SolidBody2D trigger2D = CreateCircle2D(context, Vector2d.Zero, immovable: true);
         trigger2D.Collider.IsTrigger = true;
 
         var blocked3D = CreateSphere3D(context, new Vector3d((Fixed64)4, Fixed64.Zero, Fixed64.Zero), immovable: false, layer: new PhysicsLayer(1));
@@ -128,7 +128,7 @@ public sealed class MixedBroadPhaseTests
     {
         using GravitasWorldContext context = CreateMixedContext();
         ScenarioBody<LSSphereCollider> parent3D = CreateSphere3D(context, Vector3d.Zero, immovable: false);
-        StiffBody2D child2D = CreateCircle2D(context, Vector2d.Zero, immovable: false);
+        SolidBody2D child2D = CreateCircle2D(context, Vector2d.Zero, immovable: false);
 
         child2D.Collider.SetParent(parent3D.Collider);
 
@@ -147,9 +147,9 @@ public sealed class MixedBroadPhaseTests
     public void Simulate_WithMixedSiblingHierarchy_ShouldSuppressCandidate()
     {
         using GravitasWorldContext context = CreateMixedContext();
-        StiffBody2D parent2D = CreateCircle2D(context, new Vector2d((Fixed64)8, Fixed64.Zero), immovable: true);
+        SolidBody2D parent2D = CreateCircle2D(context, new Vector2d((Fixed64)8, Fixed64.Zero), immovable: true);
         ScenarioBody<LSSphereCollider> child3D = CreateSphere3D(context, Vector3d.Zero, immovable: false);
-        StiffBody2D child2D = CreateCircle2D(context, Vector2d.Zero, immovable: false);
+        SolidBody2D child2D = CreateCircle2D(context, Vector2d.Zero, immovable: false);
 
         child3D.Collider.SetParent(parent2D.Collider);
         child2D.Collider.SetParent(parent2D.Collider);
@@ -177,7 +177,7 @@ public sealed class MixedBroadPhaseTests
         context.Settings.RetainedPartitionTimeToKillFrames = 1;
         context.Settings.RetainedPartitionRetirementSweepBudget = 1024;
         ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(context, Vector3d.Zero, immovable: false);
-        StiffBody2D body2D = CreateCircle2D(context, Vector2d.Zero, immovable: false);
+        SolidBody2D body2D = CreateCircle2D(context, Vector2d.Zero, immovable: false);
 
         Step(context);
         int retainedBeforeDeactivate = context.MixedCollisions.RetainedPartitionCount;
@@ -271,7 +271,7 @@ public sealed class MixedBroadPhaseTests
     {
         using GravitasWorldContext context = CreateMixedContext();
         _ = CreateSphere3D(context, Vector3d.Zero, immovable: false);
-        StiffBody2D body2D = CreateCircle2D(context, Vector2d.Zero, immovable: false);
+        SolidBody2D body2D = CreateCircle2D(context, Vector2d.Zero, immovable: false);
 
         Step(context);
         PhysicsMixedPartition partition = GetFirstMixedPartition(context, body2D.Collider.MixedPartitionCoordinates!);
@@ -348,7 +348,7 @@ public sealed class MixedBroadPhaseTests
         if (layer.HasValue)
             collider.Layer = layer.Value;
 
-        var body = new StiffBody(agent, collider)
+        var body = new SolidBody(agent, collider)
         {
             Mass = Fixed64.One,
             Immovable = immovable
@@ -357,7 +357,7 @@ public sealed class MixedBroadPhaseTests
         return new ScenarioBody<LSSphereCollider>(body, collider);
     }
 
-    private static StiffBody2D CreateCircle2D(
+    private static SolidBody2D CreateCircle2D(
         GravitasWorldContext context,
         Vector2d position,
         bool immovable,
@@ -371,7 +371,7 @@ public sealed class MixedBroadPhaseTests
         return CreateCircle2D(context, agent, immovable, layer);
     }
 
-    private static StiffBody2D CreateCircle2D(
+    private static SolidBody2D CreateCircle2D(
         GravitasWorldContext context,
         IMatterAgent agent,
         bool immovable,
@@ -381,7 +381,7 @@ public sealed class MixedBroadPhaseTests
         if (layer.HasValue)
             collider.Layer = layer.Value;
 
-        var body = new StiffBody2D(agent, collider)
+        var body = new SolidBody2D(agent, collider)
         {
             Mass = Fixed64.One,
             Immovable = immovable

@@ -26,7 +26,7 @@ An adapter should:
 
 An adapter should not:
 
-- mutate `StiffBody`, `StiffBody2D`, collider, partition, or query state while
+- mutate `SolidBody`, `SolidBody2D`, collider, partition, or query state while
   consuming diagnostics.
 - feed diagnostics back into authoritative simulation decisions.
 - assume collider IDs are global, stable across contexts, or valid after the

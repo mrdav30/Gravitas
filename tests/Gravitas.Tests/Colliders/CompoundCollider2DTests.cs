@@ -17,7 +17,7 @@ public sealed class CompoundCollider2DTests
             CompoundColliderPart2D.Circle(Fixed64.Half, new Vector2d(-Fixed64.One, Fixed64.Zero)),
             CompoundColliderPart2D.Circle(Fixed64.Half, new Vector2d((Fixed64)2, Fixed64.Zero)));
 
-        StiffBody2D body = CreateBody(context, compound, Vector2d.Zero);
+        SolidBody2D body = CreateBody(context, compound, Vector2d.Zero);
 
         body.Collider.Shape.Should().Be(ColliderType2D.Compound);
         compound.PartCount.Should().Be(2);
@@ -93,11 +93,11 @@ public sealed class CompoundCollider2DTests
         compound.RuntimeShapeVersion.Should().BeGreaterThan(1u);
     }
 
-    private static StiffBody2D CreateBody(GravitasWorldContext context, LSCollider2D collider, Vector2d position)
+    private static SolidBody2D CreateBody(GravitasWorldContext context, LSCollider2D collider, Vector2d position)
     {
         var transform = new FixedTransform(new Vector3d(position.X, Fixed64.Zero, position.Y), FixedQuaternion.Identity, Vector3d.One);
         var agent = new TestMatterAgent(context, transform);
-        var body = new StiffBody2D(agent, collider)
+        var body = new SolidBody2D(agent, collider)
         {
             Mass = Fixed64.One,
             Immovable = true

@@ -301,7 +301,7 @@ public sealed partial class GravitasQueryMixedService
 
         if (staticTargetsOnly)
         {
-            StiffBody2D? body = collider.Body;
+            SolidBody2D? body = collider.Body;
             if (body != null && !body.Immovable && !body.IsKinematic)
                 return false;
         }
@@ -323,7 +323,7 @@ public sealed partial class GravitasQueryMixedService
 
         if (staticTargetsOnly)
         {
-            StiffBody? body = collider.Body;
+            SolidBody? body = collider.Body;
             if (body != null && !body.Immovable && !body.IsKinematic)
                 return false;
         }

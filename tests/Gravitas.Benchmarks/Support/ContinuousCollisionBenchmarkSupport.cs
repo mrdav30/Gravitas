@@ -44,10 +44,10 @@ internal static class ContinuousCollisionBenchmarkSupport
         return context;
     }
 
-    public static StiffBody CreateSphere3D(GravitasWorldContext context, Vector3d position)
+    public static SolidBody CreateSphere3D(GravitasWorldContext context, Vector3d position)
     {
         var agent = new BenchmarkMatterAgent(context, position);
-        var body = new StiffBody(agent, new LSSphereCollider())
+        var body = new SolidBody(agent, new LSSphereCollider())
         {
             ContinuousCollisionMode = ContinuousCollisionMode.Continuous,
             GroundProbeMode = GroundProbeMode.Ray,
@@ -58,10 +58,10 @@ internal static class ContinuousCollisionBenchmarkSupport
         return body;
     }
 
-    public static StiffBody2D CreateCircle2D(GravitasWorldContext context, Vector2d position)
+    public static SolidBody2D CreateCircle2D(GravitasWorldContext context, Vector2d position)
     {
         var agent = new BenchmarkMatterAgent(context, position.ToVector3d(Fixed64.Zero));
-        var body = new StiffBody2D(agent, new LSCircleCollider2D(Fixed64.Half))
+        var body = new SolidBody2D(agent, new LSCircleCollider2D(Fixed64.Half))
         {
             ContinuousCollisionMode = ContinuousCollisionMode.Continuous,
             Mass = Fixed64.One
@@ -71,10 +71,10 @@ internal static class ContinuousCollisionBenchmarkSupport
         return body;
     }
 
-    public static StiffBody CreateThinCuboid3D(GravitasWorldContext context, Vector3d position)
+    public static SolidBody CreateThinCuboid3D(GravitasWorldContext context, Vector3d position)
     {
         var agent = new BenchmarkMatterAgent(context, position);
-        var body = new StiffBody(
+        var body = new SolidBody(
             agent,
             new LSCuboidCollider
             {
@@ -89,7 +89,7 @@ internal static class ContinuousCollisionBenchmarkSupport
         return body;
     }
 
-    public static StiffBody2D CreateThinPolygon2D(GravitasWorldContext context, Vector2d position)
+    public static SolidBody2D CreateThinPolygon2D(GravitasWorldContext context, Vector2d position)
     {
         var agent = new BenchmarkMatterAgent(context, position.ToVector3d(Fixed64.Zero));
         var collider = new LSPolygonCollider2D(
@@ -97,7 +97,7 @@ internal static class ContinuousCollisionBenchmarkSupport
             new Vector2d((Fixed64)3, Fixed64.FromFraction(-1, 10)),
             new Vector2d((Fixed64)3, Fixed64.FromFraction(1, 10)),
             new Vector2d((Fixed64)(-3), Fixed64.FromFraction(1, 10)));
-        var body = new StiffBody2D(agent, collider)
+        var body = new SolidBody2D(agent, collider)
         {
             ContinuousCollisionMode = ContinuousCollisionMode.Continuous,
             Mass = Fixed64.One
@@ -110,7 +110,7 @@ internal static class ContinuousCollisionBenchmarkSupport
     public static void CreateStaticSphere3D(GravitasWorldContext context, Vector3d position)
     {
         var agent = new BenchmarkMatterAgent(context, position);
-        var body = new StiffBody(agent, new LSSphereCollider { Radius = Fixed64.FromFraction(1, 4) })
+        var body = new SolidBody(agent, new LSSphereCollider { Radius = Fixed64.FromFraction(1, 4) })
         {
             Immovable = true,
             Mass = Fixed64.One
@@ -122,7 +122,7 @@ internal static class ContinuousCollisionBenchmarkSupport
     public static void CreateStaticCuboid3D(GravitasWorldContext context, Vector3d position, Vector3d size)
     {
         var agent = new BenchmarkMatterAgent(context, position);
-        var body = new StiffBody(agent, new LSCuboidCollider { Size = size })
+        var body = new SolidBody(agent, new LSCuboidCollider { Size = size })
         {
             Immovable = true,
             Mass = Fixed64.One
@@ -134,7 +134,7 @@ internal static class ContinuousCollisionBenchmarkSupport
     public static void CreateStaticCircle2D(GravitasWorldContext context, Vector2d position)
     {
         var agent = new BenchmarkMatterAgent(context, position.ToVector3d(Fixed64.Zero));
-        var body = new StiffBody2D(agent, new LSCircleCollider2D(Fixed64.FromFraction(1, 4)))
+        var body = new SolidBody2D(agent, new LSCircleCollider2D(Fixed64.FromFraction(1, 4)))
         {
             Immovable = true,
             Mass = Fixed64.One
@@ -146,7 +146,7 @@ internal static class ContinuousCollisionBenchmarkSupport
     public static void CreateStaticAabb2D(GravitasWorldContext context, Vector2d position, Vector2d size)
     {
         var agent = new BenchmarkMatterAgent(context, position.ToVector3d(Fixed64.Zero));
-        var body = new StiffBody2D(agent, new LSAABBoxCollider2D(size))
+        var body = new SolidBody2D(agent, new LSAABBoxCollider2D(size))
         {
             Immovable = true,
             Mass = Fixed64.One
@@ -155,51 +155,51 @@ internal static class ContinuousCollisionBenchmarkSupport
         body.Initialize(position);
     }
 
-    public static void Reset3DBodies(SwiftList<StiffBody> bodies, Vector3d[] positions, bool pairedDirections)
+    public static void Reset3DBodies(SwiftList<SolidBody> bodies, Vector3d[] positions, bool pairedDirections)
     {
         for (int i = 0; i < bodies.Count; i++)
         {
-            StiffBody body = bodies[i];
+            SolidBody body = bodies[i];
             body.ResetPosition(positions[i], FixedQuaternion.Identity);
             body.AddForce(Get3DForce(i, pairedDirections));
         }
     }
 
-    public static void Reset3DBodies(SwiftList<StiffBody> bodies, Vector3d[] positions, Vector3d force)
+    public static void Reset3DBodies(SwiftList<SolidBody> bodies, Vector3d[] positions, Vector3d force)
     {
         for (int i = 0; i < bodies.Count; i++)
         {
-            StiffBody body = bodies[i];
+            SolidBody body = bodies[i];
             body.ResetPosition(positions[i], FixedQuaternion.Identity);
             body.AddForce(force);
         }
     }
 
-    public static void Reset2DBodies(SwiftList<StiffBody2D> bodies, Vector2d[] positions, bool pairedDirections)
+    public static void Reset2DBodies(SwiftList<SolidBody2D> bodies, Vector2d[] positions, bool pairedDirections)
     {
         for (int i = 0; i < bodies.Count; i++)
         {
-            StiffBody2D body = bodies[i];
+            SolidBody2D body = bodies[i];
             body.ResetPosition(positions[i]);
             body.AddForce(Get2DForce(i, pairedDirections));
         }
     }
 
-    public static void Reset2DBodies(SwiftList<StiffBody2D> bodies, Vector2d[] positions, Vector2d force)
+    public static void Reset2DBodies(SwiftList<SolidBody2D> bodies, Vector2d[] positions, Vector2d force)
     {
         for (int i = 0; i < bodies.Count; i++)
         {
-            StiffBody2D body = bodies[i];
+            SolidBody2D body = bodies[i];
             body.ResetPosition(positions[i]);
             body.AddForce(force);
         }
     }
 
-    public static void Reset2DDynamicShapeExactBodies(SwiftList<StiffBody2D> bodies, Vector2d[] positions)
+    public static void Reset2DDynamicShapeExactBodies(SwiftList<SolidBody2D> bodies, Vector2d[] positions)
     {
         for (int i = 0; i < bodies.Count; i++)
         {
-            StiffBody2D body = bodies[i];
+            SolidBody2D body = bodies[i];
             body.ResetPosition(positions[i]);
             if ((i & 1) == 0)
                 body.AddForce(ShapeExactDynamicForce2D);
@@ -208,11 +208,11 @@ internal static class ContinuousCollisionBenchmarkSupport
         }
     }
 
-    public static void Reset3DDynamicShapeExactBodies(SwiftList<StiffBody> bodies, Vector3d[] positions)
+    public static void Reset3DDynamicShapeExactBodies(SwiftList<SolidBody> bodies, Vector3d[] positions)
     {
         for (int i = 0; i < bodies.Count; i++)
         {
-            StiffBody body = bodies[i];
+            SolidBody body = bodies[i];
             body.ResetPosition(positions[i], FixedQuaternion.Identity);
             if ((i & 1) == 0)
                 body.AddForce(ShapeExactDynamicForce3D);
@@ -221,13 +221,13 @@ internal static class ContinuousCollisionBenchmarkSupport
         }
     }
 
-    public static void Reset3DBodyPositions(SwiftList<StiffBody> bodies, Vector3d[] positions)
+    public static void Reset3DBodyPositions(SwiftList<SolidBody> bodies, Vector3d[] positions)
     {
         for (int i = 0; i < bodies.Count; i++)
             bodies[i].ResetPosition(positions[i], FixedQuaternion.Identity);
     }
 
-    public static void Reset2DBodyPositions(SwiftList<StiffBody2D> bodies, Vector2d[] positions)
+    public static void Reset2DBodyPositions(SwiftList<SolidBody2D> bodies, Vector2d[] positions)
     {
         for (int i = 0; i < bodies.Count; i++)
         {
@@ -235,22 +235,22 @@ internal static class ContinuousCollisionBenchmarkSupport
         }
     }
 
-    public static void Reset3DAngularBodies(SwiftList<StiffBody> bodies, Vector3d[] positions, bool angularMotion)
+    public static void Reset3DAngularBodies(SwiftList<SolidBody> bodies, Vector3d[] positions, bool angularMotion)
     {
         for (int i = 0; i < bodies.Count; i++)
         {
-            StiffBody body = bodies[i];
+            SolidBody body = bodies[i];
             body.ResetPosition(positions[i], FixedQuaternion.Identity);
             if (angularMotion)
                 body.AddAngularImpulse(Vector3d.Up);
         }
     }
 
-    public static void Reset2DAngularBodies(SwiftList<StiffBody2D> bodies, Vector2d[] positions, bool angularMotion)
+    public static void Reset2DAngularBodies(SwiftList<SolidBody2D> bodies, Vector2d[] positions, bool angularMotion)
     {
         for (int i = 0; i < bodies.Count; i++)
         {
-            StiffBody2D body = bodies[i];
+            SolidBody2D body = bodies[i];
             body.ResetPosition(positions[i]);
             if (angularMotion)
                 body.AddAngularImpulse(Fixed64.One);
@@ -263,7 +263,7 @@ internal static class ContinuousCollisionBenchmarkSupport
     public static Vector2d Get2DForce(int index, bool pairedDirections) =>
         pairedDirections && (index & 1) == 1 ? -Force2D : Force2D;
 
-    public static Vector3d Sum3D(SwiftList<StiffBody> bodies)
+    public static Vector3d Sum3D(SwiftList<SolidBody> bodies)
     {
         Vector3d total = Vector3d.Zero;
         for (int i = 0; i < bodies.Count; i++)
@@ -272,7 +272,7 @@ internal static class ContinuousCollisionBenchmarkSupport
         return total;
     }
 
-    public static Vector2d Sum2D(SwiftList<StiffBody2D> bodies)
+    public static Vector2d Sum2D(SwiftList<SolidBody2D> bodies)
     {
         Vector2d total = Vector2d.Zero;
         for (int i = 0; i < bodies.Count; i++)
@@ -283,7 +283,7 @@ internal static class ContinuousCollisionBenchmarkSupport
 
     public static int SweepMixedStatic2DQueries(
         GravitasWorldContext context,
-        SwiftList<StiffBody> bodies,
+        SwiftList<SolidBody> bodies,
         Vector3d[] positions,
         SwiftList<PhysicsMixedHit> hits)
     {
@@ -310,7 +310,7 @@ internal static class ContinuousCollisionBenchmarkSupport
 
     public static int SweepMixedStatic3DQueries(
         GravitasWorldContext context,
-        SwiftList<StiffBody2D> bodies,
+        SwiftList<SolidBody2D> bodies,
         Vector2d[] positions,
         SwiftList<PhysicsMixedHit> hits)
     {
@@ -339,7 +339,7 @@ internal static class ContinuousCollisionBenchmarkSupport
 
     public static int SweepPure3DStaticQueries(
         GravitasWorldContext context,
-        SwiftList<StiffBody> bodies,
+        SwiftList<SolidBody> bodies,
         Vector3d[] positions,
         bool pairedDirections,
         SwiftList<Physics3DHit> hits)
@@ -365,7 +365,7 @@ internal static class ContinuousCollisionBenchmarkSupport
 
     public static int SweepPure2DStaticQueries(
         GravitasWorldContext context,
-        SwiftList<StiffBody2D> bodies,
+        SwiftList<SolidBody2D> bodies,
         Vector2d[] positions,
         bool pairedDirections,
         SwiftList<Physics2DHit> hits)
@@ -389,13 +389,13 @@ internal static class ContinuousCollisionBenchmarkSupport
         return total;
     }
 
-    public static int QueryPure3DDynamicCandidates(GravitasWorldContext context, SwiftList<StiffBody> bodies)
+    public static int QueryPure3DDynamicCandidates(GravitasWorldContext context, SwiftList<SolidBody> bodies)
     {
         int total = 0;
         context.Physics.PrepareContinuousCollisionFrame();
         for (int i = 0; i < bodies.Count; i++)
         {
-            StiffBody body = bodies[i];
+            SolidBody body = bodies[i];
             SwiftList<int> candidates = context.Physics.QueryContinuousCollisionCandidates(
                 DynamicCcdCandidateIndex.CreateSweptSphereBounds(
                     body.ContinuousCollisionFrameStart,
@@ -407,13 +407,13 @@ internal static class ContinuousCollisionBenchmarkSupport
         return total;
     }
 
-    public static int QueryPure2DDynamicCandidates(GravitasWorldContext context, SwiftList<StiffBody2D> bodies)
+    public static int QueryPure2DDynamicCandidates(GravitasWorldContext context, SwiftList<SolidBody2D> bodies)
     {
         int total = 0;
         context.Physics2D.PrepareContinuousCollisionFrame();
         for (int i = 0; i < bodies.Count; i++)
         {
-            StiffBody2D body = bodies[i];
+            SolidBody2D body = bodies[i];
             SwiftList<int> candidates = context.Physics2D.QueryPlanarContinuousCollisionCandidates(
                 DynamicCcdCandidateIndex2D.CreateSweptCircleBounds(
                     body.ContinuousCollisionFrameStart,
@@ -425,13 +425,13 @@ internal static class ContinuousCollisionBenchmarkSupport
         return total;
     }
 
-    public static int SweepPure3DDynamicRelativeTargets(GravitasWorldContext context, SwiftList<StiffBody> bodies)
+    public static int SweepPure3DDynamicRelativeTargets(GravitasWorldContext context, SwiftList<SolidBody> bodies)
     {
         int total = 0;
         context.Physics.PrepareContinuousCollisionFrame();
         for (int i = 0; i < bodies.Count; i++)
         {
-            StiffBody source = bodies[i];
+            SolidBody source = bodies[i];
             Fixed64 sourceRadius = source.ResolveContinuousCollisionProxyRadiusForDynamicTarget();
             SwiftList<int> candidates = context.Physics.QueryContinuousCollisionCandidates(
                 DynamicCcdCandidateIndex.CreateSweptSphereBounds(
@@ -442,7 +442,7 @@ internal static class ContinuousCollisionBenchmarkSupport
             for (int j = 0; j < candidates.Count; j++)
             {
                 int dynamicId = candidates[j];
-                if (!context.Physics.TryGetDynamicBody(dynamicId, out StiffBody target)
+                if (!context.Physics.TryGetDynamicBody(dynamicId, out SolidBody target)
                     || ReferenceEquals(source, target))
                 {
                     continue;
@@ -468,13 +468,13 @@ internal static class ContinuousCollisionBenchmarkSupport
         return total;
     }
 
-    public static int SweepPure2DDynamicRelativeTargets(GravitasWorldContext context, SwiftList<StiffBody2D> bodies)
+    public static int SweepPure2DDynamicRelativeTargets(GravitasWorldContext context, SwiftList<SolidBody2D> bodies)
     {
         int total = 0;
         context.Physics2D.PrepareContinuousCollisionFrame();
         for (int i = 0; i < bodies.Count; i++)
         {
-            StiffBody2D source = bodies[i];
+            SolidBody2D source = bodies[i];
             Fixed64 sourceRadius = source.ResolveContinuousCollisionProxyRadiusForDynamicTarget();
             SwiftList<int> candidates = context.Physics2D.QueryPlanarContinuousCollisionCandidates(
                 DynamicCcdCandidateIndex2D.CreateSweptCircleBounds(
@@ -485,7 +485,7 @@ internal static class ContinuousCollisionBenchmarkSupport
             for (int j = 0; j < candidates.Count; j++)
             {
                 int dynamicId = candidates[j];
-                if (!context.Physics2D.TryGetDynamicBody(dynamicId, out StiffBody2D target)
+                if (!context.Physics2D.TryGetDynamicBody(dynamicId, out SolidBody2D target)
                     || ReferenceEquals(source, target))
                 {
                     continue;

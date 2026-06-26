@@ -1,5 +1,5 @@
 //=======================================================================
-// StiffBody2D.Serialization.cs
+// SolidBody2D.Serialization.cs
 //=======================================================================
 // MIT License, Copyright (c) 2026-present David Oravsky (mrdav30)
 // See LICENSE file in the project root for full license information.
@@ -10,7 +10,7 @@ using FixedMathSharp;
 
 namespace Gravitas;
 
-public sealed partial class StiffBody2D
+public sealed partial class SolidBody2D
 {
     public void RecordData(IChronicler chronicler)
     {

@@ -400,7 +400,7 @@ internal sealed class PhysicsMixedPartition : IVoxelPartition
         if (!Owner.Context.Physics.TryGetColliderById(id, out Gravitas.Colliders.LSCollider? collider))
             return true;
 
-        StiffBody? body = collider!.Body;
+        SolidBody? body = collider!.Body;
         return body == null || body.IsAwakeForCollision;
     }
 
@@ -409,7 +409,7 @@ internal sealed class PhysicsMixedPartition : IVoxelPartition
         if (!Owner.Context.Physics2D.TryGetColliderById(id, out Gravitas.Colliders.LSCollider2D? collider))
             return true;
 
-        StiffBody2D? body = collider!.Body;
+        SolidBody2D? body = collider!.Body;
         return body == null || body.IsAwakeForCollision;
     }
 

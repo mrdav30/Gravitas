@@ -171,11 +171,11 @@ public sealed class CollisionDetection2DTests
         });
     }
 
-    private static StiffBody2D CreateBody(GravitasWorldContext context, LSCollider2D collider, Vector2d position)
+    private static SolidBody2D CreateBody(GravitasWorldContext context, LSCollider2D collider, Vector2d position)
     {
         var transform = new FixedTransform(new Vector3d(position.X, Fixed64.Zero, position.Y), FixedQuaternion.Identity, Vector3d.One);
         var agent = new TestMatterAgent(context, transform);
-        var body = new StiffBody2D(agent, collider)
+        var body = new SolidBody2D(agent, collider)
         {
             Mass = Fixed64.One,
             Immovable = true

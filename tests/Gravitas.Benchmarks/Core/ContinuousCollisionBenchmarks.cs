@@ -18,11 +18,11 @@ public class ContinuousCollisionBenchmarks
     private GravitasWorldContext _continuousContext;
     private GravitasWorldContext _dynamicContext;
     private GravitasWorldContext _meshContext;
-    private StiffBody _discreteBody;
-    private StiffBody _continuousBody;
-    private StiffBody _dynamicLeftBody;
-    private StiffBody _dynamicRightBody;
-    private StiffBody _meshBody;
+    private SolidBody _discreteBody;
+    private SolidBody _continuousBody;
+    private SolidBody _dynamicLeftBody;
+    private SolidBody _dynamicRightBody;
+    private SolidBody _meshBody;
 
     [GlobalSetup]
     public void Setup()
@@ -133,7 +133,7 @@ public class ContinuousCollisionBenchmarks
         var triangles = new[] { 0, 1, 2, 2, 1, 3 };
         var agent = new BenchmarkMatterAgent(context, WallPosition);
         var collider = new LSMeshCollider(vertices, triangles, MeshColliderMode.Convex, MeshInertiaPolicy.SurfaceApproximation);
-        var body = new StiffBody(agent, collider)
+        var body = new SolidBody(agent, collider)
         {
             Mass = Fixed64.One,
             Immovable = true,
@@ -143,7 +143,7 @@ public class ContinuousCollisionBenchmarks
         body.Initialize(WallPosition, FixedQuaternion.Identity);
     }
 
-    private static StiffBody CreateMovingSphere(
+    private static SolidBody CreateMovingSphere(
         GravitasWorldContext context,
         ContinuousCollisionMode mode,
         Vector3d? startPosition = null)
@@ -151,7 +151,7 @@ public class ContinuousCollisionBenchmarks
         Vector3d position = startPosition ?? StartPosition;
         var agent = new BenchmarkMatterAgent(context, position);
         var collider = new LSSphereCollider();
-        var body = new StiffBody(agent, collider)
+        var body = new SolidBody(agent, collider)
         {
             ContinuousCollisionMode = mode,
             Mass = Fixed64.One,
@@ -162,6 +162,6 @@ public class ContinuousCollisionBenchmarks
         return body;
     }
 
-    private static void ResetBody(StiffBody body, Vector3d? position = null) =>
+    private static void ResetBody(SolidBody body, Vector3d? position = null) =>
         body.ResetPosition(position ?? StartPosition, FixedQuaternion.Identity);
 }

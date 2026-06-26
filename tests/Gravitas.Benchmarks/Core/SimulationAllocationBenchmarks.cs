@@ -14,8 +14,8 @@ public class SimulationAllocationBenchmarks
     private GravitasWorldContext _sweptGroundingContext;
     private GravitasWorldContext _distributionContext;
     private GravitasWorldContext _activePairContext;
-    private SwiftList<StiffBody> _groundedBodies;
-    private SwiftList<StiffBody> _sweptGroundedBodies;
+    private SwiftList<SolidBody> _groundedBodies;
+    private SwiftList<SolidBody> _sweptGroundedBodies;
 
     [Params(64)]
     public int ColliderCount { get; set; }
@@ -30,13 +30,13 @@ public class SimulationAllocationBenchmarks
 
         _groundingContext = BenchmarkPhysicsScene.CreateContext(gridExtent);
         _groundingContext.Settings.GroundCheckLayerMask = IncludeLayerZero;
-        _groundedBodies = new SwiftList<StiffBody>(ColliderCount);
+        _groundedBodies = new SwiftList<SolidBody>(ColliderCount);
         BenchmarkPhysicsScene.CreateDynamicSphereGrid(_groundingContext, ColliderCount, _groundedBodies);
         SetGroundProbeMode(_groundedBodies, GroundProbeMode.Ray);
 
         _sweptGroundingContext = BenchmarkPhysicsScene.CreateContext(gridExtent);
         _sweptGroundingContext.Settings.GroundCheckLayerMask = IncludeLayerZero;
-        _sweptGroundedBodies = new SwiftList<StiffBody>(ColliderCount);
+        _sweptGroundedBodies = new SwiftList<SolidBody>(ColliderCount);
         BenchmarkPhysicsScene.CreateDynamicSphereGrid(_sweptGroundingContext, ColliderCount, _sweptGroundedBodies);
         SetGroundProbeMode(_sweptGroundedBodies, GroundProbeMode.SweptSphere);
 
@@ -67,7 +67,7 @@ public class SimulationAllocationBenchmarks
     }
 
     [Benchmark]
-    public int StiffBodyLateSimulateOnly()
+    public int SolidBodyLateSimulateOnly()
     {
         _lateSimulateContext.Physics.LateSimulate();
         return _lateSimulateContext.Physics.AssimilatedBodyCount;
@@ -79,7 +79,7 @@ public class SimulationAllocationBenchmarks
         int groundedCount = 0;
         for (int i = 0; i < _groundedBodies.Count; i++)
         {
-            StiffBody body = _groundedBodies[i];
+            SolidBody body = _groundedBodies[i];
             body.CheckGround();
             if (body.IsGrounded)
                 groundedCount++;
@@ -94,7 +94,7 @@ public class SimulationAllocationBenchmarks
         int groundedCount = 0;
         for (int i = 0; i < _sweptGroundedBodies.Count; i++)
         {
-            StiffBody body = _sweptGroundedBodies[i];
+            SolidBody body = _sweptGroundedBodies[i];
             body.CheckGround();
             if (body.IsGrounded)
                 groundedCount++;
@@ -117,7 +117,7 @@ public class SimulationAllocationBenchmarks
         return _activePairContext.Physics.AssimilatedBodyCount;
     }
 
-    private static void SetGroundProbeMode(SwiftList<StiffBody> bodies, GroundProbeMode mode)
+    private static void SetGroundProbeMode(SwiftList<SolidBody> bodies, GroundProbeMode mode)
     {
         for (int i = 0; i < bodies.Count; i++)
             bodies[i].GroundProbeMode = mode;

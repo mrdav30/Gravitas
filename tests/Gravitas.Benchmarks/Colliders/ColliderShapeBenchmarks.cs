@@ -11,17 +11,17 @@ public class ColliderShapeBenchmarks
 {
     private GravitasWorldContext _context;
     private LSCapsuleCollider[] _capsules;
-    private StiffBody[] _bodies;
+    private SolidBody[] _bodies;
     private Vector3d[] _meshVertices;
     private int[] _meshTriangles;
     private LSMeshCollider _meshCollider;
-    private StiffBody _meshBody;
+    private SolidBody _meshBody;
     private SwiftList<int> _meshHits;
     private LSMeshCollider _concaveMeshCollider;
-    private StiffBody _concaveMeshBody;
+    private SolidBody _concaveMeshBody;
     private SwiftList<int> _concaveMeshHits;
     private LSCompoundCollider _compoundCollider;
-    private StiffBody _compoundBody;
+    private SolidBody _compoundBody;
     private int _tick;
 
     [Params(64)]
@@ -34,14 +34,14 @@ public class ColliderShapeBenchmarks
             BenchmarkPhysicsScene.GridExtentForGrid(ColliderCount),
             clearAllPools: true);
         _capsules = new LSCapsuleCollider[ColliderCount];
-        _bodies = new StiffBody[ColliderCount];
+        _bodies = new SolidBody[ColliderCount];
 
         for (int i = 0; i < ColliderCount; i++)
         {
             Vector3d position = new(i % 8 * 2, 0, i / 8 * 2);
             var agent = new BenchmarkMatterAgent(_context, position);
             var collider = new LSCapsuleCollider();
-            var body = new StiffBody(agent, collider)
+            var body = new SolidBody(agent, collider)
             {
                 Mass = Fixed64.One,
                 PreventAngularForces = true
@@ -67,7 +67,7 @@ public class ColliderShapeBenchmarks
 
         var meshAgent = new BenchmarkMatterAgent(_context, Vector3d.Zero);
         _meshCollider = new LSMeshCollider(_meshVertices, _meshTriangles);
-        _meshBody = new StiffBody(meshAgent, _meshCollider)
+        _meshBody = new SolidBody(meshAgent, _meshCollider)
         {
             Mass = Fixed64.One,
             PreventAngularForces = true
@@ -88,7 +88,7 @@ public class ColliderShapeBenchmarks
                 8, 9, 10, 10, 9, 11
             },
             MeshColliderMode.Concave);
-        _concaveMeshBody = new StiffBody(concaveAgent, _concaveMeshCollider)
+        _concaveMeshBody = new SolidBody(concaveAgent, _concaveMeshCollider)
         {
             Mass = Fixed64.One,
             PreventAngularForces = true
@@ -107,7 +107,7 @@ public class ColliderShapeBenchmarks
             CompoundColliderPart.Sphere(Fixed64.Half, new Vector3d(Fixed64.Zero, Fixed64.Zero, Fixed64.Zero)),
             CompoundColliderPart.Sphere(Fixed64.Half, new Vector3d((Fixed64)2, Fixed64.Zero, Fixed64.Zero)),
             CompoundColliderPart.Cuboid(Vector3d.One, new Vector3d(Fixed64.Zero, Fixed64.Zero, (Fixed64)2)));
-        _compoundBody = new StiffBody(compoundAgent, _compoundCollider)
+        _compoundBody = new SolidBody(compoundAgent, _compoundCollider)
         {
             Mass = Fixed64.One,
             PreventAngularForces = true

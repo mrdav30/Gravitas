@@ -23,15 +23,15 @@ public sealed partial class GravitasPhysics2DService
         IsAwakeIslandBody(pair.ColliderA.Body) || IsAwakeIslandBody(pair.ColliderB.Body);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool IsAwakeMovable(StiffBody2D? body) =>
+    private static bool IsAwakeMovable(SolidBody2D? body) =>
         body != null && body.CanTranslate && !body.IsSleeping;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool IsMovableIslandBody(StiffBody2D? body) =>
+    private static bool IsMovableIslandBody(SolidBody2D? body) =>
         body != null && body.DynamicId >= 0 && body.CanTranslate;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool IsAwakeIslandBody(StiffBody2D? body) =>
+    private static bool IsAwakeIslandBody(SolidBody2D? body) =>
         IsMovableIslandBody(body) && body!.IsAwakeForCollision;
 
     private bool IsLayerCollisionDisabled(PhysicsLayer layer1, PhysicsLayer layer2)
@@ -117,7 +117,7 @@ public sealed partial class GravitasPhysics2DService
 
     private struct DiscreteIslandNode2D
     {
-        public DiscreteIslandNode2D(int bodyKey, StiffBody2D body)
+        public DiscreteIslandNode2D(int bodyKey, SolidBody2D body)
         {
             BodyKey = bodyKey;
             Body = body;
@@ -126,7 +126,7 @@ public sealed partial class GravitasPhysics2DService
         }
 
         public int BodyKey;
-        public StiffBody2D Body;
+        public SolidBody2D Body;
         public int ParentIndex;
         public int RootKey;
     }

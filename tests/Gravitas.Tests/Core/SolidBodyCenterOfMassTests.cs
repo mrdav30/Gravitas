@@ -7,7 +7,7 @@ using Xunit;
 
 namespace Gravitas.Tests.Core;
 
-public sealed class StiffBodyCenterOfMassTests
+public sealed class SolidBodyCenterOfMassTests
 {
     [Fact]
     public void Initialize_WithOffsetPrimitiveCollider_ShouldUseColliderCenterAsDefaultCenterOfMass()

@@ -1,5 +1,5 @@
 //=======================================================================
-// StiffBody2D.ContinuousCollision.Helpers.cs
+// SolidBody2D.ContinuousCollision.Helpers.cs
 //=======================================================================
 // MIT License, Copyright (c) 2026-present David Oravsky (mrdav30)
 // See LICENSE file in the project root for full license information.
@@ -13,7 +13,7 @@ using System.Runtime.CompilerServices;
 
 namespace Gravitas;
 
-public sealed partial class StiffBody2D
+public sealed partial class SolidBody2D
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private bool ShouldUseContinuousCollision(out ContinuousCollisionMode mode)
@@ -29,7 +29,7 @@ public sealed partial class StiffBody2D
         if (mode != ContinuousCollisionMode.Inherit)
             return mode;
 
-        StiffBody2D? parentBody = Collider.TopParent2D?.Body;
+        SolidBody2D? parentBody = Collider.TopParent2D?.Body;
         if (parentBody != null && parentBody._continuousCollisionMode != ContinuousCollisionMode.Inherit)
             return parentBody._continuousCollisionMode;
 
@@ -104,7 +104,7 @@ public sealed partial class StiffBody2D
             return false;
         }
 
-        StiffBody2D? hitBody = hitCollider.Body;
+        SolidBody2D? hitBody = hitCollider.Body;
         return hitBody == null || hitBody.Immovable || hitBody.IsKinematic;
     }
 
@@ -119,7 +119,7 @@ public sealed partial class StiffBody2D
             return false;
         }
 
-        StiffBody? hitBody = hitCollider.Body;
+        SolidBody? hitBody = hitCollider.Body;
         return hitBody == null || hitBody.Immovable || hitBody.IsKinematic;
     }
 

@@ -66,8 +66,8 @@ internal sealed class CollisionPair2D
         if (colliderA.Priority != colliderB.Priority)
             return colliderA.Priority > colliderB.Priority;
 
-        StiffBody2D? bodyA = colliderA.Body;
-        StiffBody2D? bodyB = colliderB.Body;
+        SolidBody2D? bodyA = colliderA.Body;
+        SolidBody2D? bodyB = colliderB.Body;
         if (bodyA == null || bodyB == null)
             return colliderA.Id <= colliderB.Id;
 
@@ -144,8 +144,8 @@ internal sealed class CollisionPair2D
 
     internal void WakeSleepingBodiesForCollision()
     {
-        StiffBody2D? bodyA = ColliderA.Body;
-        StiffBody2D? bodyB = ColliderB.Body;
+        SolidBody2D? bodyA = ColliderA.Body;
+        SolidBody2D? bodyB = ColliderB.Body;
         if (bodyA == null || bodyB == null)
             return;
 

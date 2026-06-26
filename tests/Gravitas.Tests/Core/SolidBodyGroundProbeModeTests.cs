@@ -7,7 +7,7 @@ using Xunit;
 
 namespace Gravitas.Tests.Core;
 
-public sealed class StiffBodyGroundProbeModeTests
+public sealed class SolidBodyGroundProbeModeTests
 {
     [Fact]
     public void CheckGround_ShouldUseSelectedProbeMode()

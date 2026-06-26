@@ -1,5 +1,5 @@
 //=======================================================================
-// StiffBody.ContinuousCollision.Kinematic.cs
+// SolidBody.ContinuousCollision.Kinematic.cs
 //=======================================================================
 // MIT License, Copyright (c) 2026-present David Oravsky (mrdav30)
 // See LICENSE file in the project root for full license information.
@@ -13,7 +13,7 @@ using SwiftCollections;
 
 namespace Gravitas;
 
-public partial class StiffBody
+public partial class SolidBody
 {
     private void CaptureKinematicContinuousCollisionFrame(
         Vector3d startPosition,
@@ -166,7 +166,7 @@ public partial class StiffBody
         for (int candidateIndex = 0; candidateIndex < candidateIds.Count; candidateIndex++)
         {
             int dynamicId = candidateIds[candidateIndex];
-            if (!Context.Physics.TryGetDynamicBody(dynamicId, out StiffBody target)
+            if (!Context.Physics.TryGetDynamicBody(dynamicId, out SolidBody target)
                 || !IsEligibleDynamicContinuousCollisionTarget(target))
             {
                 continue;
@@ -254,7 +254,7 @@ public partial class StiffBody
         for (int candidateIndex = 0; candidateIndex < candidateIds.Count; candidateIndex++)
         {
             int dynamicId = candidateIds[candidateIndex];
-            if (!Context.Physics2D.TryGetDynamicBody(dynamicId, out StiffBody2D target)
+            if (!Context.Physics2D.TryGetDynamicBody(dynamicId, out SolidBody2D target)
                 || !IsEligibleDynamicMixed2DTarget(target))
             {
                 continue;
@@ -309,7 +309,7 @@ public partial class StiffBody
     }
 
     private bool ApplyKinematicContinuousCollisionHandoff(
-        StiffBody target,
+        SolidBody target,
         Vector3d sourceDisplacement,
         Vector3d normalForSource,
         Vector3d targetPositionAtImpact,
@@ -353,7 +353,7 @@ public partial class StiffBody
     }
 
     private bool ApplyKinematicContinuousCollisionHandoff(
-        StiffBody2D target,
+        SolidBody2D target,
         Vector3d sourceDisplacement,
         Vector3d normalForSource,
         Vector2d targetPositionAtImpact,

@@ -42,9 +42,9 @@ public readonly struct PhysicsMixedHit
 
     public LSCollider2D? Collider2D { get; }
 
-    public StiffBody? Body3D { get; }
+    public SolidBody? Body3D { get; }
 
-    public StiffBody2D? Body2D { get; }
+    public SolidBody2D? Body2D { get; }
 
     public Vector3d Point3D { get; }
 

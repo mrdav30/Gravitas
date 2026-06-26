@@ -24,9 +24,9 @@ trying to squeeze scalar 2D math through the 3D tensor solver helpers.
 - `CollisionPair2D` owned pair priority, resting/separated state, wake
   propagation, and notifications.
 - `CollisionResponse2D.Resolve(CollisionPair2D pair, Contact2D contact)` read
-  `StiffBody2D.EffectiveInverseMass`,
-  `StiffBody2D.EffectiveInverseMomentOfInertia`, and
-  `StiffBody2D.WorldCenterOfMass`, then applies one-pass positional correction,
+  `SolidBody2D.EffectiveInverseMass`,
+  `SolidBody2D.EffectiveInverseMomentOfInertia`, and
+  `SolidBody2D.WorldCenterOfMass`, then applies one-pass positional correction,
   normal impulse, and tangent Coulomb friction impulse.
 - 3D already has `ContactManifold`, `ManifoldContact`,
   `ContactWarmStartCache`, `ResponseBody`, `SolverContact`, and
@@ -327,7 +327,7 @@ Notes:
 
 - Added explicit pure 2D response helpers:
   `ResponseBody2D`, `SolverContact2D`, and `SolverContactBuffer2D`.
-  `ResponseBody2D` uses `StiffBody2D.EffectiveInverseMass` and
+  `ResponseBody2D` uses `SolidBody2D.EffectiveInverseMass` and
   `EffectiveInverseMomentOfInertia`, so angular-disabled, immovable,
   kinematic, inactive, and zero-mass bodies contribute zero solver mass/moment.
 - Replaced the legacy primary-contact response path with bounded manifold

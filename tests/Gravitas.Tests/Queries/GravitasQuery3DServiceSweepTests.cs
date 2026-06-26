@@ -661,7 +661,7 @@ public sealed class GravitasQuery3DServiceSweepTests
     {
         EnsureGrid(context);
         var agent = new TestMatterAgent(context);
-        var body = new StiffBody(agent, collider)
+        var body = new SolidBody(agent, collider)
         {
             Mass = Fixed64.One,
             Immovable = immovable,

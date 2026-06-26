@@ -229,7 +229,7 @@ public sealed class GravitasQuery3DServiceRaycastTests
     {
         EnsureGrid(context);
         var agent = new TestMatterAgent(context);
-        var body = new StiffBody(agent, collider)
+        var body = new SolidBody(agent, collider)
         {
             Mass = Fixed64.One
         };

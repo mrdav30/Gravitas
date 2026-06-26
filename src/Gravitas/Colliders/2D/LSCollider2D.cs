@@ -20,7 +20,7 @@ namespace Gravitas.Colliders;
 /// </summary>
 public abstract class LSCollider2D : IRecordable, IColliderHierarchyNode
 {
-    private StiffBody2D? _body;
+    private SolidBody2D? _body;
     private IMatterAgent? _agent;
     private GravitasWorldContext? _context;
     private LSCompoundCollider2D? _compoundOwner;
@@ -46,7 +46,7 @@ public abstract class LSCollider2D : IRecordable, IColliderHierarchyNode
     private ColliderPairState<CollisionPair2D> _pairState;
     private ColliderHierarchyState _hierarchyState;
 
-    public delegate void Body2DCollisionFunc(StiffBody2D other);
+    public delegate void Body2DCollisionFunc(SolidBody2D other);
     public delegate void Trigger2DCollisionFunc(LSCollider2D other);
     public delegate void Mixed2DCollisionFunc(LSCollider other);
 
@@ -113,7 +113,7 @@ public abstract class LSCollider2D : IRecordable, IColliderHierarchyNode
 
     internal SwiftHashSet<int>? CollisionPairHolders => _pairState.CollisionPairHolders;
 
-    public StiffBody2D? Body => _body;
+    public SolidBody2D? Body => _body;
 
     public IMatterAgent Agent
     {
@@ -303,7 +303,7 @@ public abstract class LSCollider2D : IRecordable, IColliderHierarchyNode
 
     public Fixed64 MaxY => _bounds.MaxY;
 
-    internal void Initialize(StiffBody2D body)
+    internal void Initialize(SolidBody2D body)
     {
         ThrowIfCompoundPartLifecycle(nameof(Initialize));
         SwiftThrowHelper.ThrowIfNull(body, nameof(body));
@@ -317,7 +317,7 @@ public abstract class LSCollider2D : IRecordable, IColliderHierarchyNode
         Context.Physics2D.AssimilateCollider(this);
     }
 
-    private void InitCore(IMatterAgent agent, StiffBody2D? body)
+    private void InitCore(IMatterAgent agent, SolidBody2D? body)
     {
         SwiftThrowHelper.ThrowIfNull(agent, nameof(agent));
         _body = body;

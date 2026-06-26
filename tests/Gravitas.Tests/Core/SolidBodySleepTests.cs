@@ -6,7 +6,7 @@ using Xunit;
 
 namespace Gravitas.Tests.Core;
 
-public sealed class StiffBodySleepTests
+public sealed class SolidBodySleepTests
 {
     [Fact]
     public void LateSimulate_AtRestForSleepWindow_ShouldPutBodyToSleep()

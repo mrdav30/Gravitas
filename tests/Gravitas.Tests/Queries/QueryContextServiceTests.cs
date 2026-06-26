@@ -36,7 +36,7 @@ public sealed class QueryContextServiceTests
             hits3D);
 
         using GravitasWorldContext context2D = Physics2DTestWorld.CreateContext();
-        StiffBody2D circle = CreateStaticCircle2D(context2D, Vector2d.Zero);
+        SolidBody2D circle = CreateStaticCircle2D(context2D, Vector2d.Zero);
         var hits2D = new SwiftList<Physics2DHit>();
 
         int count2D = context2D.Query2D.RaycastAll(
@@ -54,7 +54,7 @@ public sealed class QueryContextServiceTests
     {
         var agent = new TestMatterAgent(context);
         var collider = new LSSphereCollider();
-        var body = new StiffBody(agent, collider)
+        var body = new SolidBody(agent, collider)
         {
             Mass = Fixed64.One
         };
@@ -63,14 +63,14 @@ public sealed class QueryContextServiceTests
         return collider;
     }
 
-    private static StiffBody2D CreateStaticCircle2D(GravitasWorldContext context, Vector2d position)
+    private static SolidBody2D CreateStaticCircle2D(GravitasWorldContext context, Vector2d position)
     {
         var transform = new FixedTransform(
             new Vector3d(position.X, Fixed64.Zero, position.Y),
             FixedQuaternion.Identity,
             Vector3d.One);
         var agent = new TestMatterAgent(context, transform);
-        var body = new StiffBody2D(agent, new LSCircleCollider2D(Fixed64.Half))
+        var body = new SolidBody2D(agent, new LSCircleCollider2D(Fixed64.Half))
         {
             Immovable = true,
             Mass = Fixed64.One

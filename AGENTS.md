@@ -60,7 +60,7 @@ Read these in order before making non-trivial changes:
      should not be buried inside feature plans.
 5. [`src/Gravitas/Runtime/GravitasWorldContext.cs`](src/Gravitas/Runtime/GravitasWorldContext.cs),
    [`src/Gravitas/Core/3D/GravitasPhysicsService.cs`](src/Gravitas/Core/3D/GravitasPhysicsService.cs),
-   and [`src/Gravitas/Core/3D/StiffBody.cs`](src/Gravitas/Core/3D/StiffBody.cs).
+   and [`src/Gravitas/Core/3D/SolidBody.cs`](src/Gravitas/Core/3D/SolidBody.cs).
 6. The relevant source folder under [`src/Gravitas`](src/Gravitas).
 7. The matching test or benchmark area under [`tests`](tests). Runtime,
    collision, partition, query, serialization, CCD, shape definition, and
@@ -161,11 +161,11 @@ The current runtime uses explicit world-context ownership:
 - `GravitasDiagnosticSink` owns disabled-by-default diagnostic event and debug
   draw buffers for one context. It should expose deterministic data that host
   adapters can render or log without engine dependencies.
-- `StiffBody` owns simulated body state: position, rotation, visual
+- `SolidBody` owns simulated body state: position, rotation, visual
   interpolation state, velocity, acceleration, drag, friction, grounding,
   transforms, opt-in continuous-collision mode, frame-start CCD displacement,
   and Chronicler state recording.
-- `StiffBody2D` owns pure 2D body state: X/Z-projected position, scalar yaw,
+- `SolidBody2D` owns pure 2D body state: X/Z-projected position, scalar yaw,
   linear velocity, force integration, sleep/wake state, visualization transform
   publishing, opt-in continuous-collision mode, frame-start CCD displacement,
   and Chronicler state recording.
@@ -213,7 +213,7 @@ for visualization and host-facing presentation only.
 ## 2D, 3D, And Mixed-Dimension Direction
 
 Gravitas still has deeper 3D coverage, but pure 2D has a first-class
-runtime path through `StiffBody2D`, `LSCollider2D`,
+runtime path through `SolidBody2D`, `LSCollider2D`,
 `GravitasPhysics2DService`, `GravitasCollision2DService`,
 `PhysicsPartition2D`, `ColliderShapeDefinition2D`, `CompoundColliderPart2D`,
 and `LSCompoundCollider2D`. `PhysicsRuntimeMode` is a validated bitmask:
@@ -244,7 +244,7 @@ When adding or redesigning dimension-sensitive behavior:
   slabs/prisms centered on host-transform Y, dimension-tagged pair identity,
   explicit trigger/contact events, and a plane-constrained 2D impulse model.
 - Keep dimensional choices explicit in public APIs and tests.
-- Avoid naming that implies engine-specific behavior. `StiffBody`
+- Avoid naming that implies engine-specific behavior. `SolidBody`
   is the current term; future redesigns may rename or split it if that
   clarifies body semantics.
 
@@ -497,7 +497,7 @@ Preferred split order:
    and depends tightly on its private authoritative state.
 
 When using partials, keep them organized by responsibility rather than by
-chronology. For dimensional counterparts such as `StiffBody` and `StiffBody2D`,
+chronology. For dimensional counterparts such as `SolidBody` and `SolidBody2D`,
 prefer partial parity (`Motion`, `Serialization`, `ContinuousCollision.*`, and
 similar slices) unless the physics model is intentionally asymmetric, such as
 3D-only grounding. Do not create a service just to avoid a partial if the
@@ -602,7 +602,7 @@ Prioritize tests for:
   service ownership, and reset behavior.
 - `GravitasPhysicsService` assimilation, dessimilation, collider lookup, pair
   ownership, and reset behavior.
-- `StiffBody` force integration, velocity changes, drag/friction, grounding,
+- `SolidBody` force integration, velocity changes, drag/friction, grounding,
   rotation, transform helpers, rest state, and serialization.
 - collider bounds, local/world transforms, layer filtering, trigger/contact
   events, parent/child collision exclusion, and partition lifecycle.

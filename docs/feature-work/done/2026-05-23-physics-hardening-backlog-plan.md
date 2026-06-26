@@ -14,7 +14,7 @@
 
 ## Source Context Reviewed
 
-- `src/Gravitas/Core/StiffBody.cs`
+- `src/Gravitas/Core/SolidBody.cs`
 - `src/Gravitas/Support/PhysicsLayer.cs`
 - `src/Gravitas/Settings/PhysicsSettings.cs`
 - `src/Gravitas/Partitions/PhysicsPartition.cs`
@@ -92,9 +92,9 @@
 | `CollisionPair` | Time-spaced culling can miss behavior; culling should account for distance, velocity, and pair state. | P1 | Phase 7 complete |
 | `LSCollider` | Teleports should invalidate culling assumptions. | P1 | Phase 7 complete |
 | `PhysicsPartition` | Dynamic-object removal is linear. | P2 | Phase 7 complete |
-| `StiffBody` | Initialization assumes grounded instead of deriving it from the world. | P1 | Phase 6 complete |
-| `StiffBody` | Rotation visualization interpolation needs a clear speed/time contract. | P2 | Phase 6 complete |
-| `StiffBody` | Force/ground debug visualization should become engine-agnostic diagnostics. | P2 | Phase 10 |
+| `SolidBody` | Initialization assumes grounded instead of deriving it from the world. | P1 | Phase 6 complete |
+| `SolidBody` | Rotation visualization interpolation needs a clear speed/time contract. | P2 | Phase 6 complete |
+| `SolidBody` | Force/ground debug visualization should become engine-agnostic diagnostics. | P2 | Phase 10 |
 | `PhysicsMesh` | Edge cache may be removable if face normals and on-demand edge normals cover all callers. | P2 | Phase 8 reviewed; retained for SAT |
 
 ## Recommendations
@@ -158,7 +158,7 @@
   invariant tests, and `collision-detection`/`collision-response` benchmark
   aliases.
 - Fixed three small issues exposed by the new baseline:
-  - `StiffBody.Setup(...)` no longer evaluates stateful collider `Shape` before
+  - `SolidBody.Setup(...)` no longer evaluates stateful collider `Shape` before
     the collider has a transform/body.
   - capsule/capsule detection now handles degenerate capsule line segments
     deterministically.
@@ -394,7 +394,7 @@
 - Modify: `src/Gravitas/CollisionHandling/CollisionResponse.cs`
 - Modify: `src/Gravitas/CollisionHandling/CollisionPair.cs`
 - Modify: `src/Gravitas/CollisionHandling/Support/ContactPoint.cs`
-- Modify: `src/Gravitas/Core/StiffBody.cs`
+- Modify: `src/Gravitas/Core/SolidBody.cs`
 - Modify: `tests/Gravitas.Tests/CollisionHandling/CollisionResponseInvariantTests.cs`
 - Modify: `tests/Gravitas.Tests/CollisionHandling/CollisionDetectionShapePairTests.cs`
 - Modify: `tests/Gravitas.Tests/Support/PhysicsScenarioBuilder.cs`
@@ -417,7 +417,7 @@
   relative contact arms, depth, and A-to-B normal.
 - Treats `Immovable` and `IsKinematic` bodies as infinite mass for response.
   Movable bodies receive direct collision velocity deltas instead of the
-  time-scaled `StiffBody.AddLinearImpulse(...)` host API.
+  time-scaled `SolidBody.AddLinearImpulse(...)` host API.
 - Removed the hidden `ContactPoint` depth floor. Contact data now stores the
   narrow-phase depth directly, including zero-depth touching contacts.
 - Added `ContactPoint.HasContact` so zero-valued contact fields are not used as
@@ -451,7 +451,7 @@
   active-pair processing:
   - `ActivePairProcessingLateSimulate`: 64 colliders, mean about `58.72 us`.
   - Other included smoke paths also reported `0 B` allocated:
-    `StiffBodyLateSimulateOnly`, the then-current grounding query path, and
+    `SolidBodyLateSimulateOnly`, the then-current grounding query path, and
     `CollisionPartitionDistributionOnly`.
 
 ## Phase 6: Body, Grounding, And Visualization Semantics
@@ -460,11 +460,11 @@
 
 **Files:**
 
-- Modify: `src/Gravitas/Core/StiffBody.cs`
+- Modify: `src/Gravitas/Core/SolidBody.cs`
 - Modify: `src/Gravitas/Runtime/GravitasClock.cs`
 - Modify: `src/Gravitas/Settings/PhysicsSettings.cs`
-- Create: `tests/Gravitas.Tests/Core/StiffBodyGroundingTests.cs`
-- Create: `tests/Gravitas.Tests/Core/StiffBodyIntegrationTests.cs`
+- Create: `tests/Gravitas.Tests/Core/SolidBodyGroundingTests.cs`
+- Create: `tests/Gravitas.Tests/Core/SolidBodyIntegrationTests.cs`
 - Modify: `docs/wiki/RUNTIME_ARCHITECTURE.md`
 - Modify: `docs/wiki/HOST_INTEGRATION.md`
 
@@ -478,7 +478,7 @@
 
 **Phase 6 completion notes:**
 
-- `StiffBody.Initialize(...)` now starts airborne, registers/partitions its
+- `SolidBody.Initialize(...)` now starts airborne, registers/partitions its
   collider, and then performs an explicit ground probe. Bodies only start
   grounded when the configured ground mask produces a non-self hit.
 - Ground checks now use `PhysicsSettings.GroundCheckLayerMask` with
@@ -502,7 +502,7 @@
 - Updated `simulation-allocation` benchmark coverage to exercise the current
   grounding raycast-probe path.
 - Verification:
-  - `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~StiffBodyGroundingTests|FullyQualifiedName~StiffBodyIntegrationTests|FullyQualifiedName~GravitasClockTests"`:
+  - `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~SolidBodyGroundingTests|FullyQualifiedName~SolidBodyIntegrationTests|FullyQualifiedName~GravitasClockTests"`:
     17 passed.
   - `dotnet build Gravitas.slnx --configuration Release`: succeeded with 0
     warnings and 0 errors.
@@ -513,7 +513,7 @@
     passed.
   - `simulation-allocation` short benchmark smoke reported no managed
     allocation in the summary `Allocated` column. Timings on this machine:
-    `StiffBodyLateSimulateOnly` about `206.3 us`,
+    `SolidBodyLateSimulateOnly` about `206.3 us`,
     `GroundingRaycastProbeOnly` about `137.7 us`,
     `CollisionPartitionDistributionOnly` about `128.7 us`, and
     `ActivePairProcessingLateSimulate` about `145.1 us`. BenchmarkDotNet could
@@ -578,7 +578,7 @@
   repartitioning, direct partition member churn, and culled-pair rechecks.
 - Short benchmark smoke on this machine:
   - `simulation-allocation`: still reported `0 B` allocated for
-    `StiffBodyLateSimulateOnly`, `GroundingRaycastProbeOnly`,
+    `SolidBodyLateSimulateOnly`, `GroundingRaycastProbeOnly`,
     `CollisionPartitionDistributionOnly`, and `ActivePairProcessingLateSimulate`.
   - `collision-partition`: `SimulatePartitionedDynamicSpheres` reported `0 B`
     allocated; registration/construction scenarios still allocate by design.
@@ -635,7 +635,7 @@ start reporting those paths as if they were final.
 - Create: `src/Gravitas/Raycasting/SweptSphereQueryWorker.cs`
 - Modify: `src/Gravitas/Raycasting/LSRaycastHit.cs` only if hit metadata needs
   a query-shape flag or swept-radius value.
-- Modify: `src/Gravitas/Core/StiffBody.cs`
+- Modify: `src/Gravitas/Core/SolidBody.cs`
 - Create: `src/Gravitas/Core/GroundProbeMode.cs`
 - Modify: `src/Gravitas/Settings/PhysicsSettings.cs` if a context default
   ground-probe mode belongs in settings.
@@ -647,7 +647,7 @@ start reporting those paths as if they were final.
 - Modify: `src/Gravitas/Colliders/Support/CollisionType.cs`
 - Modify: `src/Gravitas/CollisionHandling/Support/Context/MeshObjectInfo.cs`
 - Create: `tests/Gravitas.Tests/Raycasting/GravitasSweptSphereQueryTests.cs`
-- Create: `tests/Gravitas.Tests/Core/StiffBodyGroundProbeModeTests.cs`
+- Create: `tests/Gravitas.Tests/Core/SolidBodyGroundProbeModeTests.cs`
 - Modify: `tests/Gravitas.Tests/CollisionHandling/CollisionDetectionShapePairTests.cs`
 - Create: `tests/Gravitas.Tests/Colliders/LSMeshColliderQueryTests.cs`
 - Modify: `tests/Gravitas.Benchmarks/Raycasting/QueryServiceBenchmarks.cs`
@@ -686,7 +686,7 @@ start reporting those paths as if they were final.
 - [x] Add `GroundProbeMode` with at least `Ray`, `SweptSphere`, and `Auto`.
   Prefer body-level selection with an optional settings default rather than a
   hidden global switch.
-- [x] Update `StiffBody.CheckGround()` so `Ray` preserves the Phase 6 sorted
+- [x] Update `SolidBody.CheckGround()` so `Ray` preserves the Phase 6 sorted
   raycast/self-exclusion behavior, `SweptSphere` uses the new query, and `Auto`
   chooses from collider shape/size using explicit rules. A likely alpha policy
   is swept sphere for sphere/capsule/wide finite bodies and ray for small or
@@ -833,7 +833,7 @@ about.
 - Create: `src/Gravitas/Diagnostics/GravitasDiagnosticEventKind.cs`
 - Create: `src/Gravitas/Diagnostics/GravitasDebugDrawKind.cs`
 - Modify: `src/Gravitas/Runtime/GravitasWorldContext.cs`
-- Modify: `src/Gravitas/Core/StiffBody.cs`
+- Modify: `src/Gravitas/Core/SolidBody.cs`
 - Modify: `src/Gravitas/CollisionHandling/CollisionPair.cs`
 - Modify: `src/Gravitas/CollisionHandling/CollisionResponse.cs`
 - Modify: `src/Gravitas/Raycasting/GravitasRaycastService.cs`

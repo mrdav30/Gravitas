@@ -32,18 +32,18 @@ public class KinematicActiveCcdScalingBenchmarks
     private GravitasWorldContext _rotational2DContext;
     private GravitasWorldContext _mixed3DSourceContext;
     private GravitasWorldContext _mixed2DSourceContext;
-    private SwiftList<StiffBody> _sparse3DSources;
-    private SwiftList<StiffBody> _firstHit3DSources;
-    private SwiftList<StiffBody> _dense3DSources;
-    private SwiftList<StiffBody> _rotational3DSources;
-    private SwiftList<StiffBody2D> _sparse2DSources;
-    private SwiftList<StiffBody2D> _firstHit2DSources;
-    private SwiftList<StiffBody2D> _dense2DSources;
-    private SwiftList<StiffBody2D> _rotational2DSources;
-    private SwiftList<StiffBody> _mixed3DSources;
-    private SwiftList<StiffBody2D> _mixed2DTargets;
-    private SwiftList<StiffBody2D> _mixed2DSources;
-    private SwiftList<StiffBody> _mixed3DTargets;
+    private SwiftList<SolidBody> _sparse3DSources;
+    private SwiftList<SolidBody> _firstHit3DSources;
+    private SwiftList<SolidBody> _dense3DSources;
+    private SwiftList<SolidBody> _rotational3DSources;
+    private SwiftList<SolidBody2D> _sparse2DSources;
+    private SwiftList<SolidBody2D> _firstHit2DSources;
+    private SwiftList<SolidBody2D> _dense2DSources;
+    private SwiftList<SolidBody2D> _rotational2DSources;
+    private SwiftList<SolidBody> _mixed3DSources;
+    private SwiftList<SolidBody2D> _mixed2DTargets;
+    private SwiftList<SolidBody2D> _mixed2DSources;
+    private SwiftList<SolidBody> _mixed3DTargets;
     private Vector3d[] _sparse3DPositions;
     private Vector3d[] _firstHit3DPositions;
     private Vector3d[] _dense3DPositions;
@@ -75,18 +75,18 @@ public class KinematicActiveCcdScalingBenchmarks
         _mixed3DSourceContext = CreateMixedContext(ContinuousCollisionBenchmarkLayout.SparseExtentX(mixedCount) + 16, ContinuousCollisionBenchmarkLayout.SparseExtentZ(mixedCount) + 16);
         _mixed2DSourceContext = CreateMixedContext(ContinuousCollisionBenchmarkLayout.SparseExtentX(mixedCount) + 16, ContinuousCollisionBenchmarkLayout.SparseExtentZ(mixedCount) + 16);
 
-        _sparse3DSources = new SwiftList<StiffBody>(BodyCount);
-        _firstHit3DSources = new SwiftList<StiffBody>(BodyCount);
-        _dense3DSources = new SwiftList<StiffBody>(BodyCount);
-        _rotational3DSources = new SwiftList<StiffBody>(BodyCount);
-        _sparse2DSources = new SwiftList<StiffBody2D>(BodyCount);
-        _firstHit2DSources = new SwiftList<StiffBody2D>(BodyCount);
-        _dense2DSources = new SwiftList<StiffBody2D>(BodyCount);
-        _rotational2DSources = new SwiftList<StiffBody2D>(BodyCount);
-        _mixed3DSources = new SwiftList<StiffBody>(mixedCount);
-        _mixed2DTargets = new SwiftList<StiffBody2D>(mixedCount);
-        _mixed2DSources = new SwiftList<StiffBody2D>(mixedCount);
-        _mixed3DTargets = new SwiftList<StiffBody>(mixedCount);
+        _sparse3DSources = new SwiftList<SolidBody>(BodyCount);
+        _firstHit3DSources = new SwiftList<SolidBody>(BodyCount);
+        _dense3DSources = new SwiftList<SolidBody>(BodyCount);
+        _rotational3DSources = new SwiftList<SolidBody>(BodyCount);
+        _sparse2DSources = new SwiftList<SolidBody2D>(BodyCount);
+        _firstHit2DSources = new SwiftList<SolidBody2D>(BodyCount);
+        _dense2DSources = new SwiftList<SolidBody2D>(BodyCount);
+        _rotational2DSources = new SwiftList<SolidBody2D>(BodyCount);
+        _mixed3DSources = new SwiftList<SolidBody>(mixedCount);
+        _mixed2DTargets = new SwiftList<SolidBody2D>(mixedCount);
+        _mixed2DSources = new SwiftList<SolidBody2D>(mixedCount);
+        _mixed3DTargets = new SwiftList<SolidBody>(mixedCount);
 
         _sparse3DPositions = new Vector3d[BodyCount];
         _firstHit3DPositions = new Vector3d[BodyCount];
@@ -317,10 +317,10 @@ public class KinematicActiveCcdScalingBenchmarks
         }
     }
 
-    private static StiffBody CreateKinematicSphere3D(GravitasWorldContext context, Vector3d position)
+    private static SolidBody CreateKinematicSphere3D(GravitasWorldContext context, Vector3d position)
     {
         var agent = new BenchmarkMatterAgent(context, position);
-        var body = new StiffBody(agent, new LSSphereCollider())
+        var body = new SolidBody(agent, new LSSphereCollider())
         {
             ContinuousCollisionMode = ContinuousCollisionMode.Continuous,
             IsKinematic = true,
@@ -331,10 +331,10 @@ public class KinematicActiveCcdScalingBenchmarks
         return body;
     }
 
-    private static StiffBody CreateKinematicThinCuboid3D(GravitasWorldContext context, Vector3d position)
+    private static SolidBody CreateKinematicThinCuboid3D(GravitasWorldContext context, Vector3d position)
     {
         var agent = new BenchmarkMatterAgent(context, position);
-        var body = new StiffBody(
+        var body = new SolidBody(
             agent,
             new LSCuboidCollider
             {
@@ -350,10 +350,10 @@ public class KinematicActiveCcdScalingBenchmarks
         return body;
     }
 
-    private static StiffBody2D CreateKinematicCircle2D(GravitasWorldContext context, Vector2d position)
+    private static SolidBody2D CreateKinematicCircle2D(GravitasWorldContext context, Vector2d position)
     {
         var agent = new BenchmarkMatterAgent(context, position.ToVector3d(Fixed64.Zero));
-        var body = new StiffBody2D(agent, new LSCircleCollider2D(Fixed64.Half))
+        var body = new SolidBody2D(agent, new LSCircleCollider2D(Fixed64.Half))
         {
             ContinuousCollisionMode = ContinuousCollisionMode.Continuous,
             IsKinematic = true,
@@ -364,7 +364,7 @@ public class KinematicActiveCcdScalingBenchmarks
         return body;
     }
 
-    private static StiffBody2D CreateKinematicThinPolygon2D(GravitasWorldContext context, Vector2d position)
+    private static SolidBody2D CreateKinematicThinPolygon2D(GravitasWorldContext context, Vector2d position)
     {
         var agent = new BenchmarkMatterAgent(context, position.ToVector3d(Fixed64.Zero));
         var collider = new LSPolygonCollider2D(
@@ -372,7 +372,7 @@ public class KinematicActiveCcdScalingBenchmarks
             new Vector2d((Fixed64)3, Fixed64.FromFraction(-1, 10)),
             new Vector2d((Fixed64)3, Fixed64.FromFraction(1, 10)),
             new Vector2d((Fixed64)(-3), Fixed64.FromFraction(1, 10)));
-        var body = new StiffBody2D(agent, collider)
+        var body = new SolidBody2D(agent, collider)
         {
             ContinuousCollisionMode = ContinuousCollisionMode.Continuous,
             IsKinematic = true,
@@ -383,33 +383,33 @@ public class KinematicActiveCcdScalingBenchmarks
         return body;
     }
 
-    private static void ResetKinematic3DSources(SwiftList<StiffBody> sources, Vector3d[] positions, Vector3d displacement)
+    private static void ResetKinematic3DSources(SwiftList<SolidBody> sources, Vector3d[] positions, Vector3d displacement)
     {
         for (int i = 0; i < sources.Count; i++)
         {
-            StiffBody source = sources[i];
+            SolidBody source = sources[i];
             Vector3d position = positions[i];
             source.ResetPosition(position, FixedQuaternion.Identity);
             source.Agent.Transform.Position = position + displacement;
         }
     }
 
-    private static void ResetKinematic3DRotationalSources(SwiftList<StiffBody> sources, Vector3d[] positions)
+    private static void ResetKinematic3DRotationalSources(SwiftList<SolidBody> sources, Vector3d[] positions)
     {
         for (int i = 0; i < sources.Count; i++)
         {
-            StiffBody source = sources[i];
+            SolidBody source = sources[i];
             Vector3d position = positions[i];
             source.ResetPosition(position, FixedQuaternion.Identity);
             source.Agent.Transform.Rotation = QuarterTurn3D;
         }
     }
 
-    private static void ResetKinematic2DSources(SwiftList<StiffBody2D> sources, Vector2d[] positions, Vector2d displacement)
+    private static void ResetKinematic2DSources(SwiftList<SolidBody2D> sources, Vector2d[] positions, Vector2d displacement)
     {
         for (int i = 0; i < sources.Count; i++)
         {
-            StiffBody2D source = sources[i];
+            SolidBody2D source = sources[i];
             Vector2d position = positions[i];
             source.SetPosition(position);
             source.SetRotation(Fixed64.Zero);
@@ -418,11 +418,11 @@ public class KinematicActiveCcdScalingBenchmarks
         }
     }
 
-    private static void ResetKinematic2DRotationalSources(SwiftList<StiffBody2D> sources, Vector2d[] positions)
+    private static void ResetKinematic2DRotationalSources(SwiftList<SolidBody2D> sources, Vector2d[] positions)
     {
         for (int i = 0; i < sources.Count; i++)
         {
-            StiffBody2D source = sources[i];
+            SolidBody2D source = sources[i];
             Vector2d position = positions[i];
             source.SetPosition(position);
             source.SetRotation(Fixed64.Zero);

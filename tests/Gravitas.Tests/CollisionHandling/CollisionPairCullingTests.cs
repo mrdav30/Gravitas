@@ -123,7 +123,7 @@ public sealed class CollisionPairCullingTests
         second.PartitionChanged = false;
     }
 
-    private static void ClearBodyChangeFlags(StiffBody first, StiffBody second)
+    private static void ClearBodyChangeFlags(SolidBody first, SolidBody second)
     {
         first.CheckChangedValues();
         second.CheckChangedValues();

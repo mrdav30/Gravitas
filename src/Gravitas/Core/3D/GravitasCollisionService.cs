@@ -324,7 +324,7 @@ public sealed class GravitasCollisionService
         if (!collider.IsPartitioned || collider.PartitionCoordinates == null)
             return;
 
-        StiffBody? body = collider.Body;
+        SolidBody? body = collider.Body;
         if (body == null || body.Immovable || body.IsKinematic)
             return;
 
@@ -407,7 +407,7 @@ public sealed class GravitasCollisionService
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static PhysicsPartitionMobilityKind GetMobilityKind(LSCollider collider)
     {
-        StiffBody? body = collider.Body;
+        SolidBody? body = collider.Body;
         if (body == null || body.Immovable)
             return PhysicsPartitionMobilityKind.Static;
 

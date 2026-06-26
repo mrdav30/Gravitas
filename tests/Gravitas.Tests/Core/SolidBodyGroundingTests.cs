@@ -7,7 +7,7 @@ using Xunit;
 
 namespace Gravitas.Tests.Core;
 
-public sealed class StiffBodyGroundingTests
+public sealed class SolidBodyGroundingTests
 {
     [Fact]
     public void Initialize_WithGroundBelow_ShouldProbeGroundImmediately()

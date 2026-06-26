@@ -175,17 +175,17 @@ public class MixedQueryCompound2DBenchmarks
             _hits);
     }
 
-    private static StiffBody2D CreateAabb2D(GravitasWorldContext context, Vector3d position)
+    private static SolidBody2D CreateAabb2D(GravitasWorldContext context, Vector3d position)
     {
         return CreateBody2D(context, new LSAABBoxCollider2D(new Vector2d((Fixed64)2, (Fixed64)2)), position);
     }
 
-    private static StiffBody2D CreatePolygon2D(GravitasWorldContext context, Vector3d position)
+    private static SolidBody2D CreatePolygon2D(GravitasWorldContext context, Vector3d position)
     {
         return CreateBody2D(context, new LSPolygonCollider2D(CreateDiamondVertices()), position);
     }
 
-    private static StiffBody2D CreateCompound2D(GravitasWorldContext context, Vector3d position)
+    private static SolidBody2D CreateCompound2D(GravitasWorldContext context, Vector3d position)
     {
         return CreateBody2D(
             context,
@@ -197,10 +197,10 @@ public class MixedQueryCompound2DBenchmarks
             position);
     }
 
-    private static StiffBody2D CreateBody2D(GravitasWorldContext context, LSCollider2D collider, Vector3d position)
+    private static SolidBody2D CreateBody2D(GravitasWorldContext context, LSCollider2D collider, Vector3d position)
     {
         var agent = new BenchmarkMatterAgent(context, position);
-        var body = new StiffBody2D(agent, collider)
+        var body = new SolidBody2D(agent, collider)
         {
             Mass = Fixed64.One,
             Immovable = true

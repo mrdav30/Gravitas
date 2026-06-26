@@ -56,7 +56,7 @@ public sealed class MixedResponseTests
         ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(
             context,
             new Vector3d(-Fixed64.FromFraction(1, 4), Fixed64.Zero, Fixed64.Zero));
-        StiffBody2D body2D = CreateCircle2D(context, Vector2d.Zero);
+        SolidBody2D body2D = CreateCircle2D(context, Vector2d.Zero);
 
         Step(context);
 
@@ -73,7 +73,7 @@ public sealed class MixedResponseTests
         ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(
             context,
             new Vector3d(-Fixed64.FromFraction(5, 4), Fixed64.Zero, Fixed64.Zero));
-        StiffBody2D body2D = CreateCircle2D(context, Vector2d.Zero, immovable: true);
+        SolidBody2D body2D = CreateCircle2D(context, Vector2d.Zero, immovable: true);
         Vector3d startPosition = body3D.Body.Position3d;
         int entered = 0;
         body3D.Collider.OnMixedContactEnter += other =>
@@ -103,7 +103,7 @@ public sealed class MixedResponseTests
         ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(
             context,
             new Vector3d(Fixed64.Zero, -Fixed64.Half, Fixed64.Zero));
-        StiffBody2D body2D = CreateCircle2D(context, Vector2d.Zero);
+        SolidBody2D body2D = CreateCircle2D(context, Vector2d.Zero);
         var pair = new CollisionPairMixed(body3D.Collider, body2D.Collider);
         var contact = new MixedContact(
             new Vector3d(Fixed64.Zero, -Fixed64.Half, Fixed64.Half),
@@ -126,7 +126,7 @@ public sealed class MixedResponseTests
         ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(
             context,
             new Vector3d(-Fixed64.Half, Fixed64.Zero, Fixed64.Half));
-        StiffBody2D body2D = CreateCircle2D(context, Vector2d.Zero);
+        SolidBody2D body2D = CreateCircle2D(context, Vector2d.Zero);
         var pair = new CollisionPairMixed(body3D.Collider, body2D.Collider);
         var contact = new MixedContact(
             new Vector3d(-Fixed64.Half, Fixed64.Zero, Fixed64.Half),
@@ -149,7 +149,7 @@ public sealed class MixedResponseTests
         ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(
             context,
             new Vector3d(-Fixed64.Half, -Fixed64.FromFraction(1, 4), Fixed64.Half));
-        StiffBody2D body2D = CreateCircle2D(context, Vector2d.Zero);
+        SolidBody2D body2D = CreateCircle2D(context, Vector2d.Zero);
         var pair = new CollisionPairMixed(body3D.Collider, body2D.Collider);
         var contact = new MixedContact(
             new Vector3d(-Fixed64.Half, -Fixed64.FromFraction(1, 4), Fixed64.Half),
@@ -220,7 +220,7 @@ public sealed class MixedResponseTests
         ScenarioBody<LSSphereCollider> sleeping3D = CreateSphere3D(
             context,
             new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
-        StiffBody2D bridge2D = CreateCircle2D(context, Vector2d.Zero);
+        SolidBody2D bridge2D = CreateCircle2D(context, Vector2d.Zero);
 
         Step(context);
         context.MixedCollisions.ActivePairCount.Should().Be(2);
@@ -261,7 +261,7 @@ public sealed class MixedResponseTests
             context,
             new Vector3d(-Fixed64.FromFraction(1, 4), Fixed64.Zero, Fixed64.Zero),
             isKinematic: true);
-        StiffBody2D body2D = CreateCircle2D(context, Vector2d.Zero);
+        SolidBody2D body2D = CreateCircle2D(context, Vector2d.Zero);
 
         Step(context);
 
@@ -296,7 +296,7 @@ public sealed class MixedResponseTests
     {
         using GravitasWorldContext context = CreateMixedContext();
         _ = CreateSphere3D(context, new Vector3d(-Fixed64.FromFraction(1, 4), Fixed64.Zero, Fixed64.Zero));
-        StiffBody2D sleeping2D = CreateCircle2D(context, Vector2d.Zero);
+        SolidBody2D sleeping2D = CreateCircle2D(context, Vector2d.Zero);
         sleeping2D.Sleep();
 
         Step(context);
@@ -309,7 +309,7 @@ public sealed class MixedResponseTests
     {
         using GravitasWorldContext context = CreateMixedContextWithLayerBlock();
         ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(context, Vector3d.Zero, layer: new PhysicsLayer(1));
-        StiffBody2D body2D = CreateCircle2D(context, Vector2d.Zero, layer: new PhysicsLayer(2));
+        SolidBody2D body2D = CreateCircle2D(context, Vector2d.Zero, layer: new PhysicsLayer(2));
         int entered = 0;
         body3D.Collider.OnMixedContactEnter += _ => entered++;
 
@@ -354,7 +354,7 @@ public sealed class MixedResponseTests
         ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(
             context,
             new Vector3d(-Fixed64.FromFraction(1, 4), Fixed64.Zero, Fixed64.Zero));
-        StiffBody2D body2D = CreateCircle2D(context, Vector2d.Zero);
+        SolidBody2D body2D = CreateCircle2D(context, Vector2d.Zero);
 
         for (int i = 0; i < 5; i++)
         {
@@ -471,7 +471,7 @@ public sealed class MixedResponseTests
             collider.Layer = layer.Value;
 
         var agent = new TestMatterAgent(context, new FixedTransform(position, FixedQuaternion.Identity, Vector3d.One));
-        var body = new StiffBody(agent, collider)
+        var body = new SolidBody(agent, collider)
         {
             Mass = Fixed64.One,
             Immovable = immovable,
@@ -482,7 +482,7 @@ public sealed class MixedResponseTests
         return new ScenarioBody<LSSphereCollider>(body, collider);
     }
 
-    private static StiffBody2D CreateCircle2D(
+    private static SolidBody2D CreateCircle2D(
         GravitasWorldContext context,
         Vector2d position,
         bool immovable = false,
@@ -495,7 +495,7 @@ public sealed class MixedResponseTests
         var agent = new TestMatterAgent(
             context,
             new FixedTransform(new Vector3d(position.X, Fixed64.Zero, position.Y), FixedQuaternion.Identity, Vector3d.One));
-        var body = new StiffBody2D(agent, collider)
+        var body = new SolidBody2D(agent, collider)
         {
             Mass = Fixed64.One,
             Immovable = immovable,

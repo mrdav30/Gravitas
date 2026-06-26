@@ -77,7 +77,7 @@ public sealed class MixedNarrowPhaseTests
         ScenarioBody<LSSphereCollider> sphere = CreateSphere3D(
             context,
             new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
-        StiffBody2D circle = CreateBody2D(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero);
+        SolidBody2D circle = CreateBody2D(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero);
 
         bool collided = CollisionDetectionMixed.TryCollide(sphere.Collider, circle.Collider, out MixedContact contact);
 
@@ -96,7 +96,7 @@ public sealed class MixedNarrowPhaseTests
         ScenarioBody<LSSphereCollider> sphere = CreateSphere3D(
             context,
             new Vector3d(Fixed64.Zero, (Fixed64)2, Fixed64.Zero));
-        StiffBody2D circle = CreateBody2D(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero);
+        SolidBody2D circle = CreateBody2D(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero);
 
         CollisionDetectionMixed.TryCollide(sphere.Collider, circle.Collider, out MixedContact contact).Should().BeFalse();
         contact.HasContact.Should().BeFalse();
@@ -109,7 +109,7 @@ public sealed class MixedNarrowPhaseTests
         ScenarioBody<LSSphereCollider> sphere = CreateSphere3D(
             context,
             new Vector3d(Fixed64.FromFraction(3, 2), Fixed64.Zero, Fixed64.Zero));
-        StiffBody2D box = CreateBody2D(context, new LSAABBoxCollider2D(new Vector2d((Fixed64)2, (Fixed64)2)), Vector2d.Zero);
+        SolidBody2D box = CreateBody2D(context, new LSAABBoxCollider2D(new Vector2d((Fixed64)2, (Fixed64)2)), Vector2d.Zero);
 
         bool collided = CollisionDetectionMixed.TryCollide(sphere.Collider, box.Collider, out MixedContact contact);
 
@@ -132,7 +132,7 @@ public sealed class MixedNarrowPhaseTests
             new Vector2d(Fixed64.One, -Fixed64.One),
             new Vector2d(Fixed64.One, Fixed64.One),
             new Vector2d(-Fixed64.One, Fixed64.One));
-        StiffBody2D polygonBody = CreateBody2D(context, polygon, Vector2d.Zero);
+        SolidBody2D polygonBody = CreateBody2D(context, polygon, Vector2d.Zero);
 
         bool collided = CollisionDetectionMixed.TryCollide(sphere.Collider, polygonBody.Collider, out MixedContact contact);
 
@@ -174,7 +174,7 @@ public sealed class MixedNarrowPhaseTests
         ScenarioBody<LSCuboidCollider> cuboid = CreateCuboid3D(
             context,
             new Vector3d(Fixed64.FromFraction(3, 2), Fixed64.Zero, Fixed64.Zero));
-        StiffBody2D box = CreateBody2D(context, new LSAABBoxCollider2D(new Vector2d((Fixed64)2, (Fixed64)2)), Vector2d.Zero);
+        SolidBody2D box = CreateBody2D(context, new LSAABBoxCollider2D(new Vector2d((Fixed64)2, (Fixed64)2)), Vector2d.Zero);
 
         bool collided = CollisionDetectionMixed.TryCollide(cuboid.Collider, box.Collider, out MixedContact contact);
 
@@ -190,7 +190,7 @@ public sealed class MixedNarrowPhaseTests
     {
         using GravitasWorldContext context = CreateMixedContext();
         ScenarioBody<LSCylinderCollider> cylinder = CreateCylinder3D(context, Vector3d.Zero);
-        StiffBody2D box = CreateBody2D(context, new LSAABBoxCollider2D(new Vector2d((Fixed64)2, (Fixed64)2)), Vector2d.Zero);
+        SolidBody2D box = CreateBody2D(context, new LSAABBoxCollider2D(new Vector2d((Fixed64)2, (Fixed64)2)), Vector2d.Zero);
 
         bool firstCollided = CollisionDetectionMixed.TryCollide(cylinder.Collider, box.Collider, out MixedContact first);
         bool secondCollided = CollisionDetectionMixed.TryCollide(cylinder.Collider, box.Collider, out MixedContact second);
@@ -213,7 +213,7 @@ public sealed class MixedNarrowPhaseTests
         ScenarioBody<LSCylinderCollider> cylinder = CreateCylinder3D(
             context,
             new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
-        StiffBody2D circle = CreateBody2D(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero);
+        SolidBody2D circle = CreateBody2D(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero);
 
         bool collided = CollisionDetectionMixed.TryCollide(cylinder.Collider, circle.Collider, out MixedContact contact);
 
@@ -232,7 +232,7 @@ public sealed class MixedNarrowPhaseTests
         ScenarioBody<LSCapsuleCollider> capsule = CreateCapsule3D(
             context,
             new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
-        StiffBody2D circle = CreateBody2D(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero);
+        SolidBody2D circle = CreateBody2D(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero);
 
         bool collided = CollisionDetectionMixed.TryCollide(capsule.Collider, circle.Collider, out MixedContact contact);
 
@@ -250,7 +250,7 @@ public sealed class MixedNarrowPhaseTests
         ScenarioBody<LSCylinderCollider> cylinder = CreateCylinder3D(
             context,
             new Vector3d(Fixed64.Zero, (Fixed64)2, Fixed64.Zero));
-        StiffBody2D polygon = CreateBody2D(context, CreateSquarePolygon(), Vector2d.Zero, FixedMath.DegToRad((Fixed64)45));
+        SolidBody2D polygon = CreateBody2D(context, CreateSquarePolygon(), Vector2d.Zero, FixedMath.DegToRad((Fixed64)45));
 
         CollisionDetectionMixed.TryCollide(cylinder.Collider, polygon.Collider, out MixedContact contact).Should().BeFalse();
         contact.HasContact.Should().BeFalse();
@@ -261,7 +261,7 @@ public sealed class MixedNarrowPhaseTests
     {
         using GravitasWorldContext context = CreateMixedContext();
         ScenarioBody<LSCompoundCollider> compound = CreateCompound3D(context, Vector3d.Zero);
-        StiffBody2D circle = CreateBody2D(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero);
+        SolidBody2D circle = CreateBody2D(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero);
 
         bool collided = CollisionDetectionMixed.TryCollide(compound.Collider, circle.Collider, out MixedContact contact);
 
@@ -283,7 +283,7 @@ public sealed class MixedNarrowPhaseTests
         var compound2D = new LSCompoundCollider2D(
             CompoundColliderPart2D.Circle(Fixed64.Half, new Vector2d((Fixed64)(-4), Fixed64.Zero)),
             CompoundColliderPart2D.Circle(Fixed64.Half, Vector2d.Zero));
-        StiffBody2D body2D = CreateBody2D(context, compound2D, Vector2d.Zero);
+        SolidBody2D body2D = CreateBody2D(context, compound2D, Vector2d.Zero);
 
         bool collided = CollisionDetectionMixed.TryCollide(sphere.Collider, body2D.Collider, out MixedContact contact);
 
@@ -302,7 +302,7 @@ public sealed class MixedNarrowPhaseTests
             context,
             MeshTestFixtures.CreateConvexCube(),
             new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
-        StiffBody2D circle = CreateBody2D(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero);
+        SolidBody2D circle = CreateBody2D(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero);
 
         bool collided = CollisionDetectionMixed.TryCollide(mesh.Collider, circle.Collider, out MixedContact contact);
 
@@ -320,7 +320,7 @@ public sealed class MixedNarrowPhaseTests
             context,
             MeshTestFixtures.CreateInsideCorner(inertiaPolicy: MeshInertiaPolicy.SurfaceApproximation),
             Vector3d.Zero);
-        StiffBody2D box = CreateBody2D(
+        SolidBody2D box = CreateBody2D(
             context,
             new LSAABBoxCollider2D(new Vector2d(Fixed64.Half, Fixed64.Half)),
             new Vector2d(Fixed64.FromFraction(1, 4), Fixed64.FromFraction(1, 4)));
@@ -347,7 +347,7 @@ public sealed class MixedNarrowPhaseTests
             context,
             MeshTestFixtures.CreateInsideCorner(inertiaPolicy: MeshInertiaPolicy.SurfaceApproximation),
             Vector3d.Zero);
-        StiffBody2D polygon = CreateBody2D(
+        SolidBody2D polygon = CreateBody2D(
             context,
             CreateSquarePolygon(),
             new Vector2d(Fixed64.FromFraction(1, 4), Fixed64.FromFraction(1, 4)),
@@ -369,7 +369,7 @@ public sealed class MixedNarrowPhaseTests
             context,
             MeshTestFixtures.CreateUChannel(inertiaPolicy: MeshInertiaPolicy.SurfaceApproximation),
             Vector3d.Zero);
-        StiffBody2D circle = CreateBody2D(context, new LSCircleCollider2D(Fixed64.FromFraction(1, 4)), new Vector2d(Fixed64.Zero, (Fixed64)2));
+        SolidBody2D circle = CreateBody2D(context, new LSCircleCollider2D(Fixed64.FromFraction(1, 4)), new Vector2d(Fixed64.Zero, (Fixed64)2));
 
         CollisionDetectionMixed.TryCollide(mesh.Collider, circle.Collider, out MixedContact contact).Should().BeFalse();
         contact.HasContact.Should().BeFalse();
@@ -449,7 +449,7 @@ public sealed class MixedNarrowPhaseTests
         where TCollider : LSCollider
     {
         var agent = new TestMatterAgent(context, new FixedTransform(position, rotation, Vector3d.One));
-        var body = new StiffBody(agent, collider)
+        var body = new SolidBody(agent, collider)
         {
             Mass = Fixed64.One
         };
@@ -457,7 +457,7 @@ public sealed class MixedNarrowPhaseTests
         return new ScenarioBody<TCollider>(body, collider);
     }
 
-    private static StiffBody2D CreateBody2D(
+    private static SolidBody2D CreateBody2D(
         GravitasWorldContext context,
         LSCollider2D collider,
         Vector2d position,
@@ -466,7 +466,7 @@ public sealed class MixedNarrowPhaseTests
         var agent = new TestMatterAgent(
             context,
             new FixedTransform(new Vector3d(position.X, Fixed64.Zero, position.Y), FixedQuaternion.Identity, Vector3d.One));
-        var body = new StiffBody2D(agent, collider)
+        var body = new SolidBody2D(agent, collider)
         {
             Mass = Fixed64.One
         };

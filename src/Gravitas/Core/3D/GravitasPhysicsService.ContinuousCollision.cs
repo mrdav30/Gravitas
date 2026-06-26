@@ -24,7 +24,7 @@ public sealed partial class GravitasPhysicsService
         int peak = _dynamicBodies.PeakCount;
         for (int i = 0; i < peak; i++)
         {
-            if (_dynamicBodies.TryGetValue(i, out StiffBody body))
+            if (_dynamicBodies.TryGetValue(i, out SolidBody body))
             {
                 body.EnsureContinuousCollisionFramePrepared(token);
                 AddContinuousCollisionCandidate(body);
@@ -35,7 +35,7 @@ public sealed partial class GravitasPhysicsService
         _continuousCollisionPreparedToken = token;
     }
 
-    private void AddContinuousCollisionCandidate(StiffBody body)
+    private void AddContinuousCollisionCandidate(SolidBody body)
     {
         if (!body.Active
             || body.Immovable
@@ -68,7 +68,7 @@ public sealed partial class GravitasPhysicsService
         return _continuousCollisionCandidateIds;
     }
 
-    internal void QueueContinuousCollisionHandoff(StiffBody body)
+    internal void QueueContinuousCollisionHandoff(SolidBody body)
     {
         int dynamicId = body.DynamicId;
         if (dynamicId < 0
@@ -102,7 +102,7 @@ public sealed partial class GravitasPhysicsService
         while (readIndex < _continuousCollisionHandoffQueue.Count && iterations < iterationBudget)
         {
             int dynamicId = _continuousCollisionHandoffQueue[readIndex++];
-            if (!TryGetDynamicBody(dynamicId, out StiffBody body))
+            if (!TryGetDynamicBody(dynamicId, out SolidBody body))
                 continue;
 
             if (body.TryConsumeContinuousCollisionHandoff(updateSleepState: false, updateColliderState: false))

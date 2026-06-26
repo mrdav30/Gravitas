@@ -40,10 +40,10 @@ mutable.
 
 ## Current Baseline
 
-- `src/Gravitas/Core/3D/StiffBody.cs` owns `Immovable`,
+- `src/Gravitas/Core/3D/SolidBody.cs` owns `Immovable`,
   `PreventAngularForces`, `CanTranslate`, `CanRotate`, effective inverse mass,
   effective inverse inertia, sleep, and awake-state checks.
-- `src/Gravitas/Core/2D/StiffBody2D.cs` owns matching pure 2D `Immovable`,
+- `src/Gravitas/Core/2D/SolidBody2D.cs` owns matching pure 2D `Immovable`,
   `PreventAngularForces`, `CanTranslate`, `CanRotate`, effective inverse mass,
   scalar inverse moment of inertia, and sleep checks.
 - 3D response treats immovable or kinematic bodies as infinite mass.
@@ -186,11 +186,11 @@ explainable.
   - full rotation freeze behaves like current angular-force prevention.
   - freezing one rotation axis prevents angular velocity around that axis.
   - unfrozen rotation axes still respond to off-center contacts.
-- [ ] Update `StiffBody.Motion.cs` to project velocity, acceleration, applied
+- [ ] Update `SolidBody.Motion.cs` to project velocity, acceleration, applied
   corrections, and force-derived deltas through freeze constraints.
-- [ ] Add helper methods on `StiffBody` for constrained linear inverse mass
+- [ ] Add helper methods on `SolidBody` for constrained linear inverse mass
   along a direction.
-- [ ] Add helper methods on `StiffBody` for constrained angular inverse inertia
+- [ ] Add helper methods on `SolidBody` for constrained angular inverse inertia
   along a torque axis.
 - [ ] Update 3D response impulse denominator logic to use constrained inverse
   mass and inertia instead of only scalar `InverseMass` and full tensor checks.
@@ -198,7 +198,7 @@ explainable.
 - [ ] Update sleep checks so fully frozen translation does not keep a body awake
   through impossible residual velocity.
 - [ ] Run focused 3D response and motion tests:
-  `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "StiffBody|CollisionResponse"`
+  `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "SolidBody|CollisionResponse"`
 
 **Done Criteria**
 
@@ -223,7 +223,7 @@ the same constraint quality as 3D without pretending to own world-Y height.
 - [ ] Add pure 2D tests for rotation freeze behavior:
   - `Rotation` blocks yaw angular velocity.
   - unfrozen yaw still responds to off-center contacts.
-- [ ] Update `StiffBody2D` integration to project velocities,
+- [ ] Update `SolidBody2D` integration to project velocities,
   accelerations, and corrections through 2D freeze constraints.
 - [ ] Update pure 2D effective mass helpers so impulse denominators respect
   frozen translation axes and yaw freeze.
@@ -319,8 +319,8 @@ checks.
 
 **Tasks**
 
-- [ ] Update `StiffBody.Serialization.cs` to record 3D freeze axes.
-- [ ] Update `StiffBody2D.Serialization.cs` to record 2D freeze axes.
+- [ ] Update `SolidBody.Serialization.cs` to record 3D freeze axes.
+- [ ] Update `SolidBody2D.Serialization.cs` to record 2D freeze axes.
 - [ ] Add save/populate tests proving freeze axes round-trip for both body
   types.
 - [ ] Remove old serialized `Immovable` and `PreventAngularForces` fields unless

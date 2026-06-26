@@ -8,7 +8,7 @@ using Xunit;
 
 namespace Gravitas.Tests.Physics2D;
 
-public sealed class StiffBody2DHostContractTests
+public sealed class SolidBody2DHostContractTests
 {
     [Fact]
     public void Constructor_ShouldBindAgentContextAndCollider()
@@ -18,7 +18,7 @@ public sealed class StiffBody2DHostContractTests
         var agent = new TestMatterAgent(context, transform);
         var collider = new LSCircleCollider2D(Fixed64.One);
 
-        var body = new StiffBody2D(agent, collider)
+        var body = new SolidBody2D(agent, collider)
         {
             Mass = Fixed64.One
         };
@@ -38,7 +38,7 @@ public sealed class StiffBody2DHostContractTests
         using GravitasWorldContext context = Create2DContext();
         var transform = new FixedTransform(new Vector3d(Fixed64.One, (Fixed64)9, (Fixed64)2), FixedQuaternion.Identity, Vector3d.One);
         var agent = new TestMatterAgent(context, transform);
-        var body = new StiffBody2D(agent, new LSCircleCollider2D(Fixed64.Half))
+        var body = new SolidBody2D(agent, new LSCircleCollider2D(Fixed64.Half))
         {
             IsKinematic = true,
             Mass = Fixed64.One
@@ -60,7 +60,7 @@ public sealed class StiffBody2DHostContractTests
         using GravitasWorldContext context = Create2DContext();
         var transform = new FixedTransform(new Vector3d(Fixed64.Zero, (Fixed64)9, Fixed64.Zero), FixedQuaternion.Identity, Vector3d.One);
         var agent = new TestMatterAgent(context, transform);
-        var body = new StiffBody2D(agent, new LSCircleCollider2D(Fixed64.Half))
+        var body = new SolidBody2D(agent, new LSCircleCollider2D(Fixed64.Half))
         {
             Mass = Fixed64.One
         };
@@ -84,7 +84,7 @@ public sealed class StiffBody2DHostContractTests
         context.Settings.RuntimeMode = PhysicsRuntimeMode.ThreeD;
         var transform = new FixedTransform(new Vector3d(Fixed64.Zero, (Fixed64)9, Fixed64.Zero), FixedQuaternion.Identity, Vector3d.One);
         var agent = new TestMatterAgent(context, transform);
-        var body = new StiffBody2D(agent, new LSCircleCollider2D(Fixed64.Half))
+        var body = new SolidBody2D(agent, new LSCircleCollider2D(Fixed64.Half))
         {
             Mass = Fixed64.One
         };
@@ -122,7 +122,7 @@ public sealed class StiffBody2DHostContractTests
         var staticAgent = new TestMatterAgent(context, staticTransform);
         var staticCollider = new LSCircleCollider2D(Fixed64.Half);
         staticCollider.InitializeWithNoBody(staticAgent);
-        StiffBody2D dynamicBody = CreateDynamicCircle(context, new Vector2d(Fixed64.Half, Fixed64.Zero));
+        SolidBody2D dynamicBody = CreateDynamicCircle(context, new Vector2d(Fixed64.Half, Fixed64.Zero));
 
         Step(context);
 
@@ -158,11 +158,11 @@ public sealed class StiffBody2DHostContractTests
         context.LateSimulate();
     }
 
-    private static StiffBody2D CreateDynamicCircle(GravitasWorldContext context, Vector2d position)
+    private static SolidBody2D CreateDynamicCircle(GravitasWorldContext context, Vector2d position)
     {
         var transform = new FixedTransform(new Vector3d(position.X, Fixed64.Zero, position.Y), FixedQuaternion.Identity, Vector3d.One);
         var agent = new TestMatterAgent(context, transform);
-        var body = new StiffBody2D(agent, new LSCircleCollider2D(Fixed64.Half))
+        var body = new SolidBody2D(agent, new LSCircleCollider2D(Fixed64.Half))
         {
             Mass = Fixed64.One
         };

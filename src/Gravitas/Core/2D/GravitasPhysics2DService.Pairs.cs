@@ -166,7 +166,7 @@ public sealed partial class GravitasPhysics2DService
         for (int readIndex = 0; readIndex < _discreteResponseBodyQueue.Count; readIndex++)
         {
             int dynamicId = _discreteResponseBodyQueue[readIndex];
-            if (!TryGetDynamicBody(dynamicId, out StiffBody2D body))
+            if (!TryGetDynamicBody(dynamicId, out SolidBody2D body))
                 continue;
 
             AddExistingResponsePairs(body.Collider, frame);
@@ -226,7 +226,7 @@ public sealed partial class GravitasPhysics2DService
         AddDiscreteResponseBody(second.Body);
     }
 
-    private void AddDiscreteResponseBody(StiffBody2D? body)
+    private void AddDiscreteResponseBody(SolidBody2D? body)
     {
         if (!IsMovableIslandBody(body) || !_discreteResponseBodyKeys.Add(body!.DynamicId))
             return;

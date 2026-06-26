@@ -19,7 +19,7 @@ public sealed class CompoundCollider2DCollisionTests
             CompoundColliderPart2D.Circle(Fixed64.Half, new Vector2d((Fixed64)(-4), Fixed64.Zero)),
             CompoundColliderPart2D.Circle(Fixed64.Half, new Vector2d(Fixed64.FromFraction(3, 4), Fixed64.Zero)));
         _ = CreateBody(context, compound, Vector2d.Zero);
-        StiffBody2D circle = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero);
+        SolidBody2D circle = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero);
 
         var manifold = new ContactManifold2D();
         CollisionType2D collisionType = ColliderSettings2D.GetCollisionType(compound.Shape, circle.Collider.Shape);
@@ -41,7 +41,7 @@ public sealed class CompoundCollider2DCollisionTests
         var compound = new LSCompoundCollider2D(
             CompoundColliderPart2D.Circle(Fixed64.Half, Vector2d.Zero),
             CompoundColliderPart2D.Circle(Fixed64.Half, Vector2d.Zero));
-        StiffBody2D compoundBody = CreateBody(context, compound, Vector2d.Zero, immovable: false);
+        SolidBody2D compoundBody = CreateBody(context, compound, Vector2d.Zero, immovable: false);
         _ = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: true);
         int contactCount = 0;
         compound.OnContact += _ => contactCount++;
@@ -91,7 +91,7 @@ public sealed class CompoundCollider2DCollisionTests
         hits[0].Normal.Should().Be(-Vector2d.Right);
     }
 
-    private static StiffBody2D CreateBody(
+    private static SolidBody2D CreateBody(
         GravitasWorldContext context,
         LSCollider2D collider,
         Vector2d position,
@@ -99,7 +99,7 @@ public sealed class CompoundCollider2DCollisionTests
     {
         var transform = new FixedTransform(new Vector3d(position.X, Fixed64.Zero, position.Y), FixedQuaternion.Identity, Vector3d.One);
         var agent = new TestMatterAgent(context, transform);
-        var body = new StiffBody2D(agent, collider)
+        var body = new SolidBody2D(agent, collider)
         {
             Mass = Fixed64.One,
             Immovable = immovable

@@ -1376,7 +1376,7 @@ public sealed partial class GravitasQuery3DService
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool IsStaticStyleSweepTarget(LSCollider collider)
     {
-        StiffBody? body = collider.Body;
+        SolidBody? body = collider.Body;
         return body == null || body.Immovable || body.IsKinematic;
     }
 

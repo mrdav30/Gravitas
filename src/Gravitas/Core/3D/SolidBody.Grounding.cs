@@ -1,5 +1,5 @@
 //=======================================================================
-// StiffBody.Grounding.cs
+// SolidBody.Grounding.cs
 //=======================================================================
 // MIT License, Copyright (c) 2026-present David Oravsky (mrdav30)
 // See LICENSE file in the project root for full license information.
@@ -15,7 +15,7 @@ using System.Collections.Generic;
 
 namespace Gravitas;
 
-public partial class StiffBody
+public partial class SolidBody
 {
     #region Grounding
 
@@ -262,7 +262,7 @@ public partial class StiffBody
         if (hitCollider == null || ReferenceEquals(hitCollider, Collider))
             return false;
 
-        StiffBody? hitBody = hitCollider.Body;
+        SolidBody? hitBody = hitCollider.Body;
         return hitBody == null || hitBody.Immovable || hitBody.IsKinematic;
     }
 

@@ -125,7 +125,7 @@ public sealed class PhysicsLayerTests
         {
             Layer = layer
         };
-        var body = new StiffBody(agent, collider)
+        var body = new SolidBody(agent, collider)
         {
             Mass = Fixed64.One
         };

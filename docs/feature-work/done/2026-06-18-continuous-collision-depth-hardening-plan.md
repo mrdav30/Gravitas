@@ -167,8 +167,8 @@ island plan.
 
 **Likely Files**
 
-- `src/Gravitas/Core/StiffBody.cs`
-- `src/Gravitas/Core/StiffBody2D.cs`
+- `src/Gravitas/Core/SolidBody.cs`
+- `src/Gravitas/Core/SolidBody2D.cs`
 - `src/Gravitas/Queries/GravitasQuery3DService.*.cs`
 - `src/Gravitas/Queries/GravitasQuery2DService.cs`
 - `src/Gravitas/CollisionHandling/Detection/*`
@@ -278,8 +278,8 @@ mesh/compound reducer policy.
 
 **Likely Files**
 
-- `src/Gravitas/Core/StiffBody.cs`
-- `src/Gravitas/Core/StiffBody2D.cs`
+- `src/Gravitas/Core/SolidBody.cs`
+- `src/Gravitas/Core/SolidBody2D.cs`
 - `src/Gravitas/Queries/GravitasQuery3DService.Raycast.cs`
 - `src/Gravitas/Queries/GravitasQuery3DService.Circle.cs`
 - `src/Gravitas/Queries/GravitasQuery2DService.cs`
@@ -469,8 +469,8 @@ decides the frame displacement needs CCD.
 
 **Likely Files**
 
-- `src/Gravitas/Core/StiffBody.cs`
-- `src/Gravitas/Core/StiffBody2D.cs`
+- `src/Gravitas/Core/SolidBody.cs`
+- `src/Gravitas/Core/SolidBody2D.cs`
 - `src/Gravitas/Core/GravitasPhysicsService.cs`
 - `src/Gravitas/Core/GravitasPhysics2DService.cs`
 - `src/Gravitas/Core/GravitasMixedCollisionService.cs`
@@ -505,10 +505,10 @@ mixed candidate comparison path.
   intermediate substep start before evaluating the next sweep. This prevents
   convex/AABB/compound mover reduction from accidentally using frame-start shape
   state after an earlier hit.
-- `StiffBody.LastContinuousCollisionToiIterationCount`,
-  `StiffBody.LastContinuousCollisionToiIterationLimitReached`,
-  `StiffBody2D.LastContinuousCollisionToiIterationCount`, and
-  `StiffBody2D.LastContinuousCollisionToiIterationLimitReached` expose deterministic
+- `SolidBody.LastContinuousCollisionToiIterationCount`,
+  `SolidBody.LastContinuousCollisionToiIterationLimitReached`,
+  `SolidBody2D.LastContinuousCollisionToiIterationCount`, and
+  `SolidBody2D.LastContinuousCollisionToiIterationLimitReached` expose deterministic
   last-step solver status for diagnostics and tests.
 - Focused 2D and 3D regressions now cover same-frame two-contact sliding,
   bounded-limit reporting, and zero-allocation steady-state substep paths. 2D

@@ -1,5 +1,5 @@
 //=======================================================================
-// StiffBody.cs
+// SolidBody.cs
 //=======================================================================
 // MIT License, Copyright (c) 2026–present David Oravsky (mrdav30)
 // See LICENSE file in the project root for full license information.
@@ -17,7 +17,7 @@ using System.Runtime.CompilerServices;
 
 namespace Gravitas;
 
-public partial class StiffBody : IRecordable
+public partial class SolidBody : IRecordable
 {
     public bool Debug = false;
 
@@ -508,9 +508,9 @@ public partial class StiffBody : IRecordable
     /// </summary>
     public Action? OnMoved;
 
-    public StiffBody(IMatterAgent agent, LSCollider collider) => Setup(agent, collider, null, null);
+    public SolidBody(IMatterAgent agent, LSCollider collider) => Setup(agent, collider, null, null);
 
-    public StiffBody(
+    public SolidBody(
         IMatterAgent agent,
         LSCollider collider,
         FixedTransform? positionTransform,
@@ -554,7 +554,7 @@ public partial class StiffBody : IRecordable
     {
         if (!_isSet)
         {
-            GravitasLogger.Channel.Error($"StiffBody must be set up with an agent and collider before initialization.");
+            GravitasLogger.Channel.Error($"SolidBody must be set up with an agent and collider before initialization.");
             return;
         }
 

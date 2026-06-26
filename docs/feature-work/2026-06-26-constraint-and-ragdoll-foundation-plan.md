@@ -95,7 +95,7 @@ authored model.
 - Do not hide determinism-sensitive behavior behind reflection or engine
   callbacks.
 - Do not keep weak compatibility aliases if the `SolidBody` naming cleanup has
-  already renamed `StiffBody`.
+  already renamed `SolidBody`.
 - Do not broaden this plan into pure 2D joint families unless implementation
   proves the shared 3D infrastructure naturally supports them. Pure 2D joints
   can be planned separately if a real 2D gameplay need appears.
@@ -114,7 +114,7 @@ This plan should run after:
    prevention state.
 
 If this plan starts before the naming cleanup, apply every `SolidBody` reference
-below to the current `StiffBody` type and rename during the cleanup workstream.
+below to the current `SolidBody` type and rename during the cleanup workstream.
 
 ## Guiding Rules
 

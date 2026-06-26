@@ -143,7 +143,7 @@ that as a strength rather than hiding it behind a mesh approximation.
   relationships.
 - [ ] Implement cone bounds rebuild for rotated cones without underestimating.
 - [ ] Implement shape-derived mass properties in `LSConeCollider`.
-- [ ] Ensure `StiffBody` receives the cone COM offset and full inertia tensor
+- [ ] Ensure `SolidBody` receives the cone COM offset and full inertia tensor
   correctly.
 - [ ] Update `ColliderShapeSnapshot` if cone runtime state needs snapshot
   coverage.

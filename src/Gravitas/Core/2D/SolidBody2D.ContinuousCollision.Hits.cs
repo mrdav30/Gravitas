@@ -1,5 +1,5 @@
 //=======================================================================
-// StiffBody2D.ContinuousCollision.Hits.cs
+// SolidBody2D.ContinuousCollision.Hits.cs
 //=======================================================================
 // MIT License, Copyright (c) 2026-present David Oravsky (mrdav30)
 // See LICENSE file in the project root for full license information.
@@ -15,7 +15,7 @@ using System.Runtime.CompilerServices;
 
 namespace Gravitas;
 
-public sealed partial class StiffBody2D
+public sealed partial class SolidBody2D
 {
     private bool TryGetFirstContinuousCollisionHit(
         Vector2d startPosition,
@@ -207,7 +207,7 @@ public sealed partial class StiffBody2D
         for (int candidateIndex = 0; candidateIndex < candidateIds.Count; candidateIndex++)
         {
             int dynamicId = candidateIds[candidateIndex];
-            if (!Context.Physics2D.TryGetDynamicBody(dynamicId, out StiffBody2D target)
+            if (!Context.Physics2D.TryGetDynamicBody(dynamicId, out SolidBody2D target)
                 || !IsEligibleDynamicContinuousCollisionTarget(target))
             {
                 continue;
@@ -260,7 +260,7 @@ public sealed partial class StiffBody2D
     }
 
     private bool TryGetExactDynamicRelativeContinuousCollisionHit(
-        StiffBody2D target,
+        SolidBody2D target,
         Vector2d sourceStart,
         Vector2d sourceDisplacement,
         Vector2d targetStart,
@@ -348,7 +348,7 @@ public sealed partial class StiffBody2D
         for (int candidateIndex = 0; candidateIndex < candidateIds.Count; candidateIndex++)
         {
             int dynamicId = candidateIds[candidateIndex];
-            if (!Context.Physics.TryGetDynamicBody(dynamicId, out StiffBody target)
+            if (!Context.Physics.TryGetDynamicBody(dynamicId, out SolidBody target)
                 || !IsEligibleDynamicMixed3DTarget(target))
             {
                 continue;
@@ -401,7 +401,7 @@ public sealed partial class StiffBody2D
         return found;
     }
 
-    private bool IsEligibleDynamicContinuousCollisionTarget(StiffBody2D target)
+    private bool IsEligibleDynamicContinuousCollisionTarget(SolidBody2D target)
     {
         if (ReferenceEquals(target, this)
             || !target.Active
@@ -416,7 +416,7 @@ public sealed partial class StiffBody2D
         return true;
     }
 
-    private bool IsEligibleDynamicMixed3DTarget(StiffBody target)
+    private bool IsEligibleDynamicMixed3DTarget(SolidBody target)
     {
         return target.Active
             && !target.Immovable

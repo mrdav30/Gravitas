@@ -14,9 +14,9 @@ public class DiagnosticsBenchmarks
     private GravitasWorldContext _enabledDrawContext;
     private GravitasWorldContext _disabledMeshContext;
     private GravitasWorldContext _enabledMeshContext;
-    private SwiftList<StiffBody> _disabledBodies;
-    private SwiftList<StiffBody> _enabledEventBodies;
-    private SwiftList<StiffBody> _enabledDrawBodies;
+    private SwiftList<SolidBody> _disabledBodies;
+    private SwiftList<SolidBody> _enabledEventBodies;
+    private SwiftList<SolidBody> _enabledDrawBodies;
     private LSMeshCollider _disabledMeshCollider;
     private LSMeshCollider _enabledMeshCollider;
 
@@ -32,16 +32,16 @@ public class DiagnosticsBenchmarks
         int gridExtent = BenchmarkPhysicsScene.GridExtentForGrid(ColliderCount);
 
         _disabledContext = BenchmarkPhysicsScene.CreateContext(gridExtent, clearAllPools: true);
-        _disabledBodies = new SwiftList<StiffBody>(ColliderCount);
+        _disabledBodies = new SwiftList<SolidBody>(ColliderCount);
         BenchmarkPhysicsScene.CreateDynamicSphereGrid(_disabledContext, ColliderCount, _disabledBodies);
 
         _enabledEventContext = BenchmarkPhysicsScene.CreateContext(gridExtent);
-        _enabledEventBodies = new SwiftList<StiffBody>(ColliderCount);
+        _enabledEventBodies = new SwiftList<SolidBody>(ColliderCount);
         BenchmarkPhysicsScene.CreateDynamicSphereGrid(_enabledEventContext, ColliderCount, _enabledEventBodies);
         _enabledEventContext.Diagnostics.Enable(eventCapacity: ColliderCount * 2, drawCommandCapacity: 0);
 
         _enabledDrawContext = BenchmarkPhysicsScene.CreateContext(gridExtent);
-        _enabledDrawBodies = new SwiftList<StiffBody>(ColliderCount);
+        _enabledDrawBodies = new SwiftList<SolidBody>(ColliderCount);
         BenchmarkPhysicsScene.CreateDynamicSphereGrid(_enabledDrawContext, ColliderCount, _enabledDrawBodies);
         _enabledDrawContext.Diagnostics.Enable(eventCapacity: 0, drawCommandCapacity: ColliderCount);
 
@@ -121,20 +121,20 @@ public class DiagnosticsBenchmarks
         return _enabledMeshContext.Diagnostics.DrawCommandCount;
     }
 
-    private static void ApplyForceAndTorque(SwiftList<StiffBody> bodies)
+    private static void ApplyForceAndTorque(SwiftList<SolidBody> bodies)
     {
         var force = new Vector3d(Fixed64.One, Fixed64.Zero, Fixed64.Zero);
         var torque = new Vector3d(Fixed64.Zero, Fixed64.One, Fixed64.Zero);
 
         for (int i = 0; i < bodies.Count; i++)
         {
-            StiffBody body = bodies[i];
+            SolidBody body = bodies[i];
             body.AddForce(force);
             body.AddTorque(torque);
         }
     }
 
-    private static void CaptureColliders(GravitasWorldContext context, SwiftList<StiffBody> bodies)
+    private static void CaptureColliders(GravitasWorldContext context, SwiftList<SolidBody> bodies)
     {
         for (int i = 0; i < bodies.Count; i++)
             context.Diagnostics.CaptureCollider(bodies[i].Collider, GravitasDiagnosticColor.Cyan);

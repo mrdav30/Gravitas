@@ -6,7 +6,7 @@ using Xunit;
 
 namespace Gravitas.Tests.Core;
 
-public sealed class StiffBodyEffectiveMassTests
+public sealed class SolidBodyEffectiveMassTests
 {
     [Fact]
     public void EffectiveMass_ForMovableBody_ShouldExposeRawInverseMassAndInertia()

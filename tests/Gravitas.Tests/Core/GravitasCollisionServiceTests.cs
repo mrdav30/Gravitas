@@ -92,7 +92,7 @@ public sealed class GravitasCollisionServiceTests
         EnsureGrid(context);
         var agent = new TestMatterAgent(context);
         var collider = new LSSphereCollider();
-        var body = new StiffBody(agent, collider)
+        var body = new SolidBody(agent, collider)
         {
             Mass = Fixed64.One
         };

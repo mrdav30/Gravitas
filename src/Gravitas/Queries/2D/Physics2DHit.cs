@@ -26,7 +26,7 @@ public readonly struct Physics2DHit
 
     public LSCollider2D Collider { get; }
 
-    public StiffBody2D? Body { get; }
+    public SolidBody2D? Body { get; }
 
     public Vector2d Point { get; }
 

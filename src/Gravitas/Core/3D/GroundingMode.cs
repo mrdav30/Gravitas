@@ -8,7 +8,7 @@
 namespace Gravitas;
 
 /// <summary>
-/// Selects whether a <see cref="StiffBody"/> owns ground detection through probes or receives grounding from the host.
+/// Selects whether a <see cref="SolidBody"/> owns ground detection through probes or receives grounding from the host.
 /// </summary>
 public enum GroundingMode : byte
 {

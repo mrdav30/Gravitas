@@ -35,8 +35,8 @@ public static class CollisionResponseMixed
         if (!contact.HasContact || pair.Collider3D.IsTrigger || pair.Collider2D.IsTrigger)
             return false;
 
-        StiffBody? body3D = pair.Collider3D.Body;
-        StiffBody2D? body2D = pair.Collider2D.Body;
+        SolidBody? body3D = pair.Collider3D.Body;
+        SolidBody2D? body2D = pair.Collider2D.Body;
         Fixed64 inverseMass3D = body3D?.EffectiveInverseMass ?? Fixed64.Zero;
         Fixed64 inverseMass2D = body2D?.EffectiveInverseMass ?? Fixed64.Zero;
         if (inverseMass3D + inverseMass2D <= Fixed64.Zero)
@@ -91,8 +91,8 @@ public static class CollisionResponseMixed
     }
 
     private static void ApplyPositionCorrection(
-        StiffBody? body3D,
-        StiffBody2D? body2D,
+        SolidBody? body3D,
+        SolidBody2D? body2D,
         Vector3d normal,
         Fixed64 depth,
         Fixed64 inverseMass3D,
@@ -120,8 +120,8 @@ public static class CollisionResponseMixed
     private static Fixed64 ApplyNormalImpulse(
         CollisionPairMixed pair,
         MixedContact contact,
-        StiffBody? body3D,
-        StiffBody2D? body2D,
+        SolidBody? body3D,
+        SolidBody2D? body2D,
         Vector3d normal,
         Vector3d relative3D,
         Vector2d relative2D,
@@ -160,8 +160,8 @@ public static class CollisionResponseMixed
     }
 
     private static bool ApplyFrictionImpulse(
-        StiffBody? body3D,
-        StiffBody2D? body2D,
+        SolidBody? body3D,
+        SolidBody2D? body2D,
         Vector3d normal,
         Vector3d relative3D,
         Vector2d relative2D,
@@ -202,8 +202,8 @@ public static class CollisionResponseMixed
     }
 
     private static void ApplyImpulse(
-        StiffBody? body3D,
-        StiffBody2D? body2D,
+        SolidBody? body3D,
+        SolidBody2D? body2D,
         Vector3d axis,
         Vector3d relative3D,
         Vector2d relative2D,
@@ -240,8 +240,8 @@ public static class CollisionResponseMixed
     }
 
     private static Vector3d ComputeRelativeVelocity(
-        StiffBody? body3D,
-        StiffBody2D? body2D,
+        SolidBody? body3D,
+        SolidBody2D? body2D,
         Vector3d relative3D,
         Vector2d relative2D)
     {
@@ -255,14 +255,14 @@ public static class CollisionResponseMixed
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Vector3d ResolveLinearVelocity(StiffBody body) =>
+    private static Vector3d ResolveLinearVelocity(SolidBody body) =>
         body.IsKinematic ? body.ResolveContinuousCollisionFrameVelocity() : body.LinearVelocity;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Vector2d ResolveLinearVelocity(StiffBody2D body) =>
+    private static Vector2d ResolveLinearVelocity(SolidBody2D body) =>
         body.IsKinematic ? body.ResolveContinuousCollisionFrameVelocity() : body.LinearVelocity;
 
-    private static Fixed64 ComputeAngularDenominator(StiffBody? body3D, Vector3d relativeContactPoint, Vector3d axis)
+    private static Fixed64 ComputeAngularDenominator(SolidBody? body3D, Vector3d relativeContactPoint, Vector3d axis)
     {
         if (!CanRotate(body3D))
             return Fixed64.Zero;
@@ -326,10 +326,10 @@ public static class CollisionResponseMixed
         new(-angularVelocity * relativePoint.Y, angularVelocity * relativePoint.X);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool CanRotate(StiffBody? body) =>
+    private static bool CanRotate(SolidBody? body) =>
         body?.CanRotate == true;
 
-    private static Fixed64 ResolveRestitution(StiffBody? body3D, StiffBody2D? body2D, Fixed64 closingSpeed)
+    private static Fixed64 ResolveRestitution(SolidBody? body3D, SolidBody2D? body2D, Fixed64 closingSpeed)
     {
         if (body3D == null || body2D == null || closingSpeed <= RestitutionVelocityThreshold)
             return Fixed64.Zero;
@@ -338,7 +338,7 @@ public static class CollisionResponseMixed
         return FixedMath.Clamp(restitution, Fixed64.Zero, Fixed64.One);
     }
 
-    private static Fixed64 ResolveFriction(StiffBody? body3D, StiffBody2D? body2D)
+    private static Fixed64 ResolveFriction(SolidBody? body3D, SolidBody2D? body2D)
     {
         if (body3D == null && body2D == null)
             return Fixed64.Zero;

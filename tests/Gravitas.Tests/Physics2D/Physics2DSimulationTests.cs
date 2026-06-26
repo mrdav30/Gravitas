@@ -16,7 +16,7 @@ public sealed class Physics2DSimulationTests
     {
         using GravitasWorldContext context = CreateContext(frameRate: 4);
         var agent = new TestMatterAgent(context);
-        var body = new StiffBody2D(agent, new LSCircleCollider2D(Fixed64.Half))
+        var body = new SolidBody2D(agent, new LSCircleCollider2D(Fixed64.Half))
         {
             Mass = (Fixed64)2
         };
@@ -33,8 +33,8 @@ public sealed class Physics2DSimulationTests
     public void Simulate_WithOverlapping2DBodies_ShouldResolveContactAndNotifyOnce()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 4);
-        StiffBody2D left = CreateCircle(context, Vector2d.Zero, immovable: false);
-        StiffBody2D right = CreateCircle(context, new Vector2d(Fixed64.Half, Fixed64.Zero), immovable: true);
+        SolidBody2D left = CreateCircle(context, Vector2d.Zero, immovable: false);
+        SolidBody2D right = CreateCircle(context, new Vector2d(Fixed64.Half, Fixed64.Zero), immovable: true);
         int entered = 0;
         int stayed = 0;
         left.Collider.OnContactEnter += _ => entered++;
@@ -54,8 +54,8 @@ public sealed class Physics2DSimulationTests
     public void LateSimulate_ShouldRefreshMoved2DCollidersAndDistributeContactsAfterIntegration()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 4);
-        StiffBody2D mover = CreateCircle(context, new Vector2d(-Fixed64.FromFraction(5, 4), Fixed64.Zero), immovable: false);
-        StiffBody2D target = CreateCircle(context, Vector2d.Zero, immovable: true);
+        SolidBody2D mover = CreateCircle(context, new Vector2d(-Fixed64.FromFraction(5, 4), Fixed64.Zero), immovable: false);
+        SolidBody2D target = CreateCircle(context, Vector2d.Zero, immovable: true);
         Vector2d startPosition = mover.Position;
         int entered = 0;
         mover.Collider.OnContactEnter += other =>
@@ -83,7 +83,7 @@ public sealed class Physics2DSimulationTests
     public void Deactivate_ShouldRemoveBodyColliderPairsAndQueryVisibility()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 4);
-        StiffBody2D left = CreateCircle(context, Vector2d.Zero, immovable: false);
+        SolidBody2D left = CreateCircle(context, Vector2d.Zero, immovable: false);
         _ = CreateCircle(context, new Vector2d((Fixed64)0.75f, Fixed64.Zero), immovable: true);
         int exited = 0;
         left.Collider.OnContactExit += _ => exited++;
@@ -108,8 +108,8 @@ public sealed class Physics2DSimulationTests
         };
         context.ApplySettings(new PhysicsSettings(4, matrix));
 
-        StiffBody2D left = CreateCircle(context, Vector2d.Zero, immovable: false);
-        StiffBody2D right = CreateCircle(context, new Vector2d(Fixed64.Half, Fixed64.Zero), immovable: true);
+        SolidBody2D left = CreateCircle(context, Vector2d.Zero, immovable: false);
+        SolidBody2D right = CreateCircle(context, new Vector2d(Fixed64.Half, Fixed64.Zero), immovable: true);
         left.Collider.Layer = new PhysicsLayer(0);
         right.Collider.Layer = new PhysicsLayer(1);
         int entered = 0;
@@ -125,8 +125,8 @@ public sealed class Physics2DSimulationTests
     public void TriggerCollider_ShouldNotifyTriggerWithoutResponse()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 4);
-        StiffBody2D trigger = CreateCircle(context, Vector2d.Zero, immovable: false);
-        StiffBody2D other = CreateCircle(context, new Vector2d(Fixed64.Half, Fixed64.Zero), immovable: true);
+        SolidBody2D trigger = CreateCircle(context, Vector2d.Zero, immovable: false);
+        SolidBody2D other = CreateCircle(context, new Vector2d(Fixed64.Half, Fixed64.Zero), immovable: true);
         trigger.Collider.IsTrigger = true;
         int triggerEntered = 0;
         int triggerStayed = 0;
@@ -152,7 +152,7 @@ public sealed class Physics2DSimulationTests
     public void SleepingBody_RestingAgainstImmovable_ShouldRemainSleepingAndStationary()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 4);
-        StiffBody2D sleeper = CreateCircle(context, Vector2d.Zero, immovable: false);
+        SolidBody2D sleeper = CreateCircle(context, Vector2d.Zero, immovable: false);
         _ = CreateCircle(context, new Vector2d((Fixed64)0.75f, Fixed64.Zero), immovable: true);
         sleeper.Sleep();
 
@@ -166,8 +166,8 @@ public sealed class Physics2DSimulationTests
     public void SleepingBody_ShouldWakeFromForceAndCollision()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 4);
-        StiffBody2D sleeper = CreateCircle(context, Vector2d.Zero, immovable: false);
-        StiffBody2D mover = CreateCircle(context, new Vector2d(Fixed64.Half, Fixed64.Zero), immovable: false);
+        SolidBody2D sleeper = CreateCircle(context, Vector2d.Zero, immovable: false);
+        SolidBody2D mover = CreateCircle(context, new Vector2d(Fixed64.Half, Fixed64.Zero), immovable: false);
 
         sleeper.Sleep();
         sleeper.IsSleeping.Should().BeTrue();
@@ -193,7 +193,7 @@ public sealed class Physics2DSimulationTests
     private static (Vector2d position, Vector2d velocity) RunReplayScenario()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 8);
-        StiffBody2D body = CreateCircle(context, Vector2d.Zero, immovable: false);
+        SolidBody2D body = CreateCircle(context, Vector2d.Zero, immovable: false);
         _ = CreateCircle(context, new Vector2d((Fixed64)3, Fixed64.Zero), immovable: true);
 
         for (int i = 0; i < 6; i++)
@@ -217,11 +217,11 @@ public sealed class Physics2DSimulationTests
         context.LateSimulate();
     }
 
-    private static StiffBody2D CreateCircle(GravitasWorldContext context, Vector2d position, bool immovable)
+    private static SolidBody2D CreateCircle(GravitasWorldContext context, Vector2d position, bool immovable)
     {
         var transform = new FixedTransform(new Vector3d(position.X, Fixed64.Zero, position.Y), FixedQuaternion.Identity, Vector3d.One);
         var agent = new TestMatterAgent(context, transform);
-        var body = new StiffBody2D(agent, new LSCircleCollider2D(Fixed64.Half))
+        var body = new SolidBody2D(agent, new LSCircleCollider2D(Fixed64.Half))
         {
             Mass = Fixed64.One,
             Immovable = immovable

@@ -142,7 +142,7 @@ public class CollisionResponseBenchmarks
         where TCollider : LSCollider
     {
         var agent = new BenchmarkMatterAgent(_context, position);
-        var body = new StiffBody(agent, collider)
+        var body = new SolidBody(agent, collider)
         {
             Mass = Fixed64.One,
             PreventAngularForces = preventAngularForces,
@@ -166,7 +166,7 @@ public class CollisionResponseBenchmarks
             MeshColliderMode.Convex,
             MeshInertiaPolicy.SurfaceApproximation);
 
-    private static void Push(StiffBody body, int xImpulse)
+    private static void Push(SolidBody body, int xImpulse)
     {
         body.AddLinearImpulse(new Vector3d((Fixed64)xImpulse, Fixed64.Zero, Fixed64.Zero));
     }
@@ -181,13 +181,13 @@ public class CollisionResponseBenchmarks
     private readonly struct ScenarioBody<TCollider>
         where TCollider : LSCollider
     {
-        public ScenarioBody(StiffBody body, TCollider collider)
+        public ScenarioBody(SolidBody body, TCollider collider)
         {
             Body = body;
             Collider = collider;
         }
 
-        public StiffBody Body { get; }
+        public SolidBody Body { get; }
 
         public TCollider Collider { get; }
     }

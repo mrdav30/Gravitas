@@ -22,7 +22,7 @@ public sealed partial class GravitasPhysics2DService
     private static readonly DiscreteIslandConstraint2DComparer IslandConstraintComparer = new();
 
     private readonly GravitasWorldContext _context;
-    private readonly SwiftBucket<StiffBody2D> _dynamicBodies = new();
+    private readonly SwiftBucket<SolidBody2D> _dynamicBodies = new();
     private readonly SwiftList<LSCollider2D> _colliders = new();
     private readonly SwiftDictionary<int, LSCollider2D> _collidersById = new();
     private readonly SwiftHashSet<ulong> _processedPairKeys = new();
@@ -64,7 +64,7 @@ public sealed partial class GravitasPhysics2DService
 
     internal bool LastContinuousCollisionIslandLimitReached { get; private set; }
 
-    internal void AssimilateBody(StiffBody2D body, bool isDynamic)
+    internal void AssimilateBody(SolidBody2D body, bool isDynamic)
     {
         SwiftThrowHelper.ThrowIfNull(body, nameof(body));
         SwiftThrowHelper.ThrowIfArgument(
@@ -95,7 +95,7 @@ public sealed partial class GravitasPhysics2DService
         _context.Collisions2D.PartitionCollider(collider);
     }
 
-    internal void DessimilateBody(StiffBody2D body)
+    internal void DessimilateBody(SolidBody2D body)
     {
         SwiftThrowHelper.ThrowIfNull(body, nameof(body));
         if (body.DynamicId >= 0 && _dynamicBodies.TryRemoveAt(body.DynamicId) && BodyCount > 0)
@@ -138,7 +138,7 @@ public sealed partial class GravitasPhysics2DService
         PrepareContinuousCollisionFrame();
         BeginContinuousCollisionHandoffFrame();
 
-        foreach (StiffBody2D body in _dynamicBodies)
+        foreach (SolidBody2D body in _dynamicBodies)
         {
             body.LateSimulate(updateSleepState: false, updateColliderState: false);
             _processedContinuousCollisionBodyIds.Add(body.DynamicId);
@@ -152,7 +152,7 @@ public sealed partial class GravitasPhysics2DService
 
     private void PrepareCollisionPartitions()
     {
-        foreach (StiffBody2D body in _dynamicBodies)
+        foreach (SolidBody2D body in _dynamicBodies)
             body.Collider.Simulate();
     }
 
@@ -172,13 +172,13 @@ public sealed partial class GravitasPhysics2DService
 
     private void UpdateSleepStatesAfterPhysicsStep()
     {
-        foreach (StiffBody2D body in _dynamicBodies)
+        foreach (SolidBody2D body in _dynamicBodies)
             body.UpdateSleepStateAfterPhysicsStep();
     }
 
     public void Visualize()
     {
-        foreach (StiffBody2D body in _dynamicBodies)
+        foreach (SolidBody2D body in _dynamicBodies)
             body.OnVisualize();
     }
 
@@ -232,7 +232,7 @@ public sealed partial class GravitasPhysics2DService
     internal int DynamicBodyPeakCount => _dynamicBodies.PeakCount;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal bool TryGetDynamicBody(int dynamicId, out StiffBody2D body) =>
+    internal bool TryGetDynamicBody(int dynamicId, out SolidBody2D body) =>
         _dynamicBodies.TryGetValue(dynamicId, out body);
 
     private void EnsureFrameCapacity()

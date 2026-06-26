@@ -694,7 +694,7 @@ public class CollisionDetectionBenchmarks
         where TCollider : LSCollider
     {
         var agent = new BenchmarkMatterAgent(_context, position);
-        var body = new StiffBody(agent, collider)
+        var body = new SolidBody(agent, collider)
         {
             Mass = Fixed64.One,
             PreventAngularForces = preventAngularForces
@@ -714,13 +714,13 @@ public class CollisionDetectionBenchmarks
     private readonly struct ScenarioBody<TCollider>
         where TCollider : LSCollider
     {
-        public ScenarioBody(StiffBody body, TCollider collider)
+        public ScenarioBody(SolidBody body, TCollider collider)
         {
             Body = body;
             Collider = collider;
         }
 
-        public StiffBody Body { get; }
+        public SolidBody Body { get; }
 
         public TCollider Collider { get; }
     }

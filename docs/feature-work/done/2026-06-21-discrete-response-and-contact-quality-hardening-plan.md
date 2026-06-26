@@ -209,12 +209,12 @@ islands, island-wide wake, or multi-iteration stabilization.
 post-integration `LateSimulate`: dynamic bodies integrate first, service-owned
 dynamic collider partitions refresh once, active partitions distribute
 candidates, queued solid pairs are solved, active-pair maintenance runs, and
-sleep state updates after response. Direct `StiffBody.LateSimulate()` remains
+sleep state updates after response. Direct `SolidBody.LateSimulate()` remains
 self-contained for callers outside the service path.
 
 `GravitasCollisionService` now owns deterministic discrete island assembly.
 Queued response pairs are ordered by stable collider ID pair. Movable island
-nodes are keyed by `StiffBody.DynamicId`, union roots pick the lower stable
+nodes are keyed by `SolidBody.DynamicId`, union roots pick the lower stable
 body key, and constraints are solved in root-key then pair-key order.
 Single-pair scenes bypass island construction and keep the direct response path.
 Multi-constraint islands run the bounded
@@ -235,7 +235,7 @@ positions.
 **2D/Mixed parity follow-up 2026-06-21:** Pure 2D now follows the same
 service-owned post-integration shape as 3D. `GravitasPhysics2DService.Simulate`
 only clears frame counters; `LateSimulate` prepares CCD, integrates
-`StiffBody2D` bodies without per-body collider refresh, refreshes dynamic 2D
+`SolidBody2D` bodies without per-body collider refresh, refreshes dynamic 2D
 colliders once, distributes 2D partition candidates, solves deterministic
 discrete response islands, preserves connected resting pairs, and updates sleep
 state after response. Existing resting pair-owned contacts adjacent to an active

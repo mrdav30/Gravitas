@@ -6,13 +6,13 @@ using Xunit;
 
 namespace Gravitas.Tests.Core;
 
-public sealed class StiffBody2DAngularDynamicsTests
+public sealed class SolidBody2DAngularDynamicsTests
 {
     [Fact]
     public void AddAngularImpulse_ShouldChangeAngularVelocityImmediatelyWhenBodyCanRotate()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext(frameRate: 8);
-        StiffBody2D body = CreateBody(context, new LSCircleCollider2D(Fixed64.One), mass: (Fixed64)2);
+        SolidBody2D body = CreateBody(context, new LSCircleCollider2D(Fixed64.One), mass: (Fixed64)2);
 
         body.AddAngularImpulse((Fixed64)3);
 
@@ -24,7 +24,7 @@ public sealed class StiffBody2DAngularDynamicsTests
     public void AddTorque_ShouldIntegrateAngularVelocityAndRotationDuringLateSimulate()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext(frameRate: 4);
-        StiffBody2D body = CreateBody(context, new LSCircleCollider2D(Fixed64.One), mass: (Fixed64)2);
+        SolidBody2D body = CreateBody(context, new LSCircleCollider2D(Fixed64.One), mass: (Fixed64)2);
 
         body.AddTorque((Fixed64)8);
 
@@ -40,7 +40,7 @@ public sealed class StiffBody2DAngularDynamicsTests
     public void AngularForces_ShouldBeIgnoredWhenBodyCannotRotate()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext(frameRate: 4);
-        StiffBody2D body = CreateBody(context, new LSCircleCollider2D(Fixed64.One), mass: (Fixed64)2);
+        SolidBody2D body = CreateBody(context, new LSCircleCollider2D(Fixed64.One), mass: (Fixed64)2);
         body.PreventAngularForces = true;
 
         body.AddAngularImpulse((Fixed64)3);
@@ -57,7 +57,7 @@ public sealed class StiffBody2DAngularDynamicsTests
     public void LateSimulate_ShouldKeepBodyAwakeWhileAngularSpeedExceedsSleepThreshold()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext(frameRate: 4);
-        StiffBody2D body = CreateBody(context, new LSCircleCollider2D(Fixed64.One), mass: (Fixed64)2);
+        SolidBody2D body = CreateBody(context, new LSCircleCollider2D(Fixed64.One), mass: (Fixed64)2);
         body.SleepFrameThreshold = 1;
         body.SleepLinearSpeedThreshold = Fixed64.Zero;
         body.SleepAngularSpeedThreshold = Fixed64.Half;
@@ -80,7 +80,7 @@ public sealed class StiffBody2DAngularDynamicsTests
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext(frameRate: 4);
         var collider = new LSCircleCollider2D(Fixed64.One);
-        StiffBody2D body = CreateBody(context, collider, mass: (Fixed64)2);
+        SolidBody2D body = CreateBody(context, collider, mass: (Fixed64)2);
 
         body.AddAngularImpulse(Fixed64.One);
         collider.Radius = (Fixed64)2;
@@ -95,7 +95,7 @@ public sealed class StiffBody2DAngularDynamicsTests
     public void ResetPosition_ShouldReturnMovingBodyToRest()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext(frameRate: 4);
-        StiffBody2D body = CreateBody(context, new LSCircleCollider2D(Fixed64.One), mass: (Fixed64)2);
+        SolidBody2D body = CreateBody(context, new LSCircleCollider2D(Fixed64.One), mass: (Fixed64)2);
 
         body.AddForce(new Vector2d((Fixed64)4, Fixed64.Zero));
         body.AddAngularImpulse(Fixed64.One);
@@ -115,12 +115,12 @@ public sealed class StiffBody2DAngularDynamicsTests
         body.IsSleeping.Should().BeFalse();
     }
 
-    private static StiffBody2D CreateBody(
+    private static SolidBody2D CreateBody(
         GravitasWorldContext context,
         LSCollider2D collider,
         Fixed64 mass)
     {
-        var body = new StiffBody2D(new TestMatterAgent(context), collider)
+        var body = new SolidBody2D(new TestMatterAgent(context), collider)
         {
             Mass = mass
         };

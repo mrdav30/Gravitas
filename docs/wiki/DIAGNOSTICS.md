@@ -61,11 +61,11 @@ Current event kinds:
 
 | Kind | Captured from | Payload notes |
 | --- | --- | --- |
-| `ForceDelta` | `StiffBody.AddForce(...)` | `Vector` is the force, `PointA` is acceleration delta, `ScalarA` is force magnitude. |
-| `TorqueDelta` | `StiffBody.AddTorque(...)` | `Vector` is torque, `ScalarA` is torque magnitude. |
+| `ForceDelta` | `SolidBody.AddForce(...)` | `Vector` is the force, `PointA` is acceleration delta, `ScalarA` is force magnitude. |
+| `TorqueDelta` | `SolidBody.AddTorque(...)` | `Vector` is torque, `ScalarA` is torque magnitude. |
 | `LinearVelocityDelta` | Collision response velocity change | `Start` and `End` are previous/current velocity, `Vector` is the delta. |
 | `AngularVelocityDelta` | Collision response angular velocity change | Same shape as linear velocity delta. |
-| `GroundProbe` | `StiffBody.CheckGround(...)` | `Start`/`End` are probe segment, `ScalarA` is probe radius, `DataA` is `GroundProbeMode`. |
+| `GroundProbe` | `SolidBody.CheckGround(...)` | `Start`/`End` are probe segment, `ScalarA` is probe radius, `DataA` is `GroundProbeMode`. |
 | `RayQuery` | Raycast and swept-sphere queries | `ScalarA` is sweep radius, `DataA` is layer mask bits, `DataB` is hit count. |
 | `CircleQuery` | Circle overlap queries | `Start` is center, `End` is directional extent when used, `ScalarA` is radius. |
 | `QuerySummary` | Query reducer quality diagnostics | `DataA` is eligible top-level exact reducer attempts, `DataB` is accepted hits, `ScalarA` is fallback hits, and `ScalarB` is rejected conservative candidates. |
@@ -89,8 +89,8 @@ than diagnostic events. `GravitasPhysicsService` reports
 the same counters internally for pure 2D tests and service-level validation.
 The body-owned bounded solver still reports
 `LastContinuousCollisionToiIterationCount` and
-`LastContinuousCollisionToiIterationLimitReached` on `StiffBody` and
-`StiffBody2D`. These counters are deterministic frame-local state intended for
+`LastContinuousCollisionToiIterationLimitReached` on `SolidBody` and
+`SolidBody2D`. These counters are deterministic frame-local state intended for
 tuning, tests, and host diagnostics without adding event-buffer traffic to the
 hot path.
 

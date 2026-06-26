@@ -167,7 +167,7 @@ intent and should not automatically apply these masks.
 - [ ] Route 3D CCD target eligibility helpers through the local filter.
 - [ ] Route pure 2D CCD target eligibility helpers through the local filter.
 - [ ] Route mixed CCD target eligibility helpers through the local filter.
-- [ ] Route `StiffBody.IsValidGroundHit(...)` through the local filter.
+- [ ] Route `SolidBody.IsValidGroundHit(...)` through the local filter.
 - [ ] Leave public `Query3D`, `Query2D`, and `QueryMixed` behavior unchanged.
 
 **Done Criteria**

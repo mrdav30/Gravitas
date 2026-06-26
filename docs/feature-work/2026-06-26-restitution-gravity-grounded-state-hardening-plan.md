@@ -42,21 +42,21 @@ axis freeze work is captured separately.
 - `src/Gravitas/CollisionHandling/Response/Mixed/CollisionResponseMixed.cs`
   defines the same hardcoded threshold.
 - 3D dynamic CCD restitution in
-  `src/Gravitas/Core/3D/StiffBody.ContinuousCollision.Dynamic.cs` reads the 3D
+  `src/Gravitas/Core/3D/SolidBody.ContinuousCollision.Dynamic.cs` reads the 3D
   static threshold.
 - Pure 2D dynamic CCD restitution in
-  `src/Gravitas/Core/2D/StiffBody2D.ContinuousCollision.Dynamic.cs` reads the
+  `src/Gravitas/Core/2D/SolidBody2D.ContinuousCollision.Dynamic.cs` reads the
   2D static threshold.
 - `PhysicsSettings` owns other solver-level tunables such as
   `DiscreteSolverIterations`, `ContinuousCollisionMaxToiIterations`, and
   `Mixed2DHalfThickness`.
 - `PhysicsSettingsSaver` records configurable settings for deterministic
   save/apply flows.
-- `StiffBody` uses context environment gravity during integration and CCD
+- `SolidBody` uses context environment gravity during integration and CCD
   prediction.
-- `StiffBody2D` owns a per-body planar `Gravity` vector.
-- `StiffBody` exposes `IsGrounded`, but not `WasGrounded`.
-- `StiffBody2D` grounding is planned in
+- `SolidBody2D` owns a per-body planar `Gravity` vector.
+- `SolidBody` exposes `IsGrounded`, but not `WasGrounded`.
+- `SolidBody2D` grounding is planned in
   `docs/feature-work/2026-06-26-pure-2d-grounding-and-support-plan.md`.
 
 ## Non-Goals
@@ -89,10 +89,10 @@ is:
 
 - `PhysicsSettings.DefaultRestitutionVelocityThreshold`
 - `PhysicsSettings.RestitutionVelocityThreshold`
-- `StiffBody.GravityScale`
-- `StiffBody2D.GravityScale`
-- `StiffBody.WasGrounded`
-- `StiffBody2D.WasGrounded` as part of the pure 2D grounding plan
+- `SolidBody.GravityScale`
+- `SolidBody2D.GravityScale`
+- `SolidBody.WasGrounded`
+- `SolidBody2D.WasGrounded` as part of the pure 2D grounding plan
 
 `GravityScale` should default to `Fixed64.One`. A zero scale disables gravity
 for that body. Values greater than one intentionally allow stronger gravity.
@@ -198,10 +198,10 @@ updated at the same time.
   the current implementation; otherwise document the non-use in the test name
   that verifies no stale static threshold remains.
 - [ ] Replace static threshold reads in
-  `src/Gravitas/Core/3D/StiffBody.ContinuousCollision.Dynamic.cs` with the
+  `src/Gravitas/Core/3D/SolidBody.ContinuousCollision.Dynamic.cs` with the
   context setting.
 - [ ] Replace static threshold reads in
-  `src/Gravitas/Core/2D/StiffBody2D.ContinuousCollision.Dynamic.cs` with the
+  `src/Gravitas/Core/2D/SolidBody2D.ContinuousCollision.Dynamic.cs` with the
   context setting.
 - [ ] Search with
   `rg -n "RestitutionVelocityThreshold" src/Gravitas tests/Gravitas.Tests`
@@ -227,7 +227,7 @@ positive values cover common gameplay tuning.
 **Tasks**
 
 - [ ] Add 3D integration tests in
-  `tests/Gravitas.Tests/Core/StiffBodyIntegrationTests.cs`:
+  `tests/Gravitas.Tests/Core/SolidBodyIntegrationTests.cs`:
   - default `GravityScale` preserves current gravity behavior.
   - `GravityScale = Fixed64.Zero` prevents environment gravity from changing
     velocity.
@@ -235,22 +235,22 @@ positive values cover common gameplay tuning.
   - negative values throw.
 - [ ] Add pure 2D integration tests in
   `tests/Gravitas.Tests/Physics2D/Physics2DSimulationTests.cs` or
-  `tests/Gravitas.Tests/Core/StiffBody2DAngularDynamicsTests.cs`:
+  `tests/Gravitas.Tests/Core/SolidBody2DAngularDynamicsTests.cs`:
   - default scale preserves current per-body `Gravity`.
   - zero scale prevents planar gravity from changing velocity.
   - half scale applies half planar gravity.
   - negative values throw.
-- [ ] Add `GravityScale` to `src/Gravitas/Core/3D/StiffBody.cs` with
+- [ ] Add `GravityScale` to `src/Gravitas/Core/3D/SolidBody.cs` with
   `Fixed64.One` default and negative-value validation.
 - [ ] Apply `GravityScale` in 3D integration in
-  `src/Gravitas/Core/3D/StiffBody.Motion.cs`.
+  `src/Gravitas/Core/3D/SolidBody.Motion.cs`.
 - [ ] Apply `GravityScale` in 3D CCD prediction in
-  `src/Gravitas/Core/3D/StiffBody.ContinuousCollision.cs`.
-- [ ] Add `GravityScale` to `src/Gravitas/Core/2D/StiffBody2D.cs` with the same
+  `src/Gravitas/Core/3D/SolidBody.ContinuousCollision.cs`.
+- [ ] Add `GravityScale` to `src/Gravitas/Core/2D/SolidBody2D.cs` with the same
   validation.
 - [ ] Apply `GravityScale` in pure 2D integration and CCD prediction.
-- [ ] Record `GravityScale` in `StiffBody.Serialization.cs` and
-  `StiffBody2D.Serialization.cs`.
+- [ ] Record `GravityScale` in `SolidBody.Serialization.cs` and
+  `SolidBody2D.Serialization.cs`.
 - [ ] Add serialization tests proving save/populate preserves the scale for both
   body types.
 - [ ] Update docs in `docs/wiki/HOST_INTEGRATION.md`,
@@ -274,7 +274,7 @@ behavior, and the planned pure 2D grounding model.
 **Tasks**
 
 - [ ] Add 3D grounding tests in
-  `tests/Gravitas.Tests/Core/StiffBodyGroundingTests.cs` or the nearest
+  `tests/Gravitas.Tests/Core/SolidBodyGroundingTests.cs` or the nearest
   grounding test file:
   - `WasGrounded` is false before the first successful ground check.
   - `WasGrounded` is true on the frame after a grounded check succeeds.
@@ -289,7 +289,7 @@ behavior, and the planned pure 2D grounding model.
   previous value long enough for the current step's transition to be observable.
 - [ ] Decide whether `WasGrounded` must be serialized for deterministic
   continuation. If landing/leave-ground events can be replayed differently
-  after load without it, record the field in `StiffBody.Serialization.cs`.
+  after load without it, record the field in `SolidBody.Serialization.cs`.
 - [ ] Verify the pure 2D grounding plan still carries `WasGrounded` state and
   transition tests before implementation starts.
 - [ ] Update `docs/wiki/HOST_INTEGRATION.md` to describe the frame boundary for

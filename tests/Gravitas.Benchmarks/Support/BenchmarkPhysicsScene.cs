@@ -48,7 +48,7 @@ internal static class BenchmarkPhysicsScene
     public static int CreateDynamicSphereGrid(
         GravitasWorldContext context,
         int count,
-        SwiftList<StiffBody> bodies)
+        SwiftList<SolidBody> bodies)
     {
         bodies.FastClear();
         for (int i = 0; i < count; i++)
@@ -306,19 +306,19 @@ internal static class BenchmarkPhysicsScene
         triangles = triangleList.ToArray();
     }
 
-    private static StiffBody CreateDynamicSphere(GravitasWorldContext context, Vector3d position)
+    private static SolidBody CreateDynamicSphere(GravitasWorldContext context, Vector3d position)
     {
         return CreateDynamicBody(context, new LSSphereCollider(), position);
     }
 
-    private static StiffBody CreateDynamicBody(
+    private static SolidBody CreateDynamicBody(
         GravitasWorldContext context,
         LSCollider collider,
         Vector3d position,
         FixedQuaternion? rotation = null)
     {
         var agent = new BenchmarkMatterAgent(context, position);
-        var body = new StiffBody(agent, collider)
+        var body = new SolidBody(agent, collider)
         {
             Mass = Fixed64.One
         };

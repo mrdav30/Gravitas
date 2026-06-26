@@ -225,7 +225,7 @@ public sealed class GravitasCollision2DService
         if (!collider.IsPartitioned || collider.PartitionCoordinates == null)
             return;
 
-        StiffBody2D? body = collider.Body;
+        SolidBody2D? body = collider.Body;
         if (body == null || body.Immovable || body.IsKinematic)
             return;
 
@@ -513,7 +513,7 @@ public sealed class GravitasCollision2DService
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static PhysicsPartitionMobilityKind GetMobilityKind(LSCollider2D collider)
     {
-        StiffBody2D? body = collider.Body;
+        SolidBody2D? body = collider.Body;
         if (body == null || body.Immovable)
             return PhysicsPartitionMobilityKind.Static;
 
@@ -569,7 +569,7 @@ public sealed class GravitasCollision2DService
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool IsStaticStyleCollider(LSCollider2D collider)
     {
-        StiffBody2D? body = collider.Body;
+        SolidBody2D? body = collider.Body;
         return body == null || body.Immovable || body.IsKinematic;
     }
 

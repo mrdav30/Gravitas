@@ -177,7 +177,7 @@ to add or tighten explicit allocation tests before changing the algorithm.
 | Alias | Covered paths |
 | --- | --- |
 | `query-service` | `RaycastAll`, `OverlapCircleAll`, directional `OverlapCircleInDirection`, swept-sphere queries, convex-source sweeps, high-vertex convex mesh source scaling, and overlapping-context queries. |
-| `simulation-allocation` | `StiffBody.LateSimulate`, grounding raycast probes, collision partition distribution, and active-pair late simulation. |
+| `simulation-allocation` | `SolidBody.LateSimulate`, grounding raycast probes, collision partition distribution, and active-pair late simulation. |
 | `continuous-collision` | Discrete fast body movement baseline and opt-in CCD sweep/clamp against thin static geometry. |
 | `kinematic-active-ccd-scaling` | host-driven kinematic active-source CCD rows for no-hit, first-hit, dense-hit, rotational, and mixed source scenarios. |
 | `collision-partition` | dynamic/static registration and partitioning, partitioned simulation, and reset plus dynamic re-registration churn. |

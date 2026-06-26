@@ -16,8 +16,8 @@ public sealed class Physics2DQueryTests
     public void OverlapCircleAll_ShouldUsePure2DShapeMathAndStableOrdering()
     {
         using GravitasWorldContext context = Create2DContext();
-        StiffBody2D first = CreateCircle(context, new Vector2d(Fixed64.Half, Fixed64.Zero));
-        StiffBody2D second = CreateBox(context, new Vector2d((Fixed64)2, Fixed64.Zero));
+        SolidBody2D first = CreateCircle(context, new Vector2d(Fixed64.Half, Fixed64.Zero));
+        SolidBody2D second = CreateBox(context, new Vector2d((Fixed64)2, Fixed64.Zero));
         _ = CreateCircle(context, new Vector2d((Fixed64)8, Fixed64.Zero));
         var hits = new SwiftList<Physics2DHit>();
 
@@ -37,7 +37,7 @@ public sealed class Physics2DQueryTests
     {
         using GravitasWorldContext context = Create2DContext();
         _ = CreateCircle(context, new Vector2d(Fixed64.Zero, Fixed64.Zero), new PhysicsLayer(0));
-        StiffBody2D included = CreateCircle(context, new Vector2d(Fixed64.One, Fixed64.Zero), new PhysicsLayer(1));
+        SolidBody2D included = CreateCircle(context, new Vector2d(Fixed64.One, Fixed64.Zero), new PhysicsLayer(1));
         _ = CreateBox(context, new Vector2d((Fixed64)2, Fixed64.Zero), new PhysicsLayer(2));
         var hits = new SwiftList<Physics2DHit>();
 
@@ -56,7 +56,7 @@ public sealed class Physics2DQueryTests
     {
         using GravitasWorldContext context = Create2DContext();
         _ = CreateCircle(context, Vector2d.Zero, new PhysicsLayer(0));
-        StiffBody2D closest = CreateCircle(context, new Vector2d(Fixed64.One, Fixed64.Zero), new PhysicsLayer(1));
+        SolidBody2D closest = CreateCircle(context, new Vector2d(Fixed64.One, Fixed64.Zero), new PhysicsLayer(1));
         _ = CreateBox(context, new Vector2d((Fixed64)2, Fixed64.Zero), new PhysicsLayer(1));
 
         bool hit = context.Query2D.OverlapCircle(
@@ -73,9 +73,9 @@ public sealed class Physics2DQueryTests
     public void OverlapAabbAll_ShouldUseExactShapeMathAndStableOrdering()
     {
         using GravitasWorldContext context = Create2DContext();
-        StiffBody2D circle = CreateCircle(context, new Vector2d(-Fixed64.One, Fixed64.Zero));
-        StiffBody2D box = CreateBox(context, new Vector2d(Fixed64.One, Fixed64.Zero));
-        StiffBody2D polygon = CreatePolygon(context, new Vector2d((Fixed64)3, Fixed64.Zero));
+        SolidBody2D circle = CreateCircle(context, new Vector2d(-Fixed64.One, Fixed64.Zero));
+        SolidBody2D box = CreateBox(context, new Vector2d(Fixed64.One, Fixed64.Zero));
+        SolidBody2D polygon = CreatePolygon(context, new Vector2d((Fixed64)3, Fixed64.Zero));
         _ = CreateCircle(context, new Vector2d((Fixed64)8, Fixed64.Zero));
         var hits = new SwiftList<Physics2DHit>();
 
@@ -97,7 +97,7 @@ public sealed class Physics2DQueryTests
     {
         using GravitasWorldContext context = Create2DContext();
         _ = CreateCircle(context, Vector2d.Zero, new PhysicsLayer(0));
-        StiffBody2D included = CreateBox(context, new Vector2d(Fixed64.One, Fixed64.Zero), new PhysicsLayer(1));
+        SolidBody2D included = CreateBox(context, new Vector2d(Fixed64.One, Fixed64.Zero), new PhysicsLayer(1));
 
         bool hit = context.Query2D.OverlapAabb(
             Vector2d.Zero,
@@ -113,8 +113,8 @@ public sealed class Physics2DQueryTests
     public void OverlapPolygonAll_ShouldIncludeEdgeTouchingAndCompoundOwner()
     {
         using GravitasWorldContext context = Create2DContext();
-        StiffBody2D edgeTouchingBox = CreateBox(context, new Vector2d((Fixed64)2, Fixed64.Zero), new PhysicsLayer(), new Vector2d((Fixed64)2, (Fixed64)2));
-        StiffBody2D compound = CreateCompound(context, new Vector2d(Fixed64.Zero, Fixed64.FromFraction(3, 2)));
+        SolidBody2D edgeTouchingBox = CreateBox(context, new Vector2d((Fixed64)2, Fixed64.Zero), new PhysicsLayer(), new Vector2d((Fixed64)2, (Fixed64)2));
+        SolidBody2D compound = CreateCompound(context, new Vector2d(Fixed64.Zero, Fixed64.FromFraction(3, 2)));
         _ = CreateCircle(context, new Vector2d((Fixed64)5, Fixed64.Zero));
         var hits = new SwiftList<Physics2DHit>();
 
@@ -138,7 +138,7 @@ public sealed class Physics2DQueryTests
     public void OverlapPolygon_ShouldRejectSeparatedTargetsAndReturnClosestHit()
     {
         using GravitasWorldContext context = Create2DContext();
-        StiffBody2D inside = CreatePolygon(context, Vector2d.Zero);
+        SolidBody2D inside = CreatePolygon(context, Vector2d.Zero);
         _ = CreateBox(context, new Vector2d((Fixed64)6, Fixed64.Zero));
 
         bool hit = context.Query2D.OverlapPolygon(
@@ -159,9 +159,9 @@ public sealed class Physics2DQueryTests
     public void RaycastAll_ShouldUsePure2DShapeMathAndStableOrdering()
     {
         using GravitasWorldContext context = Create2DContext();
-        StiffBody2D near = CreateCircle(context, Vector2d.Zero);
-        StiffBody2D middle = CreateBox(context, new Vector2d((Fixed64)3, Fixed64.Zero));
-        StiffBody2D far = CreatePolygon(context, new Vector2d((Fixed64)6, Fixed64.Zero));
+        SolidBody2D near = CreateCircle(context, Vector2d.Zero);
+        SolidBody2D middle = CreateBox(context, new Vector2d((Fixed64)3, Fixed64.Zero));
+        SolidBody2D far = CreatePolygon(context, new Vector2d((Fixed64)6, Fixed64.Zero));
         var hits = new SwiftList<Physics2DHit>();
 
         int count = context.Query2D.RaycastAll(
@@ -181,7 +181,7 @@ public sealed class Physics2DQueryTests
     public void Raycast_ShouldReturnZeroDistanceWhenSegmentStartsInsideCollider()
     {
         using GravitasWorldContext context = Create2DContext();
-        StiffBody2D body = CreateCircle(context, Vector2d.Zero);
+        SolidBody2D body = CreateCircle(context, Vector2d.Zero);
 
         bool hit = context.Query2D.Raycast(
             Vector2d.Zero,
@@ -198,7 +198,7 @@ public sealed class Physics2DQueryTests
     public void Raycast_WithHorizontalSegmentAcrossPolygonEdges_ShouldNotDivideByZero()
     {
         using GravitasWorldContext context = Create2DContext();
-        StiffBody2D body = CreatePolygon(context, Vector2d.Zero);
+        SolidBody2D body = CreatePolygon(context, Vector2d.Zero);
         Vector2d start = new((Fixed64)(-3), Fixed64.Zero);
         Vector2d end = new((Fixed64)3, Fixed64.Zero);
 
@@ -216,7 +216,7 @@ public sealed class Physics2DQueryTests
     {
         using GravitasWorldContext context = Create2DContext();
         _ = CreateCircle(context, Vector2d.Zero, new PhysicsLayer(0));
-        StiffBody2D included = CreateBox(context, new Vector2d((Fixed64)2, Fixed64.Zero), new PhysicsLayer(1));
+        SolidBody2D included = CreateBox(context, new Vector2d((Fixed64)2, Fixed64.Zero), new PhysicsLayer(1));
         var hits = new SwiftList<Physics2DHit>();
 
         int count = context.Query2D.RaycastAll(
@@ -233,7 +233,7 @@ public sealed class Physics2DQueryTests
     public void RaycastAll_WithColliderSpanningMultipleVoxels_ShouldReturnOneHit()
     {
         using GravitasWorldContext context = Create2DContext();
-        StiffBody2D body = CreateBox(context, Vector2d.Zero, new PhysicsLayer(), new Vector2d((Fixed64)8, (Fixed64)8));
+        SolidBody2D body = CreateBox(context, Vector2d.Zero, new PhysicsLayer(), new Vector2d((Fixed64)8, (Fixed64)8));
         var hits = new SwiftList<Physics2DHit>();
 
         int count = context.Query2D.RaycastAll(
@@ -317,16 +317,16 @@ public sealed class Physics2DQueryTests
         allocatedBytes.Should().Be(0);
     }
 
-    private static StiffBody2D CreateCircle(GravitasWorldContext context, Vector2d position)
+    private static SolidBody2D CreateCircle(GravitasWorldContext context, Vector2d position)
     {
         return CreateCircle(context, position, new PhysicsLayer());
     }
 
-    private static StiffBody2D CreateCircle(GravitasWorldContext context, Vector2d position, PhysicsLayer layer)
+    private static SolidBody2D CreateCircle(GravitasWorldContext context, Vector2d position, PhysicsLayer layer)
     {
         var transform = new FixedTransform(new Vector3d(position.X, Fixed64.Zero, position.Y), FixedQuaternion.Identity, Vector3d.One);
         var agent = new TestMatterAgent(context, transform);
-        var body = new StiffBody2D(agent, new LSCircleCollider2D(Fixed64.Half))
+        var body = new SolidBody2D(agent, new LSCircleCollider2D(Fixed64.Half))
         {
             Mass = Fixed64.One,
             Immovable = true
@@ -336,21 +336,21 @@ public sealed class Physics2DQueryTests
         return body;
     }
 
-    private static StiffBody2D CreateBox(GravitasWorldContext context, Vector2d position)
+    private static SolidBody2D CreateBox(GravitasWorldContext context, Vector2d position)
     {
         return CreateBox(context, position, new PhysicsLayer());
     }
 
-    private static StiffBody2D CreateBox(GravitasWorldContext context, Vector2d position, PhysicsLayer layer)
+    private static SolidBody2D CreateBox(GravitasWorldContext context, Vector2d position, PhysicsLayer layer)
     {
         return CreateBox(context, position, layer, Vector2d.One);
     }
 
-    private static StiffBody2D CreateBox(GravitasWorldContext context, Vector2d position, PhysicsLayer layer, Vector2d size)
+    private static SolidBody2D CreateBox(GravitasWorldContext context, Vector2d position, PhysicsLayer layer, Vector2d size)
     {
         var transform = new FixedTransform(new Vector3d(position.X, Fixed64.Zero, position.Y), FixedQuaternion.Identity, Vector3d.One);
         var agent = new TestMatterAgent(context, transform);
-        var body = new StiffBody2D(agent, new LSAABBoxCollider2D(size))
+        var body = new SolidBody2D(agent, new LSAABBoxCollider2D(size))
         {
             Mass = Fixed64.One,
             Immovable = true
@@ -360,11 +360,11 @@ public sealed class Physics2DQueryTests
         return body;
     }
 
-    private static StiffBody2D CreatePolygon(GravitasWorldContext context, Vector2d position)
+    private static SolidBody2D CreatePolygon(GravitasWorldContext context, Vector2d position)
     {
         var transform = new FixedTransform(new Vector3d(position.X, Fixed64.Zero, position.Y), FixedQuaternion.Identity, Vector3d.One);
         var agent = new TestMatterAgent(context, transform);
-        var body = new StiffBody2D(
+        var body = new SolidBody2D(
             agent,
             new LSPolygonCollider2D(
                 new Vector2d(-Fixed64.Half, -Fixed64.Half),
@@ -379,11 +379,11 @@ public sealed class Physics2DQueryTests
         return body;
     }
 
-    private static StiffBody2D CreateCompound(GravitasWorldContext context, Vector2d position)
+    private static SolidBody2D CreateCompound(GravitasWorldContext context, Vector2d position)
     {
         var transform = new FixedTransform(new Vector3d(position.X, Fixed64.Zero, position.Y), FixedQuaternion.Identity, Vector3d.One);
         var agent = new TestMatterAgent(context, transform);
-        var body = new StiffBody2D(
+        var body = new SolidBody2D(
             agent,
             new LSCompoundCollider2D(
                 CompoundColliderPart2D.Circle(Fixed64.Half, Vector2d.Zero),

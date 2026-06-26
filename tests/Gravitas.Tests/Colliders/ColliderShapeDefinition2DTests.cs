@@ -18,7 +18,7 @@ public sealed class ColliderShapeDefinition2DTests
         ColliderShapeDefinition2D definition = ColliderShapeDefinition2D.AABBox(size);
 
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
-        StiffBody2D body = CreateBody(context, new LSAABBoxCollider2D(definition), Vector2d.Zero);
+        SolidBody2D body = CreateBody(context, new LSAABBoxCollider2D(definition), Vector2d.Zero);
 
         definition.Kind.Should().Be(ColliderShapeDefinition2DKind.AABBox);
         definition.Size.Should().Be(size);
@@ -74,11 +74,11 @@ public sealed class ColliderShapeDefinition2DTests
             .NotContain(type => typeof(LSCollider2D).IsAssignableFrom(type));
     }
 
-    private static StiffBody2D CreateBody(GravitasWorldContext context, LSCollider2D collider, Vector2d position)
+    private static SolidBody2D CreateBody(GravitasWorldContext context, LSCollider2D collider, Vector2d position)
     {
         var transform = new FixedTransform(new Vector3d(position.X, Fixed64.Zero, position.Y), FixedQuaternion.Identity, Vector3d.One);
         var agent = new TestMatterAgent(context, transform);
-        var body = new StiffBody2D(agent, collider)
+        var body = new SolidBody2D(agent, collider)
         {
             Mass = Fixed64.One,
             Immovable = true

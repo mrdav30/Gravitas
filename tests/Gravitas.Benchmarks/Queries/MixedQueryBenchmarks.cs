@@ -329,12 +329,12 @@ public class MixedQueryBenchmarks
         return _falsePositiveCompoundContext.QueryMixed.LastQueryCandidateCount;
     }
 
-    private static StiffBody CreateSphere3D(GravitasWorldContext context, Vector3d position)
+    private static SolidBody CreateSphere3D(GravitasWorldContext context, Vector3d position)
     {
         return CreateStatic3D(context, new LSSphereCollider(), position);
     }
 
-    private static StiffBody CreateStatic3D(
+    private static SolidBody CreateStatic3D(
         GravitasWorldContext context,
         LSCollider collider,
         Vector3d position,
@@ -343,7 +343,7 @@ public class MixedQueryBenchmarks
         var agent = new BenchmarkMatterAgent(context, position);
         FixedQuaternion startRotation = rotation ?? FixedQuaternion.Identity;
         agent.Transform.Rotation = startRotation;
-        var body = new StiffBody(agent, collider)
+        var body = new SolidBody(agent, collider)
         {
             Mass = Fixed64.One,
             Immovable = true

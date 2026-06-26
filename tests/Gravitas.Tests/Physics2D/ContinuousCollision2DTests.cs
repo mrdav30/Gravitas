@@ -21,7 +21,7 @@ public sealed class ContinuousCollision2DTests
     public void ContinuousMode_ShouldPreventFastCircleTunnelingThroughStaticTargets(ColliderType2D targetShape)
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);
-        StiffBody2D mover = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
+        SolidBody2D mover = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
         _ = CreateBody(context, CreateCollider(targetShape), new Vector2d((Fixed64)5, Fixed64.Zero), immovable: true);
         mover.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
 
@@ -36,7 +36,7 @@ public sealed class ContinuousCollision2DTests
     public void ContinuousMode_ShouldConsumeRemainingFrameTimeAfterSlidingIntoSecondStaticContact()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);
-        StiffBody2D mover = CreateBody(
+        SolidBody2D mover = CreateBody(
             context,
             new LSCircleCollider2D(Fixed64.Half),
             new Vector2d((Fixed64)(-2), Fixed64.Zero),
@@ -65,7 +65,7 @@ public sealed class ContinuousCollision2DTests
     public void ContinuousMode_ToiIterationPath_ShouldEvaluateMoverShapeAtIntermediateTimeOfImpact()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);
-        StiffBody2D mover = CreateBody(
+        SolidBody2D mover = CreateBody(
             context,
             new LSAABBoxCollider2D(Vector2d.One),
             new Vector2d((Fixed64)(-2), Fixed64.Zero),
@@ -95,7 +95,7 @@ public sealed class ContinuousCollision2DTests
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);
         context.Settings.ContinuousCollisionMaxToiIterations = 1;
-        StiffBody2D mover = CreateBody(
+        SolidBody2D mover = CreateBody(
             context,
             new LSCircleCollider2D(Fixed64.Half),
             new Vector2d((Fixed64)(-2), Fixed64.Zero),
@@ -125,7 +125,7 @@ public sealed class ContinuousCollision2DTests
     public void ContinuousMode_ToiIterationPath_ShouldNotAllocateAfterWarmup()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);
-        StiffBody2D mover = CreateBody(
+        SolidBody2D mover = CreateBody(
             context,
             new LSCircleCollider2D(Fixed64.Half),
             new Vector2d((Fixed64)(-2), Fixed64.Zero),
@@ -165,7 +165,7 @@ public sealed class ContinuousCollision2DTests
         using GravitasWorldContext context = CreateContext(frameRate: 1);
         var compound = new LSCompoundCollider2D(
             CompoundColliderPart2D.Circle(Fixed64.Half, Vector2d.Zero));
-        StiffBody2D mover = CreateBody(context, compound, Vector2d.Zero, immovable: false);
+        SolidBody2D mover = CreateBody(context, compound, Vector2d.Zero, immovable: false);
         _ = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)5, Fixed64.Zero), immovable: true);
         mover.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
 
@@ -180,7 +180,7 @@ public sealed class ContinuousCollision2DTests
     public void DiscreteMode_ShouldKeepExistingFastMovementPath()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);
-        StiffBody2D mover = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
+        SolidBody2D mover = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
         _ = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)5, Fixed64.Zero), immovable: true);
         context.Settings.DefaultContinuousCollisionMode = ContinuousCollisionMode.Continuous;
         mover.ContinuousCollisionMode = ContinuousCollisionMode.Discrete;
@@ -195,8 +195,8 @@ public sealed class ContinuousCollision2DTests
     public void AutoMode_ShouldSweepOnlyWhenMovementExceedsProxyRadius()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);
-        StiffBody2D slow = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
-        StiffBody2D fast = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d(Fixed64.Zero, (Fixed64)3), immovable: false);
+        SolidBody2D slow = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
+        SolidBody2D fast = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d(Fixed64.Zero, (Fixed64)3), immovable: false);
         _ = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)5, Fixed64.Zero), immovable: true);
         _ = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)5, (Fixed64)3), immovable: true);
         slow.ContinuousCollisionMode = ContinuousCollisionMode.Auto;
@@ -214,8 +214,8 @@ public sealed class ContinuousCollision2DTests
     public void ContinuousMode_WithOpposingDynamicBodies_ShouldClampBothAtSharedTimeOfImpact()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);
-        StiffBody2D left = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)(-5), Fixed64.Zero), immovable: false);
-        StiffBody2D right = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)5, Fixed64.Zero), immovable: false);
+        SolidBody2D left = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)(-5), Fixed64.Zero), immovable: false);
+        SolidBody2D right = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)5, Fixed64.Zero), immovable: false);
         left.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
         right.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
 
@@ -234,9 +234,9 @@ public sealed class ContinuousCollision2DTests
     public void ContinuousMode_WithChainedDynamicBodies_ShouldWakeAndContinueConnectedIsland()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);
-        StiffBody2D middle = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
-        StiffBody2D receiver = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)2, Fixed64.Zero), immovable: false);
-        StiffBody2D driver = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)(-5), Fixed64.Zero), immovable: false);
+        SolidBody2D middle = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
+        SolidBody2D receiver = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)2, Fixed64.Zero), immovable: false);
+        SolidBody2D driver = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)(-5), Fixed64.Zero), immovable: false);
         driver.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
         middle.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
         receiver.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
@@ -261,9 +261,9 @@ public sealed class ContinuousCollision2DTests
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);
         context.Settings.ContinuousCollisionMaxToiIterations = 1;
-        StiffBody2D middle = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
-        StiffBody2D receiver = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)2, Fixed64.Zero), immovable: false);
-        StiffBody2D driver = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)(-5), Fixed64.Zero), immovable: false);
+        SolidBody2D middle = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
+        SolidBody2D receiver = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)2, Fixed64.Zero), immovable: false);
+        SolidBody2D driver = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)(-5), Fixed64.Zero), immovable: false);
         driver.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
         middle.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
         receiver.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
@@ -282,12 +282,12 @@ public sealed class ContinuousCollision2DTests
     public void ContinuousMode_DynamicRelativePath_ShouldNotClampThinAabbWhenProxyCirclesHitButShapesMiss()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);
-        StiffBody2D blade = CreateBody(
+        SolidBody2D blade = CreateBody(
             context,
             new LSAABBoxCollider2D(new Vector2d((Fixed64)6, Fixed64.FromFraction(1, 5))),
             Vector2d.Zero,
             immovable: false);
-        StiffBody2D target = CreateBody(
+        SolidBody2D target = CreateBody(
             context,
             new LSCircleCollider2D(Fixed64.FromFraction(1, 4)),
             new Vector2d((Fixed64)4, Fixed64.FromFraction(5, 2)),
@@ -307,8 +307,8 @@ public sealed class ContinuousCollision2DTests
     public void ContinuousMode_StaticCollector_ShouldSkipMovableDynamicTargets()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);
-        StiffBody2D left = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)(-5), Fixed64.Zero), immovable: false);
-        StiffBody2D right = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)5, Fixed64.Zero), immovable: false);
+        SolidBody2D left = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)(-5), Fixed64.Zero), immovable: false);
+        SolidBody2D right = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)5, Fixed64.Zero), immovable: false);
         left.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
         right.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
 
@@ -326,7 +326,7 @@ public sealed class ContinuousCollision2DTests
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);
         _ = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)5, Fixed64.Zero), immovable: false, isKinematic: true);
-        StiffBody2D mover = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
+        SolidBody2D mover = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
         mover.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
 
         mover.AddForce(new Vector2d((Fixed64)10, Fixed64.Zero));
@@ -342,7 +342,7 @@ public sealed class ContinuousCollision2DTests
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);
         _ = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: true);
-        StiffBody2D source = CreateBody(
+        SolidBody2D source = CreateBody(
             context,
             new LSCircleCollider2D(Fixed64.Half),
             new Vector2d((Fixed64)(-5), Fixed64.Zero),
@@ -361,9 +361,9 @@ public sealed class ContinuousCollision2DTests
     public void ContinuousMode_WithFastKinematic2DHostTranslation_ShouldTransferVelocityToDynamicTarget()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);
-        StiffBody2D target = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
+        SolidBody2D target = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
         target.Sleep();
-        StiffBody2D source = CreateBody(
+        SolidBody2D source = CreateBody(
             context,
             new LSCircleCollider2D(Fixed64.Half),
             new Vector2d((Fixed64)(-5), Fixed64.Zero),
@@ -385,11 +385,11 @@ public sealed class ContinuousCollision2DTests
     public void ContinuousMode_WithFastKinematic2DHostTranslation_ShouldRelayDynamicHandoffThroughChain()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);
-        StiffBody2D receiver = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)2, Fixed64.Zero), immovable: false);
-        StiffBody2D middle = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
+        SolidBody2D receiver = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)2, Fixed64.Zero), immovable: false);
+        SolidBody2D middle = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
         receiver.Sleep();
         middle.Sleep();
-        StiffBody2D source = CreateBody(
+        SolidBody2D source = CreateBody(
             context,
             new LSCircleCollider2D(Fixed64.Half),
             new Vector2d((Fixed64)(-5), Fixed64.Zero),
@@ -413,10 +413,10 @@ public sealed class ContinuousCollision2DTests
     public void ContinuousMode_WithFastKinematic2DHostTranslation_ShouldStillClampAtStaticAfterDynamicPush()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);
-        StiffBody2D target = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)(-1), Fixed64.Zero), immovable: false);
+        SolidBody2D target = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)(-1), Fixed64.Zero), immovable: false);
         target.Sleep();
         _ = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)3, Fixed64.Zero), immovable: true);
-        StiffBody2D source = CreateBody(
+        SolidBody2D source = CreateBody(
             context,
             new LSCircleCollider2D(Fixed64.Half),
             new Vector2d((Fixed64)(-5), Fixed64.Zero),
@@ -439,13 +439,13 @@ public sealed class ContinuousCollision2DTests
     public void ContinuousMode_WithPlanarDynamicsAtDifferentHostY_ShouldStillClampInPure2D()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);
-        StiffBody2D left = CreateBody(
+        SolidBody2D left = CreateBody(
             context,
             new LSCircleCollider2D(Fixed64.Half),
             new Vector2d((Fixed64)(-5), Fixed64.Zero),
             immovable: false,
             hostY: (Fixed64)(-8));
-        StiffBody2D right = CreateBody(
+        SolidBody2D right = CreateBody(
             context,
             new LSCircleCollider2D(Fixed64.Half),
             new Vector2d((Fixed64)5, Fixed64.Zero),
@@ -472,7 +472,7 @@ public sealed class ContinuousCollision2DTests
             new Vector2d((Fixed64)3, Fixed64.FromFraction(-1, 10)),
             new Vector2d((Fixed64)3, Fixed64.FromFraction(1, 10)),
             new Vector2d((Fixed64)(-3), Fixed64.FromFraction(1, 10)));
-        StiffBody2D blade = CreateBody(context, bladeCollider, Vector2d.Zero, immovable: false);
+        SolidBody2D blade = CreateBody(context, bladeCollider, Vector2d.Zero, immovable: false);
         _ = CreateBody(
             context,
             new LSCircleCollider2D(Fixed64.FromFraction(1, 4)),
@@ -496,7 +496,7 @@ public sealed class ContinuousCollision2DTests
             new Vector2d((Fixed64)3, Fixed64.FromFraction(-1, 10)),
             new Vector2d((Fixed64)3, Fixed64.FromFraction(1, 10)),
             new Vector2d((Fixed64)(-3), Fixed64.FromFraction(1, 10)));
-        StiffBody2D blade = CreateBody(context, bladeCollider, Vector2d.Zero, immovable: false);
+        SolidBody2D blade = CreateBody(context, bladeCollider, Vector2d.Zero, immovable: false);
         _ = CreateBody(
             context,
             new LSCircleCollider2D(Fixed64.FromFraction(1, 4)),
@@ -521,7 +521,7 @@ public sealed class ContinuousCollision2DTests
             new Vector2d((Fixed64)3, Fixed64.FromFraction(-1, 10)),
             new Vector2d((Fixed64)3, Fixed64.FromFraction(1, 10)),
             new Vector2d((Fixed64)(-3), Fixed64.FromFraction(1, 10)));
-        StiffBody2D blade = CreateBody(context, bladeCollider, Vector2d.Zero, immovable: false, isKinematic: true);
+        SolidBody2D blade = CreateBody(context, bladeCollider, Vector2d.Zero, immovable: false, isKinematic: true);
         _ = CreateBody(
             context,
             new LSCircleCollider2D(Fixed64.FromFraction(1, 4)),
@@ -544,7 +544,7 @@ public sealed class ContinuousCollision2DTests
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);
         _ = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: true);
-        StiffBody2D source = CreateBody(
+        SolidBody2D source = CreateBody(
             context,
             new LSCircleCollider2D(Fixed64.Half),
             new Vector2d((Fixed64)(-5), Fixed64.Zero),
@@ -578,7 +578,7 @@ public sealed class ContinuousCollision2DTests
             new Vector2d((Fixed64)3, Fixed64.FromFraction(-1, 10)),
             new Vector2d((Fixed64)3, Fixed64.FromFraction(1, 10)),
             new Vector2d((Fixed64)(-3), Fixed64.FromFraction(1, 10)));
-        StiffBody2D blade = CreateBody(context, bladeCollider, Vector2d.Zero, immovable: false);
+        SolidBody2D blade = CreateBody(context, bladeCollider, Vector2d.Zero, immovable: false);
         _ = CreateBody(
             context,
             new LSCircleCollider2D(Fixed64.FromFraction(1, 4)),
@@ -603,7 +603,7 @@ public sealed class ContinuousCollision2DTests
             new Vector2d((Fixed64)3, Fixed64.FromFraction(-1, 10)),
             new Vector2d((Fixed64)3, Fixed64.FromFraction(1, 10)),
             new Vector2d((Fixed64)(-3), Fixed64.FromFraction(1, 10)));
-        StiffBody2D blade = CreateBody(context, bladeCollider, Vector2d.Zero, immovable: false);
+        SolidBody2D blade = CreateBody(context, bladeCollider, Vector2d.Zero, immovable: false);
         _ = CreateBody(
             context,
             new LSCircleCollider2D(Fixed64.FromFraction(1, 4)),
@@ -622,7 +622,7 @@ public sealed class ContinuousCollision2DTests
     public void ContinuousMode_ShouldNotClampThinAabbWhenBoundsProxyHitsButSweptShapeMisses()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);
-        StiffBody2D blade = CreateBody(
+        SolidBody2D blade = CreateBody(
             context,
             new LSAABBoxCollider2D(new Vector2d((Fixed64)6, Fixed64.FromFraction(1, 5))),
             Vector2d.Zero,
@@ -650,7 +650,7 @@ public sealed class ContinuousCollision2DTests
             new Vector2d((Fixed64)3, Fixed64.FromFraction(-1, 10)),
             new Vector2d((Fixed64)3, Fixed64.FromFraction(1, 10)),
             new Vector2d((Fixed64)(-3), Fixed64.FromFraction(1, 10)));
-        StiffBody2D blade = CreateBody(context, bladeCollider, Vector2d.Zero, immovable: false);
+        SolidBody2D blade = CreateBody(context, bladeCollider, Vector2d.Zero, immovable: false);
         _ = CreateBody(
             context,
             new LSCircleCollider2D(Fixed64.FromFraction(1, 4)),
@@ -672,7 +672,7 @@ public sealed class ContinuousCollision2DTests
         var compound = new LSCompoundCollider2D(
             CompoundColliderPart2D.Circle(Fixed64.Half, new Vector2d((Fixed64)(-3), Fixed64.Zero)),
             CompoundColliderPart2D.Circle(Fixed64.Half, new Vector2d((Fixed64)3, Fixed64.Zero)));
-        StiffBody2D mover = CreateBody(context, compound, Vector2d.Zero, immovable: false);
+        SolidBody2D mover = CreateBody(context, compound, Vector2d.Zero, immovable: false);
         _ = CreateBody(
             context,
             new LSCircleCollider2D(Fixed64.FromFraction(1, 4)),
@@ -696,7 +696,7 @@ public sealed class ContinuousCollision2DTests
             new Vector2d((Fixed64)3, Fixed64.FromFraction(-1, 10)),
             new Vector2d((Fixed64)3, Fixed64.FromFraction(1, 10)),
             new Vector2d((Fixed64)(-3), Fixed64.FromFraction(1, 10)));
-        StiffBody2D blade = CreateBody(context, bladeCollider, Vector2d.Zero, immovable: false);
+        SolidBody2D blade = CreateBody(context, bladeCollider, Vector2d.Zero, immovable: false);
         _ = CreateBody(
             context,
             new LSCircleCollider2D(Fixed64.FromFraction(1, 4)),
@@ -731,7 +731,7 @@ public sealed class ContinuousCollision2DTests
             new Vector2d((Fixed64)3, Fixed64.FromFraction(-1, 10)),
             new Vector2d((Fixed64)3, Fixed64.FromFraction(1, 10)),
             new Vector2d((Fixed64)(-3), Fixed64.FromFraction(1, 10)));
-        StiffBody2D blade = CreateBody(context, bladeCollider, Vector2d.Zero, immovable: false);
+        SolidBody2D blade = CreateBody(context, bladeCollider, Vector2d.Zero, immovable: false);
         _ = CreateBody(
             context,
             new LSCircleCollider2D(Fixed64.FromFraction(1, 4)),
@@ -761,8 +761,8 @@ public sealed class ContinuousCollision2DTests
     public void Physics2DLateSimulate_DirectCalls_ShouldRefreshDynamicCcdFrame()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1, extent: 128);
-        StiffBody2D mover = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)(-5), Fixed64.Zero), immovable: false);
-        StiffBody2D target = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)100, Fixed64.Zero), immovable: false);
+        SolidBody2D mover = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)(-5), Fixed64.Zero), immovable: false);
+        SolidBody2D target = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)100, Fixed64.Zero), immovable: false);
         mover.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
         target.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
 
@@ -783,7 +783,7 @@ public sealed class ContinuousCollision2DTests
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);
         context.Settings.DefaultContinuousCollisionMode = ContinuousCollisionMode.Continuous;
-        StiffBody2D mover = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
+        SolidBody2D mover = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
         _ = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)5, Fixed64.Zero), immovable: true);
 
         mover.AddForce(new Vector2d((Fixed64)10, Fixed64.Zero));
@@ -796,9 +796,9 @@ public sealed class ContinuousCollision2DTests
     public void SweepCircleAll_ShouldReturnOrderedHitsAndFilterExcludedHierarchy()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);
-        StiffBody2D parent = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)3, Fixed64.Zero), immovable: true);
-        StiffBody2D child = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
-        StiffBody2D far = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)6, Fixed64.Zero), immovable: true);
+        SolidBody2D parent = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)3, Fixed64.Zero), immovable: true);
+        SolidBody2D child = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
+        SolidBody2D far = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)6, Fixed64.Zero), immovable: true);
         child.Collider.SetParent(parent.Collider);
         var hits = new SwiftList<Physics2DHit>();
 
@@ -819,10 +819,10 @@ public sealed class ContinuousCollision2DTests
     public void SweepCircleAll_ShouldIncludeMovableKinematicImmovableAndBodylessTargets()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);
-        StiffBody2D source = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)(-4), Fixed64.Zero), immovable: false);
-        StiffBody2D movable = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
-        StiffBody2D kinematic = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)2, Fixed64.Zero), immovable: false, isKinematic: true);
-        StiffBody2D immovable = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)4, Fixed64.Zero), immovable: true);
+        SolidBody2D source = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)(-4), Fixed64.Zero), immovable: false);
+        SolidBody2D movable = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
+        SolidBody2D kinematic = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)2, Fixed64.Zero), immovable: false, isKinematic: true);
+        SolidBody2D immovable = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)4, Fixed64.Zero), immovable: true);
         LSCircleCollider2D bodyless = CreateBodylessCircle(context, new Vector2d((Fixed64)6, Fixed64.Zero));
         var hits = new SwiftList<Physics2DHit>();
 
@@ -846,7 +846,7 @@ public sealed class ContinuousCollision2DTests
     public void SweepCircleAgainstStaticAll_ShouldSkipMovableDynamicTargets()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);
-        StiffBody2D source = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)(-4), Fixed64.Zero), immovable: false);
+        SolidBody2D source = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)(-4), Fixed64.Zero), immovable: false);
         _ = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
         var hits = new SwiftList<Physics2DHit>();
 
@@ -867,9 +867,9 @@ public sealed class ContinuousCollision2DTests
     public void SweepCircleAgainstStaticAll_ShouldIncludeKinematicImmovableAndBodylessTargets()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);
-        StiffBody2D source = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)(-4), Fixed64.Zero), immovable: false);
-        StiffBody2D kinematic = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false, isKinematic: true);
-        StiffBody2D immovable = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)2, Fixed64.Zero), immovable: true);
+        SolidBody2D source = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)(-4), Fixed64.Zero), immovable: false);
+        SolidBody2D kinematic = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false, isKinematic: true);
+        SolidBody2D immovable = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)2, Fixed64.Zero), immovable: true);
         LSCircleCollider2D bodyless = CreateBodylessCircle(context, new Vector2d((Fixed64)4, Fixed64.Zero));
         var hits = new SwiftList<Physics2DHit>();
 
@@ -893,10 +893,10 @@ public sealed class ContinuousCollision2DTests
     public void OverlapCircleAgainstStaticAll_ShouldApplyExcludedHierarchyAndTriggerFilters()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);
-        StiffBody2D parent = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: true);
-        StiffBody2D child = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: true);
-        StiffBody2D trigger = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)2, Fixed64.Zero), immovable: true);
-        StiffBody2D included = CreateBody(context, new LSAABBoxCollider2D(Vector2d.One), new Vector2d((Fixed64)4, Fixed64.Zero), immovable: true);
+        SolidBody2D parent = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: true);
+        SolidBody2D child = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: true);
+        SolidBody2D trigger = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)2, Fixed64.Zero), immovable: true);
+        SolidBody2D included = CreateBody(context, new LSAABBoxCollider2D(Vector2d.One), new Vector2d((Fixed64)4, Fixed64.Zero), immovable: true);
         child.Collider.SetParent(parent.Collider);
         trigger.Collider.IsTrigger = true;
         var hits = new SwiftList<Physics2DHit>();
@@ -918,8 +918,8 @@ public sealed class ContinuousCollision2DTests
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);
         _ = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)3, Fixed64.Zero), immovable: true, layer: new PhysicsLayer(0));
-        StiffBody2D trigger = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)4, Fixed64.Zero), immovable: true, layer: new PhysicsLayer(1));
-        StiffBody2D included = CreateBody(context, new LSAABBoxCollider2D(Vector2d.One), new Vector2d((Fixed64)6, Fixed64.Zero), immovable: true, layer: new PhysicsLayer(1));
+        SolidBody2D trigger = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)4, Fixed64.Zero), immovable: true, layer: new PhysicsLayer(1));
+        SolidBody2D included = CreateBody(context, new LSAABBoxCollider2D(Vector2d.One), new Vector2d((Fixed64)6, Fixed64.Zero), immovable: true, layer: new PhysicsLayer(1));
         trigger.Collider.IsTrigger = true;
         var hits = new SwiftList<Physics2DHit>();
 
@@ -940,8 +940,8 @@ public sealed class ContinuousCollision2DTests
     public void SweepCircleAll_ShouldOrderHitsByDistanceThenColliderId()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);
-        StiffBody2D first = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)4, Fixed64.One), immovable: true);
-        StiffBody2D second = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)4, -Fixed64.One), immovable: true);
+        SolidBody2D first = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)4, Fixed64.One), immovable: true);
+        SolidBody2D second = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)4, -Fixed64.One), immovable: true);
         var hits = new SwiftList<Physics2DHit>();
 
         int count = context.Query2D.SweepCircleAll(
@@ -960,8 +960,8 @@ public sealed class ContinuousCollision2DTests
     public void SweepCircleAll_WithHexGrid_ShouldOrderHitsByDistanceThenColliderId()
     {
         using GravitasWorldContext context = CreateHexContext(frameRate: 1);
-        StiffBody2D first = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)4, Fixed64.One), immovable: true);
-        StiffBody2D second = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)4, -Fixed64.One), immovable: true);
+        SolidBody2D first = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)4, Fixed64.One), immovable: true);
+        SolidBody2D second = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)4, -Fixed64.One), immovable: true);
         var hits = new SwiftList<Physics2DHit>();
 
         int count = context.Query2D.SweepCircleAll(
@@ -1027,7 +1027,7 @@ public sealed class ContinuousCollision2DTests
         return context;
     }
 
-    private static StiffBody2D CreateBody(
+    private static SolidBody2D CreateBody(
         GravitasWorldContext context,
         LSCollider2D collider,
         Vector2d position,
@@ -1041,7 +1041,7 @@ public sealed class ContinuousCollision2DTests
             FixedQuaternion.Identity,
             Vector3d.One);
         var agent = new TestMatterAgent(context, transform);
-        var body = new StiffBody2D(agent, collider)
+        var body = new SolidBody2D(agent, collider)
         {
             Mass = Fixed64.One,
             Immovable = immovable,

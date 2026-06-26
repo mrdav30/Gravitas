@@ -44,18 +44,18 @@ internal sealed class ContinuousCollisionBenchmarkFixture : IDisposable
             ContinuousCollisionBenchmarkLayout.DenseExtentX(mixedPerDimension * 2),
             ContinuousCollisionBenchmarkLayout.DenseExtentZ(mixedPerDimension * 2));
 
-        Sparse3DBodies = new SwiftList<StiffBody>(bodyCount);
-        Dense3DBodies = new SwiftList<StiffBody>(bodyCount);
-        Sparse2DBodies = new SwiftList<StiffBody2D>(bodyCount);
-        Dense2DBodies = new SwiftList<StiffBody2D>(bodyCount);
-        ShapeExact3DBodies = new SwiftList<StiffBody>(bodyCount);
-        ShapeExact2DBodies = new SwiftList<StiffBody2D>(bodyCount);
-        DynamicShapeExact3DBodies = new SwiftList<StiffBody>(bodyCount * 2);
-        DynamicShapeExact2DBodies = new SwiftList<StiffBody2D>(bodyCount * 2);
-        SparseMixed3DBodies = new SwiftList<StiffBody>(mixedPerDimension);
-        SparseMixed2DBodies = new SwiftList<StiffBody2D>(mixedPerDimension);
-        DenseMixed3DBodies = new SwiftList<StiffBody>(mixedPerDimension);
-        DenseMixed2DBodies = new SwiftList<StiffBody2D>(mixedPerDimension);
+        Sparse3DBodies = new SwiftList<SolidBody>(bodyCount);
+        Dense3DBodies = new SwiftList<SolidBody>(bodyCount);
+        Sparse2DBodies = new SwiftList<SolidBody2D>(bodyCount);
+        Dense2DBodies = new SwiftList<SolidBody2D>(bodyCount);
+        ShapeExact3DBodies = new SwiftList<SolidBody>(bodyCount);
+        ShapeExact2DBodies = new SwiftList<SolidBody2D>(bodyCount);
+        DynamicShapeExact3DBodies = new SwiftList<SolidBody>(bodyCount * 2);
+        DynamicShapeExact2DBodies = new SwiftList<SolidBody2D>(bodyCount * 2);
+        SparseMixed3DBodies = new SwiftList<SolidBody>(mixedPerDimension);
+        SparseMixed2DBodies = new SwiftList<SolidBody2D>(mixedPerDimension);
+        DenseMixed3DBodies = new SwiftList<SolidBody>(mixedPerDimension);
+        DenseMixed2DBodies = new SwiftList<SolidBody2D>(mixedPerDimension);
         Query3DHits = new SwiftList<Physics3DHit>(bodyCount);
         Query2DHits = new SwiftList<Physics2DHit>(bodyCount);
         MixedQueryHits = new SwiftList<PhysicsMixedHit>(mixedPerDimension);
@@ -99,29 +99,29 @@ internal sealed class ContinuousCollisionBenchmarkFixture : IDisposable
 
     public GravitasWorldContext DenseMixedContext { get; }
 
-    public SwiftList<StiffBody> Sparse3DBodies { get; }
+    public SwiftList<SolidBody> Sparse3DBodies { get; }
 
-    public SwiftList<StiffBody> Dense3DBodies { get; }
+    public SwiftList<SolidBody> Dense3DBodies { get; }
 
-    public SwiftList<StiffBody2D> Sparse2DBodies { get; }
+    public SwiftList<SolidBody2D> Sparse2DBodies { get; }
 
-    public SwiftList<StiffBody2D> Dense2DBodies { get; }
+    public SwiftList<SolidBody2D> Dense2DBodies { get; }
 
-    public SwiftList<StiffBody> ShapeExact3DBodies { get; }
+    public SwiftList<SolidBody> ShapeExact3DBodies { get; }
 
-    public SwiftList<StiffBody2D> ShapeExact2DBodies { get; }
+    public SwiftList<SolidBody2D> ShapeExact2DBodies { get; }
 
-    public SwiftList<StiffBody> DynamicShapeExact3DBodies { get; }
+    public SwiftList<SolidBody> DynamicShapeExact3DBodies { get; }
 
-    public SwiftList<StiffBody2D> DynamicShapeExact2DBodies { get; }
+    public SwiftList<SolidBody2D> DynamicShapeExact2DBodies { get; }
 
-    public SwiftList<StiffBody> SparseMixed3DBodies { get; }
+    public SwiftList<SolidBody> SparseMixed3DBodies { get; }
 
-    public SwiftList<StiffBody2D> SparseMixed2DBodies { get; }
+    public SwiftList<SolidBody2D> SparseMixed2DBodies { get; }
 
-    public SwiftList<StiffBody> DenseMixed3DBodies { get; }
+    public SwiftList<SolidBody> DenseMixed3DBodies { get; }
 
-    public SwiftList<StiffBody2D> DenseMixed2DBodies { get; }
+    public SwiftList<SolidBody2D> DenseMixed2DBodies { get; }
 
     public SwiftList<Physics3DHit> Query3DHits { get; }
 

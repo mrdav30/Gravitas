@@ -19,9 +19,9 @@ public class Physics2DBenchmarks
     private GravitasWorldContext _detectionContext;
     private GravitasWorldContext _responseContext;
     private GravitasWorldContext _pairCleanupContext;
-    private SwiftList<StiffBody2D> _integrationBodies;
-    private SwiftList<StiffBody2D> _collisionBodies;
-    private SwiftList<StiffBody2D> _pairCleanupOwners;
+    private SwiftList<SolidBody2D> _integrationBodies;
+    private SwiftList<SolidBody2D> _collisionBodies;
+    private SwiftList<SolidBody2D> _pairCleanupOwners;
     private SwiftList<LSCollider2D> _sweepCollisionColliders;
     private SwiftList<LSCollider2D> _sweepQueryColliders;
     private SwiftList<LSCollider2D> _sweepSortedColliders;
@@ -29,12 +29,12 @@ public class Physics2DBenchmarks
     private ContactManifold2D _sweepCollisionManifold;
     private PreparedPair2D[] _shapePairs;
     private CollisionPair2D[] _angularResponsePairs;
-    private StiffBody2D[] _angularResponseBodies;
+    private SolidBody2D[] _angularResponseBodies;
     private Vector2d[] _angularResponseVelocities;
     private CollisionWorkItem2D[] _twoContactDetectionItems;
     private ContactManifold2D[] _twoContactDetectionManifolds;
     private CollisionPair2D[] _twoContactResponsePairs;
-    private StiffBody2D[] _twoContactResponseBodies;
+    private SolidBody2D[] _twoContactResponseBodies;
     private Vector2d[] _twoContactResponseVelocities;
 
     [Params(64, 1024)]
@@ -53,8 +53,8 @@ public class Physics2DBenchmarks
         Configure2DContext(_queryContext, BodyCount);
         Configure2DContext(_detectionContext, BodyCount);
         Configure2DContext(_responseContext, BodyCount);
-        _integrationBodies = new SwiftList<StiffBody2D>(BodyCount);
-        _collisionBodies = new SwiftList<StiffBody2D>(BodyCount);
+        _integrationBodies = new SwiftList<SolidBody2D>(BodyCount);
+        _collisionBodies = new SwiftList<SolidBody2D>(BodyCount);
         _sweepCollisionColliders = new SwiftList<LSCollider2D>(BodyCount * 2);
         _sweepQueryColliders = new SwiftList<LSCollider2D>(BodyCount);
         _sweepSortedColliders = new SwiftList<LSCollider2D>(BodyCount * 2);
@@ -62,26 +62,26 @@ public class Physics2DBenchmarks
         _sweepCollisionManifold = new ContactManifold2D();
         _shapePairs = new PreparedPair2D[BodyCount];
         _angularResponsePairs = new CollisionPair2D[BodyCount];
-        _angularResponseBodies = new StiffBody2D[BodyCount];
+        _angularResponseBodies = new SolidBody2D[BodyCount];
         _angularResponseVelocities = new Vector2d[BodyCount];
         _twoContactDetectionItems = new CollisionWorkItem2D[BodyCount];
         _twoContactDetectionManifolds = new ContactManifold2D[BodyCount];
         _twoContactResponsePairs = new CollisionPair2D[BodyCount];
-        _twoContactResponseBodies = new StiffBody2D[BodyCount];
+        _twoContactResponseBodies = new SolidBody2D[BodyCount];
         _twoContactResponseVelocities = new Vector2d[BodyCount];
 
         for (int i = 0; i < BodyCount; i++)
         {
             Vector2d position = PositionForIndex(i, spacing: (Fixed64)3);
-            StiffBody2D body = CreateBody(_integrationContext, new LSCircleCollider2D(Fixed64.Half), position, immovable: false);
-            StiffBody2D queryBody = CreateBody(_queryContext, CreateShape(i), position, immovable: true);
+            SolidBody2D body = CreateBody(_integrationContext, new LSCircleCollider2D(Fixed64.Half), position, immovable: false);
+            SolidBody2D queryBody = CreateBody(_queryContext, CreateShape(i), position, immovable: true);
             _integrationBodies.Add(body);
             _sweepQueryColliders.Add(queryBody.Collider);
             _shapePairs[i] = CreatePreparedPair(i);
 
             _angularResponsePairs[i] = CreateAngularResponsePair(
                 i,
-                out StiffBody2D angularBody,
+                out SolidBody2D angularBody,
                 out Vector2d angularVelocity);
             _angularResponseBodies[i] = angularBody;
             _angularResponseVelocities[i] = angularVelocity;
@@ -89,7 +89,7 @@ public class Physics2DBenchmarks
             _twoContactDetectionManifolds[i] = new ContactManifold2D();
             _twoContactResponsePairs[i] = CreateTwoContactResponsePair(
                 i,
-                out StiffBody2D responseBody,
+                out SolidBody2D responseBody,
                 out Vector2d responseVelocity);
             _twoContactResponseBodies[i] = responseBody;
             _twoContactResponseVelocities[i] = responseVelocity;
@@ -98,8 +98,8 @@ public class Physics2DBenchmarks
         for (int i = 0; i < BodyCount; i++)
         {
             Vector2d position = PositionForIndex(i, spacing: (Fixed64)2);
-            StiffBody2D dynamicBody = CreateBody(_collisionContext, new LSCircleCollider2D(Fixed64.Half), position, immovable: false);
-            StiffBody2D staticBody = CreateBody(_collisionContext, new LSCircleCollider2D(Fixed64.Half), position + new Vector2d(Fixed64.Half, Fixed64.Zero), immovable: true);
+            SolidBody2D dynamicBody = CreateBody(_collisionContext, new LSCircleCollider2D(Fixed64.Half), position, immovable: false);
+            SolidBody2D staticBody = CreateBody(_collisionContext, new LSCircleCollider2D(Fixed64.Half), position + new Vector2d(Fixed64.Half, Fixed64.Zero), immovable: true);
             _collisionBodies.Add(dynamicBody);
             _sweepCollisionColliders.Add(dynamicBody.Collider);
             _sweepCollisionColliders.Add(staticBody.Collider);
@@ -200,7 +200,7 @@ public class Physics2DBenchmarks
         long checksum = 0;
         for (int i = 0; i < _angularResponsePairs.Length; i++)
         {
-            StiffBody2D body = _angularResponseBodies[i];
+            SolidBody2D body = _angularResponseBodies[i];
             body.ApplyCollisionAngularVelocityDelta(-body.AngularVelocity);
             body.ApplyCollisionLinearVelocityDelta(_angularResponseVelocities[i] - body.LinearVelocity);
 
@@ -231,7 +231,7 @@ public class Physics2DBenchmarks
         long checksum = 0;
         for (int i = 0; i < _twoContactResponsePairs.Length; i++)
         {
-            StiffBody2D body = _twoContactResponseBodies[i];
+            SolidBody2D body = _twoContactResponseBodies[i];
             body.ApplyCollisionAngularVelocityDelta(-body.AngularVelocity);
             body.ApplyCollisionLinearVelocityDelta(_twoContactResponseVelocities[i] - body.LinearVelocity);
 
@@ -262,11 +262,11 @@ public class Physics2DBenchmarks
     {
         _pairCleanupContext = GravitasWorldContext.CreateOwned();
         Configure2DContext(_pairCleanupContext, BodyCount);
-        _pairCleanupOwners = new SwiftList<StiffBody2D>(BodyCount);
+        _pairCleanupOwners = new SwiftList<SolidBody2D>(BodyCount);
         for (int i = 0; i < BodyCount; i++)
         {
             Vector2d position = PositionForIndex(i, spacing: (Fixed64)2);
-            StiffBody2D owner = CreateBody(_pairCleanupContext, new LSCircleCollider2D(Fixed64.Half), position, immovable: false);
+            SolidBody2D owner = CreateBody(_pairCleanupContext, new LSCircleCollider2D(Fixed64.Half), position, immovable: false);
             _ = CreateBody(_pairCleanupContext, new LSCircleCollider2D(Fixed64.Half), position + new Vector2d(Fixed64.Half, Fixed64.Zero), immovable: true);
             _pairCleanupOwners.Add(owner);
         }
@@ -492,7 +492,7 @@ public class Physics2DBenchmarks
 
     private CollisionPair2D CreateAngularResponsePair(
         int index,
-        out StiffBody2D dynamicBody,
+        out SolidBody2D dynamicBody,
         out Vector2d resetVelocity)
     {
         Vector2d position = PositionForIndex(index, spacing: (Fixed64)4);
@@ -501,7 +501,7 @@ public class Physics2DBenchmarks
             new LSAABBoxCollider2D(new Vector2d((Fixed64)2, (Fixed64)2)),
             position,
             immovable: false);
-        StiffBody2D staticBody = CreateBody(
+        SolidBody2D staticBody = CreateBody(
             _responseContext,
             new LSAABBoxCollider2D(new Vector2d((Fixed64)2, (Fixed64)2)),
             position + new Vector2d(Fixed64.Half, Fixed64.Zero),
@@ -523,7 +523,7 @@ public class Physics2DBenchmarks
 
     private CollisionPair2D CreateTwoContactResponsePair(
         int index,
-        out StiffBody2D dynamicBody,
+        out SolidBody2D dynamicBody,
         out Vector2d resetVelocity)
     {
         Vector2d position = PositionForIndex(index + BodyCount, spacing: (Fixed64)4);
@@ -532,7 +532,7 @@ public class Physics2DBenchmarks
             new LSAABBoxCollider2D(new Vector2d((Fixed64)2, (Fixed64)2)),
             position,
             immovable: false);
-        StiffBody2D staticBody = CreateBody(
+        SolidBody2D staticBody = CreateBody(
             _responseContext,
             new LSAABBoxCollider2D(new Vector2d((Fixed64)2, (Fixed64)2)),
             position + new Vector2d(Fixed64.FromFraction(3, 2), Fixed64.Zero),
@@ -556,14 +556,14 @@ public class Physics2DBenchmarks
         return pair;
     }
 
-    private static StiffBody2D CreateBody(
+    private static SolidBody2D CreateBody(
         GravitasWorldContext context,
         LSCollider2D collider,
         Vector2d position,
         bool immovable)
     {
         var agent = new BenchmarkMatterAgent(context, new Vector3d(position.X, Fixed64.Zero, position.Y));
-        var body = new StiffBody2D(agent, collider)
+        var body = new SolidBody2D(agent, collider)
         {
             Mass = Fixed64.One,
             Immovable = immovable

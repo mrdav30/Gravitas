@@ -6,8 +6,8 @@ manifolds, manifold response, and late contact notification.
 
 ## 2D And 3D Boundary
 
-The 3D collision handling path routes `StiffBody` and
-`LSCollider` route through `GravitasPhysicsService`; `StiffBody2D` and
+The 3D collision handling path routes `SolidBody` and
+`LSCollider` route through `GravitasPhysicsService`; `SolidBody2D` and
 `LSCollider2D` route through `GravitasPhysics2DService`. The active path is
 selected by `PhysicsSettings.RuntimeMode`, so pure 2D scenes do not advance 3D
 pair distribution or visualization work.
@@ -18,7 +18,7 @@ mixed-dimension embedding metadata, not a pure 2D collision axis.
 
 ## Pure 2D Collision Path
 
-`GravitasPhysics2DService` owns the pure 2D path for `StiffBody2D` and
+`GravitasPhysics2DService` owns the pure 2D path for `SolidBody2D` and
 `LSCollider2D`. It keeps 2D collider IDs, 2D body registration, reusable pair
 state, visualization publishing, and caller-buffered overlap/raycast query
 output local to one
@@ -126,9 +126,9 @@ which builds `ResponseBody2D`, `SolverContact2D`, and `SolverContactBuffer2D`
 state from the current manifold, shares positional correction across active
 contacts, applies cached normal/tangent impulses when contact IDs persist, then
 solves one stable normal pass and one stable tangent-friction pass. It reads
-`StiffBody2D.EffectiveInverseMass`,
-`StiffBody2D.EffectiveInverseMomentOfInertia`, and
-`StiffBody2D.WorldCenterOfMass` so immovable, kinematic, inactive,
+`SolidBody2D.EffectiveInverseMass`,
+`SolidBody2D.EffectiveInverseMomentOfInertia`, and
+`SolidBody2D.WorldCenterOfMass` so immovable, kinematic, inactive,
 non-positive-mass, and angular-disabled bodies remain infinite mass/inertia to
 the solver while raw mass and scalar moment values stay inspectable. If a solid
 pair has no awake movable participant, the existing pair is kept alive as
@@ -423,14 +423,14 @@ Mesh policy work should keep these boundaries explicit:
   properties. Callers that knowingly want the surface-area-weighted approximation
   must pass `MeshInertiaPolicy.SurfaceApproximation`.
 - `PhysicsMesh` does not inspect body mobility, kinematic state, or angular
-  force policy. `StiffBody` decides whether angular inertia is needed before it
+  force policy. `SolidBody` decides whether angular inertia is needed before it
   asks the collider/mesh for geometry-derived mass properties.
 
 ## Continuous Collision Detection
 
 CCD is body-owned and opt-in. `PhysicsSettings.DefaultContinuousCollisionMode`
-defaults to `Discrete`; `StiffBody.ContinuousCollisionMode` and
-`StiffBody2D.ContinuousCollisionMode` default to `Inherit`, so existing bodies
+defaults to `Discrete`; `SolidBody.ContinuousCollisionMode` and
+`SolidBody2D.ContinuousCollisionMode` default to `Inherit`, so existing bodies
 keep the discrete integration path unless the host sets a context default,
 enables a body explicitly, or assigns a top-level parent body with an explicit
 CCD mode. `ColliderHierarchyState` caches the top parent when parent
@@ -485,10 +485,10 @@ time of impact, removes only the closing component of linear velocity, and then
 continues through the remaining frame time with the updated tangential velocity.
 `PhysicsSettings.ContinuousCollisionMaxToiIterations` bounds this same-frame TOI
 consumption; the default is `PhysicsSettings.DefaultContinuousCollisionMaxToiIterations`.
-`StiffBody.LastContinuousCollisionToiIterationCount`,
-`StiffBody.LastContinuousCollisionToiIterationLimitReached`,
-`StiffBody2D.LastContinuousCollisionToiIterationCount`, and
-`StiffBody2D.LastContinuousCollisionToiIterationLimitReached` expose the most recent
+`SolidBody.LastContinuousCollisionToiIterationCount`,
+`SolidBody.LastContinuousCollisionToiIterationLimitReached`,
+`SolidBody2D.LastContinuousCollisionToiIterationCount`, and
+`SolidBody2D.LastContinuousCollisionToiIterationLimitReached` expose the most recent
 step's bounded-solver status for deterministic diagnostics.
 
 Rotational CCD is layered onto the same body-owned opt-in contract for dynamic
@@ -793,7 +793,7 @@ through contact notification.
 
 After all active partitions distribute candidates, `GravitasPhysicsService`
 sorts queued 3D response pairs by stable collider ID pair, builds
-deterministic body islands keyed by `StiffBody.DynamicId`, skips fully sleeping
+deterministic body islands keyed by `SolidBody.DynamicId`, skips fully sleeping
 islands, wakes connected sleeping bodies when an island contains an awake
 participant, and then solves constraints in stable island/pair order.
 `GravitasCollisionService` owns broad-phase partition distribution and retained
@@ -854,17 +854,17 @@ ordering, contact data, or response behavior.
 
 Response units and invariants:
 
-- mass is body mass in the same unit model used by `StiffBody`.
-- `StiffBody.InverseMass` is the raw reciprocal of body mass. Collision
-  response reads `StiffBody.EffectiveInverseMass`, which maps immovable,
+- mass is body mass in the same unit model used by `SolidBody`.
+- `SolidBody.InverseMass` is the raw reciprocal of body mass. Collision
+  response reads `SolidBody.EffectiveInverseMass`, which maps immovable,
   kinematic, inactive, and non-positive-mass bodies to zero solver mass while
   leaving raw mass values inspectable.
-- `StiffBody.CanTranslate`, `StiffBody.CanRotate`, and
-  `StiffBody.EffectiveInverseInertiaTensor` are the 3D response mobility
+- `SolidBody.CanTranslate`, `SolidBody.CanRotate`, and
+  `SolidBody.EffectiveInverseInertiaTensor` are the 3D response mobility
   contract used by both ordinary 3D response and mixed 2D/3D response.
-- `StiffBody2D.CanTranslate`, `StiffBody2D.CanRotate`,
-  `StiffBody2D.EffectiveInverseMass`, and
-  `StiffBody2D.EffectiveInverseMomentOfInertia` are the pure 2D body-side
+- `SolidBody2D.CanTranslate`, `SolidBody2D.CanRotate`,
+  `SolidBody2D.EffectiveInverseMass`, and
+  `SolidBody2D.EffectiveInverseMomentOfInertia` are the pure 2D body-side
   mobility contract. Pure 2D body integration consumes scalar moment for
   host-applied torque and angular impulses. Pure 2D contact response consumes
   the same scalar moment surface for COM-relative normal and friction angular
@@ -872,19 +872,19 @@ Response units and invariants:
   moment surface for the embedded 2D participant, but only from planar X/Z
   impulse components; vertical Y impulse remains constrained out of the 2D
   body model.
-- 3D response torque arms are measured from `StiffBody.WorldCenterOfMass`.
+- 3D response torque arms are measured from `SolidBody.WorldCenterOfMass`.
   Collider centers remain collision-geometry references for narrow phase,
   culling, and normal fallback; they are not the implicit body COM.
 - linear velocity is world units per second.
 - angular velocity is radians per second around each local/world axis.
 - pure 2D scalar rotation is radians around the yaw axis, and
-  `StiffBody2D.WorldCenterOfMass` rotates the body-local COM offset in the X/Z
+  `SolidBody2D.WorldCenterOfMass` rotates the body-local COM offset in the X/Z
   simulation plane.
 - inertia tensors are fixed-point `Fixed3x3` values supplied by the collider
-  shape for the requested `StiffBody.LocalCenterOfMassOffset` and transformed by
-  `StiffBody`. Primitive and aligned tensors keep a diagonal inversion fast
+  shape for the requested `SolidBody.LocalCenterOfMassOffset` and transformed by
+  `SolidBody`. Primitive and aligned tensors keep a diagonal inversion fast
   path; mesh and compound tensors can preserve products of inertia and use full
-  deterministic inversion. `StiffBody` keeps local and world-space tensor state
+  deterministic inversion. `SolidBody` keeps local and world-space tensor state
   separate so orientation refreshes are idempotent. Mesh colliders use cached
   closed-volume mass properties by default when angular dynamics are enabled and
   keep explicit surface approximation opt-in for open meshes.
@@ -892,7 +892,7 @@ Response units and invariants:
   low-bounce participant can dampen the pair.
 - closing speeds at or below `RestitutionVelocityThreshold` use zero
   restitution to avoid resting-contact bounce.
-- `StiffBody.FrictionCoefficient` is a non-negative Coulomb coefficient. Values
+- `SolidBody.FrictionCoefficient` is a non-negative Coulomb coefficient. Values
   above one are allowed for intentional high-friction materials.
 - friction impulses oppose tangential contact motion and are clamped by the
   normal impulse. 3D pair-local warm-start storage records solved normal,
@@ -923,7 +923,7 @@ rather than live as vague wiki caveats.
 
 ## Body Sleep And Wake
 
-`StiffBody` owns deterministic sleep state. A dynamic non-kinematic body can
+`SolidBody` owns deterministic sleep state. A dynamic non-kinematic body can
 sleep after its linear and angular speeds remain at or below explicit thresholds
 for `SleepFrameThreshold` fixed frames. Sleeping clears accumulated force,
 impulse, velocity, torque, acceleration, and pending position-correction state,

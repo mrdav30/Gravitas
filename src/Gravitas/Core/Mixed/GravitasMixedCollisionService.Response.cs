@@ -95,7 +95,7 @@ internal sealed partial class GravitasMixedCollisionService
         }
     }
 
-    private void AddMixedIslandNodeIfMovable(StiffBody? body)
+    private void AddMixedIslandNodeIfMovable(SolidBody? body)
     {
         if (!IsMovableMixedIslandBody(body))
             return;
@@ -103,7 +103,7 @@ internal sealed partial class GravitasMixedCollisionService
         _mixedIslandNodes.Add(new MixedIslandNode(Create3DBodyKey(body!), body!, null));
     }
 
-    private void AddMixedIslandNodeIfMovable(StiffBody2D? body)
+    private void AddMixedIslandNodeIfMovable(SolidBody2D? body)
     {
         if (!IsMovableMixedIslandBody(body))
             return;
@@ -145,7 +145,7 @@ internal sealed partial class GravitasMixedCollisionService
             _mixedIslandNodes.RemoveAt(_mixedIslandNodes.Count - 1);
     }
 
-    private int FindMixedIslandNode(StiffBody? body)
+    private int FindMixedIslandNode(SolidBody? body)
     {
         if (!IsMovableMixedIslandBody(body))
             return -1;
@@ -153,7 +153,7 @@ internal sealed partial class GravitasMixedCollisionService
         return FindMixedIslandNode(Create3DBodyKey(body!));
     }
 
-    private int FindMixedIslandNode(StiffBody2D? body)
+    private int FindMixedIslandNode(SolidBody2D? body)
     {
         if (!IsMovableMixedIslandBody(body))
             return -1;
@@ -307,27 +307,27 @@ internal sealed partial class GravitasMixedCollisionService
         IsAwakeMovable(pair.Collider3D.Body) || IsAwakeMovable(pair.Collider2D.Body);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool IsAwakeMovable(StiffBody? body) =>
+    private static bool IsAwakeMovable(SolidBody? body) =>
         body != null && body.Active && !body.Immovable && !body.IsKinematic && !body.IsSleeping && body.InverseMass > Fixed64.Zero;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool IsAwakeMovable(StiffBody2D? body) =>
+    private static bool IsAwakeMovable(SolidBody2D? body) =>
         body != null && body.CanTranslate && !body.IsSleeping;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool IsMovableMixedIslandBody(StiffBody? body) =>
+    private static bool IsMovableMixedIslandBody(SolidBody? body) =>
         body != null && body.DynamicId >= 0 && body.CanTranslate;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool IsMovableMixedIslandBody(StiffBody2D? body) =>
+    private static bool IsMovableMixedIslandBody(SolidBody2D? body) =>
         body != null && body.DynamicId >= 0 && body.CanTranslate;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static int Create3DBodyKey(StiffBody body) =>
+    private static int Create3DBodyKey(SolidBody body) =>
         body.DynamicId << 1;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static int Create2DBodyKey(StiffBody2D body) =>
+    private static int Create2DBodyKey(SolidBody2D body) =>
         (body.DynamicId << 1) | 1;
 
 }

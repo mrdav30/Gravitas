@@ -38,12 +38,12 @@ alarm system that makes drift visible early.
 ## Current Baseline
 
 - `docs/wiki/SERIALIZATION.md` documents populate-existing-shell replay flow.
-- `StiffBody`, `StiffBody2D`, `LSCollider`, and `LSCollider2D` record explicit
+- `SolidBody`, `SolidBody2D`, `LSCollider`, and `LSCollider2D` record explicit
   Chronicler state.
 - Existing tests compare selected replay values in:
   - `tests/Gravitas.Tests/Runtime/GravitasSimulationPhaseOrderTests.cs`
-  - `tests/Gravitas.Tests/Serialization/StiffBodySerializationTests.cs`
-  - `tests/Gravitas.Tests/Serialization/StiffBody2DSerializationTests.cs`
+  - `tests/Gravitas.Tests/Serialization/SolidBodySerializationTests.cs`
+  - `tests/Gravitas.Tests/Serialization/SolidBody2DSerializationTests.cs`
   - `tests/Gravitas.Tests/MixedDimensions/MixedResponseTests.cs`
   - `tests/Gravitas.Tests/Physics2D/Physics2DSimulationTests.cs`
 - Several value types implement `GetHashCode()`, but .NET hash APIs are not a
@@ -162,9 +162,9 @@ identity and rebuildable caches.
 - [ ] Add hash contribution methods for `PhysicsSettings` and
   `PhysicsEnvironment`.
 - [ ] Add 3D body contribution for authoritative fields currently recorded by
-  `StiffBody.Serialization.cs`.
+  `SolidBody.Serialization.cs`.
 - [ ] Add pure 2D body contribution for authoritative fields currently recorded
-  by `StiffBody2D.Serialization.cs`.
+  by `SolidBody2D.Serialization.cs`.
 - [ ] Add 3D collider contribution for:
   - collider ID.
   - active/trigger/layer/filter state.

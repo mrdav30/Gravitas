@@ -33,10 +33,10 @@ serializable, and shared across 3D, pure 2D, mixed, and CCD response.
 
 ## Current Baseline
 
-- `StiffBody.RestitutionCoefficient` defaults to `0.5`.
-- `StiffBody.FrictionCoefficient` defaults to `1`.
-- `StiffBody2D.RestitutionCoefficient` defaults to `Fixed64.Half`.
-- `StiffBody2D.FrictionCoefficient` defaults to `Fixed64.One`.
+- `SolidBody.RestitutionCoefficient` defaults to `0.5`.
+- `SolidBody.FrictionCoefficient` defaults to `1`.
+- `SolidBody2D.RestitutionCoefficient` defaults to `Fixed64.Half`.
+- `SolidBody2D.FrictionCoefficient` defaults to `Fixed64.One`.
 - `CollisionResponse`, `CollisionResponse2D`, and `CollisionResponseMixed`
   resolve restitution as the minimum of body coefficients.
 - Friction currently combines with `sqrt(bodyA * bodyB)` when both bodies are

@@ -27,7 +27,7 @@ public sealed partial class GravitasPhysicsService
 
     private readonly GravitasWorldContext _context;
 
-    private SwiftBucket<StiffBody> _dynamicBodies = new(DefaultBodySize);
+    private SwiftBucket<SolidBody> _dynamicBodies = new(DefaultBodySize);
     private LSCollider?[] _colliders = new LSCollider?[DefaultColliderIdSize];
     private SwiftStack<int> _cachedColliderIds = new(DefaultColliderIdSize);
     private SwiftStack<CollisionPair> _cachedCollisionPairs = new();
@@ -112,7 +112,7 @@ public sealed partial class GravitasPhysicsService
 
     private void PrepareCollisionPartitions()
     {
-        foreach (StiffBody body in _dynamicBodies)
+        foreach (SolidBody body in _dynamicBodies)
             body.Collider.Simulate();
     }
 
@@ -135,7 +135,7 @@ public sealed partial class GravitasPhysicsService
         int peak = _dynamicBodies.PeakCount;
         for (int i = 0; i < peak; i++)
         {
-            if (_dynamicBodies.TryGetValue(i, out StiffBody body))
+            if (_dynamicBodies.TryGetValue(i, out SolidBody body))
             {
                 body.LateSimulate(updateSleepState: false, updateColliderState: false);
                 _processedContinuousCollisionBodyIds.Add(body.DynamicId);
@@ -162,7 +162,7 @@ public sealed partial class GravitasPhysicsService
         int peak = _dynamicBodies.PeakCount;
         for (int i = 0; i < peak; i++)
         {
-            if (_dynamicBodies.TryGetValue(i, out StiffBody body))
+            if (_dynamicBodies.TryGetValue(i, out SolidBody body))
                 body.UpdateSleepStateAfterPhysicsStep();
         }
     }
@@ -172,7 +172,7 @@ public sealed partial class GravitasPhysicsService
         int peak = _dynamicBodies.PeakCount;
         for (int i = 0; i < peak; i++)
         {
-            if (_dynamicBodies.TryGetValue(i, out StiffBody body))
+            if (_dynamicBodies.TryGetValue(i, out SolidBody body))
                 body.OnVisualize();
         }
     }
@@ -212,7 +212,7 @@ public sealed partial class GravitasPhysicsService
     /// </summary>
     public void Deactivate() => Reset();
 
-    internal int AssimilateBody(StiffBody body, bool isDynamic)
+    internal int AssimilateBody(SolidBody body, bool isDynamic)
     {
         SwiftThrowHelper.ThrowIfNull(body, nameof(body));
         SwiftThrowHelper.ThrowIfArgument(
@@ -255,7 +255,7 @@ public sealed partial class GravitasPhysicsService
         return id;
     }
 
-    internal void DessimilateBody(StiffBody body)
+    internal void DessimilateBody(SolidBody body)
     {
         SwiftThrowHelper.ThrowIfNull(body, nameof(body));
         int dynamicId = body.DynamicId;
@@ -306,7 +306,7 @@ public sealed partial class GravitasPhysicsService
 
     internal int DynamicBodyPeakCount => _dynamicBodies.PeakCount;
 
-    internal bool TryGetDynamicBody(int dynamicId, out StiffBody body) =>
+    internal bool TryGetDynamicBody(int dynamicId, out SolidBody body) =>
         _dynamicBodies.TryGetValue(dynamicId, out body);
 
 }

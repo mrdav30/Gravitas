@@ -8,7 +8,7 @@
 
 **Goal:** Give pure 2D bodies the same physically meaningful mass-property boundary as 3D bodies: explicit center of mass, scalar angular inertia, torque, angular impulses, and off-center contact response.
 
-**Architecture:** `StiffBody2D` owns runtime body state and effective solver mobility policy; `LSCollider2D` and primitive/compound subclasses derive geometry mass properties. Pure 2D response consumes body-owned effective mass/moment helpers and keeps X/Z planar physics explicit. Mixed 2D/3D response consumes the same 2D angular model only from planar X/Z impulse components.
+**Architecture:** `SolidBody2D` owns runtime body state and effective solver mobility policy; `LSCollider2D` and primitive/compound subclasses derive geometry mass properties. Pure 2D response consumes body-owned effective mass/moment helpers and keeps X/Z planar physics explicit. Mixed 2D/3D response consumes the same 2D angular model only from planar X/Z impulse components.
 
 **Tech Stack:** C# 11, FixedMathSharp `Fixed64`/`Vector2d`, Chronicler `IRecordable`, SwiftCollections hot-path buffers, xUnit v3, FluentAssertions, BenchmarkDotNet.
 
@@ -29,14 +29,14 @@ of the 3D tensor model.
 
 ## Current Baseline
 
-- `StiffBody2D` owns X/Z-projected position, scalar yaw rotation, linear
+- `SolidBody2D` owns X/Z-projected position, scalar yaw rotation, linear
   velocity, force integration, scalar angular velocity, queued torque
   acceleration, linear/angular sleep state, pure 2D CCD, mixed CCD source
   handling, visualization publishing, and Chronicler state.
-- `StiffBody2D.Mass`, `InverseMass`, scalar moment, inverse moment,
+- `SolidBody2D.Mass`, `InverseMass`, scalar moment, inverse moment,
   `EffectiveInverseMass`, and `EffectiveInverseMomentOfInertia` are the
   body-owned solver mass surface.
-- `StiffBody2D.CanTranslate` and `CanRotate` separate linear and angular solver
+- `SolidBody2D.CanTranslate` and `CanRotate` separate linear and angular solver
   mobility policy.
 - `LSCollider2D` owns shape state, bounds, local offset, mixed embedding, query
   state, partition state, pair state, and hierarchy state. It exposes
@@ -57,8 +57,8 @@ of the 3D tensor model.
 ## Design Decisions
 
 - Pure 2D COM is a body-local `Vector2d` in the same X/Z plane as
-  `StiffBody2D.Position`.
-- `StiffBody2D.WorldCenterOfMass` is
+  `SolidBody2D.Position`.
+- `SolidBody2D.WorldCenterOfMass` is
   `Position + Vector2d.Rotate(LocalCenterOfMassOffset, Rotation)`.
 - Pure 2D inertia is a scalar moment around the body yaw axis, not a tensor.
 - Shape APIs derive moment about an explicit requested body-local reference
@@ -67,7 +67,7 @@ of the 3D tensor model.
   restore a duplicate public mobility alias; the project is pre-alpha and API
   clarity wins.
 - `CanRotate`, `EffectiveInverseMass`, and `EffectiveInverseMomentOfInertia`
-  belong on `StiffBody2D`, mirroring the 3D effective mass policy while keeping
+  belong on `SolidBody2D`, mirroring the 3D effective mass policy while keeping
   the scalar 2D model simple.
 - Positive angular velocity uses the same orientation as `Vector2d.Rotate`.
   Point velocity from angular motion is:
@@ -94,7 +94,7 @@ Fixed64 denominator =
 
 ## File Map
 
-- Modify `src/Gravitas/Core/StiffBody2D.cs`
+- Modify `src/Gravitas/Core/SolidBody2D.cs`
   - Add COM, scalar moment, angular velocity, torque, angular sleep, effective
     mass/moment helpers, torque/impulse APIs, serialization fields, and replay
     restore behavior.
@@ -115,10 +115,10 @@ Fixed64 denominator =
   - Become the pure 2D normal/friction impulse solver.
 - Modify `src/Gravitas/CollisionHandling/Response/CollisionResponseMixed.cs`
   - Add 2D angular effects only in the mixed workstream.
-- Create `tests/Gravitas.Tests/Core/StiffBody2DMassPropertiesTests.cs`
+- Create `tests/Gravitas.Tests/Core/SolidBody2DMassPropertiesTests.cs`
 - Create `tests/Gravitas.Tests/Colliders/Collider2DMassPropertyTests.cs`
 - Create `tests/Gravitas.Tests/CollisionHandling/CollisionResponse2DAngularTests.cs`
-- Modify `tests/Gravitas.Tests/Serialization/StiffBody2DSerializationTests.cs`
+- Modify `tests/Gravitas.Tests/Serialization/SolidBody2DSerializationTests.cs`
 - Modify `docs/wiki/DIMENSIONS.md`
 - Modify `docs/wiki/COLLISION_PIPELINE.md`
 - Modify `docs/wiki/SERIALIZATION.md`
@@ -127,28 +127,28 @@ Fixed64 denominator =
 
 ## Workstream 1: Body Mobility, COM, And Scalar Inertia
 
-**Goal:** Make `StiffBody2D` own explicit body mass properties and effective
+**Goal:** Make `SolidBody2D` own explicit body mass properties and effective
 2D solver policy before collision response consumes them.
 
 Tasks:
 
 - [x] Add failing tests in
-  `tests/Gravitas.Tests/Core/StiffBody2DMassPropertiesTests.cs` for movable,
+  `tests/Gravitas.Tests/Core/SolidBody2DMassPropertiesTests.cs` for movable,
   kinematic, immovable, zero-mass, and angular-disabled bodies.
 - [x] Add failing tests for `LocalCenterOfMassOffset`, `WorldCenterOfMass`, and
   `ResetCenterOfMassFromCollider`.
-- [x] Replace `CanMove` in `StiffBody2D` with explicit `CanTranslate` and
+- [x] Replace `CanMove` in `SolidBody2D` with explicit `CanTranslate` and
   `CanRotate`. Update all pure 2D and mixed callers in the same change.
 - [x] Convert `Mass` from an auto-property into a setter that refreshes scalar
   moment and inverse moment when shape mass properties are available.
-- [x] Add explicit COM and scalar moment state to `StiffBody2D`.
+- [x] Add explicit COM and scalar moment state to `SolidBody2D`.
 - [x] Add `ResetCenterOfMassFromCollider()` and
   `RefreshMassPropertiesFromColliderShape()` to derive default COM and moment
   from the bound collider.
 - [x] Run focused body tests.
 
 ```bash
-dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter FullyQualifiedName~StiffBody2DMassPropertiesTests
+dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter FullyQualifiedName~SolidBody2DMassPropertiesTests
 ```
 
 Expected after implementation: all new body mass-property tests pass.
@@ -161,8 +161,8 @@ the 2D effective inverse mass surface instead of the removed `CanMove` alias.
 `Mass`, collider shape changes, and COM overrides refresh scalar mass
 properties, and Chronicler records the new body-owned COM/angular-policy state.
 Focused coverage lives in
-`tests/Gravitas.Tests/Core/StiffBody2DMassPropertiesTests.cs` and
-`tests/Gravitas.Tests/Serialization/StiffBody2DSerializationTests.cs`.
+`tests/Gravitas.Tests/Core/SolidBody2DMassPropertiesTests.cs` and
+`tests/Gravitas.Tests/Serialization/SolidBody2DSerializationTests.cs`.
 The shared `LSCollider2D` mass-property surface and current shape formula
 implementations were pulled forward to avoid placeholder body inertia.
 
@@ -215,20 +215,20 @@ Tasks:
 
 - [x] Add failing tests for `AddTorque`, `AddAngularImpulse`, `LateSimulate`
   rotation, angular sleep threshold, and shape mutation refreshing moment.
-- [x] Add angular state to `StiffBody2D`.
+- [x] Add angular state to `SolidBody2D`.
 - [x] Add torque and angular impulse APIs.
 - [x] Integrate angular velocity in `LateSimulate` before publishing rotation.
 - [x] Update `Sleep()` and `UpdateSleepState()` so a body sleeps only when both
   linear and angular speed are at or below their thresholds.
 - [x] Extend `RecordData` and `ApplyLoadedState` for angular state, COM state,
   and scalar moment inputs required for deterministic continuation.
-- [x] Update `tests/Gravitas.Tests/Serialization/StiffBody2DSerializationTests.cs`
+- [x] Update `tests/Gravitas.Tests/Serialization/SolidBody2DSerializationTests.cs`
   so populate restores COM, angular velocity, queued torque acceleration, sleep
   thresholds, and replay continuation.
 - [x] Run focused body and serialization tests.
 
 ```bash
-dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~StiffBody2DAngularDynamicsTests|FullyQualifiedName~StiffBody2DSerializationTests"
+dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~SolidBody2DAngularDynamicsTests|FullyQualifiedName~SolidBody2DSerializationTests"
 ```
 
 Expected after implementation: angular integration and serialization tests pass
@@ -236,7 +236,7 @@ with identical replay state across uninterrupted and restored worlds.
 
 **Progress 2026-06-19:** Workstream 3 added scalar angular velocity,
 angular acceleration, angular speed, angular sleep threshold, `AddTorque`, and
-`AddAngularImpulse` to `StiffBody2D`. `LateSimulate` now integrates queued
+`AddAngularImpulse` to `SolidBody2D`. `LateSimulate` now integrates queued
 torque through `EffectiveInverseMomentOfInertia`, advances scalar yaw rotation,
 and keeps sleep gated on both linear and angular speed. Sleep clears angular
 runtime motion state. Chronicler now records 2D angular velocity, applied and
@@ -259,9 +259,9 @@ Tasks:
   `CollisionResponse2D.Resolve(CollisionPair2D pair, Contact2D contact)`.
   `CollisionPair2D.MarkColliding` should call the response surface and retain
   pair notification/wake ownership.
-- [x] Build solver body values from `StiffBody2D.EffectiveInverseMass`,
-  `StiffBody2D.EffectiveInverseMomentOfInertia`, and
-  `StiffBody2D.WorldCenterOfMass`.
+- [x] Build solver body values from `SolidBody2D.EffectiveInverseMass`,
+  `SolidBody2D.EffectiveInverseMomentOfInertia`, and
+  `SolidBody2D.WorldCenterOfMass`.
 - [x] Compute contact point velocity from linear and angular velocity.
 - [x] Apply normal impulse to linear and angular velocity. The impulse applied
   to body A is `-impulse`, and the impulse applied to body B is `impulse`.
@@ -304,7 +304,7 @@ Tasks:
 - [x] Update `CollisionResponseMixed` so the 2D participant uses
   `EffectiveInverseMass` and `EffectiveInverseMomentOfInertia`.
 - [x] Compute the 2D relative contact arm from the planar contact point to
-  `StiffBody2D.WorldCenterOfMass`.
+  `SolidBody2D.WorldCenterOfMass`.
 - [x] Apply scalar 2D angular impulse only from the planar impulse component.
   The vertical Y impulse remains constrained out of the pure 2D body model.
 - [x] Preserve existing mixed rule: planar X/Z impulse can move the 2D body,
@@ -323,9 +323,9 @@ and does not change pure 2D or pure 3D pair identity.
 angular contact velocity, angular impulse denominator, and angular velocity
 delta from the planar X/Z component of mixed normal and friction impulses.
 The 2D contact arm is measured from the planar mixed contact point to
-`StiffBody2D.WorldCenterOfMass`, using
-`StiffBody2D.EffectiveInverseMass` and
-`StiffBody2D.EffectiveInverseMomentOfInertia` for solver mobility. Vertical
+`SolidBody2D.WorldCenterOfMass`, using
+`SolidBody2D.EffectiveInverseMass` and
+`SolidBody2D.EffectiveInverseMomentOfInertia` for solver mobility. Vertical
 Y-only impulse still treats the 2D body as having infinite constrained mass and
 cannot translate or spin the 2D participant. Focused coverage lives in
 `tests/Gravitas.Tests/MixedDimensions/MixedResponseTests.cs`.

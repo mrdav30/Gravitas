@@ -43,7 +43,7 @@ Observed steady-state allocation signals:
 
 ### Phase 2: Grounding And Simulation Allocation
 
-- Split benchmarks for `StiffBody.LateSimulate`, grounding `CircleCast`, collision partition distribution, and active pair processing.
+- Split benchmarks for `SolidBody.LateSimulate`, grounding `CircleCast`, collision partition distribution, and active pair processing.
 - Identified active-pair late simulation repartitioning as the remaining allocation source.
 - Replaced `PartitionObject`'s `GridTracer.GetCoveredVoxels(...)` enumeration with direct spatial-cell and voxel scanning backed by reusable context sets.
 - Added steady-state allocation benchmarks for grounded and moving-body scenarios.
@@ -71,7 +71,7 @@ steady-state paths:
 | `QueryServiceBenchmarks.CircleCastAllAcrossPopulatedContext` | 0 B/op |
 | `QueryServiceBenchmarks.DirectionalCircleCastAcrossPopulatedContext` | 0 B/op |
 | `QueryServiceBenchmarks.RaycastAcrossTwoOverlappingContexts` | 0 B/op |
-| `SimulationAllocationBenchmarks.StiffBodyLateSimulateOnly` | 0 B/op |
+| `SimulationAllocationBenchmarks.SolidBodyLateSimulateOnly` | 0 B/op |
 | `SimulationAllocationBenchmarks.GroundingCircleCastOnly` | 0 B/op |
 | `SimulationAllocationBenchmarks.CollisionPartitionDistributionOnly` | 0 B/op |
 | `SimulationAllocationBenchmarks.ActivePairProcessingLateSimulate` | 0 B/op |

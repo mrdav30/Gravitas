@@ -366,7 +366,7 @@ public sealed class CollisionResponseInvariantTests
         return pair;
     }
 
-    private static void Push(StiffBody body, int xImpulse)
+    private static void Push(SolidBody body, int xImpulse)
     {
         body.AddLinearImpulse(new Vector3d((Fixed64)xImpulse, Fixed64.Zero, Fixed64.Zero));
     }

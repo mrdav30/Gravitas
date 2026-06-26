@@ -16,7 +16,7 @@
 
 - `src/Gravitas/Core/PhysicsManager.cs`
 - `src/Gravitas/Core/CollisionManager.cs`
-- `src/Gravitas/Core/StiffBody.cs`
+- `src/Gravitas/Core/SolidBody.cs`
 - `src/Gravitas/Core/IMatterAgent.cs`
 - `src/Gravitas/Colliders/LSCollider.cs`
 - `src/Gravitas/Partitions/PhysicsPartition.cs`
@@ -113,7 +113,7 @@ GravitasWorldContext
 ## Non-Negotiable Invariants
 
 - One active `GridWorld` can be attached to at most one active `GravitasWorldContext`.
-- A `StiffBody`, `LSCollider`, `PhysicsPartition`, collision pair, coroutine, raycast, and circlecast belong to exactly one `GravitasWorldContext`.
+- A `SolidBody`, `LSCollider`, `PhysicsPartition`, collision pair, coroutine, raycast, and circlecast belong to exactly one `GravitasWorldContext`.
 - Collider IDs are context-local. A partition stores IDs meaningful only to its owning context.
 - Collision pairs never cross contexts.
 - Simulation order remains deterministic: body order, collider ID assignment, partition traversal, pair ordering, and query result ordering must be explicit and test-pinned.
@@ -244,7 +244,7 @@ dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release -
 
 - Create: `src/Gravitas/Core/GravitasPhysicsService.cs`
 - Modify: `src/Gravitas/Runtime/GravitasWorldContext.cs`
-- Modify: `src/Gravitas/Core/StiffBody.cs`
+- Modify: `src/Gravitas/Core/SolidBody.cs`
 - Modify: `src/Gravitas/Colliders/LSCollider.cs`
 - Modify: `src/Gravitas/CollisionHandling/CollisionPair.cs`
 - Create: `tests/Gravitas.Tests/Core/GravitasPhysicsServiceTests.cs`
@@ -252,7 +252,7 @@ dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release -
 **Design:**
 
 - `GravitasPhysicsService` owns:
-  - `SwiftBucket<StiffBody>` dynamic bodies
+  - `SwiftBucket<SolidBody>` dynamic bodies
   - `LSCollider?[]` collider table
   - free collider ID stack
   - active collision-pair queue
@@ -268,7 +268,7 @@ dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release -
   - `LateVisualize()`
   - `Reset()`
   - `Deactivate()`
-- `StiffBody` stores `GravitasWorldContext Context`.
+- `SolidBody` stores `GravitasWorldContext Context`.
 - `LSCollider` stores `GravitasWorldContext Context`.
 - `CollisionPair` should be initialized with the owning context and should not resolve colliders through static state.
 
@@ -278,7 +278,7 @@ dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release -
 - [x] Write tests proving `TryGetColliderById` resolves only within its context.
 - [x] Write tests proving a pair created in one context cannot use colliders from another context.
 - [x] Add `GravitasPhysicsService` and wire it into `GravitasWorldContext`.
-- [x] Replace body/collider assimilation calls in `StiffBody` and `LSCollider` with `Context.Physics`.
+- [x] Replace body/collider assimilation calls in `SolidBody` and `LSCollider` with `Context.Physics`.
 - [x] Keep a temporary internal adapter only if necessary to make incremental compilation possible. Remove the adapter by Phase 8.
 - [x] Run:
 
@@ -301,7 +301,7 @@ dotnet build Gravitas.slnx --configuration Release
 
 - Modify: `src/Gravitas/Core/IMatterAgent.cs`
 - Modify: `src/Gravitas/Runtime/GravitasWorldContext.cs`
-- Modify: `src/Gravitas/Core/StiffBody.cs`
+- Modify: `src/Gravitas/Core/SolidBody.cs`
 - Modify: `src/Gravitas/Colliders/LSCollider.cs`
 - Create: `tests/Gravitas.Tests/Support/TestMatterAgent.cs`
 - Create: `tests/Gravitas.Tests/Core/MatterAgentContextTests.cs`
@@ -310,7 +310,7 @@ dotnet build Gravitas.slnx --configuration Release
 
 - Replace `GridWorld World { get; }` on `IMatterAgent` with `GravitasWorldContext Context { get; }`.
 - All world access flows through `agent.Context.World`.
-- `StiffBody.Setup(...)` verifies the agent and collider bind to the same context.
+- `SolidBody.Setup(...)` verifies the agent and collider bind to the same context.
 - `LSCollider.InitializeWithNoBody(...)` binds static colliders to `agent.Context`.
 - Static collider APIs should take a context-bound agent, not a raw world.
 
@@ -431,7 +431,7 @@ dotnet build Gravitas.slnx --configuration Release
 
 - Query state is context-local and static query buffers are gone.
 
-**Status:** Complete for Phase 6. Added context-owned `GravitasRaycastService` and `GravitasCirclecastService`, exposed them through `GravitasWorldContext`, removed the old query facades, and moved `RayCasterWorker` cached state into the context-owned `RaycastAxisWorker`. `StiffBody.CheckGround()` now uses the owning context's clock, settings, and circlecast service. Also normalized the raycast worker axis during preparation after focused tests exposed that the old raw-vector projection treated non-normalized ray directions as normalized. Verified with focused Phase 6 tests plus `Release` and `ReleaseLean` solution build/test runs.
+**Status:** Complete for Phase 6. Added context-owned `GravitasRaycastService` and `GravitasCirclecastService`, exposed them through `GravitasWorldContext`, removed the old query facades, and moved `RayCasterWorker` cached state into the context-owned `RaycastAxisWorker`. `SolidBody.CheckGround()` now uses the owning context's clock, settings, and circlecast service. Also normalized the raycast worker axis during preparation after focused tests exposed that the old raw-vector projection treated non-normalized ray directions as normalized. Verified with focused Phase 6 tests plus `Release` and `ReleaseLean` solution build/test runs.
 
 ## Phase 7: Move Coroutines And Yield Instructions To The Context Clock
 
@@ -475,7 +475,7 @@ dotnet build Gravitas.slnx --configuration Release
 
 - Coroutines and wait instructions are deterministic per context.
 
-**Status:** Complete for Phase 7. Added context-owned `GravitasCoroutineService`, exposed it through `GravitasWorldContext.Coroutines`, and made `GravitasWorldContext.Simulate()` advance context-local coroutines after the context clock and physics step. `WaitForFrames`, `WaitForNextSimulate`, and `WaitForRealSeconds` now bind to an explicit context through service factories, and `StiffBody.SkipGrounding()` uses its owning context coroutine service. Removed the old static `CoroutineManager` instead of leaving a compatibility facade. Verified with focused Phase 7 tests plus `Release` and `ReleaseLean` solution build/test runs.
+**Status:** Complete for Phase 7. Added context-owned `GravitasCoroutineService`, exposed it through `GravitasWorldContext.Coroutines`, and made `GravitasWorldContext.Simulate()` advance context-local coroutines after the context clock and physics step. `WaitForFrames`, `WaitForNextSimulate`, and `WaitForRealSeconds` now bind to an explicit context through service factories, and `SolidBody.SkipGrounding()` uses its owning context coroutine service. Removed the old static `CoroutineManager` instead of leaving a compatibility facade. Verified with focused Phase 7 tests plus `Release` and `ReleaseLean` solution build/test runs.
 
 **Pre-Phase 8 follow-up:** Converted live context-owned `SwiftBucket` loops in `GravitasCoroutineService`, `GravitasPhysicsService`, and `GravitasCollisionService` to captured-peak `TryGetValue(...)` iteration. This avoids the `IsAllocated(...)` plus indexer double probe, tolerates removals during callback-driven simulation loops, and prevents newly added coroutines from running in the same simulation tick. At the time, the only remaining old `SwiftBucket` loops were isolated to the legacy static `PhysicsManager` slated for removal/reduction in Phase 8.
 
@@ -522,7 +522,7 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 
 - Runtime code no longer relies on mutable static manager state.
 
-**Status:** Complete for Phase 8. Added tests pinning context-local impulse timing and explicit settings-saver application, moved `StiffBody` timing/environment reads to its owning `GravitasWorldContext`, added `PhysicsSettingsSaver.ApplyTo(...)`, removed the legacy static `PhysicsManager` file, and converted `ColliderSettings` priority lookup away from a mutable public dictionary. README, AGENTS, and benchmark docs now describe the context-owned runtime API. Verified with the static-reference search plus `Release` and `ReleaseLean` solution build/test runs.
+**Status:** Complete for Phase 8. Added tests pinning context-local impulse timing and explicit settings-saver application, moved `SolidBody` timing/environment reads to its owning `GravitasWorldContext`, added `PhysicsSettingsSaver.ApplyTo(...)`, removed the legacy static `PhysicsManager` file, and converted `ColliderSettings` priority lookup away from a mutable public dictionary. README, AGENTS, and benchmark docs now describe the context-owned runtime API. Verified with the static-reference search plus `Release` and `ReleaseLean` solution build/test runs.
 
 ## Phase 9: Benchmarks And Regression Hardening
 

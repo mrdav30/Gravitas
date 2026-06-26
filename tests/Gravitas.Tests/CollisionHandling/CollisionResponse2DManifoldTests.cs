@@ -13,8 +13,8 @@ public sealed class CollisionResponse2DManifoldTests
     public void Resolve_WithSymmetricFaceContacts_ShouldNotIntroduceAngularVelocity()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
-        StiffBody2D moving = CreateBox(context, Vector2d.Zero);
-        StiffBody2D wall = CreateBox(context, new Vector2d((Fixed64)2, Fixed64.Zero), immovable: true);
+        SolidBody2D moving = CreateBox(context, Vector2d.Zero);
+        SolidBody2D wall = CreateBox(context, new Vector2d((Fixed64)2, Fixed64.Zero), immovable: true);
         var pair = new CollisionPair2D(moving.Collider, wall.Collider);
         moving.ApplyCollisionLinearVelocityDelta(new Vector2d((Fixed64)4, Fixed64.Zero));
         AddFaceContacts(pair, depth: Fixed64.Half);
@@ -29,8 +29,8 @@ public sealed class CollisionResponse2DManifoldTests
     public void Resolve_WithOffCenterSingleContact_ShouldStillIntroduceAngularVelocity()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
-        StiffBody2D moving = CreateBox(context, Vector2d.Zero);
-        StiffBody2D wall = CreateBox(context, new Vector2d((Fixed64)2, Fixed64.Zero), immovable: true);
+        SolidBody2D moving = CreateBox(context, Vector2d.Zero);
+        SolidBody2D wall = CreateBox(context, new Vector2d((Fixed64)2, Fixed64.Zero), immovable: true);
         var pair = new CollisionPair2D(moving.Collider, wall.Collider);
         moving.ApplyCollisionLinearVelocityDelta(new Vector2d((Fixed64)4, Fixed64.Zero));
         pair.Manifold.SetContact(
@@ -48,8 +48,8 @@ public sealed class CollisionResponse2DManifoldTests
     public void Resolve_WithTwoContacts_ShouldApplyPositionCorrectionOnceForPair()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
-        StiffBody2D moving = CreateBox(context, Vector2d.Zero);
-        StiffBody2D wall = CreateBox(context, new Vector2d((Fixed64)2, Fixed64.Zero), immovable: true);
+        SolidBody2D moving = CreateBox(context, Vector2d.Zero);
+        SolidBody2D wall = CreateBox(context, new Vector2d((Fixed64)2, Fixed64.Zero), immovable: true);
         var pair = new CollisionPair2D(moving.Collider, wall.Collider);
         AddFaceContacts(pair, depth: Fixed64.Half);
         Fixed64 expectedCorrection = Fixed64.Half - CollisionResponse2D.PenetrationSlop;
@@ -63,8 +63,8 @@ public sealed class CollisionResponse2DManifoldTests
     public void Resolve_WithTwoFrictionContacts_ShouldOpposeTangentialMotionAndCacheBothContacts()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
-        StiffBody2D moving = CreateBox(context, Vector2d.Zero);
-        StiffBody2D wall = CreateBox(context, new Vector2d((Fixed64)2, Fixed64.Zero), immovable: true);
+        SolidBody2D moving = CreateBox(context, Vector2d.Zero);
+        SolidBody2D wall = CreateBox(context, new Vector2d((Fixed64)2, Fixed64.Zero), immovable: true);
         var pair = new CollisionPair2D(moving.Collider, wall.Collider);
         moving.ApplyCollisionLinearVelocityDelta(new Vector2d((Fixed64)4, (Fixed64)20));
         Fixed64 tangentialSpeed = moving.LinearVelocity.Y.Abs();
@@ -83,7 +83,7 @@ public sealed class CollisionResponse2DManifoldTests
     public void ResponseBody2D_Create_ShouldUseEffectiveMassAndScalarMoment()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
-        StiffBody2D movable = CreateBox(context, Vector2d.Zero);
+        SolidBody2D movable = CreateBox(context, Vector2d.Zero);
         ResponseBody2D movableBody = ResponseBody2D.Create(movable.Collider);
         movableBody.CanTranslate.Should().BeTrue();
         movableBody.CanRotate.Should().BeTrue();
@@ -96,25 +96,25 @@ public sealed class CollisionResponse2DManifoldTests
         angularDisabled.CanRotate.Should().BeFalse();
         angularDisabled.InverseMoment.Should().Be(Fixed64.Zero);
 
-        StiffBody2D immovable = CreateBox(context, new Vector2d((Fixed64)4, Fixed64.Zero), immovable: true);
+        SolidBody2D immovable = CreateBox(context, new Vector2d((Fixed64)4, Fixed64.Zero), immovable: true);
         ResponseBody2D immovableBody = ResponseBody2D.Create(immovable.Collider);
         immovableBody.CanTranslate.Should().BeFalse();
         immovableBody.CanRotate.Should().BeFalse();
         immovableBody.InverseMass.Should().Be(Fixed64.Zero);
 
-        StiffBody2D kinematic = CreateBox(context, new Vector2d((Fixed64)8, Fixed64.Zero), isKinematic: true);
+        SolidBody2D kinematic = CreateBox(context, new Vector2d((Fixed64)8, Fixed64.Zero), isKinematic: true);
         ResponseBody2D kinematicBody = ResponseBody2D.Create(kinematic.Collider);
         kinematicBody.CanTranslate.Should().BeFalse();
         kinematicBody.CanRotate.Should().BeFalse();
 
-        StiffBody2D zeroMass = CreateBox(context, new Vector2d((Fixed64)12, Fixed64.Zero));
+        SolidBody2D zeroMass = CreateBox(context, new Vector2d((Fixed64)12, Fixed64.Zero));
         zeroMass.Mass = Fixed64.Zero;
         ResponseBody2D zeroMassBody = ResponseBody2D.Create(zeroMass.Collider);
         zeroMassBody.CanTranslate.Should().BeFalse();
         zeroMassBody.CanRotate.Should().BeFalse();
         zeroMassBody.InverseMass.Should().Be(Fixed64.Zero);
 
-        StiffBody2D inactive = CreateBox(context, new Vector2d((Fixed64)16, Fixed64.Zero));
+        SolidBody2D inactive = CreateBox(context, new Vector2d((Fixed64)16, Fixed64.Zero));
         inactive.Deactivate();
         ResponseBody2D inactiveBody = ResponseBody2D.Create(inactive.Collider);
         inactiveBody.CanTranslate.Should().BeFalse();
@@ -127,8 +127,8 @@ public sealed class CollisionResponse2DManifoldTests
     public void Resolve_WithStaleCachedImpulse_ShouldClampWarmStartCacheAfterFreshSolve()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
-        StiffBody2D moving = CreateBox(context, Vector2d.Zero);
-        StiffBody2D wall = CreateBox(context, new Vector2d((Fixed64)2, Fixed64.Zero), immovable: true);
+        SolidBody2D moving = CreateBox(context, Vector2d.Zero);
+        SolidBody2D wall = CreateBox(context, new Vector2d((Fixed64)2, Fixed64.Zero), immovable: true);
         var pair = new CollisionPair2D(moving.Collider, wall.Collider);
         pair.Manifold.SetContact(Vector2d.Right, Vector2d.Right, Fixed64.Half, Vector2d.Right);
         ulong contactId = pair.Manifold.PrimaryContact.ContactId;
@@ -147,8 +147,8 @@ public sealed class CollisionResponse2DManifoldTests
     public void Resolve_WithClosingVelocity_ShouldRefreshWarmStartCache()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
-        StiffBody2D moving = CreateBox(context, Vector2d.Zero);
-        StiffBody2D wall = CreateBox(context, new Vector2d((Fixed64)2, Fixed64.Zero), immovable: true);
+        SolidBody2D moving = CreateBox(context, Vector2d.Zero);
+        SolidBody2D wall = CreateBox(context, new Vector2d((Fixed64)2, Fixed64.Zero), immovable: true);
         var pair = new CollisionPair2D(moving.Collider, wall.Collider);
         moving.ApplyCollisionLinearVelocityDelta(new Vector2d((Fixed64)4, Fixed64.Zero));
         pair.Manifold.SetContact(Vector2d.Right, Vector2d.Right, Fixed64.Half, Vector2d.Right);
@@ -174,13 +174,13 @@ public sealed class CollisionResponse2DManifoldTests
             Vector2d.Right);
     }
 
-    private static StiffBody2D CreateBox(
+    private static SolidBody2D CreateBox(
         GravitasWorldContext context,
         Vector2d position,
         bool immovable = false,
         bool isKinematic = false)
     {
-        var body = new StiffBody2D(
+        var body = new SolidBody2D(
             new TestMatterAgent(context, new FixedTransform(
                 new Vector3d(position.X, Fixed64.Zero, position.Y),
                 FixedQuaternion.Identity,

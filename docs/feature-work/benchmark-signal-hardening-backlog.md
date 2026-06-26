@@ -251,7 +251,7 @@ three concrete causes:
 **Resolution 2026-06-23:** `GravitasPhysics2DService` builds the mixed
 dynamic CCD index only when the runtime mode actually runs mixed contacts.
 Pure planar CCD uses `DynamicCcdCandidateIndex2D` and `DynamicCcdPlanarBounds`
-instead of projecting circles into a 3D `FixedBoundVolume`. `StiffBody2D`
+instead of projecting circles into a 3D `FixedBoundVolume`. `SolidBody2D`
 gained `ResetPosition(...)` parity with 3D, and the continuous-collision
 benchmark fixture uses it for deterministic 2D reset/setup without
 sleep/wake churn.
@@ -275,11 +275,11 @@ focused allocation guard reproduces it.
 
 - `src/Gravitas/CollisionHandling/Continuous/DynamicCcdCandidateIndex.cs`
 - `src/Gravitas/Core/2D/GravitasPhysics2DService.cs`
-- `src/Gravitas/Core/2D/StiffBody2D.cs`
-- `src/Gravitas/Core/2D/StiffBody2D.ContinuousCollision.Hits.cs`
-- `src/Gravitas/Core/2D/StiffBody2D.ContinuousCollision.Kinematic.cs`
+- `src/Gravitas/Core/2D/SolidBody2D.cs`
+- `src/Gravitas/Core/2D/SolidBody2D.ContinuousCollision.Hits.cs`
+- `src/Gravitas/Core/2D/SolidBody2D.ContinuousCollision.Kinematic.cs`
 - `tests/Gravitas.Tests/CollisionHandling/DynamicCcdCandidateIndexTests.cs`
-- `tests/Gravitas.Tests/Core/StiffBody2DAngularDynamicsTests.cs`
+- `tests/Gravitas.Tests/Core/SolidBody2DAngularDynamicsTests.cs`
 - `tests/Gravitas.Benchmarks/Support/ContinuousCollisionBenchmarkSupport.cs`
 
 **Closure criteria:** Met. The gap is explained by mixed-index overwork,
@@ -327,8 +327,8 @@ The focused `ContinuousCollisionDetectionTests` and
 
 **Likely files:**
 
-- `src/Gravitas/Core/3D/StiffBody.ContinuousCollision.Hits.cs`
-- `src/Gravitas/Core/3D/StiffBody.ContinuousCollision.Kinematic.cs`
+- `src/Gravitas/Core/3D/SolidBody.ContinuousCollision.Hits.cs`
+- `src/Gravitas/Core/3D/SolidBody.ContinuousCollision.Kinematic.cs`
 - `src/Gravitas/Queries/3D/Sweeps/ConvexSweepQueryWorker.cs`
 - `src/Gravitas/Queries/3D/GravitasQuery3DService.Raycast.cs`
 - `src/Gravitas/Queries/3D/Sweeps/SweepBoundsUtility.cs`
@@ -433,7 +433,7 @@ simulation enough to identify the moving-frame raycast grounding path.
 
 **RCA 2026-06-23:** The remaining allocation was not CCD-specific. The
 full-runtime 3D CCD evidence bodies moved each frame with automatic ray
-grounding enabled, and `StiffBody` grounding called `Query3D.RaycastAll`.
+grounding enabled, and `SolidBody` grounding called `Query3D.RaycastAll`.
 The raycast service still used GridForge's enumerable `GridTracer.TraceLine`
 path, which allocated iterator/mapping state per ray. Reset, force setup, and
 non-moving late simulation attribution were allocation-clean.
@@ -463,7 +463,7 @@ noise unless a future guardrail reproduces them.
 
 **Likely files:**
 
-- `src/Gravitas/Core/3D/StiffBody.cs`
+- `src/Gravitas/Core/3D/SolidBody.cs`
 - `src/Gravitas/Core/3D/GravitasPhysicsService.cs`
 - `src/Gravitas/CollisionHandling/Pairs/*`
 - `src/Gravitas/Partitions/*`
@@ -485,7 +485,7 @@ runtime path.
 `simulation-allocation` BenchmarkDotNet smoke reported
 `GroundingRaycastProbeOnly` at about `181.8 us` and `43,008 B/op` for
 `64` colliders. The same run reported no managed allocation for
-`StiffBodyLateSimulateOnly`, `GroundingSweptSphereProbeOnly`,
+`SolidBodyLateSimulateOnly`, `GroundingSweptSphereProbeOnly`,
 `CollisionPartitionDistributionOnly`, and
 `ActivePairProcessingLateSimulate`.
 
@@ -516,10 +516,10 @@ after warmup.
 
 **Likely files:**
 
-- `src/Gravitas/Core/3D/StiffBody.cs`
+- `src/Gravitas/Core/3D/SolidBody.cs`
 - `src/Gravitas/Queries/3D/GravitasQuery3DService.Raycast.cs`
 - `tests/Gravitas.Benchmarks/Core/SimulationAllocationBenchmarks.cs`
-- `tests/Gravitas.Tests/Core/StiffBodyGroundingTests.cs`
+- `tests/Gravitas.Tests/Core/SolidBodyGroundingTests.cs`
 
 **Closure criteria:** Met. The runtime allocation was eliminated and the 3D
 raycast path has a focused xUnit allocation guard.

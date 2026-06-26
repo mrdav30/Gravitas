@@ -1,4 +1,4 @@
-﻿//=======================================================================
+//=======================================================================
 // LSCollider.cs
 //=======================================================================
 // MIT License, Copyright (c) 2026–present David Oravsky (mrdav30)
@@ -53,8 +53,8 @@ public abstract class LSCollider : IRecordable, IColliderHierarchyNode
         }
     }
 
-    private StiffBody? _body;
-    public StiffBody? Body => _body;
+    private SolidBody? _body;
+    public SolidBody? Body => _body;
 
     private LSCompoundCollider? _compoundOwner;
     private FixedQuaternion _compoundLocalRotation = FixedQuaternion.Identity;
@@ -306,7 +306,7 @@ public abstract class LSCollider : IRecordable, IColliderHierarchyNode
 
     internal int CollisionPairHolderCount => _pairState.CollisionPairHolderCount;
 
-    public delegate void BodyCollisionFunc(StiffBody other);
+    public delegate void BodyCollisionFunc(SolidBody other);
     public event BodyCollisionFunc? OnContact;
     public event BodyCollisionFunc? OnContactEnter;
     public event BodyCollisionFunc? OnContactExit;
@@ -339,7 +339,7 @@ public abstract class LSCollider : IRecordable, IColliderHierarchyNode
 
     #endregion
 
-    public void Initialize(StiffBody body)
+    public void Initialize(SolidBody body)
     {
         ThrowIfCompoundPartLifecycle(nameof(Initialize));
         _body = body;

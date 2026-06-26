@@ -1,5 +1,5 @@
 //=======================================================================
-// StiffBody2D.ContinuousCollision.Dynamic.cs
+// SolidBody.ContinuousCollision.Dynamic.cs
 //=======================================================================
 // MIT License, Copyright (c) 2026-present David Oravsky (mrdav30)
 // See LICENSE file in the project root for full license information.
@@ -11,11 +11,11 @@ using Gravitas.CollisionHandling;
 
 namespace Gravitas;
 
-public sealed partial class StiffBody2D
+public partial class SolidBody
 {
     internal void ApplyContinuousCollisionHandoff(
-        Vector2d positionAtImpact,
-        Vector2d velocityDelta,
+        Vector3d positionAtImpact,
+        Vector3d velocityDelta,
         Fixed64 remainingTime,
         LSCollider? ignoredCollider3D = null,
         LSCollider2D? ignoredCollider2D = null)
@@ -23,7 +23,7 @@ public sealed partial class StiffBody2D
         if (!CanTranslate)
             return;
 
-        _position = positionAtImpact;
+        Position3d = positionAtImpact;
         ApplyCollisionLinearVelocityDelta(velocityDelta);
         if (remainingTime <= Fixed64.Epsilon || _linearVelocity.MagnitudeSquared <= Fixed64.Epsilon)
         {
@@ -38,7 +38,7 @@ public sealed partial class StiffBody2D
         _continuousCollisionHandoffIgnoredCollider3D = ignoredCollider3D;
         _continuousCollisionHandoffIgnoredCollider2D = ignoredCollider2D;
         _continuousCollisionHandoffPending = true;
-        Context.Physics2D.QueueContinuousCollisionHandoff(this);
+        Context.Physics.QueueContinuousCollisionHandoff(this);
     }
 
     internal bool TryConsumeContinuousCollisionHandoff(bool updateSleepState, bool updateColliderState)
@@ -56,8 +56,8 @@ public sealed partial class StiffBody2D
             return true;
         }
 
-        Vector2d startPosition = _position;
-        Vector2d proposedPosition = startPosition + _linearVelocity * remainingTime;
+        Vector3d startPosition = Position3d;
+        Vector3d proposedPosition = startPosition + _linearVelocity * remainingTime;
         Fixed64 elapsedTime = FixedMath.Max(Fixed64.Zero, Context.DeltaTime - remainingTime);
         try
         {
@@ -68,19 +68,36 @@ public sealed partial class StiffBody2D
             _continuousCollisionHandoffIgnoredCollider3D = null;
             _continuousCollisionHandoffIgnoredCollider2D = null;
         }
-        _position = proposedPosition;
-        if (updateColliderState)
-            Collider.Rebuild();
+
+        Position2d = _positionCorrection + proposedPosition.ToVector2d();
+        _positionCorrection = Vector2d.Zero;
+        HeightPos = proposedPosition.Y;
+
+        CheckGroundForSimulation();
+        if (_isGrounded)
+            HeightPos = HitPoint.Y;
         else
-            Collider.RebuildRuntimeShapeOnly();
+            ResetGroundCalculations();
+
+        CheckChangedValues();
+        UpdateInertiaTensorOrientation();
+        ApplyGyroscopicPrecession();
+
+        if (updateColliderState)
+            Collider.Simulate();
+        else
+            Collider.RebuildRuntimeShapeOnly(refreshMassProperties: false);
 
         if (updateSleepState)
             UpdateSleepState();
 
+        if (PositionChangePending || RotationChangePending)
+            OnMoved?.Invoke();
+
         return true;
     }
 
-    private bool TryResolveContinuousCollision(Vector2d startPosition, ref Vector2d proposedPosition) =>
+    private bool TryResolveContinuousCollision(Vector3d startPosition, ref Vector3d proposedPosition) =>
         TryResolveContinuousCollision(
             startPosition,
             ref proposedPosition,
@@ -89,8 +106,8 @@ public sealed partial class StiffBody2D
             forceContinuous: false);
 
     private bool TryResolveContinuousCollision(
-        Vector2d startPosition,
-        ref Vector2d proposedPosition,
+        Vector3d startPosition,
+        ref Vector3d proposedPosition,
         Fixed64 initialRemainingTime,
         Fixed64 initialElapsedTime,
         bool forceContinuous)
@@ -102,7 +119,7 @@ public sealed partial class StiffBody2D
         if (!forceContinuous && !ShouldUseContinuousCollision(out mode))
             return false;
 
-        Vector2d displacement = proposedPosition - startPosition;
+        Vector3d displacement = proposedPosition - startPosition;
         if (displacement.MagnitudeSquared <= Fixed64.Epsilon)
             return false;
 
@@ -114,18 +131,18 @@ public sealed partial class StiffBody2D
         }
 
         bool resolved = false;
-        Vector2d currentPosition = startPosition;
+        Vector3d currentPosition = startPosition;
         Fixed64 remainingTime = initialRemainingTime;
         Fixed64 elapsedTime = initialElapsedTime;
         int maxToiIterations = Context.Settings.ContinuousCollisionMaxToiIterations;
         for (int toiIteration = 0; toiIteration < maxToiIterations; toiIteration++)
         {
-            Vector2d segmentDisplacement = _linearVelocity * remainingTime;
+            Vector3d segmentDisplacement = _linearVelocity * remainingTime;
             Fixed64 segmentLength = segmentDisplacement.Magnitude;
             if (segmentLength <= Fixed64.Epsilon)
                 break;
 
-            Vector2d segmentEnd = currentPosition + segmentDisplacement;
+            Vector3d segmentEnd = currentPosition + segmentDisplacement;
             Fixed64 elapsedFraction = elapsedTime / Context.DeltaTime;
             Fixed64 remainingFraction = remainingTime / Context.DeltaTime;
             if (!TryGetFirstContinuousCollisionHit(
@@ -134,11 +151,11 @@ public sealed partial class StiffBody2D
                     proxyRadius,
                     elapsedFraction,
                     remainingFraction,
-                    out Vector2d hitNormal,
+                    out Vector3d hitNormal,
                     out Fixed64 hitDistance,
                     out ContinuousCollisionTargetKind targetKind,
-                    out LSCollider2D? target2D,
-                    out LSCollider? target3D))
+                    out LSCollider? target3D,
+                    out LSCollider2D? target2D))
             {
                 currentPosition = segmentEnd;
                 break;
@@ -146,15 +163,15 @@ public sealed partial class StiffBody2D
 
             Fixed64 hitTime = FixedMath.Clamp01(hitDistance / segmentLength);
             currentPosition += segmentDisplacement.Normalized * hitDistance;
-            Vector2d previousVelocity = _linearVelocity;
+            Vector3d previousVelocity = _linearVelocity;
             Fixed64 consumedTime = remainingTime * hitTime;
             Fixed64 remainingAfterHit = remainingTime - consumedTime;
             Fixed64 hitElapsedTime = elapsedTime + consumedTime;
             if (!TryApplyContinuousCollisionDynamicResponse(
                     hitNormal,
                     targetKind,
-                    target2D,
                     target3D,
+                    target2D,
                     currentPosition,
                     hitElapsedTime,
                     remainingAfterHit))
@@ -186,22 +203,22 @@ public sealed partial class StiffBody2D
     }
 
     private bool TryApplyContinuousCollisionDynamicResponse(
-        Vector2d normalForSource,
+        Vector3d normalForSource,
         ContinuousCollisionTargetKind targetKind,
-        LSCollider2D? target2D,
         LSCollider? target3D,
-        Vector2d sourcePositionAtImpact,
+        LSCollider2D? target2D,
+        Vector3d sourcePositionAtImpact,
         Fixed64 hitElapsedTime,
         Fixed64 remainingTime)
     {
-        if (targetKind == ContinuousCollisionTargetKind.Dynamic2D)
+        if (targetKind == ContinuousCollisionTargetKind.Dynamic3D)
         {
-            StiffBody2D? targetBody = target2D?.Body;
+            SolidBody? targetBody = target3D?.Body;
             if (targetBody == null)
                 return false;
 
             Fixed64 frameFraction = ResolveContinuousCollisionFrameFraction(hitElapsedTime);
-            Vector2d targetPositionAtImpact = targetBody.ContinuousCollisionFrameStart
+            Vector3d targetPositionAtImpact = targetBody.ContinuousCollisionFrameStart
                 + targetBody.ContinuousCollisionFrameDisplacement * frameFraction;
             return TryApplyContinuousCollisionDynamicResponse(
                 targetBody,
@@ -212,16 +229,16 @@ public sealed partial class StiffBody2D
                 remainingTime);
         }
 
-        if (targetKind == ContinuousCollisionTargetKind.Dynamic3D)
+        if (targetKind == ContinuousCollisionTargetKind.Dynamic2D)
         {
-            StiffBody? targetBody = target3D?.Body;
+            SolidBody2D? targetBody = target2D?.Body;
             if (targetBody == null)
                 return false;
 
             Fixed64 frameFraction = ResolveContinuousCollisionFrameFraction(hitElapsedTime);
-            Vector3d targetPositionAtImpact = targetBody.ContinuousCollisionFrameStart
+            Vector2d targetPositionAtImpact = targetBody.ContinuousCollisionFrameStart
                 + targetBody.ContinuousCollisionFrameDisplacement * frameFraction;
-            return TryApplyContinuousCollisionMixed3DResponse(
+            return TryApplyContinuousCollisionMixed2DResponse(
                 targetBody,
                 normalForSource,
                 sourcePositionAtImpact,
@@ -234,17 +251,17 @@ public sealed partial class StiffBody2D
     }
 
     private bool TryApplyContinuousCollisionDynamicResponse(
-        StiffBody2D target,
-        Vector2d normalForSource,
-        Vector2d sourcePositionAtImpact,
-        Vector2d targetPositionAtImpact,
+        SolidBody target,
+        Vector3d normalForSource,
+        Vector3d sourcePositionAtImpact,
+        Vector3d targetPositionAtImpact,
         Fixed64 hitElapsedTime,
         Fixed64 remainingTime)
     {
-        Vector2d normal = normalForSource.MagnitudeSquared > Fixed64.Epsilon
+        Vector3d normal = normalForSource.MagnitudeSquared > Fixed64.Epsilon
             ? normalForSource.Normalized
-            : Vector2d.Zero;
-        if (normal == Vector2d.Zero)
+            : Vector3d.Zero;
+        if (normal == Vector3d.Zero)
             return false;
 
         Fixed64 inverseMassA = EffectiveInverseMass;
@@ -253,7 +270,7 @@ public sealed partial class StiffBody2D
         if (inverseMass <= Fixed64.Epsilon)
             return false;
 
-        Fixed64 normalVelocity = Vector2d.Dot(_linearVelocity - target.ResolveContinuousCollisionFrameVelocity(), normal);
+        Fixed64 normalVelocity = Vector3d.Dot(_linearVelocity - target.ResolveContinuousCollisionFrameVelocity(), normal);
         if (normalVelocity >= -Fixed64.Epsilon)
             return false;
 
@@ -262,36 +279,37 @@ public sealed partial class StiffBody2D
         if (impulseScalar <= Fixed64.Zero)
             return false;
 
-        Vector2d impulse = normal * impulseScalar;
+        Vector3d impulse = normal * impulseScalar;
         ApplyCollisionLinearVelocityDelta(impulse * inverseMassA);
         UpdateContinuousCollisionFrameTrajectory(sourcePositionAtImpact, _linearVelocity, hitElapsedTime);
         target.ApplyContinuousCollisionHandoff(targetPositionAtImpact, -impulse * inverseMassB, remainingTime);
         return true;
     }
 
-    private bool TryApplyContinuousCollisionMixed3DResponse(
-        StiffBody target,
-        Vector2d normalForSource,
-        Vector2d sourcePositionAtImpact,
-        Vector3d targetPositionAtImpact,
+    private bool TryApplyContinuousCollisionMixed2DResponse(
+        SolidBody2D target,
+        Vector3d normalForSource,
+        Vector3d sourcePositionAtImpact,
+        Vector2d targetPositionAtImpact,
         Fixed64 hitElapsedTime,
         Fixed64 remainingTime)
     {
-        Vector2d normal = normalForSource.MagnitudeSquared > Fixed64.Epsilon
+        Vector3d normal = normalForSource.MagnitudeSquared > Fixed64.Epsilon
             ? normalForSource.Normalized
-            : Vector2d.Zero;
-        if (normal == Vector2d.Zero)
+            : Vector3d.Zero;
+        Vector2d planarNormal = normal.ToVector2d();
+        if (normal == Vector3d.Zero || planarNormal == Vector2d.Zero)
             return false;
 
-        Vector3d normal3D = normal.ToVector3d(Fixed64.Zero);
         Fixed64 inverseMassA = EffectiveInverseMass;
         Fixed64 inverseMassB = target.EffectiveInverseMass;
-        Fixed64 inverseMass = inverseMassA + inverseMassB;
+        Fixed64 planarScaleSquared = planarNormal.MagnitudeSquared;
+        Fixed64 inverseMass = inverseMassA + inverseMassB * planarScaleSquared;
         if (inverseMass <= Fixed64.Epsilon)
             return false;
 
-        Vector3d targetVelocity = target.ResolveContinuousCollisionFrameVelocity();
-        Fixed64 normalVelocity = Vector3d.Dot(_linearVelocity.ToVector3d(Fixed64.Zero) - targetVelocity, normal3D);
+        Vector3d targetVelocity = target.ResolveContinuousCollisionFrameVelocity().ToVector3d(Fixed64.Zero);
+        Fixed64 normalVelocity = Vector3d.Dot(_linearVelocity - targetVelocity, normal);
         if (normalVelocity >= -Fixed64.Epsilon)
             return false;
 
@@ -304,14 +322,14 @@ public sealed partial class StiffBody2D
         UpdateContinuousCollisionFrameTrajectory(sourcePositionAtImpact, _linearVelocity, hitElapsedTime);
         target.ApplyContinuousCollisionHandoff(
             targetPositionAtImpact,
-            -normal3D * (impulseScalar * inverseMassB),
+            -planarNormal * (impulseScalar * inverseMassB),
             remainingTime);
         return true;
     }
 
     private void UpdateContinuousCollisionFrameTrajectory(
-        Vector2d positionAtElapsedTime,
-        Vector2d velocity,
+        Vector3d positionAtElapsedTime,
+        Vector3d velocity,
         Fixed64 elapsedTime)
     {
         Fixed64 deltaTime = Context.DeltaTime;
@@ -319,11 +337,11 @@ public sealed partial class StiffBody2D
             return;
 
         Fixed64 elapsedFraction = FixedMath.Clamp01(elapsedTime / deltaTime);
-        Vector2d frameDisplacement = velocity * deltaTime;
+        Vector3d frameDisplacement = velocity * deltaTime;
         _continuousCollisionFrameToken = Context.LateSimulateToken;
         _continuousCollisionFrameDisplacement = frameDisplacement;
         _continuousCollisionFrameStart = positionAtElapsedTime - frameDisplacement * elapsedFraction;
-        _continuousCollisionFrameRotation = _rotation;
+        _continuousCollisionFrameRotation = Rotation;
     }
 
     private Fixed64 ResolveContinuousCollisionFrameFraction(Fixed64 hitElapsedTime)
@@ -334,9 +352,9 @@ public sealed partial class StiffBody2D
             : Fixed64.One;
     }
 
-    private Fixed64 ResolveContinuousCollisionRestitution(StiffBody2D target, Fixed64 closingSpeed)
+    private Fixed64 ResolveContinuousCollisionRestitution(SolidBody target, Fixed64 closingSpeed)
     {
-        if (closingSpeed <= CollisionResponse2D.RestitutionVelocityThreshold)
+        if (closingSpeed <= CollisionResponse.RestitutionVelocityThreshold)
             return Fixed64.Zero;
 
         return FixedMath.Clamp(
@@ -345,9 +363,9 @@ public sealed partial class StiffBody2D
             Fixed64.One);
     }
 
-    private Fixed64 ResolveContinuousCollisionRestitution(StiffBody target, Fixed64 closingSpeed)
+    private Fixed64 ResolveContinuousCollisionRestitution(SolidBody2D target, Fixed64 closingSpeed)
     {
-        if (closingSpeed <= CollisionResponse2D.RestitutionVelocityThreshold)
+        if (closingSpeed <= CollisionResponse.RestitutionVelocityThreshold)
             return Fixed64.Zero;
 
         return FixedMath.Clamp(
@@ -356,17 +374,19 @@ public sealed partial class StiffBody2D
             Fixed64.One);
     }
 
-    private void RemoveClosingContinuousCollisionVelocity(Vector2d normal)
+    private void RemoveClosingContinuousCollisionVelocity(Vector3d normal)
     {
         if (normal.MagnitudeSquared <= Fixed64.Epsilon)
             return;
 
-        Fixed64 closingSpeed = Vector2d.Dot(_linearVelocity, normal);
+        Fixed64 closingSpeed = Vector3d.Dot(_linearVelocity, normal);
         if (closingSpeed >= Fixed64.Zero)
             return;
 
+        Vector3d lastVelocity = _linearVelocity;
         _linearVelocity -= normal * closingSpeed;
-        RefreshLinearSpeed();
+        RefreshLinearMotionState(lastVelocity);
+        Context.Diagnostics.EmitLinearVelocityDelta(this, lastVelocity, _linearVelocity);
     }
 
 }

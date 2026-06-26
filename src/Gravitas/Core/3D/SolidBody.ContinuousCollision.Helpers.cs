@@ -1,5 +1,5 @@
 //=======================================================================
-// StiffBody.ContinuousCollision.Helpers.cs
+// SolidBody.ContinuousCollision.Helpers.cs
 //=======================================================================
 // MIT License, Copyright (c) 2026-present David Oravsky (mrdav30)
 // See LICENSE file in the project root for full license information.
@@ -13,9 +13,9 @@ using System.Runtime.CompilerServices;
 
 namespace Gravitas;
 
-public partial class StiffBody
+public partial class SolidBody
 {
-    private bool IsEligibleDynamicContinuousCollisionTarget(StiffBody target)
+    private bool IsEligibleDynamicContinuousCollisionTarget(SolidBody target)
     {
         if (ReferenceEquals(target, this)
             || !target.Active
@@ -31,7 +31,7 @@ public partial class StiffBody
         return true;
     }
 
-    private bool IsEligibleDynamicMixed2DTarget(StiffBody2D target)
+    private bool IsEligibleDynamicMixed2DTarget(SolidBody2D target)
     {
         return target.Active
             && !target.Immovable
@@ -70,7 +70,7 @@ public partial class StiffBody
         if (mode != ContinuousCollisionMode.Inherit)
             return mode;
 
-        StiffBody? parentBody = Collider.TopParent3D?.Body;
+        SolidBody? parentBody = Collider.TopParent3D?.Body;
         if (parentBody != null && parentBody._continuousCollisionMode != ContinuousCollisionMode.Inherit)
             return parentBody._continuousCollisionMode;
 
@@ -137,7 +137,7 @@ public partial class StiffBody
             return false;
         }
 
-        StiffBody? hitBody = hitCollider.Body;
+        SolidBody? hitBody = hitCollider.Body;
         return hitBody == null || hitBody.Immovable || hitBody.IsKinematic;
     }
 
@@ -152,7 +152,7 @@ public partial class StiffBody
             return false;
         }
 
-        StiffBody2D? hitBody = hitCollider.Body;
+        SolidBody2D? hitBody = hitCollider.Body;
         return hitBody == null || hitBody.Immovable || hitBody.IsKinematic;
     }
 

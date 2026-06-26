@@ -26,7 +26,7 @@ public sealed partial class GravitasPhysics2DService
 
         _planarContinuousCollisionCandidates.Clear();
         _mixedContinuousCollisionCandidates.Clear();
-        foreach (StiffBody2D body in _dynamicBodies)
+        foreach (SolidBody2D body in _dynamicBodies)
         {
             body.EnsureContinuousCollisionFramePrepared(token);
             AddContinuousCollisionCandidate(body, buildMixedIndex);
@@ -40,7 +40,7 @@ public sealed partial class GravitasPhysics2DService
         _continuousCollisionPreparedMixedIndex = buildMixedIndex;
     }
 
-    private void AddContinuousCollisionCandidate(StiffBody2D body, bool buildMixedIndex)
+    private void AddContinuousCollisionCandidate(SolidBody2D body, bool buildMixedIndex)
     {
         if (!body.Active
             || body.Immovable
@@ -96,7 +96,7 @@ public sealed partial class GravitasPhysics2DService
         return _continuousCollisionCandidateIds;
     }
 
-    internal void QueueContinuousCollisionHandoff(StiffBody2D body)
+    internal void QueueContinuousCollisionHandoff(SolidBody2D body)
     {
         int dynamicId = body.DynamicId;
         if (dynamicId < 0
@@ -130,7 +130,7 @@ public sealed partial class GravitasPhysics2DService
         while (readIndex < _continuousCollisionHandoffQueue.Count && iterations < iterationBudget)
         {
             int dynamicId = _continuousCollisionHandoffQueue[readIndex++];
-            if (!TryGetDynamicBody(dynamicId, out StiffBody2D body))
+            if (!TryGetDynamicBody(dynamicId, out SolidBody2D body))
                 continue;
 
             if (body.TryConsumeContinuousCollisionHandoff(updateSleepState: false, updateColliderState: false))

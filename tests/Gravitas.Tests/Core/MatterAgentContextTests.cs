@@ -10,12 +10,12 @@ namespace Gravitas.Tests.Core;
 public sealed class MatterAgentContextTests
 {
     [Fact]
-    public void StiffBodyInitialize_WithContextBoundAgent_ShouldRegisterWithAgentContext()
+    public void SolidBodyInitialize_WithContextBoundAgent_ShouldRegisterWithAgentContext()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         var agent = new TestMatterAgent(context);
         var collider = new LSSphereCollider();
-        var body = new StiffBody(agent, collider)
+        var body = new SolidBody(agent, collider)
         {
             Mass = Fixed64.One
         };
@@ -48,7 +48,7 @@ public sealed class MatterAgentContextTests
     }
 
     [Fact]
-    public void StiffBodySetup_WithColliderBoundToDifferentContext_ShouldThrowClearException()
+    public void SolidBodySetup_WithColliderBoundToDifferentContext_ShouldThrowClearException()
     {
         using GravitasWorldContext contextA = GravitasWorldContext.CreateOwned();
         using GravitasWorldContext contextB = GravitasWorldContext.CreateOwned();
@@ -57,7 +57,7 @@ public sealed class MatterAgentContextTests
         var collider = new LSSphereCollider();
         collider.InitializeWithNoBody(agentA);
 
-        Action createBodyWithCrossContextCollider = () => _ = new StiffBody(agentB, collider);
+        Action createBodyWithCrossContextCollider = () => _ = new SolidBody(agentB, collider);
 
         createBodyWithCrossContextCollider.Should()
             .Throw<ArgumentException>()

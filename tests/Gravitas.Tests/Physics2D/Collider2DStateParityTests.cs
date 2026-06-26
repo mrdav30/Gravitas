@@ -14,7 +14,7 @@ public sealed class Collider2DStateParityTests
     public void Simulate_WithUnchangedCollider_ShouldNotAdvanceRuntimeOrBroadPhaseVersions()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
-        StiffBody2D body = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
+        SolidBody2D body = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
         uint runtimeVersion = body.Collider.RuntimeShapeVersion;
         uint broadPhaseVersion = body.Collider.BroadPhaseVersion;
 
@@ -28,7 +28,7 @@ public sealed class Collider2DStateParityTests
     public void SetPosition_WithChangedCollider_ShouldAdvanceRuntimeAndBroadPhaseVersionsOnce()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext(extent: 64);
-        StiffBody2D body = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
+        SolidBody2D body = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
         uint runtimeVersion = body.Collider.RuntimeShapeVersion;
         uint broadPhaseVersion = body.Collider.BroadPhaseVersion;
 
@@ -65,7 +65,7 @@ public sealed class Collider2DStateParityTests
     public void ShapeMutation_ShouldDirtyRuntimeShapeAndRefreshBoundsOnNextSimulate()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
-        StiffBody2D body = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
+        SolidBody2D body = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
         var circle = (LSCircleCollider2D)body.Collider;
         uint runtimeVersion = circle.RuntimeShapeVersion;
         uint broadPhaseVersion = circle.BroadPhaseVersion;
@@ -83,10 +83,10 @@ public sealed class Collider2DStateParityTests
     public void ExplicitParentBinding_ShouldSuppressParentChildAndSiblingPairs()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
-        StiffBody2D parent = CreateBody(context, new LSCircleCollider2D(Fixed64.One), Vector2d.Zero, immovable: false);
-        StiffBody2D firstChild = CreateBody(context, new LSCircleCollider2D(Fixed64.One), new Vector2d(Fixed64.Half, Fixed64.Zero), immovable: false);
-        StiffBody2D secondChild = CreateBody(context, new LSCircleCollider2D(Fixed64.One), new Vector2d(-Fixed64.Half, Fixed64.Zero), immovable: false);
-        StiffBody2D unrelated = CreateBody(context, new LSCircleCollider2D(Fixed64.One), new Vector2d((Fixed64)2, Fixed64.Zero), immovable: false);
+        SolidBody2D parent = CreateBody(context, new LSCircleCollider2D(Fixed64.One), Vector2d.Zero, immovable: false);
+        SolidBody2D firstChild = CreateBody(context, new LSCircleCollider2D(Fixed64.One), new Vector2d(Fixed64.Half, Fixed64.Zero), immovable: false);
+        SolidBody2D secondChild = CreateBody(context, new LSCircleCollider2D(Fixed64.One), new Vector2d(-Fixed64.Half, Fixed64.Zero), immovable: false);
+        SolidBody2D unrelated = CreateBody(context, new LSCircleCollider2D(Fixed64.One), new Vector2d((Fixed64)2, Fixed64.Zero), immovable: false);
 
         firstChild.Collider.SetParent(parent.Collider);
         secondChild.Collider.SetParent(parent.Collider);
@@ -102,8 +102,8 @@ public sealed class Collider2DStateParityTests
     public void DeactivateOwnedPairSide_ShouldRemovePairAndHolderReferences()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
-        StiffBody2D owner = CreateBody(context, new LSCircleCollider2D(Fixed64.One), Vector2d.Zero, immovable: false);
-        StiffBody2D holder = CreateBody(context, new LSCircleCollider2D(Fixed64.One), Vector2d.Zero, immovable: false);
+        SolidBody2D owner = CreateBody(context, new LSCircleCollider2D(Fixed64.One), Vector2d.Zero, immovable: false);
+        SolidBody2D holder = CreateBody(context, new LSCircleCollider2D(Fixed64.One), Vector2d.Zero, immovable: false);
         Step(context);
 
         owner.Collider.CollisionPairCount.Should().Be(1);
@@ -120,8 +120,8 @@ public sealed class Collider2DStateParityTests
     public void DeactivateHolderSide_ShouldRemoveOwningPairReference()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
-        StiffBody2D owner = CreateBody(context, new LSCircleCollider2D(Fixed64.One), Vector2d.Zero, immovable: false);
-        StiffBody2D holder = CreateBody(context, new LSCircleCollider2D(Fixed64.One), Vector2d.Zero, immovable: false);
+        SolidBody2D owner = CreateBody(context, new LSCircleCollider2D(Fixed64.One), Vector2d.Zero, immovable: false);
+        SolidBody2D holder = CreateBody(context, new LSCircleCollider2D(Fixed64.One), Vector2d.Zero, immovable: false);
         Step(context);
 
         holder.Collider.Deactivate();
@@ -135,11 +135,11 @@ public sealed class Collider2DStateParityTests
     public void DeactivatePairOwner_AfterWarmup_ShouldNotAllocate()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext(extent: 128);
-        var owners = new SwiftList<StiffBody2D>();
+        var owners = new SwiftList<SolidBody2D>();
         for (int i = 0; i < 32; i++)
         {
             Vector2d position = new((Fixed64)(i * 2), Fixed64.Zero);
-            StiffBody2D owner = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), position, immovable: false);
+            SolidBody2D owner = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), position, immovable: false);
             _ = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), position + new Vector2d(Fixed64.Half, Fixed64.Zero), immovable: true);
             owners.Add(owner);
         }
@@ -155,11 +155,11 @@ public sealed class Collider2DStateParityTests
     public void DeactivateAllPairOwners_AfterWarmup_ShouldNotAllocate()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext(extent: 128);
-        var owners = new SwiftList<StiffBody2D>();
+        var owners = new SwiftList<SolidBody2D>();
         for (int i = 0; i < 32; i++)
         {
             Vector2d position = new((Fixed64)(i * 2), Fixed64.Zero);
-            StiffBody2D owner = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), position, immovable: false);
+            SolidBody2D owner = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), position, immovable: false);
             _ = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), position + new Vector2d(Fixed64.Half, Fixed64.Zero), immovable: true);
             owners.Add(owner);
         }
@@ -179,8 +179,8 @@ public sealed class Collider2DStateParityTests
     public void DeactivateParent_ShouldClearChildHierarchyState()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
-        StiffBody2D parent = CreateBody(context, new LSCircleCollider2D(Fixed64.One), Vector2d.Zero, immovable: false);
-        StiffBody2D child = CreateBody(context, new LSCircleCollider2D(Fixed64.One), new Vector2d(Fixed64.Half, Fixed64.Zero), immovable: false);
+        SolidBody2D parent = CreateBody(context, new LSCircleCollider2D(Fixed64.One), Vector2d.Zero, immovable: false);
+        SolidBody2D child = CreateBody(context, new LSCircleCollider2D(Fixed64.One), new Vector2d(Fixed64.Half, Fixed64.Zero), immovable: false);
         child.Collider.SetParent(parent.Collider);
 
         parent.Collider.Deactivate();
@@ -200,7 +200,7 @@ public sealed class Collider2DStateParityTests
         ColliderSettings2D.GetCollisionType(first, second).Should().Be(expected);
     }
 
-    private static StiffBody2D CreateBody(
+    private static SolidBody2D CreateBody(
         GravitasWorldContext context,
         LSCollider2D collider,
         Vector2d position,
@@ -211,7 +211,7 @@ public sealed class Collider2DStateParityTests
             FixedQuaternion.Identity,
             Vector3d.One);
         var agent = new TestMatterAgent(context, transform);
-        var body = new StiffBody2D(agent, collider)
+        var body = new SolidBody2D(agent, collider)
         {
             Mass = Fixed64.One,
             Immovable = immovable

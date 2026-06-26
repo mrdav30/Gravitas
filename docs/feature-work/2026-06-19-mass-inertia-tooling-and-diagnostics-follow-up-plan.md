@@ -19,7 +19,7 @@ runtime diagonalization.
 
 - Gravitas now supports explicit effective inverse mass/inertia policy for 3D
   and mixed response.
-- `StiffBody` owns 3D local/world center-of-mass state and full local/world
+- `SolidBody` owns 3D local/world center-of-mass state and full local/world
   inertia tensors.
 - Mesh and compound inertia can preserve products of inertia and use full
   deterministic `Fixed3x3` inversion with a diagonal fast path.

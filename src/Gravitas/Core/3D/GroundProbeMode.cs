@@ -8,7 +8,7 @@
 namespace Gravitas;
 
 /// <summary>
-/// Selects the query primitive used by <see cref="StiffBody"/> when probing for ground.
+/// Selects the query primitive used by <see cref="SolidBody"/> when probing for ground.
 /// </summary>
 public enum GroundProbeMode : byte
 {

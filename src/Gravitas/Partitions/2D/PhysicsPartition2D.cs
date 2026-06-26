@@ -232,7 +232,7 @@ public sealed class PhysicsPartition2D : IVoxelPartition
         if (!Owner.Context.Physics2D.TryGetColliderById(item, out LSCollider2D? collider))
             return true;
 
-        StiffBody2D? body = collider!.Body;
+        SolidBody2D? body = collider!.Body;
         return body == null || body.IsAwakeForCollision;
     }
 

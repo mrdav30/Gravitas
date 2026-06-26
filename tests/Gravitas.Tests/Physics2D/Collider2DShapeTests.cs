@@ -16,7 +16,7 @@ public sealed class Collider2DShapeTests
         var collider = new LSCircleCollider2D(Fixed64.One);
         var transform = new FixedTransform(new Vector3d((Fixed64)2, Fixed64.Zero, (Fixed64)3), FixedQuaternion.Identity, Vector3d.One);
         var agent = new TestMatterAgent(context, transform);
-        var body = new StiffBody2D(agent, collider)
+        var body = new SolidBody2D(agent, collider)
         {
             Mass = Fixed64.One
         };
@@ -57,7 +57,7 @@ public sealed class Collider2DShapeTests
             new Vector2d(Fixed64.Zero, Fixed64.One));
         var transform = new FixedTransform(new Vector3d((Fixed64)4, Fixed64.Zero, (Fixed64)5), FixedQuaternion.Identity, Vector3d.One);
         var agent = new TestMatterAgent(context, transform);
-        var body = new StiffBody2D(agent, collider)
+        var body = new SolidBody2D(agent, collider)
         {
             Mass = Fixed64.One
         };

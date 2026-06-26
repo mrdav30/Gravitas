@@ -148,7 +148,7 @@ Mixed CCD has constrained impulse rules that cannot be copied blindly from pure
   signal under the renamed TOI terminology.
 - Split oversized body source files into focused partials for continuous
   collision, motion, grounding, and serialization while keeping authoritative
-  state ownership on `StiffBody` and `StiffBody2D`.
+  state ownership on `SolidBody` and `SolidBody2D`.
 
 No deferred work was left in this plan. Broader future CCD/query/response work
 should live in the existing feature-work overview, benchmark signal backlog, or

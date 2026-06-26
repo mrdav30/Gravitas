@@ -71,12 +71,12 @@ public sealed class GravitasPhysicsServiceTests
     }
 
     [Fact]
-    public void StiffBodyInitialize_ShouldRegisterBodyAndColliderWithContextPhysics()
+    public void SolidBodyInitialize_ShouldRegisterBodyAndColliderWithContextPhysics()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         var agent = new TestMatterAgent(context);
         var collider = new LSSphereCollider();
-        var body = new StiffBody(agent, collider)
+        var body = new SolidBody(agent, collider)
         {
             Mass = Fixed64.One
         };
@@ -100,8 +100,8 @@ public sealed class GravitasPhysicsServiceTests
         using GravitasWorldContext contextB = GravitasWorldContext.CreateOwned();
         contextA.SetFrameRate(10);
         contextB.SetFrameRate(100);
-        StiffBody bodyA = CreateInitializedBody(contextA);
-        StiffBody bodyB = CreateInitializedBody(contextB);
+        SolidBody bodyA = CreateInitializedBody(contextA);
+        SolidBody bodyB = CreateInitializedBody(contextB);
 
         bodyA.AddLinearImpulse(Vector3d.Right);
         bodyB.AddLinearImpulse(Vector3d.Right);
@@ -130,7 +130,7 @@ public sealed class GravitasPhysicsServiceTests
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         var agent = new TestMatterAgent(context);
         var collider = new LSSphereCollider();
-        var body = new StiffBody(agent, collider)
+        var body = new SolidBody(agent, collider)
         {
             Mass = Fixed64.One
         };
@@ -142,11 +142,11 @@ public sealed class GravitasPhysicsServiceTests
         context.Physics.AssimilatedBodyCount.Should().Be(0);
     }
 
-    private static StiffBody CreateInitializedBody(GravitasWorldContext context)
+    private static SolidBody CreateInitializedBody(GravitasWorldContext context)
     {
         var agent = new TestMatterAgent(context);
         var collider = new LSSphereCollider();
-        var body = new StiffBody(agent, collider)
+        var body = new SolidBody(agent, collider)
         {
             Mass = Fixed64.One
         };

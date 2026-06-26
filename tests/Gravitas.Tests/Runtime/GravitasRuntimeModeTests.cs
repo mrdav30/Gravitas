@@ -49,7 +49,7 @@ public sealed class GravitasRuntimeModeTests
         scenario.Context.SetFrameRate(4);
         scenario.Context.Settings.RuntimeMode = PhysicsRuntimeMode.TwoD;
         ScenarioBody<LSSphereCollider> body3D = scenario.CreateSphere(Vector3d.Zero, mass: (Fixed64)2);
-        StiffBody2D body2D = Create2DBody(scenario.Context, Vector3d.Zero);
+        SolidBody2D body2D = Create2DBody(scenario.Context, Vector3d.Zero);
 
         body3D.Body.AddForce(new Vector3d((Fixed64)8, Fixed64.Zero, Fixed64.Zero));
         body2D.AddForce(new Vector2d((Fixed64)8, Fixed64.Zero));
@@ -68,7 +68,7 @@ public sealed class GravitasRuntimeModeTests
         scenario.Context.SetFrameRate(4);
         scenario.Context.Settings.RuntimeMode = PhysicsRuntimeMode.Both;
         ScenarioBody<LSSphereCollider> body3D = scenario.CreateSphere(Vector3d.Zero, mass: (Fixed64)2);
-        StiffBody2D body2D = Create2DBody(scenario.Context, Vector3d.Zero);
+        SolidBody2D body2D = Create2DBody(scenario.Context, Vector3d.Zero);
 
         body3D.Body.AddForce(new Vector3d((Fixed64)8, Fixed64.Zero, Fixed64.Zero));
         body2D.AddForce(new Vector2d((Fixed64)8, Fixed64.Zero));
@@ -89,7 +89,7 @@ public sealed class GravitasRuntimeModeTests
         scenario.Context.SetFrameRate(4);
         scenario.Context.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
         ScenarioBody<LSSphereCollider> body3D = scenario.CreateSphere(Vector3d.Zero, mass: (Fixed64)2);
-        StiffBody2D body2D = Create2DBody(scenario.Context, Vector3d.Zero);
+        SolidBody2D body2D = Create2DBody(scenario.Context, Vector3d.Zero);
 
         body3D.Body.AddForce(new Vector3d((Fixed64)8, Fixed64.Zero, Fixed64.Zero));
         body2D.AddForce(new Vector2d((Fixed64)8, Fixed64.Zero));
@@ -126,8 +126,8 @@ public sealed class GravitasRuntimeModeTests
         lateVisualizeHooks.Should().Be(1);
         typeof(GravitasPhysicsService).GetMethod("LateVisualize").Should().BeNull();
         typeof(GravitasPhysics2DService).GetMethod("LateVisualize").Should().BeNull();
-        typeof(StiffBody).GetMethod("LateVisualize").Should().BeNull();
-        typeof(StiffBody2D)
+        typeof(SolidBody).GetMethod("LateVisualize").Should().BeNull();
+        typeof(SolidBody2D)
             .GetMethod("LateVisualize", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
             .Should()
             .BeNull();
@@ -144,7 +144,7 @@ public sealed class GravitasRuntimeModeTests
         scenario.Context.SetFrameRate(4);
         scenario.Context.Settings.RuntimeMode = PhysicsRuntimeMode.ThreeD;
         ScenarioBody<LSSphereCollider> body3D = scenario.CreateSphere(Vector3d.Zero, mass: (Fixed64)2);
-        StiffBody2D body2D = Create2DBody(scenario.Context, Vector3d.Zero);
+        SolidBody2D body2D = Create2DBody(scenario.Context, Vector3d.Zero);
 
         body3D.Body.AddForce(new Vector3d((Fixed64)8, Fixed64.Zero, Fixed64.Zero));
         body2D.AddForce(new Vector2d((Fixed64)8, Fixed64.Zero));
@@ -163,7 +163,7 @@ public sealed class GravitasRuntimeModeTests
         scenario.Context.Settings.RuntimeMode = PhysicsRuntimeMode.TwoD;
         FixedTransform transform = new(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One);
         var agent = new TestMatterAgent(scenario.Context, transform);
-        var body = new StiffBody(agent, new LSSphereCollider())
+        var body = new SolidBody(agent, new LSSphereCollider())
         {
             Mass = Fixed64.One
         };
@@ -181,11 +181,11 @@ public sealed class GravitasRuntimeModeTests
         transform.Position.Should().Be(Vector3d.Zero);
     }
 
-    private static StiffBody2D Create2DBody(GravitasWorldContext context, Vector3d position)
+    private static SolidBody2D Create2DBody(GravitasWorldContext context, Vector3d position)
     {
         var transform = new FixedTransform(position, FixedQuaternion.Identity, Vector3d.One);
         var agent = new TestMatterAgent(context, transform);
-        var body = new StiffBody2D(agent, new LSCircleCollider2D(Fixed64.Half))
+        var body = new SolidBody2D(agent, new LSCircleCollider2D(Fixed64.Half))
         {
             Mass = Fixed64.One
         };

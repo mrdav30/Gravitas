@@ -20,12 +20,12 @@ public class ContinuousCollisionToiIterationBenchmarks
     private GravitasWorldContext _chain3DContext;
     private GravitasWorldContext _chain2DContext;
     private GravitasWorldContext _mixedChainContext;
-    private SwiftList<StiffBody> _bodies3D;
-    private SwiftList<StiffBody2D> _bodies2D;
-    private SwiftList<StiffBody> _chain3DBodies;
-    private SwiftList<StiffBody2D> _chain2DBodies;
-    private SwiftList<StiffBody> _mixedChain3DBodies;
-    private SwiftList<StiffBody2D> _mixedChain2DBodies;
+    private SwiftList<SolidBody> _bodies3D;
+    private SwiftList<SolidBody2D> _bodies2D;
+    private SwiftList<SolidBody> _chain3DBodies;
+    private SwiftList<SolidBody2D> _chain2DBodies;
+    private SwiftList<SolidBody> _mixedChain3DBodies;
+    private SwiftList<SolidBody2D> _mixedChain2DBodies;
     private Vector3d[] _positions3D;
     private Vector2d[] _positions2D;
     private Vector3d[] _chain3DPositions;
@@ -53,12 +53,12 @@ public class ContinuousCollisionToiIterationBenchmarks
         _chain3DContext.Settings.ContinuousCollisionMaxToiIterations = MaxToiIterations;
         _chain2DContext.Settings.ContinuousCollisionMaxToiIterations = MaxToiIterations;
         _mixedChainContext.Settings.ContinuousCollisionMaxToiIterations = MaxToiIterations;
-        _bodies3D = new SwiftList<StiffBody>(BodyCount);
-        _bodies2D = new SwiftList<StiffBody2D>(BodyCount);
-        _chain3DBodies = new SwiftList<StiffBody>(BodyCount * 3);
-        _chain2DBodies = new SwiftList<StiffBody2D>(BodyCount * 3);
-        _mixedChain3DBodies = new SwiftList<StiffBody>(BodyCount * 2);
-        _mixedChain2DBodies = new SwiftList<StiffBody2D>(BodyCount);
+        _bodies3D = new SwiftList<SolidBody>(BodyCount);
+        _bodies2D = new SwiftList<SolidBody2D>(BodyCount);
+        _chain3DBodies = new SwiftList<SolidBody>(BodyCount * 3);
+        _chain2DBodies = new SwiftList<SolidBody2D>(BodyCount * 3);
+        _mixedChain3DBodies = new SwiftList<SolidBody>(BodyCount * 2);
+        _mixedChain2DBodies = new SwiftList<SolidBody2D>(BodyCount);
         _positions3D = new Vector3d[BodyCount];
         _positions2D = new Vector2d[BodyCount];
         _chain3DPositions = new Vector3d[BodyCount * 3];
@@ -210,12 +210,12 @@ public class ContinuousCollisionToiIterationBenchmarks
 
     private static void Add3DChainBody(
         GravitasWorldContext context,
-        SwiftList<StiffBody> bodies,
+        SwiftList<SolidBody> bodies,
         Vector3d[] positions,
         int index,
         Vector3d position)
     {
-        StiffBody body = CreateSphere3D(context, position);
+        SolidBody body = CreateSphere3D(context, position);
         body.UseManualGrounding();
         bodies.Add(body);
         positions[index] = position;
@@ -223,12 +223,12 @@ public class ContinuousCollisionToiIterationBenchmarks
 
     private static void Add2DChainBody(
         GravitasWorldContext context,
-        SwiftList<StiffBody2D> bodies,
+        SwiftList<SolidBody2D> bodies,
         Vector2d[] positions,
         int index,
         Vector2d position)
     {
-        StiffBody2D body = CreateCircle2D(context, position);
+        SolidBody2D body = CreateCircle2D(context, position);
         bodies.Add(body);
         positions[index] = position;
     }
@@ -269,14 +269,14 @@ public class ContinuousCollisionToiIterationBenchmarks
         }
     }
 
-    private static void Reset3DChainBody(StiffBody body, Vector3d position, bool sleep)
+    private static void Reset3DChainBody(SolidBody body, Vector3d position, bool sleep)
     {
         body.ResetPosition(position, FixedQuaternion.Identity);
         if (sleep)
             body.Sleep();
     }
 
-    private static void Reset2DChainBody(StiffBody2D body, Vector2d position, bool sleep)
+    private static void Reset2DChainBody(SolidBody2D body, Vector2d position, bool sleep)
     {
         body.SetPosition(position);
         if (sleep)

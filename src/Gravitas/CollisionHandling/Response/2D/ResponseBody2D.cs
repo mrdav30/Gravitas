@@ -15,14 +15,14 @@ namespace Gravitas.CollisionHandling;
 /// </summary>
 internal readonly struct ResponseBody2D
 {
-    private ResponseBody2D(StiffBody2D? body, Fixed64 inverseMass, Fixed64 inverseMoment)
+    private ResponseBody2D(SolidBody2D? body, Fixed64 inverseMass, Fixed64 inverseMoment)
     {
         Body = body;
         InverseMass = inverseMass;
         InverseMoment = inverseMoment;
     }
 
-    public StiffBody2D? Body { get; }
+    public SolidBody2D? Body { get; }
 
     public Fixed64 InverseMass { get; }
 
@@ -34,7 +34,7 @@ internal readonly struct ResponseBody2D
 
     public static ResponseBody2D Create(LSCollider2D collider)
     {
-        StiffBody2D? body = collider.Body;
+        SolidBody2D? body = collider.Body;
         if (body == null)
             return default;
 

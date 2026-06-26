@@ -107,7 +107,7 @@ internal static class ContinuousCollisionCandidateOrdering
         if (ReferenceEquals(hitCollider, ignored))
             return true;
 
-        StiffBody? ignoredBody = ignored.Body;
+        SolidBody? ignoredBody = ignored.Body;
         if (ignoredBody != null && ReferenceEquals(hitCollider.Body, ignoredBody))
             return true;
 
@@ -126,7 +126,7 @@ internal static class ContinuousCollisionCandidateOrdering
         if (ReferenceEquals(hitCollider, ignored))
             return true;
 
-        StiffBody2D? ignoredBody = ignored.Body;
+        SolidBody2D? ignoredBody = ignored.Body;
         if (ignoredBody != null && ReferenceEquals(hitCollider.Body, ignoredBody))
             return true;
 

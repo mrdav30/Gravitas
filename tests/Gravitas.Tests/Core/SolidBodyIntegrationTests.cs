@@ -7,7 +7,7 @@ using Xunit;
 
 namespace Gravitas.Tests.Core;
 
-public sealed class StiffBodyIntegrationTests
+public sealed class SolidBodyIntegrationTests
 {
     private static readonly Fixed64 Tolerance = Fixed64.FromFraction(1, 1_000_000);
 

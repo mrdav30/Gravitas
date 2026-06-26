@@ -1,5 +1,5 @@
 //=======================================================================
-// StiffBody2D.ContinuousCollision.cs
+// SolidBody2D.ContinuousCollision.cs
 //=======================================================================
 // MIT License, Copyright (c) 2026-present David Oravsky (mrdav30)
 // See LICENSE file in the project root for full license information.
@@ -11,7 +11,7 @@ using System.Runtime.CompilerServices;
 
 namespace Gravitas;
 
-public sealed partial class StiffBody2D
+public sealed partial class SolidBody2D
 {
     private LSCollider? _continuousCollisionHandoffIgnoredCollider3D;
     private LSCollider2D? _continuousCollisionHandoffIgnoredCollider2D;

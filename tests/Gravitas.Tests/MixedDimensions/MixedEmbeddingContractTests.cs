@@ -20,7 +20,7 @@ public sealed class MixedEmbeddingContractTests
             Vector3d.One);
         var agent = new TestMatterAgent(context, transform);
         var collider = new LSCircleCollider2D(Fixed64.One);
-        var body = new StiffBody2D(agent, collider)
+        var body = new SolidBody2D(agent, collider)
         {
             Mass = Fixed64.One
         };

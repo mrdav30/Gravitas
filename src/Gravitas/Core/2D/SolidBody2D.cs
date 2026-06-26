@@ -1,5 +1,5 @@
 //=======================================================================
-// StiffBody2D.cs
+// SolidBody2D.cs
 //=======================================================================
 // MIT License, Copyright (c) 2026–present David Oravsky (mrdav30)
 // See LICENSE file in the project root for full license information.
@@ -17,7 +17,7 @@ namespace Gravitas;
 /// <summary>
 /// First-class pure 2D deterministic body state.
 /// </summary>
-public sealed partial class StiffBody2D : IRecordable
+public sealed partial class SolidBody2D : IRecordable
 {
     private Vector2d _position;
     private Fixed64 _rotation;
@@ -49,7 +49,7 @@ public sealed partial class StiffBody2D : IRecordable
     private readonly SwiftList<Physics2DHit> _continuousCollisionHits = new();
     private readonly SwiftList<PhysicsMixedHit> _continuousMixedCollisionHits = new();
 
-    public StiffBody2D(IMatterAgent agent, LSCollider2D collider)
+    public SolidBody2D(IMatterAgent agent, LSCollider2D collider)
     {
         SwiftThrowHelper.ThrowIfNull(agent, nameof(agent));
         SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
@@ -252,7 +252,7 @@ public sealed partial class StiffBody2D : IRecordable
 
     public void Initialize(Vector2d position, Fixed64 rotation = default, bool isDynamic = true)
     {
-        SwiftThrowHelper.ThrowIfTrue(Active, nameof(StiffBody2D), "2D body is already initialized.");
+        SwiftThrowHelper.ThrowIfTrue(Active, nameof(SolidBody2D), "2D body is already initialized.");
 
         _position = position;
         _rotation = rotation;

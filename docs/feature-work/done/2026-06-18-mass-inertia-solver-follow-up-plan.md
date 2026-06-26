@@ -28,16 +28,16 @@ polish, and future richer mesh mass-property payload boundaries are tracked in
 ## Current Baseline
 
 - `PhysicsMesh.CalculateInertiaTensor(mass)` remains a shape/topology API. Body
-  mobility policy is applied at `StiffBody.RefreshInertiaTensor()` and response
+  mobility policy is applied at `SolidBody.RefreshInertiaTensor()` and response
   wrappers, not inside `PhysicsMesh`.
 - Runtime inertia tensors are local `Fixed3x3` tensors. Diagonal tensors use an
   explicit reciprocal fast path, while tensors with products of inertia use
   deterministic full `Fixed3x3` inversion.
-- `StiffBody` keeps local inertia, local inverse inertia, world inertia, and
+- `SolidBody` keeps local inertia, local inverse inertia, world inertia, and
   world inverse inertia separate so repeated orientation refreshes cannot rotate
   an already world-space tensor.
-- `StiffBody.LocalCenterOfMassOffset` is the authoritative 3D body-local COM
-  offset, and `StiffBody.WorldCenterOfMass` is the response-space COM.
+- `SolidBody.LocalCenterOfMassOffset` is the authoritative 3D body-local COM
+  offset, and `SolidBody.WorldCenterOfMass` is the response-space COM.
 - Collider geometry derives the default body COM through
   `LSCollider.CalculateLocalCenterOfMassOffset()`. Primitives default to their
   scaled collider center, compounds use area-weighted part centers, and closed
@@ -46,10 +46,10 @@ polish, and future richer mesh mass-property payload boundaries are tracked in
   tetrahedra and shifts between reference points with the full parallel-axis
   tensor. Compound colliders also preserve products of inertia from off-axis
   part placement.
-- `StiffBody.InverseMass` is the raw reciprocal of `Mass`; immovable and
+- `SolidBody.InverseMass` is the raw reciprocal of `Mass`; immovable and
   kinematic participants now expose zero solver mass through
-  `StiffBody.EffectiveInverseMass`.
-- `StiffBody` owns the 3D effective response policy through `CanTranslate`,
+  `SolidBody.EffectiveInverseMass`.
+- `SolidBody` owns the 3D effective response policy through `CanTranslate`,
   `CanRotate`, `EffectiveInverseMass`, and `EffectiveInverseInertiaTensor`.
   `ResponseBody` and mixed response consume that surface instead of restating
   3D mobility rules locally.
@@ -61,7 +61,7 @@ ownership into mesh/topology APIs.
 
 Tasks:
 
-- [x] Decide whether `StiffBody` should expose explicit effective mass helpers such
+- [x] Decide whether `SolidBody` should expose explicit effective mass helpers such
   as `CanTranslate`, `CanRotate`, `EffectiveInverseMass`, and
   `EffectiveInverseInertiaTensor`.
 - [x] Preserve the current rule that immovable and kinematic bodies behave as
@@ -74,7 +74,7 @@ Tasks:
 
 **Progress 2026-06-19:** Workstream 1 added the explicit 3D body-side effective
 mass API and moved 3D plus mixed response onto it. Focused coverage lives in
-`tests/Gravitas.Tests/Core/StiffBodyEffectiveMassTests.cs`, with existing 3D
+`tests/Gravitas.Tests/Core/SolidBodyEffectiveMassTests.cs`, with existing 3D
 and mixed response suites validating the refactor against solver behavior.
 Non-positive masses are documented as non-translatable in solver policy while
 the raw `InverseMass` value remains available for inspection.
@@ -97,13 +97,13 @@ Tasks:
   impulse angular effects and replay continuation.
 
 **Progress 2026-06-19:** Workstream 2 moved 3D response torque arms and mixed
-3D torque arms to `StiffBody.WorldCenterOfMass`, added authoritative
+3D torque arms to `SolidBody.WorldCenterOfMass`, added authoritative
 `LocalCenterOfMassOffset` Chronicler state, added `ResetCenterOfMassFromCollider`
 for hosts that want to return to derived geometry COM, and renamed the public
 inverse inertia property to `InverseInertiaTensor`. Focused coverage lives in
-`tests/Gravitas.Tests/Core/StiffBodyCenterOfMassTests.cs`,
+`tests/Gravitas.Tests/Core/SolidBodyCenterOfMassTests.cs`,
 `tests/Gravitas.Tests/Colliders/PhysicsMeshTests.cs`, and
-`tests/Gravitas.Tests/Serialization/StiffBodySerializationTests.cs`.
+`tests/Gravitas.Tests/Serialization/SolidBodySerializationTests.cs`.
 Existing response diagnostics observe the COM-based solver result through
 contact, response impulse, and velocity-delta events. Dedicated COM marker
 polish is tracked outside this completed solver plan.
@@ -131,7 +131,7 @@ Tasks:
 diagonal inversion fast path, deterministic full `Fixed3x3` inversion, singular
 tensor fallback to zero solver inertia, and full parallel-axis tensor shifts.
 Closed mesh mass properties now integrate products of inertia, compound
-colliders preserve off-axis products, and `StiffBody` separates local and
+colliders preserve off-axis products, and `SolidBody` separates local and
 world-space inertia state to avoid repeated orientation compounding. Runtime
 principal-axis diagonalization was intentionally not adopted; possible
 FixedMathSharp/offline payload work is tracked outside this completed solver
@@ -156,7 +156,7 @@ Tasks:
 
 **Progress 2026-06-19:** Workstream 4 confirmed the existing runtime boundary:
 `PhysicsMesh` remains a geometry/topology API and never receives body mobility
-state, while `StiffBody.CanUseAngularInertia` gates immovable, kinematic, and
+state, while `SolidBody.CanUseAngularInertia` gates immovable, kinematic, and
 angular-force-disabled bodies before collider inertia is requested. Boundary
 coverage now includes default closed-volume rejection for open mesh topology,
 explicit surface-approximation opt-in, and non-rotating body policies that can

@@ -103,7 +103,7 @@ public sealed partial class GravitasPhysicsService
         }
     }
 
-    private void AddIslandNodeIfMovable(StiffBody? body)
+    private void AddIslandNodeIfMovable(SolidBody? body)
     {
         if (!IsMovableIslandBody(body))
             return;
@@ -145,7 +145,7 @@ public sealed partial class GravitasPhysicsService
             _discreteIslandNodes.RemoveAt(_discreteIslandNodes.Count - 1);
     }
 
-    private int FindIslandNode(StiffBody? body)
+    private int FindIslandNode(SolidBody? body)
     {
         if (!IsMovableIslandBody(body))
             return -1;

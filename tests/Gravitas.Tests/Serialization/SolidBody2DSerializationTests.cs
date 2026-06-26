@@ -7,7 +7,7 @@ using Xunit;
 
 namespace Gravitas.Tests.Serialization;
 
-public sealed class StiffBody2DSerializationTests
+public sealed class SolidBody2DSerializationTests
 {
     public static TheoryData<GravitasSerializationTransport> Transports => GravitasSerializationTransportCases.All();
 
@@ -24,7 +24,7 @@ public sealed class StiffBody2DSerializationTests
             MixedHalfThicknessOverride = Fixed64.FromFraction(3, 2)
         };
         var sourceAgent = new TestMatterAgent(sourceContext);
-        var source = new StiffBody2D(sourceAgent, sourceCollider)
+        var source = new SolidBody2D(sourceAgent, sourceCollider)
         {
             Mass = (Fixed64)3,
             Immovable = true,
@@ -46,7 +46,7 @@ public sealed class StiffBody2DSerializationTests
 
         using GravitasWorldContext targetContext = Physics2DTestWorld.CreateContext(frameRate: 8);
         var targetCollider = new LSCircleCollider2D(Fixed64.Half);
-        var target = new StiffBody2D(new TestMatterAgent(targetContext), targetCollider)
+        var target = new SolidBody2D(new TestMatterAgent(targetContext), targetCollider)
         {
             Mass = Fixed64.One
         };
@@ -84,13 +84,13 @@ public sealed class StiffBody2DSerializationTests
     public void PopulateSnapshot_WithQueuedForce_ShouldReplaySameNextFrame(GravitasSerializationTransport transport)
     {
         using GravitasWorldContext uninterruptedContext = Physics2DTestWorld.CreateContext(frameRate: 8);
-        StiffBody2D uninterrupted = CreateDynamicCircle(uninterruptedContext);
+        SolidBody2D uninterrupted = CreateDynamicCircle(uninterruptedContext);
         uninterrupted.AddForce(new Vector2d((Fixed64)8, (Fixed64)4));
 
         object payload = GravitasSerializationHarness.Serialize(uninterrupted, transport);
 
         using GravitasWorldContext restoredContext = Physics2DTestWorld.CreateContext(frameRate: 8);
-        StiffBody2D restored = CreateDynamicCircle(restoredContext);
+        SolidBody2D restored = CreateDynamicCircle(restoredContext);
         GravitasSerializationHarness.Populate(restored, payload, transport);
 
         uninterruptedContext.LateSimulate();
@@ -106,7 +106,7 @@ public sealed class StiffBody2DSerializationTests
     public void PopulateSnapshot_WithQueuedTorque_ShouldReplaySameNextFrame(GravitasSerializationTransport transport)
     {
         using GravitasWorldContext uninterruptedContext = Physics2DTestWorld.CreateContext(frameRate: 8);
-        StiffBody2D uninterrupted = CreateDynamicCircle(uninterruptedContext);
+        SolidBody2D uninterrupted = CreateDynamicCircle(uninterruptedContext);
         uninterrupted.SleepAngularSpeedThreshold = Fixed64.FromFraction(1, 64);
         uninterrupted.AddAngularImpulse((Fixed64)3);
         uninterrupted.AddTorque((Fixed64)4);
@@ -114,7 +114,7 @@ public sealed class StiffBody2DSerializationTests
         object payload = GravitasSerializationHarness.Serialize(uninterrupted, transport);
 
         using GravitasWorldContext restoredContext = Physics2DTestWorld.CreateContext(frameRate: 8);
-        StiffBody2D restored = CreateDynamicCircle(restoredContext);
+        SolidBody2D restored = CreateDynamicCircle(restoredContext);
         GravitasSerializationHarness.Populate(restored, payload, transport);
 
         restored.AngularVelocity.Should().Be(uninterrupted.AngularVelocity);
@@ -135,13 +135,13 @@ public sealed class StiffBody2DSerializationTests
     public void Populate_ShouldNotWakeSleepingBodyWhenShapeStateChanges(GravitasSerializationTransport transport)
     {
         using GravitasWorldContext sourceContext = Physics2DTestWorld.CreateContext(frameRate: 8);
-        StiffBody2D source = CreateDynamicCircle(sourceContext);
+        SolidBody2D source = CreateDynamicCircle(sourceContext);
         source.Sleep();
 
         object payload = GravitasSerializationHarness.Serialize(source, transport);
 
         using GravitasWorldContext targetContext = Physics2DTestWorld.CreateContext(frameRate: 8);
-        var target = new StiffBody2D(new TestMatterAgent(targetContext), new LSCircleCollider2D((Fixed64)4))
+        var target = new SolidBody2D(new TestMatterAgent(targetContext), new LSCircleCollider2D((Fixed64)4))
         {
             Mass = Fixed64.One
         };
@@ -153,10 +153,10 @@ public sealed class StiffBody2DSerializationTests
         ((LSCircleCollider2D)target.Collider).Radius.Should().Be(((LSCircleCollider2D)source.Collider).Radius);
     }
 
-    private static StiffBody2D CreateDynamicCircle(GravitasWorldContext context)
+    private static SolidBody2D CreateDynamicCircle(GravitasWorldContext context)
     {
         var agent = new TestMatterAgent(context);
-        var body = new StiffBody2D(agent, new LSCircleCollider2D(Fixed64.Half))
+        var body = new SolidBody2D(agent, new LSCircleCollider2D(Fixed64.Half))
         {
             Mass = (Fixed64)2
         };

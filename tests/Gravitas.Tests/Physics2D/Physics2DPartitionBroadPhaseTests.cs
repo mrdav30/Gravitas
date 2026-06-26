@@ -18,7 +18,7 @@ public sealed class Physics2DPartitionBroadPhaseTests
     public void Simulate_WithSparseScene_ShouldProcessOnlyPartitionCandidates()
     {
         using GravitasWorldContext context = CreateContext(extent: 512);
-        StiffBody2D dynamicBody = CreateCircle(context, Vector2d.Zero, immovable: false);
+        SolidBody2D dynamicBody = CreateCircle(context, Vector2d.Zero, immovable: false);
         _ = CreateCircle(context, new Vector2d(Fixed64.Half, Fixed64.Zero), immovable: true);
 
         for (int i = 0; i < 160; i++)
@@ -35,7 +35,7 @@ public sealed class Physics2DPartitionBroadPhaseTests
     public void OverlapCircleAll_WithColliderSpanningMultipleVoxels_ShouldReturnOneHit()
     {
         using GravitasWorldContext context = CreateContext(extent: 32);
-        StiffBody2D body = CreateBody(
+        SolidBody2D body = CreateBody(
             context,
             new LSAABBoxCollider2D(new Vector2d((Fixed64)8, (Fixed64)8)),
             Vector2d.Zero,
@@ -53,7 +53,7 @@ public sealed class Physics2DPartitionBroadPhaseTests
     public void MovingBody_ShouldLeaveOldPartitionsAndEnterNewPartitions()
     {
         using GravitasWorldContext context = CreateContext(extent: 32);
-        StiffBody2D body = CreateCircle(context, Vector2d.Zero, immovable: false);
+        SolidBody2D body = CreateCircle(context, Vector2d.Zero, immovable: false);
         var hits = new SwiftList<Physics2DHit>();
 
         context.Query2D.OverlapCircleAll(Vector2d.Zero, Fixed64.One, hits).Should().Be(1);
@@ -71,7 +71,7 @@ public sealed class Physics2DPartitionBroadPhaseTests
         using GravitasWorldContext context = CreateContext(extent: 16);
         context.Settings.RetainedPartitionTimeToKillFrames = 1;
         context.Settings.RetainedPartitionRetirementSweepBudget = 1024;
-        StiffBody2D body = CreateCircle(context, Vector2d.Zero, immovable: false);
+        SolidBody2D body = CreateCircle(context, Vector2d.Zero, immovable: false);
         int retainedBeforeDeactivate = context.Collisions2D.RetainedPartitionCount;
 
         body.Deactivate();
@@ -86,7 +86,7 @@ public sealed class Physics2DPartitionBroadPhaseTests
     public void Reset_WithRetained2DPartitions_ShouldDetachOwnedVoxelPartitions()
     {
         using GravitasWorldContext context = CreateContext(extent: 16);
-        StiffBody2D body = CreateCircle(context, Vector2d.Zero, immovable: false);
+        SolidBody2D body = CreateCircle(context, Vector2d.Zero, immovable: false);
         WorldVoxelIndex coordinate = body.Collider.PartitionCoordinates![0];
         context.World.TryGetVoxel(coordinate, out Voxel? voxel).Should().BeTrue();
         voxel!.TryGetPartition(out PhysicsPartition2D? partition).Should().BeTrue();
@@ -104,7 +104,7 @@ public sealed class Physics2DPartitionBroadPhaseTests
         (partition.ContainedStaticObjects?.Count ?? 0).Should().Be(0);
         partition.IsAllocated.Should().BeFalse();
 
-        StiffBody2D replacement = CreateCircle(context, Vector2d.Zero, immovable: false);
+        SolidBody2D replacement = CreateCircle(context, Vector2d.Zero, immovable: false);
         WorldVoxelIndex replacementCoordinate = replacement.Collider.PartitionCoordinates![0];
         context.World.TryGetVoxel(replacementCoordinate, out Voxel? replacementVoxel).Should().BeTrue();
         replacementVoxel!.TryGetPartition(out PhysicsPartition2D? replacementPartition).Should().BeTrue();
@@ -116,7 +116,7 @@ public sealed class Physics2DPartitionBroadPhaseTests
     public void MobilityChanges_ShouldMoveColliderBetweenDynamicKinematicAndStaticBuckets()
     {
         using GravitasWorldContext context = CreateContext(extent: 16);
-        StiffBody2D body = CreateCircle(context, Vector2d.Zero, immovable: false);
+        SolidBody2D body = CreateCircle(context, Vector2d.Zero, immovable: false);
         int colliderId = body.Collider.Id;
 
         PhysicsPartition2D partition = GetFirstPartition(context, body.Collider);
@@ -146,7 +146,7 @@ public sealed class Physics2DPartitionBroadPhaseTests
     public void Simulate_WithOnlySleepingDynamicAndStaticObjects_ShouldSkipPartitionWork()
     {
         using GravitasWorldContext context = CreateContext(extent: 16);
-        StiffBody2D sleeper = CreateCircle(context, Vector2d.Zero, immovable: false);
+        SolidBody2D sleeper = CreateCircle(context, Vector2d.Zero, immovable: false);
         _ = CreateCircle(context, new Vector2d(Fixed64.Half, Fixed64.Zero), immovable: true);
         sleeper.Sleep();
 
@@ -160,7 +160,7 @@ public sealed class Physics2DPartitionBroadPhaseTests
     public void Simulate_WhenExistingSolidPairFallsAsleep_ShouldRetainRestingContactWithoutExit()
     {
         using GravitasWorldContext context = CreateContext(extent: 16);
-        StiffBody2D sleeper = CreateCircle(context, Vector2d.Zero, immovable: false);
+        SolidBody2D sleeper = CreateCircle(context, Vector2d.Zero, immovable: false);
         _ = CreateCircle(context, new Vector2d((Fixed64)0.75f, Fixed64.Zero), immovable: true);
         int exited = 0;
         sleeper.Collider.OnContactExit += _ => exited++;
@@ -178,7 +178,7 @@ public sealed class Physics2DPartitionBroadPhaseTests
     public void Simulate_WithAwakeDynamicTouchingSleepingDynamic_ShouldWakeSleeper()
     {
         using GravitasWorldContext context = CreateContext(extent: 16);
-        StiffBody2D sleeper = CreateCircle(context, Vector2d.Zero, immovable: false);
+        SolidBody2D sleeper = CreateCircle(context, Vector2d.Zero, immovable: false);
         _ = CreateCircle(context, new Vector2d(Fixed64.Half, Fixed64.Zero), immovable: false);
         sleeper.Sleep();
 
@@ -192,12 +192,12 @@ public sealed class Physics2DPartitionBroadPhaseTests
     public void Simulate_WithConnectedSleepingContactIsland_ShouldWakeWholeIsland()
     {
         using GravitasWorldContext context = CreateContext(extent: 16);
-        StiffBody2D far = CreateCircle(context, Vector2d.Zero, immovable: false);
-        StiffBody2D middle = CreateCircle(
+        SolidBody2D far = CreateCircle(context, Vector2d.Zero, immovable: false);
+        SolidBody2D middle = CreateCircle(
             context,
             new Vector2d(Fixed64.FromFraction(3, 4), Fixed64.Zero),
             immovable: false);
-        StiffBody2D driver = CreateCircle(
+        SolidBody2D driver = CreateCircle(
             context,
             new Vector2d(Fixed64.FromFraction(3, 2), Fixed64.Zero),
             immovable: false);
@@ -242,7 +242,7 @@ public sealed class Physics2DPartitionBroadPhaseTests
     public void Simulate_WithDenseOverlappingPairs_ShouldNotAllocateAfterWarmup()
     {
         using GravitasWorldContext context = CreateContext(extent: 128);
-        var bodies = new SwiftList<StiffBody2D>();
+        var bodies = new SwiftList<SolidBody2D>();
         for (int i = 0; i < 64; i++)
         {
             Vector2d position = PositionForIndex(i, spacing: (Fixed64)2);
@@ -268,7 +268,7 @@ public sealed class Physics2DPartitionBroadPhaseTests
     private static ReplayResult RunReplayScenario()
     {
         using GravitasWorldContext context = CreateContext(extent: 256, frameRate: 8);
-        var bodies = new SwiftList<StiffBody2D>();
+        var bodies = new SwiftList<SolidBody2D>();
         for (int i = 0; i < 48; i++)
             bodies.Add(CreateCircle(context, new Vector2d((Fixed64)(i * 3), Fixed64.Zero), immovable: false));
 
@@ -276,14 +276,14 @@ public sealed class Physics2DPartitionBroadPhaseTests
         int candidateTotal = 0;
         for (int frame = 0; frame < 8; frame++)
         {
-            StiffBody2D moved = bodies[frame % bodies.Count];
+            SolidBody2D moved = bodies[frame % bodies.Count];
             moved.SetPosition(moved.Position + new Vector2d(Fixed64.Half, Fixed64.Zero));
             context.Simulate();
             context.LateSimulate();
             candidateTotal += context.Physics2D.LastBroadPhaseCandidateCount;
         }
 
-        StiffBody2D body = bodies[4];
+        SolidBody2D body = bodies[4];
         return new ReplayResult(body.Position, body.LinearVelocity, candidateTotal, context.Collisions2D.RetainedPartitionCount);
     }
 
@@ -306,7 +306,7 @@ public sealed class Physics2DPartitionBroadPhaseTests
         context.LateSimulate();
     }
 
-    private static CollisionPair2D GetPair(StiffBody2D first, StiffBody2D second)
+    private static CollisionPair2D GetPair(SolidBody2D first, SolidBody2D second)
     {
         if (first.Collider.TryGetCollisionPair(second.Collider.Id, out CollisionPair2D? firstPair) && firstPair != null)
             return firstPair;
@@ -315,12 +315,12 @@ public sealed class Physics2DPartitionBroadPhaseTests
         return secondPair!;
     }
 
-    private static StiffBody2D CreateCircle(GravitasWorldContext context, Vector2d position, bool immovable)
+    private static SolidBody2D CreateCircle(GravitasWorldContext context, Vector2d position, bool immovable)
     {
         return CreateBody(context, new LSCircleCollider2D(Fixed64.Half), position, immovable);
     }
 
-    private static StiffBody2D CreateBody(
+    private static SolidBody2D CreateBody(
         GravitasWorldContext context,
         LSCollider2D collider,
         Vector2d position,
@@ -331,7 +331,7 @@ public sealed class Physics2DPartitionBroadPhaseTests
             FixedQuaternion.Identity,
             Vector3d.One);
         var agent = new TestMatterAgent(context, transform);
-        var body = new StiffBody2D(agent, collider)
+        var body = new SolidBody2D(agent, collider)
         {
             Mass = Fixed64.One,
             Immovable = immovable
@@ -367,7 +367,7 @@ public sealed class Physics2DPartitionBroadPhaseTests
         return new Vector2d((Fixed64)x * spacing, (Fixed64)y * spacing);
     }
 
-    private static void ResetBodyPositions(SwiftList<StiffBody2D> bodies)
+    private static void ResetBodyPositions(SwiftList<SolidBody2D> bodies)
     {
         for (int i = 0; i < bodies.Count; i++)
             bodies[i].SetPosition(PositionForIndex(i, spacing: (Fixed64)2));

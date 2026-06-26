@@ -173,7 +173,7 @@ internal sealed partial class GravitasMixedCollisionService
         if (!collider.IsMixedPartitioned || collider.MixedPartitionCoordinates == null)
             return;
 
-        StiffBody? body = collider.Body;
+        SolidBody? body = collider.Body;
         if (body == null || body.Immovable)
             return;
 
@@ -205,7 +205,7 @@ internal sealed partial class GravitasMixedCollisionService
         if (!collider.IsMixedPartitioned || collider.MixedPartitionCoordinates == null)
             return;
 
-        StiffBody2D? body = collider.Body;
+        SolidBody2D? body = collider.Body;
         if (body == null || body.Immovable)
             return;
 
@@ -646,7 +646,7 @@ internal sealed partial class GravitasMixedCollisionService
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static MixedPartitionMobilityKind Get3DMobilityKind(LSCollider collider)
     {
-        StiffBody? body = collider.Body;
+        SolidBody? body = collider.Body;
         if (body == null || body.Immovable)
             return MixedPartitionMobilityKind.Static;
 
@@ -656,7 +656,7 @@ internal sealed partial class GravitasMixedCollisionService
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static MixedPartitionMobilityKind Get2DMobilityKind(LSCollider2D collider)
     {
-        StiffBody2D? body = collider.Body;
+        SolidBody2D? body = collider.Body;
         if (body == null || body.Immovable)
             return MixedPartitionMobilityKind.Static;
 

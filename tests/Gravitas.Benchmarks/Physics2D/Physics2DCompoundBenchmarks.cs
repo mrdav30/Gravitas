@@ -35,7 +35,7 @@ public class Physics2DCompoundBenchmarks
         for (int i = 0; i < BodyCount; i++)
         {
             Vector2d position = PositionForIndex(i, spacing: (Fixed64)3);
-            StiffBody2D queryBody = CreateBody(_queryContext, CreateCompoundShape(), position, immovable: true);
+            SolidBody2D queryBody = CreateBody(_queryContext, CreateCompoundShape(), position, immovable: true);
             _compoundColliders.Add(queryBody.Collider);
             _shapePairs[i] = CreatePreparedPair(i);
         }
@@ -144,14 +144,14 @@ public class Physics2DCompoundBenchmarks
         return new PreparedPair2D(new CollisionWorkItem2D(colliderA, colliderB, collisionType));
     }
 
-    private static StiffBody2D CreateBody(
+    private static SolidBody2D CreateBody(
         GravitasWorldContext context,
         LSCollider2D collider,
         Vector2d position,
         bool immovable)
     {
         var agent = new BenchmarkMatterAgent(context, new Vector3d(position.X, Fixed64.Zero, position.Y));
-        var body = new StiffBody2D(agent, collider)
+        var body = new SolidBody2D(agent, collider)
         {
             Mass = Fixed64.One,
             Immovable = immovable
