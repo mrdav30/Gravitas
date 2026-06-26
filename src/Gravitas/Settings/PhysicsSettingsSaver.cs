@@ -45,6 +45,9 @@ public sealed partial class PhysicsSettingsSaver : DefaultSaver
     public int? DiscreteSolverIterations;
 
     [JsonInclude]
+    public Fixed64? RestitutionVelocityThreshold;
+
+    [JsonInclude]
     public int? RetainedPartitionTimeToKillFrames;
 
     [JsonInclude]
@@ -87,6 +90,8 @@ public sealed partial class PhysicsSettingsSaver : DefaultSaver
             settings.ContinuousCollisionMaxToiIterations = ContinuousCollisionMaxToiIterations.Value;
         if (DiscreteSolverIterations.HasValue)
             settings.DiscreteSolverIterations = DiscreteSolverIterations.Value;
+        if (RestitutionVelocityThreshold.HasValue)
+            settings.RestitutionVelocityThreshold = RestitutionVelocityThreshold.Value;
         if (RetainedPartitionTimeToKillFrames.HasValue)
             settings.RetainedPartitionTimeToKillFrames = RetainedPartitionTimeToKillFrames.Value;
         if (RetainedPartitionRetirementSweepBudget.HasValue)

@@ -20,8 +20,6 @@ public static class CollisionResponseMixed
 
     public static readonly Fixed64 PenetrationCorrectionPercent = (Fixed64)0.8f;
 
-    public static readonly Fixed64 RestitutionVelocityThreshold = (Fixed64)0.25f;
-
     internal static bool Resolve(CollisionPairMixed pair, MixedContact contact) =>
         Resolve(pair, contact, iteration: 0, iterationLimit: 1, applyPositionCorrection: true);
 
@@ -143,7 +141,11 @@ public static class CollisionResponseMixed
         if (denominator <= Fixed64.Epsilon)
             return Fixed64.Zero;
 
-        Fixed64 restitution = ResolveRestitution(body3D, body2D, -normalVelocity);
+        Fixed64 restitution = ResolveRestitution(
+            body3D,
+            body2D,
+            -normalVelocity,
+            pair.Context.Settings.RestitutionVelocityThreshold);
         Fixed64 impulseScalar = -(Fixed64.One + restitution) * normalVelocity / denominator;
         if (impulseScalar <= Fixed64.Zero)
             return Fixed64.Zero;
@@ -329,9 +331,13 @@ public static class CollisionResponseMixed
     private static bool CanRotate(SolidBody? body) =>
         body?.CanRotate == true;
 
-    private static Fixed64 ResolveRestitution(SolidBody? body3D, SolidBody2D? body2D, Fixed64 closingSpeed)
+    private static Fixed64 ResolveRestitution(
+        SolidBody? body3D,
+        SolidBody2D? body2D,
+        Fixed64 closingSpeed,
+        Fixed64 restitutionVelocityThreshold)
     {
-        if (body3D == null || body2D == null || closingSpeed <= RestitutionVelocityThreshold)
+        if (body3D == null || body2D == null || closingSpeed <= restitutionVelocityThreshold)
             return Fixed64.Zero;
 
         Fixed64 restitution = FixedMath.Min(body3D.RestitutionCoefficient, body2D.RestitutionCoefficient);

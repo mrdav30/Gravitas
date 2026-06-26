@@ -38,6 +38,7 @@ public sealed partial class SolidBody2D
         writer.WriteFixed64(RestitutionCoefficient);
         writer.WriteFixed64(FrictionCoefficient);
         writer.WriteVector2d(Gravity);
+        writer.WriteFixed64(_gravityScale);
         writer.WriteBool(SleepEnabled);
         writer.WriteInt32(SleepFrameThreshold);
         writer.WriteFixed64(SleepLinearSpeedThreshold);

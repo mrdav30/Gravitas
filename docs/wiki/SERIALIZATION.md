@@ -31,9 +31,9 @@ Serialized state:
 
 - body position, rotation, velocities, acceleration stores, pending force,
   torque, impulse, and position-correction accumulators.
-- mass, local center-of-mass offset, friction, restitution, sleep state, sleep
-  thresholds, CCD mode, and movement flags.
-- 3D grounding state and ground probe configuration.
+- mass, local center-of-mass offset, friction, restitution, gravity scale,
+  sleep state, sleep thresholds, CCD mode, and movement flags.
+- 3D current and previous-step grounding state plus ground probe configuration.
 - collider active/trigger state, layer, local offset, shape dimensions, 2D
   mixed half-thickness override, and shape-derived inputs.
 - settings that affect deterministic execution, through
@@ -57,8 +57,9 @@ authoritative state instead of treated as replay truth.
 
 `SolidBody` records 3D authoritative body state, including position,
 height, rotation, linear/angular motion, pending force and torque state, mass,
-local center-of-mass offset, response coefficients, sleep state, CCD mode, and
-3D ground probe state. It does not record the `FixedTransform` binding.
+local center-of-mass offset, response coefficients, gravity scale, sleep state,
+CCD mode, and 3D current/previous grounding and ground probe state. It does not
+record the `FixedTransform` binding.
 Collider geometry can derive a default COM for new shells, but populated
 snapshots restore the body-owned COM state directly.
 
@@ -66,10 +67,11 @@ snapshots restore the body-owned COM state directly.
 position, scalar rotation, linear motion, pending force state, scalar angular
 velocity, applied and queued angular acceleration, angular-force policy, mass,
 shape-refreshed scalar moment policy, body-local center-of-mass offset, response
-coefficients, gravity, sleep state plus linear and angular sleep thresholds, CCD
-mode, and its owned collider state. Populated snapshots restore explicit COM
-state and then refresh scalar moment/inverse moment from the loaded collider
-shape so deterministic replay continues with the same effective solver mass.
+coefficients, gravity, gravity scale, sleep state plus linear and angular sleep
+thresholds, CCD mode, and its owned collider state. Populated snapshots restore
+explicit COM state and then refresh scalar moment/inverse moment from the loaded
+collider shape so deterministic replay continues with the same effective solver
+mass.
 
 `LSCollider` records 3D collider filter and shape state. Runtime IDs are
 context-owned and intentionally excluded from snapshots. Loading a bound
@@ -97,8 +99,9 @@ Loading shape data validates the input and rebuilds bounds without waking a
 sleeping body just because state was populated.
 
 `PhysicsSettingsSaver` records frame rate, collision matrix, ground-check layer
-mask, default CCD mode, CCD TOI iteration limit, retained-partition cleanup settings,
-runtime mode, and mixed 2D half-thickness. Applying it owns a new
+mask, default CCD mode, CCD TOI iteration limit, restitution velocity threshold,
+retained-partition cleanup settings, runtime mode, and mixed 2D half-thickness.
+Applying it owns a new
 `PhysicsSettings` instance for the target context and synchronizes the context
 clock.
 

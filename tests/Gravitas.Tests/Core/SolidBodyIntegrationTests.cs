@@ -3,6 +3,7 @@ using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
+using System;
 using Xunit;
 
 namespace Gravitas.Tests.Core;
@@ -56,6 +57,92 @@ public sealed class SolidBodyIntegrationTests
         body.Body.IsGrounded.Should().BeTrue();
         body.Body.LinearVelocity.X.Should().Be(Fixed64.FromFraction(3, 4));
         body.Body.Position3d.X.Should().Be(Fixed64.FromFraction(7, 16));
+    }
+
+    [Fact]
+    public void GravityScale_WhenChangedWhileGrounded_ShouldRefreshGroundFrictionWeight()
+    {
+        using PhysicsScenarioBuilder scenario = CreateIntegrationScenario(frameRate: 4);
+        scenario.Context.Environment.Gravity = Fixed64.One;
+        CreateGround(scenario);
+        ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
+
+        body.Body.GravityScale = Fixed64.Zero;
+        body.Body.AddForce(new Vector3d((Fixed64)4, Fixed64.Zero, Fixed64.Zero));
+        scenario.Context.LateSimulate();
+        scenario.Context.LateSimulate();
+
+        body.Body.IsGrounded.Should().BeTrue();
+        body.Body.LinearVelocity.X.Should().Be(Fixed64.One);
+        body.Body.Position3d.X.Should().Be(Fixed64.Half);
+    }
+
+    [Fact]
+    public void LateSimulate_WithDefaultGravityScale_ShouldApplyEnvironmentGravity()
+    {
+        using PhysicsScenarioBuilder scenario = CreateIntegrationScenario(frameRate: 4);
+        scenario.Context.Environment.Gravity = (Fixed64)4;
+        ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
+
+        scenario.Context.LateSimulate();
+
+        body.Body.LinearVelocity.Y.Should().Be(-Fixed64.One);
+        body.Body.Position3d.Y.Should().Be(-Fixed64.FromFraction(1, 4));
+    }
+
+    [Fact]
+    public void LateSimulate_WithHalfGravityScale_ShouldApplyScaledEnvironmentGravity()
+    {
+        using PhysicsScenarioBuilder scenario = CreateIntegrationScenario(frameRate: 4);
+        scenario.Context.Environment.Gravity = (Fixed64)4;
+        ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
+        body.Body.GravityScale = Fixed64.Half;
+
+        scenario.Context.LateSimulate();
+
+        body.Body.LinearVelocity.Y.Should().Be(-Fixed64.Half);
+        body.Body.Position3d.Y.Should().Be(-Fixed64.FromFraction(1, 8));
+    }
+
+    [Fact]
+    public void LateSimulate_WithZeroGravityScale_ShouldIgnoreEnvironmentGravity()
+    {
+        using PhysicsScenarioBuilder scenario = CreateIntegrationScenario(frameRate: 4);
+        scenario.Context.Environment.Gravity = (Fixed64)4;
+        ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
+        body.Body.GravityScale = Fixed64.Zero;
+
+        scenario.Context.LateSimulate();
+
+        body.Body.LinearVelocity.Y.Should().Be(Fixed64.Zero);
+        body.Body.Position3d.Y.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void GravityScale_ShouldRejectNegativeValues()
+    {
+        using PhysicsScenarioBuilder scenario = CreateIntegrationScenario(frameRate: 4);
+        ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
+
+        Action action = () => body.Body.GravityScale = -Fixed64.Epsilon;
+
+        action.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
+    public void ContinuousCollisionPrediction_WithGravityScale_ShouldUseScaledEnvironmentGravity()
+    {
+        using PhysicsScenarioBuilder scenario = CreateIntegrationScenario(frameRate: 4);
+        scenario.Context.Environment.Gravity = (Fixed64)4;
+        ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
+        body.Body.GravityScale = Fixed64.Half;
+
+        body.Body.EnsureContinuousCollisionFramePrepared(123);
+
+        body.Body.ContinuousCollisionFrameDisplacement.Should().Be(new Vector3d(
+            Fixed64.Zero,
+            -Fixed64.FromFraction(1, 8),
+            Fixed64.Zero));
     }
 
     [Fact]

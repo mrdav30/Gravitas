@@ -24,6 +24,7 @@ public sealed class PhysicsSettingsSaverTests
             DefaultContinuousCollisionMode = ContinuousCollisionMode.Auto,
             ContinuousCollisionMaxToiIterations = 6,
             DiscreteSolverIterations = 9,
+            RestitutionVelocityThreshold = Fixed64.FromFraction(5, 8),
             RetainedPartitionTimeToKillFrames = 12,
             RetainedPartitionRetirementSweepBudget = 3
         };
@@ -41,6 +42,7 @@ public sealed class PhysicsSettingsSaverTests
         contextA.Settings.DefaultContinuousCollisionMode.Should().Be(ContinuousCollisionMode.Auto);
         contextA.Settings.ContinuousCollisionMaxToiIterations.Should().Be(6);
         contextA.Settings.DiscreteSolverIterations.Should().Be(9);
+        contextA.Settings.RestitutionVelocityThreshold.Should().Be(Fixed64.FromFraction(5, 8));
         contextA.Settings.RetainedPartitionTimeToKillFrames.Should().Be(12);
         contextA.Settings.RetainedPartitionRetirementSweepBudget.Should().Be(3);
 
@@ -50,6 +52,7 @@ public sealed class PhysicsSettingsSaverTests
         contextB.Settings.DefaultContinuousCollisionMode.Should().Be(ContinuousCollisionMode.Discrete);
         contextB.Settings.ContinuousCollisionMaxToiIterations.Should().Be(PhysicsSettings.DefaultContinuousCollisionMaxToiIterations);
         contextB.Settings.DiscreteSolverIterations.Should().Be(PhysicsSettings.DefaultDiscreteSolverIterations);
+        contextB.Settings.RestitutionVelocityThreshold.Should().Be(PhysicsSettings.DefaultRestitutionVelocityThreshold);
         contextB.Settings.RetainedPartitionTimeToKillFrames.Should().Be(PhysicsSettings.DefaultRetainedPartitionTimeToKillFrames);
         contextB.Settings.RetainedPartitionRetirementSweepBudget.Should().Be(PhysicsSettings.DefaultRetainedPartitionRetirementSweepBudget);
     }

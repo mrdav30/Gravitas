@@ -45,6 +45,31 @@ public sealed class CollisionResponse2DManifoldTests
     }
 
     [Fact]
+    public void Resolve_WithConfiguredRestitutionThreshold_ShouldControlBounce()
+    {
+        Fixed64 highThresholdVelocity = ResolveClosingVelocityAfterResponse(
+            threshold: (Fixed64)5,
+            initialVelocity: (Fixed64)4);
+        Fixed64 zeroThresholdVelocity = ResolveClosingVelocityAfterResponse(
+            threshold: Fixed64.Zero,
+            initialVelocity: (Fixed64)4);
+
+        highThresholdVelocity.Should().BeGreaterThan(zeroThresholdVelocity);
+        highThresholdVelocity.Should().BeGreaterThanOrEqualTo(Fixed64.Zero);
+        zeroThresholdVelocity.Should().BeLessThan(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void Resolve_WithZeroConfiguredRestitutionThreshold_ShouldBounceLowSpeedContact()
+    {
+        Fixed64 velocity = ResolveClosingVelocityAfterResponse(
+            threshold: Fixed64.Zero,
+            initialVelocity: Fixed64.FromFraction(1, 8));
+
+        velocity.Should().BeLessThan(Fixed64.Zero);
+    }
+
+    [Fact]
     public void Resolve_WithTwoContacts_ShouldApplyPositionCorrectionOnceForPair()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
@@ -172,6 +197,23 @@ public sealed class CollisionResponse2DManifoldTests
             new Vector2d(Fixed64.One, Fixed64.One),
             depth,
             Vector2d.Right);
+    }
+
+    private static Fixed64 ResolveClosingVelocityAfterResponse(Fixed64 threshold, Fixed64 initialVelocity)
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        context.Settings.RestitutionVelocityThreshold = threshold;
+        SolidBody2D moving = CreateBox(context, Vector2d.Zero);
+        SolidBody2D wall = CreateBox(context, new Vector2d((Fixed64)2, Fixed64.Zero), immovable: true);
+        moving.RestitutionCoefficient = Fixed64.One;
+        wall.RestitutionCoefficient = Fixed64.One;
+        moving.ApplyCollisionLinearVelocityDelta(new Vector2d(initialVelocity, Fixed64.Zero));
+        var pair = new CollisionPair2D(moving.Collider, wall.Collider);
+        pair.Manifold.SetContact(Vector2d.Right, Vector2d.Right, Fixed64.Half, Vector2d.Right);
+
+        pair.MarkColliding(context.FrameCount);
+
+        return moving.LinearVelocity.X;
     }
 
     private static SolidBody2D CreateBox(

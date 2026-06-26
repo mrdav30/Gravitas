@@ -19,6 +19,7 @@ public sealed class SolidBodyGroundingTests
         ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
 
         body.Body.IsGrounded.Should().BeTrue();
+        body.Body.WasGrounded.Should().BeFalse();
         body.Body.HitPoint.Y.Should().Be(Fixed64.Zero);
         body.Body.GroundNormal.Should().Be(Vector3d.Up);
     }
@@ -31,8 +32,39 @@ public sealed class SolidBodyGroundingTests
         ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
 
         body.Body.IsGrounded.Should().BeFalse();
+        body.Body.WasGrounded.Should().BeFalse();
         body.Body.HitPoint.Should().Be(Vector3d.Zero);
         body.Body.GroundNormal.Should().Be(Vector3d.Zero);
+    }
+
+    [Fact]
+    public void LateSimulate_WhenAlreadyGrounded_ShouldExposeWasGrounded()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        CreateGround(scenario, new PhysicsLayer(1));
+        scenario.Context.Settings.GroundCheckLayerMask = PhysicsLayerMask.FromLayer(1);
+        ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
+
+        scenario.Context.Simulate();
+        scenario.Context.LateSimulate();
+
+        body.Body.IsGrounded.Should().BeTrue();
+        body.Body.WasGrounded.Should().BeTrue();
+    }
+
+    [Fact]
+    public void CheckGround_WhenGroundNoLongerMatchesMask_ShouldPreservePreviousGroundedState()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        CreateGround(scenario, new PhysicsLayer(1));
+        scenario.Context.Settings.GroundCheckLayerMask = PhysicsLayerMask.FromLayer(1);
+        ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
+
+        scenario.Context.Settings.GroundCheckLayerMask = PhysicsLayerMask.FromLayer(2);
+        body.Body.CheckGround();
+
+        body.Body.IsGrounded.Should().BeFalse();
+        body.Body.WasGrounded.Should().BeTrue();
     }
 
     [Fact]
@@ -66,6 +98,7 @@ public sealed class SolidBodyGroundingTests
         scenario.Context.LateSimulate();
 
         body.Body.IsGrounded.Should().BeFalse();
+        body.Body.WasGrounded.Should().BeTrue();
         body.Body.HitPoint.Should().Be(Vector3d.Zero);
         body.Body.GroundNormal.Should().Be(Vector3d.Zero);
     }
@@ -84,6 +117,7 @@ public sealed class SolidBodyGroundingTests
 
         body.Body.GroundingMode.Should().Be(GroundingMode.Manual);
         body.Body.IsGrounded.Should().BeFalse();
+        body.Body.WasGrounded.Should().BeTrue();
         body.Body.HitPoint.Should().Be(Vector3d.Zero);
         body.Body.GroundNormal.Should().Be(Vector3d.Zero);
     }
@@ -98,11 +132,15 @@ public sealed class SolidBodyGroundingTests
         Vector3d heightmapPoint = new(Fixed64.Zero, Fixed64.FromFraction(3, 2), Fixed64.Zero);
 
         body.Body.SetManualGrounding(heightmapPoint, Vector3d.Up);
+
+        body.Body.WasGrounded.Should().BeTrue();
+
         scenario.Context.Simulate();
         scenario.Context.LateSimulate();
 
         body.Body.GroundingMode.Should().Be(GroundingMode.Manual);
         body.Body.IsGrounded.Should().BeTrue();
+        body.Body.WasGrounded.Should().BeTrue();
         body.Body.HitPoint.Should().Be(heightmapPoint);
         body.Body.GroundNormal.Should().Be(Vector3d.Up);
         body.Body.HeightPos.Should().Be(heightmapPoint.Y);
@@ -123,6 +161,7 @@ public sealed class SolidBodyGroundingTests
 
         body.Body.GroundingMode.Should().Be(GroundingMode.Manual);
         body.Body.IsGrounded.Should().BeFalse();
+        body.Body.WasGrounded.Should().BeTrue();
         body.Body.HitPoint.Should().Be(Vector3d.Zero);
         body.Body.GroundNormal.Should().Be(Vector3d.Zero);
     }

@@ -324,6 +324,27 @@ public partial class SolidBody : IRecordable
     /// </summary>
     public Fixed64 RestitutionCoefficient = (Fixed64)0.5f;
 
+    private Fixed64 _gravityScale = Fixed64.One;
+
+    /// <summary>
+    /// Multiplies context environment gravity for this body. Zero disables gravity-derived acceleration and grounded weight.
+    /// </summary>
+    public Fixed64 GravityScale
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => _gravityScale;
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        set
+        {
+            SwiftThrowHelper.ThrowIfArgument(
+                value < Fixed64.Zero,
+                nameof(value),
+                "Gravity scale cannot be negative.");
+            _gravityScale = value;
+            RefreshGroundNormalForce();
+        }
+    }
+
     public bool IsAtRest => _linearVelocity.IsZero && _angularVelocity.IsZero;
 
     private bool _isSleeping;
@@ -493,7 +514,7 @@ public partial class SolidBody : IRecordable
     // Weight is a measure of how the force of gravity acts upon the mass.
     // Weight (in Newtons) is mass (in Kilograms) multiplied by the acceleration of gravity (g).
     // ex: 68 kg * 9.8 m/s^2 = 667 Newtons / PhysicsEnvironment.PoundToNewton = 150 Pounds
-    private Fixed64 Weight => Mass * Context.Environment.Gravity;
+    private Fixed64 Weight => Mass * Context.Environment.Gravity * _gravityScale;
 
     public IMatterAgent Agent { get; private set; } = null!;
 
@@ -570,6 +591,8 @@ public partial class SolidBody : IRecordable
         _sleepFrameCount = 0;
 
         _isGrounded = false;
+        _wasGrounded = false;
+        _groundedTransitionCapturedForStep = false;
         _skipGroundingCheck = false;
         _lastGroundCheckFrame = int.MinValue;
         ResetGroundCalculations();
@@ -606,35 +629,43 @@ public partial class SolidBody : IRecordable
     {
         if (!Active) return;
 
-        LastContinuousCollisionToiIterationCount = 0;
-        LastContinuousCollisionToiIterationLimitReached = false;
-
-        _lastPosition = Position3d;
-        if (TryConsumeContinuousCollisionHandoff(updateSleepState, updateColliderState))
-            return;
-
-        if (IsKinematic)
-            UpdateKinematicPositionAndRotation();
-
-        // if we can't move...then we don't and ignore any forces
-        if (!Immovable)
+        CaptureGroundedStepState();
+        try
         {
-            if (!IsSleeping)
+            LastContinuousCollisionToiIterationCount = 0;
+            LastContinuousCollisionToiIterationLimitReached = false;
+
+            _lastPosition = Position3d;
+            if (TryConsumeContinuousCollisionHandoff(updateSleepState, updateColliderState))
+                return;
+
+            if (IsKinematic)
+                UpdateKinematicPositionAndRotation();
+
+            // if we can't move...then we don't and ignore any forces
+            if (!Immovable)
             {
-                ProcessMovable();
-                if (updateSleepState)
-                    UpdateSleepState();
+                if (!IsSleeping)
+                {
+                    ProcessMovable();
+                    if (updateSleepState)
+                        UpdateSleepState();
+                }
+
+                if (updateColliderState)
+                    Collider!.Simulate();
             }
 
-            if (updateColliderState)
-                Collider!.Simulate();
+            if (SettingVisuals)
+                _settingVisualsCounter--;
+
+            if (PositionChangePending || RotationChangePending)
+                OnMoved?.Invoke();
         }
-
-        if (SettingVisuals)
-            _settingVisualsCounter--;
-
-        if (PositionChangePending || RotationChangePending)
-            OnMoved?.Invoke();
+        finally
+        {
+            CompleteGroundedStepState();
+        }
     }
 
     internal void UpdateSleepStateAfterPhysicsStep()

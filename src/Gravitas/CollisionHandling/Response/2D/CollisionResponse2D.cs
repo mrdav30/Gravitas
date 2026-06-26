@@ -19,8 +19,6 @@ public static class CollisionResponse2D
 
     public static readonly Fixed64 PenetrationCorrectionPercent = Fixed64.One;
 
-    public static readonly Fixed64 RestitutionVelocityThreshold = (Fixed64)0.25f;
-
     internal static void Resolve(CollisionPair2D pair) =>
         Resolve(pair, applyCachedImpulse: true, applyPositionCorrection: true);
 
@@ -49,11 +47,13 @@ public static class CollisionResponse2D
                 ApplyCachedImpulse(contacts.GetContact(i));
         }
 
+        Fixed64 restitutionVelocityThreshold = pair.ColliderA.Context.Settings.RestitutionVelocityThreshold;
         for (int i = 0; i < contacts.Count; i++)
         {
             SolverContact2D contact = contacts.GetContact(i);
             Fixed64 normalDelta = ComputeNormalImpulseDelta(
                 contact,
+                restitutionVelocityThreshold,
                 out Fixed64 normalVelocity);
             Fixed64 normalImpulse = FixedMath.Max(
                 Fixed64.Zero,
@@ -185,7 +185,10 @@ public static class CollisionResponse2D
         ApplyImpulse(contact, impulse);
     }
 
-    private static Fixed64 ComputeNormalImpulseDelta(SolverContact2D contact, out Fixed64 normalVelocity)
+    private static Fixed64 ComputeNormalImpulseDelta(
+        SolverContact2D contact,
+        Fixed64 restitutionVelocityThreshold,
+        out Fixed64 normalVelocity)
     {
         normalVelocity = Vector2d.Dot(ComputeRelativeVelocity(contact), contact.Normal);
         Fixed64 denominator = ComputeImpulseDenominator(contact, contact.Normal);
@@ -193,7 +196,7 @@ public static class CollisionResponse2D
             return Fixed64.Zero;
 
         Fixed64 restitution = normalVelocity < Fixed64.Zero
-            ? ResolveRestitution(contact, -normalVelocity)
+            ? ResolveRestitution(contact, -normalVelocity, restitutionVelocityThreshold)
             : Fixed64.Zero;
         return -(Fixed64.One + restitution) * normalVelocity / denominator;
     }
@@ -297,9 +300,12 @@ public static class CollisionResponse2D
         return cross * cross * body.InverseMoment;
     }
 
-    private static Fixed64 ResolveRestitution(SolverContact2D contact, Fixed64 closingSpeed)
+    private static Fixed64 ResolveRestitution(
+        SolverContact2D contact,
+        Fixed64 closingSpeed,
+        Fixed64 restitutionVelocityThreshold)
     {
-        if (contact.A.Body == null || contact.B.Body == null || closingSpeed <= RestitutionVelocityThreshold)
+        if (contact.A.Body == null || contact.B.Body == null || closingSpeed <= restitutionVelocityThreshold)
             return Fixed64.Zero;
 
         Fixed64 restitution = FixedMath.Min(

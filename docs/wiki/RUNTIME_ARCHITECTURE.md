@@ -201,11 +201,13 @@ contexts. These checks are core invariants.
 - visual position/rotation interpolation buffers.
 - linear and angular velocity, acceleration, impulses, drag, friction, and
   restitution inputs.
+- per-body gravity scale for environment-gravity acceleration and grounded
+  weight.
 - body-local and world-space center-of-mass state used by inertia and response.
 - mass, raw inverse mass, and solver-effective inverse mass.
 - inertia tensor, raw inverse inertia tensor, and solver-effective inverse
   inertia tensor.
-- grounding state and ground probe settings.
+- current and previous-step grounding state plus ground probe settings.
 - deterministic sleep state, sleep thresholds, and wake handling.
 - Chronicler record data.
 

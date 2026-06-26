@@ -26,12 +26,6 @@ public static class CollisionResponse
     /// </summary>
     public static readonly Fixed64 PenetrationCorrectionPercent = (Fixed64)0.8f;
 
-    /// <summary>
-    /// Closing speed at or below this value is treated as resting contact and
-    /// uses zero restitution to avoid small deterministic bounces.
-    /// </summary>
-    public static readonly Fixed64 RestitutionVelocityThreshold = (Fixed64)0.25f;
-
     private static readonly Fixed64 WarmStartNormalCompatibilityThreshold = Fixed64.FromFraction(63, 64);
 
     /// <summary>
@@ -69,11 +63,13 @@ public static class CollisionResponse
                 ApplyCachedImpulse(contacts.GetContact(i));
         }
 
+        Fixed64 restitutionVelocityThreshold = pair.Context.Settings.RestitutionVelocityThreshold;
         for (int i = 0; i < contacts.Count; i++)
         {
             SolverContact contact = contacts.GetContact(i);
             Fixed64 normalDelta = ComputeNormalImpulseDelta(
                 contact,
+                restitutionVelocityThreshold,
                 out Fixed64 normalVelocity);
             Fixed64 scaledNormalDelta = normalDelta > Fixed64.Zero
                 ? normalDelta * contactShare
@@ -223,7 +219,10 @@ public static class CollisionResponse
         ApplyImpulse(contact.B, impulse, contact.RelativeB);
     }
 
-    private static Fixed64 ComputeNormalImpulseDelta(SolverContact contact, out Fixed64 normalVelocity)
+    private static Fixed64 ComputeNormalImpulseDelta(
+        SolverContact contact,
+        Fixed64 restitutionVelocityThreshold,
+        out Fixed64 normalVelocity)
     {
         normalVelocity = Vector3d.Dot(ComputeRelativeVelocity(contact), contact.Normal);
         Fixed64 denominator = ComputeImpulseDenominator(contact, contact.Normal);
@@ -231,7 +230,7 @@ public static class CollisionResponse
             return Fixed64.Zero;
 
         Fixed64 restitution = normalVelocity < Fixed64.Zero
-            ? ResolveRestitution(contact, -normalVelocity)
+            ? ResolveRestitution(contact, -normalVelocity, restitutionVelocityThreshold)
             : Fixed64.Zero;
         return -(Fixed64.One + restitution) * normalVelocity / denominator;
     }
@@ -384,9 +383,12 @@ public static class CollisionResponse
         body.Body.ApplyCollisionAngularVelocityDelta(angularVelocityDelta);
     }
 
-    private static Fixed64 ResolveRestitution(SolverContact contact, Fixed64 closingSpeed)
+    private static Fixed64 ResolveRestitution(
+        SolverContact contact,
+        Fixed64 closingSpeed,
+        Fixed64 restitutionVelocityThreshold)
     {
-        if (closingSpeed <= RestitutionVelocityThreshold)
+        if (closingSpeed <= restitutionVelocityThreshold)
             return Fixed64.Zero;
 
         Fixed64 restitution = FixedMath.Min(

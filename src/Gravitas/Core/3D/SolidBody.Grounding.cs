@@ -76,6 +76,14 @@ public partial class SolidBody
         }
     }
 
+    private bool _wasGrounded;
+    private bool _groundedTransitionCapturedForStep;
+
+    /// <summary>
+    /// Gets whether this body was grounded before the latest authoritative grounding refresh or manual grounding change.
+    /// </summary>
+    public bool WasGrounded => _wasGrounded;
+
     private Vector3d _lastGroundedPosition;
     public Vector3d LastGroundedPosition => _lastGroundedPosition;
 
@@ -84,6 +92,7 @@ public partial class SolidBody
     public void SkipGrounding(Fixed64 secs)
     {
         _skipGroundingCheck = true;
+        CaptureGroundedTransitionState();
         ClearGrounding();
         Context.Coroutines.StartCoroutine(SkipGroundingCoroutine(secs));
     }
@@ -96,7 +105,10 @@ public partial class SolidBody
         GroundingMode = GroundingMode.Manual;
         _skipGroundingCheck = false;
         if (clearGrounding)
+        {
+            CaptureGroundedTransitionState();
             ClearGrounding();
+        }
     }
 
     /// <summary>
@@ -106,7 +118,7 @@ public partial class SolidBody
     {
         GroundingMode = GroundingMode.Automatic;
         if (checkGroundImmediately && Active)
-            CheckGround(force: true);
+            CheckGround();
     }
 
     /// <summary>
@@ -121,6 +133,7 @@ public partial class SolidBody
 
         GroundingMode = GroundingMode.Manual;
         _skipGroundingCheck = false;
+        CaptureGroundedTransitionState();
         SetGroundingState(hitPoint, groundNormal.Normalized, hitPlatform);
     }
 
@@ -131,6 +144,7 @@ public partial class SolidBody
     {
         GroundingMode = GroundingMode.Manual;
         _skipGroundingCheck = false;
+        CaptureGroundedTransitionState();
         ClearGrounding();
     }
 
@@ -140,9 +154,27 @@ public partial class SolidBody
         _skipGroundingCheck = false;
     }
 
-    public void CheckGround() => CheckGround(force: true);
+    public void CheckGround()
+    {
+        CaptureGroundedTransitionState();
+        CheckGround(force: true);
+    }
 
     private void CheckGroundForSimulation() => CheckGround(force: false);
+
+    private void CaptureGroundedTransitionState()
+    {
+        _wasGrounded = _isGrounded;
+        _groundedTransitionCapturedForStep = true;
+    }
+
+    private void CaptureGroundedStepState()
+    {
+        if (!_groundedTransitionCapturedForStep)
+            CaptureGroundedTransitionState();
+    }
+
+    private void CompleteGroundedStepState() => _groundedTransitionCapturedForStep = false;
 
     private void CheckGround(bool force)
     {
@@ -309,11 +341,21 @@ public partial class SolidBody
         _hitPoint = hitPoint;
         _groundNormal = groundNormal;
 
+        RefreshGroundNormalForce();
+        IsGrounded = true;
+    }
+
+    private void RefreshGroundNormalForce()
+    {
+        if (!_isGrounded && _groundNormal.MagnitudeSquared <= Fixed64.Epsilon)
+        {
+            _normalForce = Vector3d.Zero;
+            return;
+        }
+
         Vector3d weightVector = Weight * Vector3d.Down;
         Fixed64 weightInNormalDirection = Vector3d.Dot(weightVector, _groundNormal);
         _normalForce = weightInNormalDirection * _groundNormal;
-
-        IsGrounded = true;
     }
 
     private void ResetGroundCalculations()

@@ -5,6 +5,7 @@ using Gravitas.Queries;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
 using SwiftCollections;
+using System;
 using Xunit;
 
 namespace Gravitas.Tests.Physics2D;
@@ -27,6 +28,73 @@ public sealed class Physics2DSimulationTests
 
         body.LinearVelocity.Should().Be(new Vector2d(Fixed64.One, Fixed64.Zero));
         body.Position.Should().Be(new Vector2d(Fixed64.FromFraction(1, 4), Fixed64.Zero));
+    }
+
+    [Fact]
+    public void LateSimulate_WithDefaultGravityScale_ShouldApplyPlanarGravity()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 4);
+        SolidBody2D body = CreateCircle(context, Vector2d.Zero, immovable: false);
+        body.Gravity = new Vector2d(Fixed64.Zero, (Fixed64)(-4));
+
+        context.LateSimulate();
+
+        body.LinearVelocity.Should().Be(new Vector2d(Fixed64.Zero, -Fixed64.One));
+        body.Position.Should().Be(new Vector2d(Fixed64.Zero, -Fixed64.FromFraction(1, 4)));
+    }
+
+    [Fact]
+    public void LateSimulate_WithHalfGravityScale_ShouldApplyScaledPlanarGravity()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 4);
+        SolidBody2D body = CreateCircle(context, Vector2d.Zero, immovable: false);
+        body.Gravity = new Vector2d(Fixed64.Zero, (Fixed64)(-4));
+        body.GravityScale = Fixed64.Half;
+
+        context.LateSimulate();
+
+        body.LinearVelocity.Should().Be(new Vector2d(Fixed64.Zero, -Fixed64.Half));
+        body.Position.Should().Be(new Vector2d(Fixed64.Zero, -Fixed64.FromFraction(1, 8)));
+    }
+
+    [Fact]
+    public void LateSimulate_WithZeroGravityScale_ShouldIgnorePlanarGravity()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 4);
+        SolidBody2D body = CreateCircle(context, Vector2d.Zero, immovable: false);
+        body.Gravity = new Vector2d(Fixed64.Zero, (Fixed64)(-4));
+        body.GravityScale = Fixed64.Zero;
+
+        context.LateSimulate();
+
+        body.LinearVelocity.Should().Be(Vector2d.Zero);
+        body.Position.Should().Be(Vector2d.Zero);
+    }
+
+    [Fact]
+    public void GravityScale_ShouldRejectNegativeValues()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 4);
+        SolidBody2D body = CreateCircle(context, Vector2d.Zero, immovable: false);
+
+        Action action = () => body.GravityScale = -Fixed64.Epsilon;
+
+        action.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
+    public void ContinuousCollisionPrediction_WithGravityScale_ShouldUseScaledPlanarGravity()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 4);
+        SolidBody2D body = CreateCircle(context, Vector2d.Zero, immovable: false);
+        body.Gravity = new Vector2d(Fixed64.Zero, (Fixed64)(-4));
+        body.GravityScale = Fixed64.Half;
+
+        body.EnsureContinuousCollisionFramePrepared(123);
+
+        body.ContinuousCollisionFrameDisplacement.Should().Be(new Vector2d(
+            Fixed64.Zero,
+            -Fixed64.FromFraction(1, 8)));
     }
 
     [Fact]

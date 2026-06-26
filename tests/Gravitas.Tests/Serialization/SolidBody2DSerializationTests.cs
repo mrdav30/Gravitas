@@ -32,6 +32,7 @@ public sealed class SolidBody2DSerializationTests
             RestitutionCoefficient = Fixed64.FromFraction(3, 4),
             FrictionCoefficient = Fixed64.FromFraction(5, 4),
             Gravity = new Vector2d(Fixed64.Zero, (Fixed64)(-2)),
+            GravityScale = Fixed64.FromFraction(3, 8),
             SleepEnabled = false,
             SleepFrameThreshold = 11,
             SleepLinearSpeedThreshold = Fixed64.FromFraction(1, 128),
@@ -63,6 +64,7 @@ public sealed class SolidBody2DSerializationTests
         target.RestitutionCoefficient.Should().Be(source.RestitutionCoefficient);
         target.FrictionCoefficient.Should().Be(source.FrictionCoefficient);
         target.Gravity.Should().Be(source.Gravity);
+        target.GravityScale.Should().Be(source.GravityScale);
         target.SleepEnabled.Should().BeFalse();
         target.SleepFrameThreshold.Should().Be(source.SleepFrameThreshold);
         target.SleepLinearSpeedThreshold.Should().Be(source.SleepLinearSpeedThreshold);

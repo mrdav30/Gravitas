@@ -44,8 +44,9 @@ serializable, and shared across 3D, pure 2D, mixed, and CCD response.
 - Body serialization records the two coefficients.
 - `ColliderShapeDefinition`, compound parts, and colliders do not own a public
   material value.
-- The restitution threshold is planned to move into `PhysicsSettings` in
-  `2026-06-26-restitution-gravity-grounded-state-hardening-plan.md`.
+- The restitution threshold is context-owned through
+  `PhysicsSettings.RestitutionVelocityThreshold`; see
+  `done/2026-06-26-restitution-gravity-grounded-state-hardening-plan.md`.
 
 ## Non-Goals
 

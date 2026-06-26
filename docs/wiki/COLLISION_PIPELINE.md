@@ -890,8 +890,8 @@ Response units and invariants:
   keep explicit surface approximation opt-in for open meshes.
 - restitution is clamped to `[0, 1]` and combined by the lower coefficient so a
   low-bounce participant can dampen the pair.
-- closing speeds at or below `RestitutionVelocityThreshold` use zero
-  restitution to avoid resting-contact bounce.
+- closing speeds at or below `PhysicsSettings.RestitutionVelocityThreshold` use
+  zero restitution to avoid resting-contact bounce.
 - `SolidBody.FrictionCoefficient` is a non-negative Coulomb coefficient. Values
   above one are allowed for intentional high-friction materials.
 - friction impulses oppose tangential contact motion and are clamped by the

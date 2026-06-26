@@ -33,6 +33,7 @@ public sealed class SolidBodySerializationTests
         source.Body.LocalCenterOfMassOffset = new Vector3d(Fixed64.FromFraction(1, 4), Fixed64.FromFraction(1, 8), -Fixed64.FromFraction(1, 2));
         source.Body.RestitutionCoefficient = Fixed64.FromFraction(3, 4);
         source.Body.FrictionCoefficient = Fixed64.FromFraction(5, 4);
+        source.Body.GravityScale = Fixed64.FromFraction(3, 8);
         source.Collider.Radius = Fixed64.FromFraction(3, 2);
         source.Collider.LocalOffset = new Vector3d(Fixed64.Half, Fixed64.FromFraction(1, 4), -Fixed64.Half);
         source.Collider.Layer = new PhysicsLayer(4);
@@ -67,6 +68,7 @@ public sealed class SolidBodySerializationTests
         target.Body.WorldCenterOfMass.Should().Be(source.Body.WorldCenterOfMass);
         target.Body.RestitutionCoefficient.Should().Be(source.Body.RestitutionCoefficient);
         target.Body.FrictionCoefficient.Should().Be(source.Body.FrictionCoefficient);
+        target.Body.GravityScale.Should().Be(source.Body.GravityScale);
         target.Body.PositionTransform.Should().BeSameAs(targetTransform);
         target.Body.RotationTransform.Should().BeSameAs(targetTransform);
         targetTransform.Position.Should().Be(source.Body.Position3d);
@@ -120,6 +122,26 @@ public sealed class SolidBodySerializationTests
         target.Body.IsGrounded.Should().BeTrue();
         target.Body.HitPoint.Should().Be(hitPoint);
         target.Body.GroundNormal.Should().Be(Vector3d.Up);
+    }
+
+    [Theory]
+    [MemberData(nameof(Transports))]
+    public void Populate_ShouldRestoreWasGroundedTransitionState(GravitasSerializationTransport transport)
+    {
+        using PhysicsScenarioBuilder sourceScenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> source = sourceScenario.CreateSphere(Vector3d.Zero);
+        source.Body.SetManualGrounding(new Vector3d(Fixed64.Zero, Fixed64.One, Fixed64.Zero), Vector3d.Up);
+        source.Body.ClearManualGrounding();
+
+        object payload = GravitasSerializationHarness.Serialize(source.Body, transport);
+
+        using PhysicsScenarioBuilder targetScenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> target = targetScenario.CreateSphere(Vector3d.Zero);
+
+        GravitasSerializationHarness.Populate(target.Body, payload, transport);
+
+        target.Body.IsGrounded.Should().BeFalse();
+        target.Body.WasGrounded.Should().BeTrue();
     }
 
     [Fact]

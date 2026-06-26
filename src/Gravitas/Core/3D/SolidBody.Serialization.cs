@@ -19,6 +19,7 @@ public partial class SolidBody
         Fixed64 groundProbeRadius = GroundProbeRadius;
         bool immovable = Immovable;
         bool isKinematic = IsKinematic;
+        Fixed64 gravityScale = GravityScale;
 
         RecordValues.Look(chronicler, ref Debug, "Debug");
         RecordValues.Look(chronicler, ref Active, "Active");
@@ -41,6 +42,7 @@ public partial class SolidBody
         RecordValues.Look(chronicler, ref _hitPlatformPosition, "HitPlatformPosition");
         RecordValues.Look(chronicler, ref _hitPoint, "HitPoint");
         RecordValues.Look(chronicler, ref _isGrounded, "IsGrounded");
+        RecordValues.Look(chronicler, ref _wasGrounded, "WasGrounded");
         RecordValues.Look(chronicler, ref _lastGroundedPosition, "LastGroundedPosition");
         RecordValues.Look(chronicler, ref _rotation, "Rotation");
         RecordValues.Look(chronicler, ref PreventAngularForces, "PreventAngularForces");
@@ -52,6 +54,7 @@ public partial class SolidBody
         RecordValues.Look(chronicler, ref _localCenterOfMassOffset, "LocalCenterOfMassOffset");
         RecordValues.Look(chronicler, ref _centerOfMassOffsetExplicit, "CenterOfMassOffsetExplicit", false);
         RecordValues.Look(chronicler, ref RestitutionCoefficient, "RestitutionCoefficient");
+        RecordValues.Look(chronicler, ref gravityScale, "GravityScale", Fixed64.One);
         RecordValues.Look(chronicler, ref _isSleeping, "IsSleeping");
         RecordValues.Look(chronicler, ref _sleepFrameCount, "SleepFrameCount");
         RecordValues.Look(chronicler, ref _sleepEnabled, "SleepEnabled", true);
@@ -85,6 +88,7 @@ public partial class SolidBody
             GroundingMode = groundingMode;
             GroundProbeMode = groundProbeMode;
             GroundProbeRadius = groundProbeRadius;
+            GravityScale = gravityScale;
             _hitPlatform = null;
         }
 

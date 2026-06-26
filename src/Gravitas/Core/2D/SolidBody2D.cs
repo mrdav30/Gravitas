@@ -225,6 +225,26 @@ public sealed partial class SolidBody2D : IRecordable
 
     public Vector2d Gravity { get; set; } = Vector2d.Zero;
 
+    private Fixed64 _gravityScale = Fixed64.One;
+
+    /// <summary>
+    /// Multiplies this body's planar gravity vector. Zero disables body-authored gravity acceleration.
+    /// </summary>
+    public Fixed64 GravityScale
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => _gravityScale;
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        set
+        {
+            SwiftThrowHelper.ThrowIfArgument(
+                value < Fixed64.Zero,
+                nameof(value),
+                "2D gravity scale cannot be negative.");
+            _gravityScale = value;
+        }
+    }
+
     public bool SleepEnabled { get; set; } = true;
 
     public int SleepFrameThreshold { get; set; } = 16;
@@ -369,7 +389,7 @@ public sealed partial class SolidBody2D : IRecordable
         if (_isSleeping)
             return;
 
-        _linearAccelerationStore = _deltaAcceleration + Gravity;
+        _linearAccelerationStore = _deltaAcceleration + Gravity * _gravityScale;
         _deltaAcceleration = Vector2d.Zero;
         _linearVelocity += _linearAccelerationStore * Context.DeltaTime;
         _linearAccelerationStore = Vector2d.Zero;

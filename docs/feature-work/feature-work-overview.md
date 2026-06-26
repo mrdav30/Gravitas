@@ -30,11 +30,6 @@ instead of burying it in notes.
 
 ## Active Release-Scope
 
-- [`Restitution Gravity And Grounded State Hardening`](2026-06-26-restitution-gravity-grounded-state-hardening-plan.md)
-  - Planned 2026-06-26. Moves bounce threshold policy into
-    `PhysicsSettings`, routes discrete/CCD response through the context setting,
-    adds body-level gravity scaling, and captures previous-grounded transition
-    state for 3D and planned pure 2D grounding.
 - [`Physics Material Model`](2026-06-26-physics-material-model-plan.md)
   - Planned 2026-06-26. Replaces ad hoc body-owned friction/restitution
     coefficients with deterministic collider-surface materials, static/dynamic
@@ -75,6 +70,11 @@ instead of burying it in notes.
 
 ## Recently Completed
 
+- [`Restitution Gravity And Grounded State Hardening`](done/2026-06-26-restitution-gravity-grounded-state-hardening-plan.md)
+  - Completed 2026-06-26. Moves restitution cutoff policy into
+    `PhysicsSettings`, routes discrete and CCD response through the context
+    setting, adds `GravityScale` for 3D and pure 2D bodies, and records
+    previous-step 3D grounded state for deterministic transition handling.
 - [`Deterministic Replay Hash Conformance Harness`](done/2026-06-26-deterministic-replay-hash-conformance-harness-plan.md)
   - Completed 2026-06-26. Adds a deterministic authoritative-state hash,
     optional solver-cache hash mode, host-facing frame hash API, replay
@@ -146,40 +146,36 @@ first public release.
 
 ## Recommended Execution Order
 
-1. [`Restitution Gravity And Grounded State Hardening`](2026-06-26-restitution-gravity-grounded-state-hardening-plan.md)
-   - Small, high-leverage body/response cleanup. It removes duplicated bounce
-     policy and establishes gravity/grounded transition semantics before 2D
-     grounding consumes them.
-2. [`Physics Material Model`](2026-06-26-physics-material-model-plan.md)
+1. [`Physics Material Model`](2026-06-26-physics-material-model-plan.md)
    - Clean up friction/restitution ownership before deeper solver constraints,
      ragdoll links, and new collider families multiply the old body-coefficient
      model.
-3. [`Pure 2D Grounding And Support`](2026-06-26-pure-2d-grounding-and-support-plan.md)
+2. [`Pure 2D Grounding And Support`](2026-06-26-pure-2d-grounding-and-support-plan.md)
    - Close the remaining pure 2D body-state parity gap before broader new
      feature work. This is release-scope because platformer-style 2D hosts
      reasonably expect grounded-state behavior, but it must stay planar rather
      than becoming hidden 3D height logic.
-4. [`Collider Local Collision Filtering`](2026-06-26-collider-local-collision-filtering-plan.md)
+3. [`Collider Local Collision Filtering`](2026-06-26-collider-local-collision-filtering-plan.md)
    - Low conceptual risk but cross-cutting. It should land before new collider
      families so future shape work inherits one physical filtering rule.
-5. [`Body Axis Freeze Constraints`](2026-06-26-body-axis-freeze-constraints-plan.md)
+4. [`Body Axis Freeze Constraints`](2026-06-26-body-axis-freeze-constraints-plan.md)
    - Deeper solver work that should land before adding more collider families,
      because new primitives should inherit the final mobility/constraint model
      instead of `Immovable` and angular-force cleanup churn.
-6. [`Constraint And Ragdoll Foundation`](2026-06-26-constraint-and-ragdoll-foundation-plan.md)
+5. [`Constraint And Ragdoll Foundation`](2026-06-26-constraint-and-ragdoll-foundation-plan.md)
    - Build deterministic articulation after the body constraint model is final.
      Ragdoll links can reuse collider hierarchy identity and local filtering,
      while the solver work can integrate with the final body freeze semantics.
-7. [`Batched Query APIs`](2026-06-26-batched-query-apis-plan.md)
+6. [`Batched Query APIs`](2026-06-26-batched-query-apis-plan.md)
    - Add the high-throughput LSF query surface after local filtering is final
      and before new shape query families make the public surface broader.
-8. [`Pure 2D Capsule And Convenience Shapes`](2026-06-26-pure-2d-capsule-and-convenience-shapes-plan.md)
+7. [`Pure 2D Capsule And Convenience Shapes`](2026-06-26-pure-2d-capsule-and-convenience-shapes-plan.md)
    - Pairs naturally with 2D grounding and improves character-style 2D
      ergonomics without adding runtime triangle complexity.
-9. [`Cone Collider And Query Support`](2026-06-26-cone-collider-and-query-support-plan.md)
+8. [`Cone Collider And Query Support`](2026-06-26-cone-collider-and-query-support-plan.md)
    - Highest geometry/reducer risk of the new plans. Execute after the smaller
      collider API hardening items so cone work can focus on analytic geometry,
      contact quality, and query evidence.
-10. Keep the benchmark backlog and issue tracker as intake buckets; promote new
+9. Keep the benchmark backlog and issue tracker as intake buckets; promote new
    measured risks into dated plans only when they are broader than a focused
    patch.

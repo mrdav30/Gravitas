@@ -42,6 +42,8 @@ public sealed class PhysicsSettingsTests
         contextB.Settings.ContinuousCollisionMaxToiIterations.Should().Be(PhysicsSettings.DefaultContinuousCollisionMaxToiIterations);
         contextA.Settings.DiscreteSolverIterations.Should().Be(PhysicsSettings.DefaultDiscreteSolverIterations);
         contextB.Settings.DiscreteSolverIterations.Should().Be(PhysicsSettings.DefaultDiscreteSolverIterations);
+        contextA.Settings.RestitutionVelocityThreshold.Should().Be(PhysicsSettings.DefaultRestitutionVelocityThreshold);
+        contextB.Settings.RestitutionVelocityThreshold.Should().Be(PhysicsSettings.DefaultRestitutionVelocityThreshold);
     }
 
     [Fact]
@@ -77,6 +79,28 @@ public sealed class PhysicsSettingsTests
         var settings = PhysicsSettings.DefaultSettings();
 
         Action action = () => settings.DiscreteSolverIterations = value;
+
+        action.Should().Throw<ArgumentException>().WithParameterName("value");
+    }
+
+    [Fact]
+    public void RestitutionVelocityThreshold_ShouldStoreNonNegativeValues()
+    {
+        var settings = PhysicsSettings.DefaultSettings();
+
+        settings.RestitutionVelocityThreshold.Should().Be((Fixed64)0.25f);
+        settings.RestitutionVelocityThreshold = Fixed64.Zero;
+        settings.RestitutionVelocityThreshold.Should().Be(Fixed64.Zero);
+        settings.RestitutionVelocityThreshold = Fixed64.FromFraction(3, 2);
+        settings.RestitutionVelocityThreshold.Should().Be(Fixed64.FromFraction(3, 2));
+    }
+
+    [Fact]
+    public void RestitutionVelocityThreshold_ShouldRejectNegativeValues()
+    {
+        var settings = PhysicsSettings.DefaultSettings();
+
+        Action action = () => settings.RestitutionVelocityThreshold = -Fixed64.Epsilon;
 
         action.Should().Throw<ArgumentException>().WithParameterName("value");
     }

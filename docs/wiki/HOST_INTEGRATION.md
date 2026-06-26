@@ -296,6 +296,7 @@ context.SetFrameRate(60);
 
 PhysicsSettings settings = PhysicsSettings.DefaultSettings();
 settings.PoolingEnabled = true;
+settings.RestitutionVelocityThreshold = Fixed64.FromFraction(1, 4);
 context.ApplySettings(settings);
 
 context.Environment.Gravity = (Fixed64)9.8f;
@@ -304,6 +305,12 @@ context.Environment.Gravity = (Fixed64)9.8f;
 Different contexts can run at different frame rates and with different settings
 in the same process. Frame-derived values such as `DeltaTime`, `FrameCount`, and
 `TotalTime` are read through the context.
+
+Per-body gravity tuning lives on the body. `SolidBody.GravityScale` multiplies
+the context environment gravity for that body; `Fixed64.Zero` disables
+environment-gravity acceleration and grounded weight for the body.
+`SolidBody2D.GravityScale` applies the same policy to that body's planar
+`Gravity` vector.
 
 ## Queries
 
@@ -378,8 +385,8 @@ actually hits suitable geometry.
 `SolidBody.GroundingMode` controls who owns grounded state:
 
 - `Automatic` is the default. Gravitas updates `IsGrounded`, `HitPoint`,
-  `GroundNormal`, `HitPlatform`, and normal-force cache from deterministic ground
-  probes.
+  `WasGrounded`, `HitPoint`, `GroundNormal`, `HitPlatform`, and normal-force
+  cache from deterministic ground probes.
 - `Manual` disables automatic probes. Hosts can call
   `UseManualGrounding(...)`, `SetManualGrounding(...)`,
   `ClearManualGrounding()`, and `UseAutomaticGrounding(...)` when deterministic
@@ -399,6 +406,10 @@ Each body selects its probe shape through `GroundProbeMode`:
 derive radius from the collider shape. Ground probes ignore the body's own
 collider and ordinary movable dynamic bodies; valid ground targets are bodyless
 colliders, immovable bodies, or kinematic bodies.
+`WasGrounded` stores the grounded value captured before the latest
+authoritative simulation refresh or explicit manual grounding change, so hosts
+can distinguish landing, remaining grounded, and leaving support without
+deriving that transition from visual-frame state.
 
 ## Deactivation And Disposal
 

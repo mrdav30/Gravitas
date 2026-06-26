@@ -143,6 +143,19 @@ public sealed class MixedResponseTests
     }
 
     [Fact]
+    public void Resolve_WithConfiguredRestitutionThreshold_ShouldControlMixedBounce()
+    {
+        Fixed64 highThresholdVelocity = Resolve3DPlanarVelocityAfterMixedResponse(
+            threshold: (Fixed64)5,
+            initialVelocity: (Fixed64)4);
+        Fixed64 zeroThresholdVelocity = Resolve3DPlanarVelocityAfterMixedResponse(
+            threshold: Fixed64.Zero,
+            initialVelocity: (Fixed64)4);
+
+        highThresholdVelocity.Should().BeGreaterThan(zeroThresholdVelocity);
+    }
+
+    [Fact]
     public void Resolve_WithPlanarVerticalMixedImpulse_ShouldConstrain2DVerticalAndMove3D()
     {
         using GravitasWorldContext context = CreateMixedContext();
@@ -436,6 +449,29 @@ public sealed class MixedResponseTests
         }
 
         return count;
+    }
+
+    private static Fixed64 Resolve3DPlanarVelocityAfterMixedResponse(Fixed64 threshold, Fixed64 initialVelocity)
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        context.Settings.RestitutionVelocityThreshold = threshold;
+        ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(
+            context,
+            new Vector3d(-Fixed64.Half, Fixed64.Zero, Fixed64.Half));
+        SolidBody2D body2D = CreateCircle2D(context, Vector2d.Zero);
+        body3D.Body.RestitutionCoefficient = Fixed64.One;
+        body2D.RestitutionCoefficient = Fixed64.One;
+        var pair = new CollisionPairMixed(body3D.Collider, body2D.Collider);
+        var contact = new MixedContact(
+            new Vector3d(-Fixed64.Half, Fixed64.Zero, Fixed64.Half),
+            new Vector3d(Fixed64.Zero, Fixed64.Zero, Fixed64.Half),
+            Vector3d.Right,
+            Fixed64.FromFraction(1, 10));
+        body3D.Body.ApplyCollisionLinearVelocityDelta(new Vector3d(initialVelocity, Fixed64.Zero, Fixed64.Zero));
+
+        CollisionResponseMixed.Resolve(pair, contact);
+
+        return body3D.Body.LinearVelocity.X;
     }
 
     private static GravitasWorldContext CreateMixedContextWithLayerBlock()

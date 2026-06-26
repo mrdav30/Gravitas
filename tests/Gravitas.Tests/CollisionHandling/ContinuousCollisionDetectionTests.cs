@@ -559,6 +559,48 @@ public sealed class ContinuousCollisionDetectionTests
     }
 
     [Fact]
+    public void ContinuousMode_WithConfiguredRestitutionThreshold_ShouldSuppressDynamicBounce()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        scenario.Context.Settings.RestitutionVelocityThreshold = (Fixed64)5;
+        ScenarioBody<LSSphereCollider> source = scenario.CreateSphere(new Vector3d((Fixed64)(-3), Fixed64.Zero, Fixed64.Zero));
+        ScenarioBody<LSSphereCollider> target = scenario.CreateSphere(Vector3d.Zero);
+        source.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        target.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        source.Body.RestitutionCoefficient = Fixed64.One;
+        target.Body.RestitutionCoefficient = Fixed64.One;
+        DisableGroundQueries(source.Body);
+        DisableGroundQueries(target.Body);
+
+        source.Body.AddForce(Vector3d.Right * (Fixed64)4);
+        scenario.Context.LateSimulate();
+
+        source.Body.LinearVelocity.X.Should().Be((Fixed64)2);
+        target.Body.LinearVelocity.X.Should().Be((Fixed64)2);
+    }
+
+    [Fact]
+    public void ContinuousMode_WithZeroRestitutionThreshold_ShouldBounceLowSpeedDynamicContact()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        scenario.Context.Settings.RestitutionVelocityThreshold = Fixed64.Zero;
+        ScenarioBody<LSSphereCollider> source = scenario.CreateSphere(new Vector3d((Fixed64)(-3), Fixed64.Zero, Fixed64.Zero));
+        ScenarioBody<LSSphereCollider> target = scenario.CreateSphere(Vector3d.Zero);
+        source.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        target.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        source.Body.RestitutionCoefficient = Fixed64.One;
+        target.Body.RestitutionCoefficient = Fixed64.One;
+        DisableGroundQueries(source.Body);
+        DisableGroundQueries(target.Body);
+
+        source.Body.AddForce(Vector3d.Right * (Fixed64)4);
+        scenario.Context.LateSimulate();
+
+        source.Body.LinearVelocity.X.Should().Be(Fixed64.Zero);
+        target.Body.LinearVelocity.X.Should().Be((Fixed64)4);
+    }
+
+    [Fact]
     public void ContinuousMode_WithChainedDynamicBodies_ShouldWakeAndContinueConnectedIsland()
     {
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();

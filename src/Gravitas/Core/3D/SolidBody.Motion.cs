@@ -270,7 +270,7 @@ public partial class SolidBody
 
         // Apply gravity only if not grounded
         if (!IsGrounded)
-            _linearVelocity.Y -= environment.Gravity * deltaTime;
+            _linearVelocity.Y -= environment.Gravity * _gravityScale * deltaTime;
 
         // Make sure we don't fall any faster than maxFallSpeed. This gives our character a terminal velocity
         _linearVelocity.Y = FixedMath.Max(_linearVelocity.Y, -environment.MaxFallSpeed);

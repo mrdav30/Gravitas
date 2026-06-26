@@ -54,7 +54,7 @@ public partial class SolidBody
         PhysicsEnvironment environment = Context.Environment;
         Vector3d predictedVelocity = _linearVelocity + _impulseStore + (_deltaAcceleration * deltaTime);
         if (!_isGrounded)
-            predictedVelocity.Y -= environment.Gravity * deltaTime;
+            predictedVelocity.Y -= environment.Gravity * _gravityScale * deltaTime;
 
         predictedVelocity.Y = FixedMath.Max(predictedVelocity.Y, -environment.MaxFallSpeed);
         Fixed64 predictedSpeed = predictedVelocity.Magnitude;

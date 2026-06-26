@@ -231,6 +231,44 @@ public sealed class ContinuousCollision2DTests
     }
 
     [Fact]
+    public void ContinuousMode_WithConfiguredRestitutionThreshold_ShouldSuppressDynamicBounce()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        context.Settings.RestitutionVelocityThreshold = (Fixed64)5;
+        SolidBody2D source = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)(-3), Fixed64.Zero), immovable: false);
+        SolidBody2D target = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
+        source.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        target.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        source.RestitutionCoefficient = Fixed64.One;
+        target.RestitutionCoefficient = Fixed64.One;
+
+        source.AddForce(Vector2d.Right * (Fixed64)4);
+        context.LateSimulate();
+
+        source.LinearVelocity.X.Should().Be((Fixed64)2);
+        target.LinearVelocity.X.Should().Be((Fixed64)2);
+    }
+
+    [Fact]
+    public void ContinuousMode_WithZeroRestitutionThreshold_ShouldBounceLowSpeedDynamicContact()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        context.Settings.RestitutionVelocityThreshold = Fixed64.Zero;
+        SolidBody2D source = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)(-3), Fixed64.Zero), immovable: false);
+        SolidBody2D target = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
+        source.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        target.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        source.RestitutionCoefficient = Fixed64.One;
+        target.RestitutionCoefficient = Fixed64.One;
+
+        source.AddForce(Vector2d.Right * (Fixed64)4);
+        context.LateSimulate();
+
+        source.LinearVelocity.X.Should().Be(Fixed64.Zero);
+        target.LinearVelocity.X.Should().Be((Fixed64)4);
+    }
+
+    [Fact]
     public void ContinuousMode_WithChainedDynamicBodies_ShouldWakeAndContinueConnectedIsland()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);

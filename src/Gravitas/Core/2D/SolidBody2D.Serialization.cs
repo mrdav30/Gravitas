@@ -21,6 +21,7 @@ public sealed partial class SolidBody2D
         Fixed64 restitutionCoefficient = RestitutionCoefficient;
         Fixed64 frictionCoefficient = FrictionCoefficient;
         Vector2d gravity = Gravity;
+        Fixed64 gravityScale = GravityScale;
         bool sleepEnabled = SleepEnabled;
         int sleepFrameThreshold = SleepFrameThreshold;
         Fixed64 sleepLinearSpeedThreshold = SleepLinearSpeedThreshold;
@@ -48,6 +49,7 @@ public sealed partial class SolidBody2D
         RecordValues.Look(chronicler, ref restitutionCoefficient, "RestitutionCoefficient", Fixed64.Half);
         RecordValues.Look(chronicler, ref frictionCoefficient, "FrictionCoefficient", Fixed64.One);
         RecordValues.Look(chronicler, ref gravity, "Gravity", Vector2d.Zero);
+        RecordValues.Look(chronicler, ref gravityScale, "GravityScale", Fixed64.One);
         RecordValues.Look(chronicler, ref sleepEnabled, "SleepEnabled", true);
         RecordValues.Look(chronicler, ref sleepFrameThreshold, "SleepFrameThreshold", 16);
         RecordValues.Look(chronicler, ref sleepLinearSpeedThreshold, "SleepLinearSpeedThreshold", (Fixed64)0.001f);
@@ -63,6 +65,7 @@ public sealed partial class SolidBody2D
             RestitutionCoefficient = restitutionCoefficient;
             FrictionCoefficient = frictionCoefficient;
             Gravity = gravity;
+            GravityScale = gravityScale;
             SleepEnabled = sleepEnabled;
             SleepFrameThreshold = sleepFrameThreshold;
             SleepLinearSpeedThreshold = sleepLinearSpeedThreshold;

@@ -91,6 +91,46 @@ public sealed class CollisionResponseInvariantTests
     }
 
     [Fact]
+    public void CalculateImpulse_WithHighConfiguredRestitutionThreshold_ShouldSuppressBounce()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        scenario.Context.Settings.RestitutionVelocityThreshold = (Fixed64)4;
+        ScenarioBody<LSSphereCollider> left = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
+        ScenarioBody<LSSphereCollider> right = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
+        left.Body.RestitutionCoefficient = Fixed64.One;
+        right.Body.RestitutionCoefficient = Fixed64.One;
+        Push(left.Body, 60);
+        Push(right.Body, -60);
+        CollisionPair pair = CreateDetectedPair(scenario, left.Collider, right.Collider);
+
+        CollisionResponse.CalculateImpulse(pair);
+
+        AssertNear(left.Body.LinearVelocity.X, Fixed64.Zero);
+        AssertNear(right.Body.LinearVelocity.X, Fixed64.Zero);
+    }
+
+    [Fact]
+    public void CalculateImpulse_WithZeroConfiguredRestitutionThreshold_ShouldBounceLowSpeedContact()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        scenario.Context.Settings.RestitutionVelocityThreshold = Fixed64.Zero;
+        ScenarioBody<LSSphereCollider> left = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
+        ScenarioBody<LSSphereCollider> right = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
+        left.Body.RestitutionCoefficient = Fixed64.One;
+        right.Body.RestitutionCoefficient = Fixed64.One;
+        Push(left.Body, 3);
+        Push(right.Body, -3);
+        CollisionPair pair = CreateDetectedPair(scenario, left.Collider, right.Collider);
+        Fixed64 leftVelocityBefore = left.Body.LinearVelocity.X;
+        Fixed64 rightVelocityBefore = right.Body.LinearVelocity.X;
+
+        CollisionResponse.CalculateImpulse(pair);
+
+        AssertNear(left.Body.LinearVelocity.X, rightVelocityBefore);
+        AssertNear(right.Body.LinearVelocity.X, leftVelocityBefore);
+    }
+
+    [Fact]
     public void CalculateImpulse_WithDifferentMasses_ShouldApplySmallerVelocityDeltaToHeavierBody()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();

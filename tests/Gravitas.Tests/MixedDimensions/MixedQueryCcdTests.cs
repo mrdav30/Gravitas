@@ -1292,6 +1292,90 @@ public sealed class MixedQueryCcdTests
     }
 
     [Fact]
+    public void LateSimulate_WithMixed3DSourceCcdRestitutionThreshold_ShouldSuppressDynamicBounce()
+    {
+        using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
+        context.Environment.Gravity = Fixed64.Zero;
+        context.Settings.RestitutionVelocityThreshold = (Fixed64)5;
+        ScenarioBody<LSSphereCollider> source3D = CreateSphere3D(
+            context,
+            new Vector3d((Fixed64)(-3), Fixed64.Zero, Fixed64.Zero));
+        SolidBody2D target2D = CreateCircle2D(context, Vector2d.Zero);
+        source3D.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        target2D.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        source3D.Body.RestitutionCoefficient = Fixed64.One;
+        target2D.RestitutionCoefficient = Fixed64.One;
+
+        source3D.Body.AddForce(Vector3d.Right * (Fixed64)4);
+        context.LateSimulate();
+
+        source3D.Body.LinearVelocity.X.Should().Be((Fixed64)2);
+        target2D.LinearVelocity.X.Should().Be((Fixed64)2);
+    }
+
+    [Fact]
+    public void LateSimulate_WithMixed3DSourceZeroRestitutionThreshold_ShouldBounceDynamicContact()
+    {
+        using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
+        context.Environment.Gravity = Fixed64.Zero;
+        context.Settings.RestitutionVelocityThreshold = Fixed64.Zero;
+        ScenarioBody<LSSphereCollider> source3D = CreateSphere3D(
+            context,
+            new Vector3d((Fixed64)(-3), Fixed64.Zero, Fixed64.Zero));
+        SolidBody2D target2D = CreateCircle2D(context, Vector2d.Zero);
+        source3D.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        target2D.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        source3D.Body.RestitutionCoefficient = Fixed64.One;
+        target2D.RestitutionCoefficient = Fixed64.One;
+
+        source3D.Body.AddForce(Vector3d.Right * (Fixed64)4);
+        context.LateSimulate();
+
+        source3D.Body.LinearVelocity.X.Should().Be(Fixed64.Zero);
+        target2D.LinearVelocity.X.Should().Be((Fixed64)4);
+    }
+
+    [Fact]
+    public void LateSimulate_WithMixed2DSourceCcdRestitutionThreshold_ShouldSuppressDynamicBounce()
+    {
+        using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
+        context.Environment.Gravity = Fixed64.Zero;
+        context.Settings.RestitutionVelocityThreshold = (Fixed64)5;
+        SolidBody2D source2D = CreateCircle2D(context, new Vector2d((Fixed64)(-3), Fixed64.Zero));
+        ScenarioBody<LSSphereCollider> target3D = CreateSphere3D(context, Vector3d.Zero);
+        source2D.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        target3D.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        source2D.RestitutionCoefficient = Fixed64.One;
+        target3D.Body.RestitutionCoefficient = Fixed64.One;
+
+        source2D.AddForce(Vector2d.Right * (Fixed64)4);
+        context.LateSimulate();
+
+        source2D.LinearVelocity.X.Should().Be((Fixed64)2);
+        target3D.Body.LinearVelocity.X.Should().Be((Fixed64)2);
+    }
+
+    [Fact]
+    public void LateSimulate_WithMixed2DSourceZeroRestitutionThreshold_ShouldBounceDynamicContact()
+    {
+        using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
+        context.Environment.Gravity = Fixed64.Zero;
+        context.Settings.RestitutionVelocityThreshold = Fixed64.Zero;
+        SolidBody2D source2D = CreateCircle2D(context, new Vector2d((Fixed64)(-3), Fixed64.Zero));
+        ScenarioBody<LSSphereCollider> target3D = CreateSphere3D(context, Vector3d.Zero);
+        source2D.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        target3D.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        source2D.RestitutionCoefficient = Fixed64.One;
+        target3D.Body.RestitutionCoefficient = Fixed64.One;
+
+        source2D.AddForce(Vector2d.Right * (Fixed64)4);
+        context.LateSimulate();
+
+        source2D.LinearVelocity.X.Should().Be(Fixed64.Zero);
+        target3D.Body.LinearVelocity.X.Should().Be((Fixed64)4);
+    }
+
+    [Fact]
     public void LateSimulate_WithMixedDynamicChain_ShouldRelayHandoffAcrossServicesDeterministically()
     {
         using GravitasWorldContext context = CreateMixedContext(frameRate: 1);

@@ -36,6 +36,7 @@ public partial class SolidBody
         writer.WriteVector3d(_hitPlatformPosition);
         writer.WriteVector3d(_hitPoint);
         writer.WriteBool(_isGrounded);
+        writer.WriteBool(_wasGrounded);
         writer.WriteVector3d(_lastGroundedPosition);
         writer.WriteQuaternion(_rotation);
         writer.WriteBool(PreventAngularForces);
@@ -47,6 +48,7 @@ public partial class SolidBody
         writer.WriteVector3d(_localCenterOfMassOffset);
         writer.WriteBool(_centerOfMassOffsetExplicit);
         writer.WriteFixed64(RestitutionCoefficient);
+        writer.WriteFixed64(_gravityScale);
         writer.WriteBool(_isSleeping);
         writer.WriteInt32(_sleepFrameCount);
         writer.WriteBool(_sleepEnabled);

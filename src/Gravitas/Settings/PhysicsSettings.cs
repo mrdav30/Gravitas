@@ -25,6 +25,8 @@ public sealed partial class PhysicsSettings
 
     public const int DefaultDiscreteSolverIterations = 6;
 
+    public static readonly Fixed64 DefaultRestitutionVelocityThreshold = (Fixed64)0.25f;
+
     public static readonly Fixed64 DefaultMixed2DHalfThickness = Fixed64.Half;
 
     public static readonly PhysicsLayerMask DefaultGroundCheckLayerMask = PhysicsLayerMask.FromLayer(new PhysicsLayer(0));
@@ -44,6 +46,7 @@ public sealed partial class PhysicsSettings
     private int _retainedPartitionRetirementSweepBudget = DefaultRetainedPartitionRetirementSweepBudget;
     private int _continuousCollisionMaxToiIterations = DefaultContinuousCollisionMaxToiIterations;
     private int _discreteSolverIterations = DefaultDiscreteSolverIterations;
+    private Fixed64 _restitutionVelocityThreshold = DefaultRestitutionVelocityThreshold;
     private PhysicsRuntimeMode _runtimeMode = PhysicsRuntimeMode.ThreeD;
     private Fixed64 _mixed2DHalfThickness = DefaultMixed2DHalfThickness;
 
@@ -104,6 +107,22 @@ public sealed partial class PhysicsSettings
         {
             SwiftThrowHelper.ThrowIfNegativeOrZero(value, nameof(value));
             _discreteSolverIterations = value;
+        }
+    }
+
+    /// <summary>
+    /// Gets or sets the closing speed at or below which contact response uses zero restitution.
+    /// </summary>
+    public Fixed64 RestitutionVelocityThreshold
+    {
+        get => _restitutionVelocityThreshold;
+        set
+        {
+            SwiftThrowHelper.ThrowIfArgument(
+                value < Fixed64.Zero,
+                nameof(value),
+                "Restitution velocity threshold cannot be negative.");
+            _restitutionVelocityThreshold = value;
         }
     }
 

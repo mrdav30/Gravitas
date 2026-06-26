@@ -336,7 +336,7 @@ public sealed partial class SolidBody2D
 
     private Fixed64 ResolveContinuousCollisionRestitution(SolidBody2D target, Fixed64 closingSpeed)
     {
-        if (closingSpeed <= CollisionResponse2D.RestitutionVelocityThreshold)
+        if (closingSpeed <= Context.Settings.RestitutionVelocityThreshold)
             return Fixed64.Zero;
 
         return FixedMath.Clamp(
@@ -347,7 +347,7 @@ public sealed partial class SolidBody2D
 
     private Fixed64 ResolveContinuousCollisionRestitution(SolidBody target, Fixed64 closingSpeed)
     {
-        if (closingSpeed <= CollisionResponse2D.RestitutionVelocityThreshold)
+        if (closingSpeed <= Context.Settings.RestitutionVelocityThreshold)
             return Fixed64.Zero;
 
         return FixedMath.Clamp(

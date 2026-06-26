@@ -20,6 +20,7 @@ public sealed partial class PhysicsSettings
         writer.WriteEnum(DefaultContinuousCollisionMode);
         writer.WriteInt32(ContinuousCollisionMaxToiIterations);
         writer.WriteInt32(DiscreteSolverIterations);
+        writer.WriteFixed64(RestitutionVelocityThreshold);
         writer.WriteFixed64(Mixed2DHalfThickness);
         writer.WriteEnum(RuntimeMode);
 
