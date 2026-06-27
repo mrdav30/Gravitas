@@ -619,10 +619,11 @@ public class Physics2DBenchmarks
 
     private static LSCollider2D CreateShape(int index)
     {
-        return (index % 3) switch
+        return (index % 4) switch
         {
             0 => new LSCircleCollider2D(Fixed64.One),
             1 => new LSAABBoxCollider2D(new Vector2d((Fixed64)2, (Fixed64)2)),
+            2 => new LSCapsuleCollider2D(Fixed64.Half, (Fixed64)3),
             _ => new LSPolygonCollider2D(
                 new Vector2d(-Fixed64.One, -Fixed64.One),
                 new Vector2d(Fixed64.One, -Fixed64.One),

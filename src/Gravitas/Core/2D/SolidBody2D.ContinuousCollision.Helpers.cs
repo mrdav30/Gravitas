@@ -44,6 +44,7 @@ public sealed partial class SolidBody2D
         return Collider switch
         {
             LSCircleCollider2D circle => circle.ScaledRadius,
+            LSCapsuleCollider2D capsule => capsule.ScaledHeight * Fixed64.Half,
             LSAABBoxCollider2D box => box.ScaledHalfExtents.Magnitude,
             LSCompoundCollider2D compound => compound.ScaledRadius,
             _ => ResolveConvexContinuousCollisionProxyRadius()

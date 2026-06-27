@@ -85,6 +85,7 @@ public static partial class CollisionDetectionMixed
         {
             case ColliderType2D.Circle:
                 return TryTestTriangleCircleSlab(triangle, (LSCircleCollider2D)embedded, out penetration);
+            case ColliderType2D.Capsule:
             case ColliderType2D.AABox:
             case ColliderType2D.ConvexPolygon:
                 return TryTestTrianglePrism(triangle, embedded, out penetration);
@@ -134,11 +135,19 @@ public static partial class CollisionDetectionMixed
         if (!CheckTrianglePrismAxis(triangle, prism, triangle.Normalized, ref penetration))
             return false;
 
-        for (int i = 0; i < prism.VertexCount; i++)
+        if (prism is LSCapsuleCollider2D embeddedCapsule)
         {
-            GetPrismEdge(prism, i, out Vector2d edge2D);
-            if (!CheckTrianglePrismAxis(triangle, prism, GetPlanarEdgeNormal(edge2D), ref penetration))
+            if (!CheckEmbeddedCapsuleAxes(triangle, embeddedCapsule, ref penetration))
                 return false;
+        }
+        else
+        {
+            for (int i = 0; i < prism.VertexCount; i++)
+            {
+                GetPrismEdge(prism, i, out Vector2d edge2D);
+                if (!CheckTrianglePrismAxis(triangle, prism, GetPlanarEdgeNormal(edge2D), ref penetration))
+                    return false;
+            }
         }
 
         for (int i = 0; i < 3; i++)
@@ -147,12 +156,20 @@ public static partial class CollisionDetectionMixed
             if (!CheckTrianglePrismAxis(triangle, prism, Vector3d.Cross(triangleEdge, Vector3d.Up), ref penetration))
                 return false;
 
-            for (int j = 0; j < prism.VertexCount; j++)
+            if (prism is LSCapsuleCollider2D capsule2D)
             {
-                GetPrismEdge(prism, j, out Vector2d edge2D);
-                Vector3d prismEdge = new(edge2D.X, Fixed64.Zero, edge2D.Y);
-                if (!CheckTrianglePrismAxis(triangle, prism, Vector3d.Cross(triangleEdge, prismEdge), ref penetration))
+                if (!CheckTriangleEmbeddedCapsuleEdgeAxis(triangle, capsule2D, triangleEdge, ref penetration))
                     return false;
+            }
+            else
+            {
+                for (int j = 0; j < prism.VertexCount; j++)
+                {
+                    GetPrismEdge(prism, j, out Vector2d edge2D);
+                    Vector3d prismEdge = new(edge2D.X, Fixed64.Zero, edge2D.Y);
+                    if (!CheckTrianglePrismAxis(triangle, prism, Vector3d.Cross(triangleEdge, prismEdge), ref penetration))
+                        return false;
+                }
             }
         }
 
@@ -200,6 +217,26 @@ public static partial class CollisionDetectionMixed
             normalizedAxis,
             GetEmbeddedCenter3D(prism) - triangle.Center,
             ref penetration);
+    }
+
+    private static bool CheckEmbeddedCapsuleAxes(
+        MixedTriangle triangle,
+        LSCapsuleCollider2D capsule,
+        ref AxisPenetration penetration)
+    {
+        GetEmbeddedCapsuleAxes(capsule, out Vector3d axis, out Vector3d normal);
+        return CheckTrianglePrismAxis(triangle, capsule, axis, ref penetration)
+            && CheckTrianglePrismAxis(triangle, capsule, normal, ref penetration);
+    }
+
+    private static bool CheckTriangleEmbeddedCapsuleEdgeAxis(
+        MixedTriangle triangle,
+        LSCapsuleCollider2D capsule,
+        Vector3d triangleEdge,
+        ref AxisPenetration penetration)
+    {
+        GetEmbeddedCapsuleAxes(capsule, out Vector3d capsuleAxis, out _);
+        return CheckTrianglePrismAxis(triangle, capsule, Vector3d.Cross(triangleEdge, capsuleAxis), ref penetration);
     }
 
     private static void BuildMeshContact(

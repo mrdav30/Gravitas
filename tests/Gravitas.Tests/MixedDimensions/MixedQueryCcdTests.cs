@@ -512,6 +512,46 @@ public sealed class MixedQueryCcdTests
     }
 
     [Fact]
+    public void SweepSphereAgainst2D_WithCapsuleSlabSide_ShouldReportExactHit()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        LSCollider2D target = CreateBodylessCapsule2D(context, Vector2d.Zero);
+
+        bool mixedHit = context.QueryMixed.SweepSphereAgainst2D(
+            new Vector3d((Fixed64)(-3), Fixed64.Zero, Fixed64.Zero),
+            new Vector3d((Fixed64)3, Fixed64.Zero, Fixed64.Zero),
+            Fixed64.Half,
+            IncludeLayerZero,
+            out PhysicsMixedHit hit);
+
+        mixedHit.Should().BeTrue();
+        hit.Collider2D.Should().BeSameAs(target);
+        hit.Distance.Should().Be((Fixed64)2);
+        hit.Normal3DTo2D.Should().Be(Vector3d.Right);
+        hit.ReducerKind.Should().Be(PhysicsQueryReducerKind.Exact);
+    }
+
+    [Fact]
+    public void SweepSphereAgainst2D_WithCapsuleSlabTopFace_ShouldReportExactHit()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        LSCollider2D target = CreateBodylessCapsule2D(context, Vector2d.Zero);
+
+        bool mixedHit = context.QueryMixed.SweepSphereAgainst2D(
+            new Vector3d(Fixed64.Zero, (Fixed64)3, Fixed64.Zero),
+            new Vector3d(Fixed64.Zero, (Fixed64)(-3), Fixed64.Zero),
+            Fixed64.Half,
+            IncludeLayerZero,
+            out PhysicsMixedHit hit);
+
+        mixedHit.Should().BeTrue();
+        hit.Collider2D.Should().BeSameAs(target);
+        hit.Distance.Should().Be((Fixed64)2);
+        hit.Normal3DTo2D.Should().Be(-Vector3d.Up);
+        hit.ReducerKind.Should().Be(PhysicsQueryReducerKind.Exact);
+    }
+
+    [Fact]
     public void SweepSphereAgainst2D_WithAabbSlabBoundsOnlyCornerMiss_ShouldRejectExactMiss()
     {
         using GravitasWorldContext context = CreateMixedContext();
@@ -649,6 +689,29 @@ public sealed class MixedQueryCcdTests
         mixedHit.Should().BeTrue();
         hit.Collider2D.Should().BeSameAs(target);
         hit.Distance.Should().Be(Fixed64.FromFraction(3, 2));
+        hit.Normal3DTo2D.Should().Be(Vector3d.Right);
+        hit.ReducerKind.Should().Be(PhysicsQueryReducerKind.Exact);
+    }
+
+    [Fact]
+    public void SweepSphereAgainst2D_WithCompoundCapsulePart_ShouldUseOwnerAndExactPartGeometry()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        LSCollider2D target = CreateBodylessCompound2D(
+            context,
+            Vector2d.Zero,
+            CompoundColliderPart2D.Capsule(Fixed64.Half, (Fixed64)3, Vector2d.Zero));
+
+        bool mixedHit = context.QueryMixed.SweepSphereAgainst2D(
+            new Vector3d((Fixed64)(-3), Fixed64.Zero, Fixed64.Zero),
+            new Vector3d((Fixed64)3, Fixed64.Zero, Fixed64.Zero),
+            Fixed64.Half,
+            IncludeLayerZero,
+            out PhysicsMixedHit hit);
+
+        mixedHit.Should().BeTrue();
+        hit.Collider2D.Should().BeSameAs(target);
+        hit.Distance.Should().Be((Fixed64)2);
         hit.Normal3DTo2D.Should().Be(Vector3d.Right);
         hit.ReducerKind.Should().Be(PhysicsQueryReducerKind.Exact);
     }
@@ -1669,27 +1732,39 @@ public sealed class MixedQueryCcdTests
     {
         using GravitasWorldContext context = CreateMixedContext();
         LSCollider2D circle = CreateBodylessCircle2D(context, new Vector2d((Fixed64)2, (Fixed64)3));
+        LSCollider2D capsule = CreateBodylessCapsule2D(context, Vector2d.Zero);
         LSCollider2D box = CreateBodylessBox2D(
             context,
             new Vector2d((Fixed64)(-2), (Fixed64)(-3)),
             new Vector2d((Fixed64)4, (Fixed64)2));
-        context.Diagnostics.Enable(eventCapacity: 0, drawCommandCapacity: 4);
+        context.Diagnostics.Enable(eventCapacity: 0, drawCommandCapacity: 6);
 
         context.Diagnostics.CaptureMixedCollider(circle, GravitasDiagnosticColor.Cyan);
+        context.Diagnostics.CaptureMixedCollider(capsule, GravitasDiagnosticColor.Green);
         context.Diagnostics.CaptureMixedCollider(box, GravitasDiagnosticColor.Yellow);
 
         ReadOnlySpan<GravitasDebugDrawCommand> commands = context.Diagnostics.DrawCommands;
-        commands.Length.Should().Be(2);
+        commands.Length.Should().Be(5);
         commands[0].Kind.Should().Be(GravitasDebugDrawKind.WireCylinder);
         commands[0].ColliderDimension.Should().Be(GravitasColliderDimension.TwoD);
         commands[0].Collider2DType.Should().Be(ColliderType2D.Circle);
         commands[0].Center.Should().Be(new Vector3d((Fixed64)2, Fixed64.Zero, (Fixed64)3));
         commands[0].Height.Should().Be(context.Settings.Mixed2DHalfThickness * 2);
-        commands[1].Kind.Should().Be(GravitasDebugDrawKind.WireBox);
+        commands[1].Kind.Should().Be(GravitasDebugDrawKind.WireCylinder);
         commands[1].ColliderDimension.Should().Be(GravitasColliderDimension.TwoD);
-        commands[1].Collider2DType.Should().Be(ColliderType2D.AABox);
-        commands[1].Center.Should().Be(new Vector3d((Fixed64)(-2), Fixed64.Zero, (Fixed64)(-3)));
-        commands[1].Size.Should().Be(new Vector3d((Fixed64)4, context.Settings.Mixed2DHalfThickness * 2, (Fixed64)2));
+        commands[1].Collider2DType.Should().Be(ColliderType2D.Capsule);
+        commands[1].Radius.Should().Be(Fixed64.Half);
+        commands[1].Height.Should().Be(context.Settings.Mixed2DHalfThickness * 2);
+        commands[2].Kind.Should().Be(GravitasDebugDrawKind.WireCylinder);
+        commands[2].Collider2DType.Should().Be(ColliderType2D.Capsule);
+        commands[3].Kind.Should().Be(GravitasDebugDrawKind.WireBox);
+        commands[3].Collider2DType.Should().Be(ColliderType2D.Capsule);
+        commands[3].Size.Should().Be(new Vector3d(Fixed64.One, context.Settings.Mixed2DHalfThickness * 2, (Fixed64)2));
+        commands[4].Kind.Should().Be(GravitasDebugDrawKind.WireBox);
+        commands[4].ColliderDimension.Should().Be(GravitasColliderDimension.TwoD);
+        commands[4].Collider2DType.Should().Be(ColliderType2D.AABox);
+        commands[4].Center.Should().Be(new Vector3d((Fixed64)(-2), Fixed64.Zero, (Fixed64)(-3)));
+        commands[4].Size.Should().Be(new Vector3d((Fixed64)4, context.Settings.Mixed2DHalfThickness * 2, (Fixed64)2));
     }
 
     private static GravitasWorldContext CreateMixedContext(int frameRate = 4)
@@ -1879,6 +1954,16 @@ public sealed class MixedQueryCcdTests
     private static LSCollider2D CreateBodylessCircle2D(GravitasWorldContext context, Vector2d position)
     {
         var collider = new LSCircleCollider2D(Fixed64.Half);
+        var agent = new TestMatterAgent(
+            context,
+            new FixedTransform(new Vector3d(position.X, Fixed64.Zero, position.Y), FixedQuaternion.Identity, Vector3d.One));
+        collider.InitializeWithNoBody(agent);
+        return collider;
+    }
+
+    private static LSCollider2D CreateBodylessCapsule2D(GravitasWorldContext context, Vector2d position)
+    {
+        var collider = new LSCapsuleCollider2D(Fixed64.Half, (Fixed64)3);
         var agent = new TestMatterAgent(
             context,
             new FixedTransform(new Vector3d(position.X, Fixed64.Zero, position.Y), FixedQuaternion.Identity, Vector3d.One));

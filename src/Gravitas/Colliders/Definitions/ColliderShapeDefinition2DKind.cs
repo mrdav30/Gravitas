@@ -15,5 +15,6 @@ public enum ColliderShapeDefinition2DKind : byte
     Undefined = 0,
     Circle = 1,
     AABBox = 2,
-    ConvexPolygon = 3
+    ConvexPolygon = 3,
+    Capsule = 4
 }

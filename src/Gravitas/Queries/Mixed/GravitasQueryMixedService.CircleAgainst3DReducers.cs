@@ -108,6 +108,7 @@ public sealed partial class GravitasQueryMixedService
     private static PhysicsQueryReducerKind ClassifySweepSphereAgainst2DReducer(LSCollider2D collider)
     {
         if (collider is LSCircleCollider2D
+            || collider is LSCapsuleCollider2D
             || collider is LSAABBoxCollider2D
             || collider is LSPolygonCollider2D)
         {

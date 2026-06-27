@@ -46,6 +46,40 @@ public sealed class Collider2DMassPropertyTests
     }
 
     [Fact]
+    public void Capsule_ShouldCalculateAreaCenterAndMomentAroundRequestedLocalReference()
+    {
+        var collider = new LSCapsuleCollider2D(Fixed64.One, (Fixed64)4)
+        {
+            LocalOffset = new Vector2d((Fixed64)3, -Fixed64.One)
+        };
+
+        Fixed64 mass = (Fixed64)12;
+        Fixed64 momentAboutCom = collider.CalculateMomentOfInertia(
+            mass,
+            collider.CalculateLocalCenterOfMassOffset());
+        Fixed64 momentAboutOrigin = collider.CalculateMomentOfInertia(mass, Vector2d.Zero);
+        Fixed64 expectedArea = (Fixed64)4 + Fixed64.Pi;
+
+        AssertNear(collider.CalculateAreaForMassProperties(), expectedArea);
+        collider.CalculateLocalCenterOfMassOffset().Should().Be(new Vector2d((Fixed64)3, -Fixed64.One));
+        momentAboutCom.Should().BeGreaterThan(mass * Fixed64.Half);
+        momentAboutOrigin.Should().Be(momentAboutCom + mass * (Fixed64)10);
+    }
+
+    [Fact]
+    public void Capsule_WithHeightEqualDiameter_ShouldBehaveLikeCircleForAreaAndMoment()
+    {
+        var capsule = new LSCapsuleCollider2D(Fixed64.One, (Fixed64)2);
+        var circle = new LSCircleCollider2D(Fixed64.One);
+
+        capsule.CalculateAreaForMassProperties().Should().Be(circle.CalculateAreaForMassProperties());
+        capsule.CalculateLocalCenterOfMassOffset().Should().Be(circle.CalculateLocalCenterOfMassOffset());
+        capsule.CalculateMomentOfInertia((Fixed64)8, Vector2d.Zero)
+            .Should()
+            .Be(circle.CalculateMomentOfInertia((Fixed64)8, Vector2d.Zero));
+    }
+
+    [Fact]
     public void ConvexPolygon_ShouldCalculateCentroidAreaAndMoment()
     {
         var collider = new LSPolygonCollider2D(

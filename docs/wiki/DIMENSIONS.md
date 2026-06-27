@@ -22,12 +22,12 @@ those concrete types, not a third dimension value.
 - `PhysicsRuntimeMode.Mixed` advances both pure services plus the dedicated
   mixed lifecycle and broad-phase path. Mixed narrow phase supports 3D spheres,
   cuboids, capsules, finite cylinders, compound colliders, and mesh colliders
-  against embedded 2D circle, AABB, convex polygon, and compound slabs. Mixed pair
-  ownership, constrained response, explicit mixed sweeps, mixed CCD hooks, and
-  dimension-tagged diagnostics are implemented. Mixed 2D swept-circle queries
-  cover primitive, mesh, and compound 3D targets; 3D swept-sphere queries cover
-  primitive and compound 2D targets with exact circle, AABB, convex polygon,
-  and supported compound slab reducers.
+  against embedded 2D circle, capsule, AABB, convex polygon, and compound
+  slabs. Mixed pair ownership, constrained response, explicit mixed sweeps,
+  mixed CCD hooks, and dimension-tagged diagnostics are implemented. Mixed 2D
+  swept-circle queries cover primitive, mesh, and compound 3D targets; 3D
+  swept-sphere queries cover primitive and compound 2D targets with exact
+  circle, capsule, AABB, convex polygon, and supported compound slab reducers.
 
 The context clock, coroutines, diagnostics, and lifecycle hooks remain shared.
 This lets pure 2D simulations use the same host loop without paying 3D
@@ -110,6 +110,7 @@ filtering, cleanup, and static collision response.
 The current pure 2D shape set is:
 
 - `LSCircleCollider2D`
+- `LSCapsuleCollider2D`
 - `LSAABBoxCollider2D`
 - `LSPolygonCollider2D`
 - `LSCompoundCollider2D`
@@ -117,22 +118,24 @@ The current pure 2D shape set is:
 `LSPolygonCollider2D` validates convexity and rejects concave or collinear
 input instead of silently accepting ambiguous collision truth. A rotated box
 should use a convex polygon; `LSAABBoxCollider2D` remains axis-aligned by
-design.
+design. Triangle authoring helpers materialize as three-vertex convex polygons
+rather than a separate runtime shape type.
 
 Each current pure 2D collider also exposes deterministic shape-derived mass
 properties: local center of mass, area, and scalar moment about an explicit
-body-local reference point. Circle, AABB, and convex polygon formulas use their
-scaled local shape data. `LSCompoundCollider2D` aggregates private parts in
-stable part order, assigns area-proportional part mass, applies the owning
-collider's local offset, and honors authored part scale and rotation before
-center-of-mass and moment calculations. Its private part geometry is anchored
-from the owner center, so aggregate bounds/collision geometry and mass-property
-geometry share the same local-coordinate model.
+body-local reference point. Circle, capsule, AABB, and convex polygon formulas
+use their scaled local shape data. `LSCompoundCollider2D` aggregates private
+parts in stable part order, assigns area-proportional part mass, applies the
+owning collider's local offset, and honors authored part scale and rotation
+before center-of-mass and moment calculations. Its private part geometry is
+anchored from the owner center, so aggregate bounds/collision geometry and
+mass-property geometry share the same local-coordinate model.
 
 `ColliderShapeDefinition2D` is the data-only authoring/import surface for
-circle, AABB, convex polygon shape inputs, and optional surface material.
-`CompoundColliderPart2D` combines that definition with optional part material,
-local offset, scalar local rotation, and local scale, then
+circle, capsule, AABB, convex polygon shape inputs, triangle convenience
+authoring, and optional surface material. `CompoundColliderPart2D` combines
+that definition with optional part material, local offset, scalar local
+rotation, and local scale, then
 `LSCompoundCollider2D` materializes private runtime part colliders under one
 public 2D collider identity. Authored 2D compound assets should use those
 definitions rather than treating child runtime colliders as serialized asset
@@ -192,11 +195,11 @@ All-hit overloads write into caller-owned `SwiftList<Physics2DHit>` buffers,
 run GridForge-backed partition candidate gathering with duplicate suppression,
 run layer-mask and exact 2D shape checks, and sort by deterministic hit
 ordering. `OverlapAabb` and `OverlapPolygon` run exact fixed-point 2D area
-checks against circle, AABB, convex polygon, and compound colliders. `Raycast`
-returns the closest segment hit from `start` to `end` using the same distance
-and collider-ID ordering as `RaycastAll`. `SweepCircle` is the pure 2D swept
-movement/query path used by 2D CCD. Compound 2D query hits report the owning
-`LSCompoundCollider2D`, not its private part colliders.
+checks against circle, capsule, AABB, convex polygon, and compound colliders.
+`Raycast` returns the closest segment hit from `start` to `end` using the same
+distance and collider-ID ordering as `RaycastAll`. `SweepCircle` is the pure 2D
+swept movement/query path used by 2D CCD. Compound 2D query hits report the
+owning `LSCompoundCollider2D`, not its private part colliders.
 
 The existing `GravitasQuery3DService` is a 3D X/Z ground-plane proximity
 query. It is not the pure 2D query API.
@@ -222,8 +225,8 @@ The mixed runtime model is explicit rather than separate dimension engines:
   dedicated mixed collision lifecycle path. The mixed broad phase uses
   `PhysicsMixedPartition` and stable 3D/2D candidate keys. Mixed narrow phase
   supports 3D spheres, cuboids, capsules, finite cylinders, compound
-  colliders, and mesh colliders against embedded 2D circle, AABB, convex
-  polygon, and compound slabs.
+  colliders, and mesh colliders against embedded 2D circle, capsule, AABB,
+  convex polygon, and compound slabs.
 - mixed contacts embed 2D colliders into 3D as finite X/Z prisms centered on
   the host transform's Y position.
 - 2D bodies remain plane-constrained: planar impulse can move them in X/Z and
@@ -248,7 +251,7 @@ The mixed runtime model is explicit rather than separate dimension engines:
   mesh, and compound targets. Current `SweepCircleAgainst3D` target reducers are
   exact for supported 3D target families, including slab-clipped mesh triangle
   targets and authored compound targets. Current `SweepSphereAgainst2D` target
-  reducers are exact for 2D circle, AABB, convex polygon, and supported
+  reducers are exact for 2D circle, capsule, AABB, convex polygon, and supported
   compound slabs. `PhysicsMixedHit.ReducerKind` labels exact hits separately
   from conservative fallback hits on proxy-based dynamic CCD paths. Mixed query
   diagnostics also emit `QuerySummary` reducer counters when enabled. Pure

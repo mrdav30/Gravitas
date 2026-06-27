@@ -16,6 +16,7 @@ public class MixedQueryCompound2DBenchmarks
     private GravitasWorldContext _falsePositiveAabbContext;
     private GravitasWorldContext _densePolygonContext;
     private GravitasWorldContext _falsePositivePolygonContext;
+    private GravitasWorldContext _denseCapsuleContext;
     private GravitasWorldContext _denseCompoundContext;
     private GravitasWorldContext _falsePositiveCompoundContext;
     private SwiftList<PhysicsMixedHit> _hits;
@@ -35,6 +36,7 @@ public class MixedQueryCompound2DBenchmarks
         _falsePositiveAabbContext = BenchmarkPhysicsScene.CreateMixedContext(extentX, 16);
         _densePolygonContext = BenchmarkPhysicsScene.CreateMixedContext(extentX, 16);
         _falsePositivePolygonContext = BenchmarkPhysicsScene.CreateMixedContext(extentX, 16);
+        _denseCapsuleContext = BenchmarkPhysicsScene.CreateMixedContext(extentX, 16);
         _denseCompoundContext = BenchmarkPhysicsScene.CreateMixedContext(extentX, 16);
         _falsePositiveCompoundContext = BenchmarkPhysicsScene.CreateMixedContext(extentX, 16);
         _hits = new SwiftList<PhysicsMixedHit>(ColliderCount);
@@ -46,6 +48,7 @@ public class MixedQueryCompound2DBenchmarks
             _ = CreateAabb2D(_falsePositiveAabbContext, position);
             _ = CreatePolygon2D(_densePolygonContext, position);
             _ = CreatePolygon2D(_falsePositivePolygonContext, position);
+            _ = CreateCapsule2D(_denseCapsuleContext, position);
             _ = CreateCompound2D(_denseCompoundContext, position);
             _ = CreateCompound2D(_falsePositiveCompoundContext, position);
         }
@@ -54,6 +57,7 @@ public class MixedQueryCompound2DBenchmarks
         _falsePositiveAabbContext.Simulate();
         _densePolygonContext.Simulate();
         _falsePositivePolygonContext.Simulate();
+        _denseCapsuleContext.Simulate();
         _denseCompoundContext.Simulate();
         _falsePositiveCompoundContext.Simulate();
 
@@ -76,12 +80,14 @@ public class MixedQueryCompound2DBenchmarks
         _falsePositiveAabbContext?.Dispose();
         _densePolygonContext?.Dispose();
         _falsePositivePolygonContext?.Dispose();
+        _denseCapsuleContext?.Dispose();
         _denseCompoundContext?.Dispose();
         _falsePositiveCompoundContext?.Dispose();
         _denseAabbContext = null;
         _falsePositiveAabbContext = null;
         _densePolygonContext = null;
         _falsePositivePolygonContext = null;
+        _denseCapsuleContext = null;
         _denseCompoundContext = null;
         _falsePositiveCompoundContext = null;
         _hits = null;
@@ -140,6 +146,19 @@ public class MixedQueryCompound2DBenchmarks
     }
 
     [Benchmark]
+    public int SweepSphereAgainst2DAll_DenseCapsuleTargets()
+    {
+        return SweepSphereAgainst2D(_denseCapsuleContext, _denseStart, _denseEnd);
+    }
+
+    [Benchmark]
+    public int SweepSphereAgainst2DAll_DenseCapsuleTargets_CandidateCount()
+    {
+        _ = SweepSphereAgainst2D(_denseCapsuleContext, _denseStart, _denseEnd);
+        return _denseCapsuleContext.QueryMixed.LastQueryCandidateCount;
+    }
+
+    [Benchmark]
     public int SweepSphereAgainst2DAll_DenseCompoundTargets()
     {
         return SweepSphereAgainst2D(_denseCompoundContext, _denseStart, _denseEnd);
@@ -185,12 +204,18 @@ public class MixedQueryCompound2DBenchmarks
         return CreateBody2D(context, new LSPolygonCollider2D(CreateDiamondVertices()), position);
     }
 
+    private static SolidBody2D CreateCapsule2D(GravitasWorldContext context, Vector3d position)
+    {
+        return CreateBody2D(context, new LSCapsuleCollider2D(Fixed64.Half, (Fixed64)3), position);
+    }
+
     private static SolidBody2D CreateCompound2D(GravitasWorldContext context, Vector3d position)
     {
         return CreateBody2D(
             context,
             new LSCompoundCollider2D(
                 CompoundColliderPart2D.AABBox(Vector2d.One, new Vector2d(-Fixed64.Half, Fixed64.Zero)),
+                CompoundColliderPart2D.Capsule(Fixed64.FromFraction(1, 4), Fixed64.FromFraction(3, 2), Vector2d.Zero),
                 CompoundColliderPart2D.ConvexPolygon(
                     CreateDiamondVertices(),
                     new Vector2d(Fixed64.Half, Fixed64.Zero))),

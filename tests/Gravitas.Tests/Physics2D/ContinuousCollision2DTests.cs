@@ -17,6 +17,7 @@ public sealed class ContinuousCollision2DTests
     [InlineData(ColliderType2D.Circle)]
     [InlineData(ColliderType2D.AABox)]
     [InlineData(ColliderType2D.ConvexPolygon)]
+    [InlineData(ColliderType2D.Capsule)]
     [InlineData(ColliderType2D.Compound)]
     public void ContinuousMode_ShouldPreventFastCircleTunnelingThroughStaticTargets(ColliderType2D targetShape)
     {
@@ -29,6 +30,29 @@ public sealed class ContinuousCollision2DTests
         context.LateSimulate();
 
         mover.Position.X.Should().Be((Fixed64)4);
+        mover.LinearVelocity.X.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void ContinuousMode_ShouldPreventFastCapsuleMoverTunnelingThroughStaticCircle()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        SolidBody2D mover = CreateBody(
+            context,
+            new LSCapsuleCollider2D(Fixed64.Half, (Fixed64)2),
+            Vector2d.Zero,
+            immovable: false);
+        _ = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.Half),
+            new Vector2d((Fixed64)5, Fixed64.Zero),
+            immovable: true);
+        mover.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+
+        mover.AddForce(new Vector2d((Fixed64)10, Fixed64.Zero));
+        context.LateSimulate();
+
+        mover.Position.X.Should().BeLessThan((Fixed64)5);
         mover.LinearVelocity.X.Should().Be(Fixed64.Zero);
     }
 
@@ -1110,6 +1134,7 @@ public sealed class ContinuousCollision2DTests
         {
             ColliderType2D.Circle => new LSCircleCollider2D(Fixed64.Half),
             ColliderType2D.AABox => new LSAABBoxCollider2D(Vector2d.One),
+            ColliderType2D.Capsule => new LSCapsuleCollider2D(Fixed64.Half, (Fixed64)2),
             ColliderType2D.ConvexPolygon => new LSPolygonCollider2D(
                 new Vector2d(-Fixed64.Half, -Fixed64.Half),
                 new Vector2d(Fixed64.Half, -Fixed64.Half),

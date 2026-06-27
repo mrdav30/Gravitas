@@ -52,11 +52,11 @@ ignore, same-agent, explicit hierarchy, duplicate, and bounds filtering. The mix
 `LSCollider2D` is a finite 3D `FixedBoundBox` built from pure 2D X/Z bounds plus a
 positive Y half-thickness centered on the host transform's Y position.
 `CollisionDetectionMixed` supports 3D sphere, cuboid, capsule, finite
-cylinder, compound, and mesh contacts against embedded 2D circle, AABB, convex
-polygon, and compound slabs. Compound mixed contacts scan owned parts in stable
-order and return one external contact surface on either side. Mesh mixed
-contacts gather local-BVH triangle candidates and test triangles against the
-embedded 2D slab volume.
+cylinder, compound, and mesh contacts against embedded 2D circle, capsule,
+AABB, convex polygon, and compound slabs. Compound mixed contacts scan owned parts
+in stable order and return one external contact surface on either side. Mesh
+mixed contacts gather local-BVH triangle candidates and test triangles against
+the embedded 2D slab volume.
 `CollisionPairMixed` owns stable 3D/2D pair identity, resting-pair retention,
 wake propagation, mixed contact enter/stay/exit events, trigger-only mixed
 trigger events, and pooled pair reuse. `CollisionResponseMixed` applies the
@@ -86,8 +86,8 @@ mixed CCD routes through the same mixed query reducers as public
 use finite-slab reducers. Mesh targets clip candidate triangles to the finite
 slab before X/Z projection, and compound targets reduce exact supported parts in
 authored order. 3D swept-sphere mixed CCD routes through the same mixed query
-reducers as public `SweepSphereAgainst2D`: circle slabs, AABB slabs, convex
-polygon slabs, and supported compound 2D slabs are exact.
+reducers as public `SweepSphereAgainst2D`: circle slabs, capsule slabs, AABB
+slabs, convex polygon slabs, and supported compound 2D slabs are exact.
 When diagnostics are enabled, mixed queries also emit `QuerySummary` events with
 eligible top-level exact attempt, accepted hit, fallback hit, and rejected
 fallback counts.
@@ -95,21 +95,26 @@ fallback counts.
 `CollisionDetection2D` supports:
 
 - circle/circle.
+- circle/capsule.
 - circle/axis-aligned box.
 - axis-aligned box/axis-aligned box.
 - circle/convex polygon.
+- capsule/capsule.
+- capsule/axis-aligned box.
+- capsule/convex polygon.
 - axis-aligned box/convex polygon.
 - convex polygon/convex polygon.
 - compound/primitive or compound/compound, resolved by scanning owned parts in
   stable declaration order and returning the owner collider identity.
 
-Circles use center/radius tests and support points. Boxes and polygons use 2D
-separating-axis tests over deterministic vertex order. `LSPolygonCollider2D`
-rejects concave and collinear input up front; concave 2D decomposition is not
-claimed yet. `CollisionPair2D` resolves collider priority up front and
-`CollisionDetection2D` dispatches through `CollisionType2D`, so adding a new
-2D shape pair should extend the settings/type table instead of growing public
-type-check conditionals.
+Circles use center/radius tests and support points. Capsules use analytic
+segment-plus-radius geometry rather than polygon approximation. Boxes and
+polygons use 2D separating-axis tests over deterministic vertex order.
+`LSPolygonCollider2D` rejects concave and collinear input up front; concave 2D
+decomposition is not claimed yet. `CollisionPair2D` resolves collider priority
+up front and `CollisionDetection2D` dispatches through `CollisionType2D`, so
+adding a new 2D shape pair should extend the settings/type table instead of
+growing public type-check conditionals.
 
 The separating-axis invariant is the broad rule behind every convex SAT path:
 if a candidate axis projects two convex shapes into non-overlapping intervals,
@@ -452,16 +457,19 @@ moving collider:
   the false-negative tunneling risk of using the smallest bounds axis while the
   shape's wider portion passes through a target away from the center path.
 - 2D circle uses its scaled radius.
+- 2D capsule uses its scaled end-to-end height as the conservative proxy
+  diameter.
 - 2D AABB and convex polygon use a conservative bounds radius.
 - 2D compound uses a conservative aggregate radius over its private parts.
 
 For static-style targets, supported movers then run an exact reduction pass
 before the proxy hit can be accepted:
 
-- pure 2D circles reuse swept-circle tests, convex/AABB movers use deterministic
-  swept SAT against convex targets, convex movers against circles reuse the
-  circle sweep in reverse, and 2D compounds reduce through private parts while
-  keeping the compound target identity.
+- pure 2D circles and capsules reuse analytic swept-circle/segment reducers,
+  convex/AABB movers use deterministic swept SAT against convex targets,
+  convex movers against circles reuse the circle sweep in reverse, and 2D
+  compounds reduce through private parts while keeping the compound target
+  identity.
 - pure 3D sphere targets are reduced by sweeping the target sphere backward
   against the moving source collider with `SweptSphereQueryWorker`. This covers
   3D cuboid, capsule, cylinder, mesh, and compound movers for sphere-target
@@ -554,8 +562,8 @@ validates supported pure-dimension candidates with exact mover-shape reducers:
   sweeps, convex primitive movers, convex mesh movers, and compounds made from
   supported convex parts against dynamic 3D targets. Concave mesh targets reduce
   through bounded triangle candidates; concave mesh sources remain unsupported.
-- pure 2D dynamic CCD uses exact relative mover-shape sweeps for circle, AABB,
-  convex polygon, and compound movers and targets.
+- pure 2D dynamic CCD uses exact relative mover-shape sweeps for circle,
+  capsule, AABB, convex polygon, and compound movers and targets.
 - mixed dynamic CCD keeps the conservative relative proxy path when no
   shape-exact mixed reducer exists. Mixed dynamic targets use the larger of
   planar radius and mixed half-thickness as their 3D proxy radius, then accepted

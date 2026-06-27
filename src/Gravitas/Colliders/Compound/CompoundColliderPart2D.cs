@@ -106,6 +106,24 @@ public readonly struct CompoundColliderPart2D
         Vector2d localScale) =>
         new(ColliderShapeDefinition2D.Circle(radius), localOffset, localRotation, localScale);
 
+    public static CompoundColliderPart2D Capsule(Fixed64 radius, Fixed64 height, Vector2d localOffset) =>
+        new(ColliderShapeDefinition2D.Capsule(radius, height), localOffset);
+
+    public static CompoundColliderPart2D Capsule(
+        Fixed64 radius,
+        Fixed64 height,
+        Vector2d localOffset,
+        PhysicsMaterial material) =>
+        new(ColliderShapeDefinition2D.Capsule(radius, height), localOffset, Fixed64.Zero, Vector2d.One, material);
+
+    public static CompoundColliderPart2D Capsule(
+        Fixed64 radius,
+        Fixed64 height,
+        Vector2d localOffset,
+        Fixed64 localRotation,
+        Vector2d localScale) =>
+        new(ColliderShapeDefinition2D.Capsule(radius, height), localOffset, localRotation, localScale);
+
     public static CompoundColliderPart2D AABBox(Vector2d size, Vector2d localOffset) =>
         new(ColliderShapeDefinition2D.AABBox(size), localOffset);
 

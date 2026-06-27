@@ -30,6 +30,9 @@ public sealed partial class GravitasQueryMixedService
         if (collider is LSCircleCollider2D circle)
             return TrySweepSphereAgainstCircleSlab(start, direction, length, radius, circle, out hit);
 
+        if (collider is LSCapsuleCollider2D capsule)
+            return TrySweepSphereAgainstCapsuleSlab(start, direction, length, radius, capsule, out hit);
+
         if (collider is LSAABBoxCollider2D || collider is LSPolygonCollider2D)
             return TrySweepSphereAgainstConvexSlab(start, direction, length, radius, collider, out hit);
 
@@ -77,6 +80,88 @@ public sealed partial class GravitasQueryMixedService
             best.ReducerKind,
             best.Distance,
             best.Direction3D);
+        return true;
+    }
+
+    private static bool TrySweepSphereAgainstCapsuleSlab(
+        Vector3d start,
+        Vector3d direction,
+        Fixed64 length,
+        Fixed64 radius,
+        LSCapsuleCollider2D capsule,
+        out PhysicsMixedHit hit)
+    {
+        if (DistanceSquaredToCapsuleSlab(start, capsule) <= radius * radius)
+        {
+            hit = BuildSphereAgainst2DHit(
+                capsule,
+                start,
+                radius,
+                PhysicsQueryReducerKind.Exact,
+                Fixed64.Zero,
+                direction);
+            return true;
+        }
+
+        Fixed64 slabMinY = capsule.MixedSlabCenterY - capsule.MixedHalfThickness;
+        Fixed64 slabMaxY = capsule.MixedSlabCenterY + capsule.MixedHalfThickness;
+        Fixed64 combinedRadius = radius + capsule.ScaledRadius;
+        bool found = false;
+        Fixed64 bestDistance = Fixed64.MaxValue;
+
+        TrySweepCapsuleSlabCapFace(
+            start,
+            direction,
+            length,
+            capsule,
+            slabMaxY + radius,
+            requireStartBeyondPlane: true,
+            ref found,
+            ref bestDistance);
+        TrySweepCapsuleSlabCapFace(
+            start,
+            direction,
+            length,
+            capsule,
+            slabMinY - radius,
+            requireStartBeyondPlane: false,
+            ref found,
+            ref bestDistance);
+        TrySweepCapsuleSlabSide(
+            start,
+            direction,
+            length,
+            capsule,
+            combinedRadius,
+            slabMinY,
+            slabMaxY,
+            ref found,
+            ref bestDistance);
+        TrySweepCapsuleSlabBoundaryEdges(
+            start,
+            direction,
+            length,
+            capsule,
+            combinedRadius,
+            slabMinY,
+            slabMaxY,
+            ref found,
+            ref bestDistance);
+
+        if (!found)
+        {
+            hit = default;
+            return false;
+        }
+
+        Vector3d sweepCenter = start + direction * bestDistance;
+        hit = BuildSphereAgainst2DHit(
+            capsule,
+            sweepCenter,
+            radius,
+            PhysicsQueryReducerKind.Exact,
+            bestDistance,
+            direction);
         return true;
     }
 
@@ -289,6 +374,160 @@ public sealed partial class GravitasQueryMixedService
                 ref found,
                 ref bestDistance);
         }
+    }
+
+    private static void TrySweepCapsuleSlabCapFace(
+        Vector3d start,
+        Vector3d direction,
+        Fixed64 length,
+        LSCapsuleCollider2D capsule,
+        Fixed64 planeY,
+        bool requireStartBeyondPlane,
+        ref bool found,
+        ref Fixed64 bestDistance)
+    {
+        bool canReach = requireStartBeyondPlane
+            ? start.Y > planeY && direction.Y < -Fixed64.Epsilon
+            : start.Y < planeY && direction.Y > Fixed64.Epsilon;
+        if (!canReach)
+            return;
+
+        Fixed64 distance = (planeY - start.Y) / direction.Y;
+        if (distance < Fixed64.Zero || distance > length)
+            return;
+
+        Vector3d point = start + direction * distance;
+        if (!capsule.ContainsPoint(new Vector2d(point.X, point.Z)))
+            return;
+
+        TryKeepEarlierSweep(true, distance, ref found, ref bestDistance);
+    }
+
+    private static void TrySweepCapsuleSlabSide(
+        Vector3d start,
+        Vector3d direction,
+        Fixed64 length,
+        LSCapsuleCollider2D capsule,
+        Fixed64 combinedRadius,
+        Fixed64 slabMinY,
+        Fixed64 slabMaxY,
+        ref bool found,
+        ref Fixed64 bestDistance)
+    {
+        Vector2d planarDirection = new(direction.X, direction.Z);
+        Fixed64 planarSpeedSquared = planarDirection.MagnitudeSquared;
+        if (planarSpeedSquared <= Fixed64.Epsilon)
+            return;
+
+        Fixed64 planarSpeed = FixedMath.Sqrt(planarSpeedSquared);
+        Vector2d planarUnit = planarDirection / planarSpeed;
+        Fixed64 planarLength = length * planarSpeed;
+        if (!TrySweepPointAgainstSegmentCapsule(
+                new Vector2d(start.X, start.Z),
+                planarUnit,
+                planarLength,
+                capsule.SegmentStart,
+                capsule.SegmentEnd,
+                combinedRadius,
+                out Fixed64 planarDistance))
+        {
+            return;
+        }
+
+        Fixed64 distance = planarDistance / planarSpeed;
+        if (distance < Fixed64.Zero || distance > length)
+            return;
+
+        Fixed64 y = start.Y + direction.Y * distance;
+        if (y < slabMinY || y > slabMaxY)
+            return;
+
+        TryKeepEarlierSweep(true, distance, ref found, ref bestDistance);
+    }
+
+    private static void TrySweepCapsuleSlabBoundaryEdges(
+        Vector3d start,
+        Vector3d direction,
+        Fixed64 length,
+        LSCapsuleCollider2D capsule,
+        Fixed64 combinedRadius,
+        Fixed64 slabMinY,
+        Fixed64 slabMaxY,
+        ref bool found,
+        ref Fixed64 bestDistance)
+    {
+        Vector3d bottomStart = new(capsule.SegmentStart.X, slabMinY, capsule.SegmentStart.Y);
+        Vector3d bottomEnd = new(capsule.SegmentEnd.X, slabMinY, capsule.SegmentEnd.Y);
+        Vector3d topStart = new(capsule.SegmentStart.X, slabMaxY, capsule.SegmentStart.Y);
+        Vector3d topEnd = new(capsule.SegmentEnd.X, slabMaxY, capsule.SegmentEnd.Y);
+
+        TryKeepCapsuleSlabBoundaryEdgeSweep(
+            start,
+            direction,
+            length,
+            capsule,
+            bottomStart,
+            bottomEnd,
+            combinedRadius,
+            ref found,
+            ref bestDistance);
+        TryKeepCapsuleSlabBoundaryEdgeSweep(
+            start,
+            direction,
+            length,
+            capsule,
+            topStart,
+            topEnd,
+            combinedRadius,
+            ref found,
+            ref bestDistance);
+        TryKeepEarlierSweep(
+            TrySweepPointAgainstSegmentCapsule3D(start, direction, length, bottomStart, topStart, combinedRadius, out Fixed64 firstVerticalDistance),
+            firstVerticalDistance,
+            ref found,
+            ref bestDistance);
+        TryKeepEarlierSweep(
+            TrySweepPointAgainstSegmentCapsule3D(start, direction, length, bottomEnd, topEnd, combinedRadius, out Fixed64 secondVerticalDistance),
+            secondVerticalDistance,
+            ref found,
+            ref bestDistance);
+    }
+
+    private static void TryKeepCapsuleSlabBoundaryEdgeSweep(
+        Vector3d start,
+        Vector3d direction,
+        Fixed64 length,
+        LSCapsuleCollider2D capsule,
+        Vector3d edgeStart,
+        Vector3d edgeEnd,
+        Fixed64 radius,
+        ref bool found,
+        ref Fixed64 bestDistance)
+    {
+        if (!TrySweepPointAgainstSegmentCapsule3D(start, direction, length, edgeStart, edgeEnd, radius, out Fixed64 distance))
+            return;
+
+        Vector3d sweepCenter = start + direction * distance;
+        if (capsule.ContainsPoint(new Vector2d(sweepCenter.X, sweepCenter.Z)))
+            return;
+
+        TryKeepEarlierSweep(true, distance, ref found, ref bestDistance);
+    }
+
+    private static Fixed64 DistanceSquaredToCapsuleSlab(Vector3d point, LSCapsuleCollider2D capsule)
+    {
+        Vector2d planarPoint = new(point.X, point.Z);
+        Fixed64 planarDistanceSqr = Fixed64.Zero;
+        if (!capsule.ContainsPoint(planarPoint))
+        {
+            Vector2d closestPlanar = capsule.GetClosestPoint(planarPoint);
+            planarDistanceSqr = (planarPoint - closestPlanar).MagnitudeSquared;
+        }
+
+        Fixed64 slabMinY = capsule.MixedSlabCenterY - capsule.MixedHalfThickness;
+        Fixed64 slabMaxY = capsule.MixedSlabCenterY + capsule.MixedHalfThickness;
+        Fixed64 verticalDistance = GetIntervalDistance(point.Y, point.Y, slabMinY, slabMaxY);
+        return planarDistanceSqr + verticalDistance * verticalDistance;
     }
 
     private static Fixed64 DistanceSquaredToConvexSlab(Vector3d point, LSCollider2D collider)

@@ -17,5 +17,10 @@ public enum CollisionType2D : byte
     Circle_Convex,
     Convex_Circle,
     Convex_Convex,
+    Capsule_Circle,
+    Circle_Capsule,
+    Capsule_Convex,
+    Convex_Capsule,
+    Capsule_Capsule,
     Compound
 }

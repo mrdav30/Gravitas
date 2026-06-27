@@ -82,6 +82,15 @@ public abstract partial class LSCollider2D
                 writer.WriteVector2d(box.ScaledSize);
                 break;
 
+            case LSCapsuleCollider2D capsule:
+                writer.WriteFixed64(capsule.Radius);
+                writer.WriteFixed64(capsule.Height);
+                writer.WriteFixed64(capsule.ScaledRadius);
+                writer.WriteFixed64(capsule.ScaledHeight);
+                writer.WriteVector2d(capsule.SegmentStart);
+                writer.WriteVector2d(capsule.SegmentEnd);
+                break;
+
             case LSCompoundCollider2D compound:
                 writer.WriteInt32(compound.PartCount);
                 ReadOnlySpan<CompoundColliderPart2D> parts = compound.Parts;

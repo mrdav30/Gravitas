@@ -107,6 +107,33 @@ public sealed class CollisionResponse2DManifoldTests
     }
 
     [Fact]
+    public void Resolve_WithCapsuleSideContacts_ShouldOpposeTangentialMotionAndCacheContacts()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        SolidBody2D capsule = CreateBody(context, new LSCapsuleCollider2D(Fixed64.Half, (Fixed64)4), Vector2d.Zero);
+        capsule.SetRotation(FixedMath.DegToRad((Fixed64)90));
+        SolidBody2D floor = CreateBody(
+            context,
+            new LSAABBoxCollider2D(new Vector2d((Fixed64)5, Fixed64.One)),
+            new Vector2d(Fixed64.Zero, -Fixed64.Half),
+            immovable: true);
+        var pair = new CollisionPair2D(capsule.Collider, floor.Collider);
+        CollisionDetection2D.TryCollide(pair, pair.Manifold, context.FrameCount).Should().BeTrue();
+        pair.Manifold.Count.Should().Be(2);
+        capsule.ApplyCollisionLinearVelocityDelta(new Vector2d((Fixed64)20, (Fixed64)(-4)));
+        Fixed64 tangentialSpeed = capsule.LinearVelocity.X.Abs();
+
+        pair.MarkColliding(context.FrameCount);
+
+        capsule.LinearVelocity.X.Abs().Should().BeLessThan(tangentialSpeed);
+        for (int i = 0; i < pair.Manifold.Count; i++)
+        {
+            pair.TryGetWarmStartImpulse(pair.Manifold[i].ContactId, out ContactWarmStartImpulse impulse).Should().BeTrue();
+            impulse.TangentImpulse.Abs().Should().BeGreaterThan(Fixed64.Zero);
+        }
+    }
+
+    [Fact]
     public void Resolve_WithHighStaticAndZeroDynamicFriction_ShouldHoldTangentialMotion()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();

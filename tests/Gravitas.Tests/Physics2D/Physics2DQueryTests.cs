@@ -76,20 +76,23 @@ public sealed class Physics2DQueryTests
         SolidBody2D circle = CreateCircle(context, new Vector2d(-Fixed64.One, Fixed64.Zero));
         SolidBody2D box = CreateBox(context, new Vector2d(Fixed64.One, Fixed64.Zero));
         SolidBody2D polygon = CreatePolygon(context, new Vector2d((Fixed64)3, Fixed64.Zero));
+        SolidBody2D capsule = CreateCapsule(context, new Vector2d((Fixed64)4, Fixed64.Zero));
         _ = CreateCircle(context, new Vector2d((Fixed64)8, Fixed64.Zero));
         var hits = new SwiftList<Physics2DHit>();
 
         int count = context.Query2D.OverlapAabbAll(
             Vector2d.Zero,
-            new Vector2d((Fixed64)6, (Fixed64)2),
+            new Vector2d((Fixed64)10, (Fixed64)2),
             hits);
 
-        count.Should().Be(3);
+        count.Should().Be(4);
         hits.Should().Contain(hit => ReferenceEquals(hit.Collider, circle.Collider));
         hits.Should().Contain(hit => ReferenceEquals(hit.Collider, box.Collider));
         hits.Should().Contain(hit => ReferenceEquals(hit.Collider, polygon.Collider));
+        hits.Should().Contain(hit => ReferenceEquals(hit.Collider, capsule.Collider));
         hits[0].Distance.Should().BeLessThanOrEqualTo(hits[1].Distance);
         hits[1].Distance.Should().BeLessThanOrEqualTo(hits[2].Distance);
+        hits[2].Distance.Should().BeLessThanOrEqualTo(hits[3].Distance);
     }
 
     [Fact]
@@ -162,19 +165,46 @@ public sealed class Physics2DQueryTests
         SolidBody2D near = CreateCircle(context, Vector2d.Zero);
         SolidBody2D middle = CreateBox(context, new Vector2d((Fixed64)3, Fixed64.Zero));
         SolidBody2D far = CreatePolygon(context, new Vector2d((Fixed64)6, Fixed64.Zero));
+        SolidBody2D capsule = CreateCapsule(context, new Vector2d((Fixed64)9, Fixed64.Zero));
         var hits = new SwiftList<Physics2DHit>();
 
         int count = context.Query2D.RaycastAll(
             new Vector2d((Fixed64)(-3), Fixed64.Zero),
-            new Vector2d((Fixed64)8, Fixed64.Zero),
+            new Vector2d((Fixed64)12, Fixed64.Zero),
             hits);
 
-        count.Should().Be(3);
+        count.Should().Be(4);
         hits[0].Collider.Should().BeSameAs(near.Collider);
         hits[1].Collider.Should().BeSameAs(middle.Collider);
         hits[2].Collider.Should().BeSameAs(far.Collider);
+        hits[3].Collider.Should().BeSameAs(capsule.Collider);
         hits[0].Distance.Should().BeLessThan(hits[1].Distance);
         hits[1].Distance.Should().BeLessThan(hits[2].Distance);
+        hits[2].Distance.Should().BeLessThan(hits[3].Distance);
+    }
+
+    [Fact]
+    public void OverlapCircleAndPolygon_ShouldIncludeCapsuleTargets()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        SolidBody2D capsule = CreateCapsule(context, new Vector2d(Fixed64.Zero, Fixed64.Zero));
+        var hits = new SwiftList<Physics2DHit>();
+
+        int circleCount = context.Query2D.OverlapCircleAll(Vector2d.Zero, Fixed64.One, hits);
+        bool polygonHit = context.Query2D.OverlapPolygon(
+            stackalloc[]
+            {
+                new Vector2d(-Fixed64.One, -Fixed64.One),
+                new Vector2d(Fixed64.One, -Fixed64.One),
+                new Vector2d(Fixed64.One, Fixed64.One),
+                new Vector2d(-Fixed64.One, Fixed64.One)
+            },
+            out Physics2DHit polygonQueryHit);
+
+        circleCount.Should().Be(1);
+        hits[0].Collider.Should().BeSameAs(capsule.Collider);
+        polygonHit.Should().BeTrue();
+        polygonQueryHit.Collider.Should().BeSameAs(capsule.Collider);
     }
 
     [Fact]
@@ -282,7 +312,9 @@ public sealed class Physics2DQueryTests
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext(extent: 128);
         for (int i = 0; i < 64; i++)
-            _ = CreatePolygon(context, new Vector2d((Fixed64)i, Fixed64.Zero));
+            _ = i % 2 == 0
+                ? CreatePolygon(context, new Vector2d((Fixed64)i, Fixed64.Zero))
+                : CreateCapsule(context, new Vector2d((Fixed64)i, Fixed64.Zero));
 
         var hits = new SwiftList<Physics2DHit>(64);
         Vector2d center = new((Fixed64)16, Fixed64.Zero);
@@ -312,6 +344,33 @@ public sealed class Physics2DQueryTests
                     new Vector2d(Fixed64.Zero, Fixed64.One)
                 },
                 hits);
+        });
+
+        allocatedBytes.Should().Be(0);
+    }
+
+    [Fact]
+    public void CapsuleQueryPaths_ShouldNotAllocateAfterWarmup()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext(extent: 128);
+        for (int i = 0; i < 64; i++)
+            _ = CreateCapsule(context, new Vector2d((Fixed64)(i * 2), Fixed64.Zero));
+
+        var hits = new SwiftList<Physics2DHit>(64);
+        Vector2d start = new((Fixed64)(-4), Fixed64.Zero);
+        Vector2d end = new((Fixed64)140, Fixed64.Zero);
+        for (int i = 0; i < 3; i++)
+        {
+            context.Query2D.RaycastAll(start, end, hits);
+            context.Query2D.SweepCircleAll(start, end, Fixed64.Half, hits);
+            context.Query2D.OverlapCircleAll(new Vector2d((Fixed64)16, Fixed64.Zero), (Fixed64)32, hits);
+        }
+
+        long allocatedBytes = MeasureAllocatedBytes(() =>
+        {
+            context.Query2D.RaycastAll(start, end, hits);
+            context.Query2D.SweepCircleAll(start, end, Fixed64.Half, hits);
+            context.Query2D.OverlapCircleAll(new Vector2d((Fixed64)16, Fixed64.Zero), (Fixed64)32, hits);
         });
 
         allocatedBytes.Should().Be(0);
@@ -371,6 +430,19 @@ public sealed class Physics2DQueryTests
                 new Vector2d(Fixed64.Half, -Fixed64.Half),
                 new Vector2d(Fixed64.Half, Fixed64.Half),
                 new Vector2d(-Fixed64.Half, Fixed64.Half)))
+        {
+            Mass = Fixed64.One,
+            FreezeAxes = BodyFreezeAxes2D.Position
+        };
+        body.Initialize(position);
+        return body;
+    }
+
+    private static SolidBody2D CreateCapsule(GravitasWorldContext context, Vector2d position)
+    {
+        var transform = new FixedTransform(new Vector3d(position.X, Fixed64.Zero, position.Y), FixedQuaternion.Identity, Vector3d.One);
+        var agent = new TestMatterAgent(context, transform);
+        var body = new SolidBody2D(agent, new LSCapsuleCollider2D(Fixed64.Half, (Fixed64)2))
         {
             Mass = Fixed64.One,
             FreezeAxes = BodyFreezeAxes2D.Position

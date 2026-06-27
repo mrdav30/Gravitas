@@ -144,6 +144,43 @@ public sealed class SolidBody2DSerializationTests
 
     [Theory]
     [MemberData(nameof(Transports))]
+    public void Populate_ShouldRestoreCapsuleColliderShapeState(GravitasSerializationTransport transport)
+    {
+        using GravitasWorldContext sourceContext = Physics2DTestWorld.CreateContext(frameRate: 8);
+        var sourceCollider = new LSCapsuleCollider2D(Fixed64.Half, (Fixed64)3)
+        {
+            LocalOffset = new Vector2d(Fixed64.One, -Fixed64.Half)
+        };
+        var source = new SolidBody2D(new TestMatterAgent(sourceContext), sourceCollider)
+        {
+            Mass = (Fixed64)2
+        };
+        source.Initialize(new Vector2d((Fixed64)4, Fixed64.One), FixedMath.DegToRad((Fixed64)30));
+
+        object payload = GravitasSerializationHarness.Serialize(source, transport);
+
+        using GravitasWorldContext targetContext = Physics2DTestWorld.CreateContext(frameRate: 8);
+        var targetCollider = new LSCapsuleCollider2D(Fixed64.One, (Fixed64)5);
+        var target = new SolidBody2D(new TestMatterAgent(targetContext), targetCollider)
+        {
+            Mass = Fixed64.One
+        };
+        target.Initialize(Vector2d.Zero);
+
+        GravitasSerializationHarness.Populate(target, payload, transport);
+
+        target.Position.Should().Be(source.Position);
+        target.Rotation.Should().Be(source.Rotation);
+        targetCollider.Radius.Should().Be(sourceCollider.Radius);
+        targetCollider.Height.Should().Be(sourceCollider.Height);
+        targetCollider.LocalOffset.Should().Be(sourceCollider.LocalOffset);
+        targetCollider.Bounds.Should().Be(sourceCollider.Bounds);
+        targetCollider.SegmentStart.Should().Be(sourceCollider.SegmentStart);
+        targetCollider.SegmentEnd.Should().Be(sourceCollider.SegmentEnd);
+    }
+
+    [Theory]
+    [MemberData(nameof(Transports))]
     public void PopulateSnapshot_WithQueuedForce_ShouldReplaySameNextFrame(GravitasSerializationTransport transport)
     {
         using GravitasWorldContext uninterruptedContext = Physics2DTestWorld.CreateContext(frameRate: 8);

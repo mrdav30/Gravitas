@@ -59,6 +59,8 @@ internal static class MixedEmbedded2DGeometry
         {
             case ColliderType2D.Circle:
                 return TryGetCircleBoundary((LSCircleCollider2D)embedded, point, out boundary, out distance);
+            case ColliderType2D.Capsule:
+                return TryGetCapsuleBoundary((LSCapsuleCollider2D)embedded, point, out boundary, out distance);
             case ColliderType2D.AABox:
                 return TryGetAABoxBoundary((LSAABBoxCollider2D)embedded, point, out boundary, out distance);
             case ColliderType2D.ConvexPolygon:
@@ -101,6 +103,22 @@ internal static class MixedEmbedded2DGeometry
         Vector2d direction = magnitude > Fixed64.Epsilon ? delta / magnitude : Vector2d.Right;
         Fixed64 radius = circle.ScaledRadius;
         boundary = circle.Center + direction * radius;
+        distance = (radius - magnitude).Abs();
+        return true;
+    }
+
+    private static bool TryGetCapsuleBoundary(
+        LSCapsuleCollider2D capsule,
+        Vector2d point,
+        out Vector2d boundary,
+        out Fixed64 distance)
+    {
+        Vector2d segmentPoint = ClosestPointOnSegment(point, capsule.SegmentStart, capsule.SegmentEnd);
+        Vector2d delta = point - segmentPoint;
+        Fixed64 magnitude = delta.Magnitude;
+        Vector2d direction = magnitude > Fixed64.Epsilon ? delta / magnitude : Vector2d.Right;
+        Fixed64 radius = capsule.ScaledRadius;
+        boundary = segmentPoint + direction * radius;
         distance = (radius - magnitude).Abs();
         return true;
     }

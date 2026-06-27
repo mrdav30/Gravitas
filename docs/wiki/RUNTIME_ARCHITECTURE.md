@@ -143,8 +143,8 @@ values: `ThreeD`, `TwoD`, `Both`, and `Mixed`. `Both` runs pure 2D and pure 3D
 side by side without cross-dimensional contacts. `Mixed` runs both pure paths
 plus the dedicated mixed lifecycle and broad-phase path. Mixed narrow phase
 supports 3D spheres, cuboids, capsules, finite cylinders, compound
-colliders, and mesh colliders against embedded 2D circle, AABB, and convex
-polygon slabs. Mixed pair ownership and constrained impulse exchange are
+colliders, and mesh colliders against embedded 2D circle, capsule, AABB, and
+convex polygon slabs. Mixed pair ownership and constrained impulse exchange are
 implemented through `CollisionPairMixed` and `CollisionResponseMixed`, including
 planar scalar angular response for embedded 2D bodies while vertical Y impulse
 remains constrained out of the 2D body model. Explicit mixed query APIs, mixed

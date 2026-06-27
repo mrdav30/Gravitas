@@ -17,6 +17,10 @@ public sealed class CollisionDetection2DTests
     [InlineData(ColliderType2D.Circle, ColliderType2D.ConvexPolygon)]
     [InlineData(ColliderType2D.AABox, ColliderType2D.ConvexPolygon)]
     [InlineData(ColliderType2D.ConvexPolygon, ColliderType2D.ConvexPolygon)]
+    [InlineData(ColliderType2D.Capsule, ColliderType2D.Circle)]
+    [InlineData(ColliderType2D.Capsule, ColliderType2D.AABox)]
+    [InlineData(ColliderType2D.Capsule, ColliderType2D.ConvexPolygon)]
+    [InlineData(ColliderType2D.Capsule, ColliderType2D.Capsule)]
     public void TryCollideManifold_ShouldSupportRequiredShapePairs(ColliderType2D firstType, ColliderType2D secondType)
     {
         using GravitasWorldContext context = Create2DContext();
@@ -82,6 +86,103 @@ public sealed class CollisionDetection2DTests
         manifold.Count.Should().Be(1);
         manifold[0].Depth.Should().Be(Fixed64.Half);
         manifold[0].Normal.Should().Be(Vector2d.Right);
+    }
+
+    [Fact]
+    public void TryCollideManifold_WithCapsuleCircleEndCapOverlap_ShouldProduceStableContact()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        var capsule = new LSCapsuleCollider2D(Fixed64.Half, (Fixed64)3);
+        var circle = new LSCircleCollider2D(Fixed64.Half);
+        _ = CreateBody(context, capsule, Vector2d.Zero);
+        _ = CreateBody(context, circle, new Vector2d(Fixed64.Zero, Fixed64.FromFraction(3, 2)));
+
+        (bool collided, ContactManifold2D manifold) = BuildManifold(capsule, circle);
+
+        collided.Should().BeTrue();
+        manifold.Count.Should().Be(1);
+        manifold[0].Normal.Should().Be(Vector2d.Forward);
+        manifold[0].Depth.Should().Be(Fixed64.Half);
+    }
+
+    [Fact]
+    public void TryCollideManifold_WithHorizontalCapsuleOnFlatBox_ShouldProduceTwoSideContacts()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        var capsule = new LSCapsuleCollider2D(Fixed64.Half, (Fixed64)4);
+        var box = new LSAABBoxCollider2D(new Vector2d((Fixed64)5, Fixed64.One));
+        _ = CreateBody(
+            context,
+            capsule,
+            new Vector2d(Fixed64.Zero, Fixed64.Zero),
+            FixedMath.DegToRad((Fixed64)90));
+        _ = CreateBody(context, box, new Vector2d(Fixed64.Zero, -Fixed64.Half));
+
+        (bool collided, ContactManifold2D manifold) = BuildManifold(capsule, box);
+
+        collided.Should().BeTrue();
+        manifold.Count.Should().Be(2);
+        manifold.Select(static contact => contact.Normal).Should().AllBeEquivalentTo(-Vector2d.Forward);
+        manifold.Select(static contact => contact.Depth).Should().AllBeEquivalentTo(Fixed64.Half);
+        manifold.Select(static contact => contact.PointA.Y).Should().AllBeEquivalentTo(-Fixed64.Half);
+        manifold.Select(static contact => contact.PointB.Y).Should().AllBeEquivalentTo(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void TryCollideManifold_WithCapsuleCircleTangentAndSeparatedBoundary_ShouldStayDeterministic()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        var capsule = new LSCapsuleCollider2D(Fixed64.Half, (Fixed64)3);
+        var tangentCircle = new LSCircleCollider2D(Fixed64.Half);
+        var separatedCircle = new LSCircleCollider2D(Fixed64.Half);
+        _ = CreateBody(context, capsule, Vector2d.Zero);
+        _ = CreateBody(context, tangentCircle, new Vector2d(Fixed64.Zero, (Fixed64)2));
+        _ = CreateBody(context, separatedCircle, new Vector2d(Fixed64.Zero, Fixed64.FromFraction(33, 16)));
+
+        (bool tangentCollided, ContactManifold2D tangent) = BuildManifold(capsule, tangentCircle);
+        (bool separatedCollided, ContactManifold2D separated) = BuildManifold(capsule, separatedCircle);
+
+        tangentCollided.Should().BeTrue();
+        tangent.Count.Should().Be(1);
+        tangent[0].Depth.Should().Be(Fixed64.Zero);
+        tangent[0].Normal.Should().Be(Vector2d.Forward);
+        separatedCollided.Should().BeFalse();
+        separated.HasContact.Should().BeFalse();
+    }
+
+    [Fact]
+    public void TryCollideManifold_WithRotatedCapsuleConvexOverlap_ShouldReportContact()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        var capsule = new LSCapsuleCollider2D(Fixed64.Half, (Fixed64)3);
+        var box = new LSAABBoxCollider2D(Vector2d.One);
+        _ = CreateBody(context, capsule, Vector2d.Zero, FixedMath.DegToRad((Fixed64)45));
+        _ = CreateBody(context, box, new Vector2d(Fixed64.FromFraction(3, 4), Fixed64.FromFraction(3, 4)));
+
+        (bool collided, ContactManifold2D manifold) = BuildManifold(capsule, box);
+
+        collided.Should().BeTrue();
+        manifold.HasContact.Should().BeTrue();
+        manifold.PrimaryContact.Depth.Should().BeGreaterThan(Fixed64.Zero);
+        manifold.PrimaryContact.Normal.MagnitudeSquared.Should().BeGreaterThan(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void TryCollideManifold_WithParallelCapsules_ShouldReportStableSideContact()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        var first = new LSCapsuleCollider2D(Fixed64.Half, (Fixed64)4);
+        var second = new LSCapsuleCollider2D(Fixed64.Half, (Fixed64)4);
+        Fixed64 horizontal = FixedMath.DegToRad((Fixed64)90);
+        _ = CreateBody(context, first, Vector2d.Zero, horizontal);
+        _ = CreateBody(context, second, new Vector2d(Fixed64.Zero, Fixed64.FromFraction(3, 4)), horizontal);
+
+        (bool collided, ContactManifold2D manifold) = BuildManifold(first, second);
+
+        collided.Should().BeTrue();
+        manifold.Count.Should().Be(1);
+        manifold[0].Normal.Should().Be(Vector2d.Forward);
+        manifold[0].Depth.Should().Be(Fixed64.FromFraction(1, 4));
     }
 
     [Fact]
@@ -171,7 +272,11 @@ public sealed class CollisionDetection2DTests
         });
     }
 
-    private static SolidBody2D CreateBody(GravitasWorldContext context, LSCollider2D collider, Vector2d position)
+    private static SolidBody2D CreateBody(
+        GravitasWorldContext context,
+        LSCollider2D collider,
+        Vector2d position,
+        Fixed64 rotation = default)
     {
         var transform = new FixedTransform(new Vector3d(position.X, Fixed64.Zero, position.Y), FixedQuaternion.Identity, Vector3d.One);
         var agent = new TestMatterAgent(context, transform);
@@ -180,7 +285,7 @@ public sealed class CollisionDetection2DTests
             Mass = Fixed64.One,
             FreezeAxes = BodyFreezeAxes2D.Position
         };
-        body.Initialize(position);
+        body.Initialize(position, rotation);
         return body;
     }
 
@@ -210,6 +315,7 @@ public sealed class CollisionDetection2DTests
         {
             ColliderType2D.Circle => new LSCircleCollider2D(Fixed64.One),
             ColliderType2D.AABox => new LSAABBoxCollider2D(new Vector2d((Fixed64)2, (Fixed64)2)),
+            ColliderType2D.Capsule => new LSCapsuleCollider2D(Fixed64.Half, (Fixed64)2),
             ColliderType2D.ConvexPolygon => new LSPolygonCollider2D(
                 new Vector2d(-Fixed64.One, -Fixed64.One),
                 new Vector2d(Fixed64.One, -Fixed64.One),

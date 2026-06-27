@@ -85,6 +85,20 @@ public readonly struct ColliderShapeDefinition2D : IEquatable<ColliderShapeDefin
     }
 
     /// <summary>
+    /// Creates a vertical local-axis capsule shape definition.
+    /// </summary>
+    public static ColliderShapeDefinition2D Capsule(Fixed64 radius, Fixed64 height, PhysicsMaterial? material = null)
+    {
+        ValidateCapsule(radius, height);
+        return new(
+            ColliderShapeDefinition2DKind.Capsule,
+            radius,
+            new Vector2d(radius * (Fixed64)2, height),
+            null,
+            material);
+    }
+
+    /// <summary>
     /// Creates an axis-aligned box shape definition.
     /// </summary>
     public static ColliderShapeDefinition2D AABBox(Vector2d size, PhysicsMaterial? material = null)
@@ -125,6 +139,12 @@ public readonly struct ColliderShapeDefinition2D : IEquatable<ColliderShapeDefin
     }
 
     /// <summary>
+    /// Creates a triangle authoring definition backed by the convex-polygon runtime shape.
+    /// </summary>
+    public static ColliderShapeDefinition2D Triangle(Vector2d a, Vector2d b, Vector2d c, PhysicsMaterial? material = null) =>
+        ConvexPolygon(material, a, b, c);
+
+    /// <summary>
     /// Gets a local polygon vertex by stable source order.
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -151,6 +171,7 @@ public readonly struct ColliderShapeDefinition2D : IEquatable<ColliderShapeDefin
             ColliderShapeDefinition2DKind.Circle => new LSCircleCollider2D(this),
             ColliderShapeDefinition2DKind.AABBox => new LSAABBoxCollider2D(this),
             ColliderShapeDefinition2DKind.ConvexPolygon => new LSPolygonCollider2D(this),
+            ColliderShapeDefinition2DKind.Capsule => new LSCapsuleCollider2D(this),
             _ => throw new InvalidOperationException("Unsupported 2D collider shape definition.")
         };
     }
@@ -204,6 +225,16 @@ public readonly struct ColliderShapeDefinition2D : IEquatable<ColliderShapeDefin
             size.X <= Fixed64.Zero || size.Y <= Fixed64.Zero,
             nameof(size),
             "2D collider size components must be greater than zero.");
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void ValidateCapsule(Fixed64 radius, Fixed64 height)
+    {
+        ValidateRadius(radius);
+        SwiftThrowHelper.ThrowIfArgument(
+            height < radius * (Fixed64)2,
+            nameof(height),
+            "2D capsule height must be at least the capsule diameter.");
+    }
 
     public bool Equals(ColliderShapeDefinition2D other)
     {

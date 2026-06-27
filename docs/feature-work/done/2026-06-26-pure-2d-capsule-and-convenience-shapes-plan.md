@@ -11,7 +11,8 @@
 ---
 
 **Date:** 2026-06-26  
-**Status:** Planned  
+**Status:** Done  
+**Completed:** 2026-06-27  
 **Owner:** Gravitas pure 2D collider hardening
 
 ## Purpose
@@ -87,24 +88,24 @@ without creating a second way to represent triangles.
 
 **Tasks**
 
-- [ ] Add tests for `ColliderShapeDefinition2D.Capsule(...)`:
+- [x] Add tests for `ColliderShapeDefinition2D.Capsule(...)`:
   - rejects non-positive radius.
   - rejects height smaller than diameter.
   - creates an `LSCapsuleCollider2D`.
   - preserves radius and height in shape equality/hash behavior.
-- [ ] Add tests for triangle convenience helpers:
+- [x] Add tests for triangle convenience helpers:
   - valid triangle creates `ColliderShapeDefinition2DKind.ConvexPolygon`.
   - materialized runtime collider is `LSPolygonCollider2D`.
   - invalid or collinear triangle input is rejected by the same polygon
     validation rules as other convex polygons.
-- [ ] Add `Capsule` to `ColliderType2D`.
-- [ ] Add `Capsule` to `ColliderShapeDefinition2DKind`.
-- [ ] Implement `LSCapsuleCollider2D` under `src/Gravitas/Colliders/2D`.
-- [ ] Add `Radius`, `Height`, `ScaledRadius`, `SegmentStart`, `SegmentEnd`,
+- [x] Add `Capsule` to `ColliderType2D`.
+- [x] Add `Capsule` to `ColliderShapeDefinition2DKind`.
+- [x] Implement `LSCapsuleCollider2D` under `src/Gravitas/Colliders/2D`.
+- [x] Add `Radius`, `Height`, `ScaledRadius`, `SegmentStart`, `SegmentEnd`,
   and capsule bounds rebuild state.
-- [ ] Ensure `LocalOffset`, local scale, compound-local transform, and body
+- [x] Ensure `LocalOffset`, local scale, compound-local transform, and body
   rotation rebuild the capsule segment deterministically.
-- [ ] Update `ColliderSettings2D` priority ordering. The capsule should sort
+- [x] Update `ColliderSettings2D` priority ordering. The capsule should sort
   near circle/convex shapes without destabilizing existing pair priority.
 
 **Done Criteria**
@@ -123,20 +124,20 @@ so `SolidBody2D` response remains physically explainable.
 
 **Tasks**
 
-- [ ] Add tests for capsule area and mass properties:
+- [x] Add tests for capsule area and mass properties:
   - area is rectangle segment area plus circular cap area.
   - center of mass is local offset when the capsule is symmetric.
   - moment of inertia scales with mass, radius, and height.
   - equal height and diameter behaves consistently with a circle-like capsule.
-- [ ] Implement `CalculateArea()`, `CalculateLocalCenterOfMassOffset()`, and
+- [x] Implement `CalculateArea()`, `CalculateLocalCenterOfMassOffset()`, and
   `CalculateMomentOfInertia(...)` for `LSCapsuleCollider2D`.
-- [ ] Add explicit comments or docs for any fixed-point constants used in the
+- [x] Add explicit comments or docs for any fixed-point constants used in the
   inertia formula.
-- [ ] Update `ColliderShapeSnapshot2D` if capsule shape state needs snapshot
+- [x] Update `ColliderShapeSnapshot2D` if capsule shape state needs snapshot
   coverage.
-- [ ] Update `LSCapsuleCollider2D.RecordData(...)` and shape definition
+- [x] Update `LSCapsuleCollider2D.RecordData(...)` and shape definition
   recording paths.
-- [ ] Add JSON/MemoryPack-compatible save/populate tests for capsule colliders.
+- [x] Add JSON/MemoryPack-compatible save/populate tests for capsule colliders.
 
 **Done Criteria**
 
@@ -154,25 +155,25 @@ stable contacts for warm-started response.
 
 **Tasks**
 
-- [ ] Add collision tests for capsule against:
+- [x] Add collision tests for capsule against:
   - circle.
   - AABB.
   - convex polygon.
   - capsule.
   - compound targets containing supported parts.
-- [ ] Add edge-case tests:
+- [x] Add edge-case tests:
   - end-cap contact.
   - side contact.
   - parallel capsule/capsule contact.
   - rotated capsule contact.
   - tangent/no-contact boundary.
   - deeply overlapping centers with deterministic fallback normal.
-- [ ] Add capsule dispatch to `CollisionDetection2D`.
-- [ ] Implement closest-segment and inflated-convex reducers needed for capsule
+- [x] Add capsule dispatch to `CollisionDetection2D`.
+- [x] Implement closest-segment and inflated-convex reducers needed for capsule
   contacts.
-- [ ] Ensure `ContactManifold2D` contact IDs remain stable when a capsule rests
+- [x] Ensure `ContactManifold2D` contact IDs remain stable when a capsule rests
   on a flat surface.
-- [ ] Add response tests proving capsule contacts warm start and apply friction
+- [x] Add response tests proving capsule contacts warm start and apply friction
   like existing two-contact manifolds.
 
 **Done Criteria**
@@ -192,20 +193,20 @@ surfaces to recognize capsules. It also needs to pair cleanly with the planned
 
 **Tasks**
 
-- [ ] Add query tests for capsule targets:
+- [x] Add query tests for capsule targets:
   - overlap circle.
   - overlap AABB.
   - overlap convex polygon.
   - raycast.
   - swept circle.
   - all-hit deterministic ordering.
-- [ ] Add query tests for capsule sources where pure 2D CCD performs exact
+- [x] Add query tests for capsule sources where pure 2D CCD performs exact
   mover-shape validation.
-- [ ] Add capsule support to `QueryDetection2D`.
-- [ ] Add capsule mover/target support to pure 2D CCD exact validation.
-- [ ] Add allocation tests for repeated capsule raycast/sweep/overlap queries
+- [x] Add capsule support to `QueryDetection2D`.
+- [x] Add capsule mover/target support to pure 2D CCD exact validation.
+- [x] Add allocation tests for repeated capsule raycast/sweep/overlap queries
   after warmup.
-- [ ] Add grounding/support tests once the 2D grounding plan is implemented:
+- [x] Add grounding/support tests once the 2D grounding plan is implemented:
   - capsule body grounds from side/foot contacts using correct planar normal.
   - capsule ground probe radius can derive from capsule radius.
 
@@ -224,22 +225,22 @@ without mixed support would create a dimensional parity hole.
 
 **Tasks**
 
-- [ ] Add mixed collision tests for 3D primitives against embedded 2D capsule
+- [x] Add mixed collision tests for 3D primitives against embedded 2D capsule
   slabs:
   - sphere.
   - cuboid.
   - capsule.
   - cylinder.
   - convex mesh where existing mixed reducers support the target/source family.
-- [ ] Add `SweepSphereAgainst2D` tests for capsule slab targets.
-- [ ] Add mixed CCD tests for 3D sphere/capsule sources against 2D capsule
+- [x] Add `SweepSphereAgainst2D` tests for capsule slab targets.
+- [x] Add mixed CCD tests for 3D sphere/capsule sources against 2D capsule
   targets where existing source policy supports exact reducers.
-- [ ] Extend mixed bounds generation for `LSCapsuleCollider2D`.
-- [ ] Extend `CollisionDetectionMixed` to handle capsule slab contact points and
+- [x] Extend mixed bounds generation for `LSCapsuleCollider2D`.
+- [x] Extend `CollisionDetectionMixed` to handle capsule slab contact points and
   normals.
-- [ ] Extend `GravitasQueryMixedService` sphere-against-2D reducers for capsule
+- [x] Extend `GravitasQueryMixedService` sphere-against-2D reducers for capsule
   slabs.
-- [ ] Ensure compound 2D colliders containing capsules preserve owner identity
+- [x] Ensure compound 2D colliders containing capsules preserve owner identity
   and stable part ordering.
 
 **Done Criteria**
@@ -257,16 +258,16 @@ need to make the support surface obvious.
 
 **Tasks**
 
-- [ ] Update `docs/wiki/DIMENSIONS.md` with the new 2D shape family and
+- [x] Update `docs/wiki/DIMENSIONS.md` with the new 2D shape family and
   triangle convenience behavior.
-- [ ] Update `docs/wiki/COLLISION_PIPELINE.md` with capsule contact support.
-- [ ] Update `docs/wiki/QUERY_SERVICES.md` with capsule query/CCD coverage.
-- [ ] Update `docs/wiki/SERIALIZATION.md` with capsule shape state.
-- [ ] Add benchmark rows only where useful:
+- [x] Update `docs/wiki/COLLISION_PIPELINE.md` with capsule contact support.
+- [x] Update `docs/wiki/QUERY_SERVICES.md` with capsule query/CCD coverage.
+- [x] Update `docs/wiki/SERIALIZATION.md` with capsule shape state.
+- [x] Add benchmark rows only where useful:
   - dense capsule/capsule response.
   - capsule query sweep.
   - mixed capsule slab query if reducer cost is non-trivial.
-- [ ] Run:
+- [x] Run:
   - `dotnet build Gravitas.slnx --configuration Release`
   - `dotnet test Gravitas.slnx --configuration Release`
   - `dotnet build Gravitas.slnx --configuration ReleaseLean`

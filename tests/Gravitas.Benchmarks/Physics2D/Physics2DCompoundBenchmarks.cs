@@ -162,10 +162,11 @@ public class Physics2DCompoundBenchmarks
 
     private static LSCollider2D CreateShape(int index)
     {
-        return (index % 3) switch
+        return (index % 4) switch
         {
             0 => new LSCircleCollider2D(Fixed64.One),
             1 => new LSAABBoxCollider2D(new Vector2d((Fixed64)2, (Fixed64)2)),
+            2 => new LSCapsuleCollider2D(Fixed64.Half, (Fixed64)3),
             _ => new LSPolygonCollider2D(
                 new Vector2d(-Fixed64.One, -Fixed64.One),
                 new Vector2d(Fixed64.One, -Fixed64.One),
@@ -178,7 +179,8 @@ public class Physics2DCompoundBenchmarks
     {
         return new LSCompoundCollider2D(
             CompoundColliderPart2D.Circle(Fixed64.Half, new Vector2d(-Fixed64.Half, Fixed64.Zero)),
-            CompoundColliderPart2D.AABBox(Vector2d.One, new Vector2d(Fixed64.Half, Fixed64.Zero)));
+            CompoundColliderPart2D.AABBox(Vector2d.One, new Vector2d(Fixed64.Half, Fixed64.Zero)),
+            CompoundColliderPart2D.Capsule(Fixed64.FromFraction(1, 4), Fixed64.FromFraction(3, 2), new Vector2d(Fixed64.Zero, Fixed64.One)));
     }
 
     private static Vector2d PositionForIndex(int index, Fixed64 spacing)

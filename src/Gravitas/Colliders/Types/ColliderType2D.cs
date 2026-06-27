@@ -16,5 +16,6 @@ public enum ColliderType2D : byte
     Circle = 1,
     AABox = 2,
     ConvexPolygon = 3,
-    Compound = 4
+    Compound = 4,
+    Capsule = 5
 }

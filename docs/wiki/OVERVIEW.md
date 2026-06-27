@@ -144,12 +144,13 @@ Pure 2D scenes use the same context and clock, set
 `context.Settings.RuntimeMode` to `PhysicsRuntimeMode.TwoD`, then create
 `LSCollider2D` shapes and `SolidBody2D` bodies from host `IMatterAgent`
 instances. The current 2D path supports circles, axis-aligned boxes, convex
-polygons, bodyless static/trigger colliders, deterministic collision response,
-contact events, sleep/wake behavior, replay tests, circle/AABB/polygon overlap
-queries, segment raycasts, and swept-circle queries. `PhysicsRuntimeMode.Both`
-runs pure 2D and pure 3D side by side without cross-dimensional contacts, while
-`PhysicsRuntimeMode.Mixed` enables the dedicated mixed lifecycle, broad-phase,
-narrow-phase, and constrained response path.
+polygons, capsules, bodyless static/trigger colliders, deterministic collision
+response, contact events, sleep/wake behavior, replay tests,
+circle/capsule/AABB/polygon overlap queries, segment raycasts, and swept-circle
+queries. `PhysicsRuntimeMode.Both` runs pure 2D and pure 3D side by side
+without cross-dimensional contacts, while `PhysicsRuntimeMode.Mixed` enables
+the dedicated mixed lifecycle, broad-phase, narrow-phase, and constrained
+response path.
 
 ## Collision In One Breath
 
@@ -177,9 +178,9 @@ active-pair queue during `LateSimulate`.
 ## Current Runtime Boundaries
 
 - The 3D path remains the deepest runtime path. The pure 2D path
-  supports circle, axis-aligned box, convex polygon, compound colliders, exact
-  area/raycast/swept-circle queries, two-contact manifolds, scalar angular
-  response, and pair-local warm-started response coverage.
+  supports circle, capsule, axis-aligned box, convex polygon, compound
+  colliders, exact area/raycast/swept-circle queries, two-contact manifolds,
+  scalar angular response, and pair-local warm-started response coverage.
 - `SolidBody` has a split 2D ground position plus height for the 3D
   y-up model, but that is not the pure 2D body model.
 - Mixed 2D/3D interaction has a dedicated runtime implementation. The runtime
@@ -188,14 +189,15 @@ active-pair queue during `LateSimulate`.
   `MixedHalfThicknessOverride`, and the host transform's Y position. Mixed
   broad phase gathers deterministic GridForge-backed 3D/2D candidate keys,
   and mixed narrow phase covers 3D spheres, cuboids, capsules, and finite
-  cylinders plus compound and mesh colliders against embedded 2D circle, AABB,
-  and convex polygon slabs. Mixed pair ownership and constrained response
-  support wake propagation, resting-pair retention, mixed contact/trigger
-  events, planar X/Z impulse for 2D bodies, and vertical response against 3D
-  participants only. Mixed query APIs, mixed CCD hooks, dimension-tagged
-  diagnostics, and slab debug draw are implemented; mixed 2D swept-circle
-  queries cover primitive, mesh, and compound 3D targets while preserving pure
-  2D semantics and labeling exact versus conservative fallback hits.
+  cylinders plus compound and mesh colliders against embedded 2D circle,
+  capsule, AABB, and convex polygon slabs. Mixed pair ownership and constrained
+  response support wake propagation, resting-pair retention, mixed
+  contact/trigger events, planar X/Z impulse for 2D bodies, and vertical
+  response against 3D participants only. Mixed query APIs, mixed CCD hooks,
+  dimension-tagged diagnostics, and slab debug draw are implemented; mixed 2D
+  swept-circle queries cover primitive, mesh, and compound 3D targets while
+  preserving pure 2D semantics and labeling exact versus conservative fallback
+  hits.
 - 3D articulated-body support is context-owned through
   `GravitasConstraint3DService`. Joints are ordinary 3D solver constraints
   integrated with contact islands; ragdoll definitions are explicit authoring

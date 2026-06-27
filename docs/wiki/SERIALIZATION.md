@@ -20,8 +20,8 @@ Host-created shell:
 - `IMatterAgent` implementations.
 - `FixedTransform` instances and any engine transform wrappers.
 - `SolidBody`, `SolidBody2D`, `LSCollider`, and `LSCollider2D` instances.
-- the concrete collider shape type, such as sphere, cuboid, circle, AABB,
-  polygon, or compound.
+- the concrete collider shape type, such as sphere, cuboid, circle, capsule,
+  AABB, polygon, or compound.
 - private runtime part colliders materialized by `LSCompoundCollider` and
   `LSCompoundCollider2D`.
 - renderer, ECS, engine object, networking, pooling, editor, and event
@@ -98,16 +98,17 @@ part materials, and stable part transforms, then let the host create
 state is populated.
 
 `ColliderShapeDefinition2D` is the matching data-only authoring/import surface
-for pure 2D circle, AABB, and convex polygon shapes. Offline authored 2D
-compound assets should serialize `ColliderShapeDefinition2D` plus
-`CompoundColliderPart2D` material/local transform data, then let the host
-create `LSCompoundCollider2D` runtime shells before Chronicler populates state.
+for pure 2D circle, capsule, AABB, convex polygon, and triangle-convenience
+shape inputs. Offline authored 2D compound assets should serialize
+`ColliderShapeDefinition2D` plus `CompoundColliderPart2D` material/local
+transform data, then let the host create `LSCompoundCollider2D` runtime shells
+before Chronicler populates state.
 
 `LSCollider2D` records pure 2D collider filter state, including its physical
 layer and locally ignored physical layer mask, plus surface material and shape
-state. Circle, AABB, convex polygon, and compound colliders record their
-shape-specific values through shape-local hooks rather than a central type
-switch. Compound part definitions are host-created shell data, not runtime
+state. Circle, capsule, AABB, convex polygon, and compound colliders record
+their shape-specific values through shape-local hooks rather than a central
+type switch. Compound part definitions are host-created shell data, not runtime
 pair/partition state. Loading shape data validates the input and rebuilds bounds
 without waking a sleeping body just because state was populated.
 

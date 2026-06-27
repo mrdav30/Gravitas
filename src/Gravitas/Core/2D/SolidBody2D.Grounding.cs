@@ -471,6 +471,7 @@ public sealed partial class SolidBody2D
         return Collider switch
         {
             LSCircleCollider2D circle => circle.ScaledRadius,
+            LSCapsuleCollider2D capsule => capsule.ScaledRadius,
             LSAABBoxCollider2D box => FixedMath.Min(box.ScaledSize.X, box.ScaledSize.Y) * Fixed64.Half,
             LSPolygonCollider2D polygon => FixedMath.Min(polygon.Bounds.Width, polygon.Bounds.Height) * Fixed64.Half,
             LSCompoundCollider2D compound => FixedMath.Min(compound.Bounds.Width, compound.Bounds.Height) * Fixed64.Half,

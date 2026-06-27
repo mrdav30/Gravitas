@@ -30,10 +30,6 @@ instead of burying it in notes.
 
 ## Active Release-Scope
 
-- [`Pure 2D Capsule And Convenience Shapes`](2026-06-26-pure-2d-capsule-and-convenience-shapes-plan.md)
-  - Planned 2026-06-26. Adds `LSCapsuleCollider2D` as a first-class analytic
-    primitive across collision, query, CCD, mixed mode, serialization, and
-    docs, while keeping triangles as convex-polygon authoring convenience.
 - [`Cone Collider And Query Support`](2026-06-26-cone-collider-and-query-support-plan.md)
   - Planned 2026-06-26. Adds an analytic 3D cone primitive and cone-volume
     query support, with explicit research gates for mass properties, discrete
@@ -41,6 +37,12 @@ instead of burying it in notes.
 
 ## Recently Completed
 
+- [`Pure 2D Capsule And Convenience Shapes`](done/2026-06-26-pure-2d-capsule-and-convenience-shapes-plan.md)
+  - Completed 2026-06-27. Adds `LSCapsuleCollider2D` as a first-class analytic
+    primitive across shape definitions, mass properties, collision manifolds,
+    pure 2D query/CCD/grounding, mixed slabs, diagnostics, serialization, docs,
+    and benchmark signal while keeping triangles as convex-polygon authoring
+    convenience.
 - [`Batched Query APIs`](done/2026-06-26-batched-query-apis-plan.md)
   - Completed 2026-06-27. Adds typed closest/all-hit batch APIs for current
     3D, pure 2D, and mixed query families with caller-owned request/output
@@ -106,9 +108,9 @@ instead of burying it in notes.
     `kinematic-active-ccd-scaling`.
 - [`Mixed Sphere Against 2D Slab Reducer Completion`](done/2026-06-23-mixed-sphere-2d-slab-reducer-completion-plan.md)
   - Completed 2026-06-23. `SweepSphereAgainst2D` uses exact finite-slab
-    reducers for 2D circle, AABB, convex polygon, and supported compound
-    targets; static mixed CCD shares that policy, diagnostics label the path as
-    exact, and dense/false-positive benchmark rows cover the source direction.
+    reducers for current supported 2D slab targets; static mixed CCD shares
+    that policy, diagnostics label the path as exact, and dense/false-positive
+    benchmark rows cover the source direction.
 - [`Mixed Query Finite-Slab Reducer Completion`](done/2026-06-22-mixed-query-finite-slab-reducer-completion-plan.md)
   - Completed 2026-06-23. Rotated capsule/cylinder, mesh, and compound target
     reducers for `SweepCircleAgainst3D` are exact; convex mesh source scaling is
@@ -148,13 +150,10 @@ first public release.
 
 ## Recommended Execution Order
 
-1. [`Pure 2D Capsule And Convenience Shapes`](2026-06-26-pure-2d-capsule-and-convenience-shapes-plan.md)
-   - Pairs naturally with 2D grounding and improves character-style 2D
-     ergonomics without adding runtime triangle complexity.
-2. [`Cone Collider And Query Support`](2026-06-26-cone-collider-and-query-support-plan.md)
+1. [`Cone Collider And Query Support`](2026-06-26-cone-collider-and-query-support-plan.md)
    - Highest geometry/reducer risk of the new plans. Execute after the smaller
      collider API hardening items so cone work can focus on analytic geometry,
      contact quality, and query evidence.
-3. Keep the benchmark backlog and issue tracker as intake buckets; promote new
+2. Keep the benchmark backlog and issue tracker as intake buckets; promote new
    measured risks into dated plans only when they are broader than a focused
    patch.

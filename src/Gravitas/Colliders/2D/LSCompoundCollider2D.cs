@@ -68,6 +68,17 @@ public sealed class LSCompoundCollider2D : LSCollider2D
                     continue;
                 }
 
+                if (part is LSCapsuleCollider2D capsule)
+                {
+                    Fixed64 distance = Vector2d.Distance(center, capsule.Center) + capsule.ScaledHeight * Fixed64.Half;
+                    if (distance > bestDistance)
+                    {
+                        bestDistance = distance;
+                        bestDistanceSquared = distance * distance;
+                    }
+                    continue;
+                }
+
                 for (int j = 0; j < part.VertexCount; j++)
                 {
                     Fixed64 distanceSquared = Vector2d.DistanceSquared(center, part.GetVertexUnchecked(j));

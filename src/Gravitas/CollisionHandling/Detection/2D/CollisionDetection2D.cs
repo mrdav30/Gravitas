@@ -62,6 +62,24 @@ internal static class CollisionDetection2D
                 return result;
             case CollisionType2D.Convex_Convex:
                 return TryConvexConvex(colliderA, colliderB, out contact);
+            case CollisionType2D.Capsule_Circle:
+                return TryCapsuleCircle((LSCapsuleCollider2D)colliderA, (LSCircleCollider2D)colliderB, out contact);
+            case CollisionType2D.Circle_Capsule:
+                bool circleCapsule = TryCapsuleCircle((LSCapsuleCollider2D)colliderB, (LSCircleCollider2D)colliderA, out Contact2D circleCapsuleReversed);
+                contact = circleCapsule
+                    ? new Contact2D(circleCapsuleReversed.PointB, circleCapsuleReversed.PointA, -circleCapsuleReversed.Normal, circleCapsuleReversed.Depth)
+                    : default;
+                return circleCapsule;
+            case CollisionType2D.Capsule_Convex:
+                return TryCapsuleConvex((LSCapsuleCollider2D)colliderA, colliderB, out contact);
+            case CollisionType2D.Convex_Capsule:
+                bool convexCapsule = TryCapsuleConvex((LSCapsuleCollider2D)colliderB, colliderA, out Contact2D convexCapsuleReversed);
+                contact = convexCapsule
+                    ? new Contact2D(convexCapsuleReversed.PointB, convexCapsuleReversed.PointA, -convexCapsuleReversed.Normal, convexCapsuleReversed.Depth)
+                    : default;
+                return convexCapsule;
+            case CollisionType2D.Capsule_Capsule:
+                return TryCapsuleCapsule((LSCapsuleCollider2D)colliderA, (LSCapsuleCollider2D)colliderB, out contact);
             case CollisionType2D.Compound:
                 return TryCompound(colliderA, colliderB, out contact);
             default:
@@ -83,6 +101,11 @@ internal static class CollisionDetection2D
             CollisionType2D.Circle_Convex => TryCircleConvex((LSCircleCollider2D)colliderA, colliderB, manifold),
             CollisionType2D.Convex_Circle => TryCircleConvexReversed((LSCircleCollider2D)colliderB, colliderA, manifold),
             CollisionType2D.Convex_Convex => TryConvexConvex(colliderA, colliderB, manifold),
+            CollisionType2D.Capsule_Circle => TryCapsuleCircle((LSCapsuleCollider2D)colliderA, (LSCircleCollider2D)colliderB, manifold),
+            CollisionType2D.Circle_Capsule => TryCapsuleCircleReversed((LSCapsuleCollider2D)colliderB, (LSCircleCollider2D)colliderA, manifold),
+            CollisionType2D.Capsule_Convex => TryCapsuleConvex((LSCapsuleCollider2D)colliderA, colliderB, manifold),
+            CollisionType2D.Convex_Capsule => TryCapsuleConvexReversed((LSCapsuleCollider2D)colliderB, colliderA, manifold),
+            CollisionType2D.Capsule_Capsule => TryCapsuleCapsule((LSCapsuleCollider2D)colliderA, (LSCapsuleCollider2D)colliderB, manifold),
             CollisionType2D.Compound => TryCompound(colliderA, colliderB, manifold),
             _ => false
         };
@@ -183,6 +206,170 @@ internal static class CollisionDetection2D
             -contact.Normal,
             convex.Material,
             circle.Material);
+        return true;
+    }
+
+    private static bool TryCapsuleCircle(LSCapsuleCollider2D capsule, LSCircleCollider2D circle, out Contact2D contact)
+    {
+        Vector2d segmentPoint = ClosestPointOnSegment(circle.Center, capsule.SegmentStart, capsule.SegmentEnd);
+        Vector2d delta = circle.Center - segmentPoint;
+        Fixed64 distanceSquared = delta.MagnitudeSquared;
+        Fixed64 radius = capsule.ScaledRadius + circle.ScaledRadius;
+        if (distanceSquared > radius * radius)
+        {
+            contact = default;
+            return false;
+        }
+
+        Fixed64 distance = distanceSquared > Fixed64.Epsilon ? FixedMath.Sqrt(distanceSquared) : Fixed64.Zero;
+        Vector2d normal = distance > Fixed64.Zero
+            ? delta / distance
+            : OrientAxis(Vector2d.Right, circle.Center - capsule.Center);
+        contact = new Contact2D(
+            segmentPoint + normal * capsule.ScaledRadius,
+            circle.Center - normal * circle.ScaledRadius,
+            normal,
+            radius - distance);
+        return true;
+    }
+
+    private static bool TryCapsuleCircle(
+        LSCapsuleCollider2D capsule,
+        LSCircleCollider2D circle,
+        ContactManifold2D manifold)
+    {
+        if (!TryCapsuleCircle(capsule, circle, out Contact2D contact))
+            return false;
+
+        AddContact(manifold, contact, capsule, circle);
+        return true;
+    }
+
+    private static bool TryCapsuleCircleReversed(
+        LSCapsuleCollider2D capsule,
+        LSCircleCollider2D circle,
+        ContactManifold2D manifold)
+    {
+        if (!TryCapsuleCircle(capsule, circle, out Contact2D contact))
+            return false;
+
+        manifold.AddContact(
+            contact.PointB,
+            contact.PointA,
+            contact.Depth,
+            -contact.Normal,
+            circle.Material,
+            capsule.Material);
+        return true;
+    }
+
+    private static bool TryCapsuleCapsule(LSCapsuleCollider2D colliderA, LSCapsuleCollider2D colliderB, out Contact2D contact)
+    {
+        ClosestPointsOnSegments(
+            colliderA.SegmentStart,
+            colliderA.SegmentEnd,
+            colliderB.SegmentStart,
+            colliderB.SegmentEnd,
+            out Vector2d pointAOnSegment,
+            out Vector2d pointBOnSegment);
+        Vector2d delta = pointBOnSegment - pointAOnSegment;
+        Fixed64 distanceSquared = delta.MagnitudeSquared;
+        Fixed64 radius = colliderA.ScaledRadius + colliderB.ScaledRadius;
+        if (distanceSquared > radius * radius)
+        {
+            contact = default;
+            return false;
+        }
+
+        Fixed64 distance = distanceSquared > Fixed64.Epsilon ? FixedMath.Sqrt(distanceSquared) : Fixed64.Zero;
+        Vector2d normal = distance > Fixed64.Zero
+            ? delta / distance
+            : OrientAxis(Vector2d.Right, colliderB.Center - colliderA.Center);
+        contact = new Contact2D(
+            pointAOnSegment + normal * colliderA.ScaledRadius,
+            pointBOnSegment - normal * colliderB.ScaledRadius,
+            normal,
+            radius - distance);
+        return true;
+    }
+
+    private static bool TryCapsuleCapsule(
+        LSCapsuleCollider2D colliderA,
+        LSCapsuleCollider2D colliderB,
+        ContactManifold2D manifold)
+    {
+        if (!TryCapsuleCapsule(colliderA, colliderB, out Contact2D contact))
+            return false;
+
+        AddContact(manifold, contact, colliderA, colliderB);
+        return true;
+    }
+
+    private static bool TryCapsuleConvex(LSCapsuleCollider2D capsule, LSCollider2D convex, out Contact2D contact)
+    {
+        Fixed64 bestOverlap = Fixed64.MaxValue;
+        Vector2d bestAxis = Vector2d.Zero;
+
+        for (int i = 0; i < convex.VertexCount; i++)
+        {
+            Vector2d edge = convex.GetVertexUnchecked((i + 1) % convex.VertexCount) - convex.GetVertexUnchecked(i);
+            if (!TryTestCapsuleConvexAxis(edge.RightHandNormal, capsule, convex, ref bestOverlap, ref bestAxis))
+            {
+                contact = default;
+                return false;
+            }
+        }
+
+        Vector2d closestAxis = FindCapsuleConvexClosestAxis(capsule, convex);
+        if (closestAxis.MagnitudeSquared > Fixed64.Epsilon
+            && !TryTestCapsuleConvexAxis(closestAxis, capsule, convex, ref bestOverlap, ref bestAxis))
+        {
+            contact = default;
+            return false;
+        }
+
+        Vector2d normal = OrientAxis(bestAxis, convex.Center - capsule.Center);
+        contact = new Contact2D(
+            capsule.GetSupportPoint(normal),
+            convex.GetSupportPoint(-normal),
+            normal,
+            bestOverlap);
+        return true;
+    }
+
+    private static bool TryCapsuleConvex(
+        LSCapsuleCollider2D capsule,
+        LSCollider2D convex,
+        ContactManifold2D manifold)
+    {
+        if (!TryCapsuleConvex(capsule, convex, out Contact2D contact))
+            return false;
+
+        if (TryAddCapsuleSideContacts(capsule, convex, manifold, contact.Normal, contact.Depth))
+            return true;
+
+        AddContact(manifold, contact, capsule, convex);
+        return true;
+    }
+
+    private static bool TryCapsuleConvexReversed(
+        LSCapsuleCollider2D capsule,
+        LSCollider2D convex,
+        ContactManifold2D manifold)
+    {
+        if (!TryCapsuleConvex(capsule, convex, out Contact2D contact))
+            return false;
+
+        if (TryAddCapsuleSideContactsReversed(capsule, convex, manifold, contact.Normal, contact.Depth))
+            return true;
+
+        manifold.AddContact(
+            contact.PointB,
+            contact.PointA,
+            contact.Depth,
+            -contact.Normal,
+            convex.Material,
+            capsule.Material);
         return true;
     }
 
@@ -397,6 +584,127 @@ internal static class CollisionDetection2D
         return true;
     }
 
+    private static bool TryTestCapsuleConvexAxis(
+        Vector2d axis,
+        LSCapsuleCollider2D capsule,
+        LSCollider2D convex,
+        ref Fixed64 bestOverlap,
+        ref Vector2d bestAxis)
+    {
+        if (axis.MagnitudeSquared <= Fixed64.Epsilon)
+            return true;
+
+        Vector2d normal = axis.Normalized;
+        ProjectCapsule(capsule, normal, out Fixed64 minA, out Fixed64 maxA);
+        Project(convex, normal, out Fixed64 minB, out Fixed64 maxB);
+        Fixed64 overlap = FixedMath.Min(maxA, maxB) - FixedMath.Max(minA, minB);
+        if (overlap < Fixed64.Zero)
+            return false;
+
+        if (overlap < bestOverlap)
+        {
+            bestOverlap = overlap;
+            bestAxis = normal;
+        }
+
+        return true;
+    }
+
+    private static Vector2d FindCapsuleConvexClosestAxis(LSCapsuleCollider2D capsule, LSCollider2D convex)
+    {
+        Vector2d segmentStart = capsule.SegmentStart;
+        Vector2d segmentEnd = capsule.SegmentEnd;
+        Fixed64 bestDistance = Fixed64.MaxValue;
+        Vector2d bestAxis = Vector2d.Zero;
+
+        for (int i = 0; i < convex.VertexCount; i++)
+        {
+            Vector2d vertex = convex.GetVertexUnchecked(i);
+            Vector2d segmentPoint = ClosestPointOnSegment(vertex, segmentStart, segmentEnd);
+            KeepClosestAxis(vertex - segmentPoint, ref bestDistance, ref bestAxis);
+        }
+
+        Vector2d closestToStart = convex.GetClosestPoint(segmentStart);
+        KeepClosestAxis(closestToStart - segmentStart, ref bestDistance, ref bestAxis);
+        Vector2d closestToEnd = convex.GetClosestPoint(segmentEnd);
+        KeepClosestAxis(closestToEnd - segmentEnd, ref bestDistance, ref bestAxis);
+
+        if (bestAxis.MagnitudeSquared > Fixed64.Epsilon)
+            return bestAxis;
+
+        return convex.Center - capsule.Center;
+    }
+
+    private static void KeepClosestAxis(Vector2d axis, ref Fixed64 bestDistance, ref Vector2d bestAxis)
+    {
+        Fixed64 distance = axis.MagnitudeSquared;
+        if (distance >= bestDistance)
+            return;
+
+        bestDistance = distance;
+        bestAxis = axis;
+    }
+
+    private static bool TryAddCapsuleSideContacts(
+        LSCapsuleCollider2D capsule,
+        LSCollider2D convex,
+        ContactManifold2D manifold,
+        Vector2d normal,
+        Fixed64 depth)
+    {
+        Vector2d segmentStart = capsule.SegmentStart;
+        Vector2d segmentEnd = capsule.SegmentEnd;
+        Vector2d segment = segmentEnd - segmentStart;
+        Fixed64 segmentLengthSquared = segment.MagnitudeSquared;
+        if (segmentLengthSquared <= Fixed64.Epsilon)
+            return false;
+
+        Vector2d segmentDirection = segment / FixedMath.Sqrt(segmentLengthSquared);
+        if (Vector2d.Dot(segmentDirection, normal).Abs() > Fixed64.Epsilon * (Fixed64)16)
+            return false;
+
+        Vector2d firstA = segmentStart + normal * capsule.ScaledRadius;
+        Vector2d secondA = segmentEnd + normal * capsule.ScaledRadius;
+        Vector2d firstB = firstA - normal * depth;
+        Vector2d secondB = secondA - normal * depth;
+        if (!convex.ContainsPoint(firstB) || !convex.ContainsPoint(secondB))
+            return false;
+
+        manifold.AddContact(firstA, firstB, depth, normal, capsule.Material, convex.Material);
+        manifold.AddContact(secondA, secondB, depth, normal, capsule.Material, convex.Material);
+        return true;
+    }
+
+    private static bool TryAddCapsuleSideContactsReversed(
+        LSCapsuleCollider2D capsule,
+        LSCollider2D convex,
+        ContactManifold2D manifold,
+        Vector2d normal,
+        Fixed64 depth)
+    {
+        Vector2d segmentStart = capsule.SegmentStart;
+        Vector2d segmentEnd = capsule.SegmentEnd;
+        Vector2d segment = segmentEnd - segmentStart;
+        Fixed64 segmentLengthSquared = segment.MagnitudeSquared;
+        if (segmentLengthSquared <= Fixed64.Epsilon)
+            return false;
+
+        Vector2d segmentDirection = segment / FixedMath.Sqrt(segmentLengthSquared);
+        if (Vector2d.Dot(segmentDirection, normal).Abs() > Fixed64.Epsilon * (Fixed64)16)
+            return false;
+
+        Vector2d firstB = segmentStart + normal * capsule.ScaledRadius;
+        Vector2d secondB = segmentEnd + normal * capsule.ScaledRadius;
+        Vector2d firstA = firstB - normal * depth;
+        Vector2d secondA = secondB - normal * depth;
+        if (!convex.ContainsPoint(firstA) || !convex.ContainsPoint(secondA))
+            return false;
+
+        manifold.AddContact(firstA, firstB, depth, -normal, convex.Material, capsule.Material);
+        manifold.AddContact(secondA, secondB, depth, -normal, convex.Material, capsule.Material);
+        return true;
+    }
+
     private static bool TryCompound(LSCollider2D colliderA, LSCollider2D colliderB, out Contact2D contact)
     {
         if (colliderA is LSCompoundCollider2D compoundA)
@@ -559,6 +867,86 @@ internal static class CollisionDetection2D
         }
     }
 
+    private static void ProjectCapsule(LSCapsuleCollider2D capsule, Vector2d axis, out Fixed64 min, out Fixed64 max)
+    {
+        Fixed64 start = Vector2d.Dot(capsule.SegmentStart, axis);
+        Fixed64 end = Vector2d.Dot(capsule.SegmentEnd, axis);
+        Fixed64 radius = capsule.ScaledRadius;
+        min = FixedMath.Min(start, end) - radius;
+        max = FixedMath.Max(start, end) + radius;
+    }
+
+    private static Vector2d ClosestPointOnSegment(Vector2d point, Vector2d start, Vector2d end)
+    {
+        Vector2d segment = end - start;
+        Fixed64 lengthSquared = segment.MagnitudeSquared;
+        if (lengthSquared <= Fixed64.Epsilon)
+            return start;
+
+        Fixed64 t = Vector2d.Dot(point - start, segment) / lengthSquared;
+        if (t <= Fixed64.Zero)
+            return start;
+        if (t >= Fixed64.One)
+            return end;
+
+        return start + segment * t;
+    }
+
+    private static void ClosestPointsOnSegments(
+        Vector2d firstStart,
+        Vector2d firstEnd,
+        Vector2d secondStart,
+        Vector2d secondEnd,
+        out Vector2d firstPoint,
+        out Vector2d secondPoint)
+    {
+        if (TryIntersectSegments(firstStart, firstEnd - firstStart, secondStart, secondEnd - secondStart, out Fixed64 t))
+        {
+            firstPoint = firstStart + (firstEnd - firstStart) * t;
+            secondPoint = firstPoint;
+            return;
+        }
+
+        firstPoint = firstStart;
+        secondPoint = ClosestPointOnSegment(firstStart, secondStart, secondEnd);
+        Fixed64 bestDistance = Vector2d.DistanceSquared(firstPoint, secondPoint);
+
+        KeepClosestSegmentPair(
+            firstEnd,
+            ClosestPointOnSegment(firstEnd, secondStart, secondEnd),
+            ref firstPoint,
+            ref secondPoint,
+            ref bestDistance);
+        KeepClosestSegmentPair(
+            ClosestPointOnSegment(secondStart, firstStart, firstEnd),
+            secondStart,
+            ref firstPoint,
+            ref secondPoint,
+            ref bestDistance);
+        KeepClosestSegmentPair(
+            ClosestPointOnSegment(secondEnd, firstStart, firstEnd),
+            secondEnd,
+            ref firstPoint,
+            ref secondPoint,
+            ref bestDistance);
+    }
+
+    private static void KeepClosestSegmentPair(
+        Vector2d candidateA,
+        Vector2d candidateB,
+        ref Vector2d bestA,
+        ref Vector2d bestB,
+        ref Fixed64 bestDistance)
+    {
+        Fixed64 distance = Vector2d.DistanceSquared(candidateA, candidateB);
+        if (distance >= bestDistance)
+            return;
+
+        bestA = candidateA;
+        bestB = candidateB;
+        bestDistance = distance;
+    }
+
     private static Edge2D FindReferenceEdge(LSCollider2D collider, Vector2d outwardNormal)
     {
         int bestIndex = 0;
@@ -656,6 +1044,34 @@ internal static class CollisionDetection2D
         first = output0;
         second = outputCount > 1 ? output1 : default;
         return outputCount;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool TryIntersectSegments(
+        Vector2d firstStart,
+        Vector2d firstSegment,
+        Vector2d secondStart,
+        Vector2d secondSegment,
+        out Fixed64 firstT)
+    {
+        Fixed64 denominator = Vector2d.CrossProduct(firstSegment, secondSegment);
+        if (denominator == Fixed64.Zero || denominator.Abs() <= Fixed64.Epsilon)
+        {
+            firstT = default;
+            return false;
+        }
+
+        Vector2d delta = secondStart - firstStart;
+        Fixed64 t = Vector2d.CrossProduct(delta, secondSegment) / denominator;
+        Fixed64 u = Vector2d.CrossProduct(delta, firstSegment) / denominator;
+        if (t < Fixed64.Zero || t > Fixed64.One || u < Fixed64.Zero || u > Fixed64.One)
+        {
+            firstT = default;
+            return false;
+        }
+
+        firstT = t;
+        return true;
     }
 
     private static void AddClippedPoint(

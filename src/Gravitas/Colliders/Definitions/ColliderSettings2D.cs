@@ -22,6 +22,7 @@ public static class ColliderSettings2D
         type switch
         {
             ColliderType2D.Circle => 0,
+            ColliderType2D.Capsule => 0,
             ColliderType2D.AABox => 1,
             ColliderType2D.ConvexPolygon => 1,
             ColliderType2D.Compound => 2,
@@ -39,8 +40,20 @@ public static class ColliderSettings2D
 
         bool firstCircle = type1 == ColliderType2D.Circle;
         bool secondCircle = type2 == ColliderType2D.Circle;
+        bool firstCapsule = type1 == ColliderType2D.Capsule;
+        bool secondCapsule = type2 == ColliderType2D.Capsule;
         if (firstCircle && secondCircle)
             return CollisionType2D.Circle_Circle;
+        if (firstCapsule && secondCircle)
+            return CollisionType2D.Capsule_Circle;
+        if (firstCircle && secondCapsule)
+            return CollisionType2D.Circle_Capsule;
+        if (firstCapsule && secondCapsule)
+            return CollisionType2D.Capsule_Capsule;
+        if (firstCapsule)
+            return IsConvex(type2) ? CollisionType2D.Capsule_Convex : CollisionType2D.None;
+        if (secondCapsule)
+            return IsConvex(type1) ? CollisionType2D.Convex_Capsule : CollisionType2D.None;
         if (firstCircle)
             return IsConvex(type2) ? CollisionType2D.Circle_Convex : CollisionType2D.None;
         if (secondCircle)

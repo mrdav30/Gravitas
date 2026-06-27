@@ -240,11 +240,19 @@ public static partial class CollisionDetectionMixed
         if (!CheckCuboidPrismAxis(cuboid, prism, Vector3d.Up, ref penetration))
             return false;
 
-        for (int i = 0; i < prism.VertexCount; i++)
+        if (prism is LSCapsuleCollider2D embeddedCapsule)
         {
-            GetPrismEdge(prism, i, out Vector2d edge2D);
-            if (!CheckCuboidPrismAxis(cuboid, prism, GetPlanarEdgeNormal(edge2D), ref penetration))
+            if (!CheckEmbeddedCapsuleAxes(cuboid, embeddedCapsule, ref penetration))
                 return false;
+        }
+        else
+        {
+            for (int i = 0; i < prism.VertexCount; i++)
+            {
+                GetPrismEdge(prism, i, out Vector2d edge2D);
+                if (!CheckCuboidPrismAxis(cuboid, prism, GetPlanarEdgeNormal(edge2D), ref penetration))
+                    return false;
+            }
         }
 
         for (int i = 0; i < cuboid.FaceNormals.Length; i++)
@@ -258,12 +266,20 @@ public static partial class CollisionDetectionMixed
             if (!CheckCuboidPrismAxis(cuboid, prism, Vector3d.Cross(cuboid.EdgeDirections[i], Vector3d.Up), ref penetration))
                 return false;
 
-            for (int j = 0; j < prism.VertexCount; j++)
+            if (prism is LSCapsuleCollider2D capsule2D)
             {
-                GetPrismEdge(prism, j, out Vector2d edge2D);
-                Vector3d edge3D = new(edge2D.X, Fixed64.Zero, edge2D.Y);
-                if (!CheckCuboidPrismAxis(cuboid, prism, Vector3d.Cross(cuboid.EdgeDirections[i], edge3D), ref penetration))
+                if (!CheckCuboidCapsuleEdgeAxis(cuboid, capsule2D, cuboid.EdgeDirections[i], ref penetration))
                     return false;
+            }
+            else
+            {
+                for (int j = 0; j < prism.VertexCount; j++)
+                {
+                    GetPrismEdge(prism, j, out Vector2d edge2D);
+                    Vector3d edge3D = new(edge2D.X, Fixed64.Zero, edge2D.Y);
+                    if (!CheckCuboidPrismAxis(cuboid, prism, Vector3d.Cross(cuboid.EdgeDirections[i], edge3D), ref penetration))
+                        return false;
+                }
             }
         }
 
@@ -291,15 +307,26 @@ public static partial class CollisionDetectionMixed
         if (!CheckCapsulePrismAxis(capsule, prism, Vector3d.Cross(capsule.LineDirection, Vector3d.Up), ref penetration))
             return false;
 
-        for (int i = 0; i < prism.VertexCount; i++)
+        if (prism is LSCapsuleCollider2D embeddedCapsule)
         {
-            GetPrismEdge(prism, i, out Vector2d edge2D);
-            Vector3d edge3D = new(edge2D.X, Fixed64.Zero, edge2D.Y);
-            if (!CheckCapsulePrismAxis(capsule, prism, GetPlanarEdgeNormal(edge2D), ref penetration))
+            if (!CheckEmbeddedCapsuleAxes(capsule, embeddedCapsule, ref penetration)
+                || !CheckCapsuleEmbeddedCapsuleEdgeAxis(capsule, embeddedCapsule, ref penetration))
+            {
                 return false;
+            }
+        }
+        else
+        {
+            for (int i = 0; i < prism.VertexCount; i++)
+            {
+                GetPrismEdge(prism, i, out Vector2d edge2D);
+                Vector3d edge3D = new(edge2D.X, Fixed64.Zero, edge2D.Y);
+                if (!CheckCapsulePrismAxis(capsule, prism, GetPlanarEdgeNormal(edge2D), ref penetration))
+                    return false;
 
-            if (!CheckCapsulePrismAxis(capsule, prism, Vector3d.Cross(capsule.LineDirection, edge3D), ref penetration))
-                return false;
+                if (!CheckCapsulePrismAxis(capsule, prism, Vector3d.Cross(capsule.LineDirection, edge3D), ref penetration))
+                    return false;
+            }
         }
 
         Vector3d linePoint = Vector3d.ClosestPointOnLineSegment(GetEmbeddedCenter3D(prism), capsule.LineSegmentStart, capsule.LineSegmentEnd);
@@ -326,15 +353,26 @@ public static partial class CollisionDetectionMixed
         if (!CheckCylinderPrismAxis(cylinder, prism, Vector3d.Cross(cylinder.LineDirection, Vector3d.Up), ref penetration))
             return false;
 
-        for (int i = 0; i < prism.VertexCount; i++)
+        if (prism is LSCapsuleCollider2D embeddedCapsule)
         {
-            GetPrismEdge(prism, i, out Vector2d edge2D);
-            Vector3d edge3D = new(edge2D.X, Fixed64.Zero, edge2D.Y);
-            if (!CheckCylinderPrismAxis(cylinder, prism, GetPlanarEdgeNormal(edge2D), ref penetration))
+            if (!CheckEmbeddedCapsuleAxes(cylinder, embeddedCapsule, ref penetration)
+                || !CheckCylinderEmbeddedCapsuleEdgeAxis(cylinder, embeddedCapsule, ref penetration))
+            {
                 return false;
+            }
+        }
+        else
+        {
+            for (int i = 0; i < prism.VertexCount; i++)
+            {
+                GetPrismEdge(prism, i, out Vector2d edge2D);
+                Vector3d edge3D = new(edge2D.X, Fixed64.Zero, edge2D.Y);
+                if (!CheckCylinderPrismAxis(cylinder, prism, GetPlanarEdgeNormal(edge2D), ref penetration))
+                    return false;
 
-            if (!CheckCylinderPrismAxis(cylinder, prism, Vector3d.Cross(cylinder.LineDirection, edge3D), ref penetration))
-                return false;
+                if (!CheckCylinderPrismAxis(cylinder, prism, Vector3d.Cross(cylinder.LineDirection, edge3D), ref penetration))
+                    return false;
+            }
         }
 
         Vector3d linePoint = Vector3d.ClosestPointOnLineSegment(GetEmbeddedCenter3D(prism), cylinder.LineSegmentStart, cylinder.LineSegmentEnd);
@@ -449,6 +487,64 @@ public static partial class CollisionDetectionMixed
         return CheckProjectedAxis(cylinderProjection, prismProjection, normalizedAxis, GetEmbeddedCenter3D(prism) - cylinder.Center, ref penetration);
     }
 
+    private static bool CheckEmbeddedCapsuleAxes(
+        LSCuboidCollider cuboid,
+        LSCapsuleCollider2D capsule,
+        ref AxisPenetration penetration)
+    {
+        GetEmbeddedCapsuleAxes(capsule, out Vector3d axis, out Vector3d normal);
+        return CheckCuboidPrismAxis(cuboid, capsule, axis, ref penetration)
+            && CheckCuboidPrismAxis(cuboid, capsule, normal, ref penetration);
+    }
+
+    private static bool CheckEmbeddedCapsuleAxes(
+        LSCapsuleCollider capsule3D,
+        LSCapsuleCollider2D capsule2D,
+        ref AxisPenetration penetration)
+    {
+        GetEmbeddedCapsuleAxes(capsule2D, out Vector3d axis, out Vector3d normal);
+        return CheckCapsulePrismAxis(capsule3D, capsule2D, axis, ref penetration)
+            && CheckCapsulePrismAxis(capsule3D, capsule2D, normal, ref penetration);
+    }
+
+    private static bool CheckEmbeddedCapsuleAxes(
+        LSCylinderCollider cylinder,
+        LSCapsuleCollider2D capsule,
+        ref AxisPenetration penetration)
+    {
+        GetEmbeddedCapsuleAxes(capsule, out Vector3d axis, out Vector3d normal);
+        return CheckCylinderPrismAxis(cylinder, capsule, axis, ref penetration)
+            && CheckCylinderPrismAxis(cylinder, capsule, normal, ref penetration);
+    }
+
+    private static bool CheckCuboidCapsuleEdgeAxis(
+        LSCuboidCollider cuboid,
+        LSCapsuleCollider2D capsule,
+        Vector3d cuboidEdge,
+        ref AxisPenetration penetration)
+    {
+        GetEmbeddedCapsuleAxes(capsule, out Vector3d capsuleAxis, out _);
+        return CheckCuboidPrismAxis(cuboid, capsule, Vector3d.Cross(cuboidEdge, capsuleAxis), ref penetration);
+    }
+
+    private static bool CheckCapsuleEmbeddedCapsuleEdgeAxis(
+        LSCapsuleCollider capsule3D,
+        LSCapsuleCollider2D capsule2D,
+        ref AxisPenetration penetration)
+    {
+        GetEmbeddedCapsuleAxes(capsule2D, out Vector3d capsuleAxis, out _);
+        return CheckCapsulePrismAxis(capsule3D, capsule2D, Vector3d.Cross(capsule3D.LineDirection, capsuleAxis), ref penetration);
+    }
+
+    private static bool CheckCylinderEmbeddedCapsuleEdgeAxis(
+        LSCylinderCollider cylinder,
+        LSCapsuleCollider2D capsule,
+        ref AxisPenetration penetration)
+    {
+        GetEmbeddedCapsuleAxes(capsule, out Vector3d capsuleAxis, out _);
+        return CheckCylinderPrismAxis(cylinder, capsule, Vector3d.Cross(cylinder.LineDirection, capsuleAxis), ref penetration);
+    }
+
     private static bool BuildCuboidContact(
         LSCuboidCollider cuboid,
         LSCollider2D embedded,
@@ -537,6 +633,9 @@ public static partial class CollisionDetectionMixed
 
     private static FixedRange ProjectPrismOntoAxis(Vector3d axis, LSCollider2D prism)
     {
+        if (prism is LSCapsuleCollider2D capsule)
+            return ProjectCapsuleSlabOntoAxis(axis, capsule);
+
         Vector2d first = GetPrismVertex(prism, 0);
         Fixed64 min = ProjectPrismVertex(axis, first, prism.MixedBounds3D.Min.Y);
         Fixed64 max = min;
@@ -557,6 +656,33 @@ public static partial class CollisionDetectionMixed
         }
 
         return new FixedRange(min, max);
+    }
+
+    private static FixedRange ProjectCapsuleSlabOntoAxis(Vector3d axis, LSCapsuleCollider2D capsule)
+    {
+        Fixed64 slabMinY = capsule.MixedBounds3D.Min.Y;
+        Fixed64 slabMaxY = capsule.MixedBounds3D.Max.Y;
+        Vector2d segmentStart = capsule.SegmentStart;
+        Vector2d segmentEnd = capsule.SegmentEnd;
+        Fixed64 min = ProjectPrismVertex(axis, segmentStart, slabMinY);
+        Fixed64 max = min;
+
+        KeepCapsuleSlabProjection(axis, segmentStart, slabMaxY, ref min, ref max);
+        KeepCapsuleSlabProjection(axis, segmentEnd, slabMinY, ref min, ref max);
+        KeepCapsuleSlabProjection(axis, segmentEnd, slabMaxY, ref min, ref max);
+
+        Fixed64 planarAxisMagnitude = FixedMath.Sqrt(axis.X * axis.X + axis.Z * axis.Z);
+        Fixed64 radiusProjection = capsule.ScaledRadius * planarAxisMagnitude;
+        return new FixedRange(min - radiusProjection, max + radiusProjection);
+    }
+
+    private static void KeepCapsuleSlabProjection(Vector3d axis, Vector2d point, Fixed64 y, ref Fixed64 min, ref Fixed64 max)
+    {
+        Fixed64 projection = ProjectPrismVertex(axis, point, y);
+        if (projection < min)
+            min = projection;
+        if (projection > max)
+            max = projection;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -636,6 +762,21 @@ public static partial class CollisionDetectionMixed
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Vector2d GetPrismVertex(LSCollider2D prism, int index) =>
         prism.GetVertexUnchecked(index);
+
+    private static void GetEmbeddedCapsuleAxes(LSCapsuleCollider2D capsule, out Vector3d axis, out Vector3d normal)
+    {
+        Vector2d segment = capsule.SegmentEnd - capsule.SegmentStart;
+        if (segment.MagnitudeSquared <= Fixed64.Epsilon)
+        {
+            axis = Vector3d.Zero;
+            normal = Vector3d.Zero;
+            return;
+        }
+
+        axis = new Vector3d(segment.X, Fixed64.Zero, segment.Y);
+        Vector2d planarNormal = segment.RightHandNormal;
+        normal = new Vector3d(planarNormal.X, Fixed64.Zero, planarNormal.Y);
+    }
 
     private static (Vector3d First, Vector3d Second) ClosestPointsOnSegments(
         Vector3d firstStart,

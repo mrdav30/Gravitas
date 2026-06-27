@@ -99,6 +99,9 @@ public sealed partial class GravitasDiagnosticSink
                     height: height,
                     color: color);
                 break;
+            case LSCapsuleCollider2D capsule:
+                CaptureMixedCapsule(capsule, color, capsule.Id, capsule.Shape);
+                break;
             case LSAABBoxCollider2D box:
                 AddDrawCommand(
                     GravitasDebugDrawKind.WireBox,
@@ -356,6 +359,9 @@ public sealed partial class GravitasDiagnosticSink
                         height: height,
                         color: color);
                     break;
+                case LSCapsuleCollider2D capsule:
+                    CaptureMixedCapsule(capsule, color, compound.Id, compound.Shape);
+                    break;
                 case LSAABBoxCollider2D box:
                     AddDrawCommand(
                         GravitasDebugDrawKind.WireBox,
@@ -371,6 +377,49 @@ public sealed partial class GravitasDiagnosticSink
                     break;
             }
         }
+    }
+
+    private void CaptureMixedCapsule(
+        LSCapsuleCollider2D capsule,
+        GravitasDiagnosticColor color,
+        int colliderId,
+        ColliderType2D colliderType)
+    {
+        Fixed64 height = capsule.MixedHalfThickness * 2;
+        Vector3d firstCenter = new(capsule.SegmentStart.X, capsule.MixedSlabCenterY, capsule.SegmentStart.Y);
+        Vector3d secondCenter = new(capsule.SegmentEnd.X, capsule.MixedSlabCenterY, capsule.SegmentEnd.Y);
+        AddDrawCommand(
+            GravitasDebugDrawKind.WireCylinder,
+            colliderId,
+            colliderDimension: GravitasColliderDimension.TwoD,
+            collider2DType: colliderType,
+            center: firstCenter,
+            radius: capsule.ScaledRadius,
+            height: height,
+            color: color);
+        AddDrawCommand(
+            GravitasDebugDrawKind.WireCylinder,
+            colliderId,
+            colliderDimension: GravitasColliderDimension.TwoD,
+            collider2DType: colliderType,
+            center: secondCenter,
+            radius: capsule.ScaledRadius,
+            height: height,
+            color: color);
+
+        Fixed64 segmentLength = Vector2d.Distance(capsule.SegmentStart, capsule.SegmentEnd);
+        if (segmentLength <= Fixed64.Epsilon)
+            return;
+
+        AddDrawCommand(
+            GravitasDebugDrawKind.WireBox,
+            colliderId,
+            colliderDimension: GravitasColliderDimension.TwoD,
+            collider2DType: colliderType,
+            center: new Vector3d(capsule.Center.X, capsule.MixedSlabCenterY, capsule.Center.Y),
+            size: new Vector3d(capsule.ScaledRadius * 2, height, segmentLength),
+            rotation: FixedQuaternion.FromEulerAngles(Fixed64.Zero, capsule.Rotation, Fixed64.Zero),
+            color: color);
     }
 
     private void CaptureMixedPolygon(LSCollider2D collider, GravitasDiagnosticColor color) =>
