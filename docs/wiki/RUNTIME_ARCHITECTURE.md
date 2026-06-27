@@ -23,7 +23,7 @@ pairs, queries, and coroutines remain context-local.
 | Service | Owned state |
 | --- | --- |
 | `GravitasPhysicsService` | Dynamic body bucket, collider ID table, reusable collider IDs, collision-pair pool, active collision-pair queue, 3D CCD frame cache, processed-body handoff queue, handoff diagnostics, deterministic 3D discrete island response, sleep-state updates, simulation switch. |
-| `GravitasPhysics2DService` | Pure 2D dynamic body bucket, monotonic collider ID table, 2D pair pool, 2D CCD frame cache, processed-body handoff queue, handoff diagnostics, post-integration collider refresh, deterministic 2D discrete island response, connected resting-pair expansion, pair-reference cleanup, visualization publishing, simulation switch. |
+| `GravitasPhysics2DService` | Pure 2D dynamic body bucket, monotonic collider ID table, 2D pair pool, 2D CCD frame cache, processed-body handoff queue, handoff diagnostics, post-integration collider refresh, deterministic 2D discrete island response, connected resting-pair expansion, contact-derived planar grounding refresh, pair-reference cleanup, visualization publishing, simulation switch. |
 | `GravitasMixedCollisionService` | Mixed 2D/3D lifecycle owner, GridForge-backed mixed broad phase, stable mixed candidate-key buffer, mixed hierarchy filtering, duplicate suppression, late-phase mixed partition refresh, mixed pair/response ownership, retained `PhysicsMixedPartition` cleanup, and lifecycle counters. |
 | `GravitasCollisionService` | Active partition bucket, inactive partition pool, duplicate voxel checker, partition awake-state refresh, collision distribution version, cull distributor. |
 | `GravitasCollision2DService` | GridForge-backed pure 2D partition bucket, inactive partition pool, duplicate voxel checker, awake dynamic membership refresh, 2D collision distribution version, retained partition cleanup. |
@@ -78,6 +78,7 @@ LateSimulate
     PrepareCollisionPartitions for dynamic 2D colliders
     Collisions2D.CheckAndDistributeCollisions
     Solve deterministic 2D discrete response islands
+    Refresh planar grounding from 2D contacts or probes
     Retire retained 2D collision partitions
     Update 2D sleep state after response
   Process cross-service queued CCD handoffs with the remaining TOI budget
@@ -113,8 +114,9 @@ same post-integration discrete collision pass. Collision response can mutate
 authoritative body state during fixed-step phases: pure 2D and 3D discrete
 response both run after their body integration in `LateSimulate()`, and mixed
 contacts run after both pure services have refreshed their colliders. Body force
-integration, 3D grounding, post-integration collider refresh, discrete island
-response, and sleep-state updates all happen during `LateSimulate()`.
+integration, grounding/support refresh, post-integration collider refresh,
+discrete island response, and sleep-state updates all happen during
+`LateSimulate()`.
 
 Lifecycle hooks run after the built-in work for their phase. `Visualize()` is
 the only built-in presentation phase currently used by bodies and services.
@@ -274,16 +276,25 @@ target.
 `Vector2d` position, `Vector2d` linear velocity, scalar rotation, scalar
 angular velocity/acceleration, 2D gravity, 2D force and torque integration,
 body-local/world center of mass, scalar moment of inertia, sleep/wake state,
-and Chronicler record data. Pure 2D positions use world X/Z projection:
+planar grounding/support state, and Chronicler record data. Pure 2D positions use world X/Z projection:
 `Vector2d.x = Vector3d.x` and `Vector2d.y = Vector3d.z`.
 `CanTranslate`, `CanRotate`, `EffectiveInverseMass`, and
 `EffectiveInverseMomentOfInertia` are the 2D body-side solver mobility surface.
 Kinematic 2D bodies read their agent transform during `LateSimulate` and use
 the same active-source CCD contract in the X/Z plane. It intentionally has no
-y-up ground probe, height split, visual interpolation state, or 3D inertia
-tensor. Pure 2D contact response uses COM-relative contact arms and scalar
-moment to apply angular velocity deltas from normal and tangent friction
-impulses. `ContinuousCollisionMode` is shared with the 3D body path:
+`HeightPos`, y-up step offset, visual interpolation state, or 3D inertia
+tensor. Its grounded state is planar support: automatic grounding accepts
+current-frame 2D contact normals from bodyless, position-frozen, or kinematic
+support colliders included by `PhysicsSettings.GroundCheckLayerMask`, then
+falls back to a body-owned `Query2D` ray or swept-circle probe when no valid
+contact candidate exists. `GroundingMode.Automatic` mirrors the 3D automatic
+ownership model, while `Manual` lets hosts supply support state or leave the
+body airborne without automatic probes. All points and normals remain in
+`Vector2d` X/Z-plane coordinates. Grounded integration removes acceleration
+and velocity into the support normal so bodies do not accumulate into-ground
+motion while resting. Pure 2D contact response uses COM-relative contact arms
+and scalar moment to apply angular velocity deltas from normal and tangent
+friction impulses. `ContinuousCollisionMode` is shared with the 3D body path:
 `SolidBody2D` resolves body, hierarchy, then context settings before committing
 movement, uses `Query2D.SweepCircle` to clip fast circle-proxy movement against
 static or kinematic 2D targets, refines supported movers with exact 2D
@@ -291,8 +302,9 @@ shape-sweep reducers, and uses prepared dynamic target candidates for exact
 relative mover-shape validation after proxy candidate gathering.
 Dynamic-vs-dynamic and kinematic-source 2D CCD preserve stable time,
 closing-speed, and collider-ID ordering.
-`GravitasPhysics2DService.Simulate()` runs 2D contact response and events;
-`GravitasPhysics2DService.LateSimulate()` integrates active movable 2D bodies;
+`GravitasPhysics2DService.LateSimulate()` integrates active movable 2D bodies,
+solves 2D contact response and events, refreshes planar grounding/support, and
+updates post-response sleep state.
 `GravitasPhysics2DService.Visualize()` publishes dynamic 2D position and yaw
 rotation back to the host transform while preserving host vertical height.
 

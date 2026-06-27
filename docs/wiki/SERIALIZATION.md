@@ -34,6 +34,8 @@ Serialized state:
 - mass, local center-of-mass offset, gravity scale, sleep state, sleep
   thresholds, CCD mode, and explicit body freeze axes.
 - 3D current and previous-step grounding state plus ground probe configuration.
+- pure 2D current and previous-step planar grounding/support state plus
+  contact/probe grounding configuration.
 - collider active/trigger state, layer, surface material, local offset, shape
   dimensions, 2D mixed half-thickness override, and shape-derived inputs.
 - settings that affect deterministic execution, through
@@ -67,11 +69,13 @@ snapshots restore the body-owned COM state directly.
 position, scalar rotation, freeze axes, linear motion, pending force state,
 scalar angular velocity, applied and queued angular acceleration, mass,
 shape-refreshed scalar moment policy, body-local center-of-mass offset, response
-mobility, gravity, gravity scale, sleep state plus linear and angular sleep
-thresholds, CCD mode, and its owned collider state. Populated snapshots restore
-explicit COM state and then refresh scalar moment/inverse moment from the loaded
+mobility, gravity, gravity scale, planar grounding mode/probe configuration,
+current and previous grounded state, ground normal, ground point, last grounded
+position, sleep state plus linear and angular sleep thresholds, CCD mode, and
+its owned collider state. Populated snapshots restore explicit COM and
+grounding state, then refresh scalar moment/inverse moment from the loaded
 collider shape so deterministic replay continues with the same effective solver
-mass.
+mass and support state.
 
 `LSCollider` records 3D collider filter, surface material, and shape state.
 Runtime IDs are context-owned and intentionally excluded from snapshots.

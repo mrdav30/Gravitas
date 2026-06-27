@@ -13,7 +13,7 @@ public sealed partial class SolidBody2D
         ref GravitasReplayHashWriter writer,
         GravitasReplayHashMode mode)
     {
-        writer.WriteSection("body.2d", 1);
+        writer.WriteSection("body.2d", 2);
         writer.WriteInt32(DynamicId);
         writer.WriteBool(Active);
         writer.WriteEnum(_freezeAxes);
@@ -40,6 +40,19 @@ public sealed partial class SolidBody2D
         writer.WriteInt32(SleepFrameThreshold);
         writer.WriteFixed64(SleepLinearSpeedThreshold);
         writer.WriteFixed64(_sleepAngularSpeedThreshold);
+        writer.WriteEnum(_groundingMode);
+        writer.WriteEnum(_groundProbeMode);
+        writer.WriteBool(_useGravityDerivedGroundUpDirection);
+        writer.WriteVector2d(_groundUpDirection);
+        writer.WriteFixed64(_groundProbeRadius);
+        writer.WriteFixed64(GroundedDistanceRay);
+        writer.WriteFixed64(GroundDownDistanceOnAir);
+        writer.WriteFixed64(GroundMinNormalDot);
+        writer.WriteBool(_isGrounded);
+        writer.WriteBool(_wasGrounded);
+        writer.WriteVector2d(_groundNormal);
+        writer.WriteVector2d(_groundPoint);
+        writer.WriteVector2d(_lastGroundedPosition);
         writer.WriteEnum(_continuousCollisionMode);
 
         writer.WriteSection("body.2d.ccd-authoritative", 1);

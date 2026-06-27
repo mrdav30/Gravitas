@@ -35,11 +35,6 @@ instead of burying it in notes.
     context-owned joints, warm-started solver constraints, ragdoll authoring
     definitions, collider-hierarchy-backed self-filtering, kinematic/animation
     handoff boundaries, CCD, serialization, diagnostics, and benchmarks.
-- [`Pure 2D Grounding And Support`](2026-06-26-pure-2d-grounding-and-support-plan.md)
-  - Planned 2026-06-26. Adds first-class `SolidBody2D` grounded-state support
-    through planar contacts, deterministic in-plane probes, manual and disabled
-    ownership modes, serialization, diagnostics, and docs while preserving the
-    pure 2D X/Z coordinate contract.
 - [`Collider Local Collision Filtering`](2026-06-26-collider-local-collision-filtering-plan.md)
   - Planned 2026-06-26. Adds collider-owned ignored physical layer masks for
     3D, pure 2D, mixed, CCD, and grounding/support paths while preserving
@@ -60,6 +55,11 @@ instead of burying it in notes.
 
 ## Recently Completed
 
+- [`Pure 2D Grounding And Support`](done/2026-06-26-pure-2d-grounding-and-support-plan.md)
+  - Completed 2026-06-27. Adds first-class `SolidBody2D` grounded-state support
+    through planar contacts, deterministic in-plane ray/swept-circle probes,
+    automatic/manual ownership modes, serialization, replay hashing,
+    diagnostics, and docs while preserving the pure 2D X/Z coordinate contract.
 - [`Body Axis Freeze Constraints`](done/2026-06-26-body-axis-freeze-constraints-plan.md)
   - Completed 2026-06-27. Replaces coarse mutable body mobility toggles with
     explicit 3D and pure 2D freeze axes across motion, constrained solver mass,
@@ -147,28 +147,23 @@ first public release.
 
 ## Recommended Execution Order
 
-1. [`Pure 2D Grounding And Support`](2026-06-26-pure-2d-grounding-and-support-plan.md)
-   - Close the remaining pure 2D body-state parity gap before broader new
-     feature work. This is release-scope because platformer-style 2D hosts
-     reasonably expect grounded-state behavior, but it must stay planar rather
-     than becoming hidden 3D height logic.
-2. [`Collider Local Collision Filtering`](2026-06-26-collider-local-collision-filtering-plan.md)
+1. [`Collider Local Collision Filtering`](2026-06-26-collider-local-collision-filtering-plan.md)
    - Low conceptual risk but cross-cutting. It should land before new collider
      families so future shape work inherits one physical filtering rule.
-3. [`Constraint And Ragdoll Foundation`](2026-06-26-constraint-and-ragdoll-foundation-plan.md)
+2. [`Constraint And Ragdoll Foundation`](2026-06-26-constraint-and-ragdoll-foundation-plan.md)
    - Build deterministic articulation after the body constraint model is final.
    Ragdoll links can reuse collider hierarchy identity and local filtering,
    while the solver work can integrate with the final body freeze semantics.
-4. [`Batched Query APIs`](2026-06-26-batched-query-apis-plan.md)
+3. [`Batched Query APIs`](2026-06-26-batched-query-apis-plan.md)
    - Add the high-throughput LSF query surface after local filtering is final
    and before new shape query families make the public surface broader.
-5. [`Pure 2D Capsule And Convenience Shapes`](2026-06-26-pure-2d-capsule-and-convenience-shapes-plan.md)
+4. [`Pure 2D Capsule And Convenience Shapes`](2026-06-26-pure-2d-capsule-and-convenience-shapes-plan.md)
    - Pairs naturally with 2D grounding and improves character-style 2D
      ergonomics without adding runtime triangle complexity.
-6. [`Cone Collider And Query Support`](2026-06-26-cone-collider-and-query-support-plan.md)
+5. [`Cone Collider And Query Support`](2026-06-26-cone-collider-and-query-support-plan.md)
    - Highest geometry/reducer risk of the new plans. Execute after the smaller
      collider API hardening items so cone work can focus on analytic geometry,
      contact quality, and query evidence.
-7. Keep the benchmark backlog and issue tracker as intake buckets; promote new
+6. Keep the benchmark backlog and issue tracker as intake buckets; promote new
    measured risks into dated plans only when they are broader than a focused
    patch.

@@ -24,6 +24,14 @@ public sealed partial class SolidBody2D
         int sleepFrameThreshold = SleepFrameThreshold;
         Fixed64 sleepLinearSpeedThreshold = SleepLinearSpeedThreshold;
         Fixed64 sleepAngularSpeedThreshold = SleepAngularSpeedThreshold;
+        GroundingMode groundingMode = GroundingMode;
+        GroundProbeMode2D groundProbeMode = GroundProbeMode;
+        bool useGravityDerivedGroundUpDirection = UseGravityDerivedGroundUpDirection;
+        Vector2d groundUpDirection = GroundUpDirection;
+        Fixed64 groundProbeRadius = GroundProbeRadius;
+        Fixed64 groundedDistanceRay = GroundedDistanceRay;
+        Fixed64 groundDownDistanceOnAir = GroundDownDistanceOnAir;
+        Fixed64 groundMinNormalDot = GroundMinNormalDot;
 
         RecordValues.Look(chronicler, ref active, "Active", false);
         RecordValues.Look(chronicler, ref freezeAxes, "FreezeAxes", BodyFreezeAxes2D.None);
@@ -49,6 +57,19 @@ public sealed partial class SolidBody2D
         RecordValues.Look(chronicler, ref sleepFrameThreshold, "SleepFrameThreshold", 16);
         RecordValues.Look(chronicler, ref sleepLinearSpeedThreshold, "SleepLinearSpeedThreshold", (Fixed64)0.001f);
         RecordValues.Look(chronicler, ref sleepAngularSpeedThreshold, "SleepAngularSpeedThreshold", (Fixed64)0.001f);
+        RecordValues.Look(chronicler, ref groundingMode, "GroundingMode", GroundingMode.Automatic);
+        RecordValues.Look(chronicler, ref groundProbeMode, "GroundProbeMode", GroundProbeMode2D.Auto);
+        RecordValues.Look(chronicler, ref useGravityDerivedGroundUpDirection, "UseGravityDerivedGroundUpDirection", true);
+        RecordValues.Look(chronicler, ref groundUpDirection, "GroundUpDirection", Vector2d.Forward);
+        RecordValues.Look(chronicler, ref groundProbeRadius, "GroundProbeRadius");
+        RecordValues.Look(chronicler, ref groundedDistanceRay, "GroundedDistanceRay", Fixed64.Half);
+        RecordValues.Look(chronicler, ref groundDownDistanceOnAir, "GroundDownDistanceOnAir", Fixed64.Half);
+        RecordValues.Look(chronicler, ref groundMinNormalDot, "GroundMinNormalDot", Fixed64.Half);
+        RecordValues.Look(chronicler, ref _isGrounded, "IsGrounded");
+        RecordValues.Look(chronicler, ref _wasGrounded, "WasGrounded");
+        RecordValues.Look(chronicler, ref _groundNormal, "GroundNormal");
+        RecordValues.Look(chronicler, ref _groundPoint, "GroundPoint");
+        RecordValues.Look(chronicler, ref _lastGroundedPosition, "LastGroundedPosition");
         RecordValues.Look(chronicler, ref _continuousCollisionMode, "ContinuousCollisionMode", ContinuousCollisionMode.Inherit);
 
         if (chronicler.Mode == SerializationMode.Loading)
@@ -63,6 +84,23 @@ public sealed partial class SolidBody2D
             SleepFrameThreshold = sleepFrameThreshold;
             SleepLinearSpeedThreshold = sleepLinearSpeedThreshold;
             SleepAngularSpeedThreshold = sleepAngularSpeedThreshold;
+            _groundingMode = groundingMode;
+            _groundProbeMode = groundProbeMode;
+            _useGravityDerivedGroundUpDirection = useGravityDerivedGroundUpDirection;
+            _groundUpDirection = groundUpDirection.MagnitudeSquared > Fixed64.Epsilon
+                ? groundUpDirection.Normalized
+                : DefaultGroundUpDirection;
+            _groundProbeRadius = groundProbeRadius < Fixed64.Zero ? Fixed64.Zero : groundProbeRadius;
+            GroundedDistanceRay = groundedDistanceRay;
+            GroundDownDistanceOnAir = groundDownDistanceOnAir;
+            GroundMinNormalDot = groundMinNormalDot;
+            _groundNormal = _groundNormal.MagnitudeSquared > Fixed64.Epsilon
+                ? _groundNormal.Normalized
+                : Vector2d.Zero;
+            _groundedTransitionCapturedForStep = false;
+            _groundCollider = null;
+            _groundColliderBroadPhaseVersion = 0;
+            ClearGroundContactCandidate();
         }
 
         Collider.RecordData(chronicler);

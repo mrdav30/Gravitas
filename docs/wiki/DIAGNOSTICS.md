@@ -65,7 +65,7 @@ Current event kinds:
 | `TorqueDelta` | `SolidBody.AddTorque(...)` | `Vector` is torque, `ScalarA` is torque magnitude. |
 | `LinearVelocityDelta` | Collision response velocity change | `Start` and `End` are previous/current velocity, `Vector` is the delta. |
 | `AngularVelocityDelta` | Collision response angular velocity change | Same shape as linear velocity delta. |
-| `GroundProbe` | `SolidBody.CheckGround(...)` | `Start`/`End` are probe segment, `ScalarA` is probe radius, `DataA` is `GroundProbeMode`. |
+| `GroundProbe` | `SolidBody.CheckGround(...)` and `SolidBody2D.CheckGround(...)` | `Start`/`End` are probe segment, `ScalarA` is probe radius, `DataA` is `GroundProbeMode` for 3D or `GroundProbeMode2D` for 2D, and collider dimensions identify the payload. |
 | `RayQuery` | Raycast and swept-sphere queries | `ScalarA` is sweep radius, `DataA` is layer mask bits, `DataB` is hit count. |
 | `CircleQuery` | Circle overlap queries | `Start` is center, `End` is directional extent when used, `ScalarA` is radius. |
 | `QuerySummary` | Query reducer quality diagnostics | `DataA` is eligible top-level exact reducer attempts, `DataB` is accepted hits, `ScalarA` is fallback hits, and `ScalarB` is rejected conservative candidates. |
@@ -123,6 +123,13 @@ Available views cover every current event kind:
 `GravitasMixedContactDiagnosticView`,
 `GravitasMixedResponseImpulseDiagnosticView`, and
 `GravitasMixedResponseIslandDiagnosticView`.
+
+`GravitasGroundProbeDiagnosticView` exposes both 3D and 2D probe metadata.
+Use `Mode` for 3D `GroundProbeMode`, `Mode2D` for pure 2D
+`GroundProbeMode2D`, and the dimension/type properties to route
+`ColliderType` versus `ColliderType2D` payloads. Pure 2D probe points are
+stored in the X/Z debug plane: event X is planar X, event Z is planar Y, and
+event Y is zero.
 
 `GravitasQuerySummaryDiagnosticView` is emitted by mixed query paths
 when diagnostics are enabled. It reports eligible top-level exact reducer

@@ -131,7 +131,8 @@ The current runtime uses explicit world-context ownership:
 - `GravitasPhysics2DService` owns pure 2D body and collider registration,
   collider IDs, 2D pair pooling, response/event processing, visualization
   transform publishing, 2D continuous-collision candidate indexing, and
-  mobility-aware partition refresh for one context.
+  mobility-aware partition refresh plus planar grounding/support refresh for
+  one context.
 - `GravitasMixedCollisionService` owns the dedicated mixed 2D/3D lifecycle path,
   GridForge-backed mixed broad phase, stable 3D/2D candidate keys, awake
   gating, dynamic/kinematic/static mixed partition membership, mixed CCD target
@@ -167,8 +168,8 @@ The current runtime uses explicit world-context ownership:
   and Chronicler state recording.
 - `SolidBody2D` owns pure 2D body state: X/Z-projected position, scalar yaw,
   linear velocity, force integration, sleep/wake state, visualization transform
-  publishing, opt-in continuous-collision mode, frame-start CCD displacement,
-  and Chronicler state recording.
+  publishing, planar grounding/support state, opt-in continuous-collision mode,
+  frame-start CCD displacement, and Chronicler state recording.
 - `IMatterAgent` is the host boundary. Hosts provide a `GravitasWorldContext`,
   a `FixedMathSharp.FixedTransform`, hierarchy information, and interaction state without tying
   Gravitas to a game engine.
@@ -500,8 +501,8 @@ When using partials, keep them organized by responsibility rather than by
 chronology. For dimensional counterparts such as `SolidBody` and `SolidBody2D`,
 prefer partial parity (`Motion`, `Serialization`, `ContinuousCollision.*`, and
 similar slices) unless the physics model is intentionally asymmetric, such as
-3D-only grounding. Do not create a service just to avoid a partial if the
-service would mostly shuttle private body state around.
+3D-only height/visual interpolation state. Do not create a service just to
+avoid a partial if the service would mostly shuttle private body state around.
 
 Reduce duplicate code when the shared behavior is genuinely type-neutral,
 deterministic, and allocation-free. Do not force a shared abstraction when the
@@ -602,8 +603,9 @@ Prioritize tests for:
   service ownership, and reset behavior.
 - `GravitasPhysicsService` assimilation, dessimilation, collider lookup, pair
   ownership, and reset behavior.
-- `SolidBody` force integration, velocity changes, drag/friction, grounding,
-  rotation, transform helpers, rest state, and serialization.
+- `SolidBody` and `SolidBody2D` force integration, velocity changes,
+  drag/friction or material response, grounding/support, rotation, transform
+  helpers, rest state, and serialization.
 - collider bounds, local/world transforms, layer filtering, trigger/contact
   events, parent/child collision exclusion, and partition lifecycle.
 - authored `ColliderShapeDefinition` and `ColliderShapeDefinition2D` data,

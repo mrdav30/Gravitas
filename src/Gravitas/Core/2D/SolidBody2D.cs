@@ -338,10 +338,12 @@ public sealed partial class SolidBody2D : IRecordable
         _isSleeping = false;
         _isDynamic = isDynamic;
         _sleepFrameCount = 0;
+        ResetGroundingForInitialize(position);
         Active = true;
         Collider.Initialize(this);
         RefreshMassPropertiesFromColliderShape();
         Context.Physics2D.AssimilateBody(this, isDynamic);
+        CheckGroundForSimulation();
     }
 
     /// <summary>
@@ -364,6 +366,7 @@ public sealed partial class SolidBody2D : IRecordable
         _sleepFrameCount = 0;
         _position = position;
         _rotation = rotation;
+        ResetGroundingForInitialize(position);
 
         if (!Active)
             return;
@@ -419,63 +422,71 @@ public sealed partial class SolidBody2D : IRecordable
         if (!Active)
             return;
 
-        LastContinuousCollisionToiIterationCount = 0;
-        LastContinuousCollisionToiIterationLimitReached = false;
-
-        if (TryConsumeContinuousCollisionHandoff(updateSleepState, updateColliderState))
-            return;
-
-        if (IsKinematic)
-            UpdateKinematicPositionAndRotation(updateColliderState);
-
-        if (!CanTranslate)
+        CaptureGroundedStepState();
+        try
         {
-            _linearAccelerationStore = Vector2d.Zero;
+            LastContinuousCollisionToiIterationCount = 0;
+            LastContinuousCollisionToiIterationLimitReached = false;
+
+            if (TryConsumeContinuousCollisionHandoff(updateSleepState, updateColliderState))
+                return;
+
+            if (IsKinematic)
+                UpdateKinematicPositionAndRotation(updateColliderState);
+
+            if (!CanTranslate)
+            {
+                _linearAccelerationStore = Vector2d.Zero;
+                _deltaAcceleration = Vector2d.Zero;
+                _angularAccelerationStore = Fixed64.Zero;
+                _deltaAngularAcceleration = Fixed64.Zero;
+                return;
+            }
+
+            if (_isSleeping)
+                return;
+
+            _linearAccelerationStore = RemoveIntoGroundComponent(_deltaAcceleration + Gravity * _gravityScale);
             _deltaAcceleration = Vector2d.Zero;
-            _angularAccelerationStore = Fixed64.Zero;
-            _deltaAngularAcceleration = Fixed64.Zero;
-            return;
+            _linearVelocity += ProjectLinearMotion(_linearAccelerationStore * Context.DeltaTime);
+            _linearVelocity = RemoveIntoGroundComponent(_linearVelocity);
+            _linearAccelerationStore = Vector2d.Zero;
+            RefreshLinearSpeed();
+
+            Fixed64 startRotation = _rotation;
+            Fixed64 proposedRotation = startRotation;
+            if (CanRotate)
+            {
+                _angularAccelerationStore = _deltaAngularAcceleration;
+                _deltaAngularAcceleration = Fixed64.Zero;
+                _angularVelocity += _angularAccelerationStore * Context.DeltaTime;
+                proposedRotation += _angularVelocity * Context.DeltaTime;
+                RefreshAngularSpeed();
+            }
+            else
+            {
+                _angularAccelerationStore = Fixed64.Zero;
+                _deltaAngularAcceleration = Fixed64.Zero;
+            }
+
+            Vector2d startPosition = _position;
+            Vector2d proposedPosition = startPosition + _linearVelocity * Context.DeltaTime;
+            TryResolveContinuousCollision(startPosition, ref proposedPosition);
+            proposedPosition = startPosition + ProjectLinearMotion(proposedPosition - startPosition);
+            TryResolveRotationalContinuousCollision(startPosition, ref proposedPosition, startRotation, ref proposedRotation);
+            proposedPosition = startPosition + ProjectLinearMotion(proposedPosition - startPosition);
+            _position = proposedPosition;
+            _rotation = proposedRotation;
+            if (updateColliderState)
+                Collider.Rebuild();
+
+            if (updateSleepState)
+                UpdateSleepState();
         }
-
-        if (_isSleeping)
-            return;
-
-        _linearAccelerationStore = ProjectLinearMotion(_deltaAcceleration + Gravity * _gravityScale);
-        _deltaAcceleration = Vector2d.Zero;
-        _linearVelocity += ProjectLinearMotion(_linearAccelerationStore * Context.DeltaTime);
-        _linearVelocity = ProjectLinearMotion(_linearVelocity);
-        _linearAccelerationStore = Vector2d.Zero;
-        RefreshLinearSpeed();
-
-        Fixed64 startRotation = _rotation;
-        Fixed64 proposedRotation = startRotation;
-        if (CanRotate)
+        finally
         {
-            _angularAccelerationStore = _deltaAngularAcceleration;
-            _deltaAngularAcceleration = Fixed64.Zero;
-            _angularVelocity += _angularAccelerationStore * Context.DeltaTime;
-            proposedRotation += _angularVelocity * Context.DeltaTime;
-            RefreshAngularSpeed();
+            CompleteGroundedStepState();
         }
-        else
-        {
-            _angularAccelerationStore = Fixed64.Zero;
-            _deltaAngularAcceleration = Fixed64.Zero;
-        }
-
-        Vector2d startPosition = _position;
-        Vector2d proposedPosition = startPosition + _linearVelocity * Context.DeltaTime;
-        TryResolveContinuousCollision(startPosition, ref proposedPosition);
-        proposedPosition = startPosition + ProjectLinearMotion(proposedPosition - startPosition);
-        TryResolveRotationalContinuousCollision(startPosition, ref proposedPosition, startRotation, ref proposedRotation);
-        proposedPosition = startPosition + ProjectLinearMotion(proposedPosition - startPosition);
-        _position = proposedPosition;
-        _rotation = proposedRotation;
-        if (updateColliderState)
-            Collider.Rebuild();
-
-        if (updateSleepState)
-            UpdateSleepState();
     }
 
     internal void UpdateSleepStateAfterPhysicsStep()

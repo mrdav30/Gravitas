@@ -429,14 +429,16 @@ actually hits suitable geometry.
 `SolidBody.GroundingMode` controls who owns grounded state:
 
 - `Automatic` is the default. Gravitas updates `IsGrounded`, `HitPoint`,
-  `WasGrounded`, `HitPoint`, `GroundNormal`, `HitPlatform`, and normal-force
+  `WasGrounded`, `GroundNormal`, `HitPlatform`, and normal-force
   cache from deterministic ground probes.
 - `Manual` disables automatic probes. Hosts can call
   `UseManualGrounding(...)`, `SetManualGrounding(...)`,
   `ClearManualGrounding()`, and `UseAutomaticGrounding(...)` when deterministic
   heightmaps or another host-owned ground source should drive grounded state
   without paying query cost. While in manual mode, the host is responsible for
-  keeping `IsGrounded` state current.
+  keeping `IsGrounded` state current. `UseManualGrounding()` and
+  `ClearManualGrounding()` leave the body airborne until the host supplies
+  manual support or returns ownership to Gravitas.
 
 Each body selects its probe shape through `GroundProbeMode`:
 
@@ -454,6 +456,19 @@ colliders, position-frozen bodies, or kinematic bodies.
 authoritative simulation refresh or explicit manual grounding change, so hosts
 can distinguish landing, remaining grounded, and leaving support without
 deriving that transition from visual-frame state.
+
+`SolidBody2D` exposes the same ownership model through `GroundingMode`,
+`UseManualGrounding(...)`, `SetManualGrounding(...)`,
+`ClearManualGrounding()`, and `UseAutomaticGrounding(...)`, but the values are
+planar support state rather than world-height state. `GroundPoint`, `GroundNormal`,
+`LastGroundedPosition`, and `GroundUpDirection` are `Vector2d` values where
+2D X maps to world X and 2D Y maps to world Z. Automatic 2D grounding first
+uses current-frame 2D contact manifolds against bodyless, position-frozen, or
+kinematic support colliders included by `GroundCheckLayerMask`; if no contact
+candidate is valid, it runs a deterministic `GroundProbeMode2D.Ray` or
+`GroundProbeMode2D.SweptCircle` probe through `context.Query2D`. Grounded
+2D integration removes acceleration and velocity components that push into the
+support normal while preserving tangential planar motion.
 
 ## Deactivation And Disposal
 

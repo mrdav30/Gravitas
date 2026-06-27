@@ -166,6 +166,7 @@ public sealed partial class GravitasPhysics2DService
         _context.Collisions2D.CheckAndDistributeCollisions();
         ExpandDiscreteResponsePairs(frame);
         SolveDiscreteResponsePairs();
+        RefreshGroundingFromDiscreteResponse(frame);
         CleanupUntouchedPairs(frame);
         _context.Collisions2D.RetireExpiredRetainedPartitions();
     }

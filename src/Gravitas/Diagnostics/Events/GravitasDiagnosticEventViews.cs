@@ -109,9 +109,17 @@ public readonly struct GravitasGroundProbeDiagnosticView
 
     public int HitColliderId => Event.ColliderBId;
 
+    public GravitasColliderDimension ColliderDimension => Event.ColliderADimension;
+
+    public GravitasColliderDimension HitColliderDimension => Event.ColliderBDimension;
+
     public ColliderType ColliderType => Event.ColliderAType;
 
     public ColliderType HitColliderType => Event.ColliderBType;
+
+    public ColliderType2D Collider2DType => Event.ColliderA2DType;
+
+    public ColliderType2D HitCollider2DType => Event.ColliderB2DType;
 
     public Vector3d Start => Event.Start;
 
@@ -126,6 +134,8 @@ public readonly struct GravitasGroundProbeDiagnosticView
     public Fixed64 Distance => Event.ScalarB;
 
     public GroundProbeMode Mode => (GroundProbeMode)Event.DataA;
+
+    public GroundProbeMode2D Mode2D => (GroundProbeMode2D)Event.DataA;
 
     public bool Hit => Event.Hit;
 }

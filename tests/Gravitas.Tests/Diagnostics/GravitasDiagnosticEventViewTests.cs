@@ -130,6 +130,32 @@ public sealed class GravitasDiagnosticEventViewTests
         groundView.Mode.Should().Be(GroundProbeMode.SweptSphere);
         groundView.Hit.Should().BeTrue();
 
+        GravitasDiagnosticEvent groundProbe2DEvent = CreateEvent(
+            GravitasDiagnosticEventKind.GroundProbe,
+            bodyId: 32,
+            colliderAId: 43,
+            colliderBId: 44,
+            colliderADimension: GravitasColliderDimension.TwoD,
+            colliderBDimension: GravitasColliderDimension.TwoD,
+            colliderA2DType: ColliderType2D.Circle,
+            colliderB2DType: ColliderType2D.AABox,
+            start: start,
+            end: end,
+            pointA: hitPoint,
+            vector: normal,
+            scalarA: Fixed64.Half,
+            scalarB: (Fixed64)3,
+            dataA: (int)GroundProbeMode2D.SweptCircle,
+            dataB: (int)GravitasColliderDimension.TwoD,
+            hit: true);
+
+        groundProbe2DEvent.TryAsGroundProbe(out GravitasGroundProbeDiagnosticView ground2DView).Should().BeTrue();
+        ground2DView.ColliderDimension.Should().Be(GravitasColliderDimension.TwoD);
+        ground2DView.HitColliderDimension.Should().Be(GravitasColliderDimension.TwoD);
+        ground2DView.Collider2DType.Should().Be(ColliderType2D.Circle);
+        ground2DView.HitCollider2DType.Should().Be(ColliderType2D.AABox);
+        ground2DView.Mode2D.Should().Be(GroundProbeMode2D.SweptCircle);
+
         GravitasDiagnosticEvent rayEvent = CreateEvent(
             GravitasDiagnosticEventKind.RayQuery,
             colliderAId: 51,

@@ -42,6 +42,16 @@ public sealed class SolidBody2DSerializationTests
             Fixed64.FromFraction(3, 4));
         source.Initialize(new Vector2d((Fixed64)5, (Fixed64)(-2)), Fixed64.FromFraction(1, 8));
         source.LocalCenterOfMassOffset = new Vector2d(Fixed64.FromFraction(1, 3), -Fixed64.FromFraction(1, 4));
+        source.UseGravityDerivedGroundUpDirection = false;
+        source.GroundUpDirection = Vector2d.Forward;
+        source.GroundProbeMode = GroundProbeMode2D.SweptCircle;
+        source.GroundProbeRadius = Fixed64.FromFraction(1, 3);
+        source.GroundedDistanceRay = Fixed64.FromFraction(3, 4);
+        source.GroundDownDistanceOnAir = Fixed64.FromFraction(5, 4);
+        source.GroundMinNormalDot = Fixed64.FromFraction(3, 5);
+        source.SetManualGrounding(
+            new Vector2d((Fixed64)5, Fixed64.FromFraction(-3, 2)),
+            Vector2d.Forward);
 
         object payload = GravitasSerializationHarness.Serialize(source, transport);
 
@@ -70,6 +80,19 @@ public sealed class SolidBody2DSerializationTests
         target.SleepLinearSpeedThreshold.Should().Be(source.SleepLinearSpeedThreshold);
         target.SleepAngularSpeedThreshold.Should().Be(source.SleepAngularSpeedThreshold);
         target.ContinuousCollisionMode.Should().Be(source.ContinuousCollisionMode);
+        target.GroundingMode.Should().Be(GroundingMode.Manual);
+        target.GroundProbeMode.Should().Be(source.GroundProbeMode);
+        target.UseGravityDerivedGroundUpDirection.Should().BeFalse();
+        target.GroundUpDirection.Should().Be(Vector2d.Forward);
+        target.GroundProbeRadius.Should().Be(source.GroundProbeRadius);
+        target.GroundedDistanceRay.Should().Be(source.GroundedDistanceRay);
+        target.GroundDownDistanceOnAir.Should().Be(source.GroundDownDistanceOnAir);
+        target.GroundMinNormalDot.Should().Be(source.GroundMinNormalDot);
+        target.IsGrounded.Should().BeTrue();
+        target.WasGrounded.Should().BeFalse();
+        target.GroundPoint.Should().Be(source.GroundPoint);
+        target.GroundNormal.Should().Be(Vector2d.Forward);
+        target.LastGroundedPosition.Should().Be(source.LastGroundedPosition);
         target.AngularMotionFrozen.Should().BeTrue();
         target.LocalCenterOfMassOffset.Should().Be(source.LocalCenterOfMassOffset);
         target.WorldCenterOfMass.Should().Be(source.WorldCenterOfMass);
@@ -79,6 +102,42 @@ public sealed class SolidBody2DSerializationTests
         targetCollider.LocalOffset.Should().Be(sourceCollider.LocalOffset);
         targetCollider.MixedHalfThicknessOverride.Should().Be(sourceCollider.MixedHalfThicknessOverride);
         targetCollider.Bounds.Should().Be(sourceCollider.Bounds);
+    }
+
+    [Theory]
+    [MemberData(nameof(Transports))]
+    public void Populate_ShouldRestoreAutomaticAndManualClearedGroundingState(GravitasSerializationTransport transport)
+    {
+        using GravitasWorldContext automaticContext = Physics2DTestWorld.CreateContext(frameRate: 8);
+        CreateStaticFloor(automaticContext);
+        SolidBody2D automatic = CreateDynamicCircle(automaticContext, new Vector2d(Fixed64.Zero, Fixed64.One));
+        automatic.GroundProbeMode = GroundProbeMode2D.Ray;
+        automatic.CheckGround();
+
+        object automaticPayload = GravitasSerializationHarness.Serialize(automatic, transport);
+
+        using GravitasWorldContext automaticTargetContext = Physics2DTestWorld.CreateContext(frameRate: 8);
+        SolidBody2D automaticTarget = CreateDynamicCircle(automaticTargetContext);
+        GravitasSerializationHarness.Populate(automaticTarget, automaticPayload, transport);
+
+        automaticTarget.GroundingMode.Should().Be(GroundingMode.Automatic);
+        automaticTarget.GroundProbeMode.Should().Be(GroundProbeMode2D.Ray);
+        automaticTarget.IsGrounded.Should().BeTrue();
+        automaticTarget.GroundPoint.Should().Be(automatic.GroundPoint);
+        automaticTarget.GroundNormal.Should().Be(Vector2d.Forward);
+
+        automatic.UseManualGrounding();
+        object manualPayload = GravitasSerializationHarness.Serialize(automatic, transport);
+
+        using GravitasWorldContext manualTargetContext = Physics2DTestWorld.CreateContext(frameRate: 8);
+        SolidBody2D manualTarget = CreateDynamicCircle(manualTargetContext);
+        GravitasSerializationHarness.Populate(manualTarget, manualPayload, transport);
+
+        manualTarget.GroundingMode.Should().Be(GroundingMode.Manual);
+        manualTarget.IsGrounded.Should().BeFalse();
+        manualTarget.WasGrounded.Should().BeTrue();
+        manualTarget.GroundNormal.Should().Be(Vector2d.Zero);
+        manualTarget.GroundPoint.Should().Be(Vector2d.Zero);
     }
 
     [Theory]
@@ -155,14 +214,24 @@ public sealed class SolidBody2DSerializationTests
         ((LSCircleCollider2D)target.Collider).Radius.Should().Be(((LSCircleCollider2D)source.Collider).Radius);
     }
 
-    private static SolidBody2D CreateDynamicCircle(GravitasWorldContext context)
+    private static SolidBody2D CreateDynamicCircle(GravitasWorldContext context, Vector2d position = default)
     {
-        var agent = new TestMatterAgent(context);
+        var agent = new TestMatterAgent(context, new FixedTransform(
+            new Vector3d(position.X, Fixed64.Zero, position.Y),
+            FixedQuaternion.Identity,
+            Vector3d.One));
         var body = new SolidBody2D(agent, new LSCircleCollider2D(Fixed64.Half))
         {
             Mass = (Fixed64)2
         };
-        body.Initialize(Vector2d.Zero);
+        body.Initialize(position);
         return body;
+    }
+
+    private static void CreateStaticFloor(GravitasWorldContext context)
+    {
+        var agent = new TestMatterAgent(context);
+        var collider = new LSAABBoxCollider2D(new Vector2d((Fixed64)8, Fixed64.One));
+        collider.InitializeWithNoBody(agent);
     }
 }

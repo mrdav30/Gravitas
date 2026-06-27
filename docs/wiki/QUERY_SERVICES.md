@@ -322,6 +322,12 @@ kinematic targets are included through kinematic/static partition membership,
 while movable dynamic targets are left to the relative dynamic CCD candidate
 index.
 
+`SolidBody2D` automatic ground probes use the pure 2D query service as well.
+Ray probes call `RaycastAll`; swept-circle probes use a static-style collector.
+Both apply `PhysicsSettings.GroundCheckLayerMask`, self exclusion,
+trigger rejection, and ordinary movable-dynamic rejection before accepting a
+support hit.
+
 Current hit data is `Physics2DHit`: collider, optional body, point, normal, and
 distance.
 

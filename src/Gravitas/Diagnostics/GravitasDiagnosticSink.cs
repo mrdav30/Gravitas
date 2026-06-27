@@ -357,6 +357,38 @@ public sealed class GravitasDiagnosticSink
             hit: hit);
     }
 
+    internal void EmitGroundProbe(
+        SolidBody2D body,
+        GroundProbeMode2D mode,
+        Vector2d start,
+        Vector2d end,
+        Fixed64 radius,
+        bool hit,
+        Physics2DHit raycastHit)
+    {
+        if (!Enabled)
+            return;
+
+        AddEvent(
+            GravitasDiagnosticEventKind.GroundProbe,
+            bodyId: body.DynamicId,
+            colliderAId: body.Collider.Id,
+            colliderBId: raycastHit.Collider?.Id ?? -1,
+            colliderADimension: GravitasColliderDimension.TwoD,
+            colliderBDimension: raycastHit.Collider == null ? GravitasColliderDimension.None : GravitasColliderDimension.TwoD,
+            colliderA2DType: body.Collider.Shape,
+            colliderB2DType: raycastHit.Collider?.Shape ?? ColliderType2D.None,
+            start: ToDiagnosticVector(start),
+            end: ToDiagnosticVector(end),
+            pointA: ToDiagnosticVector(raycastHit.Point),
+            vector: ToDiagnosticVector(raycastHit.Normal),
+            scalarA: radius,
+            scalarB: raycastHit.Distance,
+            dataA: (int)mode,
+            dataB: (int)GravitasColliderDimension.TwoD,
+            hit: hit);
+    }
+
     internal void EmitRayQuery(
         Vector3d start,
         Vector3d end,
@@ -857,4 +889,6 @@ public sealed class GravitasDiagnosticSink
             ? GravitasColliderDimension.TwoD
             : GravitasColliderDimension.None;
     }
+
+    private static Vector3d ToDiagnosticVector(Vector2d value) => new(value.X, Fixed64.Zero, value.Y);
 }

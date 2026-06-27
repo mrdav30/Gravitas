@@ -46,8 +46,13 @@ Pure 2D uses the LSF stack's X/Z planar convention:
 - scalar 2D rotation maps to yaw around the world Y axis when syncing from a
   host `FixedTransform`.
 
-Pure 2D body motion has no `HeightPos`, ground probe, step offset, or grounded
-platform state. Those belong to the current 3D y-up body model.
+Pure 2D body motion has no `HeightPos`, 3D step offset, or y-up platform
+state. Grounding is modeled as planar support in the 2D simulation plane:
+`SolidBody2D.IsGrounded`, `WasGrounded`, `GroundNormal`, `GroundPoint`, and
+`LastGroundedPosition` are X/Z-plane values. Automatic support can come from
+current 2D contact manifolds or deterministic in-plane ray/swept-circle probes;
+manual ownership lets hosts drive grounded state or leave bodies airborne
+without automatic probes.
 
 Dynamic 2D bodies publish their authoritative planar position and yaw rotation
 back to the host `FixedTransform` during `Visualize()` whenever the runtime mode
@@ -87,7 +92,9 @@ circle/circle and circle/convex contacts remain one-contact manifolds.
 Pure 2D discrete response runs after 2D body integration during
 `LateSimulate`: dynamic 2D colliders refresh once, partition candidates are
 distributed, deterministic response islands are solved, connected resting pairs
-can wake through the island graph, and sleep state updates after response.
+can wake through the island graph, contact-derived planar grounding refreshes,
+probe fallback runs when no valid support contact exists, and sleep state
+updates after response.
 
 `LSCollider2D.InitializeWithNoBody(IMatterAgent)` binds bodyless static or
 trigger colliders to the same host contract. Bodyless 2D colliders register

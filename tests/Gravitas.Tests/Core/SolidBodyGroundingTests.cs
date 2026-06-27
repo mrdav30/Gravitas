@@ -104,6 +104,25 @@ public sealed class SolidBodyGroundingTests
     }
 
     [Fact]
+    public void UseManualGrounding_ShouldClearGroundStateAndSkipAutomaticProbe()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        CreateGround(scenario, new PhysicsLayer(1));
+        scenario.Context.Settings.GroundCheckLayerMask = PhysicsLayerMask.FromLayer(1);
+        ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
+
+        body.Body.UseManualGrounding();
+        scenario.Context.Simulate();
+        scenario.Context.LateSimulate();
+
+        body.Body.GroundingMode.Should().Be(GroundingMode.Manual);
+        body.Body.IsGrounded.Should().BeFalse();
+        body.Body.WasGrounded.Should().BeTrue();
+        body.Body.HitPoint.Should().Be(Vector3d.Zero);
+        body.Body.GroundNormal.Should().Be(Vector3d.Zero);
+    }
+
+    [Fact]
     public void UseManualGrounding_ShouldDisableAutomaticProbeAndLeaveBodyAirborne()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
