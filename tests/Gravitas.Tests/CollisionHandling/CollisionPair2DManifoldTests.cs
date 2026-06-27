@@ -119,7 +119,7 @@ public sealed class CollisionPair2DManifoldTests
             new LSCircleCollider2D(Fixed64.Half))
         {
             Mass = Fixed64.One,
-            Immovable = immovable
+            FreezeAxes = immovable ? BodyFreezeAxes2D.Position : BodyFreezeAxes2D.None
         };
         body.Initialize(position);
         return body;
@@ -135,7 +135,7 @@ public sealed class CollisionPair2DManifoldTests
             new LSAABBoxCollider2D(new Vector2d((Fixed64)2, (Fixed64)2)))
         {
             Mass = Fixed64.One,
-            Immovable = immovable
+            FreezeAxes = immovable ? BodyFreezeAxes2D.Position : BodyFreezeAxes2D.None
         };
         body.Initialize(position);
         return body;

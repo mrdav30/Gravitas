@@ -1104,7 +1104,7 @@ public sealed class ContinuousCollisionDetectionTests
             new TestMatterAgent(context, transform),
             new LSSphereCollider { Radius = Fixed64.FromFraction(1, 4) })
         {
-            Immovable = true,
+            FreezeAxes = BodyFreezeAxes3D.Position,
             Mass = Fixed64.One
         };
 

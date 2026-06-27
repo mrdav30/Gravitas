@@ -60,7 +60,7 @@ public sealed partial class SolidBody2D
     {
         Fixed64 deltaTime = Context.DeltaTime;
         return deltaTime > Fixed64.Epsilon
-            ? _continuousCollisionFrameDisplacement / deltaTime
+            ? ProjectLinearMotion(_continuousCollisionFrameDisplacement / deltaTime)
             : Vector2d.Zero;
     }
 
@@ -105,7 +105,7 @@ public sealed partial class SolidBody2D
         }
 
         SolidBody2D? hitBody = hitCollider.Body;
-        return hitBody == null || hitBody.Immovable || hitBody.IsKinematic;
+        return hitBody == null || hitBody.IsPositionFullyFrozen || hitBody.IsKinematic;
     }
 
     private bool IsValidMixedContinuousCollisionHit(PhysicsMixedHit hit)
@@ -120,7 +120,7 @@ public sealed partial class SolidBody2D
         }
 
         SolidBody? hitBody = hitCollider.Body;
-        return hitBody == null || hitBody.Immovable || hitBody.IsKinematic;
+        return hitBody == null || hitBody.IsPositionFullyFrozen || hitBody.IsKinematic;
     }
 
 }

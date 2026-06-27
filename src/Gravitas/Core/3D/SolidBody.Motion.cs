@@ -13,7 +13,7 @@ namespace Gravitas;
 
 public partial class SolidBody
 {
-    private bool CanUseAngularInertia => !Immovable && !IsKinematic && !PreventAngularForces;
+    private bool CanUseAngularInertia => !IsPositionFullyFrozen && !IsKinematic && !IsRotationFullyFrozen;
 
     private void UpdateSleepState()
     {
@@ -58,6 +58,27 @@ public partial class SolidBody
         _isVelocityConstant = true;
     }
 
+    private void ApplyFreezeConstraintsToMotion()
+    {
+        Vector3d lastLinearVelocity = _linearVelocity;
+        _linearVelocity = ProjectLinearMotion(_linearVelocity);
+        _linearAccelerationStore = ProjectLinearMotion(_linearAccelerationStore);
+        _deltaAcceleration = ProjectLinearMotion(_deltaAcceleration);
+        _linearAcceleration = ProjectLinearMotion(_linearAcceleration);
+        _impulseStore = ProjectLinearMotion(_impulseStore);
+        _timeScaledAcceleration = ProjectLinearMotion(_timeScaledAcceleration);
+        _timeScaledDeceleration = ProjectLinearMotion(_timeScaledDeceleration);
+        _positionCorrection = ProjectLinearMotion(_positionCorrection.ToVector3d(Fixed64.Zero)).ToVector2d();
+        RefreshLinearMotionState(lastLinearVelocity);
+
+        Vector3d lastAngularVelocity = _angularVelocity;
+        _angularVelocity = ProjectAngularMotion(_angularVelocity);
+        _deltaTorque = ProjectAngularMotion(_deltaTorque);
+        _angularAccelerationStore = ProjectAngularMotion(_angularAccelerationStore);
+        _angularAcceleration = ProjectAngularMotion(_angularAcceleration);
+        RefreshAngularMotionState(lastAngularVelocity);
+    }
+
     private void RefreshPartitionAwakeState()
     {
         if (Collider is { IsPartitioned: true })
@@ -91,20 +112,23 @@ public partial class SolidBody
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void AddTorque(Vector3d torque)
     {
-        if (torque != Vector3d.Zero)
-            Wake();
+        Vector3d accelerationDelta = ProjectAngularMotion(torque * _inverseInertiaTensor);
+        if (accelerationDelta == Vector3d.Zero)
+            return;
 
-        _deltaTorque += torque * _inverseInertiaTensor;
+        Wake();
+        _deltaTorque += accelerationDelta;
         Context.Diagnostics.EmitTorqueDelta(this, torque);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void AddForce(Vector3d force)
     {
-        if (force != Vector3d.Zero)
-            Wake();
+        Vector3d accelerationDelta = ProjectLinearMotion(force * InverseMass);
+        if (accelerationDelta == Vector3d.Zero)
+            return;
 
-        Vector3d accelerationDelta = force * InverseMass;
+        Wake();
         _deltaAcceleration += accelerationDelta;
         Context.Diagnostics.EmitForceDelta(this, force, accelerationDelta);
     }
@@ -113,10 +137,12 @@ public partial class SolidBody
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void AddLinearImpulse(Vector3d impulse)
     {
-        if (impulse != Vector3d.Zero)
-            Wake();
+        Vector3d velocityDelta = ProjectLinearMotion((impulse * InverseMass) * Context.DeltaTime);
+        if (velocityDelta == Vector3d.Zero)
+            return;
 
-        _impulseStore += (impulse * InverseMass) * Context.DeltaTime;
+        Wake();
+        _impulseStore += velocityDelta;
         // testing immediate reaction for collisions...
         UpdateLinearVelocity();
         NonKinematicUpdate();
@@ -125,16 +151,19 @@ public partial class SolidBody
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void AddAngularImpulse(Vector3d impulse)
     {
-        if (impulse != Vector3d.Zero)
-            Wake();
+        Vector3d velocityDelta = ProjectAngularMotion((impulse * _inverseInertiaTensor) * Context.DeltaTime);
+        if (velocityDelta == Vector3d.Zero)
+            return;
 
-        if (!AngularForcesHalted)
-            _angularVelocity += (impulse * _inverseInertiaTensor) * Context.DeltaTime;
+        Wake();
+        _angularVelocity += velocityDelta;
+        RefreshAngularMotionState(_angularVelocity - velocityDelta);
     }
 
     internal void ApplyCollisionLinearVelocityDelta(Vector3d velocityDelta)
     {
-        if (Immovable || IsKinematic || velocityDelta == Vector3d.Zero)
+        velocityDelta = ProjectLinearMotion(velocityDelta);
+        if (!CanTranslate || IsKinematic || velocityDelta == Vector3d.Zero)
             return;
 
         WakeFromCollision();
@@ -146,7 +175,8 @@ public partial class SolidBody
 
     internal void ApplyCollisionAngularVelocityDelta(Vector3d velocityDelta)
     {
-        if (AngularForcesHalted || IsKinematic || velocityDelta == Vector3d.Zero)
+        velocityDelta = ProjectAngularMotion(velocityDelta);
+        if (!CanRotate || IsKinematic || velocityDelta == Vector3d.Zero)
             return;
 
         WakeFromCollision();
@@ -158,7 +188,8 @@ public partial class SolidBody
 
     internal void ApplyCollisionPositionCorrection(Vector3d positionCorrection)
     {
-        if (Immovable || IsKinematic || positionCorrection == Vector3d.Zero)
+        positionCorrection = ProjectLinearMotion(positionCorrection);
+        if (!CanTranslate || IsKinematic || positionCorrection == Vector3d.Zero)
             return;
 
         Position3d += positionCorrection;
@@ -175,7 +206,8 @@ public partial class SolidBody
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void AddPositionCorrection(Vector3d positionCorrection) => _positionCorrection += positionCorrection.ToVector2d();
+    public void AddPositionCorrection(Vector3d positionCorrection) =>
+        _positionCorrection += ProjectLinearMotion(positionCorrection).ToVector2d();
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void SetHeight(Fixed64 height)
@@ -200,7 +232,7 @@ public partial class SolidBody
         ApplyLinearForces();
         UpdateLinearVelocity();
 
-        if (!AngularForcesHalted)
+        if (CanRotate)
         {
             ApplyAngularTorques();
             UpdateAngularVelocity();
@@ -215,7 +247,7 @@ public partial class SolidBody
 
     private void ApplyLinearForces()
     {
-        _linearAccelerationStore = _deltaAcceleration;
+        _linearAccelerationStore = ProjectLinearMotion(_deltaAcceleration);
         _deltaAcceleration = Vector3d.Zero;
 
         if (_linearSpeed <= Fixed64.Zero)
@@ -262,7 +294,7 @@ public partial class SolidBody
         PhysicsEnvironment environment = Context.Environment;
         Vector3d lastVelocity = _linearVelocity;
 
-        _linearVelocity += _impulseStore + (_linearAccelerationStore * deltaTime);
+        _linearVelocity += ProjectLinearMotion(_impulseStore + (_linearAccelerationStore * deltaTime));
         // LinearVelocity = _impulseStore + (_linearAccelerationStore * deltaTime);
 
         // Reset stores for the next frame
@@ -270,11 +302,12 @@ public partial class SolidBody
         _impulseStore = Vector3d.Zero;
 
         // Apply gravity only if not grounded
-        if (!IsGrounded)
+        if (!IsGrounded && (_freezeAxes & BodyFreezeAxes3D.PositionY) != BodyFreezeAxes3D.PositionY)
             _linearVelocity.Y -= environment.Gravity * _gravityScale * deltaTime;
 
         // Make sure we don't fall any faster than maxFallSpeed. This gives our character a terminal velocity
         _linearVelocity.Y = FixedMath.Max(_linearVelocity.Y, -environment.MaxFallSpeed);
+        _linearVelocity = ProjectLinearMotion(_linearVelocity);
 
         RefreshLinearMotionState(lastVelocity);
     }
@@ -310,7 +343,7 @@ public partial class SolidBody
 
     private void ApplyAngularTorques()
     {
-        _angularAccelerationStore = _deltaTorque;
+        _angularAccelerationStore = ProjectAngularMotion(_deltaTorque);
         _deltaTorque = Vector3d.Zero;
 
         if (_angularSpeed <= Fixed64.Zero)
@@ -351,13 +384,14 @@ public partial class SolidBody
         PhysicsEnvironment environment = Context.Environment;
         Vector3d lastVelocity = _angularVelocity;
         // Apply the accumulated angular acceleration
-        _angularVelocity += _angularAccelerationStore * deltaTime;
+        _angularVelocity += ProjectAngularMotion(_angularAccelerationStore * deltaTime);
         // Reset the acceleration store for the next frame
         _angularAccelerationStore = Vector3d.Zero;
 
         // Add damping torque, proportional to negative angular velocity
         Vector3d dampingTorque = -environment.DampingFactor * _angularVelocity;
-        _angularVelocity += _inverseInertiaTensor * dampingTorque * deltaTime;
+        _angularVelocity += ProjectAngularMotion(_inverseInertiaTensor * dampingTorque * deltaTime);
+        _angularVelocity = ProjectAngularMotion(_angularVelocity);
 
         RefreshAngularMotionState(lastVelocity);
     }
@@ -407,7 +441,7 @@ public partial class SolidBody
         Vector3d rotationalCcdStartPosition = Position3d;
         PositionBasedOnForce();
         Vector3d rotationalCcdProposedPosition = Position3d;
-        if (!AngularForcesHalted && _angularSpeed > Fixed64.Zero)
+        if (CanRotate && _angularSpeed > Fixed64.Zero)
             RotationBasedOnTorque(rotationalCcdStartPosition, rotationalCcdProposedPosition);
 
         CheckGroundForSimulation();
@@ -418,7 +452,7 @@ public partial class SolidBody
             ResetGroundCalculations();
 
         CheckChangedValues();
-        if (AngularForcesHalted && !RotationChangePending)
+        if (!CanRotate && !RotationChangePending)
             return;
 
         UpdateInertiaTensorOrientation();
@@ -430,17 +464,18 @@ public partial class SolidBody
         Vector3d startPosition = Position3d;
         Vector3d velocityVector = startPosition + (_linearVelocity * Context.DeltaTime);
         TryResolveContinuousCollision(startPosition, ref velocityVector);
+        velocityVector = startPosition + ProjectLinearMotion(velocityVector - startPosition);
 
         Vector2d velocityAxis = velocityVector.ToVector2d();
 
         // Find out how much we need to push towards the ground to avoid loosing grounding
         // when walking down a step or over a sharp change in slope.
-        if (_isGrounded)
+        if (_isGrounded && (_freezeAxes & BodyFreezeAxes3D.PositionY) != BodyFreezeAxes3D.PositionY)
         {
             velocityVector.Y -= FixedMath.Max(StepOffset, velocityVector.Magnitude);
             _lastGroundedPosition = Position3d;
         }
-        else
+        else if ((_freezeAxes & BodyFreezeAxes3D.PositionY) != BodyFreezeAxes3D.PositionY)
             HeightPos = velocityVector.Y;
 
         //  Apply the force
@@ -505,10 +540,11 @@ public partial class SolidBody
     //  gyroscopic precession is a correction to the object's angular velocity based on its rotation
     private void ApplyGyroscopicPrecession()
     {
-        if (_worldInertiaTensor == Fixed3x3.Zero || _inverseInertiaTensor == Fixed3x3.Zero)
+        if (!CanRotate || _worldInertiaTensor == Fixed3x3.Zero || _inverseInertiaTensor == Fixed3x3.Zero)
             return;
 
-        _angularVelocity += _inverseInertiaTensor * Vector3d.Cross(_angularVelocity, _worldInertiaTensor * _angularVelocity) * Context.DeltaTime;
+        _angularVelocity += ProjectAngularMotion(_inverseInertiaTensor * Vector3d.Cross(_angularVelocity, _worldInertiaTensor * _angularVelocity) * Context.DeltaTime);
+        _angularVelocity = ProjectAngularMotion(_angularVelocity);
     }
 
 }

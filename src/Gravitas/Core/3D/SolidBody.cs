@@ -27,19 +27,41 @@ public partial class SolidBody : IRecordable
     public int DynamicId => _dynamicId;  // Physics Id, if not set it's assumed the object isn't simulated
     private bool _isSet = false;
 
-    private bool _immovable;
-    public bool Immovable
+    private BodyFreezeAxes3D _freezeAxes;
+
+    /// <summary>
+    /// Gets or sets the 3D translational and rotational degrees of freedom
+    /// frozen for solver response, integration, CCD, and partition mobility.
+    /// </summary>
+    public BodyFreezeAxes3D FreezeAxes
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        get => _immovable;
+        get => _freezeAxes;
         set
         {
-            if (_immovable == value)
+            SwiftThrowHelper.ThrowIfArgument(
+                (value & ~BodyFreezeAxes3D.All) != BodyFreezeAxes3D.None,
+                nameof(value),
+                "Unsupported 3D freeze axis bits.");
+
+            if (_freezeAxes == value)
                 return;
 
-            _immovable = value;
+            _freezeAxes = value;
+            ApplyFreezeConstraintsToMotion();
+            RefreshInertiaTensor();
             RefreshPartitionMobility();
         }
+    }
+
+    /// <summary>
+    /// Gets whether all translation axes are frozen. Such bodies behave as
+    /// static-equivalent participants for solver and partition mobility.
+    /// </summary>
+    public bool IsPositionFullyFrozen
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => (_freezeAxes & BodyFreezeAxes3D.Position) == BodyFreezeAxes3D.Position;
     }
 
     // Controls whether physics affects the rigidbody.
@@ -214,10 +236,16 @@ public partial class SolidBody : IRecordable
     private FixedQuaternion _lastVisualRotation;
     public FixedQuaternion LastVisualRotation => _lastVisualRotation;
 
-    // Prevents any forces from being applied to the body that would cause it to rotate.
-    public bool PreventAngularForces;
+    /// <summary>
+    /// Gets whether all angular axes are frozen.
+    /// </summary>
+    public bool AngularMotionFrozen
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => IsRotationFullyFrozen;
+    }
 
-    public bool AngularForcesHalted => Immovable || PreventAngularForces;
+    public bool AngularForcesHalted => IsPositionFullyFrozen || AngularMotionFrozen;
 
     public Fixed64 DefaultRotationSpeed = (Fixed64)30; // 1 for NPC...
 
@@ -300,16 +328,16 @@ public partial class SolidBody : IRecordable
     /// <summary>
     /// Gets whether solver-side response may translate this body.
     /// </summary>
-    public bool CanTranslate => Active && !Immovable && !IsKinematic && InverseMass > Fixed64.Zero;
+    public bool CanTranslate => Active && !IsPositionFullyFrozen && !IsKinematic && InverseMass > Fixed64.Zero;
 
     /// <summary>
     /// Gets whether solver-side response may rotate this body.
     /// </summary>
-    public bool CanRotate => CanTranslate && !PreventAngularForces && _inverseInertiaTensor != Fixed3x3.Zero;
+    public bool CanRotate => CanTranslate && !IsRotationFullyFrozen && _inverseInertiaTensor != Fixed3x3.Zero;
 
     /// <summary>
     /// Gets the inverse mass that should be used by collision response.
-    /// Immovable and kinematic bodies expose their raw mass but respond as infinite mass.
+    /// Fully position-frozen and kinematic bodies expose their raw mass but respond as infinite mass.
     /// </summary>
     public Fixed64 EffectiveInverseMass => CanTranslate ? InverseMass : Fixed64.Zero;
 
@@ -318,6 +346,60 @@ public partial class SolidBody : IRecordable
     /// Bodies that cannot rotate expose a zero tensor even when raw inertia is available.
     /// </summary>
     public Fixed3x3 EffectiveInverseInertiaTensor => CanRotate ? _inverseInertiaTensor : Fixed3x3.Zero;
+
+    internal bool IsRotationFullyFrozen
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => (_freezeAxes & BodyFreezeAxes3D.Rotation) == BodyFreezeAxes3D.Rotation;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal Vector3d ProjectLinearMotion(Vector3d value)
+    {
+        if (value == Vector3d.Zero || IsPositionFullyFrozen)
+            return Vector3d.Zero;
+
+        Fixed64 x = (_freezeAxes & BodyFreezeAxes3D.PositionX) == BodyFreezeAxes3D.PositionX ? Fixed64.Zero : value.X;
+        Fixed64 y = (_freezeAxes & BodyFreezeAxes3D.PositionY) == BodyFreezeAxes3D.PositionY ? Fixed64.Zero : value.Y;
+        Fixed64 z = (_freezeAxes & BodyFreezeAxes3D.PositionZ) == BodyFreezeAxes3D.PositionZ ? Fixed64.Zero : value.Z;
+        return new Vector3d(x, y, z);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal Vector3d ProjectAngularMotion(Vector3d value)
+    {
+        if (value == Vector3d.Zero || IsPositionFullyFrozen || IsRotationFullyFrozen)
+            return Vector3d.Zero;
+
+        Fixed64 x = (_freezeAxes & BodyFreezeAxes3D.RotationX) == BodyFreezeAxes3D.RotationX ? Fixed64.Zero : value.X;
+        Fixed64 y = (_freezeAxes & BodyFreezeAxes3D.RotationY) == BodyFreezeAxes3D.RotationY ? Fixed64.Zero : value.Y;
+        Fixed64 z = (_freezeAxes & BodyFreezeAxes3D.RotationZ) == BodyFreezeAxes3D.RotationZ ? Fixed64.Zero : value.Z;
+        return new Vector3d(x, y, z);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal Fixed64 GetConstrainedInverseMass(Vector3d axis)
+    {
+        if (!CanTranslate || axis == Vector3d.Zero)
+            return Fixed64.Zero;
+
+        Fixed64 axisMagnitudeSquared = axis.MagnitudeSquared;
+        if (axisMagnitudeSquared <= Fixed64.Epsilon)
+            return Fixed64.Zero;
+
+        Vector3d allowedAxis = ProjectLinearMotion(axis);
+        Fixed64 allowedScale = Vector3d.Dot(allowedAxis, axis) / axisMagnitudeSquared;
+        return allowedScale > Fixed64.Zero ? InverseMass * allowedScale : Fixed64.Zero;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal Vector3d ApplyConstrainedInverseInertia(Vector3d torqueAxis)
+    {
+        if (!CanRotate || torqueAxis == Vector3d.Zero)
+            return Vector3d.Zero;
+
+        return ProjectAngularMotion(_inverseInertiaTensor * torqueAxis);
+    }
 
     private Fixed64 _gravityScale = Fixed64.One;
 
@@ -416,7 +498,7 @@ public partial class SolidBody : IRecordable
         }
     }
 
-    internal bool IsAwakeForCollision => Active && !Immovable && !IsSleeping;
+    internal bool IsAwakeForCollision => Active && !IsPositionFullyFrozen && !IsSleeping;
 
     // LinearVelocity magnitude
     private Fixed64 _linearSpeed;
@@ -614,7 +696,7 @@ public partial class SolidBody : IRecordable
                 UpdateKinematicPositionAndRotation();
 
             // if we can't move...then we don't and ignore any forces
-            if (!Immovable)
+            if (!IsPositionFullyFrozen)
             {
                 if (!IsSleeping)
                 {
@@ -641,7 +723,7 @@ public partial class SolidBody : IRecordable
 
     internal void UpdateSleepStateAfterPhysicsStep()
     {
-        if (Active && !Immovable && !IsSleeping)
+        if (Active && !IsPositionFullyFrozen && !IsSleeping)
             UpdateSleepState();
     }
 
@@ -717,12 +799,12 @@ public partial class SolidBody : IRecordable
         RefreshPartitionAwakeState();
     }
 
-    private bool CanSleep => Active && SleepEnabled && !Immovable && !IsKinematic;
+    private bool CanSleep => Active && SleepEnabled && !IsPositionFullyFrozen && !IsKinematic;
 
 
     public void OnVisualize()
     {
-        if (!Active || Immovable || IsKinematic || !SettingVisuals)
+        if (!Active || IsPositionFullyFrozen || IsKinematic || !SettingVisuals)
             return;
 
         if (Context.ResetAccumulationThisVisualize)

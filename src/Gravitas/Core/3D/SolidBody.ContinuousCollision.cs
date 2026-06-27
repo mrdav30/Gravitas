@@ -47,13 +47,15 @@ public partial class SolidBody
 
     private Vector3d PredictContinuousCollisionDisplacement()
     {
-        if (!Active || Immovable || IsKinematic || _isSleeping)
+        if (!CanTranslate || _isSleeping)
             return Vector3d.Zero;
 
         Fixed64 deltaTime = Context.DeltaTime;
         PhysicsEnvironment environment = Context.Environment;
-        Vector3d predictedVelocity = _linearVelocity + _impulseStore + (_deltaAcceleration * deltaTime);
-        if (!_isGrounded)
+        Vector3d predictedVelocity = _linearVelocity
+            + _impulseStore
+            + (ProjectLinearMotion(_deltaAcceleration) * deltaTime);
+        if (!IsGrounded && (_freezeAxes & BodyFreezeAxes3D.PositionY) != BodyFreezeAxes3D.PositionY)
             predictedVelocity.Y -= environment.Gravity * _gravityScale * deltaTime;
 
         predictedVelocity.Y = FixedMath.Max(predictedVelocity.Y, -environment.MaxFallSpeed);
@@ -63,6 +65,6 @@ public partial class SolidBody
         else if (predictedSpeed <= environment.MinSpeed)
             predictedVelocity = Vector3d.Zero;
 
-        return predictedVelocity * deltaTime;
+        return ProjectLinearMotion(predictedVelocity) * deltaTime;
     }
 }

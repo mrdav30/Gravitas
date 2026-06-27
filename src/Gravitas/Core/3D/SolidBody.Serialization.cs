@@ -17,13 +17,13 @@ public partial class SolidBody
         GroundingMode groundingMode = GroundingMode;
         GroundProbeMode groundProbeMode = GroundProbeMode;
         Fixed64 groundProbeRadius = GroundProbeRadius;
-        bool immovable = Immovable;
+        BodyFreezeAxes3D freezeAxes = FreezeAxes;
         bool isKinematic = IsKinematic;
         Fixed64 gravityScale = GravityScale;
 
         RecordValues.Look(chronicler, ref Debug, "Debug");
         RecordValues.Look(chronicler, ref Active, "Active");
-        RecordValues.Look(chronicler, ref immovable, "Immovable");
+        RecordValues.Look(chronicler, ref freezeAxes, "FreezeAxes", BodyFreezeAxes3D.None);
         RecordValues.Look(chronicler, ref isKinematic, "IsKinematic", false);
         RecordValues.Look(chronicler, ref _position2dUnmarked, "Position2d");
         RecordValues.Look(chronicler, ref _heightPosUnmarked, "HeightPos");
@@ -45,7 +45,6 @@ public partial class SolidBody
         RecordValues.Look(chronicler, ref _wasGrounded, "WasGrounded");
         RecordValues.Look(chronicler, ref _lastGroundedPosition, "LastGroundedPosition");
         RecordValues.Look(chronicler, ref _rotation, "Rotation");
-        RecordValues.Look(chronicler, ref PreventAngularForces, "PreventAngularForces");
         RecordValues.Look(chronicler, ref _linearVelocity, "LinearVelocity");
         RecordValues.Look(chronicler, ref _linearDirection, "LinearDirection");
         RecordValues.Look(chronicler, ref _angularVelocity, "AngularVelocity");
@@ -81,7 +80,7 @@ public partial class SolidBody
 
         if (chronicler.Mode == SerializationMode.Loading)
         {
-            _immovable = immovable;
+            _freezeAxes = freezeAxes;
             _isKinematic = isKinematic;
             GroundingMode = groundingMode;
             GroundProbeMode = groundProbeMode;
@@ -114,6 +113,7 @@ public partial class SolidBody
         _lastVisualRotation = Rotation;
 
         RefreshMassPropertiesFromColliderShape();
+        ApplyFreezeConstraintsToMotion();
 
         Collider?.Simulate();
     }

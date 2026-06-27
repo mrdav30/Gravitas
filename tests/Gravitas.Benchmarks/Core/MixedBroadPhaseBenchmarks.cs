@@ -117,7 +117,7 @@ public class MixedBroadPhaseBenchmarks
         var body = new SolidBody(agent, collider)
         {
             Mass = Fixed64.One,
-            Immovable = immovable
+            FreezeAxes = immovable ? BodyFreezeAxes3D.Position : BodyFreezeAxes3D.None
         };
         body.Initialize(position, FixedQuaternion.Identity);
         return body;
@@ -129,7 +129,7 @@ public class MixedBroadPhaseBenchmarks
         var body = new SolidBody2D(agent, new LSCircleCollider2D(Fixed64.Half))
         {
             Mass = Fixed64.One,
-            Immovable = immovable
+            FreezeAxes = immovable ? BodyFreezeAxes2D.Position : BodyFreezeAxes2D.None
         };
         body.Initialize(position);
         return body;

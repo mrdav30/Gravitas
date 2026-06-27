@@ -248,7 +248,7 @@ public sealed class GravitasReplayConformanceTests
         var body3D = new SolidBody(agent3D, new LSSphereCollider())
         {
             Mass = (Fixed64)2,
-            Immovable = true
+            FreezeAxes = BodyFreezeAxes3D.Position
         };
         body3D.Initialize(agent3D.Transform.Position, FixedQuaternion.Identity);
 
@@ -271,7 +271,7 @@ public sealed class GravitasReplayConformanceTests
             new LSCircleCollider2D(Fixed64.Half))
         {
             Mass = (Fixed64)2,
-            Immovable = immovable
+            FreezeAxes = immovable ? BodyFreezeAxes2D.Position : BodyFreezeAxes2D.None
         };
         body.Initialize(position);
         return body;
@@ -291,7 +291,7 @@ public sealed class GravitasReplayConformanceTests
             new LSAABBoxCollider2D(Vector2d.One))
         {
             Mass = Fixed64.One,
-            Immovable = immovable
+            FreezeAxes = immovable ? BodyFreezeAxes2D.Position : BodyFreezeAxes2D.None
         };
         body.Initialize(position);
         return body;

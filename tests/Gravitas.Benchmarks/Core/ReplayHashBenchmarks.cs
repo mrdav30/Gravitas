@@ -162,7 +162,7 @@ public class ReplayHashBenchmarks
         var body = new SolidBody2D(agent, new LSCircleCollider2D(Fixed64.Half))
         {
             Mass = Fixed64.One,
-            Immovable = immovable
+            FreezeAxes = immovable ? BodyFreezeAxes2D.Position : BodyFreezeAxes2D.None
         };
         body.Initialize(position);
         return body;

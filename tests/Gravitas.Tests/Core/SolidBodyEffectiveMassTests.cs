@@ -26,14 +26,14 @@ public sealed class SolidBodyEffectiveMassTests
     [Theory]
     [InlineData(false, true)]
     [InlineData(true, false)]
-    public void EffectiveMass_ForKinematicOrImmovableBody_ShouldBehaveAsInfiniteMass(
-        bool immovable,
+    public void EffectiveMass_ForKinematicOrPositionFrozenBody_ShouldBehaveAsInfiniteMass(
+        bool positionFrozen,
         bool isKinematic)
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(
             Vector3d.Zero,
-            immovable: immovable,
+            immovable: positionFrozen,
             isKinematic: isKinematic);
 
         body.Body.InverseMass.Should().Be(Fixed64.One);

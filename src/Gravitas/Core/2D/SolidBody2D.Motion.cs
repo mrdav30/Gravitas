@@ -14,10 +14,12 @@ public sealed partial class SolidBody2D
 {
     public void AddForce(Vector2d force)
     {
-        if (force != Vector2d.Zero)
-            Wake();
+        Vector2d accelerationDelta = ProjectLinearMotion(force * InverseMass);
+        if (accelerationDelta == Vector2d.Zero)
+            return;
 
-        _deltaAcceleration += force * InverseMass;
+        Wake();
+        _deltaAcceleration += accelerationDelta;
     }
 
     public void AddTorque(Fixed64 torque)
@@ -69,6 +71,7 @@ public sealed partial class SolidBody2D
 
     internal void ApplyCollisionLinearVelocityDelta(Vector2d velocityDelta)
     {
+        velocityDelta = ProjectLinearMotion(velocityDelta);
         if (!CanTranslate || velocityDelta == Vector2d.Zero)
             return;
 
@@ -89,6 +92,7 @@ public sealed partial class SolidBody2D
 
     internal void ApplyCollisionPositionCorrection(Vector2d positionCorrection)
     {
+        positionCorrection = ProjectLinearMotion(positionCorrection);
         if (!CanTranslate || positionCorrection == Vector2d.Zero)
             return;
 
@@ -97,6 +101,22 @@ public sealed partial class SolidBody2D
     }
 
     private bool CanSleep => SleepEnabled && CanTranslate;
+
+    private void ApplyFreezeConstraintsToMotion()
+    {
+        _linearVelocity = ProjectLinearMotion(_linearVelocity);
+        _linearAccelerationStore = ProjectLinearMotion(_linearAccelerationStore);
+        _deltaAcceleration = ProjectLinearMotion(_deltaAcceleration);
+        RefreshLinearSpeed();
+
+        if (!CanRotate)
+        {
+            _angularVelocity = Fixed64.Zero;
+            _angularAccelerationStore = Fixed64.Zero;
+            _deltaAngularAcceleration = Fixed64.Zero;
+            _angularSpeed = Fixed64.Zero;
+        }
+    }
 
     private void UpdateSleepState()
     {

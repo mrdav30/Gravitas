@@ -51,7 +51,9 @@ public sealed partial class SolidBody2D
             return Vector2d.Zero;
 
         Fixed64 deltaTime = Context.DeltaTime;
-        Vector2d predictedVelocity = _linearVelocity + (_deltaAcceleration + Gravity * _gravityScale) * deltaTime;
+        Vector2d predictedVelocity = _linearVelocity
+            + ProjectLinearMotion(_deltaAcceleration + Gravity * _gravityScale) * deltaTime;
+        predictedVelocity = ProjectLinearMotion(predictedVelocity);
         return predictedVelocity.MagnitudeSquared > Fixed64.Epsilon
             ? predictedVelocity * deltaTime
             : Vector2d.Zero;

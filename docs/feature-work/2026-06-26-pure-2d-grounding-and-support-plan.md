@@ -180,7 +180,7 @@ queries in the common case and keeps grounding consistent with response.
   - slope contact grounds only when the support normal dot with up meets the
     configured threshold.
   - ordinary movable dynamic bodies are not accepted as ground by default.
-  - kinematic and immovable bodies are accepted as ground.
+  - kinematic and position-frozen bodies are accepted as ground.
 - [ ] Add a service-owned post-response grounding pass in
   `GravitasPhysics2DService.LateSimulate(...)` after
   `SolveDiscreteResponsePairs()` and before `UpdateSleepStatesAfterPhysicsStep()`.
@@ -191,7 +191,7 @@ queries in the common case and keeps grounding consistent with response.
 - [ ] Accept a candidate only when:
   - the body is active and automatic grounding is enabled.
   - the other collider is not the same collider.
-  - the other body is null, immovable, or kinematic.
+  - the other body is null, position-frozen, or kinematic.
   - the oriented normal has `Dot(normal, GroundUpDirection) >= GroundMinNormalDot`.
   - the pair is non-trigger and the contact belongs to the current frame.
 - [ ] Choose the winning support candidate deterministically:

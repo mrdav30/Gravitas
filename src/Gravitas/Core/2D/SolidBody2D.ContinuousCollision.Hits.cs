@@ -405,7 +405,7 @@ public sealed partial class SolidBody2D
     {
         if (ReferenceEquals(target, this)
             || !target.Active
-            || target.Immovable
+            || target.IsPositionFullyFrozen
             || target.IsKinematic
             || target.Collider.IsTrigger
             || !Context.Physics2D.RequireCollisionPair(Collider, target.Collider))
@@ -419,7 +419,7 @@ public sealed partial class SolidBody2D
     private bool IsEligibleDynamicMixed3DTarget(SolidBody target)
     {
         return target.Active
-            && !target.Immovable
+            && !target.IsPositionFullyFrozen
             && !target.IsKinematic
             && !target.Collider.IsTrigger
             && Context.MixedCollisions.RequireCollisionPair(target.Collider, Collider);

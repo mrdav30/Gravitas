@@ -30,7 +30,13 @@ internal readonly struct ResponseBody
 
     public bool CanMove => InverseMass > Fixed64.Zero;
 
-    public bool CanRotate => InverseInertiaTensor != Fixed3x3.Zero;
+    public bool CanRotate => Body.CanRotate;
+
+    public Fixed64 GetConstrainedInverseMass(Vector3d axis) =>
+        Body.GetConstrainedInverseMass(axis);
+
+    public Vector3d ApplyConstrainedInverseInertia(Vector3d torqueAxis) =>
+        Body.ApplyConstrainedInverseInertia(torqueAxis);
 
     public static ResponseBody Create(LSCollider collider)
     {

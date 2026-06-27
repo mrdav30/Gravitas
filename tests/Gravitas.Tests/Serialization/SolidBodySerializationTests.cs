@@ -25,6 +25,7 @@ public sealed class SolidBodySerializationTests
             isKinematic: true);
         source.Body.GroundProbeMode = GroundProbeMode.SweptSphere;
         source.Body.GroundProbeRadius = Fixed64.FromFraction(1, 3);
+        source.Body.FreezeAxes = BodyFreezeAxes3D.Position | BodyFreezeAxes3D.RotationY;
         source.Body.SleepEnabled = false;
         source.Body.SleepFrameThreshold = 9;
         source.Body.SleepLinearSpeedThreshold = Fixed64.FromFraction(1, 64);
@@ -56,7 +57,8 @@ public sealed class SolidBodySerializationTests
         target.Body.Position3d.Should().Be(source.Body.Position3d);
         target.Body.Rotation.Should().Be(source.Body.Rotation);
         target.Body.Mass.Should().Be(source.Body.Mass);
-        target.Body.Immovable.Should().BeTrue();
+        target.Body.FreezeAxes.Should().Be(source.Body.FreezeAxes);
+        target.Body.IsPositionFullyFrozen.Should().BeTrue();
         target.Body.IsKinematic.Should().BeTrue();
         target.Body.GroundProbeMode.Should().Be(GroundProbeMode.SweptSphere);
         target.Body.GroundProbeRadius.Should().Be(Fixed64.FromFraction(1, 3));

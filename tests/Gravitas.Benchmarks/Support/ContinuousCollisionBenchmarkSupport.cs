@@ -112,7 +112,7 @@ internal static class ContinuousCollisionBenchmarkSupport
         var agent = new BenchmarkMatterAgent(context, position);
         var body = new SolidBody(agent, new LSSphereCollider { Radius = Fixed64.FromFraction(1, 4) })
         {
-            Immovable = true,
+            FreezeAxes = BodyFreezeAxes3D.Position,
             Mass = Fixed64.One
         };
 
@@ -124,7 +124,7 @@ internal static class ContinuousCollisionBenchmarkSupport
         var agent = new BenchmarkMatterAgent(context, position);
         var body = new SolidBody(agent, new LSCuboidCollider { Size = size })
         {
-            Immovable = true,
+            FreezeAxes = BodyFreezeAxes3D.Position,
             Mass = Fixed64.One
         };
 
@@ -136,7 +136,7 @@ internal static class ContinuousCollisionBenchmarkSupport
         var agent = new BenchmarkMatterAgent(context, position.ToVector3d(Fixed64.Zero));
         var body = new SolidBody2D(agent, new LSCircleCollider2D(Fixed64.FromFraction(1, 4)))
         {
-            Immovable = true,
+            FreezeAxes = BodyFreezeAxes2D.Position,
             Mass = Fixed64.One
         };
 
@@ -148,7 +148,7 @@ internal static class ContinuousCollisionBenchmarkSupport
         var agent = new BenchmarkMatterAgent(context, position.ToVector3d(Fixed64.Zero));
         var body = new SolidBody2D(agent, new LSAABBoxCollider2D(size))
         {
-            Immovable = true,
+            FreezeAxes = BodyFreezeAxes2D.Position,
             Mass = Fixed64.One
         };
 

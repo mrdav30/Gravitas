@@ -15,7 +15,7 @@ public sealed partial class SolidBody2D
     public void RecordData(IChronicler chronicler)
     {
         bool active = Active;
-        bool immovable = Immovable;
+        BodyFreezeAxes2D freezeAxes = FreezeAxes;
         bool isKinematic = IsKinematic;
         Fixed64 mass = Mass;
         Vector2d gravity = Gravity;
@@ -26,11 +26,10 @@ public sealed partial class SolidBody2D
         Fixed64 sleepAngularSpeedThreshold = SleepAngularSpeedThreshold;
 
         RecordValues.Look(chronicler, ref active, "Active", false);
-        RecordValues.Look(chronicler, ref immovable, "Immovable", false);
+        RecordValues.Look(chronicler, ref freezeAxes, "FreezeAxes", BodyFreezeAxes2D.None);
         RecordValues.Look(chronicler, ref isKinematic, "IsKinematic", false);
         RecordValues.Look(chronicler, ref _position, "Position");
         RecordValues.Look(chronicler, ref _rotation, "Rotation");
-        RecordValues.Look(chronicler, ref PreventAngularForces, "PreventAngularForces", false);
         RecordValues.Look(chronicler, ref _localCenterOfMassOffset, "LocalCenterOfMassOffset");
         RecordValues.Look(chronicler, ref _centerOfMassOffsetExplicit, "CenterOfMassOffsetExplicit", false);
         RecordValues.Look(chronicler, ref _linearVelocity, "LinearVelocity");
@@ -55,7 +54,7 @@ public sealed partial class SolidBody2D
         if (chronicler.Mode == SerializationMode.Loading)
         {
             Active = active;
-            _immovable = immovable;
+            _freezeAxes = freezeAxes;
             _isKinematic = isKinematic;
             Mass = mass;
             Gravity = gravity;
@@ -71,6 +70,7 @@ public sealed partial class SolidBody2D
         if (chronicler.Mode == SerializationMode.Loading)
         {
             RefreshMassPropertiesFromColliderShape();
+            ApplyFreezeConstraintsToMotion();
             ApplyLoadedState();
         }
     }

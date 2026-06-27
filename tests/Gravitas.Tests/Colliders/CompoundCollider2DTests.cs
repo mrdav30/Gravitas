@@ -100,7 +100,7 @@ public sealed class CompoundCollider2DTests
         var body = new SolidBody2D(agent, collider)
         {
             Mass = Fixed64.One,
-            Immovable = true
+            FreezeAxes = BodyFreezeAxes2D.Position
         };
         body.Initialize(position);
         return body;

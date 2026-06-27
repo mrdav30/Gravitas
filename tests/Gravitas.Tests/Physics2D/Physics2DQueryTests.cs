@@ -329,7 +329,7 @@ public sealed class Physics2DQueryTests
         var body = new SolidBody2D(agent, new LSCircleCollider2D(Fixed64.Half))
         {
             Mass = Fixed64.One,
-            Immovable = true
+            FreezeAxes = BodyFreezeAxes2D.Position
         };
         body.Collider.Layer = layer;
         body.Initialize(position);
@@ -353,7 +353,7 @@ public sealed class Physics2DQueryTests
         var body = new SolidBody2D(agent, new LSAABBoxCollider2D(size))
         {
             Mass = Fixed64.One,
-            Immovable = true
+            FreezeAxes = BodyFreezeAxes2D.Position
         };
         body.Collider.Layer = layer;
         body.Initialize(position);
@@ -373,7 +373,7 @@ public sealed class Physics2DQueryTests
                 new Vector2d(-Fixed64.Half, Fixed64.Half)))
         {
             Mass = Fixed64.One,
-            Immovable = true
+            FreezeAxes = BodyFreezeAxes2D.Position
         };
         body.Initialize(position);
         return body;
@@ -390,7 +390,7 @@ public sealed class Physics2DQueryTests
                 CompoundColliderPart2D.AABBox(Vector2d.One, new Vector2d(Fixed64.One, Fixed64.Zero))))
         {
             Mass = Fixed64.One,
-            Immovable = true
+            FreezeAxes = BodyFreezeAxes2D.Position
         };
         body.Initialize(position);
         return body;

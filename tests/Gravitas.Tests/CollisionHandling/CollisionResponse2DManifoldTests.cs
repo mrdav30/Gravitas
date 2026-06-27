@@ -115,7 +115,7 @@ public sealed class CollisionResponse2DManifoldTests
         PhysicsMaterial stickyStatic = new((Fixed64)100, Fixed64.Zero, Fixed64.Zero);
         moving.Collider.Material = stickyStatic;
         wall.Collider.Material = stickyStatic;
-        moving.PreventAngularForces = true;
+        moving.FreezeAxes = BodyFreezeAxes2D.Rotation;
         moving.ApplyCollisionLinearVelocityDelta(new Vector2d((Fixed64)4, Fixed64.Half));
         var pair = new CollisionPair2D(moving.Collider, wall.Collider);
         pair.Manifold.SetContact(Vector2d.Right, Vector2d.Right, Fixed64.Half, Vector2d.Right);
@@ -133,7 +133,7 @@ public sealed class CollisionResponse2DManifoldTests
         SolidBody2D wall = CreateBox(context, new Vector2d((Fixed64)2, Fixed64.Zero), immovable: true);
         moving.Collider.Material = new PhysicsMaterial(Fixed64.Half, Fixed64.Half, Fixed64.Zero);
         wall.Collider.Material = new PhysicsMaterial(Fixed64.Half, Fixed64.Half, Fixed64.Zero);
-        moving.PreventAngularForces = true;
+        moving.FreezeAxes = BodyFreezeAxes2D.Rotation;
         moving.ApplyCollisionLinearVelocityDelta(new Vector2d((Fixed64)4, (Fixed64)20));
         Fixed64 tangentialSpeed = moving.LinearVelocity.Y.Abs();
         var pair = new CollisionPair2D(moving.Collider, wall.Collider);
@@ -153,7 +153,7 @@ public sealed class CollisionResponse2DManifoldTests
         SolidBody2D wall = CreateBox(context, new Vector2d((Fixed64)2, Fixed64.Zero), immovable: true);
         moving.Collider.Material = new PhysicsMaterial((Fixed64)2, Fixed64.One, Fixed64.Zero);
         wall.Collider.Material = new PhysicsMaterial(Fixed64.Half, Fixed64.FromFraction(1, 4), Fixed64.Half);
-        moving.PreventAngularForces = true;
+        moving.FreezeAxes = BodyFreezeAxes2D.Rotation;
         var pair = new CollisionPair2D(moving.Collider, wall.Collider);
         pair.Manifold.SetContact(Vector2d.Right, Vector2d.Right, Fixed64.Zero, Vector2d.Right);
         Vector2d resetVelocity = new((Fixed64)4, (Fixed64)20);
@@ -186,7 +186,7 @@ public sealed class CollisionResponse2DManifoldTests
             new Vector2d(-Fixed64.FromFraction(3, 4), Fixed64.Zero));
         wall.Collider.Material = zeroOwner;
         moving.Collider.Material = zeroOwner;
-        moving.PreventAngularForces = true;
+        moving.FreezeAxes = BodyFreezeAxes2D.Rotation;
         moving.ApplyCollisionLinearVelocityDelta(new Vector2d((Fixed64)4, Fixed64.Zero));
         var pair = new CollisionPair2D(moving.Collider, wall.Collider);
         CollisionDetection2D.TryCollide(pair, pair.Manifold, context.FrameCount).Should().BeTrue();
@@ -207,7 +207,7 @@ public sealed class CollisionResponse2DManifoldTests
         movableBody.InverseMass.Should().BeGreaterThan(Fixed64.Zero);
         movableBody.InverseMoment.Should().BeGreaterThan(Fixed64.Zero);
 
-        movable.PreventAngularForces = true;
+        movable.FreezeAxes = BodyFreezeAxes2D.Rotation;
         ResponseBody2D angularDisabled = ResponseBody2D.Create(movable.Collider);
         angularDisabled.CanTranslate.Should().BeTrue();
         angularDisabled.CanRotate.Should().BeFalse();
@@ -337,7 +337,7 @@ public sealed class CollisionResponse2DManifoldTests
             collider)
         {
             Mass = Fixed64.One,
-            Immovable = immovable,
+            FreezeAxes = immovable ? BodyFreezeAxes2D.Position : BodyFreezeAxes2D.None,
             IsKinematic = isKinematic
         };
         body.Initialize(position);

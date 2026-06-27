@@ -56,7 +56,7 @@ public sealed class CollisionResponse2DAngularTests
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
         SolidBody2D moving = CreateBox(context, Vector2d.Zero);
         SolidBody2D wall = CreateBox(context, new Vector2d((Fixed64)2, Fixed64.Zero), immovable: true);
-        moving.PreventAngularForces = true;
+        moving.FreezeAxes = BodyFreezeAxes2D.Rotation;
         var pair = new CollisionPair2D(moving.Collider, wall.Collider);
         moving.ApplyCollisionLinearVelocityDelta(new Vector2d((Fixed64)4, Fixed64.Zero));
 
@@ -136,7 +136,7 @@ public sealed class CollisionResponse2DAngularTests
             new LSAABBoxCollider2D(new Vector2d((Fixed64)2, (Fixed64)2)))
         {
             Mass = Fixed64.One,
-            Immovable = immovable,
+            FreezeAxes = immovable ? BodyFreezeAxes2D.Position : BodyFreezeAxes2D.None,
             IsKinematic = isKinematic
         };
         body.Initialize(position);

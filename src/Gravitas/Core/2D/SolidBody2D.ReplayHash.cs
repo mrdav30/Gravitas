@@ -16,12 +16,11 @@ public sealed partial class SolidBody2D
         writer.WriteSection("body.2d", 1);
         writer.WriteInt32(DynamicId);
         writer.WriteBool(Active);
-        writer.WriteBool(_immovable);
+        writer.WriteEnum(_freezeAxes);
         writer.WriteBool(_isKinematic);
         writer.WriteBool(_isDynamic);
         writer.WriteVector2d(_position);
         writer.WriteFixed64(_rotation);
-        writer.WriteBool(PreventAngularForces);
         writer.WriteVector2d(_localCenterOfMassOffset);
         writer.WriteBool(_centerOfMassOffsetExplicit);
         writer.WriteVector2d(_linearVelocity);

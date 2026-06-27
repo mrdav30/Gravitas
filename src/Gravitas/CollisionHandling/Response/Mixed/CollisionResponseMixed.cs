@@ -36,17 +36,14 @@ public static class CollisionResponseMixed
 
         SolidBody? body3D = pair.Collider3D.Body;
         SolidBody2D? body2D = pair.Collider2D.Body;
-        Fixed64 inverseMass3D = body3D?.EffectiveInverseMass ?? Fixed64.Zero;
-        Fixed64 inverseMass2D = body2D?.EffectiveInverseMass ?? Fixed64.Zero;
-        if (inverseMass3D + inverseMass2D <= Fixed64.Zero)
-            return false;
-
         Vector3d normal = ResolveNormal(pair, contact);
         if (normal == Vector3d.Zero)
             return false;
 
-        Fixed64 planarScaleSquared = GetPlanarScaleSquared(normal);
-        Fixed64 correctionInverseMass = inverseMass3D + inverseMass2D * planarScaleSquared;
+        Fixed64 inverseMass3D = body3D?.EffectiveInverseMass ?? Fixed64.Zero;
+        Fixed64 inverseMass2D = body2D?.EffectiveInverseMass ?? Fixed64.Zero;
+        Fixed64 correctionInverseMass = GetConstrainedInverseMass(body3D, normal)
+            + GetConstrainedPlanarInverseMass(body2D, normal);
         if (correctionInverseMass <= Fixed64.Zero)
             return false;
 
@@ -57,7 +54,7 @@ public static class CollisionResponseMixed
         Fixed64 inverseMoment2D = body2D?.EffectiveInverseMomentOfInertia ?? Fixed64.Zero;
 
         if (applyPositionCorrection)
-            ApplyPositionCorrection(body3D, body2D, normal, contact.Depth, inverseMass3D, inverseMass2D, correctionInverseMass);
+            ApplyPositionCorrection(body3D, body2D, normal, contact.Depth, correctionInverseMass);
 
         Fixed64 normalImpulse = ApplyNormalImpulse(
             pair,
@@ -70,7 +67,6 @@ public static class CollisionResponseMixed
             inverseMass3D,
             inverseMass2D,
             inverseMoment2D,
-            correctionInverseMass,
             iteration,
             iterationLimit);
 
@@ -102,8 +98,6 @@ public static class CollisionResponseMixed
         SolidBody2D? body2D,
         Vector3d normal,
         Fixed64 depth,
-        Fixed64 inverseMass3D,
-        Fixed64 inverseMass2D,
         Fixed64 effectiveInverseMass)
     {
         Fixed64 correctionDepth = depth - PenetrationSlop;
@@ -111,17 +105,19 @@ public static class CollisionResponseMixed
             return;
 
         Fixed64 correctionScalar = correctionDepth * PenetrationCorrectionPercent / effectiveInverseMass;
-        if (inverseMass3D > Fixed64.Zero)
-            body3D?.ApplyCollisionPositionCorrection(-normal * (correctionScalar * inverseMass3D));
+        Fixed64 constrainedInverseMass3D = GetConstrainedInverseMass(body3D, normal);
+        if (constrainedInverseMass3D > Fixed64.Zero)
+            body3D?.ApplyCollisionPositionCorrection(-normal * (correctionScalar * constrainedInverseMass3D));
 
-        if (inverseMass2D <= Fixed64.Zero)
+        Fixed64 constrainedInverseMass2D = GetConstrainedPlanarInverseMass(body2D, normal);
+        if (constrainedInverseMass2D <= Fixed64.Zero)
             return;
 
         Vector2d planarNormal = normal.ToVector2d();
         if (planarNormal == Vector2d.Zero)
             return;
 
-        body2D?.ApplyCollisionPositionCorrection(planarNormal * (correctionScalar * inverseMass2D));
+        body2D?.ApplyCollisionPositionCorrection(planarNormal * (correctionScalar * constrainedInverseMass2D));
     }
 
     private static Fixed64 ApplyNormalImpulse(
@@ -135,7 +131,6 @@ public static class CollisionResponseMixed
         Fixed64 inverseMass3D,
         Fixed64 inverseMass2D,
         Fixed64 inverseMoment2D,
-        Fixed64 effectiveInverseMass,
         int iteration,
         int iterationLimit)
     {
@@ -144,7 +139,8 @@ public static class CollisionResponseMixed
         if (normalVelocity >= Fixed64.Zero)
             return Fixed64.Zero;
 
-        Fixed64 denominator = effectiveInverseMass
+        Fixed64 denominator = GetConstrainedInverseMass(body3D, normal)
+            + GetConstrainedPlanarInverseMass(body2D, normal)
             + ComputeAngularDenominator(body3D, relative3D, normal)
             + ComputePlanarAngularDenominator(relative2D, normal.ToVector2d(), inverseMoment2D);
         if (denominator <= Fixed64.Epsilon)
@@ -196,8 +192,8 @@ public static class CollisionResponseMixed
             return false;
 
         Vector3d tangent = tangentVelocity.Normalized;
-        Fixed64 denominator = inverseMass3D
-            + inverseMass2D * GetPlanarScaleSquared(tangent)
+        Fixed64 denominator = GetConstrainedInverseMass(body3D, tangent)
+            + GetConstrainedPlanarInverseMass(body2D, tangent)
             + ComputeAngularDenominator(body3D, relative3D, tangent)
             + ComputePlanarAngularDenominator(relative2D, tangent.ToVector2d(), inverseMoment2D);
         if (denominator <= Fixed64.Epsilon)
@@ -237,7 +233,7 @@ public static class CollisionResponseMixed
             if (CanRotate(body3D))
             {
                 Vector3d angularVelocityDelta =
-                    body3D!.EffectiveInverseInertiaTensor * Vector3d.Cross(relative3D, impulse3D);
+                    body3D!.ApplyConstrainedInverseInertia(Vector3d.Cross(relative3D, impulse3D));
                 body3D.ApplyCollisionAngularVelocityDelta(angularVelocityDelta);
             }
         }
@@ -273,20 +269,20 @@ public static class CollisionResponseMixed
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Vector3d ResolveLinearVelocity(SolidBody body) =>
-        body.IsKinematic ? body.ResolveContinuousCollisionFrameVelocity() : body.LinearVelocity;
+        body.ProjectLinearMotion(body.IsKinematic ? body.ResolveContinuousCollisionFrameVelocity() : body.LinearVelocity);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Vector2d ResolveLinearVelocity(SolidBody2D body) =>
-        body.IsKinematic ? body.ResolveContinuousCollisionFrameVelocity() : body.LinearVelocity;
+        body.ProjectLinearMotion(body.IsKinematic ? body.ResolveContinuousCollisionFrameVelocity() : body.LinearVelocity);
 
     private static Fixed64 ComputeAngularDenominator(SolidBody? body3D, Vector3d relativeContactPoint, Vector3d axis)
     {
         if (!CanRotate(body3D))
             return Fixed64.Zero;
 
-        Vector3d angular = Vector3d.Cross(
-            body3D!.EffectiveInverseInertiaTensor * Vector3d.Cross(relativeContactPoint, axis),
-            relativeContactPoint);
+        Vector3d angularVelocityDelta = body3D!.ApplyConstrainedInverseInertia(
+            Vector3d.Cross(relativeContactPoint, axis));
+        Vector3d angular = Vector3d.Cross(angularVelocityDelta, relativeContactPoint);
         Fixed64 denominator = Vector3d.Dot(angular, axis);
         return denominator > Fixed64.Zero ? denominator : Fixed64.Zero;
     }
@@ -336,7 +332,21 @@ public static class CollisionResponseMixed
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Fixed64 GetPlanarScaleSquared(Vector3d axis) => axis.X * axis.X + axis.Z * axis.Z;
+    private static Fixed64 GetConstrainedInverseMass(SolidBody? body, Vector3d axis) =>
+        body?.GetConstrainedInverseMass(axis) ?? Fixed64.Zero;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Fixed64 GetConstrainedPlanarInverseMass(SolidBody2D? body, Vector3d axis)
+    {
+        if (body == null)
+            return Fixed64.Zero;
+
+        Vector2d planarAxis = axis.ToVector2d();
+        if (planarAxis == Vector2d.Zero)
+            return Fixed64.Zero;
+
+        return body.GetConstrainedInverseMass(planarAxis) * planarAxis.MagnitudeSquared;
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Vector2d AngularVelocityAtPoint(Vector2d relativePoint, Fixed64 angularVelocity) =>

@@ -32,7 +32,7 @@ Serialized state:
 - body position, rotation, velocities, acceleration stores, pending force,
   torque, impulse, and position-correction accumulators.
 - mass, local center-of-mass offset, gravity scale, sleep state, sleep
-  thresholds, CCD mode, and movement flags.
+  thresholds, CCD mode, and explicit body freeze axes.
 - 3D current and previous-step grounding state plus ground probe configuration.
 - collider active/trigger state, layer, surface material, local offset, shape
   dimensions, 2D mixed half-thickness override, and shape-derived inputs.
@@ -56,16 +56,16 @@ authoritative state instead of treated as replay truth.
 ## Current Recordable Types
 
 `SolidBody` records 3D authoritative body state, including position,
-height, rotation, linear/angular motion, pending force and torque state, mass,
-local center-of-mass offset, gravity scale, sleep state, CCD mode, and 3D
-current/previous grounding and ground probe state. It does not record the
+height, rotation, freeze axes, linear/angular motion, pending force and torque
+state, mass, local center-of-mass offset, gravity scale, sleep state, CCD mode,
+and 3D current/previous grounding and ground probe state. It does not record the
 `FixedTransform` binding.
 Collider geometry can derive a default COM for new shells, but populated
 snapshots restore the body-owned COM state directly.
 
 `SolidBody2D` records pure 2D authoritative body state, including X/Z-projected
-position, scalar rotation, linear motion, pending force state, scalar angular
-velocity, applied and queued angular acceleration, angular-force policy, mass,
+position, scalar rotation, freeze axes, linear motion, pending force state,
+scalar angular velocity, applied and queued angular acceleration, mass,
 shape-refreshed scalar moment policy, body-local center-of-mass offset, response
 mobility, gravity, gravity scale, sleep state plus linear and angular sleep
 thresholds, CCD mode, and its owned collider state. Populated snapshots restore

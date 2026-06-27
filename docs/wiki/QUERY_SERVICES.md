@@ -53,14 +53,14 @@ names an internal CCD proxy.
 
 | Owner | Query path | Source proxy | Target set | Reducer policy |
 | --- | --- | --- | --- | --- |
-| `SolidBody` static/kinematic 3D CCD | `Query3D.SweepSphereAgainstStaticAll` | source collider proxy sphere, then shape-exact validation where supported | bodyless, immovable, kinematic 3D colliders | public swept-sphere hit is exact for target geometry; supported 3D source shapes then use target-sphere reverse sweeps or support-mapped convex-source reducers before accepting proxy hits |
+| `SolidBody` static/kinematic 3D CCD | `Query3D.SweepSphereAgainstStaticAll` | source collider proxy sphere, then shape-exact validation where supported | bodyless, position-frozen, kinematic 3D colliders | public swept-sphere hit is exact for target geometry; supported 3D source shapes then use target-sphere reverse sweeps or support-mapped convex-source reducers before accepting proxy hits |
 | `SolidBody` dynamic 3D CCD | dynamic candidate index plus relative sweep | source and target dynamic proxy spheres, then exact relative source-shape validation where supported | movable dynamic 3D bodies | exact for source spheres, target spheres, supported convex primitive/convex mesh/compound source families; unsupported source families keep conservative proxy behavior |
-| `SolidBody` mixed static 2D CCD | `QueryMixed.SweepSphereAgainstStatic2DAll` | 3D sphere source | bodyless, immovable, kinematic 2D slabs | same `ReducerKind` policy as public `SweepSphereAgainst2D` |
+| `SolidBody` mixed static 2D CCD | `QueryMixed.SweepSphereAgainstStatic2DAll` | 3D sphere source | bodyless, position-frozen, kinematic 2D slabs | same `ReducerKind` policy as public `SweepSphereAgainst2D` |
 | `SolidBody` mixed dynamic 2D CCD | mixed dynamic candidate index plus relative sweep | 3D proxy sphere against 2D mixed proxy sphere | movable dynamic 2D bodies | `ConservativeFallback` |
 | `SolidBody` kinematic active-source CCD | same static-style and dynamic candidate paths above | frame-start to host-target 3D proxy sphere, then exact pure-3D validation where supported | first static-style target clips the source; dynamic 3D/2D targets up to that blocker receive bounded velocity handoff through the owning service | same reducer policy as the underlying pure or mixed path |
-| `SolidBody2D` static/kinematic 2D CCD | `Query2D.SweepCircleAgainstStaticAll` plus mover-shape refinement | source circle sweep, refined by mover shape when needed | bodyless, immovable, kinematic 2D colliders | exact for current pure 2D sweep contract |
+| `SolidBody2D` static/kinematic 2D CCD | `Query2D.SweepCircleAgainstStaticAll` plus mover-shape refinement | source circle sweep, refined by mover shape when needed | bodyless, position-frozen, kinematic 2D colliders | exact for current pure 2D sweep contract |
 | `SolidBody2D` dynamic 2D CCD | dynamic candidate index plus relative sweep | dynamic proxy circles, then exact relative mover-shape validation | movable dynamic 2D bodies | exact for circle, AABB, convex polygon, and compound mover/target families |
-| `SolidBody2D` mixed static 3D CCD | `QueryMixed.SweepCircleAgainstStatic3DAll` | embedded 2D circle slab | bodyless, immovable, kinematic 3D colliders | same `ReducerKind` policy as public `SweepCircleAgainst3D` |
+| `SolidBody2D` mixed static 3D CCD | `QueryMixed.SweepCircleAgainstStatic3DAll` | embedded 2D circle slab | bodyless, position-frozen, kinematic 3D colliders | same `ReducerKind` policy as public `SweepCircleAgainst3D` |
 | `SolidBody2D` mixed dynamic 3D CCD | mixed dynamic candidate index plus relative sweep | embedded 2D proxy sphere against 3D proxy sphere | movable dynamic 3D bodies | `ConservativeFallback` |
 | `SolidBody2D` kinematic active-source CCD | same static-style and dynamic candidate paths above | frame-start to host-target 2D proxy circle or mixed slab proxy, then exact pure-2D validation where supported | first static-style target clips the source; dynamic 2D/3D targets up to that blocker receive bounded velocity handoff through the owning service | same reducer policy as the underlying pure or mixed path |
 
@@ -196,7 +196,7 @@ stable lower-source-vertex tie breaks.
 
 `SolidBody` continuous collision detection reuses this service as an opt-in
 movement sweep. Public `SweepSphere` and `SweepSphereAll` remain all-target
-queries: they can return movable dynamic, kinematic, immovable, and bodyless
+queries: they can return movable dynamic, kinematic, position-frozen, and bodyless
 colliders according to the normal layer, trigger, and exclusion filters. Body
 CCD uses an internal static-style swept-sphere collector for its
 static/kinematic leg, so only kinematic/static partition IDs are copied and
@@ -315,9 +315,9 @@ sweeps, supports layer masks, optional trigger inclusion, and an excluded
 collider for body CCD self/hierarchy filtering. It is the pure 2D equivalent of
 the 3D swept-sphere query path; it is not a mixed 2D/3D bridge.
 
-Public pure 2D sweep queries report movable dynamic, kinematic, immovable, and
+Public pure 2D sweep queries report movable dynamic, kinematic, position-frozen, and
 bodyless colliders. `SolidBody2D` CCD uses an internal static-style swept-circle
-collector for the static/kinematic leg, mirroring 3D: bodyless, immovable, and
+collector for the static/kinematic leg, mirroring 3D: bodyless, position-frozen, and
 kinematic targets are included through kinematic/static partition membership,
 while movable dynamic targets are left to the relative dynamic CCD candidate
 index.

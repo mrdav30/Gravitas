@@ -203,7 +203,7 @@ public class MixedQueryCompound2DBenchmarks
         var body = new SolidBody2D(agent, collider)
         {
             Mass = Fixed64.One,
-            Immovable = true
+            FreezeAxes = BodyFreezeAxes2D.Position
         };
         body.Initialize(new Vector2d(position.X, position.Z));
         return body;

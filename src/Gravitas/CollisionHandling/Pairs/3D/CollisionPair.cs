@@ -312,9 +312,9 @@ public partial class CollisionPair
 
     public void SetImmovableDirection(Vector3d directionA, Vector3d directionB)
     {
-        if (ColliderA.Body?.Immovable == true)
+        if (ColliderA.Body?.IsPositionFullyFrozen == true)
             Manifold.SetImmovableDirection(directionA);
-        else if (ColliderB.Body?.Immovable == true)
+        else if (ColliderB.Body?.IsPositionFullyFrozen == true)
             Manifold.SetImmovableDirection(directionB);
     }
 

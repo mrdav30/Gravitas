@@ -27,7 +27,7 @@ public sealed class SolidBody2DSerializationTests
         var source = new SolidBody2D(sourceAgent, sourceCollider)
         {
             Mass = (Fixed64)3,
-            Immovable = true,
+            FreezeAxes = BodyFreezeAxes2D.All,
             IsKinematic = true,
             Gravity = new Vector2d(Fixed64.Zero, (Fixed64)(-2)),
             GravityScale = Fixed64.FromFraction(3, 8),
@@ -35,8 +35,7 @@ public sealed class SolidBody2DSerializationTests
             SleepFrameThreshold = 11,
             SleepLinearSpeedThreshold = Fixed64.FromFraction(1, 128),
             SleepAngularSpeedThreshold = Fixed64.FromFraction(1, 64),
-            ContinuousCollisionMode = ContinuousCollisionMode.Continuous,
-            PreventAngularForces = true
+            ContinuousCollisionMode = ContinuousCollisionMode.Continuous
         };
         sourceCollider.Material = PhysicsMaterialTestHelper.WithFrictionAndRestitution(
             Fixed64.FromFraction(5, 4),
@@ -60,7 +59,8 @@ public sealed class SolidBody2DSerializationTests
         target.Position.Should().Be(source.Position);
         target.Rotation.Should().Be(source.Rotation);
         target.Mass.Should().Be(source.Mass);
-        target.Immovable.Should().BeTrue();
+        target.FreezeAxes.Should().Be(source.FreezeAxes);
+        target.IsPositionFullyFrozen.Should().BeTrue();
         target.IsKinematic.Should().BeTrue();
         targetCollider.Material.Should().Be(sourceCollider.Material);
         target.Gravity.Should().Be(source.Gravity);
@@ -70,7 +70,7 @@ public sealed class SolidBody2DSerializationTests
         target.SleepLinearSpeedThreshold.Should().Be(source.SleepLinearSpeedThreshold);
         target.SleepAngularSpeedThreshold.Should().Be(source.SleepAngularSpeedThreshold);
         target.ContinuousCollisionMode.Should().Be(source.ContinuousCollisionMode);
-        target.PreventAngularForces.Should().BeTrue();
+        target.AngularMotionFrozen.Should().BeTrue();
         target.LocalCenterOfMassOffset.Should().Be(source.LocalCenterOfMassOffset);
         target.WorldCenterOfMass.Should().Be(source.WorldCenterOfMass);
         targetCollider.Radius.Should().Be(sourceCollider.Radius);

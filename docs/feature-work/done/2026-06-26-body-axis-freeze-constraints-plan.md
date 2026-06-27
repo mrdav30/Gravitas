@@ -11,8 +11,15 @@
 ---
 
 **Date:** 2026-06-26  
-**Status:** Planned  
+**Status:** Done  
 **Owner:** Gravitas body/solver hardening
+
+Completed on 2026-06-27. The implementation landed explicit 3D and pure 2D
+freeze-axis APIs, removed mutable coarse mobility setters, projected motion and
+CCD through frozen degrees of freedom, updated pure 3D/pure 2D/mixed response
+to use constrained inverse mass/inertia, serialized freeze state explicitly,
+removed the old read-only `Immovable` and `PreventAngularForces` aliases, and
+refreshed tests, benchmarks, and docs.
 
 ## Purpose
 
@@ -118,8 +125,8 @@ Suggested body properties:
 
 ```csharp
 public BodyFreezeAxes3D FreezeAxes { get; set; }
-public bool Immovable => FreezeAxes.HasFlag(BodyFreezeAxes3D.Position);
-public bool PreventAngularForces => FreezeAxes.HasFlag(BodyFreezeAxes3D.Rotation);
+public bool IsPositionFullyFrozen => (FreezeAxes & BodyFreezeAxes3D.Position) == BodyFreezeAxes3D.Position;
+public bool AngularMotionFrozen => (FreezeAxes & BodyFreezeAxes3D.Rotation) == BodyFreezeAxes3D.Rotation;
 public bool CanTranslate => Active && !IsKinematic && InverseMass > Fixed64.Zero && !FreezeAxes.HasFlag(BodyFreezeAxes3D.Position);
 public bool CanRotate => CanTranslate && !FreezeAxes.HasFlag(BodyFreezeAxes3D.Rotation) && _inverseInertiaTensor != Fixed3x3.Zero;
 ```
@@ -141,23 +148,22 @@ read-only properties so hosts do not have two ways to express the same state.
 
 **Tasks**
 
-- [ ] Add `BodyFreezeAxes3D` and `BodyFreezeAxes2D` in focused files under
+- [x] Add `BodyFreezeAxes3D` and `BodyFreezeAxes2D` in focused files under
   `src/Gravitas/Core/3D` and `src/Gravitas/Core/2D`.
-- [ ] Add XML docs explaining each axis and the pure 2D X/Y to world X/Z
+- [x] Add XML docs explaining each axis and the pure 2D X/Y to world X/Z
   mapping.
-- [ ] Add unit tests proving default bodies have `FreezeAxes == None`.
-- [ ] Replace mutable `Immovable` assignment tests with `FreezeAxes = Position`
+- [x] Add unit tests proving default bodies have `FreezeAxes == None`.
+- [x] Replace mutable `Immovable` assignment tests with `FreezeAxes = Position`
   or `FreezeAxes = All`, depending on the scenario.
-- [ ] Replace mutable `PreventAngularForces` assignment tests with rotation
+- [x] Replace mutable `PreventAngularForces` assignment tests with rotation
   freeze flags.
-- [ ] Keep `Immovable` as a read-only convenience property only if existing
-  code navigation remains clearer with the name.
-- [ ] Keep `PreventAngularForces` as a read-only convenience property only if it
-  remains useful during migration. Prefer a clearer derived name such as
-  `AngularMotionFrozen` if the old name reads like a mutator.
-- [ ] Remove old setters and backing fields after all call sites move to
+- [x] Remove `Immovable` as a public body property and expose
+  `IsPositionFullyFrozen` as the clear derived state.
+- [x] Remove `PreventAngularForces` as a public body property and expose
+  `AngularMotionFrozen` as the clear derived state.
+- [x] Remove old setters and backing fields after all call sites move to
   freeze axes.
-- [ ] Run:
+- [x] Run:
   `rg -n "Immovable\\s*=|PreventAngularForces\\s*=" src/Gravitas tests/Gravitas.Tests`
   and ensure there are no remaining mutable assignments.
 
@@ -177,27 +183,27 @@ explainable.
 
 **Tasks**
 
-- [ ] Add tests for 3D linear freeze behavior:
+- [x] Add tests for 3D linear freeze behavior:
   - full position freeze behaves like current immovable response.
   - `PositionY` freeze blocks vertical movement while allowing X/Z response.
   - `PositionX` and `PositionZ` block only their matching axes.
   - force application does not accumulate velocity on frozen axes.
-- [ ] Add tests for 3D angular freeze behavior:
+- [x] Add tests for 3D angular freeze behavior:
   - full rotation freeze behaves like current angular-force prevention.
   - freezing one rotation axis prevents angular velocity around that axis.
   - unfrozen rotation axes still respond to off-center contacts.
-- [ ] Update `SolidBody.Motion.cs` to project velocity, acceleration, applied
+- [x] Update `SolidBody.Motion.cs` to project velocity, acceleration, applied
   corrections, and force-derived deltas through freeze constraints.
-- [ ] Add helper methods on `SolidBody` for constrained linear inverse mass
+- [x] Add helper methods on `SolidBody` for constrained linear inverse mass
   along a direction.
-- [ ] Add helper methods on `SolidBody` for constrained angular inverse inertia
+- [x] Add helper methods on `SolidBody` for constrained angular inverse inertia
   along a torque axis.
-- [ ] Update 3D response impulse denominator logic to use constrained inverse
+- [x] Update 3D response impulse denominator logic to use constrained inverse
   mass and inertia instead of only scalar `InverseMass` and full tensor checks.
-- [ ] Update position correction so frozen axes do not receive solver movement.
-- [ ] Update sleep checks so fully frozen translation does not keep a body awake
+- [x] Update position correction so frozen axes do not receive solver movement.
+- [x] Update sleep checks so fully frozen translation does not keep a body awake
   through impossible residual velocity.
-- [ ] Run focused 3D response and motion tests:
+- [x] Run focused 3D response and motion tests:
   `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "SolidBody|CollisionResponse"`
 
 **Done Criteria**
@@ -215,24 +221,24 @@ the same constraint quality as 3D without pretending to own world-Y height.
 
 **Tasks**
 
-- [ ] Add pure 2D tests for linear freeze behavior:
+- [x] Add pure 2D tests for linear freeze behavior:
   - full position freeze behaves like current immovable response.
   - `PositionX` blocks X motion while allowing planar Y motion.
   - `PositionY` blocks planar Y motion while allowing X motion.
   - forces and position correction do not accumulate on frozen axes.
-- [ ] Add pure 2D tests for rotation freeze behavior:
+- [x] Add pure 2D tests for rotation freeze behavior:
   - `Rotation` blocks yaw angular velocity.
   - unfrozen yaw still responds to off-center contacts.
-- [ ] Update `SolidBody2D` integration to project velocities,
+- [x] Update `SolidBody2D` integration to project velocities,
   accelerations, and corrections through 2D freeze constraints.
-- [ ] Update pure 2D effective mass helpers so impulse denominators respect
+- [x] Update pure 2D effective mass helpers so impulse denominators respect
   frozen translation axes and yaw freeze.
-- [ ] Update `CollisionResponse2D` to use constrained 2D inverse mass and
+- [x] Update `CollisionResponse2D` to use constrained 2D inverse mass and
   constrained scalar angular mass.
-- [ ] Update warm-start and resting friction to skip forbidden degrees of
+- [x] Update warm-start and resting friction to skip forbidden degrees of
   freedom without changing contact ordering.
-- [ ] Update sleep checks for fully frozen translation and rotation.
-- [ ] Run focused 2D response tests:
+- [x] Update sleep checks for fully frozen translation and rotation.
+- [x] Run focused 2D response tests:
   `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "2D&CollisionResponse"`
 
 **Done Criteria**
@@ -251,24 +257,24 @@ partially frozen 3D body be misclassified as static.
 
 **Tasks**
 
-- [ ] Add mixed response tests where a 3D body has one frozen translation axis
+- [x] Add mixed response tests where a 3D body has one frozen translation axis
   and collides with a 2D slab.
-- [ ] Add mixed response tests where a pure 2D body has one frozen planar axis.
-- [ ] Add mixed response tests where full 2D position freeze behaves like the
+- [x] Add mixed response tests where a pure 2D body has one frozen planar axis.
+- [x] Add mixed response tests where full 2D position freeze behaves like the
   current immovable target behavior.
-- [ ] Update `CollisionResponseMixed` and mixed service response helpers to use
+- [x] Update `CollisionResponseMixed` and mixed service response helpers to use
   constrained inverse mass for each participant.
-- [ ] Keep the existing mixed rule that vertical Y impulse affects only the 3D
+- [x] Keep the existing mixed rule that vertical Y impulse affects only the 3D
   participant.
-- [ ] Update 3D, pure 2D, and mixed partition mobility classification:
+- [x] Update 3D, pure 2D, and mixed partition mobility classification:
   - bodyless colliders are static.
   - fully position-frozen dynamic bodies are static-equivalent for partition
     membership.
   - kinematic bodies remain kinematic.
   - partially frozen dynamic bodies remain dynamic.
-- [ ] Update query helper names only where "static" currently means bodyless or
+- [x] Update query helper names only where "static" currently means bodyless or
   fully immovable and the wording becomes misleading.
-- [ ] Run mixed tests:
+- [x] Run mixed tests:
   `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter Mixed`
 
 **Done Criteria**
@@ -287,20 +293,20 @@ TOI response can hand off impossible motion.
 
 **Tasks**
 
-- [ ] Add 3D CCD tests:
+- [x] Add 3D CCD tests:
   - fully position-frozen bodies are not active CCD sources.
   - partially frozen bodies cast only along allowed displacement.
   - TOI response cannot introduce velocity on frozen axes.
-- [ ] Add pure 2D CCD tests with the same three assertions for planar axes.
-- [ ] Add mixed CCD tests for constrained 3D and constrained 2D participants.
-- [ ] Update 3D CCD source eligibility to use full position freeze instead of
+- [x] Add pure 2D CCD tests with the same three assertions for planar axes.
+- [x] Add mixed CCD tests for constrained 3D and constrained 2D participants.
+- [x] Update 3D CCD source eligibility to use full position freeze instead of
   the old `Immovable` backing field.
-- [ ] Update pure 2D CCD source eligibility the same way.
-- [ ] Project predicted velocity and displacement through freeze constraints
+- [x] Update pure 2D CCD source eligibility the same way.
+- [x] Project predicted velocity and displacement through freeze constraints
   before candidate collection.
-- [ ] Update 3D grounding so frozen vertical movement does not create misleading
+- [x] Update 3D grounding so frozen vertical movement does not create misleading
   gravity or support transitions.
-- [ ] Update the pure 2D grounding plan before implementation so support logic
+- [x] Update the pure 2D grounding plan before implementation so support logic
   accounts for planar freeze constraints.
 
 **Done Criteria**
@@ -319,30 +325,30 @@ checks.
 
 **Tasks**
 
-- [ ] Update `SolidBody.Serialization.cs` to record 3D freeze axes.
-- [ ] Update `SolidBody2D.Serialization.cs` to record 2D freeze axes.
-- [ ] Add save/populate tests proving freeze axes round-trip for both body
+- [x] Update `SolidBody.Serialization.cs` to record 3D freeze axes.
+- [x] Update `SolidBody2D.Serialization.cs` to record 2D freeze axes.
+- [x] Add save/populate tests proving freeze axes round-trip for both body
   types.
-- [ ] Remove old serialized `Immovable` and `PreventAngularForces` fields unless
+- [x] Remove old serialized `Immovable` and `PreventAngularForces` fields unless
   the implementation chooses a one-time internal migration for existing local
   test artifacts. Backward compatibility is not required.
-- [ ] Update `docs/wiki/HOST_INTEGRATION.md` with examples for common freeze
+- [x] Update `docs/wiki/HOST_INTEGRATION.md` with examples for common freeze
   configurations.
-- [ ] Update `docs/wiki/COLLISION_PIPELINE.md` with solver semantics for frozen
+- [x] Update `docs/wiki/COLLISION_PIPELINE.md` with solver semantics for frozen
   degrees of freedom.
-- [ ] Update `docs/wiki/DIMENSIONS.md` with pure 2D axis naming.
-- [ ] Update `docs/wiki/SERIALIZATION.md` with freeze-axis state.
-- [ ] Add benchmark rows only for response or CCD paths if profiler or unit
+- [x] Update `docs/wiki/DIMENSIONS.md` with pure 2D axis naming.
+- [x] Update `docs/wiki/SERIALIZATION.md` with freeze-axis state.
+- [x] Add benchmark rows only for response or CCD paths if profiler or unit
   allocation tests show measurable overhead from constrained mass helpers.
-- [ ] Run:
+- [x] Run:
   `dotnet build Gravitas.slnx --configuration Release`
-- [ ] Run:
+- [x] Run:
   `dotnet test Gravitas.slnx --configuration Release`
-- [ ] Run:
+- [x] Run:
   `dotnet build Gravitas.slnx --configuration ReleaseLean`
-- [ ] Run:
+- [x] Run:
   `dotnet test Gravitas.slnx --configuration ReleaseLean`
-- [ ] Search for stale mutable APIs:
+- [x] Search for stale mutable APIs:
   `rg -n "Immovable\\s*=|PreventAngularForces\\s*=" src/Gravitas docs/wiki tests/Gravitas.Tests`
 
 **Done Criteria**
@@ -355,8 +361,8 @@ checks.
 ## Final Done Criteria
 
 - 3D and pure 2D bodies expose explicit axis freeze constraints.
-- Coarse mutable `Immovable` and `PreventAngularForces` state is removed or
-  reduced to derived read-only convenience.
+- Coarse mutable `Immovable` and `PreventAngularForces` state is removed, and
+  the old read-only aliases are not retained.
 - Discrete response, CCD, mixed response, sleep, grounding, and partition
   mobility all respect frozen degrees of freedom.
 - Serialization and docs describe one clear body-constraint model.

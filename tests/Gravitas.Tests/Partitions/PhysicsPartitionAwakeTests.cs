@@ -155,14 +155,14 @@ public sealed class PhysicsPartitionAwakeTests
         partition = GetFirstPartition(scenario, body.Collider);
         AssertPartitionMembership(partition, colliderId, dynamic: false, kinematic: true, @static: false);
 
-        body.Body.Immovable = true;
+        body.Body.FreezeAxes = BodyFreezeAxes3D.Position;
         body.Collider.Simulate();
 
         partition = GetFirstPartition(scenario, body.Collider);
         AssertPartitionMembership(partition, colliderId, dynamic: false, kinematic: false, @static: true);
 
         body.Body.IsKinematic = false;
-        body.Body.Immovable = false;
+        body.Body.FreezeAxes = BodyFreezeAxes3D.None;
         body.Collider.Simulate();
 
         partition = GetFirstPartition(scenario, body.Collider);

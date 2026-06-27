@@ -41,7 +41,7 @@ public sealed class SolidBody2DAngularDynamicsTests
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext(frameRate: 4);
         SolidBody2D body = CreateBody(context, new LSCircleCollider2D(Fixed64.One), mass: (Fixed64)2);
-        body.PreventAngularForces = true;
+        body.FreezeAxes = BodyFreezeAxes2D.Rotation;
 
         body.AddAngularImpulse((Fixed64)3);
         body.AddTorque((Fixed64)8);

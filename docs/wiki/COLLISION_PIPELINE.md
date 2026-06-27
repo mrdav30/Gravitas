@@ -128,7 +128,7 @@ contacts, applies cached normal/tangent impulses when contact IDs persist, then
 solves one stable normal pass and one stable tangent-friction pass. It reads
 `SolidBody2D.EffectiveInverseMass`,
 `SolidBody2D.EffectiveInverseMomentOfInertia`, and
-`SolidBody2D.WorldCenterOfMass` so immovable, kinematic, inactive,
+`SolidBody2D.WorldCenterOfMass` so position-frozen, kinematic, inactive,
 non-positive-mass, and angular-disabled bodies remain infinite mass/inertia to
 the solver while raw mass and scalar moment values stay inspectable. If a solid
 pair has no awake movable participant, the existing pair is kept alive as
@@ -181,23 +181,23 @@ GridForge removes the voxel partition itself, either through retained-partition
 retirement or world/grid cleanup.
 
 Current mobility membership is explicit: bodyless colliders and colliders whose
-body has `Immovable == true` are added to `ContainedStaticObjects`; bodies with
-`IsKinematic == true` are added to `ContainedKinematicObjects`; movable
-non-kinematic bodies are added to `ContainedDynamicObjects`. Dynamic partitions
-also keep `ContainedAwakeDynamicObjects`, a second sparse set for dynamic
-collider IDs whose bodies are currently awake for collision work. Only dynamic
-membership activates solver partition work. Sleeping bodies stay in normal
-dynamic membership so queries, wake propagation, pair cleanup, and contact
-lifecycle can still find them.
+body has all translation axes frozen are added to `ContainedStaticObjects`;
+bodies with `IsKinematic == true` are added to `ContainedKinematicObjects`;
+movable non-kinematic bodies are added to `ContainedDynamicObjects`. Dynamic
+partitions also keep `ContainedAwakeDynamicObjects`, a second sparse set for
+dynamic collider IDs whose bodies are currently awake for collision work. Only
+dynamic membership activates solver partition work. Sleeping bodies stay in
+normal dynamic membership so queries, wake propagation, pair cleanup, and
+contact lifecycle can still find them.
 
 `PhysicsPartition2D` mirrors the same ID-first lessons for pure 2D. Bodyless
-2D colliders and immovable 2D bodies are static members, kinematic 2D bodies
-are kinematic members, and movable 2D bodies are dynamic members. Only awake
-dynamic IDs activate pair distribution. Sleeping 2D bodies remain query-visible
-in dynamic membership, but partitions with no awake dynamic IDs skip solver
-work. Empty 2D partitions are retained, retired by the same deterministic TTK
-settings, and returned to the 2D collision service's partition pool through
-GridForge voxel removal.
+2D colliders and fully position-frozen 2D bodies are static members, kinematic
+2D bodies are kinematic members, and movable 2D bodies are dynamic members.
+Partial planar freezes remain dynamic. Only awake dynamic IDs activate pair
+distribution. Sleeping 2D bodies remain query-visible in dynamic membership,
+but partitions with no awake dynamic IDs skip solver work. Empty 2D partitions
+are retained, retired by the same deterministic TTK settings, and returned to
+the 2D collision service's partition pool through GridForge voxel removal.
 
 Large-object-count optimization stays inside deterministic broad-phase and
 solver ownership:
@@ -261,7 +261,7 @@ owning aggregate without adding host-scale lookup cost to ordinary standalone
 
 Partition state tracks grid coordinates, previous broad-phase coverage bounds,
 last mobility kind, partition-change flags, and broad-phase versioning together.
-Mobility changes such as dynamic -> kinematic -> immovable refresh partition
+Mobility changes such as dynamic -> kinematic -> position-frozen refresh partition
 state even when bounds do not change, and clears remove collider IDs from the
 bucket they were previously inserted into. Query state tracks the raycast and
 circle-query versions used by context-owned query services to suppress duplicate
@@ -329,7 +329,7 @@ Mesh colliders validate vertices and triangle indices at construction time.
 `MeshColliderMode` declares whether the mesh is intended as `Convex` or
 `Concave`. Convex meshes may use whole-shape convex assumptions where valid.
 Concave meshes are explicit triangle collision data and are legal for
-bodyless, immovable, kinematic, and dynamic bodies.
+bodyless, position-frozen, kinematic, and dynamic bodies.
 
 `PhysicsMesh` owns source vertices, triangle normals, triangle areas, local
 bounds, and the triangle BVH in local mesh space. Rigid movement updates the
@@ -359,7 +359,7 @@ penetration depth and contact normal.
 
 Mesh policy work should keep these boundaries explicit:
 
-- Concave triangle meshes are supported for static, kinematic, immovable, and
+- Concave triangle meshes are supported for static, kinematic, position-frozen, and
   dynamic bodies, but they should be chosen deliberately because candidate
   count scales with local triangle density. Simple authored physics meshes are
   the intended raw-triangle use case; dense rendered meshes should be
@@ -373,8 +373,8 @@ Mesh policy work should keep these boundaries explicit:
   deterministically.
 - Open or surface-only dynamic meshes must opt in with
   `MeshInertiaPolicy.SurfaceApproximation` when angular dynamics are enabled.
-  Bodyless, static, immovable, kinematic, and explicitly angular-force-disabled
-  mesh bodies do not consume mesh inertia and remain legal collision surfaces.
+  Bodyless, fully position-frozen, kinematic, and fully rotation-frozen mesh
+  bodies do not consume mesh inertia and remain legal collision surfaces.
 - Closed-volume mesh inertia is integrated with fixed-point signed tetrahedra
   and cached on the immutable mesh topology. `MeshMassProperties.CenterOfMass`
   is the homogeneous COM, and `MeshMassProperties.UnitMassInertiaTensor`
@@ -510,7 +510,7 @@ static-style targets. Translational dynamic hits are handed off through the
 service-level CCD queue; rotational CCD remains body-owned and static-style
 target focused.
 
-Static and kinematic CCD targets are non-trigger bodyless colliders, immovable
+Static and kinematic CCD targets are non-trigger bodyless colliders, position-frozen
 bodies, and kinematic bodies whose layers are allowed by the context collision
 matrix and whose hierarchy is not excluded. Static or kinematic mesh and
 compound targets are covered by the query workers, so 3D swept-sphere CCD keeps
@@ -519,7 +519,7 @@ against the sweep direction when authored triangle winding would otherwise point
 with the moving source, so closing velocity removal is two-sided and
 deterministic. Pure 2D and 3D CCD use internal static-style query collectors for
 this leg: public sweep queries still report movable dynamic, kinematic,
-immovable, and bodyless targets, while CCD's static leg copies only
+position-frozen, and bodyless targets, while CCD's static leg copies only
 kinematic/static partition IDs and skips movable dynamics because the
 relative-motion path below owns those candidates.
 
@@ -536,7 +536,7 @@ frame fraction, then swept only through the remaining frame fraction.
 
 Kinematic active-source CCD uses the same target ordering. Static-style hits
 clip the kinematic body to the earliest safe pose and write the clipped pose
-back to the bound transform, because bodyless, immovable, and kinematic targets
+back to the bound transform, because bodyless, position-frozen, and kinematic targets
 cannot receive solver correction. Dynamic candidates at or before that first
 static blocker receive deterministic velocity handoff at the accepted TOI and
 are advanced through the remaining frame time by the owning 2D or 3D service. If
@@ -588,7 +588,7 @@ candidate pairs.
 - every local dynamic-dynamic unordered pair when the partition contains at
   least one awake dynamic.
 - every local dynamic ID against the static-style IDs in that partition, where
-  static-style includes bodyless, immovable, and kinematic colliders.
+  static-style includes bodyless, position-frozen, and kinematic colliders.
 
 The dynamic, awake-dynamic, and static sparse-set keys are copied into
 context-owned buffers and sorted by collider ID before pair generation with an
@@ -815,7 +815,8 @@ manifold solver:
 1. build up to four explicit solver contacts from the pair manifold, collider
    bodies, contact points, relative contact arms, detected depth, and normals
    oriented from collider A to collider B.
-2. treat `Immovable` and `IsKinematic` bodies as infinite mass for response.
+2. treat fully position-frozen and `IsKinematic` bodies as infinite mass for
+   response.
 3. apply immediate positional correction only for depth above
    `CollisionResponse.PenetrationSlop`; the correction is distributed by
    inverse mass, scaled by `PenetrationCorrectionPercent`, and divided across
@@ -857,22 +858,24 @@ Response units and invariants:
 
 - mass is body mass in the same unit model used by `SolidBody`.
 - `SolidBody.InverseMass` is the raw reciprocal of body mass. Collision
-  response reads `SolidBody.EffectiveInverseMass`, which maps immovable,
-  kinematic, inactive, and non-positive-mass bodies to zero solver mass while
-  leaving raw mass values inspectable.
-- `SolidBody.CanTranslate`, `SolidBody.CanRotate`, and
-  `SolidBody.EffectiveInverseInertiaTensor` are the 3D response mobility
-  contract used by both ordinary 3D response and mixed 2D/3D response.
+  response reads constrained inverse mass along each contact axis so frozen
+  translation axes contribute zero while unfrozen axes remain dynamic. Fully
+  position-frozen, kinematic, inactive, and non-positive-mass bodies expose
+  zero solver mass while leaving raw mass values inspectable.
+- `SolidBody.FreezeAxes`, `SolidBody.CanTranslate`, `SolidBody.CanRotate`, and
+  the constrained inverse-inertia helpers are the 3D response mobility contract
+  used by both ordinary 3D response and mixed 2D/3D response.
 - `SolidBody2D.CanTranslate`, `SolidBody2D.CanRotate`,
   `SolidBody2D.EffectiveInverseMass`, and
   `SolidBody2D.EffectiveInverseMomentOfInertia` are the pure 2D body-side
-  mobility contract. Pure 2D body integration consumes scalar moment for
-  host-applied torque and angular impulses. Pure 2D contact response consumes
-  the same scalar moment surface for COM-relative normal and friction angular
-  velocity deltas. Mixed response consumes the same effective mass and scalar
-  moment surface for the embedded 2D participant, but only from planar X/Z
-  impulse components; vertical Y impulse remains constrained out of the 2D
-  body model.
+  mobility contract. `BodyFreezeAxes2D.PositionX` and `PositionY` constrain
+  planar translation per axis; `Rotation` constrains yaw. Pure 2D body
+  integration consumes scalar moment for host-applied torque and angular
+  impulses. Pure 2D contact response consumes the same scalar moment surface
+  for COM-relative normal and friction angular velocity deltas. Mixed response
+  consumes constrained planar mass and scalar moment for the embedded 2D
+  participant, but only from planar X/Z impulse components; vertical Y impulse
+  remains constrained out of the 2D body model.
 - 3D response torque arms are measured from `SolidBody.WorldCenterOfMass`.
   Collider centers remain collision-geometry references for narrow phase,
   culling, and normal fallback; they are not the implicit body COM.

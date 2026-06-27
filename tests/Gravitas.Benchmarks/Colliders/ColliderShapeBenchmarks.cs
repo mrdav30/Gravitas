@@ -44,7 +44,7 @@ public class ColliderShapeBenchmarks
             var body = new SolidBody(agent, collider)
             {
                 Mass = Fixed64.One,
-                PreventAngularForces = true
+                FreezeAxes = BodyFreezeAxes3D.Rotation
             };
 
             body.Initialize(position, FixedQuaternion.Identity);
@@ -70,7 +70,7 @@ public class ColliderShapeBenchmarks
         _meshBody = new SolidBody(meshAgent, _meshCollider)
         {
             Mass = Fixed64.One,
-            PreventAngularForces = true
+            FreezeAxes = BodyFreezeAxes3D.Rotation
         };
 
         _meshBody.Initialize(Vector3d.Zero, FixedQuaternion.Identity);
@@ -91,7 +91,7 @@ public class ColliderShapeBenchmarks
         _concaveMeshBody = new SolidBody(concaveAgent, _concaveMeshCollider)
         {
             Mass = Fixed64.One,
-            PreventAngularForces = true
+            FreezeAxes = BodyFreezeAxes3D.Rotation
         };
         _concaveMeshBody.Initialize(Vector3d.Zero, FixedQuaternion.Identity);
         _concaveMeshCollider.Simulate();
@@ -110,7 +110,7 @@ public class ColliderShapeBenchmarks
         _compoundBody = new SolidBody(compoundAgent, _compoundCollider)
         {
             Mass = Fixed64.One,
-            PreventAngularForces = true
+            FreezeAxes = BodyFreezeAxes3D.Rotation
         };
         _compoundBody.Initialize(Vector3d.Zero, FixedQuaternion.Identity);
         _compoundCollider.Simulate();

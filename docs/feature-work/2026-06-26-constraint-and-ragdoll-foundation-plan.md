@@ -110,8 +110,7 @@ This plan should run after:
 3. `Collider Local Collision Filtering`, so linked-collider collision policy has
    the final physical-filtering model.
 4. `Body Axis Freeze Constraints`, so joints and ragdolls build on the final
-   mobility/constraint semantics instead of deprecated `Immovable` and angular
-   prevention state.
+   position-freeze and angular-freeze mobility semantics.
 
 If this plan starts before the naming cleanup, apply every `SolidBody` reference
 below to the current `SolidBody` type and rename during the cleanup workstream.

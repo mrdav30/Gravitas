@@ -128,14 +128,14 @@ public sealed class Physics2DPartitionBroadPhaseTests
         partition = GetFirstPartition(context, body.Collider);
         AssertPartitionMembership(partition, colliderId, dynamic: false, kinematic: true, @static: false);
 
-        body.Immovable = true;
+        body.FreezeAxes = BodyFreezeAxes2D.Position;
         body.Collider.Simulate();
 
         partition = GetFirstPartition(context, body.Collider);
         AssertPartitionMembership(partition, colliderId, dynamic: false, kinematic: false, @static: true);
 
         body.IsKinematic = false;
-        body.Immovable = false;
+        body.FreezeAxes = BodyFreezeAxes2D.None;
         body.Collider.Simulate();
 
         partition = GetFirstPartition(context, body.Collider);
@@ -334,7 +334,7 @@ public sealed class Physics2DPartitionBroadPhaseTests
         var body = new SolidBody2D(agent, collider)
         {
             Mass = Fixed64.One,
-            Immovable = immovable
+            FreezeAxes = immovable ? BodyFreezeAxes2D.Position : BodyFreezeAxes2D.None
         };
         body.Initialize(position);
         return body;

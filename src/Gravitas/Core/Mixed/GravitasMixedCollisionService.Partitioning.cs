@@ -174,7 +174,7 @@ internal sealed partial class GravitasMixedCollisionService
             return;
 
         SolidBody? body = collider.Body;
-        if (body == null || body.Immovable)
+        if (body == null || body.IsPositionFullyFrozen)
             return;
 
         bool awake = body.IsAwakeForCollision;
@@ -206,7 +206,7 @@ internal sealed partial class GravitasMixedCollisionService
             return;
 
         SolidBody2D? body = collider.Body;
-        if (body == null || body.Immovable)
+        if (body == null || body.IsPositionFullyFrozen)
             return;
 
         bool awake = body.IsAwakeForCollision;
@@ -647,7 +647,7 @@ internal sealed partial class GravitasMixedCollisionService
     private static MixedPartitionMobilityKind Get3DMobilityKind(LSCollider collider)
     {
         SolidBody? body = collider.Body;
-        if (body == null || body.Immovable)
+        if (body == null || body.IsPositionFullyFrozen)
             return MixedPartitionMobilityKind.Static;
 
         return body.IsKinematic ? MixedPartitionMobilityKind.Kinematic : MixedPartitionMobilityKind.Dynamic;
@@ -657,7 +657,7 @@ internal sealed partial class GravitasMixedCollisionService
     private static MixedPartitionMobilityKind Get2DMobilityKind(LSCollider2D collider)
     {
         SolidBody2D? body = collider.Body;
-        if (body == null || body.Immovable)
+        if (body == null || body.IsPositionFullyFrozen)
             return MixedPartitionMobilityKind.Static;
 
         return body.IsKinematic ? MixedPartitionMobilityKind.Kinematic : MixedPartitionMobilityKind.Dynamic;

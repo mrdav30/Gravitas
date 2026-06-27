@@ -217,14 +217,22 @@ LSCuboidCollider floor = new();
 floor.InitializeWithNoBody(agent);
 ```
 
-An immovable `SolidBody` is different from a bodyless collider. Immovable bodies
-are placed in the partition static list. Bodyless 3D colliders are still
-registered as colliders and can participate in queries and candidate generation,
-but 3D pair creation still requires at least one collider in the pair to have a
-body. Bodyless 2D colliders bind through
-`LSCollider2D.InitializeWithNoBody(IMatterAgent)` and can participate in
-queries, trigger events, layer filtering, cleanup, and static collision
-response.
+A body with all translation axes frozen is different from a bodyless collider.
+Set `SolidBody.FreezeAxes = BodyFreezeAxes3D.Position` or
+`SolidBody2D.FreezeAxes = BodyFreezeAxes2D.Position` when the object should keep
+body-owned state but behave as static-equivalent for solver and partition
+mobility. Bodyless 3D colliders are still registered as colliders and can
+participate in queries and candidate generation, but 3D pair creation still
+requires at least one collider in the pair to have a body. Bodyless 2D colliders
+bind through `LSCollider2D.InitializeWithNoBody(IMatterAgent)` and can
+participate in queries, trigger events, layer filtering, cleanup, and static
+collision response.
+
+Freeze axes are authoritative body state. Partial position freezes, such as
+`BodyFreezeAxes3D.PositionY` or `BodyFreezeAxes2D.PositionX`, remain dynamic
+members and only constrain the matching solver and integration axis. Rotation
+freezes are explicit through `BodyFreezeAxes3D.RotationX/Y/Z` or
+`BodyFreezeAxes2D.Rotation`.
 
 If a bodyless 3D collider moves after initialization, the host must call
 `floor.Simulate()` after mutating its transform so bounds and partition
@@ -441,7 +449,7 @@ Each body selects its probe shape through `GroundProbeMode`:
 `GroundProbeRadius` can override the derived swept radius. Leave it at zero to
 derive radius from the collider shape. Ground probes ignore the body's own
 collider and ordinary movable dynamic bodies; valid ground targets are bodyless
-colliders, immovable bodies, or kinematic bodies.
+colliders, position-frozen bodies, or kinematic bodies.
 `WasGrounded` stores the grounded value captured before the latest
 authoritative simulation refresh or explicit manual grounding change, so hosts
 can distinguish landing, remaining grounded, and leaving support without

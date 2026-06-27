@@ -214,7 +214,7 @@ public sealed class Collider2DStateParityTests
         var body = new SolidBody2D(agent, collider)
         {
             Mass = Fixed64.One,
-            Immovable = immovable
+            FreezeAxes = immovable ? BodyFreezeAxes2D.Position : BodyFreezeAxes2D.None
         };
         body.Initialize(position);
         return body;

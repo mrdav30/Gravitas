@@ -201,14 +201,16 @@ public static class CollisionResponse
         if (correctionDepth <= Fixed64.Zero)
             return;
 
-        Fixed64 totalInverseMass = contact.TotalInverseMass;
+        Fixed64 inverseMassA = contact.A.GetConstrainedInverseMass(contact.Normal);
+        Fixed64 inverseMassB = contact.B.GetConstrainedInverseMass(contact.Normal);
+        Fixed64 totalInverseMass = inverseMassA + inverseMassB;
         if (totalInverseMass <= Fixed64.Zero)
             return;
 
         Vector3d correction = contact.Normal
             * (correctionDepth * PenetrationCorrectionPercent * contactShare / totalInverseMass);
-        contact.A.Body.ApplyCollisionPositionCorrection(-correction * contact.A.InverseMass);
-        contact.B.Body.ApplyCollisionPositionCorrection(correction * contact.B.InverseMass);
+        contact.A.Body.ApplyCollisionPositionCorrection(-correction * inverseMassA);
+        contact.B.Body.ApplyCollisionPositionCorrection(correction * inverseMassB);
     }
 
     private static void ApplyCachedImpulse(SolverContact contact)
@@ -369,7 +371,7 @@ public static class CollisionResponse
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Fixed64 ComputeImpulseDenominator(SolverContact contact, Vector3d axis)
     {
-        return contact.TotalInverseMass
+        return contact.GetTotalInverseMass(axis)
             + ComputeAngularDenominator(contact.A, contact.RelativeA, axis)
             + ComputeAngularDenominator(contact.B, contact.RelativeB, axis);
     }
@@ -379,9 +381,9 @@ public static class CollisionResponse
         if (!body.CanRotate)
             return Fixed64.Zero;
 
-        Vector3d angular = Vector3d.Cross(
-            body.InverseInertiaTensor * Vector3d.Cross(relativeContactPoint, axis),
-            relativeContactPoint);
+        Vector3d angularVelocityDelta = body.ApplyConstrainedInverseInertia(
+            Vector3d.Cross(relativeContactPoint, axis));
+        Vector3d angular = Vector3d.Cross(angularVelocityDelta, relativeContactPoint);
         Fixed64 denominator = Vector3d.Dot(angular, axis);
         return denominator > Fixed64.Zero ? denominator : Fixed64.Zero;
     }
@@ -396,7 +398,7 @@ public static class CollisionResponse
         if (!body.CanRotate)
             return;
 
-        Vector3d angularVelocityDelta = body.InverseInertiaTensor * Vector3d.Cross(relativeContactPoint, impulse);
+        Vector3d angularVelocityDelta = body.ApplyConstrainedInverseInertia(Vector3d.Cross(relativeContactPoint, impulse));
         body.Body.ApplyCollisionAngularVelocityDelta(angularVelocityDelta);
     }
 

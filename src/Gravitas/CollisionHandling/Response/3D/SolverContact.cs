@@ -91,7 +91,8 @@ internal readonly struct SolverContact
 
     public Fixed64 CachedSecondaryTangentImpulse { get; }
 
-    public Fixed64 TotalInverseMass => A.InverseMass + B.InverseMass;
+    public Fixed64 GetTotalInverseMass(Vector3d axis) =>
+        A.GetConstrainedInverseMass(axis) + B.GetConstrainedInverseMass(axis);
 
     private static Vector3d CreateTangent(Vector3d normal)
     {

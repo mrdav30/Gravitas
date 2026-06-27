@@ -28,9 +28,12 @@ internal readonly struct ResponseBody2D
 
     public Fixed64 InverseMoment { get; }
 
-    public bool CanTranslate => Body != null && InverseMass > Fixed64.Zero;
+    public bool CanTranslate => Body?.CanTranslate == true;
 
-    public bool CanRotate => Body != null && InverseMoment > Fixed64.Zero;
+    public bool CanRotate => Body?.CanRotate == true;
+
+    public Fixed64 GetConstrainedInverseMass(Vector2d axis) =>
+        Body?.GetConstrainedInverseMass(axis) ?? Fixed64.Zero;
 
     public static ResponseBody2D Create(LSCollider2D collider)
     {

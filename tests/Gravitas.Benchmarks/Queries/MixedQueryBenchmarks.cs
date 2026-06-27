@@ -346,7 +346,7 @@ public class MixedQueryBenchmarks
         var body = new SolidBody(agent, collider)
         {
             Mass = Fixed64.One,
-            Immovable = true
+            FreezeAxes = BodyFreezeAxes3D.Position
         };
         body.Initialize(position, startRotation);
         return body;

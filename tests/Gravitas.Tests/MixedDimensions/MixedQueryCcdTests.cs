@@ -1847,7 +1847,7 @@ public sealed class MixedQueryCcdTests
         var body = new SolidBody(agent, collider)
         {
             Mass = Fixed64.One,
-            Immovable = immovable,
+            FreezeAxes = immovable ? BodyFreezeAxes3D.Position : BodyFreezeAxes3D.None,
             IsKinematic = isKinematic
         };
         collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.Zero);
@@ -1868,7 +1868,7 @@ public sealed class MixedQueryCcdTests
         var body = new SolidBody2D(agent, collider)
         {
             Mass = Fixed64.One,
-            Immovable = immovable,
+            FreezeAxes = immovable ? BodyFreezeAxes2D.Position : BodyFreezeAxes2D.None,
             IsKinematic = isKinematic
         };
         collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.Zero);

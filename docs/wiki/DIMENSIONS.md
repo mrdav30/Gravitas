@@ -63,11 +63,15 @@ host transform bridge. Kinematic 2D bodies read the agent transform during
 `LateSimulate` and project its X/Z position into authoritative `Vector2d`
 state.
 
-2D body mobility is explicit: `CanTranslate` gates linear solver motion,
-`CanRotate` gates scalar yaw-axis rotation, and the effective inverse mass and
-effective inverse moment helpers map immovable, kinematic, inactive,
-non-positive-mass, and angular-force-disabled states to zero solver
-contribution. `SolidBody2D.LocalCenterOfMassOffset` is body-local X/Z state, and
+2D body mobility is explicit: `SolidBody2D.FreezeAxes` owns planar translation
+and yaw constraints, `CanTranslate` gates linear solver motion, and `CanRotate`
+gates scalar yaw-axis rotation. `BodyFreezeAxes2D.PositionX` maps to world X;
+`BodyFreezeAxes2D.PositionY` maps to world Z, not world height. The effective
+inverse mass and effective inverse moment helpers map fully position-frozen,
+kinematic, inactive, non-positive-mass, and yaw-frozen states to zero solver
+contribution where appropriate. Partial planar freezes remain dynamic and
+contribute constrained inverse mass only along unfrozen axes.
+`SolidBody2D.LocalCenterOfMassOffset` is body-local X/Z state, and
 `WorldCenterOfMass` rotates that offset by the body's scalar rotation.
 `AddAngularImpulse` changes scalar yaw angular velocity immediately, while
 `AddTorque` queues scalar angular acceleration for the next fixed

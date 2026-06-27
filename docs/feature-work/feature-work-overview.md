@@ -30,11 +30,6 @@ instead of burying it in notes.
 
 ## Active Release-Scope
 
-- [`Body Axis Freeze Constraints`](2026-06-26-body-axis-freeze-constraints-plan.md)
-  - Planned 2026-06-26. Replaces coarse mutable `Immovable` and
-    `PreventAngularForces` toggles with explicit per-axis freeze constraints
-    across 3D, pure 2D, mixed response, CCD, sleep, partitioning,
-    serialization, and docs.
 - [`Constraint And Ragdoll Foundation`](2026-06-26-constraint-and-ragdoll-foundation-plan.md)
   - Planned 2026-06-26. Adds deterministic 3D articulated-body physics through
     context-owned joints, warm-started solver constraints, ragdoll authoring
@@ -65,6 +60,11 @@ instead of burying it in notes.
 
 ## Recently Completed
 
+- [`Body Axis Freeze Constraints`](done/2026-06-26-body-axis-freeze-constraints-plan.md)
+  - Completed 2026-06-27. Replaces coarse mutable body mobility toggles with
+    explicit 3D and pure 2D freeze axes across motion, constrained solver mass,
+    mixed response, CCD, partition mobility, serialization, docs, tests, and
+    benchmarks.
 - [`Physics Material Model`](done/2026-06-26-physics-material-model-plan.md)
   - Completed 2026-06-26. Replaces ad hoc body-owned friction/restitution
     coefficients with deterministic collider-surface materials, static/dynamic
@@ -155,24 +155,20 @@ first public release.
 2. [`Collider Local Collision Filtering`](2026-06-26-collider-local-collision-filtering-plan.md)
    - Low conceptual risk but cross-cutting. It should land before new collider
      families so future shape work inherits one physical filtering rule.
-3. [`Body Axis Freeze Constraints`](2026-06-26-body-axis-freeze-constraints-plan.md)
-   - Deeper solver work that should land before adding more collider families,
-     because new primitives should inherit the final mobility/constraint model
-     instead of `Immovable` and angular-force cleanup churn.
-4. [`Constraint And Ragdoll Foundation`](2026-06-26-constraint-and-ragdoll-foundation-plan.md)
+3. [`Constraint And Ragdoll Foundation`](2026-06-26-constraint-and-ragdoll-foundation-plan.md)
    - Build deterministic articulation after the body constraint model is final.
-     Ragdoll links can reuse collider hierarchy identity and local filtering,
-     while the solver work can integrate with the final body freeze semantics.
-5. [`Batched Query APIs`](2026-06-26-batched-query-apis-plan.md)
+   Ragdoll links can reuse collider hierarchy identity and local filtering,
+   while the solver work can integrate with the final body freeze semantics.
+4. [`Batched Query APIs`](2026-06-26-batched-query-apis-plan.md)
    - Add the high-throughput LSF query surface after local filtering is final
-     and before new shape query families make the public surface broader.
-6. [`Pure 2D Capsule And Convenience Shapes`](2026-06-26-pure-2d-capsule-and-convenience-shapes-plan.md)
+   and before new shape query families make the public surface broader.
+5. [`Pure 2D Capsule And Convenience Shapes`](2026-06-26-pure-2d-capsule-and-convenience-shapes-plan.md)
    - Pairs naturally with 2D grounding and improves character-style 2D
      ergonomics without adding runtime triangle complexity.
-7. [`Cone Collider And Query Support`](2026-06-26-cone-collider-and-query-support-plan.md)
+6. [`Cone Collider And Query Support`](2026-06-26-cone-collider-and-query-support-plan.md)
    - Highest geometry/reducer risk of the new plans. Execute after the smaller
      collider API hardening items so cone work can focus on analytic geometry,
      contact quality, and query evidence.
-8. Keep the benchmark backlog and issue tracker as intake buckets; promote new
+7. Keep the benchmark backlog and issue tracker as intake buckets; promote new
    measured risks into dated plans only when they are broader than a focused
    patch.

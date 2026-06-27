@@ -38,7 +38,7 @@ public sealed partial class GravitasPhysicsService
     private void AddContinuousCollisionCandidate(SolidBody body)
     {
         if (!body.Active
-            || body.Immovable
+            || body.IsPositionFullyFrozen
             || body.IsKinematic
             || body.Collider.IsTrigger)
         {

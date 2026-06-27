@@ -295,7 +295,7 @@ public partial class SolidBody
             return false;
 
         SolidBody? hitBody = hitCollider.Body;
-        return hitBody == null || hitBody.Immovable || hitBody.IsKinematic;
+        return hitBody == null || hitBody.IsPositionFullyFrozen || hitBody.IsKinematic;
     }
 
     private GroundProbeMode ResolveGroundProbeMode()

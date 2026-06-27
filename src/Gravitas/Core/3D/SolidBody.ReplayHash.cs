@@ -17,7 +17,7 @@ public partial class SolidBody
         writer.WriteInt32(_dynamicId);
         writer.WriteBool(Debug);
         writer.WriteBool(Active);
-        writer.WriteBool(_immovable);
+        writer.WriteEnum(_freezeAxes);
         writer.WriteBool(_isKinematic);
         writer.WriteVector2d(_position2dUnmarked);
         writer.WriteFixed64(_heightPosUnmarked);
@@ -39,7 +39,6 @@ public partial class SolidBody
         writer.WriteBool(_wasGrounded);
         writer.WriteVector3d(_lastGroundedPosition);
         writer.WriteQuaternion(_rotation);
-        writer.WriteBool(PreventAngularForces);
         writer.WriteVector3d(_linearVelocity);
         writer.WriteVector3d(_linearDirection);
         writer.WriteVector3d(_angularVelocity);

@@ -20,7 +20,7 @@ public sealed class SolidBody2DMassPropertiesTests
         body.MomentOfInertia.Should().Be(Fixed64.One);
         body.EffectiveInverseMomentOfInertia.Should().Be(Fixed64.One);
 
-        body.PreventAngularForces = true;
+        body.FreezeAxes = BodyFreezeAxes2D.Rotation;
 
         body.CanTranslate.Should().BeTrue();
         body.CanRotate.Should().BeFalse();
@@ -31,8 +31,8 @@ public sealed class SolidBody2DMassPropertiesTests
     [Theory]
     [InlineData(false, true)]
     [InlineData(true, false)]
-    public void EffectiveMassHelpers_ForKinematicOrImmovableBody_ShouldExposeInfiniteSolverMass(
-        bool immovable,
+    public void EffectiveMassHelpers_ForKinematicOrPositionFrozenBody_ShouldExposeInfiniteSolverMass(
+        bool positionFrozen,
         bool isKinematic)
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
@@ -40,7 +40,7 @@ public sealed class SolidBody2DMassPropertiesTests
             context,
             new LSCircleCollider2D(Fixed64.One),
             mass: (Fixed64)2,
-            immovable: immovable,
+            immovable: positionFrozen,
             isKinematic: isKinematic);
 
         body.InverseMass.Should().Be(Fixed64.Half);
@@ -134,7 +134,7 @@ public sealed class SolidBody2DMassPropertiesTests
         var body = new SolidBody2D(new TestMatterAgent(context), collider)
         {
             Mass = mass,
-            Immovable = immovable,
+            FreezeAxes = immovable ? BodyFreezeAxes2D.Position : BodyFreezeAxes2D.None,
             IsKinematic = isKinematic
         };
 

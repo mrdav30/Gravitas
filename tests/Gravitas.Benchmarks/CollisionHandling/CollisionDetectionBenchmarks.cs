@@ -697,7 +697,7 @@ public class CollisionDetectionBenchmarks
         var body = new SolidBody(agent, collider)
         {
             Mass = Fixed64.One,
-            PreventAngularForces = preventAngularForces
+            FreezeAxes = preventAngularForces ? BodyFreezeAxes3D.Rotation : BodyFreezeAxes3D.None
         };
 
         body.Initialize(position, rotation ?? FixedQuaternion.Identity);

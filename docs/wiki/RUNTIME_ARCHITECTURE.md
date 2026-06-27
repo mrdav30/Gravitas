@@ -230,7 +230,7 @@ ground probes use `RaycastAll`; `SweptSphere` probes use `SweepSphereAll`;
 `Auto` derives the mode from collider shape and probe radius. Stationary
 grounded bodies can skip repeated simulation probes for a short frame window,
 but movement of the last hit platform invalidates that guard. Ground probes
-accept bodyless colliders, immovable bodies, and kinematic bodies as ground;
+accept bodyless colliders, position-frozen bodies, and kinematic bodies as ground;
 ordinary movable dynamic bodies are ignored.
 
 Hosts can switch `SolidBody.GroundingMode` to manual through

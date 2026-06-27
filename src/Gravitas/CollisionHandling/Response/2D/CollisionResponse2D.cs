@@ -173,14 +173,16 @@ public static class CollisionResponse2D
         if (correctionDepth <= Fixed64.Zero)
             return;
 
-        Fixed64 totalInverseMass = contact.TotalInverseMass;
+        Fixed64 inverseMassA = contact.A.GetConstrainedInverseMass(contact.Normal);
+        Fixed64 inverseMassB = contact.B.GetConstrainedInverseMass(contact.Normal);
+        Fixed64 totalInverseMass = inverseMassA + inverseMassB;
         if (totalInverseMass <= Fixed64.Zero)
             return;
 
         Vector2d correction = contact.Normal
             * (correctionDepth * PenetrationCorrectionPercent * contactShare / totalInverseMass);
-        ApplyPositionCorrection(contact.A, -correction * contact.A.InverseMass);
-        ApplyPositionCorrection(contact.B, correction * contact.B.InverseMass);
+        ApplyPositionCorrection(contact.A, -correction * inverseMassA);
+        ApplyPositionCorrection(contact.B, correction * inverseMassB);
     }
 
     private static void ApplyCachedImpulse(SolverContact2D contact)
@@ -297,7 +299,7 @@ public static class CollisionResponse2D
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Fixed64 ComputeImpulseDenominator(SolverContact2D contact, Vector2d axis)
     {
-        return contact.TotalInverseMass
+        return contact.GetTotalInverseMass(axis)
             + ComputeAngularDenominator(contact.A, contact.RelativeA, axis)
             + ComputeAngularDenominator(contact.B, contact.RelativeB, axis);
     }

@@ -19,7 +19,7 @@ public partial class SolidBody
     {
         if (ReferenceEquals(target, this)
             || !target.Active
-            || target.Immovable
+            || target.IsPositionFullyFrozen
             || target.IsKinematic
             || target.Collider.IsTrigger
             || target.Collider.IsSibling(Collider)
@@ -34,7 +34,7 @@ public partial class SolidBody
     private bool IsEligibleDynamicMixed2DTarget(SolidBody2D target)
     {
         return target.Active
-            && !target.Immovable
+            && !target.IsPositionFullyFrozen
             && !target.IsKinematic
             && !target.Collider.IsTrigger
             && Context.MixedCollisions.RequireCollisionPair(Collider, target.Collider);
@@ -96,7 +96,7 @@ public partial class SolidBody
     {
         Fixed64 deltaTime = Context.DeltaTime;
         return deltaTime > Fixed64.Epsilon
-            ? _continuousCollisionFrameDisplacement / deltaTime
+            ? ProjectLinearMotion(_continuousCollisionFrameDisplacement / deltaTime)
             : Vector3d.Zero;
     }
 
@@ -138,7 +138,7 @@ public partial class SolidBody
         }
 
         SolidBody? hitBody = hitCollider.Body;
-        return hitBody == null || hitBody.Immovable || hitBody.IsKinematic;
+        return hitBody == null || hitBody.IsPositionFullyFrozen || hitBody.IsKinematic;
     }
 
     private bool IsValidMixedContinuousCollisionHit(PhysicsMixedHit hit)
@@ -153,7 +153,7 @@ public partial class SolidBody
         }
 
         SolidBody2D? hitBody = hitCollider.Body;
-        return hitBody == null || hitBody.Immovable || hitBody.IsKinematic;
+        return hitBody == null || hitBody.IsPositionFullyFrozen || hitBody.IsKinematic;
     }
 
 }

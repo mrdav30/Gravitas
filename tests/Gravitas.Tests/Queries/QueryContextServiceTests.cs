@@ -72,7 +72,7 @@ public sealed class QueryContextServiceTests
         var agent = new TestMatterAgent(context, transform);
         var body = new SolidBody2D(agent, new LSCircleCollider2D(Fixed64.Half))
         {
-            Immovable = true,
+            FreezeAxes = BodyFreezeAxes2D.Position,
             Mass = Fixed64.One
         };
 

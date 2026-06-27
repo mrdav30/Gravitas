@@ -68,19 +68,41 @@ public sealed partial class SolidBody2D : IRecordable
 
     public bool Active { get; private set; }
 
-    private bool _immovable;
-    public bool Immovable
+    private BodyFreezeAxes2D _freezeAxes;
+
+    /// <summary>
+    /// Gets or sets the planar translational and yaw rotational degrees of
+    /// freedom frozen for pure 2D solver response, integration, CCD, and
+    /// partition mobility.
+    /// </summary>
+    public BodyFreezeAxes2D FreezeAxes
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        get => _immovable;
+        get => _freezeAxes;
         set
         {
-            if (_immovable == value)
+            SwiftThrowHelper.ThrowIfArgument(
+                (value & ~BodyFreezeAxes2D.All) != BodyFreezeAxes2D.None,
+                nameof(value),
+                "Unsupported 2D freeze axis bits.");
+
+            if (_freezeAxes == value)
                 return;
 
-            _immovable = value;
+            _freezeAxes = value;
+            ApplyFreezeConstraintsToMotion();
             RefreshPartitionMobility();
         }
+    }
+
+    /// <summary>
+    /// Gets whether both planar translation axes are frozen. Such bodies behave
+    /// as static-equivalent participants for solver and partition mobility.
+    /// </summary>
+    public bool IsPositionFullyFrozen
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => (_freezeAxes & BodyFreezeAxes2D.Position) == BodyFreezeAxes2D.Position;
     }
 
     private bool _isKinematic;
@@ -119,7 +141,14 @@ public sealed partial class SolidBody2D : IRecordable
     /// </summary>
     public bool LastContinuousCollisionToiIterationLimitReached { get; private set; }
 
-    public bool PreventAngularForces;
+    /// <summary>
+    /// Gets whether pure 2D yaw rotation is frozen.
+    /// </summary>
+    public bool AngularMotionFrozen
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => (_freezeAxes & BodyFreezeAxes2D.Rotation) == BodyFreezeAxes2D.Rotation;
+    }
 
     public Fixed64 Mass
     {
@@ -140,12 +169,12 @@ public sealed partial class SolidBody2D : IRecordable
     /// <summary>
     /// Gets whether solver-side response may translate this pure 2D body.
     /// </summary>
-    public bool CanTranslate => Active && _isDynamic && !Immovable && !IsKinematic && InverseMass > Fixed64.Zero;
+    public bool CanTranslate => Active && _isDynamic && !IsPositionFullyFrozen && !IsKinematic && InverseMass > Fixed64.Zero;
 
     /// <summary>
     /// Gets whether solver-side response may rotate this pure 2D body around its yaw axis.
     /// </summary>
-    public bool CanRotate => CanTranslate && !PreventAngularForces && _inverseMomentOfInertia > Fixed64.Zero;
+    public bool CanRotate => CanTranslate && !AngularMotionFrozen && _inverseMomentOfInertia > Fixed64.Zero;
 
     /// <summary>
     /// Gets the inverse mass that should be used by pure 2D and mixed response.
@@ -156,6 +185,32 @@ public sealed partial class SolidBody2D : IRecordable
     /// Gets the inverse scalar moment that should be used by pure 2D angular response.
     /// </summary>
     public Fixed64 EffectiveInverseMomentOfInertia => CanRotate ? _inverseMomentOfInertia : Fixed64.Zero;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal Vector2d ProjectLinearMotion(Vector2d value)
+    {
+        if (value == Vector2d.Zero || IsPositionFullyFrozen)
+            return Vector2d.Zero;
+
+        Fixed64 x = (_freezeAxes & BodyFreezeAxes2D.PositionX) == BodyFreezeAxes2D.PositionX ? Fixed64.Zero : value.X;
+        Fixed64 y = (_freezeAxes & BodyFreezeAxes2D.PositionY) == BodyFreezeAxes2D.PositionY ? Fixed64.Zero : value.Y;
+        return new Vector2d(x, y);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal Fixed64 GetConstrainedInverseMass(Vector2d axis)
+    {
+        if (!CanTranslate || axis == Vector2d.Zero)
+            return Fixed64.Zero;
+
+        Fixed64 axisMagnitudeSquared = axis.MagnitudeSquared;
+        if (axisMagnitudeSquared <= Fixed64.Epsilon)
+            return Fixed64.Zero;
+
+        Vector2d allowedAxis = ProjectLinearMotion(axis);
+        Fixed64 allowedScale = Vector2d.Dot(allowedAxis, axis) / axisMagnitudeSquared;
+        return allowedScale > Fixed64.Zero ? InverseMass * allowedScale : Fixed64.Zero;
+    }
 
     /// <summary>
     /// Gets or sets the authoritative body-local center-of-mass offset in the X/Z simulation plane.
@@ -264,7 +319,7 @@ public sealed partial class SolidBody2D : IRecordable
 
     public bool IsSleeping => _isSleeping;
 
-    internal bool IsAwakeForCollision => Active && !Immovable && !IsSleeping;
+    internal bool IsAwakeForCollision => Active && !IsPositionFullyFrozen && !IsSleeping;
 
     public void Initialize(Vector2d position, Fixed64 rotation = default, bool isDynamic = true)
     {
@@ -385,9 +440,10 @@ public sealed partial class SolidBody2D : IRecordable
         if (_isSleeping)
             return;
 
-        _linearAccelerationStore = _deltaAcceleration + Gravity * _gravityScale;
+        _linearAccelerationStore = ProjectLinearMotion(_deltaAcceleration + Gravity * _gravityScale);
         _deltaAcceleration = Vector2d.Zero;
-        _linearVelocity += _linearAccelerationStore * Context.DeltaTime;
+        _linearVelocity += ProjectLinearMotion(_linearAccelerationStore * Context.DeltaTime);
+        _linearVelocity = ProjectLinearMotion(_linearVelocity);
         _linearAccelerationStore = Vector2d.Zero;
         RefreshLinearSpeed();
 
@@ -410,7 +466,9 @@ public sealed partial class SolidBody2D : IRecordable
         Vector2d startPosition = _position;
         Vector2d proposedPosition = startPosition + _linearVelocity * Context.DeltaTime;
         TryResolveContinuousCollision(startPosition, ref proposedPosition);
+        proposedPosition = startPosition + ProjectLinearMotion(proposedPosition - startPosition);
         TryResolveRotationalContinuousCollision(startPosition, ref proposedPosition, startRotation, ref proposedRotation);
+        proposedPosition = startPosition + ProjectLinearMotion(proposedPosition - startPosition);
         _position = proposedPosition;
         _rotation = proposedRotation;
         if (updateColliderState)
