@@ -14,7 +14,16 @@ internal sealed class BenchmarkCatalog
     private static readonly Dictionary<string, string[]> _aliasSynonyms = new(StringComparer.OrdinalIgnoreCase)
     {
         ["constraint3-d"] = new[] { "constraint-3d", "constraints", "ragdoll" },
-        ["physics2-d"] = new[] { "physics-2d", "2d", "physics-two-d" }
+        ["physics2-d"] = new[] { "physics-2d", "2d", "physics-two-d" },
+        ["query-batch"] = new[]
+        {
+            "query-batch-3d-raycast",
+            "query-batch-3d-sweep-sphere",
+            "query-batch-2d-raycast",
+            "query-batch-2d-area",
+            "query-batch-2d-sweep-circle",
+            "query-batch-mixed-sweeps"
+        }
     };
 
     private readonly Dictionary<string, Type[]> _aliasLookup;

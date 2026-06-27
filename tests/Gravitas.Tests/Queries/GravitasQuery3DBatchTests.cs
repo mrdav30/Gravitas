@@ -1,0 +1,233 @@
+using FixedMathSharp;
+using FluentAssertions;
+using Gravitas.Colliders;
+using Gravitas.Queries;
+using Gravitas.Support;
+using Gravitas.Tests.Support;
+using SwiftCollections;
+using System;
+using Xunit;
+
+namespace Gravitas.Tests.Queries;
+
+public sealed class GravitasQuery3DBatchTests
+{
+    private static readonly PhysicsLayerMask IncludeLayerZero = PhysicsLayerMask.FromLayer(0);
+
+    [Fact]
+    public void RaycastBatch_ShouldRequireOneOutputSlotPerRequest()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        PhysicsRaycast3DRequest[] requests =
+        {
+            new(Vector(-2, 0, 0), Vector(2, 0, 0), IncludeLayerZero)
+        };
+        Physics3DHit[] closestHits = Array.Empty<Physics3DHit>();
+
+        Action act = () => scenario.Context.Query3D.RaycastBatch(requests, closestHits);
+
+        act.Should().Throw<ArgumentException>()
+            .WithParameterName("closestHits");
+    }
+
+    [Fact]
+    public void RaycastAllBatch_ShouldClearAndFillCallerOwnedBuffers()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSSphereCollider near = scenario.CreateSphere(Vector3d.Zero).Collider;
+        LSSphereCollider far = scenario.CreateSphere(Vector3d.Right * 2).Collider;
+        PhysicsRaycast3DRequest[] requests =
+        {
+            new(Vector(-2, 0, 0), Vector(4, 0, 0), IncludeLayerZero),
+            new(Vector(-2, 2, 0), Vector(4, 2, 0), IncludeLayerZero)
+        };
+        var hits = new SwiftList<Physics3DHit>();
+        PhysicsQueryHitRange[] ranges =
+        {
+            new(12, 34),
+            default
+        };
+        hits.Add(default);
+
+        int count = scenario.Context.Query3D.RaycastAllBatch(requests, hits, ranges);
+
+        count.Should().Be(2);
+        hits.Count.Should().Be(2);
+        ranges[0].Start.Should().Be(0);
+        ranges[0].Count.Should().Be(2);
+        ranges[1].Start.Should().Be(2);
+        ranges[1].Count.Should().Be(0);
+        hits[0].Collider.Should().BeSameAs(near);
+        hits[1].Collider.Should().BeSameAs(far);
+    }
+
+    [Fact]
+    public void RaycastBatch_ShouldPreserveRequestOrderAndReportZeroLengthAsMiss()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSSphereCollider first = scenario.CreateSphere(Vector3d.Zero).Collider;
+        LSSphereCollider second = scenario.CreateSphere(Vector3d.Right * 4).Collider;
+        PhysicsRaycast3DRequest[] requests =
+        {
+            new(Vector(4, -2, 0), Vector(4, 2, 0), IncludeLayerZero),
+            new(Vector3d.Zero, Vector3d.Zero, IncludeLayerZero),
+            new(Vector(0, -2, 0), Vector(0, 2, 0), IncludeLayerZero)
+        };
+        Physics3DHit[] closestHits = new Physics3DHit[requests.Length];
+
+        int count = scenario.Context.Query3D.RaycastBatch(requests, closestHits);
+
+        count.Should().Be(2);
+        closestHits[0].Collider.Should().BeSameAs(second);
+        closestHits[1].Collider.Should().BeNull();
+        closestHits[2].Collider.Should().BeSameAs(first);
+    }
+
+    [Fact]
+    public void RaycastAllBatch_ShouldPreservePerRequestHitOrdering()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSSphereCollider near = scenario.CreateSphere(Vector3d.Zero).Collider;
+        LSSphereCollider far = scenario.CreateSphere(Vector3d.Right * 2).Collider;
+        PhysicsRaycast3DRequest[] requests =
+        {
+            new(Vector(-2, 0, 0), Vector(4, 0, 0), IncludeLayerZero),
+            new(Vector(4, 0, 0), Vector(-2, 0, 0), IncludeLayerZero)
+        };
+        var hits = new SwiftList<Physics3DHit>();
+        PhysicsQueryHitRange[] ranges = new PhysicsQueryHitRange[requests.Length];
+
+        int count = scenario.Context.Query3D.RaycastAllBatch(requests, hits, ranges);
+
+        count.Should().Be(4);
+        ranges[0].Start.Should().Be(0);
+        ranges[0].Count.Should().Be(2);
+        ranges[1].Start.Should().Be(2);
+        ranges[1].Count.Should().Be(2);
+        hits[0].Collider.Should().BeSameAs(near);
+        hits[1].Collider.Should().BeSameAs(far);
+        hits[2].Collider.Should().BeSameAs(far);
+        hits[3].Collider.Should().BeSameAs(near);
+        hits[0].Distance.Should().BeLessThan(hits[1].Distance);
+        hits[2].Distance.Should().BeLessThan(hits[3].Distance);
+    }
+
+    [Fact]
+    public void RaycastBatch_ShouldNotAllocateAfterWarmup()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        _ = scenario.CreateSphere(Vector3d.Zero);
+        _ = scenario.CreateSphere(Vector3d.Right * 2);
+        PhysicsRaycast3DRequest[] requests =
+        {
+            new(Vector(-2, 0, 0), Vector(4, 0, 0), IncludeLayerZero),
+            new(Vector(-2, 2, 0), Vector(4, 2, 0), IncludeLayerZero)
+        };
+        Physics3DHit[] closestHits = new Physics3DHit[requests.Length];
+        var hits = new SwiftList<Physics3DHit>(8);
+        PhysicsQueryHitRange[] ranges = new PhysicsQueryHitRange[requests.Length];
+
+        long allocatedBytes = AllocationTestHelper.MeasureSteadyState(() =>
+        {
+            scenario.Context.Query3D.RaycastBatch(requests, closestHits);
+            scenario.Context.Query3D.RaycastAllBatch(requests, hits, ranges);
+        });
+
+        allocatedBytes.Should().Be(0);
+    }
+
+    [Fact]
+    public void RaycastAllBatch_WithDiagnosticsEnabled_ShouldKeepHitOrder()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSSphereCollider near = scenario.CreateSphere(Vector3d.Zero).Collider;
+        LSSphereCollider far = scenario.CreateSphere(Vector3d.Right * 2).Collider;
+        scenario.Context.Diagnostics.Enable(eventCapacity: 8, drawCommandCapacity: 0);
+        PhysicsRaycast3DRequest[] requests =
+        {
+            new(Vector(-2, 0, 0), Vector(4, 0, 0), IncludeLayerZero)
+        };
+        var hits = new SwiftList<Physics3DHit>();
+        PhysicsQueryHitRange[] ranges = new PhysicsQueryHitRange[requests.Length];
+
+        int count = scenario.Context.Query3D.RaycastAllBatch(requests, hits, ranges);
+
+        count.Should().Be(2);
+        ranges[0].Count.Should().Be(2);
+        hits[0].Collider.Should().BeSameAs(near);
+        hits[1].Collider.Should().BeSameAs(far);
+        scenario.Context.Query3D.LastBatchRequestCount.Should().Be(1);
+        scenario.Context.Query3D.LastBatchHitCount.Should().Be(2);
+    }
+
+    [Fact]
+    public void SweepSphereAndOverlapCircleBatches_ShouldMatchSingleQueryResults()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSSphereCollider first = scenario.CreateSphere(Vector3d.Zero).Collider;
+        LSSphereCollider second = scenario.CreateSphere(Vector3d.Right * 4).Collider;
+        PhysicsSweepSphere3DRequest[] sweepRequests =
+        {
+            new(Vector(-4, 0, 0), Vector(2, 0, 0), Fixed64.Half, IncludeLayerZero),
+            new(Vector(4, -2, 0), Vector(4, 2, 0), Fixed64.Half, IncludeLayerZero)
+        };
+        PhysicsOverlapCircle3DRequest[] overlapRequests =
+        {
+            new(Vector3d.Zero, (Fixed64)2, IncludeLayerZero),
+            new(Vector3d.Right * 4, (Fixed64)2, IncludeLayerZero)
+        };
+        Physics3DHit[] closestSweeps = new Physics3DHit[sweepRequests.Length];
+        Physics3DHit[] closestOverlaps = new Physics3DHit[overlapRequests.Length];
+        var sweepHits = new SwiftList<Physics3DHit>();
+        var overlapHits = new SwiftList<Physics3DHit>();
+        PhysicsQueryHitRange[] sweepRanges = new PhysicsQueryHitRange[sweepRequests.Length];
+        PhysicsQueryHitRange[] overlapRanges = new PhysicsQueryHitRange[overlapRequests.Length];
+
+        int sweepClosestCount = scenario.Context.Query3D.SweepSphereBatch(sweepRequests, closestSweeps);
+        int sweepAllCount = scenario.Context.Query3D.SweepSphereAllBatch(sweepRequests, sweepHits, sweepRanges);
+        int overlapClosestCount = scenario.Context.Query3D.OverlapCircleBatch(overlapRequests, closestOverlaps);
+        int overlapAllCount = scenario.Context.Query3D.OverlapCircleAllBatch(overlapRequests, overlapHits, overlapRanges);
+
+        sweepClosestCount.Should().Be(2);
+        sweepAllCount.Should().Be(2);
+        closestSweeps[0].Collider.Should().BeSameAs(first);
+        closestSweeps[1].Collider.Should().BeSameAs(second);
+        sweepHits[sweepRanges[0].Start].Collider.Should().BeSameAs(first);
+        sweepHits[sweepRanges[1].Start].Collider.Should().BeSameAs(second);
+        overlapClosestCount.Should().Be(2);
+        overlapAllCount.Should().Be(2);
+        closestOverlaps[0].Collider.Should().BeSameAs(first);
+        closestOverlaps[1].Collider.Should().BeSameAs(second);
+        overlapHits[overlapRanges[0].Start].Collider.Should().BeSameAs(first);
+        overlapHits[overlapRanges[1].Start].Collider.Should().BeSameAs(second);
+    }
+
+    [Fact]
+    public void RegisteredSourceSweepBatch_ShouldReuseExactSourceSweepBehavior()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSCuboidCollider> source = scenario.CreateCuboid(Vector(-4, 0, 0));
+        LSSphereCollider target = scenario.CreateSphere(Vector3d.Zero, immovable: true).Collider;
+        PhysicsSweepCuboid3DRequest[] requests =
+        {
+            new(source.Collider, Vector(6, 0, 0), IncludeLayerZero),
+            new(source.Collider, Vector3d.Zero, IncludeLayerZero)
+        };
+        Physics3DHit[] closestHits = new Physics3DHit[requests.Length];
+        var hits = new SwiftList<Physics3DHit>();
+        PhysicsQueryHitRange[] ranges = new PhysicsQueryHitRange[requests.Length];
+
+        int closestCount = scenario.Context.Query3D.SweepCuboidBatch(requests, closestHits);
+        int allCount = scenario.Context.Query3D.SweepCuboidAllBatch(requests, hits, ranges);
+
+        closestCount.Should().Be(1);
+        closestHits[0].Collider.Should().BeSameAs(target);
+        closestHits[1].Collider.Should().BeNull();
+        allCount.Should().Be(1);
+        ranges[0].Count.Should().Be(1);
+        ranges[1].Count.Should().Be(0);
+        hits[ranges[0].Start].Collider.Should().BeSameAs(target);
+    }
+
+    private static Vector3d Vector(int x, int y, int z) => new((Fixed64)x, (Fixed64)y, (Fixed64)z);
+}

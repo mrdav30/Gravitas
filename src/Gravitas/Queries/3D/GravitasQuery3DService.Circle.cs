@@ -29,7 +29,7 @@ public sealed partial class GravitasQuery3DService
         PhysicsLayerMask layerMask)
     {
         _currentLayerMask = layerMask;
-        CircleVersion++;
+        NextCircleVersion();
         ResetLastQueryCounters();
         _redundantColliderCheck.Clear();
         _redundantVoxelCheck.Clear();
@@ -66,7 +66,7 @@ public sealed partial class GravitasQuery3DService
         PhysicsLayerMask layerMask)
     {
         _currentLayerMask = layerMask;
-        CircleVersion++;
+        NextCircleVersion();
         ResetLastQueryCounters();
         _redundantColliderCheck.Clear();
         _redundantVoxelCheck.Clear();
@@ -112,7 +112,7 @@ public sealed partial class GravitasQuery3DService
         SwiftThrowHelper.ThrowIfNull(results, nameof(results));
 
         _currentLayerMask = layerMask;
-        CircleVersion++;
+        NextCircleVersion();
         ResetLastQueryCounters();
 
         results.FastClear();
@@ -157,7 +157,7 @@ public sealed partial class GravitasQuery3DService
         _currentExcludedCollider = excludedCollider;
         _currentIncludeTriggers = includeTriggers;
         _currentStaticSweepTargetsOnly = true;
-        CircleVersion++;
+        NextCircleVersion();
         ResetLastQueryCounters();
         _redundantColliderCheck.Clear();
         _redundantVoxelCheck.Clear();
@@ -360,7 +360,7 @@ public sealed partial class GravitasQuery3DService
         for (int i = colliderIds.Count - 1; i >= 0; i--)
         {
             if (!TryBuildOverlapHit(colliderIds.DenseKeys[i], position, radius, out Physics3DHit hitInfo)
-                || hitInfo.Distance >= closestDist)
+                || (found && !Physics3DHitSorter.ComesBefore(hitInfo, closestHit)))
             {
                 continue;
             }
@@ -407,7 +407,7 @@ public sealed partial class GravitasQuery3DService
             Vector3d toHit = hitInfo.Point - position;
             if (toHit.MagnitudeSquared > maxDistanceSqr
                 || Vector3d.Dot(toHit.Normalized, direction) <= Fixed64.Zero
-                || hitInfo.Distance >= closestDist)
+                || (found && !Physics3DHitSorter.ComesBefore(hitInfo, closestHit)))
             {
                 continue;
             }

@@ -480,6 +480,42 @@ int mixedHitCount = context.QueryMixed.SweepSphereAgainst2DAll(
     excludedCollider: null);
 ```
 
+High-volume lockstep systems should prefer batch APIs when issuing many related
+queries in one frame. Requests, closest-hit outputs, all-hit buffers, and range
+buffers remain caller-owned and reusable:
+
+```csharp
+PhysicsRaycast3DRequest[] rayRequests = new PhysicsRaycast3DRequest[agentCount];
+Physics3DHit[] closestRayHits = new Physics3DHit[agentCount];
+SwiftList<Physics3DHit> allRayHits = new(agentCount * 4);
+PhysicsQueryHitRange[] rayRanges = new PhysicsQueryHitRange[agentCount];
+
+for (int i = 0; i < agentCount; i++)
+{
+    rayRequests[i] = new PhysicsRaycast3DRequest(
+        sensorOrigins[i],
+        sensorTargets[i],
+        layerMask);
+}
+
+int closestHitCount = context.Query3D.RaycastBatch(rayRequests, closestRayHits);
+int allHitCount = context.Query3D.RaycastAllBatch(rayRequests, allRayHits, rayRanges);
+
+for (int requestIndex = 0; requestIndex < agentCount; requestIndex++)
+{
+    PhysicsQueryHitRange range = rayRanges[requestIndex];
+    for (int hitIndex = 0; hitIndex < range.Count; hitIndex++)
+    {
+        Physics3DHit queryHit = allRayHits[range.Start + hitIndex];
+        // Consume this request's sorted hits.
+    }
+}
+```
+
+The same pattern applies to pure 2D and mixed batch queries. Polygon batch
+queries take a separate flat vertex span plus per-request vertex ranges, so the
+host owns polygon vertex storage explicitly for the duration of the batch call.
+
 All-hit query APIs use caller-owned buffers. The 3D query service writes
 `Physics3DHit` values, pure 2D queries write `Physics2DHit` values, and mixed
 queries write `PhysicsMixedHit` values. They clear the supplied list, write

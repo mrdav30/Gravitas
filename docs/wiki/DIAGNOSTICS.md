@@ -100,6 +100,19 @@ The body-owned bounded solver still reports
 tuning, tests, and host diagnostics without adding event-buffer traffic to the
 hot path.
 
+## Query Batch Counters
+
+Batched query APIs expose service-local summary counters instead of emitting a
+diagnostic event for every sub-query. `Query2D`, `Query3D`, and `QueryMixed`
+report `LastBatchRequestCount`, `LastBatchHitCount`, and
+`LastBatchCandidateCount` after each batch call. `QueryMixed` also reports
+`LastBatchMeshTriangleCandidateCount` for mesh-heavy finite-slab batches.
+
+These counters are deterministic, overwritten by the next batch call on the
+same service, and intended for tuning, benchmarks, and host telemetry. They are
+not serialized replay state. When ordinary diagnostics are enabled, existing
+single-query event kinds still describe the individual public query families.
+
 ## Diagnostic Dispatch And Typed Views
 
 `GravitasDiagnosticEvent` remains the compact capture format. Host adapters

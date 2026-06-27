@@ -37,7 +37,9 @@ public sealed partial class GravitasQueryMixedService
         _candidates2D.FastClear();
         _candidates3D.FastClear();
         _meshTriangleCandidates.FastClear();
+        _batchMixedHits.FastClear();
         ResetLastQueryCounters();
+        ResetBatchCounters(0);
     }
 
 }

@@ -14,23 +14,27 @@ internal static class Physics2DHitSorter
 {
     public static void SortByDistance(SwiftList<Physics2DHit> hits)
     {
-        int count = hits.Count;
+        SortByDistance(hits, 0, hits.Count);
+    }
+
+    public static void SortByDistance(SwiftList<Physics2DHit> hits, int start, int count)
+    {
         if (count < 2)
             return;
 
         for (int root = (count / 2) - 1; root >= 0; root--)
-            SiftDown(hits, root, count);
+            SiftDown(hits, start, root, count);
 
         for (int end = count - 1; end > 0; end--)
         {
-            Swap(hits, 0, end);
-            SiftDown(hits, 0, end);
+            Swap(hits, start, start + end);
+            SiftDown(hits, start, 0, end);
         }
     }
 
     public static bool ComesBefore(Physics2DHit left, Physics2DHit right) => Compare(left, right) < 0;
 
-    private static void SiftDown(SwiftList<Physics2DHit> hits, int root, int count)
+    private static void SiftDown(SwiftList<Physics2DHit> hits, int start, int root, int count)
     {
         while (true)
         {
@@ -39,17 +43,17 @@ internal static class Physics2DHitSorter
                 return;
 
             int swapIndex = root;
-            if (ComesBefore(hits[swapIndex], hits[child]))
+            if (ComesBefore(hits[start + swapIndex], hits[start + child]))
                 swapIndex = child;
 
             int right = child + 1;
-            if (right < count && ComesBefore(hits[swapIndex], hits[right]))
+            if (right < count && ComesBefore(hits[start + swapIndex], hits[start + right]))
                 swapIndex = right;
 
             if (swapIndex == root)
                 return;
 
-            Swap(hits, root, swapIndex);
+            Swap(hits, start + root, start + swapIndex);
             root = swapIndex;
         }
     }

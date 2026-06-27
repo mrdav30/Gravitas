@@ -30,11 +30,6 @@ instead of burying it in notes.
 
 ## Active Release-Scope
 
-- [`Batched Query APIs`](2026-06-26-batched-query-apis-plan.md)
-  - Planned 2026-06-26. Adds deterministic high-throughput batched query
-    request/result surfaces for 3D, pure 2D, and mixed services using
-    caller-owned buffers, stable per-request ranges, shared scratch, diagnostics,
-    allocation guardrails, and benchmark-backed broad-phase reuse.
 - [`Pure 2D Capsule And Convenience Shapes`](2026-06-26-pure-2d-capsule-and-convenience-shapes-plan.md)
   - Planned 2026-06-26. Adds `LSCapsuleCollider2D` as a first-class analytic
     primitive across collision, query, CCD, mixed mode, serialization, and
@@ -46,6 +41,11 @@ instead of burying it in notes.
 
 ## Recently Completed
 
+- [`Batched Query APIs`](done/2026-06-26-batched-query-apis-plan.md)
+  - Completed 2026-06-27. Adds typed closest/all-hit batch APIs for current
+    3D, pure 2D, and mixed query families with caller-owned request/output
+    buffers, stable per-request hit ranges, public batch summary counters,
+    allocation guardrails, docs, and benchmark smoke coverage.
 - [`Constraint And Ragdoll Foundation`](done/2026-06-26-constraint-and-ragdoll-foundation-plan.md)
   - Completed 2026-06-27. Adds context-owned deterministic 3D joints,
     contact-integrated constraint islands, ragdoll authoring/runtime
@@ -148,16 +148,13 @@ first public release.
 
 ## Recommended Execution Order
 
-1. [`Batched Query APIs`](2026-06-26-batched-query-apis-plan.md)
-   - Add the high-throughput LSF query surface after local filtering is final
-   and before new shape query families make the public surface broader.
-2. [`Pure 2D Capsule And Convenience Shapes`](2026-06-26-pure-2d-capsule-and-convenience-shapes-plan.md)
+1. [`Pure 2D Capsule And Convenience Shapes`](2026-06-26-pure-2d-capsule-and-convenience-shapes-plan.md)
    - Pairs naturally with 2D grounding and improves character-style 2D
      ergonomics without adding runtime triangle complexity.
-3. [`Cone Collider And Query Support`](2026-06-26-cone-collider-and-query-support-plan.md)
+2. [`Cone Collider And Query Support`](2026-06-26-cone-collider-and-query-support-plan.md)
    - Highest geometry/reducer risk of the new plans. Execute after the smaller
      collider API hardening items so cone work can focus on analytic geometry,
      contact quality, and query evidence.
-4. Keep the benchmark backlog and issue tracker as intake buckets; promote new
+3. Keep the benchmark backlog and issue tracker as intake buckets; promote new
    measured risks into dated plans only when they are broader than a focused
    patch.

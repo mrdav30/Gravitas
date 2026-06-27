@@ -49,6 +49,60 @@ names an internal CCD proxy.
 | `QueryMixed.SweepCircleAgainst3D`, `SweepCircleAgainst3DAll` | 2D circle embedded in a finite Y slab | 3D sphere, capsule, cuboid, finite cylinder, mesh, compound | `Exact`; mesh targets scan triangle candidates with lower authored triangle-index tie-breaks, and compound targets reduce supported parts in authored order | distance, 3D collider ID, 2D collider ID | service-owned scratch, caller-owned all-hit buffer |
 | Concave/raw mesh-source sweeps | concave `LSMeshCollider` or raw mesh as the moving query source | 2D, 3D, or mixed targets | `NotSupported`; use offline convex decomposition into supported `LSCompoundCollider` parts | none | no raw mesh-source query API |
 
+### Batched Query APIs
+
+Every public query family above also has typed batch access on its owning
+service. Batch APIs keep dimensional semantics explicit instead of routing all
+queries through one tagged request type:
+
+- `Query3D`: `RaycastBatch`, `RaycastAllBatch`, `SweepSphereBatch`,
+  `SweepSphereAllBatch`, registered-source sweep batches for capsule, cuboid,
+  cylinder, convex mesh, and compound sources, `OverlapCircleBatch`,
+  `OverlapCircleAllBatch`, and `OverlapCircleInDirectionBatch`.
+- `Query2D`: raycast, circle/AABB/polygon overlap, and swept-circle closest
+  and all-hit batches.
+- `QueryMixed`: `SweepSphereAgainst2DBatch`,
+  `SweepSphereAgainst2DAllBatch`, `SweepCircleAgainst3DBatch`, and
+  `SweepCircleAgainst3DAllBatch`.
+
+Closest-hit batches take a typed request span and one output hit span. The
+output span must contain at least one slot per request. A miss writes the
+default hit value for that request, and the return value is the number of
+requests that hit.
+
+All-hit batches take a typed request span, a caller-owned shared hit
+`SwiftList<T>`, and a `Span<PhysicsQueryHitRange>` with one slot per request.
+The shared hit list is cleared once at batch start. Each request writes one
+range, including misses and zero-length movement requests:
+
+```csharp
+PhysicsQueryHitRange range = ranges[requestIndex];
+for (int i = 0; i < range.Count; i++)
+{
+    Physics3DHit hit = hits[range.Start + i];
+}
+```
+
+Request order is preserved in the range and closest-hit buffers. Hits inside
+each request keep the same deterministic ordering as the matching single-query
+API. Zero-length ray and sweep movement requests produce explicit misses and
+zero-count ranges. Structurally invalid input, such as an undersized output
+span, an invalid polygon vertex range, an invalid AABB size, or a sweep radius
+that the matching single-query API rejects, throws before caller output buffers
+are mutated.
+
+Batch calls are same-thread and non-reentrant, just like the single-query
+services. They reuse service-owned scratch and caller-owned buffers; they do
+not allocate per-request arrays. Polygon batches keep vertex ownership explicit:
+`PhysicsOverlapPolygon2DRequest` stores a `VertexStart`/`VertexCount` range into
+the vertex span supplied to the batch call, and the caller must keep that span
+stable for the duration of the call.
+
+Each query service exposes public summary counters for the last batch call:
+`LastBatchRequestCount`, `LastBatchHitCount`, and `LastBatchCandidateCount`.
+`QueryMixed` also exposes `LastBatchMeshTriangleCandidateCount`. These counters
+are frame-local tuning aids and benchmark signals, not replay state.
+
 ### Internal CCD Query Surface
 
 | Owner | Query path | Source proxy | Target set | Reducer policy |

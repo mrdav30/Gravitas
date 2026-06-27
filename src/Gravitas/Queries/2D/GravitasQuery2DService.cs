@@ -43,7 +43,9 @@ public sealed partial class GravitasQuery2DService
     public void Reset()
     {
         _queryCandidates.FastClear();
+        _batch2DHits.FastClear();
         LastQueryCandidateCount = 0;
+        ResetBatchCounters(0);
         _overlapQueryVersion = 0;
         _raycastVersion = 0;
     }

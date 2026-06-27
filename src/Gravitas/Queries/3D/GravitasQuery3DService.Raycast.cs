@@ -73,7 +73,9 @@ public sealed partial class GravitasQuery3DService
         RaycastVersion = 0;
         CircleVersion = 0;
         ResetLastQueryCounters();
+        ResetBatchCounters(0);
         _bufferIntersectionPoints.FastClear();
+        _batch3DHits.FastClear();
         _redundantColliderCheck.Clear();
         _redundantVoxelCheck.Clear();
         _coveredVoxels.FastClear();
@@ -586,7 +588,7 @@ public sealed partial class GravitasQuery3DService
         _redundantColliderCheck.Clear();
         _redundantVoxelCheck.Clear();
         ResetLastQueryCounters();
-        RaycastVersion++;
+        NextRaycastVersion();
     }
 
     private void BeginRaycastTrace(Vector3d start, Vector3d end)
@@ -599,7 +601,7 @@ public sealed partial class GravitasQuery3DService
         _currentStaticSweepTargetsOnly = false;
         _currentIncludeTriggers = true;
         ResetLastQueryCounters();
-        RaycastVersion++;
+        NextRaycastVersion();
         _worker.PrepareSegmentCheck(start, end);
     }
 
@@ -620,7 +622,7 @@ public sealed partial class GravitasQuery3DService
         _redundantColliderCheck.Clear();
         _redundantVoxelCheck.Clear();
         ResetLastQueryCounters();
-        RaycastVersion++;
+        NextRaycastVersion();
         _sweepWorker.Prepare(start, end, radius);
     }
 
@@ -1305,6 +1307,26 @@ public sealed partial class GravitasQuery3DService
     {
         LastQueryCandidateCount = 0;
         LastMeshTriangleCandidateCount = 0;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private uint NextRaycastVersion()
+    {
+        RaycastVersion++;
+        if (RaycastVersion == 0)
+            RaycastVersion = 1;
+
+        return RaycastVersion;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private uint NextCircleVersion()
+    {
+        CircleVersion++;
+        if (CircleVersion == 0)
+            CircleVersion = 1;
+
+        return CircleVersion;
     }
 
     private bool DoesCurrentColliderIntersectRay(LSCollider? current)

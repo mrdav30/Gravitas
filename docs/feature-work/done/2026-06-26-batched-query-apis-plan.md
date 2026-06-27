@@ -1,6 +1,6 @@
 # Batched Query APIs Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Add deterministic high-throughput batched query APIs for 3D, pure 2D, and mixed query services so large lockstep simulations can issue many ray, area, and sweep queries with caller-owned buffers and stable result ordering.
 
@@ -11,7 +11,7 @@
 ---
 
 **Date:** 2026-06-26  
-**Status:** Planned  
+**Status:** Completed  
 **Owner:** Gravitas query-service hardening
 
 ## Purpose
@@ -89,7 +89,6 @@ public readonly struct PhysicsRaycast3DRequest
     public Vector3d Start { get; }
     public Vector3d End { get; }
     public PhysicsLayerMask LayerMask { get; }
-    public bool IncludeTriggers { get; }
 }
 
 public int GravitasQuery3DService.RaycastBatch(
@@ -99,7 +98,7 @@ public int GravitasQuery3DService.RaycastBatch(
 public int GravitasQuery3DService.RaycastAllBatch(
     ReadOnlySpan<PhysicsRaycast3DRequest> requests,
     SwiftList<Physics3DHit> hits,
-    SwiftList<PhysicsQueryHitRange> ranges);
+    Span<PhysicsQueryHitRange> ranges);
 ```
 
 Use matching typed request structs for pure 2D and mixed query families. Prefer
@@ -115,21 +114,21 @@ queries without per-request allocations.
 
 **Tasks**
 
-- [ ] Add `src/Gravitas/Queries/Common/PhysicsQueryHitRange.cs`.
-- [ ] Add `src/Gravitas/Queries/3D/PhysicsRaycast3DRequest.cs`.
-- [ ] Add tests in
+- [x] Add `src/Gravitas/Queries/Common/PhysicsQueryHitRange.cs`.
+- [x] Add `src/Gravitas/Queries/3D/PhysicsRaycast3DRequest.cs`.
+- [x] Add tests in
   `tests/Gravitas.Tests/Queries/GravitasQuery3DBatchTests.cs`:
   - closest-hit output length must be at least request count.
   - all-hit batch clears and fills caller-owned hit/range buffers.
   - invalid zero-length ray produces a miss and zero range.
   - request order is preserved in closest-hit output and ranges.
   - hits inside each request are sorted like `RaycastAll`.
-- [ ] Implement `GravitasQuery3DService.RaycastBatch(...)`.
-- [ ] Implement `GravitasQuery3DService.RaycastAllBatch(...)`.
-- [ ] Reuse existing raycast reducer and hit builder logic.
-- [ ] Ensure batch setup resets only per-request scratch, not caller buffers
+- [x] Implement `GravitasQuery3DService.RaycastBatch(...)`.
+- [x] Implement `GravitasQuery3DService.RaycastAllBatch(...)`.
+- [x] Reuse existing raycast reducer and hit builder logic.
+- [x] Ensure batch setup resets only per-request scratch, not caller buffers
   that should accumulate all hits.
-- [ ] Add allocation tests proving repeated 3D ray batches allocate `0` bytes
+- [x] Add allocation tests proving repeated 3D ray batches allocate `0` bytes
   after warmup.
 
 **Done Criteria**
@@ -148,20 +147,20 @@ areas, and swept circles.
 
 **Tasks**
 
-- [ ] Add request structs:
+- [x] Add request structs:
   - `PhysicsRaycast2DRequest`
   - `PhysicsOverlapCircle2DRequest`
   - `PhysicsOverlapAabb2DRequest`
   - `PhysicsOverlapPolygon2DRequest`
   - `PhysicsSweepCircle2DRequest`
-- [ ] Add tests in `tests/Gravitas.Tests/Physics2D/Physics2DBatchQueryTests.cs`
+- [x] Add tests in `tests/Gravitas.Tests/Physics2D/Physics2DBatchQueryTests.cs`
   for closest and all-hit variants where the single-query API already has both.
-- [ ] Implement pure 2D batch methods on `GravitasQuery2DService`.
-- [ ] Keep polygon request ownership explicit. If vertices are supplied by
+- [x] Implement pure 2D batch methods on `GravitasQuery2DService`.
+- [x] Keep polygon request ownership explicit. If vertices are supplied by
   span, document that callers must keep them stable for the duration of the
   batch call.
-- [ ] Preserve existing pure 2D hit ordering by distance and collider ID.
-- [ ] Add allocation tests for ray, area, and swept-circle batches.
+- [x] Preserve existing pure 2D hit ordering by distance and collider ID.
+- [x] Add allocation tests for ray, area, and swept-circle batches.
 
 **Done Criteria**
 
@@ -178,7 +177,7 @@ queries need typed batch coverage without duplicating reducer logic.
 
 **Tasks**
 
-- [ ] Add request structs:
+- [x] Add request structs:
   - `PhysicsSweepSphere3DRequest`
   - `PhysicsSweepCapsule3DRequest`
   - `PhysicsSweepCuboid3DRequest`
@@ -186,17 +185,17 @@ queries need typed batch coverage without duplicating reducer logic.
   - `PhysicsSweepConvexMesh3DRequest`
   - `PhysicsSweepCompound3DRequest`
   - `PhysicsOverlapCircle3DRequest`
-- [ ] Add closest and all-hit batch tests for sphere sweeps and X/Z circle
+- [x] Add closest and all-hit batch tests for sphere sweeps and X/Z circle
   overlaps first.
-- [ ] Add registered-source sweep batch tests for capsule, cuboid, cylinder,
+- [x] Add registered-source sweep batch tests for capsule, cuboid, cylinder,
   convex mesh, and compound sources.
-- [ ] Implement batch methods by reusing prepared-source workers and existing
+- [x] Implement batch methods by reusing prepared-source workers and existing
   exact reducers.
-- [ ] Avoid re-preparing the same source collider when consecutive batch
+- [x] Avoid re-preparing the same source collider when consecutive batch
   requests reference the same source and displacement.
-- [ ] Keep concave mesh source rejection behavior identical to single-query
+- [x] Keep concave mesh source rejection behavior identical to single-query
   APIs.
-- [ ] Add allocation tests for representative sweep batches.
+- [x] Add allocation tests for representative sweep batches.
 
 **Done Criteria**
 
@@ -213,22 +212,22 @@ batched access without blurring pure 2D and pure 3D services.
 
 **Tasks**
 
-- [ ] Add request structs:
+- [x] Add request structs:
   - `PhysicsSweepSphereAgainst2DRequest`
   - `PhysicsSweepCircleAgainst3DRequest`
-- [ ] Add tests in
+- [x] Add tests in
   `tests/Gravitas.Tests/MixedDimensions/MixedBatchQueryTests.cs`:
   - request order is preserved.
   - closest mixed hits match individual query calls.
   - all-hit ranges match individual all-hit query calls.
   - reducer kind remains exact for supported paths.
   - invalid zero displacement produces miss/range zero.
-- [ ] Implement closest and all-hit batch methods on
+- [x] Implement closest and all-hit batch methods on
   `GravitasQueryMixedService`.
-- [ ] Preserve mixed result ordering by distance and dimension-tagged collider
+- [x] Preserve mixed result ordering by distance and dimension-tagged collider
   identity.
-- [ ] Keep mixed diagnostics as summary-first to avoid high-volume event spam.
-- [ ] Add allocation tests for mixed batches after warmup.
+- [x] Keep mixed diagnostics as summary-first to avoid high-volume event spam.
+- [x] Add allocation tests for mixed batches after warmup.
 
 **Done Criteria**
 
@@ -241,37 +240,35 @@ batched access without blurring pure 2D and pure 3D services.
 **Problem**
 
 A final batch solution should do more than loop over public calls. It needs
-shared scratch ownership and measured broad-phase reuse where the batch shape
-allows it.
+shared scratch ownership and should adopt broad-phase reuse only where the batch
+shape provides measured value without compromising request-local ordering.
 
 **Tasks**
 
-- [ ] Add service-owned batch scratch buffers for:
-  - covered voxels.
-  - candidate collider IDs.
-  - duplicate collider suppression.
-  - per-request ranges.
-  - sorted request indices where broad-phase reuse benefits from grouping.
-- [ ] Group compatible 3D ray/sweep requests by voxel coverage only when doing
-  so preserves output order and improves benchmarks.
-- [ ] Group pure 2D area queries by broad-phase cell overlap only when doing so
-  preserves output order and improves benchmarks.
-- [ ] Keep fallback per-request processing for sparse or incompatible batches.
-- [ ] Add diagnostics:
+- [x] Reuse service-owned ray/sweep/circle/finite-slab scratch and add
+  dedicated batch hit scratch for all-hit append paths.
+- [x] Preserve request-local duplicate suppression and hit ordering instead of
+  sharing candidate stamps across the whole batch.
+- [x] Keep request-local exact reducer processing as the default path.
+- [x] Do not add broad-phase grouping without benchmark evidence; the benchmark
+  smoke gives a stable baseline for a future measured optimization if a signal
+  appears.
+- [x] Add diagnostics:
   - batch request count.
   - total hit count.
   - total candidate count.
-  - optional reducer summary counts.
-- [ ] Add tests proving diagnostics disabled path allocates `0` bytes.
-- [ ] Add tests proving detailed diagnostics can be enabled without changing
-  hit order.
+  - mixed mesh-triangle candidate count.
+- [x] Add tests proving diagnostics disabled path allocates `0` bytes.
+- [x] Add tests proving diagnostics can be enabled without changing hit order.
 
 **Done Criteria**
 
 - Batch APIs own reusable scratch and do not depend on hidden per-request
   allocations.
-- Broad-phase grouping is benchmark-backed, not speculative.
-- Diagnostics are useful without being noisy by default.
+- Broad-phase grouping remains evidence-gated; no speculative grouping is part
+  of this completed pass.
+- Public batch summary counters are useful without adding high-volume event
+  spam by default.
 
 ## Workstream 6: Benchmarks, Docs, And Release Validation
 
@@ -282,28 +279,28 @@ clear docs before being presented as a first-class LSF feature.
 
 **Tasks**
 
-- [ ] Add benchmark rows:
+- [x] Add benchmark rows:
   - `query-batch-3d-raycast`
   - `query-batch-3d-sweep-sphere`
   - `query-batch-2d-raycast`
   - `query-batch-2d-area`
   - `query-batch-2d-sweep-circle`
   - `query-batch-mixed-sweeps`
-- [ ] Compare batch APIs against equivalent individual calls for sparse and
+- [x] Compare batch APIs against equivalent individual calls for sparse and
   dense scenes.
-- [ ] Track hit count, request count, candidate count, and allocation.
-- [ ] Update `docs/wiki/QUERY_SERVICES.md` with batch API contracts and
+- [x] Track hit count, request count, candidate count, and allocation.
+- [x] Update `docs/wiki/QUERY_SERVICES.md` with batch API contracts and
   same-thread rules.
-- [ ] Update `docs/wiki/HOST_INTEGRATION.md` with caller-owned batch buffer
+- [x] Update `docs/wiki/HOST_INTEGRATION.md` with caller-owned batch buffer
   examples.
-- [ ] Update `docs/wiki/DIAGNOSTICS.md` if batch summary diagnostics are added.
-- [ ] Run focused query tests:
+- [x] Update `docs/wiki/DIAGNOSTICS.md` if batch summary diagnostics are added.
+- [x] Run focused query tests:
   `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter Query`
-- [ ] Run full validation:
+- [x] Run full validation:
   `dotnet test Gravitas.slnx --configuration Release`
-- [ ] Run Lean validation:
+- [x] Run Lean validation:
   `dotnet test Gravitas.slnx --configuration ReleaseLean`
-- [ ] Run benchmark smoke:
+- [x] Run benchmark smoke:
   `dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll query-batch --filter "*" -j Short -i`
 
 **Done Criteria**
