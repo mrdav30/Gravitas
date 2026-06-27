@@ -46,6 +46,7 @@ clears and stops capture.
 | `Sequence` | Capture order inside the current buffer. |
 | `Kind` | Event payload type. |
 | `BodyId` | Context-local dynamic body ID, or `-1` when not applicable. |
+| `JointId` | Context-local 3D joint ID, or `-1` when not applicable. |
 | `ColliderAId` / `ColliderBId` | Context-local collider IDs, or `-1` when not applicable. |
 | `ColliderADimension` / `ColliderBDimension` | Collider runtime surface: `ThreeD`, `TwoD`, or `None`. |
 | `ColliderAType` / `ColliderBType` | Collider shape types when present. |
@@ -75,6 +76,11 @@ Current event kinds:
 | `MixedContact` | `CollisionPairMixed.MarkColliding(...)` | Dimension-tagged 3D/2D collider IDs, mixed contact points, `Normal3DTo2D`, and penetration depth. |
 | `MixedResponseImpulse` | `CollisionResponseMixed` | Dimension-tagged mixed impulse, impulse magnitude, normal velocity, solve iteration, and iteration cap. |
 | `MixedResponseIsland` | `GravitasMixedCollisionService` | Mixed island root key, constraint count, iterations used, and whether the configured cap was reached. |
+| `JointRegistered` | `GravitasConstraint3DService.RegisterJoint(...)` | `JointId`, linked 3D collider IDs/types, `DataA` joint type, and `DataB` collision policy. |
+| `JointRemoved` | `GravitasConstraint3DService.RemoveJoint(...)` | Same linked-joint identity payload as registration. |
+| `JointImpulse` | 3D joint solver | `JointId`, linked collider IDs/types, `ScalarA` impulse magnitude, and `DataA` emitted row count. |
+| `JointLimitReached` | 3D joint solver | `JointId`, linked collider IDs/types, `ScalarB` limit error, and `DataA` limit kind. |
+| `RagdollActivated` | `RagdollRuntime3D.ActivateDynamic()` / `DeactivateToKinematic()` | `BodyId` is the context-local ragdoll ID, `DataA` link count, `DataB` joint count, and `Hit` is active state. |
 
 The stream is scoped to one context. Collider and body IDs are not global and
 must be resolved through the same context that produced the event.
@@ -122,7 +128,8 @@ Available views cover every current event kind:
 `GravitasResponseImpulseDiagnosticView`, `GravitasMixedQueryDiagnosticView`,
 `GravitasMixedContactDiagnosticView`,
 `GravitasMixedResponseImpulseDiagnosticView`, and
-`GravitasMixedResponseIslandDiagnosticView`.
+`GravitasMixedResponseIslandDiagnosticView`,
+`GravitasJointDiagnosticView`, and `GravitasRagdollDiagnosticView`.
 
 `GravitasGroundProbeDiagnosticView` exposes both 3D and 2D probe metadata.
 Use `Mode` for 3D `GroundProbeMode`, `Mode2D` for pure 2D
@@ -175,6 +182,7 @@ Use the explicit capture helpers for host-driven overlays:
 ```csharp
 context.Diagnostics.CaptureCollider(collider, GravitasDiagnosticColor.Cyan);
 context.Diagnostics.CaptureMixedCollider(collider2D, GravitasDiagnosticColor.Cyan);
+context.Diagnostics.CaptureJoint(joint, GravitasDiagnosticColor.Yellow);
 context.Diagnostics.CaptureLine(start, end, GravitasDiagnosticColor.Yellow);
 context.Diagnostics.CaptureRay(origin, direction, maxDistance, GravitasDiagnosticColor.Green);
 context.Diagnostics.CapturePoint(point, Fixed64.Half, GravitasDiagnosticColor.Red);
@@ -194,6 +202,11 @@ vertical wire cylinders, AABBs draw as wire boxes, and polygons draw the top,
 bottom, and vertical slab edges as line commands. These commands set
 `ColliderDimension` to `TwoD` and populate `Collider2DType` so host adapters can
 style embedded 2D debug geometry separately from pure 3D colliders.
+
+`CaptureJoint(Joint3D, ...)` emits anchor points, the anchor-error line, and the
+active angular axes for hinge, cone-twist, and fixed joints using the existing
+point, line, and ray command kinds. Hosts can render joint frames without a
+Gravitas-specific gizmo format.
 
 ## Host Adapter Pattern
 

@@ -30,11 +30,6 @@ instead of burying it in notes.
 
 ## Active Release-Scope
 
-- [`Constraint And Ragdoll Foundation`](2026-06-26-constraint-and-ragdoll-foundation-plan.md)
-  - Planned 2026-06-26. Adds deterministic 3D articulated-body physics through
-    context-owned joints, warm-started solver constraints, ragdoll authoring
-    definitions, collider-hierarchy-backed self-filtering, kinematic/animation
-    handoff boundaries, CCD, serialization, diagnostics, and benchmarks.
 - [`Batched Query APIs`](2026-06-26-batched-query-apis-plan.md)
   - Planned 2026-06-26. Adds deterministic high-throughput batched query
     request/result surfaces for 3D, pure 2D, and mixed services using
@@ -51,6 +46,12 @@ instead of burying it in notes.
 
 ## Recently Completed
 
+- [`Constraint And Ragdoll Foundation`](done/2026-06-26-constraint-and-ragdoll-foundation-plan.md)
+  - Completed 2026-06-27. Adds context-owned deterministic 3D joints,
+    contact-integrated constraint islands, ragdoll authoring/runtime
+    activation, linked-collider self-filtering, service-level motor target
+    handoff, Chronicler state recording, replay hashing, diagnostics, debug
+    draw capture, tests, and benchmark signal.
 - [`Collider Local Collision Filtering`](done/2026-06-26-collider-local-collision-filtering-plan.md)
   - Completed 2026-06-27. Adds collider-owned ignored physical layer masks for
     3D, pure 2D, mixed, CCD, and grounding/support paths while preserving
@@ -147,20 +148,16 @@ first public release.
 
 ## Recommended Execution Order
 
-1. [`Constraint And Ragdoll Foundation`](2026-06-26-constraint-and-ragdoll-foundation-plan.md)
-   - Build deterministic articulation after the body constraint model is final.
-   Ragdoll links can reuse collider hierarchy identity and local filtering,
-   while the solver work can integrate with the final body freeze semantics.
-2. [`Batched Query APIs`](2026-06-26-batched-query-apis-plan.md)
+1. [`Batched Query APIs`](2026-06-26-batched-query-apis-plan.md)
    - Add the high-throughput LSF query surface after local filtering is final
    and before new shape query families make the public surface broader.
-3. [`Pure 2D Capsule And Convenience Shapes`](2026-06-26-pure-2d-capsule-and-convenience-shapes-plan.md)
+2. [`Pure 2D Capsule And Convenience Shapes`](2026-06-26-pure-2d-capsule-and-convenience-shapes-plan.md)
    - Pairs naturally with 2D grounding and improves character-style 2D
      ergonomics without adding runtime triangle complexity.
-4. [`Cone Collider And Query Support`](2026-06-26-cone-collider-and-query-support-plan.md)
+3. [`Cone Collider And Query Support`](2026-06-26-cone-collider-and-query-support-plan.md)
    - Highest geometry/reducer risk of the new plans. Execute after the smaller
      collider API hardening items so cone work can focus on analytic geometry,
      contact quality, and query evidence.
-5. Keep the benchmark backlog and issue tracker as intake buckets; promote new
+4. Keep the benchmark backlog and issue tracker as intake buckets; promote new
    measured risks into dated plans only when they are broader than a focused
    patch.

@@ -25,5 +25,10 @@ public enum GravitasDiagnosticEventKind : byte
     MixedContact = 11,
     MixedResponseImpulse = 12,
     MixedResponseIsland = 13,
-    QuerySummary = 14
+    QuerySummary = 14,
+    JointRegistered = 15,
+    JointRemoved = 16,
+    JointImpulse = 17,
+    JointLimitReached = 18,
+    RagdollActivated = 19
 }

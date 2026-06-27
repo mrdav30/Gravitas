@@ -794,18 +794,19 @@ either collider marked as a trigger skip physical response; they can still flow
 through contact notification.
 
 After all active partitions distribute candidates, `GravitasPhysicsService`
-sorts queued 3D response pairs by stable collider ID pair, builds
-deterministic body islands keyed by `SolidBody.DynamicId`, skips fully sleeping
-islands, wakes connected sleeping bodies when an island contains an awake
-participant, and then solves constraints in stable island/pair order.
-`GravitasCollisionService` owns broad-phase partition distribution and retained
-partition cleanup, not the response island solver. Single-pair scenes stay on a
-low-overhead direct response path. Multi-constraint islands run a bounded number
-of response iterations from
-`PhysicsSettings.DiscreteSolverIterations`; cached warm-start impulses and
-positional correction are applied on the first island iteration, then subsequent
-iterations refine velocity response without applying the same correction
-repeatedly.
+sorts queued 3D response pairs by stable collider ID pair, combines those
+contacts with enabled `Joint3D` constraints from `GravitasConstraint3DService`,
+builds deterministic body islands keyed by `SolidBody.DynamicId`, skips fully
+sleeping islands, wakes connected sleeping bodies when an island contains an
+awake participant, and then solves contact and joint constraints in stable
+island/constraint order. `GravitasCollisionService` owns broad-phase partition
+distribution and retained partition cleanup, not the response island solver.
+Contact-only single-pair scenes stay on a low-overhead direct response path
+when no active joints exist. Multi-constraint islands run a bounded number of
+response iterations from `PhysicsSettings.DiscreteSolverIterations`; cached
+warm-start impulses and positional correction are applied on the first island
+iteration, then subsequent iterations refine velocity response without applying
+the same correction repeatedly.
 
 If every dynamic body in the partition is sleeping, pair generation is skipped
 until a deterministic wake reason changes one of those bodies or its shape

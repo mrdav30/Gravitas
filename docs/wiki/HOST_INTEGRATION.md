@@ -252,6 +252,60 @@ members and only constrain the matching solver and integration axis. Rotation
 freezes are explicit through `BodyFreezeAxes3D.RotationX/Y/Z` or
 `BodyFreezeAxes2D.Rotation`.
 
+## 3D Constraints And Ragdolls
+
+`context.Constraints3D` owns deterministic 3D joints and ragdoll runtimes. A
+joint links two active `SolidBody` instances through explicit local frames,
+optional angular limits, optional motor payloads, and a linked-collider
+collision policy:
+
+```csharp
+using Gravitas.Constraints;
+
+Joint3D shoulder = context.Constraints3D.RegisterJoint(new JointDefinition3D(
+    upperArmBody,
+    torsoBody,
+    upperArmLocalFrame,
+    torsoLocalFrame,
+    JointType3D.ConeTwist,
+    JointLimit3D.ConeTwist(maxConeAngle, maxTwistAngle),
+    JointMotor3D.Disabled,
+    JointCollisionPolicy.SuppressLinked));
+```
+
+Enabled joints are solved in the same 3D discrete islands as contacts during
+`LateSimulate()`, using `PhysicsSettings.DiscreteSolverIterations`. Linked
+sleep/wake behavior follows the island graph, so pushing one awake link wakes
+the connected dynamic articulation.
+
+Ragdolls are authoring conveniences over the same joint model. Hosts provide
+stable link IDs, the linked bodies/colliders, authored joint definitions, and a
+self-collision policy:
+
+```csharp
+RagdollRuntime3D ragdoll = context.Constraints3D.RegisterRagdoll(
+    new RagdollDefinition3D(links, joints, RagdollSelfCollisionPolicy.SuppressAdjacentLinks));
+
+ragdoll.ActivateDynamic();
+// Later, when deterministic animation or host control takes over again:
+ragdoll.DeactivateToKinematic();
+```
+
+Animation systems remain outside Gravitas. A deterministic animation library can
+compute target joint rotations, then pass caller-owned motor payloads before
+the fixed step:
+
+```csharp
+context.Constraints3D.SetRagdollPoseTargets(ragdoll, jointMotors);
+context.Simulate();
+context.LateSimulate();
+```
+
+Foot IK, hand IK, animation events, blending, and engine animator hooks belong
+in host or animation packages. Gravitas owns only the deterministic physical
+constraints, collision filtering, activation state, diagnostics, and
+serialization boundary.
+
 If a bodyless 3D collider moves after initialization, the host must call
 `floor.Simulate()` after mutating its transform so bounds and partition
 membership are refreshed. Pure 2D bodyless colliders currently rebuild from

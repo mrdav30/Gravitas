@@ -26,6 +26,7 @@ internal static class GravitasReplayHashService
 
         context.Settings.ContributeReplayHash(ref writer);
         context.Environment.ContributeReplayHash(ref writer);
+        context.Constraints3D.ContributeReplayHash(ref writer, mode);
 
         PhysicsRuntimeMode runtimeMode = context.Settings.RuntimeMode;
         if (runtimeMode.Runs3D())

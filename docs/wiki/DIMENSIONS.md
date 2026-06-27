@@ -34,6 +34,12 @@ This lets pure 2D simulations use the same host loop without paying 3D
 simulation or visualization cost. Runtime modes are validated exactly; `None`
 and arbitrary bit combinations are rejected as settings values.
 
+3D articulated-body constraints live on `GravitasConstraint3DService` and link
+`SolidBody` instances through `Joint3D` and `RagdollRuntime3D`. They do not
+imply pure 2D joints or mixed 2D/3D articulation. Pure 2D and mixed constraints
+should be modeled as separate APIs if they become necessary, because their mass,
+angular, and embedding semantics are not the same as 3D joints.
+
 ## Pure 2D Coordinate Contract
 
 Pure 2D uses the LSF stack's X/Z planar convention:

@@ -41,6 +41,11 @@ internal readonly struct ResponseBody
     public static ResponseBody Create(LSCollider collider)
     {
         SolidBody body = collider.Body!;
+        return Create(body);
+    }
+
+    public static ResponseBody Create(SolidBody body)
+    {
         Fixed64 inverseMass = body.EffectiveInverseMass;
         Fixed3x3 inverseInertiaTensor = body.EffectiveInverseInertiaTensor;
 

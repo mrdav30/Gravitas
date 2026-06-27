@@ -453,3 +453,57 @@ public readonly struct GravitasMixedResponseIslandDiagnosticView
 
     public bool ReachedIterationLimit => Event.Hit;
 }
+
+/// <summary>
+/// Typed read-only view over a 3D joint diagnostic event.
+/// </summary>
+public readonly struct GravitasJointDiagnosticView
+{
+    internal GravitasJointDiagnosticView(GravitasDiagnosticEvent diagnosticEvent) => Event = diagnosticEvent;
+
+    public GravitasDiagnosticEvent Event { get; }
+
+    public int Frame => Event.Frame;
+
+    public int Sequence => Event.Sequence;
+
+    public GravitasDiagnosticEventKind Kind => Event.Kind;
+
+    public int JointId => Event.JointId;
+
+    public int ColliderAId => Event.ColliderAId;
+
+    public int ColliderBId => Event.ColliderBId;
+
+    public ColliderType ColliderAType => Event.ColliderAType;
+
+    public ColliderType ColliderBType => Event.ColliderBType;
+
+    public Fixed64 ImpulseMagnitude => Event.ScalarA;
+
+    public Fixed64 LimitError => Event.ScalarB;
+
+    public int RowCount => Event.DataA;
+}
+
+/// <summary>
+/// Typed read-only view over a 3D ragdoll diagnostic event.
+/// </summary>
+public readonly struct GravitasRagdollDiagnosticView
+{
+    internal GravitasRagdollDiagnosticView(GravitasDiagnosticEvent diagnosticEvent) => Event = diagnosticEvent;
+
+    public GravitasDiagnosticEvent Event { get; }
+
+    public int Frame => Event.Frame;
+
+    public int Sequence => Event.Sequence;
+
+    public int RagdollId => Event.BodyId;
+
+    public int LinkCount => Event.DataA;
+
+    public int JointCount => Event.DataB;
+
+    public bool IsActive => Event.Hit;
+}

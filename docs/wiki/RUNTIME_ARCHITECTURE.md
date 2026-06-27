@@ -23,6 +23,7 @@ pairs, queries, and coroutines remain context-local.
 | Service | Owned state |
 | --- | --- |
 | `GravitasPhysicsService` | Dynamic body bucket, collider ID table, reusable collider IDs, collision-pair pool, active collision-pair queue, 3D CCD frame cache, processed-body handoff queue, handoff diagnostics, deterministic 3D discrete island response, sleep-state updates, simulation switch. |
+| `GravitasConstraint3DService` | Context-local 3D joint IDs, `Joint3D` runtime state, ragdoll runtimes, linked-collider suppression counts, motor target handoff, joint replay hashing, and articulation diagnostics. |
 | `GravitasPhysics2DService` | Pure 2D dynamic body bucket, monotonic collider ID table, 2D pair pool, 2D CCD frame cache, processed-body handoff queue, handoff diagnostics, post-integration collider refresh, deterministic 2D discrete island response, connected resting-pair expansion, contact-derived planar grounding refresh, pair-reference cleanup, visualization publishing, simulation switch. |
 | `GravitasMixedCollisionService` | Mixed 2D/3D lifecycle owner, GridForge-backed mixed broad phase, stable mixed candidate-key buffer, mixed hierarchy filtering, duplicate suppression, late-phase mixed partition refresh, mixed pair/response ownership, retained `PhysicsMixedPartition` cleanup, and lifecycle counters. |
 | `GravitasCollisionService` | Active partition bucket, inactive partition pool, duplicate voxel checker, partition awake-state refresh, collision distribution version, cull distributor. |
@@ -67,7 +68,7 @@ LateSimulate
     Process already-processed 3D CCD handoff queue
     PrepareCollisionPartitions for dynamic-body colliders
     Collisions.CheckAndDistributeCollisions
-    Solve deterministic discrete response islands
+    Solve deterministic 3D contact and joint constraint islands
     Retire retained 3D collision partitions
     ProcessActiveCollisionPairs
     Update 3D sleep state after response
@@ -115,7 +116,7 @@ authoritative body state during fixed-step phases: pure 2D and 3D discrete
 response both run after their body integration in `LateSimulate()`, and mixed
 contacts run after both pure services have refreshed their colliders. Body force
 integration, grounding/support refresh, post-integration collider refresh,
-discrete island response, and sleep-state updates all happen during
+discrete contact/joint island response, and sleep-state updates all happen during
 `LateSimulate()`.
 
 Lifecycle hooks run after the built-in work for their phase. `Visualize()` is
@@ -155,10 +156,11 @@ Gravitas partition payloads from GridForge voxels, then invokes reset hooks.
 frame-rate-change hooks.
 
 Diagnostics are context-local and disabled by default. Runtime hooks can emit
-force, query, ground-probe, contact, response, and velocity-delta events through
-`context.Diagnostics` when enabled. Hosts can also capture colliders or simple
-line/ray/point draw commands into the same context-owned sink for visualization
-without adding renderer dependencies to core physics.
+force, query, ground-probe, contact, response, joint, ragdoll, and
+velocity-delta events through `context.Diagnostics` when enabled. Hosts can
+also capture colliders or simple line/ray/point/joint draw commands into the
+same context-owned sink for visualization without adding renderer dependencies
+to core physics.
 
 ## Clock State
 
@@ -189,6 +191,15 @@ start at `1`; released IDs are pushed into `_cachedColliderIds` for reuse.
 Because IDs are context-local, two different contexts can both have collider ID
 `1` without ambiguity. All lookups must go through the owning context's
 `GravitasPhysicsService.TryGetColliderById(...)`.
+
+3D joints are stored by `GravitasConstraint3DService` with monotonically
+allocated context-local IDs. Removing a joint releases its solver cache and
+linked-collider suppression entry but does not reuse the ID inside that context.
+Ragdoll runtimes own stable link and joint arrays copied from validated
+authoring definitions. Articulation filtering is layered on top of collider
+identity rather than embedded in `ColliderHierarchyState`, because hierarchy
+parent/sibling filtering is a collider ownership rule while ragdoll
+self-collision is physical articulation policy.
 
 `SolidBody.Setup(...)` requires the agent and collider to belong to the same
 context. `CollisionPair.Initialize(...)` rejects colliders from different

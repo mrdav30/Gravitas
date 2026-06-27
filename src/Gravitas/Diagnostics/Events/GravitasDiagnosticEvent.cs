@@ -39,11 +39,63 @@ public readonly struct GravitasDiagnosticEvent
         int dataA,
         int dataB,
         bool hit)
+        : this(
+            frame,
+            sequence,
+            kind,
+            bodyId,
+            -1,
+            colliderAId,
+            colliderBId,
+            colliderADimension,
+            colliderBDimension,
+            colliderAType,
+            colliderBType,
+            colliderA2DType,
+            colliderB2DType,
+            start,
+            end,
+            pointA,
+            pointB,
+            vector,
+            scalarA,
+            scalarB,
+            dataA,
+            dataB,
+            hit)
+    {
+    }
+
+    internal GravitasDiagnosticEvent(
+        int frame,
+        int sequence,
+        GravitasDiagnosticEventKind kind,
+        int bodyId,
+        int jointId,
+        int colliderAId,
+        int colliderBId,
+        GravitasColliderDimension colliderADimension,
+        GravitasColliderDimension colliderBDimension,
+        ColliderType colliderAType,
+        ColliderType colliderBType,
+        ColliderType2D colliderA2DType,
+        ColliderType2D colliderB2DType,
+        Vector3d start,
+        Vector3d end,
+        Vector3d pointA,
+        Vector3d pointB,
+        Vector3d vector,
+        Fixed64 scalarA,
+        Fixed64 scalarB,
+        int dataA,
+        int dataB,
+        bool hit)
     {
         Frame = frame;
         Sequence = sequence;
         Kind = kind;
         BodyId = bodyId;
+        JointId = jointId;
         ColliderAId = colliderAId;
         ColliderBId = colliderBId;
         ColliderADimension = colliderADimension;
@@ -71,6 +123,8 @@ public readonly struct GravitasDiagnosticEvent
     public GravitasDiagnosticEventKind Kind { get; }
 
     public int BodyId { get; }
+
+    public int JointId { get; }
 
     public int ColliderAId { get; }
 
@@ -159,6 +213,15 @@ public readonly struct GravitasDiagnosticEvent
                 break;
             case GravitasDiagnosticEventKind.MixedResponseIsland:
                 visitor.VisitMixedResponseIsland(new GravitasMixedResponseIslandDiagnosticView(this));
+                break;
+            case GravitasDiagnosticEventKind.JointRegistered:
+            case GravitasDiagnosticEventKind.JointRemoved:
+            case GravitasDiagnosticEventKind.JointImpulse:
+            case GravitasDiagnosticEventKind.JointLimitReached:
+                visitor.VisitJoint(new GravitasJointDiagnosticView(this));
+                break;
+            case GravitasDiagnosticEventKind.RagdollActivated:
+                visitor.VisitRagdoll(new GravitasRagdollDiagnosticView(this));
                 break;
             default:
                 visitor.VisitUnknown(this);
@@ -369,6 +432,39 @@ public readonly struct GravitasDiagnosticEvent
         if (Kind == GravitasDiagnosticEventKind.MixedResponseIsland)
         {
             view = new GravitasMixedResponseIslandDiagnosticView(this);
+            return true;
+        }
+
+        view = default;
+        return false;
+    }
+
+    /// <summary>
+    /// Tries to decode this event as a 3D joint diagnostic view.
+    /// </summary>
+    public bool TryAsJoint(out GravitasJointDiagnosticView view)
+    {
+        if (Kind == GravitasDiagnosticEventKind.JointRegistered
+            || Kind == GravitasDiagnosticEventKind.JointRemoved
+            || Kind == GravitasDiagnosticEventKind.JointImpulse
+            || Kind == GravitasDiagnosticEventKind.JointLimitReached)
+        {
+            view = new GravitasJointDiagnosticView(this);
+            return true;
+        }
+
+        view = default;
+        return false;
+    }
+
+    /// <summary>
+    /// Tries to decode this event as a 3D ragdoll diagnostic view.
+    /// </summary>
+    public bool TryAsRagdoll(out GravitasRagdollDiagnosticView view)
+    {
+        if (Kind == GravitasDiagnosticEventKind.RagdollActivated)
+        {
+            view = new GravitasRagdollDiagnosticView(this);
             return true;
         }
 

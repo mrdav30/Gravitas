@@ -11,8 +11,30 @@
 ---
 
 **Date:** 2026-06-26  
-**Status:** Planned  
+**Status:** Done  
+**Completed:** 2026-06-27  
 **Owner:** Gravitas constraint/ragdoll hardening
+
+## Completion Notes
+
+- Added `GravitasConstraint3DService` as context-owned 3D articulation state
+  with monotonic joint IDs, explicit joint/ragdoll registration, linked-collider
+  self-filtering, service-level motor target handoff, replay hashing, and
+  diagnostics.
+- Added deterministic 3D joint rows and solver integration into the existing
+  discrete island model so contacts and enabled joints solve together with
+  stable ordering, wake propagation, body freeze constraints, and warm-started
+  joint caches.
+- Added ragdoll authoring definitions and runtime activation/deactivation over
+  ordinary `SolidBody` instances. Articulation filtering intentionally stays in
+  the constraint service instead of expanding `ColliderHierarchyState` into a
+  physical joint system; hierarchy remains collider ownership/default grouping
+  infrastructure.
+- Added Chronicler record data for mutable joint and ragdoll runtime state,
+  deterministic replay hashing for constraints, joint/ragdoll diagnostic
+  events, engine-agnostic joint debug draw capture, focused tests, and
+  constraint benchmark signal.
+- No deferred work was split out from this plan.
 
 ## Purpose
 
@@ -38,7 +60,7 @@ creating ragdoll definitions, setting kinematic or motor targets, and reading
 support/query/contact state. They should not own the physics constraints or rely
 on engine-specific APIs.
 
-## Current Baseline
+## Starting Baseline
 
 - `src/Gravitas/Colliders/Hierarchy/ColliderHierarchyState.cs` stores
   parent/child/top-parent collider state, tracks dimension-tagged
@@ -53,8 +75,10 @@ on engine-specific APIs.
 - Warm-start state is pair-owned for contact response.
 - `PhysicsSettings.DiscreteSolverIterations` controls bounded projected-impulse
   iterations for multi-contact discrete islands.
-- There is no public joint, constraint, articulation, ragdoll, or motor model.
-- There is no constraint serialization or diagnostic event surface.
+- Before this plan, there was no public joint, constraint, articulation,
+  ragdoll, or motor model.
+- Before this plan, there was no constraint serialization or diagnostic event
+  surface.
 
 ## Relationship To Collider Hierarchy
 

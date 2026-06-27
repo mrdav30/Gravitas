@@ -6,6 +6,7 @@
 //=======================================================================
 
 using Gravitas.CollisionHandling;
+using Gravitas.Constraints;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
@@ -30,6 +31,22 @@ public sealed partial class GravitasPhysicsService
     {
         int idA = pair.ColliderA.Id;
         int idB = pair.ColliderB.Id;
+        if (idA <= idB)
+        {
+            minColliderId = idA;
+            maxColliderId = idB;
+            return;
+        }
+
+        minColliderId = idB;
+        maxColliderId = idA;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void GetStableJointKey(Joint3D joint, out int minColliderId, out int maxColliderId)
+    {
+        int idA = joint.BodyA.Collider.Id;
+        int idB = joint.BodyB.Collider.Id;
         if (idA <= idB)
         {
             minColliderId = idA;
@@ -75,7 +92,15 @@ public sealed partial class GravitasPhysicsService
                 return compare;
 
             compare = left.MinColliderId.CompareTo(right.MinColliderId);
-            return compare != 0 ? compare : left.MaxColliderId.CompareTo(right.MaxColliderId);
+            if (compare != 0)
+                return compare;
+
+            compare = left.MaxColliderId.CompareTo(right.MaxColliderId);
+            if (compare != 0)
+                return compare;
+
+            compare = left.Kind.CompareTo(right.Kind);
+            return compare != 0 ? compare : left.JointId.CompareTo(right.JointId);
         }
     }
 
@@ -97,22 +122,51 @@ public sealed partial class GravitasPhysicsService
 
     private readonly struct DiscreteIslandConstraint
     {
-        public DiscreteIslandConstraint(
+        private DiscreteIslandConstraint(
+            DiscreteIslandConstraintKind kind,
             CollisionPair pair,
+            Joint3D? joint,
             int rootKey,
             int minColliderId,
-            int maxColliderId)
+            int maxColliderId,
+            int jointId)
         {
+            Kind = kind;
             Pair = pair;
+            Joint = joint;
             RootKey = rootKey;
             MinColliderId = minColliderId;
             MaxColliderId = maxColliderId;
+            JointId = jointId;
         }
 
+        public static DiscreteIslandConstraint CreatePair(
+            CollisionPair pair,
+            int rootKey,
+            int minColliderId,
+            int maxColliderId) =>
+            new(DiscreteIslandConstraintKind.Contact, pair, null, rootKey, minColliderId, maxColliderId, 0);
+
+        public static DiscreteIslandConstraint CreateJoint(
+            Joint3D joint,
+            int rootKey,
+            int minColliderId,
+            int maxColliderId) =>
+            new(DiscreteIslandConstraintKind.Joint, null!, joint, rootKey, minColliderId, maxColliderId, joint.Id);
+
+        public DiscreteIslandConstraintKind Kind { get; }
         public CollisionPair Pair { get; }
+        public Joint3D? Joint { get; }
         public int RootKey { get; }
         public int MinColliderId { get; }
         public int MaxColliderId { get; }
+        public int JointId { get; }
+    }
+
+    private enum DiscreteIslandConstraintKind : byte
+    {
+        Contact = 0,
+        Joint = 1
     }
 
     private int InactiveFrameThreshold => _context.FrameRate * 8;

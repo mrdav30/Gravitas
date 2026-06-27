@@ -49,6 +49,7 @@ public sealed class GravitasWorldContext : IDisposable
         Environment = PhysicsEnvironment.Default(Settings.FrameRate);
         CollisionScratch = new CollisionSatScratch();
         Diagnostics = new GravitasDiagnosticSink(this);
+        Constraints3D = new GravitasConstraint3DService(this);
         Collisions = new GravitasCollisionService(this);
         Collisions2D = new GravitasCollision2DService(this);
         Physics = new GravitasPhysicsService(this);
@@ -121,6 +122,11 @@ public sealed class GravitasWorldContext : IDisposable
     /// Gets this context's deterministic diagnostic sink.
     /// </summary>
     public GravitasDiagnosticSink Diagnostics { get; }
+
+    /// <summary>
+    /// Gets this context's world-local 3D constraint and ragdoll service.
+    /// </summary>
+    public GravitasConstraint3DService Constraints3D { get; }
 
     internal CollisionSatScratch CollisionScratch { get; }
 
@@ -410,6 +416,7 @@ public sealed class GravitasWorldContext : IDisposable
         ThrowIfDisposed();
         _lateSimulateToken = 0;
         _clock.Reset();
+        Constraints3D.Reset();
         Collisions.Reset();
         Collisions2D.Reset();
         Physics.Reset();

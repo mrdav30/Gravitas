@@ -213,6 +213,8 @@ public sealed partial class GravitasQuery3DService
 
         LSCollider collider = current!;
         if (ReferenceEquals(collider, _currentExcludedCollider)
+            || (_currentExcludedCollider != null
+                && _context.Constraints3D.ShouldExcludeLinkedCollision(_currentExcludedCollider, collider))
             || !_currentLayerMask.Includes(collider.Layer)
             || collider.CircleQueryVersion == CircleVersion
             || !_redundantColliderCheck.Add(collider.Id)

@@ -45,6 +45,7 @@ public sealed partial class GravitasPhysicsService
             && (collider1.Body != null || collider2.Body != null)
             && !IsLayerCollisionDisabled(collider1.Layer, collider2.Layer)
             && ColliderCollisionFilter.AllowsPhysicalPair(collider1, collider2)
+            && !_context.Constraints3D.ShouldExcludeLinkedCollision(collider1, collider2)
             && !collider1.IsSibling(collider2);
     }
 

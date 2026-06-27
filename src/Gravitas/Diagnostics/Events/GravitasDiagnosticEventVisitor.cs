@@ -40,5 +40,9 @@ public abstract class GravitasDiagnosticEventVisitor
 
     public virtual void VisitMixedResponseIsland(in GravitasMixedResponseIslandDiagnosticView view) { }
 
+    public virtual void VisitJoint(in GravitasJointDiagnosticView view) { }
+
+    public virtual void VisitRagdoll(in GravitasRagdollDiagnosticView view) { }
+
     public virtual void VisitUnknown(in GravitasDiagnosticEvent diagnosticEvent) { }
 }

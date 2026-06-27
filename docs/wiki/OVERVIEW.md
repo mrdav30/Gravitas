@@ -51,6 +51,7 @@ Gravitas owns, per context:
 - fixed-step timing through `GravitasClock`.
 - world-local settings and environment values.
 - dynamic body and collider registration.
+- deterministic 3D joint, constraint, and ragdoll articulation state.
 - pure 2D body, collider, pair, response, and query state.
 - collision partitions and collision-pair state.
 - raycast, circle-overlap, and coroutine buffers.
@@ -66,6 +67,7 @@ flowchart TD
     Context --> Settings["PhysicsSettings"]
     Context --> Environment["PhysicsEnvironment"]
     Context --> Physics["GravitasPhysicsService"]
+    Context --> Constraints3D["GravitasConstraint3DService"]
     Context --> Physics2D["GravitasPhysics2DService"]
     Context --> Collisions["GravitasCollisionService"]
     Context --> Collisions2D["GravitasCollision2DService"]
@@ -78,6 +80,8 @@ flowchart TD
     Agent --> Transform["FixedTransform"]
     Physics --> Body["SolidBody"]
     Physics --> Collider["LSCollider"]
+    Constraints3D --> Joint["Joint3D"]
+    Joint --> Body
     Physics2D --> Body2D["SolidBody2D"]
     Physics2D --> Collider2D["LSCollider2D"]
     Collisions --> Partition["PhysicsPartition"]
@@ -101,6 +105,7 @@ flowchart TD
 | `LSCollider2D` | Base pure 2D collider state for circle, axis-aligned box, and convex polygon shapes. |
 | `PhysicsRuntimeMode` | Validated bitmask selecting `TwoD`, `ThreeD`, `Both`, or `Mixed` runtime routing. |
 | `GravitasPhysicsService` | Body/collider registration, context-local collider IDs, collision-pair pooling, simulation phases, and visualization phases. |
+| `GravitasConstraint3DService` | Context-owned deterministic 3D joints, ragdoll runtimes, linked-collider self-filtering, motor handoff, replay hashing, and joint diagnostics. |
 | `GravitasPhysics2DService` | Pure 2D registration, collider IDs, narrow phase, response, events, and visualization publishing. |
 | `GravitasCollisionService` | GridForge-backed broad-phase partitioning, active partition tracking, partition pooling, and collision distribution versioning. |
 | `GravitasCollision2DService` | GridForge-backed pure 2D X/Z broad-phase partitioning, active partition tracking, partition pooling, duplicate suppression, and collision distribution versioning. |
@@ -112,6 +117,8 @@ flowchart TD
 | `CollisionPair` | Pair identity, culling state, contact state, warm-start cache, narrow-phase dispatch, response dispatch, and contact notification state. |
 | `CollisionDetection` | Shape-pair narrow-phase collision checks and contact generation. |
 | `CollisionResponse` | Deterministic manifold position correction, normal impulse, friction, and warm-started response for colliding bodies. |
+| `Joint3D` | Runtime 3D joint state linking two `SolidBody` instances through authored local frames, angular limits, optional motors, collision policy, solver cache, and Chronicler recording. |
+| `RagdollDefinition3D` / `RagdollRuntime3D` | Data-first ragdoll authoring and runtime activation handles for linked 3D bodies, colliders, joints, and self-collision policy. |
 | `GravitasCoroutineService` | Lockstep coroutine execution and context-bound wait instructions. |
 | `GravitasDiagnosticSink` | Disabled-by-default context diagnostics for deterministic events and engine-agnostic debug draw commands. |
 
@@ -155,16 +162,17 @@ candidates from awake dynamic membership so fully sleeping partitions can skip
 pair generation without removing sleeping colliders from queries or contact
 lifecycle.
 `GravitasPhysicsService` filters candidates by context, active state, shape,
-layer matrix, dynamic/static rules, and sibling relationships. A `CollisionPair`
+layer matrix, collider-local ignores, dynamic/static rules, hierarchy
+relationships, and explicit 3D articulation self-filtering. A `CollisionPair`
 then performs fast distance/AABB culling before dispatching to
 `CollisionDetection`. If the narrow phase finds contact, it writes a fixed-size
 `ContactManifold`; if the pair has bodies that should receive physics, the 3D
-discrete response pass orders pairs into deterministic islands, applies cached
-warm-start impulses, runs bounded response iterations where needed, applies
-solver-side position correction, normal impulses, and friction impulses across
-the manifold contacts, then stores pair-local warm-start impulse data by contact
-identity. Contact events are emitted from the active-pair queue during
-`LateSimulate`.
+discrete response pass orders contact pairs and enabled `Joint3D` constraints
+into deterministic islands, applies cached warm-start impulses, runs bounded
+response iterations where needed, applies solver-side position correction,
+normal impulses, friction impulses, and joint impulses, then stores pair-local
+and joint-local warm-start data. Contact events are emitted from the
+active-pair queue during `LateSimulate`.
 
 ## Current Runtime Boundaries
 
@@ -188,6 +196,11 @@ identity. Contact events are emitted from the active-pair queue during
   diagnostics, and slab debug draw are implemented; mixed 2D swept-circle
   queries cover primitive, mesh, and compound 3D targets while preserving pure
   2D semantics and labeling exact versus conservative fallback hits.
+- 3D articulated-body support is context-owned through
+  `GravitasConstraint3DService`. Joints are ordinary 3D solver constraints
+  integrated with contact islands; ragdoll definitions are explicit authoring
+  data for linked `SolidBody` instances. Pure 2D and mixed-dimension joints are
+  not implied by the 3D API.
 - Cylinder collision and query behavior is implemented for the current finite
   cylinder model. Cap/face contact manifolds preserve flat finite-cylinder
   behavior; side/rim contacts remain representative finite-cylinder contacts.
@@ -224,6 +237,7 @@ identity. Contact events are emitted from the active-pair queue during
 | Collision broad phase | [`GravitasCollisionService.cs`](../../src/Gravitas/Core/3D/GravitasCollisionService.cs), [`GravitasCollision2DService.cs`](../../src/Gravitas/Core/2D/GravitasCollision2DService.cs), [`PhysicsPartition.cs`](../../src/Gravitas/Partitions/3D/PhysicsPartition.cs), [`PhysicsPartition2D.cs`](../../src/Gravitas/Partitions/2D/PhysicsPartition2D.cs), [`PhysicsMixedPartition.cs`](../../src/Gravitas/Partitions/Mixed/PhysicsMixedPartition.cs) |
 | Colliders | [`LSCollider.cs`](../../src/Gravitas/Colliders/3D/LSCollider.cs), [`LSCollider2D.cs`](../../src/Gravitas/Colliders/2D/LSCollider2D.cs), [`Definitions`](../../src/Gravitas/Colliders/Definitions), [`Mesh`](../../src/Gravitas/Colliders/Mesh) |
 | Collision handling | [`CollisionPair.cs`](../../src/Gravitas/CollisionHandling/Pairs/3D/CollisionPair.cs), [`CollisionPair2D.cs`](../../src/Gravitas/CollisionHandling/Pairs/2D/CollisionPair2D.cs), [`CollisionPairMixed.cs`](../../src/Gravitas/CollisionHandling/Pairs/Mixed/CollisionPairMixed.cs), [`CollisionDetection.cs`](../../src/Gravitas/CollisionHandling/Detection/3D/CollisionDetection.cs), [`CollisionDetection2D.cs`](../../src/Gravitas/CollisionHandling/Detection/2D/CollisionDetection2D.cs), [`CollisionDetectionMixed.cs`](../../src/Gravitas/CollisionHandling/Detection/Mixed/CollisionDetectionMixed.cs) |
+| 3D constraints and ragdolls | [`Constraints/3D`](../../src/Gravitas/Constraints/3D) |
 | 2D/3D direction | [`DIMENSIONS.md`](DIMENSIONS.md) |
 | Serialization and replay | [`SERIALIZATION.md`](SERIALIZATION.md), [`SolidBody.cs`](../../src/Gravitas/Core/3D/SolidBody.cs), [`SolidBody2D.cs`](../../src/Gravitas/Core/2D/SolidBody2D.cs), [`PhysicsSettingsSaver.cs`](../../src/Gravitas/Settings/PhysicsSettingsSaver.cs) |
 | Queries | [`GravitasQuery2DService.cs`](../../src/Gravitas/Queries/2D/GravitasQuery2DService.cs), [`GravitasQuery3DService.Raycast.cs`](../../src/Gravitas/Queries/3D/GravitasQuery3DService.Raycast.cs), [`GravitasQuery3DService.Circle.cs`](../../src/Gravitas/Queries/3D/GravitasQuery3DService.Circle.cs), [`GravitasQueryMixedService.cs`](../../src/Gravitas/Queries/Mixed/GravitasQueryMixedService.cs), [`QueryDetection2D.cs`](../../src/Gravitas/Queries/2D/QueryDetection2D.cs) |

@@ -39,6 +39,9 @@ Serialized state:
 - collider active/trigger state, layer, collider-local ignored physical layers,
   surface material, local offset, shape dimensions, 2D mixed half-thickness
   override, and shape-derived inputs.
+- joint enabled state, joint type, local frames, angular limits, motor target
+  payload, and linked-collider collision policy for existing `Joint3D` shells.
+- ragdoll runtime activation state for existing `RagdollRuntime3D` handles.
 - settings that affect deterministic execution, through
   `PhysicsSettingsSaver`.
 
@@ -48,6 +51,8 @@ Runtime-owned state that should not be serialized:
 - GridForge partition coordinate lists and active partition payloads.
 - collision pairs, pair holder references, warm runtime pair caches, query
   buffers, diagnostic buffers, and pooled collections.
+- context-local joint IDs, ragdoll IDs, articulation suppression tables, and
+  service-owned joint/ragdoll arrays.
 - lifecycle hooks, delegates, renderer callbacks, and event subscribers.
 - host transform object identity.
 - 3D visual interpolation buffers and presentation-only rotation speed state.
@@ -112,6 +117,20 @@ retained-partition cleanup settings, runtime mode, and mixed 2D half-thickness.
 Applying it owns a new
 `PhysicsSettings` instance for the target context and synchronizes the context
 clock.
+
+`Joint3D` records mutable 3D constraint state into existing runtime joint
+shells: enabled state, joint type, local anchor frames, angular limits, motor
+payload, and linked-collider collision policy. It does not create or resolve
+body links from serialized data; the host must recreate the same bodies and
+register matching joints before Chronicler populates continuation state.
+Pair-local contact caches and joint solver caches are rebuildable runtime data
+unless a drift investigation explicitly hashes them through
+`AuthoritativeWithSolverCaches`.
+
+`RagdollRuntime3D` records activation state for an existing ragdoll runtime.
+Definitions, link bodies, colliders, and joint ownership are host-created shell
+data; loading activation state switches the already-registered links between
+dynamic ragdoll simulation and kinematic host control.
 
 `PhysicsLayer` and `PhysicsLayerMask` still use direct JSON/MemoryPack-friendly
 field annotations because they are small value helpers, not Chronicler graphs.

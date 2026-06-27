@@ -6,6 +6,7 @@
 //=======================================================================
 
 using Gravitas.CollisionHandling;
+using Gravitas.Constraints;
 
 namespace Gravitas;
 
@@ -19,10 +20,11 @@ public sealed partial class GravitasPhysicsService
 
     private void SolveDiscreteResponsePairs()
     {
-        if (_discreteResponsePairs.Count == 0)
+        bool hasJoints = _context.Constraints3D.HasActiveJoints;
+        if (_discreteResponsePairs.Count == 0 && !hasJoints)
             return;
 
-        if (_discreteResponsePairs.Count == 1)
+        if (!hasJoints && _discreteResponsePairs.Count == 1)
         {
             CollisionPair pair = _discreteResponsePairs[0];
             if (!HasAwakeResponseParticipant(pair))
@@ -33,7 +35,8 @@ public sealed partial class GravitasPhysicsService
             return;
         }
 
-        _discreteResponsePairs.SortInPlace(ResponsePairComparer);
+        if (_discreteResponsePairs.Count > 1)
+            _discreteResponsePairs.SortInPlace(ResponsePairComparer);
         BuildDiscreteIslands();
         if (_discreteIslandConstraints.Count == 0)
             return;
@@ -70,6 +73,8 @@ public sealed partial class GravitasPhysicsService
             AddIslandNodeIfMovable(pair.ColliderB.Body);
         }
 
+        AddJointIslandNodes();
+
         SortAndDeduplicateIslandNodes();
         if (_discreteIslandNodes.Count == 0)
             return;
@@ -83,6 +88,8 @@ public sealed partial class GravitasPhysicsService
                 UnionIslandNodes(nodeA, nodeB);
         }
 
+        UnionJointIslandNodes();
+
         CompressIslandRoots();
 
         for (int i = 0; i < _discreteResponsePairs.Count; i++)
@@ -95,8 +102,76 @@ public sealed partial class GravitasPhysicsService
                 continue;
 
             GetStablePairKey(pair, out int minColliderId, out int maxColliderId);
-            _discreteIslandConstraints.Add(new DiscreteIslandConstraint(
+            _discreteIslandConstraints.Add(DiscreteIslandConstraint.CreatePair(
                 pair,
+                rootKey,
+                minColliderId,
+                maxColliderId));
+        }
+
+        AddJointIslandConstraints();
+    }
+
+    private void AddJointIslandNodes()
+    {
+        GravitasConstraint3DService constraints = _context.Constraints3D;
+        for (int jointId = 1; jointId <= constraints.PeakJointCount; jointId++)
+        {
+            if (!constraints.TryGetJointForSolver(jointId, out Joint3D? joint)
+                || joint == null
+                || !joint.IsEnabled
+                || !joint.HasSolverParticipant())
+            {
+                continue;
+            }
+
+            AddIslandNodeIfMovable(joint.BodyA);
+            AddIslandNodeIfMovable(joint.BodyB);
+        }
+    }
+
+    private void UnionJointIslandNodes()
+    {
+        GravitasConstraint3DService constraints = _context.Constraints3D;
+        for (int jointId = 1; jointId <= constraints.PeakJointCount; jointId++)
+        {
+            if (!constraints.TryGetJointForSolver(jointId, out Joint3D? joint)
+                || joint == null
+                || !joint.IsEnabled
+                || !joint.HasSolverParticipant())
+            {
+                continue;
+            }
+
+            int nodeA = FindIslandNode(joint.BodyA);
+            int nodeB = FindIslandNode(joint.BodyB);
+            if (nodeA >= 0 && nodeB >= 0)
+                UnionIslandNodes(nodeA, nodeB);
+        }
+    }
+
+    private void AddJointIslandConstraints()
+    {
+        GravitasConstraint3DService constraints = _context.Constraints3D;
+        for (int jointId = 1; jointId <= constraints.PeakJointCount; jointId++)
+        {
+            if (!constraints.TryGetJointForSolver(jointId, out Joint3D? joint)
+                || joint == null
+                || !joint.IsEnabled
+                || !joint.HasSolverParticipant())
+            {
+                continue;
+            }
+
+            int nodeA = FindIslandNode(joint.BodyA);
+            int nodeB = FindIslandNode(joint.BodyB);
+            int rootKey = ResolveConstraintRootKey(nodeA, nodeB);
+            if (rootKey < 0)
+                continue;
+
+            GetStableJointKey(joint, out int minColliderId, out int maxColliderId);
+            _discreteIslandConstraints.Add(DiscreteIslandConstraint.CreateJoint(
+                joint,
                 rootKey,
                 minColliderId,
                 maxColliderId));
@@ -253,7 +328,7 @@ public sealed partial class GravitasPhysicsService
 
     private void SolveDiscreteIslandRange(int start, int end)
     {
-        if (end - start == 1)
+        if (end - start == 1 && _discreteIslandConstraints[start].Kind == DiscreteIslandConstraintKind.Contact)
         {
             CollisionResponse.CalculateImpulse(_discreteIslandConstraints[start].Pair);
             return;
@@ -266,10 +341,16 @@ public sealed partial class GravitasPhysicsService
             bool applyPositionCorrection = iteration == 0;
             for (int i = start; i < end; i++)
             {
-                CollisionResponse.CalculateImpulse(
-                    _discreteIslandConstraints[i].Pair,
-                    applyCachedImpulse,
-                    applyPositionCorrection);
+                DiscreteIslandConstraint constraint = _discreteIslandConstraints[i];
+                if (constraint.Kind == DiscreteIslandConstraintKind.Contact)
+                {
+                    CollisionResponse.CalculateImpulse(
+                        constraint.Pair,
+                        applyCachedImpulse,
+                        applyPositionCorrection);
+                }
+                else
+                    JointSolver3D.Solve(constraint.Joint!, applyCachedImpulse);
             }
         }
     }

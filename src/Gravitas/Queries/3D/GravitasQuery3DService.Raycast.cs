@@ -1331,6 +1331,7 @@ public sealed partial class GravitasQuery3DService
 
         if (ReferenceEquals(current, _currentExcludedCollider)
             || ReferenceEquals(current, _currentSweepSourceCollider)
+            || IsExcludedByCurrentSweepSource(current)
             || !_currentLayerMask.Includes(current.Layer)
             || current.RaycastVersion == RaycastVersion
             || !_redundantColliderCheck.Add(current.Id))
@@ -1347,6 +1348,18 @@ public sealed partial class GravitasQuery3DService
         current.RaycastVersion = RaycastVersion;
         LastQueryCandidateCount++;
         return true;
+    }
+
+    private bool IsExcludedByCurrentSweepSource(LSCollider current)
+    {
+        if (_currentSweepSourceCollider != null
+            && _context.Constraints3D.ShouldExcludeLinkedCollision(_currentSweepSourceCollider, current))
+        {
+            return true;
+        }
+
+        return _currentExcludedCollider != null
+            && _context.Constraints3D.ShouldExcludeLinkedCollision(_currentExcludedCollider, current);
     }
 
     private void EnsureSourceBelongsToContext(LSCollider source)
