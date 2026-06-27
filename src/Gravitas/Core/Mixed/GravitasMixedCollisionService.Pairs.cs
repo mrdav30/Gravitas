@@ -54,6 +54,7 @@ internal sealed partial class GravitasMixedCollisionService
             && (collider3D.Body != null || collider2D.Body != null)
             && !ReferenceEquals(collider3D.AgentOrNull, collider2D.AgentOrNull)
             && !collider3D.ExcludesMixedCollisionWith(collider2D)
+            && ColliderCollisionFilter.AllowsPhysicalPair(collider3D, collider2D)
             && !_context.Physics.IsLayerCollisionDisabled(collider3D.Layer, collider2D.Layer);
     }
 

@@ -85,7 +85,7 @@ Gravitas is centered around explicit world-context ownership:
 7. `GravitasCollisionService` and `GravitasCollision2DService` map colliders into GridForge voxels and activate partition payloads for collision checks.
 8. `GravitasQuery2DService`, `GravitasQuery3DService`, `GravitasQueryMixedService`, and `GravitasCoroutineService` own query and coroutine state per context.
 9. `SolidBody` and `SolidBody2D` own simulated body state and Chronicler state recording for their runtime path.
-10. `LSCollider` and `LSCollider2D` collider types own runtime shape data, bounds, layers, trigger/contact events, and GridForge partition coordinates; shape-definition APIs provide data-only inputs for authored standalone and compound colliders.
+10. `LSCollider` and `LSCollider2D` collider types own runtime shape data, bounds, layers, collider-local physical ignore masks, trigger/contact events, and GridForge partition coordinates; shape-definition APIs provide data-only inputs for authored standalone and compound colliders.
 
 Typical integration creates or attaches a context, initializes bodies and colliders against agents bound to that context, then advances the simulation through `Simulate()`, `LateSimulate()`, `Visualize()`, and `LateVisualize()` according to the host's fixed-frame loop.
 

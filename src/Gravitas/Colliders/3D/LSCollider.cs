@@ -129,12 +129,32 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode
         ?? throw new InvalidOperationException("Collider has no body or static transform.");
 
     private PhysicsLayer _layer = new();
+    private PhysicsLayerMask _ignoredCollisionLayers = PhysicsLayerMask.None;
+
     public PhysicsLayer Layer
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get => _layer;
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         set => _layer = value;
+    }
+
+    /// <summary>
+    /// Gets or sets physical layers this collider ignores for collider-to-collider
+    /// interactions. Public queries continue to use the caller's query mask.
+    /// </summary>
+    public PhysicsLayerMask IgnoredCollisionLayers
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => _ignoredCollisionLayers;
+        set
+        {
+            if (_ignoredCollisionLayers == value)
+                return;
+
+            _ignoredCollisionLayers = value;
+            _body?.Wake();
+        }
     }
 
     private PhysicsMaterial _material = PhysicsMaterial.Default;
@@ -1005,6 +1025,7 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode
         RecordValues.Look(chronicler, ref _drawBoundingBox, "DrawBoundingBox", false);
         RecordValues.Look(chronicler, ref _active, "Active", true);
         RecordValues.Look(chronicler, ref _layer, "Layer", new());
+        RecordValues.Look(chronicler, ref _ignoredCollisionLayers, "IgnoredCollisionLayers", PhysicsLayerMask.None);
         RecordValues.Look(chronicler, ref _material, "Material", PhysicsMaterial.Default);
         RecordValues.Look(chronicler, ref _isTrigger, "IsTrigger", false);
         RecordValues.Look(chronicler, ref _preventCulling, "PreventCulling", false);
@@ -1040,6 +1061,9 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode
         if (_context.Settings.RuntimeMode.RunsMixedContacts())
             _context.MixedCollisions.Refresh3DColliderPartition(this);
     }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal bool IgnoresCollisionLayer(PhysicsLayer layer) => _ignoredCollisionLayers.Includes(layer);
 
     #endregion
 }

@@ -443,7 +443,8 @@ public sealed partial class SolidBody2D
         if (!collider.IsActive
             || collider.IsTrigger
             || ReferenceEquals(collider, Collider)
-            || !Context.Settings.GroundCheckLayerMask.Includes(collider.Layer))
+            || !Context.Settings.GroundCheckLayerMask.Includes(collider.Layer)
+            || !ColliderCollisionFilter.AllowsPhysicalPair(Collider, collider))
         {
             return false;
         }

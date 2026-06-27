@@ -44,6 +44,7 @@ public sealed partial class GravitasPhysicsService
             && collider1.Shape != ColliderType.None && collider2.Shape != ColliderType.None
             && (collider1.Body != null || collider2.Body != null)
             && !IsLayerCollisionDisabled(collider1.Layer, collider2.Layer)
+            && ColliderCollisionFilter.AllowsPhysicalPair(collider1, collider2)
             && !collider1.IsSibling(collider2);
     }
 
@@ -108,6 +109,13 @@ public sealed partial class GravitasPhysicsService
             CollisionPair instancePair = _activeCollisionPairs.Dequeue();
             if (instancePair == null || !instancePair.Active)
             {
+                collisionCounter--;
+                continue;
+            }
+
+            if (!RequireCollisionPair(instancePair.ColliderA, instancePair.ColliderB))
+            {
+                FullDeactivateCollisionPair(instancePair);
                 collisionCounter--;
                 continue;
             }

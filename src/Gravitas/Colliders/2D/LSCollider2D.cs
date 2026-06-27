@@ -32,6 +32,7 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
     private bool _isActive = true;
     private bool _isTrigger;
     private PhysicsLayer _layer = new();
+    private PhysicsLayerMask _ignoredCollisionLayers = PhysicsLayerMask.None;
     private PhysicsMaterial _material = PhysicsMaterial.Default;
     private Vector2d _localOffset;
     private FixedBoundArea _bounds;
@@ -182,6 +183,24 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
         get => _layer;
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         set => _layer = value;
+    }
+
+    /// <summary>
+    /// Gets or sets physical layers this collider ignores for collider-to-collider
+    /// interactions. Public queries continue to use the caller's query mask.
+    /// </summary>
+    public PhysicsLayerMask IgnoredCollisionLayers
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => _ignoredCollisionLayers;
+        set
+        {
+            if (_ignoredCollisionLayers == value)
+                return;
+
+            _ignoredCollisionLayers = value;
+            _body?.Wake();
+        }
     }
 
     /// <summary>
@@ -928,6 +947,7 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
         RecordValues.Look(chronicler, ref _isActive, "Active", true);
         RecordValues.Look(chronicler, ref _isTrigger, "IsTrigger", false);
         RecordValues.Look(chronicler, ref _layer, "Layer", new());
+        RecordValues.Look(chronicler, ref _ignoredCollisionLayers, "IgnoredCollisionLayers", PhysicsLayerMask.None);
         RecordValues.Look(chronicler, ref _material, "Material", PhysicsMaterial.Default);
         RecordValues.Look(chronicler, ref _localOffset, "LocalOffset", Vector2d.Zero);
         RecordValues.Look(chronicler, ref _mixedHalfThicknessOverride, "MixedHalfThicknessOverride");
@@ -938,6 +958,9 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
     }
 
     protected virtual void RecordShapeData(IChronicler chronicler) { }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal bool IgnoresCollisionLayer(PhysicsLayer layer) => _ignoredCollisionLayers.Includes(layer);
 
     private void ApplyLoadedState()
     {

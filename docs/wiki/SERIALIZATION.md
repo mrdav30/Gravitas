@@ -36,8 +36,9 @@ Serialized state:
 - 3D current and previous-step grounding state plus ground probe configuration.
 - pure 2D current and previous-step planar grounding/support state plus
   contact/probe grounding configuration.
-- collider active/trigger state, layer, surface material, local offset, shape
-  dimensions, 2D mixed half-thickness override, and shape-derived inputs.
+- collider active/trigger state, layer, collider-local ignored physical layers,
+  surface material, local offset, shape dimensions, 2D mixed half-thickness
+  override, and shape-derived inputs.
 - settings that affect deterministic execution, through
   `PhysicsSettingsSaver`.
 
@@ -77,10 +78,11 @@ grounding state, then refresh scalar moment/inverse moment from the loaded
 collider shape so deterministic replay continues with the same effective solver
 mass and support state.
 
-`LSCollider` records 3D collider filter, surface material, and shape state.
-Runtime IDs are context-owned and intentionally excluded from snapshots.
-Loading a bound collider rebuilds runtime shape state and refreshes partition
-membership where needed.
+`LSCollider` records 3D collider filter state, including its physical layer and
+locally ignored physical layer mask, plus surface material and shape state.
+Runtime IDs are context-owned and intentionally excluded from snapshots. Loading
+a bound collider rebuilds runtime shape state and refreshes partition membership
+where needed.
 
 `ColliderShapeDefinition` is a data-only authoring/import surface for creating
 runtime 3D colliders and compound parts. It is not a bound runtime shell: it has
@@ -96,12 +98,13 @@ compound assets should serialize `ColliderShapeDefinition2D` plus
 `CompoundColliderPart2D` material/local transform data, then let the host
 create `LSCompoundCollider2D` runtime shells before Chronicler populates state.
 
-`LSCollider2D` records pure 2D collider filter, surface material, and shape
+`LSCollider2D` records pure 2D collider filter state, including its physical
+layer and locally ignored physical layer mask, plus surface material and shape
 state. Circle, AABB, convex polygon, and compound colliders record their
 shape-specific values through shape-local hooks rather than a central type
 switch. Compound part definitions are host-created shell data, not runtime
-pair/partition state. Loading shape data validates the input and rebuilds
-bounds without waking a sleeping body just because state was populated.
+pair/partition state. Loading shape data validates the input and rebuilds bounds
+without waking a sleeping body just because state was populated.
 
 `PhysicsSettingsSaver` records frame rate, collision matrix, ground-check layer
 mask, default CCD mode, CCD TOI iteration limit, restitution velocity threshold,

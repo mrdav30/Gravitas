@@ -409,6 +409,12 @@ Use `PhysicsLayer` for a collider's single collision/filter layer and
 separate in new APIs so layer identity does not get confused with bitmask
 membership.
 
+Public query services do not apply `LSCollider.IgnoredCollisionLayers` or
+`LSCollider2D.IgnoredCollisionLayers`. Those masks are physical
+collider-to-collider filters for collision pairs, CCD, and grounding/support.
+Queries report whatever the caller's include mask, trigger flag, and explicit
+excluded-collider arguments select.
+
 ## Reentrancy
 
 Query services keep mutable buffers on the service instance. Do not run multiple

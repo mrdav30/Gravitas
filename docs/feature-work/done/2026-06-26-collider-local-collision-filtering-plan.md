@@ -11,7 +11,7 @@
 ---
 
 **Date:** 2026-06-26  
-**Status:** Planned  
+**Status:** Done  
 **Owner:** Gravitas collider/filtering hardening
 
 ## Purpose
@@ -92,19 +92,19 @@ both dimensional collider bases without creating duplicate concepts.
 
 **Tasks**
 
-- [ ] Add focused tests for default values:
+- [x] Add focused tests for default values:
   - new 3D colliders default to `PhysicsLayerMask.None`.
   - new 2D colliders default to `PhysicsLayerMask.None`.
   - default masks preserve existing physical collision behavior.
-- [ ] Add `IgnoredCollisionLayers` to `LSCollider`.
-- [ ] Add `IgnoredCollisionLayers` to `LSCollider2D`.
-- [ ] Add internal layer-check helpers on both collider bases or one shared
+- [x] Add `IgnoredCollisionLayers` to `LSCollider`.
+- [x] Add `IgnoredCollisionLayers` to `LSCollider2D`.
+- [x] Add internal layer-check helpers on both collider bases or one shared
   internal static helper.
-- [ ] Update `LSCollider.RecordData(...)` to record the mask bits.
-- [ ] Update `LSCollider2D.RecordData(...)` to record the mask bits.
-- [ ] Add serialization tests proving save/populate preserves the masks for 3D
+- [x] Update `LSCollider.RecordData(...)` to record the mask bits.
+- [x] Update `LSCollider2D.RecordData(...)` to record the mask bits.
+- [x] Add serialization tests proving save/populate preserves the masks for 3D
   and 2D colliders.
-- [ ] Add XML docs explaining that the mask affects physical
+- [x] Add XML docs explaining that the mask affects physical
   collider-to-collider interactions only.
 
 **Done Criteria**
@@ -122,21 +122,21 @@ The rule must be applied consistently across dimensional services.
 
 **Tasks**
 
-- [ ] Add 3D tests:
+- [x] Add 3D tests:
   - collider A ignoring collider B's layer prevents pair creation.
   - collider B ignoring collider A's layer prevents pair creation.
   - no ignore mask plus enabled matrix still creates the pair.
   - trigger pairs are also filtered because the rule is physical
     collider-to-collider interaction, not only response.
-- [ ] Add pure 2D tests with the same one-way and symmetric rejection cases.
-- [ ] Add mixed 2D/3D tests with 3D-owned and 2D-owned ignore masks.
-- [ ] Route `GravitasPhysicsService.RequireCollisionPair(...)` through the
+- [x] Add pure 2D tests with the same one-way and symmetric rejection cases.
+- [x] Add mixed 2D/3D tests with 3D-owned and 2D-owned ignore masks.
+- [x] Route `GravitasPhysicsService.RequireCollisionPair(...)` through the
   shared local-filter helper.
-- [ ] Route `GravitasPhysics2DService.RequireCollisionPair(...)` through the
+- [x] Route `GravitasPhysics2DService.RequireCollisionPair(...)` through the
   shared local-filter helper.
-- [ ] Route `GravitasMixedCollisionService.RequireCollisionPair(...)` through
+- [x] Route `GravitasMixedCollisionService.RequireCollisionPair(...)` through
   the shared local-filter helper.
-- [ ] Ensure resting-pair preservation and cleanup re-check the filter so
+- [x] Ensure resting-pair preservation and cleanup re-check the filter so
   changing a mask at runtime removes stale pairs deterministically.
 
 **Done Criteria**
@@ -155,20 +155,20 @@ intent and should not automatically apply these masks.
 
 **Tasks**
 
-- [ ] Add 3D CCD tests proving an ignored-layer target does not clamp a moving
+- [x] Add 3D CCD tests proving an ignored-layer target does not clamp a moving
   body and does not receive dynamic handoff.
-- [ ] Add 2D CCD tests with the same behavior for pure 2D movement.
-- [ ] Add mixed CCD tests for both source dimensions.
-- [ ] Add 3D grounding tests proving ignored-layer ground candidates are
+- [x] Add 2D CCD tests with the same behavior for pure 2D movement.
+- [x] Add mixed CCD tests for both source dimensions.
+- [x] Add 3D grounding tests proving ignored-layer ground candidates are
   rejected after query collection.
-- [ ] Add 2D grounding/support tests to the 2D grounding plan or this plan,
+- [x] Add 2D grounding/support tests to the 2D grounding plan or this plan,
   depending on execution order, proving ignored-layer support candidates are
   rejected.
-- [ ] Route 3D CCD target eligibility helpers through the local filter.
-- [ ] Route pure 2D CCD target eligibility helpers through the local filter.
-- [ ] Route mixed CCD target eligibility helpers through the local filter.
-- [ ] Route `SolidBody.IsValidGroundHit(...)` through the local filter.
-- [ ] Leave public `Query3D`, `Query2D`, and `QueryMixed` behavior unchanged.
+- [x] Route 3D CCD target eligibility helpers through the local filter.
+- [x] Route pure 2D CCD target eligibility helpers through the local filter.
+- [x] Route mixed CCD target eligibility helpers through the local filter.
+- [x] Route `SolidBody.IsValidGroundHit(...)` through the local filter.
+- [x] Leave public `Query3D`, `Query2D`, and `QueryMixed` behavior unchanged.
 
 **Done Criteria**
 
@@ -186,20 +186,20 @@ hide results because a collider happens to ignore a physical layer.
 
 **Tasks**
 
-- [ ] Add query invariance tests:
+- [x] Add query invariance tests:
   - `Query3D.RaycastAll` still returns a collider whose layer is ignored by
     another collider.
   - `Query2D.RaycastAll` and overlap queries still return ignored-layer
     colliders when the caller include mask selects them.
   - `QueryMixed` still returns ignored-layer colliders when the caller include
     mask selects them.
-- [ ] Update `docs/wiki/QUERY_SERVICES.md` to state that query masks are caller
+- [x] Update `docs/wiki/QUERY_SERVICES.md` to state that query masks are caller
   include masks and do not apply collider-local physical ignore masks.
-- [ ] Update `docs/wiki/COLLISION_PIPELINE.md` with the discrete/CCD filtering
+- [x] Update `docs/wiki/COLLISION_PIPELINE.md` with the discrete/CCD filtering
   rule.
-- [ ] Update `docs/wiki/HOST_INTEGRATION.md` with an example of local physical
+- [x] Update `docs/wiki/HOST_INTEGRATION.md` with an example of local physical
   layer ignore usage.
-- [ ] Update `docs/wiki/SERIALIZATION.md` for collider-local mask recording.
+- [x] Update `docs/wiki/SERIALIZATION.md` for collider-local mask recording.
 
 **Done Criteria**
 
@@ -216,12 +216,12 @@ kept cheaper than repeated ad hoc branch logic.
 
 **Tasks**
 
-- [ ] Run focused collision, CCD, grounding, mixed, and query test filters.
-- [ ] Run full Release and ReleaseLean test passes.
-- [ ] Inspect hot paths for duplicate local-mask checks that can be centralized.
-- [ ] Add a benchmark row only if focused collision distribution benchmarks
+- [x] Run focused collision, CCD, grounding, mixed, and query test filters.
+- [x] Run full Release and ReleaseLean test passes.
+- [x] Inspect hot paths for duplicate local-mask checks that can be centralized.
+- [x] Add a benchmark row only if focused collision distribution benchmarks
   show measurable regression.
-- [ ] Update `docs/feature-work/feature-work-overview.md` when the plan is
+- [x] Update `docs/feature-work/feature-work-overview.md` when the plan is
   completed and moved to `done`.
 
 **Done Criteria**
@@ -239,3 +239,4 @@ kept cheaper than repeated ad hoc branch logic.
   local masks.
 - Public query services remain caller-mask driven.
 - Serialization, docs, and tests cover the new filtering boundary.
+

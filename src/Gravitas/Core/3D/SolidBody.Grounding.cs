@@ -7,6 +7,7 @@
 
 using FixedMathSharp;
 using Gravitas.Colliders;
+using Gravitas.CollisionHandling;
 using Gravitas.Queries;
 using Gravitas.Support;
 using SwiftCollections;
@@ -291,7 +292,13 @@ public partial class SolidBody
     private bool IsValidGroundHit(Physics3DHit hit)
     {
         LSCollider? hitCollider = hit.Collider;
-        if (hitCollider == null || ReferenceEquals(hitCollider, Collider))
+        if (hitCollider == null
+            || ReferenceEquals(hitCollider, Collider))
+        {
+            return false;
+        }
+
+        if (!ColliderCollisionFilter.AllowsPhysicalPair(Collider, hitCollider))
             return false;
 
         SolidBody? hitBody = hitCollider.Body;

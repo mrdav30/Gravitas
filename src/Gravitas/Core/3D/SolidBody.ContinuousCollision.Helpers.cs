@@ -23,7 +23,8 @@ public partial class SolidBody
             || target.IsKinematic
             || target.Collider.IsTrigger
             || target.Collider.IsSibling(Collider)
-            || Context.Physics.IsLayerCollisionDisabled(Collider.Layer, target.Collider.Layer))
+            || Context.Physics.IsLayerCollisionDisabled(Collider.Layer, target.Collider.Layer)
+            || !ColliderCollisionFilter.AllowsPhysicalPair(Collider, target.Collider))
         {
             return false;
         }
@@ -132,7 +133,8 @@ public partial class SolidBody
             || ContinuousCollisionCandidateOrdering.IsIgnoredTarget(hitCollider, _continuousCollisionHandoffIgnoredCollider3D)
             || hitCollider.IsTrigger
             || hitCollider.IsSibling(Collider)
-            || Context.Physics.IsLayerCollisionDisabled(Collider.Layer, hitCollider.Layer))
+            || Context.Physics.IsLayerCollisionDisabled(Collider.Layer, hitCollider.Layer)
+            || !ColliderCollisionFilter.AllowsPhysicalPair(Collider, hitCollider))
         {
             return false;
         }

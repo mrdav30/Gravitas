@@ -21,7 +21,8 @@ public sealed class SolidBody2DSerializationTests
             IsTrigger = true,
             Layer = new PhysicsLayer(3),
             LocalOffset = new Vector2d(Fixed64.Half, Fixed64.FromFraction(1, 4)),
-            MixedHalfThicknessOverride = Fixed64.FromFraction(3, 2)
+            MixedHalfThicknessOverride = Fixed64.FromFraction(3, 2),
+            IgnoredCollisionLayers = PhysicsLayerMask.FromLayers(new PhysicsLayer(2), new PhysicsLayer(7))
         };
         var sourceAgent = new TestMatterAgent(sourceContext);
         var source = new SolidBody2D(sourceAgent, sourceCollider)
@@ -99,6 +100,7 @@ public sealed class SolidBody2DSerializationTests
         targetCollider.Radius.Should().Be(sourceCollider.Radius);
         targetCollider.IsTrigger.Should().BeTrue();
         targetCollider.Layer.Should().Be(sourceCollider.Layer);
+        targetCollider.IgnoredCollisionLayers.Should().Be(sourceCollider.IgnoredCollisionLayers);
         targetCollider.LocalOffset.Should().Be(sourceCollider.LocalOffset);
         targetCollider.MixedHalfThicknessOverride.Should().Be(sourceCollider.MixedHalfThicknessOverride);
         targetCollider.Bounds.Should().Be(sourceCollider.Bounds);

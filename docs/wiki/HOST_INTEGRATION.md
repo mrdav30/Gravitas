@@ -205,6 +205,24 @@ identify colliders; hosts can read `hit.Collider.Material` or the mixed hit's
 dimension-specific collider reference instead of duplicating material data in
 every hit payload.
 
+## Local Physical Filtering
+
+`IgnoredCollisionLayers` is a collider-owned physical filter. Assign it on
+`LSCollider` or `LSCollider2D` when one collider should ignore selected physical
+layers without changing the context-wide collision matrix.
+
+```csharp
+projectileCollider.Layer = new PhysicsLayer(3);
+ownerCollider.IgnoredCollisionLayers = PhysicsLayerMask.FromLayer(projectileCollider.Layer);
+```
+
+The rule is symmetric at pair time: if either collider ignores the other
+collider's layer, the physical interaction is rejected. The mask affects
+discrete collision pairs, trigger pairs, internal CCD target eligibility, and
+grounding/support acceptance. Public query services do not use this mask; query
+results are controlled by the caller's query `PhysicsLayerMask`, trigger option,
+and excluded-collider argument.
+
 ## Static Collider Setup
 
 Use `InitializeWithNoBody(...)` for bodyless host geometry. This registers and
@@ -450,8 +468,9 @@ Each body selects its probe shape through `GroundProbeMode`:
 
 `GroundProbeRadius` can override the derived swept radius. Leave it at zero to
 derive radius from the collider shape. Ground probes ignore the body's own
-collider and ordinary movable dynamic bodies; valid ground targets are bodyless
-colliders, position-frozen bodies, or kinematic bodies.
+collider, collider-local ignored physical layers, and ordinary movable dynamic
+bodies; valid ground targets are bodyless colliders, position-frozen bodies, or
+kinematic bodies.
 `WasGrounded` stores the grounded value captured before the latest
 authoritative simulation refresh or explicit manual grounding change, so hosts
 can distinguish landing, remaining grounded, and leaving support without

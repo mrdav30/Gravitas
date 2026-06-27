@@ -241,6 +241,7 @@ public sealed partial class GravitasPhysics2DService
             && (first.Body != null || second.Body != null)
             && !ReferenceEquals(first.AgentOrNull, second.AgentOrNull)
             && !IsLayerCollisionDisabled(first.Layer, second.Layer)
+            && ColliderCollisionFilter.AllowsPhysicalPair(first, second)
             && !first.IsSibling(second);
     }
 
@@ -275,12 +276,10 @@ public sealed partial class GravitasPhysics2DService
     {
         LSCollider2D first = pair.ColliderA;
         LSCollider2D second = pair.ColliderB;
-        if (!first.IsActive
-            || !second.IsActive
-            || first.IsTrigger
+        if (first.IsTrigger
             || second.IsTrigger
             || HasAwakeMovableParticipant(first, second)
-            || IsLayerCollisionDisabled(first.Layer, second.Layer)
+            || !RequireCollisionPair(first, second)
             || !CollisionDetection2D.TryCollide(pair, pair.Manifold, frame))
         {
             return false;

@@ -17,11 +17,12 @@ public abstract partial class LSCollider
         ref GravitasReplayHashWriter writer,
         GravitasReplayHashMode mode)
     {
-        writer.WriteSection("collider.3d", 1);
+        writer.WriteSection("collider.3d", 2);
         writer.WriteInt32(_id);
         writer.WriteBool(_active);
         writer.WriteBool(_isTrigger);
         writer.WritePhysicsLayer(_layer);
+        writer.WritePhysicsLayerMask(_ignoredCollisionLayers);
         WriteMaterial(ref writer, _material);
         writer.WriteBool(_preventCulling);
         writer.WriteEnum(Shape);

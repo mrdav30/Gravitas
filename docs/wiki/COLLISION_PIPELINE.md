@@ -38,8 +38,8 @@ The 2D broad phase is GridForge-backed:
 7. suppress duplicate pair work when broad colliders share several voxels by
    routing each pair through its deterministic first shared partition before
    the frame duplicate-pair set.
-8. run same-agent, explicit hierarchy, layer, and bounds filtering before exact
-   2D narrow-phase dispatch.
+8. run same-agent, explicit hierarchy, layer, collider-local physical ignore,
+   and bounds filtering before exact 2D narrow-phase dispatch.
 
 The Y=0 storage plane is not physical thickness and does not claim mixed
 2D/3D interaction. It is a deterministic broad-phase identity that lets pure
@@ -47,8 +47,8 @@ The Y=0 storage plane is not physical thickness and does not claim mixed
 keeps those paths side by side without cross-dimensional contacts; only
 `PhysicsRuntimeMode.Mixed` enables the mixed lifecycle path. The mixed broad
 phase uses `PhysicsMixedPartition` payloads attached to GridForge voxels and emits
-stable 3D/2D candidate keys after awake-dynamic, layer, same-agent, explicit
-hierarchy, duplicate, and bounds filtering. The mixed embedding state on
+stable 3D/2D candidate keys after awake-dynamic, layer, collider-local physical
+ignore, same-agent, explicit hierarchy, duplicate, and bounds filtering. The mixed embedding state on
 `LSCollider2D` is a finite 3D `FixedBoundBox` built from pure 2D X/Z bounds plus a
 positive Y half-thickness centered on the host transform's Y position.
 `CollisionDetectionMixed` supports 3D sphere, cuboid, capsule, finite
@@ -510,9 +510,10 @@ static-style targets. Translational dynamic hits are handed off through the
 service-level CCD queue; rotational CCD remains body-owned and static-style
 target focused.
 
-Static and kinematic CCD targets are non-trigger bodyless colliders, position-frozen
-bodies, and kinematic bodies whose layers are allowed by the context collision
-matrix and whose hierarchy is not excluded. Static or kinematic mesh and
+Static and kinematic CCD targets are non-trigger bodyless colliders,
+position-frozen bodies, and kinematic bodies whose layers are allowed by the
+context collision matrix, whose collider-local physical ignore masks allow the
+pair, and whose hierarchy is not excluded. Static or kinematic mesh and
 compound targets are covered by the query workers, so 3D swept-sphere CCD keeps
 triangle and stable part-order target behavior. Mesh sweep normals are oriented
 against the sweep direction when authored triangle winding would otherwise point
@@ -624,6 +625,7 @@ with `RequireCollisionPair(...)`. A pair is required only when:
 - both colliders have real shapes.
 - at least one collider has a body.
 - the context collision matrix allows the two layers to collide.
+- neither collider locally ignores the other collider's physical layer.
 - the colliders are not explicitly bound as parent-child or siblings in the
   host hierarchy.
 
