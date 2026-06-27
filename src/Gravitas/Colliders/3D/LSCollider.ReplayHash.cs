@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using Gravitas.Materials;
 using System;
 
 namespace Gravitas.Colliders;
@@ -21,6 +22,7 @@ public abstract partial class LSCollider
         writer.WriteBool(_active);
         writer.WriteBool(_isTrigger);
         writer.WritePhysicsLayer(_layer);
+        WriteMaterial(ref writer, _material);
         writer.WriteBool(_preventCulling);
         writer.WriteEnum(Shape);
         writer.WriteInt32(Priority);
@@ -92,6 +94,9 @@ public abstract partial class LSCollider
         writer.WriteVector3d(part.LocalOffset);
         writer.WriteQuaternion(part.LocalRotation);
         writer.WriteVector3d(part.LocalScale);
+        writer.WriteBool(part.HasMaterial);
+        if (part.TryGetMaterial(out PhysicsMaterial material))
+            WriteMaterial(ref writer, material);
         ContributeShapeDefinitionReplayHash(ref writer, part.Shape);
     }
 
@@ -100,6 +105,9 @@ public abstract partial class LSCollider
         ColliderShapeDefinition definition)
     {
         writer.WriteEnum(definition.Kind);
+        writer.WriteBool(definition.HasMaterial);
+        if (definition.HasMaterial)
+            WriteMaterial(ref writer, definition.Material);
         writer.WriteFixed64(definition.Radius);
         writer.WriteFixed64(definition.Height);
         writer.WriteVector3d(definition.Size);
@@ -110,5 +118,14 @@ public abstract partial class LSCollider
         writer.WriteInt32(definition.MeshTriangleIndexCount);
         for (int i = 0; i < definition.MeshTriangleIndexCount; i++)
             writer.WriteInt32(definition.GetMeshTriangleIndex(i));
+    }
+
+    private static void WriteMaterial(ref GravitasReplayHashWriter writer, PhysicsMaterial material)
+    {
+        writer.WriteFixed64(material.StaticFriction);
+        writer.WriteFixed64(material.DynamicFriction);
+        writer.WriteFixed64(material.Restitution);
+        writer.WriteEnum(material.FrictionCombine);
+        writer.WriteEnum(material.RestitutionCombine);
     }
 }

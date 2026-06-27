@@ -7,6 +7,7 @@
 
 using FixedMathSharp;
 using Gravitas.Colliders;
+using Gravitas.Materials;
 using System.Runtime.CompilerServices;
 
 namespace Gravitas.CollisionHandling;
@@ -73,6 +74,12 @@ public static class CollisionResponseMixed
             iteration,
             iterationLimit);
 
+        PhysicsMaterial material3D = contact.HasMaterialOverride
+            ? contact.Material3D
+            : pair.Collider3D.Material;
+        PhysicsMaterial material2D = contact.HasMaterialOverride
+            ? contact.Material2D
+            : pair.Collider2D.Material;
         bool appliedImpulse = normalImpulse > Fixed64.Zero;
         appliedImpulse |= ApplyFrictionImpulse(
             body3D,
@@ -83,6 +90,8 @@ public static class CollisionResponseMixed
             inverseMass3D,
             inverseMass2D,
             inverseMoment2D,
+            material3D,
+            material2D,
             normalImpulse);
 
         return appliedImpulse;
@@ -142,8 +151,8 @@ public static class CollisionResponseMixed
             return Fixed64.Zero;
 
         Fixed64 restitution = ResolveRestitution(
-            body3D,
-            body2D,
+            contact.HasMaterialOverride ? contact.Material3D : pair.Collider3D.Material,
+            contact.HasMaterialOverride ? contact.Material2D : pair.Collider2D.Material,
             -normalVelocity,
             pair.Context.Settings.RestitutionVelocityThreshold);
         Fixed64 impulseScalar = -(Fixed64.One + restitution) * normalVelocity / denominator;
@@ -170,13 +179,15 @@ public static class CollisionResponseMixed
         Fixed64 inverseMass3D,
         Fixed64 inverseMass2D,
         Fixed64 inverseMoment2D,
+        PhysicsMaterial material3D,
+        PhysicsMaterial material2D,
         Fixed64 normalImpulse)
     {
         if (normalImpulse <= Fixed64.Zero)
             return false;
 
-        Fixed64 friction = ResolveFriction(body3D, body2D);
-        if (friction <= Fixed64.Zero)
+        PhysicsMaterial.CombineFriction(material3D, material2D, out Fixed64 staticFriction, out Fixed64 dynamicFriction);
+        if (staticFriction <= Fixed64.Zero && dynamicFriction <= Fixed64.Zero)
             return false;
 
         Vector3d relativeVelocity = ComputeRelativeVelocity(body3D, body2D, relative3D, relative2D);
@@ -194,8 +205,12 @@ public static class CollisionResponseMixed
 
         Fixed64 tangentVelocityMagnitude = Vector3d.Dot(relativeVelocity, tangent);
         Fixed64 impulseScalar = -tangentVelocityMagnitude / denominator;
-        Fixed64 maxFrictionImpulse = normalImpulse * friction;
-        impulseScalar = FixedMath.Clamp(impulseScalar, -maxFrictionImpulse, maxFrictionImpulse);
+        Fixed64 staticLimit = normalImpulse * staticFriction;
+        if (impulseScalar.Abs() > staticLimit)
+        {
+            Fixed64 dynamicLimit = normalImpulse * dynamicFriction;
+            impulseScalar = FixedMath.Clamp(impulseScalar, -dynamicLimit, dynamicLimit);
+        }
         if (impulseScalar == Fixed64.Zero)
             return false;
 
@@ -332,30 +347,14 @@ public static class CollisionResponseMixed
         body?.CanRotate == true;
 
     private static Fixed64 ResolveRestitution(
-        SolidBody? body3D,
-        SolidBody2D? body2D,
+        PhysicsMaterial material3D,
+        PhysicsMaterial material2D,
         Fixed64 closingSpeed,
         Fixed64 restitutionVelocityThreshold)
     {
-        if (body3D == null || body2D == null || closingSpeed <= restitutionVelocityThreshold)
+        if (closingSpeed <= restitutionVelocityThreshold)
             return Fixed64.Zero;
 
-        Fixed64 restitution = FixedMath.Min(body3D.RestitutionCoefficient, body2D.RestitutionCoefficient);
-        return FixedMath.Clamp(restitution, Fixed64.Zero, Fixed64.One);
-    }
-
-    private static Fixed64 ResolveFriction(SolidBody? body3D, SolidBody2D? body2D)
-    {
-        if (body3D == null && body2D == null)
-            return Fixed64.Zero;
-        if (body3D == null)
-            return body2D!.FrictionCoefficient;
-        if (body2D == null)
-            return body3D.FrictionCoefficient;
-
-        Fixed64 frictionProduct = body3D.FrictionCoefficient * body2D.FrictionCoefficient;
-        return frictionProduct > Fixed64.Zero
-            ? FixedMath.Sqrt(frictionProduct)
-            : Fixed64.Zero;
+        return PhysicsMaterial.CombineRestitution(material3D, material2D);
     }
 }

@@ -53,7 +53,6 @@ public partial class SolidBody
         RecordValues.Look(chronicler, ref _deltaTorque, "DeltaTorque");
         RecordValues.Look(chronicler, ref _localCenterOfMassOffset, "LocalCenterOfMassOffset");
         RecordValues.Look(chronicler, ref _centerOfMassOffsetExplicit, "CenterOfMassOffsetExplicit", false);
-        RecordValues.Look(chronicler, ref RestitutionCoefficient, "RestitutionCoefficient");
         RecordValues.Look(chronicler, ref gravityScale, "GravityScale", Fixed64.One);
         RecordValues.Look(chronicler, ref _isSleeping, "IsSleeping");
         RecordValues.Look(chronicler, ref _sleepFrameCount, "SleepFrameCount");
@@ -77,7 +76,6 @@ public partial class SolidBody
         RecordValues.Look(chronicler, ref _isVelocityConstant, "IsVelocityConstant");
         RecordValues.Look(chronicler, ref LinearDragCoefficient, "LinearDragCoefficient");
         RecordValues.Look(chronicler, ref AngularDragCoefficient, "AngularDragCoefficient");
-        RecordValues.Look(chronicler, ref _frictionCoefficient, "FrictionCoefficient");
         RecordValues.Look(chronicler, ref _normalForce, "NormalForce");
         RecordValues.Look(chronicler, ref Mass, "Mass");
 

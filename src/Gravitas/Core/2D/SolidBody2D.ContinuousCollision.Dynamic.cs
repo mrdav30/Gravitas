@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using Gravitas.Materials;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 
@@ -339,10 +340,7 @@ public sealed partial class SolidBody2D
         if (closingSpeed <= Context.Settings.RestitutionVelocityThreshold)
             return Fixed64.Zero;
 
-        return FixedMath.Clamp(
-            FixedMath.Min(RestitutionCoefficient, target.RestitutionCoefficient),
-            Fixed64.Zero,
-            Fixed64.One);
+        return PhysicsMaterial.CombineRestitution(Collider.Material, target.Collider.Material);
     }
 
     private Fixed64 ResolveContinuousCollisionRestitution(SolidBody target, Fixed64 closingSpeed)
@@ -350,10 +348,7 @@ public sealed partial class SolidBody2D
         if (closingSpeed <= Context.Settings.RestitutionVelocityThreshold)
             return Fixed64.Zero;
 
-        return FixedMath.Clamp(
-            FixedMath.Min(RestitutionCoefficient, target.RestitutionCoefficient),
-            Fixed64.Zero,
-            Fixed64.One);
+        return PhysicsMaterial.CombineRestitution(Collider.Material, target.Collider.Material);
     }
 
     private void RemoveClosingContinuousCollisionVelocity(Vector2d normal)

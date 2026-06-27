@@ -26,6 +26,7 @@ public sealed class LSCircleCollider2D : LSCollider2D
     public LSCircleCollider2D(ColliderShapeDefinition2D definition)
     {
         definition.EnsureKind(ColliderShapeDefinition2DKind.Circle);
+        Material = definition.Material;
         Radius = definition.Radius;
     }
 

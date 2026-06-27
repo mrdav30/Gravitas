@@ -29,8 +29,6 @@ public sealed class SolidBody2DSerializationTests
             Mass = (Fixed64)3,
             Immovable = true,
             IsKinematic = true,
-            RestitutionCoefficient = Fixed64.FromFraction(3, 4),
-            FrictionCoefficient = Fixed64.FromFraction(5, 4),
             Gravity = new Vector2d(Fixed64.Zero, (Fixed64)(-2)),
             GravityScale = Fixed64.FromFraction(3, 8),
             SleepEnabled = false,
@@ -40,6 +38,9 @@ public sealed class SolidBody2DSerializationTests
             ContinuousCollisionMode = ContinuousCollisionMode.Continuous,
             PreventAngularForces = true
         };
+        sourceCollider.Material = PhysicsMaterialTestHelper.WithFrictionAndRestitution(
+            Fixed64.FromFraction(5, 4),
+            Fixed64.FromFraction(3, 4));
         source.Initialize(new Vector2d((Fixed64)5, (Fixed64)(-2)), Fixed64.FromFraction(1, 8));
         source.LocalCenterOfMassOffset = new Vector2d(Fixed64.FromFraction(1, 3), -Fixed64.FromFraction(1, 4));
 
@@ -61,8 +62,7 @@ public sealed class SolidBody2DSerializationTests
         target.Mass.Should().Be(source.Mass);
         target.Immovable.Should().BeTrue();
         target.IsKinematic.Should().BeTrue();
-        target.RestitutionCoefficient.Should().Be(source.RestitutionCoefficient);
-        target.FrictionCoefficient.Should().Be(source.FrictionCoefficient);
+        targetCollider.Material.Should().Be(sourceCollider.Material);
         target.Gravity.Should().Be(source.Gravity);
         target.GravityScale.Should().Be(source.GravityScale);
         target.SleepEnabled.Should().BeFalse();

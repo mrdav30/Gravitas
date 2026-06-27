@@ -27,6 +27,7 @@ public sealed class LSAABBoxCollider2D : LSCollider2D
     public LSAABBoxCollider2D(ColliderShapeDefinition2D definition)
     {
         definition.EnsureKind(ColliderShapeDefinition2DKind.AABBox);
+        Material = definition.Material;
         Size = definition.Size;
     }
 

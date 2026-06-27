@@ -17,8 +17,8 @@ public sealed class DiscreteIslandSolverTests
         ScenarioBody<LSCuboidCollider> body = scenario.CreateCuboid(
             PhysicsScenarioBuilder.Vector(0, 1, 0),
             preventAngularForces: true);
-        floor.Body.RestitutionCoefficient = Fixed64.Zero;
-        body.Body.RestitutionCoefficient = Fixed64.Zero;
+        floor.Collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.Zero);
+        body.Collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.Zero);
         body.Body.UseManualGrounding();
         body.Body.SleepFrameThreshold = 4;
 
@@ -45,9 +45,9 @@ public sealed class DiscreteIslandSolverTests
         ScenarioBody<LSCuboidCollider> upper = scenario.CreateCuboid(
             PhysicsScenarioBuilder.Vector(0, 2, 0),
             preventAngularForces: true);
-        floor.Body.RestitutionCoefficient = Fixed64.Zero;
-        lower.Body.RestitutionCoefficient = Fixed64.Zero;
-        upper.Body.RestitutionCoefficient = Fixed64.Zero;
+        floor.Collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.Zero);
+        lower.Collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.Zero);
+        upper.Collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.Zero);
         lower.Body.UseManualGrounding();
         upper.Body.UseManualGrounding();
         lower.Body.SleepFrameThreshold = 4;

@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using Gravitas.Materials;
 using System;
 using System.Runtime.CompilerServices;
 
@@ -19,6 +20,8 @@ public readonly struct ColliderShapeDefinition : IEquatable<ColliderShapeDefinit
 {
     private readonly Vector3d[]? _meshVertices;
     private readonly int[]? _meshTriangles;
+    private readonly PhysicsMaterial _material;
+    private readonly bool _hasMaterial;
 
     private ColliderShapeDefinition(
         ColliderShapeDefinitionKind kind,
@@ -27,7 +30,8 @@ public readonly struct ColliderShapeDefinition : IEquatable<ColliderShapeDefinit
         Vector3d size,
         MeshInertiaPolicy meshInertiaPolicy,
         Vector3d[]? meshVertices,
-        int[]? meshTriangles)
+        int[]? meshTriangles,
+        PhysicsMaterial? material)
     {
         Kind = kind;
         Radius = radius;
@@ -36,6 +40,8 @@ public readonly struct ColliderShapeDefinition : IEquatable<ColliderShapeDefinit
         MeshInertiaPolicy = meshInertiaPolicy;
         _meshVertices = meshVertices;
         _meshTriangles = meshTriangles;
+        _material = material ?? PhysicsMaterial.Default;
+        _hasMaterial = material.HasValue;
     }
 
     /// <summary>
@@ -66,6 +72,14 @@ public readonly struct ColliderShapeDefinition : IEquatable<ColliderShapeDefinit
     public MeshInertiaPolicy MeshInertiaPolicy { get; }
 
     /// <summary>
+    /// Gets the authored surface material used when this definition creates a
+    /// runtime collider directly.
+    /// </summary>
+    public PhysicsMaterial Material => _hasMaterial ? _material : PhysicsMaterial.Default;
+
+    internal bool HasMaterial => _hasMaterial;
+
+    /// <summary>
     /// Gets the number of local mesh vertices held by a convex mesh definition.
     /// </summary>
     public int MeshVertexCount
@@ -86,7 +100,7 @@ public readonly struct ColliderShapeDefinition : IEquatable<ColliderShapeDefinit
     /// <summary>
     /// Creates a sphere shape definition.
     /// </summary>
-    public static ColliderShapeDefinition Sphere(Fixed64 radius)
+    public static ColliderShapeDefinition Sphere(Fixed64 radius, PhysicsMaterial? material = null)
     {
         ValidateRadius(radius);
         Fixed64 diameter = radius * (Fixed64)2;
@@ -97,13 +111,14 @@ public readonly struct ColliderShapeDefinition : IEquatable<ColliderShapeDefinit
             new Vector3d(diameter, diameter, diameter),
             MeshInertiaPolicy.RequireClosedVolume,
             null,
-            null);
+            null,
+            material);
     }
 
     /// <summary>
     /// Creates a capsule shape definition.
     /// </summary>
-    public static ColliderShapeDefinition Capsule(Fixed64 radius, Fixed64 height)
+    public static ColliderShapeDefinition Capsule(Fixed64 radius, Fixed64 height, PhysicsMaterial? material = null)
     {
         ValidateRadius(radius);
         ValidateHeight(height);
@@ -115,13 +130,14 @@ public readonly struct ColliderShapeDefinition : IEquatable<ColliderShapeDefinit
             new Vector3d(diameter, height, diameter),
             MeshInertiaPolicy.RequireClosedVolume,
             null,
-            null);
+            null,
+            material);
     }
 
     /// <summary>
     /// Creates a cuboid shape definition.
     /// </summary>
-    public static ColliderShapeDefinition Cuboid(Vector3d size)
+    public static ColliderShapeDefinition Cuboid(Vector3d size, PhysicsMaterial? material = null)
     {
         ValidateSize(size);
         return new(
@@ -131,13 +147,14 @@ public readonly struct ColliderShapeDefinition : IEquatable<ColliderShapeDefinit
             size,
             MeshInertiaPolicy.RequireClosedVolume,
             null,
-            null);
+            null,
+            material);
     }
 
     /// <summary>
     /// Creates a finite-cylinder shape definition.
     /// </summary>
-    public static ColliderShapeDefinition Cylinder(Fixed64 radius, Fixed64 height)
+    public static ColliderShapeDefinition Cylinder(Fixed64 radius, Fixed64 height, PhysicsMaterial? material = null)
     {
         ValidateRadius(radius);
         ValidateHeight(height);
@@ -149,7 +166,8 @@ public readonly struct ColliderShapeDefinition : IEquatable<ColliderShapeDefinit
             new Vector3d(diameter, height, diameter),
             MeshInertiaPolicy.RequireClosedVolume,
             null,
-            null);
+            null,
+            material);
     }
 
     /// <summary>
@@ -158,7 +176,8 @@ public readonly struct ColliderShapeDefinition : IEquatable<ColliderShapeDefinit
     public static ColliderShapeDefinition ConvexMesh(
         Vector3d[] vertices,
         int[] triangles,
-        MeshInertiaPolicy inertiaPolicy = MeshInertiaPolicy.RequireClosedVolume)
+        MeshInertiaPolicy inertiaPolicy = MeshInertiaPolicy.RequireClosedVolume,
+        PhysicsMaterial? material = null)
     {
         ValidateMeshInput(vertices, triangles);
         ValidateMeshInertiaPolicy(inertiaPolicy);
@@ -175,7 +194,8 @@ public readonly struct ColliderShapeDefinition : IEquatable<ColliderShapeDefinit
             Vector3d.Zero,
             inertiaPolicy,
             vertexSnapshot,
-            triangleSnapshot);
+            triangleSnapshot,
+            material);
     }
 
     /// <summary>
@@ -321,6 +341,8 @@ public readonly struct ColliderShapeDefinition : IEquatable<ColliderShapeDefinit
             || Height != other.Height
             || Size != other.Size
             || MeshInertiaPolicy != other.MeshInertiaPolicy
+            || _hasMaterial != other._hasMaterial
+            || (_hasMaterial && _material != other._material)
             || MeshVertexCount != other.MeshVertexCount
             || MeshTriangleIndexCount != other.MeshTriangleIndexCount)
         {
@@ -355,6 +377,9 @@ public readonly struct ColliderShapeDefinition : IEquatable<ColliderShapeDefinit
             hash = hash * 31 + Height.GetHashCode();
             hash = hash * 31 + Size.GetHashCode();
             hash = hash * 31 + MeshInertiaPolicy.GetHashCode();
+            hash = hash * 31 + _hasMaterial.GetHashCode();
+            if (_hasMaterial)
+                hash = hash * 31 + _material.GetHashCode();
 
             for (int i = 0; i < MeshVertexCount; i++)
                 hash = hash * 31 + _meshVertices![i].GetHashCode();

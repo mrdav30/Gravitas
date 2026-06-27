@@ -5,6 +5,8 @@
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
+using Gravitas.Materials;
+
 namespace Gravitas.CollisionHandling;
 
 internal sealed partial class CollisionPairMixed
@@ -28,5 +30,20 @@ internal sealed partial class CollisionPairMixed
         writer.WriteVector3d(Contact.Point2D);
         writer.WriteVector3d(Contact.Normal3DTo2D);
         writer.WriteFixed64(Contact.Depth);
+        writer.WriteBool(Contact.HasMaterialOverride);
+        if (!Contact.HasMaterialOverride)
+            return;
+
+        WriteMaterial(ref writer, Contact.Material3D);
+        WriteMaterial(ref writer, Contact.Material2D);
+    }
+
+    private static void WriteMaterial(ref GravitasReplayHashWriter writer, PhysicsMaterial material)
+    {
+        writer.WriteFixed64(material.StaticFriction);
+        writer.WriteFixed64(material.DynamicFriction);
+        writer.WriteFixed64(material.Restitution);
+        writer.WriteEnum(material.FrictionCombine);
+        writer.WriteEnum(material.RestitutionCombine);
     }
 }

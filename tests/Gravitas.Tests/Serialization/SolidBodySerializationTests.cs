@@ -31,8 +31,9 @@ public sealed class SolidBodySerializationTests
         source.Body.SleepAngularSpeedThreshold = Fixed64.FromFraction(1, 32);
         source.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
         source.Body.LocalCenterOfMassOffset = new Vector3d(Fixed64.FromFraction(1, 4), Fixed64.FromFraction(1, 8), -Fixed64.FromFraction(1, 2));
-        source.Body.RestitutionCoefficient = Fixed64.FromFraction(3, 4);
-        source.Body.FrictionCoefficient = Fixed64.FromFraction(5, 4);
+        source.Collider.Material = PhysicsMaterialTestHelper.WithFrictionAndRestitution(
+            Fixed64.FromFraction(5, 4),
+            Fixed64.FromFraction(3, 4));
         source.Body.GravityScale = Fixed64.FromFraction(3, 8);
         source.Collider.Radius = Fixed64.FromFraction(3, 2);
         source.Collider.LocalOffset = new Vector3d(Fixed64.Half, Fixed64.FromFraction(1, 4), -Fixed64.Half);
@@ -66,8 +67,7 @@ public sealed class SolidBodySerializationTests
         target.Body.ContinuousCollisionMode.Should().Be(ContinuousCollisionMode.Continuous);
         target.Body.LocalCenterOfMassOffset.Should().Be(source.Body.LocalCenterOfMassOffset);
         target.Body.WorldCenterOfMass.Should().Be(source.Body.WorldCenterOfMass);
-        target.Body.RestitutionCoefficient.Should().Be(source.Body.RestitutionCoefficient);
-        target.Body.FrictionCoefficient.Should().Be(source.Body.FrictionCoefficient);
+        target.Collider.Material.Should().Be(source.Collider.Material);
         target.Body.GravityScale.Should().Be(source.Body.GravityScale);
         target.Body.PositionTransform.Should().BeSameAs(targetTransform);
         target.Body.RotationTransform.Should().BeSameAs(targetTransform);

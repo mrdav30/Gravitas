@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using Gravitas.Materials;
 using System;
 using System.Runtime.CompilerServices;
 
@@ -206,6 +207,7 @@ public sealed class LSCompoundCollider2D : LSCollider2D
             CompoundColliderPart2D part = _parts[i];
             LSCollider2D partCollider = _partColliders[i];
             partCollider.LocalOffset = part.LocalOffset;
+            partCollider.Material = part.ResolveMaterial(Material);
             partCollider.BindCompoundPart(this, part.LocalRotation, part.LocalScale, Context);
 
             Vector2d partMin = new(partCollider.MinX, partCollider.MinY);
@@ -252,7 +254,14 @@ public sealed class LSCompoundCollider2D : LSCollider2D
     {
         LSCollider2D collider = part.Shape.CreateRuntimeCollider();
         collider.LocalOffset = part.LocalOffset;
+        collider.Material = part.ResolveMaterial(PhysicsMaterial.Default);
         return collider;
+    }
+
+    protected override void OnMaterialChanged()
+    {
+        for (int i = 0; i < _parts.Length; i++)
+            _partColliders[i].Material = _parts[i].ResolveMaterial(Material);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

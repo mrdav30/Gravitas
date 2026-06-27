@@ -29,6 +29,7 @@ public sealed class LSPolygonCollider2D : LSCollider2D
     public LSPolygonCollider2D(ColliderShapeDefinition2D definition)
     {
         definition.EnsureKind(ColliderShapeDefinition2DKind.ConvexPolygon);
+        Material = definition.Material;
         _localVertices = Array.Empty<Vector2d>();
         _worldVertices = Array.Empty<Vector2d>();
         SetLocalVertices(definition.GetPolygonVerticesForRuntime(), markDirty: true);

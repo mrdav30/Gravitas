@@ -100,11 +100,23 @@ public static partial class CollisionDetection
             ManifoldContact contact = scratch[i];
             if (addInPartOrder)
             {
-                ownerPair.Manifold.AddContact(contact.PointA, contact.PointB, contact.Depth, contact.Normal);
+                ownerPair.Manifold.AddContact(
+                    contact.PointA,
+                    contact.PointB,
+                    contact.Depth,
+                    contact.Normal,
+                    partPair.ColliderA.Material,
+                    partPair.ColliderB.Material);
                 continue;
             }
 
-            ownerPair.Manifold.AddContact(contact.PointB, contact.PointA, contact.Depth, -contact.Normal);
+            ownerPair.Manifold.AddContact(
+                contact.PointB,
+                contact.PointA,
+                contact.Depth,
+                -contact.Normal,
+                partPair.ColliderB.Material,
+                partPair.ColliderA.Material);
         }
     }
 

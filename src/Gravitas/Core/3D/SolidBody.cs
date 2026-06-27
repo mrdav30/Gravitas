@@ -319,11 +319,6 @@ public partial class SolidBody : IRecordable
     /// </summary>
     public Fixed3x3 EffectiveInverseInertiaTensor => CanRotate ? _inverseInertiaTensor : Fixed3x3.Zero;
 
-    /// <summary>
-    /// Value between 0 (sticky) and 1 (perfectly elastic collision; i.e. not moving apart)
-    /// </summary>
-    public Fixed64 RestitutionCoefficient = (Fixed64)0.5f;
-
     private Fixed64 _gravityScale = Fixed64.One;
 
     /// <summary>
@@ -467,30 +462,6 @@ public partial class SolidBody : IRecordable
     public Fixed64 LinearDragCoefficient = (Fixed64)0.75f;
 
     private Fixed64 AngularDragCoefficient = (Fixed64)0.75f;
-
-    /// <summary>
-    /// Represents the friction force applied when the object is moving.
-    /// Higher values simulate high friction surfaces causing quick stops, while lower values simulate low friction surfaces causing prolonged slides.
-    /// The usual range is between 0 (no friction) and 1 (high friction).
-    /// </summary>
-    private Fixed64 _frictionCoefficient = Fixed64.One;
-
-    /// <summary>
-    /// Coulomb friction coefficient used by contact response and grounded motion.
-    /// Values above one are allowed for intentionally high-friction surfaces.
-    /// </summary>
-    public Fixed64 FrictionCoefficient
-    {
-        get => _frictionCoefficient;
-        set
-        {
-            SwiftThrowHelper.ThrowIfArgument(
-                value < Fixed64.Zero,
-                nameof(value),
-                "Friction coefficient cannot be negative.");
-            _frictionCoefficient = value;
-        }
-    }
 
     /// <summary>
     /// Represents the normal force on the object.

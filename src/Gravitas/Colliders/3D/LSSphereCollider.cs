@@ -18,6 +18,7 @@ public class LSSphereCollider : LSCollider
     public LSSphereCollider(ColliderShapeDefinition definition)
     {
         definition.EnsureKind(ColliderShapeDefinitionKind.Sphere);
+        Material = definition.Material;
         Radius = definition.Radius;
     }
 

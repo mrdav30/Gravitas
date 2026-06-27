@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using Gravitas.Materials;
 using Gravitas.Queries;
 using SwiftCollections;
 using System;
@@ -91,6 +92,7 @@ public sealed class LSCompoundCollider : LSCollider
             CompoundColliderPart part = _parts[i];
             LSCollider partCollider = _partColliders[i];
             partCollider.LocalOffset = part.LocalOffset;
+            partCollider.Material = part.ResolveMaterial(Material);
             partCollider.BindCompoundPart(this, part.LocalRotation, part.LocalScale, Context);
 
             if (i == 0)
@@ -214,7 +216,14 @@ public sealed class LSCompoundCollider : LSCollider
     {
         LSCollider collider = part.Shape.CreateRuntimeCollider();
         collider.LocalOffset = part.LocalOffset;
+        collider.Material = part.ResolveMaterial(PhysicsMaterial.Default);
         return collider;
+    }
+
+    protected override void OnMaterialChanged()
+    {
+        for (int i = 0; i < _parts.Length; i++)
+            _partColliders[i].Material = _parts[i].ResolveMaterial(Material);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

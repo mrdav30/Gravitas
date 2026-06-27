@@ -8,6 +8,7 @@
 using Chronicler;
 using FixedMathSharp;
 using FixedMathSharp.Bounds;
+using Gravitas.Materials;
 using Gravitas.Support;
 using GridForge.Spatial;
 using SwiftCollections;
@@ -31,6 +32,7 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
     private bool _isActive = true;
     private bool _isTrigger;
     private PhysicsLayer _layer = new();
+    private PhysicsMaterial _material = PhysicsMaterial.Default;
     private Vector2d _localOffset;
     private FixedBoundArea _bounds;
     private FixedBoundBox _mixedBounds3D;
@@ -180,6 +182,25 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
         get => _layer;
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         set => _layer = value;
+    }
+
+    /// <summary>
+    /// Gets or sets the deterministic surface material used by pure 2D and
+    /// mixed collision response for this collider.
+    /// </summary>
+    public PhysicsMaterial Material
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => _material;
+        set
+        {
+            if (_material == value)
+                return;
+
+            _material = value;
+            OnMaterialChanged();
+            _body?.Wake();
+        }
     }
 
     public abstract ColliderType2D Shape { get; }
@@ -631,6 +652,8 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
 
     protected abstract void RebuildShape();
 
+    protected virtual void OnMaterialChanged() { }
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     protected void MarkShapeDirty()
     {
@@ -905,6 +928,7 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
         RecordValues.Look(chronicler, ref _isActive, "Active", true);
         RecordValues.Look(chronicler, ref _isTrigger, "IsTrigger", false);
         RecordValues.Look(chronicler, ref _layer, "Layer", new());
+        RecordValues.Look(chronicler, ref _material, "Material", PhysicsMaterial.Default);
         RecordValues.Look(chronicler, ref _localOffset, "LocalOffset", Vector2d.Zero);
         RecordValues.Look(chronicler, ref _mixedHalfThicknessOverride, "MixedHalfThicknessOverride");
         RecordShapeData(chronicler);

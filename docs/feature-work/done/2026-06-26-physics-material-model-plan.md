@@ -11,13 +11,13 @@
 ---
 
 **Date:** 2026-06-26  
-**Status:** Planned  
+**Status:** Done  
 **Owner:** Gravitas material/response hardening
 
 ## Purpose
 
-Gravitas currently stores `FrictionCoefficient` and `RestitutionCoefficient`
-directly on bodies. That works for early rigid body response, but it makes
+Gravitas previously stored `FrictionCoefficient` and `RestitutionCoefficient`
+directly on bodies. That worked for early rigid body response, but it made
 surface authoring fuzzy as the engine grows:
 
 - different colliders on the same body cannot naturally represent different
@@ -31,7 +31,7 @@ surface authoring fuzzy as the engine grows:
 This plan creates a deterministic physics material model that is explicit,
 serializable, and shared across 3D, pure 2D, mixed, and CCD response.
 
-## Current Baseline
+## Original Baseline
 
 - `SolidBody.RestitutionCoefficient` defaults to `0.5`.
 - `SolidBody.FrictionCoefficient` defaults to `1`.
@@ -39,7 +39,7 @@ serializable, and shared across 3D, pure 2D, mixed, and CCD response.
 - `SolidBody2D.FrictionCoefficient` defaults to `Fixed64.One`.
 - `CollisionResponse`, `CollisionResponse2D`, and `CollisionResponseMixed`
   resolve restitution as the minimum of body coefficients.
-- Friction currently combines with `sqrt(bodyA * bodyB)` when both bodies are
+- Friction combined with `sqrt(bodyA * bodyB)` when both bodies were
   present.
 - Body serialization records the two coefficients.
 - `ColliderShapeDefinition`, compound parts, and colliders do not own a public
@@ -71,9 +71,9 @@ serializable, and shared across 3D, pure 2D, mixed, and CCD response.
   allows.
 - Materials must serialize through Chronicler and standard package serializers.
 
-## Proposed API Shape
+## Final API Shape
 
-The exact names should be finalized during Workstream 1. The intended shape is:
+Workstream 1 finalized the public material value shape as:
 
 ```csharp
 public readonly struct PhysicsMaterial : IEquatable<PhysicsMaterial>
@@ -119,27 +119,27 @@ response paths can migrate.
 
 **Tasks**
 
-- [ ] Add `src/Gravitas/Materials/PhysicsMaterial.cs`.
-- [ ] Add `src/Gravitas/Materials/PhysicsMaterialCombine.cs`.
-- [ ] Validate values:
+- [x] Add `src/Gravitas/Materials/PhysicsMaterial.cs`.
+- [x] Add `src/Gravitas/Materials/PhysicsMaterialCombine.cs`.
+- [x] Validate values:
   - static friction cannot be negative.
   - dynamic friction cannot be negative.
   - restitution must be clamped or rejected outside `[0, 1]`; prefer rejecting
     invalid values so authoring mistakes are visible.
   - dynamic friction cannot exceed static friction unless a specific use case is
     documented and tested.
-- [ ] Add deterministic combine helpers:
+- [x] Add deterministic combine helpers:
   - `CombineFriction(...)`
   - `CombineRestitution(...)`
   - `CombineScalar(...)`
-- [ ] Preserve current default behavior with `GeometricMean` friction and
+- [x] Preserve current default behavior with `GeometricMean` friction and
   `Minimum` restitution.
-- [ ] Add tests in `tests/Gravitas.Tests/Materials/PhysicsMaterialTests.cs`:
+- [x] Add tests in `tests/Gravitas.Tests/Materials/PhysicsMaterialTests.cs`:
   - defaults match current coefficients.
   - invalid values throw.
   - each combine policy returns expected fixed-point results.
   - equal material values compare equal.
-- [ ] Add XML docs for units, ranges, and combine semantics.
+- [x] Add XML docs for units, ranges, and combine semantics.
 
 **Done Criteria**
 
@@ -156,22 +156,22 @@ own surface material before body response migrates.
 
 **Tasks**
 
-- [ ] Add `PhysicsMaterial Material` to `LSCollider`.
-- [ ] Add `PhysicsMaterial Material` to `LSCollider2D`.
-- [ ] Add material to `ColliderShapeDefinition` and
+- [x] Add `PhysicsMaterial Material` to `LSCollider`.
+- [x] Add `PhysicsMaterial Material` to `LSCollider2D`.
+- [x] Add material to `ColliderShapeDefinition` and
   `ColliderShapeDefinition2D`.
-- [ ] Add material to `CompoundColliderPart` and `CompoundColliderPart2D`.
-- [ ] Ensure `LSCompoundCollider` and `LSCompoundCollider2D` materialize part
+- [x] Add material to `CompoundColliderPart` and `CompoundColliderPart2D`.
+- [x] Ensure `LSCompoundCollider` and `LSCompoundCollider2D` materialize part
   colliders with the part material.
-- [ ] Define owner material fallback for compound parts that omit material:
+- [x] Define owner material fallback for compound parts that omit material:
   use the compound owner material at materialization time.
-- [ ] Add tests proving:
+- [x] Add tests proving:
   - standalone colliders use their assigned material.
   - shape definitions materialize colliders with the same material.
   - compound parts keep distinct materials.
   - compound owner material is used only when a part does not supply its own
     material.
-- [ ] Update serialization for `LSCollider` and `LSCollider2D` material state.
+- [x] Update serialization for `LSCollider` and `LSCollider2D` material state.
 
 **Done Criteria**
 
@@ -188,21 +188,25 @@ The migration needs a clean ergonomic replacement.
 
 **Tasks**
 
-- [ ] Add a body-level default material property only if it materially improves
+- [x] Add a body-level default material property only if it materially improves
   setup ergonomics, such as `DefaultMaterial`.
-- [ ] If body defaults are added, define when they copy to colliders:
+- [x] If body defaults are added, define when they copy to colliders:
   - during body/collider setup.
   - through an explicit method such as `ApplyMaterialToColliders(...)`.
   - never implicitly during response.
-- [ ] Remove mutable `RestitutionCoefficient` and `FrictionCoefficient` from
+- [x] Remove mutable `RestitutionCoefficient` and `FrictionCoefficient` from
   bodies after response paths migrate.
-- [ ] Replace tests that set body coefficients with collider or material
+- [x] Replace tests that set body coefficients with collider or material
   assignment.
-- [ ] Update scenario builders so material setup is concise and explicit.
-- [ ] Update body serialization tests so material state is recorded on the
+- [x] Update scenario builders so material setup is concise and explicit.
+- [x] Update body serialization tests so material state is recorded on the
   collider surface that owns it.
-- [ ] Search for stale body coefficient assignments:
+- [x] Search for stale body coefficient assignments:
   `rg -n "RestitutionCoefficient|FrictionCoefficient" src/Gravitas tests/Gravitas.Tests docs/wiki`
+
+Outcome: no body-level default material property was added. Collider surfaces,
+shape definitions, and compound parts are the single public material ownership
+model.
 
 **Done Criteria**
 
@@ -219,22 +223,22 @@ static/dynamic friction coherently.
 
 **Tasks**
 
-- [ ] Add 3D response tests:
+- [x] Add 3D response tests:
   - restitution comes from collider material combine policy.
   - low-speed restitution threshold still suppresses bounce.
   - static friction holds resting tangential motion up to the static limit.
   - dynamic friction applies once tangential impulse exceeds static limit.
-- [ ] Add pure 2D response tests with the same material cases.
-- [ ] Add mixed response tests proving 3D and 2D collider materials combine
+- [x] Add pure 2D response tests with the same material cases.
+- [x] Add mixed response tests proving 3D and 2D collider materials combine
   correctly.
-- [ ] Update `SolverContact`, `SolverContact2D`, and mixed response helpers to
+- [x] Update `SolverContact`, `SolverContact2D`, and mixed response helpers to
   carry or resolve material values from colliders.
-- [ ] Route `CollisionResponse` through material combine helpers.
-- [ ] Route `CollisionResponse2D` through the same material policy.
-- [ ] Route `CollisionResponseMixed` through the same material policy.
-- [ ] Ensure warm-started friction clamps against the correct static or dynamic
+- [x] Route `CollisionResponse` through material combine helpers.
+- [x] Route `CollisionResponse2D` through the same material policy.
+- [x] Route `CollisionResponseMixed` through the same material policy.
+- [x] Ensure warm-started friction clamps against the correct static or dynamic
   coefficient.
-- [ ] Keep all material resolution allocation-free.
+- [x] Keep all material resolution allocation-free.
 
 **Done Criteria**
 
@@ -253,21 +257,21 @@ unless the host reads the collider material from hits.
 
 **Tasks**
 
-- [ ] Update 3D CCD restitution to resolve source/target collider material.
-- [ ] Update pure 2D CCD restitution the same way.
-- [ ] Update mixed CCD restitution where applicable.
-- [ ] Verify `Physics3DHit`, `Physics2DHit`, and `PhysicsMixedHit` expose enough
+- [x] Update 3D CCD restitution to resolve source/target collider material.
+- [x] Update pure 2D CCD restitution the same way.
+- [x] Update mixed CCD restitution where applicable.
+- [x] Verify `Physics3DHit`, `Physics2DHit`, and `PhysicsMixedHit` expose enough
   collider identity for hosts to read material without duplicating material into
   every hit payload.
-- [ ] Add serialization tests for:
+- [x] Add serialization tests for:
   - 3D collider material.
   - 2D collider material.
   - compound part material.
   - shape definition material.
-- [ ] Update `docs/wiki/COLLISION_PIPELINE.md`.
-- [ ] Update `docs/wiki/HOST_INTEGRATION.md`.
-- [ ] Update `docs/wiki/SERIALIZATION.md`.
-- [ ] Update `docs/wiki/DIMENSIONS.md` for pure 2D and mixed material behavior.
+- [x] Update `docs/wiki/COLLISION_PIPELINE.md`.
+- [x] Update `docs/wiki/HOST_INTEGRATION.md`.
+- [x] Update `docs/wiki/SERIALIZATION.md`.
+- [x] Update `docs/wiki/DIMENSIONS.md` for pure 2D and mixed material behavior.
 
 **Done Criteria**
 
@@ -284,21 +288,21 @@ deterministic behavior and avoid avoidable overhead.
 
 **Tasks**
 
-- [ ] Add or update response benchmarks:
+- [x] Add or update response benchmarks:
   - default material 3D contacts.
   - distinct material 3D contacts.
   - pure 2D manifold material contacts.
   - mixed material contacts.
   - compound part material contacts.
-- [ ] Add allocation guardrails proving steady-state material response allocates
+- [x] Add allocation guardrails proving steady-state material response allocates
   `0` bytes after warmup.
-- [ ] Run focused material tests:
+- [x] Run focused material tests:
   `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter Material`
-- [ ] Run response tests:
+- [x] Run response tests:
   `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter CollisionResponse`
-- [ ] Run full validation:
+- [x] Run full validation:
   `dotnet test Gravitas.slnx --configuration Release`
-- [ ] Run Lean validation:
+- [x] Run Lean validation:
   `dotnet test Gravitas.slnx --configuration ReleaseLean`
 
 **Done Criteria**

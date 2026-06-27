@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using Gravitas.Materials;
 
 namespace Gravitas.CollisionHandling;
 
@@ -15,11 +16,35 @@ namespace Gravitas.CollisionHandling;
 public readonly struct MixedContact
 {
     public MixedContact(Vector3d point3D, Vector3d point2D, Vector3d normal3DTo2D, Fixed64 depth)
+        : this(point3D, point2D, normal3DTo2D, depth, hasMaterialOverride: false, default, default)
+    { }
+
+    internal MixedContact(
+        Vector3d point3D,
+        Vector3d point2D,
+        Vector3d normal3DTo2D,
+        Fixed64 depth,
+        PhysicsMaterial material3D,
+        PhysicsMaterial material2D)
+        : this(point3D, point2D, normal3DTo2D, depth, hasMaterialOverride: true, material3D, material2D)
+    { }
+
+    private MixedContact(
+        Vector3d point3D,
+        Vector3d point2D,
+        Vector3d normal3DTo2D,
+        Fixed64 depth,
+        bool hasMaterialOverride,
+        PhysicsMaterial material3D,
+        PhysicsMaterial material2D)
     {
         Point3D = point3D;
         Point2D = point2D;
         Normal3DTo2D = normal3DTo2D;
         Depth = depth;
+        HasMaterialOverride = hasMaterialOverride;
+        Material3D = hasMaterialOverride ? material3D : PhysicsMaterial.Default;
+        Material2D = hasMaterialOverride ? material2D : PhysicsMaterial.Default;
         HasContact = true;
     }
 
@@ -35,4 +60,16 @@ public readonly struct MixedContact
     public Vector3d Normal3DTo2D { get; }
 
     public Fixed64 Depth { get; }
+
+    public bool HasMaterialOverride { get; }
+
+    public PhysicsMaterial Material3D { get; }
+
+    public PhysicsMaterial Material2D { get; }
+
+    internal MixedContact WithMaterialOverride(PhysicsMaterial material3D, PhysicsMaterial material2D) =>
+        new(Point3D, Point2D, Normal3DTo2D, Depth, material3D, material2D);
+
+    internal MixedContact WithFallbackMaterials(PhysicsMaterial material3D, PhysicsMaterial material2D) =>
+        HasMaterialOverride ? this : WithMaterialOverride(material3D, material2D);
 }

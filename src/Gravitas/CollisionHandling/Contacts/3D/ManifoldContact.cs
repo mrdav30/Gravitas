@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using Gravitas.Materials;
 
 namespace Gravitas.CollisionHandling;
 
@@ -20,6 +21,9 @@ public readonly struct ManifoldContact
         Vector3d pointB,
         Fixed64 depth,
         Vector3d normal,
+        bool hasMaterialOverride = false,
+        PhysicsMaterial materialA = default,
+        PhysicsMaterial materialB = default,
         Vector3d immovableCollisionDirection = default)
     {
         ContactId = contactId;
@@ -29,6 +33,9 @@ public readonly struct ManifoldContact
         Normal = normal.MagnitudeSquared > Fixed64.Epsilon
             ? normal.Normalized
             : Vector3d.Zero;
+        HasMaterialOverride = hasMaterialOverride;
+        MaterialA = hasMaterialOverride ? materialA : PhysicsMaterial.Default;
+        MaterialB = hasMaterialOverride ? materialB : PhysicsMaterial.Default;
         ImmovableCollisionDirection = immovableCollisionDirection;
     }
 
@@ -58,10 +65,25 @@ public readonly struct ManifoldContact
     public Vector3d Normal { get; }
 
     /// <summary>
+    /// Gets whether this contact carries materials from private compound parts.
+    /// </summary>
+    public bool HasMaterialOverride { get; }
+
+    /// <summary>
+    /// Material for collider A when <see cref="HasMaterialOverride"/> is true.
+    /// </summary>
+    public PhysicsMaterial MaterialA { get; }
+
+    /// <summary>
+    /// Material for collider B when <see cref="HasMaterialOverride"/> is true.
+    /// </summary>
+    public PhysicsMaterial MaterialB { get; }
+
+    /// <summary>
     /// Optional direction used by immovable-body response handling.
     /// </summary>
     public Vector3d ImmovableCollisionDirection { get; }
 
     public ManifoldContact WithImmovableDirection(Vector3d direction) =>
-        new(ContactId, PointA, PointB, Depth, Normal, direction);
+        new(ContactId, PointA, PointB, Depth, Normal, HasMaterialOverride, MaterialA, MaterialB, direction);
 }

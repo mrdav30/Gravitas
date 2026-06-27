@@ -567,8 +567,8 @@ public sealed class ContinuousCollisionDetectionTests
         ScenarioBody<LSSphereCollider> target = scenario.CreateSphere(Vector3d.Zero);
         source.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
         target.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
-        source.Body.RestitutionCoefficient = Fixed64.One;
-        target.Body.RestitutionCoefficient = Fixed64.One;
+        source.Collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.One);
+        target.Collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.One);
         DisableGroundQueries(source.Body);
         DisableGroundQueries(target.Body);
 
@@ -588,8 +588,8 @@ public sealed class ContinuousCollisionDetectionTests
         ScenarioBody<LSSphereCollider> target = scenario.CreateSphere(Vector3d.Zero);
         source.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
         target.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
-        source.Body.RestitutionCoefficient = Fixed64.One;
-        target.Body.RestitutionCoefficient = Fixed64.One;
+        source.Collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.One);
+        target.Collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.One);
         DisableGroundQueries(source.Body);
         DisableGroundQueries(target.Body);
 

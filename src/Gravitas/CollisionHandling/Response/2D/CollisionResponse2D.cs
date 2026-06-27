@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using Gravitas.Materials;
 using System.Runtime.CompilerServices;
 
 namespace Gravitas.CollisionHandling;
@@ -134,6 +135,12 @@ public static class CollisionResponse2D
             pair.ColliderB.Center - pair.ColliderA.Center);
         if (normal == Vector2d.Zero)
             return false;
+        PhysicsMaterial materialA = manifoldContact.HasMaterialOverride
+            ? manifoldContact.MaterialA
+            : pair.ColliderA.Material;
+        PhysicsMaterial materialB = manifoldContact.HasMaterialOverride
+            ? manifoldContact.MaterialB
+            : pair.ColliderB.Material;
 
         Fixed64 cachedNormalImpulse = Fixed64.Zero;
         Fixed64 cachedTangentImpulse = Fixed64.Zero;
@@ -153,6 +160,8 @@ public static class CollisionResponse2D
             bodyB.Body == null ? Vector2d.Zero : manifoldContact.PointB - bodyB.Body.WorldCenterOfMass,
             manifoldContact.Depth,
             normal,
+            materialA,
+            materialB,
             cachedNormalImpulse,
             cachedTangentImpulse);
         return true;
@@ -211,12 +220,14 @@ public static class CollisionResponse2D
 
     private static Fixed64 SolveFrictionImpulse(SolverContact2D contact, Fixed64 normalImpulseScalar)
     {
-        Fixed64 frictionCoefficient = ResolveFrictionCoefficient(contact);
-        Fixed64 maxFrictionImpulse = normalImpulseScalar > Fixed64.Zero && frictionCoefficient > Fixed64.Zero
-            ? normalImpulseScalar * frictionCoefficient
+        Fixed64 staticFrictionLimit = normalImpulseScalar > Fixed64.Zero && contact.StaticFriction > Fixed64.Zero
+            ? normalImpulseScalar * contact.StaticFriction
+            : Fixed64.Zero;
+        Fixed64 dynamicFrictionLimit = normalImpulseScalar > Fixed64.Zero && contact.DynamicFriction > Fixed64.Zero
+            ? normalImpulseScalar * contact.DynamicFriction
             : Fixed64.Zero;
         Fixed64 impulseScalar = Fixed64.Zero;
-        if (maxFrictionImpulse > Fixed64.Zero)
+        if (staticFrictionLimit > Fixed64.Zero || dynamicFrictionLimit > Fixed64.Zero)
         {
             Fixed64 tangentVelocity = Vector2d.Dot(ComputeRelativeVelocity(contact), contact.Tangent);
             Fixed64 denominator = ComputeImpulseDenominator(contact, contact.Tangent);
@@ -224,10 +235,13 @@ public static class CollisionResponse2D
                 impulseScalar = -tangentVelocity / denominator;
         }
 
-        Fixed64 accumulated = FixedMath.Clamp(
-            contact.CachedTangentImpulse + impulseScalar,
-            -maxFrictionImpulse,
-            maxFrictionImpulse);
+        Fixed64 desiredAccumulated = contact.CachedTangentImpulse + impulseScalar;
+        Fixed64 accumulated = desiredAccumulated.Abs() <= staticFrictionLimit
+            ? desiredAccumulated
+            : FixedMath.Clamp(
+                desiredAccumulated,
+                -dynamicFrictionLimit,
+                dynamicFrictionLimit);
         impulseScalar = accumulated - contact.CachedTangentImpulse;
         if (impulseScalar != Fixed64.Zero)
             ApplyImpulse(contact, contact.Tangent * impulseScalar);
@@ -305,28 +319,10 @@ public static class CollisionResponse2D
         Fixed64 closingSpeed,
         Fixed64 restitutionVelocityThreshold)
     {
-        if (contact.A.Body == null || contact.B.Body == null || closingSpeed <= restitutionVelocityThreshold)
+        if (closingSpeed <= restitutionVelocityThreshold)
             return Fixed64.Zero;
 
-        Fixed64 restitution = FixedMath.Min(
-            contact.A.Body.RestitutionCoefficient,
-            contact.B.Body.RestitutionCoefficient);
-        return FixedMath.Clamp(restitution, Fixed64.Zero, Fixed64.One);
-    }
-
-    private static Fixed64 ResolveFrictionCoefficient(SolverContact2D contact)
-    {
-        if (contact.A.Body == null && contact.B.Body == null)
-            return Fixed64.Zero;
-        if (contact.A.Body == null || contact.A.InverseMass <= Fixed64.Zero)
-            return contact.B.Body?.FrictionCoefficient ?? Fixed64.Zero;
-        if (contact.B.Body == null || contact.B.InverseMass <= Fixed64.Zero)
-            return contact.A.Body.FrictionCoefficient;
-
-        Fixed64 frictionProduct = contact.A.Body.FrictionCoefficient * contact.B.Body.FrictionCoefficient;
-        return frictionProduct > Fixed64.Zero
-            ? FixedMath.Sqrt(frictionProduct)
-            : Fixed64.Zero;
+        return contact.Restitution;
     }
 
     private static Vector2d ResolveContactNormal(Vector2d normal, Vector2d fallbackDirection)

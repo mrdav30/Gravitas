@@ -61,7 +61,47 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 
 | Signal | Status | Priority | Tracking |
 | --- | --- | --- | --- |
-| _None_ | All current benchmark signals closed | - | Add new measured signals here |
+| Pure 2D response position-correction repartition allocation | Active | Medium | See active signal below |
+
+### Signal: Pure 2D Response Position-Correction Repartition Allocation
+
+**Discovered:** 2026-06-26
+
+**Status:** Active
+
+**Evidence:** During the physics material model validation pass, a focused
+allocation guard for `CollisionResponse2D.Resolve(...)` initially measured a
+stable `2712 B` allocation when the prepared manifold used non-zero depth and
+the measured action reset velocity and resolved response in one pass. Re-running
+the material solver path with zero penetration depth and measuring only the
+prepared response call reported `0 B`, which points away from material
+resolution and toward the broader 2D position-correction/repartition path.
+
+**Why it matters:** Pure 2D contact response can run every frame for resting
+or dense contact manifolds. If the allocation is reproduced in a service-level
+response benchmark or allocation guard, position correction or the collider
+partition refresh that follows it may be creating avoidable GC pressure in a
+core 2D hot path.
+
+**Next isolation step:** Add a dedicated focused guard or benchmark row that
+separates `CollisionResponse2D.Resolve(...)` into:
+
+- zero-depth material solve.
+- non-zero-depth solve with collider rebuild but no partition transition.
+- non-zero-depth solve that crosses a partition boundary.
+
+Then inspect `SolidBody2D.ApplyCollisionPositionCorrection(...)`,
+`LSCollider2D.Rebuild()`, and
+`GravitasCollision2DService.RefreshColliderPartitionAfterShapeChange(...)` for
+repeat allocations.
+
+**Likely files:**
+
+- `src/Gravitas/CollisionHandling/Response/2D/CollisionResponse2D.cs`
+- `src/Gravitas/Core/2D/SolidBody2D.Motion.cs`
+- `src/Gravitas/Colliders/2D/LSCollider2D.cs`
+- `src/Gravitas/Core/2D/GravitasCollision2DService.cs`
+- `tests/Gravitas.Tests/CollisionHandling/CollisionResponse2DManifoldTests.cs`
 
 ### Closed Signal: SwiftCollections Sort Hot-Path Allocation
 

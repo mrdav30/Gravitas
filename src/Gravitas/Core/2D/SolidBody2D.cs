@@ -219,10 +219,6 @@ public sealed partial class SolidBody2D : IRecordable
 
     public Fixed64 LinearSpeed => _linearSpeed;
 
-    public Fixed64 RestitutionCoefficient { get; set; } = Fixed64.Half;
-
-    public Fixed64 FrictionCoefficient { get; set; } = Fixed64.One;
-
     public Vector2d Gravity { get; set; } = Vector2d.Zero;
 
     private Fixed64 _gravityScale = Fixed64.One;

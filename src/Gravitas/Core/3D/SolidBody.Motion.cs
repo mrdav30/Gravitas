@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using Gravitas.Materials;
 using System.Runtime.CompilerServices;
 
 namespace Gravitas;
@@ -244,7 +245,7 @@ public partial class SolidBody
         // Object is moving on ground, add the friction force to the accumulated force
         // Adjust the friction with the normal force magnitude
         PhysicsEnvironment environment = Context.Environment;
-        Fixed64 effectiveFriction = _frictionCoefficient;
+        Fixed64 effectiveFriction = ResolveGroundDynamicFriction();
         if (horizontalSpeed <= environment.FrictionTransitionSpeed)
         {
             Fixed64 proportion = horizontalSpeed / environment.FrictionTransitionSpeed;
@@ -333,7 +334,7 @@ public partial class SolidBody
 
         // Calculate the friction force and convert it into a torque
         PhysicsEnvironment environment = Context.Environment;
-        Fixed64 effectiveFriction = _frictionCoefficient;
+        Fixed64 effectiveFriction = ResolveGroundDynamicFriction();
         if (_angularSpeed < environment.FrictionTransitionSpeed)
         {
             Fixed64 proportion = _angularSpeed / environment.FrictionTransitionSpeed;
@@ -389,6 +390,10 @@ public partial class SolidBody
             ? (_angularVelocity - lastVelocity) / Context.DeltaTime
             : Vector3d.Zero;
     }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private Fixed64 ResolveGroundDynamicFriction() =>
+        Collider?.Material.DynamicFriction ?? PhysicsMaterial.Default.DynamicFriction;
 
     private void NonKinematicUpdate()
     {

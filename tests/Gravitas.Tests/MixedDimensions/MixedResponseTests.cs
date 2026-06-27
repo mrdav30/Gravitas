@@ -3,6 +3,7 @@ using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Diagnostics;
+using Gravitas.Materials;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
 using GridForge.Configuration;
@@ -153,6 +154,39 @@ public sealed class MixedResponseTests
             initialVelocity: (Fixed64)4);
 
         highThresholdVelocity.Should().BeGreaterThan(zeroThresholdVelocity);
+    }
+
+    [Fact]
+    public void Resolve_ShouldCombineColliderMaterialsForMixedRestitution()
+    {
+        PhysicsMaterial zeroMinimum = new(
+            Fixed64.One,
+            Fixed64.One,
+            Fixed64.Zero,
+            restitutionCombine: PhysicsMaterialCombine.Minimum);
+        PhysicsMaterial oneMinimum = new(
+            Fixed64.One,
+            Fixed64.One,
+            Fixed64.One,
+            restitutionCombine: PhysicsMaterialCombine.Minimum);
+        PhysicsMaterial oneMaximum = new(
+            Fixed64.One,
+            Fixed64.One,
+            Fixed64.One,
+            restitutionCombine: PhysicsMaterialCombine.Maximum);
+
+        Fixed64 minimumPolicyVelocity = Resolve3DPlanarVelocityAfterMixedResponse(
+            threshold: Fixed64.Zero,
+            initialVelocity: (Fixed64)4,
+            material3D: zeroMinimum,
+            material2D: oneMinimum);
+        Fixed64 maximumPolicyVelocity = Resolve3DPlanarVelocityAfterMixedResponse(
+            threshold: Fixed64.Zero,
+            initialVelocity: (Fixed64)4,
+            material3D: zeroMinimum,
+            material2D: oneMaximum);
+
+        maximumPolicyVelocity.Should().BeLessThan(minimumPolicyVelocity);
     }
 
     [Fact]
@@ -451,7 +485,11 @@ public sealed class MixedResponseTests
         return count;
     }
 
-    private static Fixed64 Resolve3DPlanarVelocityAfterMixedResponse(Fixed64 threshold, Fixed64 initialVelocity)
+    private static Fixed64 Resolve3DPlanarVelocityAfterMixedResponse(
+        Fixed64 threshold,
+        Fixed64 initialVelocity,
+        PhysicsMaterial? material3D = null,
+        PhysicsMaterial? material2D = null)
     {
         using GravitasWorldContext context = CreateMixedContext();
         context.Settings.RestitutionVelocityThreshold = threshold;
@@ -459,8 +497,8 @@ public sealed class MixedResponseTests
             context,
             new Vector3d(-Fixed64.Half, Fixed64.Zero, Fixed64.Half));
         SolidBody2D body2D = CreateCircle2D(context, Vector2d.Zero);
-        body3D.Body.RestitutionCoefficient = Fixed64.One;
-        body2D.RestitutionCoefficient = Fixed64.One;
+        body3D.Collider.Material = material3D ?? PhysicsMaterialTestHelper.WithRestitution(Fixed64.One);
+        body2D.Collider.Material = material2D ?? PhysicsMaterialTestHelper.WithRestitution(Fixed64.One);
         var pair = new CollisionPairMixed(body3D.Collider, body2D.Collider);
         var contact = new MixedContact(
             new Vector3d(-Fixed64.Half, Fixed64.Zero, Fixed64.Half),
@@ -511,9 +549,9 @@ public sealed class MixedResponseTests
         {
             Mass = Fixed64.One,
             Immovable = immovable,
-            IsKinematic = isKinematic,
-            RestitutionCoefficient = Fixed64.Zero
+            IsKinematic = isKinematic
         };
+        collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.Zero);
         body.Initialize(position, FixedQuaternion.Identity);
         return new ScenarioBody<LSSphereCollider>(body, collider);
     }
@@ -534,9 +572,9 @@ public sealed class MixedResponseTests
         var body = new SolidBody2D(agent, collider)
         {
             Mass = Fixed64.One,
-            Immovable = immovable,
-            RestitutionCoefficient = Fixed64.Zero
+            Immovable = immovable
         };
+        collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.Zero);
         body.Initialize(position);
         return body;
     }

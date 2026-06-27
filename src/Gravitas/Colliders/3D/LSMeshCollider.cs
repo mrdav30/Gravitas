@@ -63,7 +63,9 @@ public class LSMeshCollider : LSCollider
             GetTriangles(definition),
             MeshColliderMode.Convex,
             GetInertiaPolicy(definition))
-    { }
+    {
+        Material = definition.Material;
+    }
 
     public override Fixed64 ScaledRadius
     {

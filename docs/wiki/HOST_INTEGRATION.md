@@ -131,6 +131,7 @@ Dynamic matter usually has a host agent, one collider, and one `SolidBody`.
 using FixedMathSharp;
 using Gravitas;
 using Gravitas.Colliders;
+using Gravitas.Materials;
 
 FixedTransform transform = new(
     Vector3d.Zero,
@@ -139,6 +140,10 @@ FixedTransform transform = new(
 
 HostMatterAgent agent = new(context, transform);
 LSSphereCollider collider = new();
+collider.Material = new PhysicsMaterial(
+    staticFriction: Fixed64.One,
+    dynamicFriction: Fixed64.Half,
+    restitution: Fixed64.FromFraction(1, 4));
 SolidBody body = new(agent, collider)
 {
     Mass = Fixed64.One
@@ -168,6 +173,37 @@ body.Initialize(agent.Transform.Position.ToVector2d(), isDynamic: true);
 
 The 2D projection uses the LSF X/Z convention: world X maps to 2D X and world Z
 maps to 2D Y. World Y is height or future embedding metadata.
+
+## Surface Materials
+
+`PhysicsMaterial` is deterministic collider surface data. Assign it on
+`LSCollider` or `LSCollider2D` before simulation when a surface needs explicit
+static friction, dynamic friction, restitution, or combine policies.
+
+```csharp
+collider.Material = PhysicsMaterial.Frictionless;
+```
+
+Shape definitions and compound parts can also carry materials for authored
+setup:
+
+```csharp
+var compound = new LSCompoundCollider(
+    CompoundColliderPart.Sphere(
+        Fixed64.Half,
+        -Vector3d.Right,
+        PhysicsMaterial.Bouncy),
+    CompoundColliderPart.Cuboid(
+        Vector3d.One,
+        Vector3d.Right,
+        PhysicsMaterial.Default));
+```
+
+Compound parts without an explicit material use the owning compound collider's
+material when the private part colliders are materialized. Query hits still
+identify colliders; hosts can read `hit.Collider.Material` or the mixed hit's
+dimension-specific collider reference instead of duplicating material data in
+every hit payload.
 
 ## Static Collider Setup
 

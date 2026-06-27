@@ -18,6 +18,7 @@ public class LSCapsuleCollider : LSCollider
     public LSCapsuleCollider(ColliderShapeDefinition definition)
     {
         definition.EnsureKind(ColliderShapeDefinitionKind.Capsule);
+        Material = definition.Material;
         Radius = definition.Radius;
         Size = definition.Size;
     }

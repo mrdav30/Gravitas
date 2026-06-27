@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using Gravitas.Materials;
 using System;
 using System.Runtime.CompilerServices;
 
@@ -18,17 +19,22 @@ namespace Gravitas.Colliders;
 public readonly struct ColliderShapeDefinition2D : IEquatable<ColliderShapeDefinition2D>
 {
     private readonly Vector2d[]? _polygonVertices;
+    private readonly PhysicsMaterial _material;
+    private readonly bool _hasMaterial;
 
     private ColliderShapeDefinition2D(
         ColliderShapeDefinition2DKind kind,
         Fixed64 radius,
         Vector2d size,
-        Vector2d[]? polygonVertices)
+        Vector2d[]? polygonVertices,
+        PhysicsMaterial? material)
     {
         Kind = kind;
         Radius = radius;
         Size = size;
         _polygonVertices = polygonVertices;
+        _material = material ?? PhysicsMaterial.Default;
+        _hasMaterial = material.HasValue;
     }
 
     /// <summary>
@@ -47,6 +53,14 @@ public readonly struct ColliderShapeDefinition2D : IEquatable<ColliderShapeDefin
     public Vector2d Size { get; }
 
     /// <summary>
+    /// Gets the authored surface material used when this definition creates a
+    /// runtime 2D collider directly.
+    /// </summary>
+    public PhysicsMaterial Material => _hasMaterial ? _material : PhysicsMaterial.Default;
+
+    internal bool HasMaterial => _hasMaterial;
+
+    /// <summary>
     /// Gets the number of local polygon vertices held by this definition.
     /// </summary>
     public int PolygonVertexCount
@@ -58,7 +72,7 @@ public readonly struct ColliderShapeDefinition2D : IEquatable<ColliderShapeDefin
     /// <summary>
     /// Creates a circle shape definition.
     /// </summary>
-    public static ColliderShapeDefinition2D Circle(Fixed64 radius)
+    public static ColliderShapeDefinition2D Circle(Fixed64 radius, PhysicsMaterial? material = null)
     {
         ValidateRadius(radius);
         Fixed64 diameter = radius * (Fixed64)2;
@@ -66,28 +80,36 @@ public readonly struct ColliderShapeDefinition2D : IEquatable<ColliderShapeDefin
             ColliderShapeDefinition2DKind.Circle,
             radius,
             new Vector2d(diameter, diameter),
-            null);
+            null,
+            material);
     }
 
     /// <summary>
     /// Creates an axis-aligned box shape definition.
     /// </summary>
-    public static ColliderShapeDefinition2D AABBox(Vector2d size)
+    public static ColliderShapeDefinition2D AABBox(Vector2d size, PhysicsMaterial? material = null)
     {
         ValidateSize(size);
-        return new(ColliderShapeDefinition2DKind.AABBox, Fixed64.Zero, size, null);
+        return new(ColliderShapeDefinition2DKind.AABBox, Fixed64.Zero, size, null, material);
     }
 
     /// <summary>
     /// Creates an axis-aligned box shape definition.
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static ColliderShapeDefinition2D AABox(Vector2d size) => AABBox(size);
+    public static ColliderShapeDefinition2D AABox(Vector2d size, PhysicsMaterial? material = null) =>
+        AABBox(size, material);
 
     /// <summary>
     /// Creates a convex polygon shape definition.
     /// </summary>
-    public static ColliderShapeDefinition2D ConvexPolygon(params Vector2d[] vertices)
+    public static ColliderShapeDefinition2D ConvexPolygon(params Vector2d[] vertices) =>
+        ConvexPolygon(null, vertices);
+
+    /// <summary>
+    /// Creates a convex polygon shape definition.
+    /// </summary>
+    public static ColliderShapeDefinition2D ConvexPolygon(PhysicsMaterial? material, params Vector2d[] vertices)
     {
         SwiftThrowHelper.ThrowIfNull(vertices, nameof(vertices));
         LSPolygonCollider2D.ValidateConvexPolygon(vertices);
@@ -98,7 +120,8 @@ public readonly struct ColliderShapeDefinition2D : IEquatable<ColliderShapeDefin
             ColliderShapeDefinition2DKind.ConvexPolygon,
             Fixed64.Zero,
             Vector2d.Zero,
-            vertexSnapshot);
+            vertexSnapshot,
+            material);
     }
 
     /// <summary>
@@ -187,6 +210,8 @@ public readonly struct ColliderShapeDefinition2D : IEquatable<ColliderShapeDefin
         if (Kind != other.Kind
             || Radius != other.Radius
             || Size != other.Size
+            || _hasMaterial != other._hasMaterial
+            || (_hasMaterial && _material != other._material)
             || PolygonVertexCount != other.PolygonVertexCount)
         {
             return false;
@@ -212,6 +237,9 @@ public readonly struct ColliderShapeDefinition2D : IEquatable<ColliderShapeDefin
             hash = hash * 31 + Kind.GetHashCode();
             hash = hash * 31 + Radius.GetHashCode();
             hash = hash * 31 + Size.GetHashCode();
+            hash = hash * 31 + _hasMaterial.GetHashCode();
+            if (_hasMaterial)
+                hash = hash * 31 + _material.GetHashCode();
 
             for (int i = 0; i < PolygonVertexCount; i++)
                 hash = hash * 31 + _polygonVertices![i].GetHashCode();

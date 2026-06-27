@@ -73,9 +73,10 @@ contribution. `SolidBody2D.LocalCenterOfMassOffset` is body-local X/Z state, and
 `AddTorque` queues scalar angular acceleration for the next fixed
 `LateSimulate`. Dynamic 2D sleep requires both linear and angular speed to stay
 within their configured thresholds. Pure 2D contact response uses planar
-COM-relative contact arms, scalar inverse moment, normal impulses, and tangent
-Coulomb friction impulses to update both linear velocity and scalar angular
-velocity. Pure 2D collision pairs own a deterministic fixed two-contact
+COM-relative contact arms, scalar inverse moment, collider surface materials,
+normal impulses, and tangent Coulomb friction impulses to update both linear
+velocity and scalar angular velocity. Pure 2D collision pairs own a
+deterministic fixed two-contact
 `ContactManifold2D` and pair-local warm-start cache. Convex/convex face
 contacts can therefore resolve through both incident-edge points, while
 circle/circle and circle/convex contacts remain one-contact manifolds.
@@ -112,8 +113,9 @@ from the owner center, so aggregate bounds/collision geometry and mass-property
 geometry share the same local-coordinate model.
 
 `ColliderShapeDefinition2D` is the data-only authoring/import surface for
-circle, AABB, and convex polygon shape inputs. `CompoundColliderPart2D` combines
-that definition with local offset, scalar local rotation, and local scale, then
+circle, AABB, convex polygon shape inputs, and optional surface material.
+`CompoundColliderPart2D` combines that definition with optional part material,
+local offset, scalar local rotation, and local scale, then
 `LSCompoundCollider2D` materializes private runtime part colliders under one
 public 2D collider identity. Authored 2D compound assets should use those
 definitions rather than treating child runtime colliders as serialized asset
@@ -215,9 +217,10 @@ The mixed runtime model is explicit rather than separate dimension engines:
   resting-pair retention, pooled pair reuse, mixed contact enter/stay/exit
   events, and trigger-only mixed trigger events.
 - `CollisionResponseMixed` applies the constrained response model:
-  penetration correction, normal impulse, and friction are projected so 2D
-  bodies receive only X/Z correction, planar velocity deltas, and scalar angular
-  velocity deltas from the planar impulse component.
+  penetration correction, normal impulse, restitution, and material-resolved
+  friction are projected so 2D bodies receive only X/Z correction, planar
+  velocity deltas, and scalar angular velocity deltas from the planar impulse
+  component.
 - mixed broad phase uses GridForge-backed spatial identity, separate 2D and 3D
   collider ID spaces, awake-dynamic gating, layer filtering, same-agent and
   explicit hierarchy exclusion, and retained empty-partition cleanup.

@@ -60,6 +60,7 @@ public static partial class CollisionDetectionMixed
                 continue;
             }
 
+            candidate = candidate.WithFallbackMaterials(collider3D.Material, part.Material);
             if (!found || candidate.Depth < best.Depth)
             {
                 best = candidate;

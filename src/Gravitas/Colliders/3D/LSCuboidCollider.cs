@@ -132,6 +132,7 @@ public class LSCuboidCollider : LSCollider
         : this()
     {
         definition.EnsureKind(ColliderShapeDefinitionKind.Cuboid);
+        Material = definition.Material;
         Size = definition.Size;
     }
 

@@ -47,7 +47,6 @@ public partial class SolidBody
         writer.WriteVector3d(_deltaTorque);
         writer.WriteVector3d(_localCenterOfMassOffset);
         writer.WriteBool(_centerOfMassOffsetExplicit);
-        writer.WriteFixed64(RestitutionCoefficient);
         writer.WriteFixed64(_gravityScale);
         writer.WriteBool(_isSleeping);
         writer.WriteInt32(_sleepFrameCount);
@@ -71,7 +70,6 @@ public partial class SolidBody
         writer.WriteBool(_isVelocityConstant);
         writer.WriteFixed64(LinearDragCoefficient);
         writer.WriteFixed64(AngularDragCoefficient);
-        writer.WriteFixed64(_frictionCoefficient);
         writer.WriteVector3d(_normalForce);
         writer.WriteFixed64(Mass);
 

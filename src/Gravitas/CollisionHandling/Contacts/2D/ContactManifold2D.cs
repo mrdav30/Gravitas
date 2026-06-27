@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using Gravitas.Materials;
 using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -109,13 +110,56 @@ public sealed class ContactManifold2D : IEnumerable<ManifoldContact2D>
         AddContact(pointA, pointB, depth, normal);
     }
 
+    internal void SetContact(
+        Vector2d pointA,
+        Vector2d pointB,
+        Fixed64 depth,
+        Vector2d normal,
+        PhysicsMaterial materialA,
+        PhysicsMaterial materialB)
+    {
+        _count = 0;
+        AddContact(pointA, pointB, depth, normal, materialA, materialB);
+    }
+
     /// <summary>
     /// Adds a contact, keeping the deepest two contacts and exposing them by stable contact identity.
     /// </summary>
     public void AddContact(Vector2d pointA, Vector2d pointB, Fixed64 depth, Vector2d normal)
     {
+        AddContactCore(pointA, pointB, depth, normal, hasMaterialOverride: false, default, default);
+    }
+
+    internal void AddContact(
+        Vector2d pointA,
+        Vector2d pointB,
+        Fixed64 depth,
+        Vector2d normal,
+        PhysicsMaterial materialA,
+        PhysicsMaterial materialB)
+    {
+        AddContactCore(pointA, pointB, depth, normal, hasMaterialOverride: true, materialA, materialB);
+    }
+
+    private void AddContactCore(
+        Vector2d pointA,
+        Vector2d pointB,
+        Fixed64 depth,
+        Vector2d normal,
+        bool hasMaterialOverride,
+        PhysicsMaterial materialA,
+        PhysicsMaterial materialB)
+    {
         ulong contactId = CreateContactId(pointA, pointB);
-        var contact = new ManifoldContact2D(contactId, pointA, pointB, depth, normal);
+        var contact = new ManifoldContact2D(
+            contactId,
+            pointA,
+            pointB,
+            depth,
+            normal,
+            hasMaterialOverride,
+            materialA,
+            materialB);
 
         for (int i = 0; i < _count; i++)
         {

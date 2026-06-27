@@ -19,6 +19,7 @@ public class LSCylinderCollider : LSCollider
     public LSCylinderCollider(ColliderShapeDefinition definition)
     {
         definition.EnsureKind(ColliderShapeDefinitionKind.Cylinder);
+        Material = definition.Material;
         Radius = definition.Radius;
         Size = definition.Size;
     }

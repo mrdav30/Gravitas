@@ -9,6 +9,7 @@ using Chronicler;
 using FixedMathSharp;
 using FixedMathSharp.Bounds;
 using Gravitas.CollisionHandling;
+using Gravitas.Materials;
 using Gravitas.Queries;
 using Gravitas.Support;
 using GridForge.Grids;
@@ -134,6 +135,27 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode
         get => _layer;
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         set => _layer = value;
+    }
+
+    private PhysicsMaterial _material = PhysicsMaterial.Default;
+
+    /// <summary>
+    /// Gets or sets the deterministic surface material used by collision
+    /// response for this collider.
+    /// </summary>
+    public PhysicsMaterial Material
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => _material;
+        set
+        {
+            if (_material == value)
+                return;
+
+            _material = value;
+            OnMaterialChanged();
+            _body?.Wake();
+        }
     }
 
     /// <summary>
@@ -561,6 +583,8 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode
 
     protected virtual void OnRadiusChanged() { }
 
+    protected virtual void OnMaterialChanged() { }
+
     protected virtual Vector3d NormalizeSize(Vector3d value) => value;
 
     private static void ValidateSize(Vector3d value)
@@ -981,6 +1005,7 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode
         RecordValues.Look(chronicler, ref _drawBoundingBox, "DrawBoundingBox", false);
         RecordValues.Look(chronicler, ref _active, "Active", true);
         RecordValues.Look(chronicler, ref _layer, "Layer", new());
+        RecordValues.Look(chronicler, ref _material, "Material", PhysicsMaterial.Default);
         RecordValues.Look(chronicler, ref _isTrigger, "IsTrigger", false);
         RecordValues.Look(chronicler, ref _preventCulling, "PreventCulling", false);
         RecordValues.Look(chronicler, ref _offset, "Offset", Vector3d.Zero);

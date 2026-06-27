@@ -18,8 +18,6 @@ public sealed partial class SolidBody2D
         bool immovable = Immovable;
         bool isKinematic = IsKinematic;
         Fixed64 mass = Mass;
-        Fixed64 restitutionCoefficient = RestitutionCoefficient;
-        Fixed64 frictionCoefficient = FrictionCoefficient;
         Vector2d gravity = Gravity;
         Fixed64 gravityScale = GravityScale;
         bool sleepEnabled = SleepEnabled;
@@ -46,8 +44,6 @@ public sealed partial class SolidBody2D
         RecordValues.Look(chronicler, ref _isSleeping, "IsSleeping");
         RecordValues.Look(chronicler, ref _sleepFrameCount, "SleepFrameCount");
         RecordValues.Look(chronicler, ref mass, "Mass");
-        RecordValues.Look(chronicler, ref restitutionCoefficient, "RestitutionCoefficient", Fixed64.Half);
-        RecordValues.Look(chronicler, ref frictionCoefficient, "FrictionCoefficient", Fixed64.One);
         RecordValues.Look(chronicler, ref gravity, "Gravity", Vector2d.Zero);
         RecordValues.Look(chronicler, ref gravityScale, "GravityScale", Fixed64.One);
         RecordValues.Look(chronicler, ref sleepEnabled, "SleepEnabled", true);
@@ -62,8 +58,6 @@ public sealed partial class SolidBody2D
             _immovable = immovable;
             _isKinematic = isKinematic;
             Mass = mass;
-            RestitutionCoefficient = restitutionCoefficient;
-            FrictionCoefficient = frictionCoefficient;
             Gravity = gravity;
             GravityScale = gravityScale;
             SleepEnabled = sleepEnabled;

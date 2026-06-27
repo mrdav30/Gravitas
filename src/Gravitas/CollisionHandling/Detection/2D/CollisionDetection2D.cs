@@ -118,7 +118,7 @@ internal static class CollisionDetection2D
         if (!TryCircleCircle(colliderA, colliderB, out Contact2D contact))
             return false;
 
-        AddContact(manifold, contact);
+        AddContact(manifold, contact, colliderA, colliderB);
         return true;
     }
 
@@ -164,7 +164,7 @@ internal static class CollisionDetection2D
         if (!TryCircleConvex(circle, convex, out Contact2D contact))
             return false;
 
-        AddContact(manifold, contact);
+        AddContact(manifold, contact, circle, convex);
         return true;
     }
 
@@ -176,7 +176,13 @@ internal static class CollisionDetection2D
         if (!TryCircleConvex(circle, convex, out Contact2D contact))
             return false;
 
-        manifold.AddContact(contact.PointB, contact.PointA, contact.Depth, -contact.Normal);
+        manifold.AddContact(
+            contact.PointB,
+            contact.PointA,
+            contact.Depth,
+            -contact.Normal,
+            convex.Material,
+            circle.Material);
         return true;
     }
 
@@ -239,9 +245,25 @@ internal static class CollisionDetection2D
             Fixed64 depth = separation < Fixed64.Zero ? -separation : Fixed64.Zero;
             Vector2d referencePoint = incidentPoint - referenceNormal * separation;
             if (referenceIsA)
-                manifold.AddContact(referencePoint, incidentPoint, depth, ownerNormal);
+            {
+                manifold.AddContact(
+                    referencePoint,
+                    incidentPoint,
+                    depth,
+                    ownerNormal,
+                    colliderA.Material,
+                    colliderB.Material);
+            }
             else
-                manifold.AddContact(incidentPoint, referencePoint, depth, ownerNormal);
+            {
+                manifold.AddContact(
+                    incidentPoint,
+                    referencePoint,
+                    depth,
+                    ownerNormal,
+                    colliderA.Material,
+                    colliderB.Material);
+            }
 
             found = true;
         }
@@ -654,8 +676,18 @@ internal static class CollisionDetection2D
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void AddContact(ContactManifold2D manifold, Contact2D contact) =>
-        manifold.AddContact(contact.PointA, contact.PointB, contact.Depth, contact.Normal);
+    private static void AddContact(
+        ContactManifold2D manifold,
+        Contact2D contact,
+        LSCollider2D colliderA,
+        LSCollider2D colliderB) =>
+        manifold.AddContact(
+            contact.PointA,
+            contact.PointB,
+            contact.Depth,
+            contact.Normal,
+            colliderA.Material,
+            colliderB.Material);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static bool BoundsOverlap(LSCollider2D colliderA, LSCollider2D colliderB) =>

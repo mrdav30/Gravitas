@@ -2,6 +2,7 @@ using BenchmarkDotNet.Attributes;
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
+using Gravitas.Materials;
 using System;
 
 namespace Gravitas.Benchmarks;
@@ -15,6 +16,9 @@ public class MixedCollisionResponseBenchmarks
 
     [Params(16, 64)]
     public int PairCount { get; set; }
+
+    [Params(ResponseMaterialMode.Default, ResponseMaterialMode.Distinct)]
+    public ResponseMaterialMode MaterialMode { get; set; }
 
     [IterationSetup]
     public void Setup()
@@ -75,6 +79,7 @@ public class MixedCollisionResponseBenchmarks
             new LSSphereCollider(),
             origin + new Vector3d(Fixed64.FromFraction(-1, 4), Fixed64.Zero, Fixed64.Zero));
         SolidBody2D circle = CreateCircle2D(new Vector2d(origin.X, origin.Z));
+        ApplyMaterialMode(sphere.Collider, circle.Collider);
         sphere.Body.AddLinearImpulse(new Vector3d((Fixed64)30, Fixed64.Zero, Fixed64.Zero));
 
         if (!CollisionDetectionMixed.TryCollide(sphere.Collider, circle.Collider, out MixedContact contact))
@@ -117,6 +122,15 @@ public class MixedCollisionResponseBenchmarks
         return new Vector3d(x * 3, 0, z * 3);
     }
 
+    private void ApplyMaterialMode(LSCollider collider3D, LSCollider2D collider2D)
+    {
+        if (MaterialMode == ResponseMaterialMode.Default)
+            return;
+
+        collider3D.Material = RoughSurface;
+        collider2D.Material = SlickSurface;
+    }
+
     private readonly struct ScenarioBody<TCollider>
         where TCollider : LSCollider
     {
@@ -130,4 +144,24 @@ public class MixedCollisionResponseBenchmarks
 
         public TCollider Collider { get; }
     }
+
+    public enum ResponseMaterialMode
+    {
+        Default,
+        Distinct
+    }
+
+    private static readonly PhysicsMaterial RoughSurface = new(
+        (Fixed64)2,
+        Fixed64.One,
+        Fixed64.FromFraction(1, 4),
+        PhysicsMaterialCombine.Maximum,
+        PhysicsMaterialCombine.Minimum);
+
+    private static readonly PhysicsMaterial SlickSurface = new(
+        Fixed64.Half,
+        Fixed64.FromFraction(1, 4),
+        Fixed64.FromFraction(3, 4),
+        PhysicsMaterialCombine.Minimum,
+        PhysicsMaterialCombine.Maximum);
 }

@@ -2,6 +2,7 @@ using BenchmarkDotNet.Attributes;
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
+using Gravitas.Materials;
 using Gravitas.Queries;
 using GridForge.Configuration;
 using SwiftCollections;
@@ -36,6 +37,9 @@ public class Physics2DBenchmarks
     private CollisionPair2D[] _twoContactResponsePairs;
     private SolidBody2D[] _twoContactResponseBodies;
     private Vector2d[] _twoContactResponseVelocities;
+    private CollisionPair2D[] _materialResponsePairs;
+    private SolidBody2D[] _materialResponseBodies;
+    private Vector2d[] _materialResponseVelocities;
 
     [Params(64, 1024)]
     public int BodyCount { get; set; }
@@ -69,6 +73,9 @@ public class Physics2DBenchmarks
         _twoContactResponsePairs = new CollisionPair2D[BodyCount];
         _twoContactResponseBodies = new SolidBody2D[BodyCount];
         _twoContactResponseVelocities = new Vector2d[BodyCount];
+        _materialResponsePairs = new CollisionPair2D[BodyCount];
+        _materialResponseBodies = new SolidBody2D[BodyCount];
+        _materialResponseVelocities = new Vector2d[BodyCount];
 
         for (int i = 0; i < BodyCount; i++)
         {
@@ -93,6 +100,12 @@ public class Physics2DBenchmarks
                 out Vector2d responseVelocity);
             _twoContactResponseBodies[i] = responseBody;
             _twoContactResponseVelocities[i] = responseVelocity;
+            _materialResponsePairs[i] = CreateMaterialTwoContactResponsePair(
+                i,
+                out SolidBody2D materialBody,
+                out Vector2d materialVelocity);
+            _materialResponseBodies[i] = materialBody;
+            _materialResponseVelocities[i] = materialVelocity;
         }
 
         for (int i = 0; i < BodyCount; i++)
@@ -139,6 +152,9 @@ public class Physics2DBenchmarks
         _twoContactResponsePairs = null;
         _twoContactResponseBodies = null;
         _twoContactResponseVelocities = null;
+        _materialResponsePairs = null;
+        _materialResponseBodies = null;
+        _materialResponseVelocities = null;
     }
 
     [Benchmark]
@@ -236,6 +252,24 @@ public class Physics2DBenchmarks
             body.ApplyCollisionLinearVelocityDelta(_twoContactResponseVelocities[i] - body.LinearVelocity);
 
             CollisionResponse2D.Resolve(_twoContactResponsePairs[i]);
+            checksum += body.LinearVelocity.X.m_rawValue;
+            checksum += body.AngularVelocity.m_rawValue;
+        }
+
+        return checksum;
+    }
+
+    [Benchmark]
+    public long ResolveTwoContactMaterialManifoldPairs()
+    {
+        long checksum = 0;
+        for (int i = 0; i < _materialResponsePairs.Length; i++)
+        {
+            SolidBody2D body = _materialResponseBodies[i];
+            body.ApplyCollisionAngularVelocityDelta(-body.AngularVelocity);
+            body.ApplyCollisionLinearVelocityDelta(_materialResponseVelocities[i] - body.LinearVelocity);
+
+            CollisionResponse2D.Resolve(_materialResponsePairs[i]);
             checksum += body.LinearVelocity.X.m_rawValue;
             checksum += body.AngularVelocity.m_rawValue;
         }
@@ -556,6 +590,17 @@ public class Physics2DBenchmarks
         return pair;
     }
 
+    private CollisionPair2D CreateMaterialTwoContactResponsePair(
+        int index,
+        out SolidBody2D dynamicBody,
+        out Vector2d resetVelocity)
+    {
+        CollisionPair2D pair = CreateTwoContactResponsePair(index + BodyCount, out dynamicBody, out resetVelocity);
+        pair.ColliderA.Material = RoughSurface;
+        pair.ColliderB.Material = SlickSurface;
+        return pair;
+    }
+
     private static SolidBody2D CreateBody(
         GravitasWorldContext context,
         LSCollider2D collider,
@@ -684,4 +729,18 @@ public class Physics2DBenchmarks
 
         public ContactManifold2D Manifold { get; }
     }
+
+    private static readonly PhysicsMaterial RoughSurface = new(
+        (Fixed64)2,
+        Fixed64.One,
+        Fixed64.FromFraction(1, 4),
+        PhysicsMaterialCombine.Maximum,
+        PhysicsMaterialCombine.Minimum);
+
+    private static readonly PhysicsMaterial SlickSurface = new(
+        Fixed64.Half,
+        Fixed64.FromFraction(1, 4),
+        Fixed64.FromFraction(3, 4),
+        PhysicsMaterialCombine.Minimum,
+        PhysicsMaterialCombine.Maximum);
 }

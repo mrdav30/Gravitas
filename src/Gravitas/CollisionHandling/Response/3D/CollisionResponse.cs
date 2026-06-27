@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using Gravitas.Materials;
 using System.Runtime.CompilerServices;
 
 namespace Gravitas.CollisionHandling;
@@ -156,6 +157,12 @@ public static class CollisionResponse
         Vector3d normal = ResolveContactNormal(manifoldContact.Normal, pair.ColliderB.Center - pair.ColliderA.Center);
         if (normal == Vector3d.Zero)
             return false;
+        PhysicsMaterial materialA = manifoldContact.HasMaterialOverride
+            ? manifoldContact.MaterialA
+            : pair.ColliderA.Material;
+        PhysicsMaterial materialB = manifoldContact.HasMaterialOverride
+            ? manifoldContact.MaterialB
+            : pair.ColliderB.Material;
 
         Fixed64 cachedNormalImpulse = Fixed64.Zero;
         Fixed64 cachedTangentImpulse = Fixed64.Zero;
@@ -180,6 +187,8 @@ public static class CollisionResponse
             manifoldContact.PointB - bodyB.Body.WorldCenterOfMass,
             manifoldContact.Depth,
             normal,
+            materialA,
+            materialB,
             cachedNormalImpulse,
             cachedTangentImpulse,
             cachedSecondaryTangentImpulse);
@@ -259,11 +268,13 @@ public static class CollisionResponse
         tangentImpulse = Fixed64.Zero;
         secondaryTangentImpulse = Fixed64.Zero;
 
-        Fixed64 frictionCoefficient = ResolveFrictionCoefficient(contact);
-        Fixed64 maxFrictionImpulse = normalImpulseScalar > Fixed64.Zero && frictionCoefficient > Fixed64.Zero
-            ? normalImpulseScalar * frictionCoefficient
+        Fixed64 staticFrictionLimit = normalImpulseScalar > Fixed64.Zero && contact.StaticFriction > Fixed64.Zero
+            ? normalImpulseScalar * contact.StaticFriction
             : Fixed64.Zero;
-        if (maxFrictionImpulse <= Fixed64.Zero)
+        Fixed64 dynamicFrictionLimit = normalImpulseScalar > Fixed64.Zero && contact.DynamicFriction > Fixed64.Zero
+            ? normalImpulseScalar * contact.DynamicFriction
+            : Fixed64.Zero;
+        if (staticFrictionLimit <= Fixed64.Zero && dynamicFrictionLimit <= Fixed64.Zero)
         {
             ApplyFrictionDelta(contact, -contact.CachedTangentImpulse, -contact.CachedSecondaryTangentImpulse);
             return;
@@ -274,10 +285,16 @@ public static class CollisionResponse
         Fixed64 secondaryTangentDelta = ComputeTangentImpulseDelta(contact, relativeVelocity, contact.SecondaryTangent);
         tangentImpulse = contact.CachedTangentImpulse + tangentDelta;
         secondaryTangentImpulse = contact.CachedSecondaryTangentImpulse + secondaryTangentDelta;
-        ClampTangentImpulsePair(
-            ref tangentImpulse,
-            ref secondaryTangentImpulse,
-            maxFrictionImpulse);
+        Fixed64 desiredMagnitudeSquared = tangentImpulse * tangentImpulse
+            + secondaryTangentImpulse * secondaryTangentImpulse;
+        Fixed64 staticLimitSquared = staticFrictionLimit * staticFrictionLimit;
+        if (desiredMagnitudeSquared > staticLimitSquared)
+        {
+            ClampTangentImpulsePair(
+                ref tangentImpulse,
+                ref secondaryTangentImpulse,
+                dynamicFrictionLimit);
+        }
 
         ApplyFrictionDelta(
             contact,
@@ -391,18 +408,7 @@ public static class CollisionResponse
         if (closingSpeed <= restitutionVelocityThreshold)
             return Fixed64.Zero;
 
-        Fixed64 restitution = FixedMath.Min(
-            contact.A.Body.RestitutionCoefficient,
-            contact.B.Body.RestitutionCoefficient);
-        return FixedMath.Clamp(restitution, Fixed64.Zero, Fixed64.One);
-    }
-
-    private static Fixed64 ResolveFrictionCoefficient(SolverContact contact)
-    {
-        Fixed64 frictionProduct = contact.A.Body.FrictionCoefficient * contact.B.Body.FrictionCoefficient;
-        return frictionProduct > Fixed64.Zero
-            ? FixedMath.Sqrt(frictionProduct)
-            : Fixed64.Zero;
+        return contact.Restitution;
     }
 
     private static bool IsWarmStartCompatible(Vector3d cachedNormal, Vector3d normal) =>

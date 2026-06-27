@@ -1303,8 +1303,8 @@ public sealed class MixedQueryCcdTests
         SolidBody2D target2D = CreateCircle2D(context, Vector2d.Zero);
         source3D.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
         target2D.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
-        source3D.Body.RestitutionCoefficient = Fixed64.One;
-        target2D.RestitutionCoefficient = Fixed64.One;
+        source3D.Collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.One);
+        target2D.Collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.One);
 
         source3D.Body.AddForce(Vector3d.Right * (Fixed64)4);
         context.LateSimulate();
@@ -1325,8 +1325,8 @@ public sealed class MixedQueryCcdTests
         SolidBody2D target2D = CreateCircle2D(context, Vector2d.Zero);
         source3D.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
         target2D.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
-        source3D.Body.RestitutionCoefficient = Fixed64.One;
-        target2D.RestitutionCoefficient = Fixed64.One;
+        source3D.Collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.One);
+        target2D.Collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.One);
 
         source3D.Body.AddForce(Vector3d.Right * (Fixed64)4);
         context.LateSimulate();
@@ -1345,8 +1345,8 @@ public sealed class MixedQueryCcdTests
         ScenarioBody<LSSphereCollider> target3D = CreateSphere3D(context, Vector3d.Zero);
         source2D.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
         target3D.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
-        source2D.RestitutionCoefficient = Fixed64.One;
-        target3D.Body.RestitutionCoefficient = Fixed64.One;
+        source2D.Collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.One);
+        target3D.Collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.One);
 
         source2D.AddForce(Vector2d.Right * (Fixed64)4);
         context.LateSimulate();
@@ -1365,8 +1365,8 @@ public sealed class MixedQueryCcdTests
         ScenarioBody<LSSphereCollider> target3D = CreateSphere3D(context, Vector3d.Zero);
         source2D.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
         target3D.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
-        source2D.RestitutionCoefficient = Fixed64.One;
-        target3D.Body.RestitutionCoefficient = Fixed64.One;
+        source2D.Collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.One);
+        target3D.Collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.One);
 
         source2D.AddForce(Vector2d.Right * (Fixed64)4);
         context.LateSimulate();
@@ -1418,8 +1418,8 @@ public sealed class MixedQueryCcdTests
             new Vector3d((Fixed64)(-5), Fixed64.Zero, Fixed64.Zero),
             isKinematic: true);
         source.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
-        source.Body.RestitutionCoefficient = Fixed64.Half;
-        target.RestitutionCoefficient = Fixed64.Half;
+        source.Collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.Half);
+        target.Collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.Half);
 
         source.Body.Agent.Transform.Position = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
         context.LateSimulate();
@@ -1443,8 +1443,8 @@ public sealed class MixedQueryCcdTests
             new Vector2d((Fixed64)(-5), Fixed64.Zero),
             isKinematic: true);
         source.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
-        source.RestitutionCoefficient = Fixed64.Half;
-        target.Body.RestitutionCoefficient = Fixed64.Half;
+        source.Collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.Half);
+        target.Collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.Half);
 
         source.Agent.Transform.Position = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
         RunPureServicesThroughContinuousCollisionHandoffs(context);
@@ -1469,8 +1469,8 @@ public sealed class MixedQueryCcdTests
             new Vector2d((Fixed64)(-5), Fixed64.Zero),
             isKinematic: true);
         source.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
-        source.RestitutionCoefficient = Fixed64.One;
-        target.Body.RestitutionCoefficient = Fixed64.One;
+        source.Collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.One);
+        target.Collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.One);
 
         source.Agent.Transform.Position = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
         context.LateSimulate();
@@ -1848,9 +1848,9 @@ public sealed class MixedQueryCcdTests
         {
             Mass = Fixed64.One,
             Immovable = immovable,
-            IsKinematic = isKinematic,
-            RestitutionCoefficient = Fixed64.Zero
+            IsKinematic = isKinematic
         };
+        collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.Zero);
         body.Initialize(position, startRotation);
         return new ScenarioBody<TCollider>(body, collider);
     }
@@ -1869,9 +1869,9 @@ public sealed class MixedQueryCcdTests
         {
             Mass = Fixed64.One,
             Immovable = immovable,
-            IsKinematic = isKinematic,
-            RestitutionCoefficient = Fixed64.Zero
+            IsKinematic = isKinematic
         };
+        collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.Zero);
         body.Initialize(position);
         return body;
     }

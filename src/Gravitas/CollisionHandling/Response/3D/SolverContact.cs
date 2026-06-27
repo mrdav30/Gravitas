@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using Gravitas.Materials;
 
 namespace Gravitas.CollisionHandling;
 
@@ -24,6 +25,8 @@ internal readonly struct SolverContact
         Vector3d relativeB,
         Fixed64 depth,
         Vector3d normal,
+        PhysicsMaterial materialA,
+        PhysicsMaterial materialB,
         Fixed64 cachedNormalImpulse,
         Fixed64 cachedTangentImpulse,
         Fixed64 cachedSecondaryTangentImpulse)
@@ -37,6 +40,12 @@ internal readonly struct SolverContact
         RelativeB = relativeB;
         Depth = depth;
         Normal = normal;
+        MaterialA = materialA;
+        MaterialB = materialB;
+        PhysicsMaterial.CombineFriction(materialA, materialB, out Fixed64 staticFriction, out Fixed64 dynamicFriction);
+        StaticFriction = staticFriction;
+        DynamicFriction = dynamicFriction;
+        Restitution = PhysicsMaterial.CombineRestitution(materialA, materialB);
         Tangent = CreateTangent(normal);
         SecondaryTangent = Vector3d.Cross(normal, Tangent).Normalized;
         CachedNormalImpulse = cachedNormalImpulse;
@@ -61,6 +70,16 @@ internal readonly struct SolverContact
     public Fixed64 Depth { get; }
 
     public Vector3d Normal { get; }
+
+    public PhysicsMaterial MaterialA { get; }
+
+    public PhysicsMaterial MaterialB { get; }
+
+    public Fixed64 StaticFriction { get; }
+
+    public Fixed64 DynamicFriction { get; }
+
+    public Fixed64 Restitution { get; }
 
     public Vector3d Tangent { get; }
 

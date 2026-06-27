@@ -834,13 +834,14 @@ manifold solver:
 7. accumulate and clamp normal impulses at zero, then apply only the delta from
    the cached value. This lets stale normal impulses unwind instead of injecting
    separating energy.
-8. solve friction over a deterministic two-axis tangent frame derived from the
-   contact normal. The accumulated tangent pair is clamped as a Coulomb disk by
-   `normalImpulse * frictionCoefficient`, where the pair coefficient is the
-   geometric mean of the two body coefficients.
-9. use the same single `FrictionCoefficient` as the current static sticking
-   bound for near-resting tangential motion and the sliding clamp when the
-   requested tangent impulse exceeds that bound.
+8. resolve the collider surface materials for the contact pair. Static and
+   dynamic friction use the materials' friction combine policy; restitution
+   uses the materials' restitution combine policy.
+9. solve friction over a deterministic two-axis tangent frame derived from the
+   contact normal. Tangent impulses that fit within
+   `normalImpulse * staticFriction` behave as static sticking. Requests above
+   that bound are clamped by `normalImpulse * dynamicFriction` so sliding uses
+   the dynamic coefficient instead of the static coefficient.
 10. store the solved normal, primary tangent, secondary tangent, and contact
     normal in a fixed-size pair-local warm-start cache keyed by stable manifold
     contact identity.
@@ -888,20 +889,27 @@ Response units and invariants:
   separate so orientation refreshes are idempotent. Mesh colliders use cached
   closed-volume mass properties by default when angular dynamics are enabled and
   keep explicit surface approximation opt-in for open meshes.
-- restitution is clamped to `[0, 1]` and combined by the lower coefficient so a
-  low-bounce participant can dampen the pair.
+- `PhysicsMaterial` is collider surface data. `LSCollider`, `LSCollider2D`,
+  authored `ColliderShapeDefinition` values, and compound parts can carry a
+  material. Compound parts without an explicit material inherit the owning
+  compound collider material when private part colliders are materialized.
+- restitution is clamped to `[0, 1]`. The default combine policy is `Minimum`
+  so a low-bounce participant can dampen the pair; materials can explicitly
+  choose `Minimum`, `Maximum`, `Average`, `Multiply`, or `GeometricMean`.
 - closing speeds at or below `PhysicsSettings.RestitutionVelocityThreshold` use
   zero restitution to avoid resting-contact bounce.
-- `SolidBody.FrictionCoefficient` is a non-negative Coulomb coefficient. Values
-  above one are allowed for intentional high-friction materials.
+- static and dynamic friction are non-negative Coulomb coefficients on
+  `PhysicsMaterial`. Dynamic friction must not exceed static friction. Values
+  above one are allowed for intentional high-friction surfaces.
 - friction impulses oppose tangential contact motion and are clamped by the
-  normal impulse. 3D pair-local warm-start storage records solved normal,
-  primary tangent, secondary tangent, and contact normal values by contact
-  identity; cached entries are applied before the fresh solve only when the
-  current normal remains compatible with the stored normal. Pure 2D response
-  applies cached normal and tangent impulses before the fresh solve, accumulates
-  and clamps normal impulses at zero, and clamps tangent impulses to the current
-  Coulomb bound so stale cache entries can unwind.
+  normal impulse and the resolved material coefficients. 3D pair-local
+  warm-start storage records solved normal, primary tangent, secondary tangent,
+  and contact normal values by contact identity; cached entries are applied
+  before the fresh solve only when the current normal remains compatible with
+  the stored normal. Pure 2D response applies cached normal and tangent impulses
+  before the fresh solve, accumulates and clamps normal impulses at zero, and
+  clamps tangent impulses to the current Coulomb bound so stale cache entries
+  can unwind.
 - penetration depth is a world distance from narrow phase; response slop is a
   solver invariant, not contact data.
 - drag and angular damping remain integration/body behavior; contact friction is

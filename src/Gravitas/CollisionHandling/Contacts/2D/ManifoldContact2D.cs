@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using Gravitas.Materials;
 
 namespace Gravitas.CollisionHandling;
 
@@ -19,7 +20,10 @@ public readonly struct ManifoldContact2D
         Vector2d pointA,
         Vector2d pointB,
         Fixed64 depth,
-        Vector2d normal)
+        Vector2d normal,
+        bool hasMaterialOverride = false,
+        PhysicsMaterial materialA = default,
+        PhysicsMaterial materialB = default)
     {
         ContactId = contactId;
         PointA = pointA;
@@ -28,6 +32,9 @@ public readonly struct ManifoldContact2D
         Normal = normal.MagnitudeSquared > Fixed64.Epsilon
             ? normal.Normalized
             : Vector2d.Zero;
+        HasMaterialOverride = hasMaterialOverride;
+        MaterialA = hasMaterialOverride ? materialA : PhysicsMaterial.Default;
+        MaterialB = hasMaterialOverride ? materialB : PhysicsMaterial.Default;
     }
 
     /// <summary>
@@ -54,4 +61,19 @@ public readonly struct ManifoldContact2D
     /// Unit normal pointing from collider A toward collider B.
     /// </summary>
     public Vector2d Normal { get; }
+
+    /// <summary>
+    /// Gets whether this contact carries materials from private compound parts.
+    /// </summary>
+    public bool HasMaterialOverride { get; }
+
+    /// <summary>
+    /// Material for collider A when <see cref="HasMaterialOverride"/> is true.
+    /// </summary>
+    public PhysicsMaterial MaterialA { get; }
+
+    /// <summary>
+    /// Material for collider B when <see cref="HasMaterialOverride"/> is true.
+    /// </summary>
+    public PhysicsMaterial MaterialB { get; }
 }

@@ -2,6 +2,7 @@ using BenchmarkDotNet.Attributes;
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
+using Gravitas.Materials;
 using System;
 
 namespace Gravitas.Benchmarks;
@@ -20,8 +21,12 @@ public class CollisionResponseBenchmarks
         ResponseContactShape.FaceManifold,
         ResponseContactShape.RestingFaceManifold,
         ResponseContactShape.CylinderContact,
-        ResponseContactShape.MeshContact)]
+        ResponseContactShape.MeshContact,
+        ResponseContactShape.CompoundPartContact)]
     public ResponseContactShape ContactShape { get; set; }
+
+    [Params(ResponseMaterialMode.Default, ResponseMaterialMode.Distinct)]
+    public ResponseMaterialMode MaterialMode { get; set; }
 
     [IterationSetup]
     public void Setup()
@@ -35,6 +40,7 @@ public class CollisionResponseBenchmarks
         {
             Vector3d origin = PositionForPair(i);
             _pairs[i] = CreateResponsePair(origin);
+            ApplyMaterialMode(_pairs[i]);
             if (!CollisionDetection.DoCollisionCheck(_pairs[i]))
                 throw new InvalidOperationException("Unable to prepare a 3D response contact pair.");
         }
@@ -65,7 +71,8 @@ public class CollisionResponseBenchmarks
             ResponseContactShape.FaceManifold => CreateMovingCuboidCuboidPair(origin),
             ResponseContactShape.RestingFaceManifold => CreateRestingCuboidStackPair(origin),
             ResponseContactShape.CylinderContact => CreateCylinderSpherePair(origin),
-            _ => CreateMeshCuboidPair(origin),
+            ResponseContactShape.MeshContact => CreateMeshCuboidPair(origin),
+            _ => CreateCompoundPartSpherePair(origin),
         };
     }
 
@@ -130,6 +137,24 @@ public class CollisionResponseBenchmarks
         return new CollisionPair(floor.Collider, box.Collider);
     }
 
+    private CollisionPair CreateCompoundPartSpherePair(Vector3d origin)
+    {
+        var compoundCollider = MaterialMode == ResponseMaterialMode.Distinct
+            ? new LSCompoundCollider(
+                CompoundColliderPart.Sphere(Fixed64.Half, Vector3d.Zero, RoughSurface))
+            : new LSCompoundCollider(
+                CompoundColliderPart.Sphere(Fixed64.Half, Vector3d.Zero));
+        ScenarioBody<LSCompoundCollider> compound = CreateBody(
+            compoundCollider,
+            origin,
+            immovable: true);
+        ScenarioBody<LSSphereCollider> sphere = CreateBody(
+            new LSSphereCollider(),
+            origin + new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
+        Push(sphere.Body, -60);
+        return new CollisionPair(compound.Collider, sphere.Collider);
+    }
+
     private ScenarioBody<TCollider> CreateBody<TCollider>(TCollider collider, Vector3d position)
         where TCollider : LSCollider =>
         CreateBody(collider, position, preventAngularForces: false, immovable: false);
@@ -171,6 +196,21 @@ public class CollisionResponseBenchmarks
         body.AddLinearImpulse(new Vector3d((Fixed64)xImpulse, Fixed64.Zero, Fixed64.Zero));
     }
 
+    private void ApplyMaterialMode(CollisionPair pair)
+    {
+        if (MaterialMode == ResponseMaterialMode.Default)
+            return;
+
+        if (ContactShape == ResponseContactShape.CompoundPartContact)
+            return;
+
+        if (pair.ColliderA.Material != PhysicsMaterial.Default || pair.ColliderB.Material != PhysicsMaterial.Default)
+            return;
+
+        pair.ColliderA.Material = RoughSurface;
+        pair.ColliderB.Material = SlickSurface;
+    }
+
     private static Vector3d PositionForPair(int index)
     {
         int x = index % 8;
@@ -198,6 +238,27 @@ public class CollisionResponseBenchmarks
         FaceManifold,
         RestingFaceManifold,
         CylinderContact,
-        MeshContact
+        MeshContact,
+        CompoundPartContact
     }
+
+    public enum ResponseMaterialMode
+    {
+        Default,
+        Distinct
+    }
+
+    private static readonly PhysicsMaterial RoughSurface = new(
+        (Fixed64)2,
+        Fixed64.One,
+        Fixed64.FromFraction(1, 4),
+        PhysicsMaterialCombine.Maximum,
+        PhysicsMaterialCombine.Minimum);
+
+    private static readonly PhysicsMaterial SlickSurface = new(
+        Fixed64.Half,
+        Fixed64.FromFraction(1, 4),
+        Fixed64.FromFraction(3, 4),
+        PhysicsMaterialCombine.Minimum,
+        PhysicsMaterialCombine.Maximum);
 }

@@ -239,8 +239,8 @@ public sealed class ContinuousCollision2DTests
         SolidBody2D target = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
         source.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
         target.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
-        source.RestitutionCoefficient = Fixed64.One;
-        target.RestitutionCoefficient = Fixed64.One;
+        source.Collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.One);
+        target.Collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.One);
 
         source.AddForce(Vector2d.Right * (Fixed64)4);
         context.LateSimulate();
@@ -258,8 +258,8 @@ public sealed class ContinuousCollision2DTests
         SolidBody2D target = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
         source.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
         target.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
-        source.RestitutionCoefficient = Fixed64.One;
-        target.RestitutionCoefficient = Fixed64.One;
+        source.Collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.One);
+        target.Collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.One);
 
         source.AddForce(Vector2d.Right * (Fixed64)4);
         context.LateSimulate();

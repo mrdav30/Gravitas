@@ -2,7 +2,9 @@ using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
+using Gravitas.Materials;
 using Gravitas.Tests.Support;
+using System;
 using Xunit;
 
 namespace Gravitas.Tests.Response;
@@ -102,6 +104,96 @@ public sealed class CollisionResponse2DManifoldTests
         pair.TryGetWarmStartImpulse(pair.Manifold[1].ContactId, out ContactWarmStartImpulse second).Should().BeTrue();
         first.TangentImpulse.Abs().Should().BeGreaterThan(Fixed64.Zero);
         second.TangentImpulse.Abs().Should().BeGreaterThan(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void Resolve_WithHighStaticAndZeroDynamicFriction_ShouldHoldTangentialMotion()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        SolidBody2D moving = CreateBox(context, Vector2d.Zero);
+        SolidBody2D wall = CreateBox(context, new Vector2d((Fixed64)2, Fixed64.Zero), immovable: true);
+        PhysicsMaterial stickyStatic = new((Fixed64)100, Fixed64.Zero, Fixed64.Zero);
+        moving.Collider.Material = stickyStatic;
+        wall.Collider.Material = stickyStatic;
+        moving.PreventAngularForces = true;
+        moving.ApplyCollisionLinearVelocityDelta(new Vector2d((Fixed64)4, Fixed64.Half));
+        var pair = new CollisionPair2D(moving.Collider, wall.Collider);
+        pair.Manifold.SetContact(Vector2d.Right, Vector2d.Right, Fixed64.Half, Vector2d.Right);
+
+        pair.MarkColliding(context.FrameCount);
+
+        moving.LinearVelocity.Y.Abs().Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void Resolve_WhenStaticLimitIsExceeded_ShouldUseDynamicFriction()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        SolidBody2D moving = CreateBox(context, Vector2d.Zero);
+        SolidBody2D wall = CreateBox(context, new Vector2d((Fixed64)2, Fixed64.Zero), immovable: true);
+        moving.Collider.Material = new PhysicsMaterial(Fixed64.Half, Fixed64.Half, Fixed64.Zero);
+        wall.Collider.Material = new PhysicsMaterial(Fixed64.Half, Fixed64.Half, Fixed64.Zero);
+        moving.PreventAngularForces = true;
+        moving.ApplyCollisionLinearVelocityDelta(new Vector2d((Fixed64)4, (Fixed64)20));
+        Fixed64 tangentialSpeed = moving.LinearVelocity.Y.Abs();
+        var pair = new CollisionPair2D(moving.Collider, wall.Collider);
+        pair.Manifold.SetContact(Vector2d.Right, Vector2d.Right, Fixed64.Half, Vector2d.Right);
+
+        pair.MarkColliding(context.FrameCount);
+
+        moving.LinearVelocity.Y.Abs().Should().BeLessThan(tangentialSpeed);
+        moving.LinearVelocity.Y.Abs().Should().BeGreaterThan(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void Resolve_WithMaterialManifold_ShouldNotAllocateAfterWarmup()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        SolidBody2D moving = CreateBox(context, Vector2d.Zero);
+        SolidBody2D wall = CreateBox(context, new Vector2d((Fixed64)2, Fixed64.Zero), immovable: true);
+        moving.Collider.Material = new PhysicsMaterial((Fixed64)2, Fixed64.One, Fixed64.Zero);
+        wall.Collider.Material = new PhysicsMaterial(Fixed64.Half, Fixed64.FromFraction(1, 4), Fixed64.Half);
+        moving.PreventAngularForces = true;
+        var pair = new CollisionPair2D(moving.Collider, wall.Collider);
+        pair.Manifold.SetContact(Vector2d.Right, Vector2d.Right, Fixed64.Zero, Vector2d.Right);
+        Vector2d resetVelocity = new((Fixed64)4, (Fixed64)20);
+        moving.ApplyCollisionLinearVelocityDelta(resetVelocity);
+        CollisionResponse2D.Resolve(pair);
+        moving.ApplyCollisionLinearVelocityDelta(resetVelocity - moving.LinearVelocity);
+        moving.ApplyCollisionAngularVelocityDelta(-moving.AngularVelocity);
+
+        long allocatedBytes = MeasureAllocatedBytes(() => CollisionResponse2D.Resolve(pair));
+
+        allocatedBytes.Should().Be(0);
+    }
+
+    [Fact]
+    public void Resolve_WithCompoundPartMaterial_ShouldUsePartRestitution()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        PhysicsMaterial zeroOwner = PhysicsMaterialTestHelper.WithRestitution(Fixed64.Zero);
+        PhysicsMaterial bouncyPart = new(
+            Fixed64.One,
+            Fixed64.One,
+            Fixed64.One,
+            restitutionCombine: PhysicsMaterialCombine.Maximum);
+        var compound = new LSCompoundCollider2D(
+            CompoundColliderPart2D.Circle(Fixed64.Half, Vector2d.Zero, bouncyPart));
+        SolidBody2D wall = CreateBody(context, compound, Vector2d.Zero, immovable: true);
+        SolidBody2D moving = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.Half),
+            new Vector2d(-Fixed64.FromFraction(3, 4), Fixed64.Zero));
+        wall.Collider.Material = zeroOwner;
+        moving.Collider.Material = zeroOwner;
+        moving.PreventAngularForces = true;
+        moving.ApplyCollisionLinearVelocityDelta(new Vector2d((Fixed64)4, Fixed64.Zero));
+        var pair = new CollisionPair2D(moving.Collider, wall.Collider);
+        CollisionDetection2D.TryCollide(pair, pair.Manifold, context.FrameCount).Should().BeTrue();
+
+        pair.MarkColliding(context.FrameCount);
+
+        moving.LinearVelocity.X.Should().BeLessThan(Fixed64.Zero);
     }
 
     [Fact]
@@ -205,8 +297,8 @@ public sealed class CollisionResponse2DManifoldTests
         context.Settings.RestitutionVelocityThreshold = threshold;
         SolidBody2D moving = CreateBox(context, Vector2d.Zero);
         SolidBody2D wall = CreateBox(context, new Vector2d((Fixed64)2, Fixed64.Zero), immovable: true);
-        moving.RestitutionCoefficient = Fixed64.One;
-        wall.RestitutionCoefficient = Fixed64.One;
+        moving.Collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.One);
+        wall.Collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.One);
         moving.ApplyCollisionLinearVelocityDelta(new Vector2d(initialVelocity, Fixed64.Zero));
         var pair = new CollisionPair2D(moving.Collider, wall.Collider);
         pair.Manifold.SetContact(Vector2d.Right, Vector2d.Right, Fixed64.Half, Vector2d.Right);
@@ -222,12 +314,27 @@ public sealed class CollisionResponse2DManifoldTests
         bool immovable = false,
         bool isKinematic = false)
     {
+        return CreateBody(
+            context,
+            new LSAABBoxCollider2D(new Vector2d((Fixed64)2, (Fixed64)2)),
+            position,
+            immovable,
+            isKinematic);
+    }
+
+    private static SolidBody2D CreateBody(
+        GravitasWorldContext context,
+        LSCollider2D collider,
+        Vector2d position,
+        bool immovable = false,
+        bool isKinematic = false)
+    {
         var body = new SolidBody2D(
             new TestMatterAgent(context, new FixedTransform(
                 new Vector3d(position.X, Fixed64.Zero, position.Y),
                 FixedQuaternion.Identity,
                 Vector3d.One)),
-            new LSAABBoxCollider2D(new Vector2d((Fixed64)2, (Fixed64)2)))
+            collider)
         {
             Mass = Fixed64.One,
             Immovable = immovable,
@@ -236,4 +343,7 @@ public sealed class CollisionResponse2DManifoldTests
         body.Initialize(position);
         return body;
     }
+
+    private static long MeasureAllocatedBytes(Action action)
+        => AllocationTestHelper.MeasureSinglePass(action);
 }

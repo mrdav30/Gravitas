@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using Gravitas.Materials;
 using System.Runtime.CompilerServices;
 
 namespace Gravitas.Colliders;
@@ -17,25 +18,26 @@ namespace Gravitas.Colliders;
 public readonly struct CompoundColliderPart2D
 {
     public CompoundColliderPart2D(ColliderShapeDefinition2D shape)
-        : this(shape, Vector2d.Zero, Fixed64.Zero, Vector2d.One)
+        : this(shape, Vector2d.Zero, Fixed64.Zero, Vector2d.One, null)
     { }
 
     public CompoundColliderPart2D(ColliderShapeDefinition2D shape, Vector2d localOffset)
-        : this(shape, localOffset, Fixed64.Zero, Vector2d.One)
+        : this(shape, localOffset, Fixed64.Zero, Vector2d.One, null)
     { }
 
     public CompoundColliderPart2D(
         ColliderShapeDefinition2D shape,
         Vector2d localOffset,
         Fixed64 localRotation)
-        : this(shape, localOffset, localRotation, Vector2d.One)
+        : this(shape, localOffset, localRotation, Vector2d.One, null)
     { }
 
     public CompoundColliderPart2D(
         ColliderShapeDefinition2D shape,
         Vector2d localOffset,
         Fixed64 localRotation,
-        Vector2d localScale)
+        Vector2d localScale,
+        PhysicsMaterial? material = null)
     {
         shape.EnsureDefined();
         ValidateScale(localScale);
@@ -44,7 +46,12 @@ public readonly struct CompoundColliderPart2D
         LocalOffset = localOffset;
         LocalRotation = localRotation;
         LocalScale = localScale;
+        _material = material ?? PhysicsMaterial.Default;
+        _hasMaterial = material.HasValue;
     }
+
+    private readonly PhysicsMaterial _material;
+    private readonly bool _hasMaterial;
 
     /// <summary>
     /// Gets the authored data-only shape definition for this part.
@@ -69,8 +76,28 @@ public readonly struct CompoundColliderPart2D
     /// </summary>
     public Vector2d LocalScale { get; }
 
+    /// <summary>
+    /// Gets the authored material for this 2D part, or the shape/default
+    /// material when no part-level material was supplied.
+    /// </summary>
+    public PhysicsMaterial Material => TryGetMaterial(out PhysicsMaterial material)
+        ? material
+        : PhysicsMaterial.Default;
+
+    internal bool HasMaterial
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => _hasMaterial || Shape.HasMaterial;
+    }
+
     public static CompoundColliderPart2D Circle(Fixed64 radius, Vector2d localOffset) =>
         new(ColliderShapeDefinition2D.Circle(radius), localOffset);
+
+    public static CompoundColliderPart2D Circle(
+        Fixed64 radius,
+        Vector2d localOffset,
+        PhysicsMaterial material) =>
+        new(ColliderShapeDefinition2D.Circle(radius), localOffset, Fixed64.Zero, Vector2d.One, material);
 
     public static CompoundColliderPart2D Circle(
         Fixed64 radius,
@@ -85,6 +112,12 @@ public readonly struct CompoundColliderPart2D
     public static CompoundColliderPart2D AABBox(
         Vector2d size,
         Vector2d localOffset,
+        PhysicsMaterial material) =>
+        new(ColliderShapeDefinition2D.AABBox(size), localOffset, Fixed64.Zero, Vector2d.One, material);
+
+    public static CompoundColliderPart2D AABBox(
+        Vector2d size,
+        Vector2d localOffset,
         Fixed64 localRotation,
         Vector2d localScale) =>
         new(ColliderShapeDefinition2D.AABBox(size), localOffset, localRotation, localScale);
@@ -92,6 +125,12 @@ public readonly struct CompoundColliderPart2D
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static CompoundColliderPart2D AABox(Vector2d size, Vector2d localOffset) =>
         AABBox(size, localOffset);
+
+    public static CompoundColliderPart2D AABox(
+        Vector2d size,
+        Vector2d localOffset,
+        PhysicsMaterial material) =>
+        AABBox(size, localOffset, material);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static CompoundColliderPart2D AABox(
@@ -107,6 +146,12 @@ public readonly struct CompoundColliderPart2D
     public static CompoundColliderPart2D ConvexPolygon(
         Vector2d[] vertices,
         Vector2d localOffset,
+        PhysicsMaterial material) =>
+        new(ColliderShapeDefinition2D.ConvexPolygon(vertices), localOffset, Fixed64.Zero, Vector2d.One, material);
+
+    public static CompoundColliderPart2D ConvexPolygon(
+        Vector2d[] vertices,
+        Vector2d localOffset,
         Fixed64 localRotation,
         Vector2d localScale) =>
         new(ColliderShapeDefinition2D.ConvexPolygon(vertices), localOffset, localRotation, localScale);
@@ -116,6 +161,27 @@ public readonly struct CompoundColliderPart2D
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get => Shape.Kind == ColliderShapeDefinition2DKind.Undefined;
     }
+
+    internal bool TryGetMaterial(out PhysicsMaterial material)
+    {
+        if (_hasMaterial)
+        {
+            material = _material;
+            return true;
+        }
+
+        if (Shape.HasMaterial)
+        {
+            material = Shape.Material;
+            return true;
+        }
+
+        material = PhysicsMaterial.Default;
+        return false;
+    }
+
+    internal PhysicsMaterial ResolveMaterial(PhysicsMaterial ownerMaterial) =>
+        TryGetMaterial(out PhysicsMaterial material) ? material : ownerMaterial;
 
     private static void ValidateScale(Vector2d localScale)
     {
