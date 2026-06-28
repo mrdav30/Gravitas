@@ -137,6 +137,36 @@ public readonly struct PhysicsSweepCylinder3DRequest
 }
 
 /// <summary>
+/// Describes one registered 3D cone-source sweep in a batched query call.
+/// </summary>
+public readonly struct PhysicsSweepCone3DRequest
+{
+    public PhysicsSweepCone3DRequest(
+        LSConeCollider source,
+        Vector3d displacement,
+        PhysicsLayerMask layerMask,
+        LSCollider? excludedCollider = null,
+        bool includeTriggers = true)
+    {
+        Source = source;
+        Displacement = displacement;
+        LayerMask = layerMask;
+        ExcludedCollider = excludedCollider;
+        IncludeTriggers = includeTriggers;
+    }
+
+    public LSConeCollider Source { get; }
+
+    public Vector3d Displacement { get; }
+
+    public PhysicsLayerMask LayerMask { get; }
+
+    public LSCollider? ExcludedCollider { get; }
+
+    public bool IncludeTriggers { get; }
+}
+
+/// <summary>
 /// Describes one registered convex mesh-source sweep in a batched query call.
 /// </summary>
 public readonly struct PhysicsSweepConvexMesh3DRequest
@@ -255,6 +285,45 @@ public readonly struct PhysicsOverlapCircleInDirection3DRequest
     public Vector3d Direction { get; }
 
     public Fixed64 MaxDistance { get; }
+
+    public PhysicsLayerMask LayerMask { get; }
+}
+
+/// <summary>
+/// Describes one directional 3D cone-volume overlap in a batched query call.
+/// </summary>
+public readonly struct PhysicsOverlapCone3DRequest
+{
+    public PhysicsOverlapCone3DRequest(
+        Vector3d origin,
+        Vector3d direction,
+        Fixed64 length,
+        Fixed64 endRadius,
+        PhysicsLayerMask layerMask)
+    {
+        Origin = origin;
+        Direction = direction;
+        Length = length;
+        EndRadius = endRadius;
+        LayerMask = layerMask;
+    }
+
+    public PhysicsOverlapCone3DRequest(
+        Vector3d origin,
+        Vector3d direction,
+        Fixed64 length,
+        Fixed64 endRadius)
+        : this(origin, direction, length, endRadius, PhysicsLayerMask.All)
+    {
+    }
+
+    public Vector3d Origin { get; }
+
+    public Vector3d Direction { get; }
+
+    public Fixed64 Length { get; }
+
+    public Fixed64 EndRadius { get; }
 
     public PhysicsLayerMask LayerMask { get; }
 }

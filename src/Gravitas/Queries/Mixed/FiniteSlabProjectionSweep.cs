@@ -7,6 +7,7 @@
 
 using FixedMathSharp;
 using Gravitas.Colliders;
+using Gravitas.CollisionHandling;
 using System;
 using System.Runtime.CompilerServices;
 
@@ -52,6 +53,43 @@ internal static class FiniteSlabProjectionSweep
         var target = ProjectionTarget.CreateCylinder(cylinder, slabMinY, slabMaxY);
         return TrySweepCircle(start, direction, length, radius, target, out distance);
     }
+
+    public static bool TrySweepCircleAgainstCone(
+        Vector2d start,
+        Vector2d direction,
+        Fixed64 length,
+        Fixed64 radius,
+        Fixed64 slabMinY,
+        Fixed64 slabMaxY,
+        LSConeCollider cone,
+        out Fixed64 distance)
+    {
+        if (!CanUseExactConeProjection(cone))
+        {
+            distance = default;
+            return false;
+        }
+
+        var target = ProjectionTarget.CreateCone(cone, slabMinY, slabMaxY);
+        return TrySweepCircle(start, direction, length, radius, target, out distance);
+    }
+
+    public static bool TrySweepCircleAgainstConeWholeProjection(
+        Vector2d start,
+        Vector2d direction,
+        Fixed64 length,
+        Fixed64 radius,
+        Fixed64 slabMinY,
+        Fixed64 slabMaxY,
+        LSConeCollider cone,
+        out Fixed64 distance)
+    {
+        var target = ProjectionTarget.CreateConeWholeProjection(cone, slabMinY, slabMaxY);
+        return TrySweepCircle(start, direction, length, radius, target, out distance);
+    }
+
+    public static bool CanUseExactConeProjection(LSConeCollider cone) =>
+        IsConeAxisVertical(cone);
 
     private static bool TrySweepCircle(
         Vector2d start,
@@ -270,6 +308,8 @@ internal static class FiniteSlabProjectionSweep
     {
         private readonly LSCapsuleCollider? _capsule;
         private readonly LSCylinderCollider? _cylinder;
+        private readonly LSConeCollider? _cone;
+        private readonly bool _useWholeConeProjection;
         private readonly Fixed64 _slabMinY;
         private readonly Fixed64 _slabMaxY;
         private readonly Vector2d _center;
@@ -277,12 +317,16 @@ internal static class FiniteSlabProjectionSweep
         private ProjectionTarget(
             LSCapsuleCollider? capsule,
             LSCylinderCollider? cylinder,
+            LSConeCollider? cone,
+            bool useWholeConeProjection,
             Fixed64 slabMinY,
             Fixed64 slabMaxY,
             Vector2d center)
         {
             _capsule = capsule;
             _cylinder = cylinder;
+            _cone = cone;
+            _useWholeConeProjection = useWholeConeProjection;
             _slabMinY = slabMinY;
             _slabMaxY = slabMaxY;
             _center = center;
@@ -297,15 +341,24 @@ internal static class FiniteSlabProjectionSweep
                 if (_capsule != null)
                     return CapsuleIntersectsSlab(_capsule, _slabMinY, _slabMaxY);
 
-                return _cylinder != null && CylinderIntersectsSlab(_cylinder, _slabMinY, _slabMaxY);
+                if (_cylinder != null)
+                    return CylinderIntersectsSlab(_cylinder, _slabMinY, _slabMaxY);
+
+                return _cone != null && ConeIntersectsSlab(_cone, _slabMinY, _slabMaxY);
             }
         }
 
         public static ProjectionTarget CreateCapsule(LSCapsuleCollider capsule, Fixed64 slabMinY, Fixed64 slabMaxY) =>
-            new(capsule, null, slabMinY, slabMaxY, new Vector2d(capsule.Center.X, capsule.Center.Z));
+            new(capsule, null, null, false, slabMinY, slabMaxY, new Vector2d(capsule.Center.X, capsule.Center.Z));
 
         public static ProjectionTarget CreateCylinder(LSCylinderCollider cylinder, Fixed64 slabMinY, Fixed64 slabMaxY) =>
-            new(null, cylinder, slabMinY, slabMaxY, new Vector2d(cylinder.Center.X, cylinder.Center.Z));
+            new(null, cylinder, null, false, slabMinY, slabMaxY, new Vector2d(cylinder.Center.X, cylinder.Center.Z));
+
+        public static ProjectionTarget CreateCone(LSConeCollider cone, Fixed64 slabMinY, Fixed64 slabMaxY) =>
+            new(null, null, cone, false, slabMinY, slabMaxY, new Vector2d(cone.Center.X, cone.Center.Z));
+
+        public static ProjectionTarget CreateConeWholeProjection(LSConeCollider cone, Fixed64 slabMinY, Fixed64 slabMaxY) =>
+            new(null, null, cone, true, slabMinY, slabMaxY, new Vector2d(cone.Center.X, cone.Center.Z));
 
         public bool TrySupport(Vector2d direction, out Vector2d support)
         {
@@ -313,7 +366,12 @@ internal static class FiniteSlabProjectionSweep
             if (_capsule != null)
                 return TrySupportCapsuleProjection(_capsule, _slabMinY, _slabMaxY, normal, out support);
 
-            return TrySupportCylinderProjection(_cylinder!, _slabMinY, _slabMaxY, normal, out support);
+            if (_cylinder != null)
+                return TrySupportCylinderProjection(_cylinder, _slabMinY, _slabMaxY, normal, out support);
+
+            return _useWholeConeProjection
+                ? TrySupportWholeConeProjection(_cone!, normal, out support)
+                : TrySupportConeProjection(_cone!, _slabMinY, _slabMaxY, normal, out support);
         }
     }
 
@@ -442,6 +500,44 @@ internal static class FiniteSlabProjectionSweep
 
         support = best;
         return found;
+    }
+
+    private static bool TrySupportConeProjection(
+        LSConeCollider cone,
+        Fixed64 slabMinY,
+        Fixed64 slabMaxY,
+        Vector2d direction,
+        out Vector2d support)
+    {
+        bool found = false;
+        Vector2d best = default;
+
+        TryKeepConePoint(cone.WorldApex, slabMinY, slabMaxY, direction, ref found, ref best);
+        if (TrySupportCylinderDiskInBand(cone.WorldBaseCenter, cone.Axis, cone.ScaledRadius, slabMinY, slabMaxY, direction, out Vector2d baseSupport))
+            KeepBestSupport(baseSupport, direction, ref found, ref best);
+
+        Vector3d wholeSupport = ConvexColliderSupport.Support(cone, new Vector3d(direction.X, Fixed64.Zero, direction.Y));
+        TryKeepConePoint(wholeSupport, slabMinY, slabMaxY, direction, ref found, ref best);
+
+        if (IsConeAxisVertical(cone))
+        {
+            TryKeepVerticalConePlaneSupport(cone, slabMinY, direction, ref found, ref best);
+            if (slabMaxY != slabMinY)
+                TryKeepVerticalConePlaneSupport(cone, slabMaxY, direction, ref found, ref best);
+        }
+
+        support = best;
+        return found;
+    }
+
+    private static bool TrySupportWholeConeProjection(
+        LSConeCollider cone,
+        Vector2d direction,
+        out Vector2d support)
+    {
+        Vector3d worldSupport = ConvexColliderSupport.Support(cone, new Vector3d(direction.X, Fixed64.Zero, direction.Y));
+        support = new Vector2d(worldSupport.X, worldSupport.Z);
+        return true;
     }
 
     private static void AddCylinderBoundaryCandidates(
@@ -656,6 +752,54 @@ internal static class FiniteSlabProjectionSweep
         Fixed64 radialY = GetCylinderVerticalRadialCapacity(cylinder);
         return maxAxisY + radialY >= slabMinY && minAxisY - radialY <= slabMaxY;
     }
+
+    private static bool ConeIntersectsSlab(LSConeCollider cone, Fixed64 slabMinY, Fixed64 slabMaxY) =>
+        cone.BoundsMax.Y >= slabMinY && cone.BoundsMin.Y <= slabMaxY;
+
+    private static void TryKeepConePoint(
+        Vector3d point,
+        Fixed64 slabMinY,
+        Fixed64 slabMaxY,
+        Vector2d direction,
+        ref bool found,
+        ref Vector2d best)
+    {
+        if (!IsPointYInsideSlab(point.Y, slabMinY, slabMaxY))
+            return;
+
+        KeepBestSupport(new Vector2d(point.X, point.Z), direction, ref found, ref best);
+    }
+
+    private static bool IsConeAxisVertical(LSConeCollider cone) =>
+        cone.Axis.X.Abs() <= Fixed64.Epsilon && cone.Axis.Z.Abs() <= Fixed64.Epsilon;
+
+    private static void TryKeepVerticalConePlaneSupport(
+        LSConeCollider cone,
+        Fixed64 planeY,
+        Vector2d direction,
+        ref bool found,
+        ref Vector2d best)
+    {
+        Vector3d local = cone.Rotation.Inverse() * (new Vector3d(cone.Center.X, planeY, cone.Center.Z) - cone.Center);
+        Fixed64 radius = cone.RadiusAtLocalY(local.Y);
+        if (radius < Fixed64.Zero || radius > cone.ScaledRadius)
+            return;
+
+        Vector3d localDirection = cone.Rotation.Inverse() * new Vector3d(direction.X, Fixed64.Zero, direction.Y);
+        Vector3d localRadial = new(localDirection.X, Fixed64.Zero, localDirection.Z);
+        Fixed64 radialMagnitude = localRadial.Magnitude;
+        localRadial = radialMagnitude > Fixed64.Epsilon
+            ? localRadial / radialMagnitude
+            : Vector3d.Right;
+
+        Vector3d localPoint = new(localRadial.X * radius, local.Y, localRadial.Z * radius);
+        Vector3d worldPoint = cone.Center + cone.Rotation * localPoint;
+        KeepBestSupport(new Vector2d(worldPoint.X, worldPoint.Z), direction, ref found, ref best);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool IsPointYInsideSlab(Fixed64 y, Fixed64 slabMinY, Fixed64 slabMaxY) =>
+        y >= slabMinY && y <= slabMaxY;
 
     private static Fixed64 GetCylinderVerticalRadialCapacity(LSCylinderCollider cylinder)
     {

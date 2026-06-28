@@ -28,5 +28,7 @@ public abstract class GravitasDebugDrawCommandVisitor
 
     public virtual void VisitWireTriangle(in GravitasWireTriangleDebugDrawView view) { }
 
+    public virtual void VisitWireCone(in GravitasWireConeDebugDrawView view) { }
+
     public virtual void VisitUnknown(in GravitasDebugDrawCommand command) { }
 }

@@ -9,6 +9,60 @@ namespace Gravitas.Tests.Colliders;
 public sealed class ColliderRuntimeStateTests
 {
     [Fact]
+    public void ConeShape_ShouldUseBoundingCenterOriginAndAsymmetricMassProperties()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSConeCollider> coneBody = scenario.CreateBody(
+            new LSConeCollider
+            {
+                Radius = Fixed64.Half,
+                Size = new Vector3d(Fixed64.One, (Fixed64)2, Fixed64.One)
+            },
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            mass: (Fixed64)4);
+        LSConeCollider cone = coneBody.Collider;
+
+        cone.BaseCenter.Should().Be(new Vector3d(Fixed64.Zero, -Fixed64.One, Fixed64.Zero));
+        cone.Apex.Should().Be(new Vector3d(Fixed64.Zero, Fixed64.One, Fixed64.Zero));
+        cone.Axis.Should().Be(Vector3d.Up);
+        cone.Volume.Should().Be(Fixed64.Pi / (Fixed64)6);
+        cone.CalculateLocalCenterOfMassOffset().Should().Be(new Vector3d(Fixed64.Zero, -Fixed64.Half, Fixed64.Zero));
+        coneBody.Body.LocalCenterOfMassOffset.Should().Be(cone.CalculateLocalCenterOfMassOffset());
+
+        Fixed3x3 inertia = cone.CalculateInertiaTensor((Fixed64)4, cone.CalculateLocalCenterOfMassOffset());
+
+        AssertNear(inertia.M11, Fixed64.FromFraction(3, 4));
+        AssertNear(inertia.M22, Fixed64.FromFraction(3, 10));
+        AssertNear(inertia.M33, Fixed64.FromFraction(3, 4));
+        inertia.M12.Should().Be(Fixed64.Zero);
+        inertia.M13.Should().Be(Fixed64.Zero);
+        inertia.M23.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void ConeShape_WithCompoundRotation_ShouldRotateCenterOfMassIntoOwnerLocalSpace()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        var compound = new LSCompoundCollider(
+            new CompoundColliderPart(
+                ColliderShapeDefinition.Cone(Fixed64.Half, (Fixed64)2),
+                Vector3d.Zero,
+                FixedQuaternion.FromEulerAnglesInDegrees(Fixed64.Zero, Fixed64.Zero, (Fixed64)90),
+                Vector3d.One));
+
+        ScenarioBody<LSCompoundCollider> body = scenario.CreateBody(
+            compound,
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            mass: Fixed64.One);
+
+        AssertNear(body.Body.LocalCenterOfMassOffset.X, Fixed64.Half);
+        AssertNear(body.Body.LocalCenterOfMassOffset.Y, Fixed64.Zero);
+        AssertNear(body.Body.LocalCenterOfMassOffset.Z, Fixed64.Zero);
+    }
+
+    [Fact]
     public void CapsuleShapeMutations_ShouldRebuildDerivedStateOncePerSimulate()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();

@@ -7,6 +7,7 @@
 
 using FixedMathSharp;
 using Gravitas.Colliders;
+using Gravitas.CollisionHandling;
 using SwiftCollections;
 using SwiftCollections.Query;
 using System;
@@ -58,7 +59,7 @@ internal sealed class ConvexSweepQueryWorker
     public void PreparePrimitiveSource(LSCollider source, Vector3d displacement)
     {
         SwiftThrowHelper.ThrowIfNull(source, nameof(source));
-        if (!IsSupportedSourcePart(source))
+        if (!ConvexColliderSupport.IsSupported(source))
             throw new NotSupportedException(
                 $"Convex swept queries do not support {source.GetType().Name} sources.");
 
@@ -107,7 +108,7 @@ internal sealed class ConvexSweepQueryWorker
         for (int i = 0; i < source.PartCount; i++)
         {
             LSCollider part = source.GetPartCollider(i);
-            if (!IsSupportedSourcePart(part))
+            if (!ConvexColliderSupport.IsSupported(part))
                 throw new NotSupportedException(
                     $"Compound swept query sources do not support {part.GetType().Name} parts.");
 
@@ -636,15 +637,6 @@ internal sealed class ConvexSweepQueryWorker
         return new ConvexShape(first, second, third);
     }
 
-    private static bool IsSupportedSourcePart(LSCollider part)
-    {
-        return part is LSSphereCollider
-            || part is LSCapsuleCollider
-            || part is LSCuboidCollider
-            || part is LSCylinderCollider
-            || part is LSMeshCollider { Mode: MeshColliderMode.Convex };
-    }
-
     private static void ThrowIfConcaveSource(LSMeshCollider source)
     {
         if (source.Mode == MeshColliderMode.Concave)
@@ -760,7 +752,7 @@ internal sealed class ConvexSweepQueryWorker
             if (_isTriangle)
                 return SupportTriangle(direction);
 
-            return SupportCollider(_collider!, direction) + _offset;
+            return ConvexColliderSupport.Support(_collider!, direction) + _offset;
         }
 
         private Vector3d SupportTriangle(Vector3d direction)
@@ -777,68 +769,6 @@ internal sealed class ConvexSweepQueryWorker
             projection = Vector3d.Dot(_triangleC, direction);
             if (projection > bestProjection)
                 best = _triangleC;
-
-            return best;
-        }
-
-        private static Vector3d SupportCollider(LSCollider collider, Vector3d direction)
-        {
-            Vector3d normal = direction.MagnitudeSquared > Fixed64.Epsilon
-                ? direction.Normalized
-                : Vector3d.Right;
-
-            return collider switch
-            {
-                LSSphereCollider sphere => sphere.Center + normal * sphere.ScaledRadius,
-                LSCapsuleCollider capsule => SupportCapsule(capsule, normal),
-                LSCuboidCollider cuboid => SupportVertices(cuboid.Vertices, normal),
-                LSCylinderCollider cylinder => SupportCylinder(cylinder, normal),
-                LSMeshCollider mesh => SupportMesh(mesh, normal),
-                _ => throw new NotSupportedException(
-                    $"Convex swept queries do not support {collider.GetType().Name}.")
-            };
-        }
-
-        private static Vector3d SupportCapsule(LSCapsuleCollider capsule, Vector3d direction)
-        {
-            Fixed64 startProjection = Vector3d.Dot(capsule.LineSegmentStart, direction);
-            Fixed64 endProjection = Vector3d.Dot(capsule.LineSegmentEnd, direction);
-            Vector3d segmentPoint = endProjection > startProjection
-                ? capsule.LineSegmentEnd
-                : capsule.LineSegmentStart;
-            return segmentPoint + direction * capsule.ScaledRadius;
-        }
-
-        private static Vector3d SupportCylinder(LSCylinderCollider cylinder, Vector3d direction)
-        {
-            FixedQuaternion inverse = cylinder.Rotation.Inverse();
-            Vector3d localDirection = inverse * direction;
-            Vector3d radial = new(localDirection.X, Fixed64.Zero, localDirection.Z);
-            Fixed64 radialMagnitude = radial.Magnitude;
-            Vector3d radialSupport = radialMagnitude > Fixed64.Epsilon
-                ? radial / radialMagnitude * cylinder.ScaledRadius
-                : Vector3d.Right * cylinder.ScaledRadius;
-            Fixed64 y = localDirection.Y >= Fixed64.Zero ? cylinder.HalfHeight : -cylinder.HalfHeight;
-            return cylinder.Center + cylinder.Rotation * new Vector3d(radialSupport.X, y, radialSupport.Z);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static Vector3d SupportMesh(LSMeshCollider mesh, Vector3d direction) =>
-            mesh.Mesh.GetSupportVertexWorld(direction);
-
-        private static Vector3d SupportVertices(Vector3d[] vertices, Vector3d direction)
-        {
-            Vector3d best = vertices[0];
-            Fixed64 bestProjection = Vector3d.Dot(best, direction);
-            for (int i = 1; i < vertices.Length; i++)
-            {
-                Fixed64 projection = Vector3d.Dot(vertices[i], direction);
-                if (projection <= bestProjection)
-                    continue;
-
-                bestProjection = projection;
-                best = vertices[i];
-            }
 
             return best;
         }

@@ -103,6 +103,18 @@ repeat allocations.
 - `src/Gravitas/Core/2D/GravitasCollision2DService.cs`
 - `tests/Gravitas.Tests/CollisionHandling/CollisionResponse2DManifoldTests.cs`
 
+## Closed Signals
+
+| Signal | Status | Closed | Resolution |
+| --- | --- | --- | --- |
+| SwiftCollections sort hot-path allocation | Closed | 2026-06-24 | SwiftCollections owns allocation-free sort and sorted-key APIs; Gravitas removed `SwiftListSortUtility` |
+| Mixed mesh finite-slab triangle scaling signal | Closed | 2026-06-24 | Mixed and pure 3D query services expose mesh-triangle candidate counts, dedicated triangle-volume benchmarks cover dense and false-positive mesh targets, and pure 3D convex-source mesh sweeps use ordered lower-bound triangle candidates |
+| Pure 2D dynamic CCD candidate asymmetry | Closed | 2026-06-23 | 2D uses a planar candidate index, skips mixed CCD indexing outside mixed mode, and benchmark resets use 2D reset parity |
+| 3D shape-exact false-positive cost | Closed | 2026-06-23 | Static CCD uses exact-source sweeps for non-sphere convex movers before conservative sphere fallback refinement |
+| 3D dynamic shape-exact BDN allocation signal | Closed | 2026-06-23 | Shared exact-sweep bounds prefilters removed the scaling allocation/time signal from 3D dynamic false-positive rows |
+| 3D full-runtime CCD allocation | Closed | 2026-06-23 | GridForge allocation-free line tracing plus Gravitas 3D raycast adoption |
+| Grounding raycast probe allocation | Closed | 2026-06-23 | Same raycast trace fix removed automatic ray-grounding allocation |
+
 ### Closed Signal: SwiftCollections Sort Hot-Path Allocation
 
 **Discovered:** 2026-06-22
@@ -157,18 +169,6 @@ Release/ReleaseLean test suites pass, GridForge and Gravitas validate through
 local project references, Gravitas Release/ReleaseLean allocation guardrails
 pass, and the Gravitas simulation allocation benchmark smoke rows remain at
 `0 B/op`.
-
-## Closed Signals
-
-| Signal | Status | Closed | Resolution |
-| --- | --- | --- | --- |
-| SwiftCollections sort hot-path allocation | Closed | 2026-06-24 | SwiftCollections owns allocation-free sort and sorted-key APIs; Gravitas removed `SwiftListSortUtility` |
-| Mixed mesh finite-slab triangle scaling signal | Closed | 2026-06-24 | Mixed and pure 3D query services expose mesh-triangle candidate counts, dedicated triangle-volume benchmarks cover dense and false-positive mesh targets, and pure 3D convex-source mesh sweeps use ordered lower-bound triangle candidates |
-| Pure 2D dynamic CCD candidate asymmetry | Closed | 2026-06-23 | 2D uses a planar candidate index, skips mixed CCD indexing outside mixed mode, and benchmark resets use 2D reset parity |
-| 3D shape-exact false-positive cost | Closed | 2026-06-23 | Static CCD uses exact-source sweeps for non-sphere convex movers before conservative sphere fallback refinement |
-| 3D dynamic shape-exact BDN allocation signal | Closed | 2026-06-23 | Shared exact-sweep bounds prefilters removed the scaling allocation/time signal from 3D dynamic false-positive rows |
-| 3D full-runtime CCD allocation | Closed | 2026-06-23 | GridForge allocation-free line tracing plus Gravitas 3D raycast adoption |
-| Grounding raycast probe allocation | Closed | 2026-06-23 | Same raycast trace fix removed automatic ray-grounding allocation |
 
 ### Signal: Mixed Mesh Finite-Slab Triangle Scaling Signal
 

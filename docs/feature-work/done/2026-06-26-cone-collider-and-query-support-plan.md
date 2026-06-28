@@ -11,8 +11,21 @@
 ---
 
 **Date:** 2026-06-26  
-**Status:** Planned  
+**Status:** Done  
+**Completed:** 2026-06-28  
 **Owner:** Gravitas 3D collider and query hardening
+
+## Completion Notes
+
+- `LSConeCollider` is an analytic 3D primitive with deterministic bounds, COM,
+  inertia, serialization, diagnostics, collision, CCD, and query integration.
+- Cone-volume queries use apex, direction, length, and end-radius inputs, write
+  all-hit results into caller-owned buffers, and avoid temporary mesh
+  generation.
+- Mixed `SweepCircleAgainst3D` treats vertical finite-cone slabs as exact. When
+  the 3D cone is rotated relative to the horizontal mixed slab, the reducer uses
+  a safe whole-cone projection and reports `PhysicsQueryReducerKind.ConservativeFallback`
+  rather than claiming exact slab clipping.
 
 ## Purpose
 
@@ -96,26 +109,26 @@ choose one and document it before tests and reducers are written.
 
 **Tasks**
 
-- [ ] Add design tests that lock the local geometry convention:
+- [x] Add design tests that lock the local geometry convention:
   - base center.
   - apex.
   - center/bounds behavior.
   - transformed axis.
   - shape-derived COM offset direction.
-- [ ] Decide and document whether `LSConeCollider` local origin represents the
+- [x] Decide and document whether `LSConeCollider` local origin represents the
   bounding-volume center or another point. Prefer bounding-volume center for
   consistency with cylinder/capsule bounds, while storing COM offset separately.
-- [ ] Decide cone query input form:
+- [x] Decide cone query input form:
   - `origin + direction + length + endRadius`.
   - or `center + rotation + radius + height`.
   Prefer the first for gameplay queries such as directional effects.
-- [ ] Add `ColliderType.Cone`.
-- [ ] Add `ColliderShapeDefinitionKind.Cone`.
-- [ ] Add shape-definition tests for radius/height validation and runtime
+- [x] Add `ColliderType.Cone`.
+- [x] Add `ColliderShapeDefinitionKind.Cone`.
+- [x] Add shape-definition tests for radius/height validation and runtime
   collider materialization.
-- [ ] Add `LSConeCollider` skeleton with radius, height, base center, apex,
+- [x] Add `LSConeCollider` skeleton with radius, height, base center, apex,
   axis, bounds, and support-point methods.
-- [ ] Add debug draw command/view coverage if cone visualization needs a new
+- [x] Add debug draw command/view coverage if cone visualization needs a new
   diagnostic primitive. Wireframe triangle-fan debug drawing is acceptable for
   visualization only.
 
@@ -134,21 +147,21 @@ that as a strength rather than hiding it behind a mesh approximation.
 
 **Tasks**
 
-- [ ] Derive and document deterministic fixed-point formulas for:
+- [x] Derive and document deterministic fixed-point formulas for:
   - cone volume.
   - center-of-mass offset from the local origin.
   - principal inertia about the cone's local axis.
   - perpendicular principal inertia about the cone COM.
-- [ ] Add formula tests using fixed-point expected values and scale
+- [x] Add formula tests using fixed-point expected values and scale
   relationships.
-- [ ] Implement cone bounds rebuild for rotated cones without underestimating.
-- [ ] Implement shape-derived mass properties in `LSConeCollider`.
-- [ ] Ensure `SolidBody` receives the cone COM offset and full inertia tensor
+- [x] Implement cone bounds rebuild for rotated cones without underestimating.
+- [x] Implement shape-derived mass properties in `LSConeCollider`.
+- [x] Ensure `SolidBody` receives the cone COM offset and full inertia tensor
   correctly.
-- [ ] Update `ColliderShapeSnapshot` if cone runtime state needs snapshot
+- [x] Update `ColliderShapeSnapshot` if cone runtime state needs snapshot
   coverage.
-- [ ] Add Chronicler recording for cone shape state.
-- [ ] Add serialization replay tests for cone colliders.
+- [x] Add Chronicler recording for cone shape state.
+- [x] Add serialization replay tests for cone colliders.
 
 **Done Criteria**
 
@@ -166,7 +179,7 @@ and allocation-conscious.
 
 **Tasks**
 
-- [ ] Add public API tests for closest-hit and all-hit cone-volume queries:
+- [x] Add public API tests for closest-hit and all-hit cone-volume queries:
   - sphere target.
   - cuboid target.
   - capsule target.
@@ -176,19 +189,19 @@ and allocation-conscious.
   - trigger filtering.
   - layer include-mask filtering.
   - deterministic hit ordering by distance and collider identity.
-- [ ] Add query argument validation:
+- [x] Add query argument validation:
   - direction must be non-zero.
   - length must be positive.
   - end radius must be positive or non-negative according to the selected
     query contract.
-- [ ] Implement broad candidate bounds for finite cone volume.
-- [ ] Implement exact or conservative-without-false-negative reducers per target
+- [x] Implement broad candidate bounds for finite cone volume.
+- [x] Implement exact or conservative-without-false-negative reducers per target
   family. Any conservative accepted hit must be explicitly labeled or documented
   if the public hit type is extended.
-- [ ] Add caller-owned all-hit buffer overloads.
-- [ ] Add allocation tests proving repeated cone queries allocate `0` bytes
+- [x] Add caller-owned all-hit buffer overloads.
+- [x] Add allocation tests proving repeated cone queries allocate `0` bytes
   after warmup.
-- [ ] Add benchmark rows for dense cone-volume queries.
+- [x] Add benchmark rows for dense cone-volume queries.
 
 **Done Criteria**
 
@@ -207,7 +220,7 @@ cap, apex, and asymmetric mass properties.
 
 **Tasks**
 
-- [ ] Add discrete collision tests for cone against:
+- [x] Add discrete collision tests for cone against:
   - sphere.
   - cuboid.
   - capsule.
@@ -215,7 +228,7 @@ cap, apex, and asymmetric mass properties.
   - cone.
   - convex mesh.
   - compound.
-- [ ] Add contact-quality tests for:
+- [x] Add contact-quality tests for:
   - base-cap resting.
   - side-surface contact.
   - apex contact.
@@ -223,17 +236,17 @@ cap, apex, and asymmetric mass properties.
   - rotated cone contact.
   - deep overlap fallback normal.
   - stable resting pair warm-start.
-- [ ] Evaluate two implementation routes with focused prototypes and tests:
+- [x] Evaluate two implementation routes with focused prototypes and tests:
   - analytic pair-specific reducers for cone against each existing primitive.
   - reusable deterministic convex-support contact generation for convex
     primitives, with cone as the first new consumer.
-- [ ] Choose the route that gives better deterministic contact quality and
+- [x] Choose the route that gives better deterministic contact quality and
   maintainable shape expansion.
-- [ ] Implement the chosen narrow-phase path without adding runtime mesh
+- [x] Implement the chosen narrow-phase path without adding runtime mesh
   approximation.
-- [ ] Ensure contact generation produces stable manifold ordering for response
+- [x] Ensure contact generation produces stable manifold ordering for response
   and warm start.
-- [ ] Add regression tests proving existing non-cone shape pairs are unchanged.
+- [x] Add regression tests proving existing non-cone shape pairs are unchanged.
 
 **Done Criteria**
 
@@ -251,23 +264,23 @@ other convex primitives.
 
 **Tasks**
 
-- [ ] Add cone support to `ConvexSweepQueryWorker` support mappings.
-- [ ] Add swept source tests:
+- [x] Add cone support to `ConvexSweepQueryWorker` support mappings.
+- [x] Add swept source tests:
   - cone source against sphere.
   - cone source against cuboid.
   - cone source against cylinder/capsule.
   - cone source against convex mesh.
   - cone source against compound.
-- [ ] Add cone target tests for swept sphere and supported primitive source
+- [x] Add cone target tests for swept sphere and supported primitive source
   sweeps.
-- [ ] Add CCD tests for dynamic cone movers and cone targets.
-- [ ] Add rotational CCD tests for fast-spinning cone edge/apex cases where
+- [x] Add CCD tests for dynamic cone movers and cone targets.
+- [x] Add rotational CCD tests for fast-spinning cone edge/apex cases where
   existing rotational bounds need cone participation.
-- [ ] Extend mixed finite-slab reducers for cone targets in
+- [x] Extend mixed finite-slab reducers for cone targets in
   `SweepCircleAgainst3D` and mixed collision where the cone is a 3D participant.
-- [ ] Add mixed CCD tests for 3D cone bodies interacting with embedded 2D
+- [x] Add mixed CCD tests for 3D cone bodies interacting with embedded 2D
   slabs.
-- [ ] Add benchmark rows if cone support mapping or mixed reducers show dense
+- [x] Add benchmark rows if cone support mapping or mixed reducers show dense
   candidate cost.
 
 **Done Criteria**
@@ -286,16 +299,16 @@ mode, and diagnostics. The docs need to make that surface easy to understand.
 
 **Tasks**
 
-- [ ] Update `docs/wiki/DIMENSIONS.md` with cone shape support.
-- [ ] Update `docs/wiki/COLLISION_PIPELINE.md` with cone contact and CCD policy.
-- [ ] Update `docs/wiki/QUERY_SERVICES.md` with cone-volume query and cone
+- [x] Update `docs/wiki/DIMENSIONS.md` with cone shape support.
+- [x] Update `docs/wiki/COLLISION_PIPELINE.md` with cone contact and CCD policy.
+- [x] Update `docs/wiki/QUERY_SERVICES.md` with cone-volume query and cone
   sweep coverage.
-- [ ] Update `docs/wiki/SERIALIZATION.md` with cone shape state.
-- [ ] Update `docs/wiki/DIAGNOSTICS.md` and diagnostic adapters if cone debug
+- [x] Update `docs/wiki/SERIALIZATION.md` with cone shape state.
+- [x] Update `docs/wiki/DIAGNOSTICS.md` and diagnostic adapters if cone debug
   draw support is added.
-- [ ] Add benchmark selections for cone volume queries and cone collision
+- [x] Add benchmark selections for cone volume queries and cone collision
   scaling where measured value exists.
-- [ ] Run:
+- [x] Run:
   - `dotnet build Gravitas.slnx --configuration Release`
   - `dotnet test Gravitas.slnx --configuration Release`
   - `dotnet build Gravitas.slnx --configuration ReleaseLean`

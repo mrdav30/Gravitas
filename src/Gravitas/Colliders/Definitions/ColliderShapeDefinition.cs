@@ -171,6 +171,26 @@ public readonly struct ColliderShapeDefinition : IEquatable<ColliderShapeDefinit
     }
 
     /// <summary>
+    /// Creates a finite circular cone shape definition whose local origin is
+    /// the bounding center between its base plane and apex.
+    /// </summary>
+    public static ColliderShapeDefinition Cone(Fixed64 radius, Fixed64 height, PhysicsMaterial? material = null)
+    {
+        ValidateRadius(radius);
+        ValidateHeight(height);
+        Fixed64 diameter = radius * (Fixed64)2;
+        return new(
+            ColliderShapeDefinitionKind.Cone,
+            radius,
+            height,
+            new Vector3d(diameter, height, diameter),
+            MeshInertiaPolicy.RequireClosedVolume,
+            null,
+            null,
+            material);
+    }
+
+    /// <summary>
     /// Creates a convex mesh shape definition.
     /// </summary>
     public static ColliderShapeDefinition ConvexMesh(
@@ -237,6 +257,7 @@ public readonly struct ColliderShapeDefinition : IEquatable<ColliderShapeDefinit
             ColliderShapeDefinitionKind.Capsule => new LSCapsuleCollider(this),
             ColliderShapeDefinitionKind.Cuboid => new LSCuboidCollider(this),
             ColliderShapeDefinitionKind.Cylinder => new LSCylinderCollider(this),
+            ColliderShapeDefinitionKind.Cone => new LSConeCollider(this),
             ColliderShapeDefinitionKind.ConvexMesh => new LSMeshCollider(this),
             _ => throw new InvalidOperationException("Unsupported collider shape definition.")
         };

@@ -20,12 +20,14 @@ public class QueryServiceBenchmarks
     private GravitasWorldContext _capsuleSourceContext;
     private GravitasWorldContext _cuboidSourceContext;
     private GravitasWorldContext _cylinderSourceContext;
+    private GravitasWorldContext _coneSourceContext;
     private GravitasWorldContext _convexMeshSourceContext;
     private GravitasWorldContext _highVertexConvexMeshSourceContext;
     private GravitasWorldContext _compoundSourceContext;
     private LSCapsuleCollider _capsuleSource;
     private LSCuboidCollider _cuboidSource;
     private LSCylinderCollider _cylinderSource;
+    private LSConeCollider _coneSource;
     private LSMeshCollider _convexMeshSource;
     private LSMeshCollider _highVertexConvexMeshSource;
     private LSCompoundCollider _compoundSource;
@@ -35,11 +37,13 @@ public class QueryServiceBenchmarks
     private SwiftList<Physics3DHit> _raycastHits;
     private SwiftList<Physics3DHit> _overlappingRaycastHits;
     private SwiftList<Physics3DHit> _circlecastHits;
+    private SwiftList<Physics3DHit> _coneVolumeHits;
     private SwiftList<Physics3DHit> _sweepSphereHits;
     private SwiftList<Physics3DHit> _meshSweepSphereHits;
     private SwiftList<Physics3DHit> _capsuleSourceHits;
     private SwiftList<Physics3DHit> _cuboidSourceHits;
     private SwiftList<Physics3DHit> _cylinderSourceHits;
+    private SwiftList<Physics3DHit> _coneSourceHits;
     private SwiftList<Physics3DHit> _convexMeshSourceHits;
     private SwiftList<Physics3DHit> _highVertexConvexMeshSourceHits;
     private SwiftList<Physics3DHit> _compoundSourceHits;
@@ -83,6 +87,13 @@ public class QueryServiceBenchmarks
             new Vector3d((Fixed64)(-4), Fixed64.Zero, Fixed64.Zero),
             sideways);
 
+        _coneSourceContext = BenchmarkPhysicsScene.CreateContext(extent);
+        BenchmarkPhysicsScene.CreateDynamicSphereLine(_coneSourceContext, ColliderCount);
+        _coneSource = BenchmarkPhysicsScene.CreateDynamicCone(
+            _coneSourceContext,
+            new Vector3d((Fixed64)(-4), Fixed64.Zero, Fixed64.Zero),
+            sideways);
+
         _convexMeshSourceContext = BenchmarkPhysicsScene.CreateContext(extent);
         BenchmarkPhysicsScene.CreateDynamicSphereLine(_convexMeshSourceContext, ColliderCount);
         _convexMeshSource = BenchmarkPhysicsScene.CreateDynamicConvexCube(
@@ -108,11 +119,13 @@ public class QueryServiceBenchmarks
         _raycastHits = new SwiftList<Physics3DHit>(ColliderCount);
         _overlappingRaycastHits = new SwiftList<Physics3DHit>(ColliderCount);
         _circlecastHits = new SwiftList<Physics3DHit>(ColliderCount);
+        _coneVolumeHits = new SwiftList<Physics3DHit>(ColliderCount);
         _sweepSphereHits = new SwiftList<Physics3DHit>(ColliderCount);
         _meshSweepSphereHits = new SwiftList<Physics3DHit>(ColliderCount);
         _capsuleSourceHits = new SwiftList<Physics3DHit>(ColliderCount);
         _cuboidSourceHits = new SwiftList<Physics3DHit>(ColliderCount);
         _cylinderSourceHits = new SwiftList<Physics3DHit>(ColliderCount);
+        _coneSourceHits = new SwiftList<Physics3DHit>(ColliderCount);
         _convexMeshSourceHits = new SwiftList<Physics3DHit>(ColliderCount);
         _highVertexConvexMeshSourceHits = new SwiftList<Physics3DHit>(ColliderCount);
         _compoundSourceHits = new SwiftList<Physics3DHit>(ColliderCount);
@@ -127,6 +140,7 @@ public class QueryServiceBenchmarks
         _capsuleSourceContext.Dispose();
         _cuboidSourceContext.Dispose();
         _cylinderSourceContext.Dispose();
+        _coneSourceContext.Dispose();
         _convexMeshSourceContext.Dispose();
         _highVertexConvexMeshSourceContext.Dispose();
         _compoundSourceContext.Dispose();
@@ -136,9 +150,11 @@ public class QueryServiceBenchmarks
         _capsuleSourceContext = null;
         _cuboidSourceContext = null;
         _cylinderSourceContext = null;
+        _coneSourceContext = null;
         _capsuleSource = null;
         _cuboidSource = null;
         _cylinderSource = null;
+        _coneSource = null;
         _convexMeshSourceContext = null;
         _highVertexConvexMeshSourceContext = null;
         _compoundSourceContext = null;
@@ -148,11 +164,13 @@ public class QueryServiceBenchmarks
         _raycastHits = null;
         _overlappingRaycastHits = null;
         _circlecastHits = null;
+        _coneVolumeHits = null;
         _sweepSphereHits = null;
         _meshSweepSphereHits = null;
         _capsuleSourceHits = null;
         _cuboidSourceHits = null;
         _cylinderSourceHits = null;
+        _coneSourceHits = null;
         _convexMeshSourceHits = null;
         _highVertexConvexMeshSourceHits = null;
         _compoundSourceHits = null;
@@ -165,6 +183,16 @@ public class QueryServiceBenchmarks
     [Benchmark]
     public int OverlapCircleAllAcrossPopulatedContext() =>
         _context.Query3D.OverlapCircleAll(Vector3d.Zero, (Fixed64)4, IncludeLayerZero, _circlecastHits);
+
+    [Benchmark]
+    public int OverlapConeAllAcrossPopulatedContext() =>
+        _context.Query3D.OverlapConeAll(
+            new Vector3d((Fixed64)(-2), Fixed64.Zero, Fixed64.Zero),
+            Vector3d.Right,
+            (Fixed64)(ColliderCount * 2 + 2),
+            (Fixed64)4,
+            IncludeLayerZero,
+            _coneVolumeHits);
 
     [Benchmark]
     public bool DirectionalOverlapCircleAcrossPopulatedContext() =>
@@ -212,6 +240,14 @@ public class QueryServiceBenchmarks
             _sourceSweepDisplacement,
             IncludeLayerZero,
             _cylinderSourceHits);
+
+    [Benchmark]
+    public int SweepConeAllAcrossSphereTargets() =>
+        _coneSourceContext.Query3D.SweepConeAll(
+            _coneSource,
+            _sourceSweepDisplacement,
+            IncludeLayerZero,
+            _coneSourceHits);
 
     [Benchmark]
     public int SweepConvexMeshAllAcrossSphereTargets() =>

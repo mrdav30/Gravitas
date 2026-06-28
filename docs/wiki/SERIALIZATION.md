@@ -20,8 +20,8 @@ Host-created shell:
 - `IMatterAgent` implementations.
 - `FixedTransform` instances and any engine transform wrappers.
 - `SolidBody`, `SolidBody2D`, `LSCollider`, and `LSCollider2D` instances.
-- the concrete collider shape type, such as sphere, cuboid, circle, capsule,
-  AABB, polygon, or compound.
+- the concrete collider shape type, such as sphere, cuboid, capsule, finite
+  cylinder, finite cone, mesh, circle, AABB, polygon, or compound.
 - private runtime part colliders materialized by `LSCompoundCollider` and
   `LSCompoundCollider2D`.
 - renderer, ECS, engine object, networking, pooling, editor, and event
@@ -90,12 +90,12 @@ a bound collider rebuilds runtime shape state and refreshes partition membership
 where needed.
 
 `ColliderShapeDefinition` is a data-only authoring/import surface for creating
-runtime 3D colliders and compound parts. It is not a bound runtime shell: it has
-no body, context, collider ID, partition coordinates, pairs, hierarchy state, or
-events. Offline authored compound assets should serialize shape definitions,
-part materials, and stable part transforms, then let the host create
-`LSCompoundCollider` runtime shells from that data before simulation or replay
-state is populated.
+runtime 3D sphere, cuboid, capsule, finite-cylinder, finite-cone, mesh, and
+compound part inputs. It is not a bound runtime shell: it has no body, context,
+collider ID, partition coordinates, pairs, hierarchy state, or events. Offline
+authored compound assets should serialize shape definitions, part materials,
+and stable part transforms, then let the host create `LSCompoundCollider`
+runtime shells from that data before simulation or replay state is populated.
 
 `ColliderShapeDefinition2D` is the matching data-only authoring/import surface
 for pure 2D circle, capsule, AABB, convex polygon, and triangle-convenience

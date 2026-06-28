@@ -21,10 +21,13 @@ public enum CollisionType : byte
     Cylinder_Capsule,
     Cylinder_Cylinder,
     Cuboid_Cylinder,
+    Cone_Sphere,
+    Cone_Convex,
     Mesh_Sphere,
     Mesh_Capsule,
     Mesh_Cuboid,
     Mesh_Cylinder,
+    Mesh_Cone,
     Mesh_Mesh,
     Compound
 }

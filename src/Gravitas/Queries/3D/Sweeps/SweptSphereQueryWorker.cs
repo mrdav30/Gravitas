@@ -84,6 +84,7 @@ public sealed class SweptSphereQueryWorker
                 LSCapsuleCollider capsule => TrySweepCapsule(capsule, out sphereCenterAtImpact, out impactDistance),
                 LSCuboidCollider cuboid => TrySweepCuboid(cuboid, out sphereCenterAtImpact, out impactDistance),
                 LSCylinderCollider cylinder => TrySweepCylinder(cylinder, out sphereCenterAtImpact, out impactDistance),
+                LSConeCollider cone => TrySweepCone(cone, out sphereCenterAtImpact, out impactDistance),
                 LSMeshCollider mesh => TrySweepMesh(mesh, out sphereCenterAtImpact, out impactDistance),
                 LSCompoundCollider compound => TrySweepCompound(compound, out sphereCenterAtImpact, out impactDistance),
                 _ => false
@@ -189,6 +190,64 @@ public sealed class SweptSphereQueryWorker
             includeCaps: true,
             out sphereCenterAtImpact,
             out impactDistance);
+    }
+
+    private bool TrySweepCone(
+        LSConeCollider cone,
+        out Vector3d sphereCenterAtImpact,
+        out Fixed64 impactDistance)
+    {
+        sphereCenterAtImpact = Vector3d.Zero;
+        impactDistance = Fixed64.Zero;
+
+        if (GetSphereConeSeparation(cone, _start) <= Fixed64.Zero)
+        {
+            sphereCenterAtImpact = _start;
+            return true;
+        }
+
+        Fixed64 travel = Fixed64.Zero;
+        Fixed64 previousTravel = Fixed64.Zero;
+        Fixed64 previousSeparation = Fixed64.MaxValue;
+
+        for (int i = 0; i < 32; i++)
+        {
+            Vector3d center = _start + _direction * travel;
+            Fixed64 separation = GetSphereConeSeparation(cone, center);
+            if (separation <= BoundsTolerance)
+            {
+                impactDistance = RefineSphereConeImpact(cone, previousTravel, travel);
+                sphereCenterAtImpact = _start + _direction * impactDistance;
+                return true;
+            }
+
+            Vector3d closest = cone.ClosestPointOnSurface(center);
+            Vector3d toCenter = center - closest;
+            Fixed64 distance = toCenter.Magnitude;
+            Vector3d normal = distance > Fixed64.Epsilon
+                ? toCenter / distance
+                : ResolveFallbackConeNormal(cone, center);
+            Fixed64 closingSpeed = -Vector3d.Dot(_direction, normal);
+            Fixed64 step = closingSpeed > Fixed64.Epsilon
+                ? separation / closingSpeed
+                : _length * Fixed64.FromFraction(1, 32);
+
+            if (step <= BoundsTolerance)
+                step = BoundsTolerance;
+
+            previousTravel = travel;
+            previousSeparation = separation;
+            travel += step;
+            if (travel > _length)
+                break;
+
+            // If the local distance function started increasing, keep a small
+            // deterministic scan step so apex/base-edge contacts are not skipped.
+            if (previousSeparation < separation && closingSpeed <= Fixed64.Epsilon)
+                travel = previousTravel + _length * Fixed64.FromFraction(1, 32);
+        }
+
+        return false;
     }
 
     private bool TrySweepFiniteCylinder(
@@ -654,6 +713,40 @@ public sealed class SweptSphereQueryWorker
         localPoint.X >= min.X && localPoint.X <= max.X
         && localPoint.Y >= min.Y && localPoint.Y <= max.Y
         && localPoint.Z >= min.Z && localPoint.Z <= max.Z;
+
+    private Fixed64 GetSphereConeSeparation(LSConeCollider cone, Vector3d center)
+    {
+        Vector3d closest = cone.ClosestPointOnSurface(center);
+        Fixed64 distance = Vector3d.Distance(center, closest);
+        return distance - _radius;
+    }
+
+    private Fixed64 RefineSphereConeImpact(LSConeCollider cone, Fixed64 lower, Fixed64 upper)
+    {
+        Fixed64 low = FixedMath.Clamp(lower, Fixed64.Zero, _length);
+        Fixed64 high = FixedMath.Clamp(upper, Fixed64.Zero, _length);
+
+        for (int i = 0; i < 16; i++)
+        {
+            Fixed64 mid = (low + high) * Fixed64.Half;
+            Vector3d center = _start + _direction * mid;
+            if (GetSphereConeSeparation(cone, center) <= BoundsTolerance)
+                high = mid;
+            else
+                low = mid;
+        }
+
+        return high;
+    }
+
+    private static Vector3d ResolveFallbackConeNormal(LSConeCollider cone, Vector3d center)
+    {
+        Vector3d fallback = center - cone.Center;
+        if (fallback.MagnitudeSquared > Fixed64.Epsilon)
+            return fallback.Normalized;
+
+        return -cone.Axis;
+    }
 
     private static bool ClipSegmentAxis(
         Fixed64 position,

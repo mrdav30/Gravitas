@@ -31,6 +31,37 @@ public sealed class ColliderShapeDefinitionTests
     }
 
     [Fact]
+    public void ConeDefinition_ShouldBuildEquivalentStandaloneCollider()
+    {
+        ColliderShapeDefinition definition = ColliderShapeDefinition.Cone(Fixed64.Half, (Fixed64)2);
+
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSConeCollider> body = scenario.CreateBody(
+            new LSConeCollider(definition),
+            PhysicsScenarioBuilder.Vector(0, 0, 0),
+            FixedQuaternion.Identity);
+
+        definition.Kind.Should().Be(ColliderShapeDefinitionKind.Cone);
+        definition.Radius.Should().Be(Fixed64.Half);
+        definition.Height.Should().Be((Fixed64)2);
+        definition.Size.Should().Be(new Vector3d(Fixed64.One, (Fixed64)2, Fixed64.One));
+        body.Collider.Shape.Should().Be(ColliderType.Cone);
+        body.Collider.BaseCenter.Should().Be(new Vector3d(Fixed64.Zero, -Fixed64.One, Fixed64.Zero));
+        body.Collider.Apex.Should().Be(new Vector3d(Fixed64.Zero, Fixed64.One, Fixed64.Zero));
+        body.Body.LocalCenterOfMassOffset.Should().Be(new Vector3d(Fixed64.Zero, -Fixed64.Half, Fixed64.Zero));
+    }
+
+    [Fact]
+    public void ConeDefinition_ShouldRejectInvalidDimensions()
+    {
+        Action zeroRadius = () => ColliderShapeDefinition.Cone(Fixed64.Zero, Fixed64.One);
+        Action zeroHeight = () => ColliderShapeDefinition.Cone(Fixed64.Half, Fixed64.Zero);
+
+        zeroRadius.Should().Throw<ArgumentException>().WithParameterName("radius");
+        zeroHeight.Should().Throw<ArgumentException>().WithParameterName("height");
+    }
+
+    [Fact]
     public void ConvexMeshDefinition_ShouldSnapshotSourceArrays()
     {
         LSMeshCollider source = MeshTestFixtures.CreateConvexCube();

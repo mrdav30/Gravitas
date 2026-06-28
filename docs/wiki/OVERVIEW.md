@@ -102,7 +102,7 @@ flowchart TD
 | `SolidBody` | Simulated 3D body state: position, rotation, velocity, acceleration, mass, grounding, impulses, sleep/wake state, visual publishing, and Chronicler authoritative-state recording. |
 | `SolidBody2D` | Pure 2D body state: X/Z-projected position, scalar rotation, linear velocity, force integration, gravity, sleep/wake state, host agent binding, visualization publishing, and Chronicler authoritative-state recording. |
 | `LSCollider` | Base collider state: shape, bounds, layer, trigger/contact events, partition coordinates, pair references, and context binding. |
-| `LSCollider2D` | Base pure 2D collider state for circle, axis-aligned box, and convex polygon shapes. |
+| `LSCollider2D` | Base pure 2D collider state for circle, capsule, axis-aligned box, convex polygon, and compound shapes. |
 | `PhysicsRuntimeMode` | Validated bitmask selecting `TwoD`, `ThreeD`, `Both`, or `Mixed` runtime routing. |
 | `GravitasPhysicsService` | Body/collider registration, context-local collider IDs, collision-pair pooling, simulation phases, and visualization phases. |
 | `GravitasConstraint3DService` | Context-owned deterministic 3D joints, ragdoll runtimes, linked-collider self-filtering, motor handoff, replay hashing, and joint diagnostics. |
@@ -111,7 +111,7 @@ flowchart TD
 | `GravitasCollision2DService` | GridForge-backed pure 2D X/Z broad-phase partitioning, active partition tracking, partition pooling, duplicate suppression, and collision distribution versioning. |
 | `GravitasMixedCollisionService` | Mixed 2D/3D lifecycle and broad-phase candidate gathering through `PhysicsMixedPartition`, stable 3D/2D keys, duplicate suppression, and retained partition cleanup. |
 | `GravitasQuery2DService` | Pure 2D overlap-circle and segment raycast queries, caller-buffered hit output, duplicate suppression, and hit ordering. |
-| `GravitasQuery3DService` | 3D raycast, swept-sphere, convex-source sweep, and X/Z circle overlap/proximity queries, caller-buffered hit output, duplicate suppression, and hit ordering. |
+| `GravitasQuery3DService` | 3D raycast, swept-sphere, convex-source sweep, cone-volume, and X/Z circle overlap/proximity queries, caller-buffered hit output, duplicate suppression, and hit ordering. |
 | `GravitasQueryMixedService` | Explicit mixed 3D/2D swept-sphere and swept-circle queries, GridForge-backed mixed candidate gathering, caller-buffered hit output, and deterministic hit ordering. |
 | `PhysicsPartition` | Voxel partition payload containing collider IDs, awake dynamic membership, and candidate pair distribution. |
 | `CollisionPair` | Pair identity, culling state, contact state, warm-start cache, narrow-phase dispatch, response dispatch, and contact notification state. |
@@ -188,8 +188,8 @@ active-pair queue during `LateSimulate`.
   from `PhysicsSettings.Mixed2DHalfThickness`,
   `MixedHalfThicknessOverride`, and the host transform's Y position. Mixed
   broad phase gathers deterministic GridForge-backed 3D/2D candidate keys,
-  and mixed narrow phase covers 3D spheres, cuboids, capsules, and finite
-  cylinders plus compound and mesh colliders against embedded 2D circle,
+  and mixed narrow phase covers 3D spheres, cuboids, capsules, finite
+  cylinders, and finite cones plus compound and mesh colliders against embedded 2D circle,
   capsule, AABB, and convex polygon slabs. Mixed pair ownership and constrained
   response support wake propagation, resting-pair retention, mixed
   contact/trigger events, planar X/Z impulse for 2D bodies, and vertical
@@ -206,10 +206,14 @@ active-pair queue during `LateSimulate`.
 - Cylinder collision and query behavior is implemented for the current finite
   cylinder model. Cap/face contact manifolds preserve flat finite-cylinder
   behavior; side/rim contacts remain representative finite-cylinder contacts.
+- Cone collision and query behavior is implemented for the analytic finite-cone
+  model. Cone collider mass properties include the asymmetric center of mass and
+  inertia tensor, and cone-volume queries support directional gameplay volumes
+  without creating temporary mesh colliders.
 - Mesh raycast overlap, sphere sweeps against mesh targets, and concave mesh
   narrow phase are implemented through triangle-level tests. Mesh/cuboid and
   mesh/cylinder face/cap contacts clip stable support contacts to authored
-  triangles. Capsule, cuboid, finite-cylinder, convex mesh, and authored
+  triangles. Capsule, cuboid, finite-cylinder, finite-cone, convex mesh, and authored
   compound sources have explicit 3D swept query APIs; concave mesh sources and
   raw mesh source queries are rejected because they hide unbounded
   source-triangle expansion. Hosts that need concave-looking movers should use

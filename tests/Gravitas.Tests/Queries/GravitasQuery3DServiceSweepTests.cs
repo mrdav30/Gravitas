@@ -425,6 +425,29 @@ public sealed class GravitasQuery3DServiceSweepTests
     }
 
     [Fact]
+    public void SweepCone_ShouldUseAnalyticConeSourceGeometry()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSConeCollider source = CreateDynamicCollider(
+            context,
+            new LSConeCollider { Radius = Fixed64.Half, Size = new Vector3d(Fixed64.One, (Fixed64)2, Fixed64.One) },
+            new Vector3d((Fixed64)(-4), Fixed64.Zero, Fixed64.Zero),
+            FixedQuaternion.FromEulerAnglesInDegrees(Fixed64.Zero, Fixed64.Zero, (Fixed64)90));
+        LSSphereCollider target = CreateDynamicCollider(context, new LSSphereCollider(), Vector3d.Zero);
+
+        bool hit = context.Query3D.SweepCone(
+            source,
+            new Vector3d((Fixed64)6, Fixed64.Zero, Fixed64.Zero),
+            IncludeLayerZero,
+            out Physics3DHit sweepHit);
+
+        hit.Should().BeTrue();
+        sweepHit.Collider.Should().BeSameAs(target);
+        sweepHit.Distance.Should().BeLessThan((Fixed64)3);
+        sweepHit.Normal.Should().Be(-Vector3d.Right);
+    }
+
+    [Fact]
     public void SweepConvexMesh_ShouldHitCapsuleAndCylinderTargetsAsSource()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
@@ -601,6 +624,25 @@ public sealed class GravitasQuery3DServiceSweepTests
         hit.Should().BeTrue();
         distance.Should().Be(Fixed64.FromFraction(5, 4));
         centerAtImpact.Should().Be(new Vector3d((Fixed64)7 + Fixed64.FromFraction(1, 4), Fixed64.Zero, Fixed64.Zero));
+    }
+
+    [Fact]
+    public void SweptSphereWorker_ShouldDetectConeSideAndApexImpact()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSConeCollider cone = CreateDynamicCollider(
+            context,
+            new LSConeCollider { Radius = Fixed64.Half, Size = new Vector3d(Fixed64.One, (Fixed64)2, Fixed64.One) },
+            new Vector3d((Fixed64)8, Fixed64.Zero, Fixed64.Zero));
+        var worker = new SweptSphereQueryWorker();
+        Vector3d origin = new((Fixed64)6, Fixed64.Zero, Fixed64.Zero);
+        worker.Prepare(origin, origin + Vector3d.Right * (Fixed64)4, Fixed64.FromFraction(1, 4));
+
+        bool hit = worker.TrySweep(cone, out Vector3d centerAtImpact, out Fixed64 distance);
+
+        hit.Should().BeTrue();
+        distance.Should().BeLessThan((Fixed64)2);
+        centerAtImpact.X.Should().BeLessThan((Fixed64)8);
     }
 
     [Fact]

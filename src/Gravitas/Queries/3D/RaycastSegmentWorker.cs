@@ -108,6 +108,42 @@ public sealed class RaycastSegmentWorker
             includeCaps: true,
             ref outputIntersectionPoints);
 
+    public bool CheckConeOverlaps(LSConeCollider coneCollider, ref SwiftList<Vector3d> outputIntersectionPoints)
+    {
+        FixedQuaternion inverseRotation = coneCollider.Rotation.Inverse();
+        Vector3d localOrigin = (_cachedOrigin - coneCollider.Center) * inverseRotation;
+
+        if (_segmentLengthSqr == Fixed64.Zero)
+        {
+            if (!coneCollider.ContainsWorldPoint(_cachedOrigin))
+                return false;
+
+            if (_calculateIntersections)
+                outputIntersectionPoints.Add(_cachedOrigin);
+            return true;
+        }
+
+        if (coneCollider.ContainsWorldPoint(_cachedOrigin))
+        {
+            if (_calculateIntersections)
+                outputIntersectionPoints.Add(_cachedOrigin);
+            return true;
+        }
+
+        Vector3d localDirection = _segmentDirection * inverseRotation;
+        bool intersects = CheckConeSide(
+            coneCollider,
+            localOrigin,
+            localDirection,
+            ref outputIntersectionPoints);
+        intersects |= CheckConeBase(
+            coneCollider,
+            localOrigin,
+            localDirection,
+            ref outputIntersectionPoints);
+        return intersects;
+    }
+
     public bool CheckMeshOverlaps(LSMeshCollider meshCollider, ref SwiftList<Vector3d> outputIntersectionPoints)
     {
         Vector3d localOrigin = meshCollider.Mesh.ConvertWorldToLocal(_cachedOrigin);
@@ -252,6 +288,97 @@ public sealed class RaycastSegmentWorker
             return false;
 
         AddLocalIntersectionPoint(center, rotation, localPoint, ref outputIntersectionPoints);
+        return true;
+    }
+
+    private bool CheckConeSide(
+        LSConeCollider cone,
+        Vector3d localOrigin,
+        Vector3d localDirection,
+        ref SwiftList<Vector3d> outputIntersectionPoints)
+    {
+        Fixed64 slope = cone.ScaledRadius / cone.Height;
+        Fixed64 slopeSqr = slope * slope;
+        Fixed64 q = cone.HalfHeight - localOrigin.Y;
+        Fixed64 a = localDirection.X * localDirection.X
+            + localDirection.Z * localDirection.Z
+            - slopeSqr * localDirection.Y * localDirection.Y;
+        Fixed64 b = 2 * (localOrigin.X * localDirection.X
+            + localOrigin.Z * localDirection.Z
+            + slopeSqr * q * localDirection.Y);
+        Fixed64 c = localOrigin.X * localOrigin.X
+            + localOrigin.Z * localOrigin.Z
+            - slopeSqr * q * q;
+
+        if (a.Abs() <= Fixed64.Epsilon)
+        {
+            if (b.Abs() <= Fixed64.Epsilon)
+                return false;
+
+            return TryAddConeSidePoint(
+                cone,
+                localOrigin,
+                localDirection,
+                -c / b,
+                ref outputIntersectionPoints);
+        }
+
+        Fixed64 discriminant = b * b - 4 * a * c;
+        if (discriminant < Fixed64.Zero)
+            return false;
+
+        Fixed64 root = FixedMath.Sqrt(discriminant);
+        Fixed64 denominator = 2 * a;
+        Fixed64 first = (-b - root) / denominator;
+        Fixed64 second = (-b + root) / denominator;
+
+        bool intersects = TryAddConeSidePoint(cone, localOrigin, localDirection, first, ref outputIntersectionPoints);
+        if (second != first)
+            intersects |= TryAddConeSidePoint(cone, localOrigin, localDirection, second, ref outputIntersectionPoints);
+
+        return intersects;
+    }
+
+    private bool CheckConeBase(
+        LSConeCollider cone,
+        Vector3d localOrigin,
+        Vector3d localDirection,
+        ref SwiftList<Vector3d> outputIntersectionPoints)
+    {
+        if (localDirection.Y.Abs() <= Fixed64.Epsilon)
+            return false;
+
+        Fixed64 distance = (-cone.HalfHeight - localOrigin.Y) / localDirection.Y;
+        if (distance < Fixed64.Zero || distance > _segmentLength)
+            return false;
+
+        Vector3d localPoint = localOrigin + localDirection * distance;
+        Fixed64 radialSqr = localPoint.X * localPoint.X + localPoint.Z * localPoint.Z;
+        if (radialSqr > cone.ScaledRadiusSqr + Fixed64.Epsilon)
+            return false;
+
+        AddLocalIntersectionPoint(cone.Center, cone.Rotation, localPoint, ref outputIntersectionPoints);
+        return true;
+    }
+
+    private bool TryAddConeSidePoint(
+        LSConeCollider cone,
+        Vector3d localOrigin,
+        Vector3d localDirection,
+        Fixed64 distance,
+        ref SwiftList<Vector3d> outputIntersectionPoints)
+    {
+        if (distance < Fixed64.Zero || distance > _segmentLength)
+            return false;
+
+        Vector3d localPoint = localOrigin + localDirection * distance;
+        if (localPoint.Y < -cone.HalfHeight - Fixed64.Epsilon
+            || localPoint.Y > cone.HalfHeight + Fixed64.Epsilon)
+        {
+            return false;
+        }
+
+        AddLocalIntersectionPoint(cone.Center, cone.Rotation, localPoint, ref outputIntersectionPoints);
         return true;
     }
 

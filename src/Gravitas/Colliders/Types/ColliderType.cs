@@ -15,6 +15,7 @@ public enum ColliderType : byte
     OBBox,
     Capsule,
     Cylinder,
+    Cone,
     Mesh,
     Compound
 }

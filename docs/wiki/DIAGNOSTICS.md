@@ -182,12 +182,13 @@ Current draw kinds:
 | `WireBox` | `Center`, `Size`, `Rotation`, `Color` |
 | `WireCapsule` | `Center`, `Radius`, `Height`, `Rotation`, `Color` |
 | `WireCylinder` | `Center`, `Radius`, `Height`, `Rotation`, `Color` |
+| `WireCone` | `Center`, `Radius`, `Height`, `Rotation`, `Color` |
 | `WireTriangle` | `PointA`, `PointB`, `PointC`, `Color` |
 
 Host renderers can consume draw commands through
 `GravitasDebugDrawCommandVisitor` and `context.Diagnostics.DispatchDrawCommandsTo(...)`.
 That visitor exposes typed draw views for lines, rays, points, wire spheres,
-boxes, capsules, cylinders, and triangles so adapters do not need to repeat a
+boxes, capsules, cylinders, cones, and triangles so adapters do not need to repeat a
 manual command-kind switch.
 
 Use the explicit capture helpers for host-driven overlays:

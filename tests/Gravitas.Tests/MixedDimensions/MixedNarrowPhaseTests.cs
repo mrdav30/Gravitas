@@ -82,6 +82,26 @@ public sealed class MixedNarrowPhaseTests
                 "Cylinder_ConvexPolygon",
                 context => CreateCylinder3D(context, new Vector3d(Fixed64.FromFraction(13, 10), Fixed64.Zero, Fixed64.Zero)).Collider,
                 context => CreateBody2D(context, CreateSquarePolygon(), Vector2d.Zero, FixedMath.DegToRad((Fixed64)45)).Collider
+            },
+            {
+                "Cone_Circle",
+                context => CreateCone3D(context, new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero)).Collider,
+                context => CreateBody2D(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero).Collider
+            },
+            {
+                "Cone_AABox",
+                context => CreateCone3D(context, new Vector3d(Fixed64.FromFraction(3, 2), Fixed64.Zero, Fixed64.Zero)).Collider,
+                context => CreateBody2D(context, new LSAABBoxCollider2D(new Vector2d((Fixed64)2, (Fixed64)2)), Vector2d.Zero).Collider
+            },
+            {
+                "Cone_Capsule2D",
+                context => CreateCone3D(context, new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero)).Collider,
+                context => CreateBody2D(context, new LSCapsuleCollider2D(Fixed64.Half, (Fixed64)3), Vector2d.Zero).Collider
+            },
+            {
+                "Cone_ConvexPolygon",
+                context => CreateCone3D(context, new Vector3d(Fixed64.FromFraction(13, 10), Fixed64.Zero, Fixed64.Zero)).Collider,
+                context => CreateBody2D(context, CreateSquarePolygon(), Vector2d.Zero, FixedMath.DegToRad((Fixed64)45)).Collider
             }
         };
 
@@ -257,6 +277,38 @@ public sealed class MixedNarrowPhaseTests
         contact.Normal3DTo2D.Should().Be(-Vector3d.Right);
         contact.Point3D.X.Should().Be(Fixed64.FromFraction(1, 4));
         contact.Point2D.X.Should().Be(Fixed64.Half);
+    }
+
+    [Fact]
+    public void ConeCircleSlab_WithBaseRimOverlap_ShouldReportFiniteConeContact()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSConeCollider> cone = CreateCone3D(
+            context,
+            new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
+        SolidBody2D circle = CreateBody2D(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero);
+
+        bool collided = CollisionDetectionMixed.TryCollide(cone.Collider, circle.Collider, out MixedContact contact);
+
+        collided.Should().BeTrue();
+        contact.HasContact.Should().BeTrue();
+        contact.Depth.Should().BeGreaterThanOrEqualTo(Fixed64.Zero);
+        contact.Normal3DTo2D.Should().Be(-Vector3d.Right);
+        contact.Point3D.X.Should().BeLessThan(cone.Collider.Center.X);
+        contact.Point2D.X.Should().Be(Fixed64.Half);
+    }
+
+    [Fact]
+    public void ConeCircleSlab_WithSeparatedYSlab_ShouldNotCollide()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSConeCollider> cone = CreateCone3D(
+            context,
+            new Vector3d(Fixed64.Zero, (Fixed64)2, Fixed64.Zero));
+        SolidBody2D circle = CreateBody2D(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero);
+
+        CollisionDetectionMixed.TryCollide(cone.Collider, circle.Collider, out MixedContact contact).Should().BeFalse();
+        contact.HasContact.Should().BeFalse();
     }
 
     [Fact]
@@ -470,6 +522,18 @@ public sealed class MixedNarrowPhaseTests
         FixedQuaternion? rotation = null)
     {
         var collider = new LSCylinderCollider
+        {
+            Size = new Vector3d(Fixed64.One, Fixed64.One, Fixed64.One)
+        };
+        return CreateBody3D(context, collider, position, rotation ?? FixedQuaternion.Identity);
+    }
+
+    private static ScenarioBody<LSConeCollider> CreateCone3D(
+        GravitasWorldContext context,
+        Vector3d position,
+        FixedQuaternion? rotation = null)
+    {
+        var collider = new LSConeCollider
         {
             Size = new Vector3d(Fixed64.One, Fixed64.One, Fixed64.One)
         };

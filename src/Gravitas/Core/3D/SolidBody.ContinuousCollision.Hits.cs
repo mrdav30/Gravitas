@@ -312,6 +312,7 @@ public partial class SolidBody
             LSCapsuleCollider => true,
             LSCuboidCollider => true,
             LSCylinderCollider => true,
+            LSConeCollider => true,
             LSMeshCollider { Mode: MeshColliderMode.Convex } => true,
             LSCompoundCollider compound => AreExactConvexCompoundPartsSupported(compound),
             _ => false
@@ -565,7 +566,7 @@ public partial class SolidBody
         Vector3d direction)
     {
         Vector3d fromPointToSphereCenter = sphereCenterAtImpact - point;
-        if ((target is LSCuboidCollider || target is LSCylinderCollider)
+        if ((target is LSCuboidCollider || target is LSCylinderCollider || target is LSConeCollider)
             && fromPointToSphereCenter.MagnitudeSquared > Fixed64.Epsilon)
         {
             return fromPointToSphereCenter.Normalized;

@@ -37,6 +37,7 @@ public static partial class CollisionDetectionMixed
             ColliderType.AABox or ColliderType.OBBox => TryCuboidEmbedded2D((LSCuboidCollider)collider3D, collider2D, out contact),
             ColliderType.Capsule => TryCapsuleEmbedded2D((LSCapsuleCollider)collider3D, collider2D, out contact),
             ColliderType.Cylinder => TryCylinderEmbedded2D((LSCylinderCollider)collider3D, collider2D, out contact),
+            ColliderType.Cone => TryConeEmbedded2D((LSConeCollider)collider3D, collider2D, out contact),
             ColliderType.Mesh => TryMeshEmbedded2D((LSMeshCollider)collider3D, collider2D, out contact),
             ColliderType.Compound => TryCompoundEmbedded2D((LSCompoundCollider)collider3D, collider2D, out contact),
             _ => NoContact(out contact)
@@ -143,6 +144,17 @@ public static partial class CollisionDetectionMixed
             : NoContact(out contact);
     }
 
+    private static bool TryConeEmbedded2D(LSConeCollider cone, LSCollider2D embedded, out MixedContact contact)
+    {
+        bool collided = embedded.Shape == ColliderType2D.Circle
+            ? TryTestConeCircleSlab(cone, (LSCircleCollider2D)embedded, out AxisPenetration penetration)
+            : TryTestConePrism(cone, embedded, out penetration);
+
+        return collided
+            ? BuildConeContact(cone, embedded, penetration, out contact)
+            : NoContact(out contact);
+    }
+
     private static bool TryTestCuboidCircleSlab(
         LSCuboidCollider cuboid,
         LSCircleCollider2D circle,
@@ -225,6 +237,31 @@ public static partial class CollisionDetectionMixed
             circleStart,
             circleEnd);
         if (!CheckCylinderCircleSlabAxis(cylinder, circle, closest.CirclePoint - closest.CylinderPoint, ref penetration))
+            return false;
+
+        return penetration.HasValue;
+    }
+
+    private static bool TryTestConeCircleSlab(
+        LSConeCollider cone,
+        LSCircleCollider2D circle,
+        out AxisPenetration penetration)
+    {
+        penetration = default;
+        GetCircleSlabSegment(circle, out Vector3d circleStart, out Vector3d circleEnd);
+
+        if (!CheckConeCircleSlabAxis(cone, circle, cone.Axis, ref penetration))
+            return false;
+
+        if (!CheckConeCircleSlabAxis(cone, circle, Vector3d.Up, ref penetration))
+            return false;
+
+        if (!CheckConeCircleSlabAxis(cone, circle, Vector3d.Cross(cone.Axis, Vector3d.Up), ref penetration))
+            return false;
+
+        Vector3d conePoint = cone.ClosestPointOnSurface(GetEmbeddedCenter3D(circle));
+        Vector3d circlePoint = Vector3d.ClosestPointOnLineSegment(conePoint, circleStart, circleEnd);
+        if (!CheckConeCircleSlabAxis(cone, circle, circlePoint - conePoint, ref penetration))
             return false;
 
         return penetration.HasValue;
@@ -383,6 +420,52 @@ public static partial class CollisionDetectionMixed
         return penetration.HasValue;
     }
 
+    private static bool TryTestConePrism(
+        LSConeCollider cone,
+        LSCollider2D prism,
+        out AxisPenetration penetration)
+    {
+        penetration = default;
+
+        if (!CheckConePrismAxis(cone, prism, cone.Axis, ref penetration))
+            return false;
+
+        if (!CheckConePrismAxis(cone, prism, Vector3d.Up, ref penetration))
+            return false;
+
+        if (!CheckConePrismAxis(cone, prism, Vector3d.Cross(cone.Axis, Vector3d.Up), ref penetration))
+            return false;
+
+        if (prism is LSCapsuleCollider2D embeddedCapsule)
+        {
+            if (!CheckEmbeddedCapsuleAxes(cone, embeddedCapsule, ref penetration)
+                || !CheckConeEmbeddedCapsuleEdgeAxis(cone, embeddedCapsule, ref penetration))
+            {
+                return false;
+            }
+        }
+        else
+        {
+            for (int i = 0; i < prism.VertexCount; i++)
+            {
+                GetPrismEdge(prism, i, out Vector2d edge2D);
+                Vector3d edge3D = new(edge2D.X, Fixed64.Zero, edge2D.Y);
+                if (!CheckConePrismAxis(cone, prism, GetPlanarEdgeNormal(edge2D), ref penetration))
+                    return false;
+
+                if (!CheckConePrismAxis(cone, prism, Vector3d.Cross(cone.Axis, edge3D), ref penetration))
+                    return false;
+            }
+        }
+
+        Vector3d embeddedPoint = MixedEmbedded2DGeometry.GetClosestPointOnEmbeddedVolume(prism, cone.Center);
+        Vector3d conePoint = cone.ClosestPointOnSurface(embeddedPoint);
+        if (!CheckConePrismAxis(cone, prism, embeddedPoint - conePoint, ref penetration))
+            return false;
+
+        return penetration.HasValue;
+    }
+
     private static bool CheckCuboidCircleSlabAxis(
         LSCuboidCollider cuboid,
         LSCircleCollider2D circle,
@@ -433,6 +516,20 @@ public static partial class CollisionDetectionMixed
             cylinder.ScaledRadius);
         FixedRange circleProjection = ProjectCircleSlabOntoAxis(normalizedAxis, circle);
         return CheckProjectedAxis(cylinderProjection, circleProjection, normalizedAxis, GetEmbeddedCenter3D(circle) - cylinder.Center, ref penetration);
+    }
+
+    private static bool CheckConeCircleSlabAxis(
+        LSConeCollider cone,
+        LSCircleCollider2D circle,
+        Vector3d axis,
+        ref AxisPenetration penetration)
+    {
+        if (!TryNormalizeAxis(axis, out Vector3d normalizedAxis))
+            return true;
+
+        FixedRange coneProjection = ConvexColliderSupport.ProjectOntoAxis(cone, normalizedAxis);
+        FixedRange circleProjection = ProjectCircleSlabOntoAxis(normalizedAxis, circle);
+        return CheckProjectedAxis(coneProjection, circleProjection, normalizedAxis, GetEmbeddedCenter3D(circle) - cone.Center, ref penetration);
     }
 
     private static bool CheckCuboidPrismAxis(
@@ -487,6 +584,20 @@ public static partial class CollisionDetectionMixed
         return CheckProjectedAxis(cylinderProjection, prismProjection, normalizedAxis, GetEmbeddedCenter3D(prism) - cylinder.Center, ref penetration);
     }
 
+    private static bool CheckConePrismAxis(
+        LSConeCollider cone,
+        LSCollider2D prism,
+        Vector3d axis,
+        ref AxisPenetration penetration)
+    {
+        if (!TryNormalizeAxis(axis, out Vector3d normalizedAxis))
+            return true;
+
+        FixedRange coneProjection = ConvexColliderSupport.ProjectOntoAxis(cone, normalizedAxis);
+        FixedRange prismProjection = ProjectPrismOntoAxis(normalizedAxis, prism);
+        return CheckProjectedAxis(coneProjection, prismProjection, normalizedAxis, GetEmbeddedCenter3D(prism) - cone.Center, ref penetration);
+    }
+
     private static bool CheckEmbeddedCapsuleAxes(
         LSCuboidCollider cuboid,
         LSCapsuleCollider2D capsule,
@@ -517,6 +628,16 @@ public static partial class CollisionDetectionMixed
             && CheckCylinderPrismAxis(cylinder, capsule, normal, ref penetration);
     }
 
+    private static bool CheckEmbeddedCapsuleAxes(
+        LSConeCollider cone,
+        LSCapsuleCollider2D capsule,
+        ref AxisPenetration penetration)
+    {
+        GetEmbeddedCapsuleAxes(capsule, out Vector3d axis, out Vector3d normal);
+        return CheckConePrismAxis(cone, capsule, axis, ref penetration)
+            && CheckConePrismAxis(cone, capsule, normal, ref penetration);
+    }
+
     private static bool CheckCuboidCapsuleEdgeAxis(
         LSCuboidCollider cuboid,
         LSCapsuleCollider2D capsule,
@@ -543,6 +664,15 @@ public static partial class CollisionDetectionMixed
     {
         GetEmbeddedCapsuleAxes(capsule, out Vector3d capsuleAxis, out _);
         return CheckCylinderPrismAxis(cylinder, capsule, Vector3d.Cross(cylinder.LineDirection, capsuleAxis), ref penetration);
+    }
+
+    private static bool CheckConeEmbeddedCapsuleEdgeAxis(
+        LSConeCollider cone,
+        LSCapsuleCollider2D capsule,
+        ref AxisPenetration penetration)
+    {
+        GetEmbeddedCapsuleAxes(capsule, out Vector3d capsuleAxis, out _);
+        return CheckConePrismAxis(cone, capsule, Vector3d.Cross(cone.Axis, capsuleAxis), ref penetration);
     }
 
     private static bool BuildCuboidContact(
@@ -579,6 +709,19 @@ public static partial class CollisionDetectionMixed
     {
         Vector3d reference = MixedEmbedded2DGeometry.GetClosestPointOnEmbeddedVolume(embedded, cylinder.Center);
         Vector3d point3D = cylinder.ClosestPointOnSurface(reference);
+        Vector3d point2D = MixedEmbedded2DGeometry.GetClosestPointOnEmbeddedVolume(embedded, point3D);
+        contact = new MixedContact(point3D, point2D, penetration.Axis, penetration.Depth);
+        return true;
+    }
+
+    private static bool BuildConeContact(
+        LSConeCollider cone,
+        LSCollider2D embedded,
+        AxisPenetration penetration,
+        out MixedContact contact)
+    {
+        Vector3d reference = MixedEmbedded2DGeometry.GetClosestPointOnEmbeddedVolume(embedded, cone.Center);
+        Vector3d point3D = cone.ClosestPointOnSurface(reference);
         Vector3d point2D = MixedEmbedded2DGeometry.GetClosestPointOnEmbeddedVolume(embedded, point3D);
         contact = new MixedContact(point3D, point2D, penetration.Axis, penetration.Depth);
         return true;

@@ -134,6 +134,22 @@ internal sealed class PhysicsScenarioBuilder : IDisposable
             preventAngularForces);
     }
 
+    public ScenarioBody<LSConeCollider> CreateCone(
+        Vector3d position,
+        FixedQuaternion? rotation = null,
+        Fixed64? mass = null,
+        bool immovable = false,
+        bool preventAngularForces = false)
+    {
+        return CreateBody(
+            new LSConeCollider(),
+            position,
+            rotation ?? FixedQuaternion.Identity,
+            mass,
+            immovable,
+            preventAngularForces);
+    }
+
     public LSSphereCollider CreateStaticSphere(Vector3d position)
     {
         var collider = new LSSphereCollider();

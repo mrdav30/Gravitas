@@ -66,6 +66,17 @@ public sealed partial class GravitasDiagnosticSink
                     height: cylinder.Height,
                     color: color);
                 break;
+            case LSConeCollider cone:
+                AddDrawCommand(
+                    GravitasDebugDrawKind.WireCone,
+                    cone.Id,
+                    cone.Shape,
+                    center: cone.Center,
+                    rotation: cone.Rotation,
+                    radius: cone.ScaledRadius,
+                    height: cone.Height,
+                    color: color);
+                break;
             case LSCompoundCollider compound:
                 CaptureCompoundParts(compound, color);
                 break;
@@ -310,6 +321,17 @@ public sealed partial class GravitasDiagnosticSink
                         rotation: cylinder.Rotation,
                         radius: cylinder.ScaledRadius,
                         height: cylinder.Height,
+                        color: color);
+                    break;
+                case LSConeCollider cone:
+                    AddDrawCommand(
+                        GravitasDebugDrawKind.WireCone,
+                        compound.Id,
+                        compound.Shape,
+                        center: cone.Center,
+                        rotation: cone.Rotation,
+                        radius: cone.ScaledRadius,
+                        height: cone.Height,
                         color: color);
                     break;
                 case LSMeshCollider mesh:

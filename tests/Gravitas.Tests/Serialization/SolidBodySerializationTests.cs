@@ -130,6 +130,43 @@ public sealed class SolidBodySerializationTests
 
     [Theory]
     [MemberData(nameof(Transports))]
+    public void Populate_ShouldRestoreConeShapeStateAndMassProperties(GravitasSerializationTransport transport)
+    {
+        using PhysicsScenarioBuilder sourceScenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSConeCollider> source = sourceScenario.CreateBody(
+            new LSConeCollider
+            {
+                Radius = Fixed64.FromFraction(3, 4),
+                Size = new Vector3d(Fixed64.FromFraction(3, 2), (Fixed64)3, Fixed64.FromFraction(3, 2))
+            },
+            new Vector3d((Fixed64)2, Fixed64.One, Fixed64.Zero),
+            FixedQuaternion.FromEulerAnglesInDegrees(Fixed64.Zero, Fixed64.Zero, (Fixed64)45),
+            mass: (Fixed64)5);
+        source.Collider.LocalOffset = new Vector3d(Fixed64.Half, Fixed64.Zero, Fixed64.Zero);
+        source.Collider.Simulate();
+
+        object payload = GravitasSerializationHarness.Serialize(source.Body, transport);
+
+        using PhysicsScenarioBuilder targetScenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSConeCollider> target = targetScenario.CreateBody(
+            new LSConeCollider(),
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            mass: Fixed64.One);
+
+        GravitasSerializationHarness.Populate(target.Body, payload, transport);
+
+        target.Collider.Radius.Should().Be(source.Collider.Radius);
+        target.Collider.Size.Should().Be(source.Collider.Size);
+        target.Collider.LocalOffset.Should().Be(source.Collider.LocalOffset);
+        target.Collider.BaseCenter.Should().Be(source.Collider.BaseCenter);
+        target.Collider.Apex.Should().Be(source.Collider.Apex);
+        target.Body.LocalCenterOfMassOffset.Should().Be(source.Body.LocalCenterOfMassOffset);
+        target.Body.InverseInertiaTensor.Should().Be(source.Body.InverseInertiaTensor);
+    }
+
+    [Theory]
+    [MemberData(nameof(Transports))]
     public void Populate_ShouldRestoreWasGroundedTransitionState(GravitasSerializationTransport transport)
     {
         using PhysicsScenarioBuilder sourceScenario = PhysicsScenarioBuilder.Create();

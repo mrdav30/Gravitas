@@ -52,8 +52,8 @@ ignore, same-agent, explicit hierarchy, duplicate, and bounds filtering. The mix
 `LSCollider2D` is a finite 3D `FixedBoundBox` built from pure 2D X/Z bounds plus a
 positive Y half-thickness centered on the host transform's Y position.
 `CollisionDetectionMixed` supports 3D sphere, cuboid, capsule, finite
-cylinder, compound, and mesh contacts against embedded 2D circle, capsule,
-AABB, convex polygon, and compound slabs. Compound mixed contacts scan owned parts
+cylinder, finite cone, compound, and mesh contacts against embedded 2D circle,
+capsule, AABB, convex polygon, and compound slabs. Compound mixed contacts scan owned parts
 in stable order and return one external contact surface on either side. Mesh
 mixed contacts gather local-BVH triangle candidates and test triangles against
 the embedded 2D slab volume.
@@ -83,9 +83,11 @@ Mixed query hits expose `PhysicsMixedHit.ReducerKind` so hosts can distinguish
 exact finite-slab reducers from safe conservative fallbacks. 2D swept-circle
 mixed CCD routes through the same mixed query reducers as public
 `SweepCircleAgainst3D`: sphere, cuboid, capsule, and finite-cylinder targets
-use finite-slab reducers. Mesh targets clip candidate triangles to the finite
-slab before X/Z projection, and compound targets reduce exact supported parts in
-authored order. 3D swept-sphere mixed CCD routes through the same mixed query
+use finite-slab reducers. Vertical finite-cone targets use exact slab-clipped
+cone cross-sections; rotated finite-cone targets use a safe whole-cone
+projection and report `ConservativeFallback`. Mesh targets clip candidate
+triangles to the finite slab before X/Z projection, and compound targets reduce
+exact supported parts in authored order. 3D swept-sphere mixed CCD routes through the same mixed query
 reducers as public `SweepSphereAgainst2D`: circle slabs, capsule slabs, AABB
 slabs, convex polygon slabs, and supported compound 2D slabs are exact.
 When diagnostics are enabled, mixed queries also emit `QuerySummary` events with
@@ -320,6 +322,12 @@ area, and inertia inputs together. Cylinder support intentionally treats the
 shape as a real finite cylinder rather than a capsule with ignored hemispheres,
 so cap separation and side separation are tested independently.
 
+Cones rebuild their finite base-to-apex axis, base cap, height, volume, center
+of mass, and inertia inputs together. The local origin is the cone's bounding
+center, while the shape-derived COM is offset one quarter of the height from
+the base toward the apex. Cone collision and query paths use analytic support
+and closest-surface geometry instead of generating a runtime triangle fan.
+
 Cuboids keep face, edge, normal, and centroid arrays on the collider. Rotated
 closest-surface queries walk the cached face index data directly rather than
 materializing temporary face vertex arrays, because those queries are used by
@@ -403,8 +411,8 @@ Mesh policy work should keep these boundaries explicit:
   unless a future asset pipeline proves that mesh-owned pieces need different
   public semantics.
 - Mesh colliders are supported as collision shapes and as raycast and
-  swept-sphere query targets. Capsule, cuboid, finite-cylinder, convex mesh,
-  and authored compound sources also have explicit 3D swept query APIs.
+  swept-sphere query targets. Capsule, cuboid, finite-cylinder, finite-cone,
+  convex mesh, and authored compound sources also have explicit 3D swept query APIs.
   `SweptSphereQueryWorker.TrySweep(LSCollider collider, ...)` is the inverse
   relationship: it sweeps a prepared sphere source against a target collider.
   The intentionally unsupported high-risk case is exact concave
@@ -451,7 +459,7 @@ that late-simulate step. The path first uses a swept proxy derived from the
 moving collider:
 
 - 3D sphere uses its exact scaled radius.
-- 3D capsule, cuboid, finite cylinder, mesh, and compound movers use the
+- 3D capsule, cuboid, finite cylinder, finite cone, mesh, and compound movers use the
   world-bounds sphere radius (`Bounds.Scope.Magnitude`). This is intentionally
   conservative for elongated or sparse shapes: it can stop early, but it avoids
   the false-negative tunneling risk of using the smallest bounds axis while the
@@ -472,7 +480,7 @@ before the proxy hit can be accepted:
   identity.
 - pure 3D sphere targets are reduced by sweeping the target sphere backward
   against the moving source collider with `SweptSphereQueryWorker`. This covers
-  3D cuboid, capsule, cylinder, mesh, and compound movers for sphere-target
+  3D cuboid, capsule, cylinder, cone, mesh, and compound movers for sphere-target
   false-positive rejection without duplicating 3D shape math.
 - supported 3D convex movers, convex meshes, and compounds made from supported
   convex parts use the same support-mapped source sweeps as public `Query3D`
@@ -708,27 +716,31 @@ Current shape support:
 | Cylinder/Capsule | finite-cylinder projection axes against capsule segment/radius projection. |
 | Cylinder/Cylinder | finite-cylinder projection axes, preserving flat cap separation; parallel cap overlap emits a four-contact cap manifold. |
 | Cuboid/Cylinder | cuboid vertex projection against finite-cylinder projection; cuboid face/cylinder cap overlap emits a four-contact manifold. |
+| Cone/Sphere | finite cone closest surface against sphere radius, including side, base, and apex cases. |
+| Cone/Convex | support-mapped convex intersection for cone against cuboid, capsule, finite cylinder, finite cone, and convex mesh targets, with representative deterministic contact data. |
 | Mesh/Sphere | convex mesh uses closest surface point; concave mesh gathers triangle candidates against the sphere bounds. |
 | Mesh/Capsule | convex mesh uses closest surface from the capsule line seed; concave mesh uses segment-vs-triangle closest points. |
 | Mesh/Cuboid | triangle-BVH candidate scan runs per-triangle SAT against the cuboid and clips cuboid support-face contacts to authored triangles. |
 | Mesh/Cylinder | triangle-BVH candidate scan tests finite cylinder volume and clips cap contacts to authored triangles; side/rim cases keep representative finite-cylinder contacts. |
+| Mesh/Cone | convex mesh uses support-mapped cone/mesh intersection; concave mesh gathers triangle candidates against the finite cone volume. |
 | Mesh/Mesh | convex mesh uses nearby-triangle SAT; concave-involved pairs run triangle-vs-triangle candidate checks. |
 | Compound/* | stable part-order scan, existing part-vs-shape narrow phase, and pair-owned manifold reduction. |
 
 Current shape-pair matrix:
 
-| A / B | Sphere | Capsule | Cuboid | Cylinder | Mesh | Compound |
-| --- | --- | --- | --- | --- | --- | --- |
-| Sphere | Supported | Supported | Supported | Supported | Supported | Supported |
-| Capsule | Supported | Supported | Supported | Supported | Supported | Supported |
-| Cuboid | Supported | Supported | Supported | Supported | Supported | Supported |
-| Cylinder | Supported | Supported | Supported | Supported | Supported | Supported |
-| Mesh | Supported | Supported | Supported | Supported | Supported | Supported |
-| Compound | Supported | Supported | Supported | Supported | Supported | Supported |
+| A / B | Sphere | Capsule | Cuboid | Cylinder | Cone | Mesh | Compound |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Sphere | Supported | Supported | Supported | Supported | Supported | Supported | Supported |
+| Capsule | Supported | Supported | Supported | Supported | Supported | Supported | Supported |
+| Cuboid | Supported | Supported | Supported | Supported | Supported | Supported | Supported |
+| Cylinder | Supported | Supported | Supported | Supported | Supported | Supported | Supported |
+| Cone | Supported | Supported | Supported | Supported | Supported | Supported | Supported |
+| Mesh | Supported | Supported | Supported | Supported | Supported | Supported | Supported |
+| Compound | Supported | Supported | Supported | Supported | Supported | Supported | Supported |
 
-`Cuboid` covers both `AABox` and `OBBox` dispatch. `Cylinder/Mesh` is
-normalized to `Mesh/Cylinder` by pair priority so contact data is written in the
-mesh-to-cylinder direction.
+`Cuboid` covers both `AABox` and `OBBox` dispatch. `Cylinder/Mesh` and
+`Cone/Mesh` are normalized to `Mesh/Cylinder` and `Mesh/Cone` by pair priority
+so contact data is written in the mesh-to-curved-primitive direction.
 
 SAT and mesh candidate paths use context-owned scratch state through
 `GravitasWorldContext`. `CollisionSatScratch` owns the reusable

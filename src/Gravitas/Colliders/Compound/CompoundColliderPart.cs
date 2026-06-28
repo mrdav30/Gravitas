@@ -155,6 +155,24 @@ public readonly struct CompoundColliderPart
         Vector3d localScale) =>
         new(ColliderShapeDefinition.Cylinder(radius, height), localOffset, localRotation, localScale);
 
+    public static CompoundColliderPart Cone(Fixed64 radius, Fixed64 height, Vector3d localOffset) =>
+        new(ColliderShapeDefinition.Cone(radius, height), localOffset);
+
+    public static CompoundColliderPart Cone(
+        Fixed64 radius,
+        Fixed64 height,
+        Vector3d localOffset,
+        PhysicsMaterial material) =>
+        new(ColliderShapeDefinition.Cone(radius, height), localOffset, FixedQuaternion.Identity, Vector3d.One, material);
+
+    public static CompoundColliderPart Cone(
+        Fixed64 radius,
+        Fixed64 height,
+        Vector3d localOffset,
+        FixedQuaternion localRotation,
+        Vector3d localScale) =>
+        new(ColliderShapeDefinition.Cone(radius, height), localOffset, localRotation, localScale);
+
     public static CompoundColliderPart ConvexMesh(
         Vector3d[] vertices,
         int[] triangles,

@@ -126,6 +126,9 @@ public readonly struct GravitasDebugDrawCommand
             case GravitasDebugDrawKind.WireTriangle:
                 visitor.VisitWireTriangle(new GravitasWireTriangleDebugDrawView(this));
                 break;
+            case GravitasDebugDrawKind.WireCone:
+                visitor.VisitWireCone(new GravitasWireConeDebugDrawView(this));
+                break;
             default:
                 visitor.VisitUnknown(this);
                 break;

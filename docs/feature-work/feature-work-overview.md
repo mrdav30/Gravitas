@@ -23,20 +23,23 @@ instead of burying it in notes.
 1. [`Benchmark Signal Hardening Backlog`](benchmark-signal-hardening-backlog.md)
    - Measured allocation or runtime-cost signals must be reproduced, resolved,
      or closed with a no-change decision before release.
-2. [`Feature Work Issue Tracker`](issue-tracker.md)
+2. [`Issue Tracker`](issue-tracker.md)
    - Bugs, correctness risks, documentation defects, and feature-work-discovered
      issues should be triaged, tested, and committed independently from feature
      design plans.
 
 ## Active Release-Scope
 
-- [`Cone Collider And Query Support`](2026-06-26-cone-collider-and-query-support-plan.md)
-  - Planned 2026-06-26. Adds an analytic 3D cone primitive and cone-volume
-    query support, with explicit research gates for mass properties, discrete
-    contact quality, swept reducers, mixed mode, diagnostics, and benchmarks.
+- No active release-scope plans are currently queued.
 
 ## Recently Completed
 
+- [`Cone Collider And Query Support`](done/2026-06-26-cone-collider-and-query-support-plan.md)
+  - Completed 2026-06-28. Adds `LSConeCollider` as a first-class analytic 3D
+    primitive across shape definitions, mass properties, collision, CCD, mixed
+    mode, cone-volume queries, source sweeps, diagnostics, serialization, docs,
+    and benchmark signal. Mixed rotated finite-cone slab sweeps are labeled as
+    safe conservative fallbacks rather than exact slab reductions.
 - [`Pure 2D Capsule And Convenience Shapes`](done/2026-06-26-pure-2d-capsule-and-convenience-shapes-plan.md)
   - Completed 2026-06-27. Adds `LSCapsuleCollider2D` as a first-class analytic
     primitive across shape definitions, mass properties, collision manifolds,
@@ -150,10 +153,6 @@ first public release.
 
 ## Recommended Execution Order
 
-1. [`Cone Collider And Query Support`](2026-06-26-cone-collider-and-query-support-plan.md)
-   - Highest geometry/reducer risk of the new plans. Execute after the smaller
-     collider API hardening items so cone work can focus on analytic geometry,
-     contact quality, and query evidence.
-2. Keep the benchmark backlog and issue tracker as intake buckets; promote new
+1. Keep the benchmark backlog and issue tracker as intake buckets; promote new
    measured risks into dated plans only when they are broader than a focused
    patch.

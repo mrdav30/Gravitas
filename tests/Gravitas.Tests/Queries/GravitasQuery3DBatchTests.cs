@@ -229,5 +229,50 @@ public sealed class GravitasQuery3DBatchTests
         hits[ranges[0].Start].Collider.Should().BeSameAs(target);
     }
 
+    [Fact]
+    public void ConeVolumeAndConeSourceBatches_ShouldMatchSingleQueryResults()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSSphereCollider target = scenario.CreateSphere(Vector(2, 0, 0)).Collider;
+        ScenarioBody<LSConeCollider> source = scenario.CreateBody(
+            new LSConeCollider { Radius = Fixed64.Half, Size = new Vector3d(Fixed64.One, (Fixed64)2, Fixed64.One) },
+            Vector(-4, 0, 0),
+            FixedQuaternion.Identity);
+        PhysicsOverlapCone3DRequest[] coneRequests =
+        {
+            new(Vector3d.Zero, Vector3d.Right, (Fixed64)4, Fixed64.One, IncludeLayerZero),
+            new(Vector3d.Zero, Vector3d.Up, (Fixed64)4, Fixed64.One, IncludeLayerZero)
+        };
+        PhysicsSweepCone3DRequest[] sweepRequests =
+        {
+            new(source.Collider, Vector(6, 0, 0), IncludeLayerZero),
+            new(source.Collider, Vector3d.Zero, IncludeLayerZero)
+        };
+        Physics3DHit[] closestConeHits = new Physics3DHit[coneRequests.Length];
+        Physics3DHit[] closestSweepHits = new Physics3DHit[sweepRequests.Length];
+        var coneHits = new SwiftList<Physics3DHit>();
+        var sweepHits = new SwiftList<Physics3DHit>();
+        PhysicsQueryHitRange[] coneRanges = new PhysicsQueryHitRange[coneRequests.Length];
+        PhysicsQueryHitRange[] sweepRanges = new PhysicsQueryHitRange[sweepRequests.Length];
+
+        int coneClosestCount = scenario.Context.Query3D.OverlapConeBatch(coneRequests, closestConeHits);
+        int coneAllCount = scenario.Context.Query3D.OverlapConeAllBatch(coneRequests, coneHits, coneRanges);
+        int sweepClosestCount = scenario.Context.Query3D.SweepConeBatch(sweepRequests, closestSweepHits);
+        int sweepAllCount = scenario.Context.Query3D.SweepConeAllBatch(sweepRequests, sweepHits, sweepRanges);
+
+        coneClosestCount.Should().Be(1);
+        coneAllCount.Should().Be(1);
+        closestConeHits[0].Collider.Should().BeSameAs(target);
+        closestConeHits[1].Collider.Should().BeNull();
+        coneHits[coneRanges[0].Start].Collider.Should().BeSameAs(target);
+        coneRanges[1].Count.Should().Be(0);
+        sweepClosestCount.Should().Be(1);
+        sweepAllCount.Should().Be(1);
+        closestSweepHits[0].Collider.Should().BeSameAs(target);
+        closestSweepHits[1].Collider.Should().BeNull();
+        sweepHits[sweepRanges[0].Start].Collider.Should().BeSameAs(target);
+        sweepRanges[1].Count.Should().Be(0);
+    }
+
     private static Vector3d Vector(int x, int y, int z) => new((Fixed64)x, (Fixed64)y, (Fixed64)z);
 }

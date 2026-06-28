@@ -30,6 +30,7 @@ public sealed class GravitasDebugDrawCommandViewTests
         CreateCommand(GravitasDebugDrawKind.WireCapsule, center: center, radius: Fixed64.Half, height: (Fixed64)2).DispatchTo(visitor);
         CreateCommand(GravitasDebugDrawKind.WireCylinder, center: center, radius: Fixed64.Half, height: (Fixed64)3).DispatchTo(visitor);
         CreateCommand(GravitasDebugDrawKind.WireTriangle, pointA: pointA, pointB: pointB, pointC: pointC).DispatchTo(visitor);
+        CreateCommand(GravitasDebugDrawKind.WireCone, center: center, radius: Fixed64.One, height: (Fixed64)4).DispatchTo(visitor);
         CreateCommand((GravitasDebugDrawKind)250).DispatchTo(visitor);
 
         visitor.Route.Should().Equal(
@@ -41,6 +42,7 @@ public sealed class GravitasDebugDrawCommandViewTests
             nameof(RecordingDebugDrawVisitor.VisitWireCapsule),
             nameof(RecordingDebugDrawVisitor.VisitWireCylinder),
             nameof(RecordingDebugDrawVisitor.VisitWireTriangle),
+            nameof(RecordingDebugDrawVisitor.VisitWireCone),
             nameof(RecordingDebugDrawVisitor.VisitUnknown));
         visitor.LastLine.Start.Should().Be(start);
         visitor.LastLine.End.Should().Be(end);
@@ -48,6 +50,8 @@ public sealed class GravitasDebugDrawCommandViewTests
         visitor.LastWireTriangle.PointA.Should().Be(pointA);
         visitor.LastWireTriangle.PointB.Should().Be(pointB);
         visitor.LastWireTriangle.PointC.Should().Be(pointC);
+        visitor.LastWireCone.Radius.Should().Be(Fixed64.One);
+        visitor.LastWireCone.Height.Should().Be((Fixed64)4);
         visitor.LastUnknown.Kind.Should().Be((GravitasDebugDrawKind)250);
     }
 
@@ -117,6 +121,7 @@ public sealed class GravitasDebugDrawCommandViewTests
         public GravitasPointDebugDrawView LastPoint;
         public GravitasWireBoxDebugDrawView LastWireBox;
         public GravitasWireTriangleDebugDrawView LastWireTriangle;
+        public GravitasWireConeDebugDrawView LastWireCone;
         public GravitasDebugDrawCommand LastUnknown;
 
         public override void VisitLine(in GravitasLineDebugDrawView view)
@@ -153,6 +158,12 @@ public sealed class GravitasDebugDrawCommandViewTests
         {
             Route.Add(nameof(VisitWireTriangle));
             LastWireTriangle = view;
+        }
+
+        public override void VisitWireCone(in GravitasWireConeDebugDrawView view)
+        {
+            Route.Add(nameof(VisitWireCone));
+            LastWireCone = view;
         }
 
         public override void VisitUnknown(in GravitasDebugDrawCommand command)

@@ -18,5 +18,6 @@ public enum ColliderShapeDefinitionKind
     Capsule = 2,
     Cuboid = 3,
     Cylinder = 4,
-    ConvexMesh = 5
+    Cone = 5,
+    ConvexMesh = 6
 }

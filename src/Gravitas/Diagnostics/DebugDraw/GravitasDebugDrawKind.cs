@@ -19,5 +19,6 @@ public enum GravitasDebugDrawKind : byte
     WireBox = 5,
     WireCapsule = 6,
     WireCylinder = 7,
-    WireTriangle = 8
+    WireTriangle = 8,
+    WireCone = 9
 }

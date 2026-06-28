@@ -114,6 +114,16 @@ internal static class BenchmarkPhysicsScene
         return collider;
     }
 
+    public static LSConeCollider CreateDynamicCone(
+        GravitasWorldContext context,
+        Vector3d position,
+        FixedQuaternion rotation)
+    {
+        var collider = new LSConeCollider { Size = new Vector3d(Fixed64.One, (Fixed64)3, Fixed64.One) };
+        CreateDynamicBody(context, collider, position, rotation);
+        return collider;
+    }
+
     public static LSCompoundCollider CreateDynamicConvexMeshCompound(GravitasWorldContext context, Vector3d position)
     {
         CreateConvexCubeTopology(out Vector3d[] vertices, out int[] triangles);

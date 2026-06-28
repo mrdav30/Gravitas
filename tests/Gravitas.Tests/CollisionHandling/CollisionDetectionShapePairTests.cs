@@ -22,6 +22,7 @@ public sealed class CollisionDetectionShapePairTests
             [(ColliderType.Sphere, ColliderType.AABox)] = CollisionType.Cuboid_Sphere,
             [(ColliderType.Sphere, ColliderType.OBBox)] = CollisionType.Cuboid_Sphere,
             [(ColliderType.Sphere, ColliderType.Cylinder)] = CollisionType.Cylinder_Sphere,
+            [(ColliderType.Sphere, ColliderType.Cone)] = CollisionType.Cone_Sphere,
             [(ColliderType.Sphere, ColliderType.Mesh)] = CollisionType.Mesh_Sphere,
             [(ColliderType.Sphere, ColliderType.Compound)] = CollisionType.Compound,
             [(ColliderType.Capsule, ColliderType.Sphere)] = CollisionType.Capsule_Sphere,
@@ -29,6 +30,7 @@ public sealed class CollisionDetectionShapePairTests
             [(ColliderType.Capsule, ColliderType.AABox)] = CollisionType.AABox_Capsule,
             [(ColliderType.Capsule, ColliderType.OBBox)] = CollisionType.OBBox_Capsule,
             [(ColliderType.Capsule, ColliderType.Cylinder)] = CollisionType.Cylinder_Capsule,
+            [(ColliderType.Capsule, ColliderType.Cone)] = CollisionType.Cone_Convex,
             [(ColliderType.Capsule, ColliderType.Mesh)] = CollisionType.Mesh_Capsule,
             [(ColliderType.Capsule, ColliderType.Compound)] = CollisionType.Compound,
             [(ColliderType.AABox, ColliderType.Sphere)] = CollisionType.Cuboid_Sphere,
@@ -36,6 +38,7 @@ public sealed class CollisionDetectionShapePairTests
             [(ColliderType.AABox, ColliderType.AABox)] = CollisionType.Cuboid_Cuboid,
             [(ColliderType.AABox, ColliderType.OBBox)] = CollisionType.Cuboid_Cuboid,
             [(ColliderType.AABox, ColliderType.Cylinder)] = CollisionType.Cuboid_Cylinder,
+            [(ColliderType.AABox, ColliderType.Cone)] = CollisionType.Cone_Convex,
             [(ColliderType.AABox, ColliderType.Mesh)] = CollisionType.Mesh_Cuboid,
             [(ColliderType.AABox, ColliderType.Compound)] = CollisionType.Compound,
             [(ColliderType.OBBox, ColliderType.Sphere)] = CollisionType.Cuboid_Sphere,
@@ -43,6 +46,7 @@ public sealed class CollisionDetectionShapePairTests
             [(ColliderType.OBBox, ColliderType.AABox)] = CollisionType.Cuboid_Cuboid,
             [(ColliderType.OBBox, ColliderType.OBBox)] = CollisionType.Cuboid_Cuboid,
             [(ColliderType.OBBox, ColliderType.Cylinder)] = CollisionType.Cuboid_Cylinder,
+            [(ColliderType.OBBox, ColliderType.Cone)] = CollisionType.Cone_Convex,
             [(ColliderType.OBBox, ColliderType.Mesh)] = CollisionType.Mesh_Cuboid,
             [(ColliderType.OBBox, ColliderType.Compound)] = CollisionType.Compound,
             [(ColliderType.Cylinder, ColliderType.Sphere)] = CollisionType.Cylinder_Sphere,
@@ -50,13 +54,23 @@ public sealed class CollisionDetectionShapePairTests
             [(ColliderType.Cylinder, ColliderType.AABox)] = CollisionType.Cuboid_Cylinder,
             [(ColliderType.Cylinder, ColliderType.OBBox)] = CollisionType.Cuboid_Cylinder,
             [(ColliderType.Cylinder, ColliderType.Cylinder)] = CollisionType.Cylinder_Cylinder,
+            [(ColliderType.Cylinder, ColliderType.Cone)] = CollisionType.Cone_Convex,
             [(ColliderType.Cylinder, ColliderType.Mesh)] = CollisionType.Mesh_Cylinder,
             [(ColliderType.Cylinder, ColliderType.Compound)] = CollisionType.Compound,
+            [(ColliderType.Cone, ColliderType.Sphere)] = CollisionType.Cone_Sphere,
+            [(ColliderType.Cone, ColliderType.Capsule)] = CollisionType.Cone_Convex,
+            [(ColliderType.Cone, ColliderType.AABox)] = CollisionType.Cone_Convex,
+            [(ColliderType.Cone, ColliderType.OBBox)] = CollisionType.Cone_Convex,
+            [(ColliderType.Cone, ColliderType.Cylinder)] = CollisionType.Cone_Convex,
+            [(ColliderType.Cone, ColliderType.Cone)] = CollisionType.Cone_Convex,
+            [(ColliderType.Cone, ColliderType.Mesh)] = CollisionType.Mesh_Cone,
+            [(ColliderType.Cone, ColliderType.Compound)] = CollisionType.Compound,
             [(ColliderType.Mesh, ColliderType.Sphere)] = CollisionType.Mesh_Sphere,
             [(ColliderType.Mesh, ColliderType.Capsule)] = CollisionType.Mesh_Capsule,
             [(ColliderType.Mesh, ColliderType.AABox)] = CollisionType.Mesh_Cuboid,
             [(ColliderType.Mesh, ColliderType.OBBox)] = CollisionType.Mesh_Cuboid,
             [(ColliderType.Mesh, ColliderType.Cylinder)] = CollisionType.Mesh_Cylinder,
+            [(ColliderType.Mesh, ColliderType.Cone)] = CollisionType.Mesh_Cone,
             [(ColliderType.Mesh, ColliderType.Mesh)] = CollisionType.Mesh_Mesh,
             [(ColliderType.Mesh, ColliderType.Compound)] = CollisionType.Compound,
             [(ColliderType.Compound, ColliderType.Sphere)] = CollisionType.Compound,
@@ -64,6 +78,7 @@ public sealed class CollisionDetectionShapePairTests
             [(ColliderType.Compound, ColliderType.AABox)] = CollisionType.Compound,
             [(ColliderType.Compound, ColliderType.OBBox)] = CollisionType.Compound,
             [(ColliderType.Compound, ColliderType.Cylinder)] = CollisionType.Compound,
+            [(ColliderType.Compound, ColliderType.Cone)] = CollisionType.Compound,
             [(ColliderType.Compound, ColliderType.Mesh)] = CollisionType.Compound,
             [(ColliderType.Compound, ColliderType.Compound)] = CollisionType.Compound
         };
@@ -74,6 +89,7 @@ public sealed class CollisionDetectionShapePairTests
             ColliderType.AABox,
             ColliderType.OBBox,
             ColliderType.Cylinder,
+            ColliderType.Cone,
             ColliderType.Mesh,
             ColliderType.Compound
         };
@@ -485,6 +501,52 @@ public sealed class CollisionDetectionShapePairTests
     }
 
     [Fact]
+    public void ConeSphere_ShouldDetectSideBaseApexAndSeparation()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSConeCollider> cone = CreateCone(scenario, Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> sideOverlap = scenario.CreateSphere(new Vector3d(Fixed64.Half, Fixed64.Zero, Fixed64.Zero));
+        ScenarioBody<LSSphereCollider> baseOverlap = scenario.CreateSphere(new Vector3d(Fixed64.Zero, -Fixed64.One, Fixed64.Zero));
+        ScenarioBody<LSSphereCollider> apexOverlap = scenario.CreateSphere(new Vector3d(Fixed64.Zero, Fixed64.One, Fixed64.Zero));
+        ScenarioBody<LSSphereCollider> separated = scenario.CreateSphere(new Vector3d((Fixed64)3, Fixed64.Zero, Fixed64.Zero));
+
+        AssertCollision(scenario, cone.Collider, sideOverlap.Collider, CollisionType.Cone_Sphere)
+            .Manifold.PrimaryContact.Normal.X.Should().BeGreaterThan(Fixed64.Zero);
+        AssertCollision(scenario, cone.Collider, baseOverlap.Collider, CollisionType.Cone_Sphere)
+            .Manifold.PrimaryContact.Normal.Y.Should().BeLessThan(Fixed64.Zero);
+        AssertCollision(scenario, cone.Collider, apexOverlap.Collider, CollisionType.Cone_Sphere)
+            .Manifold.PrimaryContact.Depth.Should().BeGreaterThan(Fixed64.Zero);
+        AssertNoCollision(scenario, cone.Collider, separated.Collider, CollisionType.Cone_Sphere);
+    }
+
+    [Fact]
+    public void ConeConvex_ShouldDetectPrimitiveMeshAndCompoundPairs()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSConeCollider> cone = CreateCone(scenario, Vector3d.Zero);
+        ScenarioBody<LSCuboidCollider> cuboid = scenario.CreateCuboid(new Vector3d(Fixed64.Zero, -Fixed64.FromFraction(5, 4), Fixed64.Zero));
+        ScenarioBody<LSCapsuleCollider> capsule = scenario.CreateCapsule(new Vector3d(Fixed64.Half, Fixed64.Zero, Fixed64.Zero));
+        ScenarioBody<LSCylinderCollider> cylinder = scenario.CreateCylinder(new Vector3d(Fixed64.Zero, Fixed64.FromFraction(3, 4), Fixed64.Zero));
+        ScenarioBody<LSConeCollider> otherCone = CreateCone(scenario, new Vector3d(Fixed64.Zero, Fixed64.FromFraction(3, 4), Fixed64.Zero));
+        ScenarioBody<LSMeshCollider> mesh = scenario.CreateBody(
+            CreateHorizontalPlaneMesh(),
+            new Vector3d(Fixed64.Zero, -Fixed64.One, Fixed64.Zero),
+            FixedQuaternion.Identity);
+        ScenarioBody<LSCompoundCollider> compound = scenario.CreateBody(
+            new LSCompoundCollider(CompoundColliderPart.Cone(Fixed64.Half, (Fixed64)2, Vector3d.Zero)),
+            new Vector3d((Fixed64)3, Fixed64.Zero, Fixed64.Zero),
+            FixedQuaternion.Identity);
+        ScenarioBody<LSConeCollider> compoundCone = CreateCone(scenario, new Vector3d((Fixed64)3, Fixed64.Half, Fixed64.Zero));
+
+        AssertCollision(scenario, cone.Collider, cuboid.Collider, CollisionType.Cone_Convex);
+        AssertCollision(scenario, cone.Collider, capsule.Collider, CollisionType.Cone_Convex);
+        AssertCollision(scenario, cone.Collider, cylinder.Collider, CollisionType.Cone_Convex);
+        AssertCollision(scenario, cone.Collider, otherCone.Collider, CollisionType.Cone_Convex);
+        AssertCollision(scenario, mesh.Collider, cone.Collider, CollisionType.Mesh_Cone);
+        AssertCollision(scenario, compound.Collider, compoundCone.Collider, CollisionType.Compound);
+    }
+
+    [Fact]
     public void MeshSphere_WithSphereCenterOnConvexSurface_ShouldUseFaceNormalAndPositiveDepth()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
@@ -703,4 +765,14 @@ public sealed class CollisionDetectionShapePairTests
             new[] { 0, 2, 1, 1, 2, 3 },
             MeshColliderMode.Convex,
             MeshInertiaPolicy.SurfaceApproximation);
+
+    private static ScenarioBody<LSConeCollider> CreateCone(PhysicsScenarioBuilder scenario, Vector3d position) =>
+        scenario.CreateBody(
+            new LSConeCollider
+            {
+                Radius = Fixed64.Half,
+                Size = new Vector3d(Fixed64.One, (Fixed64)2, Fixed64.One)
+            },
+            position,
+            FixedQuaternion.Identity);
 }

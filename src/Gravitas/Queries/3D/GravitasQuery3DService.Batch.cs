@@ -339,6 +339,70 @@ public sealed partial class GravitasQuery3DService
     }
 
     /// <summary>
+    /// Executes multiple registered cone-source sweeps and writes one closest-hit slot per request.
+    /// </summary>
+    public int SweepConeBatch(ReadOnlySpan<PhysicsSweepCone3DRequest> requests, Span<Physics3DHit> closestHits)
+    {
+        ValidateClosestBatchOutput(requests.Length, closestHits);
+        ResetBatchCounters(requests.Length);
+
+        int hitCount = 0;
+        LSCollider? preparedSource = null;
+        Vector3d preparedDisplacement = default;
+        for (int i = 0; i < requests.Length; i++)
+        {
+            PhysicsSweepCone3DRequest request = requests[i];
+            bool found = TrySweepSourceBatchRequest(
+                request.Source,
+                request.Displacement,
+                request.LayerMask,
+                request.ExcludedCollider,
+                request.IncludeTriggers,
+                ref preparedSource,
+                ref preparedDisplacement,
+                out Physics3DHit hit);
+            WriteClosestHit(closestHits, i, hit, found, ref hitCount);
+        }
+
+        LastBatchHitCount = hitCount;
+        return hitCount;
+    }
+
+    /// <summary>
+    /// Executes multiple registered cone-source sweeps and appends all hits into one caller-owned hit buffer.
+    /// </summary>
+    public int SweepConeAllBatch(
+        ReadOnlySpan<PhysicsSweepCone3DRequest> requests,
+        SwiftList<Physics3DHit> hits,
+        Span<PhysicsQueryHitRange> ranges)
+    {
+        SwiftThrowHelper.ThrowIfNull(hits, nameof(hits));
+        ValidateRangeBatchOutput(requests.Length, ranges);
+        ResetBatchCounters(requests.Length);
+        hits.FastClear();
+
+        LSCollider? preparedSource = null;
+        Vector3d preparedDisplacement = default;
+        for (int i = 0; i < requests.Length; i++)
+        {
+            PhysicsSweepCone3DRequest request = requests[i];
+            int count = SweepSourceAllBatchRequest(
+                request.Source,
+                request.Displacement,
+                request.LayerMask,
+                request.ExcludedCollider,
+                request.IncludeTriggers,
+                ref preparedSource,
+                ref preparedDisplacement,
+                _batch3DHits);
+            AppendRange(hits, ranges, i, count);
+        }
+
+        LastBatchHitCount = hits.Count;
+        return hits.Count;
+    }
+
+    /// <summary>
     /// Executes multiple registered convex mesh-source sweeps and writes one closest-hit slot per request.
     /// </summary>
     public int SweepConvexMeshBatch(ReadOnlySpan<PhysicsSweepConvexMesh3DRequest> requests, Span<Physics3DHit> closestHits)
@@ -503,6 +567,50 @@ public sealed partial class GravitasQuery3DService
         {
             PhysicsOverlapCircle3DRequest request = requests[i];
             int count = OverlapCircleAllBatchRequest(request, _batch3DHits);
+            AppendRange(hits, ranges, i, count);
+        }
+
+        LastBatchHitCount = hits.Count;
+        return hits.Count;
+    }
+
+    /// <summary>
+    /// Executes multiple directional cone-volume overlaps and writes one closest-hit slot per request.
+    /// </summary>
+    public int OverlapConeBatch(ReadOnlySpan<PhysicsOverlapCone3DRequest> requests, Span<Physics3DHit> closestHits)
+    {
+        ValidateClosestBatchOutput(requests.Length, closestHits);
+        ResetBatchCounters(requests.Length);
+
+        int hitCount = 0;
+        for (int i = 0; i < requests.Length; i++)
+        {
+            PhysicsOverlapCone3DRequest request = requests[i];
+            bool found = TryOverlapConeBatchRequest(request, out Physics3DHit hit);
+            WriteClosestHit(closestHits, i, hit, found, ref hitCount);
+        }
+
+        LastBatchHitCount = hitCount;
+        return hitCount;
+    }
+
+    /// <summary>
+    /// Executes multiple directional cone-volume overlaps and appends all hits into one caller-owned hit buffer.
+    /// </summary>
+    public int OverlapConeAllBatch(
+        ReadOnlySpan<PhysicsOverlapCone3DRequest> requests,
+        SwiftList<Physics3DHit> hits,
+        Span<PhysicsQueryHitRange> ranges)
+    {
+        SwiftThrowHelper.ThrowIfNull(hits, nameof(hits));
+        ValidateRangeBatchOutput(requests.Length, ranges);
+        ResetBatchCounters(requests.Length);
+        hits.FastClear();
+
+        for (int i = 0; i < requests.Length; i++)
+        {
+            PhysicsOverlapCone3DRequest request = requests[i];
+            int count = OverlapConeAllBatchRequest(request, _batch3DHits);
             AppendRange(hits, ranges, i, count);
         }
 
@@ -716,6 +824,24 @@ public sealed partial class GravitasQuery3DService
         hit = found ? closest : default;
         return found;
     }
+
+    private bool TryOverlapConeBatchRequest(PhysicsOverlapCone3DRequest request, out Physics3DHit hit) =>
+        OverlapCone(
+            request.Origin,
+            request.Direction,
+            request.Length,
+            request.EndRadius,
+            out hit,
+            request.LayerMask);
+
+    private int OverlapConeAllBatchRequest(PhysicsOverlapCone3DRequest request, SwiftList<Physics3DHit> results) =>
+        OverlapConeAll(
+            request.Origin,
+            request.Direction,
+            request.Length,
+            request.EndRadius,
+            request.LayerMask,
+            results);
 
     private void WriteClosestHit(Span<Physics3DHit> closestHits, int index, Physics3DHit hit, bool found, ref int hitCount)
     {

@@ -25,6 +25,7 @@ public sealed partial class GravitasQuery3DService
     private readonly SweptSphereQueryWorker _sweepWorker = new();
     private readonly ConvexSweepQueryWorker _convexSweepWorker = new();
     private SwiftList<Vector3d> _bufferIntersectionPoints = new();
+    private readonly SwiftList<int> _meshTriangleCandidates = new(16);
     private readonly SwiftHashSet<int> _redundantColliderCheck = new();
     private readonly SwiftHashSet<int> _redundantVoxelCheck = new();
     private readonly SwiftList<Voxel> _coveredVoxels = new();
@@ -75,6 +76,7 @@ public sealed partial class GravitasQuery3DService
         ResetLastQueryCounters();
         ResetBatchCounters(0);
         _bufferIntersectionPoints.FastClear();
+        _meshTriangleCandidates.FastClear();
         _batch3DHits.FastClear();
         _redundantColliderCheck.Clear();
         _redundantVoxelCheck.Clear();
@@ -330,6 +332,37 @@ public sealed partial class GravitasQuery3DService
     /// </summary>
     public int SweepCylinderAll(
         LSCylinderCollider source,
+        Vector3d displacement,
+        PhysicsLayerMask layerMask,
+        SwiftList<Physics3DHit> results,
+        LSCollider? excludedCollider = null,
+        bool includeTriggers = true)
+    {
+        SwiftThrowHelper.ThrowIfNull(source, nameof(source));
+        SwiftThrowHelper.ThrowIfNull(results, nameof(results));
+        return SweepPrimitiveSourceAll(source, displacement, layerMask, results, excludedCollider, includeTriggers);
+    }
+
+    /// <summary>
+    /// Sweeps a finite-cone source by <paramref name="displacement"/> and returns the closest 3D target hit.
+    /// </summary>
+    public bool SweepCone(
+        LSConeCollider source,
+        Vector3d displacement,
+        PhysicsLayerMask layerMask,
+        out Physics3DHit sweepHit,
+        LSCollider? excludedCollider = null,
+        bool includeTriggers = true)
+    {
+        SwiftThrowHelper.ThrowIfNull(source, nameof(source));
+        return SweepPrimitiveSource(source, displacement, layerMask, out sweepHit, excludedCollider, includeTriggers);
+    }
+
+    /// <summary>
+    /// Writes all 3D targets hit by sweeping a finite-cone source into caller-owned storage.
+    /// </summary>
+    public int SweepConeAll(
+        LSConeCollider source,
         Vector3d displacement,
         PhysicsLayerMask layerMask,
         SwiftList<Physics3DHit> results,
@@ -1431,7 +1464,7 @@ public sealed partial class GravitasQuery3DService
         Vector3d direction)
     {
         Vector3d fromPointToSweepCenter = sweepCenter - point;
-        if ((collider is LSCuboidCollider || collider is LSCylinderCollider)
+        if ((collider is LSCuboidCollider || collider is LSCylinderCollider || collider is LSConeCollider)
             && fromPointToSweepCenter.MagnitudeSquared > Fixed64.Epsilon)
         {
             return fromPointToSweepCenter.Normalized;
