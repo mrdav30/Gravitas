@@ -129,8 +129,7 @@ public sealed class PhysicsPartitionAwakeTests
             .BeTrue();
         originalVoxel!.TryGetPartition(out PhysicsPartition? originalPartition).Should().BeTrue();
 
-        body.Body.SetPosition(new Vector3d((Fixed64)4, Fixed64.Zero, Fixed64.Zero));
-        body.Collider.Simulate();
+        scenario.Context.Collisions.ClearPartitionedObject(body.Collider, force: true).Should().BeTrue();
 
         originalVoxel.TryGetPartition(out PhysicsPartition? retainedPartition).Should().BeTrue();
         retainedPartition.Should().BeSameAs(originalPartition);
@@ -236,20 +235,17 @@ public sealed class PhysicsPartitionAwakeTests
         WorldVoxelIndex originalCoordinate = body.Collider.PartitionCoordinates![0];
         scenario.Context.World.TryGetVoxel(originalCoordinate, out Voxel? originalVoxel).Should().BeTrue();
         originalVoxel!.TryGetPartition(out PhysicsPartition? originalPartition).Should().BeTrue();
-        int inactiveBeforeMove = scenario.Context.Collisions.InactivePartitionCount;
+        int inactiveBeforeDeactivate = scenario.Context.Collisions.InactivePartitionCount;
 
-        body.Body.SetPosition(new Vector3d((Fixed64)4, Fixed64.Zero, Fixed64.Zero));
+        body.Collider.Deactivate();
         AdvancePhysicsStep(scenario);
         originalVoxel.TryGetPartition(out PhysicsPartition? retainedPartition).Should().BeTrue();
         retainedPartition.Should().BeSameAs(originalPartition);
 
         AdvancePhysicsStep(scenario);
-        originalVoxel.TryGetPartition<PhysicsPartition>(out _).Should().BeTrue();
-
-        AdvancePhysicsStep(scenario);
 
         originalVoxel.TryGetPartition<PhysicsPartition>(out _).Should().BeFalse();
-        scenario.Context.Collisions.InactivePartitionCount.Should().BeGreaterThan(inactiveBeforeMove);
+        scenario.Context.Collisions.InactivePartitionCount.Should().BeGreaterThan(inactiveBeforeDeactivate);
     }
 
     [Fact]
@@ -263,11 +259,10 @@ public sealed class PhysicsPartitionAwakeTests
         scenario.Context.World.TryGetVoxel(originalCoordinate, out Voxel? originalVoxel).Should().BeTrue();
         originalVoxel!.TryGetPartition(out PhysicsPartition? originalPartition).Should().BeTrue();
 
-        body.Body.SetPosition(new Vector3d((Fixed64)4, Fixed64.Zero, Fixed64.Zero));
-        AdvancePhysicsStep(scenario);
-        body.Body.SetPosition(Vector3d.Zero);
-        AdvancePhysicsStep(scenario);
-        AdvancePhysicsStep(scenario);
+        scenario.Context.Collisions.ClearPartitionedObject(body.Collider, force: true).Should().BeTrue();
+        body.Collider.ClearPartitionCoordinates();
+        body.Collider.MarkUnpartitioned();
+        body.Collider.Simulate();
 
         originalVoxel.TryGetPartition(out PhysicsPartition? reusedPartition).Should().BeTrue();
         reusedPartition.Should().BeSameAs(originalPartition);

@@ -195,6 +195,32 @@ public sealed class CollisionResponse2DManifoldTests
     }
 
     [Fact]
+    public void Resolve_WithPositionCorrectionCrossing2DPartitions_ShouldNotAllocateAfterWarmup()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext(extent: 128);
+        SolidBody2D moving = CreateBox(context, Vector2d.Zero);
+        SolidBody2D wall = CreateBox(context, new Vector2d((Fixed64)2, Fixed64.Zero), immovable: true);
+        moving.FreezeAxes = BodyFreezeAxes2D.Rotation;
+        var pair = new CollisionPair2D(moving.Collider, wall.Collider);
+        Fixed64 correctionStep = context.VoxelSize * (Fixed64)2;
+        Fixed64 depth = correctionStep + CollisionResponse2D.PenetrationSlop;
+
+        long allocatedBytes = AllocationTestHelper.MeasureSteadyState(
+            () =>
+            {
+                moving.ApplyCollisionLinearVelocityDelta(-moving.LinearVelocity);
+                moving.ApplyCollisionAngularVelocityDelta(-moving.AngularVelocity);
+                pair.Manifold.SetContact(moving.Collider.Center, moving.Collider.Center, depth, Vector2d.Right);
+                CollisionResponse2D.Resolve(pair);
+            },
+            warmupIterations: 4,
+            stabilizationIterations: 2,
+            measurementIterations: 4);
+
+        allocatedBytes.Should().Be(0);
+    }
+
+    [Fact]
     public void Resolve_WithCompoundPartMaterial_ShouldUsePartRestitution()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();

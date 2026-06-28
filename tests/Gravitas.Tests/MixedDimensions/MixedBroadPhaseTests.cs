@@ -192,6 +192,31 @@ public sealed class MixedBroadPhaseTests
     }
 
     [Fact]
+    public void RefreshMovedMixed3DColliderAcrossPartitions_ShouldNotAllocateAfterWarmup()
+    {
+        using GravitasWorldContext context = CreateMixedContext(extent: 128);
+        ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(context, Vector3d.Zero, immovable: false);
+        context.MixedCollisions.Refresh3DColliderPartition(body3D.Collider);
+
+        Fixed64 stepDistance = context.VoxelSize;
+        int step = 0;
+        long allocatedBytes = AllocationTestHelper.MeasureSteadyState(
+            () =>
+            {
+                step++;
+                Vector3d position = new(stepDistance * (Fixed64)step, Fixed64.Zero, Fixed64.Zero);
+                body3D.Body.ResetPosition(position);
+                body3D.Collider.RebuildRuntimeShapeOnly(refreshMassProperties: false);
+                context.MixedCollisions.Refresh3DColliderPartition(body3D.Collider);
+            },
+            warmupIterations: 4,
+            stabilizationIterations: 2,
+            measurementIterations: 4);
+
+        allocatedBytes.Should().Be(0);
+    }
+
+    [Fact]
     public void Reset_WithRetainedMixedPartitions_ShouldDetachOwnedVoxelPartitions()
     {
         using GravitasWorldContext context = CreateMixedContext();

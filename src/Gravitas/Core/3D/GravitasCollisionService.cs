@@ -533,11 +533,41 @@ public sealed class GravitasCollisionService
 
     internal PhysicsPartition RentPartition()
     {
+        if (_inactivePartitionPool.Count == 0)
+            TryRetireEmptyRetainedPartitionForReuse();
+
         PhysicsPartition partition = _inactivePartitionPool.Count > 0
             ? _inactivePartitionPool.Pop()
             : new PhysicsPartition();
         partition.SetOwner(this);
         return partition;
+    }
+
+    private bool TryRetireEmptyRetainedPartitionForReuse()
+    {
+        int inspected = 0;
+        while (inspected < _retainedPartitions.Count && _retainedPartitions.Count > 0)
+        {
+            if (_retainedPartitionRetirementCursor >= _retainedPartitions.Count)
+                _retainedPartitionRetirementCursor = 0;
+
+            PhysicsPartition partition = _retainedPartitions[_retainedPartitionRetirementCursor];
+            inspected++;
+
+            if (!partition.IsOwnedBy(this) || !partition.IsEmpty || partition.IsAllocated)
+            {
+                _retainedPartitionRetirementCursor++;
+                continue;
+            }
+
+            int poolCount = _inactivePartitionPool.Count;
+            if (RetireRetainedPartition(partition) && _inactivePartitionPool.Count > poolCount)
+                return true;
+
+            _retainedPartitionRetirementCursor++;
+        }
+
+        return false;
     }
 
     internal void ReleasePartition(PhysicsPartition partition)

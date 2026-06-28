@@ -477,6 +477,35 @@ public sealed class CollisionResponseInvariantTests
         allocatedBytes.Should().Be(0);
     }
 
+    [Fact]
+    public void CalculateImpulse_WithPositionCorrectionCrossing3DPartitions_ShouldNotAllocateAfterWarmup()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> moving = scenario.CreateSphere(
+            Vector3d.Zero,
+            preventAngularForces: true);
+        ScenarioBody<LSSphereCollider> wall = scenario.CreateSphere(
+            new Vector3d((Fixed64)2, Fixed64.Zero, Fixed64.Zero),
+            immovable: true);
+        CollisionPair pair = scenario.CreatePair(moving.Collider, wall.Collider);
+        Fixed64 depth = scenario.Context.VoxelSize + CollisionResponse.PenetrationSlop;
+
+        long allocatedBytes = AllocationTestHelper.MeasureSteadyState(
+            () =>
+            {
+                moving.Body.ApplyCollisionLinearVelocityDelta(-moving.Body.LinearVelocity);
+                moving.Body.ApplyCollisionAngularVelocityDelta(-moving.Body.AngularVelocity);
+                pair.Manifold.SetContact(moving.Collider.Center, moving.Collider.Center, depth, Vector3d.Right);
+                CollisionResponse.CalculateImpulse(pair);
+                moving.Collider.Simulate();
+            },
+            warmupIterations: 4,
+            stabilizationIterations: 2,
+            measurementIterations: 4);
+
+        allocatedBytes.Should().Be(0);
+    }
+
     private static CollisionPair CreateDetectedPair(
         PhysicsScenarioBuilder scenario,
         LSCollider colliderA,

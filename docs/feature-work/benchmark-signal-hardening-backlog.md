@@ -61,52 +61,13 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 
 | Signal | Status | Priority | Tracking |
 | --- | --- | --- | --- |
-| Pure 2D response position-correction repartition allocation | Active | Medium | See active signal below |
-
-### Signal: Pure 2D Response Position-Correction Repartition Allocation
-
-**Discovered:** 2026-06-26
-
-**Status:** Active
-
-**Evidence:** During the physics material model validation pass, a focused
-allocation guard for `CollisionResponse2D.Resolve(...)` initially measured a
-stable `2712 B` allocation when the prepared manifold used non-zero depth and
-the measured action reset velocity and resolved response in one pass. Re-running
-the material solver path with zero penetration depth and measuring only the
-prepared response call reported `0 B`, which points away from material
-resolution and toward the broader 2D position-correction/repartition path.
-
-**Why it matters:** Pure 2D contact response can run every frame for resting
-or dense contact manifolds. If the allocation is reproduced in a service-level
-response benchmark or allocation guard, position correction or the collider
-partition refresh that follows it may be creating avoidable GC pressure in a
-core 2D hot path.
-
-**Next isolation step:** Add a dedicated focused guard or benchmark row that
-separates `CollisionResponse2D.Resolve(...)` into:
-
-- zero-depth material solve.
-- non-zero-depth solve with collider rebuild but no partition transition.
-- non-zero-depth solve that crosses a partition boundary.
-
-Then inspect `SolidBody2D.ApplyCollisionPositionCorrection(...)`,
-`LSCollider2D.Rebuild()`, and
-`GravitasCollision2DService.RefreshColliderPartitionAfterShapeChange(...)` for
-repeat allocations.
-
-**Likely files:**
-
-- `src/Gravitas/CollisionHandling/Response/2D/CollisionResponse2D.cs`
-- `src/Gravitas/Core/2D/SolidBody2D.Motion.cs`
-- `src/Gravitas/Colliders/2D/LSCollider2D.cs`
-- `src/Gravitas/Core/2D/GravitasCollision2DService.cs`
-- `tests/Gravitas.Tests/CollisionHandling/CollisionResponse2DManifoldTests.cs`
+| _None_ | - | - | - |
 
 ## Closed Signals
 
 | Signal | Status | Closed | Resolution |
 | --- | --- | --- | --- |
+| Pure 2D response position-correction repartition allocation | Closed | 2026-06-28 | Gravitas reuses empty retained partitions for immediate repartitioning; GridForge stores the common single voxel partition inline and keeps diagnostic names off success paths |
 | SwiftCollections sort hot-path allocation | Closed | 2026-06-24 | SwiftCollections owns allocation-free sort and sorted-key APIs; Gravitas removed `SwiftListSortUtility` |
 | Mixed mesh finite-slab triangle scaling signal | Closed | 2026-06-24 | Mixed and pure 3D query services expose mesh-triangle candidate counts, dedicated triangle-volume benchmarks cover dense and false-positive mesh targets, and pure 3D convex-source mesh sweeps use ordered lower-bound triangle candidates |
 | Pure 2D dynamic CCD candidate asymmetry | Closed | 2026-06-23 | 2D uses a planar candidate index, skips mixed CCD indexing outside mixed mode, and benchmark resets use 2D reset parity |
@@ -114,6 +75,71 @@ repeat allocations.
 | 3D dynamic shape-exact BDN allocation signal | Closed | 2026-06-23 | Shared exact-sweep bounds prefilters removed the scaling allocation/time signal from 3D dynamic false-positive rows |
 | 3D full-runtime CCD allocation | Closed | 2026-06-23 | GridForge allocation-free line tracing plus Gravitas 3D raycast adoption |
 | Grounding raycast probe allocation | Closed | 2026-06-23 | Same raycast trace fix removed automatic ray-grounding allocation |
+
+### Closed Signal: Pure 2D Response Position-Correction Repartition Allocation
+
+**Discovered:** 2026-06-26
+**Closed:** 2026-06-28
+
+**Evidence:** During the physics material model validation pass, a focused
+allocation guard for `CollisionResponse2D.Resolve(...)` initially measured a
+stable `2712 B` allocation when the prepared manifold used non-zero depth and
+the measured action reset velocity and resolved response in one pass. Re-running
+the material solver path with zero penetration depth and measuring only the
+prepared response call reported `0 B`, which pointed away from material
+resolution and toward the 2D position-correction/repartition path.
+
+**RCA 2026-06-28:** A dedicated guard reproduced the hot path by forcing
+non-zero 2D position correction across GridForge voxel partitions. The first
+focused repro measured `18,936 B` over four measured iterations. Gravitas kept
+empty `PhysicsPartition2D` instances retained on old voxels, but when a moving
+collider crossed into fresh voxels and the inactive partition pool was empty,
+the service allocated new partition objects and first-use sparse sets instead
+of retiring an empty retained partition for immediate reuse. After adding
+retained-empty reuse, the repro dropped to `7,712 B`.
+
+The remaining allocation was lower-stack metadata. GridForge's
+`PartitionProvider` always allocated a `SwiftDictionary<Type, IVoxelPartition>`
+for the first partition attached to a voxel. Physics partitions are commonly
+the only partition type on a voxel, so this made every fresh voxel attach pay a
+general dictionary allocation. After moving the common single-partition case
+inline, the final `224 B` repro remainder came from eager `Type.Name`
+diagnostic strings in `Voxel.TryAddPartition(...)` and
+`Voxel.TryRemovePartition<T>()`; those names were only needed on failure but
+were built on the success path.
+
+**Resolution 2026-06-28:** `GravitasCollision2DService`,
+`GravitasCollisionService`, and `GravitasMixedCollisionService` now retire an
+empty retained partition for immediate reuse when their inactive pool is empty.
+GridForge's `PartitionProvider<TPartitionBase>` stores the first partition
+inline, upgrades to `SwiftDictionary` only when a second concrete partition
+type is attached, keeps multi-partition storage reusable after `Clear()`, and
+exposes an internal allocation-free enumerator for voxel reset. `Voxel` now
+creates partition type names only on error paths.
+
+**Validation 2026-06-28:** Focused GridForge allocation guards pass for first
+single-partition provider attach and voxel add/remove success paths. Focused
+Gravitas guards pass for:
+
+- 2D response position correction crossing partitions.
+- 3D response position correction followed by collider repartition refresh.
+- mixed 3D collider refresh crossing mixed partitions.
+
+The `physics-2d --filter "*Resolve*" --job Short` benchmark smoke reports no
+managed allocation across the selected 64-body and 1024-body 2D response rows.
+
+**Touched files:**
+
+- `../GridForge/src/GridForge/Spatial/PartitionProvider.cs`
+- `../GridForge/src/GridForge/Grids/Nodes/Voxel.cs`
+- `../GridForge/tests/GridForge.Tests/Spatial/SpatialTypes.Tests.cs`
+- `../GridForge/tests/GridForge.Tests/Grids/Voxel.Tests.cs`
+- `src/Gravitas/Core/2D/GravitasCollision2DService.cs`
+- `src/Gravitas/Core/3D/GravitasCollisionService.cs`
+- `src/Gravitas/Core/Mixed/GravitasMixedCollisionService.Partitioning.cs`
+- `tests/Gravitas.Tests/CollisionHandling/CollisionResponse2DManifoldTests.cs`
+- `tests/Gravitas.Tests/CollisionHandling/CollisionResponseInvariantTests.cs`
+- `tests/Gravitas.Tests/MixedDimensions/MixedBroadPhaseTests.cs`
 
 ### Closed Signal: SwiftCollections Sort Hot-Path Allocation
 
@@ -595,7 +621,8 @@ Promote a signal from this backlog into a dedicated dated plan when it has:
 ## Current Recommendation
 
 With the runtime CCD allocation, grounding, shape-exact false-positive, pure 2D
-dynamic candidate-asymmetry, mixed mesh triangle-scaling, and SwiftCollections
-sort signals closed, this backlog has no active benchmark-facing items. Keep it
-as the intake bucket for future measured signals; promote broader work into a
-dated feature plan when the scope outgrows a focused patch.
+dynamic candidate-asymmetry, mixed mesh triangle-scaling, SwiftCollections sort,
+and 2D response repartition signals closed, this backlog has no active
+benchmark-facing items. Keep it as the intake bucket for future measured
+signals; promote broader work into a dated feature plan when the scope outgrows
+a focused patch.

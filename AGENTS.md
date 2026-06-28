@@ -342,8 +342,10 @@ When a lower-stack API change would make Gravitas cleaner or safer, prefer a
 local project reference to the sibling repository over a downstream workaround.
 Apply the reference consistently to the main library, tests, and benchmarks as
 needed, because local project references sometimes need to be explicit in test
-projects as well. Restore package references before release validation unless
-the user explicitly asks to leave local links in place.
+projects as well. Treat these local links as active validation scaffolding:
+leave them unstaged/uncommitted unless the repository owner explicitly asks to
+commit them, and restore package references before release validation unless the
+user explicitly asks to leave local links in place.
 
 ## Determinism Rules
 
