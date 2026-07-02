@@ -1,7 +1,5 @@
 # Feature Work Overview
 
-**Status:** Living release-scope guide
-
 ## Release Quality Bar
 
 Gravitas' first public release is not an MVP target. It should feel like a
@@ -35,6 +33,11 @@ instead of burying it in notes.
     and related geometry primitives where they reduce Gravitas-owned duplicate
     math without losing cached mesh normals, SwiftCollections query bounds,
     deterministic contact behavior, or hot-path allocation guarantees.
+- [`Chronicler Replay Hash Migration`](2026-07-02-chronicler-replay-hash-migration-plan.md)
+  - Planned 2026-07-02. Replaces Gravitas-local generic replay hash value and
+    writer infrastructure with Chronicler and FixedMathSharp.Chronicler while
+    preserving Gravitas-owned replay inclusion policy, deterministic ordering,
+    and no-allocation conformance hash evidence.
 
 ## Recently Completed
 

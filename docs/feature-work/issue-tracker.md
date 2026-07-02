@@ -1,28 +1,5 @@
 # Feature Work Issue Tracker
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use
-> superpowers:systematic-debugging before implementing fixes, use
-> superpowers:test-driven-development for runtime behavior changes, and use
-> superpowers:verification-before-completion before claiming an issue is fixed.
-> Steps use checkbox (`- [ ]`) syntax for tracking.
-
-**Status:** Active
-
-**Goal:** Keep bugs, correctness risks, documentation defects, and
-feature-work-discovered issues separate from feature design plans so each fix
-can be triaged, tested, and committed independently.
-
-**Architecture:** This document is intentionally undated. Each tracked item has
-its own discovery date, source, status, affected files, and recommended
-verification. Feature plans may reference this tracker instead of carrying bug
-fixes inside API or design phases.
-
-**Tech Stack:** `netstandard2.1` and `net8.0` runtime targets, xUnit,
-BenchmarkDotNet when performance evidence is needed, FixedMathSharp core
-runtime and tests.
-
----
-
 ## Tracker Rules
 
 - Add new items when feature work uncovers a suspected bug, stale doc, test

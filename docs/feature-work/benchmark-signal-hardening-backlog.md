@@ -1,8 +1,5 @@
 # Benchmark Signal Hardening Backlog
 
-**Status:** Evergreen intake
-**Owner:** Gravitas benchmark and runtime hardening
-
 ## Purpose
 
 This document captures benchmark-derived hardening signals that fall outside the
