@@ -5,6 +5,7 @@
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
+using FixedMathSharp.Chronicler;
 using Chronicler;
 using FixedMathSharp;
 
@@ -177,7 +178,7 @@ public sealed class Joint3D : IRecordable
     internal static bool IsSolverBody(SolidBody body) => body.Active && body.DynamicId >= 0 && body.CanTranslate;
 
     internal void ContributeReplayHash(
-        ref GravitasReplayHashWriter writer,
+        ref ChronicleHashWriter writer,
         GravitasReplayHashMode mode)
     {
         writer.WriteSection("joint.3d", 1);

@@ -1,3 +1,4 @@
+using Chronicler;
 using BenchmarkDotNet.Attributes;
 using FixedMathSharp;
 using Gravitas.Colliders;
@@ -69,35 +70,35 @@ public class ReplayHashBenchmarks
     }
 
     [Benchmark(Description = "replay-hash-3d-sparse")]
-    public GravitasReplayHash ReplayHash3DSparse()
+    public ChronicleHash ReplayHash3DSparse()
     {
         SwiftThrowHelper.ThrowIfTrue(_sparse3DBodyCount != ColliderCount);
         return _sparse3DContext.ComputeReplayHash();
     }
 
     [Benchmark(Description = "replay-hash-3d-dense")]
-    public GravitasReplayHash ReplayHash3DDense()
+    public ChronicleHash ReplayHash3DDense()
     {
         SwiftThrowHelper.ThrowIfTrue(_dense3DBodyCount != ColliderCount);
         return _dense3DContext.ComputeReplayHash();
     }
 
     [Benchmark(Description = "replay-hash-2d-sparse")]
-    public GravitasReplayHash ReplayHash2DSparse()
+    public ChronicleHash ReplayHash2DSparse()
     {
         SwiftThrowHelper.ThrowIfTrue(_sparse2DBodyCount != ColliderCount);
         return _sparse2DContext.ComputeReplayHash();
     }
 
     [Benchmark(Description = "replay-hash-mixed")]
-    public GravitasReplayHash ReplayHashMixed()
+    public ChronicleHash ReplayHashMixed()
     {
         SwiftThrowHelper.ThrowIfTrue(_mixedColliderCount != ColliderCount);
         return _mixedContext.ComputeReplayHash();
     }
 
     [Benchmark(Description = "replay-hash-with-solver-caches")]
-    public GravitasReplayHash ReplayHashWithSolverCaches()
+    public ChronicleHash ReplayHashWithSolverCaches()
     {
         SwiftThrowHelper.ThrowIfTrue(_solverCacheContactSeedCount != ColliderCount);
         return _solverCacheContext.ComputeReplayHash(GravitasReplayHashMode.AuthoritativeWithSolverCaches);

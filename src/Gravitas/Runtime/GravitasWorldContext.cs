@@ -5,6 +5,7 @@
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
+using Chronicler;
 using FixedMathSharp;
 using Gravitas.CollisionHandling;
 using Gravitas.Diagnostics;
@@ -265,7 +266,7 @@ public sealed class GravitasWorldContext : IDisposable
     /// identity, delegates, diagnostics buffers, debug draw data, query scratch buffers, and visualization
     /// interpolation caches.
     /// </remarks>
-    public GravitasReplayHash ComputeReplayHash(
+    public ChronicleHash ComputeReplayHash(
         GravitasReplayHashMode mode = GravitasReplayHashMode.Authoritative)
     {
         ThrowIfDisposed();

@@ -28,14 +28,15 @@ instead of burying it in notes.
 
 ## Active Release-Scope
 
-- [`Chronicler Replay Hash Migration`](2026-07-02-chronicler-replay-hash-migration-plan.md)
-  - Planned 2026-07-02. Replaces Gravitas-local generic replay hash value and
-    writer infrastructure with Chronicler and FixedMathSharp.Chronicler while
-    preserving Gravitas-owned replay inclusion policy, deterministic ordering,
-    and no-allocation conformance hash evidence.
+No dated release-scope feature-work plans are currently active.
 
 ## Recently Completed
 
+- [`Chronicler Replay Hash Migration`](done/2026-07-02-chronicler-replay-hash-migration-plan.md)
+  - Completed 2026-07-02. Replaces Gravitas-local replay hash value and writer
+    infrastructure with Chronicler `ChronicleHash`/`ChronicleHashWriter` and
+    FixedMathSharp.Chronicler math writers while preserving Gravitas-owned
+    replay inclusion policy, deterministic ordering, and allocation guardrails.
 - [`FixedMathSharp v6 Geometry Adoption`](done/2026-07-02-fixedmathsharp-v6-geometry-adoption-plan.md)
   - Completed 2026-07-02. Replaces duplicate local mesh triangle structs with a
     `FixedTriangle`-backed `CollisionTriangle`, routes unsafe 3D edge

@@ -372,10 +372,12 @@ Hosts can compute a compact deterministic frame hash after a fixed step and
 compare that value across peers, servers, replay runners, or restored snapshots:
 
 ```csharp
+using Chronicler;
+
 context.Simulate();
 context.LateSimulate();
 
-GravitasReplayHash hash = context.ComputeReplayHash();
+ChronicleHash hash = context.ComputeReplayHash();
 SendFrameHashToLockstepPeer(context.FrameCount, hash);
 ```
 
@@ -387,6 +389,10 @@ commands, query scratch buffers, or visualization interpolation caches. Use
 `GravitasReplayHashMode.AuthoritativeWithSolverCaches` when investigating drift
 inside solver/cache state that is useful for RCA but not part of the ordinary
 authoritative continuation contract.
+
+The returned `ChronicleHash` is a deterministic conformance signal, not a
+cryptographic hash and not a compatibility promise across package version
+changes.
 
 The current runtime order has two important consequences:
 

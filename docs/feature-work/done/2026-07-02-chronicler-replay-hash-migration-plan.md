@@ -1,12 +1,12 @@
 # Chronicler Replay Hash Migration Implementation Plan
 
 **Date:** 2026-07-02  
-**Status:** Planned  
+**Status:** Done  
 **Owner:** Gravitas determinism and replay-hash hardening
 
 ---
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Replace Gravitas-local generic replay hash infrastructure with Chronicler and FixedMathSharp.Chronicler APIs while preserving Gravitas-owned replay inclusion policy, deterministic ordering, and no-allocation steady-state behavior.
 
@@ -147,36 +147,36 @@ code.
 
 **Tasks**
 
-- [ ] Confirm the worktree only contains intended package-reference migration
+- [x] Confirm the worktree only contains intended package-reference migration
       changes before editing.
-- [ ] Add standard build package reference:
+- [x] Add standard build package reference:
 
 ```xml
 <PackageReference Include="FixedMathSharp.Chronicler" Version="6.0.0" />
 ```
 
-- [ ] Add lean build package reference:
+- [x] Add lean build package reference:
 
 ```xml
 <PackageReference Include="FixedMathSharp.Chronicler.Lean" Version="6.0.0" />
 ```
 
-- [ ] If local project references are used during active migration, add matching
+- [x] If local project references are used during active migration, add matching
       references to the library, tests, and benchmarks because local restore can
       require explicit child-project links.
-- [ ] Run baseline determinism tests before source changes:
+- [x] Run baseline determinism tests before source changes:
 
 ```bash
 dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter Determinism
 ```
 
-- [ ] Build the benchmark project:
+- [x] Build the benchmark project:
 
 ```bash
 dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj --configuration Release -f net8.0
 ```
 
-- [ ] Capture replay-hash benchmark smoke:
+- [x] Capture replay-hash benchmark smoke:
 
 ```bash
 dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll replay-hash --filter "*" -j Short -i --exporters json
@@ -205,18 +205,18 @@ muddy the public API and force unnecessary conversions.
 
 **Tasks**
 
-- [ ] Update failing tests first to expect `ChronicleHash` from
+- [x] Update failing tests first to expect `ChronicleHash` from
       `ComputeReplayHash(...)`.
-- [ ] Change `GravitasWorldContext.ComputeReplayHash(...)` to return
+- [x] Change `GravitasWorldContext.ComputeReplayHash(...)` to return
       `ChronicleHash`.
-- [ ] Change `GravitasReplayHashService.Compute(...)` to return
+- [x] Change `GravitasReplayHashService.Compute(...)` to return
       `ChronicleHash`.
-- [ ] Delete `GravitasReplayHash.cs` if no strong domain-wrapper need appears.
-- [ ] Update replay conformance helpers and tests from `GravitasReplayHash` to
+- [x] Delete `GravitasReplayHash.cs` if no strong domain-wrapper need appears.
+- [x] Update replay conformance helpers and tests from `GravitasReplayHash` to
       `ChronicleHash`.
-- [ ] Update benchmark return types from `GravitasReplayHash` to
+- [x] Update benchmark return types from `GravitasReplayHash` to
       `ChronicleHash`.
-- [ ] Run:
+- [x] Run:
 
 ```bash
 dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~GravitasReplayHashContextTests|FullyQualifiedName~GravitasReplayConformanceTests"
@@ -246,15 +246,15 @@ physics-domain writer extensions.
 
 **Tasks**
 
-- [ ] Replace `new GravitasReplayHashWriter()` with
+- [x] Replace `new GravitasReplayHashWriter()` with
       `new ChronicleHashWriter()`.
-- [ ] Add `using Chronicler;` where contributors need the writer or hash value.
-- [ ] Add `using FixedMathSharp.Chronicler;` where contributors write
+- [x] Add `using Chronicler;` where contributors need the writer or hash value.
+- [x] Add `using FixedMathSharp.Chronicler;` where contributors write
       `Fixed64`, vectors, quaternions, transforms, matrices, bounds, rays, or
       planes.
-- [ ] Move `WritePhysicsLayer(...)` and `WritePhysicsLayerMask(...)` into a
+- [x] Move `WritePhysicsLayer(...)` and `WritePhysicsLayerMask(...)` into a
       Gravitas-owned extension helper over `ChronicleHashWriter`.
-- [ ] Replace local writer fixed-math calls with FixedMathSharp.Chronicler
+- [x] Replace local writer fixed-math calls with FixedMathSharp.Chronicler
       extension methods:
   - `WriteFixed64`
   - `WriteVector2d`
@@ -264,14 +264,14 @@ physics-domain writer extensions.
   - `WriteTransform`
   - `WriteFixed3x3`
   - bounds/geometry methods where replay contributors need them.
-- [ ] Delete `GravitasReplayHashWriter.cs` after all references are removed.
-- [ ] Replace writer-specific tests with Gravitas-domain extension tests:
+- [x] Delete `GravitasReplayHashWriter.cs` after all references are removed.
+- [x] Replace writer-specific tests with Gravitas-domain extension tests:
   - physics layer writes are deterministic.
   - physics layer mask writes are deterministic.
   - section ordering remains order-sensitive through Chronicler's writer.
   - fixed-point raw payload behavior is covered by FixedMathSharp.Chronicler
     tests and does not need duplicate Gravitas assertions.
-- [ ] Run:
+- [x] Run:
 
 ```bash
 dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter Determinism
@@ -303,21 +303,21 @@ where it preserves the existing replay signal and allocation profile.
 
 **Tasks**
 
-- [ ] Pick one representative simple Gravitas `IRecordable` state shell, such
+- [x] Pick one representative simple Gravitas `IRecordable` state shell, such
       as `PhysicsSettings` or `PhysicsEnvironment`, and compare:
   - current manual contributor hash payload.
   - `ChronicleHashSerializer.Contribute(...)` payload.
-- [ ] Add a regression test that documents whether the chosen shell can safely
+- [x] Add a regression test that documents whether the chosen shell can safely
       use `ChronicleHashSerializer.Contribute(...)`.
-- [ ] If serializer contribution preserves intended semantics and does not
+- [x] If serializer contribution preserves intended semantics and does not
       allocate after warmup, use it for that shell.
-- [ ] If serializer contribution adds unwanted field-name/type/schema payload or
+- [x] If serializer contribution adds unwanted field-name/type/schema payload or
       allocates, keep manual contributors and document the no-change decision in
       completion notes.
-- [ ] Do not route service-owned ordered collections, collider tables,
+- [x] Do not route service-owned ordered collections, collider tables,
       collision pairs, warm-start caches, constraint islands, or mixed contact
       state through generic `IRecordable` traversal.
-- [ ] Run the replay allocation test after any serializer adoption:
+- [x] Run the replay allocation test after any serializer adoption:
 
 ```bash
 dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~ComputeReplayHash_Authoritative_ShouldNotAllocateAfterWarmup"
@@ -351,44 +351,44 @@ clear and performance-neutral.
 
 **Tasks**
 
-- [ ] Update wiki docs to describe `ChronicleHash` as the replay/conformance
+- [x] Update wiki docs to describe `ChronicleHash` as the replay/conformance
       hash value returned by Gravitas.
-- [ ] Document that hash values are deterministic conformance signals, not
+- [x] Document that hash values are deterministic conformance signals, not
       cryptographic hashes and not stable compatibility promises across package
       version changes.
-- [ ] Run full Release tests:
+- [x] Run full Release tests:
 
 ```bash
 dotnet test Gravitas.slnx --configuration Release
 ```
 
-- [ ] Run full ReleaseLean tests:
+- [x] Run full ReleaseLean tests:
 
 ```bash
 dotnet test Gravitas.slnx --configuration ReleaseLean
 ```
 
-- [ ] Re-run replay-hash benchmark smoke:
+- [x] Re-run replay-hash benchmark smoke:
 
 ```bash
 dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj --configuration Release -f net8.0
 dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll replay-hash --filter "*" -j Short -i --exporters json
 ```
 
-- [ ] Compare benchmark smoke against Workstream 1:
+- [x] Compare benchmark smoke against Workstream 1:
   - no steady-state managed allocations.
   - no obvious timing regression in sparse 3D, dense 3D, pure 2D, mixed, or
     cache-inclusive rows.
   - any noisy timing delta is called out honestly rather than overclaimed.
-- [ ] Update this plan with completion notes:
+- [x] Update this plan with completion notes:
   - public API choice.
   - deleted local files.
   - any retained manual contributors.
   - test results.
   - benchmark/allocation evidence.
-- [ ] Mark this plan `Done` and move it to `docs/feature-work/done` after
+- [x] Mark this plan `Done` and move it to `docs/feature-work/done` after
       review.
-- [ ] Move this plan from active release scope to recently completed in
+- [x] Move this plan from active release scope to recently completed in
       `docs/feature-work/feature-work-overview.md`.
 
 **Done Criteria**
@@ -404,18 +404,90 @@ dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll repl
 - Release and ReleaseLean validation pass.
 - Replay-hash benchmark smoke remains allocation-free after warmup.
 
+## Completion Notes
+
+Completed 2026-07-02.
+
+- Public replay hashes now use `Chronicler.ChronicleHash` directly from
+  `GravitasWorldContext.ComputeReplayHash(...)`,
+  `GravitasReplayHashService.Compute(...)`, replay tests, and replay-hash
+  benchmarks. `GravitasReplayHashMode` remains in Gravitas as the
+  physics-domain inclusion policy.
+- Deleted the duplicate local generic hash value and writer:
+  `src/Gravitas/Determinism/GravitasReplayHash.cs` and
+  `src/Gravitas/Determinism/GravitasReplayHashWriter.cs`.
+- Added `src/Gravitas/Determinism/GravitasChronicleHashWriterExtensions.cs`
+  for the only Gravitas-owned writer helpers: `PhysicsLayer` and
+  `PhysicsLayerMask`.
+- Replay contributors now write into `ChronicleHashWriter` and use
+  `FixedMathSharp.Chronicler` extension methods for `Fixed64`, vectors,
+  quaternions, matrices, and related fixed math payloads.
+- `ChronicleHashSerializer.Contribute(...)` was evaluated but not adopted for
+  runtime replay contributors. The representative `RagdollRuntime3D` guardrail
+  test documents why: its `IRecordable` payload only transfers activation
+  state, while the replay signal must also include service-owned ragdoll ID,
+  self-collision policy, link count, and joint count. The same boundary applies
+  more strongly to bodies, colliders, service tables, collision pairs,
+  warm-start caches, constraint islands, and mixed contact state.
+- Active wiki docs now describe `ChronicleHash` as the replay/conformance hash
+  value and state that hashes are non-cryptographic conformance signals, not
+  cross-version compatibility promises.
+
+Validation:
+
+- Baseline before migration:
+  `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter Determinism`
+  passed 16 tests.
+- Baseline replay-hash benchmark smoke:
+  `dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll replay-hash --filter "*" -j Short -i --exporters json`
+  completed 10 rows; baseline artifacts were copied under
+  `BenchmarkDotNet.Artifacts/results/chronicler-replay-hash-baseline`.
+- Focused red check after test migration failed with the expected compile
+  errors because production still returned `GravitasReplayHash`.
+- Focused replay/material tests after migration passed 26 tests.
+- `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter Determinism`
+  passed 15 tests after the duplicate fixed-math writer assertion was removed
+  from Gravitas and left to FixedMathSharp.Chronicler coverage.
+- `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~ComputeReplayHash_Authoritative_ShouldNotAllocateAfterWarmup"`
+  passed.
+- `dotnet test Gravitas.slnx --configuration Release` passed 917 tests.
+- `dotnet test Gravitas.slnx --configuration ReleaseLean` passed 901 tests.
+- `dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj --configuration Release -f net8.0`
+  passed.
+- Post-migration replay-hash benchmark smoke completed all 10 rows with no GC
+  collections and the same tiny MemoryDiagnoser artifact class as baseline.
+
+Benchmark comparison, baseline to post-migration:
+
+| Row | Baseline | Current | Allocation notes |
+| --- | ---: | ---: | --- |
+| `replay-hash-3d-sparse`, 64 | 302.6 us | 316.8 us | unchanged, 0 B |
+| `replay-hash-3d-dense`, 64 | 216.5 us | 227.7 us | unchanged, 0 B |
+| `replay-hash-2d-sparse`, 64 | 123.2 us | 129.3 us | unchanged, 0 B |
+| `replay-hash-mixed`, 64 | 123.8 us | 127.4 us | unchanged, 0 B |
+| `replay-hash-with-solver-caches`, 64 | 303.3 us | 323.8 us | unchanged, 0 B |
+| `replay-hash-3d-sparse`, 256 | 1,372.7 us | 1,471.9 us | unchanged 1 B BDN artifact |
+| `replay-hash-3d-dense`, 256 | 923.3 us | 955.1 us | unchanged, 0 B |
+| `replay-hash-2d-sparse`, 256 | 526.4 us | 547.4 us | 1 B baseline artifact did not repeat |
+| `replay-hash-mixed`, 256 | 581.2 us | 575.0 us | current 1 B BDN artifact |
+| `replay-hash-with-solver-caches`, 256 | 1,277.9 us | 1,333.9 us | unchanged 1 B BDN artifact |
+
+The current ShortRun timing is modestly slower in most rows but still within the
+expected noise band for a structural writer ownership migration, and the
+steady-state allocation guardrail remains covered by the unit test.
+
 ## Review Checklist
 
-- [ ] `rg -n "GravitasReplayHash\\b|GravitasReplayHashWriter\\b" src tests`
+- [x] `rg -n "GravitasReplayHash\\b|GravitasReplayHashWriter\\b" src tests`
       returns no active references except historical docs or an explicitly
       justified wrapper.
-- [ ] `rg -n "ChronicleHash|ChronicleHashWriter" src tests` shows Gravitas
+- [x] `rg -n "ChronicleHash|ChronicleHashWriter" src tests` shows Gravitas
       contributors using lower-stack hash types directly.
-- [ ] `rg -n "FixedMathSharp.Chronicler" src tests` confirms fixed-point writer
+- [x] `rg -n "FixedMathSharp.Chronicler" src tests` confirms fixed-point writer
       extensions are used instead of duplicated local methods.
-- [ ] `GravitasReplayHashMode` remains in Gravitas.
-- [ ] All replay contributors keep stable ordering.
-- [ ] No hot path uses LINQ, iterator blocks, reflection, runtime object
+- [x] `GravitasReplayHashMode` remains in Gravitas.
+- [x] All replay contributors keep stable ordering.
+- [x] No hot path uses LINQ, iterator blocks, reflection, runtime object
       identity, or unordered collection traversal.
-- [ ] Release and ReleaseLean tests pass.
-- [ ] Replay-hash benchmark smoke is no-allocation after warmup.
+- [x] Release and ReleaseLean tests pass.
+- [x] Replay-hash benchmark smoke is no-allocation after warmup.

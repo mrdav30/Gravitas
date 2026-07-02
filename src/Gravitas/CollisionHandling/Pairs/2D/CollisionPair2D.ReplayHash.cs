@@ -5,6 +5,8 @@
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
+using FixedMathSharp.Chronicler;
+using Chronicler;
 using Gravitas.CollisionHandling;
 using Gravitas.Materials;
 
@@ -13,7 +15,7 @@ namespace Gravitas;
 internal sealed partial class CollisionPair2D
 {
     internal void ContributeReplayHash(
-        ref GravitasReplayHashWriter writer,
+        ref ChronicleHashWriter writer,
         GravitasReplayHashMode mode)
     {
         writer.WriteSection("pair.2d", 1);
@@ -27,7 +29,7 @@ internal sealed partial class CollisionPair2D
     }
 
     private static void ContributeManifoldReplayHash(
-        ref GravitasReplayHashWriter writer,
+        ref ChronicleHashWriter writer,
         ContactManifold2D manifold)
     {
         writer.WriteSection("manifold.2d", 1);
@@ -50,7 +52,7 @@ internal sealed partial class CollisionPair2D
         }
     }
 
-    private static void WriteMaterial(ref GravitasReplayHashWriter writer, PhysicsMaterial material)
+    private static void WriteMaterial(ref ChronicleHashWriter writer, PhysicsMaterial material)
     {
         writer.WriteFixed64(material.StaticFriction);
         writer.WriteFixed64(material.DynamicFriction);
@@ -60,7 +62,7 @@ internal sealed partial class CollisionPair2D
     }
 
     private static void ContributeWarmStartReplayHash(
-        ref GravitasReplayHashWriter writer,
+        ref ChronicleHashWriter writer,
         ContactWarmStartCache2D warmStart)
     {
         writer.WriteSection("warm-start.2d", 1);

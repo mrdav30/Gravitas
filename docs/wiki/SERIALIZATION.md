@@ -160,7 +160,7 @@ behavior.
 `GravitasWorldContext.ComputeReplayHash()` is the preferred compact conformance
 signal for replay and rollback tests. After Chronicler populates existing
 runtime shells, the restored context should produce the same per-frame
-`GravitasReplayHash` sequence as the uninterrupted context when both receive
+`ChronicleHash` sequence as the uninterrupted context when both receive
 the same subsequent inputs. The authoritative hash follows the same boundary as
 `IRecordable.RecordData(...)`: serialized continuation state is included, while
 host-owned bindings and rebuildable runtime caches are excluded. Active
@@ -169,6 +169,11 @@ next fixed step. Rebuildable CCD frame snapshots, query scratch data, diagnostic
 buffers, visual interpolation state, and drift-debug counters are available
 only through `GravitasReplayHashMode.AuthoritativeWithSolverCaches` when they
 are useful for RCA.
+
+Replay hashes use Chronicler's `ChronicleHash` value and hash-writer mechanics.
+Gravitas owns the physics-specific inclusion policy and deterministic ordering.
+Hash strings are non-cryptographic conformance signals and should not be treated
+as stable compatibility values across package version changes.
 
 ## Transport Notes
 

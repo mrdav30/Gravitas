@@ -91,6 +91,7 @@
 	<ItemGroup Condition="'$(DisableMemoryPack)' != 'true'">
 		<PackageReference Include="MemoryPack" Version="1.21.4" />
 		<PackageReference Include="FixedMathSharp" Version="6.0.0" />
+		<PackageReference Include="FixedMathSharp.Chronicler" Version="6.0.0" />
 		<PackageReference Include="SwiftCollections" Version="6.0.0" />
 		<PackageReference Include="SwiftCollections.FixedMathSharp" Version="6.0.0" />
 		<PackageReference Include="GridForge" Version="8.0.0" />
@@ -99,6 +100,7 @@
 
 	<ItemGroup Condition="'$(DisableMemoryPack)' == 'true'">
 		<PackageReference Include="FixedMathSharp.Lean" Version="6.0.0" />
+		<PackageReference Include="FixedMathSharp.Chronicler.Lean" Version="6.0.0" />
 		<PackageReference Include="SwiftCollections.Lean" Version="6.0.0" />
 		<PackageReference Include="SwiftCollections.FixedMathSharp.Lean" Version="6.0.0" />
 		<PackageReference Include="GridForge.Lean" Version="8.0.0" />

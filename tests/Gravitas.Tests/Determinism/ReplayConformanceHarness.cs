@@ -1,3 +1,4 @@
+using Chronicler;
 using FluentAssertions;
 using System;
 
@@ -7,12 +8,12 @@ internal sealed class ReplayHashTrace
 {
     public ReplayHashTrace(int frameCount)
     {
-        Hashes = new GravitasReplayHash[frameCount];
+        Hashes = new ChronicleHash[frameCount];
     }
 
-    public GravitasReplayHash[] Hashes { get; }
+    public ChronicleHash[] Hashes { get; }
 
-    public GravitasReplayHash this[int frame]
+    public ChronicleHash this[int frame]
     {
         get => Hashes[frame];
         set => Hashes[frame] = value;

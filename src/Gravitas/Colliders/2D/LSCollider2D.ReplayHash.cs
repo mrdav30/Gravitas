@@ -5,6 +5,8 @@
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
+using FixedMathSharp.Chronicler;
+using Chronicler;
 using Gravitas.Materials;
 using System;
 
@@ -13,7 +15,7 @@ namespace Gravitas.Colliders;
 public abstract partial class LSCollider2D
 {
     internal void ContributeReplayHash(
-        ref GravitasReplayHashWriter writer,
+        ref ChronicleHashWriter writer,
         GravitasReplayHashMode mode)
     {
         writer.WriteSection("collider.2d", 2);
@@ -66,7 +68,7 @@ public abstract partial class LSCollider2D
         writer.WriteInt32(CollisionPairHolderCount);
     }
 
-    private void ContributeShapeReplayHash(ref GravitasReplayHashWriter writer)
+    private void ContributeShapeReplayHash(ref ChronicleHashWriter writer)
     {
         writer.WriteSection("collider.2d.shape", 1);
         switch (this)
@@ -104,7 +106,7 @@ public abstract partial class LSCollider2D
     }
 
     private static void ContributeCompoundPartReplayHash(
-        ref GravitasReplayHashWriter writer,
+        ref ChronicleHashWriter writer,
         CompoundColliderPart2D part)
     {
         writer.WriteVector2d(part.LocalOffset);
@@ -117,7 +119,7 @@ public abstract partial class LSCollider2D
     }
 
     private static void ContributeShapeDefinitionReplayHash(
-        ref GravitasReplayHashWriter writer,
+        ref ChronicleHashWriter writer,
         ColliderShapeDefinition2D definition)
     {
         writer.WriteEnum(definition.Kind);
@@ -131,7 +133,7 @@ public abstract partial class LSCollider2D
             writer.WriteVector2d(definition.GetPolygonVertex(i));
     }
 
-    private static void WriteMaterial(ref GravitasReplayHashWriter writer, PhysicsMaterial material)
+    private static void WriteMaterial(ref ChronicleHashWriter writer, PhysicsMaterial material)
     {
         writer.WriteFixed64(material.StaticFriction);
         writer.WriteFixed64(material.DynamicFriction);

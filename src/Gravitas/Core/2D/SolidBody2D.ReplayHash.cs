@@ -5,12 +5,15 @@
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
+using FixedMathSharp.Chronicler;
+using Chronicler;
+
 namespace Gravitas;
 
 public sealed partial class SolidBody2D
 {
     internal void ContributeReplayHash(
-        ref GravitasReplayHashWriter writer,
+        ref ChronicleHashWriter writer,
         GravitasReplayHashMode mode)
     {
         writer.WriteSection("body.2d", 2);

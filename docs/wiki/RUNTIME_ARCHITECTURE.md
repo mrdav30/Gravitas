@@ -34,7 +34,7 @@ pairs, queries, and coroutines remain context-local.
 | `GravitasCoroutineService` | Active lockstep coroutine bucket and context-bound wait instruction factories. |
 | `GravitasDiagnosticSink` | Disabled-by-default diagnostic event buffer and engine-agnostic debug draw command buffer. |
 | `GravitasLifecycleHooks` | Ordered callbacks for simulate, late simulate, visualize, late visualize, reset, and frame-rate change. |
-| `GravitasReplayHashService` | Internal fixed-order replay hash writer used by `GravitasWorldContext.ComputeReplayHash(...)`. It reads authoritative context, body, collider, pair, contact, and active handoff state without mutating simulation state. |
+| `GravitasReplayHashService` | Internal fixed-order replay contributor used by `GravitasWorldContext.ComputeReplayHash(...)`. It writes into Chronicler's `ChronicleHashWriter` and reads authoritative context, body, collider, pair, contact, and active handoff state without mutating simulation state. |
 
 The split is intentional: host code should mostly see the context and a few
 domain objects, while mutable implementation details stay inside services.
@@ -131,12 +131,13 @@ ordered command sequence, and frame count should produce the same authoritative
 body, collider, clock, and contact state across repeated runs. The current
 contract is pinned by `GravitasSimulationPhaseOrderTests`.
 `GravitasWorldContext.ComputeReplayHash()` exposes the same expectation as a
-fixed-width `GravitasReplayHash` that hosts and tests can compare frame by
-frame. `Authoritative` mode follows the Chronicler continuation boundary and
+fixed-width `ChronicleHash` that hosts and tests can compare frame by frame.
+`Authoritative` mode follows the Chronicler continuation boundary and
 excludes host identity, query scratch buffers, diagnostics, visual
 interpolation, and rebuildable per-frame CCD caches. Use
 `AuthoritativeWithSolverCaches` for drift RCA when solver caches and diagnostic
-cache counts need to be part of the signal.
+cache counts need to be part of the signal. Hash strings are deterministic
+non-cryptographic conformance values, not cross-version compatibility promises.
 
 `PhysicsSettings.RuntimeMode` is a validated bitmask with exact public settings
 values: `ThreeD`, `TwoD`, `Both`, and `Mixed`. `Both` runs pure 2D and pure 3D

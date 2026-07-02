@@ -5,15 +5,18 @@
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
+using FixedMathSharp.Chronicler;
+using Chronicler;
+
 namespace Gravitas;
 
 internal static class GravitasReplayHashService
 {
-    public static GravitasReplayHash Compute(
+    public static ChronicleHash Compute(
         GravitasWorldContext context,
         GravitasReplayHashMode mode)
     {
-        var writer = new GravitasReplayHashWriter();
+        var writer = new ChronicleHashWriter();
         writer.WriteSection("gravitas.replay", 1);
         writer.WriteEnum(mode);
         writer.WriteEnum(context.Settings.RuntimeMode);

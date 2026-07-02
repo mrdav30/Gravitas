@@ -1,3 +1,4 @@
+using Chronicler;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
@@ -124,9 +125,9 @@ public sealed class PhysicsMaterialOwnershipTests
     [Fact]
     public void ReplayHash_ShouldIncludeCompoundPartMaterial()
     {
-        GravitasReplayHash roughHash = ComputeCompoundHash(
+        ChronicleHash roughHash = ComputeCompoundHash(
             CompoundColliderPart.Sphere(Fixed64.Half, Vector3d.Zero, RoughMaterial()));
-        GravitasReplayHash slickHash = ComputeCompoundHash(
+        ChronicleHash slickHash = ComputeCompoundHash(
             CompoundColliderPart.Sphere(Fixed64.Half, Vector3d.Zero, SlickMaterial()));
 
         roughHash.Should().NotBe(slickHash);
@@ -135,11 +136,11 @@ public sealed class PhysicsMaterialOwnershipTests
     [Fact]
     public void ReplayHash_ShouldIncludeShapeDefinitionMaterial()
     {
-        GravitasReplayHash roughHash = ComputeCompoundHash(
+        ChronicleHash roughHash = ComputeCompoundHash(
             new CompoundColliderPart(
                 ColliderShapeDefinition.Sphere(Fixed64.Half, RoughMaterial()),
                 Vector3d.Zero));
-        GravitasReplayHash slickHash = ComputeCompoundHash(
+        ChronicleHash slickHash = ComputeCompoundHash(
             new CompoundColliderPart(
                 ColliderShapeDefinition.Sphere(Fixed64.Half, SlickMaterial()),
                 Vector3d.Zero));
@@ -153,7 +154,7 @@ public sealed class PhysicsMaterialOwnershipTests
     private static PhysicsMaterial SlickMaterial() =>
         new(Fixed64.FromFraction(1, 4), Fixed64.FromFraction(1, 8), Fixed64.Half);
 
-    private static GravitasReplayHash ComputeCompoundHash(CompoundColliderPart part)
+    private static ChronicleHash ComputeCompoundHash(CompoundColliderPart part)
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         _ = scenario.CreateBody(

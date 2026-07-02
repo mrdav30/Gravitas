@@ -5,6 +5,8 @@
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
+using FixedMathSharp.Chronicler;
+using Chronicler;
 using Gravitas.Materials;
 
 namespace Gravitas.CollisionHandling;
@@ -12,7 +14,7 @@ namespace Gravitas.CollisionHandling;
 internal sealed partial class CollisionPairMixed
 {
     internal void ContributeReplayHash(
-        ref GravitasReplayHashWriter writer,
+        ref ChronicleHashWriter writer,
         GravitasReplayHashMode mode)
     {
         writer.WriteSection("pair.mixed", 1);
@@ -38,7 +40,7 @@ internal sealed partial class CollisionPairMixed
         WriteMaterial(ref writer, Contact.Material2D);
     }
 
-    private static void WriteMaterial(ref GravitasReplayHashWriter writer, PhysicsMaterial material)
+    private static void WriteMaterial(ref ChronicleHashWriter writer, PhysicsMaterial material)
     {
         writer.WriteFixed64(material.StaticFriction);
         writer.WriteFixed64(material.DynamicFriction);

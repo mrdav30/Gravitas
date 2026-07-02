@@ -1,3 +1,4 @@
+using Chronicler;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
@@ -12,8 +13,8 @@ public sealed class GravitasReplayHashContextTests
     [Fact]
     public void ComputeReplayHash_ShouldMatchForRepeatedEquivalent3DRuns()
     {
-        GravitasReplayHash[] first = Run3DTrace();
-        GravitasReplayHash[] second = Run3DTrace();
+        ChronicleHash[] first = Run3DTrace();
+        ChronicleHash[] second = Run3DTrace();
 
         second.Should().Equal(first);
     }
@@ -24,7 +25,7 @@ public sealed class GravitasReplayHashContextTests
         using PhysicsScenarioBuilder scenario = Create3DScenario();
         ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
 
-        GravitasReplayHash before = scenario.Context.ComputeReplayHash();
+        ChronicleHash before = scenario.Context.ComputeReplayHash();
 
         body.Body.AddForce(Vector3d.Right);
         scenario.Context.LateSimulate();
@@ -37,7 +38,7 @@ public sealed class GravitasReplayHashContextTests
     {
         using PhysicsScenarioBuilder first = Create3DScenario();
         first.CreateSphere(Vector3d.Zero);
-        GravitasReplayHash beforeQuery = first.Context.ComputeReplayHash();
+        ChronicleHash beforeQuery = first.Context.ComputeReplayHash();
 
         using PhysicsScenarioBuilder second = Create3DScenario();
         second.CreateSphere(Vector3d.Zero);
@@ -51,13 +52,13 @@ public sealed class GravitasReplayHashContextTests
         second.Context.ComputeReplayHash(GravitasReplayHashMode.Authoritative).Should().Be(beforeQuery);
     }
 
-    private static GravitasReplayHash[] Run3DTrace()
+    private static ChronicleHash[] Run3DTrace()
     {
         using PhysicsScenarioBuilder scenario = Create3DScenario();
         ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
         body.Body.AddForce(new Vector3d((Fixed64)4, Fixed64.Zero, Fixed64.Zero));
 
-        var hashes = new GravitasReplayHash[8];
+        var hashes = new ChronicleHash[8];
         for (int frame = 0; frame < hashes.Length; frame++)
         {
             scenario.Context.LateSimulate();

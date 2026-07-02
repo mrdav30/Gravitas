@@ -5,6 +5,7 @@
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
+using Chronicler;
 using Gravitas.Colliders;
 
 namespace Gravitas;
@@ -12,7 +13,7 @@ namespace Gravitas;
 public sealed partial class GravitasPhysics2DService
 {
     internal void ContributeReplayHash(
-        ref GravitasReplayHashWriter writer,
+        ref ChronicleHashWriter writer,
         GravitasReplayHashMode mode)
     {
         writer.WriteSection("physics.2d", 1);

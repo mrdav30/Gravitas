@@ -5,11 +5,14 @@
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
+using FixedMathSharp.Chronicler;
+using Chronicler;
+
 namespace Gravitas;
 
 public sealed partial class PhysicsEnvironment
 {
-    internal void ContributeReplayHash(ref GravitasReplayHashWriter writer)
+    internal void ContributeReplayHash(ref ChronicleHashWriter writer)
     {
         writer.WriteSection("environment", 1);
         writer.WriteFixed64(Gravity);
