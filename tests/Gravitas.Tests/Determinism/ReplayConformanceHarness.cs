@@ -1,5 +1,5 @@
-using System;
 using FluentAssertions;
+using System;
 
 namespace Gravitas.Tests.Determinism;
 

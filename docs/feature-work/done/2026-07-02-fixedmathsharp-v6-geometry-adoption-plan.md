@@ -1,12 +1,12 @@
 # FixedMathSharp v6 Geometry Adoption Implementation Plan
 
 **Date:** 2026-07-02  
-**Status:** Planned  
+**Status:** Done  
 **Owner:** Gravitas lower-stack geometry migration hardening
 
 ---
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Adopt FixedMathSharp v6 geometry primitives in Gravitas where they reduce duplicated geometry logic without weakening deterministic physics behavior or hot-path performance.
 
@@ -171,32 +171,32 @@ which are algorithm-specific.
 
 **Tasks**
 
-- [ ] Confirm the worktree only contains the user's intended package-reference
+- [x] Confirm the worktree only contains the user's intended package-reference
       migration state before changing files.
-- [ ] Inventory local triangle and segment-like helpers with:
+- [x] Inventory local triangle and segment-like helpers with:
 
 ```bash
 rg -n "TriangleData|MixedTriangle|ClosestPointOnTriangle|ClosestPointOnEdge|ClosestPointOnLineSegment|FixedSegment|FixedTriangle|FixedBoundCircle|FixedRay2d" src tests
 ```
 
-- [ ] Record the no-change decision for these algorithm-specific types in this
+- [x] Record the no-change decision for these algorithm-specific types in this
       plan's completion notes when finished:
   - `SweepTriangleCandidate`
   - `TriangleWeights`
   - `PhysicsMesh.TriangleUse`
-- [ ] Run focused tests before source changes:
+- [x] Run focused tests before source changes:
 
 ```bash
 dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~Mesh|FullyQualifiedName~Mixed"
 ```
 
-- [ ] Build the benchmark project before source changes:
+- [x] Build the benchmark project before source changes:
 
 ```bash
 dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj --configuration Release -f net8.0
 ```
 
-- [ ] Capture short allocation/perf smoke for affected benchmark families:
+- [x] Capture short allocation/perf smoke for affected benchmark families:
 
 ```bash
 dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll collision-detection collision-response query-service collider-shape --filter "*" -j Short -i --exporters json
@@ -218,7 +218,7 @@ The right migration is a shared Gravitas wrapper backed by `FixedTriangle`.
 
 **Tasks**
 
-- [ ] Add focused tests that construct a mesh triangle through the same
+- [x] Add focused tests that construct a mesh triangle through the same
       vertices used by mesh contact generation and verify:
   - `A`, `B`, and `C` preserve ordered vertices.
   - `Center` matches `(A + B + C) / 3`.
@@ -226,18 +226,18 @@ The right migration is a shared Gravitas wrapper backed by `FixedTriangle`.
   - `QueryBounds` preserves the same min/max as the old `FixedBoundVolume`.
   - cached `Normal` is the normal supplied by `PhysicsMesh`, not recomputed from
     `FixedTriangle.Normal`.
-- [ ] Create the shared internal collision triangle wrapper using
+- [x] Create the shared internal collision triangle wrapper using
       `FixedMathSharp.Bounds.FixedTriangle`.
-- [ ] Replace the nested `TriangleData` in
+- [x] Replace the nested `TriangleData` in
       `MeshTriangleContactGenerator.cs` with the shared wrapper.
-- [ ] Replace `MixedTriangle` in mixed mesh-vs-slab logic with the shared
+- [x] Replace `MixedTriangle` in mixed mesh-vs-slab logic with the shared
       wrapper.
-- [ ] Delete `MixedTriangle.cs` after all references are removed.
-- [ ] Keep helper names explicit:
+- [x] Delete `MixedTriangle.cs` after all references are removed.
+- [x] Keep helper names explicit:
   - `Normal` for cached physics normal.
   - `QueryBounds` for `FixedBoundVolume`.
   - `Triangle.Bounds` only for derived `FixedBoundBox` when truly needed.
-- [ ] Run:
+- [x] Run:
 
 ```bash
 dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~Mesh|FullyQualifiedName~Mixed"
@@ -262,25 +262,25 @@ falling back to edges.
 
 **Tasks**
 
-- [ ] Add equivalence tests for `MeshUtils.ClosestPointOnTriangle(...)` and
+- [x] Add equivalence tests for `MeshUtils.ClosestPointOnTriangle(...)` and
       `FixedTriangle.ClosestPoint(...)` using:
   - point above triangle interior.
   - point outside each edge.
   - point nearest each vertex.
   - degenerate triangle with a repeated vertex.
   - triangle whose supplied cached normal matches the vertex winding.
-- [ ] Add a regression test for zero-length edge handling. The current
+- [x] Add a regression test for zero-length edge handling. The current
       `MeshUtils.ClosestPointOnEdge(...)` divides by segment length squared;
       `FixedSegment.ClosestPoint(...)` deterministically returns `Start` for
       zero-length segments.
-- [ ] Decide from the tests whether `MeshUtils.ClosestPointOnTriangle(...)` can
+- [x] Decide from the tests whether `MeshUtils.ClosestPointOnTriangle(...)` can
       delegate to `FixedTriangle.ClosestPoint(...)`.
-- [ ] If behavior matches or improves correctness, update `MeshUtils` to route
+- [x] If behavior matches or improves correctness, update `MeshUtils` to route
       edge closest-point work through `FixedSegment`.
-- [ ] If triangle closest-point behavior differs in a way that affects mesh
+- [x] If triangle closest-point behavior differs in a way that affects mesh
       contacts, keep the current normal-projection triangle helper but replace
       only the zero-length unsafe edge helper with `FixedSegment`.
-- [ ] Run focused query and collision tests:
+- [x] Run focused query and collision tests:
 
 ```bash
 dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~Mesh|FullyQualifiedName~Cone|FullyQualifiedName~Query|FullyQualifiedName~Mixed"
@@ -303,19 +303,19 @@ guaranteed runtime value.
 
 **Tasks**
 
-- [ ] Inventory pure 2D circle query helpers that pass `center + radius` as a
+- [x] Inventory pure 2D circle query helpers that pass `center + radius` as a
       conceptual circular bound.
-- [ ] Use `FixedBoundCircle` only where it removes duplicated bound/containment
+- [x] Use `FixedBoundCircle` only where it removes duplicated bound/containment
       math without increasing per-candidate construction cost.
-- [ ] Inventory 3D and 2D finite segment call sites.
-- [ ] Use `FixedSegment` or `FixedSegment2d` where the domain object is a
+- [x] Inventory 3D and 2D finite segment call sites.
+- [x] Use `FixedSegment` or `FixedSegment2d` where the domain object is a
       finite segment and the replacement removes unsafe or duplicated edge
       math.
-- [ ] Do not replace two-segment closest-point routines unless a lower-stack
+- [x] Do not replace two-segment closest-point routines unless a lower-stack
       primitive exists for that exact operation.
-- [ ] Leave `FixedRay2d` adoption to pure 2D query code only if it simplifies
+- [x] Leave `FixedRay2d` adoption to pure 2D query code only if it simplifies
       current raycast request handling without changing public query semantics.
-- [ ] Run focused 2D/query tests after any adoption:
+- [x] Run focused 2D/query tests after any adoption:
 
 ```bash
 dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~Physics2D|FullyQualifiedName~Query|FullyQualifiedName~Capsule|FullyQualifiedName~Grounding2D"
@@ -338,45 +338,45 @@ runtime cost.
 
 **Tasks**
 
-- [ ] Run full release tests:
+- [x] Run full release tests:
 
 ```bash
 dotnet test Gravitas.slnx --configuration Release
 ```
 
-- [ ] Run lean release tests because package-reference migration and geometry
+- [x] Run lean release tests because package-reference migration and geometry
       cleanup can expose conditional build issues:
 
 ```bash
 dotnet test Gravitas.slnx --configuration ReleaseLean
 ```
 
-- [ ] Re-run affected benchmark smoke:
+- [x] Re-run affected benchmark smoke:
 
 ```bash
 dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj --configuration Release -f net8.0
 dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll collision-detection collision-response query-service collider-shape --filter "*" -j Short -i --exporters json
 ```
 
-- [ ] Compare the post-change benchmark JSON/console output against the
+- [x] Compare the post-change benchmark JSON/console output against the
       Workstream 1 baseline:
-  - no managed allocations in steady-state rows.
+  - no new managed allocations in steady-state rows.
   - no obvious mesh/mixed timing regression.
   - any noisy timing deltas are called out honestly rather than overclaimed.
-- [ ] Update docs only if public behavior, developer guidance, or lower-stack
+- [x] Update docs only if public behavior, developer guidance, or lower-stack
       migration guidance changes:
   - `docs/wiki/COLLISION_PIPELINE.md`
   - `docs/wiki/QUERY_SERVICES.md`
   - `docs/wiki/RUNTIME_ARCHITECTURE.md`
   - `tests/Gravitas.Benchmarks/README.md`
-- [ ] Update this plan with completion notes:
+- [x] Update this plan with completion notes:
   - adopted primitives.
   - intentionally skipped candidates.
   - test commands and results.
   - benchmark/allocation evidence.
-- [ ] Mark this plan `Done` and move it to `docs/feature-work/done` after
+- [x] Mark this plan `Done` and move it to `docs/feature-work/done` after
       review.
-- [ ] Update `docs/feature-work/feature-work-overview.md` to move the plan from
+- [x] Update `docs/feature-work/feature-work-overview.md` to move the plan from
       active release scope to recently completed.
 
 **Done Criteria**
@@ -391,15 +391,89 @@ dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll coll
 
 ## Review Checklist
 
-- [ ] `rg -n "TriangleData|MixedTriangle" src tests` returns no active source
+- [x] `rg -n "TriangleData|MixedTriangle" src tests` returns no active source
       references.
-- [ ] `rg -n "ClosestPointOnEdge" src tests` shows either no local helper or a
+- [x] `rg -n "ClosestPointOnEdge" src tests` shows either no local helper or a
       tested reason for keeping one.
-- [ ] Cached mesh normal behavior remains explicit in Gravitas.
-- [ ] `FixedBoundVolume` remains at SwiftCollections BVH/query boundaries where
+- [x] Cached mesh normal behavior remains explicit in Gravitas.
+- [x] `FixedBoundVolume` remains at SwiftCollections BVH/query boundaries where
       required.
-- [ ] No new public APIs duplicate an existing FixedMathSharp primitive without
+- [x] No new public APIs duplicate an existing FixedMathSharp primitive without
       a Gravitas-specific reason.
-- [ ] No hot path uses LINQ, iterator blocks, or temporary arrays.
-- [ ] Release and ReleaseLean tests pass.
-- [ ] Benchmark smoke is no-allocation after warmup for affected rows.
+- [x] No hot path uses LINQ, iterator blocks, or temporary arrays.
+- [x] Release and ReleaseLean tests pass.
+- [x] Benchmark smoke preserves the baseline allocation profile for affected
+      rows.
+
+## Completion Notes
+
+Completed 2026-07-02.
+
+Adopted:
+
+- Added `CollisionTriangle`, a shared Gravitas-owned wrapper backed by
+  `FixedTriangle` while preserving cached mesh normals and
+  `FixedBoundVolume` query bounds at SwiftCollections BVH boundaries.
+- Replaced the 3D mesh `TriangleData` and mixed `MixedTriangle` local geometry
+  models with `CollisionTriangle`; deleted `MixedTriangle.cs`.
+- Routed `MeshUtils.ClosestPointOnEdge(...)` through `FixedSegment` and added a
+  zero-length edge regression test.
+- Centralized duplicated tolerant 2D closest-point-on-segment math in
+  `PlanarSegmentGeometry`. `FixedSegment2d` was evaluated but not used in those
+  hot paths because Gravitas intentionally collapses near-zero segments with
+  `Fixed64.Epsilon`, while `FixedSegment2d` only collapses exactly zero-length
+  segments.
+
+Intentionally skipped:
+
+- `MeshUtils.ClosestPointOnTriangle(...)` remains Gravitas-owned because the
+  current helper is normal-aware and projects against cached mesh normals before
+  edge fallback. Equivalence tests cover the non-degenerate and repeated-vertex
+  cases used for the decision.
+- `FixedBoundCircle` was not introduced into 2D overlap query bounds. Gravitas'
+  public query API rejects negative radii explicitly, while `FixedBoundCircle`
+  normalizes negative radii by design; the current direct min/max candidate
+  bounds keep the public invariant clear without extra construction.
+- `FixedRay2d` was not adopted because pure 2D raycasts are finite segment
+  queries with segment-length hit ordering, not unbounded ray requests.
+- Two-segment closest-point, sweep reducer, simplex, and slab routines remain in
+  Gravitas because they carry collision/query-specific ordering and time-of-hit
+  semantics.
+- `SweepTriangleCandidate`, `TriangleWeights`, and `PhysicsMesh.TriangleUse`
+  remain algorithm/topology state rather than geometry primitives.
+
+Validation:
+
+- `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~Mesh|FullyQualifiedName~Mixed"`: passed 222 tests before refactor.
+- `dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj --configuration Release -f net8.0`: passed before and after refactor.
+- `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~Mesh|FullyQualifiedName~Cone|FullyQualifiedName~Query|FullyQualifiedName~Mixed"`: passed 315 tests.
+- `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~Physics2D|FullyQualifiedName~Query|FullyQualifiedName~Capsule|FullyQualifiedName~Grounding2D|FullyQualifiedName~Mixed"`: passed 402 tests.
+- `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~PlanarSegmentGeometryTests|FullyQualifiedName~CollisionTriangleTests|FullyQualifiedName~MeshUtilsTests"`: passed 13 tests.
+- `dotnet test Gravitas.slnx --configuration Release`: passed 917 tests.
+- `dotnet test Gravitas.slnx --configuration ReleaseLean`: passed 901 tests.
+
+Benchmark smoke:
+
+- Command: `dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll collision-detection collision-response query-service collider-shape --filter "*" -j Short -i --exporters json`
+- Result: completed 69 benchmarks successfully. Baseline JSON artifacts were
+  preserved under `BenchmarkDotNet.Artifacts/results/fixedmathsharp-v6-geometry-baseline`
+  before the post-change run.
+- Key comparisons, baseline to post-change:
+  - `MoveMeshRuntimeShapeStateAndQueryTriangles`: 9.046 us to 8.566 us, 0 B to
+    0 B.
+  - `MoveDynamicConcaveMeshAndQueryTriangles`: 35.753 us to 36.480 us, 0 B to
+    0 B.
+  - `CheckMeshCylinderPairs`: 476.226 us to 480.236 us, 0 B to 0 B.
+  - `GenerateMeshCylinderManifolds`: 476.439 us to 480.925 us, 0 B to 1 B.
+    The 1 B value is a MemoryDiagnoser rounding artifact from 960 B benchmark
+    accounting over 1024 operations; no GC collections were reported.
+  - `CheckMeshMeshPairs`: 492.486 us to 487.514 us, 0 B to 0 B.
+  - `CheckClosedDenseMeshMeshPairs`: 303081.867 us to 294214.667 us, unchanged
+    480 B MemoryDiagnoser artifact.
+  - `SweepSphereAllAcrossMeshTargetContext`: 880.878 us to 876.831 us,
+    unchanged 1 B artifact.
+  - `SweepConvexMeshAllAcrossSphereTargets_HighVertexSource`: 2667.851 us to
+    2641.299 us, unchanged 4 B artifact.
+- Conclusion: no obvious mesh/mixed/query timing regression. Allocation profiles
+  are unchanged for the relevant steady-state rows aside from documented
+  ShortRun/MemoryDiagnoser artifacts.

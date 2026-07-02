@@ -825,8 +825,10 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
         return false;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     protected void SetBounds(FixedBoundArea bounds) => _bounds = bounds;
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     protected void SetBoundsFromMinMax(Vector2d min, Vector2d max) =>
         SetBounds(FixedBoundArea.FromMinMax(min, max));
 
@@ -901,6 +903,12 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    protected Vector2d TransformMassPropertyPoint(Vector2d localPoint) =>
+        _compoundOwner == null
+            ? localPoint
+            : _compoundOwner.ScaledLocalOffset + Rotate(localPoint, _compoundLocalRotation);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     protected static Vector2d Rotate(Vector2d value, Fixed64 radians)
     {
         if (radians == Fixed64.Zero)
@@ -908,12 +916,6 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
 
         return ClampNearZero(Vector2d.Rotate(value, radians));
     }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    protected Vector2d TransformMassPropertyPoint(Vector2d localPoint) =>
-        _compoundOwner == null
-            ? localPoint
-            : _compoundOwner.ScaledLocalOffset + Rotate(localPoint, _compoundLocalRotation);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     protected static Vector2d ClampNearZero(Vector2d value)
@@ -926,17 +928,6 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     protected static Fixed64 ClampAxis(Fixed64 value, Fixed64 min, Fixed64 max) =>
         value < min ? min : value > max ? max : value;
-
-    protected static Vector2d ClosestPointOnSegment(Vector2d point, Vector2d a, Vector2d b)
-    {
-        Vector2d segment = b - a;
-        Fixed64 lengthSquared = segment.MagnitudeSquared;
-        if (lengthSquared <= Fixed64.Epsilon)
-            return a;
-
-        Fixed64 t = FixedMath.Clamp01(Vector2d.Dot(point - a, segment) / lengthSquared);
-        return a + segment * t;
-    }
 
     public void RecordData(IChronicler chronicler)
     {

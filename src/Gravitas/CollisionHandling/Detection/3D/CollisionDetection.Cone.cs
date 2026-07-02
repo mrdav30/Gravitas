@@ -5,10 +5,10 @@
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
-using System.Runtime.CompilerServices;
 using FixedMathSharp;
 using Gravitas.Colliders;
 using SwiftCollections.Query;
+using System.Runtime.CompilerServices;
 
 namespace Gravitas.CollisionHandling;
 

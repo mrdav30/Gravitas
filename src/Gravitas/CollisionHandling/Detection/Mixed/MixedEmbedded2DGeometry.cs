@@ -74,24 +74,6 @@ internal static class MixedEmbedded2DGeometry
         }
     }
 
-    public static Fixed64 DistanceSquaredToSegment(Vector2d point, Vector2d segmentStart, Vector2d segmentEnd)
-    {
-        Vector2d closest = ClosestPointOnSegment(point, segmentStart, segmentEnd);
-        return (point - closest).MagnitudeSquared;
-    }
-
-    public static Vector2d ClosestPointOnSegment(Vector2d point, Vector2d segmentStart, Vector2d segmentEnd)
-    {
-        Vector2d edge = segmentEnd - segmentStart;
-        Fixed64 edgeLengthSqr = edge.MagnitudeSquared;
-        if (edgeLengthSqr <= Fixed64.Epsilon)
-            return segmentStart;
-
-        Fixed64 t = Vector2d.Dot(point - segmentStart, edge) / edgeLengthSqr;
-        t = FixedMath.Clamp01(t);
-        return segmentStart + edge * t;
-    }
-
     private static bool TryGetCircleBoundary(
         LSCircleCollider2D circle,
         Vector2d point,
@@ -113,7 +95,7 @@ internal static class MixedEmbedded2DGeometry
         out Vector2d boundary,
         out Fixed64 distance)
     {
-        Vector2d segmentPoint = ClosestPointOnSegment(point, capsule.SegmentStart, capsule.SegmentEnd);
+        Vector2d segmentPoint = PlanarSegmentGeometry.ClosestPoint(point, capsule.SegmentStart, capsule.SegmentEnd);
         Vector2d delta = point - segmentPoint;
         Fixed64 magnitude = delta.Magnitude;
         Vector2d direction = magnitude > Fixed64.Epsilon ? delta / magnitude : Vector2d.Right;
@@ -178,7 +160,7 @@ internal static class MixedEmbedded2DGeometry
         {
             Vector2d a = convex.GetVertexUnchecked(i);
             Vector2d b = convex.GetVertexUnchecked((i + 1) % vertexCount);
-            Vector2d candidate = ClosestPointOnSegment(point, a, b);
+            Vector2d candidate = PlanarSegmentGeometry.ClosestPoint(point, a, b);
             Fixed64 candidateDistanceSquared = Vector2d.DistanceSquared(point, candidate);
             if (candidateDistanceSquared >= bestDistanceSquared)
                 continue;

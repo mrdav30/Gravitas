@@ -5,7 +5,6 @@ using Gravitas.Queries;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
 using SwiftCollections;
-using System;
 using Xunit;
 
 namespace Gravitas.Tests.Physics2D;

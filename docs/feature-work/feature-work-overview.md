@@ -28,11 +28,6 @@ instead of burying it in notes.
 
 ## Active Release-Scope
 
-- [`FixedMathSharp v6 Geometry Adoption`](2026-07-02-fixedmathsharp-v6-geometry-adoption-plan.md)
-  - Planned 2026-07-02. Adopts FixedMathSharp v6 triangle, segment, circle,
-    and related geometry primitives where they reduce Gravitas-owned duplicate
-    math without losing cached mesh normals, SwiftCollections query bounds,
-    deterministic contact behavior, or hot-path allocation guarantees.
 - [`Chronicler Replay Hash Migration`](2026-07-02-chronicler-replay-hash-migration-plan.md)
   - Planned 2026-07-02. Replaces Gravitas-local generic replay hash value and
     writer infrastructure with Chronicler and FixedMathSharp.Chronicler while
@@ -41,6 +36,12 @@ instead of burying it in notes.
 
 ## Recently Completed
 
+- [`FixedMathSharp v6 Geometry Adoption`](done/2026-07-02-fixedmathsharp-v6-geometry-adoption-plan.md)
+  - Completed 2026-07-02. Replaces duplicate local mesh triangle structs with a
+    `FixedTriangle`-backed `CollisionTriangle`, routes unsafe 3D edge
+    closest-point work through `FixedSegment`, centralizes tolerant 2D segment
+    projection, preserves cached mesh normals and SwiftCollections query
+    bounds, and records benchmark evidence for mesh/mixed/query-sensitive paths.
 - [`Cone Collider And Query Support`](done/2026-06-26-cone-collider-and-query-support-plan.md)
   - Completed 2026-06-28. Adds `LSConeCollider` as a first-class analytic 3D
     primitive across shape definitions, mass properties, collision, CCD, mixed

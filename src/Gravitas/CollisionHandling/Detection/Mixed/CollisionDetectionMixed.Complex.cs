@@ -54,8 +54,8 @@ public static partial class CollisionDetectionMixed
         MixedContact best = default;
         for (int i = 0; i < triangleBuffer.Count; i++)
         {
-            GetMeshTriangle(mesh, triangleBuffer[i], out MixedTriangle triangle);
-            if (!BoundsOverlap(triangle.Bounds, embedded.MixedBounds3D)
+            GetMeshTriangle(mesh, triangleBuffer[i], out CollisionTriangle triangle);
+            if (!BoundsOverlap(triangle.QueryBounds, embedded.MixedBounds3D)
                 || !TryTriangleEmbedded2D(triangle, embedded, out AxisPenetration penetration))
             {
                 continue;
@@ -77,7 +77,7 @@ public static partial class CollisionDetectionMixed
     }
 
     private static bool TryTriangleEmbedded2D(
-        MixedTriangle triangle,
+        CollisionTriangle triangle,
         LSCollider2D embedded,
         out AxisPenetration penetration)
     {
@@ -96,7 +96,7 @@ public static partial class CollisionDetectionMixed
     }
 
     private static bool TryTestTriangleCircleSlab(
-        MixedTriangle triangle,
+        CollisionTriangle triangle,
         LSCircleCollider2D circle,
         out AxisPenetration penetration)
     {
@@ -105,12 +105,12 @@ public static partial class CollisionDetectionMixed
         if (!CheckTriangleCircleSlabAxis(triangle, circle, Vector3d.Up, ref penetration))
             return false;
 
-        if (!CheckTriangleCircleSlabAxis(triangle, circle, triangle.Normalized, ref penetration))
+        if (!CheckTriangleCircleSlabAxis(triangle, circle, triangle.Normal, ref penetration))
             return false;
 
         for (int i = 0; i < 3; i++)
         {
-            if (!CheckTriangleCircleSlabAxis(triangle, circle, Vector3d.Cross(triangle.GetEdge(i), Vector3d.Up), ref penetration))
+            if (!CheckTriangleCircleSlabAxis(triangle, circle, Vector3d.Cross(triangle.GetEdgeVector(i), Vector3d.Up), ref penetration))
                 return false;
         }
 
@@ -123,7 +123,7 @@ public static partial class CollisionDetectionMixed
     }
 
     private static bool TryTestTrianglePrism(
-        MixedTriangle triangle,
+        CollisionTriangle triangle,
         LSCollider2D prism,
         out AxisPenetration penetration)
     {
@@ -132,7 +132,7 @@ public static partial class CollisionDetectionMixed
         if (!CheckTrianglePrismAxis(triangle, prism, Vector3d.Up, ref penetration))
             return false;
 
-        if (!CheckTrianglePrismAxis(triangle, prism, triangle.Normalized, ref penetration))
+        if (!CheckTrianglePrismAxis(triangle, prism, triangle.Normal, ref penetration))
             return false;
 
         if (prism is LSCapsuleCollider2D embeddedCapsule)
@@ -152,7 +152,7 @@ public static partial class CollisionDetectionMixed
 
         for (int i = 0; i < 3; i++)
         {
-            Vector3d triangleEdge = triangle.GetEdge(i);
+            Vector3d triangleEdge = triangle.GetEdgeVector(i);
             if (!CheckTrianglePrismAxis(triangle, prism, Vector3d.Cross(triangleEdge, Vector3d.Up), ref penetration))
                 return false;
 
@@ -174,7 +174,7 @@ public static partial class CollisionDetectionMixed
         }
 
         Vector3d embeddedPoint = MixedEmbedded2DGeometry.GetClosestPointOnEmbeddedVolume(prism, triangle.Center);
-        Vector3d trianglePoint = MeshUtils.ClosestPointOnTriangle(triangle.A, triangle.B, triangle.C, triangle.Normalized, embeddedPoint);
+        Vector3d trianglePoint = MeshUtils.ClosestPointOnTriangle(triangle.A, triangle.B, triangle.C, triangle.Normal, embeddedPoint);
         if (!CheckTrianglePrismAxis(triangle, prism, embeddedPoint - trianglePoint, ref penetration))
             return false;
 
@@ -182,7 +182,7 @@ public static partial class CollisionDetectionMixed
     }
 
     private static bool CheckTriangleCircleSlabAxis(
-        MixedTriangle triangle,
+        CollisionTriangle triangle,
         LSCircleCollider2D circle,
         Vector3d axis,
         ref AxisPenetration penetration)
@@ -201,7 +201,7 @@ public static partial class CollisionDetectionMixed
     }
 
     private static bool CheckTrianglePrismAxis(
-        MixedTriangle triangle,
+        CollisionTriangle triangle,
         LSCollider2D prism,
         Vector3d axis,
         ref AxisPenetration penetration)
@@ -220,7 +220,7 @@ public static partial class CollisionDetectionMixed
     }
 
     private static bool CheckEmbeddedCapsuleAxes(
-        MixedTriangle triangle,
+        CollisionTriangle triangle,
         LSCapsuleCollider2D capsule,
         ref AxisPenetration penetration)
     {
@@ -230,7 +230,7 @@ public static partial class CollisionDetectionMixed
     }
 
     private static bool CheckTriangleEmbeddedCapsuleEdgeAxis(
-        MixedTriangle triangle,
+        CollisionTriangle triangle,
         LSCapsuleCollider2D capsule,
         Vector3d triangleEdge,
         ref AxisPenetration penetration)
@@ -241,12 +241,12 @@ public static partial class CollisionDetectionMixed
 
     private static void BuildMeshContact(
         LSCollider2D embedded,
-        MixedTriangle triangle,
+        CollisionTriangle triangle,
         AxisPenetration penetration,
         out MixedContact contact)
     {
         Vector3d embeddedCenter = GetEmbeddedCenter3D(embedded);
-        Vector3d point3D = MeshUtils.ClosestPointOnTriangle(triangle.A, triangle.B, triangle.C, triangle.Normalized, embeddedCenter);
+        Vector3d point3D = MeshUtils.ClosestPointOnTriangle(triangle.A, triangle.B, triangle.C, triangle.Normal, embeddedCenter);
         Vector3d point2D = MixedEmbedded2DGeometry.GetClosestPointOnEmbeddedVolume(embedded, point3D);
         contact = new MixedContact(point3D, point2D, penetration.Axis, penetration.Depth);
     }
@@ -254,23 +254,23 @@ public static partial class CollisionDetectionMixed
     private static void ClosestPointsSegmentTriangle(
         Vector3d segmentStart,
         Vector3d segmentEnd,
-        MixedTriangle triangle,
+        CollisionTriangle triangle,
         out Vector3d pointOnSegment,
         out Vector3d pointOnTriangle)
     {
         pointOnSegment = segmentStart;
-        pointOnTriangle = MeshUtils.ClosestPointOnTriangle(triangle.A, triangle.B, triangle.C, triangle.Normalized, segmentStart);
+        pointOnTriangle = MeshUtils.ClosestPointOnTriangle(triangle.A, triangle.B, triangle.C, triangle.Normal, segmentStart);
         Fixed64 bestDistanceSqr = Vector3d.DistanceSquared(pointOnSegment, pointOnTriangle);
 
         Vector3d segment = segmentEnd - segmentStart;
-        Fixed64 denominator = Vector3d.Dot(triangle.Normalized, segment);
+        Fixed64 denominator = Vector3d.Dot(triangle.Normal, segment);
         if (denominator.Abs() > Fixed64.Epsilon)
         {
-            Fixed64 t = Vector3d.Dot(triangle.Normalized, triangle.A - segmentStart) / denominator;
+            Fixed64 t = Vector3d.Dot(triangle.Normal, triangle.A - segmentStart) / denominator;
             if (t >= Fixed64.Zero && t <= Fixed64.One)
             {
                 Vector3d intersection = segmentStart + segment * t;
-                if (MeshUtils.IsPointInTrianglePlane(triangle.A, triangle.B, triangle.C, triangle.Normalized, intersection))
+                if (MeshUtils.IsPointInTrianglePlane(triangle.A, triangle.B, triangle.C, triangle.Normal, intersection))
                 {
                     pointOnSegment = intersection;
                     pointOnTriangle = intersection;
@@ -287,12 +287,12 @@ public static partial class CollisionDetectionMixed
 
     private static void TrySetCloserPointTriangle(
         Vector3d point,
-        MixedTriangle triangle,
+        CollisionTriangle triangle,
         ref Vector3d pointOnSegment,
         ref Vector3d pointOnTriangle,
         ref Fixed64 bestDistanceSqr)
     {
-        Vector3d candidate = MeshUtils.ClosestPointOnTriangle(triangle.A, triangle.B, triangle.C, triangle.Normalized, point);
+        Vector3d candidate = MeshUtils.ClosestPointOnTriangle(triangle.A, triangle.B, triangle.C, triangle.Normal, point);
         Fixed64 distanceSqr = Vector3d.DistanceSquared(point, candidate);
         if (distanceSqr >= bestDistanceSqr)
             return;
@@ -321,19 +321,17 @@ public static partial class CollisionDetectionMixed
         pointOnTriangle = edgePoint;
     }
 
-    private static void GetMeshTriangle(LSMeshCollider mesh, int triangleIndex, out MixedTriangle triangle)
+    private static void GetMeshTriangle(LSMeshCollider mesh, int triangleIndex, out CollisionTriangle triangle)
     {
         mesh.Mesh.GetTriangleVertices(triangleIndex, out Vector3d first, out Vector3d second, out Vector3d third);
-        triangle = new MixedTriangle(
-            first,
-            second,
-            third,
+        triangle = new CollisionTriangle(
+            new FixedTriangle(first, second, third),
             mesh.Mesh.GetFaceNormalWorld(triangleIndex),
             CreateTriangleBounds(first, second, third));
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static FixedRange ProjectTriangleOntoAxis(MixedTriangle triangle, Vector3d axis)
+    private static FixedRange ProjectTriangleOntoAxis(CollisionTriangle triangle, Vector3d axis)
     {
         Fixed64 min = Vector3d.Dot(axis, triangle.A);
         Fixed64 max = min;

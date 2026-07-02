@@ -7,6 +7,7 @@
 
 using Chronicler;
 using FixedMathSharp;
+using Gravitas.CollisionHandling;
 using System.Runtime.CompilerServices;
 
 namespace Gravitas.Colliders;
@@ -131,14 +132,14 @@ public sealed class LSCapsuleCollider2D : LSCollider2D
     {
         CalculateSegment(out Vector2d start, out Vector2d end);
         Fixed64 radius = ScaledRadius;
-        Vector2d closest = ClosestPointOnSegment(point, start, end);
+        Vector2d closest = PlanarSegmentGeometry.ClosestPoint(point, start, end);
         return Vector2d.DistanceSquared(point, closest) <= radius * radius;
     }
 
     public override Vector2d GetClosestPoint(Vector2d point)
     {
         CalculateSegment(out Vector2d start, out Vector2d end);
-        Vector2d segmentPoint = ClosestPointOnSegment(point, start, end);
+        Vector2d segmentPoint = PlanarSegmentGeometry.ClosestPoint(point, start, end);
         Vector2d direction = point - segmentPoint;
         Fixed64 directionLengthSquared = direction.MagnitudeSquared;
         if (directionLengthSquared <= Fixed64.Epsilon)

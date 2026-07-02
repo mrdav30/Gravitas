@@ -6,7 +6,6 @@
 //=======================================================================
 
 using FixedMathSharp;
-using SwiftCollections;
 
 namespace Gravitas.Constraints;
 

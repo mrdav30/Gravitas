@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using FixedMathSharp.Bounds;
 using Gravitas.Colliders;
 using SwiftCollections;
 using SwiftCollections.Query;
@@ -86,13 +87,13 @@ internal static class MeshTriangleContactGenerator
         for (int i = 0; i < triangleBufferA.Count; i++)
         {
             int triangleA = triangleBufferA[i];
-            GetTriangle(meshA, triangleA, out TriangleData first);
-            meshB.GetTrianglesInBounds(first.Bounds, triangleBufferB);
+            GetTriangle(meshA, triangleA, out CollisionTriangle first);
+            meshB.GetTrianglesInBounds(first.QueryBounds, triangleBufferB);
 
             for (int j = 0; j < triangleBufferB.Count; j++)
             {
                 int triangleB = triangleBufferB[j];
-                GetTriangle(meshB, triangleB, out TriangleData second);
+                GetTriangle(meshB, triangleB, out CollisionTriangle second);
                 if (!TryTestTriangles(first, second, meshB.Center - meshA.Center, out Vector3d normal, out Fixed64 depth))
                     continue;
 
@@ -114,7 +115,7 @@ internal static class MeshTriangleContactGenerator
         int triangleIndex,
         LSSphereCollider sphere)
     {
-        GetTriangle(mesh, triangleIndex, out TriangleData triangle);
+        GetTriangle(mesh, triangleIndex, out CollisionTriangle triangle);
         Vector3d pointOnMesh = MeshUtils.ClosestPointOnTriangle(triangle.A, triangle.B, triangle.C, triangle.Normal, sphere.Center);
         Vector3d delta = sphere.Center - pointOnMesh;
         Fixed64 distanceSqr = delta.MagnitudeSquared;
@@ -137,7 +138,7 @@ internal static class MeshTriangleContactGenerator
         int triangleIndex,
         LSCapsuleCollider capsule)
     {
-        GetTriangle(mesh, triangleIndex, out TriangleData triangle);
+        GetTriangle(mesh, triangleIndex, out CollisionTriangle triangle);
         ClosestPointsSegmentTriangle(
             capsule.LineSegmentStart,
             capsule.LineSegmentEnd,
@@ -166,7 +167,7 @@ internal static class MeshTriangleContactGenerator
         int triangleIndex,
         LSCuboidCollider cuboid)
     {
-        GetTriangle(mesh, triangleIndex, out TriangleData triangle);
+        GetTriangle(mesh, triangleIndex, out CollisionTriangle triangle);
         if (!TryTestTriangleCuboid(triangle, cuboid, out Vector3d normal, out Fixed64 depth))
             return;
 
@@ -184,7 +185,7 @@ internal static class MeshTriangleContactGenerator
         int triangleIndex,
         LSCylinderCollider cylinder)
     {
-        GetTriangle(mesh, triangleIndex, out TriangleData triangle);
+        GetTriangle(mesh, triangleIndex, out CollisionTriangle triangle);
         Vector3d normal = OrientNormal(triangle.Normal, cylinder.Center - triangle.Center);
         if (TryAddCylinderCapTriangleContacts(pair, mesh, triangle, cylinder, normal))
             return;
@@ -201,7 +202,7 @@ internal static class MeshTriangleContactGenerator
     private static bool TryAddCuboidFaceContacts(
         CollisionWorkItem pair,
         LSMeshCollider mesh,
-        TriangleData triangle,
+        CollisionTriangle triangle,
         LSCuboidCollider cuboid,
         Vector3d normal,
         Fixed64 depth)
@@ -234,7 +235,7 @@ internal static class MeshTriangleContactGenerator
     private static bool TryAddCylinderCapTriangleContacts(
         CollisionWorkItem pair,
         LSMeshCollider mesh,
-        TriangleData triangle,
+        CollisionTriangle triangle,
         LSCylinderCollider cylinder,
         Vector3d normal)
     {
@@ -264,7 +265,7 @@ internal static class MeshTriangleContactGenerator
     private static void AddCylinderCapTriangleContact(
         CollisionWorkItem pair,
         LSMeshCollider mesh,
-        TriangleData triangle,
+        CollisionTriangle triangle,
         LSCylinderCollider cylinder,
         Vector3d pointOnCylinder,
         Fixed64 depth,
@@ -278,7 +279,7 @@ internal static class MeshTriangleContactGenerator
     }
 
     private static bool TryTestTriangleCuboid(
-        TriangleData triangle,
+        CollisionTriangle triangle,
         LSCuboidCollider cuboid,
         out Vector3d normal,
         out Fixed64 depth)
@@ -298,7 +299,7 @@ internal static class MeshTriangleContactGenerator
 
         for (int i = 0; i < 3; i++)
         {
-            Vector3d triangleEdge = triangle.GetEdge(i);
+            Vector3d triangleEdge = triangle.GetEdgeVector(i);
             for (int j = 0; j < cuboid.EdgeDirections.Length; j++)
             {
                 Vector3d axis = Vector3d.Cross(triangleEdge, cuboid.EdgeDirections[j]);
@@ -311,8 +312,8 @@ internal static class MeshTriangleContactGenerator
     }
 
     private static bool TryTestTriangles(
-        TriangleData first,
-        TriangleData second,
+        CollisionTriangle first,
+        CollisionTriangle second,
         Vector3d desiredDirection,
         out Vector3d normal,
         out Fixed64 depth)
@@ -327,17 +328,17 @@ internal static class MeshTriangleContactGenerator
 
         for (int i = 0; i < 3; i++)
         {
-            Vector3d firstEdge = first.GetEdge(i);
+            Vector3d firstEdge = first.GetEdgeVector(i);
             if (!CheckTriangleTriangleAxis(first, second, Vector3d.Cross(first.Normal, firstEdge), desiredDirection, ref normal, ref depth))
                 return false;
 
-            Vector3d secondEdge = second.GetEdge(i);
+            Vector3d secondEdge = second.GetEdgeVector(i);
             if (!CheckTriangleTriangleAxis(first, second, Vector3d.Cross(second.Normal, secondEdge), desiredDirection, ref normal, ref depth))
                 return false;
 
             for (int j = 0; j < 3; j++)
             {
-                Vector3d axis = Vector3d.Cross(firstEdge, second.GetEdge(j));
+                Vector3d axis = Vector3d.Cross(firstEdge, second.GetEdgeVector(j));
                 if (!CheckTriangleTriangleAxis(first, second, axis, desiredDirection, ref normal, ref depth))
                     return false;
             }
@@ -348,7 +349,7 @@ internal static class MeshTriangleContactGenerator
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool CheckTriangleCuboidAxis(
-        TriangleData triangle,
+        CollisionTriangle triangle,
         LSCuboidCollider cuboid,
         Vector3d axis,
         Vector3d desiredDirection,
@@ -365,8 +366,8 @@ internal static class MeshTriangleContactGenerator
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool CheckTriangleTriangleAxis(
-        TriangleData first,
-        TriangleData second,
+        CollisionTriangle first,
+        CollisionTriangle second,
         Vector3d axis,
         Vector3d desiredDirection,
         ref Vector3d normal,
@@ -442,7 +443,7 @@ internal static class MeshTriangleContactGenerator
     private static void ClosestPointsSegmentTriangle(
         Vector3d segmentStart,
         Vector3d segmentEnd,
-        TriangleData triangle,
+        CollisionTriangle triangle,
         out Vector3d pointOnSegment,
         out Vector3d pointOnTriangle)
     {
@@ -475,7 +476,7 @@ internal static class MeshTriangleContactGenerator
 
     private static void TrySetCloserPointTriangle(
         Vector3d point,
-        TriangleData triangle,
+        CollisionTriangle triangle,
         ref Vector3d pointOnSegment,
         ref Vector3d pointOnTriangle,
         ref Fixed64 bestDistanceSqr)
@@ -509,13 +510,11 @@ internal static class MeshTriangleContactGenerator
         pointOnTriangle = edgePoint;
     }
 
-    private static void GetTriangle(LSMeshCollider mesh, int triangleIndex, out TriangleData triangle)
+    private static void GetTriangle(LSMeshCollider mesh, int triangleIndex, out CollisionTriangle triangle)
     {
         mesh.Mesh.GetTriangleVertices(triangleIndex, out Vector3d first, out Vector3d second, out Vector3d third);
-        triangle = new TriangleData(
-            first,
-            second,
-            third,
+        triangle = new CollisionTriangle(
+            new FixedTriangle(first, second, third),
             mesh.Mesh.GetFaceNormalWorld(triangleIndex),
             CreateTriangleBounds(first, second, third));
     }
@@ -530,7 +529,7 @@ internal static class MeshTriangleContactGenerator
     private static FixedBoundVolume CreateBounds(Vector3d min, Vector3d max) =>
         new(min, max);
 
-    private static void ProjectTriangle(TriangleData triangle, Vector3d axis, out Fixed64 min, out Fixed64 max)
+    private static void ProjectTriangle(CollisionTriangle triangle, Vector3d axis, out Fixed64 min, out Fixed64 max)
     {
         min = Vector3d.Dot(axis, triangle.A);
         max = min;
@@ -613,38 +612,4 @@ internal static class MeshTriangleContactGenerator
             pair.Manifold.AddContact(pointOnSecond, pointOnFirst, depth, -normalFirstToSecond);
     }
 
-    private readonly struct TriangleData
-    {
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public TriangleData(Vector3d a, Vector3d b, Vector3d c, Vector3d normal, FixedBoundVolume bounds)
-        {
-            A = a;
-            B = b;
-            C = c;
-            Normal = normal;
-            Bounds = bounds;
-            Center = (a + b + c) / (Fixed64)3;
-        }
-
-        public Vector3d A { get; }
-
-        public Vector3d B { get; }
-
-        public Vector3d C { get; }
-
-        public Vector3d Normal { get; }
-
-        public FixedBoundVolume Bounds { get; }
-
-        public Vector3d Center { get; }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public Vector3d GetEdge(int index) =>
-            index switch
-            {
-                0 => B - A,
-                1 => C - B,
-                _ => A - C
-            };
-    }
 }

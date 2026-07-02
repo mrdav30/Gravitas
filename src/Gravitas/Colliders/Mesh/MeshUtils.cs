@@ -6,6 +6,8 @@
 //=======================================================================
 
 using FixedMathSharp;
+using FixedMathSharp.Bounds;
+using System.Runtime.CompilerServices;
 
 namespace Gravitas.Colliders;
 
@@ -93,18 +95,7 @@ public static class MeshUtils
         return closestPoint;
     }
 
-    public static Vector3d ClosestPointOnEdge(Vector3d start, Vector3d end, Vector3d point)
-    {
-        Vector3d displacement = end - start;
-        // get the projection of the vector from the start of the line to the point onto the line.
-        // since the line is not a unit vector, scale this projection by the square of the length of the line.
-        Fixed64 t = Vector3d.Dot(point - start, displacement) / displacement.MagnitudeSquared;
-        if (t < Fixed64.Zero)
-            return start; // The point is closer to the start of the line
-
-        if (t > Fixed64.One)
-            return end; // The point is closer to the end of the line
-
-        return start + t * displacement; // The point is on the line segment
-    }
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Vector3d ClosestPointOnEdge(Vector3d start, Vector3d end, Vector3d point) =>
+        new FixedSegment(start, end).ClosestPoint(point);
 }

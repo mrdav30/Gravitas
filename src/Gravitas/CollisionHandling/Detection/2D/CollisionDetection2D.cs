@@ -211,7 +211,7 @@ internal static class CollisionDetection2D
 
     private static bool TryCapsuleCircle(LSCapsuleCollider2D capsule, LSCircleCollider2D circle, out Contact2D contact)
     {
-        Vector2d segmentPoint = ClosestPointOnSegment(circle.Center, capsule.SegmentStart, capsule.SegmentEnd);
+        Vector2d segmentPoint = PlanarSegmentGeometry.ClosestPoint(circle.Center, capsule.SegmentStart, capsule.SegmentEnd);
         Vector2d delta = circle.Center - segmentPoint;
         Fixed64 distanceSquared = delta.MagnitudeSquared;
         Fixed64 radius = capsule.ScaledRadius + circle.ScaledRadius;
@@ -620,7 +620,7 @@ internal static class CollisionDetection2D
         for (int i = 0; i < convex.VertexCount; i++)
         {
             Vector2d vertex = convex.GetVertexUnchecked(i);
-            Vector2d segmentPoint = ClosestPointOnSegment(vertex, segmentStart, segmentEnd);
+            Vector2d segmentPoint = PlanarSegmentGeometry.ClosestPoint(vertex, segmentStart, segmentEnd);
             KeepClosestAxis(vertex - segmentPoint, ref bestDistance, ref bestAxis);
         }
 
@@ -876,22 +876,6 @@ internal static class CollisionDetection2D
         max = FixedMath.Max(start, end) + radius;
     }
 
-    private static Vector2d ClosestPointOnSegment(Vector2d point, Vector2d start, Vector2d end)
-    {
-        Vector2d segment = end - start;
-        Fixed64 lengthSquared = segment.MagnitudeSquared;
-        if (lengthSquared <= Fixed64.Epsilon)
-            return start;
-
-        Fixed64 t = Vector2d.Dot(point - start, segment) / lengthSquared;
-        if (t <= Fixed64.Zero)
-            return start;
-        if (t >= Fixed64.One)
-            return end;
-
-        return start + segment * t;
-    }
-
     private static void ClosestPointsOnSegments(
         Vector2d firstStart,
         Vector2d firstEnd,
@@ -908,23 +892,23 @@ internal static class CollisionDetection2D
         }
 
         firstPoint = firstStart;
-        secondPoint = ClosestPointOnSegment(firstStart, secondStart, secondEnd);
+        secondPoint = PlanarSegmentGeometry.ClosestPoint(firstStart, secondStart, secondEnd);
         Fixed64 bestDistance = Vector2d.DistanceSquared(firstPoint, secondPoint);
 
         KeepClosestSegmentPair(
             firstEnd,
-            ClosestPointOnSegment(firstEnd, secondStart, secondEnd),
+            PlanarSegmentGeometry.ClosestPoint(firstEnd, secondStart, secondEnd),
             ref firstPoint,
             ref secondPoint,
             ref bestDistance);
         KeepClosestSegmentPair(
-            ClosestPointOnSegment(secondStart, firstStart, firstEnd),
+            PlanarSegmentGeometry.ClosestPoint(secondStart, firstStart, firstEnd),
             secondStart,
             ref firstPoint,
             ref secondPoint,
             ref bestDistance);
         KeepClosestSegmentPair(
-            ClosestPointOnSegment(secondEnd, firstStart, firstEnd),
+            PlanarSegmentGeometry.ClosestPoint(secondEnd, firstStart, firstEnd),
             secondEnd,
             ref firstPoint,
             ref secondPoint,

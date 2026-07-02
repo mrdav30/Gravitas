@@ -5,7 +5,6 @@
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
-using FixedMathSharp;
 using Gravitas.Materials;
 using System;
 

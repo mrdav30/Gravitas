@@ -102,7 +102,7 @@ public sealed class PhysicsLayerTests
 
     [Fact]
     public void GroundCheckLayerMask_ShouldBeSettingsOwnedAndConfigurable()
-    { 
+    {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         PhysicsLayerMask defaultMask = context.Settings.GroundCheckLayerMask;
         PhysicsLayerMask customMask = PhysicsLayerMask.FromLayer(2);

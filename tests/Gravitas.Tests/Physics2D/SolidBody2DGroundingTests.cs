@@ -4,7 +4,6 @@ using Gravitas.Colliders;
 using Gravitas.Diagnostics;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
-using SwiftCollections;
 using System;
 using Xunit;
 

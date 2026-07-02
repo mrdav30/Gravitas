@@ -8,7 +8,6 @@
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.Constraints;
-using SwiftCollections;
 
 namespace Gravitas.Diagnostics;
 

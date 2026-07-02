@@ -479,7 +479,7 @@ public sealed partial class GravitasQueryMixedService
     {
         distance = Fixed64.Zero;
         Fixed64 radiusSqr = radius * radius;
-        if (MixedEmbedded2DGeometry.DistanceSquaredToSegment(start, segmentStart, segmentEnd) <= radiusSqr)
+        if (PlanarSegmentGeometry.DistanceSquared(start, segmentStart, segmentEnd) <= radiusSqr)
             return true;
 
         bool found = false;
@@ -585,7 +585,7 @@ public sealed partial class GravitasQueryMixedService
         Fixed64 best = Fixed64.MaxValue;
         for (int i = 0; i < projection.Length; i++)
         {
-            Fixed64 distanceSqr = MixedEmbedded2DGeometry.DistanceSquaredToSegment(point, projection[i], projection[(i + 1) % projection.Length]);
+            Fixed64 distanceSqr = PlanarSegmentGeometry.DistanceSquared(point, projection[i], projection[(i + 1) % projection.Length]);
             if (distanceSqr < best)
                 best = distanceSqr;
         }
