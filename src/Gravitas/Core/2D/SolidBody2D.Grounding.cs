@@ -473,8 +473,8 @@ public sealed partial class SolidBody2D
             LSCircleCollider2D circle => circle.ScaledRadius,
             LSCapsuleCollider2D capsule => capsule.ScaledRadius,
             LSAABBoxCollider2D box => FixedMath.Min(box.ScaledSize.X, box.ScaledSize.Y) * Fixed64.Half,
-            LSPolygonCollider2D polygon => FixedMath.Min(polygon.Bounds.Width, polygon.Bounds.Height) * Fixed64.Half,
-            LSCompoundCollider2D compound => FixedMath.Min(compound.Bounds.Width, compound.Bounds.Height) * Fixed64.Half,
+            LSPolygonCollider2D polygon => FixedMath.Min(polygon.Bounds.Size.X, polygon.Bounds.Size.Y) * Fixed64.Half,
+            LSCompoundCollider2D compound => FixedMath.Min(compound.Bounds.Size.X, compound.Bounds.Size.Y) * Fixed64.Half,
             _ => Fixed64.Zero
         };
     }

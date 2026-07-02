@@ -335,13 +335,13 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
         }
     }
 
-    public Fixed64 MinX => _bounds.MinX;
+    public Fixed64 MinX => _bounds.Min.X;
 
-    public Fixed64 MaxX => _bounds.MaxX;
+    public Fixed64 MaxX => _bounds.Max.X;
 
-    public Fixed64 MinY => _bounds.MinY;
+    public Fixed64 MinY => _bounds.Min.Y;
 
-    public Fixed64 MaxY => _bounds.MaxY;
+    public Fixed64 MaxY => _bounds.Max.Y;
 
     internal void Initialize(SolidBody2D body)
     {
@@ -764,7 +764,7 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
         Vector3d max = new(MaxX, slabCenterY + halfThickness, MaxY);
         if (!_mixedBoundsInitialized)
         {
-            _mixedBounds3D = new FixedBoundBox((min + max) * Fixed64.Half, max - min);
+            _mixedBounds3D = FixedBoundBox.FromMinMax(min, max);
             _mixedBoundsInitialized = true;
             return;
         }
@@ -827,12 +827,8 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
 
     protected void SetBounds(FixedBoundArea bounds) => _bounds = bounds;
 
-    protected void SetBoundsFromMinMax(Vector2d min, Vector2d max)
-    {
-        SetBounds(new FixedBoundArea(
-            new Vector3d(min.X, min.Y, Fixed64.Zero),
-            new Vector3d(max.X, max.Y, Fixed64.Zero)));
-    }
+    protected void SetBoundsFromMinMax(Vector2d min, Vector2d max) =>
+        SetBounds(FixedBoundArea.FromMinMax(min, max));
 
     private Fixed64 ResolveAgentRotation()
     {

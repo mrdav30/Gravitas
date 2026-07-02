@@ -27,10 +27,10 @@ public sealed class CompoundCollider2DTests
         context.Physics2D.TryGetColliderById(compound.GetPartCollider(0).Id, out _).Should().BeFalse();
         context.Physics2D.TryGetColliderById(compound.GetPartCollider(1).Id, out _).Should().BeFalse();
 
-        compound.Bounds.MinX.Should().Be(-Fixed64.FromFraction(3, 2));
-        compound.Bounds.MaxX.Should().Be(Fixed64.FromFraction(5, 2));
-        compound.Bounds.MinY.Should().Be(-Fixed64.Half);
-        compound.Bounds.MaxY.Should().Be(Fixed64.Half);
+        compound.Bounds.Min.X.Should().Be(-Fixed64.FromFraction(3, 2));
+        compound.Bounds.Max.X.Should().Be(Fixed64.FromFraction(5, 2));
+        compound.Bounds.Min.Y.Should().Be(-Fixed64.Half);
+        compound.Bounds.Max.Y.Should().Be(Fixed64.Half);
         compound.Center.Should().Be(Vector2d.Zero);
     }
 
@@ -68,10 +68,10 @@ public sealed class CompoundCollider2DTests
 
         _ = CreateBody(context, compound, Vector2d.Zero);
 
-        compound.Bounds.MinX.Should().Be(Fixed64.FromFraction(7, 2));
-        compound.Bounds.MaxX.Should().Be(Fixed64.FromFraction(15, 2));
-        compound.Bounds.MinY.Should().Be(-Fixed64.FromFraction(5, 2));
-        compound.Bounds.MaxY.Should().Be(-Fixed64.FromFraction(3, 2));
+        compound.Bounds.Min.X.Should().Be(Fixed64.FromFraction(7, 2));
+        compound.Bounds.Max.X.Should().Be(Fixed64.FromFraction(15, 2));
+        compound.Bounds.Min.Y.Should().Be(-Fixed64.FromFraction(5, 2));
+        compound.Bounds.Max.Y.Should().Be(-Fixed64.FromFraction(3, 2));
         compound.Center.Should().Be(new Vector2d((Fixed64)5, (Fixed64)(-2)));
     }
 
@@ -86,10 +86,10 @@ public sealed class CompoundCollider2DTests
         part.Radius = Fixed64.One;
         compound.Simulate();
 
-        compound.Bounds.MinX.Should().Be(-Fixed64.One);
-        compound.Bounds.MaxX.Should().Be(Fixed64.One);
-        compound.Bounds.MinY.Should().Be(-Fixed64.One);
-        compound.Bounds.MaxY.Should().Be(Fixed64.One);
+        compound.Bounds.Min.X.Should().Be(-Fixed64.One);
+        compound.Bounds.Max.X.Should().Be(Fixed64.One);
+        compound.Bounds.Min.Y.Should().Be(-Fixed64.One);
+        compound.Bounds.Max.Y.Should().Be(Fixed64.One);
         compound.RuntimeShapeVersion.Should().BeGreaterThan(1u);
     }
 

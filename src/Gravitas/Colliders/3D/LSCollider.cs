@@ -536,7 +536,7 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode
     {
         if (!_boundsInitialized)
         {
-            _bounds = new FixedBoundBox(Center, ScaledSize);
+            _bounds = FixedBoundBox.FromCenterAndSize(Center, ScaledSize);
             _boundsInitialized = true;
         }
         else
@@ -557,7 +557,7 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode
     {
         if (!_boundsInitialized)
         {
-            _bounds = new FixedBoundBox((min + max) * Fixed64.Half, max - min);
+            _bounds = FixedBoundBox.FromMinMax(min, max);
             _boundsInitialized = true;
             return;
         }
@@ -573,9 +573,11 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode
         // Calculate the axis-aligned bounding box (AABB) of the OBB
         Vector3d min = _bounds.Center;
         Vector3d max = _bounds.Center;
-        for (int i = 0; i < _bounds.Vertices.Length; i++)
+        Span<Vector3d> vertices = stackalloc Vector3d[FixedBoundBox.CornerCount];
+        _bounds.CopyCorners(vertices);
+        for (int i = 0; i < vertices.Length; i++)
         {
-            Vector3d orientedVertex = _bounds.Vertices[i].Rotate(_bounds.Center, Rotation);
+            Vector3d orientedVertex = vertices[i].Rotate(_bounds.Center, Rotation);
             min = Vector3d.Min(min, orientedVertex);
             max = Vector3d.Max(max, orientedVertex);
         }

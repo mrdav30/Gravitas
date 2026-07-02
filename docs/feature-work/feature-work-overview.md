@@ -30,7 +30,11 @@ instead of burying it in notes.
 
 ## Active Release-Scope
 
-- No active release-scope plans are currently queued.
+- [`FixedMathSharp v6 Geometry Adoption`](2026-07-02-fixedmathsharp-v6-geometry-adoption-plan.md)
+  - Planned 2026-07-02. Adopts FixedMathSharp v6 triangle, segment, circle,
+    and related geometry primitives where they reduce Gravitas-owned duplicate
+    math without losing cached mesh normals, SwiftCollections query bounds,
+    deterministic contact behavior, or hot-path allocation guarantees.
 
 ## Recently Completed
 

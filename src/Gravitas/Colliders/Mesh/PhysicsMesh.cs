@@ -333,7 +333,7 @@ namespace Gravitas.Colliders
             FixedBoundVolume volume = TransformBounds(_localBounds.Min, _localBounds.Max, TransformationMatrix);
             if (!_boundsInitialized)
             {
-                _bounds = new FixedBoundBox((volume.Min + volume.Max) * Fixed64.Half, volume.Max - volume.Min);
+                _bounds = FixedBoundBox.FromMinMax(volume.Min, volume.Max);
                 _boundsInitialized = true;
                 return;
             }
@@ -351,7 +351,7 @@ namespace Gravitas.Colliders
                 max = Vector3d.Max(max, vertices[i]);
             }
 
-            return new FixedBoundBox((min + max) * Fixed64.Half, max - min);
+            return FixedBoundBox.FromMinMax(min, max);
         }
 
         private static FixedBoundVolume TransformBounds(Vector3d min, Vector3d max, Fixed4x4 transform)

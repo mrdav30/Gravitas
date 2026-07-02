@@ -22,10 +22,10 @@ public sealed class ColliderShapeDefinition2DTests
 
         definition.Kind.Should().Be(ColliderShapeDefinition2DKind.AABBox);
         definition.Size.Should().Be(size);
-        body.Collider.Bounds.MinX.Should().Be(-Fixed64.One);
-        body.Collider.Bounds.MaxX.Should().Be(Fixed64.One);
-        body.Collider.Bounds.MinY.Should().Be((Fixed64)(-2));
-        body.Collider.Bounds.MaxY.Should().Be((Fixed64)2);
+        body.Collider.Bounds.Min.X.Should().Be(-Fixed64.One);
+        body.Collider.Bounds.Max.X.Should().Be(Fixed64.One);
+        body.Collider.Bounds.Min.Y.Should().Be((Fixed64)(-2));
+        body.Collider.Bounds.Max.Y.Should().Be((Fixed64)2);
     }
 
     [Fact]

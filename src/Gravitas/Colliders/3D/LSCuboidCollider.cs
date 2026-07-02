@@ -9,6 +9,7 @@ using FixedMathSharp;
 using FixedMathSharp.Bounds;
 using Gravitas.Queries;
 using SwiftCollections;
+using System;
 using System.Runtime.CompilerServices;
 
 namespace Gravitas.Colliders;
@@ -125,7 +126,7 @@ public class LSCuboidCollider : LSCollider
         _faceCentroids = new Vector3d[FaceDefinitions.Length];
         _edgeVertices = new int[EdgeDefinitions.Length][];
         _edgeDirections = new Vector3d[EdgeDefinitions.Length];
-        _orientedBounds = new FixedBoundBox(Vector3d.Zero, Vector3d.One);
+        _orientedBounds = FixedBoundBox.FromCenterAndSize(Vector3d.Zero, Vector3d.One);
     }
 
     public LSCuboidCollider(ColliderShapeDefinition definition)
@@ -138,7 +139,7 @@ public class LSCuboidCollider : LSCollider
 
     protected override void OnInitialize()
     {
-        _orientedBounds = new FixedBoundBox(Center, ScaledSize);
+        _orientedBounds = FixedBoundBox.FromCenterAndSize(Center, ScaledSize);
         base.OnInitialize();
     }
 
@@ -156,19 +157,20 @@ public class LSCuboidCollider : LSCollider
 
     protected void GenerateVertices()
     {
-        if (Rotation != FixedQuaternion.Identity)
+        if (CurrentState != CuboidState.AABox)
+        {
             _orientedBounds.Orient(Center, ScaledSize);
 
-        for (int i = 0; i < _bounds.Vertices.Length; i++)
-        {
-            if (CurrentState != CuboidState.AABox)
-            {
-                _vertices[i] = _orientedBounds.Vertices[i].Rotate(Center, Rotation);
-                continue;
-            }
+            for (int i = 0; i < _vertices.Length; i++)
+                _vertices[i] = _orientedBounds.GetCorner(i).Rotate(Center, Rotation);
 
-            _vertices[i] = _bounds.Vertices[i];
+            return;
         }
+
+        Span<Vector3d> vertices = stackalloc Vector3d[FixedBoundBox.CornerCount];
+        _bounds.CopyCorners(vertices);
+        for (int i = 0; i < vertices.Length; i++)
+            _vertices[i] = vertices[i];
     }
 
     protected void GenerateAxes()

@@ -1,5 +1,11 @@
 # Benchmark Publishing And CCD Diagnostics Implementation Plan
 
+**Date:** 2026-06-21
+**Status:** Post-alpha / evidence-gated
+**Owner:** Gravitas benchmark/diagnostics hardening
+
+---
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Turn CCD benchmark evidence and solver status into repeatable release signals through benchmark artifact publishing, baseline comparison, and deterministic host-visible CCD diagnostics where justified.
@@ -7,12 +13,6 @@
 **Architecture:** Keep benchmark evidence separate from runtime diagnostics. Benchmark publishing owns historical performance comparison; runtime diagnostics expose deterministic counters only when they help users tune or debug CCD behavior.
 
 **Tech Stack:** .NET 8, BenchmarkDotNet, xUnit v3, GitHub Actions or external benchmark tooling, Gravitas diagnostics.
-
----
-
-**Date:** 2026-06-21
-**Status:** Post-alpha / evidence-gated
-**Owner:** Gravitas benchmark/diagnostics hardening
 
 ## Purpose
 
