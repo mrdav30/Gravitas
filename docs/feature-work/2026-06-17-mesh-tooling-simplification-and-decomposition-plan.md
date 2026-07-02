@@ -1,9 +1,7 @@
 # Mesh Tooling Simplification And Decomposition Plan
 
-**Date:** 2026-06-17
-**Expanded:** 2026-06-18
-**Status:** Post-alpha / research-gated
-**Owner:** Gravitas asset-tooling research
+**Date:** 2026-06-17 **Expanded:** 2026-06-18 **Status:** Post-alpha /
+research-gated **Owner:** Gravitas asset-tooling research
 
 ## Purpose
 
@@ -42,9 +40,9 @@ Runtime remains the source of truth for simulation behavior:
   collision geometry.
 
 Tooling may eventually export a baked asset DTO, but runtime import should still
-materialize ordinary Gravitas public shapes. A dedicated mesh-owned piece path is
-allowed only if benchmarks prove that public compound colliders cannot meet the
-runtime cost or memory target.
+materialize ordinary Gravitas public shapes. A dedicated mesh-owned piece path
+is allowed only if benchmarks prove that public compound colliders cannot meet
+the runtime cost or memory target.
 
 ## Scope
 
@@ -153,11 +151,11 @@ regions, and hull-update cost.
 
 Phase 7 should add real solution projects early:
 
-| Project | Purpose |
-| --- | --- |
-| `src/Gravitas.MeshTools/Gravitas.MeshTools.csproj` | Offline deterministic mesh validation, simplification, decomposition, metrics, and export APIs. |
-| `tests/Gravitas.MeshTools.Tests/Gravitas.MeshTools.Tests.csproj` | Focused xUnit coverage for quantization, topology, validation diagnostics, hulls, simplification, decomposition, exports, and determinism. |
-| `tests/Gravitas.MeshTools.Benchmarks/Gravitas.MeshTools.Benchmarks.csproj` | BenchmarkDotNet coverage for validation, hull generation, simplification, decomposition, metric scoring, and runtime-export comparison. |
+| Project                                                                    | Purpose                                                                                                                                    |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `src/Gravitas.MeshTools/Gravitas.MeshTools.csproj`                         | Offline deterministic mesh validation, simplification, decomposition, metrics, and export APIs.                                            |
+| `tests/Gravitas.MeshTools.Tests/Gravitas.MeshTools.Tests.csproj`           | Focused xUnit coverage for quantization, topology, validation diagnostics, hulls, simplification, decomposition, exports, and determinism. |
+| `tests/Gravitas.MeshTools.Benchmarks/Gravitas.MeshTools.Benchmarks.csproj` | BenchmarkDotNet coverage for validation, hull generation, simplification, decomposition, metric scoring, and runtime-export comparison.    |
 
 The tooling project may reference `Gravitas` when it needs runtime value types,
 `ColliderShapeDefinition`, `CompoundColliderPart`, `PhysicsMesh` validation
@@ -176,12 +174,12 @@ Mesh tooling should be a good citizen of the existing stack, not a parallel
 foundation. The first implementation pass should inventory these libraries
 before writing custom equivalents:
 
-| Library | Reuse first for |
-| --- | --- |
-| `FixedMathSharp` | `Fixed64`, vectors, quaternions, bounds, rays, planes, containment tests, and deterministic geometry primitives. |
+| Library            | Reuse first for                                                                                                                                                                                    |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `FixedMathSharp`   | `Fixed64`, vectors, quaternions, bounds, rays, planes, containment tests, and deterministic geometry primitives.                                                                                   |
 | `SwiftCollections` | low-allocation lists, sets, queues, pools, deterministic candidate buffers, and FixedMathSharp query structures such as BVHs, octrees, or spatial hashes when their ordering can be made explicit. |
-| `Chronicler` | explicit persisted asset/report data contracts when baked mesh-tooling output needs deterministic save/load behavior. |
-| `GridForge` | deterministic voxel/topology concepts for fixed-grid quality probes, union-volume estimates, or sampling experiments when they fit better than a mesh-tooling-owned grid. |
+| `Chronicler`       | explicit persisted asset/report data contracts when baked mesh-tooling output needs deterministic save/load behavior.                                                                              |
+| `GridForge`        | deterministic voxel/topology concepts for fixed-grid quality probes, union-volume estimates, or sampling experiments when they fit better than a mesh-tooling-owned grid.                          |
 
 If a lower-stack type is rejected, the plan or implementation notes should say
 why. Good reasons include an API mismatch, a proven benchmark cost, missing
@@ -192,21 +190,21 @@ runtime-focused libraries.
 
 Future implementation should start small and keep responsibilities separate:
 
-| Area | Responsibility |
-| --- | --- |
-| `Gravitas.MeshTools` | Tooling package, separate from runtime simulation. |
-| `MeshToolingMesh` | Immutable quantized vertex/triangle source, canonical IDs, bounds, and source metadata. |
-| `MeshTopologyGraph` | Deterministic edges, triangle adjacency, shell/component grouping, and winding state. |
-| `MeshValidationReport` | Structured diagnostics for asset problems; no exception-only user feedback. |
-| `MeshQualityReport` | Deterministic metrics for coverage, error, hull count, hull vertices, and runtime proxy cost. |
-| `ConvexHullBuilder` | Managed deterministic 3D hull generation for fixed/quantized input. |
-| `MeshSimplifier` | Optional collision simplification experiments with closed-volume preservation. |
-| `ConvexDecomposer` | Experimental strategy host for split/merge and source-triangle-growth approaches. |
-| `CompoundCollisionAsset` | Stable serialized tool output that can materialize `CompoundColliderPart[]`. |
+| Area                     | Responsibility                                                                                |
+| ------------------------ | --------------------------------------------------------------------------------------------- |
+| `Gravitas.MeshTools`     | Tooling package, separate from runtime simulation.                                            |
+| `MeshToolingMesh`        | Immutable quantized vertex/triangle source, canonical IDs, bounds, and source metadata.       |
+| `MeshTopologyGraph`      | Deterministic edges, triangle adjacency, shell/component grouping, and winding state.         |
+| `MeshValidationReport`   | Structured diagnostics for asset problems; no exception-only user feedback.                   |
+| `MeshQualityReport`      | Deterministic metrics for coverage, error, hull count, hull vertices, and runtime proxy cost. |
+| `ConvexHullBuilder`      | Managed deterministic 3D hull generation for fixed/quantized input.                           |
+| `MeshSimplifier`         | Optional collision simplification experiments with closed-volume preservation.                |
+| `ConvexDecomposer`       | Experimental strategy host for split/merge and source-triangle-growth approaches.             |
+| `CompoundCollisionAsset` | Stable serialized tool output that can materialize `CompoundColliderPart[]`.                  |
 
-This table is a planning boundary, not a demand to create every type on day
-one. The implementation should grow only as the earlier evidence phases need
-each component.
+This table is a planning boundary, not a demand to create every type on day one.
+The implementation should grow only as the earlier evidence phases need each
+component.
 
 ## Core Data Contract
 
@@ -323,20 +321,21 @@ it exists. A fixture without a specific failure mode or quality signal is noise.
 
 - [ ] Add `src/Gravitas.MeshTools/Gravitas.MeshTools.csproj` to the solution.
 - [ ] Add `tests/Gravitas.MeshTools.Tests/Gravitas.MeshTools.Tests.csproj` to
-  the solution.
-- [ ] Add `tests/Gravitas.MeshTools.Benchmarks/Gravitas.MeshTools.Benchmarks.csproj`
-  to the solution.
-- [ ] Inventory FixedMathSharp, SwiftCollections, Chronicler, and GridForge
-  APIs that can be reused for the first validation and fixture tasks.
+      the solution.
+- [ ] Add
+      `tests/Gravitas.MeshTools.Benchmarks/Gravitas.MeshTools.Benchmarks.csproj`
+      to the solution.
+- [ ] Inventory FixedMathSharp, SwiftCollections, Chronicler, and GridForge APIs
+      that can be reused for the first validation and fixture tasks.
 - [ ] Keep package metadata experimental so it cannot be mistaken for the
-  recommended alpha asset workflow before the evidence gates are met.
+      recommended alpha asset workflow before the evidence gates are met.
 - [ ] Add only the minimal public API root required by the first validation
-  task; avoid marker types with no behavior.
+      task; avoid marker types with no behavior.
 - [ ] Add fixture helpers for deterministic source meshes and current runtime
-  dense-mesh benchmark shapes.
+      dense-mesh benchmark shapes.
 - [ ] Add golden hash infrastructure for generated tool outputs.
 - [ ] Add cross-platform deterministic-output tests to CI only after the first
-  algorithm exists.
+      algorithm exists.
 
 **Exit criteria:** tooling experiments compile as first-class solution projects
 without adding dependencies from runtime `Gravitas` back to the tooling package.
@@ -344,16 +343,16 @@ without adding dependencies from runtime `Gravitas` back to the tooling package.
 ### Tooling Phase B: Quantized Mesh And Validation Kernel
 
 - [ ] Define immutable quantized mesh input with explicit scale and rounding
-  settings.
+      settings.
 - [ ] Build deterministic topology: canonical vertices, directed edges,
-  undirected edge groups, triangle adjacency, connected shells, and winding
-  classification.
+      undirected edge groups, triangle adjacency, connected shells, and winding
+      classification.
 - [ ] Validate edge manifoldness, boundary edges, duplicate faces, degenerate
-  faces, inconsistent winding, disconnected shells, coordinate overflow, and
-  unsupported triangle counts.
+      faces, inconsistent winding, disconnected shells, coordinate overflow, and
+      unsupported triangle counts.
 - [ ] Add self-intersection candidate diagnostics. Exact self-intersection can
-  start conservative: report candidate triangle pairs from a BVH and fail the
-  asset unless a follow-up exact test clears them.
+      start conservative: report candidate triangle pairs from a BVH and fail
+      the asset unless a follow-up exact test clears them.
 - [ ] Return `MeshValidationReport` diagnostics in stable order.
 
 **Exit criteria:** validation can explain why an asset is accepted, rejected, or
@@ -363,13 +362,13 @@ needs offline repair without throwing as the primary user-facing API.
 
 - [ ] Mirror or share runtime closed-volume mass-property math.
 - [ ] Export baked source volume, center of mass, reference center, bounds, and
-  inertia metadata.
+      inertia metadata.
 - [ ] Verify runtime `PhysicsMesh.TryGetClosedVolumeMassProperties(...)` agrees
-  with tooling output on closed fixtures.
-- [ ] Define `CompoundCollisionAsset` as a stable DTO for authored convex
-  pieces and transforms.
+      with tooling output on closed fixtures.
+- [ ] Define `CompoundCollisionAsset` as a stable DTO for authored convex pieces
+      and transforms.
 - [ ] Add import tests that materialize `LSCompoundCollider` from the DTO and
-  preserve one runtime collider identity.
+      preserve one runtime collider identity.
 
 **Exit criteria:** tooling can validate and export known-good closed convex
 pieces before decomposition exists.
@@ -377,14 +376,14 @@ pieces before decomposition exists.
 ### Tooling Phase D: Convex Hull And Convexity Primitives
 
 - [ ] Implement a deterministic 3D convex hull builder for fixed/quantized
-  points, or write a prototype plus tests that prove a simpler managed option
-  can be made deterministic.
+      points, or write a prototype plus tests that prove a simpler managed
+      option can be made deterministic.
 - [ ] Define hull vertex and face ordering rules.
 - [ ] Validate outward winding and closed-volume mass properties on generated
-  hulls.
+      hulls.
 - [ ] Add hull containment and point-in-convex-polyhedron tests.
-- [ ] Benchmark hull construction and incremental hull updates on small,
-  medium, and dense fixture subsets.
+- [ ] Benchmark hull construction and incremental hull updates on small, medium,
+      and dense fixture subsets.
 
 **Exit criteria:** hull generation is stable enough to be a dependency of
 simplification/decomposition experiments. If it is not, decomposition pauses
@@ -395,9 +394,9 @@ here.
 - [ ] Implement deterministic surface probes, volume probes, and contact probes.
 - [ ] Add feature probes for channels, handles, slots, and inside corners.
 - [ ] Implement approximate union-volume estimation for overlapping convex
-  pieces using deterministic sampling or a fixed voxel grid.
+      pieces using deterministic sampling or a fixed voxel grid.
 - [ ] Add benchmark harnesses that compare raw triangle BVH, hand-authored
-  compound proxies, and generated compounds on the same fixtures.
+      compound proxies, and generated compounds on the same fixtures.
 - [ ] Define report thresholds for:
   - maximum piece count.
   - maximum per-piece hull vertices.
@@ -412,15 +411,15 @@ strategy can claim success.
 ### Tooling Phase F: Collision Mesh Simplification Experiments
 
 - [ ] Prototype deterministic edge-collapse simplification with fixed-point or
-  scaled-integer error metrics.
+      scaled-integer error metrics.
 - [ ] Prototype feature-preserving simplification that pins boundary, sharp
-  crease, and semantic marker vertices.
+      crease, and semantic marker vertices.
 - [ ] Require closed-volume preservation when simplification is used for dynamic
-  mesh inertia.
+      mesh inertia.
 - [ ] Compare simplified raw mesh collision against unsimplified raw mesh and
-  authored compound output.
+      authored compound output.
 - [ ] Reject simplification settings that create non-manifold output, invalid
-  winding, or unbounded feature drift.
+      winding, or unbounded feature drift.
 
 **Exit criteria:** simplification is either promoted as a separate optional tool
 or explicitly deferred. It must not be a hidden pre-step for decomposition
@@ -438,11 +437,11 @@ Run at least two strategies against the same Phase E scoreboard.
 - Build hulls for each region.
 - Optionally refit hulls if refitting reduces over-coverage without
   under-coverage.
-- Merge bottom-up by stable priority queue: least quality loss, then lower
-  piece count, then source triangle range, then lexicographic centroid.
+- Merge bottom-up by stable priority queue: least quality loss, then lower piece
+  count, then source triangle range, then lexicographic centroid.
 
-This is closest to the CGAL/V-HACD family, but with deterministic candidate
-sets and explicit Gravitas quality metrics.
+This is closest to the CGAL/V-HACD family, but with deterministic candidate sets
+and explicit Gravitas quality metrics.
 
 #### Strategy 2: Source-Triangle Growth With Hull Containment
 
@@ -457,10 +456,10 @@ sets and explicit Gravitas quality metrics.
 - Optionally merge adjacent accepted pieces when the merged hull still passes
   the same quality gates.
 
-This strategy is worth trying because it may preserve source-triangle
-provenance and reduce unnecessary piece count on simple game collision meshes.
-It must be abandoned if hull containment checks become too slow or too
-conservative on dense meshes.
+This strategy is worth trying because it may preserve source-triangle provenance
+and reduce unnecessary piece count on simple game collision meshes. It must be
+abandoned if hull containment checks become too slow or too conservative on
+dense meshes.
 
 #### Strategy 3: Exact Reflex-Edge Decomposition Reference
 
@@ -481,7 +480,7 @@ recommendation.
 
 - [ ] Export stable `CompoundCollisionAsset` data with one ordered part list.
 - [ ] Materialize runtime `CompoundColliderPart.ConvexMesh(...)` values without
-  exposing internal runtime part colliders.
+      exposing internal runtime part colliders.
 - [ ] Add report output that asset pipelines can display in editors or CI.
 - [ ] Add "why this failed" diagnostics for common authoring mistakes.
 - [ ] Add deterministic text or JSON output intended for source control review.
@@ -495,12 +494,12 @@ runtime `LSCompoundCollider`, and understand the quality/cost tradeoff.
 Before recommending generated decomposition for alpha:
 
 - [ ] Run the fixture corpus through every promoted strategy.
-- [ ] Run runtime benchmarks comparing generated output against raw triangle
-  BVH and hand-authored compound proxies.
+- [ ] Run runtime benchmarks comparing generated output against raw triangle BVH
+      and hand-authored compound proxies.
 - [ ] Run deterministic-output tests repeatedly and cross-platform.
 - [ ] Document recommended settings and failure modes.
 - [ ] Explicitly state when users should keep raw concave `LSMeshCollider`
-  instead of decomposition.
+      instead of decomposition.
 
 **Exit criteria:** docs can honestly say which asset path to use for simple
 concave meshes, dense concave meshes, dynamic closed-volume meshes, and authored
@@ -513,8 +512,8 @@ An algorithm or tool phase is promotable only when all of these are true:
 - output is byte-for-byte stable for identical quantized input and settings.
 - all generated runtime pieces satisfy `PhysicsMesh` deterministic limits.
 - generated convex mesh pieces pass closed-volume validation.
-- under-coverage is zero for required-solid settings, or explicitly reported
-  for approximate settings.
+- under-coverage is zero for required-solid settings, or explicitly reported for
+  approximate settings.
 - feature probes catch unacceptable filled holes, tunnels, and channels.
 - generated compound-vs-compound runtime collision meets the documented Phase E
   speedup threshold against raw dense concave mesh-vs-mesh on dense fixtures.
@@ -560,9 +559,6 @@ the Phase E scoreboard.
 
 - CGAL Convex Decomposition of Polyhedra:
   <https://doc.cgal.org/latest/Convex_decomposition_3/index.html>
-- CoACD project:
-  <https://colin97.github.io/CoACD/>
-- CoACD repository:
-  <https://github.com/SarahWeiii/CoACD>
-- V-HACD repository:
-  <https://github.com/kmammou/v-hacd>
+- CoACD project: <https://colin97.github.io/CoACD/>
+- CoACD repository: <https://github.com/SarahWeiii/CoACD>
+- V-HACD repository: <https://github.com/kmammou/v-hacd>

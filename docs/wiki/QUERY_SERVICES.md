@@ -2,20 +2,19 @@
 
 Queries are split into explicit context-owned 2D, 3D, and mixed services:
 `GravitasWorldContext.Query2D`, `GravitasWorldContext.Query3D`, and
-`GravitasWorldContext.QueryMixed`. The 3D service owns raycasts,
-swept-sphere queries, convex-source sweeps, cone-volume queries, and X/Z
-circle overlap/proximity queries. It uses the
-same GridForge-backed partitions as 3D collision detection, resolves collider
-IDs through the owning `GravitasPhysicsService`, and suppresses duplicate hits
-when a collider appears in multiple voxels.
+`GravitasWorldContext.QueryMixed`. The 3D service owns raycasts, swept-sphere
+queries, convex-source sweeps, cone-volume queries, and X/Z circle
+overlap/proximity queries. It uses the same GridForge-backed partitions as 3D
+collision detection, resolves collider IDs through the owning
+`GravitasPhysicsService`, and suppresses duplicate hits when a collider appears
+in multiple voxels.
 
 Pure 2D queries live on `GravitasQuery2DService` and operate over `Vector2d`
 shape data. They should not route through the 3D raycast path or the X/Z circle
 query path by accident.
 
-Mixed 2D/3D queries live on `GravitasQueryMixedService` and are always
-explicit. Pure `Query2D` and pure `Query3D` do not report cross-dimensional
-hits.
+Mixed 2D/3D queries live on `GravitasQueryMixedService` and are always explicit.
+Pure `Query2D` and pure `Query3D` do not report cross-dimensional hits.
 
 ## Query Surface Inventory And Fallback Policy
 
@@ -33,22 +32,22 @@ names an internal CCD proxy.
 
 ### Public Query Surface
 
-| Surface | Source shape | Target shapes | Reducer policy | Ordering key | Allocation behavior |
-| --- | --- | --- | --- | --- | --- |
-| `Query3D.Raycast`, `RaycastAll` | bounded 3D segment | sphere, capsule, cuboid, finite cylinder, finite cone, mesh, compound | `Exact`; mesh targets query triangle BVH candidates, compound targets keep owner identity | distance, collider ID | service-owned scratch, caller-owned all-hit buffer |
-| `Query3D.SweepSphere`, `SweepSphereAll` | 3D sphere | sphere, capsule, cuboid, finite cylinder, finite cone, mesh, compound | `Exact` swept-sphere reducers in `SweptSphereQueryWorker`; mesh uses triangle face/edge/vertex TOI, compound reduces stable part order | distance, collider ID | service-owned scratch, caller-owned all-hit buffer |
-| `Query3D.SweepCapsule`, `SweepCapsuleAll`, `SweepCuboid`, `SweepCuboidAll`, `SweepCylinder`, `SweepCylinderAll`, `SweepCone`, `SweepConeAll` | registered capsule, cuboid, finite-cylinder, or finite-cone collider at its current pose plus a displacement | sphere, capsule, cuboid, finite cylinder, finite cone, convex mesh, concave mesh target triangles, compound | `Exact` support-mapped conservative advancement; source collider is skipped; concave mesh targets reduce triangle candidates to owner collider hits | distance, collider ID | service-owned scratch, caller-owned all-hit buffer |
-| `Query3D.SweepConvexMesh`, `SweepConvexMeshAll` | convex `LSMeshCollider` at its current pose plus a displacement | sphere, capsule, cuboid, finite cylinder, finite cone, convex mesh, concave mesh target triangles, compound | `Exact` support-mapped conservative advancement; high-vertex convex sources use deterministic support-tree pruning; concave source meshes throw; concave mesh targets reduce triangle candidates to owner collider hits | distance, collider ID | service-owned scratch, caller-owned all-hit buffer |
-| `Query3D.SweepCompound`, `SweepCompoundAll` | authored `LSCompoundCollider` made from supported convex 3D parts | sphere, capsule, cuboid, finite cylinder, finite cone, convex mesh, concave mesh target triangles, compound | `Exact` per-part convex source reduction with stable authored part order; unsupported or concave mesh source parts throw | distance, collider ID | service-owned scratch, caller-owned all-hit buffer |
-| `Query3D.OverlapCone`, `OverlapConeAll` | apex-origin directional cone volume | 3D colliders; convex targets use support-mapped cone-volume intersection, compounds reduce stable part order | `Exact` for supported convex targets and stable compound reduction | axial distance, collider ID | service-owned scratch, caller-owned all-hit buffer |
-| `Query3D.OverlapCircle`, `OverlapCircleInDirection`, `OverlapCircleAll` | X/Z circle proximity query | 3D colliders through closest-surface projection | `Exact` for the current X/Z proximity contract; this is not swept movement | distance, collider ID for all-hit | service-owned scratch, caller-owned all-hit buffer |
-| `Query2D.OverlapCircle`, `OverlapCircleAll` | 2D circle | circle, capsule, AABB, convex polygon, compound | `Exact`; compound reports owner once through stable part reduction | distance, collider ID | service-owned scratch, caller-owned all-hit buffer |
-| `Query2D.OverlapAabb`, `OverlapAabbAll`, `OverlapPolygon`, `OverlapPolygonAll` | 2D AABB or convex polygon area | circle, capsule, AABB, convex polygon, compound | `Exact` SAT/closest-point area overlap; compound reports owner once through stable part reduction | distance, collider ID | service-owned scratch, caller-owned all-hit buffer |
-| `Query2D.Raycast`, `RaycastAll` | 2D segment | circle, capsule, AABB, convex polygon, compound | `Exact`; zero-length segments return no hit, starting-inside returns distance zero | distance, collider ID | service-owned scratch, caller-owned all-hit buffer |
-| `Query2D.SweepCircle`, `SweepCircleAll` | 2D circle | circle, capsule, AABB, convex polygon, compound | `Exact` circle-source sweep reducers; compound reports owner once through earliest part | distance, collider ID | service-owned scratch, caller-owned all-hit buffer |
-| `QueryMixed.SweepSphereAgainst2D`, `SweepSphereAgainst2DAll` | 3D sphere | 2D circle slab, capsule slab, AABB slab, convex polygon slab, compound slab | `Exact`; capsule/AABB/polygon slabs test cap, side, edge, and vertex features as appropriate, and compound targets reduce supported parts in authored order | distance, 3D collider ID, 2D collider ID | service-owned scratch, caller-owned all-hit buffer |
-| `QueryMixed.SweepCircleAgainst3D`, `SweepCircleAgainst3DAll` | 2D circle embedded in a finite Y slab | 3D sphere, capsule, cuboid, finite cylinder, finite cone, mesh, compound | `Exact` for supported primitive slabs, mesh triangles, compounds, and vertical finite cones; rotated finite cones report `ConservativeFallback` through a safe whole-cone projection | distance, 3D collider ID, 2D collider ID | service-owned scratch, caller-owned all-hit buffer |
-| Concave/raw mesh-source sweeps | concave `LSMeshCollider` or raw mesh as the moving query source | 2D, 3D, or mixed targets | `NotSupported`; use offline convex decomposition into supported `LSCompoundCollider` parts | none | no raw mesh-source query API |
+| Surface                                                                                                                                      | Source shape                                                                                                 | Target shapes                                                                                                | Reducer policy                                                                                                                                                                                                          | Ordering key                             | Allocation behavior                                |
+| -------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- | -------------------------------------------------- |
+| `Query3D.Raycast`, `RaycastAll`                                                                                                              | bounded 3D segment                                                                                           | sphere, capsule, cuboid, finite cylinder, finite cone, mesh, compound                                        | `Exact`; mesh targets query triangle BVH candidates, compound targets keep owner identity                                                                                                                               | distance, collider ID                    | service-owned scratch, caller-owned all-hit buffer |
+| `Query3D.SweepSphere`, `SweepSphereAll`                                                                                                      | 3D sphere                                                                                                    | sphere, capsule, cuboid, finite cylinder, finite cone, mesh, compound                                        | `Exact` swept-sphere reducers in `SweptSphereQueryWorker`; mesh uses triangle face/edge/vertex TOI, compound reduces stable part order                                                                                  | distance, collider ID                    | service-owned scratch, caller-owned all-hit buffer |
+| `Query3D.SweepCapsule`, `SweepCapsuleAll`, `SweepCuboid`, `SweepCuboidAll`, `SweepCylinder`, `SweepCylinderAll`, `SweepCone`, `SweepConeAll` | registered capsule, cuboid, finite-cylinder, or finite-cone collider at its current pose plus a displacement | sphere, capsule, cuboid, finite cylinder, finite cone, convex mesh, concave mesh target triangles, compound  | `Exact` support-mapped conservative advancement; source collider is skipped; concave mesh targets reduce triangle candidates to owner collider hits                                                                     | distance, collider ID                    | service-owned scratch, caller-owned all-hit buffer |
+| `Query3D.SweepConvexMesh`, `SweepConvexMeshAll`                                                                                              | convex `LSMeshCollider` at its current pose plus a displacement                                              | sphere, capsule, cuboid, finite cylinder, finite cone, convex mesh, concave mesh target triangles, compound  | `Exact` support-mapped conservative advancement; high-vertex convex sources use deterministic support-tree pruning; concave source meshes throw; concave mesh targets reduce triangle candidates to owner collider hits | distance, collider ID                    | service-owned scratch, caller-owned all-hit buffer |
+| `Query3D.SweepCompound`, `SweepCompoundAll`                                                                                                  | authored `LSCompoundCollider` made from supported convex 3D parts                                            | sphere, capsule, cuboid, finite cylinder, finite cone, convex mesh, concave mesh target triangles, compound  | `Exact` per-part convex source reduction with stable authored part order; unsupported or concave mesh source parts throw                                                                                                | distance, collider ID                    | service-owned scratch, caller-owned all-hit buffer |
+| `Query3D.OverlapCone`, `OverlapConeAll`                                                                                                      | apex-origin directional cone volume                                                                          | 3D colliders; convex targets use support-mapped cone-volume intersection, compounds reduce stable part order | `Exact` for supported convex targets and stable compound reduction                                                                                                                                                      | axial distance, collider ID              | service-owned scratch, caller-owned all-hit buffer |
+| `Query3D.OverlapCircle`, `OverlapCircleInDirection`, `OverlapCircleAll`                                                                      | X/Z circle proximity query                                                                                   | 3D colliders through closest-surface projection                                                              | `Exact` for the current X/Z proximity contract; this is not swept movement                                                                                                                                              | distance, collider ID for all-hit        | service-owned scratch, caller-owned all-hit buffer |
+| `Query2D.OverlapCircle`, `OverlapCircleAll`                                                                                                  | 2D circle                                                                                                    | circle, capsule, AABB, convex polygon, compound                                                              | `Exact`; compound reports owner once through stable part reduction                                                                                                                                                      | distance, collider ID                    | service-owned scratch, caller-owned all-hit buffer |
+| `Query2D.OverlapAabb`, `OverlapAabbAll`, `OverlapPolygon`, `OverlapPolygonAll`                                                               | 2D AABB or convex polygon area                                                                               | circle, capsule, AABB, convex polygon, compound                                                              | `Exact` SAT/closest-point area overlap; compound reports owner once through stable part reduction                                                                                                                       | distance, collider ID                    | service-owned scratch, caller-owned all-hit buffer |
+| `Query2D.Raycast`, `RaycastAll`                                                                                                              | 2D segment                                                                                                   | circle, capsule, AABB, convex polygon, compound                                                              | `Exact`; zero-length segments return no hit, starting-inside returns distance zero                                                                                                                                      | distance, collider ID                    | service-owned scratch, caller-owned all-hit buffer |
+| `Query2D.SweepCircle`, `SweepCircleAll`                                                                                                      | 2D circle                                                                                                    | circle, capsule, AABB, convex polygon, compound                                                              | `Exact` circle-source sweep reducers; compound reports owner once through earliest part                                                                                                                                 | distance, collider ID                    | service-owned scratch, caller-owned all-hit buffer |
+| `QueryMixed.SweepSphereAgainst2D`, `SweepSphereAgainst2DAll`                                                                                 | 3D sphere                                                                                                    | 2D circle slab, capsule slab, AABB slab, convex polygon slab, compound slab                                  | `Exact`; capsule/AABB/polygon slabs test cap, side, edge, and vertex features as appropriate, and compound targets reduce supported parts in authored order                                                             | distance, 3D collider ID, 2D collider ID | service-owned scratch, caller-owned all-hit buffer |
+| `QueryMixed.SweepCircleAgainst3D`, `SweepCircleAgainst3DAll`                                                                                 | 2D circle embedded in a finite Y slab                                                                        | 3D sphere, capsule, cuboid, finite cylinder, finite cone, mesh, compound                                     | `Exact` for supported primitive slabs, mesh triangles, compounds, and vertical finite cones; rotated finite cones report `ConservativeFallback` through a safe whole-cone projection                                    | distance, 3D collider ID, 2D collider ID | service-owned scratch, caller-owned all-hit buffer |
+| Concave/raw mesh-source sweeps                                                                                                               | concave `LSMeshCollider` or raw mesh as the moving query source                                              | 2D, 3D, or mixed targets                                                                                     | `NotSupported`; use offline convex decomposition into supported `LSCompoundCollider` parts                                                                                                                              | none                                     | no raw mesh-source query API                       |
 
 ### Batched Query APIs
 
@@ -62,9 +61,8 @@ queries through one tagged request type:
   `OverlapCircleAllBatch`, `OverlapCircleInDirectionBatch`, `OverlapConeBatch`,
   and `OverlapConeAllBatch`.
 - `Query2D`: raycast, overlap, and swept-circle closest and all-hit batches.
-- `QueryMixed`: `SweepSphereAgainst2DBatch`,
-  `SweepSphereAgainst2DAllBatch`, `SweepCircleAgainst3DBatch`, and
-  `SweepCircleAgainst3DAllBatch`.
+- `QueryMixed`: `SweepSphereAgainst2DBatch`, `SweepSphereAgainst2DAllBatch`,
+  `SweepCircleAgainst3DBatch`, and `SweepCircleAgainst3DAllBatch`.
 
 Closest-hit batches take a typed request span and one output hit span. The
 output span must contain at least one slot per request. A miss writes the
@@ -93,8 +91,8 @@ that the matching single-query API rejects, throws before caller output buffers
 are mutated.
 
 Batch calls are same-thread and non-reentrant, just like the single-query
-services. They reuse service-owned scratch and caller-owned buffers; they do
-not allocate per-request arrays. Polygon batches keep vertex ownership explicit:
+services. They reuse service-owned scratch and caller-owned buffers; they do not
+allocate per-request arrays. Polygon batches keep vertex ownership explicit:
 `PhysicsOverlapPolygon2DRequest` stores a `VertexStart`/`VertexCount` range into
 the vertex span supplied to the batch call, and the caller must keep that span
 stable for the duration of the call.
@@ -106,18 +104,18 @@ are frame-local tuning aids and benchmark signals, not replay state.
 
 ### Internal CCD Query Surface
 
-| Owner | Query path | Source proxy | Target set | Reducer policy |
-| --- | --- | --- | --- | --- |
-| `SolidBody` static/kinematic 3D CCD | `Query3D.SweepSphereAgainstStaticAll` | source collider proxy sphere, then shape-exact validation where supported | bodyless, position-frozen, kinematic 3D colliders | public swept-sphere hit is exact for target geometry; supported 3D source shapes then use target-sphere reverse sweeps or support-mapped convex-source reducers before accepting proxy hits |
-| `SolidBody` dynamic 3D CCD | dynamic candidate index plus relative sweep | source and target dynamic proxy spheres, then exact relative source-shape validation where supported | movable dynamic 3D bodies | exact for source spheres, target spheres, supported convex primitive/convex mesh/compound source families; unsupported source families keep conservative proxy behavior |
-| `SolidBody` mixed static 2D CCD | `QueryMixed.SweepSphereAgainstStatic2DAll` | 3D sphere source | bodyless, position-frozen, kinematic 2D slabs | same `ReducerKind` policy as public `SweepSphereAgainst2D` |
-| `SolidBody` mixed dynamic 2D CCD | mixed dynamic candidate index plus relative sweep | 3D proxy sphere against 2D mixed proxy sphere | movable dynamic 2D bodies | `ConservativeFallback` |
-| `SolidBody` kinematic active-source CCD | same static-style and dynamic candidate paths above | frame-start to host-target 3D proxy sphere, then exact pure-3D validation where supported | first static-style target clips the source; dynamic 3D/2D targets up to that blocker receive bounded velocity handoff through the owning service | same reducer policy as the underlying pure or mixed path |
-| `SolidBody2D` static/kinematic 2D CCD | `Query2D.SweepCircleAgainstStaticAll` plus mover-shape refinement | source circle sweep, refined by mover shape when needed | bodyless, position-frozen, kinematic 2D colliders | exact for current pure 2D sweep contract |
-| `SolidBody2D` dynamic 2D CCD | dynamic candidate index plus relative sweep | dynamic proxy circles, then exact relative mover-shape validation | movable dynamic 2D bodies | exact for circle, capsule, AABB, convex polygon, and compound mover/target families |
-| `SolidBody2D` mixed static 3D CCD | `QueryMixed.SweepCircleAgainstStatic3DAll` | embedded 2D circle slab | bodyless, position-frozen, kinematic 3D colliders | same `ReducerKind` policy as public `SweepCircleAgainst3D` |
-| `SolidBody2D` mixed dynamic 3D CCD | mixed dynamic candidate index plus relative sweep | embedded 2D proxy sphere against 3D proxy sphere | movable dynamic 3D bodies | `ConservativeFallback` |
-| `SolidBody2D` kinematic active-source CCD | same static-style and dynamic candidate paths above | frame-start to host-target 2D proxy circle or mixed slab proxy, then exact pure-2D validation where supported | first static-style target clips the source; dynamic 2D/3D targets up to that blocker receive bounded velocity handoff through the owning service | same reducer policy as the underlying pure or mixed path |
+| Owner                                     | Query path                                                        | Source proxy                                                                                                  | Target set                                                                                                                                       | Reducer policy                                                                                                                                                                              |
+| ----------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SolidBody` static/kinematic 3D CCD       | `Query3D.SweepSphereAgainstStaticAll`                             | source collider proxy sphere, then shape-exact validation where supported                                     | bodyless, position-frozen, kinematic 3D colliders                                                                                                | public swept-sphere hit is exact for target geometry; supported 3D source shapes then use target-sphere reverse sweeps or support-mapped convex-source reducers before accepting proxy hits |
+| `SolidBody` dynamic 3D CCD                | dynamic candidate index plus relative sweep                       | source and target dynamic proxy spheres, then exact relative source-shape validation where supported          | movable dynamic 3D bodies                                                                                                                        | exact for source spheres, target spheres, supported convex primitive/convex mesh/compound source families; unsupported source families keep conservative proxy behavior                     |
+| `SolidBody` mixed static 2D CCD           | `QueryMixed.SweepSphereAgainstStatic2DAll`                        | 3D sphere source                                                                                              | bodyless, position-frozen, kinematic 2D slabs                                                                                                    | same `ReducerKind` policy as public `SweepSphereAgainst2D`                                                                                                                                  |
+| `SolidBody` mixed dynamic 2D CCD          | mixed dynamic candidate index plus relative sweep                 | 3D proxy sphere against 2D mixed proxy sphere                                                                 | movable dynamic 2D bodies                                                                                                                        | `ConservativeFallback`                                                                                                                                                                      |
+| `SolidBody` kinematic active-source CCD   | same static-style and dynamic candidate paths above               | frame-start to host-target 3D proxy sphere, then exact pure-3D validation where supported                     | first static-style target clips the source; dynamic 3D/2D targets up to that blocker receive bounded velocity handoff through the owning service | same reducer policy as the underlying pure or mixed path                                                                                                                                    |
+| `SolidBody2D` static/kinematic 2D CCD     | `Query2D.SweepCircleAgainstStaticAll` plus mover-shape refinement | source circle sweep, refined by mover shape when needed                                                       | bodyless, position-frozen, kinematic 2D colliders                                                                                                | exact for current pure 2D sweep contract                                                                                                                                                    |
+| `SolidBody2D` dynamic 2D CCD              | dynamic candidate index plus relative sweep                       | dynamic proxy circles, then exact relative mover-shape validation                                             | movable dynamic 2D bodies                                                                                                                        | exact for circle, capsule, AABB, convex polygon, and compound mover/target families                                                                                                         |
+| `SolidBody2D` mixed static 3D CCD         | `QueryMixed.SweepCircleAgainstStatic3DAll`                        | embedded 2D circle slab                                                                                       | bodyless, position-frozen, kinematic 3D colliders                                                                                                | same `ReducerKind` policy as public `SweepCircleAgainst3D`                                                                                                                                  |
+| `SolidBody2D` mixed dynamic 3D CCD        | mixed dynamic candidate index plus relative sweep                 | embedded 2D proxy sphere against 3D proxy sphere                                                              | movable dynamic 3D bodies                                                                                                                        | `ConservativeFallback`                                                                                                                                                                      |
+| `SolidBody2D` kinematic active-source CCD | same static-style and dynamic candidate paths above               | frame-start to host-target 2D proxy circle or mixed slab proxy, then exact pure-2D validation where supported | first static-style target clips the source; dynamic 2D/3D targets up to that blocker receive bounded velocity handoff through the owning service | same reducer policy as the underlying pure or mixed path                                                                                                                                    |
 
 ### Mesh-Source Query Boundary
 
@@ -125,19 +123,18 @@ In this document, mesh-as-source means a public query where mesh geometry is the
 moving sweep source. Convex mesh sources are supported through
 `Query3D.SweepConvexMesh` and `SweepConvexMeshAll`. Capsule, cuboid,
 finite-cylinder, and finite-cone collider sources have explicit source-sweep
-APIs, and authored
-compounds made from supported convex parts are supported through
-`Query3D.SweepCompound` and `SweepCompoundAll`.
+APIs, and authored compounds made from supported convex parts are supported
+through `Query3D.SweepCompound` and `SweepCompoundAll`.
 
 Concave mesh sources are intentionally rejected. The unsupported case is exact
-concave mesh-as-source sweeping or automatic runtime decomposition, because
-that can hide `source triangles x target candidates` work, runtime convex
+concave mesh-as-source sweeping or automatic runtime decomposition, because that
+can hide `source triangles x target candidates` work, runtime convex
 decomposition, or ambiguous concave-source ordering behind what looks like a
 simple query call. Hosts should author concave movers as offline-decomposed
 `LSCompoundCollider` assets with stable convex part order.
 
-`SweptSphereQueryWorker.TrySweep(LSCollider collider, ...)` is not a
-mesh-source query. That worker is prepared with a swept sphere source through
+`SweptSphereQueryWorker.TrySweep(LSCollider collider, ...)` is not a mesh-source
+query. That worker is prepared with a swept sphere source through
 `Prepare(start, end, radius)`, then tests one target collider against that
 prepared swept sphere. Passing an `LSMeshCollider` there means "sweep this
 sphere against a mesh target", not "sweep this mesh as the source".
@@ -178,9 +175,11 @@ sphere calls use the same event kind with `ScalarA` set to the sweep radius and
 The candidate path is:
 
 1. prepare the worker for the 3D query segment.
-2. ask GridForge `GridTracer.TraceLine(...)` or `GetCoveredVoxels(...)` for topology-aware voxel candidates.
+2. ask GridForge `GridTracer.TraceLine(...)` or `GetCoveredVoxels(...)` for
+   topology-aware voxel candidates.
 3. suppress duplicate voxels and inspect each voxel's `PhysicsPartition`.
-4. resolve dynamic, kinematic, and static collider IDs through the context physics service.
+4. resolve dynamic, kinematic, and static collider IDs through the context
+   physics service.
 5. filter by layer mask.
 6. skip colliders already checked in this query.
 7. call the collider's `ColliderOverlapsRay(...)`.
@@ -190,15 +189,15 @@ The candidate path is:
 Colliders also store `RaycastVersion`; this is a second duplicate guard scoped
 to the service's raycast/sweep version.
 
-3D raycasts use deterministic segment intersection points. Horizontal,
-vertical, diagonal, and starting-inside segments have defined behavior and are
-covered by focused tests. Mesh ray overlap is triangle-level and queries the
-mesh triangle BVH before testing candidate triangles. `FixedRay` was reviewed
-during this pass, but the service keeps a custom segment worker because the
-query path needs all segment intersection points, caller-owned buffers, and
-bounded segment distance rather than the first forward hit on an infinite ray.
-Duplicate suppression is covered for colliders whose broad-phase bounds span
-many voxels; the all-hit path should still report one hit per collider.
+3D raycasts use deterministic segment intersection points. Horizontal, vertical,
+diagonal, and starting-inside segments have defined behavior and are covered by
+focused tests. Mesh ray overlap is triangle-level and queries the mesh triangle
+BVH before testing candidate triangles. `FixedRay` was reviewed during this
+pass, but the service keeps a custom segment worker because the query path needs
+all segment intersection points, caller-owned buffers, and bounded segment
+distance rather than the first forward hit on an infinite ray. Duplicate
+suppression is covered for colliders whose broad-phase bounds span many voxels;
+the all-hit path should still report one hit per collider.
 
 ## Swept Sphere Queries
 
@@ -223,9 +222,9 @@ The contract is segment-based and deterministic:
 
 Current swept-sphere support covers sphere, capsule, cuboid, finite cylinder,
 finite cone, mesh, and compound targets. Mesh targets query local-BVH triangle
-candidates, then test triangle faces, edges, and vertices for deterministic
-time of impact. Compound targets reduce over owned parts in stable declaration
-order while the public hit remains the owning compound collider.
+candidates, then test triangle faces, edges, and vertices for deterministic time
+of impact. Compound targets reduce over owned parts in stable declaration order
+while the public hit remains the owning compound collider.
 
 For registered collider sources whose current pose matters, `Query3D` also
 exposes:
@@ -254,13 +253,13 @@ stable lower-source-vertex tie breaks.
 
 `SolidBody` continuous collision detection reuses this service as an opt-in
 movement sweep. Public `SweepSphere` and `SweepSphereAll` remain all-target
-queries: they can return movable dynamic, kinematic, position-frozen, and bodyless
-colliders according to the normal layer, trigger, and exclusion filters. Body
-CCD uses an internal static-style swept-sphere collector for its
+queries: they can return movable dynamic, kinematic, position-frozen, and
+bodyless colliders according to the normal layer, trigger, and exclusion
+filters. Body CCD uses an internal static-style swept-sphere collector for its
 static/kinematic leg, so only kinematic/static partition IDs are copied and
 movable dynamics are handled by the separate relative-motion CCD path. The
-internal collector keeps the same deterministic distance/collider-ID ordering
-as host-facing swept-sphere queries for the targets it includes.
+internal collector keeps the same deterministic distance/collider-ID ordering as
+host-facing swept-sphere queries for the targets it includes.
 
 ## Cone Volume Queries
 
@@ -324,8 +323,8 @@ swept circle or swept sphere query.
 
 Duplicate suppression is also covered for large colliders that appear in many
 voxel partitions. Circle queries remain X/Z overlap/proximity queries for the
-current 3D grounding model; they are not the pure 2D query API. Use
-swept-sphere queries for deterministic 3D swept movement.
+current 3D grounding model; they are not the pure 2D query API. Use swept-sphere
+queries for deterministic 3D swept movement.
 
 ## Pure 2D Queries
 
@@ -368,8 +367,8 @@ The overlap-circle candidate path is:
    pure 2D Y=0 partition plane.
 2. scan covered GridForge spatial cells and voxels.
 3. inspect `PhysicsPartition2D` payloads and copy static/dynamic collider IDs.
-4. suppress duplicate collider hits with each collider's 2D query-version
-   stamp when a broad collider spans several voxels.
+4. suppress duplicate collider hits with each collider's 2D query-version stamp
+   when a broad collider spans several voxels.
 5. reject inactive colliders, layer-mask misses, and separated 2D bounds.
 6. ask each 2D shape for its closest point to the query center.
 7. include the collider when that closest point lies within the query radius or
@@ -378,38 +377,36 @@ The overlap-circle candidate path is:
 
 `OverlapAabb` and `OverlapPolygon` use the same GridForge-backed candidate
 gatherer with the query area's 2D bounds, then run exact fixed-point SAT and
-closest-point checks against circle, capsule, AABB, convex polygon, and
-compound targets. Polygon query vertices must be convex and non-collinear;
-edge-touching counts as overlap. The service validates and computes area bounds
-once before candidate testing so repeated candidate checks do not allocate or
-rebuild query shapes.
+closest-point checks against circle, capsule, AABB, convex polygon, and compound
+targets. Polygon query vertices must be convex and non-collinear; edge-touching
+counts as overlap. The service validates and computes area bounds once before
+candidate testing so repeated candidate checks do not allocate or rebuild query
+shapes.
 
 The segment raycast path projects the segment's 2D bounds into the same
 GridForge-backed candidate gatherer, then runs deterministic shape math against
-circle, capsule, AABB, and convex polygon colliders. Zero-length segments
-return no hits. Starting inside a collider returns a zero-distance hit. A
-collider that spans multiple voxels is still reported once because candidate
-gathering stamps duplicate collider visits before exact shape testing.
+circle, capsule, AABB, and convex polygon colliders. Zero-length segments return
+no hits. Starting inside a collider returns a zero-distance hit. A collider that
+spans multiple voxels is still reported once because candidate gathering stamps
+duplicate collider visits before exact shape testing.
 
 `SweepCircle` uses the same candidate gatherer with the swept circle's expanded
 bounds. It performs deterministic circle-vs-circle, circle-vs-capsule, and
-circle-vs-convex-shape sweeps, supports layer masks, optional trigger
-inclusion, and an excluded collider for body CCD self/hierarchy filtering. It
-is the pure 2D equivalent of the 3D swept-sphere query path; it is not a mixed
-2D/3D bridge.
+circle-vs-convex-shape sweeps, supports layer masks, optional trigger inclusion,
+and an excluded collider for body CCD self/hierarchy filtering. It is the pure
+2D equivalent of the 3D swept-sphere query path; it is not a mixed 2D/3D bridge.
 
-Public pure 2D sweep queries report movable dynamic, kinematic, position-frozen, and
-bodyless colliders. `SolidBody2D` CCD uses an internal static-style swept-circle
-collector for the static/kinematic leg, mirroring 3D: bodyless, position-frozen, and
-kinematic targets are included through kinematic/static partition membership,
-while movable dynamic targets are left to the relative dynamic CCD candidate
-index.
+Public pure 2D sweep queries report movable dynamic, kinematic, position-frozen,
+and bodyless colliders. `SolidBody2D` CCD uses an internal static-style
+swept-circle collector for the static/kinematic leg, mirroring 3D: bodyless,
+position-frozen, and kinematic targets are included through kinematic/static
+partition membership, while movable dynamic targets are left to the relative
+dynamic CCD candidate index.
 
-`SolidBody2D` automatic ground probes use the pure 2D query service as well.
-Ray probes call `RaycastAll`; swept-circle probes use a static-style collector.
-Both apply `PhysicsSettings.GroundCheckLayerMask`, self exclusion,
-trigger rejection, and ordinary movable-dynamic rejection before accepting a
-support hit.
+`SolidBody2D` automatic ground probes use the pure 2D query service as well. Ray
+probes call `RaycastAll`; swept-circle probes use a static-style collector. Both
+apply `PhysicsSettings.GroundCheckLayerMask`, self exclusion, trigger rejection,
+and ordinary movable-dynamic rejection before accepting a support hit.
 
 Current hit data is `Physics2DHit`: collider, optional body, point, normal, and
 distance.
@@ -431,18 +428,18 @@ Mixed query candidate gathering uses `PhysicsMixedPartition` payloads attached
 to GridForge voxels. The gatherer refreshes the relevant mixed partition side,
 scans deterministic voxel identities, suppresses duplicate collider IDs, filters
 by layer and bounds, and orders hits by distance with 3D ID and 2D ID
-tie-breakers. Single-hit mixed queries keep the best candidate directly with
-the same ordering rule; all-hit overloads sort the caller-owned result buffer.
+tie-breakers. Single-hit mixed queries keep the best candidate directly with the
+same ordering rule; all-hit overloads sort the caller-owned result buffer.
 
 `SweepSphereAgainst2D` sweeps a 3D sphere center against embedded 2D mixed
 slabs. 2D circles are treated as finite vertical cylinders. 2D capsules are
-treated as finite capsule slabs with cap, side, and boundary-edge reducers.
-AABB and convex polygon slabs use exact finite-prism reducers that test cap
-faces, side faces, and finite prism edges instead of accepting prism-bound
-proxy hits. Compound 2D targets reduce supported parts in authored order and
-report the owning `LSCompoundCollider2D`; equal-distance part hits keep the
-earlier authored part. Accepted circle, capsule, AABB, polygon, and supported
-compound slab hits report `PhysicsQueryReducerKind.Exact`.
+treated as finite capsule slabs with cap, side, and boundary-edge reducers. AABB
+and convex polygon slabs use exact finite-prism reducers that test cap faces,
+side faces, and finite prism edges instead of accepting prism-bound proxy hits.
+Compound 2D targets reduce supported parts in authored order and report the
+owning `LSCompoundCollider2D`; equal-distance part hits keep the earlier
+authored part. Accepted circle, capsule, AABB, polygon, and supported compound
+slab hits report `PhysicsQueryReducerKind.Exact`.
 
 `SweepCircleAgainst3D` sweeps a pure 2D circle embedded at the supplied slab Y
 center and half-thickness against 3D targets. Sphere targets use an exact
@@ -451,25 +448,25 @@ planar reach, so tall slabs and slab-corner cases do not inflate the horizontal
 sweep radius. Cuboid targets project the cuboid portion intersecting the slab's
 Y interval into X/Z and sweep the source circle against that convex projection,
 so rotated cuboids do not rely on the generic sphere proxy. World-Y capsule,
-finite-cylinder, and finite-cone targets use exact vertical-interval fast
-paths: capsule cap reach is reduced by slab interval distance, finite cylinders
-require interval overlap before the planar circle sweep is accepted, and
-vertical cones use the slab-clipped cone cross-section. Rotated capsule and
-finite-cylinder targets use deterministic exact finite-slab projection
-reducers, so the moving 2D circle is tested against the target volume actually
-intersecting the slab rather than a circumsphere proxy. Rotated finite-cone
-targets use a conservative whole-cone projection and report
-`PhysicsQueryReducerKind.ConservativeFallback`, preserving no-false-negative
-mixed CCD/query behavior without presenting the hit as exact.
+finite-cylinder, and finite-cone targets use exact vertical-interval fast paths:
+capsule cap reach is reduced by slab interval distance, finite cylinders require
+interval overlap before the planar circle sweep is accepted, and vertical cones
+use the slab-clipped cone cross-section. Rotated capsule and finite-cylinder
+targets use deterministic exact finite-slab projection reducers, so the moving
+2D circle is tested against the target volume actually intersecting the slab
+rather than a circumsphere proxy. Rotated finite-cone targets use a conservative
+whole-cone projection and report `PhysicsQueryReducerKind.ConservativeFallback`,
+preserving no-false-negative mixed CCD/query behavior without presenting the hit
+as exact.
 
 Mesh targets query triangle BVH candidates, clip each world-space triangle to
 the slab Y interval, project the clipped polygon into X/Z, and sweep against
 that projected point, segment, or convex polygon. Accepted mesh hits report the
 owning `LSMeshCollider` with `PhysicsQueryReducerKind.Exact`; equal-distance
 triangle hits keep the lower authored triangle index without sorting the
-candidate buffer. Compound targets reduce exact supported parts in authored
-part order and report one owner hit on the `LSCompoundCollider`; equal-distance
-part hits keep the earlier authored part.
+candidate buffer. Compound targets reduce exact supported parts in authored part
+order and report one owner hit on the `LSCompoundCollider`; equal-distance part
+hits keep the earlier authored part.
 
 When diagnostics are enabled, mixed queries emit both `MixedQuery` and
 `QuerySummary` events. `MixedQuery` reports the closest mixed hit and accepted
@@ -557,8 +554,8 @@ toward the embedded 2D volume. CCD source helpers expose the normal orientation
 needed by the moving source so velocity clamping does not have to reinterpret
 the invariant at every call site. `ReducerKind` is
 `PhysicsQueryReducerKind.Exact` when the hit was accepted by shape-specific
-mixed query math and `PhysicsQueryReducerKind.ConservativeFallback` when the
-hit came from a safe conservative proxy or bounds reducer.
+mixed query math and `PhysicsQueryReducerKind.ConservativeFallback` when the hit
+came from a safe conservative proxy or bounds reducer.
 
 ## Query Hardening Targets
 

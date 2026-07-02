@@ -5,9 +5,9 @@
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
-using FixedMathSharp.Chronicler;
 using Chronicler;
 using FixedMathSharp;
+using FixedMathSharp.Chronicler;
 
 namespace Gravitas.Constraints;
 

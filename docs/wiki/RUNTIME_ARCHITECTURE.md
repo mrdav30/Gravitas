@@ -20,21 +20,21 @@ pairs, queries, and coroutines remain context-local.
 
 ## Services
 
-| Service | Owned state |
-| --- | --- |
-| `GravitasPhysicsService` | Dynamic body bucket, collider ID table, reusable collider IDs, collision-pair pool, active collision-pair queue, 3D CCD frame cache, processed-body handoff queue, handoff diagnostics, deterministic 3D discrete island response, sleep-state updates, simulation switch. |
-| `GravitasConstraint3DService` | Context-local 3D joint IDs, `Joint3D` runtime state, ragdoll runtimes, linked-collider suppression counts, motor target handoff, joint replay hashing, and articulation diagnostics. |
-| `GravitasPhysics2DService` | Pure 2D dynamic body bucket, monotonic collider ID table, 2D pair pool, 2D CCD frame cache, processed-body handoff queue, handoff diagnostics, post-integration collider refresh, deterministic 2D discrete island response, connected resting-pair expansion, contact-derived planar grounding refresh, pair-reference cleanup, visualization publishing, simulation switch. |
-| `GravitasMixedCollisionService` | Mixed 2D/3D lifecycle owner, GridForge-backed mixed broad phase, stable mixed candidate-key buffer, mixed hierarchy filtering, duplicate suppression, late-phase mixed partition refresh, mixed pair/response ownership, retained `PhysicsMixedPartition` cleanup, and lifecycle counters. |
-| `GravitasCollisionService` | Active partition bucket, inactive partition pool, duplicate voxel checker, partition awake-state refresh, collision distribution version, cull distributor. |
-| `GravitasCollision2DService` | GridForge-backed pure 2D partition bucket, inactive partition pool, duplicate voxel checker, awake dynamic membership refresh, 2D collision distribution version, retained partition cleanup. |
-| `GravitasQuery2DService` | Pure 2D query candidate buffer, overlap-circle queries, segment raycasts, swept-circle queries, collider-stamped duplicate suppression, hit ordering. |
-| `GravitasQuery3DService` | 3D segment worker, swept-sphere worker, convex-source sweep worker, cone-volume queries, X/Z circle overlap/proximity queries, intersection buffer, duplicate voxel checker, duplicate collider checker, raycast and circle query versions. |
-| `GravitasQueryMixedService` | Explicit mixed swept-sphere and swept-circle query buffers, GridForge-backed mixed candidate gathering, duplicate suppression, and `PhysicsMixedHit` ordering. |
-| `GravitasCoroutineService` | Active lockstep coroutine bucket and context-bound wait instruction factories. |
-| `GravitasDiagnosticSink` | Disabled-by-default diagnostic event buffer and engine-agnostic debug draw command buffer. |
-| `GravitasLifecycleHooks` | Ordered callbacks for simulate, late simulate, visualize, late visualize, reset, and frame-rate change. |
-| `GravitasReplayHashService` | Internal fixed-order replay contributor used by `GravitasWorldContext.ComputeReplayHash(...)`. It writes into Chronicler's `ChronicleHashWriter` and reads authoritative context, body, collider, pair, contact, and active handoff state without mutating simulation state. |
+| Service                         | Owned state                                                                                                                                                                                                                                                                                                                                                                   |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GravitasPhysicsService`        | Dynamic body bucket, collider ID table, reusable collider IDs, collision-pair pool, active collision-pair queue, 3D CCD frame cache, processed-body handoff queue, handoff diagnostics, deterministic 3D discrete island response, sleep-state updates, simulation switch.                                                                                                    |
+| `GravitasConstraint3DService`   | Context-local 3D joint IDs, `Joint3D` runtime state, ragdoll runtimes, linked-collider suppression counts, motor target handoff, joint replay hashing, and articulation diagnostics.                                                                                                                                                                                          |
+| `GravitasPhysics2DService`      | Pure 2D dynamic body bucket, monotonic collider ID table, 2D pair pool, 2D CCD frame cache, processed-body handoff queue, handoff diagnostics, post-integration collider refresh, deterministic 2D discrete island response, connected resting-pair expansion, contact-derived planar grounding refresh, pair-reference cleanup, visualization publishing, simulation switch. |
+| `GravitasMixedCollisionService` | Mixed 2D/3D lifecycle owner, GridForge-backed mixed broad phase, stable mixed candidate-key buffer, mixed hierarchy filtering, duplicate suppression, late-phase mixed partition refresh, mixed pair/response ownership, retained `PhysicsMixedPartition` cleanup, and lifecycle counters.                                                                                    |
+| `GravitasCollisionService`      | Active partition bucket, inactive partition pool, duplicate voxel checker, partition awake-state refresh, collision distribution version, cull distributor.                                                                                                                                                                                                                   |
+| `GravitasCollision2DService`    | GridForge-backed pure 2D partition bucket, inactive partition pool, duplicate voxel checker, awake dynamic membership refresh, 2D collision distribution version, retained partition cleanup.                                                                                                                                                                                 |
+| `GravitasQuery2DService`        | Pure 2D query candidate buffer, overlap-circle queries, segment raycasts, swept-circle queries, collider-stamped duplicate suppression, hit ordering.                                                                                                                                                                                                                         |
+| `GravitasQuery3DService`        | 3D segment worker, swept-sphere worker, convex-source sweep worker, cone-volume queries, X/Z circle overlap/proximity queries, intersection buffer, duplicate voxel checker, duplicate collider checker, raycast and circle query versions.                                                                                                                                   |
+| `GravitasQueryMixedService`     | Explicit mixed swept-sphere and swept-circle query buffers, GridForge-backed mixed candidate gathering, duplicate suppression, and `PhysicsMixedHit` ordering.                                                                                                                                                                                                                |
+| `GravitasCoroutineService`      | Active lockstep coroutine bucket and context-bound wait instruction factories.                                                                                                                                                                                                                                                                                                |
+| `GravitasDiagnosticSink`        | Disabled-by-default diagnostic event buffer and engine-agnostic debug draw command buffer.                                                                                                                                                                                                                                                                                    |
+| `GravitasLifecycleHooks`        | Ordered callbacks for simulate, late simulate, visualize, late visualize, reset, and frame-rate change.                                                                                                                                                                                                                                                                       |
+| `GravitasReplayHashService`     | Internal fixed-order replay contributor used by `GravitasWorldContext.ComputeReplayHash(...)`. It writes into Chronicler's `ChronicleHashWriter` and reads authoritative context, body, collider, pair, contact, and active handoff state without mutating simulation state.                                                                                                  |
 
 The split is intentional: host code should mostly see the context and a few
 domain objects, while mutable implementation details stay inside services.
@@ -105,19 +105,19 @@ LateVisualize
   Hooks.InvokeLateVisualize
 ```
 
-This order is a runtime contract, not just an implementation detail. Ordered host
-commands should be applied before `Simulate()`. Transform teleports made before
-`Simulate()` are reflected in the same fixed step because dynamic-body
-colliders are refreshed before collisions are distributed in
-`LateSimulate()`. Force and acceleration commands made before `Simulate()` are
-stored on the body, integrated during `LateSimulate()`, and then included in the
-same post-integration discrete collision pass. Collision response can mutate
+This order is a runtime contract, not just an implementation detail. Ordered
+host commands should be applied before `Simulate()`. Transform teleports made
+before `Simulate()` are reflected in the same fixed step because dynamic-body
+colliders are refreshed before collisions are distributed in `LateSimulate()`.
+Force and acceleration commands made before `Simulate()` are stored on the body,
+integrated during `LateSimulate()`, and then included in the same
+post-integration discrete collision pass. Collision response can mutate
 authoritative body state during fixed-step phases: pure 2D and 3D discrete
 response both run after their body integration in `LateSimulate()`, and mixed
 contacts run after both pure services have refreshed their colliders. Body force
 integration, grounding/support refresh, post-integration collider refresh,
-discrete contact/joint island response, and sleep-state updates all happen during
-`LateSimulate()`.
+discrete contact/joint island response, and sleep-state updates all happen
+during `LateSimulate()`.
 
 Lifecycle hooks run after the built-in work for their phase. `Visualize()` is
 the only built-in presentation phase currently used by bodies and services.
@@ -132,20 +132,20 @@ body, collider, clock, and contact state across repeated runs. The current
 contract is pinned by `GravitasSimulationPhaseOrderTests`.
 `GravitasWorldContext.ComputeReplayHash()` exposes the same expectation as a
 fixed-width `ChronicleHash` that hosts and tests can compare frame by frame.
-`Authoritative` mode follows the Chronicler continuation boundary and
-excludes host identity, query scratch buffers, diagnostics, visual
-interpolation, and rebuildable per-frame CCD caches. Use
-`AuthoritativeWithSolverCaches` for drift RCA when solver caches and diagnostic
-cache counts need to be part of the signal. Hash strings are deterministic
-non-cryptographic conformance values, not cross-version compatibility promises.
+`Authoritative` mode follows the Chronicler continuation boundary and excludes
+host identity, query scratch buffers, diagnostics, visual interpolation, and
+rebuildable per-frame CCD caches. Use `AuthoritativeWithSolverCaches` for drift
+RCA when solver caches and diagnostic cache counts need to be part of the
+signal. Hash strings are deterministic non-cryptographic conformance values, not
+cross-version compatibility promises.
 
 `PhysicsSettings.RuntimeMode` is a validated bitmask with exact public settings
 values: `ThreeD`, `TwoD`, `Both`, and `Mixed`. `Both` runs pure 2D and pure 3D
 side by side without cross-dimensional contacts. `Mixed` runs both pure paths
 plus the dedicated mixed lifecycle and broad-phase path. Mixed narrow phase
-supports 3D spheres, cuboids, capsules, finite cylinders, finite cones,
-compound colliders, and mesh colliders against embedded 2D circle, capsule,
-AABB, and convex polygon slabs. Mixed pair ownership and constrained impulse exchange are
+supports 3D spheres, cuboids, capsules, finite cylinders, finite cones, compound
+colliders, and mesh colliders against embedded 2D circle, capsule, AABB, and
+convex polygon slabs. Mixed pair ownership and constrained impulse exchange are
 implemented through `CollisionPairMixed` and `CollisionResponseMixed`, including
 planar scalar angular response for embedded 2D bodies while vertical Y impulse
 remains constrained out of the 2D body model. Explicit mixed query APIs, mixed
@@ -158,10 +158,10 @@ frame-rate-change hooks.
 
 Diagnostics are context-local and disabled by default. Runtime hooks can emit
 force, query, ground-probe, contact, response, joint, ragdoll, and
-velocity-delta events through `context.Diagnostics` when enabled. Hosts can
-also capture colliders or simple line/ray/point/joint draw commands into the
-same context-owned sink for visualization without adding renderer dependencies
-to core physics.
+velocity-delta events through `context.Diagnostics` when enabled. Hosts can also
+capture colliders or simple line/ray/point/joint draw commands into the same
+context-owned sink for visualization without adding renderer dependencies to
+core physics.
 
 ## Clock State
 
@@ -236,27 +236,27 @@ lightweight; service-owned 3D broad-phase refresh and discrete response happen
 after body integration in `LateSimulate()`.
 
 Body initialization does not assume grounded state. After the body collider is
-registered and partitioned, initialization performs an explicit ground probe.
-If no configured ground layer is hit, the body starts airborne. Ground probes
-use `PhysicsSettings.GroundCheckLayerMask`, write hits into a body-owned buffer,
-and ignore the body's own collider before accepting the closest hit. `Ray`
-ground probes use `RaycastAll`; `SweptSphere` probes use `SweepSphereAll`;
-`Auto` derives the mode from collider shape and probe radius. Stationary
-grounded bodies can skip repeated simulation probes for a short frame window,
-but movement of the last hit platform invalidates that guard. Ground probes
-accept bodyless colliders, position-frozen bodies, and kinematic bodies as ground;
+registered and partitioned, initialization performs an explicit ground probe. If
+no configured ground layer is hit, the body starts airborne. Ground probes use
+`PhysicsSettings.GroundCheckLayerMask`, write hits into a body-owned buffer, and
+ignore the body's own collider before accepting the closest hit. `Ray` ground
+probes use `RaycastAll`; `SweptSphere` probes use `SweepSphereAll`; `Auto`
+derives the mode from collider shape and probe radius. Stationary grounded
+bodies can skip repeated simulation probes for a short frame window, but
+movement of the last hit platform invalidates that guard. Ground probes accept
+bodyless colliders, position-frozen bodies, and kinematic bodies as ground;
 ordinary movable dynamic bodies are ignored.
 
 Hosts can switch `SolidBody.GroundingMode` to manual through
 `UseManualGrounding(...)`, `SetManualGrounding(...)`, or
-`ClearManualGrounding()`. Manual grounding preserves the supplied grounded
-state through simulation and skips automatic probes until
-`UseAutomaticGrounding(...)` returns ownership to Gravitas. This is intended for
-deterministic heightmaps or host-owned terrain systems where probing collider
-geometry every frame is unnecessary.
+`ClearManualGrounding()`. Manual grounding preserves the supplied grounded state
+through simulation and skips automatic probes until `UseAutomaticGrounding(...)`
+returns ownership to Gravitas. This is intended for deterministic heightmaps or
+host-owned terrain systems where probing collider geometry every frame is
+unnecessary.
 
-`SolidBody` is the 3D body model. Pure 2D behavior uses `SolidBody2D` instead
-of a dimension flag on `SolidBody`. This prevents temporary 3D colliders from
+`SolidBody` is the 3D body model. Pure 2D behavior uses `SolidBody2D` instead of
+a dimension flag on `SolidBody`. This prevents temporary 3D colliders from
 becoming the hidden implementation path for pure 2D bodies. The existing
 position-as-ground-plus-height fields still belong to the current 3D y-up body
 model.
@@ -285,57 +285,56 @@ target.
 
 `SolidBody2D` owns the pure 2D body model. It is constructed from an
 `IMatterAgent`, uses the agent context and transform bridge, and stores
-`Vector2d` position, `Vector2d` linear velocity, scalar rotation, scalar
-angular velocity/acceleration, 2D gravity, 2D force and torque integration,
+`Vector2d` position, `Vector2d` linear velocity, scalar rotation, scalar angular
+velocity/acceleration, 2D gravity, 2D force and torque integration,
 body-local/world center of mass, scalar moment of inertia, sleep/wake state,
-planar grounding/support state, and Chronicler record data. Pure 2D positions use world X/Z projection:
-`Vector2d.x = Vector3d.x` and `Vector2d.y = Vector3d.z`.
-`CanTranslate`, `CanRotate`, `EffectiveInverseMass`, and
-`EffectiveInverseMomentOfInertia` are the 2D body-side solver mobility surface.
-Kinematic 2D bodies read their agent transform during `LateSimulate` and use
-the same active-source CCD contract in the X/Z plane. It intentionally has no
-`HeightPos`, y-up step offset, visual interpolation state, or 3D inertia
+planar grounding/support state, and Chronicler record data. Pure 2D positions
+use world X/Z projection: `Vector2d.x = Vector3d.x` and
+`Vector2d.y = Vector3d.z`. `CanTranslate`, `CanRotate`, `EffectiveInverseMass`,
+and `EffectiveInverseMomentOfInertia` are the 2D body-side solver mobility
+surface. Kinematic 2D bodies read their agent transform during `LateSimulate`
+and use the same active-source CCD contract in the X/Z plane. It intentionally
+has no `HeightPos`, y-up step offset, visual interpolation state, or 3D inertia
 tensor. Its grounded state is planar support: automatic grounding accepts
 current-frame 2D contact normals from bodyless, position-frozen, or kinematic
-support colliders included by `PhysicsSettings.GroundCheckLayerMask`, then
-falls back to a body-owned `Query2D` ray or swept-circle probe when no valid
-contact candidate exists. `GroundingMode.Automatic` mirrors the 3D automatic
-ownership model, while `Manual` lets hosts supply support state or leave the
-body airborne without automatic probes. All points and normals remain in
-`Vector2d` X/Z-plane coordinates. Grounded integration removes acceleration
-and velocity into the support normal so bodies do not accumulate into-ground
-motion while resting. Pure 2D contact response uses COM-relative contact arms
-and scalar moment to apply angular velocity deltas from normal and tangent
-friction impulses. `ContinuousCollisionMode` is shared with the 3D body path:
-`SolidBody2D` resolves body, hierarchy, then context settings before committing
-movement, uses `Query2D.SweepCircle` to clip fast circle-proxy movement against
-static or kinematic 2D targets, refines supported movers with exact 2D
-shape-sweep reducers, and uses prepared dynamic target candidates for exact
-relative mover-shape validation after proxy candidate gathering.
-Dynamic-vs-dynamic and kinematic-source 2D CCD preserve stable time,
-closing-speed, and collider-ID ordering.
-`GravitasPhysics2DService.LateSimulate()` integrates active movable 2D bodies,
-solves 2D contact response and events, refreshes planar grounding/support, and
-updates post-response sleep state.
+support colliders included by `PhysicsSettings.GroundCheckLayerMask`, then falls
+back to a body-owned `Query2D` ray or swept-circle probe when no valid contact
+candidate exists. `GroundingMode.Automatic` mirrors the 3D automatic ownership
+model, while `Manual` lets hosts supply support state or leave the body airborne
+without automatic probes. All points and normals remain in `Vector2d` X/Z-plane
+coordinates. Grounded integration removes acceleration and velocity into the
+support normal so bodies do not accumulate into-ground motion while resting.
+Pure 2D contact response uses COM-relative contact arms and scalar moment to
+apply angular velocity deltas from normal and tangent friction impulses.
+`ContinuousCollisionMode` is shared with the 3D body path: `SolidBody2D`
+resolves body, hierarchy, then context settings before committing movement, uses
+`Query2D.SweepCircle` to clip fast circle-proxy movement against static or
+kinematic 2D targets, refines supported movers with exact 2D shape-sweep
+reducers, and uses prepared dynamic target candidates for exact relative
+mover-shape validation after proxy candidate gathering. Dynamic-vs-dynamic and
+kinematic-source 2D CCD preserve stable time, closing-speed, and collider-ID
+ordering. `GravitasPhysics2DService.LateSimulate()` integrates active movable 2D
+bodies, solves 2D contact response and events, refreshes planar
+grounding/support, and updates post-response sleep state.
 `GravitasPhysics2DService.Visualize()` publishes dynamic 2D position and yaw
 rotation back to the host transform while preserving host vertical height.
 
 ## Serialization And Replay State
 
-Chronicler support follows the stack-wide populate-existing-shell contract.
-The host creates the context, world, agents, transforms, body instances, and
-the correct collider shape types before loading. Chronicler then transfers
+Chronicler support follows the stack-wide populate-existing-shell contract. The
+host creates the context, world, agents, transforms, body instances, and the
+correct collider shape types before loading. Chronicler then transfers
 authoritative simulation values into those objects.
 
 Host bindings, context-local service IDs, partition lists, pair tables, query
 buffers, diagnostic buffers, delegates, and visual interpolation state are not
 snapshot identity. Read [Serialization And Replay](SERIALIZATION.md) before
-changing serialized fields, load defaults, or replay tests.
-Replay hashing is built around this same boundary: values recorded by
-`SolidBody`, `SolidBody2D`, `LSCollider`, and `LSCollider2D` are authoritative
-when they affect deterministic continuation, while context-owned IDs, retained
-pair/contact state, and active CCD handoffs are hashed by the context services
-that own their ordering.
+changing serialized fields, load defaults, or replay tests. Replay hashing is
+built around this same boundary: values recorded by `SolidBody`, `SolidBody2D`,
+`LSCollider`, and `LSCollider2D` are authoritative when they affect
+deterministic continuation, while context-owned IDs, retained pair/contact
+state, and active CCD handoffs are hashed by the context services that own their
+ordering.
 
 ## Collider State
 
@@ -360,11 +359,11 @@ The dense mutable groups inside `LSCollider` are split into focused internal
 state helpers: runtime shape, partition, query, hierarchy, and pair state. The
 public collider remains the host-facing shape object, while the helpers keep
 ownership rules local enough for manifold and solver work to evolve without
-turning the base collider into a bigger conditional path.
-Runtime-shape snapshot commits are the source of truth for collider
-position/rotation/scale/shape invalidation. Partition state advances the
-broad-phase version from those commits, and collision pairs use broad-phase
-version changes instead of maintaining a second position/rotation dirty path.
+turning the base collider into a bigger conditional path. Runtime-shape snapshot
+commits are the source of truth for collider position/rotation/scale/shape
+invalidation. Partition state advances the broad-phase version from those
+commits, and collision pairs use broad-phase version changes instead of
+maintaining a second position/rotation dirty path.
 
 Dynamic colliders are updated by their bodies during the simulation phases.
 Bodyless/static colliders are not owned by the dynamic body bucket, so a host
@@ -380,12 +379,11 @@ partition through `GravitasCollision2DService`, and do not register with the 3D
 `InitializeWithNoBody(IMatterAgent)` and use the same X/Z transform projection
 for query and trigger visibility. Pure 2D partition storage uses GridForge
 voxels on the internal Y=0 storage plane; that is a deterministic broad-phase
-identity, not physical 3D thickness.
-`LSCollider2D` shares the dimension-free collider helper pattern used by the 3D
-path: query stamps, generic pair references, generic hierarchy state, and
-runtime-shape dirty/version commits. Its runtime snapshot is 2D-specific only
-where the payload is actually dimensional, and unchanged colliders skip bounds
-and partition refresh work.
+identity, not physical 3D thickness. `LSCollider2D` shares the dimension-free
+collider helper pattern used by the 3D path: query stamps, generic pair
+references, generic hierarchy state, and runtime-shape dirty/version commits.
+Its runtime snapshot is 2D-specific only where the payload is actually
+dimensional, and unchanged colliders skip bounds and partition refresh work.
 
 ## Settings And Environment
 
@@ -403,11 +401,11 @@ coefficient, `PhysicsEnvironment.AirDensity`, collider frontal area, and current
 speed to accumulate acceleration opposite motion. The standard aerodynamic drag
 equation is quadratic in speed, `D = 1/2 * rho * V^2 * Cd * A`; NASA's
 [Beginner's Guide to Aerodynamics](https://www.grc.nasa.gov/www/k-12/VirtualAero/BottleRocket/airplane/dragco.html)
-notes that drag coefficient values depend on reference area and flow
-conditions. Gravitas should not silently reinterpret the current linear
-coefficient as a physical aerodynamic `Cd`. If full quadratic drag is needed,
-it should be a deliberate body/environment hardening pass with tests,
-benchmarks, and clear units.
+notes that drag coefficient values depend on reference area and flow conditions.
+Gravitas should not silently reinterpret the current linear coefficient as a
+physical aerodynamic `Cd`. If full quadratic drag is needed, it should be a
+deliberate body/environment hardening pass with tests, benchmarks, and clear
+units.
 
 ## Lifecycle Hooks
 

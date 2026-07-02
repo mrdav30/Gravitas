@@ -1,8 +1,7 @@
 # Mass Inertia Tooling And Diagnostics Follow-Up Plan
 
-**Date:** 2026-06-19
-**Status:** Post-alpha / evidence-gated
-**Owner:** Gravitas runtime/collision hardening, with possible FixedMathSharp tooling support
+**Date:** 2026-06-19 **Status:** Post-alpha / evidence-gated **Owner:** Gravitas
+runtime/collision hardening, with possible FixedMathSharp tooling support
 
 ## Purpose
 
@@ -23,8 +22,8 @@ runtime diagonalization.
   inertia tensors.
 - Mesh and compound inertia can preserve products of inertia and use full
   deterministic `Fixed3x3` inversion with a diagonal fast path.
-- `PhysicsMesh` remains a geometry/topology API. Body mobility and angular
-  force policy are applied by the caller before mesh inertia is requested.
+- `PhysicsMesh` remains a geometry/topology API. Body mobility and angular force
+  policy are applied by the caller before mesh inertia is requested.
 - Pure 2D center-of-mass, scalar moment, and angular response work is tracked
   separately in
   [`2026-06-19-pure-2d-angular-dynamics-com-plan.md`](done/2026-06-19-pure-2d-angular-dynamics-com-plan.md).
@@ -38,17 +37,19 @@ diagonalization to Gravitas by default.
 Tasks:
 
 - [ ] Collect evidence before implementation: benchmark pressure from full
-  tensor inversion, authoring workflows that prefer diagonal natural inertia,
-  or FixedMathSharp demand for deterministic symmetric-matrix decomposition.
+      tensor inversion, authoring workflows that prefer diagonal natural
+      inertia, or FixedMathSharp demand for deterministic symmetric-matrix
+      decomposition.
 - [ ] If pursued, design the payload as explicit data: center of mass,
-  principal-axis orientation, diagonal inertia tensor, and validation metadata.
+      principal-axis orientation, diagonal inertia tensor, and validation
+      metadata.
 - [ ] Keep the eigensolver/diagonalization algorithm out of the hot Gravitas
-  solver path unless benchmarks prove runtime generation is needed.
+      solver path unless benchmarks prove runtime generation is needed.
 - [ ] Require deterministic tie rules for repeated or near-repeated eigenvalues,
-  sign conventions for axes, fixed-point error bounds, and stable serialization
-  behavior.
+      sign conventions for axes, fixed-point error bounds, and stable
+      serialization behavior.
 - [ ] Add Gravitas importer/tests only after the lower-stack/tooling contract is
-  explicit enough to reject ambiguous or inconsistent payloads.
+      explicit enough to reject ambiguous or inconsistent payloads.
 
 ## Workstream 2: Center-Of-Mass Diagnostic Marker
 
@@ -60,9 +61,9 @@ Tasks:
 - [ ] Confirm a real adapter or debugging workflow needs a dedicated COM marker.
 - [ ] Keep COM marker output diagnostic-only and disabled-path allocation-free.
 - [ ] Emit deterministic marker data from authoritative body state without
-  changing simulation behavior.
+      changing simulation behavior.
 - [ ] Update diagnostic adapter docs and tests if a new debug draw kind or event
-  payload is introduced.
+      payload is introduced.
 
 ## Workstream 3: Richer Mesh Mass-Property Payload Boundary
 
@@ -72,13 +73,14 @@ mass-property structs instead of raw tensors.
 Tasks:
 
 - [ ] Keep body mobility, kinematic state, and angular-force policy outside
-  `PhysicsMesh` and mesh-authored data APIs.
+      `PhysicsMesh` and mesh-authored data APIs.
 - [ ] Make caller responsibility explicit in any new mass-property return type:
-  geometry supplies mass properties; body/collider binding applies solver gates.
+      geometry supplies mass properties; body/collider binding applies solver
+      gates.
 - [ ] Add tests that invalid open topology is still rejected by closed-volume
-  mesh APIs unless the caller explicitly selects a surface approximation.
+      mesh APIs unless the caller explicitly selects a surface approximation.
 - [ ] Add tests that non-rotating body policies can bind legal collision
-  surfaces without forcing mesh inertia calculation.
+      surfaces without forcing mesh inertia calculation.
 
 ## Exit Criteria
 

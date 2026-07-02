@@ -34,8 +34,8 @@ mixed discrete response read kinematic participants through stored dynamic
 `LinearVelocity`. Kinematic bodies keep that velocity at zero and expose their
 deterministic host movement through the current continuous-collision frame
 displacement instead. With restitution enabled, the same-frame mixed response
-therefore compared a fast handed-off 3D target against a seemingly stationary
-2D source and could apply a backward bounce.
+therefore compared a fast handed-off 3D target against a seemingly stationary 2D
+source and could apply a backward bounce.
 
 Fix: `CollisionResponseMixed` now resolves kinematic participants through their
 current frame displacement velocity while still treating them as infinite-mass

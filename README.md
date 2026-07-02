@@ -11,7 +11,8 @@
 
 **Deterministic physics for lockstep simulations and games.**
 
-Gravitas is an engine-agnostic fixed-point physics library for simulation-heavy .NET projects. It is designed to sit above the LSF stack:
+Gravitas is an engine-agnostic fixed-point physics library for simulation-heavy
+.NET projects. It is designed to sit above the LSF stack:
 
 - `FixedMathSharp` for deterministic fixed-point math, transforms, and reusable
   fixed-point geometry algebra.
@@ -23,17 +24,32 @@ Gravitas is an engine-agnostic fixed-point physics library for simulation-heavy 
 
 ## Project Status
 
-Gravitas is under active first-public-release hardening and is not API-stable while deterministic behavior, physics correctness, runtime complexity, and engine-agnostic integration are refined. The 3D path is the deepest slice, with first-class pure 2D and mixed 2D/3D runtime paths.
+Gravitas is under active first-public-release hardening and is not API-stable
+while deterministic behavior, physics correctness, runtime complexity, and
+engine-agnostic integration are refined. The 3D path is the deepest slice, with
+first-class pure 2D and mixed 2D/3D runtime paths.
 
-The unit test project includes focused runtime, settings, query, partition, coroutine, collision, CCD, constraints, ragdolls, serialization, 2D, and mixed-dimension coverage. The benchmark project covers context lifecycle, registration, partitioning, simulation, queries, diagnostics, mesh paths, constraints, mixed broad phase, and CCD scaling. Use this README as current orientation, and use [AGENTS.md](AGENTS.md) for detailed contributor guidance.
+The unit test project includes focused runtime, settings, query, partition,
+coroutine, collision, CCD, constraints, ragdolls, serialization, 2D, and
+mixed-dimension coverage. The benchmark project covers context lifecycle,
+registration, partitioning, simulation, queries, diagnostics, mesh paths,
+constraints, mixed broad phase, and CCD scaling. Use this README as current
+orientation, and use [AGENTS.md](AGENTS.md) for detailed contributor guidance.
 
 ## Why Gravitas?
 
-- Deterministic runtime math through `Fixed64`, `Vector2d`, `Vector3d`, and `FixedQuaternion`.
-- Engine-agnostic host boundary through `IMatterAgent` instead of direct renderer or ECS coupling.
-- Grid-backed broad-phase partitioning through `GridForge` `GridWorld`, voxel tracing, `PhysicsPartition`, and `PhysicsPartition2D`.
-- Runtime systems for 3D, pure 2D, and mixed 2D/3D bodies/colliders, authored shape definitions, compound collision assets, collision pairs, collision detection/response, 3D joints/ragdolls, opt-in CCD, raycasts, circlecasts, swept queries, pure 2D overlap/raycast queries, and physics settings.
-- Mixed 2D/3D simulation where 2D bodies are embedded as explicit finite slabs/prisms and constrained to X/Z impulse response.
+- Deterministic runtime math through `Fixed64`, `Vector2d`, `Vector3d`, and
+  `FixedQuaternion`.
+- Engine-agnostic host boundary through `IMatterAgent` instead of direct
+  renderer or ECS coupling.
+- Grid-backed broad-phase partitioning through `GridForge` `GridWorld`, voxel
+  tracing, `PhysicsPartition`, and `PhysicsPartition2D`.
+- Runtime systems for 3D, pure 2D, and mixed 2D/3D bodies/colliders, authored
+  shape definitions, compound collision assets, collision pairs, collision
+  detection/response, 3D joints/ragdolls, opt-in CCD, raycasts, circlecasts,
+  swept queries, pure 2D overlap/raycast queries, and physics settings.
+- Mixed 2D/3D simulation where 2D bodies are embedded as explicit finite
+  slabs/prisms and constrained to X/Z impulse response.
 
 ## Install
 
@@ -47,10 +63,17 @@ Gravitas targets `netstandard2.1` and `net8.0`.
 
 Gravitas is configured for two package variants:
 
-- `Gravitas`: Includes `MemoryPack` and depends on the standard `FixedMathSharp`, `SwiftCollections`, `SwiftCollections.FixedMathSharp`, `GridForge`, and `Chronicler.Core` packages.
-- `Gravitas.Lean`: Excludes the direct `MemoryPack` package and swaps to the lean dependency chain: `FixedMathSharp.Lean`, `SwiftCollections.Lean`, `SwiftCollections.FixedMathSharp.Lean`, `GridForge.Lean`, and `Chronicler.Core.Lean`.
+- `Gravitas`: Includes `MemoryPack` and depends on the standard
+  `FixedMathSharp`, `SwiftCollections`, `SwiftCollections.FixedMathSharp`,
+  `GridForge`, and `Chronicler.Core` packages.
+- `Gravitas.Lean`: Excludes the direct `MemoryPack` package and swaps to the
+  lean dependency chain: `FixedMathSharp.Lean`, `SwiftCollections.Lean`,
+  `SwiftCollections.FixedMathSharp.Lean`, `GridForge.Lean`, and
+  `Chronicler.Core.Lean`.
 
-Both variants are intended to expose the same core physics API. The difference is whether built-in MemoryPack support and the standard dependency chain are present.
+Both variants are intended to expose the same core physics API. The difference
+is whether built-in MemoryPack support and the standard dependency chain are
+present.
 
 Install via NuGet:
 
@@ -76,41 +99,60 @@ For local development against the repository, reference the project directly:
 
 Gravitas is centered around explicit world-context ownership:
 
-1. A host creates or attaches a `GravitasWorldContext`, which owns an explicit `GridForge.Grids.GridWorld`.
-2. Host objects expose deterministic transform and world context access through `IMatterAgent`.
-3. `GravitasWorldContext` owns fixed-step clock state, settings, physical environment values, lifecycle hooks, and context-local services.
-4. `GravitasPhysicsService` owns 3D body/collider registration, collider ID lookup, collision-pair pooling, and physics lifecycle work for one context.
-5. `GravitasConstraint3DService` owns deterministic 3D joint IDs, ragdoll runtimes, linked-collider self-filtering, motor targets, replay hashing, and joint diagnostics.
-6. `GravitasPhysics2DService` owns pure 2D registration, pair state, response, and visualization publishing for one context.
-7. `GravitasMixedCollisionService` owns the explicit mixed 2D/3D broad-phase, pair lifecycle, and constrained response path when `PhysicsRuntimeMode.Mixed` is active.
-8. `GravitasCollisionService` and `GravitasCollision2DService` map colliders into GridForge voxels and activate partition payloads for collision checks.
-9. `GravitasQuery2DService`, `GravitasQuery3DService`, `GravitasQueryMixedService`, and `GravitasCoroutineService` own query and coroutine state per context.
-10. `SolidBody` and `SolidBody2D` own simulated body state and Chronicler state recording for their runtime path.
-11. `LSCollider` and `LSCollider2D` collider types own runtime shape data, bounds, layers, collider-local physical ignore masks, trigger/contact events, and GridForge partition coordinates; shape-definition APIs provide data-only inputs for authored standalone and compound colliders.
+1. A host creates or attaches a `GravitasWorldContext`, which owns an explicit
+   `GridForge.Grids.GridWorld`.
+2. Host objects expose deterministic transform and world context access through
+   `IMatterAgent`.
+3. `GravitasWorldContext` owns fixed-step clock state, settings, physical
+   environment values, lifecycle hooks, and context-local services.
+4. `GravitasPhysicsService` owns 3D body/collider registration, collider ID
+   lookup, collision-pair pooling, and physics lifecycle work for one context.
+5. `GravitasConstraint3DService` owns deterministic 3D joint IDs, ragdoll
+   runtimes, linked-collider self-filtering, motor targets, replay hashing, and
+   joint diagnostics.
+6. `GravitasPhysics2DService` owns pure 2D registration, pair state, response,
+   and visualization publishing for one context.
+7. `GravitasMixedCollisionService` owns the explicit mixed 2D/3D broad-phase,
+   pair lifecycle, and constrained response path when `PhysicsRuntimeMode.Mixed`
+   is active.
+8. `GravitasCollisionService` and `GravitasCollision2DService` map colliders
+   into GridForge voxels and activate partition payloads for collision checks.
+9. `GravitasQuery2DService`, `GravitasQuery3DService`,
+   `GravitasQueryMixedService`, and `GravitasCoroutineService` own query and
+   coroutine state per context.
+10. `SolidBody` and `SolidBody2D` own simulated body state and Chronicler state
+    recording for their runtime path.
+11. `LSCollider` and `LSCollider2D` collider types own runtime shape data,
+    bounds, layers, collider-local physical ignore masks, trigger/contact
+    events, and GridForge partition coordinates; shape-definition APIs provide
+    data-only inputs for authored standalone and compound colliders.
 
-Typical integration creates or attaches a context, initializes bodies and colliders against agents bound to that context, then advances the simulation through `Simulate()`, `LateSimulate()`, `Visualize()`, and `LateVisualize()` according to the host's fixed-frame loop.
+Typical integration creates or attaches a context, initializes bodies and
+colliders against agents bound to that context, then advances the simulation
+through `Simulate()`, `LateSimulate()`, `Visualize()`, and `LateVisualize()`
+according to the host's fixed-frame loop.
 
 ## Main Systems
 
-| Area | What it does | Start here |
-| --- | --- | --- |
-| Core runtime | Context-owned physics services, body state, and host agent boundary | [`src/Gravitas/Core`](src/Gravitas/Core), dimensional Core subfolders, and [`src/Gravitas/Runtime`](src/Gravitas/Runtime) |
-| Colliders | Collider base classes, primitive shapes, mesh support, authored shape definitions, compound colliders, bounds, and layer behavior | [`src/Gravitas/Colliders`](src/Gravitas/Colliders) |
-| Collision handling | Shape-pair checks, contact data, collision pairs, and response logic | [`src/Gravitas/CollisionHandling`](src/Gravitas/CollisionHandling) |
-| Constraints | 3D joints, ragdoll definitions/runtimes, joint rows, and solver integration | [`src/Gravitas/Constraints`](src/Gravitas/Constraints) |
-| Partitions | GridForge-backed physics partitions used by collision distribution | [`src/Gravitas/Partitions`](src/Gravitas/Partitions) |
-| Queries | 2D/3D raycast, swept-sphere, convex-source sweep, cone-volume, and overlap query support | [`src/Gravitas/Queries`](src/Gravitas/Queries) |
-| Settings | Frame rate, collision matrix, pooling switch, CCD defaults, and settings save helpers | [`src/Gravitas/Settings`](src/Gravitas/Settings) |
-| Support | Layers, lifecycle hooks, coroutines, and transient state helpers | [`src/Gravitas/Support`](src/Gravitas/Support) |
+| Area               | What it does                                                                                                                      | Start here                                                                                                                |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Core runtime       | Context-owned physics services, body state, and host agent boundary                                                               | [`src/Gravitas/Core`](src/Gravitas/Core), dimensional Core subfolders, and [`src/Gravitas/Runtime`](src/Gravitas/Runtime) |
+| Colliders          | Collider base classes, primitive shapes, mesh support, authored shape definitions, compound colliders, bounds, and layer behavior | [`src/Gravitas/Colliders`](src/Gravitas/Colliders)                                                                        |
+| Collision handling | Shape-pair checks, contact data, collision pairs, and response logic                                                              | [`src/Gravitas/CollisionHandling`](src/Gravitas/CollisionHandling)                                                        |
+| Constraints        | 3D joints, ragdoll definitions/runtimes, joint rows, and solver integration                                                       | [`src/Gravitas/Constraints`](src/Gravitas/Constraints)                                                                    |
+| Partitions         | GridForge-backed physics partitions used by collision distribution                                                                | [`src/Gravitas/Partitions`](src/Gravitas/Partitions)                                                                      |
+| Queries            | 2D/3D raycast, swept-sphere, convex-source sweep, cone-volume, and overlap query support                                          | [`src/Gravitas/Queries`](src/Gravitas/Queries)                                                                            |
+| Settings           | Frame rate, collision matrix, pooling switch, CCD defaults, and settings save helpers                                             | [`src/Gravitas/Settings`](src/Gravitas/Settings)                                                                          |
+| Support            | Layers, lifecycle hooks, coroutines, and transient state helpers                                                                  | [`src/Gravitas/Support`](src/Gravitas/Support)                                                                            |
 
 ## Repository Map
 
-| Path | Purpose |
-| --- | --- |
-| [`src/Gravitas`](src/Gravitas) | Main library project. |
-| [`tests/Gravitas.Tests`](tests/Gravitas.Tests) | xUnit v3 test project with focused runtime/settings/query coverage. |
-| [`tests/Gravitas.Benchmarks`](tests/Gravitas.Benchmarks) | BenchmarkDotNet project scaffold and benchmark runner. |
-| [`.github/workflows`](.github/workflows) | CI, coverage, release, NuGet publish, Discord, and wiki-sync workflows. |
+| Path                                                     | Purpose                                                                 |
+| -------------------------------------------------------- | ----------------------------------------------------------------------- |
+| [`src/Gravitas`](src/Gravitas)                           | Main library project.                                                   |
+| [`tests/Gravitas.Tests`](tests/Gravitas.Tests)           | xUnit v3 test project with focused runtime/settings/query coverage.     |
+| [`tests/Gravitas.Benchmarks`](tests/Gravitas.Benchmarks) | BenchmarkDotNet project scaffold and benchmark runner.                  |
+| [`.github/workflows`](.github/workflows)                 | CI, coverage, release, NuGet publish, Discord, and wiki-sync workflows. |
 
 ## Build And Test
 
@@ -120,7 +162,8 @@ dotnet build Gravitas.slnx --configuration Release
 dotnet test Gravitas.slnx --configuration Release
 ```
 
-Validate the lean package path when changing package references, serialization, or conditional MemoryPack behavior:
+Validate the lean package path when changing package references, serialization,
+or conditional MemoryPack behavior:
 
 ```bash
 dotnet build Gravitas.slnx --configuration ReleaseLean
@@ -133,11 +176,14 @@ For focused unit-test work:
 dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release
 ```
 
-Release builds generate NuGet packages because `GeneratePackageOnBuild` is enabled.
+Release builds generate NuGet packages because `GeneratePackageOnBuild` is
+enabled.
 
 ## Benchmarks
 
-The benchmark project includes physics hot-path measurements for context lifecycle, body/collider registration, partitioning, simulation, query services, diagnostics, mesh paths, 3D constraints, mixed broad phase, and CCD scaling.
+The benchmark project includes physics hot-path measurements for context
+lifecycle, body/collider registration, partitioning, simulation, query services,
+diagnostics, mesh paths, 3D constraints, mixed broad phase, and CCD scaling.
 
 List available benchmark selections:
 
@@ -153,14 +199,19 @@ dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f 
 dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll all
 ```
 
-See the [benchmark README](tests/Gravitas.Benchmarks/README.md) for runner details and benchmark authoring notes.
+See the [benchmark README](tests/Gravitas.Benchmarks/README.md) for runner
+details and benchmark authoring notes.
 
 ## Documentation
 
-- [AGENTS.md](AGENTS.md) is the main contributor guide for deterministic, performance-sensitive, and physics-design work.
-- [`docs/wiki/OVERVIEW.md`](docs/wiki/OVERVIEW.md) is the developer-facing architecture guide for context ownership, host integration, collisions, queries, serialization/replay, diagnostics, and host diagnostic adapters.
+- [AGENTS.md](AGENTS.md) is the main contributor guide for deterministic,
+  performance-sensitive, and physics-design work.
+- [`docs/wiki/OVERVIEW.md`](docs/wiki/OVERVIEW.md) is the developer-facing
+  architecture guide for context ownership, host integration, collisions,
+  queries, serialization/replay, diagnostics, and host diagnostic adapters.
 
-If behavior changes, keep code, tests, this README, and benchmark documentation aligned.
+If behavior changes, keep code, tests, this README, and benchmark documentation
+aligned.
 
 ## Compatibility
 
@@ -170,10 +221,15 @@ If behavior changes, keep code, tests, this README, and benchmark documentation 
 
 ## Contributing
 
-Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md) before opening a pull request.
+Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) and
+[AGENTS.md](AGENTS.md) before opening a pull request.
 
-Prefer focused changes with release-mode validation. Determinism, physics correctness, low time complexity, and allocation behavior are first-order design constraints.
+Prefer focused changes with release-mode validation. Determinism, physics
+correctness, low time complexity, and allocation behavior are first-order design
+constraints.
 
 ## License
 
-Gravitas is licensed under the MIT License. See [LICENSE](LICENSE), [NOTICE](NOTICE), and [COPYRIGHT](COPYRIGHT) for the project terms and attribution details.
+Gravitas is licensed under the MIT License. See [LICENSE](LICENSE),
+[NOTICE](NOTICE), and [COPYRIGHT](COPYRIGHT) for the project terms and
+attribution details.

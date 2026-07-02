@@ -41,8 +41,8 @@ No dated release-scope feature-work plans are currently active.
   - Completed 2026-07-02. Replaces duplicate local mesh triangle structs with a
     `FixedTriangle`-backed `CollisionTriangle`, routes unsafe 3D edge
     closest-point work through `FixedSegment`, centralizes tolerant 2D segment
-    projection, preserves cached mesh normals and SwiftCollections query
-    bounds, and records benchmark evidence for mesh/mixed/query-sensitive paths.
+    projection, preserves cached mesh normals and SwiftCollections query bounds,
+    and records benchmark evidence for mesh/mixed/query-sensitive paths.
 - [`Cone Collider And Query Support`](done/2026-06-26-cone-collider-and-query-support-plan.md)
   - Completed 2026-06-28. Adds `LSConeCollider` as a first-class analytic 3D
     primitive across shape definitions, mass properties, collision, CCD, mixed
@@ -56,16 +56,16 @@ No dated release-scope feature-work plans are currently active.
     and benchmark signal while keeping triangles as convex-polygon authoring
     convenience.
 - [`Batched Query APIs`](done/2026-06-26-batched-query-apis-plan.md)
-  - Completed 2026-06-27. Adds typed closest/all-hit batch APIs for current
-    3D, pure 2D, and mixed query families with caller-owned request/output
-    buffers, stable per-request hit ranges, public batch summary counters,
-    allocation guardrails, docs, and benchmark smoke coverage.
+  - Completed 2026-06-27. Adds typed closest/all-hit batch APIs for current 3D,
+    pure 2D, and mixed query families with caller-owned request/output buffers,
+    stable per-request hit ranges, public batch summary counters, allocation
+    guardrails, docs, and benchmark smoke coverage.
 - [`Constraint And Ragdoll Foundation`](done/2026-06-26-constraint-and-ragdoll-foundation-plan.md)
   - Completed 2026-06-27. Adds context-owned deterministic 3D joints,
-    contact-integrated constraint islands, ragdoll authoring/runtime
-    activation, linked-collider self-filtering, service-level motor target
-    handoff, Chronicler state recording, replay hashing, diagnostics, debug
-    draw capture, tests, and benchmark signal.
+    contact-integrated constraint islands, ragdoll authoring/runtime activation,
+    linked-collider self-filtering, service-level motor target handoff,
+    Chronicler state recording, replay hashing, diagnostics, debug draw capture,
+    tests, and benchmark signal.
 - [`Collider Local Collision Filtering`](done/2026-06-26-collider-local-collision-filtering-plan.md)
   - Completed 2026-06-27. Adds collider-owned ignored physical layer masks for
     3D, pure 2D, mixed, CCD, and grounding/support paths while preserving
@@ -97,32 +97,32 @@ No dated release-scope feature-work plans are currently active.
     conformance fixtures, allocation guardrails, docs, and benchmark signal
     across 3D, pure 2D, mixed, CCD, query-cache, and serialization paths.
 - **SolidBody Naming Cleanup**
-  - Completed 2026-06-26. The public body API, source files, tests,
-    benchmarks, and docs use `SolidBody` and `SolidBody2D` directly, with no
-    compatibility aliases for the old pre-release terminology.
+  - Completed 2026-06-26. The public body API, source files, tests, benchmarks,
+    and docs use `SolidBody` and `SolidBody2D` directly, with no compatibility
+    aliases for the old pre-release terminology.
 - [`CCD Service-Level Island Solver`](done/2026-06-21-ccd-service-level-island-solver-plan.md)
   - Completed 2026-06-23. Pure 3D, pure 2D, and mixed dynamic CCD use
     service-owned processed-body handoff queues for chained TOI contacts,
     cross-service velocity transfer, bounded continuation, cap diagnostics, and
     active kinematic-source velocity handoff.
 - [`CCD Exact TOI And Shape Reducers`](done/2026-06-21-ccd-exact-toi-and-shape-reducers-plan.md)
-  - Completed 2026-06-23. Body-owned CCD refines static-style 3D
-    non-sphere targets with supported convex-source reducers, bracketed
-    rotational CCD with fixed-iteration exact narrow-phase bisection, and pure
-    2D/3D dynamic relative proxy candidates with exact mover-shape validation
-    where supported. Mixed dynamic CCD uses the service-level handoff queues
-    added by the completed island-solver plan.
+  - Completed 2026-06-23. Body-owned CCD refines static-style 3D non-sphere
+    targets with supported convex-source reducers, bracketed rotational CCD with
+    fixed-iteration exact narrow-phase bisection, and pure 2D/3D dynamic
+    relative proxy candidates with exact mover-shape validation where supported.
+    Mixed dynamic CCD uses the service-level handoff queues added by the
+    completed island-solver plan.
 - [`CCD Active Swept Sources`](done/2026-06-21-ccd-active-swept-sources-plan.md)
   - Completed 2026-06-23. Host-driven kinematic 2D/3D translation and rotation
-    run as active CCD sources; static-style blockers clip the source,
-    dynamic pure/mixed targets receive deterministic velocity handoff through
-    the completed service-level queue, and benchmark/docs coverage was added under
+    run as active CCD sources; static-style blockers clip the source, dynamic
+    pure/mixed targets receive deterministic velocity handoff through the
+    completed service-level queue, and benchmark/docs coverage was added under
     `kinematic-active-ccd-scaling`.
 - [`Mixed Sphere Against 2D Slab Reducer Completion`](done/2026-06-23-mixed-sphere-2d-slab-reducer-completion-plan.md)
-  - Completed 2026-06-23. `SweepSphereAgainst2D` uses exact finite-slab
-    reducers for current supported 2D slab targets; static mixed CCD shares
-    that policy, diagnostics label the path as exact, and dense/false-positive
-    benchmark rows cover the source direction.
+  - Completed 2026-06-23. `SweepSphereAgainst2D` uses exact finite-slab reducers
+    for current supported 2D slab targets; static mixed CCD shares that policy,
+    diagnostics label the path as exact, and dense/false-positive benchmark rows
+    cover the source direction.
 - [`Mixed Query Finite-Slab Reducer Completion`](done/2026-06-22-mixed-query-finite-slab-reducer-completion-plan.md)
   - Completed 2026-06-23. Rotated capsule/cylinder, mesh, and compound target
     reducers for `SweepCircleAgainst3D` are exact; convex mesh source scaling is
@@ -130,9 +130,9 @@ No dated release-scope feature-work plans are currently active.
     docs, and benchmark signal were refreshed.
 - [`Query And Mixed Swept Shape Hardening`](done/2026-06-21-query-and-mixed-swept-shape-hardening-plan.md)
   - Completed 2026-06-22. Public 2D area-query parity, mixed primitive
-    finite-slab reducers, convex/compound source sweeps, explicit
-    concave-source rejection, query diagnostics, deterministic ordering, and
-    benchmark/docs coverage are in place.
+    finite-slab reducers, convex/compound source sweeps, explicit concave-source
+    rejection, query diagnostics, deterministic ordering, and benchmark/docs
+    coverage are in place.
 - [`Discrete Response And Contact Quality Hardening`](done/2026-06-21-discrete-response-and-contact-quality-hardening-plan.md)
   - Completed 2026-06-22. Resting friction, 3D warm-start application,
     deterministic discrete islands, cylinder/mesh contact quality, and mixed
@@ -154,11 +154,19 @@ first public release.
   - Publishing, baseline comparison, CI integration, and host-visible diagnostic
     polish can follow once the release-critical physics behavior is nailed down.
 - **Scene / Fixture Authoring Definitions**
-  - Hold until engine-specific adapter packages and sample projects clarify the
+  - Hold until engine-specific adapter packages and sample projects clarify the1
     real public authoring needs. Gravitas can already be configured directly
     through contexts, bodies, colliders, shape definitions, materials, and
     ragdoll definitions; a friendlier scene/fixture DTO layer should come from
     observed host workflows rather than speculation.
+- **Support-mapped convex penetration kernel**
+  - Evaluate deterministic EPA or MPR only if measured contact-quality gaps
+    appear in generic convex fallback pairs such as
+    cone/cylinder/capsule/convex-mesh overlaps. Analytic, SAT, and
+    shape-specific manifold paths remain primary; any EPA/MPR work must be
+    bounded, allocation-free, fixed-point deterministic, benchmarked, and
+    adopted only where it improves contact quality without replacing stronger
+    existing solvers.
 
 ## Recommended Execution Order
 

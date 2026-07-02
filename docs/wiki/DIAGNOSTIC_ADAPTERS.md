@@ -6,9 +6,9 @@ emits deterministic `GravitasDiagnosticEvent` values and
 translate those streams into engine-specific overlays, logs, captures, or replay
 tools outside `src/Gravitas`.
 
-Keep adapter code in the host, samples, or tooling projects. Do not add engine-specific,
-renderer, file-system, networking, or editor dependencies to the Gravitas core
-library to make diagnostics easier to display.
+Keep adapter code in the host, samples, or tooling projects. Do not add
+engine-specific, renderer, file-system, networking, or editor dependencies to
+the Gravitas core library to make diagnostics easier to display.
 
 ## Adapter Boundary
 
@@ -97,10 +97,9 @@ public static void FlushDebugDraw(GravitasWorldContext context, HostDebugDrawAda
 ```
 
 2D debug draw in mixed mode is emitted as finite 3D slab geometry. Circles draw
-as wire cylinders, axis-aligned boxes draw as wire boxes, and polygons draw
-top, bottom, and vertical slab edges. Use `ColliderDimension` and
-`Collider2DType` to style embedded 2D geometry differently from normal 3D
-colliders.
+as wire cylinders, axis-aligned boxes draw as wire boxes, and polygons draw top,
+bottom, and vertical slab edges. Use `ColliderDimension` and `Collider2DType` to
+style embedded 2D geometry differently from normal 3D colliders.
 
 Mesh and compound capture can emit many commands. Reserve draw-command capacity
 before a capture-heavy run and avoid enabling full mesh capture every frame in
@@ -147,9 +146,9 @@ public static void FlushEvents(GravitasWorldContext context, HostDiagnosticLogAd
     context.Diagnostics.DispatchEventsTo(adapter);
 ```
 
-For production logs, prefer a structured payload object over ad hoc strings.
-The important rule is that adapters should consume semantic typed views instead
-of decoding `ScalarA`, `ScalarB`, `DataA`, and `DataB` directly.
+For production logs, prefer a structured payload object over ad hoc strings. The
+important rule is that adapters should consume semantic typed views instead of
+decoding `ScalarA`, `ScalarB`, `DataA`, and `DataB` directly.
 
 ## Replay Timeline Adapter Shape
 
@@ -211,5 +210,5 @@ dispatch.
 
 Draw commands follow the same pattern: `GravitasDebugDrawCommand` stays compact,
 while `GravitasDebugDrawCommandVisitor` exposes typed draw views for renderer
-adapters. Do not overload the same event or draw kind with new meanings that
-are not documented and tested.
+adapters. Do not overload the same event or draw kind with new meanings that are
+not documented and tested.

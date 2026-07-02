@@ -8,17 +8,17 @@ phases at deterministic points.
 
 Use the LSF lifecycle names as a mental model, not as engine-specific APIs:
 
-| Phase | Host responsibility | Gravitas call |
-| --- | --- | --- |
-| `Setup` | Create package defaults, host resources, and worlds. | Create or attach `GravitasWorldContext`. |
-| `Initialize` | Bind agents, transforms, colliders, bodies, settings, and grids. | Initialize colliders and bodies. |
-| `Execute` | Apply deterministic commands or network input in ordered frame batches. | No direct call; mutate host-owned state before simulation. |
-| `Simulate` | Advance the authoritative fixed step. | `context.Simulate()`. |
-| `LateSimulate` | Finish deterministic end-of-frame work. | `context.LateSimulate()`. |
-| `Visualize` | Interpolate or publish presentation state. | `context.Visualize()`. |
-| `LateVisualize` | Finish presentation-only work. | `context.LateVisualize()`. |
-| `Deactivate` | Pool/despawn agents and release registrations. | `body.Deactivate()` or `collider.Deactivate()`. |
-| `Quit` | Shut down the host process/session. | `context.Dispose()` when the context is no longer needed. |
+| Phase           | Host responsibility                                                     | Gravitas call                                              |
+| --------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `Setup`         | Create package defaults, host resources, and worlds.                    | Create or attach `GravitasWorldContext`.                   |
+| `Initialize`    | Bind agents, transforms, colliders, bodies, settings, and grids.        | Initialize colliders and bodies.                           |
+| `Execute`       | Apply deterministic commands or network input in ordered frame batches. | No direct call; mutate host-owned state before simulation. |
+| `Simulate`      | Advance the authoritative fixed step.                                   | `context.Simulate()`.                                      |
+| `LateSimulate`  | Finish deterministic end-of-frame work.                                 | `context.LateSimulate()`.                                  |
+| `Visualize`     | Interpolate or publish presentation state.                              | `context.Visualize()`.                                     |
+| `LateVisualize` | Finish presentation-only work.                                          | `context.LateVisualize()`.                                 |
+| `Deactivate`    | Pool/despawn agents and release registrations.                          | `body.Deactivate()` or `collider.Deactivate()`.            |
+| `Quit`          | Shut down the host process/session.                                     | `context.Dispose()` when the context is no longer needed.  |
 
 Authoritative simulation state belongs in `Simulate` and `LateSimulate`.
 `Visualize` and `LateVisualize` are for interpolation and presentation; they
@@ -27,8 +27,8 @@ should not be used to apply gameplay commands or physics corrections.
 ## Minimal Host Agent
 
 The host provides `IMatterAgent` so Gravitas can bind an object to a context and
-fixed transform without depending on an engine, ECS, rendering, or a specific object
-model.
+fixed transform without depending on an engine, ECS, rendering, or a specific
+object model.
 
 ```csharp
 using FixedMathSharp;
@@ -56,16 +56,15 @@ internal sealed class HostMatterAgent : IMatterAgent
 }
 ```
 
-`IsParent` marks whether an agent is intended to be a top-level hierarchy
-owner, but hierarchy collision filtering is bound explicitly on colliders. Hosts
-that need parent-child or sibling collision suppression should initialize the
+`IsParent` marks whether an agent is intended to be a top-level hierarchy owner,
+but hierarchy collision filtering is bound explicitly on colliders. Hosts that
+need parent-child or sibling collision suppression should initialize the
 colliders first, then call `childCollider.SetParent(parentCollider)`.
 `SetParent(...)` walks the collider-parent chain to the top collider and stores
 the top parent as a dimension-tagged collider key on the child, so sibling
 filtering does not depend on an engine `transform.parent` or any other engine
-hierarchy object. Mixed mode can bind a 2D collider under a 3D collider, or a
-3D collider under a 2D collider, without aliasing the separate collider ID
-tables.
+hierarchy object. Mixed mode can bind a 2D collider under a 3D collider, or a 3D
+collider under a 2D collider, without aliasing the separate collider ID tables.
 
 ```csharp
 weaponCollider.SetParent(characterCollider);
@@ -292,8 +291,8 @@ ragdoll.DeactivateToKinematic();
 ```
 
 Animation systems remain outside Gravitas. A deterministic animation library can
-compute target joint rotations, then pass caller-owned motor payloads before
-the fixed step:
+compute target joint rotations, then pass caller-owned motor payloads before the
+fixed step:
 
 ```csharp
 context.Constraints3D.SetRagdollPoseTargets(ragdoll, jointMotors);
@@ -336,14 +335,14 @@ Current service order matters:
 - `context.Simulate()` advances the clock, runs enabled simulate-phase services,
   runs the mixed lifecycle path only in `Mixed`, advances lockstep coroutines,
   then invokes simulate hooks.
-- `context.LateSimulate()` marks visualization accumulation for reset. In the
-  3D path it prepares CCD frame state, integrates dynamic bodies, evaluates
+- `context.LateSimulate()` marks visualization accumulation for reset. In the 3D
+  path it prepares CCD frame state, integrates dynamic bodies, evaluates
   host-driven kinematic active sweeps, refreshes dynamic collider partitions,
   distributes and solves discrete contacts, updates active pair/contact
-  maintenance, and updates sleep state after response. It also runs each
-  enabled 2D/mixed late-simulate path, then invokes late-simulate hooks.
-- `context.Visualize()` advances interpolation accumulation, updates enabled
-  2D and/or 3D body visual transforms, runs the mixed lifecycle path only in
+  maintenance, and updates sleep state after response. It also runs each enabled
+  2D/mixed late-simulate path, then invokes late-simulate hooks.
+- `context.Visualize()` advances interpolation accumulation, updates enabled 2D
+  and/or 3D body visual transforms, runs the mixed lifecycle path only in
   `Mixed`, then invokes visualize hooks.
 - `context.LateVisualize()` invokes context hooks only. Add built-in late
   presentation work only when there is a real runtime invariant for it.
@@ -383,8 +382,8 @@ SendFrameHashToLockstepPeer(context.FrameCount, hash);
 
 `ComputeReplayHash()` hashes context settings, physical environment values,
 clock state, body state, collider shape/filter state, retained
-continuation-affecting pair/contact state, and active CCD handoff state. It
-does not hash host object identity, delegates, diagnostics buffers, debug draw
+continuation-affecting pair/contact state, and active CCD handoff state. It does
+not hash host object identity, delegates, diagnostics buffers, debug draw
 commands, query scratch buffers, or visualization interpolation caches. Use
 `GravitasReplayHashMode.AuthoritativeWithSolverCaches` when investigating drift
 inside solver/cache state that is useful for RCA but not part of the ordinary
@@ -530,9 +529,9 @@ enumerators or temporary hit lists.
 
 Query APIs use `PhysicsLayerMask` as an include mask. Use
 `PhysicsLayerMask.FromLayer(...)` for a single layer,
-`PhysicsLayerMask.FromLayers(...)` for several layers,
-`PhysicsLayerMask.All` for every layer, and `PhysicsLayerMask.None` when no
-collider should be included.
+`PhysicsLayerMask.FromLayers(...)` for several layers, `PhysicsLayerMask.All`
+for every layer, and `PhysicsLayerMask.None` when no collider should be
+included.
 
 Ground checks use `context.Settings.GroundCheckLayerMask`. Hosts need to set
 this explicitly for their own layer model before relying on grounding behavior.
@@ -543,16 +542,16 @@ actually hits suitable geometry.
 `SolidBody.GroundingMode` controls who owns grounded state:
 
 - `Automatic` is the default. Gravitas updates `IsGrounded`, `HitPoint`,
-  `WasGrounded`, `GroundNormal`, `HitPlatform`, and normal-force
-  cache from deterministic ground probes.
-- `Manual` disables automatic probes. Hosts can call
-  `UseManualGrounding(...)`, `SetManualGrounding(...)`,
-  `ClearManualGrounding()`, and `UseAutomaticGrounding(...)` when deterministic
-  heightmaps or another host-owned ground source should drive grounded state
-  without paying query cost. While in manual mode, the host is responsible for
-  keeping `IsGrounded` state current. `UseManualGrounding()` and
-  `ClearManualGrounding()` leave the body airborne until the host supplies
-  manual support or returns ownership to Gravitas.
+  `WasGrounded`, `GroundNormal`, `HitPlatform`, and normal-force cache from
+  deterministic ground probes.
+- `Manual` disables automatic probes. Hosts can call `UseManualGrounding(...)`,
+  `SetManualGrounding(...)`, `ClearManualGrounding()`, and
+  `UseAutomaticGrounding(...)` when deterministic heightmaps or another
+  host-owned ground source should drive grounded state without paying query
+  cost. While in manual mode, the host is responsible for keeping `IsGrounded`
+  state current. `UseManualGrounding()` and `ClearManualGrounding()` leave the
+  body airborne until the host supplies manual support or returns ownership to
+  Gravitas.
 
 Each body selects its probe shape through `GroundProbeMode`:
 
@@ -566,24 +565,23 @@ Each body selects its probe shape through `GroundProbeMode`:
 derive radius from the collider shape. Ground probes ignore the body's own
 collider, collider-local ignored physical layers, and ordinary movable dynamic
 bodies; valid ground targets are bodyless colliders, position-frozen bodies, or
-kinematic bodies.
-`WasGrounded` stores the grounded value captured before the latest
-authoritative simulation refresh or explicit manual grounding change, so hosts
-can distinguish landing, remaining grounded, and leaving support without
+kinematic bodies. `WasGrounded` stores the grounded value captured before the
+latest authoritative simulation refresh or explicit manual grounding change, so
+hosts can distinguish landing, remaining grounded, and leaving support without
 deriving that transition from visual-frame state.
 
 `SolidBody2D` exposes the same ownership model through `GroundingMode`,
-`UseManualGrounding(...)`, `SetManualGrounding(...)`,
-`ClearManualGrounding()`, and `UseAutomaticGrounding(...)`, but the values are
-planar support state rather than world-height state. `GroundPoint`, `GroundNormal`,
-`LastGroundedPosition`, and `GroundUpDirection` are `Vector2d` values where
-2D X maps to world X and 2D Y maps to world Z. Automatic 2D grounding first
-uses current-frame 2D contact manifolds against bodyless, position-frozen, or
-kinematic support colliders included by `GroundCheckLayerMask`; if no contact
-candidate is valid, it runs a deterministic `GroundProbeMode2D.Ray` or
-`GroundProbeMode2D.SweptCircle` probe through `context.Query2D`. Grounded
-2D integration removes acceleration and velocity components that push into the
-support normal while preserving tangential planar motion.
+`UseManualGrounding(...)`, `SetManualGrounding(...)`, `ClearManualGrounding()`,
+and `UseAutomaticGrounding(...)`, but the values are planar support state rather
+than world-height state. `GroundPoint`, `GroundNormal`, `LastGroundedPosition`,
+and `GroundUpDirection` are `Vector2d` values where 2D X maps to world X and 2D
+Y maps to world Z. Automatic 2D grounding first uses current-frame 2D contact
+manifolds against bodyless, position-frozen, or kinematic support colliders
+included by `GroundCheckLayerMask`; if no contact candidate is valid, it runs a
+deterministic `GroundProbeMode2D.Ray` or `GroundProbeMode2D.SweptCircle` probe
+through `context.Query2D`. Grounded 2D integration removes acceleration and
+velocity components that push into the support normal while preserving
+tangential planar motion.
 
 ## Deactivation And Disposal
 
