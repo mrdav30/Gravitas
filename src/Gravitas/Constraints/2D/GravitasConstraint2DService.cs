@@ -1,5 +1,5 @@
 //=======================================================================
-// GravitasConstraint3DService.cs
+// GravitasConstraint2DService.cs
 //=======================================================================
 // MIT License, Copyright (c) 2026-present David Oravsky (mrdav30)
 // See LICENSE file in the project root for full license information.
@@ -15,20 +15,20 @@ using System;
 namespace Gravitas;
 
 /// <summary>
-/// Owns deterministic 3D joints and ragdoll articulation state for one world context.
+/// Owns deterministic pure 2D joints and ragdoll articulation state for one world context.
 /// </summary>
-public sealed class GravitasConstraint3DService
+public sealed class GravitasConstraint2DService
 {
     private const int DefaultJointCapacity = 64;
 
     private readonly GravitasWorldContext _context;
     private readonly SwiftDictionary<ulong, int> _suppressedColliderPairs = new();
-    private readonly SwiftList<RagdollRuntime3D> _ragdolls = new();
-    private Joint3D?[] _joints = new Joint3D?[DefaultJointCapacity];
+    private readonly SwiftList<RagdollRuntime2D> _ragdolls = new();
+    private Joint2D?[] _joints = new Joint2D?[DefaultJointCapacity];
     private int _nextRagdollId;
     private int _enabledJointCount;
 
-    internal GravitasConstraint3DService(GravitasWorldContext context)
+    internal GravitasConstraint2DService(GravitasWorldContext context)
     {
         SwiftThrowHelper.ThrowIfNull(context, nameof(context));
         _context = context;
@@ -59,17 +59,15 @@ public sealed class GravitasConstraint3DService
     internal bool HasActiveJoints => _enabledJointCount > 0;
 
     /// <summary>
-    /// Registers a context-owned deterministic 3D joint.
+    /// Registers a context-owned deterministic pure 2D joint.
     /// </summary>
-    public Joint3D RegisterJoint(in JointDefinition3D definition)
+    public Joint2D RegisterJoint(in JointDefinition2D definition)
     {
         ValidateDefinition(definition);
-        JointFrame3D frameA = JointFrame3D.FromTransform(definition.LocalFrameA, nameof(definition.LocalFrameA));
-        JointFrame3D frameB = JointFrame3D.FromTransform(definition.LocalFrameB, nameof(definition.LocalFrameB));
 
         int id = ++PeakJointCount;
         EnsureJointCapacity(id + 1);
-        var joint = new Joint3D(this, id, definition, frameA, frameB);
+        var joint = new Joint2D(this, id, definition);
         _joints[id] = joint;
         RegisteredJointCount++;
         _enabledJointCount++;
@@ -82,11 +80,11 @@ public sealed class GravitasConstraint3DService
     }
 
     /// <summary>
-    /// Removes a context-owned joint and releases its filter state.
+    /// Removes a context-owned pure 2D joint and releases its filter state.
     /// </summary>
     public bool RemoveJoint(int jointId)
     {
-        if (!TryGetJoint(jointId, out Joint3D? joint))
+        if (!TryGetJoint(jointId, out Joint2D? joint))
             return false;
 
         _joints[jointId] = null;
@@ -103,20 +101,20 @@ public sealed class GravitasConstraint3DService
     }
 
     /// <summary>
-    /// Gets a registered joint by context-local ID.
+    /// Gets a registered pure 2D joint by context-local ID.
     /// </summary>
-    public Joint3D GetJoint(int jointId)
+    public Joint2D GetJoint(int jointId)
     {
-        if (!TryGetJoint(jointId, out Joint3D? joint))
-            throw new ArgumentOutOfRangeException(nameof(jointId), "No active joint exists with the supplied ID.");
+        if (!TryGetJoint(jointId, out Joint2D? joint))
+            throw new ArgumentOutOfRangeException(nameof(jointId), "No active 2D joint exists with the supplied ID.");
 
         return joint!;
     }
 
     /// <summary>
-    /// Tries to get a registered joint by context-local ID.
+    /// Tries to get a registered pure 2D joint by context-local ID.
     /// </summary>
-    public bool TryGetJoint(int jointId, out Joint3D? joint)
+    public bool TryGetJoint(int jointId, out Joint2D? joint)
     {
         if ((uint)jointId >= (uint)_joints.Length)
         {
@@ -129,14 +127,14 @@ public sealed class GravitasConstraint3DService
     }
 
     /// <summary>
-    /// Registers a ragdoll articulation and its owned joints.
+    /// Registers a pure 2D ragdoll articulation and its owned joints.
     /// </summary>
-    public RagdollRuntime3D RegisterRagdoll(RagdollDefinition3D definition)
+    public RagdollRuntime2D RegisterRagdoll(RagdollDefinition2D definition)
     {
         ValidateRagdollDefinition(definition);
 
         int linkCount = definition.Links.Length;
-        var links = new SolidBody[linkCount];
+        var links = new SolidBody2D[linkCount];
         var linkIds = new int[linkCount];
         for (int i = 0; i < linkCount; i++)
         {
@@ -145,17 +143,17 @@ public sealed class GravitasConstraint3DService
         }
 
         int jointCount = definition.Joints.Length;
-        var joints = new Joint3D[jointCount];
+        var joints = new Joint2D[jointCount];
         for (int i = 0; i < jointCount; i++)
         {
-            RagdollJointDefinition3D authoredJoint = definition.Joints[i];
-            SolidBody bodyA = ResolveRagdollLink(linkIds, links, authoredJoint.LinkAId);
-            SolidBody bodyB = ResolveRagdollLink(linkIds, links, authoredJoint.LinkBId);
+            RagdollJointDefinition2D authoredJoint = definition.Joints[i];
+            SolidBody2D bodyA = ResolveRagdollLink(linkIds, links, authoredJoint.LinkAId);
+            SolidBody2D bodyB = ResolveRagdollLink(linkIds, links, authoredJoint.LinkBId);
             JointCollisionPolicy collisionPolicy = definition.SelfCollisionPolicy == RagdollSelfCollisionPolicy.CollideAllLinks
                 ? JointCollisionPolicy.Collide
                 : authoredJoint.CollisionPolicy;
 
-            joints[i] = RegisterJoint(new JointDefinition3D(
+            joints[i] = RegisterJoint(new JointDefinition2D(
                 bodyA,
                 bodyB,
                 authoredJoint.LocalFrameA,
@@ -169,7 +167,7 @@ public sealed class GravitasConstraint3DService
         if (definition.SelfCollisionPolicy == RagdollSelfCollisionPolicy.SuppressAllLinks)
             AddAllRagdollPairSuppressions(links);
 
-        var runtime = new RagdollRuntime3D(
+        var runtime = new RagdollRuntime2D(
             ++_nextRagdollId,
             links,
             joints,
@@ -180,28 +178,27 @@ public sealed class GravitasConstraint3DService
     }
 
     /// <summary>
-    /// Updates a joint motor target while preserving the joint's authored motor gains and impulse cap.
+    /// Updates a pure 2D joint motor target while preserving the motor's gains and impulse cap.
     /// </summary>
-    public bool SetJointMotorTarget(int jointId, FixedQuaternion targetLocalRotation)
+    public bool SetJointMotorTarget(int jointId, Fixed64 target)
     {
-        if (!TryGetJoint(jointId, out Joint3D? joint))
+        if (!TryGetJoint(jointId, out Joint2D? joint))
             return false;
 
-        JointMotor3D current = joint!.Motor;
-        joint.SetMotor(new JointMotor3D(
-            targetLocalRotation,
-            current.AngularDriveStrength,
-            current.AngularDriveDamping,
-            current.MaximumMotorImpulse));
+        JointMotor2D current = joint!.Motor;
+        JointMotor2D replacement = current.Kind == JointMotorKind2D.Linear
+            ? JointMotor2D.Linear(target, current.DriveStrength, current.Damping, current.MaximumMotorImpulse)
+            : JointMotor2D.Angular(target, current.DriveStrength, current.Damping, current.MaximumMotorImpulse);
+        joint.SetMotor(replacement);
         return true;
     }
 
     /// <summary>
-    /// Disables a joint motor target and clears its cached solver impulses.
+    /// Disables a pure 2D joint motor target and clears its cached solver impulses.
     /// </summary>
     public bool ClearJointMotorTarget(int jointId)
     {
-        if (!TryGetJoint(jointId, out Joint3D? joint))
+        if (!TryGetJoint(jointId, out Joint2D? joint))
             return false;
 
         joint!.ClearMotor();
@@ -209,9 +206,9 @@ public sealed class GravitasConstraint3DService
     }
 
     /// <summary>
-    /// Applies caller-owned motor payloads to every joint in a ragdoll runtime.
+    /// Applies caller-owned motor payloads to every joint in a pure 2D ragdoll runtime.
     /// </summary>
-    public void SetRagdollPoseTargets(RagdollRuntime3D ragdoll, ReadOnlySpan<JointMotor3D> motors)
+    public void SetRagdollPoseTargets(RagdollRuntime2D ragdoll, ReadOnlySpan<JointMotor2D> motors)
     {
         SwiftThrowHelper.ThrowIfNull(ragdoll, nameof(ragdoll));
         SwiftThrowHelper.ThrowIfArgument(
@@ -221,19 +218,19 @@ public sealed class GravitasConstraint3DService
 
         for (int i = 0; i < motors.Length; i++)
         {
-            Joint3D joint = ragdoll.GetJoint(i);
+            Joint2D joint = ragdoll.GetJoint(i);
             SwiftThrowHelper.ThrowIfArgument(
                 !ReferenceEquals(joint.Service, this),
                 nameof(ragdoll),
-                "Ragdoll targets must be applied through the owning constraint service.");
+                "Ragdoll targets must be applied through the owning 2D constraint service.");
             joint.SetMotor(motors[i]);
         }
     }
 
     /// <summary>
-    /// Gets whether the supplied 3D colliders should be excluded because a registered articulation links them.
+    /// Gets whether the supplied pure 2D colliders should be excluded because a registered articulation links them.
     /// </summary>
-    public bool ShouldExcludeLinkedCollision(LSCollider colliderA, LSCollider colliderB)
+    public bool ShouldExcludeLinkedCollision(LSCollider2D colliderA, LSCollider2D colliderB)
     {
         if (colliderA == null || colliderB == null)
             return false;
@@ -243,10 +240,10 @@ public sealed class GravitasConstraint3DService
         return _suppressedColliderPairs.ContainsKey(CreateColliderPairKey(colliderA.Id, colliderB.Id));
     }
 
-    internal bool TryGetJointForSolver(int jointId, out Joint3D? joint) => TryGetJoint(jointId, out joint);
+    internal bool TryGetJointForSolver(int jointId, out Joint2D? joint) => TryGetJoint(jointId, out joint);
 
     internal void UpdateJointCollisionPolicy(
-        Joint3D joint,
+        Joint2D joint,
         JointCollisionPolicy oldPolicy,
         JointCollisionPolicy newPolicy)
     {
@@ -260,7 +257,7 @@ public sealed class GravitasConstraint3DService
     }
 
     internal void UpdateJointEnabledState(
-        Joint3D joint,
+        Joint2D joint,
         bool oldEnabled,
         bool newEnabled)
     {
@@ -274,7 +271,7 @@ public sealed class GravitasConstraint3DService
     {
         for (int i = 1; i <= PeakJointCount && i < _joints.Length; i++)
         {
-            Joint3D? joint = _joints[i];
+            Joint2D? joint = _joints[i];
             if (joint == null)
                 continue;
 
@@ -295,12 +292,12 @@ public sealed class GravitasConstraint3DService
         ref ChronicleHashWriter writer,
         GravitasReplayHashMode mode)
     {
-        writer.WriteSection("constraints.3d", 1);
+        writer.WriteSection("constraints.2d", 1);
         writer.WriteInt32(PeakJointCount);
         writer.WriteInt32(RegisteredJointCount);
         for (int jointId = 1; jointId <= PeakJointCount; jointId++)
         {
-            bool hasJoint = TryGetJoint(jointId, out Joint3D? joint);
+            bool hasJoint = TryGetJoint(jointId, out Joint2D? joint);
             writer.WriteBool(hasJoint);
             if (hasJoint)
                 joint!.ContributeReplayHash(ref writer, mode);
@@ -309,7 +306,7 @@ public sealed class GravitasConstraint3DService
         writer.WriteInt32(_ragdolls.Count);
         for (int i = 0; i < _ragdolls.Count; i++)
         {
-            RagdollRuntime3D ragdoll = _ragdolls[i];
+            RagdollRuntime2D ragdoll = _ragdolls[i];
             writer.WriteInt32(ragdoll.Id);
             writer.WriteEnum(ragdoll.SelfCollisionPolicy);
             writer.WriteBool(ragdoll.IsActive);
@@ -337,35 +334,30 @@ public sealed class GravitasConstraint3DService
         Array.Resize(ref _joints, newSize);
     }
 
-    private void ValidateDefinition(in JointDefinition3D definition)
+    private void ValidateDefinition(in JointDefinition2D definition)
     {
         SwiftThrowHelper.ThrowIfNull(definition.BodyA, nameof(definition.BodyA));
         SwiftThrowHelper.ThrowIfNull(definition.BodyB, nameof(definition.BodyB));
-        SwiftThrowHelper.ThrowIfNull(definition.LocalFrameA, nameof(definition.LocalFrameA));
-        SwiftThrowHelper.ThrowIfNull(definition.LocalFrameB, nameof(definition.LocalFrameB));
         SwiftThrowHelper.ThrowIfArgument(
             ReferenceEquals(definition.BodyA, definition.BodyB),
             nameof(definition),
-            "A joint cannot link a body to itself.");
+            "A 2D joint cannot link a body to itself.");
         SwiftThrowHelper.ThrowIfArgument(
             !ReferenceEquals(definition.BodyA.Context, _context) || !ReferenceEquals(definition.BodyB.Context, _context),
             nameof(definition),
-            "Both joint bodies must belong to this constraint service context.");
+            "Both 2D joint bodies must belong to this constraint service context.");
         SwiftThrowHelper.ThrowIfArgument(
             !definition.BodyA.Active || !definition.BodyB.Active,
             nameof(definition),
-            "Joint bodies must be active before registration.");
+            "2D joint bodies must be active before registration.");
         SwiftThrowHelper.ThrowIfArgument(
             definition.BodyA.Collider == null || definition.BodyB.Collider == null,
             nameof(definition),
-            "Joint bodies must have registered 3D colliders.");
+            "2D joint bodies must have registered 2D colliders.");
         SwiftThrowHelper.ThrowIfArgument(
-            definition.Type != JointType3D.BallSocket
-                && definition.Type != JointType3D.Hinge
-                && definition.Type != JointType3D.ConeTwist
-                && definition.Type != JointType3D.Fixed,
+            !Joint2D.IsSupportedType(definition.Type),
             nameof(definition.Type),
-            "Unsupported 3D joint type.");
+            "Unsupported 2D joint type.");
         SwiftThrowHelper.ThrowIfArgument(
             definition.CollisionPolicy != JointCollisionPolicy.SuppressLinked
                 && definition.CollisionPolicy != JointCollisionPolicy.Collide,
@@ -373,14 +365,15 @@ public sealed class GravitasConstraint3DService
             "Unsupported joint collision policy.");
         definition.Limits.Validate();
         definition.Motor.Validate();
+        Joint2D.ValidatePayload(definition.Type, definition.Limits, definition.Motor);
     }
 
-    private void ValidateRagdollDefinition(RagdollDefinition3D definition)
+    private void ValidateRagdollDefinition(RagdollDefinition2D definition)
     {
         SwiftThrowHelper.ThrowIfNull(definition, nameof(definition));
         SwiftThrowHelper.ThrowIfNull(definition.Links, nameof(definition.Links));
         SwiftThrowHelper.ThrowIfNull(definition.Joints, nameof(definition.Joints));
-        SwiftThrowHelper.ThrowIfArgument(definition.Links.Length == 0, nameof(definition.Links), "A ragdoll must contain at least one link.");
+        SwiftThrowHelper.ThrowIfArgument(definition.Links.Length == 0, nameof(definition.Links), "A 2D ragdoll must contain at least one link.");
         SwiftThrowHelper.ThrowIfArgument(
             definition.SelfCollisionPolicy != RagdollSelfCollisionPolicy.SuppressAdjacentLinks
                 && definition.SelfCollisionPolicy != RagdollSelfCollisionPolicy.CollideAllLinks
@@ -390,70 +383,56 @@ public sealed class GravitasConstraint3DService
 
         for (int i = 0; i < definition.Links.Length; i++)
         {
-            RagdollLinkDefinition3D link = definition.Links[i];
+            RagdollLinkDefinition2D link = definition.Links[i];
             SwiftThrowHelper.ThrowIfNull(link.Body, nameof(definition.Links));
             SwiftThrowHelper.ThrowIfNull(link.Collider, nameof(definition.Links));
             SwiftThrowHelper.ThrowIfArgument(
                 !ReferenceEquals(link.Body.Context, _context),
                 nameof(definition.Links),
-                "All ragdoll links must belong to this context.");
+                "All 2D ragdoll links must belong to this context.");
             SwiftThrowHelper.ThrowIfArgument(
                 !link.Body.Active || link.Body.Collider == null,
                 nameof(definition.Links),
-                "Ragdoll links must have active 3D colliders.");
+                "2D ragdoll links must have active 2D colliders.");
             SwiftThrowHelper.ThrowIfArgument(
                 !ReferenceEquals(link.Body.Collider, link.Collider),
                 nameof(definition.Links),
-                "Ragdoll link collider must match the link body's collider.");
+                "2D ragdoll link collider must match the link body's collider.");
 
             for (int j = i + 1; j < definition.Links.Length; j++)
             {
                 SwiftThrowHelper.ThrowIfArgument(
                     link.LinkId == definition.Links[j].LinkId,
                     nameof(definition.Links),
-                    "Ragdoll link IDs must be unique.");
+                    "2D ragdoll link IDs must be unique.");
             }
         }
 
         for (int i = 0; i < definition.Joints.Length; i++)
         {
-            RagdollJointDefinition3D joint = definition.Joints[i];
-            _ = ResolveRagdollLink(definition.Links, joint.LinkAId);
-            _ = ResolveRagdollLink(definition.Links, joint.LinkBId);
+            RagdollJointDefinition2D joint = definition.Joints[i];
+            SolidBody2D bodyA = ResolveRagdollLink(definition.Links, joint.LinkAId);
+            SolidBody2D bodyB = ResolveRagdollLink(definition.Links, joint.LinkBId);
             SwiftThrowHelper.ThrowIfArgument(
                 joint.LinkAId == joint.LinkBId,
                 nameof(definition.Joints),
-                "A ragdoll joint cannot link a body to itself.");
-            SwiftThrowHelper.ThrowIfNull(joint.LocalFrameA, nameof(joint.LocalFrameA));
-            SwiftThrowHelper.ThrowIfNull(joint.LocalFrameB, nameof(joint.LocalFrameB));
-            joint.Limits.Validate();
-            joint.Motor.Validate();
+                "A 2D ragdoll joint cannot link a body to itself.");
+            JointCollisionPolicy collisionPolicy = definition.SelfCollisionPolicy == RagdollSelfCollisionPolicy.CollideAllLinks
+                ? JointCollisionPolicy.Collide
+                : joint.CollisionPolicy;
+            ValidateDefinition(new JointDefinition2D(
+                bodyA,
+                bodyB,
+                joint.LocalFrameA,
+                joint.LocalFrameB,
+                joint.Type,
+                joint.Limits,
+                joint.Motor,
+                collisionPolicy));
         }
     }
 
-    private static SolidBody ResolveRagdollLink(RagdollLinkDefinition3D[] links, int linkId)
-    {
-        for (int i = 0; i < links.Length; i++)
-        {
-            if (links[i].LinkId == linkId)
-                return links[i].Body;
-        }
-
-        throw new ArgumentException("Ragdoll joint references an unknown link ID.", nameof(linkId));
-    }
-
-    private static SolidBody ResolveRagdollLink(int[] linkIds, SolidBody[] links, int linkId)
-    {
-        for (int i = 0; i < linkIds.Length; i++)
-        {
-            if (linkIds[i] == linkId)
-                return links[i];
-        }
-
-        throw new ArgumentException("Ragdoll joint references an unknown link ID.", nameof(linkId));
-    }
-
-    private static bool HasKinematicLink(SolidBody[] links)
+    private static bool HasKinematicLink(SolidBody2D[] links)
     {
         for (int i = 0; i < links.Length; i++)
         {
@@ -464,7 +443,29 @@ public sealed class GravitasConstraint3DService
         return false;
     }
 
-    private void AddAllRagdollPairSuppressions(SolidBody[] links)
+    private static SolidBody2D ResolveRagdollLink(RagdollLinkDefinition2D[] links, int linkId)
+    {
+        for (int i = 0; i < links.Length; i++)
+        {
+            if (links[i].LinkId == linkId)
+                return links[i].Body;
+        }
+
+        throw new ArgumentException("2D ragdoll joint references an unknown link ID.", nameof(linkId));
+    }
+
+    private static SolidBody2D ResolveRagdollLink(int[] linkIds, SolidBody2D[] links, int linkId)
+    {
+        for (int i = 0; i < linkIds.Length; i++)
+        {
+            if (linkIds[i] == linkId)
+                return links[i];
+        }
+
+        throw new ArgumentException("2D ragdoll joint references an unknown link ID.", nameof(linkId));
+    }
+
+    private void AddAllRagdollPairSuppressions(SolidBody2D[] links)
     {
         for (int i = 0; i < links.Length; i++)
         {
@@ -473,7 +474,7 @@ public sealed class GravitasConstraint3DService
         }
     }
 
-    private void AddSuppressedColliderPair(LSCollider colliderA, LSCollider colliderB)
+    private void AddSuppressedColliderPair(LSCollider2D colliderA, LSCollider2D colliderB)
     {
         ulong key = CreateColliderPairKey(colliderA.Id, colliderB.Id);
         if (_suppressedColliderPairs.TryGetValue(key, out int count))
@@ -482,7 +483,7 @@ public sealed class GravitasConstraint3DService
             _suppressedColliderPairs.Add(key, 1);
     }
 
-    private void RemoveSuppressedColliderPair(LSCollider colliderA, LSCollider colliderB)
+    private void RemoveSuppressedColliderPair(LSCollider2D colliderA, LSCollider2D colliderB)
     {
         ulong key = CreateColliderPairKey(colliderA.Id, colliderB.Id);
         if (!_suppressedColliderPairs.TryGetValue(key, out int count))

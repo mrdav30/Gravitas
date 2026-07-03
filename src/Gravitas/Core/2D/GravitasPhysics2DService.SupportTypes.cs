@@ -6,6 +6,7 @@
 //=======================================================================
 
 using Gravitas.Colliders;
+using Gravitas.Constraints;
 using Gravitas.Support;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -77,6 +78,22 @@ public sealed partial class GravitasPhysics2DService
         maxColliderId = idA;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void GetStableJointKey(Joint2D joint, out int minColliderId, out int maxColliderId)
+    {
+        int idA = joint.BodyA.Collider.Id;
+        int idB = joint.BodyB.Collider.Id;
+        if (idA <= idB)
+        {
+            minColliderId = idA;
+            maxColliderId = idB;
+            return;
+        }
+
+        minColliderId = idB;
+        maxColliderId = idA;
+    }
+
     private sealed class CollisionPair2DStableKeyComparer : IComparer<CollisionPair2D>
     {
         public int Compare(CollisionPair2D? left, CollisionPair2D? right)
@@ -111,7 +128,15 @@ public sealed partial class GravitasPhysics2DService
                 return compare;
 
             compare = left.MinColliderId.CompareTo(right.MinColliderId);
-            return compare != 0 ? compare : left.MaxColliderId.CompareTo(right.MaxColliderId);
+            if (compare != 0)
+                return compare;
+
+            compare = left.MaxColliderId.CompareTo(right.MaxColliderId);
+            if (compare != 0)
+                return compare;
+
+            compare = left.Kind.CompareTo(right.Kind);
+            return compare != 0 ? compare : left.JointId.CompareTo(right.JointId);
         }
     }
 
@@ -133,21 +158,50 @@ public sealed partial class GravitasPhysics2DService
 
     private readonly struct DiscreteIslandConstraint2D
     {
-        public DiscreteIslandConstraint2D(
+        private DiscreteIslandConstraint2D(
+            DiscreteIslandConstraint2DKind kind,
             CollisionPair2D pair,
+            Joint2D? joint,
             int rootKey,
             int minColliderId,
-            int maxColliderId)
+            int maxColliderId,
+            int jointId)
         {
+            Kind = kind;
             Pair = pair;
+            Joint = joint;
             RootKey = rootKey;
             MinColliderId = minColliderId;
             MaxColliderId = maxColliderId;
+            JointId = jointId;
         }
 
+        public static DiscreteIslandConstraint2D CreatePair(
+            CollisionPair2D pair,
+            int rootKey,
+            int minColliderId,
+            int maxColliderId) =>
+            new(DiscreteIslandConstraint2DKind.Contact, pair, null, rootKey, minColliderId, maxColliderId, 0);
+
+        public static DiscreteIslandConstraint2D CreateJoint(
+            Joint2D joint,
+            int rootKey,
+            int minColliderId,
+            int maxColliderId) =>
+            new(DiscreteIslandConstraint2DKind.Joint, null!, joint, rootKey, minColliderId, maxColliderId, joint.Id);
+
+        public DiscreteIslandConstraint2DKind Kind { get; }
         public CollisionPair2D Pair { get; }
+        public Joint2D? Joint { get; }
         public int RootKey { get; }
         public int MinColliderId { get; }
         public int MaxColliderId { get; }
+        public int JointId { get; }
+    }
+
+    private enum DiscreteIslandConstraint2DKind : byte
+    {
+        Contact = 0,
+        Joint = 1
     }
 }

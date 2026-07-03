@@ -52,7 +52,7 @@ Gravitas owns, per context:
 - world-local settings and environment values.
 - dynamic body and collider registration.
 - deterministic 3D joint, constraint, and ragdoll articulation state.
-- pure 2D body, collider, pair, response, and query state.
+- pure 2D body, collider, joint, ragdoll, pair, response, and query state.
 - collision partitions and collision-pair state.
 - raycast, circle-overlap, and coroutine buffers.
 - swept-sphere query buffers.
@@ -69,6 +69,7 @@ flowchart TD
     Context --> Physics["GravitasPhysicsService"]
     Context --> Constraints3D["GravitasConstraint3DService"]
     Context --> Physics2D["GravitasPhysics2DService"]
+    Context --> Constraints2D["GravitasConstraint2DService"]
     Context --> Collisions["GravitasCollisionService"]
     Context --> Collisions2D["GravitasCollision2DService"]
     Context --> Query2D["GravitasQuery2DService"]
@@ -84,6 +85,8 @@ flowchart TD
     Joint --> Body
     Physics2D --> Body2D["SolidBody2D"]
     Physics2D --> Collider2D["LSCollider2D"]
+    Constraints2D --> Joint2D["Joint2D"]
+    Joint2D --> Body2D
     Collisions --> Partition["PhysicsPartition"]
     Collisions2D --> Partition2D["PhysicsPartition2D"]
     Partition --> World
@@ -107,6 +110,7 @@ flowchart TD
 | `GravitasPhysicsService`                   | Body/collider registration, context-local collider IDs, collision-pair pooling, simulation phases, and visualization phases.                                                                                            |
 | `GravitasConstraint3DService`              | Context-owned deterministic 3D joints, ragdoll runtimes, linked-collider self-filtering, motor handoff, replay hashing, and joint diagnostics.                                                                          |
 | `GravitasPhysics2DService`                 | Pure 2D registration, collider IDs, narrow phase, response, events, and visualization publishing.                                                                                                                       |
+| `GravitasConstraint2DService`              | Context-owned deterministic pure 2D joints, ragdoll runtimes, linked-collider self-filtering, motor handoff, replay hashing, and joint diagnostics.                                                                     |
 | `GravitasCollisionService`                 | GridForge-backed broad-phase partitioning, active partition tracking, partition pooling, and collision distribution versioning.                                                                                         |
 | `GravitasCollision2DService`               | GridForge-backed pure 2D X/Z broad-phase partitioning, active partition tracking, partition pooling, duplicate suppression, and collision distribution versioning.                                                      |
 | `GravitasMixedCollisionService`            | Mixed 2D/3D lifecycle and broad-phase candidate gathering through `PhysicsMixedPartition`, stable 3D/2D keys, duplicate suppression, and retained partition cleanup.                                                    |
@@ -119,6 +123,8 @@ flowchart TD
 | `CollisionResponse`                        | Deterministic manifold position correction, normal impulse, friction, and warm-started response for colliding bodies.                                                                                                   |
 | `Joint3D`                                  | Runtime 3D joint state linking two `SolidBody` instances through authored local frames, angular limits, optional motors, collision policy, solver cache, and Chronicler recording.                                      |
 | `RagdollDefinition3D` / `RagdollRuntime3D` | Data-first ragdoll authoring and runtime activation handles for linked 3D bodies, colliders, joints, and self-collision policy.                                                                                         |
+| `Joint2D`                                  | Runtime pure 2D joint state linking two `SolidBody2D` instances through planar local anchors, scalar limits, optional motors, collision policy, solver cache, and Chronicler recording.                                  |
+| `RagdollDefinition2D` / `RagdollRuntime2D` | Data-first ragdoll authoring and runtime activation handles for linked pure 2D bodies, colliders, joints, and self-collision policy.                                                                                    |
 | `GravitasCoroutineService`                 | Lockstep coroutine execution and context-bound wait instructions.                                                                                                                                                       |
 | `GravitasDiagnosticSink`                   | Disabled-by-default context diagnostics for deterministic events and engine-agnostic debug draw commands.                                                                                                               |
 
@@ -146,8 +152,9 @@ Pure 2D scenes use the same context and clock, set
 instances. The current 2D path supports circles, axis-aligned boxes, convex
 polygons, capsules, bodyless static/trigger colliders, deterministic collision
 response, contact events, sleep/wake behavior, replay tests,
-circle/capsule/AABB/polygon overlap queries, segment raycasts, and swept-circle
-queries. `PhysicsRuntimeMode.Both` runs pure 2D and pure 3D side by side without
+circle/capsule/AABB/polygon overlap queries, segment raycasts, swept-circle
+queries, native 2D joints, and ragdoll-style articulated bodies.
+`PhysicsRuntimeMode.Both` runs pure 2D and pure 3D side by side without
 cross-dimensional contacts, while `PhysicsRuntimeMode.Mixed` enables the
 dedicated mixed lifecycle, broad-phase, narrow-phase, and constrained response
 path.
@@ -174,12 +181,22 @@ normal impulses, friction impulses, and joint impulses, then stores pair-local
 and joint-local warm-start data. Contact events are emitted from the active-pair
 queue during `LateSimulate`.
 
+The pure 2D path follows the same ownership shape with 2D-specific physics:
+`GravitasPhysics2DService` filters and queues `CollisionPair2D` work, then
+orders contact pairs and enabled `Joint2D` constraints into deterministic
+islands over `SolidBody2D.DynamicId`. Contact rows consume planar manifolds and
+pair-local warm-start data; joint rows consume planar anchors, scalar angular
+state, and joint-local warm-start data. Both row families solve inside the same
+bounded island loop so articulated 2D bodies, resting contacts, linked wake
+state, and self-collision filtering stay coherent.
+
 ## Current Runtime Boundaries
 
 - The 3D path remains the deepest runtime path. The pure 2D path supports
   circle, capsule, axis-aligned box, convex polygon, compound colliders, exact
   area/raycast/swept-circle queries, two-contact manifolds, scalar angular
-  response, and pair-local warm-started response coverage.
+  response, pair-local warm-started response, native 2D constraints, and 2D
+  ragdoll-style articulation coverage.
 - `SolidBody` has a split 2D ground position plus height for the 3D y-up model,
   but that is not the pure 2D body model.
 - Mixed 2D/3D interaction has a dedicated runtime implementation. The runtime
@@ -199,8 +216,11 @@ queue during `LateSimulate`.
 - 3D articulated-body support is context-owned through
   `GravitasConstraint3DService`. Joints are ordinary 3D solver constraints
   integrated with contact islands; ragdoll definitions are explicit authoring
-  data for linked `SolidBody` instances. Pure 2D and mixed-dimension joints are
-  not implied by the 3D API.
+  data for linked `SolidBody` instances. Pure 2D articulated-body support is
+  context-owned through `GravitasConstraint2DService`, where `Joint2D` and
+  `RagdollRuntime2D` use planar anchors, scalar yaw, scalar inertia, and 2D
+  contact islands rather than projected 3D frames. Mixed-dimension joints remain
+  outside the current articulated-body model.
 - Cylinder collision and query behavior is implemented for the current finite
   cylinder model. Cap/face contact manifolds preserve flat finite-cylinder
   behavior; side/rim contacts remain representative finite-cylinder contacts.

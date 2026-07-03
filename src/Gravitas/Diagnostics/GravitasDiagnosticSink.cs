@@ -474,6 +474,24 @@ public sealed partial class GravitasDiagnosticSink
             dataB: (int)joint.CollisionPolicy);
     }
 
+    internal void EmitJointRegistered(Joint2D joint)
+    {
+        if (!Enabled)
+            return;
+
+        AddEvent(
+            GravitasDiagnosticEventKind.JointRegistered,
+            jointId: joint.Id,
+            colliderAId: joint.BodyA.Collider.Id,
+            colliderBId: joint.BodyB.Collider.Id,
+            colliderADimension: GravitasColliderDimension.TwoD,
+            colliderBDimension: GravitasColliderDimension.TwoD,
+            colliderA2DType: joint.BodyA.Collider.Shape,
+            colliderB2DType: joint.BodyB.Collider.Shape,
+            dataA: (int)joint.Type,
+            dataB: (int)joint.CollisionPolicy);
+    }
+
     internal void EmitJointRemoved(Joint3D joint)
     {
         if (!Enabled)
@@ -486,6 +504,24 @@ public sealed partial class GravitasDiagnosticSink
             colliderBId: joint.BodyB.Collider.Id,
             colliderAType: joint.BodyA.Collider.Shape,
             colliderBType: joint.BodyB.Collider.Shape,
+            dataA: (int)joint.Type,
+            dataB: (int)joint.CollisionPolicy);
+    }
+
+    internal void EmitJointRemoved(Joint2D joint)
+    {
+        if (!Enabled)
+            return;
+
+        AddEvent(
+            GravitasDiagnosticEventKind.JointRemoved,
+            jointId: joint.Id,
+            colliderAId: joint.BodyA.Collider.Id,
+            colliderBId: joint.BodyB.Collider.Id,
+            colliderADimension: GravitasColliderDimension.TwoD,
+            colliderBDimension: GravitasColliderDimension.TwoD,
+            colliderA2DType: joint.BodyA.Collider.Shape,
+            colliderB2DType: joint.BodyB.Collider.Shape,
             dataA: (int)joint.Type,
             dataB: (int)joint.CollisionPolicy);
     }
@@ -513,6 +549,31 @@ public sealed partial class GravitasDiagnosticSink
             hit: metrics.IncrementalImpulseMagnitude > Fixed64.Zero);
     }
 
+    internal void EmitJointImpulse(Joint2D joint, JointSolveMetrics2D metrics)
+    {
+        if (!Enabled)
+            return;
+
+        AddEvent(
+            GravitasDiagnosticEventKind.JointImpulse,
+            jointId: joint.Id,
+            colliderAId: joint.BodyA.Collider.Id,
+            colliderBId: joint.BodyB.Collider.Id,
+            colliderADimension: GravitasColliderDimension.TwoD,
+            colliderBDimension: GravitasColliderDimension.TwoD,
+            colliderA2DType: joint.BodyA.Collider.Shape,
+            colliderB2DType: joint.BodyB.Collider.Shape,
+            vector: new Vector3d(
+                metrics.MotorImpulseMagnitude,
+                metrics.MotorErrorMagnitude,
+                metrics.LimitErrorMagnitude),
+            scalarA: metrics.AccumulatedImpulseMagnitude,
+            scalarB: metrics.LinearAnchorErrorMagnitude,
+            dataA: metrics.PreparedRowCount,
+            dataB: metrics.ClampedRowCount,
+            hit: metrics.IncrementalImpulseMagnitude > Fixed64.Zero);
+    }
+
     internal void EmitJointLimitReached(Joint3D joint, Fixed64 limitError)
     {
         if (!Enabled)
@@ -525,6 +586,25 @@ public sealed partial class GravitasDiagnosticSink
             colliderBId: joint.BodyB.Collider.Id,
             colliderAType: joint.BodyA.Collider.Shape,
             colliderBType: joint.BodyB.Collider.Shape,
+            scalarB: limitError,
+            dataA: (int)joint.Limits.Kind,
+            hit: limitError != Fixed64.Zero);
+    }
+
+    internal void EmitJointLimitReached(Joint2D joint, Fixed64 limitError)
+    {
+        if (!Enabled)
+            return;
+
+        AddEvent(
+            GravitasDiagnosticEventKind.JointLimitReached,
+            jointId: joint.Id,
+            colliderAId: joint.BodyA.Collider.Id,
+            colliderBId: joint.BodyB.Collider.Id,
+            colliderADimension: GravitasColliderDimension.TwoD,
+            colliderBDimension: GravitasColliderDimension.TwoD,
+            colliderA2DType: joint.BodyA.Collider.Shape,
+            colliderB2DType: joint.BodyB.Collider.Shape,
             scalarB: limitError,
             dataA: (int)joint.Limits.Kind,
             hit: limitError != Fixed64.Zero);

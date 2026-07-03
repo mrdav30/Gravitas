@@ -13,6 +13,7 @@ internal sealed class BenchmarkCatalog
     private static readonly string[] _benchmarkSuffixes = new[] { "Benchmarks", "Benchmark" };
     private static readonly Dictionary<string, string[]> _aliasSynonyms = new(StringComparer.OrdinalIgnoreCase)
     {
+        ["constraint2-d"] = new[] { "constraint-2d", "constraints-2d", "ragdoll-2d" },
         ["constraint3-d"] = new[] { "constraint-3d", "constraints", "ragdoll" },
         ["physics2-d"] = new[] { "physics-2d", "2d", "physics-two-d" },
         ["query-batch"] = new[]

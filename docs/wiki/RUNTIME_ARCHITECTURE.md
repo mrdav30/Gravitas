@@ -25,6 +25,7 @@ pairs, queries, and coroutines remain context-local.
 | `GravitasPhysicsService`        | Dynamic body bucket, collider ID table, reusable collider IDs, collision-pair pool, active collision-pair queue, 3D CCD frame cache, processed-body handoff queue, handoff diagnostics, deterministic 3D discrete island response, sleep-state updates, simulation switch.                                                                                                    |
 | `GravitasConstraint3DService`   | Context-local 3D joint IDs, `Joint3D` runtime state, ragdoll runtimes, linked-collider suppression counts, motor target handoff, joint replay hashing, and articulation diagnostics.                                                                                                                                                                                          |
 | `GravitasPhysics2DService`      | Pure 2D dynamic body bucket, monotonic collider ID table, 2D pair pool, 2D CCD frame cache, processed-body handoff queue, handoff diagnostics, post-integration collider refresh, deterministic 2D discrete island response, connected resting-pair expansion, contact-derived planar grounding refresh, pair-reference cleanup, visualization publishing, simulation switch. |
+| `GravitasConstraint2DService`   | Context-local pure 2D joint IDs, `Joint2D` runtime state, 2D ragdoll runtimes, linked-collider suppression counts, motor target handoff, joint replay hashing, and articulation diagnostics.                                                                                                                                                                                  |
 | `GravitasMixedCollisionService` | Mixed 2D/3D lifecycle owner, GridForge-backed mixed broad phase, stable mixed candidate-key buffer, mixed hierarchy filtering, duplicate suppression, late-phase mixed partition refresh, mixed pair/response ownership, retained `PhysicsMixedPartition` cleanup, and lifecycle counters.                                                                                    |
 | `GravitasCollisionService`      | Active partition bucket, inactive partition pool, duplicate voxel checker, partition awake-state refresh, collision distribution version, cull distributor.                                                                                                                                                                                                                   |
 | `GravitasCollision2DService`    | GridForge-backed pure 2D partition bucket, inactive partition pool, duplicate voxel checker, awake dynamic membership refresh, 2D collision distribution version, retained partition cleanup.                                                                                                                                                                                 |
@@ -78,7 +79,7 @@ LateSimulate
     Process already-processed 2D CCD handoff queue
     PrepareCollisionPartitions for dynamic 2D colliders
     Collisions2D.CheckAndDistributeCollisions
-    Solve deterministic 2D discrete response islands
+    Solve deterministic 2D contact and joint constraint islands
     Refresh planar grounding from 2D contacts or probes
     Retire retained 2D collision partitions
     Update 2D sleep state after response
@@ -438,6 +439,9 @@ multi-context safe.
 - Pure 2D bodies and colliders are simulated by `GravitasPhysics2DService`;
   2D/3D contacts are produced only by `GravitasMixedCollisionService` when
   `PhysicsRuntimeMode.Mixed` is active.
+- Pure 2D joints and ragdolls are simulated by `GravitasConstraint2DService`;
+  they link `SolidBody2D` instances through planar anchors and scalar angles,
+  not projected 3D frames.
 - Partition ownership is through `GravitasCollisionService` for 3D and
   `GravitasCollision2DService` for pure 2D; partitions are returned to the
   owning service pool through voxel removal.

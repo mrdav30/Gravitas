@@ -58,7 +58,8 @@ public sealed class GravitasChronicleHashWriterExtensionsTests
             7,
             Array.Empty<SolidBody>(),
             Array.Empty<Joint3D>(),
-            RagdollSelfCollisionPolicy.SuppressAllLinks);
+            RagdollSelfCollisionPolicy.SuppressAllLinks,
+            startsActive: false);
 
         ChronicleHash serializerHash = Hash((ref ChronicleHashWriter writer) =>
             ChronicleHashSerializer.Contribute(runtime, ref writer));

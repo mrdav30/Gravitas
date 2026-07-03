@@ -109,6 +109,8 @@ public sealed class Joint3D : IRecordable
             if (_isEnabled == value)
                 return;
 
+            bool oldValue = _isEnabled;
+            Service.UpdateJointEnabledState(this, oldValue, value);
             _isEnabled = value;
             ClearSolverCache();
             WakeBodies();

@@ -314,6 +314,50 @@ in host or animation packages. Gravitas owns only the deterministic physical
 constraints, collision filtering, activation state, diagnostics, and
 serialization boundary.
 
+## Pure 2D Constraints And Ragdolls
+
+`context.Constraints2D` owns deterministic pure 2D joints and ragdoll runtimes.
+A 2D joint links two active `SolidBody2D` instances through local planar
+anchors, scalar local angles, optional scalar limits, optional motor payloads,
+and the same linked-collider collision policy used by 3D articulations:
+
+```csharp
+using Gravitas.Constraints;
+
+Joint2D hinge = context.Constraints2D.RegisterJoint(new JointDefinition2D(
+    forearmBody2D,
+    upperArmBody2D,
+    new JointFrame2D(Vector2d.Right * Fixed64.Half, Fixed64.Zero),
+    new JointFrame2D(-Vector2d.Right * Fixed64.Half, Fixed64.Zero),
+    JointType2D.Pin,
+    JointLimit2D.Angular(-Fixed64.HalfPi, Fixed64.HalfPi),
+    JointMotor2D.Disabled,
+    JointCollisionPolicy.SuppressLinked));
+```
+
+Enabled 2D joints solve in the same pure 2D response islands as contact rows
+during `LateSimulate()`. They use `PhysicsSettings.DiscreteSolverIterations`,
+respect `SolidBody2D.FreezeAxes`, and write deterministic metrics to
+`Joint2D.LastSolveMetrics`. Current joint types are distance, pin/revolute,
+weld/fixed, and prismatic/slider. Angular values are radians; distance and
+slider limits are world units in the X/Z simulation plane.
+
+2D ragdolls follow the same data-first authoring shape as 3D ragdolls, but the
+payload is planar:
+
+```csharp
+RagdollRuntime2D ragdoll2D = context.Constraints2D.RegisterRagdoll(
+    new RagdollDefinition2D(links2D, joints2D, RagdollSelfCollisionPolicy.SuppressAdjacentLinks));
+
+ragdoll2D.ActivateDynamic();
+ragdoll2D.DeactivateToKinematic();
+```
+
+Animation, IK, pose selection, and engine-specific skeleton state stay outside
+Gravitas. A deterministic animation package can compute `JointMotor2D` values
+and pass them through `context.Constraints2D.SetRagdollPoseTargets(...)` before
+the fixed step.
+
 If a bodyless 3D collider moves after initialization, the host must call
 `floor.Simulate()` after mutating its transform so bounds and partition
 membership are refreshed. Pure 2D bodyless colliders currently rebuild from

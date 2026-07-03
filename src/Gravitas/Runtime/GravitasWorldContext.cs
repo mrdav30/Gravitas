@@ -51,6 +51,7 @@ public sealed class GravitasWorldContext : IDisposable
         CollisionScratch = new CollisionSatScratch();
         Diagnostics = new GravitasDiagnosticSink(this);
         Constraints3D = new GravitasConstraint3DService(this);
+        Constraints2D = new GravitasConstraint2DService(this);
         Collisions = new GravitasCollisionService(this);
         Collisions2D = new GravitasCollision2DService(this);
         Physics = new GravitasPhysicsService(this);
@@ -128,6 +129,11 @@ public sealed class GravitasWorldContext : IDisposable
     /// Gets this context's world-local 3D constraint and ragdoll service.
     /// </summary>
     public GravitasConstraint3DService Constraints3D { get; }
+
+    /// <summary>
+    /// Gets this context's world-local pure 2D constraint and ragdoll service.
+    /// </summary>
+    public GravitasConstraint2DService Constraints2D { get; }
 
     internal CollisionSatScratch CollisionScratch { get; }
 
@@ -418,6 +424,7 @@ public sealed class GravitasWorldContext : IDisposable
         _lateSimulateToken = 0;
         _clock.Reset();
         Constraints3D.Reset();
+        Constraints2D.Reset();
         Collisions.Reset();
         Collisions2D.Reset();
         Physics.Reset();

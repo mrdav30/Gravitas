@@ -28,14 +28,18 @@ instead of burying it in notes.
 
 ## Active Release-Scope
 
-- [`Pure 2D Constraint And Ragdoll Foundation`](2026-07-02-pure-2d-constraint-and-ragdoll-foundation-plan.md)
-  - Planned 2026-07-02. Adds a native pure 2D constraint service, 2D joint
-    rows, contact-integrated 2D islands, linked-collider filtering, 2D ragdoll
-    authoring, serialization, replay hashing, diagnostics, docs, and benchmark
-    evidence without projecting the 3D joint API onto one ignored axis.
+No active release-scope plans are currently queued.
 
 ## Recently Completed
 
+- [`Pure 2D Constraint And Ragdoll Foundation`](done/2026-07-02-pure-2d-constraint-and-ragdoll-foundation-plan.md)
+  - Completed 2026-07-03. Adds a native pure 2D constraint service, distance,
+    pin/revolute, weld/fixed, and prismatic/slider joint rows, contact-
+    integrated 2D islands, linked-collider filtering, 2D ragdoll authoring,
+    serialization, replay hashing, diagnostics, docs, and benchmark evidence.
+    Independent review fixes tightened ragdoll registration atomicity, shared
+    joint payload validation, zero-error solver row emission, and enabled-joint
+    fast-path gating in both 2D and 3D constraint services.
 - [`3D Constraint Solver Stress And Tuning Hardening`](done/2026-07-02-3d-constraint-solver-stress-and-tuning-hardening-plan.md)
   - Completed 2026-07-03. Adds long-chain, alternating hinge, humanoid-ish,
     contact-heavy, and motor-driven 3D articulation stress coverage; exposes
@@ -185,10 +189,6 @@ first public release.
 
 ## Recommended Execution Order
 
-1. Work
-   [`Pure 2D Constraint And Ragdoll Foundation`](2026-07-02-pure-2d-constraint-and-ragdoll-foundation-plan.md)
-   next, reusing only the completed 3D stress-pass lessons that fit native 2D
-   planar/scalar physics.
-2. Keep the benchmark backlog and issue tracker as intake buckets; promote new
+1. Keep the benchmark backlog and issue tracker as intake buckets; promote new
    measured risks into dated plans only when they are broader than a focused
    patch.

@@ -39,9 +39,11 @@ Serialized state:
 - collider active/trigger state, layer, collider-local ignored physical layers,
   surface material, local offset, shape dimensions, 2D mixed half-thickness
   override, and shape-derived inputs.
-- joint enabled state, joint type, local frames, angular limits, motor target
-  payload, and linked-collider collision policy for existing `Joint3D` shells.
-- ragdoll runtime activation state for existing `RagdollRuntime3D` handles.
+- joint enabled state, joint type, local frames, limits, motor target payload,
+  and linked-collider collision policy for existing `Joint3D` and `Joint2D`
+  shells.
+- ragdoll runtime activation state for existing `RagdollRuntime3D` and
+  `RagdollRuntime2D` handles.
 - settings that affect deterministic execution, through `PhysicsSettingsSaver`.
 
 Runtime-owned state that should not be serialized:
@@ -118,17 +120,19 @@ synchronizes the context clock.
 
 `Joint3D` records mutable 3D constraint state into existing runtime joint
 shells: enabled state, joint type, local anchor frames, angular limits, motor
-payload, and linked-collider collision policy. It does not create or resolve
-body links from serialized data; the host must recreate the same bodies and
-register matching joints before Chronicler populates continuation state.
-Pair-local contact caches and joint solver caches are rebuildable runtime data
-unless a drift investigation explicitly hashes them through
-`AuthoritativeWithSolverCaches`.
+payload, and linked-collider collision policy. `Joint2D` records the matching
+pure 2D continuation state: enabled state, joint type, planar local frames,
+distance/slider/angular limits, scalar motor payload, and linked-collider
+collision policy. Neither joint type creates or resolves body links from
+serialized data; the host must recreate the same bodies and register matching
+joints before Chronicler populates continuation state. Pair-local contact caches
+and joint solver caches are rebuildable runtime data unless a drift
+investigation explicitly hashes them through `AuthoritativeWithSolverCaches`.
 
-`RagdollRuntime3D` records activation state for an existing ragdoll runtime.
-Definitions, link bodies, colliders, and joint ownership are host-created shell
-data; loading activation state switches the already-registered links between
-dynamic ragdoll simulation and kinematic host control.
+`RagdollRuntime3D` and `RagdollRuntime2D` record activation state for existing
+ragdoll runtimes. Definitions, link bodies, colliders, and joint ownership are
+host-created shell data; loading activation state switches the already-
+registered links between dynamic ragdoll simulation and kinematic host control.
 
 `PhysicsLayer` and `PhysicsLayerMask` still use direct JSON/MemoryPack-friendly
 field annotations because they are small value helpers, not Chronicler graphs.

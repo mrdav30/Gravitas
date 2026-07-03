@@ -455,7 +455,7 @@ public readonly struct GravitasMixedResponseIslandDiagnosticView
 }
 
 /// <summary>
-/// Typed read-only view over a 3D joint diagnostic event.
+/// Typed read-only view over a joint diagnostic event.
 /// </summary>
 public readonly struct GravitasJointDiagnosticView
 {
@@ -475,15 +475,23 @@ public readonly struct GravitasJointDiagnosticView
 
     public int ColliderBId => Event.ColliderBId;
 
+    public GravitasColliderDimension ColliderADimension => Event.ColliderADimension;
+
+    public GravitasColliderDimension ColliderBDimension => Event.ColliderBDimension;
+
     public ColliderType ColliderAType => Event.ColliderAType;
 
     public ColliderType ColliderBType => Event.ColliderBType;
+
+    public ColliderType2D ColliderA2DType => Event.ColliderA2DType;
+
+    public ColliderType2D ColliderB2DType => Event.ColliderB2DType;
 
     public Fixed64 ImpulseMagnitude => Event.ScalarA;
 
     public Fixed64 LimitError => Kind == GravitasDiagnosticEventKind.JointLimitReached
         ? Event.ScalarB
-        : AngularLimitErrorMagnitude;
+        : LimitErrorMagnitude;
 
     public Fixed64 LinearAnchorErrorMagnitude => Event.ScalarB;
 
@@ -491,7 +499,7 @@ public readonly struct GravitasJointDiagnosticView
 
     public Fixed64 MotorErrorMagnitude => Event.Vector.Y;
 
-    public Fixed64 AngularLimitErrorMagnitude => Event.Vector.Z;
+    public Fixed64 LimitErrorMagnitude => Event.Vector.Z;
 
     public int RowCount => Event.DataA;
 

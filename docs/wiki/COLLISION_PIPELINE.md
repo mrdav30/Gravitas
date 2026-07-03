@@ -828,6 +828,19 @@ warm-start impulses and positional correction are applied on the first island
 iteration, then subsequent iterations refine velocity response without applying
 the same correction repeatedly.
 
+`GravitasPhysics2DService` performs the same island ownership for pure 2D with
+2D-specific solver data. It combines queued `CollisionPair2D` contacts with
+enabled `Joint2D` constraints from `GravitasConstraint2DService`, builds
+deterministic body islands keyed by `SolidBody2D.DynamicId`, wakes linked
+sleeping bodies when an island has an awake participant, and solves contact and
+joint rows in stable island/constraint order. Contact-only single-pair scenes
+keep the direct 2D response path when no active 2D joints exist. Multi-
+constraint 2D islands use the same `PhysicsSettings.DiscreteSolverIterations`
+cap as 3D, but the row math is planar/scalar: 2D contact rows consume
+`ContactManifold2D`, 2D joint rows consume `JointFrame2D` anchors, scalar yaw
+angles, scalar limits, scalar motors, and `SolidBody2D` effective inverse mass
+and moment.
+
 Joint rows write deterministic `JointSolveMetrics3D` back to the owning
 `Joint3D` after each solve. The metrics expose prepared row count, pre-solve
 linear anchor error, angular limit error, motor error, cached and incremental
@@ -835,6 +848,13 @@ impulse magnitudes, motor impulse, and clamped row count. Hosts should use
 these counters, focused stress tests, and benchmarks before asking for broader
 joint tuning APIs; the current public tuning surface remains the discrete
 solver iteration count plus the explicit values on `JointMotor3D`.
+
+2D joint rows write deterministic `JointSolveMetrics2D` back to the owning
+`Joint2D` after each solve. The metrics expose prepared row count, pre-solve
+linear anchor error, scalar angular error, limit error, motor error, cached and
+incremental impulse magnitudes, motor impulse, and clamped row count. Hosts
+should use those counters beside 2D constraint benchmarks before requesting new
+planar tuning knobs.
 
 If every dynamic body in the partition is sleeping, pair generation is skipped
 until a deterministic wake reason changes one of those bodies or its shape

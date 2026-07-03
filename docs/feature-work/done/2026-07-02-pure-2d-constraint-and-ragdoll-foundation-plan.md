@@ -1,7 +1,7 @@
 # Pure 2D Constraint And Ragdoll Foundation Plan
 
 **Date:** 2026-07-02  
-**Status:** Planned  
+**Status:** Done  
 **Owner:** Gravitas pure 2D constraint and articulated-body hardening
 
 ---
@@ -46,8 +46,8 @@ inside the same deterministic 2D island graph as contacts.
 - `GravitasPhysics2DService` owns 2D body/collider registration, 2D collision
   pair processing, response/event processing, partition refresh, and grounding.
 - Pure 2D contact response has manifold and warm-start support.
-- 3D constraints exist under `src/Gravitas/Constraints/3D`, but there is no
-  `Constraints/2D` subsystem.
+- At plan start, 3D constraints existed under `src/Gravitas/Constraints/3D`,
+  but there was no `Constraints/2D` subsystem.
 - Existing collider hierarchy keys can identify 2D colliders, but physical
   articulation should live in dedicated constraint types.
 
@@ -75,9 +75,58 @@ pure 2D release blocker appears first. The 3D stress pass should inform:
 
 2D should reuse those lessons, not copy 3D formulas.
 
+## Completion Evidence
+
+Completed on 2026-07-03.
+
+Implementation results:
+
+- Added `GravitasConstraint2DService`, `Joint2D`, 2D joint definitions, planar
+  local frames, scalar limits, scalar motors, and validated deterministic
+  context-local joint registration.
+- Added native 2D distance, pin/revolute, weld/fixed, and prismatic/slider
+  constraint rows with warm-start caching, fixed-point scalar/planar effective
+  mass, bounded motor/limit impulses, and `JointSolveMetrics2D`.
+- Integrated enabled 2D joints into the pure 2D contact island solver so contact
+  rows and joint rows solve in one deterministic island order.
+- Added allocation-free linked-collider suppression for 2D joint/ragdoll self
+  collisions in physical pair creation and 2D CCD source filtering.
+- Added `RagdollDefinition2D`, `RagdollLinkDefinition2D`,
+  `RagdollJointDefinition2D`, and `RagdollRuntime2D` over ordinary
+  `SolidBody2D` links and `LSCollider2D` colliders.
+- Added Chronicler `RecordData(...)`, replay hash contribution, diagnostic
+  events, debug draw capture, tests, and benchmark smoke coverage for the pure
+  2D articulated-body path.
+- Addressed independent review findings before closure: ragdoll registration is
+  validation-first and failure-atomic, direct/ragdoll/load paths share the same
+  2D joint payload validation, zero-error angular rows and coincident positive
+  distance targets now emit deterministic solver rows, and enabled-joint counts
+  prevent inactive ragdolls from forcing the joint-island path in 2D and 3D.
+
+Evidence captured during implementation:
+
+- Focused constraint tests cover registration, invalid payloads, cross-context
+  rejection, solver correction, freeze-axis behavior, deterministic order,
+  linked wake state, ragdoll activation/filtering, serialization, 2D CCD
+  linked filtering, diagnostics, and disabled diagnostics/filtering allocation
+  guardrails.
+- `tests/Gravitas.Benchmarks/Core/Constraint2DBenchmarks.cs` mirrors the 3D
+  stress families for long chains, resting ragdolls, contact-heavy articulated
+  stacks, motor-driven chains, linked filtering, inactive ragdolls, and
+  activation toggles.
+- Validation passed:
+  - `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~Constraint2D"`: 25 passed.
+  - `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~Constraint3D"`: 29 passed.
+  - `dotnet test Gravitas.slnx --configuration Release`: 951 passed.
+  - `dotnet test Gravitas.slnx --configuration ReleaseLean`: 933 passed.
+  - `dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll constraint-2d --filter "*SimulateInactiveRagdoll*" --job Dry --warmupCount 1 --iterationCount 1`: benchmark smoke passed with no managed allocation reported.
+
+Deferred work: none. Mixed-dimension articulated constraints remain outside the
+current model by design; they are not a hidden gap in this pure 2D plan.
+
 ## Workstream 1: API Shape, Service Ownership, And Identity
 
-**Status:** Planned
+**Status:** Done
 
 **Problem**
 
@@ -86,15 +135,15 @@ and public names that make 2D semantics obvious.
 
 **Tasks**
 
-- [ ] Add `src/Gravitas/Constraints/2D/GravitasConstraint2DService.cs` as the
+- [x] Add `src/Gravitas/Constraints/2D/GravitasConstraint2DService.cs` as the
       context-owned service.
-- [ ] Expose the service from `GravitasWorldContext` as `Constraints2D`.
-- [ ] Add `src/Gravitas/Constraints/2D/Joint2D.cs` for runtime joint state.
-- [ ] Add `src/Gravitas/Constraints/2D/JointDefinition2D.cs` for registration
+- [x] Expose the service from `GravitasWorldContext` as `Constraints2D`.
+- [x] Add `src/Gravitas/Constraints/2D/Joint2D.cs` for runtime joint state.
+- [x] Add `src/Gravitas/Constraints/2D/JointDefinition2D.cs` for registration
       input.
-- [ ] Add `src/Gravitas/Constraints/2D/JointFrame2D.cs` using a local `Vector2d`
+- [x] Add `src/Gravitas/Constraints/2D/JointFrame2D.cs` using a local `Vector2d`
       anchor and scalar local angle.
-- [ ] Add `src/Gravitas/Constraints/2D/JointType2D.cs` with 2D-native joint
+- [x] Add `src/Gravitas/Constraints/2D/JointType2D.cs` with 2D-native joint
       kinds:
   - distance.
   - pin/revolute.
@@ -102,14 +151,14 @@ and public names that make 2D semantics obvious.
   - prismatic/slider.
   - rope or maximum-length constraint if tests prove it belongs in the first
     release surface.
-- [ ] Add `src/Gravitas/Constraints/2D/JointLimit2D.cs` for angular and slider
+- [x] Add `src/Gravitas/Constraints/2D/JointLimit2D.cs` for angular and slider
       limits.
-- [ ] Add `src/Gravitas/Constraints/2D/JointMotor2D.cs` for angular and linear
+- [x] Add `src/Gravitas/Constraints/2D/JointMotor2D.cs` for angular and linear
       motor payloads where supported by the joint type.
-- [ ] Reuse `JointCollisionPolicy` only if the shared namespace and semantics
+- [x] Reuse `JointCollisionPolicy` only if the shared namespace and semantics
       are already dimension-neutral; otherwise extract a shared policy file
       without changing the public name.
-- [ ] Add tests for:
+- [x] Add tests for:
   - empty service ownership.
   - deterministic monotonic joint IDs.
   - duplicate body pairs with distinct joint IDs.
@@ -125,7 +174,7 @@ and public names that make 2D semantics obvious.
 
 ## Workstream 2: 2D Constraint Rows And Joint Solver
 
-**Status:** Planned
+**Status:** Done
 
 **Problem**
 
@@ -134,7 +183,7 @@ The 2D solver needs planar linear rows and scalar angular rows that respect
 
 **Tasks**
 
-- [ ] Add `src/Gravitas/Constraints/2D/JointConstraintRow2D.cs` for internal row
+- [x] Add `src/Gravitas/Constraints/2D/JointConstraintRow2D.cs` for internal row
       state:
   - planar linear axis.
   - scalar angular contribution for body A.
@@ -143,22 +192,22 @@ The 2D solver needs planar linear rows and scalar angular rows that respect
   - bias velocity.
   - accumulated impulse.
   - lower and upper impulse bounds.
-- [ ] Add `src/Gravitas/Constraints/2D/JointSolver2D.cs` for row preparation,
+- [x] Add `src/Gravitas/Constraints/2D/JointSolver2D.cs` for row preparation,
       warm-start application, iterative solve, and impulse storage.
-- [ ] Add tests for row math:
+- [x] Add tests for row math:
   - anchor positions from local 2D frames.
   - distance error for distance joints.
   - coincident anchors for pin/revolute joints.
   - scalar angular error for weld/fixed joints.
   - slider axis projection for prismatic joints.
   - scalar effective mass respects frozen axes and angular freeze.
-- [ ] Implement distance joint rows.
-- [ ] Implement pin/revolute anchor rows.
-- [ ] Implement weld/fixed linear and angular rows.
-- [ ] Implement prismatic/slider axis rows and limits.
-- [ ] Implement angular limit rows.
-- [ ] Implement motor rows with bounded impulses.
-- [ ] Add deterministic warm-start tests across repeated frames.
+- [x] Implement distance joint rows.
+- [x] Implement pin/revolute anchor rows.
+- [x] Implement weld/fixed linear and angular rows.
+- [x] Implement prismatic/slider axis rows and limits.
+- [x] Implement angular limit rows.
+- [x] Implement motor rows with bounded impulses.
+- [x] Add deterministic warm-start tests across repeated frames.
 
 **Done Criteria**
 
@@ -169,7 +218,7 @@ The 2D solver needs planar linear rows and scalar angular rows that respect
 
 ## Workstream 3: 2D Island Integration With Contacts
 
-**Status:** Planned
+**Status:** Done
 
 **Problem**
 
@@ -179,19 +228,19 @@ fighting each other.
 
 **Tasks**
 
-- [ ] Extend the pure 2D island graph to union dynamic bodies connected by
+- [x] Extend the pure 2D island graph to union dynamic bodies connected by
       enabled `Joint2D` constraints.
-- [ ] Sort 2D island constraints by documented stable keys:
+- [x] Sort 2D island constraints by documented stable keys:
   - island root dynamic ID.
   - constraint kind.
   - contact pair ID or joint ID.
   - row index.
-- [ ] Prepare 2D contact rows and 2D joint rows before solver iteration.
-- [ ] Warm-start both contact and joint rows before the first iteration.
-- [ ] Iterate contacts and joints in the same bounded loop.
-- [ ] Persist joint warm-start data after the solve.
-- [ ] Propagate sleep and wake state through enabled 2D joints.
-- [ ] Add tests for:
+- [x] Prepare 2D contact rows and 2D joint rows before solver iteration.
+- [x] Warm-start both contact and joint rows before the first iteration.
+- [x] Iterate contacts and joints in the same bounded loop.
+- [x] Persist joint warm-start data after the solve.
+- [x] Propagate sleep and wake state through enabled 2D joints.
+- [x] Add tests for:
   - two linked bodies form one island.
   - a linked body contacting a static platform solves contacts and joints
     together.
@@ -207,7 +256,7 @@ fighting each other.
 
 ## Workstream 4: 2D Linked Collision Filtering And Ragdoll Authoring
 
-**Status:** Planned
+**Status:** Done
 
 **Problem**
 
@@ -217,27 +266,27 @@ system.
 
 **Tasks**
 
-- [ ] Add linked-collider filtering tests:
+- [x] Add linked-collider filtering tests:
   - directly linked 2D colliders suppress collision by default.
   - linked colliders collide when policy is `Collide`.
   - non-adjacent ragdoll links follow the ragdoll self-collision policy.
   - external colliders still collide with ragdoll links.
-- [ ] Add allocation-free `Constraints2D.ShouldExcludeLinkedCollision(...)`
+- [x] Add allocation-free `Constraints2D.ShouldExcludeLinkedCollision(...)`
       helpers for 2D broad phase, 2D queries where relevant, and 2D CCD source
       filtering.
-- [ ] Add `src/Gravitas/Constraints/2D/RagdollDefinition2D.cs`.
-- [ ] Add `src/Gravitas/Constraints/2D/RagdollLinkDefinition2D.cs`.
-- [ ] Add `src/Gravitas/Constraints/2D/RagdollJointDefinition2D.cs`.
-- [ ] Add `src/Gravitas/Constraints/2D/RagdollRuntime2D.cs`.
-- [ ] Add `RagdollSelfCollisionPolicy` reuse or extraction if the existing 3D
+- [x] Add `src/Gravitas/Constraints/2D/RagdollDefinition2D.cs`.
+- [x] Add `src/Gravitas/Constraints/2D/RagdollLinkDefinition2D.cs`.
+- [x] Add `src/Gravitas/Constraints/2D/RagdollJointDefinition2D.cs`.
+- [x] Add `src/Gravitas/Constraints/2D/RagdollRuntime2D.cs`.
+- [x] Add `RagdollSelfCollisionPolicy` reuse or extraction if the existing 3D
       policy is dimension-neutral.
-- [ ] Validate 2D ragdoll definitions:
+- [x] Validate 2D ragdoll definitions:
   - all link IDs are unique.
   - all joint link references resolve.
   - all links belong to one context.
   - every link body has an active 2D collider.
   - authored joints are compatible with their linked bodies.
-- [ ] Provide activation/deactivation methods that switch linked `SolidBody2D`
+- [x] Provide activation/deactivation methods that switch linked `SolidBody2D`
       instances between dynamic and kinematic/host-driven modes
       deterministically.
 
@@ -250,7 +299,7 @@ system.
 
 ## Workstream 5: CCD, Serialization, Replay Hashing, And Diagnostics
 
-**Status:** Planned
+**Status:** Done
 
 **Problem**
 
@@ -260,14 +309,14 @@ release-quality.
 
 **Tasks**
 
-- [ ] Add CCD tests:
+- [x] Add CCD tests:
   - fast linked 2D bodies keep existing body CCD behavior.
   - adjacent linked bodies do not self-hit through CCD.
   - external static blockers still clip active links.
   - joint wake propagation works after CCD handoff.
-- [ ] Add Chronicler `RecordData(...)` for `Joint2D` mutable state.
-- [ ] Add Chronicler `RecordData(...)` for `RagdollRuntime2D` activation state.
-- [ ] Add replay hash contribution for:
+- [x] Add Chronicler `RecordData(...)` for `Joint2D` mutable state.
+- [x] Add Chronicler `RecordData(...)` for `RagdollRuntime2D` activation state.
+- [x] Add replay hash contribution for:
   - service joint counts and IDs.
   - enabled state.
   - joint type.
@@ -276,15 +325,15 @@ release-quality.
   - motor payloads.
   - collision policy.
   - ragdoll activation and link/joint counts.
-- [ ] Add diagnostic events or views for:
+- [x] Add diagnostic events or views for:
   - 2D joint registered/removed.
   - 2D joint impulse.
   - 2D joint limit reached.
   - 2D ragdoll activated/deactivated.
-  - 2D island joint count.
-- [ ] Add debug draw capture for 2D joint anchors, axes, limits, and ragdoll
+  - 2D joint row count, clamped-row count, and solver error metrics.
+- [x] Add debug draw capture for 2D joint anchors, axes, limits, and ragdoll
       links using existing engine-agnostic draw commands where possible.
-- [ ] Add tests proving disabled diagnostics allocate `0` bytes after warmup.
+- [x] Add tests proving disabled diagnostics allocate `0` bytes after warmup.
 
 **Done Criteria**
 
@@ -294,7 +343,7 @@ release-quality.
 
 ## Workstream 6: Benchmarks, Docs, And Release Validation
 
-**Status:** Planned
+**Status:** Done
 
 **Problem**
 
@@ -303,30 +352,30 @@ API feel first-class, not a shadow of 3D.
 
 **Tasks**
 
-- [ ] Add `tests/Gravitas.Benchmarks/Core/Constraint2DBenchmarks.cs` covering:
+- [x] Add `tests/Gravitas.Benchmarks/Core/Constraint2DBenchmarks.cs` covering:
   - long 2D chain solve.
   - 2D ragdoll activation.
   - contact-heavy articulated 2D bodies.
   - motor-driven 2D chain.
   - linked self-collision filtering.
-- [ ] Add allocation guardrails for steady-state 2D joint solve and linked
+- [x] Add allocation guardrails for steady-state 2D joint solve and linked
       filtering.
-- [ ] Update `docs/wiki/OVERVIEW.md` with the 2D constraint subsystem.
-- [ ] Update `docs/wiki/RUNTIME_ARCHITECTURE.md` with
+- [x] Update `docs/wiki/OVERVIEW.md` with the 2D constraint subsystem.
+- [x] Update `docs/wiki/RUNTIME_ARCHITECTURE.md` with
       `GravitasConstraint2DService` ownership.
-- [ ] Update `docs/wiki/DIMENSIONS.md` to describe native 2D constraints and the
+- [x] Update `docs/wiki/DIMENSIONS.md` to describe native 2D constraints and the
       difference from 3D joints.
-- [ ] Update `docs/wiki/COLLISION_PIPELINE.md` with 2D joint/contact island
+- [x] Update `docs/wiki/COLLISION_PIPELINE.md` with 2D joint/contact island
       ordering.
-- [ ] Update `docs/wiki/HOST_INTEGRATION.md` with 2D joint and ragdoll examples.
-- [ ] Update `docs/wiki/SERIALIZATION.md` and `docs/wiki/DIAGNOSTICS.md`.
-- [ ] Run focused tests:
+- [x] Update `docs/wiki/HOST_INTEGRATION.md` with 2D joint and ragdoll examples.
+- [x] Update `docs/wiki/SERIALIZATION.md` and `docs/wiki/DIAGNOSTICS.md`.
+- [x] Run focused tests:
   - `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~Constraint2D|FullyQualifiedName~Ragdoll2D"`
-- [ ] Run release validation:
+- [x] Run release validation:
   - `dotnet test Gravitas.slnx --configuration Release`
   - `dotnet test Gravitas.slnx --configuration ReleaseLean`
-- [ ] Run focused 2D constraint benchmark smoke.
-- [ ] Move this plan to `docs/feature-work/done` only after tests, benchmarks,
+- [x] Run focused 2D constraint benchmark smoke.
+- [x] Move this plan to `docs/feature-work/done` only after tests, benchmarks,
       docs, and deferred-work extraction are complete.
 
 **Done Criteria**

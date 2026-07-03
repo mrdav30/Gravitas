@@ -190,6 +190,67 @@ public sealed partial class GravitasDiagnosticSink
     }
 
     /// <summary>
+    /// Emits engine-agnostic draw commands for a pure 2D joint's anchors and active planar axis.
+    /// </summary>
+    public void CaptureJoint(Joint2D joint, GravitasDiagnosticColor color)
+    {
+        if (!Enabled)
+            return;
+
+        SwiftThrowHelper.ThrowIfNull(joint, nameof(joint));
+        SolidBody2D bodyA = joint.BodyA;
+        SolidBody2D bodyB = joint.BodyB;
+        Fixed64 y = bodyA.Agent.Transform.Position.Y;
+        Vector2d anchorA2D = bodyA.Position + Vector2d.Rotate(joint.LocalFrameA.Anchor, bodyA.Rotation);
+        Vector2d anchorB2D = bodyB.Position + Vector2d.Rotate(joint.LocalFrameB.Anchor, bodyB.Rotation);
+        Vector3d anchorA = new(anchorA2D.X, y, anchorA2D.Y);
+        Vector3d anchorB = new(anchorB2D.X, y, anchorB2D.Y);
+        Fixed64 pointRadius = Fixed64.One / (Fixed64)10;
+
+        AddDrawCommand(
+            GravitasDebugDrawKind.Point,
+            bodyA.Collider.Id,
+            colliderDimension: GravitasColliderDimension.TwoD,
+            collider2DType: bodyA.Collider.Shape,
+            center: anchorA,
+            radius: pointRadius,
+            color: color);
+        AddDrawCommand(
+            GravitasDebugDrawKind.Point,
+            bodyB.Collider.Id,
+            colliderDimension: GravitasColliderDimension.TwoD,
+            collider2DType: bodyB.Collider.Shape,
+            center: anchorB,
+            radius: pointRadius,
+            color: color);
+        AddDrawCommand(
+            GravitasDebugDrawKind.Line,
+            bodyA.Collider.Id,
+            colliderDimension: GravitasColliderDimension.TwoD,
+            collider2DType: bodyA.Collider.Shape,
+            start: anchorA,
+            end: anchorB,
+            color: color);
+
+        if (joint.Type != JointType2D.Prismatic)
+            return;
+
+        Vector2d axis2D = Vector2d.Rotate(Vector2d.Right, bodyA.Rotation + joint.LocalFrameA.Angle);
+        Vector3d axis = new(axis2D.X, Fixed64.Zero, axis2D.Y);
+        if (axis.MagnitudeSquared <= Fixed64.Epsilon)
+            return;
+
+        AddDrawCommand(
+            GravitasDebugDrawKind.Ray,
+            bodyA.Collider.Id,
+            colliderDimension: GravitasColliderDimension.TwoD,
+            collider2DType: bodyA.Collider.Shape,
+            start: anchorA,
+            end: anchorA + axis.Normalized,
+            color: color);
+    }
+
+    /// <summary>
     /// Emits an engine-agnostic line draw command.
     /// </summary>
     public void CaptureLine(Vector3d start, Vector3d end, GravitasDiagnosticColor color)

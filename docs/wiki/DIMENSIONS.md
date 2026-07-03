@@ -35,10 +35,12 @@ simulation or visualization cost. Runtime modes are validated exactly; `None`
 and arbitrary bit combinations are rejected as settings values.
 
 3D articulated-body constraints live on `GravitasConstraint3DService` and link
-`SolidBody` instances through `Joint3D` and `RagdollRuntime3D`. They do not
-imply pure 2D joints or mixed 2D/3D articulation. Pure 2D and mixed constraints
-should be modeled as separate APIs if they become necessary, because their mass,
-angular, and embedding semantics are not the same as 3D joints.
+`SolidBody` instances through `Joint3D` and `RagdollRuntime3D`. Pure 2D
+articulated-body constraints live on `GravitasConstraint2DService` and link
+`SolidBody2D` instances through `Joint2D` and `RagdollRuntime2D`. The two APIs
+share ownership and ordering principles, but not physics payloads: 2D joints
+use planar anchors, scalar angles, scalar inertia, and X/Z motion, while 3D
+joints use full local frames, angular axes, and inertia tensors.
 
 ## Pure 2D Coordinate Contract
 
@@ -153,6 +155,34 @@ thickness, or mixed-dimension contact rule.
 
 Pure 2D does not expose a public bounds/config bridge. Keep bounds ownership on
 `LSCollider2D` and runtime services.
+
+## Pure 2D Constraints
+
+Pure 2D constraints are native planar/scalar physics, not projected 3D joints.
+`context.Constraints2D` owns deterministic joint IDs, `Joint2D` runtime state,
+linked-collider suppression counts, ragdoll runtimes, replay hashing, and joint
+diagnostics for one context. Current joint types are distance, pin/revolute,
+weld/fixed, and prismatic/slider. Limits and motors use `Fixed64` scalar values:
+distance limits are world units, slider limits are signed translation along the
+joint axis, angular limits are radians, angular motors target scalar local
+angle, and linear motors target slider translation.
+
+Enabled `Joint2D` rows solve inside the same pure 2D response islands as contact
+rows during `LateSimulate()`. The island graph wakes linked sleeping bodies when
+an awake participant exists, applies cached joint impulses on the first
+iteration, and respects `SolidBody2D.CanTranslate`, `CanRotate`,
+`EffectiveInverseMass`, and `EffectiveInverseMomentOfInertia`. Directly linked
+colliders suppress physical self-collision by default through
+`JointCollisionPolicy.SuppressLinked`; `JointCollisionPolicy.Collide` keeps the
+link physically collidable. This linked filtering affects physical
+collision/CCD pair creation, not public query include-mask semantics.
+
+`RagdollDefinition2D` and `RagdollRuntime2D` are authoring/runtime conveniences
+over ordinary `SolidBody2D` links and `LSCollider2D` colliders. They provide
+stable link IDs, authored 2D joint definitions, explicit self-collision policy,
+activation/deactivation between dynamic simulation and kinematic host control,
+and caller-owned motor target handoff. Animation, IK, and bone pose blending
+remain host or animation-library responsibilities.
 
 ## Mixed 2D Embedding State
 

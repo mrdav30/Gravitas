@@ -242,6 +242,7 @@ public sealed partial class GravitasPhysics2DService
             && !ReferenceEquals(first.AgentOrNull, second.AgentOrNull)
             && !IsLayerCollisionDisabled(first.Layer, second.Layer)
             && ColliderCollisionFilter.AllowsPhysicalPair(first, second)
+            && !_context.Constraints2D.ShouldExcludeLinkedCollision(first, second)
             && !first.IsSibling(second);
     }
 

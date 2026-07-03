@@ -46,7 +46,7 @@ clears and stops capture.
 | `Sequence`                                  | Capture order inside the current buffer.                                           |
 | `Kind`                                      | Event payload type.                                                                |
 | `BodyId`                                    | Context-local dynamic body ID, or `-1` when not applicable.                        |
-| `JointId`                                   | Context-local 3D joint ID, or `-1` when not applicable.                            |
+| `JointId`                                   | Context-local joint ID for the event dimension, or `-1` when not applicable.       |
 | `ColliderAId` / `ColliderBId`               | Context-local collider IDs, or `-1` when not applicable.                           |
 | `ColliderADimension` / `ColliderBDimension` | Collider runtime surface: `ThreeD`, `TwoD`, or `None`.                             |
 | `ColliderAType` / `ColliderBType`           | Collider shape types when present.                                                 |
@@ -76,31 +76,35 @@ Current event kinds:
 | `MixedContact`         | `CollisionPairMixed.MarkColliding(...)`                          | Dimension-tagged 3D/2D collider IDs, mixed contact points, `Normal3DTo2D`, and penetration depth.                                                                            |
 | `MixedResponseImpulse` | `CollisionResponseMixed`                                         | Dimension-tagged mixed impulse, impulse magnitude, normal velocity, solve iteration, and iteration cap.                                                                      |
 | `MixedResponseIsland`  | `GravitasMixedCollisionService`                                  | Mixed island root key, constraint count, iterations used, and whether the configured cap was reached.                                                                        |
-| `JointRegistered`      | `GravitasConstraint3DService.RegisterJoint(...)`                 | `JointId`, linked 3D collider IDs/types, `DataA` joint type, and `DataB` collision policy.                                                                                   |
-| `JointRemoved`         | `GravitasConstraint3DService.RemoveJoint(...)`                   | Same linked-joint identity payload as registration.                                                                                                                          |
-| `JointImpulse`         | 3D joint solver                                                  | `JointId`, linked collider IDs/types, `ScalarA` cached impulse magnitude, `ScalarB` linear anchor error, `Vector.X/Y/Z` motor impulse, motor error, and angular-limit error, plus `DataA` row count and `DataB` clamped row count.         |
-| `JointLimitReached`    | 3D joint solver                                                  | `JointId`, linked collider IDs/types, `ScalarB` limit error, and `DataA` limit kind.                                                                                         |
-| `RagdollActivated`     | `RagdollRuntime3D.ActivateDynamic()` / `DeactivateToKinematic()` | `BodyId` is the context-local ragdoll ID, `DataA` link count, `DataB` joint count, and `Hit` is active state.                                                                |
+| `JointRegistered`      | `GravitasConstraint3DService.RegisterJoint(...)` and `GravitasConstraint2DService.RegisterJoint(...)` | `JointId`, dimension-tagged linked collider IDs/types, `DataA` joint type, and `DataB` collision policy.                                                                 |
+| `JointRemoved`         | 3D and pure 2D constraint services                               | Same linked-joint identity payload as registration.                                                                                                                          |
+| `JointImpulse`         | 3D and pure 2D joint solvers                                     | `JointId`, dimension-tagged linked collider IDs/types, `ScalarA` cached impulse magnitude, `ScalarB` linear anchor error, `Vector.X/Y/Z` motor impulse, motor error, and limit error, plus `DataA` row count and `DataB` clamped row count. |
+| `JointLimitReached`    | 3D and pure 2D joint solvers                                     | `JointId`, dimension-tagged linked collider IDs/types, `ScalarB` limit error, and `DataA` limit kind.                                                                        |
+| `RagdollActivated`     | `RagdollRuntime3D` and `RagdollRuntime2D` activation changes     | `BodyId` is the context-local ragdoll ID, `DataA` link count, `DataB` joint count, and `Hit` is active state.                                                                |
 
 The stream is scoped to one context. Collider and body IDs are not global and
 must be resolved through the same context that produced the event.
 
-## 3D Joint Solver Metrics
+## Joint Solver Metrics
 
-Each active `Joint3D` exposes `LastSolveMetrics`, a deterministic snapshot from
-the most recent solver pass. It reports prepared row count, pre-solve linear
-anchor error, angular limit error, cached impulse magnitude, fresh incremental
-impulse magnitude, motor impulse, motor target error, and clamped row count.
-`Joint3D.AccumulatedImpulseMagnitude` remains the cumulative fresh impulse
+Each active `Joint3D` and `Joint2D` exposes `LastSolveMetrics`, a deterministic
+snapshot from the most recent solver pass. It reports prepared row count,
+pre-solve linear anchor error, limit error, cached impulse magnitude, fresh
+incremental impulse magnitude, motor impulse, motor target error, and clamped
+row count. `Joint3D.AccumulatedImpulseMagnitude` and
+`Joint2D.AccumulatedImpulseMagnitude` remain the cumulative fresh impulse
 emitted since the solver cache was last cleared.
 
 When diagnostics are enabled, `JointImpulse` events carry the same high-signal
 solver values through `GravitasJointDiagnosticView`. `LimitError` continues to
 decode `JointLimitReached` events, while `LinearAnchorErrorMagnitude`,
-`AngularLimitErrorMagnitude`, `MotorImpulseMagnitude`, `MotorErrorMagnitude`,
-and `ClampedRowCount` decode joint impulse events. These counters are intended
-for deterministic stress tests, replay RCA, host telemetry, and benchmark
-triage. They are not separate tuning knobs.
+`LimitErrorMagnitude`, `MotorImpulseMagnitude`, `MotorErrorMagnitude`, and
+`ClampedRowCount` decode joint impulse events. The view also exposes
+`ColliderADimension`, `ColliderBDimension`, `ColliderA2DType`, and
+`ColliderB2DType` so host tooling can route 2D and 3D events without inspecting
+the raw payload. These counters are intended for deterministic stress tests,
+replay RCA, host telemetry, and benchmark triage. They are not separate tuning
+knobs.
 
 ## CCD Service Counters
 
@@ -238,6 +242,11 @@ debug geometry separately from pure 3D colliders.
 active angular axes for hinge, cone-twist, and fixed joints using the existing
 point, line, and ray command kinds. Hosts can render joint frames without a
 Gravitas-specific gizmo format.
+
+`CaptureJoint(Joint2D, ...)` emits the two planar anchor points, their
+anchor-error line, and a prismatic slider axis ray when applicable. Points are
+stored in the X/Z debug plane using the owning body's host Y for visual
+placement, and commands are tagged with `GravitasColliderDimension.TwoD`.
 
 ## Host Adapter Pattern
 

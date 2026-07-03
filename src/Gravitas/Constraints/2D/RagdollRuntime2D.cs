@@ -1,28 +1,27 @@
 //=======================================================================
-// RagdollRuntime3D.cs
+// RagdollRuntime2D.cs
 //=======================================================================
 // MIT License, Copyright (c) 2026-present David Oravsky (mrdav30)
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
-using System.Runtime.CompilerServices;
 using Chronicler;
 
 namespace Gravitas.Constraints;
 
 /// <summary>
-/// Runtime handle for a context-owned 3D ragdoll articulation.
+/// Runtime handle for a context-owned pure 2D ragdoll articulation.
 /// </summary>
-public sealed class RagdollRuntime3D : IRecordable
+public sealed class RagdollRuntime2D : IRecordable
 {
-    private readonly SolidBody[] _links;
-    private readonly Joint3D[] _joints;
+    private readonly SolidBody2D[] _links;
+    private readonly Joint2D[] _joints;
     private bool _isActive;
 
-    internal RagdollRuntime3D(
+    internal RagdollRuntime2D(
         int id,
-        SolidBody[] links,
-        Joint3D[] joints,
+        SolidBody2D[] links,
+        Joint2D[] joints,
         RagdollSelfCollisionPolicy selfCollisionPolicy,
         bool startsActive)
     {
@@ -61,24 +60,28 @@ public sealed class RagdollRuntime3D : IRecordable
     /// <summary>
     /// Gets a ragdoll link by runtime index.
     /// </summary>
-    public SolidBody GetLink(int index) => _links[index];
+    public SolidBody2D GetLink(int index) => _links[index];
 
     /// <summary>
     /// Gets a ragdoll joint by runtime index.
     /// </summary>
-    public Joint3D GetJoint(int index) => _joints[index];
+    public Joint2D GetJoint(int index) => _joints[index];
 
     /// <summary>
     /// Switches all links to dynamic simulation and enables ragdoll joints.
     /// </summary>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void ActivateDynamic() => ApplyActivationState(isActive: true, emitDiagnostics: true);
+    public void ActivateDynamic()
+    {
+        ApplyActivationState(isActive: true, emitDiagnostics: true);
+    }
 
     /// <summary>
     /// Switches all links to kinematic host control and disables ragdoll joints.
     /// </summary>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void DeactivateToKinematic() => ApplyActivationState(isActive: false, emitDiagnostics: true);
+    public void DeactivateToKinematic()
+    {
+        ApplyActivationState(isActive: false, emitDiagnostics: true);
+    }
 
     /// <summary>
     /// Records runtime activation state for deterministic continuation.
