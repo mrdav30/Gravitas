@@ -573,9 +573,7 @@ public sealed partial class GravitasQuery3DService
         out Vector3d max)
     {
         Vector3d end = origin + direction * length;
-        Vector3d radiusExtents = Vector3d.One * endRadius;
-        min = Vector3d.Min(origin, end - radiusExtents);
-        max = Vector3d.Max(origin, end + radiusExtents);
+        ConeGeometry.CreateFiniteConeBounds(origin, end, direction, endRadius, out min, out max);
     }
 
     private static void ValidateConeQuery(Vector3d direction, Fixed64 length, Fixed64 endRadius)

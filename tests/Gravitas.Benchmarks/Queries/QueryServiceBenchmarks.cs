@@ -195,6 +195,40 @@ public class QueryServiceBenchmarks
             _coneVolumeHits);
 
     [Benchmark]
+    public int OverlapConeAll_LongNarrowAcrossPopulatedContext() =>
+        _context.Query3D.OverlapConeAll(
+            new Vector3d((Fixed64)(-2), Fixed64.Zero, Fixed64.Zero),
+            new Vector3d(Fixed64.One, Fixed64.FromFraction(1, 4), Fixed64.FromFraction(1, 8)),
+            (Fixed64)(ColliderCount * 2 + 2),
+            Fixed64.Half,
+            IncludeLayerZero,
+            _coneVolumeHits);
+
+    [Benchmark]
+    public int OverlapConeAll_LongNarrowAcrossPopulatedContext_CandidateCount()
+    {
+        _ = OverlapConeAll_LongNarrowAcrossPopulatedContext();
+        return _context.Query3D.LastQueryCandidateCount;
+    }
+
+    [Benchmark]
+    public int OverlapConeAll_ShortWideAcrossPopulatedContext() =>
+        _context.Query3D.OverlapConeAll(
+            new Vector3d((Fixed64)(-2), Fixed64.Zero, Fixed64.Zero),
+            Vector3d.Right,
+            (Fixed64)8,
+            (Fixed64)4,
+            IncludeLayerZero,
+            _coneVolumeHits);
+
+    [Benchmark]
+    public int OverlapConeAll_ShortWideAcrossPopulatedContext_CandidateCount()
+    {
+        _ = OverlapConeAll_ShortWideAcrossPopulatedContext();
+        return _context.Query3D.LastQueryCandidateCount;
+    }
+
+    [Benchmark]
     public bool DirectionalOverlapCircleAcrossPopulatedContext() =>
         _context.Query3D.OverlapCircleInDirection(
             Vector3d.Zero,

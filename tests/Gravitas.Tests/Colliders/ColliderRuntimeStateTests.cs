@@ -63,6 +63,36 @@ public sealed class ColliderRuntimeStateTests
     }
 
     [Fact]
+    public void ConeShape_WithArbitraryRotation_ShouldUseFiniteConeBounds()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSConeCollider> coneBody = scenario.CreateBody(
+            new LSConeCollider
+            {
+                Radius = Fixed64.Half,
+                Size = new Vector3d(Fixed64.One, (Fixed64)3, Fixed64.One)
+            },
+            new Vector3d(Fixed64.One, Fixed64.FromFraction(1, 4), -Fixed64.Half),
+            FixedQuaternion.FromEulerAnglesInDegrees((Fixed64)25, (Fixed64)(-35), (Fixed64)50));
+        LSConeCollider cone = coneBody.Collider;
+
+        ConeGeometry.CreateFiniteConeBounds(
+            cone.WorldApex,
+            cone.WorldBaseCenter,
+            cone.Axis,
+            cone.ScaledRadius,
+            out Vector3d expectedMin,
+            out Vector3d expectedMax);
+
+        AssertNear(cone.BoundsMin.X, expectedMin.X);
+        AssertNear(cone.BoundsMin.Y, expectedMin.Y);
+        AssertNear(cone.BoundsMin.Z, expectedMin.Z);
+        AssertNear(cone.BoundsMax.X, expectedMax.X);
+        AssertNear(cone.BoundsMax.Y, expectedMax.Y);
+        AssertNear(cone.BoundsMax.Z, expectedMax.Z);
+    }
+
+    [Fact]
     public void CapsuleShapeMutations_ShouldRebuildDerivedStateOncePerSimulate()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();

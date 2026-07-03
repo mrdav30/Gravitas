@@ -361,7 +361,7 @@ public sealed class MixedQueryCcdTests
     }
 
     [Fact]
-    public void SweepCircleAgainst3D_WithRotatedConeTarget_ShouldReportConservativeFallback()
+    public void SweepCircleAgainst3D_WithRotatedConeTarget_ShouldUseExactCircleSlabSweep()
     {
         using GravitasWorldContext context = CreateMixedContext();
         FixedQuaternion rotation = FixedQuaternion.FromEulerAnglesInDegrees(Fixed64.Zero, Fixed64.Zero, (Fixed64)90);
@@ -383,7 +383,33 @@ public sealed class MixedQueryCcdTests
 
         mixedHit.Should().BeTrue();
         hit.Collider3D.Should().BeSameAs(target.Collider);
-        hit.ReducerKind.Should().Be(PhysicsQueryReducerKind.ConservativeFallback);
+        hit.ReducerKind.Should().Be(PhysicsQueryReducerKind.Exact);
+    }
+
+    [Fact]
+    public void SweepCircleAgainst3D_WithRotatedConeTarget_ShouldRejectWholeProjectionOnlyHit()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        FixedQuaternion rotation = FixedQuaternion.FromEulerAnglesInDegrees(Fixed64.Zero, Fixed64.Zero, (Fixed64)90);
+        _ = CreateBody3D(
+            context,
+            new LSConeCollider { Size = new Vector3d(Fixed64.One, (Fixed64)3, Fixed64.One) },
+            Vector3d.Zero,
+            immovable: true,
+            rotation: rotation);
+        var hits = new SwiftList<PhysicsMixedHit>();
+
+        int count = context.QueryMixed.SweepCircleAgainst3DAll(
+            new Vector2d((Fixed64)(-4), Fixed64.FromFraction(2, 5)),
+            new Vector2d((Fixed64)4, Fixed64.FromFraction(2, 5)),
+            Fixed64.FromFraction(1, 10),
+            Fixed64.FromFraction(9, 20),
+            Fixed64.FromFraction(1, 100),
+            IncludeLayerZero,
+            hits);
+
+        count.Should().Be(0);
+        hits.Count.Should().Be(0);
     }
 
     [Fact]
@@ -455,21 +481,28 @@ public sealed class MixedQueryCcdTests
             new Vector3d((Fixed64)2, Fixed64.Zero, Fixed64.Zero),
             immovable: true,
             rotation: FixedQuaternion.FromEulerAnglesInDegrees((Fixed64)(-20), (Fixed64)40, (Fixed64)65));
+        _ = CreateBody3D(
+            context,
+            new LSConeCollider { Size = new Vector3d(Fixed64.One, (Fixed64)3, Fixed64.One) },
+            new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero),
+            immovable: true,
+            rotation: FixedQuaternion.FromEulerAnglesInDegrees((Fixed64)15, (Fixed64)(-25), (Fixed64)70));
         var hits = new SwiftList<PhysicsMixedHit>();
 
         int count = context.QueryMixed.SweepCircleAgainst3DAll(
             new Vector2d((Fixed64)(-5), Fixed64.Zero),
-            new Vector2d((Fixed64)5, Fixed64.Zero),
+            new Vector2d((Fixed64)7, Fixed64.Zero),
             Fixed64.Half,
             Fixed64.Zero,
             Fixed64.Half,
             IncludeLayerZero,
             hits);
 
-        count.Should().Be(2);
-        hits.Count.Should().Be(2);
+        count.Should().Be(3);
+        hits.Count.Should().Be(3);
         hits[0].ReducerKind.Should().Be(PhysicsQueryReducerKind.Exact);
         hits[1].ReducerKind.Should().Be(PhysicsQueryReducerKind.Exact);
+        hits[2].ReducerKind.Should().Be(PhysicsQueryReducerKind.Exact);
     }
 
     [Fact]
@@ -554,12 +587,18 @@ public sealed class MixedQueryCcdTests
             new Vector3d((Fixed64)6, Fixed64.Zero, Fixed64.Zero),
             immovable: true,
             rotation: rotatedCurvedTarget);
+        _ = CreateBody3D(
+            context,
+            new LSConeCollider { Size = new Vector3d(Fixed64.One, (Fixed64)3, Fixed64.One) },
+            new Vector3d((Fixed64)8, Fixed64.Zero, Fixed64.Zero),
+            immovable: true,
+            rotation: rotatedCurvedTarget);
         var hits = new SwiftList<PhysicsMixedHit>(8);
 
         long allocatedBytes = AllocationTestHelper.MeasureSteadyState(
             () => context.QueryMixed.SweepCircleAgainst3DAll(
                 new Vector2d((Fixed64)(-8), Fixed64.Zero),
-                new Vector2d((Fixed64)8, Fixed64.Zero),
+                new Vector2d((Fixed64)10, Fixed64.Zero),
                 Fixed64.Half,
                 Fixed64.Zero,
                 Fixed64.Half,

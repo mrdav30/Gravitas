@@ -97,6 +97,17 @@ public sealed class LSConeCollider : LSCollider
         Area = Volume;
     }
 
+    protected override void BuildBoundingBox()
+    {
+        Fixed64 height = ScaledSize.Y;
+        Fixed64 halfHeight = height * Fixed64.Half;
+        Vector3d axis = Rotation * Vector3d.Up;
+        Vector3d baseCenter = Center + Rotation * new Vector3d(Fixed64.Zero, -halfHeight, Fixed64.Zero);
+        Vector3d apex = Center + Rotation * new Vector3d(Fixed64.Zero, halfHeight, Fixed64.Zero);
+        ConeGeometry.CreateFiniteConeBounds(apex, baseCenter, axis, ScaledRadius, out Vector3d min, out Vector3d max);
+        SetBoundsMinMax(min, max);
+    }
+
     public override Vector3d CalculateLocalCenterOfMassOffset()
     {
         Vector3d localCom = new(Fixed64.Zero, -Height * Fixed64.FromFraction(1, 4), Fixed64.Zero);

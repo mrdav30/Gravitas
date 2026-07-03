@@ -28,11 +28,6 @@ instead of burying it in notes.
 
 ## Active Release-Scope
 
-- [`Rotated Cone Projection And Query Bounds Hardening`](2026-07-02-rotated-cone-projection-and-query-bounds-hardening-plan.md)
-  - Planned 2026-07-02. Investigates and, if benchmark/test evidence supports
-    it, promotes rotated finite-cone mixed slab sweeps from safe conservative
-    fallback to exact reducers while tightening physical cone and cone-volume
-    query bounds through shared deterministic cone geometry.
 - [`3D Constraint Solver Stress And Tuning Hardening`](2026-07-02-3d-constraint-solver-stress-and-tuning-hardening-plan.md)
   - Planned 2026-07-02. Adds long-chain, humanoid-ish, contact-heavy, and
     motor-driven 3D articulation stress coverage, solver diagnostics, benchmark
@@ -46,6 +41,11 @@ instead of burying it in notes.
 
 ## Recently Completed
 
+- [`Rotated Cone Projection And Query Bounds Hardening`](done/2026-07-02-rotated-cone-projection-and-query-bounds-hardening-plan.md)
+  - Completed 2026-07-02. Replaces rotated finite-cone mixed query conservative
+    projection with exact support-mapped circle-slab source sweeps, tightens
+    physical cone and cone-volume query bounds through shared deterministic cone
+    geometry, and records mixed/cone benchmark evidence.
 - [`Chronicler Replay Hash Migration`](done/2026-07-02-chronicler-replay-hash-migration-plan.md)
   - Completed 2026-07-02. Replaces Gravitas-local replay hash value and writer
     infrastructure with Chronicler `ChronicleHash`/`ChronicleHashWriter` and
@@ -61,8 +61,7 @@ instead of burying it in notes.
   - Completed 2026-06-28. Adds `LSConeCollider` as a first-class analytic 3D
     primitive across shape definitions, mass properties, collision, CCD, mixed
     mode, cone-volume queries, source sweeps, diagnostics, serialization, docs,
-    and benchmark signal. Mixed rotated finite-cone slab sweeps are labeled as
-    safe conservative fallbacks rather than exact slab reductions.
+    and benchmark signal.
 - [`Pure 2D Capsule And Convenience Shapes`](done/2026-06-26-pure-2d-capsule-and-convenience-shapes-plan.md)
   - Completed 2026-06-27. Adds `LSCapsuleCollider2D` as a first-class analytic
     primitive across shape definitions, mass properties, collision manifolds,

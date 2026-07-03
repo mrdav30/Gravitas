@@ -20,6 +20,9 @@ public class MixedQueryBenchmarks
     private GravitasWorldContext _denseCylinderContext;
     private GravitasWorldContext _denseRotatedCapsuleContext;
     private GravitasWorldContext _denseRotatedCylinderContext;
+    private GravitasWorldContext _denseRotatedConeContext;
+    private GravitasWorldContext _denseLongRotatedConeContext;
+    private GravitasWorldContext _denseWideRotatedConeContext;
     private GravitasWorldContext _sparseMeshContext;
     private GravitasWorldContext _denseMeshContext;
     private GravitasWorldContext _falsePositiveMeshContext;
@@ -48,6 +51,9 @@ public class MixedQueryBenchmarks
         _denseCylinderContext = BenchmarkPhysicsScene.CreateMixedContext(denseExtentX, 16);
         _denseRotatedCapsuleContext = BenchmarkPhysicsScene.CreateMixedContext(denseExtentX, 16);
         _denseRotatedCylinderContext = BenchmarkPhysicsScene.CreateMixedContext(denseExtentX, 16);
+        _denseRotatedConeContext = BenchmarkPhysicsScene.CreateMixedContext(denseExtentX, 16);
+        _denseLongRotatedConeContext = BenchmarkPhysicsScene.CreateMixedContext(denseExtentX, 16);
+        _denseWideRotatedConeContext = BenchmarkPhysicsScene.CreateMixedContext(denseExtentX, 16);
         _sparseMeshContext = BenchmarkPhysicsScene.CreateMixedContext(sparseExtentX, 16);
         _denseMeshContext = BenchmarkPhysicsScene.CreateMixedContext(denseExtentX, 16);
         _falsePositiveMeshContext = BenchmarkPhysicsScene.CreateMixedContext(denseExtentX, 16);
@@ -85,6 +91,21 @@ public class MixedQueryBenchmarks
                 new LSCylinderCollider { Size = new Vector3d(Fixed64.One, (Fixed64)3, Fixed64.One) },
                 densePosition,
                 rotatedCurvedTarget);
+            _ = CreateStatic3D(
+                _denseRotatedConeContext,
+                new LSConeCollider { Size = new Vector3d(Fixed64.One, (Fixed64)3, Fixed64.One) },
+                densePosition,
+                rotatedCurvedTarget);
+            _ = CreateStatic3D(
+                _denseLongRotatedConeContext,
+                CreateCone(Fixed64.FromFraction(1, 4), (Fixed64)6),
+                densePosition,
+                rotatedCurvedTarget);
+            _ = CreateStatic3D(
+                _denseWideRotatedConeContext,
+                CreateCone(Fixed64.One, (Fixed64)2),
+                densePosition,
+                rotatedCurvedTarget);
             _ = CreateStatic3D(_sparseMeshContext, CreateVerticalQuadMesh(), sparsePosition);
             _ = CreateStatic3D(_denseMeshContext, CreateVerticalQuadMesh(), densePosition);
             _ = CreateStatic3D(_falsePositiveMeshContext, CreateSlabClippedProxyOnlyTriangleMesh(), densePosition);
@@ -101,6 +122,9 @@ public class MixedQueryBenchmarks
         _denseCylinderContext.Simulate();
         _denseRotatedCapsuleContext.Simulate();
         _denseRotatedCylinderContext.Simulate();
+        _denseRotatedConeContext.Simulate();
+        _denseLongRotatedConeContext.Simulate();
+        _denseWideRotatedConeContext.Simulate();
         _sparseMeshContext.Simulate();
         _denseMeshContext.Simulate();
         _falsePositiveMeshContext.Simulate();
@@ -124,6 +148,9 @@ public class MixedQueryBenchmarks
         _denseCylinderContext?.Dispose();
         _denseRotatedCapsuleContext?.Dispose();
         _denseRotatedCylinderContext?.Dispose();
+        _denseRotatedConeContext?.Dispose();
+        _denseLongRotatedConeContext?.Dispose();
+        _denseWideRotatedConeContext?.Dispose();
         _sparseMeshContext?.Dispose();
         _denseMeshContext?.Dispose();
         _falsePositiveMeshContext?.Dispose();
@@ -138,6 +165,9 @@ public class MixedQueryBenchmarks
         _denseCylinderContext = null;
         _denseRotatedCapsuleContext = null;
         _denseRotatedCylinderContext = null;
+        _denseRotatedConeContext = null;
+        _denseLongRotatedConeContext = null;
+        _denseWideRotatedConeContext = null;
         _sparseMeshContext = null;
         _denseMeshContext = null;
         _falsePositiveMeshContext = null;
@@ -249,6 +279,31 @@ public class MixedQueryBenchmarks
     {
         _ = SweepCircleAgainstDensePrimitive3D(_denseRotatedCylinderContext);
         return _denseRotatedCylinderContext.QueryMixed.LastQueryCandidateCount;
+    }
+
+    [Benchmark]
+    public int SweepCircleAgainst3DAll_DenseRotatedConeTargets()
+    {
+        return SweepCircleAgainstDensePrimitive3D(_denseRotatedConeContext);
+    }
+
+    [Benchmark]
+    public int SweepCircleAgainst3DAll_DenseRotatedConeTargets_CandidateCount()
+    {
+        _ = SweepCircleAgainstDensePrimitive3D(_denseRotatedConeContext);
+        return _denseRotatedConeContext.QueryMixed.LastQueryCandidateCount;
+    }
+
+    [Benchmark]
+    public int SweepCircleAgainst3DAll_DenseLongRotatedConeTargets()
+    {
+        return SweepCircleAgainstDensePrimitive3D(_denseLongRotatedConeContext);
+    }
+
+    [Benchmark]
+    public int SweepCircleAgainst3DAll_DenseWideRotatedConeTargets()
+    {
+        return SweepCircleAgainstDensePrimitive3D(_denseWideRotatedConeContext);
     }
 
     [Benchmark]
@@ -378,6 +433,15 @@ public class MixedQueryBenchmarks
             1 => Fixed64.FromFraction(1, 4),
             2 => -Fixed64.FromFraction(1, 4),
             _ => Fixed64.FromFraction(3, 4)
+        };
+    }
+
+    private static LSConeCollider CreateCone(Fixed64 radius, Fixed64 height)
+    {
+        return new LSConeCollider
+        {
+            Radius = radius,
+            Size = new Vector3d(radius * (Fixed64)2, height, radius * (Fixed64)2)
         };
     }
 

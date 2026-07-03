@@ -143,10 +143,8 @@ public sealed partial class GravitasQueryMixedService
             return PhysicsQueryReducerKind.Exact;
         }
 
-        if (collider is LSConeCollider cone)
-            return FiniteSlabProjectionSweep.CanUseExactConeProjection(cone)
-                ? PhysicsQueryReducerKind.Exact
-                : PhysicsQueryReducerKind.ConservativeFallback;
+        if (collider is LSConeCollider)
+            return PhysicsQueryReducerKind.Exact;
 
         if (collider is LSCompoundCollider compound)
         {
@@ -378,7 +376,7 @@ public sealed partial class GravitasQueryMixedService
         return true;
     }
 
-    private static bool TrySweepCircleAgainstCone(
+    private bool TrySweepCircleAgainstCone(
         Vector2d start,
         Vector2d direction,
         Fixed64 length,
@@ -392,10 +390,10 @@ public sealed partial class GravitasQueryMixedService
     {
         Fixed64 slabMinY = slabCenterY - halfThickness;
         Fixed64 slabMaxY = slabCenterY + halfThickness;
-        PhysicsQueryReducerKind reducerKind;
         bool found;
         Fixed64 distance;
-        if (FiniteSlabProjectionSweep.CanUseExactConeProjection(cone))
+        Vector3d point3D;
+        if (FiniteSlabProjectionSweep.IsConeAxisVertical(cone))
         {
             found = FiniteSlabProjectionSweep.TrySweepCircleAgainstCone(
                 start,
@@ -406,20 +404,16 @@ public sealed partial class GravitasQueryMixedService
                 slabMaxY,
                 cone,
                 out distance);
-            reducerKind = PhysicsQueryReducerKind.Exact;
+            Vector2d verticalCenter2D = start + direction * distance;
+            Vector3d verticalSweepCenter = new(verticalCenter2D.X, slabCenterY, verticalCenter2D.Y);
+            point3D = GetSweepSurfacePoint(cone, verticalSweepCenter, direction3D);
         }
         else
         {
-            found = FiniteSlabProjectionSweep.TrySweepCircleAgainstConeWholeProjection(
-                start,
-                direction,
-                length,
-                radius,
-                slabMinY,
-                slabMaxY,
-                cone,
-                out distance);
-            reducerKind = PhysicsQueryReducerKind.ConservativeFallback;
+            found = _circleSlabSweepWorker.TrySweepPreparedSource(cone, out Physics3DHit sweepHit);
+            LastMeshTriangleCandidateCount += _circleSlabSweepWorker.LastMeshTriangleCandidateCount;
+            distance = sweepHit.Distance;
+            point3D = sweepHit.Point;
         }
 
         if (!found)
@@ -432,12 +426,13 @@ public sealed partial class GravitasQueryMixedService
         Vector3d sweepCenter = new(center2D.X, slabCenterY, center2D.Y);
         hit = BuildCircleAgainst3DHit(
             cone,
+            point3D,
             sweepCenter,
             direction3D,
             radius,
             slabCenterY,
             halfThickness,
-            reducerKind,
+            PhysicsQueryReducerKind.Exact,
             distance,
             sourceCollider);
         return true;

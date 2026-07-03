@@ -128,6 +128,7 @@ public sealed partial class GravitasQueryMixedService
         Fixed64 length = segment.Magnitude;
         Vector2d direction2D = segment / length;
         Vector3d direction = new(direction2D.X, Fixed64.Zero, direction2D.Y);
+        _circleSlabSweepWorker.PrepareCircleSlabSource(start3D, radius, halfThickness, direction * length);
         CreateCircleSlabSweepBounds(start, end, radius, slabCenterY, halfThickness, out Vector3d min, out Vector3d max);
         _context.MixedCollisions.Collect3DCandidatesInMixedBounds(
             min,
@@ -217,6 +218,7 @@ public sealed partial class GravitasQueryMixedService
         Fixed64 length = segment.Magnitude;
         Vector2d direction2D = segment / length;
         Vector3d direction = new(direction2D.X, Fixed64.Zero, direction2D.Y);
+        _circleSlabSweepWorker.PrepareCircleSlabSource(start3D, radius, halfThickness, direction * length);
         CreateCircleSlabSweepBounds(start, end, radius, slabCenterY, halfThickness, out Vector3d min, out Vector3d max);
         _context.MixedCollisions.Collect3DCandidatesInMixedBounds(
             min,

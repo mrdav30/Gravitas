@@ -46,7 +46,7 @@ names an internal CCD proxy.
 | `Query2D.Raycast`, `RaycastAll`                                                                                                              | 2D segment                                                                                                   | circle, capsule, AABB, convex polygon, compound                                                              | `Exact`; zero-length segments return no hit, starting-inside returns distance zero                                                                                                                                      | distance, collider ID                    | service-owned scratch, caller-owned all-hit buffer |
 | `Query2D.SweepCircle`, `SweepCircleAll`                                                                                                      | 2D circle                                                                                                    | circle, capsule, AABB, convex polygon, compound                                                              | `Exact` circle-source sweep reducers; compound reports owner once through earliest part                                                                                                                                 | distance, collider ID                    | service-owned scratch, caller-owned all-hit buffer |
 | `QueryMixed.SweepSphereAgainst2D`, `SweepSphereAgainst2DAll`                                                                                 | 3D sphere                                                                                                    | 2D circle slab, capsule slab, AABB slab, convex polygon slab, compound slab                                  | `Exact`; capsule/AABB/polygon slabs test cap, side, edge, and vertex features as appropriate, and compound targets reduce supported parts in authored order                                                             | distance, 3D collider ID, 2D collider ID | service-owned scratch, caller-owned all-hit buffer |
-| `QueryMixed.SweepCircleAgainst3D`, `SweepCircleAgainst3DAll`                                                                                 | 2D circle embedded in a finite Y slab                                                                        | 3D sphere, capsule, cuboid, finite cylinder, finite cone, mesh, compound                                     | `Exact` for supported primitive slabs, mesh triangles, compounds, and vertical finite cones; rotated finite cones report `ConservativeFallback` through a safe whole-cone projection                                    | distance, 3D collider ID, 2D collider ID | service-owned scratch, caller-owned all-hit buffer |
+| `QueryMixed.SweepCircleAgainst3D`, `SweepCircleAgainst3DAll`                                                                                 | 2D circle embedded in a finite Y slab                                                                        | 3D sphere, capsule, cuboid, finite cylinder, finite cone, mesh, compound                                     | `Exact` for supported primitive slabs, finite cones at any rotation, mesh triangles, and compounds; rotated finite cones use the shared convex sweep kernel with a query-owned circle-slab source                     | distance, 3D collider ID, 2D collider ID | service-owned scratch, caller-owned all-hit buffer |
 | Concave/raw mesh-source sweeps                                                                                                               | concave `LSMeshCollider` or raw mesh as the moving query source                                              | 2D, 3D, or mixed targets                                                                                     | `NotSupported`; use offline convex decomposition into supported `LSCompoundCollider` parts                                                                                                                              | none                                     | no raw mesh-source query API                       |
 
 ### Batched Query APIs
@@ -447,17 +447,16 @@ finite-slab projection: vertical overlap determines the sphere's effective
 planar reach, so tall slabs and slab-corner cases do not inflate the horizontal
 sweep radius. Cuboid targets project the cuboid portion intersecting the slab's
 Y interval into X/Z and sweep the source circle against that convex projection,
-so rotated cuboids do not rely on the generic sphere proxy. World-Y capsule,
-finite-cylinder, and finite-cone targets use exact vertical-interval fast paths:
-capsule cap reach is reduced by slab interval distance, finite cylinders require
-interval overlap before the planar circle sweep is accepted, and vertical cones
-use the slab-clipped cone cross-section. Rotated capsule and finite-cylinder
-targets use deterministic exact finite-slab projection reducers, so the moving
-2D circle is tested against the target volume actually intersecting the slab
-rather than a circumsphere proxy. Rotated finite-cone targets use a conservative
-whole-cone projection and report `PhysicsQueryReducerKind.ConservativeFallback`,
-preserving no-false-negative mixed CCD/query behavior without presenting the hit
-as exact.
+so rotated cuboids do not rely on the generic sphere proxy. World-Y capsule and
+finite-cylinder targets use exact vertical-interval fast paths: capsule cap
+reach is reduced by slab interval distance, and finite cylinders require
+interval overlap before the planar circle sweep is accepted. Vertical cones use
+the slab-clipped cone cross-section. Rotated capsule and finite-cylinder targets
+use deterministic exact finite-slab projection reducers, so the moving 2D circle
+is tested against the target volume actually intersecting the slab rather than a
+circumsphere proxy. Rotated finite-cone targets use the same support-mapped
+convex advancement kernel as 3D swept source queries with a query-owned vertical
+circle-slab source, so they also report `PhysicsQueryReducerKind.Exact`.
 
 Mesh targets query triangle BVH candidates, clip each world-space triangle to
 the slab Y interval, project the clipped polygon into X/Z, and sweep against

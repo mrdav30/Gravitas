@@ -83,12 +83,13 @@ exact finite-slab reducers from safe conservative fallbacks. 2D swept-circle
 mixed CCD routes through the same mixed query reducers as public
 `SweepCircleAgainst3D`: sphere, cuboid, capsule, and finite-cylinder targets use
 finite-slab reducers. Vertical finite-cone targets use exact slab-clipped cone
-cross-sections; rotated finite-cone targets use a safe whole-cone projection and
-report `ConservativeFallback`. Mesh targets clip candidate triangles to the
-finite slab before X/Z projection, and compound targets reduce exact supported
-parts in authored order. 3D swept-sphere mixed CCD routes through the same mixed
-query reducers as public `SweepSphereAgainst2D`: circle slabs, capsule slabs,
-AABB slabs, convex polygon slabs, and supported compound 2D slabs are exact.
+cross-sections; rotated finite-cone targets use the shared support-mapped convex
+sweep kernel with a query-owned circle-slab source. Mesh targets clip candidate
+triangles to the finite slab before X/Z projection, and compound targets reduce
+exact supported parts in authored order. 3D swept-sphere mixed CCD routes
+through the same mixed query reducers as public `SweepSphereAgainst2D`: circle
+slabs, capsule slabs, AABB slabs, convex polygon slabs, and supported compound
+2D slabs are exact.
 When diagnostics are enabled, mixed queries also emit `QuerySummary` events with
 eligible top-level exact attempt, accepted hit, fallback hit, and rejected
 fallback counts.

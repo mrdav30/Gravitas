@@ -245,15 +245,13 @@ The mixed runtime model is explicit rather than separate dimension engines:
   primitive and compound slabs, and 2D swept circles can query 3D primitive,
   mesh, and compound targets. Current `SweepCircleAgainst3D` target reducers are
   exact for supported 3D target families, including slab-clipped mesh triangle
-  targets, authored compound targets, and vertical finite-cone slabs. Rotated
-  finite-cone targets use a safe whole-cone projection and report
-  `ConservativeFallback`. Current `SweepSphereAgainst2D` target reducers are
-  exact for 2D circle, capsule, AABB, convex polygon, and supported compound
-  slabs. `PhysicsMixedHit.ReducerKind` labels exact hits separately from
-  conservative fallback hits on proxy-based dynamic CCD paths and rotated
-  finite-cone slab reductions. Mixed query diagnostics also emit `QuerySummary`
-  reducer counters when enabled. Pure query services do not accidentally report
-  cross-dimensional hits.
+  targets, authored compound targets, and finite-cone targets at any rotation.
+  Current `SweepSphereAgainst2D` target reducers are exact for 2D circle,
+  capsule, AABB, convex polygon, and supported compound slabs.
+  `PhysicsMixedHit.ReducerKind` labels exact hits separately from conservative
+  fallback hits on proxy-based dynamic CCD paths. Mixed query diagnostics also
+  emit `QuerySummary` reducer counters when enabled. Pure query services do not
+  accidentally report cross-dimensional hits.
 - mixed diagnostics emit dimension-tagged query, contact, and response impulse
   events, and debug draw can capture the finite 2D slab geometry used by mixed
   collision.
