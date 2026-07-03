@@ -28,11 +28,6 @@ instead of burying it in notes.
 
 ## Active Release-Scope
 
-- [`3D Constraint Solver Stress And Tuning Hardening`](2026-07-02-3d-constraint-solver-stress-and-tuning-hardening-plan.md)
-  - Planned 2026-07-02. Adds long-chain, humanoid-ish, contact-heavy, and
-    motor-driven 3D articulation stress coverage, solver diagnostics, benchmark
-    signal, and evidence-gated joint stabilization tuning only if the current
-    bias model proves insufficient.
 - [`Pure 2D Constraint And Ragdoll Foundation`](2026-07-02-pure-2d-constraint-and-ragdoll-foundation-plan.md)
   - Planned 2026-07-02. Adds a native pure 2D constraint service, 2D joint
     rows, contact-integrated 2D islands, linked-collider filtering, 2D ragdoll
@@ -41,6 +36,13 @@ instead of burying it in notes.
 
 ## Recently Completed
 
+- [`3D Constraint Solver Stress And Tuning Hardening`](done/2026-07-02-3d-constraint-solver-stress-and-tuning-hardening-plan.md)
+  - Completed 2026-07-03. Adds long-chain, alternating hinge, humanoid-ish,
+    contact-heavy, and motor-driven 3D articulation stress coverage; exposes
+    deterministic joint solve metrics through `Joint3D`, replay hashing, and
+    diagnostics; hardens angular-error math and warmed body hit buffers; and
+    closes the public tuning decision with benchmark/test evidence instead of
+    speculative stiffness/compliance knobs.
 - [`Rotated Cone Projection And Query Bounds Hardening`](done/2026-07-02-rotated-cone-projection-and-query-bounds-hardening-plan.md)
   - Completed 2026-07-02. Replaces rotated finite-cone mixed query conservative
     projection with exact support-mapped circle-slab source sweeps, tightens
@@ -184,16 +186,9 @@ first public release.
 ## Recommended Execution Order
 
 1. Work
-   [`Rotated Cone Projection And Query Bounds Hardening`](2026-07-02-rotated-cone-projection-and-query-bounds-hardening-plan.md)
-   first; it is narrowly scoped and closes the current mixed cone asymmetry.
-2. Work
-   [`3D Constraint Solver Stress And Tuning Hardening`](2026-07-02-3d-constraint-solver-stress-and-tuning-hardening-plan.md)
-   next so the existing 3D constraint/ragdoll foundation has stress evidence
-   before shaping 2D constraints.
-3. Work
    [`Pure 2D Constraint And Ragdoll Foundation`](2026-07-02-pure-2d-constraint-and-ragdoll-foundation-plan.md)
-   after the 3D stress pass, reusing only the lessons that fit native 2D
+   next, reusing only the completed 3D stress-pass lessons that fit native 2D
    planar/scalar physics.
-4. Keep the benchmark backlog and issue tracker as intake buckets; promote new
+2. Keep the benchmark backlog and issue tracker as intake buckets; promote new
    measured risks into dated plans only when they are broader than a focused
    patch.

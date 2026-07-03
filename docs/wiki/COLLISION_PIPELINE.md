@@ -828,6 +828,14 @@ warm-start impulses and positional correction are applied on the first island
 iteration, then subsequent iterations refine velocity response without applying
 the same correction repeatedly.
 
+Joint rows write deterministic `JointSolveMetrics3D` back to the owning
+`Joint3D` after each solve. The metrics expose prepared row count, pre-solve
+linear anchor error, angular limit error, motor error, cached and incremental
+impulse magnitudes, motor impulse, and clamped row count. Hosts should use
+these counters, focused stress tests, and benchmarks before asking for broader
+joint tuning APIs; the current public tuning surface remains the discrete
+solver iteration count plus the explicit values on `JointMotor3D`.
+
 If every dynamic body in the partition is sleeping, pair generation is skipped
 until a deterministic wake reason changes one of those bodies or its shape
 state.

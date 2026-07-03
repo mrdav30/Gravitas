@@ -481,9 +481,21 @@ public readonly struct GravitasJointDiagnosticView
 
     public Fixed64 ImpulseMagnitude => Event.ScalarA;
 
-    public Fixed64 LimitError => Event.ScalarB;
+    public Fixed64 LimitError => Kind == GravitasDiagnosticEventKind.JointLimitReached
+        ? Event.ScalarB
+        : AngularLimitErrorMagnitude;
+
+    public Fixed64 LinearAnchorErrorMagnitude => Event.ScalarB;
+
+    public Fixed64 MotorImpulseMagnitude => Event.Vector.X;
+
+    public Fixed64 MotorErrorMagnitude => Event.Vector.Y;
+
+    public Fixed64 AngularLimitErrorMagnitude => Event.Vector.Z;
 
     public int RowCount => Event.DataA;
+
+    public int ClampedRowCount => Event.DataB;
 }
 
 /// <summary>

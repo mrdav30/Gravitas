@@ -277,6 +277,15 @@ Enabled joints are solved in the same 3D discrete islands as contacts during
 sleep/wake behavior follows the island graph, so pushing one awake link wakes
 the connected dynamic articulation.
 
+`Joint3D.LastSolveMetrics` exposes the latest solver row count, anchor error,
+angular limit error, motor error, impulse, and clamped-row counters. Hosts can
+read these values directly or enable diagnostics and consume
+`GravitasJointDiagnosticView` when debugging ragdoll stability, motor drive
+strength, or authoring mistakes. Stabilization is still controlled by the
+discrete solver iteration count and by physically named motor values; Gravitas
+does not expose extra public stiffness/compliance knobs until stress evidence
+shows a clear API shape.
+
 Ragdolls are authoring conveniences over the same joint model. Hosts provide
 stable link IDs, the linked bodies/colliders, authored joint definitions, and a
 self-collision policy:

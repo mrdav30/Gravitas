@@ -172,8 +172,9 @@ public partial class SolidBody : IRecordable
     private Vector3d _lastPosition;
     public Vector3d LastPosition => _lastPosition;
 
-    private readonly SwiftList<Physics3DHit> _continuousCollisionHits = new();
-    private readonly SwiftList<PhysicsMixedHit> _continuousMixedCollisionHits = new();
+    private const int DefaultBodyHitBufferCapacity = 16;
+    private readonly SwiftList<Physics3DHit> _continuousCollisionHits = new(DefaultBodyHitBufferCapacity);
+    private readonly SwiftList<PhysicsMixedHit> _continuousMixedCollisionHits = new(DefaultBodyHitBufferCapacity);
     private readonly ContactManifold _rotationalContinuousCollisionManifold = new();
     private readonly SweptSphereQueryWorker _shapeExactContinuousSweepWorker = new();
     private readonly ConvexSweepQueryWorker _shapeExactContinuousConvexSweepWorker = new();

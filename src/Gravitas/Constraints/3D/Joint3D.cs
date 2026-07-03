@@ -121,9 +121,15 @@ public sealed class Joint3D : IRecordable
     public int LastSolvedRowCount { get; internal set; }
 
     /// <summary>
-    /// Gets the total absolute impulse emitted by the most recent solver pass.
+    /// Gets the cumulative absolute incremental impulse emitted since the
+    /// solver cache was last cleared.
     /// </summary>
     public Fixed64 AccumulatedImpulseMagnitude { get; internal set; }
+
+    /// <summary>
+    /// Gets deterministic metrics from the most recent solver pass.
+    /// </summary>
+    public JointSolveMetrics3D LastSolveMetrics { get; internal set; }
 
     /// <summary>
     /// Replaces the motor payload and wakes linked bodies.
@@ -152,6 +158,7 @@ public sealed class Joint3D : IRecordable
 
         LastSolvedRowCount = 0;
         AccumulatedImpulseMagnitude = Fixed64.Zero;
+        LastSolveMetrics = default;
     }
 
     internal void WakeBodies()
@@ -210,6 +217,14 @@ public sealed class Joint3D : IRecordable
         writer.WriteSection("joint.3d.caches", 1);
         writer.WriteInt32(LastSolvedRowCount);
         writer.WriteFixed64(AccumulatedImpulseMagnitude);
+        writer.WriteInt32(LastSolveMetrics.PreparedRowCount);
+        writer.WriteFixed64(LastSolveMetrics.LinearAnchorErrorMagnitude);
+        writer.WriteFixed64(LastSolveMetrics.AngularLimitErrorMagnitude);
+        writer.WriteFixed64(LastSolveMetrics.AccumulatedImpulseMagnitude);
+        writer.WriteFixed64(LastSolveMetrics.IncrementalImpulseMagnitude);
+        writer.WriteFixed64(LastSolveMetrics.MotorImpulseMagnitude);
+        writer.WriteFixed64(LastSolveMetrics.MotorErrorMagnitude);
+        writer.WriteInt32(LastSolveMetrics.ClampedRowCount);
         for (int i = 0; i < _accumulatedImpulses.Length; i++)
             writer.WriteFixed64(_accumulatedImpulses[i]);
     }

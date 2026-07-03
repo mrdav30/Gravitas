@@ -490,7 +490,7 @@ public sealed partial class GravitasDiagnosticSink
             dataB: (int)joint.CollisionPolicy);
     }
 
-    internal void EmitJointImpulse(Joint3D joint, int rowCount, Fixed64 impulseMagnitude)
+    internal void EmitJointImpulse(Joint3D joint, JointSolveMetrics3D metrics)
     {
         if (!Enabled)
             return;
@@ -502,9 +502,15 @@ public sealed partial class GravitasDiagnosticSink
             colliderBId: joint.BodyB.Collider.Id,
             colliderAType: joint.BodyA.Collider.Shape,
             colliderBType: joint.BodyB.Collider.Shape,
-            scalarA: impulseMagnitude,
-            dataA: rowCount,
-            hit: impulseMagnitude > Fixed64.Zero);
+            vector: new Vector3d(
+                metrics.MotorImpulseMagnitude,
+                metrics.MotorErrorMagnitude,
+                metrics.AngularLimitErrorMagnitude),
+            scalarA: metrics.AccumulatedImpulseMagnitude,
+            scalarB: metrics.LinearAnchorErrorMagnitude,
+            dataA: metrics.PreparedRowCount,
+            dataB: metrics.ClampedRowCount,
+            hit: metrics.IncrementalImpulseMagnitude > Fixed64.Zero);
     }
 
     internal void EmitJointLimitReached(Joint3D joint, Fixed64 limitError)

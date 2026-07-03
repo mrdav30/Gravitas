@@ -196,10 +196,14 @@ Because IDs are context-local, two different contexts can both have collider ID
 3D joints are stored by `GravitasConstraint3DService` with monotonically
 allocated context-local IDs. Removing a joint releases its solver cache and
 linked-collider suppression entry but does not reuse the ID inside that context.
-Ragdoll runtimes own stable link and joint arrays copied from validated
-authoring definitions. Articulation filtering is layered on top of collider
-identity rather than embedded in `ColliderHierarchyState`, because hierarchy
-parent/sibling filtering is a collider ownership rule while ragdoll
+Each `Joint3D` keeps deterministic last-pass solve metrics for anchor error,
+angular limit error, motor error, impulse magnitude, prepared rows, and clamped
+rows. These metrics are replay-hashable in solver-cache mode and observable
+through diagnostics, but they are measurement state rather than authored
+stabilization settings. Ragdoll runtimes own stable link and joint arrays copied
+from validated authoring definitions. Articulation filtering is layered on top
+of collider identity rather than embedded in `ColliderHierarchyState`, because
+hierarchy parent/sibling filtering is a collider ownership rule while ragdoll
 self-collision is physical articulation policy.
 
 `SolidBody.Setup(...)` requires the agent and collider to belong to the same

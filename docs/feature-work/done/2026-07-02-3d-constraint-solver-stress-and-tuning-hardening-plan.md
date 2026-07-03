@@ -1,7 +1,7 @@
 # 3D Constraint Solver Stress And Tuning Hardening Plan
 
 **Date:** 2026-07-02  
-**Status:** Planned  
+**Status:** Done  
 **Owner:** Gravitas 3D constraint, ragdoll, and solver-quality hardening
 
 ---
@@ -66,9 +66,97 @@ current solver.
 - Do not use floating-point math, background threads, or nondeterministic
   ordering in stress fixtures or solver changes.
 
+## Completion Evidence
+
+Completed on 2026-07-03.
+
+Implementation results:
+
+- Added `JointSolveMetrics3D` and `Joint3D.LastSolveMetrics` for deterministic
+  last-pass joint solver telemetry: prepared row count, linear anchor error,
+  angular limit error, cached and incremental impulse, motor impulse, motor
+  error, and clamped row count.
+- Routed the same high-signal counters through `JointImpulse` diagnostics
+  without changing disabled diagnostics behavior.
+- Added replay-hash coverage for solve metrics in
+  `AuthoritativeWithSolverCaches` mode.
+- Hardened joint angular-error math with a safe fixed-point quaternion-log path
+  that clamps the scalar term before `Acos`.
+- Pre-sized 3D body hit buffers used by CCD and grounding so warmed body
+  simulation does not allocate on first non-empty query result.
+- Added long ball-socket chain, alternating hinge chain, humanoid-ish ragdoll,
+  contact-heavy ragdoll, motor-driven chain, diagnostic trend, replay, and
+  allocation stress tests.
+- Expanded constraint benchmarks to cover long chains, resting ragdolls,
+  contact-heavy ragdoll stacks, motorized chains, linked-collision filter
+  lookup, and ragdoll activation toggling.
+
+Tuning decision:
+
+- No new public `JointStabilization3D` or `JointSolverTuning3D` API was added.
+  The stress evidence did not justify a broader stiffness/compliance surface.
+  Current release-scope tuning remains `PhysicsSettings.DiscreteSolverIterations`
+  plus explicit `JointMotor3D` drive strength, damping, and maximum impulse.
+  The new metrics provide the evidence path for future tuning if measured
+  instability appears.
+
+Benchmark smoke:
+
+- Dry `Constraint3DBenchmarks` smoke at `LinkCount=32` completed with no
+  managed allocations reported:
+  - `SimulateLongConstraintChain`: 4.518 ms.
+  - `SimulateHumanoidRagdollResting`: 1.808 ms.
+  - `SimulateContactHeavyRagdollStack`: 5.071 ms.
+  - `SimulateMotorDrivenConstraintChain`: 2.165 ms.
+  - `LinkedCollisionFilterLookup`: 251.5 us.
+  - `ToggleRagdollActivation`: 1.258 ms.
+- Longer motor-chain benchmark smoke completed at about 1.695 ms/op with no
+  managed allocations reported. The motor stress fixture drives around the link
+  axis so it measures clamped motor rows instead of broad-phase first-touch
+  partition churn.
+
+Validation:
+
+- `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~Constraint3DStressTests"`
+  passed: 7 tests.
+- `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~Constraint|FullyQualifiedName~Ragdoll"`
+  passed: 39 tests.
+- `dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj --configuration Release -f net8.0`
+  passed.
+- `dotnet test Gravitas.slnx --configuration Release` passed: 926 tests.
+- `dotnet test Gravitas.slnx --configuration ReleaseLean` passed: 910 tests.
+
+## Summary Recap
+
+This plan was not only a diagnostics pass. It kept the existing 3D constraint
+architecture, but it improved the release quality bar in four practical ways:
+
+- Solver robustness improved. Stress tests exposed that the previous angular
+  error path could feed slightly out-of-range fixed-point quaternion values into
+  `Acos`; the solver now uses a safe deterministic quaternion-log path with
+  explicit clamping and a named vector epsilon.
+- Warmed runtime allocation behavior improved. The pass found first-non-empty
+  3D body query buffers in CCD/grounding paths that could allocate during
+  warmed simulation. Those buffers are pre-sized now, which benefits ordinary
+  body simulation beyond the constraint tests.
+- Benchmark signal improved. The old constraint benchmark mostly measured a
+  simple chain plus activation toggling. The suite now separates long chains,
+  resting ragdolls, contact-heavy ragdoll stacks, motor-driven chains,
+  linked-collision filtering, and activation toggling, with no-allocation smoke
+  coverage.
+- API quality improved by omission. Stress evidence did not justify a broad
+  public stiffness/compliance tuning surface, so the public API stayed smaller:
+  `DiscreteSolverIterations` plus explicit `JointMotor3D` values remain the
+  release-scope controls. Future tuning can be based on measured
+  `JointSolveMetrics3D` signals rather than speculative knobs.
+
+The main behavior model did not change: 3D joints still solve inside the
+contact-integrated discrete island graph, ragdolls remain authored data over
+ordinary `SolidBody` links, and animation still belongs outside Gravitas.
+
 ## Workstream 1: Stress Fixture Inventory And Baselines
 
-**Status:** Planned
+**Status:** Done
 
 **Problem**
 
@@ -77,34 +165,34 @@ that usually reveal articulation weakness are still thin.
 
 **Tasks**
 
-- [ ] Inventory the current 3D constraint and island paths:
+- [x] Inventory the current 3D constraint and island paths:
   - `src/Gravitas/Constraints/3D/GravitasConstraint3DService.cs`
   - `src/Gravitas/Constraints/3D/Joint3D.cs`
   - `src/Gravitas/Constraints/3D/JointSolver3D.cs`
   - `src/Gravitas/Constraints/3D/JointConstraintRow3D.cs`
   - `src/Gravitas/Core/3D/GravitasPhysicsService.cs`
   - `src/Gravitas/CollisionHandling/Response/3D`
-- [ ] Add reusable test helpers for articulated 3D scenes:
+- [x] Add reusable test helpers for articulated 3D scenes:
   - a long chain with ball-socket joints.
   - a hinge chain with alternating axes.
   - a humanoid-ish torso/limb ragdoll graph.
   - a motor-driven chain with target rotations.
   - a contact-heavy ragdoll resting on stacked/static geometry.
-- [ ] Add baseline correctness tests that run each fixture for repeated frames
+- [x] Add baseline correctness tests that run each fixture for repeated frames
       and assert:
   - no invalid fixed-point values.
   - stable deterministic replay hash across repeated runs.
   - bounded anchor error after settling.
   - sleeping/waking propagates through linked bodies.
   - no allocations after warmup for steady-state solve.
-- [ ] Add benchmark rows in
+- [x] Add benchmark rows in
       `tests/Gravitas.Benchmarks/Core/Constraint3DBenchmarks.cs`:
   - `SimulateLongConstraintChain`.
   - `SimulateHumanoidRagdollResting`.
   - `SimulateContactHeavyRagdollStack`.
   - `SimulateMotorDrivenConstraintChain`.
   - allocation/counter rows where the harness supports them cleanly.
-- [ ] Record baseline benchmark and allocation numbers in this plan before
+- [x] Record baseline benchmark and allocation numbers in this plan before
       solver changes.
 
 **Done Criteria**
@@ -115,7 +203,7 @@ that usually reveal articulation weakness are still thin.
 
 ## Workstream 2: Solver Diagnostics And Error Visibility
 
-**Status:** Planned
+**Status:** Done
 
 **Problem**
 
@@ -125,20 +213,20 @@ anchor drift, angular limit error, motor overshoot, or contact interaction.
 
 **Tasks**
 
-- [ ] Add internal solver counters for each active joint solve:
+- [x] Add internal solver counters for each active joint solve:
   - prepared row count.
   - linear anchor error magnitude.
   - angular limit error magnitude.
   - accumulated impulse magnitude.
   - motor impulse magnitude.
   - clamped row count.
-- [ ] Route the counters through disabled-by-default diagnostics without
+- [x] Route the counters through disabled-by-default diagnostics without
       allocations when diagnostics are off.
-- [ ] Extend `GravitasDiagnosticEvent` or diagnostic views only if the existing
+- [x] Extend `GravitasDiagnosticEvent` or diagnostic views only if the existing
       joint diagnostic payload cannot represent the new counters cleanly.
-- [ ] Add tests proving diagnostics remain deterministic and disabled
+- [x] Add tests proving diagnostics remain deterministic and disabled
       diagnostics allocate `0` bytes after warmup.
-- [ ] Add tests that compare diagnostic error trends for:
+- [x] Add tests that compare diagnostic error trends for:
   - a stable resting ragdoll.
   - an overdriven motor chain.
   - a long chain with insufficient solver iterations.
@@ -152,7 +240,7 @@ anchor drift, angular limit error, motor overshoot, or contact interaction.
 
 ## Workstream 3: Evidence-Gated Stabilization API Decision
 
-**Status:** Planned
+**Status:** Done
 
 **Problem**
 
@@ -162,32 +250,32 @@ real problems and can be named clearly.
 
 **Tasks**
 
-- [ ] Run Workstream 1 stress fixtures using current defaults and record:
+- [x] Run Workstream 1 stress fixtures using current defaults and record:
   - max anchor error.
   - max angular error.
   - settle frame count.
   - average solve time.
   - allocation count.
-- [ ] Decide whether current defaults are sufficient for release:
+- [x] Decide whether current defaults are sufficient for release:
   - if yes, document the no-change decision in this plan and keep the public API
     smaller.
   - if no, introduce an explicit value type such as `JointStabilization3D` or
     `JointSolverTuning3D`.
-- [ ] If tuning is needed, keep the API fixed-point and physically explainable:
+- [x] If tuning is needed, keep the API fixed-point and physically explainable:
   - linear bias factor.
   - angular bias factor.
   - compliance or softness.
   - damping ratio or damping factor.
   - maximum correction velocity or maximum stabilization impulse.
-- [ ] Attach tuning at the correct scope based on evidence:
+- [x] Attach tuning at the correct scope based on evidence:
   - per-joint for authored ragdoll differences.
   - context settings for global solver defaults.
   - both only if tests prove both scopes are necessary.
-- [ ] Add validation tests for all public tuning values:
+- [x] Add validation tests for all public tuning values:
   - negative values fail.
   - defaults reproduce current behavior.
   - extreme but valid values remain bounded and deterministic.
-- [ ] Add serialization and replay hash coverage if tuning becomes runtime
+- [x] Add serialization and replay hash coverage if tuning becomes runtime
       state.
 
 **Done Criteria**
@@ -199,7 +287,7 @@ real problems and can be named clearly.
 
 ## Workstream 4: Long-Chain, Motor, And Contact-Heavy Hardening
 
-**Status:** Planned
+**Status:** Done
 
 **Problem**
 
@@ -209,19 +297,19 @@ contact/joint solve sequencing.
 
 **Tasks**
 
-- [ ] Fix any measured row-ordering instability by sorting joints and rows using
+- [x] Fix any measured row-ordering instability by sorting joints and rows using
       documented context-owned IDs.
-- [ ] Fix any warm-start leakage when joint type, limits, motor payload, or
+- [x] Fix any warm-start leakage when joint type, limits, motor payload, or
       linked body mobility changes.
-- [ ] Fix any motor impulse overshoot by clamping through fixed-point row bounds
+- [x] Fix any motor impulse overshoot by clamping through fixed-point row bounds
       rather than post-solve pose correction.
-- [ ] Fix any contact-heavy ragdoll jitter by adjusting row preparation order
+- [x] Fix any contact-heavy ragdoll jitter by adjusting row preparation order
       only when tests prove the ordering effect.
-- [ ] Fix any sleep/wake issue so connected dynamic bodies sleep and wake as one
+- [x] Fix any sleep/wake issue so connected dynamic bodies sleep and wake as one
       articulation island when joints are enabled.
-- [ ] Re-run the Workstream 1 stress tests and benchmark rows after each solver
+- [x] Re-run the Workstream 1 stress tests and benchmark rows after each solver
       change.
-- [ ] Record before/after evidence in this plan.
+- [x] Record before/after evidence in this plan.
 
 **Done Criteria**
 
@@ -231,7 +319,7 @@ contact/joint solve sequencing.
 
 ## Workstream 5: Docs, Benchmarks, And Release Validation
 
-**Status:** Planned
+**Status:** Done
 
 **Problem**
 
@@ -241,23 +329,23 @@ should feed motor targets.
 
 **Tasks**
 
-- [ ] Update `docs/wiki/RUNTIME_ARCHITECTURE.md` with any solver diagnostic or
+- [x] Update `docs/wiki/RUNTIME_ARCHITECTURE.md` with any solver diagnostic or
       tuning ownership changes.
-- [ ] Update `docs/wiki/COLLISION_PIPELINE.md` with final joint/contact island
+- [x] Update `docs/wiki/COLLISION_PIPELINE.md` with final joint/contact island
       solve ordering if it changes.
-- [ ] Update `docs/wiki/HOST_INTEGRATION.md` with tuning or motor guidance if
+- [x] Update `docs/wiki/HOST_INTEGRATION.md` with tuning or motor guidance if
       public APIs change.
-- [ ] Update `docs/wiki/DIAGNOSTICS.md` with new joint/ragdoll counters or
+- [x] Update `docs/wiki/DIAGNOSTICS.md` with new joint/ragdoll counters or
       views.
-- [ ] Update this plan with final stress benchmark numbers and allocation
+- [x] Update this plan with final stress benchmark numbers and allocation
       evidence.
-- [ ] Run focused tests:
+- [x] Run focused tests:
   - `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~Constraint|FullyQualifiedName~Ragdoll"`
-- [ ] Run release validation:
+- [x] Run release validation:
   - `dotnet test Gravitas.slnx --configuration Release`
   - `dotnet test Gravitas.slnx --configuration ReleaseLean`
-- [ ] Run focused constraint benchmark smoke.
-- [ ] Move this plan to `docs/feature-work/done` only after tests, benchmarks,
+- [x] Run focused constraint benchmark smoke.
+- [x] Move this plan to `docs/feature-work/done` only after tests, benchmarks,
       docs, and any tuning decision agree.
 
 **Done Criteria**
