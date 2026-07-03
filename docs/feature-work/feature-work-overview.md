@@ -28,7 +28,21 @@ instead of burying it in notes.
 
 ## Active Release-Scope
 
-No dated release-scope feature-work plans are currently active.
+- [`Rotated Cone Projection And Query Bounds Hardening`](2026-07-02-rotated-cone-projection-and-query-bounds-hardening-plan.md)
+  - Planned 2026-07-02. Investigates and, if benchmark/test evidence supports
+    it, promotes rotated finite-cone mixed slab sweeps from safe conservative
+    fallback to exact reducers while tightening physical cone and cone-volume
+    query bounds through shared deterministic cone geometry.
+- [`3D Constraint Solver Stress And Tuning Hardening`](2026-07-02-3d-constraint-solver-stress-and-tuning-hardening-plan.md)
+  - Planned 2026-07-02. Adds long-chain, humanoid-ish, contact-heavy, and
+    motor-driven 3D articulation stress coverage, solver diagnostics, benchmark
+    signal, and evidence-gated joint stabilization tuning only if the current
+    bias model proves insufficient.
+- [`Pure 2D Constraint And Ragdoll Foundation`](2026-07-02-pure-2d-constraint-and-ragdoll-foundation-plan.md)
+  - Planned 2026-07-02. Adds a native pure 2D constraint service, 2D joint
+    rows, contact-integrated 2D islands, linked-collider filtering, 2D ragdoll
+    authoring, serialization, replay hashing, diagnostics, docs, and benchmark
+    evidence without projecting the 3D joint API onto one ignored axis.
 
 ## Recently Completed
 
@@ -154,7 +168,7 @@ first public release.
   - Publishing, baseline comparison, CI integration, and host-visible diagnostic
     polish can follow once the release-critical physics behavior is nailed down.
 - **Scene / Fixture Authoring Definitions**
-  - Hold until engine-specific adapter packages and sample projects clarify the1
+  - Hold until engine-specific adapter packages and sample projects clarify the
     real public authoring needs. Gravitas can already be configured directly
     through contexts, bodies, colliders, shape definitions, materials, and
     ragdoll definitions; a friendlier scene/fixture DTO layer should come from
@@ -170,6 +184,17 @@ first public release.
 
 ## Recommended Execution Order
 
-1. Keep the benchmark backlog and issue tracker as intake buckets; promote new
+1. Work
+   [`Rotated Cone Projection And Query Bounds Hardening`](2026-07-02-rotated-cone-projection-and-query-bounds-hardening-plan.md)
+   first; it is narrowly scoped and closes the current mixed cone asymmetry.
+2. Work
+   [`3D Constraint Solver Stress And Tuning Hardening`](2026-07-02-3d-constraint-solver-stress-and-tuning-hardening-plan.md)
+   next so the existing 3D constraint/ragdoll foundation has stress evidence
+   before shaping 2D constraints.
+3. Work
+   [`Pure 2D Constraint And Ragdoll Foundation`](2026-07-02-pure-2d-constraint-and-ragdoll-foundation-plan.md)
+   after the 3D stress pass, reusing only the lessons that fit native 2D
+   planar/scalar physics.
+4. Keep the benchmark backlog and issue tracker as intake buckets; promote new
    measured risks into dated plans only when they are broader than a focused
    patch.

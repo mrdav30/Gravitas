@@ -1,7 +1,8 @@
 # Benchmark Publishing And CCD Diagnostics Implementation Plan
 
-**Date:** 2026-06-21 **Status:** Post-alpha / evidence-gated **Owner:** Gravitas
-benchmark/diagnostics hardening
+**Date:** 2026-06-21  
+**Status:** Post-alpha / evidence-gated  
+**Owner:** Gravitas benchmark/diagnostics hardening
 
 ---
 

@@ -1,7 +1,9 @@
 # Mesh Tooling Simplification And Decomposition Plan
 
-**Date:** 2026-06-17 **Expanded:** 2026-06-18 **Status:** Post-alpha /
-research-gated **Owner:** Gravitas asset-tooling research
+**Date:** 2026-06-17  
+**Expanded:** 2026-06-18  
+**Status:** Post-alpha / research-gated  
+**Owner:** Gravitas asset-tooling research
 
 ## Purpose
 
