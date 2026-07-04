@@ -1,30 +1,78 @@
 # Host Integration
 
-Gravitas does not own the application loop. A game engine, server, deterministic
-simulation harness, or unit test owns the outer lifecycle and calls Gravitas
-phases at deterministic points.
+Gravitas does not own your application loop. A game engine, server,
+deterministic simulation harness, or unit test creates the host objects and calls
+Gravitas at deterministic points.
+
+This page is the practical starting point for wiring Gravitas into a host. For
+runtime ownership details, read [Runtime Architecture](RUNTIME_ARCHITECTURE.md).
+For replay and snapshot boundaries, read
+[Serialization And Replay](SERIALIZATION.md).
+
+## Quick Read
+
+- Create or attach one `GravitasWorldContext` per simulation.
+- Add GridForge grid coverage before registering colliders.
+- Implement `IMatterAgent` to bridge host objects to context and
+  `FixedTransform`.
+- Use `SolidBody`/`LSCollider` for 3D and `SolidBody2D`/`LSCollider2D` for 2D.
+- Apply deterministic commands before `context.Simulate()`.
+- Call `context.Simulate()` and `context.LateSimulate()` from the authoritative
+  fixed step.
+- Use `context.Visualize()` and `context.LateVisualize()` only for
+  presentation.
+- Deactivate bodies and colliders before pooling or destroying host wrappers.
+
+```mermaid
+flowchart LR
+    Commands["Ordered commands"] --> Simulate["context.Simulate()"]
+    Simulate --> Late["context.LateSimulate()"]
+    Late --> Hash["optional replay hash"]
+    Late --> Visualize["context.Visualize()"]
+    Visualize --> Render["host render/update"]
+```
+
+## Public Surface
+
+| Need | Use |
+| --- | --- |
+| Create an owned world | `GravitasWorldContext.CreateOwned(...)` |
+| Attach a host-owned world | `GravitasWorldContext.Attach(world, takeOwnership)` |
+| Bind a host object | `IMatterAgent` |
+| Register a 3D body | `new SolidBody(agent, collider).Initialize(...)` |
+| Register a 2D body | `new SolidBody2D(agent, collider).Initialize(...)` |
+| Register bodyless geometry | `collider.InitializeWithNoBody(agent)` |
+| Set runtime mode | `context.Settings.RuntimeMode` |
+| Run 3D constraints/ragdolls | `context.Constraints3D` |
+| Run 2D constraints/ragdolls | `context.Constraints2D` |
+| Query 3D, 2D, or mixed geometry | `context.Query3D`, `context.Query2D`, `context.QueryMixed` |
+| Hash replay state | `context.ComputeReplayHash()` |
+| Reset a session | `context.Reset()` |
+| End a context | `context.Dispose()` |
 
 ## Lifecycle Contract
 
 Use the LSF lifecycle names as a mental model, not as engine-specific APIs:
 
-| Phase           | Host responsibility                                                     | Gravitas call                                              |
-| --------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------- |
-| `Setup`         | Create package defaults, host resources, and worlds.                    | Create or attach `GravitasWorldContext`.                   |
-| `Initialize`    | Bind agents, transforms, colliders, bodies, settings, and grids.        | Initialize colliders and bodies.                           |
-| `Execute`       | Apply deterministic commands or network input in ordered frame batches. | No direct call; mutate host-owned state before simulation. |
-| `Simulate`      | Advance the authoritative fixed step.                                   | `context.Simulate()`.                                      |
-| `LateSimulate`  | Finish deterministic end-of-frame work.                                 | `context.LateSimulate()`.                                  |
-| `Visualize`     | Interpolate or publish presentation state.                              | `context.Visualize()`.                                     |
-| `LateVisualize` | Finish presentation-only work.                                          | `context.LateVisualize()`.                                 |
-| `Deactivate`    | Pool/despawn agents and release registrations.                          | `body.Deactivate()` or `collider.Deactivate()`.            |
-| `Quit`          | Shut down the host process/session.                                     | `context.Dispose()` when the context is no longer needed.  |
+| Phase | Host responsibility | Gravitas call |
+| --- | --- | --- |
+| `Setup` | Create package defaults, host resources, and worlds. | Create or attach `GravitasWorldContext`. |
+| `Initialize` | Bind agents, transforms, colliders, bodies, settings, and grids. | Initialize colliders and bodies. |
+| `Execute` | Apply deterministic commands or network input in ordered frame batches. | No direct call. Mutate host-owned state before simulation. |
+| `Simulate` | Advance the authoritative fixed step. | `context.Simulate()`. |
+| `LateSimulate` | Finish deterministic end-of-frame work. | `context.LateSimulate()`. |
+| `Visualize` | Interpolate or publish presentation state. | `context.Visualize()`. |
+| `LateVisualize` | Finish presentation-only work. | `context.LateVisualize()`. |
+| `Deactivate` | Pool/despawn agents and release registrations. | `body.Deactivate()` or `collider.Deactivate()`. |
+| `Quit` | Shut down the host process/session. | `context.Dispose()` when the context is no longer needed. |
 
 Authoritative simulation state belongs in `Simulate` and `LateSimulate`.
-`Visualize` and `LateVisualize` are for interpolation and presentation; they
-should not be used to apply gameplay commands or physics corrections.
+`Visualize` and `LateVisualize` are for interpolation and presentation; do not
+use them to apply gameplay commands or physics corrections.
 
-## Minimal Host Agent
+## Minimal Setup
+
+### Host Agent
 
 The host provides `IMatterAgent` so Gravitas can bind an object to a context and
 fixed transform without depending on an engine, ECS, rendering, or a specific
@@ -56,15 +104,8 @@ internal sealed class HostMatterAgent : IMatterAgent
 }
 ```
 
-`IsParent` marks whether an agent is intended to be a top-level hierarchy owner,
-but hierarchy collision filtering is bound explicitly on colliders. Hosts that
-need parent-child or sibling collision suppression should initialize the
-colliders first, then call `childCollider.SetParent(parentCollider)`.
-`SetParent(...)` walks the collider-parent chain to the top collider and stores
-the top parent as a dimension-tagged collider key on the child, so sibling
-filtering does not depend on an engine `transform.parent` or any other engine
-hierarchy object. Mixed mode can bind a 2D collider under a 3D collider, or a 3D
-collider under a 2D collider, without aliasing the separate collider ID tables.
+`IsParent` marks whether an agent is intended to be a top-level hierarchy owner.
+Hierarchy collision filtering is bound explicitly on colliders:
 
 ```csharp
 weaponCollider.SetParent(characterCollider);
@@ -72,10 +113,13 @@ leftFootCollider.SetParent(characterCollider);
 rightFootCollider.SetParent(characterCollider);
 ```
 
-Use `ClearParent()` when a collider leaves that host hierarchy without being
-deactivated.
+`SetParent(...)` stores a dimension-tagged top-parent collider key, so sibling
+filtering does not depend on an engine transform hierarchy. Mixed mode can bind
+2D colliders under 3D colliders, or the reverse, without aliasing the separate
+collider ID tables. Use `ClearParent()` when a collider leaves the hierarchy
+without being deactivated.
 
-## Creating A Context
+### Context And Grid
 
 Use `CreateOwned(...)` when Gravitas should own the `GridWorld` lifetime:
 
@@ -96,16 +140,11 @@ using GravitasWorldContext context = GravitasWorldContext.Attach(world);
 ```
 
 Pass `takeOwnership: true` to `Attach(...)` only when disposing the context
-should also dispose the supplied world.
-
-One active `GridWorld` can be attached to only one active
-`GravitasWorldContext`. This prevents collider IDs, partitions, query buffers,
-and pair state from being ambiguously shared across simulations.
-
-## Configure Grid Coverage First
+should also dispose the supplied world. One active `GridWorld` can be attached
+to only one active `GravitasWorldContext`.
 
 Colliders partition into existing GridForge voxels. Add grids that cover the
-simulation area before initializing bodies and colliders.
+simulation area before initializing bodies and colliders:
 
 ```csharp
 using FixedMathSharp;
@@ -122,9 +161,10 @@ If no voxel exists for a collider's bounds, the collider cannot be distributed
 into partitions and will not participate in partition-backed collision/query
 work for that area.
 
-## Dynamic Body Setup
+### Dynamic 3D Body
 
-Dynamic matter usually has a host agent, one collider, and one `SolidBody`.
+Dynamic 3D matter usually has a host agent, one `LSCollider`, and one
+`SolidBody`.
 
 ```csharp
 using FixedMathSharp;
@@ -138,11 +178,13 @@ FixedTransform transform = new(
     Vector3d.One);
 
 HostMatterAgent agent = new(context, transform);
+
 LSSphereCollider collider = new();
 collider.Material = new PhysicsMaterial(
     staticFriction: Fixed64.One,
     dynamicFriction: Fixed64.Half,
     restitution: Fixed64.FromFraction(1, 4));
+
 SolidBody body = new(agent, collider)
 {
     Mass = Fixed64.One
@@ -151,11 +193,13 @@ SolidBody body = new(agent, collider)
 body.Initialize(Vector3d.Zero, FixedQuaternion.Identity, isDynamic: true);
 ```
 
-Initialization binds the body and collider to `agent.Context`, allocates a
-context-local body slot, allocates a context-local collider ID, calculates shape
-runtime data, and partitions the collider.
+Initialization binds the body and collider to `agent.Context`, allocates
+context-local body/collider IDs, calculates runtime shape data, and partitions
+the collider.
 
-Pure 2D scenes use the same host-agent shape, but select the 2D runtime path and
+### 2D Body
+
+2D scenes use the same host-agent shape, but select the 2D runtime path and
 create 2D body/collider types:
 
 ```csharp
@@ -171,20 +215,44 @@ body.Initialize(agent.Transform.Position.ToVector2d(), isDynamic: true);
 ```
 
 The 2D projection uses the LSF X/Z convention: world X maps to 2D X and world Z
-maps to 2D Y. World Y is height or future embedding metadata.
+maps to 2D Y. World Y remains vertical height or mixed embedding metadata.
 
-## Surface Materials
+### Bodyless Geometry
 
-`PhysicsMaterial` is deterministic collider surface data. Assign it on
-`LSCollider` or `LSCollider2D` before simulation when a surface needs explicit
-static friction, dynamic friction, restitution, or combine policies.
+Use `InitializeWithNoBody(...)` for static or trigger geometry that does not need
+body-owned state:
+
+```csharp
+using Gravitas.Colliders;
+
+LSCuboidCollider floor = new();
+floor.InitializeWithNoBody(agent);
+```
+
+A body with all translation axes frozen is different from a bodyless collider.
+Use `SolidBody.FreezeAxes = BodyFreezeAxes3D.Position` or
+`SolidBody2D.FreezeAxes = BodyFreezeAxes2D.Position` when an object should keep
+body state but behave as static-equivalent for solver and partition mobility.
+Partial freezes remain dynamic and constrain only the selected axes.
+
+If a bodyless 3D collider moves after initialization, the host must call
+`collider.Simulate()` after mutating the transform so bounds and partition
+membership refresh. 2D bodyless colliders rebuild from their agent
+transform during the 2D broad-phase pass.
+
+## Common Configuration
+
+### Surface Materials
+
+`PhysicsMaterial` is deterministic collider surface data. Assign it before
+simulation when a surface needs explicit static friction, dynamic friction,
+restitution, or combine policies:
 
 ```csharp
 collider.Material = PhysicsMaterial.Frictionless;
 ```
 
-Shape definitions and compound parts can also carry materials for authored
-setup:
+Shape definitions and compound parts can also carry materials:
 
 ```csharp
 var compound = new LSCompoundCollider(
@@ -199,64 +267,59 @@ var compound = new LSCompoundCollider(
 ```
 
 Compound parts without an explicit material use the owning compound collider's
-material when the private part colliders are materialized. Query hits still
-identify colliders; hosts can read `hit.Collider.Material` or the mixed hit's
-dimension-specific collider reference instead of duplicating material data in
-every hit payload.
+material when private part colliders are materialized.
 
-## Local Physical Filtering
+### Local Physical Filtering
 
-`IgnoredCollisionLayers` is a collider-owned physical filter. Assign it on
-`LSCollider` or `LSCollider2D` when one collider should ignore selected physical
-layers without changing the context-wide collision matrix.
+`IgnoredCollisionLayers` is a collider-owned physical filter:
 
 ```csharp
 projectileCollider.Layer = new PhysicsLayer(3);
-ownerCollider.IgnoredCollisionLayers = PhysicsLayerMask.FromLayer(projectileCollider.Layer);
+ownerCollider.IgnoredCollisionLayers =
+    PhysicsLayerMask.FromLayer(projectileCollider.Layer);
 ```
 
 The rule is symmetric at pair time: if either collider ignores the other
-collider's layer, the physical interaction is rejected. The mask affects
-discrete collision pairs, trigger pairs, internal CCD target eligibility, and
-grounding/support acceptance. Public query services do not use this mask; query
-results are controlled by the caller's query `PhysicsLayerMask`, trigger option,
-and excluded-collider argument.
+collider's layer, the physical interaction is rejected. This affects discrete
+collision pairs, trigger pairs, internal CCD target eligibility, and
+grounding/support acceptance. Public query services use the caller's
+`PhysicsLayerMask` instead.
 
-## Static Collider Setup
+### Settings And Environment
 
-Use `InitializeWithNoBody(...)` for bodyless host geometry. This registers and
-partitions the collider but does not create a simulated body.
+Each context owns its own `PhysicsSettings` and `PhysicsEnvironment`.
 
 ```csharp
-using Gravitas.Colliders;
+context.SetFrameRate(60);
 
-LSCuboidCollider floor = new();
-floor.InitializeWithNoBody(agent);
+PhysicsSettings settings = PhysicsSettings.DefaultSettings();
+settings.PoolingEnabled = true;
+settings.RestitutionVelocityThreshold = Fixed64.FromFraction(1, 4);
+context.ApplySettings(settings);
+
+context.Environment.Gravity = Fixed64.FromFraction(49, 5);
 ```
 
-A body with all translation axes frozen is different from a bodyless collider.
-Set `SolidBody.FreezeAxes = BodyFreezeAxes3D.Position` or
-`SolidBody2D.FreezeAxes = BodyFreezeAxes2D.Position` when the object should keep
-body-owned state but behave as static-equivalent for solver and partition
-mobility. Bodyless 3D colliders are still registered as colliders and can
-participate in queries and candidate generation, but 3D pair creation still
-requires at least one collider in the pair to have a body. Bodyless 2D colliders
-bind through `LSCollider2D.InitializeWithNoBody(IMatterAgent)` and can
-participate in queries, trigger events, layer filtering, cleanup, and static
-collision response.
+Different contexts can run at different frame rates and settings in the same
+process. Frame-derived values such as `DeltaTime`, `FrameCount`, and
+`TotalTime` are read through the context.
 
-Freeze axes are authoritative body state. Partial position freezes, such as
-`BodyFreezeAxes3D.PositionY` or `BodyFreezeAxes2D.PositionX`, remain dynamic
-members and only constrain the matching solver and integration axis. Rotation
-freezes are explicit through `BodyFreezeAxes3D.RotationX/Y/Z` or
-`BodyFreezeAxes2D.Rotation`.
+Per-body gravity tuning lives on the body. `SolidBody.GravityScale` multiplies
+context gravity for that body; `Fixed64.Zero` disables environment-gravity
+acceleration and grounded weight. `SolidBody2D.GravityScale` applies the same
+policy to that body's planar gravity vector.
 
-## 3D Constraints And Ragdolls
+## Constraints And Ragdolls
 
-`context.Constraints3D` owns deterministic 3D joints and ragdoll runtimes. A
-joint links two active `SolidBody` instances through explicit local frames,
-optional angular limits, optional motor payloads, and a linked-collider
-collision policy:
+`context.Constraints3D` owns deterministic 3D joints and ragdoll runtimes.
+`context.Constraints2D` owns deterministic 2D joints and ragdoll runtimes.
+
+| Domain | Runtime types | Joint shape | Solved with |
+| --- | --- | --- | --- |
+| 3D | `Joint3D`, `RagdollRuntime3D` | Local frames, angular axes, 3D motors/limits | 3D contact islands in `LateSimulate()` |
+| 2D | `Joint2D`, `RagdollRuntime2D` | Planar anchors, scalar angles, scalar motors/limits | 2D contact islands in `LateSimulate()` |
+
+3D example:
 
 ```csharp
 using Gravitas.Constraints;
@@ -272,54 +335,7 @@ Joint3D shoulder = context.Constraints3D.RegisterJoint(new JointDefinition3D(
     JointCollisionPolicy.SuppressLinked));
 ```
 
-Enabled joints are solved in the same 3D discrete islands as contacts during
-`LateSimulate()`, using `PhysicsSettings.DiscreteSolverIterations`. Linked
-sleep/wake behavior follows the island graph, so pushing one awake link wakes
-the connected dynamic articulation.
-
-`Joint3D.LastSolveMetrics` exposes the latest solver row count, anchor error,
-angular limit error, motor error, impulse, and clamped-row counters. Hosts can
-read these values directly or enable diagnostics and consume
-`GravitasJointDiagnosticView` when debugging ragdoll stability, motor drive
-strength, or authoring mistakes. Stabilization is still controlled by the
-discrete solver iteration count and by physically named motor values; Gravitas
-does not expose extra public stiffness/compliance knobs until stress evidence
-shows a clear API shape.
-
-Ragdolls are authoring conveniences over the same joint model. Hosts provide
-stable link IDs, the linked bodies/colliders, authored joint definitions, and a
-self-collision policy:
-
-```csharp
-RagdollRuntime3D ragdoll = context.Constraints3D.RegisterRagdoll(
-    new RagdollDefinition3D(links, joints, RagdollSelfCollisionPolicy.SuppressAdjacentLinks));
-
-ragdoll.ActivateDynamic();
-// Later, when deterministic animation or host control takes over again:
-ragdoll.DeactivateToKinematic();
-```
-
-Animation systems remain outside Gravitas. A deterministic animation library can
-compute target joint rotations, then pass caller-owned motor payloads before the
-fixed step:
-
-```csharp
-context.Constraints3D.SetRagdollPoseTargets(ragdoll, jointMotors);
-context.Simulate();
-context.LateSimulate();
-```
-
-Foot IK, hand IK, animation events, blending, and engine animator hooks belong
-in host or animation packages. Gravitas owns only the deterministic physical
-constraints, collision filtering, activation state, diagnostics, and
-serialization boundary.
-
-## Pure 2D Constraints And Ragdolls
-
-`context.Constraints2D` owns deterministic pure 2D joints and ragdoll runtimes.
-A 2D joint links two active `SolidBody2D` instances through local planar
-anchors, scalar local angles, optional scalar limits, optional motor payloads,
-and the same linked-collider collision policy used by 3D articulations:
+2D example:
 
 ```csharp
 using Gravitas.Constraints;
@@ -335,33 +351,26 @@ Joint2D hinge = context.Constraints2D.RegisterJoint(new JointDefinition2D(
     JointCollisionPolicy.SuppressLinked));
 ```
 
-Enabled 2D joints solve in the same pure 2D response islands as contact rows
-during `LateSimulate()`. They use `PhysicsSettings.DiscreteSolverIterations`,
-respect `SolidBody2D.FreezeAxes`, and write deterministic metrics to
-`Joint2D.LastSolveMetrics`. Current joint types are distance, pin/revolute,
-weld/fixed, and prismatic/slider. Angular values are radians; distance and
-slider limits are world units in the X/Z simulation plane.
+Enabled joints use `PhysicsSettings.DiscreteSolverIterations`. Linked sleep/wake
+behavior follows the island graph. Linked-collider collision suppression affects
+physical collision/CCD pair creation, not public query include-mask semantics.
 
-2D ragdolls follow the same data-first authoring shape as 3D ragdolls, but the
-payload is planar:
+Ragdolls are authoring conveniences over the same joint model:
 
 ```csharp
-RagdollRuntime2D ragdoll2D = context.Constraints2D.RegisterRagdoll(
-    new RagdollDefinition2D(links2D, joints2D, RagdollSelfCollisionPolicy.SuppressAdjacentLinks));
+RagdollRuntime3D ragdoll = context.Constraints3D.RegisterRagdoll(
+    new RagdollDefinition3D(
+        links,
+        joints,
+        RagdollSelfCollisionPolicy.SuppressAdjacentLinks));
 
-ragdoll2D.ActivateDynamic();
-ragdoll2D.DeactivateToKinematic();
+ragdoll.ActivateDynamic();
+ragdoll.DeactivateToKinematic();
 ```
 
-Animation, IK, pose selection, and engine-specific skeleton state stay outside
-Gravitas. A deterministic animation package can compute `JointMotor2D` values
-and pass them through `context.Constraints2D.SetRagdollPoseTargets(...)` before
-the fixed step.
-
-If a bodyless 3D collider moves after initialization, the host must call
-`floor.Simulate()` after mutating its transform so bounds and partition
-membership are refreshed. Pure 2D bodyless colliders currently rebuild from
-their agent transform during the 2D broad-phase pass.
+Animation, IK, pose selection, engine animator hooks, and blending remain host
+or animation-package responsibilities. A deterministic animation package can
+compute motor payloads and pass them before the fixed step.
 
 ## Fixed Loop
 
@@ -381,24 +390,19 @@ while (running)
 ```
 
 Most real hosts call `Simulate` and `LateSimulate` from a fixed-rate scheduler
-and call the visualization phases from the render/update loop.
+and call visualization phases from the render/update loop.
 
-Current service order matters:
+The high-level order is:
 
-- `context.Simulate()` advances the clock, runs enabled simulate-phase services,
-  runs the mixed lifecycle path only in `Mixed`, advances lockstep coroutines,
-  then invokes simulate hooks.
-- `context.LateSimulate()` marks visualization accumulation for reset. In the 3D
-  path it prepares CCD frame state, integrates dynamic bodies, evaluates
-  host-driven kinematic active sweeps, refreshes dynamic collider partitions,
-  distributes and solves discrete contacts, updates active pair/contact
-  maintenance, and updates sleep state after response. It also runs each enabled
-  2D/mixed late-simulate path, then invokes late-simulate hooks.
-- `context.Visualize()` advances interpolation accumulation, updates enabled 2D
-  and/or 3D body visual transforms, runs the mixed lifecycle path only in
-  `Mixed`, then invokes visualize hooks.
-- `context.LateVisualize()` invokes context hooks only. Add built-in late
-  presentation work only when there is a real runtime invariant for it.
+1. `context.Simulate()` advances the clock, runs simulate-phase services,
+   advances lockstep coroutines, and invokes simulate hooks.
+2. `context.LateSimulate()` integrates bodies, processes CCD, refreshes
+   partitions, distributes pairs, solves contacts and joints, refreshes
+   grounding/support, handles mixed contacts when enabled, and invokes
+   late-simulate hooks.
+3. `context.Visualize()` updates visual/presentation transforms for enabled
+   services and invokes visualize hooks.
+4. `context.LateVisualize()` invokes hooks only.
 
 For the 3D path, the fixed-step order is integrate-then-collide inside
 `LateSimulate`: queued forces affect motion before the discrete collision pass
@@ -407,88 +411,13 @@ for that same frame.
 For kinematic CCD, hosts must write deterministic target transforms before
 `context.LateSimulate()`. Gravitas captures the body pose at the start of the
 late step, reads the host transform as the requested target, and sweeps between
-those two poses when `ContinuousCollisionMode` resolves to `Continuous` or
-`Auto`. Dynamic targets crossed before the first static-style blocker are woken
-and position-corrected as if hit by an infinite-mass source. The first
-static-style blocker clips the kinematic pose and updates the bound transform to
-the clipped value so render and physics state do not diverge.
+those two poses when continuous collision is enabled. The first static-style
+blocker clips the kinematic pose and writes the clipped transform back to the
+host binding.
 
-## Replay Contract
+## Queries And Grounding
 
-For deterministic runs, hosts should treat command application as a separate
-ordered input phase before `context.Simulate()`. Given the same initial context,
-settings, world state, command order, and frame count, Gravitas should replay to
-the same authoritative body, collider, clock, and contact state.
-
-Hosts can compute a compact deterministic frame hash after a fixed step and
-compare that value across peers, servers, replay runners, or restored snapshots:
-
-```csharp
-using Chronicler;
-
-context.Simulate();
-context.LateSimulate();
-
-ChronicleHash hash = context.ComputeReplayHash();
-SendFrameHashToLockstepPeer(context.FrameCount, hash);
-```
-
-`ComputeReplayHash()` hashes context settings, physical environment values,
-clock state, body state, collider shape/filter state, retained
-continuation-affecting pair/contact state, and active CCD handoff state. It does
-not hash host object identity, delegates, diagnostics buffers, debug draw
-commands, query scratch buffers, or visualization interpolation caches. Use
-`GravitasReplayHashMode.AuthoritativeWithSolverCaches` when investigating drift
-inside solver/cache state that is useful for RCA but not part of the ordinary
-authoritative continuation contract.
-
-The returned `ChronicleHash` is a deterministic conformance signal, not a
-cryptographic hash and not a compatibility promise across package version
-changes.
-
-The current runtime order has two important consequences:
-
-- Teleports or transform mutations made before `Simulate()` refresh dynamic
-  collider bounds and can create contacts in that same fixed step's
-  `LateSimulate()` call.
-- Forces and accelerations queued before `Simulate()` move the body during
-  `LateSimulate()` before the 3D discrete collision pass runs.
-
-Visualization phases are non-authoritative. Use them to publish interpolated
-positions, rotations, and diagnostic draw data to a renderer or host adapter,
-not to change physics state that must replay. In pure 2D mode,
-`context.Visualize()` publishes dynamic `SolidBody2D` X/Z position and yaw
-rotation back to each agent transform while preserving the host transform's
-vertical height.
-
-## Settings And Environment
-
-Each context owns its own `PhysicsSettings` and `PhysicsEnvironment`.
-
-```csharp
-context.SetFrameRate(60);
-
-PhysicsSettings settings = PhysicsSettings.DefaultSettings();
-settings.PoolingEnabled = true;
-settings.RestitutionVelocityThreshold = Fixed64.FromFraction(1, 4);
-context.ApplySettings(settings);
-
-context.Environment.Gravity = (Fixed64)9.8f;
-```
-
-Different contexts can run at different frame rates and with different settings
-in the same process. Frame-derived values such as `DeltaTime`, `FrameCount`, and
-`TotalTime` are read through the context.
-
-Per-body gravity tuning lives on the body. `SolidBody.GravityScale` multiplies
-the context environment gravity for that body; `Fixed64.Zero` disables
-environment-gravity acceleration and grounded weight for the body.
-`SolidBody2D.GravityScale` applies the same policy to that body's planar
-`Gravity` vector.
-
-## Queries
-
-2D and 3D queries are context services:
+2D, 3D, and mixed queries are explicit context services:
 
 ```csharp
 using Gravitas.Queries;
@@ -496,30 +425,13 @@ using Gravitas.Support;
 using SwiftCollections;
 
 PhysicsLayerMask layerMask = PhysicsLayerMask.FromLayer(0);
-SwiftList<Physics3DHit> circleHits = new();
 
-bool hit = context.Query3D.Raycast(
+bool rayHitFound = context.Query3D.Raycast(
     origin,
     direction,
     maxDistance,
     out Physics3DHit rayHit,
     layerMask);
-
-int circleHitCount = context.Query3D.OverlapCircleAll(origin, radius, layerMask, circleHits);
-for (int i = 0; i < circleHitCount; i++)
-{
-    Physics3DHit circleHit = circleHits[i];
-    // Consume circle-overlap hits.
-}
-
-SwiftList<Physics3DHit> sweepHits = new();
-int sweepHitCount = context.Query3D.SweepSphereAll(
-    origin,
-    origin + direction * maxDistance,
-    radius,
-    layerMask,
-    sweepHits,
-    excludedCollider: null);
 
 SwiftList<Physics2DHit> planarHits = new();
 int planarHitCount = context.Query2D.RaycastAll(
@@ -538,103 +450,43 @@ int mixedHitCount = context.QueryMixed.SweepSphereAgainst2DAll(
     excludedCollider: null);
 ```
 
-High-volume lockstep systems should prefer batch APIs when issuing many related
-queries in one frame. Requests, closest-hit outputs, all-hit buffers, and range
-buffers remain caller-owned and reusable:
+All-hit APIs use caller-owned buffers. Batch APIs use typed request spans,
+caller-owned output spans or shared hit lists, and `PhysicsQueryHitRange`
+buffers.
+
+Ground checks use `context.Settings.GroundCheckLayerMask`; hosts should set this
+explicitly for their layer model. `SolidBody.GroundingMode` and
+`SolidBody2D.GroundingMode` can stay automatic or switch to manual host-owned
+support through `UseManualGrounding(...)`, `SetManualGrounding(...)`,
+`ClearManualGrounding()`, and `UseAutomaticGrounding(...)`.
+
+Read [Query Services](QUERY_SERVICES.md) for the full query surface.
+
+## Replay Contract
+
+For deterministic runs, apply ordered commands before `context.Simulate()`.
+Given the same initial context, settings, world state, command order, and frame
+count, Gravitas should replay to the same authoritative body, collider, clock,
+and contact state.
 
 ```csharp
-PhysicsRaycast3DRequest[] rayRequests = new PhysicsRaycast3DRequest[agentCount];
-Physics3DHit[] closestRayHits = new Physics3DHit[agentCount];
-SwiftList<Physics3DHit> allRayHits = new(agentCount * 4);
-PhysicsQueryHitRange[] rayRanges = new PhysicsQueryHitRange[agentCount];
+using Chronicler;
 
-for (int i = 0; i < agentCount; i++)
-{
-    rayRequests[i] = new PhysicsRaycast3DRequest(
-        sensorOrigins[i],
-        sensorTargets[i],
-        layerMask);
-}
+context.Simulate();
+context.LateSimulate();
 
-int closestHitCount = context.Query3D.RaycastBatch(rayRequests, closestRayHits);
-int allHitCount = context.Query3D.RaycastAllBatch(rayRequests, allRayHits, rayRanges);
-
-for (int requestIndex = 0; requestIndex < agentCount; requestIndex++)
-{
-    PhysicsQueryHitRange range = rayRanges[requestIndex];
-    for (int hitIndex = 0; hitIndex < range.Count; hitIndex++)
-    {
-        Physics3DHit queryHit = allRayHits[range.Start + hitIndex];
-        // Consume this request's sorted hits.
-    }
-}
+ChronicleHash hash = context.ComputeReplayHash();
+SendFrameHashToLockstepPeer(context.FrameCount, hash);
 ```
 
-The same pattern applies to pure 2D and mixed batch queries. Polygon batch
-queries take a separate flat vertex span plus per-request vertex ranges, so the
-host owns polygon vertex storage explicitly for the duration of the batch call.
+`ComputeReplayHash()` hashes context settings, physical environment values,
+clock state, body state, collider shape/filter state, retained
+continuation-affecting pair/contact state, and active CCD handoff state. It does
+not hash host object identity, delegates, diagnostics buffers, debug draw
+commands, query scratch buffers, or visualization interpolation caches.
 
-All-hit query APIs use caller-owned buffers. The 3D query service writes
-`Physics3DHit` values, pure 2D queries write `Physics2DHit` values, and mixed
-queries write `PhysicsMixedHit` values. They clear the supplied list, write
-sorted hits into it, and return the count so hot query loops do not allocate
-enumerators or temporary hit lists.
-
-Query APIs use `PhysicsLayerMask` as an include mask. Use
-`PhysicsLayerMask.FromLayer(...)` for a single layer,
-`PhysicsLayerMask.FromLayers(...)` for several layers, `PhysicsLayerMask.All`
-for every layer, and `PhysicsLayerMask.None` when no collider should be
-included.
-
-Ground checks use `context.Settings.GroundCheckLayerMask`. Hosts need to set
-this explicitly for their own layer model before relying on grounding behavior.
-`SolidBody.Initialize(...)` performs an initial ground probe after the collider
-is registered, so bodies only start grounded when the configured ground mask
-actually hits suitable geometry.
-
-`SolidBody.GroundingMode` controls who owns grounded state:
-
-- `Automatic` is the default. Gravitas updates `IsGrounded`, `HitPoint`,
-  `WasGrounded`, `GroundNormal`, `HitPlatform`, and normal-force cache from
-  deterministic ground probes.
-- `Manual` disables automatic probes. Hosts can call `UseManualGrounding(...)`,
-  `SetManualGrounding(...)`, `ClearManualGrounding()`, and
-  `UseAutomaticGrounding(...)` when deterministic heightmaps or another
-  host-owned ground source should drive grounded state without paying query
-  cost. While in manual mode, the host is responsible for keeping `IsGrounded`
-  state current. `UseManualGrounding()` and `ClearManualGrounding()` leave the
-  body airborne until the host supplies manual support or returns ownership to
-  Gravitas.
-
-Each body selects its probe shape through `GroundProbeMode`:
-
-- `Ray` preserves the sorted raycast/self-exclusion behavior.
-- `SweptSphere` uses the true swept-sphere query and the body collider as the
-  excluded collider.
-- `Auto` uses swept spheres for sphere, capsule, cylinder, and wide cuboid
-  bodies, and ray probes for point-like or unsupported bodies.
-
-`GroundProbeRadius` can override the derived swept radius. Leave it at zero to
-derive radius from the collider shape. Ground probes ignore the body's own
-collider, collider-local ignored physical layers, and ordinary movable dynamic
-bodies; valid ground targets are bodyless colliders, position-frozen bodies, or
-kinematic bodies. `WasGrounded` stores the grounded value captured before the
-latest authoritative simulation refresh or explicit manual grounding change, so
-hosts can distinguish landing, remaining grounded, and leaving support without
-deriving that transition from visual-frame state.
-
-`SolidBody2D` exposes the same ownership model through `GroundingMode`,
-`UseManualGrounding(...)`, `SetManualGrounding(...)`, `ClearManualGrounding()`,
-and `UseAutomaticGrounding(...)`, but the values are planar support state rather
-than world-height state. `GroundPoint`, `GroundNormal`, `LastGroundedPosition`,
-and `GroundUpDirection` are `Vector2d` values where 2D X maps to world X and 2D
-Y maps to world Z. Automatic 2D grounding first uses current-frame 2D contact
-manifolds against bodyless, position-frozen, or kinematic support colliders
-included by `GroundCheckLayerMask`; if no contact candidate is valid, it runs a
-deterministic `GroundProbeMode2D.Ray` or `GroundProbeMode2D.SweptCircle` probe
-through `context.Query2D`. Grounded 2D integration removes acceleration and
-velocity components that push into the support normal while preserving
-tangential planar motion.
+The returned `ChronicleHash` is a deterministic conformance signal, not a
+cryptographic hash and not a compatibility promise across package versions.
 
 ## Deactivation And Disposal
 
@@ -654,15 +506,29 @@ collider ID.
 Use `context.Reset()` for a reusable session context. Reset detaches Gravitas
 partition payloads from GridForge voxels and clears context-local runtime state
 while preserving the world and its grids. Use `context.Dispose()` when the
-context is finished. If the context owns its world, dispose will also dispose
-the world.
+context is finished.
 
-## Serialization Boundary
+## Rules That Matter
 
-`SolidBody`, `SolidBody2D`, `LSCollider`, and `LSCollider2D` implement
-Chronicler record methods for state transfer into existing host-created objects.
-Treat serialization as populate-existing-runtime-shell behavior, not
-construct-from-data behavior.
+- Do not mutate authoritative physics state from visualization phases.
+- Do not read wall-clock time from runtime simulation logic.
+- Keep command ordering deterministic before `Simulate()`.
+- Add grid coverage before initializing colliders.
+- Keep public query buffers caller-owned in hot paths.
+- Use explicit runtime modes: `ThreeD`, `TwoD`, `Both`, or `Mixed`.
+- Use `Mixed` only when cross-dimensional contacts are intended.
+- Treat Chronicler as populate-existing-shell infrastructure, not an object
+  factory.
 
-Read [Serialization And Replay](SERIALIZATION.md) before changing serialized
-fields, load defaults, runtime cache rebuilds, or replay tests.
+## Source Map
+
+| Area | Source |
+| --- | --- |
+| Context and lifecycle | [`src/Gravitas/Runtime/GravitasWorldContext.cs`](../../src/Gravitas/Runtime/GravitasWorldContext.cs), [`src/Gravitas/Runtime/GravitasClock.cs`](../../src/Gravitas/Runtime/GravitasClock.cs) |
+| Host boundary | [`src/Gravitas/Core/IMatterAgent.cs`](../../src/Gravitas/Core/IMatterAgent.cs) |
+| 3D body/service | [`src/Gravitas/Core/3D/SolidBody.cs`](../../src/Gravitas/Core/3D/SolidBody.cs), [`src/Gravitas/Core/3D/GravitasPhysicsService.cs`](../../src/Gravitas/Core/3D/GravitasPhysicsService.cs) |
+| 2D body/service | [`src/Gravitas/Core/2D/SolidBody2D.cs`](../../src/Gravitas/Core/2D/SolidBody2D.cs), [`src/Gravitas/Core/2D/GravitasPhysics2DService.cs`](../../src/Gravitas/Core/2D/GravitasPhysics2DService.cs) |
+| Settings | [`src/Gravitas/Settings/PhysicsSettings.cs`](../../src/Gravitas/Settings/PhysicsSettings.cs), [`src/Gravitas/Settings/PhysicsRuntimeMode.cs`](../../src/Gravitas/Settings/PhysicsRuntimeMode.cs) |
+| Constraints | [`src/Gravitas/Constraints/3D`](../../src/Gravitas/Constraints/3D), [`src/Gravitas/Constraints/2D`](../../src/Gravitas/Constraints/2D) |
+| Query APIs | [`src/Gravitas/Queries`](../../src/Gravitas/Queries) |
+| Replay hash | [`src/Gravitas/Determinism/GravitasReplayHashService.cs`](../../src/Gravitas/Determinism/GravitasReplayHashService.cs) |

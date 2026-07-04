@@ -6,9 +6,16 @@ emits deterministic `GravitasDiagnosticEvent` values and
 translate those streams into engine-specific overlays, logs, captures, or replay
 tools outside `src/Gravitas`.
 
-Keep adapter code in the host, samples, or tooling projects. Do not add
-engine-specific, renderer, file-system, networking, or editor dependencies to
-the Gravitas core library to make diagnostics easier to display.
+Read [Diagnostics](DIAGNOSTICS.md) for the event and draw command reference.
+
+## Quick Read
+
+- Keep adapter code in host, sample, or tooling projects.
+- Consume diagnostics after the deterministic frame or capture window.
+- Preserve `Frame` and `Sequence` as ordering keys.
+- Resolve context-local IDs only against the producing context.
+- Translate fixed-point values at the host boundary.
+- Do not feed diagnostics back into authoritative simulation decisions.
 
 ## Adapter Boundary
 
@@ -16,28 +23,27 @@ An adapter should:
 
 - consume diagnostics after the deterministic frame or debug capture window has
   finished.
-- preserve `Frame` and `Sequence` as the ordering keys.
-- resolve context-local body and collider IDs only against the same
+- preserve `Frame` and `Sequence` as ordering keys.
+- resolve body, collider, and joint IDs through the same
   `GravitasWorldContext` that produced the payload.
-- translate fixed-point values at the edge, if the host renderer or log format
-  requires floating-point or text output.
-- call `context.Diagnostics.Clear()` after the frame is consumed when the host
-  wants a per-frame stream.
+- translate fixed-point values at the edge when the host renderer or log format
+  requires floats or text.
+- call `context.Diagnostics.Clear()` after consumption when the host wants a
+  per-frame stream.
 
 An adapter should not:
 
-- mutate `SolidBody`, `SolidBody2D`, collider, partition, or query state while
-  consuming diagnostics.
-- feed diagnostics back into authoritative simulation decisions.
-- assume collider IDs are global, stable across contexts, or valid after the
-  owning context is reset.
-- project diagnostics through observable/event APIs in authoritative hot paths
-  unless ordering and notification cost have dedicated tests and benchmarks.
+- mutate `SolidBody`, `SolidBody2D`, collider, partition, query, or constraint
+  state while consuming diagnostics.
+- make authoritative simulation decisions from diagnostic payloads.
+- assume collider IDs are global, stable across contexts, or valid after reset.
+- add engine-specific renderer, file-system, networking, or editor dependencies
+  to the Gravitas core library.
 
-## Debug Draw Adapter Shape
+## Debug Draw Adapter
 
 Renderer adapters usually need a small command sink that mirrors the host's
-debug drawing API. The adapter owns any conversion to host units, colors, and
+debug drawing API. The adapter owns conversion to host units, colors, and
 duration.
 
 ```csharp
@@ -80,42 +86,61 @@ public sealed class HostDebugDrawAdapter : GravitasDebugDrawCommandVisitor
         _sink.DrawWireBox(view.Center, view.Size, view.Rotation, view.Color);
 
     public override void VisitWireCylinder(in GravitasWireCylinderDebugDrawView view) =>
-        _sink.DrawWireCylinder(view.Center, view.Radius, view.Height, view.Rotation, view.Color);
+        _sink.DrawWireCylinder(
+            view.Center,
+            view.Radius,
+            view.Height,
+            view.Rotation,
+            view.Color);
 
     public override void VisitWireCone(in GravitasWireConeDebugDrawView view) =>
-        _sink.DrawWireCone(view.Center, view.Radius, view.Height, view.Rotation, view.Color);
+        _sink.DrawWireCone(
+            view.Center,
+            view.Radius,
+            view.Height,
+            view.Rotation,
+            view.Color);
 
     public override void VisitWireCapsule(in GravitasWireCapsuleDebugDrawView view) =>
-        _sink.DrawWireCapsule(view.Center, view.Radius, view.Height, view.Rotation, view.Color);
+        _sink.DrawWireCapsule(
+            view.Center,
+            view.Radius,
+            view.Height,
+            view.Rotation,
+            view.Color);
 
     public override void VisitWireTriangle(in GravitasWireTriangleDebugDrawView view) =>
         _sink.DrawWireTriangle(view.PointA, view.PointB, view.PointC, view.Color);
 }
 
-public static void FlushDebugDraw(GravitasWorldContext context, HostDebugDrawAdapter adapter) =>
+public static void FlushDebugDraw(
+    GravitasWorldContext context,
+    HostDebugDrawAdapter adapter) =>
     context.Diagnostics.DispatchDrawCommandsTo(adapter);
 ```
 
-2D debug draw in mixed mode is emitted as finite 3D slab geometry. Circles draw
-as wire cylinders, axis-aligned boxes draw as wire boxes, and polygons draw top,
-bottom, and vertical slab edges. Use `ColliderDimension` and `Collider2DType` to
-style embedded 2D geometry differently from normal 3D colliders.
+2D debug draw in mixed mode is emitted as finite 3D slab geometry. Use
+`ColliderDimension` and `Collider2DType` to style embedded 2D geometry
+separately from normal 3D colliders.
 
 Mesh and compound capture can emit many commands. Reserve draw-command capacity
-before a capture-heavy run and avoid enabling full mesh capture every frame in
-normal gameplay.
+before a capture-heavy run and avoid full mesh capture every frame in normal
+gameplay.
 
-## Structured Log Adapter Shape
+## Structured Log Adapter
 
 Server or headless hosts can ignore draw commands and write diagnostic events to
 a deterministic log sink. Prefer `GravitasDiagnosticEventVisitor` so decoding
-stays centralized in Gravitas instead of repeating generic-field mappings in
-every adapter.
+stays centralized in Gravitas.
 
 ```csharp
 public interface IHostDiagnosticLogSink
 {
-    void Write(int frame, int sequence, GravitasDiagnosticEventKind kind, string payload);
+    void Write(
+        int frame,
+        int sequence,
+        GravitasDiagnosticEventKind kind,
+        string payload);
 }
 ```
 
@@ -130,27 +155,45 @@ public sealed class HostDiagnosticLogAdapter : GravitasDiagnosticEventVisitor
     }
 
     public override void VisitForceDelta(in GravitasForceDeltaDiagnosticView view) =>
-        _sink.Write(view.Frame, view.Sequence, view.Event.Kind, $"body={view.BodyId} force={view.Force} accelDelta={view.AccelerationDelta}");
+        _sink.Write(
+            view.Frame,
+            view.Sequence,
+            view.Event.Kind,
+            $"body={view.BodyId} force={view.Force} accelDelta={view.AccelerationDelta}");
 
     public override void VisitRayQuery(in GravitasRayQueryDiagnosticView view) =>
-        _sink.Write(view.Frame, view.Sequence, view.Event.Kind, $"hit={view.Hit} collider={view.HitColliderId} distance={view.Distance}");
+        _sink.Write(
+            view.Frame,
+            view.Sequence,
+            view.Event.Kind,
+            $"hit={view.Hit} collider={view.HitColliderId} distance={view.Distance}");
 
     public override void VisitContact(in GravitasContactDiagnosticView view) =>
-        _sink.Write(view.Frame, view.Sequence, view.Event.Kind, $"a={view.ColliderAId} b={view.ColliderBId} depth={view.Depth}");
+        _sink.Write(
+            view.Frame,
+            view.Sequence,
+            view.Event.Kind,
+            $"a={view.ColliderAId} b={view.ColliderBId} depth={view.Depth}");
 
     public override void VisitMixedContact(in GravitasMixedContactDiagnosticView view) =>
-        _sink.Write(view.Frame, view.Sequence, view.Event.Kind, $"3d={view.Collider3DId} 2d={view.Collider2DId} depth={view.Depth}");
+        _sink.Write(
+            view.Frame,
+            view.Sequence,
+            view.Event.Kind,
+            $"3d={view.Collider3DId} 2d={view.Collider2DId} depth={view.Depth}");
 }
 
-public static void FlushEvents(GravitasWorldContext context, HostDiagnosticLogAdapter adapter) =>
+public static void FlushEvents(
+    GravitasWorldContext context,
+    HostDiagnosticLogAdapter adapter) =>
     context.Diagnostics.DispatchEventsTo(adapter);
 ```
 
 For production logs, prefer a structured payload object over ad hoc strings. The
-important rule is that adapters should consume semantic typed views instead of
-decoding `ScalarA`, `ScalarB`, `DataA`, and `DataB` directly.
+important rule is that adapters consume semantic typed views instead of decoding
+`ScalarA`, `ScalarB`, `DataA`, and `DataB` directly.
 
-## Replay Timeline Adapter Shape
+## Replay Timeline Adapter
 
 Replay tooling should keep diagnostics beside the authoritative replay frame,
 not inside the authoritative snapshot. A simple frame capture can store events
@@ -178,10 +221,13 @@ public readonly struct DiagnosticFrameCapture
 ```
 
 ```csharp
-public static DiagnosticFrameCapture CaptureTimelineFrame(GravitasWorldContext context)
+public static DiagnosticFrameCapture CaptureTimelineFrame(
+    GravitasWorldContext context)
 {
-    ReadOnlySpan<GravitasDiagnosticEvent> events = context.Diagnostics.Events;
-    ReadOnlySpan<GravitasDebugDrawCommand> drawCommands = context.Diagnostics.DrawCommands;
+    ReadOnlySpan<GravitasDiagnosticEvent> events =
+        context.Diagnostics.Events;
+    ReadOnlySpan<GravitasDebugDrawCommand> drawCommands =
+        context.Diagnostics.DrawCommands;
 
     return new DiagnosticFrameCapture(
         context.FrameCount,
@@ -190,25 +236,31 @@ public static DiagnosticFrameCapture CaptureTimelineFrame(GravitasWorldContext c
 }
 ```
 
-The array allocation above belongs to the tooling edge. Do not move that pattern
-into runtime hooks. Long-running replay tools should pool or stream their own
-capture storage if diagnostics are enabled for many frames.
+The array allocation belongs to the tooling edge. Long-running replay tools
+should pool or stream capture storage when diagnostics are enabled for many
+frames.
 
 ## Generic Payload Policy
 
-The current event struct intentionally uses generic numeric fields:
+The event struct intentionally uses generic numeric fields:
 
 - `ScalarA` and `ScalarB` for fixed-point payload values.
 - `DataA` and `DataB` for integer payload values.
 
-That shape keeps the core event stream compact and predictable. The generic
-payload table in [`DIAGNOSTICS.md`](DIAGNOSTICS.md) remains the storage
-contract, while `GravitasDiagnosticEventVisitor` and typed event views are the
-preferred adapter-facing decode surface. The lower-level `TryAs...` helpers are
+The generic payload table in [Diagnostics](DIAGNOSTICS.md) is the storage
+contract. `GravitasDiagnosticEventVisitor` and typed event views are the
+preferred adapter-facing decode surface. Lower-level `TryAs...` helpers are
 useful for one-off filters over known event kinds, not for full adapter
 dispatch.
 
 Draw commands follow the same pattern: `GravitasDebugDrawCommand` stays compact,
 while `GravitasDebugDrawCommandVisitor` exposes typed draw views for renderer
-adapters. Do not overload the same event or draw kind with new meanings that are
-not documented and tested.
+adapters. Do not overload an event or draw kind with undocumented meanings.
+
+## Source Map
+
+| Area | Source |
+| --- | --- |
+| Event visitors/views | [`src/Gravitas/Diagnostics/Events`](../../src/Gravitas/Diagnostics/Events) |
+| Draw visitors/views | [`src/Gravitas/Diagnostics/DebugDraw`](../../src/Gravitas/Diagnostics/DebugDraw) |
+| Diagnostic sink | [`src/Gravitas/Diagnostics/GravitasDiagnosticSink.cs`](../../src/Gravitas/Diagnostics/GravitasDiagnosticSink.cs) |

@@ -58,11 +58,20 @@ public sealed partial class GravitasPhysics2DService
 
     internal int LastBroadPhaseCandidateCount { get; private set; }
 
-    internal int LastContinuousCollisionIslandCount { get; private set; }
+    /// <summary>
+    /// Gets how many service-owned continuous-collision handoff batches were consumed during the last late step.
+    /// </summary>
+    public int LastContinuousCollisionIslandCount { get; private set; }
 
-    internal int LastContinuousCollisionIslandIterationCount { get; private set; }
+    /// <summary>
+    /// Gets how many service-owned continuous-collision handoff iterations were consumed during the last late step.
+    /// </summary>
+    public int LastContinuousCollisionIslandIterationCount { get; private set; }
 
-    internal bool LastContinuousCollisionIslandLimitReached { get; private set; }
+    /// <summary>
+    /// Gets whether the service-owned continuous-collision handoff queue hit its deterministic iteration cap.
+    /// </summary>
+    public bool LastContinuousCollisionIslandLimitReached { get; private set; }
 
     internal void AssimilateBody(SolidBody2D body, bool isDynamic)
     {

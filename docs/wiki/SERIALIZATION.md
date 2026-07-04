@@ -3,48 +3,36 @@
 Gravitas uses Chronicler for deterministic state transfer into host-created
 runtime shells. The goal is not to materialize a full engine object graph from
 data. The host creates the context, world, agents, transforms, body instances,
-and collider shape types; Chronicler populates deterministic physics state into
-those existing objects.
+and concrete collider shape types; Chronicler populates deterministic physics
+state into those existing objects.
 
-This contract matters for lockstep debugging, rollback-style validation, save
-state testing, and future replay tools.
+This contract supports lockstep debugging, rollback-style validation, save-state
+testing, and replay tools.
+
+## Quick Read
+
+- Serialize authoritative simulation state, not host object identity.
+- Load into existing runtime shells created by the host.
+- Rebuild context-owned runtime caches after load.
+- Populate settings before body/collider state when snapshots include
+  `PhysicsSettingsSaver`.
+- Use `GravitasWorldContext.ComputeReplayHash()` for compact conformance checks.
+- Treat hash strings as deterministic non-cryptographic signals, not
+  cross-version compatibility values.
+- Keep `ReleaseLean` compiling when serialization-related fields or attributes
+  change.
 
 ## Ownership Contract
 
-Serialize authoritative simulation state. Keep host bindings and runtime caches
-owned by the runtime that created them.
-
-Host-created shell:
-
-- `GravitasWorldContext` and its `GridWorld`.
-- `IMatterAgent` implementations.
-- `FixedTransform` instances and any engine transform wrappers.
-- `SolidBody`, `SolidBody2D`, `LSCollider`, and `LSCollider2D` instances.
-- the concrete collider shape type, such as sphere, cuboid, capsule, finite
-  cylinder, finite cone, mesh, circle, AABB, polygon, or compound.
-- private runtime part colliders materialized by `LSCompoundCollider` and
-  `LSCompoundCollider2D`.
-- renderer, ECS, engine object, networking, pooling, editor, and event
-  subscription state.
-
-Serialized state:
-
-- body position, rotation, velocities, acceleration stores, pending force,
-  torque, impulse, and position-correction accumulators.
-- mass, local center-of-mass offset, gravity scale, sleep state, sleep
-  thresholds, CCD mode, and explicit body freeze axes.
-- 3D current and previous-step grounding state plus ground probe configuration.
-- pure 2D current and previous-step planar grounding/support state plus
-  contact/probe grounding configuration.
-- collider active/trigger state, layer, collider-local ignored physical layers,
-  surface material, local offset, shape dimensions, 2D mixed half-thickness
-  override, and shape-derived inputs.
-- joint enabled state, joint type, local frames, limits, motor target payload,
-  and linked-collider collision policy for existing `Joint3D` and `Joint2D`
-  shells.
-- ragdoll runtime activation state for existing `RagdollRuntime3D` and
-  `RagdollRuntime2D` handles.
-- settings that affect deterministic execution, through `PhysicsSettingsSaver`.
+| Host-created shell | Serialized state |
+| --- | --- |
+| `GravitasWorldContext` and `GridWorld` | Settings that affect deterministic execution. |
+| `IMatterAgent`, `FixedTransform`, engine wrappers | Body position, rotation, velocities, force/torque stores, gravity scale, sleep, CCD, freeze axes. |
+| `SolidBody`, `SolidBody2D` | 3D grounding state and 2D planar support state. |
+| Concrete `LSCollider` and `LSCollider2D` types | Active/trigger state, layer, local ignored physical layers, material, local offset, shape inputs, mixed half-thickness override. |
+| Compound runtime shells and private part colliders | Authored shape/part values needed to rebuild deterministic geometry. |
+| Existing `Joint3D`, `Joint2D`, ragdoll runtimes | Joint enabled state, type, frames, limits, motors, linked collision policy, ragdoll activation state. |
+| Renderer, ECS, networking, pooling, editor state | Nothing. These remain host-owned. |
 
 Runtime-owned state that should not be serialized:
 
@@ -59,83 +47,31 @@ Runtime-owned state that should not be serialized:
 - 3D visual interpolation buffers and presentation-only rotation speed state.
 
 On load, bodies publish restored authoritative position and rotation into their
-existing host transform. 3D visual interpolation buffers are reset from that
-authoritative state instead of treated as replay truth.
+existing host transform. 3D visual interpolation buffers reset from that
+authoritative state instead of being treated as replay truth.
 
-## Current Recordable Types
+## Recordable Types
 
-`SolidBody` records 3D authoritative body state, including position, height,
-rotation, freeze axes, linear/angular motion, pending force and torque state,
-mass, local center-of-mass offset, gravity scale, sleep state, CCD mode, and 3D
-current/previous grounding and ground probe state. It does not record the
-`FixedTransform` binding. Collider geometry can derive a default COM for new
-shells, but populated snapshots restore the body-owned COM state directly.
+| Type | What it records | What it does not own |
+| --- | --- | --- |
+| `SolidBody` | 3D position/height, rotation, freeze axes, motion stores, mass, COM, gravity scale, sleep, CCD, grounding/probe state, owned collider state. | `FixedTransform` identity, service IDs, partitions, pairs. |
+| `SolidBody2D` | X/Z position, scalar rotation, freeze axes, planar motion stores, scalar angular state, mass, COM, scalar moment policy, gravity, grounding/probe state, sleep, CCD, owned collider state. | Host transform identity, runtime service IDs, query buffers. |
+| `LSCollider` | 3D layer/filter state, local ignored physical mask, material, shape state. | Context-owned collider ID, partition identity, pairs/events. |
+| `LSCollider2D` | 2D layer/filter state, material, shape-local values, mixed half-thickness override. | Context-owned collider ID, private runtime pair/partition state. |
+| `ColliderShapeDefinition` | Data-only 3D authoring/import values for primitive, mesh, and compound part inputs. | Runtime body, context, collider ID, pairs, hierarchy, events. |
+| `ColliderShapeDefinition2D` | Data-only 2D authoring/import values for circle, capsule, AABB, convex polygon, triangle convenience, and compound parts. | Runtime body, context, collider ID, pairs, hierarchy, events. |
+| `PhysicsSettingsSaver` | Frame rate, collision matrix, ground mask, CCD settings, restitution threshold, retained partition cleanup, runtime mode, mixed 2D thickness. | Runtime service state. |
+| `Joint3D` / `Joint2D` | Mutable joint continuation state: enabled flag, type, frames/anchors, limits, motors, linked-collider policy. | Body link construction, service joint IDs, solver caches. |
+| `RagdollRuntime3D` / `RagdollRuntime2D` | Runtime activation state for existing handles. | Definitions, link bodies, colliders, joint ownership. |
+| `PhysicsLayer` / `PhysicsLayerMask` | JSON/MemoryPack-friendly value fields. | Chronicler graph identity. |
 
-`SolidBody2D` records pure 2D authoritative body state, including X/Z-projected
-position, scalar rotation, freeze axes, linear motion, pending force state,
-scalar angular velocity, applied and queued angular acceleration, mass,
-shape-refreshed scalar moment policy, body-local center-of-mass offset, response
-mobility, gravity, gravity scale, planar grounding mode/probe configuration,
-current and previous grounded state, ground normal, ground point, last grounded
-position, sleep state plus linear and angular sleep thresholds, CCD mode, and
-its owned collider state. Populated snapshots restore explicit COM and grounding
-state, then refresh scalar moment/inverse moment from the loaded collider shape
-so deterministic replay continues with the same effective solver mass and
-support state.
+Collider geometry can derive default COM/mass properties for new shells, but
+populated snapshots restore body-owned COM state directly where that state is
+authoritative.
 
-`LSCollider` records 3D collider filter state, including its physical layer and
-locally ignored physical layer mask, plus surface material and shape state.
-Runtime IDs are context-owned and intentionally excluded from snapshots. Loading
-a bound collider rebuilds runtime shape state and refreshes partition membership
-where needed.
-
-`ColliderShapeDefinition` is a data-only authoring/import surface for creating
-runtime 3D sphere, cuboid, capsule, finite-cylinder, finite-cone, mesh, and
-compound part inputs. It is not a bound runtime shell: it has no body, context,
-collider ID, partition coordinates, pairs, hierarchy state, or events. Offline
-authored compound assets should serialize shape definitions, part materials, and
-stable part transforms, then let the host create `LSCompoundCollider` runtime
-shells from that data before simulation or replay state is populated.
-
-`ColliderShapeDefinition2D` is the matching data-only authoring/import surface
-for pure 2D circle, capsule, AABB, convex polygon, and triangle-convenience
-shape inputs. Offline authored 2D compound assets should serialize
-`ColliderShapeDefinition2D` plus `CompoundColliderPart2D` material/local
-transform data, then let the host create `LSCompoundCollider2D` runtime shells
-before Chronicler populates state.
-
-`LSCollider2D` records pure 2D collider filter state, including its physical
-layer and locally ignored physical layer mask, plus surface material and shape
-state. Circle, capsule, AABB, convex polygon, and compound colliders record
-their shape-specific values through shape-local hooks rather than a central type
-switch. Compound part definitions are host-created shell data, not runtime
-pair/partition state. Loading shape data validates the input and rebuilds bounds
-without waking a sleeping body just because state was populated.
-
-`PhysicsSettingsSaver` records frame rate, collision matrix, ground-check layer
-mask, default CCD mode, CCD TOI iteration limit, restitution velocity threshold,
-retained-partition cleanup settings, runtime mode, and mixed 2D half-thickness.
-Applying it owns a new `PhysicsSettings` instance for the target context and
-synchronizes the context clock.
-
-`Joint3D` records mutable 3D constraint state into existing runtime joint
-shells: enabled state, joint type, local anchor frames, angular limits, motor
-payload, and linked-collider collision policy. `Joint2D` records the matching
-pure 2D continuation state: enabled state, joint type, planar local frames,
-distance/slider/angular limits, scalar motor payload, and linked-collider
-collision policy. Neither joint type creates or resolves body links from
-serialized data; the host must recreate the same bodies and register matching
-joints before Chronicler populates continuation state. Pair-local contact caches
-and joint solver caches are rebuildable runtime data unless a drift
-investigation explicitly hashes them through `AuthoritativeWithSolverCaches`.
-
-`RagdollRuntime3D` and `RagdollRuntime2D` record activation state for existing
-ragdoll runtimes. Definitions, link bodies, colliders, and joint ownership are
-host-created shell data; loading activation state switches the already-
-registered links between dynamic ragdoll simulation and kinematic host control.
-
-`PhysicsLayer` and `PhysicsLayerMask` still use direct JSON/MemoryPack-friendly
-field annotations because they are small value helpers, not Chronicler graphs.
+Pair-local contact caches and joint solver caches are rebuildable runtime data
+unless a drift investigation explicitly hashes them through
+`GravitasReplayHashMode.AuthoritativeWithSolverCaches`.
 
 ## Replay Workflow
 
@@ -144,12 +80,13 @@ A deterministic replay or rollback restore should follow this shape:
 1. Create or attach a `GravitasWorldContext` with matching settings and
    GridForge world setup.
 2. Create host agents, transforms, bodies, and concrete collider shapes in the
-   same stable order the host expects. Authored 3D and 2D compound assets can
-   materialize those shapes from `ColliderShapeDefinition` or
-   `ColliderShapeDefinition2D` parts before binding.
-3. Populate settings first when the snapshot includes `PhysicsSettingsSaver`.
-4. Populate body/collider state into those existing shells.
-5. Continue fixed-step simulation from the restored frame using the same ordered
+   same stable order the host expects.
+3. Materialize authored 3D and 2D compound assets from
+   `ColliderShapeDefinition`, `ColliderShapeDefinition2D`, and compound part
+   data before binding.
+4. Populate settings first when the snapshot includes `PhysicsSettingsSaver`.
+5. Populate body/collider/joint/ragdoll state into existing shells.
+6. Continue fixed-step simulation from the restored frame using the same ordered
    input commands.
 
 For dynamic replay tests, compare the uninterrupted simulation against a fresh
@@ -158,30 +95,43 @@ compare runtime-owned service IDs or partition list identities; compare
 authoritative body/collider values and externally observable collision/query
 behavior.
 
+## Replay Hashes
+
 `GravitasWorldContext.ComputeReplayHash()` is the preferred compact conformance
-signal for replay and rollback tests. After Chronicler populates existing
-runtime shells, the restored context should produce the same per-frame
-`ChronicleHash` sequence as the uninterrupted context when both receive the same
-subsequent inputs. The authoritative hash follows the same boundary as
-`IRecordable.RecordData(...)`: serialized continuation state is included, while
-host-owned bindings and rebuildable runtime caches are excluded. Active
-cross-frame CCD handoff state remains authoritative because it can affect the
-next fixed step. Rebuildable CCD frame snapshots, query scratch data, diagnostic
-buffers, visual interpolation state, and drift-debug counters are available only
-through `GravitasReplayHashMode.AuthoritativeWithSolverCaches` when they are
-useful for RCA.
+signal for replay and rollback tests.
+
+After Chronicler populates existing runtime shells, the restored context should
+produce the same per-frame `ChronicleHash` sequence as the uninterrupted context
+when both receive the same subsequent inputs.
+
+The authoritative hash follows the same boundary as
+`IRecordable.RecordData(...)`:
+
+- serialized continuation state is included.
+- host-owned bindings are excluded.
+- rebuildable runtime caches are excluded.
+- active cross-frame CCD handoff state is included because it can affect the
+  next fixed step.
+- solver caches and diagnostic counters are included only in
+  `AuthoritativeWithSolverCaches` mode for RCA.
 
 Replay hashes use Chronicler's `ChronicleHash` value and hash-writer mechanics.
 Gravitas owns the physics-specific inclusion policy and deterministic ordering.
-Hash strings are non-cryptographic conformance signals and should not be treated
-as stable compatibility values across package version changes.
+
+```mermaid
+flowchart LR
+    Shells["Host-created shells"] --> Populate["Chronicler populate"]
+    Populate --> Sim["Continue fixed-step simulation"]
+    Sim --> Hash["ComputeReplayHash"]
+    Hash --> Compare["Compare peers/replay runners"]
+```
 
 ## Transport Notes
 
 Standard `Release` builds include MemoryPack support through the standard
 dependency chain. `ReleaseLean` defines `GRAVITAS_DISABLE_MEMORYPACK`, excludes
-the direct MemoryPack package, and relies on the shim attributes needed for the
-same core API to compile without built-in MemoryPack support.
+the direct MemoryPack package, and relies on shim attributes needed for the same
+core API to compile without built-in MemoryPack support.
 
 When changing serialized fields, defaults, or load behavior:
 
@@ -192,3 +142,26 @@ When changing serialized fields, defaults, or load behavior:
   continue simulation.
 - document whether the field is authoritative simulation state, host-owned
   binding, or runtime cache.
+
+## Rules That Matter
+
+- Do not turn Chronicler loading into a construct-from-data object factory.
+- Do not serialize host bindings such as engine objects, renderers, or external
+  transform object identity.
+- Do not serialize context-local IDs as portable identity.
+- Keep JSON and MemoryPack behavior aligned when both are supported.
+- Treat presentation-only data and runtime caches as rebuildable.
+- Add replay-continuation tests when state affects deterministic continuation.
+
+## Source Map
+
+| Area | Source |
+| --- | --- |
+| 3D body serialization | [`src/Gravitas/Core/3D/SolidBody.Serialization.cs`](../../src/Gravitas/Core/3D/SolidBody.Serialization.cs) |
+| 2D body serialization | [`src/Gravitas/Core/2D/SolidBody2D.Serialization.cs`](../../src/Gravitas/Core/2D/SolidBody2D.Serialization.cs) |
+| 3D collider replay/record state | [`src/Gravitas/Colliders/3D/LSCollider.ReplayHash.cs`](../../src/Gravitas/Colliders/3D/LSCollider.ReplayHash.cs) |
+| 2D collider replay/record state | [`src/Gravitas/Colliders/2D/LSCollider2D.ReplayHash.cs`](../../src/Gravitas/Colliders/2D/LSCollider2D.ReplayHash.cs) |
+| Settings saver | [`src/Gravitas/Settings/PhysicsSettingsSaver.cs`](../../src/Gravitas/Settings/PhysicsSettingsSaver.cs) |
+| Replay hash service | [`src/Gravitas/Determinism/GravitasReplayHashService.cs`](../../src/Gravitas/Determinism/GravitasReplayHashService.cs) |
+| Serialization tests | [`tests/Gravitas.Tests/Serialization`](../../tests/Gravitas.Tests/Serialization) |
+| Replay conformance tests | [`tests/Gravitas.Tests/Determinism`](../../tests/Gravitas.Tests/Determinism) |
