@@ -255,7 +255,7 @@ public sealed partial class GravitasPhysics2DService
             if (pair.LastFrame == frame)
                 continue;
 
-            if (TryKeepRestingPair(pair, frame))
+            if (TryKeepUntouchedPair(pair, frame))
                 continue;
 
             pair.MarkSeparated();
@@ -273,17 +273,22 @@ public sealed partial class GravitasPhysics2DService
         }
     }
 
-    private bool TryKeepRestingPair(CollisionPair2D pair, int frame)
+    private bool TryKeepUntouchedPair(CollisionPair2D pair, int frame)
     {
         LSCollider2D first = pair.ColliderA;
         LSCollider2D second = pair.ColliderB;
-        if (first.IsTrigger
-            || second.IsTrigger
-            || HasAwakeMovableParticipant(first, second)
+        bool triggerPair = first.IsTrigger || second.IsTrigger;
+        if ((!triggerPair && HasAwakeMovableParticipant(first, second))
             || !RequireCollisionPair(first, second)
             || !CollisionDetection2D.TryCollide(pair, pair.Manifold, frame))
         {
             return false;
+        }
+
+        if (triggerPair)
+        {
+            pair.MarkColliding(frame);
+            return true;
         }
 
         pair.MarkResting(frame);

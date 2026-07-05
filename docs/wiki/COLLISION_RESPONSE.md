@@ -8,7 +8,8 @@ explicit.
 ## Quick Read
 
 - Narrow phase writes pair-owned contact manifolds.
-- Trigger pairs skip physical response and emit trigger events.
+- Bodyless trigger volumes skip physical response and emit trigger events for
+  valid trigger/body pairs.
 - Non-trigger pairs are solved with enabled joints in deterministic body
   islands.
 - 3D response uses 3D mass, inertia tensors, contact arms, and tangent frames.
@@ -190,10 +191,16 @@ Sleeping contact pairs are preserved while their manifold is known to be
 colliding. This prevents resting sleeping contacts from aging out and emitting a
 false contact exit simply because their partition skipped pair generation.
 
-`LSCollider.NotifyContact(...)` emits:
+`LSCollider.NotifyContact(...)` and `LSCollider2D.NotifyContact(...)` emit:
 
-- `OnTriggerEnter` and `OnTriggerExit` for trigger colliders.
+- `OnTriggerEnter`, `OnTriggerStay`, and `OnTriggerExit` when exactly one
+  collider is a trigger volume and the non-trigger collider is body-owned. Both
+  colliders in the pair receive the trigger callback.
 - `OnContactEnter`, `OnContact`, and `OnContactExit` for body contacts.
+
+Mixed pairs follow the same rule with `OnMixedTriggerEnter`,
+`OnMixedTriggerStay`, and `OnMixedTriggerExit`. Trigger pairs never emit contact
+callbacks and do not participate in physical response.
 
 ## Diagnostics
 

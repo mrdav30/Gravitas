@@ -40,7 +40,6 @@ public sealed class SolidBodySerializationTests
         source.Collider.LocalOffset = new Vector3d(Fixed64.Half, Fixed64.FromFraction(1, 4), -Fixed64.Half);
         source.Collider.Layer = new PhysicsLayer(4);
         source.Collider.IgnoredCollisionLayers = PhysicsLayerMask.FromLayers(new PhysicsLayer(2), new PhysicsLayer(7));
-        PhysicsScenarioBuilder.SetTrigger(source.Collider);
         source.Collider.Simulate();
 
         object payload = GravitasSerializationHarness.Serialize(source.Body, transport);
@@ -80,7 +79,7 @@ public sealed class SolidBodySerializationTests
         target.Collider.LocalOffset.Should().Be(source.Collider.LocalOffset);
         target.Collider.Layer.Should().Be(source.Collider.Layer);
         target.Collider.IgnoredCollisionLayers.Should().Be(source.Collider.IgnoredCollisionLayers);
-        target.Collider.IsTrigger.Should().BeTrue();
+        target.Collider.IsTrigger.Should().BeFalse();
         target.Collider.Bounds.Center.Should().Be(source.Collider.Bounds.Center);
     }
 

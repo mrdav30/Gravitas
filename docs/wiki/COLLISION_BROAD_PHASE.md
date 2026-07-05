@@ -139,7 +139,7 @@ fails:
 | Explicit hierarchy | Parent/child and sibling filters use dimension-tagged hierarchy keys. |
 | Collision matrix | Context-wide physical layer matrix must allow the pair. |
 | Collider-local ignored layers | Either collider can reject the other collider's layer. |
-| Trigger policy | Trigger pairs skip physical response but keep trigger events. |
+| Trigger policy | Bodyless trigger volumes skip physical response and emit trigger events only when exactly one collider is a trigger and the other collider is body-owned. |
 | Bounds | Broad bounds must overlap before narrow phase. |
 | Awake/resting policy | Sleeping/sleeping fresh links exit; retained resting links can keep island state. |
 

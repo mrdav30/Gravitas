@@ -959,10 +959,10 @@ public sealed class ContinuousCollision2DTests
         using GravitasWorldContext context = CreateContext(frameRate: 1);
         SolidBody2D parent = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: true);
         SolidBody2D child = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: true);
-        SolidBody2D trigger = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)2, Fixed64.Zero), immovable: true);
+        LSCircleCollider2D trigger = CreateBodylessCircle(context, new Vector2d((Fixed64)2, Fixed64.Zero));
         SolidBody2D included = CreateBody(context, new LSAABBoxCollider2D(Vector2d.One), new Vector2d((Fixed64)4, Fixed64.Zero), immovable: true);
         child.Collider.SetParent(parent.Collider);
-        trigger.Collider.IsTrigger = true;
+        trigger.IsTrigger = true;
         var hits = new SwiftList<Physics2DHit>();
 
         int count = context.Query2D.OverlapCircleAgainstStaticAll(
@@ -982,9 +982,9 @@ public sealed class ContinuousCollision2DTests
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);
         _ = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)3, Fixed64.Zero), immovable: true, layer: new PhysicsLayer(0));
-        SolidBody2D trigger = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)4, Fixed64.Zero), immovable: true, layer: new PhysicsLayer(1));
+        LSCircleCollider2D trigger = CreateBodylessCircle(context, new Vector2d((Fixed64)4, Fixed64.Zero), layer: new PhysicsLayer(1));
         SolidBody2D included = CreateBody(context, new LSAABBoxCollider2D(Vector2d.One), new Vector2d((Fixed64)6, Fixed64.Zero), immovable: true, layer: new PhysicsLayer(1));
-        trigger.Collider.IsTrigger = true;
+        trigger.IsTrigger = true;
         var hits = new SwiftList<Physics2DHit>();
 
         int count = context.Query2D.SweepCircleAll(
@@ -1120,14 +1120,18 @@ public sealed class ContinuousCollision2DTests
     private static LSCircleCollider2D CreateBodylessCircle(
         GravitasWorldContext context,
         Vector2d position,
-        Fixed64 hostY = default)
+        Fixed64 hostY = default,
+        PhysicsLayer layer = default)
     {
         var transform = new FixedTransform(
             new Vector3d(position.X, hostY, position.Y),
             FixedQuaternion.Identity,
             Vector3d.One);
         var agent = new TestMatterAgent(context, transform);
-        var collider = new LSCircleCollider2D(Fixed64.Half);
+        var collider = new LSCircleCollider2D(Fixed64.Half)
+        {
+            Layer = layer
+        };
         collider.InitializeWithNoBody(agent);
         return collider;
     }

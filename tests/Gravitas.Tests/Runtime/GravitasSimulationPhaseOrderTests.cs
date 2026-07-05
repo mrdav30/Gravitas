@@ -25,17 +25,18 @@ public sealed class GravitasSimulationPhaseOrderTests
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         scenario.Context.Environment.Gravity = Fixed64.Zero;
         ScenarioBody<LSSphereCollider> first = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
-        ScenarioBody<LSSphereCollider> second = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(8, 0, 0));
-        PhysicsScenarioBuilder.SetTrigger(second.Collider);
+        LSSphereCollider trigger = scenario.CreateStaticSphere(PhysicsScenarioBuilder.Vector(8, 0, 0));
+        trigger.IsTrigger = true;
         Vector3d teleportedPosition = new(Fixed64.Half, Fixed64.Zero, Fixed64.Zero);
 
-        second.Body.SetPosition(teleportedPosition);
+        trigger.Position = teleportedPosition;
+        trigger.Simulate();
 
         scenario.Context.Simulate();
         scenario.Context.LateSimulate();
 
-        second.Body.Position3d.Should().Be(teleportedPosition);
-        first.Collider.TryGetCollisionPair(second.Collider.Id, out CollisionPair? pair).Should().BeTrue();
+        trigger.Position.Should().Be(teleportedPosition);
+        first.Collider.TryGetCollisionPair(trigger.Id, out CollisionPair? pair).Should().BeTrue();
         pair!.Manifold.HasContact.Should().BeTrue();
         pair.LastFrame.Should().Be(scenario.Context.FrameCount);
     }
@@ -83,8 +84,8 @@ public sealed class GravitasSimulationPhaseOrderTests
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSSphereCollider> first = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
-        ScenarioBody<LSSphereCollider> second = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(8, 0, 0));
-        PhysicsScenarioBuilder.SetTrigger(second.Collider);
+        LSSphereCollider trigger = scenario.CreateStaticSphere(PhysicsScenarioBuilder.Vector(8, 0, 0));
+        trigger.IsTrigger = true;
         Vector3d teleportedPosition = new(Fixed64.Half, Fixed64.Zero, Fixed64.Zero);
         Vector3d startPosition = first.Body.Position3d;
         bool simulateHookRanBeforeContacts = false;
@@ -93,17 +94,18 @@ public sealed class GravitasSimulationPhaseOrderTests
         using IDisposable simulateHook = scenario.Context.RegisterOnSimulate(
             "PhaseOrder.ContactProbe",
             0,
-            () => simulateHookRanBeforeContacts = !first.Collider.TryGetCollisionPair(second.Collider.Id, out _)
+            () => simulateHookRanBeforeContacts = !first.Collider.TryGetCollisionPair(trigger.Id, out _)
                 && scenario.Context.FrameCount == 1);
         using IDisposable lateSimulateHook = scenario.Context.RegisterOnLateSimulate(
             "PhaseOrder.IntegrationProbe",
             0,
             () => lateSimulateHookSawSolvedFrame =
                 first.Body.Position3d.X > startPosition.X
-                && first.Collider.TryGetCollisionPair(second.Collider.Id, out CollisionPair? pair)
+                && first.Collider.TryGetCollisionPair(trigger.Id, out CollisionPair? pair)
                 && pair!.Manifold.HasContact);
 
-        second.Body.SetPosition(teleportedPosition);
+        trigger.Position = teleportedPosition;
+        trigger.Simulate();
         first.Body.AddForce(new Vector3d((Fixed64)12, Fixed64.Zero, Fixed64.Zero));
         scenario.Context.Simulate();
         scenario.Context.LateSimulate();

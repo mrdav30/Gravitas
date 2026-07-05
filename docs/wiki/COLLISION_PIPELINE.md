@@ -129,8 +129,11 @@ TOI ordering, and service counters: [Continuous Collision Detection](CONTINUOUS_
 
 ## Response And Notifications
 
-Non-trigger contacts are solved through deterministic manifold response. Trigger
-pairs skip physical response but keep trigger notifications.
+Non-trigger contacts are solved through deterministic manifold response.
+Bodyless trigger volumes skip physical response and emit trigger notifications
+only when exactly one collider in the pair is a trigger and the other collider is
+body-owned. Both colliders in a valid trigger pair receive enter, stay, and exit
+callbacks.
 
 3D and 2D response both:
 

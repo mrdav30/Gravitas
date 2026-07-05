@@ -342,10 +342,7 @@ public sealed class PhysicsPartitionAwakeTests
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSSphereCollider>[] bodies = new ScenarioBody<LSSphereCollider>[4];
         for (int i = 0; i < bodies.Length; i++)
-        {
             bodies[i] = scenario.CreateSphere(new Vector3d((Fixed64)(-8 + i * 4), Fixed64.Zero, Fixed64.Zero));
-            PhysicsScenarioBuilder.SetTrigger(bodies[i].Collider);
-        }
 
         for (int i = 0; i < moveOrder.Length; i++)
         {

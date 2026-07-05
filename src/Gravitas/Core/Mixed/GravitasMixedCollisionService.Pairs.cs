@@ -110,7 +110,7 @@ internal sealed partial class GravitasMixedCollisionService
             if (pair.LastFrame == frame)
                 continue;
 
-            if (TryKeepRestingPair(pair, frame))
+            if (TryKeepUntouchedPair(pair, frame))
                 continue;
 
             pair.MarkSeparated();
@@ -120,18 +120,23 @@ internal sealed partial class GravitasMixedCollisionService
         RemoveQueuedPairs();
     }
 
-    private bool TryKeepRestingPair(CollisionPairMixed pair, int frame)
+    private bool TryKeepUntouchedPair(CollisionPairMixed pair, int frame)
     {
         LSCollider collider3D = pair.Collider3D;
         LSCollider2D collider2D = pair.Collider2D;
-        if (collider3D.IsTrigger
-            || collider2D.IsTrigger
-            || HasAwakeMovableParticipant(collider3D, collider2D)
+        bool triggerPair = collider3D.IsTrigger || collider2D.IsTrigger;
+        if ((!triggerPair && HasAwakeMovableParticipant(collider3D, collider2D))
             || !RequireCollisionPair(collider3D, collider2D)
             || !MixedBoundsOverlap(collider3D, collider2D)
-            || !CollisionDetectionMixed.TryCollide(collider3D, collider2D, out _))
+            || !CollisionDetectionMixed.TryCollide(collider3D, collider2D, out MixedContact contact))
         {
             return false;
+        }
+
+        if (triggerPair)
+        {
+            pair.MarkColliding(frame, contact);
+            return true;
         }
 
         pair.MarkResting(frame);

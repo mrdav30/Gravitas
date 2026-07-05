@@ -164,9 +164,10 @@ and deterministic warm-start caches. Convex/convex face contacts can resolve
 through a fixed two-contact `ContactManifold2D`; circle/circle and circle/convex
 contacts remain one-contact manifolds.
 
-`LSCollider2D.InitializeWithNoBody(IMatterAgent)` binds bodyless static or
-trigger colliders to the same host contract. Bodyless 2D colliders participate
-in queries, triggers, layer filtering, cleanup, and static collision response.
+`LSCollider2D.InitializeWithNoBody(IMatterAgent)` binds bodyless static geometry
+and bodyless trigger volumes to the same host contract. Bodyless 2D colliders
+participate in queries, triggers, layer filtering, cleanup, and static collision
+response.
 
 `LSPolygonCollider2D` validates convexity and rejects concave or collinear input
 instead of silently accepting ambiguous collision truth. A rotated box should

@@ -14,16 +14,16 @@ public sealed class CollisionPair2DManifoldTests
     public void Simulate_WithPersistentTriggerPair_ShouldUpdatePairOwnedManifoldAcrossFrames()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
-        SolidBody2D trigger = CreateCircle(context, Vector2d.Zero, immovable: false);
-        SolidBody2D other = CreateCircle(context, new Vector2d(Fixed64.Half, Fixed64.Zero), immovable: true);
-        trigger.Collider.IsTrigger = true;
+        LSCircleCollider2D trigger = CreateBodylessCircle(context, Vector2d.Zero);
+        SolidBody2D other = CreateCircle(context, new Vector2d(Fixed64.Half, Fixed64.Zero), immovable: false);
+        trigger.IsTrigger = true;
 
         Step(context);
-        CollisionPair2D pair = GetPair(trigger, other);
+        CollisionPair2D pair = GetPair(trigger, other.Collider);
         ulong contactId = pair.Manifold.PrimaryContact.ContactId;
 
         Step(context);
-        CollisionPair2D updatedPair = GetPair(trigger, other);
+        CollisionPair2D updatedPair = GetPair(trigger, other.Collider);
 
         updatedPair.Should().BeSameAs(pair);
         updatedPair.LastFrame.Should().Be(context.FrameCount);
@@ -36,10 +36,10 @@ public sealed class CollisionPair2DManifoldTests
     public void MarkSeparated_ShouldResetPairOwnedManifoldAndWarmStartState()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
-        SolidBody2D first = CreateCircle(context, Vector2d.Zero, immovable: true);
+        LSCircleCollider2D first = CreateBodylessCircle(context, Vector2d.Zero);
         SolidBody2D second = CreateCircle(context, new Vector2d(Fixed64.Half, Fixed64.Zero), immovable: true);
-        first.Collider.IsTrigger = true;
-        var pair = new CollisionPair2D(first.Collider, second.Collider);
+        first.IsTrigger = true;
+        var pair = new CollisionPair2D(first, second.Collider);
         CollisionDetection2D.TryCollide(pair, pair.Manifold, frame: 7).Should().BeTrue();
         ulong contactId = pair.Manifold.PrimaryContact.ContactId;
         pair.StoreWarmStartImpulse(contactId, Fixed64.One, Fixed64.Half);
@@ -94,12 +94,12 @@ public sealed class CollisionPair2DManifoldTests
         pair.Manifold.Select(static contact => contact.ContactId).Should().Equal(contactIds);
     }
 
-    private static CollisionPair2D GetPair(SolidBody2D first, SolidBody2D second)
+    private static CollisionPair2D GetPair(LSCollider2D first, LSCollider2D second)
     {
-        if (first.Collider.TryGetCollisionPair(second.Collider.Id, out CollisionPair2D? firstPair) && firstPair != null)
+        if (first.TryGetCollisionPair(second.Id, out CollisionPair2D? firstPair) && firstPair != null)
             return firstPair;
 
-        second.Collider.TryGetCollisionPair(first.Collider.Id, out CollisionPair2D? secondPair).Should().BeTrue();
+        second.TryGetCollisionPair(first.Id, out CollisionPair2D? secondPair).Should().BeTrue();
         return secondPair!;
     }
 
@@ -139,6 +139,13 @@ public sealed class CollisionPair2DManifoldTests
         };
         body.Initialize(position);
         return body;
+    }
+
+    private static LSCircleCollider2D CreateBodylessCircle(GravitasWorldContext context, Vector2d position)
+    {
+        var collider = new LSCircleCollider2D(Fixed64.Half);
+        collider.InitializeWithNoBody(new TestMatterAgent(context, CreateTransform(position)));
+        return collider;
     }
 
     private static FixedTransform CreateTransform(Vector2d position) =>

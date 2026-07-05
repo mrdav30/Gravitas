@@ -79,8 +79,8 @@ public sealed class GravitasQuery3DServiceConeTests
                 MeshInertiaPolicy.SurfaceApproximation),
             Vector3d.Zero,
             FixedQuaternion.Identity).Collider;
-        LSSphereCollider trigger = scenario.CreateSphere(new Vector3d((Fixed64)6, Fixed64.Zero, Fixed64.Zero)).Collider;
-        PhysicsScenarioBuilder.SetTrigger(trigger);
+        LSSphereCollider trigger = scenario.CreateStaticSphere(new Vector3d((Fixed64)6, Fixed64.Zero, Fixed64.Zero));
+        trigger.IsTrigger = true;
         LSSphereCollider masked = scenario.CreateSphere(new Vector3d((Fixed64)8, Fixed64.Zero, Fixed64.Zero)).Collider;
         masked.Layer = new PhysicsLayer(2);
         var hits = new SwiftList<Physics3DHit>();

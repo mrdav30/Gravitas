@@ -72,19 +72,37 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
     public event Body2DCollisionFunc? OnContactExit;
 
     /// <summary>
-    /// Raised on the first simulation frame this trigger overlaps another 2D collider.
+    /// Raised on the first simulation frame this collider participates in a valid trigger pair.
     /// </summary>
     public event Trigger2DCollisionFunc? OnTriggerEnter;
 
     /// <summary>
-    /// Raised when this trigger stops overlapping another 2D collider.
+    /// Raised each simulation frame this collider participates in an overlapped valid trigger pair.
+    /// </summary>
+    public event Trigger2DCollisionFunc? OnTriggerStay;
+
+    /// <summary>
+    /// Raised when this collider stops participating in a valid trigger pair.
     /// </summary>
     public event Trigger2DCollisionFunc? OnTriggerExit;
 
     public event Mixed2DCollisionFunc? OnMixedContact;
     public event Mixed2DCollisionFunc? OnMixedContactEnter;
     public event Mixed2DCollisionFunc? OnMixedContactExit;
+
+    /// <summary>
+    /// Raised on the first mixed 2D/3D simulation frame this collider participates in a valid trigger pair.
+    /// </summary>
     public event Mixed2DCollisionFunc? OnMixedTriggerEnter;
+
+    /// <summary>
+    /// Raised each mixed 2D/3D simulation frame this collider participates in an overlapped valid trigger pair.
+    /// </summary>
+    public event Mixed2DCollisionFunc? OnMixedTriggerStay;
+
+    /// <summary>
+    /// Raised when this collider stops participating in a valid mixed 2D/3D trigger pair.
+    /// </summary>
     public event Mixed2DCollisionFunc? OnMixedTriggerExit;
 
     public int Id => _id;
@@ -182,12 +200,16 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
         }
     }
 
+    /// <summary>
+    /// Gets or sets whether this bodyless collider is a trigger volume.
+    /// Trigger volumes raise trigger enter/stay/exit callbacks for valid overlap
+    /// pairs and never apply physical response.
+    /// </summary>
     public bool IsTrigger
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get => _isTrigger;
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        set => _isTrigger = value;
+        set => SetTrigger(value);
     }
 
     /// <summary>
@@ -363,6 +385,7 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
     {
         ThrowIfCompoundPartLifecycle(nameof(Initialize));
         SwiftThrowHelper.ThrowIfNull(body, nameof(body));
+        ThrowIfTriggerWouldAttachToBody(nameof(Initialize));
         InitCore(body.Agent, body);
     }
 
@@ -636,15 +659,24 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
         if (!IsActive)
             return;
 
+        bool isTriggerPair = IsTrigger || other.IsTrigger;
         if (isColliding)
         {
-            if (isChanged)
+            if (isTriggerPair)
             {
-                if (IsTrigger)
-                    OnTriggerEnter?.Invoke(other);
-                else if (other.Body != null)
-                    OnContactEnter?.Invoke(other.Body);
+                if (ColliderTriggerEventPolicy.ShouldRaise(this, other))
+                {
+                    if (isChanged)
+                        OnTriggerEnter?.Invoke(other);
+
+                    OnTriggerStay?.Invoke(other);
+                }
+
+                return;
             }
+
+            if (isChanged && other.Body != null)
+                OnContactEnter?.Invoke(other.Body);
 
             if (other.Body != null)
                 OnContact?.Invoke(other.Body);
@@ -654,8 +686,14 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
         if (!isChanged)
             return;
 
-        if (IsTrigger)
-            OnTriggerExit?.Invoke(other);
+        if (isTriggerPair)
+        {
+            if (ColliderTriggerEventPolicy.ShouldRaise(this, other))
+                OnTriggerExit?.Invoke(other);
+
+            return;
+        }
+
         if (other.Body != null)
             OnContactExit?.Invoke(other.Body);
     }
@@ -669,8 +707,13 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
         {
             if (isTriggerPair)
             {
-                if (isChanged && IsTrigger)
-                    OnMixedTriggerEnter?.Invoke(other);
+                if (ColliderTriggerEventPolicy.ShouldRaise(other, this))
+                {
+                    if (isChanged)
+                        OnMixedTriggerEnter?.Invoke(other);
+
+                    OnMixedTriggerStay?.Invoke(other);
+                }
 
                 return;
             }
@@ -687,7 +730,7 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
 
         if (isTriggerPair)
         {
-            if (IsTrigger)
+            if (ColliderTriggerEventPolicy.ShouldRaise(other, this))
                 OnMixedTriggerExit?.Invoke(other);
 
             return;
@@ -985,6 +1028,45 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
     protected static Fixed64 ClampAxis(Fixed64 value, Fixed64 min, Fixed64 max) =>
         value < min ? min : value > max ? max : value;
 
+    private void SetTrigger(bool value)
+    {
+        if (_isTrigger == value)
+            return;
+
+        if (value)
+            ThrowIfCannotEnableTrigger(nameof(IsTrigger));
+
+        _isTrigger = value;
+    }
+
+    private void ThrowIfCannotEnableTrigger(string operation)
+    {
+        SwiftThrowHelper.ThrowIfArgument(
+            _body != null,
+            operation,
+            "2D trigger colliders must be initialized without a SolidBody2D. Use InitializeWithNoBody for trigger volumes.");
+        SwiftThrowHelper.ThrowIfArgument(
+            _compoundOwner != null,
+            operation,
+            "2D compound collider parts are not trigger identities. Set IsTrigger on the owning compound collider.");
+    }
+
+    private void ThrowIfTriggerWouldAttachToBody(string operation)
+    {
+        SwiftThrowHelper.ThrowIfArgument(
+            _isTrigger,
+            operation,
+            "2D trigger colliders must be initialized without a SolidBody2D. Use InitializeWithNoBody for trigger volumes.");
+    }
+
+    private void ThrowIfLoadedTriggerHasBody(string operation)
+    {
+        SwiftThrowHelper.ThrowIfArgument(
+            _isTrigger && _body != null,
+            operation,
+            "Loaded 2D trigger state is invalid for a collider attached to a SolidBody2D.");
+    }
+
     public void RecordData(IChronicler chronicler)
     {
         RecordValues.Look(chronicler, ref _isActive, "Active", true);
@@ -997,7 +1079,10 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
         RecordShapeData(chronicler);
 
         if (chronicler.Mode == SerializationMode.Loading)
+        {
+            ThrowIfLoadedTriggerHasBody(nameof(IsTrigger));
             ApplyLoadedState();
+        }
     }
 
     protected virtual void RecordShapeData(IChronicler chronicler) { }

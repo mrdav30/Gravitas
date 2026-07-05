@@ -67,15 +67,15 @@ public sealed class ColliderLocalCollisionFilteringTests
     public void RequireCollisionPair3D_WhenTriggerIgnoresOtherLayer_ShouldRejectTriggerPair()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
-        ScenarioBody<LSSphereCollider> trigger = scenario.CreateSphere(Vector3d.Zero);
+        LSCuboidCollider trigger = CreateStaticWall(scenario, Fixed64.Zero, default);
         ScenarioBody<LSSphereCollider> other = scenario.CreateSphere(new Vector3d(Fixed64.Half, Fixed64.Zero, Fixed64.Zero));
-        PhysicsScenarioBuilder.SetTrigger(trigger.Collider);
-        trigger.Collider.IgnoredCollisionLayers = PhysicsLayerMask.FromLayer(other.Collider.Layer);
+        trigger.IsTrigger = true;
+        trigger.IgnoredCollisionLayers = PhysicsLayerMask.FromLayer(other.Collider.Layer);
 
         scenario.Context.Simulate();
         scenario.Context.LateSimulate();
 
-        HasPair(trigger.Collider, other.Collider).Should().BeFalse();
+        HasPair(trigger, other.Collider).Should().BeFalse();
     }
 
     [Fact]
@@ -132,14 +132,14 @@ public sealed class ColliderLocalCollisionFilteringTests
     public void RequireCollisionPair2D_WhenTriggerIgnoresOtherLayer_ShouldRejectTriggerPair()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
-        SolidBody2D trigger = CreateCircle2D(context, Vector2d.Zero);
+        LSAABBoxCollider2D trigger = CreateStaticBox2D(context, Vector2d.Zero, Vector2d.One, default);
         SolidBody2D other = CreateCircle2D(context, new Vector2d(Fixed64.Half, Fixed64.Zero));
-        trigger.Collider.IsTrigger = true;
-        trigger.Collider.IgnoredCollisionLayers = PhysicsLayerMask.FromLayer(other.Collider.Layer);
+        trigger.IsTrigger = true;
+        trigger.IgnoredCollisionLayers = PhysicsLayerMask.FromLayer(other.Collider.Layer);
 
         Step(context);
 
-        HasPair(trigger.Collider, other.Collider).Should().BeFalse();
+        HasPair(trigger, other.Collider).Should().BeFalse();
     }
 
     [Fact]

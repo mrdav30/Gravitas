@@ -5,17 +5,12 @@ using Gravitas.CollisionHandling;
 using GridForge.Configuration;
 using SwiftCollections.Diagnostics;
 using System;
-using System.Reflection;
 
 namespace Gravitas.Tests.Support;
 
 internal sealed class PhysicsScenarioBuilder : IDisposable
 {
     private const int DefaultGridExtent = 16;
-
-    private static readonly FieldInfo IsTriggerField =
-        typeof(LSCollider).GetField("_isTrigger", BindingFlags.Instance | BindingFlags.NonPublic)
-        ?? throw new InvalidOperationException("Unable to locate LSCollider trigger state.");
 
     private bool _disposed;
 
@@ -168,11 +163,6 @@ internal sealed class PhysicsScenarioBuilder : IDisposable
     public CollisionPair CreatePair(LSCollider colliderA, LSCollider colliderB)
     {
         return new CollisionPair(colliderA, colliderB);
-    }
-
-    public static void SetTrigger(LSCollider collider, bool isTrigger = true)
-    {
-        IsTriggerField.SetValue(collider, isTrigger);
     }
 
     public static FixedQuaternion Yaw(int degrees)

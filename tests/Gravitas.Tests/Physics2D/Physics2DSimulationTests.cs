@@ -193,24 +193,28 @@ public sealed class Physics2DSimulationTests
     public void TriggerCollider_ShouldNotifyTriggerWithoutResponse()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 4);
-        SolidBody2D trigger = CreateCircle(context, Vector2d.Zero, immovable: false);
-        SolidBody2D other = CreateCircle(context, new Vector2d(Fixed64.Half, Fixed64.Zero), immovable: true);
-        trigger.Collider.IsTrigger = true;
+        LSCircleCollider2D trigger = CreateBodylessCircle(context, Vector2d.Zero);
+        SolidBody2D other = CreateCircle(context, new Vector2d(Fixed64.Half, Fixed64.Zero), immovable: false);
+        trigger.IsTrigger = true;
         int triggerEntered = 0;
         int triggerStayed = 0;
         int contactEntered = 0;
-        trigger.Collider.OnTriggerEnter += collider =>
+        trigger.OnTriggerEnter += collider =>
         {
             collider.Should().BeSameAs(other.Collider);
             triggerEntered++;
         };
-        trigger.Collider.OnContact += _ => triggerStayed++;
-        trigger.Collider.OnContactEnter += _ => contactEntered++;
+        trigger.OnTriggerStay += collider =>
+        {
+            collider.Should().BeSameAs(other.Collider);
+            triggerStayed++;
+        };
+        trigger.OnContactEnter += _ => contactEntered++;
 
         Step(context);
         Step(context);
 
-        trigger.Position.Should().Be(Vector2d.Zero);
+        trigger.Center.Should().Be(Vector2d.Zero);
         triggerEntered.Should().Be(1);
         triggerStayed.Should().Be(2);
         contactEntered.Should().Be(0);
@@ -296,5 +300,14 @@ public sealed class Physics2DSimulationTests
         };
         body.Initialize(position);
         return body;
+    }
+
+    private static LSCircleCollider2D CreateBodylessCircle(GravitasWorldContext context, Vector2d position)
+    {
+        var transform = new FixedTransform(new Vector3d(position.X, Fixed64.Zero, position.Y), FixedQuaternion.Identity, Vector3d.One);
+        var agent = new TestMatterAgent(context, transform);
+        var collider = new LSCircleCollider2D(Fixed64.Half);
+        collider.InitializeWithNoBody(agent);
+        return collider;
     }
 }

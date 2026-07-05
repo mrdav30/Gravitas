@@ -1044,7 +1044,7 @@ public sealed class ContinuousCollisionDetectionTests
     {
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();
         LSCuboidCollider trigger = CreateStaticWall(scenario, Fixed64.Zero);
-        PhysicsScenarioBuilder.SetTrigger(trigger);
+        trigger.IsTrigger = true;
         (SolidBody body, _) = CreateMover(scenario, TestColliderShape.Sphere);
         body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
 

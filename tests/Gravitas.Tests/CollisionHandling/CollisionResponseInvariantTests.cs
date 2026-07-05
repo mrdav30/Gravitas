@@ -248,18 +248,15 @@ public sealed class CollisionResponseInvariantTests
     public void CalculateImpulse_WithTriggerCollider_ShouldNotApplyPhysicalImpulse()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
-        ScenarioBody<LSSphereCollider> trigger = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
+        LSSphereCollider trigger = scenario.CreateStaticSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
         ScenarioBody<LSSphereCollider> solid = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
-        PhysicsScenarioBuilder.SetTrigger(trigger.Collider);
-        Push(trigger.Body, 60);
+        trigger.IsTrigger = true;
         Push(solid.Body, -60);
-        CollisionPair pair = CreateDetectedPair(scenario, trigger.Collider, solid.Collider);
-        Vector3d triggerVelocityBefore = trigger.Body.LinearVelocity;
+        CollisionPair pair = CreateDetectedPair(scenario, trigger, solid.Collider);
         Vector3d solidVelocityBefore = solid.Body.LinearVelocity;
 
         CollisionResponse.CalculateImpulse(pair);
 
-        trigger.Body.LinearVelocity.Should().Be(triggerVelocityBefore);
         solid.Body.LinearVelocity.Should().Be(solidVelocityBefore);
     }
 

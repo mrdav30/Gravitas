@@ -33,15 +33,17 @@ public sealed class MixedBroadPhaseTests
     public void Simulate_WithDenseMixedOverlap_ShouldEmitEachPairOnceInDeterministicOrder()
     {
         using GravitasWorldContext context = CreateMixedContext();
-        var bodies3D = new SwiftList<ScenarioBody<LSSphereCollider>>();
+        var colliders3D = new SwiftList<LSSphereCollider>();
         var bodies2D = new SwiftList<SolidBody2D>();
 
         for (int i = 0; i < 4; i++)
         {
-            ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(context, Vector3d.Zero, immovable: false);
-            PhysicsScenarioBuilder.SetTrigger(body3D.Collider);
-            bodies3D.Add(body3D);
-            bodies2D.Add(CreateCircle2D(context, Vector2d.Zero, immovable: true));
+            LSSphereCollider bodyless3D = CreateBodylessSphere3D(context, Vector3d.Zero);
+            bodyless3D.Radius = (Fixed64)12;
+            bodyless3D.Simulate();
+            bodyless3D.IsTrigger = true;
+            colliders3D.Add(bodyless3D);
+            bodies2D.Add(CreateCircle2D(context, new Vector2d((Fixed64)(i * 3), Fixed64.Zero), immovable: false));
         }
 
         Step(context);
@@ -101,8 +103,8 @@ public sealed class MixedBroadPhaseTests
     {
         using GravitasWorldContext context = CreateMixedContext();
         var allowed3D = CreateSphere3D(context, Vector3d.Zero, immovable: false);
-        SolidBody2D trigger2D = CreateCircle2D(context, Vector2d.Zero, immovable: true);
-        trigger2D.Collider.IsTrigger = true;
+        LSCircleCollider2D trigger2D = CreateBodylessCircle2D(context, Vector2d.Zero);
+        trigger2D.IsTrigger = true;
 
         var blocked3D = CreateSphere3D(context, new Vector3d((Fixed64)4, Fixed64.Zero, Fixed64.Zero), immovable: false, layer: new PhysicsLayer(1));
         _ = CreateCircle2D(context, new Vector2d((Fixed64)4, Fixed64.Zero), immovable: true, layer: new PhysicsLayer(2));
@@ -118,7 +120,7 @@ public sealed class MixedBroadPhaseTests
         context.MixedCollisions.LastBroadPhaseCandidateCount.Should().Be(1);
         MixedColliderKey candidate = context.MixedCollisions.GetCandidate(0);
         candidate.Collider3DId.Should().Be(allowed3D.Collider.Id);
-        candidate.Collider2DId.Should().Be(trigger2D.Collider.Id);
+        candidate.Collider2DId.Should().Be(trigger2D.Id);
         candidate.Collider3DId.Should().NotBe(blocked3D.Collider.Id);
         candidate.Collider3DId.Should().NotBe(sameAgent3D.Collider.Id);
     }
@@ -382,25 +384,41 @@ public sealed class MixedBroadPhaseTests
         return new ScenarioBody<LSSphereCollider>(body, collider);
     }
 
+    private static LSSphereCollider CreateBodylessSphere3D(
+        GravitasWorldContext context,
+        Vector3d position,
+        PhysicsLayer? layer = null)
+    {
+        var transform = new FixedTransform(position, FixedQuaternion.Identity, Vector3d.One);
+        var collider = new LSSphereCollider();
+        if (layer.HasValue)
+            collider.Layer = layer.Value;
+
+        collider.InitializeWithNoBody(new TestMatterAgent(context, transform));
+        return collider;
+    }
+
     private static SolidBody2D CreateCircle2D(
         GravitasWorldContext context,
         Vector2d position,
         bool immovable,
-        PhysicsLayer? layer = null)
+        PhysicsLayer? layer = null,
+        bool isKinematic = false)
     {
         var transform = new FixedTransform(
             new Vector3d(position.X, Fixed64.Zero, position.Y),
             FixedQuaternion.Identity,
             Vector3d.One);
         var agent = new TestMatterAgent(context, transform);
-        return CreateCircle2D(context, agent, immovable, layer);
+        return CreateCircle2D(context, agent, immovable, layer, isKinematic);
     }
 
     private static SolidBody2D CreateCircle2D(
         GravitasWorldContext context,
         IMatterAgent agent,
         bool immovable,
-        PhysicsLayer? layer = null)
+        PhysicsLayer? layer = null,
+        bool isKinematic = false)
     {
         var collider = new LSCircleCollider2D(Fixed64.Half);
         if (layer.HasValue)
@@ -409,10 +427,28 @@ public sealed class MixedBroadPhaseTests
         var body = new SolidBody2D(agent, collider)
         {
             Mass = Fixed64.One,
-            FreezeAxes = immovable ? BodyFreezeAxes2D.Position : BodyFreezeAxes2D.None
+            FreezeAxes = immovable ? BodyFreezeAxes2D.Position : BodyFreezeAxes2D.None,
+            IsKinematic = isKinematic
         };
         body.Initialize(agent.Transform.Position.ToVector2d());
         return body;
+    }
+
+    private static LSCircleCollider2D CreateBodylessCircle2D(
+        GravitasWorldContext context,
+        Vector2d position,
+        PhysicsLayer? layer = null)
+    {
+        var transform = new FixedTransform(
+            new Vector3d(position.X, Fixed64.Zero, position.Y),
+            FixedQuaternion.Identity,
+            Vector3d.One);
+        var collider = new LSCircleCollider2D(Fixed64.Half);
+        if (layer.HasValue)
+            collider.Layer = layer.Value;
+
+        collider.InitializeWithNoBody(new TestMatterAgent(context, transform));
+        return collider;
     }
 
     private static PhysicsMixedPartition GetFirstMixedPartition(

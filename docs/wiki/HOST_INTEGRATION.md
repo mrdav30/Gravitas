@@ -220,7 +220,9 @@ maps to 2D Y. World Y remains vertical height or mixed embedding metadata.
 ### Bodyless Geometry
 
 Use `InitializeWithNoBody(...)` for static or trigger geometry that does not need
-body-owned state:
+body-owned state. `IsTrigger` is valid only on bodyless colliders; use a normal
+body-owned collider for the moving participant that should receive trigger
+callbacks:
 
 ```csharp
 using Gravitas.Colliders;

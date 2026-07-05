@@ -33,7 +33,18 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
     public bool IsActive => _active;
 
     private bool _isTrigger;
-    public bool IsTrigger => _isTrigger;
+
+    /// <summary>
+    /// Gets or sets whether this bodyless collider is a trigger volume.
+    /// Trigger volumes raise trigger enter/stay/exit callbacks for valid overlap
+    /// pairs and never apply physical response.
+    /// </summary>
+    public bool IsTrigger
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => _isTrigger;
+        set => SetTrigger(value);
+    }
 
     private int _id = -1;
     public int Id => _id;
@@ -377,14 +388,40 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
     public event BodyCollisionFunc? OnContactExit;
 
     public delegate void TriggerCollisionFunc(LSCollider other);
+
+    /// <summary>
+    /// Raised on the first simulation frame this collider participates in a valid trigger pair.
+    /// </summary>
     public event TriggerCollisionFunc? OnTriggerEnter;
+
+    /// <summary>
+    /// Raised each simulation frame this collider participates in an overlapped valid trigger pair.
+    /// </summary>
+    public event TriggerCollisionFunc? OnTriggerStay;
+
+    /// <summary>
+    /// Raised when this collider stops participating in a valid trigger pair.
+    /// </summary>
     public event TriggerCollisionFunc? OnTriggerExit;
 
     public delegate void MixedCollisionFunc(LSCollider2D other);
     public event MixedCollisionFunc? OnMixedContact;
     public event MixedCollisionFunc? OnMixedContactEnter;
     public event MixedCollisionFunc? OnMixedContactExit;
+
+    /// <summary>
+    /// Raised on the first mixed 3D/2D simulation frame this collider participates in a valid trigger pair.
+    /// </summary>
     public event MixedCollisionFunc? OnMixedTriggerEnter;
+
+    /// <summary>
+    /// Raised each mixed 3D/2D simulation frame this collider participates in an overlapped valid trigger pair.
+    /// </summary>
+    public event MixedCollisionFunc? OnMixedTriggerStay;
+
+    /// <summary>
+    /// Raised when this collider stops participating in a valid mixed 3D/2D trigger pair.
+    /// </summary>
     public event MixedCollisionFunc? OnMixedTriggerExit;
 
     public bool IsChild => _hierarchyState.IsChild;
@@ -407,6 +444,7 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
     public void Initialize(SolidBody body)
     {
         ThrowIfCompoundPartLifecycle(nameof(Initialize));
+        ThrowIfTriggerWouldAttachToBody(nameof(Initialize));
         _body = body;
         InitCore(body.Agent);
     }
@@ -640,6 +678,45 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
             "Collider size components must be greater than zero.");
     }
 
+    private void SetTrigger(bool value)
+    {
+        if (_isTrigger == value)
+            return;
+
+        if (value)
+            ThrowIfCannotEnableTrigger(nameof(IsTrigger));
+
+        _isTrigger = value;
+    }
+
+    private void ThrowIfCannotEnableTrigger(string operation)
+    {
+        SwiftThrowHelper.ThrowIfArgument(
+            _body != null,
+            operation,
+            "Trigger colliders must be initialized without a SolidBody. Use InitializeWithNoBody for trigger volumes.");
+        SwiftThrowHelper.ThrowIfArgument(
+            _compoundOwner != null,
+            operation,
+            "Compound collider parts are not trigger identities. Set IsTrigger on the owning compound collider.");
+    }
+
+    private void ThrowIfTriggerWouldAttachToBody(string operation)
+    {
+        SwiftThrowHelper.ThrowIfArgument(
+            _isTrigger,
+            operation,
+            "Trigger colliders must be initialized without a SolidBody. Use InitializeWithNoBody for trigger volumes.");
+    }
+
+    private void ThrowIfLoadedTriggerHasBody(string operation)
+    {
+        SwiftThrowHelper.ThrowIfArgument(
+            _isTrigger && _body != null,
+            operation,
+            "Loaded trigger state is invalid for a collider attached to a SolidBody.");
+    }
+
     // default to total area for shapes where frontal area doesn't make sense
     public virtual Fixed64 GetFrontalArea(Vector3d direction) => Area;
 
@@ -670,16 +747,24 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
         if (!IsActive)
             return;
 
+        bool isTriggerPair = IsTrigger || other.IsTrigger;
         if (isColliding)
         {
-            // Only called once per collision
-            if (isChanged)
+            if (isTriggerPair)
             {
-                if (IsTrigger)
-                    OnTriggerEnter?.Invoke(other);
-                else if (other.Body != null)
-                    OnContactEnter?.Invoke(other.Body);
+                if (ColliderTriggerEventPolicy.ShouldRaise(this, other))
+                {
+                    if (isChanged)
+                        OnTriggerEnter?.Invoke(other);
+
+                    OnTriggerStay?.Invoke(other);
+                }
+
+                return;
             }
+
+            if (isChanged && other.Body != null)
+                OnContactEnter?.Invoke(other.Body);
 
             if (other.Body != null)
                 OnContact?.Invoke(other.Body);
@@ -690,8 +775,14 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
         if (!isChanged)
             return;
 
-        if (IsTrigger)
-            OnTriggerExit?.Invoke(other);
+        if (isTriggerPair)
+        {
+            if (ColliderTriggerEventPolicy.ShouldRaise(this, other))
+                OnTriggerExit?.Invoke(other);
+
+            return;
+        }
+
         if (other.Body != null)
             OnContactExit?.Invoke(other.Body);
     }
@@ -705,8 +796,13 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
         {
             if (isTriggerPair)
             {
-                if (isChanged && IsTrigger)
-                    OnMixedTriggerEnter?.Invoke(other);
+                if (ColliderTriggerEventPolicy.ShouldRaise(this, other))
+                {
+                    if (isChanged)
+                        OnMixedTriggerEnter?.Invoke(other);
+
+                    OnMixedTriggerStay?.Invoke(other);
+                }
 
                 return;
             }
@@ -723,7 +819,7 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
 
         if (isTriggerPair)
         {
-            if (IsTrigger)
+            if (ColliderTriggerEventPolicy.ShouldRaise(this, other))
                 OnMixedTriggerExit?.Invoke(other);
 
             return;
@@ -1098,9 +1194,14 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
         RecordValues.Look(chronicler, ref _size, "Size", Vector3d.One);
 
         if (chronicler.Mode == SerializationMode.Loading)
+        {
+            ThrowIfLoadedTriggerHasBody(nameof(IsTrigger));
             ApplyLoadedState();
+        }
         else
+        {
             _runtimeShapeState.MarkDirty();
+        }
     }
 
     private void ApplyLoadedState()

@@ -18,7 +18,6 @@ public sealed class SolidBody2DSerializationTests
         using GravitasWorldContext sourceContext = Physics2DTestWorld.CreateContext(frameRate: 8);
         var sourceCollider = new LSCircleCollider2D((Fixed64)2)
         {
-            IsTrigger = true,
             Layer = new PhysicsLayer(3),
             LocalOffset = new Vector2d(Fixed64.Half, Fixed64.FromFraction(1, 4)),
             MixedHalfThicknessOverride = Fixed64.FromFraction(3, 2),
@@ -98,7 +97,7 @@ public sealed class SolidBody2DSerializationTests
         target.LocalCenterOfMassOffset.Should().Be(source.LocalCenterOfMassOffset);
         target.WorldCenterOfMass.Should().Be(source.WorldCenterOfMass);
         targetCollider.Radius.Should().Be(sourceCollider.Radius);
-        targetCollider.IsTrigger.Should().BeTrue();
+        targetCollider.IsTrigger.Should().BeFalse();
         targetCollider.Layer.Should().Be(sourceCollider.Layer);
         targetCollider.IgnoredCollisionLayers.Should().Be(sourceCollider.IgnoredCollisionLayers);
         targetCollider.LocalOffset.Should().Be(sourceCollider.LocalOffset);

@@ -29,7 +29,7 @@ testing, and replay tools.
 | `GravitasWorldContext` and `GridWorld` | Settings that affect deterministic execution. |
 | `IMatterAgent`, `FixedTransform`, engine wrappers | Body position, rotation, velocities, force/torque stores, gravity scale, sleep, CCD, freeze axes. |
 | `SolidBody`, `SolidBody2D` | 3D grounding state and 2D planar support state. |
-| Concrete `LSCollider` and `LSCollider2D` types | Active/trigger state, layer, local ignored physical layers, material, local offset, shape inputs, mixed half-thickness override. |
+| Concrete `LSCollider` and `LSCollider2D` types | Active/trigger state for bodyless trigger volumes, layer, local ignored physical layers, material, local offset, shape inputs, mixed half-thickness override. |
 | Compound runtime shells and private part colliders | Authored shape/part values needed to rebuild deterministic geometry. |
 | Existing `Joint3D`, `Joint2D`, ragdoll runtimes | Joint enabled state, type, frames, limits, motors, linked collision policy, ragdoll activation state. |
 | Renderer, ECS, networking, pooling, editor state | Nothing. These remain host-owned. |
@@ -56,8 +56,8 @@ authoritative state instead of being treated as replay truth.
 | --- | --- | --- |
 | `SolidBody` | 3D position/height, rotation, freeze axes, motion stores, mass, COM, gravity scale, sleep, CCD, grounding/probe state, owned collider state. | `FixedTransform` identity, service IDs, partitions, pairs. |
 | `SolidBody2D` | X/Z position, scalar rotation, freeze axes, planar motion stores, scalar angular state, mass, COM, scalar moment policy, gravity, grounding/probe state, sleep, CCD, owned collider state. | Host transform identity, runtime service IDs, query buffers. |
-| `LSCollider` | 3D layer/filter state, local ignored physical mask, material, shape state. | Context-owned collider ID, partition identity, pairs/events. |
-| `LSCollider2D` | 2D layer/filter state, material, shape-local values, mixed half-thickness override. | Context-owned collider ID, private runtime pair/partition state. |
+| `LSCollider` | 3D active state, bodyless trigger state, layer/filter state, local ignored physical mask, material, shape state. | Context-owned collider ID, partition identity, pairs/events. |
+| `LSCollider2D` | 2D active state, bodyless trigger state, layer/filter state, material, shape-local values, mixed half-thickness override. | Context-owned collider ID, private runtime pair/partition state. |
 | `ColliderShapeDefinition` | Data-only 3D authoring/import values for primitive, mesh, and compound part inputs. | Runtime body, context, collider ID, pairs, hierarchy, events. |
 | `ColliderShapeDefinition2D` | Data-only 2D authoring/import values for circle, capsule, AABB, convex polygon, triangle convenience, and compound parts. | Runtime body, context, collider ID, pairs, hierarchy, events. |
 | `PhysicsSettingsSaver` | Frame rate, collision matrix, ground mask, CCD settings, restitution threshold, retained partition cleanup, runtime mode, mixed 2D thickness. | Runtime service state. |
