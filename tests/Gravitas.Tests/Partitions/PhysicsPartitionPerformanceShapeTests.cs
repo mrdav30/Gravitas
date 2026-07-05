@@ -53,4 +53,30 @@ public sealed class PhysicsPartitionPerformanceShapeTests
         context.Collisions.ActivePartitionCount.Should().Be(0);
         partition.ContainedDynamicObjects!.Count.Should().Be(0);
     }
+
+    [Fact]
+    public void ResetRetainedMembership_ShouldClearAllBucketsAndMarkPartitionEmpty()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        context.Simulate();
+        PhysicsPartition partition = context.Collisions.RentPartition();
+        partition.AddDynamicObject(7);
+        partition.AddKinematicObject(3);
+        partition.AddStaticObject(11);
+        partition.SetDynamicObjectAwake(7, awake: false);
+        int activationId = partition.ActivationId;
+
+        context.Collisions.DeactivatePartition(activationId);
+        partition.ResetRetainedMembership();
+
+        partition.IsEmpty.Should().BeTrue();
+        partition.EmptySinceFrame.Should().Be(context.FrameCount);
+        partition.IsAllocated.Should().BeFalse();
+        partition.AwakeDynamicObjectCount.Should().Be(0);
+        partition.ContainedDynamicObjects!.Count.Should().Be(0);
+        partition.ContainedAwakeDynamicObjects!.Count.Should().Be(0);
+        partition.ContainedKinematicObjects!.Count.Should().Be(0);
+        partition.ContainedStaticObjects!.Count.Should().Be(0);
+        context.Collisions.ReleasePartition(partition);
+    }
 }

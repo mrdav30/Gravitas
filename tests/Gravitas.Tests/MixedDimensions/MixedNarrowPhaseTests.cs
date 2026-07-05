@@ -381,6 +381,46 @@ public sealed class MixedNarrowPhaseTests
     }
 
     [Fact]
+    public void TryGetPlanarBoundaryPoint_WithCompoundContainingPoint_ShouldUseContainingPartBoundary()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        var compound = new LSCompoundCollider2D(
+            CompoundColliderPart2D.Circle(Fixed64.Half, new Vector2d((Fixed64)(-3), Fixed64.Zero)),
+            CompoundColliderPart2D.AABBox(new Vector2d((Fixed64)2, (Fixed64)2), Vector2d.Zero));
+        SolidBody2D body = CreateBody2D(context, compound, Vector2d.Zero);
+
+        bool found = MixedEmbedded2DGeometry.TryGetPlanarBoundaryPoint(
+            body.Collider,
+            new Vector2d(Fixed64.FromFraction(1, 4), Fixed64.Zero),
+            out Vector2d boundary,
+            out Fixed64 distance);
+
+        found.Should().BeTrue();
+        boundary.Should().Be(new Vector2d(Fixed64.One, Fixed64.Zero));
+        distance.Should().Be(Fixed64.FromFraction(3, 4));
+    }
+
+    [Fact]
+    public void TryGetPlanarBoundaryPoint_WithCompoundSeparatedPoint_ShouldFallbackToNearestPartBoundary()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        var compound = new LSCompoundCollider2D(
+            CompoundColliderPart2D.Circle(Fixed64.Half, new Vector2d((Fixed64)(-3), Fixed64.Zero)),
+            CompoundColliderPart2D.AABBox(new Vector2d((Fixed64)2, (Fixed64)2), new Vector2d((Fixed64)3, Fixed64.Zero)));
+        SolidBody2D body = CreateBody2D(context, compound, Vector2d.Zero);
+
+        bool found = MixedEmbedded2DGeometry.TryGetPlanarBoundaryPoint(
+            body.Collider,
+            new Vector2d(Fixed64.FromFraction(3, 2), Fixed64.Zero),
+            out Vector2d boundary,
+            out Fixed64 distance);
+
+        found.Should().BeTrue();
+        boundary.Should().Be(new Vector2d((Fixed64)2, Fixed64.Zero));
+        distance.Should().Be(Fixed64.Half);
+    }
+
+    [Fact]
     public void ConvexMeshCircleSlab_WithTriangleCandidateOverlap_ShouldReportContact()
     {
         using GravitasWorldContext context = CreateMixedContext();

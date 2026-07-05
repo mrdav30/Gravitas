@@ -184,6 +184,28 @@ public sealed class Physics2DQueryTests
     }
 
     [Fact]
+    public void RaycastAll_WithCompoundCollider_ShouldReturnOwnerAtEarliestPart()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        var compound = new LSCompoundCollider2D(
+            CompoundColliderPart2D.Circle(Fixed64.Half, new Vector2d((Fixed64)3, Fixed64.Zero)),
+            CompoundColliderPart2D.Circle(Fixed64.Half, new Vector2d(-Fixed64.One, Fixed64.Zero)));
+        SolidBody2D body = CreateCompound(context, Vector2d.Zero, compound);
+        var hits = new SwiftList<Physics2DHit>();
+
+        int count = context.Query2D.RaycastAll(
+            new Vector2d((Fixed64)(-4), Fixed64.Zero),
+            new Vector2d((Fixed64)5, Fixed64.Zero),
+            hits);
+
+        count.Should().Be(1);
+        hits[0].Collider.Should().BeSameAs(body.Collider);
+        hits[0].Distance.Should().Be(Fixed64.FromFraction(5, 2));
+        hits[0].Point.Should().Be(new Vector2d(Fixed64.FromFraction(-3, 2), Fixed64.Zero));
+        hits[0].Normal.Should().Be(-Vector2d.Right);
+    }
+
+    [Fact]
     public void OverlapCircleAndPolygon_ShouldIncludeCapsuleTargets()
     {
         using GravitasWorldContext context = Create2DContext();
@@ -287,6 +309,61 @@ public sealed class Physics2DQueryTests
 
         count.Should().Be(0);
         hits.Count.Should().Be(0);
+    }
+
+    [Fact]
+    public void TrySweepMoverShape_WithCapsuleMoverAgainstBoxFace_ShouldReportEdgeHit()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        SolidBody2D mover = CreateCapsule(context, new Vector2d((Fixed64)(-3), Fixed64.Zero));
+        SolidBody2D target = CreateBox(context, Vector2d.Zero, new PhysicsLayer(), new Vector2d((Fixed64)2, (Fixed64)4));
+
+        bool hit = QueryDetection2D.TrySweepMoverShape(
+            mover.Collider,
+            new Vector2d((Fixed64)4, Fixed64.Zero),
+            target.Collider,
+            out Physics2DHit sweepHit);
+
+        hit.Should().BeTrue();
+        sweepHit.Collider.Should().BeSameAs(target.Collider);
+        sweepHit.Distance.Should().Be(Fixed64.FromFraction(3, 2));
+        sweepHit.Normal.Should().Be(-Vector2d.Right);
+        sweepHit.Point.X.Should().Be(-Fixed64.One);
+    }
+
+    [Fact]
+    public void TrySweepMoverShape_WithCapsuleMoverOutsideConvexEdgeSpan_ShouldMiss()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        SolidBody2D mover = CreateCapsule(context, new Vector2d((Fixed64)(-3), (Fixed64)3));
+        SolidBody2D target = CreateBox(context, Vector2d.Zero, new PhysicsLayer(), new Vector2d((Fixed64)2, (Fixed64)2));
+
+        bool hit = QueryDetection2D.TrySweepMoverShape(
+            mover.Collider,
+            new Vector2d((Fixed64)4, Fixed64.Zero),
+            target.Collider,
+            out Physics2DHit sweepHit);
+
+        hit.Should().BeFalse();
+        sweepHit.Should().Be(default(Physics2DHit));
+    }
+
+    [Fact]
+    public void TrySweepMoverShape_WithCapsuleMoverStartingOverlapped_ShouldReportZeroDistance()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        SolidBody2D mover = CreateCapsule(context, new Vector2d(-Fixed64.Half, Fixed64.Zero));
+        SolidBody2D target = CreateBox(context, Vector2d.Zero, new PhysicsLayer(), new Vector2d((Fixed64)2, (Fixed64)2));
+
+        bool hit = QueryDetection2D.TrySweepMoverShape(
+            mover.Collider,
+            new Vector2d((Fixed64)4, Fixed64.Zero),
+            target.Collider,
+            out Physics2DHit sweepHit);
+
+        hit.Should().BeTrue();
+        sweepHit.Collider.Should().BeSameAs(target.Collider);
+        sweepHit.Distance.Should().Be(Fixed64.Zero);
     }
 
     [Fact]
@@ -453,13 +530,22 @@ public sealed class Physics2DQueryTests
 
     private static SolidBody2D CreateCompound(GravitasWorldContext context, Vector2d position)
     {
-        var transform = new FixedTransform(new Vector3d(position.X, Fixed64.Zero, position.Y), FixedQuaternion.Identity, Vector3d.One);
-        var agent = new TestMatterAgent(context, transform);
-        var body = new SolidBody2D(
-            agent,
+        return CreateCompound(
+            context,
+            position,
             new LSCompoundCollider2D(
                 CompoundColliderPart2D.Circle(Fixed64.Half, Vector2d.Zero),
-                CompoundColliderPart2D.AABBox(Vector2d.One, new Vector2d(Fixed64.One, Fixed64.Zero))))
+                CompoundColliderPart2D.AABBox(Vector2d.One, new Vector2d(Fixed64.One, Fixed64.Zero))));
+    }
+
+    private static SolidBody2D CreateCompound(
+        GravitasWorldContext context,
+        Vector2d position,
+        LSCompoundCollider2D collider)
+    {
+        var transform = new FixedTransform(new Vector3d(position.X, Fixed64.Zero, position.Y), FixedQuaternion.Identity, Vector3d.One);
+        var agent = new TestMatterAgent(context, transform);
+        var body = new SolidBody2D(agent, collider)
         {
             Mass = Fixed64.One,
             FreezeAxes = BodyFreezeAxes2D.Position

@@ -327,6 +327,40 @@ public sealed class MixedBroadPhaseTests
         ContainsId(partition.ContainedDynamic2DObjects, body2D.Collider.Id).Should().BeTrue();
     }
 
+    [Fact]
+    public void ResetRetainedMembership_ShouldClearAllDimensionalBucketsAndMarkPartitionEmpty()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        context.Simulate();
+        PhysicsMixedPartition partition = context.MixedCollisions.RentPartition();
+        partition.AddDynamic3DObject(7);
+        partition.AddKinematic3DObject(3);
+        partition.AddStatic3DObject(11);
+        partition.AddDynamic2DObject(13);
+        partition.AddKinematic2DObject(17);
+        partition.AddStatic2DObject(19);
+        partition.SetDynamic3DObjectAwake(7, awake: false);
+        partition.SetDynamic2DObjectAwake(13, awake: false);
+        int activationId = partition.ActivationId;
+
+        context.MixedCollisions.DeactivatePartition(activationId);
+        partition.ResetRetainedMembership();
+
+        partition.IsEmpty.Should().BeTrue();
+        partition.EmptySinceFrame.Should().Be(context.FrameCount);
+        partition.IsAllocated.Should().BeFalse();
+        partition.AwakeDynamicObjectCount.Should().Be(0);
+        partition.ContainedDynamic3DObjects!.Count.Should().Be(0);
+        partition.ContainedAwakeDynamic3DObjects!.Count.Should().Be(0);
+        partition.ContainedKinematic3DObjects!.Count.Should().Be(0);
+        partition.ContainedStatic3DObjects!.Count.Should().Be(0);
+        partition.ContainedDynamic2DObjects!.Count.Should().Be(0);
+        partition.ContainedAwakeDynamic2DObjects!.Count.Should().Be(0);
+        partition.ContainedKinematic2DObjects!.Count.Should().Be(0);
+        partition.ContainedStatic2DObjects!.Count.Should().Be(0);
+        context.MixedCollisions.ReleasePartition(partition);
+    }
+
     private static GravitasWorldContext CreateMixedContext(int extent = 32)
     {
         GravitasWorldContext context = GravitasWorldContext.CreateOwned();

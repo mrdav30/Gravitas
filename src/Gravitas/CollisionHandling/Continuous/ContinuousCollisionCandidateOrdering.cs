@@ -88,6 +88,10 @@ internal static class ContinuousCollisionCandidateOrdering
         if (closing != 0)
             return closing > 0;
 
+        int reducer = candidate.ReducerKind.CompareTo(current.ReducerKind);
+        if (reducer != 0)
+            return reducer < 0;
+
         int candidate3D = candidate.Collider3D?.Id ?? -1;
         int current3D = current.Collider3D?.Id ?? -1;
         int collider3D = candidate3D.CompareTo(current3D);

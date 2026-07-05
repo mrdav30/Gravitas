@@ -1,6 +1,7 @@
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
+using Gravitas.Materials;
 using Gravitas.Tests.Support;
 using System;
 using Xunit;
@@ -41,6 +42,61 @@ public sealed class CompoundCollider2DTests
 
         act.Should().Throw<ArgumentException>()
             .WithMessage("*default*");
+    }
+
+    [Fact]
+    public void CompoundColliderPart2D_ShouldCaptureAuthoredShapeTransformScaleAndMaterial()
+    {
+        PhysicsMaterial material = PhysicsMaterial.Frictionless;
+        Vector2d offset = new(Fixed64.One, (Fixed64)2);
+        Vector2d scale = new((Fixed64)2, (Fixed64)3);
+        Fixed64 rotation = Fixed64.Half;
+        Vector2d[] vertices =
+        {
+            new(-Fixed64.One, -Fixed64.One),
+            new(Fixed64.One, -Fixed64.One),
+            new(Fixed64.One, Fixed64.One),
+            new(-Fixed64.One, Fixed64.One)
+        };
+
+        CompoundColliderPart2D circle = CompoundColliderPart2D.Circle(Fixed64.Half, offset, material);
+        CompoundColliderPart2D capsule = CompoundColliderPart2D.Capsule(Fixed64.Half, (Fixed64)3, offset, rotation, scale);
+        CompoundColliderPart2D box = CompoundColliderPart2D.AABox(new Vector2d((Fixed64)2, (Fixed64)4), offset);
+        CompoundColliderPart2D polygon = CompoundColliderPart2D.ConvexPolygon(vertices, offset, material);
+
+        circle.Shape.Kind.Should().Be(ColliderShapeDefinition2DKind.Circle);
+        circle.LocalOffset.Should().Be(offset);
+        circle.LocalScale.Should().Be(Vector2d.One);
+        circle.Material.Should().Be(material);
+
+        capsule.Shape.Kind.Should().Be(ColliderShapeDefinition2DKind.Capsule);
+        capsule.LocalRotation.Should().Be(rotation);
+        capsule.LocalScale.Should().Be(scale);
+        capsule.Material.Should().Be(PhysicsMaterial.Default);
+
+        box.Shape.Kind.Should().Be(ColliderShapeDefinition2DKind.AABBox);
+        polygon.Shape.Kind.Should().Be(ColliderShapeDefinition2DKind.ConvexPolygon);
+        polygon.Material.Should().Be(material);
+    }
+
+    [Fact]
+    public void CompoundColliderPart2D_ShouldRejectNonPositiveScaleComponents()
+    {
+        ColliderShapeDefinition2D shape = ColliderShapeDefinition2D.Circle(Fixed64.One);
+
+        Action zeroX = () => _ = new CompoundColliderPart2D(
+            shape,
+            Vector2d.Zero,
+            Fixed64.Zero,
+            new Vector2d(Fixed64.Zero, Fixed64.One));
+        Action negativeY = () => _ = new CompoundColliderPart2D(
+            shape,
+            Vector2d.Zero,
+            Fixed64.Zero,
+            new Vector2d(Fixed64.One, -Fixed64.One));
+
+        zeroX.Should().Throw<ArgumentException>().WithParameterName("localScale");
+        negativeY.Should().Throw<ArgumentException>().WithParameterName("localScale");
     }
 
     [Fact]

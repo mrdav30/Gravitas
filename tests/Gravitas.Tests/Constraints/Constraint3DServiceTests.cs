@@ -289,6 +289,52 @@ public sealed class Constraint3DServiceTests
     }
 
     [Fact]
+    public void ConeTwistJoint_ShouldReportConeSwingLimitViolations()
+    {
+        using PhysicsScenarioBuilder scenario = CreateConstraintScenario();
+        ScenarioBody<LSSphereCollider> first = scenario.CreateSphere(Vector3d.Zero, immovable: true);
+        ScenarioBody<LSSphereCollider> second = scenario.CreateSphere(
+            Vector3d.Right * (Fixed64)2,
+            FixedQuaternion.FromAxisAngle(Vector3d.Up, Fixed64.HalfPi));
+        Joint3D joint = scenario.Context.Constraints3D.RegisterJoint(new JointDefinition3D(
+            first.Body,
+            second.Body,
+            LocalFrame(Vector3d.Zero),
+            LocalFrame(Vector3d.Zero),
+            JointType3D.ConeTwist,
+            JointLimit3D.ConeTwist(Fixed64.FromFraction(1, 8), Fixed64.HalfPi),
+            JointMotor3D.Disabled,
+            JointCollisionPolicy.SuppressLinked));
+
+        Step(scenario.Context, 2);
+
+        joint.LastSolveMetrics.AngularLimitErrorMagnitude.Should().BeGreaterThan(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void ConeTwistJoint_ShouldReportTwistLimitViolations()
+    {
+        using PhysicsScenarioBuilder scenario = CreateConstraintScenario();
+        ScenarioBody<LSSphereCollider> first = scenario.CreateSphere(Vector3d.Zero, immovable: true);
+        ScenarioBody<LSSphereCollider> second = scenario.CreateSphere(
+            Vector3d.Right * (Fixed64)2,
+            FixedQuaternion.FromAxisAngle(Vector3d.Forward, Fixed64.HalfPi));
+        Joint3D joint = scenario.Context.Constraints3D.RegisterJoint(new JointDefinition3D(
+            first.Body,
+            second.Body,
+            LocalFrame(Vector3d.Zero),
+            LocalFrame(Vector3d.Zero),
+            JointType3D.ConeTwist,
+            JointLimit3D.ConeTwist(Fixed64.HalfPi, Fixed64.FromFraction(1, 8)),
+            JointMotor3D.Disabled,
+            JointCollisionPolicy.SuppressLinked));
+
+        Step(scenario.Context, 2);
+
+        joint.LastSolveMetrics.AngularLimitErrorMagnitude.Should().BeGreaterThan(Fixed64.Zero);
+    }
+
+    [Fact]
     public void ConstraintSolver_ShouldRespectFrozenBodyAxes()
     {
         using PhysicsScenarioBuilder scenario = CreateConstraintScenario();

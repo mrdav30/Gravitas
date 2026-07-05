@@ -45,6 +45,73 @@ public sealed class LSMeshColliderQueryTests
     }
 
     [Fact]
+    public void ColliderOverlapsRay_WithPointOnTriangle_ShouldReturnPoint()
+    {
+        LSMeshCollider mesh = CreateTriangleMesh();
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+        Vector3d point = new(Fixed64.FromFraction(1, 4), Fixed64.FromFraction(1, 4), Fixed64.Zero);
+
+        worker.PrepareSegmentCheck(point, point);
+
+        bool hit = mesh.ColliderOverlapsRay(worker, ref hits);
+
+        hit.Should().BeTrue();
+        hits.Count.Should().Be(1);
+        hits[0].Should().Be(point);
+    }
+
+    [Fact]
+    public void ColliderOverlapsRay_WithPointOffTrianglePlane_ShouldReturnFalse()
+    {
+        LSMeshCollider mesh = CreateTriangleMesh();
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+        Vector3d point = new(Fixed64.FromFraction(1, 4), Fixed64.FromFraction(1, 4), Fixed64.One);
+
+        worker.PrepareSegmentCheck(point, point);
+
+        bool hit = mesh.ColliderOverlapsRay(worker, ref hits);
+
+        hit.Should().BeFalse();
+        hits.Count.Should().Be(0);
+    }
+
+    [Fact]
+    public void ColliderOverlapsRay_WithCoplanarSegmentOnTriangleEdge_ShouldReturnUniqueEndpoints()
+    {
+        LSMeshCollider mesh = CreateTriangleMesh();
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+
+        worker.PrepareSegmentCheck(Vector3d.Zero, Vector3d.Right);
+
+        bool hit = mesh.ColliderOverlapsRay(worker, ref hits);
+
+        hit.Should().BeTrue();
+        hits.Count.Should().Be(2);
+        hits[0].Should().Be(Vector3d.Zero);
+        hits[1].Should().Be(Vector3d.Right);
+    }
+
+    [Fact]
+    public void ColliderOverlapsRay_WithCoplanarSegmentOutsideTriangle_ShouldReturnFalse()
+    {
+        LSMeshCollider mesh = CreateTriangleMesh();
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+
+        worker.PrepareSegmentCheck(
+            new Vector3d(Fixed64.Half, Fixed64.FromFraction(3, 4), Fixed64.Zero),
+            new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.Half, Fixed64.Zero));
+
+        bool hit = mesh.ColliderOverlapsRay(worker, ref hits);
+
+        hit.Should().BeFalse();
+        hits.Count.Should().Be(0);
+    }
+
+    [Fact]
     public void GetNormalAtPoint_ShouldUseClosestTriangleNormal()
     {
         LSMeshCollider mesh = CreateTriangleMesh();

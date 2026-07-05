@@ -1,6 +1,7 @@
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
+using Gravitas.CollisionHandling;
 using Gravitas.Diagnostics;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
@@ -242,6 +243,62 @@ public sealed class SolidBody2DGroundingTests
     }
 
     [Fact]
+    public void ContactSupport_ShouldChooseBestCandidateByNormalDepthColliderAndContactId()
+    {
+        SubmitCandidatePairAndGetGroundPoint(
+                firstNormal: Up,
+                firstDepth: Fixed64.Half,
+                firstContactId: 10,
+                secondNormal: new Vector2d(Fixed64.Half, Fixed64.Half).Normalized,
+                secondDepth: (Fixed64)2,
+                secondContactId: 1)
+            .Should()
+            .Be(new Vector2d(Fixed64.Zero, Fixed64.One));
+
+        SubmitCandidatePairAndGetGroundPoint(
+                firstNormal: new Vector2d(Fixed64.Half, Fixed64.Half).Normalized,
+                firstDepth: (Fixed64)2,
+                firstContactId: 10,
+                secondNormal: Up,
+                secondDepth: Fixed64.Half,
+                secondContactId: 1)
+            .Should()
+            .Be(new Vector2d(Fixed64.One, Fixed64.One));
+
+        SubmitCandidatePairAndGetGroundPoint(
+                firstNormal: Up,
+                firstDepth: Fixed64.Half,
+                firstContactId: 10,
+                secondNormal: Up,
+                secondDepth: Fixed64.One,
+                secondContactId: 1)
+            .Should()
+            .Be(new Vector2d(Fixed64.One, Fixed64.One));
+
+        SubmitCandidatePairAndGetGroundPoint(
+                firstNormal: Up,
+                firstDepth: Fixed64.One,
+                firstContactId: 20,
+                secondNormal: Up,
+                secondDepth: Fixed64.One,
+                secondContactId: 10,
+                reuseFirstSupportForSecondCandidate: true)
+            .Should()
+            .Be(new Vector2d(Fixed64.One, Fixed64.One));
+
+        SubmitCandidatePairAndGetGroundPoint(
+                firstNormal: Up,
+                firstDepth: Fixed64.One,
+                firstContactId: 10,
+                secondNormal: Up,
+                secondDepth: Fixed64.One,
+                secondContactId: 1,
+                submitLowerColliderIdSecond: true)
+            .Should()
+            .Be(new Vector2d(Fixed64.One, Fixed64.One));
+    }
+
+    [Fact]
     public void GroundProbeDiagnostics_ShouldEmit2DProbeShape()
     {
         using GravitasWorldContext context = CreateContext();
@@ -358,4 +415,47 @@ public sealed class SolidBody2DGroundingTests
         body.GroundedDistanceRay = Fixed64.Zero;
         body.GroundDownDistanceOnAir = Fixed64.Zero;
     }
+
+    private static Vector2d SubmitCandidatePairAndGetGroundPoint(
+        Vector2d firstNormal,
+        Fixed64 firstDepth,
+        ulong firstContactId,
+        Vector2d secondNormal,
+        Fixed64 secondDepth,
+        ulong secondContactId,
+        bool submitLowerColliderIdSecond = false,
+        bool reuseFirstSupportForSecondCandidate = false)
+    {
+        using GravitasWorldContext context = CreateContext();
+        SolidBody2D body = CreateCircle(context, Vector2d.Zero);
+        DisableProbeFallback(body);
+        LSAABBoxCollider2D lowerIdSupport = CreateStaticFloor(context, center: new Vector2d((Fixed64)(-8), Fixed64.Zero));
+        LSAABBoxCollider2D higherIdSupport = reuseFirstSupportForSecondCandidate
+            ? lowerIdSupport
+            : CreateStaticFloor(context, center: new Vector2d((Fixed64)8, Fixed64.Zero));
+        LSAABBoxCollider2D firstSupport = submitLowerColliderIdSecond ? higherIdSupport : lowerIdSupport;
+        LSAABBoxCollider2D secondSupport = submitLowerColliderIdSecond ? lowerIdSupport : higherIdSupport;
+
+        body.BeginAutomaticGroundingRefresh();
+        body.TryAcceptContactGroundCandidate(
+            body.Collider,
+            firstSupport,
+            CreateGroundContact(firstContactId, new Vector2d(Fixed64.Zero, Fixed64.One), firstDepth, firstNormal),
+            ownColliderIsA: true);
+        body.TryAcceptContactGroundCandidate(
+            body.Collider,
+            secondSupport,
+            CreateGroundContact(secondContactId, new Vector2d(Fixed64.One, Fixed64.One), secondDepth, secondNormal),
+            ownColliderIsA: true);
+        body.CompleteAutomaticGroundingRefresh();
+
+        return body.GroundPoint;
+    }
+
+    private static ManifoldContact2D CreateGroundContact(
+        ulong contactId,
+        Vector2d point,
+        Fixed64 depth,
+        Vector2d groundNormal) =>
+        new(contactId, point, point, depth, -groundNormal);
 }

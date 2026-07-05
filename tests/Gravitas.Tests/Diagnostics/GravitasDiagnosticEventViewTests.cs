@@ -403,6 +403,73 @@ public sealed class GravitasDiagnosticEventViewTests
     }
 
     [Fact]
+    public void TryAsJointAndRagdollViews_ShouldMapConstraintPayloads()
+    {
+        Vector3d jointVector = new((Fixed64)5, (Fixed64)6, (Fixed64)7);
+        GravitasDiagnosticEvent jointEvent = CreateEvent(
+            GravitasDiagnosticEventKind.JointImpulse,
+            jointId: 91,
+            colliderAId: 92,
+            colliderBId: 93,
+            colliderADimension: GravitasColliderDimension.ThreeD,
+            colliderBDimension: GravitasColliderDimension.TwoD,
+            colliderAType: ColliderType.Capsule,
+            colliderB2DType: ColliderType2D.Capsule,
+            vector: jointVector,
+            scalarA: (Fixed64)4,
+            scalarB: Fixed64.Half,
+            dataA: 8,
+            dataB: 2);
+
+        jointEvent.TryAsJoint(out GravitasJointDiagnosticView jointView).Should().BeTrue();
+        jointView.Frame.Should().Be(7);
+        jointView.Sequence.Should().Be(3);
+        jointView.Kind.Should().Be(GravitasDiagnosticEventKind.JointImpulse);
+        jointView.JointId.Should().Be(91);
+        jointView.ColliderAId.Should().Be(92);
+        jointView.ColliderBId.Should().Be(93);
+        jointView.ColliderADimension.Should().Be(GravitasColliderDimension.ThreeD);
+        jointView.ColliderBDimension.Should().Be(GravitasColliderDimension.TwoD);
+        jointView.ColliderAType.Should().Be(ColliderType.Capsule);
+        jointView.ColliderBType.Should().Be(ColliderType.None);
+        jointView.ColliderA2DType.Should().Be(ColliderType2D.None);
+        jointView.ColliderB2DType.Should().Be(ColliderType2D.Capsule);
+        jointView.ImpulseMagnitude.Should().Be((Fixed64)4);
+        jointView.LinearAnchorErrorMagnitude.Should().Be(Fixed64.Half);
+        jointView.MotorImpulseMagnitude.Should().Be((Fixed64)5);
+        jointView.MotorErrorMagnitude.Should().Be((Fixed64)6);
+        jointView.LimitErrorMagnitude.Should().Be((Fixed64)7);
+        jointView.LimitError.Should().Be((Fixed64)7);
+        jointView.RowCount.Should().Be(8);
+        jointView.ClampedRowCount.Should().Be(2);
+        jointEvent.TryAsRagdoll(out _).Should().BeFalse();
+
+        GravitasDiagnosticEvent limitEvent = CreateEvent(
+            GravitasDiagnosticEventKind.JointLimitReached,
+            vector: jointVector,
+            scalarB: (Fixed64)9);
+
+        limitEvent.TryAsJoint(out GravitasJointDiagnosticView limitView).Should().BeTrue();
+        limitView.LimitError.Should().Be((Fixed64)9);
+
+        GravitasDiagnosticEvent ragdollEvent = CreateEvent(
+            GravitasDiagnosticEventKind.RagdollActivated,
+            bodyId: 101,
+            dataA: 12,
+            dataB: 13,
+            hit: true);
+
+        ragdollEvent.TryAsRagdoll(out GravitasRagdollDiagnosticView ragdollView).Should().BeTrue();
+        ragdollView.Frame.Should().Be(7);
+        ragdollView.Sequence.Should().Be(3);
+        ragdollView.RagdollId.Should().Be(101);
+        ragdollView.LinkCount.Should().Be(12);
+        ragdollView.JointCount.Should().Be(13);
+        ragdollView.IsActive.Should().BeTrue();
+        ragdollEvent.TryAsJoint(out _).Should().BeFalse();
+    }
+
+    [Fact]
     public void DispatchTo_ShouldRouteEveryEventKindToTypedVisitorMethod()
     {
         var visitor = new RecordingDiagnosticEventVisitor();
@@ -421,6 +488,11 @@ public sealed class GravitasDiagnosticEventViewTests
         CreateEvent(GravitasDiagnosticEventKind.MixedContact, scalarA: Fixed64.Half).DispatchTo(visitor);
         CreateEvent(GravitasDiagnosticEventKind.MixedResponseImpulse, vector: Vector3d.Down).DispatchTo(visitor);
         CreateEvent(GravitasDiagnosticEventKind.MixedResponseIsland, bodyId: 7).DispatchTo(visitor);
+        CreateEvent(GravitasDiagnosticEventKind.JointRegistered, jointId: 8).DispatchTo(visitor);
+        CreateEvent(GravitasDiagnosticEventKind.JointRemoved, jointId: 9).DispatchTo(visitor);
+        CreateEvent(GravitasDiagnosticEventKind.JointImpulse, jointId: 10).DispatchTo(visitor);
+        CreateEvent(GravitasDiagnosticEventKind.JointLimitReached, jointId: 11).DispatchTo(visitor);
+        CreateEvent(GravitasDiagnosticEventKind.RagdollActivated, bodyId: 12).DispatchTo(visitor);
         CreateEvent((GravitasDiagnosticEventKind)250).DispatchTo(visitor);
 
         visitor.Route.Should().Equal(
@@ -438,10 +510,44 @@ public sealed class GravitasDiagnosticEventViewTests
             nameof(RecordingDiagnosticEventVisitor.VisitMixedContact),
             nameof(RecordingDiagnosticEventVisitor.VisitMixedResponseImpulse),
             nameof(RecordingDiagnosticEventVisitor.VisitMixedResponseIsland),
+            nameof(RecordingDiagnosticEventVisitor.VisitJoint),
+            nameof(RecordingDiagnosticEventVisitor.VisitJoint),
+            nameof(RecordingDiagnosticEventVisitor.VisitJoint),
+            nameof(RecordingDiagnosticEventVisitor.VisitJoint),
+            nameof(RecordingDiagnosticEventVisitor.VisitRagdoll),
             nameof(RecordingDiagnosticEventVisitor.VisitUnknown));
         visitor.LastForce.Force.Should().Be(Vector3d.Right);
         visitor.LastMixedContact.Depth.Should().Be(Fixed64.Half);
+        visitor.LastJoint.JointId.Should().Be(11);
+        visitor.LastRagdoll.RagdollId.Should().Be(12);
         visitor.LastUnknown.Kind.Should().Be((GravitasDiagnosticEventKind)250);
+    }
+
+    [Fact]
+    public void DefaultDiagnosticEventVisitor_ShouldAcceptEveryEventKindWithoutOverrides()
+    {
+        var visitor = new DefaultDiagnosticEventVisitor();
+
+        CreateEvent(GravitasDiagnosticEventKind.ForceDelta).DispatchTo(visitor);
+        CreateEvent(GravitasDiagnosticEventKind.TorqueDelta).DispatchTo(visitor);
+        CreateEvent(GravitasDiagnosticEventKind.LinearVelocityDelta).DispatchTo(visitor);
+        CreateEvent(GravitasDiagnosticEventKind.AngularVelocityDelta).DispatchTo(visitor);
+        CreateEvent(GravitasDiagnosticEventKind.GroundProbe).DispatchTo(visitor);
+        CreateEvent(GravitasDiagnosticEventKind.RayQuery).DispatchTo(visitor);
+        CreateEvent(GravitasDiagnosticEventKind.CircleQuery).DispatchTo(visitor);
+        CreateEvent(GravitasDiagnosticEventKind.QuerySummary).DispatchTo(visitor);
+        CreateEvent(GravitasDiagnosticEventKind.Contact).DispatchTo(visitor);
+        CreateEvent(GravitasDiagnosticEventKind.ResponseImpulse).DispatchTo(visitor);
+        CreateEvent(GravitasDiagnosticEventKind.MixedQuery).DispatchTo(visitor);
+        CreateEvent(GravitasDiagnosticEventKind.MixedContact).DispatchTo(visitor);
+        CreateEvent(GravitasDiagnosticEventKind.MixedResponseImpulse).DispatchTo(visitor);
+        CreateEvent(GravitasDiagnosticEventKind.MixedResponseIsland).DispatchTo(visitor);
+        CreateEvent(GravitasDiagnosticEventKind.JointRegistered).DispatchTo(visitor);
+        CreateEvent(GravitasDiagnosticEventKind.JointRemoved).DispatchTo(visitor);
+        CreateEvent(GravitasDiagnosticEventKind.JointImpulse).DispatchTo(visitor);
+        CreateEvent(GravitasDiagnosticEventKind.JointLimitReached).DispatchTo(visitor);
+        CreateEvent(GravitasDiagnosticEventKind.RagdollActivated).DispatchTo(visitor);
+        CreateEvent((GravitasDiagnosticEventKind)250).DispatchTo(visitor);
     }
 
     [Fact]
@@ -467,6 +573,7 @@ public sealed class GravitasDiagnosticEventViewTests
     private static GravitasDiagnosticEvent CreateEvent(
         GravitasDiagnosticEventKind kind,
         int bodyId = -1,
+        int jointId = -1,
         int colliderAId = -1,
         int colliderBId = -1,
         GravitasColliderDimension colliderADimension = GravitasColliderDimension.None,
@@ -491,6 +598,7 @@ public sealed class GravitasDiagnosticEventViewTests
             sequence: 3,
             kind: kind,
             bodyId: bodyId,
+            jointId: jointId,
             colliderAId: colliderAId,
             colliderBId: colliderBId,
             colliderADimension: colliderADimension,
@@ -517,6 +625,8 @@ public sealed class GravitasDiagnosticEventViewTests
         public GravitasForceDeltaDiagnosticView LastForce;
         public GravitasTorqueDeltaDiagnosticView LastTorque;
         public GravitasMixedContactDiagnosticView LastMixedContact;
+        public GravitasJointDiagnosticView LastJoint;
+        public GravitasRagdollDiagnosticView LastRagdoll;
         public GravitasDiagnosticEvent LastUnknown;
 
         public override void VisitForceDelta(in GravitasForceDeltaDiagnosticView view)
@@ -570,10 +680,26 @@ public sealed class GravitasDiagnosticEventViewTests
         public override void VisitMixedResponseIsland(in GravitasMixedResponseIslandDiagnosticView view) =>
             Route.Add(nameof(VisitMixedResponseIsland));
 
+        public override void VisitJoint(in GravitasJointDiagnosticView view)
+        {
+            Route.Add(nameof(VisitJoint));
+            LastJoint = view;
+        }
+
+        public override void VisitRagdoll(in GravitasRagdollDiagnosticView view)
+        {
+            Route.Add(nameof(VisitRagdoll));
+            LastRagdoll = view;
+        }
+
         public override void VisitUnknown(in GravitasDiagnosticEvent diagnosticEvent)
         {
             Route.Add(nameof(VisitUnknown));
             LastUnknown = diagnosticEvent;
         }
+    }
+
+    private sealed class DefaultDiagnosticEventVisitor : GravitasDiagnosticEventVisitor
+    {
     }
 }

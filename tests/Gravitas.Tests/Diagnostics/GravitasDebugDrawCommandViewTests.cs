@@ -21,16 +21,17 @@ public sealed class GravitasDebugDrawCommandViewTests
         Vector3d pointA = Vector3d.Right;
         Vector3d pointB = Vector3d.Up;
         Vector3d pointC = Vector3d.Forward;
+        GravitasDiagnosticColor color = new(1, 2, 3, 4);
 
-        CreateCommand(GravitasDebugDrawKind.Line, start: start, end: end).DispatchTo(visitor);
-        CreateCommand(GravitasDebugDrawKind.Ray, start: start, end: end).DispatchTo(visitor);
-        CreateCommand(GravitasDebugDrawKind.Point, center: center, radius: Fixed64.Half).DispatchTo(visitor);
-        CreateCommand(GravitasDebugDrawKind.WireSphere, center: center, radius: Fixed64.One).DispatchTo(visitor);
-        CreateCommand(GravitasDebugDrawKind.WireBox, center: center, size: size, rotation: FixedQuaternion.Identity).DispatchTo(visitor);
-        CreateCommand(GravitasDebugDrawKind.WireCapsule, center: center, radius: Fixed64.Half, height: (Fixed64)2).DispatchTo(visitor);
-        CreateCommand(GravitasDebugDrawKind.WireCylinder, center: center, radius: Fixed64.Half, height: (Fixed64)3).DispatchTo(visitor);
-        CreateCommand(GravitasDebugDrawKind.WireTriangle, pointA: pointA, pointB: pointB, pointC: pointC).DispatchTo(visitor);
-        CreateCommand(GravitasDebugDrawKind.WireCone, center: center, radius: Fixed64.One, height: (Fixed64)4).DispatchTo(visitor);
+        CreateCommand(GravitasDebugDrawKind.Line, start: start, end: end, color: color).DispatchTo(visitor);
+        CreateCommand(GravitasDebugDrawKind.Ray, start: start, end: end, color: color).DispatchTo(visitor);
+        CreateCommand(GravitasDebugDrawKind.Point, center: center, radius: Fixed64.Half, color: color).DispatchTo(visitor);
+        CreateCommand(GravitasDebugDrawKind.WireSphere, center: center, radius: Fixed64.One, color: color).DispatchTo(visitor);
+        CreateCommand(GravitasDebugDrawKind.WireBox, center: center, size: size, rotation: FixedQuaternion.Identity, color: color).DispatchTo(visitor);
+        CreateCommand(GravitasDebugDrawKind.WireCapsule, center: center, rotation: FixedQuaternion.Identity, radius: Fixed64.Half, height: (Fixed64)2, color: color).DispatchTo(visitor);
+        CreateCommand(GravitasDebugDrawKind.WireCylinder, center: center, rotation: FixedQuaternion.Identity, radius: Fixed64.Half, height: (Fixed64)3, color: color).DispatchTo(visitor);
+        CreateCommand(GravitasDebugDrawKind.WireTriangle, pointA: pointA, pointB: pointB, pointC: pointC, color: color).DispatchTo(visitor);
+        CreateCommand(GravitasDebugDrawKind.WireCone, center: center, rotation: FixedQuaternion.Identity, radius: Fixed64.One, height: (Fixed64)4, color: color).DispatchTo(visitor);
         CreateCommand((GravitasDebugDrawKind)250).DispatchTo(visitor);
 
         visitor.Route.Should().Equal(
@@ -44,14 +45,47 @@ public sealed class GravitasDebugDrawCommandViewTests
             nameof(RecordingDebugDrawVisitor.VisitWireTriangle),
             nameof(RecordingDebugDrawVisitor.VisitWireCone),
             nameof(RecordingDebugDrawVisitor.VisitUnknown));
+        visitor.LastLine.Frame.Should().Be(5);
+        visitor.LastLine.Sequence.Should().Be(9);
+        visitor.LastLine.ColliderId.Should().Be(17);
+        visitor.LastLine.ColliderDimension.Should().Be(GravitasColliderDimension.ThreeD);
+        visitor.LastLine.ColliderType.Should().Be(ColliderType.Sphere);
+        visitor.LastLine.Collider2DType.Should().Be(ColliderType2D.None);
         visitor.LastLine.Start.Should().Be(start);
         visitor.LastLine.End.Should().Be(end);
+        visitor.LastLine.Color.Should().Be(color);
+        visitor.LastRay.Start.Should().Be(start);
+        visitor.LastRay.End.Should().Be(end);
+        visitor.LastRay.Color.Should().Be(color);
+        visitor.LastPoint.Center.Should().Be(center);
+        visitor.LastPoint.Radius.Should().Be(Fixed64.Half);
+        visitor.LastPoint.Color.Should().Be(color);
+        visitor.LastWireSphere.Center.Should().Be(center);
+        visitor.LastWireSphere.Radius.Should().Be(Fixed64.One);
+        visitor.LastWireSphere.Color.Should().Be(color);
+        visitor.LastWireBox.Center.Should().Be(center);
         visitor.LastWireBox.Size.Should().Be(size);
+        visitor.LastWireBox.Rotation.Should().Be(FixedQuaternion.Identity);
+        visitor.LastWireBox.Color.Should().Be(color);
+        visitor.LastWireCapsule.Center.Should().Be(center);
+        visitor.LastWireCapsule.Rotation.Should().Be(FixedQuaternion.Identity);
+        visitor.LastWireCapsule.Radius.Should().Be(Fixed64.Half);
+        visitor.LastWireCapsule.Height.Should().Be((Fixed64)2);
+        visitor.LastWireCapsule.Color.Should().Be(color);
+        visitor.LastWireCylinder.Center.Should().Be(center);
+        visitor.LastWireCylinder.Rotation.Should().Be(FixedQuaternion.Identity);
+        visitor.LastWireCylinder.Radius.Should().Be(Fixed64.Half);
+        visitor.LastWireCylinder.Height.Should().Be((Fixed64)3);
+        visitor.LastWireCylinder.Color.Should().Be(color);
         visitor.LastWireTriangle.PointA.Should().Be(pointA);
         visitor.LastWireTriangle.PointB.Should().Be(pointB);
         visitor.LastWireTriangle.PointC.Should().Be(pointC);
+        visitor.LastWireTriangle.Color.Should().Be(color);
+        visitor.LastWireCone.Center.Should().Be(center);
+        visitor.LastWireCone.Rotation.Should().Be(FixedQuaternion.Identity);
         visitor.LastWireCone.Radius.Should().Be(Fixed64.One);
         visitor.LastWireCone.Height.Should().Be((Fixed64)4);
+        visitor.LastWireCone.Color.Should().Be(color);
         visitor.LastUnknown.Kind.Should().Be((GravitasDebugDrawKind)250);
     }
 
@@ -73,6 +107,41 @@ public sealed class GravitasDebugDrawCommandViewTests
         visitor.LastLine.Sequence.Should().Be(0);
         visitor.LastPoint.Sequence.Should().Be(1);
         visitor.LastPoint.Center.Should().Be(Vector3d.Up);
+    }
+
+    [Fact]
+    public void DefaultDebugDrawVisitor_ShouldAcceptEveryDrawKindWithoutOverrides()
+    {
+        var visitor = new DefaultDebugDrawVisitor();
+
+        CreateCommand(GravitasDebugDrawKind.Line).DispatchTo(visitor);
+        CreateCommand(GravitasDebugDrawKind.Ray).DispatchTo(visitor);
+        CreateCommand(GravitasDebugDrawKind.Point).DispatchTo(visitor);
+        CreateCommand(GravitasDebugDrawKind.WireSphere).DispatchTo(visitor);
+        CreateCommand(GravitasDebugDrawKind.WireBox).DispatchTo(visitor);
+        CreateCommand(GravitasDebugDrawKind.WireCapsule).DispatchTo(visitor);
+        CreateCommand(GravitasDebugDrawKind.WireCylinder).DispatchTo(visitor);
+        CreateCommand(GravitasDebugDrawKind.WireTriangle).DispatchTo(visitor);
+        CreateCommand(GravitasDebugDrawKind.WireCone).DispatchTo(visitor);
+        CreateCommand((GravitasDebugDrawKind)250).DispatchTo(visitor);
+    }
+
+    [Fact]
+    public void DiagnosticColor_ShouldPackChannelsAndExposeNamedColors()
+    {
+        var color = new GravitasDiagnosticColor(1, 2, 3, 4);
+
+        color.R.Should().Be(1);
+        color.G.Should().Be(2);
+        color.B.Should().Be(3);
+        color.A.Should().Be(4);
+        color.Rgba.Should().Be(0x01020304);
+        GravitasDiagnosticColor.White.Rgba.Should().Be(0xFFFFFFFF);
+        GravitasDiagnosticColor.Red.Rgba.Should().Be(0xFF0000FF);
+        GravitasDiagnosticColor.Green.Rgba.Should().Be(0x00FF00FF);
+        GravitasDiagnosticColor.Blue.Rgba.Should().Be(0x0000FFFF);
+        GravitasDiagnosticColor.Yellow.Rgba.Should().Be(0xFFFF00FF);
+        GravitasDiagnosticColor.Cyan.Rgba.Should().Be(0x00FFFFFF);
     }
 
     private static GravitasDebugDrawCommand CreateCommand(
@@ -118,8 +187,12 @@ public sealed class GravitasDebugDrawCommandViewTests
     {
         public readonly List<string> Route = new();
         public GravitasLineDebugDrawView LastLine;
+        public GravitasRayDebugDrawView LastRay;
         public GravitasPointDebugDrawView LastPoint;
+        public GravitasWireSphereDebugDrawView LastWireSphere;
         public GravitasWireBoxDebugDrawView LastWireBox;
+        public GravitasWireCapsuleDebugDrawView LastWireCapsule;
+        public GravitasWireCylinderDebugDrawView LastWireCylinder;
         public GravitasWireTriangleDebugDrawView LastWireTriangle;
         public GravitasWireConeDebugDrawView LastWireCone;
         public GravitasDebugDrawCommand LastUnknown;
@@ -130,8 +203,11 @@ public sealed class GravitasDebugDrawCommandViewTests
             LastLine = view;
         }
 
-        public override void VisitRay(in GravitasRayDebugDrawView view) =>
+        public override void VisitRay(in GravitasRayDebugDrawView view)
+        {
             Route.Add(nameof(VisitRay));
+            LastRay = view;
+        }
 
         public override void VisitPoint(in GravitasPointDebugDrawView view)
         {
@@ -139,8 +215,11 @@ public sealed class GravitasDebugDrawCommandViewTests
             LastPoint = view;
         }
 
-        public override void VisitWireSphere(in GravitasWireSphereDebugDrawView view) =>
+        public override void VisitWireSphere(in GravitasWireSphereDebugDrawView view)
+        {
             Route.Add(nameof(VisitWireSphere));
+            LastWireSphere = view;
+        }
 
         public override void VisitWireBox(in GravitasWireBoxDebugDrawView view)
         {
@@ -148,11 +227,17 @@ public sealed class GravitasDebugDrawCommandViewTests
             LastWireBox = view;
         }
 
-        public override void VisitWireCapsule(in GravitasWireCapsuleDebugDrawView view) =>
+        public override void VisitWireCapsule(in GravitasWireCapsuleDebugDrawView view)
+        {
             Route.Add(nameof(VisitWireCapsule));
+            LastWireCapsule = view;
+        }
 
-        public override void VisitWireCylinder(in GravitasWireCylinderDebugDrawView view) =>
+        public override void VisitWireCylinder(in GravitasWireCylinderDebugDrawView view)
+        {
             Route.Add(nameof(VisitWireCylinder));
+            LastWireCylinder = view;
+        }
 
         public override void VisitWireTriangle(in GravitasWireTriangleDebugDrawView view)
         {
@@ -171,5 +256,9 @@ public sealed class GravitasDebugDrawCommandViewTests
             Route.Add(nameof(VisitUnknown));
             LastUnknown = command;
         }
+    }
+
+    private sealed class DefaultDebugDrawVisitor : GravitasDebugDrawCommandVisitor
+    {
     }
 }

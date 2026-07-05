@@ -1,7 +1,7 @@
 # Coverage Hardening Plan
 
 **Date:** 2026-07-05  
-**Status:** Active  
+**Status:** Active - first hardening pass complete; 100% campaign remains  
 **Owner:** Gravitas coverage, test-quality, and dead-code hardening
 
 ---
@@ -100,6 +100,55 @@ Largest uncovered file areas from the same baseline:
 | `Constraints/2D/JointSolver2D.cs` | 78.4% | 71.7% | 74 |
 | `Queries/3D/RaycastSegmentWorker.cs` | 79.7% | 58.9% | 63 |
 
+## Current Checkpoint
+
+First hardening pass completed on 2026-07-05:
+
+| Metric | Baseline | Current | Delta | Short-Term Gate |
+| --- | ---: | ---: | ---: | --- |
+| Line coverage | 87.3% | 90.0% | +2.7% | Met |
+| Branch coverage | 74.1% | 76.0% | +1.9% | Not met |
+| Method coverage | 86.5% | 91.0% | +4.5% | Met |
+| Tests | 974 passed | 1025 passed | +51 | Green |
+
+Evidence:
+
+- Coverage report:
+  `TestResults/coverage-hardening-final/reports/Summary.txt`
+- ReportGenerator output:
+  `TestResults/coverage-hardening-final/reports/index.html`
+- Full validation:
+  `dotnet test Gravitas.slnx --configuration Release` passed with 1025 tests.
+- Lean validation:
+  `dotnet test Gravitas.slnx --configuration ReleaseLean` passed with 1007
+  tests.
+- The branch gap is real runtime branch surface, not generated MemoryPack
+  formatter noise. Reaching 90% branch coverage should be treated as a focused
+  branch-quality campaign, not a DTO/property coverage sweep.
+
+Cleanup completed:
+
+- Removed unused `ITransient`, `TransientAttribute`, and
+  `TransientStateUtility` scaffolding. It was a self-contained, unused
+  reflection/expression-compiled transient-state path that no Gravitas runtime
+  code referenced. Chronicler `IRecordable` remains the explicit state-transfer
+  model.
+
+Remaining top CRAP hotspots after the first pass:
+
+| Rank | Method | File | Coverage | CRAP |
+| ---: | --- | --- | ---: | ---: |
+| 1 | `IsInsideBox` | `Queries/Mixed/GravitasQueryMixedService.Support.cs` | 0.0% | 110.00 |
+| 2 | `ClipSegmentAxis` | `Queries/Mixed/GravitasQueryMixedService.Support.cs` | 0.0% | 110.00 |
+| 3 | `ClassifySweepCircleAgainst3DReducer` | `Queries/Mixed/GravitasQueryMixedService.CircleAgainst3DReducers.cs` | 42.9% | 78.45 |
+| 4 | `RemoveChild` | `Colliders/Hierarchy/ColliderHierarchyState.cs` | 0.0% | 72.00 |
+| 5 | `SetImmovableDirection` | `CollisionHandling/Pairs/3D/CollisionPair.cs` | 0.0% | 72.00 |
+| 6 | `TrySweepBox` | `Queries/Mixed/GravitasQueryMixedService.Support.cs` | 0.0% | 72.00 |
+| 7 | `ContributeReplayHash` | `Constraints/2D/Joint2D.cs` | 0.0% | 72.00 |
+| 8 | `TryCollide` | `CollisionHandling/Detection/2D/CollisionDetection2D.cs` | 50.0% | 64.12 |
+| 9 | `TryIntersectSegments` | `CollisionHandling/Detection/2D/CollisionDetection2D.cs` | 33.3% | 54.67 |
+| 10 | `TryRefineShapeExactContinuousCollisionHit` | `Core/3D/SolidBody.ContinuousCollision.Hits.cs` | 35.3% | 51.01 |
+
 ## Hardening Rules
 
 - Do not chase generated MemoryPack formatter coverage. Keep generated-code
@@ -128,7 +177,7 @@ Largest uncovered file areas from the same baseline:
 
 ## Workstream 1: Query And 2D Collision Hotspots
 
-**Status:** Pending
+**Status:** Completed
 
 **Purpose**
 
@@ -148,26 +197,26 @@ collision behavior while pruning any unreachable or duplicate test/code paths.
 
 **Tasks**
 
-- [ ] Review existing 2D query and collision tests for duplicate scenario
+- [x] Review existing 2D query and collision tests for duplicate scenario
       setup, stale assertions, and redundant cases.
-- [ ] Cover `QueryDetection2D.TrySweepCapsuleSegmentAgainstConvexEdges(...)`
+- [x] Cover `QueryDetection2D.TrySweepCapsuleSegmentAgainstConvexEdges(...)`
       with deterministic hit, miss, endpoint, tangent, and initial-overlap
       cases where the public API reaches this helper.
-- [ ] Cover `QueryDetection2D.TryRaycastCompound(...)` through public 2D query
+- [x] Cover `QueryDetection2D.TryRaycastCompound(...)` through public 2D query
       APIs using compound colliders with at least two parts and stable hit
       ordering.
-- [ ] Cover `CollisionDetection2D.TryCompoundOther(...)` with compound-vs-
+- [x] Cover `CollisionDetection2D.TryCompoundOther(...)` with compound-vs-
       primitive pairs that exercise both normal orientation paths.
-- [ ] Cover `CollisionDetection2D.TryCompoundCompound(...)` with compound-vs-
+- [x] Cover `CollisionDetection2D.TryCompoundCompound(...)` with compound-vs-
       compound contact selection and deterministic tie ordering.
-- [ ] Cover `MixedEmbedded2DGeometry.TryGetCompoundBoundary(...)` through mixed
+- [x] Cover `MixedEmbedded2DGeometry.TryGetCompoundBoundary(...)` through mixed
       collision or mixed query paths that use compound 2D slabs.
-- [ ] Delete or simplify any private helper branch that proves unreachable
+- [x] Delete or simplify any private helper branch that proves unreachable
       through valid collider/query shapes.
-- [ ] Run focused tests for `QueryDetection2D`, `CollisionDetection2D`, and
+- [x] Run focused tests for `QueryDetection2D`, `CollisionDetection2D`, and
       mixed compound slab behavior.
-- [ ] Run full `dotnet test Gravitas.slnx --configuration Release`.
-- [ ] Rerun coverage with `coverlet.runsettings` and update this plan's
+- [x] Run full `dotnet test Gravitas.slnx --configuration Release`.
+- [x] Rerun coverage with `coverlet.runsettings` and update this plan's
       progress log with line/branch/method deltas.
 
 **Expected Evidence**
@@ -179,7 +228,7 @@ collision behavior while pruning any unreachable or duplicate test/code paths.
 
 ## Workstream 2: Partition Retained-Membership Cleanup
 
-**Status:** Pending
+**Status:** Completed
 
 **Purpose**
 
@@ -197,22 +246,22 @@ order and duplicate-removal invariants.
 
 **Tasks**
 
-- [ ] Review partition tests for overlap between 3D, 2D, and mixed retained
+- [x] Review partition tests for overlap between 3D, 2D, and mixed retained
       membership scenarios.
-- [ ] Add focused tests that build retained static, kinematic, dynamic, and
+- [x] Add focused tests that build retained static, kinematic, dynamic, and
       sleeping memberships, then verify reset clears only the intended retained
       state without corrupting active membership.
-- [ ] Check whether retained reset logic can share a small helper or clearer
+- [x] Check whether retained reset logic can share a small helper or clearer
       collection pattern without adding abstraction overhead.
-- [ ] Verify no managed allocations are introduced in partition cleanup hot
+- [x] Verify no managed allocations are introduced in partition cleanup hot
       paths.
-- [ ] Run focused partition tests.
-- [ ] Run full `dotnet test Gravitas.slnx --configuration Release`.
-- [ ] Rerun coverage and update this plan's progress log.
+- [x] Run focused partition tests.
+- [x] Run full `dotnet test Gravitas.slnx --configuration Release`.
+- [x] Rerun coverage and update this plan's progress log.
 
 ## Workstream 3: Grounding And Candidate Ordering Branches
 
-**Status:** Pending
+**Status:** Completed
 
 **Purpose**
 
@@ -229,24 +278,24 @@ selection.
 
 **Tasks**
 
-- [ ] Cover `CompareGroundContactCandidate(...)` with distance, normal, collider
+- [x] Cover `CompareGroundContactCandidate(...)` with distance, normal, collider
       ID, and contact key tie-break cases through public grounding probes where
       practical.
-- [ ] If public grounding setup becomes too indirect, extract a tiny internal
+- [x] If public grounding setup becomes too indirect, extract a tiny internal
       comparison policy only if it improves clarity and testability without
       adding runtime overhead.
-- [ ] Cover `ShouldReplaceMixedHit(...)` with earlier TOI, equal TOI,
+- [x] Cover `ShouldReplaceMixedHit(...)` with earlier TOI, equal TOI,
       exact-vs-conservative reducer, trigger/filter, and collider ordering
       cases.
-- [ ] Remove any duplicate CCD ordering tests that assert the same replacement
+- [x] Remove any duplicate CCD ordering tests that assert the same replacement
       branch through a slower integration scenario.
-- [ ] Run focused grounding and CCD ordering tests.
-- [ ] Run full `dotnet test Gravitas.slnx --configuration Release`.
-- [ ] Rerun coverage and update this plan's progress log.
+- [x] Run focused grounding and CCD ordering tests.
+- [x] Run full `dotnet test Gravitas.slnx --configuration Release`.
+- [x] Rerun coverage and update this plan's progress log.
 
 ## Workstream 4: 3D Raycast Segment And Mesh Branches
 
-**Status:** Pending
+**Status:** Completed
 
 **Purpose**
 
@@ -263,22 +312,22 @@ wrong and hard to debug in gameplay.
 
 **Tasks**
 
-- [ ] Cover `RaycastSegmentWorker.CheckPointInsideBox(...)` through public
+- [x] Cover `RaycastSegmentWorker.CheckPointInsideBox(...)` through public
       segment/raycast query cases hitting inside, outside, face, edge, and
       corner conditions.
-- [ ] Review mesh/capsule and mesh/cylinder uncovered branches for true
+- [x] Review mesh/capsule and mesh/cylinder uncovered branches for true
       behavior gaps versus unreachable defensive branches.
-- [ ] Add focused mesh collision tests only for meaningful shape pairs and
+- [x] Add focused mesh collision tests only for meaningful shape pairs and
       deterministic contact ordering.
-- [ ] Remove unreachable defensive branches if valid mesh/collider invariants
+- [x] Remove unreachable defensive branches if valid mesh/collider invariants
       make them impossible.
-- [ ] Run focused 3D query and mesh collision tests.
-- [ ] Run full `dotnet test Gravitas.slnx --configuration Release`.
-- [ ] Rerun coverage and update this plan's progress log.
+- [x] Run focused 3D query and mesh collision tests.
+- [x] Run full `dotnet test Gravitas.slnx --configuration Release`.
+- [x] Rerun coverage and update this plan's progress log.
 
 ## Workstream 5: Batch Query API Coverage And Test Condensing
 
-**Status:** Pending
+**Status:** Completed
 
 **Purpose**
 
@@ -295,20 +344,20 @@ test.
 
 **Tasks**
 
-- [ ] Inventory existing scalar and batch query tests and remove redundant cases
+- [x] Inventory existing scalar and batch query tests and remove redundant cases
       that only repeat scalar behavior.
-- [ ] Add compact batch tests for closest-hit and all-hit range contracts.
-- [ ] Cover empty request spans, undersized output spans, mixed hit ranges,
+- [x] Add compact batch tests for closest-hit and all-hit range contracts.
+- [x] Cover empty request spans, undersized output spans, mixed hit ranges,
       stable per-request ordering, and no-allocation caller-owned buffers.
-- [ ] Keep shape-specific correctness in scalar query tests; batch tests should
+- [x] Keep shape-specific correctness in scalar query tests; batch tests should
       verify batching mechanics and routing.
-- [ ] Run focused query batch tests.
-- [ ] Run full `dotnet test Gravitas.slnx --configuration Release`.
-- [ ] Rerun coverage and update this plan's progress log.
+- [x] Run focused query batch tests.
+- [x] Run full `dotnet test Gravitas.slnx --configuration Release`.
+- [x] Rerun coverage and update this plan's progress log.
 
 ## Workstream 6: Diagnostics, Debug Draw, And Low-Value Surface Review
 
-**Status:** Pending
+**Status:** Completed
 
 **Purpose**
 
@@ -323,24 +372,24 @@ genuinely boilerplate or unreachable.
 
 **Tasks**
 
-- [ ] Review diagnostic view and debug draw visitor tests for duplicate
+- [x] Review diagnostic view and debug draw visitor tests for duplicate
       assertions.
-- [ ] Cover disabled-sink allocation-free paths for diagnostic families not
+- [x] Cover disabled-sink allocation-free paths for diagnostic families not
       currently exercised.
-- [ ] Cover visitor dispatch for every public debug draw and diagnostic event
+- [x] Cover visitor dispatch for every public debug draw and diagnostic event
       kind that host adapters are expected to consume.
-- [ ] Identify trivial immutable view types where coverage is low only because
+- [x] Identify trivial immutable view types where coverage is low only because
       property getters are not read; add tests only when construction or visitor
       behavior is meaningful.
-- [ ] Remove duplicate diagnostic tests that assert the same sink enqueue path
+- [x] Remove duplicate diagnostic tests that assert the same sink enqueue path
       with different event names.
-- [ ] Run focused diagnostics tests.
-- [ ] Run full `dotnet test Gravitas.slnx --configuration Release`.
-- [ ] Rerun coverage and update this plan's progress log.
+- [x] Run focused diagnostics tests.
+- [x] Run full `dotnet test Gravitas.slnx --configuration Release`.
+- [x] Rerun coverage and update this plan's progress log.
 
 ## Workstream 7: Constraint And Replay Hash Coverage
 
-**Status:** Pending
+**Status:** Completed
 
 **Purpose**
 
@@ -358,21 +407,21 @@ explicit untested branch families.
 
 **Tasks**
 
-- [ ] Cover `JointSolver2D` angular limit, motor, and prismatic branch gaps
+- [x] Cover `JointSolver2D` angular limit, motor, and prismatic branch gaps
       with deterministic constraint tests.
-- [ ] Cover `JointSolver3D.AddConeTwistRows(...)` with cone/twist limit cases
+- [x] Cover `JointSolver3D.AddConeTwistRows(...)` with cone/twist limit cases
       that prove the hardened quaternion angular-error behavior.
-- [ ] Cover replay hash contribution paths for 2D joints and mixed/contact
+- [x] Cover replay hash contribution paths for 2D joints and mixed/contact
       pairs in both authoritative and solver-cache modes.
-- [ ] Remove duplicate high-level ragdoll tests if lower-level joint tests make
+- [x] Remove duplicate high-level ragdoll tests if lower-level joint tests make
       them redundant.
-- [ ] Run focused constraint and replay hash tests.
-- [ ] Run full `dotnet test Gravitas.slnx --configuration Release`.
-- [ ] Rerun coverage and update this plan's progress log.
+- [x] Run focused constraint and replay hash tests.
+- [x] Run full `dotnet test Gravitas.slnx --configuration Release`.
+- [x] Rerun coverage and update this plan's progress log.
 
 ## Workstream 8: Final 90% Gate And 100% Roadmap
 
-**Status:** Pending
+**Status:** Active
 
 **Purpose**
 
@@ -381,20 +430,89 @@ coverage tracker.
 
 **Tasks**
 
-- [ ] Rerun coverage with `tests/Gravitas.Tests/coverlet.runsettings`.
+- [x] Rerun coverage with `tests/Gravitas.Tests/coverlet.runsettings`.
 - [ ] Confirm line, branch, and method coverage are all at least 90%.
-- [ ] Run `dotnet test Gravitas.slnx --configuration Release`.
-- [ ] Run `dotnet test Gravitas.slnx --configuration ReleaseLean`.
-- [ ] Record the 90% milestone evidence in this plan.
-- [ ] Re-sort remaining coverage gaps by CRAP score and uncovered branch count.
-- [ ] Add the next 100% milestone workstreams to this same document.
-- [ ] Move any larger discovered correctness, performance, or API issues into
+- [x] Run `dotnet test Gravitas.slnx --configuration Release`.
+- [x] Run `dotnet test Gravitas.slnx --configuration ReleaseLean`.
+- [x] Record the 90% milestone evidence in this plan.
+- [x] Re-sort remaining coverage gaps by CRAP score and uncovered branch count.
+- [x] Add the next 100% milestone workstreams to this same document.
+- [x] Move any larger discovered correctness, performance, or API issues into
       `issue-tracker.md`, `benchmark-signal-hardening-backlog.md`, or a focused
       dated feature-work plan.
+
+**Current Result**
+
+Line and method coverage reached the short-term gate. Branch coverage improved
+to 76.0%, but the remaining gap is too large to close honestly in one pass
+without targeted branch campaigns across mixed query support, replay hash,
+diagnostics, collision dispatch, and service lifecycle paths.
+
+No new correctness or performance issue was split into `issue-tracker.md` or
+`benchmark-signal-hardening-backlog.md` during this pass; the remaining work is
+coverage quality and is tracked below.
+
+## 100% Roadmap Workstreams
+
+### Roadmap A: Mixed Query Support Branches
+
+**Status:** Pending
+
+Target `GravitasQueryMixedService.Support.cs` and mixed finite-slab reducer
+classification branches. Add focused tests for inside-box clipping, segment
+axis clipping, swept-box hit/miss/parallel cases, and reducer classification
+for all 2D/3D supported shape families. Prefer public mixed query APIs when
+setup is readable; extract tiny internal policies only if it reduces brittle
+integration setup without changing runtime cost.
+
+### Roadmap B: Replay Hash Branch Families
+
+**Status:** Pending
+
+Target 2D joint replay hashing, mixed collision pair replay hashing, and
+manifold/contact contribution branches. Cover authoritative and solver-cache
+modes, inactive/empty state, hierarchy ordinal resolution, and stable ordering.
+Do not add tests that merely hash default objects; each case should prove a
+deterministic state distinction.
+
+### Roadmap C: Diagnostics Draw And Event Branches
+
+**Status:** Pending
+
+Target diagnostic sink emit/draw helpers with disabled-sink, enabled-sink,
+capacity, mixed polygon, compound-part, joint, ragdoll, and query event
+branches. Keep disabled paths allocation-free and do not chase view property
+getters unless the view construction or visitor dispatch has host-adapter value.
+
+### Roadmap D: Collision Dispatch And Geometry Branches
+
+**Status:** Pending
+
+Target 2D dispatch branches, segment intersection branches, 3D mesh/cuboid/
+cylinder/capsule contact branches, convex support simplex updates, and compound
+compound collision branches. Prefer edge-case tests that prove physical
+behavior: parallel/separated, tangent, contained, degenerate-but-valid, and
+deterministic tie-ordering cases.
+
+### Roadmap E: Service Lifecycle And Collider Authoring Branches
+
+**Status:** Pending
+
+Target collider hierarchy removal, compound collider mutation/lifecycle edges,
+constraint service ragdoll pose-target helpers, physics settings saver branches,
+and service lifecycle branch families that remain below 90%. Delete unreachable
+or stale support paths rather than preserving them for coverage.
 
 ## Progress Log
 
 | Date | Line | Branch | Method | Tests | Notes |
 | --- | ---: | ---: | ---: | --- | --- |
 | 2026-07-05 | 87.3% | 74.1% | 86.5% | 974 passed | Baseline captured with `tests/Gravitas.Tests/coverlet.runsettings` after trigger collider hardening. |
-
+| 2026-07-05 | 87.8% | 74.7% | 86.7% | 983 passed | Workstream 1 covered 2D capsule sweep, compound 2D collision, and mixed compound boundary behavior. |
+| 2026-07-05 | 87.9% | 75.0% | 86.8% | 986 passed | Workstream 2 covered retained partition cleanup across 3D, 2D, and mixed partitions. |
+| 2026-07-05 | 88.0% | 75.2% | 86.8% | 988 passed | Workstream 3 covered 2D support candidate tie-ordering and mixed CCD reducer-kind ordering. |
+| 2026-07-05 | 88.0% | 75.3% | 86.9% | 1000 passed | Workstream 4 covered segment raycast point/mesh edge cases. |
+| 2026-07-05 | 88.9% | 75.6% | 87.3% | 1002 passed | Workstream 5 covered 3D batch routing for registered source sweeps and directional overlap order. |
+| 2026-07-05 | 89.1% | 75.6% | 89.4% | 1006 passed | Workstream 6 covered diagnostic debug-draw and event visitor families. |
+| 2026-07-05 | 89.4% | 75.8% | 89.5% | 1012 passed | Workstream 7 covered additional 2D/3D constraint limit and motor branches. |
+| 2026-07-05 | 90.0% | 76.0% | 91.0% | 1025 passed | Final first-pass checkpoint. Removed unused transient-state scaffolding and covered query request/range, coroutine wait, layer, and compound-part contracts. Branch 90% remains active roadmap work. |

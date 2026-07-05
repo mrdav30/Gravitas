@@ -143,6 +143,32 @@ public sealed class Physics2DPartitionBroadPhaseTests
     }
 
     [Fact]
+    public void ResetRetainedMembership_ShouldClearAllBucketsAndMarkPartitionEmpty()
+    {
+        using GravitasWorldContext context = CreateContext(extent: 16);
+        context.Simulate();
+        PhysicsPartition2D partition = context.Collisions2D.RentPartition();
+        partition.AddDynamicObject(7);
+        partition.AddKinematicObject(3);
+        partition.AddStaticObject(11);
+        partition.SetDynamicObjectAwake(7, awake: false);
+        int activationId = partition.ActivationId;
+
+        context.Collisions2D.DeactivatePartition(activationId);
+        partition.ResetRetainedMembership();
+
+        partition.IsEmpty.Should().BeTrue();
+        partition.EmptySinceFrame.Should().Be(context.FrameCount);
+        partition.IsAllocated.Should().BeFalse();
+        partition.AwakeDynamicObjectCount.Should().Be(0);
+        partition.ContainedDynamicObjects!.Count.Should().Be(0);
+        partition.ContainedAwakeDynamicObjects!.Count.Should().Be(0);
+        partition.ContainedKinematicObjects!.Count.Should().Be(0);
+        partition.ContainedStaticObjects!.Count.Should().Be(0);
+        context.Collisions2D.ReleasePartition(partition);
+    }
+
+    [Fact]
     public void Simulate_WithOnlySleepingDynamicAndStaticObjects_ShouldSkipPartitionWork()
     {
         using GravitasWorldContext context = CreateContext(extent: 16);

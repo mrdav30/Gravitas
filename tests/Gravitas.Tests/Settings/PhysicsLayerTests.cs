@@ -5,6 +5,7 @@ using Gravitas.Queries;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
 using GridForge.Configuration;
+using System;
 using SwiftCollections;
 using Xunit;
 
@@ -19,8 +20,31 @@ public sealed class PhysicsLayerTests
 
         layer.Index.Should().Be(3);
         layer.MaskBit.Should().Be(1 << 3);
+        layer.ToString().Should().Be("3");
+        layer.GetHashCode().Should().Be(3);
         PhysicsLayer.LayerToName(3).Should().Be("Gameplay");
         PhysicsLayer.NameToLayer("Gameplay").Should().Be(3);
+        PhysicsLayer.LayerToName(12).Should().BeNull();
+        PhysicsLayer.NameToLayer("Missing").Should().Be(-1);
+    }
+
+    [Fact]
+    public void PhysicsLayer_ShouldSupportMutationEqualityAndIndexValidation()
+    {
+        var layer = new PhysicsLayer(1);
+
+        layer.Set(4);
+
+        layer.Should().Be(new PhysicsLayer(4));
+        layer.Equals((object)new PhysicsLayer(4)).Should().BeTrue();
+        layer.Equals("4").Should().BeFalse();
+        (layer == new PhysicsLayer(4)).Should().BeTrue();
+        (layer != new PhysicsLayer(5)).Should().BeTrue();
+
+        Action belowRange = () => _ = new PhysicsLayer(-1);
+        Action aboveRange = () => layer.Set(32);
+        belowRange.Should().Throw<ArgumentOutOfRangeException>().WithParameterName("index");
+        aboveRange.Should().Throw<ArgumentOutOfRangeException>().WithParameterName("index");
     }
 
     [Fact]
@@ -39,7 +63,16 @@ public sealed class PhysicsLayerTests
         multiple.Includes(layerThree).Should().BeFalse();
 
         PhysicsLayerMask.All.Includes(layerThree).Should().BeTrue();
+        PhysicsLayerMask.All.Bits.Should().Be(-1);
         PhysicsLayerMask.None.Includes(layerZero).Should().BeFalse();
+        PhysicsLayerMask.None.Bits.Should().Be(0);
+        PhysicsLayerMask.None.ToString().Should().Be("0");
+        PhysicsLayerMask.FromLayer(3).Should().Be(PhysicsLayerMask.FromLayer(layerThree));
+        PhysicsLayerMask.FromLayer(3).Includes(3).Should().BeTrue();
+        (PhysicsLayerMask.FromLayer(3) == PhysicsLayerMask.FromLayer(layerThree)).Should().BeTrue();
+        (PhysicsLayerMask.FromLayer(3) != PhysicsLayerMask.FromLayer(layerFive)).Should().BeTrue();
+        PhysicsLayerMask.FromLayer(3).Equals((object)PhysicsLayerMask.FromLayer(layerThree)).Should().BeTrue();
+        PhysicsLayerMask.FromLayer(3).Equals("3").Should().BeFalse();
     }
 
     [Fact]

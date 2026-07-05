@@ -212,6 +212,28 @@ public sealed class Constraint2DServiceTests
     }
 
     [Fact]
+    public void PrismaticJoint_WithLowerSliderLimit_ShouldReportLimitError()
+    {
+        using GravitasWorldContext context = CreateConstraintContext();
+        SolidBody2D first = CreateBody(context, Vector2d.Zero, immovable: true);
+        SolidBody2D second = CreateBody(context, new Vector2d((Fixed64)(-3), Fixed64.Zero));
+        Joint2D joint = context.Constraints2D.RegisterJoint(new JointDefinition2D(
+            first,
+            second,
+            JointFrame2D.Identity,
+            JointFrame2D.Identity,
+            JointType2D.Prismatic,
+            JointLimit2D.Slider((Fixed64)(-2), Fixed64.Zero),
+            JointMotor2D.Disabled,
+            JointCollisionPolicy.SuppressLinked));
+
+        Step(context, 2);
+
+        joint.LastSolveMetrics.LimitErrorMagnitude.Should().BeGreaterThan(Fixed64.Zero);
+        joint.LastSolveMetrics.ClampedRowCount.Should().BeGreaterThan(0);
+    }
+
+    [Fact]
     public void ConstraintIsland_ShouldWakeSleepingLinked2DBodiesAsOneIsland()
     {
         using GravitasWorldContext context = CreateConstraintContext();
@@ -492,6 +514,57 @@ public sealed class Constraint2DServiceTests
         Step(context, 4);
 
         dynamic.AngularVelocity.Abs().Should().BeLessThan(before);
+        joint.LastSolveMetrics.MotorImpulseMagnitude.Should().BeGreaterThan(Fixed64.Zero);
+    }
+
+    [Theory]
+    [InlineData(-90)]
+    [InlineData(90)]
+    public void AngularLimit_ShouldReportLowerAndUpperViolations(int degrees)
+    {
+        using GravitasWorldContext context = CreateConstraintContext();
+        SolidBody2D anchor = CreateBody(context, Vector2d.Zero, immovable: true);
+        SolidBody2D dynamic = CreateBody(
+            context,
+            Vector2d.Right * (Fixed64)2,
+            rotation: FixedMath.DegToRad((Fixed64)degrees));
+        Joint2D joint = context.Constraints2D.RegisterJoint(new JointDefinition2D(
+            anchor,
+            dynamic,
+            JointFrame2D.Identity,
+            JointFrame2D.Identity,
+            JointType2D.Pin,
+            JointLimit2D.Angular(-Fixed64.Half, Fixed64.Half),
+            JointMotor2D.Disabled,
+            JointCollisionPolicy.SuppressLinked));
+
+        Step(context, 2);
+
+        joint.LastSolveMetrics.LimitErrorMagnitude.Should().BeGreaterThan(Fixed64.Zero);
+        joint.LastSolveMetrics.ClampedRowCount.Should().BeGreaterThan(0);
+    }
+
+    [Fact]
+    public void PrismaticLinearMotor_ShouldDriveAlongSliderAxis()
+    {
+        using GravitasWorldContext context = CreateConstraintContext();
+        SolidBody2D anchor = CreateBody(context, Vector2d.Zero, immovable: true);
+        SolidBody2D dynamic = CreateBody(context, Vector2d.Right * Fixed64.Half);
+        Joint2D joint = context.Constraints2D.RegisterJoint(new JointDefinition2D(
+            anchor,
+            dynamic,
+            JointFrame2D.Identity,
+            JointFrame2D.Identity,
+            JointType2D.Prismatic,
+            JointLimit2D.Unrestricted,
+            JointMotor2D.Linear((Fixed64)2, (Fixed64)2, Fixed64.Half, Fixed64.One),
+            JointCollisionPolicy.SuppressLinked));
+        Fixed64 before = dynamic.Position.X;
+
+        Step(context, 6);
+
+        dynamic.Position.X.Should().BeGreaterThan(before);
+        joint.LastSolveMetrics.MotorErrorMagnitude.Should().BeGreaterThan(Fixed64.Zero);
         joint.LastSolveMetrics.MotorImpulseMagnitude.Should().BeGreaterThan(Fixed64.Zero);
     }
 
