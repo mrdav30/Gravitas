@@ -17,15 +17,15 @@ public sealed partial class GravitasPhysics2DService
 {
     internal void ProcessPartitionCandidate(int firstId, int secondId, WorldVoxelIndex partitionIndex)
     {
-        if (!_collidersById.TryGetValue(firstId, out LSCollider2D? first)
-            || !_collidersById.TryGetValue(secondId, out LSCollider2D? second))
+        if (!TryGetColliderById(firstId, out LSCollider2D? first)
+            || !TryGetColliderById(secondId, out LSCollider2D? second))
         {
             return;
         }
 
         if (!RequireCollisionPair(first!, second!)
-            || !CollisionDetection2D.BoundsOverlap(first, second)
-            || !IsCanonicalSharedPartition(first, second, partitionIndex))
+            || !CollisionDetection2D.BoundsOverlap(first!, second!)
+            || !IsCanonicalSharedPartition(first!, second!, partitionIndex))
         {
             return;
         }
@@ -35,7 +35,7 @@ public sealed partial class GravitasPhysics2DService
             return;
 
         LastBroadPhaseCandidateCount++;
-        ProcessCandidate(first, second, _context.FrameCount);
+        ProcessCandidate(first!, second!, _context.FrameCount);
     }
 
     private static bool IsCanonicalSharedPartition(LSCollider2D first, LSCollider2D second, WorldVoxelIndex currentIndex)
@@ -188,7 +188,7 @@ public sealed partial class GravitasPhysics2DService
 
         foreach (int holderId in pairHolders)
         {
-            if (!_collidersById.TryGetValue(holderId, out LSCollider2D? holder)
+            if (!TryGetColliderById(holderId, out LSCollider2D? holder)
                 || holder!.TryGetCollisionPair(collider.Id, out CollisionPair2D? pair) != true
                 || pair == null)
             {
@@ -328,7 +328,7 @@ public sealed partial class GravitasPhysics2DService
         {
             foreach (int holderId in collisionPairHolders)
             {
-                if (!_collidersById.TryGetValue(holderId, out LSCollider2D? holder)
+                if (!TryGetColliderById(holderId, out LSCollider2D? holder)
                     || !holder!.TryRemoveCollisionPair(collider.Id, out CollisionPair2D? pair)
                     || pair == null)
                 {
@@ -344,22 +344,4 @@ public sealed partial class GravitasPhysics2DService
         collider.ClearCollisionPairState();
         collider.ClearRuntimeRelationships();
     }
-
-    private void RemoveCollider(LSCollider2D collider)
-    {
-        int index = collider.ServiceIndex;
-        if (index < 0 || index >= _colliders.Count || !ReferenceEquals(_colliders[index], collider))
-            return;
-
-        int lastIndex = _colliders.Count - 1;
-        if (index != lastIndex)
-        {
-            LSCollider2D moved = _colliders[lastIndex];
-            _colliders[index] = moved;
-            moved.SetServiceIndex(index);
-        }
-
-        _colliders.RemoveAt(lastIndex);
-    }
-
 }

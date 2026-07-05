@@ -26,7 +26,7 @@ public sealed class CompoundColliderTests
         body.Collider.PartCount.Should().Be(2);
         body.Collider.GetPartId(0).Should().Be(0);
         body.Collider.GetPartId(1).Should().Be(1);
-        scenario.Context.Physics.AssimilatedColliderCount.Should().Be(1);
+        scenario.Context.Physics.ColliderCount.Should().Be(1);
         scenario.Context.Physics.TryGetColliderById(body.Collider.GetPartCollider(0).Id, out _).Should().BeFalse();
         scenario.Context.Physics.TryGetColliderById(body.Collider.GetPartCollider(1).Id, out _).Should().BeFalse();
 

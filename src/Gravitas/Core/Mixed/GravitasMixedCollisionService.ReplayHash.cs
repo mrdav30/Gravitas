@@ -8,6 +8,7 @@
 using Chronicler;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
+using SwiftCollections;
 
 namespace Gravitas;
 
@@ -17,21 +18,19 @@ internal sealed partial class GravitasMixedCollisionService
         ref ChronicleHashWriter writer,
         GravitasReplayHashMode mode)
     {
-        writer.WriteSection("physics.mixed", 1);
+        SwiftList<LSCollider> replay3DColliders = _context.Physics.PrepareReplayColliders();
+        SwiftList<LSCollider2D> replay2DColliders = _context.Physics2D.PrepareReplayColliders();
+
+        writer.WriteSection("physics.mixed", 2);
         writer.WriteUInt32(Version);
         writer.WriteInt32(ActivePairCount);
 
-        int peak3D = _context.Physics.PeakColliderCount;
-        for (int collider3DId = 1; collider3DId <= peak3D; collider3DId++)
+        for (int i = 0; i < replay3DColliders.Count; i++)
         {
-            if (!_context.Physics.TryGetColliderById(collider3DId, out LSCollider? _))
-                continue;
-
-            for (int collider2DId = 1; collider2DId < _context.Physics2D.NextColliderIdForReplayHash; collider2DId++)
+            int collider3DId = replay3DColliders[i].Id;
+            for (int j = 0; j < replay2DColliders.Count; j++)
             {
-                if (!_context.Physics2D.TryGetColliderById(collider2DId, out LSCollider2D? _))
-                    continue;
-
+                int collider2DId = replay2DColliders[j].Id;
                 ulong key = MixedColliderKey.CreateKey(collider3DId, collider2DId);
                 if (_pairs.TryGetValue(key, out CollisionPairMixed? pair) && pair != null)
                     pair.ContributeReplayHash(ref writer, mode);

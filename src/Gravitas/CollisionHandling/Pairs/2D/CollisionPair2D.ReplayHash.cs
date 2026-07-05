@@ -18,9 +18,9 @@ internal sealed partial class CollisionPair2D
         ref ChronicleHashWriter writer,
         GravitasReplayHashMode mode)
     {
-        writer.WriteSection("pair.2d", 1);
-        writer.WriteInt32(Id1);
-        writer.WriteInt32(Id2);
+        writer.WriteSection("pair.2d", 2);
+        writer.WriteInt32(ColliderA.ReplayOrdinal);
+        writer.WriteInt32(ColliderB.ReplayOrdinal);
         writer.WriteEnum(CollisionType);
         writer.WriteInt32(LastFrame);
         writer.WriteBool(_isColliding);

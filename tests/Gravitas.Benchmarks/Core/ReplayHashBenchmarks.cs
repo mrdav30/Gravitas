@@ -14,14 +14,18 @@ public class ReplayHashBenchmarks
     private GravitasWorldContext _churned3DContext;
     private GravitasWorldContext _dense3DContext;
     private GravitasWorldContext _sparse2DContext;
+    private GravitasWorldContext _churned2DContext;
     private GravitasWorldContext _mixedContext;
+    private GravitasWorldContext _churnedMixedContext;
     private GravitasWorldContext _solverCacheContext;
 
     private int _sparse3DBodyCount;
     private int _churned3DLiveColliderCount;
     private int _dense3DBodyCount;
     private int _sparse2DBodyCount;
+    private int _churned2DLiveColliderCount;
     private int _mixedColliderCount;
+    private int _churnedMixedColliderCount;
     private int _solverCacheContactSeedCount;
 
     [Params(64, 256)]
@@ -48,9 +52,17 @@ public class ReplayHashBenchmarks
         _sparse2DBodyCount = CreateCircleGrid2D(_sparse2DContext, ColliderCount);
         _sparse2DContext.LateSimulate();
 
+        _churned2DContext = Create2DContext(gridExtent);
+        _churned2DLiveColliderCount = CreateChurnedStaticColliders2D(_churned2DContext, ColliderCount);
+        _churned2DContext.LateSimulate();
+
         _mixedContext = CreateMixedContext(gridExtent);
         _mixedColliderCount = CreateMixedPairs(_mixedContext, ColliderCount / 2);
         _mixedContext.Simulate();
+
+        _churnedMixedContext = CreateMixedContext(gridExtent);
+        _churnedMixedColliderCount = CreateChurnedMixedStaticColliders(_churnedMixedContext, ColliderCount);
+        _churnedMixedContext.LateSimulate();
 
         _solverCacheContext = BenchmarkPhysicsScene.CreateContext(gridExtent);
         _solverCacheContactSeedCount = BenchmarkPhysicsScene.CreateOverlappingDynamicSpherePairs(
@@ -66,14 +78,18 @@ public class ReplayHashBenchmarks
         _churned3DContext?.Dispose();
         _dense3DContext?.Dispose();
         _sparse2DContext?.Dispose();
+        _churned2DContext?.Dispose();
         _mixedContext?.Dispose();
+        _churnedMixedContext?.Dispose();
         _solverCacheContext?.Dispose();
 
         _sparse3DContext = null;
         _churned3DContext = null;
         _dense3DContext = null;
         _sparse2DContext = null;
+        _churned2DContext = null;
         _mixedContext = null;
+        _churnedMixedContext = null;
         _solverCacheContext = null;
     }
 
@@ -105,11 +121,25 @@ public class ReplayHashBenchmarks
         return _sparse2DContext.ComputeReplayHash();
     }
 
+    [Benchmark(Description = "replay-hash-2d-churned-ids")]
+    public ChronicleHash ReplayHash2DChurnedIds()
+    {
+        SwiftThrowHelper.ThrowIfTrue(_churned2DLiveColliderCount != ColliderCount);
+        return _churned2DContext.ComputeReplayHash();
+    }
+
     [Benchmark(Description = "replay-hash-mixed")]
     public ChronicleHash ReplayHashMixed()
     {
         SwiftThrowHelper.ThrowIfTrue(_mixedColliderCount != ColliderCount);
         return _mixedContext.ComputeReplayHash();
+    }
+
+    [Benchmark(Description = "replay-hash-mixed-churned-ids")]
+    public ChronicleHash ReplayHashMixedChurnedIds()
+    {
+        SwiftThrowHelper.ThrowIfTrue(_churnedMixedColliderCount != ColliderCount);
+        return _churnedMixedContext.ComputeReplayHash();
     }
 
     [Benchmark(Description = "replay-hash-with-solver-caches")]
@@ -189,7 +219,54 @@ public class ReplayHashBenchmarks
                 Position3DForGridIndex(i));
         }
 
-        return context.Physics.AssimilatedColliderCount;
+        return context.Physics.ColliderCount;
+    }
+
+    private static int CreateChurnedStaticColliders2D(GravitasWorldContext context, int liveCount)
+    {
+        const int churnMultiplier = 8;
+        int retiredCount = liveCount * (churnMultiplier - 1);
+
+        for (int i = 0; i < retiredCount; i++)
+        {
+            LSCircleCollider2D collider = CreateBodylessCircle2D(context, Position2DForGridIndex(i % liveCount));
+            collider.Deactivate();
+        }
+
+        for (int i = 0; i < liveCount; i++)
+            _ = CreateBodylessCircle2D(context, Position2DForGridIndex(i));
+
+        return context.Physics2D.ColliderCount;
+    }
+
+    private static int CreateChurnedMixedStaticColliders(GravitasWorldContext context, int liveCount)
+    {
+        const int churnMultiplier = 8;
+        int perDimension = liveCount / 2;
+        int retiredPerDimension = perDimension * (churnMultiplier - 1);
+
+        for (int i = 0; i < retiredPerDimension; i++)
+        {
+            int index = i % perDimension;
+            LSSphereCollider collider3D = BenchmarkPhysicsScene.CreateStaticCollider(
+                context,
+                new LSSphereCollider(),
+                Position3DForGridIndex(index));
+            LSCircleCollider2D collider2D = CreateBodylessCircle2D(context, Position2DForGridIndex(index));
+            collider3D.Deactivate();
+            collider2D.Deactivate();
+        }
+
+        for (int i = 0; i < perDimension; i++)
+        {
+            _ = BenchmarkPhysicsScene.CreateStaticCollider(
+                context,
+                new LSSphereCollider(),
+                Position3DForGridIndex(i));
+            _ = CreateBodylessCircle2D(context, Position2DForGridIndex(i));
+        }
+
+        return context.Physics.ColliderCount + context.Physics2D.ColliderCount;
     }
 
     private static SolidBody2D CreateCircle2D(
@@ -207,6 +284,18 @@ public class ReplayHashBenchmarks
         };
         body.Initialize(position);
         return body;
+    }
+
+    private static LSCircleCollider2D CreateBodylessCircle2D(
+        GravitasWorldContext context,
+        Vector2d position)
+    {
+        var agent = new BenchmarkMatterAgent(
+            context,
+            new Vector3d(position.X, Fixed64.Zero, position.Y));
+        var collider = new LSCircleCollider2D(Fixed64.Half);
+        collider.InitializeWithNoBody(agent);
+        return collider;
     }
 
     private static Vector2d Position2DForGridIndex(int index)

@@ -17,10 +17,10 @@ public partial class CollisionPair
         ref ChronicleHashWriter writer,
         GravitasReplayHashMode mode)
     {
-        writer.WriteSection("pair.3d", 1);
+        writer.WriteSection("pair.3d", 2);
         writer.WriteBool(Active);
-        writer.WriteInt32(Id1);
-        writer.WriteInt32(Id2);
+        writer.WriteInt32(ColliderA.ReplayOrdinal);
+        writer.WriteInt32(ColliderB.ReplayOrdinal);
         writer.WriteEnum(CollisionType);
         writer.WriteUInt32(PartitionVersion);
         writer.WriteInt32(PairVersion);

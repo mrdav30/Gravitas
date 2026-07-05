@@ -145,11 +145,16 @@ visual interpolation cannot overshoot its target.
 Dynamic 3D bodies are stored in a `SwiftBucket<SolidBody>`. Their `DynamicId` is
 the bucket index returned by `GravitasPhysicsService.AssimilateBody(...)`.
 
-3D colliders live in a compact context-local `SwiftList<LSCollider>` with an ID
-lookup table. Collider IDs start at `1` and grow monotonically within a context;
-removing a collider compacts service iteration without reusing the released ID.
-Because IDs are context-local, two different contexts can both have collider ID
-`1`. Lookups must go through the owning context's physics service.
+3D and 2D colliders use a shared context-local registry shape: reusable
+`SwiftBucket` slots provide stable live IDs, while compact live lists provide
+cache-friendly service iteration. Collider ID `0` is valid; `-1` is the
+unregistered sentinel. Removing a collider releases its slot for reuse and
+compacts service iteration. Because IDs are context-local, two different
+contexts can both have collider ID `0`. Lookups must go through the owning
+context's physics service. Replay hashing does not treat reusable bucket IDs as
+authoritative snapshot identity: each hash pass builds canonical live
+registration order and writes dense replay ordinals for collider, hierarchy,
+and pair identity.
 
 Both 3D and 2D physics services keep compact service-refresh lists for bodyless
 and non-dynamic colliders. Dynamic body buckets refresh dynamic-body colliders,
@@ -252,9 +257,12 @@ buffers, diagnostic buffers, delegates, and visual interpolation state are not
 snapshot identity.
 
 Replay hashing follows the same boundary: body/collider values are
-authoritative when they affect deterministic continuation, while context-owned
-IDs, retained pair/contact state, and active CCD handoffs are hashed by the
-context services that own their ordering.
+authoritative when they affect deterministic continuation. Runtime collider IDs
+remain context-local lookup and pair keys, while replay hashing uses canonical
+live registration order with dense replay ordinals. Deleted ID history,
+free-list ordering, and allocator holes are not authoritative replay identity.
+Retained pair/contact state and active CCD handoffs are hashed by the context
+services that own their ordering.
 
 Read [Serialization And Replay](SERIALIZATION.md) before changing serialized
 fields, load defaults, or replay tests.

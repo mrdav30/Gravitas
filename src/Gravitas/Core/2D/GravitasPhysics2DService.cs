@@ -23,8 +23,7 @@ public sealed partial class GravitasPhysics2DService
 
     private readonly GravitasWorldContext _context;
     private readonly SwiftBucket<SolidBody2D> _dynamicBodies = new();
-    private readonly SwiftList<LSCollider2D> _colliders = new();
-    private readonly SwiftDictionary<int, LSCollider2D> _collidersById = new();
+    private readonly ColliderRegistry<LSCollider2D> _colliders = new();
     private readonly SwiftList<LSCollider2D> _serviceRefreshColliders = new();
     private readonly SwiftHashSet<ulong> _processedPairKeys = new();
     private readonly SwiftDictionary<ulong, CollisionPair2D> _pairs = new();
@@ -43,7 +42,6 @@ public sealed partial class GravitasPhysics2DService
     private readonly SwiftList<int> _continuousCollisionHandoffQueue = new();
     private int _continuousCollisionPreparedToken = int.MinValue;
     private bool _continuousCollisionPreparedMixedIndex;
-    private int _nextColliderId = 1;
 
     public GravitasPhysics2DService(GravitasWorldContext context)
     {
@@ -99,9 +97,7 @@ public sealed partial class GravitasPhysics2DService
             nameof(collider),
             "2D collider must belong to this physics service context.");
 
-        collider.SetPhysicsState(_nextColliderId++, _colliders.Count);
-        _colliders.Add(collider);
-        _collidersById.Add(collider.Id, collider);
+        _colliders.Register(collider);
         RefreshColliderServiceRefreshRegistration(collider);
         _context.Collisions2D.PartitionCollider(collider);
     }
@@ -119,14 +115,13 @@ public sealed partial class GravitasPhysics2DService
     internal void DessimilateCollider(LSCollider2D collider)
     {
         SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
+        _context.Constraints2D.RemoveSuppressionsForCollider(collider.Id);
         RemovePairsForCollider(collider);
         _context.MixedCollisions.RemovePairsFor2DCollider(collider);
         _context.MixedCollisions.ClearPartitioned2DCollider(collider, force: true);
         _context.Collisions2D.ClearPartitionedCollider(collider, force: true);
         RemoveServiceRefreshCollider(collider);
-        RemoveCollider(collider);
-        _collidersById.Remove(collider.Id);
-        collider.ClearPhysicsState();
+        _colliders.Remove(collider);
     }
 
     public void Simulate()
@@ -201,8 +196,7 @@ public sealed partial class GravitasPhysics2DService
     public void Reset()
     {
         _dynamicBodies.Clear();
-        _colliders.FastClear();
-        _collidersById.Clear();
+        _colliders.Clear();
         _serviceRefreshColliders.FastClear();
         _processedPairKeys.Clear();
         _pairs.Clear();
@@ -221,7 +215,6 @@ public sealed partial class GravitasPhysics2DService
         _continuousCollisionHandoffQueue.FastClear();
         _continuousCollisionPreparedToken = int.MinValue;
         _continuousCollisionPreparedMixedIndex = false;
-        _nextColliderId = 1;
         BodyCount = 0;
         LastBroadPhaseCandidateCount = 0;
         LastContinuousCollisionIslandCount = 0;
@@ -229,26 +222,13 @@ public sealed partial class GravitasPhysics2DService
         LastContinuousCollisionIslandLimitReached = false;
     }
 
-    internal bool TryGetColliderById(int colliderId, out LSCollider2D? collider)
-    {
-        return _collidersById.TryGetValue(colliderId, out collider);
-    }
+    internal bool TryGetColliderById(int colliderId, out LSCollider2D? collider) =>
+        _colliders.TryGetById(colliderId, out collider);
 
-    internal bool TryGetColliderByServiceIndex(int serviceIndex, out LSCollider2D? collider)
-    {
-        if (serviceIndex < 0 || serviceIndex >= _colliders.Count)
-        {
-            collider = null;
-            return false;
-        }
+    internal bool TryGetColliderByServiceIndex(int serviceIndex, out LSCollider2D? collider) =>
+        _colliders.TryGetByServiceIndex(serviceIndex, out collider);
 
-        collider = _colliders[serviceIndex];
-        return true;
-    }
-
-    internal int DynamicBodyPeakCount => _dynamicBodies.PeakCount;
-
-    internal int NextColliderIdForReplayHash => _nextColliderId;
+    internal SwiftList<LSCollider2D> PrepareReplayColliders() => _colliders.PrepareReplayColliders();
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal bool TryGetDynamicBody(int dynamicId, out SolidBody2D body) =>

@@ -20,7 +20,7 @@ using System.Runtime.CompilerServices;
 
 namespace Gravitas.Colliders;
 
-public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode
+public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, IPhysicsColliderRegistryItem
 {
     #region Fields and Properties
 
@@ -35,11 +35,17 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode
     private bool _isTrigger;
     public bool IsTrigger => _isTrigger;
 
-    private int _id;
+    private int _id = -1;
     public int Id => _id;
 
     private int _serviceIndex = -1;
     internal int ServiceIndex => _serviceIndex;
+
+    private int _replayOrder = -1;
+    internal int ReplayOrder => _replayOrder;
+
+    private int _replayOrdinal = -1;
+    internal int ReplayOrdinal => _replayOrdinal;
 
     private int _serviceRefreshIndex = -1;
     internal int ServiceRefreshIndex => _serviceRefreshIndex;
@@ -360,6 +366,10 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode
     internal int CollisionPairCount => _pairState.CollisionPairCount;
 
     internal int CollisionPairHolderCount => _pairState.CollisionPairHolderCount;
+
+    internal SwiftDictionary<int, CollisionPair>? CollisionPairs => _pairState.CollisionPairs;
+
+    internal SwiftHashSet<int>? CollisionPairHolders => _pairState.CollisionPairHolders;
 
     public delegate void BodyCollisionFunc(SolidBody other);
     public event BodyCollisionFunc? OnContact;
@@ -805,6 +815,18 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode
 
     internal bool TryRemoveCollisionPairHolder(int otherId) => _pairState.TryRemoveCollisionPairHolder(otherId);
 
+    internal void ClearCollisionPairState()
+    {
+        _pairState.ClearCollisionPairs();
+        _pairState.ClearCollisionPairHolders();
+    }
+
+    internal void ClearRuntimeRelationships()
+    {
+        ClearChildParentReferences();
+        ClearParent();
+    }
+
     public void Deactivate()
     {
         ThrowIfCompoundPartLifecycle(nameof(Deactivate));
@@ -818,43 +840,10 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode
             _partitionState.MarkUnpartitioned();
         }
 
-        // Remove all collision pairs involving this collider
-        SwiftDictionary<int, CollisionPair>? collisionPairs = _pairState.CollisionPairs;
-        if (collisionPairs != null)
-        {
-            foreach (var kvp in collisionPairs)
-            {
-                int otherId = kvp.Key;
-                CollisionPair collisionPair = kvp.Value;
-                if (!Context.Physics.TryGetColliderById(otherId, out LSCollider? other))
-                    continue;
-                other!.TryRemoveCollisionPairHolder(Id);
-                // Remove the pair regardless of whether the other collider has already removed it,
-                // to ensure it's cleaned up properly and to avoid potential issues with colliders
-                // that might still reference this collider in their pairs.
-                Context.Physics.DeactivateAndPoolPair(collisionPair);
-            }
-        }
-        _pairState.ClearCollisionPairs();
+        Context.Physics.RemovePairsForCollider(this);
 
-        // Remove this collider from the collision pair holders of all colliders it has pairs with.
-        SwiftHashSet<int>? collisionPairHolders = _pairState.CollisionPairHolders;
-        if (collisionPairHolders != null)
-        {
-            foreach (int holderId in collisionPairHolders)
-            {
-                if (!Context.Physics.TryGetColliderById(holderId, out LSCollider? other))
-                    continue;
-
-                if (other!.TryRemoveCollisionPair(Id) != true)
-                    GravitasLogger.DebugChannel.Info($"Collider with ID {Id} was not found in the collision pairs of collider with ID {holderId} during deactivation. This may indicate that the pair was already removed or that there is an inconsistency in the collision management.");
-            }
-        }
-        _pairState.ClearCollisionPairHolders();
-        ClearChildParentReferences();
-        ClearParent();
-
-        Context.Physics.DessimilateCollider(this);
+        if (_id >= 0)
+            Context.Physics.DessimilateCollider(this);
         //  IsInCollision = false;
         _active = false;
     }
@@ -978,18 +967,27 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal void SetPhysicsState(int id, int serviceIndex)
+    internal void SetPhysicsState(int id, int serviceIndex, int replayOrder)
     {
         SwiftThrowHelper.ThrowIfNegative(id, nameof(id));
         SwiftThrowHelper.ThrowIfNegative(serviceIndex, nameof(serviceIndex));
+        SwiftThrowHelper.ThrowIfNegative(replayOrder, nameof(replayOrder));
         _id = id;
         _serviceIndex = serviceIndex;
+        _replayOrder = replayOrder;
+        _replayOrdinal = -1;
     }
 
     internal void SetServiceIndex(int serviceIndex)
     {
         SwiftThrowHelper.ThrowIfNegative(serviceIndex, nameof(serviceIndex));
         _serviceIndex = serviceIndex;
+    }
+
+    internal void SetReplayOrdinal(int replayOrdinal)
+    {
+        SwiftThrowHelper.ThrowIfNegative(replayOrdinal, nameof(replayOrdinal));
+        _replayOrdinal = replayOrdinal;
     }
 
     internal void SetServiceRefreshIndex(int serviceRefreshIndex)
@@ -1011,10 +1009,29 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode
         _mixedPartitionState.ClearCoordinates();
         _pairState.ClearCollisionPairs();
         _pairState.ClearCollisionPairHolders();
-        _id = 0;
+        _id = -1;
         _serviceIndex = -1;
+        _replayOrder = -1;
+        _replayOrdinal = -1;
         _serviceRefreshIndex = -1;
     }
+
+    void IPhysicsColliderRegistryItem.SetRegistryState(int id, int serviceIndex, int replayOrder) =>
+        SetPhysicsState(id, serviceIndex, replayOrder);
+
+    int IPhysicsColliderRegistryItem.ServiceIndex => _serviceIndex;
+
+    int IPhysicsColliderRegistryItem.ReplayOrder => _replayOrder;
+
+    int IPhysicsColliderRegistryItem.ReplayOrdinal => _replayOrdinal;
+
+    void IPhysicsColliderRegistryItem.SetRegistryServiceIndex(int serviceIndex) =>
+        SetServiceIndex(serviceIndex);
+
+    void IPhysicsColliderRegistryItem.SetRegistryReplayOrdinal(int replayOrdinal) =>
+        SetReplayOrdinal(replayOrdinal);
+
+    void IPhysicsColliderRegistryItem.ClearRegistryState() => ClearPhysicsState();
 
     internal SwiftList<WorldVoxelIndex> GetOrCreateMixedPartitionCoordinates()
     {

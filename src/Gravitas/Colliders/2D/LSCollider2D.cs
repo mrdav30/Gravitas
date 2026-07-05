@@ -19,7 +19,7 @@ namespace Gravitas.Colliders;
 /// <summary>
 /// Base type for pure 2D collider shapes.
 /// </summary>
-public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
+public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode, IPhysicsColliderRegistryItem
 {
     private SolidBody2D? _body;
     private IMatterAgent? _agent;
@@ -29,6 +29,8 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
     private Vector2d _compoundLocalScale = Vector2d.One;
     private int _id = -1;
     private int _serviceIndex = -1;
+    private int _replayOrder = -1;
+    private int _replayOrdinal = -1;
     private int _serviceRefreshIndex = -1;
     private bool _isActive = true;
     private bool _isTrigger;
@@ -88,6 +90,10 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
     public int Id => _id;
 
     internal int ServiceIndex => _serviceIndex;
+
+    internal int ReplayOrder => _replayOrder;
+
+    internal int ReplayOrdinal => _replayOrdinal;
 
     internal int ServiceRefreshIndex => _serviceRefreshIndex;
 
@@ -380,18 +386,27 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
         RebuildRuntimeShapeState();
     }
 
-    internal void SetPhysicsState(int id, int serviceIndex)
+    internal void SetPhysicsState(int id, int serviceIndex, int replayOrder)
     {
         SwiftThrowHelper.ThrowIfNegative(id, nameof(id));
         SwiftThrowHelper.ThrowIfNegative(serviceIndex, nameof(serviceIndex));
+        SwiftThrowHelper.ThrowIfNegative(replayOrder, nameof(replayOrder));
         _id = id;
         _serviceIndex = serviceIndex;
+        _replayOrder = replayOrder;
+        _replayOrdinal = -1;
     }
 
     internal void SetServiceIndex(int serviceIndex)
     {
         SwiftThrowHelper.ThrowIfNegative(serviceIndex, nameof(serviceIndex));
         _serviceIndex = serviceIndex;
+    }
+
+    internal void SetReplayOrdinal(int replayOrdinal)
+    {
+        SwiftThrowHelper.ThrowIfNegative(replayOrdinal, nameof(replayOrdinal));
+        _replayOrdinal = replayOrdinal;
     }
 
     internal void SetServiceRefreshIndex(int serviceRefreshIndex)
@@ -415,8 +430,27 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
         _pairState.ClearCollisionPairHolders();
         _id = -1;
         _serviceIndex = -1;
+        _replayOrder = -1;
+        _replayOrdinal = -1;
         _serviceRefreshIndex = -1;
     }
+
+    void IPhysicsColliderRegistryItem.SetRegistryState(int id, int serviceIndex, int replayOrder) =>
+        SetPhysicsState(id, serviceIndex, replayOrder);
+
+    int IPhysicsColliderRegistryItem.ServiceIndex => _serviceIndex;
+
+    int IPhysicsColliderRegistryItem.ReplayOrder => _replayOrder;
+
+    int IPhysicsColliderRegistryItem.ReplayOrdinal => _replayOrdinal;
+
+    void IPhysicsColliderRegistryItem.SetRegistryServiceIndex(int serviceIndex) =>
+        SetServiceIndex(serviceIndex);
+
+    void IPhysicsColliderRegistryItem.SetRegistryReplayOrdinal(int replayOrdinal) =>
+        SetReplayOrdinal(replayOrdinal);
+
+    void IPhysicsColliderRegistryItem.ClearRegistryState() => ClearPhysicsState();
 
     internal void ClearBindingState()
     {

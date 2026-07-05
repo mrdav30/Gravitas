@@ -112,6 +112,10 @@ The authoritative hash follows the same boundary as
 - rebuildable runtime caches are excluded.
 - active cross-frame CCD handoff state is included because it can affect the
   next fixed step.
+- runtime collider IDs are context-local lookup and pair keys; replay hashes
+  use canonical live registration order with dense replay ordinals for collider,
+  hierarchy, and pair identity, so deleted collider ID history and allocator
+  holes are excluded.
 - solver caches and diagnostic counters are included only in
   `AuthoritativeWithSolverCaches` mode for RCA.
 

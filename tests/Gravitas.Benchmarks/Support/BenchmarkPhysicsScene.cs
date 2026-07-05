@@ -41,7 +41,7 @@ internal static class BenchmarkPhysicsScene
         for (int i = 0; i < count; i++)
             CreateDynamicSphere(context, PositionForGridIndex(i));
 
-        return context.Physics.AssimilatedBodyCount;
+        return context.Physics.BodyCount;
     }
 
     public static int CreateDynamicSphereGrid(
@@ -61,7 +61,7 @@ internal static class BenchmarkPhysicsScene
         for (int i = 0; i < count; i++)
             CreateDynamicSphere(context, new Vector3d(i * DefaultSpacing, 0, 0));
 
-        return context.Physics.AssimilatedBodyCount;
+        return context.Physics.BodyCount;
     }
 
     public static LSMeshCollider CreateDynamicConvexCube(GravitasWorldContext context, Vector3d position)
@@ -150,7 +150,7 @@ internal static class BenchmarkPhysicsScene
             CreateDynamicSphere(context, position + new Vector3d(Fixed64.Half, Fixed64.Zero, Fixed64.Zero));
         }
 
-        return context.Physics.AssimilatedBodyCount;
+        return context.Physics.BodyCount;
     }
 
     public static int CreateStaticSphereGrid(GravitasWorldContext context, int count)
@@ -158,7 +158,7 @@ internal static class BenchmarkPhysicsScene
         for (int i = 0; i < count; i++)
             CreateStaticCollider(context, new LSSphereCollider(), PositionForGridIndex(i));
 
-        return context.Physics.AssimilatedColliderCount;
+        return context.Physics.ColliderCount;
     }
 
     public static int CreateStaticMeshWallLine(GravitasWorldContext context, int count)
@@ -166,7 +166,7 @@ internal static class BenchmarkPhysicsScene
         for (int i = 0; i < count; i++)
             CreateStaticCollider(context, CreateVerticalQuadMesh(), new Vector3d(i * DefaultSpacing, 0, 0));
 
-        return context.Physics.AssimilatedColliderCount;
+        return context.Physics.ColliderCount;
     }
 
     public static TCollider CreateStaticCollider<TCollider>(

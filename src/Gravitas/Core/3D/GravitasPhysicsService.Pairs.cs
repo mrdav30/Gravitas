@@ -8,6 +8,7 @@
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Support;
+using SwiftCollections;
 
 namespace Gravitas;
 
@@ -90,6 +91,35 @@ public sealed partial class GravitasPhysicsService
     {
         return pair.ColliderA.TryRemoveCollisionPair(pair.Id2)
             && pair.ColliderB.TryRemoveCollisionPairHolder(pair.Id1);
+    }
+
+    internal void RemovePairsForCollider(LSCollider collider)
+    {
+        SwiftDictionary<int, CollisionPair>? collisionPairs = collider.CollisionPairs;
+        if (collisionPairs != null)
+        {
+            foreach (var pairEntry in collisionPairs)
+            {
+                CollisionPair pair = pairEntry.Value;
+                pair.ColliderB.TryRemoveCollisionPairHolder(pair.Id1);
+                DeactivateAndPoolPair(pair);
+            }
+        }
+
+        SwiftHashSet<int>? collisionPairHolders = collider.CollisionPairHolders;
+        if (collisionPairHolders != null)
+        {
+            foreach (int holderId in collisionPairHolders)
+            {
+                if (!TryGetColliderById(holderId, out LSCollider? holder))
+                    continue;
+
+                holder!.TryRemoveCollisionPair(collider.Id);
+            }
+        }
+
+        collider.ClearCollisionPairState();
+        collider.ClearRuntimeRelationships();
     }
 
     private CollisionPair CreatePair(LSCollider collider1, LSCollider collider2)

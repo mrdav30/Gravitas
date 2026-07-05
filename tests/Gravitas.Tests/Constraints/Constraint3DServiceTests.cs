@@ -132,6 +132,25 @@ public sealed class Constraint3DServiceTests
     }
 
     [Fact]
+    public void LinkedCollisionSuppression_ShouldNotFollowReusedColliderIdsAfterColliderRemoval()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        scenario.Context.Environment.Gravity = Fixed64.Zero;
+        ScenarioBody<LSSphereCollider> first = scenario.CreateSphere(Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> second = scenario.CreateSphere(Vector3d.Right * (Fixed64)2);
+        scenario.Context.Constraints3D.RegisterJoint(CreateBallSocket(first.Body, second.Body));
+
+        first.Collider.Deactivate();
+        second.Collider.Deactivate();
+        ScenarioBody<LSSphereCollider> replacementA = scenario.CreateSphere(Vector3d.Up * (Fixed64)4);
+        ScenarioBody<LSSphereCollider> replacementB = scenario.CreateSphere(Vector3d.Up * (Fixed64)6);
+
+        scenario.Context.Constraints3D.ShouldExcludeLinkedCollision(
+            replacementA.Collider,
+            replacementB.Collider).Should().BeFalse();
+    }
+
+    [Fact]
     public void RagdollFiltering_ShouldSuppressAdjacentLinksButAllowNonAdjacentByDefault()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();

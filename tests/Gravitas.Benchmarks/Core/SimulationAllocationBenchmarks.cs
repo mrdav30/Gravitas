@@ -70,7 +70,7 @@ public class SimulationAllocationBenchmarks
     public int SolidBodyLateSimulateOnly()
     {
         _lateSimulateContext.Physics.LateSimulate();
-        return _lateSimulateContext.Physics.AssimilatedBodyCount;
+        return _lateSimulateContext.Physics.BodyCount;
     }
 
     [Benchmark]
@@ -114,7 +114,7 @@ public class SimulationAllocationBenchmarks
     public int ActivePairProcessingLateSimulate()
     {
         _activePairContext.Physics.LateSimulate();
-        return _activePairContext.Physics.AssimilatedBodyCount;
+        return _activePairContext.Physics.BodyCount;
     }
 
     private static void SetGroundProbeMode(SwiftList<SolidBody> bodies, GroundProbeMode mode)

@@ -18,8 +18,8 @@ public abstract partial class LSCollider2D
         ref ChronicleHashWriter writer,
         GravitasReplayHashMode mode)
     {
-        writer.WriteSection("collider.2d", 2);
-        writer.WriteInt32(_id);
+        writer.WriteSection("collider.2d", 3);
+        writer.WriteInt32(_replayOrdinal);
         writer.WriteBool(_isActive);
         writer.WriteBool(_isTrigger);
         writer.WritePhysicsLayer(_layer);
@@ -44,9 +44,9 @@ public abstract partial class LSCollider2D
         writer.WriteFixed64(_mixedHalfThickness);
         writer.WriteFixed64(_mixedSlabCenterY);
         writer.WriteInt32(HierarchyChildCount);
-        writer.WriteUInt64(HierarchyKey.Packed);
-        writer.WriteUInt64(ParentKey.Packed);
-        writer.WriteUInt64(TopParentKey.Packed);
+        WriteReplayHierarchyKey(ref writer, HierarchyKey);
+        WriteReplayHierarchyKey(ref writer, ParentKey);
+        WriteReplayHierarchyKey(ref writer, TopParentKey);
 
         ContributeShapeReplayHash(ref writer);
 
@@ -103,6 +103,43 @@ public abstract partial class LSCollider2D
         writer.WriteInt32(VertexCount);
         for (int i = 0; i < VertexCount; i++)
             writer.WriteVector2d(GetVertexUnchecked(i));
+    }
+
+    private void WriteReplayHierarchyKey(ref ChronicleHashWriter writer, ColliderHierarchyKey key)
+    {
+        if (!TryResolveReplayHierarchyOrdinal(key, out int replayOrdinal))
+        {
+            writer.WriteUInt64(0UL);
+            return;
+        }
+
+        writer.WriteUInt64(((ulong)key.Dimension << 32) | (uint)replayOrdinal);
+    }
+
+    private bool TryResolveReplayHierarchyOrdinal(ColliderHierarchyKey key, out int replayOrdinal)
+    {
+        replayOrdinal = -1;
+        if (!key.IsValid || _context == null)
+            return false;
+
+        if (key.Is2D)
+        {
+            if (!_context.Physics2D.TryGetColliderById(key.Id, out LSCollider2D? collider) || collider == null)
+                return false;
+
+            replayOrdinal = collider.ReplayOrdinal;
+            return replayOrdinal >= 0;
+        }
+
+        if (!key.Is3D
+            || !_context.Physics.TryGetColliderById(key.Id, out LSCollider? collider3D)
+            || collider3D == null)
+        {
+            return false;
+        }
+
+        replayOrdinal = collider3D.ReplayOrdinal;
+        return replayOrdinal >= 0;
     }
 
     private static void ContributeCompoundPartReplayHash(

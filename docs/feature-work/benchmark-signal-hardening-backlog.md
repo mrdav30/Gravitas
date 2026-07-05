@@ -58,51 +58,13 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 
 | Signal | Status | Priority | Tracking |
 | ------ | ------ | -------- | -------- |
-| Replay hash collider-ID churn scaling | Active | Medium | [Active Signal: Replay Hash Collider-ID Churn Scaling](#active-signal-replay-hash-collider-id-churn-scaling) |
-
-### Active Signal: Replay Hash Collider-ID Churn Scaling
-
-**Discovered:** 2026-07-05  
-**Status:** Active  
-**Priority:** Medium  
-**Affected area:** 3D, 2D, and mixed replay-hash traversal
-
-**Evidence:** A focused replay-hash benchmark row,
-`ReplayHashBenchmarks.ReplayHash3DChurnedIds`, creates an 8x collider-ID
-high-water mark by registering and deactivating bodyless 3D static colliders,
-then leaves only the final live tail active. The current 3D replay hash still
-walks the full high-water ID range, so this row isolates collider churn from
-live collider count.
-
-Command:
-
-```powershell
-dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll replay-hash --filter "*ReplayHash3DChurnedIds*" --warmupCount 1 --iterationCount 3
-```
-
-Measured on 2026-07-05:
-
-| Row | Mean | Allocated |
-| --- | ---: | --------: |
-| `ColliderCount=64` live, 512 created IDs | `119.0 us` | `0 B` |
-| `ColliderCount=256` live, 2048 created IDs | `483.9 us` | `0 B` |
-
-**Why it matters:** `ComputeReplayHash()` is a conformance and replay tooling
-path rather than the normal simulation hot path, but hosts may call it every
-fixed frame. The 3D and 2D replay hash contributors currently walk collider ID
-high-water ranges, and the mixed contributor can cross-product 3D and 2D
-high-water ranges before checking live pairs.
-
-**Next isolation step:** compare current peak-range traversal against an
-allocation-free live-ID traversal that preserves deterministic ordering and
-hash semantics. Include matching 2D and mixed churn rows before changing replay
-hash structure, and decide whether high-water/churn history should remain part
-of the authoritative hash or only solver-cache diagnostics.
+| _None_ | - | - | - |
 
 ## Closed Signals
 
 | Signal                                                      | Status | Closed     | Resolution                                                                                                                                                                                                                                  |
 | ----------------------------------------------------------- | ------ | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Replay hash collider-ID churn scaling                      | Closed | 2026-07-05 | 2D and 3D collider registration now uses a shared reusable-slot registry; authoritative replay hashes traverse canonical live registration order with dense replay ordinals, while deleted ID history remains outside replay identity      |
 | Pure 2D response position-correction repartition allocation | Closed | 2026-06-28 | Gravitas reuses empty retained partitions for immediate repartitioning; GridForge stores the common single voxel partition inline and keeps diagnostic names off success paths                                                              |
 | SwiftCollections sort hot-path allocation                   | Closed | 2026-06-24 | SwiftCollections owns allocation-free sort and sorted-key APIs; Gravitas removed `SwiftListSortUtility`                                                                                                                                     |
 | Mixed mesh finite-slab triangle scaling signal              | Closed | 2026-06-24 | Mixed and pure 3D query services expose mesh-triangle candidate counts, dedicated triangle-volume benchmarks cover dense and false-positive mesh targets, and pure 3D convex-source mesh sweeps use ordered lower-bound triangle candidates |
@@ -111,6 +73,71 @@ of the authoritative hash or only solver-cache diagnostics.
 | 3D dynamic shape-exact BDN allocation signal                | Closed | 2026-06-23 | Shared exact-sweep bounds prefilters removed the scaling allocation/time signal from 3D dynamic false-positive rows                                                                                                                         |
 | 3D full-runtime CCD allocation                              | Closed | 2026-06-23 | GridForge allocation-free line tracing plus Gravitas 3D raycast adoption                                                                                                                                                                    |
 | Grounding raycast probe allocation                          | Closed | 2026-06-23 | Same raycast trace fix removed automatic ray-grounding allocation                                                                                                                                                                           |
+
+### Closed Signal: Replay Hash Collider-ID Churn Scaling
+
+**Discovered:** 2026-07-05 **Closed:** 2026-07-05
+
+**Initial evidence:** A focused replay-hash benchmark row,
+`ReplayHashBenchmarks.ReplayHash3DChurnedIds`, created an 8x deleted-collider
+history by registering and deactivating bodyless 3D static colliders, then
+leaving only the final live tail active.
+
+Initial command:
+
+```powershell
+dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll replay-hash --filter "*ReplayHash3DChurnedIds*" --warmupCount 1 --iterationCount 3
+```
+
+Initial measurement on 2026-07-05:
+
+| Row | Mean | Allocated |
+| --- | ---: | --------: |
+| `ColliderCount=64` live, 512 created IDs | `119.0 us` | `0 B` |
+| `ColliderCount=256` live, 2048 created IDs | `483.9 us` | `0 B` |
+
+**RCA:** 2D and 3D services had separate collider ownership structures:
+compact live lists, ID dictionaries, and manual next-ID/high-water counters.
+Replay hashing walked the high-water ID range and emitted deleted-hole state,
+while mixed replay hashing crossed 3D and 2D high-water ranges before checking
+whether a mixed pair existed. That made deleted context-local allocation
+history part of authoritative replay identity even though serialization treats
+context-local collider IDs, service indices, partitions, and pair tables as
+runtime-owned state.
+
+**Resolution:** 2D and 3D collider registration now goes through a shared
+registry backed by reusable `SwiftBucket` slots plus compact live iteration.
+`-1` is the unregistered collider sentinel across dimensions; `0` is a valid
+context-local collider ID. Runtime IDs remain lookup and pair keys, while
+authoritative replay hashes traverse canonical live registration order and
+write dense replay ordinals for collider, hierarchy, and pair identity. Deleted
+ID holes, free-list ordering, and allocator history are excluded from
+authoritative hashes, while registry peak counts remain cache diagnostics for
+`AuthoritativeWithSolverCaches`.
+
+Post-fix command:
+
+```powershell
+dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll replay-hash --filter "*ChurnedIds*" --warmupCount 1 --iterationCount 3
+```
+
+Post-fix measurement on 2026-07-05:
+
+| Row | Mean | Allocated |
+| --- | ---: | --------: |
+| `replay-hash-3d-churned-ids`, `ColliderCount=64` | `114.7 us` | `0 B` |
+| `replay-hash-2d-churned-ids`, `ColliderCount=64` | `124.3 us` | `0 B` |
+| `replay-hash-mixed-churned-ids`, `ColliderCount=64` | `124.3 us` | `0 B` |
+| `replay-hash-3d-churned-ids`, `ColliderCount=256` | `489.2 us` | `0 B` |
+| `replay-hash-2d-churned-ids`, `ColliderCount=256` | `537.9 us` | `0 B` |
+| `replay-hash-mixed-churned-ids`, `ColliderCount=256` | `550.9 us` | `0 B` |
+
+**Verification:** Added replay-hash tests proving deleted 3D, 2D, and mixed
+collider churn and free-list ordering do not affect authoritative hashes, live
+collider ordering still affects authoritative hashes, and steady-state replay
+hashing remains allocation-free after churn. Added registry tests proving
+reusable IDs, context-local lookup, compact service indices, and `-1` inactive
+sentinels.
 
 ### Closed Signal: Pure 2D Response Position-Correction Repartition Allocation
 

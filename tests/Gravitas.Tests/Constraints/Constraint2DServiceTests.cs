@@ -2,7 +2,6 @@ using Chronicler;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
-using Gravitas.CollisionHandling;
 using Gravitas.Constraints;
 using Gravitas.Diagnostics;
 using Gravitas.Tests.Serialization;
@@ -118,6 +117,24 @@ public sealed class Constraint2DServiceTests
 
         first.Collider.TryGetCollisionPair(second.Collider.Id, out CollisionPair2D? pair).Should().BeTrue();
         pair!.Manifold.HasContact.Should().BeTrue();
+    }
+
+    [Fact]
+    public void LinkedCollisionSuppression_ShouldNotFollowReusedColliderIdsAfterColliderRemoval()
+    {
+        using GravitasWorldContext context = CreateConstraintContext();
+        SolidBody2D first = CreateBody(context, Vector2d.Zero);
+        SolidBody2D second = CreateBody(context, Vector2d.Right * (Fixed64)2);
+        context.Constraints2D.RegisterJoint(CreatePin(first, second));
+
+        first.Collider.Deactivate();
+        second.Collider.Deactivate();
+        SolidBody2D replacementA = CreateBody(context, Vector2d.Forward * (Fixed64)4);
+        SolidBody2D replacementB = CreateBody(context, Vector2d.Forward * (Fixed64)6);
+
+        context.Constraints2D.ShouldExcludeLinkedCollision(
+            replacementA.Collider,
+            replacementB.Collider).Should().BeFalse();
     }
 
     [Fact]

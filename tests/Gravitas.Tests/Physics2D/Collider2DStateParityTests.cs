@@ -52,6 +52,31 @@ public sealed class Collider2DStateParityTests
     }
 
     [Fact]
+    public void ColliderRegistration_ShouldUseReusableIdsAndNegativeInactiveSentinel()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        LSCollider2D first = CreateStaticCollider(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero);
+        LSCollider2D second = CreateStaticCollider(
+            context,
+            new LSCircleCollider2D(Fixed64.Half),
+            new Vector2d((Fixed64)2, Fixed64.Zero));
+
+        first.Id.Should().Be(0);
+        second.Id.Should().Be(1);
+
+        second.Deactivate();
+        LSCollider2D replacement = CreateStaticCollider(
+            context,
+            new LSCircleCollider2D(Fixed64.Half),
+            new Vector2d((Fixed64)4, Fixed64.Zero));
+
+        second.Id.Should().Be(-1);
+        replacement.Id.Should().Be(1);
+        context.Physics2D.TryGetColliderById(replacement.Id, out LSCollider2D? resolved).Should().BeTrue();
+        resolved.Should().BeSameAs(replacement);
+    }
+
+    [Fact]
     public void SetPosition_WithChangedCollider_ShouldAdvanceRuntimeAndBroadPhaseVersionsOnce()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext(extent: 64);

@@ -100,7 +100,7 @@ public class CollisionPartitionBenchmarks
     {
         _mostlyDynamicWithBodylessContext.Simulate();
         _mostlyDynamicWithBodylessContext.LateSimulate();
-        return _mostlyDynamicWithBodylessContext.Physics.AssimilatedColliderCount;
+        return _mostlyDynamicWithBodylessContext.Physics.ColliderCount;
     }
 
     [Benchmark]

@@ -5,8 +5,8 @@ using Gravitas.Queries;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
 using GridForge.Configuration;
-using System;
 using SwiftCollections;
+using System;
 using Xunit;
 
 namespace Gravitas.Tests.Core;
@@ -32,8 +32,8 @@ public sealed class MatterAgentContextTests
         body.World.Should().BeSameAs(context.World);
         collider.Context.Should().BeSameAs(context);
         collider.World.Should().BeSameAs(context.World);
-        context.Physics.AssimilatedBodyCount.Should().Be(1);
-        context.Physics.AssimilatedColliderCount.Should().Be(1);
+        context.Physics.BodyCount.Should().Be(1);
+        context.Physics.ColliderCount.Should().Be(1);
     }
 
     [Fact]
@@ -47,8 +47,8 @@ public sealed class MatterAgentContextTests
 
         collider.Context.Should().BeSameAs(context);
         collider.World.Should().BeSameAs(context.World);
-        collider.Id.Should().Be(1);
-        context.Physics.AssimilatedColliderCount.Should().Be(1);
+        collider.Id.Should().Be(0);
+        context.Physics.ColliderCount.Should().Be(1);
         context.Physics.TryGetColliderById(collider.Id, out LSCollider? resolved).Should().BeTrue();
         resolved.Should().BeSameAs(collider);
     }

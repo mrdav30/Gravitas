@@ -74,7 +74,7 @@ public sealed class ColliderOwnershipStateTests
         parent.Collider.Deactivate();
         ScenarioBody<LSSphereCollider> replacement = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(2, 0, 0));
 
-        replacement.Collider.Id.Should().BeGreaterThan(parentId);
+        replacement.Collider.Id.Should().Be(parentId);
         child.Collider.ParentId.Should().Be(-1);
         child.Collider.Parent3D.Should().BeNull();
         child.Collider.Parent2D.Should().BeNull();

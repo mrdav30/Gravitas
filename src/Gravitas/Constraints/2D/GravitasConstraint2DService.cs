@@ -23,6 +23,7 @@ public sealed class GravitasConstraint2DService
 
     private readonly GravitasWorldContext _context;
     private readonly SwiftDictionary<ulong, int> _suppressedColliderPairs = new();
+    private readonly SwiftList<ulong> _suppressedPairsToRemove = new();
     private readonly SwiftList<RagdollRuntime2D> _ragdolls = new();
     private Joint2D?[] _joints = new Joint2D?[DefaultJointCapacity];
     private int _nextRagdollId;
@@ -234,13 +235,30 @@ public sealed class GravitasConstraint2DService
     {
         if (colliderA == null || colliderB == null)
             return false;
-        if (colliderA.Id <= 0 || colliderB.Id <= 0 || colliderA.Id == colliderB.Id)
+        if (colliderA.Id < 0 || colliderB.Id < 0 || colliderA.Id == colliderB.Id)
             return false;
 
         return _suppressedColliderPairs.ContainsKey(CreateColliderPairKey(colliderA.Id, colliderB.Id));
     }
 
     internal bool TryGetJointForSolver(int jointId, out Joint2D? joint) => TryGetJoint(jointId, out joint);
+
+    internal void RemoveSuppressionsForCollider(int colliderId)
+    {
+        if (colliderId < 0 || _suppressedColliderPairs.Count == 0)
+            return;
+
+        _suppressedPairsToRemove.FastClear();
+        foreach (var pair in _suppressedColliderPairs)
+        {
+            if (ColliderPairKeyContains(pair.Key, colliderId))
+                _suppressedPairsToRemove.Add(pair.Key);
+        }
+
+        for (int i = 0; i < _suppressedPairsToRemove.Count; i++)
+            _suppressedColliderPairs.Remove(_suppressedPairsToRemove[i]);
+        _suppressedPairsToRemove.FastClear();
+    }
 
     internal void UpdateJointCollisionPolicy(
         Joint2D joint,
@@ -281,6 +299,7 @@ public sealed class GravitasConstraint2DService
         }
 
         _suppressedColliderPairs.Clear();
+        _suppressedPairsToRemove.FastClear();
         _ragdolls.FastClear();
         PeakJointCount = 0;
         RegisteredJointCount = 0;
@@ -320,6 +339,12 @@ public sealed class GravitasConstraint2DService
         uint min = (uint)(colliderAId <= colliderBId ? colliderAId : colliderBId);
         uint max = (uint)(colliderAId <= colliderBId ? colliderBId : colliderAId);
         return ((ulong)min << 32) | max;
+    }
+
+    private static bool ColliderPairKeyContains(ulong key, int colliderId)
+    {
+        uint id = (uint)colliderId;
+        return (uint)(key >> 32) == id || (uint)key == id;
     }
 
     private void EnsureJointCapacity(int required)

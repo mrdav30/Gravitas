@@ -66,14 +66,14 @@ public sealed class AuthoredConvexCollisionAssetTests
         LSCollider leftPiece = body.Collider.GetPartCollider(0);
         LSCollider rightPiece = body.Collider.GetPartCollider(1);
 
-        body.Collider.Id.Should().BeGreaterThan(0);
+        body.Collider.Id.Should().BeGreaterThanOrEqualTo(0);
         leftPiece.BoundsMin.Should().Be(new Vector3d(-Fixed64.FromFraction(3, 2), -Fixed64.Half, -Fixed64.Half));
         leftPiece.BoundsMax.Should().Be(new Vector3d(-Fixed64.Half, Fixed64.Half, Fixed64.Half));
         rightPiece.BoundsMin.Should().Be(new Vector3d(Fixed64.Half, -Fixed64.Half, -Fixed64.Half));
         rightPiece.BoundsMax.Should().Be(new Vector3d(Fixed64.FromFraction(3, 2), Fixed64.Half, Fixed64.Half));
-        leftPiece.Id.Should().Be(0);
-        rightPiece.Id.Should().Be(0);
-        scenario.Context.Physics.AssimilatedColliderCount.Should().Be(1);
+        leftPiece.Id.Should().Be(-1);
+        rightPiece.Id.Should().Be(-1);
+        scenario.Context.Physics.ColliderCount.Should().Be(1);
         scenario.Context.Physics.TryGetColliderById(body.Collider.Id, out LSCollider? ownerById).Should().BeTrue();
         ownerById.Should().BeSameAs(body.Collider);
         scenario.Context.Physics.TryGetColliderById(leftPiece.Id, out _).Should().BeFalse();

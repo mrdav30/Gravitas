@@ -8,6 +8,7 @@
 using Chronicler;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
+using SwiftCollections;
 
 namespace Gravitas;
 
@@ -17,21 +18,19 @@ public sealed partial class GravitasPhysicsService
         ref ChronicleHashWriter writer,
         GravitasReplayHashMode mode)
     {
-        writer.WriteSection("physics.3d", 1);
+        SwiftList<LSCollider> replayColliders = PrepareReplayColliders();
+
+        writer.WriteSection("physics.3d", 2);
         writer.WriteBool(SimulatePhysics);
-        writer.WriteInt32(PeakColliderCount);
-        writer.WriteInt32(AssimilatedBodyCount);
-        writer.WriteInt32(AssimilatedColliderCount);
+        writer.WriteInt32(BodyCount);
+        writer.WriteInt32(ColliderCount);
         writer.WriteInt32(_dynamicBodies.PeakCount);
+        writer.WriteInt32(replayColliders.Count);
 
-        for (int colliderId = 1; colliderId <= PeakColliderCount; colliderId++)
+        for (int i = 0; i < replayColliders.Count; i++)
         {
-            bool hasCollider = TryGetColliderById(colliderId, out LSCollider? collider);
-            writer.WriteBool(hasCollider);
-            if (!hasCollider)
-                continue;
-
-            collider!.ContributeReplayHash(ref writer, mode);
+            LSCollider collider = replayColliders[i];
+            collider.ContributeReplayHash(ref writer, mode);
             if (collider.Body == null)
                 writer.WriteBool(false);
             else
@@ -41,23 +40,30 @@ public sealed partial class GravitasPhysicsService
             }
         }
 
-        writer.WriteSection("physics.3d.pairs", 1);
-        for (int colliderId = 1; colliderId <= PeakColliderCount; colliderId++)
+        writer.WriteSection("physics.3d.pairs", 2);
+        for (int i = 0; i < replayColliders.Count; i++)
         {
-            if (!TryGetColliderById(colliderId, out LSCollider? collider))
-                continue;
+            LSCollider collider = replayColliders[i];
 
-            for (int otherId = colliderId + 1; otherId <= PeakColliderCount; otherId++)
+            for (int j = i + 1; j < replayColliders.Count; j++)
             {
-                if (collider!.TryGetCollisionPair(otherId, out CollisionPair? pair) && pair != null)
-                    pair.ContributeReplayHash(ref writer, mode);
+                LSCollider other = replayColliders[j];
+                if ((!collider.TryGetCollisionPair(other.Id, out CollisionPair? pair)
+                        && !other.TryGetCollisionPair(collider.Id, out pair))
+                    || pair == null)
+                {
+                    continue;
+                }
+
+                pair.ContributeReplayHash(ref writer, mode);
             }
         }
 
         if (mode != GravitasReplayHashMode.AuthoritativeWithSolverCaches)
             return;
 
-        writer.WriteSection("physics.3d.caches", 2);
+        writer.WriteSection("physics.3d.caches", 3);
+        writer.WriteInt32(PeakColliderCount);
         writer.WriteInt32(_cachedCollisionPairs.Count);
         writer.WriteInt32(_activeCollisionPairs.Count);
         writer.WriteInt32(_continuousCollisionPreparedToken);
