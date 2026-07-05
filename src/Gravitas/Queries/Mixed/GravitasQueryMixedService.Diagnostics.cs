@@ -74,7 +74,7 @@ public sealed partial class GravitasQueryMixedService
         PhysicsQueryReducerKind reducerKind = default;
         if (captureReducerDiagnostics)
         {
-            reducerKind = ClassifySweepSphereAgainst2DReducer(collider);
+            reducerKind = MixedQueryReducerClassifier.ClassifySweepSphereAgainst2D(collider);
             reducerCounters.RecordAttempt(reducerKind);
         }
 
@@ -115,7 +115,7 @@ public sealed partial class GravitasQueryMixedService
         PhysicsQueryReducerKind reducerKind = default;
         if (captureReducerDiagnostics)
         {
-            reducerKind = ClassifySweepCircleAgainst3DReducer(collider);
+            reducerKind = MixedQueryReducerClassifier.ClassifySweepCircleAgainst3D(collider);
             reducerCounters.RecordAttempt(reducerKind);
         }
 

@@ -1,7 +1,7 @@
 # Coverage Hardening Plan
 
 **Date:** 2026-07-05  
-**Status:** Active - first hardening pass complete; 100% campaign remains  
+**Status:** Active - Roadmap A complete; 100% campaign remains  
 **Owner:** Gravitas coverage, test-quality, and dead-code hardening
 
 ---
@@ -456,7 +456,7 @@ coverage quality and is tracked below.
 
 ### Roadmap A: Mixed Query Support Branches
 
-**Status:** Pending
+**Status:** Completed
 
 Target `GravitasQueryMixedService.Support.cs` and mixed finite-slab reducer
 classification branches. Add focused tests for inside-box clipping, segment
@@ -464,6 +464,21 @@ axis clipping, swept-box hit/miss/parallel cases, and reducer classification
 for all 2D/3D supported shape families. Prefer public mixed query APIs when
 setup is readable; extract tiny internal policies only if it reduces brittle
 integration setup without changing runtime cost.
+
+**Result**
+
+- Extracted mixed swept-box clipping into `MixedSweepBoxUtility` and covered
+  start-inside, parallel-inside, parallel-outside, interval-reject, and
+  negative-direction clipping cases.
+- Extracted mixed reducer classification into `MixedQueryReducerClassifier`,
+  covered exact 2D and 3D shape families, and kept unknown collider subclasses
+  classified as conservative fallback.
+- Removed unreachable compound-part fallback classification branches. Current
+  2D and 3D compound colliders materialize only supported exact parts, so the
+  classifier now reflects the actual authored compound model instead of
+  carrying future-shape defensive logic.
+- Coverage report:
+  `TestResults/coverage-roadmap-a/reports/Summary.txt`
 
 ### Roadmap B: Replay Hash Branch Families
 
@@ -516,3 +531,4 @@ or stale support paths rather than preserving them for coverage.
 | 2026-07-05 | 89.1% | 75.6% | 89.4% | 1006 passed | Workstream 6 covered diagnostic debug-draw and event visitor families. |
 | 2026-07-05 | 89.4% | 75.8% | 89.5% | 1012 passed | Workstream 7 covered additional 2D/3D constraint limit and motor branches. |
 | 2026-07-05 | 90.0% | 76.0% | 91.0% | 1025 passed | Final first-pass checkpoint. Removed unused transient-state scaffolding and covered query request/range, coroutine wait, layer, and compound-part contracts. Branch 90% remains active roadmap work. |
+| 2026-07-05 | 90.1% | 76.5% | 91.1% | 1034 passed | Roadmap A completed. Mixed swept-box clipping and reducer classification are split into focused internal helpers with direct branch coverage. |

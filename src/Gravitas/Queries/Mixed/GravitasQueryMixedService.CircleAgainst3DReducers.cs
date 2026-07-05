@@ -108,58 +108,6 @@ public sealed partial class GravitasQueryMixedService
         return false;
     }
 
-    private static PhysicsQueryReducerKind ClassifySweepSphereAgainst2DReducer(LSCollider2D collider)
-    {
-        if (collider is LSCircleCollider2D
-            || collider is LSCapsuleCollider2D
-            || collider is LSAABBoxCollider2D
-            || collider is LSPolygonCollider2D)
-        {
-            return PhysicsQueryReducerKind.Exact;
-        }
-
-        if (collider is LSCompoundCollider2D compound)
-        {
-            for (int i = 0; i < compound.PartCount; i++)
-            {
-                if (ClassifySweepSphereAgainst2DReducer(compound.GetPartCollider(i)) == PhysicsQueryReducerKind.ConservativeFallback)
-                    return PhysicsQueryReducerKind.ConservativeFallback;
-            }
-
-            return PhysicsQueryReducerKind.Exact;
-        }
-
-        return PhysicsQueryReducerKind.ConservativeFallback;
-    }
-
-    private static PhysicsQueryReducerKind ClassifySweepCircleAgainst3DReducer(LSCollider collider)
-    {
-        if (collider is LSSphereCollider
-            || collider is LSCuboidCollider
-            || collider is LSCapsuleCollider
-            || collider is LSCylinderCollider
-            || collider is LSMeshCollider)
-        {
-            return PhysicsQueryReducerKind.Exact;
-        }
-
-        if (collider is LSConeCollider)
-            return PhysicsQueryReducerKind.Exact;
-
-        if (collider is LSCompoundCollider compound)
-        {
-            for (int i = 0; i < compound.PartCount; i++)
-            {
-                if (ClassifySweepCircleAgainst3DReducer(compound.GetPartCollider(i)) == PhysicsQueryReducerKind.ConservativeFallback)
-                    return PhysicsQueryReducerKind.ConservativeFallback;
-            }
-
-            return PhysicsQueryReducerKind.Exact;
-        }
-
-        return PhysicsQueryReducerKind.ConservativeFallback;
-    }
-
     private static bool TrySweepCircleAgainstCuboid(
         Vector2d start,
         Vector2d direction,
