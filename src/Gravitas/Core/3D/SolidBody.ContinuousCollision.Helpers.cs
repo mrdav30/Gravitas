@@ -140,7 +140,7 @@ public partial class SolidBody
         }
 
         SolidBody? hitBody = hitCollider.Body;
-        return hitBody == null || hitBody.IsPositionFullyFrozen || hitBody.IsKinematic;
+        return hitCollider.IsStatic || hitBody!.IsKinematic;
     }
 
     private bool IsValidMixedContinuousCollisionHit(PhysicsMixedHit hit)
@@ -155,7 +155,7 @@ public partial class SolidBody
         }
 
         SolidBody2D? hitBody = hitCollider.Body;
-        return hitBody == null || hitBody.IsPositionFullyFrozen || hitBody.IsKinematic;
+        return hitCollider.IsStatic || hitBody!.IsKinematic;
     }
 
 }

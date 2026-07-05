@@ -134,22 +134,24 @@ public sealed class GravitasQuery3DServiceSweepTests
         LSSphereCollider source = CreateDynamicCollider(context, new LSSphereCollider(), new Vector3d((Fixed64)(-4), Fixed64.Zero, Fixed64.Zero));
         LSSphereCollider kinematic = CreateDynamicCollider(context, new LSSphereCollider(), Vector3d.Zero, isKinematic: true);
         LSSphereCollider immovable = CreateDynamicCollider(context, new LSSphereCollider(), Vector3d.Right * 2, immovable: true);
-        LSSphereCollider bodyless = CreateBodylessCollider(context, Vector3d.Right * 4);
+        LSSphereCollider nonDynamic = CreateDynamicCollider(context, new LSSphereCollider(), Vector3d.Right * 4, isDynamic: false);
+        LSSphereCollider bodyless = CreateBodylessCollider(context, Vector3d.Right * 6);
         var hits = new SwiftList<Physics3DHit>();
 
         int count = context.Query3D.SweepSphereAgainstStaticAll(
             new Vector3d((Fixed64)(-2), Fixed64.Zero, Fixed64.Zero),
-            new Vector3d((Fixed64)6, Fixed64.Zero, Fixed64.Zero),
+            new Vector3d((Fixed64)8, Fixed64.Zero, Fixed64.Zero),
             Fixed64.Half,
             IncludeLayerZero,
             hits,
             source,
             includeTriggers: false);
 
-        count.Should().Be(3);
-        context.Query3D.LastQueryCandidateCount.Should().Be(3);
+        count.Should().Be(4);
+        context.Query3D.LastQueryCandidateCount.Should().Be(4);
         hits.Should().Contain(hit => ReferenceEquals(hit.Collider, kinematic));
         hits.Should().Contain(hit => ReferenceEquals(hit.Collider, immovable));
+        hits.Should().Contain(hit => ReferenceEquals(hit.Collider, nonDynamic));
         hits.Should().Contain(hit => ReferenceEquals(hit.Collider, bodyless));
     }
 
@@ -698,7 +700,8 @@ public sealed class GravitasQuery3DServiceSweepTests
         Vector3d position,
         FixedQuaternion? rotation = null,
         bool immovable = false,
-        bool isKinematic = false)
+        bool isKinematic = false,
+        bool isDynamic = true)
         where TCollider : LSCollider
     {
         EnsureGrid(context);
@@ -710,7 +713,7 @@ public sealed class GravitasQuery3DServiceSweepTests
             IsKinematic = isKinematic
         };
 
-        body.Initialize(position, rotation ?? FixedQuaternion.Identity);
+        body.Initialize(position, rotation ?? FixedQuaternion.Identity, isDynamic);
         return collider;
     }
 

@@ -1682,6 +1682,10 @@ public sealed class MixedQueryCcdTests
             context,
             new Vector2d(Fixed64.Zero, -Fixed64.One),
             immovable: true);
+        SolidBody2D nonDynamic = CreateCircle2D(
+            context,
+            new Vector2d((Fixed64)2, Fixed64.Zero),
+            isDynamic: false);
         var hits = new SwiftList<PhysicsMixedHit>();
 
         int count = context.QueryMixed.SweepSphereAgainstStatic2DAll(
@@ -1693,11 +1697,12 @@ public sealed class MixedQueryCcdTests
             source.Collider,
             includeTriggers: false);
 
-        count.Should().Be(2);
-        context.QueryMixed.LastQueryCandidateCount.Should().Be(2);
+        count.Should().Be(3);
+        context.QueryMixed.LastQueryCandidateCount.Should().Be(3);
         hits.Should().OnlyContain(hit => !ReferenceEquals(hit.Collider2D, movable.Collider));
         hits.Should().Contain(hit => ReferenceEquals(hit.Collider2D, kinematic.Collider));
         hits.Should().Contain(hit => ReferenceEquals(hit.Collider2D, immovable.Collider));
+        hits.Should().Contain(hit => ReferenceEquals(hit.Collider2D, nonDynamic.Collider));
     }
 
     [Fact]
@@ -1716,6 +1721,10 @@ public sealed class MixedQueryCcdTests
             context,
             new Vector3d(Fixed64.Zero, Fixed64.Zero, -Fixed64.One),
             immovable: true);
+        ScenarioBody<LSSphereCollider> nonDynamic = CreateSphere3D(
+            context,
+            new Vector3d((Fixed64)2, Fixed64.Zero, Fixed64.Zero),
+            isDynamic: false);
         var hits = new SwiftList<PhysicsMixedHit>();
 
         int count = context.QueryMixed.SweepCircleAgainstStatic3DAll(
@@ -1729,11 +1738,12 @@ public sealed class MixedQueryCcdTests
             source.Collider,
             includeTriggers: false);
 
-        count.Should().Be(2);
-        context.QueryMixed.LastQueryCandidateCount.Should().Be(2);
+        count.Should().Be(3);
+        context.QueryMixed.LastQueryCandidateCount.Should().Be(3);
         hits.Should().OnlyContain(hit => !ReferenceEquals(hit.Collider3D, movable.Collider));
         hits.Should().Contain(hit => ReferenceEquals(hit.Collider3D, kinematic.Collider));
         hits.Should().Contain(hit => ReferenceEquals(hit.Collider3D, immovable.Collider));
+        hits.Should().Contain(hit => ReferenceEquals(hit.Collider3D, nonDynamic.Collider));
     }
 
     [Fact]
@@ -1915,9 +1925,16 @@ public sealed class MixedQueryCcdTests
         GravitasWorldContext context,
         Vector3d position,
         bool immovable = false,
-        bool isKinematic = false)
+        bool isKinematic = false,
+        bool isDynamic = true)
     {
-        return CreateBody3D(context, new LSSphereCollider(), position, immovable: immovable, isKinematic: isKinematic);
+        return CreateBody3D(
+            context,
+            new LSSphereCollider(),
+            position,
+            immovable: immovable,
+            isKinematic: isKinematic,
+            isDynamic: isDynamic);
     }
 
     private static ScenarioBody<LSMeshCollider> CreateMesh3D(
@@ -2034,7 +2051,8 @@ public sealed class MixedQueryCcdTests
         Vector3d position,
         bool immovable = false,
         bool isKinematic = false,
-        FixedQuaternion? rotation = null)
+        FixedQuaternion? rotation = null,
+        bool isDynamic = true)
         where TCollider : LSCollider
     {
         FixedQuaternion startRotation = rotation ?? FixedQuaternion.Identity;
@@ -2046,7 +2064,7 @@ public sealed class MixedQueryCcdTests
             IsKinematic = isKinematic
         };
         collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.Zero);
-        body.Initialize(position, startRotation);
+        body.Initialize(position, startRotation, isDynamic);
         return new ScenarioBody<TCollider>(body, collider);
     }
 
@@ -2054,7 +2072,8 @@ public sealed class MixedQueryCcdTests
         GravitasWorldContext context,
         Vector2d position,
         bool immovable = false,
-        bool isKinematic = false)
+        bool isKinematic = false,
+        bool isDynamic = true)
     {
         var collider = new LSCircleCollider2D(Fixed64.Half);
         var agent = new TestMatterAgent(
@@ -2067,7 +2086,7 @@ public sealed class MixedQueryCcdTests
             IsKinematic = isKinematic
         };
         collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.Zero);
-        body.Initialize(position);
+        body.Initialize(position, isDynamic: isDynamic);
         return body;
     }
 

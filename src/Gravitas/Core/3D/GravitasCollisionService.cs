@@ -325,7 +325,7 @@ public sealed class GravitasCollisionService
             return;
 
         SolidBody? body = collider.Body;
-        if (body == null || body.IsPositionFullyFrozen || body.IsKinematic)
+        if (collider.IsStatic || body!.IsKinematic)
             return;
 
         bool awake = body.IsAwakeForCollision;
@@ -407,11 +407,11 @@ public sealed class GravitasCollisionService
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static PhysicsPartitionMobilityKind GetMobilityKind(LSCollider collider)
     {
-        SolidBody? body = collider.Body;
-        if (body == null || body.IsPositionFullyFrozen)
+        if (collider.IsStatic)
             return PhysicsPartitionMobilityKind.Static;
 
-        return body.IsKinematic ? PhysicsPartitionMobilityKind.Kinematic : PhysicsPartitionMobilityKind.Dynamic;
+        SolidBody? body = collider.Body;
+        return body!.IsKinematic ? PhysicsPartitionMobilityKind.Kinematic : PhysicsPartitionMobilityKind.Dynamic;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

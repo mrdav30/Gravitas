@@ -29,6 +29,7 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
     private Vector2d _compoundLocalScale = Vector2d.One;
     private int _id = -1;
     private int _serviceIndex = -1;
+    private int _serviceRefreshIndex = -1;
     private bool _isActive = true;
     private bool _isTrigger;
     private PhysicsLayer _layer = new();
@@ -88,6 +89,8 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
 
     internal int ServiceIndex => _serviceIndex;
 
+    internal int ServiceRefreshIndex => _serviceRefreshIndex;
+
     internal bool IsPartitioned => _partitionState.IsPartitioned;
 
     internal SwiftList<WorldVoxelIndex>? PartitionCoordinates => _partitionState.Coordinates;
@@ -117,6 +120,13 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
     internal SwiftHashSet<int>? CollisionPairHolders => _pairState.CollisionPairHolders;
 
     public SolidBody2D? Body => _body;
+
+    /// <summary>
+    /// Gets whether this collider is static-style for partition mobility.
+    /// </summary>
+    public bool IsStatic => _body == null || _body.DynamicId < 0 || _body.IsPositionFullyFrozen;
+
+    internal bool RequiresServiceSideRefresh => _body == null || _body.DynamicId < 0;
 
     public IMatterAgent Agent
     {
@@ -384,6 +394,17 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
         _serviceIndex = serviceIndex;
     }
 
+    internal void SetServiceRefreshIndex(int serviceRefreshIndex)
+    {
+        SwiftThrowHelper.ThrowIfNegative(serviceRefreshIndex, nameof(serviceRefreshIndex));
+        _serviceRefreshIndex = serviceRefreshIndex;
+    }
+
+    internal void ClearServiceRefreshIndex()
+    {
+        _serviceRefreshIndex = -1;
+    }
+
     internal void ClearPhysicsState()
     {
         _partitionState.MarkUnpartitioned();
@@ -394,6 +415,7 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
         _pairState.ClearCollisionPairHolders();
         _id = -1;
         _serviceIndex = -1;
+        _serviceRefreshIndex = -1;
     }
 
     internal void ClearBindingState()

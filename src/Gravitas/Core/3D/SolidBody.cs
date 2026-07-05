@@ -329,7 +329,7 @@ public partial class SolidBody : IRecordable
     /// <summary>
     /// Gets whether solver-side response may translate this body.
     /// </summary>
-    public bool CanTranslate => Active && !IsPositionFullyFrozen && !IsKinematic && InverseMass > Fixed64.Zero;
+    public bool CanTranslate => Active && _dynamicId >= 0 && !IsPositionFullyFrozen && !IsKinematic && InverseMass > Fixed64.Zero;
 
     /// <summary>
     /// Gets whether solver-side response may rotate this body.

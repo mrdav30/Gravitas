@@ -145,10 +145,16 @@ visual interpolation cannot overshoot its target.
 Dynamic 3D bodies are stored in a `SwiftBucket<SolidBody>`. Their `DynamicId` is
 the bucket index returned by `GravitasPhysicsService.AssimilateBody(...)`.
 
-3D colliders live in a context-local `LSCollider?[]` table. Collider IDs start
-at `1`; released IDs are cached for reuse. Because IDs are context-local, two
-different contexts can both have collider ID `1`. Lookups must go through the
-owning context's physics service.
+3D colliders live in a compact context-local `SwiftList<LSCollider>` with an ID
+lookup table. Collider IDs start at `1` and grow monotonically within a context;
+removing a collider compacts service iteration without reusing the released ID.
+Because IDs are context-local, two different contexts can both have collider ID
+`1`. Lookups must go through the owning context's physics service.
+
+Both 3D and 2D physics services keep compact service-refresh lists for bodyless
+and non-dynamic colliders. Dynamic body buckets refresh dynamic-body colliders,
+so fixed-step partition preparation only visits colliders whose bounds can
+change through that ownership path.
 
 3D joints use context-local IDs allocated by `GravitasConstraint3DService`.
 Removing a joint releases solver cache and linked-collider suppression state,
@@ -229,9 +235,10 @@ the same helper pattern through `LSCollider2D`, with dimensional payloads kept
 2D-specific.
 
 Dynamic colliders update through their bodies during simulation phases.
-Bodyless/static 3D colliders are not owned by the dynamic body bucket, so a host
-that moves one after initialization must call `collider.Simulate()` to refresh
-bounds and partition membership.
+Bodyless 3D and 2D colliders are refreshed from their agent transforms during
+fixed-step partition preparation, so host-authored transform changes are visible
+on the next step. Hosts can still call `collider.Simulate()` when they need an
+immediate bounds and partition refresh before issuing same-frame queries.
 
 ## Serialization And Replay State
 

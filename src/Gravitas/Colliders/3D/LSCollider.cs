@@ -38,6 +38,12 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode
     private int _id;
     public int Id => _id;
 
+    private int _serviceIndex = -1;
+    internal int ServiceIndex => _serviceIndex;
+
+    private int _serviceRefreshIndex = -1;
+    internal int ServiceRefreshIndex => _serviceRefreshIndex;
+
     private IMatterAgent? _agent;
     internal IMatterAgent? AgentOrNull => _agent;
 
@@ -56,6 +62,13 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode
 
     private SolidBody? _body;
     public SolidBody? Body => _body;
+
+    /// <summary>
+    /// Gets whether this collider is static-style for partition mobility.
+    /// </summary>
+    public bool IsStatic => _body == null || _body.DynamicId < 0 || _body.IsPositionFullyFrozen;
+
+    internal bool RequiresServiceSideRefresh => _body == null || _body.DynamicId < 0;
 
     private LSCompoundCollider? _compoundOwner;
     private FixedQuaternion _compoundLocalRotation = FixedQuaternion.Identity;
@@ -965,10 +978,42 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal void SetPhysicsId(int id)
+    internal void SetPhysicsState(int id, int serviceIndex)
     {
         SwiftThrowHelper.ThrowIfNegative(id, nameof(id));
+        SwiftThrowHelper.ThrowIfNegative(serviceIndex, nameof(serviceIndex));
         _id = id;
+        _serviceIndex = serviceIndex;
+    }
+
+    internal void SetServiceIndex(int serviceIndex)
+    {
+        SwiftThrowHelper.ThrowIfNegative(serviceIndex, nameof(serviceIndex));
+        _serviceIndex = serviceIndex;
+    }
+
+    internal void SetServiceRefreshIndex(int serviceRefreshIndex)
+    {
+        SwiftThrowHelper.ThrowIfNegative(serviceRefreshIndex, nameof(serviceRefreshIndex));
+        _serviceRefreshIndex = serviceRefreshIndex;
+    }
+
+    internal void ClearServiceRefreshIndex()
+    {
+        _serviceRefreshIndex = -1;
+    }
+
+    internal void ClearPhysicsState()
+    {
+        _partitionState.MarkUnpartitioned();
+        _partitionState.ClearCoordinates();
+        _mixedPartitionState.MarkUnpartitioned();
+        _mixedPartitionState.ClearCoordinates();
+        _pairState.ClearCollisionPairs();
+        _pairState.ClearCollisionPairHolders();
+        _id = 0;
+        _serviceIndex = -1;
+        _serviceRefreshIndex = -1;
     }
 
     internal SwiftList<WorldVoxelIndex> GetOrCreateMixedPartitionCoordinates()

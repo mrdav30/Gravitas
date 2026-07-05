@@ -932,22 +932,24 @@ public sealed class ContinuousCollision2DTests
         SolidBody2D source = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)(-4), Fixed64.Zero), immovable: false);
         SolidBody2D kinematic = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false, isKinematic: true);
         SolidBody2D immovable = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)2, Fixed64.Zero), immovable: true);
-        LSCircleCollider2D bodyless = CreateBodylessCircle(context, new Vector2d((Fixed64)4, Fixed64.Zero));
+        SolidBody2D nonDynamic = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)4, Fixed64.Zero), immovable: false, isDynamic: false);
+        LSCircleCollider2D bodyless = CreateBodylessCircle(context, new Vector2d((Fixed64)6, Fixed64.Zero));
         var hits = new SwiftList<Physics2DHit>();
 
         int count = context.Query2D.SweepCircleAgainstStaticAll(
             new Vector2d((Fixed64)(-2), Fixed64.Zero),
-            new Vector2d((Fixed64)6, Fixed64.Zero),
+            new Vector2d((Fixed64)8, Fixed64.Zero),
             Fixed64.Half,
             PhysicsLayerMask.All,
             hits,
             source.Collider,
             includeTriggers: false);
 
-        count.Should().Be(3);
-        context.Query2D.LastQueryCandidateCount.Should().Be(3);
+        count.Should().Be(4);
+        context.Query2D.LastQueryCandidateCount.Should().Be(4);
         hits.Should().Contain(hit => ReferenceEquals(hit.Collider, kinematic.Collider));
         hits.Should().Contain(hit => ReferenceEquals(hit.Collider, immovable.Collider));
+        hits.Should().Contain(hit => ReferenceEquals(hit.Collider, nonDynamic.Collider));
         hits.Should().Contain(hit => ReferenceEquals(hit.Collider, bodyless));
     }
 
@@ -1096,7 +1098,8 @@ public sealed class ContinuousCollision2DTests
         bool immovable,
         PhysicsLayer layer = default,
         Fixed64 hostY = default,
-        bool isKinematic = false)
+        bool isKinematic = false,
+        bool isDynamic = true)
     {
         var transform = new FixedTransform(
             new Vector3d(position.X, hostY, position.Y),
@@ -1110,7 +1113,7 @@ public sealed class ContinuousCollision2DTests
             IsKinematic = isKinematic
         };
         body.Collider.Layer = layer;
-        body.Initialize(position);
+        body.Initialize(position, isDynamic: isDynamic);
         return body;
     }
 

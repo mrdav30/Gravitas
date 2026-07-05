@@ -63,7 +63,7 @@ public sealed class ColliderOwnershipStateTests
     }
 
     [Fact]
-    public void DeactivateParent_ShouldClearChildrenBeforeColliderIdReuse()
+    public void DeactivateParent_ShouldClearChildrenBeforeRegisteringReplacementCollider()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSSphereCollider> parent = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
@@ -74,7 +74,7 @@ public sealed class ColliderOwnershipStateTests
         parent.Collider.Deactivate();
         ScenarioBody<LSSphereCollider> replacement = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(2, 0, 0));
 
-        replacement.Collider.Id.Should().Be(parentId);
+        replacement.Collider.Id.Should().BeGreaterThan(parentId);
         child.Collider.ParentId.Should().Be(-1);
         child.Collider.Parent3D.Should().BeNull();
         child.Collider.Parent2D.Should().BeNull();

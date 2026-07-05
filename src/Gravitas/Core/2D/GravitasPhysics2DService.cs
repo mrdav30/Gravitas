@@ -25,6 +25,7 @@ public sealed partial class GravitasPhysics2DService
     private readonly SwiftBucket<SolidBody2D> _dynamicBodies = new();
     private readonly SwiftList<LSCollider2D> _colliders = new();
     private readonly SwiftDictionary<int, LSCollider2D> _collidersById = new();
+    private readonly SwiftList<LSCollider2D> _serviceRefreshColliders = new();
     private readonly SwiftHashSet<ulong> _processedPairKeys = new();
     private readonly SwiftDictionary<ulong, CollisionPair2D> _pairs = new();
     private readonly SwiftList<ulong> _pairsToRemove = new();
@@ -101,6 +102,7 @@ public sealed partial class GravitasPhysics2DService
         collider.SetPhysicsState(_nextColliderId++, _colliders.Count);
         _colliders.Add(collider);
         _collidersById.Add(collider.Id, collider);
+        RefreshColliderServiceRefreshRegistration(collider);
         _context.Collisions2D.PartitionCollider(collider);
     }
 
@@ -121,6 +123,7 @@ public sealed partial class GravitasPhysics2DService
         _context.MixedCollisions.RemovePairsFor2DCollider(collider);
         _context.MixedCollisions.ClearPartitioned2DCollider(collider, force: true);
         _context.Collisions2D.ClearPartitionedCollider(collider, force: true);
+        RemoveServiceRefreshCollider(collider);
         RemoveCollider(collider);
         _collidersById.Remove(collider.Id);
         collider.ClearPhysicsState();
@@ -163,6 +166,9 @@ public sealed partial class GravitasPhysics2DService
     {
         foreach (SolidBody2D body in _dynamicBodies)
             body.Collider.Simulate();
+
+        for (int i = 0; i < _serviceRefreshColliders.Count; i++)
+            _serviceRefreshColliders[i].Simulate();
     }
 
     private void RunDiscreteCollisionStep()
@@ -197,6 +203,7 @@ public sealed partial class GravitasPhysics2DService
         _dynamicBodies.Clear();
         _colliders.FastClear();
         _collidersById.Clear();
+        _serviceRefreshColliders.FastClear();
         _processedPairKeys.Clear();
         _pairs.Clear();
         _pairsToRemove.FastClear();
@@ -246,6 +253,46 @@ public sealed partial class GravitasPhysics2DService
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal bool TryGetDynamicBody(int dynamicId, out SolidBody2D body) =>
         _dynamicBodies.TryGetValue(dynamicId, out body);
+
+    internal void RefreshColliderServiceRefreshRegistration(LSCollider2D collider)
+    {
+        SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
+
+        if (collider.RequiresServiceSideRefresh)
+            AddServiceRefreshCollider(collider);
+        else
+            RemoveServiceRefreshCollider(collider);
+    }
+
+    private void AddServiceRefreshCollider(LSCollider2D collider)
+    {
+        if (collider.ServiceRefreshIndex >= 0)
+            return;
+
+        collider.SetServiceRefreshIndex(_serviceRefreshColliders.Count);
+        _serviceRefreshColliders.Add(collider);
+    }
+
+    private void RemoveServiceRefreshCollider(LSCollider2D collider)
+    {
+        int index = collider.ServiceRefreshIndex;
+        if (index < 0 || index >= _serviceRefreshColliders.Count || !ReferenceEquals(_serviceRefreshColliders[index], collider))
+        {
+            collider.ClearServiceRefreshIndex();
+            return;
+        }
+
+        int lastIndex = _serviceRefreshColliders.Count - 1;
+        if (index != lastIndex)
+        {
+            LSCollider2D moved = _serviceRefreshColliders[lastIndex];
+            _serviceRefreshColliders[index] = moved;
+            moved.SetServiceRefreshIndex(index);
+        }
+
+        _serviceRefreshColliders.RemoveAt(lastIndex);
+        collider.ClearServiceRefreshIndex();
+    }
 
     private void EnsureFrameCapacity()
     {

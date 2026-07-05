@@ -234,11 +234,15 @@ Use `SolidBody.FreezeAxes = BodyFreezeAxes3D.Position` or
 `SolidBody2D.FreezeAxes = BodyFreezeAxes2D.Position` when an object should keep
 body state but behave as static-equivalent for solver and partition mobility.
 Partial freezes remain dynamic and constrain only the selected axes.
+`LSCollider.IsStatic` and `LSCollider2D.IsStatic` report this static-style
+partition role for bodyless colliders, non-dynamic bodies, and position-frozen
+bodies.
 
-If a bodyless 3D collider moves after initialization, the host must call
-`collider.Simulate()` after mutating the transform so bounds and partition
-membership refresh. 2D bodyless colliders rebuild from their agent
-transform during the 2D broad-phase pass.
+Bodyless 3D and 2D colliders rebuild from their agent transform during the next
+fixed-step partition preparation. If the host mutates a bodyless collider's
+transform and needs query results before the next step, call
+`collider.Simulate()` after the mutation to refresh bounds and partition
+membership immediately.
 
 ## Common Configuration
 

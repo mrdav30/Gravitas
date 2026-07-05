@@ -1445,7 +1445,7 @@ public sealed partial class GravitasQuery3DService
     private static bool IsStaticStyleSweepTarget(LSCollider collider)
     {
         SolidBody? body = collider.Body;
-        return body == null || body.IsPositionFullyFrozen || body.IsKinematic;
+        return collider.IsStatic || body!.IsKinematic;
     }
 
     private static Vector3d GetSweepSurfacePoint(LSCollider collider, Vector3d sweepCenter, Vector3d direction)

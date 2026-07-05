@@ -1,14 +1,20 @@
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
+using Gravitas.Queries;
+using Gravitas.Support;
 using Gravitas.Tests.Support;
+using GridForge.Configuration;
 using System;
+using SwiftCollections;
 using Xunit;
 
 namespace Gravitas.Tests.Core;
 
 public sealed class MatterAgentContextTests
 {
+    private static readonly PhysicsLayerMask IncludeLayerZero = PhysicsLayerMask.FromLayer(0);
+
     [Fact]
     public void SolidBodyInitialize_WithContextBoundAgent_ShouldRegisterWithAgentContext()
     {
@@ -48,6 +54,36 @@ public sealed class MatterAgentContextTests
     }
 
     [Fact]
+    public void LateSimulate_WithMovedBodylessCollider_ShouldRefreshBoundsAndPartitionsFromAgentTransform()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        EnsureGrid(context);
+        var transform = new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One);
+        var agent = new TestMatterAgent(context, transform);
+        var collider = new LSSphereCollider();
+        var hits = new SwiftList<Physics3DHit>();
+
+        collider.InitializeWithNoBody(agent);
+
+        transform.Position = new Vector3d((Fixed64)4, Fixed64.Zero, Fixed64.Zero);
+        context.Simulate();
+        context.LateSimulate();
+
+        context.Query3D.RaycastAll(
+            new Vector3d((Fixed64)3, Fixed64.Zero, Fixed64.Zero),
+            new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero),
+            IncludeLayerZero,
+            hits).Should().Be(1);
+        hits[0].Collider.Should().BeSameAs(collider);
+
+        context.Query3D.RaycastAll(
+            new Vector3d((Fixed64)(-1), Fixed64.Zero, Fixed64.Zero),
+            new Vector3d(Fixed64.One, Fixed64.Zero, Fixed64.Zero),
+            IncludeLayerZero,
+            hits).Should().Be(0);
+    }
+
+    [Fact]
     public void SolidBodySetup_WithColliderBoundToDifferentContext_ShouldThrowClearException()
     {
         using GravitasWorldContext contextA = GravitasWorldContext.CreateOwned();
@@ -62,5 +98,17 @@ public sealed class MatterAgentContextTests
         createBodyWithCrossContextCollider.Should()
             .Throw<ArgumentException>()
             .WithMessage("*same context*");
+    }
+
+    private static void EnsureGrid(GravitasWorldContext context)
+    {
+        if (context.World.ActiveGrids.Count > 0)
+            return;
+
+        GridConfiguration configuration = new(
+            new Vector3d((Fixed64)(-4), (Fixed64)(-4), (Fixed64)(-4)),
+            new Vector3d((Fixed64)8, (Fixed64)8, (Fixed64)8));
+
+        context.World.TryAddGrid(configuration, out _).Should().BeTrue();
     }
 }

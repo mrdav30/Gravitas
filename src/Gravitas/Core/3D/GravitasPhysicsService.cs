@@ -28,8 +28,9 @@ public sealed partial class GravitasPhysicsService
     private readonly GravitasWorldContext _context;
 
     private SwiftBucket<SolidBody> _dynamicBodies = new(DefaultBodySize);
-    private LSCollider?[] _colliders = new LSCollider?[DefaultColliderIdSize];
-    private SwiftStack<int> _cachedColliderIds = new(DefaultColliderIdSize);
+    private SwiftList<LSCollider> _colliders = new(DefaultColliderSize);
+    private SwiftDictionary<int, LSCollider> _collidersById = new();
+    private SwiftList<LSCollider> _serviceRefreshColliders = new(DefaultColliderIdSize);
     private SwiftStack<CollisionPair> _cachedCollisionPairs = new();
     private SwiftQueue<CollisionPair> _activeCollisionPairs = new();
     private readonly SwiftList<CollisionPair> _discreteResponsePairs = new();
@@ -73,6 +74,11 @@ public sealed partial class GravitasPhysicsService
     public int AssimilatedColliderCount { get; private set; }
 
     /// <summary>
+    /// Gets the number of colliders currently registered in this context.
+    /// </summary>
+    public int ColliderCount => _colliders.Count;
+
+    /// <summary>
     /// Gets how many service-owned continuous-collision handoff batches were consumed during the last late step.
     /// </summary>
     public int LastContinuousCollisionIslandCount { get; private set; }
@@ -97,8 +103,8 @@ public sealed partial class GravitasPhysicsService
     /// </summary>
     public void LateInitialize()
     {
-        for (int i = 0; i < _colliders.Length; i++)
-            _colliders[i]?.LateInitialize();
+        for (int i = 0; i < _colliders.Count; i++)
+            _colliders[i].LateInitialize();
     }
 
     /// <summary>
@@ -114,6 +120,9 @@ public sealed partial class GravitasPhysicsService
     {
         foreach (SolidBody body in _dynamicBodies)
             body.Collider.Simulate();
+
+        for (int i = 0; i < _serviceRefreshColliders.Count; i++)
+            _serviceRefreshColliders[i].Simulate();
     }
 
     /// <summary>
@@ -182,11 +191,10 @@ public sealed partial class GravitasPhysicsService
     /// </summary>
     public void Reset()
     {
-        for (int i = 1; i <= PeakColliderCount && i < _colliders.Length; i++)
-            _colliders[i] = null;
-
         _dynamicBodies.Clear();
-        _cachedColliderIds.FastClear();
+        _colliders.FastClear();
+        _collidersById.Clear();
+        _serviceRefreshColliders.FastClear();
         _cachedCollisionPairs.FastClear();
         _activeCollisionPairs.FastClear();
         _discreteResponsePairs.FastClear();
@@ -235,22 +243,14 @@ public sealed partial class GravitasPhysicsService
         SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
         collider.BindContext(_context);
 
-        int id;
-        lock (_cachedColliderIds)
-        {
-            if (_cachedColliderIds.Count > 0)
-                id = _cachedColliderIds.Pop();
-            else
-            {
-                PeakColliderCount++;
-                id = PeakColliderCount;
-                if (PeakColliderCount == _colliders.Length)
-                    Array.Resize(ref _colliders, _colliders.Length * 2);
-            }
-        }
+        int id = PeakColliderCount + 1;
+        int serviceIndex = _colliders.Count;
+        PeakColliderCount = id;
 
-        collider.SetPhysicsId(id);
-        _colliders[id] = collider;
+        collider.SetPhysicsState(id, serviceIndex);
+        _colliders.Add(collider);
+        _collidersById.Add(id, collider);
+        RefreshColliderServiceRefreshRegistration(collider);
         AssimilatedColliderCount++;
         return id;
     }
@@ -272,7 +272,7 @@ public sealed partial class GravitasPhysicsService
         SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
         int id = collider.Id;
 
-        if ((uint)id >= (uint)_colliders.Length || _colliders[id] == null)
+        if (!_collidersById.TryGetValue(id, out LSCollider? registered) || !ReferenceEquals(registered, collider))
         {
             GravitasLogger.Channel.Warn($"Object with ID {collider.Id} cannot be dessimilated because it is not assimilated.");
             return;
@@ -280,9 +280,21 @@ public sealed partial class GravitasPhysicsService
 
         _context.MixedCollisions.RemovePairsFor3DCollider(collider);
         _context.MixedCollisions.ClearPartitioned3DCollider(collider, force: true);
-        _colliders[id] = null;
-        _cachedColliderIds.Push(id);
+        RemoveServiceRefreshCollider(collider);
+        RemoveCollider(collider);
+        _collidersById.Remove(id);
+        collider.ClearPhysicsState();
         AssimilatedColliderCount--;
+    }
+
+    internal void RefreshColliderServiceRefreshRegistration(LSCollider collider)
+    {
+        SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
+
+        if (collider.RequiresServiceSideRefresh)
+            AddServiceRefreshCollider(collider);
+        else
+            RemoveServiceRefreshCollider(collider);
     }
 
     /// <summary>
@@ -294,19 +306,77 @@ public sealed partial class GravitasPhysicsService
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool TryGetColliderById(int id, out LSCollider? collider)
     {
-        if (id < 0 || id >= _colliders.Length)
+        if (id < 0)
         {
             collider = null;
             return false;
         }
 
-        collider = _colliders[id];
-        return collider != null;
+        return _collidersById.TryGetValue(id, out collider);
+    }
+
+    internal bool TryGetColliderByServiceIndex(int serviceIndex, out LSCollider? collider)
+    {
+        if (serviceIndex < 0 || serviceIndex >= _colliders.Count)
+        {
+            collider = null;
+            return false;
+        }
+
+        collider = _colliders[serviceIndex];
+        return true;
     }
 
     internal int DynamicBodyPeakCount => _dynamicBodies.PeakCount;
 
     internal bool TryGetDynamicBody(int dynamicId, out SolidBody body) =>
         _dynamicBodies.TryGetValue(dynamicId, out body);
+
+    private void RemoveCollider(LSCollider collider)
+    {
+        int index = collider.ServiceIndex;
+        if (index < 0 || index >= _colliders.Count || !ReferenceEquals(_colliders[index], collider))
+            return;
+
+        int lastIndex = _colliders.Count - 1;
+        if (index != lastIndex)
+        {
+            LSCollider moved = _colliders[lastIndex];
+            _colliders[index] = moved;
+            moved.SetServiceIndex(index);
+        }
+
+        _colliders.RemoveAt(lastIndex);
+    }
+
+    private void AddServiceRefreshCollider(LSCollider collider)
+    {
+        if (collider.ServiceRefreshIndex >= 0)
+            return;
+
+        collider.SetServiceRefreshIndex(_serviceRefreshColliders.Count);
+        _serviceRefreshColliders.Add(collider);
+    }
+
+    private void RemoveServiceRefreshCollider(LSCollider collider)
+    {
+        int index = collider.ServiceRefreshIndex;
+        if (index < 0 || index >= _serviceRefreshColliders.Count || !ReferenceEquals(_serviceRefreshColliders[index], collider))
+        {
+            collider.ClearServiceRefreshIndex();
+            return;
+        }
+
+        int lastIndex = _serviceRefreshColliders.Count - 1;
+        if (index != lastIndex)
+        {
+            LSCollider moved = _serviceRefreshColliders[lastIndex];
+            _serviceRefreshColliders[index] = moved;
+            moved.SetServiceRefreshIndex(index);
+        }
+
+        _serviceRefreshColliders.RemoveAt(lastIndex);
+        collider.ClearServiceRefreshIndex();
+    }
 
 }

@@ -61,7 +61,9 @@ partitions the collision service checks per distribution step.
 
 `GravitasWorldContext.Reset()` is a stronger session boundary: it detaches
 retained Gravitas partition payloads from GridForge voxels, clears retained
-tracking, and clears partition pools before collider IDs are reused.
+tracking, and clears partition pools. Within a session, released collider IDs
+are not cached for reuse; reset starts a fresh context-local allocation
+sequence.
 
 ## 2D Partitioning
 

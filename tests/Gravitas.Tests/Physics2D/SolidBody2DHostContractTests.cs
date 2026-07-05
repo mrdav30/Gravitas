@@ -115,6 +115,26 @@ public sealed class SolidBody2DHostContractTests
     }
 
     [Fact]
+    public void LateSimulate_WithMovedBodylessCollider_ShouldRefreshBoundsAndPartitionsFromAgentTransform()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        var transform = new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One);
+        var agent = new TestMatterAgent(context, transform);
+        var collider = new LSCircleCollider2D(Fixed64.Half);
+        var hits = new SwiftList<Physics2DHit>();
+
+        collider.InitializeWithNoBody(agent);
+
+        transform.Position = new Vector3d((Fixed64)4, Fixed64.Zero, Fixed64.Zero);
+        Step(context);
+
+        collider.Center.Should().Be(new Vector2d((Fixed64)4, Fixed64.Zero));
+        context.Query2D.OverlapCircleAll(new Vector2d((Fixed64)4, Fixed64.Zero), Fixed64.Half, hits).Should().Be(1);
+        hits[0].Collider.Should().BeSameAs(collider);
+        context.Query2D.OverlapCircleAll(Vector2d.Zero, Fixed64.Half, hits).Should().Be(0);
+    }
+
+    [Fact]
     public void Simulate_WithBodylessStaticCollider_ShouldResolveDynamicBody()
     {
         using GravitasWorldContext context = Create2DContext();

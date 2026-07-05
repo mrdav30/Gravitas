@@ -25,6 +25,33 @@ public sealed class Collider2DStateParityTests
     }
 
     [Fact]
+    public void ColliderIsStatic_ShouldBeTrueForBodylessAndPositionFrozenColliders()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        var bodyless = new LSCircleCollider2D(Fixed64.Half);
+        bodyless.InitializeWithNoBody(new TestMatterAgent(context));
+        SolidBody2D body = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
+        SolidBody2D nonDynamicBody = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.Half),
+            new Vector2d((Fixed64)4, Fixed64.Zero),
+            immovable: false,
+            isDynamic: false);
+
+        bodyless.IsStatic.Should().BeTrue();
+        body.Collider.IsStatic.Should().BeFalse();
+        nonDynamicBody.Collider.IsStatic.Should().BeTrue();
+
+        body.FreezeAxes = BodyFreezeAxes2D.Position;
+        body.Collider.IsStatic.Should().BeTrue();
+
+        body.FreezeAxes = BodyFreezeAxes2D.None;
+        body.Collider.IsStatic.Should().BeFalse();
+        body.IsKinematic = true;
+        body.Collider.IsStatic.Should().BeFalse();
+    }
+
+    [Fact]
     public void SetPosition_WithChangedCollider_ShouldAdvanceRuntimeAndBroadPhaseVersionsOnce()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext(extent: 64);
@@ -204,7 +231,8 @@ public sealed class Collider2DStateParityTests
         GravitasWorldContext context,
         LSCollider2D collider,
         Vector2d position,
-        bool immovable)
+        bool immovable,
+        bool isDynamic = true)
     {
         var transform = new FixedTransform(
             new Vector3d(position.X, Fixed64.Zero, position.Y),
@@ -216,7 +244,7 @@ public sealed class Collider2DStateParityTests
             Mass = Fixed64.One,
             FreezeAxes = immovable ? BodyFreezeAxes2D.Position : BodyFreezeAxes2D.None
         };
-        body.Initialize(position);
+        body.Initialize(position, isDynamic: isDynamic);
         return body;
     }
 

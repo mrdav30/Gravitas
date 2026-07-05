@@ -450,7 +450,7 @@ public sealed partial class SolidBody2D
         }
 
         SolidBody2D? body = collider.Body;
-        return body == null || body.IsPositionFullyFrozen || body.IsKinematic;
+        return collider.IsStatic || body!.IsKinematic;
     }
 
     private GroundProbeMode2D ResolveGroundProbeMode()

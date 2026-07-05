@@ -174,10 +174,10 @@ internal sealed partial class GravitasMixedCollisionService
             return;
 
         SolidBody? body = collider.Body;
-        if (body == null || body.IsPositionFullyFrozen)
+        if (collider.IsStatic)
             return;
 
-        bool awake = body.IsAwakeForCollision;
+        bool awake = body!.IsAwakeForCollision;
         GridWorld world = _context.World;
         try
         {
@@ -206,10 +206,10 @@ internal sealed partial class GravitasMixedCollisionService
             return;
 
         SolidBody2D? body = collider.Body;
-        if (body == null || body.IsPositionFullyFrozen)
+        if (collider.IsStatic)
             return;
 
-        bool awake = body.IsAwakeForCollision;
+        bool awake = body!.IsAwakeForCollision;
         GridWorld world = _context.World;
         try
         {
@@ -377,9 +377,9 @@ internal sealed partial class GravitasMixedCollisionService
 
     private void Refresh3DColliderPartitions()
     {
-        int peak = _context.Physics.PeakColliderCount;
-        for (int id = 1; id <= peak; id++)
-            if (_context.Physics.TryGetColliderById(id, out LSCollider? collider))
+        int count = _context.Physics.ColliderCount;
+        for (int i = 0; i < count; i++)
+            if (_context.Physics.TryGetColliderByServiceIndex(i, out LSCollider? collider))
                 Refresh3DColliderPartition(collider!);
     }
 
@@ -649,21 +649,21 @@ internal sealed partial class GravitasMixedCollisionService
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static MixedPartitionMobilityKind Get3DMobilityKind(LSCollider collider)
     {
-        SolidBody? body = collider.Body;
-        if (body == null || body.IsPositionFullyFrozen)
+        if (collider.IsStatic)
             return MixedPartitionMobilityKind.Static;
 
-        return body.IsKinematic ? MixedPartitionMobilityKind.Kinematic : MixedPartitionMobilityKind.Dynamic;
+        SolidBody? body = collider.Body;
+        return body!.IsKinematic ? MixedPartitionMobilityKind.Kinematic : MixedPartitionMobilityKind.Dynamic;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static MixedPartitionMobilityKind Get2DMobilityKind(LSCollider2D collider)
     {
-        SolidBody2D? body = collider.Body;
-        if (body == null || body.IsPositionFullyFrozen)
+        if (collider.IsStatic)
             return MixedPartitionMobilityKind.Static;
 
-        return body.IsKinematic ? MixedPartitionMobilityKind.Kinematic : MixedPartitionMobilityKind.Dynamic;
+        SolidBody2D? body = collider.Body;
+        return body!.IsKinematic ? MixedPartitionMobilityKind.Kinematic : MixedPartitionMobilityKind.Dynamic;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

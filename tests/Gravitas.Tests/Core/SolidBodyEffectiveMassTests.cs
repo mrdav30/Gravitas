@@ -44,6 +44,25 @@ public sealed class SolidBodyEffectiveMassTests
     }
 
     [Fact]
+    public void EffectiveMass_ForNonDynamicBody_ShouldBehaveAsInfiniteMass()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> body = scenario.CreateBody(
+            new LSSphereCollider(),
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            mass: (Fixed64)4,
+            isDynamic: false);
+
+        body.Body.DynamicId.Should().Be(-1);
+        body.Body.InverseMass.Should().Be(Fixed64.FromFraction(1, 4));
+        body.Body.CanTranslate.Should().BeFalse();
+        body.Body.CanRotate.Should().BeFalse();
+        body.Body.EffectiveInverseMass.Should().Be(Fixed64.Zero);
+        body.Body.EffectiveInverseInertiaTensor.Should().Be(Fixed3x3.Zero);
+    }
+
+    [Fact]
     public void EffectiveMass_WithAngularForcesDisabled_ShouldKeepLinearMassAndDisableRotation()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();

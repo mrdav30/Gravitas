@@ -58,7 +58,46 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 
 | Signal | Status | Priority | Tracking |
 | ------ | ------ | -------- | -------- |
-| _None_ | -      | -        | -        |
+| Replay hash collider-ID churn scaling | Active | Medium | [Active Signal: Replay Hash Collider-ID Churn Scaling](#active-signal-replay-hash-collider-id-churn-scaling) |
+
+### Active Signal: Replay Hash Collider-ID Churn Scaling
+
+**Discovered:** 2026-07-05  
+**Status:** Active  
+**Priority:** Medium  
+**Affected area:** 3D, 2D, and mixed replay-hash traversal
+
+**Evidence:** A focused replay-hash benchmark row,
+`ReplayHashBenchmarks.ReplayHash3DChurnedIds`, creates an 8x collider-ID
+high-water mark by registering and deactivating bodyless 3D static colliders,
+then leaves only the final live tail active. The current 3D replay hash still
+walks the full high-water ID range, so this row isolates collider churn from
+live collider count.
+
+Command:
+
+```powershell
+dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll replay-hash --filter "*ReplayHash3DChurnedIds*" --warmupCount 1 --iterationCount 3
+```
+
+Measured on 2026-07-05:
+
+| Row | Mean | Allocated |
+| --- | ---: | --------: |
+| `ColliderCount=64` live, 512 created IDs | `119.0 us` | `0 B` |
+| `ColliderCount=256` live, 2048 created IDs | `483.9 us` | `0 B` |
+
+**Why it matters:** `ComputeReplayHash()` is a conformance and replay tooling
+path rather than the normal simulation hot path, but hosts may call it every
+fixed frame. The 3D and 2D replay hash contributors currently walk collider ID
+high-water ranges, and the mixed contributor can cross-product 3D and 2D
+high-water ranges before checking live pairs.
+
+**Next isolation step:** compare current peak-range traversal against an
+allocation-free live-ID traversal that preserves deterministic ordering and
+hash semantics. Include matching 2D and mixed churn rows before changing replay
+hash structure, and decide whether high-water/churn history should remain part
+of the authoritative hash or only solver-cache diagnostics.
 
 ## Closed Signals
 

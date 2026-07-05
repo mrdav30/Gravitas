@@ -54,6 +54,67 @@ public sealed class GravitasPhysicsServiceTests
     }
 
     [Fact]
+    public void ColliderRegistration_ShouldUseCompactServiceIndicesAndMonotonicIds()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        var first = new LSSphereCollider();
+        var second = new LSSphereCollider();
+        var third = new LSSphereCollider();
+
+        int firstId = context.Physics.AssimilateCollider(first);
+        int secondId = context.Physics.AssimilateCollider(second);
+        int thirdId = context.Physics.AssimilateCollider(third);
+
+        context.Physics.ColliderCount.Should().Be(3);
+        context.Physics.TryGetColliderByServiceIndex(0, out LSCollider? firstByIndex).Should().BeTrue();
+        context.Physics.TryGetColliderByServiceIndex(1, out LSCollider? secondByIndex).Should().BeTrue();
+        context.Physics.TryGetColliderByServiceIndex(2, out LSCollider? thirdByIndex).Should().BeTrue();
+        firstByIndex.Should().BeSameAs(first);
+        secondByIndex.Should().BeSameAs(second);
+        thirdByIndex.Should().BeSameAs(third);
+
+        context.Physics.DessimilateCollider(second);
+        var replacement = new LSSphereCollider();
+        int replacementId = context.Physics.AssimilateCollider(replacement);
+
+        firstId.Should().Be(1);
+        secondId.Should().Be(2);
+        thirdId.Should().Be(3);
+        replacementId.Should().Be(4);
+        context.Physics.PeakColliderCount.Should().Be(4);
+        context.Physics.ColliderCount.Should().Be(3);
+        context.Physics.TryGetColliderById(secondId, out _).Should().BeFalse();
+        context.Physics.TryGetColliderByServiceIndex(0, out LSCollider? compactFirst).Should().BeTrue();
+        context.Physics.TryGetColliderByServiceIndex(1, out LSCollider? compactThird).Should().BeTrue();
+        context.Physics.TryGetColliderByServiceIndex(2, out LSCollider? compactReplacement).Should().BeTrue();
+        compactFirst.Should().BeSameAs(first);
+        compactThird.Should().BeSameAs(third);
+        compactReplacement.Should().BeSameAs(replacement);
+    }
+
+    [Fact]
+    public void ColliderIsStatic_ShouldBeTrueForBodylessAndPositionFrozenColliders()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        var bodyless = new LSSphereCollider();
+        bodyless.InitializeWithNoBody(new TestMatterAgent(context));
+        SolidBody body = CreateInitializedBody(context);
+        SolidBody nonDynamicBody = CreateInitializedBody(context, isDynamic: false);
+
+        bodyless.IsStatic.Should().BeTrue();
+        body.Collider.IsStatic.Should().BeFalse();
+        nonDynamicBody.Collider.IsStatic.Should().BeTrue();
+
+        body.FreezeAxes = BodyFreezeAxes3D.Position;
+        body.Collider.IsStatic.Should().BeTrue();
+
+        body.FreezeAxes = BodyFreezeAxes3D.None;
+        body.Collider.IsStatic.Should().BeFalse();
+        body.IsKinematic = true;
+        body.Collider.IsStatic.Should().BeFalse();
+    }
+
+    [Fact]
     public void CollisionPair_ShouldRejectCollidersFromDifferentContexts()
     {
         using GravitasWorldContext contextA = GravitasWorldContext.CreateOwned();
@@ -142,7 +203,7 @@ public sealed class GravitasPhysicsServiceTests
         context.Physics.AssimilatedBodyCount.Should().Be(0);
     }
 
-    private static SolidBody CreateInitializedBody(GravitasWorldContext context)
+    private static SolidBody CreateInitializedBody(GravitasWorldContext context, bool isDynamic = true)
     {
         var agent = new TestMatterAgent(context);
         var collider = new LSSphereCollider();
@@ -150,7 +211,7 @@ public sealed class GravitasPhysicsServiceTests
         {
             Mass = Fixed64.One
         };
-        body.Initialize(Vector3d.Zero, FixedQuaternion.Identity);
+        body.Initialize(Vector3d.Zero, FixedQuaternion.Identity, isDynamic);
         return body;
     }
 }

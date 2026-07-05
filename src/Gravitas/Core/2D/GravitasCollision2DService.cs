@@ -226,7 +226,7 @@ public sealed class GravitasCollision2DService
             return;
 
         SolidBody2D? body = collider.Body;
-        if (body == null || body.IsPositionFullyFrozen || body.IsKinematic)
+        if (collider.IsStatic || body!.IsKinematic)
             return;
 
         bool awake = body.IsAwakeForCollision;
@@ -513,11 +513,11 @@ public sealed class GravitasCollision2DService
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static PhysicsPartitionMobilityKind GetMobilityKind(LSCollider2D collider)
     {
-        SolidBody2D? body = collider.Body;
-        if (body == null || body.IsPositionFullyFrozen)
+        if (collider.IsStatic)
             return PhysicsPartitionMobilityKind.Static;
 
-        return body.IsKinematic ? PhysicsPartitionMobilityKind.Kinematic : PhysicsPartitionMobilityKind.Dynamic;
+        SolidBody2D? body = collider.Body;
+        return body!.IsKinematic ? PhysicsPartitionMobilityKind.Kinematic : PhysicsPartitionMobilityKind.Dynamic;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -570,7 +570,7 @@ public sealed class GravitasCollision2DService
     private static bool IsStaticStyleCollider(LSCollider2D collider)
     {
         SolidBody2D? body = collider.Body;
-        return body == null || body.IsPositionFullyFrozen || body.IsKinematic;
+        return collider.IsStatic || body!.IsKinematic;
     }
 
     private void DetachRetainedPartitions()
