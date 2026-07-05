@@ -1,16 +1,11 @@
 # Feature Work Overview
 
-## Release Quality Bar
+## Purpose
 
-Gravitas' first public release is not an MVP target. It should feel like a
-first-class deterministic physics engine: coherent APIs, deterministic ordering,
-physically explainable solver behavior, low-allocation hot paths, and credible
-2D, 3D, mixed, CCD, query, and response quality.
-
-Breaking changes are acceptable before the first public release when they
-strengthen the engine or end-user development experience. Weak compatibility
-layers, vague wiki caveats, and hidden "future work" notes should be promoted
-into explicit plans or closed with evidence.
+This document is a living overview of Gravitas feature work. It tracks the
+current release-scope, recently completed work, and future / evidence-gated
+plans. It is not a backlog of all possible work, but a curated view of the most
+important work for the first public release and beyond.
 
 ## Release Closure Trackers
 
@@ -28,7 +23,11 @@ instead of burying it in notes.
 
 ## Active Release-Scope
 
-No active release-scope plans are currently queued.
+- [`Coverage Hardening`](coverage-hardening-plan.md)
+  - Active living plan. Short-term target is at least 90% line, branch, and
+    method coverage using the repository `coverlet.runsettings`; long-term
+    target is 100% across the board. Coverage work should remove dead code,
+    condense duplicate tests, and add only high-signal behavior tests.
 
 ## Recently Completed
 
@@ -157,10 +156,11 @@ No active release-scope plans are currently queued.
     deterministic discrete islands, cylinder/mesh contact quality, and mixed
     response islands are covered by tests, docs, and benchmark signal.
 
-## Post-Release / Evidence-Gated
+## Future / Evidence-Gated
 
-These are valuable, but they do not define the core physics quality bar for the
-first public release.
+The following work is not currently in the active release-scope, but it is
+evidence-gated and may be promoted into dated plans once measured risks or a
+host-facing need appears.
 
 - [`Mesh Tooling Simplification And Decomposition`](2026-06-17-mesh-tooling-simplification-and-decomposition-plan.md)
   - Offline decomposition, simplification, and richer mesh tooling can mature

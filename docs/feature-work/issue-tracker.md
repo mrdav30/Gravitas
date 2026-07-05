@@ -1,4 +1,4 @@
-# Feature Work Issue Tracker
+# Issue Tracker
 
 ## Tracker Rules
 
