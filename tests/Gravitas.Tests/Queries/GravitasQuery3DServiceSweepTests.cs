@@ -483,6 +483,34 @@ public sealed class GravitasQuery3DServiceSweepTests
     }
 
     [Fact]
+    public void SweepConvexMesh_ShouldReturnCompoundTargetOwnerThroughNearestPartGeometry()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSMeshCollider source = CreateDynamicCollider(
+            context,
+            MeshTestFixtures.CreateConvexCube(inertiaPolicy: MeshInertiaPolicy.SurfaceApproximation),
+            new Vector3d((Fixed64)(-4), Fixed64.Zero, Fixed64.Zero));
+        LSCompoundCollider target = CreateDynamicCollider(
+            context,
+            new LSCompoundCollider(
+                CompoundColliderPart.Sphere(Fixed64.Half, Vector3d.Zero),
+                CompoundColliderPart.Sphere(Fixed64.Half, new Vector3d((Fixed64)2, Fixed64.Zero, Fixed64.Zero))),
+            Vector3d.Zero);
+
+        bool hit = context.Query3D.SweepConvexMesh(
+            source,
+            new Vector3d((Fixed64)8, Fixed64.Zero, Fixed64.Zero),
+            IncludeLayerZero,
+            out Physics3DHit sweepHit);
+
+        hit.Should().BeTrue();
+        sweepHit.Collider.Should().BeSameAs(target);
+        sweepHit.Distance.Should().Be((Fixed64)3);
+        sweepHit.Point.Should().Be(new Vector3d(-Fixed64.Half, Fixed64.Zero, Fixed64.Zero));
+        sweepHit.Normal.Should().Be(-Vector3d.Right);
+    }
+
+    [Fact]
     public void SweepConvexMeshAll_ShouldSupportConcaveMeshTargetsAsOrderedTargets()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();

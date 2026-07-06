@@ -1,6 +1,8 @@
 using FixedMathSharp;
 using FluentAssertions;
+using Gravitas.Colliders;
 using Gravitas.Queries;
+using Gravitas.Tests.Support;
 using SwiftCollections;
 using Xunit;
 
@@ -62,6 +64,111 @@ public sealed class RaycastSegmentWorkerTests
             ref hits);
 
         hit.Should().BeTrue();
+        hits.Count.Should().Be(0);
+    }
+
+    [Fact]
+    public void CheckSphereOverlaps_WithPointInsideSphere_ShouldReturnPoint()
+    {
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+
+        worker.PrepareSegmentCheck(Vector3d.Zero, Vector3d.Zero);
+
+        bool hit = worker.CheckSphereOverlaps(Vector3d.Zero, Fixed64.One, ref hits);
+
+        hit.Should().BeTrue();
+        hits.Count.Should().Be(1);
+        hits[0].Should().Be(Vector3d.Zero);
+    }
+
+    [Fact]
+    public void CheckSphereOverlaps_WithPointOutsideSphere_ShouldReturnFalse()
+    {
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+
+        worker.PrepareSegmentCheck(
+            new Vector3d((Fixed64)2, Fixed64.Zero, Fixed64.Zero),
+            new Vector3d((Fixed64)2, Fixed64.Zero, Fixed64.Zero));
+
+        bool hit = worker.CheckSphereOverlaps(Vector3d.Zero, Fixed64.One, ref hits);
+
+        hit.Should().BeFalse();
+        hits.Count.Should().Be(0);
+    }
+
+    [Fact]
+    public void CheckCylinderOverlaps_WithPointInsideFiniteCylinder_ShouldReturnPoint()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSCylinderCollider cylinder = scenario.CreateCylinder(Vector3d.Zero).Collider;
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+
+        worker.PrepareSegmentCheck(Vector3d.Zero, Vector3d.Zero);
+
+        bool hit = worker.CheckCylinderOverlaps(cylinder, ref hits);
+
+        hit.Should().BeTrue();
+        hits.Count.Should().Be(1);
+        hits[0].Should().Be(Vector3d.Zero);
+    }
+
+    [Fact]
+    public void CheckCylinderOverlaps_WithPointOutsideFiniteCylinder_ShouldReturnFalse()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSCylinderCollider cylinder = scenario.CreateCylinder(Vector3d.Zero).Collider;
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+
+        worker.PrepareSegmentCheck(
+            new Vector3d((Fixed64)2, Fixed64.Zero, Fixed64.Zero),
+            new Vector3d((Fixed64)2, Fixed64.Zero, Fixed64.Zero));
+
+        bool hit = worker.CheckCylinderOverlaps(cylinder, ref hits);
+
+        hit.Should().BeFalse();
+        hits.Count.Should().Be(0);
+    }
+
+    [Fact]
+    public void CheckOBBoxOverlaps_WithPointInsideRotatedBox_ShouldReturnPoint()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSCuboidCollider box = scenario.CreateCuboid(
+            Vector3d.Zero,
+            PhysicsScenarioBuilder.Yaw(45)).Collider;
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+
+        worker.PrepareSegmentCheck(Vector3d.Zero, Vector3d.Zero);
+
+        bool hit = worker.CheckOBBoxOverlaps(box, ref hits);
+
+        hit.Should().BeTrue();
+        hits.Count.Should().Be(1);
+        hits[0].Should().Be(Vector3d.Zero);
+    }
+
+    [Fact]
+    public void CheckOBBoxOverlaps_WithPointOutsideRotatedBox_ShouldReturnFalse()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSCuboidCollider box = scenario.CreateCuboid(
+            Vector3d.Zero,
+            PhysicsScenarioBuilder.Yaw(45)).Collider;
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+
+        worker.PrepareSegmentCheck(
+            new Vector3d((Fixed64)3, Fixed64.Zero, Fixed64.Zero),
+            new Vector3d((Fixed64)3, Fixed64.Zero, Fixed64.Zero));
+
+        bool hit = worker.CheckOBBoxOverlaps(box, ref hits);
+
+        hit.Should().BeFalse();
         hits.Count.Should().Be(0);
     }
 

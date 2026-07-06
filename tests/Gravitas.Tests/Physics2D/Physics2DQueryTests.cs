@@ -367,6 +367,61 @@ public sealed class Physics2DQueryTests
     }
 
     [Fact]
+    public void TrySweepMoverShape_WithPolygonMoverAgainstCapsule_ShouldReportReverseCapsuleHit()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        SolidBody2D mover = CreatePolygon(context, new Vector2d((Fixed64)(-3), Fixed64.Zero));
+        SolidBody2D target = CreateCapsule(context, Vector2d.Zero);
+
+        bool hit = QueryDetection2D.TrySweepMoverShape(
+            mover.Collider,
+            new Vector2d((Fixed64)4, Fixed64.Zero),
+            target.Collider,
+            out Physics2DHit sweepHit);
+
+        hit.Should().BeTrue();
+        sweepHit.Collider.Should().BeSameAs(target.Collider);
+        sweepHit.Distance.Should().Be((Fixed64)2);
+        sweepHit.Normal.Should().Be(-Vector2d.Right);
+        sweepHit.Point.X.Should().Be(-Fixed64.Half);
+    }
+
+    [Fact]
+    public void TrySweepMoverShape_WithPolygonMoverOverlappingCapsule_ShouldReportZeroDistance()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        SolidBody2D mover = CreatePolygon(context, -Vector2d.Right * Fixed64.Half);
+        SolidBody2D target = CreateCapsule(context, Vector2d.Zero);
+
+        bool hit = QueryDetection2D.TrySweepMoverShape(
+            mover.Collider,
+            new Vector2d((Fixed64)4, Fixed64.Zero),
+            target.Collider,
+            out Physics2DHit sweepHit);
+
+        hit.Should().BeTrue();
+        sweepHit.Collider.Should().BeSameAs(target.Collider);
+        sweepHit.Distance.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void TrySweepMoverShape_WithPolygonMoverMissingCapsule_ShouldReturnFalse()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        SolidBody2D mover = CreatePolygon(context, new Vector2d((Fixed64)(-3), (Fixed64)4));
+        SolidBody2D target = CreateCapsule(context, Vector2d.Zero);
+
+        bool hit = QueryDetection2D.TrySweepMoverShape(
+            mover.Collider,
+            new Vector2d((Fixed64)4, Fixed64.Zero),
+            target.Collider,
+            out Physics2DHit sweepHit);
+
+        hit.Should().BeFalse();
+        sweepHit.Should().Be(default(Physics2DHit));
+    }
+
+    [Fact]
     public void RaycastAll_ShouldNotAllocateAfterWarmup()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext(extent: 128);

@@ -87,32 +87,32 @@ configuration before making source changes.
 
 ## Current Standing
 
-Fresh checkpoint after Workstream 2 collision and shape geometry hardening:
+Fresh checkpoint after Workstream 3 query reducer and shape-cast hardening:
 
 | Metric | Baseline | Current | Short-Term Gate | Long-Term Target |
 | --- | ---: | ---: | ---: | ---: |
-| Line coverage | 87.3% | 92.5% | 90% | 100% |
-| Branch coverage | 74.1% | 78.4% | 90% | 100% |
-| Method coverage | 86.5% | 92.5% | 90% | 100% |
-| Tests | 974 passed | 1105 passed | green | green |
+| Line coverage | 87.3% | 92.8% | 90% | 100% |
+| Branch coverage | 74.1% | 78.7% | 90% | 100% |
+| Method coverage | 86.5% | 92.7% | 90% | 100% |
+| Tests | 974 passed | 1118 passed | green | green |
 
 Current evidence:
 
 - Coverage report:
-  `TestResults/coverage-branch-hardening-ws2/reports/Summary.txt`
+  `TestResults/coverage-branch-hardening-ws3/reports/Summary.txt`
 - Coverage collection:
   `dotnet test tests\Gravitas.Tests\Gravitas.Tests.csproj --configuration Release --collect:"XPlat Code Coverage" --settings tests\Gravitas.Tests\coverlet.runsettings`
-  passed with 1105 tests.
+  passed with 1118 tests.
 - Branch shortlist:
-  `TestResults/coverage-branch-hardening-ws2/branch-gap-shortlist.txt`
-- Latest CRAP extraction reported 40 flagged methods and 278 uncovered
+  `TestResults/coverage-branch-hardening-ws3/branch-gap-shortlist.txt`
+- Latest CRAP extraction reported 37 flagged methods and 272 uncovered
   methods.
 
 ## Completed Coverage Summary
 
 The first coverage campaign, branch inventory sweep, and collision geometry
 hardening moved the project from 87.3% line, 74.1% branch, and 86.5% method
-coverage to 92.5% line, 78.4% branch, and 92.5% method coverage.
+coverage to 92.8% line, 78.7% branch, and 92.7% method coverage.
 
 High-value work completed:
 
@@ -141,6 +141,10 @@ High-value work completed:
 - Rotated cuboid raycast regression coverage after the inventory sweep exposed
   that oriented-box raycasts clipped the enclosing AABB instead of cuboid-local
   slabs.
+- Query reducer and shape-cast branch coverage for convex source sweeps against
+  compound 3D targets, concave triangle cone-axis hits, mixed conservative
+  fallback reducers, pure 2D convex mover/capsule CCD, and direct raycast worker
+  point/rotated-box geometry.
 
 Cleanup completed:
 
@@ -368,7 +372,7 @@ while deleting stale fallback paths that no valid collider shape can reach.
 
 ### Workstream 3: Query Reducer And Shape-Cast Branches
 
-**Status:** Pending
+**Status:** Complete - 2026-07-06
 
 **Purpose**
 
@@ -388,16 +392,47 @@ scalar-vs-batch tests.
 
 **Tasks**
 
-- [ ] Cover cone query branches only where gameplay-facing behavior changes:
+- [x] Cover cone query branches only where gameplay-facing behavior changes:
       axis hits, cap/rim hits, triangle intersections, rejected candidates, and
       conservative reducer markers.
-- [ ] Review `ConvexSweepQueryWorker` uncovered branches for true exact
+- [x] Review `ConvexSweepQueryWorker` uncovered branches for true exact
       shape-cast behavior versus stale compound fallback.
-- [ ] Cover mixed sphere/2D reducer branches that still decide exact vs
+- [x] Cover mixed sphere/2D reducer branches that still decide exact vs
       conservative hit reporting.
-- [ ] Remove duplicate batch tests that only repeat scalar query correctness.
-- [ ] Run focused query tests, allocation-sensitive query checks where
+- [x] Remove duplicate batch tests that only repeat scalar query correctness.
+- [x] Run focused query tests, allocation-sensitive query checks where
       relevant, full `Release`, then coverage.
+
+**Result Notes**
+
+- Added behavior coverage for convex mesh source sweeps against compound 3D
+  targets, keeping target owner identity while selecting the nearest part
+  geometry. `ConvexSweepQueryWorker.TrySweepTargetCompound(...)` moved from
+  uncovered to fully line-covered with 83.3% branch coverage.
+- Added cone overlap coverage for a concave mesh triangle crossing the cone
+  axis. This covers the axis/triangle intersection path without adding private
+  helper tests.
+- Added mixed swept-sphere coverage for unsupported 2D collider fallback
+  reducers and capsule slab starting overlap. This documents exact-vs-
+  conservative reducer reporting through the public mixed query surface.
+- Added pure 2D mover-shape sweep coverage for polygon movers against capsule
+  targets. `QueryDetection2D.TrySweepConvexMoverAgainstCapsule(...)` now has
+  100% line and branch coverage through the live CCD helper path.
+- Added direct `RaycastSegmentWorker` coverage for point-inside sphere,
+  point-inside finite cylinder, and rotated cuboid point checks. This raised
+  raycast-worker coverage while keeping the tests focused on reusable query
+  geometry rather than batch plumbing.
+- Extracted reusable unsupported 2D/3D test colliders into
+  `tests/Gravitas.Tests/Support/UnsupportedTestColliders.cs` so mixed query
+  fallback tests do not duplicate private fake collider implementations. Final
+  review tightened the unsupported 2D helper to clamp fallback closest points to
+  its authored bounds and assert the resulting mixed contact points.
+- Avoided adding a conservative fallback miss test after validation showed the
+  public broad phase rejects that setup before the reducer runs. Keeping it
+  would have asserted a candidate-gathering behavior, not the reducer branch.
+- Focused query/reducer slice passed with 150 tests. Full Release coverage
+  passed with 1118 tests and reported 92.8% line, 78.7% branch, and 92.7%
+  method coverage.
 
 ### Workstream 4: Serialization, Replay, And Authoring Branches
 
@@ -520,3 +555,4 @@ Close the release-hardening branch gate cleanly before expanding the plan toward
 | 2026-07-05 | 92.0% | 77.9% | 92.2% | 1094 passed | Roadmaps A-E completed. Added focused branch coverage across mixed query support, replay hash, diagnostics, collision dispatch, geometry, service lifecycle, and collider authoring. Removed stale cuboid and joint helper code. Fixed 3D inactive direct-collider load partition cleanup parity. |
 | 2026-07-06 | 92.1% | 77.9% | 92.4% | 1095 passed | Workstream 1 branch inventory completed. Removed stale immovable-contact direction, collider height shortcut, dead acceleration flags, mesh edge-normal storage, and an allocating triangle wrapper. Fixed rotated cuboid raycasts to clip local slabs. Recorded mesh-cuboid fallback SAT completeness for RCA. |
 | 2026-07-06 | 92.5% | 78.4% | 92.5% | 1105 passed | Workstream 2 collision geometry hardening completed. Removed unused SAT projection overload and duplicate mesh-cylinder fallback logic. Added 2D compound geometry/manifold, mixed compound selection, and cone-convex reversed/negative dispatch coverage. |
+| 2026-07-06 | 92.8% | 78.7% | 92.7% | 1118 passed | Workstream 3 query reducer and shape-cast hardening completed. Added focused coverage for convex-vs-compound sweeps, cone-axis concave triangle hits, mixed conservative fallback reporting, 2D convex mover/capsule sweeps, and raycast worker point/rotated-box geometry. |
