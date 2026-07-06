@@ -17,28 +17,42 @@
 
 ## Active Issues
 
-### Reduced SAT Helper Remains In Rotated Cuboid And Convex Mesh-Mesh Paths
+No active issues currently tracked.
+
+## Resolved Issues
+
+### Reduced SAT Helper Could False-Positive Rotated Cuboid And Convex Mesh-Mesh Paths
 
 **Discovered:** 2026-07-06  
+**Resolved:** 2026-07-06  
 **Source:** Mesh-cuboid fallback SAT RCA  
 **Affected area:** `CollisionDetection.Cuboid`, `CollisionDetection.Mesh`,
 rotated cuboid vs cuboid and convex mesh vs convex mesh fallback contact
 generation
 
-Concern: resolving the mesh-cuboid fallback false positive exposed the broader
-legacy `CollisionContext` SAT model. It is still used by non-axis-aligned
-cuboid/cuboid and convex mesh/mesh fallback paths, and it prepares axes from
-face normals only. Oriented box SAT and convex polyhedron SAT generally require
-edge-cross axes as well, so these paths need the same focused RCA before we
-either replace the reduced helper with full shape-specific SAT or prove the
-reachable public paths are already protected elsewhere.
+RCA: the legacy `CollisionContext` SAT model prepared axes from face normals
+only. That was insufficient for non-axis-aligned cuboid/cuboid and convex
+mesh/mesh public paths because both oriented box SAT and convex polyhedron SAT
+require edge-cross axes to reject certain separated configurations. Public-path
+counterexamples confirmed false positives for both rotated cuboid/cuboid and
+convex mesh/mesh.
 
-Next step: create public-path rotated cuboid/cuboid and convex mesh/mesh
-counterexample probes, verify red regressions if real, then replace the reduced
-helper with shape-specific no-allocation SAT paths and delete stale context
-types that become unused.
+Fix: rotated cuboid/cuboid now uses explicit full OBB SAT over three
+representative face axes from each cuboid plus the nine representative
+edge-cross axes. Convex mesh/mesh now uses full convex SAT over both meshes'
+face normals plus cross products of cached SAT mesh edges. `PhysicsMesh`
+builds the convex SAT edge cache once at construction time, skipping coplanar
+triangulation diagonals and omitting the cache for concave meshes. The obsolete
+`CollisionContext`, `CollisionObjectInfo`, `CuboidObjectInfo`, and
+`MeshObjectInfo` reduced SAT path was removed.
 
-## Resolved Issues
+Verification:
+
+- Added public-path red regressions for rotated cuboid/cuboid and convex
+  mesh/mesh configurations separated by edge-cross axes.
+- Verified the cuboid/cuboid regression failed before the OBB SAT fix and the
+  mesh/mesh regression failed before the convex mesh SAT fix.
+- Ran focused shape-pair and mesh/collider suites.
 
 ### Mesh-Cuboid Fallback SAT Could False-Positive Without Edge-Cross Axes
 

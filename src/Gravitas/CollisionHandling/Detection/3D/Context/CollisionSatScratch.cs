@@ -5,8 +5,6 @@
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
-using FixedMathSharp;
-using Gravitas.Colliders;
 using SwiftCollections;
 
 namespace Gravitas.CollisionHandling;
@@ -16,16 +14,6 @@ namespace Gravitas.CollisionHandling;
 /// </summary>
 internal sealed class CollisionSatScratch
 {
-    public CollisionContext Context { get; } = new();
-
-    public CuboidObjectInfo CuboidA { get; } = new();
-
-    public CuboidObjectInfo CuboidB { get; } = new();
-
-    public MeshObjectInfo MeshA { get; } = new();
-
-    public MeshObjectInfo MeshB { get; } = new();
-
     public SwiftList<int> MeshCylinderTriangles { get; } = new(8);
 
     public SwiftList<int> MeshTriangleCandidatesA { get; } = new(16);
@@ -33,44 +21,4 @@ internal sealed class CollisionSatScratch
     public SwiftList<int> MeshTriangleCandidatesB { get; } = new(16);
 
     public ContactManifold CompoundPartManifold { get; } = new();
-
-    public CollisionContext PrepareCuboids(
-        LSCuboidCollider cuboidA,
-        Vector3d pointA,
-        LSCuboidCollider cuboidB,
-        Vector3d pointB)
-    {
-        CuboidA.Set(cuboidA, pointA);
-        CuboidB.Set(cuboidB, pointB);
-        Context.Prepare(CuboidA, CuboidB);
-        return Context;
-    }
-
-    public bool TryPrepareMeshes(
-        LSMeshCollider meshA,
-        Vector3d pointA,
-        LSMeshCollider meshB,
-        Vector3d pointB,
-        out CollisionContext context)
-    {
-        MeshA.Set(meshA, pointA);
-        meshA.GetNearbyTriangles(pointA, MeshA.TriangleIndices);
-        if (MeshA.TriangleIndices.Count <= 0)
-        {
-            context = null!;
-            return false;
-        }
-
-        MeshB.Set(meshB, pointB);
-        meshB.GetNearbyTriangles(pointB, MeshB.TriangleIndices);
-        if (MeshB.TriangleIndices.Count <= 0)
-        {
-            context = null!;
-            return false;
-        }
-
-        Context.Prepare(MeshA, MeshB);
-        context = Context;
-        return true;
-    }
 }

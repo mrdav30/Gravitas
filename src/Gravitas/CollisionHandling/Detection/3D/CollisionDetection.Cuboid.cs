@@ -148,7 +148,7 @@ public static partial class CollisionDetection
         if (cuboidA.CurrentState == CuboidState.AABox && cuboidB.CurrentState == CuboidState.AABox)
             return TryBuildAxisAlignedCuboidManifold(pair, cuboidA, cuboidB);
 
-        if (!TestCuboidsSeperatingAxes(pair.Context.CollisionScratch, cuboidA, cuboidB, out CollisionResult? output))
+        if (!TestCuboidsSeperatingAxes(cuboidA, cuboidB, out CollisionResult? output))
             return false;
 
         if (!output.HasValue) return false;
@@ -164,13 +164,11 @@ public static partial class CollisionDetection
     /// <summary>
     /// Tests if there are any separating axes between two polygons using the given axis vectors.
     /// </summary>
-    /// <param name="scratch">The context-owned SAT scratch buffers.</param>
     /// <param name="cuboidA">The first collider.</param>
     /// <param name="cuboidB">The second collider.</param>
     /// <param name="output">The resulting collision information if a collision is detected.</param>
     /// <returns>true if no separating axis is found, false otherwise.</returns>
     private static bool TestCuboidsSeperatingAxes(
-        CollisionSatScratch scratch,
         LSCuboidCollider cuboidA,
         LSCuboidCollider cuboidB,
         out CollisionResult? output)
@@ -178,16 +176,72 @@ public static partial class CollisionDetection
         output = null;
 
         (Vector3d PointA, Vector3d PointB) = FindInitialPointsOfContact(cuboidA, cuboidB);
-
-        CollisionContext data = scratch.PrepareCuboids(cuboidA, PointA, cuboidB, PointB);
-        if (!PerformSeparatingAxisTest(data, out (Vector3d Vector, Fixed64 Depth)? axisPenetration))
+        if (!TryFindCuboidCuboidPenetration(cuboidA, cuboidB, out AxisPenetration penetration))
             return false;
 
         output = new CollisionResult(
-            data.PointsOfContact,
-            axisPenetration!.Value);
+            (PointA, PointB),
+            (penetration.Axis, penetration.Depth));
 
         return true;
+    }
+
+    private static bool TryFindCuboidCuboidPenetration(
+        LSCuboidCollider cuboidA,
+        LSCuboidCollider cuboidB,
+        out AxisPenetration penetration)
+    {
+        penetration = default;
+        Vector3d[] verticesA = cuboidA.Vertices;
+        Vector3d[] verticesB = cuboidB.Vertices;
+        Vector3d displacementAtoB = cuboidB.Center - cuboidA.Center;
+
+        if (!CheckCuboidFaceAxes(verticesA, verticesB, cuboidA, displacementAtoB, ref penetration)
+            || !CheckCuboidFaceAxes(verticesA, verticesB, cuboidB, displacementAtoB, ref penetration))
+        {
+            return false;
+        }
+
+        return CheckCuboidEdgeCrossAxes(verticesA, verticesB, cuboidA, cuboidB, displacementAtoB, ref penetration)
+            && penetration.HasValue;
+    }
+
+    private static bool CheckCuboidFaceAxes(
+        Vector3d[] verticesA,
+        Vector3d[] verticesB,
+        LSCuboidCollider axisSource,
+        Vector3d displacementAtoB,
+        ref AxisPenetration penetration)
+    {
+        return CheckVertexProjectionAxis(verticesA, verticesB, axisSource.FaceNormals[0], displacementAtoB, ref penetration)
+            && CheckVertexProjectionAxis(verticesA, verticesB, axisSource.FaceNormals[2], displacementAtoB, ref penetration)
+            && CheckVertexProjectionAxis(verticesA, verticesB, axisSource.FaceNormals[4], displacementAtoB, ref penetration);
+    }
+
+    private static bool CheckCuboidEdgeCrossAxes(
+        Vector3d[] verticesA,
+        Vector3d[] verticesB,
+        LSCuboidCollider cuboidA,
+        LSCuboidCollider cuboidB,
+        Vector3d displacementAtoB,
+        ref AxisPenetration penetration)
+    {
+        return CheckCuboidEdgeCrossAxes(verticesA, verticesB, cuboidA.EdgeDirections[0], cuboidB, displacementAtoB, ref penetration)
+            && CheckCuboidEdgeCrossAxes(verticesA, verticesB, cuboidA.EdgeDirections[2], cuboidB, displacementAtoB, ref penetration)
+            && CheckCuboidEdgeCrossAxes(verticesA, verticesB, cuboidA.EdgeDirections[8], cuboidB, displacementAtoB, ref penetration);
+    }
+
+    private static bool CheckCuboidEdgeCrossAxes(
+        Vector3d[] verticesA,
+        Vector3d[] verticesB,
+        Vector3d edgeA,
+        LSCuboidCollider cuboidB,
+        Vector3d displacementAtoB,
+        ref AxisPenetration penetration)
+    {
+        return CheckVertexProjectionAxis(verticesA, verticesB, Vector3d.Cross(edgeA, cuboidB.EdgeDirections[0]), displacementAtoB, ref penetration)
+            && CheckVertexProjectionAxis(verticesA, verticesB, Vector3d.Cross(edgeA, cuboidB.EdgeDirections[2]), displacementAtoB, ref penetration)
+            && CheckVertexProjectionAxis(verticesA, verticesB, Vector3d.Cross(edgeA, cuboidB.EdgeDirections[8]), displacementAtoB, ref penetration);
     }
 
     private static bool TryBuildAxisAlignedCuboidManifold(

@@ -34,6 +34,7 @@ namespace Gravitas.Colliders
         private static readonly Fixed64 TetrahedronCentroidDivisor = (Fixed64)4;
         private static readonly Fixed64 SecondMomentIntegralDivisor = (Fixed64)10;
         private static readonly Fixed64 ProductMomentIntegralDivisor = (Fixed64)20;
+        private static readonly Fixed64 SatEdgeNormalParallelCosThreshold = FixedMath.Cos(FixedMath.DegToRad((Fixed64)2));
 
         private readonly Vector3d[] _localVertices;
 
@@ -74,6 +75,9 @@ namespace Gravitas.Colliders
 
         private readonly int _triangleCount;
         public int TriangleCount => _triangleCount;
+
+        private readonly int[] _convexSatEdgeVertexPairs;
+        internal int[] ConvexSatEdgeVertexPairs => _convexSatEdgeVertexPairs;
 
         public MeshColliderMode Mode { get; }
 
@@ -178,6 +182,9 @@ namespace Gravitas.Colliders
             _triangleCount = triangles.Length / 3; // 3 vertices per triangle
             _triangleBVH = new SwiftFixedBVH<int>(2 * TriangleCount - 1);
             _faceNormals = new Vector3d[TriangleCount];
+            _convexSatEdgeVertexPairs = Mode == MeshColliderMode.Convex
+                ? CreateConvexSatEdgeVertexPairs(_localVertices, _triangles, _triangleCount)
+                : Array.Empty<int>();
 
             _faceAreas = new Fixed64[TriangleCount];
             _totalArea = Fixed64.Zero;
@@ -269,15 +276,109 @@ namespace Gravitas.Colliders
             Vector3d startEdgeB,
             Vector3d endEdgeB) => Vector3d.Cross(endEdgeA - startEdgeA, endEdgeB - startEdgeB).Magnitude * Fixed64.Half;
 
+        private static int[] CreateConvexSatEdgeVertexPairs(
+            Vector3d[] vertices,
+            int[] triangles,
+            int triangleCount)
+        {
+            var edgeUses = new EdgeUse[triangleCount * 3];
+            int edgeIndex = 0;
+            for (int i = 0; i < triangleCount; i++)
+            {
+                int triangleIndex = i * 3;
+                int index0 = triangles[triangleIndex];
+                int index1 = triangles[triangleIndex + 1];
+                int index2 = triangles[triangleIndex + 2];
+
+                edgeUses[edgeIndex++] = EdgeUse.Create(index0, index1, i);
+                edgeUses[edgeIndex++] = EdgeUse.Create(index1, index2, i);
+                edgeUses[edgeIndex++] = EdgeUse.Create(index2, index0, i);
+            }
+
+            Array.Sort(edgeUses, CompareEdgeUses);
+            int satEdgeCount = CountConvexSatEdges(edgeUses, vertices, triangles);
+            var edgeVertexPairs = new int[satEdgeCount * 2];
+            int pairIndex = 0;
+            for (int start = 0; start < edgeUses.Length;)
+            {
+                int end = FindEdgeUseGroupEnd(edgeUses, start);
+                if (ShouldIncludeConvexSatEdge(edgeUses, start, end, vertices, triangles))
+                {
+                    edgeVertexPairs[pairIndex++] = edgeUses[start].StartVertexIndex;
+                    edgeVertexPairs[pairIndex++] = edgeUses[start].EndVertexIndex;
+                }
+
+                start = end;
+            }
+
+            return edgeVertexPairs;
+        }
+
+        private static int CountConvexSatEdges(
+            EdgeUse[] edgeUses,
+            Vector3d[] vertices,
+            int[] triangles)
+        {
+            int count = 0;
+            for (int start = 0; start < edgeUses.Length;)
+            {
+                int end = FindEdgeUseGroupEnd(edgeUses, start);
+                if (ShouldIncludeConvexSatEdge(edgeUses, start, end, vertices, triangles))
+                    count++;
+
+                start = end;
+            }
+
+            return count;
+        }
+
+        private static int FindEdgeUseGroupEnd(EdgeUse[] edgeUses, int start)
+        {
+            long key = edgeUses[start].Key;
+            int end = start + 1;
+            while (end < edgeUses.Length && edgeUses[end].Key == key)
+                end++;
+
+            return end;
+        }
+
+        private static bool ShouldIncludeConvexSatEdge(
+            EdgeUse[] edgeUses,
+            int start,
+            int end,
+            Vector3d[] vertices,
+            int[] triangles)
+        {
+            if (end - start <= 1)
+                return true;
+
+            Vector3d firstNormal = CalculateLocalTriangleNormal(vertices, triangles, edgeUses[start].TriangleIndex);
+            for (int i = start + 1; i < end; i++)
+            {
+                Vector3d nextNormal = CalculateLocalTriangleNormal(vertices, triangles, edgeUses[i].TriangleIndex);
+                if (Vector3d.Dot(firstNormal, nextNormal).Abs() < SatEdgeNormalParallelCosThreshold)
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static Vector3d CalculateLocalTriangleNormal(
+            Vector3d[] vertices,
+            int[] triangles,
+            int triangleIndex)
+        {
+            int index = triangleIndex * 3;
+            Vector3d first = vertices[triangles[index]];
+            Vector3d second = vertices[triangles[index + 1]];
+            Vector3d third = vertices[triangles[index + 2]];
+            return Vector3d.Cross(second - first, third - first).Normalized;
+        }
+
         private Vector3d[] CalculateFaceNormals()
         {
             for (int i = 0; i < _triangleCount; i++)
-            {
-                int index0 = _triangles[i * 3];
-                int index1 = _triangles[i * 3 + 1];
-                int index2 = _triangles[i * 3 + 2];
-                _faceNormals[i] = Vector3d.Cross(_localVertices[index1] - _localVertices[index0], _localVertices[index2] - _localVertices[index0]).Normalized;
-            }
+                _faceNormals[i] = CalculateLocalTriangleNormal(_localVertices, _triangles, i);
 
             _faceNormalsValid = true;
             return _faceNormals;
@@ -950,6 +1051,10 @@ namespace Gravitas.Colliders
             }
 
             public long Key { get; }
+
+            public int StartVertexIndex => (int)(Key >> 32);
+
+            public int EndVertexIndex => (int)(uint)Key;
 
             public int Direction { get; }
 

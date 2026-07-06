@@ -246,7 +246,6 @@ public static partial class CollisionDetection
         penetration = default;
         PhysicsMesh physicsMesh = mesh.Mesh;
         Vector3d[] meshVertices = physicsMesh.Vertices;
-        int[] meshTriangles = physicsMesh.Triangles;
         int triangleCount = physicsMesh.TriangleCount;
         Vector3d[] cuboidVertices = cuboid.Vertices;
         Vector3d meshToCuboid = cuboid.Center - mesh.Center;
@@ -263,17 +262,11 @@ public static partial class CollisionDetection
             || !CheckConvexMeshCuboidAxis(meshVertices, cuboidVertices, cuboid.FaceNormals[4], meshToCuboid, ref penetration))
             return false;
 
-        for (int triangleIndex = 0; triangleIndex < triangleCount; triangleIndex++)
+        int[] edgeVertexPairs = physicsMesh.ConvexSatEdgeVertexPairs;
+        for (int i = 0; i < edgeVertexPairs.Length; i += 2)
         {
-            int triangleOffset = triangleIndex * 3;
-            Vector3d first = meshVertices[meshTriangles[triangleOffset]];
-            Vector3d second = meshVertices[meshTriangles[triangleOffset + 1]];
-            Vector3d third = meshVertices[meshTriangles[triangleOffset + 2]];
-            if (!CheckConvexMeshCuboidEdgeAxes(meshVertices, cuboidVertices, cuboid, second - first, meshToCuboid, ref penetration))
-                return false;
-            if (!CheckConvexMeshCuboidEdgeAxes(meshVertices, cuboidVertices, cuboid, third - second, meshToCuboid, ref penetration))
-                return false;
-            if (!CheckConvexMeshCuboidEdgeAxes(meshVertices, cuboidVertices, cuboid, first - third, meshToCuboid, ref penetration))
+            Vector3d meshEdge = meshVertices[edgeVertexPairs[i + 1]] - meshVertices[edgeVertexPairs[i]];
+            if (!CheckConvexMeshCuboidEdgeAxes(meshVertices, cuboidVertices, cuboid, meshEdge, meshToCuboid, ref penetration))
                 return false;
         }
 
@@ -299,16 +292,7 @@ public static partial class CollisionDetection
         Vector3d axis,
         Vector3d meshToCuboid,
         ref AxisPenetration penetration)
-    {
-        if (!TryNormalizeAxis(axis, out Vector3d normalizedAxis))
-            return true;
-
-        FixedRange meshProjection = FixedRange.MinRange;
-        FixedRange cuboidProjection = FixedRange.MinRange;
-        AxisProjectionHelper.ProjectPolygonOntoAxis(normalizedAxis, meshVertices, ref meshProjection);
-        AxisProjectionHelper.ProjectPolygonOntoAxis(normalizedAxis, cuboidVertices, ref cuboidProjection);
-        return CheckProjectedAxis(meshProjection, cuboidProjection, normalizedAxis, meshToCuboid, ref penetration);
-    }
+        => CheckVertexProjectionAxis(meshVertices, cuboidVertices, axis, meshToCuboid, ref penetration);
 
     private static (Vector3d Point1, Vector3d Point2) FindInitialPointsOfContact(LSMeshCollider mesh, LSCuboidCollider cuboid)
     {
@@ -368,17 +352,62 @@ public static partial class CollisionDetection
             return false;
 
         (Vector3d Point1, Vector3d Point2) = FindInitialPointsOfContact(mesh1, mesh2);
-        if (!pair.Context.CollisionScratch.TryPrepareMeshes(mesh1, Point1, mesh2, Point2, out CollisionContext data))
+        if (!TryFindConvexMeshMeshPenetration(mesh1, mesh2, out AxisPenetration penetration))
+            return false;
+
+        output = new CollisionResult(
+            (Point1, Point2),
+            (penetration.Axis, penetration.Depth));
+
+        return true;
+    }
+
+    private static bool TryFindConvexMeshMeshPenetration(
+        LSMeshCollider meshA,
+        LSMeshCollider meshB,
+        out AxisPenetration penetration)
+    {
+        penetration = default;
+        PhysicsMesh physicsMeshA = meshA.Mesh;
+        PhysicsMesh physicsMeshB = meshB.Mesh;
+        Vector3d[] verticesA = physicsMeshA.Vertices;
+        Vector3d[] verticesB = physicsMeshB.Vertices;
+        Vector3d displacementAtoB = meshB.Center - meshA.Center;
+
+        if (!CheckConvexMeshFaceAxes(physicsMeshA, verticesA, verticesB, displacementAtoB, ref penetration)
+            || !CheckConvexMeshFaceAxes(physicsMeshB, verticesA, verticesB, displacementAtoB, ref penetration))
         {
             return false;
         }
 
-        if (!PerformSeparatingAxisTest(data, out (Vector3d Vector, Fixed64 Depth)? axisPenetration))
-            return false;
+        int[] edgeVertexPairsA = physicsMeshA.ConvexSatEdgeVertexPairs;
+        int[] edgeVertexPairsB = physicsMeshB.ConvexSatEdgeVertexPairs;
+        for (int a = 0; a < edgeVertexPairsA.Length; a += 2)
+        {
+            Vector3d edgeA = verticesA[edgeVertexPairsA[a + 1]] - verticesA[edgeVertexPairsA[a]];
+            for (int b = 0; b < edgeVertexPairsB.Length; b += 2)
+            {
+                Vector3d edgeB = verticesB[edgeVertexPairsB[b + 1]] - verticesB[edgeVertexPairsB[b]];
+                if (!CheckVertexProjectionAxis(verticesA, verticesB, Vector3d.Cross(edgeA, edgeB), displacementAtoB, ref penetration))
+                    return false;
+            }
+        }
 
-        output = new CollisionResult(
-            data.PointsOfContact,
-            axisPenetration!.Value);
+        return penetration.HasValue;
+    }
+
+    private static bool CheckConvexMeshFaceAxes(
+        PhysicsMesh axisSource,
+        Vector3d[] verticesA,
+        Vector3d[] verticesB,
+        Vector3d displacementAtoB,
+        ref AxisPenetration penetration)
+    {
+        for (int i = 0; i < axisSource.TriangleCount; i++)
+        {
+            if (!CheckVertexProjectionAxis(verticesA, verticesB, axisSource.GetFaceNormalWorld(i), displacementAtoB, ref penetration))
+                return false;
+        }
 
         return true;
     }
@@ -389,30 +418,6 @@ public static partial class CollisionDetection
         Vector3d support1 = mesh1.GetSupportPoint(mesh2.Center);
         Vector3d pointOfContactA = mesh1.ClosestPointOnSurface(support1);
         return (pointOfContactA, mesh2.ClosestPointOnSurface(pointOfContactA));
-    }
-
-    private static bool PerformSeparatingAxisTest(
-        CollisionContext data,
-        out (Vector3d Vector, Fixed64 Depth)? axisPenetration)
-    {
-        axisPenetration = null;
-        if (data.AxisVectors.Count <= 0)
-            return false;
-
-        FixedRange projectionA = FixedRange.MinRange, projectionB = FixedRange.MinRange;
-        foreach (Vector3d axis in data.AxisVectors)
-        {
-            AxisProjectionHelper.ProjectPolygonOntoAxis(axis, data.CollisionInfoA.UniqueVertices, ref projectionA);
-            AxisProjectionHelper.ProjectPolygonOntoAxis(axis, data.CollisionInfoB.UniqueVertices, ref projectionB);
-            if (!projectionA.Overlaps(projectionB))
-                return false;  //  Found seperating axis, no collision.
-            Fixed64 overlap = FixedRange.ComputeOverlapDepth(projectionA, projectionB);
-            // Update if this axis is the axis of minimum penetration
-            if (!axisPenetration.HasValue || overlap < axisPenetration.Value.Depth)
-                axisPenetration = (Vector3d.Dot(data.Displacement, axis) < Fixed64.Zero ? -axis : axis, overlap);  // Flip the direction if it's pointing the wrong way.
-        }
-
-        return true;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

@@ -33,6 +33,23 @@ public static partial class CollisionDetection
         return true;
     }
 
+    private static bool CheckVertexProjectionAxis(
+        Vector3d[] verticesA,
+        Vector3d[] verticesB,
+        Vector3d axis,
+        Vector3d displacementAtoB,
+        ref AxisPenetration penetration)
+    {
+        if (!TryNormalizeAxis(axis, out Vector3d normalizedAxis))
+            return true;
+
+        FixedRange projectionA = FixedRange.MinRange;
+        FixedRange projectionB = FixedRange.MinRange;
+        AxisProjectionHelper.ProjectPolygonOntoAxis(normalizedAxis, verticesA, ref projectionA);
+        AxisProjectionHelper.ProjectPolygonOntoAxis(normalizedAxis, verticesB, ref projectionB);
+        return CheckProjectedAxis(projectionA, projectionB, normalizedAxis, displacementAtoB, ref penetration);
+    }
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Fixed64 ComputeMinimumProjectionOverlap(FixedRange projectionA, FixedRange projectionB)
     {

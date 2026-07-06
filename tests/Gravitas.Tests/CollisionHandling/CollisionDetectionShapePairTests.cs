@@ -290,6 +290,22 @@ public sealed class CollisionDetectionShapePairTests
     }
 
     [Fact]
+    public void CuboidCuboid_WithRotatedCuboidSeparatedByEdgeAxis_ShouldNotUseReducedSatFalsePositive()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSCuboidCollider> first = scenario.CreateCuboid(Vector3d.Zero);
+        ScenarioBody<LSCuboidCollider> second = scenario.CreateCuboid(
+            new Vector3d(
+                Fixed64.FromFraction(-9, 8),
+                Fixed64.FromFraction(-9, 8),
+                Fixed64.FromFraction(-3, 4)),
+            FixedQuaternion.FromEulerAnglesInDegrees((Fixed64)10, (Fixed64)35, (Fixed64)15));
+
+        AssertNoCollision(scenario, first.Collider, second.Collider, CollisionType.Cuboid_Cuboid);
+        AssertNoCollision(scenario, second.Collider, first.Collider, CollisionType.Cuboid_Cuboid);
+    }
+
+    [Fact]
     public void AxisAlignedCuboidChecks_ShouldNotAllocateAfterWarmup()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
@@ -732,6 +748,26 @@ public sealed class CollisionDetectionShapePairTests
         CollisionPair pair = AssertCollision(scenario, first.Collider, second.Collider, CollisionType.Mesh_Mesh);
 
         pair.Manifold.HasContact.Should().BeTrue();
+    }
+
+    [Fact]
+    public void MeshMesh_WithRotatedConvexMeshSeparatedByEdgeAxis_ShouldNotUseReducedSatFalsePositive()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSMeshCollider> first = scenario.CreateBody(
+            MeshTestFixtures.CreateConvexCube(),
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+        ScenarioBody<LSMeshCollider> second = scenario.CreateBody(
+            MeshTestFixtures.CreateConvexCube(),
+            new Vector3d(
+                Fixed64.FromFraction(-1, 4),
+                Fixed64.FromFraction(-5, 8),
+                Fixed64.FromFraction(5, 4)),
+            FixedQuaternion.FromEulerAnglesInDegrees((Fixed64)32, (Fixed64)(-20), (Fixed64)12));
+
+        AssertNoCollision(scenario, first.Collider, second.Collider, CollisionType.Mesh_Mesh);
+        AssertNoCollision(scenario, second.Collider, first.Collider, CollisionType.Mesh_Mesh);
     }
 
     [Fact]
