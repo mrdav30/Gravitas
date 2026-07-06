@@ -149,6 +149,34 @@ public sealed class CompoundCollider2DTests
         compound.RuntimeShapeVersion.Should().BeGreaterThan(1u);
     }
 
+    [Fact]
+    public void ScaledRadius_ShouldUseFarthestCircleCapsuleAndVertexPart()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        var compound = new LSCompoundCollider2D(
+            CompoundColliderPart2D.Circle(Fixed64.Half, new Vector2d(-Fixed64.One, Fixed64.Zero)),
+            CompoundColliderPart2D.Capsule(Fixed64.Half, (Fixed64)4, new Vector2d(Fixed64.Zero, (Fixed64)2)),
+            CompoundColliderPart2D.AABox(new Vector2d((Fixed64)2, (Fixed64)2), new Vector2d((Fixed64)3, Fixed64.Zero)));
+
+        _ = CreateBody(context, compound, Vector2d.Zero);
+
+        compound.ScaledRadius.Should().Be(FixedMath.Sqrt((Fixed64)17));
+    }
+
+    [Fact]
+    public void GetClosestPoint_ShouldUseNearestPart()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        var compound = new LSCompoundCollider2D(
+            CompoundColliderPart2D.Circle(Fixed64.Half, new Vector2d((Fixed64)(-4), Fixed64.Zero)),
+            CompoundColliderPart2D.Circle(Fixed64.Half, new Vector2d((Fixed64)2, Fixed64.Zero)));
+        _ = CreateBody(context, compound, Vector2d.Zero);
+
+        Vector2d closest = compound.GetClosestPoint(new Vector2d((Fixed64)3, Fixed64.Zero));
+
+        closest.Should().Be(new Vector2d(Fixed64.FromFraction(5, 2), Fixed64.Zero));
+    }
+
     private static SolidBody2D CreateBody(GravitasWorldContext context, LSCollider2D collider, Vector2d position)
     {
         var transform = new FixedTransform(new Vector3d(position.X, Fixed64.Zero, position.Y), FixedQuaternion.Identity, Vector3d.One);

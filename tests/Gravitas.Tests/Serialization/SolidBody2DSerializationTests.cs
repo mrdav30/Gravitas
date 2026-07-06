@@ -252,6 +252,27 @@ public sealed class SolidBody2DSerializationTests
         ((LSCircleCollider2D)target.Collider).Radius.Should().Be(((LSCircleCollider2D)source.Collider).Radius);
     }
 
+    [Theory]
+    [MemberData(nameof(Transports))]
+    public void PopulateInactiveCollider_ShouldClearExistingPartitionMembership(GravitasSerializationTransport transport)
+    {
+        using GravitasWorldContext sourceContext = Physics2DTestWorld.CreateContext(frameRate: 8);
+        LSCircleCollider2D source = CreateStaticCircle(sourceContext, Vector2d.Zero);
+        source.Deactivate();
+        source.IsActive.Should().BeFalse();
+        object payload = GravitasSerializationHarness.Serialize(source, transport);
+
+        using GravitasWorldContext targetContext = Physics2DTestWorld.CreateContext(frameRate: 8);
+        LSCircleCollider2D target = CreateStaticCircle(targetContext, Vector2d.Zero);
+        target.IsPartitioned.Should().BeTrue();
+
+        GravitasSerializationHarness.Populate(target, payload, transport);
+
+        target.IsActive.Should().BeFalse();
+        target.IsPartitioned.Should().BeFalse();
+        target.PartitionCoordinates.Should().BeEmpty();
+    }
+
     private static SolidBody2D CreateDynamicCircle(GravitasWorldContext context, Vector2d position = default)
     {
         var agent = new TestMatterAgent(context, new FixedTransform(
@@ -264,6 +285,17 @@ public sealed class SolidBody2DSerializationTests
         };
         body.Initialize(position);
         return body;
+    }
+
+    private static LSCircleCollider2D CreateStaticCircle(GravitasWorldContext context, Vector2d position)
+    {
+        var agent = new TestMatterAgent(context, new FixedTransform(
+            new Vector3d(position.X, Fixed64.Zero, position.Y),
+            FixedQuaternion.Identity,
+            Vector3d.One));
+        var collider = new LSCircleCollider2D(Fixed64.Half);
+        collider.InitializeWithNoBody(agent);
+        return collider;
     }
 
     private static void CreateStaticFloor(GravitasWorldContext context)

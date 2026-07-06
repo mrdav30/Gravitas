@@ -176,10 +176,6 @@ public sealed class Joint2D : IRecordable
         _collisionPolicy = collisionPolicy;
     }
 
-    internal bool HasAwakeParticipant() =>
-        IsSolverBody(BodyA) && BodyA.IsAwakeForCollision
-        || IsSolverBody(BodyB) && BodyB.IsAwakeForCollision;
-
     internal bool HasSolverParticipant() => IsSolverBody(BodyA) || IsSolverBody(BodyB);
 
     internal static bool IsSolverBody(SolidBody2D body) => body.Active && body.DynamicId >= 0 && body.CanTranslate;

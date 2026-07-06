@@ -242,6 +242,39 @@ public sealed class Collider2DStateParityTests
         child.Collider.Parent3D.Should().BeNull();
     }
 
+    [Fact]
+    public void ClearParent_ShouldRemoveParentChildReferencesAndRestoreCollisionEligibility()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        SolidBody2D parent = CreateBody(context, new LSCircleCollider2D(Fixed64.One), Vector2d.Zero, immovable: false);
+        SolidBody2D child = CreateBody(context, new LSCircleCollider2D(Fixed64.One), new Vector2d(Fixed64.Half, Fixed64.Zero), immovable: false);
+        child.Collider.SetParent(parent.Collider);
+
+        child.Collider.ClearParent();
+
+        parent.Collider.HierarchyChildCount.Should().Be(0);
+        child.Collider.ParentId.Should().Be(-1);
+        child.Collider.Parent2D.Should().BeNull();
+        child.Collider.Parent3D.Should().BeNull();
+        context.Physics2D.RequireCollisionPair(parent.Collider, child.Collider).Should().BeTrue();
+    }
+
+    [Fact]
+    public void ClearParent_ShouldRestoreConfiguredParentFlagWhenLastChildIsRemoved()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        SolidBody2D parent = CreateBody(context, new LSCircleCollider2D(Fixed64.One), Vector2d.Zero, immovable: false, isParent: false);
+        SolidBody2D child = CreateBody(context, new LSCircleCollider2D(Fixed64.One), new Vector2d(Fixed64.Half, Fixed64.Zero), immovable: false);
+        child.Collider.SetParent(parent.Collider);
+        parent.Collider.IsParent.Should().BeTrue();
+
+        child.Collider.ClearParent();
+
+        parent.Collider.IsParent.Should().BeFalse();
+        parent.Collider.HierarchyChildCount.Should().Be(0);
+        child.Collider.ParentId.Should().Be(-1);
+    }
+
     [Theory]
     [InlineData(ColliderType2D.Circle, ColliderType2D.Circle, CollisionType2D.Circle_Circle)]
     [InlineData(ColliderType2D.Circle, ColliderType2D.AABox, CollisionType2D.Circle_Convex)]
@@ -257,13 +290,14 @@ public sealed class Collider2DStateParityTests
         LSCollider2D collider,
         Vector2d position,
         bool immovable,
-        bool isDynamic = true)
+        bool isDynamic = true,
+        bool isParent = true)
     {
         var transform = new FixedTransform(
             new Vector3d(position.X, Fixed64.Zero, position.Y),
             FixedQuaternion.Identity,
             Vector3d.One);
-        var agent = new TestMatterAgent(context, transform);
+        var agent = new TestMatterAgent(context, transform, isParent);
         var body = new SolidBody2D(agent, collider)
         {
             Mass = Fixed64.One,

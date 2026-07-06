@@ -355,6 +355,45 @@ public sealed class Constraint2DServiceTests
         context.Constraints2D.EnabledJointCount.Should().Be(0);
     }
 
+    [Fact]
+    public void ConstraintServiceMotorHelpers_ShouldUpdateJointAndRagdollTargets()
+    {
+        using GravitasWorldContext context = CreateConstraintContext();
+        SolidBody2D root = CreateBody(context, Vector2d.Zero, isKinematic: true);
+        SolidBody2D child = CreateBody(context, Vector2d.Right * (Fixed64)2, isKinematic: true);
+        RagdollRuntime2D ragdoll = context.Constraints2D.RegisterRagdoll(CreateTwoLinkRagdoll(root, child));
+        Joint2D joint = ragdoll.GetJoint(0);
+        JointMotor2D motor = JointMotor2D.Angular(Fixed64.FromFraction(1, 4), (Fixed64)2, Fixed64.Half, Fixed64.One);
+
+        context.Constraints2D.SetRagdollPoseTargets(ragdoll, new[] { motor });
+        context.Constraints2D.SetJointMotorTarget(joint.Id, Fixed64.FromFraction(1, 3)).Should().BeTrue();
+
+        joint.Motor.Kind.Should().Be(JointMotorKind2D.Angular);
+        joint.Motor.DriveStrength.Should().Be((Fixed64)2);
+        joint.Motor.Damping.Should().Be(Fixed64.Half);
+        joint.Motor.MaximumMotorImpulse.Should().Be(Fixed64.One);
+        joint.Motor.Target.Should().Be(Fixed64.FromFraction(1, 3));
+
+        context.Constraints2D.ClearJointMotorTarget(joint.Id).Should().BeTrue();
+        joint.Motor.Kind.Should().Be(JointMotorKind2D.Disabled);
+    }
+
+    [Fact]
+    public void SetRagdollPoseTargets_WithForeignRuntime_ShouldReject()
+    {
+        using GravitasWorldContext sourceContext = CreateConstraintContext();
+        using GravitasWorldContext targetContext = CreateConstraintContext();
+        SolidBody2D root = CreateBody(sourceContext, Vector2d.Zero, isKinematic: true);
+        SolidBody2D child = CreateBody(sourceContext, Vector2d.Right * (Fixed64)2, isKinematic: true);
+        RagdollRuntime2D ragdoll = sourceContext.Constraints2D.RegisterRagdoll(CreateTwoLinkRagdoll(root, child));
+        JointMotor2D motor = JointMotor2D.Angular(Fixed64.Zero, Fixed64.One, Fixed64.Zero, Fixed64.One);
+
+        Action act = () => targetContext.Constraints2D.SetRagdollPoseTargets(ragdoll, new[] { motor });
+
+        act.Should().Throw<ArgumentException>()
+            .WithParameterName("ragdoll");
+    }
+
     [Theory]
     [MemberData(nameof(Transports))]
     public void JointRecordData_ShouldRoundTripAuthoritative2DState(GravitasSerializationTransport transport)

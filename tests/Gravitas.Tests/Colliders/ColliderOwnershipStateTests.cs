@@ -82,6 +82,69 @@ public sealed class ColliderOwnershipStateTests
     }
 
     [Fact]
+    public void Deactivate3DParent_ShouldClear2DChildHierarchyState()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> parent = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
+        SolidBody2D child = CreateCircle2D(scenario.Context, Vector2d.Zero);
+        child.Collider.SetParent(parent.Collider);
+
+        parent.Collider.Deactivate();
+
+        child.Collider.ParentId.Should().Be(-1);
+        child.Collider.Parent2D.Should().BeNull();
+        child.Collider.Parent3D.Should().BeNull();
+    }
+
+    [Fact]
+    public void Deactivate2DParent_ShouldClear3DChildHierarchyState()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        SolidBody2D parent = CreateCircle2D(scenario.Context, Vector2d.Zero);
+        ScenarioBody<LSSphereCollider> child = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(1, 0, 0));
+        child.Collider.SetParent(parent.Collider);
+
+        parent.Collider.Deactivate();
+
+        child.Collider.ParentId.Should().Be(-1);
+        child.Collider.Parent2D.Should().BeNull();
+        child.Collider.Parent3D.Should().BeNull();
+    }
+
+    [Fact]
+    public void ClearParent_ShouldRemoveParentChildReferencesAndRestoreCollisionEligibility()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> parent = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
+        ScenarioBody<LSSphereCollider> child = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(1, 0, 0));
+        child.Collider.SetParent(parent.Collider);
+
+        child.Collider.ClearParent();
+
+        parent.Collider.HierarchyChildCount.Should().Be(0);
+        child.Collider.ParentId.Should().Be(-1);
+        child.Collider.Parent3D.Should().BeNull();
+        child.Collider.Parent2D.Should().BeNull();
+        scenario.Context.Physics.RequireCollisionPair(parent.Collider, child.Collider).Should().BeTrue();
+    }
+
+    [Fact]
+    public void ClearParent_ShouldRestoreConfiguredParentFlagWhenLastChildIsRemoved()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> parent = CreateSphere(scenario, PhysicsScenarioBuilder.Vector(0, 0, 0), isParent: false);
+        ScenarioBody<LSSphereCollider> child = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(1, 0, 0));
+        child.Collider.SetParent(parent.Collider);
+        parent.Collider.IsParent.Should().BeTrue();
+
+        child.Collider.ClearParent();
+
+        parent.Collider.IsParent.Should().BeFalse();
+        parent.Collider.HierarchyChildCount.Should().Be(0);
+        child.Collider.ParentId.Should().Be(-1);
+    }
+
+    [Fact]
     public void DeactivateHolderSide_ShouldRemoveOwningPairReference()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
@@ -142,5 +205,36 @@ public sealed class ColliderOwnershipStateTests
     {
         scenario.Context.Simulate();
         scenario.Context.LateSimulate();
+    }
+
+    private static ScenarioBody<LSSphereCollider> CreateSphere(
+        PhysicsScenarioBuilder scenario,
+        Vector3d position,
+        bool isParent)
+    {
+        var collider = new LSSphereCollider();
+        var transform = new FixedTransform(position, FixedQuaternion.Identity, Vector3d.One);
+        var agent = new TestMatterAgent(scenario.Context, transform, isParent);
+        var body = new SolidBody(agent, collider)
+        {
+            Mass = Fixed64.One
+        };
+        body.Initialize(position, FixedQuaternion.Identity);
+        return new ScenarioBody<LSSphereCollider>(body, collider);
+    }
+
+    private static SolidBody2D CreateCircle2D(GravitasWorldContext context, Vector2d position)
+    {
+        var transform = new FixedTransform(
+            new Vector3d(position.X, Fixed64.Zero, position.Y),
+            FixedQuaternion.Identity,
+            Vector3d.One);
+        var agent = new TestMatterAgent(context, transform);
+        var body = new SolidBody2D(agent, new LSCircleCollider2D(Fixed64.Half))
+        {
+            Mass = Fixed64.One
+        };
+        body.Initialize(position);
+        return body;
     }
 }
