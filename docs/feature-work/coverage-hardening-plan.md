@@ -1,7 +1,7 @@
 # Coverage Hardening Plan
 
 **Date:** 2026-07-05  
-**Status:** Active - Roadmap A complete; 100% campaign remains  
+**Status:** Active - Roadmap B complete; 100% campaign remains  
 **Owner:** Gravitas coverage, test-quality, and dead-code hardening
 
 ---
@@ -482,13 +482,28 @@ integration setup without changing runtime cost.
 
 ### Roadmap B: Replay Hash Branch Families
 
-**Status:** Pending
+**Status:** Completed
 
 Target 2D joint replay hashing, mixed collision pair replay hashing, and
 manifold/contact contribution branches. Cover authoritative and solver-cache
 modes, inactive/empty state, hierarchy ordinal resolution, and stable ordering.
 Do not add tests that merely hash default objects; each case should prove a
 deterministic state distinction.
+
+**Result**
+
+- Added a focused replay hash branch suite for 2D joint authoritative state,
+  solver-cache-only mutation, removed 2D constraint slots, 2D ragdoll activation
+  metadata, 2D/3D pair manifold material payloads, warm-start cache payloads,
+  mixed trigger/contact material payloads, and mixed 2D/3D hierarchy ordinal
+  resolution.
+- Kept this pass test-only. The existing replay hash writers already separated
+  authoritative continuation state from solver-cache RCA state correctly.
+- Verified hierarchy replay keys are normalized through replay ordinals rather
+  than raw collider IDs by comparing equivalent mixed hierarchies with deleted
+  collider ID churn.
+- Coverage report:
+  `TestResults/coverage-roadmap-b/reports/Summary.txt`
 
 ### Roadmap C: Diagnostics Draw And Event Branches
 
@@ -532,3 +547,4 @@ or stale support paths rather than preserving them for coverage.
 | 2026-07-05 | 89.4% | 75.8% | 89.5% | 1012 passed | Workstream 7 covered additional 2D/3D constraint limit and motor branches. |
 | 2026-07-05 | 90.0% | 76.0% | 91.0% | 1025 passed | Final first-pass checkpoint. Removed unused transient-state scaffolding and covered query request/range, coroutine wait, layer, and compound-part contracts. Branch 90% remains active roadmap work. |
 | 2026-07-05 | 90.1% | 76.5% | 91.1% | 1034 passed | Roadmap A completed. Mixed swept-box clipping and reducer classification are split into focused internal helpers with direct branch coverage. |
+| 2026-07-05 | 90.7% | 76.8% | 91.5% | 1042 passed | Roadmap B completed. Replay hash branch coverage now covers 2D joint cache/authoritative distinctions, pair manifold/warm-start payloads, mixed trigger/contact materials, and hierarchy replay ordinal normalization. |
