@@ -3,6 +3,7 @@ using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.Diagnostics;
 using Gravitas.Tests.Support;
+using System;
 using System.Collections.Generic;
 using Xunit;
 
@@ -107,6 +108,26 @@ public sealed class GravitasDebugDrawCommandViewTests
         visitor.LastLine.Sequence.Should().Be(0);
         visitor.LastPoint.Sequence.Should().Be(1);
         visitor.LastPoint.Center.Should().Be(Vector3d.Up);
+    }
+
+    [Fact]
+    public void DispatchTo_ShouldRejectNullDebugDrawVisitors()
+    {
+        GravitasDebugDrawCommand command = CreateCommand(GravitasDebugDrawKind.Line);
+
+        Action dispatchCommand = () => command.DispatchTo(null!);
+
+        dispatchCommand.Should().Throw<ArgumentNullException>().WithParameterName("visitor");
+    }
+
+    [Fact]
+    public void DispatchDrawCommandsTo_ShouldRejectNullVisitor()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+
+        Action dispatch = () => scenario.Context.Diagnostics.DispatchDrawCommandsTo(null!);
+
+        dispatch.Should().Throw<ArgumentNullException>().WithParameterName("visitor");
     }
 
     [Fact]

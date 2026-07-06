@@ -32,6 +32,48 @@ public sealed class GravitasDiagnosticSinkTests
     }
 
     [Fact]
+    public void DisabledDiagnostics_ShouldIgnorePublicCaptureApisBeforeArgumentValidation()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        using GravitasWorldContext context2D = Physics2DTestWorld.CreateContext();
+
+        Action captureCollider = () => scenario.Context.Diagnostics.CaptureCollider(null!, GravitasDiagnosticColor.Cyan);
+        Action captureMixed = () => context2D.Diagnostics.CaptureMixedCollider(null!, GravitasDiagnosticColor.Cyan);
+        Action captureJoint3D = () => scenario.Context.Diagnostics.CaptureJoint((Joint3D)null!, GravitasDiagnosticColor.Cyan);
+        Action captureJoint2D = () => context2D.Diagnostics.CaptureJoint((Joint2D)null!, GravitasDiagnosticColor.Cyan);
+
+        captureCollider.Should().NotThrow();
+        captureMixed.Should().NotThrow();
+        captureJoint3D.Should().NotThrow();
+        captureJoint2D.Should().NotThrow();
+        scenario.Context.Diagnostics.CaptureLine(Vector3d.Zero, Vector3d.Right, GravitasDiagnosticColor.Cyan);
+        scenario.Context.Diagnostics.CaptureRay(Vector3d.Zero, Vector3d.Right, Fixed64.One, GravitasDiagnosticColor.Cyan);
+        scenario.Context.Diagnostics.CapturePoint(Vector3d.Zero, Fixed64.Half, GravitasDiagnosticColor.Cyan);
+
+        scenario.Context.Diagnostics.DrawCommandCount.Should().Be(0);
+        context2D.Diagnostics.DrawCommandCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void EnabledDiagnostics_ShouldRejectNullDrawCaptureInputs()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        using GravitasWorldContext context2D = Physics2DTestWorld.CreateContext();
+        scenario.Context.Diagnostics.Enable(eventCapacity: 0, drawCommandCapacity: 1);
+        context2D.Diagnostics.Enable(eventCapacity: 0, drawCommandCapacity: 1);
+
+        Action captureCollider = () => scenario.Context.Diagnostics.CaptureCollider(null!, GravitasDiagnosticColor.Cyan);
+        Action captureMixed = () => context2D.Diagnostics.CaptureMixedCollider(null!, GravitasDiagnosticColor.Cyan);
+        Action captureJoint3D = () => scenario.Context.Diagnostics.CaptureJoint((Joint3D)null!, GravitasDiagnosticColor.Cyan);
+        Action captureJoint2D = () => context2D.Diagnostics.CaptureJoint((Joint2D)null!, GravitasDiagnosticColor.Cyan);
+
+        captureCollider.Should().Throw<ArgumentNullException>().WithParameterName("collider");
+        captureMixed.Should().Throw<ArgumentNullException>().WithParameterName("collider");
+        captureJoint3D.Should().Throw<ArgumentNullException>().WithParameterName("joint");
+        captureJoint2D.Should().Throw<ArgumentNullException>().WithParameterName("joint");
+    }
+
+    [Fact]
     public void EnabledDiagnostics_ShouldRecordDeterministicEventsAndStayContextScoped()
     {
         using PhysicsScenarioBuilder firstScenario = PhysicsScenarioBuilder.Create();
@@ -241,6 +283,26 @@ public sealed class GravitasDiagnosticSinkTests
         commands[11].Kind.Should().Be(GravitasDebugDrawKind.Point);
         commands[11].Center.Should().Be(PhysicsScenarioBuilder.Vector(2, 0, 0));
         commands[11].Radius.Should().Be(Fixed64.Half);
+    }
+
+    [Fact]
+    public void CaptureRay_WithZeroDirection_ShouldEmitDegenerateRayAtOrigin()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        Vector3d origin = PhysicsScenarioBuilder.Vector(3, 4, 5);
+
+        scenario.Context.Diagnostics.Enable(eventCapacity: 0, drawCommandCapacity: 1);
+        scenario.Context.Diagnostics.CaptureRay(
+            origin,
+            Vector3d.Zero,
+            (Fixed64)8,
+            GravitasDiagnosticColor.Green);
+
+        ReadOnlySpan<GravitasDebugDrawCommand> commands = scenario.Context.Diagnostics.DrawCommands;
+        commands.Length.Should().Be(1);
+        commands[0].Kind.Should().Be(GravitasDebugDrawKind.Ray);
+        commands[0].Start.Should().Be(origin);
+        commands[0].End.Should().Be(origin);
     }
 
     [Fact]
@@ -460,6 +522,24 @@ public sealed class GravitasDiagnosticSinkTests
     }
 
     [Fact]
+    public void CaptureJoint_WithNonPrismatic2DJoint_ShouldEmitAnchorsWithoutAxisRay()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        SolidBody2D first = CreateBody2D(context, Vector2d.Zero);
+        SolidBody2D second = CreateBody2D(context, Vector2d.Right * (Fixed64)2);
+        Joint2D joint = context.Constraints2D.RegisterJoint(Create2DJoint(first, second, JointType2D.Distance));
+
+        context.Diagnostics.Enable(eventCapacity: 0, drawCommandCapacity: 4);
+        context.Diagnostics.CaptureJoint(joint, GravitasDiagnosticColor.Cyan);
+
+        ReadOnlySpan<GravitasDebugDrawCommand> commands = context.Diagnostics.DrawCommands;
+        commands.Length.Should().Be(3);
+        Assert2DDrawCommandMetadata(commands[0], GravitasDebugDrawKind.Point, first.Collider.Id, ColliderType2D.Circle);
+        Assert2DDrawCommandMetadata(commands[1], GravitasDebugDrawKind.Point, second.Collider.Id, ColliderType2D.Circle);
+        Assert2DDrawCommandMetadata(commands[2], GravitasDebugDrawKind.Line, first.Collider.Id, ColliderType2D.Circle);
+    }
+
+    [Fact]
     public void CaptureCollider_ShouldEmitOneWireTrianglePerHighVolumeMeshTriangle()
     {
         const int quadCount = 128;
@@ -523,12 +603,15 @@ public sealed class GravitasDiagnosticSinkTests
             JointCollisionPolicy.SuppressLinked);
 
     private static JointDefinition2D CreatePrismatic2D(SolidBody2D first, SolidBody2D second) =>
+        Create2DJoint(first, second, JointType2D.Prismatic);
+
+    private static JointDefinition2D Create2DJoint(SolidBody2D first, SolidBody2D second, JointType2D type) =>
         new(
             first,
             second,
             new JointFrame2D(Vector2d.Right * Fixed64.Half, Fixed64.Zero),
             new JointFrame2D(-Vector2d.Right * Fixed64.Half, Fixed64.Zero),
-            JointType2D.Prismatic,
+            type,
             JointLimit2D.Unrestricted,
             JointMotor2D.Disabled,
             JointCollisionPolicy.SuppressLinked);

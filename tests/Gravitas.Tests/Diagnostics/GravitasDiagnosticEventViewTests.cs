@@ -3,6 +3,7 @@ using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.Diagnostics;
 using Gravitas.Tests.Support;
+using System;
 using System.Collections.Generic;
 using Xunit;
 
@@ -592,6 +593,26 @@ public sealed class GravitasDiagnosticEventViewTests
             nameof(RecordingDiagnosticEventVisitor.VisitTorqueDelta));
         visitor.LastForce.Sequence.Should().Be(0);
         visitor.LastTorque.Sequence.Should().Be(1);
+    }
+
+    [Fact]
+    public void DispatchTo_ShouldRejectNullDiagnosticVisitors()
+    {
+        GravitasDiagnosticEvent diagnosticEvent = CreateEvent(GravitasDiagnosticEventKind.ForceDelta);
+
+        Action dispatchEvent = () => diagnosticEvent.DispatchTo(null!);
+
+        dispatchEvent.Should().Throw<ArgumentNullException>().WithParameterName("visitor");
+    }
+
+    [Fact]
+    public void DispatchEventsTo_ShouldRejectNullVisitor()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+
+        Action dispatch = () => scenario.Context.Diagnostics.DispatchEventsTo(null!);
+
+        dispatch.Should().Throw<ArgumentNullException>().WithParameterName("visitor");
     }
 
     private static GravitasDiagnosticEvent CreateEvent(

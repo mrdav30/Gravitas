@@ -87,26 +87,25 @@ configuration before making source changes.
 
 ## Current Standing
 
-Fresh checkpoint after Workstream 5 service lifecycle, partition, and runtime
-hardening:
+Fresh checkpoint after Workstream 6 diagnostics and low-value surface audit:
 
 | Metric | Baseline | Current | Short-Term Gate | Long-Term Target |
 | --- | ---: | ---: | ---: | ---: |
-| Line coverage | 87.3% | 93.2% | 90% | 100% |
-| Branch coverage | 74.1% | 79.6% | 90% | 100% |
-| Method coverage | 86.5% | 93.4% | 90% | 100% |
-| Tests | 974 passed | 1137 passed | green | green |
+| Line coverage | 87.3% | 93.3% | 90% | 100% |
+| Branch coverage | 74.1% | 79.7% | 90% | 100% |
+| Method coverage | 86.5% | 93.6% | 90% | 100% |
+| Tests | 974 passed | 1146 passed | green | green |
 
 Current evidence:
 
 - Coverage report:
-  `TestResults/coverage-branch-hardening-ws5/reports/Summary.txt`
+  `TestResults/coverage-branch-hardening-ws6/reports/Summary.txt`
 - Coverage collection:
   `dotnet test tests\Gravitas.Tests\Gravitas.Tests.csproj --configuration Release --collect:"XPlat Code Coverage" --settings tests\Gravitas.Tests\coverlet.runsettings`
-  passed with 1137 tests.
+  passed with 1146 tests.
 - Branch shortlist:
-  `TestResults/coverage-branch-hardening-ws5/branch-gap-shortlist.txt`
-- Latest CRAP extraction reported 34 flagged methods and 248 uncovered
+  `TestResults/coverage-branch-hardening-ws6/branch-gap-shortlist.txt`
+- Latest CRAP extraction reported 34 flagged methods and 237 uncovered
   methods.
 
 ## Completed Coverage Summary
@@ -153,6 +152,9 @@ High-value work completed:
   reset idempotency, context reset collider/partition cleanup, coroutine
   reset/deactivate disposal, clock hook ordering, and 2D deferred partition
   refresh from distribution-time trigger callbacks.
+- Diagnostics coverage for public logger facade behavior, visitor null guards,
+  disabled capture no-op boundaries, zero-direction ray draw commands, and
+  non-prismatic 2D joint draw behavior.
 
 Cleanup completed:
 
@@ -326,9 +328,11 @@ Use this list as the next-pass ordering, then re-rank after each workstream:
    - Hierarchy serialization remains host-owned unless a future feature plan
      deliberately changes that boundary.
 7. **Low-Value Diagnostic/View Getter Noise**
-   - Immutable diagnostic view getters and simple constructor branches remain
-     lower priority unless they affect visitor dispatch, disabled-path behavior,
-     or host adapter data.
+   - Workstream 6 covered host-adapter-visible visitor, disabled-path, logger,
+     ray, and joint draw behavior.
+   - Remaining immutable diagnostic view getters and simple constructor branches
+     are intentionally left as low-value surface noise unless a future adapter
+     contract or construction invariant makes them meaningful.
 
 ### Workstream 2: Collision And Shape Geometry Branches
 
@@ -568,7 +572,7 @@ partition cleanup, and coroutine/wait behavior.
 
 ### Workstream 6: Diagnostics And Low-Value Surface Audit
 
-**Status:** Pending
+**Status:** Complete - 2026-07-06
 
 **Purpose**
 
@@ -582,13 +586,36 @@ property getter noise.
 
 **Tasks**
 
-- [ ] Review remaining diagnostic coverage gaps and classify them as visitor
+- [x] Review remaining diagnostic coverage gaps and classify them as visitor
       behavior, construction behavior, disabled-path behavior, or getter noise.
-- [ ] Add tests for host-adapter-visible visitor and disabled-path behavior.
-- [ ] Leave mirrored immutable view getter noise alone unless it hides a real
+- [x] Add tests for host-adapter-visible visitor and disabled-path behavior.
+- [x] Leave mirrored immutable view getter noise alone unless it hides a real
       branch or construction invariant.
-- [ ] Condense duplicate diagnostic tests that differ only by payload name.
-- [ ] Run focused diagnostics tests, full `Release`, then coverage.
+- [x] Review duplicate diagnostic tests that differ only by payload name and
+      avoid adding new mirrored payload-only cases.
+- [x] Run focused diagnostics tests, full `Release`, then coverage.
+
+**Result Notes**
+
+- Added `GravitasLogger` facade coverage for channel names, minimum-level
+  filtering, debug-channel gating, custom formatter restoration, and default
+  formatter output without capturing global console streams.
+- Added null-visitor guard coverage for direct event/draw command dispatch and
+  sink-level dispatch.
+- Added disabled diagnostics capture coverage proving public draw-capture APIs
+  stay no-op before argument validation when diagnostics are disabled, while
+  enabled diagnostics reject null collider/joint inputs.
+- Added host-adapter-visible draw coverage for zero-direction rays and
+  non-prismatic 2D joints. The 2D joint case proves anchors and the connection
+  line are emitted without a prismatic axis ray.
+- Reviewed the remaining diagnostics gaps. The meaningful sink/visitor/logging
+  branches are now covered; the remaining entries are mostly mirrored immutable
+  diagnostic view getters, simple constructor overloads, and internal event
+  emission hit/null variants that are already covered through higher-level
+  query/collision tests where behavior matters.
+- Focused diagnostics slice passed with 49 tests. Full `Release` passed with
+  1146 tests, and coverage reported 93.3% line, 79.7% branch, and 93.6% method
+  coverage.
 
 ### Workstream 7: Branch 90 Gate
 
@@ -624,3 +651,4 @@ Close the release-hardening branch gate cleanly before expanding the plan toward
 | 2026-07-06 | 92.8% | 78.7% | 92.7% | 1118 passed | Workstream 3 query reducer and shape-cast hardening completed. Added focused coverage for convex-vs-compound sweeps, cone-axis concave triangle hits, mixed conservative fallback reporting, 2D convex mover/capsule sweeps, and raycast worker point/rotated-box geometry. |
 | 2026-07-06 | 93.0% | 79.2% | 93.0% | 1125 passed | Workstream 4 serialization, replay, and authoring hardening completed. Added shape-definition value semantics, compound authored replay payload, polygon serialization, and mixed inactive-load coverage. Tightened final review assertions for mixed partition membership and compound replay hash stability. Fixed 2D active-state mixed partition cleanup parity. |
 | 2026-07-06 | 93.2% | 79.6% | 93.4% | 1137 passed | Workstream 5 service lifecycle, partition, and runtime hardening completed. Added retained partition idempotency, context reset parity, coroutine lifecycle, clock hook, and 2D deferred refresh coverage. Centralized partition voxel ordering and removed duplicated null-comparer branch debt. |
+| 2026-07-06 | 93.3% | 79.7% | 93.6% | 1146 passed | Workstream 6 diagnostics and low-value surface audit completed. Added logger facade, visitor null guard, disabled capture, zero-ray, and non-prismatic 2D joint draw coverage while leaving immutable view getter noise classified as low-value. |
