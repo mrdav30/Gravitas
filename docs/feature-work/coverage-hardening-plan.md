@@ -583,13 +583,11 @@ or stale support paths rather than preserving them for coverage.
   collision matrix creation.
 - Added 2D collider load coverage for inactive serialized state clearing
   existing partition membership without preserving stale broad-phase presence.
+- Added matching 3D direct-collider inactive load coverage and fixed stale
+  primary/mixed partition state cleanup after loading inactive collider state.
 - Removed unused `Joint2D.HasAwakeParticipant()` and
   `Joint3D.HasAwakeParticipant()`. The island builders use solver
   participation instead, and no runtime path called the awake-only helpers.
-- Left 3D direct-collider inactive load coverage alone. Direct standalone
-  collider active-state transfer has different historical semantics from body
-  snapshot loading; expanding that behavior here would have been a lifecycle
-  semantic change rather than Roadmap E coverage hardening.
 - Coverage report:
   `TestResults/coverage-roadmap-e/reports/Summary.txt`
 
@@ -610,4 +608,4 @@ or stale support paths rather than preserving them for coverage.
 | 2026-07-05 | 90.7% | 76.8% | 91.5% | 1042 passed | Roadmap B completed. Replay hash branch coverage now covers 2D joint cache/authoritative distinctions, pair manifold/warm-start payloads, mixed trigger/contact materials, and hierarchy replay ordinal normalization. |
 | 2026-07-05 | 91.4% | 77.1% | 91.7% | 1048 passed | Roadmap C completed. Diagnostic sink coverage now exercises compound/mixed slab draw expansion, joint draw branches, circle-query events, 2D/3D joint-limit events, ragdoll activation events, and typed event rejection branches. |
 | 2026-07-05 | 91.7% | 77.4% | 91.8% | 1076 passed | Roadmap D completed. Collision dispatch coverage now includes 2D single-contact pair routing, crossed capsule segment contacts, 3D compound-compound owner-order symmetry, convex mesh/capsule fallback dispatch, mixed prism rejection families, and stale cuboid face-projection helper removal. |
-| 2026-07-05 | 92.0% | 77.8% | 92.2% | 1092 passed | Roadmap E completed. Service lifecycle and authoring coverage now includes hierarchy detach/cleanup parity, 2D compound radius/closest-part behavior, 2D ragdoll pose-target helpers, settings saver branches, 2D inactive collider load partition cleanup, and dead joint awake-helper removal. |
+| 2026-07-05 | 92.0% | 77.9% | 92.2% | 1094 passed | Roadmap E completed. Service lifecycle and authoring coverage now includes hierarchy detach/cleanup parity, 2D compound radius/closest-part behavior, 2D ragdoll pose-target helpers, settings saver branches, 2D/3D inactive collider load partition cleanup, and dead joint awake-helper removal. |

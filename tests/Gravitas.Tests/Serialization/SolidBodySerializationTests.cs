@@ -184,6 +184,27 @@ public sealed class SolidBodySerializationTests
         target.Body.WasGrounded.Should().BeTrue();
     }
 
+    [Theory]
+    [MemberData(nameof(Transports))]
+    public void PopulateInactiveCollider_ShouldClearExistingPartitionMembership(GravitasSerializationTransport transport)
+    {
+        using PhysicsScenarioBuilder sourceScenario = PhysicsScenarioBuilder.Create();
+        LSSphereCollider source = sourceScenario.CreateStaticSphere(Vector3d.Zero);
+        source.Deactivate();
+        source.IsActive.Should().BeFalse();
+        object payload = GravitasSerializationHarness.Serialize(source, transport);
+
+        using PhysicsScenarioBuilder targetScenario = PhysicsScenarioBuilder.Create();
+        LSSphereCollider target = targetScenario.CreateStaticSphere(Vector3d.Zero);
+        target.IsPartitioned.Should().BeTrue();
+
+        GravitasSerializationHarness.Populate(target, payload, transport);
+
+        target.IsActive.Should().BeFalse();
+        target.IsPartitioned.Should().BeFalse();
+        target.PartitionCoordinates.Should().BeEmpty();
+    }
+
     [Fact]
     public void JsonSnapshot_ShouldExcludeHostBindingsAndPresentationOnlyVisualState()
     {

@@ -1216,8 +1216,13 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
         {
             if (IsPartitioned)
                 _context.Collisions.ClearPartitionedObject(this, force: true);
+            MarkUnpartitioned();
+            ClearPartitionCoordinates();
+
             if (IsMixedPartitioned)
                 _context.MixedCollisions.ClearPartitioned3DCollider(this, force: true);
+            MarkMixedUnpartitioned();
+            ClearMixedPartitionCoordinates();
             return;
         }
 
