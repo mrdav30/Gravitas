@@ -7,7 +7,6 @@
 
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
-using GridForge.Spatial;
 using System.Collections.Generic;
 
 namespace Gravitas;
@@ -16,36 +15,8 @@ internal sealed partial class GravitasMixedCollisionService
 {
     private sealed class PhysicsMixedPartitionOrderComparer : IComparer<PhysicsMixedPartition>
     {
-        public int Compare(PhysicsMixedPartition? left, PhysicsMixedPartition? right)
-        {
-            if (ReferenceEquals(left, right))
-                return 0;
-            if (left == null)
-                return -1;
-            if (right == null)
-                return 1;
-
-            WorldVoxelIndex leftIndex = left.WorldIndex;
-            WorldVoxelIndex rightIndex = right.WorldIndex;
-
-            int compare = leftIndex.GridIndex.CompareTo(rightIndex.GridIndex);
-            if (compare != 0)
-                return compare;
-
-            compare = leftIndex.GridSpawnToken.CompareTo(rightIndex.GridSpawnToken);
-            if (compare != 0)
-                return compare;
-
-            compare = leftIndex.VoxelIndex.x.CompareTo(rightIndex.VoxelIndex.x);
-            if (compare != 0)
-                return compare;
-
-            compare = leftIndex.VoxelIndex.y.CompareTo(rightIndex.VoxelIndex.y);
-            if (compare != 0)
-                return compare;
-
-            return leftIndex.VoxelIndex.z.CompareTo(rightIndex.VoxelIndex.z);
-        }
+        public int Compare(PhysicsMixedPartition? left, PhysicsMixedPartition? right) =>
+            WorldVoxelIndexOrdering.Compare3D(left!.WorldIndex, right!.WorldIndex);
     }
 
     private sealed class MixedColliderKeyComparer : IComparer<MixedColliderKey>

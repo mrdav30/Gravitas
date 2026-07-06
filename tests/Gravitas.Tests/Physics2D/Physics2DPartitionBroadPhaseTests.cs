@@ -66,6 +66,39 @@ public sealed class Physics2DPartitionBroadPhaseTests
     }
 
     [Fact]
+    public void ShapeRefresh_During2DDistribution_ShouldDeferUntilNextQueryBoundary()
+    {
+        using GravitasWorldContext context = CreateContext(extent: 32);
+        _ = CreateCircle(context, Vector2d.Zero, immovable: false);
+        LSCircleCollider2D trigger = CreateBodylessCircle(
+            context,
+            new Vector2d(Fixed64.Half, Fixed64.Zero),
+            isTrigger: true);
+        LSCircleCollider2D expanding = CreateBodylessCircle(
+            context,
+            new Vector2d((Fixed64)8, Fixed64.Zero),
+            isTrigger: false);
+        var hits = new SwiftList<Physics2DHit>();
+        int entered = 0;
+
+        context.Query2D.OverlapCircleAll(Vector2d.Zero, Fixed64.One, hits);
+        hits.Should().NotContain(hit => ReferenceEquals(hit.Collider, expanding));
+
+        trigger.OnTriggerEnter += _ =>
+        {
+            entered++;
+            expanding.Radius = (Fixed64)9;
+            expanding.Simulate();
+        };
+
+        Step(context);
+
+        entered.Should().Be(1);
+        context.Query2D.OverlapCircleAll(Vector2d.Zero, Fixed64.One, hits).Should().BeGreaterThan(0);
+        hits.Should().Contain(hit => ReferenceEquals(hit.Collider, expanding));
+    }
+
+    [Fact]
     public void Deactivate_WithRetainedPartitionTtk_ShouldRetireAndPoolEmpty2DPartitions()
     {
         using GravitasWorldContext context = CreateContext(extent: 16);
@@ -166,6 +199,58 @@ public sealed class Physics2DPartitionBroadPhaseTests
         partition.ContainedKinematicObjects!.Count.Should().Be(0);
         partition.ContainedStaticObjects!.Count.Should().Be(0);
         context.Collisions2D.ReleasePartition(partition);
+    }
+
+    [Fact]
+    public void ResetRetainedMembership_WithFreshPartition_ShouldBeIdempotent()
+    {
+        var partition = new PhysicsPartition2D();
+
+        partition.ResetRetainedMembership();
+        partition.ResetRetainedMembership();
+
+        partition.IsEmpty.Should().BeTrue();
+        partition.EmptySinceFrame.Should().Be(0);
+        partition.IsAllocated.Should().BeFalse();
+        partition.AwakeDynamicObjectCount.Should().Be(0);
+        partition.ContainsAwakeDynamicObject(7).Should().BeFalse();
+    }
+
+    [Fact]
+    public void EmptyPartitionCopyHelpers_ShouldReturnEmptySortedBuffers()
+    {
+        var partition = new PhysicsPartition2D();
+        var ids = new SwiftList<int>();
+
+        partition.CopyAllColliderIds(ids);
+        ids.Count.Should().Be(0);
+
+        partition.CopyStaticStyleColliderIds(ids);
+        ids.Count.Should().Be(0);
+    }
+
+    [Fact]
+    public void ContextReset_ShouldClear2DPartitionAndColliderRegistryState()
+    {
+        using GravitasWorldContext context = CreateContext(extent: 16);
+        SolidBody2D body = CreateCircle(context, Vector2d.Zero, immovable: false);
+        int id = body.Collider.Id;
+
+        context.Collisions2D.ActivePartitionCount.Should().BeGreaterThan(0);
+        context.Collisions2D.RetainedPartitionCount.Should().BeGreaterThan(0);
+        body.Collider.IsPartitioned.Should().BeTrue();
+
+        context.Reset();
+
+        context.Collisions2D.ActivePartitionCount.Should().Be(0);
+        context.Collisions2D.RetainedPartitionCount.Should().Be(0);
+        context.Collisions2D.InactivePartitionCount.Should().Be(0);
+        context.Physics2D.ColliderCount.Should().Be(0);
+        context.Physics2D.TryGetColliderById(id, out LSCollider2D? resolved).Should().BeFalse();
+        resolved.Should().BeNull();
+        body.Collider.IsPartitioned.Should().BeFalse();
+        (body.Collider.PartitionCoordinates?.Count ?? 0).Should().Be(0);
+        body.Collider.Id.Should().Be(-1);
     }
 
     [Fact]
@@ -344,6 +429,24 @@ public sealed class Physics2DPartitionBroadPhaseTests
     private static SolidBody2D CreateCircle(GravitasWorldContext context, Vector2d position, bool immovable)
     {
         return CreateBody(context, new LSCircleCollider2D(Fixed64.Half), position, immovable);
+    }
+
+    private static LSCircleCollider2D CreateBodylessCircle(
+        GravitasWorldContext context,
+        Vector2d position,
+        bool isTrigger)
+    {
+        var transform = new FixedTransform(
+            new Vector3d(position.X, Fixed64.Zero, position.Y),
+            FixedQuaternion.Identity,
+            Vector3d.One);
+        var agent = new TestMatterAgent(context, transform);
+        var collider = new LSCircleCollider2D(Fixed64.Half)
+        {
+            IsTrigger = isTrigger
+        };
+        collider.InitializeWithNoBody(agent);
+        return collider;
     }
 
     private static SolidBody2D CreateBody(

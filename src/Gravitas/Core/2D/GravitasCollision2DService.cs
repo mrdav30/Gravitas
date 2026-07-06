@@ -779,36 +779,8 @@ public sealed class GravitasCollision2DService
 
     private sealed class PhysicsPartition2DOrderComparer : IComparer<PhysicsPartition2D>
     {
-        public int Compare(PhysicsPartition2D? left, PhysicsPartition2D? right)
-        {
-            if (ReferenceEquals(left, right))
-                return 0;
-            if (left == null)
-                return -1;
-            if (right == null)
-                return 1;
-
-            WorldVoxelIndex leftIndex = left.WorldIndex;
-            WorldVoxelIndex rightIndex = right.WorldIndex;
-
-            int compare = leftIndex.GridIndex.CompareTo(rightIndex.GridIndex);
-            if (compare != 0)
-                return compare;
-
-            compare = leftIndex.GridSpawnToken.CompareTo(rightIndex.GridSpawnToken);
-            if (compare != 0)
-                return compare;
-
-            compare = leftIndex.VoxelIndex.x.CompareTo(rightIndex.VoxelIndex.x);
-            if (compare != 0)
-                return compare;
-
-            compare = leftIndex.VoxelIndex.z.CompareTo(rightIndex.VoxelIndex.z);
-            if (compare != 0)
-                return compare;
-
-            return leftIndex.VoxelIndex.y.CompareTo(rightIndex.VoxelIndex.y);
-        }
+        public int Compare(PhysicsPartition2D? left, PhysicsPartition2D? right) =>
+            WorldVoxelIndexOrdering.ComparePlanar(left!.WorldIndex, right!.WorldIndex);
     }
 
     private sealed class Collider2DIdComparer : IComparer<LSCollider2D>

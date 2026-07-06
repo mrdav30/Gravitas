@@ -3,6 +3,7 @@ using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Tests.Support;
+using SwiftCollections;
 using Xunit;
 
 namespace Gravitas.Tests.Partitions;
@@ -78,5 +79,33 @@ public sealed class PhysicsPartitionPerformanceShapeTests
         partition.ContainedKinematicObjects!.Count.Should().Be(0);
         partition.ContainedStaticObjects!.Count.Should().Be(0);
         context.Collisions.ReleasePartition(partition);
+    }
+
+    [Fact]
+    public void ResetRetainedMembership_WithFreshPartition_ShouldBeIdempotent()
+    {
+        var partition = new PhysicsPartition();
+
+        partition.ResetRetainedMembership();
+        partition.ResetRetainedMembership();
+
+        partition.IsEmpty.Should().BeTrue();
+        partition.EmptySinceFrame.Should().Be(0);
+        partition.IsAllocated.Should().BeFalse();
+        partition.AwakeDynamicObjectCount.Should().Be(0);
+        partition.ContainsAwakeDynamicObject(7).Should().BeFalse();
+    }
+
+    [Fact]
+    public void EmptyPartitionCopyHelpers_ShouldReturnEmptySortedBuffers()
+    {
+        var partition = new PhysicsPartition();
+        var ids = new SwiftList<int>();
+
+        partition.CopyAllColliderIds(ids);
+        ids.Count.Should().Be(0);
+
+        partition.CopyStaticStyleColliderIds(ids);
+        ids.Count.Should().Be(0);
     }
 }

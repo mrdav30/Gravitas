@@ -87,26 +87,26 @@ configuration before making source changes.
 
 ## Current Standing
 
-Fresh checkpoint after Workstream 4 serialization, replay, and authoring
+Fresh checkpoint after Workstream 5 service lifecycle, partition, and runtime
 hardening:
 
 | Metric | Baseline | Current | Short-Term Gate | Long-Term Target |
 | --- | ---: | ---: | ---: | ---: |
-| Line coverage | 87.3% | 93.0% | 90% | 100% |
-| Branch coverage | 74.1% | 79.2% | 90% | 100% |
-| Method coverage | 86.5% | 93.0% | 90% | 100% |
-| Tests | 974 passed | 1125 passed | green | green |
+| Line coverage | 87.3% | 93.2% | 90% | 100% |
+| Branch coverage | 74.1% | 79.6% | 90% | 100% |
+| Method coverage | 86.5% | 93.4% | 90% | 100% |
+| Tests | 974 passed | 1137 passed | green | green |
 
 Current evidence:
 
 - Coverage report:
-  `TestResults/coverage-branch-hardening-ws4/reports/Summary.txt`
+  `TestResults/coverage-branch-hardening-ws5/reports/Summary.txt`
 - Coverage collection:
   `dotnet test tests\Gravitas.Tests\Gravitas.Tests.csproj --configuration Release --collect:"XPlat Code Coverage" --settings tests\Gravitas.Tests\coverlet.runsettings`
-  passed with 1125 tests.
+  passed with 1137 tests.
 - Branch shortlist:
-  `TestResults/coverage-branch-hardening-ws4/branch-gap-shortlist.txt`
-- Latest CRAP extraction reported 35 flagged methods and 260 uncovered
+  `TestResults/coverage-branch-hardening-ws5/branch-gap-shortlist.txt`
+- Latest CRAP extraction reported 34 flagged methods and 248 uncovered
   methods.
 
 ## Completed Coverage Summary
@@ -149,6 +149,10 @@ High-value work completed:
 - Serialization, replay, and authoring coverage for 2D/3D shape-definition
   equality/hash semantics, compound-part replay hash payloads, 2D polygon shape
   serialization, and inactive mixed-partition cleanup.
+- Service lifecycle, partition, and runtime coverage for retained partition
+  reset idempotency, context reset collider/partition cleanup, coroutine
+  reset/deactivate disposal, clock hook ordering, and 2D deferred partition
+  refresh from distribution-time trigger callbacks.
 
 Cleanup completed:
 
@@ -172,6 +176,8 @@ Cleanup completed:
   `GetTriangleVertices(..., out ...)` path.
 - Fixed `LSCollider2D.IsActive` so mixed-mode bodyless 2D colliders refresh and
   clear mixed partition membership along with pure 2D partition membership.
+- Centralized 2D/3D/mixed `WorldVoxelIndex` ordering and removed duplicated
+  impossible-null partition comparer branches.
 
 ## Hardening Rules
 
@@ -500,7 +506,7 @@ authoring objects decide deterministic continuation behavior.
 
 ### Workstream 5: Service Lifecycle, Partition, And Runtime Branches
 
-**Status:** Pending
+**Status:** Complete - 2026-07-06
 
 **Purpose**
 
@@ -521,15 +527,44 @@ partition cleanup, and coroutine/wait behavior.
 
 **Tasks**
 
-- [ ] Review deferred partition refresh branches in 2D/3D/mixed services for
+- [x] Review deferred partition refresh branches in 2D/3D/mixed services for
       valid lifecycle paths, duplicate work, and stale cleanup logic.
-- [ ] Cover service reset/deactivate/idempotency branches that protect pooling
+- [x] Cover service reset/deactivate/idempotency branches that protect pooling
       and context reuse.
-- [ ] Cover queued CCD handoff branches only where they affect deterministic
+- [x] Cover queued CCD handoff branches only where they affect deterministic
       runtime behavior.
-- [ ] Delete lifecycle branches that only preserve obsolete initialization
+- [x] Delete lifecycle branches that only preserve obsolete initialization
       orders.
-- [ ] Run focused runtime/partition tests, full `Release`, then coverage.
+- [x] Run focused runtime/partition tests, full `Release`, then coverage.
+
+**Result Notes**
+
+- Added retained partition reset and empty-copy idempotency coverage for 3D,
+  pure 2D, and mixed partitions without asserting implementation-only pool
+  internals.
+- Added context reset parity coverage showing 3D and 2D collider registries
+  clear IDs, partition flags, and partition coordinates when the owning context
+  resets. Direct collision-service reset remains a service-cache boundary; the
+  physics registries own collider state cleanup.
+- Added coroutine lifecycle coverage for rejecting foreign handles, ignoring
+  repeated stops, and disposing active iterators during `Reset`, `Initialize`,
+  and `Deactivate`.
+- Added deterministic clock and hook coverage for frame-rate conversion,
+  reset-hook ordering, hook disposal idempotency, and frame-rate changed hooks.
+- Added a distribution-time 2D trigger callback test that mutates and rebuilds
+  a third collider, proving deferred shape refresh is flushed before the next
+  query boundary.
+- Centralized duplicated 2D/3D/mixed partition voxel ordering into
+  `WorldVoxelIndexOrdering`, preserving 2D planar X/Z/Y order and 3D/mixed
+  X/Y/Z order while deleting impossible null comparer branches.
+- Reviewed context-level queued CCD handoff coverage. Existing 2D and 3D
+  dynamic-chain tests cover service queue budget and limit behavior; no
+  additional private/reflection test was added because a meaningful
+  cross-service surviving-queue setup belongs with the CCD-focused branch
+  campaign, not lifecycle padding.
+- Focused lifecycle/partition/coroutine slice passed with 36 tests. Full
+  `Release` passed with 1137 tests, `ReleaseLean` passed with 1116 tests, and
+  coverage reported 93.2% line, 79.6% branch, and 93.4% method coverage.
 
 ### Workstream 6: Diagnostics And Low-Value Surface Audit
 
@@ -588,3 +623,4 @@ Close the release-hardening branch gate cleanly before expanding the plan toward
 | 2026-07-06 | 92.5% | 78.4% | 92.5% | 1105 passed | Workstream 2 collision geometry hardening completed. Removed unused SAT projection overload and duplicate mesh-cylinder fallback logic. Added 2D compound geometry/manifold, mixed compound selection, and cone-convex reversed/negative dispatch coverage. |
 | 2026-07-06 | 92.8% | 78.7% | 92.7% | 1118 passed | Workstream 3 query reducer and shape-cast hardening completed. Added focused coverage for convex-vs-compound sweeps, cone-axis concave triangle hits, mixed conservative fallback reporting, 2D convex mover/capsule sweeps, and raycast worker point/rotated-box geometry. |
 | 2026-07-06 | 93.0% | 79.2% | 93.0% | 1125 passed | Workstream 4 serialization, replay, and authoring hardening completed. Added shape-definition value semantics, compound authored replay payload, polygon serialization, and mixed inactive-load coverage. Tightened final review assertions for mixed partition membership and compound replay hash stability. Fixed 2D active-state mixed partition cleanup parity. |
+| 2026-07-06 | 93.2% | 79.6% | 93.4% | 1137 passed | Workstream 5 service lifecycle, partition, and runtime hardening completed. Added retained partition idempotency, context reset parity, coroutine lifecycle, clock hook, and 2D deferred refresh coverage. Centralized partition voxel ordering and removed duplicated null-comparer branch debt. |

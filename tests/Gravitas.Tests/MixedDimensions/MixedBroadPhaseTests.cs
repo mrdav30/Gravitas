@@ -361,6 +361,22 @@ public sealed class MixedBroadPhaseTests
         context.MixedCollisions.ReleasePartition(partition);
     }
 
+    [Fact]
+    public void ResetRetainedMembership_WithFreshMixedPartition_ShouldBeIdempotent()
+    {
+        var partition = new PhysicsMixedPartition();
+
+        partition.ResetRetainedMembership();
+        partition.ResetRetainedMembership();
+
+        partition.IsEmpty.Should().BeTrue();
+        partition.EmptySinceFrame.Should().Be(0);
+        partition.IsAllocated.Should().BeFalse();
+        partition.AwakeDynamicObjectCount.Should().Be(0);
+        ContainsId(partition.ContainedDynamic3DObjects, 7).Should().BeFalse();
+        ContainsId(partition.ContainedDynamic2DObjects, 11).Should().BeFalse();
+    }
+
     private static GravitasWorldContext CreateMixedContext(int extent = 32)
     {
         GravitasWorldContext context = GravitasWorldContext.CreateOwned();

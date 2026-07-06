@@ -480,36 +480,8 @@ public sealed class GravitasCollisionService
 
     private sealed class PhysicsPartitionOrderComparer : IComparer<PhysicsPartition>
     {
-        public int Compare(PhysicsPartition? left, PhysicsPartition? right)
-        {
-            if (ReferenceEquals(left, right))
-                return 0;
-            if (left == null)
-                return -1;
-            if (right == null)
-                return 1;
-
-            WorldVoxelIndex leftIndex = left.WorldIndex;
-            WorldVoxelIndex rightIndex = right.WorldIndex;
-
-            int compare = leftIndex.GridIndex.CompareTo(rightIndex.GridIndex);
-            if (compare != 0)
-                return compare;
-
-            compare = leftIndex.GridSpawnToken.CompareTo(rightIndex.GridSpawnToken);
-            if (compare != 0)
-                return compare;
-
-            compare = leftIndex.VoxelIndex.x.CompareTo(rightIndex.VoxelIndex.x);
-            if (compare != 0)
-                return compare;
-
-            compare = leftIndex.VoxelIndex.y.CompareTo(rightIndex.VoxelIndex.y);
-            if (compare != 0)
-                return compare;
-
-            return leftIndex.VoxelIndex.z.CompareTo(rightIndex.VoxelIndex.z);
-        }
+        public int Compare(PhysicsPartition? left, PhysicsPartition? right) =>
+            WorldVoxelIndexOrdering.Compare3D(left!.WorldIndex, right!.WorldIndex);
     }
 
     internal int ActivatePartition(PhysicsPartition partition)

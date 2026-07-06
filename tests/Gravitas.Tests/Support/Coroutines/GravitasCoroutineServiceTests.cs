@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Gravitas.Support;
+using System;
 using System.Collections.Generic;
 using Xunit;
 
@@ -93,11 +94,82 @@ public sealed class GravitasCoroutineServiceTests
         }
     }
 
+    [Fact]
+    public void StopCoroutine_ShouldRejectForeignOwnerAndIgnoreInactiveHandles()
+    {
+        using GravitasWorldContext contextA = GravitasWorldContext.CreateOwned();
+        using GravitasWorldContext contextB = GravitasWorldContext.CreateOwned();
+        LSCoroutine coroutine = contextA.Coroutines.StartCoroutine(WaitForever(contextA));
+
+        Action wrongOwner = () => contextB.Coroutines.StopCoroutine(coroutine);
+        wrongOwner.Should().Throw<ArgumentException>().WithParameterName("coroutine");
+
+        contextA.Coroutines.StopCoroutine(coroutine);
+        contextA.Coroutines.StopCoroutine(coroutine);
+
+        coroutine.Active.Should().BeFalse();
+        contextA.Coroutines.ActiveCoroutineCount.Should().Be(0);
+        contextB.Coroutines.ActiveCoroutineCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void ResetInitializeAndDeactivate_ShouldEndActiveCoroutinesAndClearServiceState()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        int disposed = 0;
+
+        LSCoroutine resetCoroutine = context.Coroutines.StartCoroutine(DisposableWait(context, () => disposed++));
+        context.Simulate();
+        context.Coroutines.Reset();
+
+        resetCoroutine.Active.Should().BeFalse();
+        disposed.Should().Be(1);
+        context.Coroutines.ActiveCoroutineCount.Should().Be(0);
+
+        LSCoroutine initializedCoroutine = context.Coroutines.StartCoroutine(DisposableWait(context, () => disposed++));
+        context.Simulate();
+        context.Coroutines.Initialize();
+
+        initializedCoroutine.Active.Should().BeFalse();
+        disposed.Should().Be(2);
+        context.Coroutines.ActiveCoroutineCount.Should().Be(0);
+
+        LSCoroutine deactivatedCoroutine = context.Coroutines.StartCoroutine(DisposableWait(context, () => disposed++));
+        context.Simulate();
+        context.Coroutines.Deactivate();
+        context.Coroutines.Deactivate();
+
+        deactivatedCoroutine.Active.Should().BeFalse();
+        disposed.Should().Be(3);
+        context.Coroutines.ActiveCoroutineCount.Should().Be(0);
+        context.Coroutines.Context.Should().BeSameAs(context);
+    }
+
     private static IEnumerator<ILockedYieldInstruction> WaitForNext(
         GravitasWorldContext context,
         System.Action onResume)
     {
         yield return context.Coroutines.WaitForNextSimulate();
         onResume();
+    }
+
+    private static IEnumerator<ILockedYieldInstruction> WaitForever(GravitasWorldContext context)
+    {
+        while (true)
+            yield return context.Coroutines.WaitForNextSimulate();
+    }
+
+    private static IEnumerator<ILockedYieldInstruction> DisposableWait(
+        GravitasWorldContext context,
+        Action onDispose)
+    {
+        try
+        {
+            yield return context.Coroutines.WaitForFrames(16);
+        }
+        finally
+        {
+            onDispose();
+        }
     }
 }

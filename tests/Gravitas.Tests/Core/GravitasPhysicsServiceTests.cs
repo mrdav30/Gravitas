@@ -208,6 +208,30 @@ public sealed class GravitasPhysicsServiceTests
     }
 
     [Fact]
+    public void ContextReset_ShouldClear3DPartitionAndColliderRegistryState()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> sphere = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
+        int id = sphere.Collider.Id;
+
+        scenario.Context.Collisions.ActivePartitionCount.Should().BeGreaterThan(0);
+        scenario.Context.Collisions.RetainedPartitionCount.Should().BeGreaterThan(0);
+        sphere.Collider.IsPartitioned.Should().BeTrue();
+
+        scenario.Context.Reset();
+
+        scenario.Context.Collisions.ActivePartitionCount.Should().Be(0);
+        scenario.Context.Collisions.RetainedPartitionCount.Should().Be(0);
+        scenario.Context.Collisions.InactivePartitionCount.Should().Be(0);
+        scenario.Context.Physics.ColliderCount.Should().Be(0);
+        scenario.Context.Physics.TryGetColliderById(id, out LSCollider? resolved).Should().BeFalse();
+        resolved.Should().BeNull();
+        sphere.Collider.IsPartitioned.Should().BeFalse();
+        (sphere.Collider.PartitionCoordinates?.Count ?? 0).Should().Be(0);
+        sphere.Collider.Id.Should().Be(-1);
+    }
+
+    [Fact]
     public void DessimilateBody_AfterReset_ShouldNotUnderflowBodyCount()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
