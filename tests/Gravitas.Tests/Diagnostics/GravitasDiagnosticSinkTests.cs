@@ -2,7 +2,9 @@ using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
+using Gravitas.Constraints;
 using Gravitas.Diagnostics;
+using Gravitas.Queries;
 using Gravitas.Tests.Support;
 using System;
 using Xunit;
@@ -268,6 +270,196 @@ public sealed class GravitasDiagnosticSinkTests
     }
 
     [Fact]
+    public void CaptureCollider_WithCompoundCapsuleCylinderAndMeshParts_ShouldEmitOwnerCommands()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSCompoundCollider> compound = scenario.CreateBody(
+            new LSCompoundCollider(
+                CompoundColliderPart.Capsule(
+                    Fixed64.Half,
+                    (Fixed64)2,
+                    new Vector3d(-Fixed64.One, Fixed64.Zero, Fixed64.Zero)),
+                CompoundColliderPart.Cylinder(
+                    Fixed64.Half,
+                    (Fixed64)2,
+                    Vector3d.Zero),
+                CompoundColliderPart.ConvexMesh(
+                    TriangleVertices(),
+                    TriangleIndices(),
+                    new Vector3d(Fixed64.One, Fixed64.Zero, Fixed64.Zero),
+                    MeshInertiaPolicy.SurfaceApproximation)),
+            PhysicsScenarioBuilder.Vector(0, 0, 0),
+            FixedQuaternion.Identity);
+
+        scenario.Context.Diagnostics.Enable(eventCapacity: 0, drawCommandCapacity: 3);
+        scenario.Context.Diagnostics.CaptureCollider(compound.Collider, GravitasDiagnosticColor.Blue);
+
+        ReadOnlySpan<GravitasDebugDrawCommand> commands = scenario.Context.Diagnostics.DrawCommands;
+        commands.Length.Should().Be(3);
+        AssertDrawCommandMetadata(commands[0], GravitasDebugDrawKind.WireCapsule, compound.Collider.Id, ColliderType.Compound);
+        AssertDrawCommandMetadata(commands[1], GravitasDebugDrawKind.WireCylinder, compound.Collider.Id, ColliderType.Compound);
+        AssertDrawCommandMetadata(commands[2], GravitasDebugDrawKind.WireTriangle, compound.Collider.Id, ColliderType.Compound);
+    }
+
+    [Fact]
+    public void CaptureMixedCollider_WithPolygonAndCapsuleShapes_ShouldEmitSlabCommands()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        context.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
+        var polygon = new LSPolygonCollider2D(DiamondVertices());
+        var capsule = new LSCapsuleCollider2D(Fixed64.Half, (Fixed64)3);
+        var degenerateCapsule = new LSCapsuleCollider2D(Fixed64.Half, Fixed64.One);
+        var compound = new LSCompoundCollider2D(
+            CompoundColliderPart2D.Capsule(
+                Fixed64.Half,
+                (Fixed64)3,
+                new Vector2d(-Fixed64.One, Fixed64.Zero)),
+            CompoundColliderPart2D.ConvexPolygon(
+                DiamondVertices(),
+                new Vector2d(Fixed64.One, Fixed64.Zero)));
+        InitializeBodylessCollider(context, polygon, Vector2d.Zero);
+        InitializeBodylessCollider(context, capsule, new Vector2d((Fixed64)3, Fixed64.Zero));
+        InitializeBodylessCollider(context, degenerateCapsule, new Vector2d((Fixed64)6, Fixed64.Zero));
+        InitializeBodylessCollider(context, compound, new Vector2d((Fixed64)9, Fixed64.Zero));
+
+        context.Diagnostics.Enable(eventCapacity: 0, drawCommandCapacity: 40);
+        context.Diagnostics.CaptureMixedCollider(polygon, GravitasDiagnosticColor.Cyan);
+        context.Diagnostics.CaptureMixedCollider(capsule, GravitasDiagnosticColor.Green);
+        context.Diagnostics.CaptureMixedCollider(degenerateCapsule, GravitasDiagnosticColor.Yellow);
+        context.Diagnostics.CaptureMixedCollider(compound, GravitasDiagnosticColor.Blue);
+
+        ReadOnlySpan<GravitasDebugDrawCommand> commands = context.Diagnostics.DrawCommands;
+        commands.Length.Should().Be(32);
+        Assert2DDrawCommandRange(commands, 0, 12, GravitasDebugDrawKind.Line, polygon.Id, ColliderType2D.ConvexPolygon);
+        Assert2DDrawCommandMetadata(commands[12], GravitasDebugDrawKind.WireCylinder, capsule.Id, ColliderType2D.Capsule);
+        Assert2DDrawCommandMetadata(commands[13], GravitasDebugDrawKind.WireCylinder, capsule.Id, ColliderType2D.Capsule);
+        Assert2DDrawCommandMetadata(commands[14], GravitasDebugDrawKind.WireBox, capsule.Id, ColliderType2D.Capsule);
+        Assert2DDrawCommandMetadata(commands[15], GravitasDebugDrawKind.WireCylinder, degenerateCapsule.Id, ColliderType2D.Capsule);
+        Assert2DDrawCommandMetadata(commands[16], GravitasDebugDrawKind.WireCylinder, degenerateCapsule.Id, ColliderType2D.Capsule);
+        Assert2DDrawCommandRange(commands, 17, 15, null, compound.Id, ColliderType2D.Compound);
+        commands[17].Kind.Should().Be(GravitasDebugDrawKind.WireCylinder);
+        commands[18].Kind.Should().Be(GravitasDebugDrawKind.WireCylinder);
+        commands[19].Kind.Should().Be(GravitasDebugDrawKind.WireBox);
+        Assert2DDrawCommandRange(commands, 20, 12, GravitasDebugDrawKind.Line, compound.Id, ColliderType2D.Compound);
+    }
+
+    [Fact]
+    public void EnabledDiagnostics_ShouldEmitCircleQueryJointLimitAndRagdollPayloads()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> hit = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
+        ScenarioBody<LSSphereCollider> first = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(2, 0, 0));
+        ScenarioBody<LSSphereCollider> second = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(4, 0, 0));
+        Joint3D joint = scenario.Context.Constraints3D.RegisterJoint(CreateBallSocket(first.Body, second.Body));
+        var queryHit = new Physics3DHit(
+            hit.Collider,
+            PhysicsScenarioBuilder.Vector(1, 0, 0),
+            Vector3d.Left,
+            (Fixed64)3,
+            Vector3d.Right);
+
+        scenario.Context.Diagnostics.Enable(eventCapacity: 4, drawCommandCapacity: 0);
+        scenario.Context.Diagnostics.EmitCircleQuery(
+            PhysicsScenarioBuilder.Vector(-2, 0, 0),
+            Fixed64.Half,
+            Vector3d.Right,
+            (Fixed64)5,
+            layerMaskBits: 0x1F,
+            hit: true,
+            hitCount: 2,
+            queryHit);
+        scenario.Context.Diagnostics.EmitJointLimitReached(joint, Fixed64.Half);
+        scenario.Context.Diagnostics.EmitRagdollActivated(ragdollId: 9, linkCount: 4, jointCount: 3, isActive: true);
+
+        ReadOnlySpan<GravitasDiagnosticEvent> events = scenario.Context.Diagnostics.Events;
+        events.Length.Should().Be(3);
+        events[0].Kind.Should().Be(GravitasDiagnosticEventKind.CircleQuery);
+        events[0].ColliderAId.Should().Be(hit.Collider.Id);
+        events[0].ColliderAType.Should().Be(ColliderType.Sphere);
+        events[0].End.Should().Be(PhysicsScenarioBuilder.Vector(3, 0, 0));
+        events[0].ScalarA.Should().Be(Fixed64.Half);
+        events[0].ScalarB.Should().Be((Fixed64)3);
+        events[0].DataA.Should().Be(0x1F);
+        events[0].DataB.Should().Be(2);
+        events[0].Hit.Should().BeTrue();
+        events[1].Kind.Should().Be(GravitasDiagnosticEventKind.JointLimitReached);
+        events[1].JointId.Should().Be(joint.Id);
+        events[1].ColliderAId.Should().Be(first.Collider.Id);
+        events[1].ColliderBId.Should().Be(second.Collider.Id);
+        events[1].ScalarB.Should().Be(Fixed64.Half);
+        events[2].Kind.Should().Be(GravitasDiagnosticEventKind.RagdollActivated);
+        events[2].BodyId.Should().Be(9);
+        events[2].DataA.Should().Be(4);
+        events[2].DataB.Should().Be(3);
+        events[2].Hit.Should().BeTrue();
+    }
+
+    [Fact]
+    public void EnabledDiagnostics_ShouldEmit2DJointLimitPayload()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        SolidBody2D first = CreateBody2D(context, Vector2d.Zero);
+        SolidBody2D second = CreateBody2D(context, Vector2d.Right * (Fixed64)2);
+        Joint2D joint = context.Constraints2D.RegisterJoint(CreatePrismatic2D(first, second));
+
+        context.Diagnostics.Enable(eventCapacity: 2, drawCommandCapacity: 0);
+        context.Diagnostics.EmitJointLimitReached(joint, Fixed64.Half);
+
+        ReadOnlySpan<GravitasDiagnosticEvent> events = context.Diagnostics.Events;
+        events.Length.Should().Be(1);
+        events[0].Kind.Should().Be(GravitasDiagnosticEventKind.JointLimitReached);
+        events[0].JointId.Should().Be(joint.Id);
+        events[0].ColliderADimension.Should().Be(GravitasColliderDimension.TwoD);
+        events[0].ColliderBDimension.Should().Be(GravitasColliderDimension.TwoD);
+        events[0].ColliderA2DType.Should().Be(ColliderType2D.Circle);
+        events[0].ColliderB2DType.Should().Be(ColliderType2D.Circle);
+        events[0].ScalarB.Should().Be(Fixed64.Half);
+        events[0].Hit.Should().BeTrue();
+    }
+
+    [Fact]
+    public void CaptureJoint_ShouldEmitDimensionalJointDrawCommands()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> first3D = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
+        ScenarioBody<LSSphereCollider> second3D = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(2, 0, 0));
+        Joint3D hinge = scenario.Context.Constraints3D.RegisterJoint(Create3DJoint(first3D.Body, second3D.Body, JointType3D.Hinge));
+        Joint3D coneTwist = scenario.Context.Constraints3D.RegisterJoint(Create3DJoint(first3D.Body, second3D.Body, JointType3D.ConeTwist));
+        Joint3D fixedJoint = scenario.Context.Constraints3D.RegisterJoint(Create3DJoint(first3D.Body, second3D.Body, JointType3D.Fixed));
+        using GravitasWorldContext context2D = Physics2DTestWorld.CreateContext();
+        SolidBody2D first2D = CreateBody2D(context2D, Vector2d.Zero);
+        SolidBody2D second2D = CreateBody2D(context2D, Vector2d.Right * (Fixed64)2);
+        Joint2D prismatic = context2D.Constraints2D.RegisterJoint(CreatePrismatic2D(first2D, second2D));
+
+        scenario.Context.Diagnostics.Enable(eventCapacity: 0, drawCommandCapacity: 20);
+        scenario.Context.Diagnostics.CaptureJoint(hinge, GravitasDiagnosticColor.Cyan);
+        scenario.Context.Diagnostics.CaptureJoint(coneTwist, GravitasDiagnosticColor.Green);
+        scenario.Context.Diagnostics.CaptureJoint(fixedJoint, GravitasDiagnosticColor.Yellow);
+        context2D.Diagnostics.Enable(eventCapacity: 0, drawCommandCapacity: 4);
+        context2D.Diagnostics.CaptureJoint(prismatic, GravitasDiagnosticColor.Blue);
+
+        ReadOnlySpan<GravitasDebugDrawCommand> commands3D = scenario.Context.Diagnostics.DrawCommands;
+        commands3D.Length.Should().Be(16);
+        AssertDrawCommandMetadata(commands3D[0], GravitasDebugDrawKind.Point, first3D.Collider.Id, ColliderType.Sphere);
+        AssertDrawCommandMetadata(commands3D[1], GravitasDebugDrawKind.Point, second3D.Collider.Id, ColliderType.Sphere);
+        AssertDrawCommandMetadata(commands3D[2], GravitasDebugDrawKind.Line, first3D.Collider.Id, ColliderType.Sphere);
+        AssertDrawCommandMetadata(commands3D[3], GravitasDebugDrawKind.Ray, first3D.Collider.Id, ColliderType.Sphere);
+        AssertDrawCommandMetadata(commands3D[4], GravitasDebugDrawKind.Ray, second3D.Collider.Id, ColliderType.Sphere);
+        AssertDrawCommandMetadata(commands3D[8], GravitasDebugDrawKind.Ray, first3D.Collider.Id, ColliderType.Sphere);
+        AssertDrawCommandMetadata(commands3D[9], GravitasDebugDrawKind.Ray, second3D.Collider.Id, ColliderType.Sphere);
+        AssertDrawCommandMetadata(commands3D[13], GravitasDebugDrawKind.Ray, first3D.Collider.Id, ColliderType.Sphere);
+        AssertDrawCommandMetadata(commands3D[14], GravitasDebugDrawKind.Ray, first3D.Collider.Id, ColliderType.Sphere);
+        AssertDrawCommandMetadata(commands3D[15], GravitasDebugDrawKind.Ray, first3D.Collider.Id, ColliderType.Sphere);
+
+        ReadOnlySpan<GravitasDebugDrawCommand> commands2D = context2D.Diagnostics.DrawCommands;
+        commands2D.Length.Should().Be(4);
+        Assert2DDrawCommandMetadata(commands2D[0], GravitasDebugDrawKind.Point, first2D.Collider.Id, ColliderType2D.Circle);
+        Assert2DDrawCommandMetadata(commands2D[1], GravitasDebugDrawKind.Point, second2D.Collider.Id, ColliderType2D.Circle);
+        Assert2DDrawCommandMetadata(commands2D[2], GravitasDebugDrawKind.Line, first2D.Collider.Id, ColliderType2D.Circle);
+        Assert2DDrawCommandMetadata(commands2D[3], GravitasDebugDrawKind.Ray, first2D.Collider.Id, ColliderType2D.Circle);
+    }
+
+    [Fact]
     public void CaptureCollider_ShouldEmitOneWireTrianglePerHighVolumeMeshTriangle()
     {
         const int quadCount = 128;
@@ -295,19 +487,123 @@ public sealed class GravitasDiagnosticSinkTests
     private static long MeasureAllocatedBytes(Action action)
         => AllocationTestHelper.MeasureSteadyState(action, warmupIterations: 1);
 
+    private static void InitializeBodylessCollider(
+        GravitasWorldContext context,
+        LSCollider2D collider,
+        Vector2d position)
+    {
+        var agent = new TestMatterAgent(
+            context,
+            new FixedTransform(new Vector3d(position.X, Fixed64.Zero, position.Y), FixedQuaternion.Identity, Vector3d.One));
+        collider.InitializeWithNoBody(agent);
+    }
+
+    private static SolidBody2D CreateBody2D(GravitasWorldContext context, Vector2d position)
+    {
+        var agent = new TestMatterAgent(
+            context,
+            new FixedTransform(new Vector3d(position.X, Fixed64.Zero, position.Y), FixedQuaternion.Identity, Vector3d.One));
+        var body = new SolidBody2D(agent, new LSCircleCollider2D(Fixed64.Half));
+        body.Initialize(position);
+        return body;
+    }
+
+    private static JointDefinition3D CreateBallSocket(SolidBody first, SolidBody second) =>
+        Create3DJoint(first, second, JointType3D.BallSocket);
+
+    private static JointDefinition3D Create3DJoint(SolidBody first, SolidBody second, JointType3D type) =>
+        new(
+            first,
+            second,
+            IdentityTransform(),
+            IdentityTransform(),
+            type,
+            JointLimit3D.Unrestricted,
+            JointMotor3D.Disabled,
+            JointCollisionPolicy.SuppressLinked);
+
+    private static JointDefinition2D CreatePrismatic2D(SolidBody2D first, SolidBody2D second) =>
+        new(
+            first,
+            second,
+            new JointFrame2D(Vector2d.Right * Fixed64.Half, Fixed64.Zero),
+            new JointFrame2D(-Vector2d.Right * Fixed64.Half, Fixed64.Zero),
+            JointType2D.Prismatic,
+            JointLimit2D.Unrestricted,
+            JointMotor2D.Disabled,
+            JointCollisionPolicy.SuppressLinked);
+
+    private static FixedTransform IdentityTransform() =>
+        new(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One);
+
+    private static void AssertDrawCommandMetadata(
+        GravitasDebugDrawCommand command,
+        GravitasDebugDrawKind kind,
+        int colliderId,
+        ColliderType colliderType)
+    {
+        command.Kind.Should().Be(kind);
+        command.ColliderId.Should().Be(colliderId);
+        command.ColliderType.Should().Be(colliderType);
+        command.ColliderDimension.Should().Be(GravitasColliderDimension.ThreeD);
+    }
+
+    private static void Assert2DDrawCommandRange(
+        ReadOnlySpan<GravitasDebugDrawCommand> commands,
+        int start,
+        int count,
+        GravitasDebugDrawKind? kind,
+        int colliderId,
+        ColliderType2D colliderType)
+    {
+        for (int i = start; i < start + count; i++)
+        {
+            if (kind.HasValue)
+                commands[i].Kind.Should().Be(kind.Value);
+            Assert2DDrawCommandMetadata(commands[i], commands[i].Kind, colliderId, colliderType);
+        }
+    }
+
+    private static void Assert2DDrawCommandMetadata(
+        GravitasDebugDrawCommand command,
+        GravitasDebugDrawKind kind,
+        int colliderId,
+        ColliderType2D colliderType)
+    {
+        command.Kind.Should().Be(kind);
+        command.ColliderId.Should().Be(colliderId);
+        command.ColliderDimension.Should().Be(GravitasColliderDimension.TwoD);
+        command.Collider2DType.Should().Be(colliderType);
+    }
+
     private static LSMeshCollider CreateTriangleMesh()
     {
+        Vector3d[] vertices = TriangleVertices();
         return new LSMeshCollider(
-            new[]
-            {
-                new Vector3d(Fixed64.Zero, Fixed64.Zero, Fixed64.Zero),
-                new Vector3d(Fixed64.One, Fixed64.Zero, Fixed64.Zero),
-                new Vector3d(Fixed64.Zero, Fixed64.Zero, Fixed64.One)
-            },
-            new[] { 0, 1, 2 },
+            vertices,
+            TriangleIndices(),
             MeshColliderMode.Convex,
             MeshInertiaPolicy.SurfaceApproximation);
     }
+
+    private static Vector2d[] DiamondVertices() =>
+        new[]
+        {
+            new Vector2d(Fixed64.Zero, Fixed64.One),
+            new Vector2d(Fixed64.One, Fixed64.Zero),
+            new Vector2d(Fixed64.Zero, -Fixed64.One),
+            new Vector2d(-Fixed64.One, Fixed64.Zero)
+        };
+
+    private static Vector3d[] TriangleVertices() =>
+        new[]
+        {
+            new Vector3d(Fixed64.Zero, Fixed64.Zero, Fixed64.Zero),
+            new Vector3d(Fixed64.One, Fixed64.Zero, Fixed64.Zero),
+            new Vector3d(Fixed64.Zero, Fixed64.Zero, Fixed64.One)
+        };
+
+    private static int[] TriangleIndices() => new[] { 0, 1, 2 };
 
     private static LSMeshCollider CreateStripMesh(int quadCount)
     {

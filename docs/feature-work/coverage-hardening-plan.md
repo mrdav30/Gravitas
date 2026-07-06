@@ -1,7 +1,7 @@
 # Coverage Hardening Plan
 
 **Date:** 2026-07-05  
-**Status:** Active - Roadmap B complete; 100% campaign remains  
+**Status:** Active - Roadmap C complete; 100% campaign remains  
 **Owner:** Gravitas coverage, test-quality, and dead-code hardening
 
 ---
@@ -507,12 +507,26 @@ deterministic state distinction.
 
 ### Roadmap C: Diagnostics Draw And Event Branches
 
-**Status:** Pending
+**Status:** Completed
 
 Target diagnostic sink emit/draw helpers with disabled-sink, enabled-sink,
 capacity, mixed polygon, compound-part, joint, ragdoll, and query event
 branches. Keep disabled paths allocation-free and do not chase view property
 getters unless the view construction or visitor dispatch has host-adapter value.
+
+**Result**
+
+- Added focused diagnostic sink coverage for 3D compound capsule/cylinder/mesh
+  part draw expansion, mixed 2D polygon/capsule/compound slab draw expansion,
+  3D circle-query event payloads, 2D/3D joint-limit payloads, ragdoll
+  activation payloads, and dimensional joint debug-draw commands.
+- Added a compact typed diagnostic-event rejection test so wrong-kind `TryAs*`
+  calls fail cleanly across the event visitor surface.
+- Left low-value typed debug-draw view getter noise alone. Existing dispatch
+  tests already assert every host-adapter draw payload; the remaining uncovered
+  lines are mirrored metadata/property accessors rather than branchy behavior.
+- Coverage report:
+  `TestResults/coverage-roadmap-c/reports/Summary.txt`
 
 ### Roadmap D: Collision Dispatch And Geometry Branches
 
@@ -548,3 +562,4 @@ or stale support paths rather than preserving them for coverage.
 | 2026-07-05 | 90.0% | 76.0% | 91.0% | 1025 passed | Final first-pass checkpoint. Removed unused transient-state scaffolding and covered query request/range, coroutine wait, layer, and compound-part contracts. Branch 90% remains active roadmap work. |
 | 2026-07-05 | 90.1% | 76.5% | 91.1% | 1034 passed | Roadmap A completed. Mixed swept-box clipping and reducer classification are split into focused internal helpers with direct branch coverage. |
 | 2026-07-05 | 90.7% | 76.8% | 91.5% | 1042 passed | Roadmap B completed. Replay hash branch coverage now covers 2D joint cache/authoritative distinctions, pair manifold/warm-start payloads, mixed trigger/contact materials, and hierarchy replay ordinal normalization. |
+| 2026-07-05 | 91.4% | 77.1% | 91.7% | 1048 passed | Roadmap C completed. Diagnostic sink coverage now exercises compound/mixed slab draw expansion, joint draw branches, circle-query events, 2D/3D joint-limit events, ragdoll activation events, and typed event rejection branches. |

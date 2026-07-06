@@ -93,6 +93,30 @@ public sealed class GravitasDiagnosticEventViewTests
     }
 
     [Fact]
+    public void TryAsViews_ShouldRejectNonMatchingKinds()
+    {
+        GravitasDiagnosticEvent forceEvent = CreateEvent(GravitasDiagnosticEventKind.ForceDelta);
+        GravitasDiagnosticEvent torqueEvent = CreateEvent(GravitasDiagnosticEventKind.TorqueDelta);
+
+        forceEvent.TryAsTorqueDelta(out _).Should().BeFalse();
+        forceEvent.TryAsLinearVelocityDelta(out _).Should().BeFalse();
+        forceEvent.TryAsAngularVelocityDelta(out _).Should().BeFalse();
+        forceEvent.TryAsGroundProbe(out _).Should().BeFalse();
+        forceEvent.TryAsRayQuery(out _).Should().BeFalse();
+        forceEvent.TryAsCircleQuery(out _).Should().BeFalse();
+        forceEvent.TryAsQuerySummary(out _).Should().BeFalse();
+        forceEvent.TryAsContact(out _).Should().BeFalse();
+        forceEvent.TryAsResponseImpulse(out _).Should().BeFalse();
+        forceEvent.TryAsMixedQuery(out _).Should().BeFalse();
+        forceEvent.TryAsMixedContact(out _).Should().BeFalse();
+        forceEvent.TryAsMixedResponseImpulse(out _).Should().BeFalse();
+        forceEvent.TryAsMixedResponseIsland(out _).Should().BeFalse();
+        forceEvent.TryAsJoint(out _).Should().BeFalse();
+        forceEvent.TryAsRagdoll(out _).Should().BeFalse();
+        torqueEvent.TryAsForceDelta(out _).Should().BeFalse();
+    }
+
+    [Fact]
     public void TryAsQueryViews_ShouldMapQueryPayloads()
     {
         Vector3d start = new(Fixed64.One, (Fixed64)2, (Fixed64)3);
