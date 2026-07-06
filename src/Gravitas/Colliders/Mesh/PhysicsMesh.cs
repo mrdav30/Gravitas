@@ -86,14 +86,6 @@ namespace Gravitas.Colliders
             ? CalculateFaceNormals()
             : _faceNormals;
 
-        private readonly int[][] _edges;
-
-        private bool _edgesNormalsValid;
-        private readonly Vector3d[] _edgeNormals;
-        public Vector3d[] EdgeNormals => !_edgesNormalsValid
-            ? CalculateEdgeNormals()
-            : _edgeNormals;
-
         private readonly Fixed64[] _faceAreas;
         public Fixed64[] FaceAreas => _faceAreas;
 
@@ -186,8 +178,6 @@ namespace Gravitas.Colliders
             _triangleCount = triangles.Length / 3; // 3 vertices per triangle
             _triangleBVH = new SwiftFixedBVH<int>(2 * TriangleCount - 1);
             _faceNormals = new Vector3d[TriangleCount];
-            _edges = new int[TriangleCount][];
-            _edgeNormals = new Vector3d[TriangleCount * 3]; // 3 edges per triangle
 
             _faceAreas = new Fixed64[TriangleCount];
             _totalArea = Fixed64.Zero;
@@ -208,7 +198,6 @@ namespace Gravitas.Colliders
                 int index1 = _triangles[i * 3 + 1];
                 int index2 = _triangles[i * 3 + 2];
 
-                _edges[i] = new[] { index0, index1, index1, index2, index2, index0 };
                 _faceAreas[i] = CalculateTriangleArea(
                     _localVertices[index0],
                     _localVertices[index1],
@@ -279,22 +268,6 @@ namespace Gravitas.Colliders
             Vector3d endEdgeA,
             Vector3d startEdgeB,
             Vector3d endEdgeB) => Vector3d.Cross(endEdgeA - startEdgeA, endEdgeB - startEdgeB).Magnitude * Fixed64.Half;
-
-        public Vector3d[] CalculateEdgeNormals()
-        {
-            for (int i = 0; i < _triangleCount; i++)
-            {
-                for (int n = 0; n < 3; n++)
-                {
-                    int edgeStart = _edges[i][n * 2];
-                    int edgeEnd = _edges[i][n * 2 + 1];
-                    _edgeNormals[i * 3 + n] = (_localVertices[edgeEnd] - _localVertices[edgeStart]).Normalized;
-                }
-            }
-
-            _edgesNormalsValid = true;
-            return _edgeNormals;
-        }
 
         private Vector3d[] CalculateFaceNormals()
         {
@@ -687,18 +660,6 @@ namespace Gravitas.Colliders
             }
 
             return totalArea;
-        }
-
-        public Vector3d[] GetTriangleAtIndex(int index)
-        {
-            GetTriangleVertices(index, out Vector3d first, out Vector3d second, out Vector3d third);
-
-            return new[]
-            {
-                first,
-                second,
-                third
-            };
         }
 
         public void GetTriangleVertices(int index, out Vector3d first, out Vector3d second, out Vector3d third)

@@ -418,13 +418,41 @@ public sealed class RaycastSegmentWorker
     /// </summary>
     public bool CheckOBBoxOverlaps(LSCuboidCollider oobox, ref SwiftList<Vector3d> outputIntersectionPoints)
     {
-        if (!CheckAABBoxOverlaps(oobox.BoundsMin, oobox.BoundsMax, ref outputIntersectionPoints))
-            return false;
+        FixedQuaternion inverseRotation = oobox.Rotation.Inverse();
+        Vector3d localOrigin = (_cachedOrigin - oobox.Center) * inverseRotation;
+        Vector3d halfExtents = oobox.ScaledSize * Fixed64.Half;
+        Vector3d min = -halfExtents;
+        Vector3d max = halfExtents;
 
-        for (int i = 0; i < outputIntersectionPoints.Count; i++)
+        if (_segmentLengthSqr == Fixed64.Zero)
         {
-            Vector3d worldSpaceIntersection = outputIntersectionPoints[i].Rotate(oobox.Position, oobox.Rotation);
-            outputIntersectionPoints[i] = worldSpaceIntersection;
+            if (localOrigin.X < min.X || localOrigin.X > max.X
+                || localOrigin.Y < min.Y || localOrigin.Y > max.Y
+                || localOrigin.Z < min.Z || localOrigin.Z > max.Z)
+            {
+                return false;
+            }
+
+            AddLocalIntersectionPoint(oobox.Center, oobox.Rotation, localOrigin, ref outputIntersectionPoints);
+            return true;
+        }
+
+        Vector3d localDirection = _segmentDirection * inverseRotation;
+        Fixed64 entry = Fixed64.Zero;
+        Fixed64 exit = _segmentLength;
+
+        if (!ClipSegmentAxis(localOrigin.X, localDirection.X, min.X, max.X, ref entry, ref exit)
+            || !ClipSegmentAxis(localOrigin.Y, localDirection.Y, min.Y, max.Y, ref entry, ref exit)
+            || !ClipSegmentAxis(localOrigin.Z, localDirection.Z, min.Z, max.Z, ref entry, ref exit))
+        {
+            return false;
+        }
+
+        if (_calculateIntersections)
+        {
+            AddLocalIntersectionPoint(oobox.Center, oobox.Rotation, localOrigin + localDirection * entry, ref outputIntersectionPoints);
+            if (exit != entry)
+                AddLocalIntersectionPoint(oobox.Center, oobox.Rotation, localOrigin + localDirection * exit, ref outputIntersectionPoints);
         }
 
         return true;

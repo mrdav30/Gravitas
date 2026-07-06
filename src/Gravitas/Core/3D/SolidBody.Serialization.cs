@@ -71,8 +71,6 @@ public partial class SolidBody
         RecordValues.Look(chronicler, ref _positionCorrection, "PositionCorrection");
         RecordValues.Look(chronicler, ref _timeScaledAcceleration, "TimeScaledAcceleration");
         RecordValues.Look(chronicler, ref _timeScaledDeceleration, "TimeScaledDeceleration");
-        RecordValues.Look(chronicler, ref _decelerating, "Decelerating");
-        RecordValues.Look(chronicler, ref _isVelocityConstant, "IsVelocityConstant");
         RecordValues.Look(chronicler, ref LinearDragCoefficient, "LinearDragCoefficient");
         RecordValues.Look(chronicler, ref AngularDragCoefficient, "AngularDragCoefficient");
         RecordValues.Look(chronicler, ref _normalForce, "NormalForce");

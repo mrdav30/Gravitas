@@ -200,12 +200,6 @@ public sealed class ContactManifold : IEnumerable<ManifoldContact>
         SortContactsById();
     }
 
-    public void SetImmovableDirection(Vector3d direction)
-    {
-        for (int i = 0; i < _count; i++)
-            SetContactUnchecked(i, GetContactUnchecked(i).WithImmovableDirection(direction));
-    }
-
     public Enumerator GetEnumerator() => new(this);
 
     IEnumerator<ManifoldContact> IEnumerable<ManifoldContact>.GetEnumerator() => GetEnumerator();

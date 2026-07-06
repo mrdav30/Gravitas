@@ -310,14 +310,6 @@ public partial class CollisionPair
         _lastColliderBBroadPhaseVersion = ColliderB.BroadPhaseVersion;
     }
 
-    public void SetImmovableDirection(Vector3d directionA, Vector3d directionB)
-    {
-        if (ColliderA.Body?.IsPositionFullyFrozen == true)
-            Manifold.SetImmovableDirection(directionA);
-        else if (ColliderB.Body?.IsPositionFullyFrozen == true)
-            Manifold.SetImmovableDirection(directionB);
-    }
-
     private bool ShouldPerformCollisionCheck()
     {
         // Calculate the square distance between the two bounding box centers

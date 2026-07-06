@@ -132,6 +132,33 @@ public sealed class GravitasQuery3DServiceRaycastTests
     }
 
     [Fact]
+    public void Raycast_ShouldClipRotatedCuboidInLocalSpace()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        var collider = new LSCuboidCollider
+        {
+            Size = new Vector3d((Fixed64)2, Fixed64.One, Fixed64.One)
+        };
+        CreateDynamicCollider(
+            context,
+            collider,
+            Vector3d.Zero,
+            FixedQuaternion.FromAxisAngle(Vector3d.Up, FixedMath.DegToRad((Fixed64)45)));
+
+        bool hit = context.Query3D.Raycast(
+            Vector(-4, 0, 0),
+            Vector3d.Right,
+            (Fixed64)8,
+            out Physics3DHit rayHit,
+            IncludeLayerZero);
+
+        hit.Should().BeTrue();
+        rayHit.Collider.Should().BeSameAs(collider);
+        rayHit.Point.X.Should().BeLessThan(Fixed64.Zero);
+        rayHit.Point.Z.Abs().Should().BeLessThan(Fixed64.FromFraction(1, 256));
+    }
+
+    [Fact]
     public void RaycastAll_ShouldReturnNoHitsWhenSegmentMissesCollider()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
@@ -227,6 +254,16 @@ public sealed class GravitasQuery3DServiceRaycastTests
     private static TCollider CreateDynamicCollider<TCollider>(GravitasWorldContext context, TCollider collider, Vector3d position)
         where TCollider : LSCollider
     {
+        return CreateDynamicCollider(context, collider, position, FixedQuaternion.Identity);
+    }
+
+    private static TCollider CreateDynamicCollider<TCollider>(
+        GravitasWorldContext context,
+        TCollider collider,
+        Vector3d position,
+        FixedQuaternion rotation)
+        where TCollider : LSCollider
+    {
         EnsureGrid(context);
         var agent = new TestMatterAgent(context);
         var body = new SolidBody(agent, collider)
@@ -234,7 +271,7 @@ public sealed class GravitasQuery3DServiceRaycastTests
             Mass = Fixed64.One
         };
 
-        body.Initialize(position, FixedQuaternion.Identity);
+        body.Initialize(position, rotation);
         return collider;
     }
 

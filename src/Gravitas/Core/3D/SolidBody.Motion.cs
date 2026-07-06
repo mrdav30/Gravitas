@@ -54,8 +54,6 @@ public partial class SolidBody
         _positionCorrection = Vector2d.Zero;
         _timeScaledAcceleration = Vector3d.Zero;
         _timeScaledDeceleration = Vector3d.Zero;
-        _decelerating = false;
-        _isVelocityConstant = true;
     }
 
     private void ApplyFreezeConstraintsToMotion()

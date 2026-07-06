@@ -130,7 +130,7 @@ public sealed class ReplayHashBranchCoverageTests
     }
 
     [Fact]
-    public void CollisionPair3DReplayHash_ShouldEncodeMaterialImmovableDirectionAndWarmStartState()
+    public void CollisionPair3DReplayHash_ShouldEncodeMaterialAndWarmStartState()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSSphereCollider> first = scenario.CreateSphere(Vector3d.Zero);
@@ -152,12 +152,10 @@ public sealed class ReplayHashBranchCoverageTests
             Fixed64.FromFraction(1, 4),
             Fixed64.FromFraction(1, 8));
         ChronicleHash warmStarted = HashPair3D(pair, GravitasReplayHashMode.Authoritative);
-        pair.Manifold.SetImmovableDirection(Vector3d.Up);
 
         contactOnly.Should().NotBe(empty);
         materialOverride.Should().NotBe(contactOnly);
         warmStarted.Should().NotBe(contactOnly);
-        HashPair3D(pair, GravitasReplayHashMode.Authoritative).Should().NotBe(warmStarted);
     }
 
     [Fact]

@@ -29,7 +29,6 @@ The 3D narrow phase writes a `ContactManifold` owned by the `CollisionPair`.
 - point on collider B.
 - penetration depth.
 - normal oriented from collider A toward collider B.
-- optional immovable collision direction.
 
 3D manifolds store up to four contacts. When more candidates are offered, the
 manifold keeps the deepest four and breaks depth ties by lower stable contact

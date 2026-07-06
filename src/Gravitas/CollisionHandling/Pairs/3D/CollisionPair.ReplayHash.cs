@@ -68,7 +68,6 @@ public partial class CollisionPair
                 WriteMaterial(ref writer, contact.MaterialA);
                 WriteMaterial(ref writer, contact.MaterialB);
             }
-            writer.WriteVector3d(contact.ImmovableCollisionDirection);
         }
     }
 

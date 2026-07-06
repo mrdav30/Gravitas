@@ -68,8 +68,6 @@ public partial class SolidBody
         writer.WriteVector2d(_positionCorrection);
         writer.WriteVector3d(_timeScaledAcceleration);
         writer.WriteVector3d(_timeScaledDeceleration);
-        writer.WriteBool(_decelerating);
-        writer.WriteBool(_isVelocityConstant);
         writer.WriteFixed64(LinearDragCoefficient);
         writer.WriteFixed64(AngularDragCoefficient);
         writer.WriteVector3d(_normalForce);

@@ -17,9 +17,49 @@
 
 ## Active Issues
 
-- None currently.
+### Mesh-Cuboid Fallback SAT May Be Incomplete
+
+**Discovered:** 2026-07-06  
+**Source:** Coverage Workstream 1 zombie-code sweep and subagent geometry review  
+**Affected area:** `CollisionDetection.Mesh`, convex mesh vs cuboid fallback
+contact generation
+
+Concern: the retained mesh-cuboid fallback path prepares nearby triangle face
+normals and vertex-derived points for SAT-style testing, but does not appear to
+include explicit triangle-edge vs cuboid-edge axes. The newer
+`MeshTriangleContactGenerator` handles the common manifold path first, so this
+needs a focused RCA before we either add branch coverage, centralize the
+fallback, or delete it as unreachable.
+
+Next step: investigate through valid convex mesh/cuboid setups and compare
+against triangle-cuboid SAT expectations. If a real miss is reproduced, add a
+regression before changing the fallback.
 
 ## Resolved Issues
+
+### Rotated Cuboid Raycast Clipped The Enclosing AABB Instead Of Local Slabs
+
+**Discovered:** 2026-07-06  
+**Resolved:** 2026-07-06  
+**Source:** Coverage Workstream 1 branch inventory and subagent query review  
+**Affected area:** `RaycastSegmentWorker.CheckOBBoxOverlaps(...)`,
+3D raycast queries against rotated `LSCuboidCollider`
+
+RCA: rotated cuboid raycasts first clipped the ray segment against the
+collider's enclosing world-space AABB, then rotated those world-space
+intersection points around the cuboid. That could report hit points that no
+longer lay on the original ray and could accept candidates based on the broad
+box rather than the cuboid's local slabs.
+
+Fix: `CheckOBBoxOverlaps(...)` now transforms the prepared ray segment into the
+cuboid's local space, clips against local half-extents, and transforms accepted
+intersection points back to world space.
+
+Verification:
+
+- Added `Raycast_ShouldClipRotatedCuboidInLocalSpace`.
+- Verified the regression failed before the fix and passed after the fix.
+- Ran the focused 3D raycast test suite.
 
 ### 3D Direct Collider Inactive Load Preserved Stale Partition State
 

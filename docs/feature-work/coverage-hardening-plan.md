@@ -65,6 +65,12 @@ Generate CRAP and method-gap data when prioritizing work:
     > TestResults\coverage-branch-hardening\method-gaps-under-90.json
 ```
 
+If `TestResults\coverage-branch-hardening` contains prior run directories,
+either delete the old run directories before collection or pass the newest
+`coverage.cobertura.xml` file explicitly to the CRAP/method-gap scripts. Those
+scripts expect one Cobertura document, while ReportGenerator can merge multiple
+files.
+
 The runsettings file excludes generated sources:
 
 - `**/bin/**`
@@ -81,35 +87,32 @@ configuration before making source changes.
 
 ## Current Standing
 
-Fresh checkpoint after Roadmap E and the 3D inactive-collider load parity fix:
+Fresh checkpoint after Workstream 1 branch inventory and zombie-code cleanup:
 
 | Metric | Baseline | Current | Short-Term Gate | Long-Term Target |
 | --- | ---: | ---: | ---: | ---: |
-| Line coverage | 87.3% | 92.0% | 90% | 100% |
+| Line coverage | 87.3% | 92.1% | 90% | 100% |
 | Branch coverage | 74.1% | 77.9% | 90% | 100% |
-| Method coverage | 86.5% | 92.2% | 90% | 100% |
-| Tests | 974 passed | 1094 passed | green | green |
+| Method coverage | 86.5% | 92.4% | 90% | 100% |
+| Tests | 974 passed | 1095 passed | green | green |
 
 Current evidence:
 
 - Coverage report:
-  `TestResults/coverage-roadmap-e/reports/Summary.txt`
+  `TestResults/coverage-branch-hardening/reports/Summary.txt`
 - Coverage collection:
   `dotnet test tests\Gravitas.Tests\Gravitas.Tests.csproj --configuration Release --collect:"XPlat Code Coverage" --settings tests\Gravitas.Tests\coverlet.runsettings`
-  passed with 1094 tests.
-- Full validation:
-  `dotnet test Gravitas.slnx --configuration Release` passed with 1094 tests.
-- Lean validation:
-  `dotnet test Gravitas.slnx --configuration ReleaseLean` passed with 1074
-  tests.
-- Latest CRAP extraction reported 42 flagged methods and 292 uncovered
+  passed with 1095 tests.
+- Branch shortlist:
+  `TestResults/coverage-branch-hardening/branch-gap-shortlist.txt`
+- Latest CRAP extraction reported 41 flagged methods and 285 uncovered
   methods.
 
 ## Completed Coverage Summary
 
-The first coverage campaign moved the project from 87.3% line, 74.1% branch,
-and 86.5% method coverage to 92.0% line, 77.9% branch, and 92.2% method
-coverage.
+The first coverage campaign and branch inventory sweep moved the project from
+87.3% line, 74.1% branch, and 86.5% method coverage to 92.1% line, 77.9%
+branch, and 92.4% method coverage.
 
 High-value work completed:
 
@@ -130,6 +133,9 @@ High-value work completed:
 - Service lifecycle and collider authoring coverage for hierarchy detach,
   cross-dimensional parent cleanup, compound 2D authoring, ragdoll pose-target
   helpers, settings saver branches, and inactive 2D/3D collider load cleanup.
+- Rotated cuboid raycast regression coverage after the inventory sweep exposed
+  that oriented-box raycasts clipped the enclosing AABB instead of cuboid-local
+  slabs.
 
 Cleanup completed:
 
@@ -141,6 +147,16 @@ Cleanup completed:
   `Joint3D.HasAwakeParticipant()`.
 - Fixed 3D direct-collider inactive load so loaded inactive state clears stale
   primary and mixed partition state just like 2D.
+- Removed stale 3D immovable-contact-direction state from contact manifolds,
+  collision pairs, and replay hashing after confirming response no longer reads
+  it.
+- Removed the unused `LSCollider.HeightPos` shortcut; body-owned `HeightPos`
+  remains the authoritative 3D height state.
+- Removed dead `SolidBody.UpdateAcceleration()` state and the never-read
+  `_decelerating` / `_isVelocityConstant` serialization and replay fields.
+- Removed unused `PhysicsMesh.EdgeNormals` storage and the allocating
+  `GetTriangleAtIndex(...)` wrapper, keeping the allocation-free
+  `GetTriangleVertices(..., out ...)` path.
 
 ## Hardening Rules
 
@@ -193,7 +209,7 @@ RCA and verification, even if the fix is small.
 
 ### Workstream 1: Fresh Branch Inventory And Zombie-Code Sweep
 
-**Status:** Ready
+**Status:** Complete - 2026-07-06
 
 **Purpose**
 
@@ -202,8 +218,9 @@ or track zombie code before writing more tests.
 
 **Files To Inspect**
 
-- `TestResults/coverage-roadmap-e/reports/Summary.txt`
-- `TestResults/coverage-roadmap-e/method-gaps-under-90.json`
+- `TestResults/coverage-branch-hardening/reports/Summary.txt`
+- `TestResults/coverage-branch-hardening/method-gaps-under-90.json`
+- `TestResults/coverage-branch-hardening/branch-gap-shortlist.txt`
 - `src/Gravitas`
 - `tests/Gravitas.Tests`
 - `docs/feature-work/issue-tracker.md`
@@ -211,23 +228,88 @@ or track zombie code before writing more tests.
 
 **Tasks**
 
-- [ ] Rerun coverage into `TestResults\coverage-branch-hardening`.
-- [ ] Regenerate ReportGenerator, CRAP, and method-gap artifacts.
-- [ ] Sort the remaining branch gaps by CRAP score, uncovered branch count,
+- [x] Rerun coverage into `TestResults\coverage-branch-hardening`.
+- [x] Regenerate ReportGenerator, CRAP, and method-gap artifacts.
+- [x] Sort the remaining branch gaps by CRAP score, uncovered branch count,
       runtime risk, and hot-path relevance.
-- [ ] For each top candidate, classify it using the zombie-code triage
+- [x] For each top candidate, classify it using the zombie-code triage
       protocol before writing tests.
-- [ ] Delete or simplify obvious zombie code immediately when it has no valid
+- [x] Delete or simplify obvious zombie code immediately when it has no valid
       runtime path.
-- [ ] Record suspected bugs or parity smells in `issue-tracker.md`; if fixed in
+- [x] Record suspected bugs or parity smells in `issue-tracker.md`; if fixed in
       the same pass, record them under `Resolved Issues`.
-- [ ] Update this plan with the new prioritized branch campaign list.
+- [x] Update this plan with the new prioritized branch campaign list.
 
 **Exit Criteria**
 
 - A current branch-gap shortlist exists.
 - Any discovered correctness risk is visible in the issue tracker.
 - Obvious zombie code is deleted instead of carried forward.
+
+**Outcome**
+
+- Coverage after cleanup: 92.1% line, 77.9% branch, 92.4% method.
+- Tests after cleanup: coverage collection passed with 1095 tests.
+- CRAP extraction after cleanup: 41 flagged methods, down from 42.
+- Method-gap extraction after cleanup: 285 uncovered methods, down from 292.
+- The inventory sweep found and fixed the rotated cuboid raycast local-slab
+  bug, and recorded the mesh-cuboid fallback SAT completeness concern in
+  `issue-tracker.md` for focused RCA.
+
+## Current Branch Campaign Shortlist
+
+Use this list as the next-pass ordering, then re-rank after each workstream:
+
+1. **Authoring Equality And Replay Families**
+   - `ColliderShapeDefinition.Equals(...)`: missed 17 / 28 branches.
+   - `ColliderShapeDefinition2D.Equals(...)`: missed 9 / 18 branches.
+   - `ColliderShapeDefinition.GetHashCode()`: missed 6 / 6 branches.
+   - `LSCollider2D.ContributeShapeReplayHash(...)` and compound-part shape
+     replay helpers.
+   - Classification: real authoring/replay behavior. Cover through shape
+     definition and compound-part scenarios; delete only if an equality/hash
+     branch proves impossible after API review.
+2. **CCD Handoff And Shape-Exact Refinement Families**
+   - 3D/2D kinematic-dynamic handoff helpers.
+   - `TryResolveRotationalContinuousCollision(...)` in 3D and 2D.
+   - `TryRefineShapeExactContinuousCollisionHit(...)`.
+   - `ProcessQueuedContinuousCollisionHandoffs(...)`.
+   - Classification: real runtime behavior. High risk; cover with focused
+     deterministic CCD scenarios rather than private-helper branch steering.
+3. **Mixed Prism And Response Families**
+   - `TryTestCuboidPrism(...)`: missed 8 / 28 branches.
+   - `TryTestCapsulePrism(...)`, `TryTestCylinderPrism(...)`, and
+     `TryTestConePrism(...)`: each missed 8 / 20 branches.
+   - `CollisionResponseMixed.Resolve(...)`, mixed candidate processing, and
+     mixed trigger/contact event branches.
+   - Classification: real mixed behavior. Cover with physical pair scenarios
+     and avoid duplicating tests that only repeat shape families.
+4. **3D Query And Shape-Cast Families**
+   - `RaycastSegmentWorker.CheckOBBoxOverlaps(...)`: missed 18 / 24 branches
+     after the local-slab bug fix; remaining coverage should target meaningful
+     local slab edge cases rather than restoring the old AABB behavior.
+   - Cone hit construction and concave-mesh cone paths.
+   - `ConvexSweepQueryWorker` compound target, hit point/normal, and reducer
+     ordering paths.
+   - Zero-length sphere ray behavior in `RaycastSegmentWorker` remains a
+     defensive worker branch because public query APIs reject zero-length rays.
+   - Classification: real query behavior. Cover through public query APIs and
+     keep scalar/batch tests non-duplicative.
+5. **Collision Geometry Families**
+   - Mesh-cuboid, mesh-cylinder, and mesh-cone fallback/contact branches.
+   - 2D convex/compound collision and manifold replacement branches.
+   - `ConvexColliderSupport` simplex update branches.
+   - Classification: real geometry behavior until proven otherwise. Delete only
+     after demonstrating no valid collider setup can reach the fallback.
+6. **Service Lifecycle And Partition Families**
+   - Deferred 2D partition refresh, retained mixed membership reset, partition
+     order comparers, and collider load-state branches.
+   - Classification: real lifecycle/pooling behavior. Add tests only for
+     observable ownership and idempotency guarantees.
+7. **Low-Value Diagnostic/View Getter Noise**
+   - Immutable diagnostic view getters and simple constructor branches remain
+     lower priority unless they affect visitor dispatch, disabled-path behavior,
+     or host adapter data.
 
 ### Workstream 2: Collision And Shape Geometry Branches
 
@@ -240,7 +322,6 @@ while deleting stale fallback paths that no valid collider shape can reach.
 
 **Likely Candidate Areas**
 
-- `src/Gravitas/CollisionHandling/Pairs/3D/CollisionPair.cs`
 - `src/Gravitas/CollisionHandling/Detection/3D`
 - `src/Gravitas/CollisionHandling/Detection/2D/CollisionDetection2D.cs`
 - `src/Gravitas/CollisionHandling/Detection/Mixed/CollisionDetectionMixed*.cs`
@@ -249,8 +330,6 @@ while deleting stale fallback paths that no valid collider shape can reach.
 
 **Tasks**
 
-- [ ] Review `SetImmovableDirection(...)` and decide whether it is real runtime
-      behavior, stale API, or an issue-tracker candidate.
 - [ ] Cover or delete remaining mixed prism branch gaps for cuboid, capsule,
       cylinder, cone, and triangle/mesh slab paths.
 - [ ] Review 2D convex/compound collision branches for duplicate tests and
@@ -414,3 +493,4 @@ Close the release-hardening branch gate cleanly before expanding the plan toward
 | 2026-07-05 | 87.3% | 74.1% | 86.5% | 974 passed | Baseline captured with `tests/Gravitas.Tests/coverlet.runsettings` after trigger collider hardening. |
 | 2026-07-05 | 90.0% | 76.0% | 91.0% | 1025 passed | First coverage campaign completed. Line and method gates met; branch gap remained active. Removed unused transient-state scaffolding. |
 | 2026-07-05 | 92.0% | 77.9% | 92.2% | 1094 passed | Roadmaps A-E completed. Added focused branch coverage across mixed query support, replay hash, diagnostics, collision dispatch, geometry, service lifecycle, and collider authoring. Removed stale cuboid and joint helper code. Fixed 3D inactive direct-collider load partition cleanup parity. |
+| 2026-07-06 | 92.1% | 77.9% | 92.4% | 1095 passed | Workstream 1 branch inventory completed. Removed stale immovable-contact direction, collider height shortcut, dead acceleration flags, mesh edge-normal storage, and an allocating triangle wrapper. Fixed rotated cuboid raycasts to clip local slabs. Recorded mesh-cuboid fallback SAT completeness for RCA. |

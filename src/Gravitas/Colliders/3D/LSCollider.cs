@@ -123,11 +123,6 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
         }
     }
 
-    public Fixed64 HeightPos => _compoundOwner?.HeightPos
-        ?? Body?.HeightPos
-        ?? _agent?.Transform.Position.Y
-        ?? throw new InvalidOperationException("Collider has no body or static transform.");
-
     public virtual FixedQuaternion Rotation
     {
         get => _compoundOwner != null

@@ -23,8 +23,7 @@ public readonly struct ManifoldContact
         Vector3d normal,
         bool hasMaterialOverride = false,
         PhysicsMaterial materialA = default,
-        PhysicsMaterial materialB = default,
-        Vector3d immovableCollisionDirection = default)
+        PhysicsMaterial materialB = default)
     {
         ContactId = contactId;
         PointA = pointA;
@@ -36,7 +35,6 @@ public readonly struct ManifoldContact
         HasMaterialOverride = hasMaterialOverride;
         MaterialA = hasMaterialOverride ? materialA : PhysicsMaterial.Default;
         MaterialB = hasMaterialOverride ? materialB : PhysicsMaterial.Default;
-        ImmovableCollisionDirection = immovableCollisionDirection;
     }
 
     /// <summary>
@@ -79,11 +77,4 @@ public readonly struct ManifoldContact
     /// </summary>
     public PhysicsMaterial MaterialB { get; }
 
-    /// <summary>
-    /// Optional direction used by immovable-body response handling.
-    /// </summary>
-    public Vector3d ImmovableCollisionDirection { get; }
-
-    public ManifoldContact WithImmovableDirection(Vector3d direction) =>
-        new(ContactId, PointA, PointB, Depth, Normal, HasMaterialOverride, MaterialA, MaterialB, direction);
 }

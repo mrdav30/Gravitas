@@ -531,11 +531,6 @@ public partial class SolidBody : IRecordable
     public Vector3d _timeScaledDeceleration;
     public Vector3d TimeScaledDeceleration => _timeScaledDeceleration;
 
-    // If acceleration is in the opposite direction to its velocity
-    private bool _decelerating;
-
-    private bool _isVelocityConstant;
-
     /// <summary>
     /// Represents a body's resistance to movement, akin to air resistance.
     /// Higher values slow down the body more quickly in absence of other forces.
@@ -886,25 +881,6 @@ public partial class SolidBody : IRecordable
     {
         _lastVisualRotation = _visualRotation;
         _visualRotation = rot;
-    }
-
-    public void UpdateAcceleration()
-    {
-        Vector3d lastAcceleration = _linearAcceleration;
-
-        // if we aren't decelerating then we're...
-        if ((_linearAcceleration - lastAcceleration).Magnitude.Abs() < Fixed64.Epsilon)
-        {
-            _isVelocityConstant = true;
-            _decelerating = false;
-            return;
-        }
-
-        _isVelocityConstant = false;
-        if (_linearAcceleration.Magnitude > lastAcceleration.Magnitude)
-            _decelerating = false;
-        else
-            _decelerating = true;
     }
 
     // https://www2.chem.wisc.edu/deptfiles/genchem/netorial/modules/thermodynamics/energy/energy2.htm
