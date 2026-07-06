@@ -46,27 +46,6 @@ internal sealed class CollisionSatScratch
         return Context;
     }
 
-    public bool TryPrepareMeshCuboid(
-        LSMeshCollider mesh,
-        Vector3d pointOnMesh,
-        LSCuboidCollider cuboid,
-        Vector3d pointOnCuboid,
-        out CollisionContext context)
-    {
-        MeshA.Set(mesh, pointOnMesh);
-        mesh.GetNearbyTriangles(pointOnMesh, MeshA.TriangleIndices);
-        if (MeshA.TriangleIndices.Count <= 0)
-        {
-            context = null!;
-            return false;
-        }
-
-        CuboidA.Set(cuboid, pointOnCuboid);
-        Context.Prepare(MeshA, CuboidA);
-        context = Context;
-        return true;
-    }
-
     public bool TryPrepareMeshes(
         LSMeshCollider meshA,
         Vector3d pointA,

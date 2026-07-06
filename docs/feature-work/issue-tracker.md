@@ -17,25 +17,58 @@
 
 ## Active Issues
 
-### Mesh-Cuboid Fallback SAT May Be Incomplete
+### Reduced SAT Helper Remains In Rotated Cuboid And Convex Mesh-Mesh Paths
 
 **Discovered:** 2026-07-06  
+**Source:** Mesh-cuboid fallback SAT RCA  
+**Affected area:** `CollisionDetection.Cuboid`, `CollisionDetection.Mesh`,
+rotated cuboid vs cuboid and convex mesh vs convex mesh fallback contact
+generation
+
+Concern: resolving the mesh-cuboid fallback false positive exposed the broader
+legacy `CollisionContext` SAT model. It is still used by non-axis-aligned
+cuboid/cuboid and convex mesh/mesh fallback paths, and it prepares axes from
+face normals only. Oriented box SAT and convex polyhedron SAT generally require
+edge-cross axes as well, so these paths need the same focused RCA before we
+either replace the reduced helper with full shape-specific SAT or prove the
+reachable public paths are already protected elsewhere.
+
+Next step: create public-path rotated cuboid/cuboid and convex mesh/mesh
+counterexample probes, verify red regressions if real, then replace the reduced
+helper with shape-specific no-allocation SAT paths and delete stale context
+types that become unused.
+
+## Resolved Issues
+
+### Mesh-Cuboid Fallback SAT Could False-Positive Without Edge-Cross Axes
+
+**Discovered:** 2026-07-06  
+**Resolved:** 2026-07-06  
 **Source:** Coverage Workstream 1 zombie-code sweep and subagent geometry review  
 **Affected area:** `CollisionDetection.Mesh`, convex mesh vs cuboid fallback
 contact generation
 
-Concern: the retained mesh-cuboid fallback path prepares nearby triangle face
-normals and vertex-derived points for SAT-style testing, but does not appear to
-include explicit triangle-edge vs cuboid-edge axes. The newer
-`MeshTriangleContactGenerator` handles the common manifold path first, so this
-needs a focused RCA before we either add branch coverage, centralize the
-fallback, or delete it as unreachable.
+RCA: the common mesh-cuboid triangle manifold path already checks cuboid face
+normals, triangle normals, and triangle-edge x cuboid-edge axes. The fallback
+path is still reachable for closed-convex cases such as a cuboid contained
+inside a convex mesh, but it prepared SAT from nearby mesh triangle face normals
+plus cuboid face normals only. Rotated convex mesh/cuboid pairs could therefore
+overlap on all sampled face axes while separating on an edge-cross axis,
+producing a false positive.
 
-Next step: investigate through valid convex mesh/cuboid setups and compare
-against triangle-cuboid SAT expectations. If a real miss is reproduced, add a
-regression before changing the fallback.
+Fix: the convex fallback now performs full convex mesh vs cuboid SAT over mesh
+face normals, representative cuboid face axes, and mesh-edge x representative
+cuboid-edge axes using full convex mesh vertices. The obsolete nearby-triangle
+mesh-cuboid scratch preparation path was removed.
 
-## Resolved Issues
+Verification:
+
+- Added a regression for a rotated cuboid separated from a convex cube mesh by
+  an edge-cross axis; verified it failed before the fix and passes after.
+- Added a containment guard proving the convex fallback remains reachable for a
+  cuboid fully inside a closed convex mesh.
+- Added a steady-state allocation guard for the convex fallback.
+- Ran the focused `CollisionDetectionShapePairTests` suite.
 
 ### Rotated Cuboid Raycast Clipped The Enclosing AABB Instead Of Local Slabs
 

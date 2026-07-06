@@ -675,6 +675,48 @@ public sealed class CollisionDetectionShapePairTests
     }
 
     [Fact]
+    public void MeshCuboid_WithCuboidContainedInClosedConvexMesh_ShouldUseConvexFallback()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSMeshCollider> mesh = scenario.CreateBody(
+            MeshTestFixtures.CreateConvexCube(),
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+        ScenarioBody<LSCuboidCollider> cuboid = scenario.CreateBody(
+            new LSCuboidCollider
+            {
+                Size = new Vector3d(Fixed64.Half, Fixed64.Half, Fixed64.Half)
+            },
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+
+        CollisionPair forward = AssertCollision(scenario, mesh.Collider, cuboid.Collider, CollisionType.Mesh_Cuboid);
+        CollisionPair reversed = AssertCollision(scenario, cuboid.Collider, mesh.Collider, CollisionType.Mesh_Cuboid);
+
+        forward.Manifold.PrimaryContact.Depth.Should().BeGreaterThan(Fixed64.Zero);
+        reversed.Manifold.PrimaryContact.Depth.Should().BeGreaterThan(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void MeshCuboid_WithRotatedCuboidSeparatedByEdgeAxis_ShouldNotUseReducedFallbackFalsePositive()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSMeshCollider> mesh = scenario.CreateBody(
+            MeshTestFixtures.CreateConvexCube(),
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+        ScenarioBody<LSCuboidCollider> cuboid = scenario.CreateCuboid(
+            new Vector3d(
+                Fixed64.FromFraction(-9, 8),
+                Fixed64.FromFraction(-9, 8),
+                Fixed64.FromFraction(-3, 4)),
+            FixedQuaternion.FromEulerAnglesInDegrees((Fixed64)10, (Fixed64)35, (Fixed64)15));
+
+        AssertNoCollision(scenario, mesh.Collider, cuboid.Collider, CollisionType.Mesh_Cuboid);
+        AssertNoCollision(scenario, cuboid.Collider, mesh.Collider, CollisionType.Mesh_Cuboid);
+    }
+
+    [Fact]
     public void MeshMesh_ShouldPreserveTriangleContact()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
@@ -702,6 +744,28 @@ public sealed class CollisionDetectionShapePairTests
             FixedQuaternion.Identity);
         ScenarioBody<LSCuboidCollider> cuboid = scenario.CreateCuboid(new Vector3d(Fixed64.Zero, Fixed64.FromFraction(1, 4), Fixed64.Zero));
         CollisionPair pair = scenario.CreatePair(floor.Collider, cuboid.Collider);
+
+        long allocatedBytes = MeasureAllocatedBytes(() => EnsureCollision(pair));
+
+        allocatedBytes.Should().Be(0);
+    }
+
+    [Fact]
+    public void MeshCuboidConvexFallback_ShouldNotAllocateAfterWarmup()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSMeshCollider> mesh = scenario.CreateBody(
+            MeshTestFixtures.CreateConvexCube(),
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+        ScenarioBody<LSCuboidCollider> cuboid = scenario.CreateBody(
+            new LSCuboidCollider
+            {
+                Size = new Vector3d(Fixed64.Half, Fixed64.Half, Fixed64.Half)
+            },
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+        CollisionPair pair = scenario.CreatePair(mesh.Collider, cuboid.Collider);
 
         long allocatedBytes = MeasureAllocatedBytes(() => EnsureCollision(pair));
 

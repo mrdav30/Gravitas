@@ -228,19 +228,86 @@ public static partial class CollisionDetection
         output = null;
 
         (Vector3d PointA, Vector3d PointB) = FindInitialPointsOfContact(mesh, cuboid);
-        if (!pair.Context.CollisionScratch.TryPrepareMeshCuboid(mesh, PointA, cuboid, PointB, out CollisionContext data))
-        {
-            return false;
-        }
-
-        if (!PerformSeparatingAxisTest(data, out (Vector3d Vector, Fixed64 Depth)? axisPenetration))
+        if (!TryFindConvexMeshCuboidPenetration(mesh, cuboid, out AxisPenetration penetration))
             return false;
 
         output = new CollisionResult(
-            data.PointsOfContact,
-            axisPenetration!.Value);
+            (PointA, PointB),
+            (penetration.Axis, penetration.Depth));
 
         return true;
+    }
+
+    private static bool TryFindConvexMeshCuboidPenetration(
+        LSMeshCollider mesh,
+        LSCuboidCollider cuboid,
+        out AxisPenetration penetration)
+    {
+        penetration = default;
+        PhysicsMesh physicsMesh = mesh.Mesh;
+        Vector3d[] meshVertices = physicsMesh.Vertices;
+        int[] meshTriangles = physicsMesh.Triangles;
+        int triangleCount = physicsMesh.TriangleCount;
+        Vector3d[] cuboidVertices = cuboid.Vertices;
+        Vector3d meshToCuboid = cuboid.Center - mesh.Center;
+
+        for (int i = 0; i < triangleCount; i++)
+        {
+            if (!CheckConvexMeshCuboidAxis(meshVertices, cuboidVertices, physicsMesh.GetFaceNormalWorld(i), meshToCuboid, ref penetration))
+                return false;
+        }
+
+        // Cuboid face/edge arrays contain opposite or parallel duplicates; one representative per axis is enough for SAT.
+        if (!CheckConvexMeshCuboidAxis(meshVertices, cuboidVertices, cuboid.FaceNormals[0], meshToCuboid, ref penetration)
+            || !CheckConvexMeshCuboidAxis(meshVertices, cuboidVertices, cuboid.FaceNormals[2], meshToCuboid, ref penetration)
+            || !CheckConvexMeshCuboidAxis(meshVertices, cuboidVertices, cuboid.FaceNormals[4], meshToCuboid, ref penetration))
+            return false;
+
+        for (int triangleIndex = 0; triangleIndex < triangleCount; triangleIndex++)
+        {
+            int triangleOffset = triangleIndex * 3;
+            Vector3d first = meshVertices[meshTriangles[triangleOffset]];
+            Vector3d second = meshVertices[meshTriangles[triangleOffset + 1]];
+            Vector3d third = meshVertices[meshTriangles[triangleOffset + 2]];
+            if (!CheckConvexMeshCuboidEdgeAxes(meshVertices, cuboidVertices, cuboid, second - first, meshToCuboid, ref penetration))
+                return false;
+            if (!CheckConvexMeshCuboidEdgeAxes(meshVertices, cuboidVertices, cuboid, third - second, meshToCuboid, ref penetration))
+                return false;
+            if (!CheckConvexMeshCuboidEdgeAxes(meshVertices, cuboidVertices, cuboid, first - third, meshToCuboid, ref penetration))
+                return false;
+        }
+
+        return penetration.HasValue;
+    }
+
+    private static bool CheckConvexMeshCuboidEdgeAxes(
+        Vector3d[] meshVertices,
+        Vector3d[] cuboidVertices,
+        LSCuboidCollider cuboid,
+        Vector3d meshEdge,
+        Vector3d meshToCuboid,
+        ref AxisPenetration penetration)
+    {
+        return CheckConvexMeshCuboidAxis(meshVertices, cuboidVertices, Vector3d.Cross(meshEdge, cuboid.EdgeDirections[0]), meshToCuboid, ref penetration)
+            && CheckConvexMeshCuboidAxis(meshVertices, cuboidVertices, Vector3d.Cross(meshEdge, cuboid.EdgeDirections[2]), meshToCuboid, ref penetration)
+            && CheckConvexMeshCuboidAxis(meshVertices, cuboidVertices, Vector3d.Cross(meshEdge, cuboid.EdgeDirections[8]), meshToCuboid, ref penetration);
+    }
+
+    private static bool CheckConvexMeshCuboidAxis(
+        Vector3d[] meshVertices,
+        Vector3d[] cuboidVertices,
+        Vector3d axis,
+        Vector3d meshToCuboid,
+        ref AxisPenetration penetration)
+    {
+        if (!TryNormalizeAxis(axis, out Vector3d normalizedAxis))
+            return true;
+
+        FixedRange meshProjection = FixedRange.MinRange;
+        FixedRange cuboidProjection = FixedRange.MinRange;
+        AxisProjectionHelper.ProjectPolygonOntoAxis(normalizedAxis, meshVertices, ref meshProjection);
+        AxisProjectionHelper.ProjectPolygonOntoAxis(normalizedAxis, cuboidVertices, ref cuboidProjection);
+        return CheckProjectedAxis(meshProjection, cuboidProjection, normalizedAxis, meshToCuboid, ref penetration);
     }
 
     private static (Vector3d Point1, Vector3d Point2) FindInitialPointsOfContact(LSMeshCollider mesh, LSCuboidCollider cuboid)
