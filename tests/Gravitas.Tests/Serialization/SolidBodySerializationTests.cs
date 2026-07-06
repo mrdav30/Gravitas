@@ -3,6 +3,8 @@ using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
+using GridForge.Grids;
+using GridForge.Spatial;
 using Xunit;
 
 namespace Gravitas.Tests.Serialization;
@@ -195,14 +197,24 @@ public sealed class SolidBodySerializationTests
         object payload = GravitasSerializationHarness.Serialize(source, transport);
 
         using PhysicsScenarioBuilder targetScenario = PhysicsScenarioBuilder.Create();
+        targetScenario.Context.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
         LSSphereCollider target = targetScenario.CreateStaticSphere(Vector3d.Zero);
+        targetScenario.Context.MixedCollisions.Refresh3DColliderPartition(target);
         target.IsPartitioned.Should().BeTrue();
+        target.IsMixedPartitioned.Should().BeTrue();
+        PhysicsMixedPartition mixedPartition = GetMixedPartition(
+            targetScenario.Context,
+            target.MixedPartitionCoordinates![0]);
+        PartitionContains3DCollider(mixedPartition, target.Id).Should().BeTrue();
 
         GravitasSerializationHarness.Populate(target, payload, transport);
 
         target.IsActive.Should().BeFalse();
         target.IsPartitioned.Should().BeFalse();
+        target.IsMixedPartitioned.Should().BeFalse();
         target.PartitionCoordinates.Should().BeEmpty();
+        (target.MixedPartitionCoordinates?.Count ?? 0).Should().Be(0);
+        PartitionContains3DCollider(mixedPartition, target.Id).Should().BeFalse();
     }
 
     [Fact]
@@ -243,4 +255,18 @@ public sealed class SolidBodySerializationTests
         scenario.Context.Environment.DampingFactor = Fixed64.Zero;
         return scenario;
     }
+
+    private static PhysicsMixedPartition GetMixedPartition(
+        GravitasWorldContext context,
+        WorldVoxelIndex coordinate)
+    {
+        context.World.TryGetVoxel(coordinate, out Voxel? voxel).Should().BeTrue();
+        voxel!.TryGetPartition(out PhysicsMixedPartition? partition).Should().BeTrue();
+        return partition!;
+    }
+
+    private static bool PartitionContains3DCollider(PhysicsMixedPartition partition, int colliderId) =>
+        partition.ContainedDynamic3DObjects?.Contains(colliderId) == true
+        || partition.ContainedKinematic3DObjects?.Contains(colliderId) == true
+        || partition.ContainedStatic3DObjects?.Contains(colliderId) == true;
 }

@@ -1,6 +1,7 @@
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
+using Gravitas.Materials;
 using Gravitas.Tests.Support;
 using System;
 using System.Linq;
@@ -85,6 +86,50 @@ public sealed class ColliderShapeDefinition2DTests
         first.Should().Be(same);
         first.GetHashCode().Should().Be(same.GetHashCode());
         first.Should().NotBe(differentHeight);
+    }
+
+    [Fact]
+    public void ShapeDefinition2DEqualityAndHash_ShouldEncodeAuthoredShapeMaterialAndPolygonPayload()
+    {
+        PhysicsMaterial material = PhysicsMaterialTestHelper.WithFrictionAndRestitution(
+            Fixed64.FromFraction(3, 4),
+            Fixed64.FromFraction(1, 4));
+        PhysicsMaterial otherMaterial = PhysicsMaterialTestHelper.WithFrictionAndRestitution(
+            Fixed64.Half,
+            Fixed64.FromFraction(1, 8));
+        Vector2d[] vertices =
+        {
+            new(-Fixed64.One, -Fixed64.One),
+            new(Fixed64.One, -Fixed64.One),
+            new(Fixed64.One, Fixed64.One),
+            new(-Fixed64.One, Fixed64.One)
+        };
+        ColliderShapeDefinition2D definition = ColliderShapeDefinition2D.ConvexPolygon(material, vertices);
+        ColliderShapeDefinition2D same = ColliderShapeDefinition2D.ConvexPolygon(material, vertices.ToArray());
+
+        definition.Should().Be(same);
+        definition.Equals((object)same).Should().BeTrue();
+        definition.GetHashCode().Should().Be(same.GetHashCode());
+        (definition == same).Should().BeTrue();
+        (definition != same).Should().BeFalse();
+
+        definition.Equals("polygon").Should().BeFalse();
+        definition.Should().NotBe(ColliderShapeDefinition2D.Circle(Fixed64.One, material));
+        definition.Should().NotBe(ColliderShapeDefinition2D.ConvexPolygon(vertices));
+        definition.Should().NotBe(ColliderShapeDefinition2D.ConvexPolygon(otherMaterial, vertices));
+        definition.Should().NotBe(ColliderShapeDefinition2D.ConvexPolygon(
+            material,
+            vertices[1],
+            vertices[2],
+            vertices[3],
+            vertices[0]));
+        definition.Should().NotBe(ColliderShapeDefinition2D.Triangle(vertices[0], vertices[1], vertices[2], material));
+        ColliderShapeDefinition2D.Capsule(Fixed64.Half, (Fixed64)3)
+            .Should()
+            .NotBe(ColliderShapeDefinition2D.Capsule(Fixed64.Half, (Fixed64)4));
+        ColliderShapeDefinition2D.AABBox(Vector2d.One)
+            .Should()
+            .NotBe(ColliderShapeDefinition2D.AABBox(new Vector2d(Fixed64.One, (Fixed64)2)));
     }
 
     [Fact]

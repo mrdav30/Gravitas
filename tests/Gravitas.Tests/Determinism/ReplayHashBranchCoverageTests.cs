@@ -7,6 +7,7 @@ using Gravitas.Constraints;
 using Gravitas.Materials;
 using Gravitas.Tests.Support;
 using GridForge.Configuration;
+using System.Linq;
 using Xunit;
 
 namespace Gravitas.Tests.Determinism;
@@ -211,6 +212,37 @@ public sealed class ReplayHashBranchCoverageTests
         churned.ComputeReplayHash().Should().Be(compact.ComputeReplayHash());
     }
 
+    [Fact]
+    public void ComputeReplayHash_WithCompound2DShapeDefinitions_ShouldEncodeAuthoredPartPayloads()
+    {
+        ChronicleHash baseline = HashCompound2DReplay(Compound2DReplayVariant.Baseline);
+
+        HashCompound2DReplay(Compound2DReplayVariant.Baseline).Should().Be(baseline);
+        HashCompound2DReplay(Compound2DReplayVariant.ShapeMaterial).Should().NotBe(baseline);
+        HashCompound2DReplay(Compound2DReplayVariant.PartMaterial).Should().NotBe(baseline);
+        HashCompound2DReplay(Compound2DReplayVariant.PartOffset).Should().NotBe(baseline);
+        HashCompound2DReplay(Compound2DReplayVariant.PartRotation).Should().NotBe(baseline);
+        HashCompound2DReplay(Compound2DReplayVariant.PartScale).Should().NotBe(baseline);
+        HashCompound2DReplay(Compound2DReplayVariant.CapsuleHeight).Should().NotBe(baseline);
+        HashCompound2DReplay(Compound2DReplayVariant.BoxSize).Should().NotBe(baseline);
+        HashCompound2DReplay(Compound2DReplayVariant.PolygonVertex).Should().NotBe(baseline);
+    }
+
+    [Fact]
+    public void ComputeReplayHash_WithCompound3DShapeDefinitions_ShouldEncodeAuthoredPartPayloads()
+    {
+        ChronicleHash baseline = HashCompound3DReplay(Compound3DReplayVariant.Baseline);
+
+        HashCompound3DReplay(Compound3DReplayVariant.Baseline).Should().Be(baseline);
+        HashCompound3DReplay(Compound3DReplayVariant.ShapeMaterial).Should().NotBe(baseline);
+        HashCompound3DReplay(Compound3DReplayVariant.PartMaterial).Should().NotBe(baseline);
+        HashCompound3DReplay(Compound3DReplayVariant.PartOffset).Should().NotBe(baseline);
+        HashCompound3DReplay(Compound3DReplayVariant.PartRotation).Should().NotBe(baseline);
+        HashCompound3DReplay(Compound3DReplayVariant.PartScale).Should().NotBe(baseline);
+        HashCompound3DReplay(Compound3DReplayVariant.ConeHeight).Should().NotBe(baseline);
+        HashCompound3DReplay(Compound3DReplayVariant.MeshVertex).Should().NotBe(baseline);
+    }
+
     private static Joint2D CreateJoint2D(GravitasWorldContext context)
     {
         SolidBody2D first = CreateBody2D(context, Vector2d.Zero);
@@ -366,6 +398,132 @@ public sealed class ReplayHashBranchCoverageTests
         return pair;
     }
 
+    private static ChronicleHash HashCompound2DReplay(Compound2DReplayVariant variant)
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        var compound = new LSCompoundCollider2D(CreateCompound2DParts(variant));
+        compound.InitializeWithNoBody(new TestMatterAgent(context));
+        return context.ComputeReplayHash();
+    }
+
+    private static CompoundColliderPart2D[] CreateCompound2DParts(Compound2DReplayVariant variant)
+    {
+        PhysicsMaterial shapeMaterial = PhysicsMaterialTestHelper.WithFrictionAndRestitution(
+            variant == Compound2DReplayVariant.ShapeMaterial ? Fixed64.Half : Fixed64.FromFraction(3, 4),
+            Fixed64.FromFraction(1, 4));
+        PhysicsMaterial partMaterial = PhysicsMaterialTestHelper.WithFrictionAndRestitution(
+            variant == Compound2DReplayVariant.PartMaterial ? Fixed64.Half : Fixed64.FromFraction(5, 8),
+            Fixed64.FromFraction(1, 8));
+        Vector2d capsuleOffset = variant == Compound2DReplayVariant.PartOffset
+            ? Vector2d.Right
+            : Vector2d.Zero;
+        Fixed64 capsuleRotation = variant == Compound2DReplayVariant.PartRotation
+            ? Fixed64.FromFraction(1, 8)
+            : Fixed64.Zero;
+        Vector2d capsuleScale = variant == Compound2DReplayVariant.PartScale
+            ? new Vector2d(Fixed64.One, Fixed64.FromFraction(3, 2))
+            : Vector2d.One;
+        Fixed64 capsuleHeight = variant == Compound2DReplayVariant.CapsuleHeight ? (Fixed64)4 : (Fixed64)3;
+        Vector2d boxSize = variant == Compound2DReplayVariant.BoxSize
+            ? new Vector2d(Fixed64.One, (Fixed64)3)
+            : new Vector2d(Fixed64.One, (Fixed64)2);
+        Vector2d polygonPeak = variant == Compound2DReplayVariant.PolygonVertex
+            ? new Vector2d(Fixed64.Zero, Fixed64.FromFraction(3, 2))
+            : Vector2d.Forward;
+
+        return new[]
+        {
+            new CompoundColliderPart2D(
+                ColliderShapeDefinition2D.Circle(Fixed64.Half, shapeMaterial),
+                new Vector2d((Fixed64)(-3), Fixed64.Zero)),
+            new CompoundColliderPart2D(
+                ColliderShapeDefinition2D.Capsule(Fixed64.Half, capsuleHeight),
+                capsuleOffset,
+                capsuleRotation,
+                capsuleScale,
+                partMaterial),
+            new CompoundColliderPart2D(
+                ColliderShapeDefinition2D.AABBox(boxSize),
+                new Vector2d((Fixed64)3, Fixed64.Zero)),
+            new CompoundColliderPart2D(
+                ColliderShapeDefinition2D.ConvexPolygon(
+                    new Vector2d(-Fixed64.Half, Fixed64.Zero),
+                    new Vector2d(Fixed64.Half, Fixed64.Zero),
+                    polygonPeak),
+                new Vector2d(Fixed64.Zero, (Fixed64)3))
+        };
+    }
+
+    private static ChronicleHash HashCompound3DReplay(Compound3DReplayVariant variant)
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        var compound = new LSCompoundCollider(CreateCompound3DParts(variant));
+        scenario.InitializeStaticCollider(compound, Vector3d.Zero);
+        return scenario.Context.ComputeReplayHash();
+    }
+
+    private static CompoundColliderPart[] CreateCompound3DParts(Compound3DReplayVariant variant)
+    {
+        PhysicsMaterial shapeMaterial = PhysicsMaterialTestHelper.WithFrictionAndRestitution(
+            variant == Compound3DReplayVariant.ShapeMaterial ? Fixed64.Half : Fixed64.FromFraction(3, 4),
+            Fixed64.FromFraction(1, 4));
+        PhysicsMaterial partMaterial = PhysicsMaterialTestHelper.WithFrictionAndRestitution(
+            variant == Compound3DReplayVariant.PartMaterial ? Fixed64.Half : Fixed64.FromFraction(5, 8),
+            Fixed64.FromFraction(1, 8));
+        Vector3d capsuleOffset = variant == Compound3DReplayVariant.PartOffset
+            ? new Vector3d((Fixed64)(-2), Fixed64.Half, Fixed64.Zero)
+            : new Vector3d((Fixed64)(-2), Fixed64.Zero, Fixed64.Zero);
+        FixedQuaternion capsuleRotation = variant == Compound3DReplayVariant.PartRotation
+            ? FixedQuaternion.FromEulerAnglesInDegrees(Fixed64.Zero, (Fixed64)15, Fixed64.Zero)
+            : FixedQuaternion.Identity;
+        Vector3d capsuleScale = variant == Compound3DReplayVariant.PartScale
+            ? new Vector3d(Fixed64.One, Fixed64.FromFraction(3, 2), Fixed64.One)
+            : Vector3d.One;
+        Fixed64 coneHeight = variant == Compound3DReplayVariant.ConeHeight ? (Fixed64)3 : (Fixed64)2;
+        ColliderShapeDefinition meshDefinition = CreateConvexMeshReplayDefinition(variant, shapeMaterial);
+
+        return new[]
+        {
+            new CompoundColliderPart(
+                ColliderShapeDefinition.Sphere(Fixed64.Half, shapeMaterial),
+                new Vector3d((Fixed64)(-4), Fixed64.Zero, Fixed64.Zero)),
+            new CompoundColliderPart(
+                ColliderShapeDefinition.Capsule(Fixed64.Half, (Fixed64)2),
+                capsuleOffset,
+                capsuleRotation,
+                capsuleScale,
+                partMaterial),
+            new CompoundColliderPart(
+                ColliderShapeDefinition.Cuboid(Vector3d.One),
+                Vector3d.Zero),
+            new CompoundColliderPart(
+                ColliderShapeDefinition.Cylinder(Fixed64.Half, (Fixed64)2),
+                new Vector3d((Fixed64)2, Fixed64.Zero, Fixed64.Zero)),
+            new CompoundColliderPart(
+                ColliderShapeDefinition.Cone(Fixed64.Half, coneHeight),
+                new Vector3d((Fixed64)4, Fixed64.Zero, Fixed64.Zero)),
+            new CompoundColliderPart(
+                meshDefinition,
+                new Vector3d(Fixed64.Zero, Fixed64.Zero, (Fixed64)3))
+        };
+    }
+
+    private static ColliderShapeDefinition CreateConvexMeshReplayDefinition(
+        Compound3DReplayVariant variant,
+        PhysicsMaterial material)
+    {
+        LSMeshCollider mesh = MeshTestFixtures.CreateConvexCube();
+        Vector3d[] vertices = mesh.Mesh.LocalVertices.ToArray();
+        if (variant == Compound3DReplayVariant.MeshVertex)
+            vertices[7] += new Vector3d(Fixed64.Zero, Fixed64.FromFraction(1, 4), Fixed64.Zero);
+
+        return ColliderShapeDefinition.ConvexMesh(
+            vertices,
+            mesh.Mesh.Triangles.ToArray(),
+            MeshInertiaPolicy.RequireClosedVolume,
+            material);
+    }
+
     private static SolidBody2D CreateBody2D(GravitasWorldContext context, Vector2d position)
     {
         var transform = new FixedTransform(
@@ -448,4 +606,29 @@ public sealed class ReplayHashBranchCoverageTests
     }
 
     private delegate void WriterAction(ref ChronicleHashWriter writer);
+
+    private enum Compound2DReplayVariant
+    {
+        Baseline,
+        ShapeMaterial,
+        PartMaterial,
+        PartOffset,
+        PartRotation,
+        PartScale,
+        CapsuleHeight,
+        BoxSize,
+        PolygonVertex
+    }
+
+    private enum Compound3DReplayVariant
+    {
+        Baseline,
+        ShapeMaterial,
+        PartMaterial,
+        PartOffset,
+        PartRotation,
+        PartScale,
+        ConeHeight,
+        MeshVertex
+    }
 }

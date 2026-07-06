@@ -3,6 +3,8 @@ using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
+using GridForge.Grids;
+using GridForge.Spatial;
 using Xunit;
 
 namespace Gravitas.Tests.Serialization;
@@ -180,6 +182,64 @@ public sealed class SolidBody2DSerializationTests
 
     [Theory]
     [MemberData(nameof(Transports))]
+    public void Populate_ShouldRestorePolygonColliderShapeStateAndReplayNextFrame(GravitasSerializationTransport transport)
+    {
+        Vector2d[] sourceVertices =
+        {
+            new(-Fixed64.One, -Fixed64.Half),
+            new(Fixed64.One, -Fixed64.Half),
+            new(Fixed64.One, Fixed64.Half),
+            new(-Fixed64.One, Fixed64.Half)
+        };
+
+        using GravitasWorldContext sourceContext = Physics2DTestWorld.CreateContext(frameRate: 8);
+        var sourceCollider = new LSPolygonCollider2D(sourceVertices)
+        {
+            LocalOffset = new Vector2d(Fixed64.Half, -Fixed64.FromFraction(1, 4))
+        };
+        var source = new SolidBody2D(new TestMatterAgent(sourceContext), sourceCollider)
+        {
+            Mass = (Fixed64)3
+        };
+        source.Initialize(new Vector2d((Fixed64)2, Fixed64.One), FixedMath.DegToRad((Fixed64)15));
+        source.AddForce(new Vector2d((Fixed64)6, (Fixed64)(-2)));
+
+        object payload = GravitasSerializationHarness.Serialize(source, transport);
+
+        using GravitasWorldContext targetContext = Physics2DTestWorld.CreateContext(frameRate: 8);
+        var targetCollider = new LSPolygonCollider2D(
+            new Vector2d(Fixed64.Zero, Fixed64.Zero),
+            new Vector2d(Fixed64.One, Fixed64.Zero),
+            new Vector2d(Fixed64.Zero, Fixed64.One));
+        var target = new SolidBody2D(new TestMatterAgent(targetContext), targetCollider)
+        {
+            Mass = Fixed64.One
+        };
+        target.Initialize(Vector2d.Zero);
+
+        GravitasSerializationHarness.Populate(target, payload, transport);
+
+        target.Position.Should().Be(source.Position);
+        target.Rotation.Should().Be(source.Rotation);
+        targetCollider.LocalOffset.Should().Be(sourceCollider.LocalOffset);
+        targetCollider.Count.Should().Be(sourceCollider.Count);
+        for (int i = 0; i < sourceCollider.Count; i++)
+            targetCollider.GetWorldVertex(i).Should().Be(sourceCollider.GetWorldVertex(i));
+
+        targetCollider.Bounds.Should().Be(sourceCollider.Bounds);
+        target.LocalCenterOfMassOffset.Should().Be(source.LocalCenterOfMassOffset);
+        target.MomentOfInertia.Should().Be(source.MomentOfInertia);
+        target.InverseMomentOfInertia.Should().Be(source.InverseMomentOfInertia);
+
+        sourceContext.LateSimulate();
+        targetContext.LateSimulate();
+
+        target.Position.Should().Be(source.Position);
+        target.LinearVelocity.Should().Be(source.LinearVelocity);
+    }
+
+    [Theory]
+    [MemberData(nameof(Transports))]
     public void PopulateSnapshot_WithQueuedForce_ShouldReplaySameNextFrame(GravitasSerializationTransport transport)
     {
         using GravitasWorldContext uninterruptedContext = Physics2DTestWorld.CreateContext(frameRate: 8);
@@ -263,14 +323,24 @@ public sealed class SolidBody2DSerializationTests
         object payload = GravitasSerializationHarness.Serialize(source, transport);
 
         using GravitasWorldContext targetContext = Physics2DTestWorld.CreateContext(frameRate: 8);
+        targetContext.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
         LSCircleCollider2D target = CreateStaticCircle(targetContext, Vector2d.Zero);
+        targetContext.MixedCollisions.Refresh2DColliderPartition(target);
         target.IsPartitioned.Should().BeTrue();
+        target.IsMixedPartitioned.Should().BeTrue();
+        PhysicsMixedPartition mixedPartition = GetMixedPartition(
+            targetContext,
+            target.MixedPartitionCoordinates![0]);
+        PartitionContains2DCollider(mixedPartition, target.Id).Should().BeTrue();
 
         GravitasSerializationHarness.Populate(target, payload, transport);
 
         target.IsActive.Should().BeFalse();
         target.IsPartitioned.Should().BeFalse();
+        target.IsMixedPartitioned.Should().BeFalse();
         target.PartitionCoordinates.Should().BeEmpty();
+        (target.MixedPartitionCoordinates?.Count ?? 0).Should().Be(0);
+        PartitionContains2DCollider(mixedPartition, target.Id).Should().BeFalse();
     }
 
     private static SolidBody2D CreateDynamicCircle(GravitasWorldContext context, Vector2d position = default)
@@ -304,4 +374,18 @@ public sealed class SolidBody2DSerializationTests
         var collider = new LSAABBoxCollider2D(new Vector2d((Fixed64)8, Fixed64.One));
         collider.InitializeWithNoBody(agent);
     }
+
+    private static PhysicsMixedPartition GetMixedPartition(
+        GravitasWorldContext context,
+        WorldVoxelIndex coordinate)
+    {
+        context.World.TryGetVoxel(coordinate, out Voxel? voxel).Should().BeTrue();
+        voxel!.TryGetPartition(out PhysicsMixedPartition? partition).Should().BeTrue();
+        return partition!;
+    }
+
+    private static bool PartitionContains2DCollider(PhysicsMixedPartition partition, int colliderId) =>
+        partition.ContainedDynamic2DObjects?.Contains(colliderId) == true
+        || partition.ContainedKinematic2DObjects?.Contains(colliderId) == true
+        || partition.ContainedStatic2DObjects?.Contains(colliderId) == true;
 }

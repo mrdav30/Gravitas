@@ -21,6 +21,32 @@ No active issues currently tracked.
 
 ## Resolved Issues
 
+### 2D Active-State Toggle Preserved Mixed Partition Membership
+
+**Discovered:** 2026-07-06  
+**Resolved:** 2026-07-06  
+**Source:** Coverage Workstream 4 serialization/replay/authoring branch audit  
+**Affected area:** `LSCollider2D.IsActive`, mixed 2D/3D static collider
+partition membership
+
+RCA: pure 2D bodyless colliders can be toggled through `IsActive` without
+detaching from their host binding. The setter refreshed or cleared the pure 2D
+partition only. In a mixed context, a collider that already had mixed partition
+membership could be deactivated while still reporting stale mixed partition
+state, leaving primary and mixed ownership semantics out of parity.
+
+Fix: `LSCollider2D.IsActive` now refreshes mixed partition membership when a
+collider is reactivated in `PhysicsRuntimeMode.Mixed`, and clears mixed
+partition membership when the collider is deactivated.
+
+Verification:
+
+- Added a red regression for a mixed-mode bodyless 2D collider whose mixed
+  membership was seeded before toggling `IsActive`.
+- Verified the regression failed before the setter fix and passed after it.
+- Included the regression in the Workstream 4 focused serialization/replay/
+  authoring test slice and full coverage run.
+
 ### Reduced SAT Helper Could False-Positive Rotated Cuboid And Convex Mesh-Mesh Paths
 
 **Discovered:** 2026-07-06  

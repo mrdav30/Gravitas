@@ -2,6 +2,8 @@ using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.Tests.Support;
+using GridForge.Grids;
+using GridForge.Spatial;
 using Xunit;
 
 namespace Gravitas.Tests.Colliders;
@@ -201,11 +203,56 @@ public sealed class ColliderOwnershipStateTests
         collider.CircleQueryVersion.Should().Be(0);
     }
 
+    [Fact]
+    public void IsActiveSetter_WithMixed2DStaticCollider_ShouldRefreshPrimaryAndMixedPartitions()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        scenario.Context.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
+        LSCircleCollider2D collider = CreateStaticCircle2D(scenario.Context, Vector2d.Zero);
+        scenario.Context.MixedCollisions.Refresh2DColliderPartition(collider);
+
+        collider.IsPartitioned.Should().BeTrue();
+        collider.IsMixedPartitioned.Should().BeTrue();
+        WorldVoxelIndex mixedCoordinate = collider.MixedPartitionCoordinates![0];
+        PhysicsMixedPartition mixedPartition = GetMixedPartition(scenario.Context, mixedCoordinate);
+        PartitionContains2DCollider(mixedPartition, collider.Id).Should().BeTrue();
+
+        collider.IsActive = false;
+
+        collider.IsPartitioned.Should().BeFalse();
+        collider.IsMixedPartitioned.Should().BeFalse();
+        (collider.PartitionCoordinates?.Count ?? 0).Should().Be(0);
+        (collider.MixedPartitionCoordinates?.Count ?? 0).Should().Be(0);
+        PartitionContains2DCollider(mixedPartition, collider.Id).Should().BeFalse();
+
+        collider.IsActive = true;
+
+        collider.IsPartitioned.Should().BeTrue();
+        collider.IsMixedPartitioned.Should().BeTrue();
+        PhysicsMixedPartition refreshedMixedPartition =
+            GetMixedPartition(scenario.Context, collider.MixedPartitionCoordinates![0]);
+        PartitionContains2DCollider(refreshedMixedPartition, collider.Id).Should().BeTrue();
+    }
+
     private static void AdvancePhysicsStep(PhysicsScenarioBuilder scenario)
     {
         scenario.Context.Simulate();
         scenario.Context.LateSimulate();
     }
+
+    private static PhysicsMixedPartition GetMixedPartition(
+        GravitasWorldContext context,
+        WorldVoxelIndex coordinate)
+    {
+        context.World.TryGetVoxel(coordinate, out Voxel? voxel).Should().BeTrue();
+        voxel!.TryGetPartition(out PhysicsMixedPartition? partition).Should().BeTrue();
+        return partition!;
+    }
+
+    private static bool PartitionContains2DCollider(PhysicsMixedPartition partition, int colliderId) =>
+        partition.ContainedDynamic2DObjects?.Contains(colliderId) == true
+        || partition.ContainedKinematic2DObjects?.Contains(colliderId) == true
+        || partition.ContainedStatic2DObjects?.Contains(colliderId) == true;
 
     private static ScenarioBody<LSSphereCollider> CreateSphere(
         PhysicsScenarioBuilder scenario,
@@ -236,5 +283,16 @@ public sealed class ColliderOwnershipStateTests
         };
         body.Initialize(position);
         return body;
+    }
+
+    private static LSCircleCollider2D CreateStaticCircle2D(GravitasWorldContext context, Vector2d position)
+    {
+        var collider = new LSCircleCollider2D(Fixed64.Half);
+        var transform = new FixedTransform(
+            new Vector3d(position.X, Fixed64.Zero, position.Y),
+            FixedQuaternion.Identity,
+            Vector3d.One);
+        collider.InitializeWithNoBody(new TestMatterAgent(context, transform));
+        return collider;
     }
 }

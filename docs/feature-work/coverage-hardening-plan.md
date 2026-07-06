@@ -87,32 +87,33 @@ configuration before making source changes.
 
 ## Current Standing
 
-Fresh checkpoint after Workstream 3 query reducer and shape-cast hardening:
+Fresh checkpoint after Workstream 4 serialization, replay, and authoring
+hardening:
 
 | Metric | Baseline | Current | Short-Term Gate | Long-Term Target |
 | --- | ---: | ---: | ---: | ---: |
-| Line coverage | 87.3% | 92.8% | 90% | 100% |
-| Branch coverage | 74.1% | 78.7% | 90% | 100% |
-| Method coverage | 86.5% | 92.7% | 90% | 100% |
-| Tests | 974 passed | 1118 passed | green | green |
+| Line coverage | 87.3% | 93.0% | 90% | 100% |
+| Branch coverage | 74.1% | 79.2% | 90% | 100% |
+| Method coverage | 86.5% | 93.0% | 90% | 100% |
+| Tests | 974 passed | 1125 passed | green | green |
 
 Current evidence:
 
 - Coverage report:
-  `TestResults/coverage-branch-hardening-ws3/reports/Summary.txt`
+  `TestResults/coverage-branch-hardening-ws4/reports/Summary.txt`
 - Coverage collection:
   `dotnet test tests\Gravitas.Tests\Gravitas.Tests.csproj --configuration Release --collect:"XPlat Code Coverage" --settings tests\Gravitas.Tests\coverlet.runsettings`
-  passed with 1118 tests.
+  passed with 1125 tests.
 - Branch shortlist:
-  `TestResults/coverage-branch-hardening-ws3/branch-gap-shortlist.txt`
-- Latest CRAP extraction reported 37 flagged methods and 272 uncovered
+  `TestResults/coverage-branch-hardening-ws4/branch-gap-shortlist.txt`
+- Latest CRAP extraction reported 35 flagged methods and 260 uncovered
   methods.
 
 ## Completed Coverage Summary
 
 The first coverage campaign, branch inventory sweep, and collision geometry
 hardening moved the project from 87.3% line, 74.1% branch, and 86.5% method
-coverage to 92.8% line, 78.7% branch, and 92.7% method coverage.
+coverage to 93.0% line, 79.2% branch, and 93.0% method coverage.
 
 High-value work completed:
 
@@ -145,6 +146,9 @@ High-value work completed:
   compound 3D targets, concave triangle cone-axis hits, mixed conservative
   fallback reducers, pure 2D convex mover/capsule CCD, and direct raycast worker
   point/rotated-box geometry.
+- Serialization, replay, and authoring coverage for 2D/3D shape-definition
+  equality/hash semantics, compound-part replay hash payloads, 2D polygon shape
+  serialization, and inactive mixed-partition cleanup.
 
 Cleanup completed:
 
@@ -166,6 +170,8 @@ Cleanup completed:
 - Removed unused `PhysicsMesh.EdgeNormals` storage and the allocating
   `GetTriangleAtIndex(...)` wrapper, keeping the allocation-free
   `GetTriangleVertices(..., out ...)` path.
+- Fixed `LSCollider2D.IsActive` so mixed-mode bodyless 2D colliders refresh and
+  clear mixed partition membership along with pure 2D partition membership.
 
 ## Hardening Rules
 
@@ -269,23 +275,14 @@ or track zombie code before writing more tests.
 
 Use this list as the next-pass ordering, then re-rank after each workstream:
 
-1. **Authoring Equality And Replay Families**
-   - `ColliderShapeDefinition.Equals(...)`: missed 17 / 28 branches.
-   - `ColliderShapeDefinition2D.Equals(...)`: missed 9 / 18 branches.
-   - `ColliderShapeDefinition.GetHashCode()`: missed 6 / 6 branches.
-   - `LSCollider2D.ContributeShapeReplayHash(...)` and compound-part shape
-     replay helpers.
-   - Classification: real authoring/replay behavior. Cover through shape
-     definition and compound-part scenarios; delete only if an equality/hash
-     branch proves impossible after API review.
-2. **CCD Handoff And Shape-Exact Refinement Families**
+1. **CCD Handoff And Shape-Exact Refinement Families**
    - 3D/2D kinematic-dynamic handoff helpers.
    - `TryResolveRotationalContinuousCollision(...)` in 3D and 2D.
    - `TryRefineShapeExactContinuousCollisionHit(...)`.
    - `ProcessQueuedContinuousCollisionHandoffs(...)`.
    - Classification: real runtime behavior. High risk; cover with focused
      deterministic CCD scenarios rather than private-helper branch steering.
-3. **Mixed Prism And Response Families**
+2. **Mixed Prism And Response Families**
    - `TryTestCuboidPrism(...)`: missed 8 / 28 branches.
    - `TryTestCapsulePrism(...)`, `TryTestCylinderPrism(...)`, and
      `TryTestConePrism(...)`: each missed 8 / 20 branches.
@@ -293,7 +290,7 @@ Use this list as the next-pass ordering, then re-rank after each workstream:
      mixed trigger/contact event branches.
    - Classification: real mixed behavior. Cover with physical pair scenarios
      and avoid duplicating tests that only repeat shape families.
-4. **3D Query And Shape-Cast Families**
+3. **3D Query And Shape-Cast Families**
    - `RaycastSegmentWorker.CheckOBBoxOverlaps(...)`: missed 18 / 24 branches
      after the local-slab bug fix; remaining coverage should target meaningful
      local slab edge cases rather than restoring the old AABB behavior.
@@ -304,17 +301,24 @@ Use this list as the next-pass ordering, then re-rank after each workstream:
      defensive worker branch because public query APIs reject zero-length rays.
    - Classification: real query behavior. Cover through public query APIs and
      keep scalar/batch tests non-duplicative.
-5. **Collision Geometry Families**
+4. **Collision Geometry Families**
    - Mesh-cuboid, mesh-cylinder, and mesh-cone fallback/contact branches.
    - 2D convex/compound collision and manifold replacement branches.
    - `ConvexColliderSupport` simplex update branches.
    - Classification: real geometry behavior until proven otherwise. Delete only
      after demonstrating no valid collider setup can reach the fallback.
-6. **Service Lifecycle And Partition Families**
+5. **Service Lifecycle And Partition Families**
    - Deferred 2D partition refresh, retained mixed membership reset, partition
      order comparers, and collider load-state branches.
    - Classification: real lifecycle/pooling behavior. Add tests only for
      observable ownership and idempotency guarantees.
+6. **Serialization, Replay, And Authoring Residue**
+   - Authoring equality/hash hot spots were covered in Workstream 4.
+   - Remaining replay branches are mostly body/cache mode distinctions and
+     hierarchy ordinal failure paths; cover only through valid replay or load
+     semantics, not reflection.
+   - Hierarchy serialization remains host-owned unless a future feature plan
+     deliberately changes that boundary.
 7. **Low-Value Diagnostic/View Getter Noise**
    - Immutable diagnostic view getters and simple constructor branches remain
      lower priority unless they affect visitor dispatch, disabled-path behavior,
@@ -436,7 +440,7 @@ scalar-vs-batch tests.
 
 ### Workstream 4: Serialization, Replay, And Authoring Branches
 
-**Status:** Pending
+**Status:** Complete - 2026-07-06
 
 **Purpose**
 
@@ -456,16 +460,43 @@ authoring objects decide deterministic continuation behavior.
 
 **Tasks**
 
-- [ ] Review `ColliderShapeDefinition` equality/hash branches for meaningful
+- [x] Review `ColliderShapeDefinition` equality/hash branches for meaningful
       authored-shape behavior; delete weak comparison paths if the API no
       longer needs them.
-- [ ] Cover replay hash branches that distinguish authoritative state from
+- [x] Cover replay hash branches that distinguish authoritative state from
       solver-cache or diagnostic state.
-- [ ] Audit inactive/active load, trigger, material, ignored-layer, hierarchy,
+- [x] Audit inactive/active load, trigger, material, ignored-layer, hierarchy,
       and compound-part serialization parity between 2D and 3D.
-- [ ] Record any parity bug in `issue-tracker.md` before fixing it.
-- [ ] Run focused serialization/determinism tests, `ReleaseLean`, full
+- [x] Record any parity bug in `issue-tracker.md` before fixing it.
+- [x] Run focused serialization/determinism tests, `ReleaseLean`, full
       `Release`, then coverage.
+
+**Result Notes**
+
+- Added compact 3D and 2D shape-definition equality/hash tests that prove
+  authored kind, dimensions, material presence/value, mesh inertia policy,
+  vertex count/order, triangle count/order, and polygon vertex order affect
+  value semantics.
+- Added context-level replay hash coverage for compound 2D and 3D authored
+  shape payloads. The 2D case now covers circle, capsule, AABB, convex polygon,
+  part-level material, and shape-level material contribution through
+  `ComputeReplayHash()`.
+- Added 2D polygon serialization coverage that loads into a target polygon with
+  a different vertex count, then verifies rebuilt vertices, bounds, mass
+  properties, and next-frame force replay.
+- Strengthened inactive collider serialization tests so 3D and 2D targets in a
+  mixed runtime clear mixed partition state as well as primary partition state.
+- Tightened the final review gaps by asserting old mixed partitions drop the
+  collider ID, reactivated bodyless 2D colliders are visible in mixed partition
+  membership again, equivalent independently rebuilt compound payloads keep the
+  same replay hash, and compound part offset/rotation/scale payload changes are
+  encoded.
+- Found and fixed a real parity bug: `LSCollider2D.IsActive` cleared/refreshed
+  pure 2D partitions but left mixed partition membership stale. The red
+  regression and RCA are recorded in `issue-tracker.md`.
+- Focused serialization/replay/authoring slice passed with 57 tests. Full
+  Release coverage passed with 1125 tests and reported 93.0% line, 79.2%
+  branch (9033 / 11401 covered branches), and 93.0% method coverage.
 
 ### Workstream 5: Service Lifecycle, Partition, And Runtime Branches
 
@@ -556,3 +587,4 @@ Close the release-hardening branch gate cleanly before expanding the plan toward
 | 2026-07-06 | 92.1% | 77.9% | 92.4% | 1095 passed | Workstream 1 branch inventory completed. Removed stale immovable-contact direction, collider height shortcut, dead acceleration flags, mesh edge-normal storage, and an allocating triangle wrapper. Fixed rotated cuboid raycasts to clip local slabs. Recorded mesh-cuboid fallback SAT completeness for RCA. |
 | 2026-07-06 | 92.5% | 78.4% | 92.5% | 1105 passed | Workstream 2 collision geometry hardening completed. Removed unused SAT projection overload and duplicate mesh-cylinder fallback logic. Added 2D compound geometry/manifold, mixed compound selection, and cone-convex reversed/negative dispatch coverage. |
 | 2026-07-06 | 92.8% | 78.7% | 92.7% | 1118 passed | Workstream 3 query reducer and shape-cast hardening completed. Added focused coverage for convex-vs-compound sweeps, cone-axis concave triangle hits, mixed conservative fallback reporting, 2D convex mover/capsule sweeps, and raycast worker point/rotated-box geometry. |
+| 2026-07-06 | 93.0% | 79.2% | 93.0% | 1125 passed | Workstream 4 serialization, replay, and authoring hardening completed. Added shape-definition value semantics, compound authored replay payload, polygon serialization, and mixed inactive-load coverage. Tightened final review assertions for mixed partition membership and compound replay hash stability. Fixed 2D active-state mixed partition cleanup parity. |

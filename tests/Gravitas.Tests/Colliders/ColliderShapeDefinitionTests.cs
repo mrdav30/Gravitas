@@ -1,6 +1,7 @@
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
+using Gravitas.Materials;
 using Gravitas.Tests.Support;
 using System;
 using System.Linq;
@@ -84,6 +85,86 @@ public sealed class ColliderShapeDefinitionTests
         definition.GetMeshVertex(0).Should().Be(originalVertex);
         definition.GetMeshTriangleIndex(0).Should().Be(originalIndex);
         definition.MeshInertiaPolicy.Should().Be(MeshInertiaPolicy.RequireClosedVolume);
+    }
+
+    [Fact]
+    public void ShapeDefinitionEqualityAndHash_ShouldEncodeAuthoredShapeMaterialAndMeshPayload()
+    {
+        PhysicsMaterial material = PhysicsMaterialTestHelper.WithFrictionAndRestitution(
+            Fixed64.FromFraction(3, 4),
+            Fixed64.FromFraction(1, 4));
+        PhysicsMaterial otherMaterial = PhysicsMaterialTestHelper.WithFrictionAndRestitution(
+            Fixed64.Half,
+            Fixed64.FromFraction(1, 8));
+        Vector3d[] vertices =
+        {
+            new(Fixed64.Zero, Fixed64.Zero, Fixed64.Zero),
+            new(Fixed64.One, Fixed64.Zero, Fixed64.Zero),
+            new(Fixed64.Zero, Fixed64.One, Fixed64.Zero)
+        };
+        int[] triangles = { 0, 1, 2 };
+        ColliderShapeDefinition definition = ColliderShapeDefinition.ConvexMesh(
+            vertices,
+            triangles,
+            MeshInertiaPolicy.RequireClosedVolume,
+            material);
+        ColliderShapeDefinition same = ColliderShapeDefinition.ConvexMesh(
+            vertices.ToArray(),
+            triangles.ToArray(),
+            MeshInertiaPolicy.RequireClosedVolume,
+            material);
+
+        definition.Should().Be(same);
+        definition.Equals((object)same).Should().BeTrue();
+        definition.GetHashCode().Should().Be(same.GetHashCode());
+        (definition == same).Should().BeTrue();
+        (definition != same).Should().BeFalse();
+
+        definition.Equals("mesh").Should().BeFalse();
+        definition.Should().NotBe(ColliderShapeDefinition.Sphere(Fixed64.One, material));
+        definition.Should().NotBe(ColliderShapeDefinition.ConvexMesh(
+            vertices,
+            triangles,
+            MeshInertiaPolicy.SurfaceApproximation,
+            material));
+        definition.Should().NotBe(ColliderShapeDefinition.ConvexMesh(vertices, triangles));
+        definition.Should().NotBe(ColliderShapeDefinition.ConvexMesh(
+            vertices,
+            triangles,
+            MeshInertiaPolicy.RequireClosedVolume,
+            otherMaterial));
+        definition.Should().NotBe(ColliderShapeDefinition.ConvexMesh(
+            new[] { vertices[1], vertices[0], vertices[2] },
+            triangles,
+            MeshInertiaPolicy.RequireClosedVolume,
+            material));
+        definition.Should().NotBe(ColliderShapeDefinition.ConvexMesh(
+            vertices,
+            new[] { 0, 2, 1 },
+            MeshInertiaPolicy.RequireClosedVolume,
+            material));
+        definition.Should().NotBe(ColliderShapeDefinition.ConvexMesh(
+            new[]
+            {
+                vertices[0],
+                vertices[1],
+                vertices[2],
+                new Vector3d(Fixed64.Zero, Fixed64.Zero, Fixed64.One)
+            },
+            triangles,
+            MeshInertiaPolicy.RequireClosedVolume,
+            material));
+        definition.Should().NotBe(ColliderShapeDefinition.ConvexMesh(
+            vertices,
+            new[] { 0, 1, 2, 0, 2, 1 },
+            MeshInertiaPolicy.RequireClosedVolume,
+            material));
+        ColliderShapeDefinition.Capsule(Fixed64.Half, (Fixed64)2)
+            .Should()
+            .NotBe(ColliderShapeDefinition.Capsule(Fixed64.Half, (Fixed64)3));
+        ColliderShapeDefinition.Cuboid(Vector3d.One)
+            .Should()
+            .NotBe(ColliderShapeDefinition.Cuboid(new Vector3d(Fixed64.One, Fixed64.One, (Fixed64)2)));
     }
 
     [Fact]

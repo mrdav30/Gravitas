@@ -194,9 +194,17 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
                 return;
 
             if (_isActive)
+            {
                 _context.Collisions2D.RefreshColliderPartition(this);
+                if (_context.Settings.RuntimeMode.RunsMixedContacts())
+                    _context.MixedCollisions.Refresh2DColliderPartition(this);
+            }
             else
+            {
                 _context.Collisions2D.ClearPartitionedCollider(this, force: true);
+                if (IsMixedPartitioned)
+                    _context.MixedCollisions.ClearPartitioned2DCollider(this, force: true);
+            }
         }
     }
 
