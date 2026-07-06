@@ -563,6 +563,33 @@ public sealed class CollisionDetectionShapePairTests
     }
 
     [Fact]
+    public void MeshCapsule_WithConvexMesh_ShouldDetectFallbackContactAndReversedDispatch()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSMeshCollider> floor = scenario.CreateBody(
+            CreateHorizontalPlaneMesh(),
+            PhysicsScenarioBuilder.Vector(0, 0, 0),
+            FixedQuaternion.Identity);
+        ScenarioBody<LSCapsuleCollider> capsule = scenario.CreateBody(
+            CreateTallCapsule(),
+            new Vector3d(Fixed64.Zero, Fixed64.FromFraction(3, 4), Fixed64.Zero),
+            FixedQuaternion.Identity);
+        ScenarioBody<LSCapsuleCollider> separated = scenario.CreateBody(
+            CreateTallCapsule(),
+            new Vector3d(Fixed64.Zero, (Fixed64)2, Fixed64.Zero),
+            FixedQuaternion.Identity);
+
+        CollisionPair forward = AssertCollision(scenario, floor.Collider, capsule.Collider, CollisionType.Mesh_Capsule);
+        CollisionPair reversed = AssertCollision(scenario, capsule.Collider, floor.Collider, CollisionType.Mesh_Capsule);
+        AssertNoCollision(scenario, floor.Collider, separated.Collider, CollisionType.Mesh_Capsule);
+
+        forward.Manifold.PrimaryContact.Depth.Should().Be(Fixed64.FromFraction(1, 4));
+        forward.Manifold.PrimaryContact.Normal.Should().Be(Vector3d.Up);
+        reversed.Manifold.PrimaryContact.Depth.Should().Be(Fixed64.FromFraction(1, 4));
+        reversed.Manifold.PrimaryContact.Normal.Should().Be(Vector3d.Up);
+    }
+
+    [Fact]
     public void PrimitiveManifoldChecks_ShouldNotAllocateAfterWarmup()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
@@ -775,4 +802,10 @@ public sealed class CollisionDetectionShapePairTests
             },
             position,
             FixedQuaternion.Identity);
+
+    private static LSCapsuleCollider CreateTallCapsule() =>
+        new()
+        {
+            Size = new Vector3d(Fixed64.One, (Fixed64)2, Fixed64.One)
+        };
 }

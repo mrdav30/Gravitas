@@ -61,6 +61,40 @@ public sealed class CompoundColliderCollisionTests
     }
 
     [Fact]
+    public void CompoundCompound_ShouldDetectMatchingPartsInOwnerOrder()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSCompoundCollider> first = scenario.CreateBody(
+            CreateTwoSphereCompound(),
+            PhysicsScenarioBuilder.Vector(0, 0, 0),
+            FixedQuaternion.Identity,
+            preventAngularForces: true);
+        ScenarioBody<LSCompoundCollider> second = scenario.CreateBody(
+            new LSCompoundCollider(
+                CompoundColliderPart.Sphere(Fixed64.Half, new Vector3d((Fixed64)(-4), Fixed64.Zero, Fixed64.Zero)),
+                CompoundColliderPart.Sphere(Fixed64.Half, new Vector3d(Fixed64.FromFraction(3, 2), Fixed64.Zero, Fixed64.Zero))),
+            PhysicsScenarioBuilder.Vector(0, 0, 0),
+            FixedQuaternion.Identity,
+            preventAngularForces: true);
+        CollisionPair forward = scenario.CreatePair(first.Collider, second.Collider);
+        CollisionPair reversed = scenario.CreatePair(second.Collider, first.Collider);
+
+        CollisionDetection.DoCollisionCheck(forward).Should().BeTrue();
+        CollisionDetection.DoCollisionCheck(reversed).Should().BeTrue();
+
+        forward.CollisionType.Should().Be(CollisionType.Compound);
+        reversed.CollisionType.Should().Be(CollisionType.Compound);
+        forward.Manifold.Count.Should().Be(1);
+        reversed.Manifold.Count.Should().Be(1);
+        forward.Manifold.PrimaryContact.Depth.Should().BeGreaterThan(Fixed64.Zero);
+        forward.Manifold.PrimaryContact.Normal.Should().Be(Vector3d.Right);
+        reversed.Manifold.PrimaryContact.Depth.Should().Be(forward.Manifold.PrimaryContact.Depth);
+        reversed.Manifold.PrimaryContact.Normal.Should().Be(-Vector3d.Right);
+        reversed.Manifold.PrimaryContact.PointA.Should().Be(forward.Manifold.PrimaryContact.PointB);
+        reversed.Manifold.PrimaryContact.PointB.Should().Be(forward.Manifold.PrimaryContact.PointA);
+    }
+
+    [Fact]
     public void CompoundCollision_ShouldNotifyOwningColliderOnce()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();

@@ -1,7 +1,7 @@
 # Coverage Hardening Plan
 
 **Date:** 2026-07-05  
-**Status:** Active - Roadmap C complete; 100% campaign remains  
+**Status:** Active - Roadmap D complete; 100% campaign remains  
 **Owner:** Gravitas coverage, test-quality, and dead-code hardening
 
 ---
@@ -530,13 +530,35 @@ getters unless the view construction or visitor dispatch has host-adapter value.
 
 ### Roadmap D: Collision Dispatch And Geometry Branches
 
-**Status:** Pending
+**Status:** Completed
 
 Target 2D dispatch branches, segment intersection branches, 3D mesh/cuboid/
 cylinder/capsule contact branches, convex support simplex updates, and compound
 compound collision branches. Prefer edge-case tests that prove physical
 behavior: parallel/separated, tangent, contained, degenerate-but-valid, and
 deterministic tie-ordering cases.
+
+**Result**
+
+- Added focused 2D single-contact dispatch coverage for required circle,
+  AABox, convex polygon, and capsule pair permutations.
+- Added crossed 2D capsule coverage for the segment-intersection contact path.
+- Added 3D compound-vs-compound owner-order coverage using the narrow-phase
+  detection path directly so response mutation does not hide symmetry defects.
+- Added convex mesh-vs-capsule fallback and reversed-dispatch coverage.
+- Added mixed prism rejection coverage for cuboid, capsule, cylinder, and cone
+  families against AABox, capsule, and convex polygon slabs.
+- Removed the unused `LSCuboidCollider` face-projection helper cluster,
+  including the allocating `GetFace(...)` public helper. The active oriented
+  cuboid closest-point path no longer uses those methods, so deleting them was
+  stronger than preserving stale geometry code for coverage.
+- Left `ConvexColliderSupport` simplex internals as future branch work. They
+  are reachable only through cone collision/query and convex sweep paths, and
+  steering private simplex topology with brittle geometry cases would not be a
+  good coverage trade. A later pass should refactor GJK simplex policy into a
+  directly testable helper if those branches remain high-risk.
+- Coverage report:
+  `TestResults/coverage-roadmap-d/reports/Summary.txt`
 
 ### Roadmap E: Service Lifecycle And Collider Authoring Branches
 
@@ -563,3 +585,4 @@ or stale support paths rather than preserving them for coverage.
 | 2026-07-05 | 90.1% | 76.5% | 91.1% | 1034 passed | Roadmap A completed. Mixed swept-box clipping and reducer classification are split into focused internal helpers with direct branch coverage. |
 | 2026-07-05 | 90.7% | 76.8% | 91.5% | 1042 passed | Roadmap B completed. Replay hash branch coverage now covers 2D joint cache/authoritative distinctions, pair manifold/warm-start payloads, mixed trigger/contact materials, and hierarchy replay ordinal normalization. |
 | 2026-07-05 | 91.4% | 77.1% | 91.7% | 1048 passed | Roadmap C completed. Diagnostic sink coverage now exercises compound/mixed slab draw expansion, joint draw branches, circle-query events, 2D/3D joint-limit events, ragdoll activation events, and typed event rejection branches. |
+| 2026-07-05 | 91.7% | 77.4% | 91.8% | 1076 passed | Roadmap D completed. Collision dispatch coverage now includes 2D single-contact pair routing, crossed capsule segment contacts, 3D compound-compound owner-order symmetry, convex mesh/capsule fallback dispatch, mixed prism rejection families, and stale cuboid face-projection helper removal. |

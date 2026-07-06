@@ -193,18 +193,6 @@ public class LSCuboidCollider : LSCollider
         }
     }
 
-    // Method to get a face by index
-    public Vector3d[] GetFace(int index)
-    {
-        int[] faceIndices = _faceVertices[index];
-        Vector3d[] faceVertices = new Vector3d[faceIndices.Length];
-
-        for (int i = 0; i < faceIndices.Length; i++)
-            faceVertices[i] = Vertices[faceIndices[i]];
-
-        return faceVertices;
-    }
-
     protected virtual void CalculateFaceNormals()
     {
         for (int i = 0; i < _faceVertices.Length; i++)
@@ -323,35 +311,6 @@ public class LSCuboidCollider : LSCollider
         return area;
     }
 
-    protected Vector3d ClosestPointOnFace(int[] faceVertices, Vector3d faceNormal, Vector3d faceCentroid, Vector3d point)
-    {
-        Vector3d projectedPoint = ProjectPointOntoPlane(faceNormal, faceCentroid, point);
-
-        // Check if the projected point lies within the face
-        if (IsPointInFacePlane(faceVertices, faceNormal, projectedPoint))
-            return projectedPoint;
-
-        // Find the closest point on the edges or vertices
-        Vector3d closestPoint = Vertices[faceVertices[0]];
-        Fixed64 minDistanceSquared = (projectedPoint - closestPoint).MagnitudeSquared;
-
-        for (int i = 0; i < faceVertices.Length; i++)
-        {
-            Vector3d start = Vertices[faceVertices[i]];
-            Vector3d end = Vertices[faceVertices[(i + 1) % faceVertices.Length]];
-            Vector3d closestPointOnEdge = ClosestPointOnLineSegment(start, end, projectedPoint);
-            Fixed64 distanceSquared = (projectedPoint - closestPointOnEdge).MagnitudeSquared;
-
-            if (distanceSquared < minDistanceSquared)
-            {
-                minDistanceSquared = distanceSquared;
-                closestPoint = closestPointOnEdge;
-            }
-        }
-
-        return closestPoint;
-    }
-
     public override Vector3d ClosestPointOnSurface(Vector3d other)
     {
         if (CurrentState == CuboidState.AABox)
@@ -465,45 +424,6 @@ public class LSCuboidCollider : LSCollider
 
         // Transform the normal back to world space
         return localNormal.Rotate(Position, Rotation);
-    }
-
-    protected Vector3d ProjectPointOntoPlane(Vector3d faceNormal, Vector3d faceCentroid, Vector3d point)
-    {
-        // Calculate the distance from the point to the plane along the normal
-        Fixed64 distance = Vector3d.Dot(faceNormal, point - faceCentroid);
-        // Project the point onto the plane
-        return point - faceNormal * distance;
-    }
-
-    protected bool IsPointInFacePlane(int[] faceVertices, Vector3d faceNorm, Vector3d point)
-    {
-        Vector3d v0 = Vertices[faceVertices[0]];
-        Vector3d edge0 = Vertices[faceVertices[1]] - v0;
-        Vector3d edge0_normal = Vector3d.Cross(faceNorm, edge0);
-        Fixed64 dot0 = Vector3d.Dot(edge0_normal, point - v0);
-
-        for (int i = 1; i < faceVertices.Length; i++)
-        {
-            Vector3d vi = Vertices[faceVertices[i]];
-            Vector3d edgei = Vertices[faceVertices[(i + 1) % faceVertices.Length]] - vi;
-            Vector3d edgei_normal = Vector3d.Cross(faceNorm, edgei);
-
-            if (Vector3d.Dot(edgei_normal, point - vi) * dot0 < Fixed64.Zero)
-                return false;
-        }
-
-        return true;
-    }
-
-    protected Vector3d ClosestPointOnLineSegment(Vector3d start, Vector3d end, Vector3d point)
-    {
-        Vector3d direction = end - start;
-        Fixed64 lengthSquared = direction.MagnitudeSquared;
-        if (lengthSquared == Fixed64.Zero) return start;
-
-        Fixed64 t = Vector3d.Dot(point - start, direction) / lengthSquared;
-        t = FixedMath.Clamp01(t);
-        return start + t * direction;
     }
 
     public override bool ColliderOverlapsRay(RaycastSegmentWorker worker, ref SwiftList<Vector3d> outputIntersectionPoints)
