@@ -24,10 +24,11 @@ instead of burying it in notes.
 ## Active Release-Scope
 
 - [`Coverage Hardening`](coverage-hardening-plan.md)
-  - Active living plan. Short-term target is at least 90% line, branch, and
-    method coverage using the repository `coverlet.runsettings`; long-term
-    target is 100% across the board. Coverage work should remove dead code,
-    condense duplicate tests, and add only high-signal behavior tests.
+  - Active living plan. Line and method coverage are above 90%; the current
+    release-hardening gate is raising branch coverage to at least 90% using the
+    repository `coverlet.runsettings`. Long-term target is 100% across the
+    board. Coverage work should remove zombie code, condense duplicate tests,
+    and add only high-signal behavior tests.
 
 ## Recently Completed
 

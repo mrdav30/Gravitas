@@ -21,6 +21,32 @@
 
 ## Resolved Issues
 
+### 3D Direct Collider Inactive Load Preserved Stale Partition State
+
+**Discovered:** 2026-07-06  
+**Resolved:** 2026-07-06  
+**Source:** Coverage Roadmap E review and 2D/3D serialization parity audit  
+**Affected area:** `LSCollider.RecordData(...)`, 3D bodyless collider
+serialization, primary and mixed partition state cleanup
+
+RCA: 3D direct-collider serialization correctly wrote and loaded
+`Active=false`, but the inactive load branch only removed the collider from the
+partition services. It did not mark the collider's own primary/mixed partition
+state unpartitioned or clear cached coordinates. The matching 2D path already
+cleared service membership and collider-local partition state, so 3D could
+remain inactive while still reporting stale partition membership.
+
+Fix: `LSCollider.ApplyLoadedState()` now clears collider-local primary and
+mixed partition state after loading inactive collider state.
+
+Verification:
+
+- Added a 3D parity regression for inactive bodyless collider population.
+- Verified the new regression failed before the fix and passed after the fix.
+- Ran focused 2D/3D serialization tests.
+- Ran full `Release`, full `ReleaseLean`, coverage collection, and
+  `git diff --check`.
+
 ### Mixed Discrete Response Can Reverse Restitution-Heavy Kinematic CCD Handoff Velocity
 
 **Discovered:** 2026-06-23  
