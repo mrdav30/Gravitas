@@ -472,6 +472,27 @@ public sealed class MixedNarrowPhaseTests
     }
 
     [Fact]
+    public void SphereCompound2DSlab_WithMultipleOverlaps_ShouldUseShallowestPartContact()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSSphereCollider> sphere = CreateSphere3D(
+            context,
+            new Vector3d(Fixed64.FromFraction(9, 10), Fixed64.Zero, Fixed64.Zero));
+        var compound2D = new LSCompoundCollider2D(
+            CompoundColliderPart2D.Circle(Fixed64.Half, new Vector2d(Fixed64.FromFraction(3, 10), Fixed64.Zero)),
+            CompoundColliderPart2D.Circle(Fixed64.Half, Vector2d.Zero));
+        SolidBody2D body2D = CreateBody2D(context, compound2D, Vector2d.Zero);
+
+        bool collided = CollisionDetectionMixed.TryCollide(sphere.Collider, body2D.Collider, out MixedContact contact);
+
+        collided.Should().BeTrue();
+        contact.HasContact.Should().BeTrue();
+        contact.Depth.Should().Be(Fixed64.FromFraction(1, 10));
+        contact.Normal3DTo2D.Should().Be(-Vector3d.Right);
+        contact.Point2D.X.Should().Be(Fixed64.Half);
+    }
+
+    [Fact]
     public void TryGetPlanarBoundaryPoint_WithCompoundContainingPoint_ShouldUseContainingPartBoundary()
     {
         using GravitasWorldContext context = CreateMixedContext();

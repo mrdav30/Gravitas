@@ -177,6 +177,32 @@ public sealed class CompoundCollider2DTests
         closest.Should().Be(new Vector2d(Fixed64.FromFraction(5, 2), Fixed64.Zero));
     }
 
+    [Fact]
+    public void ContainsPoint_ShouldCheckAllParts()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        var compound = new LSCompoundCollider2D(
+            CompoundColliderPart2D.Circle(Fixed64.Half, new Vector2d((Fixed64)(-4), Fixed64.Zero)),
+            CompoundColliderPart2D.AABox(new Vector2d((Fixed64)2, (Fixed64)2), new Vector2d((Fixed64)2, Fixed64.Zero)));
+        _ = CreateBody(context, compound, Vector2d.Zero);
+
+        compound.ContainsPoint(new Vector2d((Fixed64)2, Fixed64.Zero)).Should().BeTrue();
+        compound.ContainsPoint(new Vector2d(Fixed64.Zero, (Fixed64)3)).Should().BeFalse();
+    }
+
+    [Fact]
+    public void GetSupportPoint_ShouldUseFarthestPart()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        var compound = new LSCompoundCollider2D(
+            CompoundColliderPart2D.Circle(Fixed64.Half, new Vector2d((Fixed64)(-2), Fixed64.Zero)),
+            CompoundColliderPart2D.AABox(new Vector2d((Fixed64)2, (Fixed64)2), new Vector2d((Fixed64)3, Fixed64.Zero)));
+        _ = CreateBody(context, compound, Vector2d.Zero);
+
+        compound.GetSupportPoint(Vector2d.Right).Should().Be(new Vector2d((Fixed64)4, Fixed64.One));
+        compound.GetSupportPoint(Vector2d.Left).Should().Be(new Vector2d(-Fixed64.FromFraction(5, 2), Fixed64.Zero));
+    }
+
     private static SolidBody2D CreateBody(GravitasWorldContext context, LSCollider2D collider, Vector2d position)
     {
         var transform = new FixedTransform(new Vector3d(position.X, Fixed64.Zero, position.Y), FixedQuaternion.Identity, Vector3d.One);

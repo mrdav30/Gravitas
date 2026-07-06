@@ -87,32 +87,32 @@ configuration before making source changes.
 
 ## Current Standing
 
-Fresh checkpoint after Workstream 1 branch inventory and zombie-code cleanup:
+Fresh checkpoint after Workstream 2 collision and shape geometry hardening:
 
 | Metric | Baseline | Current | Short-Term Gate | Long-Term Target |
 | --- | ---: | ---: | ---: | ---: |
-| Line coverage | 87.3% | 92.1% | 90% | 100% |
-| Branch coverage | 74.1% | 77.9% | 90% | 100% |
-| Method coverage | 86.5% | 92.4% | 90% | 100% |
-| Tests | 974 passed | 1095 passed | green | green |
+| Line coverage | 87.3% | 92.5% | 90% | 100% |
+| Branch coverage | 74.1% | 78.4% | 90% | 100% |
+| Method coverage | 86.5% | 92.5% | 90% | 100% |
+| Tests | 974 passed | 1105 passed | green | green |
 
 Current evidence:
 
 - Coverage report:
-  `TestResults/coverage-branch-hardening/reports/Summary.txt`
+  `TestResults/coverage-branch-hardening-ws2/reports/Summary.txt`
 - Coverage collection:
   `dotnet test tests\Gravitas.Tests\Gravitas.Tests.csproj --configuration Release --collect:"XPlat Code Coverage" --settings tests\Gravitas.Tests\coverlet.runsettings`
-  passed with 1095 tests.
+  passed with 1105 tests.
 - Branch shortlist:
-  `TestResults/coverage-branch-hardening/branch-gap-shortlist.txt`
-- Latest CRAP extraction reported 41 flagged methods and 285 uncovered
+  `TestResults/coverage-branch-hardening-ws2/branch-gap-shortlist.txt`
+- Latest CRAP extraction reported 40 flagged methods and 278 uncovered
   methods.
 
 ## Completed Coverage Summary
 
-The first coverage campaign and branch inventory sweep moved the project from
-87.3% line, 74.1% branch, and 86.5% method coverage to 92.1% line, 77.9%
-branch, and 92.4% method coverage.
+The first coverage campaign, branch inventory sweep, and collision geometry
+hardening moved the project from 87.3% line, 74.1% branch, and 86.5% method
+coverage to 92.5% line, 78.4% branch, and 92.5% method coverage.
 
 High-value work completed:
 
@@ -123,6 +123,11 @@ High-value work completed:
 - Deterministic ordering coverage for 2D grounding candidates and continuous
   collision hit replacement.
 - 3D raycast, mesh, convex, and collision dispatch branch coverage.
+- 2D compound geometry behavior and compound-vs-compound manifold coverage.
+- Mixed compound part-selection coverage and 3D cone-convex reversed/negative
+  dispatch coverage.
+- Stale SAT/mesh fallback cleanup for unused polygon projection and duplicate
+  mesh-cylinder candidate logic.
 - Batch query API coverage for range/output contracts without duplicating every
   scalar query.
 - Diagnostic sink, debug draw, typed event, joint, ragdoll, and mixed diagnostic
@@ -313,7 +318,7 @@ Use this list as the next-pass ordering, then re-rank after each workstream:
 
 ### Workstream 2: Collision And Shape Geometry Branches
 
-**Status:** Pending
+**Status:** Done
 
 **Purpose**
 
@@ -330,16 +335,36 @@ while deleting stale fallback paths that no valid collider shape can reach.
 
 **Tasks**
 
-- [ ] Cover or delete remaining mixed prism branch gaps for cuboid, capsule,
+- [x] Cover or delete remaining mixed prism branch gaps for cuboid, capsule,
       cylinder, cone, and triangle/mesh slab paths.
-- [ ] Review 2D convex/compound collision branches for duplicate tests and
+- [x] Review 2D convex/compound collision branches for duplicate tests and
       unreachable defensive branches.
-- [ ] Review 3D mesh/cuboid/cylinder/capsule branches for measured behavior
+- [x] Review 3D mesh/cuboid/cylinder/capsule branches for measured behavior
       gaps rather than private-helper branch steering.
-- [ ] If GJK/simplex branches remain high-risk, refactor only the simplex policy
+- [x] If GJK/simplex branches remain high-risk, refactor only the simplex policy
       needed for direct deterministic tests; avoid brittle geometry setups that
       exist only for coverage.
-- [ ] Run focused collision tests, then full `Release`, then coverage.
+- [x] Run focused collision tests, then full `Release`, then coverage.
+
+**Outcome**
+
+- Removed the unused `AxisProjectionHelper.ProjectPolygonOntoAxis(...)`
+  overload for `SwiftList<Vector3d>`.
+- Removed duplicate mesh-cylinder fallback candidate logic from
+  `CollisionDetection.Mesh`; `MeshTriangleContactGenerator` already owns the
+  same candidate/contact predicate and returns no weaker result.
+- Added focused behavior coverage for `LSCompoundCollider2D.ContainsPoint`,
+  `LSCompoundCollider2D.GetSupportPoint`, 2D compound-vs-compound manifold
+  contacts, mixed 2D compound shallowest-part selection, and reversed/negative
+  cone-convex dispatch.
+- Reviewed remaining mixed prism SAT branch misses. The remaining high CRAP
+  entries are mostly private defensive separating-axis exits where the public
+  broad-phase or earlier SAT axes reject invalid setups before those exact
+  branches can be observed. They remain classified as geometry guardrails, not
+  current release behavior gaps.
+- Focused collision slice passed with 106 tests. Full Release coverage passed
+  with 1105 tests and reported 92.5% line, 78.4% branch, and 92.5% method
+  coverage.
 
 ### Workstream 3: Query Reducer And Shape-Cast Branches
 
@@ -494,3 +519,4 @@ Close the release-hardening branch gate cleanly before expanding the plan toward
 | 2026-07-05 | 90.0% | 76.0% | 91.0% | 1025 passed | First coverage campaign completed. Line and method gates met; branch gap remained active. Removed unused transient-state scaffolding. |
 | 2026-07-05 | 92.0% | 77.9% | 92.2% | 1094 passed | Roadmaps A-E completed. Added focused branch coverage across mixed query support, replay hash, diagnostics, collision dispatch, geometry, service lifecycle, and collider authoring. Removed stale cuboid and joint helper code. Fixed 3D inactive direct-collider load partition cleanup parity. |
 | 2026-07-06 | 92.1% | 77.9% | 92.4% | 1095 passed | Workstream 1 branch inventory completed. Removed stale immovable-contact direction, collider height shortcut, dead acceleration flags, mesh edge-normal storage, and an allocating triangle wrapper. Fixed rotated cuboid raycasts to clip local slabs. Recorded mesh-cuboid fallback SAT completeness for RCA. |
+| 2026-07-06 | 92.5% | 78.4% | 92.5% | 1105 passed | Workstream 2 collision geometry hardening completed. Removed unused SAT projection overload and duplicate mesh-cylinder fallback logic. Added 2D compound geometry/manifold, mixed compound selection, and cone-convex reversed/negative dispatch coverage. |

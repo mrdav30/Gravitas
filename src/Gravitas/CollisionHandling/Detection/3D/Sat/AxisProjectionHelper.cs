@@ -78,33 +78,6 @@ public static class AxisProjectionHelper
     }
 
     /// <summary>
-    /// Project all points onto axis vector and get distance from beginning of the axis.
-    /// If done for all points in object, and minimum and maximum value recorded,
-    /// the result is a set of two numbers that define from where to where projection goes.
-    /// </summary>
-    /// <param name="axisVector">The axis vector to project onto.</param>
-    /// <param name="vertices">The vertices of the polygon.</param>
-    /// <param name="projection">The resulting projection range.</param>
-    public static void ProjectPolygonOntoAxis(
-        Vector3d axisVector,
-        SwiftList<Vector3d> vertices,
-        ref FixedRange projection)
-    {
-        Fixed64 min = Vector3d.Dot(axisVector, vertices[0]);
-        Fixed64 max = min;
-        Fixed64 projectionSize;
-
-        for (int i = 0; i < vertices.Count; i++)
-        {
-            projectionSize = Vector3d.Dot(axisVector, vertices[i]); // this scalar value is equal to length of vector B projected onto vector A
-            if (projectionSize < min) min = projectionSize;
-            if (projectionSize > max) max = projectionSize;
-        }
-
-        projection.SetMinMax(min, max);
-    }
-
-    /// <summary>
     /// Project position onto axis vector and add/subtract diameter to get center projection
     /// </summary>
     /// <param name="axisVector"></param>

@@ -94,6 +94,51 @@ public sealed class CollisionPair2DManifoldTests
         pair.Manifold.Select(static contact => contact.ContactId).Should().Equal(contactIds);
     }
 
+    [Fact]
+    public void TryCollide_WithCompoundCompoundSeparatedParts_ShouldReturnFalse()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        SolidBody2D first = CreateCompound(
+            context,
+            Vector2d.Zero,
+            CompoundColliderPart2D.Circle(Fixed64.Half, new Vector2d((Fixed64)(-2), Fixed64.Zero)),
+            CompoundColliderPart2D.Circle(Fixed64.Half, new Vector2d((Fixed64)2, Fixed64.Zero)));
+        SolidBody2D second = CreateCompound(
+            context,
+            Vector2d.Zero,
+            CompoundColliderPart2D.Circle(Fixed64.Half, Vector2d.Zero));
+        var pair = new CollisionPair2D(first.Collider, second.Collider);
+
+        CollisionDetection2D.TryCollide(pair, pair.Manifold, frame: 3).Should().BeFalse();
+
+        pair.Manifold.HasContact.Should().BeFalse();
+        pair.Manifold.LastUpdatedFrame.Should().Be(3);
+    }
+
+    [Fact]
+    public void TryCollide_WithCompoundCompoundMatchingLaterParts_ShouldPopulateManifold()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        SolidBody2D first = CreateCompound(
+            context,
+            Vector2d.Zero,
+            CompoundColliderPart2D.Circle(Fixed64.Half, new Vector2d((Fixed64)(-4), Fixed64.Zero)),
+            CompoundColliderPart2D.Circle(Fixed64.Half, Vector2d.Zero));
+        SolidBody2D second = CreateCompound(
+            context,
+            Vector2d.Zero,
+            CompoundColliderPart2D.Circle(Fixed64.Half, new Vector2d(Fixed64.Half, Fixed64.Zero)),
+            CompoundColliderPart2D.Circle(Fixed64.Half, new Vector2d((Fixed64)4, Fixed64.Zero)));
+        var pair = new CollisionPair2D(first.Collider, second.Collider);
+
+        CollisionDetection2D.TryCollide(pair, pair.Manifold, frame: 4).Should().BeTrue();
+
+        pair.Manifold.HasContact.Should().BeTrue();
+        pair.Manifold.Count.Should().Be(1);
+        pair.Manifold.PrimaryContact.Depth.Should().Be(Fixed64.Half);
+        pair.Manifold.LastUpdatedFrame.Should().Be(4);
+    }
+
     private static CollisionPair2D GetPair(LSCollider2D first, LSCollider2D second)
     {
         if (first.TryGetCollisionPair(second.Id, out CollisionPair2D? firstPair) && firstPair != null)
@@ -136,6 +181,22 @@ public sealed class CollisionPair2DManifoldTests
         {
             Mass = Fixed64.One,
             FreezeAxes = immovable ? BodyFreezeAxes2D.Position : BodyFreezeAxes2D.None
+        };
+        body.Initialize(position);
+        return body;
+    }
+
+    private static SolidBody2D CreateCompound(
+        GravitasWorldContext context,
+        Vector2d position,
+        params CompoundColliderPart2D[] parts)
+    {
+        var body = new SolidBody2D(
+            new TestMatterAgent(context, CreateTransform(position)),
+            new LSCompoundCollider2D(parts))
+        {
+            Mass = Fixed64.One,
+            FreezeAxes = BodyFreezeAxes2D.Position
         };
         body.Initialize(position);
         return body;

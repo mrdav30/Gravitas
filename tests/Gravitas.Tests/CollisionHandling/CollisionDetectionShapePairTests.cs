@@ -541,6 +541,7 @@ public sealed class CollisionDetectionShapePairTests
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSConeCollider> cone = CreateCone(scenario, Vector3d.Zero);
         ScenarioBody<LSCuboidCollider> cuboid = scenario.CreateCuboid(new Vector3d(Fixed64.Zero, -Fixed64.FromFraction(5, 4), Fixed64.Zero));
+        ScenarioBody<LSCuboidCollider> separatedCuboid = scenario.CreateCuboid(new Vector3d((Fixed64)3, Fixed64.Zero, Fixed64.Zero));
         ScenarioBody<LSCapsuleCollider> capsule = scenario.CreateCapsule(new Vector3d(Fixed64.Half, Fixed64.Zero, Fixed64.Zero));
         ScenarioBody<LSCylinderCollider> cylinder = scenario.CreateCylinder(new Vector3d(Fixed64.Zero, Fixed64.FromFraction(3, 4), Fixed64.Zero));
         ScenarioBody<LSConeCollider> otherCone = CreateCone(scenario, new Vector3d(Fixed64.Zero, Fixed64.FromFraction(3, 4), Fixed64.Zero));
@@ -558,6 +559,8 @@ public sealed class CollisionDetectionShapePairTests
         AssertCollision(scenario, cone.Collider, capsule.Collider, CollisionType.Cone_Convex);
         AssertCollision(scenario, cone.Collider, cylinder.Collider, CollisionType.Cone_Convex);
         AssertCollision(scenario, cone.Collider, otherCone.Collider, CollisionType.Cone_Convex);
+        AssertCollision(scenario, cuboid.Collider, cone.Collider, CollisionType.Cone_Convex);
+        AssertNoCollision(scenario, cone.Collider, separatedCuboid.Collider, CollisionType.Cone_Convex);
         AssertCollision(scenario, mesh.Collider, cone.Collider, CollisionType.Mesh_Cone);
         AssertCollision(scenario, compound.Collider, compoundCone.Collider, CollisionType.Compound);
     }

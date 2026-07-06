@@ -7,9 +7,6 @@
 
 using FixedMathSharp;
 using Gravitas.Colliders;
-using SwiftCollections;
-using SwiftCollections.Query;
-using System.Runtime.CompilerServices;
 
 namespace Gravitas.CollisionHandling;
 
@@ -143,76 +140,11 @@ public static partial class CollisionDetection
         if (!TryGetPairColliders(pair, out LSMeshCollider mesh, out LSCylinderCollider cylinder))
             return false;
 
-        if (MeshTriangleContactGenerator.TryBuildMeshCylinderManifold(
+        return MeshTriangleContactGenerator.TryBuildMeshCylinderManifold(
             pair,
             mesh,
             cylinder,
-            pair.Context.CollisionScratch.MeshTriangleCandidatesA))
-        {
-            return true;
-        }
-
-        if (mesh.Mode == MeshColliderMode.Concave)
-            return false;
-
-        SwiftList<int> nearbyTriangles = pair.Context.CollisionScratch.MeshCylinderTriangles;
-        if (!TryFindMeshCylinderContact(
-            mesh,
-            cylinder,
-            nearbyTriangles,
-            out Vector3d pointOnMesh,
-            out Vector3d pointOnCylinder,
-            out Vector3d normalMeshToCylinder,
-            out Fixed64 depth))
-        {
-            return false;
-        }
-
-        SetContactInPairOrder(pair, mesh, pointOnMesh, cylinder, pointOnCylinder, depth, normalMeshToCylinder);
-        return true;
-    }
-
-    private static bool TryFindMeshCylinderContact(
-        LSMeshCollider mesh,
-        LSCylinderCollider cylinder,
-        SwiftList<int> triangleBuffer,
-        out Vector3d pointOnMesh,
-        out Vector3d pointOnCylinder,
-        out Vector3d normalMeshToCylinder,
-        out Fixed64 depth)
-    {
-        pointOnMesh = Vector3d.Zero;
-        pointOnCylinder = Vector3d.Zero;
-        normalMeshToCylinder = Vector3d.Zero;
-        depth = Fixed64.Zero;
-
-        mesh.GetTrianglesInBounds(new FixedBoundVolume(cylinder.BoundsMin, cylinder.BoundsMax), triangleBuffer);
-        bool found = false;
-        Fixed64 bestDepth = Fixed64.MaxValue;
-
-        for (int i = 0; i < triangleBuffer.Count; i++)
-        {
-            int triangleIndex = triangleBuffer[i];
-            mesh.Mesh.GetTriangleVertices(triangleIndex, out Vector3d first, out Vector3d second, out Vector3d third);
-            Vector3d faceNormal = mesh.Mesh.GetFaceNormalWorld(triangleIndex);
-            Vector3d candidatePointOnMesh = MeshUtils.ClosestPointOnTriangle(first, second, third, faceNormal, cylinder.Center);
-            if (!IsPointInsideCylinder(cylinder, candidatePointOnMesh))
-                continue;
-
-            Vector3d candidatePointOnCylinder = cylinder.ClosestPointOnSurface(candidatePointOnMesh);
-            Fixed64 candidateDepth = Vector3d.Distance(candidatePointOnMesh, candidatePointOnCylinder);
-            if (found && candidateDepth >= bestDepth)
-                continue;
-
-            found = true;
-            bestDepth = candidateDepth;
-            pointOnMesh = candidatePointOnMesh;
-            pointOnCylinder = candidatePointOnCylinder;
-            normalMeshToCylinder = OrientNormal(faceNormal, cylinder.Center - candidatePointOnMesh);
-            depth = candidateDepth;
-        }
-
-        return found;
+            pair.Context.CollisionScratch.MeshTriangleCandidatesA);
     }
 
     /// <summary>
@@ -418,16 +350,6 @@ public static partial class CollisionDetection
         Vector3d support1 = mesh1.GetSupportPoint(mesh2.Center);
         Vector3d pointOfContactA = mesh1.ClosestPointOnSurface(support1);
         return (pointOfContactA, mesh2.ClosestPointOnSurface(pointOfContactA));
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool IsPointInsideCylinder(LSCylinderCollider cylinder, Vector3d point)
-    {
-        Vector3d local = cylinder.Rotation.Inverse() * (point - cylinder.Center);
-        Fixed64 radialSqr = local.X * local.X + local.Z * local.Z;
-        return radialSqr <= cylinder.ScaledRadiusSqr + Fixed64.Epsilon
-            && local.Y >= -cylinder.HalfHeight - Fixed64.Epsilon
-            && local.Y <= cylinder.HalfHeight + Fixed64.Epsilon;
     }
 
     #endregion
