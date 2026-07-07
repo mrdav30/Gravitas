@@ -450,6 +450,29 @@ public sealed class GravitasQuery3DServiceSweepTests
     }
 
     [Fact]
+    public void SweepCuboid_WithInitialCenterOverlap_ShouldReturnStableFallbackSurfacePointAndNormal()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSCuboidCollider source = CreateDynamicCollider(
+            context,
+            new LSCuboidCollider(),
+            Vector3d.Zero);
+        LSCuboidCollider target = CreateDynamicCollider(context, new LSCuboidCollider(), Vector3d.Zero);
+
+        bool hit = context.Query3D.SweepCuboid(
+            source,
+            Vector3d.Right * (Fixed64)2,
+            IncludeLayerZero,
+            out Physics3DHit sweepHit);
+
+        hit.Should().BeTrue();
+        sweepHit.Collider.Should().BeSameAs(target);
+        sweepHit.Distance.Should().Be(Fixed64.Zero);
+        sweepHit.Point.Should().Be(new Vector3d(-Fixed64.Half, Fixed64.Zero, Fixed64.Zero));
+        sweepHit.Normal.Should().Be(-Vector3d.Right);
+    }
+
+    [Fact]
     public void SweepConvexMesh_ShouldHitCapsuleAndCylinderTargetsAsSource()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();

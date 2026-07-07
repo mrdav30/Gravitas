@@ -924,6 +924,31 @@ public sealed class ContinuousCollisionDetectionTests
     }
 
     [Fact]
+    public void ContinuousMode_WithFastKinematicHostTranslation_ShouldNotPushDynamicTargetBehindEarlierStaticHit()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        _ = scenario.CreateStaticSphere(Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> target = scenario.CreateSphere(new Vector3d((Fixed64)3, Fixed64.Zero, Fixed64.Zero));
+        target.Body.Sleep();
+        ScenarioBody<LSSphereCollider> source = scenario.CreateSphere(
+            new Vector3d((Fixed64)(-5), Fixed64.Zero, Fixed64.Zero),
+            isKinematic: true);
+        source.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+
+        source.Body.Agent.Transform.Position = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
+        scenario.Context.LateSimulate();
+
+        Fixed64 expectedFirstHitX = -Fixed64.One;
+        Fixed64 tolerance = Fixed64.FromFraction(1, 1024);
+        source.Body.Position3d.X.Should().BeGreaterThanOrEqualTo(expectedFirstHitX - tolerance);
+        source.Body.Position3d.X.Should().BeLessThanOrEqualTo(expectedFirstHitX + tolerance);
+        source.Body.LastContinuousCollisionToiIterationCount.Should().Be(1);
+        target.Body.Position3d.X.Should().Be((Fixed64)3);
+        target.Body.LinearVelocity.Should().Be(Vector3d.Zero);
+        target.Body.IsSleeping.Should().BeTrue();
+    }
+
+    [Fact]
     public void ContinuousMode_WithKinematicHostRotation_ShouldClampBeforeAngularTunnelingThroughStaticSphere()
     {
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();

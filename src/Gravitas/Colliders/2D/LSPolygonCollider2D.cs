@@ -134,9 +134,6 @@ public sealed class LSPolygonCollider2D : LSCollider2D
         }
 
         Fixed64 area = signedDoubleArea.Abs() * Fixed64.Half;
-        if (area <= Fixed64.Zero)
-            return Fixed64.Zero;
-
         Fixed64 density = mass / area;
         Fixed64 originIntegral = Fixed64.Zero;
         for (int i = 0; i < _localVertices.Length; i++)

@@ -101,6 +101,27 @@ public sealed class Collider2DMassPropertyTests
     }
 
     [Fact]
+    public void ConvexPolygon_WithClockwiseWinding_ShouldCalculateSameMassProperties()
+    {
+        var collider = new LSPolygonCollider2D(
+            new Vector2d(Fixed64.Zero, Fixed64.Zero),
+            new Vector2d(Fixed64.Zero, Fixed64.One),
+            new Vector2d((Fixed64)2, Fixed64.One),
+            new Vector2d((Fixed64)2, Fixed64.Zero));
+
+        Fixed64 momentAboutCom = collider.CalculateMomentOfInertia(
+            (Fixed64)12,
+            collider.CalculateLocalCenterOfMassOffset());
+        Fixed64 momentAboutOrigin = collider.CalculateMomentOfInertia((Fixed64)12, Vector2d.Zero);
+
+        collider.CalculateAreaForMassProperties().Should().Be((Fixed64)2);
+        collider.CalculateLocalCenterOfMassOffset().Should().Be(new Vector2d(Fixed64.One, Fixed64.Half));
+        collider.CalculateMomentOfInertia(Fixed64.Zero, Vector2d.Zero).Should().Be(Fixed64.Zero);
+        momentAboutCom.Should().Be((Fixed64)5);
+        momentAboutOrigin.Should().Be((Fixed64)20);
+    }
+
+    [Fact]
     public void Compound_ShouldAggregateAreaWeightedCenterAndMomentInStablePartOrder()
     {
         var collider = new LSCompoundCollider2D(

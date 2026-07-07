@@ -785,16 +785,7 @@ public sealed class GravitasCollision2DService
 
     private sealed class Collider2DIdComparer : IComparer<LSCollider2D>
     {
-        public int Compare(LSCollider2D? left, LSCollider2D? right)
-        {
-            if (ReferenceEquals(left, right))
-                return 0;
-            if (left == null)
-                return -1;
-            if (right == null)
-                return 1;
-
-            return left.Id.CompareTo(right.Id);
-        }
+        public int Compare(LSCollider2D? left, LSCollider2D? right) =>
+            left!.Id.CompareTo(right!.Id);
     }
 }

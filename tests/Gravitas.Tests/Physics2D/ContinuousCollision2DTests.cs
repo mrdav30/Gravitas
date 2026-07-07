@@ -498,6 +498,34 @@ public sealed class ContinuousCollision2DTests
     }
 
     [Fact]
+    public void ContinuousMode_WithFastKinematic2DHostTranslation_ShouldNotPushDynamicTargetBehindEarlierStaticHit()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        _ = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: true);
+        SolidBody2D target = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)3, Fixed64.Zero), immovable: false);
+        target.Sleep();
+        SolidBody2D source = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.Half),
+            new Vector2d((Fixed64)(-5), Fixed64.Zero),
+            immovable: false,
+            isKinematic: true);
+        source.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+
+        source.Agent.Transform.Position = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
+        context.LateSimulate();
+
+        Fixed64 expectedFirstHitX = -Fixed64.One;
+        Fixed64 tolerance = Fixed64.FromFraction(1, 1024);
+        source.Position.X.Should().BeGreaterThanOrEqualTo(expectedFirstHitX - tolerance);
+        source.Position.X.Should().BeLessThanOrEqualTo(expectedFirstHitX + tolerance);
+        source.LastContinuousCollisionToiIterationCount.Should().Be(1);
+        target.Position.X.Should().Be((Fixed64)3);
+        target.LinearVelocity.Should().Be(Vector2d.Zero);
+        target.IsSleeping.Should().BeTrue();
+    }
+
+    [Fact]
     public void ContinuousMode_WithPlanarDynamicsAtDifferentHostY_ShouldStillClampInPure2D()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);

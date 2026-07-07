@@ -325,13 +325,11 @@ internal sealed class ConvexSweepQueryWorker
 
         if ((movedSource.Center - targetCollider.Center).MagnitudeSquared <= Fixed64.Epsilon)
         {
-            if (result.PointB.MagnitudeSquared > Fixed64.Epsilon)
-                return result.PointB;
-
             Vector3d fallbackDirection = _direction.MagnitudeSquared > Fixed64.Epsilon
                 ? -_direction
                 : Vector3d.Right;
-            return targetCollider.Center + fallbackDirection * targetCollider.ScaledRadius;
+            Vector3d surfaceProbe = targetCollider.Center + fallbackDirection * targetCollider.ScaledRadius;
+            return targetCollider.ClosestPointOnSurface(surfaceProbe);
         }
 
         return targetCollider.ClosestPointOnSurface(movedSource.Center);

@@ -27,17 +27,8 @@ internal sealed partial class GravitasMixedCollisionService
 
     private sealed class MixedResponsePairComparer : IComparer<CollisionPairMixed>
     {
-        public int Compare(CollisionPairMixed? left, CollisionPairMixed? right)
-        {
-            if (ReferenceEquals(left, right))
-                return 0;
-            if (left == null)
-                return -1;
-            if (right == null)
-                return 1;
-
-            return left.Key.CompareTo(right.Key);
-        }
+        public int Compare(CollisionPairMixed? left, CollisionPairMixed? right) =>
+            left!.Key.CompareTo(right!.Key);
     }
 
     private sealed class MixedIslandNodeComparer : IComparer<MixedIslandNode>
@@ -60,32 +51,14 @@ internal sealed partial class GravitasMixedCollisionService
 
     private sealed class Collider2DIdComparer : IComparer<LSCollider2D>
     {
-        public int Compare(LSCollider2D? left, LSCollider2D? right)
-        {
-            if (ReferenceEquals(left, right))
-                return 0;
-            if (left == null)
-                return -1;
-            if (right == null)
-                return 1;
-
-            return left.Id.CompareTo(right.Id);
-        }
+        public int Compare(LSCollider2D? left, LSCollider2D? right) =>
+            left!.Id.CompareTo(right!.Id);
     }
 
     private sealed class Collider3DIdComparer : IComparer<LSCollider>
     {
-        public int Compare(LSCollider? left, LSCollider? right)
-        {
-            if (ReferenceEquals(left, right))
-                return 0;
-            if (left == null)
-                return -1;
-            if (right == null)
-                return 1;
-
-            return left.Id.CompareTo(right.Id);
-        }
+        public int Compare(LSCollider? left, LSCollider? right) =>
+            left!.Id.CompareTo(right!.Id);
     }
 
     private struct MixedIslandNode

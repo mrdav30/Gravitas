@@ -1785,6 +1785,33 @@ public sealed class MixedQueryCcdTests
     }
 
     [Fact]
+    public void LateSimulate_WithKinematic3DSource_ShouldNotPushDynamic2DTargetBehindEarlierStaticSlab()
+    {
+        using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
+        context.Environment.Gravity = Fixed64.Zero;
+        _ = CreateCircle2D(context, Vector2d.Zero, immovable: true);
+        SolidBody2D target = CreateCircle2D(context, new Vector2d((Fixed64)3, Fixed64.Zero));
+        target.Sleep();
+        ScenarioBody<LSSphereCollider> source = CreateSphere3D(
+            context,
+            new Vector3d((Fixed64)(-5), Fixed64.Zero, Fixed64.Zero),
+            isKinematic: true);
+        source.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+
+        source.Body.Agent.Transform.Position = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
+        context.LateSimulate();
+
+        Fixed64 expectedFirstHitX = -Fixed64.One;
+        Fixed64 tolerance = Fixed64.FromFraction(1, 1024);
+        source.Body.Position3d.X.Should().BeGreaterThanOrEqualTo(expectedFirstHitX - tolerance);
+        source.Body.Position3d.X.Should().BeLessThanOrEqualTo(expectedFirstHitX + tolerance);
+        source.Body.LastContinuousCollisionToiIterationCount.Should().Be(1);
+        target.Position.X.Should().Be((Fixed64)3);
+        target.LinearVelocity.Should().Be(Vector2d.Zero);
+        target.IsSleeping.Should().BeTrue();
+    }
+
+    [Fact]
     public void LateSimulate_WithKinematic2DSourceCrossingDynamic3DTarget_ShouldTransferVelocityAtSweptToi()
     {
         using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
@@ -1808,6 +1835,33 @@ public sealed class MixedQueryCcdTests
         target.Body.LinearVelocity.X.Should().BeGreaterThan(Fixed64.Zero);
         target.Body.IsSleeping.Should().BeFalse();
         context.Physics.LastContinuousCollisionIslandIterationCount.Should().Be(1);
+    }
+
+    [Fact]
+    public void LateSimulate_WithKinematic2DSource_ShouldNotPushDynamic3DTargetBehindEarlierStaticPrimitive()
+    {
+        using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
+        context.Environment.Gravity = Fixed64.Zero;
+        _ = CreateSphere3D(context, Vector3d.Zero, immovable: true);
+        ScenarioBody<LSSphereCollider> target = CreateSphere3D(context, new Vector3d((Fixed64)3, Fixed64.Zero, Fixed64.Zero));
+        target.Body.Sleep();
+        SolidBody2D source = CreateCircle2D(
+            context,
+            new Vector2d((Fixed64)(-5), Fixed64.Zero),
+            isKinematic: true);
+        source.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+
+        source.Agent.Transform.Position = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
+        context.LateSimulate();
+
+        Fixed64 expectedFirstHitX = -Fixed64.One;
+        Fixed64 tolerance = Fixed64.FromFraction(1, 1024);
+        source.Position.X.Should().BeGreaterThanOrEqualTo(expectedFirstHitX - tolerance);
+        source.Position.X.Should().BeLessThanOrEqualTo(expectedFirstHitX + tolerance);
+        source.LastContinuousCollisionToiIterationCount.Should().Be(1);
+        target.Body.Position3d.X.Should().Be((Fixed64)3);
+        target.Body.LinearVelocity.Should().Be(Vector3d.Zero);
+        target.Body.IsSleeping.Should().BeTrue();
     }
 
     [Fact]

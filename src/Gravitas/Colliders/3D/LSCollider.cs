@@ -116,8 +116,12 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
                 _compoundOwner != null,
                 nameof(Position),
                 "Compound collider parts inherit position from their owning compound collider.");
+            SwiftThrowHelper.ThrowIfTrue(
+                _agent == null,
+                nameof(Position),
+                "Collider is not bound to a static transform.");
 
-            if (_agent == null || _agent.Transform.Position == value)
+            if (_agent.Transform.Position == value)
                 return;
             _agent.Transform.Position = value;
         }
@@ -136,8 +140,12 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
                 _compoundOwner != null,
                 nameof(Rotation),
                 "Compound collider parts inherit rotation from their owning compound collider.");
+            SwiftThrowHelper.ThrowIfTrue(
+                _agent == null,
+                nameof(Rotation),
+                "Collider is not bound to a static transform.");
 
-            if (_agent == null || _agent.Transform.Rotation == value)
+            if (_agent.Transform.Rotation == value)
                 return;
             _agent.Transform.Rotation = value;
         }

@@ -12,6 +12,18 @@ namespace Gravitas.Tests.Colliders;
 public sealed class ColliderOwnershipStateTests
 {
     [Fact]
+    public void UnboundColliderPositionAndRotationSetters_ShouldThrow()
+    {
+        var collider = new LSSphereCollider();
+
+        Action setPosition = () => collider.Position = Vector3d.Right;
+        Action setRotation = () => collider.Rotation = FixedQuaternion.Identity;
+
+        setPosition.Should().Throw<InvalidOperationException>();
+        setRotation.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
     public void ExplicitParentBinding_ShouldSuppressParentChildAndSiblingPairs()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();

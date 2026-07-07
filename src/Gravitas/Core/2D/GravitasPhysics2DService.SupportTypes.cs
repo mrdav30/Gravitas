@@ -98,15 +98,8 @@ public sealed partial class GravitasPhysics2DService
     {
         public int Compare(CollisionPair2D? left, CollisionPair2D? right)
         {
-            if (ReferenceEquals(left, right))
-                return 0;
-            if (left == null)
-                return -1;
-            if (right == null)
-                return 1;
-
-            GetStablePairKey(left, out int leftMin, out int leftMax);
-            GetStablePairKey(right, out int rightMin, out int rightMax);
+            GetStablePairKey(left!, out int leftMin, out int leftMax);
+            GetStablePairKey(right!, out int rightMin, out int rightMax);
 
             int compare = leftMin.CompareTo(rightMin);
             return compare != 0 ? compare : leftMax.CompareTo(rightMax);

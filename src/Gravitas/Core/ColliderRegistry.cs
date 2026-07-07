@@ -132,16 +132,7 @@ internal sealed class ColliderRegistry<TCollider>
     private readonly struct ReplayOrderComparer : IComparer<TCollider>
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public int Compare(TCollider? x, TCollider? y)
-        {
-            if (ReferenceEquals(x, y))
-                return 0;
-            if (x == null)
-                return -1;
-            if (y == null)
-                return 1;
-
-            return x.ReplayOrder.CompareTo(y.ReplayOrder);
-        }
+        public int Compare(TCollider? x, TCollider? y) =>
+            x!.ReplayOrder.CompareTo(y!.ReplayOrder);
     }
 }

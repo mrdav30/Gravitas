@@ -89,36 +89,36 @@ configuration before making source changes.
 
 ## Current Standing
 
-Fresh checkpoint after Workstream 15 mixed, CCD, convex, and replay residue
-pass:
+Fresh checkpoint after Workstream 16 kinematic CCD, convex sweep, lifecycle,
+and geometry residue pass:
 
 | Metric | Baseline | Current | Short-Term Gate | Long-Term Target |
 | --- | ---: | ---: | ---: | ---: |
-| Line coverage | 87.3% | 94.5% | 90% | 100% |
-| Branch coverage | 74.1% | 82.2% | 90% | 100% |
+| Line coverage | 87.3% | 94.7% | 90% | 100% |
+| Branch coverage | 74.1% | 82.5% | 90% | 100% |
 | Method coverage | 86.5% | 94.6% | 90% | 100% |
-| Tests | 974 passed | 1231 passed | green | green |
+| Tests | 974 passed | 1238 passed | green | green |
 
-At the current denominator, the 90% branch gate requires at least 10,173 covered
-branches. The latest run covered 9,300 of 11,303 branches, leaving roughly
-873 net branch outcomes to cover or delete. Treat this as a focused branch
+At the current denominator, the 90% branch gate requires at least 10,128 covered
+branches. The latest run covered 9,287 of 11,253 branches, leaving roughly
+841 net branch outcomes to cover or delete. Treat this as a focused branch
 campaign, not a single gate-check workstream.
 
 Current evidence:
 
 - Coverage report:
-  `TestResults/coverage-branch-hardening-ws15-final/reports/Summary.txt`
+  `TestResults/coverage-branch-hardening-ws16-final/reports/Summary.txt`
 - Coverage collection:
   `dotnet test tests\Gravitas.Tests\Gravitas.Tests.csproj --configuration Release --collect:"XPlat Code Coverage" --settings tests\Gravitas.Tests\coverlet.runsettings`
-  passed with 1231 tests.
+  passed with 1238 tests.
 - Branch shortlist:
-  `TestResults/coverage-branch-hardening-ws15-final/branch-gap-shortlist.csv`
-- Latest summary reports 201 uncovered methods.
+  `TestResults/coverage-branch-hardening-ws16-final/branch-gap-shortlist.csv`
+- Latest summary reports 200 uncovered methods.
 
 ## Completed Coverage Summary
 
 The completed coverage campaign moved Gravitas from 87.3% line, 74.1% branch,
-and 86.5% method coverage to 94.5% line, 82.2% branch, and 94.6% method
+and 86.5% method coverage to 94.7% line, 82.5% branch, and 94.6% method
 coverage.
 
 High-value work completed:
@@ -174,6 +174,10 @@ Cleanup completed:
 - Classified remaining low-value diagnostic view getter and simple constructor
   noise as intentionally out of scope unless a future adapter invariant makes
   it meaningful.
+- Removed context-owned comparer null-handling branches from collider registry
+  and 2D/3D/mixed response ordering, tightened unbound 3D collider transform
+  setters to fail fast, and removed a redundant 2D polygon inertia area branch
+  already guaranteed by signed-area validation.
 
 ## Hardening Rules
 
@@ -911,7 +915,7 @@ zombie code, and avoid artificial private-state tests.
 
 ### Workstream 16: Kinematic CCD, Convex Sweep, Lifecycle, And Geometry Residue
 
-**Status:** Pending
+**Status:** Complete - 2026-07-07
 
 **Purpose**
 
@@ -941,31 +945,113 @@ adding tests.
 
 **Tasks**
 
-- [ ] Rerank the Workstream 15 branch shortlist by behavior value, not just
+- [x] Rerank the Workstream 15 branch shortlist by behavior value, not just
       percentage. Prefer rows where coverage can expose bugs, parity gaps, or
       stale complexity.
-- [ ] Audit 3D/2D kinematic CCD handoff branches for real lifecycle paths,
+- [x] Audit 3D/2D kinematic CCD handoff branches for real lifecycle paths,
       duplicate branch debt, and any parity bug between dynamic, kinematic, and
       mixed handoff flows.
-- [ ] Cover or simplify `ConvexSweepQueryWorker.ResolveHitNormal` and
+- [x] Cover or simplify `ConvexSweepQueryWorker.ResolveHitNormal` and
       `ResolveHitPoint` through public shape-cast scenarios, especially mesh,
       cone/cylinder, coincident, and equal-distance cases.
-- [ ] Review `LSCollider.World`, position/rotation setters, trigger setters,
+- [x] Review `LSCollider.World`, position/rotation setters, trigger setters,
       collider registry comparers, and retained partition cleanup rows for
       stale fallback behavior versus real lifecycle edge cases.
-- [ ] Continue geometry residue only where it protects real collision behavior:
+- [x] Continue geometry residue only where it protects real collision behavior:
       2D polygon inertia, capsule/circle and compound dispatch, mixed
       capsule/cylinder/cone circle-slab helpers, and bounds-overlap parity.
-- [ ] Run focused tests, full `Release`, full `ReleaseLean`, coverage
+- [x] Run focused tests, full `Release`, full `ReleaseLean`, coverage
       collection, `git diff --check`, and final review.
 
-### Workstream 17: Branch 90 Gate And 100% Roadmap Refresh
+**Results**
+
+- Added 3D, pure 2D, and mixed kinematic CCD parity coverage for a fast
+  kinematic source that reaches an earlier static hit before a sleeping dynamic
+  target. This locks the handoff rule that dynamic targets behind an earlier
+  static TOI are not pushed or woken by the later overlap.
+- Hardened `ConvexSweepQueryWorker.ResolveHitPoint` for initial center-overlap
+  casts. Coincident source/target centers now report the deterministic target
+  surface point opposite the sweep direction instead of leaking an arbitrary GJK
+  witness point.
+- Tightened 3D standalone collider transform setters. Unbound collider
+  `Position` and `Rotation` writes now fail fast like their getters instead of
+  silently no-oping before initialization.
+- Removed impossible null branches from context-owned comparer paths in
+  `ColliderRegistry`, 2D/3D stable pair ordering, mixed response ordering, and
+  partition candidate ordering. The owning services only sort populated
+  context-owned buffers.
+- Added clockwise-winding 2D polygon mass-property coverage and removed the
+  redundant polygon inertia area guard that was already guaranteed by
+  `TryCalculateSignedAreaAndCentroid`.
+- Coverage moved to 94.7% line, 82.5% branch, and 94.6% method with 1238
+  Release coverage tests passing.
+
+**Evidence**
+
+- Focused Workstream 16 bundle:
+  `dotnet test tests\Gravitas.Tests\Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~ContinuousCollisionDetectionTests|FullyQualifiedName~ContinuousCollision2DTests|FullyQualifiedName~MixedQueryCcdTests|FullyQualifiedName~GravitasQuery3DServiceSweepTests|FullyQualifiedName~GravitasPhysicsServiceTests|FullyQualifiedName~Physics2DPartitionBroadPhaseTests|FullyQualifiedName~ColliderOwnershipStateTests|FullyQualifiedName~Collider2DMassPropertyTests|FullyQualifiedName~MixedBroadPhaseTests|FullyQualifiedName~MixedResponseTests|FullyQualifiedName~ReplayHashBranchCoverageTests"`
+  passed with 322 tests.
+- Full `Release`:
+  `dotnet test tests\Gravitas.Tests\Gravitas.Tests.csproj --configuration Release`
+  passed with 1238 tests.
+- Full `ReleaseLean`:
+  `dotnet test tests\Gravitas.Tests\Gravitas.Tests.csproj --configuration ReleaseLean`
+  passed with 1215 tests.
+- Coverage collection:
+  `TestResults/coverage-branch-hardening-ws16-final/reports/Summary.txt`
+- Branch shortlist:
+  `TestResults/coverage-branch-hardening-ws16-final/branch-gap-shortlist.csv`
+
+### Workstream 17: Convex Support, CCD Handoff, Mixed Bounds, And Constraint Residue
 
 **Purpose**
 
-Confirm the short-term 90% branch gate only after the preceding workstreams make
-it realistically reachable, then pivot the living plan toward the long-term
-100% target.
+Continue from the Workstream 16 shortlist. The next pass should focus on the
+remaining behavior-heavy families rather than forcing the branch gate too early:
+convex simplex/support behavior, CCD handoff and dynamic response residue,
+mixed bounds/circle-slab helper parity, constraint collision-policy edges, and
+small lifecycle rows that may still hide stale fallbacks.
+
+**Likely Candidate Areas**
+
+- `src/Gravitas/CollisionHandling/Detection/3D/ConvexColliderSupport.cs`
+- `src/Gravitas/Core/3D/SolidBody.ContinuousCollision*.cs`
+- `src/Gravitas/Core/2D/SolidBody2D.ContinuousCollision*.cs`
+- `src/Gravitas/CollisionHandling/Detection/Mixed/CollisionDetectionMixed*.cs`
+- `src/Gravitas/Core/Mixed/GravitasMixedCollisionService.Partitioning.cs`
+- `src/Gravitas/Constraints/2D/GravitasConstraint2DService.cs`
+- `src/Gravitas/Constraints/3D/GravitasConstraint3DService.cs`
+- `src/Gravitas/Queries/3D/Sweeps/ConvexSweepQueryWorker.cs`
+- `src/Gravitas/Queries/Mixed/FiniteSlabProjectionSweep.cs`
+- `src/Gravitas/Queries/Mixed/GravitasQueryMixedService.*.cs`
+
+**Tasks**
+
+- [ ] Classify convex-support rows (`Perpendicular`, `UpdateTriangle`,
+      `UpdateTetrahedron`) as public GJK behavior, valid malformed-simplex
+      defense, or deletion candidates. Avoid private malformed-simplex tests
+      unless the helper contract truly permits them.
+- [ ] Continue CCD branch work around dynamic response and mixed eligibility
+      helpers where public fast-mover scenarios can prove stable TOI ordering,
+      no penetration, and deterministic handoff.
+- [ ] Review duplicated mixed bounds/circle-slab helpers for centralization or
+      parity tests across collision service, narrow phase, and mixed query
+      reducers.
+- [ ] Cover or simplify constraint collision-policy and joint removal branches
+      through valid 2D/3D service flows.
+- [ ] Triage retained partition, registry, and world-ownership rows only where
+      they expose real lifecycle semantics; leave low-value defensive branches
+      alone unless a stale fallback is found.
+- [ ] Run focused tests, full `Release`, full `ReleaseLean`, coverage
+      collection, `git diff --check`, and final review.
+
+### Workstream 18: Branch 90 Gate And 100% Roadmap Refresh
+
+**Purpose**
+
+Confirm the short-term 90% branch gate only after the focused residue campaigns
+make it realistically reachable, then pivot the living plan toward the
+long-term 100% target.
 
 **Tasks**
 
@@ -973,8 +1059,8 @@ it realistically reachable, then pivot the living plan toward the long-term
 - [ ] Confirm line coverage remains at least 90%.
 - [ ] Confirm branch coverage is at least 90%.
 - [ ] Confirm method coverage remains at least 90%.
-- [ ] Run `dotnet test Gravitas.slnx --configuration Release`.
-- [ ] Run `dotnet test Gravitas.slnx --configuration ReleaseLean`.
+- [ ] Run `dotnet test tests\Gravitas.Tests\Gravitas.Tests.csproj --configuration Release`.
+- [ ] Run `dotnet test tests\Gravitas.Tests\Gravitas.Tests.csproj --configuration ReleaseLean`.
 - [ ] Run `git diff --check`.
 - [ ] Record final 90% gate evidence in this plan.
 - [ ] If branch coverage is still below 90%, rerank the active campaign instead
@@ -1004,3 +1090,4 @@ it realistically reachable, then pivot the living plan toward the long-term
 | 2026-07-07 | 94.2% | 81.5% | 94.6% | 1215 passed | Workstream 13 collision geometry, response, and transform residue completed. Removed dead 2D response velocity storage, stale CCD contact-point overloads, impossible mesh normal fallbacks, malformed-pair contact-order branches, null-collider transform fallbacks, and duplicate-triangle equality scaffolding. Added scale-aware 3D transform round-trip coverage and reranked the next campaign around hierarchy/pair-state/constraint lifecycle residue. |
 | 2026-07-07 | 94.4% | 81.9% | 94.6% | 1221 passed | Workstream 14 hierarchy, lifecycle, CCD, and contact geometry residue completed. Removed duplicated hierarchy/pair wrapper branches, centralized CCD contact-point and rotational hit tie-break helpers, tightened dynamic body dessimilation invariants, and added constraint capacity/reset plus coincident relative sphere/circle CCD coverage. Fresh branch shortlist reranks the next campaign around mixed fallback normals, convex simplex residue, mixed root resolution, settings replay hash, and shape-exact CCD refinement. |
 | 2026-07-07 | 94.5% | 82.2% | 94.6% | 1231 passed | Workstream 15 mixed, CCD, convex, and replay residue completed. Added extension-shape mixed fallback normal coverage, authoritative settings replay-hash variation coverage, mixed response root-key island coverage, convex touching/simplex behavior coverage, dynamic shape-exact CCD sphere-hit coverage, mixed vertical sphere query hit construction, and unsupported cone-query target rejection. Review tightened matrix-shape hashing and CCD non-penetration assertions while removing one redundant tangent-sphere test. Fresh shortlist reranks the next pass around kinematic CCD handoff, convex sweep normal/point resolution, lifecycle fallbacks, and geometry residue before any 90% gate attempt. |
+| 2026-07-07 | 94.7% | 82.5% | 94.6% | 1238 passed | Workstream 16 kinematic CCD, convex sweep, lifecycle, and geometry residue completed. Added 3D/2D/mixed kinematic earlier-static-hit parity coverage, hardened centered convex-sweep fallback hit points, made unbound 3D collider transform writes fail fast, removed context-owned comparer null-branch debt, and trimmed redundant 2D polygon inertia area handling. Fresh shortlist reranks the next pass around convex simplex/support behavior, CCD dynamic/mixed response residue, mixed bounds/slab helper parity, and constraint lifecycle policy branches. |
