@@ -47,6 +47,32 @@ public sealed class Constraint3DServiceTests
     }
 
     [Fact]
+    public void RegisterJoint_BeyondDefaultCapacity_ShouldGrowAndResetDeterministically()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        scenario.Context.Environment.Gravity = Fixed64.Zero;
+        ScenarioBody<LSSphereCollider> first = scenario.CreateSphere(Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> second = scenario.CreateSphere(Vector3d.Right * (Fixed64)2);
+
+        Joint3D? lastJoint = null;
+        for (int i = 0; i < 70; i++)
+            lastJoint = scenario.Context.Constraints3D.RegisterJoint(CreateBallSocket(first.Body, second.Body));
+
+        scenario.Context.Constraints3D.RemoveJoint(2).Should().BeTrue();
+        scenario.Context.Constraints3D.RegisteredJointCount.Should().Be(69);
+        scenario.Context.Constraints3D.PeakJointCount.Should().Be(70);
+        scenario.Context.Constraints3D.TryGetJoint(lastJoint!.Id, out Joint3D? resolved).Should().BeTrue();
+        resolved.Should().BeSameAs(lastJoint);
+
+        scenario.Context.Reset();
+
+        scenario.Context.Constraints3D.RegisteredJointCount.Should().Be(0);
+        scenario.Context.Constraints3D.PeakJointCount.Should().Be(0);
+        scenario.Context.Constraints3D.TryGetJoint(lastJoint.Id, out _).Should().BeFalse();
+        scenario.Context.Constraints3D.ShouldExcludeLinkedCollision(first.Collider, second.Collider).Should().BeFalse();
+    }
+
+    [Fact]
     public void RemoveJoint_ShouldReleaseRuntimeStateAndPreventLookup()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();

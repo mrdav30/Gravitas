@@ -34,6 +34,40 @@ internal static class ContinuousCollisionMath
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Vector3d ResolveContactPointOnTarget(
+        Vector3d sourceCenter,
+        Vector3d targetCenter,
+        Vector3d normalForSource,
+        Fixed64 targetRadius)
+    {
+        if (normalForSource.MagnitudeSquared > Fixed64.Epsilon)
+            return targetCenter + normalForSource * targetRadius;
+
+        Vector3d fallback = sourceCenter - targetCenter;
+        return fallback.MagnitudeSquared > Fixed64.Epsilon
+            ? targetCenter + fallback.Normalized * targetRadius
+            : targetCenter;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool ShouldReplaceContinuousCollisionHit(
+        Fixed64 candidateSafeTime,
+        int candidateTargetId,
+        bool hasCurrent,
+        Fixed64 currentSafeTime,
+        int currentTargetId)
+    {
+        if (!hasCurrent)
+            return true;
+
+        int timeCompare = candidateSafeTime.CompareTo(currentSafeTime);
+        if (timeCompare != 0)
+            return timeCompare < 0;
+
+        return candidateTargetId < currentTargetId;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool TrySweepRelativeSpheres(
         Vector3d sourceStart,
         Vector3d sourceDisplacement,

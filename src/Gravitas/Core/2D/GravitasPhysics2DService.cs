@@ -105,7 +105,7 @@ public sealed partial class GravitasPhysics2DService
     internal void DessimilateBody(SolidBody2D body)
     {
         SwiftThrowHelper.ThrowIfNull(body, nameof(body));
-        if (body.DynamicId >= 0 && _dynamicBodies.TryRemoveAt(body.DynamicId) && BodyCount > 0)
+        if (body.DynamicId >= 0 && _dynamicBodies.TryRemoveAt(body.DynamicId))
             BodyCount--;
 
         LSCollider2D collider = body.Collider;

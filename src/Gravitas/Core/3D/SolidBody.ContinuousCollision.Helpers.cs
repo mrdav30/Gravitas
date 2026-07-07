@@ -42,22 +42,6 @@ public partial class SolidBody
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Vector3d ResolveDynamicContactPoint(
-        Vector3d sourceCenter,
-        Vector3d targetCenter,
-        Vector3d normalForSource,
-        Fixed64 targetRadius)
-    {
-        if (normalForSource.MagnitudeSquared > Fixed64.Epsilon)
-            return targetCenter + normalForSource * targetRadius;
-
-        Vector3d fallback = sourceCenter - targetCenter;
-        return fallback.MagnitudeSquared > Fixed64.Epsilon
-            ? targetCenter + fallback.Normalized * targetRadius
-            : targetCenter;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private bool ShouldUseContinuousCollision(out ContinuousCollisionMode mode)
     {
         mode = ResolveContinuousCollisionMode();

@@ -249,12 +249,10 @@ public sealed partial class GravitasPhysicsService
     {
         SwiftThrowHelper.ThrowIfNull(body, nameof(body));
         int dynamicId = body.DynamicId;
-        if (!_dynamicBodies.TryGetValue(dynamicId, out _))
+        if (!_dynamicBodies.TryRemoveAt(dynamicId))
             return;
 
-        _dynamicBodies.TryRemoveAt(dynamicId);
-        if (BodyCount > 0)
-            BodyCount--;
+        BodyCount--;
     }
 
     internal void DessimilateCollider(LSCollider collider)

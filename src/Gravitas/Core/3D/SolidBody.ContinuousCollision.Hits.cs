@@ -407,7 +407,7 @@ public partial class SolidBody
                 Fixed64 distance = sourceLength * normalizedTime;
                 Vector3d sourceCenter = startPosition + sourceDisplacement * normalizedTime;
                 Vector3d targetCenter = targetStart + targetDisplacement * normalizedTime;
-                Vector3d point = ResolveDynamicContactPoint(sourceCenter, targetCenter, normal, targetRadius);
+                Vector3d point = ContinuousCollisionMath.ResolveContactPointOnTarget(sourceCenter, targetCenter, normal, targetRadius);
                 candidate = new Physics3DHit(target.Collider, point, normal, distance, sourceDirection);
             }
 
@@ -645,7 +645,7 @@ public partial class SolidBody
             Vector3d sourceCenter = startPosition + sourceDisplacement * normalizedTime;
             Vector3d targetCenter = targetStart + targetDisplacement * normalizedTime;
             Vector3d point3D = sourceCenter - normalForSource * proxyRadius;
-            Vector3d point2D = ResolveDynamicContactPoint(sourceCenter, targetCenter, normalForSource, targetRadius);
+            Vector3d point2D = ContinuousCollisionMath.ResolveContactPointOnTarget(sourceCenter, targetCenter, normalForSource, targetRadius);
             var candidate = new PhysicsMixedHit(
                 null,
                 target.Collider,

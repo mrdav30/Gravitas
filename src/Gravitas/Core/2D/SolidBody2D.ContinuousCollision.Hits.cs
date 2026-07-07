@@ -11,7 +11,6 @@ using Gravitas.CollisionHandling;
 using Gravitas.Queries;
 using Gravitas.Support;
 using SwiftCollections;
-using System.Runtime.CompilerServices;
 
 namespace Gravitas;
 
@@ -378,7 +377,7 @@ public sealed partial class SolidBody2D
             Vector3d sourceCenter = sourceStart + sourceDisplacement * normalizedTime;
             Vector3d targetCenter = targetStart + targetDisplacement * normalizedTime;
             Vector3d point2D = sourceCenter - normalForSource * sourceRadius;
-            Vector3d point3D = ResolveDynamicContactPoint(sourceCenter, targetCenter, normalForSource, targetRadius);
+            Vector3d point3D = ContinuousCollisionMath.ResolveContactPointOnTarget(sourceCenter, targetCenter, normalForSource, targetRadius);
             var candidate = new PhysicsMixedHit(
                 target.Collider,
                 null,
@@ -423,22 +422,6 @@ public sealed partial class SolidBody2D
             && !target.IsKinematic
             && !target.Collider.IsTrigger
             && Context.MixedCollisions.RequireCollisionPair(target.Collider, Collider);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Vector3d ResolveDynamicContactPoint(
-        Vector3d sourceCenter,
-        Vector3d targetCenter,
-        Vector3d normalForSource,
-        Fixed64 targetRadius)
-    {
-        if (normalForSource.MagnitudeSquared > Fixed64.Epsilon)
-            return targetCenter + normalForSource * targetRadius;
-
-        Vector3d fallback = sourceCenter - targetCenter;
-        return fallback.MagnitudeSquared > Fixed64.Epsilon
-            ? targetCenter + fallback.Normalized * targetRadius
-            : targetCenter;
     }
 
 }

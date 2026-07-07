@@ -93,7 +93,7 @@ public partial class SolidBody
                         sampleTime,
                         contactNormal,
                         out Vector3d refinedNormal);
-                    if (!ShouldReplaceRotationalContinuousCollisionHit(
+                    if (!ContinuousCollisionMath.ShouldReplaceContinuousCollisionHit(
                             safeTime,
                             targetCollider.Id,
                             foundSampleHit,
@@ -210,7 +210,7 @@ public partial class SolidBody
                         sampleTime,
                         contactNormal,
                         out _);
-                    if (!ShouldReplaceRotationalContinuousCollisionHit(
+                    if (!ContinuousCollisionMath.ShouldReplaceContinuousCollisionHit(
                             safeTime,
                             targetCollider.Id,
                             foundSampleHit,
@@ -332,23 +332,6 @@ public partial class SolidBody
         }
 
         return safeTime;
-    }
-
-    private static bool ShouldReplaceRotationalContinuousCollisionHit(
-        Fixed64 candidateSafeTime,
-        int candidateTargetId,
-        bool hasCurrent,
-        Fixed64 currentSafeTime,
-        int currentTargetId)
-    {
-        if (!hasCurrent)
-            return true;
-
-        int timeCompare = candidateSafeTime.CompareTo(currentSafeTime);
-        if (timeCompare != 0)
-            return timeCompare < 0;
-
-        return candidateTargetId < currentTargetId;
     }
 
     private static Fixed64 ResolveKinematicAngularDistanceRadians(FixedQuaternion startRotation, FixedQuaternion proposedRotation)

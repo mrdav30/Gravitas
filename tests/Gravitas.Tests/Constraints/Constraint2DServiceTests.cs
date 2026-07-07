@@ -47,6 +47,31 @@ public sealed class Constraint2DServiceTests
     }
 
     [Fact]
+    public void RegisterJoint_BeyondDefaultCapacity_ShouldGrowAndResetDeterministically()
+    {
+        using GravitasWorldContext context = CreateConstraintContext();
+        SolidBody2D first = CreateBody(context, Vector2d.Zero);
+        SolidBody2D second = CreateBody(context, Vector2d.Right * (Fixed64)2);
+
+        Joint2D? lastJoint = null;
+        for (int i = 0; i < 70; i++)
+            lastJoint = context.Constraints2D.RegisterJoint(CreatePin(first, second));
+
+        context.Constraints2D.RemoveJoint(2).Should().BeTrue();
+        context.Constraints2D.RegisteredJointCount.Should().Be(69);
+        context.Constraints2D.PeakJointCount.Should().Be(70);
+        context.Constraints2D.TryGetJoint(lastJoint!.Id, out Joint2D? resolved).Should().BeTrue();
+        resolved.Should().BeSameAs(lastJoint);
+
+        context.Reset();
+
+        context.Constraints2D.RegisteredJointCount.Should().Be(0);
+        context.Constraints2D.PeakJointCount.Should().Be(0);
+        context.Constraints2D.TryGetJoint(lastJoint.Id, out _).Should().BeFalse();
+        context.Constraints2D.ShouldExcludeLinkedCollision(first.Collider, second.Collider).Should().BeFalse();
+    }
+
+    [Fact]
     public void RegisterJoint_WithInvalidDefinition_ShouldFailBeforeSolverStateIsCreated()
     {
         using GravitasWorldContext context = CreateConstraintContext();

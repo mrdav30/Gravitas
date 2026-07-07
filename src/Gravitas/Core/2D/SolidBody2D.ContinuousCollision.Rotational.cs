@@ -93,7 +93,7 @@ public sealed partial class SolidBody2D
                         sampleTime,
                         contact,
                         out Contact2D refinedContact);
-                    if (!ShouldReplaceRotationalContinuousCollisionHit(
+                    if (!ContinuousCollisionMath.ShouldReplaceContinuousCollisionHit(
                             safeTime,
                             targetCollider.Id,
                             foundSampleHit,
@@ -206,7 +206,7 @@ public sealed partial class SolidBody2D
                         sampleTime,
                         contact,
                         out _);
-                    if (!ShouldReplaceRotationalContinuousCollisionHit(
+                    if (!ContinuousCollisionMath.ShouldReplaceContinuousCollisionHit(
                             safeTime,
                             targetCollider.Id,
                             foundSampleHit,
@@ -294,23 +294,6 @@ public sealed partial class SolidBody2D
         }
 
         return safeTime;
-    }
-
-    private static bool ShouldReplaceRotationalContinuousCollisionHit(
-        Fixed64 candidateSafeTime,
-        int candidateTargetId,
-        bool hasCurrent,
-        Fixed64 currentSafeTime,
-        int currentTargetId)
-    {
-        if (!hasCurrent)
-            return true;
-
-        int timeCompare = candidateSafeTime.CompareTo(currentSafeTime);
-        if (timeCompare != 0)
-            return timeCompare < 0;
-
-        return candidateTargetId < currentTargetId;
     }
 
     private void StopRotationalContinuousCollision(Vector2d contactNormal)

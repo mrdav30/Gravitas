@@ -880,15 +880,8 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
     internal bool TryGetCollisionPair(int otherId, out CollisionPair? collisionPair) =>
         _pairState.TryGetCollisionPair(otherId, out collisionPair);
 
-    internal bool TryAddCollisionPair(int otherId, CollisionPair collisionPair)
-    {
-        if (_pairState.TryAddCollisionPair(otherId, collisionPair) != true)
-        {
-            GravitasLogger.Channel.Warn($"Collision pair with collider ID {otherId} already exists.");
-            return false;
-        }
-        return true;
-    }
+    internal bool TryAddCollisionPair(int otherId, CollisionPair collisionPair) =>
+        _pairState.TryAddCollisionPair(otherId, collisionPair);
 
     internal bool TryRemoveCollisionPair(int otherId)
     {
@@ -1021,15 +1014,13 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
     void IColliderHierarchyNode.AddChild(ColliderHierarchyKey key)
     {
         ThrowIfCompoundPartLifecycle(nameof(IColliderHierarchyNode.AddChild));
-        if (_hierarchyState.AddChild(key) != true)
-            GravitasLogger.Channel.Warn($"Collider hierarchy key {key.Packed} is already a child.");
+        _hierarchyState.AddChild(key);
     }
 
     void IColliderHierarchyNode.RemoveChild(ColliderHierarchyKey key)
     {
         ThrowIfCompoundPartLifecycle(nameof(IColliderHierarchyNode.RemoveChild));
-        if (_hierarchyState.RemoveChild(key) != true)
-            GravitasLogger.Channel.Warn($"Cannot remove. Collider hierarchy key {key.Packed} is not a child.");
+        _hierarchyState.RemoveChild(key);
     }
 
     void IColliderHierarchyNode.ClearParentReference() => _hierarchyState.ClearParentReference();
