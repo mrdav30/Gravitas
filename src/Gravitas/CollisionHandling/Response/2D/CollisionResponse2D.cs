@@ -54,15 +54,13 @@ public static class CollisionResponse2D
             SolverContact2D contact = contacts.GetContact(i);
             Fixed64 normalDelta = ComputeNormalImpulseDelta(
                 contact,
-                restitutionVelocityThreshold,
-                out Fixed64 normalVelocity);
+                restitutionVelocityThreshold);
             Fixed64 normalImpulse = FixedMath.Max(
                 Fixed64.Zero,
                 contact.CachedNormalImpulse + normalDelta * contactShare);
             contacts.SetNormalImpulse(
                 i,
-                normalImpulse,
-                normalVelocity);
+                normalImpulse);
         }
 
         for (int i = 0; i < contacts.Count; i++)
@@ -198,10 +196,9 @@ public static class CollisionResponse2D
 
     private static Fixed64 ComputeNormalImpulseDelta(
         SolverContact2D contact,
-        Fixed64 restitutionVelocityThreshold,
-        out Fixed64 normalVelocity)
+        Fixed64 restitutionVelocityThreshold)
     {
-        normalVelocity = Vector2d.Dot(ComputeRelativeVelocity(contact), contact.Normal);
+        Fixed64 normalVelocity = Vector2d.Dot(ComputeRelativeVelocity(contact), contact.Normal);
         Fixed64 denominator = ComputeImpulseDenominator(contact, contact.Normal);
         if (denominator <= Fixed64.Epsilon)
             return Fixed64.Zero;

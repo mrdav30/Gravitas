@@ -421,8 +421,7 @@ public static partial class CollisionDetection
             return;
         }
 
-        if (ReferenceEquals(pair.ColliderA, second))
-            pair.Manifold.SetContact(pointOnSecond, pointOnFirst, depth, -normalFirstToSecond);
+        pair.Manifold.SetContact(pointOnSecond, pointOnFirst, depth, -normalFirstToSecond);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -441,8 +440,7 @@ public static partial class CollisionDetection
             return;
         }
 
-        if (ReferenceEquals(pair.ColliderA, second))
-            pair.Manifold.AddContact(pointOnSecond, pointOnFirst, depth, -normalFirstToSecond);
+        pair.Manifold.AddContact(pointOnSecond, pointOnFirst, depth, -normalFirstToSecond);
     }
 
     #endregion

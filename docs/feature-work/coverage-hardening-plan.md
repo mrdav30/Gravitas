@@ -89,36 +89,36 @@ configuration before making source changes.
 
 ## Current Standing
 
-Fresh checkpoint after Workstream 12 CCD, query, and mixed reducer residue
+Fresh checkpoint after Workstream 13 collision geometry, response, and transform
 pass:
 
 | Metric | Baseline | Current | Short-Term Gate | Long-Term Target |
 | --- | ---: | ---: | ---: | ---: |
-| Line coverage | 87.3% | 94.1% | 90% | 100% |
-| Branch coverage | 74.1% | 81.3% | 90% | 100% |
-| Method coverage | 86.5% | 94.4% | 90% | 100% |
-| Tests | 974 passed | 1214 passed | green | green |
+| Line coverage | 87.3% | 94.2% | 90% | 100% |
+| Branch coverage | 74.1% | 81.5% | 90% | 100% |
+| Method coverage | 86.5% | 94.6% | 90% | 100% |
+| Tests | 974 passed | 1215 passed | green | green |
 
-At the current denominator, the 90% branch gate requires at least 10,234 covered
-branches. The latest run covered 9,251 of 11,371 branches, leaving roughly
-983 net branch outcomes to cover or delete. Treat this as a focused branch
+At the current denominator, the 90% branch gate requires at least 10,206 covered
+branches. The latest run covered 9,250 of 11,339 branches, leaving roughly
+956 net branch outcomes to cover or delete. Treat this as a focused branch
 campaign, not a single gate-check workstream.
 
 Current evidence:
 
 - Coverage report:
-  `TestResults/coverage-branch-hardening-ws12-final2/reports/Summary.txt`
+  `TestResults/coverage-branch-hardening-ws13-final/reports/Summary.txt`
 - Coverage collection:
   `dotnet test tests\Gravitas.Tests\Gravitas.Tests.csproj --configuration Release --collect:"XPlat Code Coverage" --settings tests\Gravitas.Tests\coverlet.runsettings`
-  passed with 1214 tests.
+  passed with 1215 tests.
 - Branch shortlist:
-  `TestResults/coverage-branch-hardening-ws12-final2/branch-gap-shortlist.csv`
-- Latest method-gap extraction reported 210 uncovered methods.
+  `TestResults/coverage-branch-hardening-ws13-final/branch-gap-shortlist.csv`
+- Latest summary reports 202 uncovered methods.
 
 ## Completed Coverage Summary
 
 The completed coverage campaign moved Gravitas from 87.3% line, 74.1% branch,
-and 86.5% method coverage to 94.1% line, 81.3% branch, and 94.4% method
+and 86.5% method coverage to 94.2% line, 81.5% branch, and 94.6% method
 coverage.
 
 High-value work completed:
@@ -159,6 +159,9 @@ Cleanup completed:
 - Removed unreachable kinematic push-axis helpers, removed stale static CCD
   exact-source refinement now covered by the exact source sweep path, and
   dropped an unreachable cone swept-sphere fallback normal helper.
+- Removed dead 2D solver-contact normal-velocity storage, stale 2D dynamic CCD
+  contact-point overloads, impossible mesh normal fallbacks, unreachable body
+  transform null-collider fallbacks, and duplicate-triangle equality scaffolding.
 - Classified remaining low-value diagnostic view getter and simple constructor
   noise as intentionally out of scope unless a future adapter invariant makes
   it meaningful.
@@ -212,20 +215,19 @@ RCA and verification, even if the fix is small.
 
 ## Active Branch-90 Campaign
 
-Workstreams 1-12 are now historical context. The next phase starts at
-Workstream 13 and should be reranked after each coverage run. The ordering below
+Workstreams 1-13 are now historical context. The next phase starts at
+Workstream 14 and should be reranked after each coverage run. The ordering below
 comes from
-`TestResults/coverage-branch-hardening-ws12-final2/branch-gap-shortlist.csv`
+`TestResults/coverage-branch-hardening-ws13-final/branch-gap-shortlist.csv`
 plus
 runtime risk, hot-path relevance, and duplicate/zombie-code likelihood.
 
 | Order | Branch Family | Why It Comes Next |
 | ---: | --- | --- |
-| 1 | Collision geometry fallback, response-contact, and transform residue | The top zero-branch rows after Workstream 12 are now `ResolveDynamicContactPoint`, mixed/mesh fallback-normal helpers, 2D solver contact velocity, and simple body transform accessors. Classify these before adding tests; delete only proven zombie helpers. |
-| 2 | Collider hierarchy, pair-state, and constraint capacity residue | Several one-covered-branch rows sit in hierarchy mutation, pair registration, and joint capacity helpers. These are deterministic lifecycle invariants and good candidates for focused tests if the public setup stays readable. |
-| 3 | Query reducer and convex-support CRAP hotspots | `TryBuildConeHitForCollider`, `TrySweepPointInSpace`, convex sweep hit-point/normal resolution, and mixed prism reducers remain high-CRAP but behavior-bearing. Tackle them with scenario tests or small helper cleanup, not private steering. |
-| 4 | Diagnostic/debug-draw DTO surface audit | Several diagnostic view and draw-command constructors remain low coverage. Cover only visitor/adapter dispatch invariants; leave simple immutable getter noise alone. |
-| 5 | Branch 90 gate and 100% roadmap refresh | Only run as a true gate after focused campaigns make 90% realistic. |
+| 1 | Hierarchy/lifecycle plus CCD/contact geometry residue | The top one-covered rows now mix 2D/3D hierarchy mutation, pair registration, joint capacity/reset helpers, mixed constraint root keys, 3D dessimilation, and still-prominent CCD/contact geometry guards such as continuous-normal fallback, convex-support perpendiculars, dynamic contact points, and rotational hit replacement. Treat this as another classification-first pass instead of a lifecycle-only sweep. |
+| 2 | Query reducer and convex-support CRAP hotspots | `TryBuildConeHitForCollider`, `TrySweepPointInSpace`, convex sweep hit-point/normal resolution, and mixed prism reducers remain high-CRAP but behavior-bearing. Tackle them with scenario tests or small helper cleanup, not private steering. |
+| 3 | Diagnostic/debug-draw DTO surface audit | Several diagnostic view and draw-command constructors remain low coverage. Cover only visitor/adapter dispatch invariants; leave simple immutable getter noise alone. |
+| 4 | Branch 90 gate and 100% roadmap refresh | Only run as a true gate after focused campaigns make 90% realistic. |
 
 ### Workstream 7: CCD Handoff And Shape-Exact Branch Families
 
@@ -632,7 +634,7 @@ alone unless a real collision/query gap appears.
 
 ### Workstream 13: Collision Geometry, Response, And Transform Residue
 
-**Status:** Pending
+**Status:** Complete - 2026-07-07
 
 **Purpose**
 
@@ -654,20 +656,115 @@ another gate attempt.
 
 **Tasks**
 
-- [ ] Classify remaining zero-branch geometry/contact rows:
+- [x] Classify remaining zero-branch geometry/contact rows:
       `SolidBody2D.ResolveDynamicContactPoint`,
       `CollisionDetectionMixed.ResolveFallbackNormal`,
       `MeshTriangleContactGenerator.ResolveNormal`, and
       `SolverContactBuffer2D.GetNormalVelocity`.
-- [ ] Cover public behavior for contact-point fallback, response velocity, and
+- [x] Cover public behavior for contact-point fallback, response velocity, and
       body transform helpers where host-visible behavior is meaningful.
-- [ ] Delete or simplify fallback helpers only when valid collider/query flows
+- [x] Delete or simplify fallback helpers only when valid collider/query flows
       prove the state is unreachable.
-- [ ] Review one-covered-branch rows around `ContinuousCollisionHitComesBefore`,
+- [x] Review one-covered-branch rows around `ContinuousCollisionHitComesBefore`,
       contact ordering, and collision normal fallback before adding tests.
+- [x] Run focused tests, full `Release`, and coverage collection.
+
+**Results**
+
+- Removed unread 2D solver-contact normal-velocity storage and the corresponding
+  `GetNormalVelocity` branch. Restitution still computes normal velocity locally
+  where it is used.
+- Removed the unused pure-2D `ResolveDynamicContactPoint` overload; exact 2D
+  dynamic CCD now owns dynamic contact points, while the remaining 3D overload
+  is still used for mixed dynamic targets.
+- Simplified mesh triangle normal orientation around the valid `PhysicsMesh`
+  invariant that degenerate triangles are rejected during construction.
+- Tightened 3D body transform helpers by removing the private `Forward` setter
+  and unreachable null-collider scale fallback. Added a scale-aware
+  `TransformPoint`/`InverseTransformPoint` round-trip test.
+- Tightened static CCD and contact-order helper assumptions after validation:
+  refined CCD hits have colliders, and internal mesh/cylinder contact helpers
+  are called only with the active pair participants.
+- Removed unused `PhysicsMesh.TriangleUse` equality/hash scaffolding by comparing
+  sorted adjacent triangle uses with the existing deterministic comparer.
+- Classified `CollisionDetectionMixed.ResolveFallbackNormal` as the final
+  zero-branch defensive guard. Current built-in 2D shapes include boundaries in
+  `ContainsPoint`, but this guard protects a rare closest-point-equals-center
+  boundary path from divide-by-zero without allocating or changing ordering.
+- Coverage moved to 94.2% line, 81.5% branch, and 94.6% method with 1215
+  Release coverage tests passing.
+
+**Evidence**
+
+- Focused tests:
+  `dotnet test tests\Gravitas.Tests\Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~PhysicsMeshTests|FullyQualifiedName~CollisionDetectionShapePairTests|FullyQualifiedName~SolidBodyIntegrationTests|FullyQualifiedName~CollisionResponse2DManifoldTests|FullyQualifiedName~ContinuousCollision2DTests|FullyQualifiedName~MixedNarrowPhaseTests"`
+  passed with 196 tests.
+- Coverage collection:
+  `TestResults/coverage-branch-hardening-ws13-final/reports/Summary.txt`
+- Branch shortlist:
+  `TestResults/coverage-branch-hardening-ws13-final/branch-gap-shortlist.csv`
+- CRAP shortlist:
+  `TestResults/coverage-branch-hardening-ws13-final/crap-scores-top100.txt`
+
+### Workstream 14: Hierarchy, Lifecycle, CCD, And Contact Geometry Residue
+
+**Status:** Pending
+
+**Purpose**
+
+Continue the branch-90 campaign from the fresh Workstream 13 shortlist. Branch
+coverage remains at 81.5%, so this pass should harden the mixed top block:
+deterministic lifecycle residue around hierarchy mutation, pair registration,
+constraint capacity/reset, mixed constraint roots, and body/collider
+dessimilation, plus the still-prominent CCD/contact geometry guardrails that sit
+in the same branch-rate tier.
+
+**Likely Candidate Areas**
+
+- `src/Gravitas/Colliders/3D/LSCollider.cs`
+- `src/Gravitas/Colliders/2D/LSCollider2D.cs`
+- `src/Gravitas/Colliders/Hierarchy`
+- `src/Gravitas/Colliders/State`
+- `src/Gravitas/Constraints/2D`
+- `src/Gravitas/Constraints/3D`
+- `src/Gravitas/Core/3D/GravitasPhysicsService.cs`
+- `src/Gravitas/Core/Mixed`
+- `src/Gravitas/CollisionHandling/Continuous`
+- `src/Gravitas/CollisionHandling/Detection/3D/ConvexColliderSupport.cs`
+- `src/Gravitas/Core/3D/SolidBody.ContinuousCollision*.cs`
+- `src/Gravitas/Core/2D/SolidBody2D.ContinuousCollision*.cs`
+- `tests/Gravitas.Tests/Colliders`
+- `tests/Gravitas.Tests/Constraints`
+- `tests/Gravitas.Tests/Core`
+- `tests/Gravitas.Tests/CollisionHandling`
+- `tests/Gravitas.Tests/Physics2D`
+
+**Tasks**
+
+- [ ] Classify 2D/3D `IColliderHierarchyNode.AddChild` and `RemoveChild`
+      branch gaps as lifecycle behavior, duplicate code, or unreachable
+      malformed-hierarchy guards.
+- [ ] Review `LSCollider.TryAddCollisionPair` and `LSCollider2D.TryAddCollisionPair`
+      for duplicate pair-state logic before adding tests.
+- [ ] Cover or simplify `GravitasConstraint2DService.EnsureJointCapacity`,
+      `GravitasConstraint3DService.EnsureJointCapacity`, and reset residue
+      through valid capacity growth/reset scenarios.
+- [ ] Review `GravitasMixedCollisionService.ResolveMixedConstraintRootKey` and
+      `GravitasPhysicsService.DessimilateBody` for user-visible lifecycle
+      behavior versus stale defensive branches.
+- [ ] Reclassify the remaining CCD/contact geometry rows in the same top block:
+      `ContinuousCollisionMath.ResolveNormal`,
+      `ConvexColliderSupport.Perpendicular`,
+      `SolidBody.ResolveDynamicContactPoint`,
+      `SolidBody.ShouldReplaceRotationalContinuousCollisionHit`,
+      `SolidBody.TryRefineContinuousCollisionAgainstTargetSphere`,
+      `SolidBody2D.ResolveDynamicContactPoint`, and
+      `SolidBody2D.ShouldReplaceRotationalContinuousCollisionHit`.
+- [ ] Keep hierarchy and pair tests scenario-driven; do not add artificial
+      malformed private-state tests unless they expose a real bug or invariant.
 - [ ] Run focused tests, full `Release`, and coverage collection.
 
-### Workstream 14: Branch 90 Gate And 100% Roadmap Refresh
+### Workstream 15: Branch 90 Gate And 100% Roadmap Refresh
 
 **Purpose**
 
@@ -709,3 +806,4 @@ it realistically reachable, then pivot the living plan toward the long-term
 | 2026-07-07 | 93.9% | 80.7% | 93.9% | 1192 passed | Workstream 10 collision geometry and convex support residue completed. Added mesh-cone support/fallback, cuboid-capsule SAT miss, axis-aligned cuboid Z-contact, 2D reversed capsule/clipping, manifold replacement/material, convex-support policy, and cone/cylinder/mesh frontal-area coverage. Tightened cuboid SAT helper contracts and classified remaining simplex/fallback-normal residue as defensive guardrails unless a public bug appears. |
 | 2026-07-07 | 94.1% | 81.3% | 94.3% | 1212 passed | Workstream 11 lifecycle, serialization, replay, and authoring residue completed. Deleted unused `LateInitialize` scaffolding, removed weak explicit ragdoll-link collider constructors, and added focused coverage for shape authoring guards, trigger load rejection, pending CCD handoff replay hash state, hierarchy rejection/reparenting, partition cleanup, stale collider-ID removal safety, and mixed thickness override idempotence. |
 | 2026-07-07 | 94.1% | 81.3% | 94.4% | 1214 passed | Workstream 12 CCD, query, and mixed reducer residue completed. Removed unreachable kinematic push-axis helpers, stale static CCD exact-source refinement, and unreachable cone swept-sphere fallback-normal helper. Added cone exact-miss and mixed swept-circle center-overlap normal coverage, and strengthened direct swept-sphere cone worker assertions. Fresh branch shortlist reranks the next campaign around geometry/contact/transform residue before any 90% gate attempt. |
+| 2026-07-07 | 94.2% | 81.5% | 94.6% | 1215 passed | Workstream 13 collision geometry, response, and transform residue completed. Removed dead 2D response velocity storage, stale CCD contact-point overloads, impossible mesh normal fallbacks, malformed-pair contact-order branches, null-collider transform fallbacks, and duplicate-triangle equality scaffolding. Added scale-aware 3D transform round-trip coverage and reranked the next campaign around hierarchy/pair-state/constraint lifecycle residue. |

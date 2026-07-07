@@ -181,6 +181,27 @@ public sealed class SolidBodyIntegrationTests
     }
 
     [Fact]
+    public void TransformPoint_WithColliderScale_ShouldRoundTripLocalAndWorldPositions()
+    {
+        using PhysicsScenarioBuilder scenario = CreateIntegrationScenario(frameRate: 4);
+        var collider = new LSCuboidCollider
+        {
+            Size = new Vector3d((Fixed64)2, (Fixed64)4, (Fixed64)6)
+        };
+        ScenarioBody<LSCuboidCollider> body = scenario.CreateBody(
+            collider,
+            new Vector3d((Fixed64)10, (Fixed64)2, (Fixed64)(-3)),
+            FixedQuaternion.Identity);
+        Vector3d localPoint = new(Fixed64.Half, Fixed64.One, -Fixed64.Half);
+
+        Vector3d worldPoint = body.Body.TransformPoint(localPoint);
+        Vector3d roundTripped = body.Body.InverseTransformPoint(worldPoint);
+
+        worldPoint.Should().Be(new Vector3d((Fixed64)11, (Fixed64)6, (Fixed64)(-6)));
+        AssertNear(roundTripped, localPoint);
+    }
+
+    [Fact]
     public void SetHeightAndFreezeAxes_ShouldExposeLifecycleStateWithoutWakingOnNoOp()
     {
         using PhysicsScenarioBuilder scenario = CreateIntegrationScenario(frameRate: 4);
@@ -289,5 +310,12 @@ public sealed class SolidBodyIntegrationTests
     private static void AssertNear(Fixed64 actual, Fixed64 expected)
     {
         (actual - expected).Abs().Should().BeLessThan(Tolerance);
+    }
+
+    private static void AssertNear(Vector3d actual, Vector3d expected)
+    {
+        AssertNear(actual.X, expected.X);
+        AssertNear(actual.Y, expected.Y);
+        AssertNear(actual.Z, expected.Z);
     }
 }

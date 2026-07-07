@@ -426,22 +426,6 @@ public sealed partial class SolidBody2D
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Vector2d ResolveDynamicContactPoint(
-        Vector2d sourceCenter,
-        Vector2d targetCenter,
-        Vector2d normalForSource,
-        Fixed64 targetRadius)
-    {
-        if (normalForSource.MagnitudeSquared > Fixed64.Epsilon)
-            return targetCenter + normalForSource * targetRadius;
-
-        Vector2d fallback = sourceCenter - targetCenter;
-        return fallback.MagnitudeSquared > Fixed64.Epsilon
-            ? targetCenter + fallback.Normalized * targetRadius
-            : targetCenter;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Vector3d ResolveDynamicContactPoint(
         Vector3d sourceCenter,
         Vector3d targetCenter,

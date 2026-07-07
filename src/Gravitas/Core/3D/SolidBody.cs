@@ -213,19 +213,7 @@ public partial class SolidBody : IRecordable
 
     public Fixed3x3 RotationMatrix => _rotation.ToMatrix3x3();
 
-    public Vector3d Forward
-    {
-        get => _rotation.Rotate(Vector3d.Forward);
-        private set
-        {
-            if (value == Vector3d.Zero)
-                return;
-
-            // Convert the direction vector to a rotation quaternion
-            Rotation = FixedQuaternion.FromDirection(value);
-        }
-    }
-
+    public Vector3d Forward => _rotation.Rotate(Vector3d.Forward);
     public Vector3d Up => _rotation.Rotate(Vector3d.Up);
     public Vector3d Right => _rotation.Rotate(Vector3d.Right);
 
@@ -948,7 +936,7 @@ public partial class SolidBody : IRecordable
     /// <returns></returns>
     public Vector3d TransformPoint(Vector3d point)
     {
-        return Position3d + Rotation * Vector3d.Multiply(Collider?.ScaledSize ?? Vector3d.One, point);
+        return Position3d + Rotation * Vector3d.Multiply(Collider.ScaledSize, point);
     }
 
     /// <summary>
@@ -963,7 +951,7 @@ public partial class SolidBody : IRecordable
         // next negate the rotation (Quaternion.Inverse(rotation)
         Vector3d rotated = Rotation.Inverse() * translated;
         // Finally, negate scaling by dividing 1 by the value
-        return Vector3d.Multiply(Vector3d.One / (Collider?.ScaledSize ?? Vector3d.One), rotated);
+        return Vector3d.Multiply(Vector3d.One / Collider.ScaledSize, rotated);
     }
 
     public void ResetPosition(Vector3d position = default, FixedQuaternion rotation = default)

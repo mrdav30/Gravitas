@@ -21,8 +21,6 @@ internal struct SolverContactBuffer2D
     private Fixed64 _normalImpulse1;
     private Fixed64 _tangentImpulse0;
     private Fixed64 _tangentImpulse1;
-    private Fixed64 _normalVelocity0;
-    private Fixed64 _normalVelocity1;
 
     public int Count { get; private set; }
 
@@ -49,19 +47,15 @@ internal struct SolverContactBuffer2D
     public Fixed64 GetTangentImpulse(int index) => index == 0 ? _tangentImpulse0 : _tangentImpulse1;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public Fixed64 GetNormalVelocity(int index) => index == 0 ? _normalVelocity0 : _normalVelocity1;
-
-    public void SetNormalImpulse(int index, Fixed64 impulse, Fixed64 normalVelocity)
+    public void SetNormalImpulse(int index, Fixed64 impulse)
     {
         if (index == 0)
         {
             _normalImpulse0 = impulse;
-            _normalVelocity0 = normalVelocity;
             return;
         }
 
         _normalImpulse1 = impulse;
-        _normalVelocity1 = normalVelocity;
     }
 
     public void SetTangentImpulse(int index, Fixed64 impulse)

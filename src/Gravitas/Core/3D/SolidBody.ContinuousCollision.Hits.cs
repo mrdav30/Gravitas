@@ -327,7 +327,7 @@ public partial class SolidBody
         if (distanceCompare != 0)
             return distanceCompare < 0;
 
-        return (left.Collider?.Id ?? -1) < (right.Collider?.Id ?? -1);
+        return left.Collider!.Id < right.Collider!.Id;
     }
 
     private bool TryGetFirstDynamicContinuousCollisionHit(

@@ -706,7 +706,7 @@ namespace Gravitas.Colliders
             Array.Sort(triangleUses, CompareTriangleUses);
             for (int i = 1; i < triangleUses.Length; i++)
             {
-                if (triangleUses[i].Equals(triangleUses[i - 1]))
+                if (CompareTriangleUses(triangleUses[i], triangleUses[i - 1]) == 0)
                     return true;
             }
 
@@ -1070,7 +1070,7 @@ namespace Gravitas.Colliders
             }
         }
 
-        private readonly struct TriangleUse : IEquatable<TriangleUse>
+        private readonly struct TriangleUse
         {
             private TriangleUse(int a, int b, int c)
             {
@@ -1100,15 +1100,6 @@ namespace Gravitas.Colliders
 
                 return new TriangleUse(a, b, c);
             }
-
-            public bool Equals(TriangleUse other) =>
-                A == other.A && B == other.B && C == other.C;
-
-            public override bool Equals(object? obj) =>
-                obj is TriangleUse other && Equals(other);
-
-            public override int GetHashCode() =>
-                HashCode.Combine(A, B, C);
         }
 
         private readonly struct SupportTreeNode

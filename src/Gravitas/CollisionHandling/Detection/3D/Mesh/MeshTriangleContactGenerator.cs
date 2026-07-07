@@ -582,15 +582,9 @@ internal static class MeshTriangleContactGenerator
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Vector3d OrientNormal(Vector3d normal, Vector3d desiredDirection)
     {
-        Vector3d resolved = normal.MagnitudeSquared > Fixed64.Epsilon
-            ? normal.Normalized
-            : ResolveNormal(desiredDirection);
+        Vector3d resolved = normal.Normalized;
         return Vector3d.Dot(resolved, desiredDirection) < Fixed64.Zero ? -resolved : resolved;
     }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Vector3d ResolveNormal(Vector3d direction) =>
-        direction.MagnitudeSquared > Fixed64.Epsilon ? direction.Normalized : Vector3d.Right;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void AddContactInPairOrder(
@@ -608,8 +602,7 @@ internal static class MeshTriangleContactGenerator
             return;
         }
 
-        if (ReferenceEquals(pair.ColliderA, second))
-            pair.Manifold.AddContact(pointOnSecond, pointOnFirst, depth, -normalFirstToSecond);
+        pair.Manifold.AddContact(pointOnSecond, pointOnFirst, depth, -normalFirstToSecond);
     }
 
 }
