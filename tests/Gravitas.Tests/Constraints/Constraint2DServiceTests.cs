@@ -268,9 +268,9 @@ public sealed class Constraint2DServiceTests
         RagdollRuntime2D runtime = context.Constraints2D.RegisterRagdoll(new RagdollDefinition2D(
             new[]
             {
-                new RagdollLinkDefinition2D(0, root, root.Collider),
-                new RagdollLinkDefinition2D(1, middle, middle.Collider),
-                new RagdollLinkDefinition2D(2, end, end.Collider)
+                new RagdollLinkDefinition2D(0, root),
+                new RagdollLinkDefinition2D(1, middle),
+                new RagdollLinkDefinition2D(2, end)
             },
             new[]
             {
@@ -288,6 +288,46 @@ public sealed class Constraint2DServiceTests
     }
 
     [Fact]
+    public void RagdollFiltering_WithSuppressAllPolicy_ShouldSuppressNonAdjacentLinks()
+    {
+        using GravitasWorldContext context = CreateConstraintContext();
+        SolidBody2D root = CreateBody(context, Vector2d.Zero);
+        SolidBody2D middle = CreateBody(context, Vector2d.Right * (Fixed64)2);
+        SolidBody2D end = CreateBody(context, Vector2d.Right * Fixed64.Half);
+
+        context.Constraints2D.RegisterRagdoll(new RagdollDefinition2D(
+            new[]
+            {
+                new RagdollLinkDefinition2D(0, root),
+                new RagdollLinkDefinition2D(1, middle),
+                new RagdollLinkDefinition2D(2, end)
+            },
+            new[]
+            {
+                new RagdollJointDefinition2D(0, 1, JointType2D.Pin, JointFrame2D.Identity, JointFrame2D.Identity),
+                new RagdollJointDefinition2D(1, 2, JointType2D.Pin, JointFrame2D.Identity, JointFrame2D.Identity)
+            },
+            RagdollSelfCollisionPolicy.SuppressAllLinks));
+
+        context.Constraints2D.ShouldExcludeLinkedCollision(root.Collider, end.Collider).Should().BeTrue();
+    }
+
+    [Fact]
+    public void RagdollLinkDefinition_ShouldDeriveColliderFromBodyAndRejectNullBody()
+    {
+        using GravitasWorldContext context = CreateConstraintContext();
+        SolidBody2D body = CreateBody(context, Vector2d.Zero);
+
+        var link = new RagdollLinkDefinition2D(7, body);
+        Action nullBody = () => _ = new RagdollLinkDefinition2D(0, null!);
+
+        link.LinkId.Should().Be(7);
+        link.Body.Should().BeSameAs(body);
+        link.Collider.Should().BeSameAs(body.Collider);
+        nullBody.Should().Throw<ArgumentNullException>().WithParameterName("body");
+    }
+
+    [Fact]
     public void RegisterRagdoll_WithInvalidJointPayload_ShouldFailAtomically()
     {
         using GravitasWorldContext context = CreateConstraintContext();
@@ -297,9 +337,9 @@ public sealed class Constraint2DServiceTests
         var definition = new RagdollDefinition2D(
             new[]
             {
-                new RagdollLinkDefinition2D(0, root, root.Collider),
-                new RagdollLinkDefinition2D(1, middle, middle.Collider),
-                new RagdollLinkDefinition2D(2, end, end.Collider)
+                new RagdollLinkDefinition2D(0, root),
+                new RagdollLinkDefinition2D(1, middle),
+                new RagdollLinkDefinition2D(2, end)
             },
             new[]
             {
@@ -719,8 +759,8 @@ public sealed class Constraint2DServiceTests
         new(
             new[]
             {
-                new RagdollLinkDefinition2D(0, root, root.Collider),
-                new RagdollLinkDefinition2D(1, child, child.Collider)
+                new RagdollLinkDefinition2D(0, root),
+                new RagdollLinkDefinition2D(1, child)
             },
             new[]
             {

@@ -82,6 +82,33 @@ public sealed class PhysicsPartitionPerformanceShapeTests
     }
 
     [Fact]
+    public void StaticAndKinematicRemoval_ShouldMarkPartitionEmptyAndIgnoreMissingIds()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        PhysicsPartition partition = context.Collisions.RentPartition();
+
+        partition.RemoveStaticObject(99);
+        partition.RemoveKinematicObject(99);
+        partition.AddStaticObject(11);
+        partition.AddKinematicObject(3);
+
+        partition.IsEmpty.Should().BeFalse();
+        partition.RemoveStaticObject(12);
+        partition.RemoveKinematicObject(4);
+        partition.ContainedStaticObjects!.Should().Contain(11);
+        partition.ContainedKinematicObjects!.Should().Contain(3);
+
+        partition.RemoveStaticObject(11);
+        partition.IsEmpty.Should().BeFalse();
+        partition.RemoveKinematicObject(3);
+
+        partition.IsEmpty.Should().BeTrue();
+        partition.ContainedStaticObjects.Count.Should().Be(0);
+        partition.ContainedKinematicObjects.Count.Should().Be(0);
+        context.Collisions.ReleasePartition(partition);
+    }
+
+    [Fact]
     public void ResetRetainedMembership_WithFreshPartition_ShouldBeIdempotent()
     {
         var partition = new PhysicsPartition();

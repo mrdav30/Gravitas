@@ -92,15 +92,6 @@ public sealed partial class GravitasPhysicsService
     public void Initialize() => Reset();
 
     /// <summary>
-    /// Runs late initialization for registered colliders.
-    /// </summary>
-    public void LateInitialize()
-    {
-        for (int i = 0; i < _colliders.Count; i++)
-            _colliders[i].LateInitialize();
-    }
-
-    /// <summary>
     /// Runs this context's physics simulation step.
     /// </summary>
     public void Simulate()

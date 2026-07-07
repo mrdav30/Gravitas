@@ -493,8 +493,6 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
         }
     }
 
-    public void LateInitialize() { }
-
     // Dynamic Colliders attached to a body will be updated by the body
     // Static Colliders need to be updated by whatever is updating the static collider
     // Even if the collider is inactive, if the body is active, the collider will be updated

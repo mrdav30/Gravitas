@@ -132,6 +132,43 @@ public sealed class Collider2DStateParityTests
     }
 
     [Fact]
+    public void CapsuleShapeMutation_ShouldValidateDimensionsAndDirtyShapeOnlyWhenValuesChange()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        SolidBody2D body = CreateBody(context, new LSCapsuleCollider2D(Fixed64.Half, (Fixed64)3), Vector2d.Zero, immovable: false);
+        var capsule = (LSCapsuleCollider2D)body.Collider;
+        uint runtimeVersion = capsule.RuntimeShapeVersion;
+        uint broadPhaseVersion = capsule.BroadPhaseVersion;
+
+        capsule.Radius = Fixed64.Half;
+        capsule.Height = (Fixed64)3;
+        capsule.Simulate();
+
+        capsule.RuntimeShapeVersion.Should().Be(runtimeVersion);
+        capsule.BroadPhaseVersion.Should().Be(broadPhaseVersion);
+
+        Action zeroRadius = () => capsule.Radius = Fixed64.Zero;
+        Action tooLargeRadius = () => capsule.Radius = (Fixed64)2;
+        Action tooShortHeight = () => capsule.Height = Fixed64.Half;
+        zeroRadius.Should().Throw<ArgumentException>().WithParameterName("radius");
+        tooLargeRadius.Should().Throw<ArgumentException>().WithParameterName("height");
+        tooShortHeight.Should().Throw<ArgumentException>().WithParameterName("height");
+
+        capsule.Radius = Fixed64.FromFraction(3, 4);
+        capsule.Simulate();
+        capsule.RuntimeShapeVersion.Should().Be(runtimeVersion + 1);
+        capsule.BroadPhaseVersion.Should().BeGreaterThan(broadPhaseVersion);
+
+        uint radiusVersion = capsule.RuntimeShapeVersion;
+        capsule.Height = (Fixed64)4;
+        capsule.Simulate();
+
+        capsule.RuntimeShapeVersion.Should().Be(radiusVersion + 1);
+        capsule.Height.Should().Be((Fixed64)4);
+        capsule.Radius.Should().Be(Fixed64.FromFraction(3, 4));
+    }
+
+    [Fact]
     public void ExplicitParentBinding_ShouldSuppressParentChildAndSiblingPairs()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
@@ -160,12 +197,14 @@ public sealed class Collider2DStateParityTests
 
         owner.Collider.CollisionPairCount.Should().Be(1);
         holder.Collider.CollisionPairHolderCount.Should().Be(1);
+        int ownerId = owner.Collider.Id;
 
         owner.Collider.Deactivate();
 
         owner.Collider.CollisionPairCount.Should().Be(0);
         holder.Collider.CollisionPairHolderCount.Should().Be(0);
         context.Physics2D.TryGetColliderById(owner.Collider.Id, out _).Should().BeFalse();
+        holder.Collider.TryRemoveCollisionPairHolder(ownerId).Should().BeFalse();
     }
 
     [Fact]
@@ -175,12 +214,14 @@ public sealed class Collider2DStateParityTests
         SolidBody2D owner = CreateBody(context, new LSCircleCollider2D(Fixed64.One), Vector2d.Zero, immovable: false);
         SolidBody2D holder = CreateBody(context, new LSCircleCollider2D(Fixed64.One), Vector2d.Zero, immovable: false);
         Step(context);
+        int holderId = holder.Collider.Id;
 
         holder.Collider.Deactivate();
 
         owner.Collider.CollisionPairCount.Should().Be(0);
         holder.Collider.CollisionPairHolderCount.Should().Be(0);
         context.Physics2D.TryGetColliderById(holder.Collider.Id, out _).Should().BeFalse();
+        owner.Collider.TryRemoveCollisionPair(holderId, out _).Should().BeFalse();
     }
 
     [Fact]

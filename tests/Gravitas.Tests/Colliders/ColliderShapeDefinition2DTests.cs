@@ -89,6 +89,25 @@ public sealed class ColliderShapeDefinition2DTests
     }
 
     [Fact]
+    public void ShapeDefinition2DAccessors_ShouldRejectUndefinedWrongShapeFamiliesAndInvalidAabbSize()
+    {
+        ColliderShapeDefinition2D undefined = default;
+        ColliderShapeDefinition2D circle = ColliderShapeDefinition2D.Circle(Fixed64.One);
+
+        Action createUndefined = () => undefined.CreateCollider();
+        Action readUndefinedPolygonVertex = () => _ = undefined.GetPolygonVertex(0);
+        Action readCirclePolygonVertex = () => _ = circle.GetPolygonVertex(0);
+        Action createInvalidAabb = () => ColliderShapeDefinition2D.AABBox(new Vector2d(Fixed64.One, Fixed64.Zero));
+        Action buildCircleFromBoxDefinition = () => _ = new LSCircleCollider2D(ColliderShapeDefinition2D.AABBox(Vector2d.One));
+
+        createUndefined.Should().Throw<ArgumentException>().WithParameterName(nameof(ColliderShapeDefinition2D));
+        readUndefinedPolygonVertex.Should().Throw<ArgumentException>().WithParameterName(nameof(ColliderShapeDefinition2D));
+        readCirclePolygonVertex.Should().Throw<ArgumentException>().WithParameterName(nameof(ColliderShapeDefinition2D));
+        createInvalidAabb.Should().Throw<ArgumentException>().WithParameterName("size");
+        buildCircleFromBoxDefinition.Should().Throw<ArgumentException>().WithParameterName(nameof(ColliderShapeDefinition2D));
+    }
+
+    [Fact]
     public void ShapeDefinition2DEqualityAndHash_ShouldEncodeAuthoredShapeMaterialAndPolygonPayload()
     {
         PhysicsMaterial material = PhysicsMaterialTestHelper.WithFrictionAndRestitution(

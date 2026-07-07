@@ -4,6 +4,7 @@ using Gravitas.Colliders;
 using Gravitas.Tests.Support;
 using GridForge.Grids;
 using GridForge.Spatial;
+using System;
 using Xunit;
 
 namespace Gravitas.Tests.Colliders;
@@ -56,12 +57,14 @@ public sealed class ColliderOwnershipStateTests
 
         owner.Collider.CollisionPairCount.Should().Be(1);
         holder.Collider.CollisionPairHolderCount.Should().Be(1);
+        int ownerId = owner.Collider.Id;
 
         owner.Collider.Deactivate();
 
         owner.Collider.CollisionPairCount.Should().Be(0);
         holder.Collider.CollisionPairHolderCount.Should().Be(0);
         scenario.Context.Physics.TryGetColliderById(owner.Collider.Id, out _).Should().BeFalse();
+        holder.Collider.TryRemoveCollisionPairHolder(ownerId).Should().BeFalse();
     }
 
     [Fact]
@@ -131,6 +134,43 @@ public sealed class ColliderOwnershipStateTests
     }
 
     [Fact]
+    public void ReparentChild_ShouldMoveTopParentChildReference()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> firstParent = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
+        ScenarioBody<LSSphereCollider> secondParent = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(1, 0, 0));
+        ScenarioBody<LSSphereCollider> child = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(2, 0, 0));
+
+        child.Collider.SetParent(firstParent.Collider);
+        child.Collider.SetParent(secondParent.Collider);
+
+        firstParent.Collider.HierarchyChildCount.Should().Be(0);
+        secondParent.Collider.HierarchyChildCount.Should().Be(1);
+        child.Collider.Parent3D.Should().BeSameAs(secondParent.Collider);
+        child.Collider.TopParent3D.Should().BeSameAs(secondParent.Collider);
+        child.Collider.ParentId.Should().Be(secondParent.Collider.Id);
+    }
+
+    [Fact]
+    public void SetParent_ShouldRejectSelfCrossContextAndCycles()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        using PhysicsScenarioBuilder foreignScenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> parent = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
+        ScenarioBody<LSSphereCollider> child = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(1, 0, 0));
+        ScenarioBody<LSSphereCollider> foreign = foreignScenario.CreateSphere(PhysicsScenarioBuilder.Vector(2, 0, 0));
+
+        Action selfParent = () => parent.Collider.SetParent(parent.Collider);
+        Action crossContextParent = () => child.Collider.SetParent(foreign.Collider);
+        child.Collider.SetParent(parent.Collider);
+        Action cyclicParent = () => parent.Collider.SetParent(child.Collider);
+
+        selfParent.Should().Throw<ArgumentException>().WithParameterName("parent");
+        crossContextParent.Should().Throw<ArgumentException>().WithParameterName("parent");
+        cyclicParent.Should().Throw<ArgumentException>().WithParameterName("parent");
+    }
+
+    [Fact]
     public void ClearParent_ShouldRestoreConfiguredParentFlagWhenLastChildIsRemoved()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
@@ -153,12 +193,14 @@ public sealed class ColliderOwnershipStateTests
         ScenarioBody<LSSphereCollider> owner = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
         ScenarioBody<LSSphereCollider> holder = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
         AdvancePhysicsStep(scenario);
+        int holderId = holder.Collider.Id;
 
         holder.Collider.Deactivate();
 
         owner.Collider.CollisionPairCount.Should().Be(0);
         holder.Collider.CollisionPairHolderCount.Should().Be(0);
         scenario.Context.Physics.TryGetColliderById(holder.Collider.Id, out _).Should().BeFalse();
+        owner.Collider.TryRemoveCollisionPair(holderId).Should().BeFalse();
     }
 
     [Fact]

@@ -92,6 +92,10 @@ public sealed class GravitasPhysicsServiceTests
         compactFirst.Should().BeSameAs(first);
         compactThird.Should().BeSameAs(third);
         compactReplacement.Should().BeSameAs(replacement);
+
+        context.Physics.DessimilateCollider(second);
+        context.Physics.TryGetColliderById(replacementId, out LSCollider? replacementAfterStaleRemoval).Should().BeTrue();
+        replacementAfterStaleRemoval.Should().BeSameAs(replacement);
     }
 
     [Fact]

@@ -160,9 +160,9 @@ public sealed class Constraint3DServiceTests
         RagdollRuntime3D runtime = scenario.Context.Constraints3D.RegisterRagdoll(new RagdollDefinition3D(
             new[]
             {
-                new RagdollLinkDefinition3D(0, root.Body, root.Collider),
-                new RagdollLinkDefinition3D(1, middle.Body, middle.Collider),
-                new RagdollLinkDefinition3D(2, end.Body, end.Collider)
+                new RagdollLinkDefinition3D(0, root.Body),
+                new RagdollLinkDefinition3D(1, middle.Body),
+                new RagdollLinkDefinition3D(2, end.Body)
             },
             new[]
             {
@@ -178,6 +178,21 @@ public sealed class Constraint3DServiceTests
     }
 
     [Fact]
+    public void RagdollLinkDefinition_ShouldDeriveColliderFromBodyAndRejectNullBody()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
+
+        var link = new RagdollLinkDefinition3D(7, body.Body);
+        Action nullBody = () => _ = new RagdollLinkDefinition3D(0, null!);
+
+        link.LinkId.Should().Be(7);
+        link.Body.Should().BeSameAs(body.Body);
+        link.Collider.Should().BeSameAs(body.Collider);
+        nullBody.Should().Throw<ArgumentNullException>().WithParameterName("body");
+    }
+
+    [Fact]
     public void RagdollFiltering_WithSuppressAllPolicy_ShouldSuppressNonAdjacentLinks()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
@@ -188,9 +203,9 @@ public sealed class Constraint3DServiceTests
         scenario.Context.Constraints3D.RegisterRagdoll(new RagdollDefinition3D(
             new[]
             {
-                new RagdollLinkDefinition3D(0, root.Body, root.Collider),
-                new RagdollLinkDefinition3D(1, middle.Body, middle.Collider),
-                new RagdollLinkDefinition3D(2, end.Body, end.Collider)
+                new RagdollLinkDefinition3D(0, root.Body),
+                new RagdollLinkDefinition3D(1, middle.Body),
+                new RagdollLinkDefinition3D(2, end.Body)
             },
             new[]
             {
@@ -629,8 +644,8 @@ public sealed class Constraint3DServiceTests
         return new RagdollDefinition3D(
             new[]
             {
-                new RagdollLinkDefinition3D(0, root.Body, root.Collider),
-                new RagdollLinkDefinition3D(1, child.Body, child.Collider)
+                new RagdollLinkDefinition3D(0, root.Body),
+                new RagdollLinkDefinition3D(1, child.Body)
             },
             new[]
             {

@@ -78,6 +78,53 @@ public sealed class MixedEmbeddingContractTests
     }
 
     [Fact]
+    public void MixedHalfThicknessOverrideMutation_ShouldDirtyOnlyWhenEffectiveOverrideChanges()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        context.Settings.Mixed2DHalfThickness = (Fixed64)2;
+        var transform = new FixedTransform(
+            new Vector3d((Fixed64)3, (Fixed64)7, (Fixed64)5),
+            FixedQuaternion.Identity,
+            Vector3d.One);
+        var collider = new LSCircleCollider2D(Fixed64.One);
+        collider.InitializeWithNoBody(new TestMatterAgent(context, transform));
+        uint initialRuntimeVersion = collider.RuntimeShapeVersion;
+        uint initialBroadPhaseVersion = collider.BroadPhaseVersion;
+
+        collider.MixedHalfThicknessOverride = null;
+        collider.Simulate();
+
+        collider.RuntimeShapeVersion.Should().Be(initialRuntimeVersion);
+        collider.BroadPhaseVersion.Should().Be(initialBroadPhaseVersion);
+
+        collider.MixedHalfThicknessOverride = (Fixed64)3;
+        collider.Simulate();
+        uint overrideRuntimeVersion = collider.RuntimeShapeVersion;
+        uint overrideBroadPhaseVersion = collider.BroadPhaseVersion;
+
+        overrideRuntimeVersion.Should().Be(initialRuntimeVersion + 1);
+        overrideBroadPhaseVersion.Should().Be(initialBroadPhaseVersion);
+        collider.MixedHalfThickness.Should().Be((Fixed64)3);
+        collider.MixedBounds3D.Min.Y.Should().Be((Fixed64)4);
+        collider.MixedBounds3D.Max.Y.Should().Be((Fixed64)10);
+
+        collider.MixedHalfThicknessOverride = (Fixed64)3;
+        collider.Simulate();
+
+        collider.RuntimeShapeVersion.Should().Be(overrideRuntimeVersion);
+        collider.BroadPhaseVersion.Should().Be(overrideBroadPhaseVersion);
+
+        collider.MixedHalfThicknessOverride = null;
+        collider.Simulate();
+
+        collider.MixedHalfThickness.Should().Be((Fixed64)2);
+        collider.RuntimeShapeVersion.Should().Be(overrideRuntimeVersion + 1);
+        collider.BroadPhaseVersion.Should().Be(overrideBroadPhaseVersion);
+        collider.MixedBounds3D.Min.Y.Should().Be((Fixed64)5);
+        collider.MixedBounds3D.Max.Y.Should().Be((Fixed64)9);
+    }
+
+    [Fact]
     public void MixedHalfThicknessSettingsAndOverride_ShouldRejectNonPositiveValues()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();

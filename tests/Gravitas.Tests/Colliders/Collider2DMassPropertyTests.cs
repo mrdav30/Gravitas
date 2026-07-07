@@ -62,6 +62,7 @@ public sealed class Collider2DMassPropertyTests
 
         AssertNear(collider.CalculateAreaForMassProperties(), expectedArea);
         collider.CalculateLocalCenterOfMassOffset().Should().Be(new Vector2d((Fixed64)3, -Fixed64.One));
+        collider.CalculateMomentOfInertia(Fixed64.Zero, Vector2d.Zero).Should().Be(Fixed64.Zero);
         momentAboutCom.Should().BeGreaterThan(mass * Fixed64.Half);
         momentAboutOrigin.Should().Be(momentAboutCom + mass * (Fixed64)10);
     }

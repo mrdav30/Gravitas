@@ -76,8 +76,8 @@ public sealed class ReplayHashBranchCoverageTests
         RagdollRuntime2D ragdoll = context.Constraints2D.RegisterRagdoll(new RagdollDefinition2D(
             new[]
             {
-                new RagdollLinkDefinition2D(0, first, first.Collider),
-                new RagdollLinkDefinition2D(1, third, third.Collider)
+                new RagdollLinkDefinition2D(0, first),
+                new RagdollLinkDefinition2D(1, third)
             },
             new[]
             {
@@ -201,6 +201,45 @@ public sealed class ReplayHashBranchCoverageTests
         CollisionPairMixed churnedPair = CreateReplayOrdinalMixedPair(churned);
 
         HashMixedPair(churnedPair).Should().Be(HashMixedPair(compactPair));
+    }
+
+    [Fact]
+    public void Body3DReplayHash_ShouldEncodePendingContinuousCollisionHandoff()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        scenario.Context.SetFrameRate(1);
+        ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
+        LSSphereCollider ignored = scenario.CreateStaticSphere(Vector3d.Right * (Fixed64)4);
+        ChronicleHash authoritativeBefore = HashBody3D(body.Body, GravitasReplayHashMode.Authoritative);
+        ChronicleHash cacheBefore = HashBody3D(body.Body, GravitasReplayHashMode.AuthoritativeWithSolverCaches);
+
+        body.Body.ApplyContinuousCollisionHandoff(
+            Vector3d.Right * Fixed64.Half,
+            Vector3d.Right,
+            Fixed64.Half,
+            ignoredCollider3D: ignored);
+
+        HashBody3D(body.Body, GravitasReplayHashMode.Authoritative).Should().NotBe(authoritativeBefore);
+        HashBody3D(body.Body, GravitasReplayHashMode.AuthoritativeWithSolverCaches).Should().NotBe(cacheBefore);
+    }
+
+    [Fact]
+    public void Body2DReplayHash_ShouldEncodePendingContinuousCollisionHandoff()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext(frameRate: 1);
+        SolidBody2D body = CreateBody2D(context, Vector2d.Zero);
+        LSCircleCollider2D ignored = CreateBodylessCircle2D(context, Vector2d.Right * (Fixed64)4);
+        ChronicleHash authoritativeBefore = HashBody2D(body, GravitasReplayHashMode.Authoritative);
+        ChronicleHash cacheBefore = HashBody2D(body, GravitasReplayHashMode.AuthoritativeWithSolverCaches);
+
+        body.ApplyContinuousCollisionHandoff(
+            Vector2d.Right * Fixed64.Half,
+            Vector2d.Right,
+            Fixed64.Half,
+            ignoredCollider2D: ignored);
+
+        HashBody2D(body, GravitasReplayHashMode.Authoritative).Should().NotBe(authoritativeBefore);
+        HashBody2D(body, GravitasReplayHashMode.AuthoritativeWithSolverCaches).Should().NotBe(cacheBefore);
     }
 
     [Fact]
@@ -586,6 +625,12 @@ public sealed class ReplayHashBranchCoverageTests
 
     private static ChronicleHash HashConstraints2D(GravitasWorldContext context, GravitasReplayHashMode mode) =>
         Hash((ref ChronicleHashWriter writer) => context.Constraints2D.ContributeReplayHash(ref writer, mode));
+
+    private static ChronicleHash HashBody3D(SolidBody body, GravitasReplayHashMode mode) =>
+        Hash((ref ChronicleHashWriter writer) => body.ContributeReplayHash(ref writer, mode));
+
+    private static ChronicleHash HashBody2D(SolidBody2D body, GravitasReplayHashMode mode) =>
+        Hash((ref ChronicleHashWriter writer) => body.ContributeReplayHash(ref writer, mode));
 
     private static ChronicleHash HashPair2D(CollisionPair2D pair) =>
         Hash((ref ChronicleHashWriter writer) =>

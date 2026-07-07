@@ -88,6 +88,25 @@ public sealed class ColliderShapeDefinitionTests
     }
 
     [Fact]
+    public void ShapeDefinitionAccessors_ShouldRejectUndefinedAndWrongShapeFamilies()
+    {
+        ColliderShapeDefinition undefined = default;
+        ColliderShapeDefinition sphere = ColliderShapeDefinition.Sphere(Fixed64.One);
+
+        Action createUndefined = () => undefined.CreateCollider();
+        Action readUndefinedMeshVertex = () => _ = undefined.GetMeshVertex(0);
+        Action readSphereMeshVertex = () => _ = sphere.GetMeshVertex(0);
+        Action readSphereTriangleIndex = () => _ = sphere.GetMeshTriangleIndex(0);
+        Action buildSphereFromCuboidDefinition = () => _ = new LSSphereCollider(ColliderShapeDefinition.Cuboid(Vector3d.One));
+
+        createUndefined.Should().Throw<ArgumentException>().WithParameterName(nameof(ColliderShapeDefinition));
+        readUndefinedMeshVertex.Should().Throw<ArgumentException>().WithParameterName(nameof(ColliderShapeDefinition));
+        readSphereMeshVertex.Should().Throw<ArgumentException>().WithParameterName(nameof(ColliderShapeDefinition));
+        readSphereTriangleIndex.Should().Throw<ArgumentException>().WithParameterName(nameof(ColliderShapeDefinition));
+        buildSphereFromCuboidDefinition.Should().Throw<ArgumentException>().WithParameterName(nameof(ColliderShapeDefinition));
+    }
+
+    [Fact]
     public void ShapeDefinitionEqualityAndHash_ShouldEncodeAuthoredShapeMaterialAndMeshPayload()
     {
         PhysicsMaterial material = PhysicsMaterialTestHelper.WithFrictionAndRestitution(

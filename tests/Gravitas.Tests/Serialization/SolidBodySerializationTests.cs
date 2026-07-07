@@ -5,6 +5,7 @@ using Gravitas.Support;
 using Gravitas.Tests.Support;
 using GridForge.Grids;
 using GridForge.Spatial;
+using System;
 using Xunit;
 
 namespace Gravitas.Tests.Serialization;
@@ -215,6 +216,22 @@ public sealed class SolidBodySerializationTests
         target.PartitionCoordinates.Should().BeEmpty();
         (target.MixedPartitionCoordinates?.Count ?? 0).Should().Be(0);
         PartitionContains3DCollider(mixedPartition, target.Id).Should().BeFalse();
+    }
+
+    [Theory]
+    [MemberData(nameof(Transports))]
+    public void PopulateTriggerColliderIntoBodyCollider_ShouldRejectInvalidLoadedState(GravitasSerializationTransport transport)
+    {
+        using PhysicsScenarioBuilder sourceScenario = PhysicsScenarioBuilder.Create();
+        LSSphereCollider source = sourceScenario.CreateStaticSphere(Vector3d.Zero);
+        source.IsTrigger = true;
+        object payload = GravitasSerializationHarness.Serialize(source, transport);
+
+        using PhysicsScenarioBuilder targetScenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> target = targetScenario.CreateSphere(Vector3d.Zero);
+        Action loadTriggerOntoBodyCollider = () => GravitasSerializationHarness.Populate(target.Collider, payload, transport);
+
+        loadTriggerOntoBodyCollider.Should().Throw<ArgumentException>().WithParameterName(nameof(LSCollider.IsTrigger));
     }
 
     [Fact]

@@ -348,7 +348,7 @@ public class Constraint2DBenchmarks
     }
 
     private static RagdollLinkDefinition2D Link(int id, SolidBody2D body) =>
-        new(id, body, body.Collider);
+        new(id, body);
 
     private static RagdollJointDefinition2D RagdollJoint(
         int first,

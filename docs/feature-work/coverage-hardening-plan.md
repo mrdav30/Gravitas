@@ -89,36 +89,36 @@ configuration before making source changes.
 
 ## Current Standing
 
-Fresh checkpoint after Workstream 10 collision geometry and convex-support
-residue pass:
+Fresh checkpoint after Workstream 11 lifecycle, serialization, replay, and
+authoring residue pass:
 
 | Metric | Baseline | Current | Short-Term Gate | Long-Term Target |
 | --- | ---: | ---: | ---: | ---: |
-| Line coverage | 87.3% | 93.9% | 90% | 100% |
-| Branch coverage | 74.1% | 80.7% | 90% | 100% |
-| Method coverage | 86.5% | 93.9% | 90% | 100% |
-| Tests | 974 passed | 1192 passed | green | green |
+| Line coverage | 87.3% | 94.1% | 90% | 100% |
+| Branch coverage | 74.1% | 81.3% | 90% | 100% |
+| Method coverage | 86.5% | 94.3% | 90% | 100% |
+| Tests | 974 passed | 1212 passed | green | green |
 
-At the current denominator, the 90% branch gate requires at least 10,251 covered
-branches. The latest run covered 9,202 of 11,389 branches, leaving roughly
-1,049 net branch outcomes to cover or delete. Treat this as a focused branch
+At the current denominator, the 90% branch gate requires at least 10,245 covered
+branches. The latest run covered 9,255 of 11,383 branches, leaving roughly
+990 net branch outcomes to cover or delete. Treat this as a focused branch
 campaign, not a single gate-check workstream.
 
 Current evidence:
 
 - Coverage report:
-  `TestResults/coverage-branch-hardening-ws10/reports/Summary.txt`
+  `TestResults/coverage-branch-hardening-ws11/reports/Summary.txt`
 - Coverage collection:
   `dotnet test tests\Gravitas.Tests\Gravitas.Tests.csproj --configuration Release --collect:"XPlat Code Coverage" --settings tests\Gravitas.Tests\coverlet.runsettings`
-  passed with 1192 tests.
+  passed with 1212 tests.
 - Branch shortlist:
-  `TestResults/coverage-branch-hardening-ws10/branch-gap-shortlist.csv`
-- Latest method-gap extraction reported 229 uncovered methods.
+  `TestResults/coverage-branch-hardening-ws11/branch-gap-shortlist.csv`
+- Latest method-gap extraction reported 214 uncovered methods.
 
 ## Completed Coverage Summary
 
 The completed coverage campaign moved Gravitas from 87.3% line, 74.1% branch,
-and 86.5% method coverage to 93.9% line, 80.7% branch, and 93.9% method
+and 86.5% method coverage to 94.1% line, 81.3% branch, and 94.3% method
 coverage.
 
 High-value work completed:
@@ -131,10 +131,13 @@ High-value work completed:
   curved/mesh frontal-area geometry used by drag.
 - Runtime lifecycle coverage for partition reset, retained membership cleanup,
   context reset, coroutine lifecycle, clock hooks, trigger-driven deferred
-  refresh, inactive collider loading, and mixed partition state cleanup.
+  refresh, inactive collider loading, mixed partition state cleanup, static and
+  kinematic partition removals, stale collider-ID reuse safety, and hierarchy
+  reparent/rejection behavior.
 - Serialization and replay coverage for shape-definition equality/hash
-  semantics, compound authored replay payloads, polygon serialization, and
-  authoritative-vs-cache hash distinctions.
+  semantics, shape-definition guardrails, compound authored replay payloads,
+  polygon serialization, invalid trigger load rejection, pending CCD handoff
+  hash state, and authoritative-vs-cache hash distinctions.
 - Constraint, ragdoll, grounding, diagnostics, trigger, material, and logger
   coverage where behavior is host-visible or deterministic-state-relevant.
 - Real bug fixes found by coverage review: rotated cuboid raycasts now clip
@@ -206,15 +209,18 @@ RCA and verification, even if the fix is small.
 
 ## Active Branch-90 Campaign
 
-Workstreams 1-10 are now historical context. The next phase starts at Workstream
-11 and should be reranked after each coverage run. The ordering below comes from
-`TestResults/coverage-branch-hardening-ws10/branch-gap-shortlist.csv` plus
+Workstreams 1-11 are now historical context. The next phase starts at
+Workstream 12 and should be reranked after each coverage run. The ordering below
+comes from `TestResults/coverage-branch-hardening-ws11/branch-gap-shortlist.csv`
+plus
 runtime risk, hot-path relevance, and duplicate/zombie-code likelihood.
 
 | Order | Branch Family | Why It Comes Next |
 | ---: | --- | --- |
-| 1 | Lifecycle, serialization, replay, and authoring residue | Remaining top gaps are now mostly state transfer, collider authoring, partition cleanup, service lifecycle, and low-count constructor/equality branches. Prior passes found real parity bugs in this family, so it is worth sweeping before the gate. |
-| 2 | Branch 90 gate and 100% roadmap refresh | Only run as a true gate after focused campaigns make 90% realistic. |
+| 1 | CCD exact-hit, kinematic helper, and shape-cast residue | The latest CRAP and branch reports moved the top risk back to CCD exact-hit refinement, kinematic push-axis helpers, cone/query reducers, and mixed shape paths. These are behavior-bearing hot paths and should come before low-value diagnostics padding. |
+| 2 | Mixed/query reducer and fallback-normal audit | Remaining mixed prism/reducer/fallback-normal gaps need classification as valid public behavior, defensive guardrails, or zombie duplication before more tests are added. |
+| 3 | Diagnostic/debug-draw DTO surface audit | Several diagnostic view and draw-command constructors remain low coverage. Cover only visitor/adapter dispatch invariants; leave simple immutable getter noise alone. |
+| 4 | Branch 90 gate and 100% roadmap refresh | Only run as a true gate after focused campaigns make 90% realistic. |
 
 ### Workstream 7: CCD Handoff And Shape-Exact Branch Families
 
@@ -480,7 +486,7 @@ manifold replacement behavior.
 
 ### Workstream 11: Lifecycle, Serialization, Replay, And Authoring Residue
 
-**Status:** Pending
+**Status:** Complete - 2026-07-07
 
 **Purpose**
 
@@ -502,16 +508,37 @@ shape state, and record/load behavior.
 
 **Tasks**
 
-- [ ] Re-check retained partition, direct load, active-state, and deferred
+- [x] Re-check retained partition, direct load, active-state, and deferred
       refresh branches for 2D/3D/mixed parity.
-- [ ] Cover replay and serialization branches only through valid save/load,
+- [x] Cover replay and serialization branches only through valid save/load,
       replay hash, or `IRecordable` flows.
-- [ ] Cover constraint record/load or solver branch residue only where it proves
+- [x] Cover constraint record/load or solver branch residue only where it proves
       meaningful deterministic continuation or solver state.
-- [ ] Delete stale authoring or lifecycle compatibility branches when the new
+- [x] Delete stale authoring or lifecycle compatibility branches when the new
       public API makes them impossible.
-- [ ] Run focused serialization/determinism/runtime tests, full `Release`,
+- [x] Run focused serialization/determinism/runtime tests, full `Release`,
       `ReleaseLean`, and coverage collection.
+
+**Results**
+
+- Deleted unused 3D `LateInitialize` lifecycle scaffolding from
+  `GravitasPhysicsService` and `LSCollider`; no call sites or 2D counterpart
+  existed.
+- Removed explicit collider parameters from 2D/3D ragdoll link definitions so
+  authored links derive their collider from the owning body. This prevents
+  mismatched body/collider authoring and keeps benchmarks/tests on the cleaner
+  API.
+- Added serialization guard coverage proving loaded trigger state is rejected
+  when applied to a body-owned collider in both 2D and 3D.
+- Added replay hash coverage proving pending CCD handoff state contributes to
+  both authoritative and solver-cache hash modes in 2D and 3D.
+- Added authoring guard coverage for undefined/wrong-family shape definitions,
+  invalid 2D AABB size, shape snapshot equality, capsule mutation/no-op
+  branches, zero-mass capsule inertia, hierarchy reparent/rejection behavior,
+  2D suppress-all ragdoll filtering parity, static/kinematic partition removal,
+  stale collider-ID removal safety, and mixed thickness override idempotence.
+- Coverage moved to 94.1% line, 81.3% branch, and 94.3% method with 1212
+  Release tests passing. `ReleaseLean` passed with 1189 tests.
 
 **Exit Criteria**
 
@@ -520,7 +547,45 @@ shape state, and record/load behavior.
 - `ReleaseLean` remains green when serialization or conditional compile paths
   are touched.
 
-### Workstream 12: Branch 90 Gate And 100% Roadmap Refresh
+### Workstream 12: CCD, Query, And Mixed Reducer Residue
+
+**Status:** Pending
+
+**Purpose**
+
+Continue the branch-90 campaign where the latest evidence points: CCD exact-hit
+refinement, kinematic push-axis helpers, cone/query reducers, mixed prism
+reducers, and fallback-normal guardrails. This should be a classification-first
+pass: cover public behavior, delete duplication, and leave defensive guardrails
+alone unless a real collision/query gap appears.
+
+**Likely Candidate Areas**
+
+- `src/Gravitas/Core/3D/SolidBody.ContinuousCollision*.cs`
+- `src/Gravitas/Core/2D/SolidBody2D.ContinuousCollision*.cs`
+- `src/Gravitas/Queries/3D`
+- `src/Gravitas/Queries/Mixed`
+- `src/Gravitas/CollisionHandling/Detection`
+- `tests/Gravitas.Tests/CollisionHandling`
+- `tests/Gravitas.Tests/Physics2D`
+- `tests/Gravitas.Tests/MixedDimensions`
+
+**Tasks**
+
+- [ ] Classify `ResolveKinematicPushAxis`,
+      `ResolveDynamicContactPoint`, CCD exact-hit refinement, and swept-normal
+      residue as public behavior, defensive guardrail, duplicate helper, or bug.
+- [ ] Cover or delete only the branches that represent valid user-visible
+      collision/query behavior.
+- [ ] Review cone overlap/query reducers and mixed prism reducers for shared
+      helper opportunities before adding more tests.
+- [ ] Keep fallback-normal coverage tied to observable collision/query cases,
+      not private-helper branch steering.
+- [ ] Record deeper CCD/query parity or performance issues in
+      `issue-tracker.md` or `benchmark-signal-hardening-backlog.md`.
+- [ ] Run focused tests, full `Release`, and coverage collection.
+
+### Workstream 13: Branch 90 Gate And 100% Roadmap Refresh
 
 **Status:** Pending
 
@@ -562,3 +627,4 @@ it realistically reachable, then pivot the living plan toward the long-term
 | 2026-07-06 | 93.4% | 80.1% | 93.6% | 1162 passed | Workstream 8 mixed prism, response, trigger, and contact branch pass completed. Added bodyless mixed response, friction, response normal-fallback, 2D contact parity, and oblique prism SAT rejection coverage. Reviewed mixed candidate/pair-retention residue and classified `ResolveFallbackNormal` as defensive collision-geometry zombie-code sweep material. |
 | 2026-07-06 | 93.6% | 80.3% | 93.7% | 1174 passed | Workstream 9 query reducer and shape-cast residue completed. Added 2D AABB batch contracts, 3D circle closest/zero-direction coverage, mixed sphere-against-2D circle/fallback normals, convex sweep equal-distance ordering, concave mesh cone query tie coverage, and cone ray worker geometry tests. |
 | 2026-07-07 | 93.9% | 80.7% | 93.9% | 1192 passed | Workstream 10 collision geometry and convex support residue completed. Added mesh-cone support/fallback, cuboid-capsule SAT miss, axis-aligned cuboid Z-contact, 2D reversed capsule/clipping, manifold replacement/material, convex-support policy, and cone/cylinder/mesh frontal-area coverage. Tightened cuboid SAT helper contracts and classified remaining simplex/fallback-normal residue as defensive guardrails unless a public bug appears. |
+| 2026-07-07 | 94.1% | 81.3% | 94.3% | 1212 passed | Workstream 11 lifecycle, serialization, replay, and authoring residue completed. Deleted unused `LateInitialize` scaffolding, removed weak explicit ragdoll-link collider constructors, and added focused coverage for shape authoring guards, trigger load rejection, pending CCD handoff replay hash state, hierarchy rejection/reparenting, partition cleanup, stale collider-ID removal safety, and mixed thickness override idempotence. |

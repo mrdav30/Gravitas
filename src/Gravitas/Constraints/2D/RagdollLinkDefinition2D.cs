@@ -6,6 +6,7 @@
 //=======================================================================
 
 using Gravitas.Colliders;
+using SwiftCollections;
 
 namespace Gravitas.Constraints;
 
@@ -18,17 +19,12 @@ public readonly struct RagdollLinkDefinition2D
     /// Creates a pure 2D ragdoll link definition.
     /// </summary>
     public RagdollLinkDefinition2D(int linkId, SolidBody2D body)
-        : this(linkId, body, body?.Collider!)
-    { }
-
-    /// <summary>
-    /// Creates a pure 2D ragdoll link definition.
-    /// </summary>
-    public RagdollLinkDefinition2D(int linkId, SolidBody2D body, LSCollider2D collider)
     {
+        SwiftThrowHelper.ThrowIfNull(body, nameof(body));
+
         LinkId = linkId;
         Body = body;
-        Collider = collider;
+        Collider = body.Collider;
     }
 
     /// <summary>
