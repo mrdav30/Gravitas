@@ -88,6 +88,66 @@ public sealed class Constraint3DServiceTests
     }
 
     [Fact]
+    public void RemoveJoint_WithDisabledJoint_ShouldUpdateEnabledCountOnlyOnce()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> first = scenario.CreateSphere(Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> second = scenario.CreateSphere(Vector3d.Right * (Fixed64)2);
+        Joint3D joint = scenario.Context.Constraints3D.RegisterJoint(CreateBallSocket(first.Body, second.Body));
+
+        joint.IsEnabled = false;
+        bool removed = scenario.Context.Constraints3D.RemoveJoint(joint.Id);
+        bool removedAgain = scenario.Context.Constraints3D.RemoveJoint(joint.Id);
+
+        removed.Should().BeTrue();
+        removedAgain.Should().BeFalse();
+        scenario.Context.Constraints3D.RegisteredJointCount.Should().Be(0);
+        scenario.Context.Constraints3D.EnabledJointCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void CollisionPolicyRecordUpdate_ShouldAddAndRemoveLinkedCollisionSuppression()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> first = scenario.CreateSphere(Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> second = scenario.CreateSphere(Vector3d.Right * (Fixed64)2);
+        Joint3D joint = scenario.Context.Constraints3D.RegisterJoint(CreateBallSocket(first.Body, second.Body));
+
+        scenario.Context.Constraints3D.ShouldExcludeLinkedCollision(first.Collider, second.Collider).Should().BeTrue();
+
+        joint.SetCollisionPolicyFromRecord(JointCollisionPolicy.Collide);
+
+        joint.CollisionPolicy.Should().Be(JointCollisionPolicy.Collide);
+        scenario.Context.Constraints3D.ShouldExcludeLinkedCollision(first.Collider, second.Collider).Should().BeFalse();
+
+        joint.SetCollisionPolicyFromRecord(JointCollisionPolicy.SuppressLinked);
+
+        joint.CollisionPolicy.Should().Be(JointCollisionPolicy.SuppressLinked);
+        scenario.Context.Constraints3D.ShouldExcludeLinkedCollision(first.Collider, second.Collider).Should().BeTrue();
+    }
+
+    [Fact]
+    public void RemoveJoint_WithDuplicateSuppressingJoints_ShouldKeepSuppressionUntilLastJointIsRemoved()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> first = scenario.CreateSphere(Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> second = scenario.CreateSphere(Vector3d.Right * (Fixed64)2);
+        JointDefinition3D definition = CreateBallSocket(first.Body, second.Body);
+        Joint3D firstJoint = scenario.Context.Constraints3D.RegisterJoint(definition);
+        Joint3D secondJoint = scenario.Context.Constraints3D.RegisterJoint(definition);
+
+        scenario.Context.Constraints3D.ShouldExcludeLinkedCollision(first.Collider, second.Collider).Should().BeTrue();
+
+        scenario.Context.Constraints3D.RemoveJoint(firstJoint.Id).Should().BeTrue();
+
+        scenario.Context.Constraints3D.ShouldExcludeLinkedCollision(first.Collider, second.Collider).Should().BeTrue();
+
+        scenario.Context.Constraints3D.RemoveJoint(secondJoint.Id).Should().BeTrue();
+
+        scenario.Context.Constraints3D.ShouldExcludeLinkedCollision(first.Collider, second.Collider).Should().BeFalse();
+    }
+
+    [Fact]
     public void RegisterJoint_WithInvalidDefinition_ShouldFailBeforeSolverStateIsCreated()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();

@@ -89,36 +89,36 @@ configuration before making source changes.
 
 ## Current Standing
 
-Fresh checkpoint after Workstream 16 kinematic CCD, convex sweep, lifecycle,
-and geometry residue pass:
+Fresh checkpoint after Workstream 17 convex support, CCD handoff, mixed bounds,
+and constraint residue pass:
 
 | Metric | Baseline | Current | Short-Term Gate | Long-Term Target |
 | --- | ---: | ---: | ---: | ---: |
 | Line coverage | 87.3% | 94.7% | 90% | 100% |
-| Branch coverage | 74.1% | 82.5% | 90% | 100% |
+| Branch coverage | 74.1% | 82.7% | 90% | 100% |
 | Method coverage | 86.5% | 94.6% | 90% | 100% |
-| Tests | 974 passed | 1238 passed | green | green |
+| Tests | 974 passed | 1254 passed | green | green |
 
-At the current denominator, the 90% branch gate requires at least 10,128 covered
-branches. The latest run covered 9,287 of 11,253 branches, leaving roughly
-841 net branch outcomes to cover or delete. Treat this as a focused branch
+At the current denominator, the 90% branch gate requires at least 10,092 covered
+branches. The latest run covered 9,280 of 11,213 branches, leaving roughly
+812 net branch outcomes to cover or delete. Treat this as a focused branch
 campaign, not a single gate-check workstream.
 
 Current evidence:
 
 - Coverage report:
-  `TestResults/coverage-branch-hardening-ws16-final/reports/Summary.txt`
+  `TestResults/coverage-branch-hardening-ws17/reports/Summary.txt`
 - Coverage collection:
   `dotnet test tests\Gravitas.Tests\Gravitas.Tests.csproj --configuration Release --collect:"XPlat Code Coverage" --settings tests\Gravitas.Tests\coverlet.runsettings`
-  passed with 1238 tests.
+  passed with 1254 tests.
 - Branch shortlist:
-  `TestResults/coverage-branch-hardening-ws16-final/branch-gap-shortlist.csv`
-- Latest summary reports 200 uncovered methods.
+  `TestResults/coverage-branch-hardening-ws17/branch-gap-shortlist.csv`
+- Latest summary reports 199 uncovered methods.
 
 ## Completed Coverage Summary
 
 The completed coverage campaign moved Gravitas from 87.3% line, 74.1% branch,
-and 86.5% method coverage to 94.7% line, 82.5% branch, and 94.6% method
+and 86.5% method coverage to 94.7% line, 82.7% branch, and 94.6% method
 coverage.
 
 High-value work completed:
@@ -1027,42 +1027,61 @@ small lifecycle rows that may still hide stale fallbacks.
 
 **Tasks**
 
-- [ ] Classify convex-support rows (`Perpendicular`, `UpdateTriangle`,
+- [x] Classify convex-support rows (`Perpendicular`, `UpdateTriangle`,
       `UpdateTetrahedron`) as public GJK behavior, valid malformed-simplex
-      defense, or deletion candidates. Avoid private malformed-simplex tests
-      unless the helper contract truly permits them.
-- [ ] Continue CCD branch work around dynamic response and mixed eligibility
+      defense, or deletion candidates. Added public support/cone-volume and
+      stable perpendicular coverage; left malformed simplex internals alone.
+- [x] Continue CCD branch work around dynamic response and mixed eligibility
       helpers where public fast-mover scenarios can prove stable TOI ordering,
-      no penetration, and deterministic handoff.
-- [ ] Review duplicated mixed bounds/circle-slab helpers for centralization or
+      no penetration, and deterministic handoff. Added 2D/3D handoff guard
+      coverage for fully frozen targets and immediate no-remaining-motion state.
+- [x] Review duplicated mixed bounds/circle-slab helpers for centralization or
       parity tests across collision service, narrow phase, and mixed query
-      reducers.
-- [ ] Cover or simplify constraint collision-policy and joint removal branches
-      through valid 2D/3D service flows.
-- [ ] Triage retained partition, registry, and world-ownership rows only where
+      reducers. Replaced duplicated mixed AABB comparisons with lower-stack
+      `Intersects` helpers and added finite curved circle-slab exact-miss
+      coverage.
+- [x] Cover or simplify constraint collision-policy and joint removal branches
+      through valid 2D/3D service flows. Added disabled-joint removal,
+      collision-policy churn, and duplicate suppressing-joint coverage.
+- [x] Triage retained partition, registry, and world-ownership rows only where
       they expose real lifecycle semantics; leave low-value defensive branches
-      alone unless a stale fallback is found.
-- [ ] Run focused tests, full `Release`, full `ReleaseLean`, coverage
+      alone unless a stale fallback is found. Fresh shortlist moved the next
+      meaningful work toward query, CCD eligibility, mixed pair, and island
+      response families.
+- [x] Run focused tests, full `Release`, full `ReleaseLean`, coverage
       collection, `git diff --check`, and final review.
 
-### Workstream 18: Branch 90 Gate And 100% Roadmap Refresh
+### Workstream 18: Query, CCD Eligibility, Mixed Pair, And Island Residue
 
 **Purpose**
 
-Confirm the short-term 90% branch gate only after the focused residue campaigns
-make it realistically reachable, then pivot the living plan toward the
-long-term 100% target.
+Continue toward the 90% branch gate from the Workstream 17 shortlist. The gate
+is still not realistic as a single step; the next value is in behavior-heavy
+branch families that remain visible after the mixed-bounds and constraint pass:
+3D overlap-sphere hit construction, 2D/3D CCD eligibility predicates,
+shape-exact convex-source support, mixed pair retention/processing, 2D response
+pair reuse, joint-island response integration, and selected query reducer
+residue. Keep the same rule: cover public behavior or simplify stale guards,
+but do not write private malformed-state tests just to color a line.
 
 **Tasks**
 
-- [ ] Rerun coverage with `tests/Gravitas.Tests/coverlet.runsettings`.
-- [ ] Confirm line coverage remains at least 90%.
-- [ ] Confirm branch coverage is at least 90%.
-- [ ] Confirm method coverage remains at least 90%.
-- [ ] Run `dotnet test tests\Gravitas.Tests\Gravitas.Tests.csproj --configuration Release`.
-- [ ] Run `dotnet test tests\Gravitas.Tests\Gravitas.Tests.csproj --configuration ReleaseLean`.
-- [ ] Run `git diff --check`.
-- [ ] Record final 90% gate evidence in this plan.
+- [ ] Classify `TryBuildOverlapSphereHit` and `ProcessColliderListForDirectionalHit`
+      query rows as public query behavior, stale fallback, or low-value view
+      construction residue.
+- [ ] Cover or simplify 2D/3D `IsEligibleDynamicContinuousCollisionTarget`,
+      `IsValidContinuousCollisionTarget`, and mixed CCD eligibility rows through
+      public fast-mover scenarios where possible.
+- [ ] Review `IsExactConvexSourceSupported` coverage through real convex,
+      concave, compound, and unsupported source paths; prefer API cleanup if the
+      support matrix is duplicated or unclear.
+- [ ] Cover mixed `ProcessCandidate` and `TryKeepUntouchedPair` through trigger,
+      resting, inactive, bounds-miss, and retained-pair service flows where those
+      flows are real gameplay semantics.
+- [ ] Review 2D/3D joint-island response helpers and 2D `TryAddExistingResponsePair`
+      for public resting-stack or duplicate-pair behavior before adding tests.
+- [ ] Rerun focused tests, full `Release`, full `ReleaseLean`, coverage
+      collection, `git diff --check`, and final review.
 - [ ] If branch coverage is still below 90%, rerank the active campaign instead
       of marking the gate complete.
 - [ ] Once the branch gate passes, refresh this plan into a 100% roadmap using
@@ -1091,3 +1110,4 @@ long-term 100% target.
 | 2026-07-07 | 94.4% | 81.9% | 94.6% | 1221 passed | Workstream 14 hierarchy, lifecycle, CCD, and contact geometry residue completed. Removed duplicated hierarchy/pair wrapper branches, centralized CCD contact-point and rotational hit tie-break helpers, tightened dynamic body dessimilation invariants, and added constraint capacity/reset plus coincident relative sphere/circle CCD coverage. Fresh branch shortlist reranks the next campaign around mixed fallback normals, convex simplex residue, mixed root resolution, settings replay hash, and shape-exact CCD refinement. |
 | 2026-07-07 | 94.5% | 82.2% | 94.6% | 1231 passed | Workstream 15 mixed, CCD, convex, and replay residue completed. Added extension-shape mixed fallback normal coverage, authoritative settings replay-hash variation coverage, mixed response root-key island coverage, convex touching/simplex behavior coverage, dynamic shape-exact CCD sphere-hit coverage, mixed vertical sphere query hit construction, and unsupported cone-query target rejection. Review tightened matrix-shape hashing and CCD non-penetration assertions while removing one redundant tangent-sphere test. Fresh shortlist reranks the next pass around kinematic CCD handoff, convex sweep normal/point resolution, lifecycle fallbacks, and geometry residue before any 90% gate attempt. |
 | 2026-07-07 | 94.7% | 82.5% | 94.6% | 1238 passed | Workstream 16 kinematic CCD, convex sweep, lifecycle, and geometry residue completed. Added 3D/2D/mixed kinematic earlier-static-hit parity coverage, hardened centered convex-sweep fallback hit points, made unbound 3D collider transform writes fail fast, removed context-owned comparer null-branch debt, and trimmed redundant 2D polygon inertia area handling. Fresh shortlist reranks the next pass around convex simplex/support behavior, CCD dynamic/mixed response residue, mixed bounds/slab helper parity, and constraint lifecycle policy branches. |
+| 2026-07-07 | 94.7% | 82.7% | 94.6% | 1254 passed | Workstream 17 convex support, CCD handoff, mixed bounds, and constraint residue completed. Replaced duplicated mixed bounds comparisons with lower-stack bounds `Intersects` helpers, precomputed mixed mesh embedded volumes once per call, and added focused convex-support, 2D/3D handoff, duplicate joint suppression, and curved circle-slab exact-miss coverage. Fresh shortlist reranks the next campaign around query hit construction, CCD eligibility, mixed pair retention, and island response residue. |

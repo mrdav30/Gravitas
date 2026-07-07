@@ -117,6 +117,66 @@ public sealed class Constraint2DServiceTests
     }
 
     [Fact]
+    public void RemoveJoint_WithDisabledJoint_ShouldUpdateEnabledCountOnlyOnce()
+    {
+        using GravitasWorldContext context = CreateConstraintContext();
+        SolidBody2D first = CreateBody(context, Vector2d.Zero);
+        SolidBody2D second = CreateBody(context, Vector2d.Right * (Fixed64)2);
+        Joint2D joint = context.Constraints2D.RegisterJoint(CreatePin(first, second));
+
+        joint.IsEnabled = false;
+        bool removed = context.Constraints2D.RemoveJoint(joint.Id);
+        bool removedAgain = context.Constraints2D.RemoveJoint(joint.Id);
+
+        removed.Should().BeTrue();
+        removedAgain.Should().BeFalse();
+        context.Constraints2D.RegisteredJointCount.Should().Be(0);
+        context.Constraints2D.EnabledJointCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void CollisionPolicyRecordUpdate_ShouldAddAndRemoveLinked2DCollisionSuppression()
+    {
+        using GravitasWorldContext context = CreateConstraintContext();
+        SolidBody2D first = CreateBody(context, Vector2d.Zero);
+        SolidBody2D second = CreateBody(context, Vector2d.Right * (Fixed64)2);
+        Joint2D joint = context.Constraints2D.RegisterJoint(CreatePin(first, second));
+
+        context.Constraints2D.ShouldExcludeLinkedCollision(first.Collider, second.Collider).Should().BeTrue();
+
+        joint.SetCollisionPolicyFromRecord(JointCollisionPolicy.Collide);
+
+        joint.CollisionPolicy.Should().Be(JointCollisionPolicy.Collide);
+        context.Constraints2D.ShouldExcludeLinkedCollision(first.Collider, second.Collider).Should().BeFalse();
+
+        joint.SetCollisionPolicyFromRecord(JointCollisionPolicy.SuppressLinked);
+
+        joint.CollisionPolicy.Should().Be(JointCollisionPolicy.SuppressLinked);
+        context.Constraints2D.ShouldExcludeLinkedCollision(first.Collider, second.Collider).Should().BeTrue();
+    }
+
+    [Fact]
+    public void RemoveJoint_WithDuplicateSuppressingJoints_ShouldKeep2DSuppressionUntilLastJointIsRemoved()
+    {
+        using GravitasWorldContext context = CreateConstraintContext();
+        SolidBody2D first = CreateBody(context, Vector2d.Zero);
+        SolidBody2D second = CreateBody(context, Vector2d.Right * (Fixed64)2);
+        JointDefinition2D definition = CreatePin(first, second);
+        Joint2D firstJoint = context.Constraints2D.RegisterJoint(definition);
+        Joint2D secondJoint = context.Constraints2D.RegisterJoint(definition);
+
+        context.Constraints2D.ShouldExcludeLinkedCollision(first.Collider, second.Collider).Should().BeTrue();
+
+        context.Constraints2D.RemoveJoint(firstJoint.Id).Should().BeTrue();
+
+        context.Constraints2D.ShouldExcludeLinkedCollision(first.Collider, second.Collider).Should().BeTrue();
+
+        context.Constraints2D.RemoveJoint(secondJoint.Id).Should().BeTrue();
+
+        context.Constraints2D.ShouldExcludeLinkedCollision(first.Collider, second.Collider).Should().BeFalse();
+    }
+
+    [Fact]
     public void DirectJoint_ShouldSuppressAdjacentLinked2DCollisionByDefault()
     {
         using GravitasWorldContext context = CreateConstraintContext();

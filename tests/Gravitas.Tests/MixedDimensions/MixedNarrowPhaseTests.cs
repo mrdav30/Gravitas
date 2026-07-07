@@ -179,6 +179,14 @@ public sealed class MixedNarrowPhaseTests
             }
         };
 
+    public static TheoryData<string, Func<GravitasWorldContext, LSCollider>> CurvedCircleSlabExactMissPairs =>
+        new()
+        {
+            { "Capsule", context => CreateCapsule3D(context, Vector3d.Zero).Collider },
+            { "Cylinder", context => CreateCylinder3D(context, Vector3d.Zero).Collider },
+            { "Cone", context => CreateCone3D(context, Vector3d.Zero).Collider }
+        };
+
     [Fact]
     public void SphereCircleSlab_WithPlanarOverlap_ShouldReportDeterministicContact()
     {
@@ -450,6 +458,25 @@ public sealed class MixedNarrowPhaseTests
         contact.Normal3DTo2D.Should().Be(-Vector3d.Right);
         contact.Point3D.X.Should().Be(Fixed64.FromFraction(1, 4));
         contact.Point2D.X.Should().Be(Fixed64.Half);
+    }
+
+    [Theory]
+    [MemberData(nameof(CurvedCircleSlabExactMissPairs))]
+    public void CurvedCircleSlab_WithOverlappingBoundsButDiagonalSeparation_ShouldRejectExactContact(
+        string _,
+        Func<GravitasWorldContext, LSCollider> createCollider3D)
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        LSCollider collider3D = createCollider3D(context);
+        SolidBody2D circle = CreateBody2D(
+            context,
+            new LSCircleCollider2D(Fixed64.Half),
+            new Vector2d(Fixed64.FromFraction(9, 10), Fixed64.FromFraction(9, 10)));
+
+        collider3D.Bounds.Intersects(circle.Collider.MixedBounds3D).Should().BeTrue();
+
+        CollisionDetectionMixed.TryCollide(collider3D, circle.Collider, out MixedContact contact).Should().BeFalse();
+        contact.HasContact.Should().BeFalse();
     }
 
     [Fact]

@@ -6,7 +6,6 @@
 //=======================================================================
 
 using FixedMathSharp;
-using FixedMathSharp.Bounds;
 using Gravitas.Colliders;
 using System.Runtime.CompilerServices;
 
@@ -22,7 +21,7 @@ public static partial class CollisionDetectionMixed
         SwiftThrowHelper.ThrowIfNull(collider3D, nameof(collider3D));
         SwiftThrowHelper.ThrowIfNull(collider2D, nameof(collider2D));
 
-        if (!BoundsOverlap(collider3D.Bounds, collider2D.MixedBounds3D))
+        if (!collider3D.Bounds.Intersects(collider2D.MixedBounds3D))
         {
             contact = default;
             return false;
@@ -55,7 +54,7 @@ public static partial class CollisionDetectionMixed
         for (int i = 0; i < compound2D.PartCount; i++)
         {
             LSCollider2D part = compound2D.GetPartCollider(i);
-            if (!BoundsOverlap(collider3D.Bounds, part.MixedBounds3D)
+            if (!collider3D.Bounds.Intersects(part.MixedBounds3D)
                 || !TryCollide(collider3D, part, out MixedContact candidate))
             {
                 continue;
@@ -941,15 +940,6 @@ public static partial class CollisionDetectionMixed
 
         return Vector3d.ClosestPointsOnTwoLines(firstStart, firstEnd, secondStart, secondEnd);
     }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool BoundsOverlap(FixedBoundBox first, FixedBoundBox second) =>
-        first.Max.X >= second.Min.X
-        && first.Min.X <= second.Max.X
-        && first.Max.Y >= second.Min.Y
-        && first.Min.Y <= second.Max.Y
-        && first.Max.Z >= second.Min.Z
-        && first.Min.Z <= second.Max.Z;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Vector3d ResolveFallbackNormal(Vector3d sphereCenter, LSCollider2D embedded)

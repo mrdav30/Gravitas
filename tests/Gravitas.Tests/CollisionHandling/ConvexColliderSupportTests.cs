@@ -3,6 +3,7 @@ using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Tests.Support;
+using System;
 using Xunit;
 
 namespace Gravitas.Tests.CollisionHandlingTests;
@@ -32,6 +33,24 @@ public sealed class ConvexColliderSupportTests
 
         range.Min.Should().Be(Fixed64.FromFraction(3, 2));
         range.Max.Should().Be(Fixed64.FromFraction(5, 2));
+    }
+
+    [Fact]
+    public void Support_ShouldUseConvexMeshVerticesAndRejectUnsupportedColliders()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSMeshCollider> mesh = scenario.CreateBody(
+            MeshTestFixtures.CreateConvexCube(inertiaPolicy: MeshInertiaPolicy.SurfaceApproximation),
+            new Vector3d((Fixed64)2, Fixed64.Zero, Fixed64.Zero),
+            FixedQuaternion.Identity);
+        var unsupported = new UnsupportedTestCollider3D();
+        scenario.InitializeStaticCollider(unsupported, Vector3d.Zero);
+
+        Vector3d support = ConvexColliderSupport.Support(mesh.Collider, Vector3d.Right);
+        Action unsupportedSupport = () => ConvexColliderSupport.Support(unsupported, Vector3d.Right);
+
+        support.X.Should().Be(Fixed64.FromFraction(5, 2));
+        unsupportedSupport.Should().Throw<NotSupportedException>();
     }
 
     [Fact]
@@ -84,6 +103,16 @@ public sealed class ConvexColliderSupportTests
     }
 
     [Fact]
+    public void Intersects_WithVerticallyTouchingSpheres_ShouldUseStablePerpendicularFallback()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> first = scenario.CreateSphere(Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> second = scenario.CreateSphere(Vector3d.Up);
+
+        ConvexColliderSupport.Intersects(first.Collider, second.Collider).Should().BeTrue();
+    }
+
+    [Fact]
     public void Intersects_WithOffsetCapsuleAgainstCuboid_ShouldReduceTriangleSimplex()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
@@ -128,5 +157,20 @@ public sealed class ConvexColliderSupportTests
 
         ConvexColliderSupport.IntersectsConeVolume(hit.Collider, apex, axis, length, radius).Should().BeTrue();
         ConvexColliderSupport.IntersectsConeVolume(miss.Collider, apex, axis, length, radius).Should().BeFalse();
+    }
+
+    [Fact]
+    public void IntersectsConeVolume_ShouldRejectUnsupportedColliderTypes()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        var unsupported = new UnsupportedTestCollider3D();
+        scenario.InitializeStaticCollider(unsupported, Vector3d.Zero);
+
+        ConvexColliderSupport.IntersectsConeVolume(
+            unsupported,
+            Vector3d.Zero,
+            Vector3d.Up,
+            Fixed64.One,
+            Fixed64.Half).Should().BeFalse();
     }
 }

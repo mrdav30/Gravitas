@@ -24,7 +24,7 @@ public static partial class CollisionDetectionMixed
         for (int i = 0; i < compound.PartCount; i++)
         {
             LSCollider part = compound.GetPartCollider(i);
-            if (!BoundsOverlap(part.Bounds, embedded.MixedBounds3D)
+            if (!part.Bounds.Intersects(embedded.MixedBounds3D)
                 || !TryCollide(part, embedded, out MixedContact candidate))
             {
                 continue;
@@ -48,14 +48,15 @@ public static partial class CollisionDetectionMixed
     private static bool TryMeshEmbedded2D(LSMeshCollider mesh, LSCollider2D embedded, out MixedContact contact)
     {
         SwiftList<int> triangleBuffer = mesh.Context.CollisionScratch.MeshTriangleCandidatesA;
-        mesh.GetTrianglesInBounds(new FixedBoundVolume(embedded.MixedBounds3D.Min, embedded.MixedBounds3D.Max), triangleBuffer);
+        FixedBoundVolume embeddedBounds = new(embedded.MixedBounds3D.Min, embedded.MixedBounds3D.Max);
+        mesh.GetTrianglesInBounds(embeddedBounds, triangleBuffer);
 
         bool found = false;
         MixedContact best = default;
         for (int i = 0; i < triangleBuffer.Count; i++)
         {
             GetMeshTriangle(mesh, triangleBuffer[i], out CollisionTriangle triangle);
-            if (!BoundsOverlap(triangle.QueryBounds, embedded.MixedBounds3D)
+            if (!triangle.QueryBounds.Intersects(embeddedBounds)
                 || !TryTriangleEmbedded2D(triangle, embedded, out AxisPenetration penetration))
             {
                 continue;
@@ -355,14 +356,5 @@ public static partial class CollisionDetectionMixed
         new(
             Vector3d.Min(Vector3d.Min(first, second), third),
             Vector3d.Max(Vector3d.Max(first, second), third));
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool BoundsOverlap(FixedBoundVolume first, FixedBoundBox second) =>
-        first.Max.X >= second.Min.X
-        && first.Min.X <= second.Max.X
-        && first.Max.Y >= second.Min.Y
-        && first.Min.Y <= second.Max.Y
-        && first.Max.Z >= second.Min.Z
-        && first.Min.Z <= second.Max.Z;
 
 }

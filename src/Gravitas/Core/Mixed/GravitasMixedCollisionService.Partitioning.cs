@@ -259,6 +259,7 @@ internal sealed partial class GravitasMixedCollisionService
         SwiftThrowHelper.ThrowIfNull(candidates, nameof(candidates));
         Refresh2DColliderPartitionsForQuery(cachePartitionRefresh);
         candidates.FastClear();
+        FixedBoundBox queryBounds = FixedBoundBox.FromMinMax(min, max);
         CollectCoveredMixedQueryPartitions(min, max, _queryPartitions);
         _queryPartitions.SortInPlace(PartitionOrderComparer);
         _queryColliderRedundancy.Clear();
@@ -276,7 +277,7 @@ internal sealed partial class GravitasMixedCollisionService
                 int colliderId = _queryColliderIds[j];
                 if (!_queryColliderRedundancy.Add(colliderId)
                     || !_context.Physics2D.TryGetColliderById(colliderId, out LSCollider2D? collider)
-                    || !Is2DQueryCandidate(collider!, min, max, layerMask))
+                    || !Is2DQueryCandidate(collider!, queryBounds, layerMask))
                 {
                     continue;
                 }
@@ -300,6 +301,7 @@ internal sealed partial class GravitasMixedCollisionService
         SwiftThrowHelper.ThrowIfNull(candidates, nameof(candidates));
         Refresh3DColliderPartitionsForQuery(cachePartitionRefresh);
         candidates.FastClear();
+        FixedBoundBox queryBounds = FixedBoundBox.FromMinMax(min, max);
         CollectCoveredMixedQueryPartitions(min, max, _queryPartitions);
         _queryPartitions.SortInPlace(PartitionOrderComparer);
         _queryColliderRedundancy.Clear();
@@ -317,7 +319,7 @@ internal sealed partial class GravitasMixedCollisionService
                 int colliderId = _queryColliderIds[j];
                 if (!_queryColliderRedundancy.Add(colliderId)
                     || !_context.Physics.TryGetColliderById(colliderId, out LSCollider? collider)
-                    || !Is3DQueryCandidate(collider!, min, max, layerMask))
+                    || !Is3DQueryCandidate(collider!, queryBounds, layerMask))
                 {
                     continue;
                 }
@@ -751,42 +753,24 @@ internal sealed partial class GravitasMixedCollisionService
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool MixedBoundsOverlap(LSCollider collider3D, LSCollider2D collider2D)
     {
-        FixedBoundBox bounds2D = collider2D.MixedBounds3D;
-        return collider3D.BoundsMax.X >= bounds2D.Min.X
-            && collider3D.BoundsMin.X <= bounds2D.Max.X
-            && collider3D.BoundsMax.Y >= bounds2D.Min.Y
-            && collider3D.BoundsMin.Y <= bounds2D.Max.Y
-            && collider3D.BoundsMax.Z >= bounds2D.Min.Z
-            && collider3D.BoundsMin.Z <= bounds2D.Max.Z;
+        return collider3D.Bounds.Intersects(collider2D.MixedBounds3D);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool Is2DQueryCandidate(LSCollider2D collider, Vector3d min, Vector3d max, PhysicsLayerMask layerMask)
+    private static bool Is2DQueryCandidate(LSCollider2D collider, FixedBoundBox queryBounds, PhysicsLayerMask layerMask)
     {
         if (!collider.IsActive || !layerMask.Includes(collider.Layer))
             return false;
 
-        FixedBoundBox bounds = collider.MixedBounds3D;
-        return BoundsOverlap(bounds.Min, bounds.Max, min, max);
+        return collider.MixedBounds3D.Intersects(queryBounds);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool Is3DQueryCandidate(LSCollider collider, Vector3d min, Vector3d max, PhysicsLayerMask layerMask)
+    private static bool Is3DQueryCandidate(LSCollider collider, FixedBoundBox queryBounds, PhysicsLayerMask layerMask)
     {
         return collider.IsActive
             && layerMask.Includes(collider.Layer)
-            && BoundsOverlap(collider.BoundsMin, collider.BoundsMax, min, max);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool BoundsOverlap(Vector3d firstMin, Vector3d firstMax, Vector3d secondMin, Vector3d secondMax)
-    {
-        return firstMax.X >= secondMin.X
-            && firstMin.X <= secondMax.X
-            && firstMax.Y >= secondMin.Y
-            && firstMin.Y <= secondMax.Y
-            && firstMax.Z >= secondMin.Z
-            && firstMin.Z <= secondMax.Z;
+            && collider.Bounds.Intersects(queryBounds);
     }
 
     private void DetachRetainedPartitions()

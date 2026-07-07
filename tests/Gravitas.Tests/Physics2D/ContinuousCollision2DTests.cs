@@ -341,6 +341,57 @@ public sealed class ContinuousCollision2DTests
     }
 
     [Fact]
+    public void ContinuousHandoff_WithFrozenBody_ShouldNotMoveOrQueue()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        SolidBody2D body = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
+        body.FreezeAxes = BodyFreezeAxes2D.Position;
+
+        body.ApplyContinuousCollisionHandoff(
+            Vector2d.Right,
+            Vector2d.Right,
+            Fixed64.Half);
+
+        body.Position.Should().Be(Vector2d.Zero);
+        body.LinearVelocity.Should().Be(Vector2d.Zero);
+        body.TryConsumeContinuousCollisionHandoff(
+            updateSleepState: false,
+            updateColliderState: false).Should().BeFalse();
+    }
+
+    [Fact]
+    public void ContinuousHandoff_WithNoRemainingMotion_ShouldApplyImmediateStateWithoutQueueing()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        SolidBody2D noTime = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
+        SolidBody2D noVelocity = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.Half),
+            Vector2d.Forward * (Fixed64)4,
+            immovable: false);
+
+        noTime.ApplyContinuousCollisionHandoff(
+            Vector2d.Right * Fixed64.Half,
+            Vector2d.Right,
+            Fixed64.Zero);
+        noVelocity.ApplyContinuousCollisionHandoff(
+            new Vector2d(Fixed64.Zero, Fixed64.FromFraction(9, 2)),
+            Vector2d.Zero,
+            Fixed64.Half);
+
+        noTime.Position.Should().Be(Vector2d.Right * Fixed64.Half);
+        noTime.LinearVelocity.Should().Be(Vector2d.Right);
+        noTime.TryConsumeContinuousCollisionHandoff(
+            updateSleepState: false,
+            updateColliderState: false).Should().BeFalse();
+        noVelocity.Position.Should().Be(new Vector2d(Fixed64.Zero, Fixed64.FromFraction(9, 2)));
+        noVelocity.LinearVelocity.Should().Be(Vector2d.Zero);
+        noVelocity.TryConsumeContinuousCollisionHandoff(
+            updateSleepState: false,
+            updateColliderState: false).Should().BeFalse();
+    }
+
+    [Fact]
     public void ContinuousMode_DynamicRelativePath_ShouldNotClampThinAabbWhenProxyCirclesHitButShapesMiss()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);

@@ -655,6 +655,53 @@ public sealed class ContinuousCollisionDetectionTests
     }
 
     [Fact]
+    public void ContinuousHandoff_WithFrozenBody_ShouldNotMoveOrQueue()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
+        body.Body.FreezeAxes = BodyFreezeAxes3D.Position;
+
+        body.Body.ApplyContinuousCollisionHandoff(
+            Vector3d.Right,
+            Vector3d.Right,
+            Fixed64.Half);
+
+        body.Body.Position3d.Should().Be(Vector3d.Zero);
+        body.Body.LinearVelocity.Should().Be(Vector3d.Zero);
+        body.Body.TryConsumeContinuousCollisionHandoff(
+            updateSleepState: false,
+            updateColliderState: false).Should().BeFalse();
+    }
+
+    [Fact]
+    public void ContinuousHandoff_WithNoRemainingMotion_ShouldApplyImmediateStateWithoutQueueing()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        ScenarioBody<LSSphereCollider> noTime = scenario.CreateSphere(Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> noVelocity = scenario.CreateSphere(Vector3d.Up * (Fixed64)4);
+
+        noTime.Body.ApplyContinuousCollisionHandoff(
+            Vector3d.Right * Fixed64.Half,
+            Vector3d.Right,
+            Fixed64.Zero);
+        noVelocity.Body.ApplyContinuousCollisionHandoff(
+            new Vector3d(Fixed64.Zero, (Fixed64)4, Fixed64.Half),
+            Vector3d.Zero,
+            Fixed64.Half);
+
+        noTime.Body.Position3d.Should().Be(Vector3d.Right * Fixed64.Half);
+        noTime.Body.LinearVelocity.Should().Be(Vector3d.Right);
+        noTime.Body.TryConsumeContinuousCollisionHandoff(
+            updateSleepState: false,
+            updateColliderState: false).Should().BeFalse();
+        noVelocity.Body.Position3d.Should().Be(new Vector3d(Fixed64.Zero, (Fixed64)4, Fixed64.Half));
+        noVelocity.Body.LinearVelocity.Should().Be(Vector3d.Zero);
+        noVelocity.Body.TryConsumeContinuousCollisionHandoff(
+            updateSleepState: false,
+            updateColliderState: false).Should().BeFalse();
+    }
+
+    [Fact]
     public void ContinuousMode_DynamicRelativePath_ShouldNotClampThinCuboidWhenProxySpheresHitButShapesMiss()
     {
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();
