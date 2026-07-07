@@ -21,6 +21,42 @@ No active issues currently tracked.
 
 ## Resolved Issues
 
+### Context-Driven Mixed CCD Handoffs Could Drain Per Service Before The Shared Budget
+
+**Discovered:** 2026-07-06  
+**Resolved:** 2026-07-06  
+**Source:** Coverage Workstream 7 CCD handoff branch audit  
+**Affected area:** `GravitasWorldContext.LateSimulate`,
+`GravitasPhysicsService`, `GravitasPhysics2DService`, mixed 2D/3D continuous
+collision handoff chains
+
+RCA: direct `GravitasPhysicsService.LateSimulate()` and
+`GravitasPhysics2DService.LateSimulate()` correctly owned their local handoff
+drain for standalone service calls. The context-driven mixed runtime reused the
+same service method and then ran an additional context-level handoff relay
+afterward. That split ownership meant `ContinuousCollisionMaxToiIterations`
+could be consumed independently by each pure service before the context-level
+mixed relay, making the mixed-frame budget less explicit than the public
+setting implied.
+
+Fix: the pure physics services now expose an internal begin/complete late-step
+split. Direct service calls remain self-contained, while
+`GravitasWorldContext.LateSimulate()` integrates 3D and 2D bodies first,
+drains the shared queued CCD handoff budget once at the context level, then
+completes partitioning, discrete response, active-pair processing, and sleep
+updates for the services that actually ran.
+
+Verification:
+
+- Added mixed 3D-to-2D and 2D-to-3D handoff-chain regressions, plus an
+  independent same-frame 3D/2D queued-handoff regression, with
+  `ContinuousCollisionMaxToiIterations = 1`.
+- Converted the 2D-to-3D kinematic mixed handoff test from a manual service
+  helper to the real `GravitasWorldContext.LateSimulate()` path.
+- Ran focused pure 3D, pure 2D, mixed handoff, and direct-service CCD tests.
+- Ran full coverage collection: 1153 tests passed, branch coverage reached
+  79.9%.
+
 ### 2D Active-State Toggle Preserved Mixed Partition Membership
 
 **Discovered:** 2026-07-06  

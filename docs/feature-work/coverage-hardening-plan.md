@@ -89,36 +89,36 @@ configuration before making source changes.
 
 ## Current Standing
 
-Fresh checkpoint after Workstream 6 diagnostics and low-value surface audit:
+Fresh checkpoint after Workstream 7 CCD handoff and shape-exact branch pass:
 
 | Metric | Baseline | Current | Short-Term Gate | Long-Term Target |
 | --- | ---: | ---: | ---: | ---: |
 | Line coverage | 87.3% | 93.3% | 90% | 100% |
-| Branch coverage | 74.1% | 79.7% | 90% | 100% |
+| Branch coverage | 74.1% | 79.9% | 90% | 100% |
 | Method coverage | 86.5% | 93.6% | 90% | 100% |
-| Tests | 974 passed | 1146 passed | green | green |
+| Tests | 974 passed | 1153 passed | green | green |
 
-At the current denominator, the 90% branch gate requires 10,236 covered
-branches. The latest run covered 9,066 of 11,373 branches, leaving roughly
-1,170 net branch outcomes to cover or delete. Treat this as a focused branch
+At the current denominator, the 90% branch gate requires 10,249 covered
+branches. The latest run covered 9,109 of 11,387 branches, leaving roughly
+1,140 net branch outcomes to cover or delete. Treat this as a focused branch
 campaign, not a single gate-check workstream.
 
 Current evidence:
 
 - Coverage report:
-  `TestResults/coverage-branch-hardening-ws6/reports/Summary.txt`
+  `TestResults/coverage-branch-hardening-ws7/reports/Summary.txt`
 - Coverage collection:
   `dotnet test tests\Gravitas.Tests\Gravitas.Tests.csproj --configuration Release --collect:"XPlat Code Coverage" --settings tests\Gravitas.Tests\coverlet.runsettings`
-  passed with 1146 tests.
+  passed with 1153 tests.
 - Branch shortlist:
-  `TestResults/coverage-branch-hardening-ws6/branch-gap-shortlist.txt`
+  `TestResults/coverage-branch-hardening-ws7/branch-gap-shortlist.txt`
 - Latest CRAP extraction reported 34 flagged methods and 237 uncovered
   methods.
 
 ## Completed Coverage Summary
 
 The completed coverage campaign moved Gravitas from 87.3% line, 74.1% branch,
-and 86.5% method coverage to 93.3% line, 79.7% branch, and 93.6% method
+and 86.5% method coverage to 93.3% line, 79.9% branch, and 93.6% method
 coverage.
 
 High-value work completed:
@@ -135,8 +135,10 @@ High-value work completed:
 - Constraint, ragdoll, grounding, diagnostics, trigger, material, and logger
   coverage where behavior is host-visible or deterministic-state-relevant.
 - Real bug fixes found by coverage review: rotated cuboid raycasts now clip
-  local slabs, 2D active-state changes clear mixed partitions, and inactive 3D
-  direct-collider loads clear stale partition state.
+  local slabs, 2D active-state changes clear mixed partitions, inactive 3D
+  direct-collider loads clear stale partition state, and mixed CCD handoff
+  queues now drain through one context-owned budget before partition/discrete
+  completion.
 
 Cleanup completed:
 
@@ -199,9 +201,9 @@ RCA and verification, even if the fix is small.
 
 ## Active Branch-90 Campaign
 
-Workstreams 1-6 are now historical context. The next phase starts at Workstream
-7 and should be reranked after each coverage run. The ordering below comes from
-`TestResults/coverage-branch-hardening-ws6/branch-gap-shortlist.txt` plus
+Workstreams 1-7 are now historical context. The next phase starts at Workstream
+8 and should be reranked after each coverage run. The ordering below comes from
+`TestResults/coverage-branch-hardening-ws7/branch-gap-shortlist.txt` plus
 runtime risk, hot-path relevance, and duplicate/zombie-code likelihood.
 
 | Order | Branch Family | Why It Comes Next |
@@ -215,7 +217,7 @@ runtime risk, hot-path relevance, and duplicate/zombie-code likelihood.
 
 ### Workstream 7: CCD Handoff And Shape-Exact Branch Families
 
-**Status:** Pending
+**Status:** Complete - 2026-07-06
 
 **Purpose**
 
@@ -230,28 +232,50 @@ fast-mover behavior, not just coverage percentages.
 - `src/Gravitas/Core/2D/SolidBody2D.ContinuousCollision*.cs`
 - `src/Gravitas/Runtime/GravitasWorldContext.cs`
 - `src/Gravitas/CollisionHandling/Continuous/ContinuousCollisionCandidateOrdering.cs`
-- `tests/Gravitas.Tests/ContinuousCollision`
-- `tests/Gravitas.Tests/Core`
+- `tests/Gravitas.Tests/CollisionHandling`
+- `tests/Gravitas.Tests/Physics2D`
+- `tests/Gravitas.Tests/MixedDimensions`
 
 **Tasks**
 
-- [ ] Re-open the latest branch shortlist and classify each CCD entry as real
+- [x] Re-open the latest branch shortlist and classify each CCD entry as real
       behavior, duplicate code, defensive impossible branch, or bug/parity
       smell before adding tests.
-- [ ] Cover 3D and 2D kinematic-dynamic push eligibility, ignored-target, and
+- [x] Cover 3D and 2D kinematic-dynamic push eligibility, ignored-target, and
       no-target branches through public simulation scenarios.
-- [ ] Cover mixed 2D/3D CCD push/handoff branches where they affect observable
+- [x] Cover mixed 2D/3D CCD push/handoff branches where they affect observable
       movement, contact, trigger, or replay state.
-- [ ] Cover rotational CCD branches in 3D and 2D with deterministic angular
+- [x] Review rotational CCD branches in 3D and 2D with deterministic angular
       sweeps, including no-hit, replacement-hit, and exact-hit paths.
-- [ ] Cover shape-exact refinement and swept-normal fallback branches through
+- [x] Review shape-exact refinement and swept-normal fallback branches through
       valid collider configurations rather than private-helper steering.
-- [ ] Review candidate-ordering duplicate entries and centralize/delete any
+- [x] Review candidate-ordering duplicate entries and centralize/delete any
       redundant branch logic before writing more tests around it.
-- [ ] Record any CCD semantic bug or parity gap in `issue-tracker.md`; if fixed
+- [x] Record any CCD semantic bug or parity gap in `issue-tracker.md`; if fixed
       immediately, move it to resolved with RCA and verification evidence.
-- [ ] Run focused CCD tests, full `Release`, coverage collection, and
+- [x] Run focused CCD tests, full `Release`, coverage collection, and
       `ReleaseLean` if serialization or conditional compilation changes.
+
+**Result**
+
+- Added deterministic candidate-ordering coverage for 3D and 2D hit ordering,
+  plus ignored-target self/body/hierarchy cases. The
+  `ContinuousCollisionCandidateOrdering` class now reports 100% line coverage
+  in the WS7 report.
+- Removed a mixed CCD test-only service helper and routed the 2D-to-3D
+  kinematic handoff test through `GravitasWorldContext.LateSimulate`.
+- Fixed a real lifecycle ownership issue: context-driven late simulation now
+  integrates 3D and 2D bodies first, drains the shared CCD handoff queue once at
+  the context level, then completes partition/discrete response phases. Direct
+  service `LateSimulate()` calls remain self-contained.
+- Added mixed 3D-to-2D and 2D-to-3D handoff-chain tests plus an independent
+  same-frame 3D/2D queued-handoff regression that proves
+  `ContinuousCollisionMaxToiIterations` is honored as a single context-owned
+  queue budget in mixed frames.
+- Existing rotational and shape-exact public tests already cover the meaningful
+  no-hit/hit/allocation scenarios. The remaining high-complexity CCD rows stay
+  visible in the WS7 shortlist for later branch campaigns rather than being
+  padded with private-helper tests.
 
 **Exit Criteria**
 
@@ -462,3 +486,4 @@ it realistically reachable, then pivot the living plan toward the long-term
 | 2026-07-06 | 93.0% | 79.2% | 93.0% | 1125 passed | Workstream 4 serialization, replay, and authoring hardening completed. Added shape-definition value semantics, compound authored replay payload, polygon serialization, and mixed inactive-load coverage. Tightened final review assertions for mixed partition membership and compound replay hash stability. Fixed 2D active-state mixed partition cleanup parity. |
 | 2026-07-06 | 93.2% | 79.6% | 93.4% | 1137 passed | Workstream 5 service lifecycle, partition, and runtime hardening completed. Added retained partition idempotency, context reset parity, coroutine lifecycle, clock hook, and 2D deferred refresh coverage. Centralized partition voxel ordering and removed duplicated null-comparer branch debt. |
 | 2026-07-06 | 93.3% | 79.7% | 93.6% | 1146 passed | Workstream 6 diagnostics and low-value surface audit completed. Added logger facade, visitor null guard, disabled capture, zero-ray, and non-prismatic 2D joint draw coverage while leaving immutable view getter noise classified as low-value. |
+| 2026-07-06 | 93.3% | 79.9% | 93.6% | 1153 passed | Workstream 7 CCD handoff and shape-exact branch pass completed. Added 3D/2D candidate-ordering and ignored-target coverage, removed a mixed CCD test-only handoff helper, and fixed context-driven mixed CCD handoff ownership so the shared TOI budget drains before partition/discrete completion. |

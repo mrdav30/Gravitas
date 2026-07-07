@@ -341,32 +341,39 @@ public sealed class GravitasWorldContext : IDisposable
             Physics.PrepareContinuousCollisionFrame();
         if (runtimeMode.Runs2D())
             Physics2D.PrepareContinuousCollisionFrame();
-        if (runtimeMode.Runs3D())
-            Physics.LateSimulate(continuousCollisionFramePrepared: true);
-        if (runtimeMode.Runs2D())
-            Physics2D.LateSimulate(continuousCollisionFramePrepared: true);
-        ProcessQueuedContinuousCollisionHandoffs(runtimeMode);
+        bool ran3D = runtimeMode.Runs3D()
+            && Physics.BeginLateSimulateBodies(continuousCollisionFramePrepared: true);
+        bool ran2D = runtimeMode.Runs2D()
+            && Physics2D.BeginLateSimulateBodies(continuousCollisionFramePrepared: true);
+        ProcessQueuedContinuousCollisionHandoffs(ran3D, ran2D);
+        if (ran3D)
+            Physics.CompleteLateSimulatePhysicsStep();
+        if (ran2D)
+            Physics2D.CompleteLateSimulatePhysicsStep();
         if (runtimeMode.RunsMixedContacts())
             MixedCollisions.LateSimulate();
 
         _hooks.InvokeLateSimulate();
     }
 
-    private void ProcessQueuedContinuousCollisionHandoffs(PhysicsRuntimeMode runtimeMode)
+    private void ProcessQueuedContinuousCollisionHandoffs(bool runs3D, bool runs2D)
     {
+        if (!runs3D && !runs2D)
+            return;
+
         int iterationLimit = Settings.ContinuousCollisionMaxToiIterations;
         int remainingIterations = iterationLimit;
         for (int iteration = 0; iteration < iterationLimit && remainingIterations > 0; iteration++)
         {
             int processedIterations = 0;
-            if (runtimeMode.Runs3D())
+            if (runs3D)
             {
                 int usedIterations = Physics.ProcessQueuedContinuousCollisionHandoffs(remainingIterations);
                 processedIterations += usedIterations;
                 remainingIterations -= usedIterations;
             }
 
-            if (remainingIterations > 0 && runtimeMode.Runs2D())
+            if (remainingIterations > 0 && runs2D)
             {
                 int usedIterations = Physics2D.ProcessQueuedContinuousCollisionHandoffs(remainingIterations);
                 processedIterations += usedIterations;
@@ -380,9 +387,9 @@ public sealed class GravitasWorldContext : IDisposable
         if (remainingIterations > 0)
             return;
 
-        if (runtimeMode.Runs3D())
+        if (runs3D)
             Physics.ProcessQueuedContinuousCollisionHandoffs(iterationBudget: 0);
-        if (runtimeMode.Runs2D())
+        if (runs2D)
             Physics2D.ProcessQueuedContinuousCollisionHandoffs(iterationBudget: 0);
     }
 

@@ -125,8 +125,17 @@ public sealed partial class GravitasPhysicsService
 
     internal void LateSimulate(bool continuousCollisionFramePrepared)
     {
-        if (!SimulatePhysics)
+        if (!BeginLateSimulateBodies(continuousCollisionFramePrepared))
             return;
+
+        ProcessQueuedContinuousCollisionHandoffs();
+        CompleteLateSimulatePhysicsStep();
+    }
+
+    internal bool BeginLateSimulateBodies(bool continuousCollisionFramePrepared)
+    {
+        if (!SimulatePhysics)
+            return false;
 
         if (!continuousCollisionFramePrepared)
             _context.AdvanceLateSimulateToken();
@@ -144,7 +153,14 @@ public sealed partial class GravitasPhysicsService
             }
         }
 
-        ProcessQueuedContinuousCollisionHandoffs();
+        return true;
+    }
+
+    internal void CompleteLateSimulatePhysicsStep()
+    {
+        if (!SimulatePhysics)
+            return;
+
         PrepareCollisionPartitions();
         RunDiscreteCollisionStep();
         ProcessActiveCollisionPairs();
