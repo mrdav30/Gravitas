@@ -181,11 +181,12 @@ public sealed class CollisionDetectionShapePairTests
     }
 
     [Fact]
-    public void CuboidCapsule_ShouldDetectAxisAlignedAndRotatedOverlap()
+    public void CuboidCapsule_ShouldDetectAxisAlignedRotatedAndSeparatedCases()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSCuboidCollider> axisAligned = scenario.CreateCuboid(PhysicsScenarioBuilder.Vector(0, 0, 0));
         ScenarioBody<LSCapsuleCollider> axisAlignedCapsule = scenario.CreateCapsule(PhysicsScenarioBuilder.Vector(Fixed64.Half, Fixed64.Zero, Fixed64.Zero));
+        ScenarioBody<LSCapsuleCollider> separatedAxisAlignedCapsule = scenario.CreateCapsule(PhysicsScenarioBuilder.Vector(3, 0, 0));
         ScenarioBody<LSCuboidCollider> rotated = scenario.CreateCuboid(
             PhysicsScenarioBuilder.Vector(4, 0, 0),
             PhysicsScenarioBuilder.Yaw(45));
@@ -193,11 +194,14 @@ public sealed class CollisionDetectionShapePairTests
             (Fixed64)4 + Fixed64.Half,
             Fixed64.Zero,
             Fixed64.Zero));
+        ScenarioBody<LSCapsuleCollider> separatedRotatedCapsule = scenario.CreateCapsule(PhysicsScenarioBuilder.Vector(7, 0, 0));
 
         axisAligned.Collider.Shape.Should().Be(ColliderType.AABox);
         rotated.Collider.Shape.Should().Be(ColliderType.OBBox);
         AssertCollision(scenario, axisAligned.Collider, axisAlignedCapsule.Collider, CollisionType.AABox_Capsule);
         AssertCollision(scenario, rotated.Collider, rotatedCapsule.Collider, CollisionType.OBBox_Capsule);
+        AssertNoCollision(scenario, axisAligned.Collider, separatedAxisAlignedCapsule.Collider, CollisionType.AABox_Capsule);
+        AssertNoCollision(scenario, rotated.Collider, separatedRotatedCapsule.Collider, CollisionType.OBBox_Capsule);
     }
 
     [Fact]
@@ -273,6 +277,30 @@ public sealed class CollisionDetectionShapePairTests
         pair.Manifold.Count.Should().Be(ContactManifold.MaxContactCount);
         pair.Manifold.PrimaryContact.Depth.Should().Be(Fixed64.Zero);
         pair.Manifold.PrimaryContact.Normal.Should().Be(Vector3d.Up);
+    }
+
+    [Theory]
+    [InlineData(3, 4, 1)]
+    [InlineData(-3, 4, -1)]
+    public void CuboidCuboidDepthOnZ_ShouldGenerateStableFaceContacts(int zNumerator, int zDenominator, int expectedNormalZ)
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSCuboidCollider> first = scenario.CreateCuboid(PhysicsScenarioBuilder.Vector(0, 0, 0));
+        Fixed64 offsetZ = Fixed64.FromFraction(zNumerator, zDenominator);
+        ScenarioBody<LSCuboidCollider> second = scenario.CreateCuboid(new Vector3d(Fixed64.Zero, Fixed64.Zero, offsetZ));
+
+        CollisionPair pair = AssertCollision(scenario, first.Collider, second.Collider, CollisionType.Cuboid_Cuboid);
+
+        pair.Manifold.Count.Should().Be(ContactManifold.MaxContactCount);
+        pair.Manifold.Select(contact => contact.ContactId).Should().BeInAscendingOrder();
+        for (int i = 0; i < pair.Manifold.Count; i++)
+        {
+            ManifoldContact contact = pair.Manifold[i];
+            contact.Depth.Should().Be(Fixed64.One - offsetZ.Abs());
+            contact.Normal.Should().Be(new Vector3d(Fixed64.Zero, Fixed64.Zero, (Fixed64)expectedNormalZ));
+            contact.PointA.Z.Should().Be(expectedNormalZ > 0 ? first.Collider.BoundsMax.Z : first.Collider.BoundsMin.Z);
+            contact.PointB.Z.Should().Be(contact.PointA.Z - contact.Normal.Z * contact.Depth);
+        }
     }
 
     [Fact]
@@ -563,6 +591,48 @@ public sealed class CollisionDetectionShapePairTests
         AssertNoCollision(scenario, cone.Collider, separatedCuboid.Collider, CollisionType.Cone_Convex);
         AssertCollision(scenario, mesh.Collider, cone.Collider, CollisionType.Mesh_Cone);
         AssertCollision(scenario, compound.Collider, compoundCone.Collider, CollisionType.Compound);
+    }
+
+    [Fact]
+    public void MeshCone_WithConeSideCrossingTrianglePlane_ShouldUseConeSupportContact()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSMeshCollider> wall = scenario.CreateBody(
+            CreateVerticalPlaneMesh(),
+            PhysicsScenarioBuilder.Vector(0, 0, 0),
+            FixedQuaternion.Identity);
+        ScenarioBody<LSConeCollider> cone = CreateCone(
+            scenario,
+            new Vector3d(Fixed64.FromFraction(2, 5), Fixed64.Zero, Fixed64.Zero));
+
+        CollisionPair pair = AssertCollision(scenario, wall.Collider, cone.Collider, CollisionType.Mesh_Cone);
+
+        pair.Manifold.PrimaryContact.Normal.X.Should().BeGreaterThan(Fixed64.Zero);
+        pair.Manifold.PrimaryContact.PointB.X.Should().BeLessThan(Fixed64.Zero);
+        pair.Manifold.PrimaryContact.PointA.X.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void MeshCone_WithConeContainedInClosedConvexMesh_ShouldUseConvexFallback()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSMeshCollider> mesh = scenario.CreateBody(
+            MeshTestFixtures.CreateConvexCube(),
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+        ScenarioBody<LSConeCollider> cone = scenario.CreateBody(
+            new LSConeCollider
+            {
+                Radius = Fixed64.FromFraction(1, 8),
+                Size = new Vector3d(Fixed64.FromFraction(1, 4), Fixed64.FromFraction(1, 4), Fixed64.FromFraction(1, 4))
+            },
+            new Vector3d(Fixed64.FromFraction(1, 8), Fixed64.Zero, Fixed64.Zero),
+            FixedQuaternion.Identity);
+
+        CollisionPair pair = AssertCollision(scenario, mesh.Collider, cone.Collider, CollisionType.Mesh_Cone);
+
+        pair.Manifold.PrimaryContact.Depth.Should().BeGreaterThan(Fixed64.Zero);
+        pair.Manifold.PrimaryContact.Normal.MagnitudeSquared.Should().BeGreaterThan(Fixed64.Zero);
     }
 
     [Fact]

@@ -93,6 +93,37 @@ public sealed class ColliderRuntimeStateTests
     }
 
     [Fact]
+    public void CurvedShapeFrontalArea_ShouldUseAxialRadialAndZeroDirectionProfiles()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSConeCollider> coneBody = scenario.CreateBody(
+            new LSConeCollider
+            {
+                Radius = Fixed64.One,
+                Size = new Vector3d((Fixed64)2, (Fixed64)4, (Fixed64)2)
+            },
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+        ScenarioBody<LSCylinderCollider> cylinderBody = scenario.CreateBody(
+            new LSCylinderCollider
+            {
+                Radius = Fixed64.One,
+                Size = new Vector3d((Fixed64)2, (Fixed64)4, (Fixed64)2)
+            },
+            new Vector3d((Fixed64)4, Fixed64.Zero, Fixed64.Zero),
+            FixedQuaternion.Identity);
+        LSConeCollider cone = coneBody.Collider;
+        LSCylinderCollider cylinder = cylinderBody.Collider;
+
+        cone.GetFrontalArea(Vector3d.Zero).Should().Be(cone.Area);
+        cylinder.GetFrontalArea(Vector3d.Zero).Should().Be(cylinder.Area);
+        AssertNear(cone.GetFrontalArea(Vector3d.Up), Fixed64.Pi);
+        AssertNear(cylinder.GetFrontalArea(Vector3d.Up), Fixed64.Pi);
+        AssertNear(cone.GetFrontalArea(Vector3d.Right), (Fixed64)4);
+        AssertNear(cylinder.GetFrontalArea(Vector3d.Right), (Fixed64)8);
+    }
+
+    [Fact]
     public void CapsuleShapeMutations_ShouldRebuildDerivedStateOncePerSimulate()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();

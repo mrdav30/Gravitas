@@ -147,6 +147,21 @@ public sealed class PhysicsMeshTests
     }
 
     [Fact]
+    public void GetFrontalArea_ShouldSumOnlyFacingWorldTriangles()
+    {
+        PhysicsMesh mesh = MeshTestFixtures.CreateConvexQuadFloor().Mesh;
+
+        mesh.GetFrontalArea(Vector3d.Up).Should().Be(mesh.TotalArea);
+        mesh.GetFrontalArea(-Vector3d.Up).Should().Be(Fixed64.Zero);
+        mesh.GetFrontalArea(Vector3d.Zero).Should().Be(Fixed64.Zero);
+
+        mesh.UpdatePosition(Vector3d.Zero, FixedQuaternion.FromEulerAnglesInDegrees(Fixed64.Zero, Fixed64.Zero, (Fixed64)90));
+
+        mesh.GetFrontalArea(Vector3d.Left).Should().Be(mesh.TotalArea);
+        mesh.GetFrontalArea(Vector3d.Up).Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
     public void Constructor_ShouldStoreExplicitMeshColliderMode()
     {
         var collider = new LSMeshCollider(

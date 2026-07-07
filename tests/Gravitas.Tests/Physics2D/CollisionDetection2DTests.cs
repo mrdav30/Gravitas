@@ -160,6 +160,29 @@ public sealed class CollisionDetection2DTests
     }
 
     [Fact]
+    public void TryCollideManifold_WithFlatBoxOnHorizontalCapsule_ShouldProduceReversedSideContacts()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        var box = new LSAABBoxCollider2D(new Vector2d((Fixed64)5, Fixed64.One));
+        var capsule = new LSCapsuleCollider2D(Fixed64.Half, (Fixed64)4);
+        _ = CreateBody(context, box, new Vector2d(Fixed64.Zero, -Fixed64.Half));
+        _ = CreateBody(
+            context,
+            capsule,
+            new Vector2d(Fixed64.Zero, Fixed64.Zero),
+            FixedMath.DegToRad((Fixed64)90));
+
+        (bool collided, ContactManifold2D manifold) = BuildManifold(box, capsule);
+
+        collided.Should().BeTrue();
+        manifold.Count.Should().Be(2);
+        manifold.Select(static contact => contact.Normal).Should().AllBeEquivalentTo(Vector2d.Forward);
+        manifold.Select(static contact => contact.Depth).Should().AllBeEquivalentTo(Fixed64.Half);
+        manifold.Select(static contact => contact.PointA.Y).Should().AllBeEquivalentTo(Fixed64.Zero);
+        manifold.Select(static contact => contact.PointB.Y).Should().AllBeEquivalentTo(-Fixed64.Half);
+    }
+
+    [Fact]
     public void TryCollideManifold_WithCapsuleCircleTangentAndSeparatedBoundary_ShouldStayDeterministic()
     {
         using GravitasWorldContext context = Create2DContext();
@@ -194,6 +217,23 @@ public sealed class CollisionDetection2DTests
 
         collided.Should().BeTrue();
         manifold.HasContact.Should().BeTrue();
+        manifold.PrimaryContact.Depth.Should().BeGreaterThan(Fixed64.Zero);
+        manifold.PrimaryContact.Normal.MagnitudeSquared.Should().BeGreaterThan(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void TryCollideManifold_WithConvexRotatedCapsuleOverlap_ShouldUseReversedSingleContactFallback()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        var box = new LSAABBoxCollider2D(Vector2d.One);
+        var capsule = new LSCapsuleCollider2D(Fixed64.Half, (Fixed64)3);
+        _ = CreateBody(context, box, new Vector2d(Fixed64.FromFraction(3, 4), Fixed64.FromFraction(3, 4)));
+        _ = CreateBody(context, capsule, Vector2d.Zero, FixedMath.DegToRad((Fixed64)45));
+
+        (bool collided, ContactManifold2D manifold) = BuildManifold(box, capsule);
+
+        collided.Should().BeTrue();
+        manifold.Count.Should().Be(1);
         manifold.PrimaryContact.Depth.Should().BeGreaterThan(Fixed64.Zero);
         manifold.PrimaryContact.Normal.MagnitudeSquared.Should().BeGreaterThan(Fixed64.Zero);
     }
@@ -253,6 +293,27 @@ public sealed class CollisionDetection2DTests
         manifold.Select(static contact => contact.PointB.X).Should().AllBeEquivalentTo(Fixed64.Half);
         manifold.Select(static contact => contact.PointA.Y).Should().BeEquivalentTo(new[] { Fixed64.One, -Fixed64.One });
         manifold.Select(static contact => contact.PointB.Y).Should().BeEquivalentTo(new[] { Fixed64.One, -Fixed64.One });
+    }
+
+    [Fact]
+    public void TryCollideManifold_WithRotatedIncidentPolygon_ShouldClipAgainstSecondReferenceEdge()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        var wideBox = new LSAABBoxCollider2D(new Vector2d((Fixed64)4, Fixed64.One));
+        var diamond = new LSPolygonCollider2D(
+            new Vector2d(Fixed64.Zero, (Fixed64)(-2)),
+            new Vector2d((Fixed64)2, Fixed64.Zero),
+            new Vector2d(Fixed64.Zero, (Fixed64)2),
+            new Vector2d((Fixed64)(-2), Fixed64.Zero));
+        _ = CreateBody(context, wideBox, Vector2d.Zero);
+        _ = CreateBody(context, diamond, new Vector2d(Fixed64.FromFraction(7, 2), Fixed64.Zero));
+
+        (bool collided, ContactManifold2D manifold) = BuildManifold(wideBox, diamond);
+
+        collided.Should().BeTrue();
+        manifold.Count.Should().BeGreaterThan(0);
+        manifold.PrimaryContact.Normal.X.Should().BeGreaterThan(Fixed64.Zero);
+        manifold.PrimaryContact.Depth.Should().BeGreaterThan(Fixed64.Zero);
     }
 
     [Fact]

@@ -89,36 +89,36 @@ configuration before making source changes.
 
 ## Current Standing
 
-Fresh checkpoint after Workstream 9 query reducer and shape-cast residue branch
-pass:
+Fresh checkpoint after Workstream 10 collision geometry and convex-support
+residue pass:
 
 | Metric | Baseline | Current | Short-Term Gate | Long-Term Target |
 | --- | ---: | ---: | ---: | ---: |
-| Line coverage | 87.3% | 93.6% | 90% | 100% |
-| Branch coverage | 74.1% | 80.3% | 90% | 100% |
-| Method coverage | 86.5% | 93.7% | 90% | 100% |
-| Tests | 974 passed | 1174 passed | green | green |
+| Line coverage | 87.3% | 93.9% | 90% | 100% |
+| Branch coverage | 74.1% | 80.7% | 90% | 100% |
+| Method coverage | 86.5% | 93.9% | 90% | 100% |
+| Tests | 974 passed | 1192 passed | green | green |
 
-At the current denominator, the 90% branch gate requires 10,249 covered
-branches. The latest run covered 9,155 of 11,387 branches, leaving roughly
-1,094 net branch outcomes to cover or delete. Treat this as a focused branch
+At the current denominator, the 90% branch gate requires at least 10,251 covered
+branches. The latest run covered 9,202 of 11,389 branches, leaving roughly
+1,049 net branch outcomes to cover or delete. Treat this as a focused branch
 campaign, not a single gate-check workstream.
 
 Current evidence:
 
 - Coverage report:
-  `TestResults/coverage-branch-hardening-ws9/reports/Summary.txt`
+  `TestResults/coverage-branch-hardening-ws10/reports/Summary.txt`
 - Coverage collection:
   `dotnet test tests\Gravitas.Tests\Gravitas.Tests.csproj --configuration Release --collect:"XPlat Code Coverage" --settings tests\Gravitas.Tests\coverlet.runsettings`
-  passed with 1174 tests.
+  passed with 1192 tests.
 - Branch shortlist:
-  `TestResults/coverage-branch-hardening-ws9/branch-gap-shortlist.txt`
-- Latest method-gap extraction reported 235 uncovered methods.
+  `TestResults/coverage-branch-hardening-ws10/branch-gap-shortlist.csv`
+- Latest method-gap extraction reported 229 uncovered methods.
 
 ## Completed Coverage Summary
 
 The completed coverage campaign moved Gravitas from 87.3% line, 74.1% branch,
-and 86.5% method coverage to 93.6% line, 80.3% branch, and 93.7% method
+and 86.5% method coverage to 93.9% line, 80.7% branch, and 93.9% method
 coverage.
 
 High-value work completed:
@@ -126,7 +126,9 @@ High-value work completed:
 - Query and collision coverage across 2D, 3D, and mixed dimensions, including
   capsule sweeps, compound shapes, mixed compound boundaries, cone queries,
   convex-vs-compound sweeps, public batch-query contracts, mixed sphere-slab
-  fallback normals, and shape-cast reducer reporting.
+  fallback normals, shape-cast reducer reporting, 2D reversed capsule manifold
+  paths, mesh-cone support/fallback contacts, cuboid-capsule SAT misses, and
+  curved/mesh frontal-area geometry used by drag.
 - Runtime lifecycle coverage for partition reset, retained membership cleanup,
   context reset, coroutine lifecycle, clock hooks, trigger-driven deferred
   refresh, inactive collider loading, and mixed partition state cleanup.
@@ -149,6 +151,8 @@ Cleanup completed:
   storage, and an allocating mesh triangle wrapper.
 - Removed duplicate mesh-cylinder fallback candidate logic and centralized
   2D/3D/mixed `WorldVoxelIndex` ordering.
+- Tightened cuboid SAT helper contracts so successful geometry helpers return
+  concrete contact state instead of nullable success payloads.
 - Classified remaining low-value diagnostic view getter and simple constructor
   noise as intentionally out of scope unless a future adapter invariant makes
   it meaningful.
@@ -202,16 +206,15 @@ RCA and verification, even if the fix is small.
 
 ## Active Branch-90 Campaign
 
-Workstreams 1-9 are now historical context. The next phase starts at Workstream
-10 and should be reranked after each coverage run. The ordering below comes from
-`TestResults/coverage-branch-hardening-ws9/branch-gap-shortlist.txt` plus
+Workstreams 1-10 are now historical context. The next phase starts at Workstream
+11 and should be reranked after each coverage run. The ordering below comes from
+`TestResults/coverage-branch-hardening-ws10/branch-gap-shortlist.csv` plus
 runtime risk, hot-path relevance, and duplicate/zombie-code likelihood.
 
 | Order | Branch Family | Why It Comes Next |
 | ---: | --- | --- |
-| 1 | Collision geometry and convex support residue | Remaining GJK/simplex, mesh, cone, cuboid, and 2D clipping branches can hide real geometric false positives or false negatives. |
-| 2 | Lifecycle, serialization, replay, and authoring residue | Lower-risk after prior passes, but still worth sweeping for parity bugs and zombie code before the gate. |
-| 3 | Branch 90 gate and 100% roadmap refresh | Only run as a true gate after focused campaigns make 90% realistic. |
+| 1 | Lifecycle, serialization, replay, and authoring residue | Remaining top gaps are now mostly state transfer, collider authoring, partition cleanup, service lifecycle, and low-count constructor/equality branches. Prior passes found real parity bugs in this family, so it is worth sweeping before the gate. |
+| 2 | Branch 90 gate and 100% roadmap refresh | Only run as a true gate after focused campaigns make 90% realistic. |
 
 ### Workstream 7: CCD Handoff And Shape-Exact Branch Families
 
@@ -413,7 +416,7 @@ fallback classification, and rotated/curved shape geometry.
 
 ### Workstream 10: Collision Geometry And Convex Support Residue
 
-**Status:** Pending
+**Status:** Complete - 2026-07-07
 
 **Purpose**
 
@@ -430,17 +433,43 @@ manifold replacement behavior.
 
 **Tasks**
 
-- [ ] Review `ConvexColliderSupport` simplex branches for valid geometry cases
+- [x] Review `ConvexColliderSupport` simplex branches for valid geometry cases
       versus unreachable defensive transitions.
-- [ ] Cover mesh-cone, mesh-cuboid, and axis-aligned cuboid manifold branches
+- [x] Cover mesh-cone, mesh-cuboid, and axis-aligned cuboid manifold branches
       only through valid collider setups.
-- [ ] Cover 2D convex clipping, manifold replacement, and compound collision
+- [x] Cover 2D convex clipping, manifold replacement, and compound collision
       branches that still affect contact quality.
-- [ ] Delete fallback code if no valid collider setup can reach it after the
+- [x] Delete fallback code if no valid collider setup can reach it after the
       stronger geometry paths added in prior hardening work.
-- [ ] Add or update regression tests for any false-positive or false-negative
+- [x] Add or update regression tests for any false-positive or false-negative
       geometry issue discovered during the sweep.
-- [ ] Run focused collision tests, full `Release`, and coverage collection.
+- [x] Run focused collision tests, full `Release`, and coverage collection.
+
+**Results**
+
+- Added valid-geometry coverage for axis-aligned cuboid Z-manifold contacts,
+  cuboid-capsule SAT misses, mesh-cone support contacts, mesh-cone convex
+  fallback contacts, 2D reversed capsule side contacts, reversed capsule-convex
+  fallback contacts, 2D rotated clipping, manifold replacement ordering, and
+  material-preserving `SetContact`.
+- Added internal support-policy coverage for supported/unsupported convex
+  shapes, zero-axis fallback projection, same-center spheres, separated convex
+  shapes, rotated overlaps, and cone-volume support hits/misses.
+- Added drag-facing frontal-area coverage for cone, cylinder, and mesh
+  geometry, including zero-direction, axial, radial, front-facing,
+  back-facing, and transformed mesh normals.
+- Removed the unused cuboid-capsule SAT counter and tightened cuboid SAT helper
+  contracts so successful helpers return concrete `AxisPenetration` or
+  `CollisionResult` values.
+- Classified remaining `ConvexColliderSupport.UpdateTriangle` and
+  `Perpendicular` residue as defensive simplex fallback logic that is not worth
+  brittle private branch padding without a real geometry defect.
+- Left mixed/mesh/swept fallback-normal residue visible for future sweeps:
+  `CollisionDetectionMixed.ResolveFallbackNormal`,
+  `MeshTriangleContactGenerator.ResolveNormal`, and
+  `SweptSphereQueryWorker.ResolveFallbackConeNormal` are valid guardrails, but
+  should be exercised only through user-visible collision/query cases if a
+  measured gap or bug appears.
 
 **Exit Criteria**
 
@@ -532,3 +561,4 @@ it realistically reachable, then pivot the living plan toward the long-term
 | 2026-07-06 | 93.3% | 79.9% | 93.6% | 1153 passed | Workstream 7 CCD handoff and shape-exact branch pass completed. Added 3D/2D candidate-ordering and ignored-target coverage, removed a mixed CCD test-only handoff helper, and fixed context-driven mixed CCD handoff ownership so the shared TOI budget drains before partition/discrete completion. |
 | 2026-07-06 | 93.4% | 80.1% | 93.6% | 1162 passed | Workstream 8 mixed prism, response, trigger, and contact branch pass completed. Added bodyless mixed response, friction, response normal-fallback, 2D contact parity, and oblique prism SAT rejection coverage. Reviewed mixed candidate/pair-retention residue and classified `ResolveFallbackNormal` as defensive collision-geometry zombie-code sweep material. |
 | 2026-07-06 | 93.6% | 80.3% | 93.7% | 1174 passed | Workstream 9 query reducer and shape-cast residue completed. Added 2D AABB batch contracts, 3D circle closest/zero-direction coverage, mixed sphere-against-2D circle/fallback normals, convex sweep equal-distance ordering, concave mesh cone query tie coverage, and cone ray worker geometry tests. |
+| 2026-07-07 | 93.9% | 80.7% | 93.9% | 1192 passed | Workstream 10 collision geometry and convex support residue completed. Added mesh-cone support/fallback, cuboid-capsule SAT miss, axis-aligned cuboid Z-contact, 2D reversed capsule/clipping, manifold replacement/material, convex-support policy, and cone/cylinder/mesh frontal-area coverage. Tightened cuboid SAT helper contracts and classified remaining simplex/fallback-normal residue as defensive guardrails unless a public bug appears. |

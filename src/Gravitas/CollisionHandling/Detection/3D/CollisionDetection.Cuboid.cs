@@ -73,10 +73,9 @@ public static partial class CollisionDetection
         if (pair.ColliderA is not LSCuboidCollider obb || pair.ColliderB is not LSCapsuleCollider capsule)
             return false;
 
-        if (!TestOBBoxCapsuleSeparatingAxes(obb, capsule, out (Vector3d Vector, Fixed64 Depth)? axisPenetration))
+        if (!TestOBBoxCapsuleSeparatingAxes(obb, capsule, out AxisPenetration axisPenetration))
             return false;
 
-        if (!axisPenetration.HasValue) return false;
         // find closest point on capsules inner line segment relative to poly center
         Vector3d closestPointOnCapsuleLine = Vector3d.ClosestPointOnLineSegment(capsule.LineSegmentStart, capsule.LineSegmentEnd, obb.Center);
         // find the closest point on the poly relative to the closest point on capsule's line segment
@@ -85,8 +84,8 @@ public static partial class CollisionDetection
         pair.Manifold.SetContact(
             collisionPointOBBox,
             collisionPointCapsule,
-            axisPenetration.Value.Depth,
-            OrientNormal(axisPenetration.Value.Vector, capsule.Center - obb.Center)
+            axisPenetration.Depth,
+            OrientNormal(axisPenetration.Axis, capsule.Center - obb.Center)
         );
 
         return true;
@@ -95,9 +94,9 @@ public static partial class CollisionDetection
     private static bool TestOBBoxCapsuleSeparatingAxes(
         LSCuboidCollider obb,
         LSCapsuleCollider capsule,
-        out (Vector3d Vector, Fixed64 Depth)? output)
+        out AxisPenetration penetration)
     {
-        output = null;
+        penetration = default;
         bool overlaps = false;
 
         SwiftHashSet<Vector3d> axes = SwiftHashSetPool<Vector3d>.Shared.Rent();
@@ -108,7 +107,6 @@ public static partial class CollisionDetection
             return false;
         }
 
-        int ndx = 0;
         Vector3d representativePointB = Vector3d.ClosestPointOnLineSegment(capsule.LineSegmentStart, capsule.LineSegmentEnd, obb.Center);
         // Check for a separating axis
         FixedRange obbProjection = FixedRange.MinRange, capProjection;
@@ -126,14 +124,19 @@ public static partial class CollisionDetection
             Vector3d representativePointA = obb.ClosestPointOnSurface(representativePointB);
             // Determine the direction of the overlap
             Fixed64 sign = Vector3d.Dot(axis, representativePointB - representativePointA) < Fixed64.Zero ? -Fixed64.One : Fixed64.One;
-            Fixed64 checkDepth = output.HasValue ? output.Value.Depth : Fixed64.MaxValue;
+            Fixed64 checkDepth = penetration.HasValue ? penetration.Depth : Fixed64.MaxValue;
             if (FixedRange.CheckOverlap(axis, obbProjection, capProjection, checkDepth, sign, out (Vector3d Vector, Fixed64 Depth)? axisOverlap))
-                output = axisOverlap;
-            ndx++;
+            {
+                AxisPenetration overlap = axisOverlap.HasValue
+                    ? new AxisPenetration(axisOverlap.Value.Vector, axisOverlap.Value.Depth)
+                    : default;
+                if (overlap.HasValue)
+                    penetration = overlap;
+            }
         }
 
         SwiftHashSetPool<Vector3d>.Shared.Release(axes);
-        return overlaps;
+        return overlaps && penetration.HasValue;
     }
 
     /// <summary>
@@ -148,15 +151,14 @@ public static partial class CollisionDetection
         if (cuboidA.CurrentState == CuboidState.AABox && cuboidB.CurrentState == CuboidState.AABox)
             return TryBuildAxisAlignedCuboidManifold(pair, cuboidA, cuboidB);
 
-        if (!TestCuboidsSeperatingAxes(cuboidA, cuboidB, out CollisionResult? output))
+        if (!TestCuboidsSeperatingAxes(cuboidA, cuboidB, out CollisionResult output))
             return false;
 
-        if (!output.HasValue) return false;
         pair.Manifold.SetContact(
-            output.Value.PointsOfContact.Point1,
-            output.Value.PointsOfContact.Point2,
-            output.Value.AxisPenetration.Depth,
-            OrientNormal(output.Value.AxisPenetration.Vector, cuboidB.Center - cuboidA.Center)
+            output.PointsOfContact.Point1,
+            output.PointsOfContact.Point2,
+            output.AxisPenetration.Depth,
+            OrientNormal(output.AxisPenetration.Vector, cuboidB.Center - cuboidA.Center)
         ); ;
         return true;
     }
@@ -171,9 +173,9 @@ public static partial class CollisionDetection
     private static bool TestCuboidsSeperatingAxes(
         LSCuboidCollider cuboidA,
         LSCuboidCollider cuboidB,
-        out CollisionResult? output)
+        out CollisionResult output)
     {
-        output = null;
+        output = default;
 
         (Vector3d PointA, Vector3d PointB) = FindInitialPointsOfContact(cuboidA, cuboidB);
         if (!TryFindCuboidCuboidPenetration(cuboidA, cuboidB, out AxisPenetration penetration))
