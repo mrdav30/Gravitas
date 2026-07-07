@@ -313,6 +313,22 @@ public sealed class MixedNarrowPhaseTests
     }
 
     [Fact]
+    public void CuboidConvexPolygonSlab_WithOverlappingBoundsButSeparatingObliqueAxis_ShouldNotReportContact()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSCuboidCollider> cuboid = CreateCuboid3D(
+            context,
+            new Vector3d(Fixed64.FromFraction(29, 20), Fixed64.Zero, Fixed64.FromFraction(29, 20)),
+            FixedQuaternion.FromEulerAnglesInDegrees(Fixed64.Zero, (Fixed64)45, Fixed64.Zero));
+        SolidBody2D polygon = CreateBody2D(context, CreateSquarePolygon(), Vector2d.Zero, FixedMath.DegToRad((Fixed64)45));
+
+        bool collided = CollisionDetectionMixed.TryCollide(cuboid.Collider, polygon.Collider, out MixedContact contact);
+
+        collided.Should().BeFalse();
+        contact.HasContact.Should().BeFalse();
+    }
+
+    [Fact]
     public void CuboidAABoxSlab_WithTouchingFace_ShouldReportZeroDepthContact()
     {
         using GravitasWorldContext context = CreateMixedContext();

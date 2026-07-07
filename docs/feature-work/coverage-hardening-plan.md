@@ -89,36 +89,37 @@ configuration before making source changes.
 
 ## Current Standing
 
-Fresh checkpoint after Workstream 7 CCD handoff and shape-exact branch pass:
+Fresh checkpoint after Workstream 8 mixed prism, response, trigger, and contact
+branch pass:
 
 | Metric | Baseline | Current | Short-Term Gate | Long-Term Target |
 | --- | ---: | ---: | ---: | ---: |
-| Line coverage | 87.3% | 93.3% | 90% | 100% |
-| Branch coverage | 74.1% | 79.9% | 90% | 100% |
+| Line coverage | 87.3% | 93.4% | 90% | 100% |
+| Branch coverage | 74.1% | 80.1% | 90% | 100% |
 | Method coverage | 86.5% | 93.6% | 90% | 100% |
-| Tests | 974 passed | 1153 passed | green | green |
+| Tests | 974 passed | 1162 passed | green | green |
 
 At the current denominator, the 90% branch gate requires 10,249 covered
-branches. The latest run covered 9,109 of 11,387 branches, leaving roughly
-1,140 net branch outcomes to cover or delete. Treat this as a focused branch
+branches. The latest run covered 9,128 of 11,387 branches, leaving roughly
+1,121 net branch outcomes to cover or delete. Treat this as a focused branch
 campaign, not a single gate-check workstream.
 
 Current evidence:
 
 - Coverage report:
-  `TestResults/coverage-branch-hardening-ws7/reports/Summary.txt`
+  `TestResults/coverage-branch-hardening-ws8/reports/Summary.txt`
 - Coverage collection:
   `dotnet test tests\Gravitas.Tests\Gravitas.Tests.csproj --configuration Release --collect:"XPlat Code Coverage" --settings tests\Gravitas.Tests\coverlet.runsettings`
-  passed with 1153 tests.
+  passed with 1162 tests.
 - Branch shortlist:
-  `TestResults/coverage-branch-hardening-ws7/branch-gap-shortlist.txt`
-- Latest CRAP extraction reported 34 flagged methods and 237 uncovered
+  `TestResults/coverage-branch-hardening-ws8/branch-gap-shortlist.txt`
+- Latest CRAP extraction reported 34 flagged methods and 238 uncovered
   methods.
 
 ## Completed Coverage Summary
 
 The completed coverage campaign moved Gravitas from 87.3% line, 74.1% branch,
-and 86.5% method coverage to 93.3% line, 79.9% branch, and 93.6% method
+and 86.5% method coverage to 93.4% line, 80.1% branch, and 93.6% method
 coverage.
 
 High-value work completed:
@@ -201,19 +202,17 @@ RCA and verification, even if the fix is small.
 
 ## Active Branch-90 Campaign
 
-Workstreams 1-7 are now historical context. The next phase starts at Workstream
-8 and should be reranked after each coverage run. The ordering below comes from
-`TestResults/coverage-branch-hardening-ws7/branch-gap-shortlist.txt` plus
+Workstreams 1-8 are now historical context. The next phase starts at Workstream
+9 and should be reranked after each coverage run. The ordering below comes from
+`TestResults/coverage-branch-hardening-ws8/branch-gap-shortlist.txt` plus
 runtime risk, hot-path relevance, and duplicate/zombie-code likelihood.
 
 | Order | Branch Family | Why It Comes Next |
 | ---: | --- | --- |
-| 1 | CCD handoff and shape-exact branches | Highest-risk uncovered runtime behavior, many high-complexity branches, and direct impact on deterministic fast-mover correctness. |
-| 2 | Mixed prism, response, trigger, and contact branches | Large remaining branch clusters in first-class mixed collision/response behavior. |
-| 3 | Query reducer and shape-cast residue | Public query correctness and exact-vs-conservative reporting still have meaningful branch gaps. |
-| 4 | Collision geometry and convex support residue | Remaining GJK/simplex, mesh, convex, and 2D clipping branches can hide real geometric false positives or false negatives. |
-| 5 | Lifecycle, serialization, replay, and authoring residue | Lower-risk after prior passes, but still worth sweeping for parity bugs and zombie code before the gate. |
-| 6 | Branch 90 gate and 100% roadmap refresh | Only run as a true gate after focused campaigns make 90% realistic. |
+| 1 | Query reducer and shape-cast residue | Public query correctness and exact-vs-conservative reporting still have meaningful branch gaps. |
+| 2 | Collision geometry and convex support residue | Remaining GJK/simplex, mesh, convex, and 2D clipping branches can hide real geometric false positives or false negatives. |
+| 3 | Lifecycle, serialization, replay, and authoring residue | Lower-risk after prior passes, but still worth sweeping for parity bugs and zombie code before the gate. |
+| 4 | Branch 90 gate and 100% roadmap refresh | Only run as a true gate after focused campaigns make 90% realistic. |
 
 ### Workstream 7: CCD Handoff And Shape-Exact Branch Families
 
@@ -286,7 +285,7 @@ fast-mover behavior, not just coverage percentages.
 
 ### Workstream 8: Mixed Prism, Response, Trigger, And Contact Branches
 
-**Status:** Pending
+**Status:** Complete - 2026-07-06
 
 **Purpose**
 
@@ -306,18 +305,41 @@ notifications, pair retention, and candidate processing.
 
 **Tasks**
 
-- [ ] Cover meaningful cuboid, capsule, cylinder, cone, and triangle prism
+- [x] Cover meaningful cuboid, capsule, cylinder, cone, and triangle prism
       branches with physical mixed pair scenarios.
-- [ ] Cover mixed response branches for dynamic/static, dynamic/kinematic,
+- [x] Cover mixed response branches for dynamic/static, dynamic/kinematic,
       trigger, sensor-like bodyless, frozen-axis, friction, and restitution
       behavior where those branches are valid.
-- [ ] Review mixed trigger/contact notification branches for duplicate 2D/3D
+- [x] Review mixed trigger/contact notification branches for duplicate 2D/3D
       behavior and centralize shared assertions where useful.
-- [ ] Review mixed candidate processing and pair-retention branches for stale
+- [x] Review mixed candidate processing and pair-retention branches for stale
       lifecycle behavior before adding tests.
-- [ ] Avoid one-test-per-shape padding when one shared test can prove the branch
+- [x] Avoid one-test-per-shape padding when one shared test can prove the branch
       family.
-- [ ] Run focused mixed tests, full `Release`, and coverage collection.
+- [x] Run focused mixed tests, full `Release`, and coverage collection.
+
+**Result**
+
+- Added focused mixed response coverage for bodyless 3D and bodyless 2D
+  physical participants, separating velocities with correction disabled,
+  frictionless contacts, high-static-friction contacts, and fallback/contrary
+  normal resolution. This raised `CollisionResponseMixed` from 94.2% to 94.7%
+  line coverage in the WS8 report and improved branch coverage in `Resolve`,
+  `ApplyFrictionImpulse`, and normal resolution without changing runtime logic.
+- Tightened mixed contact event parity by asserting 2D stay and exit callbacks
+  alongside the existing 3D contact notifications.
+- Added an oblique cuboid-vs-convex-polygon slab regression where broad bounds
+  overlap but the exact prism SAT path rejects the pair. This covers a useful
+  mixed prism false-positive guard instead of a far-apart bounds-only case.
+- Reviewed the remaining mixed candidate and pair-retention gaps. Existing
+  sleep, filter, trigger, stale-pair, and retained-partition tests already
+  cover the meaningful lifecycle outcomes; the remaining branch residue is
+  best handled by later reducer/lifecycle passes if it still ranks highly.
+- `CollisionDetectionMixed.ResolveFallbackNormal(...)` remains fully uncovered.
+  Current 2D shape semantics include boundaries in `ContainsPoint`, so valid
+  zero-distance sphere/slab cases route through the inside-slab path before that
+  fallback. Treat it as a defensive fallback to revisit during a later
+  collision-geometry zombie-code sweep rather than adding a synthetic test.
 
 **Exit Criteria**
 
@@ -487,3 +509,4 @@ it realistically reachable, then pivot the living plan toward the long-term
 | 2026-07-06 | 93.2% | 79.6% | 93.4% | 1137 passed | Workstream 5 service lifecycle, partition, and runtime hardening completed. Added retained partition idempotency, context reset parity, coroutine lifecycle, clock hook, and 2D deferred refresh coverage. Centralized partition voxel ordering and removed duplicated null-comparer branch debt. |
 | 2026-07-06 | 93.3% | 79.7% | 93.6% | 1146 passed | Workstream 6 diagnostics and low-value surface audit completed. Added logger facade, visitor null guard, disabled capture, zero-ray, and non-prismatic 2D joint draw coverage while leaving immutable view getter noise classified as low-value. |
 | 2026-07-06 | 93.3% | 79.9% | 93.6% | 1153 passed | Workstream 7 CCD handoff and shape-exact branch pass completed. Added 3D/2D candidate-ordering and ignored-target coverage, removed a mixed CCD test-only handoff helper, and fixed context-driven mixed CCD handoff ownership so the shared TOI budget drains before partition/discrete completion. |
+| 2026-07-06 | 93.4% | 80.1% | 93.6% | 1162 passed | Workstream 8 mixed prism, response, trigger, and contact branch pass completed. Added bodyless mixed response, friction, response normal-fallback, 2D contact parity, and oblique prism SAT rejection coverage. Reviewed mixed candidate/pair-retention residue and classified `ResolveFallbackNormal` as defensive collision-geometry zombie-code sweep material. |
