@@ -74,6 +74,48 @@ public sealed class ConvexColliderSupportTests
     }
 
     [Fact]
+    public void Intersects_WithTouchingAxisAlignedSpheres_ShouldReturnTrue()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> first = scenario.CreateSphere(Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> second = scenario.CreateSphere(Vector3d.Right);
+
+        ConvexColliderSupport.Intersects(first.Collider, second.Collider).Should().BeTrue();
+    }
+
+    [Fact]
+    public void Intersects_WithOffsetCapsuleAgainstCuboid_ShouldReduceTriangleSimplex()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSCapsuleCollider> capsule = scenario.CreateBody(
+            new LSCapsuleCollider
+            {
+                Size = new Vector3d(Fixed64.One, (Fixed64)3, Fixed64.One)
+            },
+            new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero),
+            PhysicsScenarioBuilder.Yaw(90));
+        ScenarioBody<LSCuboidCollider> cuboid = scenario.CreateCuboid(Vector3d.Zero);
+
+        ConvexColliderSupport.Intersects(capsule.Collider, cuboid.Collider).Should().BeTrue();
+    }
+
+    [Fact]
+    public void Intersects_WithSphereInsideCuboid_ShouldReduceTetrahedronSimplex()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> sphere = scenario.CreateSphere(Vector3d.Zero);
+        ScenarioBody<LSCuboidCollider> cuboid = scenario.CreateBody(
+            new LSCuboidCollider
+            {
+                Size = new Vector3d((Fixed64)3, (Fixed64)3, (Fixed64)3)
+            },
+            Vector3d.Zero,
+            PhysicsScenarioBuilder.Yaw(15));
+
+        ConvexColliderSupport.Intersects(sphere.Collider, cuboid.Collider).Should().BeTrue();
+    }
+
+    [Fact]
     public void IntersectsConeVolume_ShouldDetectConvexHitsAndMisses()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();

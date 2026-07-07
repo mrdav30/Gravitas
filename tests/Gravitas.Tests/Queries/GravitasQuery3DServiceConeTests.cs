@@ -74,6 +74,27 @@ public sealed class GravitasQuery3DServiceConeTests
     }
 
     [Fact]
+    public void OverlapCone_WithUnsupportedTargetInsideBoundsButOutsideVolume_ShouldRejectConservativeMiss()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        scenario.InitializeStaticCollider(
+            new UnsupportedTestCollider3D(),
+            new Vector3d(Fixed64.One, (Fixed64)2, Fixed64.Zero));
+
+        bool hit = scenario.Context.Query3D.OverlapCone(
+            Vector3d.Zero,
+            Vector3d.Right,
+            (Fixed64)4,
+            (Fixed64)3,
+            out Physics3DHit coneHit,
+            IncludeLayerZero);
+
+        hit.Should().BeFalse();
+        coneHit.Collider.Should().BeNull();
+        scenario.Context.Query3D.LastQueryCandidateCount.Should().Be(1);
+    }
+
+    [Fact]
     public void OverlapCone_ShouldSupportMeshCompoundFilteringAndValidation()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();

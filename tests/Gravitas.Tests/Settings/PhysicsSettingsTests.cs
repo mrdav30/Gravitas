@@ -1,5 +1,7 @@
 using FixedMathSharp;
 using FluentAssertions;
+using Chronicler;
+using Gravitas.Support;
 using System;
 using Xunit;
 
@@ -103,5 +105,82 @@ public sealed class PhysicsSettingsTests
         Action action = () => settings.RestitutionVelocityThreshold = -Fixed64.Epsilon;
 
         action.Should().Throw<ArgumentException>().WithParameterName("value");
+    }
+
+    [Fact]
+    public void ContributeReplayHash_ShouldEncodeAuthoritativeSettingsAndMatrixShape()
+    {
+        PhysicsSettings baseline = CreateReplayHashSettings();
+        ChronicleHash baselineHash = HashSettings(baseline);
+
+        HashSettings(CreateReplayHashSettings(frameRate: 21))
+            .Should().NotBe(baselineHash);
+        HashSettings(CreateReplayHashSettings(mutate: settings => settings.PoolingEnabled = !settings.PoolingEnabled))
+            .Should().NotBe(baselineHash);
+        HashSettings(CreateReplayHashSettings(mutate: settings => settings.GroundCheckLayerMask = PhysicsLayerMask.None))
+            .Should().NotBe(baselineHash);
+        HashSettings(CreateReplayHashSettings(mutate: settings => settings.RetainedPartitionTimeToKillFrames++))
+            .Should().NotBe(baselineHash);
+        HashSettings(CreateReplayHashSettings(mutate: settings => settings.RetainedPartitionRetirementSweepBudget++))
+            .Should().NotBe(baselineHash);
+        HashSettings(CreateReplayHashSettings(mutate: settings => settings.DefaultContinuousCollisionMode = ContinuousCollisionMode.Continuous))
+            .Should().NotBe(baselineHash);
+        HashSettings(CreateReplayHashSettings(mutate: settings => settings.ContinuousCollisionMaxToiIterations++))
+            .Should().NotBe(baselineHash);
+        HashSettings(CreateReplayHashSettings(mutate: settings => settings.DiscreteSolverIterations++))
+            .Should().NotBe(baselineHash);
+        HashSettings(CreateReplayHashSettings(mutate: settings => settings.RestitutionVelocityThreshold += Fixed64.Epsilon))
+            .Should().NotBe(baselineHash);
+        HashSettings(CreateReplayHashSettings(mutate: settings => settings.Mixed2DHalfThickness += Fixed64.Epsilon))
+            .Should().NotBe(baselineHash);
+        HashSettings(CreateReplayHashSettings(mutate: settings => settings.RuntimeMode = PhysicsRuntimeMode.Mixed))
+            .Should().NotBe(baselineHash);
+
+        bool[,] matrixValueChange =
+        {
+            { true, false },
+            { false, false }
+        };
+        HashSettings(CreateReplayHashSettings(collisionMatrix: matrixValueChange)).Should().NotBe(baselineHash);
+        bool[,] matrixShapeChange =
+        {
+            { true, false, false, true }
+        };
+        HashSettings(CreateReplayHashSettings(collisionMatrix: matrixShapeChange)).Should().NotBe(baselineHash);
+        HashSettings(CreateReplayHashSettings(collisionMatrix: new bool[0, 0])).Should().NotBe(baselineHash);
+    }
+
+    private static PhysicsSettings CreateReplayHashSettings(
+        int frameRate = 20,
+        Action<PhysicsSettings>? mutate = null,
+        bool[,]? collisionMatrix = null)
+    {
+        collisionMatrix ??= new[,]
+        {
+            { true, false },
+            { false, true }
+        };
+        var settings = new PhysicsSettings(frameRate, collisionMatrix, PhysicsLayerMask.FromLayer(0))
+        {
+            PoolingEnabled = true,
+            RetainedPartitionTimeToKillFrames = 3,
+            RetainedPartitionRetirementSweepBudget = 4,
+            DefaultContinuousCollisionMode = ContinuousCollisionMode.Auto,
+            ContinuousCollisionMaxToiIterations = 5,
+            DiscreteSolverIterations = 6,
+            RestitutionVelocityThreshold = Fixed64.FromFraction(1, 3),
+            Mixed2DHalfThickness = Fixed64.FromFraction(2, 3),
+            RuntimeMode = PhysicsRuntimeMode.Both
+        };
+
+        mutate?.Invoke(settings);
+        return settings;
+    }
+
+    private static ChronicleHash HashSettings(PhysicsSettings settings)
+    {
+        var writer = new ChronicleHashWriter();
+        settings.ContributeReplayHash(ref writer);
+        return writer.ToHash();
     }
 }

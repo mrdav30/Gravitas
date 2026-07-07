@@ -706,7 +706,7 @@ public sealed class ContinuousCollisionDetectionTests
         mover.Body.AddForce(Vector3d.Right * (Fixed64)10);
         scenario.Context.LateSimulate();
 
-        mover.Body.Position3d.X.Should().BeLessThan((Fixed64)4);
+        mover.Collider.BoundsMax.X.Should().BeLessThanOrEqualTo(target.Collider.BoundsMin.X);
         mover.Body.LinearVelocity.X.Should().BeGreaterThanOrEqualTo(Fixed64.Zero);
         mover.Body.LinearVelocity.X.Should().BeLessThan((Fixed64)10);
         target.Body.IsSleeping.Should().BeFalse();
@@ -739,6 +739,33 @@ public sealed class ContinuousCollisionDetectionTests
         mover.Body.LinearVelocity.X.Should().Be((Fixed64)10);
         target.Body.IsSleeping.Should().BeTrue();
         target.Body.LinearVelocity.Should().Be(Vector3d.Zero);
+    }
+
+    [Fact]
+    public void ContinuousMode_DynamicRelativeShapeExactPath_ShouldClampThinCuboidAgainstDynamicSphere()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        ScenarioBody<LSCuboidCollider> mover = scenario.CreateBody(
+            new LSCuboidCollider
+            {
+                Size = new Vector3d((Fixed64)6, Fixed64.FromFraction(1, 5), Fixed64.FromFraction(1, 5))
+            },
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+        ScenarioBody<LSSphereCollider> target = scenario.CreateSphere(new Vector3d((Fixed64)4, Fixed64.Zero, Fixed64.Zero));
+        mover.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        DisableGroundQueries(mover.Body);
+        DisableGroundQueries(target.Body);
+
+        target.Body.Sleep();
+        mover.Body.AddForce(Vector3d.Right * (Fixed64)10);
+        scenario.Context.LateSimulate();
+
+        mover.Collider.BoundsMax.X.Should().BeLessThanOrEqualTo(target.Collider.BoundsMin.X);
+        mover.Body.LinearVelocity.X.Should().BeGreaterThanOrEqualTo(Fixed64.Zero);
+        mover.Body.LinearVelocity.X.Should().BeLessThan((Fixed64)10);
+        target.Body.IsSleeping.Should().BeFalse();
+        target.Body.LinearVelocity.X.Should().BeGreaterThan(Fixed64.Zero);
     }
 
     [Fact]

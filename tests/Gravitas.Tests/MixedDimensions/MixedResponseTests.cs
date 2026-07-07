@@ -265,6 +265,46 @@ public sealed class MixedResponseTests
     }
 
     [Fact]
+    public void Simulate_WithOneDynamic3DAndTwoBodyless2DContacts_ShouldUse3DRootForMixedIsland()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        context.Settings.DiscreteSolverIterations = 2;
+        context.Diagnostics.Enable(eventCapacity: 64, drawCommandCapacity: 0);
+        ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(context, Vector3d.Zero);
+        _ = CreateBodylessCircle2D(context, new Vector2d(-Fixed64.FromFraction(1, 4), Fixed64.Zero));
+        _ = CreateBodylessCircle2D(context, new Vector2d(Fixed64.FromFraction(1, 4), Fixed64.Zero));
+        body3D.Body.AddLinearImpulse(Vector3d.Right);
+
+        Step(context);
+
+        GravitasMixedResponseIslandDiagnosticView island = FindFirstMixedIsland(context);
+        island.RootKey.Should().Be(body3D.Body.DynamicId << 1);
+        island.ConstraintCount.Should().Be(2);
+        island.IterationCount.Should().Be(2);
+    }
+
+    [Fact]
+    public void Simulate_WithTwoBodyless3DContactsAndOneDynamic2D_ShouldUse2DRootForMixedIsland()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        context.Settings.DiscreteSolverIterations = 2;
+        context.Diagnostics.Enable(eventCapacity: 64, drawCommandCapacity: 0);
+        LSCollider left3D = CreateBodylessSphere3D(context, new Vector3d(-Fixed64.FromFraction(1, 4), Fixed64.Zero, Fixed64.Zero));
+        LSCollider right3D = CreateBodylessSphere3D(context, new Vector3d(Fixed64.FromFraction(1, 4), Fixed64.Zero, Fixed64.Zero));
+        SolidBody2D body2D = CreateCircle2D(context, Vector2d.Zero);
+        body2D.ApplyCollisionLinearVelocityDelta(Vector2d.Right);
+
+        Step(context);
+
+        GravitasMixedResponseIslandDiagnosticView island = FindFirstMixedIsland(context);
+        island.RootKey.Should().Be((body2D.DynamicId << 1) | 1);
+        island.ConstraintCount.Should().Be(2);
+        island.IterationCount.Should().Be(2);
+        left3D.Center.X.Should().Be(-Fixed64.FromFraction(1, 4));
+        right3D.Center.X.Should().Be(Fixed64.FromFraction(1, 4));
+    }
+
+    [Fact]
     public void Simulate_WithSleepingMixedLinkInAwakeIsland_ShouldWakeConnectedSleepingBodies()
     {
         using GravitasWorldContext context = CreateMixedContext();

@@ -199,6 +199,22 @@ public sealed class MixedNarrowPhaseTests
     }
 
     [Fact]
+    public void SphereCustom2DSlab_WithDegenerateClosestPoint_ShouldUseDeterministicFallbackNormal()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSSphereCollider> sphere = CreateSphere3D(context, Vector3d.Zero);
+        SolidBody2D custom = CreateBody2D(context, new UnsupportedTestCollider2D(), Vector2d.Zero);
+
+        bool collided = CollisionDetectionMixed.TryCollide(sphere.Collider, custom.Collider, out MixedContact contact);
+
+        collided.Should().BeTrue();
+        contact.HasContact.Should().BeTrue();
+        contact.Normal3DTo2D.Should().Be(Vector3d.Right);
+        contact.Point3D.Should().Be(Vector3d.Right * Fixed64.Half);
+        contact.Point2D.Should().Be(Vector3d.Zero);
+    }
+
+    [Fact]
     public void SphereCircleSlab_WithSeparatedYSlab_ShouldNotCollide()
     {
         using GravitasWorldContext context = CreateMixedContext();

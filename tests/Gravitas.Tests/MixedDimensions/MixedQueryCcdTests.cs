@@ -142,6 +142,30 @@ public sealed class MixedQueryCcdTests
     }
 
     [Fact]
+    public void SweepCircleAgainst3D_WithVerticalSphereOverlap_ShouldKeepPlanarPointAtCircleCenter()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSSphereCollider> target = CreateSphere3D(context, Vector3d.Up, immovable: true);
+
+        bool mixedHit = context.QueryMixed.SweepCircleAgainst3D(
+            Vector2d.Zero,
+            new Vector2d((Fixed64)3, Fixed64.Zero),
+            Fixed64.Half,
+            Fixed64.Zero,
+            Fixed64.Half,
+            IncludeLayerZero,
+            out PhysicsMixedHit hit);
+
+        mixedHit.Should().BeTrue();
+        hit.Collider3D.Should().BeSameAs(target.Collider);
+        hit.Collider2D.Should().BeNull();
+        hit.Distance.Should().Be(Fixed64.Zero);
+        hit.Point2D.Should().Be(new Vector3d(Fixed64.Zero, Fixed64.Half, Fixed64.Zero));
+        hit.Normal3DTo2D.Should().Be(-Vector3d.Up);
+        hit.ReducerKind.Should().Be(PhysicsQueryReducerKind.Exact);
+    }
+
+    [Fact]
     public void SweepCircleAgainst3D_WithCuboidTarget_ShouldUseExactFiniteSlabReducer()
     {
         using GravitasWorldContext context = CreateMixedContext();
