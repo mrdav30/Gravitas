@@ -311,7 +311,9 @@ public sealed partial class SolidBody2D
     {
         Vector2d normal = normalForSource.MagnitudeSquared > Fixed64.Epsilon
             ? normalForSource.Normalized
-            : -ResolveKinematicPushAxis(sourceDisplacement, sourceDisplacement);
+            : sourceDisplacement.MagnitudeSquared > Fixed64.Epsilon
+                ? -sourceDisplacement.Normalized
+                : Vector2d.Zero;
         if (normal == Vector2d.Zero)
             return false;
 
@@ -355,7 +357,9 @@ public sealed partial class SolidBody2D
     {
         Vector2d normal = normalForSource.MagnitudeSquared > Fixed64.Epsilon
             ? normalForSource.Normalized
-            : -ResolveKinematicPushAxis(sourceDisplacement, sourceDisplacement);
+            : sourceDisplacement.MagnitudeSquared > Fixed64.Epsilon
+                ? -sourceDisplacement.Normalized
+                : Vector2d.Zero;
         if (normal == Vector2d.Zero)
             return false;
 
@@ -391,16 +395,6 @@ public sealed partial class SolidBody2D
             deltaTime * (Fixed64.One - hitTime),
             ignoredCollider2D: Collider);
         return true;
-    }
-
-    private static Vector2d ResolveKinematicPushAxis(Vector2d candidate, Vector2d fallback)
-    {
-        if (candidate.MagnitudeSquared > Fixed64.Epsilon)
-            return candidate.Normalized;
-
-        return fallback.MagnitudeSquared > Fixed64.Epsilon
-            ? fallback.Normalized
-            : Vector2d.Zero;
     }
 
 }

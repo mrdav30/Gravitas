@@ -239,19 +239,10 @@ public partial class SolidBody
         if (Collider is LSSphereCollider)
             return false;
 
-        if (target is LSSphereCollider targetSphere)
-            return TryRefineContinuousCollisionAgainstTargetSphere(targetSphere, displacement, direction, out refined, out exactSupported);
-
-        if (!IsExactConvexSourceSupported(Collider))
+        if (target is not LSSphereCollider targetSphere)
             return false;
 
-        exactSupported = true;
-        PrepareExactConvexSourceSweep(displacement);
-        if (!_shapeExactContinuousConvexSweepWorker.TrySweepPreparedSource(target, out Physics3DHit convexHit))
-            return false;
-
-        refined = ApplyShapeExactContinuousContactSlop(convexHit);
-        return true;
+        return TryRefineContinuousCollisionAgainstTargetSphere(targetSphere, displacement, direction, out refined, out exactSupported);
     }
 
     private bool TryRefineContinuousCollisionAgainstTargetSphere(

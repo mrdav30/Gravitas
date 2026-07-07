@@ -723,7 +723,7 @@ public sealed class GravitasQuery3DServiceSweepTests
     }
 
     [Fact]
-    public void SweptSphereWorker_ShouldDetectConeSideAndApexImpact()
+    public void SweptSphereWorker_ShouldDetectConeSideImpactWithStableSurfaceDelta()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         LSConeCollider cone = CreateDynamicCollider(
@@ -737,8 +737,10 @@ public sealed class GravitasQuery3DServiceSweepTests
         bool hit = worker.TrySweep(cone, out Vector3d centerAtImpact, out Fixed64 distance);
 
         hit.Should().BeTrue();
-        distance.Should().BeLessThan((Fixed64)2);
-        centerAtImpact.X.Should().BeLessThan((Fixed64)8);
+        distance.Should().BeInRange(Fixed64.FromFraction(5, 4), Fixed64.FromFraction(7, 4));
+        centerAtImpact.X.Should().BeInRange(Fixed64.FromFraction(29, 4), Fixed64.FromFraction(31, 4));
+        centerAtImpact.Y.Should().Be(Fixed64.Zero);
+        centerAtImpact.Z.Should().Be(Fixed64.Zero);
     }
 
     [Fact]

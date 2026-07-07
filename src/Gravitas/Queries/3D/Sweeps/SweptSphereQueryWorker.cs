@@ -224,9 +224,9 @@ public sealed class SweptSphereQueryWorker
             Vector3d closest = cone.ClosestPointOnSurface(center);
             Vector3d toCenter = center - closest;
             Fixed64 distance = toCenter.Magnitude;
-            Vector3d normal = distance > Fixed64.Epsilon
-                ? toCenter / distance
-                : ResolveFallbackConeNormal(cone, center);
+            // Positive separation implies a non-zero closest-surface delta for
+            // a valid non-negative swept radius.
+            Vector3d normal = toCenter / distance;
             Fixed64 closingSpeed = -Vector3d.Dot(_direction, normal);
             Fixed64 step = closingSpeed > Fixed64.Epsilon
                 ? separation / closingSpeed
@@ -737,15 +737,6 @@ public sealed class SweptSphereQueryWorker
         }
 
         return high;
-    }
-
-    private static Vector3d ResolveFallbackConeNormal(LSConeCollider cone, Vector3d center)
-    {
-        Vector3d fallback = center - cone.Center;
-        if (fallback.MagnitudeSquared > Fixed64.Epsilon)
-            return fallback.Normalized;
-
-        return -cone.Axis;
     }
 
     private static bool ClipSegmentAxis(
