@@ -112,8 +112,7 @@ public sealed partial class GravitasPhysics2DService
         for (int jointId = 1; jointId <= constraints.PeakJointCount; jointId++)
         {
             if (!constraints.TryGetJointForSolver(jointId, out Joint2D? joint)
-                || joint == null
-                || !joint.IsEnabled
+                || !joint!.IsEnabled
                 || !joint.HasSolverParticipant())
             {
                 continue;
@@ -130,8 +129,7 @@ public sealed partial class GravitasPhysics2DService
         for (int jointId = 1; jointId <= constraints.PeakJointCount; jointId++)
         {
             if (!constraints.TryGetJointForSolver(jointId, out Joint2D? joint)
-                || joint == null
-                || !joint.IsEnabled
+                || !joint!.IsEnabled
                 || !joint.HasSolverParticipant())
             {
                 continue;
@@ -150,8 +148,7 @@ public sealed partial class GravitasPhysics2DService
         for (int jointId = 1; jointId <= constraints.PeakJointCount; jointId++)
         {
             if (!constraints.TryGetJointForSolver(jointId, out Joint2D? joint)
-                || joint == null
-                || !joint.IsEnabled
+                || !joint!.IsEnabled
                 || !joint.HasSolverParticipant())
             {
                 continue;

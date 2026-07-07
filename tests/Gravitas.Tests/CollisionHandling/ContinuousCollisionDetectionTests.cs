@@ -98,6 +98,8 @@ public sealed class ContinuousCollisionDetectionTests
     [InlineData(TestColliderShape.Capsule)]
     [InlineData(TestColliderShape.Cuboid)]
     [InlineData(TestColliderShape.Cylinder)]
+    [InlineData(TestColliderShape.Cone)]
+    [InlineData(TestColliderShape.ConvexMesh)]
     [InlineData(TestColliderShape.Compound)]
     public void ContinuousMode_ShouldPreventFastColliderTunnelingThroughThinStaticGeometry(TestColliderShape shape)
     {
@@ -556,6 +558,27 @@ public sealed class ContinuousCollisionDetectionTests
         (right.Body.Position3d.X - left.Body.Position3d.X).Should().BeGreaterThanOrEqualTo(Fixed64.One);
         left.Body.LinearVelocity.X.Should().BeLessThanOrEqualTo(Fixed64.Zero);
         right.Body.LinearVelocity.X.Should().BeGreaterThanOrEqualTo(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void ContinuousMode_DynamicRelativePath_ShouldIgnoreSiblingTarget()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        ScenarioBody<LSSphereCollider> source = scenario.CreateSphere(new Vector3d((Fixed64)(-3), Fixed64.Zero, Fixed64.Zero));
+        ScenarioBody<LSSphereCollider> target = scenario.CreateSphere(Vector3d.Zero);
+        target.Collider.SetParent(source.Collider);
+        source.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        target.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        DisableGroundQueries(source.Body);
+        DisableGroundQueries(target.Body);
+
+        source.Body.AddForce(Vector3d.Right * (Fixed64)4);
+        scenario.Context.LateSimulate();
+
+        source.Body.Position3d.X.Should().Be(Fixed64.One);
+        source.Body.LinearVelocity.X.Should().Be((Fixed64)4);
+        target.Body.Position3d.Should().Be(Vector3d.Zero);
+        target.Body.LinearVelocity.Should().Be(Vector3d.Zero);
     }
 
     [Fact]
@@ -1230,6 +1253,11 @@ public sealed class ContinuousCollisionDetectionTests
             TestColliderShape.Capsule => ToTuple(scenario.CreateCapsule(new Vector3d((Fixed64)(-2), Fixed64.Zero, Fixed64.Zero))),
             TestColliderShape.Cuboid => ToTuple(scenario.CreateCuboid(new Vector3d((Fixed64)(-2), Fixed64.Zero, Fixed64.Zero))),
             TestColliderShape.Cylinder => ToTuple(scenario.CreateCylinder(new Vector3d((Fixed64)(-2), Fixed64.Zero, Fixed64.Zero))),
+            TestColliderShape.Cone => ToTuple(scenario.CreateCone(new Vector3d((Fixed64)(-2), Fixed64.Zero, Fixed64.Zero))),
+            TestColliderShape.ConvexMesh => ToTuple(scenario.CreateBody(
+                MeshTestFixtures.CreateConvexCube(inertiaPolicy: MeshInertiaPolicy.SurfaceApproximation),
+                new Vector3d((Fixed64)(-2), Fixed64.Zero, Fixed64.Zero),
+                FixedQuaternion.Identity)),
             TestColliderShape.Compound => ToTuple(scenario.CreateBody(
                 new LSCompoundCollider(
                     CompoundColliderPart.Sphere(Fixed64.Half, new Vector3d(-Fixed64.One, Fixed64.Zero, Fixed64.Zero)),
@@ -1259,6 +1287,8 @@ public sealed class ContinuousCollisionDetectionTests
         Capsule,
         Cuboid,
         Cylinder,
+        Cone,
+        ConvexMesh,
         Compound
     }
 }

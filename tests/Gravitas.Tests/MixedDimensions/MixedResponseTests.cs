@@ -333,6 +333,39 @@ public sealed class MixedResponseTests
     }
 
     [Fact]
+    public void Simulate_WhenExistingMixedPairFallsAsleep_ShouldRetainRestingContactWithoutExit()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(
+            context,
+            new Vector3d(Fixed64.Zero, Fixed64.FromFraction(3, 4), Fixed64.Zero));
+        LSCollider2D platform = CreateBodylessBox2D(context, Vector2d.Zero, new Vector2d((Fixed64)4, (Fixed64)4));
+        int exited3D = 0;
+        int exited2D = 0;
+        body3D.Collider.OnMixedContactExit += other =>
+        {
+            other.Should().BeSameAs(platform);
+            exited3D++;
+        };
+        platform.OnMixedContactExit += other =>
+        {
+            other.Should().BeSameAs(body3D.Collider);
+            exited2D++;
+        };
+
+        Step(context);
+        Vector3d restingPosition = body3D.Body.Position3d;
+        body3D.Body.Sleep();
+        Step(context);
+
+        body3D.Body.IsSleeping.Should().BeTrue();
+        body3D.Body.Position3d.Should().Be(restingPosition);
+        exited3D.Should().Be(0);
+        exited2D.Should().Be(0);
+        context.MixedCollisions.ActivePairCount.Should().Be(1);
+    }
+
+    [Fact]
     public void Simulate_WithRuntimeModeBoth_ShouldNotCreateMixedPairsOrDiagnostics()
     {
         using GravitasWorldContext context = CreateMixedContext();
