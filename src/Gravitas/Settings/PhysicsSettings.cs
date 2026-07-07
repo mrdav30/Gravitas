@@ -8,12 +8,23 @@
 using FixedMathSharp;
 using Gravitas.Support;
 using SwiftCollections;
+using System;
 
 namespace Gravitas;
 
 public sealed partial class PhysicsSettings
 {
     public const int DefaultFrameRate = 32;
+
+    /// <summary>
+    /// Maximum supported fixed-step frame rate.
+    /// </summary>
+    /// <remarks>
+    /// Higher values quantize <see cref="GravitasWorldContext.DeltaTime"/> at or below
+    /// <see cref="Fixed64.Epsilon"/>, which would make integration and CCD degeneracy
+    /// checks disagree about whether a step has meaningful duration.
+    /// </remarks>
+    public const int MaxResolvableFrameRate = (int)(FixedMath.ONE_L / (FixedMath.DEFAULT_TOLERANCE_L + 1));
 
     public const int MaxLayers = 32;
 
@@ -171,8 +182,20 @@ public sealed partial class PhysicsSettings
 
     public void SetFrameRate(int frameRate)
     {
-        SwiftThrowHelper.ThrowIfNegativeOrZero(frameRate, nameof(frameRate));
+        ThrowIfInvalidFrameRate(frameRate);
         FrameRate = frameRate;
+    }
+
+    internal static void ThrowIfInvalidFrameRate(int frameRate)
+    {
+        SwiftThrowHelper.ThrowIfNegativeOrZero(frameRate, nameof(frameRate));
+        if (frameRate > MaxResolvableFrameRate)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(frameRate),
+                frameRate,
+                $"Frame rate cannot exceed {MaxResolvableFrameRate}.");
+        }
     }
 
     public static PhysicsSettings DefaultSettings()

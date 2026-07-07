@@ -838,6 +838,36 @@ public sealed class ContinuousCollisionDetectionTests
         target.Body.LinearVelocity.X.Should().BeGreaterThan(Fixed64.Zero);
     }
 
+    [Theory]
+    [InlineData(TestColliderShape.Cuboid)]
+    [InlineData(TestColliderShape.Cylinder)]
+    [InlineData(TestColliderShape.Cone)]
+    [InlineData(TestColliderShape.ConvexMesh)]
+    public void ContinuousMode_DynamicRelativeSphereSource_ShouldClampAgainstDynamicConvexTarget(TestColliderShape targetShape)
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        ScenarioBody<LSSphereCollider> mover = scenario.CreateSphere(Vector3d.Zero);
+        (SolidBody targetBody, LSCollider targetCollider) = CreateDynamicTarget(
+            scenario,
+            targetShape,
+            new Vector3d((Fixed64)4, Fixed64.Zero, Fixed64.Zero));
+        mover.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        targetBody.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        DisableGroundQueries(mover.Body);
+        DisableGroundQueries(targetBody);
+
+        targetBody.Sleep();
+        mover.Body.AddForce(Vector3d.Right * (Fixed64)10);
+        scenario.Context.LateSimulate();
+
+        mover.Body.Position3d.X.Should().BeLessThan(targetBody.Position3d.X);
+        mover.Body.LinearVelocity.X.Should().BeGreaterThanOrEqualTo(Fixed64.Zero);
+        mover.Body.LinearVelocity.X.Should().BeLessThan((Fixed64)10);
+        targetBody.IsSleeping.Should().BeFalse();
+        targetBody.LinearVelocity.X.Should().BeGreaterThan(Fixed64.Zero);
+        targetCollider.BoundsMin.X.Should().BeGreaterThan(mover.Collider.BoundsMin.X);
+    }
+
     [Fact]
     public void ContinuousMode_DynamicRelativeShapeExactPath_ShouldNotAllocateAfterWarmup()
     {
@@ -943,6 +973,28 @@ public sealed class ContinuousCollisionDetectionTests
         target.Body.LinearVelocity.X.Should().BeGreaterThan(Fixed64.Zero);
         source.Body.LastContinuousCollisionToiIterationCount.Should().Be(1);
         target.Body.IsSleeping.Should().BeFalse();
+    }
+
+    [Fact]
+    public void ContinuousMode_WithFastKinematicHostTranslation_ShouldNotTransferVelocityAcrossFrozenTargetAxis()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        ScenarioBody<LSSphereCollider> target = scenario.CreateSphere(Vector3d.Zero);
+        target.Body.FreezeAxes = BodyFreezeAxes3D.PositionX;
+        target.Body.Sleep();
+        ScenarioBody<LSSphereCollider> source = scenario.CreateSphere(
+            new Vector3d((Fixed64)(-5), Fixed64.Zero, Fixed64.Zero),
+            isKinematic: true);
+        source.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+
+        source.Body.Agent.Transform.Position = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
+        scenario.Context.LateSimulate();
+
+        source.Body.Position3d.X.Should().Be((Fixed64)5);
+        source.Body.LastContinuousCollisionToiIterationCount.Should().Be(0);
+        target.Body.Position3d.Should().Be(Vector3d.Zero);
+        target.Body.LinearVelocity.Should().Be(Vector3d.Zero);
+        target.Body.IsSleeping.Should().BeTrue();
     }
 
     [Fact]
@@ -1243,6 +1295,24 @@ public sealed class ContinuousCollisionDetectionTests
 
         scenario.InitializeStaticCollider(wall, new Vector3d(x, Fixed64.Zero, Fixed64.Zero));
         return wall;
+    }
+
+    private static (SolidBody Body, LSCollider Collider) CreateDynamicTarget(
+        PhysicsScenarioBuilder scenario,
+        TestColliderShape shape,
+        Vector3d position)
+    {
+        return shape switch
+        {
+            TestColliderShape.Cuboid => ToTuple(scenario.CreateCuboid(position)),
+            TestColliderShape.Cylinder => ToTuple(scenario.CreateCylinder(position)),
+            TestColliderShape.Cone => ToTuple(scenario.CreateCone(position)),
+            TestColliderShape.ConvexMesh => ToTuple(scenario.CreateBody(
+                MeshTestFixtures.CreateConvexCube(inertiaPolicy: MeshInertiaPolicy.SurfaceApproximation),
+                position,
+                FixedQuaternion.Identity)),
+            _ => throw new System.ArgumentOutOfRangeException(nameof(shape), shape, null)
+        };
     }
 
     private static (SolidBody Body, LSCollider Collider) CreateMover(PhysicsScenarioBuilder scenario, TestColliderShape shape)

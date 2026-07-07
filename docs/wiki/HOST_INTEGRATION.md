@@ -308,7 +308,9 @@ context.Environment.Gravity = Fixed64.FromFraction(49, 5);
 
 Different contexts can run at different frame rates and settings in the same
 process. Frame-derived values such as `DeltaTime`, `FrameCount`, and
-`TotalTime` are read through the context.
+`TotalTime` are read through the context. Frame rates must stay between `1` and
+`PhysicsSettings.MaxResolvableFrameRate`; ordinary lockstep rates are far below that
+ceiling.
 
 Per-body gravity tuning lives on the body. `SolidBody.GravityScale` multiplies
 context gravity for that body; `Fixed64.Zero` disables environment-gravity

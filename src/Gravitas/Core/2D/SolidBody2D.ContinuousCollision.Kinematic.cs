@@ -152,9 +152,6 @@ public sealed partial class SolidBody2D
         Fixed64 sourceLength)
     {
         Vector2d sourceDisplacement = proposedPosition - startPosition;
-        if (sourceLength <= Fixed64.Epsilon)
-            return false;
-
         bool pushed = false;
         int token = Context.LateSimulateToken;
         SwiftList<int> candidateIds = Context.Physics2D.QueryPlanarContinuousCollisionCandidates(
@@ -198,9 +195,7 @@ public sealed partial class SolidBody2D
                     out _))
             {
                 normal = exactHit.Normal;
-                normalizedTime = sourceLength > Fixed64.Epsilon
-                    ? FixedMath.Clamp01(exactHit.Distance / sourceLength)
-                    : normalizedTime;
+                normalizedTime = FixedMath.Clamp01(exactHit.Distance / sourceLength);
             }
             else
             {
@@ -211,9 +206,7 @@ public sealed partial class SolidBody2D
             if (distance > maxDistance)
                 continue;
 
-            Fixed64 frameFraction = sourceLength > Fixed64.Epsilon
-                ? FixedMath.Clamp01(distance / sourceLength)
-                : Fixed64.Zero;
+            Fixed64 frameFraction = FixedMath.Clamp01(distance / sourceLength);
             Vector2d targetPositionAtImpact = targetStart + targetDisplacement * frameFraction;
             if (ApplyKinematicContinuousCollisionHandoff(
                     target,
@@ -241,9 +234,6 @@ public sealed partial class SolidBody2D
             return false;
 
         Vector2d sourceDisplacement2D = proposedPosition - startPosition;
-        if (sourceLength <= Fixed64.Epsilon)
-            return false;
-
         Vector3d sourceStart = new(startPosition.X, Collider.MixedSlabCenterY, startPosition.Y);
         Vector3d sourceDisplacement = new(sourceDisplacement2D.X, Fixed64.Zero, sourceDisplacement2D.Y);
         Fixed64 sourceRadius = FixedMath.Max(proxyRadius, Collider.MixedHalfThickness);
@@ -281,9 +271,7 @@ public sealed partial class SolidBody2D
             if (distance > maxDistance)
                 continue;
 
-            Fixed64 frameFraction = sourceLength > Fixed64.Epsilon
-                ? FixedMath.Clamp01(distance / sourceLength)
-                : Fixed64.Zero;
+            Fixed64 frameFraction = FixedMath.Clamp01(distance / sourceLength);
             Vector3d targetPositionAtImpact = target.ContinuousCollisionFrameStart
                 + target.ContinuousCollisionFrameDisplacement * frameFraction;
             if (ApplyKinematicContinuousCollisionHandoff(
@@ -319,7 +307,7 @@ public sealed partial class SolidBody2D
 
         Fixed64 deltaTime = Context.DeltaTime;
         Fixed64 constrainedInverseMass = target.GetConstrainedInverseMass(normal);
-        if (deltaTime <= Fixed64.Epsilon || constrainedInverseMass <= Fixed64.Epsilon)
+        if (constrainedInverseMass <= Fixed64.Epsilon)
             return false;
 
         Vector2d sourceVelocity = sourceDisplacement / deltaTime;
@@ -333,12 +321,7 @@ public sealed partial class SolidBody2D
 
         Fixed64 restitution = ResolveContinuousCollisionRestitution(target, -normalVelocity);
         Fixed64 impulseScalar = -(Fixed64.One + restitution) * normalVelocity / constrainedInverseMass;
-        if (impulseScalar <= Fixed64.Zero)
-            return false;
-
-        Fixed64 hitTime = sourceLength > Fixed64.Epsilon
-            ? FixedMath.Clamp01(hitDistance / sourceLength)
-            : Fixed64.Zero;
+        Fixed64 hitTime = FixedMath.Clamp01(hitDistance / sourceLength);
         target.ApplyContinuousCollisionHandoff(
             targetPositionAtImpact,
             -normal * (impulseScalar * target.EffectiveInverseMass),
@@ -365,7 +348,7 @@ public sealed partial class SolidBody2D
 
         Fixed64 deltaTime = Context.DeltaTime;
         Fixed64 constrainedInverseMass = target.GetConstrainedInverseMass(normal.ToVector3d(Fixed64.Zero));
-        if (deltaTime <= Fixed64.Epsilon || constrainedInverseMass <= Fixed64.Epsilon)
+        if (constrainedInverseMass <= Fixed64.Epsilon)
             return false;
 
         Vector3d normal3D = normal.ToVector3d(Fixed64.Zero);
@@ -383,12 +366,7 @@ public sealed partial class SolidBody2D
 
         Fixed64 restitution = ResolveContinuousCollisionRestitution(target, -normalVelocity);
         Fixed64 impulseScalar = -(Fixed64.One + restitution) * normalVelocity / constrainedInverseMass;
-        if (impulseScalar <= Fixed64.Zero)
-            return false;
-
-        Fixed64 hitTime = sourceLength > Fixed64.Epsilon
-            ? FixedMath.Clamp01(hitDistance / sourceLength)
-            : Fixed64.Zero;
+        Fixed64 hitTime = FixedMath.Clamp01(hitDistance / sourceLength);
         target.ApplyContinuousCollisionHandoff(
             targetPositionAtImpact,
             -normal3D * (impulseScalar * target.EffectiveInverseMass),

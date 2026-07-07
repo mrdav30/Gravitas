@@ -273,7 +273,7 @@ public sealed partial class SolidBody2D
 
         Vector2d relativeDisplacement = sourceDisplacement - targetDisplacement;
         Fixed64 relativeLength = relativeDisplacement.Magnitude;
-        if (relativeLength <= Fixed64.Epsilon || sourceLength <= Fixed64.Epsilon)
+        if (relativeLength <= Fixed64.Epsilon)
             return false;
 
         Vector2d originalSourcePosition = _position;

@@ -89,30 +89,30 @@ configuration before making source changes.
 
 ## Current Standing
 
-Fresh checkpoint after Workstream 18 query, CCD eligibility, mixed pair, and
-island residue pass:
+Fresh checkpoint after Workstream 19 kinematic CCD and dynamic response residue
+pass:
 
 | Metric | Baseline | Current | Short-Term Gate | Long-Term Target |
 | --- | ---: | ---: | ---: | ---: |
-| Line coverage | 87.3% | 94.7% | 90% | 100% |
-| Branch coverage | 74.1% | 82.8% | 90% | 100% |
+| Line coverage | 87.3% | 94.8% | 90% | 100% |
+| Branch coverage | 74.1% | 83.2% | 90% | 100% |
 | Method coverage | 86.5% | 94.6% | 90% | 100% |
-| Tests | 974 passed | 1261 passed | green | green |
+| Tests | 974 passed | 1272 passed | green | green |
 
-At the current denominator, the 90% branch gate requires at least 10,081 covered
-branches. The latest run covered 9,283 of 11,201 branches, leaving roughly 798
+At the current denominator, the 90% branch gate requires at least 10,023 covered
+branches. The latest run covered 9,268 of 11,137 branches, leaving roughly 755
 net branch outcomes to cover or delete. Treat this as a focused branch
 campaign, not a single gate-check workstream.
 
 Current evidence:
 
 - Coverage report:
-  `TestResults/coverage-branch-hardening-ws18/reports/Summary.txt`
+  `TestResults/coverage-branch-hardening-ws19-final/reports/Summary.txt`
 - Coverage collection:
   `dotnet test tests\Gravitas.Tests\Gravitas.Tests.csproj --configuration Release --collect:"XPlat Code Coverage" --settings tests\Gravitas.Tests\coverlet.runsettings`
-  passed with 1261 tests.
+  passed with 1272 tests.
 - Branch shortlist:
-  `TestResults/coverage-branch-hardening-ws18/branch-gap-shortlist.csv`
+  `TestResults/coverage-branch-hardening-ws19-final/branch-gap-shortlist.csv`
 - Latest summary reports 199 uncovered methods.
 
 ## Historical Summary
@@ -217,9 +217,9 @@ RCA and verification, even if the fix is small.
 
 This roadmap replaces the old pattern of appending one new workstream after
 each coverage attempt. Work through the workstreams below from the current
-`ws18` shortlist. After each completed workstream, update checkboxes and the
-coverage checkpoint table; do not add a new workstream unless fresh evidence
-invalidates the next two planned areas or the 90% gate passes.
+`ws19-final` shortlist. After each completed workstream, update checkboxes and
+the coverage checkpoint table; do not add a new workstream unless fresh
+evidence invalidates the next two planned areas or the 90% gate passes.
 
 Run focused tests during each workstream. Run full `Release`, `ReleaseLean`
 when relevant, and coverage at the end of each workstream or after a tightly
@@ -250,25 +250,44 @@ These branches are release-critical because they decide fast-mover behavior.
 
 **Tasks**
 
-- [ ] Classify `ApplyKinematicContinuousCollisionHandoff` rows across 2D and
+- [x] Classify `ApplyKinematicContinuousCollisionHandoff` rows across 2D and
       3D as real behavior, obsolete fallback, or impossible guard.
-- [ ] Cover valid kinematic handoff branches where source/target state changes
+- [x] Cover valid kinematic handoff branches where source/target state changes
       are observable through position, velocity, ignored-target, trigger, or
       sibling/hierarchy behavior.
-- [ ] Cover or delete `TryApplyKinematicDynamic3DContinuousCollisionPushes`,
+- [x] Cover or delete `TryApplyKinematicDynamic3DContinuousCollisionPushes`,
       `TryApplyKinematicDynamic2DContinuousCollisionPushes`, and mixed
       kinematic push residue through public fast-mover scenarios.
-- [ ] Review rotational CCD residue in both dimensions; add behavior tests only
+- [x] Review rotational CCD residue in both dimensions; add behavior tests only
       for valid angular sweeps, no-hit/miss ordering, and replacement-hit
       semantics.
-- [ ] Review `ResolveSweptSphereContinuousNormal`,
+- [x] Review `ResolveSweptSphereContinuousNormal`,
       `TryApplyContinuousCollisionDynamicResponse`,
       `TryApplyContinuousCollisionMixed*Response`,
       `TryGetExactDynamicRelativeContinuousCollisionHit`, and
       `TryRefineShapeExactContinuousCollisionHit` for real behavior versus stale
       fallback code.
-- [ ] Run focused CCD tests, full `Release`, coverage collection, and
+- [x] Run focused CCD tests, full `Release`, coverage collection, and
       `ReleaseLean` if conditional serialization or package behavior changes.
+
+**Completion Notes**
+
+Workstream 19 added public CCD coverage for kinematic handoff into
+per-axis-frozen dynamic targets across 3D, pure 2D, and mixed 3D/2D paths. It
+also added a dynamic sphere-source exact CCD theory for cuboid, cylinder, cone,
+and convex mesh targets so swept-sphere target-normal branches are exercised
+through real fast-mover behavior.
+
+The cleanup removed private CCD branches proven impossible by caller/runtime
+invariants: positive source-length rechecks, `sourceLength > Epsilon` ternaries
+after positive-length callers, nonpositive impulse checks after positive
+inverse mass plus closing velocity plus nonnegative restitution, and exact-hit
+source-length/displacement guards where callers already prove motion. A
+subagent review caught that positive frame-rate validation alone did not prove
+`Context.DeltaTime > Epsilon`, so this workstream added
+`PhysicsSettings.MaxResolvableFrameRate` and shared frame-rate validation before keeping
+the removed CCD delta-time guards out of hot paths. Remaining rotational CCD
+residue is valid behavior surface, not stale fallback.
 
 ### Workstream 20: Query Reducers And Shape-Cast Geometry Residue
 
@@ -504,3 +523,4 @@ campaign checkpoints; do not add a row for every focused test filter.
 | 2026-07-06 | 93.3% | 79.7% | 93.6% | 1146 passed | Workstreams 1-6 completed; zombie-code sweep plus query, collision, serialization, lifecycle, and diagnostics hardening. |
 | 2026-07-07 | 94.1% | 81.3% | 94.4% | 1214 passed | Workstreams 7-12 completed; CCD handoff, mixed response, query reducer, replay, lifecycle, and shape-cast residue. |
 | 2026-07-07 | 94.7% | 82.8% | 94.6% | 1261 passed | Workstreams 13-18 completed; geometry, hierarchy, convex support, CCD eligibility, mixed pair retention, and joint-island cleanup. |
+| 2026-07-07 | 94.8% | 83.2% | 94.6% | 1272 passed | Workstream 19 completed; kinematic CCD frozen-axis coverage plus fixed-step frame-rate invariant. Branches covered: 9268/11137. |

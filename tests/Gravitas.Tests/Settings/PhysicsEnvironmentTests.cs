@@ -1,5 +1,6 @@
 using FixedMathSharp;
 using FluentAssertions;
+using System;
 using Xunit;
 
 namespace Gravitas.Tests.Settings;
@@ -63,5 +64,13 @@ public sealed class PhysicsEnvironmentTests
         contextB.Environment.Gravity.Should().Be((Fixed64)24.79f);
         contextA.Environment.CullDistanceMax.Should().Be(4);
         contextB.Environment.CullDistanceMax.Should().Be(12);
+    }
+
+    [Fact]
+    public void Default_ShouldRejectFrameRatesThatQuantizeDeltaTimeAtOrBelowEpsilon()
+    {
+        Action action = () => _ = PhysicsEnvironment.Default(PhysicsSettings.MaxResolvableFrameRate + 1);
+
+        action.Should().Throw<ArgumentOutOfRangeException>().WithParameterName("frameRate");
     }
 }

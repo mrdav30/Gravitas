@@ -216,7 +216,7 @@ public sealed partial class PhysicsEnvironment
     /// <returns>A new environment instance.</returns>
     public static PhysicsEnvironment Default(int frameRate = PhysicsSettings.DefaultFrameRate)
     {
-        SwiftThrowHelper.ThrowIfNegativeOrZero(frameRate, nameof(frameRate));
+        PhysicsSettings.ThrowIfInvalidFrameRate(frameRate);
 
         return new PhysicsEnvironment(
             gravity: DefaultGravity,

@@ -61,6 +61,33 @@ public sealed class PhysicsSettingsTests
         context.InvDeltaTime.Should().Be(Fixed64.One / context.DeltaTime);
     }
 
+    [Fact]
+    public void SetFrameRate_ShouldKeepDeltaTimeAboveFixed64Epsilon()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+
+        context.SetFrameRate(PhysicsSettings.MaxResolvableFrameRate);
+
+        context.Settings.FrameRate.Should().Be(PhysicsSettings.MaxResolvableFrameRate);
+        context.FrameRate.Should().Be(PhysicsSettings.MaxResolvableFrameRate);
+        context.DeltaTime.Should().BeGreaterThan(Fixed64.Epsilon);
+    }
+
+    [Fact]
+    public void SetFrameRate_ShouldRejectRatesThatQuantizeDeltaTimeAtOrBelowEpsilon()
+    {
+        var settings = PhysicsSettings.DefaultSettings();
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+
+        Action construct = () => _ = new PhysicsSettings(PhysicsSettings.MaxResolvableFrameRate + 1, null);
+        Action setSettings = () => settings.SetFrameRate(PhysicsSettings.MaxResolvableFrameRate + 1);
+        Action setContext = () => context.SetFrameRate(PhysicsSettings.MaxResolvableFrameRate + 1);
+
+        construct.Should().Throw<ArgumentOutOfRangeException>().WithParameterName("frameRate");
+        setSettings.Should().Throw<ArgumentOutOfRangeException>().WithParameterName("frameRate");
+        setContext.Should().Throw<ArgumentOutOfRangeException>().WithParameterName("frameRate");
+    }
+
     [Theory]
     [InlineData(0)]
     [InlineData(-1)]

@@ -233,7 +233,7 @@ public partial class SolidBody
         refined = default;
         exactSupported = false;
         LSCollider? target = candidate.Collider;
-        if (target == null || displacement.MagnitudeSquared <= Fixed64.Epsilon)
+        if (target == null)
             return false;
 
         if (Collider is LSSphereCollider)
@@ -441,7 +441,7 @@ public partial class SolidBody
 
         Vector3d relativeDisplacement = sourceDisplacement - targetDisplacement;
         Fixed64 relativeLength = relativeDisplacement.Magnitude;
-        if (relativeLength <= Fixed64.Epsilon || sourceLength <= Fixed64.Epsilon)
+        if (relativeLength <= Fixed64.Epsilon)
             return false;
 
         Vector3d relativeDirection = relativeDisplacement / relativeLength;

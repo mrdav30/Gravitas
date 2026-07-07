@@ -277,9 +277,6 @@ public partial class SolidBody
 
         Fixed64 restitution = ResolveContinuousCollisionRestitution(target, -normalVelocity);
         Fixed64 impulseScalar = -(Fixed64.One + restitution) * normalVelocity / inverseMass;
-        if (impulseScalar <= Fixed64.Zero)
-            return false;
-
         Vector3d impulse = normal * impulseScalar;
         ApplyCollisionLinearVelocityDelta(impulse * EffectiveInverseMass);
         UpdateContinuousCollisionFrameTrajectory(sourcePositionAtImpact, _linearVelocity, hitElapsedTime);
@@ -315,9 +312,6 @@ public partial class SolidBody
 
         Fixed64 restitution = ResolveContinuousCollisionRestitution(target, -normalVelocity);
         Fixed64 impulseScalar = -(Fixed64.One + restitution) * normalVelocity / inverseMass;
-        if (impulseScalar <= Fixed64.Zero)
-            return false;
-
         ApplyCollisionLinearVelocityDelta(normal * (impulseScalar * EffectiveInverseMass));
         UpdateContinuousCollisionFrameTrajectory(sourcePositionAtImpact, _linearVelocity, hitElapsedTime);
         target.ApplyContinuousCollisionHandoff(
@@ -333,9 +327,6 @@ public partial class SolidBody
         Fixed64 elapsedTime)
     {
         Fixed64 deltaTime = Context.DeltaTime;
-        if (deltaTime <= Fixed64.Epsilon)
-            return;
-
         Fixed64 elapsedFraction = FixedMath.Clamp01(elapsedTime / deltaTime);
         Vector3d frameDisplacement = ProjectLinearMotion(velocity) * deltaTime;
         _continuousCollisionFrameToken = Context.LateSimulateToken;
@@ -346,10 +337,7 @@ public partial class SolidBody
 
     private Fixed64 ResolveContinuousCollisionFrameFraction(Fixed64 hitElapsedTime)
     {
-        Fixed64 deltaTime = Context.DeltaTime;
-        return deltaTime > Fixed64.Epsilon
-            ? FixedMath.Clamp01(hitElapsedTime / deltaTime)
-            : Fixed64.One;
+        return FixedMath.Clamp01(hitElapsedTime / Context.DeltaTime);
     }
 
     private Fixed64 ResolveContinuousCollisionRestitution(SolidBody target, Fixed64 closingSpeed)

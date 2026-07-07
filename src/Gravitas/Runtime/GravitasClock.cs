@@ -113,10 +113,10 @@ internal sealed class GravitasClock
     /// <summary>
     /// Updates the fixed simulation frame rate.
     /// </summary>
-    /// <param name="frameRate">The new frame rate. Must be greater than zero.</param>
+    /// <param name="frameRate">The new frame rate. Must be within the supported physics settings range.</param>
     public void SetFrameRate(int frameRate)
     {
-        SwiftThrowHelper.ThrowIfNegativeOrZero(frameRate, nameof(frameRate));
+        PhysicsSettings.ThrowIfInvalidFrameRate(frameRate);
         _frameRate = frameRate;
         _deltaTime = Fixed64.One / (Fixed64)_frameRate;
     }

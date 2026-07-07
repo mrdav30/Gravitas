@@ -448,7 +448,7 @@ public sealed class GravitasWorldContext : IDisposable
     /// <summary>
     /// Updates this context's fixed simulation frame rate.
     /// </summary>
-    /// <param name="frameRate">The new frame rate. Must be greater than zero.</param>
+    /// <param name="frameRate">The new frame rate. Must be within the supported physics settings range.</param>
     public void SetFrameRate(int frameRate)
     {
         ThrowIfDisposed();

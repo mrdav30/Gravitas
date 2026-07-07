@@ -5,6 +5,7 @@
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
+using System.Runtime.CompilerServices;
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
@@ -260,9 +261,6 @@ public sealed partial class SolidBody2D
 
         Fixed64 restitution = ResolveContinuousCollisionRestitution(target, -normalVelocity);
         Fixed64 impulseScalar = -(Fixed64.One + restitution) * normalVelocity / inverseMass;
-        if (impulseScalar <= Fixed64.Zero)
-            return false;
-
         Vector2d impulse = normal * impulseScalar;
         ApplyCollisionLinearVelocityDelta(impulse * EffectiveInverseMass);
         UpdateContinuousCollisionFrameTrajectory(sourcePositionAtImpact, _linearVelocity, hitElapsedTime);
@@ -298,9 +296,6 @@ public sealed partial class SolidBody2D
 
         Fixed64 restitution = ResolveContinuousCollisionRestitution(target, -normalVelocity);
         Fixed64 impulseScalar = -(Fixed64.One + restitution) * normalVelocity / inverseMass;
-        if (impulseScalar <= Fixed64.Zero)
-            return false;
-
         ApplyCollisionLinearVelocityDelta(normal * (impulseScalar * EffectiveInverseMass));
         UpdateContinuousCollisionFrameTrajectory(sourcePositionAtImpact, _linearVelocity, hitElapsedTime);
         target.ApplyContinuousCollisionHandoff(
@@ -316,9 +311,6 @@ public sealed partial class SolidBody2D
         Fixed64 elapsedTime)
     {
         Fixed64 deltaTime = Context.DeltaTime;
-        if (deltaTime <= Fixed64.Epsilon)
-            return;
-
         Fixed64 elapsedFraction = FixedMath.Clamp01(elapsedTime / deltaTime);
         Vector2d frameDisplacement = ProjectLinearMotion(velocity) * deltaTime;
         _continuousCollisionFrameToken = Context.LateSimulateToken;
@@ -327,14 +319,11 @@ public sealed partial class SolidBody2D
         _continuousCollisionFrameRotation = _rotation;
     }
 
-    private Fixed64 ResolveContinuousCollisionFrameFraction(Fixed64 hitElapsedTime)
-    {
-        Fixed64 deltaTime = Context.DeltaTime;
-        return deltaTime > Fixed64.Epsilon
-            ? FixedMath.Clamp01(hitElapsedTime / deltaTime)
-            : Fixed64.One;
-    }
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private Fixed64 ResolveContinuousCollisionFrameFraction(Fixed64 hitElapsedTime) =>
+        FixedMath.Clamp01(hitElapsedTime / Context.DeltaTime);
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private Fixed64 ResolveContinuousCollisionRestitution(SolidBody2D target, Fixed64 closingSpeed)
     {
         if (closingSpeed <= Context.Settings.RestitutionVelocityThreshold)
@@ -343,6 +332,7 @@ public sealed partial class SolidBody2D
         return PhysicsMaterial.CombineRestitution(Collider.Material, target.Collider.Material);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private Fixed64 ResolveContinuousCollisionRestitution(SolidBody target, Fixed64 closingSpeed)
     {
         if (closingSpeed <= Context.Settings.RestitutionVelocityThreshold)

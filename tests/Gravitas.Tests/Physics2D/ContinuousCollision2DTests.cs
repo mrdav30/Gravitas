@@ -514,6 +514,31 @@ public sealed class ContinuousCollision2DTests
     }
 
     [Fact]
+    public void ContinuousMode_WithFastKinematic2DHostTranslation_ShouldNotTransferVelocityAcrossFrozenTargetAxis()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        SolidBody2D target = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
+        target.FreezeAxes = BodyFreezeAxes2D.PositionX;
+        target.Sleep();
+        SolidBody2D source = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.Half),
+            new Vector2d((Fixed64)(-5), Fixed64.Zero),
+            immovable: false,
+            isKinematic: true);
+        source.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+
+        source.Agent.Transform.Position = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
+        context.LateSimulate();
+
+        source.Position.X.Should().Be((Fixed64)5);
+        source.LastContinuousCollisionToiIterationCount.Should().Be(0);
+        target.Position.Should().Be(Vector2d.Zero);
+        target.LinearVelocity.Should().Be(Vector2d.Zero);
+        target.IsSleeping.Should().BeTrue();
+    }
+
+    [Fact]
     public void ContinuousMode_WithFastKinematic2DHostTranslation_ShouldRelayDynamicHandoffThroughChain()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);
