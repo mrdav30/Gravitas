@@ -134,6 +134,61 @@ public sealed class RaycastSegmentWorkerTests
     }
 
     [Fact]
+    public void CheckConeOverlaps_WithPointInsideCone_ShouldReturnPoint()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSConeCollider cone = scenario.CreateCone(Vector3d.Zero).Collider;
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+
+        worker.PrepareSegmentCheck(Vector3d.Zero, Vector3d.Zero);
+
+        bool hit = worker.CheckConeOverlaps(cone, ref hits);
+
+        hit.Should().BeTrue();
+        hits.Count.Should().Be(1);
+        hits[0].Should().Be(Vector3d.Zero);
+    }
+
+    [Fact]
+    public void CheckConeOverlaps_WithSegmentCrossingConeSide_ShouldReturnSideIntersections()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSConeCollider cone = scenario.CreateCone(Vector3d.Zero).Collider;
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+
+        worker.PrepareSegmentCheck(
+            new Vector3d((Fixed64)(-2), Fixed64.Zero, Fixed64.Zero),
+            new Vector3d((Fixed64)2, Fixed64.Zero, Fixed64.Zero));
+
+        bool hit = worker.CheckConeOverlaps(cone, ref hits);
+
+        hit.Should().BeTrue();
+        hits.Count.Should().Be(2);
+        hits.Should().Contain(new Vector3d(-Fixed64.FromFraction(1, 4), Fixed64.Zero, Fixed64.Zero));
+        hits.Should().Contain(new Vector3d(Fixed64.FromFraction(1, 4), Fixed64.Zero, Fixed64.Zero));
+    }
+
+    [Fact]
+    public void CheckConeOverlaps_WithSegmentCrossingConeBase_ShouldReturnBaseIntersection()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSConeCollider cone = scenario.CreateCone(Vector3d.Zero).Collider;
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+
+        worker.PrepareSegmentCheck(
+            new Vector3d(Fixed64.Zero, (Fixed64)(-2), Fixed64.Zero),
+            new Vector3d(Fixed64.Zero, (Fixed64)2, Fixed64.Zero));
+
+        bool hit = worker.CheckConeOverlaps(cone, ref hits);
+
+        hit.Should().BeTrue();
+        hits.Should().Contain(new Vector3d(Fixed64.Zero, -Fixed64.Half, Fixed64.Zero));
+    }
+
+    [Fact]
     public void CheckOBBoxOverlaps_WithPointInsideRotatedBox_ShouldReturnPoint()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();

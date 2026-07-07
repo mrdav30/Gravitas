@@ -76,7 +76,8 @@ public sealed class Physics2DBatchQueryTests
         PhysicsOverlapAabb2DRequest[] aabbRequests =
         {
             new(Vector2d.Zero, new Vector2d((Fixed64)2, (Fixed64)2), IncludeLayerZero),
-            new(new Vector2d((Fixed64)6, Fixed64.Zero), new Vector2d((Fixed64)2, (Fixed64)2), IncludeLayerZero)
+            new(new Vector2d((Fixed64)6, Fixed64.Zero), new Vector2d((Fixed64)2, (Fixed64)2), IncludeLayerZero),
+            new(new Vector2d((Fixed64)(-6), Fixed64.Zero), new Vector2d((Fixed64)2, (Fixed64)2), IncludeLayerZero)
         };
         Vector2d[] vertices =
         {
@@ -95,15 +96,26 @@ public sealed class Physics2DBatchQueryTests
             new(4, 4, IncludeLayerZero)
         };
         Physics2DHit[] closest = new Physics2DHit[2];
+        Physics2DHit[] closestAabb =
+        {
+            new(box.Collider, Vector2d.Zero, Vector2d.Right, Fixed64.One),
+            new(circle.Collider, Vector2d.Zero, Vector2d.Right, Fixed64.One),
+            new(polygon.Collider, Vector2d.Zero, Vector2d.Right, Fixed64.One)
+        };
         var hits = new SwiftList<Physics2DHit>();
-        PhysicsQueryHitRange[] ranges = new PhysicsQueryHitRange[2];
+        PhysicsQueryHitRange[] ranges = new PhysicsQueryHitRange[3];
 
         context.Query2D.OverlapCircleBatch(circleRequests, closest).Should().Be(2);
         closest[0].Collider.Should().BeSameAs(circle.Collider);
         closest[1].Collider.Should().BeSameAs(box.Collider);
+        context.Query2D.OverlapAabbBatch(aabbRequests, closestAabb).Should().Be(2);
+        closestAabb[0].Collider.Should().BeSameAs(circle.Collider);
+        closestAabb[1].Collider.Should().BeSameAs(polygon.Collider);
+        closestAabb[2].Collider.Should().BeNull();
         context.Query2D.OverlapAabbAllBatch(aabbRequests, hits, ranges).Should().Be(2);
         hits[ranges[0].Start].Collider.Should().BeSameAs(circle.Collider);
         hits[ranges[1].Start].Collider.Should().BeSameAs(polygon.Collider);
+        ranges[2].Count.Should().Be(0);
         context.Query2D.OverlapPolygonBatch(polygonRequests, vertices, closest).Should().Be(2);
         closest[0].Collider.Should().BeSameAs(circle.Collider);
         closest[1].Collider.Should().BeSameAs(polygon.Collider);
@@ -129,6 +141,11 @@ public sealed class Physics2DBatchQueryTests
             new(new Vector2d((Fixed64)8, Fixed64.Zero), (Fixed64)8, IncludeLayerZero),
             new(new Vector2d((Fixed64)16, Fixed64.Zero), (Fixed64)8, IncludeLayerZero)
         };
+        PhysicsOverlapAabb2DRequest[] aabbs =
+        {
+            new(new Vector2d((Fixed64)8, Fixed64.Zero), new Vector2d((Fixed64)8, (Fixed64)2), IncludeLayerZero),
+            new(new Vector2d((Fixed64)16, Fixed64.Zero), new Vector2d((Fixed64)8, (Fixed64)2), IncludeLayerZero)
+        };
         PhysicsSweepCircle2DRequest[] sweeps =
         {
             new(new Vector2d((Fixed64)(-4), Fixed64.Zero), new Vector2d((Fixed64)40, Fixed64.Zero), Fixed64.Half, IncludeLayerZero)
@@ -143,6 +160,8 @@ public sealed class Physics2DBatchQueryTests
             context.Query2D.RaycastAllBatch(rays, hits, ranges);
             context.Query2D.OverlapCircleBatch(circles, closest);
             context.Query2D.OverlapCircleAllBatch(circles, hits, ranges);
+            context.Query2D.OverlapAabbBatch(aabbs, closest);
+            context.Query2D.OverlapAabbAllBatch(aabbs, hits, ranges);
             context.Query2D.SweepCircleAllBatch(sweeps, hits, ranges);
         });
 

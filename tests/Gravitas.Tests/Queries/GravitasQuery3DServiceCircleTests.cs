@@ -49,6 +49,25 @@ public sealed class GravitasQuery3DServiceCircleTests
     }
 
     [Fact]
+    public void OverlapCircle_ShouldReturnClosestLayerFilteredHit()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        _ = CreateDynamicSphere(context, new Vector3d(1, 0, 0), new PhysicsLayer(2));
+        LSSphereCollider included = CreateDynamicSphere(context, new Vector3d(3, 0, 0));
+
+        bool found = context.Query3D.OverlapCircle(
+            Vector3d.Zero,
+            (Fixed64)4,
+            out Physics3DHit hit,
+            IncludeLayerZero);
+
+        found.Should().BeTrue();
+        hit.Collider.Should().BeSameAs(included);
+        hit.Distance.Should().Be(Fixed64.FromFraction(5, 2));
+        context.Query3D.LastQueryCandidateCount.Should().Be(1);
+    }
+
+    [Fact]
     public void OverlapCircleAll_ShouldResolveColliderIdsThroughOwningContext()
     {
         using GravitasWorldContext contextA = GravitasWorldContext.CreateOwned();
@@ -93,6 +112,25 @@ public sealed class GravitasQuery3DServiceCircleTests
     }
 
     [Fact]
+    public void OverlapCircleInDirection_WithZeroDirection_ShouldReturnNoHit()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        _ = CreateDynamicSphere(context, new Vector3d(1, 0, 0));
+
+        bool hit = context.Query3D.OverlapCircleInDirection(
+            Vector3d.Zero,
+            (Fixed64)3,
+            Vector3d.Zero,
+            out Physics3DHit hitInfo,
+            (Fixed64)3,
+            IncludeLayerZero);
+
+        hit.Should().BeFalse();
+        hitInfo.Collider.Should().BeNull();
+        context.Query3D.LastQueryCandidateCount.Should().Be(0);
+    }
+
+    [Fact]
     public void OverlapCircleAll_WithColliderSpanningManyVoxels_ShouldReturnSingleColliderHit()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
@@ -107,11 +145,16 @@ public sealed class GravitasQuery3DServiceCircleTests
     }
 
 
-    private static LSSphereCollider CreateDynamicSphere(GravitasWorldContext context, Vector3d position)
+    private static LSSphereCollider CreateDynamicSphere(
+        GravitasWorldContext context,
+        Vector3d position,
+        PhysicsLayer? layer = null)
     {
         EnsureGrid(context);
         var agent = new TestMatterAgent(context);
         var collider = new LSSphereCollider();
+        if (layer.HasValue)
+            collider.Layer = layer.Value;
         var body = new SolidBody(agent, collider)
         {
             Mass = Fixed64.One

@@ -511,6 +511,34 @@ public sealed class GravitasQuery3DServiceSweepTests
     }
 
     [Fact]
+    public void SweepConvexMesh_WithEqualDistanceCompoundParts_ShouldUseStablePartOrdering()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSMeshCollider source = CreateDynamicCollider(
+            context,
+            MeshTestFixtures.CreateConvexCube(inertiaPolicy: MeshInertiaPolicy.SurfaceApproximation),
+            new Vector3d((Fixed64)(-4), Fixed64.Zero, Fixed64.Zero));
+        LSCompoundCollider target = CreateDynamicCollider(
+            context,
+            new LSCompoundCollider(
+                CompoundColliderPart.Sphere(Fixed64.Half, -Vector3d.Up),
+                CompoundColliderPart.Sphere(Fixed64.Half, Vector3d.Up)),
+            Vector3d.Zero);
+
+        bool hit = context.Query3D.SweepConvexMesh(
+            source,
+            new Vector3d((Fixed64)8, Fixed64.Zero, Fixed64.Zero),
+            IncludeLayerZero,
+            out Physics3DHit sweepHit);
+
+        hit.Should().BeTrue();
+        sweepHit.Collider.Should().BeSameAs(target);
+        sweepHit.Distance.Should().BeGreaterThan((Fixed64)3);
+        sweepHit.Distance.Should().BeLessThan(Fixed64.FromFraction(31, 10));
+        sweepHit.Point.Y.Should().BeLessThan(Fixed64.Zero);
+    }
+
+    [Fact]
     public void SweepConvexMeshAll_ShouldSupportConcaveMeshTargetsAsOrderedTargets()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
@@ -551,6 +579,44 @@ public sealed class GravitasQuery3DServiceSweepTests
         hits[1].Distance.Should().Be(Fixed64.FromFraction(11, 2));
         context.Query3D.LastQueryCandidateCount.Should().Be(2);
         context.Query3D.LastMeshTriangleCandidateCount.Should().Be(4);
+    }
+
+    [Fact]
+    public void SweepConvexMesh_WithEqualDistanceConcaveTriangles_ShouldUseTriangleOrdinal()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSMeshCollider source = CreateDynamicCollider(
+            context,
+            MeshTestFixtures.CreateConvexCube(inertiaPolicy: MeshInertiaPolicy.SurfaceApproximation),
+            new Vector3d((Fixed64)(-4), Fixed64.One, Fixed64.Zero));
+        LSMeshCollider target = CreateDynamicCollider(
+            context,
+            new LSMeshCollider(
+                new[]
+                {
+                    new Vector3d(Fixed64.Zero, Fixed64.Half, -Fixed64.Half),
+                    new Vector3d(Fixed64.Zero, (Fixed64)1.5f, -Fixed64.Half),
+                    new Vector3d(Fixed64.Zero, Fixed64.One, -Fixed64.FromFraction(1, 4)),
+                    new Vector3d(Fixed64.Zero, Fixed64.Half, Fixed64.Half),
+                    new Vector3d(Fixed64.Zero, (Fixed64)1.5f, Fixed64.Half),
+                    new Vector3d(Fixed64.Zero, Fixed64.One, Fixed64.FromFraction(1, 4))
+                },
+                new[] { 0, 1, 2, 3, 4, 5 },
+                MeshColliderMode.Concave,
+                MeshInertiaPolicy.SurfaceApproximation),
+            Vector3d.Zero);
+
+        bool hit = context.Query3D.SweepConvexMesh(
+            source,
+            new Vector3d((Fixed64)8, Fixed64.Zero, Fixed64.Zero),
+            IncludeLayerZero,
+            out Physics3DHit sweepHit);
+
+        hit.Should().BeTrue();
+        sweepHit.Collider.Should().BeSameAs(target);
+        AssertDistanceNear(sweepHit.Distance, Fixed64.FromFraction(7, 2));
+        sweepHit.Point.Z.Should().BeLessThan(Fixed64.Zero);
+        context.Query3D.LastMeshTriangleCandidateCount.Should().Be(2);
     }
 
     [Fact]
