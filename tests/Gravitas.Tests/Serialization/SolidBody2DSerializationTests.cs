@@ -3,7 +3,6 @@ using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
-using GridForge.Grids;
 using GridForge.Spatial;
 using System;
 using Xunit;
@@ -329,10 +328,11 @@ public sealed class SolidBody2DSerializationTests
         targetContext.MixedCollisions.Refresh2DColliderPartition(target);
         target.IsPartitioned.Should().BeTrue();
         target.IsMixedPartitioned.Should().BeTrue();
-        PhysicsMixedPartition mixedPartition = GetMixedPartition(
+        WorldVoxelIndex mixedCoordinate = target.MixedPartitionCoordinates![0];
+        SerializationPartitionAssertions.Mixed2DPartitionContains(
             targetContext,
-            target.MixedPartitionCoordinates![0]);
-        PartitionContains2DCollider(mixedPartition, target.Id).Should().BeTrue();
+            mixedCoordinate,
+            target.Id).Should().BeTrue();
 
         GravitasSerializationHarness.Populate(target, payload, transport);
 
@@ -341,7 +341,58 @@ public sealed class SolidBody2DSerializationTests
         target.IsMixedPartitioned.Should().BeFalse();
         target.PartitionCoordinates.Should().BeEmpty();
         (target.MixedPartitionCoordinates?.Count ?? 0).Should().Be(0);
-        PartitionContains2DCollider(mixedPartition, target.Id).Should().BeFalse();
+        SerializationPartitionAssertions.Mixed2DPartitionContains(
+            targetContext,
+            mixedCoordinate,
+            target.Id).Should().BeFalse();
+    }
+
+    [Theory]
+    [MemberData(nameof(Transports))]
+    public void PopulateActiveColliderShape_ShouldRefreshPrimaryAndMixedPartitionMembership(
+        GravitasSerializationTransport transport)
+    {
+        using GravitasWorldContext sourceContext = Physics2DTestWorld.CreateContext(frameRate: 8);
+        LSCircleCollider2D source = CreateStaticCircle(sourceContext, Vector2d.Zero);
+        source.LocalOffset = new Vector2d((Fixed64)6, Fixed64.Zero);
+        source.Simulate();
+        object payload = GravitasSerializationHarness.Serialize(source, transport);
+
+        using GravitasWorldContext targetContext = Physics2DTestWorld.CreateContext(frameRate: 8);
+        targetContext.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
+        LSCircleCollider2D target = CreateStaticCircle(targetContext, Vector2d.Zero);
+        targetContext.MixedCollisions.Refresh2DColliderPartition(target);
+        WorldVoxelIndex[] primaryCoordinatesBeforeLoad =
+            SerializationPartitionAssertions.CopyCoordinates(target.PartitionCoordinates!);
+        WorldVoxelIndex[] mixedCoordinatesBeforeLoad =
+            SerializationPartitionAssertions.CopyCoordinates(target.MixedPartitionCoordinates!);
+
+        GravitasSerializationHarness.Populate(target, payload, transport);
+
+        target.IsActive.Should().BeTrue();
+        target.Radius.Should().Be(source.Radius);
+        target.LocalOffset.Should().Be(source.LocalOffset);
+        target.Bounds.Should().Be(source.Bounds);
+        target.IsPartitioned.Should().BeTrue();
+        target.IsMixedPartitioned.Should().BeTrue();
+        SerializationPartitionAssertions.Primary2DPartitionsShouldContain(
+            targetContext,
+            target.PartitionCoordinates!,
+            target.Id);
+        SerializationPartitionAssertions.Mixed2DPartitionsShouldContain(
+            targetContext,
+            target.MixedPartitionCoordinates!,
+            target.Id);
+        SerializationPartitionAssertions.StalePrimary2DPartitionsShouldBeCleared(
+            targetContext,
+            primaryCoordinatesBeforeLoad,
+            target.PartitionCoordinates!,
+            target.Id).Should().BeTrue("the loaded local offset should move the collider out of an original primary partition");
+        SerializationPartitionAssertions.StaleMixed2DPartitionsShouldBeCleared(
+            targetContext,
+            mixedCoordinatesBeforeLoad,
+            target.MixedPartitionCoordinates!,
+            target.Id).Should().BeTrue("the loaded local offset should move the collider out of an original mixed partition");
     }
 
     [Theory]
@@ -392,17 +443,4 @@ public sealed class SolidBody2DSerializationTests
         collider.InitializeWithNoBody(agent);
     }
 
-    private static PhysicsMixedPartition GetMixedPartition(
-        GravitasWorldContext context,
-        WorldVoxelIndex coordinate)
-    {
-        context.World.TryGetVoxel(coordinate, out Voxel? voxel).Should().BeTrue();
-        voxel!.TryGetPartition(out PhysicsMixedPartition? partition).Should().BeTrue();
-        return partition!;
-    }
-
-    private static bool PartitionContains2DCollider(PhysicsMixedPartition partition, int colliderId) =>
-        partition.ContainedDynamic2DObjects?.Contains(colliderId) == true
-        || partition.ContainedKinematic2DObjects?.Contains(colliderId) == true
-        || partition.ContainedStatic2DObjects?.Contains(colliderId) == true;
 }

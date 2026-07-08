@@ -89,37 +89,37 @@ configuration before making source changes.
 
 ## Current Standing
 
-Fresh checkpoint after Workstream 22 collision geometry, convex support, and
-contact residue pass:
+Fresh checkpoint after Workstream 23 serialization, replay, authoring, and
+partition lifecycle pass:
 
 | Metric | Baseline | Current | Short-Term Gate | Long-Term Target |
 | --- | ---: | ---: | ---: | ---: |
-| Line coverage | 87.3% | 95.0% | 90% | 100% |
-| Branch coverage | 74.1% | 83.9% | 90% | 100% |
+| Line coverage | 87.3% | 95.1% | 90% | 100% |
+| Branch coverage | 74.1% | 84.2% | 90% | 100% |
 | Method coverage | 86.5% | 94.7% | 90% | 100% |
-| Tests | 974 passed | 1317 passed | green | green |
+| Tests | 974 passed | 1330 passed | green | green |
 
-At the current denominator, the 90% branch gate requires at least 10,008 covered
-branches. The latest run covered 9,339 of 11,119 branches, leaving roughly 669
+At the current denominator, the 90% branch gate requires at least 10,004 covered
+branches. The latest run covered 9,360 of 11,115 branches, leaving roughly 644
 net branch outcomes to cover or delete. Treat this as a focused branch
 campaign, not a single gate-check workstream.
 
 Current evidence:
 
 - Coverage report:
-  `TestResults/coverage-branch-hardening-ws22-final/reports/Summary.txt`
+  `TestResults/coverage-branch-hardening-ws23-final/reports/Summary.txt`
 - Coverage collection:
   `dotnet test tests\Gravitas.Tests\Gravitas.Tests.csproj --configuration Release --collect:"XPlat Code Coverage" --settings tests\Gravitas.Tests\coverlet.runsettings`
-  passed with 1317 tests.
+  passed with 1330 tests.
 - Branch shortlist:
-  `TestResults/coverage-branch-hardening-ws22-final/branch-gap-shortlist.csv`
+  `TestResults/coverage-branch-hardening-ws23-final/branch-gap-shortlist.csv`
 - Latest summary reports 198 uncovered methods.
 
 ## Historical Summary
 
 This plan began after trigger collider hardening with 87.3% line, 74.1% branch,
-and 86.5% method coverage. The campaign so far raised the suite to 94.9% line,
-83.7% branch, and 94.7% method coverage while also finding real defects and
+and 86.5% method coverage. The campaign so far raised the suite to 95.1% line,
+84.2% branch, and 94.7% method coverage while also finding real defects and
 removing stale runtime branches.
 
 | Phase | Coverage Result | Tests | Main Outcome |
@@ -132,6 +132,7 @@ removing stale runtime branches.
 | Workstreams 13-18 | 94.7% line / 82.8% branch / 94.6% method | 1261 | Contact geometry, hierarchy, convex support, CCD eligibility, mixed pair retention, and joint-island cleanup. |
 | Workstreams 19-21 | 94.9% line / 83.7% branch / 94.7% method | 1295 | Kinematic CCD, dynamic response, query reducer, mixed sweep filter, rotated OBB raycast, 2D mover-shape, swept cone, stale reducer cleanup, mixed trigger policy, pair lifecycle, and constrained mixed response coverage. |
 | Workstream 22 | 95.0% line / 83.9% branch / 94.7% method | 1317 | Cuboid normal bug fix, 2D convex SAT/manifold coverage, contact-normal fallback parity, mixed exact-prism miss coverage, and stale 2D clipping guard removal. |
+| Workstream 23 | 95.1% line / 84.2% branch / 94.7% method | 1330 | Active collider load partition refresh/stale bucket coverage, hierarchy replay mutation coverage, mixed replay hash pair-state coverage, 2D/3D partition lifecycle parity, and duplicate dynamic distribution guard removal. |
 
 High-value work completed:
 
@@ -218,8 +219,8 @@ RCA and verification, even if the fix is small.
 ## Active Branch-90 Roadmap
 
 This roadmap replaces the old pattern of appending one new workstream after
-each coverage attempt. Work through the workstreams below from the current
-`ws19-final` shortlist. After each completed workstream, update checkboxes and
+each coverage attempt. Work through the workstreams below from the latest
+coverage shortlist. After each completed workstream, update checkboxes and
 the coverage checkpoint table; do not add a new workstream unless fresh
 evidence invalidates the next two planned areas or the 90% gate passes.
 
@@ -508,18 +509,47 @@ shape authoring helpers.
 
 **Tasks**
 
-- [ ] Cover or simplify 2D/3D `ApplyLoadedState` residue through load/default
+- [x] Cover or simplify 2D/3D `ApplyLoadedState` residue through load/default
       semantics that matter for deterministic continuation.
-- [ ] Review replay hierarchy ordinal branches and `RemoveChild` residue for
+- [x] Review replay hierarchy ordinal branches and `RemoveChild` residue for
       valid hierarchy mutation behavior.
-- [ ] Cover replay hash service rows only where different authoritative state
+- [x] Cover replay hash service rows only where different authoritative state
       should produce different hashes; avoid duplicate hash-equality padding.
-- [ ] Review partition `Distribute`, `RemoveDynamicObject`, and retained
+- [x] Review partition `Distribute`, `RemoveDynamicObject`, and retained
       partition detach/retire branches for real lifecycle behavior and
       allocation-sensitive cleanup.
-- [ ] Capture any load/replay parity bug in `issue-tracker.md` before fixing.
-- [ ] Run focused serialization/replay/partition tests, full `Release`,
+- [x] Capture any load/replay parity bug in `issue-tracker.md` before fixing.
+- [x] Run focused serialization/replay/partition tests, full `Release`,
       `ReleaseLean`, and coverage collection.
+
+**Completion Notes**
+
+- Added active collider load coverage for 3D and 2D shape changes. Populating
+  into an existing static collider now has regression coverage proving the
+  loaded shape refreshes both primary and mixed partition membership and clears
+  stale old primary/mixed partition buckets.
+- Added hierarchy mutation coverage for clearing one child while siblings
+  remain and for reparenting a child between descendants under the same top
+  parent without duplicating replay hierarchy references.
+- Added mixed replay hash coverage through the public mixed simulation
+  lifecycle so separated and paired mixed states run the same lifecycle shape,
+  remain stable, and hash differently when authoritative pair state exists.
+- Added 3D and 2D partition lifecycle coverage for missing dynamic removals,
+  deactivation only after the last dynamic member leaves, sleeping dynamic
+  distribution early exits, and duplicate static/kinematic/dynamic membership
+  adds.
+- Removed the duplicate nullable `CopySortedIds` helper branch from 3D and 2D
+  partitions. `Distribute` already proves dynamic membership exists before
+  copying sorted keys, so the helper only preserved an impossible defensive
+  branch.
+- Investigated unbound direct-collider load shells and left them unsupported:
+  valid Chronicler population loads into host-created bound colliders because
+  shape rebuild and partition refresh require context/body or static-transform
+  ownership.
+- No load/replay parity bug was found, so no issue-tracker entry was needed.
+- Final W23 coverage: 95.1% line, 84.2% branch (9,360/11,115), 94.7% method,
+  1,330 tests passed. Fresh shortlist:
+  `TestResults/coverage-branch-hardening-ws23-final/branch-gap-shortlist.csv`.
 
 ### Workstream 24: Constraint Solver And Ragdoll Residue
 
@@ -603,3 +633,4 @@ campaign checkpoints; do not add a row for every focused test filter.
 | 2026-07-07 | 94.8% | 83.2% | 94.6% | 1272 passed | Workstream 19 completed; kinematic CCD frozen-axis coverage plus fixed-step frame-rate invariant. Branches covered: 9268/11137. |
 | 2026-07-07 | 94.9% | 83.7% | 94.7% | 1295 passed | Workstreams 20-21 completed; query reducer/shape-cast geometry plus mixed pair, contact notification, trigger policy, and constrained mixed response lifecycle. Branches covered: 9315/11129. |
 | 2026-07-07 | 95.0% | 83.9% | 94.7% | 1317 passed | Workstream 22 completed; cuboid normal bug fix, 2D convex/mixed prism/contact fallback branch hardening, and stale clipping guard removal. Branches covered: 9339/11119. |
+| 2026-07-07 | 95.1% | 84.2% | 94.7% | 1330 passed | Workstream 23 completed; active collider load partition refresh/stale bucket cleanup, replay hierarchy mutation, mixed replay pair-state hash, 2D/3D partition lifecycle parity, and stale distribution guard removal. Branches covered: 9360/11115. |

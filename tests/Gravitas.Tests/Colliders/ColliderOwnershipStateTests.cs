@@ -199,6 +199,48 @@ public sealed class ColliderOwnershipStateTests
     }
 
     [Fact]
+    public void ClearParent_WithRemainingChildren_ShouldKeepParentRoleUntilLastChildIsRemoved()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> parent = CreateSphere(scenario, PhysicsScenarioBuilder.Vector(0, 0, 0), isParent: false);
+        ScenarioBody<LSSphereCollider> firstChild = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(1, 0, 0));
+        ScenarioBody<LSSphereCollider> secondChild = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(2, 0, 0));
+        firstChild.Collider.SetParent(parent.Collider);
+        secondChild.Collider.SetParent(parent.Collider);
+
+        firstChild.Collider.ClearParent();
+
+        parent.Collider.IsParent.Should().BeTrue();
+        parent.Collider.HierarchyChildCount.Should().Be(1);
+        secondChild.Collider.ParentId.Should().Be(parent.Collider.Id);
+
+        secondChild.Collider.ClearParent();
+
+        parent.Collider.IsParent.Should().BeFalse();
+        parent.Collider.HierarchyChildCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void ReparentChildWithinSameTopParent_ShouldNotDuplicateTopParentChildReference()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> topParent = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
+        ScenarioBody<LSSphereCollider> firstMiddle = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(1, 0, 0));
+        ScenarioBody<LSSphereCollider> secondMiddle = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(2, 0, 0));
+        ScenarioBody<LSSphereCollider> child = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(3, 0, 0));
+        firstMiddle.Collider.SetParent(topParent.Collider);
+        secondMiddle.Collider.SetParent(topParent.Collider);
+        child.Collider.SetParent(firstMiddle.Collider);
+
+        child.Collider.SetParent(secondMiddle.Collider);
+
+        topParent.Collider.HierarchyChildCount.Should().Be(3);
+        child.Collider.Parent3D.Should().BeSameAs(secondMiddle.Collider);
+        child.Collider.TopParent3D.Should().BeSameAs(topParent.Collider);
+        child.Collider.ParentId.Should().Be(topParent.Collider.Id);
+    }
+
+    [Fact]
     public void DeactivateHolderSide_ShouldRemoveOwningPairReference()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();

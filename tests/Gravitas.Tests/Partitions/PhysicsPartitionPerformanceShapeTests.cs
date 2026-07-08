@@ -56,6 +56,80 @@ public sealed class PhysicsPartitionPerformanceShapeTests
     }
 
     [Fact]
+    public void DynamicObjectRemoval_ShouldIgnoreMissingIdsAndDeactivateOnlyAfterLastDynamic()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        PhysicsPartition partition = context.Collisions.RentPartition();
+        partition.AddDynamicObject(1);
+        partition.AddDynamicObject(2);
+        int activationId = partition.ActivationId;
+
+        partition.RemoveDynamicObject(99);
+        partition.RemoveDynamicObject(1);
+
+        partition.ActivationId.Should().Be(activationId);
+        context.Collisions.ActivePartitionCount.Should().Be(1);
+        partition.ContainedDynamicObjects!.Should().Contain(2);
+        partition.AwakeDynamicObjectCount.Should().Be(1);
+
+        partition.RemoveDynamicObject(2);
+
+        partition.ActivationId.Should().Be(-1);
+        context.Collisions.ActivePartitionCount.Should().Be(0);
+        partition.ContainedDynamicObjects.Count.Should().Be(0);
+        partition.AwakeDynamicObjectCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void Distribute_WithEmptyOrSleepingDynamicMembership_ShouldReturnWithoutOwnerAccess()
+    {
+        var dynamicIds = new SwiftList<int>();
+        var staticIds = new SwiftList<int>();
+        var partition = new PhysicsPartition();
+
+        partition.Distribute(dynamicIds, staticIds);
+        dynamicIds.Count.Should().Be(0);
+        staticIds.Count.Should().Be(0);
+
+        partition.ContainedDynamicObjects = new SwiftSparseSet();
+        partition.Distribute(dynamicIds, staticIds);
+        dynamicIds.Count.Should().Be(0);
+        staticIds.Count.Should().Be(0);
+
+        partition.ContainedDynamicObjects.Add(7);
+        partition.Distribute(dynamicIds, staticIds);
+        dynamicIds.Count.Should().Be(0);
+        staticIds.Count.Should().Be(0);
+
+        partition.ContainedAwakeDynamicObjects = new SwiftSparseSet();
+        partition.Distribute(dynamicIds, staticIds);
+        dynamicIds.Count.Should().Be(0);
+        staticIds.Count.Should().Be(0);
+    }
+
+    [Fact]
+    public void DuplicateMembershipAdds_ShouldNotReactivateOrDuplicatePartitionBuckets()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        PhysicsPartition partition = context.Collisions.RentPartition();
+
+        partition.AddDynamicObject(1);
+        partition.AddStaticObject(2);
+        partition.AddKinematicObject(3);
+        int activationId = partition.ActivationId;
+
+        partition.AddDynamicObject(1);
+        partition.AddStaticObject(2);
+        partition.AddKinematicObject(3);
+
+        partition.ActivationId.Should().Be(activationId);
+        context.Collisions.ActivePartitionCount.Should().Be(1);
+        partition.ContainedDynamicObjects!.Count.Should().Be(1);
+        partition.ContainedStaticObjects!.Count.Should().Be(1);
+        partition.ContainedKinematicObjects!.Count.Should().Be(1);
+    }
+
+    [Fact]
     public void ResetRetainedMembership_ShouldClearAllBucketsAndMarkPartitionEmpty()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();

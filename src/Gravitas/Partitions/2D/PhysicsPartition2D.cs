@@ -84,7 +84,7 @@ public sealed class PhysicsPartition2D : IVoxelPartition
         if (ContainedDynamicObjects == null || dynamicCount == 0 || ContainedAwakeDynamicObjects == null || awakeDynamicCount == 0)
             return;
 
-        CopySortedIds(ContainedDynamicObjects, dynamicIds);
+        ContainedDynamicObjects.CopySortedKeysTo(dynamicIds);
         CopySortedStaticStyleIds(staticIds);
 
         for (int j = 0; j < dynamicIds.Count; j++)
@@ -113,17 +113,6 @@ public sealed class PhysicsPartition2D : IVoxelPartition
         CopyIds(ContainedKinematicObjects, destination);
         CopyIds(ContainedStaticObjects, destination);
         destination.SortInPlace();
-    }
-
-    private static void CopySortedIds(SwiftSparseSet? source, SwiftList<int> destination)
-    {
-        if (source == null)
-        {
-            destination.FastClear();
-            return;
-        }
-
-        source.CopySortedKeysTo(destination);
     }
 
     private void CopySortedStaticStyleIds(SwiftList<int> destination)

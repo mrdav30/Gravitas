@@ -97,7 +97,7 @@ public class PhysicsPartition : IVoxelPartition
         if (ContainedDynamicObjects == null || dynamicCount == 0 || ContainedAwakeDynamicObjects == null || awakeDynamicCount == 0)
             return;
 
-        CopySortedIds(ContainedDynamicObjects, dynamicIds);
+        ContainedDynamicObjects.CopySortedKeysTo(dynamicIds);
         CopySortedStaticStyleIds(staticIds);
 
         // Sleeping bodies stay query-visible in dynamic membership, while awake membership gates partition work.
@@ -115,17 +115,6 @@ public class PhysicsPartition : IVoxelPartition
                 ProcessPair(id1, id2);
             }
         }
-    }
-
-    private static void CopySortedIds(SwiftSparseSet? source, SwiftList<int> destination)
-    {
-        if (source == null)
-        {
-            destination.FastClear();
-            return;
-        }
-
-        source.CopySortedKeysTo(destination);
     }
 
     private void CopySortedStaticStyleIds(SwiftList<int> destination)

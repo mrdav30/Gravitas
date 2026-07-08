@@ -252,6 +252,19 @@ public sealed class ReplayHashBranchCoverageTests
     }
 
     [Fact]
+    public void ComputeReplayHash_WithSeparatedAndPairedMixedStates_ShouldHashStableAuthoritativeState()
+    {
+        (ChronicleHash Hash, int PairCount) separated = HashMixedPairPresence(overlapping: false);
+        (ChronicleHash Hash, int PairCount) repeatedSeparated = HashMixedPairPresence(overlapping: false);
+        (ChronicleHash Hash, int PairCount) paired = HashMixedPairPresence(overlapping: true);
+
+        separated.PairCount.Should().Be(0);
+        paired.PairCount.Should().Be(1);
+        repeatedSeparated.Hash.Should().Be(separated.Hash);
+        paired.Hash.Should().NotBe(separated.Hash);
+    }
+
+    [Fact]
     public void ComputeReplayHash_WithCompound2DShapeDefinitions_ShouldEncodeAuthoredPartPayloads()
     {
         ChronicleHash baseline = HashCompound2DReplay(Compound2DReplayVariant.Baseline);
@@ -437,6 +450,22 @@ public sealed class ReplayHashBranchCoverageTests
         return pair;
     }
 
+    private static (ChronicleHash Hash, int PairCount) HashMixedPairPresence(bool overlapping)
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        Vector3d position3D = Vector3d.Zero;
+        Vector2d position2D = overlapping
+            ? Vector2d.Right * Fixed64.Half
+            : new Vector2d((Fixed64)6, Fixed64.Zero);
+        CreateBody3D(context, position3D);
+        CreateBodylessCircle2D(context, position2D);
+
+        context.Simulate();
+        context.LateSimulate();
+
+        return (context.ComputeReplayHash(), context.MixedCollisions.ActivePairCount);
+    }
+
     private static ChronicleHash HashCompound2DReplay(Compound2DReplayVariant variant)
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
@@ -595,6 +624,18 @@ public sealed class ReplayHashBranchCoverageTests
         var collider = new LSSphereCollider();
         var transform = new FixedTransform(position, FixedQuaternion.Identity, Vector3d.One);
         collider.InitializeWithNoBody(new TestMatterAgent(context, transform));
+        return collider;
+    }
+
+    private static LSSphereCollider CreateBody3D(GravitasWorldContext context, Vector3d position)
+    {
+        var collider = new LSSphereCollider();
+        var transform = new FixedTransform(position, FixedQuaternion.Identity, Vector3d.One);
+        var body = new SolidBody(new TestMatterAgent(context, transform), collider)
+        {
+            Mass = Fixed64.One
+        };
+        body.Initialize(position, FixedQuaternion.Identity);
         return collider;
     }
 

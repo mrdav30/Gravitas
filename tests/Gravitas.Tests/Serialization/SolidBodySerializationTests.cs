@@ -3,7 +3,6 @@ using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
-using GridForge.Grids;
 using GridForge.Spatial;
 using System;
 using Xunit;
@@ -203,10 +202,11 @@ public sealed class SolidBodySerializationTests
         targetScenario.Context.MixedCollisions.Refresh3DColliderPartition(target);
         target.IsPartitioned.Should().BeTrue();
         target.IsMixedPartitioned.Should().BeTrue();
-        PhysicsMixedPartition mixedPartition = GetMixedPartition(
+        WorldVoxelIndex mixedCoordinate = target.MixedPartitionCoordinates![0];
+        SerializationPartitionAssertions.Mixed3DPartitionContains(
             targetScenario.Context,
-            target.MixedPartitionCoordinates![0]);
-        PartitionContains3DCollider(mixedPartition, target.Id).Should().BeTrue();
+            mixedCoordinate,
+            target.Id).Should().BeTrue();
 
         GravitasSerializationHarness.Populate(target, payload, transport);
 
@@ -215,7 +215,58 @@ public sealed class SolidBodySerializationTests
         target.IsMixedPartitioned.Should().BeFalse();
         target.PartitionCoordinates.Should().BeEmpty();
         (target.MixedPartitionCoordinates?.Count ?? 0).Should().Be(0);
-        PartitionContains3DCollider(mixedPartition, target.Id).Should().BeFalse();
+        SerializationPartitionAssertions.Mixed3DPartitionContains(
+            targetScenario.Context,
+            mixedCoordinate,
+            target.Id).Should().BeFalse();
+    }
+
+    [Theory]
+    [MemberData(nameof(Transports))]
+    public void PopulateActiveColliderShape_ShouldRefreshPrimaryAndMixedPartitionMembership(
+        GravitasSerializationTransport transport)
+    {
+        using PhysicsScenarioBuilder sourceScenario = PhysicsScenarioBuilder.Create();
+        LSSphereCollider source = sourceScenario.CreateStaticSphere(Vector3d.Zero);
+        source.LocalOffset = new Vector3d((Fixed64)6, Fixed64.Zero, Fixed64.Zero);
+        source.Simulate();
+        object payload = GravitasSerializationHarness.Serialize(source, transport);
+
+        using PhysicsScenarioBuilder targetScenario = PhysicsScenarioBuilder.Create();
+        targetScenario.Context.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
+        LSSphereCollider target = targetScenario.CreateStaticSphere(Vector3d.Zero);
+        targetScenario.Context.MixedCollisions.Refresh3DColliderPartition(target);
+        WorldVoxelIndex[] primaryCoordinatesBeforeLoad =
+            SerializationPartitionAssertions.CopyCoordinates(target.PartitionCoordinates!);
+        WorldVoxelIndex[] mixedCoordinatesBeforeLoad =
+            SerializationPartitionAssertions.CopyCoordinates(target.MixedPartitionCoordinates!);
+
+        GravitasSerializationHarness.Populate(target, payload, transport);
+
+        target.IsActive.Should().BeTrue();
+        target.Radius.Should().Be(source.Radius);
+        target.LocalOffset.Should().Be(source.LocalOffset);
+        target.Bounds.Should().Be(source.Bounds);
+        target.IsPartitioned.Should().BeTrue();
+        target.IsMixedPartitioned.Should().BeTrue();
+        SerializationPartitionAssertions.Primary3DPartitionsShouldContain(
+            targetScenario.Context,
+            target.PartitionCoordinates!,
+            target.Id);
+        SerializationPartitionAssertions.Mixed3DPartitionsShouldContain(
+            targetScenario.Context,
+            target.MixedPartitionCoordinates!,
+            target.Id);
+        SerializationPartitionAssertions.StalePrimary3DPartitionsShouldBeCleared(
+            targetScenario.Context,
+            primaryCoordinatesBeforeLoad,
+            target.PartitionCoordinates!,
+            target.Id).Should().BeTrue("the loaded local offset should move the collider out of an original primary partition");
+        SerializationPartitionAssertions.StaleMixed3DPartitionsShouldBeCleared(
+            targetScenario.Context,
+            mixedCoordinatesBeforeLoad,
+            target.MixedPartitionCoordinates!,
+            target.Id).Should().BeTrue("the loaded local offset should move the collider out of an original mixed partition");
     }
 
     [Theory]
@@ -273,17 +324,4 @@ public sealed class SolidBodySerializationTests
         return scenario;
     }
 
-    private static PhysicsMixedPartition GetMixedPartition(
-        GravitasWorldContext context,
-        WorldVoxelIndex coordinate)
-    {
-        context.World.TryGetVoxel(coordinate, out Voxel? voxel).Should().BeTrue();
-        voxel!.TryGetPartition(out PhysicsMixedPartition? partition).Should().BeTrue();
-        return partition!;
-    }
-
-    private static bool PartitionContains3DCollider(PhysicsMixedPartition partition, int colliderId) =>
-        partition.ContainedDynamic3DObjects?.Contains(colliderId) == true
-        || partition.ContainedKinematic3DObjects?.Contains(colliderId) == true
-        || partition.ContainedStatic3DObjects?.Contains(colliderId) == true;
 }
