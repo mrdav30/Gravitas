@@ -127,8 +127,6 @@ public readonly partial struct PhysicsMaterial : IEquatable<PhysicsMaterial>
         PhysicsMaterialCombine policy = ResolveDominantPolicy(left.FrictionCombine, right.FrictionCombine);
         staticFriction = CombineScalar(left.StaticFriction, right.StaticFriction, policy);
         dynamicFriction = CombineScalar(left.DynamicFriction, right.DynamicFriction, policy);
-        if (dynamicFriction > staticFriction)
-            dynamicFriction = staticFriction;
     }
 
     /// <summary>

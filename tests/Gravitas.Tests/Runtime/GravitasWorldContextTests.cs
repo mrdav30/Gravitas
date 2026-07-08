@@ -132,4 +132,19 @@ public sealed class GravitasWorldContextTests
 
         calls.Should().ContainInOrder("early", "late");
     }
+
+    [Fact]
+    public void LifecycleHookRegistration_ShouldRejectInvalidOwnersCallbacksAndDuplicates()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        using IDisposable first = context.RegisterOnSimulate("duplicate", 0, () => { });
+
+        Action whitespaceOwner = () => context.RegisterOnSimulate(" ", 0, () => { });
+        Action nullCallback = () => context.RegisterOnSimulate("null-callback", 0, null!);
+        Action duplicateOwner = () => context.RegisterOnSimulate("duplicate", 1, () => { });
+
+        whitespaceOwner.Should().Throw<ArgumentException>().WithParameterName("owner");
+        nullCallback.Should().Throw<ArgumentNullException>().WithParameterName("callback");
+        duplicateOwner.Should().Throw<InvalidOperationException>().WithMessage("*duplicate*");
+    }
 }

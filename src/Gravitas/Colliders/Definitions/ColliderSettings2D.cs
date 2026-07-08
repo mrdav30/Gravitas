@@ -33,38 +33,37 @@ public static class ColliderSettings2D
     /// Resolves the narrow-phase collision type for an ordered pair of 2D collider shapes.
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static CollisionType2D GetCollisionType(ColliderType2D type1, ColliderType2D type2)
-    {
-        if (type1 == ColliderType2D.Compound || type2 == ColliderType2D.Compound)
-            return CollisionType2D.Compound;
-
-        bool firstCircle = type1 == ColliderType2D.Circle;
-        bool secondCircle = type2 == ColliderType2D.Circle;
-        bool firstCapsule = type1 == ColliderType2D.Capsule;
-        bool secondCapsule = type2 == ColliderType2D.Capsule;
-        if (firstCircle && secondCircle)
-            return CollisionType2D.Circle_Circle;
-        if (firstCapsule && secondCircle)
-            return CollisionType2D.Capsule_Circle;
-        if (firstCircle && secondCapsule)
-            return CollisionType2D.Circle_Capsule;
-        if (firstCapsule && secondCapsule)
-            return CollisionType2D.Capsule_Capsule;
-        if (firstCapsule)
-            return IsConvex(type2) ? CollisionType2D.Capsule_Convex : CollisionType2D.None;
-        if (secondCapsule)
-            return IsConvex(type1) ? CollisionType2D.Convex_Capsule : CollisionType2D.None;
-        if (firstCircle)
-            return IsConvex(type2) ? CollisionType2D.Circle_Convex : CollisionType2D.None;
-        if (secondCircle)
-            return IsConvex(type1) ? CollisionType2D.Convex_Circle : CollisionType2D.None;
-
-        return IsConvex(type1) && IsConvex(type2)
-            ? CollisionType2D.Convex_Convex
-            : CollisionType2D.None;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool IsConvex(ColliderType2D type) =>
-        type == ColliderType2D.AABox || type == ColliderType2D.ConvexPolygon;
+    public static CollisionType2D GetCollisionType(ColliderType2D type1, ColliderType2D type2) =>
+        (type1, type2) switch
+        {
+            (ColliderType2D.Circle, ColliderType2D.Circle) => CollisionType2D.Circle_Circle,
+            (ColliderType2D.Circle, ColliderType2D.AABox or ColliderType2D.ConvexPolygon) =>
+                CollisionType2D.Circle_Convex,
+            (ColliderType2D.Circle, ColliderType2D.Capsule) => CollisionType2D.Circle_Capsule,
+            (ColliderType2D.AABox or ColliderType2D.ConvexPolygon, ColliderType2D.Circle) =>
+                CollisionType2D.Convex_Circle,
+            (
+                ColliderType2D.AABox or ColliderType2D.ConvexPolygon,
+                ColliderType2D.AABox or ColliderType2D.ConvexPolygon) => CollisionType2D.Convex_Convex,
+            (ColliderType2D.AABox or ColliderType2D.ConvexPolygon, ColliderType2D.Capsule) =>
+                CollisionType2D.Convex_Capsule,
+            (ColliderType2D.Capsule, ColliderType2D.Circle) => CollisionType2D.Capsule_Circle,
+            (ColliderType2D.Capsule, ColliderType2D.AABox or ColliderType2D.ConvexPolygon) =>
+                CollisionType2D.Capsule_Convex,
+            (ColliderType2D.Capsule, ColliderType2D.Capsule) => CollisionType2D.Capsule_Capsule,
+            (
+                ColliderType2D.Compound,
+                ColliderType2D.Circle
+                    or ColliderType2D.AABox
+                    or ColliderType2D.ConvexPolygon
+                    or ColliderType2D.Compound
+                    or ColliderType2D.Capsule) => CollisionType2D.Compound,
+            (
+                ColliderType2D.Circle
+                    or ColliderType2D.AABox
+                    or ColliderType2D.ConvexPolygon
+                    or ColliderType2D.Capsule,
+                ColliderType2D.Compound) => CollisionType2D.Compound,
+            _ => CollisionType2D.None
+        };
 }

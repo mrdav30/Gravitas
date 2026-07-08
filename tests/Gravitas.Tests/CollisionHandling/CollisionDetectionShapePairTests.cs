@@ -107,6 +107,18 @@ public sealed class CollisionDetectionShapePairTests
         }
     }
 
+    [Theory]
+    [InlineData(ColliderType.None, ColliderType.Sphere)]
+    [InlineData(ColliderType.Sphere, ColliderType.None)]
+    [InlineData(ColliderType.None, ColliderType.Compound)]
+    [InlineData(ColliderType.Compound, ColliderType.None)]
+    [InlineData((ColliderType)250, ColliderType.Sphere)]
+    [InlineData(ColliderType.Sphere, (ColliderType)250)]
+    public void CollisionTypeMatrix_ShouldRejectNoneAndUnknownTypes(ColliderType first, ColliderType second)
+    {
+        ColliderSettings.GetCollisionType(first, second).Should().Be(CollisionType.None);
+    }
+
     [Fact]
     public void SphereSphere_ShouldDetectOverlapTouchAndDegenerateCenter()
     {

@@ -113,6 +113,33 @@ public sealed class GravitasCoroutineServiceTests
     }
 
     [Fact]
+    public void SimulateAndReset_ShouldSkipStoppedSparseSlots()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        int firstSteps = 0;
+        int secondSteps = 0;
+        int disposed = 0;
+        LSCoroutine first = context.Coroutines.StartCoroutine(CountAndDispose(() => firstSteps++, () => disposed++));
+        LSCoroutine second = context.Coroutines.StartCoroutine(CountAndDispose(() => secondSteps++, () => disposed++));
+
+        context.Coroutines.Simulate();
+        context.Coroutines.StopCoroutine(first);
+        context.Coroutines.Simulate();
+
+        firstSteps.Should().Be(1);
+        secondSteps.Should().Be(2);
+        second.Active.Should().BeTrue();
+        context.Coroutines.ActiveCoroutineCount.Should().Be(1);
+
+        context.Coroutines.Reset();
+
+        first.Active.Should().BeFalse();
+        second.Active.Should().BeFalse();
+        disposed.Should().Be(2);
+        context.Coroutines.ActiveCoroutineCount.Should().Be(0);
+    }
+
+    [Fact]
     public void ResetInitializeAndDeactivate_ShouldEndActiveCoroutinesAndClearServiceState()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
@@ -166,6 +193,22 @@ public sealed class GravitasCoroutineServiceTests
         try
         {
             yield return context.Coroutines.WaitForFrames(16);
+        }
+        finally
+        {
+            onDispose();
+        }
+    }
+
+    private static IEnumerator<ILockedYieldInstruction> CountAndDispose(Action onStep, Action onDispose)
+    {
+        try
+        {
+            while (true)
+            {
+                onStep();
+                yield return null!;
+            }
         }
         finally
         {

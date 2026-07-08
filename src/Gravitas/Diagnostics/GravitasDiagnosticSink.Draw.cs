@@ -237,8 +237,6 @@ public sealed partial class GravitasDiagnosticSink
 
         Vector2d axis2D = Vector2d.Rotate(Vector2d.Right, bodyA.Rotation + joint.LocalFrameA.Angle);
         Vector3d axis = new(axis2D.X, Fixed64.Zero, axis2D.Y);
-        if (axis.MagnitudeSquared <= Fixed64.Epsilon)
-            return;
 
         AddDrawCommand(
             GravitasDebugDrawKind.Ray,

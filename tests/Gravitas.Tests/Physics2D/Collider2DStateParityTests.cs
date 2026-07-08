@@ -317,11 +317,48 @@ public sealed class Collider2DStateParityTests
     }
 
     [Theory]
+    [InlineData(ColliderType2D.None, ColliderType2D.None, CollisionType2D.None)]
+    [InlineData(ColliderType2D.None, ColliderType2D.Circle, CollisionType2D.None)]
+    [InlineData(ColliderType2D.None, ColliderType2D.AABox, CollisionType2D.None)]
+    [InlineData(ColliderType2D.None, ColliderType2D.ConvexPolygon, CollisionType2D.None)]
+    [InlineData(ColliderType2D.None, ColliderType2D.Compound, CollisionType2D.None)]
+    [InlineData(ColliderType2D.None, ColliderType2D.Capsule, CollisionType2D.None)]
+    [InlineData(ColliderType2D.Circle, ColliderType2D.None, CollisionType2D.None)]
     [InlineData(ColliderType2D.Circle, ColliderType2D.Circle, CollisionType2D.Circle_Circle)]
     [InlineData(ColliderType2D.Circle, ColliderType2D.AABox, CollisionType2D.Circle_Convex)]
+    [InlineData(ColliderType2D.Circle, ColliderType2D.ConvexPolygon, CollisionType2D.Circle_Convex)]
+    [InlineData(ColliderType2D.Circle, ColliderType2D.Compound, CollisionType2D.Compound)]
+    [InlineData(ColliderType2D.Circle, ColliderType2D.Capsule, CollisionType2D.Circle_Capsule)]
+    [InlineData(ColliderType2D.AABox, ColliderType2D.None, CollisionType2D.None)]
     [InlineData(ColliderType2D.AABox, ColliderType2D.Circle, CollisionType2D.Convex_Circle)]
+    [InlineData(ColliderType2D.AABox, ColliderType2D.AABox, CollisionType2D.Convex_Convex)]
     [InlineData(ColliderType2D.AABox, ColliderType2D.ConvexPolygon, CollisionType2D.Convex_Convex)]
-    public void ColliderSettings2D_ShouldResolveCollisionType(ColliderType2D first, ColliderType2D second, CollisionType2D expected)
+    [InlineData(ColliderType2D.AABox, ColliderType2D.Compound, CollisionType2D.Compound)]
+    [InlineData(ColliderType2D.AABox, ColliderType2D.Capsule, CollisionType2D.Convex_Capsule)]
+    [InlineData(ColliderType2D.ConvexPolygon, ColliderType2D.None, CollisionType2D.None)]
+    [InlineData(ColliderType2D.ConvexPolygon, ColliderType2D.Circle, CollisionType2D.Convex_Circle)]
+    [InlineData(ColliderType2D.ConvexPolygon, ColliderType2D.AABox, CollisionType2D.Convex_Convex)]
+    [InlineData(ColliderType2D.ConvexPolygon, ColliderType2D.ConvexPolygon, CollisionType2D.Convex_Convex)]
+    [InlineData(ColliderType2D.ConvexPolygon, ColliderType2D.Compound, CollisionType2D.Compound)]
+    [InlineData(ColliderType2D.ConvexPolygon, ColliderType2D.Capsule, CollisionType2D.Convex_Capsule)]
+    [InlineData(ColliderType2D.Compound, ColliderType2D.None, CollisionType2D.None)]
+    [InlineData(ColliderType2D.Compound, ColliderType2D.Circle, CollisionType2D.Compound)]
+    [InlineData(ColliderType2D.Compound, ColliderType2D.AABox, CollisionType2D.Compound)]
+    [InlineData(ColliderType2D.Compound, ColliderType2D.ConvexPolygon, CollisionType2D.Compound)]
+    [InlineData(ColliderType2D.Compound, ColliderType2D.Compound, CollisionType2D.Compound)]
+    [InlineData(ColliderType2D.Compound, ColliderType2D.Capsule, CollisionType2D.Compound)]
+    [InlineData(ColliderType2D.Capsule, ColliderType2D.None, CollisionType2D.None)]
+    [InlineData(ColliderType2D.Capsule, ColliderType2D.Circle, CollisionType2D.Capsule_Circle)]
+    [InlineData(ColliderType2D.Capsule, ColliderType2D.AABox, CollisionType2D.Capsule_Convex)]
+    [InlineData(ColliderType2D.Capsule, ColliderType2D.ConvexPolygon, CollisionType2D.Capsule_Convex)]
+    [InlineData(ColliderType2D.Capsule, ColliderType2D.Compound, CollisionType2D.Compound)]
+    [InlineData(ColliderType2D.Capsule, ColliderType2D.Capsule, CollisionType2D.Capsule_Capsule)]
+    [InlineData((ColliderType2D)250, ColliderType2D.Circle, CollisionType2D.None)]
+    [InlineData(ColliderType2D.Circle, (ColliderType2D)250, CollisionType2D.None)]
+    public void ColliderSettings2D_ShouldResolveCompleteCollisionMatrix(
+        ColliderType2D first,
+        ColliderType2D second,
+        CollisionType2D expected)
     {
         ColliderSettings2D.GetCollisionType(first, second).Should().Be(expected);
     }

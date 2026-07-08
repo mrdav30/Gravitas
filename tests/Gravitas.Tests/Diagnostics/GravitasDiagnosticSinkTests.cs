@@ -136,6 +136,54 @@ public sealed class GravitasDiagnosticSinkTests
     }
 
     [Fact]
+    public void EnabledDiagnostics_ShouldRecordNoHitQuerySummaryAndContactPayloads()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> first = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
+        ScenarioBody<LSSphereCollider> second = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(4, 0, 0));
+        CollisionPair pair = scenario.CreatePair(first.Collider, second.Collider);
+        var noHit = new Physics3DHit(
+            null,
+            Vector3d.Zero,
+            Vector3d.Zero,
+            Fixed64.Zero,
+            Vector3d.Zero);
+
+        scenario.Context.Diagnostics.Enable(eventCapacity: 4, drawCommandCapacity: 0);
+        scenario.Context.Diagnostics.EmitCircleQuery(
+            Vector3d.Zero,
+            Fixed64.One,
+            Vector3d.Right,
+            (Fixed64)4,
+            layerMaskBits: 0x2,
+            hit: false,
+            hitCount: 0,
+            noHit);
+        scenario.Context.Diagnostics.EmitQuerySummary(
+            GravitasColliderDimension.ThreeD,
+            GravitasColliderDimension.ThreeD,
+            Vector3d.Zero,
+            Vector3d.Right,
+            exactReducerAttempts: 1,
+            acceptedHits: 0,
+            fallbackHits: 0,
+            rejectedConservativeCandidates: 0);
+        scenario.Context.Diagnostics.EmitContact(pair, hit: false);
+
+        ReadOnlySpan<GravitasDiagnosticEvent> events = scenario.Context.Diagnostics.Events;
+        events.Length.Should().Be(3);
+        events[0].Kind.Should().Be(GravitasDiagnosticEventKind.CircleQuery);
+        events[0].ColliderAId.Should().Be(-1);
+        events[0].ColliderAType.Should().Be(ColliderType.None);
+        events[0].Hit.Should().BeFalse();
+        events[1].Kind.Should().Be(GravitasDiagnosticEventKind.QuerySummary);
+        events[1].Hit.Should().BeFalse();
+        events[2].Kind.Should().Be(GravitasDiagnosticEventKind.Contact);
+        events[2].Hit.Should().BeFalse();
+        events[2].DataA.Should().Be(0);
+    }
+
+    [Fact]
     public void ClearAndDisable_ShouldResetSequencesAndRetainReservedCapacity()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();

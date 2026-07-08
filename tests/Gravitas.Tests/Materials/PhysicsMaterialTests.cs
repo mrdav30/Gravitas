@@ -80,6 +80,38 @@ public sealed class PhysicsMaterialTests
             .Be(Fixed64.FromFraction(3, 4));
     }
 
+    [Theory]
+    [InlineData(PhysicsMaterialCombine.Average, PhysicsMaterialCombine.Minimum, PhysicsMaterialCombine.Minimum)]
+    [InlineData(PhysicsMaterialCombine.Minimum, PhysicsMaterialCombine.GeometricMean, PhysicsMaterialCombine.GeometricMean)]
+    [InlineData(PhysicsMaterialCombine.GeometricMean, PhysicsMaterialCombine.Multiply, PhysicsMaterialCombine.Multiply)]
+    [InlineData(PhysicsMaterialCombine.Multiply, PhysicsMaterialCombine.Maximum, PhysicsMaterialCombine.Maximum)]
+    [InlineData(PhysicsMaterialCombine.Maximum, PhysicsMaterialCombine.Average, PhysicsMaterialCombine.Maximum)]
+    public void ResolveDominantPolicy_ShouldUseDeterministicPriority(
+        PhysicsMaterialCombine left,
+        PhysicsMaterialCombine right,
+        PhysicsMaterialCombine expected)
+    {
+        PhysicsMaterial.ResolveDominantPolicy(left, right).Should().Be(expected);
+        PhysicsMaterial.ResolveDominantPolicy(right, left).Should().Be(expected);
+    }
+
+    [Fact]
+    public void CombineMethods_ShouldRejectUnsupportedPolicies()
+    {
+        const PhysicsMaterialCombine unsupported = (PhysicsMaterialCombine)250;
+        Action construct = () => new PhysicsMaterial(
+            Fixed64.One,
+            Fixed64.One,
+            Fixed64.Zero,
+            unsupported);
+        Action combineScalar = () => PhysicsMaterial.CombineScalar(Fixed64.One, Fixed64.One, unsupported);
+        Action resolveDominant = () => PhysicsMaterial.ResolveDominantPolicy(PhysicsMaterialCombine.Minimum, unsupported);
+
+        construct.Should().Throw<ArgumentOutOfRangeException>().WithParameterName("frictionCombine");
+        combineScalar.Should().Throw<ArgumentOutOfRangeException>().WithParameterName("policy");
+        resolveDominant.Should().Throw<ArgumentOutOfRangeException>().WithParameterName("right");
+    }
+
     [Fact]
     public void EqualValues_ShouldCompareEqual()
     {
