@@ -94,18 +94,18 @@ configuration before making source changes.
 
 ## Current Standing
 
-Fresh checkpoint after Workstream 27 mixed prism, finite-slab, and query
-reducer coverage:
+Fresh checkpoint after Workstream 28 collision geometry, convex support, and
+2D/3D query coverage:
 
 | Metric | Baseline | Current | Short-Term Gate | Long-Term Target |
 | --- | ---: | ---: | ---: | ---: |
-| Line coverage | 87.3% | 95.3% | 90% | 100% |
-| Branch coverage | 74.1% | 85.1% | 90% | 100% |
+| Line coverage | 87.3% | 95.4% | 90% | 100% |
+| Branch coverage | 74.1% | 85.3% | 90% | 100% |
 | Method coverage | 86.5% | 94.7% | 90% | 100% |
-| Tests | 974 passed | 1415 passed | green | green |
+| Tests | 974 passed | 1429 passed | green | green |
 
-At the current denominator, the 90% branch gate requires at least 10,046 covered
-branches. The latest run covered 9,507 of 11,162 branches, leaving roughly 539
+At the current denominator, the 90% branch gate requires at least 10,044 covered
+branches. The latest run covered 9,523 of 11,160 branches, leaving roughly 521
 net branch outcomes to cover or delete. The remaining gap is too large for one
 low-value audit pass, so the next phase should attack broad branch families
 instead of adding one-off residue tests.
@@ -113,9 +113,9 @@ instead of adding one-off residue tests.
 Current evidence:
 
 - Coverage report:
-  `TestResults/coverage-branch-hardening-ws27-final/reports/Summary.txt`
+  `TestResults/coverage-branch-hardening-ws28-final-clean/reports/Summary.txt`
 - Branch shortlist:
-  `TestResults/coverage-branch-hardening-ws27-final/branch-gap-shortlist.csv`
+  `TestResults/coverage-branch-hardening-ws28-final-clean/branch-gap-shortlist.csv`
 - Latest uncovered method count: 195.
 
 Top branch-gap groups by source area:
@@ -123,23 +123,23 @@ Top branch-gap groups by source area:
 | Area | Missing Branch Outcomes |
 | --- | ---: |
 | `Core/3D` | 263 |
-| `CollisionHandling/Detection` | 258 |
+| `CollisionHandling/Detection` | 257 |
 | `Core/2D` | 250 |
-| `Queries/3D` | 169 |
+| `Queries/3D` | 161 |
 | `Queries/Mixed` | 124 |
-| `Queries/2D` | 91 |
 | `Core/Mixed` | 88 |
-| `Constraints` | 84 |
+| `Queries/2D` | 82 |
 | `Colliders/3D` | 63 |
 | `Colliders/2D` | 60 |
-| `Partitions` | 43 |
+| `Constraints/3D` | 43 |
 | `CollisionHandling/Response` | 42 |
+| `Constraints/2D` | 41 |
 
 ## Historical Summary
 
 This plan began after trigger collider hardening with 87.3% line, 74.1% branch,
-and 86.5% method coverage. The campaign so far raised the suite to 95.3% line,
-85.1% branch, and 94.7% method coverage while also finding real defects and
+and 86.5% method coverage. The campaign so far raised the suite to 95.4% line,
+85.3% branch, and 94.7% method coverage while also finding real defects and
 removing stale runtime branches.
 
 | Phase | Coverage Result | Tests | Main Outcome |
@@ -154,6 +154,7 @@ removing stale runtime branches.
 | Workstream 25 | 95.2% line / 84.6% branch / 94.7% method | 1391 | Low-value audit, compact lifecycle/diagnostic/support tests, 2D collision-type parity fix, and stale branch removal. |
 | Workstream 26 | 95.3% line / 84.9% branch / 94.7% method | 1411 | CCD handoff lifecycle, rotational Auto/miss paths, same-velocity dynamic TOI, kinematic shape-exact misses, `Both` versus `Mixed` CCD gating, and redundant CCD invariant guard removal. |
 | Workstream 27 | 95.3% line / 85.1% branch / 94.7% method | 1415 | Mixed partition bucket invariants, finite-slab reducer miss exits, projected capsule/cylinder helper cleanup, and unreachable mixed query guard removal. |
+| Workstream 28 | 95.4% line / 85.3% branch / 94.7% method | 1429 | Public 2D query validation, focused 2D geometry-worker ray/sweep edge cases, 3D overlap-sphere filter branches, swept-sphere worker guards, convex support unsupported dispatch parity, and dead static-sphere dynamic traversal removal. |
 
 High-value work completed:
 
@@ -364,16 +365,39 @@ scenarios, and remove private branches that valid authored shapes cannot reach.
 
 **Tasks**
 
-- [ ] Cover convex support simplex branches only through public convex/mesh
+- [x] Triage convex support simplex branches through public convex/mesh
       collision or sweep behavior unless the branch is a proven private policy.
-- [ ] Cover 2D query residue around raycast circle, sweep circle edge,
+- [x] Cover 2D query residue around raycast circle, sweep circle edge,
       capsule-segment versus convex, and convex mover versus convex target.
-- [ ] Cover 3D query residue around overlap sphere hit construction, swept cone,
-      sweep normals, OBB raycasts, and triangle closest-point behavior.
-- [ ] Review contact notification and response CRAP hotspots for branch
+- [x] Cover and triage 3D query residue around overlap sphere hit construction,
+      swept cone/sphere guards, sweep normals, OBB raycasts, and triangle
+      closest-point behavior.
+- [x] Review contact notification and response CRAP hotspots for branch
       consolidation before adding more event permutation tests.
-- [ ] Run focused collision/query tests, allocation-sensitive query checks, and
+- [x] Run focused collision/query tests, allocation-sensitive query checks, and
       coverage collection.
+
+**Result**
+
+- Final W28 report: 95.4% line / 85.3% branch / 94.7% method coverage, 1,429
+  `Release` tests passing under coverage.
+- Focused allocation-sensitive query checks passed for 2D ray/area/capsule
+  queries, 3D ray/cone queries, and 2D/3D query batch paths.
+- Added public 2D query-service tests for non-positive AABB validation,
+  clockwise convex polygon validation, and zero-length circle sweeps, plus
+  focused 2D geometry-worker tests for circle tangent/out-of-range raycasts,
+  bounds misses, zero-displacement mover sweeps, and separated convex mover
+  sweeps.
+- Added 3D overlap-sphere query coverage for linked-constraint suppression,
+  trigger inclusion, and non-positive radius exits, plus swept-sphere worker
+  coverage for zero-length and unsupported-collider dispatch.
+- Removed dead dynamic partition traversal from the static-only overlap-sphere
+  query path instead of preserving an unreachable branch.
+- Remaining cone-iteration and convex-simplex private-policy branches stay in
+  the branch shortlist for future targeted work. OBB slab and triangle
+  closest-point residue also remain in the shortlist where existing public tests
+  already cover the main behavior, but no brittle private-helper tests were
+  added.
 
 ### Workstream 29: Lifecycle, Serialization, Replay, Authoring, And Low-Value Residue
 

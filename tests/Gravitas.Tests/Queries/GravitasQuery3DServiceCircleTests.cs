@@ -1,6 +1,7 @@
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
+using Gravitas.Constraints;
 using Gravitas.Queries;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
@@ -188,6 +189,66 @@ public sealed class GravitasQuery3DServiceCircleTests
         context.Query3D.LastQueryCandidateCount.Should().Be(1);
     }
 
+    [Fact]
+    public void OverlapSphereAgainstStaticAll_ShouldSuppressLinkedTargetsForExcludedCollider()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> source = scenario.CreateSphere(Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> linked = scenario.CreateSphere(Vector3d.Right, immovable: true);
+        ScenarioBody<LSSphereCollider> included = scenario.CreateSphere(Vector3d.Right * 2, immovable: true);
+        _ = scenario.Context.Constraints3D.RegisterJoint(CreateBallSocket(source.Body, linked.Body));
+        var hits = new SwiftList<Physics3DHit>();
+
+        int count = scenario.Context.Query3D.OverlapSphereAgainstStaticAll(
+            Vector3d.Zero,
+            (Fixed64)3,
+            IncludeLayerZero,
+            hits,
+            source.Collider);
+
+        count.Should().Be(1);
+        hits[0].Collider.Should().BeSameAs(included.Collider);
+        scenario.Context.Query3D.LastQueryCandidateCount.Should().Be(1);
+    }
+
+    [Fact]
+    public void OverlapSphereAgainstStaticAll_ShouldIncludeTriggerWhenRequested()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSSphereCollider trigger = CreateBodylessSphere(context, Vector3d.Right, isTrigger: true);
+        var hits = new SwiftList<Physics3DHit>();
+
+        int count = context.Query3D.OverlapSphereAgainstStaticAll(
+            Vector3d.Zero,
+            (Fixed64)2,
+            IncludeLayerZero,
+            hits,
+            excludedCollider: null,
+            includeTriggers: true);
+
+        count.Should().Be(1);
+        hits[0].Collider.Should().BeSameAs(trigger);
+        context.Query3D.LastQueryCandidateCount.Should().Be(1);
+    }
+
+    [Fact]
+    public void OverlapSphereAgainstStaticAll_WithNonPositiveRadius_ShouldReturnNoHits()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        _ = CreateBodylessSphere(context, Vector3d.Zero);
+        var hits = new SwiftList<Physics3DHit>();
+
+        int count = context.Query3D.OverlapSphereAgainstStaticAll(
+            Vector3d.Zero,
+            Fixed64.Zero,
+            IncludeLayerZero,
+            hits);
+
+        count.Should().Be(0);
+        hits.Count.Should().Be(0);
+        context.Query3D.LastQueryCandidateCount.Should().Be(0);
+    }
+
 
     private static LSSphereCollider CreateDynamicSphere(
         GravitasWorldContext context,
@@ -254,4 +315,20 @@ public sealed class GravitasQuery3DServiceCircleTests
 
         context.World.TryAddGrid(configuration, out _).Should().BeTrue();
     }
+
+    private static JointDefinition3D CreateBallSocket(SolidBody first, SolidBody second)
+    {
+        return new JointDefinition3D(
+            first,
+            second,
+            LocalFrame(Vector3d.Zero),
+            LocalFrame(Vector3d.Zero),
+            JointType3D.BallSocket,
+            JointLimit3D.Unrestricted,
+            JointMotor3D.Disabled,
+            JointCollisionPolicy.SuppressLinked);
+    }
+
+    private static FixedTransform LocalFrame(Vector3d position) =>
+        new(position, FixedQuaternion.Identity, Vector3d.One);
 }

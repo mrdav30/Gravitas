@@ -184,9 +184,6 @@ public sealed partial class GravitasQuery3DService
         Fixed64 radius,
         SwiftList<Physics3DHit> results)
     {
-        if (!_currentStaticSweepTargetsOnly)
-            ProcessColliderListForAllSphereHits(partition.ContainedDynamicObjects, position, radius, results);
-
         ProcessColliderListForAllSphereHits(partition.ContainedKinematicObjects, position, radius, results);
         ProcessColliderListForAllSphereHits(partition.ContainedStaticObjects, position, radius, results);
     }

@@ -809,6 +809,37 @@ public sealed class GravitasQuery3DServiceSweepTests
     }
 
     [Fact]
+    public void SweptSphereWorker_WithZeroLengthSegment_ShouldReturnFalse()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSSphereCollider sphere = CreateDynamicCollider(context, new LSSphereCollider(), Vector3d.Zero);
+        var worker = new SweptSphereQueryWorker();
+        worker.Prepare(Vector3d.Zero, Vector3d.Zero, Fixed64.FromFraction(1, 4));
+
+        bool hit = worker.TrySweep(sphere, out Vector3d centerAtImpact, out Fixed64 distance);
+
+        hit.Should().BeFalse();
+        centerAtImpact.Should().Be(Vector3d.Zero);
+        distance.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void SweptSphereWorker_WithUnsupportedCollider_ShouldReturnFalse()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        var unsupported = new UnsupportedTestCollider3D();
+        scenario.InitializeStaticCollider(unsupported, Vector3d.Zero);
+        var worker = new SweptSphereQueryWorker();
+        worker.Prepare(-Vector3d.Right * (Fixed64)2, Vector3d.Right * (Fixed64)2, Fixed64.Half);
+
+        bool hit = worker.TrySweep(unsupported, out Vector3d centerAtImpact, out Fixed64 distance);
+
+        hit.Should().BeFalse();
+        centerAtImpact.Should().Be(Vector3d.Zero);
+        distance.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
     public void SweepSphere_ShouldSupportVerticalAndDiagonalSweeps()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();

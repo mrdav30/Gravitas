@@ -21,6 +21,7 @@ public sealed class ConvexColliderSupportTests
         ConvexColliderSupport.IsSupported(sphere.Collider).Should().BeTrue();
         ConvexColliderSupport.IsSupported(unsupported).Should().BeFalse();
         ConvexColliderSupport.Intersects(sphere.Collider, unsupported).Should().BeFalse();
+        ConvexColliderSupport.Intersects(unsupported, sphere.Collider).Should().BeFalse();
     }
 
     [Fact]
