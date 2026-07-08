@@ -137,6 +137,7 @@ public sealed class Joint2D : IRecordable
     public void SetMotor(JointMotor2D motor)
     {
         motor.Validate();
+        ValidatePayload(Type, Limits, motor);
         Motor = motor;
         ClearSolverCache();
         WakeBodies();
@@ -291,6 +292,11 @@ public sealed class Joint2D : IRecordable
             JointLimitKind2D.Angular => JointLimit2D.Angular(minAngle, maxAngle),
             _ => JointLimit2D.Unrestricted
         };
+        JointFrame2D localFrameA = new(frameAAnchor, frameAAngle);
+        JointFrame2D localFrameB = new(frameBAnchor, frameBAngle);
+        if (type == JointType2D.Distance && limits.Kind == JointLimitKind2D.Unrestricted)
+            limits = JointLimit2D.Distance(ResolveCurrentAnchorDistance(BodyA, BodyB, localFrameA, localFrameB));
+
         JointMotor2D motor = motorKind switch
         {
             JointMotorKind2D.Angular => JointMotor2D.Angular(motorTarget, motorStrength, motorDamping, maxMotorImpulse),
@@ -303,8 +309,8 @@ public sealed class Joint2D : IRecordable
         Limits = limits;
         Motor = motor;
         SetCollisionPolicyFromRecord(collisionPolicy);
-        LocalFrameA = new JointFrame2D(frameAAnchor, frameAAngle);
-        LocalFrameB = new JointFrame2D(frameBAnchor, frameBAngle);
+        LocalFrameA = localFrameA;
+        LocalFrameB = localFrameB;
         if (_isEnabled == isEnabled)
             ClearSolverCache();
         else
@@ -362,8 +368,21 @@ public sealed class Joint2D : IRecordable
 
     private static Fixed64 ResolveCurrentAnchorDistance(in JointDefinition2D definition)
     {
-        Vector2d anchorA = definition.BodyA.Position + Vector2d.Rotate(definition.LocalFrameA.Anchor, definition.BodyA.Rotation);
-        Vector2d anchorB = definition.BodyB.Position + Vector2d.Rotate(definition.LocalFrameB.Anchor, definition.BodyB.Rotation);
+        return ResolveCurrentAnchorDistance(
+            definition.BodyA,
+            definition.BodyB,
+            definition.LocalFrameA,
+            definition.LocalFrameB);
+    }
+
+    private static Fixed64 ResolveCurrentAnchorDistance(
+        SolidBody2D bodyA,
+        SolidBody2D bodyB,
+        in JointFrame2D localFrameA,
+        in JointFrame2D localFrameB)
+    {
+        Vector2d anchorA = bodyA.Position + Vector2d.Rotate(localFrameA.Anchor, bodyA.Rotation);
+        Vector2d anchorB = bodyB.Position + Vector2d.Rotate(localFrameB.Anchor, bodyB.Rotation);
         return (anchorB - anchorA).Magnitude;
     }
 }

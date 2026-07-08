@@ -166,9 +166,7 @@ internal static class JointSolver2D
         Vector2d relativeAnchorB)
     {
         Fixed64 magnitudeSquared = anchorError.MagnitudeSquared;
-        Fixed64 targetDistance = joint.Limits.Kind == JointLimitKind2D.Distance
-            ? joint.Limits.TargetDistance
-            : (magnitudeSquared > RowEpsilon ? FixedMath.Sqrt(magnitudeSquared) : Fixed64.Zero);
+        Fixed64 targetDistance = joint.Limits.TargetDistance;
         if (magnitudeSquared <= RowEpsilon && targetDistance <= RowEpsilon)
             return;
 
@@ -184,11 +182,7 @@ internal static class JointSolver2D
         }
         else
         {
-            axis = Vector2d.Rotate(Vector2d.Right, frameAngleA);
-            if (axis.MagnitudeSquared <= RowEpsilon)
-                axis = Vector2d.Right;
-            else
-                axis = axis.Normalized;
+            axis = Vector2d.Rotate(Vector2d.Right, frameAngleA).Normalized;
         }
 
         AddLinearRow(
@@ -246,12 +240,7 @@ internal static class JointSolver2D
         Fixed64 frameAngleB,
         ref Fixed64 limitErrorMagnitude)
     {
-        Vector2d axis = Vector2d.Rotate(Vector2d.Right, frameAngleA);
-        if (axis.MagnitudeSquared <= RowEpsilon)
-            axis = Vector2d.Right;
-        else
-            axis = axis.Normalized;
-
+        Vector2d axis = Vector2d.Rotate(Vector2d.Right, frameAngleA).Normalized;
         Vector2d normal = Perpendicular(axis);
         AddLinearRow(
             rows,

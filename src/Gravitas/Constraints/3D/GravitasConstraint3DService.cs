@@ -385,10 +385,7 @@ public sealed class GravitasConstraint3DService
             nameof(definition),
             "Joint bodies must have registered 3D colliders.");
         SwiftThrowHelper.ThrowIfArgument(
-            definition.Type != JointType3D.BallSocket
-                && definition.Type != JointType3D.Hinge
-                && definition.Type != JointType3D.ConeTwist
-                && definition.Type != JointType3D.Fixed,
+            !Joint3D.IsSupportedType(definition.Type),
             nameof(definition.Type),
             "Unsupported 3D joint type.");
         SwiftThrowHelper.ThrowIfArgument(
@@ -398,6 +395,7 @@ public sealed class GravitasConstraint3DService
             "Unsupported joint collision policy.");
         definition.Limits.Validate();
         definition.Motor.Validate();
+        Joint3D.ValidatePayload(definition.Type, definition.Limits);
     }
 
     private void ValidateRagdollDefinition(RagdollDefinition3D definition)
@@ -443,16 +441,24 @@ public sealed class GravitasConstraint3DService
         for (int i = 0; i < definition.Joints.Length; i++)
         {
             RagdollJointDefinition3D joint = definition.Joints[i];
-            _ = ResolveRagdollLink(definition.Links, joint.LinkAId);
-            _ = ResolveRagdollLink(definition.Links, joint.LinkBId);
+            SolidBody bodyA = ResolveRagdollLink(definition.Links, joint.LinkAId);
+            SolidBody bodyB = ResolveRagdollLink(definition.Links, joint.LinkBId);
             SwiftThrowHelper.ThrowIfArgument(
                 joint.LinkAId == joint.LinkBId,
                 nameof(definition.Joints),
                 "A ragdoll joint cannot link a body to itself.");
-            SwiftThrowHelper.ThrowIfNull(joint.LocalFrameA, nameof(joint.LocalFrameA));
-            SwiftThrowHelper.ThrowIfNull(joint.LocalFrameB, nameof(joint.LocalFrameB));
-            joint.Limits.Validate();
-            joint.Motor.Validate();
+            JointCollisionPolicy collisionPolicy = definition.SelfCollisionPolicy == RagdollSelfCollisionPolicy.CollideAllLinks
+                ? JointCollisionPolicy.Collide
+                : joint.CollisionPolicy;
+            ValidateDefinition(new JointDefinition3D(
+                bodyA,
+                bodyB,
+                joint.LocalFrameA,
+                joint.LocalFrameB,
+                joint.Type,
+                joint.Limits,
+                joint.Motor,
+                collisionPolicy));
         }
     }
 

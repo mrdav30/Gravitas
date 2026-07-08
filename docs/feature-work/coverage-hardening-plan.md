@@ -89,37 +89,36 @@ configuration before making source changes.
 
 ## Current Standing
 
-Fresh checkpoint after Workstream 23 serialization, replay, authoring, and
-partition lifecycle pass:
+Fresh checkpoint after Workstream 24 constraint solver and ragdoll residue pass:
 
 | Metric | Baseline | Current | Short-Term Gate | Long-Term Target |
 | --- | ---: | ---: | ---: | ---: |
-| Line coverage | 87.3% | 95.1% | 90% | 100% |
-| Branch coverage | 74.1% | 84.2% | 90% | 100% |
+| Line coverage | 87.3% | 95.2% | 90% | 100% |
+| Branch coverage | 74.1% | 84.5% | 90% | 100% |
 | Method coverage | 86.5% | 94.7% | 90% | 100% |
-| Tests | 974 passed | 1330 passed | green | green |
+| Tests | 974 passed | 1346 passed | green | green |
 
-At the current denominator, the 90% branch gate requires at least 10,004 covered
-branches. The latest run covered 9,360 of 11,115 branches, leaving roughly 644
+At the current denominator, the 90% branch gate requires at least 10,009 covered
+branches. The latest run covered 9,398 of 11,121 branches, leaving roughly 611
 net branch outcomes to cover or delete. Treat this as a focused branch
 campaign, not a single gate-check workstream.
 
 Current evidence:
 
 - Coverage report:
-  `TestResults/coverage-branch-hardening-ws23-final/reports/Summary.txt`
+  `TestResults/coverage-branch-hardening-ws24-final/reports/Summary.txt`
 - Coverage collection:
   `dotnet test tests\Gravitas.Tests\Gravitas.Tests.csproj --configuration Release --collect:"XPlat Code Coverage" --settings tests\Gravitas.Tests\coverlet.runsettings`
-  passed with 1330 tests.
+  passed with 1346 tests.
 - Branch shortlist:
-  `TestResults/coverage-branch-hardening-ws23-final/branch-gap-shortlist.csv`
-- Latest summary reports 198 uncovered methods.
+  `TestResults/coverage-branch-hardening-ws24-final/branch-gap-shortlist.csv`
+- Latest summary reports 197 uncovered methods.
 
 ## Historical Summary
 
 This plan began after trigger collider hardening with 87.3% line, 74.1% branch,
-and 86.5% method coverage. The campaign so far raised the suite to 95.1% line,
-84.2% branch, and 94.7% method coverage while also finding real defects and
+and 86.5% method coverage. The campaign so far raised the suite to 95.2% line,
+84.5% branch, and 94.7% method coverage while also finding real defects and
 removing stale runtime branches.
 
 | Phase | Coverage Result | Tests | Main Outcome |
@@ -133,6 +132,7 @@ removing stale runtime branches.
 | Workstreams 19-21 | 94.9% line / 83.7% branch / 94.7% method | 1295 | Kinematic CCD, dynamic response, query reducer, mixed sweep filter, rotated OBB raycast, 2D mover-shape, swept cone, stale reducer cleanup, mixed trigger policy, pair lifecycle, and constrained mixed response coverage. |
 | Workstream 22 | 95.0% line / 83.9% branch / 94.7% method | 1317 | Cuboid normal bug fix, 2D convex SAT/manifold coverage, contact-normal fallback parity, mixed exact-prism miss coverage, and stale 2D clipping guard removal. |
 | Workstream 23 | 95.1% line / 84.2% branch / 94.7% method | 1330 | Active collider load partition refresh/stale bucket coverage, hierarchy replay mutation coverage, mixed replay hash pair-state coverage, 2D/3D partition lifecycle parity, and duplicate dynamic distribution guard removal. |
+| Workstream 24 | 95.2% line / 84.5% branch / 94.7% method | 1346 | 3D joint limit compatibility validation, ragdoll registration atomicity parity, 3D replay-load enabled-count fix, 2D distance replay-load target canonicalization, 2D motor setter compatibility, and constraint solver edge coverage. |
 
 High-value work completed:
 
@@ -152,9 +152,13 @@ High-value work completed:
   behavior protects deterministic runtime edge cases.
 - Real bug fixes found by coverage review: rotated cuboid raycasts now clip
   local slabs, 2D active-state changes clear mixed partitions, inactive 3D
-  direct-collider loads clear stale partition state, and mixed CCD handoff
-  queues now drain through one context-owned budget before partition/discrete
-  completion.
+  direct-collider loads clear stale partition state, mixed CCD handoff queues now
+  drain through one context-owned budget before partition/discrete completion,
+  3D joint replay loads keep enabled-joint counts coherent, 3D joint/ragdoll
+  validation rejects incompatible angular limit payloads atomically, 2D distance
+  replay-load semantics canonicalize unrestricted payloads to explicit target
+  distances, and 2D public motor mutation rejects linear motors on non-prismatic
+  joints.
 
 Cleanup completed:
 
@@ -571,17 +575,42 @@ serialization edge cases.
 
 **Tasks**
 
-- [ ] Cover `JointSolver2D.AddDistanceRow` and `JointSolver3D.AddHingeLimitRow`
+- [x] Cover `JointSolver2D.AddDistanceRow` and `JointSolver3D.AddHingeLimitRow`
       branches through valid pin/distance/hinge/limit scenarios.
-- [ ] Review joint `RecordData` residue for version-tolerant load semantics and
+- [x] Review joint `RecordData` residue for version-tolerant load semantics and
       invalid payload handling.
-- [ ] Cover disabled, body-frozen, static-only, and no-solver-participant joint
+- [x] Cover disabled, body-frozen, static-only, and no-solver-participant joint
       branches only through public service registration/removal/simulation
       flows.
-- [ ] Extend stress tests only if they reveal measurable solver stability or
+- [x] Extend stress tests only if they reveal measurable solver stability or
       allocation value; do not add slow long-chain cases for branch count alone.
-- [ ] Run focused constraint tests, allocation-sensitive constraint checks,
+- [x] Run focused constraint tests, allocation-sensitive constraint checks,
       full `Release`, `ReleaseLean`, and coverage collection.
+
+**Outcome**
+
+- Tightened 3D joint payload validation so hinge limits are accepted only by
+  hinge joints, cone-twist limits only by cone-twist joints, and ball-socket or
+  fixed joints reject angular limit payloads that the solver would ignore.
+- Made 3D ragdoll validation mirror 2D's atomic preflight path by validating
+  fully resolved joint definitions before any owned joint registration occurs.
+- Fixed 3D joint replay-load enabled-state bookkeeping by routing changed
+  `IsEnabled` values through the service counter update path.
+- Canonicalized 2D distance-joint replay loads with unrestricted/default limit
+  payloads into explicit target distances, matching registration semantics, and
+  removed the solver's dynamic target fallback plus impossible rotated-unit
+  zero-axis guards.
+- Closed a 2D public mutation hole where `Joint2D.SetMotor` could install a
+  linear motor on non-prismatic joints even though registration and replay load
+  already rejected that payload.
+- Added focused tests for signed hinge limit violations, coincident 2D distance
+  anchors, static-only solver participants, 2D/3D joint record-load edge cases,
+  and invalid 3D ragdoll payload atomicity. No new stress rows were added
+  because the coverage gaps did not point at measured stability or allocation
+  value.
+- Final W24 coverage: 95.2% line, 84.5% branch (9,398/11,121), 94.7% method,
+  1,346 Release tests passed. Fresh shortlist:
+  `TestResults/coverage-branch-hardening-ws24-final/branch-gap-shortlist.csv`.
 
 ### Workstream 25: Low-Value Surface Audit And Branch-90 Gate
 

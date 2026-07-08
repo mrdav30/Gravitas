@@ -267,37 +267,66 @@ public sealed class Joint3D : IRecordable
         if (chronicler.Mode != SerializationMode.Loading)
             return;
 
-        SwiftThrowHelper.ThrowIfArgument(
-            type != JointType3D.BallSocket
-                && type != JointType3D.Hinge
-                && type != JointType3D.ConeTwist
-                && type != JointType3D.Fixed,
-            nameof(Type),
-            "Unsupported 3D joint type.");
-        SwiftThrowHelper.ThrowIfArgument(
-            limitKind != JointLimitKind3D.Unrestricted
-                && limitKind != JointLimitKind3D.Hinge
-                && limitKind != JointLimitKind3D.ConeTwist,
-            nameof(Limits),
-            "Unsupported joint limit kind.");
+        SwiftThrowHelper.ThrowIfArgument(!IsSupportedType(type), nameof(Type), "Unsupported 3D joint type.");
+        SwiftThrowHelper.ThrowIfArgument(!IsSupportedLimitKind(limitKind), nameof(Limits), "Unsupported joint limit kind.");
         SwiftThrowHelper.ThrowIfArgument(
             collisionPolicy != JointCollisionPolicy.SuppressLinked
                 && collisionPolicy != JointCollisionPolicy.Collide,
             nameof(CollisionPolicy),
             "Unsupported joint collision policy.");
 
-        Type = type;
-        Limits = limitKind switch
+        JointLimit3D limits = limitKind switch
         {
             JointLimitKind3D.Hinge => JointLimit3D.Hinge(maxHingeAngle),
             JointLimitKind3D.ConeTwist => JointLimit3D.ConeTwist(maxConeAngle, maxTwistAngle),
             _ => JointLimit3D.Unrestricted
         };
-        Motor = new JointMotor3D(motorTarget, motorStrength, motorDamping, maxMotorImpulse);
+        JointMotor3D motor = new(motorTarget, motorStrength, motorDamping, maxMotorImpulse);
+        ValidatePayload(type, limits);
+
+        Type = type;
+        Limits = limits;
+        Motor = motor;
         SetCollisionPolicyFromRecord(collisionPolicy);
         LocalFrameA = new JointFrame3D(frameAPosition, frameARotation);
         LocalFrameB = new JointFrame3D(frameBPosition, frameBRotation);
-        _isEnabled = isEnabled;
-        ClearSolverCache();
+        if (_isEnabled == isEnabled)
+            ClearSolverCache();
+        else
+            IsEnabled = isEnabled;
+    }
+
+    internal static bool IsSupportedType(JointType3D type) =>
+        type == JointType3D.BallSocket
+        || type == JointType3D.Hinge
+        || type == JointType3D.ConeTwist
+        || type == JointType3D.Fixed;
+
+    internal static bool IsSupportedLimitKind(JointLimitKind3D kind) =>
+        kind == JointLimitKind3D.Unrestricted
+        || kind == JointLimitKind3D.Hinge
+        || kind == JointLimitKind3D.ConeTwist;
+
+    internal static void ValidatePayload(
+        JointType3D type,
+        in JointLimit3D limits)
+    {
+        SwiftThrowHelper.ThrowIfArgument(
+            type == JointType3D.Hinge
+                && limits.Kind != JointLimitKind3D.Unrestricted
+                && limits.Kind != JointLimitKind3D.Hinge,
+            nameof(limits),
+            "Hinge joints accept only hinge limits.");
+        SwiftThrowHelper.ThrowIfArgument(
+            type == JointType3D.ConeTwist
+                && limits.Kind != JointLimitKind3D.Unrestricted
+                && limits.Kind != JointLimitKind3D.ConeTwist,
+            nameof(limits),
+            "Cone-twist joints accept only cone-twist limits.");
+        SwiftThrowHelper.ThrowIfArgument(
+            (type == JointType3D.BallSocket || type == JointType3D.Fixed)
+                && limits.Kind != JointLimitKind3D.Unrestricted,
+            nameof(limits),
+            "Ball-socket and fixed joints do not accept angular limit payloads.");
     }
 }

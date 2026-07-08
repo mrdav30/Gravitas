@@ -1,4 +1,3 @@
-using Chronicler;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
@@ -335,6 +334,22 @@ public sealed class Constraint2DServiceTests
     }
 
     [Fact]
+    public void ConstraintSolver_WithOnlyFrozen2DBodies_ShouldKeepJointRegisteredWithoutRows()
+    {
+        using GravitasWorldContext context = CreateConstraintContext();
+        SolidBody2D first = CreateBody(context, Vector2d.Zero, immovable: true);
+        SolidBody2D second = CreateBody(context, Vector2d.Right * (Fixed64)2, immovable: true);
+        Joint2D joint = context.Constraints2D.RegisterJoint(CreatePin(first, second));
+
+        Step(context);
+
+        joint.IsEnabled.Should().BeTrue();
+        context.Constraints2D.EnabledJointCount.Should().Be(1);
+        joint.LastSolvedRowCount.Should().Be(0);
+        joint.AccumulatedImpulseMagnitude.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
     public void ConstraintSolveOrder_ShouldBeDeterministicAcross2DJointRegistrationOrder()
     {
         ConstraintState first = RunConstraintChain(registerForward: true);
@@ -504,6 +519,20 @@ public sealed class Constraint2DServiceTests
     }
 
     [Fact]
+    public void SetMotor_WithLinearMotorOnNonPrismaticJoint_ShouldReject()
+    {
+        using GravitasWorldContext context = CreateConstraintContext();
+        SolidBody2D first = CreateBody(context, Vector2d.Zero);
+        SolidBody2D second = CreateBody(context, Vector2d.Right * (Fixed64)2);
+        Joint2D joint = context.Constraints2D.RegisterJoint(CreatePin(first, second));
+
+        Action act = () => joint.SetMotor(JointMotor2D.Linear(Fixed64.Zero, Fixed64.One, Fixed64.Zero, Fixed64.One));
+
+        act.Should().Throw<ArgumentException>();
+        joint.Motor.Kind.Should().Be(JointMotorKind2D.Disabled);
+    }
+
+    [Fact]
     public void SetRagdollPoseTargets_WithForeignRuntime_ShouldReject()
     {
         using GravitasWorldContext sourceContext = CreateConstraintContext();
@@ -552,6 +581,35 @@ public sealed class Constraint2DServiceTests
         target.CollisionPolicy.Should().Be(JointCollisionPolicy.Collide);
     }
 
+    [Theory]
+    [MemberData(nameof(Transports))]
+    public void JointRecordData_ShouldRoundTripAngularLimitAndMotorState(GravitasSerializationTransport transport)
+    {
+        using GravitasWorldContext context = CreateConstraintContext();
+        SolidBody2D first = CreateBody(context, Vector2d.Zero);
+        SolidBody2D second = CreateBody(context, Vector2d.Right * (Fixed64)2);
+        Joint2D source = context.Constraints2D.RegisterJoint(new JointDefinition2D(
+            first,
+            second,
+            JointFrame2D.Identity,
+            JointFrame2D.Identity,
+            JointType2D.Pin,
+            JointLimit2D.Angular(-Fixed64.Half, Fixed64.Half),
+            JointMotor2D.Angular(Fixed64.Half, (Fixed64)3, Fixed64.Half, Fixed64.One),
+            JointCollisionPolicy.SuppressLinked));
+
+        object payload = GravitasSerializationHarness.Serialize(source, transport);
+
+        Joint2D target = context.Constraints2D.RegisterJoint(CreatePin(first, second));
+        GravitasSerializationHarness.Populate(target, payload, transport);
+
+        target.IsEnabled.Should().BeTrue();
+        target.Type.Should().Be(JointType2D.Pin);
+        target.Limits.Should().Be(source.Limits);
+        target.Motor.Should().Be(source.Motor);
+        target.CollisionPolicy.Should().Be(JointCollisionPolicy.SuppressLinked);
+    }
+
     [Fact]
     public void JointRecordData_WithInvalidLoadedTypePayload_ShouldReject()
     {
@@ -559,7 +617,7 @@ public sealed class Constraint2DServiceTests
         SolidBody2D first = CreateBody(context, Vector2d.Zero);
         SolidBody2D second = CreateBody(context, Vector2d.Right * (Fixed64)2);
         Joint2D target = context.Constraints2D.RegisterJoint(CreatePin(first, second));
-        var chronicler = new InvalidJointPayloadChronicler(new Dictionary<string, object>
+        var chronicler = new InvalidRecordPayloadChronicler(new Dictionary<string, object>
         {
             [nameof(Joint2D.IsEnabled)] = true,
             ["Type"] = JointType2D.Pin,
@@ -580,6 +638,34 @@ public sealed class Constraint2DServiceTests
 
         act.Should().Throw<ArgumentException>();
         target.Type.Should().Be(JointType2D.Pin);
+        target.Motor.Kind.Should().Be(JointMotorKind2D.Disabled);
+    }
+
+    [Fact]
+    public void JointRecordData_WithUnrestrictedDistancePayload_ShouldResolveExplicitTargetDistance()
+    {
+        using GravitasWorldContext context = CreateConstraintContext();
+        SolidBody2D first = CreateBody(context, Vector2d.Zero);
+        SolidBody2D second = CreateBody(context, Vector2d.Right * (Fixed64)2);
+        Joint2D target = context.Constraints2D.RegisterJoint(CreatePin(first, second));
+        var chronicler = new InvalidRecordPayloadChronicler(new Dictionary<string, object>
+        {
+            [nameof(Joint2D.IsEnabled)] = true,
+            ["Type"] = JointType2D.Distance,
+            ["LimitKind"] = JointLimitKind2D.Unrestricted,
+            ["MotorKind"] = JointMotorKind2D.Disabled,
+            ["CollisionPolicy"] = JointCollisionPolicy.SuppressLinked,
+            ["LocalFrameAAnchor"] = Vector2d.Zero,
+            ["LocalFrameAAngle"] = Fixed64.Zero,
+            ["LocalFrameBAnchor"] = Vector2d.Zero,
+            ["LocalFrameBAngle"] = Fixed64.Zero
+        });
+
+        target.RecordData(chronicler);
+
+        target.Type.Should().Be(JointType2D.Distance);
+        target.Limits.Kind.Should().Be(JointLimitKind2D.Distance);
+        target.Limits.TargetDistance.Should().Be((Fixed64)2);
         target.Motor.Kind.Should().Be(JointMotorKind2D.Disabled);
     }
 
@@ -631,6 +717,56 @@ public sealed class Constraint2DServiceTests
         (second.Position - first.Position).Magnitude.Should().BeGreaterThan(Fixed64.Zero);
         joint.LastSolvedRowCount.Should().BeGreaterThan(0);
         joint.AccumulatedImpulseMagnitude.Should().BeGreaterThan(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void DistanceJoint_WithCoincidentAnchorsAndZeroTarget_ShouldEmitNoRows()
+    {
+        using GravitasWorldContext context = CreateConstraintContext();
+        SolidBody2D first = CreateBody(context, Vector2d.Zero);
+        SolidBody2D second = CreateBody(context, Vector2d.Zero);
+        Joint2D joint = context.Constraints2D.RegisterJoint(new JointDefinition2D(
+            first,
+            second,
+            JointFrame2D.Identity,
+            JointFrame2D.Identity,
+            JointType2D.Distance,
+            JointLimit2D.Distance(Fixed64.Zero),
+            JointMotor2D.Disabled,
+            JointCollisionPolicy.SuppressLinked));
+
+        Step(context);
+
+        joint.LastSolvedRowCount.Should().Be(0);
+        joint.LastSolveMetrics.PreparedRowCount.Should().Be(0);
+        joint.AccumulatedImpulseMagnitude.Should().Be(Fixed64.Zero);
+        first.Position.Should().Be(Vector2d.Zero);
+        second.Position.Should().Be(Vector2d.Zero);
+    }
+
+    [Fact]
+    public void DistanceJoint_WithCoincidentAnchorsAndSeparatedBodies_ShouldUseBodyDeltaAxis()
+    {
+        using GravitasWorldContext context = CreateConstraintContext();
+        SolidBody2D first = CreateBody(context, Vector2d.Zero);
+        SolidBody2D second = CreateBody(context, Vector2d.Right * (Fixed64)2);
+        Joint2D joint = context.Constraints2D.RegisterJoint(new JointDefinition2D(
+            first,
+            second,
+            new JointFrame2D(Vector2d.Zero, Fixed64.HalfPi),
+            new JointFrame2D(-Vector2d.Right * (Fixed64)2, Fixed64.Zero),
+            JointType2D.Distance,
+            JointLimit2D.Distance(Fixed64.One),
+            JointMotor2D.Disabled,
+            JointCollisionPolicy.SuppressLinked));
+        Step(context);
+
+        joint.LastSolvedRowCount.Should().Be(1);
+        joint.AccumulatedImpulseMagnitude.Should().BeGreaterThan(Fixed64.Zero);
+        first.LinearVelocity.X.Abs().Should().BeGreaterThan(Fixed64.Zero);
+        second.LinearVelocity.X.Abs().Should().BeGreaterThan(Fixed64.Zero);
+        first.LinearVelocity.Y.Should().Be(Fixed64.Zero);
+        second.LinearVelocity.Y.Should().Be(Fixed64.Zero);
     }
 
     [Fact]
@@ -906,46 +1042,4 @@ public sealed class Constraint2DServiceTests
         Fixed64 AnchorDistanceSquared,
         int JointSolvedRowCount,
         Fixed64 AccumulatedImpulseMagnitude);
-
-    private sealed class InvalidJointPayloadChronicler : IChronicler
-    {
-        private readonly IReadOnlyDictionary<string, object> _values;
-
-        public InvalidJointPayloadChronicler(IReadOnlyDictionary<string, object> values)
-        {
-            _values = values;
-            Context = new ChronicleContext();
-        }
-
-        public ChronicleContext Context { get; }
-
-        public SerializationMode Mode => SerializationMode.Loading;
-
-        public void LookValue<T>(ref T value, string name, T? defaultValue = default)
-        {
-            if (_values.TryGetValue(name, out object? loadedValue))
-                value = (T)loadedValue;
-        }
-
-        public void LookDeep<T>(ref T value, string name) where T : class, IRecordable
-        {
-        }
-
-        public void LookDeepStruct<T>(ref T value, string name) where T : struct, IRecordable
-        {
-        }
-
-        public void LookNullableDeep<T>(ref T? value, string name) where T : struct, IRecordable
-        {
-        }
-
-        public void LookLink<T>(
-            ref T value,
-            string name,
-            string? slot = null,
-            RecordLinkResolveMode resolveMode = RecordLinkResolveMode.Immediate,
-            Action<T>? assignLoadedValue = null)
-        {
-        }
-    }
 }
