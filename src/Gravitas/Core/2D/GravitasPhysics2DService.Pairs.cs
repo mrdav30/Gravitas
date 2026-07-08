@@ -94,9 +94,6 @@ public sealed partial class GravitasPhysics2DService
 
     private void ProcessCandidate(LSCollider2D first, LSCollider2D second, int frame)
     {
-        if (!RequireCollisionPair(first, second))
-            return;
-
         ulong key = CreatePairKey(first.Id, second.Id);
         bool hasPair = _pairs.TryGetValue(key, out CollisionPair2D pair);
         bool hasAwakeMovableParticipant = HasAwakeMovableParticipant(first, second);
@@ -266,9 +263,7 @@ public sealed partial class GravitasPhysics2DService
         for (int i = 0; i < _pairsToRemove.Count; i++)
         {
             ulong key = _pairsToRemove[i];
-            if (_pairs.TryGetValue(key, out CollisionPair2D pair))
-                RecyclePair(pair);
-
+            RecyclePair(_pairs[key]);
             _pairs.Remove(key);
         }
     }

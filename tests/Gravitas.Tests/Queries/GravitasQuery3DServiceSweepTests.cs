@@ -694,6 +694,86 @@ public sealed class GravitasQuery3DServiceSweepTests
     }
 
     [Fact]
+    public void ConvexSweepWorker_WithoutPreparedSource_ShouldRejectTarget()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSSphereCollider target = CreateDynamicCollider(context, new LSSphereCollider(), Vector3d.Zero);
+        var worker = new ConvexSweepQueryWorker();
+
+        bool hit = worker.TrySweepPreparedSource(target, out Physics3DHit sweepHit);
+
+        hit.Should().BeFalse();
+        sweepHit.Should().Be(default(Physics3DHit));
+        worker.LastMeshTriangleCandidateCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void ConvexSweepWorker_WithZeroDisplacement_ShouldRejectTarget()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSSphereCollider source = CreateDynamicCollider(context, new LSSphereCollider(), -Vector3d.Right);
+        LSSphereCollider target = CreateDynamicCollider(context, new LSSphereCollider(), Vector3d.Zero);
+        var worker = new ConvexSweepQueryWorker();
+
+        worker.PreparePrimitiveSource(source, Vector3d.Zero);
+        bool hit = worker.TrySweepPreparedSource(target, out Physics3DHit sweepHit);
+
+        hit.Should().BeFalse();
+        sweepHit.Should().Be(default(Physics3DHit));
+    }
+
+    [Fact]
+    public void ConvexSweepWorker_WhenSweptBoundsMissTarget_ShouldRejectBeforeNarrowPhase()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSSphereCollider source = CreateDynamicCollider(context, new LSSphereCollider(), new Vector3d((Fixed64)(-6), Fixed64.Zero, Fixed64.Zero));
+        LSSphereCollider target = CreateDynamicCollider(context, new LSSphereCollider(), new Vector3d((Fixed64)6, Fixed64.Zero, Fixed64.Zero));
+        var worker = new ConvexSweepQueryWorker();
+
+        worker.PreparePrimitiveSource(source, Vector3d.Right);
+        bool hit = worker.TrySweepPreparedSource(target, out Physics3DHit sweepHit);
+
+        hit.Should().BeFalse();
+        sweepHit.Should().Be(default(Physics3DHit));
+    }
+
+    [Fact]
+    public void ConvexSweepWorker_WithUnsupportedPrimitiveSource_ShouldThrow()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSMeshCollider source = CreateDynamicCollider(
+            context,
+            MeshTestFixtures.CreateUChannel(
+                MeshColliderMode.Concave,
+                MeshInertiaPolicy.SurfaceApproximation),
+            Vector3d.Zero);
+        var worker = new ConvexSweepQueryWorker();
+
+        Action query = () => worker.PreparePrimitiveSource(source, Vector3d.Right);
+
+        query.Should().Throw<NotSupportedException>().WithMessage("*LSMeshCollider sources*");
+    }
+
+    [Theory]
+    [InlineData(0, 1, "radius")]
+    [InlineData(1, 0, "halfHeight")]
+    public void ConvexSweepWorker_WithInvalidCircleSlabSource_ShouldThrow(
+        int radius,
+        int halfHeight,
+        string parameterName)
+    {
+        var worker = new ConvexSweepQueryWorker();
+
+        Action query = () => worker.PrepareCircleSlabSource(
+            Vector3d.Zero,
+            (Fixed64)radius,
+            (Fixed64)halfHeight,
+            Vector3d.Right);
+
+        query.Should().Throw<ArgumentException>().Where(exception => exception.ParamName == parameterName);
+    }
+
+    [Fact]
     public void SweepSphere_ShouldOrientMeshNormalsAgainstSweepDirection()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();

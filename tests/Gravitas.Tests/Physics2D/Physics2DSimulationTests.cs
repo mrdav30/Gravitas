@@ -198,6 +198,10 @@ public sealed class Physics2DSimulationTests
         trigger.IsTrigger = true;
         int triggerEntered = 0;
         int triggerStayed = 0;
+        int triggerExited = 0;
+        int otherEntered = 0;
+        int otherStayed = 0;
+        int otherExited = 0;
         int contactEntered = 0;
         trigger.OnTriggerEnter += collider =>
         {
@@ -209,14 +213,40 @@ public sealed class Physics2DSimulationTests
             collider.Should().BeSameAs(other.Collider);
             triggerStayed++;
         };
+        trigger.OnTriggerExit += collider =>
+        {
+            collider.Should().BeSameAs(other.Collider);
+            triggerExited++;
+        };
+        other.Collider.OnTriggerEnter += collider =>
+        {
+            collider.Should().BeSameAs(trigger);
+            otherEntered++;
+        };
+        other.Collider.OnTriggerStay += collider =>
+        {
+            collider.Should().BeSameAs(trigger);
+            otherStayed++;
+        };
+        other.Collider.OnTriggerExit += collider =>
+        {
+            collider.Should().BeSameAs(trigger);
+            otherExited++;
+        };
         trigger.OnContactEnter += _ => contactEntered++;
 
         Step(context);
+        Step(context);
+        other.SetPosition(new Vector2d((Fixed64)4, Fixed64.Zero));
         Step(context);
 
         trigger.Center.Should().Be(Vector2d.Zero);
         triggerEntered.Should().Be(1);
         triggerStayed.Should().Be(2);
+        triggerExited.Should().Be(1);
+        otherEntered.Should().Be(1);
+        otherStayed.Should().Be(2);
+        otherExited.Should().Be(1);
         contactEntered.Should().Be(0);
     }
 

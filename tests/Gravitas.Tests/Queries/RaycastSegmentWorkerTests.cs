@@ -227,6 +227,32 @@ public sealed class RaycastSegmentWorkerTests
         hits.Count.Should().Be(0);
     }
 
+    [Theory]
+    [InlineData(1, 0, 0)]
+    [InlineData(0, 1, 0)]
+    [InlineData(0, 0, 1)]
+    public void CheckOBBoxOverlaps_WithPointOutsideEachLocalAxis_ShouldReturnFalse(int x, int y, int z)
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSCuboidCollider box = scenario.CreateCuboid(
+            Vector3d.Zero,
+            PhysicsScenarioBuilder.Yaw(45)).Collider;
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+        Vector3d localPoint = new(
+            x == 0 ? Fixed64.Zero : (Fixed64)x,
+            y == 0 ? Fixed64.Zero : (Fixed64)y,
+            z == 0 ? Fixed64.Zero : (Fixed64)z);
+        Vector3d worldPoint = LocalToWorld(box, localPoint);
+
+        worker.PrepareSegmentCheck(worldPoint, worldPoint);
+
+        bool hit = worker.CheckOBBoxOverlaps(box, ref hits);
+
+        hit.Should().BeFalse();
+        hits.Count.Should().Be(0);
+    }
+
     [Fact]
     public void CheckOBBoxOverlaps_WithSegmentCrossingRotatedBox_ShouldReturnEntryAndExit()
     {
@@ -273,6 +299,27 @@ public sealed class RaycastSegmentWorkerTests
     }
 
     [Fact]
+    public void CheckOBBoxOverlaps_WithSegmentTangentToRotatedBoxCorner_ShouldReturnSingleIntersection()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSCuboidCollider box = scenario.CreateCuboid(
+            Vector3d.Zero,
+            PhysicsScenarioBuilder.Yaw(45)).Collider;
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+        Vector3d localStart = new((Fixed64)(-2), -Fixed64.One, Fixed64.Half);
+        Vector3d localEnd = new((Fixed64)2, (Fixed64)3, Fixed64.Half);
+
+        worker.PrepareSegmentCheck(LocalToWorld(box, localStart), LocalToWorld(box, localEnd));
+
+        bool hit = worker.CheckOBBoxOverlaps(box, ref hits);
+
+        hit.Should().BeTrue();
+        hits.Count.Should().Be(1);
+        hits[0].Should().Be(LocalToWorld(box, new Vector3d(-Fixed64.Half, Fixed64.Half, Fixed64.Half)));
+    }
+
+    [Fact]
     public void CheckOBBoxOverlaps_WithSegmentOutsideParallelAxis_ShouldReturnFalse()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
@@ -299,4 +346,7 @@ public sealed class RaycastSegmentWorkerTests
         new Vector3d(Fixed64.One, Fixed64.One, Fixed64.Zero),
         new Vector3d(Fixed64.One, Fixed64.One, Fixed64.One)
     };
+
+    private static Vector3d LocalToWorld(LSCuboidCollider box, Vector3d localPoint) =>
+        box.Center + box.Rotation * localPoint;
 }

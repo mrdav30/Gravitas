@@ -734,6 +734,82 @@ public sealed class MixedResponseTests
     }
 
     [Fact]
+    public void Simulate_WithBodylessMixedTrigger_ShouldNotifyStayAndExitOnBothParticipants()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(context, Vector3d.Zero);
+        LSCollider2D trigger = CreateBodylessCircle2D(context, Vector2d.Zero, isTrigger: true);
+        int entered3D = 0;
+        int stayed3D = 0;
+        int exited3D = 0;
+        int entered2D = 0;
+        int stayed2D = 0;
+        int exited2D = 0;
+        int contacted = 0;
+        body3D.Collider.OnMixedTriggerEnter += other =>
+        {
+            other.Should().BeSameAs(trigger);
+            entered3D++;
+        };
+        body3D.Collider.OnMixedTriggerStay += other =>
+        {
+            other.Should().BeSameAs(trigger);
+            stayed3D++;
+        };
+        body3D.Collider.OnMixedTriggerExit += other =>
+        {
+            other.Should().BeSameAs(trigger);
+            exited3D++;
+        };
+        body3D.Collider.OnMixedContact += _ => contacted++;
+        trigger.OnMixedTriggerEnter += other =>
+        {
+            other.Should().BeSameAs(body3D.Collider);
+            entered2D++;
+        };
+        trigger.OnMixedTriggerStay += other =>
+        {
+            other.Should().BeSameAs(body3D.Collider);
+            stayed2D++;
+        };
+        trigger.OnMixedTriggerExit += other =>
+        {
+            other.Should().BeSameAs(body3D.Collider);
+            exited2D++;
+        };
+
+        Step(context);
+        Step(context);
+        body3D.Body.SetPosition(new Vector3d((Fixed64)4, Fixed64.Zero, Fixed64.Zero));
+        Step(context);
+
+        entered3D.Should().Be(1);
+        stayed3D.Should().Be(2);
+        exited3D.Should().Be(1);
+        entered2D.Should().Be(1);
+        stayed2D.Should().Be(2);
+        exited2D.Should().Be(1);
+        contacted.Should().Be(0);
+        context.MixedCollisions.ActivePairCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void Simulate_WithMixedBoundsOverlapButExactMiss_ShouldSkipPairCreation()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        _ = CreateSphere3D(context, Vector3d.Zero);
+        SolidBody2D circle = CreateCircle2D(
+            context,
+            new Vector2d(Fixed64.FromFraction(9, 10), Fixed64.FromFraction(9, 10)));
+
+        Step(context);
+
+        context.MixedCollisions.LastBroadPhaseCandidateCount.Should().Be(1);
+        context.MixedCollisions.ActivePairCount.Should().Be(0);
+        circle.Position.Should().Be(new Vector2d(Fixed64.FromFraction(9, 10), Fixed64.FromFraction(9, 10)));
+    }
+
+    [Fact]
     public void Simulate_WithAwake3DAgainstSleeping2D_ShouldWakeSleepingParticipant()
     {
         using GravitasWorldContext context = CreateMixedContext();

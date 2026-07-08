@@ -701,6 +701,31 @@ public sealed class MixedNarrowPhaseTests
         contact.HasContact.Should().BeFalse();
     }
 
+    [Theory]
+    [InlineData(ColliderType2D.AABox, 0)]
+    [InlineData(ColliderType2D.Capsule, 0)]
+    [InlineData(ColliderType2D.ConvexPolygon, 45)]
+    public void ConePrismSlab_WithEmbeddedPrismOverlap_ShouldReportFiniteConeContact(
+        ColliderType2D prismShape,
+        int prismRotationDegrees)
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSConeCollider> cone = CreateCone3D(
+            context,
+            new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
+        LSCollider2D prism = CreatePrimitive2D(
+            context,
+            prismShape,
+            FixedMath.DegToRad((Fixed64)prismRotationDegrees));
+
+        bool collided = CollisionDetectionMixed.TryCollide(cone.Collider, prism, out MixedContact contact);
+
+        collided.Should().BeTrue();
+        contact.HasContact.Should().BeTrue();
+        contact.Depth.Should().BeGreaterThanOrEqualTo(Fixed64.Zero);
+        contact.Normal3DTo2D.MagnitudeSquared.Should().BeGreaterThan(Fixed64.Zero);
+    }
+
     [Fact]
     public void CapsuleCircleSlab_WithPlanarSideOverlap_ShouldReportContact()
     {

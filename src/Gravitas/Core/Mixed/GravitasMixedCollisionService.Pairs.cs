@@ -61,9 +61,7 @@ internal sealed partial class GravitasMixedCollisionService
     private void ProcessCandidate(MixedColliderKey candidate, int frame)
     {
         if (!_context.Physics.TryGetColliderById(candidate.Collider3DId, out LSCollider? collider3D)
-            || !_context.Physics2D.TryGetColliderById(candidate.Collider2DId, out LSCollider2D? collider2D)
-            || !RequireCollisionPair(collider3D!, collider2D!)
-            || !MixedBoundsOverlap(collider3D!, collider2D!))
+            || !_context.Physics2D.TryGetColliderById(candidate.Collider2DId, out LSCollider2D? collider2D))
         {
             return;
         }
@@ -81,12 +79,8 @@ internal sealed partial class GravitasMixedCollisionService
 
         if (!triggerPair && !hasAwakeMovableParticipant)
         {
-            if (hasPair)
-            {
-                pair!.MarkResting(frame, contact);
-                _mixedResponsePairs.Add(pair);
-            }
-
+            pair!.MarkResting(frame, contact);
+            _mixedResponsePairs.Add(pair);
             return;
         }
 
@@ -160,9 +154,7 @@ internal sealed partial class GravitasMixedCollisionService
         for (int i = 0; i < _pairsToRemove.Count; i++)
         {
             ulong key = _pairsToRemove[i];
-            if (_pairs.TryGetValue(key, out CollisionPairMixed pair))
-                RecyclePair(pair);
-
+            RecyclePair(_pairs[key]);
             _pairs.Remove(key);
         }
     }

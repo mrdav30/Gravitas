@@ -94,32 +94,32 @@ configuration before making source changes.
 
 ## Current Standing
 
-Fresh checkpoint after Workstream 30 mixed exact-prism and swept-cone worker
-coverage:
+Fresh checkpoint after Workstreams 31-34 geometry, query worker, mixed pair,
+and lifecycle cleanup:
 
 | Metric | Baseline | Current | Short-Term Gate | Long-Term Target |
 | --- | ---: | ---: | ---: | ---: |
-| Line coverage | 87.3% | 95.4% | 90% | 100% |
-| Branch coverage | 74.1% | 85.5% | 90% | 100% |
+| Line coverage | 87.3% | 95.6% | 90% | 100% |
+| Branch coverage | 74.1% | 85.8% | 90% | 100% |
 | Method coverage | 86.5% | 94.7% | 90% | 100% |
-| Tests | 974 passed | 1461 passed | green | green |
+| Tests | 974 passed | 1493 passed | green | green |
 
-At the current denominator, the 90% branch gate requires at least 10,037 covered
-branches. The latest run covered 9,537 of 11,152 branches, leaving roughly 500
-net branch outcomes to cover or delete. The remaining gap is too large for one
-low-value audit pass, so the next phase should attack broad branch families
-instead of adding one-off residue tests.
+At the current denominator, the 90% branch gate requires at least 10,026 covered
+branches. The latest run covered 9,561 of 11,140 branches, leaving 465 net
+branch outcomes to cover or delete. The remaining gap is still too large for
+one low-value audit pass, so the next phase should keep attacking broad branch
+families and stale branch surfaces instead of adding one-off residue tests.
 
 Current evidence:
 
 - Coverage report:
-  `TestResults/coverage-branch-hardening-ws30-final/reports/Summary.txt`
+  `TestResults/coverage-branch-hardening-ws34-final/reports/Summary.txt`
 - Branch shortlist:
-  `TestResults/coverage-branch-hardening-ws30-final/branch-gap-shortlist.csv`
+  `TestResults/coverage-branch-hardening-ws34-final/branch-gap-shortlist.csv`
 - CRAP hotspots:
-  `TestResults/coverage-branch-hardening-ws30-final/crap-scores.txt`
+  `TestResults/coverage-branch-hardening-ws34-final/crap-scores.txt`
 - Method gaps:
-  `TestResults/coverage-branch-hardening-ws30-final/method-gaps-under-90.json`
+  `TestResults/coverage-branch-hardening-ws34-final/method-gaps-under-90.json`
 - Latest uncovered method count: 195.
 
 Top branch-gap groups by source area:
@@ -127,23 +127,25 @@ Top branch-gap groups by source area:
 | Area | Missing Branch Outcomes |
 | --- | ---: |
 | `Core/3D` | 262 |
-| `Core/2D` | 248 |
-| `CollisionHandling/Detection` | 247 |
-| `Queries/3D` | 158 |
+| `Core/2D` | 243 |
+| `CollisionHandling/Detection` | 233 |
+| `Queries/3D` | 153 |
 | `Queries/Mixed` | 124 |
-| `Core/Mixed` | 88 |
-| `Queries/2D` | 82 |
+| `Core/Mixed` | 81 |
+| `Queries/2D` | 77 |
 | `Colliders/3D` | 60 |
 | `Colliders/2D` | 57 |
 | `Constraints/3D` | 43 |
+| `Partitions` | 43 |
 | `CollisionHandling/Response` | 42 |
 | `Constraints/2D` | 41 |
+| `Diagnostics` | 11 |
 
 ## Historical Summary
 
 This plan began after trigger collider hardening with 87.3% line, 74.1% branch,
-and 86.5% method coverage. The campaign so far raised the suite to 95.4% line,
-85.3% branch, and 94.7% method coverage while also finding real defects and
+and 86.5% method coverage. The campaign so far raised the suite to 95.6% line,
+85.8% branch, and 94.7% method coverage while also finding real defects and
 removing stale runtime branches.
 
 | Phase | Coverage Result | Tests | Main Outcome |
@@ -161,6 +163,7 @@ removing stale runtime branches.
 | Workstream 28 | 95.4% line / 85.3% branch / 94.7% method | 1429 | Public 2D query validation, focused 2D geometry-worker ray/sweep edge cases, 3D overlap-sphere filter branches, swept-sphere worker guards, convex support unsupported dispatch parity, and dead static-sphere dynamic traversal removal. |
 | Workstream 29 | 95.4% line / 85.3% branch / 94.7% method | 1438 | Pure-runtime 2D/3D collider load partition refresh/cleanup, 2D grounding load canonicalization, replay hierarchy null-check cleanup, and low-value lifecycle/diagnostic residue classification. |
 | Workstream 30 | 95.4% line / 85.5% branch / 94.7% method | 1461 | Mixed primitive-prism exact axis misses, swept-sphere cone iterative miss exits, and branch-90 roadmap refresh. |
+| Workstreams 31-34 | 95.6% line / 85.8% branch / 94.7% method | 1493 | GJK simplex policy extraction, 2D/raycast query geometry, convex sweep worker contracts, mixed trigger lifecycle, cone-prism hit coverage, and duplicate 2D/mixed candidate-gate cleanup. |
 
 High-value work completed:
 
@@ -513,81 +516,85 @@ gate and refresh the roadmap from a new full coverage run.
   the suite covers 9,537, leaving roughly 500 net branch outcomes to cover or
   delete.
 
-### Workstream 31: GJK Simplex, Convex Geometry, And Narrow-Phase Policy
+### Completed Workstreams 31-34: Geometry, Query, Pair, And Lifecycle Pass
+
+This pass raised branch coverage from 85.5% to 85.8% while keeping the work
+behavioral:
+
+- Extracted `GjkSimplexPolicy` from `ConvexColliderSupport` and covered line,
+  triangle, and tetrahedron simplex-region behavior without reflection.
+- Added focused 2D query, raycast OBB, convex sweep worker contract, mixed
+  trigger stay/exit, and mixed cone-prism contact coverage.
+- Removed duplicate pure 2D and mixed candidate-gate checks where partition
+  candidate collection already proved the same filters before same-frame pair
+  processing.
+- Confirmed the 90% branch gate still needs broad family work: 465 net branch
+  outcomes remain.
+
+### Workstream 35: CCD Helper And Handoff Branch Audit
 
 **Purpose**
 
-Close the largest remaining `CollisionHandling/Detection` family without
-forcing brittle public coordinates. The fresh CRAP/method-gap data points at
-GJK simplex updates, mixed triangle/prism SAT, compound part contact ordering,
-mesh/cone geometry, and 2D segment/convex dispatch.
-
-**Candidate Areas**
-
-- `src/Gravitas/CollisionHandling/Detection/3D/ConvexColliderSupport.cs`
-- `src/Gravitas/CollisionHandling/Detection/3D`
-- `src/Gravitas/CollisionHandling/Detection/2D`
-- `src/Gravitas/CollisionHandling/Detection/Mixed`
-- `tests/Gravitas.Tests/CollisionHandling`
-- `tests/Gravitas.Tests/MixedDimensions`
-
-**Tasks**
-
-- [ ] Extract or expose a focused internal GJK simplex policy helper only if it
-      makes `UpdateLine`, `UpdateTriangle`, and `UpdateTetrahedron` directly
-      testable without reflection or public-coordinate hunting.
-- [ ] Cover GJK simplex regions through deterministic simplex-policy tests and
-      keep public `ConvexColliderSupport.Intersects` tests for end-to-end
-      behavior.
-- [ ] Continue mixed prism/triangle SAT coverage for capsule-2D edge axes,
-      cone planar/edge axes, and triangle-prism misses where public fixtures
-      stay stable.
-- [ ] Audit compound and mesh contact helper branches for stale reduced-SAT or
-      duplicate ordering logic before adding tests.
-- [ ] Run focused collision/mixed tests, full `Release`, coverage, and CRAP.
-
-### Workstream 32: CCD Handoff, Dynamic Response, And Rotational Residue
-
-**Purpose**
-
-Attack the still-dominant `Core/3D` and `Core/2D` branch families around
-kinematic handoff, dynamic exact TOI, rotational CCD, target eligibility,
-grounding support selection, and response handoff queues.
+The largest remaining branch families still sit in 3D and 2D continuous
+collision. Attack them with a mix of behavioral CCD tests and stale-helper
+cleanup, but do not add brittle private tests around unsupported custom
+collider behavior.
 
 **Candidate Areas**
 
 - `src/Gravitas/Core/3D/SolidBody.ContinuousCollision.*.cs`
 - `src/Gravitas/Core/2D/SolidBody2D.ContinuousCollision.*.cs`
-- `src/Gravitas/Core/3D/GravitasPhysicsService.ContinuousCollision.cs`
-- `src/Gravitas/Core/2D/GravitasPhysics2DService.Grounding.cs`
-- `tests/Gravitas.Tests/CollisionHandling`
-- `tests/Gravitas.Tests/Physics2D`
-- `tests/Gravitas.Tests/MixedDimensions`
+- `tests/Gravitas.Tests/CollisionHandling/ContinuousCollisionDetectionTests.cs`
+- `tests/Gravitas.Tests/Physics2D/ContinuousCollision2DTests.cs`
+- `tests/Gravitas.Tests/MixedDimensions/MixedQueryCcdTests.cs`
 
 **Tasks**
 
-- [ ] Cover 2D and 3D kinematic handoff branches that still distinguish ignored
-      targets, constrained axes, mixed target projection, and non-closing
-      response velocity.
-- [ ] Cover dynamic exact TOI branches for equal/near-equal velocities,
-      unsupported exact convex source paths, ignored target ordering, and mixed
-      target eligibility.
-- [ ] Review rotational CCD branch residue for duplicated 2D/3D policy and
-      remove stale fallback branches where frame-rate or mobility invariants
-      already prove the condition.
-- [ ] Cover 2D support/grounding refresh and contact-candidate tie-break
-      branches where they affect deterministic support state.
-- [ ] Run focused CCD/grounding tests, full `Release`, `ReleaseLean`, and
-      coverage.
+- [ ] Cover or remove stale 3D/2D kinematic handoff branches around ignored
+      targets, frozen-axis transfer, non-closing response velocity, and mixed
+      target projection.
+- [ ] Audit `ResolveSweptSphereContinuousNormal`,
+      `TryRefineShapeExactContinuousCollisionHit`, and dynamic relative exact
+      TOI helpers for branches that are unreachable under current
+      shape-exact-source policy.
+- [ ] Add behavioral CCD tests only when they prove deterministic clamp,
+      handoff, or non-clamp behavior across real body/collider setups.
+- [ ] Run focused CCD filters, full `Release`, and coverage.
 
-### Workstream 33: Query Reducer, Shape-Cast, And Ray Geometry Residue
+### Workstream 36: Mixed And 3D Geometry Branch Families
 
 **Purpose**
 
-Close remaining query branches in 3D, 2D, and mixed shape-cast reducers while
-avoiding low-value DTO/view coverage. The fresh shortlist still shows OBB
-raycasts, cone ray side checks, convex sweep normals, mixed finite-slab
-reducers, and 2D sweep geometry.
+`CollisionHandling/Detection` remains the third-largest gap. Continue closing
+real shape-pair behavior and delete stale reduced-axis or fallback paths where
+the stronger SAT/GJK helpers already prove the invariant.
+
+**Candidate Areas**
+
+- `src/Gravitas/CollisionHandling/Detection/Mixed`
+- `src/Gravitas/CollisionHandling/Detection/3D`
+- `src/Gravitas/CollisionHandling/Detection/2D`
+- `tests/Gravitas.Tests/MixedDimensions/MixedNarrowPhaseTests.cs`
+- `tests/Gravitas.Tests/CollisionHandling`
+- `tests/Gravitas.Tests/Physics2D`
+
+**Tasks**
+
+- [ ] Cover or simplify mixed cone/cylinder/capsule/triangle-prism branches
+      through stable narrow-phase fixtures.
+- [ ] Re-audit compound and mesh contact branch residue for duplicated ordering
+      or obsolete fallback logic.
+- [ ] Keep `GjkSimplexPolicy` direct tests focused; do not expand them into
+      public API shape.
+- [ ] Run focused collision/mixed filters and coverage.
+
+### Workstream 37: Query Reducer And Raycast Residue
+
+**Purpose**
+
+The query layer still has meaningful branch residue in 3D cone/raycast normal
+resolution, convex sweep normal fallback, mixed finite-slab reducers, and 2D
+sweep/raycast edge cases.
 
 **Candidate Areas**
 
@@ -596,27 +603,26 @@ reducers, and 2D sweep geometry.
 - `src/Gravitas/Queries/Mixed`
 - `tests/Gravitas.Tests/Queries`
 - `tests/Gravitas.Tests/MixedDimensions`
+- `tests/Gravitas.Tests/Physics2D`
 
 **Tasks**
 
-- [ ] Cover 3D OBB/cone ray and sweep-normal branches through public query
-      worker/service scenarios where possible.
-- [ ] Cover `ConvexSweepQueryWorker` distance/normal residue with direct worker
-      tests only when public query setup cannot isolate the geometry.
-- [ ] Cover mixed sphere/circle finite-slab reducer residue for point-in-space,
-      capsule side, convex slab side faces, and projection-distance exits.
-- [ ] Cover 2D query sweep/raycast edge cases that represent real public
-      behavior, especially capsule-segment and convex mover residue.
-- [ ] Run focused query allocation checks where hot paths are touched, then
-      full coverage.
+- [ ] Prefer public query-service tests for normal orientation, candidate
+      ordering, exact miss, and all-hit result ordering.
+- [ ] Extract a tiny internal geometry policy only if public setup cannot
+      isolate a high-risk branch and the helper has a stable physics contract.
+- [ ] Keep low-value DTO/view branches out of scope unless visitor dispatch or
+      adapter behavior makes them meaningful.
+- [ ] Run focused query filters, allocation smoke where hot paths are touched,
+      and coverage.
 
-### Workstream 34: Lifecycle, Replay, Pair, And Low-Value Surface Gate
+### Workstream 38: Lifecycle, Partition, Replay, And Branch-90 Gate
 
 **Purpose**
 
-Use the next fresh shortlist to separate remaining real runtime lifecycle
-branches from low-value construction/view noise. This is the cleanup pass after
-the geometry, CCD, and query families move.
+Use the next fresh shortlist to decide whether the 90% gate can be reached with
+high-value runtime coverage or whether the remaining gap requires another
+evidence-based phase.
 
 **Candidate Areas**
 
@@ -624,26 +630,24 @@ the geometry, CCD, and query families move.
 - `src/Gravitas/Core/3D`
 - `src/Gravitas/Core/Mixed`
 - `src/Gravitas/Colliders`
-- `src/Gravitas/Diagnostics`
 - `src/Gravitas/Partitions`
 - `tests/Gravitas.Tests/Serialization`
-- `tests/Gravitas.Tests/Replay`
 - `tests/Gravitas.Tests/Diagnostics`
+- `tests/Gravitas.Tests/Physics2D`
+- `tests/Gravitas.Tests/MixedDimensions`
 
 **Tasks**
 
-- [ ] Cover remaining pair candidate, replay hash, retained partition,
-      active-state, trigger/contact notification, and load/apply branches that
-      affect deterministic continuation.
-- [ ] Re-audit diagnostic view constructors and low-value getter branches; keep
-      them out of scope unless visitor dispatch, adapter behavior, or
-      serialization makes them meaningful.
-- [ ] Delete stale lifecycle guards that valid registries, frame-rate
-      invariants, or shape validation already make impossible.
-- [ ] Generate fresh coverage, CRAP, method-gap, and branch-shortlist artifacts.
+- [ ] Cover service lifecycle, retained partition, replay hash, active-state,
+      and contact/trigger notification branches that affect deterministic
+      continuation.
+- [ ] Delete stale lifecycle guards where registries, frame-rate invariants,
+      or shape validation make them unreachable.
+- [ ] Generate fresh coverage, CRAP, method-gap, and branch-shortlist
+      artifacts.
 - [ ] If branch coverage reaches 90%, rewrite this plan as the remaining 100%
-      roadmap. If not, create one more evidence-based gate workstream from the
-      newest shortlist.
+      roadmap. If not, create one more evidence-based gate phase from the newest
+      shortlist.
 
 ## Coverage Checkpoints
 
@@ -669,3 +673,4 @@ campaign checkpoints; do not add a row for every focused test filter.
 | 2026-07-08 | 95.4% | 85.3% | 94.7% | 1429 passed | Workstream 28 completed; public 2D query validation, 2D geometry-worker edge cases, 3D overlap/swept-sphere guard coverage, convex support dispatch parity, and dead static-sphere traversal removal. Branches covered: 9523/11160. |
 | 2026-07-08 | 95.4% | 85.3% | 94.7% | 1438 passed | Workstream 29 completed; pure-runtime collider load partition refresh/cleanup, 2D grounding load canonicalization, replay hierarchy null-check cleanup, and low-value lifecycle residue classification. Branches covered: 9523/11152. |
 | 2026-07-08 | 95.4% | 85.5% | 94.7% | 1461 passed | Workstream 30 completed; mixed exact primitive-prism axis misses, swept-sphere cone iterative miss exits, and branch-90 roadmap refresh. Branches covered: 9537/11152. |
+| 2026-07-08 | 95.6% | 85.8% | 94.7% | 1493 passed | Workstreams 31-34 completed; GJK simplex policy extraction, 2D/raycast query geometry, convex sweep worker contracts, mixed trigger lifecycle, cone-prism hit coverage, duplicate 2D/mixed candidate-gate cleanup, and next branch-gate phase refresh. Branches covered: 9561/11140. |
