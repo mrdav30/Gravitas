@@ -64,12 +64,6 @@ internal static class FiniteSlabProjectionSweep
         LSConeCollider cone,
         out Fixed64 distance)
     {
-        if (!IsConeAxisVertical(cone))
-        {
-            distance = default;
-            return false;
-        }
-
         var target = ProjectionTarget.CreateCone(cone, slabMinY, slabMaxY);
         return TrySweepCircle(start, direction, length, radius, target, out distance);
     }
@@ -494,12 +488,8 @@ internal static class FiniteSlabProjectionSweep
         Vector3d wholeSupport = ConvexColliderSupport.Support(cone, new Vector3d(direction.X, Fixed64.Zero, direction.Y));
         TryKeepConePoint(wholeSupport, slabMinY, slabMaxY, direction, ref found, ref best);
 
-        if (IsConeAxisVertical(cone))
-        {
-            TryKeepVerticalConePlaneSupport(cone, slabMinY, direction, ref found, ref best);
-            if (slabMaxY != slabMinY)
-                TryKeepVerticalConePlaneSupport(cone, slabMaxY, direction, ref found, ref best);
-        }
+        TryKeepVerticalConePlaneSupport(cone, slabMinY, direction, ref found, ref best);
+        TryKeepVerticalConePlaneSupport(cone, slabMaxY, direction, ref found, ref best);
 
         support = best;
         return found;
@@ -627,8 +617,7 @@ internal static class FiniteSlabProjectionSweep
         }
 
         TryKeepCylinderDiskBoundary(axisPoint, axisDirection, radius, slabMinY, direction, ref found, ref best);
-        if (slabMaxY != slabMinY)
-            TryKeepCylinderDiskBoundary(axisPoint, axisDirection, radius, slabMaxY, direction, ref found, ref best);
+        TryKeepCylinderDiskBoundary(axisPoint, axisDirection, radius, slabMaxY, direction, ref found, ref best);
 
         support = best;
         return found;

@@ -335,8 +335,7 @@ public sealed partial class GravitasQueryMixedService
             Vector3d first = vertices[edge[0]];
             Vector3d second = vertices[edge[1]];
             TryAddSlabPlaneIntersection(first, second, slabMinY, projection, ref projectionCount);
-            if (slabMaxY != slabMinY)
-                TryAddSlabPlaneIntersection(first, second, slabMaxY, projection, ref projectionCount);
+            TryAddSlabPlaneIntersection(first, second, slabMaxY, projection, ref projectionCount);
         }
 
         if (projectionCount == 0)

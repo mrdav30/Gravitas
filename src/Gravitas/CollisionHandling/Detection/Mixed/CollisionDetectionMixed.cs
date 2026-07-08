@@ -778,13 +778,13 @@ public static partial class CollisionDetectionMixed
         if (prism is LSCapsuleCollider2D capsule)
             return ProjectCapsuleSlabOntoAxis(axis, capsule);
 
-        Vector2d first = GetPrismVertex(prism, 0);
+        Vector2d first = prism.GetVertexUnchecked(0);
         Fixed64 min = ProjectPrismVertex(axis, first, prism.MixedBounds3D.Min.Y);
         Fixed64 max = min;
 
         for (int i = 0; i < prism.VertexCount; i++)
         {
-            Vector2d vertex = GetPrismVertex(prism, i);
+            Vector2d vertex = prism.GetVertexUnchecked(i);
             Fixed64 bottom = ProjectPrismVertex(axis, vertex, prism.MixedBounds3D.Min.Y);
             Fixed64 top = ProjectPrismVertex(axis, vertex, prism.MixedBounds3D.Max.Y);
             if (bottom < min)
@@ -896,14 +896,10 @@ public static partial class CollisionDetectionMixed
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void GetPrismEdge(LSCollider2D prism, int index, out Vector2d edge)
     {
-        Vector2d current = GetPrismVertex(prism, index);
-        Vector2d next = GetPrismVertex(prism, (index + 1) % prism.VertexCount);
+        Vector2d current = prism.GetVertexUnchecked(index);
+        Vector2d next = prism.GetVertexUnchecked((index + 1) % prism.VertexCount);
         edge = next - current;
     }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Vector2d GetPrismVertex(LSCollider2D prism, int index) =>
-        prism.GetVertexUnchecked(index);
 
     private static void GetEmbeddedCapsuleAxes(LSCapsuleCollider2D capsule, out Vector3d axis, out Vector3d normal)
     {

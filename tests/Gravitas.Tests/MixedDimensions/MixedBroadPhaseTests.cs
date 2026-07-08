@@ -377,6 +377,66 @@ public sealed class MixedBroadPhaseTests
         ContainsId(partition.ContainedDynamic2DObjects, 11).Should().BeFalse();
     }
 
+    [Fact]
+    public void MixedPartition_AddRemoveAndCopyHelpers_ShouldKeepDimensionalBucketsCoherent()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        PhysicsMixedPartition partition = context.MixedCollisions.RentPartition();
+        var ids = new SwiftList<int>();
+
+        partition.AddDynamic3DObject(11);
+        partition.AddDynamic3DObject(11);
+        partition.AddKinematic3DObject(7);
+        partition.AddStatic3DObject(19);
+        partition.AddDynamic2DObject(13);
+        partition.AddDynamic2DObject(13);
+        partition.AddKinematic2DObject(5);
+        partition.AddStatic2DObject(17);
+        partition.SetDynamic3DObjectAwake(999, awake: true);
+        partition.SetDynamic2DObjectAwake(999, awake: true);
+
+        partition.IsAllocated.Should().BeTrue();
+        partition.AwakeDynamicObjectCount.Should().Be(2);
+
+        partition.Copy3DColliderIds(ids);
+        ids.Count.Should().Be(3);
+        ids[0].Should().Be(7);
+        ids[1].Should().Be(11);
+        ids[2].Should().Be(19);
+        partition.Copy2DColliderIds(ids);
+        ids.Count.Should().Be(3);
+        ids[0].Should().Be(5);
+        ids[1].Should().Be(13);
+        ids[2].Should().Be(17);
+        partition.CopyStaticStyle3DColliderIds(ids);
+        ids.Count.Should().Be(2);
+        ids[0].Should().Be(7);
+        ids[1].Should().Be(19);
+        partition.CopyStaticStyle2DColliderIds(ids);
+        ids.Count.Should().Be(2);
+        ids[0].Should().Be(5);
+        ids[1].Should().Be(17);
+
+        partition.RemoveDynamic3DObject(999);
+        partition.RemoveStatic3DObject(999);
+        partition.RemoveKinematic3DObject(999);
+        partition.RemoveDynamic2DObject(999);
+        partition.RemoveStatic2DObject(999);
+        partition.RemoveKinematic2DObject(999);
+
+        partition.RemoveDynamic3DObject(11);
+        partition.RemoveKinematic3DObject(7);
+        partition.RemoveStatic3DObject(19);
+        partition.RemoveDynamic2DObject(13);
+        partition.RemoveKinematic2DObject(5);
+        partition.RemoveStatic2DObject(17);
+
+        partition.IsEmpty.Should().BeTrue();
+        partition.AwakeDynamicObjectCount.Should().Be(0);
+        partition.IsAllocated.Should().BeFalse();
+        context.MixedCollisions.ReleasePartition(partition);
+    }
+
     private static GravitasWorldContext CreateMixedContext(int extent = 32)
     {
         GravitasWorldContext context = GravitasWorldContext.CreateOwned();

@@ -173,12 +173,6 @@ public sealed partial class GravitasQueryMixedService
         LSCollider2D collider,
         out PhysicsMixedHit hit)
     {
-        if (collider.VertexCount < 3)
-        {
-            hit = default;
-            return false;
-        }
-
         Fixed64 radiusSqr = radius * radius;
         if (DistanceSquaredToConvexSlab(start, collider) <= radiusSqr)
         {

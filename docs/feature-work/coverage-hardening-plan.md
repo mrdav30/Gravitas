@@ -94,17 +94,18 @@ configuration before making source changes.
 
 ## Current Standing
 
-Fresh checkpoint after Workstream 26 CCD handoff and rotational sweep coverage:
+Fresh checkpoint after Workstream 27 mixed prism, finite-slab, and query
+reducer coverage:
 
 | Metric | Baseline | Current | Short-Term Gate | Long-Term Target |
 | --- | ---: | ---: | ---: | ---: |
 | Line coverage | 87.3% | 95.3% | 90% | 100% |
-| Branch coverage | 74.1% | 84.9% | 90% | 100% |
+| Branch coverage | 74.1% | 85.1% | 90% | 100% |
 | Method coverage | 86.5% | 94.7% | 90% | 100% |
-| Tests | 974 passed | 1411 passed | green | green |
+| Tests | 974 passed | 1415 passed | green | green |
 
-At the current denominator, the 90% branch gate requires at least 10,059 covered
-branches. The latest run covered 9,499 of 11,176 branches, leaving roughly 560
+At the current denominator, the 90% branch gate requires at least 10,046 covered
+branches. The latest run covered 9,507 of 11,162 branches, leaving roughly 539
 net branch outcomes to cover or delete. The remaining gap is too large for one
 low-value audit pass, so the next phase should attack broad branch families
 instead of adding one-off residue tests.
@@ -112,9 +113,9 @@ instead of adding one-off residue tests.
 Current evidence:
 
 - Coverage report:
-  `TestResults/coverage-branch-hardening-ws26-final/reports/Summary.txt`
+  `TestResults/coverage-branch-hardening-ws27-final/reports/Summary.txt`
 - Branch shortlist:
-  `TestResults/coverage-branch-hardening-ws26-final/branch-gap-shortlist.csv`
+  `TestResults/coverage-branch-hardening-ws27-final/branch-gap-shortlist.csv`
 - Latest uncovered method count: 195.
 
 Top branch-gap groups by source area:
@@ -125,20 +126,20 @@ Top branch-gap groups by source area:
 | `CollisionHandling/Detection` | 258 |
 | `Core/2D` | 250 |
 | `Queries/3D` | 169 |
-| `Queries/Mixed` | 137 |
+| `Queries/Mixed` | 124 |
 | `Queries/2D` | 91 |
 | `Core/Mixed` | 88 |
 | `Constraints` | 84 |
 | `Colliders/3D` | 63 |
 | `Colliders/2D` | 60 |
-| `Partitions` | 52 |
+| `Partitions` | 43 |
 | `CollisionHandling/Response` | 42 |
 
 ## Historical Summary
 
 This plan began after trigger collider hardening with 87.3% line, 74.1% branch,
 and 86.5% method coverage. The campaign so far raised the suite to 95.3% line,
-84.9% branch, and 94.7% method coverage while also finding real defects and
+85.1% branch, and 94.7% method coverage while also finding real defects and
 removing stale runtime branches.
 
 | Phase | Coverage Result | Tests | Main Outcome |
@@ -152,6 +153,7 @@ removing stale runtime branches.
 | Workstreams 19-24 | 95.2% line / 84.5% branch / 94.7% method | 1346 | Kinematic CCD, query reducers, mixed pair lifecycle, collision geometry, serialization, partition lifecycle, constraints, and ragdoll residue. |
 | Workstream 25 | 95.2% line / 84.6% branch / 94.7% method | 1391 | Low-value audit, compact lifecycle/diagnostic/support tests, 2D collision-type parity fix, and stale branch removal. |
 | Workstream 26 | 95.3% line / 84.9% branch / 94.7% method | 1411 | CCD handoff lifecycle, rotational Auto/miss paths, same-velocity dynamic TOI, kinematic shape-exact misses, `Both` versus `Mixed` CCD gating, and redundant CCD invariant guard removal. |
+| Workstream 27 | 95.3% line / 85.1% branch / 94.7% method | 1415 | Mixed partition bucket invariants, finite-slab reducer miss exits, projected capsule/cylinder helper cleanup, and unreachable mixed query guard removal. |
 
 High-value work completed:
 
@@ -315,17 +317,32 @@ projection, swept sphere against 2D slabs, and mixed pair candidate processing.
 
 **Tasks**
 
-- [ ] Cover or simplify mixed prism branches for cuboid, capsule, cylinder,
+- [x] Cover or simplify mixed prism branches for cuboid, capsule, cylinder,
       cone, triangle, mesh, and compound targets.
-- [ ] Cover finite-slab projection rows for side, cap, disk-boundary, rotated,
-      and no-hit cases through public mixed query calls.
-- [ ] Cover mixed source/target eligibility, pair retention, sleeping,
+- [x] Cover finite-slab projection rows for side, cap, disk-boundary, rotated,
+      and no-hit cases through public mixed query calls where visible, with
+      focused reducer-policy tests for exits hidden behind candidate
+      collection.
+- [x] Cover mixed source/target eligibility, pair retention, sleeping,
       inactive, trigger, and partition-retention rows where event or contact
       behavior changes.
-- [ ] Review `PhysicsMixedPartition.Distribute`, `IsEmpty`, and retained
+- [x] Review `PhysicsMixedPartition.Distribute`, `IsEmpty`, and retained
       membership branches for duplicate state or stale defensive guards.
-- [ ] Run focused mixed detection/query/partition tests and coverage
+- [x] Run focused mixed detection/query/partition tests and coverage
       collection.
+
+**Result**
+
+- Final W27 report: 95.3% line / 85.1% branch / 94.7% method coverage, 1,415
+  `Release` tests passing under coverage.
+- Focused mixed detection/query/partition test slice passed with 173 tests.
+- Removed unreachable mixed reducer guards around projected finite slabs,
+  zero-thickness slab duplicates, and validated 2D convex slab vertex counts.
+- Split projected capsule/cylinder finite-slab handling away from an impossible
+  fallback branch and added compact reducer miss-exit coverage for no
+  projection, moving-away, and out-of-range hits.
+- Added direct mixed-partition bucket tests for duplicate adds, missing removes,
+  awake tracking, sorted copy helpers, and dynamic deactivation.
 
 ### Workstream 28: Collision Geometry, Convex Support, And 2D Query Branches
 
