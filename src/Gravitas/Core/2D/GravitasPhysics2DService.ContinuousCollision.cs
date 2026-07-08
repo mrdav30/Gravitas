@@ -50,7 +50,7 @@ public sealed partial class GravitasPhysics2DService
             return;
         }
 
-        Fixed64 planarRadius = body.ResolveContinuousCollisionProxyRadiusForDynamicTarget();
+        Fixed64 planarRadius = body.ResolveContinuousCollisionProxyRadius();
         if (planarRadius <= Fixed64.Epsilon)
             return;
 

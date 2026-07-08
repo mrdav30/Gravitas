@@ -20,7 +20,7 @@ public partial class SolidBody
         FixedQuaternion startRotation,
         ref FixedQuaternion proposedRotation)
     {
-        if (!CanRotate || !ShouldUseContinuousCollision(out ContinuousCollisionMode mode))
+        if (!ShouldUseContinuousCollision(out ContinuousCollisionMode mode))
             return false;
 
         Fixed64 angularDistance = _angularSpeed * Context.DeltaTime;
@@ -58,9 +58,6 @@ public partial class SolidBody
             return false;
 
         int stepCount = ContinuousCollisionMath.ResolveRotationalSubstepCount(angularDistance);
-        if (stepCount <= 0)
-            return false;
-
         Vector3d originalPosition = Position3d;
         FixedQuaternion originalRotation = Rotation;
         bool originalPositionMutated = _positionMutated;
@@ -174,9 +171,6 @@ public partial class SolidBody
             return false;
 
         int stepCount = ContinuousCollisionMath.ResolveRotationalSubstepCount(angularDistance);
-        if (stepCount <= 0)
-            return false;
-
         FixedQuaternion targetRotation = proposedRotation;
         Vector3d originalPosition = Position3d;
         FixedQuaternion originalRotation = Rotation;

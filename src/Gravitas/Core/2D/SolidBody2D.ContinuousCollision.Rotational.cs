@@ -59,9 +59,6 @@ public sealed partial class SolidBody2D
             return false;
 
         int stepCount = ContinuousCollisionMath.ResolveRotationalSubstepCount(angularDelta);
-        if (stepCount <= 0)
-            return false;
-
         Vector2d originalPosition = _position;
         Fixed64 originalRotation = _rotation;
         try
@@ -173,9 +170,6 @@ public sealed partial class SolidBody2D
             return false;
 
         int stepCount = ContinuousCollisionMath.ResolveRotationalSubstepCount(angularDelta);
-        if (stepCount <= 0)
-            return false;
-
         Vector2d originalPosition = _position;
         Fixed64 originalRotation = _rotation;
         try

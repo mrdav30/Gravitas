@@ -216,7 +216,7 @@ public sealed partial class SolidBody2D
             Vector2d targetStart = target.ContinuousCollisionFrameStart
                 + target.ContinuousCollisionFrameDisplacement * elapsedFrameFraction;
             Vector2d targetDisplacement = target.ContinuousCollisionFrameDisplacement * remainingFrameFraction;
-            Fixed64 targetRadius = target.ResolveContinuousCollisionProxyRadiusForDynamicTarget();
+            Fixed64 targetRadius = target.ResolveContinuousCollisionProxyRadius();
             if (targetRadius <= Fixed64.Epsilon
                 || !ContinuousCollisionMath.TrySweepRelativeCircles(
                     startPosition,
@@ -357,7 +357,7 @@ public sealed partial class SolidBody2D
             Vector3d targetStart = target.ContinuousCollisionFrameStart
                 + target.ContinuousCollisionFrameDisplacement * elapsedFrameFraction;
             Vector3d targetDisplacement = target.ContinuousCollisionFrameDisplacement * remainingFrameFraction;
-            Fixed64 targetRadius = target.ResolveContinuousCollisionProxyRadiusForDynamicTarget();
+            Fixed64 targetRadius = target.ResolveContinuousCollisionProxyRadius();
             if (targetRadius <= Fixed64.Epsilon
                 || !ContinuousCollisionMath.TrySweepRelativeSpheres(
                     sourceStart,

@@ -400,7 +400,7 @@ internal static class ContinuousCollisionBenchmarkSupport
                 DynamicCcdCandidateIndex.CreateSweptSphereBounds(
                     body.ContinuousCollisionFrameStart,
                     body.ContinuousCollisionFrameDisplacement,
-                    body.ResolveContinuousCollisionProxyRadiusForDynamicTarget()));
+                    body.ResolveContinuousCollisionProxyRadius()));
             total += candidates.Count;
         }
 
@@ -418,7 +418,7 @@ internal static class ContinuousCollisionBenchmarkSupport
                 DynamicCcdCandidateIndex2D.CreateSweptCircleBounds(
                     body.ContinuousCollisionFrameStart,
                     body.ContinuousCollisionFrameDisplacement,
-                    body.ResolveContinuousCollisionProxyRadiusForDynamicTarget()));
+                    body.ResolveContinuousCollisionProxyRadius()));
             total += candidates.Count;
         }
 
@@ -432,7 +432,7 @@ internal static class ContinuousCollisionBenchmarkSupport
         for (int i = 0; i < bodies.Count; i++)
         {
             SolidBody source = bodies[i];
-            Fixed64 sourceRadius = source.ResolveContinuousCollisionProxyRadiusForDynamicTarget();
+            Fixed64 sourceRadius = source.ResolveContinuousCollisionProxyRadius();
             SwiftList<int> candidates = context.Physics.QueryContinuousCollisionCandidates(
                 DynamicCcdCandidateIndex.CreateSweptSphereBounds(
                     source.ContinuousCollisionFrameStart,
@@ -448,7 +448,7 @@ internal static class ContinuousCollisionBenchmarkSupport
                     continue;
                 }
 
-                Fixed64 targetRadius = target.ResolveContinuousCollisionProxyRadiusForDynamicTarget();
+                Fixed64 targetRadius = target.ResolveContinuousCollisionProxyRadius();
                 if (ContinuousCollisionMath.TrySweepRelativeSpheres(
                         source.ContinuousCollisionFrameStart,
                         source.ContinuousCollisionFrameDisplacement,
@@ -475,7 +475,7 @@ internal static class ContinuousCollisionBenchmarkSupport
         for (int i = 0; i < bodies.Count; i++)
         {
             SolidBody2D source = bodies[i];
-            Fixed64 sourceRadius = source.ResolveContinuousCollisionProxyRadiusForDynamicTarget();
+            Fixed64 sourceRadius = source.ResolveContinuousCollisionProxyRadius();
             SwiftList<int> candidates = context.Physics2D.QueryPlanarContinuousCollisionCandidates(
                 DynamicCcdCandidateIndex2D.CreateSweptCircleBounds(
                     source.ContinuousCollisionFrameStart,
@@ -491,7 +491,7 @@ internal static class ContinuousCollisionBenchmarkSupport
                     continue;
                 }
 
-                Fixed64 targetRadius = target.ResolveContinuousCollisionProxyRadiusForDynamicTarget();
+                Fixed64 targetRadius = target.ResolveContinuousCollisionProxyRadius();
                 if (ContinuousCollisionMath.TrySweepRelativeCircles(
                         source.ContinuousCollisionFrameStart,
                         source.ContinuousCollisionFrameDisplacement,

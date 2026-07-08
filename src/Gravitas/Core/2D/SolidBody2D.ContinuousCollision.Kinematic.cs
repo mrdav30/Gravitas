@@ -166,7 +166,7 @@ public sealed partial class SolidBody2D
             }
 
             target.EnsureContinuousCollisionFramePrepared(token);
-            Fixed64 targetRadius = target.ResolveContinuousCollisionProxyRadiusForDynamicTarget();
+            Fixed64 targetRadius = target.ResolveContinuousCollisionProxyRadius();
             if (targetRadius <= Fixed64.Epsilon
                 || !ContinuousCollisionMath.TrySweepRelativeCircles(
                     startPosition,
@@ -251,7 +251,7 @@ public sealed partial class SolidBody2D
             }
 
             target.EnsureContinuousCollisionFramePrepared(token);
-            Fixed64 targetRadius = target.ResolveContinuousCollisionProxyRadiusForDynamicTarget();
+            Fixed64 targetRadius = target.ResolveContinuousCollisionProxyRadius();
             if (targetRadius <= Fixed64.Epsilon
                 || !ContinuousCollisionMath.TrySweepRelativeSpheres(
                     sourceStart,

@@ -367,7 +367,7 @@ public partial class SolidBody
             Vector3d targetStart = target.ContinuousCollisionFrameStart
                 + target.ContinuousCollisionFrameDisplacement * elapsedFrameFraction;
             Vector3d targetDisplacement = target.ContinuousCollisionFrameDisplacement * remainingFrameFraction;
-            Fixed64 targetRadius = ResolveContinuousCollisionProxyRadius(target.Collider);
+            Fixed64 targetRadius = target.ResolveContinuousCollisionProxyRadius();
             if (targetRadius <= Fixed64.Epsilon
                 || !ContinuousCollisionMath.TrySweepRelativeSpheres(
                     startPosition,
@@ -617,7 +617,7 @@ public partial class SolidBody
 
             target.EnsureContinuousCollisionFramePrepared(token);
             Fixed64 targetRadius = FixedMath.Max(
-                target.ResolveContinuousCollisionProxyRadiusForDynamicTarget(),
+                target.ResolveContinuousCollisionProxyRadius(),
                 target.Collider.MixedHalfThickness);
             if (targetRadius <= Fixed64.Epsilon)
                 continue;

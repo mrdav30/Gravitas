@@ -2047,6 +2047,54 @@ public sealed class MixedQueryCcdTests
     }
 
     [Fact]
+    public void LateSimulate_WithBothRuntimeMode_ShouldNotTransferKinematic3DSourceIntoDynamic2DTarget()
+    {
+        using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
+        context.Settings.RuntimeMode = PhysicsRuntimeMode.Both;
+        context.Environment.Gravity = Fixed64.Zero;
+        SolidBody2D target = CreateCircle2D(context, Vector2d.Zero);
+        target.Sleep();
+        ScenarioBody<LSSphereCollider> source = CreateSphere3D(
+            context,
+            new Vector3d((Fixed64)(-5), Fixed64.Zero, Fixed64.Zero),
+            isKinematic: true);
+        source.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+
+        source.Body.Agent.Transform.Position = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
+        context.LateSimulate();
+
+        source.Body.Position3d.X.Should().Be((Fixed64)5);
+        source.Body.LastContinuousCollisionToiIterationCount.Should().Be(0);
+        target.Position.Should().Be(Vector2d.Zero);
+        target.LinearVelocity.Should().Be(Vector2d.Zero);
+        target.IsSleeping.Should().BeTrue();
+    }
+
+    [Fact]
+    public void LateSimulate_WithBothRuntimeMode_ShouldNotTransferKinematic2DSourceIntoDynamic3DTarget()
+    {
+        using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
+        context.Settings.RuntimeMode = PhysicsRuntimeMode.Both;
+        context.Environment.Gravity = Fixed64.Zero;
+        ScenarioBody<LSSphereCollider> target = CreateSphere3D(context, Vector3d.Zero);
+        target.Body.Sleep();
+        SolidBody2D source = CreateCircle2D(
+            context,
+            new Vector2d((Fixed64)(-5), Fixed64.Zero),
+            isKinematic: true);
+        source.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+
+        source.Agent.Transform.Position = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
+        context.LateSimulate();
+
+        source.Position.X.Should().Be((Fixed64)5);
+        source.LastContinuousCollisionToiIterationCount.Should().Be(0);
+        target.Body.Position3d.Should().Be(Vector3d.Zero);
+        target.Body.LinearVelocity.Should().Be(Vector3d.Zero);
+        target.Body.IsSleeping.Should().BeTrue();
+    }
+
+    [Fact]
     public void LateSimulate_WithKinematic2DSourceCrossingDynamic3DTarget_ShouldPreserveHandoffVelocityAfterMixedResponse()
     {
         using GravitasWorldContext context = CreateMixedContext(frameRate: 1);

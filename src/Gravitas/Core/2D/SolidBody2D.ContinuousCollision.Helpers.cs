@@ -39,7 +39,7 @@ public sealed partial class SolidBody2D
             : mode;
     }
 
-    private Fixed64 ResolveContinuousCollisionProxyRadius()
+    internal Fixed64 ResolveContinuousCollisionProxyRadius()
     {
         return Collider switch
         {
@@ -52,18 +52,8 @@ public sealed partial class SolidBody2D
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal Fixed64 ResolveContinuousCollisionProxyRadiusForDynamicTarget()
-    {
-        return ResolveContinuousCollisionProxyRadius();
-    }
-
-    internal Vector2d ResolveContinuousCollisionFrameVelocity()
-    {
-        Fixed64 deltaTime = Context.DeltaTime;
-        return deltaTime > Fixed64.Epsilon
-            ? ProjectLinearMotion(_continuousCollisionFrameDisplacement / deltaTime)
-            : Vector2d.Zero;
-    }
+    internal Vector2d ResolveContinuousCollisionFrameVelocity() =>
+        ProjectLinearMotion(_continuousCollisionFrameDisplacement / Context.DeltaTime);
 
     private Fixed64 ResolveConvexContinuousCollisionProxyRadius()
     {

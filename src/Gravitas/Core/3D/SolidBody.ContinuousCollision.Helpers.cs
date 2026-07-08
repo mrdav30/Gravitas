@@ -66,35 +66,20 @@ public partial class SolidBody
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private Fixed64 ResolveContinuousCollisionProxyRadius()
-    {
-        return ResolveContinuousCollisionProxyRadius(Collider);
-    }
+    internal Vector3d ResolveContinuousCollisionFrameVelocity() =>
+        ProjectLinearMotion(_continuousCollisionFrameDisplacement / Context.DeltaTime);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal Fixed64 ResolveContinuousCollisionProxyRadiusForDynamicTarget()
+    internal Fixed64 ResolveContinuousCollisionProxyRadius()
     {
-        return ResolveContinuousCollisionProxyRadius(Collider);
-    }
-
-    internal Vector3d ResolveContinuousCollisionFrameVelocity()
-    {
-        Fixed64 deltaTime = Context.DeltaTime;
-        return deltaTime > Fixed64.Epsilon
-            ? ProjectLinearMotion(_continuousCollisionFrameDisplacement / deltaTime)
-            : Vector3d.Zero;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Fixed64 ResolveContinuousCollisionProxyRadius(LSCollider collider)
-    {
-        return collider switch
+        return Collider switch
         {
             LSSphereCollider sphere => sphere.ScaledRadius,
-            _ => ResolveBoundsProxyRadius(collider)
+            _ => ResolveBoundsProxyRadius(Collider)
         };
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Fixed64 ResolveBoundsProxyRadius(LSCollider collider)
     {
         Fixed64 radius = collider.Bounds.Scope.Magnitude;

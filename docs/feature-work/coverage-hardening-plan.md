@@ -94,17 +94,17 @@ configuration before making source changes.
 
 ## Current Standing
 
-Fresh checkpoint after Workstream 25 low-value surface audit:
+Fresh checkpoint after Workstream 26 CCD handoff and rotational sweep coverage:
 
 | Metric | Baseline | Current | Short-Term Gate | Long-Term Target |
 | --- | ---: | ---: | ---: | ---: |
-| Line coverage | 87.3% | 95.2% | 90% | 100% |
-| Branch coverage | 74.1% | 84.6% | 90% | 100% |
+| Line coverage | 87.3% | 95.3% | 90% | 100% |
+| Branch coverage | 74.1% | 84.9% | 90% | 100% |
 | Method coverage | 86.5% | 94.7% | 90% | 100% |
-| Tests | 974 passed | 1391 passed | green | green |
+| Tests | 974 passed | 1411 passed | green | green |
 
-At the current denominator, the 90% branch gate requires at least 9,979 covered
-branches. The latest run covered 9,388 of 11,087 branches, leaving roughly 591
+At the current denominator, the 90% branch gate requires at least 10,059 covered
+branches. The latest run covered 9,499 of 11,176 branches, leaving roughly 560
 net branch outcomes to cover or delete. The remaining gap is too large for one
 low-value audit pass, so the next phase should attack broad branch families
 instead of adding one-off residue tests.
@@ -112,37 +112,33 @@ instead of adding one-off residue tests.
 Current evidence:
 
 - Coverage report:
-  `TestResults/coverage-branch-hardening-ws25-final/reports/Summary.txt`
+  `TestResults/coverage-branch-hardening-ws26-final/reports/Summary.txt`
 - Branch shortlist:
-  `TestResults/coverage-branch-hardening-ws25-final/branch-gap-shortlist.csv`
-- CRAP hotspots:
-  `TestResults/coverage-branch-hardening-ws25-final/crap-hotspots.txt`
-- Method gaps:
-  `TestResults/coverage-branch-hardening-ws25-final/method-gaps-under-90.json`
-- Latest uncovered method count: 197.
+  `TestResults/coverage-branch-hardening-ws26-final/branch-gap-shortlist.csv`
+- Latest uncovered method count: 195.
 
 Top branch-gap groups by source area:
 
 | Area | Missing Branch Outcomes |
 | --- | ---: |
-| `Core/3D` | 274 |
-| `Core/2D` | 260 |
+| `Core/3D` | 263 |
 | `CollisionHandling/Detection` | 258 |
+| `Core/2D` | 250 |
 | `Queries/3D` | 169 |
 | `Queries/Mixed` | 137 |
 | `Queries/2D` | 91 |
 | `Core/Mixed` | 88 |
+| `Constraints` | 84 |
 | `Colliders/3D` | 63 |
 | `Colliders/2D` | 60 |
-| `Constraints/3D` | 43 |
+| `Partitions` | 52 |
 | `CollisionHandling/Response` | 42 |
-| `Constraints/2D` | 41 |
 
 ## Historical Summary
 
 This plan began after trigger collider hardening with 87.3% line, 74.1% branch,
-and 86.5% method coverage. The campaign so far raised the suite to 95.2% line,
-84.6% branch, and 94.7% method coverage while also finding real defects and
+and 86.5% method coverage. The campaign so far raised the suite to 95.3% line,
+84.9% branch, and 94.7% method coverage while also finding real defects and
 removing stale runtime branches.
 
 | Phase | Coverage Result | Tests | Main Outcome |
@@ -155,12 +151,17 @@ removing stale runtime branches.
 | Workstreams 13-18 | 94.7% line / 82.8% branch / 94.6% method | 1261 | Contact geometry, hierarchy, convex support, CCD eligibility, mixed pair retention, and joint-island cleanup. |
 | Workstreams 19-24 | 95.2% line / 84.5% branch / 94.7% method | 1346 | Kinematic CCD, query reducers, mixed pair lifecycle, collision geometry, serialization, partition lifecycle, constraints, and ragdoll residue. |
 | Workstream 25 | 95.2% line / 84.6% branch / 94.7% method | 1391 | Low-value audit, compact lifecycle/diagnostic/support tests, 2D collision-type parity fix, and stale branch removal. |
+| Workstream 26 | 95.3% line / 84.9% branch / 94.7% method | 1411 | CCD handoff lifecycle, rotational Auto/miss paths, same-velocity dynamic TOI, kinematic shape-exact misses, `Both` versus `Mixed` CCD gating, and redundant CCD invariant guard removal. |
 
 High-value work completed:
 
 - Query and collision coverage across 2D, 3D, and mixed dimensions, including
   capsule sweeps, compound shapes, mixed finite slabs/prisms, cone queries,
   convex sweeps, mesh contacts, 2D manifolds, and public batch-query contracts.
+- CCD coverage for kinematic handoff lifecycle, rotational Auto skips and
+  kinematic near-misses, same-velocity dynamic relative motion, shape-exact
+  kinematic proxy misses, and explicit `Both` versus `Mixed` runtime-mode
+  handoff behavior.
 - Runtime lifecycle coverage for partition reset, retained membership cleanup,
   context reset, coroutine lifecycle, clock hooks, trigger-driven deferred
   refresh, inactive collider loading, stale collider-ID reuse safety, and
@@ -192,6 +193,9 @@ Cleanup completed:
 - Centralized duplicated voxel ordering, CCD contact-point selection,
   rotational hit tie-breaks, mixed bounds comparisons, and mesh embedded-volume
   reuse.
+- Removed unreachable rotational CCD substep fallbacks and redundant
+  non-positive-delta CCD frame-velocity branches after verifying the frame-rate
+  contract keeps `DeltaTime` above `Fixed64.Epsilon`.
 - Tightened cuboid SAT helper contracts, dynamic body dessimilation invariants,
   unbound collider transform writes, and joint-island lookup assumptions.
 - Classified low-value diagnostic DTO getter/constructor noise as out of scope
@@ -272,17 +276,25 @@ mixed CCD, and source/target eligibility branches.
 
 **Tasks**
 
-- [ ] Cover remaining 2D/3D rotational CCD hit, miss, replacement, and
+- [x] Cover remaining 2D/3D rotational CCD hit, miss, replacement, and
       kinematic-source rows through public fast-mover scenarios.
-- [ ] Cover 2D/3D `ApplyKinematicContinuousCollisionHandoff` rows that change
+- [x] Cover 2D/3D `ApplyKinematicContinuousCollisionHandoff` rows that change
       target position, source position, ignored target, or response velocity.
-- [ ] Cover `TryConsumeContinuousCollisionHandoff`, dynamic relative exact TOI,
+- [x] Cover `TryConsumeContinuousCollisionHandoff`, dynamic relative exact TOI,
       mixed target selection, and shape-exact fallback rows where public
       behavior is meaningful.
-- [ ] Delete impossible positive-motion, positive-delta-time, or positive-mass
+- [x] Delete impossible positive-motion, positive-delta-time, or positive-mass
       guards only when caller invariants prove them.
-- [ ] Run focused CCD tests, full `Release`, coverage collection, and
+- [x] Run focused CCD tests, full `Release`, coverage collection, and
       `ReleaseLean` if touched code affects replay or serialization.
+
+**Result**
+
+- Final W26 report: 95.3% line / 84.9% branch / 94.7% method coverage, 1,411
+  `Release` tests passing under coverage.
+- Focused CCD tests passed for 3D, 2D, mixed, and frame-rate guard scenarios.
+- Full non-instrumented `Release` passed with 1,411 tests.
+- `ReleaseLean` passed with 1,384 tests.
 
 ### Workstream 27: Mixed Prism, Finite-Slab, And Query Reducer Branches
 
