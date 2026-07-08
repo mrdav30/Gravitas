@@ -74,6 +74,63 @@ public sealed class CollisionResponseInvariantTests
     }
 
     [Fact]
+    public void CalculateImpulse_WithZeroContactNormal_ShouldUseColliderCenterFallback()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> left = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
+        ScenarioBody<LSSphereCollider> right = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
+        Push(left.Body, 60);
+        Push(right.Body, -60);
+        CollisionPair pair = scenario.CreatePair(left.Collider, right.Collider);
+        pair.Manifold.SetContact(left.Collider.Center, right.Collider.Center, Fixed64.FromFraction(1, 4), Vector3d.Zero);
+        Fixed64 leftVelocityBefore = left.Body.LinearVelocity.X;
+        Fixed64 rightVelocityBefore = right.Body.LinearVelocity.X;
+
+        CollisionResponse.CalculateImpulse(pair);
+
+        left.Body.LinearVelocity.X.Should().BeLessThan(leftVelocityBefore);
+        right.Body.LinearVelocity.X.Should().BeGreaterThan(rightVelocityBefore);
+    }
+
+    [Fact]
+    public void CalculateImpulse_WithOpposedContactNormal_ShouldFlipTowardSecondCollider()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> left = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
+        ScenarioBody<LSSphereCollider> right = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
+        Push(left.Body, 60);
+        Push(right.Body, -60);
+        CollisionPair pair = scenario.CreatePair(left.Collider, right.Collider);
+        pair.Manifold.SetContact(left.Collider.Center, right.Collider.Center, Fixed64.FromFraction(1, 4), -Vector3d.Right);
+        Fixed64 leftVelocityBefore = left.Body.LinearVelocity.X;
+        Fixed64 rightVelocityBefore = right.Body.LinearVelocity.X;
+
+        CollisionResponse.CalculateImpulse(pair);
+
+        left.Body.LinearVelocity.X.Should().BeLessThan(leftVelocityBefore);
+        right.Body.LinearVelocity.X.Should().BeGreaterThan(rightVelocityBefore);
+    }
+
+    [Fact]
+    public void CalculateImpulse_WithZeroNormalAndNoFallbackDirection_ShouldIgnoreContact()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> left = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
+        ScenarioBody<LSSphereCollider> right = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
+        Push(left.Body, 60);
+        Push(right.Body, -60);
+        CollisionPair pair = scenario.CreatePair(left.Collider, right.Collider);
+        pair.Manifold.SetContact(left.Collider.Center, right.Collider.Center, Fixed64.FromFraction(1, 4), Vector3d.Zero);
+        Vector3d leftVelocityBefore = left.Body.LinearVelocity;
+        Vector3d rightVelocityBefore = right.Body.LinearVelocity;
+
+        CollisionResponse.CalculateImpulse(pair);
+
+        left.Body.LinearVelocity.Should().Be(leftVelocityBefore);
+        right.Body.LinearVelocity.Should().Be(rightVelocityBefore);
+    }
+
+    [Fact]
     public void CalculateImpulse_BelowRestitutionThreshold_ShouldRemoveClosingVelocityWithoutBounce()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();

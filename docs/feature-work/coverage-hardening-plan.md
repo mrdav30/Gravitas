@@ -89,30 +89,30 @@ configuration before making source changes.
 
 ## Current Standing
 
-Fresh checkpoint after Workstream 21 mixed pair/contact notification/response
-lifecycle pass:
+Fresh checkpoint after Workstream 22 collision geometry, convex support, and
+contact residue pass:
 
 | Metric | Baseline | Current | Short-Term Gate | Long-Term Target |
 | --- | ---: | ---: | ---: | ---: |
-| Line coverage | 87.3% | 94.9% | 90% | 100% |
-| Branch coverage | 74.1% | 83.7% | 90% | 100% |
+| Line coverage | 87.3% | 95.0% | 90% | 100% |
+| Branch coverage | 74.1% | 83.9% | 90% | 100% |
 | Method coverage | 86.5% | 94.7% | 90% | 100% |
-| Tests | 974 passed | 1295 passed | green | green |
+| Tests | 974 passed | 1317 passed | green | green |
 
-At the current denominator, the 90% branch gate requires at least 10,017 covered
-branches. The latest run covered 9,315 of 11,129 branches, leaving roughly 702
+At the current denominator, the 90% branch gate requires at least 10,008 covered
+branches. The latest run covered 9,339 of 11,119 branches, leaving roughly 669
 net branch outcomes to cover or delete. Treat this as a focused branch
 campaign, not a single gate-check workstream.
 
 Current evidence:
 
 - Coverage report:
-  `TestResults/coverage-branch-hardening-ws21-final/reports/Summary.txt`
+  `TestResults/coverage-branch-hardening-ws22-final/reports/Summary.txt`
 - Coverage collection:
   `dotnet test tests\Gravitas.Tests\Gravitas.Tests.csproj --configuration Release --collect:"XPlat Code Coverage" --settings tests\Gravitas.Tests\coverlet.runsettings`
-  passed with 1295 tests.
+  passed with 1317 tests.
 - Branch shortlist:
-  `TestResults/coverage-branch-hardening-ws21-final/branch-gap-shortlist.csv`
+  `TestResults/coverage-branch-hardening-ws22-final/branch-gap-shortlist.csv`
 - Latest summary reports 198 uncovered methods.
 
 ## Historical Summary
@@ -131,6 +131,7 @@ removing stale runtime branches.
 | Workstreams 7-12 | 94.1% line / 81.3% branch / 94.4% method | 1214 | CCD handoff, mixed response, query reducer, replay, lifecycle, and shape-cast residue. |
 | Workstreams 13-18 | 94.7% line / 82.8% branch / 94.6% method | 1261 | Contact geometry, hierarchy, convex support, CCD eligibility, mixed pair retention, and joint-island cleanup. |
 | Workstreams 19-21 | 94.9% line / 83.7% branch / 94.7% method | 1295 | Kinematic CCD, dynamic response, query reducer, mixed sweep filter, rotated OBB raycast, 2D mover-shape, swept cone, stale reducer cleanup, mixed trigger policy, pair lifecycle, and constrained mixed response coverage. |
+| Workstream 22 | 95.0% line / 83.9% branch / 94.7% method | 1317 | Cuboid normal bug fix, 2D convex SAT/manifold coverage, contact-normal fallback parity, mixed exact-prism miss coverage, and stale 2D clipping guard removal. |
 
 High-value work completed:
 
@@ -436,20 +437,49 @@ clipping, contact normal fallback, and mixed exact prism branches.
 
 **Tasks**
 
-- [ ] Review `ConvexColliderSupport.UpdateTriangle` for meaningful simplex
+- [x] Review `ConvexColliderSupport.UpdateTriangle` for meaningful simplex
       behavior versus unreachable/defensive state.
-- [ ] Cover supported `LSCuboidCollider.GetNormalAtPoint` edge/face/corner
+- [x] Cover supported `LSCuboidCollider.GetNormalAtPoint` edge/face/corner
       semantics if they affect collision/query behavior; otherwise simplify the
       helper contract.
-- [ ] Cover 2D `TryConvexConvex` and `ClipSegment` branches through manifold or
+- [x] Cover 2D `TryConvexConvex` and `ClipSegment` branches through manifold or
       query scenarios that prove physical contact behavior.
-- [ ] Revisit mixed prism exact branches not already handled in Workstream 20
+- [x] Revisit mixed prism exact branches not already handled in Workstream 20
       if they still rank highly.
-- [ ] Review contact-normal fallback rows in 2D/3D response; delete impossible
+- [x] Review contact-normal fallback rows in 2D/3D response; delete impossible
       branches or add regression tests for physically valid zero-normal/contact
       edge cases.
-- [ ] Run focused collision geometry/response tests, full `Release`, and
+- [x] Run focused collision geometry/response tests, full `Release`, and
       coverage collection.
+
+**Completion Notes**
+
+- Fixed `LSCuboidCollider.GetNormalAtPoint` for non-cubic rectangular cuboids.
+  The previous AABox path selected the largest absolute coordinate, which could
+  report a tall box's Y normal for a point lying on its narrow X/Z face. The
+  helper now uses nearest-face distance with deterministic tie-breaking for both
+  AABox and OBox states.
+- Added cuboid normal coverage for axis-aligned and rotated rectangular boxes,
+  including side faces where another local coordinate is larger but still
+  inside the cuboid extent.
+- Added 2D convex SAT/manifold coverage for diagonal separation discovered only
+  by the second polygon's axes and for a contact where the second polygon
+  supplies the minimum penetration axis.
+- Removed stale `ClipSegment` defensive branches: callers only pass one or two
+  points and already stop before re-clipping a zero-count result; when one
+  endpoint is inside and one is outside, the clipping denominator cannot be
+  zero.
+- Added response fallback coverage in 3D and pure 2D for zero contact normals,
+  reversed contact normals, and unresolvable zero-normal/zero-fallback contacts.
+- Added mixed exact-prism miss coverage for rotated cuboid-vs-AABB and
+  capsule/cylinder/cone-vs-AABB corner cases where broad bounds overlap but the
+  exact finite slab test rejects contact.
+- Reviewed `ConvexColliderSupport.UpdateTriangle`: the remaining uncovered rows
+  are private simplex-evolution permutations. Existing public GJK tests cover
+  line, triangle, and tetrahedron behavior; no reflection-only test was added.
+- Final W22 coverage: 95.0% line, 83.9% branch (9,339/11,119), 94.7% method,
+  1,317 tests passed. Fresh shortlist:
+  `TestResults/coverage-branch-hardening-ws22-final/branch-gap-shortlist.csv`.
 
 ### Workstream 23: Serialization, Replay, Authoring, And Partition Lifecycle
 
@@ -572,3 +602,4 @@ campaign checkpoints; do not add a row for every focused test filter.
 | 2026-07-07 | 94.7% | 82.8% | 94.6% | 1261 passed | Workstreams 13-18 completed; geometry, hierarchy, convex support, CCD eligibility, mixed pair retention, and joint-island cleanup. |
 | 2026-07-07 | 94.8% | 83.2% | 94.6% | 1272 passed | Workstream 19 completed; kinematic CCD frozen-axis coverage plus fixed-step frame-rate invariant. Branches covered: 9268/11137. |
 | 2026-07-07 | 94.9% | 83.7% | 94.7% | 1295 passed | Workstreams 20-21 completed; query reducer/shape-cast geometry plus mixed pair, contact notification, trigger policy, and constrained mixed response lifecycle. Branches covered: 9315/11129. |
+| 2026-07-07 | 95.0% | 83.9% | 94.7% | 1317 passed | Workstream 22 completed; cuboid normal bug fix, 2D convex/mixed prism/contact fallback branch hardening, and stale clipping guard removal. Branches covered: 9339/11119. |

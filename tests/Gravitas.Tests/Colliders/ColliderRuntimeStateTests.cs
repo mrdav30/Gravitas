@@ -175,6 +175,61 @@ public sealed class ColliderRuntimeStateTests
         inertia.M33.Should().Be(inertia.M11);
     }
 
+    [Theory]
+    [InlineData(1, 4, 0, 1, 0, 0)]
+    [InlineData(0, 4, 1, 0, 0, 1)]
+    [InlineData(0, -4, -1, 0, 0, -1)]
+    public void CuboidGetNormalAtPoint_WithAxisAlignedRectangularCuboid_ShouldUseNearestFace(
+        int pointX,
+        int pointY,
+        int pointZ,
+        int expectedX,
+        int expectedY,
+        int expectedZ)
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSCuboidCollider> cuboid = scenario.CreateBody(
+            new LSCuboidCollider
+            {
+                Size = new Vector3d((Fixed64)2, (Fixed64)10, (Fixed64)2)
+            },
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+
+        Vector3d normal = cuboid.Collider.GetNormalAtPoint(new Vector3d((Fixed64)pointX, (Fixed64)pointY, (Fixed64)pointZ));
+
+        normal.Should().Be(new Vector3d((Fixed64)expectedX, (Fixed64)expectedY, (Fixed64)expectedZ));
+    }
+
+    [Theory]
+    [InlineData(1, 4, 0, 1, 0, 0)]
+    [InlineData(0, -4, 1, 0, 0, 1)]
+    [InlineData(0, -4, -1, 0, 0, -1)]
+    public void CuboidGetNormalAtPoint_WithRotatedRectangularCuboid_ShouldUseNearestLocalFace(
+        int localPointX,
+        int localPointY,
+        int localPointZ,
+        int expectedLocalX,
+        int expectedLocalY,
+        int expectedLocalZ)
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        FixedQuaternion rotation = FixedQuaternion.FromEulerAnglesInDegrees((Fixed64)15, (Fixed64)30, (Fixed64)25);
+        ScenarioBody<LSCuboidCollider> cuboid = scenario.CreateBody(
+            new LSCuboidCollider
+            {
+                Size = new Vector3d((Fixed64)2, (Fixed64)10, (Fixed64)2)
+            },
+            Vector3d.Zero,
+            rotation);
+        Vector3d localPoint = new((Fixed64)localPointX, (Fixed64)localPointY, (Fixed64)localPointZ);
+        Vector3d expectedLocalNormal = new((Fixed64)expectedLocalX, (Fixed64)expectedLocalY, (Fixed64)expectedLocalZ);
+
+        Vector3d normal = cuboid.Collider.GetNormalAtPoint(rotation.Rotate(localPoint));
+
+        normal.Should().Be(rotation.Rotate(expectedLocalNormal));
+    }
+
     [Fact]
     public void Initialize_WithRotatedNonUniformCuboid_ShouldRotateInverseInertiaTensor()
     {

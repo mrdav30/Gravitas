@@ -52,6 +52,55 @@ public sealed class CollisionDetection2DTests
         manifold.HasContact.Should().BeFalse();
     }
 
+    [Fact]
+    public void TryCollide_WithDiagonalSeparationOnSecondPolygonAxis_ShouldReturnFalse()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        LSCollider2D square = CreateCollider(ColliderType2D.ConvexPolygon);
+        LSCollider2D diamond = CreateDiamondPolygon();
+        _ = CreateBody(context, square, Vector2d.Zero);
+        _ = CreateBody(
+            context,
+            diamond,
+            new Vector2d(Fixed64.FromFraction(17, 10), Fixed64.FromFraction(17, 10)));
+
+        bool collided = CollisionDetection2D.TryCollide(square, diamond, out Contact2D contact);
+        (bool manifoldCollided, ContactManifold2D manifold) = BuildManifold(square, diamond);
+
+        collided.Should().BeFalse();
+        contact.Should().Be(default(Contact2D));
+        manifoldCollided.Should().BeFalse();
+        manifold.HasContact.Should().BeFalse();
+    }
+
+    [Fact]
+    public void TryCollideManifold_WhenSecondPolygonProvidesMinimumAxis_ShouldOrientOwnerPoints()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        LSCollider2D square = CreateCollider(ColliderType2D.ConvexPolygon);
+        LSCollider2D diamond = CreateDiamondPolygon();
+        _ = CreateBody(context, square, Vector2d.Zero);
+        _ = CreateBody(
+            context,
+            diamond,
+            new Vector2d(Fixed64.FromFraction(6, 5), Fixed64.FromFraction(6, 5)));
+
+        (bool collided, ContactManifold2D manifold) = BuildManifold(square, diamond);
+
+        collided.Should().BeTrue();
+        manifold.Count.Should().BeGreaterThan(0);
+        manifold.PrimaryContact.Normal.X.Should().BeGreaterThan(Fixed64.Zero);
+        manifold.PrimaryContact.Normal.Y.Should().BeGreaterThan(Fixed64.Zero);
+        manifold.PrimaryContact.PointA.X.Should().BeLessThanOrEqualTo(Fixed64.One);
+        manifold.PrimaryContact.PointA.Y.Should().BeLessThanOrEqualTo(Fixed64.One);
+        Fixed64 projectedDepth = Vector2d.Dot(
+            manifold.PrimaryContact.PointA - manifold.PrimaryContact.PointB,
+            manifold.PrimaryContact.Normal);
+        (projectedDepth - manifold.PrimaryContact.Depth).Abs()
+            .Should()
+            .BeLessThan(Fixed64.FromFraction(1, 1_000_000));
+    }
+
     [Theory]
     [InlineData(ColliderType2D.Circle, ColliderType2D.Circle)]
     [InlineData(ColliderType2D.Circle, ColliderType2D.AABox)]
@@ -492,4 +541,11 @@ public sealed class CollisionDetection2DTests
                 new Vector2d(-Fixed64.One, Fixed64.One)),
             _ => throw new Xunit.Sdk.XunitException("Unsupported test collider type.")
         };
+
+    private static LSPolygonCollider2D CreateDiamondPolygon() =>
+        new(
+            new Vector2d(Fixed64.Zero, -Fixed64.One),
+            new Vector2d(Fixed64.One, Fixed64.Zero),
+            new Vector2d(Fixed64.Zero, Fixed64.One),
+            new Vector2d(-Fixed64.One, Fixed64.Zero));
 }

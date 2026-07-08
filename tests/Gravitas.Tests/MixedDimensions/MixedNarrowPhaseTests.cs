@@ -179,12 +179,60 @@ public sealed class MixedNarrowPhaseTests
             }
         };
 
+    public static TheoryData<string, Func<GravitasWorldContext, LSCollider>, Func<GravitasWorldContext, LSCollider2D>> VerticallySeparatedPrimitivePrismPairs =>
+        new()
+        {
+            {
+                "Cuboid_AABox",
+                context => CreateCuboid3D(context, new Vector3d(Fixed64.Zero, (Fixed64)3, Fixed64.Zero)).Collider,
+                context => CreateBody2D(context, new LSAABBoxCollider2D(new Vector2d((Fixed64)2, (Fixed64)2)), Vector2d.Zero).Collider
+            },
+            {
+                "Capsule_AABox",
+                context => CreateCapsule3D(context, new Vector3d(Fixed64.Zero, (Fixed64)3, Fixed64.Zero)).Collider,
+                context => CreateBody2D(context, new LSAABBoxCollider2D(new Vector2d((Fixed64)2, (Fixed64)2)), Vector2d.Zero).Collider
+            },
+            {
+                "Cylinder_AABox",
+                context => CreateCylinder3D(context, new Vector3d(Fixed64.Zero, (Fixed64)3, Fixed64.Zero)).Collider,
+                context => CreateBody2D(context, new LSAABBoxCollider2D(new Vector2d((Fixed64)2, (Fixed64)2)), Vector2d.Zero).Collider
+            },
+            {
+                "Cone_AABox",
+                context => CreateCone3D(context, new Vector3d(Fixed64.Zero, (Fixed64)3, Fixed64.Zero)).Collider,
+                context => CreateBody2D(context, new LSAABBoxCollider2D(new Vector2d((Fixed64)2, (Fixed64)2)), Vector2d.Zero).Collider
+            }
+        };
+
     public static TheoryData<string, Func<GravitasWorldContext, LSCollider>> CurvedCircleSlabExactMissPairs =>
         new()
         {
             { "Capsule", context => CreateCapsule3D(context, Vector3d.Zero).Collider },
             { "Cylinder", context => CreateCylinder3D(context, Vector3d.Zero).Collider },
             { "Cone", context => CreateCone3D(context, Vector3d.Zero).Collider }
+        };
+
+    public static TheoryData<string, Func<GravitasWorldContext, LSCollider>> CurvedPrismSlabExactMissPairs =>
+        new()
+        {
+            {
+                "Capsule",
+                context => CreateCapsule3D(
+                    context,
+                    new Vector3d(Fixed64.FromFraction(29, 20), Fixed64.Zero, Fixed64.FromFraction(29, 20))).Collider
+            },
+            {
+                "Cylinder",
+                context => CreateCylinder3D(
+                    context,
+                    new Vector3d(Fixed64.FromFraction(29, 20), Fixed64.Zero, Fixed64.FromFraction(29, 20))).Collider
+            },
+            {
+                "Cone",
+                context => CreateCone3D(
+                    context,
+                    new Vector3d(Fixed64.FromFraction(29, 20), Fixed64.Zero, Fixed64.FromFraction(29, 20))).Collider
+            }
         };
 
     [Fact]
@@ -336,6 +384,23 @@ public sealed class MixedNarrowPhaseTests
         contact.HasContact.Should().BeFalse();
     }
 
+    [Theory]
+    [MemberData(nameof(VerticallySeparatedPrimitivePrismPairs))]
+    public void PrimitivePrismPairs_WithVerticalSlabSeparation_ShouldNotReportContact(
+        string caseName,
+        Func<GravitasWorldContext, LSCollider> create3D,
+        Func<GravitasWorldContext, LSCollider2D> create2D)
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        LSCollider collider3D = create3D(context);
+        LSCollider2D collider2D = create2D(context);
+
+        bool collided = CollisionDetectionMixed.TryCollide(collider3D, collider2D, out MixedContact contact);
+
+        collided.Should().BeFalse(caseName);
+        contact.HasContact.Should().BeFalse();
+    }
+
     [Fact]
     public void CuboidConvexPolygonSlab_WithOverlappingBoundsButSeparatingObliqueAxis_ShouldNotReportContact()
     {
@@ -347,6 +412,27 @@ public sealed class MixedNarrowPhaseTests
         SolidBody2D polygon = CreateBody2D(context, CreateSquarePolygon(), Vector2d.Zero, FixedMath.DegToRad((Fixed64)45));
 
         bool collided = CollisionDetectionMixed.TryCollide(cuboid.Collider, polygon.Collider, out MixedContact contact);
+
+        collided.Should().BeFalse();
+        contact.HasContact.Should().BeFalse();
+    }
+
+    [Fact]
+    public void CuboidAABoxSlab_WithOverlappingBoundsButRotatedCornerSeparation_ShouldNotReportContact()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSCuboidCollider> cuboid = CreateCuboid3D(
+            context,
+            new Vector3d(Fixed64.FromFraction(33, 20), Fixed64.Zero, Fixed64.FromFraction(33, 20)),
+            FixedQuaternion.FromEulerAnglesInDegrees(Fixed64.Zero, (Fixed64)45, Fixed64.Zero));
+        SolidBody2D box = CreateBody2D(
+            context,
+            new LSAABBoxCollider2D(new Vector2d((Fixed64)2, (Fixed64)2)),
+            Vector2d.Zero);
+
+        cuboid.Collider.Bounds.Intersects(box.Collider.MixedBounds3D).Should().BeTrue();
+
+        bool collided = CollisionDetectionMixed.TryCollide(cuboid.Collider, box.Collider, out MixedContact contact);
 
         collided.Should().BeFalse();
         contact.HasContact.Should().BeFalse();
@@ -476,6 +562,25 @@ public sealed class MixedNarrowPhaseTests
         collider3D.Bounds.Intersects(circle.Collider.MixedBounds3D).Should().BeTrue();
 
         CollisionDetectionMixed.TryCollide(collider3D, circle.Collider, out MixedContact contact).Should().BeFalse();
+        contact.HasContact.Should().BeFalse();
+    }
+
+    [Theory]
+    [MemberData(nameof(CurvedPrismSlabExactMissPairs))]
+    public void CurvedAABoxSlab_WithOverlappingBoundsButCornerSeparation_ShouldRejectExactContact(
+        string caseName,
+        Func<GravitasWorldContext, LSCollider> createCollider3D)
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        LSCollider collider3D = createCollider3D(context);
+        SolidBody2D box = CreateBody2D(
+            context,
+            new LSAABBoxCollider2D(new Vector2d((Fixed64)2, (Fixed64)2)),
+            Vector2d.Zero);
+
+        collider3D.Bounds.Intersects(box.Collider.MixedBounds3D).Should().BeTrue(caseName);
+
+        CollisionDetectionMixed.TryCollide(collider3D, box.Collider, out MixedContact contact).Should().BeFalse(caseName);
         contact.HasContact.Should().BeFalse();
     }
 

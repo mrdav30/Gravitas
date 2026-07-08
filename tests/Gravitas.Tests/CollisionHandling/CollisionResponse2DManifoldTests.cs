@@ -62,6 +62,57 @@ public sealed class CollisionResponse2DManifoldTests
     }
 
     [Fact]
+    public void Resolve_WithZeroContactNormal_ShouldUseColliderCenterFallback()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        SolidBody2D moving = CreateBox(context, Vector2d.Zero);
+        SolidBody2D wall = CreateBox(context, new Vector2d((Fixed64)2, Fixed64.Zero), immovable: true);
+        var pair = new CollisionPair2D(moving.Collider, wall.Collider);
+        moving.ApplyCollisionLinearVelocityDelta(new Vector2d((Fixed64)4, Fixed64.Zero));
+        pair.Manifold.SetContact(Vector2d.Right, Vector2d.Right, Fixed64.Half, Vector2d.Zero);
+        Fixed64 velocityBefore = moving.LinearVelocity.X;
+
+        pair.MarkColliding(context.FrameCount);
+
+        moving.LinearVelocity.X.Should().BeLessThan(velocityBefore);
+    }
+
+    [Fact]
+    public void Resolve_WithOpposedContactNormal_ShouldFlipTowardSecondCollider()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        SolidBody2D moving = CreateBox(context, Vector2d.Zero);
+        SolidBody2D wall = CreateBox(context, new Vector2d((Fixed64)2, Fixed64.Zero), immovable: true);
+        var pair = new CollisionPair2D(moving.Collider, wall.Collider);
+        moving.ApplyCollisionLinearVelocityDelta(new Vector2d((Fixed64)4, Fixed64.Zero));
+        pair.Manifold.SetContact(Vector2d.Right, Vector2d.Right, Fixed64.Half, -Vector2d.Right);
+        Fixed64 velocityBefore = moving.LinearVelocity.X;
+
+        pair.MarkColliding(context.FrameCount);
+
+        moving.LinearVelocity.X.Should().BeLessThan(velocityBefore);
+    }
+
+    [Fact]
+    public void Resolve_WithZeroNormalAndNoFallbackDirection_ShouldIgnoreContact()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        SolidBody2D first = CreateBox(context, Vector2d.Zero);
+        SolidBody2D second = CreateBox(context, Vector2d.Zero);
+        var pair = new CollisionPair2D(first.Collider, second.Collider);
+        first.ApplyCollisionLinearVelocityDelta(new Vector2d((Fixed64)4, Fixed64.Zero));
+        second.ApplyCollisionLinearVelocityDelta(new Vector2d((Fixed64)(-4), Fixed64.Zero));
+        pair.Manifold.SetContact(Vector2d.Zero, Vector2d.Zero, Fixed64.Half, Vector2d.Zero);
+        Vector2d firstVelocityBefore = first.LinearVelocity;
+        Vector2d secondVelocityBefore = second.LinearVelocity;
+
+        pair.MarkColliding(context.FrameCount);
+
+        first.LinearVelocity.Should().Be(firstVelocityBefore);
+        second.LinearVelocity.Should().Be(secondVelocityBefore);
+    }
+
+    [Fact]
     public void Resolve_WithZeroConfiguredRestitutionThreshold_ShouldBounceLowSpeedContact()
     {
         Fixed64 velocity = ResolveClosingVelocityAfterResponse(

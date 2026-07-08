@@ -384,47 +384,31 @@ public class LSCuboidCollider : LSCollider
 
     public override Vector3d GetNormalAtPoint(Vector3d point)
     {
-        if (CurrentState == CuboidState.AABox)
-        {
-            Vector3d localToCenter = point - Center;
-            Vector3d absLocal = Vector3d.Abs(localToCenter);
+        Vector3d axisX = CurrentState == CuboidState.AABox ? Vector3d.Right : Rotation.Rotate(Vector3d.Right);
+        Vector3d axisY = CurrentState == CuboidState.AABox ? Vector3d.Up : Rotation.Rotate(Vector3d.Up);
+        Vector3d axisZ = CurrentState == CuboidState.AABox ? Vector3d.Forward : Rotation.Rotate(Vector3d.Forward);
+        Vector3d halfExtents = ScaledSize * Fixed64.Half;
+        Vector3d delta = point - Center;
+        Fixed64 x = Vector3d.Dot(delta, axisX);
+        Fixed64 y = Vector3d.Dot(delta, axisY);
+        Fixed64 z = Vector3d.Dot(delta, axisZ);
 
-            if (absLocal.X > absLocal.Y && absLocal.X > absLocal.Z)
-                return new Vector3d(localToCenter.X > Fixed64.Zero ? Fixed64.One : -Fixed64.One, Fixed64.Zero, Fixed64.Zero);
+        Fixed64 distanceX = halfExtents.X - x.Abs();
+        Fixed64 distanceY = halfExtents.Y - y.Abs();
+        Fixed64 distanceZ = halfExtents.Z - z.Abs();
 
-            if (absLocal.Y > absLocal.Z)
-                return new Vector3d(Fixed64.Zero, localToCenter.Y > Fixed64.Zero ? Fixed64.One : -Fixed64.One, Fixed64.Zero);
+        if (distanceX <= distanceY && distanceX <= distanceZ)
+            return axisX * SignedUnit(x);
 
-            return new Vector3d(Fixed64.Zero, Fixed64.Zero, localToCenter.Z > Fixed64.Zero ? Fixed64.One : -Fixed64.One);
-        }
+        if (distanceY <= distanceZ)
+            return axisY * SignedUnit(y);
 
-        // Transform the point to local space
-        Vector3d localPoint = (point - Position).InverseRotate(Position, Rotation);
-
-        // Get the local normal as if it's an AABB
-        Vector3d localNormal = Vector3d.Abs(localPoint - Center) - Bounds.Scope;
-
-        Vector3d sign = new((localPoint.X - Center.X).Sign(), (localPoint.Y - Center.Y).Sign(), (localPoint.Z - Center.Z).Sign());
-
-        // Find the component of localNormal with the greatest absolute value
-        if (localNormal.X > localNormal.Y)
-        {
-            if (localNormal.X > localNormal.Z)
-                localNormal = new Vector3d(sign.X, Fixed64.Zero, Fixed64.Zero);
-            else
-                localNormal = new Vector3d(Fixed64.Zero, Fixed64.Zero, sign.Z);
-        }
-        else
-        {
-            if (localNormal.Y > localNormal.Z)
-                localNormal = new Vector3d(Fixed64.Zero, sign.Y, Fixed64.Zero);
-            else
-                localNormal = new Vector3d(Fixed64.Zero, Fixed64.Zero, sign.Z);
-        }
-
-        // Transform the normal back to world space
-        return localNormal.Rotate(Position, Rotation);
+        return axisZ * SignedUnit(z);
     }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Fixed64 SignedUnit(Fixed64 coordinate) =>
+        coordinate < Fixed64.Zero ? -Fixed64.One : Fixed64.One;
 
     public override bool ColliderOverlapsRay(RaycastSegmentWorker worker, ref SwiftList<Vector3d> outputIntersectionPoints)
     {
