@@ -767,6 +767,48 @@ public sealed class GravitasQuery3DServiceSweepTests
     }
 
     [Fact]
+    public void SweptSphereWorker_WithConeStartingOverlap_ShouldReturnZeroDistance()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSConeCollider cone = CreateDynamicCollider(
+            context,
+            new LSConeCollider { Radius = Fixed64.Half, Size = new Vector3d(Fixed64.One, (Fixed64)2, Fixed64.One) },
+            Vector3d.Zero);
+        var worker = new SweptSphereQueryWorker();
+        worker.Prepare(
+            Vector3d.Zero,
+            new Vector3d((Fixed64)2, Fixed64.Zero, Fixed64.Zero),
+            Fixed64.FromFraction(1, 4));
+
+        bool hit = worker.TrySweep(cone, out Vector3d centerAtImpact, out Fixed64 distance);
+
+        hit.Should().BeTrue();
+        distance.Should().Be(Fixed64.Zero);
+        centerAtImpact.Should().Be(Vector3d.Zero);
+    }
+
+    [Fact]
+    public void SweptSphereWorker_WithConeSeparatedAndMovingAway_ShouldReturnFalse()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSConeCollider cone = CreateDynamicCollider(
+            context,
+            new LSConeCollider { Radius = Fixed64.Half, Size = new Vector3d(Fixed64.One, (Fixed64)2, Fixed64.One) },
+            Vector3d.Zero);
+        var worker = new SweptSphereQueryWorker();
+        worker.Prepare(
+            new Vector3d((Fixed64)3, Fixed64.Zero, Fixed64.Zero),
+            new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero),
+            Fixed64.FromFraction(1, 4));
+
+        bool hit = worker.TrySweep(cone, out Vector3d centerAtImpact, out Fixed64 distance);
+
+        hit.Should().BeFalse();
+        centerAtImpact.Should().Be(Vector3d.Zero);
+        distance.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
     public void SweepSphere_ShouldSupportVerticalAndDiagonalSweeps()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();

@@ -635,7 +635,7 @@ public sealed partial class GravitasQueryMixedService
             return false;
         }
 
-        if (!TrySolveQuadraticSweep(a, b, c, out Fixed64 first, out Fixed64 second))
+        if (!TrySolveQuadraticSweep(a, b, c, out Fixed64 first, out _))
         {
             distance = default;
             return false;
@@ -644,12 +644,6 @@ public sealed partial class GravitasQueryMixedService
         if (first >= Fixed64.Zero && first <= length)
         {
             distance = first;
-            return true;
-        }
-
-        if (second >= Fixed64.Zero && second <= length)
-        {
-            distance = second;
             return true;
         }
 

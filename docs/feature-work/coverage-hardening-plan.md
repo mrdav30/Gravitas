@@ -89,30 +89,30 @@ configuration before making source changes.
 
 ## Current Standing
 
-Fresh checkpoint after Workstream 19 kinematic CCD and dynamic response residue
-pass:
+Fresh checkpoint after Workstream 20 query reducer and shape-cast geometry
+residue pass:
 
 | Metric | Baseline | Current | Short-Term Gate | Long-Term Target |
 | --- | ---: | ---: | ---: | ---: |
-| Line coverage | 87.3% | 94.8% | 90% | 100% |
-| Branch coverage | 74.1% | 83.2% | 90% | 100% |
+| Line coverage | 87.3% | 94.9% | 90% | 100% |
+| Branch coverage | 74.1% | 83.4% | 90% | 100% |
 | Method coverage | 86.5% | 94.6% | 90% | 100% |
-| Tests | 974 passed | 1272 passed | green | green |
+| Tests | 974 passed | 1285 passed | green | green |
 
-At the current denominator, the 90% branch gate requires at least 10,023 covered
-branches. The latest run covered 9,268 of 11,137 branches, leaving roughly 755
+At the current denominator, the 90% branch gate requires at least 10,017 covered
+branches. The latest run covered 9,290 of 11,129 branches, leaving roughly 727
 net branch outcomes to cover or delete. Treat this as a focused branch
 campaign, not a single gate-check workstream.
 
 Current evidence:
 
 - Coverage report:
-  `TestResults/coverage-branch-hardening-ws19-final/reports/Summary.txt`
+  `TestResults/coverage-branch-hardening-ws20-final/reports/Summary.txt`
 - Coverage collection:
   `dotnet test tests\Gravitas.Tests\Gravitas.Tests.csproj --configuration Release --collect:"XPlat Code Coverage" --settings tests\Gravitas.Tests\coverlet.runsettings`
-  passed with 1272 tests.
+  passed with 1285 tests.
 - Branch shortlist:
-  `TestResults/coverage-branch-hardening-ws19-final/branch-gap-shortlist.csv`
+  `TestResults/coverage-branch-hardening-ws20-final/branch-gap-shortlist.csv`
 - Latest summary reports 199 uncovered methods.
 
 ## Historical Summary
@@ -130,6 +130,7 @@ removing stale runtime branches.
 | Workstreams 1-6 | 93.3% line / 79.7% branch / 93.6% method | 1146 | Zombie-code sweep, query/collision/serialization/lifecycle/diagnostic branch hardening. |
 | Workstreams 7-12 | 94.1% line / 81.3% branch / 94.4% method | 1214 | CCD handoff, mixed response, query reducer, replay, lifecycle, and shape-cast residue. |
 | Workstreams 13-18 | 94.7% line / 82.8% branch / 94.6% method | 1261 | Contact geometry, hierarchy, convex support, CCD eligibility, mixed pair retention, and joint-island cleanup. |
+| Workstreams 19-20 | 94.9% line / 83.4% branch / 94.6% method | 1285 | Kinematic CCD, dynamic response, query reducer, mixed sweep filter, rotated OBB raycast, 2D mover-shape, swept cone, and stale reducer-branch cleanup. |
 
 High-value work completed:
 
@@ -314,22 +315,45 @@ query residue.
 
 **Tasks**
 
-- [ ] Cover or simplify `TrySweepPointInSpace`, mixed target eligibility, and
+- [x] Cover or simplify `TrySweepPointInSpace`, mixed target eligibility, and
       finite slab reducer rows through public mixed query scenarios.
-- [ ] Cover mixed capsule/cylinder/cone/cuboid/triangle prism reducer residue
+- [x] Cover mixed capsule/cylinder/cone/cuboid/triangle prism reducer residue
       where exact collision or query behavior is user-visible.
-- [ ] Review `ConvexSweepQueryWorker.ResolveHitNormal`,
+- [x] Review `ConvexSweepQueryWorker.ResolveHitNormal`,
       `SweptSphereQueryWorker.TrySweepCone`, and 3D sweep-normal rows for
       supported shape-cast combinations.
-- [ ] Cover 2D `TryConvexConvex`, `ClipSegment`,
+- [x] Cover 2D `TryConvexConvex`, `ClipSegment`,
       `TrySweepConvexMoverAgainstConvex`,
       `TrySweepCapsuleSegmentAgainstConvexEdges`, and `TryRaycastCircle`
       residue only through public 2D query or CCD flows when readable.
-- [ ] Review `RaycastSegmentWorker.CheckOBBoxOverlaps` and remaining overlap
+- [x] Review `RaycastSegmentWorker.CheckOBBoxOverlaps` and remaining overlap
       sphere hit-construction rows; delete or classify any view-construction
       residue that does not protect runtime behavior.
-- [ ] Run focused query tests, allocation-sensitive query checks where relevant,
+- [x] Run focused query tests, allocation-sensitive query checks where relevant,
       full `Release`, and coverage collection.
+
+**Completion Notes**
+
+- Simplified `TrySweepPointInSpace` by removing the stale second-root success
+  branch. The starting-overlap and moving-away guards mean a valid outside
+  sweep only needs the first quadratic root.
+- Tightened mixed target eligibility by encoding the `!IsStatic` invariant:
+  when a collider is not static-style, it must own a body, so the static-only
+  kinematic check no longer carries an unreachable null branch.
+- Added public mixed sweep coverage for trigger filtering, excluded shared-agent
+  filtering, bottom-face 2D slab hits, and capsule slab bottom-face hits.
+- Added public 2D mover-shape coverage for convex mover hits/misses and compound
+  target nearest-part and all-parts-miss behavior.
+- Added rotated OBB segment coverage for entry/exit points, no-intersection
+  point mode, and parallel-axis misses, plus swept-cone starting-overlap and
+  moving-away rows.
+- Reviewed `TryRaycastCircle` residue and left private-only rows alone where the
+  public prefilter or starting-inside path prevents the branch from being
+  reached through a meaningful query scenario.
+- Remaining high-count W20-adjacent rows are better owned by later planned
+  passes: mixed prism collision geometry in Workstream 22, service-level mixed
+  pair lifecycle in Workstream 21, and convex support/normal residue in
+  Workstream 22.
 
 ### Workstream 21: Mixed Pair, Contact Notification, And Response Lifecycle
 

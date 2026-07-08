@@ -227,6 +227,71 @@ public sealed class RaycastSegmentWorkerTests
         hits.Count.Should().Be(0);
     }
 
+    [Fact]
+    public void CheckOBBoxOverlaps_WithSegmentCrossingRotatedBox_ShouldReturnEntryAndExit()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSCuboidCollider box = scenario.CreateCuboid(
+            Vector3d.Zero,
+            PhysicsScenarioBuilder.Yaw(45)).Collider;
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+
+        worker.PrepareSegmentCheck(
+            new Vector3d((Fixed64)(-3), Fixed64.Zero, Fixed64.Zero),
+            new Vector3d((Fixed64)3, Fixed64.Zero, Fixed64.Zero));
+
+        bool hit = worker.CheckOBBoxOverlaps(box, ref hits);
+
+        hit.Should().BeTrue();
+        hits.Count.Should().Be(2);
+        hits[0].X.Should().BeLessThan(Fixed64.Zero);
+        hits[1].X.Should().BeGreaterThan(Fixed64.Zero);
+        hits[0].Y.Should().Be(Fixed64.Zero);
+        hits[1].Y.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void CheckOBBoxOverlaps_WithSegmentCrossingRotatedBoxAndIntersectionsDisabled_ShouldNotWritePoints()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSCuboidCollider box = scenario.CreateCuboid(
+            Vector3d.Zero,
+            PhysicsScenarioBuilder.Yaw(45)).Collider;
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+
+        worker.PrepareSegmentCheck(
+            new Vector3d((Fixed64)(-3), Fixed64.Zero, Fixed64.Zero),
+            new Vector3d((Fixed64)3, Fixed64.Zero, Fixed64.Zero),
+            calculateIntersectionPoints: false);
+
+        bool hit = worker.CheckOBBoxOverlaps(box, ref hits);
+
+        hit.Should().BeTrue();
+        hits.Count.Should().Be(0);
+    }
+
+    [Fact]
+    public void CheckOBBoxOverlaps_WithSegmentOutsideParallelAxis_ShouldReturnFalse()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSCuboidCollider box = scenario.CreateCuboid(
+            Vector3d.Zero,
+            PhysicsScenarioBuilder.Yaw(45)).Collider;
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+
+        worker.PrepareSegmentCheck(
+            new Vector3d((Fixed64)(-3), (Fixed64)2, Fixed64.Zero),
+            new Vector3d((Fixed64)3, (Fixed64)2, Fixed64.Zero));
+
+        bool hit = worker.CheckOBBoxOverlaps(box, ref hits);
+
+        hit.Should().BeFalse();
+        hits.Count.Should().Be(0);
+    }
+
     public static TheoryData<Vector3d> BoxBoundaryPoints() => new()
     {
         Vector3d.Zero,

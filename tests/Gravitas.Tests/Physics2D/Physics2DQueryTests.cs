@@ -367,6 +367,43 @@ public sealed class Physics2DQueryTests
     }
 
     [Fact]
+    public void TrySweepMoverShape_WithPolygonMoverAgainstBoxFace_ShouldReportConvexSweepHit()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        SolidBody2D mover = CreatePolygon(context, new Vector2d((Fixed64)(-3), Fixed64.Zero));
+        SolidBody2D target = CreateBox(context, Vector2d.Zero, new PhysicsLayer(), new Vector2d((Fixed64)2, (Fixed64)2));
+
+        bool hit = QueryDetection2D.TrySweepMoverShape(
+            mover.Collider,
+            new Vector2d((Fixed64)4, Fixed64.Zero),
+            target.Collider,
+            out Physics2DHit sweepHit);
+
+        hit.Should().BeTrue();
+        sweepHit.Collider.Should().BeSameAs(target.Collider);
+        sweepHit.Distance.Should().Be(Fixed64.FromFraction(3, 2));
+        sweepHit.Normal.Should().Be(-Vector2d.Right);
+        sweepHit.Point.X.Should().Be(-Fixed64.One);
+    }
+
+    [Fact]
+    public void TrySweepMoverShape_WithPolygonMoverAwayFromBox_ShouldReturnFalse()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        SolidBody2D mover = CreatePolygon(context, new Vector2d((Fixed64)(-3), Fixed64.Zero));
+        SolidBody2D target = CreateBox(context, Vector2d.Zero, new PhysicsLayer(), new Vector2d((Fixed64)2, (Fixed64)2));
+
+        bool hit = QueryDetection2D.TrySweepMoverShape(
+            mover.Collider,
+            new Vector2d((Fixed64)(-2), Fixed64.Zero),
+            target.Collider,
+            out Physics2DHit sweepHit);
+
+        hit.Should().BeFalse();
+        sweepHit.Should().Be(default(Physics2DHit));
+    }
+
+    [Fact]
     public void TrySweepMoverShape_WithPolygonMoverAgainstCapsule_ShouldReportReverseCapsuleHit()
     {
         using GravitasWorldContext context = Create2DContext();
@@ -414,6 +451,53 @@ public sealed class Physics2DQueryTests
         bool hit = QueryDetection2D.TrySweepMoverShape(
             mover.Collider,
             new Vector2d((Fixed64)4, Fixed64.Zero),
+            target.Collider,
+            out Physics2DHit sweepHit);
+
+        hit.Should().BeFalse();
+        sweepHit.Should().Be(default(Physics2DHit));
+    }
+
+    [Fact]
+    public void TrySweepMoverShape_WithCircleMoverAgainstCompound_ShouldReturnOwnerAtNearestPart()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        SolidBody2D mover = CreateCircle(context, new Vector2d((Fixed64)(-3), Fixed64.Zero));
+        SolidBody2D target = CreateCompound(
+            context,
+            Vector2d.Zero,
+            new LSCompoundCollider2D(
+                CompoundColliderPart2D.Circle(Fixed64.Half, new Vector2d((Fixed64)2, Fixed64.Zero)),
+                CompoundColliderPart2D.Circle(Fixed64.Half, Vector2d.Zero),
+                CompoundColliderPart2D.Circle(Fixed64.Half, new Vector2d((Fixed64)3, Fixed64.Zero))));
+
+        bool hit = QueryDetection2D.TrySweepMoverShape(
+            mover.Collider,
+            new Vector2d((Fixed64)8, Fixed64.Zero),
+            target.Collider,
+            out Physics2DHit sweepHit);
+
+        hit.Should().BeTrue();
+        sweepHit.Collider.Should().BeSameAs(target.Collider);
+        sweepHit.Distance.Should().Be((Fixed64)2);
+        sweepHit.Normal.Should().Be(-Vector2d.Right);
+    }
+
+    [Fact]
+    public void TrySweepMoverShape_WithCircleMoverMissingCompound_ShouldReturnFalse()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        SolidBody2D mover = CreateCircle(context, new Vector2d((Fixed64)(-3), (Fixed64)3));
+        SolidBody2D target = CreateCompound(
+            context,
+            Vector2d.Zero,
+            new LSCompoundCollider2D(
+                CompoundColliderPart2D.Circle(Fixed64.Half, Vector2d.Zero),
+                CompoundColliderPart2D.AABBox(Vector2d.One, new Vector2d((Fixed64)2, Fixed64.Zero))));
+
+        bool hit = QueryDetection2D.TrySweepMoverShape(
+            mover.Collider,
+            new Vector2d((Fixed64)8, Fixed64.Zero),
             target.Collider,
             out Physics2DHit sweepHit);
 
