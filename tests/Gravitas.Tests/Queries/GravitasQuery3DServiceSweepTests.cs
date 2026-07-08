@@ -809,6 +809,50 @@ public sealed class GravitasQuery3DServiceSweepTests
     }
 
     [Fact]
+    public void SweptSphereWorker_WithConeNearSurfaceMovingAwayInsideSweptBounds_ShouldReturnFalse()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSConeCollider cone = CreateDynamicCollider(
+            context,
+            new LSConeCollider { Radius = Fixed64.Half, Size = new Vector3d(Fixed64.One, (Fixed64)2, Fixed64.One) },
+            Vector3d.Zero);
+        var worker = new SweptSphereQueryWorker();
+        Vector3d start = new(Fixed64.FromFraction(3, 5), Fixed64.FromFraction(9, 10), Fixed64.Zero);
+        worker.Prepare(
+            start,
+            start + Vector3d.Right * Fixed64.Half,
+            Fixed64.FromFraction(1, 4));
+
+        bool hit = worker.TrySweep(cone, out Vector3d centerAtImpact, out Fixed64 distance);
+
+        hit.Should().BeFalse();
+        centerAtImpact.Should().Be(Vector3d.Zero);
+        distance.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void SweptSphereWorker_WithConeNearSurfaceShortSweep_ShouldReturnFalse()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSConeCollider cone = CreateDynamicCollider(
+            context,
+            new LSConeCollider { Radius = Fixed64.Half, Size = new Vector3d(Fixed64.One, (Fixed64)2, Fixed64.One) },
+            Vector3d.Zero);
+        var worker = new SweptSphereQueryWorker();
+        Vector3d start = new(Fixed64.FromFraction(3, 5), Fixed64.FromFraction(9, 10), Fixed64.Zero);
+        worker.Prepare(
+            start,
+            start - Vector3d.Right * Fixed64.FromFraction(1, 10),
+            Fixed64.FromFraction(1, 4));
+
+        bool hit = worker.TrySweep(cone, out Vector3d centerAtImpact, out Fixed64 distance);
+
+        hit.Should().BeFalse();
+        centerAtImpact.Should().Be(Vector3d.Zero);
+        distance.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
     public void SweptSphereWorker_WithZeroLengthSegment_ShouldReturnFalse()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();

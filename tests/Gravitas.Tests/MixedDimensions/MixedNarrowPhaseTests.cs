@@ -235,6 +235,179 @@ public sealed class MixedNarrowPhaseTests
             }
         };
 
+    public static TheoryData<string, ColliderType, Vector3d, FixedQuaternion, ColliderType2D, Fixed64> PrimitivePrismExactMissPairs =>
+        new()
+        {
+            {
+                "Cuboid_AABox",
+                ColliderType.AABox,
+                new Vector3d(Fixed64.FromFraction(-3, 2), -Fixed64.One, Fixed64.FromFraction(-3, 2)),
+                Euler(0, 0, 15),
+                ColliderType2D.AABox,
+                Fixed64.Zero
+            },
+            {
+                "Cuboid_Capsule2D",
+                ColliderType.AABox,
+                new Vector3d(-Fixed64.One, -Fixed64.One, (Fixed64)(-2)),
+                FixedQuaternion.Identity,
+                ColliderType2D.Capsule,
+                Fixed64.Zero
+            },
+            {
+                "Cuboid_ConvexPolygon",
+                ColliderType.AABox,
+                new Vector3d(Fixed64.FromFraction(-3, 2), -Fixed64.One, Fixed64.FromFraction(-3, 2)),
+                FixedQuaternion.Identity,
+                ColliderType2D.ConvexPolygon,
+                FixedMath.DegToRad((Fixed64)15)
+            },
+            {
+                "Cuboid_AABox_EdgeUp",
+                ColliderType.AABox,
+                new Vector3d(Fixed64.FromFraction(-3, 2), -Fixed64.Half, Fixed64.FromFraction(3, 2)),
+                Euler(0, 15, 75),
+                ColliderType2D.AABox,
+                Fixed64.Zero
+            },
+            {
+                "Cuboid_AABox_EdgePrism",
+                ColliderType.AABox,
+                new Vector3d(Fixed64.FromFraction(-3, 2), Fixed64.One, -Fixed64.One),
+                Euler(0, 15, 15),
+                ColliderType2D.AABox,
+                Fixed64.Zero
+            },
+            {
+                "Capsule_AABox",
+                ColliderType.Capsule,
+                new Vector3d(Fixed64.FromFraction(-3, 2), (Fixed64)(-2), Fixed64.FromFraction(-3, 2)),
+                FixedQuaternion.Identity,
+                ColliderType2D.AABox,
+                Fixed64.Zero
+            },
+            {
+                "Capsule_Capsule2D",
+                ColliderType.Capsule,
+                new Vector3d(-Fixed64.One, (Fixed64)(-2), (Fixed64)(-2)),
+                FixedQuaternion.Identity,
+                ColliderType2D.Capsule,
+                Fixed64.Zero
+            },
+            {
+                "Capsule_ConvexPolygon",
+                ColliderType.Capsule,
+                new Vector3d(Fixed64.FromFraction(-3, 2), (Fixed64)(-2), Fixed64.FromFraction(-3, 2)),
+                FixedQuaternion.Identity,
+                ColliderType2D.ConvexPolygon,
+                Fixed64.Zero
+            },
+            {
+                "Capsule_AABox_Line",
+                ColliderType.Capsule,
+                new Vector3d(Fixed64.FromFraction(-3, 2), (Fixed64)2, Fixed64.FromFraction(-3, 2)),
+                Euler(0, 0, 15),
+                ColliderType2D.AABox,
+                Fixed64.Zero
+            },
+            {
+                "Capsule_AABox_LineUp",
+                ColliderType.Capsule,
+                new Vector3d((Fixed64)(-2), Fixed64.FromFraction(-3, 2), Fixed64.FromFraction(-3, 2)),
+                Euler(0, 0, 45),
+                ColliderType2D.AABox,
+                Fixed64.Zero
+            },
+            {
+                "Capsule_AABox_PrismNormal",
+                ColliderType.Capsule,
+                new Vector3d((Fixed64)(-2), Fixed64.FromFraction(-3, 2), -Fixed64.One),
+                Euler(0, 15, 30),
+                ColliderType2D.AABox,
+                Fixed64.Zero
+            },
+            {
+                "Cylinder_AABox",
+                ColliderType.Cylinder,
+                new Vector3d(Fixed64.FromFraction(-3, 2), -Fixed64.One, Fixed64.FromFraction(-3, 2)),
+                FixedQuaternion.Identity,
+                ColliderType2D.AABox,
+                Fixed64.Zero
+            },
+            {
+                "Cylinder_Capsule2D",
+                ColliderType.Cylinder,
+                new Vector3d(-Fixed64.One, -Fixed64.One, (Fixed64)(-2)),
+                FixedQuaternion.Identity,
+                ColliderType2D.Capsule,
+                Fixed64.Zero
+            },
+            {
+                "Cylinder_ConvexPolygon",
+                ColliderType.Cylinder,
+                new Vector3d(Fixed64.FromFraction(-3, 2), -Fixed64.One, Fixed64.FromFraction(-3, 2)),
+                FixedQuaternion.Identity,
+                ColliderType2D.ConvexPolygon,
+                Fixed64.Zero
+            },
+            {
+                "Cylinder_AABox_LineUp",
+                ColliderType.Cylinder,
+                new Vector3d(Fixed64.FromFraction(-3, 2), -Fixed64.One, Fixed64.FromFraction(-3, 2)),
+                Euler(0, 0, 15),
+                ColliderType2D.AABox,
+                Fixed64.Zero
+            },
+            {
+                "Cylinder_AABox_Line",
+                ColliderType.Cylinder,
+                new Vector3d(Fixed64.FromFraction(-3, 2), Fixed64.One, Fixed64.FromFraction(-3, 2)),
+                Euler(0, 0, 15),
+                ColliderType2D.AABox,
+                Fixed64.Zero
+            },
+            {
+                "Cylinder_AABox_EdgePrism",
+                ColliderType.Cylinder,
+                new Vector3d(Fixed64.FromFraction(-3, 2), -Fixed64.One, -Fixed64.One),
+                Euler(0, 0, 15),
+                ColliderType2D.AABox,
+                Fixed64.Zero
+            },
+            {
+                "Cone_AABox",
+                ColliderType.Cone,
+                new Vector3d(Fixed64.FromFraction(-3, 2), -Fixed64.One, Fixed64.FromFraction(-3, 2)),
+                FixedQuaternion.Identity,
+                ColliderType2D.AABox,
+                Fixed64.Zero
+            },
+            {
+                "Cone_Capsule2D",
+                ColliderType.Cone,
+                new Vector3d(-Fixed64.One, -Fixed64.One, (Fixed64)(-2)),
+                FixedQuaternion.Identity,
+                ColliderType2D.Capsule,
+                Fixed64.Zero
+            },
+            {
+                "Cone_ConvexPolygon",
+                ColliderType.Cone,
+                new Vector3d(Fixed64.FromFraction(-3, 2), -Fixed64.One, Fixed64.FromFraction(-3, 2)),
+                FixedQuaternion.Identity,
+                ColliderType2D.ConvexPolygon,
+                Fixed64.Zero
+            },
+            {
+                "Cone_AABox_Axis",
+                ColliderType.Cone,
+                new Vector3d(Fixed64.FromFraction(-3, 2), Fixed64.One, Fixed64.FromFraction(-3, 2)),
+                Euler(0, 0, 15),
+                ColliderType2D.AABox,
+                Fixed64.Zero
+            }
+        };
+
     [Fact]
     public void SphereCircleSlab_WithPlanarOverlap_ShouldReportDeterministicContact()
     {
@@ -584,6 +757,26 @@ public sealed class MixedNarrowPhaseTests
         contact.HasContact.Should().BeFalse();
     }
 
+    [Theory]
+    [MemberData(nameof(PrimitivePrismExactMissPairs))]
+    public void PrimitivePrismPairs_WithOverlappingBoundsButExactAxisSeparation_ShouldRejectContact(
+        string caseName,
+        ColliderType shape3D,
+        Vector3d position3D,
+        FixedQuaternion rotation3D,
+        ColliderType2D shape2D,
+        Fixed64 rotation2D)
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        LSCollider collider3D = CreatePrimitive3D(context, shape3D, position3D, rotation3D);
+        LSCollider2D collider2D = CreatePrimitive2D(context, shape2D, rotation2D);
+
+        collider3D.Bounds.Intersects(collider2D.MixedBounds3D).Should().BeTrue(caseName);
+
+        CollisionDetectionMixed.TryCollide(collider3D, collider2D, out MixedContact contact).Should().BeFalse(caseName);
+        contact.HasContact.Should().BeFalse();
+    }
+
     [Fact]
     public void CylinderConvexPolygonSlab_WithSeparatedYSlab_ShouldNotCollide()
     {
@@ -806,6 +999,39 @@ public sealed class MixedNarrowPhaseTests
             out _).Should().BeTrue();
         return context;
     }
+
+    private static LSCollider CreatePrimitive3D(
+        GravitasWorldContext context,
+        ColliderType shape,
+        Vector3d position,
+        FixedQuaternion rotation)
+    {
+        return shape switch
+        {
+            ColliderType.AABox => CreateCuboid3D(context, position, rotation).Collider,
+            ColliderType.Capsule => CreateCapsule3D(context, position, rotation).Collider,
+            ColliderType.Cylinder => CreateCylinder3D(context, position, rotation).Collider,
+            ColliderType.Cone => CreateCone3D(context, position, rotation).Collider,
+            _ => throw new ArgumentOutOfRangeException(nameof(shape), shape, null)
+        };
+    }
+
+    private static LSCollider2D CreatePrimitive2D(
+        GravitasWorldContext context,
+        ColliderType2D shape,
+        Fixed64 rotation)
+    {
+        return shape switch
+        {
+            ColliderType2D.AABox => CreateBody2D(context, new LSAABBoxCollider2D(new Vector2d((Fixed64)2, (Fixed64)2)), Vector2d.Zero, rotation).Collider,
+            ColliderType2D.Capsule => CreateBody2D(context, new LSCapsuleCollider2D(Fixed64.Half, (Fixed64)3), Vector2d.Zero, rotation).Collider,
+            ColliderType2D.ConvexPolygon => CreateBody2D(context, CreateSquarePolygon(), Vector2d.Zero, rotation).Collider,
+            _ => throw new ArgumentOutOfRangeException(nameof(shape), shape, null)
+        };
+    }
+
+    private static FixedQuaternion Euler(int x, int y, int z) =>
+        FixedQuaternion.FromEulerAnglesInDegrees((Fixed64)x, (Fixed64)y, (Fixed64)z);
 
     private static ScenarioBody<LSSphereCollider> CreateSphere3D(GravitasWorldContext context, Vector3d position)
     {
