@@ -5,6 +5,7 @@ using Gravitas.Support;
 using Gravitas.Tests.Support;
 using GridForge.Spatial;
 using System;
+using System.Collections.Generic;
 using Xunit;
 
 namespace Gravitas.Tests.Serialization;
@@ -141,6 +142,30 @@ public sealed class SolidBody2DSerializationTests
         manualTarget.WasGrounded.Should().BeTrue();
         manualTarget.GroundNormal.Should().Be(Vector2d.Zero);
         manualTarget.GroundPoint.Should().Be(Vector2d.Zero);
+    }
+
+    [Fact]
+    public void LoadPayload_WithInvalidGroundingValues_ShouldCanonicalize2DGroundingState()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext(frameRate: 8);
+        SolidBody2D body = CreateDynamicCircle(context);
+        body.UseGravityDerivedGroundUpDirection = false;
+        body.GroundUpDirection = Vector2d.Right;
+        body.GroundProbeRadius = Fixed64.Half;
+        var chronicler = new InvalidRecordPayloadChronicler(new Dictionary<string, object>
+        {
+            ["UseGravityDerivedGroundUpDirection"] = false,
+            ["GroundUpDirection"] = Vector2d.Zero,
+            ["GroundProbeRadius"] = -Fixed64.One,
+            ["GroundNormal"] = Vector2d.Right * (Fixed64)2
+        });
+
+        body.RecordData(chronicler);
+
+        body.UseGravityDerivedGroundUpDirection.Should().BeFalse();
+        body.GroundUpDirection.Should().Be(Vector2d.Forward);
+        body.GroundProbeRadius.Should().Be(Fixed64.Zero);
+        body.GroundNormal.Should().Be(Vector2d.Right);
     }
 
     [Theory]
@@ -349,6 +374,38 @@ public sealed class SolidBody2DSerializationTests
 
     [Theory]
     [MemberData(nameof(Transports))]
+    public void PopulateInactiveCollider_ShouldClearPrimaryPartitionMembershipInPureRuntime(GravitasSerializationTransport transport)
+    {
+        using GravitasWorldContext sourceContext = Physics2DTestWorld.CreateContext(frameRate: 8);
+        LSCircleCollider2D source = CreateStaticCircle(sourceContext, Vector2d.Zero);
+        source.Deactivate();
+        object payload = GravitasSerializationHarness.Serialize(source, transport);
+
+        using GravitasWorldContext targetContext = Physics2DTestWorld.CreateContext(frameRate: 8);
+        LSCircleCollider2D target = CreateStaticCircle(targetContext, Vector2d.Zero);
+        target.IsPartitioned.Should().BeTrue();
+        target.IsMixedPartitioned.Should().BeFalse();
+        WorldVoxelIndex coordinate = target.PartitionCoordinates![0];
+        SerializationPartitionAssertions.Primary2DPartitionContains(
+            targetContext,
+            coordinate,
+            target.Id).Should().BeTrue();
+
+        GravitasSerializationHarness.Populate(target, payload, transport);
+
+        target.IsActive.Should().BeFalse();
+        target.IsPartitioned.Should().BeFalse();
+        target.IsMixedPartitioned.Should().BeFalse();
+        target.PartitionCoordinates.Should().BeEmpty();
+        (target.MixedPartitionCoordinates?.Count ?? 0).Should().Be(0);
+        SerializationPartitionAssertions.Primary2DPartitionContains(
+            targetContext,
+            coordinate,
+            target.Id).Should().BeFalse();
+    }
+
+    [Theory]
+    [MemberData(nameof(Transports))]
     public void PopulateActiveColliderShape_ShouldRefreshPrimaryAndMixedPartitionMembership(
         GravitasSerializationTransport transport)
     {
@@ -393,6 +450,41 @@ public sealed class SolidBody2DSerializationTests
             mixedCoordinatesBeforeLoad,
             target.MixedPartitionCoordinates!,
             target.Id).Should().BeTrue("the loaded local offset should move the collider out of an original mixed partition");
+    }
+
+    [Theory]
+    [MemberData(nameof(Transports))]
+    public void PopulateActiveColliderShape_ShouldRefreshPrimaryPartitionMembershipInPureRuntime(
+        GravitasSerializationTransport transport)
+    {
+        using GravitasWorldContext sourceContext = Physics2DTestWorld.CreateContext(frameRate: 8);
+        LSCircleCollider2D source = CreateStaticCircle(sourceContext, Vector2d.Zero);
+        source.LocalOffset = new Vector2d((Fixed64)6, Fixed64.Zero);
+        source.Simulate();
+        object payload = GravitasSerializationHarness.Serialize(source, transport);
+
+        using GravitasWorldContext targetContext = Physics2DTestWorld.CreateContext(frameRate: 8);
+        LSCircleCollider2D target = CreateStaticCircle(targetContext, Vector2d.Zero);
+        WorldVoxelIndex[] primaryCoordinatesBeforeLoad =
+            SerializationPartitionAssertions.CopyCoordinates(target.PartitionCoordinates!);
+
+        GravitasSerializationHarness.Populate(target, payload, transport);
+
+        target.IsActive.Should().BeTrue();
+        target.LocalOffset.Should().Be(source.LocalOffset);
+        target.Bounds.Should().Be(source.Bounds);
+        target.IsPartitioned.Should().BeTrue();
+        target.IsMixedPartitioned.Should().BeFalse();
+        (target.MixedPartitionCoordinates?.Count ?? 0).Should().Be(0);
+        SerializationPartitionAssertions.Primary2DPartitionsShouldContain(
+            targetContext,
+            target.PartitionCoordinates!,
+            target.Id);
+        SerializationPartitionAssertions.StalePrimary2DPartitionsShouldBeCleared(
+            targetContext,
+            primaryCoordinatesBeforeLoad,
+            target.PartitionCoordinates!,
+            target.Id).Should().BeTrue("the loaded local offset should move the collider out of an original primary partition");
     }
 
     [Theory]

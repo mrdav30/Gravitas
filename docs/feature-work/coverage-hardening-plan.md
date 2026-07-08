@@ -94,18 +94,18 @@ configuration before making source changes.
 
 ## Current Standing
 
-Fresh checkpoint after Workstream 28 collision geometry, convex support, and
-2D/3D query coverage:
+Fresh checkpoint after Workstream 29 lifecycle, serialization, replay,
+authoring, and low-value residue coverage:
 
 | Metric | Baseline | Current | Short-Term Gate | Long-Term Target |
 | --- | ---: | ---: | ---: | ---: |
 | Line coverage | 87.3% | 95.4% | 90% | 100% |
 | Branch coverage | 74.1% | 85.3% | 90% | 100% |
 | Method coverage | 86.5% | 94.7% | 90% | 100% |
-| Tests | 974 passed | 1429 passed | green | green |
+| Tests | 974 passed | 1438 passed | green | green |
 
-At the current denominator, the 90% branch gate requires at least 10,044 covered
-branches. The latest run covered 9,523 of 11,160 branches, leaving roughly 521
+At the current denominator, the 90% branch gate requires at least 10,037 covered
+branches. The latest run covered 9,523 of 11,152 branches, leaving roughly 514
 net branch outcomes to cover or delete. The remaining gap is too large for one
 low-value audit pass, so the next phase should attack broad branch families
 instead of adding one-off residue tests.
@@ -113,9 +113,13 @@ instead of adding one-off residue tests.
 Current evidence:
 
 - Coverage report:
-  `TestResults/coverage-branch-hardening-ws28-final-clean/reports/Summary.txt`
+  `TestResults/coverage-branch-hardening-ws29-final/reports/Summary.txt`
 - Branch shortlist:
-  `TestResults/coverage-branch-hardening-ws28-final-clean/branch-gap-shortlist.csv`
+  `TestResults/coverage-branch-hardening-ws29-final/branch-gap-shortlist.csv`
+- CRAP hotspots:
+  `TestResults/coverage-branch-hardening-ws29-final/crap-scores.txt`
+- Method gaps:
+  `TestResults/coverage-branch-hardening-ws29-final/method-gaps-under-90.json`
 - Latest uncovered method count: 195.
 
 Top branch-gap groups by source area:
@@ -124,13 +128,13 @@ Top branch-gap groups by source area:
 | --- | ---: |
 | `Core/3D` | 263 |
 | `CollisionHandling/Detection` | 257 |
-| `Core/2D` | 250 |
+| `Core/2D` | 248 |
 | `Queries/3D` | 161 |
 | `Queries/Mixed` | 124 |
 | `Core/Mixed` | 88 |
 | `Queries/2D` | 82 |
-| `Colliders/3D` | 63 |
-| `Colliders/2D` | 60 |
+| `Colliders/3D` | 60 |
+| `Colliders/2D` | 57 |
 | `Constraints/3D` | 43 |
 | `CollisionHandling/Response` | 42 |
 | `Constraints/2D` | 41 |
@@ -155,6 +159,7 @@ removing stale runtime branches.
 | Workstream 26 | 95.3% line / 84.9% branch / 94.7% method | 1411 | CCD handoff lifecycle, rotational Auto/miss paths, same-velocity dynamic TOI, kinematic shape-exact misses, `Both` versus `Mixed` CCD gating, and redundant CCD invariant guard removal. |
 | Workstream 27 | 95.3% line / 85.1% branch / 94.7% method | 1415 | Mixed partition bucket invariants, finite-slab reducer miss exits, projected capsule/cylinder helper cleanup, and unreachable mixed query guard removal. |
 | Workstream 28 | 95.4% line / 85.3% branch / 94.7% method | 1429 | Public 2D query validation, focused 2D geometry-worker ray/sweep edge cases, 3D overlap-sphere filter branches, swept-sphere worker guards, convex support unsupported dispatch parity, and dead static-sphere dynamic traversal removal. |
+| Workstream 29 | 95.4% line / 85.3% branch / 94.7% method | 1438 | Pure-runtime 2D/3D collider load partition refresh/cleanup, 2D grounding load canonicalization, replay hierarchy null-check cleanup, and low-value lifecycle/diagnostic residue classification. |
 
 High-value work completed:
 
@@ -423,32 +428,64 @@ authoring helpers.
 
 **Tasks**
 
-- [ ] Cover only meaningful load/replay/authoring branches that affect
+- [x] Cover only meaningful load/replay/authoring branches that affect
       deterministic continuation or public API invariants.
-- [ ] Audit low-value diagnostic draw/view/logger branches one more time and
+- [x] Audit low-value diagnostic draw/view/logger branches one more time and
       leave construction noise alone unless visitor dispatch or adapter behavior
       is meaningful.
-- [ ] Review 2D/3D parity in lifecycle, partition, and authoring behavior while
+- [x] Review 2D/3D parity in lifecycle, partition, and authoring behavior while
       touching these areas.
-- [ ] Delete stale wrappers, duplicate tests, and defensive branches that are
+- [x] Delete stale wrappers, duplicate tests, and defensive branches that are
       unreachable under validated public APIs.
-- [ ] Run full `Release`, full `ReleaseLean`, coverage, CRAP, and method-gap
+- [x] Run full `Release`, full `ReleaseLean`, coverage, CRAP, and method-gap
       scripts.
+
+**Result**
+
+- Final W29 report: 95.4% line / 85.3% branch / 94.7% method coverage, 1,438
+  `Release` tests passing under coverage.
+- Full non-instrumented `Release` passed with 1,438 tests.
+- `ReleaseLean` passed with 1,407 tests.
+- Added pure-runtime 2D and 3D collider load tests proving inactive loads clear
+  primary partition membership and active shape loads refresh stale primary
+  partitions without touching mixed membership.
+- Added a 2D load canonicalization test proving invalid loaded grounding values
+  fall back to the default support-up direction, clamp negative probe radius to
+  zero, and normalize loaded support normals before simulation resumes.
+- Removed impossible replay hierarchy null-success checks after
+  `ColliderRegistry.TryGetById`; the registry contract only reports success for
+  live stored colliders.
+- Classified retained-partition callback fallback, diagnostic view
+  construction, and logger facade residue as low-value or defensive behavior to
+  leave alone for now rather than weakening reset resilience or bloating tests.
 
 ### Workstream 30: Branch-90 Gate And 100% Roadmap Refresh
 
 **Purpose**
 
-Use the fresh evidence after Workstreams 26-29 to close the 90% branch gate. If
-90% is reached, rewrite this document into the remaining 100% plan. If not,
-identify the minimum next branch family needed to cross the gate.
+Use the fresh evidence after Workstream 29 to continue closing the 90% branch
+gate. The latest shortlist shows the next high-value families are kinematic CCD
+handoff, mixed prism collision detection, convex support simplex policy, query
+reducer/shape-cast residue, and a small retained-partition defensive bucket.
+If 90% is reached, rewrite this document into the remaining 100% plan. If not,
+keep the next pass scoped to one broad family at a time.
 
 **Tasks**
 
+- [ ] Cover or simplify the remaining 2D/3D kinematic CCD handoff branches,
+      especially ignored-target, source/target push, and mixed handoff rows.
+- [ ] Attack the mixed capsule/cylinder/cone/cuboid/triangle prism branch
+      family through public collision scenarios or compact policy tests where
+      candidate setup hides the invariant.
+- [ ] Triage convex support simplex update branches and 3D swept-cone/OBB query
+      residue without adding brittle private tests unless the policy is truly
+      internal-only.
+- [ ] Review 2D grounding refresh, 2D pair replay/hash, mixed pair candidate,
+      and retained-partition defensive branches for real behavior versus
+      stale guard code.
 - [ ] Generate fresh coverage, CRAP, method-gap, and branch-shortlist artifacts.
-- [ ] Confirm line and method coverage remain above 90%.
-- [ ] Confirm branch coverage is at least 90% or calculate the exact remaining
-      branch delta.
+- [ ] Confirm line and method coverage remain above 90%, then calculate the
+      remaining branch delta against the 90% gate.
 - [ ] Run `git diff --check` and a final independent review.
 - [ ] If branch coverage is at least 90%, replace this active roadmap with a
       100% coverage roadmap focused on the remaining uncovered methods and
@@ -476,3 +513,7 @@ campaign checkpoints; do not add a row for every focused test filter.
 | 2026-07-07 | 95.1% | 84.2% | 94.7% | 1330 passed | Workstream 23 completed; active collider load partition refresh/stale bucket cleanup, replay hierarchy mutation, mixed replay pair-state hash, 2D/3D partition lifecycle parity, and stale distribution guard removal. Branches covered: 9360/11115. |
 | 2026-07-08 | 95.2% | 84.5% | 94.7% | 1346 passed | Workstream 24 completed; 3D joint load-count fix, 3D ragdoll atomic validation parity, 2D distance load canonicalization, 2D motor mutation validation, and constraint solver edge coverage. Branches covered: 9398/11121. |
 | 2026-07-08 | 95.2% | 84.6% | 94.7% | 1391 passed | Workstream 25 completed; low-value surface audit, 2D collision matrix parity fix, support/lifecycle/diagnostic branch coverage, and stale branch removal. Branches covered: 9388/11087. |
+| 2026-07-08 | 95.3% | 84.9% | 94.7% | 1411 passed | Workstream 26 completed; CCD handoff lifecycle, rotational Auto/miss paths, same-velocity dynamic TOI, kinematic shape-exact misses, and redundant CCD guard removal. Branches covered: 9447/11125. |
+| 2026-07-08 | 95.3% | 85.1% | 94.7% | 1415 passed | Workstream 27 completed; mixed partition bucket invariants, finite-slab reducer miss exits, projected capsule/cylinder cleanup, and unreachable mixed query guard removal. Branches covered: 9476/11130. |
+| 2026-07-08 | 95.4% | 85.3% | 94.7% | 1429 passed | Workstream 28 completed; public 2D query validation, 2D geometry-worker edge cases, 3D overlap/swept-sphere guard coverage, convex support dispatch parity, and dead static-sphere traversal removal. Branches covered: 9523/11160. |
+| 2026-07-08 | 95.4% | 85.3% | 94.7% | 1438 passed | Workstream 29 completed; pure-runtime collider load partition refresh/cleanup, 2D grounding load canonicalization, replay hierarchy null-check cleanup, and low-value lifecycle residue classification. Branches covered: 9523/11152. |

@@ -223,6 +223,38 @@ public sealed class SolidBodySerializationTests
 
     [Theory]
     [MemberData(nameof(Transports))]
+    public void PopulateInactiveCollider_ShouldClearPrimaryPartitionMembershipInPureRuntime(GravitasSerializationTransport transport)
+    {
+        using PhysicsScenarioBuilder sourceScenario = PhysicsScenarioBuilder.Create();
+        LSSphereCollider source = sourceScenario.CreateStaticSphere(Vector3d.Zero);
+        source.Deactivate();
+        object payload = GravitasSerializationHarness.Serialize(source, transport);
+
+        using PhysicsScenarioBuilder targetScenario = PhysicsScenarioBuilder.Create();
+        LSSphereCollider target = targetScenario.CreateStaticSphere(Vector3d.Zero);
+        target.IsPartitioned.Should().BeTrue();
+        target.IsMixedPartitioned.Should().BeFalse();
+        WorldVoxelIndex coordinate = target.PartitionCoordinates![0];
+        SerializationPartitionAssertions.Primary3DPartitionContains(
+            targetScenario.Context,
+            coordinate,
+            target.Id).Should().BeTrue();
+
+        GravitasSerializationHarness.Populate(target, payload, transport);
+
+        target.IsActive.Should().BeFalse();
+        target.IsPartitioned.Should().BeFalse();
+        target.IsMixedPartitioned.Should().BeFalse();
+        target.PartitionCoordinates.Should().BeEmpty();
+        (target.MixedPartitionCoordinates?.Count ?? 0).Should().Be(0);
+        SerializationPartitionAssertions.Primary3DPartitionContains(
+            targetScenario.Context,
+            coordinate,
+            target.Id).Should().BeFalse();
+    }
+
+    [Theory]
+    [MemberData(nameof(Transports))]
     public void PopulateActiveColliderShape_ShouldRefreshPrimaryAndMixedPartitionMembership(
         GravitasSerializationTransport transport)
     {
@@ -267,6 +299,41 @@ public sealed class SolidBodySerializationTests
             mixedCoordinatesBeforeLoad,
             target.MixedPartitionCoordinates!,
             target.Id).Should().BeTrue("the loaded local offset should move the collider out of an original mixed partition");
+    }
+
+    [Theory]
+    [MemberData(nameof(Transports))]
+    public void PopulateActiveColliderShape_ShouldRefreshPrimaryPartitionMembershipInPureRuntime(
+        GravitasSerializationTransport transport)
+    {
+        using PhysicsScenarioBuilder sourceScenario = PhysicsScenarioBuilder.Create();
+        LSSphereCollider source = sourceScenario.CreateStaticSphere(Vector3d.Zero);
+        source.LocalOffset = new Vector3d((Fixed64)6, Fixed64.Zero, Fixed64.Zero);
+        source.Simulate();
+        object payload = GravitasSerializationHarness.Serialize(source, transport);
+
+        using PhysicsScenarioBuilder targetScenario = PhysicsScenarioBuilder.Create();
+        LSSphereCollider target = targetScenario.CreateStaticSphere(Vector3d.Zero);
+        WorldVoxelIndex[] primaryCoordinatesBeforeLoad =
+            SerializationPartitionAssertions.CopyCoordinates(target.PartitionCoordinates!);
+
+        GravitasSerializationHarness.Populate(target, payload, transport);
+
+        target.IsActive.Should().BeTrue();
+        target.LocalOffset.Should().Be(source.LocalOffset);
+        target.Bounds.Should().Be(source.Bounds);
+        target.IsPartitioned.Should().BeTrue();
+        target.IsMixedPartitioned.Should().BeFalse();
+        (target.MixedPartitionCoordinates?.Count ?? 0).Should().Be(0);
+        SerializationPartitionAssertions.Primary3DPartitionsShouldContain(
+            targetScenario.Context,
+            target.PartitionCoordinates!,
+            target.Id);
+        SerializationPartitionAssertions.StalePrimary3DPartitionsShouldBeCleared(
+            targetScenario.Context,
+            primaryCoordinatesBeforeLoad,
+            target.PartitionCoordinates!,
+            target.Id).Should().BeTrue("the loaded local offset should move the collider out of an original primary partition");
     }
 
     [Theory]

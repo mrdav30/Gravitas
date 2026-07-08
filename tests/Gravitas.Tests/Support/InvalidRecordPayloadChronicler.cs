@@ -2,7 +2,7 @@ using Chronicler;
 using System;
 using System.Collections.Generic;
 
-namespace Gravitas.Tests.Constraints;
+namespace Gravitas.Tests.Support;
 
 internal sealed class InvalidRecordPayloadChronicler : IChronicler
 {
@@ -25,16 +25,13 @@ internal sealed class InvalidRecordPayloadChronicler : IChronicler
     }
 
     public void LookDeep<T>(ref T value, string name) where T : class, IRecordable
-    {
-    }
+    { }
 
     public void LookDeepStruct<T>(ref T value, string name) where T : struct, IRecordable
-    {
-    }
+    { }
 
     public void LookNullableDeep<T>(ref T? value, string name) where T : struct, IRecordable
-    {
-    }
+    { }
 
     public void LookLink<T>(
         ref T value,
@@ -42,6 +39,5 @@ internal sealed class InvalidRecordPayloadChronicler : IChronicler
         string? slot = null,
         RecordLinkResolveMode resolveMode = RecordLinkResolveMode.Immediate,
         Action<T>? assignLoadedValue = null)
-    {
-    }
+    { }
 }

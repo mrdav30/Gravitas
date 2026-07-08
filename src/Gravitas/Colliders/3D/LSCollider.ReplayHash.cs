@@ -108,21 +108,20 @@ public abstract partial class LSCollider
 
         if (key.Is3D)
         {
-            if (!_context.Physics.TryGetColliderById(key.Id, out LSCollider? collider) || collider == null)
+            if (!_context.Physics.TryGetColliderById(key.Id, out LSCollider? collider))
                 return false;
 
-            replayOrdinal = collider.ReplayOrdinal;
+            replayOrdinal = collider!.ReplayOrdinal;
             return replayOrdinal >= 0;
         }
 
         if (!key.Is2D
-            || !_context.Physics2D.TryGetColliderById(key.Id, out LSCollider2D? collider2D)
-            || collider2D == null)
+            || !_context.Physics2D.TryGetColliderById(key.Id, out LSCollider2D? collider2D))
         {
             return false;
         }
 
-        replayOrdinal = collider2D.ReplayOrdinal;
+        replayOrdinal = collider2D!.ReplayOrdinal;
         return replayOrdinal >= 0;
     }
 
