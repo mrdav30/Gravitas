@@ -443,6 +443,105 @@ public sealed class MixedResponseTests
     }
 
     [Fact]
+    public void Resolve_WithMixedTriggerPair_ShouldSkipResponse()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(
+            context,
+            new Vector3d(-Fixed64.Half, Fixed64.Zero, Fixed64.Zero));
+        LSCollider2D trigger2D = CreateBodylessCircle2D(context, Vector2d.Zero, isTrigger: true);
+        body3D.Body.ApplyCollisionLinearVelocityDelta(Vector3d.Right * (Fixed64)4);
+        var pair = new CollisionPairMixed(body3D.Collider, trigger2D);
+        var contact = new MixedContact(
+            body3D.Collider.Center,
+            new Vector3d(Fixed64.Zero, Fixed64.Zero, Fixed64.Zero),
+            Vector3d.Right,
+            Fixed64.FromFraction(1, 5));
+
+        bool appliedImpulse = CollisionResponseMixed.Resolve(pair, contact);
+
+        appliedImpulse.Should().BeFalse();
+        body3D.Body.Position3d.Should().Be(new Vector3d(-Fixed64.Half, Fixed64.Zero, Fixed64.Zero));
+        body3D.Body.LinearVelocity.X.Should().Be((Fixed64)4);
+    }
+
+    [Fact]
+    public void Resolve_WithFullyFrozenMixedBodies_ShouldSkipNoEffectiveMass()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(
+            context,
+            new Vector3d(-Fixed64.Half, Fixed64.Zero, Fixed64.Zero),
+            immovable: true);
+        SolidBody2D body2D = CreateCircle2D(context, Vector2d.Zero, immovable: true);
+        body3D.Body.ApplyCollisionLinearVelocityDelta(Vector3d.Right * (Fixed64)4);
+        body2D.ApplyCollisionLinearVelocityDelta(-Vector2d.Right * (Fixed64)4);
+        var pair = new CollisionPairMixed(body3D.Collider, body2D.Collider);
+        var contact = new MixedContact(
+            body3D.Collider.Center,
+            new Vector3d(Fixed64.Zero, Fixed64.Zero, Fixed64.Zero),
+            Vector3d.Right,
+            Fixed64.FromFraction(1, 5));
+
+        bool appliedImpulse = CollisionResponseMixed.Resolve(pair, contact);
+
+        appliedImpulse.Should().BeFalse();
+        body3D.Body.Position3d.Should().Be(new Vector3d(-Fixed64.Half, Fixed64.Zero, Fixed64.Zero));
+        body2D.Position.Should().Be(Vector2d.Zero);
+        body3D.Body.LinearVelocity.Should().Be(Vector3d.Zero);
+        body2D.LinearVelocity.Should().Be(Vector2d.Zero);
+    }
+
+    [Fact]
+    public void Resolve_With2DRotationFrozen_ShouldApplyPlanarImpulseWithoutYaw()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(
+            context,
+            new Vector3d(-Fixed64.Half, Fixed64.Zero, Fixed64.Half));
+        SolidBody2D body2D = CreateCircle2D(context, Vector2d.Zero);
+        body2D.FreezeAxes = BodyFreezeAxes2D.Rotation;
+        body3D.Body.ApplyCollisionLinearVelocityDelta(Vector3d.Right * (Fixed64)4);
+        var pair = new CollisionPairMixed(body3D.Collider, body2D.Collider);
+        var contact = new MixedContact(
+            body3D.Collider.Center,
+            new Vector3d(Fixed64.Zero, Fixed64.Zero, Fixed64.Half),
+            Vector3d.Right,
+            Fixed64.FromFraction(1, 5));
+
+        bool appliedImpulse = CollisionResponseMixed.Resolve(pair, contact);
+
+        appliedImpulse.Should().BeTrue();
+        body2D.LinearVelocity.X.Should().BeGreaterThan(Fixed64.Zero);
+        body2D.AngularVelocity.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void Resolve_With3DRotationFrozen_ShouldApplyLinearImpulseWithoutAngularDelta()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(
+            context,
+            new Vector3d(-Fixed64.Half, Fixed64.Zero, Fixed64.Half),
+            preventAngularForces: true);
+        SolidBody2D body2D = CreateCircle2D(context, Vector2d.Zero);
+        body3D.Body.ApplyCollisionLinearVelocityDelta(Vector3d.Right * (Fixed64)4);
+        var pair = new CollisionPairMixed(body3D.Collider, body2D.Collider);
+        var contact = new MixedContact(
+            body3D.Collider.Center,
+            new Vector3d(Fixed64.Zero, Fixed64.Zero, Fixed64.Half),
+            Vector3d.Right,
+            Fixed64.FromFraction(1, 5));
+
+        bool appliedImpulse = CollisionResponseMixed.Resolve(pair, contact);
+
+        appliedImpulse.Should().BeTrue();
+        body3D.Body.LinearVelocity.X.Should().BeLessThan((Fixed64)4);
+        body3D.Body.AngularVelocity.Should().Be(Vector3d.Zero);
+        body2D.AngularVelocity.Should().BeLessThan(Fixed64.Zero);
+    }
+
+    [Fact]
     public void Resolve_WithSeparatingMixedVelocity_ShouldSkipImpulseWhenCorrectionIsDisabled()
     {
         using GravitasWorldContext context = CreateMixedContext();
@@ -694,6 +793,35 @@ public sealed class MixedResponseTests
     }
 
     [Fact]
+    public void Deactivate2DParticipant_WithActiveMixedPair_ShouldEmitExitAndRecyclePair()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(context, Vector3d.Zero);
+        SolidBody2D body2D = CreateCircle2D(context, Vector2d.Zero);
+        int exited3D = 0;
+        int exited2D = 0;
+        body3D.Collider.OnMixedContactExit += other =>
+        {
+            other.Should().BeSameAs(body2D.Collider);
+            exited3D++;
+        };
+        body2D.Collider.OnMixedContactExit += other =>
+        {
+            other.Should().BeSameAs(body3D.Collider);
+            exited2D++;
+        };
+
+        Step(context);
+        body2D.Deactivate();
+
+        exited3D.Should().Be(1);
+        exited2D.Should().Be(1);
+        context.MixedCollisions.ActivePairCount.Should().Be(0);
+        context.MixedCollisions.PooledPairCount.Should().BeGreaterThan(0);
+        body2D.Collider.IsActive.Should().BeFalse();
+    }
+
+    [Fact]
     public void ReplayedMixedResponseScenario_ShouldProduceSameState()
     {
         (Vector3d position3D, Vector3d velocity3D, Vector2d position2D, Vector2d velocity2D) first = RunReplayScenario();
@@ -844,6 +972,7 @@ public sealed class MixedResponseTests
         GravitasWorldContext context,
         Vector3d position,
         bool immovable = false,
+        bool preventAngularForces = false,
         bool isKinematic = false,
         PhysicsLayer? layer = null)
     {
@@ -852,10 +981,13 @@ public sealed class MixedResponseTests
             collider.Layer = layer.Value;
 
         var agent = new TestMatterAgent(context, new FixedTransform(position, FixedQuaternion.Identity, Vector3d.One));
+        BodyFreezeAxes3D freezeAxes =
+            (immovable ? BodyFreezeAxes3D.Position : BodyFreezeAxes3D.None)
+            | (preventAngularForces ? BodyFreezeAxes3D.Rotation : BodyFreezeAxes3D.None);
         var body = new SolidBody(agent, collider)
         {
             Mass = Fixed64.One,
-            FreezeAxes = immovable ? BodyFreezeAxes3D.Position : BodyFreezeAxes3D.None,
+            FreezeAxes = freezeAxes,
             IsKinematic = isKinematic
         };
         collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.Zero);

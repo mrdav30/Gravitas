@@ -89,37 +89,37 @@ configuration before making source changes.
 
 ## Current Standing
 
-Fresh checkpoint after Workstream 20 query reducer and shape-cast geometry
-residue pass:
+Fresh checkpoint after Workstream 21 mixed pair/contact notification/response
+lifecycle pass:
 
 | Metric | Baseline | Current | Short-Term Gate | Long-Term Target |
 | --- | ---: | ---: | ---: | ---: |
 | Line coverage | 87.3% | 94.9% | 90% | 100% |
-| Branch coverage | 74.1% | 83.4% | 90% | 100% |
-| Method coverage | 86.5% | 94.6% | 90% | 100% |
-| Tests | 974 passed | 1285 passed | green | green |
+| Branch coverage | 74.1% | 83.7% | 90% | 100% |
+| Method coverage | 86.5% | 94.7% | 90% | 100% |
+| Tests | 974 passed | 1295 passed | green | green |
 
 At the current denominator, the 90% branch gate requires at least 10,017 covered
-branches. The latest run covered 9,290 of 11,129 branches, leaving roughly 727
+branches. The latest run covered 9,315 of 11,129 branches, leaving roughly 702
 net branch outcomes to cover or delete. Treat this as a focused branch
 campaign, not a single gate-check workstream.
 
 Current evidence:
 
 - Coverage report:
-  `TestResults/coverage-branch-hardening-ws20-final/reports/Summary.txt`
+  `TestResults/coverage-branch-hardening-ws21-final/reports/Summary.txt`
 - Coverage collection:
   `dotnet test tests\Gravitas.Tests\Gravitas.Tests.csproj --configuration Release --collect:"XPlat Code Coverage" --settings tests\Gravitas.Tests\coverlet.runsettings`
-  passed with 1285 tests.
+  passed with 1295 tests.
 - Branch shortlist:
-  `TestResults/coverage-branch-hardening-ws20-final/branch-gap-shortlist.csv`
-- Latest summary reports 199 uncovered methods.
+  `TestResults/coverage-branch-hardening-ws21-final/branch-gap-shortlist.csv`
+- Latest summary reports 198 uncovered methods.
 
 ## Historical Summary
 
 This plan began after trigger collider hardening with 87.3% line, 74.1% branch,
-and 86.5% method coverage. The campaign so far raised the suite to 94.7% line,
-82.8% branch, and 94.6% method coverage while also finding real defects and
+and 86.5% method coverage. The campaign so far raised the suite to 94.9% line,
+83.7% branch, and 94.7% method coverage while also finding real defects and
 removing stale runtime branches.
 
 | Phase | Coverage Result | Tests | Main Outcome |
@@ -130,7 +130,7 @@ removing stale runtime branches.
 | Workstreams 1-6 | 93.3% line / 79.7% branch / 93.6% method | 1146 | Zombie-code sweep, query/collision/serialization/lifecycle/diagnostic branch hardening. |
 | Workstreams 7-12 | 94.1% line / 81.3% branch / 94.4% method | 1214 | CCD handoff, mixed response, query reducer, replay, lifecycle, and shape-cast residue. |
 | Workstreams 13-18 | 94.7% line / 82.8% branch / 94.6% method | 1261 | Contact geometry, hierarchy, convex support, CCD eligibility, mixed pair retention, and joint-island cleanup. |
-| Workstreams 19-20 | 94.9% line / 83.4% branch / 94.6% method | 1285 | Kinematic CCD, dynamic response, query reducer, mixed sweep filter, rotated OBB raycast, 2D mover-shape, swept cone, and stale reducer-branch cleanup. |
+| Workstreams 19-21 | 94.9% line / 83.7% branch / 94.7% method | 1295 | Kinematic CCD, dynamic response, query reducer, mixed sweep filter, rotated OBB raycast, 2D mover-shape, swept cone, stale reducer cleanup, mixed trigger policy, pair lifecycle, and constrained mixed response coverage. |
 
 High-value work completed:
 
@@ -377,20 +377,43 @@ reuse, contact notification branches, and response/event parity.
 
 **Tasks**
 
-- [ ] Revisit `ProcessCandidate`, `TryKeepUntouchedPair`, and
+- [x] Revisit `ProcessCandidate`, `TryKeepUntouchedPair`, and
       `TryAddExistingResponsePair` after Workstreams 19-20; cover only real
       trigger, sleeping, inactive, bounds-miss, retained-pair, or island flows.
-- [ ] Cover 3D/2D `NotifyContact` branches through symmetric enter/stay/exit
+- [x] Cover 3D/2D `NotifyContact` branches through symmetric enter/stay/exit
       contact and trigger scenarios where parity is expected.
-- [ ] Review mixed response impulse branch residue after query reducer cleanup;
+- [x] Review mixed response impulse branch residue after query reducer cleanup;
       add tests only for physical behavior such as frozen axes, bodyless
       participants, friction/restitution, or constrained 2D vertical response.
-- [ ] Review `RefreshGroundingFromDiscreteResponse` residue against current 2D
+- [x] Review `RefreshGroundingFromDiscreteResponse` residue against current 2D
       grounding/support semantics; avoid duplicating existing support tests.
-- [ ] Record any event-ordering or pair-retention parity bug in
+- [x] Record any event-ordering or pair-retention parity bug in
       `issue-tracker.md` before fixing it.
-- [ ] Run focused mixed/2D response tests, full `Release`, and coverage
+- [x] Run focused mixed/2D response tests, full `Release`, and coverage
       collection.
+
+**Completion Notes**
+
+- Added mixed trigger lifecycle coverage for both bodyless-2D-trigger and
+  bodyless-3D-trigger ownership directions, including enter/stay/exit symmetry,
+  sleeping participant retention, and no physical contact callback leakage.
+- Added direct trigger-policy tests proving trigger callbacks require exactly
+  one trigger collider and one body-backed participant across 3D, pure 2D, and
+  mixed 3D/2D notification surfaces.
+- Added notification suppression coverage for inactive colliders, unchanged
+  separation, and bodyless solid targets so callback contracts stay explicit
+  without adding broad simulation noise.
+- Added mixed response coverage for trigger pairs, no-effective-mass frozen
+  bodies, 2D yaw-freeze impulse projection, and 3D rotation-freeze impulse
+  projection.
+- Reviewed `ProcessCandidate`, `TryKeepUntouchedPair`,
+  `TryAddExistingResponsePair`, and `RefreshGroundingFromDiscreteResponse`
+  residue. Remaining branches are mostly compound-condition permutations,
+  delegate-null paths, or private defensive exits already guarded by public
+  setup; no pair-retention or event-ordering bug was found.
+- Final W21 coverage: 94.9% line, 83.7% branch (9,315/11,129), 94.7% method,
+  1,295 tests passed. Fresh shortlist:
+  `TestResults/coverage-branch-hardening-ws21-final/branch-gap-shortlist.csv`.
 
 ### Workstream 22: Collision Geometry, Convex Support, And Contact Residue
 
@@ -548,3 +571,4 @@ campaign checkpoints; do not add a row for every focused test filter.
 | 2026-07-07 | 94.1% | 81.3% | 94.4% | 1214 passed | Workstreams 7-12 completed; CCD handoff, mixed response, query reducer, replay, lifecycle, and shape-cast residue. |
 | 2026-07-07 | 94.7% | 82.8% | 94.6% | 1261 passed | Workstreams 13-18 completed; geometry, hierarchy, convex support, CCD eligibility, mixed pair retention, and joint-island cleanup. |
 | 2026-07-07 | 94.8% | 83.2% | 94.6% | 1272 passed | Workstream 19 completed; kinematic CCD frozen-axis coverage plus fixed-step frame-rate invariant. Branches covered: 9268/11137. |
+| 2026-07-07 | 94.9% | 83.7% | 94.7% | 1295 passed | Workstreams 20-21 completed; query reducer/shape-cast geometry plus mixed pair, contact notification, trigger policy, and constrained mixed response lifecycle. Branches covered: 9315/11129. |
