@@ -293,6 +293,111 @@ public sealed class ColliderTriggerTests
     }
 
     [Fact]
+    public void NotifyContact_ShouldRaiseSubscribedSameDimensionContactAndTriggerLifecycle()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        SolidBody body3D = CreateSphere3D(context, Vector3d.Zero);
+        SolidBody other3D = CreateSphere3D(context, Vector3d.Right * Fixed64.Half);
+        LSSphereCollider trigger3D = CreateBodylessSphere3D(context, Vector3d.Right);
+        SolidBody2D body2D = CreateCircle2D(context, Vector2d.Zero);
+        SolidBody2D other2D = CreateCircle2D(context, Vector2d.Right * Fixed64.Half);
+        LSCircleCollider2D trigger2D = CreateBodylessCircle2D(context, Vector2d.Right);
+        trigger3D.IsTrigger = true;
+        trigger2D.IsTrigger = true;
+        int contactEnter3D = 0;
+        int contactStay3D = 0;
+        int contactExit3D = 0;
+        int triggerEnter3D = 0;
+        int triggerStay3D = 0;
+        int triggerExit3D = 0;
+        int contactEnter2D = 0;
+        int contactStay2D = 0;
+        int contactExit2D = 0;
+        int triggerEnter2D = 0;
+        int triggerStay2D = 0;
+        int triggerExit2D = 0;
+
+        body3D.Collider.OnContactEnter += other =>
+        {
+            other.Should().BeSameAs(other3D);
+            contactEnter3D++;
+        };
+        body3D.Collider.OnContact += other =>
+        {
+            other.Should().BeSameAs(other3D);
+            contactStay3D++;
+        };
+        body3D.Collider.OnContactExit += other =>
+        {
+            other.Should().BeSameAs(other3D);
+            contactExit3D++;
+        };
+        trigger3D.OnTriggerEnter += other =>
+        {
+            other.Should().BeSameAs(body3D.Collider);
+            triggerEnter3D++;
+        };
+        trigger3D.OnTriggerStay += other =>
+        {
+            other.Should().BeSameAs(body3D.Collider);
+            triggerStay3D++;
+        };
+        trigger3D.OnTriggerExit += other =>
+        {
+            other.Should().BeSameAs(body3D.Collider);
+            triggerExit3D++;
+        };
+        body2D.Collider.OnContactEnter += other =>
+        {
+            other.Should().BeSameAs(other2D);
+            contactEnter2D++;
+        };
+        body2D.Collider.OnContact += other =>
+        {
+            other.Should().BeSameAs(other2D);
+            contactStay2D++;
+        };
+        body2D.Collider.OnContactExit += other =>
+        {
+            other.Should().BeSameAs(other2D);
+            contactExit2D++;
+        };
+        trigger2D.OnTriggerEnter += other =>
+        {
+            other.Should().BeSameAs(body2D.Collider);
+            triggerEnter2D++;
+        };
+        trigger2D.OnTriggerStay += other =>
+        {
+            other.Should().BeSameAs(body2D.Collider);
+            triggerStay2D++;
+        };
+        trigger2D.OnTriggerExit += other =>
+        {
+            other.Should().BeSameAs(body2D.Collider);
+            triggerExit2D++;
+        };
+
+        NotifyContactLifecycle(body3D.Collider, other3D.Collider);
+        NotifyContactLifecycle(body2D.Collider, other2D.Collider);
+        NotifyContactLifecycle(trigger3D, body3D.Collider);
+        NotifyContactLifecycle(trigger2D, body2D.Collider);
+
+        contactEnter3D.Should().Be(1);
+        contactStay3D.Should().Be(2);
+        contactExit3D.Should().Be(1);
+        triggerEnter3D.Should().Be(1);
+        triggerStay3D.Should().Be(2);
+        triggerExit3D.Should().Be(1);
+        contactEnter2D.Should().Be(1);
+        contactStay2D.Should().Be(2);
+        contactExit2D.Should().Be(1);
+        triggerEnter2D.Should().Be(1);
+        triggerStay2D.Should().Be(2);
+        triggerExit2D.Should().Be(1);
+    }
+
+    [Fact]
     public void BodylessMixed2DTrigger_ShouldNotifyBothCollidersEnterStayExitWithoutMixedContact()
     {
         using GravitasWorldContext context = CreateMixedContext();
@@ -468,6 +573,20 @@ public sealed class ColliderTriggerTests
         collider2D.NotifyMixedContact(collider3D, isColliding: true, isChanged: true, isTriggerPair: true);
         collider3D.NotifyMixedContact(collider2D, isColliding: false, isChanged: true, isTriggerPair: true);
         collider2D.NotifyMixedContact(collider3D, isColliding: false, isChanged: true, isTriggerPair: true);
+    }
+
+    private static void NotifyContactLifecycle(LSCollider first, LSCollider second)
+    {
+        first.NotifyContact(second, isColliding: true, isChanged: true);
+        first.NotifyContact(second, isColliding: true, isChanged: false);
+        first.NotifyContact(second, isColliding: false, isChanged: true);
+    }
+
+    private static void NotifyContactLifecycle(LSCollider2D first, LSCollider2D second)
+    {
+        first.NotifyContact(second, isColliding: true, isChanged: true);
+        first.NotifyContact(second, isColliding: true, isChanged: false);
+        first.NotifyContact(second, isColliding: false, isChanged: true);
     }
 
     private static SolidBody2D CreateCircle2D(GravitasWorldContext context, Vector2d position)

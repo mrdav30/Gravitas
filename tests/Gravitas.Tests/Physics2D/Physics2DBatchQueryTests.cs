@@ -5,6 +5,7 @@ using Gravitas.Queries;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
 using SwiftCollections;
+using System;
 using Xunit;
 
 namespace Gravitas.Tests.Physics2D;
@@ -122,6 +123,41 @@ public sealed class Physics2DBatchQueryTests
         context.Query2D.OverlapPolygonAllBatch(polygonRequests, vertices, hits, ranges).Should().Be(2);
         hits[ranges[0].Start].Collider.Should().BeSameAs(circle.Collider);
         hits[ranges[1].Start].Collider.Should().BeSameAs(polygon.Collider);
+    }
+
+    [Fact]
+    public void OverlapPolygonBatch_ShouldRejectVertexRangesOutsideSuppliedSpan()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext(extent: 16);
+        Vector2d[] vertices =
+        {
+            Vector2d.Zero,
+            Vector2d.Right,
+            Vector2d.Forward
+        };
+        Physics2DHit[] closest = new Physics2DHit[1];
+
+        Action negativeStart = () => context.Query2D.OverlapPolygonBatch(
+            new[] { new PhysicsOverlapPolygon2DRequest(-1, 3, IncludeLayerZero) },
+            vertices,
+            closest);
+        Action negativeCount = () => context.Query2D.OverlapPolygonBatch(
+            new[] { new PhysicsOverlapPolygon2DRequest(0, -1, IncludeLayerZero) },
+            vertices,
+            closest);
+        Action startPastEnd = () => context.Query2D.OverlapPolygonBatch(
+            new[] { new PhysicsOverlapPolygon2DRequest(4, 0, IncludeLayerZero) },
+            vertices,
+            closest);
+        Action countPastEnd = () => context.Query2D.OverlapPolygonBatch(
+            new[] { new PhysicsOverlapPolygon2DRequest(1, 3, IncludeLayerZero) },
+            vertices,
+            closest);
+
+        negativeStart.Should().Throw<ArgumentException>();
+        negativeCount.Should().Throw<ArgumentException>();
+        startPastEnd.Should().Throw<ArgumentException>();
+        countPastEnd.Should().Throw<ArgumentException>();
     }
 
     [Fact]

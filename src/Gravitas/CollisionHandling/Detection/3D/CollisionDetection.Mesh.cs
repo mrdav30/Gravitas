@@ -27,8 +27,8 @@ public static partial class CollisionDetection
 
     private static bool DoMeshSphereCheck(CollisionWorkItem pair)
     {
-        if (pair.ColliderA is not LSMeshCollider meshCollider || pair.ColliderB is not LSSphereCollider sphere)
-            return false;
+        var meshCollider = (LSMeshCollider)pair.ColliderA;
+        var sphere = (LSSphereCollider)pair.ColliderB;
 
         if (meshCollider.Mode == MeshColliderMode.Concave)
             return MeshTriangleContactGenerator.TryBuildMeshSphereManifold(
@@ -68,8 +68,8 @@ public static partial class CollisionDetection
 
     private static bool DoMeshCapsuleCheck(CollisionWorkItem pair)
     {
-        if (pair.ColliderA is not LSMeshCollider mesh || pair.ColliderB is not LSCapsuleCollider capsule)
-            return false;
+        var mesh = (LSMeshCollider)pair.ColliderA;
+        var capsule = (LSCapsuleCollider)pair.ColliderB;
 
         if (mesh.Mode == MeshColliderMode.Concave)
             return MeshTriangleContactGenerator.TryBuildMeshCapsuleManifold(
@@ -104,8 +104,8 @@ public static partial class CollisionDetection
 
     private static bool DoMeshCuboidCheck(CollisionWorkItem pair)
     {
-        if (!TryGetPairColliders(pair, out LSMeshCollider mesh, out LSCuboidCollider cuboid))
-            return false;
+        var mesh = (LSMeshCollider)pair.ColliderA;
+        var cuboid = (LSCuboidCollider)pair.ColliderB;
 
         if (MeshTriangleContactGenerator.TryBuildMeshCuboidManifold(
             pair,
@@ -123,11 +123,8 @@ public static partial class CollisionDetection
             return false;
 
         if (!output.HasValue) return false; // Check if axisPenetration was found
-        SetContactInPairOrder(
-            pair,
-            mesh,
+        pair.Manifold.SetContact(
             output.Value.PointsOfContact.Point1,
-            cuboid,
             output.Value.PointsOfContact.Point2,
             output.Value.AxisPenetration.Depth,
             output.Value.AxisPenetration.Vector.Normalized);
@@ -137,8 +134,8 @@ public static partial class CollisionDetection
 
     private static bool DoMeshCylinderCheck(CollisionWorkItem pair)
     {
-        if (!TryGetPairColliders(pair, out LSMeshCollider mesh, out LSCylinderCollider cylinder))
-            return false;
+        var mesh = (LSMeshCollider)pair.ColliderA;
+        var cylinder = (LSCylinderCollider)pair.ColliderB;
 
         return MeshTriangleContactGenerator.TryBuildMeshCylinderManifold(
             pair,
@@ -280,8 +277,8 @@ public static partial class CollisionDetection
     {
         output = null;
 
-        if (pair.ColliderA is not LSMeshCollider mesh1 || pair.ColliderB is not LSMeshCollider mesh2)
-            return false;
+        var mesh1 = (LSMeshCollider)pair.ColliderA;
+        var mesh2 = (LSMeshCollider)pair.ColliderB;
 
         (Vector3d Point1, Vector3d Point2) = FindInitialPointsOfContact(mesh1, mesh2);
         if (!TryFindConvexMeshMeshPenetration(mesh1, mesh2, out AxisPenetration penetration))

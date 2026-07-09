@@ -953,6 +953,31 @@ public sealed class ContinuousCollisionDetectionTests
         targetCollider.BoundsMin.X.Should().BeGreaterThan(mover.Collider.BoundsMin.X);
     }
 
+    [Theory]
+    [InlineData(TestColliderShape.ConvexMesh)]
+    [InlineData(TestColliderShape.Compound)]
+    public void ContinuousMode_DynamicRelativeConvexSource_ShouldUsePreparedExactSourceSweep(TestColliderShape sourceShape)
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        (SolidBody mover, LSCollider moverCollider) = CreateMover(scenario, sourceShape);
+        ScenarioBody<LSCuboidCollider> target = scenario.CreateCuboid(
+            new Vector3d((Fixed64)4, Fixed64.Zero, Fixed64.Zero));
+        mover.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        target.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        DisableGroundQueries(mover);
+        DisableGroundQueries(target.Body);
+
+        target.Body.Sleep();
+        mover.AddForce(Vector3d.Right * (Fixed64)10);
+        scenario.Context.LateSimulate();
+
+        moverCollider.BoundsMax.X.Should().BeLessThanOrEqualTo(target.Collider.BoundsMin.X);
+        mover.LinearVelocity.X.Should().BeGreaterThanOrEqualTo(Fixed64.Zero);
+        mover.LinearVelocity.X.Should().BeLessThan((Fixed64)10);
+        target.Body.IsSleeping.Should().BeFalse();
+        target.Body.LinearVelocity.X.Should().BeGreaterThan(Fixed64.Zero);
+    }
+
     [Fact]
     public void ContinuousMode_DynamicRelativeShapeExactPath_ShouldNotAllocateAfterWarmup()
     {

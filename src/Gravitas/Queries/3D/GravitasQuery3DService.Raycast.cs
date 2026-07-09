@@ -7,6 +7,7 @@
 
 using FixedMathSharp;
 using Gravitas.Colliders;
+using Gravitas.CollisionHandling;
 using Gravitas.Support;
 using GridForge.Grids;
 using GridForge.Utility;
@@ -1042,7 +1043,7 @@ public sealed partial class GravitasQuery3DService
         for (int i = colliderIds.Count - 1; i >= 0; i--)
         {
             if (!TryBuildHitForCollider(colliderIds.DenseKeys[i], origin, direction, out Physics3DHit hit)
-                || !ShouldReplaceClosestHit(hit, found, closestHit))
+                || !PhysicsHitSelectionPolicy.ShouldReplace(hit, found, closestHit))
             {
                 continue;
             }
@@ -1130,7 +1131,7 @@ public sealed partial class GravitasQuery3DService
         for (int i = colliderIds.Count - 1; i >= 0; i--)
         {
             if (!TryBuildSweepHitForCollider(colliderIds.DenseKeys[i], origin, direction, out Physics3DHit hit)
-                || !ShouldReplaceClosestHit(hit, found, closestHit))
+                || !PhysicsHitSelectionPolicy.ShouldReplace(hit, found, closestHit))
             {
                 continue;
             }
@@ -1140,9 +1141,6 @@ public sealed partial class GravitasQuery3DService
             closestHit = hit;
         }
     }
-
-    private static bool ShouldReplaceClosestHit(Physics3DHit hit, bool found, Physics3DHit closestHit) =>
-        !found || Physics3DHitSorter.ComesBefore(hit, closestHit);
 
     private void ProcessPartitionForAllSweepHits(
         PhysicsPartition partition,
@@ -1224,7 +1222,7 @@ public sealed partial class GravitasQuery3DService
         for (int i = colliderIds.Count - 1; i >= 0; i--)
         {
             if (!TryBuildConvexSweepHitForCollider(colliderIds.DenseKeys[i], out Physics3DHit hit)
-                || !ShouldReplaceClosestHit(hit, found, closestHit))
+                || !PhysicsHitSelectionPolicy.ShouldReplace(hit, found, closestHit))
             {
                 continue;
             }
@@ -1329,8 +1327,8 @@ public sealed partial class GravitasQuery3DService
         if (!found)
             return false;
 
-        Vector3d point = GetSweepSurfacePoint(collider, sweepCenter, direction);
-        Vector3d normal = ResolveSweepNormal(collider, point, sweepCenter, direction);
+        Vector3d point = ContinuousCollisionContactPolicy.ResolveSweptSpherePoint(collider, sweepCenter, direction);
+        Vector3d normal = ContinuousCollisionContactPolicy.ResolveSweptSphereNormal(collider, point, sweepCenter, direction);
         sweepHit = new Physics3DHit(collider, point, normal, distance, direction);
         return true;
     }
@@ -1446,44 +1444,6 @@ public sealed partial class GravitasQuery3DService
     {
         SolidBody? body = collider.Body;
         return collider.IsStatic || body!.IsKinematic;
-    }
-
-    private static Vector3d GetSweepSurfacePoint(LSCollider collider, Vector3d sweepCenter, Vector3d direction)
-    {
-        Vector3d centerDelta = sweepCenter - collider.Center;
-        if (centerDelta.MagnitudeSquared <= Fixed64.Epsilon)
-            return collider.Center - direction * collider.ScaledRadius;
-
-        return collider.ClosestPointOnSurface(sweepCenter);
-    }
-
-    private static Vector3d ResolveSweepNormal(
-        LSCollider collider,
-        Vector3d point,
-        Vector3d sweepCenter,
-        Vector3d direction)
-    {
-        Vector3d fromPointToSweepCenter = sweepCenter - point;
-        if ((collider is LSCuboidCollider || collider is LSCylinderCollider || collider is LSConeCollider)
-            && fromPointToSweepCenter.MagnitudeSquared > Fixed64.Epsilon)
-        {
-            return fromPointToSweepCenter.Normalized;
-        }
-
-        Vector3d normal = collider.GetNormalAtPoint(point);
-        if (normal.MagnitudeSquared > Fixed64.Epsilon)
-        {
-            normal = normal.Normalized;
-            if (collider is LSMeshCollider && Vector3d.Dot(normal, direction) > Fixed64.Zero)
-                return -normal;
-
-            return normal;
-        }
-
-        if (fromPointToSweepCenter.MagnitudeSquared > Fixed64.Epsilon)
-            return -fromPointToSweepCenter.Normalized;
-
-        return direction.MagnitudeSquared > Fixed64.Epsilon ? -direction.Normalized : Vector3d.Zero;
     }
 
 }

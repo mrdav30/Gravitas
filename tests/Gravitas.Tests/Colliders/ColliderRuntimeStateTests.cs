@@ -176,6 +176,26 @@ public sealed class ColliderRuntimeStateTests
     }
 
     [Theory]
+    [InlineData(0, 1, 0, 0, 1, 0)]
+    [InlineData(0, -1, 0, 0, -1, 0)]
+    [InlineData(0, 0, 0, 1, 0, 0)]
+    public void CapsuleGetNormalAtPoint_WithAxisCenterFallbacks_ShouldUseStableLocalDirections(
+        int pointX,
+        int pointY,
+        int pointZ,
+        int expectedX,
+        int expectedY,
+        int expectedZ)
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSCapsuleCollider> capsule = scenario.CreateCapsule(Vector3d.Zero);
+
+        Vector3d normal = capsule.Collider.GetNormalAtPoint(new Vector3d((Fixed64)pointX, (Fixed64)pointY, (Fixed64)pointZ));
+
+        normal.Should().Be(new Vector3d((Fixed64)expectedX, (Fixed64)expectedY, (Fixed64)expectedZ));
+    }
+
+    [Theory]
     [InlineData(1, 4, 0, 1, 0, 0)]
     [InlineData(0, 4, 1, 0, 0, 1)]
     [InlineData(0, -4, -1, 0, 0, -1)]

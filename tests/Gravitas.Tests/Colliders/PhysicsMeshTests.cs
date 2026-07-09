@@ -241,6 +241,26 @@ public sealed class PhysicsMeshTests
     }
 
     [Fact]
+    public void MeshColliderInertia_WithZeroScaleAxes_ShouldNotDivideByZero()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSMeshCollider collider = MeshTestFixtures.CreateConvexCube();
+        var agent = new TestMatterAgent(
+            context,
+            new FixedTransform(
+                Vector3d.Zero,
+                FixedQuaternion.Identity,
+                new Vector3d(Fixed64.Zero, (Fixed64)2, Fixed64.Zero)));
+        collider.InitializeWithNoBody(agent);
+
+        Action calculate = () => _ = collider.CalculateInertiaTensor(
+            Fixed64.One,
+            new Vector3d((Fixed64)3, (Fixed64)4, (Fixed64)5));
+
+        calculate.Should().NotThrow();
+    }
+
+    [Fact]
     public void CalculateInertiaTensor_ForReversedClosedVolume_ShouldMatchForwardWinding()
     {
         LSMeshCollider forward = MeshTestFixtures.CreateConvexCube();

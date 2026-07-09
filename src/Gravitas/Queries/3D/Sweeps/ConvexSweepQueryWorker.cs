@@ -339,18 +339,8 @@ internal sealed class ConvexSweepQueryWorker
         LSCollider targetCollider,
         Vector3d point,
         Vector3d resultNormal,
-        Vector3d fallbackNormal)
-    {
-        Vector3d normal = targetCollider.GetNormalAtPoint(point);
-        if (normal.MagnitudeSquared <= Fixed64.Epsilon)
-            normal = resultNormal.MagnitudeSquared > Fixed64.Epsilon ? resultNormal : fallbackNormal;
-
-        if (normal.MagnitudeSquared <= Fixed64.Epsilon)
-            return _direction.MagnitudeSquared > Fixed64.Epsilon ? -_direction : Vector3d.Zero;
-
-        normal = normal.Normalized;
-        return Vector3d.Dot(normal, _direction) > Fixed64.Zero ? -normal : normal;
-    }
+        Vector3d fallbackNormal) =>
+        ConvexSweepHitPolicy.ResolveHitNormal(targetCollider, point, resultNormal, fallbackNormal, _direction);
 
     private GjkResult ComputeDistance(ConvexShape sourceShape, ConvexShape targetShape)
     {

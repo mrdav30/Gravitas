@@ -17,8 +17,8 @@ public static partial class CollisionDetection
 
     private static bool DoCylinderSphereCheck(CollisionWorkItem pair)
     {
-        if (!TryGetPairColliders(pair, out LSCylinderCollider cylinder, out LSSphereCollider sphere))
-            return false;
+        var cylinder = (LSCylinderCollider)pair.ColliderA;
+        var sphere = (LSSphereCollider)pair.ColliderB;
 
         Vector3d cylinderPoint = cylinder.ClosestPointOnSurface(sphere.Center);
         Vector3d delta = sphere.Center - cylinderPoint;
@@ -28,11 +28,8 @@ public static partial class CollisionDetection
         Fixed64 distance = delta.Magnitude;
         Vector3d normal = ResolveNormal(delta, sphere.Center - cylinder.Center);
         Vector3d spherePoint = sphere.Center - normal * sphere.ScaledRadius;
-        SetContactInPairOrder(
-            pair,
-            cylinder,
+        pair.Manifold.SetContact(
             cylinderPoint,
-            sphere,
             spherePoint,
             sphere.ScaledRadius - distance,
             normal);
@@ -42,8 +39,18 @@ public static partial class CollisionDetection
 
     private static bool DoCylinderCapsuleCheck(CollisionWorkItem pair)
     {
-        if (!TryGetPairColliders(pair, out LSCylinderCollider cylinder, out LSCapsuleCollider capsule))
-            return false;
+        LSCylinderCollider cylinder;
+        LSCapsuleCollider capsule;
+        if (pair.ColliderA is LSCylinderCollider cylinderA)
+        {
+            cylinder = cylinderA;
+            capsule = (LSCapsuleCollider)pair.ColliderB;
+        }
+        else
+        {
+            cylinder = (LSCylinderCollider)pair.ColliderB;
+            capsule = (LSCapsuleCollider)pair.ColliderA;
+        }
 
         if (!TestCylinderCapsuleSeparatingAxes(cylinder, capsule, out AxisPenetration penetration))
             return false;
@@ -68,8 +75,8 @@ public static partial class CollisionDetection
 
     private static bool DoCylindersCheck(CollisionWorkItem pair)
     {
-        if (pair.ColliderA is not LSCylinderCollider cylinderA || pair.ColliderB is not LSCylinderCollider cylinderB)
-            return false;
+        var cylinderA = (LSCylinderCollider)pair.ColliderA;
+        var cylinderB = (LSCylinderCollider)pair.ColliderB;
 
         if (!TestCylinderCylinderSeparatingAxes(cylinderA, cylinderB, out AxisPenetration penetration))
             return false;
@@ -90,8 +97,8 @@ public static partial class CollisionDetection
 
     private static bool DoCuboidCylinderCheck(CollisionWorkItem pair)
     {
-        if (!TryGetPairColliders(pair, out LSCuboidCollider cuboid, out LSCylinderCollider cylinder))
-            return false;
+        var cuboid = (LSCuboidCollider)pair.ColliderA;
+        var cylinder = (LSCylinderCollider)pair.ColliderB;
 
         if (!TestCuboidCylinderSeparatingAxes(cuboid, cylinder, out AxisPenetration penetration))
             return false;
@@ -101,11 +108,8 @@ public static partial class CollisionDetection
 
         Vector3d cuboidPoint = cuboid.ClosestPointOnSurface(cylinder.Center);
         Vector3d cylinderPoint = cylinder.ClosestPointOnSurface(cuboidPoint);
-        SetContactInPairOrder(
-            pair,
-            cuboid,
+        pair.Manifold.SetContact(
             cuboidPoint,
-            cylinder,
             cylinderPoint,
             penetration.Depth,
             penetration.Axis);
@@ -174,11 +178,8 @@ public static partial class CollisionDetection
         AxisPenetration penetration)
     {
         Vector3d pointOnCuboid = pointOnCylinder + penetration.Axis * penetration.Depth;
-        AddContactInPairOrder(
-            pair,
-            cuboid,
+        pair.Manifold.AddContact(
             pointOnCuboid,
-            cylinder,
             pointOnCylinder,
             penetration.Depth,
             penetration.Axis);
@@ -379,33 +380,6 @@ public static partial class CollisionDetection
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool TryGetPairColliders<TFirst, TSecond>(
-        CollisionWorkItem pair,
-        out TFirst first,
-        out TSecond second)
-        where TFirst : LSCollider
-        where TSecond : LSCollider
-    {
-        if (pair.ColliderA is TFirst firstA && pair.ColliderB is TSecond secondB)
-        {
-            first = firstA;
-            second = secondB;
-            return true;
-        }
-
-        if (pair.ColliderA is TSecond secondA && pair.ColliderB is TFirst firstB)
-        {
-            first = firstB;
-            second = secondA;
-            return true;
-        }
-
-        first = null!;
-        second = null!;
-        return false;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void SetContactInPairOrder(
         CollisionWorkItem pair,
         LSCollider first,
@@ -422,25 +396,6 @@ public static partial class CollisionDetection
         }
 
         pair.Manifold.SetContact(pointOnSecond, pointOnFirst, depth, -normalFirstToSecond);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void AddContactInPairOrder(
-        CollisionWorkItem pair,
-        LSCollider first,
-        Vector3d pointOnFirst,
-        LSCollider second,
-        Vector3d pointOnSecond,
-        Fixed64 depth,
-        Vector3d normalFirstToSecond)
-    {
-        if (ReferenceEquals(pair.ColliderA, first))
-        {
-            pair.Manifold.AddContact(pointOnFirst, pointOnSecond, depth, normalFirstToSecond);
-            return;
-        }
-
-        pair.Manifold.AddContact(pointOnSecond, pointOnFirst, depth, -normalFirstToSecond);
     }
 
     #endregion

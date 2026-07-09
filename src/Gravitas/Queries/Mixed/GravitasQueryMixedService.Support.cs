@@ -82,7 +82,7 @@ public sealed partial class GravitasQueryMixedService
         Vector3d to2D = sweepCenter - point3D;
         Vector3d normal3DTo2D = to2D.MagnitudeSquared > Fixed64.Epsilon
             ? to2D.Normalized
-            : direction.MagnitudeSquared > Fixed64.Epsilon ? -direction.Normalized : Vector3d.Right;
+            : -direction;
         Vector2d planarNormal = new(normal3DTo2D.X, normal3DTo2D.Z);
         Vector2d planarPoint = new(sweepCenter.X, sweepCenter.Z);
         if (planarNormal.MagnitudeSquared > Fixed64.Epsilon)
@@ -124,7 +124,7 @@ public sealed partial class GravitasQueryMixedService
         if (to2D.MagnitudeSquared > Fixed64.Epsilon)
             return to2D.Normalized;
 
-        return direction.MagnitudeSquared > Fixed64.Epsilon ? direction.Normalized : Vector3d.Down;
+        return direction;
     }
 
     private static bool TrySweepCircleSlabSide(

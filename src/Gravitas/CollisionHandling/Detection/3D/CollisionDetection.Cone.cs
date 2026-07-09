@@ -16,8 +16,8 @@ public static partial class CollisionDetection
 {
     private static bool DoConeSphereCheck(CollisionWorkItem pair)
     {
-        if (!TryGetPairColliders(pair, out LSConeCollider cone, out LSSphereCollider sphere))
-            return false;
+        var cone = (LSConeCollider)pair.ColliderA;
+        var sphere = (LSSphereCollider)pair.ColliderB;
 
         Vector3d conePoint = cone.ClosestPointOnSurface(sphere.Center);
         Vector3d delta = sphere.Center - conePoint;
@@ -27,11 +27,8 @@ public static partial class CollisionDetection
         Fixed64 distance = delta.Magnitude;
         Vector3d normal = ResolveNormal(delta, sphere.Center - cone.Center);
         Vector3d spherePoint = sphere.Center - normal * sphere.ScaledRadius;
-        SetContactInPairOrder(
-            pair,
-            cone,
+        pair.Manifold.SetContact(
             conePoint,
-            sphere,
             spherePoint,
             sphere.ScaledRadius - distance,
             normal);
@@ -71,8 +68,8 @@ public static partial class CollisionDetection
 
     private static bool DoMeshConeCheck(CollisionWorkItem pair)
     {
-        if (!TryGetPairColliders(pair, out LSMeshCollider mesh, out LSConeCollider cone))
-            return false;
+        var mesh = (LSMeshCollider)pair.ColliderA;
+        var cone = (LSConeCollider)pair.ColliderB;
 
         if (TryFindMeshConeTriangleContact(
                 mesh,
@@ -83,7 +80,7 @@ public static partial class CollisionDetection
                 out Vector3d normalMeshToCone,
                 out Fixed64 depth))
         {
-            SetContactInPairOrder(pair, mesh, pointOnMesh, cone, pointOnCone, depth, normalMeshToCone);
+            pair.Manifold.SetContact(pointOnMesh, pointOnCone, depth, normalMeshToCone);
             return true;
         }
 
@@ -97,7 +94,7 @@ public static partial class CollisionDetection
         if (depth < Fixed64.Zero)
             depth = Fixed64.Zero;
 
-        SetContactInPairOrder(pair, mesh, pointOnMesh, cone, pointOnCone, depth, normalMeshToCone);
+        pair.Manifold.SetContact(pointOnMesh, pointOnCone, depth, normalMeshToCone);
         return true;
     }
 

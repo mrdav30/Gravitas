@@ -123,6 +123,24 @@ public sealed class SolidBody2DMassPropertiesTests
         body.LocalCenterOfMassOffset.Should().Be(collider.ScaledLocalOffset);
     }
 
+    [Fact]
+    public void LocalCenterOfMassOffset_ShouldNoOpForSameExplicitValueAndAllowInactiveSetup()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        var inactive = new SolidBody2D(new TestMatterAgent(context), new LSCircleCollider2D(Fixed64.One));
+
+        inactive.LocalCenterOfMassOffset = Vector2d.Right;
+        inactive.LocalCenterOfMassOffset.Should().Be(Vector2d.Right);
+
+        SolidBody2D body = CreateBody(context, new LSCircleCollider2D(Fixed64.One), Fixed64.One);
+        body.LocalCenterOfMassOffset = Vector2d.Forward;
+        body.Sleep();
+
+        body.LocalCenterOfMassOffset = Vector2d.Forward;
+
+        body.IsSleeping.Should().BeTrue();
+    }
+
     private static SolidBody2D CreateBody(
         GravitasWorldContext context,
         LSCollider2D collider,

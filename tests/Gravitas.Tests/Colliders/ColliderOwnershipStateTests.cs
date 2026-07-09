@@ -1,6 +1,7 @@
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
+using Gravitas.Support;
 using Gravitas.Tests.Support;
 using GridForge.Grids;
 using GridForge.Spatial;
@@ -21,6 +22,173 @@ public sealed class ColliderOwnershipStateTests
 
         setPosition.Should().Throw<InvalidOperationException>();
         setRotation.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void UnboundColliderWorldAndTransform_ShouldExposeMissingBinding()
+    {
+        var collider = new LSSphereCollider();
+
+        collider.World.Should().BeNull();
+        Action readTransform = () => _ = collider.Transform;
+
+        readTransform.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void BodylessColliderWorldTransformAndRotation_ShouldUseAgentBinding()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        var transform = new FixedTransform(
+            new Vector3d(Fixed64.One, (Fixed64)2, (Fixed64)3),
+            FixedQuaternion.Identity,
+            Vector3d.One);
+        var agent = new TestMatterAgent(scenario.Context, transform);
+        var collider = new LSSphereCollider();
+
+        collider.InitializeWithNoBody(agent);
+        collider.World.Should().BeSameAs(scenario.Context.World);
+        collider.Transform.Should().BeSameAs(transform);
+        collider.Position = transform.Position;
+        agent.Transform.Position.Should().Be(transform.Position);
+        collider.Position = Vector3d.Forward;
+        agent.Transform.Position.Should().Be(Vector3d.Forward);
+        collider.Rotation = FixedQuaternion.Identity;
+        collider.Rotation.Should().Be(FixedQuaternion.Identity);
+
+        FixedQuaternion rotation = FixedQuaternion.FromAxisAngle(Vector3d.Up, Fixed64.Half);
+        collider.Rotation = rotation;
+
+        agent.Transform.Rotation.Should().Be(collider.Rotation);
+        agent.Transform.Rotation.Should().NotBe(FixedQuaternion.Identity);
+        collider.Transform.Should().BeSameAs(transform);
+    }
+
+    [Fact]
+    public void BindingAndHierarchyIdentity_ShouldTrackUnregisteredAndRegisteredState()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        var collider3D = new LSSphereCollider();
+        var collider2D = new LSCircleCollider2D(Fixed64.Half);
+
+        collider3D.HasHostBinding.Should().BeFalse();
+        collider2D.HasHostBinding.Should().BeFalse();
+        collider3D.HierarchyKey.Should().Be(ColliderHierarchyKey.None);
+        collider2D.HierarchyKey.Should().Be(ColliderHierarchyKey.None);
+        collider2D.Position.Should().Be(Vector2d.Zero);
+        collider2D.Rotation.Should().Be(Fixed64.Zero);
+
+        scenario.InitializeStaticCollider(collider3D, Vector3d.Zero);
+        collider2D.InitializeWithNoBody(new TestMatterAgent(scenario.Context));
+
+        collider3D.HasHostBinding.Should().BeTrue();
+        collider2D.HasHostBinding.Should().BeTrue();
+        collider3D.HierarchyKey.Should().Be(ColliderHierarchyKey.Create3D(collider3D.Id));
+        collider2D.HierarchyKey.Should().Be(ColliderHierarchyKey.Create2D(collider2D.Id));
+
+        collider3D.Deactivate();
+        collider2D.Deactivate();
+
+        collider3D.HasHostBinding.Should().BeTrue();
+        collider2D.HasHostBinding.Should().BeFalse();
+        collider3D.HierarchyKey.Should().Be(ColliderHierarchyKey.None);
+        collider2D.HierarchyKey.Should().Be(ColliderHierarchyKey.None);
+    }
+
+    [Fact]
+    public void PreRegistration2DActiveAndTriggerSetters_ShouldRemainLocal()
+    {
+        var collider = new LSCircleCollider2D(Fixed64.Half);
+
+        collider.IsActive = true;
+        collider.IsActive.Should().BeTrue();
+        collider.IsActive = false;
+        collider.IsActive.Should().BeFalse();
+        collider.IsActive = false;
+        collider.IsActive.Should().BeFalse();
+        collider.IsTrigger = false;
+        collider.IsTrigger.Should().BeFalse();
+        collider.IsTrigger = true;
+        collider.IsTrigger.Should().BeTrue();
+        collider.IsTrigger = true;
+        collider.IsTrigger.Should().BeTrue();
+
+        collider.Deactivate();
+
+        collider.HasHostBinding.Should().BeFalse();
+        collider.IsActive.Should().BeFalse();
+    }
+
+    [Fact]
+    public void IgnoredCollisionLayers_ShouldIgnoreSameValueAndWakeOnChange()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> body3D = scenario.CreateSphere(Vector3d.Zero);
+        SolidBody2D body2D = CreateCircle2D(scenario.Context, Vector2d.Zero);
+        body3D.Body.Sleep();
+        body2D.Sleep();
+
+        body3D.Collider.IgnoredCollisionLayers = PhysicsLayerMask.None;
+        body2D.Collider.IgnoredCollisionLayers = PhysicsLayerMask.None;
+
+        body3D.Body.IsAwakeForCollision.Should().BeFalse();
+        body2D.IsAwakeForCollision.Should().BeFalse();
+
+        PhysicsLayerMask mask = PhysicsLayerMask.FromLayer(3);
+        body3D.Collider.IgnoredCollisionLayers = mask;
+        body2D.Collider.IgnoredCollisionLayers = mask;
+
+        body3D.Collider.IgnoredCollisionLayers.Should().Be(mask);
+        body2D.Collider.IgnoredCollisionLayers.Should().Be(mask);
+        body3D.Body.IsAwakeForCollision.Should().BeTrue();
+        body2D.IsAwakeForCollision.Should().BeTrue();
+    }
+
+    [Fact]
+    public void BodyColliderWorldAndTransform_ShouldUseSimulatedBodyBinding()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(1, 2, 3));
+
+        body.Collider.World.Should().BeSameAs(scenario.Context.World);
+        body.Collider.Transform.Should().BeSameAs(body.Body.PositionTransform);
+        body.Collider.Velocity.Should().Be(body.Body.LinearVelocity);
+    }
+
+    [Fact]
+    public void CompoundPartTransform_ShouldUseOwnerBinding()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        var collider = new LSCompoundCollider(
+            CompoundColliderPart.Sphere(Fixed64.Half, new Vector3d(-Fixed64.Half, Fixed64.Zero, Fixed64.Zero)),
+            CompoundColliderPart.Sphere(Fixed64.Half, new Vector3d(Fixed64.Half, Fixed64.Zero, Fixed64.Zero)));
+        var transform = new FixedTransform(Vector3d.Right, FixedQuaternion.Identity, Vector3d.One);
+        var body = new SolidBody(new TestMatterAgent(scenario.Context, transform), collider)
+        {
+            Mass = Fixed64.One
+        };
+        body.Initialize(transform.Position, transform.Rotation);
+        LSCollider part = collider.GetPartCollider(0);
+
+        part.World.Should().BeSameAs(scenario.Context.World);
+        part.Transform.Should().BeSameAs(collider.Transform);
+        part.Velocity.Should().Be(body.LinearVelocity);
+    }
+
+    [Theory]
+    [InlineData(0, 1, 1)]
+    [InlineData(1, 0, 1)]
+    [InlineData(1, 1, 0)]
+    [InlineData(-1, 1, 1)]
+    [InlineData(1, -1, 1)]
+    [InlineData(1, 1, -1)]
+    public void CuboidSize_WithNonPositiveComponent_ShouldThrow(int x, int y, int z)
+    {
+        var collider = new LSCuboidCollider();
+
+        Action setSize = () => collider.Size = new Vector3d((Fixed64)x, (Fixed64)y, (Fixed64)z);
+
+        setSize.Should().Throw<ArgumentException>().WithParameterName("value");
     }
 
     [Fact]
@@ -57,6 +225,28 @@ public sealed class ColliderOwnershipStateTests
         child.Collider.TopParent3D.Should().BeSameAs(topParent.Collider);
         child.Collider.Parent3D.Should().BeSameAs(middleParent.Collider);
         child.Collider.ParentId.Should().Be(topParent.Collider.Id);
+    }
+
+    [Fact]
+    public void HierarchyLookup_ShouldResolveRegistered2DAnd3DKeysAcrossDimensions()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> collider3D = scenario.CreateSphere(Vector3d.Zero);
+        SolidBody2D collider2D = CreateCircle2D(scenario.Context, Vector2d.Zero);
+        var node3D = (IColliderHierarchyNode)collider3D.Collider;
+        var node2D = (IColliderHierarchyNode)collider2D.Collider;
+
+        node3D.TryGetHierarchyColliderByKey(ColliderHierarchyKey.None, out _).Should().BeFalse();
+        node2D.TryGetHierarchyColliderByKey(ColliderHierarchyKey.None, out _).Should().BeFalse();
+        node3D.TryGetHierarchyColliderByKey(collider3D.Collider.HierarchyKey, out IColliderHierarchyNode? resolved3D).Should().BeTrue();
+        node3D.TryGetHierarchyColliderByKey(collider2D.Collider.HierarchyKey, out IColliderHierarchyNode? resolved2DFrom3D).Should().BeTrue();
+        node2D.TryGetHierarchyColliderByKey(collider2D.Collider.HierarchyKey, out IColliderHierarchyNode? resolved2D).Should().BeTrue();
+        node2D.TryGetHierarchyColliderByKey(collider3D.Collider.HierarchyKey, out IColliderHierarchyNode? resolved3DFrom2D).Should().BeTrue();
+
+        resolved3D.Should().BeSameAs(collider3D.Collider);
+        resolved2DFrom3D.Should().BeSameAs(collider2D.Collider);
+        resolved2D.Should().BeSameAs(collider2D.Collider);
+        resolved3DFrom2D.Should().BeSameAs(collider3D.Collider);
     }
 
     [Fact]
@@ -328,6 +518,27 @@ public sealed class ColliderOwnershipStateTests
         PhysicsMixedPartition refreshedMixedPartition =
             GetMixedPartition(scenario.Context, collider.MixedPartitionCoordinates![0]);
         PartitionContains2DCollider(refreshedMixedPartition, collider.Id).Should().BeTrue();
+    }
+
+    [Fact]
+    public void IsActiveSetter_WithPure2DStaticCollider_ShouldRefreshOnlyPrimaryPartition()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        scenario.Context.Settings.RuntimeMode = PhysicsRuntimeMode.TwoD;
+        LSCircleCollider2D collider = CreateStaticCircle2D(scenario.Context, Vector2d.Zero);
+
+        collider.IsPartitioned.Should().BeTrue();
+        collider.IsMixedPartitioned.Should().BeFalse();
+
+        collider.IsActive = false;
+
+        collider.IsPartitioned.Should().BeFalse();
+        collider.IsMixedPartitioned.Should().BeFalse();
+
+        collider.IsActive = true;
+
+        collider.IsPartitioned.Should().BeTrue();
+        collider.IsMixedPartitioned.Should().BeFalse();
     }
 
     private static void AdvancePhysicsStep(PhysicsScenarioBuilder scenario)

@@ -402,26 +402,23 @@ public sealed partial class SolidBody2D
 
     private bool IsEligibleDynamicContinuousCollisionTarget(SolidBody2D target)
     {
-        if (ReferenceEquals(target, this)
-            || !target.Active
-            || target.IsPositionFullyFrozen
-            || target.IsKinematic
-            || target.Collider.IsTrigger
-            || !Context.Physics2D.RequireCollisionPair(Collider, target.Collider))
-        {
-            return false;
-        }
-
-        return true;
+        return ContinuousCollisionTargetPolicy.AllowsDynamic2DTarget(
+            ReferenceEquals(target, this),
+            target.Active,
+            target.IsPositionFullyFrozen,
+            target.IsKinematic,
+            target.Collider.IsTrigger,
+            Context.Physics2D.RequireCollisionPair(Collider, target.Collider));
     }
 
     private bool IsEligibleDynamicMixed3DTarget(SolidBody target)
     {
-        return target.Active
-            && !target.IsPositionFullyFrozen
-            && !target.IsKinematic
-            && !target.Collider.IsTrigger
-            && Context.MixedCollisions.RequireCollisionPair(target.Collider, Collider);
+        return ContinuousCollisionTargetPolicy.AllowsMixedDynamicTarget(
+            target.Active,
+            target.IsPositionFullyFrozen,
+            target.IsKinematic,
+            target.Collider.IsTrigger,
+            Context.MixedCollisions.RequireCollisionPair(target.Collider, Collider));
     }
 
 }

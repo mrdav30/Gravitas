@@ -13,7 +13,7 @@ using System.Runtime.CompilerServices;
 
 namespace Gravitas;
 
-public sealed class PhysicsPartition2D : IVoxelPartition
+public sealed class PhysicsPartition2D : IVoxelPartition, IRetainedPhysicsPartition<GravitasCollision2DService>
 {
     private GravitasCollision2DService? _owner;
     private int _emptySinceFrame = -1;
@@ -294,4 +294,16 @@ public sealed class PhysicsPartition2D : IVoxelPartition
     private void MarkEmpty(int frame) => _emptySinceFrame = frame;
 
     public void SetParentIndex(WorldVoxelIndex parentIndex) => WorldIndex = parentIndex;
+
+    int IRetainedPhysicsPartition<GravitasCollision2DService>.RetainedIndex => RetainedIndex;
+
+    bool IRetainedPhysicsPartition<GravitasCollision2DService>.IsEmpty => IsEmpty;
+
+    int IRetainedPhysicsPartition<GravitasCollision2DService>.EmptySinceFrame => EmptySinceFrame;
+
+    bool IRetainedPhysicsPartition<GravitasCollision2DService>.IsOwnedBy(GravitasCollision2DService owner) => IsOwnedBy(owner);
+
+    void IRetainedPhysicsPartition<GravitasCollision2DService>.SetRetainedIndex(int index) => SetRetainedIndex(index);
+
+    void IRetainedPhysicsPartition<GravitasCollision2DService>.ClearRetainedIndex() => ClearRetainedIndex();
 }

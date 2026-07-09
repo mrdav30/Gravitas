@@ -58,6 +58,29 @@ public sealed class DynamicCcdCandidateIndexTests
     }
 
     [Fact]
+    public void Query_ShouldUseFullBoundsTupleOrdering()
+    {
+        var index = new DynamicCcdCandidateIndex(8);
+        index.Add(70, new FixedBoundVolume(new Vector3d(Fixed64.Zero, Fixed64.Zero, Fixed64.Zero), new Vector3d(Fixed64.One, Fixed64.One, Fixed64.One)));
+        index.Add(60, new FixedBoundVolume(new Vector3d(Fixed64.Zero, Fixed64.Zero, Fixed64.Zero), new Vector3d(Fixed64.One, Fixed64.One, (Fixed64)2)));
+        index.Add(50, new FixedBoundVolume(new Vector3d(Fixed64.Zero, Fixed64.Zero, Fixed64.Zero), new Vector3d(Fixed64.One, (Fixed64)2, Fixed64.One)));
+        index.Add(40, new FixedBoundVolume(new Vector3d(Fixed64.Zero, Fixed64.Zero, Fixed64.Zero), new Vector3d((Fixed64)2, Fixed64.One, Fixed64.One)));
+        index.Add(30, new FixedBoundVolume(new Vector3d(Fixed64.Zero, Fixed64.Zero, Fixed64.Half), new Vector3d(Fixed64.One, Fixed64.One, Fixed64.One)));
+        index.Add(20, new FixedBoundVolume(new Vector3d(Fixed64.Zero, Fixed64.Half, Fixed64.Zero), new Vector3d(Fixed64.One, Fixed64.One, Fixed64.One)));
+        index.Add(10, new FixedBoundVolume(new Vector3d(-Fixed64.Half, Fixed64.Zero, Fixed64.Zero), new Vector3d(Fixed64.One, Fixed64.One, Fixed64.One)));
+        index.Sort();
+
+        var results = new SwiftList<int>(8);
+        index.Query(
+            new FixedBoundVolume(
+                new Vector3d(-Fixed64.One, -Fixed64.One, -Fixed64.One),
+                new Vector3d((Fixed64)3, (Fixed64)3, (Fixed64)3)),
+            results);
+
+        results.Should().Equal(10, 70, 60, 50, 40, 30, 20);
+    }
+
+    [Fact]
     public void Query2D_ShouldIncludeTargetsWhoseSweptBoundsOverlapAfterMovement()
     {
         var index = new DynamicCcdCandidateIndex2D(4);
@@ -103,6 +126,25 @@ public sealed class DynamicCcdCandidateIndexTests
         results[0].Should().Be(20);
         results[1].Should().Be(10);
         results[2].Should().Be(30);
+    }
+
+    [Fact]
+    public void Query2D_ShouldUseFullBoundsTupleOrdering()
+    {
+        var index = new DynamicCcdCandidateIndex2D(6);
+        index.Add(50, new DynamicCcdPlanarBounds(Fixed64.Zero, Fixed64.Zero, Fixed64.One, Fixed64.One));
+        index.Add(40, new DynamicCcdPlanarBounds(Fixed64.Zero, Fixed64.Zero, Fixed64.One, (Fixed64)2));
+        index.Add(30, new DynamicCcdPlanarBounds(Fixed64.Zero, Fixed64.Zero, (Fixed64)2, Fixed64.One));
+        index.Add(20, new DynamicCcdPlanarBounds(Fixed64.Zero, Fixed64.Half, Fixed64.One, Fixed64.One));
+        index.Add(10, new DynamicCcdPlanarBounds(-Fixed64.Half, Fixed64.Zero, Fixed64.One, Fixed64.One));
+        index.Sort();
+
+        var results = new SwiftList<int>(6);
+        index.Query(
+            new DynamicCcdPlanarBounds(-Fixed64.One, -Fixed64.One, (Fixed64)3, (Fixed64)3),
+            results);
+
+        results.Should().Equal(10, 50, 40, 30, 20);
     }
 
     [Fact]

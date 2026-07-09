@@ -241,7 +241,19 @@ public sealed class GravitasConstraint2DService
         return _suppressedColliderPairs.ContainsKey(CreateColliderPairKey(colliderA.Id, colliderB.Id));
     }
 
-    internal bool TryGetJointForSolver(int jointId, out Joint2D? joint) => TryGetJoint(jointId, out joint);
+    internal bool TryGetJointForSolver(int jointId, out Joint2D? joint)
+    {
+        if (!TryGetJoint(jointId, out joint))
+            return false;
+
+        if (!joint!.IsEnabled || !joint.HasSolverParticipant())
+        {
+            joint = null;
+            return false;
+        }
+
+        return true;
+    }
 
     internal void RemoveSuppressionsForCollider(int colliderId)
     {

@@ -214,10 +214,7 @@ public partial class SolidBody
     {
         if (targetKind == ContinuousCollisionTargetKind.Dynamic3D)
         {
-            SolidBody? targetBody = target3D?.Body;
-            if (targetBody == null)
-                return false;
-
+            SolidBody targetBody = target3D!.Body!;
             Fixed64 frameFraction = ResolveContinuousCollisionFrameFraction(hitElapsedTime);
             Vector3d targetPositionAtImpact = targetBody.ContinuousCollisionFrameStart
                 + targetBody.ContinuousCollisionFrameDisplacement * frameFraction;
@@ -232,10 +229,7 @@ public partial class SolidBody
 
         if (targetKind == ContinuousCollisionTargetKind.Dynamic2D)
         {
-            SolidBody2D? targetBody = target2D?.Body;
-            if (targetBody == null)
-                return false;
-
+            SolidBody2D targetBody = target2D!.Body!;
             Fixed64 frameFraction = ResolveContinuousCollisionFrameFraction(hitElapsedTime);
             Vector2d targetPositionAtImpact = targetBody.ContinuousCollisionFrameStart
                 + targetBody.ContinuousCollisionFrameDisplacement * frameFraction;
@@ -259,10 +253,7 @@ public partial class SolidBody
         Fixed64 hitElapsedTime,
         Fixed64 remainingTime)
     {
-        Vector3d normal = normalForSource.MagnitudeSquared > Fixed64.Epsilon
-            ? normalForSource.Normalized
-            : Vector3d.Zero;
-        if (normal == Vector3d.Zero)
+        if (!ContinuousCollisionImpulsePolicy.TryResolveImpactNormal(normalForSource, out Vector3d normal))
             return false;
 
         Fixed64 constrainedInverseMassA = GetConstrainedInverseMass(normal);
@@ -292,11 +283,11 @@ public partial class SolidBody
         Fixed64 hitElapsedTime,
         Fixed64 remainingTime)
     {
-        Vector3d normal = normalForSource.MagnitudeSquared > Fixed64.Epsilon
-            ? normalForSource.Normalized
-            : Vector3d.Zero;
+        if (!ContinuousCollisionImpulsePolicy.TryResolveImpactNormal(normalForSource, out Vector3d normal))
+            return false;
+
         Vector2d planarNormal = normal.ToVector2d();
-        if (normal == Vector3d.Zero || planarNormal == Vector2d.Zero)
+        if (planarNormal == Vector2d.Zero)
             return false;
 
         Fixed64 constrainedInverseMassA = GetConstrainedInverseMass(normal);

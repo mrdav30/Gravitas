@@ -60,8 +60,7 @@ public sealed partial class GravitasQueryMixedService
         }
 
         if (collider is LSCapsuleCollider capsule)
-        {
-            bool found = TrySweepCircleAgainstCapsule(
+            return TrySweepCircleAgainstCapsule(
                 start,
                 direction2D,
                 length,
@@ -71,15 +70,10 @@ public sealed partial class GravitasQueryMixedService
                 direction3D,
                 capsule,
                 sourceCollider,
-                out hit,
-                out bool handled);
-            if (handled)
-                return found;
-        }
+                out hit);
 
         if (collider is LSCylinderCollider cylinder)
-        {
-            bool found = TrySweepCircleAgainstCylinder(
+            return TrySweepCircleAgainstCylinder(
                 start,
                 direction2D,
                 length,
@@ -89,11 +83,7 @@ public sealed partial class GravitasQueryMixedService
                 direction3D,
                 cylinder,
                 sourceCollider,
-                out hit,
-                out bool handled);
-            if (handled)
-                return found;
-        }
+                out hit);
 
         if (collider is LSConeCollider cone)
             return TrySweepCircleAgainstCone(start, direction2D, length, radius, slabCenterY, halfThickness, direction3D, cone, sourceCollider, out hit);
@@ -159,12 +149,10 @@ public sealed partial class GravitasQueryMixedService
         Vector3d direction3D,
         LSCapsuleCollider capsule,
         LSCollider2D? sourceCollider,
-        out PhysicsMixedHit hit,
-        out bool handled)
+        out PhysicsMixedHit hit)
     {
         if (!TryGetVerticalSegmentInterval(capsule.LineSegmentStart, capsule.LineSegmentEnd, out Fixed64 segmentMinY, out Fixed64 segmentMaxY))
         {
-            handled = true;
             Fixed64 slabMinY = slabCenterY - halfThickness;
             Fixed64 slabMaxY = slabCenterY + halfThickness;
             if (!FiniteSlabProjectionSweep.TrySweepCircleAgainstCapsule(
@@ -194,7 +182,6 @@ public sealed partial class GravitasQueryMixedService
             return true;
         }
 
-        handled = true;
         Fixed64 verticalExcess = GetIntervalDistance(segmentMinY, segmentMaxY, slabCenterY - halfThickness, slabCenterY + halfThickness);
         Fixed64 capsuleRadius = capsule.ScaledRadius;
         if (verticalExcess > capsuleRadius)
@@ -204,9 +191,6 @@ public sealed partial class GravitasQueryMixedService
         }
 
         Fixed64 planarRadiusSqr = capsuleRadius * capsuleRadius - verticalExcess * verticalExcess;
-        if (planarRadiusSqr < Fixed64.Zero)
-            planarRadiusSqr = Fixed64.Zero;
-
         return TryBuildCircleAgainstPlanarCircleTargetHit(
             start,
             direction,
@@ -232,12 +216,10 @@ public sealed partial class GravitasQueryMixedService
         Vector3d direction3D,
         LSCylinderCollider cylinder,
         LSCollider2D? sourceCollider,
-        out PhysicsMixedHit hit,
-        out bool handled)
+        out PhysicsMixedHit hit)
     {
         if (!TryGetVerticalSegmentInterval(cylinder.LineSegmentStart, cylinder.LineSegmentEnd, out Fixed64 segmentMinY, out Fixed64 segmentMaxY))
         {
-            handled = true;
             Fixed64 slabMinY = slabCenterY - halfThickness;
             Fixed64 slabMaxY = slabCenterY + halfThickness;
             if (!FiniteSlabProjectionSweep.TrySweepCircleAgainstCylinder(
@@ -267,7 +249,6 @@ public sealed partial class GravitasQueryMixedService
             return true;
         }
 
-        handled = true;
         if (!IntervalsOverlap(segmentMinY, segmentMaxY, slabCenterY - halfThickness, slabCenterY + halfThickness))
         {
             hit = default;
@@ -489,7 +470,7 @@ public sealed partial class GravitasQueryMixedService
                 continue;
             }
 
-            if (found && candidate.Distance >= bestDistance)
+            if (!PhysicsHitSelectionPolicy.ShouldReplaceDistance(candidate.Distance, found, bestDistance))
                 continue;
 
             best = candidate;

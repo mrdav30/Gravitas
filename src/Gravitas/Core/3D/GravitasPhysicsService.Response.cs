@@ -117,14 +117,10 @@ public sealed partial class GravitasPhysicsService
         GravitasConstraint3DService constraints = _context.Constraints3D;
         for (int jointId = 1; jointId <= constraints.PeakJointCount; jointId++)
         {
-            if (!constraints.TryGetJointForSolver(jointId, out Joint3D? joint)
-                || !joint!.IsEnabled
-                || !joint.HasSolverParticipant())
-            {
+            if (!constraints.TryGetJointForSolver(jointId, out Joint3D? joint))
                 continue;
-            }
 
-            AddIslandNodeIfMovable(joint.BodyA);
+            AddIslandNodeIfMovable(joint!.BodyA);
             AddIslandNodeIfMovable(joint.BodyB);
         }
     }
@@ -134,14 +130,10 @@ public sealed partial class GravitasPhysicsService
         GravitasConstraint3DService constraints = _context.Constraints3D;
         for (int jointId = 1; jointId <= constraints.PeakJointCount; jointId++)
         {
-            if (!constraints.TryGetJointForSolver(jointId, out Joint3D? joint)
-                || !joint!.IsEnabled
-                || !joint.HasSolverParticipant())
-            {
+            if (!constraints.TryGetJointForSolver(jointId, out Joint3D? joint))
                 continue;
-            }
 
-            int nodeA = FindIslandNode(joint.BodyA);
+            int nodeA = FindIslandNode(joint!.BodyA);
             int nodeB = FindIslandNode(joint.BodyB);
             if (nodeA >= 0 && nodeB >= 0)
                 UnionIslandNodes(nodeA, nodeB);
@@ -153,14 +145,10 @@ public sealed partial class GravitasPhysicsService
         GravitasConstraint3DService constraints = _context.Constraints3D;
         for (int jointId = 1; jointId <= constraints.PeakJointCount; jointId++)
         {
-            if (!constraints.TryGetJointForSolver(jointId, out Joint3D? joint)
-                || !joint!.IsEnabled
-                || !joint.HasSolverParticipant())
-            {
+            if (!constraints.TryGetJointForSolver(jointId, out Joint3D? joint))
                 continue;
-            }
 
-            int nodeA = FindIslandNode(joint.BodyA);
+            int nodeA = FindIslandNode(joint!.BodyA);
             int nodeB = FindIslandNode(joint.BodyB);
             int rootKey = ResolveConstraintRootKey(nodeA, nodeB);
             if (rootKey < 0)

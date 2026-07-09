@@ -62,6 +62,17 @@ public sealed class ColliderShapeDefinitionTests
         zeroHeight.Should().Throw<ArgumentException>().WithParameterName("height");
     }
 
+    [Theory]
+    [InlineData(0, 1, 1)]
+    [InlineData(1, 0, 1)]
+    [InlineData(1, 1, 0)]
+    public void CuboidDefinition_ShouldRejectNonPositiveSizeComponents(int x, int y, int z)
+    {
+        Action create = () => _ = ColliderShapeDefinition.Cuboid(new Vector3d((Fixed64)x, (Fixed64)y, (Fixed64)z));
+
+        create.Should().Throw<ArgumentException>().WithParameterName("size");
+    }
+
     [Fact]
     public void ConvexMeshDefinition_ShouldSnapshotSourceArrays()
     {

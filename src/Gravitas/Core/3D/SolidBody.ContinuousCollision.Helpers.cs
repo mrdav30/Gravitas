@@ -15,31 +15,24 @@ namespace Gravitas;
 
 public partial class SolidBody
 {
-    private bool IsEligibleDynamicContinuousCollisionTarget(SolidBody target)
-    {
-        if (ReferenceEquals(target, this)
-            || !target.Active
-            || target.IsPositionFullyFrozen
-            || target.IsKinematic
-            || target.Collider.IsTrigger
-            || target.Collider.IsSibling(Collider)
-            || Context.Physics.IsLayerCollisionDisabled(Collider.Layer, target.Collider.Layer)
-            || !ColliderCollisionFilter.AllowsPhysicalPair(Collider, target.Collider))
-        {
-            return false;
-        }
+    private bool IsEligibleDynamicContinuousCollisionTarget(SolidBody target) =>
+        ContinuousCollisionTargetPolicy.AllowsDynamic3DTarget(
+            ReferenceEquals(target, this),
+            target.Active,
+            target.IsPositionFullyFrozen,
+            target.IsKinematic,
+            target.Collider.IsTrigger,
+            target.Collider.IsSibling(Collider),
+            Context.Physics.IsLayerCollisionDisabled(Collider.Layer, target.Collider.Layer),
+            ColliderCollisionFilter.AllowsPhysicalPair(Collider, target.Collider));
 
-        return true;
-    }
-
-    private bool IsEligibleDynamicMixed2DTarget(SolidBody2D target)
-    {
-        return target.Active
-            && !target.IsPositionFullyFrozen
-            && !target.IsKinematic
-            && !target.Collider.IsTrigger
-            && Context.MixedCollisions.RequireCollisionPair(Collider, target.Collider);
-    }
+    private bool IsEligibleDynamicMixed2DTarget(SolidBody2D target) =>
+        ContinuousCollisionTargetPolicy.AllowsMixedDynamicTarget(
+            target.Active,
+            target.IsPositionFullyFrozen,
+            target.IsKinematic,
+            target.Collider.IsTrigger,
+            Context.MixedCollisions.RequireCollisionPair(Collider, target.Collider));
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private bool ShouldUseContinuousCollision(out ContinuousCollisionMode mode)
@@ -97,34 +90,36 @@ public partial class SolidBody
 
     private bool IsValidContinuousCollisionTarget(LSCollider? hitCollider)
     {
-        if (hitCollider == null
-            || ReferenceEquals(hitCollider, Collider)
-            || ContinuousCollisionCandidateOrdering.IsIgnoredTarget(hitCollider, _continuousCollisionHandoffIgnoredCollider3D)
-            || hitCollider.IsTrigger
-            || hitCollider.IsSibling(Collider)
-            || Context.Physics.IsLayerCollisionDisabled(Collider.Layer, hitCollider.Layer)
-            || !ColliderCollisionFilter.AllowsPhysicalPair(Collider, hitCollider))
-        {
+        if (hitCollider == null)
             return false;
-        }
 
         SolidBody? hitBody = hitCollider.Body;
-        return hitCollider.IsStatic || hitBody!.IsKinematic;
+        return ContinuousCollisionTargetPolicy.AllowsStaticOrKinematic3DTarget(
+            hasCollider: true,
+            ReferenceEquals(hitCollider, Collider),
+            ContinuousCollisionCandidateOrdering.IsIgnoredTarget(hitCollider, _continuousCollisionHandoffIgnoredCollider3D),
+            hitCollider.IsTrigger,
+            hitCollider.IsSibling(Collider),
+            Context.Physics.IsLayerCollisionDisabled(Collider.Layer, hitCollider.Layer),
+            ColliderCollisionFilter.AllowsPhysicalPair(Collider, hitCollider),
+            hitCollider.IsStatic,
+            hitBody != null && hitBody.IsKinematic);
     }
 
     private bool IsValidMixedContinuousCollisionHit(PhysicsMixedHit hit)
     {
         LSCollider2D? hitCollider = hit.Collider2D;
-        if (hitCollider == null
-            || ContinuousCollisionCandidateOrdering.IsIgnoredTarget(hitCollider, _continuousCollisionHandoffIgnoredCollider2D)
-            || hitCollider.IsTrigger
-            || !Context.MixedCollisions.RequireCollisionPair(Collider, hitCollider))
-        {
+        if (hitCollider == null)
             return false;
-        }
 
         SolidBody2D? hitBody = hitCollider.Body;
-        return hitCollider.IsStatic || hitBody!.IsKinematic;
+        return ContinuousCollisionTargetPolicy.AllowsMixedStaticOrKinematicTarget(
+            hasCollider: true,
+            ContinuousCollisionCandidateOrdering.IsIgnoredTarget(hitCollider, _continuousCollisionHandoffIgnoredCollider2D),
+            hitCollider.IsTrigger,
+            Context.MixedCollisions.RequireCollisionPair(Collider, hitCollider),
+            hitCollider.IsStatic,
+            hitBody != null && hitBody.IsKinematic);
     }
 
 }

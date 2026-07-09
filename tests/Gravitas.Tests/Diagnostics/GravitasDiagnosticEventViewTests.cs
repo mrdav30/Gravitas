@@ -477,6 +477,17 @@ public sealed class GravitasDiagnosticEventViewTests
         limitEvent.TryAsJoint(out GravitasJointDiagnosticView limitView).Should().BeTrue();
         limitView.LimitError.Should().Be((Fixed64)9);
 
+        CreateEvent(GravitasDiagnosticEventKind.JointRegistered, jointId: 94)
+            .TryAsJoint(out GravitasJointDiagnosticView registeredView)
+            .Should()
+            .BeTrue();
+        registeredView.JointId.Should().Be(94);
+        CreateEvent(GravitasDiagnosticEventKind.JointRemoved, jointId: 95)
+            .TryAsJoint(out GravitasJointDiagnosticView removedView)
+            .Should()
+            .BeTrue();
+        removedView.JointId.Should().Be(95);
+
         GravitasDiagnosticEvent ragdollEvent = CreateEvent(
             GravitasDiagnosticEventKind.RagdollActivated,
             bodyId: 101,

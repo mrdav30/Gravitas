@@ -41,9 +41,6 @@ public sealed partial class GravitasQueryMixedService
         }
 
         Fixed64 planarSphereRadiusSqr = sphereRadius * sphereRadius - verticalExcess * verticalExcess;
-        if (planarSphereRadiusSqr < Fixed64.Zero)
-            planarSphereRadiusSqr = Fixed64.Zero;
-
         Fixed64 combinedPlanarRadius = radius + FixedMath.Sqrt(planarSphereRadiusSqr);
         Vector2d sphereCenter = new(sphere.Center.X, sphere.Center.Z);
         if (!TrySweepPointInPlane(start, direction, length, sphereCenter, combinedPlanarRadius, out Fixed64 distance))
@@ -204,14 +201,14 @@ public sealed partial class GravitasQueryMixedService
             bool currentInside = IsInsideYPlane(current, planeY, keepAbove);
             if (currentInside)
             {
-                if (!previousInside && TryIntersectYPlane(previous, current, planeY, out Vector3d intersection))
-                    AddClippedPoint(output, ref outputCount, intersection);
+                if (!previousInside)
+                    AddClippedPoint(output, ref outputCount, IntersectYPlane(previous, current, planeY));
 
                 AddClippedPoint(output, ref outputCount, current);
             }
-            else if (previousInside && TryIntersectYPlane(previous, current, planeY, out Vector3d intersection))
+            else if (previousInside)
             {
-                AddClippedPoint(output, ref outputCount, intersection);
+                AddClippedPoint(output, ref outputCount, IntersectYPlane(previous, current, planeY));
             }
 
             previous = current;
@@ -269,25 +266,11 @@ public sealed partial class GravitasQueryMixedService
         return best;
     }
 
-    private static bool TryIntersectYPlane(Vector3d first, Vector3d second, Fixed64 planeY, out Vector3d intersection)
+    private static Vector3d IntersectYPlane(Vector3d first, Vector3d second, Fixed64 planeY)
     {
         Fixed64 deltaY = second.Y - first.Y;
-        if (deltaY.Abs() <= Fixed64.Epsilon)
-        {
-            intersection = default;
-            return false;
-        }
-
         Fixed64 t = (planeY - first.Y) / deltaY;
-        if (t < -Fixed64.Epsilon || t > Fixed64.One + Fixed64.Epsilon)
-        {
-            intersection = default;
-            return false;
-        }
-
-        t = FixedMath.Clamp01(t);
-        intersection = first + (second - first) * t;
-        return true;
+        return first + (second - first) * FixedMath.Clamp01(t);
     }
 
     private static void AddClippedPoint(Span<Vector3d> points, ref int count, Vector3d point)
@@ -495,47 +478,43 @@ public sealed partial class GravitasQueryMixedService
             ref best);
 
         Vector2d edge = segmentEnd - segmentStart;
-        Fixed64 edgeLengthSqr = edge.MagnitudeSquared;
-        if (edgeLengthSqr > Fixed64.Epsilon)
+        Fixed64 edgeLength = edge.Magnitude;
+        Vector2d edgeDirection = edge / edgeLength;
+        Vector2d normal = new(-edgeDirection.Y, edgeDirection.X);
+        Fixed64 signedStart = Vector2d.Dot(start - segmentStart, normal);
+        Fixed64 signedDirection = Vector2d.Dot(direction, normal);
+        if (signedDirection.Abs() > Fixed64.Epsilon)
         {
-            Fixed64 edgeLength = FixedMath.Sqrt(edgeLengthSqr);
-            Vector2d edgeDirection = edge / edgeLength;
-            Vector2d normal = new(-edgeDirection.Y, edgeDirection.X);
-            Fixed64 signedStart = Vector2d.Dot(start - segmentStart, normal);
-            Fixed64 signedDirection = Vector2d.Dot(direction, normal);
-            if (signedDirection.Abs() > Fixed64.Epsilon)
-            {
-                TryKeepEarlierSweep(
-                    TrySweepPointAgainstSegmentOffsetLine(
-                        start,
-                        direction,
-                        length,
-                        segmentStart,
-                        edgeDirection,
-                        edgeLength,
-                        signedStart,
-                        signedDirection,
-                        radius,
-                        out Fixed64 positiveDistance),
-                    positiveDistance,
-                    ref found,
-                    ref best);
-                TryKeepEarlierSweep(
-                    TrySweepPointAgainstSegmentOffsetLine(
-                        start,
-                        direction,
-                        length,
-                        segmentStart,
-                        edgeDirection,
-                        edgeLength,
-                        signedStart,
-                        signedDirection,
-                        -radius,
-                        out Fixed64 negativeDistance),
-                    negativeDistance,
-                    ref found,
-                    ref best);
-            }
+            TryKeepEarlierSweep(
+                TrySweepPointAgainstSegmentOffsetLine(
+                    start,
+                    direction,
+                    length,
+                    segmentStart,
+                    edgeDirection,
+                    edgeLength,
+                    signedStart,
+                    signedDirection,
+                    radius,
+                    out Fixed64 positiveDistance),
+                positiveDistance,
+                ref found,
+                ref best);
+            TryKeepEarlierSweep(
+                TrySweepPointAgainstSegmentOffsetLine(
+                    start,
+                    direction,
+                    length,
+                    segmentStart,
+                    edgeDirection,
+                    edgeLength,
+                    signedStart,
+                    signedDirection,
+                    -radius,
+                    out Fixed64 negativeDistance),
+                negativeDistance,
+                ref found,
+                ref best);
         }
 
         distance = best;
@@ -595,11 +574,7 @@ public sealed partial class GravitasQueryMixedService
     private static Fixed64 DistanceSquaredToSegment3D(Vector3d point, Vector3d segmentStart, Vector3d segmentEnd)
     {
         Vector3d edge = segmentEnd - segmentStart;
-        Fixed64 edgeLengthSqr = edge.MagnitudeSquared;
-        if (edgeLengthSqr <= Fixed64.Epsilon)
-            return (point - segmentStart).MagnitudeSquared;
-
-        Fixed64 t = Vector3d.Dot(point - segmentStart, edge) / edgeLengthSqr;
+        Fixed64 t = Vector3d.Dot(point - segmentStart, edge) / edge.MagnitudeSquared;
         t = FixedMath.Clamp01(t);
         Vector3d closest = segmentStart + edge * t;
         return (point - closest).MagnitudeSquared;

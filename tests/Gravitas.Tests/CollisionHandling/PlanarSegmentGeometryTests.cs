@@ -29,4 +29,46 @@ public sealed class PlanarSegmentGeometryTests
 
         PlanarSegmentGeometry.ClosestPoint(point, start, end).Should().Be(start);
     }
+
+    [Fact]
+    public void TryIntersect_ShouldReturnFirstSegmentParameterForCrossingSegments()
+    {
+        bool result = PlanarSegmentGeometry.TryIntersect(
+            new Vector2d(Fixed64.Zero, Fixed64.Zero),
+            new Vector2d((Fixed64)4, Fixed64.Zero),
+            new Vector2d((Fixed64)2, (Fixed64)(-1)),
+            new Vector2d(Fixed64.Zero, (Fixed64)2),
+            out Fixed64 firstT);
+
+        result.Should().BeTrue();
+        firstT.Should().Be(Fixed64.Half);
+    }
+
+    [Fact]
+    public void TryIntersect_ShouldRejectParallelOrOutOfRangeSegments()
+    {
+        PlanarSegmentGeometry.TryIntersect(
+                new Vector2d(Fixed64.Zero, Fixed64.Zero),
+                new Vector2d((Fixed64)4, Fixed64.Zero),
+                new Vector2d(Fixed64.Zero, Fixed64.One),
+                new Vector2d((Fixed64)4, Fixed64.Zero),
+                out _)
+            .Should().BeFalse();
+
+        PlanarSegmentGeometry.TryIntersect(
+                new Vector2d(Fixed64.Zero, Fixed64.Zero),
+                new Vector2d(Fixed64.One, Fixed64.Zero),
+                new Vector2d((Fixed64)2, (Fixed64)(-1)),
+                new Vector2d(Fixed64.Zero, (Fixed64)2),
+                out _)
+            .Should().BeFalse();
+
+        PlanarSegmentGeometry.TryIntersect(
+                new Vector2d(Fixed64.Zero, Fixed64.Zero),
+                new Vector2d((Fixed64)4, Fixed64.Zero),
+                new Vector2d((Fixed64)2, (Fixed64)2),
+                new Vector2d(Fixed64.Zero, Fixed64.One),
+                out _)
+            .Should().BeFalse();
+    }
 }

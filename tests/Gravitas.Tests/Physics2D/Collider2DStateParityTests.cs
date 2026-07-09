@@ -77,6 +77,19 @@ public sealed class Collider2DStateParityTests
     }
 
     [Fact]
+    public void Deactivate_WithUnboundOrAlreadyInactiveCollider_ShouldBeIdempotent()
+    {
+        var collider = new LSCircleCollider2D(Fixed64.Half);
+
+        collider.Deactivate();
+        collider.Deactivate();
+
+        collider.IsActive.Should().BeFalse();
+        collider.Id.Should().Be(-1);
+        collider.ServiceIndex.Should().Be(-1);
+    }
+
+    [Fact]
     public void SetPosition_WithChangedCollider_ShouldAdvanceRuntimeAndBroadPhaseVersionsOnce()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext(extent: 64);

@@ -232,14 +232,11 @@ public partial class SolidBody
     {
         refined = default;
         exactSupported = false;
-        LSCollider? target = candidate.Collider;
-        if (target == null)
-            return false;
 
         if (Collider is LSSphereCollider)
             return false;
 
-        if (target is not LSSphereCollider targetSphere)
+        if (candidate.Collider is not LSSphereCollider targetSphere)
             return false;
 
         return TryRefineContinuousCollisionAgainstTargetSphere(targetSphere, displacement, direction, out refined, out exactSupported);
@@ -532,51 +529,10 @@ public partial class SolidBody
         if (!_shapeExactContinuousSweepWorker.TrySweep(target, out Vector3d sphereCenterAtImpact, out Fixed64 distance))
             return false;
 
-        Vector3d point = ResolveSweptSphereContinuousPoint(target, sphereCenterAtImpact, relativeDirection);
-        Vector3d normal = ResolveSweptSphereContinuousNormal(target, point, sphereCenterAtImpact, relativeDirection);
+        Vector3d point = ContinuousCollisionContactPolicy.ResolveSweptSpherePoint(target, sphereCenterAtImpact, relativeDirection);
+        Vector3d normal = ContinuousCollisionContactPolicy.ResolveSweptSphereNormal(target, point, sphereCenterAtImpact, relativeDirection);
         hit = new Physics3DHit(target, point, normal, distance, relativeDirection);
         return true;
-    }
-
-    private static Vector3d ResolveSweptSphereContinuousPoint(
-        LSCollider target,
-        Vector3d sphereCenterAtImpact,
-        Vector3d direction)
-    {
-        Vector3d centerDelta = sphereCenterAtImpact - target.Center;
-        if (centerDelta.MagnitudeSquared <= Fixed64.Epsilon)
-            return target.Center - direction * target.ScaledRadius;
-
-        return target.ClosestPointOnSurface(sphereCenterAtImpact);
-    }
-
-    private static Vector3d ResolveSweptSphereContinuousNormal(
-        LSCollider target,
-        Vector3d point,
-        Vector3d sphereCenterAtImpact,
-        Vector3d direction)
-    {
-        Vector3d fromPointToSphereCenter = sphereCenterAtImpact - point;
-        if ((target is LSCuboidCollider || target is LSCylinderCollider || target is LSConeCollider)
-            && fromPointToSphereCenter.MagnitudeSquared > Fixed64.Epsilon)
-        {
-            return fromPointToSphereCenter.Normalized;
-        }
-
-        Vector3d normal = target.GetNormalAtPoint(point);
-        if (normal.MagnitudeSquared > Fixed64.Epsilon)
-        {
-            normal = normal.Normalized;
-            if (target is LSMeshCollider && Vector3d.Dot(normal, direction) > Fixed64.Zero)
-                return -normal;
-
-            return normal;
-        }
-
-        if (fromPointToSphereCenter.MagnitudeSquared > Fixed64.Epsilon)
-            return fromPointToSphereCenter.Normalized;
-
-        return direction.MagnitudeSquared > Fixed64.Epsilon ? -direction.Normalized : Vector3d.Zero;
     }
 
     private bool TryGetFirstDynamicMixedContinuousCollisionHit(

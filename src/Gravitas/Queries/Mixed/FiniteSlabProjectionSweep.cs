@@ -737,9 +737,6 @@ internal static class FiniteSlabProjectionSweep
     {
         Vector3d local = cone.Rotation.Inverse() * (new Vector3d(cone.Center.X, planeY, cone.Center.Z) - cone.Center);
         Fixed64 radius = cone.RadiusAtLocalY(local.Y);
-        if (radius < Fixed64.Zero || radius > cone.ScaledRadius)
-            return;
-
         Vector3d localDirection = cone.Rotation.Inverse() * new Vector3d(direction.X, Fixed64.Zero, direction.Y);
         Vector3d localRadial = new(localDirection.X, Fixed64.Zero, localDirection.Z);
         Fixed64 radialMagnitude = localRadial.Magnitude;

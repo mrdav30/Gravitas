@@ -8,6 +8,7 @@
 using Gravitas.CollisionHandling;
 using GridForge.Grids;
 using SwiftCollections;
+using System;
 
 namespace Gravitas;
 
@@ -50,6 +51,7 @@ internal sealed partial class GravitasMixedCollisionService
     private readonly SwiftList<CollisionPairMixed> _mixedResponsePairs = new();
     private readonly SwiftList<MixedIslandNode> _mixedIslandNodes = new();
     private readonly SwiftList<MixedIslandConstraint> _mixedIslandConstraints = new();
+    private readonly Action<PhysicsMixedPartition> _releaseRetainedPartition;
 
     private int _retainedPartitionRetirementCursor;
     private int _cached3DQueryRefreshFrame = int.MinValue;
@@ -61,6 +63,7 @@ internal sealed partial class GravitasMixedCollisionService
     {
         SwiftThrowHelper.ThrowIfNull(context, nameof(context));
         _context = context;
+        _releaseRetainedPartition = ReleasePartition;
     }
 
     internal GravitasWorldContext Context => _context;

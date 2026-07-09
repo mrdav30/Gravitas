@@ -57,7 +57,7 @@ public sealed partial class GravitasQueryMixedService
             if (!TrySweepSphereAgainst2D(start, direction, length, radius, part, out PhysicsMixedHit candidate))
                 continue;
 
-            if (found && candidate.Distance >= bestDistance)
+            if (!PhysicsHitSelectionPolicy.ShouldReplaceDistance(candidate.Distance, found, bestDistance))
                 continue;
 
             best = candidate;
@@ -264,7 +264,7 @@ public sealed partial class GravitasQueryMixedService
             return;
 
         Fixed64 distance = (planeY - start.Y) / direction.Y;
-        if (distance < Fixed64.Zero || distance > length)
+        if (distance > length)
             return;
 
         Vector3d point = start + direction * distance;
@@ -295,27 +295,19 @@ public sealed partial class GravitasQueryMixedService
             Vector2d first = collider.GetVertexUnchecked(i);
             Vector2d second = collider.GetVertexUnchecked((i + 1) % vertexCount);
             Vector2d edge = second - first;
-            Fixed64 edgeLengthSqr = edge.MagnitudeSquared;
-            if (edgeLengthSqr <= Fixed64.Epsilon)
-                continue;
-
-            Fixed64 edgeLength = FixedMath.Sqrt(edgeLengthSqr);
+            Fixed64 edgeLength = edge.Magnitude;
             Vector2d edgeDirection = edge / edgeLength;
             Vector2d outward = new(edge.Y, -edge.X);
             if (Vector2d.Dot(polygonCenter - first, outward) > Fixed64.Zero)
                 outward = -outward;
-            Fixed64 outwardLengthSqr = outward.MagnitudeSquared;
-            if (outwardLengthSqr <= Fixed64.Epsilon)
-                continue;
-
-            outward /= FixedMath.Sqrt(outwardLengthSqr);
+            outward /= outward.Magnitude;
             Fixed64 signedStart = Vector2d.Dot(planarStart - first, outward);
             Fixed64 signedDirection = Vector2d.Dot(planarDirection, outward);
             if (signedStart <= radius || signedDirection >= -Fixed64.Epsilon)
                 continue;
 
             Fixed64 distance = (radius - signedStart) / signedDirection;
-            if (distance < Fixed64.Zero || distance > length)
+            if (distance > length)
                 continue;
 
             Vector3d sweepCenter = start + direction * distance;
@@ -387,7 +379,7 @@ public sealed partial class GravitasQueryMixedService
             return;
 
         Fixed64 distance = (planeY - start.Y) / direction.Y;
-        if (distance < Fixed64.Zero || distance > length)
+        if (distance > length)
             return;
 
         Vector3d point = start + direction * distance;
@@ -429,9 +421,6 @@ public sealed partial class GravitasQueryMixedService
         }
 
         Fixed64 distance = planarDistance / planarSpeed;
-        if (distance < Fixed64.Zero || distance > length)
-            return;
-
         Fixed64 y = start.Y + direction.Y * distance;
         if (y < slabMinY || y > slabMaxY)
             return;
@@ -551,9 +540,6 @@ public sealed partial class GravitasQueryMixedService
 
         Vector3d segment = segmentEnd - segmentStart;
         Fixed64 segmentLengthSqr = segment.MagnitudeSquared;
-        if (segmentLengthSqr <= Fixed64.Epsilon)
-            return TrySweepPointInSpace(start, direction, length, segmentStart, radius, out distance);
-
         bool found = false;
         Fixed64 best = Fixed64.MaxValue;
         TryKeepEarlierSweep(
@@ -615,12 +601,6 @@ public sealed partial class GravitasQueryMixedService
         }
 
         Fixed64 a = direction.MagnitudeSquared;
-        if (a <= Fixed64.Epsilon)
-        {
-            distance = default;
-            return false;
-        }
-
         Fixed64 b = 2 * Vector3d.Dot(startToPoint, direction);
         Fixed64 c = startToPoint.MagnitudeSquared - radiusSqr;
         if (c > Fixed64.Zero && b > Fixed64.Zero)
@@ -654,9 +634,6 @@ public sealed partial class GravitasQueryMixedService
     {
         first = default;
         second = default;
-        if (a <= Fixed64.Epsilon)
-            return false;
-
         Fixed64 discriminant = b * b - 4 * a * c;
         if (discriminant < Fixed64.Zero)
             return false;

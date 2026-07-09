@@ -7,6 +7,7 @@ using GridForge.Configuration;
 using GridForge.Grids;
 using GridForge.Spatial;
 using SwiftCollections;
+using System;
 using Xunit;
 
 namespace Gravitas.Tests.MixedDimensions;
@@ -191,6 +192,206 @@ public sealed class MixedBroadPhaseTests
         context.MixedCollisions.ActivePartitionCount.Should().Be(0);
         context.MixedCollisions.RetainedPartitionCount.Should().BeLessThan(retainedBeforeDeactivate);
         context.MixedCollisions.InactivePartitionCount.Should().BeGreaterThan(0);
+    }
+
+    [Fact]
+    public void Simulate_WithRetainedMixedPartitionsAndZeroSweepBudget_ShouldKeepRetainedPartitionsUntilBudgetRestored()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        context.Settings.RetainedPartitionTimeToKillFrames = 1;
+        context.Settings.RetainedPartitionRetirementSweepBudget = 0;
+        ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(context, Vector3d.Zero, immovable: false);
+        SolidBody2D body2D = CreateCircle2D(context, Vector2d.Zero, immovable: false);
+
+        Step(context);
+        int retainedBeforeDeactivate = context.MixedCollisions.RetainedPartitionCount;
+        body3D.Collider.Deactivate();
+        body2D.Collider.Deactivate();
+        Step(context);
+
+        context.MixedCollisions.ActivePartitionCount.Should().Be(0);
+        context.MixedCollisions.RetainedPartitionCount.Should().Be(retainedBeforeDeactivate);
+        context.MixedCollisions.InactivePartitionCount.Should().Be(0);
+
+        context.Settings.RetainedPartitionRetirementSweepBudget = 1024;
+        Step(context);
+
+        context.MixedCollisions.RetainedPartitionCount.Should().BeLessThan(retainedBeforeDeactivate);
+        context.MixedCollisions.InactivePartitionCount.Should().BeGreaterThan(0);
+    }
+
+    [Fact]
+    public void Reset_WithRetainedMixedPartitionAlreadyDetached_ShouldReleaseWithoutVoxelDetach()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(context, Vector3d.Zero, immovable: false);
+        _ = CreateCircle2D(context, Vector2d.Zero, immovable: false);
+
+        Step(context);
+        WorldVoxelIndex coordinate = body3D.Collider.MixedPartitionCoordinates![0];
+        context.World.TryGetVoxel(coordinate, out Voxel? voxel).Should().BeTrue();
+        voxel!.TryGetPartition(out PhysicsMixedPartition? partition).Should().BeTrue();
+        voxel.TryRemovePartition<PhysicsMixedPartition>().Should().BeTrue();
+
+        context.Reset();
+
+        context.MixedCollisions.RetainedPartitionCount.Should().Be(0);
+        context.MixedCollisions.ActivePartitionCount.Should().Be(0);
+        context.MixedCollisions.InactivePartitionCount.Should().Be(0);
+        partition!.IsAllocated.Should().BeFalse();
+        Action readOwner = () => _ = partition.Owner;
+        readOwner.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void RentPartition_WhenPoolEmptyAndRetainedEmptyPartitionExists_ShouldReuseRetiredPartition()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        context.Settings.RetainedPartitionRetirementSweepBudget = 0;
+        ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(context, Vector3d.Zero, immovable: false);
+        SolidBody2D body2D = CreateCircle2D(context, Vector2d.Zero, immovable: false);
+
+        Step(context);
+        _ = GetFirstMixedPartition(context, body3D.Collider.MixedPartitionCoordinates!);
+        body3D.Collider.Deactivate();
+        body2D.Collider.Deactivate();
+        Step(context);
+
+        context.MixedCollisions.ActivePartitionCount.Should().Be(0);
+        context.MixedCollisions.InactivePartitionCount.Should().Be(0);
+        context.MixedCollisions.RetainedPartitionCount.Should().BeGreaterThan(0);
+
+        int retainedBeforeRent = context.MixedCollisions.RetainedPartitionCount;
+        PhysicsMixedPartition rented = context.MixedCollisions.RentPartition();
+
+        rented.Owner.Should().BeSameAs(context.MixedCollisions);
+        context.MixedCollisions.RetainedPartitionCount.Should().Be(retainedBeforeRent - 1);
+        context.MixedCollisions.InactivePartitionCount.Should().Be(0);
+        context.MixedCollisions.ReleasePartition(rented);
+    }
+
+    [Fact]
+    public void ClearPartitionedMixedColliders_ShouldRequireForceWhenBoundsAreUnchanged()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(context, Vector3d.Zero, immovable: false);
+        SolidBody2D body2D = CreateCircle2D(context, Vector2d.Zero, immovable: false);
+
+        Step(context);
+
+        context.MixedCollisions.ClearPartitioned3DCollider(body3D.Collider).Should().BeFalse();
+        context.MixedCollisions.ClearPartitioned2DCollider(body2D.Collider).Should().BeFalse();
+
+        context.MixedCollisions.ClearPartitioned3DCollider(body3D.Collider, force: true).Should().BeTrue();
+        context.MixedCollisions.ClearPartitioned2DCollider(body2D.Collider, force: true).Should().BeTrue();
+
+        body3D.Collider.IsMixedPartitioned.Should().BeFalse();
+        body2D.Collider.IsMixedPartitioned.Should().BeFalse();
+        body3D.Collider.MixedPartitionCoordinates!.Count.Should().Be(0);
+        body2D.Collider.MixedPartitionCoordinates!.Count.Should().Be(0);
+    }
+
+    [Fact]
+    public void Refresh3DColliderPartition_WithInactiveCollider_ShouldClearMixedMembership()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(context, Vector3d.Zero, immovable: false);
+
+        Step(context);
+        body3D.Collider.IsMixedPartitioned.Should().BeTrue();
+
+        body3D.Collider.SetStatus(false);
+
+        context.MixedCollisions.Refresh3DColliderPartition(body3D.Collider).Should().BeFalse();
+
+        body3D.Collider.IsMixedPartitioned.Should().BeFalse();
+        body3D.Collider.MixedPartitionCoordinates!.Count.Should().Be(0);
+        context.MixedCollisions.Refresh3DColliderPartition(body3D.Collider).Should().BeFalse();
+    }
+
+    [Fact]
+    public void RefreshMixedPartitionAwakeState_ShouldIgnoreStaticAndUpdateDynamicBuckets()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSSphereCollider> dynamic3D = CreateSphere3D(context, Vector3d.Zero, immovable: false);
+        SolidBody2D dynamic2D = CreateCircle2D(context, Vector2d.Zero, immovable: false);
+        LSSphereCollider static3D = CreateBodylessSphere3D(context, new Vector3d((Fixed64)4, Fixed64.Zero, Fixed64.Zero));
+        LSCircleCollider2D static2D = CreateBodylessCircle2D(context, new Vector2d((Fixed64)4, Fixed64.Zero));
+
+        Step(context);
+        dynamic3D.Body.Sleep();
+        dynamic2D.Sleep();
+
+        context.MixedCollisions.Refresh3DPartitionAwakeState(static3D);
+        context.MixedCollisions.Refresh2DPartitionAwakeState(static2D);
+        context.MixedCollisions.Refresh3DPartitionAwakeState(dynamic3D.Collider);
+        context.MixedCollisions.Refresh2DPartitionAwakeState(dynamic2D.Collider);
+
+        PhysicsMixedPartition dynamic3DPartition = GetFirstMixedPartition(context, dynamic3D.Collider.MixedPartitionCoordinates!);
+        PhysicsMixedPartition dynamic2DPartition = GetFirstMixedPartition(context, dynamic2D.Collider.MixedPartitionCoordinates!);
+        ContainsId(dynamic3DPartition.ContainedAwakeDynamic3DObjects, dynamic3D.Collider.Id).Should().BeFalse();
+        ContainsId(dynamic2DPartition.ContainedAwakeDynamic2DObjects, dynamic2D.Collider.Id).Should().BeFalse();
+
+        context.MixedCollisions.Refresh3DPartitionAwakeState(new LSSphereCollider());
+        context.MixedCollisions.Refresh2DPartitionAwakeState(new LSCircleCollider2D(Fixed64.Half));
+    }
+
+    [Fact]
+    public void CollectMixedCandidates_WithStaticStyleOnlyAndCachedRefresh_ShouldFilterDynamicsAndLayers()
+    {
+        using GravitasWorldContext context = CreateMixedContext(extent: 64);
+        ScenarioBody<LSSphereCollider> dynamic3D = CreateSphere3D(context, Vector3d.Zero, immovable: false);
+        ScenarioBody<LSSphereCollider> kinematic3D = CreateSphere3D(context, Vector3d.Right * (Fixed64)2, immovable: false);
+        kinematic3D.Body.IsKinematic = true;
+        ScenarioBody<LSSphereCollider> staticBody3D = CreateSphere3D(context, Vector3d.Right * (Fixed64)4, immovable: true);
+        _ = CreateSphere3D(context, Vector3d.Right * (Fixed64)6, immovable: true, layer: new PhysicsLayer(1));
+
+        SolidBody2D dynamic2D = CreateCircle2D(context, Vector2d.Zero, immovable: false);
+        SolidBody2D kinematic2D = CreateCircle2D(context, Vector2d.Right * (Fixed64)2, immovable: false, isKinematic: true);
+        SolidBody2D staticBody2D = CreateCircle2D(context, Vector2d.Right * (Fixed64)4, immovable: true);
+        _ = CreateCircle2D(context, Vector2d.Right * (Fixed64)6, immovable: true, layer: new PhysicsLayer(1));
+        var candidates3D = new SwiftList<LSCollider>();
+        var candidates2D = new SwiftList<LSCollider2D>();
+
+        context.MixedCollisions.Collect3DCandidatesInMixedBounds(
+            new Vector3d((Fixed64)(-2), (Fixed64)(-2), (Fixed64)(-2)),
+            new Vector3d((Fixed64)8, (Fixed64)2, (Fixed64)2),
+            PhysicsLayerMask.FromLayer(0),
+            candidates3D,
+            staticStyleOnly: true,
+            cachePartitionRefresh: true);
+        context.MixedCollisions.Collect3DCandidatesInMixedBounds(
+            new Vector3d((Fixed64)(-2), (Fixed64)(-2), (Fixed64)(-2)),
+            new Vector3d((Fixed64)8, (Fixed64)2, (Fixed64)2),
+            PhysicsLayerMask.FromLayer(0),
+            candidates3D,
+            staticStyleOnly: true,
+            cachePartitionRefresh: true);
+        context.MixedCollisions.Collect2DCandidatesInMixedBounds(
+            new Vector3d((Fixed64)(-2), (Fixed64)(-2), (Fixed64)(-2)),
+            new Vector3d((Fixed64)8, (Fixed64)2, (Fixed64)2),
+            PhysicsLayerMask.FromLayer(0),
+            candidates2D,
+            staticStyleOnly: true,
+            cachePartitionRefresh: true);
+        context.MixedCollisions.Collect2DCandidatesInMixedBounds(
+            new Vector3d((Fixed64)(-2), (Fixed64)(-2), (Fixed64)(-2)),
+            new Vector3d((Fixed64)8, (Fixed64)2, (Fixed64)2),
+            PhysicsLayerMask.FromLayer(0),
+            candidates2D,
+            staticStyleOnly: true,
+            cachePartitionRefresh: true);
+
+        candidates3D.Should().Contain(collider => ReferenceEquals(collider, kinematic3D.Collider));
+        candidates3D.Should().Contain(collider => ReferenceEquals(collider, staticBody3D.Collider));
+        candidates3D.Should().NotContain(collider => ReferenceEquals(collider, dynamic3D.Collider));
+        candidates2D.Should().Contain(collider => ReferenceEquals(collider, kinematic2D.Collider));
+        candidates2D.Should().Contain(collider => ReferenceEquals(collider, staticBody2D.Collider));
+        candidates2D.Should().NotContain(collider => ReferenceEquals(collider, dynamic2D.Collider));
+        for (int i = 0; i < candidates3D.Count; i++)
+            candidates3D[i].Layer.Should().Be(new PhysicsLayer(0));
+        for (int i = 0; i < candidates2D.Count; i++)
+            candidates2D[i].Layer.Should().Be(new PhysicsLayer(0));
     }
 
     [Fact]

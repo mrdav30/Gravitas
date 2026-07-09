@@ -59,6 +59,53 @@ public sealed class BodyFreezeConstraintTests
     }
 
     [Fact]
+    public void SolidBody_InternalProjectionHelpers_ShouldRespectFullAndPerAxisFreeze()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSCuboidCollider> body = scenario.CreateCuboid(Vector3d.Zero);
+        Vector3d motion = new(Fixed64.One, (Fixed64)2, (Fixed64)3);
+
+        body.Body.ProjectLinearMotion(Vector3d.Zero).Should().Be(Vector3d.Zero);
+        body.Body.ProjectAngularMotion(Vector3d.Zero).Should().Be(Vector3d.Zero);
+
+        body.Body.FreezeAxes = BodyFreezeAxes3D.Position;
+        body.Body.ProjectLinearMotion(motion).Should().Be(Vector3d.Zero);
+        body.Body.ProjectAngularMotion(motion).Should().Be(Vector3d.Zero);
+
+        body.Body.FreezeAxes = BodyFreezeAxes3D.Rotation;
+        body.Body.ProjectLinearMotion(motion).Should().Be(motion);
+        body.Body.ProjectAngularMotion(motion).Should().Be(Vector3d.Zero);
+
+        body.Body.FreezeAxes = BodyFreezeAxes3D.PositionX | BodyFreezeAxes3D.RotationZ;
+        body.Body.ProjectLinearMotion(motion).Should().Be(new Vector3d(Fixed64.Zero, (Fixed64)2, (Fixed64)3));
+        body.Body.ProjectAngularMotion(motion).Should().Be(new Vector3d(Fixed64.One, (Fixed64)2, Fixed64.Zero));
+    }
+
+    [Fact]
+    public void SolidBody_ConstrainedMassAndInertia_ShouldReflectAxisFreeze()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSCuboidCollider> body = scenario.CreateCuboid(Vector3d.Zero);
+
+        body.Body.GetConstrainedInverseMass(Vector3d.Zero).Should().Be(Fixed64.Zero);
+        body.Body.ApplyConstrainedInverseInertia(Vector3d.Zero).Should().Be(Vector3d.Zero);
+
+        body.Body.FreezeAxes = BodyFreezeAxes3D.PositionX;
+
+        body.Body.GetConstrainedInverseMass(Vector3d.Right).Should().Be(Fixed64.Zero);
+        body.Body.GetConstrainedInverseMass(Vector3d.Up).Should().Be(body.Body.InverseMass);
+        body.Body.GetConstrainedInverseMass(Vector3d.Right + Vector3d.Up).Should().Be(body.Body.InverseMass / (Fixed64)2);
+
+        body.Body.FreezeAxes = BodyFreezeAxes3D.RotationY;
+        body.Body.ApplyConstrainedInverseInertia(Vector3d.Up).Should().Be(Vector3d.Zero);
+        body.Body.ApplyConstrainedInverseInertia(Vector3d.Right).Should().NotBe(Vector3d.Zero);
+
+        body.Body.FreezeAxes = BodyFreezeAxes3D.Position;
+        body.Body.GetConstrainedInverseMass(Vector3d.Up).Should().Be(Fixed64.Zero);
+        body.Body.ApplyConstrainedInverseInertia(Vector3d.Right).Should().Be(Vector3d.Zero);
+    }
+
+    [Fact]
     public void CollisionResponse_WithPositionYFreeze_ShouldTreatFrozenAxisAsInfiniteMass()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();

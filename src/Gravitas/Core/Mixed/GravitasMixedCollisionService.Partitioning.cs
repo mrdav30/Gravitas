@@ -96,10 +96,7 @@ internal sealed partial class GravitasMixedCollisionService
         if (!force && collider.MatchesMixedPartitionGridBounds(coverageMin, coverageMax, (int)currentKind))
             return false;
 
-        SwiftList<WorldVoxelIndex>? coordinates = collider.MixedPartitionCoordinates;
-        if (coordinates == null)
-            return false;
-
+        SwiftList<WorldVoxelIndex> coordinates = collider.MixedPartitionCoordinates!;
         GridWorld world = _context.World;
         MixedPartitionMobilityKind partitionKind = GetStoredMobilityKind(collider.MixedPartitionKind);
         try
@@ -137,10 +134,7 @@ internal sealed partial class GravitasMixedCollisionService
         if (!force && collider.MatchesMixedPartitionGridBounds(coverageMin, coverageMax, (int)currentKind))
             return false;
 
-        SwiftList<WorldVoxelIndex>? coordinates = collider.MixedPartitionCoordinates;
-        if (coordinates == null)
-            return false;
-
+        SwiftList<WorldVoxelIndex> coordinates = collider.MixedPartitionCoordinates!;
         GridWorld world = _context.World;
         MixedPartitionMobilityKind partitionKind = GetStoredMobilityKind(collider.MixedPartitionKind);
         try
@@ -170,9 +164,10 @@ internal sealed partial class GravitasMixedCollisionService
     internal void Refresh3DPartitionAwakeState(LSCollider collider)
     {
         SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
-        if (!collider.IsMixedPartitioned || collider.MixedPartitionCoordinates == null)
+        if (!collider.IsMixedPartitioned)
             return;
 
+        SwiftList<WorldVoxelIndex> coordinates = collider.MixedPartitionCoordinates!;
         SolidBody? body = collider.Body;
         if (collider.IsStatic)
             return;
@@ -181,9 +176,9 @@ internal sealed partial class GravitasMixedCollisionService
         GridWorld world = _context.World;
         try
         {
-            for (int i = 0; i < collider.MixedPartitionCoordinates.Count; i++)
+            for (int i = 0; i < coordinates.Count; i++)
             {
-                WorldVoxelIndex coordinate = collider.MixedPartitionCoordinates[i];
+                WorldVoxelIndex coordinate = coordinates[i];
                 if (!world.TryGetVoxel(coordinate, out Voxel? voxel)
                     || !GridTraversal.TryGetUniquePartition(voxel!, _redundancyChecker, out PhysicsMixedPartition? partition))
                 {
@@ -202,9 +197,10 @@ internal sealed partial class GravitasMixedCollisionService
     internal void Refresh2DPartitionAwakeState(LSCollider2D collider)
     {
         SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
-        if (!collider.IsMixedPartitioned || collider.MixedPartitionCoordinates == null)
+        if (!collider.IsMixedPartitioned)
             return;
 
+        SwiftList<WorldVoxelIndex> coordinates = collider.MixedPartitionCoordinates!;
         SolidBody2D? body = collider.Body;
         if (collider.IsStatic)
             return;
@@ -213,9 +209,9 @@ internal sealed partial class GravitasMixedCollisionService
         GridWorld world = _context.World;
         try
         {
-            for (int i = 0; i < collider.MixedPartitionCoordinates.Count; i++)
+            for (int i = 0; i < coordinates.Count; i++)
             {
-                WorldVoxelIndex coordinate = collider.MixedPartitionCoordinates[i];
+                WorldVoxelIndex coordinate = coordinates[i];
                 if (!world.TryGetVoxel(coordinate, out Voxel? voxel)
                     || !GridTraversal.TryGetUniquePartition(voxel!, _redundancyChecker, out PhysicsMixedPartition? partition))
                 {
@@ -773,167 +769,42 @@ internal sealed partial class GravitasMixedCollisionService
             && collider.Bounds.Intersects(queryBounds);
     }
 
-    private void DetachRetainedPartitions()
-    {
-        // Reset is a context boundary; retained GridForge payloads are a runtime cache, not replay state.
-        while (_retainedPartitions.Count > 0)
-        {
-            PhysicsMixedPartition partition = _retainedPartitions[_retainedPartitions.Count - 1];
-            if (!partition.IsOwnedBy(this))
-            {
-                UntrackRetainedPartition(partition);
-                continue;
-            }
+    private void DetachRetainedPartitions() => RetainedPartitionLifecycle.DetachAll(
+            _retainedPartitions,
+            _context.World,
+            this,
+            _releaseRetainedPartition,
+            nameof(PhysicsMixedPartition),
+            "Unable to detach retained mixed physics partition from its voxel during reset.");
 
-            if (_context.World.TryGetVoxel(partition.WorldIndex, out Voxel? voxel)
-                && voxel!.TryGetPartition(out PhysicsMixedPartition? attachedPartition)
-                && ReferenceEquals(attachedPartition, partition))
-            {
-                bool removed = voxel.TryRemovePartition<PhysicsMixedPartition>();
-                SwiftThrowHelper.ThrowIfTrue(
-                    !removed,
-                    nameof(PhysicsMixedPartition),
-                    "Unable to detach retained mixed physics partition from its voxel during reset.");
+    private void TrackRetainedPartition(PhysicsMixedPartition partition) => RetainedPartitionLifecycle.Track(
+            _retainedPartitions,
+            this,
+            partition,
+            nameof(PhysicsMixedPartition));
 
-                if (partition.IsOwnedBy(this))
-                    ReleasePartition(partition);
+    private void UntrackRetainedPartition(PhysicsMixedPartition partition) => RetainedPartitionLifecycle.Untrack(
+            _retainedPartitions,
+            this,
+            partition,
+            ref _retainedPartitionRetirementCursor);
 
-                continue;
-            }
+    private void RetireExpiredRetainedPartitions() => RetainedPartitionLifecycle.RetireExpired(
+            _retainedPartitions,
+            _context.World,
+            this,
+            _context.Settings.RetainedPartitionRetirementSweepBudget,
+            _context.FrameCount,
+            _context.Settings.RetainedPartitionTimeToKillFrames,
+            _releaseRetainedPartition,
+            ref _retainedPartitionRetirementCursor);
 
-            ReleasePartition(partition);
-        }
-    }
-
-    private void TrackRetainedPartition(PhysicsMixedPartition partition)
-    {
-        SwiftThrowHelper.ThrowIfNull(partition, nameof(partition));
-        SwiftThrowHelper.ThrowIfArgument(
-            partition.RetainedIndex >= 0,
-            nameof(partition),
-            "PhysicsMixedPartition is already tracked as retained.");
-
-        partition.SetRetainedIndex(_retainedPartitions.Count);
-        _retainedPartitions.Add(partition);
-    }
-
-    private void UntrackRetainedPartition(PhysicsMixedPartition partition)
-    {
-        int index = FindRetainedPartitionIndex(partition);
-        if (index < 0)
-        {
-            partition.ClearRetainedIndex();
-            return;
-        }
-
-        int lastIndex = _retainedPartitions.Count - 1;
-        if (index != lastIndex)
-        {
-            PhysicsMixedPartition movedPartition = _retainedPartitions[lastIndex];
-            _retainedPartitions[index] = movedPartition;
-            movedPartition.SetRetainedIndex(index);
-        }
-
-        _retainedPartitions.RemoveAt(lastIndex);
-        partition.ClearRetainedIndex();
-
-        if (_retainedPartitionRetirementCursor > index)
-            _retainedPartitionRetirementCursor--;
-        if (_retainedPartitionRetirementCursor >= _retainedPartitions.Count)
-            _retainedPartitionRetirementCursor = 0;
-    }
-
-    private int FindRetainedPartitionIndex(PhysicsMixedPartition partition)
-    {
-        int index = partition.RetainedIndex;
-        if ((uint)index < (uint)_retainedPartitions.Count && ReferenceEquals(_retainedPartitions[index], partition))
-            return index;
-
-        for (int i = 0; i < _retainedPartitions.Count; i++)
-            if (ReferenceEquals(_retainedPartitions[i], partition))
-                return i;
-
-        return -1;
-    }
-
-    private void RetireExpiredRetainedPartitions()
-    {
-        int budget = _context.Settings.RetainedPartitionRetirementSweepBudget;
-        if (budget <= 0 || _retainedPartitions.Count == 0)
-            return;
-
-        int inspected = 0;
-        while (inspected < budget && _retainedPartitions.Count > 0)
-        {
-            if (_retainedPartitionRetirementCursor >= _retainedPartitions.Count)
-                _retainedPartitionRetirementCursor = 0;
-
-            PhysicsMixedPartition partition = _retainedPartitions[_retainedPartitionRetirementCursor];
-            inspected++;
-
-            if (!ShouldRetireRetainedPartition(partition))
-            {
-                _retainedPartitionRetirementCursor++;
-                continue;
-            }
-
-            if (!RetireRetainedPartition(partition))
-                _retainedPartitionRetirementCursor++;
-        }
-    }
-
-    private bool ShouldRetireRetainedPartition(PhysicsMixedPartition partition)
-    {
-        if (!partition.IsOwnedBy(this) || !partition.IsEmpty || partition.IsAllocated || partition.EmptySinceFrame < 0)
-            return false;
-
-        int idleFrames = _context.FrameCount - partition.EmptySinceFrame;
-        return idleFrames >= _context.Settings.RetainedPartitionTimeToKillFrames;
-    }
-
-    private bool RetireRetainedPartition(PhysicsMixedPartition partition)
-    {
-        if (!_context.World.TryGetVoxel(partition.WorldIndex, out Voxel? voxel))
-        {
-            ReleasePartition(partition);
-            return true;
-        }
-
-        if (!voxel!.TryGetPartition(out PhysicsMixedPartition? attachedPartition)
-            || !ReferenceEquals(attachedPartition, partition))
-        {
-            ReleasePartition(partition);
-            return true;
-        }
-
-        return voxel.TryRemovePartition<PhysicsMixedPartition>();
-    }
-
-    private bool TryRetireEmptyRetainedPartitionForReuse()
-    {
-        int inspected = 0;
-        while (inspected < _retainedPartitions.Count && _retainedPartitions.Count > 0)
-        {
-            if (_retainedPartitionRetirementCursor >= _retainedPartitions.Count)
-                _retainedPartitionRetirementCursor = 0;
-
-            PhysicsMixedPartition partition = _retainedPartitions[_retainedPartitionRetirementCursor];
-            inspected++;
-
-            if (!partition.IsOwnedBy(this) || !partition.IsEmpty || partition.IsAllocated)
-            {
-                _retainedPartitionRetirementCursor++;
-                continue;
-            }
-
-            int poolCount = _inactivePartitionPool.Count;
-            if (RetireRetainedPartition(partition) && _inactivePartitionPool.Count > poolCount)
-                return true;
-
-            _retainedPartitionRetirementCursor++;
-        }
-
-        return false;
-    }
+    private bool TryRetireEmptyRetainedPartitionForReuse() => RetainedPartitionLifecycle.TryRetireEmptyForReuse(
+            _retainedPartitions,
+            _inactivePartitionPool,
+            _context.World,
+            this,
+            _releaseRetainedPartition,
+            ref _retainedPartitionRetirementCursor);
 
 }

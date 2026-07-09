@@ -5,6 +5,7 @@ using Gravitas.Tests.Support;
 using GridForge.Configuration;
 using GridForge.Grids;
 using GridForge.Spatial;
+using System;
 using Xunit;
 
 namespace Gravitas.Tests.Core;
@@ -71,6 +72,72 @@ public sealed class GravitasCollisionServiceTests
     }
 
     [Fact]
+    public void Deactivate_WithZeroRetirementBudget_ShouldKeepRetainedPartitionsUntilBudgetRestored()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        context.Settings.RetainedPartitionTimeToKillFrames = 1;
+        context.Settings.RetainedPartitionRetirementSweepBudget = 0;
+        LSSphereCollider collider = CreateDynamicSphere(context);
+        int retainedBeforeDeactivate = context.Collisions.RetainedPartitionCount;
+
+        collider.Deactivate();
+        Step(context);
+
+        context.Collisions.ActivePartitionCount.Should().Be(0);
+        context.Collisions.RetainedPartitionCount.Should().Be(retainedBeforeDeactivate);
+        context.Collisions.InactivePartitionCount.Should().Be(0);
+
+        context.Settings.RetainedPartitionRetirementSweepBudget = 1024;
+        Step(context);
+
+        context.Collisions.RetainedPartitionCount.Should().BeLessThan(retainedBeforeDeactivate);
+        context.Collisions.InactivePartitionCount.Should().BeGreaterThan(0);
+    }
+
+    [Fact]
+    public void Reset_WithRetainedPartitionAlreadyDetached_ShouldReleaseWithoutVoxelDetach()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSSphereCollider collider = CreateDynamicSphere(context);
+        WorldVoxelIndex coordinate = collider.PartitionCoordinates![0];
+        context.World.TryGetVoxel(coordinate, out Voxel? voxel).Should().BeTrue();
+        voxel!.TryGetPartition(out PhysicsPartition? partition).Should().BeTrue();
+        voxel.TryRemovePartition<PhysicsPartition>().Should().BeTrue();
+
+        context.Reset();
+
+        context.Collisions.RetainedPartitionCount.Should().Be(0);
+        context.Collisions.ActivePartitionCount.Should().Be(0);
+        context.Collisions.InactivePartitionCount.Should().Be(0);
+        partition!.IsAllocated.Should().BeFalse();
+        Action readOwner = () => _ = partition.Owner;
+        readOwner.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void RentPartition_WhenPoolEmptyAndRetainedEmptyPartitionExists_ShouldReuseRetiredPartition()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        context.Settings.RetainedPartitionRetirementSweepBudget = 0;
+        LSSphereCollider collider = CreateDynamicSphere(context);
+
+        collider.Deactivate();
+        Step(context);
+
+        context.Collisions.ActivePartitionCount.Should().Be(0);
+        context.Collisions.InactivePartitionCount.Should().Be(0);
+        context.Collisions.RetainedPartitionCount.Should().BeGreaterThan(0);
+
+        int retainedBeforeRent = context.Collisions.RetainedPartitionCount;
+        PhysicsPartition rented = context.Collisions.RentPartition();
+
+        rented.Owner.Should().BeSameAs(context.Collisions);
+        context.Collisions.RetainedPartitionCount.Should().Be(retainedBeforeRent - 1);
+        context.Collisions.InactivePartitionCount.Should().Be(0);
+        context.Collisions.ReleasePartition(rented);
+    }
+
+    [Fact]
     public void ClearPartitionedObject_InOneContext_ShouldNotAffectOverlappingCoordinatesInAnotherContext()
     {
         using GravitasWorldContext contextA = GravitasWorldContext.CreateOwned();
@@ -99,6 +166,12 @@ public sealed class GravitasCollisionServiceTests
 
         body.Initialize(Vector3d.Zero, FixedQuaternion.Identity);
         return collider;
+    }
+
+    private static void Step(GravitasWorldContext context)
+    {
+        context.Simulate();
+        context.LateSimulate();
     }
 
     private static void EnsureGrid(GravitasWorldContext context)

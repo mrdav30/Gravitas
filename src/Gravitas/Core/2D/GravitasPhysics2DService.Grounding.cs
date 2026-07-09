@@ -19,11 +19,11 @@ public sealed partial class GravitasPhysics2DService
         for (int i = 0; i < _discreteResponsePairs.Count; i++)
         {
             CollisionPair2D pair = _discreteResponsePairs[i];
-            if (pair.LastFrame != frame || pair.ColliderA.IsTrigger || pair.ColliderB.IsTrigger)
+            if (!ShouldUseDiscreteGroundingPair(pair, frame))
                 continue;
 
             ContactManifold2D manifold = pair.Manifold;
-            if (!manifold.HasContact || manifold.LastUpdatedFrame != frame)
+            if (!ShouldUseDiscreteGroundingManifold(manifold, frame))
                 continue;
 
             SolidBody2D? bodyA = pair.ColliderA.Body;
@@ -39,4 +39,10 @@ public sealed partial class GravitasPhysics2DService
         foreach (SolidBody2D body in _dynamicBodies)
             body.CompleteAutomaticGroundingRefresh();
     }
+
+    internal static bool ShouldUseDiscreteGroundingPair(CollisionPair2D pair, int frame) =>
+        pair.LastFrame == frame && !pair.ColliderA.IsTrigger && !pair.ColliderB.IsTrigger;
+
+    internal static bool ShouldUseDiscreteGroundingManifold(ContactManifold2D manifold, int frame) =>
+        manifold.HasContact && manifold.LastUpdatedFrame == frame;
 }

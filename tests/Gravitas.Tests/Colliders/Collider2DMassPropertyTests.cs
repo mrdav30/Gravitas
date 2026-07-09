@@ -134,6 +134,7 @@ public sealed class Collider2DMassPropertyTests
         Fixed64 momentAboutOrigin = collider.CalculateMomentOfInertia((Fixed64)4, Vector2d.Zero);
 
         collider.CalculateLocalCenterOfMassOffset().Should().Be(new Vector2d(Fixed64.One, Fixed64.Zero));
+        collider.CalculateMomentOfInertia(Fixed64.Zero, Vector2d.Zero).Should().Be(Fixed64.Zero);
         momentAboutCom.Should().Be((Fixed64)18);
         momentAboutOrigin.Should().Be((Fixed64)22);
     }

@@ -89,7 +89,7 @@ public sealed partial class GravitasQuery2DService
         for (int i = 0; i < _queryCandidates.Count; i++)
         {
             if (!QueryDetection2D.TryOverlapCircle(center, radius, _queryCandidates[i], out Physics2DHit candidate)
-                || (found && !Physics2DHitSorter.ComesBefore(candidate, closest)))
+                || !PhysicsHitSelectionPolicy.ShouldReplace(candidate, found, closest))
             {
                 continue;
             }
@@ -268,7 +268,7 @@ public sealed partial class GravitasQuery2DService
         for (int i = 0; i < _queryCandidates.Count; i++)
         {
             if (!QueryDetection2D.TryOverlapPolygon(vertices, center, _queryCandidates[i], out Physics2DHit candidate)
-                || (found && !Physics2DHitSorter.ComesBefore(candidate, closest)))
+                || !PhysicsHitSelectionPolicy.ShouldReplace(candidate, found, closest))
             {
                 continue;
             }

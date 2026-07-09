@@ -42,4 +42,35 @@ internal static class PlanarSegmentGeometry
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Fixed64 DistanceSquared(Vector2d point, Vector2d start, Vector2d end) =>
         Vector2d.DistanceSquared(point, ClosestPoint(point, start, end));
+
+    /// <summary>
+    /// Intersects two finite segments and returns the hit parameter along the first segment.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool TryIntersect(
+        Vector2d firstStart,
+        Vector2d firstSegment,
+        Vector2d secondStart,
+        Vector2d secondSegment,
+        out Fixed64 firstT)
+    {
+        Fixed64 denominator = Vector2d.CrossProduct(firstSegment, secondSegment);
+        if (denominator.Abs() <= Fixed64.Epsilon)
+        {
+            firstT = default;
+            return false;
+        }
+
+        Vector2d delta = secondStart - firstStart;
+        Fixed64 t = Vector2d.CrossProduct(delta, secondSegment) / denominator;
+        Fixed64 u = Vector2d.CrossProduct(delta, firstSegment) / denominator;
+        if (t < Fixed64.Zero || t > Fixed64.One || u < Fixed64.Zero || u > Fixed64.One)
+        {
+            firstT = default;
+            return false;
+        }
+
+        firstT = t;
+        return true;
+    }
 }

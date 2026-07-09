@@ -95,10 +95,25 @@ public sealed class Constraint2DServiceTests
             JointLimit2D.Slider(Fixed64.One, -Fixed64.One),
             JointMotor2D.Disabled,
             JointCollisionPolicy.SuppressLinked));
+        SolidBody2D inactive = CreateBody(context, Vector2d.Right * (Fixed64)6);
+        inactive.Deactivate();
+        Action inactiveBody = () => context.Constraints2D.RegisterJoint(CreatePin(body, inactive));
+        SolidBody2D inactiveFirst = CreateBody(context, Vector2d.Right * (Fixed64)7);
+        inactiveFirst.Deactivate();
+        Action inactiveFirstBody = () => context.Constraints2D.RegisterJoint(CreatePin(
+            inactiveFirst,
+            CreateBody(context, Vector2d.Right * (Fixed64)7 + Vector2d.Forward)));
+        Action invalidCollisionPolicy = () => context.Constraints2D.RegisterJoint(CreatePin(
+            body,
+            CreateBody(context, Vector2d.Right * (Fixed64)8),
+            (JointCollisionPolicy)255));
 
         sameBody.Should().Throw<ArgumentException>();
         invalidType.Should().Throw<ArgumentException>();
         invalidLimit.Should().Throw<ArgumentException>();
+        inactiveBody.Should().Throw<ArgumentException>();
+        inactiveFirstBody.Should().Throw<ArgumentException>();
+        invalidCollisionPolicy.Should().Throw<ArgumentException>();
         context.Constraints2D.RegisteredJointCount.Should().Be(0);
     }
 
@@ -111,8 +126,10 @@ public sealed class Constraint2DServiceTests
         SolidBody2D second = CreateBody(secondContext, Vector2d.Right * (Fixed64)2);
 
         Action act = () => firstContext.Constraints2D.RegisterJoint(CreatePin(first, second));
+        Action reversed = () => firstContext.Constraints2D.RegisterJoint(CreatePin(second, first));
 
         act.Should().Throw<ArgumentException>();
+        reversed.Should().Throw<ArgumentException>();
     }
 
     [Fact]
@@ -131,6 +148,58 @@ public sealed class Constraint2DServiceTests
         removedAgain.Should().BeFalse();
         context.Constraints2D.RegisteredJointCount.Should().Be(0);
         context.Constraints2D.EnabledJointCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void ConstraintServicePolicyHelpers_ShouldRejectInvalid2DFilterInputsAndInactivePolicyChanges()
+    {
+        using GravitasWorldContext context = CreateConstraintContext();
+        SolidBody2D first = CreateBody(context, Vector2d.Zero);
+        SolidBody2D second = CreateBody(context, Vector2d.Right * (Fixed64)2);
+        Joint2D joint = context.Constraints2D.RegisterJoint(CreatePin(first, second));
+        var unregistered = new LSCircleCollider2D(Fixed64.Half);
+
+        context.Constraints2D.ShouldExcludeLinkedCollision(null!, second.Collider).Should().BeFalse();
+        context.Constraints2D.ShouldExcludeLinkedCollision(first.Collider, null!).Should().BeFalse();
+        context.Constraints2D.ShouldExcludeLinkedCollision(first.Collider, first.Collider).Should().BeFalse();
+        context.Constraints2D.ShouldExcludeLinkedCollision(unregistered, second.Collider).Should().BeFalse();
+
+        context.Constraints2D.UpdateJointCollisionPolicy(
+            joint,
+            JointCollisionPolicy.SuppressLinked,
+            JointCollisionPolicy.SuppressLinked);
+        context.Constraints2D.ShouldExcludeLinkedCollision(first.Collider, second.Collider).Should().BeTrue();
+
+        context.Constraints2D.RemoveJoint(joint.Id).Should().BeTrue();
+        joint.SetCollisionPolicyFromRecord(JointCollisionPolicy.Collide);
+        joint.SetCollisionPolicyFromRecord(JointCollisionPolicy.SuppressLinked);
+
+        context.Constraints2D.ShouldExcludeLinkedCollision(first.Collider, second.Collider).Should().BeFalse();
+    }
+
+    [Fact]
+    public void ConstraintServiceSolverLookup_ShouldHonor2DEnabledAndMobilityState()
+    {
+        using GravitasWorldContext context = CreateConstraintContext();
+        SolidBody2D first = CreateBody(context, Vector2d.Zero);
+        SolidBody2D second = CreateBody(context, Vector2d.Right * (Fixed64)2);
+        Joint2D joint = context.Constraints2D.RegisterJoint(CreatePin(first, second));
+
+        context.Constraints2D.TryGetJointForSolver(99, out Joint2D? missing).Should().BeFalse();
+        missing.Should().BeNull();
+
+        joint.IsEnabled = false;
+        context.Constraints2D.TryGetJointForSolver(joint.Id, out Joint2D? disabled).Should().BeFalse();
+        disabled.Should().BeNull();
+
+        joint.IsEnabled = true;
+        context.Constraints2D.TryGetJointForSolver(joint.Id, out Joint2D? enabled).Should().BeTrue();
+        enabled.Should().BeSameAs(joint);
+
+        first.FreezeAxes = BodyFreezeAxes2D.Position;
+        second.FreezeAxes = BodyFreezeAxes2D.Position;
+        context.Constraints2D.TryGetJointForSolver(joint.Id, out Joint2D? frozen).Should().BeFalse();
+        frozen.Should().BeNull();
     }
 
     [Fact]

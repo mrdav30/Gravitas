@@ -74,6 +74,23 @@ public sealed class SolidBody2DGroundingTests
     }
 
     [Fact]
+    public void GroundingModeTransitions_ShouldRespectNoClearAndNoImmediateRefreshOptions()
+    {
+        using GravitasWorldContext context = CreateContext();
+        SolidBody2D body = CreateCircle(context, new Vector2d(Fixed64.Zero, Fixed64.One));
+        int groundedChanges = 0;
+        body.OnGrounded += _ => groundedChanges++;
+
+        body.SetManualGrounding(Vector2d.Zero, Up);
+        body.UseManualGrounding(clearGrounding: false);
+        body.UseAutomaticGrounding(checkGroundImmediately: false);
+
+        body.IsGrounded.Should().BeTrue();
+        body.GroundingMode.Should().Be(GroundingMode.Automatic);
+        groundedChanges.Should().Be(1);
+    }
+
+    [Fact]
     public void AutomaticGrounding_WhenSupportIsLost_ShouldExposeWasGroundedForStep()
     {
         using GravitasWorldContext context = CreateContext();
@@ -165,6 +182,57 @@ public sealed class SolidBody2DGroundingTests
         Step(context);
 
         body.IsGrounded.Should().BeFalse();
+    }
+
+    [Fact]
+    public void ContactSupport_ShouldIgnoreTriggerPairsDuringDiscreteGroundingRefresh()
+    {
+        using GravitasWorldContext context = CreateContext();
+        LSAABBoxCollider2D triggerFloor = CreateStaticFloor(
+            context,
+            center: new Vector2d(Fixed64.Zero, -Fixed64.Half),
+            size: new Vector2d((Fixed64)4, Fixed64.One));
+        triggerFloor.IsTrigger = true;
+        SolidBody2D body = CreateCircle(context, Vector2d.Zero);
+        DisableProbeFallback(body);
+
+        Step(context);
+
+        body.IsGrounded.Should().BeFalse();
+        triggerFloor.IsTrigger.Should().BeTrue();
+    }
+
+    [Fact]
+    public void DiscreteGroundingPairPolicy_ShouldRejectStaleAndTriggerPairs()
+    {
+        using GravitasWorldContext context = CreateContext();
+        LSAABBoxCollider2D first = CreateStaticFloor(context);
+        LSAABBoxCollider2D second = CreateStaticFloor(context, center: Vector2d.Right * (Fixed64)3);
+        var pair = new CollisionPair2D(first, second);
+        pair.MarkResting(frame: 12);
+
+        GravitasPhysics2DService.ShouldUseDiscreteGroundingPair(pair, frame: 12).Should().BeTrue();
+        GravitasPhysics2DService.ShouldUseDiscreteGroundingPair(pair, frame: 13).Should().BeFalse();
+
+        first.IsTrigger = true;
+        GravitasPhysics2DService.ShouldUseDiscreteGroundingPair(pair, frame: 12).Should().BeFalse();
+
+        first.IsTrigger = false;
+        second.IsTrigger = true;
+        GravitasPhysics2DService.ShouldUseDiscreteGroundingPair(pair, frame: 12).Should().BeFalse();
+    }
+
+    [Fact]
+    public void DiscreteGroundingManifoldPolicy_ShouldRequireCurrentContact()
+    {
+        var manifold = new ContactManifold2D();
+
+        manifold.BeginUpdate(frame: 12);
+        GravitasPhysics2DService.ShouldUseDiscreteGroundingManifold(manifold, frame: 12).Should().BeFalse();
+
+        manifold.SetContact(Vector2d.Zero, Vector2d.Zero, Fixed64.Half, -Up);
+        GravitasPhysics2DService.ShouldUseDiscreteGroundingManifold(manifold, frame: 12).Should().BeTrue();
+        GravitasPhysics2DService.ShouldUseDiscreteGroundingManifold(manifold, frame: 13).Should().BeFalse();
     }
 
     [Fact]
@@ -296,6 +364,47 @@ public sealed class SolidBody2DGroundingTests
                 submitLowerColliderIdSecond: true)
             .Should()
             .Be(new Vector2d(Fixed64.One, Fixed64.One));
+
+        SubmitCandidatePairAndGetGroundPoint(
+                firstNormal: Up,
+                firstDepth: Fixed64.One,
+                firstContactId: 1,
+                secondNormal: new Vector2d(Fixed64.Half, Fixed64.Half).Normalized,
+                secondDepth: (Fixed64)2,
+                secondContactId: 10)
+            .Should()
+            .Be(new Vector2d(Fixed64.Zero, Fixed64.One));
+
+        SubmitCandidatePairAndGetGroundPoint(
+                firstNormal: Up,
+                firstDepth: Fixed64.One,
+                firstContactId: 1,
+                secondNormal: Up,
+                secondDepth: Fixed64.Half,
+                secondContactId: 10)
+            .Should()
+            .Be(new Vector2d(Fixed64.Zero, Fixed64.One));
+
+        SubmitCandidatePairAndGetGroundPoint(
+                firstNormal: Up,
+                firstDepth: Fixed64.One,
+                firstContactId: 1,
+                secondNormal: Up,
+                secondDepth: Fixed64.One,
+                secondContactId: 10)
+            .Should()
+            .Be(new Vector2d(Fixed64.Zero, Fixed64.One));
+
+        SubmitCandidatePairAndGetGroundPoint(
+                firstNormal: Up,
+                firstDepth: Fixed64.One,
+                firstContactId: 10,
+                secondNormal: Up,
+                secondDepth: Fixed64.One,
+                secondContactId: 10,
+                reuseFirstSupportForSecondCandidate: true)
+            .Should()
+            .Be(new Vector2d(Fixed64.Zero, Fixed64.One));
     }
 
     [Fact]

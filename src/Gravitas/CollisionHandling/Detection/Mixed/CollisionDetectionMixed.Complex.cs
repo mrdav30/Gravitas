@@ -31,7 +31,7 @@ public static partial class CollisionDetectionMixed
             }
 
             candidate = candidate.WithFallbackMaterials(part.Material, embedded.Material);
-            if (!found || candidate.Depth < best.Depth)
+            if (ContactSelectionPolicy.ShouldReplaceWithShallower(candidate, found, best))
             {
                 best = candidate;
                 found = true;
@@ -63,7 +63,7 @@ public static partial class CollisionDetectionMixed
             }
 
             BuildMeshContact(embedded, triangle, penetration, out MixedContact candidate);
-            if (!found || candidate.Depth < best.Depth)
+            if (ContactSelectionPolicy.ShouldReplaceWithShallower(candidate, found, best))
             {
                 best = candidate;
                 found = true;

@@ -165,7 +165,7 @@ public sealed partial class GravitasQueryMixedService
                 continue;
             }
 
-            if (!found || PhysicsMixedHitSorter.ComesBefore(candidate, best))
+            if (PhysicsHitSelectionPolicy.ShouldReplace(candidate, found, best))
             {
                 best = candidate;
                 found = true;

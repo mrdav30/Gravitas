@@ -22,7 +22,7 @@ internal enum MixedPartitionMobilityKind
 /// <summary>
 /// GridForge voxel partition that stores cross-dimensional broad-phase memberships.
 /// </summary>
-internal sealed class PhysicsMixedPartition : IVoxelPartition
+internal sealed class PhysicsMixedPartition : IVoxelPartition, IRetainedPhysicsPartition<GravitasMixedCollisionService>
 {
     private GravitasMixedCollisionService? _owner;
     private int _emptySinceFrame = -1;
@@ -303,6 +303,18 @@ internal sealed class PhysicsMixedPartition : IVoxelPartition
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal void ClearRetainedIndex() => _retainedIndex = -1;
+
+    int IRetainedPhysicsPartition<GravitasMixedCollisionService>.RetainedIndex => RetainedIndex;
+
+    bool IRetainedPhysicsPartition<GravitasMixedCollisionService>.IsEmpty => IsEmpty;
+
+    int IRetainedPhysicsPartition<GravitasMixedCollisionService>.EmptySinceFrame => EmptySinceFrame;
+
+    bool IRetainedPhysicsPartition<GravitasMixedCollisionService>.IsOwnedBy(GravitasMixedCollisionService owner) => IsOwnedBy(owner);
+
+    void IRetainedPhysicsPartition<GravitasMixedCollisionService>.SetRetainedIndex(int index) => SetRetainedIndex(index);
+
+    void IRetainedPhysicsPartition<GravitasMixedCollisionService>.ClearRetainedIndex() => ClearRetainedIndex();
 
     internal void ResetRetainedMembership()
     {

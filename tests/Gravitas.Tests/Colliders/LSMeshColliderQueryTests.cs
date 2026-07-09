@@ -78,6 +78,22 @@ public sealed class LSMeshColliderQueryTests
     }
 
     [Fact]
+    public void ColliderOverlapsRay_WithPointInTrianglePlaneOutsideTriangle_ShouldReturnFalse()
+    {
+        LSMeshCollider mesh = CreateTriangleMesh();
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+        Vector3d point = new(Fixed64.FromFraction(3, 4), Fixed64.FromFraction(3, 4), Fixed64.Zero);
+
+        worker.PrepareSegmentCheck(point, point);
+
+        bool hit = mesh.ColliderOverlapsRay(worker, ref hits);
+
+        hit.Should().BeFalse();
+        hits.Count.Should().Be(0);
+    }
+
+    [Fact]
     public void ColliderOverlapsRay_WithCoplanarSegmentOnTriangleEdge_ShouldReturnUniqueEndpoints()
     {
         LSMeshCollider mesh = CreateTriangleMesh();
@@ -92,6 +108,41 @@ public sealed class LSMeshColliderQueryTests
         hits.Count.Should().Be(2);
         hits[0].Should().Be(Vector3d.Zero);
         hits[1].Should().Be(Vector3d.Right);
+    }
+
+    [Fact]
+    public void ColliderOverlapsRay_WithIntersectionsDisabled_ShouldReturnTrueWithoutPoints()
+    {
+        LSMeshCollider mesh = CreateTriangleMesh();
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+
+        worker.PrepareSegmentCheck(
+            new Vector3d(Fixed64.FromFraction(1, 4), Fixed64.FromFraction(1, 4), (Fixed64)(-2)),
+            new Vector3d(Fixed64.FromFraction(1, 4), Fixed64.FromFraction(1, 4), (Fixed64)2),
+            calculateIntersectionPoints: false);
+
+        bool hit = mesh.ColliderOverlapsRay(worker, ref hits);
+
+        hit.Should().BeTrue();
+        hits.Count.Should().Be(0);
+    }
+
+    [Fact]
+    public void ColliderOverlapsRay_WithSegmentOnSharedTriangleEdge_ShouldSuppressDuplicatePoint()
+    {
+        LSMeshCollider mesh = CreateQuadMesh();
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+
+        worker.PrepareSegmentCheck(Vector3d.Zero, new Vector3d(Fixed64.One, Fixed64.One, Fixed64.Zero));
+
+        bool hit = mesh.ColliderOverlapsRay(worker, ref hits);
+
+        hit.Should().BeTrue();
+        hits.Count.Should().Be(2);
+        hits[0].Should().Be(Vector3d.Zero);
+        hits[1].Should().Be(new Vector3d(Fixed64.One, Fixed64.One, Fixed64.Zero));
     }
 
     [Fact]
@@ -188,6 +239,19 @@ public sealed class LSMeshColliderQueryTests
                 Vector3d.Up
             },
             new[] { 0, 1, 2 },
+            MeshColliderMode.Convex,
+            MeshInertiaPolicy.SurfaceApproximation);
+
+    private static LSMeshCollider CreateQuadMesh() =>
+        new(
+            new[]
+            {
+                Vector3d.Zero,
+                Vector3d.Right,
+                new Vector3d(Fixed64.One, Fixed64.One, Fixed64.Zero),
+                Vector3d.Up
+            },
+            new[] { 0, 1, 2, 0, 2, 3 },
             MeshColliderMode.Convex,
             MeshInertiaPolicy.SurfaceApproximation);
 

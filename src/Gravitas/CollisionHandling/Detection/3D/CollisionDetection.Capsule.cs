@@ -16,8 +16,8 @@ public static partial class CollisionDetection
 
     private static bool DoCapsuleSphereCheck(CollisionWorkItem pair)
     {
-        if (pair.ColliderA is not LSCapsuleCollider capsule || pair.ColliderB is not LSSphereCollider sphere)
-            return false;
+        var capsule = (LSCapsuleCollider)pair.ColliderA;
+        var sphere = (LSSphereCollider)pair.ColliderB;
 
         Vector3d closestPointOnCapsule = capsule.ClosestPointOnSurface(sphere.Center);
         Vector3d penetrationVector = sphere.Center - closestPointOnCapsule;
@@ -37,8 +37,8 @@ public static partial class CollisionDetection
 
     private static bool DoCapsulesCheck(CollisionWorkItem pair)
     {
-        if (pair.ColliderA is not LSCapsuleCollider capsule1 || pair.ColliderB is not LSCapsuleCollider capsule2)
-            return false;
+        var capsule1 = (LSCapsuleCollider)pair.ColliderA;
+        var capsule2 = (LSCapsuleCollider)pair.ColliderB;
 
         (Vector3d, Vector3d) closestPointsOnCapsules = ClosestPointsOnSegments(
             capsule1.LineSegmentStart,

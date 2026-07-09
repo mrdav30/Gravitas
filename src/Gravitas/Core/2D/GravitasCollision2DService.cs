@@ -12,6 +12,7 @@ using GridForge.Grids;
 using GridForge.Spatial;
 using GridForge.Utility;
 using SwiftCollections;
+using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
@@ -38,6 +39,7 @@ public sealed class GravitasCollision2DService
     private readonly SwiftList<int> _distributionStaticIds = new();
     private readonly SwiftList<PhysicsPartition2D> _queryPartitions = new();
     private readonly SwiftList<int> _queryColliderIds = new();
+    private readonly Action<PhysicsPartition2D> _releaseRetainedPartition;
     private readonly SwiftSparseSet _deferredPartitionRefreshIds = new();
 
     private int _retainedPartitionRetirementCursor;
@@ -47,6 +49,7 @@ public sealed class GravitasCollision2DService
     {
         SwiftThrowHelper.ThrowIfNull(context, nameof(context));
         _context = context;
+        _releaseRetainedPartition = ReleasePartition;
     }
 
     public GravitasWorldContext Context => _context;
@@ -184,10 +187,7 @@ public sealed class GravitasCollision2DService
         if (!force && collider.MatchesPartitionGridBounds(coverageMin, coverageMax, (int)currentKind))
             return false;
 
-        SwiftList<WorldVoxelIndex>? coordinates = collider.PartitionCoordinates;
-        if (coordinates == null)
-            return false;
-
+        SwiftList<WorldVoxelIndex> coordinates = collider.PartitionCoordinates!;
         GridWorld world = _context.World;
         PhysicsPartitionMobilityKind partitionKind = GetStoredMobilityKind(collider.PartitionKind);
         try
@@ -222,9 +222,10 @@ public sealed class GravitasCollision2DService
             nameof(collider),
             "2D collider must belong to this collision service context.");
 
-        if (!collider.IsPartitioned || collider.PartitionCoordinates == null)
+        if (!collider.IsPartitioned)
             return;
 
+        SwiftList<WorldVoxelIndex> coordinates = collider.PartitionCoordinates!;
         SolidBody2D? body = collider.Body;
         if (collider.IsStatic || body!.IsKinematic)
             return;
@@ -234,9 +235,9 @@ public sealed class GravitasCollision2DService
 
         try
         {
-            for (int i = 0; i < collider.PartitionCoordinates.Count; i++)
+            for (int i = 0; i < coordinates.Count; i++)
             {
-                WorldVoxelIndex coordinate = collider.PartitionCoordinates[i];
+                WorldVoxelIndex coordinate = coordinates[i];
                 if (!world.TryGetVoxel(coordinate, out Voxel? voxel)
                     || !GridTraversal.TryGetUniquePartition(voxel!, _redundancyChecker, out PhysicsPartition2D? partition))
                 {
@@ -573,141 +574,35 @@ public sealed class GravitasCollision2DService
         return collider.IsStatic || body!.IsKinematic;
     }
 
-    private void DetachRetainedPartitions()
-    {
-        // Reset is a context boundary; retained GridForge payloads are a runtime cache, not replay state.
-        while (_retainedPartitions.Count > 0)
-        {
-            PhysicsPartition2D partition = _retainedPartitions[_retainedPartitions.Count - 1];
-            if (!partition.IsOwnedBy(this))
-            {
-                UntrackRetainedPartition(partition);
-                continue;
-            }
+    private void DetachRetainedPartitions() => RetainedPartitionLifecycle.DetachAll(
+        _retainedPartitions,
+        _context.World,
+        this,
+        _releaseRetainedPartition,
+        nameof(PhysicsPartition2D),
+        "Unable to detach retained 2D physics partition from its voxel during reset.");
 
-            if (_context.World.TryGetVoxel(partition.WorldIndex, out Voxel? voxel)
-                && voxel!.TryGetPartition(out PhysicsPartition2D? attachedPartition)
-                && ReferenceEquals(attachedPartition, partition))
-            {
-                bool removed = voxel.TryRemovePartition<PhysicsPartition2D>();
-                SwiftThrowHelper.ThrowIfTrue(
-                    !removed,
-                    nameof(PhysicsPartition2D),
-                    "Unable to detach retained 2D physics partition from its voxel during reset.");
+    private void TrackRetainedPartition(PhysicsPartition2D partition) => RetainedPartitionLifecycle.Track(
+        _retainedPartitions,
+        this,
+        partition,
+        nameof(PhysicsPartition2D));
 
-                if (partition.IsOwnedBy(this))
-                    ReleasePartition(partition);
+    private void UntrackRetainedPartition(PhysicsPartition2D partition) => RetainedPartitionLifecycle.Untrack(
+        _retainedPartitions,
+        this,
+        partition,
+        ref _retainedPartitionRetirementCursor);
 
-                continue;
-            }
-
-            ReleasePartition(partition);
-        }
-    }
-
-    private void TrackRetainedPartition(PhysicsPartition2D partition)
-    {
-        SwiftThrowHelper.ThrowIfNull(partition, nameof(partition));
-        SwiftThrowHelper.ThrowIfArgument(
-            partition.RetainedIndex >= 0,
-            nameof(partition),
-            "PhysicsPartition2D is already tracked as retained.");
-
-        partition.SetRetainedIndex(_retainedPartitions.Count);
-        _retainedPartitions.Add(partition);
-    }
-
-    private void UntrackRetainedPartition(PhysicsPartition2D partition)
-    {
-        int index = FindRetainedPartitionIndex(partition);
-        if (index < 0)
-        {
-            partition.ClearRetainedIndex();
-            return;
-        }
-
-        int lastIndex = _retainedPartitions.Count - 1;
-        if (index != lastIndex)
-        {
-            PhysicsPartition2D movedPartition = _retainedPartitions[lastIndex];
-            _retainedPartitions[index] = movedPartition;
-            movedPartition.SetRetainedIndex(index);
-        }
-
-        _retainedPartitions.RemoveAt(lastIndex);
-        partition.ClearRetainedIndex();
-
-        if (_retainedPartitionRetirementCursor > index)
-            _retainedPartitionRetirementCursor--;
-        if (_retainedPartitionRetirementCursor >= _retainedPartitions.Count)
-            _retainedPartitionRetirementCursor = 0;
-    }
-
-    private int FindRetainedPartitionIndex(PhysicsPartition2D partition)
-    {
-        int index = partition.RetainedIndex;
-        if ((uint)index < (uint)_retainedPartitions.Count && ReferenceEquals(_retainedPartitions[index], partition))
-            return index;
-
-        for (int i = 0; i < _retainedPartitions.Count; i++)
-            if (ReferenceEquals(_retainedPartitions[i], partition))
-                return i;
-
-        return -1;
-    }
-
-    internal void RetireExpiredRetainedPartitions()
-    {
-        int budget = _context.Settings.RetainedPartitionRetirementSweepBudget;
-        if (budget <= 0 || _retainedPartitions.Count == 0)
-            return;
-
-        int inspected = 0;
-        while (inspected < budget && _retainedPartitions.Count > 0)
-        {
-            if (_retainedPartitionRetirementCursor >= _retainedPartitions.Count)
-                _retainedPartitionRetirementCursor = 0;
-
-            PhysicsPartition2D partition = _retainedPartitions[_retainedPartitionRetirementCursor];
-            inspected++;
-
-            if (!ShouldRetireRetainedPartition(partition))
-            {
-                _retainedPartitionRetirementCursor++;
-                continue;
-            }
-
-            if (!RetireRetainedPartition(partition))
-                _retainedPartitionRetirementCursor++;
-        }
-    }
-
-    private bool ShouldRetireRetainedPartition(PhysicsPartition2D partition)
-    {
-        if (!partition.IsOwnedBy(this) || !partition.IsEmpty || partition.IsAllocated || partition.EmptySinceFrame < 0)
-            return false;
-
-        int idleFrames = _context.FrameCount - partition.EmptySinceFrame;
-        return idleFrames >= _context.Settings.RetainedPartitionTimeToKillFrames;
-    }
-
-    private bool RetireRetainedPartition(PhysicsPartition2D partition)
-    {
-        if (!_context.World.TryGetVoxel(partition.WorldIndex, out Voxel? voxel))
-        {
-            ReleasePartition(partition);
-            return true;
-        }
-
-        if (!voxel!.TryGetPartition(out PhysicsPartition2D? attachedPartition)
-            || !ReferenceEquals(attachedPartition, partition))
-        {
-            ReleasePartition(partition);
-            return true;
-        }
-
-        return voxel.TryRemovePartition<PhysicsPartition2D>();
-    }
+    internal void RetireExpiredRetainedPartitions() => RetainedPartitionLifecycle.RetireExpired(
+            _retainedPartitions,
+            _context.World,
+            this,
+            _context.Settings.RetainedPartitionRetirementSweepBudget,
+            _context.FrameCount,
+            _context.Settings.RetainedPartitionTimeToKillFrames,
+            _releaseRetainedPartition,
+            ref _retainedPartitionRetirementCursor);
 
     internal int ActivatePartition(PhysicsPartition2D partition)
     {
@@ -720,10 +615,8 @@ public sealed class GravitasCollision2DService
         return _activePartitions.Add(partition);
     }
 
-    internal void DeactivatePartition(int activationId)
-    {
-        _activePartitions.TryRemoveAt(activationId);
-    }
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal void DeactivatePartition(int activationId) => _activePartitions.TryRemoveAt(activationId);
 
     internal PhysicsPartition2D RentPartition()
     {
@@ -739,29 +632,13 @@ public sealed class GravitasCollision2DService
 
     private bool TryRetireEmptyRetainedPartitionForReuse()
     {
-        int inspected = 0;
-        while (inspected < _retainedPartitions.Count && _retainedPartitions.Count > 0)
-        {
-            if (_retainedPartitionRetirementCursor >= _retainedPartitions.Count)
-                _retainedPartitionRetirementCursor = 0;
-
-            PhysicsPartition2D partition = _retainedPartitions[_retainedPartitionRetirementCursor];
-            inspected++;
-
-            if (!partition.IsOwnedBy(this) || !partition.IsEmpty || partition.IsAllocated)
-            {
-                _retainedPartitionRetirementCursor++;
-                continue;
-            }
-
-            int poolCount = _inactivePartitionPool.Count;
-            if (RetireRetainedPartition(partition) && _inactivePartitionPool.Count > poolCount)
-                return true;
-
-            _retainedPartitionRetirementCursor++;
-        }
-
-        return false;
+        return RetainedPartitionLifecycle.TryRetireEmptyForReuse(
+            _retainedPartitions,
+            _inactivePartitionPool,
+            _context.World,
+            this,
+            _releaseRetainedPartition,
+            ref _retainedPartitionRetirementCursor);
     }
 
     internal void ReleasePartition(PhysicsPartition2D partition)

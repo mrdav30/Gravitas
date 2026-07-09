@@ -232,9 +232,7 @@ internal static class QueryDetection2D
         }
 
         Vector2d point = start + direction * distance;
-        Vector2d normal = point == circle.Center
-            ? ResolveQueryFallbackNormal(point, circle.Center)
-            : (point - circle.Center).Normalized;
+        Vector2d normal = (point - circle.Center).Normalized;
         hit = new Physics2DHit(circle, point, normal, distance);
         return true;
     }
@@ -255,9 +253,7 @@ internal static class QueryDetection2D
         }
 
         Vector2d sweptCenter = start + direction * distance;
-        Vector2d normal = sweptCenter == circle.Center
-            ? ResolveQueryFallbackNormal(sweptCenter, circle.Center)
-            : (sweptCenter - circle.Center).Normalized;
+        Vector2d normal = (sweptCenter - circle.Center).Normalized;
         Vector2d point = circle.Center + normal * circle.ScaledRadius;
         hit = new Physics2DHit(circle, point, normal, distance);
         return true;
@@ -342,11 +338,7 @@ internal static class QueryDetection2D
             if (!TryOverlapCircle(center, radius, part, out Physics2DHit candidate))
                 continue;
 
-            if (!found || Physics2DHitSorter.ComesBefore(candidate, best))
-            {
-                best = candidate;
-                found = true;
-            }
+            TryKeepEarlierHit(candidate, ref found, ref best);
         }
 
         if (!found)
@@ -398,11 +390,7 @@ internal static class QueryDetection2D
             if (!TryOverlapConvexArea(center, vertices, part, out Physics2DHit candidate))
                 continue;
 
-            if (!found || Physics2DHitSorter.ComesBefore(candidate, best))
-            {
-                best = candidate;
-                found = true;
-            }
+            TryKeepEarlierHit(candidate, ref found, ref best);
         }
 
         if (!found)
@@ -583,11 +571,7 @@ internal static class QueryDetection2D
             if (!TryRaycast(start, end, part, out Physics2DHit candidate))
                 continue;
 
-            if (!found || Physics2DHitSorter.ComesBefore(candidate, best))
-            {
-                best = candidate;
-                found = true;
-            }
+            TryKeepEarlierHit(candidate, ref found, ref best);
         }
 
         if (!found)
@@ -616,11 +600,7 @@ internal static class QueryDetection2D
             if (!TrySweepCircle(start, end, radius, part, out Physics2DHit candidate))
                 continue;
 
-            if (!found || Physics2DHitSorter.ComesBefore(candidate, best))
-            {
-                best = candidate;
-                found = true;
-            }
+            TryKeepEarlierHit(candidate, ref found, ref best);
         }
 
         if (!found)
@@ -648,11 +628,7 @@ internal static class QueryDetection2D
             if (!TrySweepMoverShape(part, displacement, target, out Physics2DHit candidate))
                 continue;
 
-            if (!found || Physics2DHitSorter.ComesBefore(candidate, best))
-            {
-                best = candidate;
-                found = true;
-            }
+            TryKeepEarlierHit(candidate, ref found, ref best);
         }
 
         hit = best;
@@ -674,11 +650,7 @@ internal static class QueryDetection2D
             if (!TrySweepMoverShape(mover, displacement, part, out Physics2DHit candidate))
                 continue;
 
-            if (!found || candidate.Distance < best.Distance)
-            {
-                best = candidate;
-                found = true;
-            }
+            TryKeepCloserHit(candidate, ref found, ref best);
         }
 
         if (!found)
@@ -708,23 +680,21 @@ internal static class QueryDetection2D
         {
             Vector2d a = collider.GetVertexUnchecked(i);
             Vector2d b = collider.GetVertexUnchecked((i + 1) % collider.VertexCount);
-            if (!TryIntersectSegments(start, segment, a, b - a, out Fixed64 t))
+            if (!PlanarSegmentGeometry.TryIntersect(start, segment, a, b - a, out Fixed64 t))
                 continue;
 
             if (found && t >= bestT)
                 continue;
 
             Vector2d edge = b - a;
-            Vector2d normal = edge.LeftHandNormal;
-            if (normal.MagnitudeSquared > Fixed64.Epsilon)
-                normal = normal.Normalized;
+            Vector2d normal = edge.LeftHandNormal.Normalized;
             if (Vector2d.Dot(normal, direction) > Fixed64.Zero)
                 normal = -normal;
 
             found = true;
             bestT = t;
             bestPoint = start + segment * t;
-            bestNormal = normal.MagnitudeSquared > Fixed64.Epsilon ? normal : ResolveQueryFallbackNormal(bestPoint, collider.Center);
+            bestNormal = normal;
         }
 
         if (!found)
@@ -847,12 +817,6 @@ internal static class QueryDetection2D
         }
 
         Fixed64 length = displacement.Magnitude;
-        if (length <= Fixed64.Epsilon)
-        {
-            hit = default;
-            return false;
-        }
-
         Vector2d direction = displacement / length;
         bool found = false;
         Physics2DHit best = default;
@@ -922,12 +886,6 @@ internal static class QueryDetection2D
         }
 
         Fixed64 segmentLength = displacement.Magnitude;
-        if (segmentLength <= Fixed64.Epsilon)
-        {
-            hit = default;
-            return false;
-        }
-
         Fixed64 entryTime = Fixed64.Zero;
         Fixed64 exitTime = Fixed64.One;
         Vector2d entryNormal = ResolveQueryFallbackNormal(mover.Center, target.Center);
@@ -1012,9 +970,6 @@ internal static class QueryDetection2D
             Vector2d edgeEnd = target.GetVertexUnchecked((i + 1) % target.VertexCount);
             Vector2d edge = edgeEnd - edgeStart;
             Fixed64 edgeLengthSquared = edge.MagnitudeSquared;
-            if (edgeLengthSquared <= Fixed64.Epsilon)
-                continue;
-
             Vector2d normal = ResolveOutwardEdgeNormal(edgeStart, edge, target.Center);
             Fixed64 normalVelocity = Vector2d.Dot(direction, normal);
             if (normalVelocity >= -Fixed64.Epsilon)
@@ -1027,7 +982,7 @@ internal static class QueryDetection2D
                 continue;
 
             Fixed64 distance = (mover.ScaledRadius - nearestOffset) / normalVelocity;
-            if (distance < Fixed64.Zero || distance > length)
+            if (distance > length)
                 continue;
 
             Vector2d movedStart = segmentStart + direction * distance;
@@ -1063,14 +1018,6 @@ internal static class QueryDetection2D
     {
         Vector2d edge = edgeEnd - edgeStart;
         Fixed64 edgeLengthSquared = edge.MagnitudeSquared;
-        if (edgeLengthSquared <= Fixed64.Epsilon)
-        {
-            distance = default;
-            point = default;
-            normal = default;
-            return false;
-        }
-
         normal = ResolveOutwardEdgeNormal(edgeStart, edge, colliderCenter);
         Fixed64 startOffset = Vector2d.Dot(start - edgeStart, normal);
         Fixed64 directionOffset = Vector2d.Dot(direction, normal);
@@ -1082,7 +1029,7 @@ internal static class QueryDetection2D
         }
 
         distance = (radius - startOffset) / directionOffset;
-        if (distance < Fixed64.Zero || distance > segmentLength)
+        if (distance > segmentLength)
         {
             point = default;
             return false;
@@ -1210,7 +1157,7 @@ internal static class QueryDetection2D
             return;
 
         Fixed64 distance = (radius - sideOffset) / sideVelocity;
-        if (distance < Fixed64.Zero || distance > segmentLength)
+        if (distance > segmentLength)
             return;
 
         Vector2d point = start + direction * distance;
@@ -1234,11 +1181,7 @@ internal static class QueryDetection2D
         for (int i = 0; i < vertexCount; i++)
         {
             Vector2d edge = axisSource.GetVertexUnchecked((i + 1) % vertexCount) - axisSource.GetVertexUnchecked(i);
-            Vector2d axis = edge.RightHandNormal;
-            if (axis.MagnitudeSquared <= Fixed64.Epsilon)
-                continue;
-
-            axis = axis.Normalized;
+            Vector2d axis = edge.RightHandNormal.Normalized;
             ProjectConvex(mover, axis, out Fixed64 moverMin, out Fixed64 moverMax);
             ProjectConvex(target, axis, out Fixed64 targetMin, out Fixed64 targetMax);
 
@@ -1352,7 +1295,7 @@ internal static class QueryDetection2D
         out Vector2d firstPoint,
         out Vector2d secondPoint)
     {
-        if (TryIntersectSegments(firstStart, firstEnd - firstStart, secondStart, secondEnd - secondStart, out Fixed64 t))
+        if (PlanarSegmentGeometry.TryIntersect(firstStart, firstEnd - firstStart, secondStart, secondEnd - secondStart, out Fixed64 t))
         {
             firstPoint = firstStart + (firstEnd - firstStart) * t;
             secondPoint = firstPoint;
@@ -1416,7 +1359,17 @@ internal static class QueryDetection2D
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void TryKeepEarlierHit(Physics2DHit candidate, ref bool found, ref Physics2DHit best)
     {
-        if (found && !Physics2DHitSorter.ComesBefore(candidate, best))
+        if (!PhysicsHitSelectionPolicy.ShouldReplace(candidate, found, best))
+            return;
+
+        found = true;
+        best = candidate;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void TryKeepCloserHit(Physics2DHit candidate, ref bool found, ref Physics2DHit best)
+    {
+        if (!PhysicsHitSelectionPolicy.ShouldReplaceDistance(candidate.Distance, found, best.Distance))
             return;
 
         found = true;
@@ -1450,34 +1403,6 @@ internal static class QueryDetection2D
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool TryIntersectSegments(
-        Vector2d rayStart,
-        Vector2d raySegment,
-        Vector2d edgeStart,
-        Vector2d edgeSegment,
-        out Fixed64 rayT)
-    {
-        Fixed64 denominator = Vector2d.CrossProduct(raySegment, edgeSegment);
-        if (denominator == Fixed64.Zero || denominator.Abs() <= Fixed64.Epsilon)
-        {
-            rayT = default;
-            return false;
-        }
-
-        Vector2d delta = edgeStart - rayStart;
-        Fixed64 t = Vector2d.CrossProduct(delta, edgeSegment) / denominator;
-        Fixed64 u = Vector2d.CrossProduct(delta, raySegment) / denominator;
-        if (t < Fixed64.Zero || t > Fixed64.One || u < Fixed64.Zero || u > Fixed64.One)
-        {
-            rayT = default;
-            return false;
-        }
-
-        rayT = t;
-        return true;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Vector2d ResolveQueryFallbackNormal(Vector2d center, Vector2d colliderCenter)
     {
         Vector2d direction = center - colliderCenter;
@@ -1489,11 +1414,7 @@ internal static class QueryDetection2D
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Vector2d ResolveOutwardEdgeNormal(Vector2d edgeStart, Vector2d edge, Vector2d colliderCenter)
     {
-        Vector2d normal = edge.LeftHandNormal;
-        if (normal.MagnitudeSquared <= Fixed64.Epsilon)
-            return ResolveQueryFallbackNormal(edgeStart, colliderCenter);
-
-        normal = normal.Normalized;
+        Vector2d normal = edge.LeftHandNormal.Normalized;
         if (Vector2d.Dot(colliderCenter - edgeStart, normal) > Fixed64.Zero)
             normal = -normal;
         return normal;

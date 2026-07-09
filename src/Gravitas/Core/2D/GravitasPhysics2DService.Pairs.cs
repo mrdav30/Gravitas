@@ -38,7 +38,7 @@ public sealed partial class GravitasPhysics2DService
         ProcessCandidate(first!, second!, _context.FrameCount);
     }
 
-    private static bool IsCanonicalSharedPartition(LSCollider2D first, LSCollider2D second, WorldVoxelIndex currentIndex)
+    internal static bool IsCanonicalSharedPartition(LSCollider2D first, LSCollider2D second, WorldVoxelIndex currentIndex)
     {
         SwiftList<WorldVoxelIndex>? firstCoordinates = first.PartitionCoordinates;
         SwiftList<WorldVoxelIndex>? secondCoordinates = second.PartitionCoordinates;
@@ -53,14 +53,13 @@ public sealed partial class GravitasPhysics2DService
 
         VoxelIndex current = currentIndex.VoxelIndex;
         return current.x == Max(firstMin.x, secondMin.x)
-            && current.z == Max(firstMin.z, secondMin.z)
-            && current.y == Max(firstMin.y, secondMin.y);
+            && current.z == Max(firstMin.z, secondMin.z);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static int Max(int first, int second) => first >= second ? first : second;
 
-    private static bool TryGetMinimumVoxelIndexForGrid(
+    internal static bool TryGetMinimumVoxelIndexForGrid(
         SwiftList<WorldVoxelIndex> coordinates,
         WorldVoxelIndex gridIdentity,
         out VoxelIndex minimum)
@@ -85,8 +84,6 @@ public sealed partial class GravitasPhysics2DService
                 minimum.x = voxel.x;
             if (voxel.z < minimum.z)
                 minimum.z = voxel.z;
-            if (voxel.y < minimum.y)
-                minimum.y = voxel.y;
         }
 
         return found;
@@ -186,13 +183,12 @@ public sealed partial class GravitasPhysics2DService
         foreach (int holderId in pairHolders)
         {
             if (!TryGetColliderById(holderId, out LSCollider2D? holder)
-                || holder!.TryGetCollisionPair(collider.Id, out CollisionPair2D? pair) != true
-                || pair == null)
+                || !holder!.TryGetCollisionPair(collider.Id, out CollisionPair2D? pair))
             {
                 continue;
             }
 
-            TryAddExistingResponsePair(pair, frame);
+            TryAddExistingResponsePair(pair!, frame);
         }
     }
 
@@ -329,13 +325,12 @@ public sealed partial class GravitasPhysics2DService
             foreach (int holderId in collisionPairHolders)
             {
                 if (!TryGetColliderById(holderId, out LSCollider2D? holder)
-                    || !holder!.TryRemoveCollisionPair(collider.Id, out CollisionPair2D? pair)
-                    || pair == null)
+                    || !holder!.TryRemoveCollisionPair(collider.Id, out CollisionPair2D? pair))
                 {
                     continue;
                 }
 
-                pair.MarkSeparated();
+                pair!.MarkSeparated();
                 _pairs.Remove(CreatePairKey(pair.Id1, pair.Id2));
                 RecyclePair(pair);
             }

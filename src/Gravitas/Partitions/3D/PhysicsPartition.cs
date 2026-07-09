@@ -20,7 +20,7 @@ internal enum PhysicsPartitionMobilityKind
     Static = 2
 }
 
-public class PhysicsPartition : IVoxelPartition
+public class PhysicsPartition : IVoxelPartition, IRetainedPhysicsPartition<GravitasCollisionService>
 {
     private GravitasCollisionService? _owner;
     private int _emptySinceFrame = -1;
@@ -201,7 +201,7 @@ public class PhysicsPartition : IVoxelPartition
 
         ContainedAwakeDynamicObjects?.Remove(item);
 
-        if (ContainedDynamicObjects?.Count > 0)
+        if (ContainedDynamicObjects.Count > 0)
             return;
 
         // If there are no more dynamic objects, we can deactivate the partition to save on future checks until it's needed again.
@@ -337,4 +337,16 @@ public class PhysicsPartition : IVoxelPartition
     /// </summary>
     /// <param name="parentIndex">The index to assign as the parent of the current voxel.</param>
     public void SetParentIndex(WorldVoxelIndex parentIndex) => WorldIndex = parentIndex;
+
+    int IRetainedPhysicsPartition<GravitasCollisionService>.RetainedIndex => RetainedIndex;
+
+    bool IRetainedPhysicsPartition<GravitasCollisionService>.IsEmpty => IsEmpty;
+
+    int IRetainedPhysicsPartition<GravitasCollisionService>.EmptySinceFrame => EmptySinceFrame;
+
+    bool IRetainedPhysicsPartition<GravitasCollisionService>.IsOwnedBy(GravitasCollisionService owner) => IsOwnedBy(owner);
+
+    void IRetainedPhysicsPartition<GravitasCollisionService>.SetRetainedIndex(int index) => SetRetainedIndex(index);
+
+    void IRetainedPhysicsPartition<GravitasCollisionService>.ClearRetainedIndex() => ClearRetainedIndex();
 }

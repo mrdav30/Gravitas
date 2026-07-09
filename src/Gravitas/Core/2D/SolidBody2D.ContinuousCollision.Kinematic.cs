@@ -297,12 +297,7 @@ public sealed partial class SolidBody2D
         Fixed64 hitDistance,
         Fixed64 sourceLength)
     {
-        Vector2d normal = normalForSource.MagnitudeSquared > Fixed64.Epsilon
-            ? normalForSource.Normalized
-            : sourceDisplacement.MagnitudeSquared > Fixed64.Epsilon
-                ? -sourceDisplacement.Normalized
-                : Vector2d.Zero;
-        if (normal == Vector2d.Zero)
+        if (!ContinuousCollisionImpulsePolicy.TryResolveSourceNormal(normalForSource, sourceDisplacement, out Vector2d normal))
             return false;
 
         Fixed64 deltaTime = Context.DeltaTime;
@@ -338,12 +333,7 @@ public sealed partial class SolidBody2D
         Fixed64 hitDistance,
         Fixed64 sourceLength)
     {
-        Vector2d normal = normalForSource.MagnitudeSquared > Fixed64.Epsilon
-            ? normalForSource.Normalized
-            : sourceDisplacement.MagnitudeSquared > Fixed64.Epsilon
-                ? -sourceDisplacement.Normalized
-                : Vector2d.Zero;
-        if (normal == Vector2d.Zero)
+        if (!ContinuousCollisionImpulsePolicy.TryResolveSourceNormal(normalForSource, sourceDisplacement, out Vector2d normal))
             return false;
 
         Fixed64 deltaTime = Context.DeltaTime;

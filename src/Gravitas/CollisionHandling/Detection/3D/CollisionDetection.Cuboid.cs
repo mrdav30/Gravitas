@@ -18,8 +18,7 @@ public static partial class CollisionDetection
 
     private static bool DoCuboidSphereCheck(CollisionWorkItem pair)
     {
-        if (pair.ColliderA is not LSCuboidCollider cuboid || pair.ColliderB is not LSSphereCollider)
-            return false;
+        var cuboid = (LSCuboidCollider)pair.ColliderA;
 
         // Calculate the closest point the AABB to the sphere center
         Vector3d closetPointOnBox = cuboid.ClosestPointOnSurface(pair.ColliderB.Center);
@@ -44,8 +43,8 @@ public static partial class CollisionDetection
 
     private static bool DoAABoxCapsuleCheck(CollisionWorkItem pair)
     {
-        if (pair.ColliderA is not LSCuboidCollider aabb || pair.ColliderB is not LSCapsuleCollider capsule)
-            return false;
+        var aabb = (LSCuboidCollider)pair.ColliderA;
+        var capsule = (LSCapsuleCollider)pair.ColliderB;
 
         // Calculate the closest point on the capsule line segment to the AABB center
         Vector3d closestPointOnCapsuleLine = Vector3d.ClosestPointOnLineSegment(capsule.LineSegmentStart, capsule.LineSegmentEnd, aabb.Center);
@@ -70,8 +69,8 @@ public static partial class CollisionDetection
 
     private static bool DoOBBoxCapsuleCheck(CollisionWorkItem pair)
     {
-        if (pair.ColliderA is not LSCuboidCollider obb || pair.ColliderB is not LSCapsuleCollider capsule)
-            return false;
+        var obb = (LSCuboidCollider)pair.ColliderA;
+        var capsule = (LSCapsuleCollider)pair.ColliderB;
 
         if (!TestOBBoxCapsuleSeparatingAxes(obb, capsule, out AxisPenetration axisPenetration))
             return false;
@@ -145,8 +144,8 @@ public static partial class CollisionDetection
     /// <returns>true if a collision is detected, false otherwise.</returns>
     private static bool DoCuboidsCheck(CollisionWorkItem pair)
     {
-        if (pair.ColliderA is not LSCuboidCollider cuboidA || pair.ColliderB is not LSCuboidCollider cuboidB)
-            return false;
+        var cuboidA = (LSCuboidCollider)pair.ColliderA;
+        var cuboidB = (LSCuboidCollider)pair.ColliderB;
 
         if (cuboidA.CurrentState == CuboidState.AABox && cuboidB.CurrentState == CuboidState.AABox)
             return TryBuildAxisAlignedCuboidManifold(pair, cuboidA, cuboidB);

@@ -17,12 +17,13 @@ public partial class SolidBody
         GroundingMode groundingMode = GroundingMode;
         GroundProbeMode groundProbeMode = GroundProbeMode;
         Fixed64 groundProbeRadius = GroundProbeRadius;
+        bool active = Active;
         BodyFreezeAxes3D freezeAxes = FreezeAxes;
         bool isKinematic = IsKinematic;
         Fixed64 gravityScale = GravityScale;
 
         RecordValues.Look(chronicler, ref Debug, "Debug");
-        RecordValues.Look(chronicler, ref Active, "Active");
+        RecordValues.Look(chronicler, ref active, "Active");
         RecordValues.Look(chronicler, ref freezeAxes, "FreezeAxes", BodyFreezeAxes3D.None);
         RecordValues.Look(chronicler, ref isKinematic, "IsKinematic", false);
         RecordValues.Look(chronicler, ref _position2dUnmarked, "Position2d");
@@ -78,6 +79,7 @@ public partial class SolidBody
 
         if (chronicler.Mode == SerializationMode.Loading)
         {
+            Active = active;
             _freezeAxes = freezeAxes;
             _isKinematic = isKinematic;
             GroundingMode = groundingMode;

@@ -32,8 +32,8 @@ internal sealed partial class GravitasMixedCollisionService
             {
                 int collider2DId = replay2DColliders[j].Id;
                 ulong key = MixedColliderKey.CreateKey(collider3DId, collider2DId);
-                if (_pairs.TryGetValue(key, out CollisionPairMixed? pair) && pair != null)
-                    pair.ContributeReplayHash(ref writer, mode);
+                if (_pairs.TryGetValue(key, out CollisionPairMixed? pair))
+                    pair!.ContributeReplayHash(ref writer, mode);
             }
         }
 

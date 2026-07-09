@@ -48,14 +48,12 @@ public sealed partial class GravitasPhysicsService
             for (int j = i + 1; j < replayColliders.Count; j++)
             {
                 LSCollider other = replayColliders[j];
-                if ((!collider.TryGetCollisionPair(other.Id, out CollisionPair? pair)
-                        && !other.TryGetCollisionPair(collider.Id, out pair))
-                    || pair == null)
+                if (!TryGetReplayHashPair(collider, other, out CollisionPair? pair))
                 {
                     continue;
                 }
 
-                pair.ContributeReplayHash(ref writer, mode);
+                pair!.ContributeReplayHash(ref writer, mode);
             }
         }
 
@@ -77,4 +75,11 @@ public sealed partial class GravitasPhysicsService
         writer.WriteInt32(LastContinuousCollisionIslandIterationCount);
         writer.WriteBool(LastContinuousCollisionIslandLimitReached);
     }
+
+    private static bool TryGetReplayHashPair(
+        LSCollider first,
+        LSCollider second,
+        out CollisionPair? pair) =>
+        first.TryGetCollisionPair(second.Id, out pair)
+        || second.TryGetCollisionPair(first.Id, out pair);
 }

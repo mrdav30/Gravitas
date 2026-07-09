@@ -3,6 +3,7 @@ using FluentAssertions;
 using Chronicler;
 using Gravitas.Support;
 using System;
+using System.Collections.Generic;
 using Xunit;
 
 namespace Gravitas.Tests.Settings;
@@ -86,6 +87,39 @@ public sealed class PhysicsSettingsTests
         construct.Should().Throw<ArgumentOutOfRangeException>().WithParameterName("frameRate");
         setSettings.Should().Throw<ArgumentOutOfRangeException>().WithParameterName("frameRate");
         setContext.Should().Throw<ArgumentOutOfRangeException>().WithParameterName("frameRate");
+    }
+
+    [Fact]
+    public void GetRegisteredCollisionMatrix_ShouldReflectRegisteredLayerNames()
+    {
+        var previousLayers = new List<KeyValuePair<int, string>>();
+        foreach (var pair in PhysicsLayer.LayerNamesCache)
+            previousLayers.Add(new KeyValuePair<int, string>(pair.Key, pair.Value));
+
+        try
+        {
+            PhysicsLayer.LayerNamesCache.Clear();
+
+            PhysicsSettings.GetRegisteredCollisionMatrix().Length.Should().Be(0);
+
+            _ = new PhysicsLayer(1, "Players");
+            _ = new PhysicsLayer(5, "World");
+
+            bool[,] matrix = PhysicsSettings.GetRegisteredCollisionMatrix();
+
+            matrix.GetLength(0).Should().Be(2);
+            matrix.GetLength(1).Should().Be(2);
+            matrix[0, 0].Should().BeTrue();
+            matrix[0, 1].Should().BeTrue();
+            matrix[1, 0].Should().BeTrue();
+            matrix[1, 1].Should().BeTrue();
+        }
+        finally
+        {
+            PhysicsLayer.LayerNamesCache.Clear();
+            for (int i = 0; i < previousLayers.Count; i++)
+                PhysicsLayer.LayerNamesCache[previousLayers[i].Key] = previousLayers[i].Value;
+        }
     }
 
     [Theory]

@@ -115,9 +115,6 @@ internal sealed class ColliderRegistry<TCollider>
     private void RemoveLiveCollider(TCollider collider)
     {
         int index = collider.ServiceIndex;
-        if (index < 0 || index >= _liveColliders.Count || !ReferenceEquals(_liveColliders[index], collider))
-            return;
-
         int lastIndex = _liveColliders.Count - 1;
         if (index != lastIndex)
         {

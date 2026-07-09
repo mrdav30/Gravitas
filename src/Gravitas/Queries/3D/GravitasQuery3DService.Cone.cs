@@ -192,7 +192,7 @@ public sealed partial class GravitasQuery3DService
         for (int i = colliderIds.Count - 1; i >= 0; i--)
         {
             if (!TryBuildOverlapConeHit(colliderIds.DenseKeys[i], origin, direction, length, endRadius, out Physics3DHit hit)
-                || (found && !Physics3DHitSorter.ComesBefore(hit, closestHit)))
+                || !PhysicsHitSelectionPolicy.ShouldReplace(hit, found, closestHit))
             {
                 continue;
             }
@@ -519,7 +519,7 @@ public sealed partial class GravitasQuery3DService
         for (int i = 0; i < compound.PartCount; i++)
         {
             if (!TryBuildConeHitForCollider(compound.GetPartCollider(i), origin, direction, length, endRadius, out Physics3DHit partHit)
-                || (found && !Physics3DHitSorter.ComesBefore(partHit, best)))
+                || !PhysicsHitSelectionPolicy.ShouldReplace(partHit, found, best))
             {
                 continue;
             }

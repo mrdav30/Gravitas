@@ -84,6 +84,41 @@ public sealed class GravitasQuery3DServiceRaycastTests
         rayHit.Point.Should().Be(new Vector3d(Fixed64.FromFraction(1, 4), Fixed64.Zero, Fixed64.Zero));
     }
 
+    [Theory]
+    [InlineData(0, 1)]
+    [InlineData(1, 0)]
+    [InlineData(1, -1)]
+    public void Raycast_WithInvalidDirectionOrDistance_ShouldReturnFalse(int directionX, int maxDistance)
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        CreateDynamicSphere(context, Vector3d.Zero);
+
+        bool hit = context.Query3D.Raycast(
+            Vector3d.Right * (Fixed64)directionX,
+            Vector3d.Right * (Fixed64)directionX,
+            (Fixed64)maxDistance,
+            out Physics3DHit rayHit,
+            IncludeLayerZero);
+
+        hit.Should().BeFalse();
+        rayHit.Should().Be(default(Physics3DHit));
+        context.Query3D.LastQueryCandidateCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void RaycastAll_WithZeroLengthSegment_ShouldReturnZeroAndClearResults()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        CreateDynamicSphere(context, Vector3d.Zero);
+        var hits = new SwiftList<Physics3DHit> { new() };
+
+        int count = context.Query3D.RaycastAll(Vector3d.Zero, Vector3d.Zero, IncludeLayerZero, hits);
+
+        count.Should().Be(0);
+        hits.Count.Should().Be(0);
+        context.Query3D.LastQueryCandidateCount.Should().Be(0);
+    }
+
     [Fact]
     public void Raycast_WithEqualDistanceHits_ShouldUseColliderIdTieBreaker()
     {

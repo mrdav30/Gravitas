@@ -83,6 +83,24 @@ public sealed class ContinuousCollisionCandidateOrderingTests
                 Fixed64.One)
             .Should()
             .BeFalse();
+        ContinuousCollisionCandidateOrdering.ShouldReplaceHit(
+                CreateHit((LSCollider?)null, current.Distance),
+                Fixed64.One,
+                hasCandidate: true,
+                hasCurrent: true,
+                current,
+                Fixed64.One)
+            .Should()
+            .BeTrue();
+        ContinuousCollisionCandidateOrdering.ShouldReplaceHit(
+                CreateHit(higher, current.Distance),
+                Fixed64.One,
+                hasCandidate: true,
+                hasCurrent: true,
+                CreateHit((LSCollider?)null, current.Distance),
+                Fixed64.One)
+            .Should()
+            .BeFalse();
     }
 
     [Fact]
@@ -253,6 +271,24 @@ public sealed class ContinuousCollisionCandidateOrderingTests
                 Fixed64.One)
             .Should()
             .BeFalse();
+        ContinuousCollisionCandidateOrdering.ShouldReplaceMixedHit(
+                CreateHit(null, higher2D, PhysicsQueryReducerKind.ConservativeFallback, distance: current.Distance),
+                Fixed64.One,
+                hasCandidate: true,
+                hasCurrent: true,
+                current,
+                Fixed64.One)
+            .Should()
+            .BeTrue();
+        ContinuousCollisionCandidateOrdering.ShouldReplaceMixedHit(
+                CreateHit(higher3D, null, PhysicsQueryReducerKind.ConservativeFallback, distance: current.Distance),
+                Fixed64.One,
+                hasCandidate: true,
+                hasCurrent: true,
+                CreateHit(higher3D, higher2D, PhysicsQueryReducerKind.ConservativeFallback, distance: current.Distance),
+                Fixed64.One)
+            .Should()
+            .BeTrue();
     }
 
     [Fact]
@@ -310,8 +346,8 @@ public sealed class ContinuousCollisionCandidateOrderingTests
         new(collider, Vector2d.Zero, Vector2d.Right, distance);
 
     private static PhysicsMixedHit CreateHit(
-        LSCollider collider3D,
-        LSCollider2D collider2D,
+        LSCollider? collider3D,
+        LSCollider2D? collider2D,
         PhysicsQueryReducerKind reducerKind,
         Fixed64 distance) =>
         new(

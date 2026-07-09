@@ -493,9 +493,6 @@ internal static class CollisionDetection2D
         bool sourceIsA,
         ref MinimumAxis2D bestAxis)
     {
-        if (axis.MagnitudeSquared <= Fixed64.Epsilon)
-            return true;
-
         Vector2d normal = axis.Normalized;
         Project(colliderA, normal, out Fixed64 minA, out Fixed64 maxA);
         Project(colliderB, normal, out Fixed64 minB, out Fixed64 maxB);
@@ -536,9 +533,6 @@ internal static class CollisionDetection2D
         ref Fixed64 bestOverlap,
         ref Vector2d bestAxis)
     {
-        if (axis.MagnitudeSquared <= Fixed64.Epsilon)
-            return true;
-
         Vector2d normal = axis.Normalized;
         Project(colliderA, normal, out Fixed64 minA, out Fixed64 maxA);
         Project(colliderB, normal, out Fixed64 minB, out Fixed64 maxB);
@@ -562,9 +556,6 @@ internal static class CollisionDetection2D
         ref Fixed64 bestOverlap,
         ref Vector2d bestAxis)
     {
-        if (axis.MagnitudeSquared <= Fixed64.Epsilon)
-            return true;
-
         Vector2d normal = axis.Normalized;
         Fixed64 centerProjection = Vector2d.Dot(circle.Center, normal);
         Fixed64 radius = circle.ScaledRadius;
@@ -591,9 +582,6 @@ internal static class CollisionDetection2D
         ref Fixed64 bestOverlap,
         ref Vector2d bestAxis)
     {
-        if (axis.MagnitudeSquared <= Fixed64.Epsilon)
-            return true;
-
         Vector2d normal = axis.Normalized;
         ProjectCapsule(capsule, normal, out Fixed64 minA, out Fixed64 maxA);
         Project(convex, normal, out Fixed64 minB, out Fixed64 maxB);
@@ -739,7 +727,7 @@ internal static class CollisionDetection2D
                 if (!TryCollide(partA, partB, out Contact2D candidate))
                     continue;
 
-                if (!found || candidate.Depth > best.Depth)
+                if (ContactSelectionPolicy.ShouldReplaceWithDeeper(candidate, found, best))
                 {
                     best = candidate;
                     found = true;
@@ -777,7 +765,7 @@ internal static class CollisionDetection2D
             if (!collided)
                 continue;
 
-            if (!found || candidate.Depth > best.Depth)
+            if (ContactSelectionPolicy.ShouldReplaceWithDeeper(candidate, found, best))
             {
                 best = candidate;
                 found = true;
@@ -884,7 +872,7 @@ internal static class CollisionDetection2D
         out Vector2d firstPoint,
         out Vector2d secondPoint)
     {
-        if (TryIntersectSegments(firstStart, firstEnd - firstStart, secondStart, secondEnd - secondStart, out Fixed64 t))
+        if (PlanarSegmentGeometry.TryIntersect(firstStart, firstEnd - firstStart, secondStart, secondEnd - secondStart, out Fixed64 t))
         {
             firstPoint = firstStart + (firstEnd - firstStart) * t;
             secondPoint = firstPoint;
@@ -940,9 +928,6 @@ internal static class CollisionDetection2D
             Vector2d start = collider.GetVertexUnchecked(i);
             Vector2d end = collider.GetVertexUnchecked((i + 1) % collider.VertexCount);
             Vector2d edge = end - start;
-            if (edge.MagnitudeSquared <= Fixed64.Epsilon)
-                continue;
-
             Fixed64 dot = Vector2d.Dot(edge.LeftHandNormal.Normalized, outwardNormal);
             if (dot > bestDot)
             {
@@ -963,9 +948,6 @@ internal static class CollisionDetection2D
             Vector2d start = collider.GetVertexUnchecked(i);
             Vector2d end = collider.GetVertexUnchecked((i + 1) % collider.VertexCount);
             Vector2d edge = end - start;
-            if (edge.MagnitudeSquared <= Fixed64.Epsilon)
-                continue;
-
             Fixed64 dot = Vector2d.Dot(edge.LeftHandNormal.Normalized, referenceNormal);
             if (dot < bestDot)
             {
@@ -982,7 +964,7 @@ internal static class CollisionDetection2D
         Vector2d start = collider.GetVertexUnchecked(index);
         Vector2d end = collider.GetVertexUnchecked((index + 1) % collider.VertexCount);
         Vector2d direction = end - start;
-        return new Edge2D(start, end, direction.MagnitudeSquared > Fixed64.Epsilon ? direction.Normalized : Vector2d.Zero);
+        return new Edge2D(start, end, direction.Normalized);
     }
 
     private static int ClipSegment(
@@ -1022,34 +1004,6 @@ internal static class CollisionDetection2D
         first = output0;
         second = outputCount > 1 ? output1 : default;
         return outputCount;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool TryIntersectSegments(
-        Vector2d firstStart,
-        Vector2d firstSegment,
-        Vector2d secondStart,
-        Vector2d secondSegment,
-        out Fixed64 firstT)
-    {
-        Fixed64 denominator = Vector2d.CrossProduct(firstSegment, secondSegment);
-        if (denominator == Fixed64.Zero || denominator.Abs() <= Fixed64.Epsilon)
-        {
-            firstT = default;
-            return false;
-        }
-
-        Vector2d delta = secondStart - firstStart;
-        Fixed64 t = Vector2d.CrossProduct(delta, secondSegment) / denominator;
-        Fixed64 u = Vector2d.CrossProduct(delta, firstSegment) / denominator;
-        if (t < Fixed64.Zero || t > Fixed64.One || u < Fixed64.Zero || u > Fixed64.One)
-        {
-            firstT = default;
-            return false;
-        }
-
-        firstT = t;
-        return true;
     }
 
     private static void AddClippedPoint(

@@ -65,7 +65,7 @@ public sealed partial class GravitasQuery2DService
             LSCollider2D collider = _queryCandidates[i];
             if (!IsEligibleSweepCandidate(collider, excludedCollider, includeTriggers)
                 || !QueryDetection2D.TrySweepCircle(start, end, radius, collider, out Physics2DHit candidate)
-                || (found && !Physics2DHitSorter.ComesBefore(candidate, closest)))
+                || !PhysicsHitSelectionPolicy.ShouldReplace(candidate, found, closest))
             {
                 continue;
             }

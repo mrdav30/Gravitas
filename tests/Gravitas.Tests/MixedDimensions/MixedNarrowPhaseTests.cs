@@ -327,6 +327,14 @@ public sealed class MixedNarrowPhaseTests
                 Fixed64.Zero
             },
             {
+                "Capsule_ConvexPolygon_PrismEdge",
+                ColliderType.Capsule,
+                new Vector3d(Fixed64.FromFraction(-3, 2), -Fixed64.Half, Fixed64.FromFraction(7, 5)),
+                Euler(0, 0, 30),
+                ColliderType2D.ConvexPolygon,
+                FixedMath.DegToRad((Fixed64)30)
+            },
+            {
                 "Cylinder_AABox",
                 ColliderType.Cylinder,
                 new Vector3d(Fixed64.FromFraction(-3, 2), -Fixed64.One, Fixed64.FromFraction(-3, 2)),
@@ -375,6 +383,14 @@ public sealed class MixedNarrowPhaseTests
                 Fixed64.Zero
             },
             {
+                "Cylinder_ConvexPolygon_PrismEdge",
+                ColliderType.Cylinder,
+                new Vector3d(Fixed64.FromFraction(-3, 2), Fixed64.Half, Fixed64.FromFraction(7, 5)),
+                Euler(0, 0, 30),
+                ColliderType2D.ConvexPolygon,
+                FixedMath.DegToRad((Fixed64)30)
+            },
+            {
                 "Cone_AABox",
                 ColliderType.Cone,
                 new Vector3d(Fixed64.FromFraction(-3, 2), -Fixed64.One, Fixed64.FromFraction(-3, 2)),
@@ -405,6 +421,14 @@ public sealed class MixedNarrowPhaseTests
                 Euler(0, 0, 15),
                 ColliderType2D.AABox,
                 Fixed64.Zero
+            },
+            {
+                "Cone_ConvexPolygon_PrismEdge",
+                ColliderType.Cone,
+                new Vector3d(Fixed64.FromFraction(-3, 2), Fixed64.Half, Fixed64.FromFraction(7, 5)),
+                Euler(0, 0, 30),
+                ColliderType2D.ConvexPolygon,
+                FixedMath.DegToRad((Fixed64)30)
             }
         };
 
@@ -441,6 +465,42 @@ public sealed class MixedNarrowPhaseTests
         contact.Normal3DTo2D.Should().Be(Vector3d.Right);
         contact.Point3D.Should().Be(Vector3d.Right * Fixed64.Half);
         contact.Point2D.Should().Be(Vector3d.Zero);
+    }
+
+    [Fact]
+    public void SphereCustom2DSlab_WithDegenerateClosestPointAndOffsetCenter_ShouldUseCenterFallbackNormal()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSSphereCollider> sphere = CreateSphere3D(context, Vector3d.Zero);
+        SolidBody2D custom = CreateBody2D(
+            context,
+            new UnsupportedTestCollider2D(),
+            new Vector2d(Fixed64.Zero, Fixed64.One));
+
+        bool collided = CollisionDetectionMixed.TryCollide(sphere.Collider, custom.Collider, out MixedContact contact);
+
+        collided.Should().BeTrue();
+        contact.HasContact.Should().BeTrue();
+        contact.Normal3DTo2D.Should().Be(Vector3d.Forward);
+        contact.Point3D.Should().Be(Vector3d.Forward * Fixed64.Half);
+        contact.Point2D.Should().Be(Vector3d.Zero);
+    }
+
+    [Fact]
+    public void Unsupported3DSlab_WithOverlappingBounds_ShouldReturnNoContact()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<UnsupportedTestCollider3D> unsupported = CreateBody3D(
+            context,
+            new UnsupportedTestCollider3D(),
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+        SolidBody2D circle = CreateBody2D(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero);
+
+        bool collided = CollisionDetectionMixed.TryCollide(unsupported.Collider, circle.Collider, out MixedContact contact);
+
+        collided.Should().BeFalse();
+        contact.HasContact.Should().BeFalse();
     }
 
     [Fact]
@@ -491,6 +551,42 @@ public sealed class MixedNarrowPhaseTests
         contact.Normal3DTo2D.Should().Be(-Vector3d.Right);
         contact.Point3D.Should().Be(new Vector3d(Fixed64.One, Fixed64.Zero, Fixed64.Zero));
         contact.Point2D.Should().Be(new Vector3d(Fixed64.One, Fixed64.Zero, Fixed64.Zero));
+    }
+
+    [Fact]
+    public void SphereAABoxSlab_FromInsideWithPlanarSideCloserThanCap_ShouldUsePlanarNormal()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSSphereCollider> sphere = CreateSphere3D(
+            context,
+            new Vector3d(Fixed64.FromFraction(9, 10), Fixed64.Zero, Fixed64.Zero));
+        SolidBody2D box = CreateBody2D(context, new LSAABBoxCollider2D(new Vector2d((Fixed64)2, (Fixed64)2)), Vector2d.Zero);
+
+        bool collided = CollisionDetectionMixed.TryCollide(sphere.Collider, box.Collider, out MixedContact contact);
+
+        collided.Should().BeTrue();
+        contact.HasContact.Should().BeTrue();
+        contact.Normal3DTo2D.Should().Be(Vector3d.Right);
+        contact.Point2D.Should().Be(new Vector3d(Fixed64.One, Fixed64.Zero, Fixed64.Zero));
+        contact.Depth.Should().Be(Fixed64.FromFraction(3, 5));
+    }
+
+    [Fact]
+    public void SphereAABoxSlab_FromInsideWithTopCapCloserThanPlanarSide_ShouldUseVerticalNormal()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSSphereCollider> sphere = CreateSphere3D(
+            context,
+            new Vector3d(Fixed64.Zero, Fixed64.FromFraction(9, 20), Fixed64.Zero));
+        SolidBody2D box = CreateBody2D(context, new LSAABBoxCollider2D(new Vector2d((Fixed64)2, (Fixed64)2)), Vector2d.Zero);
+
+        bool collided = CollisionDetectionMixed.TryCollide(sphere.Collider, box.Collider, out MixedContact contact);
+
+        collided.Should().BeTrue();
+        contact.HasContact.Should().BeTrue();
+        contact.Normal3DTo2D.Should().Be(Vector3d.Up);
+        contact.Point2D.Should().Be(new Vector3d(Fixed64.Zero, Fixed64.Half, Fixed64.Zero));
+        contact.Depth.Should().Be(Fixed64.FromFraction(11, 20));
     }
 
     [Fact]
@@ -726,6 +822,32 @@ public sealed class MixedNarrowPhaseTests
         contact.Normal3DTo2D.MagnitudeSquared.Should().BeGreaterThan(Fixed64.Zero);
     }
 
+    [Theory]
+    [InlineData(ColliderType.AABox)]
+    [InlineData(ColliderType.Capsule)]
+    [InlineData(ColliderType.Cylinder)]
+    [InlineData(ColliderType.Cone)]
+    public void PrimitiveDegenerateCapsule2DSlab_WithRepresentativeOverlap_ShouldReportContact(ColliderType shape3D)
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        LSCollider collider3D = CreatePrimitive3D(
+            context,
+            shape3D,
+            new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero),
+            FixedQuaternion.Identity);
+        SolidBody2D capsule2D = CreateBody2D(
+            context,
+            new LSCapsuleCollider2D(Fixed64.Half, Fixed64.One),
+            Vector2d.Zero);
+
+        bool collided = CollisionDetectionMixed.TryCollide(collider3D, capsule2D.Collider, out MixedContact contact);
+
+        collided.Should().BeTrue(shape3D.ToString());
+        contact.HasContact.Should().BeTrue();
+        contact.Depth.Should().BeGreaterThanOrEqualTo(Fixed64.Zero);
+        contact.Normal3DTo2D.MagnitudeSquared.Should().BeGreaterThan(Fixed64.Zero);
+    }
+
     [Fact]
     public void CapsuleCircleSlab_WithPlanarSideOverlap_ShouldReportContact()
     {
@@ -742,6 +864,29 @@ public sealed class MixedNarrowPhaseTests
         contact.Normal3DTo2D.Should().Be(-Vector3d.Right);
         contact.Point3D.X.Should().Be(Fixed64.FromFraction(1, 4));
         contact.Point2D.X.Should().Be(Fixed64.Half);
+    }
+
+    [Fact]
+    public void DegenerateCapsuleCircleSlab_WithPlanarOverlap_ShouldReportStableContact()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        var collider = new LSCapsuleCollider
+        {
+            Size = Vector3d.One
+        };
+        ScenarioBody<LSCapsuleCollider> capsule = CreateBody3D(
+            context,
+            collider,
+            new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero),
+            FixedQuaternion.Identity);
+        SolidBody2D circle = CreateBody2D(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero);
+
+        bool collided = CollisionDetectionMixed.TryCollide(capsule.Collider, circle.Collider, out MixedContact contact);
+
+        collided.Should().BeTrue();
+        contact.HasContact.Should().BeTrue();
+        contact.Depth.Should().Be(Fixed64.FromFraction(1, 4));
+        contact.Normal3DTo2D.Should().Be(-Vector3d.Right);
     }
 
     [Theory]
@@ -833,6 +978,31 @@ public sealed class MixedNarrowPhaseTests
     }
 
     [Fact]
+    public void CompoundCircleSlab_WithOnlyExactMissParts_ShouldReturnNoContact()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        var compoundCollider = new LSCompoundCollider(
+            CompoundColliderPart.Sphere(
+                Fixed64.Half,
+                new Vector3d(Fixed64.FromFraction(9, 10), Fixed64.Zero, Fixed64.FromFraction(9, 10))),
+            CompoundColliderPart.Sphere(Fixed64.Half, new Vector3d((Fixed64)4, Fixed64.Zero, Fixed64.Zero)));
+        ScenarioBody<LSCompoundCollider> compound = CreateBody3D(
+            context,
+            compoundCollider,
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+        SolidBody2D circle = CreateBody2D(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero);
+
+        compound.Collider.GetPartCollider(0).Bounds.Intersects(circle.Collider.MixedBounds3D).Should().BeTrue();
+        compound.Collider.GetPartCollider(1).Bounds.Intersects(circle.Collider.MixedBounds3D).Should().BeFalse();
+
+        bool collided = CollisionDetectionMixed.TryCollide(compound.Collider, circle.Collider, out MixedContact contact);
+
+        collided.Should().BeFalse();
+        contact.HasContact.Should().BeFalse();
+    }
+
+    [Fact]
     public void SphereCompound2DSlab_WithSeparatedFirstPart_ShouldUseLaterPartContact()
     {
         using GravitasWorldContext context = CreateMixedContext();
@@ -851,6 +1021,27 @@ public sealed class MixedNarrowPhaseTests
         contact.Depth.Should().Be(Fixed64.FromFraction(1, 4));
         contact.Normal3DTo2D.Should().Be(-Vector3d.Right);
         body2D.Collider.Should().BeSameAs(compound2D);
+    }
+
+    [Fact]
+    public void SphereCompound2DSlab_WithOnlyExactMissParts_ShouldReturnNoContact()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSSphereCollider> sphere = CreateSphere3D(context, Vector3d.Zero);
+        var compound2D = new LSCompoundCollider2D(
+            CompoundColliderPart2D.Circle(
+                Fixed64.Half,
+                new Vector2d(Fixed64.FromFraction(9, 10), Fixed64.FromFraction(9, 10))),
+            CompoundColliderPart2D.Circle(Fixed64.Half, new Vector2d((Fixed64)4, Fixed64.Zero)));
+        SolidBody2D body2D = CreateBody2D(context, compound2D, Vector2d.Zero);
+
+        sphere.Collider.Bounds.Intersects(compound2D.GetPartCollider(0).MixedBounds3D).Should().BeTrue();
+        sphere.Collider.Bounds.Intersects(compound2D.GetPartCollider(1).MixedBounds3D).Should().BeFalse();
+
+        bool collided = CollisionDetectionMixed.TryCollide(sphere.Collider, body2D.Collider, out MixedContact contact);
+
+        collided.Should().BeFalse();
+        contact.HasContact.Should().BeFalse();
     }
 
     [Fact]
@@ -948,6 +1139,24 @@ public sealed class MixedNarrowPhaseTests
         contact.HasContact.Should().BeTrue();
         contact.Depth.Should().BeGreaterThanOrEqualTo(Fixed64.Zero);
         contact.Normal3DTo2D.MagnitudeSquared.Should().BeGreaterThan(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void ConvexMeshUnsupported2DSlab_WithOverlappingBounds_ShouldReturnNoContact()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSMeshCollider> mesh = CreateMesh3D(
+            context,
+            MeshTestFixtures.CreateConvexCube(),
+            Vector3d.Zero);
+        SolidBody2D unsupported = CreateBody2D(context, new UnsupportedTestCollider2D(), Vector2d.Zero);
+
+        mesh.Collider.Bounds.Intersects(unsupported.Collider.MixedBounds3D).Should().BeTrue();
+
+        bool collided = CollisionDetectionMixed.TryCollide(mesh.Collider, unsupported.Collider, out MixedContact contact);
+
+        collided.Should().BeFalse();
+        contact.HasContact.Should().BeFalse();
     }
 
     [Fact]

@@ -63,6 +63,24 @@ public sealed class SolidBodyCenterOfMassTests
     }
 
     [Fact]
+    public void LocalCenterOfMassOffset_ShouldNoOpForSameExplicitValueAndAllowInactiveSetup()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        var inactive = new SolidBody(new TestMatterAgent(scenario.Context), new LSSphereCollider());
+
+        inactive.LocalCenterOfMassOffset = Vector3d.Up;
+        inactive.LocalCenterOfMassOffset.Should().Be(Vector3d.Up);
+
+        ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
+        body.Body.LocalCenterOfMassOffset = Vector3d.Right;
+        body.Body.Sleep();
+
+        body.Body.LocalCenterOfMassOffset = Vector3d.Right;
+
+        body.Body.IsSleeping.Should().BeTrue();
+    }
+
+    [Fact]
     public void Initialize_WithClosedMeshCollider_ShouldUseMeshCenterOfMassAsDefaultBodyCenterOfMass()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();

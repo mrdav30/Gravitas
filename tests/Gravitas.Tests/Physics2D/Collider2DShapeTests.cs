@@ -28,6 +28,34 @@ public sealed class Collider2DShapeTests
         collider.Bounds.Max.Should().Be(new Vector2d((Fixed64)3, (Fixed64)4));
     }
 
+    [Theory]
+    [InlineData(0, 1)]
+    [InlineData(1, 0)]
+    public void AABBoxCollider2D_ShouldRejectNonPositiveSizeComponents(int x, int y)
+    {
+        Action create = () => _ = new LSAABBoxCollider2D(new Vector2d((Fixed64)x, (Fixed64)y));
+
+        create.Should().Throw<ArgumentException>().WithParameterName("value");
+    }
+
+    [Fact]
+    public void CapsuleCollider2D_GetSupportPoint_ShouldUseDirectionAndSegmentSign()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        var collider = new LSCapsuleCollider2D(Fixed64.Half, (Fixed64)3);
+        var transform = new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One);
+        var body = new SolidBody2D(new TestMatterAgent(context, transform), collider)
+        {
+            Mass = Fixed64.One
+        };
+
+        body.Initialize(Vector2d.Zero);
+
+        collider.GetSupportPoint(Vector2d.Forward).Should().Be(new Vector2d(Fixed64.Zero, Fixed64.FromFraction(3, 2)));
+        collider.GetSupportPoint(-Vector2d.Forward).Should().Be(new Vector2d(Fixed64.Zero, -Fixed64.FromFraction(3, 2)));
+        collider.GetSupportPoint(Vector2d.Zero).Should().Be(new Vector2d(Fixed64.Half, Fixed64.One));
+    }
+
     [Fact]
     public void PolygonCollider2D_WithConcaveVertices_ShouldThrow()
     {

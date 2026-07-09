@@ -21,11 +21,10 @@ public partial class SolidBody : IRecordable
 {
     public bool Debug = false;
 
-    public bool Active = false;
+    public bool Active { get; private set; }
 
     private int _dynamicId = -1;
     public int DynamicId => _dynamicId;  // Physics Id, if not set it's assumed the object isn't simulated
-    private bool _isSet = false;
 
     private BodyFreezeAxes3D _freezeAxes;
 
@@ -601,8 +600,6 @@ public partial class SolidBody : IRecordable
 
         _rotationSpeed = DefaultRotationSpeed;
         _rotationInterpoleSpeed = Fixed64.Zero;
-
-        _isSet = true;
     }
 
     public void Initialize(
@@ -610,12 +607,6 @@ public partial class SolidBody : IRecordable
         FixedQuaternion startRotation,
         bool isDynamic = true)
     {
-        if (!_isSet)
-        {
-            GravitasLogger.Channel.Error($"SolidBody must be set up with an agent and collider before initialization.");
-            return;
-        }
-
         Active = true;
 
         _linearAcceleration = Vector3d.Zero;

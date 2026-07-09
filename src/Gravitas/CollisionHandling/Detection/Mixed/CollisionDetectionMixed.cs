@@ -61,7 +61,7 @@ public static partial class CollisionDetectionMixed
             }
 
             candidate = candidate.WithFallbackMaterials(collider3D.Material, part.Material);
-            if (!found || candidate.Depth < best.Depth)
+            if (ContactSelectionPolicy.ShouldReplaceWithShallower(candidate, found, best))
             {
                 best = candidate;
                 found = true;
@@ -161,8 +161,7 @@ public static partial class CollisionDetectionMixed
     {
         penetration = default;
 
-        if (!CheckCuboidCircleSlabAxis(cuboid, circle, Vector3d.Up, ref penetration))
-            return false;
+        CheckCuboidCircleSlabAxis(cuboid, circle, Vector3d.Up, ref penetration);
 
         for (int i = 0; i < cuboid.FaceNormals.Length; i++)
         {
@@ -193,8 +192,7 @@ public static partial class CollisionDetectionMixed
         penetration = default;
         GetCircleSlabSegment(circle, out Vector3d circleStart, out Vector3d circleEnd);
 
-        if (!CheckCapsuleCircleSlabAxis(capsule, circle, Vector3d.Up, ref penetration))
-            return false;
+        CheckCapsuleCircleSlabAxis(capsule, circle, Vector3d.Up, ref penetration);
 
         if (!CheckCapsuleCircleSlabAxis(capsule, circle, capsule.LineDirection, ref penetration))
             return false;
@@ -224,8 +222,7 @@ public static partial class CollisionDetectionMixed
         if (!CheckCylinderCircleSlabAxis(cylinder, circle, cylinder.LineDirection, ref penetration))
             return false;
 
-        if (!CheckCylinderCircleSlabAxis(cylinder, circle, Vector3d.Up, ref penetration))
-            return false;
+        CheckCylinderCircleSlabAxis(cylinder, circle, Vector3d.Up, ref penetration);
 
         if (!CheckCylinderCircleSlabAxis(cylinder, circle, Vector3d.Cross(cylinder.LineDirection, Vector3d.Up), ref penetration))
             return false;
@@ -252,8 +249,7 @@ public static partial class CollisionDetectionMixed
         if (!CheckConeCircleSlabAxis(cone, circle, cone.Axis, ref penetration))
             return false;
 
-        if (!CheckConeCircleSlabAxis(cone, circle, Vector3d.Up, ref penetration))
-            return false;
+        CheckConeCircleSlabAxis(cone, circle, Vector3d.Up, ref penetration);
 
         if (!CheckConeCircleSlabAxis(cone, circle, Vector3d.Cross(cone.Axis, Vector3d.Up), ref penetration))
             return false;
@@ -273,8 +269,7 @@ public static partial class CollisionDetectionMixed
     {
         penetration = default;
 
-        if (!CheckCuboidPrismAxis(cuboid, prism, Vector3d.Up, ref penetration))
-            return false;
+        CheckCuboidPrismAxis(cuboid, prism, Vector3d.Up, ref penetration);
 
         if (prism is LSCapsuleCollider2D embeddedCapsule)
         {
@@ -337,8 +332,7 @@ public static partial class CollisionDetectionMixed
         if (!CheckCapsulePrismAxis(capsule, prism, capsule.LineDirection, ref penetration))
             return false;
 
-        if (!CheckCapsulePrismAxis(capsule, prism, Vector3d.Up, ref penetration))
-            return false;
+        CheckCapsulePrismAxis(capsule, prism, Vector3d.Up, ref penetration);
 
         if (!CheckCapsulePrismAxis(capsule, prism, Vector3d.Cross(capsule.LineDirection, Vector3d.Up), ref penetration))
             return false;
@@ -383,8 +377,7 @@ public static partial class CollisionDetectionMixed
         if (!CheckCylinderPrismAxis(cylinder, prism, cylinder.LineDirection, ref penetration))
             return false;
 
-        if (!CheckCylinderPrismAxis(cylinder, prism, Vector3d.Up, ref penetration))
-            return false;
+        CheckCylinderPrismAxis(cylinder, prism, Vector3d.Up, ref penetration);
 
         if (!CheckCylinderPrismAxis(cylinder, prism, Vector3d.Cross(cylinder.LineDirection, Vector3d.Up), ref penetration))
             return false;
@@ -429,8 +422,7 @@ public static partial class CollisionDetectionMixed
         if (!CheckConePrismAxis(cone, prism, cone.Axis, ref penetration))
             return false;
 
-        if (!CheckConePrismAxis(cone, prism, Vector3d.Up, ref penetration))
-            return false;
+        CheckConePrismAxis(cone, prism, Vector3d.Up, ref penetration);
 
         if (!CheckConePrismAxis(cone, prism, Vector3d.Cross(cone.Axis, Vector3d.Up), ref penetration))
             return false;
