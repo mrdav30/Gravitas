@@ -11,6 +11,43 @@ namespace Gravitas.Tests.CollisionHandlingTests;
 public sealed class CollisionPairCullingTests
 {
     [Fact]
+    public void UpdateCollision_AfterPairDeactivation_ShouldBeCompleteNoOp()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> first = scenario.CreateSphere(Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> second = scenario.CreateSphere(Vector3d.Right * Fixed64.Half);
+        CollisionPair pair = scenario.Context.Physics.GetCollisionPair(
+            first.Collider.Id,
+            second.Collider.Id)!;
+        int exitCount = 0;
+        first.Collider.OnContactExit += _ => exitCount++;
+        second.Collider.OnContactExit += _ => exitCount++;
+        scenario.Context.Diagnostics.Enable(eventCapacity: 4, drawCommandCapacity: 0);
+
+        pair.UpdateCollision();
+        pair.Manifold.HasContact.Should().BeTrue();
+        pair.Deactivate();
+
+        int lastFrame = pair.LastFrame;
+        short cullCounter = pair.CullCounter;
+        int diagnosticCount = scenario.Context.Diagnostics.EventCount;
+        int exitCountAfterDeactivate = exitCount;
+        var replayHash = scenario.Context.ComputeReplayHash(
+            GravitasReplayHashMode.AuthoritativeWithSolverCaches);
+
+        pair.UpdateCollision();
+
+        pair.Active.Should().BeFalse();
+        pair.Manifold.HasContact.Should().BeFalse();
+        pair.LastFrame.Should().Be(lastFrame);
+        pair.CullCounter.Should().Be(cullCounter);
+        scenario.Context.Diagnostics.EventCount.Should().Be(diagnosticCount);
+        exitCount.Should().Be(exitCountAfterDeactivate);
+        scenario.Context.ComputeReplayHash(GravitasReplayHashMode.AuthoritativeWithSolverCaches)
+            .Should().Be(replayHash);
+    }
+
+    [Fact]
     public void UpdateCollision_WithPositiveCullCounter_ShouldRecheckMovedCollider()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();

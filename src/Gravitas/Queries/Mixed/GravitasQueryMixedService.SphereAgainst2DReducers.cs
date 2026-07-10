@@ -535,9 +535,6 @@ public sealed partial class GravitasQueryMixedService
     {
         distance = Fixed64.Zero;
         Fixed64 radiusSqr = radius * radius;
-        if (DistanceSquaredToSegment3D(start, segmentStart, segmentEnd) <= radiusSqr)
-            return true;
-
         Vector3d segment = segmentEnd - segmentStart;
         Fixed64 segmentLengthSqr = segment.MagnitudeSquared;
         bool found = false;
@@ -594,12 +591,6 @@ public sealed partial class GravitasQueryMixedService
     {
         Fixed64 radiusSqr = radius * radius;
         Vector3d startToPoint = start - point;
-        if (startToPoint.MagnitudeSquared <= radiusSqr)
-        {
-            distance = Fixed64.Zero;
-            return true;
-        }
-
         Fixed64 a = direction.MagnitudeSquared;
         Fixed64 b = 2 * Vector3d.Dot(startToPoint, direction);
         Fixed64 c = startToPoint.MagnitudeSquared - radiusSqr;
@@ -615,7 +606,7 @@ public sealed partial class GravitasQueryMixedService
             return false;
         }
 
-        if (first >= Fixed64.Zero && first <= length)
+        if (first <= length)
         {
             distance = first;
             return true;

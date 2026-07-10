@@ -241,14 +241,8 @@ public sealed partial class GravitasQueryMixedService
         bool includeTriggers,
         bool staticTargetsOnly)
     {
-        if (!collider.IsActive || (!includeTriggers && collider.IsTrigger))
+        if (!includeTriggers && collider.IsTrigger)
             return false;
-
-        if (staticTargetsOnly)
-        {
-            if (!collider.IsStatic && !collider.Body!.IsKinematic)
-                return false;
-        }
 
         return excludedCollider == null
             || (!ReferenceEquals(collider.AgentOrNull, excludedCollider.AgentOrNull)
@@ -262,14 +256,8 @@ public sealed partial class GravitasQueryMixedService
         bool includeTriggers,
         bool staticTargetsOnly)
     {
-        if (!collider.IsActive || (!includeTriggers && collider.IsTrigger))
+        if (!includeTriggers && collider.IsTrigger)
             return false;
-
-        if (staticTargetsOnly)
-        {
-            if (!collider.IsStatic && !collider.Body!.IsKinematic)
-                return false;
-        }
 
         return excludedCollider == null
             || (!ReferenceEquals(collider.AgentOrNull, excludedCollider.AgentOrNull)

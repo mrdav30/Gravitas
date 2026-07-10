@@ -1,8 +1,7 @@
 # Coverage Hardening Plan
 
-**Date:** 2026-07-06  
-**Status:** Active - 93% branch review checkpoint reached; 95% roadmap paused
-for review  
+**Date:** 2026-07-10  
+**Status:** Active - 95% branch gate met; 100% roadmap refreshed  
 **Owner:** Gravitas coverage, test-quality, zombie-code, and branch-quality
 hardening
 
@@ -21,16 +20,14 @@ test suite that proves useful deterministic physics behavior.
 The current short-term goal is the next practical chunk:
 
 - Keep line, branch, and method coverage at or above the 90% release floor.
-- Raise branch coverage to at least 95%.
-- Current review checkpoint: stop after a fresh full coverage run reaches at
-  least 93% branch coverage so the current campaign can be reviewed before the
-  next push.
+- Preserve the verified 95% branch gate while working toward 100% line, branch,
+  and method coverage.
 - Remove zombie code instead of testing it.
 - Condense or delete duplicate tests while adding only high-signal branch tests.
 - Record suspected bugs, parity gaps, stale behavior, and deeper RCA items in
   [`issue-tracker.md`](issue-tracker.md) instead of burying them in plan notes.
-- After the 95% branch gate is met, refresh the remaining 100% roadmap from a
-  fresh coverage and CRAP report.
+- Drive the remaining work from the fresh 95% coverage, CRAP, and method-gap
+  artifacts recorded below.
 
 ## Measurement Source Of Truth
 
@@ -98,40 +95,38 @@ configuration before making source changes.
 
 ## Current Standing
 
-Fresh checkpoint after the branch-93 review pass:
+Fresh checkpoint after the branch-95 gate pass:
 
 | Metric          |   Baseline |     Current | Release Floor | Short-Term Target | Long-Term Target |
 | --------------- | ---------: | ----------: | ------------: | ----------------: | ---------------: |
-| Line coverage   |      87.3% |       97.7% |           90% |    keep above 90% |             100% |
-| Branch coverage |      74.1% |       93.0% |           90% |               95% |             100% |
+| Line coverage   |      87.3% |       98.2% |           90% |    keep above 90% |             100% |
+| Branch coverage |      74.1% |       95.0% |           90% | preserve at least 95% |             100% |
 | Method coverage |      86.5% |       96.6% |           90% |    keep above 90% |             100% |
-| Tests           | 974 passed | 1906 passed |         green |             green |            green |
+| Tests           | 974 passed | 2014 passed |         green |             green |            green |
 
-The branch-93 review checkpoint is met, but the buffer is intentionally treated
-as fragile. The latest run covered 9,600 of 10,322 branch outcomes. The 93%
-threshold currently requires 9,600 covered outcomes, so the next 95% push should
-build buffer before continuing deep residue work.
-
-At the current denominator, 95% branch coverage requires 9,806 covered branch
-outcomes. That means roughly +206 net branch outcomes must be covered or deleted
-to hit the next gate. This is a directional budget, not a test count; new code
-and branch removal can move the denominator.
+The branch-95 gate is met exactly: the authoritative run covered 9,698 of 10,208
+branch outcomes. Treat the gate as fragile until later work creates a buffer;
+new hand-authored branches can move the denominator below 95% even when existing
+coverage does not regress.
 
 Current evidence:
 
 - Coverage artifact:
-  `TestResults/coverage-branch-hardening-95-pass43/917dcdc5-6265-42ac-9dda-a0eeda1e9b1c/coverage.cobertura.xml`
+  `TestResults/coverage-branch-hardening-95-final2/05bb0b97-6100-424b-9d1e-8ae22eb73d4d/coverage.cobertura.xml`
 - ReportGenerator summary:
-  `TestResults/coverage-branch-hardening-95-pass43/reports/Summary.txt`
-- Covered branches: 9,600 / 10,322.
-- Branch-93 threshold: 9,600 covered branches.
-- Branch-95 threshold at the current denominator: 9,806 covered branches.
+  `TestResults/coverage-branch-hardening-95-final2/reports/Summary.txt`
+- CRAP analysis:
+  `TestResults/coverage-branch-hardening-95-final2/crap-scores.txt`
+- Methods below the 95% line-or-branch threshold:
+  `TestResults/coverage-branch-hardening-95-final2/method-gaps-under-95.json`
+- Covered branches: 9,698 / 10,208.
 
 ## Historical Context
 
 This plan began after trigger collider hardening with 87.3% line, 74.1% branch,
-and 86.5% method coverage. The first target was 90% across the board. That gate
-is now met; the next target is 95% branch coverage.
+and 86.5% method coverage. The 90% release floor and 95% branch gate are now
+met; the remaining target is 100% across the board without weakening test
+quality.
 
 | Phase                   | Coverage Result                             | Tests | Main Outcome                                                                                                                                                                                                                                                          |
 | ----------------------- | ------------------------------------------- | ----: | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -144,6 +139,7 @@ is now met; the next target is 95% branch coverage.
 | Workstreams 31-34       | 95.6% line / 85.8% branch / 94.7% method    |  1493 | GJK simplex policy extraction, 2D/raycast query geometry, convex sweep contracts, mixed trigger lifecycle, cone-prism hit coverage, and duplicate candidate-gate cleanup.                                                                                             |
 | Branch-90 gate pass     | 96.99% line / 90.03% branch / 96.66% method |  1756 | CCD/query/mixed/lifecycle residue, stale reducer cleanup, 3D/2D active-state parity, collider registry and partition lifecycle hardening, contact/trigger lifecycle coverage, constraint validation parity, settings matrix coverage, and shape authoring guardrails. |
 | Branch-93 review pass   |  97.7% line /  93.0% branch /  96.6% method |  1906 | Workstreams A-G plus follow-on branch-residue passes; added high-signal coverage for authored shape factories, collider geometry fallback normals/frontal areas, 2D batch sweep filtering, 2D partition stale-ID/idempotence guards, manifold replacement tie-breaks, constraint solver-body filters, and compact runtime-state helpers. Stopping here for review before the 95% push. |
+| Branch-95 gate pass     |  98.2% line /  95.0% branch /  96.6% method |  2014 | Focused 3D/2D/mixed CCD, mixed narrow phase and partitioning, query geometry, collision response, pair lifecycle, and `SolidBody2D` lifecycle hardening. Removed dead pair-culling serialization state and duplicate runtime guards; independently reviewed each concentrated block. |
 
 High-value outcomes from the 90% campaign:
 
@@ -222,14 +218,13 @@ Do not let an issue hide inside a result bullet. The 3D inactive direct-collider
 load parity bug is the model: it should be visible in the issue tracker with RCA
 and verification, even if the fix is small.
 
-## Active 95% Branch Roadmap
+## 95% Branch Campaign Planning Record
 
-This roadmap is paused at the 93% review checkpoint. After review, the next
-phase should begin from the pass43 coverage artifact, refresh any stale gap
-shortlists, then work broad families instead of single-branch residue. Getting
-from 93.0% to 95% is roughly +206 net branch outcomes at the current
-denominator, so each workstream should either move a meaningful family or delete
-code that no longer earns its keep.
+The following workstreams are retained as the planning record for the campaign
+that moved branch coverage from 93% to 95%. The implementation followed these
+families in concentrated blocks, with focused tests and independent reviews,
+rather than treating every checklist item as an obligation to preserve stale
+code.
 
 ### Workstream A: Fresh 95% Inventory
 
@@ -429,11 +424,55 @@ the 95% branch gate is met.
 - [ ] Keep diagnostic visitor dispatch, disabled-path allocation behavior, and
       adapter-visible payload correctness; leave DTO getter/constructor noise
       for the long-term 100% pass.
-- [ ] Run full `Release`, full `ReleaseLean`, coverage, CRAP, method-gap, and
+- [x] Run full `Release`, full `ReleaseLean`, coverage, CRAP, method-gap, and
       `git diff --check`.
-- [ ] If branch coverage is at least 95%, update this plan to a 100% roadmap.
-- [ ] If branch coverage is still below 95%, add the next alpha-lettered
-      evidence-based workstream from the newest shortlist.
+- [x] Branch coverage reached at least 95%; update this plan to a 100% roadmap.
+- The below-95 fallback was not needed.
+
+## Active 100% Coverage Roadmap
+
+The authoritative 95% run leaves 454 uncovered lines, 510 uncovered branch
+outcomes, and 117 uncovered methods. The 95-threshold extraction identifies 478
+methods whose line or branch coverage remains below 95%; many are tiny wrappers
+or DTO construction paths, so method count alone is not a priority signal.
+
+### Workstream H: Residual Runtime Branch Families
+
+- Preserve a 95% branch buffer before broadening production code.
+- Start with branch-dense behavior that still changes runtime outcomes:
+  rotational CCD in 2D and 3D, queued 3D CCD handoffs, 2D segment clipping,
+  cylinder/capsule/cone separating axes, and 3D overlap hit reducers.
+- Continue the zombie/duplicate/defensive classification before adding tests.
+- Keep each pass scoped to one related block and obtain an independent review
+  before moving to the next block.
+
+### Workstream I: Method And Line Residue
+
+- Review the 117 uncovered methods by public reachability and behavior value.
+- Cover meaningful host-facing constructors, query overloads, replay paths,
+  partition state transitions, and diagnostic payloads through real workflows.
+- Delete unreachable or duplicate wrappers instead of creating invocation-only
+  tests. Leave generated MemoryPack code excluded.
+
+### Workstream J: Complexity And CRAP Reduction
+
+- The fresh CRAP report flags five methods above 30. Four are fully line-covered
+  and remain flagged because their complexity alone is 32-81; treat those as
+  refactor candidates, not coverage failures.
+- Close or simplify the only under-covered flagged method,
+  `ConvexSweepQueryWorker.ClosestPointOnTriangleToOrigin` (93.9% line coverage,
+  CRAP 30.2), when working the related convex-sweep block.
+- Reassess high-complexity collision dispatch and contact notification only when
+  a focused refactor makes determinism and reviewability clearer.
+
+### Workstream K: Final 100% Validation
+
+- Run focused tests, full `Release`, and full `ReleaseLean` for every completed
+  block.
+- Regenerate coverage, ReportGenerator, CRAP, and method-gap artifacts from one
+  explicit Cobertura source of truth.
+- Require independent review of correctness, determinism, allocation behavior,
+  and test signal before declaring 100% complete.
 
 ## Coverage Checkpoints
 
@@ -451,3 +490,4 @@ campaign checkpoints; do not add a row for every focused test filter.
 | 2026-07-08 |  95.6% |  85.8% |  94.7% | 1493 passed | Workstreams 31-34 completed; GJK simplex policy extraction, 2D/raycast query geometry, convex sweep worker contracts, mixed trigger lifecycle, cone-prism hit coverage, duplicate 2D/mixed candidate-gate cleanup, and next branch-gate phase refresh. Branches covered: 9561/11140. |
 | 2026-07-09 | 96.99% | 90.03% | 96.66% | 1756 passed | Branch-90 gate met; CCD/query/mixed/lifecycle residue, parity cleanup, contact/trigger lifecycle coverage, constraint validation parity, settings matrix coverage, and shape authoring guardrails. Branches covered: 9573/10632.                                                     |
 | 2026-07-10 |  97.7% |  93.0% |  96.6% | 1906 passed | Branch-93 review checkpoint met; pass43 covered 9600/10322 branches. Added targeted coverage for shape factories, cone/cylinder/capsule geometry edges, 2D batch sweep filtering, partition stale-ID/idempotence guards, manifold replacement, and constraint solver-body filters. |
+| 2026-07-10 |  98.2% |  95.0% |  96.6% | 2014 passed | Branch-95 gate met exactly at 9698/10208 branches. Concentrated passes hardened CCD, mixed detection/partitioning, query geometry, collision response, pair lifecycle, and `SolidBody2D`; final Release and ReleaseLean suites passed. |

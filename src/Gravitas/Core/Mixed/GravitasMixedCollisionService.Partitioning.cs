@@ -101,23 +101,16 @@ internal sealed partial class GravitasMixedCollisionService
         SwiftList<WorldVoxelIndex> coordinates = collider.MixedPartitionCoordinates!;
         GridWorld world = _context.World;
         MixedPartitionMobilityKind partitionKind = GetStoredMobilityKind(collider.MixedPartitionKind);
-        try
+        for (int i = 0; i < coordinates.Count; i++)
         {
-            for (int i = 0; i < coordinates.Count; i++)
+            WorldVoxelIndex coordinate = coordinates[i];
+            if (!world.TryGetVoxel(coordinate, out Voxel? voxel)
+                || !voxel!.TryGetPartition(out PhysicsMixedPartition? partition))
             {
-                WorldVoxelIndex coordinate = coordinates[i];
-                if (!world.TryGetVoxel(coordinate, out Voxel? voxel)
-                    || !GridTraversal.TryGetUniquePartition(voxel!, _redundancyChecker, out PhysicsMixedPartition? partition))
-                {
-                    continue;
-                }
-
-                Remove3DObject(partition!, collider.Id, partitionKind);
+                continue;
             }
-        }
-        finally
-        {
-            _redundancyChecker.Clear();
+
+            Remove3DObject(partition!, collider.Id, partitionKind);
         }
 
         collider.MarkMixedUnpartitioned();
@@ -139,23 +132,16 @@ internal sealed partial class GravitasMixedCollisionService
         SwiftList<WorldVoxelIndex> coordinates = collider.MixedPartitionCoordinates!;
         GridWorld world = _context.World;
         MixedPartitionMobilityKind partitionKind = GetStoredMobilityKind(collider.MixedPartitionKind);
-        try
+        for (int i = 0; i < coordinates.Count; i++)
         {
-            for (int i = 0; i < coordinates.Count; i++)
+            WorldVoxelIndex coordinate = coordinates[i];
+            if (!world.TryGetVoxel(coordinate, out Voxel? voxel)
+                || !voxel!.TryGetPartition(out PhysicsMixedPartition? partition))
             {
-                WorldVoxelIndex coordinate = coordinates[i];
-                if (!world.TryGetVoxel(coordinate, out Voxel? voxel)
-                    || !GridTraversal.TryGetUniquePartition(voxel!, _redundancyChecker, out PhysicsMixedPartition? partition))
-                {
-                    continue;
-                }
-
-                Remove2DObject(partition!, collider.Id, partitionKind);
+                continue;
             }
-        }
-        finally
-        {
-            _redundancyChecker.Clear();
+
+            Remove2DObject(partition!, collider.Id, partitionKind);
         }
 
         collider.MarkMixedUnpartitioned();
@@ -176,23 +162,16 @@ internal sealed partial class GravitasMixedCollisionService
 
         bool awake = body!.IsAwakeForCollision;
         GridWorld world = _context.World;
-        try
+        for (int i = 0; i < coordinates.Count; i++)
         {
-            for (int i = 0; i < coordinates.Count; i++)
+            WorldVoxelIndex coordinate = coordinates[i];
+            if (!world.TryGetVoxel(coordinate, out Voxel? voxel)
+                || !voxel!.TryGetPartition(out PhysicsMixedPartition? partition))
             {
-                WorldVoxelIndex coordinate = coordinates[i];
-                if (!world.TryGetVoxel(coordinate, out Voxel? voxel)
-                    || !GridTraversal.TryGetUniquePartition(voxel!, _redundancyChecker, out PhysicsMixedPartition? partition))
-                {
-                    continue;
-                }
-
-                partition!.SetDynamic3DObjectAwake(collider.Id, awake);
+                continue;
             }
-        }
-        finally
-        {
-            _redundancyChecker.Clear();
+
+            partition!.SetDynamic3DObjectAwake(collider.Id, awake);
         }
     }
 
@@ -209,23 +188,16 @@ internal sealed partial class GravitasMixedCollisionService
 
         bool awake = body!.IsAwakeForCollision;
         GridWorld world = _context.World;
-        try
+        for (int i = 0; i < coordinates.Count; i++)
         {
-            for (int i = 0; i < coordinates.Count; i++)
+            WorldVoxelIndex coordinate = coordinates[i];
+            if (!world.TryGetVoxel(coordinate, out Voxel? voxel)
+                || !voxel!.TryGetPartition(out PhysicsMixedPartition? partition))
             {
-                WorldVoxelIndex coordinate = coordinates[i];
-                if (!world.TryGetVoxel(coordinate, out Voxel? voxel)
-                    || !GridTraversal.TryGetUniquePartition(voxel!, _redundancyChecker, out PhysicsMixedPartition? partition))
-                {
-                    continue;
-                }
-
-                partition!.SetDynamic2DObjectAwake(collider.Id, awake);
+                continue;
             }
-        }
-        finally
-        {
-            _redundancyChecker.Clear();
+
+            partition!.SetDynamic2DObjectAwake(collider.Id, awake);
         }
     }
 
@@ -342,13 +314,7 @@ internal sealed partial class GravitasMixedCollisionService
         return _activePartitions.Add(partition);
     }
 
-    internal void DeactivatePartition(int activationId)
-    {
-        if (activationId < 0)
-            return;
-
-        _activePartitions.TryRemoveAt(activationId);
-    }
+    internal void DeactivatePartition(int activationId) => _activePartitions.TryRemoveAt(activationId);
 
     internal PhysicsMixedPartition RentPartition()
     {
@@ -435,19 +401,12 @@ internal sealed partial class GravitasMixedCollisionService
         SwiftList<WorldVoxelIndex> coordinates = collider.GetOrCreateMixedPartitionCoordinates();
         coordinates.FastClear();
 
-        try
-        {
-            ScanCovered3DVoxels(collider, coverageMin, coverageMax, coordinates, kind);
-            if (coordinates.Count == 0)
-                return false;
+        ScanCovered3DVoxels(collider, coverageMin, coverageMax, coordinates, kind);
+        if (coordinates.Count == 0)
+            return false;
 
-            collider.MarkMixedPartitioned(coverageMin, coverageMax, (int)kind);
-            return true;
-        }
-        finally
-        {
-            _redundancyChecker.Clear();
-        }
+        collider.MarkMixedPartitioned(coverageMin, coverageMax, (int)kind);
+        return true;
     }
 
     private bool Partition2DCollider(LSCollider2D collider, Vector3d coverageMin, Vector3d coverageMax)
@@ -456,19 +415,12 @@ internal sealed partial class GravitasMixedCollisionService
         SwiftList<WorldVoxelIndex> coordinates = collider.GetOrCreateMixedPartitionCoordinates();
         coordinates.FastClear();
 
-        try
-        {
-            ScanCovered2DMixedVoxels(collider, coverageMin, coverageMax, coordinates, kind);
-            if (coordinates.Count == 0)
-                return false;
+        ScanCovered2DMixedVoxels(collider, coverageMin, coverageMax, coordinates, kind);
+        if (coordinates.Count == 0)
+            return false;
 
-            collider.MarkMixedPartitioned(coverageMin, coverageMax, (int)kind);
-            return true;
-        }
-        finally
-        {
-            _redundancyChecker.Clear();
-        }
+        collider.MarkMixedPartitioned(coverageMin, coverageMax, (int)kind);
+        return true;
     }
 
     private void ScanCovered3DVoxels(
@@ -519,15 +471,7 @@ internal sealed partial class GravitasMixedCollisionService
         SwiftList<PhysicsMixedPartition> partitions)
     {
         partitions.FastClear();
-
-        try
-        {
-            ScanCoveredMixedQueryPartitions(min, max, partitions);
-        }
-        finally
-        {
-            _redundancyChecker.Clear();
-        }
+        ScanCoveredMixedQueryPartitions(min, max, partitions);
     }
 
     private void ScanCoveredMixedQueryPartitions(
@@ -556,9 +500,9 @@ internal sealed partial class GravitasMixedCollisionService
         for (int i = 0; i < _coveredVoxels.Count; i++)
         {
             Voxel voxel = _coveredVoxels[i];
+            Fixed64 cellEdge = traversal.GetCellEdge(voxel);
 
-            if (!traversal.TryVisitUnique(voxel, _redundancyChecker, out Fixed64 cellEdge)
-                || !GridTraversal.IsWorldPositionInPaddedBounds(queryMin, queryMax, cellEdge, voxel.WorldPosition)
+            if (!GridTraversal.IsWorldPositionInPaddedBounds(queryMin, queryMax, cellEdge, voxel.WorldPosition)
                 || !voxel.TryGetPartition(out PhysicsMixedPartition? partition)
                 || partition!.IsEmpty)
             {
@@ -576,11 +520,9 @@ internal sealed partial class GravitasMixedCollisionService
         ref GridTraversalState traversal,
         MixedPartitionMobilityKind kind)
     {
-        if (!traversal.TryVisitUnique(voxel, _redundancyChecker, out Fixed64 cellEdge)
-            || !collider.IsPositionInBounds(cellEdge, voxel.WorldPosition))
-        {
+        Fixed64 cellEdge = traversal.GetCellEdge(voxel);
+        if (!collider.IsPositionInBounds(cellEdge, voxel.WorldPosition))
             return;
-        }
 
         PhysicsMixedPartition partition = GetOrCreatePartition(voxel);
         coordinates.Add(voxel.WorldIndex);
@@ -594,11 +536,9 @@ internal sealed partial class GravitasMixedCollisionService
         ref GridTraversalState traversal,
         MixedPartitionMobilityKind kind)
     {
-        if (!traversal.TryVisitUnique(voxel, _redundancyChecker, out Fixed64 cellEdge)
-            || !collider.IsPositionInMixedBounds(cellEdge, voxel.WorldPosition))
-        {
+        Fixed64 cellEdge = traversal.GetCellEdge(voxel);
+        if (!collider.IsPositionInMixedBounds(cellEdge, voxel.WorldPosition))
             return;
-        }
 
         PhysicsMixedPartition partition = GetOrCreatePartition(voxel);
         coordinates.Add(voxel.WorldIndex);
@@ -748,7 +688,7 @@ internal sealed partial class GravitasMixedCollisionService
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool Is2DQueryCandidate(LSCollider2D collider, FixedBoundBox queryBounds, PhysicsLayerMask layerMask)
     {
-        if (!collider.IsActive || !layerMask.Includes(collider.Layer))
+        if (!layerMask.Includes(collider.Layer))
             return false;
 
         return collider.MixedBounds3D.Intersects(queryBounds);

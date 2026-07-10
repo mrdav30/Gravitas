@@ -53,9 +53,7 @@ public partial class CollisionPair
     private Fixed64 _fastDistance;
     public CollisionType CollisionType { get; private set; }
     private bool _doPhysics = true;
-    private bool _preventCulling = false;
 
-    //If negative, prevent culling altogether
     public short CullCounter { get; private set; }
     private bool _preventDistanceCull;
     private Fixed64 _fastDistanceOffset;
@@ -69,14 +67,14 @@ public partial class CollisionPair
 
     private ContactWarmStartCache _warmStart;
 
-    public CollisionPair(LSCollider c1, LSCollider c2) => Initialize(c1, c2);
+    internal CollisionPair(LSCollider c1, LSCollider c2) => Initialize(c1, c2);
 
     /// <summary>
     /// Initializes the CollisionPair with the given colliders.
     /// </summary>
     /// <param name="c1">The first collider.</param>
     /// <param name="c2">The second collider.</param>
-    public void Initialize(LSCollider c1, LSCollider c2)
+    internal void Initialize(LSCollider c1, LSCollider c2)
     {
         SwiftThrowHelper.ThrowIfNull(c1, nameof(c1));
         SwiftThrowHelper.ThrowIfNull(c2, nameof(c2));
@@ -103,19 +101,11 @@ public partial class CollisionPair
 
         _doPhysics = ColliderA!.Body != null && ColliderB!.Body != null && !ColliderA!.IsTrigger && !ColliderB!.IsTrigger;
 
-        if (ColliderA!.PreventCulling || ColliderB!.PreventCulling)
-        {
-            CullCounter = -1;  //  Never cull
-            _preventCulling = true;
-        }
-        else
-        {
-            //Immediately check collision
-            CullCounter = 0;
-            //If collision distance is too large, don't cull based on distance
-            _preventDistanceCull = _fastCollideDistance > Context.Environment.CullFastDistanceMax;
-            _fastDistanceOffset = Fixed64.FromRaw((int)_fastCollideDistance) + (Fixed64.One * 2) * (Fixed64.One * 2);
-        }
+        // Immediately check collision. If collision distance is too large, do
+        // not cull based on distance.
+        CullCounter = 0;
+        _preventDistanceCull = _fastCollideDistance > Context.Environment.CullFastDistanceMax;
+        _fastDistanceOffset = Fixed64.FromRaw((int)_fastCollideDistance) + (Fixed64.One * 2) * (Fixed64.One * 2);
 
         LastCollidedFrame = Context.FrameCount;
         RefreshBroadPhaseVersions();
@@ -160,17 +150,17 @@ public partial class CollisionPair
 
     private void UpdateCollision(CollisionResponseDispatchMode responseMode)
     {
-        if (!IsCollisionPairActive())
+        if (!Active)
             return;
 
         UpdateLastFrame();
         DeactivateAndPoolIfRequired();
 
         _isCollidingChanged = false;
-        if (!_preventCulling && IsCullStateInvalidated())
+        if (IsCullStateInvalidated())
             CullCounter = 0;
 
-        if (_preventCulling || CullCounter <= 0)
+        if (CullCounter <= 0)
         {
             ProcessCollision(responseMode);
             RefreshBroadPhaseVersions();
@@ -181,10 +171,8 @@ public partial class CollisionPair
             return;
         }
 
-        if (!_preventCulling) CullCounter--;  //  Culled and counter 1 step closer until checking again
+        CullCounter--;  // Culled and one step closer to checking again.
     }
-
-    private bool IsCollisionPairActive() => Active && ColliderA.IsActive && ColliderB.IsActive;
 
     private void UpdateLastFrame() => LastFrame = Context.FrameCount;
 
@@ -209,7 +197,7 @@ public partial class CollisionPair
         }
 
         bool result = CheckCollision();
-        if (result && Manifold.HasContact)
+        if (result)
             Context.Diagnostics.EmitContact(this, result);
 
         if (result ^ _isColliding)
@@ -267,8 +255,7 @@ public partial class CollisionPair
             return;
         }
 
-        if (CullCounter >= 0)  //  A Negative cull counter means a Body is preventing culling
-            CalculateCullScore();
+        CalculateCullScore();
     }
 
     internal bool TryPreserveSleepingRestingContact()
@@ -363,12 +350,9 @@ public partial class CollisionPair
     /// Defines the step value for distance-based culling. The score is increased
     /// when the distance between objects increases. Higher values make the culling more aggressive for distant objects.
     /// </summary>
-    internal int GetCullDistanceStep(GridWorld world)
+    private int GetCullDistanceStep(GridWorld world)
     {
         int distanceMax = Context.Environment.CullDistanceMax;
-        if (distanceMax <= 0)
-            return int.MaxValue;
-
         Fixed64 cellEdge = GridTopologyMetricUtility.GetRepresentativeCellEdge(world);
         int step = ((cellEdge + Fixed64.One * 2) * (cellEdge + Fixed64.One * 2) / distanceMax).CeilToInt();
         return Math.Max(1, step);

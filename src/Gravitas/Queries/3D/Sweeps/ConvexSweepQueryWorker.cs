@@ -127,7 +127,7 @@ internal sealed class ConvexSweepQueryWorker
         {
             LSCollider part = source.GetPartCollider(i);
             if (!TrySweepSourceShape(CreateColliderShape(part, Vector3d.Zero), target, out Physics3DHit candidate)
-                || !ComesBeforeReducerCandidate(candidate, i, found, closestDistance, closestPartIndex, hit))
+                || !ComesBeforeReducerCandidate(candidate, i, found, closestDistance, closestPartIndex))
             {
                 continue;
             }
@@ -160,7 +160,6 @@ internal sealed class ConvexSweepQueryWorker
     private bool TrySweepTargetCompound(ConvexShape sourceShape, LSCompoundCollider compound, out Physics3DHit hit)
     {
         hit = default;
-        Physics3DHit bestPartHit = default;
         bool found = false;
         Fixed64 closestDistance = Fixed64.MaxValue;
         int closestPartIndex = int.MaxValue;
@@ -169,12 +168,11 @@ internal sealed class ConvexSweepQueryWorker
         {
             LSCollider part = compound.GetPartCollider(i);
             if (!TrySweepSourceShape(sourceShape, part, out Physics3DHit partHit)
-                || !ComesBeforeReducerCandidate(partHit, i, found, closestDistance, closestPartIndex, bestPartHit))
+                || !ComesBeforeReducerCandidate(partHit, i, found, closestDistance, closestPartIndex))
             {
                 continue;
             }
 
-            bestPartHit = partHit;
             hit = new Physics3DHit(compound, partHit.Point, partHit.Normal, partHit.Distance, partHit.Direction);
             closestDistance = partHit.Distance;
             closestPartIndex = i;
@@ -211,7 +209,7 @@ internal sealed class ConvexSweepQueryWorker
             int triangleIndex = sweepCandidate.TriangleIndex;
             ConvexShape triangle = CreateTriangleShape(mesh, triangleIndex);
             if (!TrySweepConvexTarget(sourceShape, triangle, mesh, out Physics3DHit candidate)
-                || !ComesBeforeReducerCandidate(candidate, triangleIndex, found, closestDistance, closestTriangleIndex, hit))
+                || !ComesBeforeReducerCandidate(candidate, triangleIndex, found, closestDistance, closestTriangleIndex))
             {
                 continue;
             }
@@ -361,8 +359,6 @@ internal sealed class ConvexSweepQueryWorker
 
             previousDistanceSqr = closest.DistanceSqr;
             direction = -closest.Point;
-            if (direction.MagnitudeSquared <= DistanceToleranceSqr)
-                return GjkResult.CreateIntersection(closest.PointA, closest.PointB);
         }
 
         Fixed64 distance = FixedMath.Sqrt(closest.DistanceSqr);
@@ -666,8 +662,7 @@ internal sealed class ConvexSweepQueryWorker
         int candidateOrdinal,
         bool found,
         Fixed64 closestDistance,
-        int closestOrdinal,
-        Physics3DHit closestHit)
+        int closestOrdinal)
     {
         if (!found)
             return true;
@@ -675,10 +670,6 @@ internal sealed class ConvexSweepQueryWorker
         int distanceCompare = hit.Distance.CompareTo(closestDistance);
         if (distanceCompare != 0)
             return distanceCompare < 0;
-
-        int colliderCompare = (hit.Collider?.Id ?? -1).CompareTo(closestHit.Collider?.Id ?? -1);
-        if (colliderCompare != 0)
-            return colliderCompare < 0;
 
         return candidateOrdinal < closestOrdinal;
     }

@@ -76,13 +76,12 @@ public partial class SolidBody
                 for (int hitIndex = 0; hitIndex < hitCount; hitIndex++)
                 {
                     SampleDynamicRotationalContinuousPose(startPosition, displacement, startRotation, sampleTime);
-                    LSCollider? target = _continuousCollisionHits[hitIndex].Collider;
+                    LSCollider target = _continuousCollisionHits[hitIndex].Collider!;
                     if (!TrySampleRotationalContinuousCollision(target, out Vector3d contactNormal))
                         continue;
 
-                    LSCollider targetCollider = target!;
                     Fixed64 safeTime = RefineDynamicRotationalContinuousCollisionSafeTime(
-                        targetCollider,
+                        target,
                         startPosition,
                         displacement,
                         startRotation,
@@ -92,7 +91,7 @@ public partial class SolidBody
                         out Vector3d refinedNormal);
                     if (!ContinuousCollisionMath.ShouldReplaceContinuousCollisionHit(
                             safeTime,
-                            targetCollider.Id,
+                            target.Id,
                             foundSampleHit,
                             bestSafeTime,
                             bestTargetId))
@@ -102,7 +101,7 @@ public partial class SolidBody
 
                     foundSampleHit = true;
                     bestSafeTime = safeTime;
-                    bestTargetId = targetCollider.Id;
+                    bestTargetId = target.Id;
                     bestContactNormal = refinedNormal;
                 }
 
@@ -189,13 +188,12 @@ public partial class SolidBody
                 for (int hitIndex = 0; hitIndex < hitCount; hitIndex++)
                 {
                     SampleKinematicRotationalContinuousPose(startPosition, displacement, startRotation, targetRotation, sampleTime);
-                    LSCollider? target = _continuousCollisionHits[hitIndex].Collider;
+                    LSCollider target = _continuousCollisionHits[hitIndex].Collider!;
                     if (!TrySampleRotationalContinuousCollision(target, out Vector3d contactNormal))
                         continue;
 
-                    LSCollider targetCollider = target!;
                     Fixed64 safeTime = RefineKinematicRotationalContinuousCollisionSafeTime(
-                        targetCollider,
+                        target,
                         startPosition,
                         displacement,
                         startRotation,
@@ -206,7 +204,7 @@ public partial class SolidBody
                         out _);
                     if (!ContinuousCollisionMath.ShouldReplaceContinuousCollisionHit(
                             safeTime,
-                            targetCollider.Id,
+                            target.Id,
                             foundSampleHit,
                             bestSafeTime,
                             bestTargetId))
@@ -216,7 +214,7 @@ public partial class SolidBody
 
                     foundSampleHit = true;
                     bestSafeTime = safeTime;
-                    bestTargetId = targetCollider.Id;
+                    bestTargetId = target.Id;
                 }
 
                 if (!foundSampleHit)
@@ -334,13 +332,13 @@ public partial class SolidBody
         return FixedMath.DegToRad(angleDegrees.Abs());
     }
 
-    private bool TrySampleRotationalContinuousCollision(LSCollider? target, out Vector3d contactNormal)
+    private bool TrySampleRotationalContinuousCollision(LSCollider target, out Vector3d contactNormal)
     {
         contactNormal = Vector3d.Zero;
         if (!IsValidContinuousCollisionTarget(target))
             return false;
 
-        OrderRotationalContinuousCollisionPair(target!, out LSCollider colliderA, out LSCollider colliderB, out bool sourceIsA);
+        OrderRotationalContinuousCollisionPair(target, out LSCollider colliderA, out LSCollider colliderB, out bool sourceIsA);
         CollisionType collisionType = ColliderSettings.GetCollisionType(colliderA.Shape, colliderB.Shape);
         if (collisionType == CollisionType.None)
             return false;

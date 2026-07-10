@@ -1726,6 +1726,256 @@ public sealed class Physics2DQueryTests
     }
 
     [Fact]
+    public void SweepCircle_WithConvexCornerInsideSweptBoundsButOutsideRadius_ShouldReturnFalse()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        SolidBody2D target = CreatePolygon(context, Vector2d.Zero);
+
+        bool hit = QueryDetection2D.TrySweepCircle(
+            new Vector2d(Fixed64.FromFraction(-7, 10), Fixed64.FromFraction(7, 10)),
+            new Vector2d(Fixed64.FromFraction(-29, 50), Fixed64.FromFraction(29, 50)),
+            Fixed64.FromFraction(1, 10),
+            target.Collider,
+            out Physics2DHit sweepHit);
+
+        hit.Should().BeFalse();
+        sweepHit.Should().Be(default(Physics2DHit));
+    }
+
+    [Fact]
+    public void TrySweepMoverShape_WithSeparationOnlyOnRotatedTargetAxis_ShouldReturnFalse()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        SolidBody2D mover = CreatePolygon(context, Vector2d.Zero);
+        SolidBody2D target = CreatePolygon(
+            context,
+            new Vector2d(Fixed64.FromFraction(6, 5), Fixed64.FromFraction(6, 5)));
+        target.SetRotation(FixedMath.DegToRad((Fixed64)45));
+
+        bool hit = QueryDetection2D.TrySweepMoverShape(
+            mover.Collider,
+            new Vector2d(Fixed64.One, -Fixed64.One),
+            target.Collider,
+            out Physics2DHit sweepHit);
+
+        hit.Should().BeFalse();
+        sweepHit.Should().Be(default(Physics2DHit));
+    }
+
+    [Fact]
+    public void TrySweepMoverShape_WithConvexEntryBeyondUnitInterval_ShouldReturnFalse()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        SolidBody2D mover = CreatePolygon(context, new Vector2d((Fixed64)(-3), Fixed64.Zero));
+        SolidBody2D target = CreateBox(context, Vector2d.Zero);
+
+        bool hit = QueryDetection2D.TrySweepMoverShape(
+            mover.Collider,
+            Vector2d.Right,
+            target.Collider,
+            out Physics2DHit sweepHit);
+
+        hit.Should().BeFalse();
+        sweepHit.Should().Be(default(Physics2DHit));
+    }
+
+    [Fact]
+    public void TrySweepMoverShape_WithCapsuleBelowConvexEdgeSpan_ShouldReturnFalse()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        SolidBody2D mover = CreateCapsule(context, new Vector2d((Fixed64)(-3), (Fixed64)(-3)));
+        SolidBody2D target = CreateBox(context, Vector2d.Zero);
+
+        bool hit = QueryDetection2D.TrySweepMoverShape(
+            mover.Collider,
+            new Vector2d((Fixed64)4, Fixed64.Zero),
+            target.Collider,
+            out Physics2DHit sweepHit);
+
+        hit.Should().BeFalse();
+        sweepHit.Should().Be(default(Physics2DHit));
+    }
+
+    [Fact]
+    public void SweepCircle_WithSlantedEdgeImpactBeyondSegmentLength_ShouldReturnFalse()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        SolidBody2D target = CreatePolygon(
+            context,
+            Vector2d.Zero,
+            new Vector2d(Fixed64.Zero, -Fixed64.One),
+            new Vector2d(Fixed64.One, Fixed64.Zero),
+            new Vector2d(Fixed64.Zero, Fixed64.One),
+            new Vector2d(-Fixed64.One, Fixed64.Zero));
+
+        bool hit = QueryDetection2D.TrySweepCircle(
+            new Vector2d((Fixed64)(-2), Fixed64.FromFraction(7, 5)),
+            new Vector2d(Fixed64.FromFraction(-7, 5), Fixed64.FromFraction(7, 5)),
+            Fixed64.Half,
+            target.Collider,
+            out Physics2DHit sweepHit);
+
+        hit.Should().BeFalse();
+        sweepHit.Should().Be(default(Physics2DHit));
+    }
+
+    [Fact]
+    public void TrySweepMoverShape_WithConvexMoverBelowParallelTargetAxis_ShouldReturnFalse()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        SolidBody2D mover = CreateBox(context, new Vector2d((Fixed64)(-3), (Fixed64)(-2)));
+        SolidBody2D target = CreateBox(context, Vector2d.Zero);
+
+        bool hit = QueryDetection2D.TrySweepMoverShape(
+            mover.Collider,
+            new Vector2d((Fixed64)4, Fixed64.Zero),
+            target.Collider,
+            out Physics2DHit sweepHit);
+
+        hit.Should().BeFalse();
+        sweepHit.Should().Be(default(Physics2DHit));
+    }
+
+    [Fact]
+    public void OverlapPolygon_WithVertexOnCapsuleCore_ShouldUseClosestAxisFallback()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        SolidBody2D target = CreateCapsule(context, Vector2d.Zero);
+        Vector2d center = new(Fixed64.FromFraction(1, 6), Fixed64.Zero);
+
+        bool hit = QueryDetection2D.TryOverlapPolygon(
+            stackalloc[]
+            {
+                Vector2d.Zero,
+                new Vector2d(Fixed64.FromFraction(1, 4), Fixed64.FromFraction(-1, 4)),
+                new Vector2d(Fixed64.FromFraction(1, 4), Fixed64.FromFraction(1, 4))
+            },
+            center,
+            target.Collider,
+            out Physics2DHit overlapHit);
+
+        hit.Should().BeTrue();
+        overlapHit.Collider.Should().BeSameAs(target.Collider);
+        overlapHit.Point.Should().Be(center);
+        Vector2d.DistanceSquared(overlapHit.Normal, Vector2d.Right).Should().BeLessThanOrEqualTo(Fixed64.Epsilon);
+        overlapHit.Distance.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void OverlapPolygon_WithClosestAxisOutsideCapsuleCore_ShouldReportSideHit()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        SolidBody2D target = CreateCapsule(context, Vector2d.Zero);
+        Vector2d center = new(Fixed64.FromFraction(11, 20), Fixed64.Zero);
+
+        bool hit = QueryDetection2D.TryOverlapPolygon(
+            stackalloc[]
+            {
+                new Vector2d(Fixed64.FromFraction(9, 20), Fixed64.FromFraction(-1, 10)),
+                new Vector2d(Fixed64.FromFraction(13, 20), Fixed64.FromFraction(-1, 10)),
+                new Vector2d(Fixed64.FromFraction(13, 20), Fixed64.FromFraction(1, 10)),
+                new Vector2d(Fixed64.FromFraction(9, 20), Fixed64.FromFraction(1, 10))
+            },
+            center,
+            target.Collider,
+            out Physics2DHit overlapHit);
+
+        hit.Should().BeTrue();
+        overlapHit.Collider.Should().BeSameAs(target.Collider);
+        overlapHit.Point.Should().Be(new Vector2d(Fixed64.Half, Fixed64.Zero));
+        Vector2d.DistanceSquared(overlapHit.Normal, Vector2d.Right).Should().BeLessThanOrEqualTo(Fixed64.Epsilon);
+        (overlapHit.Distance - Fixed64.FromFraction(1, 20)).Abs().Should().BeLessThanOrEqualTo(Fixed64.Epsilon * (Fixed64)4);
+    }
+
+    [Fact]
+    public void SweepCircle_WithReversedWindingConvexEdge_ShouldFlipOutwardNormal()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        SolidBody2D target = CreatePolygon(
+            context,
+            Vector2d.Zero,
+            new Vector2d(-Fixed64.Half, -Fixed64.Half),
+            new Vector2d(-Fixed64.Half, Fixed64.Half),
+            new Vector2d(Fixed64.Half, Fixed64.Half),
+            new Vector2d(Fixed64.Half, -Fixed64.Half));
+
+        bool hit = QueryDetection2D.TrySweepCircle(
+            new Vector2d((Fixed64)(-2), Fixed64.Zero),
+            new Vector2d((Fixed64)2, Fixed64.Zero),
+            Fixed64.Half,
+            target.Collider,
+            out Physics2DHit sweepHit);
+
+        hit.Should().BeTrue();
+        sweepHit.Collider.Should().BeSameAs(target.Collider);
+        sweepHit.Point.Should().Be(new Vector2d(-Fixed64.Half, Fixed64.Zero));
+        sweepHit.Normal.Should().Be(-Vector2d.Right);
+        sweepHit.Distance.Should().Be(Fixed64.One);
+    }
+
+    [Fact]
+    public void TrySweepMoverShape_WithQuantizedZeroRadiusCapsuleCrossingBoxFace_ShouldUseCoincidentEdgePoint()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        Fixed64 authoredRadius = Fixed64.Half;
+        Fixed64 authoredScale = Fixed64.FromRaw(1);
+        SolidBody2D mover = CreateQuantizedZeroRadiusCapsuleMover(
+            context,
+            new Vector2d((Fixed64)(-2), Fixed64.Zero),
+            authoredRadius,
+            authoredScale);
+        SolidBody2D target = CreateBox(context, Vector2d.Zero);
+
+        bool hit = QueryDetection2D.TrySweepMoverShape(
+            mover.Collider,
+            new Vector2d((Fixed64)2, Fixed64.Zero),
+            target.Collider,
+            out Physics2DHit sweepHit);
+
+        authoredRadius.Should().BeGreaterThan(Fixed64.Zero);
+        authoredScale.Should().BeGreaterThan(Fixed64.Zero);
+        (authoredRadius * authoredScale).Should().Be(Fixed64.Zero);
+        hit.Should().BeTrue();
+        sweepHit.Collider.Should().BeSameAs(target.Collider);
+        sweepHit.Point.Should().Be(new Vector2d(-Fixed64.Half, Fixed64.Zero));
+        sweepHit.Normal.Should().Be(-Vector2d.Right);
+        sweepHit.Distance.Should().BeGreaterThan(Fixed64.One);
+        sweepHit.Distance.Should().BeLessThan((Fixed64)2);
+    }
+
+    [Fact]
+    public void TrySweepMoverShape_WithQuantizedSeparationFromBoxVertex_ShouldUseFallbackNormal()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        Fixed64 authoredRadius = Fixed64.Half;
+        Fixed64 authoredScale = Fixed64.FromRaw(1);
+        Fixed64 gap = Fixed64.FromRaw(1 << 15);
+        SolidBody2D mover = CreateQuantizedZeroRadiusCapsuleMover(
+            context,
+            new Vector2d(-Fixed64.Half, -Fixed64.Half - gap),
+            authoredRadius,
+            authoredScale);
+        SolidBody2D target = CreateBox(context, Vector2d.Zero);
+
+        bool hit = QueryDetection2D.TrySweepMoverShape(
+            mover.Collider,
+            Vector2d.Right,
+            target.Collider,
+            out Physics2DHit sweepHit);
+
+        authoredRadius.Should().BeGreaterThan(Fixed64.Zero);
+        authoredScale.Should().BeGreaterThan(Fixed64.Zero);
+        (authoredRadius * authoredScale).Should().Be(Fixed64.Zero);
+        gap.Should().BeGreaterThan(Fixed64.Zero);
+        (gap * gap).Should().Be(Fixed64.Zero);
+        hit.Should().BeTrue();
+        sweepHit.Collider.Should().BeSameAs(target.Collider);
+        sweepHit.Point.Should().Be(new Vector2d(-Fixed64.Half, -Fixed64.Half));
+        sweepHit.Normal.Should().Be(Vector2d.Right);
+        sweepHit.Distance.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
     public void TrySweepMoverShape_WithCapsuleMoverAgainstCircle_ShouldUseReversePointCapsuleHit()
     {
         using GravitasWorldContext context = Create2DContext();
@@ -2148,6 +2398,21 @@ public sealed class Physics2DQueryTests
         };
         body.Initialize(position);
         return body;
+    }
+
+    private static SolidBody2D CreateQuantizedZeroRadiusCapsuleMover(
+        GravitasWorldContext context,
+        Vector2d position,
+        Fixed64 authoredRadius,
+        Fixed64 authoredScale)
+    {
+        var part = CompoundColliderPart2D.Capsule(
+            authoredRadius,
+            (Fixed64)1_000_000_000,
+            Vector2d.Zero,
+            FixedMath.DegToRad((Fixed64)90),
+            new Vector2d(authoredScale, authoredScale));
+        return CreateCompound(context, position, new LSCompoundCollider2D(part));
     }
 
     private static SolidBody2D CreateCompound(GravitasWorldContext context, Vector2d position)

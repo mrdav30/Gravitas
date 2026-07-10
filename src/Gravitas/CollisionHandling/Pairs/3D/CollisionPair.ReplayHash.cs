@@ -27,7 +27,6 @@ public partial class CollisionPair
         writer.WriteInt32(LastFrame);
         writer.WriteInt32(LastCollidedFrame);
         writer.WriteBool(_doPhysics);
-        writer.WriteBool(_preventCulling);
         writer.WriteInt32(CullCounter);
         writer.WriteBool(_preventDistanceCull);
         writer.WriteBool(_isColliding);

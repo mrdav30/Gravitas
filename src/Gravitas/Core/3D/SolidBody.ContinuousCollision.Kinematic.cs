@@ -350,9 +350,6 @@ public partial class SolidBody
             normal = -normal;
 
         Vector2d planarNormal = normal.ToVector2d();
-        if (planarNormal == Vector2d.Zero)
-            return false;
-
         Fixed64 constrainedInverseMass = target.GetConstrainedInverseMass(planarNormal) * planarNormal.MagnitudeSquared;
         if (constrainedInverseMass <= Fixed64.Epsilon)
             return false;

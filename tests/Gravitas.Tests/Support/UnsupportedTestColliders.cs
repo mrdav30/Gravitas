@@ -14,9 +14,16 @@ namespace Gravitas.Tests.Support;
 
 internal sealed class UnsupportedTestCollider2D : LSCollider2D
 {
+    private readonly bool _containsPoints;
+
+    public UnsupportedTestCollider2D(bool containsPoints = false)
+    {
+        _containsPoints = containsPoints;
+    }
+
     public override ColliderType2D Shape => (ColliderType2D)byte.MaxValue;
 
-    public override bool ContainsPoint(Vector2d point) => false;
+    public override bool ContainsPoint(Vector2d point) => _containsPoints;
 
     public override Vector2d GetClosestPoint(Vector2d point) =>
         new(

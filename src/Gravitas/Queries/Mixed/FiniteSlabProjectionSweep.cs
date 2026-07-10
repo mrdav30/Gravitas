@@ -118,8 +118,7 @@ internal static class FiniteSlabProjectionSweep
 
         for (int i = 0; i < MaxGjkIterations; i++)
         {
-            if (!TryCreateSupportPoint(point, expansionRadius, target, direction, out PlanarSupportPoint support))
-                return PlanarGjkResult.Separated;
+            CreateSupportPoint(point, expansionRadius, target, direction, out PlanarSupportPoint support);
 
             if (ContainsSupportPoint(simplex, simplexCount, support.Point))
                 break;
@@ -134,8 +133,6 @@ internal static class FiniteSlabProjectionSweep
 
             previousDistanceSqr = closest.DistanceSqr;
             direction = -closest.Point;
-            if (direction.MagnitudeSquared <= DistanceToleranceSqr)
-                return PlanarGjkResult.Intersection;
         }
 
         Fixed64 distance = FixedMath.Sqrt(closest.DistanceSqr);
@@ -145,7 +142,7 @@ internal static class FiniteSlabProjectionSweep
         return new PlanarGjkResult(false, distance, normal);
     }
 
-    private static bool TryCreateSupportPoint(
+    private static void CreateSupportPoint(
         Vector2d point,
         Fixed64 expansionRadius,
         ProjectionTarget target,
@@ -153,15 +150,10 @@ internal static class FiniteSlabProjectionSweep
         out PlanarSupportPoint support)
     {
         Vector2d targetDirection = -direction;
-        if (!target.TrySupport(targetDirection, out Vector2d targetSupport))
-        {
-            support = default;
-            return false;
-        }
+        target.TrySupport(targetDirection, out Vector2d targetSupport);
 
         Vector2d expansion = NormalizePlanarDirection(targetDirection) * expansionRadius;
         support = new PlanarSupportPoint(point - (targetSupport + expansion));
-        return true;
     }
 
     private static ClosestPlanarSimplexResult SolveClosestSimplex(Span<PlanarSupportPoint> simplex, ref int count)
@@ -313,7 +305,7 @@ internal static class FiniteSlabProjectionSweep
                 if (_cylinder != null)
                     return CylinderIntersectsSlab(_cylinder, _slabMinY, _slabMaxY);
 
-                return _cone != null && ConeIntersectsSlab(_cone, _slabMinY, _slabMaxY);
+                return ConeIntersectsSlab(_cone!, _slabMinY, _slabMaxY);
             }
         }
 
@@ -641,9 +633,7 @@ internal static class FiniteSlabProjectionSweep
             Vector3d planarDirection = new(direction.X, Fixed64.Zero, direction.Y);
             Vector3d radialDirection = planarDirection - axisDirection * Vector3d.Dot(planarDirection, axisDirection);
             Fixed64 radialMagnitude = radialDirection.Magnitude;
-            radial = radialMagnitude > Fixed64.Epsilon
-                ? radialDirection / radialMagnitude * radius
-                : Vector3d.Right * radius;
+            radial = radialDirection / radialMagnitude * radius;
             return true;
         }
 

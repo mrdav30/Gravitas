@@ -144,7 +144,7 @@ public partial class SolidBody
         for (int i = 0; i < hitCount; i++)
         {
             Physics3DHit candidate = _continuousCollisionHits[i];
-            if (!IsValidContinuousCollisionHit(candidate))
+            if (!IsValidContinuousCollisionTarget(candidate.Collider!))
                 continue;
 
             Physics3DHit refined;
@@ -211,7 +211,7 @@ public partial class SolidBody
         for (int i = 0; i < hitCount; i++)
         {
             PhysicsMixedHit candidate = _continuousMixedCollisionHits[i];
-            if (!IsValidMixedContinuousCollisionHit(candidate)
+            if (!IsValidMixedContinuousCollisionHit(candidate.Collider2D!)
                 || !IsClosingContinuousCollisionHit(displacement, candidate.NormalFor3DSource))
                 continue;
 
@@ -302,20 +302,9 @@ public partial class SolidBody
             LSCylinderCollider => true,
             LSConeCollider => true,
             LSMeshCollider { Mode: MeshColliderMode.Convex } => true,
-            LSCompoundCollider compound => AreExactConvexCompoundPartsSupported(compound),
+            LSCompoundCollider => true,
             _ => false
         };
-    }
-
-    private static bool AreExactConvexCompoundPartsSupported(LSCompoundCollider compound)
-    {
-        for (int i = 0; i < compound.PartCount; i++)
-        {
-            if (!IsExactConvexSourceSupported(compound.GetPartCollider(i)))
-                return false;
-        }
-
-        return true;
     }
 
     private static bool ContinuousCollisionHitComesBefore(Physics3DHit left, Physics3DHit right)

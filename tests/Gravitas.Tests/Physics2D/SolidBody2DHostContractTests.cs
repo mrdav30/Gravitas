@@ -97,6 +97,70 @@ public sealed class SolidBody2DHostContractTests
     }
 
     [Fact]
+    public void DeactivatedBody_ShouldKeepResetPoseAndIgnoreRepeatedCleanupAndDirectLateStep()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        SolidBody2D body = CreateDynamicCircle(context, Vector2d.Zero);
+        Vector2d resetPosition = new((Fixed64)3, (Fixed64)4);
+
+        body.Deactivate();
+        body.Deactivate();
+        body.ResetPosition(resetPosition, Fixed64.Half);
+        body.LateSimulate();
+
+        body.Active.Should().BeFalse();
+        body.DynamicId.Should().Be(-1);
+        body.Position.Should().Be(resetPosition);
+        body.Rotation.Should().Be(Fixed64.Half);
+        context.Physics2D.ColliderCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void DirectLateSimulate_WithOrdinaryDynamicMotion_ShouldRefreshColliderAndSleepState()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        SolidBody2D body = CreateDynamicCircle(context, Vector2d.Zero);
+        body.SleepFrameThreshold = 1;
+        body.SleepLinearSpeedThreshold = (Fixed64)10;
+        body.SleepAngularSpeedThreshold = (Fixed64)10;
+        body.AddForce(Vector2d.Right);
+
+        body.LateSimulate();
+
+        body.Position.X.Should().BeGreaterThan(Fixed64.Zero);
+        body.Collider.Center.Should().Be(body.Position);
+        body.IsSleeping.Should().BeTrue();
+        body.LinearVelocity.Should().Be(Vector2d.Zero);
+    }
+
+    [Fact]
+    public void DirectLateSimulate_WithKinematicBody_ShouldRefreshColliderAndPreserveHostVisualization()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        SolidBody2D body = CreateDynamicCircle(context, Vector2d.Zero);
+        FixedTransform transform = body.Agent.Transform;
+        Vector3d hostPosition = new((Fixed64)5, (Fixed64)9, (Fixed64)7);
+        FixedQuaternion hostRotation = FixedQuaternion.FromEulerAnglesInDegrees(
+            Fixed64.Zero,
+            (Fixed64)90,
+            Fixed64.Zero);
+        body.IsKinematic = true;
+        transform.Position = hostPosition;
+        transform.Rotation = hostRotation;
+
+        body.LateSimulate();
+
+        body.Position.Should().Be(new Vector2d((Fixed64)5, (Fixed64)7));
+        body.Collider.Center.Should().Be(body.Position);
+        body.Rotation.Should().Be(FixedMath.DegToRad((Fixed64)90));
+
+        context.Visualize();
+
+        transform.Position.Should().Be(hostPosition);
+        transform.Rotation.Should().Be(hostRotation);
+    }
+
+    [Fact]
     public void InitializeWithNoBody_ShouldBindStaticColliderToAgentAndQueries()
     {
         using GravitasWorldContext context = Create2DContext();

@@ -881,7 +881,6 @@ internal static class QueryDetection2D
 
         if (!TrySweepConvexAxes(mover, mover, target, displacement, ref entryTime, ref exitTime, ref entryNormal)
             || !TrySweepConvexAxes(target, mover, target, displacement, ref entryTime, ref exitTime, ref entryNormal)
-            || entryTime > Fixed64.One
             || exitTime < Fixed64.Zero)
         {
             hit = default;

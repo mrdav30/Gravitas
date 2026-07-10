@@ -327,6 +327,49 @@ public sealed class ContinuousCollisionDetectionTests
     }
 
     [Fact]
+    public void ContinuousMode_WithConcaveMeshSource_ShouldClampAgainstStaticSphere()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        LSSphereCollider target = scenario.CreateStaticSphere(new Vector3d((Fixed64)4, Fixed64.Zero, Fixed64.Zero));
+        ScenarioBody<LSMeshCollider> mover = scenario.CreateBody(
+            MeshTestFixtures.CreateConvexCube(
+                MeshColliderMode.Concave,
+                MeshInertiaPolicy.SurfaceApproximation),
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+        mover.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        DisableGroundQueries(mover.Body);
+
+        mover.Body.AddForce(Vector3d.Right * (Fixed64)10);
+        scenario.Context.LateSimulate();
+
+        mover.Body.Position3d.X.Should().BeLessThan((Fixed64)10);
+        mover.Body.LinearVelocity.X.Should().Be(Fixed64.Zero);
+        mover.Collider.BoundsMax.X.Should().BeLessThanOrEqualTo(target.BoundsMin.X);
+    }
+
+    [Fact]
+    public void ContinuousMode_WithConcaveMeshSource_ShouldRejectStaticSphereConservativeProxyMiss()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        _ = scenario.CreateStaticSphere(new Vector3d((Fixed64)4, Fixed64.FromFraction(6, 5), Fixed64.Zero));
+        ScenarioBody<LSMeshCollider> mover = scenario.CreateBody(
+            MeshTestFixtures.CreateConvexCube(
+                MeshColliderMode.Concave,
+                MeshInertiaPolicy.SurfaceApproximation),
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+        mover.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        DisableGroundQueries(mover.Body);
+
+        mover.Body.AddForce(Vector3d.Right * (Fixed64)10);
+        scenario.Context.LateSimulate();
+
+        mover.Body.Position3d.Should().Be(new Vector3d((Fixed64)10, Fixed64.Zero, Fixed64.Zero));
+        mover.Body.LinearVelocity.Should().Be(Vector3d.Right * (Fixed64)10);
+    }
+
+    [Fact]
     public void ContinuousMode_ShouldNotClampThinCuboidWhenBoundsProxyHitsButSweptShapeMissesStaticSphere()
     {
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();
@@ -477,6 +520,82 @@ public sealed class ContinuousCollisionDetectionTests
             Fixed64.Zero);
         FixedQuaternion.Angle(blade.Body.Rotation, fullTurn).Should().BeGreaterThan(Fixed64.Zero);
         blade.Body.AngularVelocity.Should().Be(Vector3d.Zero);
+    }
+
+    [Fact]
+    public void ContinuousMode_ShouldClampTranslatingAndRotatingLongCuboidBeforeFullPose()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        scenario.Context.Environment.DampingFactor = Fixed64.Zero;
+        _ = scenario.CreateStaticSphere(new Vector3d(Fixed64.FromFraction(3, 2), Fixed64.Zero, Fixed64.FromFraction(-5, 4)));
+        ScenarioBody<LSCuboidCollider> blade = scenario.CreateBody(
+            new LSCuboidCollider
+            {
+                Size = new Vector3d((Fixed64)6, Fixed64.One, Fixed64.FromFraction(1, 5))
+            },
+            new Vector3d((Fixed64)(-2), Fixed64.Zero, Fixed64.Zero),
+            FixedQuaternion.Identity);
+        blade.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        DisableGroundQueries(blade.Body);
+
+        Fixed64 angularVelocity = FixedMath.DegToRad((Fixed64)90);
+        FixedQuaternion fullRotation = new(
+            Fixed64.Zero,
+            angularVelocity * Fixed64.Half,
+            Fixed64.Zero,
+            Fixed64.One);
+        fullRotation = fullRotation.Normalized;
+        blade.Body.AddForce(Vector3d.Right * (Fixed64)2);
+        blade.Body.AddAngularImpulse(Vector3d.Up * (angularVelocity / blade.Body.EffectiveInverseInertiaTensor.M22));
+        scenario.Context.LateSimulate();
+
+        blade.Body.Position3d.X.Should().BeLessThan(Fixed64.Zero);
+        FixedQuaternion.Angle(blade.Body.Rotation, fullRotation).Should().BeGreaterThan(Fixed64.Zero);
+        blade.Body.AngularVelocity.Should().Be(Vector3d.Zero);
+    }
+
+    [Fact]
+    public void ContinuousMode_WithLowerPriorityRotatingSource_ShouldClampAndClearAngularVelocity()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        scenario.Context.Environment.DampingFactor = Fixed64.Zero;
+        ScenarioBody<LSMeshCollider> target = scenario.CreateBody(
+            MeshTestFixtures.CreateConvexCube(inertiaPolicy: MeshInertiaPolicy.SurfaceApproximation),
+            new Vector3d(Fixed64.FromFraction(3, 2), Fixed64.Zero, Fixed64.FromFraction(-5, 4)),
+            FixedQuaternion.Identity,
+            immovable: true);
+        ScenarioBody<LSCuboidCollider> blade = scenario.CreateBody(
+            new LSCuboidCollider
+            {
+                Size = new Vector3d((Fixed64)6, Fixed64.One, Fixed64.FromFraction(1, 5))
+            },
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+        blade.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        DisableGroundQueries(blade.Body);
+        blade.Collider.Priority.Should().BeLessThan(target.Collider.Priority);
+
+        Fixed64 angularVelocity = FixedMath.DegToRad((Fixed64)90);
+        FixedQuaternion fullRotation = new(
+            Fixed64.Zero,
+            angularVelocity * Fixed64.Half,
+            Fixed64.Zero,
+            Fixed64.One);
+        fullRotation = fullRotation.Normalized;
+        Vector3d closingVelocity = new(
+            Fixed64.FromFraction(-3, 32),
+            Fixed64.Zero,
+            Fixed64.FromFraction(5, 64));
+        Fixed64 tangentialSpeed = Fixed64.FromFraction(1, 64);
+        blade.Body.AddLinearImpulse(closingVelocity + Vector3d.Up * tangentialSpeed);
+        blade.Body.AddAngularImpulse(Vector3d.Up * (angularVelocity / blade.Body.EffectiveInverseInertiaTensor.M22));
+        scenario.Context.LateSimulate();
+
+        FixedQuaternion.Angle(blade.Body.Rotation, fullRotation).Should().BeGreaterThan(Fixed64.Zero);
+        blade.Body.AngularVelocity.Should().Be(Vector3d.Zero);
+        blade.Body.LinearVelocity.Y.Should().Be(tangentialSpeed);
+        new Vector3d(blade.Body.LinearVelocity.X, Fixed64.Zero, blade.Body.LinearVelocity.Z)
+            .MagnitudeSquared.Should().BeLessThan(closingVelocity.MagnitudeSquared);
     }
 
     [Fact]
@@ -680,6 +799,30 @@ public sealed class ContinuousCollisionDetectionTests
         target.Body.Position3d.X.Should().Be((Fixed64)5);
         source.Body.LinearVelocity.X.Should().Be((Fixed64)5);
         target.Body.LinearVelocity.X.Should().Be((Fixed64)5);
+    }
+
+    [Fact]
+    public void ContinuousMode_WithStaleDynamicCandidate_ShouldReachRequestedEndPose()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        ScenarioBody<LSSphereCollider> deactivator = scenario.CreateSphere(new Vector3d(Fixed64.Zero, Fixed64.Zero, (Fixed64)3));
+        ScenarioBody<LSSphereCollider> target = scenario.CreateSphere(Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> source = scenario.CreateSphere(new Vector3d((Fixed64)(-5), Fixed64.Zero, Fixed64.Zero));
+        source.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        DisableGroundQueries(deactivator.Body);
+        DisableGroundQueries(source.Body);
+        deactivator.Body.OnMoved += target.Body.Deactivate;
+
+        deactivator.Body.AddForce(Vector3d.Right);
+        source.Body.AddForce(Vector3d.Right * (Fixed64)10);
+        scenario.Context.LateSimulate();
+
+        deactivator.Body.Position3d.Should().Be(new Vector3d(Fixed64.One, Fixed64.Zero, (Fixed64)3));
+        target.Body.Active.Should().BeFalse();
+        target.Body.Position3d.Should().Be(Vector3d.Zero);
+        target.Body.LinearVelocity.Should().Be(Vector3d.Zero);
+        source.Body.Position3d.Should().Be(new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero));
+        source.Body.LinearVelocity.Should().Be(Vector3d.Right * (Fixed64)10);
     }
 
     [Fact]
@@ -907,6 +1050,35 @@ public sealed class ContinuousCollisionDetectionTests
     }
 
     [Fact]
+    public void ContinuousMode_DynamicRelativeConcaveMeshSource_ShouldUseConservativeFallbackAgainstDynamicCuboid()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        ScenarioBody<LSMeshCollider> mover = scenario.CreateBody(
+            MeshTestFixtures.CreateConvexCube(
+                MeshColliderMode.Concave,
+                MeshInertiaPolicy.SurfaceApproximation),
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+        ScenarioBody<LSCuboidCollider> target = scenario.CreateCuboid(
+            new Vector3d((Fixed64)4, Fixed64.Zero, Fixed64.Zero));
+        mover.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        DisableGroundQueries(mover.Body);
+        DisableGroundQueries(target.Body);
+
+        target.Body.Sleep();
+        mover.Body.AddForce(Vector3d.Right * (Fixed64)10);
+        scenario.Context.LateSimulate();
+
+        mover.Collider.BoundsMax.X.Should().BeLessThanOrEqualTo(target.Collider.BoundsMin.X);
+        mover.Body.Position3d.X.Should().BeLessThan((Fixed64)10);
+        mover.Body.LinearVelocity.X.Should().BeGreaterThanOrEqualTo(Fixed64.Zero);
+        mover.Body.LinearVelocity.X.Should().BeLessThan((Fixed64)10);
+        target.Body.IsSleeping.Should().BeFalse();
+        target.Body.LinearVelocity.X.Should().BeGreaterThan(Fixed64.Zero);
+        target.Body.Position3d.X.Should().BeGreaterThan((Fixed64)4);
+    }
+
+    [Fact]
     public void ContinuousMode_DynamicRelativePath_ShouldNotClampThinCuboidWhenProxySpheresHitButShapesMiss()
     {
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();
@@ -1018,6 +1190,63 @@ public sealed class ContinuousCollisionDetectionTests
         mover.Body.LinearVelocity.X.Should().BeLessThan((Fixed64)10);
         target.Body.IsSleeping.Should().BeFalse();
         target.Body.LinearVelocity.X.Should().BeGreaterThan(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void ContinuousMode_DynamicRelativeSphereSource_ShouldRejectThinCuboidProxyMiss()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        ScenarioBody<LSSphereCollider> mover = scenario.CreateSphere(Vector3d.Zero);
+        Vector3d targetPosition = new((Fixed64)4, Fixed64.FromFraction(5, 2), Fixed64.Zero);
+        ScenarioBody<LSCuboidCollider> target = scenario.CreateBody(
+            new LSCuboidCollider
+            {
+                Size = new Vector3d((Fixed64)6, Fixed64.FromFraction(1, 5), Fixed64.FromFraction(1, 5))
+            },
+            targetPosition,
+            FixedQuaternion.Identity);
+        mover.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        DisableGroundQueries(mover.Body);
+        DisableGroundQueries(target.Body);
+
+        target.Body.Sleep();
+        mover.Body.AddForce(Vector3d.Right * (Fixed64)10);
+        scenario.Context.LateSimulate();
+
+        mover.Body.Position3d.Should().Be(new Vector3d((Fixed64)10, Fixed64.Zero, Fixed64.Zero));
+        mover.Body.LinearVelocity.Should().Be(Vector3d.Right * (Fixed64)10);
+        target.Body.Position3d.Should().Be(targetPosition);
+        target.Body.IsSleeping.Should().BeTrue();
+        target.Body.LinearVelocity.Should().Be(Vector3d.Zero);
+    }
+
+    [Fact]
+    public void ContinuousMode_DynamicRelativeConvexSource_ShouldRejectThinCuboidProxyMiss()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        var thinCuboid = new Vector3d((Fixed64)6, Fixed64.FromFraction(1, 5), Fixed64.FromFraction(1, 5));
+        ScenarioBody<LSCuboidCollider> mover = scenario.CreateBody(
+            new LSCuboidCollider { Size = thinCuboid },
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+        Vector3d targetPosition = new((Fixed64)4, (Fixed64)5, Fixed64.Zero);
+        ScenarioBody<LSCuboidCollider> target = scenario.CreateBody(
+            new LSCuboidCollider { Size = thinCuboid },
+            targetPosition,
+            FixedQuaternion.Identity);
+        mover.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        DisableGroundQueries(mover.Body);
+        DisableGroundQueries(target.Body);
+
+        target.Body.Sleep();
+        mover.Body.AddForce(Vector3d.Right * (Fixed64)10);
+        scenario.Context.LateSimulate();
+
+        mover.Body.Position3d.Should().Be(new Vector3d((Fixed64)10, Fixed64.Zero, Fixed64.Zero));
+        mover.Body.LinearVelocity.Should().Be(Vector3d.Right * (Fixed64)10);
+        target.Body.Position3d.Should().Be(targetPosition);
+        target.Body.IsSleeping.Should().BeTrue();
+        target.Body.LinearVelocity.Should().Be(Vector3d.Zero);
     }
 
     [Theory]
@@ -1202,6 +1431,32 @@ public sealed class ContinuousCollisionDetectionTests
     }
 
     [Fact]
+    public void ContinuousMode_WithKinematicSourceAndStaleDynamicCandidate_ShouldReachHostTargetPose()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        ScenarioBody<LSSphereCollider> deactivator = scenario.CreateSphere(new Vector3d(Fixed64.Zero, Fixed64.Zero, (Fixed64)3));
+        ScenarioBody<LSSphereCollider> target = scenario.CreateSphere(Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> source = scenario.CreateSphere(
+            new Vector3d((Fixed64)(-5), Fixed64.Zero, Fixed64.Zero),
+            isKinematic: true);
+        source.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        DisableGroundQueries(deactivator.Body);
+        deactivator.Body.OnMoved += target.Body.Deactivate;
+        var hostTarget = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
+
+        deactivator.Body.AddForce(Vector3d.Right);
+        source.Body.Agent.Transform.Position = hostTarget;
+        scenario.Context.LateSimulate();
+
+        deactivator.Body.Position3d.Should().Be(new Vector3d(Fixed64.One, Fixed64.Zero, (Fixed64)3));
+        target.Body.Active.Should().BeFalse();
+        target.Body.Position3d.Should().Be(Vector3d.Zero);
+        target.Body.LinearVelocity.Should().Be(Vector3d.Zero);
+        source.Body.Position3d.Should().Be(hostTarget);
+        source.Body.LastContinuousCollisionToiIterationCount.Should().Be(0);
+    }
+
+    [Fact]
     public void ContinuousMode_WithFastKinematicHostTranslationAndShapeExactMiss_ShouldNotPushDynamicTarget()
     {
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();
@@ -1375,6 +1630,33 @@ public sealed class ContinuousCollisionDetectionTests
 
         FixedQuaternion.Angle(blade.Body.Rotation, fullTurn).Should().BeGreaterThan(Fixed64.Zero);
         blade.Body.LastContinuousCollisionToiIterationCount.Should().Be(1);
+    }
+
+    [Fact]
+    public void ContinuousMode_WithKinematicHostRotationAndProxyNearMiss_ShouldReachExactHostRotation()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        _ = scenario.CreateStaticSphere(new Vector3d(Fixed64.FromFraction(3, 2), Fixed64.Zero, Fixed64.FromFraction(5, 4)));
+        ScenarioBody<LSCuboidCollider> blade = scenario.CreateBody(
+            new LSCuboidCollider
+            {
+                Size = new Vector3d((Fixed64)6, Fixed64.One, Fixed64.FromFraction(1, 5))
+            },
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            isKinematic: true);
+        blade.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        DisableGroundQueries(blade.Body);
+
+        FixedQuaternion hostRotation = FixedQuaternion.FromEulerAnglesInDegrees(
+            Fixed64.Zero,
+            (Fixed64)90,
+            Fixed64.Zero);
+        blade.Body.Agent.Transform.Rotation = hostRotation;
+        scenario.Context.LateSimulate();
+
+        blade.Body.Rotation.Should().Be(hostRotation);
+        blade.Body.LastContinuousCollisionToiIterationCount.Should().Be(0);
     }
 
     [Fact]

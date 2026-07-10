@@ -25,7 +25,6 @@ public abstract partial class LSCollider
         writer.WritePhysicsLayer(_layer);
         writer.WritePhysicsLayerMask(_ignoredCollisionLayers);
         WriteMaterial(ref writer, _material);
-        writer.WriteBool(_preventCulling);
         writer.WriteEnum(Shape);
         writer.WriteInt32(Priority);
         writer.WriteVector3d(_offset);

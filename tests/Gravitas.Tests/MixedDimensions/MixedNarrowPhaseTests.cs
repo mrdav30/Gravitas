@@ -4,6 +4,8 @@ using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Tests.Support;
 using GridForge.Configuration;
+using SwiftCollections;
+using SwiftCollections.Query;
 using System;
 using Xunit;
 
@@ -255,12 +257,36 @@ public sealed class MixedNarrowPhaseTests
                 Fixed64.Zero
             },
             {
+                "Cuboid_Capsule2D_EdgeAxis",
+                ColliderType.AABox,
+                new Vector3d(Fixed64.One, Fixed64.FromFraction(4, 5), Fixed64.Half),
+                Euler(15, 0, 15),
+                ColliderType2D.Capsule,
+                FixedMath.DegToRad((Fixed64)25)
+            },
+            {
                 "Cuboid_ConvexPolygon",
                 ColliderType.AABox,
                 new Vector3d(Fixed64.FromFraction(-3, 2), -Fixed64.One, Fixed64.FromFraction(-3, 2)),
                 FixedQuaternion.Identity,
                 ColliderType2D.ConvexPolygon,
                 FixedMath.DegToRad((Fixed64)15)
+            },
+            {
+                "Cuboid_Circle_ClosestFeatureAxis",
+                ColliderType.AABox,
+                new Vector3d(Fixed64.FromFraction(9, 10), Fixed64.Zero, Fixed64.FromFraction(9, 10)),
+                FixedQuaternion.Identity,
+                ColliderType2D.Circle,
+                Fixed64.Zero
+            },
+            {
+                "Cuboid_Circle_EdgeUpAxis",
+                ColliderType.AABox,
+                new Vector3d(Fixed64.FromFraction(9, 10), Fixed64.Zero, Fixed64.FromFraction(9, 10)),
+                Euler(15, 0, 15),
+                ColliderType2D.Circle,
+                Fixed64.Zero
             },
             {
                 "Cuboid_AABox_EdgeUp",
@@ -335,6 +361,22 @@ public sealed class MixedNarrowPhaseTests
                 FixedMath.DegToRad((Fixed64)30)
             },
             {
+                "Capsule_Circle_LineAxis",
+                ColliderType.Capsule,
+                new Vector3d(-Fixed64.FromFraction(8, 5), Fixed64.FromFraction(8, 5), Fixed64.Zero),
+                Euler(0, 0, 45),
+                ColliderType2D.Circle,
+                Fixed64.Zero
+            },
+            {
+                "Capsule_Capsule2D_FirstAxis",
+                ColliderType.Capsule,
+                new Vector3d(-Fixed64.FromFraction(29, 20), Fixed64.Zero, Fixed64.FromFraction(29, 20)),
+                FixedQuaternion.Identity,
+                ColliderType2D.Capsule,
+                FixedMath.DegToRad((Fixed64)45)
+            },
+            {
                 "Cylinder_AABox",
                 ColliderType.Cylinder,
                 new Vector3d(Fixed64.FromFraction(-3, 2), -Fixed64.One, Fixed64.FromFraction(-3, 2)),
@@ -391,6 +433,30 @@ public sealed class MixedNarrowPhaseTests
                 FixedMath.DegToRad((Fixed64)30)
             },
             {
+                "Cylinder_Circle_LineAxis",
+                ColliderType.Cylinder,
+                new Vector3d(-Fixed64.FromFraction(19, 20), Fixed64.FromFraction(19, 20), Fixed64.Zero),
+                Euler(0, 0, 45),
+                ColliderType2D.Circle,
+                Fixed64.Zero
+            },
+            {
+                "Cylinder_Circle_LineUpAxis",
+                ColliderType.Cylinder,
+                new Vector3d(-Fixed64.FromFraction(9, 10), Fixed64.Zero, -Fixed64.FromFraction(13, 20)),
+                Euler(45, 0, 45),
+                ColliderType2D.Circle,
+                Fixed64.Zero
+            },
+            {
+                "Cylinder_Capsule2D_FirstAxis",
+                ColliderType.Cylinder,
+                new Vector3d(-Fixed64.FromFraction(29, 20), Fixed64.Zero, Fixed64.FromFraction(29, 20)),
+                FixedQuaternion.Identity,
+                ColliderType2D.Capsule,
+                FixedMath.DegToRad((Fixed64)45)
+            },
+            {
                 "Cone_AABox",
                 ColliderType.Cone,
                 new Vector3d(Fixed64.FromFraction(-3, 2), -Fixed64.One, Fixed64.FromFraction(-3, 2)),
@@ -429,6 +495,114 @@ public sealed class MixedNarrowPhaseTests
                 Euler(0, 0, 30),
                 ColliderType2D.ConvexPolygon,
                 FixedMath.DegToRad((Fixed64)30)
+            },
+            {
+                "Cone_ConvexPolygon_EdgeAxis",
+                ColliderType.Cone,
+                new Vector3d(Fixed64.One, Fixed64.One, Fixed64.One),
+                Euler(45, 0, 45),
+                ColliderType2D.ConvexPolygon,
+                FixedMath.DegToRad((Fixed64)45)
+            },
+            {
+                "Cone_Circle_Axis",
+                ColliderType.Cone,
+                new Vector3d(-Fixed64.FromFraction(19, 20), Fixed64.FromFraction(19, 20), Fixed64.Zero),
+                Euler(0, 0, 45),
+                ColliderType2D.Circle,
+                Fixed64.Zero
+            },
+            {
+                "Cone_Circle_AxisUp",
+                ColliderType.Cone,
+                new Vector3d(-Fixed64.FromFraction(9, 10), Fixed64.Zero, -Fixed64.FromFraction(13, 20)),
+                Euler(45, 0, 45),
+                ColliderType2D.Circle,
+                Fixed64.Zero
+            },
+            {
+                "Cone_Capsule2D_FirstAxis",
+                ColliderType.Cone,
+                new Vector3d(-Fixed64.FromFraction(29, 20), Fixed64.Zero, Fixed64.FromFraction(29, 20)),
+                FixedQuaternion.Identity,
+                ColliderType2D.Capsule,
+                FixedMath.DegToRad((Fixed64)45)
+            },
+            {
+                "Cuboid_Capsule2D_FirstAxis",
+                ColliderType.AABox,
+                new Vector3d(-Fixed64.FromFraction(29, 20), Fixed64.Zero, Fixed64.FromFraction(29, 20)),
+                Euler(0, 45, 0),
+                ColliderType2D.Capsule,
+                FixedMath.DegToRad((Fixed64)45)
+            }
+        };
+
+    public static TheoryData<string, Vector3d, Vector3d, Vector3d, ColliderType2D, Fixed64, bool> MeshTriangleReducerCases =>
+        new()
+        {
+            {
+                "TriangleNormal_CircleReject",
+                new Vector3d(Fixed64.FromFraction(2, 5), -Fixed64.FromFraction(1, 4), Fixed64.Half),
+                new Vector3d(Fixed64.Half, Fixed64.FromFraction(1, 4), Fixed64.FromFraction(2, 5)),
+                new Vector3d(Fixed64.Half, -Fixed64.FromFraction(1, 4), Fixed64.FromFraction(2, 5)),
+                ColliderType2D.Circle,
+                Fixed64.Zero,
+                false
+            },
+            {
+                "TriangleNormal_AABoxReject",
+                new Vector3d(Fixed64.FromFraction(9, 10), -Fixed64.FromFraction(1, 4), Fixed64.FromFraction(6, 5)),
+                new Vector3d(Fixed64.FromFraction(6, 5), Fixed64.FromFraction(1, 4), Fixed64.FromFraction(9, 10)),
+                new Vector3d(Fixed64.FromFraction(13, 10), -Fixed64.FromFraction(1, 4), Fixed64.FromFraction(4, 5)),
+                ColliderType2D.AABox,
+                Fixed64.Zero,
+                false
+            },
+            {
+                "EmbeddedCapsuleAxisReject",
+                new Vector3d(-Fixed64.FromFraction(11, 10), Fixed64.Zero, Fixed64.FromFraction(11, 10)),
+                new Vector3d(-Fixed64.FromFraction(6, 5), Fixed64.Zero, Fixed64.FromFraction(11, 10)),
+                new Vector3d(-Fixed64.FromFraction(11, 10), Fixed64.Zero, Fixed64.FromFraction(6, 5)),
+                ColliderType2D.Capsule,
+                FixedMath.DegToRad((Fixed64)45),
+                false
+            },
+            {
+                "TriangleEdgeCapsuleAxisReject",
+                new Vector3d(Fixed64.FromFraction(2, 5), Fixed64.FromFraction(7, 10), -Fixed64.One),
+                new Vector3d(Fixed64.FromFraction(7, 10), Fixed64.FromFraction(2, 5), Fixed64.Zero),
+                new Vector3d(Fixed64.FromFraction(4, 5), Fixed64.FromFraction(6, 5), Fixed64.Zero),
+                ColliderType2D.Capsule,
+                Fixed64.Zero,
+                false
+            },
+            {
+                "ClosestFeatureCapsuleReject",
+                new Vector3d(Fixed64.FromFraction(2, 5), Fixed64.Zero, Fixed64.FromFraction(7, 5)),
+                new Vector3d(Fixed64.FromFraction(22, 5), Fixed64.Zero, Fixed64.FromFraction(29, 10)),
+                new Vector3d(Fixed64.FromFraction(2, 5), Fixed64.Zero, Fixed64.FromFraction(39, 10)),
+                ColliderType2D.Capsule,
+                Fixed64.Zero,
+                false
+            },
+            {
+                "CircleSegmentPiercesTriangle",
+                new Vector3d(-Fixed64.One, Fixed64.Zero, -Fixed64.One),
+                new Vector3d(Fixed64.One, Fixed64.Zero, -Fixed64.One),
+                new Vector3d(Fixed64.Zero, Fixed64.Zero, Fixed64.One),
+                ColliderType2D.Circle,
+                Fixed64.Zero,
+                true
+            },
+            {
+                "CircleSegmentEdgeImprovesClosestPair",
+                new Vector3d(Fixed64.FromFraction(1, 10), Fixed64.Zero, Fixed64.FromFraction(1, 10)),
+                new Vector3d(Fixed64.FromFraction(2, 5), Fixed64.Zero, Fixed64.FromFraction(1, 10)),
+                new Vector3d(Fixed64.FromFraction(1, 10), Fixed64.Zero, Fixed64.FromFraction(2, 5)),
+                ColliderType2D.Circle,
+                Fixed64.Zero,
+                true
             }
         };
 
@@ -484,6 +658,34 @@ public sealed class MixedNarrowPhaseTests
         contact.Normal3DTo2D.Should().Be(Vector3d.Forward);
         contact.Point3D.Should().Be(Vector3d.Forward * Fixed64.Half);
         contact.Point2D.Should().Be(Vector3d.Zero);
+    }
+
+    [Fact]
+    public void SphereCustomContaining2DSlab_WithoutPlanarBoundary_ShouldRetainVerticalBoundary()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSSphereCollider> sphere = CreateSphere3D(context, Vector3d.Zero);
+        SolidBody2D custom = CreateBody2D(
+            context,
+            new UnsupportedTestCollider2D(containsPoints: true),
+            Vector2d.Zero);
+
+        custom.Collider.ContainsPoint(Vector2d.Zero).Should().BeTrue();
+        MixedEmbedded2DGeometry.TryGetPlanarBoundaryPoint(
+            custom.Collider,
+            Vector2d.Zero,
+            out _,
+            out _).Should().BeFalse();
+
+        CollisionDetectionMixed.TryCollide(
+            sphere.Collider,
+            custom.Collider,
+            out MixedContact contact).Should().BeTrue();
+
+        contact.Normal3DTo2D.Should().Be(-Vector3d.Up);
+        contact.Point3D.Should().Be(new Vector3d(Fixed64.Zero, -Fixed64.Half, Fixed64.Zero));
+        contact.Point2D.Should().Be(new Vector3d(Fixed64.Zero, -Fixed64.Half, Fixed64.Zero));
+        contact.Depth.Should().Be(Fixed64.One);
     }
 
     [Fact]
@@ -1224,6 +1426,47 @@ public sealed class MixedNarrowPhaseTests
     }
 
     [Fact]
+    public void CompoundCircleSlab_WithShallowerFirstOverlaps_ShouldRetainFirstPartContact()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        var compoundCollider = new LSCompoundCollider(
+            CompoundColliderPart.Sphere(
+                Fixed64.Half,
+                new Vector3d(Fixed64.FromFraction(9, 10), Fixed64.Zero, Fixed64.Zero)),
+            CompoundColliderPart.Sphere(
+                Fixed64.Half,
+                new Vector3d(Fixed64.FromFraction(3, 5), Fixed64.Zero, Fixed64.Zero)));
+        ScenarioBody<LSCompoundCollider> compound = CreateBody3D(
+            context,
+            compoundCollider,
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+        SolidBody2D circle = CreateBody2D(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero);
+
+        CollisionDetectionMixed.TryCollide(
+            compound.Collider.GetPartCollider(0),
+            circle.Collider,
+            out MixedContact shallow).Should().BeTrue();
+        CollisionDetectionMixed.TryCollide(
+            compound.Collider.GetPartCollider(1),
+            circle.Collider,
+            out MixedContact deep).Should().BeTrue();
+
+        shallow.Depth.Should().Be(Fixed64.FromFraction(1, 10));
+        deep.Depth.Should().Be(Fixed64.FromFraction(2, 5));
+        shallow.Point3D.Should().NotBe(deep.Point3D);
+
+        CollisionDetectionMixed.TryCollide(
+            compound.Collider,
+            circle.Collider,
+            out MixedContact contact).Should().BeTrue();
+
+        contact.Depth.Should().Be(shallow.Depth);
+        contact.Normal3DTo2D.Should().Be(shallow.Normal3DTo2D);
+        contact.Point3D.Should().Be(shallow.Point3D);
+    }
+
+    [Fact]
     public void CompoundCircleSlab_WithOnlyExactMissParts_ShouldReturnNoContact()
     {
         using GravitasWorldContext context = CreateMixedContext();
@@ -1312,6 +1555,43 @@ public sealed class MixedNarrowPhaseTests
     }
 
     [Fact]
+    public void SphereCompound2DSlab_WithShallowerFirstOverlaps_ShouldRetainFirstPartContact()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSSphereCollider> sphere = CreateSphere3D(
+            context,
+            new Vector3d(Fixed64.FromFraction(9, 10), Fixed64.Zero, Fixed64.Zero));
+        var compound2D = new LSCompoundCollider2D(
+            CompoundColliderPart2D.Circle(Fixed64.Half, Vector2d.Zero),
+            CompoundColliderPart2D.Circle(
+                Fixed64.Half,
+                new Vector2d(Fixed64.FromFraction(3, 10), Fixed64.Zero)));
+        SolidBody2D body2D = CreateBody2D(context, compound2D, Vector2d.Zero);
+
+        CollisionDetectionMixed.TryCollide(
+            sphere.Collider,
+            compound2D.GetPartCollider(0),
+            out MixedContact shallow).Should().BeTrue();
+        CollisionDetectionMixed.TryCollide(
+            sphere.Collider,
+            compound2D.GetPartCollider(1),
+            out MixedContact deep).Should().BeTrue();
+
+        shallow.Depth.Should().Be(Fixed64.FromFraction(1, 10));
+        deep.Depth.Should().Be(Fixed64.FromFraction(2, 5));
+        shallow.Point2D.Should().NotBe(deep.Point2D);
+
+        CollisionDetectionMixed.TryCollide(
+            sphere.Collider,
+            body2D.Collider,
+            out MixedContact contact).Should().BeTrue();
+
+        contact.Depth.Should().Be(shallow.Depth);
+        contact.Normal3DTo2D.Should().Be(shallow.Normal3DTo2D);
+        contact.Point2D.Should().Be(shallow.Point2D);
+    }
+
+    [Fact]
     public void TryGetPlanarBoundaryPoint_WithCompoundContainingPoint_ShouldUseContainingPartBoundary()
     {
         using GravitasWorldContext context = CreateMixedContext();
@@ -1349,6 +1629,34 @@ public sealed class MixedNarrowPhaseTests
         found.Should().BeTrue();
         boundary.Should().Be(new Vector2d((Fixed64)2, Fixed64.Zero));
         distance.Should().Be(Fixed64.Half);
+    }
+
+    [Theory]
+    [MemberData(nameof(MeshTriangleReducerCases))]
+    public void MeshTriangleReducerCases_ShouldClassifyExactContact(
+        string caseName,
+        Vector3d first,
+        Vector3d second,
+        Vector3d third,
+        ColliderType2D embeddedShape,
+        Fixed64 embeddedRotation,
+        bool expectedContact)
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSMeshCollider> mesh = CreateMesh3D(
+            context,
+            CreateTriangleMesh(first, second, third),
+            Vector3d.Zero);
+        LSCollider2D embedded = CreatePrimitive2D(context, embeddedShape, embeddedRotation);
+
+        mesh.Collider.Bounds.Intersects(embedded.MixedBounds3D).Should().BeTrue(caseName);
+
+        bool collided = CollisionDetectionMixed.TryCollide(mesh.Collider, embedded, out MixedContact contact);
+
+        collided.Should().Be(expectedContact, caseName);
+        contact.HasContact.Should().Be(expectedContact, caseName);
+        if (expectedContact)
+            contact.Normal3DTo2D.MagnitudeSquared.Should().BeGreaterThan(Fixed64.Zero, caseName);
     }
 
     [Fact]
@@ -1402,6 +1710,61 @@ public sealed class MixedNarrowPhaseTests
         bool collided = CollisionDetectionMixed.TryCollide(mesh.Collider, unsupported.Collider, out MixedContact contact);
 
         collided.Should().BeFalse();
+        contact.HasContact.Should().BeFalse();
+    }
+
+    [Fact]
+    public void RotatedMesh_WithConservativeTriangleCandidatesOutsideWorldBounds_ShouldReturnNoContact()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        Fixed64 center = Fixed64.FromFraction(6, 5);
+        Fixed64 halfSize = Fixed64.FromFraction(1, 20);
+        Vector3d[] vertices =
+        {
+            new(center - halfSize, Fixed64.Zero, center - halfSize),
+            new(center + halfSize, Fixed64.Zero, center - halfSize),
+            new(center, Fixed64.Zero, center + halfSize),
+            new(-center - halfSize, Fixed64.Zero, -center - halfSize),
+            new(-center + halfSize, Fixed64.Zero, -center - halfSize),
+            new(-center, Fixed64.Zero, -center + halfSize)
+        };
+        var meshCollider = new LSMeshCollider(
+            vertices,
+            new[] { 0, 1, 2, 3, 4, 5 },
+            MeshColliderMode.Concave,
+            MeshInertiaPolicy.SurfaceApproximation);
+        ScenarioBody<LSMeshCollider> mesh = CreateMesh3D(
+            context,
+            meshCollider,
+            Vector3d.Zero,
+            Euler(0, 45, 0));
+        SolidBody2D box = CreateBody2D(
+            context,
+            new LSAABBoxCollider2D(new Vector2d((Fixed64)2, (Fixed64)2)),
+            Vector2d.Zero);
+        var embeddedBounds = new FixedBoundVolume(box.Collider.MixedBounds3D.Min, box.Collider.MixedBounds3D.Max);
+        var candidates = new SwiftList<int>();
+
+        mesh.Collider.Bounds.Intersects(box.Collider.MixedBounds3D).Should().BeTrue();
+        mesh.Collider.Mesh.GetTrianglesInWorldBounds(embeddedBounds, candidates);
+        candidates.Should().HaveCount(2);
+        for (int i = 0; i < candidates.Count; i++)
+        {
+            mesh.Collider.Mesh.GetTriangleVertices(
+                candidates[i],
+                out Vector3d first,
+                out Vector3d second,
+                out Vector3d third);
+            var triangleBounds = new FixedBoundVolume(
+                Vector3d.Min(Vector3d.Min(first, second), third),
+                Vector3d.Max(Vector3d.Max(first, second), third));
+            triangleBounds.Intersects(embeddedBounds).Should().BeFalse();
+        }
+
+        CollisionDetectionMixed.TryCollide(
+            mesh.Collider,
+            box.Collider,
+            out MixedContact contact).Should().BeFalse();
         contact.HasContact.Should().BeFalse();
     }
 
@@ -1585,6 +1948,7 @@ public sealed class MixedNarrowPhaseTests
     {
         return shape switch
         {
+            ColliderType2D.Circle => CreateBody2D(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, rotation).Collider,
             ColliderType2D.AABox => CreateBody2D(context, new LSAABBoxCollider2D(new Vector2d((Fixed64)2, (Fixed64)2)), Vector2d.Zero, rotation).Collider,
             ColliderType2D.Capsule => CreateBody2D(context, new LSCapsuleCollider2D(Fixed64.Half, (Fixed64)3), Vector2d.Zero, rotation).Collider,
             ColliderType2D.ConvexPolygon => CreateBody2D(context, CreateSquarePolygon(), Vector2d.Zero, rotation).Collider,

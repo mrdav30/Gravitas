@@ -78,7 +78,7 @@ public sealed class SweptSphereQueryWorker
                 return false;
             }
 
-            return collider switch
+            bool found = collider switch
             {
                 LSSphereCollider sphere => TrySweepSphere(sphere.Center, sphere.ScaledRadius + _radius, out sphereCenterAtImpact, out impactDistance),
                 LSCapsuleCollider capsule => TrySweepCapsule(capsule, out sphereCenterAtImpact, out impactDistance),
@@ -89,6 +89,14 @@ public sealed class SweptSphereQueryWorker
                 LSCompoundCollider compound => TrySweepCompound(compound, out sphereCenterAtImpact, out impactDistance),
                 _ => false
             };
+
+            if (!found)
+            {
+                sphereCenterAtImpact = Vector3d.Zero;
+                impactDistance = Fixed64.Zero;
+            }
+
+            return found;
         }
         finally
         {
@@ -208,7 +216,6 @@ public sealed class SweptSphereQueryWorker
 
         Fixed64 travel = Fixed64.Zero;
         Fixed64 previousTravel = Fixed64.Zero;
-        Fixed64 previousSeparation = Fixed64.MaxValue;
 
         for (int i = 0; i < 32; i++)
         {
@@ -236,15 +243,9 @@ public sealed class SweptSphereQueryWorker
                 step = BoundsTolerance;
 
             previousTravel = travel;
-            previousSeparation = separation;
             travel += step;
             if (travel > _length)
                 break;
-
-            // If the local distance function started increasing, keep a small
-            // deterministic scan step so apex/base-edge contacts are not skipped.
-            if (previousSeparation < separation && closingSpeed <= Fixed64.Epsilon)
-                travel = previousTravel + _length * Fixed64.FromFraction(1, 32);
         }
 
         return false;

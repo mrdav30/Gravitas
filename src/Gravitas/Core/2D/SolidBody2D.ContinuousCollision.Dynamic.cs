@@ -51,7 +51,7 @@ public sealed partial class SolidBody2D
         Fixed64 remainingTime = _continuousCollisionHandoffRemainingTime;
         _continuousCollisionHandoffPending = false;
         _continuousCollisionHandoffRemainingTime = Fixed64.Zero;
-        if (!CanTranslate || remainingTime <= Fixed64.Epsilon || _linearVelocity.MagnitudeSquared <= Fixed64.Epsilon)
+        if (!CanTranslate || _linearVelocity.MagnitudeSquared <= Fixed64.Epsilon)
         {
             _continuousCollisionHandoffIgnoredCollider3D = null;
             _continuousCollisionHandoffIgnoredCollider2D = null;
@@ -239,8 +239,7 @@ public sealed partial class SolidBody2D
         Fixed64 hitElapsedTime,
         Fixed64 remainingTime)
     {
-        if (!ContinuousCollisionImpulsePolicy.TryResolveImpactNormal(normalForSource, out Vector2d normal))
-            return false;
+        _ = ContinuousCollisionImpulsePolicy.TryResolveImpactNormal(normalForSource, out Vector2d normal);
 
         Fixed64 constrainedInverseMassA = GetConstrainedInverseMass(normal);
         Fixed64 constrainedInverseMassB = target.GetConstrainedInverseMass(normal);
@@ -249,9 +248,6 @@ public sealed partial class SolidBody2D
             return false;
 
         Fixed64 normalVelocity = Vector2d.Dot(_linearVelocity - target.ResolveContinuousCollisionFrameVelocity(), normal);
-        if (normalVelocity >= -Fixed64.Epsilon)
-            return false;
-
         Fixed64 restitution = ResolveContinuousCollisionRestitution(target, -normalVelocity);
         Fixed64 impulseScalar = -(Fixed64.One + restitution) * normalVelocity / inverseMass;
         Vector2d impulse = normal * impulseScalar;

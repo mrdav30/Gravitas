@@ -256,6 +256,33 @@ public sealed class CollisionResponseInvariantTests
     }
 
     [Fact]
+    public void CalculateImpulse_WithBodiesConstrainedAlongContactNormal_ShouldSkipCorrectionAndImpulse()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> left = scenario.CreateSphere(Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> right = scenario.CreateSphere(
+            new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
+        BodyFreezeAxes3D constraints = BodyFreezeAxes3D.PositionX | BodyFreezeAxes3D.Rotation;
+        left.Body.FreezeAxes = constraints;
+        right.Body.FreezeAxes = constraints;
+        CollisionPair pair = scenario.CreatePair(left.Collider, right.Collider);
+        pair.Manifold.SetContact(
+            left.Collider.Center,
+            right.Collider.Center,
+            Fixed64.FromFraction(1, 10),
+            Vector3d.Right);
+        Vector3d leftPosition = left.Body.Position3d;
+        Vector3d rightPosition = right.Body.Position3d;
+
+        CollisionResponse.CalculateImpulse(pair);
+
+        left.Body.Position3d.Should().Be(leftPosition);
+        right.Body.Position3d.Should().Be(rightPosition);
+        left.Body.LinearVelocity.Should().Be(Vector3d.Zero);
+        right.Body.LinearVelocity.Should().Be(Vector3d.Zero);
+    }
+
+    [Fact]
     public void CalculateImpulse_RepeatedDeterministicSequence_ShouldReplaySameState()
     {
         ResponseState first = RunDeterministicResponseSequence();
@@ -467,6 +494,48 @@ public sealed class CollisionResponseInvariantTests
 
         mover.Body.LinearVelocity.Z.Abs().Should().BeLessThan(tangentialSpeedBefore);
         mover.Body.LinearVelocity.Z.Abs().Should().BeGreaterThan(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void CalculateImpulse_WithFrictionlessContact_ShouldPreserveTangentialVelocity()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSCuboidCollider> wall = scenario.CreateCuboid(Vector3d.Zero, immovable: true);
+        ScenarioBody<LSSphereCollider> mover = scenario.CreateSphere(
+            new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero),
+            preventAngularForces: true);
+        wall.Collider.Material = PhysicsMaterial.Frictionless;
+        mover.Collider.Material = PhysicsMaterial.Frictionless;
+        mover.Body.AddLinearImpulse(new Vector3d((Fixed64)(-60), Fixed64.Zero, (Fixed64)30));
+        CollisionPair pair = CreateDetectedPair(scenario, wall.Collider, mover.Collider);
+        Fixed64 tangentialVelocity = mover.Body.LinearVelocity.Z;
+
+        CollisionResponse.CalculateImpulse(pair);
+
+        mover.Body.LinearVelocity.X.Should().Be(Fixed64.Zero);
+        mover.Body.LinearVelocity.Z.Should().Be(tangentialVelocity);
+    }
+
+    [Fact]
+    public void CalculateImpulse_WithKinematicTangentialMotionAndQuantizedTargetMass_ShouldSkipUndefinedFrictionImpulse()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> driver = scenario.CreateSphere(Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> target = scenario.CreateSphere(
+            new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero),
+            mass: Fixed64.MaxValue,
+            preventAngularForces: true);
+        driver.Body.AddLinearImpulse(new Vector3d((Fixed64)60, Fixed64.Zero, (Fixed64)30));
+        driver.Body.IsKinematic = true;
+        CollisionPair pair = CreateDetectedPair(scenario, driver.Collider, target.Collider);
+        ManifoldContact contact = pair.Manifold.PrimaryContact;
+        pair.StoreWarmStartImpulse(contact.ContactId, contact.Normal, Fixed64.One, Fixed64.Zero);
+        Vector3d driverVelocity = driver.Body.LinearVelocity;
+
+        CollisionResponse.CalculateImpulse(pair);
+
+        driver.Body.LinearVelocity.Should().Be(driverVelocity);
+        target.Body.LinearVelocity.Should().Be(Vector3d.Zero);
     }
 
     [Fact]

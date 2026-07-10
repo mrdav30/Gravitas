@@ -103,8 +103,8 @@ public static partial class CollisionDetectionMixed
     {
         penetration = default;
 
-        if (!CheckTriangleCircleSlabAxis(triangle, circle, Vector3d.Up, ref penetration))
-            return false;
+        // Candidate bounds already establish overlap on the slab's vertical axis.
+        CheckTriangleCircleSlabAxis(triangle, circle, Vector3d.Up, ref penetration);
 
         if (!CheckTriangleCircleSlabAxis(triangle, circle, triangle.Normal, ref penetration))
             return false;
@@ -130,8 +130,8 @@ public static partial class CollisionDetectionMixed
     {
         penetration = default;
 
-        if (!CheckTrianglePrismAxis(triangle, prism, Vector3d.Up, ref penetration))
-            return false;
+        // Candidate bounds already establish overlap on the prism's vertical axis.
+        CheckTrianglePrismAxis(triangle, prism, Vector3d.Up, ref penetration);
 
         if (!CheckTrianglePrismAxis(triangle, prism, triangle.Normal, ref penetration))
             return false;

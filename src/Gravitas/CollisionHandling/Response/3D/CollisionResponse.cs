@@ -341,18 +341,7 @@ public static class CollisionResponse
     {
         Fixed64 magnitudeSquared = tangentImpulse * tangentImpulse
             + secondaryTangentImpulse * secondaryTangentImpulse;
-        Fixed64 maxMagnitudeSquared = maxMagnitude * maxMagnitude;
-        if (magnitudeSquared <= maxMagnitudeSquared)
-            return;
-
         Fixed64 magnitude = FixedMath.Sqrt(magnitudeSquared);
-        if (magnitude <= Fixed64.Epsilon)
-        {
-            tangentImpulse = Fixed64.Zero;
-            secondaryTangentImpulse = Fixed64.Zero;
-            return;
-        }
-
         Fixed64 scale = maxMagnitude / magnitude;
         tangentImpulse *= scale;
         secondaryTangentImpulse *= scale;
@@ -414,8 +403,7 @@ public static class CollisionResponse
     }
 
     private static bool IsWarmStartCompatible(Vector3d cachedNormal, Vector3d normal) =>
-        cachedNormal.MagnitudeSquared > Fixed64.Epsilon
-        && Vector3d.Dot(cachedNormal, normal) >= WarmStartNormalCompatibilityThreshold;
+        Vector3d.Dot(cachedNormal, normal) >= WarmStartNormalCompatibilityThreshold;
 
     private static Vector3d ResolveContactNormal(Vector3d normal, Vector3d fallbackDirection)
     {

@@ -50,7 +50,7 @@ public partial class SolidBody
         Fixed64 remainingTime = _continuousCollisionHandoffRemainingTime;
         _continuousCollisionHandoffPending = false;
         _continuousCollisionHandoffRemainingTime = Fixed64.Zero;
-        if (!CanTranslate || remainingTime <= Fixed64.Epsilon || _linearVelocity.MagnitudeSquared <= Fixed64.Epsilon)
+        if (!CanTranslate || _linearVelocity.MagnitudeSquared <= Fixed64.Epsilon)
         {
             _continuousCollisionHandoffIgnoredCollider3D = null;
             _continuousCollisionHandoffIgnoredCollider2D = null;

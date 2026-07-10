@@ -2,6 +2,7 @@ using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.Tests.Support;
+using GridForge.Grids;
 using Xunit;
 
 namespace Gravitas.Tests.Core;
@@ -113,6 +114,28 @@ public sealed class SolidBody2DAngularDynamicsTests
         body.AngularVelocity.Should().Be(Fixed64.Zero);
         body.AngularSpeed.Should().Be(Fixed64.Zero);
         body.IsSleeping.Should().BeFalse();
+    }
+
+    [Fact]
+    public void ResetPosition_WithSleepingBody_ShouldWakeAtNewPose()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext(frameRate: 4);
+        SolidBody2D body = CreateBody(context, new LSCircleCollider2D(Fixed64.One), mass: (Fixed64)2);
+        Vector2d resetPosition = Vector2d.Zero;
+        context.World.TryGetVoxel(body.Collider.PartitionCoordinates![0], out Voxel? voxel).Should().BeTrue();
+        voxel!.TryGetPartition(out PhysicsPartition2D? partition).Should().BeTrue();
+        body.Sleep();
+        partition!.ContainsAwakeDynamicObject(body.Collider.Id).Should().BeFalse();
+
+        body.ResetPosition(resetPosition, Fixed64.Half);
+
+        body.IsSleeping.Should().BeFalse();
+        body.Position.Should().Be(resetPosition);
+        body.Rotation.Should().Be(Fixed64.Half);
+        body.LinearVelocity.Should().Be(Vector2d.Zero);
+        body.AngularVelocity.Should().Be(Fixed64.Zero);
+        body.Collider.Center.Should().Be(resetPosition);
+        partition.ContainsAwakeDynamicObject(body.Collider.Id).Should().BeTrue();
     }
 
     private static SolidBody2D CreateBody(

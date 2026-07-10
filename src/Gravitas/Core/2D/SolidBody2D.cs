@@ -411,8 +411,7 @@ public sealed partial class SolidBody2D : IRecordable
 
         _sleepFrameCount = 0;
         _isSleeping = false;
-        if (Active)
-            Context.Collisions2D.RefreshPartitionAwakeState(Collider);
+        Context.Collisions2D.RefreshPartitionAwakeState(Collider);
     }
 
     internal void LateSimulate() => LateSimulate(updateSleepState: true, updateColliderState: true);
@@ -491,13 +490,13 @@ public sealed partial class SolidBody2D : IRecordable
 
     internal void UpdateSleepStateAfterPhysicsStep()
     {
-        if (Active && !_isSleeping)
+        if (!_isSleeping)
             UpdateSleepState();
     }
 
     internal void OnVisualize()
     {
-        if (!Active || IsKinematic)
+        if (IsKinematic)
             return;
 
         FixedTransform transform = Agent.Transform;

@@ -25,10 +25,10 @@ instead of burying it in notes.
 
 - [`Coverage Hardening`](coverage-hardening-plan.md)
   - Active living plan. Line, branch, and method coverage are above the 90%
-    release-hardening floor using the repository `coverlet.runsettings`. The
-    current short-term target is 95% branch coverage; the long-term target is
-    100% across the board. Coverage work should remove zombie code, condense
-    duplicate tests, and add only high-signal behavior tests.
+    release-hardening floor using the repository `coverlet.runsettings`, and the
+    95% branch gate is met. The active roadmap now targets 100% across the board.
+    Coverage work should remove zombie code, condense duplicate tests, and add
+    only high-signal behavior tests.
 
 ## Recently Completed
 

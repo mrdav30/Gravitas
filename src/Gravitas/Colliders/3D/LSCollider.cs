@@ -211,16 +211,6 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
         }
     }
 
-    /// <summary>
-    /// Used to prevent distance culling for very large objects.
-    /// </summary>
-    /// <remarks>
-    /// Useful for fast-moving objects that might pass through if not checked for a frame.
-    /// When enabled, the collider will not be culled based on distance for the first frame after being added to a new partition.
-    /// </remarks>
-    private bool _preventCulling = false;
-    internal bool PreventCulling => _preventCulling;
-
     public bool IsPartitioned => _partitionState.IsPartitioned;
 
     /// <summary>
@@ -1174,7 +1164,6 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
         RecordValues.Look(chronicler, ref _ignoredCollisionLayers, "IgnoredCollisionLayers", PhysicsLayerMask.None);
         RecordValues.Look(chronicler, ref _material, "Material", PhysicsMaterial.Default);
         RecordValues.Look(chronicler, ref _isTrigger, "IsTrigger", false);
-        RecordValues.Look(chronicler, ref _preventCulling, "PreventCulling", false);
         RecordValues.Look(chronicler, ref _offset, "Offset", Vector3d.Zero);
         RecordValues.Look(chronicler, ref _radius, "Radius", Fixed64.Half);
         RecordValues.Look(chronicler, ref _size, "Size", Vector3d.One);

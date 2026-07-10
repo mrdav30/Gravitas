@@ -8,7 +8,6 @@
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
-using Gravitas.Queries;
 using System.Runtime.CompilerServices;
 
 namespace Gravitas;
@@ -80,19 +79,12 @@ public partial class SolidBody
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private bool IsValidContinuousCollisionHit(Physics3DHit hit) =>
-        IsValidContinuousCollisionTarget(hit.Collider);
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool IsClosingContinuousCollisionHit(Vector3d displacement, Vector3d normal) =>
         normal.MagnitudeSquared > Fixed64.Epsilon
         && Vector3d.Dot(displacement, normal) < -Fixed64.Epsilon;
 
-    private bool IsValidContinuousCollisionTarget(LSCollider? hitCollider)
+    private bool IsValidContinuousCollisionTarget(LSCollider hitCollider)
     {
-        if (hitCollider == null)
-            return false;
-
         SolidBody? hitBody = hitCollider.Body;
         return ContinuousCollisionTargetPolicy.AllowsStaticOrKinematic3DTarget(
             hasCollider: true,
@@ -106,12 +98,8 @@ public partial class SolidBody
             hitBody != null && hitBody.IsKinematic);
     }
 
-    private bool IsValidMixedContinuousCollisionHit(PhysicsMixedHit hit)
+    private bool IsValidMixedContinuousCollisionHit(LSCollider2D hitCollider)
     {
-        LSCollider2D? hitCollider = hit.Collider2D;
-        if (hitCollider == null)
-            return false;
-
         SolidBody2D? hitBody = hitCollider.Body;
         return ContinuousCollisionTargetPolicy.AllowsMixedStaticOrKinematicTarget(
             hasCollider: true,

@@ -304,13 +304,7 @@ public sealed partial class SolidBody2D
 
         Vector2d sourceVelocity = sourceDisplacement / deltaTime;
         Vector2d relativeVelocity = sourceVelocity - target.ResolveContinuousCollisionFrameVelocity();
-        if (Vector2d.Dot(relativeVelocity, normal) > Fixed64.Zero)
-            normal = -normal;
-
         Fixed64 normalVelocity = Vector2d.Dot(relativeVelocity, normal);
-        if (normalVelocity >= -Fixed64.Epsilon)
-            return false;
-
         Fixed64 restitution = ResolveContinuousCollisionRestitution(target, -normalVelocity);
         Fixed64 impulseScalar = -(Fixed64.One + restitution) * normalVelocity / constrainedInverseMass;
         Fixed64 hitTime = FixedMath.Clamp01(hitDistance / sourceLength);
@@ -340,12 +334,6 @@ public sealed partial class SolidBody2D
         Vector3d normal3D = normal.ToVector3d(Fixed64.Zero);
         Vector3d sourceVelocity = (sourceDisplacement / deltaTime).ToVector3d(Fixed64.Zero);
         Vector3d relativeVelocity = sourceVelocity - target.ResolveContinuousCollisionFrameVelocity();
-        if (Vector3d.Dot(relativeVelocity, normal3D) > Fixed64.Zero)
-        {
-            normal = -normal;
-            normal3D = -normal3D;
-        }
-
         Fixed64 normalVelocity = Vector3d.Dot(relativeVelocity, normal3D);
         if (normalVelocity >= -Fixed64.Epsilon)
             return false;
