@@ -96,8 +96,6 @@ public sealed partial class GravitasQueryMixedService
         }
 
         distance = -b - FixedMath.Sqrt(discriminant);
-        if (distance < Fixed64.Zero)
-            distance = Fixed64.Zero;
         return distance <= length;
     }
 
@@ -126,13 +124,6 @@ public sealed partial class GravitasQueryMixedService
         int projectionCount = 0;
         for (int i = 0; i < clippedCount; i++)
             TryAddUniqueProjectionPoint(projection, ref projectionCount, ToPlanar(clipped[i]));
-
-        if (projectionCount == 0)
-        {
-            distance = default;
-            point3D = default;
-            return false;
-        }
 
         BuildConvexHullInPlace(projection, ref projectionCount);
         if (!TrySweepCircleAgainstConvexProjection(
@@ -190,9 +181,6 @@ public sealed partial class GravitasQueryMixedService
         out int outputCount)
     {
         outputCount = 0;
-        if (inputCount == 0)
-            return;
-
         Vector3d previous = input[inputCount - 1];
         bool previousInside = IsInsideYPlane(previous, planeY, keepAbove);
         for (int i = 0; i < inputCount; i++)
@@ -278,8 +266,7 @@ public sealed partial class GravitasQueryMixedService
         if (count > 0 && PointsEquivalent(points[count - 1], point))
             return;
 
-        if (count < points.Length)
-            points[count++] = point;
+        points[count++] = point;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -356,8 +343,7 @@ public sealed partial class GravitasQueryMixedService
                 return;
         }
 
-        if (projectionCount < projection.Length)
-            projection[projectionCount++] = point;
+        projection[projectionCount++] = point;
     }
 
     private static void BuildConvexHullInPlace(Span<Vector2d> projection, ref int projectionCount)

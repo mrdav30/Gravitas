@@ -26,13 +26,6 @@ internal static class JointSolver2D
 
     internal static void Solve(Joint2D joint, bool applyCachedImpulse)
     {
-        if (!joint.IsActive || !joint.IsEnabled || !joint.HasSolverParticipant())
-        {
-            joint.LastSolvedRowCount = 0;
-            joint.LastSolveMetrics = default;
-            return;
-        }
-
         Span<JointConstraintRow2D> rows = stackalloc JointConstraintRow2D[MaxRowsPerJoint];
         int rowCount = BuildRows(
             joint,
@@ -421,7 +414,7 @@ internal static class JointSolver2D
         int cacheIndex,
         JointConstraintRowKind2D kind = JointConstraintRowKind2D.Linear)
     {
-        if (count >= MaxRowsPerJoint || axis.MagnitudeSquared <= RowEpsilon)
+        if (axis.MagnitudeSquared <= RowEpsilon)
             return;
 
         Vector2d normalizedAxis = axis.MagnitudeSquared == Fixed64.One
@@ -450,9 +443,6 @@ internal static class JointSolver2D
         int cacheIndex,
         JointConstraintRowKind2D kind = JointConstraintRowKind2D.Angular)
     {
-        if (count >= MaxRowsPerJoint)
-            return;
-
         rows[count] = new JointConstraintRow2D(
             kind,
             Vector2d.Zero,

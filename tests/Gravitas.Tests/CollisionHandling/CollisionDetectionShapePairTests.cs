@@ -120,6 +120,21 @@ public sealed class CollisionDetectionShapePairTests
     }
 
     [Fact]
+    public void PriorityMatrix_ShouldRankKnownColliderTypesAndRejectUnknownTypes()
+    {
+        ColliderSettings.GetPriority(ColliderType.Sphere).Should().Be(0);
+        ColliderSettings.GetPriority(ColliderType.Capsule).Should().Be(1);
+        ColliderSettings.GetPriority(ColliderType.Cylinder).Should().Be(1);
+        ColliderSettings.GetPriority(ColliderType.Cone).Should().Be(1);
+        ColliderSettings.GetPriority(ColliderType.AABox).Should().Be(2);
+        ColliderSettings.GetPriority(ColliderType.OBBox).Should().Be(2);
+        ColliderSettings.GetPriority(ColliderType.Mesh).Should().Be(3);
+        ColliderSettings.GetPriority(ColliderType.Compound).Should().Be(4);
+        ColliderSettings.GetPriority(ColliderType.None).Should().Be(-1);
+        ColliderSettings.GetPriority((ColliderType)250).Should().Be(-1);
+    }
+
+    [Fact]
     public void SphereSphere_ShouldDetectOverlapTouchAndDegenerateCenter()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();

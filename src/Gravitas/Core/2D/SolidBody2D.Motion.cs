@@ -64,6 +64,9 @@ public sealed partial class SolidBody2D
         if (!Active)
             return;
 
+        if (Collider.IsPartitioned)
+            Collider.Simulate();
+
         Context.Collisions2D.RefreshColliderPartition(Collider);
         if (Context.Settings.RuntimeMode.RunsMixedContacts())
             Context.MixedCollisions.Refresh2DColliderPartition(Collider);

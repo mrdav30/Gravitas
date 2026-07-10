@@ -1093,15 +1093,18 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
         _runtimeShapeState.MarkDirty();
         RebuildRuntimeShapeState();
 
-        if (_context == null || _id < 0)
+        if (_context == null || _compoundOwner != null || _id < 0)
             return;
 
         if (!_isActive)
         {
-            if (IsPartitioned)
-                _context.Collisions2D.ClearPartitionedCollider(this, force: true);
-            if (IsMixedPartitioned)
-                _context.MixedCollisions.ClearPartitioned2DCollider(this, force: true);
+            _context.Collisions2D.ClearPartitionedCollider(this, force: true);
+            MarkUnpartitioned();
+            ClearPartitionCoordinates();
+
+            _context.MixedCollisions.ClearPartitioned2DCollider(this, force: true);
+            MarkMixedUnpartitioned();
+            ClearMixedPartitionCoordinates();
             return;
         }
 

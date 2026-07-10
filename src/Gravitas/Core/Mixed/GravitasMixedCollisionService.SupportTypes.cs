@@ -31,12 +31,6 @@ internal sealed partial class GravitasMixedCollisionService
             left!.Key.CompareTo(right!.Key);
     }
 
-    private sealed class MixedIslandNodeComparer : IComparer<MixedIslandNode>
-    {
-        public int Compare(MixedIslandNode left, MixedIslandNode right) =>
-            left.BodyKey.CompareTo(right.BodyKey);
-    }
-
     private sealed class MixedIslandConstraintComparer : IComparer<MixedIslandConstraint>
     {
         public int Compare(MixedIslandConstraint left, MixedIslandConstraint right)
@@ -61,7 +55,7 @@ internal sealed partial class GravitasMixedCollisionService
             left!.Id.CompareTo(right!.Id);
     }
 
-    private struct MixedIslandNode
+    private struct MixedIslandNode : IIslandNodeState
     {
         public MixedIslandNode(int bodyKey, SolidBody? body3D, SolidBody2D? body2D)
         {

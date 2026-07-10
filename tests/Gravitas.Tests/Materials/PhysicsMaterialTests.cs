@@ -53,6 +53,19 @@ public sealed class PhysicsMaterialTests
             .Be((Fixed64)expected);
     }
 
+    [Theory]
+    [InlineData(0, 4)]
+    [InlineData(4, 0)]
+    [InlineData(-4, 9)]
+    public void CombineScalar_GeometricMean_ShouldReturnZeroWhenEitherInputIsNonPositive(
+        int left,
+        int right)
+    {
+        PhysicsMaterial.CombineScalar((Fixed64)left, (Fixed64)right, PhysicsMaterialCombine.GeometricMean)
+            .Should()
+            .Be(Fixed64.Zero);
+    }
+
     [Fact]
     public void CombineFriction_ShouldUseDominantFrictionPolicy()
     {
@@ -106,10 +119,12 @@ public sealed class PhysicsMaterialTests
             unsupported);
         Action combineScalar = () => PhysicsMaterial.CombineScalar(Fixed64.One, Fixed64.One, unsupported);
         Action resolveDominant = () => PhysicsMaterial.ResolveDominantPolicy(PhysicsMaterialCombine.Minimum, unsupported);
+        Action resolveDominantLeft = () => PhysicsMaterial.ResolveDominantPolicy(unsupported, PhysicsMaterialCombine.Minimum);
 
         construct.Should().Throw<ArgumentOutOfRangeException>().WithParameterName("frictionCombine");
         combineScalar.Should().Throw<ArgumentOutOfRangeException>().WithParameterName("policy");
         resolveDominant.Should().Throw<ArgumentOutOfRangeException>().WithParameterName("right");
+        resolveDominantLeft.Should().Throw<ArgumentOutOfRangeException>().WithParameterName("left");
     }
 
     [Fact]
@@ -120,6 +135,9 @@ public sealed class PhysicsMaterialTests
 
         left.Should().Be(right);
         (left == right).Should().BeTrue();
+        (left != right).Should().BeFalse();
         left.GetHashCode().Should().Be(right.GetHashCode());
+        left.Equals((object)right).Should().BeTrue();
+        left.Equals("material").Should().BeFalse();
     }
 }

@@ -126,10 +126,6 @@ internal sealed class ConvexSweepQueryWorker
         for (int i = 0; i < source.PartCount; i++)
         {
             LSCollider part = source.GetPartCollider(i);
-            if (!ConvexColliderSupport.IsSupported(part))
-                throw new NotSupportedException(
-                    $"Compound swept query sources do not support {part.GetType().Name} parts.");
-
             if (!TrySweepSourceShape(CreateColliderShape(part, Vector3d.Zero), target, out Physics3DHit candidate)
                 || !ComesBeforeReducerCandidate(candidate, i, found, closestDistance, closestPartIndex, hit))
             {
@@ -250,7 +246,7 @@ internal sealed class ConvexSweepQueryWorker
         Vector3d sourceFront = sourceShape.Support(_direction);
         Vector3d targetBack = targetShape.Support(-_direction);
         Fixed64 lowerBound = Vector3d.Dot(targetBack - sourceFront, _direction) - SweepContactTolerance;
-        return lowerBound > Fixed64.Zero ? lowerBound : Fixed64.Zero;
+        return FixedMath.Max(lowerBound, Fixed64.Zero);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -281,7 +277,7 @@ internal sealed class ConvexSweepQueryWorker
     {
         hit = default;
         Fixed64 travelDistance = Fixed64.Zero;
-        Vector3d normal = _direction.MagnitudeSquared > Fixed64.Epsilon ? -_direction : Vector3d.Zero;
+        Vector3d normal = -_direction;
         GjkResult result = default;
 
         for (int i = 0; i < MaxConservativeAdvancementIterations; i++)
@@ -303,9 +299,6 @@ internal sealed class ConvexSweepQueryWorker
                 return false;
 
             Fixed64 stepDistance = result.Distance / closingSpeed;
-            if (stepDistance <= Fixed64.Zero)
-                return false;
-
             travelDistance += stepDistance;
             if (travelDistance > _length)
                 return false;
@@ -325,9 +318,7 @@ internal sealed class ConvexSweepQueryWorker
 
         if ((movedSource.Center - targetCollider.Center).MagnitudeSquared <= Fixed64.Epsilon)
         {
-            Vector3d fallbackDirection = _direction.MagnitudeSquared > Fixed64.Epsilon
-                ? -_direction
-                : Vector3d.Right;
+            Vector3d fallbackDirection = -_direction;
             Vector3d surfaceProbe = targetCollider.Center + fallbackDirection * targetCollider.ScaledRadius;
             return targetCollider.ClosestPointOnSurface(surfaceProbe);
         }
@@ -374,9 +365,7 @@ internal sealed class ConvexSweepQueryWorker
                 return GjkResult.CreateIntersection(closest.PointA, closest.PointB);
         }
 
-        Fixed64 distance = closest.DistanceSqr <= Fixed64.Zero
-            ? Fixed64.Zero
-            : FixedMath.Sqrt(closest.DistanceSqr);
+        Fixed64 distance = FixedMath.Sqrt(closest.DistanceSqr);
         Vector3d normal = closest.Point.MagnitudeSquared > Fixed64.Epsilon
             ? closest.Point.Normalized
             : Vector3d.Zero;
@@ -631,9 +620,6 @@ internal sealed class ConvexSweepQueryWorker
 
     private static ConvexShape CreateColliderShape(LSCollider collider, Vector3d offset)
     {
-        if (collider is LSMeshCollider mesh && mesh.Mode == MeshColliderMode.Concave)
-            throw CreateConcaveSourceException(mesh);
-
         return new ConvexShape(collider, offset);
     }
 

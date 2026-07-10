@@ -556,7 +556,7 @@ public partial class SolidBody : IRecordable
 
     public GravitasWorldContext Context { get; private set; } = null!;
 
-    public GridWorld? World => Context?.World;
+    public GridWorld World => Context.World;
 
     public LSCollider Collider { get; private set; } = null!;
 
@@ -885,7 +885,7 @@ public partial class SolidBody : IRecordable
     public void UpdateRotation(FixedQuaternion targetRotation, Fixed64 bufferInterpolation)
     {
         _rotationInterpoleSpeed = bufferInterpolation;
-        _rotationSpeed = Agent?.IsInteracting == true
+        _rotationSpeed = Agent.IsInteracting
             ? InteractionRotationSpeed
             : DefaultRotationSpeed;
         Rotation = targetRotation;

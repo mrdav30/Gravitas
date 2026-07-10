@@ -299,6 +299,12 @@ public sealed class MixedBroadPhaseTests
 
         Step(context);
         body3D.Collider.IsMixedPartitioned.Should().BeTrue();
+        WorldVoxelIndex originalCoordinate = body3D.Collider.MixedPartitionCoordinates![0];
+
+        context.MixedCollisions.Refresh3DColliderPartition(body3D.Collider).Should().BeFalse();
+
+        body3D.Collider.IsMixedPartitioned.Should().BeTrue();
+        body3D.Collider.MixedPartitionCoordinates![0].Should().Be(originalCoordinate);
 
         body3D.Collider.SetStatus(false);
 
@@ -307,6 +313,30 @@ public sealed class MixedBroadPhaseTests
         body3D.Collider.IsMixedPartitioned.Should().BeFalse();
         body3D.Collider.MixedPartitionCoordinates!.Count.Should().Be(0);
         context.MixedCollisions.Refresh3DColliderPartition(body3D.Collider).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Refresh2DColliderPartition_WithInactiveCollider_ShouldClearMixedMembership()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        SolidBody2D body2D = CreateCircle2D(context, Vector2d.Zero, immovable: false);
+
+        Step(context);
+        body2D.Collider.IsMixedPartitioned.Should().BeTrue();
+        WorldVoxelIndex originalCoordinate = body2D.Collider.MixedPartitionCoordinates![0];
+
+        context.MixedCollisions.Refresh2DColliderPartition(body2D.Collider).Should().BeFalse();
+
+        body2D.Collider.IsMixedPartitioned.Should().BeTrue();
+        body2D.Collider.MixedPartitionCoordinates![0].Should().Be(originalCoordinate);
+
+        body2D.Collider.IsActive = false;
+
+        context.MixedCollisions.Refresh2DColliderPartition(body2D.Collider).Should().BeFalse();
+
+        body2D.Collider.IsMixedPartitioned.Should().BeFalse();
+        body2D.Collider.MixedPartitionCoordinates!.Count.Should().Be(0);
+        context.MixedCollisions.Refresh2DColliderPartition(body2D.Collider).Should().BeFalse();
     }
 
     [Fact]
@@ -345,11 +375,15 @@ public sealed class MixedBroadPhaseTests
         kinematic3D.Body.IsKinematic = true;
         ScenarioBody<LSSphereCollider> staticBody3D = CreateSphere3D(context, Vector3d.Right * (Fixed64)4, immovable: true);
         _ = CreateSphere3D(context, Vector3d.Right * (Fixed64)6, immovable: true, layer: new PhysicsLayer(1));
+        LSSphereCollider inactive3D = CreateBodylessSphere3D(context, Vector3d.Right * (Fixed64)7);
+        inactive3D.SetStatus(false);
 
         SolidBody2D dynamic2D = CreateCircle2D(context, Vector2d.Zero, immovable: false);
         SolidBody2D kinematic2D = CreateCircle2D(context, Vector2d.Right * (Fixed64)2, immovable: false, isKinematic: true);
         SolidBody2D staticBody2D = CreateCircle2D(context, Vector2d.Right * (Fixed64)4, immovable: true);
         _ = CreateCircle2D(context, Vector2d.Right * (Fixed64)6, immovable: true, layer: new PhysicsLayer(1));
+        LSCircleCollider2D inactive2D = CreateBodylessCircle2D(context, Vector2d.Right * (Fixed64)7);
+        inactive2D.IsActive = false;
         var candidates3D = new SwiftList<LSCollider>();
         var candidates2D = new SwiftList<LSCollider2D>();
 
@@ -385,9 +419,11 @@ public sealed class MixedBroadPhaseTests
         candidates3D.Should().Contain(collider => ReferenceEquals(collider, kinematic3D.Collider));
         candidates3D.Should().Contain(collider => ReferenceEquals(collider, staticBody3D.Collider));
         candidates3D.Should().NotContain(collider => ReferenceEquals(collider, dynamic3D.Collider));
+        candidates3D.Should().NotContain(collider => ReferenceEquals(collider, inactive3D));
         candidates2D.Should().Contain(collider => ReferenceEquals(collider, kinematic2D.Collider));
         candidates2D.Should().Contain(collider => ReferenceEquals(collider, staticBody2D.Collider));
         candidates2D.Should().NotContain(collider => ReferenceEquals(collider, dynamic2D.Collider));
+        candidates2D.Should().NotContain(collider => ReferenceEquals(collider, inactive2D));
         for (int i = 0; i < candidates3D.Count; i++)
             candidates3D[i].Layer.Should().Be(new PhysicsLayer(0));
         for (int i = 0; i < candidates2D.Count; i++)

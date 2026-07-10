@@ -148,6 +148,49 @@ public sealed class PhysicsPartitionTests
     }
 
     [Fact]
+    public void PhysicsPartition_WithBodylessRegisteredDynamicObject_ShouldTreatItAsAwake()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSSphereCollider collider = CreateBodylessSphere(context, Vector3d.Zero);
+        var partition = new PhysicsPartition();
+        partition.SetOwner(context.Collisions);
+
+        partition.AddDynamicObject(collider.Id);
+
+        partition.ContainsAwakeDynamicObject(collider.Id).Should().BeTrue();
+
+        partition.RemoveDynamicObject(collider.Id);
+    }
+
+    [Fact]
+    public void PhysicsPartition_CopyHelpers_WithEmptyBuckets_ShouldClearDestination()
+    {
+        var partition = new PhysicsPartition();
+        var ids = new SwiftList<int> { 99 };
+
+        partition.CopyAllColliderIds(ids);
+        ids.Count.Should().Be(0);
+
+        ids.Add(99);
+        partition.CopyStaticStyleColliderIds(ids);
+        ids.Count.Should().Be(0);
+    }
+
+    [Fact]
+    public void PhysicsPartition_RemoveMissingObjects_WithNoBuckets_ShouldBeIdempotent()
+    {
+        var partition = new PhysicsPartition();
+
+        partition.RemoveDynamicObject(3);
+        partition.RemoveStaticObject(5);
+        partition.RemoveKinematicObject(7);
+
+        partition.IsEmpty.Should().BeTrue();
+        partition.IsAllocated.Should().BeFalse();
+        partition.EmptySinceFrame.Should().Be(-1);
+    }
+
+    [Fact]
     public void PhysicsPartition2D_ShouldTrackMembershipAwakeStateAndPoolReset()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
@@ -249,6 +292,50 @@ public sealed class PhysicsPartitionTests
 
         partition.IsAllocated.Should().BeFalse();
         partition.ContainedDynamicObjects.Count.Should().Be(0);
+    }
+
+    [Fact]
+    public void PhysicsPartition2D_WithBodylessRegisteredDynamicObject_ShouldTreatItAsAwake()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        context.Settings.RuntimeMode = PhysicsRuntimeMode.TwoD;
+        LSCircleCollider2D collider = CreateBodylessCircle2D(context, Vector2d.Zero);
+        var partition = new PhysicsPartition2D();
+        partition.SetOwner(context.Collisions2D);
+
+        partition.AddDynamicObject(collider.Id);
+
+        partition.ContainsAwakeDynamicObject(collider.Id).Should().BeTrue();
+
+        partition.RemoveDynamicObject(collider.Id);
+    }
+
+    [Fact]
+    public void PhysicsPartition2D_CopyHelpers_WithEmptyBuckets_ShouldClearDestination()
+    {
+        var partition = new PhysicsPartition2D();
+        var ids = new SwiftList<int> { 99 };
+
+        partition.CopyAllColliderIds(ids);
+        ids.Count.Should().Be(0);
+
+        ids.Add(99);
+        partition.CopyStaticStyleColliderIds(ids);
+        ids.Count.Should().Be(0);
+    }
+
+    [Fact]
+    public void PhysicsPartition2D_RemoveMissingObjects_WithNoBuckets_ShouldBeIdempotent()
+    {
+        var partition = new PhysicsPartition2D();
+
+        partition.RemoveDynamicObject(3);
+        partition.RemoveStaticObject(5);
+        partition.RemoveKinematicObject(7);
+
+        partition.IsEmpty.Should().BeTrue();
+        partition.IsAllocated.Should().BeFalse();
+        partition.EmptySinceFrame.Should().Be(-1);
     }
 
     [Fact]
@@ -356,6 +443,64 @@ public sealed class PhysicsPartitionTests
     }
 
     [Fact]
+    public void PhysicsMixedPartition_WithBodylessRegisteredDynamicObjects_ShouldTreatThemAsAwake()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        context.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
+        LSSphereCollider collider3D = CreateBodylessSphere(context, Vector3d.Zero);
+        LSCircleCollider2D collider2D = CreateBodylessCircle2D(context, Vector2d.Zero);
+        var partition = new PhysicsMixedPartition();
+        partition.SetOwner(context.MixedCollisions);
+
+        partition.AddDynamic3DObject(collider3D.Id);
+        partition.AddDynamic2DObject(collider2D.Id);
+
+        partition.AwakeDynamicObjectCount.Should().Be(2);
+
+        partition.RemoveDynamic3DObject(collider3D.Id);
+        partition.RemoveDynamic2DObject(collider2D.Id);
+    }
+
+    [Fact]
+    public void PhysicsMixedPartition_CopyHelpers_WithEmptyBuckets_ShouldClearDestination()
+    {
+        var partition = new PhysicsMixedPartition();
+        var ids = new SwiftList<int> { 99 };
+
+        partition.Copy3DColliderIds(ids);
+        ids.Count.Should().Be(0);
+
+        ids.Add(99);
+        partition.Copy2DColliderIds(ids);
+        ids.Count.Should().Be(0);
+
+        ids.Add(99);
+        partition.CopyStaticStyle3DColliderIds(ids);
+        ids.Count.Should().Be(0);
+
+        ids.Add(99);
+        partition.CopyStaticStyle2DColliderIds(ids);
+        ids.Count.Should().Be(0);
+    }
+
+    [Fact]
+    public void PhysicsMixedPartition_RemoveMissingObjects_WithNoBuckets_ShouldBeIdempotent()
+    {
+        var partition = new PhysicsMixedPartition();
+
+        partition.RemoveDynamic3DObject(3);
+        partition.RemoveStatic3DObject(5);
+        partition.RemoveKinematic3DObject(7);
+        partition.RemoveDynamic2DObject(11);
+        partition.RemoveStatic2DObject(13);
+        partition.RemoveKinematic2DObject(17);
+
+        partition.IsEmpty.Should().BeTrue();
+        partition.IsAllocated.Should().BeFalse();
+        partition.EmptySinceFrame.Should().Be(-1);
+    }
+
+    [Fact]
     public void RetainedPartitionLifecycle_Untrack_ShouldMaintainDenseIndicesAndRetirementCursor()
     {
         var owner = new object();
@@ -447,10 +592,12 @@ public sealed class PhysicsPartitionTests
         var pool = new SwiftStack<RetainedPartitionProbe>();
         var release = new RetainedPartitionProbeRelease(retained, pool, owner);
         RetainedPartitionProbe notExpired = CreateProbe(owner, emptySinceFrame: 9);
+        RetainedPartitionProbe notYetEmpty = CreateProbe(owner, emptySinceFrame: -1);
         RetainedPartitionProbe allocated = CreateProbe(owner, emptySinceFrame: 0, isAllocated: true);
         RetainedPartitionProbe expired = CreateProbe(owner, emptySinceFrame: 0);
 
         RetainedPartitionLifecycle.Track(retained, owner, notExpired, nameof(RetainedPartitionProbe));
+        RetainedPartitionLifecycle.Track(retained, owner, notYetEmpty, nameof(RetainedPartitionProbe));
         RetainedPartitionLifecycle.Track(retained, owner, allocated, nameof(RetainedPartitionProbe));
         RetainedPartitionLifecycle.Track(retained, owner, expired, nameof(RetainedPartitionProbe));
 
@@ -458,7 +605,7 @@ public sealed class PhysicsPartitionTests
             retained,
             new GridWorld(),
             owner,
-            budget: 3,
+            budget: 4,
             currentFrame: 10,
             timeToKillFrames: 5,
             release.Release,
@@ -466,10 +613,80 @@ public sealed class PhysicsPartitionTests
 
         pool.Count.Should().Be(1);
         pool.Peek().Should().BeSameAs(expired);
-        retained.Count.Should().Be(2);
+        retained.Count.Should().Be(3);
         retained[0].Should().BeSameAs(notExpired);
-        retained[1].Should().BeSameAs(allocated);
+        retained[1].Should().BeSameAs(notYetEmpty);
+        retained[2].Should().BeSameAs(allocated);
         release.Cursor.Should().Be(0);
+    }
+
+    [Fact]
+    public void RetainedPartitionLifecycle_TryRetireEmptyForReuse_ShouldStopWhenReleaseDoesNotPool()
+    {
+        var owner = new object();
+        var retained = new SwiftList<RetainedPartitionProbe>();
+        var pool = new SwiftStack<RetainedPartitionProbe>();
+        RetainedPartitionProbe releasedWithoutPooling = CreateProbe(owner);
+        RetainedPartitionProbe reusable = CreateProbe(owner);
+        int cursor = 0;
+
+        RetainedPartitionLifecycle.Track(retained, owner, releasedWithoutPooling, nameof(RetainedPartitionProbe));
+        RetainedPartitionLifecycle.Track(retained, owner, reusable, nameof(RetainedPartitionProbe));
+
+        void Release(RetainedPartitionProbe partition)
+        {
+            RetainedPartitionLifecycle.Untrack(retained, owner, partition, ref cursor);
+            partition.ResetForPool(owner);
+            if (!ReferenceEquals(partition, releasedWithoutPooling))
+                pool.Push(partition);
+        }
+
+        bool retired = RetainedPartitionLifecycle.TryRetireEmptyForReuse(
+            retained,
+            pool,
+            new GridWorld(),
+            owner,
+            Release,
+            ref cursor);
+
+        retired.Should().BeFalse();
+        pool.Count.Should().Be(0);
+        retained.Count.Should().Be(1);
+        retained[0].Should().BeSameAs(reusable);
+        releasedWithoutPooling.RetainedIndex.Should().Be(-1);
+    }
+
+    [Fact]
+    public void RetainedPartitionLifecycle_RetireExpired_WithStaleVoxelAttachment_ShouldReleasePartition()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        EnsureGrid(context);
+        context.World.TryGetVoxel(Vector3d.Zero, out Voxel? voxel).Should().BeTrue();
+        var owner = new object();
+        var retained = new SwiftList<RetainedPartitionProbe>();
+        var pool = new SwiftStack<RetainedPartitionProbe>();
+        var release = new RetainedPartitionProbeRelease(retained, pool, owner);
+        RetainedPartitionProbe attachedOther = CreateProbe(owner);
+        RetainedPartitionProbe stale = CreateProbe(owner);
+
+        voxel!.TryAddPartition(attachedOther).Should().BeTrue();
+        stale.SetParentIndex(attachedOther.WorldIndex);
+        RetainedPartitionLifecycle.Track(retained, owner, stale, nameof(RetainedPartitionProbe));
+
+        RetainedPartitionLifecycle.RetireExpired(
+            retained,
+            context.World,
+            owner,
+            budget: 1,
+            currentFrame: 10,
+            timeToKillFrames: 1,
+            release.Release,
+            ref release.Cursor);
+
+        pool.Count.Should().Be(1);
+        pool.Peek().Should().BeSameAs(stale);
+        retained.Count.Should().Be(0);
+        voxel.HasPartition<RetainedPartitionProbe>().Should().BeTrue();
     }
 
     [Fact]
@@ -542,6 +759,26 @@ public sealed class PhysicsPartitionTests
 
         body.Initialize(position);
         return body;
+    }
+
+    private static LSSphereCollider CreateBodylessSphere(GravitasWorldContext context, Vector3d position)
+    {
+        EnsureGrid(context);
+        var transform = new FixedTransform(position, FixedQuaternion.Identity, Vector3d.One);
+        var collider = new LSSphereCollider();
+        collider.InitializeWithNoBody(new TestMatterAgent(context, transform));
+        return collider;
+    }
+
+    private static LSCircleCollider2D CreateBodylessCircle2D(GravitasWorldContext context, Vector2d position)
+    {
+        var transform = new FixedTransform(
+            new Vector3d(position.X, Fixed64.Zero, position.Y),
+            FixedQuaternion.Identity,
+            Vector3d.One);
+        var collider = new LSCircleCollider2D(Fixed64.Half);
+        collider.InitializeWithNoBody(new TestMatterAgent(context, transform));
+        return collider;
     }
 
     private static void EnsureGrid(GravitasWorldContext context)

@@ -194,9 +194,6 @@ public sealed partial class SolidBody2D
 
         Vector2d sourceDisplacement = proposedPosition - startPosition;
         Fixed64 sourceLength = sourceDisplacement.Magnitude;
-        if (sourceLength <= Fixed64.Epsilon)
-            return false;
-
         bool found = false;
         Physics2DHit best = default;
         Fixed64 bestClosingSpeed = Fixed64.Zero;
@@ -217,8 +214,7 @@ public sealed partial class SolidBody2D
                 + target.ContinuousCollisionFrameDisplacement * elapsedFrameFraction;
             Vector2d targetDisplacement = target.ContinuousCollisionFrameDisplacement * remainingFrameFraction;
             Fixed64 targetRadius = target.ResolveContinuousCollisionProxyRadius();
-            if (targetRadius <= Fixed64.Epsilon
-                || !ContinuousCollisionMath.TrySweepRelativeCircles(
+            if (!ContinuousCollisionMath.TrySweepRelativeCircles(
                     startPosition,
                     sourceDisplacement,
                     proxyRadius,
@@ -332,9 +328,6 @@ public sealed partial class SolidBody2D
 
         Vector2d sourceDisplacement2D = proposedPosition - startPosition;
         Fixed64 sourceLength = sourceDisplacement2D.Magnitude;
-        if (sourceLength <= Fixed64.Epsilon)
-            return false;
-
         Vector3d sourceStart = new(startPosition.X, Collider.MixedSlabCenterY, startPosition.Y);
         Vector3d sourceDisplacement = new(sourceDisplacement2D.X, Fixed64.Zero, sourceDisplacement2D.Y);
         Fixed64 sourceRadius = FixedMath.Max(proxyRadius, Collider.MixedHalfThickness);
@@ -358,8 +351,7 @@ public sealed partial class SolidBody2D
                 + target.ContinuousCollisionFrameDisplacement * elapsedFrameFraction;
             Vector3d targetDisplacement = target.ContinuousCollisionFrameDisplacement * remainingFrameFraction;
             Fixed64 targetRadius = target.ResolveContinuousCollisionProxyRadius();
-            if (targetRadius <= Fixed64.Epsilon
-                || !ContinuousCollisionMath.TrySweepRelativeSpheres(
+            if (!ContinuousCollisionMath.TrySweepRelativeSpheres(
                     sourceStart,
                     sourceDisplacement,
                     sourceRadius,
@@ -386,7 +378,7 @@ public sealed partial class SolidBody2D
                 normalForSource,
                 PhysicsQueryReducerKind.ConservativeFallback,
                 distance,
-                sourceDisplacement.MagnitudeSquared > Fixed64.Epsilon ? sourceDisplacement.Normalized : Vector3d.Zero);
+                sourceDisplacement.Normalized);
             if (!ContinuousCollisionCandidateOrdering.ShouldReplaceMixedHit(candidate, candidateClosingSpeed, true, found, best, bestClosingSpeed))
                 continue;
 

@@ -27,6 +27,25 @@ public sealed class Collider2DMassPropertyTests
     }
 
     [Fact]
+    public void Primitive2DGuards_ShouldHandleSameValueSettersZeroMassAndFallbackDirections()
+    {
+        var circle = new LSCircleCollider2D(Fixed64.One);
+        var box = new LSAABBoxCollider2D(Vector2d.One);
+        var capsule = new LSCapsuleCollider2D(Fixed64.One, (Fixed64)2);
+
+        circle.Radius = Fixed64.One;
+        box.Size = Vector2d.One;
+        capsule.Radius = Fixed64.One;
+        capsule.Height = (Fixed64)2;
+
+        circle.GetClosestPoint(Vector2d.Zero).Should().Be(Vector2d.Right);
+        circle.GetSupportPoint(Vector2d.Zero).Should().Be(Vector2d.Right);
+        circle.CalculateMomentOfInertia(Fixed64.Zero, Vector2d.Zero).Should().Be(Fixed64.Zero);
+        box.CalculateMomentOfInertia(Fixed64.Zero, Vector2d.Zero).Should().Be(Fixed64.Zero);
+        capsule.ScaledHeight.Should().Be((Fixed64)2);
+    }
+
+    [Fact]
     public void Aabb_ShouldCalculateMomentAroundRequestedLocalReference()
     {
         var collider = new LSAABBoxCollider2D(new Vector2d((Fixed64)2, (Fixed64)4))

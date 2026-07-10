@@ -111,39 +111,8 @@ internal sealed partial class GravitasMixedCollisionService
         _mixedIslandNodes.Add(new MixedIslandNode(Create2DBodyKey(body!), null, body!));
     }
 
-    private void SortAndDeduplicateMixedIslandNodes()
-    {
-        if (_mixedIslandNodes.Count == 0)
-            return;
-
-        if (_mixedIslandNodes.Count == 1)
-        {
-            MixedIslandNode singleNode = _mixedIslandNodes[0];
-            singleNode.ParentIndex = 0;
-            singleNode.RootKey = singleNode.BodyKey;
-            _mixedIslandNodes[0] = singleNode;
-            return;
-        }
-
-        _mixedIslandNodes.SortInPlace(IslandNodeComparer);
-
-        int writeIndex = 0;
-        int previousKey = -1;
-        for (int readIndex = 0; readIndex < _mixedIslandNodes.Count; readIndex++)
-        {
-            MixedIslandNode node = _mixedIslandNodes[readIndex];
-            if (node.BodyKey == previousKey)
-                continue;
-
-            node.ParentIndex = writeIndex;
-            node.RootKey = node.BodyKey;
-            _mixedIslandNodes[writeIndex++] = node;
-            previousKey = node.BodyKey;
-        }
-
-        while (_mixedIslandNodes.Count > writeIndex)
-            _mixedIslandNodes.RemoveAt(_mixedIslandNodes.Count - 1);
-    }
+    private void SortAndDeduplicateMixedIslandNodes() =>
+        IslandGraphUtility.SortAndDeduplicate(_mixedIslandNodes, IslandNodeComparer);
 
     private int FindMixedIslandNode(SolidBody? body)
     {
@@ -161,107 +130,20 @@ internal sealed partial class GravitasMixedCollisionService
         return FindMixedIslandNode(Create2DBodyKey(body!));
     }
 
-    private int FindMixedIslandNode(int key)
-    {
-        int low = 0;
-        int high = _mixedIslandNodes.Count - 1;
-        while (low <= high)
-        {
-            int mid = low + ((high - low) >> 1);
-            int midKey = _mixedIslandNodes[mid].BodyKey;
-            if (midKey == key)
-                return mid;
+    private int FindMixedIslandNode(int key) =>
+        IslandGraphUtility.Find(_mixedIslandNodes, key);
 
-            if (midKey < key)
-                low = mid + 1;
-            else
-                high = mid - 1;
-        }
+    private void UnionMixedIslandNodes(int nodeA, int nodeB) =>
+        IslandGraphUtility.Union(_mixedIslandNodes, nodeA, nodeB);
 
-        return -1;
-    }
+    private void CompressMixedIslandRoots() =>
+        IslandGraphUtility.CompressRoots(_mixedIslandNodes);
 
-    private void UnionMixedIslandNodes(int nodeA, int nodeB)
-    {
-        int rootA = FindMixedIslandRoot(nodeA);
-        int rootB = FindMixedIslandRoot(nodeB);
-        if (rootA == rootB)
-            return;
+    private int ResolveMixedConstraintRootKey(int node3D, int node2D) =>
+        IslandGraphUtility.ResolveConstraintRootKey(_mixedIslandNodes, node3D, node2D);
 
-        int keyA = _mixedIslandNodes[rootA].BodyKey;
-        int keyB = _mixedIslandNodes[rootB].BodyKey;
-        int parent = keyA <= keyB ? rootA : rootB;
-        int child = parent == rootA ? rootB : rootA;
-
-        MixedIslandNode childNode = _mixedIslandNodes[child];
-        childNode.ParentIndex = parent;
-        childNode.RootKey = _mixedIslandNodes[parent].BodyKey;
-        _mixedIslandNodes[child] = childNode;
-    }
-
-    private int FindMixedIslandRoot(int index)
-    {
-        int root = index;
-        while (_mixedIslandNodes[root].ParentIndex != root)
-            root = _mixedIslandNodes[root].ParentIndex;
-
-        while (index != root)
-        {
-            MixedIslandNode node = _mixedIslandNodes[index];
-            int parent = node.ParentIndex;
-            node.ParentIndex = root;
-            node.RootKey = _mixedIslandNodes[root].BodyKey;
-            _mixedIslandNodes[index] = node;
-            index = parent;
-        }
-
-        return root;
-    }
-
-    private void CompressMixedIslandRoots()
-    {
-        for (int i = 0; i < _mixedIslandNodes.Count; i++)
-        {
-            int root = FindMixedIslandRoot(i);
-            MixedIslandNode node = _mixedIslandNodes[i];
-            node.RootKey = _mixedIslandNodes[root].BodyKey;
-            _mixedIslandNodes[i] = node;
-        }
-    }
-
-    private int ResolveMixedConstraintRootKey(int node3D, int node2D)
-    {
-        if (node3D >= 0)
-            return _mixedIslandNodes[node3D].RootKey;
-
-        return node2D >= 0 ? _mixedIslandNodes[node2D].RootKey : -1;
-    }
-
-    private bool WakeMixedIslandBodies(int rootKey)
-    {
-        bool hasAwakeBody = false;
-        for (int i = 0; i < _mixedIslandNodes.Count; i++)
-        {
-            MixedIslandNode node = _mixedIslandNodes[i];
-            if (node.RootKey == rootKey && node.IsAwakeForCollision)
-            {
-                hasAwakeBody = true;
-                break;
-            }
-        }
-
-        if (!hasAwakeBody)
-            return false;
-
-        for (int i = 0; i < _mixedIslandNodes.Count; i++)
-        {
-            MixedIslandNode node = _mixedIslandNodes[i];
-            if (node.RootKey == rootKey)
-                node.WakeFromCollision();
-        }
-
-        return true;
-    }
+    private bool WakeMixedIslandBodies(int rootKey) =>
+        IslandGraphUtility.WakeBodies(_mixedIslandNodes, rootKey);
 
     private void SolveMixedIslandRange(int rootKey, int start, int end)
     {

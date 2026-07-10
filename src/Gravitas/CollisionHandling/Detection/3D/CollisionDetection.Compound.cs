@@ -16,19 +16,13 @@ public static partial class CollisionDetection
 
     private static bool DoCompoundCheck(CollisionWorkItem pair)
     {
-        if (pair.ColliderA is LSCompoundCollider compoundA
-            && pair.ColliderB is LSCompoundCollider compoundB)
+        var compoundA = (LSCompoundCollider)pair.ColliderA;
+        if (pair.ColliderB is LSCompoundCollider compoundB)
         {
             return DoCompoundCompoundCheck(pair, compoundA, compoundB);
         }
 
-        if (pair.ColliderA is LSCompoundCollider firstCompound)
-            return DoCompoundOtherCheck(pair, firstCompound, pair.ColliderB);
-
-        if (pair.ColliderB is LSCompoundCollider secondCompound)
-            return DoCompoundOtherCheck(pair, secondCompound, pair.ColliderA);
-
-        return false;
+        return DoCompoundOtherCheck(pair, compoundA, pair.ColliderB);
     }
 
     private static bool DoCompoundOtherCheck(
@@ -72,9 +66,6 @@ public static partial class CollisionDetection
 
         OrderPartPairForDetection(first, second, out LSCollider colliderA, out LSCollider colliderB);
         CollisionType collisionType = ColliderSettings.GetCollisionType(colliderA.Shape, colliderB.Shape);
-        if (collisionType == CollisionType.None || collisionType == CollisionType.Compound)
-            return false;
-
         ContactManifold scratch = ownerPair.Context.CollisionScratch.CompoundPartManifold;
         scratch.BeginUpdate(ownerPair.Context.FrameCount);
         var partPair = new CollisionWorkItem(ownerPair.Context, colliderA, colliderB, collisionType, scratch);
@@ -90,9 +81,6 @@ public static partial class CollisionDetection
         CollisionWorkItem partPair)
     {
         bool addInPartOrder = BelongsToOwnerSide(partPair.ColliderA, ownerPair.ColliderA);
-        bool flip = !addInPartOrder && BelongsToOwnerSide(partPair.ColliderA, ownerPair.ColliderB);
-        if (!addInPartOrder && !flip)
-            return;
 
         ContactManifold scratch = partPair.Manifold;
         for (int i = 0; i < scratch.Count; i++)

@@ -21,7 +21,7 @@ public sealed partial class GravitasPhysicsService
     private const int DefaultBodySize = DefaultColliderSize / 4;
     private const int DefaultColliderIdSize = DefaultColliderSize / 8;
     private static readonly CollisionPairStableKeyComparer ResponsePairComparer = new();
-    private static readonly DiscreteIslandNodeComparer IslandNodeComparer = new();
+    private static readonly IslandNodeKeyComparer<DiscreteIslandNode> IslandNodeComparer = new();
     private static readonly DiscreteIslandConstraintComparer IslandConstraintComparer = new();
 
     private readonly GravitasWorldContext _context;
@@ -305,6 +305,8 @@ public sealed partial class GravitasPhysicsService
 
     internal bool TryGetColliderByServiceIndex(int serviceIndex, out LSCollider? collider) =>
         _colliders.TryGetByServiceIndex(serviceIndex, out collider);
+
+    internal LSCollider GetColliderByServiceIndex(int serviceIndex) => _colliders[serviceIndex];
 
     internal SwiftList<LSCollider> PrepareReplayColliders() => _colliders.PrepareReplayColliders();
 

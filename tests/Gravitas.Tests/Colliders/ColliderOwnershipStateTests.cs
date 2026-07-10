@@ -29,9 +29,10 @@ public sealed class ColliderOwnershipStateTests
     {
         var collider = new LSSphereCollider();
 
-        collider.World.Should().BeNull();
+        Action readWorld = () => _ = collider.World;
         Action readTransform = () => _ = collider.Transform;
 
+        readWorld.Should().Throw<InvalidOperationException>();
         readTransform.Should().Throw<InvalidOperationException>();
     }
 
@@ -247,6 +248,35 @@ public sealed class ColliderOwnershipStateTests
         resolved2DFrom3D.Should().BeSameAs(collider2D.Collider);
         resolved2D.Should().BeSameAs(collider2D.Collider);
         resolved3DFrom2D.Should().BeSameAs(collider3D.Collider);
+
+        node3D.TryGetHierarchyColliderByKey(ColliderHierarchyKey.Create2D(10_000), out _).Should().BeFalse();
+        node2D.TryGetHierarchyColliderByKey(ColliderHierarchyKey.Create3D(10_000), out _).Should().BeFalse();
+    }
+
+    [Fact]
+    public void CompoundParts_ShouldRejectStandaloneBindingAndForeignOwners()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        var owner3D = new LSCompoundCollider(CompoundColliderPart.Sphere(Fixed64.Half, Vector3d.Zero));
+        var foreign3D = new LSCompoundCollider(CompoundColliderPart.Sphere(Fixed64.Half, Vector3d.Zero));
+        var owner2D = new LSCompoundCollider2D(CompoundColliderPart2D.Circle(Fixed64.Half, Vector2d.Zero));
+        var foreign2D = new LSCompoundCollider2D(CompoundColliderPart2D.Circle(Fixed64.Half, Vector2d.Zero));
+        LSCollider part3D = owner3D.GetPartCollider(0);
+        LSCollider2D part2D = owner2D.GetPartCollider(0);
+        var standalone3D = new LSSphereCollider();
+        var standalone2D = new LSCircleCollider2D(Fixed64.Half);
+        scenario.InitializeStaticCollider(standalone3D, Vector3d.Zero);
+        standalone2D.InitializeWithNoBody(new TestMatterAgent(scenario.Context));
+
+        Action reserveBound3D = () => standalone3D.ReserveCompoundPart(owner3D);
+        Action reserveBound2D = () => standalone2D.ReserveCompoundPart(owner2D, Fixed64.Zero, Vector2d.One);
+        Action rebindPart3D = () => part3D.ReserveCompoundPart(foreign3D);
+        Action rebindPart2D = () => part2D.ReserveCompoundPart(foreign2D, Fixed64.Zero, Vector2d.One);
+
+        reserveBound3D.Should().Throw<ArgumentException>().WithParameterName("owner");
+        reserveBound2D.Should().Throw<ArgumentException>().WithParameterName("owner");
+        rebindPart3D.Should().Throw<ArgumentException>().WithParameterName("owner");
+        rebindPart2D.Should().Throw<ArgumentException>().WithParameterName("owner");
     }
 
     [Fact]
@@ -539,6 +569,67 @@ public sealed class ColliderOwnershipStateTests
 
         collider.IsPartitioned.Should().BeTrue();
         collider.IsMixedPartitioned.Should().BeFalse();
+    }
+
+    [Fact]
+    public void DirectColliderNotifications_ShouldHonorTriggerBodyAndBodylessContactPolicy()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> body3D = CreateSphere(scenario, Vector3d.Zero, isParent: false);
+        SolidBody2D body2D = CreateCircle2D(scenario.Context, Vector2d.Zero);
+        var bodyless3D = new LSSphereCollider();
+        var bodyless2D = new LSCircleCollider2D(Fixed64.Half);
+        var trigger3D = new LSSphereCollider { IsTrigger = true };
+        var trigger2D = new LSCircleCollider2D(Fixed64.Half) { IsTrigger = true };
+        int entered3D = 0;
+        int stayed3D = 0;
+        int contacted3D = 0;
+        int entered2D = 0;
+        int stayed2D = 0;
+        int contacted2D = 0;
+        int mixedEntered3D = 0;
+        int mixedStayed3D = 0;
+        int mixedEntered2D = 0;
+        int mixedStayed2D = 0;
+
+        trigger3D.OnTriggerEnter += _ => entered3D++;
+        trigger3D.OnTriggerStay += _ => stayed3D++;
+        body3D.Collider.OnContact += _ => contacted3D++;
+        trigger2D.OnTriggerEnter += _ => entered2D++;
+        trigger2D.OnTriggerStay += _ => stayed2D++;
+        body2D.Collider.OnContact += _ => contacted2D++;
+        trigger3D.OnMixedTriggerEnter += _ => mixedEntered3D++;
+        trigger3D.OnMixedTriggerStay += _ => mixedStayed3D++;
+        trigger2D.OnMixedTriggerEnter += _ => mixedEntered2D++;
+        trigger2D.OnMixedTriggerStay += _ => mixedStayed2D++;
+
+        trigger3D.NotifyContact(body3D.Collider, isColliding: true, isChanged: true);
+        trigger3D.NotifyContact(body3D.Collider, isColliding: false, isChanged: true);
+        trigger3D.NotifyContact(bodyless3D, isColliding: true, isChanged: true);
+        body3D.Collider.NotifyContact(bodyless3D, isColliding: true, isChanged: true);
+
+        trigger2D.NotifyContact(body2D.Collider, isColliding: true, isChanged: true);
+        trigger2D.NotifyContact(body2D.Collider, isColliding: false, isChanged: true);
+        trigger2D.NotifyContact(bodyless2D, isColliding: true, isChanged: true);
+        body2D.Collider.NotifyContact(bodyless2D, isColliding: true, isChanged: true);
+
+        trigger3D.NotifyMixedContact(body2D.Collider, isColliding: true, isChanged: true, isTriggerPair: true);
+        trigger3D.NotifyMixedContact(body2D.Collider, isColliding: false, isChanged: true, isTriggerPair: true);
+        trigger3D.NotifyMixedContact(bodyless2D, isColliding: true, isChanged: true, isTriggerPair: true);
+        trigger2D.NotifyMixedContact(body3D.Collider, isColliding: true, isChanged: true, isTriggerPair: true);
+        trigger2D.NotifyMixedContact(body3D.Collider, isColliding: false, isChanged: true, isTriggerPair: true);
+        trigger2D.NotifyMixedContact(bodyless3D, isColliding: true, isChanged: true, isTriggerPair: true);
+
+        entered3D.Should().Be(1);
+        stayed3D.Should().Be(1);
+        contacted3D.Should().Be(0);
+        entered2D.Should().Be(1);
+        stayed2D.Should().Be(1);
+        contacted2D.Should().Be(0);
+        mixedEntered3D.Should().Be(1);
+        mixedStayed3D.Should().Be(1);
+        mixedEntered2D.Should().Be(1);
+        mixedStayed2D.Should().Be(1);
     }
 
     private static void AdvancePhysicsStep(PhysicsScenarioBuilder scenario)

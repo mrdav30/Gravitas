@@ -106,12 +106,6 @@ public sealed partial class GravitasPhysics2DService
         }
     }
 
-    private sealed class DiscreteIslandNode2DComparer : IComparer<DiscreteIslandNode2D>
-    {
-        public int Compare(DiscreteIslandNode2D left, DiscreteIslandNode2D right) =>
-            left.BodyKey.CompareTo(right.BodyKey);
-    }
-
     private sealed class DiscreteIslandConstraint2DComparer : IComparer<DiscreteIslandConstraint2D>
     {
         public int Compare(DiscreteIslandConstraint2D left, DiscreteIslandConstraint2D right)
@@ -133,7 +127,7 @@ public sealed partial class GravitasPhysics2DService
         }
     }
 
-    private struct DiscreteIslandNode2D
+    private struct DiscreteIslandNode2D : IIslandNodeState
     {
         public DiscreteIslandNode2D(int bodyKey, SolidBody2D body)
         {
@@ -143,10 +137,17 @@ public sealed partial class GravitasPhysics2DService
             RootKey = bodyKey;
         }
 
-        public int BodyKey;
-        public SolidBody2D Body;
-        public int ParentIndex;
-        public int RootKey;
+        public int BodyKey { get; }
+
+        public SolidBody2D Body { get; }
+
+        public int ParentIndex { get; set; }
+
+        public int RootKey { get; set; }
+
+        public bool IsAwakeForCollision => Body.IsAwakeForCollision;
+
+        public void WakeFromCollision() => Body.WakeFromCollision();
     }
 
     private readonly struct DiscreteIslandConstraint2D

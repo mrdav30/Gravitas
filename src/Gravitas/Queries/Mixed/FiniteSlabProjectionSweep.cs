@@ -97,9 +97,6 @@ internal static class FiniteSlabProjectionSweep
                 return false;
 
             Fixed64 stepDistance = result.Distance / closingSpeed;
-            if (stepDistance <= Fixed64.Zero)
-                return false;
-
             travelDistance += stepDistance;
             if (travelDistance > length)
                 return false;
@@ -141,9 +138,7 @@ internal static class FiniteSlabProjectionSweep
                 return PlanarGjkResult.Intersection;
         }
 
-        Fixed64 distance = closest.DistanceSqr <= Fixed64.Zero
-            ? Fixed64.Zero
-            : FixedMath.Sqrt(closest.DistanceSqr);
+        Fixed64 distance = FixedMath.Sqrt(closest.DistanceSqr);
         Vector2d normal = closest.Point.MagnitudeSquared > Fixed64.Epsilon
             ? closest.Point.Normalized
             : Vector2d.Zero;
@@ -400,11 +395,7 @@ internal static class FiniteSlabProjectionSweep
         ref bool found,
         ref Vector2d best)
     {
-        Fixed64 denominator = dy * dy + planarSlope * planarSlope;
-        if (denominator <= Fixed64.Epsilon)
-            return;
-
-        Fixed64 excessMagnitude = planarSlope.Abs() * capsule.ScaledRadius / FixedMath.Sqrt(denominator);
+        Fixed64 excessMagnitude = planarSlope.Abs() * capsule.ScaledRadius / FixedMath.Sqrt(dy * dy + planarSlope * planarSlope);
         Fixed64 signProbe = belowSlab ? -planarSlope / dy : planarSlope / dy;
         if (signProbe < Fixed64.Zero)
             return;
@@ -549,22 +540,14 @@ internal static class FiniteSlabProjectionSweep
         Vector3d direction3D = new(direction.X, Fixed64.Zero, direction.Y);
         Fixed64 linearBoundarySlope = Vector3d.Dot(direction3D, verticalInRadialPlane) / verticalCapacitySqr;
         Vector3d tangent = Vector3d.Cross(axisDirection, verticalInRadialPlane);
-        Fixed64 tangentMagnitude = tangent.Magnitude;
-        if (tangentMagnitude <= Fixed64.Epsilon)
-            return;
-
-        Fixed64 tangentProjection = Vector3d.Dot(direction3D, tangent / tangentMagnitude).Abs();
+        Fixed64 tangentProjection = Vector3d.Dot(direction3D, tangent.Normalized).Abs();
         if (tangentProjection <= Fixed64.Epsilon)
             return;
 
         Fixed64 k = planarSlope - linearBoundarySlope * dy;
         Fixed64 m = -k * verticalCapacitySqr / (tangentProjection * dy);
         Fixed64 mSqr = m * m;
-        Fixed64 denominator = verticalCapacitySqr + mSqr;
-        if (denominator <= Fixed64.Epsilon)
-            return;
-
-        Fixed64 qSqr = mSqr * cylinder.ScaledRadiusSqr * verticalCapacitySqr / denominator;
+        Fixed64 qSqr = mSqr * cylinder.ScaledRadiusSqr * verticalCapacitySqr / (verticalCapacitySqr + mSqr);
         Fixed64 q = FixedMath.Sqrt(qSqr);
         if (m < Fixed64.Zero)
             q = -q;
@@ -679,7 +662,7 @@ internal static class FiniteSlabProjectionSweep
 
         Vector3d tangent = Vector3d.Cross(axisDirection, verticalInRadialPlane);
         Fixed64 tangentMagnitude = tangent.Magnitude;
-        if (tangentMagnitude <= Fixed64.Epsilon || remainingSqr <= Fixed64.Epsilon)
+        if (remainingSqr <= Fixed64.Epsilon)
         {
             radial = baseRadial;
             return true;

@@ -32,10 +32,13 @@ public sealed class PhysicsHitSelectionPolicyTests
         Physics3DHit current = new(currentCollider, Vector3d.Zero, Vector3d.Right, (Fixed64)5, Vector3d.Right);
         Physics3DHit farther = new(candidateCollider, Vector3d.Zero, Vector3d.Right, (Fixed64)6, Vector3d.Right);
         Physics3DHit earlierIdTie = new(candidateCollider, Vector3d.Zero, Vector3d.Right, (Fixed64)5, Vector3d.Right);
+        Physics3DHit nullColliderTie = new(null, Vector3d.Zero, Vector3d.Right, (Fixed64)5, Vector3d.Right);
 
         PhysicsHitSelectionPolicy.ShouldReplace(farther, found: false, current).Should().BeTrue();
         PhysicsHitSelectionPolicy.ShouldReplace(farther, found: true, current).Should().BeFalse();
         PhysicsHitSelectionPolicy.ShouldReplace(earlierIdTie, found: true, current).Should().BeTrue();
+        Physics3DHitSorter.ComesBefore(nullColliderTie, current).Should().BeTrue();
+        Physics3DHitSorter.ComesBefore(current, nullColliderTie).Should().BeFalse();
     }
 
     [Fact]
@@ -44,8 +47,8 @@ public sealed class PhysicsHitSelectionPolicyTests
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         LSSphereCollider candidate3D = scenario.CreateStaticSphere(Vector3d.Left);
         LSSphereCollider current3D = scenario.CreateStaticSphere(Vector3d.Right);
-        LSCircleCollider2D current2D = CreateCircle2D();
-        LSCircleCollider2D candidate2D = CreateCircle2D();
+        LSCircleCollider2D current2D = CreateCircle2D(scenario.Context);
+        LSCircleCollider2D candidate2D = CreateCircle2D(scenario.Context);
         PhysicsMixedHit current = new(
             current3D,
             current2D,
@@ -77,6 +80,27 @@ public sealed class PhysicsHitSelectionPolicyTests
         PhysicsHitSelectionPolicy.ShouldReplace(farther, found: false, current).Should().BeTrue();
         PhysicsHitSelectionPolicy.ShouldReplace(farther, found: true, current).Should().BeFalse();
         PhysicsHitSelectionPolicy.ShouldReplace(earlierIdTie, found: true, current).Should().BeTrue();
+
+        PhysicsMixedHit null2DLeft = new(
+            current3D,
+            null,
+            Vector3d.Zero,
+            Vector3d.Zero,
+            Vector3d.Right,
+            PhysicsQueryReducerKind.Exact,
+            (Fixed64)5,
+            Vector3d.Right);
+        PhysicsMixedHit null2DRight = new(
+            current3D,
+            current2D,
+            Vector3d.Zero,
+            Vector3d.Zero,
+            Vector3d.Right,
+            PhysicsQueryReducerKind.Exact,
+            (Fixed64)5,
+            Vector3d.Right);
+        PhysicsMixedHitSorter.ComesBefore(null2DLeft, null2DRight).Should().BeTrue();
+        PhysicsMixedHitSorter.ComesBefore(null2DRight, null2DLeft).Should().BeFalse();
     }
 
     [Fact]
@@ -89,4 +113,11 @@ public sealed class PhysicsHitSelectionPolicyTests
     }
 
     private static LSCircleCollider2D CreateCircle2D() => new(Fixed64.One);
+
+    private static LSCircleCollider2D CreateCircle2D(GravitasWorldContext context)
+    {
+        var collider = new LSCircleCollider2D(Fixed64.One);
+        collider.InitializeWithNoBody(new TestMatterAgent(context));
+        return collider;
+    }
 }

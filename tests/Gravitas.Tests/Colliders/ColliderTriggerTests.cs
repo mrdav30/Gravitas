@@ -207,11 +207,14 @@ public sealed class ColliderTriggerTests
         trigger3D.OnTriggerEnter += _ => triggerEnter++;
         body.Collider.OnTriggerEnter += _ => bodyEnter++;
         bodyless3D.OnTriggerEnter += _ => bodylessEnter++;
+        bodyless3D.OnTriggerExit += _ => bodylessEnter++;
 
         trigger3D.NotifyContact(body.Collider, isColliding: true, isChanged: true);
         body.Collider.NotifyContact(trigger3D, isColliding: true, isChanged: true);
         trigger3D.NotifyContact(bodyless3D, isColliding: true, isChanged: true);
+        trigger3D.NotifyContact(bodyless3D, isColliding: false, isChanged: true);
         bodyless3D.NotifyContact(trigger3D, isColliding: true, isChanged: true);
+        bodyless3D.NotifyContact(trigger3D, isColliding: false, isChanged: true);
 
         triggerEnter.Should().Be(1);
         bodyEnter.Should().Be(1);
@@ -234,11 +237,14 @@ public sealed class ColliderTriggerTests
         trigger.OnTriggerEnter += _ => triggerEnter++;
         body.Collider.OnTriggerEnter += _ => bodyEnter++;
         bodyless.OnTriggerEnter += _ => bodylessEnter++;
+        bodyless.OnTriggerExit += _ => bodylessEnter++;
 
         trigger.NotifyContact(body.Collider, isColliding: true, isChanged: true);
         body.Collider.NotifyContact(trigger, isColliding: true, isChanged: true);
         trigger.NotifyContact(bodyless, isColliding: true, isChanged: true);
+        trigger.NotifyContact(bodyless, isColliding: false, isChanged: true);
         bodyless.NotifyContact(trigger, isColliding: true, isChanged: true);
+        bodyless.NotifyContact(trigger, isColliding: false, isChanged: true);
 
         triggerEnter.Should().Be(1);
         bodyEnter.Should().Be(1);

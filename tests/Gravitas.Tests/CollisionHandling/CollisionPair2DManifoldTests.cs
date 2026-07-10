@@ -139,6 +139,66 @@ public sealed class CollisionPair2DManifoldTests
         pair.Manifold.LastUpdatedFrame.Should().Be(4);
     }
 
+    [Fact]
+    public void TryCollide_WithCompoundAsSecondCollider_ShouldPopulateManifoldUsingReversedPartOrder()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        SolidBody2D circle = CreateCircle(context, Vector2d.Zero, immovable: true);
+        SolidBody2D compound = CreateCompound(
+            context,
+            Vector2d.Zero,
+            CompoundColliderPart2D.Circle(Fixed64.Half, new Vector2d((Fixed64)3, Fixed64.Zero)),
+            CompoundColliderPart2D.Circle(Fixed64.Half, new Vector2d(Fixed64.Half, Fixed64.Zero)));
+        var pair = new CollisionPair2D(circle.Collider, compound.Collider);
+
+        CollisionDetection2D.TryCollide(pair, pair.Manifold, frame: 5).Should().BeTrue();
+
+        pair.Manifold.HasContact.Should().BeTrue();
+        pair.Manifold.PrimaryContact.Depth.Should().Be(Fixed64.Half);
+        pair.Manifold.PrimaryContact.Normal.X.Abs().Should().Be(Fixed64.One);
+        pair.Manifold.LastUpdatedFrame.Should().Be(5);
+    }
+
+    [Fact]
+    public void TryCollide_WithCapsuleSideAgainstBox_ShouldPopulateTwoSideContacts()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        SolidBody2D capsule = CreateCapsule(context, Vector2d.Zero, immovable: true);
+        SolidBody2D box = CreateBox(
+            context,
+            new Vector2d(Fixed64.FromFraction(3, 4), Fixed64.Zero),
+            immovable: true,
+            new Vector2d((Fixed64)2, (Fixed64)4));
+        var pair = new CollisionPair2D(capsule.Collider, box.Collider);
+
+        CollisionDetection2D.TryCollide(pair, pair.Manifold, frame: 6).Should().BeTrue();
+
+        pair.Manifold.Count.Should().Be(2);
+        pair.Manifold.LastUpdatedFrame.Should().Be(6);
+        pair.Manifold.PrimaryContact.Depth.Should().BeGreaterThan(Fixed64.Zero);
+        pair.Manifold.Should().OnlyContain(contact => contact.Normal.X < Fixed64.Zero);
+    }
+
+    [Fact]
+    public void TryCollide_WithBoxAgainstCapsuleSide_ShouldPopulateTwoReversedSideContacts()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        SolidBody2D box = CreateBox(
+            context,
+            new Vector2d(Fixed64.FromFraction(3, 4), Fixed64.Zero),
+            immovable: true,
+            new Vector2d((Fixed64)2, (Fixed64)4));
+        SolidBody2D capsule = CreateCapsule(context, Vector2d.Zero, immovable: true);
+        var pair = new CollisionPair2D(box.Collider, capsule.Collider);
+
+        CollisionDetection2D.TryCollide(pair, pair.Manifold, frame: 7).Should().BeTrue();
+
+        pair.Manifold.Count.Should().Be(2);
+        pair.Manifold.LastUpdatedFrame.Should().Be(7);
+        pair.Manifold.PrimaryContact.Depth.Should().BeGreaterThan(Fixed64.Zero);
+        pair.Manifold.Should().OnlyContain(contact => contact.Normal.X < Fixed64.Zero);
+    }
+
     private static CollisionPair2D GetPair(LSCollider2D first, LSCollider2D second)
     {
         if (first.TryGetCollisionPair(second.Id, out CollisionPair2D? firstPair) && firstPair != null)
@@ -173,11 +233,34 @@ public sealed class CollisionPair2DManifoldTests
     private static SolidBody2D CreateBox(
         GravitasWorldContext context,
         Vector2d position,
+        bool immovable) =>
+        CreateBox(context, position, immovable, new Vector2d((Fixed64)2, (Fixed64)2));
+
+    private static SolidBody2D CreateBox(
+        GravitasWorldContext context,
+        Vector2d position,
+        bool immovable,
+        Vector2d size)
+    {
+        var body = new SolidBody2D(
+            new TestMatterAgent(context, CreateTransform(position)),
+            new LSAABBoxCollider2D(size))
+        {
+            Mass = Fixed64.One,
+            FreezeAxes = immovable ? BodyFreezeAxes2D.Position : BodyFreezeAxes2D.None
+        };
+        body.Initialize(position);
+        return body;
+    }
+
+    private static SolidBody2D CreateCapsule(
+        GravitasWorldContext context,
+        Vector2d position,
         bool immovable)
     {
         var body = new SolidBody2D(
             new TestMatterAgent(context, CreateTransform(position)),
-            new LSAABBoxCollider2D(new Vector2d((Fixed64)2, (Fixed64)2)))
+            new LSCapsuleCollider2D(Fixed64.Half, (Fixed64)4))
         {
             Mass = Fixed64.One,
             FreezeAxes = immovable ? BodyFreezeAxes2D.Position : BodyFreezeAxes2D.None

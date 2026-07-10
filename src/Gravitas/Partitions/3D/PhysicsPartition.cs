@@ -310,7 +310,7 @@ public class PhysicsPartition : IVoxelPartition, IRetainedPhysicsPartition<Gravi
         ContainedStaticObjects?.Clear();
 
         if (ActivationId != -1)
-            _owner?.DeactivatePartition(ActivationId);
+            Owner.DeactivatePartition(ActivationId);
 
         _owner = null;
         ActivationId = -1;
@@ -325,7 +325,7 @@ public class PhysicsPartition : IVoxelPartition, IRetainedPhysicsPartition<Gravi
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void MarkEmptyIfUnoccupied()
     {
-        if (IsEmpty && _emptySinceFrame < 0)
+        if (IsEmpty)
             MarkEmpty(Owner.Context.FrameCount);
     }
 

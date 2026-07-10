@@ -4,6 +4,7 @@ using Gravitas.Colliders;
 using Gravitas.Materials;
 using Gravitas.Tests.Support;
 using System;
+using System.Collections.Generic;
 using Xunit;
 
 namespace Gravitas.Tests.Colliders;
@@ -112,6 +113,26 @@ public sealed class CompoundCollider2DTests
     }
 
     [Fact]
+    public void RecordData_OnContextBoundPart_ShouldRemainGeometryOnly()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        var compound = new LSCompoundCollider2D(CompoundColliderPart2D.Circle(Fixed64.Half, Vector2d.Zero));
+        _ = CreateBody(context, compound, Vector2d.Zero);
+        LSCollider2D part = compound.GetPartCollider(0);
+        var chronicler = new InvalidRecordPayloadChronicler(new Dictionary<string, object>
+        {
+            ["Active"] = false,
+            ["Radius"] = Fixed64.One
+        });
+
+        part.RecordData(chronicler);
+
+        context.Physics2D.ColliderCount.Should().Be(1);
+        context.Physics2D.TryGetColliderById(part.Id, out _).Should().BeFalse();
+        compound.IsActive.Should().BeTrue();
+    }
+
+    [Fact]
     public void Initialize_ShouldApplyOwnerLocalOffsetToAggregateBounds()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
@@ -161,6 +182,24 @@ public sealed class CompoundCollider2DTests
         _ = CreateBody(context, compound, Vector2d.Zero);
 
         compound.ScaledRadius.Should().Be(FixedMath.Sqrt((Fixed64)17));
+    }
+
+    [Fact]
+    public void CapsulePart_WithWideLocalScale_ShouldClampScaledHeightToScaledDiameter()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        var compound = new LSCompoundCollider2D(
+            CompoundColliderPart2D.Capsule(
+                Fixed64.One,
+                (Fixed64)2,
+                Vector2d.Zero,
+                Fixed64.Zero,
+                new Vector2d((Fixed64)2, Fixed64.Half)));
+
+        _ = CreateBody(context, compound, Vector2d.Zero);
+
+        var capsule = (LSCapsuleCollider2D)compound.GetPartCollider(0);
+        capsule.ScaledHeight.Should().Be((Fixed64)4);
     }
 
     [Fact]

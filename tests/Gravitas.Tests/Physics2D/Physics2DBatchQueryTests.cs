@@ -63,6 +63,39 @@ public sealed class Physics2DBatchQueryTests
     }
 
     [Fact]
+    public void SweepCircleBatch_ShouldFilterTriggersAndExcludedCollidersBeforeChoosingLaterHit()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext(extent: 16);
+        LSCircleCollider2D trigger = CreateBodylessCircle(context, new Vector2d((Fixed64)(-1), Fixed64.Zero), isTrigger: true);
+        SolidBody2D excluded = CreateCircle(context, Vector2d.Zero);
+        SolidBody2D target = CreateCircle(context, new Vector2d((Fixed64)2, Fixed64.Zero));
+        PhysicsSweepCircle2DRequest[] requests =
+        {
+            new(
+                new Vector2d((Fixed64)(-4), Fixed64.Zero),
+                new Vector2d((Fixed64)4, Fixed64.Zero),
+                Fixed64.Half,
+                IncludeLayerZero,
+                excluded.Collider,
+                includeTriggers: false)
+        };
+        Physics2DHit[] closestHits = new Physics2DHit[requests.Length];
+        var hits = new SwiftList<Physics2DHit>();
+        PhysicsQueryHitRange[] ranges = new PhysicsQueryHitRange[requests.Length];
+
+        int closestCount = context.Query2D.SweepCircleBatch(requests, closestHits);
+        int allCount = context.Query2D.SweepCircleAllBatch(requests, hits, ranges);
+
+        closestCount.Should().Be(1);
+        closestHits[0].Collider.Should().BeSameAs(target.Collider);
+        allCount.Should().Be(1);
+        ranges[0].Count.Should().Be(1);
+        hits[ranges[0].Start].Collider.Should().BeSameAs(target.Collider);
+        hits.Should().NotContain(hit => ReferenceEquals(hit.Collider, trigger));
+        hits.Should().NotContain(hit => ReferenceEquals(hit.Collider, excluded.Collider));
+    }
+
+    [Fact]
     public void AreaBatches_ShouldSupportCircleAabbAndPolygonRequests()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext(extent: 16);
@@ -215,6 +248,20 @@ public sealed class Physics2DBatchQueryTests
         };
         body.Initialize(position);
         return body;
+    }
+
+    private static LSCircleCollider2D CreateBodylessCircle(GravitasWorldContext context, Vector2d position, bool isTrigger)
+    {
+        var transform = new FixedTransform(
+            new Vector3d(position.X, Fixed64.Zero, position.Y),
+            FixedQuaternion.Identity,
+            Vector3d.One);
+        var collider = new LSCircleCollider2D(Fixed64.Half)
+        {
+            IsTrigger = isTrigger
+        };
+        collider.InitializeWithNoBody(new TestMatterAgent(context, transform));
+        return collider;
     }
 
     private static SolidBody2D CreateBox(GravitasWorldContext context, Vector2d position)

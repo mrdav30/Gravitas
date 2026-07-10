@@ -370,6 +370,14 @@ public sealed class SolidBody2DSerializationTests
             targetContext,
             mixedCoordinate,
             target.Id).Should().BeFalse();
+
+        GravitasSerializationHarness.Populate(target, payload, transport);
+
+        target.IsActive.Should().BeFalse();
+        target.IsPartitioned.Should().BeFalse();
+        target.IsMixedPartitioned.Should().BeFalse();
+        target.PartitionCoordinates.Should().BeEmpty();
+        (target.MixedPartitionCoordinates?.Count ?? 0).Should().Be(0);
     }
 
     [Theory]
@@ -402,6 +410,14 @@ public sealed class SolidBody2DSerializationTests
             targetContext,
             coordinate,
             target.Id).Should().BeFalse();
+
+        GravitasSerializationHarness.Populate(target, payload, transport);
+
+        target.IsActive.Should().BeFalse();
+        target.IsPartitioned.Should().BeFalse();
+        target.IsMixedPartitioned.Should().BeFalse();
+        target.PartitionCoordinates.Should().BeEmpty();
+        (target.MixedPartitionCoordinates?.Count ?? 0).Should().Be(0);
     }
 
     [Theory]
@@ -501,6 +517,31 @@ public sealed class SolidBody2DSerializationTests
         Action loadTriggerOntoBodyCollider = () => GravitasSerializationHarness.Populate(target.Collider, payload, transport);
 
         loadTriggerOntoBodyCollider.Should().Throw<ArgumentException>().WithParameterName(nameof(LSCollider2D.IsTrigger));
+    }
+
+    [Theory]
+    [MemberData(nameof(Transports))]
+    public void PopulateUnboundCollider_ShouldApplyShapeStateWithoutPartitionRefresh(GravitasSerializationTransport transport)
+    {
+        using GravitasWorldContext sourceContext = Physics2DTestWorld.CreateContext(frameRate: 8);
+        LSCircleCollider2D source = CreateStaticCircle(sourceContext, Vector2d.Zero);
+        source.Radius = Fixed64.FromFraction(3, 2);
+        source.LocalOffset = new Vector2d(Fixed64.Half, -Fixed64.Half);
+        source.MixedHalfThicknessOverride = Fixed64.FromFraction(5, 4);
+        source.Layer = new PhysicsLayer(3);
+        source.Simulate();
+        object payload = GravitasSerializationHarness.Serialize(source, transport);
+        var target = new LSCircleCollider2D(Fixed64.Half);
+
+        GravitasSerializationHarness.Populate(target, payload, transport);
+
+        target.Radius.Should().Be(source.Radius);
+        target.LocalOffset.Should().Be(source.LocalOffset);
+        target.MixedHalfThicknessOverride.Should().Be(source.MixedHalfThicknessOverride);
+        target.Layer.Should().Be(source.Layer);
+        target.IsActive.Should().BeTrue();
+        target.IsPartitioned.Should().BeFalse();
+        target.IsMixedPartitioned.Should().BeFalse();
     }
 
     private static SolidBody2D CreateDynamicCircle(GravitasWorldContext context, Vector2d position = default)

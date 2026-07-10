@@ -174,8 +174,7 @@ public partial class SolidBody
             Vector3d targetStart = target.ContinuousCollisionFrameStart;
             Vector3d targetDisplacement = target.ContinuousCollisionFrameDisplacement;
             Fixed64 targetRadius = target.ResolveContinuousCollisionProxyRadius();
-            if (targetRadius <= Fixed64.Epsilon
-                || !ContinuousCollisionMath.TrySweepRelativeSpheres(
+            if (!ContinuousCollisionMath.TrySweepRelativeSpheres(
                     startPosition,
                     sourceDisplacement,
                     proxyRadius,
@@ -255,9 +254,6 @@ public partial class SolidBody
             Fixed64 targetRadius = FixedMath.Max(
                 target.ResolveContinuousCollisionProxyRadius(),
                 target.Collider.MixedHalfThickness);
-            if (targetRadius <= Fixed64.Epsilon)
-                continue;
-
             Vector2d targetStart2D = target.ContinuousCollisionFrameStart;
             Vector2d targetDisplacement2D = target.ContinuousCollisionFrameDisplacement;
             Vector3d targetStart = new(targetStart2D.X, target.Collider.MixedSlabCenterY, targetStart2D.Y);
@@ -305,8 +301,7 @@ public partial class SolidBody
         Fixed64 hitDistance,
         Fixed64 sourceLength)
     {
-        if (!ContinuousCollisionImpulsePolicy.TryResolveSourceNormal(normalForSource, sourceDisplacement, out Vector3d normal))
-            return false;
+        _ = ContinuousCollisionImpulsePolicy.TryResolveSourceNormal(normalForSource, sourceDisplacement, out Vector3d normal);
 
         Fixed64 deltaTime = Context.DeltaTime;
         Fixed64 constrainedInverseMass = target.GetConstrainedInverseMass(normal);
@@ -341,8 +336,7 @@ public partial class SolidBody
         Fixed64 hitDistance,
         Fixed64 sourceLength)
     {
-        if (!ContinuousCollisionImpulsePolicy.TryResolveSourceNormal(normalForSource, sourceDisplacement, out Vector3d normal))
-            return false;
+        _ = ContinuousCollisionImpulsePolicy.TryResolveSourceNormal(normalForSource, sourceDisplacement, out Vector3d normal);
 
         Fixed64 deltaTime = Context.DeltaTime;
         Fixed64 inverseMass = target.EffectiveInverseMass;

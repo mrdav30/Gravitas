@@ -114,9 +114,6 @@ public sealed class LSCompoundCollider : LSCollider
 
     public override Vector3d CalculateLocalCenterOfMassOffset()
     {
-        if (_parts.Length == 0)
-            return ScaledOffset;
-
         Fixed64 totalArea = Area;
         Fixed64 totalWeight = Fixed64.Zero;
         Vector3d weightedCenter = Vector3d.Zero;
@@ -138,9 +135,6 @@ public sealed class LSCompoundCollider : LSCollider
 
     public override Fixed3x3 CalculateInertiaTensor(Fixed64 mass, Vector3d localCenterOfMassOffset)
     {
-        if (_parts.Length == 0)
-            return Fixed3x3.Zero;
-
         Fixed64 totalArea = Area;
         Fixed64 equalPartMass = mass / (Fixed64)_parts.Length;
         Fixed3x3 tensor = Fixed3x3.Zero;

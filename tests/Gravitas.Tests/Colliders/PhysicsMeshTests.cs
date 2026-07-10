@@ -523,8 +523,10 @@ public sealed class PhysicsMeshTests
         TheoryData<Vector3d[], int[], MeshVolumeValidationResult> data = new();
         data.Add(ValidVertices(), ValidTriangles(), MeshVolumeValidationResult.BoundaryEdge);
         data.Add(CubeVertices(), CubeTrianglesWithDuplicateFace(), MeshVolumeValidationResult.DuplicateTriangle);
+        data.Add(CubeVertices(), CubeTrianglesWithInconsistentWinding(), MeshVolumeValidationResult.InconsistentWinding);
         data.Add(NonManifoldEdgeVertices(), NonManifoldEdgeTriangles(), MeshVolumeValidationResult.NonManifoldEdge);
         data.Add(DisconnectedCubeVertices(), DisconnectedCubeTriangles(), MeshVolumeValidationResult.DisconnectedShell);
+        data.Add(PlanarClosedVolumeVertices(), PlanarClosedVolumeTriangles(), MeshVolumeValidationResult.ZeroVolume);
         return data;
     }
 
@@ -581,6 +583,13 @@ public sealed class PhysicsMeshTests
         return result;
     }
 
+    private static int[] CubeTrianglesWithInconsistentWinding()
+    {
+        int[] triangles = CubeTriangles();
+        (triangles[1], triangles[2]) = (triangles[2], triangles[1]);
+        return triangles;
+    }
+
     private static Vector3d[] NonManifoldEdgeVertices() =>
         new[]
         {
@@ -620,6 +629,24 @@ public sealed class PhysicsMeshTests
 
         return result;
     }
+
+    private static Vector3d[] PlanarClosedVolumeVertices() =>
+        new[]
+        {
+            Vector3d.Zero,
+            Vector3d.Right,
+            Vector3d.Forward,
+            Vector3d.Right + Vector3d.Forward
+        };
+
+    private static int[] PlanarClosedVolumeTriangles() =>
+        new[]
+        {
+            1, 2, 3,
+            0, 2, 1,
+            0, 1, 3,
+            0, 3, 2
+        };
 
     private static void AssertNear(Fixed64 actual, Fixed64 expected) =>
         (actual - expected).Abs().Should().BeLessThan(Fixed64.FromFraction(1, 1000));

@@ -850,6 +850,302 @@ public sealed class MixedQueryCcdTests
     }
 
     [Fact]
+    public void FiniteSlabProjectionSweep_WithClippedCurvedSupportMatrix_ShouldClassifyEdgeRows()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSCapsuleCollider> capsule = CreateBody3D(
+            context,
+            new LSCapsuleCollider { Size = new Vector3d(Fixed64.One, (Fixed64)3, Fixed64.One) },
+            new Vector3d((Fixed64)(-3), Fixed64.Zero, Fixed64.Zero),
+            immovable: true,
+            rotation: FixedQuaternion.FromEulerAnglesInDegrees((Fixed64)30, Fixed64.Zero, (Fixed64)55));
+        ScenarioBody<LSCylinderCollider> cylinder = CreateBody3D(
+            context,
+            new LSCylinderCollider { Size = new Vector3d(Fixed64.One, (Fixed64)3, Fixed64.One) },
+            Vector3d.Zero,
+            immovable: true,
+            rotation: FixedQuaternion.FromEulerAnglesInDegrees(Fixed64.Zero, Fixed64.Zero, (Fixed64)45));
+        ScenarioBody<LSConeCollider> cone = CreateBody3D(
+            context,
+            new LSConeCollider { Size = new Vector3d(Fixed64.One, (Fixed64)3, Fixed64.One) },
+            Vector3d.Zero,
+            immovable: true);
+
+        bool capsuleHit = FiniteSlabProjectionSweep.TrySweepCircleAgainstCapsule(
+            new Vector2d((Fixed64)(-7), Fixed64.Zero),
+            Vector2d.Right,
+            (Fixed64)8,
+            Fixed64.Half,
+            -Fixed64.Half,
+            Fixed64.Half,
+            capsule.Collider,
+            out Fixed64 capsuleDistance);
+        bool cylinderHitFromLeft = FiniteSlabProjectionSweep.TrySweepCircleAgainstCylinder(
+            new Vector2d((Fixed64)(-4), Fixed64.Zero),
+            Vector2d.Right,
+            (Fixed64)8,
+            Fixed64.Half,
+            -Fixed64.Half,
+            Fixed64.Half,
+            cylinder.Collider,
+            out Fixed64 cylinderLeftDistance);
+        bool cylinderHitFromRight = FiniteSlabProjectionSweep.TrySweepCircleAgainstCylinder(
+            new Vector2d((Fixed64)4, Fixed64.Zero),
+            -Vector2d.Right,
+            (Fixed64)8,
+            Fixed64.Half,
+            -Fixed64.Half,
+            Fixed64.Half,
+            cylinder.Collider,
+            out Fixed64 cylinderRightDistance);
+        bool coneHit = FiniteSlabProjectionSweep.TrySweepCircleAgainstCone(
+            new Vector2d((Fixed64)(-4), Fixed64.Zero),
+            Vector2d.Right,
+            (Fixed64)8,
+            Fixed64.Half,
+            -Fixed64.Half,
+            Fixed64.Half,
+            cone.Collider,
+            out Fixed64 coneDistance);
+        bool coneMiss = FiniteSlabProjectionSweep.TrySweepCircleAgainstCone(
+            new Vector2d((Fixed64)(-4), (Fixed64)4),
+            Vector2d.Right,
+            (Fixed64)8,
+            Fixed64.Half,
+            -Fixed64.Half,
+            Fixed64.Half,
+            cone.Collider,
+            out Fixed64 coneMissDistance);
+
+        capsuleHit.Should().BeTrue(nameof(capsuleHit));
+        capsuleDistance.Should().BeGreaterThan(Fixed64.Zero);
+        cylinderHitFromLeft.Should().BeTrue(nameof(cylinderHitFromLeft));
+        cylinderHitFromRight.Should().BeTrue(nameof(cylinderHitFromRight));
+        cylinderLeftDistance.Should().BeGreaterThan(Fixed64.Zero);
+        cylinderRightDistance.Should().BeGreaterThan(Fixed64.Zero);
+        coneHit.Should().BeTrue(nameof(coneHit));
+        coneDistance.Should().BeGreaterThan(Fixed64.Zero);
+        coneMiss.Should().BeFalse();
+        coneMissDistance.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void FiniteSlabProjectionSweep_WithBoundarySupportMatrix_ShouldClassifyDegenerateAndClippedRows()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSCylinderCollider> verticalCylinder = CreateBody3D(
+            context,
+            new LSCylinderCollider { Size = new Vector3d(Fixed64.One, (Fixed64)3, Fixed64.One) },
+            Vector3d.Zero,
+            immovable: true);
+        ScenarioBody<LSCylinderCollider> tiltedCylinder = CreateBody3D(
+            context,
+            new LSCylinderCollider { Size = new Vector3d(Fixed64.One, (Fixed64)3, Fixed64.One) },
+            Vector3d.Zero,
+            immovable: true,
+            rotation: FixedQuaternion.FromEulerAnglesInDegrees(Fixed64.Zero, Fixed64.Zero, (Fixed64)45));
+        ScenarioBody<LSCapsuleCollider> horizontalCapsule = CreateBody3D(
+            context,
+            new LSCapsuleCollider { Size = new Vector3d(Fixed64.One, (Fixed64)3, Fixed64.One) },
+            Vector3d.Zero,
+            immovable: true,
+            rotation: FixedQuaternion.FromEulerAnglesInDegrees(Fixed64.Zero, Fixed64.Zero, (Fixed64)90));
+        ScenarioBody<LSConeCollider> verticalCone = CreateBody3D(
+            context,
+            new LSConeCollider { Size = new Vector3d(Fixed64.One, (Fixed64)3, Fixed64.One) },
+            Vector3d.Zero,
+            immovable: true);
+
+        bool cylinderInsideZeroDirection = FiniteSlabProjectionSweep.TrySweepCircleAgainstCylinder(
+            Vector2d.Zero,
+            Vector2d.Zero,
+            (Fixed64)4,
+            Fixed64.Half,
+            -Fixed64.Half,
+            Fixed64.Half,
+            verticalCylinder.Collider,
+            out Fixed64 cylinderInsideDistance);
+        bool cylinderOutsideZeroDirection = FiniteSlabProjectionSweep.TrySweepCircleAgainstCylinder(
+            new Vector2d((Fixed64)4, Fixed64.Zero),
+            Vector2d.Zero,
+            (Fixed64)4,
+            Fixed64.Half,
+            -Fixed64.Half,
+            Fixed64.Half,
+            verticalCylinder.Collider,
+            out Fixed64 cylinderOutsideDistance);
+        bool cylinderOutsideSlab = FiniteSlabProjectionSweep.TrySweepCircleAgainstCylinder(
+            new Vector2d((Fixed64)(-4), Fixed64.Zero),
+            Vector2d.Right,
+            (Fixed64)8,
+            Fixed64.Half,
+            (Fixed64)3,
+            (Fixed64)4,
+            verticalCylinder.Collider,
+            out Fixed64 cylinderOutsideSlabDistance);
+        bool cylinderTopBand = FiniteSlabProjectionSweep.TrySweepCircleAgainstCylinder(
+            new Vector2d((Fixed64)(-4), Fixed64.Zero),
+            Vector2d.Right,
+            (Fixed64)8,
+            Fixed64.Half,
+            Fixed64.FromFraction(7, 5),
+            Fixed64.FromFraction(8, 5),
+            verticalCylinder.Collider,
+            out Fixed64 cylinderTopBandDistance);
+        bool tiltedCylinderForward = FiniteSlabProjectionSweep.TrySweepCircleAgainstCylinder(
+            new Vector2d((Fixed64)(-4), Fixed64.Zero),
+            Vector2d.Right,
+            (Fixed64)8,
+            Fixed64.Half,
+            -Fixed64.Half,
+            Fixed64.Half,
+            tiltedCylinder.Collider,
+            out Fixed64 tiltedCylinderForwardDistance);
+        bool tiltedCylinderReverse = FiniteSlabProjectionSweep.TrySweepCircleAgainstCylinder(
+            new Vector2d((Fixed64)4, Fixed64.Zero),
+            -Vector2d.Right,
+            (Fixed64)8,
+            Fixed64.Half,
+            -Fixed64.Half,
+            Fixed64.Half,
+            tiltedCylinder.Collider,
+            out Fixed64 tiltedCylinderReverseDistance);
+        bool horizontalCapsuleHit = FiniteSlabProjectionSweep.TrySweepCircleAgainstCapsule(
+            new Vector2d((Fixed64)(-4), Fixed64.Zero),
+            Vector2d.Right,
+            (Fixed64)8,
+            Fixed64.Half,
+            -Fixed64.Half,
+            Fixed64.Half,
+            horizontalCapsule.Collider,
+            out Fixed64 horizontalCapsuleDistance);
+        bool coneInsideZeroDirection = FiniteSlabProjectionSweep.TrySweepCircleAgainstCone(
+            Vector2d.Zero,
+            Vector2d.Zero,
+            (Fixed64)4,
+            Fixed64.Half,
+            -Fixed64.Half,
+            Fixed64.Half,
+            verticalCone.Collider,
+            out Fixed64 coneInsideDistance);
+        bool coneOutsideZeroDirection = FiniteSlabProjectionSweep.TrySweepCircleAgainstCone(
+            new Vector2d((Fixed64)4, Fixed64.Zero),
+            Vector2d.Zero,
+            (Fixed64)4,
+            Fixed64.Half,
+            -Fixed64.Half,
+            Fixed64.Half,
+            verticalCone.Collider,
+            out Fixed64 coneOutsideDistance);
+
+        cylinderInsideZeroDirection.Should().BeTrue(nameof(cylinderInsideZeroDirection));
+        cylinderInsideDistance.Should().Be(Fixed64.Zero);
+        cylinderOutsideZeroDirection.Should().BeFalse();
+        cylinderOutsideDistance.Should().Be(Fixed64.Zero);
+        cylinderOutsideSlab.Should().BeFalse();
+        cylinderOutsideSlabDistance.Should().Be(Fixed64.Zero);
+        cylinderTopBand.Should().BeTrue(nameof(cylinderTopBand));
+        cylinderTopBandDistance.Should().BeGreaterThan(Fixed64.Zero);
+        tiltedCylinderForward.Should().BeTrue(nameof(tiltedCylinderForward));
+        tiltedCylinderForwardDistance.Should().BeGreaterThan(Fixed64.Zero);
+        tiltedCylinderReverse.Should().BeTrue(nameof(tiltedCylinderReverse));
+        tiltedCylinderReverseDistance.Should().BeGreaterThan(Fixed64.Zero);
+        horizontalCapsuleHit.Should().BeTrue(nameof(horizontalCapsuleHit));
+        horizontalCapsuleDistance.Should().BeGreaterThan(Fixed64.Zero);
+        coneInsideZeroDirection.Should().BeTrue(nameof(coneInsideZeroDirection));
+        coneInsideDistance.Should().Be(Fixed64.Zero);
+        coneOutsideZeroDirection.Should().BeFalse();
+        coneOutsideDistance.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void FiniteSlabProjectionSweep_WithHorizontalCylinderAndBoundaryBands_ShouldClassifySupportRows()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSCylinderCollider> horizontalCylinder = CreateBody3D(
+            context,
+            new LSCylinderCollider { Size = new Vector3d(Fixed64.One, (Fixed64)3, Fixed64.One) },
+            Vector3d.Zero,
+            immovable: true,
+            rotation: FixedQuaternion.FromEulerAnglesInDegrees(Fixed64.Zero, Fixed64.Zero, (Fixed64)90));
+        ScenarioBody<LSCylinderCollider> tiltedCylinder = CreateBody3D(
+            context,
+            new LSCylinderCollider { Size = new Vector3d(Fixed64.One, (Fixed64)3, Fixed64.One) },
+            Vector3d.Zero,
+            immovable: true,
+            rotation: FixedQuaternion.FromEulerAnglesInDegrees((Fixed64)20, Fixed64.Zero, (Fixed64)55));
+        ScenarioBody<LSCapsuleCollider> tiltedCapsule = CreateBody3D(
+            context,
+            new LSCapsuleCollider { Size = new Vector3d(Fixed64.One, (Fixed64)3, Fixed64.One) },
+            Vector3d.Zero,
+            immovable: true,
+            rotation: FixedQuaternion.FromEulerAnglesInDegrees((Fixed64)35, Fixed64.Zero, (Fixed64)65));
+        ScenarioBody<LSConeCollider> tiltedCone = CreateBody3D(
+            context,
+            new LSConeCollider { Size = new Vector3d((Fixed64)2, (Fixed64)3, (Fixed64)2) },
+            Vector3d.Zero,
+            immovable: true,
+            rotation: FixedQuaternion.FromEulerAnglesInDegrees(Fixed64.Zero, (Fixed64)35, (Fixed64)35));
+
+        bool horizontalHit = FiniteSlabProjectionSweep.TrySweepCircleAgainstCylinder(
+            new Vector2d(Fixed64.Zero, (Fixed64)(-4)),
+            Vector2d.Forward,
+            (Fixed64)8,
+            Fixed64.Half,
+            -Fixed64.FromFraction(1, 10),
+            Fixed64.FromFraction(1, 10),
+            horizontalCylinder.Collider,
+            out Fixed64 horizontalDistance);
+        bool tiltedLeftHit = FiniteSlabProjectionSweep.TrySweepCircleAgainstCylinder(
+            new Vector2d((Fixed64)(-4), Fixed64.Zero),
+            Vector2d.Right,
+            (Fixed64)8,
+            Fixed64.Half,
+            -Fixed64.FromFraction(1, 10),
+            Fixed64.FromFraction(1, 10),
+            tiltedCylinder.Collider,
+            out Fixed64 tiltedLeftDistance);
+        bool tiltedRightHit = FiniteSlabProjectionSweep.TrySweepCircleAgainstCylinder(
+            new Vector2d((Fixed64)4, Fixed64.Zero),
+            -Vector2d.Right,
+            (Fixed64)8,
+            Fixed64.Half,
+            -Fixed64.FromFraction(1, 10),
+            Fixed64.FromFraction(1, 10),
+            tiltedCylinder.Collider,
+            out Fixed64 tiltedRightDistance);
+        bool capsuleBoundaryHit = FiniteSlabProjectionSweep.TrySweepCircleAgainstCapsule(
+            new Vector2d((Fixed64)(-4), Fixed64.Zero),
+            Vector2d.Right,
+            (Fixed64)8,
+            Fixed64.Half,
+            Fixed64.FromFraction(1, 4),
+            Fixed64.FromFraction(3, 10),
+            tiltedCapsule.Collider,
+            out Fixed64 capsuleBoundaryDistance);
+        bool coneTiltedHit = FiniteSlabProjectionSweep.TrySweepCircleAgainstCone(
+            new Vector2d((Fixed64)(-4), Fixed64.Zero),
+            Vector2d.Right,
+            (Fixed64)8,
+            Fixed64.Half,
+            -Fixed64.FromFraction(1, 5),
+            Fixed64.FromFraction(1, 5),
+            tiltedCone.Collider,
+            out Fixed64 coneTiltedDistance);
+
+        horizontalHit.Should().BeTrue(nameof(horizontalHit));
+        horizontalDistance.Should().BeGreaterThan(Fixed64.Zero);
+        tiltedLeftHit.Should().BeFalse(nameof(tiltedLeftHit));
+        tiltedRightHit.Should().BeFalse(nameof(tiltedRightHit));
+        tiltedLeftDistance.Should().Be(Fixed64.Zero);
+        tiltedRightDistance.Should().Be(Fixed64.Zero);
+        capsuleBoundaryHit.Should().BeFalse(nameof(capsuleBoundaryHit));
+        capsuleBoundaryDistance.Should().Be(Fixed64.Zero);
+        coneTiltedHit.Should().BeFalse(nameof(coneTiltedHit));
+        coneTiltedDistance.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
     public void SweepCircleAgainst3DAll_WithArbitrarilyRotatedCurvedTargets_ShouldUseExactFiniteSlabReducers()
     {
         using GravitasWorldContext context = CreateMixedContext();
@@ -1640,6 +1936,60 @@ public sealed class MixedQueryCcdTests
     }
 
     [Fact]
+    public void SweepCircleAgainst3D_WithCompoundSpherePartOutsideFiniteSlab_ShouldRejectExactPart()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        _ = CreateBody3D(
+            context,
+            new LSCompoundCollider(
+                CompoundColliderPart.Sphere(Fixed64.Half, new Vector3d(Fixed64.Zero, (Fixed64)2, Fixed64.Zero)),
+                CompoundColliderPart.Cuboid(Vector3d.One, new Vector3d(Fixed64.Zero, Fixed64.Zero, (Fixed64)2))),
+            Vector3d.Zero,
+            immovable: true);
+        var hits = new SwiftList<PhysicsMixedHit>();
+
+        int count = context.QueryMixed.SweepCircleAgainst3DAll(
+            new Vector2d((Fixed64)(-3), Fixed64.Zero),
+            new Vector2d((Fixed64)3, Fixed64.Zero),
+            Fixed64.Half,
+            Fixed64.Zero,
+            Fixed64.FromFraction(1, 4),
+            IncludeLayerZero,
+            hits);
+
+        count.Should().Be(0);
+        context.QueryMixed.LastQueryCandidateCount.Should().Be(1);
+        hits.Count.Should().Be(0);
+    }
+
+    [Fact]
+    public void SweepCircleAgainst3D_WithCompoundSpherePartBehindAndMovingAway_ShouldRejectExactPart()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        _ = CreateBody3D(
+            context,
+            new LSCompoundCollider(
+                CompoundColliderPart.Sphere(Fixed64.Half, Vector3d.Zero),
+                CompoundColliderPart.Cuboid(Vector3d.One, new Vector3d((Fixed64)3, Fixed64.Zero, (Fixed64)2))),
+            Vector3d.Zero,
+            immovable: true);
+        var hits = new SwiftList<PhysicsMixedHit>();
+
+        int count = context.QueryMixed.SweepCircleAgainst3DAll(
+            new Vector2d((Fixed64)2, Fixed64.Zero),
+            new Vector2d((Fixed64)5, Fixed64.Zero),
+            Fixed64.Half,
+            Fixed64.Zero,
+            Fixed64.Half,
+            IncludeLayerZero,
+            hits);
+
+        count.Should().Be(0);
+        context.QueryMixed.LastQueryCandidateCount.Should().Be(1);
+        hits.Count.Should().Be(0);
+    }
+
+    [Fact]
     public void SweepCircleAgainst3D_ShouldHitMeshTargetThroughFiniteSlabProjection()
     {
         using GravitasWorldContext context = CreateMixedContext();
@@ -1799,6 +2149,31 @@ public sealed class MixedQueryCcdTests
         hit.Collider3D.Should().BeSameAs(mesh.Collider);
         hit.Distance.Should().Be(Fixed64.FromFraction(5, 2));
         hit.Point3D.Should().Be(new Vector3d(Fixed64.Zero, Fixed64.One, Fixed64.Zero));
+        hit.ReducerKind.Should().Be(PhysicsQueryReducerKind.Exact);
+    }
+
+    [Fact]
+    public void SweepCircleAgainst3D_WithStartingOverlapInsideMeshSegmentProjection_ShouldReturnStableExactHit()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSMeshCollider> mesh = CreateMesh3D(
+            context,
+            CreateSegmentProjectionTriangle(),
+            Vector3d.Zero,
+            immovable: true);
+
+        bool mixedHit = context.QueryMixed.SweepCircleAgainst3D(
+            new Vector2d(Fixed64.Zero, Fixed64.Zero),
+            new Vector2d((Fixed64)3, Fixed64.Zero),
+            Fixed64.Half,
+            Fixed64.Half,
+            Fixed64.Half,
+            IncludeLayerZero,
+            out PhysicsMixedHit hit);
+
+        mixedHit.Should().BeTrue();
+        hit.Collider3D.Should().BeSameAs(mesh.Collider);
+        hit.Distance.Should().Be(Fixed64.Zero);
         hit.ReducerKind.Should().Be(PhysicsQueryReducerKind.Exact);
     }
 
@@ -2151,6 +2526,71 @@ public sealed class MixedQueryCcdTests
     }
 
     [Fact]
+    public void LateSimulate_WithMixed3DSourceAndSleeping2DTarget_ShouldWakeAndApplyDynamicHandoff()
+    {
+        using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
+        context.Environment.Gravity = Fixed64.Zero;
+        SolidBody2D target = CreateCircle2D(context, Vector2d.Zero);
+        ScenarioBody<LSSphereCollider> source = CreateSphere3D(
+            context,
+            new Vector3d((Fixed64)(-5), Fixed64.Zero, Fixed64.Zero));
+        source.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        target.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        target.Sleep();
+
+        source.Body.AddForce(Vector3d.Right * (Fixed64)10);
+        context.LateSimulate();
+
+        target.IsSleeping.Should().BeFalse();
+        target.Position.X.Should().BeGreaterThan(Fixed64.Zero);
+        target.LinearVelocity.X.Should().BeGreaterThan(Fixed64.Zero);
+        source.Body.Position3d.X.Should().BeLessThan(target.Position.X);
+    }
+
+    [Fact]
+    public void LateSimulate_WithMixed2DSourceAndSleeping3DTarget_ShouldWakeAndApplyDynamicHandoff()
+    {
+        using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
+        context.Environment.Gravity = Fixed64.Zero;
+        ScenarioBody<LSSphereCollider> target = CreateSphere3D(context, Vector3d.Zero);
+        SolidBody2D source = CreateCircle2D(context, new Vector2d((Fixed64)(-5), Fixed64.Zero));
+        source.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        target.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        target.Body.Sleep();
+
+        source.AddForce(Vector2d.Right * (Fixed64)10);
+        context.LateSimulate();
+
+        target.Body.IsSleeping.Should().BeFalse();
+        target.Body.Position3d.X.Should().BeGreaterThan(Fixed64.Zero);
+        target.Body.LinearVelocity.X.Should().BeGreaterThan(Fixed64.Zero);
+        source.Position.X.Should().BeLessThan(target.Body.Position3d.X);
+    }
+
+    [Fact]
+    public void LateSimulate_WithVerticalMixed3DDynamicHit_ShouldNotInventPlanar2DHandoff()
+    {
+        using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
+        context.Environment.Gravity = Fixed64.Zero;
+        SolidBody2D target = CreateCircle2D(context, Vector2d.Zero);
+        ScenarioBody<LSSphereCollider> source = CreateSphere3D(
+            context,
+            new Vector3d(Fixed64.Zero, (Fixed64)3, Fixed64.Zero));
+        source.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        target.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        target.Sleep();
+
+        source.Body.AddForce(Vector3d.Down * (Fixed64)10);
+        context.LateSimulate();
+
+        source.Body.LastContinuousCollisionToiIterationCount.Should().Be(1);
+        source.Body.LinearVelocity.Y.Should().Be(Fixed64.Zero);
+        target.Position.Should().Be(Vector2d.Zero);
+        target.LinearVelocity.Should().Be(Vector2d.Zero);
+        target.IsSleeping.Should().BeTrue();
+    }
+
+    [Fact]
     public void LateSimulate_WithMixed3DSourceCcdRestitutionThreshold_ShouldSuppressDynamicBounce()
     {
         using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
@@ -2258,8 +2698,10 @@ public sealed class MixedQueryCcdTests
         middle.IsSleeping.Should().BeFalse();
         receiver.Body.IsSleeping.Should().BeFalse();
         receiver.Body.Position3d.X.Should().BeGreaterThan((Fixed64)2);
-        (receiver.Body.Position3d.X - middle.Position.X).Should().BeGreaterThan(Fixed64.FromFraction(19, 20));
-        (middle.Position.X - driver.Body.Position3d.X).Should().BeGreaterThan(Fixed64.FromFraction(19, 20));
+        Fixed64 mixedContactSpan = driver.Collider.ScaledRadius + ((LSCircleCollider2D)middle.Collider).ScaledRadius;
+        Fixed64 maxResidualPenetration = Fixed64.FromFraction(1, 10);
+        (receiver.Body.Position3d.X - middle.Position.X).Should().BeGreaterThan(mixedContactSpan - maxResidualPenetration);
+        (middle.Position.X - driver.Body.Position3d.X).Should().BeGreaterThan(mixedContactSpan - maxResidualPenetration);
         context.Physics.LastContinuousCollisionIslandCount.Should().Be(1);
         context.Physics.LastContinuousCollisionIslandIterationCount.Should().BeGreaterThanOrEqualTo(1);
         context.Physics.LastContinuousCollisionIslandLimitReached.Should().BeFalse();

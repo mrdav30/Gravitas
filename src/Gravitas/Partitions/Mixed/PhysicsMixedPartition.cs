@@ -342,7 +342,7 @@ internal sealed class PhysicsMixedPartition : IVoxelPartition, IRetainedPhysicsP
         ContainedStatic2DObjects?.Clear();
 
         if (ActivationId != -1)
-            _owner?.DeactivatePartition(ActivationId);
+            Owner.DeactivatePartition(ActivationId);
 
         _owner = null;
         ActivationId = -1;
@@ -441,7 +441,7 @@ internal sealed class PhysicsMixedPartition : IVoxelPartition, IRetainedPhysicsP
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void MarkEmptyIfUnoccupied()
     {
-        if (IsEmpty && _emptySinceFrame < 0)
+        if (IsEmpty)
             MarkEmpty(Owner.Context.FrameCount);
     }
 

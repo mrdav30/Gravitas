@@ -1255,7 +1255,7 @@ public sealed partial class GravitasQuery3DService
     {
         hit = default;
         return _context.Physics.TryGetColliderById(colliderId, out LSCollider? current)
-            && DoesCurrentColliderIntersectRay(current)
+            && DoesCurrentColliderIntersectRay(current!)
             && TryBuildHit(current!, origin, direction, out hit);
     }
 
@@ -1267,7 +1267,7 @@ public sealed partial class GravitasQuery3DService
     {
         hit = default;
         return _context.Physics.TryGetColliderById(colliderId, out LSCollider? current)
-            && IsSweepCandidate(current)
+            && IsSweepCandidate(current!)
             && TryBuildSweepHit(current!, origin, direction, out hit);
     }
 
@@ -1275,7 +1275,7 @@ public sealed partial class GravitasQuery3DService
     {
         hit = default;
         if (!_context.Physics.TryGetColliderById(colliderId, out LSCollider? current)
-            || !IsSweepCandidate(current))
+            || !IsSweepCandidate(current!))
         {
             return false;
         }
@@ -1360,11 +1360,8 @@ public sealed partial class GravitasQuery3DService
         return CircleVersion;
     }
 
-    private bool DoesCurrentColliderIntersectRay(LSCollider? current)
+    private bool DoesCurrentColliderIntersectRay(LSCollider current)
     {
-        if (current == null)
-            return false;
-
         if (!_currentLayerMask.Includes(current.Layer)
             || current.RaycastVersion == RaycastVersion
             || !_redundantColliderCheck.Add(current.Id))
@@ -1377,11 +1374,8 @@ public sealed partial class GravitasQuery3DService
         return current.ColliderOverlapsRay(_worker, ref _bufferIntersectionPoints);
     }
 
-    private bool IsSweepCandidate(LSCollider? current)
+    private bool IsSweepCandidate(LSCollider current)
     {
-        if (current == null)
-            return false;
-
         if (ReferenceEquals(current, _currentExcludedCollider)
             || ReferenceEquals(current, _currentSweepSourceCollider)
             || IsExcludedByCurrentSweepSource(current)

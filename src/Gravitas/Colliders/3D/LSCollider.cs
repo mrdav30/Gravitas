@@ -154,7 +154,7 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
     // For dynamic colliders, this is the velocity of the body. For static colliders, this is always zero.
     public Vector3d Velocity => Body?.LinearVelocity ?? Vector3d.Zero;
 
-    public GridWorld? World => _context?.World ?? _agent?.Context.World;
+    public GridWorld World => Context.World;
 
     public FixedTransform Transform => _compoundOwner?.Transform
         ?? Body?.PositionTransform
@@ -873,21 +873,15 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
     /// <returns></returns>
     public abstract bool ColliderOverlapsRay(RaycastSegmentWorker worker, ref SwiftList<Vector3d> outputIntersectionPoints);
 
-    public void SetPreviousGridBounds()
-    {
-        GridWorld? world = World;
-        if (world == null)
-        {
-            _partitionState.SetPreviousGridBounds(Vector3d.Zero, Vector3d.Zero);
-            return;
-        }
-
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void SetPreviousGridBounds() =>
         _partitionState.SetPreviousGridBounds(BoundsMin, BoundsMax, Context.Collisions.ResolvePartitionKind(this));
-    }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal bool TryGetCollisionPair(int otherId, out CollisionPair? collisionPair) =>
         _pairState.TryGetCollisionPair(otherId, out collisionPair);
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal bool TryAddCollisionPair(int otherId, CollisionPair collisionPair) =>
         _pairState.TryAddCollisionPair(otherId, collisionPair);
 
@@ -1206,13 +1200,11 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
 
         if (!_active)
         {
-            if (IsPartitioned)
-                _context.Collisions.ClearPartitionedObject(this, force: true);
+            _context.Collisions.ClearPartitionedObject(this, force: true);
             MarkUnpartitioned();
             ClearPartitionCoordinates();
 
-            if (IsMixedPartitioned)
-                _context.MixedCollisions.ClearPartitioned3DCollider(this, force: true);
+            _context.MixedCollisions.ClearPartitioned3DCollider(this, force: true);
             MarkMixedUnpartitioned();
             ClearMixedPartitionCoordinates();
             return;

@@ -119,15 +119,14 @@ public static partial class CollisionDetection
         if (mesh.Mode == MeshColliderMode.Concave)
             return false;
 
-        if (!TestMeshCuboidColliders(pair, mesh, cuboid, out CollisionResult? output))
+        if (!TestMeshCuboidColliders(pair, mesh, cuboid, out CollisionResult output))
             return false;
 
-        if (!output.HasValue) return false; // Check if axisPenetration was found
         pair.Manifold.SetContact(
-            output.Value.PointsOfContact.Point1,
-            output.Value.PointsOfContact.Point2,
-            output.Value.AxisPenetration.Depth,
-            output.Value.AxisPenetration.Vector.Normalized);
+            output.PointsOfContact.Point1,
+            output.PointsOfContact.Point2,
+            output.AxisPenetration.Depth,
+            output.AxisPenetration.Vector.Normalized);
 
         return true;
     }
@@ -152,9 +151,9 @@ public static partial class CollisionDetection
         CollisionWorkItem pair,
         LSMeshCollider mesh,
         LSCuboidCollider cuboid,
-        out CollisionResult? output)
+        out CollisionResult output)
     {
-        output = null;
+        output = default;
 
         (Vector3d PointA, Vector3d PointB) = FindInitialPointsOfContact(mesh, cuboid);
         if (!TryFindConvexMeshCuboidPenetration(mesh, cuboid, out AxisPenetration penetration))
@@ -257,25 +256,23 @@ public static partial class CollisionDetection
         }
 
         // Test for intersection between the meshes using separating axis theorem
-        if (!TestMeshColliders(pair, out CollisionResult? output))
+        if (!TestMeshColliders(pair, out CollisionResult output))
             return false;
 
-        // Check if axisPenetration was found
-        if (!output.HasValue) return false;
         // Set the contact point information if collision detected
         pair.Manifold.SetContact(
-            output.Value.PointsOfContact.Point1,
-            output.Value.PointsOfContact.Point2,
-            output.Value.AxisPenetration.Depth,
-            output.Value.AxisPenetration.Vector.Normalized
+            output.PointsOfContact.Point1,
+            output.PointsOfContact.Point2,
+            output.AxisPenetration.Depth,
+            output.AxisPenetration.Vector.Normalized
         );
 
         return true;
     }
 
-    private static bool TestMeshColliders(CollisionWorkItem pair, out CollisionResult? output)
+    private static bool TestMeshColliders(CollisionWorkItem pair, out CollisionResult output)
     {
-        output = null;
+        output = default;
 
         var mesh1 = (LSMeshCollider)pair.ColliderA;
         var mesh2 = (LSMeshCollider)pair.ColliderB;

@@ -54,6 +54,8 @@ public partial class SolidBody
         {
             _continuousCollisionHandoffIgnoredCollider3D = null;
             _continuousCollisionHandoffIgnoredCollider2D = null;
+            if (updateColliderState)
+                Collider.Simulate();
             return true;
         }
 

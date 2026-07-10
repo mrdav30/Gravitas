@@ -165,145 +165,28 @@ public sealed partial class GravitasPhysics2DService
         _discreteIslandNodes.Add(new DiscreteIslandNode2D(body!.DynamicId, body));
     }
 
-    private void SortAndDeduplicateIslandNodes()
-    {
-        if (_discreteIslandNodes.Count == 0)
-            return;
-
-        if (_discreteIslandNodes.Count == 1)
-        {
-            DiscreteIslandNode2D singleNode = _discreteIslandNodes[0];
-            singleNode.ParentIndex = 0;
-            singleNode.RootKey = singleNode.BodyKey;
-            _discreteIslandNodes[0] = singleNode;
-            return;
-        }
-
-        _discreteIslandNodes.SortInPlace(IslandNodeComparer);
-
-        int writeIndex = 0;
-        int previousKey = -1;
-        for (int readIndex = 0; readIndex < _discreteIslandNodes.Count; readIndex++)
-        {
-            DiscreteIslandNode2D node = _discreteIslandNodes[readIndex];
-            if (node.BodyKey == previousKey)
-                continue;
-
-            node.ParentIndex = writeIndex;
-            node.RootKey = node.BodyKey;
-            _discreteIslandNodes[writeIndex++] = node;
-            previousKey = node.BodyKey;
-        }
-
-        while (_discreteIslandNodes.Count > writeIndex)
-            _discreteIslandNodes.RemoveAt(_discreteIslandNodes.Count - 1);
-    }
+    private void SortAndDeduplicateIslandNodes() =>
+        IslandGraphUtility.SortAndDeduplicate(_discreteIslandNodes, IslandNodeComparer);
 
     private int FindIslandNode(SolidBody2D? body)
     {
         if (!IsMovableIslandBody(body))
             return -1;
 
-        int key = body!.DynamicId;
-        int low = 0;
-        int high = _discreteIslandNodes.Count - 1;
-        while (low <= high)
-        {
-            int mid = low + ((high - low) >> 1);
-            int midKey = _discreteIslandNodes[mid].BodyKey;
-            if (midKey == key)
-                return mid;
-
-            if (midKey < key)
-                low = mid + 1;
-            else
-                high = mid - 1;
-        }
-
-        return -1;
+        return IslandGraphUtility.Find(_discreteIslandNodes, body!.DynamicId);
     }
 
-    private void UnionIslandNodes(int nodeA, int nodeB)
-    {
-        int rootA = FindIslandRoot(nodeA);
-        int rootB = FindIslandRoot(nodeB);
-        if (rootA == rootB)
-            return;
+    private void UnionIslandNodes(int nodeA, int nodeB) =>
+        IslandGraphUtility.Union(_discreteIslandNodes, nodeA, nodeB);
 
-        int keyA = _discreteIslandNodes[rootA].BodyKey;
-        int keyB = _discreteIslandNodes[rootB].BodyKey;
-        int parent = keyA <= keyB ? rootA : rootB;
-        int child = parent == rootA ? rootB : rootA;
+    private void CompressIslandRoots() =>
+        IslandGraphUtility.CompressRoots(_discreteIslandNodes);
 
-        DiscreteIslandNode2D childNode = _discreteIslandNodes[child];
-        childNode.ParentIndex = parent;
-        childNode.RootKey = _discreteIslandNodes[parent].BodyKey;
-        _discreteIslandNodes[child] = childNode;
-    }
+    private int ResolveConstraintRootKey(int nodeA, int nodeB) =>
+        IslandGraphUtility.ResolveConstraintRootKey(_discreteIslandNodes, nodeA, nodeB);
 
-    private int FindIslandRoot(int index)
-    {
-        int root = index;
-        while (_discreteIslandNodes[root].ParentIndex != root)
-            root = _discreteIslandNodes[root].ParentIndex;
-
-        while (index != root)
-        {
-            DiscreteIslandNode2D node = _discreteIslandNodes[index];
-            int parent = node.ParentIndex;
-            node.ParentIndex = root;
-            node.RootKey = _discreteIslandNodes[root].BodyKey;
-            _discreteIslandNodes[index] = node;
-            index = parent;
-        }
-
-        return root;
-    }
-
-    private void CompressIslandRoots()
-    {
-        for (int i = 0; i < _discreteIslandNodes.Count; i++)
-        {
-            int root = FindIslandRoot(i);
-            DiscreteIslandNode2D node = _discreteIslandNodes[i];
-            node.RootKey = _discreteIslandNodes[root].BodyKey;
-            _discreteIslandNodes[i] = node;
-        }
-    }
-
-    private int ResolveConstraintRootKey(int nodeA, int nodeB)
-    {
-        if (nodeA >= 0)
-            return _discreteIslandNodes[nodeA].RootKey;
-
-        return nodeB >= 0 ? _discreteIslandNodes[nodeB].RootKey : -1;
-    }
-
-    private bool WakeIslandBodies(int rootKey)
-    {
-        bool hasAwakeBody = false;
-        for (int i = 0; i < _discreteIslandNodes.Count; i++)
-        {
-            DiscreteIslandNode2D node = _discreteIslandNodes[i];
-            if (node.RootKey == rootKey && node.Body.IsAwakeForCollision)
-            {
-                hasAwakeBody = true;
-                break;
-            }
-        }
-
-        if (!hasAwakeBody)
-            return false;
-
-        for (int i = 0; i < _discreteIslandNodes.Count; i++)
-        {
-            DiscreteIslandNode2D node = _discreteIslandNodes[i];
-            if (node.RootKey == rootKey)
-                node.Body.WakeFromCollision();
-        }
-
-        return true;
-    }
+    private bool WakeIslandBodies(int rootKey) =>
+        IslandGraphUtility.WakeBodies(_discreteIslandNodes, rootKey);
 
     private void SolveDiscreteIslandRange(int start, int end)
     {

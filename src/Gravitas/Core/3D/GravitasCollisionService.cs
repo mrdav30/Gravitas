@@ -147,7 +147,7 @@ public sealed class GravitasCollisionService
             nameof(collider),
             "Collider must belong to this collision service context.");
 
-        if (collider.IsPartitioned || collider.World == null)
+        if (collider.IsPartitioned)
             return false;
 
         partitionedCoordinates.FastClear();
@@ -201,7 +201,10 @@ public sealed class GravitasCollisionService
             if (!voxel.TryAddPartition(partition))
             {
                 ReleasePartition(partition);
-                return;
+                SwiftThrowHelper.ThrowIfTrue(
+                    true,
+                    nameof(GravitasCollisionService),
+                    "Unable to attach 3D physics partition to voxel.");
             }
 
             TrackRetainedPartition(partition);

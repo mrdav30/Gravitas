@@ -6,7 +6,6 @@
 //=======================================================================
 
 using FixedMathSharp;
-using Gravitas.Materials;
 using System.Runtime.CompilerServices;
 
 namespace Gravitas;
@@ -85,7 +84,7 @@ public partial class SolidBody
 
     private void RefreshPartitionMobility()
     {
-        if (!Active || Collider == null || !Collider.TryGetBoundContext(out GravitasWorldContext? context))
+        if (!Active || !Collider.TryGetBoundContext(out GravitasWorldContext? context))
             return;
 
         if (Collider.IsPartitioned)
@@ -258,7 +257,7 @@ public partial class SolidBody
     private void ApplyDragForce()
     {
         // Drag calculation and accumulation.
-        Fixed64 dragMagnitude = LinearDragCoefficient * Context.Environment.AirDensity * Collider!.GetFrontalArea(_linearDirection) * _linearSpeed;
+        Fixed64 dragMagnitude = LinearDragCoefficient * Context.Environment.AirDensity * Collider.GetFrontalArea(_linearDirection) * _linearSpeed;
         _linearAccelerationStore += (-_linearDirection * dragMagnitude);
     }
 
@@ -324,7 +323,7 @@ public partial class SolidBody
             else
                 _linearSpeed = desiredSpeed;
         }
-        else if (desiredSpeed >= Fixed64.Zero)
+        else
         {
             _linearVelocity = Vector3d.Zero;
             _linearSpeed = Fixed64.Zero;
@@ -354,7 +353,7 @@ public partial class SolidBody
     private void ApplyDragTorque()
     {
         // Angular drag should also be proportional to the square of the angular velocity, just like linear drag.
-        Fixed64 angularDragMagnitude = AngularDragCoefficient * Context.Environment.AirDensity * Collider!.GetFrontalArea(_angularDirection) * _angularSpeed;
+        Fixed64 angularDragMagnitude = AngularDragCoefficient * Context.Environment.AirDensity * Collider.GetFrontalArea(_angularDirection) * _angularSpeed;
         _angularAccelerationStore += (-_angularDirection * angularDragMagnitude);
     }
 
@@ -412,7 +411,7 @@ public partial class SolidBody
                 _angularDirection = _angularSpeed > Fixed64.Zero ? _angularVelocity.Normalized : Vector3d.Zero;
             }
         }
-        else if (desiredSpeed >= Fixed64.Zero)
+        else
         {
             _angularVelocity = Vector3d.Zero;
             _angularSpeed = Fixed64.Zero;
@@ -425,7 +424,7 @@ public partial class SolidBody
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private Fixed64 ResolveGroundDynamicFriction() =>
-        Collider?.Material.DynamicFriction ?? PhysicsMaterial.Default.DynamicFriction;
+        Collider.Material.DynamicFriction;
 
     private void NonKinematicUpdate()
     {
@@ -494,9 +493,6 @@ public partial class SolidBody
 
     internal void RefreshMassPropertiesFromColliderShape()
     {
-        if (Collider == null)
-            return;
-
         if (!_centerOfMassOffsetExplicit)
             _localCenterOfMassOffset = Collider.CalculateLocalCenterOfMassOffset();
 
@@ -521,7 +517,7 @@ public partial class SolidBody
 
     private void RefreshInertiaTensor()
     {
-        if (!CanUseAngularInertia || Collider == null)
+        if (!CanUseAngularInertia)
         {
             _inertiaTensor = Fixed3x3.Zero;
             _worldInertiaTensor = Fixed3x3.Zero;

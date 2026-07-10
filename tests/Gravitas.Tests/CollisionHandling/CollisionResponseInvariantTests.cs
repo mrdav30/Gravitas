@@ -318,6 +318,42 @@ public sealed class CollisionResponseInvariantTests
     }
 
     [Fact]
+    public void CalculateImpulse_WithBodylessOrFrozenPairs_ShouldNotMutateBodies()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSSphereCollider staticCollider = scenario.CreateStaticSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
+        ScenarioBody<LSSphereCollider> solid = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
+        Push(solid.Body, -60);
+        CollisionPair bodylessPair = scenario.CreatePair(staticCollider, solid.Collider);
+        bodylessPair.Manifold.SetContact(staticCollider.Center, solid.Collider.Center, Fixed64.FromFraction(1, 4), Vector3d.Right);
+        Vector3d solidVelocityBefore = solid.Body.LinearVelocity;
+
+        CollisionResponse.CalculateImpulse(bodylessPair);
+
+        solid.Body.LinearVelocity.Should().Be(solidVelocityBefore);
+
+        ScenarioBody<LSSphereCollider> frozenA = scenario.CreateSphere(
+            PhysicsScenarioBuilder.Vector(2, 0, 0),
+            immovable: true,
+            preventAngularForces: true);
+        ScenarioBody<LSSphereCollider> frozenB = scenario.CreateSphere(
+            PhysicsScenarioBuilder.Vector(Fixed64.FromFraction(11, 4), Fixed64.Zero, Fixed64.Zero),
+            immovable: true,
+            preventAngularForces: true);
+        CollisionPair frozenPair = scenario.CreatePair(frozenA.Collider, frozenB.Collider);
+        frozenPair.Manifold.SetContact(frozenA.Collider.Center, frozenB.Collider.Center, Fixed64.FromFraction(1, 4), Vector3d.Right);
+        Vector3d frozenAPositionBefore = frozenA.Body.Position3d;
+        Vector3d frozenBPositionBefore = frozenB.Body.Position3d;
+
+        CollisionResponse.CalculateImpulse(frozenPair);
+
+        frozenA.Body.Position3d.Should().Be(frozenAPositionBefore);
+        frozenB.Body.Position3d.Should().Be(frozenBPositionBefore);
+        frozenA.Body.LinearVelocity.Should().Be(Vector3d.Zero);
+        frozenB.Body.LinearVelocity.Should().Be(Vector3d.Zero);
+    }
+
+    [Fact]
     public void CalculateImpulse_WithZeroRestitution_ShouldDampenWithoutReversingLinearVelocity()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();

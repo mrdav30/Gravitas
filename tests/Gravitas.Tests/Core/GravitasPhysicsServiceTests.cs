@@ -99,6 +99,25 @@ public sealed class GravitasPhysicsServiceTests
     }
 
     [Fact]
+    public void TryGetColliderByServiceIndex_ShouldRejectOutOfRangeIndicesFor3DAnd2DRegistries()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        var collider3D = new LSSphereCollider();
+        var collider2D = new LSCircleCollider2D(Fixed64.Half);
+        context.Physics.AssimilateCollider(collider3D);
+        collider2D.InitializeWithNoBody(new TestMatterAgent(context));
+
+        context.Physics.TryGetColliderByServiceIndex(-1, out LSCollider? negative3D).Should().BeFalse();
+        context.Physics.TryGetColliderByServiceIndex(1, out LSCollider? tooHigh3D).Should().BeFalse();
+        context.Physics2D.TryGetColliderByServiceIndex(-1, out LSCollider2D? negative2D).Should().BeFalse();
+        context.Physics2D.TryGetColliderByServiceIndex(1, out LSCollider2D? tooHigh2D).Should().BeFalse();
+        negative3D.Should().BeNull();
+        tooHigh3D.Should().BeNull();
+        negative2D.Should().BeNull();
+        tooHigh2D.Should().BeNull();
+    }
+
+    [Fact]
     public void ColliderIsStatic_ShouldBeTrueForBodylessAndPositionFrozenColliders()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();

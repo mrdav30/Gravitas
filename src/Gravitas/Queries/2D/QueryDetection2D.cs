@@ -223,8 +223,6 @@ internal static class QueryDetection2D
         }
 
         Fixed64 distance = -b - FixedMath.Sqrt(discriminant);
-        if (distance < Fixed64.Zero)
-            distance = Fixed64.Zero;
         if (distance > segmentLength)
         {
             hit = default;
@@ -467,9 +465,6 @@ internal static class QueryDetection2D
 
     private static bool TryTestAreaCircleAxis(Vector2d axis, ReadOnlySpan<Vector2d> vertices, LSCircleCollider2D circle)
     {
-        if (axis.MagnitudeSquared <= Fixed64.Epsilon)
-            return true;
-
         axis = axis.Normalized;
         ProjectVertices(vertices, axis, out Fixed64 areaMin, out Fixed64 areaMax);
         Fixed64 circleCenter = Vector2d.Dot(circle.Center, axis);
@@ -480,9 +475,6 @@ internal static class QueryDetection2D
 
     private static bool TryTestAreaCapsuleAxis(Vector2d axis, ReadOnlySpan<Vector2d> vertices, LSCapsuleCollider2D capsule)
     {
-        if (axis.MagnitudeSquared <= Fixed64.Epsilon)
-            return true;
-
         axis = axis.Normalized;
         ProjectVertices(vertices, axis, out Fixed64 areaMin, out Fixed64 areaMax);
         ProjectCapsule(capsule, axis, out Fixed64 capsuleMin, out Fixed64 capsuleMax);
@@ -491,9 +483,6 @@ internal static class QueryDetection2D
 
     private static bool TryTestAreaConvexAxis(Vector2d axis, ReadOnlySpan<Vector2d> vertices, LSCollider2D collider)
     {
-        if (axis.MagnitudeSquared <= Fixed64.Epsilon)
-            return true;
-
         axis = axis.Normalized;
         ProjectVertices(vertices, axis, out Fixed64 areaMin, out Fixed64 areaMax);
         ProjectConvex(collider, axis, out Fixed64 colliderMin, out Fixed64 colliderMax);
@@ -899,9 +888,6 @@ internal static class QueryDetection2D
             return false;
         }
 
-        if (entryTime < Fixed64.Zero)
-            entryTime = Fixed64.Zero;
-
         Vector2d point = target.GetSupportPoint(entryNormal);
         hit = new Physics2DHit(target, point, entryNormal, segmentLength * entryTime);
         return true;
@@ -1096,8 +1082,6 @@ internal static class QueryDetection2D
         }
 
         distance = -b - FixedMath.Sqrt(discriminant);
-        if (distance < Fixed64.Zero)
-            distance = Fixed64.Zero;
         return distance <= segmentLength;
     }
 

@@ -229,6 +229,108 @@ public sealed class GravitasQuery3DServiceConeTests
     }
 
     [Fact]
+    public void OverlapCone_WithConcaveTriangleInsideBoundsButOutsideVolume_ShouldRejectWithoutHit()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSMeshCollider concaveMesh = scenario.CreateBody(
+            new LSMeshCollider(
+                new[]
+                {
+                    new Vector3d((Fixed64)2, Fixed64.Zero, Fixed64.FromFraction(3, 2)),
+                    new Vector3d((Fixed64)2, Fixed64.Half, Fixed64.FromFraction(3, 2)),
+                    new Vector3d((Fixed64)2, Fixed64.Zero, Fixed64.FromFraction(7, 5))
+                },
+                new[] { 0, 1, 2 },
+                MeshColliderMode.Concave,
+                MeshInertiaPolicy.SurfaceApproximation),
+            Vector3d.Zero,
+            FixedQuaternion.Identity).Collider;
+
+        bool hit = scenario.Context.Query3D.OverlapCone(
+            Vector3d.Zero,
+            Vector3d.Right,
+            (Fixed64)4,
+            (Fixed64)2,
+            out Physics3DHit coneHit,
+            IncludeLayerZero);
+
+        hit.Should().BeFalse();
+        coneHit.Collider.Should().BeNull();
+        scenario.Context.Query3D.LastQueryCandidateCount.Should().Be(1);
+        scenario.Context.Query3D.LastMeshTriangleCandidateCount.Should().Be(1);
+        concaveMesh.Mode.Should().Be(MeshColliderMode.Concave);
+    }
+
+    [Fact]
+    public void OverlapCone_WithConcaveGeneratorParallelTriangleOutsideVolume_ShouldRejectWithoutHit()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSMeshCollider concaveMesh = scenario.CreateBody(
+            new LSMeshCollider(
+                new[]
+                {
+                    new Vector3d(Fixed64.One, Fixed64.One, Fixed64.Zero),
+                    new Vector3d((Fixed64)3, (Fixed64)2, Fixed64.Zero),
+                    new Vector3d((Fixed64)2, Fixed64.FromFraction(3, 2), Fixed64.FromFraction(1, 10))
+                },
+                new[] { 0, 1, 2 },
+                MeshColliderMode.Concave,
+                MeshInertiaPolicy.SurfaceApproximation),
+            Vector3d.Zero,
+            FixedQuaternion.Identity).Collider;
+
+        bool hit = scenario.Context.Query3D.OverlapCone(
+            Vector3d.Zero,
+            Vector3d.Right,
+            (Fixed64)4,
+            (Fixed64)2,
+            out Physics3DHit coneHit,
+            IncludeLayerZero);
+
+        hit.Should().BeFalse();
+        coneHit.Collider.Should().BeNull();
+        scenario.Context.Query3D.LastQueryCandidateCount.Should().Be(1);
+        scenario.Context.Query3D.LastMeshTriangleCandidateCount.Should().Be(1);
+        concaveMesh.Mode.Should().Be(MeshColliderMode.Concave);
+    }
+
+    [Fact]
+    public void OverlapCone_WithConcaveLaterCloserTriangle_ShouldReplaceFartherHit()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSMeshCollider concaveMesh = scenario.CreateBody(
+            new LSMeshCollider(
+                new[]
+                {
+                    new Vector3d((Fixed64)3, Fixed64.Half, Fixed64.Zero),
+                    new Vector3d((Fixed64)3, -Fixed64.Half, Fixed64.Half),
+                    new Vector3d((Fixed64)3, -Fixed64.Half, -Fixed64.Half),
+                    new Vector3d((Fixed64)2, Fixed64.Half, Fixed64.Zero),
+                    new Vector3d((Fixed64)2, -Fixed64.Half, Fixed64.Half),
+                    new Vector3d((Fixed64)2, -Fixed64.Half, -Fixed64.Half)
+                },
+                new[] { 0, 1, 2, 3, 4, 5 },
+                MeshColliderMode.Concave,
+                MeshInertiaPolicy.SurfaceApproximation),
+            Vector3d.Zero,
+            FixedQuaternion.Identity).Collider;
+
+        bool hit = scenario.Context.Query3D.OverlapCone(
+            Vector3d.Zero,
+            Vector3d.Right,
+            (Fixed64)4,
+            Fixed64.One,
+            out Physics3DHit coneHit,
+            IncludeLayerZero);
+
+        hit.Should().BeTrue();
+        coneHit.Collider.Should().BeSameAs(concaveMesh);
+        coneHit.Distance.Should().Be((Fixed64)2);
+        coneHit.Point.X.Should().Be((Fixed64)2);
+        scenario.Context.Query3D.LastMeshTriangleCandidateCount.Should().Be(2);
+    }
+
+    [Fact]
     public void OverlapConeAll_ShouldNotAllocateAfterWarmup()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();

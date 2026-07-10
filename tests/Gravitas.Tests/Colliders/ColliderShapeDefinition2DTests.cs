@@ -12,6 +12,30 @@ namespace Gravitas.Tests.Colliders;
 
 public sealed class ColliderShapeDefinition2DTests
 {
+    public static TheoryData<ColliderShapeDefinition2D, Type> RuntimeColliderDefinitions => new()
+    {
+        { ColliderShapeDefinition2D.Circle(Fixed64.Half), typeof(LSCircleCollider2D) },
+        { ColliderShapeDefinition2D.Capsule(Fixed64.Half, (Fixed64)3), typeof(LSCapsuleCollider2D) },
+        { ColliderShapeDefinition2D.AABBox(Vector2d.One), typeof(LSAABBoxCollider2D) },
+        { ColliderShapeDefinition2D.ConvexPolygon(
+            new Vector2d(-Fixed64.One, -Fixed64.One),
+            new Vector2d(Fixed64.One, -Fixed64.One),
+            new Vector2d(Fixed64.One, Fixed64.One),
+            new Vector2d(-Fixed64.One, Fixed64.One)),
+            typeof(LSPolygonCollider2D) }
+    };
+
+    [Theory]
+    [MemberData(nameof(RuntimeColliderDefinitions))]
+    public void ShapeDefinition2D_ShouldCreateEverySupportedRuntimeColliderKind(
+        ColliderShapeDefinition2D definition,
+        Type expectedType)
+    {
+        LSCollider2D collider = definition.CreateCollider();
+
+        collider.Should().BeOfType(expectedType);
+    }
+
     [Fact]
     public void AABBoxDefinition_ShouldBuildEquivalentStandaloneCollider()
     {
@@ -152,6 +176,21 @@ public sealed class ColliderShapeDefinition2DTests
     }
 
     [Fact]
+    public void ShapeDefinition2DEqualityAndHash_ShouldHandleDefaultMaterialAndObjectNull()
+    {
+        ColliderShapeDefinition2D circle = ColliderShapeDefinition2D.Circle(Fixed64.Half);
+        ColliderShapeDefinition2D same = ColliderShapeDefinition2D.Circle(Fixed64.Half);
+        ColliderShapeDefinition2D differentRadius = ColliderShapeDefinition2D.Circle(Fixed64.One);
+        ColliderShapeDefinition2D capsule = ColliderShapeDefinition2D.Capsule(Fixed64.Half, (Fixed64)3);
+
+        circle.Should().Be(same);
+        circle.GetHashCode().Should().Be(same.GetHashCode());
+        circle.Equals((object?)null).Should().BeFalse();
+        circle.Should().NotBe(differentRadius);
+        circle.Should().NotBe(capsule);
+    }
+
+    [Fact]
     public void TriangleDefinition_ShouldMaterializeAsConvexPolygon()
     {
         ColliderShapeDefinition2D definition = ColliderShapeDefinition2D.Triangle(
@@ -164,6 +203,18 @@ public sealed class ColliderShapeDefinition2DTests
         definition.Kind.Should().Be(ColliderShapeDefinition2DKind.ConvexPolygon);
         definition.PolygonVertexCount.Should().Be(3);
         collider.Should().BeOfType<LSPolygonCollider2D>();
+    }
+
+    [Fact]
+    public void ShapeDefinitions2D_ShouldMaterializeEverySupportedRuntimeCollider()
+    {
+        ColliderShapeDefinition2D.Circle(Fixed64.Half).CreateCollider().Should().BeOfType<LSCircleCollider2D>();
+        ColliderShapeDefinition2D.AABBox(Vector2d.One).CreateCollider().Should().BeOfType<LSAABBoxCollider2D>();
+        ColliderShapeDefinition2D.Capsule(Fixed64.Half, (Fixed64)2).CreateCollider().Should().BeOfType<LSCapsuleCollider2D>();
+        ColliderShapeDefinition2D.Triangle(Vector2d.Zero, Vector2d.Right, Vector2d.Forward)
+            .CreateCollider()
+            .Should()
+            .BeOfType<LSPolygonCollider2D>();
     }
 
     [Fact]

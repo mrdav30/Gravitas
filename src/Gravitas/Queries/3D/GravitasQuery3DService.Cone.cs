@@ -323,10 +323,6 @@ public sealed partial class GravitasQuery3DService
             int triangleIndex = _meshTriangleCandidates[i];
             mesh.Mesh.GetTriangleVertices(triangleIndex, out Vector3d first, out Vector3d second, out Vector3d third);
             Vector3d normal = mesh.Mesh.GetFaceNormalWorld(triangleIndex);
-            if (normal.MagnitudeSquared <= Fixed64.Epsilon)
-                continue;
-
-            normal = normal.Normalized;
             if (!TryBuildConeTriangleHit(
                     origin,
                     direction,

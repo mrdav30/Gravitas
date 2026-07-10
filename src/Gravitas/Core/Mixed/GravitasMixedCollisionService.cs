@@ -21,7 +21,7 @@ internal sealed partial class GravitasMixedCollisionService
     private static readonly PhysicsMixedPartitionOrderComparer PartitionOrderComparer = new();
     private static readonly MixedColliderKeyComparer CandidatePairComparer = new();
     private static readonly MixedResponsePairComparer ResponsePairComparer = new();
-    private static readonly MixedIslandNodeComparer IslandNodeComparer = new();
+    private static readonly IslandNodeKeyComparer<MixedIslandNode> IslandNodeComparer = new();
     private static readonly MixedIslandConstraintComparer IslandConstraintComparer = new();
     private static readonly Collider2DIdComparer Collider2DIdOrderComparer = new();
     private static readonly Collider3DIdComparer Collider3DIdOrderComparer = new();

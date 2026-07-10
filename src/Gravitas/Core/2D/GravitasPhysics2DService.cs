@@ -18,7 +18,7 @@ namespace Gravitas;
 public sealed partial class GravitasPhysics2DService
 {
     private static readonly CollisionPair2DStableKeyComparer ResponsePairComparer = new();
-    private static readonly DiscreteIslandNode2DComparer IslandNodeComparer = new();
+    private static readonly IslandNodeKeyComparer<DiscreteIslandNode2D> IslandNodeComparer = new();
     private static readonly DiscreteIslandConstraint2DComparer IslandConstraintComparer = new();
 
     private readonly GravitasWorldContext _context;
@@ -243,6 +243,8 @@ public sealed partial class GravitasPhysics2DService
 
     internal bool TryGetColliderByServiceIndex(int serviceIndex, out LSCollider2D? collider) =>
         _colliders.TryGetByServiceIndex(serviceIndex, out collider);
+
+    internal LSCollider2D GetColliderByServiceIndex(int serviceIndex) => _colliders[serviceIndex];
 
     internal SwiftList<LSCollider2D> PrepareReplayColliders() => _colliders.PrepareReplayColliders();
 

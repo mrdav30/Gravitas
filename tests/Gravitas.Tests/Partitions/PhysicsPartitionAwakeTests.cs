@@ -169,6 +169,25 @@ public sealed class PhysicsPartitionAwakeTests
     }
 
     [Fact]
+    public void RefreshPartitionAwakeState_ShouldLeaveStaticAndKinematicMembershipUnchanged()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> staticBody = scenario.CreateSphere(Vector3d.Zero, immovable: true);
+        ScenarioBody<LSSphereCollider> kinematicBody = scenario.CreateSphere(new Vector3d((Fixed64)2, Fixed64.Zero, Fixed64.Zero));
+        kinematicBody.Body.IsKinematic = true;
+        staticBody.Body.Sleep();
+        kinematicBody.Body.Sleep();
+
+        scenario.Context.Collisions.RefreshPartitionAwakeState(staticBody.Collider);
+        scenario.Context.Collisions.RefreshPartitionAwakeState(kinematicBody.Collider);
+
+        staticBody.Collider.IsPartitioned.Should().BeTrue();
+        kinematicBody.Collider.IsPartitioned.Should().BeTrue();
+        AssertPartitionMembership(GetFirstPartition(scenario, staticBody.Collider), staticBody.Collider.Id, dynamic: false, kinematic: false, @static: true);
+        AssertPartitionMembership(GetFirstPartition(scenario, kinematicBody.Collider), kinematicBody.Collider.Id, dynamic: false, kinematic: true, @static: false);
+    }
+
+    [Fact]
     public void Reset_WithRetainedVoxelPartitions_ShouldDetachOwnedVoxelPartitions()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();

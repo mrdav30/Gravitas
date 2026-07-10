@@ -376,6 +376,18 @@ public sealed class Collider2DStateParityTests
         ColliderSettings2D.GetCollisionType(first, second).Should().Be(expected);
     }
 
+    [Fact]
+    public void ColliderSettings2D_ShouldRankKnownColliderTypesAndRejectUnknownTypes()
+    {
+        ColliderSettings2D.GetPriority(ColliderType2D.Circle).Should().Be(0);
+        ColliderSettings2D.GetPriority(ColliderType2D.Capsule).Should().Be(0);
+        ColliderSettings2D.GetPriority(ColliderType2D.AABox).Should().Be(1);
+        ColliderSettings2D.GetPriority(ColliderType2D.ConvexPolygon).Should().Be(1);
+        ColliderSettings2D.GetPriority(ColliderType2D.Compound).Should().Be(2);
+        ColliderSettings2D.GetPriority(ColliderType2D.None).Should().Be(-1);
+        ColliderSettings2D.GetPriority((ColliderType2D)250).Should().Be(-1);
+    }
+
     private static SolidBody2D CreateBody(
         GravitasWorldContext context,
         LSCollider2D collider,

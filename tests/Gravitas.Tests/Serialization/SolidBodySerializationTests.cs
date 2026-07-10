@@ -219,6 +219,14 @@ public sealed class SolidBodySerializationTests
             targetScenario.Context,
             mixedCoordinate,
             target.Id).Should().BeFalse();
+
+        GravitasSerializationHarness.Populate(target, payload, transport);
+
+        target.IsActive.Should().BeFalse();
+        target.IsPartitioned.Should().BeFalse();
+        target.IsMixedPartitioned.Should().BeFalse();
+        target.PartitionCoordinates.Should().BeEmpty();
+        (target.MixedPartitionCoordinates?.Count ?? 0).Should().Be(0);
     }
 
     [Theory]
@@ -251,6 +259,14 @@ public sealed class SolidBodySerializationTests
             targetScenario.Context,
             coordinate,
             target.Id).Should().BeFalse();
+
+        GravitasSerializationHarness.Populate(target, payload, transport);
+
+        target.IsActive.Should().BeFalse();
+        target.IsPartitioned.Should().BeFalse();
+        target.IsMixedPartitioned.Should().BeFalse();
+        target.PartitionCoordinates.Should().BeEmpty();
+        (target.MixedPartitionCoordinates?.Count ?? 0).Should().Be(0);
     }
 
     [Theory]

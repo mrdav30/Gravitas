@@ -167,8 +167,7 @@ public sealed partial class SolidBody2D
 
             target.EnsureContinuousCollisionFramePrepared(token);
             Fixed64 targetRadius = target.ResolveContinuousCollisionProxyRadius();
-            if (targetRadius <= Fixed64.Epsilon
-                || !ContinuousCollisionMath.TrySweepRelativeCircles(
+            if (!ContinuousCollisionMath.TrySweepRelativeCircles(
                     startPosition,
                     sourceDisplacement,
                     proxyRadius,
@@ -252,8 +251,7 @@ public sealed partial class SolidBody2D
 
             target.EnsureContinuousCollisionFramePrepared(token);
             Fixed64 targetRadius = target.ResolveContinuousCollisionProxyRadius();
-            if (targetRadius <= Fixed64.Epsilon
-                || !ContinuousCollisionMath.TrySweepRelativeSpheres(
+            if (!ContinuousCollisionMath.TrySweepRelativeSpheres(
                     sourceStart,
                     sourceDisplacement,
                     sourceRadius,
@@ -297,8 +295,7 @@ public sealed partial class SolidBody2D
         Fixed64 hitDistance,
         Fixed64 sourceLength)
     {
-        if (!ContinuousCollisionImpulsePolicy.TryResolveSourceNormal(normalForSource, sourceDisplacement, out Vector2d normal))
-            return false;
+        _ = ContinuousCollisionImpulsePolicy.TryResolveSourceNormal(normalForSource, sourceDisplacement, out Vector2d normal);
 
         Fixed64 deltaTime = Context.DeltaTime;
         Fixed64 constrainedInverseMass = target.GetConstrainedInverseMass(normal);
@@ -333,8 +330,7 @@ public sealed partial class SolidBody2D
         Fixed64 hitDistance,
         Fixed64 sourceLength)
     {
-        if (!ContinuousCollisionImpulsePolicy.TryResolveSourceNormal(normalForSource, sourceDisplacement, out Vector2d normal))
-            return false;
+        _ = ContinuousCollisionImpulsePolicy.TryResolveSourceNormal(normalForSource, sourceDisplacement, out Vector2d normal);
 
         Fixed64 deltaTime = Context.DeltaTime;
         Fixed64 constrainedInverseMass = target.GetConstrainedInverseMass(normal.ToVector3d(Fixed64.Zero));

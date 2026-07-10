@@ -277,6 +277,24 @@ public sealed class RaycastSegmentWorkerTests
     }
 
     [Fact]
+    public void CheckCapsuleOverlaps_WithSegmentMissingCylinderAndHemispheres_ShouldReturnFalse()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSCapsuleCollider capsule = scenario.CreateCapsule(Vector3d.Zero).Collider;
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+
+        worker.PrepareSegmentCheck(
+            new Vector3d((Fixed64)(-2), Fixed64.Zero, (Fixed64)2),
+            new Vector3d((Fixed64)2, Fixed64.Zero, (Fixed64)2));
+
+        bool hit = worker.CheckCapsuleOverlaps(capsule, ref hits);
+
+        hit.Should().BeFalse();
+        hits.Count.Should().Be(0);
+    }
+
+    [Fact]
     public void CheckCylinderOverlaps_WithSegmentStartingInsideAndIntersectionsDisabled_ShouldNotWritePoint()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
@@ -618,6 +636,43 @@ public sealed class RaycastSegmentWorkerTests
         worker.PrepareSegmentCheck(
             new Vector3d((Fixed64)(-3), -cone.HalfHeight, Fixed64.Zero),
             new Vector3d(Fixed64.Zero, cone.HalfHeight, Fixed64.Zero));
+
+        bool hit = worker.CheckConeOverlaps(cone, ref hits);
+
+        hit.Should().BeFalse();
+        hits.Count.Should().Be(0);
+    }
+
+    [Fact]
+    public void CheckConeOverlaps_WithExactGeneratorSlopeSegmentBelowCone_ShouldReturnFalse()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSConeCollider cone = scenario.CreateCone(Vector3d.Zero).Collider;
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+
+        worker.PrepareSegmentCheck(
+            new Vector3d(-cone.ScaledRadius * (Fixed64)2, -cone.HalfHeight - cone.Height, Fixed64.Zero),
+            new Vector3d(-cone.ScaledRadius * Fixed64.FromFraction(3, 2), -cone.HalfHeight - cone.Height * Fixed64.Half, Fixed64.Zero));
+
+        bool hit = worker.CheckConeOverlaps(cone, ref hits);
+
+        hit.Should().BeFalse();
+        hits.Count.Should().Be(0);
+    }
+
+    [Fact]
+    public void CheckConeOverlaps_WithOffsetGeneratorSlopeSegmentBelowCone_ShouldReturnFalse()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSConeCollider cone = scenario.CreateCone(Vector3d.Zero).Collider;
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+        Fixed64 offset = cone.ScaledRadius * Fixed64.FromFraction(1, 4);
+
+        worker.PrepareSegmentCheck(
+            new Vector3d(-cone.ScaledRadius * (Fixed64)2 - offset, -cone.HalfHeight - cone.Height, Fixed64.Zero),
+            new Vector3d(-cone.ScaledRadius * Fixed64.FromFraction(3, 2) - offset, -cone.HalfHeight - cone.Height * Fixed64.Half, Fixed64.Zero));
 
         bool hit = worker.CheckConeOverlaps(cone, ref hits);
 

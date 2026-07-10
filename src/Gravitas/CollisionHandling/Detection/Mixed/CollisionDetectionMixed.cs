@@ -914,17 +914,8 @@ public static partial class CollisionDetectionMixed
         Vector3d secondStart,
         Vector3d secondEnd)
     {
-        bool firstDegenerate = (firstEnd - firstStart).MagnitudeSquared <= Fixed64.Epsilon;
-        bool secondDegenerate = (secondEnd - secondStart).MagnitudeSquared <= Fixed64.Epsilon;
-
-        if (firstDegenerate && secondDegenerate)
-            return (firstStart, secondStart);
-
-        if (firstDegenerate)
+        if ((firstEnd - firstStart).MagnitudeSquared <= Fixed64.Epsilon)
             return (firstStart, Vector3d.ClosestPointOnLineSegment(firstStart, secondStart, secondEnd));
-
-        if (secondDegenerate)
-            return (Vector3d.ClosestPointOnLineSegment(secondStart, firstStart, firstEnd), secondStart);
 
         return Vector3d.ClosestPointsOnTwoLines(firstStart, firstEnd, secondStart, secondEnd);
     }

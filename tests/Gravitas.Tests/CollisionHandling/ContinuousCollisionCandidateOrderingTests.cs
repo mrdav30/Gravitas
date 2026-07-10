@@ -289,6 +289,24 @@ public sealed class ContinuousCollisionCandidateOrderingTests
                 Fixed64.One)
             .Should()
             .BeTrue();
+        ContinuousCollisionCandidateOrdering.ShouldReplaceMixedHit(
+                CreateHit(higher3D, higher2D, PhysicsQueryReducerKind.ConservativeFallback, distance: current.Distance),
+                Fixed64.One,
+                hasCandidate: true,
+                hasCurrent: true,
+                CreateHit(null, higher2D, PhysicsQueryReducerKind.ConservativeFallback, distance: current.Distance),
+                Fixed64.One)
+            .Should()
+            .BeFalse();
+        ContinuousCollisionCandidateOrdering.ShouldReplaceMixedHit(
+                CreateHit(higher3D, higher2D, PhysicsQueryReducerKind.ConservativeFallback, distance: current.Distance),
+                Fixed64.One,
+                hasCandidate: true,
+                hasCurrent: true,
+                CreateHit(higher3D, null, PhysicsQueryReducerKind.ConservativeFallback, distance: current.Distance),
+                Fixed64.One)
+            .Should()
+            .BeFalse();
     }
 
     [Fact]

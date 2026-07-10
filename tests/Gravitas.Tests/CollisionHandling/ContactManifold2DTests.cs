@@ -157,6 +157,24 @@ public sealed class ContactManifold2DTests
     }
 
     [Fact]
+    public void PrimaryContact_WhenSecondContactIsDeeper_ShouldReturnSecondContact()
+    {
+        ContactCandidate[] candidates = Enumerable.Range(-4, 9)
+            .Select(static value => CreateCandidate(value))
+            .OrderBy(static candidate => candidate.ContactId)
+            .ToArray();
+        var manifold = new ContactManifold2D();
+        ContactCandidate first = candidates[0];
+        ContactCandidate second = candidates[^1];
+
+        manifold.AddContact(first.PointA, first.PointB, Fixed64.Half, Vector2d.Forward);
+        manifold.AddContact(second.PointA, second.PointB, Fixed64.One, Vector2d.Forward);
+
+        manifold.PrimaryContact.ContactId.Should().Be(second.ContactId);
+        manifold.PrimaryContact.Depth.Should().Be(Fixed64.One);
+    }
+
+    [Fact]
     public void SetContact_ShouldReplaceExistingContacts()
     {
         var manifold = new ContactManifold2D();

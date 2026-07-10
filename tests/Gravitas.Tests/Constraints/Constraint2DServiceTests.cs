@@ -26,6 +26,21 @@ public sealed class Constraint2DServiceTests
     }
 
     [Fact]
+    public void Joint2D_IsSolverBody_ShouldRequireActiveRegisteredTranslatableBody()
+    {
+        using GravitasWorldContext context = CreateConstraintContext();
+        SolidBody2D active = CreateBody(context, Vector2d.Zero);
+        SolidBody2D frozen = CreateBody(context, Vector2d.Right * (Fixed64)2, immovable: true);
+        SolidBody2D inactive = CreateBody(context, Vector2d.Right * (Fixed64)4);
+
+        inactive.Deactivate();
+
+        Joint2D.IsSolverBody(active).Should().BeTrue();
+        Joint2D.IsSolverBody(frozen).Should().BeFalse();
+        Joint2D.IsSolverBody(inactive).Should().BeFalse();
+    }
+
+    [Fact]
     public void RegisterJoint_ShouldAssignDeterministicMonotonicIdsAndAllowDuplicateBodyPairs()
     {
         using GravitasWorldContext context = CreateConstraintContext();
@@ -163,16 +178,19 @@ public sealed class Constraint2DServiceTests
         context.Constraints2D.ShouldExcludeLinkedCollision(first.Collider, null!).Should().BeFalse();
         context.Constraints2D.ShouldExcludeLinkedCollision(first.Collider, first.Collider).Should().BeFalse();
         context.Constraints2D.ShouldExcludeLinkedCollision(unregistered, second.Collider).Should().BeFalse();
+        context.Constraints2D.ShouldExcludeLinkedCollision(first.Collider, unregistered).Should().BeFalse();
 
         context.Constraints2D.UpdateJointCollisionPolicy(
             joint,
             JointCollisionPolicy.SuppressLinked,
             JointCollisionPolicy.SuppressLinked);
         context.Constraints2D.ShouldExcludeLinkedCollision(first.Collider, second.Collider).Should().BeTrue();
+        context.Constraints2D.RemoveSuppressionsForCollider(unregistered.Id);
 
         context.Constraints2D.RemoveJoint(joint.Id).Should().BeTrue();
         joint.SetCollisionPolicyFromRecord(JointCollisionPolicy.Collide);
         joint.SetCollisionPolicyFromRecord(JointCollisionPolicy.SuppressLinked);
+        context.Constraints2D.UpdateJointEnabledState(joint, true, false);
 
         context.Constraints2D.ShouldExcludeLinkedCollision(first.Collider, second.Collider).Should().BeFalse();
     }
@@ -184,7 +202,9 @@ public sealed class Constraint2DServiceTests
         SolidBody2D first = CreateBody(context, Vector2d.Zero);
         SolidBody2D second = CreateBody(context, Vector2d.Right * (Fixed64)2);
         Joint2D joint = context.Constraints2D.RegisterJoint(CreatePin(first, second));
+        Action missingGet = () => context.Constraints2D.GetJoint(99);
 
+        missingGet.Should().Throw<ArgumentOutOfRangeException>().WithParameterName("jointId");
         context.Constraints2D.TryGetJointForSolver(99, out Joint2D? missing).Should().BeFalse();
         missing.Should().BeNull();
 
@@ -221,6 +241,28 @@ public sealed class Constraint2DServiceTests
 
         joint.CollisionPolicy.Should().Be(JointCollisionPolicy.SuppressLinked);
         context.Constraints2D.ShouldExcludeLinkedCollision(first.Collider, second.Collider).Should().BeTrue();
+    }
+
+    [Fact]
+    public void RemoveJoint_WithCollidePolicy_ShouldLeave2DSuppressionStateUntouched()
+    {
+        using GravitasWorldContext context = CreateConstraintContext();
+        SolidBody2D first = CreateBody(context, Vector2d.Zero);
+        SolidBody2D second = CreateBody(context, Vector2d.Right * (Fixed64)2);
+        Joint2D joint = context.Constraints2D.RegisterJoint(CreatePin(
+            first,
+            second,
+            JointCollisionPolicy.Collide));
+
+        context.Constraints2D.ShouldExcludeLinkedCollision(first.Collider, second.Collider).Should().BeFalse();
+        context.Constraints2D.UpdateJointCollisionPolicy(
+            joint,
+            JointCollisionPolicy.SuppressLinked,
+            JointCollisionPolicy.Collide);
+
+        context.Constraints2D.RemoveJoint(joint.Id).Should().BeTrue();
+
+        context.Constraints2D.ShouldExcludeLinkedCollision(first.Collider, second.Collider).Should().BeFalse();
     }
 
     [Fact]
@@ -387,6 +429,53 @@ public sealed class Constraint2DServiceTests
     }
 
     [Fact]
+    public void PrismaticJoint_WithinSliderLimits_ShouldSkipLimitCorrection()
+    {
+        using GravitasWorldContext context = CreateConstraintContext();
+        SolidBody2D first = CreateBody(context, Vector2d.Zero, immovable: true);
+        SolidBody2D second = CreateBody(context, Vector2d.Right);
+        Joint2D joint = context.Constraints2D.RegisterJoint(new JointDefinition2D(
+            first,
+            second,
+            JointFrame2D.Identity,
+            JointFrame2D.Identity,
+            JointType2D.Prismatic,
+            JointLimit2D.Slider(Fixed64.Zero, (Fixed64)2),
+            JointMotor2D.Disabled,
+            JointCollisionPolicy.SuppressLinked));
+
+        Step(context, 2);
+
+        joint.LastSolveMetrics.LimitErrorMagnitude.Should().Be(Fixed64.Zero);
+        second.Position.X.Should().Be(Fixed64.One);
+    }
+
+    [Fact]
+    public void AngularLimit_WithinRange_ShouldSkipLimitCorrection()
+    {
+        using GravitasWorldContext context = CreateConstraintContext();
+        SolidBody2D first = CreateBody(context, Vector2d.Zero, immovable: true);
+        SolidBody2D second = CreateBody(
+            context,
+            Vector2d.Right * (Fixed64)2,
+            rotation: Fixed64.FromFraction(1, 4));
+        Joint2D joint = context.Constraints2D.RegisterJoint(new JointDefinition2D(
+            first,
+            second,
+            JointFrame2D.Identity,
+            JointFrame2D.Identity,
+            JointType2D.Pin,
+            JointLimit2D.Angular(-Fixed64.Half, Fixed64.Half),
+            JointMotor2D.Disabled,
+            JointCollisionPolicy.SuppressLinked));
+
+        Step(context, 2);
+
+        joint.LastSolveMetrics.LimitErrorMagnitude.Should().Be(Fixed64.Zero);
+        joint.LastSolvedRowCount.Should().BeGreaterThan(0);
+    }
+
+    [Fact]
     public void ConstraintIsland_ShouldWakeSleepingLinked2DBodiesAsOneIsland()
     {
         using GravitasWorldContext context = CreateConstraintContext();
@@ -482,6 +571,33 @@ public sealed class Constraint2DServiceTests
     }
 
     [Fact]
+    public void RagdollFiltering_WithCollideAllPolicy_ShouldAllowAll2DLinkCollisions()
+    {
+        using GravitasWorldContext context = CreateConstraintContext();
+        SolidBody2D root = CreateBody(context, Vector2d.Zero);
+        SolidBody2D middle = CreateBody(context, Vector2d.Right * (Fixed64)2);
+        SolidBody2D end = CreateBody(context, Vector2d.Right * Fixed64.Half);
+
+        context.Constraints2D.RegisterRagdoll(new RagdollDefinition2D(
+            new[]
+            {
+                new RagdollLinkDefinition2D(0, root),
+                new RagdollLinkDefinition2D(1, middle),
+                new RagdollLinkDefinition2D(2, end)
+            },
+            new[]
+            {
+                new RagdollJointDefinition2D(0, 1, JointType2D.Pin, JointFrame2D.Identity, JointFrame2D.Identity),
+                new RagdollJointDefinition2D(1, 2, JointType2D.Pin, JointFrame2D.Identity, JointFrame2D.Identity)
+            },
+            RagdollSelfCollisionPolicy.CollideAllLinks));
+
+        context.Constraints2D.ShouldExcludeLinkedCollision(root.Collider, middle.Collider).Should().BeFalse();
+        context.Constraints2D.ShouldExcludeLinkedCollision(middle.Collider, end.Collider).Should().BeFalse();
+        context.Constraints2D.ShouldExcludeLinkedCollision(root.Collider, end.Collider).Should().BeFalse();
+    }
+
+    [Fact]
     public void RagdollLinkDefinition_ShouldDeriveColliderFromBodyAndRejectNullBody()
     {
         using GravitasWorldContext context = CreateConstraintContext();
@@ -536,6 +652,30 @@ public sealed class Constraint2DServiceTests
     }
 
     [Fact]
+    public void RegisterRagdoll_WithUnknownLinkReference_ShouldFailBefore2DRuntimeStateIsCreated()
+    {
+        using GravitasWorldContext context = CreateConstraintContext();
+        SolidBody2D root = CreateBody(context, Vector2d.Zero);
+        SolidBody2D child = CreateBody(context, Vector2d.Right * (Fixed64)2);
+        var definition = new RagdollDefinition2D(
+            new[]
+            {
+                new RagdollLinkDefinition2D(0, root),
+                new RagdollLinkDefinition2D(1, child)
+            },
+            new[]
+            {
+                new RagdollJointDefinition2D(0, 99, JointType2D.Pin, JointFrame2D.Identity, JointFrame2D.Identity)
+            });
+
+        Action act = () => context.Constraints2D.RegisterRagdoll(definition);
+
+        act.Should().Throw<ArgumentException>().WithParameterName("linkId");
+        context.Constraints2D.RegisteredJointCount.Should().Be(0);
+        context.Constraints2D.RegisteredRagdollCount.Should().Be(0);
+    }
+
+    [Fact]
     public void RagdollRuntime_ShouldActivateDynamicAndDeactivateToKinematicDeterministically()
     {
         using GravitasWorldContext context = CreateConstraintContext();
@@ -576,6 +716,7 @@ public sealed class Constraint2DServiceTests
 
         context.Constraints2D.SetRagdollPoseTargets(ragdoll, new[] { motor });
         context.Constraints2D.SetJointMotorTarget(joint.Id, Fixed64.FromFraction(1, 3)).Should().BeTrue();
+        context.Constraints2D.SetJointMotorTarget(99, Fixed64.Zero).Should().BeFalse();
 
         joint.Motor.Kind.Should().Be(JointMotorKind2D.Angular);
         joint.Motor.DriveStrength.Should().Be((Fixed64)2);
@@ -584,7 +725,33 @@ public sealed class Constraint2DServiceTests
         joint.Motor.Target.Should().Be(Fixed64.FromFraction(1, 3));
 
         context.Constraints2D.ClearJointMotorTarget(joint.Id).Should().BeTrue();
+        context.Constraints2D.ClearJointMotorTarget(99).Should().BeFalse();
         joint.Motor.Kind.Should().Be(JointMotorKind2D.Disabled);
+    }
+
+    [Fact]
+    public void SetJointMotorTarget_WithLinearMotor_ShouldPreserve2DMotorPayload()
+    {
+        using GravitasWorldContext context = CreateConstraintContext();
+        SolidBody2D first = CreateBody(context, Vector2d.Zero);
+        SolidBody2D second = CreateBody(context, Vector2d.Right * (Fixed64)2);
+        Joint2D joint = context.Constraints2D.RegisterJoint(new JointDefinition2D(
+            first,
+            second,
+            JointFrame2D.Identity,
+            JointFrame2D.Identity,
+            JointType2D.Prismatic,
+            JointLimit2D.Unrestricted,
+            JointMotor2D.Linear(Fixed64.Zero, (Fixed64)2, Fixed64.Half, Fixed64.One),
+            JointCollisionPolicy.SuppressLinked));
+
+        context.Constraints2D.SetJointMotorTarget(joint.Id, Fixed64.One).Should().BeTrue();
+
+        joint.Motor.Kind.Should().Be(JointMotorKind2D.Linear);
+        joint.Motor.Target.Should().Be(Fixed64.One);
+        joint.Motor.DriveStrength.Should().Be((Fixed64)2);
+        joint.Motor.Damping.Should().Be(Fixed64.Half);
+        joint.Motor.MaximumMotorImpulse.Should().Be(Fixed64.One);
     }
 
     [Fact]
@@ -893,15 +1060,13 @@ public sealed class Constraint2DServiceTests
     {
         using GravitasWorldContext context = CreateConstraintContext();
         SolidBody2D anchor = CreateBody(context, Vector2d.Zero, immovable: true);
-        SolidBody2D dynamic = CreateBody(
-            context,
-            Vector2d.Right * (Fixed64)2,
-            rotation: FixedMath.DegToRad((Fixed64)degrees));
+        SolidBody2D dynamic = CreateBody(context, Vector2d.Right * (Fixed64)2);
+        Fixed64 relativeFrameAngle = FixedMath.DegToRad((Fixed64)degrees);
         Joint2D joint = context.Constraints2D.RegisterJoint(new JointDefinition2D(
             anchor,
             dynamic,
             JointFrame2D.Identity,
-            JointFrame2D.Identity,
+            new JointFrame2D(Vector2d.Zero, relativeFrameAngle),
             JointType2D.Pin,
             JointLimit2D.Angular(-Fixed64.Half, Fixed64.Half),
             JointMotor2D.Disabled,
@@ -911,6 +1076,57 @@ public sealed class Constraint2DServiceTests
 
         joint.LastSolveMetrics.LimitErrorMagnitude.Should().BeGreaterThan(Fixed64.Zero);
         joint.LastSolveMetrics.ClampedRowCount.Should().BeGreaterThan(0);
+    }
+
+    [Theory]
+    [InlineData(-270)]
+    [InlineData(270)]
+    public void AngularLimit_ShouldNormalizeAnglesAcrossPiBoundary(int degrees)
+    {
+        using GravitasWorldContext context = CreateConstraintContext();
+        SolidBody2D anchor = CreateBody(context, Vector2d.Zero, immovable: true);
+        SolidBody2D dynamic = CreateBody(context, Vector2d.Right * (Fixed64)2);
+        Fixed64 relativeFrameAngle = FixedMath.DegToRad((Fixed64)degrees);
+        Joint2D joint = context.Constraints2D.RegisterJoint(new JointDefinition2D(
+            anchor,
+            dynamic,
+            new JointFrame2D(Vector2d.Zero, relativeFrameAngle),
+            JointFrame2D.Identity,
+            JointType2D.Pin,
+            JointLimit2D.Angular(-Fixed64.Half, Fixed64.Half),
+            JointMotor2D.Disabled,
+            JointCollisionPolicy.SuppressLinked));
+
+        Step(context, 2);
+
+        joint.LastSolveMetrics.LimitErrorMagnitude.Should().BeGreaterThan(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void WeldJoint_WithFrozenRotation_ShouldLeaveAngularStateUntouched()
+    {
+        using GravitasWorldContext context = CreateConstraintContext();
+        SolidBody2D anchor = CreateBody(context, Vector2d.Zero, immovable: true);
+        SolidBody2D dynamic = CreateBody(
+            context,
+            Vector2d.Right * (Fixed64)2,
+            rotation: FixedMath.DegToRad((Fixed64)45));
+        dynamic.FreezeAxes = BodyFreezeAxes2D.Rotation;
+        Fixed64 initialRotation = dynamic.Rotation;
+        Joint2D joint = context.Constraints2D.RegisterJoint(new JointDefinition2D(
+            anchor,
+            dynamic,
+            JointFrame2D.Identity,
+            JointFrame2D.Identity,
+            JointType2D.Weld,
+            JointLimit2D.Unrestricted,
+            JointMotor2D.Disabled,
+            JointCollisionPolicy.SuppressLinked));
+
+        Step(context, 4);
+
+        dynamic.Rotation.Should().Be(initialRotation);
+        joint.LastSolvedRowCount.Should().BeGreaterThan(0);
     }
 
     [Fact]

@@ -150,7 +150,7 @@ internal static class ContinuousCollisionMath
             return false;
 
         Fixed64 time = (-b - FixedMath.Sqrt(discriminant)) / ((Fixed64)2 * a);
-        if (time < Fixed64.Zero || time > Fixed64.One)
+        if (time > Fixed64.One)
             return false;
 
         Vector3d impactDelta = delta + relativeDisplacement * time;
@@ -198,7 +198,7 @@ internal static class ContinuousCollisionMath
             return false;
 
         Fixed64 time = (-b - FixedMath.Sqrt(discriminant)) / ((Fixed64)2 * a);
-        if (time < Fixed64.Zero || time > Fixed64.One)
+        if (time > Fixed64.One)
             return false;
 
         Vector2d impactDelta = delta + relativeDisplacement * time;
@@ -217,9 +217,7 @@ internal static class ContinuousCollisionMath
         if (delta.MagnitudeSquared > Fixed64.Epsilon)
             return delta.Normalized;
 
-        return relativeDisplacement.MagnitudeSquared > Fixed64.Epsilon
-            ? -relativeDisplacement.Normalized
-            : Vector3d.Zero;
+        return -relativeDisplacement.Normalized;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -228,8 +226,6 @@ internal static class ContinuousCollisionMath
         if (delta.MagnitudeSquared > Fixed64.Epsilon)
             return delta.Normalized;
 
-        return relativeDisplacement.MagnitudeSquared > Fixed64.Epsilon
-            ? -relativeDisplacement.Normalized
-            : Vector2d.Zero;
+        return -relativeDisplacement.Normalized;
     }
 }

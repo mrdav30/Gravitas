@@ -93,8 +93,9 @@ public sealed class GravitasCollision2DService
 
         if (!collider.IsActive)
         {
-            if (collider.IsPartitioned)
-                ClearPartitionedCollider(collider, force: true);
+            ClearPartitionedCollider(collider, force: true);
+            collider.MarkUnpartitioned();
+            collider.ClearPartitionCoordinates();
 
             return false;
         }
@@ -278,21 +279,6 @@ public sealed class GravitasCollision2DService
         {
             _isDistributing = false;
         }
-    }
-
-    internal void CollectOverlapCircleCandidates(
-        Vector2d center,
-        Fixed64 radius,
-        PhysicsLayerMask layerMask,
-        uint queryVersion,
-        SwiftList<LSCollider2D> candidates)
-    {
-        candidates.FastClear();
-
-        Vector2d min = new(center.X - radius, center.Y - radius);
-        Vector2d max = new(center.X + radius, center.Y + radius);
-
-        CollectBoundsCandidates(min, max, layerMask, queryVersion, raycastQuery: false, candidates);
     }
 
     internal void CollectBoundsCandidates(
@@ -492,7 +478,10 @@ public sealed class GravitasCollision2DService
             if (!voxel.TryAddPartition(partition))
             {
                 ReleasePartition(partition);
-                return;
+                SwiftThrowHelper.ThrowIfTrue(
+                    true,
+                    nameof(GravitasCollision2DService),
+                    "Unable to attach 2D physics partition to voxel.");
             }
 
             TrackRetainedPartition(partition);

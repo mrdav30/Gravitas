@@ -138,7 +138,7 @@ public partial class SolidBody
         out Physics3DHit hit)
     {
         Vector3d displacement = proposedPosition - startPosition;
-        Vector3d direction = displacement.MagnitudeSquared > Fixed64.Epsilon ? displacement.Normalized : Vector3d.Zero;
+        Vector3d direction = displacement.Normalized;
         bool found = false;
         Physics3DHit best = default;
         for (int i = 0; i < hitCount; i++)
@@ -341,9 +341,6 @@ public partial class SolidBody
 
         Vector3d sourceDisplacement = proposedPosition - startPosition;
         Fixed64 sourceLength = sourceDisplacement.Magnitude;
-        if (sourceLength <= Fixed64.Epsilon)
-            return false;
-
         Vector3d sourceDirection = sourceDisplacement / sourceLength;
         bool found = false;
         Physics3DHit best = default;
@@ -365,8 +362,7 @@ public partial class SolidBody
                 + target.ContinuousCollisionFrameDisplacement * elapsedFrameFraction;
             Vector3d targetDisplacement = target.ContinuousCollisionFrameDisplacement * remainingFrameFraction;
             Fixed64 targetRadius = target.ResolveContinuousCollisionProxyRadius();
-            if (targetRadius <= Fixed64.Epsilon
-                || !ContinuousCollisionMath.TrySweepRelativeSpheres(
+            if (!ContinuousCollisionMath.TrySweepRelativeSpheres(
                     startPosition,
                     sourceDisplacement,
                     proxyRadius,
@@ -552,9 +548,6 @@ public partial class SolidBody
 
         Vector3d sourceDisplacement = proposedPosition - startPosition;
         Fixed64 sourceLength = sourceDisplacement.Magnitude;
-        if (sourceLength <= Fixed64.Epsilon)
-            return false;
-
         Vector3d sourceDirection = sourceDisplacement / sourceLength;
         bool found = false;
         PhysicsMixedHit best = default;
@@ -575,9 +568,6 @@ public partial class SolidBody
             Fixed64 targetRadius = FixedMath.Max(
                 target.ResolveContinuousCollisionProxyRadius(),
                 target.Collider.MixedHalfThickness);
-            if (targetRadius <= Fixed64.Epsilon)
-                continue;
-
             Vector2d targetStart2D = target.ContinuousCollisionFrameStart
                 + target.ContinuousCollisionFrameDisplacement * elapsedFrameFraction;
             Vector2d targetDisplacement2D = target.ContinuousCollisionFrameDisplacement * remainingFrameFraction;

@@ -271,7 +271,7 @@ public sealed class PhysicsPartition2D : IVoxelPartition, IRetainedPhysicsPartit
         ContainedStaticObjects?.Clear();
 
         if (ActivationId != -1)
-            _owner?.DeactivatePartition(ActivationId);
+            Owner.DeactivatePartition(ActivationId);
 
         _owner = null;
         ActivationId = -1;
@@ -286,7 +286,7 @@ public sealed class PhysicsPartition2D : IVoxelPartition, IRetainedPhysicsPartit
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void MarkEmptyIfUnoccupied()
     {
-        if (IsEmpty && _emptySinceFrame < 0)
+        if (IsEmpty)
             MarkEmpty(Owner.Context.FrameCount);
     }
 

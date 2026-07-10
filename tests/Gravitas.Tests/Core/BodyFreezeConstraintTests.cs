@@ -79,6 +79,31 @@ public sealed class BodyFreezeConstraintTests
         body.Body.FreezeAxes = BodyFreezeAxes3D.PositionX | BodyFreezeAxes3D.RotationZ;
         body.Body.ProjectLinearMotion(motion).Should().Be(new Vector3d(Fixed64.Zero, (Fixed64)2, (Fixed64)3));
         body.Body.ProjectAngularMotion(motion).Should().Be(new Vector3d(Fixed64.One, (Fixed64)2, Fixed64.Zero));
+
+        body.Body.FreezeAxes = BodyFreezeAxes3D.PositionZ | BodyFreezeAxes3D.RotationX;
+        body.Body.ProjectLinearMotion(motion).Should().Be(new Vector3d(Fixed64.One, (Fixed64)2, Fixed64.Zero));
+        body.Body.ProjectAngularMotion(motion).Should().Be(new Vector3d(Fixed64.Zero, (Fixed64)2, (Fixed64)3));
+    }
+
+    [Fact]
+    public void SolidBody_FullyFrozenMotionInputs_ShouldRemainNoOp()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSCuboidCollider> body = scenario.CreateCuboid(Vector3d.Zero);
+        body.Body.FreezeAxes = BodyFreezeAxes3D.All;
+        body.Body.Sleep();
+
+        body.Body.AddForce(new Vector3d(Fixed64.One, (Fixed64)2, (Fixed64)3));
+        body.Body.AddTorque(new Vector3d(Fixed64.One, (Fixed64)2, (Fixed64)3));
+        body.Body.AddLinearImpulse(new Vector3d(Fixed64.One, (Fixed64)2, (Fixed64)3));
+        body.Body.AddAngularImpulse(new Vector3d(Fixed64.One, (Fixed64)2, (Fixed64)3));
+        body.Body.ApplyCollisionLinearVelocityDelta(Vector3d.Right);
+        body.Body.ApplyCollisionAngularVelocityDelta(Vector3d.Up);
+        body.Body.ApplyCollisionPositionCorrection(Vector3d.Forward);
+
+        body.Body.LinearVelocity.Should().Be(Vector3d.Zero);
+        body.Body.AngularVelocity.Should().Be(Vector3d.Zero);
+        body.Body.Position3d.Should().Be(Vector3d.Zero);
     }
 
     [Fact]
@@ -89,6 +114,7 @@ public sealed class BodyFreezeConstraintTests
 
         body.Body.GetConstrainedInverseMass(Vector3d.Zero).Should().Be(Fixed64.Zero);
         body.Body.ApplyConstrainedInverseInertia(Vector3d.Zero).Should().Be(Vector3d.Zero);
+        body.Body.GetConstrainedInverseMass(new Vector3d(Fixed64.Epsilon, Fixed64.Zero, Fixed64.Zero)).Should().Be(Fixed64.Zero);
 
         body.Body.FreezeAxes = BodyFreezeAxes3D.PositionX;
 
@@ -103,6 +129,27 @@ public sealed class BodyFreezeConstraintTests
         body.Body.FreezeAxes = BodyFreezeAxes3D.Position;
         body.Body.GetConstrainedInverseMass(Vector3d.Up).Should().Be(Fixed64.Zero);
         body.Body.ApplyConstrainedInverseInertia(Vector3d.Right).Should().Be(Vector3d.Zero);
+    }
+
+    [Fact]
+    public void SolidBody_SleepEnabledAndWake_ShouldRespectNoOpAndDisabledRows()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
+
+        body.Body.SleepEnabled = true;
+        body.Body.Sleep();
+        body.Body.IsSleeping.Should().BeTrue();
+
+        body.Body.SleepEnabled = false;
+        body.Body.IsSleeping.Should().BeFalse();
+
+        body.Body.Sleep();
+        body.Body.IsSleeping.Should().BeFalse();
+
+        body.Body.SleepEnabled = true;
+        body.Body.Wake();
+        body.Body.IsSleeping.Should().BeFalse();
     }
 
     [Fact]
@@ -139,6 +186,50 @@ public sealed class BodyFreezeConstraintTests
         body.AngularMotionFrozen.Should().BeFalse();
         body.CanTranslate.Should().BeTrue();
         body.CanRotate.Should().BeTrue();
+    }
+
+    [Fact]
+    public void SolidBody2D_InternalProjectionHelpers_ShouldRespectFullAndPerAxisFreeze()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        SolidBody2D body = Create2DBody(context);
+        Vector2d motion = new(Fixed64.One, (Fixed64)2);
+
+        body.ProjectLinearMotion(Vector2d.Zero).Should().Be(Vector2d.Zero);
+        body.GetConstrainedInverseMass(Vector2d.Zero).Should().Be(Fixed64.Zero);
+        body.GetConstrainedInverseMass(new Vector2d(Fixed64.Epsilon, Fixed64.Zero)).Should().Be(Fixed64.Zero);
+
+        body.FreezeAxes = BodyFreezeAxes2D.Position;
+        body.ProjectLinearMotion(motion).Should().Be(Vector2d.Zero);
+        body.GetConstrainedInverseMass(Vector2d.Right).Should().Be(Fixed64.Zero);
+
+        body.FreezeAxes = BodyFreezeAxes2D.PositionX;
+        body.ProjectLinearMotion(motion).Should().Be(new Vector2d(Fixed64.Zero, (Fixed64)2));
+        body.GetConstrainedInverseMass(Vector2d.Right).Should().Be(Fixed64.Zero);
+        body.GetConstrainedInverseMass(Vector2d.Forward).Should().Be(body.InverseMass);
+
+        body.FreezeAxes = BodyFreezeAxes2D.PositionY;
+        body.ProjectLinearMotion(motion).Should().Be(new Vector2d(Fixed64.One, Fixed64.Zero));
+    }
+
+    [Fact]
+    public void SolidBody2D_FullyFrozenMotionInputs_ShouldRemainNoOp()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        SolidBody2D body = Create2DBody(context);
+        body.FreezeAxes = BodyFreezeAxes2D.All;
+        body.Sleep();
+
+        body.AddForce(new Vector2d(Fixed64.One, (Fixed64)2));
+        body.AddAngularImpulse(Fixed64.One);
+        body.AddTorque(Fixed64.One);
+        body.ApplyCollisionLinearVelocityDelta(Vector2d.Right);
+        body.ApplyCollisionAngularVelocityDelta(Fixed64.One);
+        body.ApplyCollisionPositionCorrection(Vector2d.Forward);
+
+        body.LinearVelocity.Should().Be(Vector2d.Zero);
+        body.AngularVelocity.Should().Be(Fixed64.Zero);
+        body.Position.Should().Be(Vector2d.Zero);
     }
 
     [Fact]

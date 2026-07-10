@@ -51,4 +51,84 @@ public sealed class ContactManifoldTests
         manifold.Count.Should().Be(1);
         manifold.PrimaryContact.Depth.Should().Be(Fixed64.FromFraction(1, 2));
     }
+
+    [Fact]
+    public void AddContact_WhenFullWithEqualDepth_ShouldReplaceHighestIdentityContact()
+    {
+        ContactCandidate[] candidates = Enumerable.Range(-12, 25)
+            .Select(static value => CreateCandidate(value))
+            .OrderBy(static candidate => candidate.ContactId)
+            .ToArray();
+        var manifold = new ContactManifold();
+
+        ContactCandidate replacement = candidates[0];
+        ContactCandidate keptA = candidates[1];
+        ContactCandidate keptB = candidates[2];
+        ContactCandidate keptC = candidates[3];
+        ContactCandidate replaced = candidates[^1];
+
+        manifold.AddContact(keptA.PointA, keptA.PointB, Fixed64.Half, Vector3d.Forward);
+        manifold.AddContact(keptB.PointA, keptB.PointB, Fixed64.Half, Vector3d.Forward);
+        manifold.AddContact(keptC.PointA, keptC.PointB, Fixed64.Half, Vector3d.Forward);
+        manifold.AddContact(replaced.PointA, replaced.PointB, Fixed64.Half, Vector3d.Forward);
+        manifold.AddContact(replacement.PointA, replacement.PointB, Fixed64.Half, Vector3d.Forward);
+
+        manifold.Select(static contact => contact.ContactId)
+            .Should()
+            .Equal(new[] { replacement.ContactId, keptA.ContactId, keptB.ContactId, keptC.ContactId }.OrderBy(static id => id));
+    }
+
+    [Fact]
+    public void AddContact_WhenFull_ShouldReplaceShallowestThenTieBreakByHighestIdentity()
+    {
+        ContactCandidate[] candidates = Enumerable.Range(-12, 25)
+            .Select(static value => CreateCandidate(value))
+            .OrderBy(static candidate => candidate.ContactId)
+            .ToArray();
+        var manifold = new ContactManifold();
+
+        ContactCandidate lowId = candidates[0];
+        ContactCandidate middleId = candidates[1];
+        ContactCandidate highId = candidates[^1];
+        ContactCandidate replacement = candidates[2];
+        ContactCandidate filler = CreateCandidate(50);
+
+        manifold.AddContact(highId.PointA, highId.PointB, Fixed64.Half, Vector3d.Forward);
+        manifold.AddContact(middleId.PointA, middleId.PointB, Fixed64.FromFraction(1, 4), Vector3d.Forward);
+        manifold.AddContact(lowId.PointA, lowId.PointB, Fixed64.FromFraction(1, 4), Vector3d.Forward);
+        manifold.AddContact(filler.PointA, filler.PointB, Fixed64.Half, Vector3d.Forward);
+        manifold.AddContact(replacement.PointA, replacement.PointB, Fixed64.Half, Vector3d.Forward);
+
+        manifold.Select(static contact => contact.ContactId)
+            .Should()
+            .Contain(new[] { lowId.ContactId, replacement.ContactId, highId.ContactId });
+        manifold.Select(static contact => contact.ContactId)
+            .Should()
+            .NotContain(middleId.ContactId);
+    }
+
+    private static ContactCandidate CreateCandidate(int x)
+    {
+        Vector3d pointA = new((Fixed64)x, Fixed64.Zero, Fixed64.Zero);
+        Vector3d pointB = new((Fixed64)x, Fixed64.Zero, Fixed64.One);
+        var manifold = new ContactManifold();
+        manifold.AddContact(pointA, pointB, Fixed64.One, Vector3d.Forward);
+        return new ContactCandidate(pointA, pointB, manifold.PrimaryContact.ContactId);
+    }
+
+    private readonly struct ContactCandidate
+    {
+        public ContactCandidate(Vector3d pointA, Vector3d pointB, ulong contactId)
+        {
+            PointA = pointA;
+            PointB = pointB;
+            ContactId = contactId;
+        }
+
+        public Vector3d PointA { get; }
+
+        public Vector3d PointB { get; }
+
+        public ulong ContactId { get; }
+    }
 }

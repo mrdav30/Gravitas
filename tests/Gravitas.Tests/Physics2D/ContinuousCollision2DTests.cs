@@ -235,6 +235,23 @@ public sealed class ContinuousCollision2DTests
     }
 
     [Fact]
+    public void ContinuousMode_WithEqualDistanceStaticTargets_ShouldUseLowerColliderId()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        SolidBody2D first = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)4, Fixed64.Half), immovable: true);
+        SolidBody2D second = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)4, -Fixed64.Half), immovable: true);
+        SolidBody2D mover = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
+        mover.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+
+        mover.AddForce(Vector2d.Right * (Fixed64)8);
+        context.LateSimulate();
+
+        first.Collider.Id.Should().BeLessThan(second.Collider.Id);
+        mover.Position.X.Should().BeLessThan((Fixed64)4);
+        mover.LinearVelocity.Y.Should().BeLessThan(Fixed64.Zero);
+    }
+
+    [Fact]
     public void ContinuousMode_WithOpposingDynamicBodies_ShouldClampBothAtSharedTimeOfImpact()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);
@@ -465,6 +482,45 @@ public sealed class ContinuousCollision2DTests
     }
 
     [Fact]
+    public void ContinuousHandoff_WhenFrozenAfterQueue_ShouldConsumeAtImpactAndRefreshCollider()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        SolidBody2D body = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
+
+        body.ApplyContinuousCollisionHandoff(
+            Vector2d.Right * Fixed64.Half,
+            Vector2d.Right,
+            Fixed64.Half);
+        body.FreezeAxes = BodyFreezeAxes2D.Position;
+        body.LateSimulate();
+
+        body.Position.X.Should().Be(Fixed64.Half);
+        body.LinearVelocity.Should().Be(Vector2d.Zero);
+        body.Collider.Center.X.Should().Be(Fixed64.Half);
+    }
+
+    [Fact]
+    public void ContinuousHandoff_WhenFrozenAfterQueueAndDirectConsumeWithoutColliderRefresh_ShouldRemainAtImpact()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        SolidBody2D body = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
+
+        body.ApplyContinuousCollisionHandoff(
+            Vector2d.Right * Fixed64.Half,
+            Vector2d.Right,
+            Fixed64.Half);
+        body.FreezeAxes = BodyFreezeAxes2D.Position;
+
+        body.TryConsumeContinuousCollisionHandoff(
+            updateSleepState: false,
+            updateColliderState: false).Should().BeTrue();
+
+        body.Position.X.Should().Be(Fixed64.Half);
+        body.LinearVelocity.Should().Be(Vector2d.Zero);
+        body.Collider.Center.X.Should().Be(Fixed64.Half);
+    }
+
+    [Fact]
     public void ContinuousMode_DynamicRelativePath_ShouldNotClampThinAabbWhenProxyCirclesHitButShapesMiss()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);
@@ -568,6 +624,25 @@ public sealed class ContinuousCollision2DTests
 
         source.Position.X.Should().BeLessThanOrEqualTo(-Fixed64.One);
         source.LastContinuousCollisionToiIterationCount.Should().Be(1);
+    }
+
+    [Fact]
+    public void AutoMode_WithShortKinematic2DHostTranslation_ShouldSkipContinuousCollision()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        SolidBody2D source = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.Half),
+            new Vector2d((Fixed64)(-5), Fixed64.Zero),
+            immovable: false,
+            isKinematic: true);
+        source.ContinuousCollisionMode = ContinuousCollisionMode.Auto;
+
+        source.Agent.Transform.Position = new Vector3d(Fixed64.FromFraction(-19, 4), Fixed64.Zero, Fixed64.Zero);
+        context.LateSimulate();
+
+        source.Position.X.Should().Be(Fixed64.FromFraction(-19, 4));
+        source.LastContinuousCollisionToiIterationCount.Should().Be(0);
     }
 
     [Fact]

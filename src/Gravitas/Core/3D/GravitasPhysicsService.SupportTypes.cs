@@ -70,12 +70,6 @@ public sealed partial class GravitasPhysicsService
         }
     }
 
-    private sealed class DiscreteIslandNodeComparer : IComparer<DiscreteIslandNode>
-    {
-        public int Compare(DiscreteIslandNode left, DiscreteIslandNode right) =>
-            left.BodyKey.CompareTo(right.BodyKey);
-    }
-
     private sealed class DiscreteIslandConstraintComparer : IComparer<DiscreteIslandConstraint>
     {
         public int Compare(DiscreteIslandConstraint left, DiscreteIslandConstraint right)
@@ -97,7 +91,7 @@ public sealed partial class GravitasPhysicsService
         }
     }
 
-    private struct DiscreteIslandNode
+    private struct DiscreteIslandNode : IIslandNodeState
     {
         public DiscreteIslandNode(int bodyKey, SolidBody body)
         {
@@ -107,10 +101,17 @@ public sealed partial class GravitasPhysicsService
             RootKey = bodyKey;
         }
 
-        public int BodyKey;
-        public SolidBody Body;
-        public int ParentIndex;
-        public int RootKey;
+        public int BodyKey { get; }
+
+        public SolidBody Body { get; }
+
+        public int ParentIndex { get; set; }
+
+        public int RootKey { get; set; }
+
+        public bool IsAwakeForCollision => Body.IsAwakeForCollision;
+
+        public void WakeFromCollision() => Body.WakeFromCollision();
     }
 
     private readonly struct DiscreteIslandConstraint

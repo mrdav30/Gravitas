@@ -101,6 +101,105 @@ public sealed class Physics2DPartitionBroadPhaseTests
     }
 
     [Fact]
+    public void Simulate_With2DCollidersSharingMultiplePartitions_ShouldProcessPairOnce()
+    {
+        using GravitasWorldContext context = CreateContext(extent: 32);
+        SolidBody2D dynamicBody = CreateBody(
+            context,
+            new LSAABBoxCollider2D(new Vector2d((Fixed64)8, (Fixed64)8)),
+            Vector2d.Zero,
+            immovable: false);
+        SolidBody2D staticBody = CreateBody(
+            context,
+            new LSAABBoxCollider2D(new Vector2d((Fixed64)8, (Fixed64)8)),
+            new Vector2d(Fixed64.Half, Fixed64.Zero),
+            immovable: true);
+        int entered = 0;
+        dynamicBody.Collider.OnContactEnter += otherBody =>
+        {
+            otherBody.Should().BeSameAs(staticBody);
+            entered++;
+        };
+
+        Step(context);
+
+        context.Physics2D.LastBroadPhaseCandidateCount.Should().Be(1);
+        entered.Should().Be(1);
+        dynamicBody.Collider.TryGetCollisionPair(staticBody.Collider.Id, out CollisionPair2D? pair).Should().BeTrue();
+        pair!.Manifold.HasContact.Should().BeTrue();
+        pair.LastFrame.Should().Be(context.FrameCount);
+    }
+
+    [Fact]
+    public void ProcessPartitionCandidate_WithStaleIdsOrDuplicatePair_ShouldRemainDeterministic()
+    {
+        using GravitasWorldContext context = CreateContext(extent: 32);
+        context.Settings.PoolingEnabled = false;
+        SolidBody2D dynamicBody = CreateCircle(context, Vector2d.Zero, immovable: false);
+        SolidBody2D staticBody = CreateCircle(context, new Vector2d(Fixed64.Half, Fixed64.Zero), immovable: true);
+        WorldVoxelIndex partitionIndex = ResolveCanonicalSharedPartition(dynamicBody.Collider, staticBody.Collider);
+
+        context.Physics2D.ProcessPartitionCandidate(-1, staticBody.Collider.Id, partitionIndex);
+        context.Physics2D.ProcessPartitionCandidate(dynamicBody.Collider.Id, -1, partitionIndex);
+        context.Physics2D.ProcessPartitionCandidate(dynamicBody.Collider.Id, staticBody.Collider.Id, partitionIndex);
+        context.Physics2D.ProcessPartitionCandidate(dynamicBody.Collider.Id, staticBody.Collider.Id, partitionIndex);
+
+        context.Physics2D.LastBroadPhaseCandidateCount.Should().Be(1);
+        dynamicBody.Collider.TryGetCollisionPair(staticBody.Collider.Id, out CollisionPair2D? pair).Should().BeTrue();
+        pair!.Manifold.HasContact.Should().BeTrue();
+        pair.LastFrame.Should().Be(context.FrameCount);
+    }
+
+    [Fact]
+    public void BoundsQueryCandidates_ShouldFilterInactiveWrongLayerDuplicateStaticStyleAndBoundsMisses()
+    {
+        using GravitasWorldContext context = CreateContext(extent: 32);
+        SolidBody2D included = CreateBody(
+            context,
+            new LSAABBoxCollider2D(new Vector2d((Fixed64)8, (Fixed64)8)),
+            Vector2d.Zero,
+            immovable: false);
+        SolidBody2D inactive = CreateCircle(context, new Vector2d(Fixed64.One, Fixed64.Zero), immovable: false);
+        SolidBody2D wrongLayer = CreateCircle(context, new Vector2d(Fixed64.Zero, Fixed64.One), immovable: false);
+        SolidBody2D staticStyle = CreateCircle(context, new Vector2d((Fixed64)3, Fixed64.Zero), immovable: false);
+        SolidBody2D boundsMiss = CreateBody(
+            context,
+            new LSAABBoxCollider2D(new Vector2d((Fixed64)8, (Fixed64)8)),
+            new Vector2d((Fixed64)7, Fixed64.Zero),
+            immovable: false);
+        GetFirstPartition(context, included.Collider).AddDynamicObject(999);
+        var hits = new SwiftList<Physics2DHit>();
+
+        inactive.Collider.IsActive = false;
+        wrongLayer.Collider.Layer = new PhysicsLayer(1);
+        staticStyle.IsKinematic = true;
+
+        int count = context.Query2D.OverlapCircleAll(
+            Vector2d.Zero,
+            Fixed64.One,
+            PhysicsLayerMask.FromLayer(0),
+            hits);
+
+        count.Should().Be(1);
+        hits[0].Collider.Should().BeSameAs(included.Collider);
+        context.Query2D.LastQueryCandidateCount.Should().Be(1);
+        hits.Should().NotContain(hit => ReferenceEquals(hit.Collider, inactive.Collider));
+        hits.Should().NotContain(hit => ReferenceEquals(hit.Collider, wrongLayer.Collider));
+        hits.Should().NotContain(hit => ReferenceEquals(hit.Collider, staticStyle.Collider));
+        hits.Should().NotContain(hit => ReferenceEquals(hit.Collider, boundsMiss.Collider));
+
+        int staticOnlyCount = context.Query2D.SweepCircleAgainstStaticAll(
+            new Vector2d((Fixed64)(-4), Fixed64.Zero),
+            new Vector2d((Fixed64)4, Fixed64.Zero),
+            Fixed64.Half,
+            PhysicsLayerMask.FromLayer(0),
+            hits);
+
+        staticOnlyCount.Should().Be(1);
+        hits[0].Collider.Should().BeSameAs(staticStyle.Collider);
+    }
+
+    [Fact]
     public void MovingBody_ShouldLeaveOldPartitionsAndEnterNewPartitions()
     {
         using GravitasWorldContext context = CreateContext(extent: 32);
@@ -114,6 +213,30 @@ public sealed class Physics2DPartitionBroadPhaseTests
         context.Query2D.OverlapCircleAll(Vector2d.Zero, Fixed64.One, hits).Should().Be(0);
         context.Query2D.OverlapCircleAll(new Vector2d((Fixed64)10, Fixed64.Zero), Fixed64.One, hits).Should().Be(1);
         hits[0].Collider.Should().BeSameAs(body.Collider);
+    }
+
+    [Fact]
+    public void RefreshColliderPartition_WithUnchangedOrInactiveCollider_ShouldKeepMembershipDeterministic()
+    {
+        using GravitasWorldContext context = CreateContext(extent: 32);
+        SolidBody2D body = CreateCircle(context, Vector2d.Zero, immovable: false);
+        WorldVoxelIndex originalCoordinate = body.Collider.PartitionCoordinates![0];
+
+        context.Collisions2D.RefreshColliderPartition(body.Collider).Should().BeFalse();
+        context.Collisions2D.PartitionCollider(body.Collider).Should().BeFalse();
+        context.Collisions2D.ClearPartitionedCollider(body.Collider).Should().BeFalse();
+
+        body.Collider.IsPartitioned.Should().BeTrue();
+        body.Collider.PartitionCoordinates![0].Should().Be(originalCoordinate);
+
+        context.Collisions2D.ClearPartitionedCollider(body.Collider, force: true).Should().BeTrue();
+        body.Collider.IsActive = false;
+        context.Collisions2D.PartitionCollider(body.Collider).Should().BeFalse();
+
+        context.Collisions2D.RefreshColliderPartition(body.Collider).Should().BeFalse();
+
+        body.Collider.IsPartitioned.Should().BeFalse();
+        body.Collider.PartitionCoordinates.Should().BeEmpty();
     }
 
     [Fact]
@@ -147,6 +270,37 @@ public sealed class Physics2DPartitionBroadPhaseTests
         entered.Should().Be(1);
         context.Query2D.OverlapCircleAll(Vector2d.Zero, Fixed64.One, hits).Should().BeGreaterThan(0);
         hits.Should().Contain(hit => ReferenceEquals(hit.Collider, expanding));
+    }
+
+    [Fact]
+    public void ShapeRefresh_During2DDistribution_ShouldIgnoreColliderMadeInactiveBeforeRefresh()
+    {
+        using GravitasWorldContext context = CreateContext(extent: 32);
+        _ = CreateCircle(context, Vector2d.Zero, immovable: false);
+        LSCircleCollider2D trigger = CreateBodylessCircle(
+            context,
+            new Vector2d(Fixed64.Half, Fixed64.Zero),
+            isTrigger: true);
+        LSCircleCollider2D expanding = CreateBodylessCircle(
+            context,
+            new Vector2d((Fixed64)8, Fixed64.Zero),
+            isTrigger: false);
+        var hits = new SwiftList<Physics2DHit>();
+        int entered = 0;
+
+        trigger.OnTriggerEnter += _ =>
+        {
+            entered++;
+            expanding.Radius = (Fixed64)9;
+            expanding.Simulate();
+            expanding.IsActive = false;
+        };
+
+        Step(context);
+
+        entered.Should().Be(1);
+        context.Query2D.OverlapCircleAll(Vector2d.Zero, Fixed64.One, hits).Should().BeGreaterThan(0);
+        hits.Should().NotContain(hit => ReferenceEquals(hit.Collider, expanding));
     }
 
     [Fact]
@@ -290,6 +444,25 @@ public sealed class Physics2DPartitionBroadPhaseTests
 
         partition = GetFirstPartition(context, body.Collider);
         AssertPartitionMembership(partition, colliderId, dynamic: true, kinematic: false, @static: false);
+    }
+
+    [Fact]
+    public void RefreshPartitionAwakeState_ShouldLeaveStaticAndKinematicMembershipUnchanged()
+    {
+        using GravitasWorldContext context = CreateContext(extent: 16);
+        SolidBody2D staticBody = CreateCircle(context, Vector2d.Zero, immovable: true);
+        SolidBody2D kinematicBody = CreateCircle(context, new Vector2d((Fixed64)3, Fixed64.Zero), immovable: false);
+        kinematicBody.IsKinematic = true;
+        kinematicBody.Collider.Simulate();
+
+        PhysicsPartition2D staticPartition = GetFirstPartition(context, staticBody.Collider);
+        PhysicsPartition2D kinematicPartition = GetFirstPartition(context, kinematicBody.Collider);
+
+        context.Collisions2D.RefreshPartitionAwakeState(staticBody.Collider);
+        context.Collisions2D.RefreshPartitionAwakeState(kinematicBody.Collider);
+
+        AssertPartitionMembership(staticPartition, staticBody.Collider.Id, dynamic: false, kinematic: false, @static: true);
+        AssertPartitionMembership(kinematicPartition, kinematicBody.Collider.Id, dynamic: false, kinematic: true, @static: false);
     }
 
     [Fact]
@@ -760,6 +933,34 @@ public sealed class Physics2DPartitionBroadPhaseTests
         context.World.TryGetVoxel(collider.PartitionCoordinates![0], out Voxel? voxel).Should().BeTrue();
         voxel!.TryGetPartition(out PhysicsPartition2D? partition).Should().BeTrue();
         return partition!;
+    }
+
+    private static WorldVoxelIndex ResolveCanonicalSharedPartition(LSCollider2D first, LSCollider2D second)
+    {
+        SwiftList<WorldVoxelIndex> firstCoordinates = first.PartitionCoordinates!;
+        SwiftList<WorldVoxelIndex> secondCoordinates = second.PartitionCoordinates!;
+        for (int i = 0; i < firstCoordinates.Count; i++)
+        {
+            WorldVoxelIndex candidate = firstCoordinates[i];
+            if (!ContainsCoordinate(secondCoordinates, candidate))
+                continue;
+
+            if (GravitasPhysics2DService.IsCanonicalSharedPartition(first, second, candidate))
+                return candidate;
+        }
+
+        throw new InvalidOperationException("Expected a canonical shared 2D partition coordinate.");
+    }
+
+    private static bool ContainsCoordinate(SwiftList<WorldVoxelIndex> coordinates, WorldVoxelIndex candidate)
+    {
+        for (int i = 0; i < coordinates.Count; i++)
+        {
+            if (coordinates[i].Equals(candidate))
+                return true;
+        }
+
+        return false;
     }
 
     private static void AssertPartitionMembership(

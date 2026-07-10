@@ -29,8 +29,9 @@ internal sealed partial class GravitasMixedCollisionService
 
         if (!collider.IsActive || collider.Shape == ColliderType.None)
         {
-            if (collider.IsMixedPartitioned)
-                ClearPartitioned3DCollider(collider, force: true);
+            ClearPartitioned3DCollider(collider, force: true);
+            collider.MarkMixedUnpartitioned();
+            collider.ClearMixedPartitionCoordinates();
 
             return false;
         }
@@ -65,8 +66,9 @@ internal sealed partial class GravitasMixedCollisionService
 
         if (!collider.IsActive || collider.Shape == ColliderType2D.None)
         {
-            if (collider.IsMixedPartitioned)
-                ClearPartitioned2DCollider(collider, force: true);
+            ClearPartitioned2DCollider(collider, force: true);
+            collider.MarkMixedUnpartitioned();
+            collider.ClearMixedPartitionCoordinates();
 
             return false;
         }
@@ -377,8 +379,7 @@ internal sealed partial class GravitasMixedCollisionService
     {
         int count = _context.Physics.ColliderCount;
         for (int i = 0; i < count; i++)
-            if (_context.Physics.TryGetColliderByServiceIndex(i, out LSCollider? collider))
-                Refresh3DColliderPartition(collider!);
+            Refresh3DColliderPartition(_context.Physics.GetColliderByServiceIndex(i));
     }
 
     private void Refresh3DColliderPartitionsForQuery(bool cachePartitionRefresh)
@@ -405,8 +406,7 @@ internal sealed partial class GravitasMixedCollisionService
     {
         int count = _context.Physics2D.ColliderCount;
         for (int i = 0; i < count; i++)
-            if (_context.Physics2D.TryGetColliderByServiceIndex(i, out LSCollider2D? collider))
-                Refresh2DColliderPartition(collider!, rebuildShapes);
+            Refresh2DColliderPartition(_context.Physics2D.GetColliderByServiceIndex(i), rebuildShapes);
     }
 
     private void Refresh2DColliderPartitionsForQuery(bool cachePartitionRefresh)
@@ -431,9 +431,6 @@ internal sealed partial class GravitasMixedCollisionService
 
     private bool Partition3DCollider(LSCollider collider, Vector3d coverageMin, Vector3d coverageMax)
     {
-        if (collider.IsMixedPartitioned || !collider.IsActive)
-            return false;
-
         MixedPartitionMobilityKind kind = Get3DMobilityKind(collider);
         SwiftList<WorldVoxelIndex> coordinates = collider.GetOrCreateMixedPartitionCoordinates();
         coordinates.FastClear();
@@ -455,9 +452,6 @@ internal sealed partial class GravitasMixedCollisionService
 
     private bool Partition2DCollider(LSCollider2D collider, Vector3d coverageMin, Vector3d coverageMax)
     {
-        if (collider.IsMixedPartitioned || !collider.IsActive)
-            return false;
-
         MixedPartitionMobilityKind kind = Get2DMobilityKind(collider);
         SwiftList<WorldVoxelIndex> coordinates = collider.GetOrCreateMixedPartitionCoordinates();
         coordinates.FastClear();
@@ -617,17 +611,16 @@ internal sealed partial class GravitasMixedCollisionService
             return partition!;
 
         partition = RentPartition();
-        if (voxel.TryAddPartition(partition))
+        if (!voxel.TryAddPartition(partition))
         {
-            TrackRetainedPartition(partition);
-            return partition;
+            ReleasePartition(partition);
+            SwiftThrowHelper.ThrowIfTrue(
+                true,
+                nameof(GravitasMixedCollisionService),
+                "Unable to attach mixed physics partition to voxel.");
         }
 
-        ReleasePartition(partition);
-        SwiftThrowHelper.ThrowIfTrue(
-            true,
-            nameof(GravitasMixedCollisionService),
-            "Unable to attach mixed physics partition to voxel.");
+        TrackRetainedPartition(partition);
         return partition;
     }
 

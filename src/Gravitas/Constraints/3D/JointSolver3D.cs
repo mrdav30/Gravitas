@@ -19,13 +19,6 @@ internal static class JointSolver3D
 
     internal static void Solve(Joint3D joint, bool applyCachedImpulse)
     {
-        if (!joint.IsActive || !joint.IsEnabled || !joint.HasSolverParticipant())
-        {
-            joint.LastSolvedRowCount = 0;
-            joint.LastSolveMetrics = default;
-            return;
-        }
-
         Span<JointConstraintRow3D> rows = stackalloc JointConstraintRow3D[MaxRowsPerJoint];
         int rowCount = BuildRows(
             joint,
@@ -33,12 +26,6 @@ internal static class JointSolver3D
             out Fixed64 linearAnchorErrorMagnitude,
             out Fixed64 angularLimitErrorMagnitude,
             out Fixed64 motorErrorMagnitude);
-        if (rowCount == 0)
-        {
-            joint.LastSolvedRowCount = 0;
-            joint.LastSolveMetrics = default;
-            return;
-        }
 
         Fixed64 incrementalImpulseMagnitude = Fixed64.Zero;
         Fixed64 motorImpulseMagnitude = Fixed64.Zero;
@@ -293,7 +280,7 @@ internal static class JointSolver3D
         Fixed64 damping,
         Fixed64 maxImpulse)
     {
-        if (count >= MaxRowsPerJoint || error.Abs() <= RowEpsilon || axis.MagnitudeSquared <= RowEpsilon)
+        if (error.Abs() <= RowEpsilon || axis.MagnitudeSquared <= RowEpsilon)
             return;
 
         rows[count] = new JointConstraintRow3D(
@@ -317,7 +304,7 @@ internal static class JointSolver3D
         Fixed64 damping,
         Fixed64 maxImpulse)
     {
-        if (count >= MaxRowsPerJoint || biasVelocity.Abs() <= RowEpsilon)
+        if (biasVelocity.Abs() <= RowEpsilon)
             return;
 
         rows[count] = new JointConstraintRow3D(

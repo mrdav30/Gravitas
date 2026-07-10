@@ -10,6 +10,32 @@ namespace Gravitas.Tests.Colliders;
 public sealed class ColliderHierarchyStateTests
 {
     [Fact]
+    public void HierarchyKey_ShouldRoundTripPackedIdentityAndRejectInvalidIds()
+    {
+        ColliderHierarchyKey none = ColliderHierarchyKey.None;
+        ColliderHierarchyKey twoD = ColliderHierarchyKey.Create2D(12);
+        ColliderHierarchyKey threeD = ColliderHierarchyKey.Create3D(12);
+
+        none.IsValid.Should().BeFalse();
+        none.Packed.Should().Be(0UL);
+        ColliderHierarchyKey.FromPacked(0UL).Should().Be(none);
+        ColliderHierarchyKey.FromPacked(twoD.Packed).Should().Be(twoD);
+        twoD.Is2D.Should().BeTrue();
+        twoD.Is3D.Should().BeFalse();
+        threeD.Is3D.Should().BeTrue();
+        threeD.Is2D.Should().BeFalse();
+        twoD.Equals((object?)null).Should().BeFalse();
+        twoD.Equals("2d").Should().BeFalse();
+        (twoD == ColliderHierarchyKey.Create2D(12)).Should().BeTrue();
+        (twoD != threeD).Should().BeTrue();
+
+        Action createNegative2D = () => ColliderHierarchyKey.Create2D(-1);
+        Action createNegative3D = () => ColliderHierarchyKey.Create3D(-1);
+        createNegative2D.Should().Throw<ArgumentOutOfRangeException>().WithParameterName("id");
+        createNegative3D.Should().Throw<ArgumentOutOfRangeException>().WithParameterName("id");
+    }
+
+    [Fact]
     public void Initialize_ShouldResetChildrenAndConfiguredParentState()
     {
         var state = new ColliderHierarchyState();

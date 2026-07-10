@@ -113,6 +113,41 @@ public sealed class CollisionResponse2DManifoldTests
     }
 
     [Fact]
+    public void Resolve_WithTriggerEmptyOrInfiniteMassPair_ShouldNotMutateBodies()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        SolidBody2D triggerTarget = CreateBox(context, new Vector2d((Fixed64)2, Fixed64.Zero));
+        var trigger = new LSAABBoxCollider2D(new Vector2d((Fixed64)2, (Fixed64)2))
+        {
+            IsTrigger = true
+        };
+        trigger.InitializeWithNoBody(new TestMatterAgent(
+            context,
+            new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)));
+        var triggerPair = new CollisionPair2D(trigger, triggerTarget.Collider);
+        triggerPair.Manifold.SetContact(Vector2d.Right, Vector2d.Right, Fixed64.Half, Vector2d.Right);
+        triggerTarget.ApplyCollisionLinearVelocityDelta(Vector2d.Right);
+        CollisionResponse2D.Resolve(triggerPair);
+        triggerTarget.LinearVelocity.Should().Be(Vector2d.Right);
+
+        SolidBody2D emptyA = CreateBox(context, new Vector2d((Fixed64)4, Fixed64.Zero));
+        SolidBody2D emptyB = CreateBox(context, new Vector2d((Fixed64)6, Fixed64.Zero));
+        var emptyPair = new CollisionPair2D(emptyA.Collider, emptyB.Collider);
+        emptyA.ApplyCollisionLinearVelocityDelta(Vector2d.Right);
+        CollisionResponse2D.Resolve(emptyPair);
+        emptyA.LinearVelocity.Should().Be(Vector2d.Right);
+
+        SolidBody2D frozenA = CreateBox(context, new Vector2d((Fixed64)8, Fixed64.Zero), immovable: true);
+        SolidBody2D frozenB = CreateBox(context, new Vector2d((Fixed64)10, Fixed64.Zero), immovable: true);
+        var frozenPair = new CollisionPair2D(frozenA.Collider, frozenB.Collider);
+        frozenPair.Manifold.SetContact(Vector2d.Right, Vector2d.Right, Fixed64.Half, Vector2d.Right);
+        CollisionResponse2D.Resolve(frozenPair);
+        frozenPair.TryGetWarmStartImpulse(
+            frozenPair.Manifold.PrimaryContact.ContactId,
+            out _).Should().BeFalse();
+    }
+
+    [Fact]
     public void Resolve_WithZeroConfiguredRestitutionThreshold_ShouldBounceLowSpeedContact()
     {
         Fixed64 velocity = ResolveClosingVelocityAfterResponse(

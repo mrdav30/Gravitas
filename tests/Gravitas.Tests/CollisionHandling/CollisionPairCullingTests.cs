@@ -117,6 +117,31 @@ public sealed class CollisionPairCullingTests
         pair.Manifold.PrimaryContact.Depth.Should().Be(Fixed64.Zero);
     }
 
+    [Fact]
+    public void WakeSleepingBodiesForCollision_ShouldWakeOnlyLinkedSleepingBodyWhenOtherCanDriveCollision()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> sleepingA = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
+        ScenarioBody<LSSphereCollider> awakeB = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(1, 0, 0));
+        CollisionPair pair = scenario.CreatePair(sleepingA.Collider, awakeB.Collider);
+        sleepingA.Body.Sleep();
+
+        pair.WakeSleepingBodiesForCollision();
+
+        sleepingA.Body.IsSleeping.Should().BeFalse();
+        awakeB.Body.IsSleeping.Should().BeFalse();
+
+        awakeB.Body.Sleep();
+
+        pair.WakeSleepingBodiesForCollision();
+
+        awakeB.Body.IsSleeping.Should().BeFalse();
+
+        LSSphereCollider bodylessA = scenario.CreateStaticSphere(PhysicsScenarioBuilder.Vector(2, 0, 0));
+        scenario.CreatePair(bodylessA, awakeB.Collider).WakeSleepingBodiesForCollision();
+        scenario.CreatePair(awakeB.Collider, bodylessA).WakeSleepingBodiesForCollision();
+    }
+
     private static void ClearPartitionFlags(LSCollider first, LSCollider second)
     {
         first.PartitionChanged = false;

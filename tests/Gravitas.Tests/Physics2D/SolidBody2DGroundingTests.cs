@@ -271,6 +271,63 @@ public sealed class SolidBody2DGroundingTests
     }
 
     [Fact]
+    public void AutomaticRefresh_ShouldReuseCachedGroundWithinFrameUntilForceProbe()
+    {
+        using GravitasWorldContext context = CreateContext();
+        CreateStaticFloor(context, layer: new PhysicsLayer(1));
+        context.Settings.GroundCheckLayerMask = PhysicsLayerMask.FromLayer(1);
+        SolidBody2D body = CreateCircle(context, new Vector2d(Fixed64.Zero, Fixed64.One));
+
+        body.CheckGround();
+        body.IsGrounded.Should().BeTrue();
+
+        body.GroundedDistanceRay = Fixed64.Zero;
+        body.BeginAutomaticGroundingRefresh();
+        body.CompleteAutomaticGroundingRefresh();
+
+        body.IsGrounded.Should().BeTrue();
+
+        body.CheckGround();
+
+        body.IsGrounded.Should().BeFalse();
+        body.WasGrounded.Should().BeTrue();
+    }
+
+    [Fact]
+    public void ContactGroundCandidate_ShouldRejectLayerMaskedAndLocallyIgnoredSupport()
+    {
+        using GravitasWorldContext layerContext = CreateContext();
+        SolidBody2D layerBody = CreateCircle(layerContext, Vector2d.Zero);
+        LSAABBoxCollider2D wrongLayerSupport = CreateStaticFloor(layerContext, layer: new PhysicsLayer(2));
+        layerContext.Settings.GroundCheckLayerMask = PhysicsLayerMask.FromLayer(1);
+        layerBody.BeginAutomaticGroundingRefresh();
+        layerBody.TryAcceptContactGroundCandidate(
+            layerBody.Collider,
+            wrongLayerSupport,
+            CreateGroundContact(1, Vector2d.Zero, Fixed64.Half, Up),
+            ownColliderIsA: true);
+        layerBody.CompleteAutomaticGroundingRefresh();
+
+        layerBody.IsGrounded.Should().BeFalse();
+
+        using GravitasWorldContext ignoredContext = CreateContext();
+        SolidBody2D ignoredBody = CreateCircle(ignoredContext, Vector2d.Zero);
+        LSAABBoxCollider2D ignoredSupport = CreateStaticFloor(ignoredContext, layer: new PhysicsLayer(1));
+        ignoredContext.Settings.GroundCheckLayerMask = PhysicsLayerMask.FromLayer(1);
+        ignoredBody.Collider.IgnoredCollisionLayers = PhysicsLayerMask.FromLayer(ignoredSupport.Layer);
+
+        ignoredBody.BeginAutomaticGroundingRefresh();
+        ignoredBody.TryAcceptContactGroundCandidate(
+            ignoredBody.Collider,
+            ignoredSupport,
+            CreateGroundContact(1, Vector2d.Zero, Fixed64.Half, Up),
+            ownColliderIsA: true);
+        ignoredBody.CompleteAutomaticGroundingRefresh();
+
+        ignoredBody.IsGrounded.Should().BeFalse();
+    }
+
+    [Fact]
     public void SweptCircleProbe_ShouldGroundWhenCenterRayMissesSupportEdge()
     {
         using GravitasWorldContext context = CreateContext();

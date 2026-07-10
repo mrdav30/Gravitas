@@ -34,6 +34,29 @@ public sealed class CompoundColliderCollisionTests
     }
 
     [Fact]
+    public void SphereCompound_ShouldReportContactInSphereOwnerOrder()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> sphere = scenario.CreateSphere(
+            new Vector3d(Fixed64.FromFraction(3, 2), Fixed64.Zero, Fixed64.Zero),
+            preventAngularForces: true);
+        ScenarioBody<LSCompoundCollider> compound = scenario.CreateBody(
+            CreateTwoSphereCompound(),
+            PhysicsScenarioBuilder.Vector(0, 0, 0),
+            FixedQuaternion.Identity,
+            preventAngularForces: true);
+        CollisionPair pair = scenario.CreatePair(sphere.Collider, compound.Collider);
+
+        pair.CollisionType.Should().Be(CollisionType.Compound);
+        pair.UpdateCollision();
+
+        pair.Manifold.HasContact.Should().BeTrue();
+        pair.Manifold.Count.Should().Be(1);
+        pair.Manifold.PrimaryContact.Normal.Should().Be(Vector3d.Right);
+        pair.Manifold.PrimaryContact.Depth.Should().Be(Fixed64.Half);
+    }
+
+    [Fact]
     public void CompoundInternalOverlap_ShouldReduceDuplicateContactsDeterministically()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();

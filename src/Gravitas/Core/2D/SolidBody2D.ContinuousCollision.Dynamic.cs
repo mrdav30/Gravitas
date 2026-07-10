@@ -55,6 +55,8 @@ public sealed partial class SolidBody2D
         {
             _continuousCollisionHandoffIgnoredCollider3D = null;
             _continuousCollisionHandoffIgnoredCollider2D = null;
+            if (updateColliderState)
+                Collider.Rebuild();
             return true;
         }
 
