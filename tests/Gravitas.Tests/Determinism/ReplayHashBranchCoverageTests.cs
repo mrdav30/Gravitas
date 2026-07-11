@@ -102,6 +102,60 @@ public sealed class ReplayHashBranchCoverageTests
     }
 
     [Fact]
+    public void Constraint3DReplayHash_ShouldEncodeRemovedJointSlotsAndRagdollActivation()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> first = scenario.CreateSphere(Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> second = scenario.CreateSphere(Vector3d.Right * (Fixed64)2);
+        ScenarioBody<LSSphereCollider> third = scenario.CreateSphere(Vector3d.Right * (Fixed64)4);
+        Joint3D removed = scenario.Context.Constraints3D.RegisterJoint(new JointDefinition3D(
+            first.Body,
+            second.Body,
+            LocalFrame3D(Vector3d.Zero),
+            LocalFrame3D(Vector3d.Zero),
+            JointType3D.BallSocket,
+            JointLimit3D.Unrestricted,
+            JointMotor3D.Disabled,
+            JointCollisionPolicy.SuppressLinked));
+        scenario.Context.Constraints3D.RegisterJoint(new JointDefinition3D(
+            second.Body,
+            third.Body,
+            LocalFrame3D(Vector3d.Zero),
+            LocalFrame3D(Vector3d.Zero),
+            JointType3D.BallSocket,
+            JointLimit3D.Unrestricted,
+            JointMotor3D.Disabled,
+            JointCollisionPolicy.SuppressLinked));
+        ChronicleHash beforeRemoval = HashConstraints3D(scenario.Context, GravitasReplayHashMode.Authoritative);
+
+        scenario.Context.Constraints3D.RemoveJoint(removed.Id).Should().BeTrue();
+        ChronicleHash afterRemoval = HashConstraints3D(scenario.Context, GravitasReplayHashMode.Authoritative);
+        RagdollRuntime3D ragdoll = scenario.Context.Constraints3D.RegisterRagdoll(new RagdollDefinition3D(
+            new[]
+            {
+                new RagdollLinkDefinition3D(0, first.Body),
+                new RagdollLinkDefinition3D(1, third.Body)
+            },
+            new[]
+            {
+                new RagdollJointDefinition3D(
+                    0,
+                    1,
+                    JointType3D.BallSocket,
+                    LocalFrame3D(Vector3d.Zero),
+                    LocalFrame3D(Vector3d.Zero))
+            },
+            RagdollSelfCollisionPolicy.CollideAllLinks));
+        ChronicleHash activeRagdoll = HashConstraints3D(scenario.Context, GravitasReplayHashMode.Authoritative);
+
+        ragdoll.DeactivateToKinematic();
+
+        afterRemoval.Should().NotBe(beforeRemoval);
+        activeRagdoll.Should().NotBe(afterRemoval);
+        HashConstraints3D(scenario.Context, GravitasReplayHashMode.Authoritative).Should().NotBe(activeRagdoll);
+    }
+
+    [Fact]
     public void Constraint2DReplayHash_ShouldEncodeRemovedJointSlotsAndRagdollActivation()
     {
         using GravitasWorldContext context = CreateConstraint2DContext();
@@ -894,6 +948,9 @@ public sealed class ReplayHashBranchCoverageTests
 
     private static ChronicleHash HashConstraints2D(GravitasWorldContext context, GravitasReplayHashMode mode) =>
         Hash((ref ChronicleHashWriter writer) => context.Constraints2D.ContributeReplayHash(ref writer, mode));
+
+    private static ChronicleHash HashConstraints3D(GravitasWorldContext context, GravitasReplayHashMode mode) =>
+        Hash((ref ChronicleHashWriter writer) => context.Constraints3D.ContributeReplayHash(ref writer, mode));
 
     private static ChronicleHash HashPhysics2D(GravitasWorldContext context) =>
         Hash((ref ChronicleHashWriter writer) =>

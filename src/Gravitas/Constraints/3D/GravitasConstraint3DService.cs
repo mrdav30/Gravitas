@@ -138,20 +138,16 @@ public sealed class GravitasConstraint3DService
 
         int linkCount = definition.Links.Length;
         var links = new SolidBody[linkCount];
-        var linkIds = new int[linkCount];
         for (int i = 0; i < linkCount; i++)
-        {
-            linkIds[i] = definition.Links[i].LinkId;
             links[i] = definition.Links[i].Body;
-        }
 
         int jointCount = definition.Joints.Length;
         var joints = new Joint3D[jointCount];
         for (int i = 0; i < jointCount; i++)
         {
             RagdollJointDefinition3D authoredJoint = definition.Joints[i];
-            SolidBody bodyA = ResolveRagdollLink(linkIds, links, authoredJoint.LinkAId);
-            SolidBody bodyB = ResolveRagdollLink(linkIds, links, authoredJoint.LinkBId);
+            SolidBody bodyA = ResolveRagdollLink(definition.Links, authoredJoint.LinkAId);
+            SolidBody bodyB = ResolveRagdollLink(definition.Links, authoredJoint.LinkBId);
             JointCollisionPolicy collisionPolicy = definition.SelfCollisionPolicy == RagdollSelfCollisionPolicy.CollideAllLinks
                 ? JointCollisionPolicy.Collide
                 : authoredJoint.CollisionPolicy;
@@ -393,10 +389,6 @@ public sealed class GravitasConstraint3DService
             nameof(definition),
             "Joint bodies must be active before registration.");
         SwiftThrowHelper.ThrowIfArgument(
-            definition.BodyA.Collider == null || definition.BodyB.Collider == null,
-            nameof(definition),
-            "Joint bodies must have registered 3D colliders.");
-        SwiftThrowHelper.ThrowIfArgument(
             !Joint3D.IsSupportedType(definition.Type),
             nameof(definition.Type),
             "Unsupported 3D joint type.");
@@ -433,7 +425,7 @@ public sealed class GravitasConstraint3DService
                 nameof(definition.Links),
                 "All ragdoll links must belong to this context.");
             SwiftThrowHelper.ThrowIfArgument(
-                !link.Body.Active || link.Body.Collider == null,
+                !link.Body.Active,
                 nameof(definition.Links),
                 "Ragdoll links must have active 3D colliders.");
             SwiftThrowHelper.ThrowIfArgument(
@@ -480,17 +472,6 @@ public sealed class GravitasConstraint3DService
         {
             if (links[i].LinkId == linkId)
                 return links[i].Body;
-        }
-
-        throw new ArgumentException("Ragdoll joint references an unknown link ID.", nameof(linkId));
-    }
-
-    private static SolidBody ResolveRagdollLink(int[] linkIds, SolidBody[] links, int linkId)
-    {
-        for (int i = 0; i < linkIds.Length; i++)
-        {
-            if (linkIds[i] == linkId)
-                return links[i];
         }
 
         throw new ArgumentException("Ragdoll joint references an unknown link ID.", nameof(linkId));
