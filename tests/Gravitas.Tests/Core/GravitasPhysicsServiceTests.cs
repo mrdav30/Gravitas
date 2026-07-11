@@ -1,6 +1,7 @@
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
+using Gravitas.Support;
 using Gravitas.Tests.Support;
 using SwiftCollections.Diagnostics;
 using System;
@@ -332,6 +333,60 @@ public sealed class GravitasPhysicsServiceTests
 
             entries.Should().HaveCount(1);
             context.Physics.ColliderCount.Should().Be(0);
+        }
+        finally
+        {
+            GravitasLogger.LogHandler = originalLogHandler;
+            GravitasLogger.MinimumLevel = originalMinimumLevel;
+        }
+    }
+
+    [Fact]
+    public void DessimilateCollider_WithForeignSameIdCollider_ShouldPreserveBothContexts()
+    {
+        using PhysicsScenarioBuilder scenarioA = PhysicsScenarioBuilder.Create();
+        using PhysicsScenarioBuilder scenarioB = PhysicsScenarioBuilder.Create();
+        GravitasWorldContext contextA = scenarioA.Context;
+        GravitasWorldContext contextB = scenarioB.Context;
+        LSSphereCollider colliderA = scenarioA.CreateStaticSphere(Vector3d.Zero);
+        LSSphereCollider colliderB = scenarioB.CreateStaticSphere(Vector3d.Zero);
+        DiagnosticLevel originalMinimumLevel = GravitasLogger.MinimumLevel;
+        Action<DiagnosticLevel, string, string> originalLogHandler = GravitasLogger.LogHandler;
+        var entries = new List<(DiagnosticLevel Level, string Message, string Source)>();
+
+        try
+        {
+            GravitasLogger.MinimumLevel = DiagnosticLevel.Warning;
+            GravitasLogger.LogHandler = (level, message, source) => entries.Add((level, message, source));
+
+            contextA.Physics.DessimilateCollider(colliderB);
+
+            colliderA.IsPartitioned.Should().BeTrue();
+            colliderB.IsPartitioned.Should().BeTrue();
+            colliderA.ServiceRefreshIndex.Should().Be(0);
+            colliderB.ServiceRefreshIndex.Should().Be(0);
+            contextA.Physics.ColliderCount.Should().Be(1);
+            contextB.Physics.ColliderCount.Should().Be(1);
+            contextA.Physics.TryGetColliderById(0, out LSCollider? resolvedA).Should().BeTrue();
+            contextB.Physics.TryGetColliderById(0, out LSCollider? resolvedB).Should().BeTrue();
+            resolvedA.Should().BeSameAs(colliderA);
+            resolvedB.Should().BeSameAs(colliderB);
+            contextA.Query3D.Raycast(
+                -Vector3d.Right * (Fixed64)2,
+                Vector3d.Right,
+                (Fixed64)4,
+                out _,
+                PhysicsLayerMask.All).Should().BeTrue();
+            contextB.Query3D.Raycast(
+                -Vector3d.Right * (Fixed64)2,
+                Vector3d.Right,
+                (Fixed64)4,
+                out _,
+                PhysicsLayerMask.All).Should().BeTrue();
+            entries.Should().Equal((
+                DiagnosticLevel.Warning,
+                "Object with ID 0 cannot be dessimilated because it is not assimilated.",
+                "GravitasPhysicsService.DessimilateCollider"));
         }
         finally
         {

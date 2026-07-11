@@ -244,7 +244,7 @@ public sealed partial class GravitasPhysicsService
         SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
         int id = collider.Id;
 
-        if (!_colliders.TryGetById(id, out _))
+        if (!_colliders.TryGetById(id, out LSCollider? registered) || !ReferenceEquals(registered, collider))
         {
             GravitasLogger.Channel.Warn($"Object with ID {collider.Id} cannot be dessimilated because it is not assimilated.");
             return;
