@@ -135,11 +135,9 @@ public sealed partial class GravitasPhysics2DService
         LastBroadPhaseCandidateCount = 0;
     }
 
-    public void LateSimulate() => LateSimulate(continuousCollisionFramePrepared: false);
-
-    internal void LateSimulate(bool continuousCollisionFramePrepared)
+    public void LateSimulate()
     {
-        if (!BeginLateSimulateBodies(continuousCollisionFramePrepared))
+        if (!BeginLateSimulateBodies(continuousCollisionFramePrepared: false))
             return;
 
         ProcessQueuedContinuousCollisionHandoffs();
@@ -168,9 +166,6 @@ public sealed partial class GravitasPhysics2DService
 
     internal void CompleteLateSimulatePhysicsStep()
     {
-        if (!SimulatePhysics)
-            return;
-
         PrepareCollisionPartitions();
         RunDiscreteCollisionStep();
         UpdateSleepStatesAfterPhysicsStep();
@@ -266,9 +261,6 @@ public sealed partial class GravitasPhysics2DService
 
     private void AddServiceRefreshCollider(LSCollider2D collider)
     {
-        if (collider.ServiceRefreshIndex >= 0)
-            return;
-
         collider.SetServiceRefreshIndex(_serviceRefreshColliders.Count);
         _serviceRefreshColliders.Add(collider);
     }
@@ -276,7 +268,7 @@ public sealed partial class GravitasPhysics2DService
     private void RemoveServiceRefreshCollider(LSCollider2D collider)
     {
         int index = collider.ServiceRefreshIndex;
-        if (index < 0 || index >= _serviceRefreshColliders.Count || !ReferenceEquals(_serviceRefreshColliders[index], collider))
+        if (index < 0 || !ReferenceEquals(_serviceRefreshColliders[index], collider))
         {
             collider.ClearServiceRefreshIndex();
             return;

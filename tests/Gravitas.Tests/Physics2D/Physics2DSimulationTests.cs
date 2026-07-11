@@ -166,6 +166,94 @@ public sealed class Physics2DSimulationTests
     }
 
     [Fact]
+    public void Deactivate_NonDynamicBody_ShouldStillRemoveColliderAndPartition()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 4);
+        SolidBody2D body = CreateCircle(context, Vector2d.Zero, immovable: false, isDynamic: false);
+
+        body.DynamicId.Should().Be(-1);
+        context.Physics2D.BodyCount.Should().Be(0);
+        body.Collider.IsPartitioned.Should().BeTrue();
+
+        body.Deactivate();
+
+        body.Active.Should().BeFalse();
+        body.Collider.IsPartitioned.Should().BeFalse();
+        body.Collider.Id.Should().Be(-1);
+        context.Physics2D.BodyCount.Should().Be(0);
+        context.Physics2D.ColliderCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void Deactivate_AfterPhysicsServiceReset_ShouldClearStaleBodyState()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 4);
+        SolidBody2D body = CreateCircle(context, Vector2d.Zero, immovable: false);
+
+        context.Physics2D.Reset();
+
+        body.Deactivate();
+
+        body.Active.Should().BeFalse();
+        body.Collider.Body.Should().BeNull();
+        body.Collider.Id.Should().Be(-1);
+        context.Physics2D.BodyCount.Should().Be(0);
+        context.Physics2D.ColliderCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void DirectSimulation_WhenPhysicsIsDisabled_ShouldPreserveBodyAndBroadPhaseState()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 4);
+        SolidBody2D body = CreateCircle(context, Vector2d.Zero, immovable: false);
+        _ = CreateCircle(context, Fixed64.Half * Vector2d.Right, immovable: true);
+        context.LateSimulate();
+        body.AddForce(Vector2d.Right);
+        Vector2d position = body.Position;
+        Vector2d velocity = body.LinearVelocity;
+        int candidateCount = context.Physics2D.LastBroadPhaseCandidateCount;
+        int lateSimulateToken = context.LateSimulateToken;
+        context.Physics2D.SimulatePhysics = false;
+
+        context.Physics2D.Simulate();
+        context.Physics2D.LateSimulate();
+
+        candidateCount.Should().BeGreaterThan(0);
+        context.Physics2D.LastBroadPhaseCandidateCount.Should().Be(candidateCount);
+        body.Position.Should().Be(position);
+        body.LinearVelocity.Should().Be(velocity);
+        context.LateSimulateToken.Should().Be(lateSimulateToken);
+    }
+
+    [Fact]
+    public void LateSimulate_DirectCall_ShouldOwnLateStepTokenAdvance()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 4);
+        SolidBody2D body = CreateCircle(context, Vector2d.Zero, immovable: false);
+        body.AddForce(new Vector2d((Fixed64)4, Fixed64.Zero));
+
+        context.Physics2D.LateSimulate();
+
+        context.LateSimulateToken.Should().Be(1);
+        body.Position.Should().Be(Fixed64.FromFraction(1, 4) * Vector2d.Right);
+    }
+
+    [Fact]
+    public void LateSimulate_WithPoolingDisabled_ShouldStillProcessCollisionCandidates()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 4);
+        context.Settings.PoolingEnabled = false;
+        SolidBody2D left = CreateCircle(context, Vector2d.Zero, immovable: false);
+        SolidBody2D right = CreateCircle(context, Fixed64.Half * Vector2d.Right, immovable: true);
+
+        context.LateSimulate();
+
+        context.Physics2D.LastBroadPhaseCandidateCount.Should().BeGreaterThan(0);
+        left.Collider.TryGetCollisionPair(right.Collider.Id, out CollisionPair2D? pair).Should().BeTrue();
+        pair!.Manifold.HasContact.Should().BeTrue();
+    }
+
+    [Fact]
     public void CollisionMatrix_ShouldFilter2DCollisionPairs()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 4);
@@ -319,7 +407,11 @@ public sealed class Physics2DSimulationTests
         context.LateSimulate();
     }
 
-    private static SolidBody2D CreateCircle(GravitasWorldContext context, Vector2d position, bool immovable)
+    private static SolidBody2D CreateCircle(
+        GravitasWorldContext context,
+        Vector2d position,
+        bool immovable,
+        bool isDynamic = true)
     {
         var transform = new FixedTransform(new Vector3d(position.X, Fixed64.Zero, position.Y), FixedQuaternion.Identity, Vector3d.One);
         var agent = new TestMatterAgent(context, transform);
@@ -328,7 +420,7 @@ public sealed class Physics2DSimulationTests
             Mass = Fixed64.One,
             FreezeAxes = immovable ? BodyFreezeAxes2D.Position : BodyFreezeAxes2D.None
         };
-        body.Initialize(position);
+        body.Initialize(position, isDynamic: isDynamic);
         return body;
     }
 
