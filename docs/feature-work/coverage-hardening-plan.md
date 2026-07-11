@@ -22,26 +22,26 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-circle-geometry-full/e0f5020c-824b-4d66-ac8d-0035474368d3/coverage.cobertura.xml`.
+`TestResults/coverage-physics-service-full/a4a90fc4-fbd9-4f99-8916-cec34c3e9407/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
-| Lines | 99.2% | 25,586 / 25,801 | 215 | 100% |
-| Branches | 96.6% | 9,799 / 10,142 | 343 | 100% |
-| Methods | 98.8% | 3,396 / 3,437 | 41 | 100% |
+| Lines | 99.2% | 25,585 / 25,794 | 209 | 100% |
+| Branches | 96.7% | 9,800 / 10,136 | 336 | 100% |
+| Methods | 98.9% | 3,395 / 3,434 | 39 | 100% |
 
-The full coverage-enabled `Release` suite passes 2,138/2,138 tests, and
+The full coverage-enabled `Release` suite passes 2,142/2,142 tests, and
 `ReleaseLean` builds both targets without warnings. Branch coverage is now the
 primary constraint, but the remaining line and method gaps must close from the
 same final artifact.
 
 ### Immediate Next Block
 
-Finish `src/Gravitas/Core/3D/GravitasPhysicsService.cs` before changing target.
-The current artifact reports six uncovered lines, seven uncovered branch
-outcomes, and two uncovered methods in this file. Trace registration, reset,
-pair, partition, and lifecycle ownership together so local tests do not hide a
-cross-phase defect.
+Finish `src/Gravitas/Constraints/3D/GravitasConstraint3DService.cs` before
+changing target. The current artifact reports seven uncovered lines and six
+uncovered branch outcomes in this file. Trace joint, ragdoll, suppression,
+reset, and replay ownership together; do not rely on GridForge pooled spawn
+tokens when constructing lifecycle fixtures.
 
 ## Rules Of Engagement
 
@@ -106,18 +106,18 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | `Core/3D/GravitasPhysicsService.cs` | 6 | 7 | 2 | Registration, reset, and lifecycle ownership. |
-| 2 | `CollisionHandling/Detection/3D/CollisionDetection.Mesh.cs` | 6 | 7 | 1 | Mesh dispatch and valid-topology geometry outcomes. |
-| 3 | `Core/2D/GravitasPhysics2DService.cs` | 5 | 9 | 0 | 2D lifecycle and service parity. |
-| 4 | `Core/3D/SolidBody.Motion.cs` | 1 | 9 | 1 | Motion-state transitions and fixed-step boundaries. |
-| 5 | `Core/2D/SolidBody2D.ContinuousCollision.Helpers.cs` | 4 | 9 | 0 | CCD helper invariants and degenerate outcomes. |
-| 6 | `Core/2D/GravitasPhysics2DService.Pairs.cs` | 2 | 10 | 0 | Pair creation, culling, ordering, and cleanup. |
-| 7 | `CollisionHandling/Contacts/3D/ContactManifold.cs` | 6 | 1 | 4 | Remaining meaningful contact-manifold surface. |
-| 8 | `Queries/3D/RaycastSegmentWorker.cs` | 4 | 8 | 0 | Segment reduction, filtering, and hit ordering. |
+| 1 | `Constraints/3D/GravitasConstraint3DService.cs` | 7 | 6 | 0 | Joint, ragdoll, suppression, reset, and replay ownership. |
+| 2 | `Core/2D/GravitasPhysics2DService.cs` | 5 | 9 | 0 | 2D lifecycle and service parity. |
+| 3 | `CollisionHandling/Detection/3D/CollisionDetection.Mesh.cs` | 6 | 7 | 1 | Mesh dispatch and valid-topology geometry outcomes. |
+| 4 | `Core/2D/SolidBody2D.ContinuousCollision.Helpers.cs` | 4 | 9 | 0 | CCD helper invariants and degenerate outcomes. |
+| 5 | `Runtime/GravitasWorldContext.cs` | 5 | 7 | 0 | Context ownership and phase routing. |
+| 6 | `Queries/3D/RaycastSegmentWorker.cs` | 4 | 8 | 0 | Segment reduction, filtering, and hit ordering. |
+| 7 | `Core/Mixed/GravitasMixedCollisionService.Pairs.cs` | 5 | 6 | 0 | Mixed pair ownership and cleanup. |
+| 8 | `Colliders/2D/LSPolygonCollider2D.cs` | 4 | 7 | 0 | Authored polygon validation and geometry. |
 
 ### Phase 1: Core Runtime And Service Ownership
 
-- [ ] Complete and independently review
+- [x] Complete and independently review
       `Core/3D/GravitasPhysicsService.cs`.
 - [ ] Complete `Core/2D/GravitasPhysics2DService.cs` and verify intentional
       2D/3D lifecycle parity.
@@ -253,6 +253,7 @@ of record.
 | 93% review | 97.7% | 93.0% | 96.6% | 1,906 | Broad residual pass completed before the 95% push. |
 | 95% gate | 98.2% | 95.0% | 96.6% | 2,014 | CCD, mixed collision, queries, response, pair lifecycle, and `SolidBody2D` hardening completed. |
 | Last-mile checkpoint | 99.2% | 96.6% | 98.8% | 2,138 | Partition services, teardown/load ownership slices, compound collision, and mixed-query geometry completed and independently reviewed. |
+| 3D physics service | 99.2% | 96.7% | 98.9% | 2,142 | Service wrappers and impossible guards removed; disabled phases, sparse visualization, refresh ownership, diagnostics, and cross-context cleanup independently reviewed. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.
