@@ -87,11 +87,6 @@ public sealed partial class GravitasPhysicsService
     public bool LastContinuousCollisionIslandLimitReached { get; private set; }
 
     /// <summary>
-    /// Resets context-local physics registration state.
-    /// </summary>
-    public void Initialize() => Reset();
-
-    /// <summary>
     /// Runs this context's physics simulation step.
     /// </summary>
     public void Simulate()
@@ -112,11 +107,9 @@ public sealed partial class GravitasPhysicsService
     /// <summary>
     /// Runs this context's late physics step.
     /// </summary>
-    public void LateSimulate() => LateSimulate(continuousCollisionFramePrepared: false);
-
-    internal void LateSimulate(bool continuousCollisionFramePrepared)
+    public void LateSimulate()
     {
-        if (!BeginLateSimulateBodies(continuousCollisionFramePrepared))
+        if (!BeginLateSimulateBodies(continuousCollisionFramePrepared: false))
             return;
 
         ProcessQueuedContinuousCollisionHandoffs();
@@ -149,9 +142,6 @@ public sealed partial class GravitasPhysicsService
 
     internal void CompleteLateSimulatePhysicsStep()
     {
-        if (!SimulatePhysics)
-            return;
-
         PrepareCollisionPartitions();
         RunDiscreteCollisionStep();
         ProcessActiveCollisionPairs();
@@ -211,11 +201,6 @@ public sealed partial class GravitasPhysicsService
         BodyCount = 0;
     }
 
-    /// <summary>
-    /// Deactivates the service and clears pooled state.
-    /// </summary>
-    public void Deactivate() => Reset();
-
     internal int AssimilateBody(SolidBody body, bool isDynamic)
     {
         SwiftThrowHelper.ThrowIfNull(body, nameof(body));
@@ -259,7 +244,7 @@ public sealed partial class GravitasPhysicsService
         SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
         int id = collider.Id;
 
-        if (!_colliders.TryGetById(id, out LSCollider? registered) || !ReferenceEquals(registered, collider))
+        if (!_colliders.TryGetById(id, out _))
         {
             GravitasLogger.Channel.Warn($"Object with ID {collider.Id} cannot be dessimilated because it is not assimilated.");
             return;
@@ -318,9 +303,6 @@ public sealed partial class GravitasPhysicsService
 
     private void AddServiceRefreshCollider(LSCollider collider)
     {
-        if (collider.ServiceRefreshIndex >= 0)
-            return;
-
         collider.SetServiceRefreshIndex(_serviceRefreshColliders.Count);
         _serviceRefreshColliders.Add(collider);
     }
@@ -328,7 +310,7 @@ public sealed partial class GravitasPhysicsService
     private void RemoveServiceRefreshCollider(LSCollider collider)
     {
         int index = collider.ServiceRefreshIndex;
-        if (index < 0 || index >= _serviceRefreshColliders.Count || !ReferenceEquals(_serviceRefreshColliders[index], collider))
+        if (index < 0 || !ReferenceEquals(_serviceRefreshColliders[index], collider))
         {
             collider.ClearServiceRefreshIndex();
             return;

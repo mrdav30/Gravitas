@@ -2,7 +2,9 @@ using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.Tests.Support;
+using SwiftCollections.Diagnostics;
 using System;
+using System.Collections.Generic;
 using Xunit;
 
 namespace Gravitas.Tests.Core;
@@ -270,6 +272,72 @@ public sealed class GravitasPhysicsServiceTests
         body.Deactivate();
 
         context.Physics.BodyCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void LateSimulate_WhenPhysicsIsDisabled_ShouldNotAdvanceBodiesOrLateStepToken()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        SolidBody body = CreateInitializedBody(context);
+        body.AddForce(Vector3d.Right);
+        context.Physics.SimulatePhysics = false;
+
+        context.Physics.LateSimulate();
+
+        body.Position3d.Should().Be(Vector3d.Zero);
+        body.LinearVelocity.Should().Be(Vector3d.Zero);
+        context.LateSimulateToken.Should().Be(0);
+    }
+
+    [Fact]
+    public void Visualize_WithRemovedEarlierBody_ShouldStillPublishLaterBody()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        SolidBody removed = CreateInitializedBody(context);
+        SolidBody retained = CreateInitializedBody(context);
+        retained.CanSetVisualPosition = true;
+        retained.SetPosition(Vector3d.Right);
+        retained.CheckChangedValues();
+        retained.SetVisualPosition(Vector3d.Right);
+        removed.Deactivate();
+
+        context.Visualize();
+
+        context.Physics.BodyCount.Should().Be(1);
+        retained.PositionTransform.Position.Should().Be(Vector3d.Right);
+    }
+
+    [Fact]
+    public void DessimilateCollider_WithUnregisteredCollider_ShouldRespectTheWarningLogGate()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        DiagnosticLevel originalMinimumLevel = GravitasLogger.MinimumLevel;
+        Action<DiagnosticLevel, string, string> originalLogHandler = GravitasLogger.LogHandler;
+        var entries = new List<(DiagnosticLevel Level, string Message, string Source)>();
+
+        try
+        {
+            GravitasLogger.MinimumLevel = DiagnosticLevel.Warning;
+            GravitasLogger.LogHandler = (level, message, source) => entries.Add((level, message, source));
+
+            context.Physics.DessimilateCollider(new LSSphereCollider());
+
+            entries.Should().Equal((
+                DiagnosticLevel.Warning,
+                "Object with ID -1 cannot be dessimilated because it is not assimilated.",
+                "GravitasPhysicsService.DessimilateCollider"));
+
+            GravitasLogger.MinimumLevel = DiagnosticLevel.Error;
+            context.Physics.DessimilateCollider(new LSSphereCollider());
+
+            entries.Should().HaveCount(1);
+            context.Physics.ColliderCount.Should().Be(0);
+        }
+        finally
+        {
+            GravitasLogger.LogHandler = originalLogHandler;
+            GravitasLogger.MinimumLevel = originalMinimumLevel;
+        }
     }
 
     private static SolidBody CreateInitializedBody(GravitasWorldContext context, bool isDynamic = true)
