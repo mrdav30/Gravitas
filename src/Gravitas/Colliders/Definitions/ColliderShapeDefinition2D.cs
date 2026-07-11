@@ -108,13 +108,6 @@ public readonly struct ColliderShapeDefinition2D : IEquatable<ColliderShapeDefin
     }
 
     /// <summary>
-    /// Creates an axis-aligned box shape definition.
-    /// </summary>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static ColliderShapeDefinition2D AABox(Vector2d size, PhysicsMaterial? material = null) =>
-        AABBox(size, material);
-
-    /// <summary>
     /// Creates a convex polygon shape definition.
     /// </summary>
     public static ColliderShapeDefinition2D ConvexPolygon(params Vector2d[] vertices) =>

@@ -14,16 +14,10 @@ using System.Runtime.CompilerServices;
 
 namespace Gravitas.Colliders;
 
-public enum CuboidState
-{
-    AABox,
-    OOBox
-}
-
 public class LSCuboidCollider : LSCollider
 {
     // Define faces with vertex indices
-    public static readonly int[][] FaceDefinitions = new int[][]
+    private static readonly int[][] FaceDefinitions = new int[][]
     {
             new[] {0, 1, 3, 2}, // near quad
             new[] {4, 6, 7, 5}, // far quad
@@ -34,7 +28,7 @@ public class LSCuboidCollider : LSCollider
     };
 
     // Define edges with vertex indices
-    public static readonly int[][] EdgeDefinitions = new int[][]
+    internal static readonly int[][] EdgeDefinitions = new int[][]
     {
             new[] {0, 1}, new[] {2, 3}, new[] {0, 2}, new[] {1, 3},  // near quad
             new[] {4, 5}, new[] {6, 7}, new[] {4, 6}, new[] {5, 7},  // far quad
@@ -45,40 +39,20 @@ public class LSCuboidCollider : LSCollider
     /// <summary>
     /// The vertices of the cuboid.
     /// </summary>
-    public Vector3d[] Vertices => _vertices;
-
-    protected FixedBoundBox _orientedBounds;
-
-    protected int[][] _faceVertices = null!;
-    /// <summary>
-    /// The face definitions of the cuboid, represented by indices of vertices.
-    /// </summary>
-    public int[][] Faces => _faceVertices;
+    internal Vector3d[] Vertices => _vertices;
 
     protected Vector3d[] _faceNormals = null!;
     /// <summary>
     /// The normal vectors for each face of the cuboid.
     /// </summary>
-    public Vector3d[] FaceNormals => _faceNormals;
-
-    protected Vector3d[] _faceCentroids = null!;
-    /// <summary>
-    /// The centroids of each face of the cuboid.
-    /// </summary>
-    public Vector3d[] FaceCentroids => _faceCentroids;
-
-    protected int[][] _edgeVertices = null!;
-    /// <summary>
-    /// The edge definitions of the cuboid, represented by pairs of vertex indices.
-    /// </summary>
-    public int[][] EdgeVertices => _edgeVertices;
+    internal Vector3d[] FaceNormals => _faceNormals;
 
     protected Vector3d[] _edgeDirections = null!;
     /// <summary>
     /// A collection of normalized edge displacement vectors.
     /// Note, the displacement is a vector that points from the start of the edge (line segment) to the end.
     /// </summary>
-    public Vector3d[] EdgeDirections => _edgeDirections;
+    internal Vector3d[] EdgeDirections => _edgeDirections;
 
     /// <summary>
     /// Stores the length of the cuboid along the X axis.
@@ -110,9 +84,7 @@ public class LSCuboidCollider : LSCollider
     /// </summary>
     protected Vector3d _zAxisDirectionVector;
 
-    public CuboidState CurrentState => Rotation == FixedQuaternion.Identity ? CuboidState.AABox : CuboidState.OOBox;
-
-    public override ColliderType Shape => CurrentState == CuboidState.AABox ? ColliderType.AABox : ColliderType.OBBox;
+    public override ColliderType Shape => Rotation == FixedQuaternion.Identity ? ColliderType.AABox : ColliderType.OBBox;
 
     public override int Priority => ColliderSettings.GetPriority(Shape);
 
@@ -121,12 +93,8 @@ public class LSCuboidCollider : LSCollider
     public LSCuboidCollider()
     {
         _vertices = new Vector3d[8];
-        _faceVertices = new int[FaceDefinitions.Length][];
         _faceNormals = new Vector3d[FaceDefinitions.Length];
-        _faceCentroids = new Vector3d[FaceDefinitions.Length];
-        _edgeVertices = new int[EdgeDefinitions.Length][];
         _edgeDirections = new Vector3d[EdgeDefinitions.Length];
-        _orientedBounds = FixedBoundBox.FromCenterAndSize(Vector3d.Zero, Vector3d.One);
     }
 
     public LSCuboidCollider(ColliderShapeDefinition definition)
@@ -137,32 +105,23 @@ public class LSCuboidCollider : LSCollider
         Size = definition.Size;
     }
 
-    protected override void OnInitialize()
-    {
-        _orientedBounds = FixedBoundBox.FromCenterAndSize(Center, ScaledSize);
-        base.OnInitialize();
-    }
-
     protected override void BuildShape()
     {
         GenerateVertices();
         GenerateAxes();
-        GenerateFaces();
         CalculateFaceNormals();
-        CalculateFaceCentroids();
-        GenerateEdges();
         CalculateEdgeDirections();
         GenerateArea();
     }
 
     protected void GenerateVertices()
     {
-        if (CurrentState != CuboidState.AABox)
+        if (Shape == ColliderType.OBBox)
         {
-            _orientedBounds.Orient(Center, ScaledSize);
+            FixedBoundBox orientedBounds = FixedBoundBox.FromCenterAndSize(Center, ScaledSize);
 
             for (int i = 0; i < _vertices.Length; i++)
-                _vertices[i] = _orientedBounds.GetCorner(i).Rotate(Center, Rotation);
+                _vertices[i] = orientedBounds.GetCorner(i).Rotate(Center, Rotation);
 
             return;
         }
@@ -184,20 +143,11 @@ public class LSCuboidCollider : LSCollider
         _zAxisDirectionVector = (Vertices[4] - Vertices[0]) / _zAxisLength;
     }
 
-    protected virtual void GenerateFaces()
+    private void CalculateFaceNormals()
     {
         for (int i = 0; i < FaceDefinitions.Length; i++)
         {
-            if (_faceVertices[i] == null)
-                _faceVertices[i] = FaceDefinitions[i];
-        }
-    }
-
-    protected virtual void CalculateFaceNormals()
-    {
-        for (int i = 0; i < _faceVertices.Length; i++)
-        {
-            int[] faceVertices = _faceVertices[i];
+            int[] faceVertices = FaceDefinitions[i];
             Vector3d first = Vertices[faceVertices[0]];
 
             // Get two non-parallel edges
@@ -209,52 +159,14 @@ public class LSCuboidCollider : LSCollider
         }
     }
 
-    protected virtual void CalculateFaceCentroids()
-    {
-        for (int i = 0; i < _faceVertices.Length; i++)
-        {
-            Vector3d result = Vector3d.Zero;
-            int[] faceIndices = _faceVertices[i];
-            for (int j = 0; j < faceIndices.Length; j++)
-                result += Vertices[faceIndices[j]];
-
-            // Average the sum of vertices
-            _faceCentroids[i] = result / faceIndices.Length;
-        }
-    }
-
-    protected virtual void GenerateEdges()
-    {
-        for (int i = 0; i < EdgeDefinitions.Length; i++)
-        {
-            if (_edgeVertices[i] == null)
-                _edgeVertices[i] = EdgeDefinitions[i];
-        }
-    }
-
-    // Method to get an edge by index
-    public (Vector3d start, Vector3d end) GetEdge(int index)
-    {
-        int[] edgeIndices = _edgeVertices[index];
-        return (Vertices[edgeIndices[0]], Vertices[edgeIndices[1]]);
-    }
-
-    protected virtual void CalculateEdgeDirections()
+    private void CalculateEdgeDirections()
     {
         for (int i = 0; i < _edgeDirections.Length; i++)
-            _edgeDirections[i] = GetEdgeDirection(i);
+        {
+            int[] edge = EdgeDefinitions[i];
+            _edgeDirections[i] = (Vertices[edge[1]] - Vertices[edge[0]]).Normalized;
+        }
     }
-
-    // Method to calculate displacement of an edge
-    public Vector3d GetEdgeDisplacement(int index)
-    {
-        var (start, end) = GetEdge(index);
-        return end - start;
-    }
-
-    // Method to calculate direction of an edge
-    public Vector3d GetEdgeDirection(int index) =>
-         GetEdgeDisplacement(index).Normalized;
 
     protected virtual void GenerateArea() =>
         // Area calculation: A = 2lw + 2lh + 2wh
@@ -279,41 +191,26 @@ public class LSCuboidCollider : LSCollider
 
     public override Fixed64 GetFrontalArea(Vector3d direction)
     {
-        // Normalize the direction vector to get only the direction information
-        direction.NormalizeInPlace();
+        Fixed64 directionMagnitude = direction.Magnitude;
+        if (directionMagnitude <= Fixed64.Epsilon)
+            return Area;
 
-        // Get the absolute dot products of the direction with the local axes
+        direction /= directionMagnitude;
+
         Fixed64 dotX = Vector3d.Dot(direction, _xAxisDirectionVector).Abs();
         Fixed64 dotY = Vector3d.Dot(direction, _yAxisDirectionVector).Abs();
         Fixed64 dotZ = Vector3d.Dot(direction, _zAxisDirectionVector).Abs();
 
-        // Determine the two dimensions of the box that contribute to the frontal area
-        Fixed64 area;
-        if (dotX < dotY)
-        {
-            if (dotX < dotZ)
-                // The x-axis of the box is most aligned with the direction, so the y and z axes contribute to the frontal area
-                area = _yAxisLength * _zAxisLength;
-            else
-                // The z-axis of the box is most aligned with the direction, so the x and y axes contribute to the frontal area
-                area = _xAxisLength * _yAxisLength;
-        }
-        else
-        {
-            if (dotY < dotZ)
-                // The y-axis of the box is most aligned with the direction, so the x and z axes contribute to the frontal area
-                area = _xAxisLength * _zAxisLength;
-            else
-                // The z-axis of the box is most aligned with the direction, so the x and y axes contribute to the frontal area
-                area = _xAxisLength * _yAxisLength;
-        }
-
-        return area;
+        // The orthographic projection of a box is the sum of each face area's
+        // contribution along the view direction.
+        return _yAxisLength * _zAxisLength * dotX
+            + _xAxisLength * _zAxisLength * dotY
+            + _xAxisLength * _yAxisLength * dotZ;
     }
 
     public override Vector3d ClosestPointOnSurface(Vector3d other)
     {
-        if (CurrentState == CuboidState.AABox)
+        if (Shape == ColliderType.AABox)
             return Bounds.ClosestPointOnSurface(other);
 
         Vector3d axisX = Rotation.Rotate(Vector3d.Right);
@@ -384,9 +281,9 @@ public class LSCuboidCollider : LSCollider
 
     public override Vector3d GetNormalAtPoint(Vector3d point)
     {
-        Vector3d axisX = CurrentState == CuboidState.AABox ? Vector3d.Right : Rotation.Rotate(Vector3d.Right);
-        Vector3d axisY = CurrentState == CuboidState.AABox ? Vector3d.Up : Rotation.Rotate(Vector3d.Up);
-        Vector3d axisZ = CurrentState == CuboidState.AABox ? Vector3d.Forward : Rotation.Rotate(Vector3d.Forward);
+        Vector3d axisX = Shape == ColliderType.AABox ? Vector3d.Right : Rotation.Rotate(Vector3d.Right);
+        Vector3d axisY = Shape == ColliderType.AABox ? Vector3d.Up : Rotation.Rotate(Vector3d.Up);
+        Vector3d axisZ = Shape == ColliderType.AABox ? Vector3d.Forward : Rotation.Rotate(Vector3d.Forward);
         Vector3d halfExtents = ScaledSize * Fixed64.Half;
         Vector3d delta = point - Center;
         Fixed64 x = Vector3d.Dot(delta, axisX);
@@ -412,7 +309,7 @@ public class LSCuboidCollider : LSCollider
 
     public override bool ColliderOverlapsRay(RaycastSegmentWorker worker, ref SwiftList<Vector3d> outputIntersectionPoints)
     {
-        if (CurrentState == CuboidState.AABox)
+        if (Shape == ColliderType.AABox)
             return worker.CheckAABBoxOverlaps(this, ref outputIntersectionPoints);
 
         return worker.CheckOBBoxOverlaps(this, ref outputIntersectionPoints);

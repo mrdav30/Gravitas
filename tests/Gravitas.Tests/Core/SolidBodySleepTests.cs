@@ -17,8 +17,12 @@ public sealed class SolidBodySleepTests
         body.Body.SleepFrameThreshold = 2;
 
         scenario.Context.LateSimulate();
-        scenario.Context.LateSimulate();
+        body.Body.IsSleeping.Should().BeFalse();
 
+        scenario.Context.LateSimulate();
+        body.Body.IsSleeping.Should().BeTrue();
+
+        scenario.Context.LateSimulate();
         body.Body.IsSleeping.Should().BeTrue();
     }
 
@@ -61,6 +65,26 @@ public sealed class SolidBodySleepTests
         body.Collider.Radius = Fixed64.One;
 
         body.Body.IsSleeping.Should().BeFalse();
+    }
+
+    [Fact]
+    public void SleepDeactivateAndLateSimulate_ShouldRemainIdempotent()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
+
+        body.Body.Sleep();
+        body.Body.Sleep();
+        body.Body.Deactivate();
+        body.Body.Sleep();
+        body.Body.Deactivate();
+        body.Body.LateSimulate();
+
+        body.Body.IsSleeping.Should().BeTrue();
+        body.Body.Active.Should().BeFalse();
+        body.Body.DynamicId.Should().Be(-1);
+        body.Collider.IsActive.Should().BeFalse();
+        scenario.Context.Physics.BodyCount.Should().Be(0);
     }
 
     [Fact]

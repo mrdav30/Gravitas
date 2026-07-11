@@ -417,7 +417,7 @@ internal static class CollisionDetection2D
         if (count == 0)
             return false;
 
-        count = ClipSegment(referenceEdge.End, -referenceEdge.Direction, ref first, ref second, count);
+        count = ClipSegment(referenceEdge.End, -referenceEdge.Direction, ref first, ref second);
         if (count == 0)
             return false;
 
@@ -971,15 +971,14 @@ internal static class CollisionDetection2D
         Vector2d planePoint,
         Vector2d insideNormal,
         ref ClipPoint2D first,
-        ref ClipPoint2D second,
-        int count = 2)
+        ref ClipPoint2D second)
     {
         ClipPoint2D input0 = first;
-        ClipPoint2D input1 = count > 1 ? second : first;
+        ClipPoint2D input1 = second;
         Fixed64 distance0 = Vector2d.Dot(input0.Point - planePoint, insideNormal);
         Fixed64 distance1 = Vector2d.Dot(input1.Point - planePoint, insideNormal);
         bool inside0 = distance0 >= Fixed64.Zero;
-        bool inside1 = count > 1 && distance1 >= Fixed64.Zero;
+        bool inside1 = distance1 >= Fixed64.Zero;
         int outputCount = 0;
         ClipPoint2D output0 = default;
         ClipPoint2D output1 = default;
@@ -987,7 +986,7 @@ internal static class CollisionDetection2D
         if (inside0)
             AddClippedPoint(input0, ref output0, ref output1, ref outputCount);
 
-        if (count > 1 && inside0 != inside1)
+        if (inside0 != inside1)
         {
             Fixed64 denominator = distance0 - distance1;
             Fixed64 t = distance0 / denominator;
@@ -1002,7 +1001,7 @@ internal static class CollisionDetection2D
             AddClippedPoint(input1, ref output0, ref output1, ref outputCount);
 
         first = output0;
-        second = outputCount > 1 ? output1 : default;
+        second = output1;
         return outputCount;
     }
 

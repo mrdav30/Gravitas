@@ -38,16 +38,12 @@ public static partial class CollisionDetection
 
     private static bool DoConeConvexCheck(CollisionWorkItem pair)
     {
-        if (!TryGetConeConvexColliders(pair, out LSConeCollider cone, out LSCollider convex))
-            return false;
+        GetConeConvexColliders(pair, out LSConeCollider cone, out LSCollider convex);
 
         if (!ConvexColliderSupport.Intersects(cone, convex))
             return false;
 
         Vector3d normalConeToConvex = OrientNormal(convex.Center - cone.Center, convex.Center - cone.Center);
-        if (normalConeToConvex.MagnitudeSquared <= Fixed64.Epsilon)
-            normalConeToConvex = Vector3d.Right;
-
         normalConeToConvex = normalConeToConvex.Normalized;
         Vector3d pointOnCone = ConvexColliderSupport.Support(cone, normalConeToConvex);
         Vector3d pointOnConvex = ConvexColliderSupport.Support(convex, -normalConeToConvex);
@@ -121,9 +117,6 @@ public static partial class CollisionDetection
             int triangleIndex = triangleBuffer[i];
             mesh.Mesh.GetTriangleVertices(triangleIndex, out Vector3d first, out Vector3d second, out Vector3d third);
             Vector3d faceNormal = mesh.Mesh.GetFaceNormalWorld(triangleIndex);
-            if (faceNormal.MagnitudeSquared <= Fixed64.Epsilon)
-                continue;
-
             faceNormal = OrientNormal(faceNormal, cone.Center - mesh.Center).Normalized;
             Vector3d candidatePointOnMesh = MeshUtils.ClosestPointOnTriangle(first, second, third, faceNormal, cone.Center);
             Vector3d candidatePointOnCone = Vector3d.Zero;
@@ -174,7 +167,7 @@ public static partial class CollisionDetection
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool TryGetConeConvexColliders(
+    private static void GetConeConvexColliders(
         CollisionWorkItem pair,
         out LSConeCollider cone,
         out LSCollider convex)
@@ -183,18 +176,11 @@ public static partial class CollisionDetection
         {
             cone = coneA;
             convex = pair.ColliderB;
-            return true;
+            return;
         }
 
-        if (pair.ColliderB is LSConeCollider coneB && ConvexColliderSupport.IsSupported(pair.ColliderA))
-        {
-            cone = coneB;
-            convex = pair.ColliderA;
-            return true;
-        }
-
-        cone = null!;
-        convex = null!;
-        return false;
+        cone = (LSConeCollider)pair.ColliderB;
+        convex = pair.ColliderA;
     }
+
 }

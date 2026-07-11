@@ -100,13 +100,13 @@ public sealed partial class GravitasPhysics2DService
     {
         int dynamicId = body.DynamicId;
         if (dynamicId < 0
-            || !_processedContinuousCollisionBodyIds.Contains(dynamicId)
-            || !_queuedContinuousCollisionHandoffIds.Add(dynamicId))
+            || !_processedContinuousCollisionBodies.Contains(body)
+            || !_queuedContinuousCollisionHandoffBodies.Add(body))
         {
             return;
         }
 
-        _continuousCollisionHandoffQueue.Add(dynamicId);
+        _continuousCollisionHandoffQueue.Add(body);
     }
 
     internal bool ProcessQueuedContinuousCollisionHandoffs() =>
@@ -120,7 +120,7 @@ public sealed partial class GravitasPhysics2DService
         if (iterationBudget <= 0)
         {
             LastContinuousCollisionIslandLimitReached = true;
-            ClearContinuousCollisionHandoffQueue();
+            DiscardContinuousCollisionHandoffQueue();
             return 0;
         }
 
@@ -129,9 +129,7 @@ public sealed partial class GravitasPhysics2DService
         bool processed = false;
         while (readIndex < _continuousCollisionHandoffQueue.Count && iterations < iterationBudget)
         {
-            int dynamicId = _continuousCollisionHandoffQueue[readIndex++];
-            if (!TryGetDynamicBody(dynamicId, out SolidBody2D body))
-                continue;
+            SolidBody2D body = _continuousCollisionHandoffQueue[readIndex++];
 
             if (body.TryConsumeContinuousCollisionHandoff(updateSleepState: false, updateColliderState: false))
             {
@@ -144,14 +142,18 @@ public sealed partial class GravitasPhysics2DService
             LastContinuousCollisionIslandCount++;
 
         LastContinuousCollisionIslandIterationCount += iterations;
-        LastContinuousCollisionIslandLimitReached |= readIndex < _continuousCollisionHandoffQueue.Count;
-        ClearContinuousCollisionHandoffQueue();
+        bool limitReached = readIndex < _continuousCollisionHandoffQueue.Count;
+        LastContinuousCollisionIslandLimitReached |= limitReached;
+        if (limitReached)
+            DiscardContinuousCollisionHandoffQueue();
+        else
+            ClearContinuousCollisionHandoffQueue();
         return iterations;
     }
 
     private void BeginContinuousCollisionHandoffFrame()
     {
-        _processedContinuousCollisionBodyIds.Clear();
+        _processedContinuousCollisionBodies.Clear();
         ClearContinuousCollisionHandoffQueue();
         LastContinuousCollisionIslandCount = 0;
         LastContinuousCollisionIslandIterationCount = 0;
@@ -160,8 +162,16 @@ public sealed partial class GravitasPhysics2DService
 
     private void ClearContinuousCollisionHandoffQueue()
     {
-        _queuedContinuousCollisionHandoffIds.Clear();
+        _queuedContinuousCollisionHandoffBodies.Clear();
         _continuousCollisionHandoffQueue.FastClear();
+    }
+
+    private void DiscardContinuousCollisionHandoffQueue()
+    {
+        for (int i = 0; i < _continuousCollisionHandoffQueue.Count; i++)
+            _continuousCollisionHandoffQueue[i].DiscardContinuousCollisionHandoff();
+
+        ClearContinuousCollisionHandoffQueue();
     }
 
 }

@@ -225,7 +225,7 @@ public static partial class CollisionDetection
     private static (Vector3d Point1, Vector3d Point2) FindInitialPointsOfContact(LSMeshCollider mesh, LSCuboidCollider cuboid)
     {
         Vector3d cuboidBoundPoint = cuboid.Bounds.GetPointOnSurfaceTowardsObject(mesh.Position);
-        if (cuboid.CurrentState == CuboidState.OOBox)
+        if (cuboid.Shape == ColliderType.OBBox)
             cuboidBoundPoint = cuboid.ClosestPointOnSurface(cuboidBoundPoint);
 
         Vector3d meshBoundPoint = mesh.Bounds.GetPointOnSurfaceTowardsObject(cuboidBoundPoint);

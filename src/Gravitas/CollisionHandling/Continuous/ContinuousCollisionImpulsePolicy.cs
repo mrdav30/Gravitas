@@ -11,6 +11,27 @@ namespace Gravitas.CollisionHandling;
 
 internal static class ContinuousCollisionImpulsePolicy
 {
+    internal static bool IsResolvableMobility(
+        Fixed64 bodyInverseMass,
+        Fixed64 constrainedInverseMass) =>
+        bodyInverseMass <= Fixed64.Zero
+        || (constrainedInverseMass > Fixed64.Zero
+            && constrainedInverseMass / bodyInverseMass > Fixed64.Epsilon);
+
+    internal static Vector3d ResolveVelocityDelta(
+        Vector3d normal,
+        Fixed64 responseSpeed,
+        Fixed64 bodyInverseMass,
+        Fixed64 constrainedInverseMass) =>
+        (normal * (bodyInverseMass / constrainedInverseMass)) * responseSpeed;
+
+    internal static Vector2d ResolveVelocityDelta(
+        Vector2d normal,
+        Fixed64 responseSpeed,
+        Fixed64 bodyInverseMass,
+        Fixed64 constrainedInverseMass) =>
+        (normal * (bodyInverseMass / constrainedInverseMass)) * responseSpeed;
+
     internal static bool TryResolveSourceNormal(
         Vector3d normalForSource,
         Vector3d sourceDisplacement,

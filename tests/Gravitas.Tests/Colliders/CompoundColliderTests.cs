@@ -51,19 +51,65 @@ public sealed class CompoundColliderTests
         PhysicsMaterial material = PhysicsMaterial.Frictionless;
         Vector3d offset = new(Fixed64.One, (Fixed64)2, (Fixed64)3);
         Vector3d scale = new((Fixed64)2, (Fixed64)3, (Fixed64)4);
-        FixedQuaternion rotation = FixedQuaternion.Identity;
+        FixedQuaternion rotation = FixedQuaternion.FromEulerAnglesInDegrees(
+            (Fixed64)10,
+            (Fixed64)20,
+            (Fixed64)30);
+        Vector3d[] vertices =
+        {
+            new(Fixed64.One, Fixed64.One, Fixed64.One),
+            new(-Fixed64.One, -Fixed64.One, Fixed64.One),
+            new(-Fixed64.One, Fixed64.One, -Fixed64.One),
+            new(Fixed64.One, -Fixed64.One, -Fixed64.One)
+        };
+        int[] triangles = { 0, 2, 1, 0, 1, 3, 0, 3, 2, 1, 2, 3 };
 
+        CompoundColliderPart shapeDefaults = new(ColliderShapeDefinition.Sphere(Fixed64.Half));
+        CompoundColliderPart transformDefaults = new(
+            ColliderShapeDefinition.Cuboid(Vector3d.One),
+            offset,
+            rotation);
         CompoundColliderPart sphere = CompoundColliderPart.Sphere(Fixed64.Half, offset, material);
+        CompoundColliderPart transformedSphere = CompoundColliderPart.Sphere(Fixed64.Half, offset, rotation, scale);
+        CompoundColliderPart materialCapsule = CompoundColliderPart.Capsule(Fixed64.Half, (Fixed64)3, offset, material);
         CompoundColliderPart capsule = CompoundColliderPart.Capsule(Fixed64.Half, (Fixed64)3, offset, rotation, scale);
         CompoundColliderPart cuboid = CompoundColliderPart.Cuboid(new Vector3d((Fixed64)2, (Fixed64)4, (Fixed64)6), offset);
         CompoundColliderPart cylinder = CompoundColliderPart.Cylinder(Fixed64.One, (Fixed64)5, offset, material);
+        CompoundColliderPart transformedCylinder = CompoundColliderPart.Cylinder(Fixed64.One, (Fixed64)5, offset, rotation, scale);
+        CompoundColliderPart materialCone = CompoundColliderPart.Cone(Fixed64.One, (Fixed64)6, offset, material);
         CompoundColliderPart cone = CompoundColliderPart.Cone(Fixed64.One, (Fixed64)6, offset, rotation, scale);
+        CompoundColliderPart materialMesh = CompoundColliderPart.ConvexMesh(
+            vertices,
+            triangles,
+            offset,
+            material,
+            MeshInertiaPolicy.SurfaceApproximation);
+        CompoundColliderPart transformedMesh = CompoundColliderPart.ConvexMesh(
+            vertices,
+            triangles,
+            offset,
+            rotation,
+            scale,
+            MeshInertiaPolicy.SurfaceApproximation);
+
+        shapeDefaults.Shape.Kind.Should().Be(ColliderShapeDefinitionKind.Sphere);
+        shapeDefaults.LocalOffset.Should().Be(Vector3d.Zero);
+        shapeDefaults.LocalRotation.Should().Be(FixedQuaternion.Identity);
+        shapeDefaults.LocalScale.Should().Be(Vector3d.One);
+
+        transformDefaults.Shape.Kind.Should().Be(ColliderShapeDefinitionKind.Cuboid);
+        transformDefaults.LocalOffset.Should().Be(offset);
+        transformDefaults.LocalRotation.Should().Be(rotation);
+        transformDefaults.LocalScale.Should().Be(Vector3d.One);
 
         sphere.Shape.Kind.Should().Be(ColliderShapeDefinitionKind.Sphere);
         sphere.LocalOffset.Should().Be(offset);
         sphere.LocalScale.Should().Be(Vector3d.One);
         sphere.Material.Should().Be(material);
+        transformedSphere.LocalRotation.Should().Be(rotation);
+        transformedSphere.LocalScale.Should().Be(scale);
 
+        materialCapsule.Material.Should().Be(material);
         capsule.Shape.Kind.Should().Be(ColliderShapeDefinitionKind.Capsule);
         capsule.LocalRotation.Should().Be(rotation);
         capsule.LocalScale.Should().Be(scale);
@@ -72,8 +118,19 @@ public sealed class CompoundColliderTests
         cuboid.Shape.Kind.Should().Be(ColliderShapeDefinitionKind.Cuboid);
         cylinder.Shape.Kind.Should().Be(ColliderShapeDefinitionKind.Cylinder);
         cylinder.Material.Should().Be(material);
+        transformedCylinder.LocalRotation.Should().Be(rotation);
+        transformedCylinder.LocalScale.Should().Be(scale);
+        materialCone.Material.Should().Be(material);
         cone.Shape.Kind.Should().Be(ColliderShapeDefinitionKind.Cone);
+        cone.LocalRotation.Should().Be(rotation);
         cone.LocalScale.Should().Be(scale);
+        materialMesh.Shape.Kind.Should().Be(ColliderShapeDefinitionKind.ConvexMesh);
+        materialMesh.Shape.MeshInertiaPolicy.Should().Be(MeshInertiaPolicy.SurfaceApproximation);
+        materialMesh.Material.Should().Be(material);
+        transformedMesh.Shape.Kind.Should().Be(ColliderShapeDefinitionKind.ConvexMesh);
+        transformedMesh.Shape.MeshInertiaPolicy.Should().Be(MeshInertiaPolicy.SurfaceApproximation);
+        transformedMesh.LocalRotation.Should().Be(rotation);
+        transformedMesh.LocalScale.Should().Be(scale);
     }
 
     [Fact]

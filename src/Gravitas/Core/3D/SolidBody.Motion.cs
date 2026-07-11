@@ -51,8 +51,6 @@ public partial class SolidBody
         _angularSpeed = Fixed64.Zero;
         _impulseStore = Vector3d.Zero;
         _positionCorrection = Vector2d.Zero;
-        _timeScaledAcceleration = Vector3d.Zero;
-        _timeScaledDeceleration = Vector3d.Zero;
     }
 
     private void ApplyFreezeConstraintsToMotion()
@@ -63,8 +61,6 @@ public partial class SolidBody
         _deltaAcceleration = ProjectLinearMotion(_deltaAcceleration);
         _linearAcceleration = ProjectLinearMotion(_linearAcceleration);
         _impulseStore = ProjectLinearMotion(_impulseStore);
-        _timeScaledAcceleration = ProjectLinearMotion(_timeScaledAcceleration);
-        _timeScaledDeceleration = ProjectLinearMotion(_timeScaledDeceleration);
         _positionCorrection = ProjectLinearMotion(_positionCorrection.ToVector3d(Fixed64.Zero)).ToVector2d();
         RefreshLinearMotionState(lastLinearVelocity);
 
@@ -92,18 +88,6 @@ public partial class SolidBody
 
         if (context!.Settings.RuntimeMode.RunsMixedContacts())
             context.MixedCollisions.Refresh3DColliderPartition(Collider);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void UpdateTimeScaledAcceleration()
-    {
-        PhysicsEnvironment environment = Context.Environment;
-        _timeScaledAcceleration = _linearSpeed > Fixed64.Zero
-            ? _linearAcceleration * _linearSpeed / Context.FrameRate
-            : Vector3d.Zero;
-        _timeScaledDeceleration = _timeScaledAcceleration != Vector3d.Zero
-            ? _timeScaledAcceleration * environment.DecelerationMultiplier
-            : Vector3d.Zero;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -238,8 +222,6 @@ public partial class SolidBody
         // Non-kinematic bodies position is calculated based on current velocity
         NonKinematicUpdate();
 
-        if (_linearSpeed > Fixed64.Zero)
-            UpdateTimeScaledAcceleration();
     }
 
     private void ApplyLinearForces()
@@ -431,10 +413,6 @@ public partial class SolidBody
         if (IsKinematic)
             return;
 
-        //Position2d += _positionCorrection;
-        //_positionCorrection = Vector2d.Zero;
-
-        //// if (_linearSpeed > Fixed64.Zero)
         Vector3d rotationalCcdStartPosition = Position3d;
         PositionBasedOnForce();
         Vector3d rotationalCcdProposedPosition = Position3d;
@@ -476,7 +454,7 @@ public partial class SolidBody
             HeightPos = velocityVector.Y;
 
         //  Apply the force
-        Position2d = _positionCorrection + velocityAxis;
+        SetPosition2d(_positionCorrection + velocityAxis);
         _positionCorrection = Vector2d.Zero;
     }
 

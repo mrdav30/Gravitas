@@ -1,6 +1,6 @@
 # Coverage Hardening Plan
 
-**Date:** 2026-07-10  
+**Date:** 2026-07-11  
 **Status:** Active - closing the 95% to 100% coverage gap  
 **Owner:** Gravitas coverage, test-quality, zombie-code, and branch-quality
 hardening
@@ -22,21 +22,22 @@ public API. Generated-code chasing and invocation-only tests do not count.
 ## Current Gap
 
 Authoritative checkpoint:
-`TestResults/coverage-branch-hardening-95-final2/05bb0b97-6100-424b-9d1e-8ae22eb73d4d/coverage.cobertura.xml`.
+`TestResults/coverage-circle-geometry-full/e0f5020c-824b-4d66-ac8d-0035474368d3/coverage.cobertura.xml`.
 
 | Metric   | Current | Covered / Total | Remaining | Target |
 | -------- | ------: | --------------: | --------: | -----: |
-| Lines    |   98.2% | 25,438 / 25,892 |       454 |   100% |
-| Branches |   95.0% |  9,698 / 10,208 |       510 |   100% |
-| Methods  |   96.6% |    3,364 / 3,481 |       117 |   100% |
+| Lines    |   99.2% | 25,586 / 25,801 |       215 |   100% |
+| Branches |   96.6% |  9,799 / 10,142 |       343 |   100% |
+| Methods  |   98.8% |    3,396 / 3,437 |        41 |   100% |
 
-The branch gate has no useful buffer: 9,698 is the minimum whole-outcome count
-that reports at least 95% for the current denominator. New production branches
-must arrive with coverage.
+The completed blocks continue to reduce both uncovered outcomes and stale
+production surface while keeping every new production method covered.
 
 Supporting evidence:
 
-- Report: `TestResults/coverage-branch-hardening-95-final2/reports/Summary.txt`
+- Previous 95% gate:
+  `TestResults/coverage-branch-hardening-95-final2/05bb0b97-6100-424b-9d1e-8ae22eb73d4d/coverage.cobertura.xml`
+- Previous report: `TestResults/coverage-branch-hardening-95-final2/reports/Summary.txt`
 - CRAP analysis:
   `TestResults/coverage-branch-hardening-95-final2/crap-scores.txt`
 - Methods below 95% line or branch coverage:
@@ -105,25 +106,62 @@ motion and lifecycle correctness while creating room for later cleanup.
 
 Priority blocks:
 
-- 2D kinematic rotational CCD: five missing outcomes in
+- [x] 2D kinematic rotational CCD: five missing outcomes closed with five
+  behavioral tests; focused method coverage is 100% line/branch, the affected
+  class passes 76/76, full `Release` passes 2,019/2,019, and independent review
+  is resolved. Source:
   `src/Gravitas/Core/2D/SolidBody2D.ContinuousCollision.Rotational.cs`.
-- 3D kinematic rotational CCD: five missing outcomes in
+- [x] 3D kinematic rotational CCD: five missing outcomes closed with five
+  behavioral tests; the target decisions report 8/8 and 2/2 focused branch
+  outcomes, the affected class passes 90/90, full `Release` passes 2,024/2,024,
+  and independent review approved. Source:
   `src/Gravitas/Core/3D/SolidBody.ContinuousCollision.Rotational.cs`.
-- Queued 3D CCD handoffs: four missing outcomes in
-  `src/Gravitas/Core/3D/GravitasPhysicsService.ContinuousCollision.cs`.
-- 3D rotational CCD: four missing outcomes in
+- [x] Queued CCD handoffs: the original four 3D outcomes and matching 2D
+  lifecycle paths are closed. Queue ownership now preserves body identity,
+  exhausted budgets and resets discard pending body state, affected methods
+  report 100% focused line/branch coverage, both CCD classes pass 178/178,
+  full `Release` passes 2,036/2,036, and independent review approved. Source:
+  `src/Gravitas/Core/3D/GravitasPhysicsService.ContinuousCollision.cs` and its
+  2D counterpart.
+- [x] Dynamic 3D rotational CCD: four missing outcomes closed with epsilon
+  angular-distance, epsilon-proxy-with-offset-inertia, sub-epsilon arc, and
+  no-static-candidate tests. Target decisions report 2/2, 8/8, and 2/2
+  focused outcomes, the complete CCD class passes 100/100, full `Release`
+  passes 2,040/2,040, and independent review is resolved. Source:
   `src/Gravitas/Core/3D/SolidBody.ContinuousCollision.Rotational.cs`.
-- Dynamic 3D CCD and response subpaths: four missing outcomes in
-  `src/Gravitas/Core/3D/SolidBody.ContinuousCollision.Dynamic.cs`, plus related
-  three-outcome response helpers.
+- [x] Dynamic 3D TOI loop: the four proxy, quantized-tail, frame-end, and
+  zero-time outcomes are closed and every branch in the leading resolver is
+  covered. Review also corrected finite-heavy-body response across 2D, 3D,
+  mixed, dynamic, and kinematic paths, added max-mass saturation and explicit
+  near-singular mobility policy coverage, and retained bounded zero-time
+  stagnation handling for unsupported mobility. The CCD class passes 108/108,
+  full `Release` passes 2,052/2,052, and independent review approved. Source:
+  `src/Gravitas/Core/3D/SolidBody.ContinuousCollision.Dynamic.cs` and
+  dimensional counterparts.
+- [x] CCD response/helper residue: caller-proven normal, closing, and aggregate-
+  mass guards were removed; finite/max-mass and near-singular mobility behavior
+  is explicit and covered across pure and mixed paths. The complete 3D dynamic
+  CCD file reports 100% line/branch coverage, focused pure 3D and mixed classes
+  pass 108/108 and 147/147, full `Release` passes 2,052/2,052, and independent
+  review approved.
+- [x] Kinematic translation CCD residue: seven deterministic workflows cover
+  tiny positive proxies, live candidates invalidated by same-frame filter
+  changes, broad-corner proxy misses, and near-singular partially frozen target
+  mobility across pure 3D and mixed 2D handoffs. Successful relative/exact
+  sweeps already prove a closing normal, so four unreachable normal-flip and
+  non-closing branches plus one duplicate inverse-mass guard were deleted. The
+  complete 3D kinematic CCD file reports 100% line/branch/method coverage,
+  focused suites pass 262/262, full coverage-enabled `Release` passes
+  2,116/2,116, `ReleaseLean` builds both targets, and independent review
+  approved.
 
 Tasks:
 
-- [ ] Cover meaningful miss, replacement, frozen-axis, handoff-budget,
+- [x] Cover meaningful miss, replacement, frozen-axis, handoff-budget,
       stale-target, and relative-motion outcomes.
-- [ ] Remove caller-proven or duplicate eligibility gates.
-- [ ] Verify 2D/3D parity where the physical model is intentionally equivalent.
-- [ ] Finish and review each CCD block separately.
+- [x] Remove caller-proven or duplicate eligibility gates.
+- [x] Verify 2D/3D parity where the physical model is intentionally equivalent.
+- [x] Finish and review each CCD block separately.
 
 ### Workstream 2: Collision And Query Geometry
 
@@ -132,30 +170,223 @@ normal, penetration, or contact ordering.
 
 Priority blocks:
 
-- 2D segment clipping: four missing outcomes in
+- [x] 2D segment clipping: removed four unreachable single-point reclip
+  outcomes by proving each private two-point clip returns only 0 or 2 points.
+  Public collision/manifold suites pass 78/78, `ClipSegment` reports 100%
+  focused line/branch coverage, full `Release` passes 2,052/2,052, and
+  independent review approved. Source:
   `src/Gravitas/CollisionHandling/Detection/2D/CollisionDetection2D.cs`.
-- Cuboid/cylinder and cylinder/capsule separating axes: three missing outcomes
-  per method in `src/Gravitas/CollisionHandling/Detection/3D`.
-- Cone/convex and mesh/cone reducers: three-outcome families in
-  `src/Gravitas/CollisionHandling/Detection/3D`.
-- 3D overlap hit reducers: three missing outcomes per leading method in
-  `src/Gravitas/Queries/3D/GravitasQuery3DService.Circle.cs`.
-- `ConvexSweepQueryWorker.ClosestPointOnTriangleToOrigin`, the only
-  under-covered CRAP hotspot: 93.9% lines, complexity 30, CRAP 30.2.
+- [x] Cuboid/cylinder and cylinder/capsule separating axes: six public shape-
+  pair fixtures isolate cylinder, capsule, cross, edge-cross, and closest-
+  feature exits. Both SAT methods report 100% focused line/branch coverage,
+  the shape-pair class passes 56/56, full `Release` passes 2,058/2,058, and
+  independent review approved. Source:
+  `src/Gravitas/CollisionHandling/Detection/3D/CollisionDetection.Cylinder.cs`.
+- [x] Cone/convex and mesh/cone reducers: removed impossible dispatcher,
+  post-normal-resolution, and validated-mesh degeneracy branches; covered
+  concave rejection, convex miss, both pair orientations, triangle-reducer
+  outcomes, and deterministic coincident-center fallback. Independent review
+  exposed epsilon-tolerant GJK contacts whose signed support depth is one raw
+  unit negative, so both zero-depth clamps were retained and pinned with exact
+  public-workflow regressions. All four target methods report 100% focused
+  line/branch coverage, the shape-pair class passes 61/61, full `Release`
+  passes 2,063/2,063, and re-review approved. Source:
+  `src/Gravitas/CollisionHandling/Detection/3D/CollisionDetection.Cone.cs`.
+- [x] 3D overlap hit reducers: public fixtures cover broad-sphere and exact-
+  surface misses, empty all-hit diagnostics, stale partition IDs in both
+  planar-circle and static-sphere resolution, and deterministic rejection of
+  farther closest/directional candidates. The complete source file reports
+  100% focused line/branch coverage, the focused class passes 15/15, the full
+  coverage-enabled `Release` suite passes 2,066/2,066, and independent review
+  approved after diagnostic and fixture-invariant assertions were strengthened.
+  Source: `src/Gravitas/Queries/3D/GravitasQuery3DService.Circle.cs`.
+- [x] `ConvexSweepQueryWorker.ClosestPointOnTriangleToOrigin`: exact fixed-
+  point fixtures now validate all three vertex Voronoi regions and reconstruct
+  the selected endpoint from barycentric weights. The standard GJK arithmetic
+  and tetrahedron face order remain unchanged; a narrow internal seam avoids
+  reflection and brittle end-to-end arrangements without expanding public API.
+  The target method reports 100% focused line/branch coverage, the combined
+  sweep/reducer suites pass 90/90, full `Release` passes 2,069/2,069, and
+  independent review approved. Source:
+  `src/Gravitas/Queries/3D/Sweeps/ConvexSweepQueryWorker.cs`.
+- [x] Mesh triangle manifolds: five public collision fixtures cover the
+  coplanar sphere-normal fallback, capsule segment/edge closest-feature
+  reduction, cuboid and cylinder plane separation with overlapping AABBs, and
+  both mesh face-normal exit orders. Proven-impossible negative-overlap clamps
+  and the caller-impossible reverse contact-order branch were deleted. The
+  complete generator reports 100% line/branch coverage, the focused shape-pair
+  class passes 66/66, full `Release` passes 2,096/2,096, and independent review
+  approved. Source:
+  `src/Gravitas/CollisionHandling/Detection/3D/Mesh/MeshTriangleContactGenerator.cs`.
 
 Tasks:
 
-- [ ] Prefer public query and collision workflows over private-method tests.
-- [ ] Assert deterministic closest/all-hit ordering and exact normal/distance
+- [x] Prefer public query and collision workflows over private-method tests;
+      use a narrow internal seam only for the isolated pure triangle reducer.
+- [x] Assert deterministic closest/all-hit ordering and exact normal/distance
       behavior at edge, corner, parallel, degenerate, and tie cases.
-- [ ] Delete reducer permutations that valid authored shapes cannot reach.
-- [ ] Keep 2D, 3D, and mixed semantics explicit; do not gain coverage through
+- [x] Delete reducer permutations that valid authored shapes cannot reach.
+- [x] Keep 2D, 3D, and mixed semantics explicit; do not gain coverage through
       accidental projection behavior.
 
 ### Workstream 3: Lifecycle, Replay, Partition, And Public Surface Residue
 
-Classify the 117 uncovered methods and remaining low-line-coverage paths by
+Classify the 77 uncovered methods and remaining low-line-coverage paths by
 public reachability and deterministic value.
+
+Completed blocks:
+
+- [x] Diagnostic event construction: deleted the unused pre-joint internal
+  constructor, leaving the joint-aware constructor as the sole source of truth.
+  This removed 25 uncovered lines and one uncovered method; diagnostic suites
+  pass 29/29, full `Release` passes 2,069/2,069, and independent review found no
+  serialization, reflection, source-generation, or caller dependency.
+- [x] 2D layer-matrix fallback stability: an explicit pair-eligibility test now
+  covers both out-of-range short-circuit positions and normal in-range lookup,
+  preventing full-run order from deciding whether the method reports 3/4 or
+  4/4 branch outcomes. The method reports 100% focused line/branch coverage,
+  full `Release` passes 2,070/2,070, and independent review approved.
+- [x] 3D `SolidBody` surface and lifecycle: deleted 15 unused methods plus dead
+  spawned-position and time-scaled-acceleration state, folded one-time setup
+  into the validated constructor, and covered the retained acceleration,
+  orientation, visualization-buffer, interaction-speed, sleep-threshold, and
+  idempotent-deactivation contracts. `SolidBody.cs` reports 100% line/branch
+  coverage, serialization/replay tests pass 31/31, focused lifecycle tests pass
+  22/22, full coverage-enabled `Release` passes 2,073/2,073, `ReleaseLean`
+  builds both targets, and independent deletion and contract reviews approved.
+- [x] 3D raycast and registered-source sweep surface: direct behavioral tests
+  cover capsule, cylinder, cone, and compound all-hit entry points, equal-point
+  batch sweeps, stale partition IDs and mobility, out-of-order intersection
+  reduction, malformed extensible colliders, and context ownership. Duplicate
+  endpoint visits, dead closest-distance plumbing, and impossible closest-path
+  static-only guards were removed. Rollover testing and review exposed that
+  reused query versions could suppress live colliders after `uint` wrap or a
+  standalone public reset; both cache families now invalidate the compact live
+  registry before version reuse. The complete raycast source reports 100%
+  line/branch coverage, focused query suites pass 158/158, full `Release`
+  passes 2,085/2,085, and independent review approved after the reset defect
+  was fixed and re-reviewed.
+- [x] 3D collider surface and active/load lifecycle: deleted nine unused
+  registry, partition-cache, inertia, and interface wrappers; internalized
+  query stamps; retained and covered the public subclass radius/initialization
+  hooks, unbound access failures, hierarchy state, and reverse mixed filtering.
+  Review exposed stale partition/query visibility from flag-only activation,
+  missing repartition after inactive-to-active loads, invalid ID `-1`
+  repartition of fully deactivated shells, and false errors on repeated inactive
+  loads. `IsActive` now owns primary/mixed partition transitions and load paths
+  distinguish unbound, unregistered, inactive, and registered-active shells.
+  `LSCollider.cs` reports 100% line/branch coverage, full `Release` passes
+  2,091/2,091, `ReleaseLean` builds both targets, and independent review
+  approved after all findings were resolved.
+- [x] Compound authored-part surface: retained and behaviorally covered the 13
+  previously untouched 2D/3D constructor, material, transform, scale, and mesh
+  policy overloads. Deleted all three duplicate `CompoundColliderPart2D.AABox`
+  aliases plus the matching zero-caller `ColliderShapeDefinition2D.AABox`
+  alias, migrating existing tests to canonical `AABBox`. Both compound-part
+  files report 100% line/branch/method coverage, focused suites pass 19/19,
+  full `Release` passes 2,096/2,096, `ReleaseLean` builds both targets, and
+  independent review approved after non-identity rotation and mesh-policy
+  assertions were strengthened.
+- [x] 2D collider surface, teardown, load, and query-cache parity: deleted the
+  unused registry/inertia wrappers and dead compound-owner chain, internalized
+  query stamps, simplified caller-proven ownership guards, and covered retained
+  hierarchy/default-shape behavior. Red regressions exposed unbound compound
+  rebuild-before-context failure, inactive registered-collider leaks, broken
+  direct teardown of body-owned colliders, and ray/overlap false negatives
+  after version wrap or public reset. The collider and both query service files
+  report 100% line/branch/method coverage, focused suites pass, full `Release`
+  passes 2,104/2,104, `ReleaseLean` builds both targets, and independent review
+  approved after the teardown findings were resolved.
+- [x] Inactive `SolidBody2D` load ownership: JSON and MemoryPack regressions
+  proved inactive snapshots left registered body/collider IDs behind and later
+  active snapshots could invent activity on the resulting unregistered shell.
+  Teardown is now registration-aware, inactive load reconciles runtime ownership
+  while bindings remain valid, and active snapshot state is accepted only for
+  already registered shells; explicit `Initialize()` owns re-registration.
+  Both body source files report 100% line/branch/method coverage, full `Release`
+  passes 2,106/2,106, `ReleaseLean` builds both targets, and independent review
+  approved.
+- [x] Physics mesh authored/topology surface: deleted three zero-caller public
+  wrappers, including the mutable `FaceAreas` array exposure, and removed the
+  impossible zero-total-area fallback guaranteed by constructor validation.
+  Public tests cover empty topology, singular authored transforms, invalid
+  inertia policy, and negative-Y deterministic support-tree traversal. The
+  complete `PhysicsMesh` class reports 100% line/branch/method coverage, the
+  focused suite passes 28/28, full `Release` passes 2,108/2,108, `ReleaseLean`
+  builds both targets, and independent review approved.
+- [x] Cuboid geometry and authored surface: a public regression proved the
+  frontal-area selector returned the wrong face for every principal axis and
+  only one face for diagonal motion. It now computes the exact deterministic
+  orthographic projection in fixed-point world space, with the established
+  zero-direction fallback. Deleted the unused centroid/cache tables, duplicate
+  cuboid-state enum, stale edge helpers and overridable build hooks, and
+  external mutable-array exposure; live geometry remains internal to collision
+  and query consumers. `LSCuboidCollider.cs` reports 100%
+  line/branch/method coverage, full `Release` passes 2,109/2,109,
+  `ReleaseLean` builds both targets, and independent review approved.
+- [x] 3D grounding lifecycle and probe policy: deterministic workflows now
+  cover skip-window expiry plus the stationary-probe throttle boundary,
+  no-clear/no-immediate mode transitions, inactive ownership changes,
+  transition callbacks, platform and last-grounded-position state, explicit
+  swept-sphere radius, cone ray fallback, and the sub-threshold compound-radius
+  policy. Deleted the zero-caller `HitPlatform` setter and two nullable paths
+  that validated query hits cannot produce. `SolidBody.Grounding.cs` reports
+  100% line/branch/method coverage, focused suites pass 22/22, full
+  coverage-enabled `Release` passes 2,120/2,120, `ReleaseLean` builds both
+  targets, and independent review approved.
+- [x] Dimensional teardown, binding reuse, and inactive 3D body loads: physics
+  services now solely own constraints, pairs/hierarchy, primary/mixed
+  partitions, refresh registration, and collider registry removal. Public
+  body-owned collider teardown delegates atomically to its body; partition
+  clears normalize state and are idempotent without false errors. JSON and
+  MemoryPack regressions reconcile inactive registered 3D shells and prevent
+  active payloads from inventing registration. Three independent P1 review
+  rounds additionally closed stale body/host bindings, stale-body teardown of
+  rebound colliders, and registered or post-reset foreign-binding theft during
+  reinitialization in both dimensions. The touched 2D/3D body, 3D collider, and
+  3D body serialization files report 100% line/branch/method coverage, focused
+  lifecycle/reset/serialization suites pass 222/222, full coverage-enabled
+  `Release` passes 2,123/2,123, `ReleaseLean` builds both targets, and final
+  review approved.
+- [x] 3D partition service and bodyless binding reuse: repeated public
+  bodyless initialization could overwrite collider IDs and orphan the prior
+  registry/partition entry, so both dimensions now reject registered or
+  foreign-bound shells before mutation while permitting same-agent reuse after
+  context reset. The 3D service also internalizes partition coordinates,
+  removes its duplicate voxel hash pass, dead reset alias, and caller-proven
+  guards, and handles removed grids, replaced grid slots, missing voxels, and
+  detached partitions without error-log spam. `GravitasCollisionService.cs`
+  reports 100% line/branch/method coverage, full `Release` passes 2,129/2,129,
+  `ReleaseLean` builds both targets without warnings, and independent review
+  approved after its findings were resolved.
+- [x] 2D partition service parity: deleted the matching dead alias, duplicate
+  voxel hash pass, unreachable attach rollback, zero-caller mobility wrapper,
+  caller-proven ID checks, and redundant static-style query revalidation.
+  Behavioral coverage retains stale registry-ID and registered-inactive query
+  filtering, four directional bounds misses, deferred inactive/deactivated
+  refresh, primary partition pool reuse, and removed/replaced/missing GridForge
+  state without error-log spam. `GravitasCollision2DService.cs` reports 100%
+  line/branch/method coverage, focused tests pass 37/37, full `Release` passes
+  2,132/2,132, `ReleaseLean` builds without warnings, and independent review
+  approved with no findings.
+- [x] 3D compound collision detection: public workflows now cover all-parts-
+  separated compound/primitive and compound/compound pairs, broad-bounds-only
+  corner misses, and higher-priority primitive swaps with owner-ordered points,
+  normals, and part materials. Deleted duplicate manifold predicates and an
+  impossible owner-reference path already guaranteed by compound-first pair
+  ordering. `CollisionDetection.Compound.cs` reports 100%
+  line/branch/method coverage, focused tests pass 10/10, full `Release` passes
+  2,136/2,136, and independent review approved with no actionable findings.
+- [x] Mixed projected-circle geometry: a rotated multi-triangle mesh regression
+  proves conservative local triangle candidates wholly below the finite slab
+  are clipped before hit reduction. One compound workflow covers an out-of-
+  slab cuboid projection plus vertical cylinders on both interval-separation
+  sides. Deleted an impossible clip-closing duplicate guard, a caller-proven
+  convex-hull count guard, and a zero-caller 3D segment helper.
+  `GravitasQueryMixedService.CircleGeometry.cs` reports 100%
+  line/branch/method coverage, focused mixed query tests pass 152/152, full
+  `Release` passes 2,138/2,138, `ReleaseLean` builds both targets without
+  warnings, and independent review approved with no actionable findings.
 
 Priority areas:
 

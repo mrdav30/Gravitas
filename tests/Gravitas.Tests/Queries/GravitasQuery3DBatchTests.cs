@@ -170,7 +170,8 @@ public sealed class GravitasQuery3DBatchTests
         {
             new(Vector(-4, 0, 0), Vector(2, 0, 0), Fixed64.Half, IncludeLayerZero),
             new(Vector(4, -2, 0), Vector(4, 2, 0), Fixed64.Half, IncludeLayerZero),
-            new(Vector(-4, -4, 0), Vector(4, -4, 0), Fixed64.Zero, IncludeLayerZero)
+            new(Vector(-4, -4, 0), Vector(4, -4, 0), Fixed64.Zero, IncludeLayerZero),
+            new(Vector3d.Zero, Vector3d.Zero, Fixed64.Half, IncludeLayerZero)
         };
         PhysicsOverlapCircle3DRequest[] overlapRequests =
         {
@@ -194,9 +195,11 @@ public sealed class GravitasQuery3DBatchTests
         closestSweeps[0].Collider.Should().BeSameAs(first);
         closestSweeps[1].Collider.Should().BeSameAs(second);
         closestSweeps[2].Collider.Should().BeNull();
+        closestSweeps[3].Collider.Should().BeNull();
         sweepHits[sweepRanges[0].Start].Collider.Should().BeSameAs(first);
         sweepHits[sweepRanges[1].Start].Collider.Should().BeSameAs(second);
         sweepRanges[2].Count.Should().Be(0);
+        sweepRanges[3].Count.Should().Be(0);
         overlapClosestCount.Should().Be(2);
         overlapAllCount.Should().Be(2);
         closestOverlaps[0].Collider.Should().BeSameAs(first);

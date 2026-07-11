@@ -138,6 +138,50 @@ public sealed class GravitasQuery3DServiceRaycastTests
     }
 
     [Fact]
+    public void Raycast_WithOutOfOrderCompoundIntersections_ShouldReturnNearestSurface()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSCompoundCollider compound = CreateDynamicCollider(
+            context,
+            new LSCompoundCollider(
+                CompoundColliderPart.Sphere(Fixed64.Half, Vector3d.Right),
+                CompoundColliderPart.Sphere(Fixed64.Half, Vector3d.Left)),
+            Vector3d.Zero);
+
+        bool hit = context.Query3D.Raycast(
+            Vector(-4, 0, 0),
+            Vector3d.Right,
+            (Fixed64)8,
+            out Physics3DHit raycastHit,
+            IncludeLayerZero);
+
+        hit.Should().BeTrue();
+        raycastHit.Collider.Should().BeSameAs(compound);
+        raycastHit.Point.Should().Be(new Vector3d(Fixed64.FromFraction(-3, 2), Fixed64.Zero, Fixed64.Zero));
+        raycastHit.Distance.Should().Be(Fixed64.FromFraction(5, 2));
+    }
+
+    [Fact]
+    public void Raycast_WhenExtensibleColliderReportsHitWithoutPoint_ShouldRejectMalformedHit()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        _ = CreateDynamicCollider(
+            context,
+            new UnsupportedTestCollider3D { ReportRayOverlapWithoutIntersection = true },
+            Vector3d.Zero);
+
+        bool hit = context.Query3D.Raycast(
+            Vector(-2, 0, 0),
+            Vector3d.Right,
+            (Fixed64)4,
+            out Physics3DHit raycastHit,
+            IncludeLayerZero);
+
+        hit.Should().BeFalse();
+        raycastHit.Should().Be(default(Physics3DHit));
+    }
+
+    [Fact]
     public void Raycast_ShouldHitCylinderSideAndCaps()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
@@ -245,6 +289,44 @@ public sealed class GravitasQuery3DServiceRaycastTests
 
         count.Should().Be(1);
         hits[0].Collider.Should().BeSameAs(collider);
+    }
+
+    [Fact]
+    public void Raycast_WithEndOutsideOwnedGrid_ShouldStillReturnTraversedHit()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSSphereCollider collider = CreateDynamicSphere(context, Vector3d.Zero);
+
+        bool hit = context.Query3D.Raycast(
+            Vector(-2, 0, 0),
+            Vector3d.Right,
+            (Fixed64)12,
+            out Physics3DHit raycastHit,
+            IncludeLayerZero);
+
+        hit.Should().BeTrue();
+        raycastHit.Collider.Should().BeSameAs(collider);
+        raycastHit.Distance.Should().Be(Fixed64.FromFraction(3, 2));
+    }
+
+    [Fact]
+    public void RaycastVersionWrap_ShouldNotSuppressColliderFromPreviousVersionOneQuery()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSSphereCollider collider = CreateDynamicSphere(context, Vector3d.Zero);
+        collider.RaycastVersion = 1;
+        context.Query3D.RaycastVersion = uint.MaxValue;
+
+        bool hit = context.Query3D.Raycast(
+            Vector(-2, 0, 0),
+            Vector3d.Right,
+            (Fixed64)4,
+            out Physics3DHit raycastHit,
+            IncludeLayerZero);
+
+        context.Query3D.RaycastVersion.Should().Be(1);
+        hit.Should().BeTrue();
+        raycastHit.Collider.Should().BeSameAs(collider);
     }
 
     [Fact]

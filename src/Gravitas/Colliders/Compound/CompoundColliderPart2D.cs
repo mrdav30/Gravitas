@@ -140,24 +140,6 @@ public readonly struct CompoundColliderPart2D
         Vector2d localScale) =>
         new(ColliderShapeDefinition2D.AABBox(size), localOffset, localRotation, localScale);
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static CompoundColliderPart2D AABox(Vector2d size, Vector2d localOffset) =>
-        AABBox(size, localOffset);
-
-    public static CompoundColliderPart2D AABox(
-        Vector2d size,
-        Vector2d localOffset,
-        PhysicsMaterial material) =>
-        AABBox(size, localOffset, material);
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static CompoundColliderPart2D AABox(
-        Vector2d size,
-        Vector2d localOffset,
-        Fixed64 localRotation,
-        Vector2d localScale) =>
-        AABBox(size, localOffset, localRotation, localScale);
-
     public static CompoundColliderPart2D ConvexPolygon(Vector2d[] vertices, Vector2d localOffset) =>
         new(ColliderShapeDefinition2D.ConvexPolygon(vertices), localOffset);
 

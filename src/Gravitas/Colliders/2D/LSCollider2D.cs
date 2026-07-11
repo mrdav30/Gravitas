@@ -107,10 +107,6 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
 
     public int Id => _id;
 
-    internal int ServiceIndex => _serviceIndex;
-
-    internal int ReplayOrder => _replayOrder;
-
     internal int ReplayOrdinal => _replayOrdinal;
 
     internal int ServiceRefreshIndex => _serviceRefreshIndex;
@@ -131,9 +127,7 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
 
     internal uint RuntimeShapeVersion => _runtimeShapeState.RuntimeVersion;
 
-    internal bool HasHostBinding => _body != null || _agent != null;
-
-    internal LSCompoundCollider2D? CompoundOwner2D => _compoundOwner;
+    internal bool HasHostBinding => _agent != null;
 
     internal int CollisionPairCount => _pairState.CollisionPairCount;
 
@@ -272,7 +266,7 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
 
     public virtual int Priority => ColliderSettings2D.GetPriority(Shape);
 
-    public uint RaycastVersion
+    internal uint RaycastVersion
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get => _queryState.RaycastVersion;
@@ -280,7 +274,7 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
         set => _queryState.RaycastVersion = value;
     }
 
-    public uint CircleQueryVersion
+    internal uint CircleQueryVersion
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get => _queryState.CircleQueryVersion;
@@ -400,6 +394,11 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
     public void InitializeWithNoBody(IMatterAgent agent)
     {
         ThrowIfCompoundPartLifecycle(nameof(InitializeWithNoBody));
+        SwiftThrowHelper.ThrowIfNull(agent, nameof(agent));
+        SwiftThrowHelper.ThrowIfArgument(
+            Id >= 0 || (HasHostBinding && !ReferenceEquals(_agent, agent)),
+            nameof(agent),
+            "2D collider is already registered or bound to another host agent.");
         InitCore(agent, null);
         Context.Physics2D.AssimilateCollider(this);
     }
@@ -473,8 +472,6 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
 
     int IPhysicsColliderRegistryItem.ReplayOrder => _replayOrder;
 
-    int IPhysicsColliderRegistryItem.ReplayOrdinal => _replayOrdinal;
-
     void IPhysicsColliderRegistryItem.SetRegistryServiceIndex(int serviceIndex) =>
         SetServiceIndex(serviceIndex);
 
@@ -494,17 +491,14 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
     {
         ThrowIfCompoundPartLifecycle(nameof(Deactivate));
 
-        if (!_isActive)
+        if (_body != null)
+        {
+            _body.Deactivate();
             return;
+        }
 
-        if (_context != null && IsMixedPartitioned)
-            _context.MixedCollisions.ClearPartitioned2DCollider(this, force: true);
-
-        ClearChildParentReferences();
-        ClearParent();
-
-        if (_context != null && _id >= 0)
-            _context.Physics2D.DessimilateCollider(this);
+        if (_id >= 0)
+            _context!.Physics2D.DessimilateCollider(this);
 
         _isActive = false;
         ClearBindingState();
@@ -525,8 +519,8 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
         if (!RebuildRuntimeShapeState())
             return false;
 
-        if (_context != null && _id >= 0)
-            return _context.Collisions2D.RefreshColliderPartitionAfterShapeChange(this);
+        if (_id >= 0)
+            return _context!.Collisions2D.RefreshColliderPartitionAfterShapeChange(this);
 
         return true;
     }
@@ -756,12 +750,6 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
         TransformMassPropertyPoint(ScaledLocalOffset);
 
     /// <summary>
-    /// Calculates the scalar moment of inertia about this collider's derived center of mass.
-    /// </summary>
-    public Fixed64 CalculateMomentOfInertia(Fixed64 mass) =>
-        CalculateMomentOfInertia(mass, CalculateLocalCenterOfMassOffset());
-
-    /// <summary>
     /// Calculates the scalar moment of inertia about a requested body-local reference point.
     /// </summary>
     public abstract Fixed64 CalculateMomentOfInertia(Fixed64 mass, Vector2d localReferencePoint);
@@ -958,11 +946,6 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
             HasHostBinding,
             nameof(owner),
             "2D compound collider parts cannot be initialized as standalone colliders.");
-        SwiftThrowHelper.ThrowIfArgument(
-            _compoundOwner != null && !ReferenceEquals(_compoundOwner, owner),
-            nameof(owner),
-            "2D compound collider part is already owned by another compound collider.");
-
         _compoundOwner = owner;
         _compoundLocalRotation = localRotation;
         _compoundLocalScale = localScale;
@@ -1091,18 +1074,23 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
     private void ApplyLoadedState()
     {
         _runtimeShapeState.MarkDirty();
+        if (_context == null)
+            return;
+
         RebuildRuntimeShapeState();
 
-        if (_context == null || _compoundOwner != null || _id < 0)
+        if (_id < 0)
             return;
 
         if (!_isActive)
         {
-            _context.Collisions2D.ClearPartitionedCollider(this, force: true);
+            if (IsPartitioned)
+                _context.Collisions2D.ClearPartitionedCollider(this, force: true);
             MarkUnpartitioned();
             ClearPartitionCoordinates();
 
-            _context.MixedCollisions.ClearPartitioned2DCollider(this, force: true);
+            if (IsMixedPartitioned)
+                _context.MixedCollisions.ClearPartitioned2DCollider(this, force: true);
             MarkMixedUnpartitioned();
             ClearMixedPartitionCoordinates();
             return;

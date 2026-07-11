@@ -91,7 +91,6 @@ namespace Gravitas.Colliders
             : _faceNormals;
 
         private readonly Fixed64[] _faceAreas;
-        public Fixed64[] FaceAreas => _faceAreas;
 
         private Fixed64 _totalArea;
         public Fixed64 TotalArea => _totalArea;
@@ -514,9 +513,6 @@ namespace Gravitas.Colliders
         private Fixed3x3 CalculateSurfaceApproximationInertiaTensor(Fixed64 mass)
         {
             Fixed3x3 tensor = Fixed3x3.Zero;
-            if (_totalArea <= Fixed64.Zero)
-                return tensor;
-
             for (int i = 0; i < _triangleCount; i++)
             {
                 int index0 = _triangles[i * 3];
@@ -781,13 +777,6 @@ namespace Gravitas.Colliders
             third = _localVertices[_triangles[triangleIndex + 2]];
         }
 
-        public int GetTriangleVertexIndex(int triangleIndex, int vertexOffset)
-        {
-            SwiftThrowHelper.ThrowIfArrayIndexInvalid(triangleIndex, _triangleCount, nameof(triangleIndex));
-            SwiftThrowHelper.ThrowIfArrayIndexInvalid(vertexOffset, 3, nameof(vertexOffset));
-            return _triangles[triangleIndex * 3 + vertexOffset];
-        }
-
         public Vector3d GetVertexWorld(int index)
         {
             SwiftThrowHelper.ThrowIfArrayIndexInvalid(index, _localVertices.Length, nameof(index));
@@ -1031,9 +1020,6 @@ namespace Gravitas.Colliders
 
         public Vector3d ConvertWorldDirectionToLocal(Vector3d worldDirection) =>
             _rotation.Inverse() * worldDirection;
-
-        public Vector3d ConvertLocalNormalToWorld(Vector3d localNormal) =>
-            TransformLocalNormal(localNormal);
 
         private Vector3d TransformLocalPoint(Vector3d localPoint) =>
             TransformationMatrix * localPoint;

@@ -2,10 +2,12 @@ using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.Constraints;
+using Gravitas.Diagnostics;
 using Gravitas.Queries;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
 using GridForge.Configuration;
+using GridForge.Grids;
 using SwiftCollections;
 using Xunit;
 
@@ -25,6 +27,26 @@ public sealed class GravitasQuery3DServiceCircleTests
         int count = context.Query3D
             .OverlapCircleAll(Vector3d.Zero, Fixed64.One * 2, IncludeLayerZero, hits);
 
+        count.Should().Be(1);
+        hits[0].Collider.Should().BeSameAs(collider);
+    }
+
+    [Fact]
+    public void CircleVersionWrap_ShouldNotSuppressColliderFromPreviousVersionOneQuery()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSSphereCollider collider = CreateDynamicSphere(context, Vector3d.Zero);
+        collider.CircleQueryVersion = 1;
+        context.Query3D.CircleVersion = uint.MaxValue;
+        var hits = new SwiftList<Physics3DHit>();
+
+        int count = context.Query3D.OverlapCircleAll(
+            Vector3d.Zero,
+            (Fixed64)2,
+            IncludeLayerZero,
+            hits);
+
+        context.Query3D.CircleVersion.Should().Be(1);
         count.Should().Be(1);
         hits[0].Collider.Should().BeSameAs(collider);
     }
@@ -165,6 +187,109 @@ public sealed class GravitasQuery3DServiceCircleTests
     }
 
     [Fact]
+    public void OverlapQueries_ShouldRejectBroadAndNarrowPhaseMissesFromTracedPartition()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSSphereCollider broadMiss = CreateBodylessSphere(
+            context,
+            new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
+        LSCuboidCollider narrowMiss = CreateBodylessCuboid(
+            context,
+            new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
+        Fixed64 radius = Fixed64.FromFraction(1, 8);
+        var circleHits = new SwiftList<Physics3DHit>();
+        var sphereHits = new SwiftList<Physics3DHit>();
+        context.Diagnostics.Enable();
+
+        broadMiss.Center.Magnitude.Should().BeGreaterThan(broadMiss.ScaledRadius + radius);
+        narrowMiss.Center.Magnitude.Should().BeLessThanOrEqualTo(narrowMiss.ScaledRadius + radius);
+        narrowMiss.ClosestPointOnSurface(Vector3d.Zero).Magnitude.Should().BeGreaterThan(radius);
+
+        int circleCount = context.Query3D.OverlapCircleAll(Vector3d.Zero, radius, IncludeLayerZero, circleHits);
+        int circleCandidates = context.Query3D.LastQueryCandidateCount;
+        int sphereCount = context.Query3D.OverlapSphereAgainstStaticAll(
+            Vector3d.Zero,
+            radius,
+            IncludeLayerZero,
+            sphereHits);
+
+        circleCount.Should().Be(0);
+        sphereCount.Should().Be(0);
+        circleHits.Count.Should().Be(0);
+        sphereHits.Count.Should().Be(0);
+        circleCandidates.Should().Be(2);
+        context.Query3D.LastQueryCandidateCount.Should().Be(2);
+        context.Diagnostics.EventCount.Should().Be(1);
+        GravitasDiagnosticEvent diagnostic = context.Diagnostics.Events[0];
+        diagnostic.Kind.Should().Be(GravitasDiagnosticEventKind.CircleQuery);
+        diagnostic.Hit.Should().BeFalse();
+        diagnostic.DataB.Should().Be(0);
+        diagnostic.ColliderAId.Should().Be(-1);
+        diagnostic.ColliderAType.Should().Be(ColliderType.None);
+    }
+
+    [Fact]
+    public void OverlapQueries_WithStalePartitionColliderId_ShouldIgnoreStaleEntry()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSSphereCollider collider = CreateBodylessSphere(context, Vector3d.Zero);
+        for (int i = 0; i < collider.PartitionCoordinates!.Count; i++)
+        {
+            context.World.TryGetVoxel(collider.PartitionCoordinates[i], out Voxel? voxel).Should().BeTrue();
+            voxel!.TryGetPartition(out PhysicsPartition? partition).Should().BeTrue();
+            partition!.ContainedStaticObjects!.Add(collider.Id + 1).Should().BeTrue();
+        }
+
+        context.Physics.TryGetColliderById(collider.Id + 1, out _).Should().BeFalse();
+        var circleHits = new SwiftList<Physics3DHit>();
+        var sphereHits = new SwiftList<Physics3DHit>();
+
+        int circleCount = context.Query3D.OverlapCircleAll(
+            Vector3d.Zero,
+            Fixed64.One,
+            IncludeLayerZero,
+            circleHits);
+        int sphereCount = context.Query3D.OverlapSphereAgainstStaticAll(
+            Vector3d.Zero,
+            Fixed64.One,
+            IncludeLayerZero,
+            sphereHits);
+
+        circleCount.Should().Be(1);
+        sphereCount.Should().Be(1);
+        circleHits[0].Collider.Should().BeSameAs(collider);
+        sphereHits[0].Collider.Should().BeSameAs(collider);
+    }
+
+    [Fact]
+    public void ClosestOverlapQueries_ShouldKeepNearerHitWhenFartherCandidateIsProcessedLater()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        _ = CreateDynamicSphere(context, Vector3d.Right * 2);
+        LSSphereCollider nearer = CreateDynamicSphere(context, Vector3d.Right);
+
+        bool closestFound = context.Query3D.OverlapCircle(
+            Vector3d.Zero,
+            (Fixed64)3,
+            out Physics3DHit closest,
+            IncludeLayerZero);
+        bool directionalFound = context.Query3D.OverlapCircleInDirection(
+            Vector3d.Zero,
+            (Fixed64)3,
+            Vector3d.Right,
+            out Physics3DHit directional,
+            (Fixed64)3,
+            IncludeLayerZero);
+
+        closestFound.Should().BeTrue();
+        directionalFound.Should().BeTrue();
+        closest.Collider.Should().BeSameAs(nearer);
+        directional.Collider.Should().BeSameAs(nearer);
+        closest.Distance.Should().Be(Fixed64.Half);
+        directional.Distance.Should().Be(Fixed64.Half);
+    }
+
+    [Fact]
     public void OverlapSphereAgainstStaticAll_ShouldFilterExcludedLayerTriggerAndMovableDynamicTargets()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
@@ -286,6 +411,17 @@ public sealed class GravitasQuery3DServiceCircleTests
         if (layer.HasValue)
             collider.Layer = layer.Value;
 
+        collider.InitializeWithNoBody(agent);
+        return collider;
+    }
+
+    private static LSCuboidCollider CreateBodylessCuboid(GravitasWorldContext context, Vector3d position)
+    {
+        EnsureGrid(context);
+        var agent = new TestMatterAgent(
+            context,
+            new FixedTransform(position, FixedQuaternion.Identity, Vector3d.One));
+        var collider = new LSCuboidCollider();
         collider.InitializeWithNoBody(agent);
         return collider;
     }

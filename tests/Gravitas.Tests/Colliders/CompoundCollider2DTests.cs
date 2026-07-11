@@ -60,24 +60,52 @@ public sealed class CompoundCollider2DTests
             new(-Fixed64.One, Fixed64.One)
         };
 
+        CompoundColliderPart2D shapeDefaults = new(ColliderShapeDefinition2D.Circle(Fixed64.Half));
+        CompoundColliderPart2D transformDefaults = new(
+            ColliderShapeDefinition2D.AABBox(Vector2d.One),
+            offset,
+            rotation);
         CompoundColliderPart2D circle = CompoundColliderPart2D.Circle(Fixed64.Half, offset, material);
+        CompoundColliderPart2D materialCapsule = CompoundColliderPart2D.Capsule(Fixed64.Half, (Fixed64)3, offset, material);
         CompoundColliderPart2D capsule = CompoundColliderPart2D.Capsule(Fixed64.Half, (Fixed64)3, offset, rotation, scale);
-        CompoundColliderPart2D box = CompoundColliderPart2D.AABox(new Vector2d((Fixed64)2, (Fixed64)4), offset);
+        CompoundColliderPart2D box = CompoundColliderPart2D.AABBox(new Vector2d((Fixed64)2, (Fixed64)4), offset);
+        CompoundColliderPart2D transformedBox = CompoundColliderPart2D.AABBox(
+            new Vector2d((Fixed64)2, (Fixed64)4),
+            offset,
+            rotation,
+            scale);
         CompoundColliderPart2D polygon = CompoundColliderPart2D.ConvexPolygon(vertices, offset, material);
+        CompoundColliderPart2D transformedPolygon = CompoundColliderPart2D.ConvexPolygon(vertices, offset, rotation, scale);
+
+        shapeDefaults.Shape.Kind.Should().Be(ColliderShapeDefinition2DKind.Circle);
+        shapeDefaults.LocalOffset.Should().Be(Vector2d.Zero);
+        shapeDefaults.LocalRotation.Should().Be(Fixed64.Zero);
+        shapeDefaults.LocalScale.Should().Be(Vector2d.One);
+
+        transformDefaults.Shape.Kind.Should().Be(ColliderShapeDefinition2DKind.AABBox);
+        transformDefaults.LocalOffset.Should().Be(offset);
+        transformDefaults.LocalRotation.Should().Be(rotation);
+        transformDefaults.LocalScale.Should().Be(Vector2d.One);
 
         circle.Shape.Kind.Should().Be(ColliderShapeDefinition2DKind.Circle);
         circle.LocalOffset.Should().Be(offset);
         circle.LocalScale.Should().Be(Vector2d.One);
         circle.Material.Should().Be(material);
 
+        materialCapsule.Material.Should().Be(material);
         capsule.Shape.Kind.Should().Be(ColliderShapeDefinition2DKind.Capsule);
         capsule.LocalRotation.Should().Be(rotation);
         capsule.LocalScale.Should().Be(scale);
         capsule.Material.Should().Be(PhysicsMaterial.Default);
 
         box.Shape.Kind.Should().Be(ColliderShapeDefinition2DKind.AABBox);
+        transformedBox.LocalRotation.Should().Be(rotation);
+        transformedBox.LocalScale.Should().Be(scale);
         polygon.Shape.Kind.Should().Be(ColliderShapeDefinition2DKind.ConvexPolygon);
         polygon.Material.Should().Be(material);
+        transformedPolygon.Shape.Kind.Should().Be(ColliderShapeDefinition2DKind.ConvexPolygon);
+        transformedPolygon.LocalRotation.Should().Be(rotation);
+        transformedPolygon.LocalScale.Should().Be(scale);
     }
 
     [Fact]
@@ -133,6 +161,27 @@ public sealed class CompoundCollider2DTests
     }
 
     [Fact]
+    public void RecordData_OnUnboundCompound_ShouldApplySharedStateWithoutShapePayload()
+    {
+        var compound = new LSCompoundCollider2D(
+            CompoundColliderPart2D.Circle(Fixed64.Half, Vector2d.Zero));
+        Vector2d loadedOffset = new(Fixed64.One, (Fixed64)(-2));
+        var chronicler = new InvalidRecordPayloadChronicler(new Dictionary<string, object>
+        {
+            ["Active"] = false,
+            ["LocalOffset"] = loadedOffset
+        });
+
+        compound.RecordData(chronicler);
+
+        compound.IsActive.Should().BeFalse();
+        compound.LocalOffset.Should().Be(loadedOffset);
+        compound.PartCount.Should().Be(1);
+        compound.IsPartitioned.Should().BeFalse();
+        compound.IsMixedPartitioned.Should().BeFalse();
+    }
+
+    [Fact]
     public void Initialize_ShouldApplyOwnerLocalOffsetToAggregateBounds()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
@@ -177,7 +226,7 @@ public sealed class CompoundCollider2DTests
         var compound = new LSCompoundCollider2D(
             CompoundColliderPart2D.Circle(Fixed64.Half, new Vector2d(-Fixed64.One, Fixed64.Zero)),
             CompoundColliderPart2D.Capsule(Fixed64.Half, (Fixed64)4, new Vector2d(Fixed64.Zero, (Fixed64)2)),
-            CompoundColliderPart2D.AABox(new Vector2d((Fixed64)2, (Fixed64)2), new Vector2d((Fixed64)3, Fixed64.Zero)));
+            CompoundColliderPart2D.AABBox(new Vector2d((Fixed64)2, (Fixed64)2), new Vector2d((Fixed64)3, Fixed64.Zero)));
 
         _ = CreateBody(context, compound, Vector2d.Zero);
 
@@ -222,7 +271,7 @@ public sealed class CompoundCollider2DTests
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
         var compound = new LSCompoundCollider2D(
             CompoundColliderPart2D.Circle(Fixed64.Half, new Vector2d((Fixed64)(-4), Fixed64.Zero)),
-            CompoundColliderPart2D.AABox(new Vector2d((Fixed64)2, (Fixed64)2), new Vector2d((Fixed64)2, Fixed64.Zero)));
+            CompoundColliderPart2D.AABBox(new Vector2d((Fixed64)2, (Fixed64)2), new Vector2d((Fixed64)2, Fixed64.Zero)));
         _ = CreateBody(context, compound, Vector2d.Zero);
 
         compound.ContainsPoint(new Vector2d((Fixed64)2, Fixed64.Zero)).Should().BeTrue();
@@ -235,7 +284,7 @@ public sealed class CompoundCollider2DTests
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
         var compound = new LSCompoundCollider2D(
             CompoundColliderPart2D.Circle(Fixed64.Half, new Vector2d((Fixed64)(-2), Fixed64.Zero)),
-            CompoundColliderPart2D.AABox(new Vector2d((Fixed64)2, (Fixed64)2), new Vector2d((Fixed64)3, Fixed64.Zero)));
+            CompoundColliderPart2D.AABBox(new Vector2d((Fixed64)2, (Fixed64)2), new Vector2d((Fixed64)3, Fixed64.Zero)));
         _ = CreateBody(context, compound, Vector2d.Zero);
 
         compound.GetSupportPoint(Vector2d.Right).Should().Be(new Vector2d((Fixed64)4, Fixed64.One));

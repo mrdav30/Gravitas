@@ -24,7 +24,6 @@ public partial class SolidBody
         writer.WriteBool(_isKinematic);
         writer.WriteVector2d(_position2dUnmarked);
         writer.WriteFixed64(_heightPosUnmarked);
-        writer.WriteVector3d(_spawnedPosition);
         writer.WriteVector3d(_lastPosition);
         writer.WriteFixed64(GroundOriginOffset);
         writer.WriteFixed64(GroundedDistanceRay);
@@ -66,8 +65,6 @@ public partial class SolidBody
         writer.WriteVector3d(_angularAcceleration);
         writer.WriteVector3d(_impulseStore);
         writer.WriteVector2d(_positionCorrection);
-        writer.WriteVector3d(_timeScaledAcceleration);
-        writer.WriteVector3d(_timeScaledDeceleration);
         writer.WriteFixed64(LinearDragCoefficient);
         writer.WriteFixed64(AngularDragCoefficient);
         writer.WriteVector3d(_normalForce);

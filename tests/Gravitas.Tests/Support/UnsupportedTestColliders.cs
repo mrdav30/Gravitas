@@ -46,6 +46,10 @@ internal sealed class UnsupportedTestCollider2D : LSCollider2D
 
 internal sealed class UnsupportedTestCollider3D : LSCollider
 {
+    internal bool ReportRayOverlapWithoutIntersection { get; set; }
+
+    internal bool DeactivateOnInitialize { get; set; }
+
     public override ColliderType Shape => (ColliderType)byte.MaxValue;
 
     public override int Priority => 0;
@@ -56,6 +60,14 @@ internal sealed class UnsupportedTestCollider3D : LSCollider
         SetBoundsMinMax(Center - Vector3d.One, Center + Vector3d.One);
     }
 
+    protected override void OnInitialize()
+    {
+        if (DeactivateOnInitialize)
+            IsActive = false;
+
+        base.OnInitialize();
+    }
+
     public override Fixed3x3 CalculateInertiaTensor(Fixed64 mass, Vector3d localCenterOfMassOffset) =>
         Fixed3x3.Zero;
 
@@ -64,5 +76,5 @@ internal sealed class UnsupportedTestCollider3D : LSCollider
     public override Vector3d GetNormalAtPoint(Vector3d point) => Vector3d.Up;
 
     public override bool ColliderOverlapsRay(RaycastSegmentWorker worker, ref SwiftList<Vector3d> outputIntersectionPoints) =>
-        false;
+        ReportRayOverlapWithoutIntersection;
 }

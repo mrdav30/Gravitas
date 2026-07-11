@@ -166,8 +166,8 @@ Removing a joint releases solver cache and linked-collider suppression state,
 but does not reuse that joint ID in the same context. 2D joints follow the
 same context-local ownership principle through `GravitasConstraint2DService`.
 
-`SolidBody.Setup(...)` requires the agent and collider to belong to the same
-context. `CollisionPair.Initialize(...)` rejects colliders from different
+`SolidBody(agent, collider)` requires the agent and collider to belong to the
+same context. `CollisionPair.Initialize(...)` rejects colliders from different
 contexts. These checks are core invariants.
 
 ## Body State

@@ -37,7 +37,7 @@ public static partial class CollisionDetection
             collided |= TryBuildCompoundPartContact(pair, part, other);
         }
 
-        return collided && pair.Manifold.HasContact;
+        return collided;
     }
 
     private static bool DoCompoundCompoundCheck(
@@ -53,7 +53,7 @@ public static partial class CollisionDetection
                 collided |= TryBuildCompoundPartContact(pair, partA, compoundB.GetPartCollider(j));
         }
 
-        return collided && pair.Manifold.HasContact;
+        return collided;
     }
 
     private static bool TryBuildCompoundPartContact(
@@ -69,7 +69,7 @@ public static partial class CollisionDetection
         ContactManifold scratch = ownerPair.Context.CollisionScratch.CompoundPartManifold;
         scratch.BeginUpdate(ownerPair.Context.FrameCount);
         var partPair = new CollisionWorkItem(ownerPair.Context, colliderA, colliderB, collisionType, scratch);
-        if (!DoCollisionCheck(partPair) || !scratch.HasContact)
+        if (!DoCollisionCheck(partPair))
             return false;
 
         AddCompoundPartContactsInOwnerOrder(ownerPair, partPair);
@@ -80,7 +80,7 @@ public static partial class CollisionDetection
         CollisionWorkItem ownerPair,
         CollisionWorkItem partPair)
     {
-        bool addInPartOrder = BelongsToOwnerSide(partPair.ColliderA, ownerPair.ColliderA);
+        bool addInPartOrder = ((LSCompoundCollider)ownerPair.ColliderA).ContainsPartCollider(partPair.ColliderA);
 
         ContactManifold scratch = partPair.Manifold;
         for (int i = 0; i < scratch.Count; i++)
@@ -124,15 +124,6 @@ public static partial class CollisionDetection
 
         colliderA = second;
         colliderB = first;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool BelongsToOwnerSide(LSCollider candidate, LSCollider ownerSide)
-    {
-        if (ReferenceEquals(candidate, ownerSide))
-            return true;
-
-        return ownerSide is LSCompoundCollider compound && compound.ContainsPartCollider(candidate);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

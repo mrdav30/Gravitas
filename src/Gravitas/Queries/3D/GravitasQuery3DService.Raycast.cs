@@ -56,12 +56,12 @@ public sealed partial class GravitasQuery3DService
     /// <summary>
     /// Gets the context-local raycast/sweep query version.
     /// </summary>
-    public uint RaycastVersion { get; private set; }
+    public uint RaycastVersion { get; internal set; }
 
     /// <summary>
     /// Gets the context-local 3D X/Z circle query version.
     /// </summary>
-    public uint CircleVersion { get; private set; }
+    public uint CircleVersion { get; internal set; }
 
     internal int LastQueryCandidateCount { get; private set; }
 
@@ -72,6 +72,8 @@ public sealed partial class GravitasQuery3DService
     /// </summary>
     public void Reset()
     {
+        ResetColliderRaycastVersions();
+        ResetColliderCircleVersions();
         RaycastVersion = 0;
         CircleVersion = 0;
         ResetLastQueryCounters();
@@ -695,10 +697,9 @@ public sealed partial class GravitasQuery3DService
         out Physics3DHit sweepHit)
     {
         bool found = false;
-        Fixed64 closestDistance = Fixed64.MaxValue;
         Physics3DHit closestHit = default;
 
-        TraceSweepForClosestHit(start, end, radius, direction, ref found, ref closestDistance, ref closestHit);
+        TraceSweepForClosestHit(start, end, radius, direction, ref found, ref closestHit);
 
         sweepHit = closestHit;
         return found;
@@ -707,10 +708,9 @@ public sealed partial class GravitasQuery3DService
     private bool TryFindClosestHit(Vector3d start, Vector3d end, Vector3d direction, out Physics3DHit raycastHit)
     {
         bool found = false;
-        Fixed64 closestDistance = Fixed64.MaxValue;
         Physics3DHit closestHit = default;
 
-        TraceLineForClosestHit(start, end, direction, ref found, ref closestDistance, ref closestHit);
+        TraceLineForClosestHit(start, end, direction, ref found, ref closestHit);
 
         raycastHit = closestHit;
         return found;
@@ -737,10 +737,9 @@ public sealed partial class GravitasQuery3DService
         out Physics3DHit sweepHit)
     {
         bool found = false;
-        Fixed64 closestDistance = Fixed64.MaxValue;
         Physics3DHit closestHit = default;
 
-        TraceConvexSweepForClosestHit(source, displacement, ref found, ref closestDistance, ref closestHit);
+        TraceConvexSweepForClosestHit(source, displacement, ref found, ref closestHit);
 
         sweepHit = closestHit;
         return found;
@@ -759,7 +758,6 @@ public sealed partial class GravitasQuery3DService
         Vector3d end,
         Vector3d direction,
         ref bool found,
-        ref Fixed64 closestDistance,
         ref Physics3DHit closestHit)
     {
         GridTracer.TraceLineInto(_context.World, start, end, _coveredVoxels, _traceScratch);
@@ -769,10 +767,7 @@ public sealed partial class GravitasQuery3DService
                 start,
                 direction,
                 ref found,
-                ref closestDistance,
                 ref closestHit);
-
-        ProcessTraceEndVoxelForClosestHit(end, start, direction, ref found, ref closestDistance, ref closestHit);
     }
 
     private void TraceLineForAllHits(
@@ -784,8 +779,6 @@ public sealed partial class GravitasQuery3DService
         GridTracer.TraceLineInto(_context.World, start, end, _coveredVoxels, _traceScratch);
         for (int i = 0; i < _coveredVoxels.Count; i++)
             ProcessTraceVoxelForAllHits(_coveredVoxels[i], start, direction, results);
-
-        ProcessTraceEndVoxelForAllHits(end, start, direction, results);
     }
 
     private void TraceSweepForClosestHit(
@@ -794,7 +787,6 @@ public sealed partial class GravitasQuery3DService
         Fixed64 radius,
         Vector3d direction,
         ref bool found,
-        ref Fixed64 closestDistance,
         ref Physics3DHit closestHit)
     {
         PrepareSweepBounds(start, end, radius, out Vector3d coverageMin, out Vector3d coverageMax);
@@ -805,7 +797,6 @@ public sealed partial class GravitasQuery3DService
                 start,
                 direction,
                 ref found,
-                ref closestDistance,
                 ref closestHit);
     }
 
@@ -826,7 +817,6 @@ public sealed partial class GravitasQuery3DService
         LSCollider source,
         Vector3d displacement,
         ref bool found,
-        ref Fixed64 closestDistance,
         ref Physics3DHit closestHit)
     {
         PrepareConvexSweepBounds(source, displacement, out Vector3d coverageMin, out Vector3d coverageMax);
@@ -835,7 +825,6 @@ public sealed partial class GravitasQuery3DService
             ProcessConvexSweepVoxelForClosestHit(
                 _coveredVoxels[i],
                 ref found,
-                ref closestDistance,
                 ref closestHit);
     }
 
@@ -872,34 +861,11 @@ public sealed partial class GravitasQuery3DService
         coverageMax = Vector3d.Max(source.BoundsMax, source.BoundsMax + displacement);
     }
 
-    private void ProcessTraceEndVoxelForClosestHit(
-        Vector3d end,
-        Vector3d origin,
-        Vector3d direction,
-        ref bool found,
-        ref Fixed64 closestDistance,
-        ref Physics3DHit closestHit)
-    {
-        if (_context.World.TryGetVoxel(end, out Voxel? voxel))
-            ProcessTraceVoxelForClosestHit(voxel!, origin, direction, ref found, ref closestDistance, ref closestHit);
-    }
-
-    private void ProcessTraceEndVoxelForAllHits(
-        Vector3d end,
-        Vector3d origin,
-        Vector3d direction,
-        SwiftList<Physics3DHit> results)
-    {
-        if (_context.World.TryGetVoxel(end, out Voxel? voxel))
-            ProcessTraceVoxelForAllHits(voxel!, origin, direction, results);
-    }
-
     private void ProcessTraceVoxelForClosestHit(
         Voxel voxel,
         Vector3d origin,
         Vector3d direction,
         ref bool found,
-        ref Fixed64 closestDistance,
         ref Physics3DHit closestHit)
     {
         if (!GridTraversal.TryGetUniquePartition(voxel, _redundantVoxelCheck, out PhysicsPartition? partition))
@@ -912,7 +878,6 @@ public sealed partial class GravitasQuery3DService
             origin,
             direction,
             ref found,
-            ref closestDistance,
             ref closestHit);
     }
 
@@ -935,7 +900,6 @@ public sealed partial class GravitasQuery3DService
         Vector3d origin,
         Vector3d direction,
         ref bool found,
-        ref Fixed64 closestDistance,
         ref Physics3DHit closestHit)
     {
         if (!GridTraversal.TryGetUniquePartition(voxel, _redundantVoxelCheck, out PhysicsPartition? partition))
@@ -948,7 +912,6 @@ public sealed partial class GravitasQuery3DService
             origin,
             direction,
             ref found,
-            ref closestDistance,
             ref closestHit);
     }
 
@@ -969,7 +932,6 @@ public sealed partial class GravitasQuery3DService
     private void ProcessConvexSweepVoxelForClosestHit(
         Voxel voxel,
         ref bool found,
-        ref Fixed64 closestDistance,
         ref Physics3DHit closestHit)
     {
         if (!GridTraversal.TryGetUniquePartition(voxel, _redundantVoxelCheck, out PhysicsPartition? partition))
@@ -980,7 +942,6 @@ public sealed partial class GravitasQuery3DService
         ProcessPartitionForClosestConvexSweepHit(
             partition!,
             ref found,
-            ref closestDistance,
             ref closestHit);
     }
 
@@ -1001,7 +962,6 @@ public sealed partial class GravitasQuery3DService
         Vector3d origin,
         Vector3d direction,
         ref bool found,
-        ref Fixed64 closestDistance,
         ref Physics3DHit closestHit)
     {
         ProcessColliderListForClosestHit(
@@ -1009,7 +969,6 @@ public sealed partial class GravitasQuery3DService
             origin,
             direction,
             ref found,
-            ref closestDistance,
             ref closestHit);
 
         ProcessColliderListForClosestHit(
@@ -1017,7 +976,6 @@ public sealed partial class GravitasQuery3DService
             origin,
             direction,
             ref found,
-            ref closestDistance,
             ref closestHit);
 
         ProcessColliderListForClosestHit(
@@ -1025,7 +983,6 @@ public sealed partial class GravitasQuery3DService
             origin,
             direction,
             ref found,
-            ref closestDistance,
             ref closestHit);
     }
 
@@ -1034,7 +991,6 @@ public sealed partial class GravitasQuery3DService
         Vector3d origin,
         Vector3d direction,
         ref bool found,
-        ref Fixed64 closestDistance,
         ref Physics3DHit closestHit)
     {
         if (colliderIds == null)
@@ -1049,7 +1005,6 @@ public sealed partial class GravitasQuery3DService
             }
 
             found = true;
-            closestDistance = hit.Distance;
             closestHit = hit;
         }
     }
@@ -1086,26 +1041,20 @@ public sealed partial class GravitasQuery3DService
         Vector3d origin,
         Vector3d direction,
         ref bool found,
-        ref Fixed64 closestDistance,
         ref Physics3DHit closestHit)
     {
-        if (!_currentStaticSweepTargetsOnly)
-        {
-            ProcessColliderListForClosestSweepHit(
-                partition.ContainedDynamicObjects,
-                origin,
-                direction,
-                ref found,
-                ref closestDistance,
-                ref closestHit);
-        }
+        ProcessColliderListForClosestSweepHit(
+            partition.ContainedDynamicObjects,
+            origin,
+            direction,
+            ref found,
+            ref closestHit);
 
         ProcessColliderListForClosestSweepHit(
             partition.ContainedKinematicObjects,
             origin,
             direction,
             ref found,
-            ref closestDistance,
             ref closestHit);
 
         ProcessColliderListForClosestSweepHit(
@@ -1113,7 +1062,6 @@ public sealed partial class GravitasQuery3DService
             origin,
             direction,
             ref found,
-            ref closestDistance,
             ref closestHit);
     }
 
@@ -1122,7 +1070,6 @@ public sealed partial class GravitasQuery3DService
         Vector3d origin,
         Vector3d direction,
         ref bool found,
-        ref Fixed64 closestDistance,
         ref Physics3DHit closestHit)
     {
         if (colliderIds == null)
@@ -1137,7 +1084,6 @@ public sealed partial class GravitasQuery3DService
             }
 
             found = true;
-            closestDistance = hit.Distance;
             closestHit = hit;
         }
     }
@@ -1158,28 +1104,21 @@ public sealed partial class GravitasQuery3DService
     private void ProcessPartitionForClosestConvexSweepHit(
         PhysicsPartition partition,
         ref bool found,
-        ref Fixed64 closestDistance,
         ref Physics3DHit closestHit)
     {
-        if (!_currentStaticSweepTargetsOnly)
-        {
-            ProcessColliderListForClosestConvexSweepHit(
-                partition.ContainedDynamicObjects,
-                ref found,
-                ref closestDistance,
-                ref closestHit);
-        }
+        ProcessColliderListForClosestConvexSweepHit(
+            partition.ContainedDynamicObjects,
+            ref found,
+            ref closestHit);
 
         ProcessColliderListForClosestConvexSweepHit(
             partition.ContainedKinematicObjects,
             ref found,
-            ref closestDistance,
             ref closestHit);
 
         ProcessColliderListForClosestConvexSweepHit(
             partition.ContainedStaticObjects,
             ref found,
-            ref closestDistance,
             ref closestHit);
     }
 
@@ -1213,7 +1152,6 @@ public sealed partial class GravitasQuery3DService
     private void ProcessColliderListForClosestConvexSweepHit(
         SwiftSparseSet? colliderIds,
         ref bool found,
-        ref Fixed64 closestDistance,
         ref Physics3DHit closestHit)
     {
         if (colliderIds == null)
@@ -1228,7 +1166,6 @@ public sealed partial class GravitasQuery3DService
             }
 
             found = true;
-            closestDistance = hit.Distance;
             closestHit = hit;
         }
     }
@@ -1345,7 +1282,10 @@ public sealed partial class GravitasQuery3DService
     {
         RaycastVersion++;
         if (RaycastVersion == 0)
+        {
+            ResetColliderRaycastVersions();
             RaycastVersion = 1;
+        }
 
         return RaycastVersion;
     }
@@ -1355,9 +1295,24 @@ public sealed partial class GravitasQuery3DService
     {
         CircleVersion++;
         if (CircleVersion == 0)
+        {
+            ResetColliderCircleVersions();
             CircleVersion = 1;
+        }
 
         return CircleVersion;
+    }
+
+    private void ResetColliderRaycastVersions()
+    {
+        for (int i = 0; i < _context.Physics.ColliderCount; i++)
+            _context.Physics.GetColliderByServiceIndex(i).RaycastVersion = 0;
+    }
+
+    private void ResetColliderCircleVersions()
+    {
+        for (int i = 0; i < _context.Physics.ColliderCount; i++)
+            _context.Physics.GetColliderByServiceIndex(i).CircleQueryVersion = 0;
     }
 
     private bool DoesCurrentColliderIntersectRay(LSCollider current)

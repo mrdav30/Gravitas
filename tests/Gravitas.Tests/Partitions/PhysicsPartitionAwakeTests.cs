@@ -279,8 +279,6 @@ public sealed class PhysicsPartitionAwakeTests
         originalVoxel!.TryGetPartition(out PhysicsPartition? originalPartition).Should().BeTrue();
 
         scenario.Context.Collisions.ClearPartitionedObject(body.Collider, force: true).Should().BeTrue();
-        body.Collider.ClearPartitionCoordinates();
-        body.Collider.MarkUnpartitioned();
         body.Collider.Simulate();
 
         originalVoxel.TryGetPartition(out PhysicsPartition? reusedPartition).Should().BeTrue();

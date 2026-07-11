@@ -339,10 +339,59 @@ public sealed class SolidBody2DSerializationTests
 
     [Theory]
     [MemberData(nameof(Transports))]
+    public void PopulateInactiveBodyIntoRegisteredShell_ShouldReleaseRuntimeRegistration(
+        GravitasSerializationTransport transport)
+    {
+        using GravitasWorldContext sourceContext = Physics2DTestWorld.CreateContext(frameRate: 8);
+        SolidBody2D source = CreateDynamicCircle(sourceContext);
+        object activePayload = GravitasSerializationHarness.Serialize(source, transport);
+        source.Deactivate();
+        object payload = GravitasSerializationHarness.Serialize(source, transport);
+
+        using GravitasWorldContext targetContext = Physics2DTestWorld.CreateContext(frameRate: 8);
+        SolidBody2D target = CreateDynamicCircle(targetContext);
+        targetContext.Physics2D.BodyCount.Should().Be(1);
+        targetContext.Physics2D.ColliderCount.Should().Be(1);
+
+        GravitasSerializationHarness.Populate(target, payload, transport);
+
+        target.Active.Should().BeFalse();
+        target.DynamicId.Should().Be(-1);
+        target.Collider.Id.Should().Be(-1);
+        targetContext.Physics2D.BodyCount.Should().Be(0);
+        targetContext.Physics2D.ColliderCount.Should().Be(0);
+        target.Collider.IsPartitioned.Should().BeFalse();
+        target.Collider.IsMixedPartitioned.Should().BeFalse();
+
+        target.Deactivate();
+
+        targetContext.Physics2D.BodyCount.Should().Be(0);
+        targetContext.Physics2D.ColliderCount.Should().Be(0);
+
+        GravitasSerializationHarness.Populate(target, activePayload, transport);
+
+        target.Active.Should().BeFalse();
+        target.DynamicId.Should().Be(-1);
+        target.Collider.Id.Should().Be(-1);
+        targetContext.Physics2D.BodyCount.Should().Be(0);
+        targetContext.Physics2D.ColliderCount.Should().Be(0);
+
+        target.Initialize(Vector2d.Zero);
+
+        target.Active.Should().BeTrue();
+        target.DynamicId.Should().Be(0);
+        target.Collider.Id.Should().Be(0);
+        targetContext.Physics2D.BodyCount.Should().Be(1);
+        targetContext.Physics2D.ColliderCount.Should().Be(1);
+    }
+
+    [Theory]
+    [MemberData(nameof(Transports))]
     public void PopulateInactiveCollider_ShouldClearExistingPartitionMembership(GravitasSerializationTransport transport)
     {
         using GravitasWorldContext sourceContext = Physics2DTestWorld.CreateContext(frameRate: 8);
         LSCircleCollider2D source = CreateStaticCircle(sourceContext, Vector2d.Zero);
+        object activePayload = GravitasSerializationHarness.Serialize(source, transport);
         source.Deactivate();
         source.IsActive.Should().BeFalse();
         object payload = GravitasSerializationHarness.Serialize(source, transport);
@@ -377,6 +426,46 @@ public sealed class SolidBody2DSerializationTests
         target.IsPartitioned.Should().BeFalse();
         target.IsMixedPartitioned.Should().BeFalse();
         target.PartitionCoordinates.Should().BeEmpty();
+        (target.MixedPartitionCoordinates?.Count ?? 0).Should().Be(0);
+
+        GravitasSerializationHarness.Populate(target, activePayload, transport);
+
+        target.IsActive.Should().BeTrue();
+        target.IsPartitioned.Should().BeTrue();
+        target.IsMixedPartitioned.Should().BeTrue();
+        SerializationPartitionAssertions.Primary2DPartitionsShouldContain(
+            targetContext,
+            target.PartitionCoordinates!,
+            target.Id);
+        SerializationPartitionAssertions.Mixed2DPartitionsShouldContain(
+            targetContext,
+            target.MixedPartitionCoordinates!,
+            target.Id);
+    }
+
+    [Theory]
+    [MemberData(nameof(Transports))]
+    public void PopulateActiveColliderIntoDeactivatedShell_ShouldNotRegisterInvalidId(
+        GravitasSerializationTransport transport)
+    {
+        using GravitasWorldContext sourceContext = Physics2DTestWorld.CreateContext(frameRate: 8);
+        LSCircleCollider2D source = CreateStaticCircle(sourceContext, Vector2d.Zero);
+        object activePayload = GravitasSerializationHarness.Serialize(source, transport);
+
+        using GravitasWorldContext targetContext = Physics2DTestWorld.CreateContext(frameRate: 8);
+        targetContext.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
+        LSCircleCollider2D target = CreateStaticCircle(targetContext, Vector2d.Zero);
+        targetContext.MixedCollisions.Refresh2DColliderPartition(target);
+        target.Deactivate();
+
+        GravitasSerializationHarness.Populate(target, activePayload, transport);
+
+        target.IsActive.Should().BeTrue();
+        target.Id.Should().Be(-1);
+        targetContext.Physics2D.ColliderCount.Should().Be(0);
+        target.IsPartitioned.Should().BeFalse();
+        target.IsMixedPartitioned.Should().BeFalse();
+        (target.PartitionCoordinates?.Count ?? 0).Should().Be(0);
         (target.MixedPartitionCoordinates?.Count ?? 0).Should().Be(0);
     }
 

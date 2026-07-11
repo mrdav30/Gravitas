@@ -55,7 +55,7 @@ public partial class SolidBody
     public Vector3d GroundNormal => _groundNormal;
 
     private FixedTransform? _hitPlatform;
-    public FixedTransform? HitPlatform { get => _hitPlatform; set => _hitPlatform = value; }
+    public FixedTransform? HitPlatform => _hitPlatform;
 
     private Vector3d _hitPlatformPosition;
 
@@ -221,7 +221,7 @@ public partial class SolidBody
             return;
         }
 
-        SetGroundingState(hit.Point, hit.Normal, hit.Collider?.Transform);
+        SetGroundingState(hit.Point, hit.Normal, hit.Collider!.Transform);
     }
 
     private bool TryFindGroundHit(
@@ -291,12 +291,9 @@ public partial class SolidBody
 
     private bool IsValidGroundHit(Physics3DHit hit)
     {
-        LSCollider? hitCollider = hit.Collider;
-        if (hitCollider == null
-            || ReferenceEquals(hitCollider, Collider))
-        {
+        LSCollider hitCollider = hit.Collider!;
+        if (ReferenceEquals(hitCollider, Collider))
             return false;
-        }
 
         if (!ColliderCollisionFilter.AllowsPhysicalPair(Collider, hitCollider))
             return false;

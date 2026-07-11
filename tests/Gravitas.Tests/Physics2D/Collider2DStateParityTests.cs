@@ -1,6 +1,7 @@
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
+using Gravitas.Support;
 using Gravitas.Tests.Support;
 using SwiftCollections;
 using System;
@@ -86,7 +87,81 @@ public sealed class Collider2DStateParityTests
 
         collider.IsActive.Should().BeFalse();
         collider.Id.Should().Be(-1);
-        collider.ServiceIndex.Should().Be(-1);
+    }
+
+    [Fact]
+    public void Deactivate_AfterRegisteredColliderWasMadeInactive_ShouldStillReleaseRegistration()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        LSCollider2D collider = CreateStaticCollider(
+            context,
+            new LSCircleCollider2D(Fixed64.Half),
+            Vector2d.Zero);
+        collider.IsActive = false;
+
+        collider.Deactivate();
+        collider.Deactivate();
+
+        context.Physics2D.ColliderCount.Should().Be(0);
+        collider.IsActive.Should().BeFalse();
+        collider.Id.Should().Be(-1);
+        Action readAgent = () => _ = collider.Agent;
+        Action readContext = () => _ = collider.Context;
+        readAgent.Should().Throw<InvalidOperationException>();
+        readContext.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void Deactivate_OnBodyOwnedCollider_ShouldTearDownOwningBodyIdempotently()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        SolidBody2D body = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.Half),
+            Vector2d.Zero,
+            immovable: false);
+
+        body.Collider.Deactivate();
+        body.Deactivate();
+
+        body.Active.Should().BeFalse();
+        body.DynamicId.Should().Be(-1);
+        body.Collider.Id.Should().Be(-1);
+        context.Physics2D.BodyCount.Should().Be(0);
+        context.Physics2D.ColliderCount.Should().Be(0);
+
+        using GravitasWorldContext reuseContext = Physics2DTestWorld.CreateContext();
+        body.Collider.InitializeWithNoBody(new TestMatterAgent(reuseContext));
+
+        body.Deactivate();
+
+        body.Collider.IsActive.Should().BeTrue();
+        body.Collider.Id.Should().Be(0);
+        body.Collider.Context.Should().BeSameAs(reuseContext);
+        reuseContext.Physics2D.ColliderCount.Should().Be(1);
+
+        Action staleInitialize = () => body.Initialize(Vector2d.Zero);
+
+        staleInitialize.Should().Throw<ArgumentException>().WithParameterName("Collider");
+        body.Active.Should().BeFalse();
+        context.Physics2D.BodyCount.Should().Be(0);
+        context.Physics2D.ColliderCount.Should().Be(0);
+        body.Collider.Body.Should().BeNull();
+        body.Collider.Context.Should().BeSameAs(reuseContext);
+        body.Collider.Id.Should().Be(0);
+        reuseContext.Physics2D.ColliderCount.Should().Be(1);
+
+        reuseContext.Reset();
+        body.Collider.Id.Should().Be(-1);
+        body.Collider.HasHostBinding.Should().BeTrue();
+
+        staleInitialize.Should().Throw<ArgumentException>().WithParameterName("Collider");
+        body.Active.Should().BeFalse();
+        context.Physics2D.BodyCount.Should().Be(0);
+        context.Physics2D.ColliderCount.Should().Be(0);
+        body.Collider.Body.Should().BeNull();
+        body.Collider.Context.Should().BeSameAs(reuseContext);
+        reuseContext.Physics2D.ColliderCount.Should().Be(0);
     }
 
     [Fact]
@@ -197,7 +272,32 @@ public sealed class Collider2DStateParityTests
         context.Physics2D.RequireCollisionPair(firstChild.Collider, secondChild.Collider).Should().BeFalse();
         context.Physics2D.RequireCollisionPair(firstChild.Collider, unrelated.Collider).Should().BeTrue();
         parent.Collider.HierarchyChildCount.Should().Be(2);
+        parent.Collider.IsChild.Should().BeFalse();
+        firstChild.Collider.IsChild.Should().BeTrue();
         firstChild.Collider.ParentId.Should().Be(parent.Collider.Id);
+    }
+
+    [Fact]
+    public void UnboundCollider_SimulateShouldBuildDefaultStandaloneGeometry()
+    {
+        var collider = new LSCircleCollider2D(Fixed64.One);
+
+        collider.Simulate();
+
+        collider.Bounds.Center.Should().Be(Vector2d.Zero);
+        collider.Bounds.Scope.Should().Be(Vector2d.One);
+        collider.MixedHalfThickness.Should().Be(PhysicsSettings.DefaultMixed2DHalfThickness);
+        collider.IsPartitioned.Should().BeFalse();
+        collider.IsMixedPartitioned.Should().BeFalse();
+
+        uint runtimeVersion = collider.RuntimeShapeVersion;
+        var activeBounds = collider.Bounds;
+        collider.IsActive = false;
+        collider.Radius = (Fixed64)2;
+        collider.Simulate();
+
+        collider.RuntimeShapeVersion.Should().Be(runtimeVersion);
+        collider.Bounds.Should().Be(activeBounds);
     }
 
     [Fact]
@@ -386,6 +486,30 @@ public sealed class Collider2DStateParityTests
         ColliderSettings2D.GetPriority(ColliderType2D.Compound).Should().Be(2);
         ColliderSettings2D.GetPriority(ColliderType2D.None).Should().Be(-1);
         ColliderSettings2D.GetPriority((ColliderType2D)250).Should().Be(-1);
+    }
+
+    [Fact]
+    public void RequireCollisionPair_WithEitherLayerOutsideMatrix_ShouldKeepPairEligible()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        context.ApplySettings(new PhysicsSettings(60, new[,] { { true } }));
+        SolidBody2D first = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.Half),
+            Vector2d.Zero,
+            immovable: false);
+        SolidBody2D second = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.Half),
+            Vector2d.Right,
+            immovable: false);
+        first.Collider.Layer = new PhysicsLayer(1);
+        second.Collider.Layer = new PhysicsLayer(0);
+
+        context.Physics2D.RequireCollisionPair(first.Collider, second.Collider).Should().BeTrue();
+        context.Physics2D.RequireCollisionPair(second.Collider, first.Collider).Should().BeTrue();
+        first.Collider.Layer = new PhysicsLayer(0);
+        context.Physics2D.RequireCollisionPair(first.Collider, second.Collider).Should().BeTrue();
     }
 
     private static SolidBody2D CreateBody(

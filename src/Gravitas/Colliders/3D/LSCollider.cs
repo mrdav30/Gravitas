@@ -30,7 +30,40 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
     private bool _drawBoundingBox;
 
     private bool _active = true;
-    public bool IsActive => _active;
+    public bool IsActive
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => _active;
+        set
+        {
+            ThrowIfCompoundPartLifecycle(nameof(IsActive));
+
+            if (_active == value)
+                return;
+
+            _active = value;
+            if (_context == null || _id < 0)
+                return;
+
+            if (_active)
+            {
+                InitialPartition();
+                if (_context.Settings.RuntimeMode.RunsMixedContacts())
+                    _context.MixedCollisions.Refresh3DColliderPartition(this);
+                return;
+            }
+
+            if (IsPartitioned)
+                _context.Collisions.ClearPartitionedObject(this, force: true);
+
+            if (IsMixedPartitioned)
+            {
+                _context.MixedCollisions.ClearPartitioned3DCollider(this, force: true);
+                MarkMixedUnpartitioned();
+                ClearMixedPartitionCoordinates();
+            }
+        }
+    }
 
     private bool _isTrigger;
 
@@ -50,10 +83,8 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
     public int Id => _id;
 
     private int _serviceIndex = -1;
-    internal int ServiceIndex => _serviceIndex;
 
     private int _replayOrder = -1;
-    internal int ReplayOrder => _replayOrder;
 
     private int _replayOrdinal = -1;
     internal int ReplayOrdinal => _replayOrdinal;
@@ -100,7 +131,7 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
 
     internal uint RuntimeShapeVersion => _runtimeShapeState.RuntimeVersion;
 
-    internal bool HasHostBinding => _body != null || _agent != null;
+    internal bool HasHostBinding => _agent != null;
 
     internal LSCompoundCollider? CompoundOwner => _compoundOwner;
 
@@ -329,17 +360,7 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
     public Vector3d BoundsMin => _bounds.Min;
     public Vector3d BoundsMax => _bounds.Max;
 
-    public Vector3d LastGridBoundsMin => _partitionState.LastGridBoundsMin;
-
-    public Vector3d LastGridBoundsMax => _partitionState.LastGridBoundsMax;
-
-    public SwiftList<WorldVoxelIndex>? PartitionCoordinates
-    {
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        get => _partitionState.Coordinates;
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        set => _partitionState.Coordinates = value;
-    }
+    internal SwiftList<WorldVoxelIndex>? PartitionCoordinates => _partitionState.Coordinates;
 
     internal int PartitionKind => _partitionState.LastPartitionKind;
 
@@ -351,7 +372,7 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
 
     #endregion
 
-    public uint RaycastVersion
+    internal uint RaycastVersion
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get => _queryState.RaycastVersion;
@@ -359,7 +380,7 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
         set => _queryState.RaycastVersion = value;
     }
 
-    public uint CircleQueryVersion
+    internal uint CircleQueryVersion
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get => _queryState.CircleQueryVersion;
@@ -434,7 +455,7 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
 
     #endregion
 
-    public void Initialize(SolidBody body)
+    internal void Initialize(SolidBody body)
     {
         ThrowIfCompoundPartLifecycle(nameof(Initialize));
         ThrowIfTriggerWouldAttachToBody(nameof(Initialize));
@@ -445,6 +466,11 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
     public void InitializeWithNoBody(IMatterAgent agent)
     {
         ThrowIfCompoundPartLifecycle(nameof(InitializeWithNoBody));
+        SwiftThrowHelper.ThrowIfNull(agent, nameof(agent));
+        SwiftThrowHelper.ThrowIfArgument(
+            Id >= 0 || (HasHostBinding && !ReferenceEquals(_agent, agent)),
+            nameof(agent),
+            "Collider is already registered or bound to another host agent.");
         InitCore(agent);
     }
 
@@ -478,17 +504,16 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
     private void InitialPartition()
     {
         RebuildRuntimeShapeState();
+        if (!IsActive)
+            return;
 
-        if (IsActive)
-        {
-            _partitionState.Coordinates ??= new();
-            SwiftList<WorldVoxelIndex>? partitionCoordinates = _partitionState.Coordinates;
-            Context.Collisions.PartitionObject(this, ref partitionCoordinates);
-            _partitionState.Coordinates = partitionCoordinates;
-            SetPreviousGridBounds();
-            _partitionState.MarkPartitioned();
-            MarkBroadPhaseChanged();
-        }
+        _partitionState.Coordinates ??= new();
+        SwiftList<WorldVoxelIndex> partitionCoordinates = _partitionState.Coordinates!;
+        Context.Collisions.PartitionObject(this, ref partitionCoordinates);
+        _partitionState.Coordinates = partitionCoordinates;
+        SetPreviousGridBounds();
+        _partitionState.MarkPartitioned();
+        MarkBroadPhaseChanged();
     }
 
     // Dynamic Colliders attached to a body will be updated by the body
@@ -518,10 +543,7 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
         if (!Context.Collisions.ClearPartitionedObject(this))
             return;
 
-        _partitionState.MarkUnpartitioned();
-
-        _partitionState.Coordinates ??= new();
-        SwiftList<WorldVoxelIndex>? partitionCoordinates = _partitionState.Coordinates;
+        SwiftList<WorldVoxelIndex> partitionCoordinates = _partitionState.Coordinates!;
         bool partitioned = Context.Collisions.PartitionObject(this, ref partitionCoordinates);
         _partitionState.Coordinates = partitionCoordinates;
         if (!partitioned)
@@ -716,12 +738,6 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
     /// </summary>
     public virtual Vector3d CalculateLocalCenterOfMassOffset() => ScaledOffset;
 
-    /// <summary>
-    /// Calculates the local inertia tensor for this collider about its derived center of mass.
-    /// </summary>
-    public Fixed3x3 CalculateInertiaTensor(Fixed64 mass) =>
-        CalculateInertiaTensor(mass, CalculateLocalCenterOfMassOffset());
-
     public abstract Fixed3x3 CalculateInertiaTensor(Fixed64 mass, Vector3d localCenterOfMassOffset);
 
     protected Fixed3x3 ShiftInertiaTensorFromLocalCenterOfMass(
@@ -819,12 +835,6 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
         OnMixedContactExit?.Invoke(other);
     }
 
-    public void SetStatus(bool status)
-    {
-        ThrowIfCompoundPartLifecycle(nameof(SetStatus));
-        _active = status;
-    }
-
     /// <summary>
     /// The point on the surface of the capsule that's nearest to the given point
     /// </summary>
@@ -880,8 +890,7 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
         if (!_pairState.TryRemoveCollisionPair(otherId, out CollisionPair? collisionPair))
             return false;
 
-        if (collisionPair != null && collisionPair.Active)
-            Context.Physics.DeactivateAndPoolPair(collisionPair);
+        Context.Physics.DeactivateAndPoolPair(collisionPair!);
         return true;
     }
 
@@ -904,22 +913,29 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
     public void Deactivate()
     {
         ThrowIfCompoundPartLifecycle(nameof(Deactivate));
-        if (IsMixedPartitioned)
-            Context.MixedCollisions.ClearPartitioned3DCollider(this, force: true);
-
-        if (IsPartitioned)
+        if (_body != null)
         {
-            Context.Collisions.ClearPartitionedObject(this, true);
-            _partitionState.ClearCoordinates();
-            _partitionState.MarkUnpartitioned();
+            _body.Deactivate();
+            return;
         }
 
-        Context.Physics.RemovePairsForCollider(this);
+        DeactivateRuntimeRegistration();
+    }
 
+    internal void DeactivateRuntimeRegistration()
+    {
         if (_id >= 0)
             Context.Physics.DessimilateCollider(this);
-        //  IsInCollision = false;
+
         _active = false;
+        ClearBindingState();
+    }
+
+    private void ClearBindingState()
+    {
+        _body = null;
+        _agent = null;
+        _context = null;
     }
 
     private void ClearChildParentReferences()
@@ -960,11 +976,6 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
             HasHostBinding,
             nameof(owner),
             "Compound collider parts cannot be initialized as standalone colliders.");
-        SwiftThrowHelper.ThrowIfArgument(
-            _compoundOwner != null && !ReferenceEquals(_compoundOwner, owner),
-            nameof(owner),
-            "Compound collider part is already owned by another compound collider.");
-
         _compoundOwner = owner;
         _compoundLocalRotation = localRotation;
         _compoundLocalScale = localScale;
@@ -1095,8 +1106,6 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
 
     int IPhysicsColliderRegistryItem.ReplayOrder => _replayOrder;
 
-    int IPhysicsColliderRegistryItem.ReplayOrdinal => _replayOrdinal;
-
     void IPhysicsColliderRegistryItem.SetRegistryServiceIndex(int serviceIndex) =>
         SetServiceIndex(serviceIndex);
 
@@ -1117,13 +1126,6 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
         && _partitionState.LastGridBoundsMin == min
         && _partitionState.LastGridBoundsMax == max
         && _partitionState.LastPartitionKind == partitionKind;
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal void MarkPartitioned(Vector3d min, Vector3d max, int partitionKind)
-    {
-        _partitionState.SetPreviousGridBounds(min, max, partitionKind);
-        _partitionState.MarkPartitioned();
-    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal void MarkUnpartitioned() => _partitionState.MarkUnpartitioned();
@@ -1182,25 +1184,25 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
     private void ApplyLoadedState()
     {
         _runtimeShapeState.MarkDirty();
-        RebuildRuntimeShapeState();
-
-        if (_context == null || _compoundOwner != null)
+        if (_context == null)
             return;
+
+        RebuildRuntimeShapeState();
 
         if (!_active)
         {
-            _context.Collisions.ClearPartitionedObject(this, force: true);
-            MarkUnpartitioned();
-            ClearPartitionCoordinates();
+            if (IsPartitioned)
+                _context.Collisions.ClearPartitionedObject(this, force: true);
 
-            _context.MixedCollisions.ClearPartitioned3DCollider(this, force: true);
-            MarkMixedUnpartitioned();
-            ClearMixedPartitionCoordinates();
+            if (IsMixedPartitioned)
+                _context.MixedCollisions.ClearPartitioned3DCollider(this, force: true);
             return;
         }
 
         if (IsPartitioned)
             UpdatePartition();
+        else
+            InitialPartition();
         if (_context.Settings.RuntimeMode.RunsMixedContacts())
             _context.MixedCollisions.Refresh3DColliderPartition(this);
     }

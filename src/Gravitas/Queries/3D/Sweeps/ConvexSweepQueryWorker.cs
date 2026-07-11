@@ -529,7 +529,10 @@ internal sealed class ConvexSweepQueryWorker
         count++;
     }
 
-    private static TriangleWeights ClosestPointOnTriangleToOrigin(Vector3d a, Vector3d b, Vector3d c)
+    /// <summary>
+    /// Returns barycentric weights for the point on a triangle closest to the origin.
+    /// </summary>
+    internal static TriangleWeights ClosestPointOnTriangleToOrigin(Vector3d a, Vector3d b, Vector3d c)
     {
         Vector3d ab = b - a;
         Vector3d ac = c - a;
@@ -989,7 +992,7 @@ internal sealed class ConvexSweepQueryWorker
         }
     }
 
-    private readonly struct TriangleWeights
+    internal readonly struct TriangleWeights
     {
         public TriangleWeights(Fixed64 a, Fixed64 b, Fixed64 c)
         {

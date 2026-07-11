@@ -17,8 +17,8 @@ public sealed partial class GravitasQuery2DService
 {
     private readonly GravitasWorldContext _context;
     private readonly SwiftList<LSCollider2D> _queryCandidates = new();
-    private uint _overlapQueryVersion;
-    private uint _raycastVersion;
+    internal uint OverlapQueryVersion { get; set; }
+    internal uint RaycastVersion { get; set; }
 
     /// <summary>
     /// Initializes a pure 2D query service for the supplied context.
@@ -42,12 +42,14 @@ public sealed partial class GravitasQuery2DService
     /// </summary>
     public void Reset()
     {
+        ResetColliderOverlapQueryVersions();
+        ResetColliderRaycastVersions();
         _queryCandidates.FastClear();
         _batch2DHits.FastClear();
         LastQueryCandidateCount = 0;
         ResetBatchCounters(0);
-        _overlapQueryVersion = 0;
-        _raycastVersion = 0;
+        OverlapQueryVersion = 0;
+        RaycastVersion = 0;
     }
 
 }

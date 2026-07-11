@@ -279,6 +279,34 @@ public sealed class ColliderShapeDefinitionTests
     }
 
     [Fact]
+    public void CuboidFrontalArea_ShouldUseExactOrthographicProjectionInWorldSpace()
+    {
+        Vector3d size = new((Fixed64)2, (Fixed64)4, (Fixed64)6);
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSCuboidCollider> axisAligned = scenario.CreateBody(
+            new LSCuboidCollider { Size = size },
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+        ScenarioBody<LSCuboidCollider> rotated = scenario.CreateBody(
+            new LSCuboidCollider { Size = size },
+            new Vector3d((Fixed64)8, Fixed64.Zero, Fixed64.Zero),
+            FixedQuaternion.FromEulerAnglesInDegrees(Fixed64.Zero, Fixed64.Zero, (Fixed64)90));
+        Vector3d diagonal = new Vector3d(Fixed64.One, Fixed64.One, Fixed64.One).Normalized;
+        Fixed64 expectedDiagonal =
+            (Fixed64)24 * diagonal.X.Abs()
+            + (Fixed64)12 * diagonal.Y.Abs()
+            + (Fixed64)8 * diagonal.Z.Abs();
+
+        axisAligned.Collider.GetFrontalArea(Vector3d.Zero).Should().Be(axisAligned.Collider.Area);
+        axisAligned.Collider.GetFrontalArea(Vector3d.Right).Should().Be((Fixed64)24);
+        axisAligned.Collider.GetFrontalArea(Vector3d.Up).Should().Be((Fixed64)12);
+        axisAligned.Collider.GetFrontalArea(Vector3d.Forward).Should().Be((Fixed64)8);
+        axisAligned.Collider.GetFrontalArea(diagonal).Should().Be(expectedDiagonal);
+        rotated.Collider.GetFrontalArea(Vector3d.Up).Should().Be((Fixed64)24);
+        rotated.Collider.GetFrontalArea(Vector3d.Right).Should().Be((Fixed64)12);
+    }
+
+    [Fact]
     public void CapsuleNormal_ShouldUseDeterministicFallbacksAtCapCentersAndAxis()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();

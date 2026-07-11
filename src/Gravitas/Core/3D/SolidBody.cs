@@ -124,16 +124,13 @@ public partial class SolidBody : IRecordable
     public bool PositionChangePending => _positionMutated || _positionChangedBuffer;
 
     private Vector2d _position2dUnmarked;
-    public Vector2d Position2d
+    private void SetPosition2d(Vector2d value)
     {
-        get { return _position2dUnmarked; }
-        private set
-        {
-            if (_position2dUnmarked == value)
-                return;
-            _position2dUnmarked = value;
-            _positionMutated = true;
-        }
+        if (_position2dUnmarked == value)
+            return;
+
+        _position2dUnmarked = value;
+        _positionMutated = true;
     }
 
     // Used to correct position after collision resolution to avoid sinking into other objects or the ground
@@ -165,11 +162,7 @@ public partial class SolidBody : IRecordable
         }
     }
 
-    private Vector3d _spawnedPosition;
-    public Vector3d SpawnedPosition => _spawnedPosition;
-
     private Vector3d _lastPosition;
-    public Vector3d LastPosition => _lastPosition;
 
     private const int DefaultBodyHitBufferCapacity = 16;
     private readonly SwiftList<Physics3DHit> _continuousCollisionHits = new(DefaultBodyHitBufferCapacity);
@@ -209,8 +202,6 @@ public partial class SolidBody : IRecordable
             _rotationMutated = true;
         }
     }
-
-    public Fixed3x3 RotationMatrix => _rotation.ToMatrix3x3();
 
     public Vector3d Forward => _rotation.Rotate(Vector3d.Forward);
     public Vector3d Up => _rotation.Rotate(Vector3d.Up);
@@ -511,13 +502,6 @@ public partial class SolidBody : IRecordable
     public Vector3d AngularAcceleration => _angularAcceleration;
 
 
-    private Vector3d _timeScaledAcceleration;
-    public Vector3d TimeScaledAcceleration => _timeScaledAcceleration;
-
-    //Cleaner stops with more decelleration
-    public Vector3d _timeScaledDeceleration;
-    public Vector3d TimeScaledDeceleration => _timeScaledDeceleration;
-
     /// <summary>
     /// Represents a body's resistance to movement, akin to air resistance.
     /// Higher values slow down the body more quickly in absence of other forces.
@@ -565,19 +549,7 @@ public partial class SolidBody : IRecordable
     /// </summary>
     public Action? OnMoved;
 
-    public SolidBody(IMatterAgent agent, LSCollider collider) => Setup(agent, collider, null, null);
-
-    public SolidBody(
-        IMatterAgent agent,
-        LSCollider collider,
-        FixedTransform? positionTransform,
-        FixedTransform? rotationTransform) => Setup(agent, collider, positionTransform, rotationTransform);
-
-    public void Setup(
-        IMatterAgent agent,
-        LSCollider collider,
-        FixedTransform? positionTransform,
-        FixedTransform? rotationTransform)
+    public SolidBody(IMatterAgent agent, LSCollider collider)
     {
         SwiftThrowHelper.ThrowIfNull(agent, nameof(agent));
         SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
@@ -595,8 +567,8 @@ public partial class SolidBody : IRecordable
         Context = context;
         Collider.BindContext(context);
 
-        _positionTransform = positionTransform ?? agent.Transform;
-        _rotationTransform = rotationTransform ?? agent.Transform;
+        _positionTransform = agent.Transform;
+        _rotationTransform = agent.Transform;
 
         _rotationSpeed = DefaultRotationSpeed;
         _rotationInterpoleSpeed = Fixed64.Zero;
@@ -607,6 +579,12 @@ public partial class SolidBody : IRecordable
         FixedQuaternion startRotation,
         bool isDynamic = true)
     {
+        SwiftThrowHelper.ThrowIfArgument(
+            Collider.Id >= 0
+                || (Collider.HasHostBinding && !ReferenceEquals(Collider.Body, this)),
+            nameof(Collider),
+            "Body collider must be unregistered and free of another host binding before initialization.");
+
         Active = true;
 
         _linearAcceleration = Vector3d.Zero;
@@ -627,7 +605,7 @@ public partial class SolidBody : IRecordable
 
         _positionChangedBuffer = true;
         _position2dUnmarked = startPosition.ToVector2d();
-        _lastGroundedPosition = _lastPosition = _spawnedPosition = startPosition;
+        _lastGroundedPosition = _lastPosition = startPosition;
         _heightPosUnmarked = startPosition.Y;
 
         _rotationChangedBuffer = true;
@@ -650,8 +628,6 @@ public partial class SolidBody : IRecordable
 
 
     public void LateSimulate() => LateSimulate(updateSleepState: true, updateColliderState: true);
-
-    internal void LateSimulate(bool updateSleepState) => LateSimulate(updateSleepState, updateColliderState: true);
 
     internal void LateSimulate(bool updateSleepState, bool updateColliderState)
     {
@@ -698,7 +674,7 @@ public partial class SolidBody : IRecordable
 
     internal void UpdateSleepStateAfterPhysicsStep()
     {
-        if (Active && !IsPositionFullyFrozen && !IsSleeping)
+        if (!IsSleeping)
             UpdateSleepState();
     }
 
@@ -724,7 +700,7 @@ public partial class SolidBody : IRecordable
         if (resolvedRotation != kinematicRotation)
             _rotationTransform.Rotation = resolvedRotation;
 
-        Position2d = resolvedPosition.ToVector2d();
+        SetPosition2d(resolvedPosition.ToVector2d());
         HeightPos = resolvedPosition.Y;
         SetVisualPosition(resolvedPosition);
 
@@ -777,9 +753,9 @@ public partial class SolidBody : IRecordable
     private bool CanSleep => Active && SleepEnabled && !IsPositionFullyFrozen && !IsKinematic;
 
 
-    public void OnVisualize()
+    internal void OnVisualize()
     {
-        if (!Active || IsPositionFullyFrozen || IsKinematic || !SettingVisuals)
+        if (IsPositionFullyFrozen || IsKinematic || !SettingVisuals)
             return;
 
         if (Context.ResetAccumulationThisVisualize)
@@ -816,10 +792,11 @@ public partial class SolidBody : IRecordable
 
     public void Deactivate()
     {
-        if (!Active)
+        if (!ReferenceEquals(Collider.Body, this))
             return;
 
-        Collider!.Deactivate();
+        DiscardContinuousCollisionHandoff();
+        Collider.DeactivateRuntimeRegistration();
         Context.Physics.DessimilateBody(this);
         _dynamicId = -1;
         Active = false;
@@ -862,26 +839,6 @@ public partial class SolidBody : IRecordable
         _visualRotation = rot;
     }
 
-    // https://www2.chem.wisc.edu/deptfiles/genchem/netorial/modules/thermodynamics/energy/energy2.htm
-    /// <summary>
-    /// Energy possessed by an object in motion that describes things like how long it will take to stop
-    /// and how much damage it will do in a collision (aka measurement of how strong the hit was)
-    /// If kinetic energy is greater than defined break energy...do something, ex:
-    ///  Debug.Log ("Impulse taken: " + result.magnitude);
-    ///  if(result.magnitude > minForceToBreak){
-    ///  Destroy(gameObject);
-    /// </summary>
-    /// <returns>
-    /// Result is joules
-    /// one Joule is equal to 1 kg m^2 / s^2
-    /// </returns>
-    public Fixed64 KineticEnergy()
-    {
-        // mass in kg, velocity in meters per second
-        Fixed64 halfMass = Fixed64.Half * Mass;
-        return halfMass * LinearSpeed;
-    }
-
     public void UpdateRotation(FixedQuaternion targetRotation, Fixed64 bufferInterpolation)
     {
         _rotationInterpoleSpeed = bufferInterpolation;
@@ -889,35 +846,6 @@ public partial class SolidBody : IRecordable
             ? InteractionRotationSpeed
             : DefaultRotationSpeed;
         Rotation = targetRotation;
-    }
-
-    public void Rotate(Fixed64 sin, Fixed64 cos)
-    {
-        Rotate(sin, cos, Vector3d.Up);
-    }
-
-    public void Rotate(Fixed64 sin, Fixed64 cos, Vector3d axis)
-    {
-        // Apply the rotation
-        Rotation = Rotation.Rotated(sin, cos, axis);
-    }
-
-    public Vector3d TransformDirection(Vector3d localDirection)
-    {
-        // Multiply the local direction by the rotation matrix
-        Vector3d worldDirection = RotationMatrix * localDirection;
-        return worldDirection;
-    }
-
-    public Vector3d InverseTransformDirection(Vector3d direction)
-    {
-        // Then transpose the rotation matrix
-        Fixed3x3 transposedMatrix = Fixed3x3.Transpose(RotationMatrix);
-
-        // Finally, multiply the direction by the transposed matrix
-        Vector3d localDirection = transposedMatrix * direction;
-
-        return localDirection;
     }
 
     /// <summary>
@@ -957,7 +885,7 @@ public partial class SolidBody : IRecordable
         _sleepFrameCount = 0;
         _normalForce = Vector3d.Zero;
 
-        Position2d = position.ToVector2d();
+        SetPosition2d(position.ToVector2d());
         HeightPos = position.Y;
         _lastPosition = position;
         _lastVisualPosition = _visualPosition = position;

@@ -74,7 +74,7 @@ public sealed partial class SolidBody2D
 
         if (chronicler.Mode == SerializationMode.Loading)
         {
-            Active = active;
+            Active = active && Collider.Id >= 0;
             _freezeAxes = freezeAxes;
             _isKinematic = isKinematic;
             Mass = mass;
@@ -110,6 +110,8 @@ public sealed partial class SolidBody2D
             RefreshMassPropertiesFromColliderShape();
             ApplyFreezeConstraintsToMotion();
             ApplyLoadedState();
+            if (!Active)
+                Deactivate();
         }
     }
 

@@ -324,6 +324,11 @@ public sealed partial class SolidBody2D : IRecordable
     public void Initialize(Vector2d position, Fixed64 rotation = default, bool isDynamic = true)
     {
         SwiftThrowHelper.ThrowIfTrue(Active, nameof(SolidBody2D), "2D body is already initialized.");
+        SwiftThrowHelper.ThrowIfArgument(
+            Collider.Id >= 0
+                || (Collider.HasHostBinding && !ReferenceEquals(Collider.Body, this)),
+            nameof(Collider),
+            "Body collider must be unregistered and free of another host binding before initialization.");
 
         _position = position;
         _rotation = rotation;
@@ -549,9 +554,10 @@ public sealed partial class SolidBody2D : IRecordable
     /// </summary>
     public void Deactivate()
     {
-        if (!Active)
+        if (!ReferenceEquals(Collider.Body, this))
             return;
 
+        DiscardContinuousCollisionHandoff();
         Context.Physics2D.DessimilateBody(this);
         Active = false;
         _isDynamic = false;

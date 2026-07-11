@@ -89,6 +89,8 @@ public sealed class SolidBodyGroundingTests
     public void SkipGrounding_ShouldKeepBodyAirborneDuringSkipWindow()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        scenario.Context.SetFrameRate(1);
+        scenario.Context.Environment.Gravity = Fixed64.Zero;
         CreateGround(scenario, new PhysicsLayer(1));
         scenario.Context.Settings.GroundCheckLayerMask = PhysicsLayerMask.FromLayer(1);
         ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
@@ -101,6 +103,22 @@ public sealed class SolidBodyGroundingTests
         body.Body.WasGrounded.Should().BeTrue();
         body.Body.HitPoint.Should().Be(Vector3d.Zero);
         body.Body.GroundNormal.Should().Be(Vector3d.Zero);
+
+        scenario.Context.Simulate();
+        scenario.Context.LateSimulate();
+
+        body.Body.IsGrounded.Should().BeFalse();
+        scenario.Context.Coroutines.ActiveCoroutineCount.Should().Be(0);
+
+        for (int i = 0; i < 8; i++)
+        {
+            scenario.Context.Simulate();
+            scenario.Context.LateSimulate();
+        }
+
+        body.Body.IsGrounded.Should().BeTrue();
+        body.Body.WasGrounded.Should().BeFalse();
+        body.Body.HitPoint.Y.Should().Be(Fixed64.Zero);
     }
 
     [Fact]
@@ -199,6 +217,47 @@ public sealed class SolidBodyGroundingTests
         body.Body.GroundingMode.Should().Be(GroundingMode.Automatic);
         body.Body.IsGrounded.Should().BeTrue();
         body.Body.HitPoint.Y.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void GroundingModeTransitions_ShouldRespectNoClearAndNoImmediateRefreshOptions()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        scenario.Context.Environment.Gravity = Fixed64.Zero;
+        ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
+        var platform = new FixedTransform(Vector3d.Down, FixedQuaternion.Identity, Vector3d.One);
+        Vector3d manualPoint = new(Fixed64.Zero, Fixed64.Half, Fixed64.Zero);
+        int groundedChanges = 0;
+        body.Body.OnGrounded += _ => groundedChanges++;
+
+        body.Body.SetManualGrounding(manualPoint, Vector3d.Up, platform);
+        body.Body.UseManualGrounding(clearGrounding: false);
+        body.Body.AddForce(Vector3d.Right);
+        scenario.Context.LateSimulate();
+        body.Body.UseAutomaticGrounding(checkGroundImmediately: false);
+
+        body.Body.IsGrounded.Should().BeTrue();
+        body.Body.GroundingMode.Should().Be(GroundingMode.Automatic);
+        body.Body.HitPlatform.Should().BeSameAs(platform);
+        body.Body.HitPoint.Should().Be(manualPoint);
+        body.Body.LastGroundedPosition.Should().Be(Vector3d.Zero);
+        body.Body.Position3d.X.Should().BeGreaterThan(Fixed64.Zero);
+        groundedChanges.Should().Be(1);
+    }
+
+    [Fact]
+    public void UseAutomaticGrounding_WhenInactive_ShouldOnlyChangeOwnershipMode()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
+        body.Body.UseManualGrounding();
+        body.Body.Deactivate();
+
+        body.Body.UseAutomaticGrounding();
+
+        body.Body.Active.Should().BeFalse();
+        body.Body.GroundingMode.Should().Be(GroundingMode.Automatic);
+        body.Body.IsGrounded.Should().BeFalse();
     }
 
     [Fact]

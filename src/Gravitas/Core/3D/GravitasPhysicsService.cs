@@ -36,9 +36,9 @@ public sealed partial class GravitasPhysicsService
     private readonly SwiftList<DiscreteIslandConstraint> _discreteIslandConstraints = new();
     private readonly DynamicCcdCandidateIndex _continuousCollisionCandidates = new(DefaultBodySize);
     private readonly SwiftList<int> _continuousCollisionCandidateIds = new(DefaultBodySize);
-    private readonly SwiftHashSet<int> _processedContinuousCollisionBodyIds = new(DefaultBodySize);
-    private readonly SwiftHashSet<int> _queuedContinuousCollisionHandoffIds = new(DefaultBodySize);
-    private readonly SwiftList<int> _continuousCollisionHandoffQueue = new(DefaultBodySize);
+    private readonly SwiftHashSet<SolidBody> _processedContinuousCollisionBodies = new(DefaultBodySize);
+    private readonly SwiftHashSet<SolidBody> _queuedContinuousCollisionHandoffBodies = new(DefaultBodySize);
+    private readonly SwiftList<SolidBody> _continuousCollisionHandoffQueue = new(DefaultBodySize);
     private int _continuousCollisionPreparedToken = int.MinValue;
 
     /// <summary>
@@ -140,7 +140,7 @@ public sealed partial class GravitasPhysicsService
             if (_dynamicBodies.TryGetValue(i, out SolidBody body))
             {
                 body.LateSimulate(updateSleepState: false, updateColliderState: false);
-                _processedContinuousCollisionBodyIds.Add(body.DynamicId);
+                _processedContinuousCollisionBodies.Add(body);
             }
         }
 
@@ -191,6 +191,7 @@ public sealed partial class GravitasPhysicsService
     /// </summary>
     public void Reset()
     {
+        DiscardContinuousCollisionHandoffQueue();
         _dynamicBodies.Clear();
         _colliders.Clear();
         _serviceRefreshColliders.FastClear();
@@ -201,9 +202,7 @@ public sealed partial class GravitasPhysicsService
         _discreteIslandConstraints.FastClear();
         _continuousCollisionCandidates.Clear();
         _continuousCollisionCandidateIds.FastClear();
-        _processedContinuousCollisionBodyIds.Clear();
-        _queuedContinuousCollisionHandoffIds.Clear();
-        _continuousCollisionHandoffQueue.FastClear();
+        _processedContinuousCollisionBodies.Clear();
         _continuousCollisionPreparedToken = int.MinValue;
         LastContinuousCollisionIslandCount = 0;
         LastContinuousCollisionIslandIterationCount = 0;
@@ -268,9 +267,13 @@ public sealed partial class GravitasPhysicsService
 
         _context.Constraints3D.RemoveSuppressionsForCollider(id);
         RemovePairsForCollider(collider);
-        _context.Collisions.ClearPartitionedObject(collider, true);
+        if (collider.IsPartitioned)
+            _context.Collisions.ClearPartitionedObject(collider, true);
+
         _context.MixedCollisions.RemovePairsFor3DCollider(collider);
-        _context.MixedCollisions.ClearPartitioned3DCollider(collider, force: true);
+        if (collider.IsMixedPartitioned)
+            _context.MixedCollisions.ClearPartitioned3DCollider(collider, force: true);
+
         RemoveServiceRefreshCollider(collider);
         _colliders.Remove(collider);
     }

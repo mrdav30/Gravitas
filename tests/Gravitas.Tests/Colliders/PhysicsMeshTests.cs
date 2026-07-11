@@ -16,6 +16,7 @@ public sealed class PhysicsMeshTests
     {
         Action nullVertices = () => _ = new PhysicsMesh(null!, ValidTriangles(), Vector3d.Zero, FixedQuaternion.Identity);
         Action nullTriangles = () => _ = new PhysicsMesh(ValidVertices(), null!, Vector3d.Zero, FixedQuaternion.Identity);
+        Action emptyTriangleCount = () => _ = new PhysicsMesh(ValidVertices(), Array.Empty<int>(), Vector3d.Zero, FixedQuaternion.Identity);
         Action invalidTriangleCount = () => _ = new PhysicsMesh(ValidVertices(), new[] { 0, 1 }, Vector3d.Zero, FixedQuaternion.Identity);
         Action outOfRangeTriangle = () => _ = new PhysicsMesh(ValidVertices(), new[] { 0, 1, 3 }, Vector3d.Zero, FixedQuaternion.Identity);
         Action duplicateTriangleIndex = () => _ = new PhysicsMesh(ValidVertices(), new[] { 0, 1, 1 }, Vector3d.Zero, FixedQuaternion.Identity);
@@ -32,6 +33,7 @@ public sealed class PhysicsMeshTests
 
         nullVertices.Should().Throw<ArgumentNullException>();
         nullTriangles.Should().Throw<ArgumentNullException>();
+        emptyTriangleCount.Should().Throw<ArgumentException>();
         invalidTriangleCount.Should().Throw<ArgumentException>();
         outOfRangeTriangle.Should().Throw<ArgumentOutOfRangeException>();
         duplicateTriangleIndex.Should().Throw<ArgumentException>();
@@ -82,6 +84,21 @@ public sealed class PhysicsMeshTests
     }
 
     [Fact]
+    public void InverseTransformationMatrix_WithSingularRotation_ShouldRejectConversion()
+    {
+        var mesh = new PhysicsMesh(
+            ValidVertices(),
+            ValidTriangles(),
+            Vector3d.Zero,
+            new FixedQuaternion(Fixed64.Half, Fixed64.Half, Fixed64.Zero, Fixed64.Zero));
+
+        Action convert = () => _ = mesh.ConvertWorldToLocal(Vector3d.Zero);
+
+        convert.Should().Throw<InvalidOperationException>()
+            .WithMessage("*invert*");
+    }
+
+    [Fact]
     public void TriangleBVH_ShouldStayLocalWhenRigidMeshMoves()
     {
         var mesh = new PhysicsMesh(
@@ -128,6 +145,7 @@ public sealed class PhysicsMeshTests
             Vector3d.Right,
             Vector3d.Left,
             Vector3d.Up,
+            Vector3d.Down,
             Vector3d.Forward,
             new Vector3d(Fixed64.One, Fixed64.One, Fixed64.Zero).Normalized
         };
@@ -419,6 +437,24 @@ public sealed class PhysicsMeshTests
         Action calculate = () => _ = mesh.CalculateInertiaTensor((Fixed64)3, MeshInertiaPolicy.SurfaceApproximation);
 
         calculate.Should().NotThrow();
+    }
+
+    [Fact]
+    public void CalculateInertiaTensor_WithUnknownPolicy_ShouldRejectPolicy()
+    {
+        var mesh = new PhysicsMesh(
+            ValidVertices(),
+            ValidTriangles(),
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+
+        Action calculate = () => _ = mesh.CalculateInertiaTensor(
+            Fixed64.One,
+            (MeshInertiaPolicy)byte.MaxValue,
+            Vector3d.Zero);
+
+        calculate.Should().Throw<ArgumentOutOfRangeException>()
+            .WithParameterName("policy");
     }
 
     [Fact]

@@ -5,6 +5,7 @@ using Gravitas.Support;
 using Gravitas.Tests.Support;
 using GridForge.Spatial;
 using System;
+using System.Collections.Generic;
 using Xunit;
 
 namespace Gravitas.Tests.Serialization;
@@ -12,6 +13,100 @@ namespace Gravitas.Tests.Serialization;
 public sealed class SolidBodySerializationTests
 {
     public static TheoryData<GravitasSerializationTransport> Transports => GravitasSerializationTransportCases.All();
+
+    [Fact]
+    public void RecordData_BeforeHostBinding_ShouldDeferShapeRebuildUntilInitialization()
+    {
+        var collider = new LSSphereCollider();
+        var chronicler = new InvalidRecordPayloadChronicler(new Dictionary<string, object>
+        {
+            ["Radius"] = (Fixed64)2
+        });
+
+        collider.RecordData(chronicler);
+
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        collider.InitializeWithNoBody(new TestMatterAgent(scenario.Context));
+
+        collider.Radius.Should().Be((Fixed64)2);
+        collider.BoundsMin.Should().Be(Vector3d.One * (Fixed64)(-2));
+        collider.BoundsMax.Should().Be(Vector3d.One * (Fixed64)2);
+    }
+
+    [Theory]
+    [MemberData(nameof(Transports))]
+    public void PopulateActiveColliderIntoDeactivatedShell_ShouldNotPartitionUnregisteredIdentity(
+        GravitasSerializationTransport transport)
+    {
+        using PhysicsScenarioBuilder sourceScenario = PhysicsScenarioBuilder.Create();
+        LSSphereCollider source = sourceScenario.CreateStaticSphere(Vector3d.Zero);
+        object activePayload = GravitasSerializationHarness.Serialize(source, transport);
+
+        using PhysicsScenarioBuilder targetScenario = PhysicsScenarioBuilder.Create();
+        targetScenario.Context.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
+        LSSphereCollider target = targetScenario.CreateStaticSphere(Vector3d.Zero);
+        targetScenario.Context.MixedCollisions.Refresh3DColliderPartition(target);
+        target.Deactivate();
+        target.Id.Should().Be(-1);
+
+        GravitasSerializationHarness.Populate(target, activePayload, transport);
+
+        target.IsActive.Should().BeTrue();
+        target.Id.Should().Be(-1);
+        target.IsPartitioned.Should().BeFalse();
+        target.IsMixedPartitioned.Should().BeFalse();
+        (target.PartitionCoordinates?.Count ?? 0).Should().Be(0);
+        (target.MixedPartitionCoordinates?.Count ?? 0).Should().Be(0);
+        targetScenario.Context.Physics.ColliderCount.Should().Be(0);
+    }
+
+    [Theory]
+    [MemberData(nameof(Transports))]
+    public void PopulateInactiveBodyIntoRegisteredShell_ShouldReleaseRuntimeRegistration(
+        GravitasSerializationTransport transport)
+    {
+        using PhysicsScenarioBuilder sourceScenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> source = sourceScenario.CreateSphere(Vector3d.Zero);
+        object activePayload = GravitasSerializationHarness.Serialize(source.Body, transport);
+        source.Body.Deactivate();
+        object inactivePayload = GravitasSerializationHarness.Serialize(source.Body, transport);
+
+        using PhysicsScenarioBuilder targetScenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> target = targetScenario.CreateSphere(Vector3d.Zero);
+        targetScenario.Context.Physics.BodyCount.Should().Be(1);
+        targetScenario.Context.Physics.ColliderCount.Should().Be(1);
+
+        GravitasSerializationHarness.Populate(target.Body, inactivePayload, transport);
+
+        target.Body.Active.Should().BeFalse();
+        target.Body.DynamicId.Should().Be(-1);
+        target.Collider.Id.Should().Be(-1);
+        targetScenario.Context.Physics.BodyCount.Should().Be(0);
+        targetScenario.Context.Physics.ColliderCount.Should().Be(0);
+        target.Collider.IsPartitioned.Should().BeFalse();
+        target.Collider.IsMixedPartitioned.Should().BeFalse();
+
+        target.Body.Deactivate();
+
+        targetScenario.Context.Physics.BodyCount.Should().Be(0);
+        targetScenario.Context.Physics.ColliderCount.Should().Be(0);
+
+        GravitasSerializationHarness.Populate(target.Body, activePayload, transport);
+
+        target.Body.Active.Should().BeFalse();
+        target.Body.DynamicId.Should().Be(-1);
+        target.Collider.Id.Should().Be(-1);
+        targetScenario.Context.Physics.BodyCount.Should().Be(0);
+        targetScenario.Context.Physics.ColliderCount.Should().Be(0);
+
+        target.Body.Initialize(Vector3d.Zero, FixedQuaternion.Identity);
+
+        target.Body.Active.Should().BeTrue();
+        target.Body.DynamicId.Should().Be(0);
+        target.Collider.Id.Should().Be(0);
+        targetScenario.Context.Physics.BodyCount.Should().Be(1);
+        targetScenario.Context.Physics.ColliderCount.Should().Be(1);
+    }
 
     [Theory]
     [MemberData(nameof(Transports))]
@@ -192,9 +287,10 @@ public sealed class SolidBodySerializationTests
     {
         using PhysicsScenarioBuilder sourceScenario = PhysicsScenarioBuilder.Create();
         LSSphereCollider source = sourceScenario.CreateStaticSphere(Vector3d.Zero);
+        object activePayload = GravitasSerializationHarness.Serialize(source, transport);
         source.Deactivate();
         source.IsActive.Should().BeFalse();
-        object payload = GravitasSerializationHarness.Serialize(source, transport);
+        object inactivePayload = GravitasSerializationHarness.Serialize(source, transport);
 
         using PhysicsScenarioBuilder targetScenario = PhysicsScenarioBuilder.Create();
         targetScenario.Context.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
@@ -208,7 +304,7 @@ public sealed class SolidBodySerializationTests
             mixedCoordinate,
             target.Id).Should().BeTrue();
 
-        GravitasSerializationHarness.Populate(target, payload, transport);
+        GravitasSerializationHarness.Populate(target, inactivePayload, transport);
 
         target.IsActive.Should().BeFalse();
         target.IsPartitioned.Should().BeFalse();
@@ -220,13 +316,27 @@ public sealed class SolidBodySerializationTests
             mixedCoordinate,
             target.Id).Should().BeFalse();
 
-        GravitasSerializationHarness.Populate(target, payload, transport);
+        GravitasSerializationHarness.Populate(target, inactivePayload, transport);
 
         target.IsActive.Should().BeFalse();
         target.IsPartitioned.Should().BeFalse();
         target.IsMixedPartitioned.Should().BeFalse();
         target.PartitionCoordinates.Should().BeEmpty();
         (target.MixedPartitionCoordinates?.Count ?? 0).Should().Be(0);
+
+        GravitasSerializationHarness.Populate(target, activePayload, transport);
+
+        target.IsActive.Should().BeTrue();
+        target.IsPartitioned.Should().BeTrue();
+        target.IsMixedPartitioned.Should().BeTrue();
+        SerializationPartitionAssertions.Primary3DPartitionsShouldContain(
+            targetScenario.Context,
+            target.PartitionCoordinates!,
+            target.Id);
+        SerializationPartitionAssertions.Mixed3DPartitionsShouldContain(
+            targetScenario.Context,
+            target.MixedPartitionCoordinates!,
+            target.Id);
     }
 
     [Theory]
@@ -235,8 +345,9 @@ public sealed class SolidBodySerializationTests
     {
         using PhysicsScenarioBuilder sourceScenario = PhysicsScenarioBuilder.Create();
         LSSphereCollider source = sourceScenario.CreateStaticSphere(Vector3d.Zero);
+        object activePayload = GravitasSerializationHarness.Serialize(source, transport);
         source.Deactivate();
-        object payload = GravitasSerializationHarness.Serialize(source, transport);
+        object inactivePayload = GravitasSerializationHarness.Serialize(source, transport);
 
         using PhysicsScenarioBuilder targetScenario = PhysicsScenarioBuilder.Create();
         LSSphereCollider target = targetScenario.CreateStaticSphere(Vector3d.Zero);
@@ -248,7 +359,7 @@ public sealed class SolidBodySerializationTests
             coordinate,
             target.Id).Should().BeTrue();
 
-        GravitasSerializationHarness.Populate(target, payload, transport);
+        GravitasSerializationHarness.Populate(target, inactivePayload, transport);
 
         target.IsActive.Should().BeFalse();
         target.IsPartitioned.Should().BeFalse();
@@ -260,13 +371,23 @@ public sealed class SolidBodySerializationTests
             coordinate,
             target.Id).Should().BeFalse();
 
-        GravitasSerializationHarness.Populate(target, payload, transport);
+        GravitasSerializationHarness.Populate(target, inactivePayload, transport);
 
         target.IsActive.Should().BeFalse();
         target.IsPartitioned.Should().BeFalse();
         target.IsMixedPartitioned.Should().BeFalse();
         target.PartitionCoordinates.Should().BeEmpty();
         (target.MixedPartitionCoordinates?.Count ?? 0).Should().Be(0);
+
+        GravitasSerializationHarness.Populate(target, activePayload, transport);
+
+        target.IsActive.Should().BeTrue();
+        target.IsPartitioned.Should().BeTrue();
+        target.IsMixedPartitioned.Should().BeFalse();
+        SerializationPartitionAssertions.Primary3DPartitionsShouldContain(
+            targetScenario.Context,
+            target.PartitionCoordinates!,
+            target.Id);
     }
 
     [Theory]

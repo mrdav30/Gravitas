@@ -28,7 +28,6 @@ public partial class SolidBody
         RecordValues.Look(chronicler, ref isKinematic, "IsKinematic", false);
         RecordValues.Look(chronicler, ref _position2dUnmarked, "Position2d");
         RecordValues.Look(chronicler, ref _heightPosUnmarked, "HeightPos");
-        RecordValues.Look(chronicler, ref _spawnedPosition, "SpawnedPosition");
         RecordValues.Look(chronicler, ref _lastPosition, "LastPosition");
         RecordValues.Look(chronicler, ref GroundOriginOffset, "GroundOriginOffset");
         RecordValues.Look(chronicler, ref GroundedDistanceRay, "GroundedDistanceRay");
@@ -70,8 +69,6 @@ public partial class SolidBody
         RecordValues.Look(chronicler, ref _angularAcceleration, "AngularAcceleration");
         RecordValues.Look(chronicler, ref _impulseStore, "ImpulseStore");
         RecordValues.Look(chronicler, ref _positionCorrection, "PositionCorrection");
-        RecordValues.Look(chronicler, ref _timeScaledAcceleration, "TimeScaledAcceleration");
-        RecordValues.Look(chronicler, ref _timeScaledDeceleration, "TimeScaledDeceleration");
         RecordValues.Look(chronicler, ref LinearDragCoefficient, "LinearDragCoefficient");
         RecordValues.Look(chronicler, ref AngularDragCoefficient, "AngularDragCoefficient");
         RecordValues.Look(chronicler, ref _normalForce, "NormalForce");
@@ -79,7 +76,7 @@ public partial class SolidBody
 
         if (chronicler.Mode == SerializationMode.Loading)
         {
-            Active = active;
+            Active = active && Collider.Id >= 0;
             _freezeAxes = freezeAxes;
             _isKinematic = isKinematic;
             GroundingMode = groundingMode;
@@ -89,10 +86,14 @@ public partial class SolidBody
             _hitPlatform = null;
         }
 
-        Collider?.RecordData(chronicler);
+        Collider.RecordData(chronicler);
 
         if (chronicler.Mode == SerializationMode.Loading)
+        {
             ApplyLoadedState();
+            if (!Active)
+                Deactivate();
+        }
     }
 
     private void ApplyLoadedState()
@@ -112,10 +113,12 @@ public partial class SolidBody
         _visualRotation = Rotation;
         _lastVisualRotation = Rotation;
 
-        RefreshMassPropertiesFromColliderShape();
+        if (Collider.HasHostBinding)
+            RefreshMassPropertiesFromColliderShape();
         ApplyFreezeConstraintsToMotion();
 
-        Collider?.Simulate();
+        if (Active)
+            Collider.Simulate();
     }
 
 }

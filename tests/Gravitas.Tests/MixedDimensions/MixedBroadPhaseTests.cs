@@ -213,6 +213,7 @@ public sealed class MixedBroadPhaseTests
         child2D.Collider.TopParent2D.Should().BeSameAs(parent2D.Collider);
         child2D.Collider.TopParent3D.Should().BeNull();
         child2D.Collider.ParentKey.Should().Be(parent2D.Collider.HierarchyKey);
+        child2D.Collider.ExcludesMixedCollisionWith(child3D.Collider).Should().BeTrue();
     }
 
     [Fact]
@@ -393,7 +394,7 @@ public sealed class MixedBroadPhaseTests
         body3D.Collider.IsMixedPartitioned.Should().BeTrue();
         body3D.Collider.MixedPartitionCoordinates![0].Should().Be(originalCoordinate);
 
-        body3D.Collider.SetStatus(false);
+        body3D.Collider.IsActive = false;
 
         context.MixedCollisions.Refresh3DColliderPartition(body3D.Collider).Should().BeFalse();
 
@@ -482,7 +483,7 @@ public sealed class MixedBroadPhaseTests
         ScenarioBody<LSSphereCollider> staticBody3D = CreateSphere3D(context, Vector3d.Right * (Fixed64)4, immovable: true);
         _ = CreateSphere3D(context, Vector3d.Right * (Fixed64)6, immovable: true, layer: new PhysicsLayer(1));
         LSSphereCollider inactive3D = CreateBodylessSphere3D(context, Vector3d.Right * (Fixed64)7);
-        inactive3D.SetStatus(false);
+        inactive3D.IsActive = false;
 
         SolidBody2D dynamic2D = CreateCircle2D(context, Vector2d.Zero, immovable: false);
         SolidBody2D kinematic2D = CreateCircle2D(context, Vector2d.Right * (Fixed64)2, immovable: false, isKinematic: true);

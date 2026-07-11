@@ -70,11 +70,11 @@ public sealed partial class GravitasPhysics2DService
         writer.WriteBool(_continuousCollisionPreparedMixedIndex);
         writer.WriteInt32(_planarContinuousCollisionCandidates.Count);
         writer.WriteInt32(_mixedContinuousCollisionCandidates.Count);
-        writer.WriteInt32(_processedContinuousCollisionBodyIds.Count);
-        writer.WriteInt32(_queuedContinuousCollisionHandoffIds.Count);
+        writer.WriteInt32(_processedContinuousCollisionBodies.Count);
+        writer.WriteInt32(_queuedContinuousCollisionHandoffBodies.Count);
         writer.WriteInt32(_continuousCollisionHandoffQueue.Count);
         for (int i = 0; i < _continuousCollisionHandoffQueue.Count; i++)
-            writer.WriteInt32(_continuousCollisionHandoffQueue[i]);
+            writer.WriteInt32(_continuousCollisionHandoffQueue[i].DynamicId);
         writer.WriteInt32(LastBroadPhaseCandidateCount);
         writer.WriteInt32(LastContinuousCollisionIslandCount);
         writer.WriteInt32(LastContinuousCollisionIslandIterationCount);

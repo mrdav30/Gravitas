@@ -102,7 +102,7 @@ internal static class MeshTriangleContactGenerator
                 if (Vector3d.DistanceSquared(pointA, pointB) <= Fixed64.Epsilon)
                     pointB = pointA - normal * depth;
 
-                AddContactInPairOrder(pair, meshA, pointA, meshB, pointB, depth, normal);
+                AddContact(pair, pointA, pointB, depth, normal);
             }
         }
 
@@ -129,7 +129,7 @@ internal static class MeshTriangleContactGenerator
             ? delta / distance
             : OrientNormal(triangle.Normal, sphere.Center - triangle.Center);
         Vector3d pointOnSphere = sphere.Center - normal * sphere.ScaledRadius;
-        AddContactInPairOrder(pair, mesh, pointOnMesh, sphere, pointOnSphere, sphere.ScaledRadius - distance, normal);
+        AddContact(pair, pointOnMesh, pointOnSphere, sphere.ScaledRadius - distance, normal);
     }
 
     private static void TryAddCapsuleTriangleContact(
@@ -158,7 +158,7 @@ internal static class MeshTriangleContactGenerator
             ? delta / distance
             : OrientNormal(triangle.Normal, capsule.Center - triangle.Center);
         Vector3d pointOnCapsule = pointOnCapsuleLine - normal * capsule.ScaledRadius;
-        AddContactInPairOrder(pair, mesh, pointOnMesh, capsule, pointOnCapsule, capsule.ScaledRadius - distance, normal);
+        AddContact(pair, pointOnMesh, pointOnCapsule, capsule.ScaledRadius - distance, normal);
     }
 
     private static void TryAddCuboidTriangleContact(
@@ -176,7 +176,7 @@ internal static class MeshTriangleContactGenerator
 
         Vector3d pointOnMesh = MeshUtils.ClosestPointOnTriangle(triangle.A, triangle.B, triangle.C, triangle.Normal, cuboid.Center);
         Vector3d pointOnCuboid = pointOnMesh - normal * depth;
-        AddContactInPairOrder(pair, mesh, pointOnMesh, cuboid, pointOnCuboid, depth, normal);
+        AddContact(pair, pointOnMesh, pointOnCuboid, depth, normal);
     }
 
     private static void TryAddCylinderTriangleContact(
@@ -196,7 +196,7 @@ internal static class MeshTriangleContactGenerator
 
         Vector3d pointOnCylinder = cylinder.ClosestPointOnSurface(pointOnMesh);
         Fixed64 depth = Vector3d.Distance(pointOnMesh, pointOnCylinder);
-        AddContactInPairOrder(pair, mesh, pointOnMesh, cylinder, pointOnCylinder, depth, normal);
+        AddContact(pair, pointOnMesh, pointOnCylinder, depth, normal);
     }
 
     private static bool TryAddCuboidFaceContacts(
@@ -226,7 +226,7 @@ internal static class MeshTriangleContactGenerator
             if (!MeshUtils.IsPointInTrianglePlane(triangle.A, triangle.B, triangle.C, triangle.Normal, pointOnMesh))
                 continue;
 
-            AddContactInPairOrder(pair, mesh, pointOnMesh, cuboid, pointOnCuboid, depth, normal);
+            AddContact(pair, pointOnMesh, pointOnCuboid, depth, normal);
         }
 
         return pair.Manifold.Count > initialCount;
@@ -275,7 +275,7 @@ internal static class MeshTriangleContactGenerator
         if (!MeshUtils.IsPointInTrianglePlane(triangle.A, triangle.B, triangle.C, triangle.Normal, pointOnMesh))
             return;
 
-        AddContactInPairOrder(pair, mesh, pointOnMesh, cylinder, pointOnCylinder, depth, normal);
+        AddContact(pair, pointOnMesh, pointOnCylinder, depth, normal);
     }
 
     private static bool TryTestTriangleCuboid(
@@ -400,9 +400,6 @@ internal static class MeshTriangleContactGenerator
         if (overlap > Fixed64.Zero && overlap >= depth)
             return true;
 
-        if (overlap < Fixed64.Zero)
-            overlap = Fixed64.Zero;
-
         depth = overlap;
         normal = OrientNormal(axis, desiredDirection);
         return true;
@@ -430,9 +427,6 @@ internal static class MeshTriangleContactGenerator
         {
             return true;
         }
-
-        if (overlap < Fixed64.Zero)
-            overlap = Fixed64.Zero;
 
         Fixed64 axisMagnitude = FixedMath.Sqrt(axisMagnitudeSqr);
         depth = overlap / axisMagnitude;
@@ -587,22 +581,14 @@ internal static class MeshTriangleContactGenerator
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void AddContactInPairOrder(
+    private static void AddContact(
         CollisionWorkItem pair,
-        LSCollider first,
         Vector3d pointOnFirst,
-        LSCollider second,
         Vector3d pointOnSecond,
         Fixed64 depth,
         Vector3d normalFirstToSecond)
     {
-        if (ReferenceEquals(pair.ColliderA, first))
-        {
-            pair.Manifold.AddContact(pointOnFirst, pointOnSecond, depth, normalFirstToSecond);
-            return;
-        }
-
-        pair.Manifold.AddContact(pointOnSecond, pointOnFirst, depth, -normalFirstToSecond);
+        pair.Manifold.AddContact(pointOnFirst, pointOnSecond, depth, normalFirstToSecond);
     }
 
 }

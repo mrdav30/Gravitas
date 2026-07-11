@@ -147,7 +147,7 @@ public static partial class CollisionDetection
         var cuboidA = (LSCuboidCollider)pair.ColliderA;
         var cuboidB = (LSCuboidCollider)pair.ColliderB;
 
-        if (cuboidA.CurrentState == CuboidState.AABox && cuboidB.CurrentState == CuboidState.AABox)
+        if (cuboidA.Shape == ColliderType.AABox && cuboidB.Shape == ColliderType.AABox)
             return TryBuildAxisAlignedCuboidManifold(pair, cuboidA, cuboidB);
 
         if (!TestCuboidsSeperatingAxes(cuboidA, cuboidB, out CollisionResult output))

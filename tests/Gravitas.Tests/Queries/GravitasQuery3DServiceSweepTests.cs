@@ -6,6 +6,7 @@ using Gravitas.Queries;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
 using GridForge.Configuration;
+using GridForge.Grids;
 using SwiftCollections;
 using System;
 using Xunit;
@@ -580,6 +581,42 @@ public sealed class GravitasQuery3DServiceSweepTests
         hits.Should().NotContain(hit => ReferenceEquals(hit.Collider, source));
     }
 
+    [Theory]
+    [InlineData(ColliderType.Capsule)]
+    [InlineData(ColliderType.Cylinder)]
+    [InlineData(ColliderType.Cone)]
+    [InlineData(ColliderType.Compound)]
+    public void RegisteredSourceAllHitSweeps_ShouldSuppressSourceAndOrderTargets(ColliderType sourceType)
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSCollider source = CreateDynamicCollider(
+            context,
+            CreateAllHitSweepSource(sourceType),
+            new Vector3d((Fixed64)(-3), Fixed64.Zero, Fixed64.Zero));
+        LSSphereCollider near = CreateDynamicCollider(context, new LSSphereCollider(), Vector3d.Zero);
+        LSSphereCollider far = CreateDynamicCollider(context, new LSSphereCollider(), Vector3d.Right * 2);
+        var hits = new SwiftList<Physics3DHit>();
+
+        int count = source switch
+        {
+            LSCapsuleCollider capsule => context.Query3D.SweepCapsuleAll(
+                capsule, Vector3d.Right * (Fixed64)6, IncludeLayerZero, hits),
+            LSCylinderCollider cylinder => context.Query3D.SweepCylinderAll(
+                cylinder, Vector3d.Right * (Fixed64)6, IncludeLayerZero, hits),
+            LSConeCollider cone => context.Query3D.SweepConeAll(
+                cone, Vector3d.Right * (Fixed64)6, IncludeLayerZero, hits),
+            LSCompoundCollider compound => context.Query3D.SweepCompoundAll(
+                compound, Vector3d.Right * (Fixed64)6, IncludeLayerZero, hits),
+            _ => throw new InvalidOperationException($"Unsupported source type {sourceType}.")
+        };
+
+        count.Should().Be(2);
+        hits[0].Collider.Should().BeSameAs(near);
+        hits[1].Collider.Should().BeSameAs(far);
+        hits[0].Distance.Should().BeLessThan(hits[1].Distance);
+        hits.Should().NotContain(hit => ReferenceEquals(hit.Collider, source));
+    }
+
     [Fact]
     public void SweepCuboid_WithZeroDisplacement_ShouldReturnFalseAndResetCounters()
     {
@@ -617,6 +654,60 @@ public sealed class GravitasQuery3DServiceSweepTests
         hits.Count.Should().Be(0);
         context.Query3D.LastQueryCandidateCount.Should().Be(0);
         context.Query3D.LastMeshTriangleCandidateCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void SweepCuboidAll_WithStalePartitionColliderId_ShouldIgnoreStaleEntry()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSCuboidCollider source = CreateDynamicCollider(context, new LSCuboidCollider(), Vector3d.Left * 3);
+        LSSphereCollider target = CreateDynamicCollider(context, new LSSphereCollider(), Vector3d.Zero);
+        int staleId = target.Id + 1_000;
+        for (int i = 0; i < target.PartitionCoordinates!.Count; i++)
+        {
+            context.World.TryGetVoxel(target.PartitionCoordinates[i], out Voxel? voxel).Should().BeTrue();
+            voxel!.TryGetPartition(out PhysicsPartition? partition).Should().BeTrue();
+            partition!.ContainedDynamicObjects!.Add(staleId).Should().BeTrue();
+        }
+
+        context.Physics.TryGetColliderById(staleId, out _).Should().BeFalse();
+        var hits = new SwiftList<Physics3DHit>();
+
+        int count = context.Query3D.SweepCuboidAll(
+            source,
+            Vector3d.Right * (Fixed64)6,
+            IncludeLayerZero,
+            hits);
+
+        count.Should().Be(1);
+        hits[0].Collider.Should().BeSameAs(target);
+    }
+
+    [Fact]
+    public void StaticOnlyExactSweep_WithDynamicColliderRetainedInStaticSet_ShouldRejectStaleMobility()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSCuboidCollider source = CreateDynamicCollider(context, new LSCuboidCollider(), Vector3d.Left * 3);
+        LSSphereCollider dynamicTarget = CreateDynamicCollider(context, new LSSphereCollider(), Vector3d.Zero);
+        for (int i = 0; i < dynamicTarget.PartitionCoordinates!.Count; i++)
+        {
+            context.World.TryGetVoxel(dynamicTarget.PartitionCoordinates[i], out Voxel? voxel).Should().BeTrue();
+            voxel!.TryGetPartition(out PhysicsPartition? partition).Should().BeTrue();
+            partition!.ContainedStaticObjects ??= new SwiftSparseSet();
+            partition.ContainedStaticObjects.Add(dynamicTarget.Id).Should().BeTrue();
+        }
+
+        var hits = new SwiftList<Physics3DHit>();
+
+        int count = context.Query3D.SweepExactSourceAgainstStaticAll(
+            source,
+            Vector3d.Right * (Fixed64)6,
+            IncludeLayerZero,
+            hits);
+
+        count.Should().Be(0);
+        hits.Count.Should().Be(0);
+        context.Query3D.LastQueryCandidateCount.Should().Be(0);
     }
 
     [Fact]
@@ -1916,6 +2007,15 @@ public sealed class GravitasQuery3DServiceSweepTests
         hit.Should().BeTrue();
         sweepHit.Collider.Should().BeSameAs(expected);
     }
+
+    private static LSCollider CreateAllHitSweepSource(ColliderType sourceType) => sourceType switch
+    {
+        ColliderType.Capsule => new LSCapsuleCollider(),
+        ColliderType.Cylinder => new LSCylinderCollider(),
+        ColliderType.Cone => new LSConeCollider(),
+        ColliderType.Compound => new LSCompoundCollider(CompoundColliderPart.Sphere(Fixed64.Half, Vector3d.Zero)),
+        _ => throw new ArgumentOutOfRangeException(nameof(sourceType), sourceType, null)
+    };
 
     private static void AssertDistanceNear(Fixed64 actual, Fixed64 expected)
     {

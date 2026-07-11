@@ -27,19 +27,37 @@ public sealed partial class GravitasQuery2DService
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private uint NextOverlapQueryVersion()
     {
-        _overlapQueryVersion++;
-        if (_overlapQueryVersion == 0)
-            _overlapQueryVersion = 1;
-        return _overlapQueryVersion;
+        OverlapQueryVersion++;
+        if (OverlapQueryVersion == 0)
+        {
+            ResetColliderOverlapQueryVersions();
+            OverlapQueryVersion = 1;
+        }
+        return OverlapQueryVersion;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private uint NextRaycastVersion()
     {
-        _raycastVersion++;
-        if (_raycastVersion == 0)
-            _raycastVersion = 1;
-        return _raycastVersion;
+        RaycastVersion++;
+        if (RaycastVersion == 0)
+        {
+            ResetColliderRaycastVersions();
+            RaycastVersion = 1;
+        }
+        return RaycastVersion;
+    }
+
+    private void ResetColliderOverlapQueryVersions()
+    {
+        for (int i = 0; i < _context.Physics2D.ColliderCount; i++)
+            _context.Physics2D.GetColliderByServiceIndex(i).CircleQueryVersion = 0;
+    }
+
+    private void ResetColliderRaycastVersions()
+    {
+        for (int i = 0; i < _context.Physics2D.ColliderCount; i++)
+            _context.Physics2D.GetColliderByServiceIndex(i).RaycastVersion = 0;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

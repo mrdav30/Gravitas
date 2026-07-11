@@ -5,7 +5,9 @@ using Gravitas.Support;
 using Gravitas.Tests.Support;
 using GridForge.Grids;
 using GridForge.Spatial;
+using SwiftCollections.Diagnostics;
 using System;
+using System.Collections.Generic;
 using Xunit;
 
 namespace Gravitas.Tests.Colliders;
@@ -17,11 +19,17 @@ public sealed class ColliderOwnershipStateTests
     {
         var collider = new LSSphereCollider();
 
+        collider.IsActive = false;
+        collider.IsActive = false;
+        collider.IsActive = true;
+        collider.IsActive = true;
+
         Action setPosition = () => collider.Position = Vector3d.Right;
         Action setRotation = () => collider.Rotation = FixedQuaternion.Identity;
 
         setPosition.Should().Throw<InvalidOperationException>();
         setRotation.Should().Throw<InvalidOperationException>();
+        collider.IsActive.Should().BeTrue();
     }
 
     [Fact]
@@ -29,11 +37,17 @@ public sealed class ColliderOwnershipStateTests
     {
         var collider = new LSSphereCollider();
 
+        Action readContext = () => _ = collider.Context;
         Action readWorld = () => _ = collider.World;
         Action readTransform = () => _ = collider.Transform;
+        Action readPosition = () => _ = collider.Position;
+        Action readRotation = () => _ = collider.Rotation;
 
+        readContext.Should().Throw<InvalidOperationException>();
         readWorld.Should().Throw<InvalidOperationException>();
         readTransform.Should().Throw<InvalidOperationException>();
+        readPosition.Should().Throw<InvalidOperationException>();
+        readRotation.Should().Throw<InvalidOperationException>();
     }
 
     [Fact]
@@ -66,6 +80,79 @@ public sealed class ColliderOwnershipStateTests
     }
 
     [Fact]
+    public void BodylessInitialization_ShouldRejectDuplicateAndForeignBindingButAllowSameAgentAfterReset()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        var agent3D = new TestMatterAgent(scenario.Context);
+        var agent2D = new TestMatterAgent(scenario.Context);
+        var collider3D = new LSSphereCollider();
+        var collider2D = new LSCircleCollider2D(Fixed64.Half);
+        collider3D.InitializeWithNoBody(agent3D);
+        collider2D.InitializeWithNoBody(agent2D);
+        int id3D = collider3D.Id;
+        int id2D = collider2D.Id;
+
+        Action duplicate3D = () => collider3D.InitializeWithNoBody(agent3D);
+        Action duplicate2D = () => collider2D.InitializeWithNoBody(agent2D);
+
+        duplicate3D.Should().Throw<ArgumentException>().WithParameterName("agent");
+        duplicate2D.Should().Throw<ArgumentException>().WithParameterName("agent");
+        collider3D.Id.Should().Be(id3D);
+        collider2D.Id.Should().Be(id2D);
+        scenario.Context.Physics.ColliderCount.Should().Be(1);
+        scenario.Context.Physics2D.ColliderCount.Should().Be(1);
+
+        scenario.Context.Reset();
+        var foreignAgent3D = new TestMatterAgent(scenario.Context);
+        var foreignAgent2D = new TestMatterAgent(scenario.Context);
+
+        Action foreign3D = () => collider3D.InitializeWithNoBody(foreignAgent3D);
+        Action foreign2D = () => collider2D.InitializeWithNoBody(foreignAgent2D);
+
+        foreign3D.Should().Throw<ArgumentException>().WithParameterName("agent");
+        foreign2D.Should().Throw<ArgumentException>().WithParameterName("agent");
+        collider3D.Transform.Should().BeSameAs(agent3D.Transform);
+        collider2D.Context.Should().BeSameAs(agent2D.Context);
+
+        collider3D.InitializeWithNoBody(agent3D);
+        collider2D.InitializeWithNoBody(agent2D);
+
+        collider3D.Id.Should().BeGreaterThanOrEqualTo(0);
+        collider2D.Id.Should().BeGreaterThanOrEqualTo(0);
+        collider3D.IsPartitioned.Should().BeTrue();
+        collider2D.IsPartitioned.Should().BeTrue();
+        scenario.Context.Physics.ColliderCount.Should().Be(1);
+        scenario.Context.Physics2D.ColliderCount.Should().Be(1);
+        scenario.Context.Query3D.Raycast(
+            -Vector3d.Right * (Fixed64)2,
+            Vector3d.Right,
+            (Fixed64)4,
+            out _,
+            PhysicsLayerMask.All).Should().BeTrue();
+        scenario.Context.Query2D.OverlapCircle(
+            Vector2d.Zero,
+            Fixed64.One,
+            out _).Should().BeTrue();
+    }
+
+    [Fact]
+    public void CustomColliderExtensionHooks_ShouldPreserveRadiusPolicyAndAllowInactiveInitialization()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        var collider = new UnsupportedTestCollider3D { DeactivateOnInitialize = true };
+        Vector3d authoredSize = collider.Size;
+
+        collider.Radius = (Fixed64)2;
+        collider.InitializeWithNoBody(new TestMatterAgent(scenario.Context));
+
+        collider.Radius.Should().Be((Fixed64)2);
+        collider.Size.Should().Be(authoredSize);
+        collider.IsActive.Should().BeFalse();
+        collider.IsPartitioned.Should().BeFalse();
+        collider.PartitionCoordinates.Should().BeNull();
+    }
+
+    [Fact]
     public void BindingAndHierarchyIdentity_ShouldTrackUnregisteredAndRegisteredState()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
@@ -90,7 +177,7 @@ public sealed class ColliderOwnershipStateTests
         collider3D.Deactivate();
         collider2D.Deactivate();
 
-        collider3D.HasHostBinding.Should().BeTrue();
+        collider3D.HasHostBinding.Should().BeFalse();
         collider2D.HasHostBinding.Should().BeFalse();
         collider3D.HierarchyKey.Should().Be(ColliderHierarchyKey.None);
         collider2D.HierarchyKey.Should().Be(ColliderHierarchyKey.None);
@@ -208,6 +295,8 @@ public sealed class ColliderOwnershipStateTests
         scenario.Context.Physics.RequireCollisionPair(firstChild.Collider, secondChild.Collider).Should().BeFalse();
         scenario.Context.Physics.RequireCollisionPair(firstChild.Collider, unrelated.Collider).Should().BeTrue();
         parent.Collider.HierarchyChildCount.Should().Be(2);
+        parent.Collider.IsChild.Should().BeFalse();
+        firstChild.Collider.IsChild.Should().BeTrue();
         firstChild.Collider.ParentId.Should().Be(parent.Collider.Id);
     }
 
@@ -297,6 +386,106 @@ public sealed class ColliderOwnershipStateTests
         holder.Collider.CollisionPairHolderCount.Should().Be(0);
         scenario.Context.Physics.TryGetColliderById(owner.Collider.Id, out _).Should().BeFalse();
         holder.Collider.TryRemoveCollisionPairHolder(ownerId).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Deactivate_ShouldUseSingleServiceOwnedTeardownForBodyOwnedBodylessAndInactiveColliders()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> direct = scenario.CreateSphere(Vector3d.Zero);
+        LSSphereCollider bodyless = scenario.CreateStaticSphere(Vector3d.Right * (Fixed64)3);
+        ScenarioBody<LSSphereCollider> inactive = scenario.CreateSphere(Vector3d.Right * (Fixed64)6);
+        inactive.Collider.IsActive = false;
+        inactive.Collider.Simulate();
+        inactive.Collider.IsPartitioned.Should().BeFalse();
+        bool originalDebugLogging = GravitasLogger.EnableDebugLogging;
+        DiagnosticLevel originalMinimumLevel = GravitasLogger.MinimumLevel;
+        Action<DiagnosticLevel, string, string> originalLogHandler = GravitasLogger.LogHandler;
+        var entries = new List<(DiagnosticLevel Level, string Message)>();
+
+        try
+        {
+            GravitasLogger.EnableDebugLogging = true;
+            GravitasLogger.MinimumLevel = DiagnosticLevel.Info;
+            GravitasLogger.LogHandler = (level, message, _) => entries.Add((level, message));
+
+            direct.Collider.Deactivate();
+            direct.Collider.Deactivate();
+            bodyless.Deactivate();
+            bodyless.Deactivate();
+            inactive.Body.Deactivate();
+            inactive.Body.Deactivate();
+
+            direct.Body.Active.Should().BeFalse();
+            direct.Body.DynamicId.Should().Be(-1);
+            direct.Collider.IsActive.Should().BeFalse();
+            direct.Collider.Id.Should().Be(-1);
+            bodyless.IsActive.Should().BeFalse();
+            bodyless.Id.Should().Be(-1);
+            inactive.Body.Active.Should().BeFalse();
+            inactive.Body.DynamicId.Should().Be(-1);
+            inactive.Collider.Id.Should().Be(-1);
+            scenario.Context.Physics.BodyCount.Should().Be(0);
+            scenario.Context.Physics.ColliderCount.Should().Be(0);
+            direct.Collider.HasHostBinding.Should().BeFalse();
+            entries.Should().NotContain(entry =>
+                entry.Message.Contains("non-partitioned collider", StringComparison.Ordinal)
+                || entry.Message.Contains("cannot be dessimilated", StringComparison.Ordinal));
+
+            using GravitasWorldContext reuseContext = GravitasWorldContext.CreateOwned();
+            var reuseTransform = new FixedTransform(
+                Vector3d.Right * (Fixed64)9,
+                FixedQuaternion.Identity,
+                Vector3d.One);
+            direct.Collider.InitializeWithNoBody(new TestMatterAgent(reuseContext, reuseTransform));
+
+            direct.Collider.Body.Should().BeNull();
+            direct.Collider.Context.Should().BeSameAs(reuseContext);
+            direct.Collider.Transform.Should().BeSameAs(reuseTransform);
+            direct.Collider.Position.Should().Be(Vector3d.Right * (Fixed64)9);
+            direct.Collider.Id.Should().Be(0);
+            reuseContext.Physics.ColliderCount.Should().Be(1);
+
+            direct.Body.Deactivate();
+
+            direct.Collider.IsActive.Should().BeTrue();
+            direct.Collider.Id.Should().Be(0);
+            direct.Collider.Context.Should().BeSameAs(reuseContext);
+            reuseContext.Physics.ColliderCount.Should().Be(1);
+
+            Action staleInitialize = () => direct.Body.Initialize(Vector3d.Zero, FixedQuaternion.Identity);
+
+            staleInitialize.Should().Throw<ArgumentException>().WithParameterName("Collider");
+            direct.Body.Active.Should().BeFalse();
+            scenario.Context.Physics.BodyCount.Should().Be(0);
+            scenario.Context.Physics.ColliderCount.Should().Be(0);
+            direct.Collider.Body.Should().BeNull();
+            direct.Collider.Context.Should().BeSameAs(reuseContext);
+            direct.Collider.Transform.Should().BeSameAs(reuseTransform);
+            direct.Collider.Position.Should().Be(Vector3d.Right * (Fixed64)9);
+            direct.Collider.Id.Should().Be(0);
+            reuseContext.Physics.ColliderCount.Should().Be(1);
+
+            reuseContext.Reset();
+            direct.Collider.Id.Should().Be(-1);
+            direct.Collider.HasHostBinding.Should().BeTrue();
+
+            staleInitialize.Should().Throw<ArgumentException>().WithParameterName("Collider");
+            direct.Body.Active.Should().BeFalse();
+            scenario.Context.Physics.BodyCount.Should().Be(0);
+            scenario.Context.Physics.ColliderCount.Should().Be(0);
+            direct.Collider.Body.Should().BeNull();
+            direct.Collider.Context.Should().BeSameAs(reuseContext);
+            direct.Collider.Transform.Should().BeSameAs(reuseTransform);
+            direct.Collider.Position.Should().Be(Vector3d.Right * (Fixed64)9);
+            reuseContext.Physics.ColliderCount.Should().Be(0);
+        }
+        finally
+        {
+            GravitasLogger.LogHandler = originalLogHandler;
+            GravitasLogger.MinimumLevel = originalMinimumLevel;
+            GravitasLogger.EnableDebugLogging = originalDebugLogging;
+        }
     }
 
     [Fact]
@@ -520,6 +709,69 @@ public sealed class ColliderOwnershipStateTests
     }
 
     [Fact]
+    public void IsActiveSetter_WithMixed3DStaticCollider_ShouldRefreshPartitionsAndQueryVisibility()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        scenario.Context.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
+        LSSphereCollider collider = scenario.CreateStaticSphere(Vector3d.Zero);
+        scenario.Context.MixedCollisions.Refresh3DColliderPartition(collider);
+        PhysicsMixedPartition mixedPartition =
+            GetMixedPartition(scenario.Context, collider.MixedPartitionCoordinates![0]);
+
+        collider.IsPartitioned.Should().BeTrue();
+        collider.IsMixedPartitioned.Should().BeTrue();
+        PartitionContains3DCollider(mixedPartition, collider.Id).Should().BeTrue();
+
+        collider.IsActive = false;
+
+        collider.IsPartitioned.Should().BeFalse();
+        collider.IsMixedPartitioned.Should().BeFalse();
+        (collider.PartitionCoordinates?.Count ?? 0).Should().Be(0);
+        (collider.MixedPartitionCoordinates?.Count ?? 0).Should().Be(0);
+        PartitionContains3DCollider(mixedPartition, collider.Id).Should().BeFalse();
+        scenario.Context.Query3D.Raycast(
+            -Vector3d.Right * (Fixed64)2,
+            Vector3d.Right,
+            (Fixed64)4,
+            out _,
+            PhysicsLayerMask.All).Should().BeFalse();
+
+        collider.IsActive = true;
+
+        collider.IsPartitioned.Should().BeTrue();
+        collider.IsMixedPartitioned.Should().BeTrue();
+        PhysicsMixedPartition refreshedMixedPartition =
+            GetMixedPartition(scenario.Context, collider.MixedPartitionCoordinates![0]);
+        PartitionContains3DCollider(refreshedMixedPartition, collider.Id).Should().BeTrue();
+        scenario.Context.Query3D.Raycast(
+            -Vector3d.Right * (Fixed64)2,
+            Vector3d.Right,
+            (Fixed64)4,
+            out _,
+            PhysicsLayerMask.All).Should().BeTrue();
+    }
+
+    [Fact]
+    public void IsActiveSetter_WithPure3DStaticCollider_ShouldRefreshOnlyPrimaryPartition()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSSphereCollider collider = scenario.CreateStaticSphere(Vector3d.Zero);
+
+        collider.IsPartitioned.Should().BeTrue();
+        collider.IsMixedPartitioned.Should().BeFalse();
+
+        collider.IsActive = false;
+
+        collider.IsPartitioned.Should().BeFalse();
+        collider.IsMixedPartitioned.Should().BeFalse();
+
+        collider.IsActive = true;
+
+        collider.IsPartitioned.Should().BeTrue();
+        collider.IsMixedPartitioned.Should().BeFalse();
+    }
+
+    [Fact]
     public void IsActiveSetter_WithMixed2DStaticCollider_ShouldRefreshPrimaryAndMixedPartitions()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
@@ -651,6 +903,11 @@ public sealed class ColliderOwnershipStateTests
         partition.ContainedDynamic2DObjects?.Contains(colliderId) == true
         || partition.ContainedKinematic2DObjects?.Contains(colliderId) == true
         || partition.ContainedStatic2DObjects?.Contains(colliderId) == true;
+
+    private static bool PartitionContains3DCollider(PhysicsMixedPartition partition, int colliderId) =>
+        partition.ContainedDynamic3DObjects?.Contains(colliderId) == true
+        || partition.ContainedKinematic3DObjects?.Contains(colliderId) == true
+        || partition.ContainedStatic3DObjects?.Contains(colliderId) == true;
 
     private static ScenarioBody<LSSphereCollider> CreateSphere(
         PhysicsScenarioBuilder scenario,

@@ -276,10 +276,10 @@ public sealed class ColliderTriggerTests
         body2D.Collider.OnMixedContact += _ => callbackCount++;
         body2D.Collider.OnMixedContactExit += _ => callbackCount++;
 
-        body3D.Collider.SetStatus(false);
+        body3D.Collider.IsActive = false;
         body3D.Collider.NotifyContact(other3D.Collider, isColliding: true, isChanged: true);
         body3D.Collider.NotifyMixedContact(body2D.Collider, isColliding: true, isChanged: true, isTriggerPair: false);
-        body3D.Collider.SetStatus(true);
+        body3D.Collider.IsActive = true;
 
         body2D.Collider.Deactivate();
         body2D.Collider.NotifyContact(other2D.Collider, isColliding: true, isChanged: true);

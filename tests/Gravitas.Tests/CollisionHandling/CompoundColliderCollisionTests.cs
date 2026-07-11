@@ -2,6 +2,7 @@ using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
+using Gravitas.Materials;
 using Gravitas.Tests.Support;
 using System.Linq;
 using Xunit;
@@ -31,6 +32,25 @@ public sealed class CompoundColliderCollisionTests
         pair.Manifold.Count.Should().Be(1);
         pair.Manifold.PrimaryContact.Normal.X.Should().BeGreaterThan(Fixed64.Zero);
         pair.Manifold.PrimaryContact.Depth.Should().Be(Fixed64.Half);
+    }
+
+    [Fact]
+    public void CompoundSphere_WithAllPartsSeparated_ShouldReturnFalseWithoutContacts()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSCompoundCollider> compound = scenario.CreateBody(
+            new LSCompoundCollider(
+                CompoundColliderPart.Sphere(Fixed64.Half, new Vector3d((Fixed64)(-3), Fixed64.Zero, Fixed64.Zero)),
+                CompoundColliderPart.Sphere(Fixed64.Half, new Vector3d((Fixed64)3, Fixed64.Zero, Fixed64.Zero))),
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+        ScenarioBody<LSSphereCollider> sphere = scenario.CreateSphere(Vector3d.Zero);
+        CollisionPair pair = scenario.CreatePair(compound.Collider, sphere.Collider);
+
+        CollisionDetection.DoCollisionCheck(pair).Should().BeFalse();
+
+        pair.Manifold.HasContact.Should().BeFalse();
+        pair.Manifold.Count.Should().Be(0);
     }
 
     [Fact]
@@ -115,6 +135,68 @@ public sealed class CompoundColliderCollisionTests
         reversed.Manifold.PrimaryContact.Normal.Should().Be(-Vector3d.Right);
         reversed.Manifold.PrimaryContact.PointA.Should().Be(forward.Manifold.PrimaryContact.PointB);
         reversed.Manifold.PrimaryContact.PointB.Should().Be(forward.Manifold.PrimaryContact.PointA);
+    }
+
+    [Fact]
+    public void CompoundCompound_WithSeparatedParts_ShouldReturnFalseWithoutContacts()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSCompoundCollider> first = scenario.CreateBody(
+            new LSCompoundCollider(
+                CompoundColliderPart.Sphere(Fixed64.Half, new Vector3d((Fixed64)(-2), Fixed64.Zero, Fixed64.Zero))),
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+        ScenarioBody<LSCompoundCollider> second = scenario.CreateBody(
+            new LSCompoundCollider(
+                CompoundColliderPart.Sphere(Fixed64.Half, new Vector3d((Fixed64)2, Fixed64.Zero, Fixed64.Zero))),
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+        CollisionPair pair = scenario.CreatePair(first.Collider, second.Collider);
+
+        CollisionDetection.DoCollisionCheck(pair).Should().BeFalse();
+
+        pair.Manifold.HasContact.Should().BeFalse();
+        pair.Manifold.Count.Should().Be(0);
+    }
+
+    [Fact]
+    public void CompoundSpherePart_WithOverlappingCuboidBoundsButSeparatedCorner_ShouldRejectNarrowPhase()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSCompoundCollider> compound = scenario.CreateBody(
+            new LSCompoundCollider(CompoundColliderPart.Sphere(Fixed64.Half, Vector3d.Zero)),
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+        ScenarioBody<LSCuboidCollider> cuboid = scenario.CreateCuboid(
+            new Vector3d(Fixed64.FromFraction(9, 10), Fixed64.Zero, Fixed64.FromFraction(9, 10)));
+        CollisionPair pair = scenario.CreatePair(compound.Collider, cuboid.Collider);
+
+        CollisionDetection.DoCollisionCheck(pair).Should().BeFalse();
+
+        pair.Manifold.HasContact.Should().BeFalse();
+    }
+
+    [Fact]
+    public void CompoundSpherePart_AgainstHigherPriorityCuboid_ShouldPreserveOwnerContactOrder()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        PhysicsMaterial partMaterial = PhysicsMaterial.Frictionless;
+        PhysicsMaterial cuboidMaterial = PhysicsMaterial.Default;
+        ScenarioBody<LSCompoundCollider> compound = scenario.CreateBody(
+            new LSCompoundCollider(CompoundColliderPart.Sphere(Fixed64.Half, Vector3d.Zero, partMaterial)),
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+        ScenarioBody<LSCuboidCollider> cuboid = scenario.CreateCuboid(
+            new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
+        cuboid.Collider.Material = cuboidMaterial;
+        CollisionPair pair = scenario.CreatePair(compound.Collider, cuboid.Collider);
+
+        CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
+
+        pair.Manifold.Count.Should().Be(1);
+        pair.Manifold.PrimaryContact.Normal.X.Should().BeGreaterThan(Fixed64.Zero);
+        pair.Manifold.PrimaryContact.MaterialA.Should().Be(partMaterial);
+        pair.Manifold.PrimaryContact.MaterialB.Should().Be(cuboidMaterial);
     }
 
     [Fact]

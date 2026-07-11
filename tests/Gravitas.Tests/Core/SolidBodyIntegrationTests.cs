@@ -22,6 +22,7 @@ public sealed class SolidBodyIntegrationTests
         scenario.Context.LateSimulate();
 
         body.Body.LinearVelocity.Should().Be(new Vector3d(Fixed64.One, Fixed64.Zero, Fixed64.Zero));
+        body.Body.LinearAcceleration.Should().Be(Vector3d.Right * (Fixed64)4);
         body.Body.Position3d.Should().Be(new Vector3d(Fixed64.FromFraction(1, 4), Fixed64.Zero, Fixed64.Zero));
         body.Body.IsAtRest.Should().BeFalse();
     }
@@ -155,6 +156,8 @@ public sealed class SolidBodyIntegrationTests
         scenario.Context.LateSimulate();
 
         AssertNear(body.Body.AngularVelocity.Y, Fixed64.FromFraction(3, 2));
+        AssertNear(body.Body.AngularSpeed, Fixed64.FromFraction(3, 2));
+        AssertNear(body.Body.AngularAcceleration, Vector3d.Up * (Fixed64)6);
 
         scenario.Context.Environment.DampingFactor = Fixed64.Half;
         scenario.Context.LateSimulate();
@@ -241,12 +244,27 @@ public sealed class SolidBodyIntegrationTests
             Fixed64.Zero);
 
         body.Body.UpdateRotation(target, Fixed64.Zero);
+        body.Body.Forward.Should().Be(target.Rotate(Vector3d.Forward));
+        body.Body.Up.Should().Be(target.Rotate(Vector3d.Up));
         scenario.Context.LateSimulate();
         scenario.Context.Visualize();
 
         FixedQuaternion.Angle(body.Body.RotationTransform.Rotation, target).Should().BeLessThan(Tolerance);
         body.Body.LastVisualRotation.Should().Be(FixedQuaternion.Identity);
         body.Body.VisualRotation.Should().Be(target);
+    }
+
+    [Fact]
+    public void SetVisualPosition_ShouldPreservePreviousAndCurrentInterpolationEndpoints()
+    {
+        using PhysicsScenarioBuilder scenario = CreateIntegrationScenario(frameRate: 4);
+        ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
+
+        body.Body.SetVisualPosition(Vector3d.Right);
+        body.Body.SetVisualPosition(Vector3d.Up);
+
+        body.Body.LastVisualPosition.Should().Be(Vector3d.Right);
+        body.Body.VisualPosition.Should().Be(Vector3d.Up);
     }
 
     [Fact]
@@ -272,6 +290,47 @@ public sealed class SolidBodyIntegrationTests
         firstVisual.Should().NotBe(target);
         secondVisual.Should().NotBe(firstVisual);
         FixedQuaternion.Angle(secondVisual, target).Should().BeLessThan(FixedQuaternion.Angle(firstVisual, target));
+    }
+
+    [Fact]
+    public void InteractingRotation_ShouldPublishBufferedStateAtInteractionSpeed()
+    {
+        using PhysicsScenarioBuilder scenario = CreateIntegrationScenario(frameRate: 4);
+        var transform = new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One);
+        var agent = new TestMatterAgent(
+            scenario.Context,
+            transform,
+            isParent: true,
+            isInteracting: true);
+        var body = new SolidBody(agent, new LSSphereCollider())
+        {
+            CanSetVisualRotation = true,
+            DefaultRotationSpeed = (Fixed64)4,
+            InteractionRotationSpeed = Fixed64.One,
+            Mass = Fixed64.One
+        };
+        body.Initialize(Vector3d.Zero, FixedQuaternion.Identity);
+        FixedQuaternion target = FixedQuaternion.FromEulerAnglesInDegrees(
+            Fixed64.Zero,
+            (Fixed64)90,
+            Fixed64.Zero);
+
+        body.UpdateRotation(target, Fixed64.One);
+        body.RotationChangePending.Should().BeTrue();
+        body.CheckChangedValues();
+        body.RotationChangePending.Should().BeTrue();
+        body.CheckChangedValues();
+        body.RotationChangePending.Should().BeFalse();
+        scenario.Context.LateSimulate();
+        scenario.Context.Visualize();
+
+        FixedQuaternion expected = FixedQuaternion.Slerp(
+            FixedQuaternion.Identity,
+            target,
+            scenario.Context.DeltaTime * body.InteractionRotationSpeed);
+        FixedQuaternion.Angle(transform.Rotation, expected).Should().BeLessThan(Tolerance);
+        transform.Rotation.Should().NotBe(FixedQuaternion.Identity);
+        transform.Rotation.Should().NotBe(target);
     }
 
     private static PhysicsScenarioBuilder CreateIntegrationScenario(int frameRate)

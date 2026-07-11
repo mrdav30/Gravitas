@@ -4,11 +4,14 @@ using Gravitas.Colliders;
 using Gravitas.Queries;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
+using GridForge;
 using GridForge.Configuration;
 using GridForge.Grids;
 using GridForge.Spatial;
 using SwiftCollections;
+using SwiftCollections.Diagnostics;
 using System;
+using System.Collections.Generic;
 using Xunit;
 
 namespace Gravitas.Tests.Physics2D;
@@ -167,12 +170,33 @@ public sealed class Physics2DPartitionBroadPhaseTests
             new LSAABBoxCollider2D(new Vector2d((Fixed64)8, (Fixed64)8)),
             new Vector2d((Fixed64)7, Fixed64.Zero),
             immovable: false);
-        GetFirstPartition(context, included.Collider).AddDynamicObject(999);
+        SolidBody2D negativeXMiss = CreateBody(
+            context,
+            new LSAABBoxCollider2D(new Vector2d((Fixed64)8, (Fixed64)8)),
+            new Vector2d((Fixed64)(-7), Fixed64.Zero),
+            immovable: false);
+        SolidBody2D positiveYMiss = CreateBody(
+            context,
+            new LSAABBoxCollider2D(new Vector2d((Fixed64)8, (Fixed64)8)),
+            new Vector2d(Fixed64.Zero, (Fixed64)7),
+            immovable: false);
+        SolidBody2D negativeYMiss = CreateBody(
+            context,
+            new LSAABBoxCollider2D(new Vector2d((Fixed64)8, (Fixed64)8)),
+            new Vector2d(Fixed64.Zero, (Fixed64)(-7)),
+            immovable: false);
         var hits = new SwiftList<Physics2DHit>();
 
         inactive.Collider.IsActive = false;
         wrongLayer.Collider.Layer = new PhysicsLayer(1);
         staticStyle.IsKinematic = true;
+        for (int i = 0; i < included.Collider.PartitionCoordinates!.Count; i++)
+        {
+            context.World.TryGetVoxel(included.Collider.PartitionCoordinates[i], out Voxel? voxel).Should().BeTrue();
+            voxel!.TryGetPartition(out PhysicsPartition2D? partition).Should().BeTrue();
+            partition!.AddDynamicObject(999);
+            partition.AddDynamicObject(inactive.Collider.Id);
+        }
 
         int count = context.Query2D.OverlapCircleAll(
             Vector2d.Zero,
@@ -187,6 +211,9 @@ public sealed class Physics2DPartitionBroadPhaseTests
         hits.Should().NotContain(hit => ReferenceEquals(hit.Collider, wrongLayer.Collider));
         hits.Should().NotContain(hit => ReferenceEquals(hit.Collider, staticStyle.Collider));
         hits.Should().NotContain(hit => ReferenceEquals(hit.Collider, boundsMiss.Collider));
+        hits.Should().NotContain(hit => ReferenceEquals(hit.Collider, negativeXMiss.Collider));
+        hits.Should().NotContain(hit => ReferenceEquals(hit.Collider, positiveYMiss.Collider));
+        hits.Should().NotContain(hit => ReferenceEquals(hit.Collider, negativeYMiss.Collider));
 
         int staticOnlyCount = context.Query2D.SweepCircleAgainstStaticAll(
             new Vector2d((Fixed64)(-4), Fixed64.Zero),
@@ -285,6 +312,10 @@ public sealed class Physics2DPartitionBroadPhaseTests
             context,
             new Vector2d((Fixed64)8, Fixed64.Zero),
             isTrigger: false);
+        LSCircleCollider2D deactivated = CreateBodylessCircle(
+            context,
+            new Vector2d((Fixed64)9, Fixed64.Zero),
+            isTrigger: false);
         var hits = new SwiftList<Physics2DHit>();
         int entered = 0;
 
@@ -294,6 +325,9 @@ public sealed class Physics2DPartitionBroadPhaseTests
             expanding.Radius = (Fixed64)9;
             expanding.Simulate();
             expanding.IsActive = false;
+            deactivated.Radius = (Fixed64)10;
+            deactivated.Simulate();
+            deactivated.Deactivate();
         };
 
         Step(context);
@@ -301,6 +335,7 @@ public sealed class Physics2DPartitionBroadPhaseTests
         entered.Should().Be(1);
         context.Query2D.OverlapCircleAll(Vector2d.Zero, Fixed64.One, hits).Should().BeGreaterThan(0);
         hits.Should().NotContain(hit => ReferenceEquals(hit.Collider, expanding));
+        hits.Should().NotContain(hit => ReferenceEquals(hit.Collider, deactivated));
     }
 
     [Fact]
@@ -414,6 +449,80 @@ public sealed class Physics2DPartitionBroadPhaseTests
         context.Collisions2D.RetainedPartitionCount.Should().Be(retainedBeforeRent - 1);
         context.Collisions2D.InactivePartitionCount.Should().Be(0);
         context.Collisions2D.ReleasePartition(rented);
+    }
+
+    [Fact]
+    public void RentPartition_AfterExplicitRelease_ShouldReuseInactive2DPoolEntry()
+    {
+        using GravitasWorldContext context = CreateContext(extent: 16);
+        PhysicsPartition2D first = context.Collisions2D.RentPartition();
+        context.Collisions2D.ReleasePartition(first);
+
+        PhysicsPartition2D second = context.Collisions2D.RentPartition();
+
+        second.Should().BeSameAs(first);
+        context.Collisions2D.InactivePartitionCount.Should().Be(0);
+        context.Collisions2D.ReleasePartition(second);
+    }
+
+    [Fact]
+    public void ClearPartitionedCollider_WithMissingGridVoxelOrPartition_ShouldNormalizeStateWithoutErrors()
+    {
+        using GravitasWorldContext detachedContext = CreateContext(extent: 16);
+        SolidBody2D detached = CreateCircle(detachedContext, Vector2d.Zero, immovable: false);
+        WorldVoxelIndex coordinate = detached.Collider.PartitionCoordinates![0];
+        detachedContext.World.TryGetVoxel(coordinate, out Voxel? voxel).Should().BeTrue();
+        voxel!.TryRemovePartition<PhysicsPartition2D>().Should().BeTrue();
+        detachedContext.Collisions2D.ClearPartitionedCollider(detached.Collider, force: true).Should().BeTrue();
+        detached.Collider.IsPartitioned.Should().BeFalse();
+
+        using GravitasWorldContext removedContext = CreateContext(extent: 16);
+        SolidBody2D removed = CreateCircle(removedContext, Vector2d.Zero, immovable: false);
+        List<(DiagnosticLevel Level, string Message)> entries = CaptureGridLogs(() =>
+        {
+            removedContext.World.TryRemoveGrid(0).Should().BeTrue();
+            removedContext.Collisions2D.ClearPartitionedCollider(removed.Collider, force: true).Should().BeTrue();
+        });
+        entries.Should().NotContain(entry => entry.Level == DiagnosticLevel.Error);
+
+        using GravitasWorldContext replacedContext = CreateContext(extent: 16);
+        SolidBody2D replaced = CreateCircle(replacedContext, Vector2d.Zero, immovable: false);
+        entries = CaptureGridLogs(() =>
+        {
+            ReplacePrimaryGrid(replacedContext);
+            replacedContext.Collisions2D.ClearPartitionedCollider(replaced.Collider, force: true).Should().BeTrue();
+        });
+        replaced.Collider.IsPartitioned.Should().BeFalse();
+        entries.Should().NotContain(entry => entry.Level == DiagnosticLevel.Error);
+    }
+
+    [Fact]
+    public void RefreshPartitionAwakeState_WithMissingGridVoxelOrPartition_ShouldSkipStaleCoordinatesWithoutErrors()
+    {
+        using GravitasWorldContext detachedContext = CreateContext(extent: 16);
+        SolidBody2D detached = CreateCircle(detachedContext, Vector2d.Zero, immovable: false);
+        WorldVoxelIndex coordinate = detached.Collider.PartitionCoordinates![0];
+        detachedContext.World.TryGetVoxel(coordinate, out Voxel? voxel).Should().BeTrue();
+        voxel!.TryRemovePartition<PhysicsPartition2D>().Should().BeTrue();
+        detachedContext.Collisions2D.RefreshPartitionAwakeState(detached.Collider);
+
+        using GravitasWorldContext removedContext = CreateContext(extent: 16);
+        SolidBody2D removed = CreateCircle(removedContext, Vector2d.Zero, immovable: false);
+        List<(DiagnosticLevel Level, string Message)> entries = CaptureGridLogs(() =>
+        {
+            removedContext.World.TryRemoveGrid(0).Should().BeTrue();
+            removedContext.Collisions2D.RefreshPartitionAwakeState(removed.Collider);
+        });
+        entries.Should().NotContain(entry => entry.Level == DiagnosticLevel.Error);
+
+        using GravitasWorldContext replacedContext = CreateContext(extent: 16);
+        SolidBody2D replaced = CreateCircle(replacedContext, Vector2d.Zero, immovable: false);
+        entries = CaptureGridLogs(() =>
+        {
+            ReplacePrimaryGrid(replacedContext);
+            replacedContext.Collisions2D.RefreshPartitionAwakeState(replaced.Collider);
+        });
+        entries.Should().NotContain(entry => entry.Level == DiagnosticLevel.Error);
     }
 
     [Fact]
@@ -868,6 +977,37 @@ public sealed class Physics2DPartitionBroadPhaseTests
                 new Vector3d((Fixed64)extent, Fixed64.Zero, (Fixed64)extent)),
             out _).Should().BeTrue();
         return context;
+    }
+
+    private static void ReplacePrimaryGrid(GravitasWorldContext context)
+    {
+        GridConfiguration spareConfiguration = new(
+            new Vector3d((Fixed64)100, Fixed64.Zero, (Fixed64)100),
+            new Vector3d((Fixed64)104, Fixed64.Zero, (Fixed64)104));
+        context.World.TryAddGrid(spareConfiguration, out _).Should().BeTrue();
+        context.World.TryRemoveGrid(0).Should().BeTrue();
+
+        GridConfiguration replacementConfiguration = new(
+            new Vector3d((Fixed64)200, Fixed64.Zero, (Fixed64)200),
+            new Vector3d((Fixed64)201, Fixed64.Zero, (Fixed64)201));
+        context.World.TryAddGrid(replacementConfiguration, out ushort replacementIndex).Should().BeTrue();
+        replacementIndex.Should().Be(0);
+    }
+
+    private static List<(DiagnosticLevel Level, string Message)> CaptureGridLogs(Action action)
+    {
+        Action<DiagnosticLevel, string, string> originalHandler = GridForgeLogger.LogHandler;
+        var entries = new List<(DiagnosticLevel Level, string Message)>();
+        try
+        {
+            GridForgeLogger.LogHandler = (level, message, _) => entries.Add((level, message));
+            action();
+            return entries;
+        }
+        finally
+        {
+            GridForgeLogger.LogHandler = originalHandler;
+        }
     }
 
     private static void Step(GravitasWorldContext context)

@@ -203,8 +203,6 @@ public sealed partial class GravitasQueryMixedService
             previousInside = currentInside;
         }
 
-        if (outputCount > 1 && PointsEquivalent(output[0], output[outputCount - 1]))
-            outputCount--;
     }
 
     private static Vector3d FindClosestPointOnClippedProjection(
@@ -372,8 +370,7 @@ public sealed partial class GravitasQueryMixedService
             hull[hullCount++] = projection[i];
         }
 
-        if (hullCount > 1)
-            hullCount--;
+        hullCount--;
 
         for (int i = 0; i < hullCount; i++)
             projection[i] = hull[i];
@@ -555,15 +552,6 @@ public sealed partial class GravitasQueryMixedService
         }
 
         return best;
-    }
-
-    private static Fixed64 DistanceSquaredToSegment3D(Vector3d point, Vector3d segmentStart, Vector3d segmentEnd)
-    {
-        Vector3d edge = segmentEnd - segmentStart;
-        Fixed64 t = Vector3d.Dot(point - segmentStart, edge) / edge.MagnitudeSquared;
-        t = FixedMath.Clamp01(t);
-        Vector3d closest = segmentStart + edge * t;
-        return (point - closest).MagnitudeSquared;
     }
 
     private static bool TryGetVerticalSegmentInterval(Vector3d start, Vector3d end, out Fixed64 minY, out Fixed64 maxY)

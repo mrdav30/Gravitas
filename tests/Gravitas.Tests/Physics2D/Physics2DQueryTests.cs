@@ -286,6 +286,52 @@ public sealed class Physics2DQueryTests
     }
 
     [Fact]
+    public void QueryVersionWrap_ShouldNotSuppressColliderFromPreviousVersionOneQueries()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        SolidBody2D body = CreateCircle(context, Vector2d.Zero);
+        body.Collider.RaycastVersion = 1;
+        body.Collider.CircleQueryVersion = 1;
+        context.Query2D.RaycastVersion = uint.MaxValue;
+        context.Query2D.OverlapQueryVersion = uint.MaxValue;
+
+        bool rayHit = context.Query2D.Raycast(
+            new Vector2d((Fixed64)(-2), Fixed64.Zero),
+            new Vector2d((Fixed64)2, Fixed64.Zero),
+            out Physics2DHit raycastHit);
+        bool overlapHit = context.Query2D.OverlapCircle(
+            Vector2d.Zero,
+            Fixed64.One,
+            out Physics2DHit overlapCircleHit);
+
+        rayHit.Should().BeTrue();
+        raycastHit.Collider.Should().BeSameAs(body.Collider);
+        overlapHit.Should().BeTrue();
+        overlapCircleHit.Collider.Should().BeSameAs(body.Collider);
+        context.Query2D.RaycastVersion.Should().Be(1);
+        context.Query2D.OverlapQueryVersion.Should().Be(1);
+    }
+
+    [Fact]
+    public void Reset_ShouldInvalidateLiveColliderQueryVersionsBeforeCounterReuse()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        SolidBody2D body = CreateCircle(context, Vector2d.Zero);
+        Vector2d start = new((Fixed64)(-2), Fixed64.Zero);
+        Vector2d end = new((Fixed64)2, Fixed64.Zero);
+
+        context.Query2D.Raycast(start, end, out _).Should().BeTrue();
+        context.Query2D.OverlapCircle(Vector2d.Zero, Fixed64.One, out _).Should().BeTrue();
+
+        context.Query2D.Reset();
+
+        context.Query2D.Raycast(start, end, out Physics2DHit raycastHit).Should().BeTrue();
+        context.Query2D.OverlapCircle(Vector2d.Zero, Fixed64.One, out Physics2DHit overlapHit).Should().BeTrue();
+        raycastHit.Collider.Should().BeSameAs(body.Collider);
+        overlapHit.Collider.Should().BeSameAs(body.Collider);
+    }
+
+    [Fact]
     public void Raycast_WithSegmentBoundsOutsideCollider_ShouldRejectBeforeShapeMath()
     {
         using GravitasWorldContext context = Create2DContext();

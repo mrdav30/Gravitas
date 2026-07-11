@@ -237,10 +237,6 @@ public sealed class LSCompoundCollider2D : LSCollider2D
         SetBoundsFromMinMax(min, max);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal bool ContainsPartCollider(LSCollider2D collider) =>
-        ReferenceEquals(collider.CompoundOwner2D, this);
-
     private int FindClosestPartIndex(Vector2d point)
     {
         int bestIndex = 0;

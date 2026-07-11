@@ -28,7 +28,6 @@ public sealed class GravitasCollisionService
     private readonly GravitasWorldContext _context;
     private readonly SwiftBucket<PhysicsPartition> _activePartitions = new();
     private readonly SwiftStack<PhysicsPartition> _inactivePartitionPool = new(DefaultPartitionPoolCapacity);
-    private readonly SwiftHashSet<int> _redundancyChecker = new();
     private readonly SwiftList<Voxel> _coveredVoxels = new();
     private readonly GridTraceScratch _traceScratch = new();
     private readonly SwiftList<PhysicsPartition> _retainedPartitions = new();
@@ -95,7 +94,6 @@ public sealed class GravitasCollisionService
     {
         DetachRetainedPartitions();
         _activePartitions.Clear();
-        _redundancyChecker.Clear();
         _coveredVoxels.FastClear();
         _traceScratch.Clear();
         _distributionPartitions.FastClear();
@@ -127,11 +125,6 @@ public sealed class GravitasCollisionService
             partition,
             ref _retainedPartitionRetirementCursor);
 
-    /// <summary>
-    /// Deactivates this collision service and clears pooled state.
-    /// </summary>
-    public void Deactivate() => Reset();
-
     internal bool IsPartitionRefreshRequired(LSCollider collider) =>
         !collider.MatchesPartitionGridBounds(collider.BoundsMin, collider.BoundsMax, ResolvePartitionKind(collider));
 
@@ -147,20 +140,10 @@ public sealed class GravitasCollisionService
             nameof(collider),
             "Collider must belong to this collision service context.");
 
-        if (collider.IsPartitioned)
-            return false;
-
         partitionedCoordinates.FastClear();
 
-        try
-        {
-            PartitionCoveredVoxels(collider, partitionedCoordinates, GetMobilityKind(collider));
-            return partitionedCoordinates.Count > 0;
-        }
-        finally
-        {
-            _redundancyChecker.Clear();
-        }
+        PartitionCoveredVoxels(collider, partitionedCoordinates, GetMobilityKind(collider));
+        return partitionedCoordinates.Count > 0;
     }
 
     private void PartitionCoveredVoxels(
@@ -189,23 +172,17 @@ public sealed class GravitasCollisionService
         ref GridTraversalState traversal,
         PhysicsPartitionMobilityKind kind)
     {
-        if (!traversal.TryVisitUnique(voxel, _redundancyChecker, out Fixed64 cellEdge)
-            || !collider.IsPositionInBounds(cellEdge, voxel.WorldPosition))
-        {
+        Fixed64 cellEdge = traversal.GetCellEdge(voxel);
+        if (!collider.IsPositionInBounds(cellEdge, voxel.WorldPosition))
             return;
-        }
 
         if (!voxel.TryGetPartition(out PhysicsPartition? partition))
         {
             partition = RentPartition();
-            if (!voxel.TryAddPartition(partition))
-            {
-                ReleasePartition(partition);
-                SwiftThrowHelper.ThrowIfTrue(
-                    true,
-                    nameof(GravitasCollisionService),
-                    "Unable to attach 3D physics partition to voxel.");
-            }
+            SwiftThrowHelper.ThrowIfTrue(
+                !voxel.TryAddPartition(partition),
+                nameof(GravitasCollisionService),
+                "Unable to attach 3D physics partition to voxel.");
 
             TrackRetainedPartition(partition);
         }
@@ -224,10 +201,7 @@ public sealed class GravitasCollisionService
 
         GridWorld world = _context.World;
         if (!collider.IsPartitioned)
-        {
-            GravitasLogger.Channel.Error($"Attempted to clear partitions for a non-partitioned collider! - {collider}");
             return false;
-        }
 
         PhysicsPartitionMobilityKind currentKind = GetMobilityKind(collider);
         if (!force && collider.MatchesPartitionGridBounds(collider.BoundsMin, collider.BoundsMax, (int)currentKind))
@@ -238,8 +212,9 @@ public sealed class GravitasCollisionService
         for (int i = 0; i < collider.PartitionCoordinates!.Count; i++)
         {
             WorldVoxelIndex coordinate = collider.PartitionCoordinates[i];
-            if (!world.TryGetVoxel(coordinate, out Voxel? voxel)
-                || !GridTraversal.TryGetUniquePartition(voxel!, _redundancyChecker, out PhysicsPartition? partition))
+            if (!world.ActiveGrids.IsAllocated(coordinate.GridIndex)
+                || !world.TryGetVoxel(coordinate, out Voxel? voxel)
+                || !voxel!.TryGetPartition(out PhysicsPartition? partition))
             {
                 continue;
             }
@@ -251,7 +226,8 @@ public sealed class GravitasCollisionService
             // while an empty PhysicsPartition is inactive and query-invisible.
         }
 
-        _redundancyChecker.Clear();
+        collider.MarkUnpartitioned();
+        collider.ClearPartitionCoordinates();
 
         return true;
     }
@@ -264,9 +240,6 @@ public sealed class GravitasCollisionService
             nameof(collider),
             "Collider must belong to this collision service context.");
 
-        if (!collider.IsPartitioned)
-            return;
-
         SwiftList<WorldVoxelIndex> coordinates = collider.PartitionCoordinates!;
         SolidBody? body = collider.Body;
         if (collider.IsStatic || body!.IsKinematic)
@@ -275,23 +248,17 @@ public sealed class GravitasCollisionService
         bool awake = body.IsAwakeForCollision;
         GridWorld world = _context.World;
 
-        try
+        for (int i = 0; i < coordinates.Count; i++)
         {
-            for (int i = 0; i < coordinates.Count; i++)
+            WorldVoxelIndex coordinate = coordinates[i];
+            if (!world.ActiveGrids.IsAllocated(coordinate.GridIndex)
+                || !world.TryGetVoxel(coordinate, out Voxel? voxel)
+                || !voxel!.TryGetPartition(out PhysicsPartition? partition))
             {
-                WorldVoxelIndex coordinate = coordinates[i];
-                if (!world.TryGetVoxel(coordinate, out Voxel? voxel)
-                    || !GridTraversal.TryGetUniquePartition(voxel!, _redundancyChecker, out PhysicsPartition? partition))
-                {
-                    continue;
-                }
-
-                partition!.SetDynamicObjectAwake(collider.Id, awake);
+                continue;
             }
-        }
-        finally
-        {
-            _redundancyChecker.Clear();
+
+            partition!.SetDynamicObjectAwake(collider.Id, awake);
         }
     }
 
@@ -393,13 +360,7 @@ public sealed class GravitasCollisionService
         return _activePartitions.Add(partition);
     }
 
-    internal void DeactivatePartition(int activationId)
-    {
-        if (activationId < 0)
-            return;
-
-        _activePartitions.TryRemoveAt(activationId);
-    }
+    internal void DeactivatePartition(int activationId) => _activePartitions.TryRemoveAt(activationId);
 
     internal PhysicsPartition RentPartition()
     {
