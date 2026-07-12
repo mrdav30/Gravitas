@@ -22,27 +22,32 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-task11-authoritative-reviewed-full/f2b13b84-687c-4d3e-81da-065b12a7aed4/coverage.cobertura.xml`.
+`TestResults/coverage-task12-authoritative-reviewed-full-rerun/56f638df-6d66-4c69-a5e7-cfa6ba170f93/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
-| Lines | 99.4% | 25,794 / 25,959 | 165 | 100% |
-| Branches | 97.7% | 9,946 / 10,182 | 236 | 100% |
-| Methods | 98.9% | 3,411 / 3,448 | 37 | 100% |
+| Lines | 99.3% | 26,113 / 26,278 | 165 | 100% |
+| Branches | 97.6% | 10,107 / 10,354 | 247 | 100% |
+| Methods | 98.9% | 3,433 / 3,470 | 37 | 100% |
 
-The full coverage-enabled `Release` suite passes 2,229/2,229 tests, and
+The full coverage-enabled `Release` suite passes 2,255/2,255 tests, and
 `ReleaseLean` builds both targets without warnings. Branch coverage is now the
 primary constraint, but the remaining line and method gaps must close from the
 same final artifact.
 
 ### Immediate Next Block
 
-Finish `src/Gravitas/Core/3D/GravitasPhysicsService.Pairs.cs` before changing
-target. The current artifact reports four uncovered lines and seven uncovered
-branch outcomes in this file. Treat removal callbacks, exact enter/exit order,
-active-queue ownership, pooled shell reuse, and collider/pair lifetime
-validation as one cohesive 3D pair contract. Mirror the proven 2D safeguards
-only where the 3D lifecycle trace establishes the same invariant.
+Finish the mixed pair lifecycle family before changing target:
+`Core/Mixed/GravitasMixedCollisionService.Pairs.cs`,
+`CollisionHandling/Pairs/Mixed/CollisionPairMixed.cs`,
+`Core/Mixed/GravitasMixedCollisionService.Response.cs`, and the mixed
+notification paths in `LSCollider.Events.cs` and `LSCollider2D.cs`. Together
+they account for 16 uncovered lines, 29 uncovered branch outcomes, and two
+uncovered methods. Close pooling modes, stale lifetime tokens, nested callback
+mutation, trigger admission, resting pairs, response admission, and exact
+enter/stay/exit order as one contract. The newly completed 3D pair safeguards
+are a reference, not a reason to force dimensional parity where mixed ownership
+differs.
 
 ## Rules Of Engagement
 
@@ -107,14 +112,14 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | `Core/3D/GravitasPhysicsService.Pairs.cs` | 4 | 7 | 0 | 3D pair callbacks, pooled lifetime, ordering, and cleanup. |
+| 1 | Mixed pair lifecycle and response family | 16 | 29 | 2 | Mixed callbacks, pooled lifetime, response admission, ordering, and cleanup. |
 | 2 | `Colliders/2D/LSPolygonCollider2D.cs` | 4 | 7 | 0 | Authored polygon validation and geometry. |
 | 3 | `CollisionHandling/Detection/3D/CollisionDetection.Cuboid.cs` | 3 | 7 | 0 | Cuboid feature selection and separation. |
 | 4 | `Core/2D/SolidBody2D.ContinuousCollision.Hits.cs` | 2 | 7 | 0 | 2D hit admission and deterministic reduction. |
-| 5 | `Core/Mixed/GravitasMixedCollisionService.Pairs.cs` | 5 | 6 | 0 | Mixed pair ownership and cleanup. |
-| 6 | `CollisionHandling/Detection/2D/CollisionDetection2D.cs` | 4 | 6 | 0 | Pure 2D dispatch and degenerate-shape rejection. |
-| 7 | `Core/2D/SolidBody2D.ContinuousCollision.Dynamic.cs` | 4 | 6 | 0 | Dynamic 2D CCD handoff and substep state. |
-| 8 | `CollisionHandling/Detection/3D/ConvexColliderSupport.cs` | 5 | 5 | 0 | Convex volume tests and degenerate geometry. |
+| 5 | `CollisionHandling/Detection/2D/CollisionDetection2D.cs` | 4 | 6 | 0 | Pure 2D dispatch and degenerate-shape rejection. |
+| 6 | `Core/2D/SolidBody2D.ContinuousCollision.Dynamic.cs` | 4 | 6 | 0 | Dynamic 2D CCD handoff and substep state. |
+| 7 | `CollisionHandling/Detection/3D/ConvexColliderSupport.cs` | 5 | 5 | 0 | Convex volume tests and degenerate geometry. |
+| 8 | `CollisionHandling/Response/3D/CollisionResponse.cs` | 3 | 5 | 0 | Reclose response outcomes no longer reached after stale-pair response removal. |
 
 ### Phase 1: Core Runtime And Service Ownership
 
@@ -130,8 +135,12 @@ mid-block merely because another branch looks easier.
 - [x] Close and independently review 3D response island admission, sleeping
       suppression, sparse joint traversal, anchored participants, rootless
       contacts, and single-contact dispatch.
-- [ ] Close the 3D and mixed pair/response files as cohesive dimensional
-      families, including their callback and pooled-lifetime counterparts.
+- [x] Close and independently review the 3D pair lifecycle, including callback
+      mutation, per-side admission, exception retry, stale queue snapshots,
+      exact exit order, and pooled-lifetime reuse.
+- [ ] Close the mixed pair/response files as one cohesive dimensional family,
+      including their callback, response-admission, and pooled-lifetime
+      counterparts.
 - [x] Close residual world-context outcomes through real owned/attached
       lifetime, phase-routing, reset, and disposal workflows.
 - [x] Close and independently review residual 3D body-motion outcomes through
@@ -278,6 +287,7 @@ of record.
 | 2D grounding lifecycle | 99.3% | 97.5% | 98.9% | 2,215 | Manual ownership, cached support, query/contact lifetime validation, callback replacement, nested body/pair snapshots, pooled pair generations, and automatic invalidation independently reviewed. |
 | 3D body motion | 99.4% | 97.6% | 98.9% | 2,226 | Reset/reuse stores, angular friction, analytic gyroscopic precession, total-step acceleration, queued CCD handoff, sleep/wake, and zombie correction state independently reviewed. |
 | 3D response islands | 99.4% | 97.7% | 98.9% | 2,229 | Sleeping and single-contact islands, sparse and anchored joints, live rootless contacts, and the caller-impossible joint-root guard independently reviewed. |
+| 3D and mixed pair lifetime hardening | 99.3% | 97.6% | 98.9% | 2,255 | 3D pair coverage closed; callback-safe snapshots, admitted-side retry, exception-safe teardown, mixed lifetime tokens, deferred nested exits, and stale-generation suppression independently reviewed. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.
