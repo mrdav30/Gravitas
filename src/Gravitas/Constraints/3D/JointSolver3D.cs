@@ -145,7 +145,7 @@ internal static class JointSolver3D
                 AddHingeLimitRow(joint, rows, ref count, error, worldRotationA * Vector3d.Right, ref angularLimitErrorMagnitude);
                 break;
             case JointType3D.ConeTwist:
-                AddConeTwistRows(joint, rows, ref count, worldRotationA, worldRotationB, error, ref angularLimitErrorMagnitude);
+                AddConeTwistRows(joint, rows, ref count, worldRotationA, worldRotationB, ref angularLimitErrorMagnitude);
                 break;
         }
     }
@@ -212,13 +212,10 @@ internal static class JointSolver3D
         ref int count,
         FixedQuaternion worldRotationA,
         FixedQuaternion worldRotationB,
-        Vector3d angularError,
         ref Fixed64 angularLimitErrorMagnitude)
     {
         Vector3d forwardA = (worldRotationA * Vector3d.Forward).Normalized;
         Vector3d forwardB = (worldRotationB * Vector3d.Forward).Normalized;
-        AddAxisAlignmentRows(rows, ref count, forwardA, forwardB);
-
         if (joint.Limits.Kind != JointLimitKind3D.ConeTwist)
             return;
 
@@ -227,16 +224,16 @@ internal static class JointSolver3D
         if (swing > joint.Limits.MaxConeAngle)
         {
             Vector3d swingAxis = Vector3d.Cross(forwardA, forwardB);
-            if (swingAxis.MagnitudeSquared > RowEpsilon)
-            {
-                Fixed64 limitedError = swing - joint.Limits.MaxConeAngle;
-                angularLimitErrorMagnitude += limitedError.Abs();
-                AddAngularRow(rows, ref count, swingAxis.Normalized, limitedError, Fixed64.Zero, Fixed64.MaxValue);
-                joint.Context.Diagnostics.EmitJointLimitReached(joint, limitedError);
-            }
+            if (swingAxis.MagnitudeSquared <= RowEpsilon)
+                swingAxis = Perpendicular(forwardA);
+
+            Fixed64 limitedError = swing - joint.Limits.MaxConeAngle;
+            angularLimitErrorMagnitude += limitedError.Abs();
+            AddAngularRow(rows, ref count, swingAxis.Normalized, limitedError, Fixed64.Zero, Fixed64.MaxValue);
+            joint.Context.Diagnostics.EmitJointLimitReached(joint, limitedError);
         }
 
-        Fixed64 twist = Vector3d.Dot(angularError, forwardA);
+        Fixed64 twist = GetSignedTwistAngle(worldRotationA, worldRotationB, forwardA);
         Fixed64 maxTwist = joint.Limits.MaxTwistAngle;
         if (twist.Abs() > maxTwist)
         {
@@ -337,6 +334,41 @@ internal static class JointSolver3D
         Fixed64 w = FixedMath.Clamp(normalized.W, -Fixed64.One, Fixed64.One);
         Fixed64 theta = Fixed64.Two * FixedMath.Acos(w);
         return (vector / vectorLength) * theta;
+    }
+
+    private static Fixed64 GetSignedTwistAngle(
+        FixedQuaternion worldRotationA,
+        FixedQuaternion worldRotationB,
+        Vector3d twistAxis)
+    {
+        FixedQuaternion relative = (worldRotationB * worldRotationA.Inverse()).Normalized;
+        Vector3d relativeVector = new(relative.X, relative.Y, relative.Z);
+        Fixed64 projectedTwist = Vector3d.Dot(relativeVector, twistAxis);
+        if (projectedTwist.Abs() < QuaternionLogVectorEpsilon
+            && relative.W.Abs() < QuaternionLogVectorEpsilon)
+        {
+            return Fixed64.Zero;
+        }
+
+        return NormalizeAngle(Fixed64.Two * FixedMath.Atan2(projectedTwist, relative.W));
+    }
+
+    private static Fixed64 NormalizeAngle(Fixed64 angle)
+    {
+        angle %= Fixed64.TwoPi;
+        if (angle < -Fixed64.Pi)
+            angle += Fixed64.TwoPi;
+        else if (angle >= Fixed64.Pi)
+            angle -= Fixed64.TwoPi;
+        return angle;
+    }
+
+    private static Vector3d Perpendicular(Vector3d axis)
+    {
+        Vector3d candidate = Vector3d.Cross(axis, Vector3d.Up);
+        return candidate.MagnitudeSquared > RowEpsilon
+            ? candidate
+            : Vector3d.Cross(axis, Vector3d.Right);
     }
 
     private static Fixed64 SolveRow(

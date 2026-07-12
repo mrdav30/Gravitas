@@ -653,6 +653,35 @@ public sealed class Constraint3DServiceTests
     }
 
     [Theory]
+    [InlineData(JointType3D.Hinge)]
+    [InlineData(JointType3D.ConeTwist)]
+    public void UnrestrictedAngularJoint_ShouldAdmitOnlyAnchorRows(JointType3D type)
+    {
+        using PhysicsScenarioBuilder scenario = CreateConstraintScenario();
+        ScenarioBody<LSSphereCollider> first = scenario.CreateSphere(Vector3d.Zero, immovable: true);
+        Vector3d rotationAxis = type == JointType3D.Hinge ? Vector3d.Right : Vector3d.Up;
+        ScenarioBody<LSSphereCollider> second = scenario.CreateSphere(
+            Vector3d.Right * (Fixed64)2,
+            FixedQuaternion.FromAxisAngle(rotationAxis, Fixed64.HalfPi));
+        FixedQuaternion initialRotation = second.Body.Rotation;
+        Joint3D joint = scenario.Context.Constraints3D.RegisterJoint(new JointDefinition3D(
+            first.Body,
+            second.Body,
+            LocalFrame(Vector3d.Zero),
+            LocalFrame(Vector3d.Zero),
+            type,
+            JointLimit3D.Unrestricted,
+            JointMotor3D.Disabled,
+            JointCollisionPolicy.SuppressLinked));
+        Step(scenario.Context, 1);
+
+        joint.LastSolvedRowCount.Should().Be(3);
+        joint.LastSolveMetrics.AngularLimitErrorMagnitude.Should().Be(Fixed64.Zero);
+        second.Body.AngularVelocity.Should().Be(Vector3d.Zero);
+        second.Body.Rotation.Should().Be(initialRotation);
+    }
+
+    [Theory]
     [InlineData(-90)]
     [InlineData(90)]
     public void HingeJoint_ShouldReportSignedLimitViolations(int degrees)
@@ -734,7 +763,8 @@ public sealed class Constraint3DServiceTests
         ScenarioBody<LSSphereCollider> first = scenario.CreateSphere(Vector3d.Zero, immovable: true);
         ScenarioBody<LSSphereCollider> second = scenario.CreateSphere(
             Vector3d.Right * (Fixed64)2,
-            FixedQuaternion.FromAxisAngle(Vector3d.Forward, Fixed64.FromFraction(1, 8)));
+            FixedQuaternion.FromAxisAngle(Vector3d.Up, Fixed64.FromFraction(1, 8)));
+        FixedQuaternion initialRotation = second.Body.Rotation;
         Joint3D joint = scenario.Context.Constraints3D.RegisterJoint(new JointDefinition3D(
             first.Body,
             second.Body,
@@ -745,10 +775,62 @@ public sealed class Constraint3DServiceTests
             JointMotor3D.Disabled,
             JointCollisionPolicy.SuppressLinked));
 
-        Step(scenario.Context, 2);
+        Step(scenario.Context, 1);
 
         joint.LastSolveMetrics.AngularLimitErrorMagnitude.Should().Be(Fixed64.Zero);
-        joint.LastSolvedRowCount.Should().BeGreaterThan(0);
+        joint.LastSolvedRowCount.Should().Be(3);
+        second.Body.AngularVelocity.Should().Be(Vector3d.Zero);
+        second.Body.Rotation.Should().Be(initialRotation);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ConeTwistJoint_WithAntiparallelAxes_ShouldUseDeterministicSwingFallback(bool verticalAxis)
+    {
+        using PhysicsScenarioBuilder scenario = CreateConstraintScenario();
+        scenario.Context.Settings.DiscreteSolverIterations = 1;
+        ScenarioBody<LSSphereCollider> first = scenario.CreateSphere(Vector3d.Zero, immovable: true);
+        FixedQuaternion frameRotation = verticalAxis
+            ? FixedQuaternion.FromAxisAngle(Vector3d.Right, -Fixed64.HalfPi)
+            : FixedQuaternion.Identity;
+        FixedQuaternion bodyRotation = FixedQuaternion.FromAxisAngle(
+            verticalAxis ? Vector3d.Right : Vector3d.Up,
+            Fixed64.Pi);
+        ScenarioBody<LSSphereCollider> second = scenario.CreateSphere(
+            Vector3d.Right * (Fixed64)2,
+            bodyRotation);
+        var localFrame = new FixedTransform(Vector3d.Zero, frameRotation, Vector3d.One);
+        Joint3D joint = scenario.Context.Constraints3D.RegisterJoint(new JointDefinition3D(
+            first.Body,
+            second.Body,
+            localFrame,
+            localFrame,
+            JointType3D.ConeTwist,
+            JointLimit3D.ConeTwist(Fixed64.HalfPi, Fixed64.Pi),
+            JointMotor3D.Disabled,
+            JointCollisionPolicy.SuppressLinked));
+        Vector3d forwardA = (first.Body.Rotation * joint.LocalFrameA.Rotation).Normalized * Vector3d.Forward;
+        Vector3d forwardB = (second.Body.Rotation * joint.LocalFrameB.Rotation).Normalized * Vector3d.Forward;
+        Vector3d.Dot(forwardA, forwardB).Should().BeLessThan(-Fixed64.FromFraction(99, 100));
+
+        Step(scenario.Context, 1);
+
+        joint.LastSolveMetrics.AngularLimitErrorMagnitude.Should().BeGreaterThan(Fixed64.Zero);
+        joint.LastSolvedRowCount.Should().Be(4);
+        joint.GetCachedImpulse(3).Should().BeLessThan(Fixed64.Zero);
+        if (verticalAxis)
+        {
+            second.Body.AngularVelocity.X.Should().Be(Fixed64.Zero);
+            second.Body.AngularVelocity.Y.Should().Be(Fixed64.Zero);
+            second.Body.AngularVelocity.Z.Abs().Should().BeGreaterThan(Fixed64.Zero);
+        }
+        else
+        {
+            second.Body.AngularVelocity.X.Should().BeGreaterThan(Fixed64.Zero);
+            second.Body.AngularVelocity.Y.Should().Be(Fixed64.Zero);
+            second.Body.AngularVelocity.Z.Should().Be(Fixed64.Zero);
+        }
     }
 
     [Fact]
@@ -795,6 +877,61 @@ public sealed class Constraint3DServiceTests
         Step(scenario.Context, 2);
 
         joint.LastSolveMetrics.AngularLimitErrorMagnitude.Should().BeGreaterThan(Fixed64.Zero);
+    }
+
+    [Theory]
+    [InlineData(1, false)]
+    [InlineData(1, true)]
+    [InlineData(-1, false)]
+    [InlineData(-1, true)]
+    public void ConeTwistJoint_WithCombinedSwingAndTwist_ShouldEnforceDecomposedTwistLimit(
+        int twistSign,
+        bool negateQuaternion)
+    {
+        using PhysicsScenarioBuilder scenario = CreateConstraintScenario();
+        scenario.Context.Settings.DiscreteSolverIterations = 1;
+        ScenarioBody<LSSphereCollider> first = scenario.CreateSphere(Vector3d.Zero, immovable: true);
+        FixedQuaternion swing = FixedQuaternion.FromAxisAngle(Vector3d.Up, Fixed64.HalfPi);
+        FixedQuaternion twist = FixedQuaternion.FromAxisAngle(Vector3d.Forward, twistSign * Fixed64.HalfPi);
+        FixedQuaternion combined = (swing * twist).Normalized;
+        ScenarioBody<LSSphereCollider> second = scenario.CreateSphere(
+            Vector3d.Right * (Fixed64)2,
+            negateQuaternion ? -combined : combined);
+        Joint3D joint = scenario.Context.Constraints3D.RegisterJoint(new JointDefinition3D(
+            first.Body,
+            second.Body,
+            LocalFrame(Vector3d.Zero),
+            LocalFrame(Vector3d.Zero),
+            JointType3D.ConeTwist,
+            JointLimit3D.ConeTwist(Fixed64.Pi, Fixed64.FromFraction(13, 10)),
+            JointMotor3D.Disabled,
+            JointCollisionPolicy.SuppressLinked));
+
+        Step(scenario.Context, 1);
+
+        joint.LastSolveMetrics.AngularLimitErrorMagnitude.Should().BeGreaterThan(Fixed64.Zero);
+        joint.LastSolvedRowCount.Should().Be(4);
+        (joint.GetCachedImpulse(3) * twistSign).Should().BeLessThan(Fixed64.Zero);
+        second.Body.AngularVelocity.X.Should().Be(Fixed64.Zero);
+        second.Body.AngularVelocity.Y.Should().Be(Fixed64.Zero);
+        (second.Body.AngularVelocity.Z * twistSign).Should().BeLessThan(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void ConeTwistJoint_WithPurePiTwist_ShouldCanonicalizeQuaternionSign()
+    {
+        (Fixed64 CachedImpulse, Vector3d AngularVelocity, Fixed64 LimitError, int RowCount) canonical =
+            RunPurePiTwist(negateQuaternion: false);
+        (Fixed64 CachedImpulse, Vector3d AngularVelocity, Fixed64 LimitError, int RowCount) negated =
+            RunPurePiTwist(negateQuaternion: true);
+
+        canonical.Should().Be(negated);
+        canonical.CachedImpulse.Should().BeGreaterThan(Fixed64.Zero);
+        canonical.AngularVelocity.X.Should().Be(Fixed64.Zero);
+        canonical.AngularVelocity.Y.Should().Be(Fixed64.Zero);
+        canonical.AngularVelocity.Z.Should().BeGreaterThan(Fixed64.Zero);
+        canonical.LimitError.Should().BeGreaterThan(Fixed64.Zero);
+        canonical.RowCount.Should().Be(4);
     }
 
     [Fact]
@@ -1199,6 +1336,35 @@ public sealed class Constraint3DServiceTests
             FixedQuaternion.Angle(FixedQuaternion.Identity, second.Body.Rotation),
             second.Body.AngularVelocity,
             joint.AccumulatedImpulseMagnitude);
+    }
+
+    private static (Fixed64 CachedImpulse, Vector3d AngularVelocity, Fixed64 LimitError, int RowCount)
+        RunPurePiTwist(bool negateQuaternion)
+    {
+        using PhysicsScenarioBuilder scenario = CreateConstraintScenario();
+        scenario.Context.Settings.DiscreteSolverIterations = 1;
+        ScenarioBody<LSSphereCollider> first = scenario.CreateSphere(Vector3d.Zero, immovable: true);
+        FixedQuaternion rotation = FixedQuaternion.FromAxisAngle(Vector3d.Forward, Fixed64.Pi);
+        ScenarioBody<LSSphereCollider> second = scenario.CreateSphere(
+            Vector3d.Right * (Fixed64)2,
+            negateQuaternion ? -rotation : rotation);
+        Joint3D joint = scenario.Context.Constraints3D.RegisterJoint(new JointDefinition3D(
+            first.Body,
+            second.Body,
+            LocalFrame(Vector3d.Zero),
+            LocalFrame(Vector3d.Zero),
+            JointType3D.ConeTwist,
+            JointLimit3D.ConeTwist(Fixed64.Pi, Fixed64.HalfPi),
+            JointMotor3D.Disabled,
+            JointCollisionPolicy.SuppressLinked));
+
+        Step(scenario.Context, 1);
+
+        return (
+            joint.GetCachedImpulse(3),
+            second.Body.AngularVelocity,
+            joint.LastSolveMetrics.AngularLimitErrorMagnitude,
+            joint.LastSolvedRowCount);
     }
 
     private static RagdollDefinition3D CreateTwoLinkRagdoll(
