@@ -28,8 +28,10 @@ public sealed partial class GravitasPhysics2DService
     private readonly SwiftHashSet<ulong> _processedPairKeys = new();
     private readonly SwiftDictionary<ulong, CollisionPair2D> _pairs = new();
     private readonly SwiftList<ulong> _pairsToRemove = new();
+    private readonly SwiftList<CollisionPair2D> _pairsPendingSeparation = new();
     private readonly SwiftStack<CollisionPair2D> _cachedPairs = new();
     private readonly SwiftList<CollisionPair2D> _discreteResponsePairs = new();
+    private readonly SwiftList<CollisionPair2D> _existingResponsePairCandidates = new();
     private readonly SwiftHashSet<int> _discreteResponseBodyKeys = new();
     private readonly SwiftList<int> _discreteResponseBodyQueue = new();
     private readonly SwiftList<DiscreteIslandNode2D> _discreteIslandNodes = new();
@@ -216,8 +218,10 @@ public sealed partial class GravitasPhysics2DService
         _processedPairKeys.Clear();
         _pairs.Clear();
         _pairsToRemove.FastClear();
+        _pairsPendingSeparation.FastClear();
         _cachedPairs.Clear();
         _discreteResponsePairs.FastClear();
+        _existingResponsePairCandidates.FastClear();
         _discreteResponseBodyKeys.Clear();
         _discreteResponseBodyQueue.FastClear();
         _discreteIslandNodes.FastClear();
@@ -295,7 +299,9 @@ public sealed partial class GravitasPhysics2DService
         int expectedPairKeyCapacity = colliderCount * 4;
         _processedPairKeys.EnsureCapacity(expectedPairKeyCapacity);
         _pairsToRemove.EnsureCapacity(colliderCount);
+        _pairsPendingSeparation.EnsureCapacity(expectedPairKeyCapacity);
         _discreteResponsePairs.EnsureCapacity(expectedPairKeyCapacity);
+        _existingResponsePairCandidates.EnsureCapacity(expectedPairKeyCapacity);
         _discreteResponseBodyKeys.EnsureCapacity(colliderCount);
         _discreteResponseBodyQueue.EnsureCapacity(colliderCount);
         _discreteIslandNodes.EnsureCapacity(colliderCount);

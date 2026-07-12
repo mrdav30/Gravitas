@@ -51,6 +51,7 @@ public sealed class Physics2DPartitionBroadPhaseTests
     {
         var coordinates = new SwiftList<WorldVoxelIndex>();
         WorldVoxelIndex identity = CreateWorldVoxel(2, 20, 0, 0, 0);
+        coordinates.Add(new WorldVoxelIndex(2, 1, 20, new VoxelIndex(-11, 0, -11)));
         coordinates.Add(CreateWorldVoxel(2, 21, -9, 0, -9));
         coordinates.Add(CreateWorldVoxel(2, 20, 3, 0, 5));
         coordinates.Add(CreateWorldVoxel(2, 20, 1, 0, 7));

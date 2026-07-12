@@ -1,0 +1,526 @@
+using FixedMathSharp;
+using FluentAssertions;
+using Gravitas.Colliders;
+using Gravitas.Support;
+using Gravitas.Tests.Support;
+using GridForge.Configuration;
+using System;
+using Xunit;
+
+namespace Gravitas.Tests.Physics2D;
+
+public sealed class Physics2DPairLifecycleHardeningTests
+{
+    [Fact]
+    public void Simulate_WithNewSleepingTriggerAndAwakeBystander_ShouldNotifyWithoutWaking()
+    {
+        using GravitasWorldContext context = CreateContext(extent: 16);
+        SolidBody2D sleeper = CreateCircle(context, Vector2d.Zero, immovable: false);
+        LSCircleCollider2D trigger = CreateBodylessCircle(
+            context,
+            new Vector2d(Fixed64.FromFraction(3, 4), Fixed64.Zero),
+            isTrigger: true);
+        SolidBody2D bystander = CreateCircle(context, Vector2d.Zero, immovable: false);
+        bystander.Collider.IgnoredCollisionLayers = PhysicsLayerMask.FromLayer(sleeper.Collider.Layer);
+        int entered = 0;
+        int stayed = 0;
+        trigger.OnTriggerEnter += other =>
+        {
+            other.Should().BeSameAs(sleeper.Collider);
+            entered++;
+        };
+        trigger.OnTriggerStay += other =>
+        {
+            other.Should().BeSameAs(sleeper.Collider);
+            stayed++;
+        };
+        sleeper.Sleep();
+        Vector2d position = sleeper.Position;
+
+        Step(context);
+
+        sleeper.IsSleeping.Should().BeTrue();
+        sleeper.Position.Should().Be(position);
+        sleeper.Collider.TryGetCollisionPair(trigger.Id, out CollisionPair2D? pair).Should().BeTrue();
+        pair!.IsColliding.Should().BeTrue();
+        pair.LastFrame.Should().Be(context.FrameCount);
+        entered.Should().Be(1);
+        stayed.Should().Be(1);
+    }
+
+    [Fact]
+    public void Simulate_WithNewSleepingSolidPairAndAwakeBystander_ShouldSkipPairCreation()
+    {
+        using GravitasWorldContext context = CreateContext(extent: 16);
+        SolidBody2D sleeper = CreateCircle(context, Vector2d.Zero, immovable: false);
+        SolidBody2D support = CreateCircle(
+            context,
+            new Vector2d(Fixed64.FromFraction(3, 4), Fixed64.Zero),
+            immovable: true);
+        SolidBody2D bystander = CreateCircle(context, Vector2d.Zero, immovable: false);
+        bystander.Collider.IgnoredCollisionLayers = PhysicsLayerMask.FromLayer(sleeper.Collider.Layer);
+        int entered = 0;
+        sleeper.Collider.OnContactEnter += _ => entered++;
+        sleeper.Sleep();
+        Vector2d position = sleeper.Position;
+
+        Step(context);
+
+        sleeper.IsSleeping.Should().BeTrue();
+        sleeper.Position.Should().Be(position);
+        sleeper.LinearVelocity.Should().Be(Vector2d.Zero);
+        sleeper.Collider.TryGetCollisionPair(support.Collider.Id, out _).Should().BeFalse();
+        entered.Should().Be(0);
+    }
+
+    [Fact]
+    public void Simulate_WithSleepingPairAndAwakeBystander_ShouldKeepSingleResponsePairResting()
+    {
+        using GravitasWorldContext context = CreateContext(extent: 16);
+        SolidBody2D sleeper = CreateCircle(context, Vector2d.Zero, immovable: false);
+        SolidBody2D support = CreateCircle(
+            context,
+            new Vector2d(Fixed64.FromFraction(3, 4), Fixed64.Zero),
+            immovable: true);
+        int entered = 0;
+        int stayed = 0;
+        sleeper.Collider.OnContactEnter += _ => entered++;
+        sleeper.Collider.OnContact += _ => stayed++;
+
+        Step(context);
+        sleeper.SetPosition(Vector2d.Zero);
+        sleeper.Sleep();
+        SolidBody2D bystander = CreateCircle(context, Vector2d.Zero, immovable: false);
+        bystander.Collider.IgnoredCollisionLayers = PhysicsLayerMask.FromLayer(sleeper.Collider.Layer);
+        Vector2d position = sleeper.Position;
+        Vector2d velocity = sleeper.LinearVelocity;
+
+        Step(context);
+
+        CollisionPair2D pair = GetPair(sleeper, support);
+        sleeper.IsSleeping.Should().BeTrue();
+        sleeper.Position.Should().Be(position);
+        sleeper.LinearVelocity.Should().Be(velocity);
+        pair.IsColliding.Should().BeTrue();
+        pair.LastFrame.Should().Be(context.FrameCount);
+        entered.Should().Be(1);
+        stayed.Should().Be(1);
+    }
+
+    [Fact]
+    public void Simulate_WithFilteredSleepingPairAndPoolingDisabled_ShouldExitAndNotReusePair()
+    {
+        using GravitasWorldContext context = CreateContext(extent: 16);
+        context.Settings.PoolingEnabled = false;
+        SolidBody2D sleeper = CreateCircle(context, Vector2d.Zero, immovable: false);
+        SolidBody2D firstSupport = CreateCircle(
+            context,
+            new Vector2d(Fixed64.FromFraction(3, 4), Fixed64.Zero),
+            immovable: true);
+        int exited = 0;
+        sleeper.Collider.OnContactExit += _ => exited++;
+
+        Step(context);
+        CollisionPair2D removedPair = GetPair(sleeper, firstSupport);
+        sleeper.Collider.IgnoredCollisionLayers = PhysicsLayerMask.FromLayer(firstSupport.Collider.Layer);
+        sleeper.SetPosition(Vector2d.Zero);
+        sleeper.Sleep();
+
+        Step(context);
+
+        removedPair.IsColliding.Should().BeFalse();
+        sleeper.Collider.TryGetCollisionPair(firstSupport.Collider.Id, out _).Should().BeFalse();
+        exited.Should().Be(1);
+
+        sleeper.Collider.IgnoredCollisionLayers = PhysicsLayerMask.None;
+        sleeper.Wake();
+        SolidBody2D secondSupport = CreateCircle(
+            context,
+            new Vector2d(-Fixed64.FromFraction(3, 4), Fixed64.Zero),
+            immovable: true);
+        Step(context);
+
+        CollisionPair2D replacementPair = GetPair(sleeper, secondSupport);
+        replacementPair.Should().NotBeSameAs(removedPair);
+        replacementPair.IsColliding.Should().BeTrue();
+        replacementPair.LastFrame.Should().Be(context.FrameCount);
+    }
+
+    [Fact]
+    public void Simulate_WhenExpandedPairCallbackDeactivatesQueuedBodies_ShouldSkipStaleResponseState()
+    {
+        using GravitasWorldContext context = CreateContext(extent: 32);
+        SolidBody2D bridge = CreateCircle(context, Vector2d.Zero, immovable: false);
+        SolidBody2D retainedSupport = CreateCircle(
+            context,
+            new Vector2d(Fixed64.FromFraction(3, 4), Fixed64.Zero),
+            immovable: true);
+        Step(context);
+        bridge.SetPosition(Vector2d.Zero);
+        CollisionPair2D retainedPair = GetPair(bridge, retainedSupport);
+        context.Collisions2D.ClearPartitionedCollider(retainedSupport.Collider, force: true).Should().BeTrue();
+
+        SolidBody2D queued = CreateCircle(context, new Vector2d((Fixed64)8, Fixed64.Zero), immovable: false);
+        SolidBody2D queuedSupport = CreateCircle(
+            context,
+            new Vector2d((Fixed64)8 + Fixed64.FromFraction(3, 4), Fixed64.Zero),
+            immovable: true);
+        SolidBody2D bridgeSupport = CreateCircle(
+            context,
+            new Vector2d(-Fixed64.FromFraction(3, 4), Fixed64.Zero),
+            immovable: true);
+        int callbackCount = 0;
+        bridge.Collider.OnContact += other =>
+        {
+            if (!ReferenceEquals(other, retainedSupport))
+                return;
+
+            callbackCount++;
+            queued.Deactivate();
+            queuedSupport.Deactivate();
+        };
+
+        Step(context);
+
+        callbackCount.Should().Be(1);
+        queued.Active.Should().BeFalse();
+        queuedSupport.Active.Should().BeFalse();
+        queued.DynamicId.Should().Be(-1);
+        queuedSupport.DynamicId.Should().Be(-1);
+        bridge.Collider.TryGetCollisionPair(bridgeSupport.Collider.Id, out CollisionPair2D? bridgePair)
+            .Should()
+            .BeTrue();
+        bridgePair!.IsColliding.Should().BeTrue();
+        bridgePair.LastFrame.Should().Be(context.FrameCount);
+        retainedPair.IsColliding.Should().BeTrue();
+        retainedPair.LastFrame.Should().Be(context.FrameCount);
+    }
+
+    [Fact]
+    public void Simulate_WhenExpandedPairCallbackRemovesCurrentPair_ShouldSkipItWithoutInvalidatingEnumeration()
+    {
+        using GravitasWorldContext context = CreateContext(extent: 32);
+        SolidBody2D bridge = CreateCircle(context, Vector2d.Zero, immovable: false);
+        SolidBody2D retainedSupport = CreateCircle(
+            context,
+            new Vector2d(Fixed64.FromFraction(3, 4), Fixed64.Zero),
+            immovable: true);
+        SolidBody2D retainedSecondSupport = CreateCircle(
+            context,
+            new Vector2d(-Fixed64.FromFraction(3, 4), Fixed64.Zero),
+            immovable: true);
+        Step(context);
+        bridge.SetPosition(Vector2d.Zero);
+        CollisionPair2D removedPair = GetPair(bridge, retainedSupport);
+        CollisionPair2D removedSecondPair = GetPair(bridge, retainedSecondSupport);
+        context.Collisions2D.ClearPartitionedCollider(retainedSupport.Collider, force: true).Should().BeTrue();
+        context.Collisions2D.ClearPartitionedCollider(retainedSecondSupport.Collider, force: true).Should().BeTrue();
+        SolidBody2D bridgeSupport = CreateCircle(
+            context,
+            new Vector2d(Fixed64.Zero, Fixed64.FromFraction(3, 4)),
+            immovable: true);
+        int callbacks = 0;
+        bridge.Collider.OnContact += other =>
+        {
+            if (!ReferenceEquals(other, retainedSupport))
+                return;
+
+            callbacks++;
+            retainedSupport.Deactivate();
+            retainedSecondSupport.Deactivate();
+        };
+
+        Action simulate = () => Step(context);
+
+        simulate.Should().NotThrow();
+        callbacks.Should().Be(1);
+        retainedSupport.Active.Should().BeFalse();
+        retainedSecondSupport.Active.Should().BeFalse();
+        removedPair.IsColliding.Should().BeFalse();
+        removedSecondPair.IsColliding.Should().BeFalse();
+        bridge.Collider.TryGetCollisionPair(bridgeSupport.Collider.Id, out CollisionPair2D? currentPair)
+            .Should()
+            .BeTrue();
+        currentPair!.IsColliding.Should().BeTrue();
+        currentPair.LastFrame.Should().Be(context.FrameCount);
+    }
+
+    [Fact]
+    public void Simulate_WhenRetainedTriggersAreDiscoveredThroughResponseExpansion_ShouldKeepBothPairOrders()
+    {
+        using GravitasWorldContext context = CreateContext(extent: 32);
+        LSCircleCollider2D firstTrigger = CreateBodylessCircle(context, Vector2d.Zero, isTrigger: true);
+        SolidBody2D firstBridge = CreateCircle(
+            context,
+            new Vector2d(Fixed64.FromFraction(3, 4), Fixed64.Zero),
+            immovable: false);
+        SolidBody2D secondBridge = CreateCircle(context, new Vector2d((Fixed64)8, Fixed64.Zero), immovable: false);
+        LSCircleCollider2D secondTrigger = CreateBodylessCircle(
+            context,
+            new Vector2d((Fixed64)8 + Fixed64.FromFraction(3, 4), Fixed64.Zero),
+            isTrigger: true);
+        int firstEntered = 0;
+        int firstStayed = 0;
+        int secondEntered = 0;
+        int secondStayed = 0;
+        firstTrigger.OnTriggerEnter += _ => firstEntered++;
+        firstTrigger.OnTriggerStay += _ => firstStayed++;
+        secondTrigger.OnTriggerEnter += _ => secondEntered++;
+        secondTrigger.OnTriggerStay += _ => secondStayed++;
+
+        Step(context);
+        firstTrigger.TryGetCollisionPair(firstBridge.Collider.Id, out CollisionPair2D? firstPair).Should().BeTrue();
+        secondBridge.Collider.TryGetCollisionPair(secondTrigger.Id, out CollisionPair2D? secondPair).Should().BeTrue();
+        firstPair!.ColliderA.Should().BeSameAs(firstTrigger);
+        secondPair!.ColliderB.Should().BeSameAs(secondTrigger);
+        context.Collisions2D.ClearPartitionedCollider(firstTrigger, force: true).Should().BeTrue();
+        context.Collisions2D.ClearPartitionedCollider(secondTrigger, force: true).Should().BeTrue();
+        _ = CreateCircle(context, new Vector2d(Fixed64.FromFraction(3, 2), Fixed64.Zero), immovable: true);
+        _ = CreateCircle(
+            context,
+            new Vector2d((Fixed64)8 - Fixed64.FromFraction(3, 4), Fixed64.Zero),
+            immovable: true);
+
+        Step(context);
+
+        firstPair.IsColliding.Should().BeTrue();
+        secondPair.IsColliding.Should().BeTrue();
+        firstPair.LastFrame.Should().Be(context.FrameCount);
+        secondPair.LastFrame.Should().Be(context.FrameCount);
+        firstEntered.Should().Be(1);
+        secondEntered.Should().Be(1);
+        firstStayed.Should().Be(2);
+        secondStayed.Should().Be(2);
+    }
+
+    [Fact]
+    public void Simulate_WhenExitCallbackRemovesCurrentPair_ShouldRecycleItOnlyOnce()
+    {
+        using GravitasWorldContext context = CreateContext(extent: 32);
+        SolidBody2D first = CreateCircle(context, Vector2d.Zero, immovable: false);
+        SolidBody2D removedSupport = CreateCircle(
+            context,
+            new Vector2d(Fixed64.FromFraction(3, 4), Fixed64.Zero),
+            immovable: true);
+        SolidBody2D removedSecondSupport = CreateCircle(
+            context,
+            new Vector2d(-Fixed64.FromFraction(3, 4), Fixed64.Zero),
+            immovable: true);
+        int removedSupportId = removedSupport.Collider.Id;
+        int exits = 0;
+
+        Step(context);
+        first.Collider.OnContactExit += other =>
+        {
+            exits++;
+            if (ReferenceEquals(other, removedSupport))
+            {
+                removedSupport.Deactivate();
+                removedSecondSupport.Deactivate();
+            }
+        };
+        first.SetPosition(new Vector2d((Fixed64)(-4), Fixed64.Zero));
+
+        Action cleanup = () => Step(context);
+
+        cleanup.Should().NotThrow();
+        exits.Should().Be(2);
+        removedSupport.Active.Should().BeFalse();
+        removedSecondSupport.Active.Should().BeFalse();
+        first.Collider.TryGetCollisionPair(removedSupportId, out _).Should().BeFalse();
+
+        SolidBody2D second = CreateCircle(context, Vector2d.Zero, immovable: false);
+        SolidBody2D secondSupport = CreateCircle(
+            context,
+            new Vector2d(Fixed64.FromFraction(3, 4), Fixed64.Zero),
+            immovable: true);
+        SolidBody2D third = CreateCircle(context, new Vector2d((Fixed64)8, Fixed64.Zero), immovable: false);
+        SolidBody2D thirdSupport = CreateCircle(
+            context,
+            new Vector2d((Fixed64)8 + Fixed64.FromFraction(3, 4), Fixed64.Zero),
+            immovable: true);
+
+        Step(context);
+
+        CollisionPair2D secondPair = GetPair(second, secondSupport);
+        CollisionPair2D thirdPair = GetPair(third, thirdSupport);
+        secondPair.Should().NotBeSameAs(thirdPair);
+        secondPair.ColliderA.Should().BeOneOf(second.Collider, secondSupport.Collider);
+        secondPair.ColliderB.Should().BeOneOf(second.Collider, secondSupport.Collider);
+        thirdPair.ColliderA.Should().BeOneOf(third.Collider, thirdSupport.Collider);
+        thirdPair.ColliderB.Should().BeOneOf(third.Collider, thirdSupport.Collider);
+        secondPair.LastFrame.Should().Be(context.FrameCount);
+        thirdPair.LastFrame.Should().Be(context.FrameCount);
+    }
+
+    [Fact]
+    public void Deactivate_WhenExitCallbackRemovesAnotherOwnedPair_ShouldClearEveryPairOnce()
+    {
+        using GravitasWorldContext context = CreateContext(extent: 32);
+        SolidBody2D owner = CreateCircle(context, Vector2d.Zero, immovable: false);
+        SolidBody2D firstSupport = CreateCircle(
+            context,
+            new Vector2d(Fixed64.FromFraction(3, 4), Fixed64.Zero),
+            immovable: true);
+        SolidBody2D secondSupport = CreateCircle(
+            context,
+            new Vector2d(-Fixed64.FromFraction(3, 4), Fixed64.Zero),
+            immovable: true);
+        int exits = 0;
+
+        Step(context);
+        CollisionPair2D firstPair = GetPair(owner, firstSupport);
+        CollisionPair2D secondPair = GetPair(owner, secondSupport);
+        owner.Collider.OnContactExit += other =>
+        {
+            exits++;
+            if (ReferenceEquals(other, firstSupport))
+                secondSupport.Deactivate();
+        };
+
+        Action deactivate = owner.Deactivate;
+
+        deactivate.Should().NotThrow();
+        exits.Should().Be(2);
+        owner.Active.Should().BeFalse();
+        secondSupport.Active.Should().BeFalse();
+        firstPair.IsColliding.Should().BeFalse();
+        secondPair.IsColliding.Should().BeFalse();
+        firstSupport.Collider.CollisionPairHolderCount.Should().Be(0);
+        context.Physics2D.ColliderCount.Should().Be(1);
+    }
+
+    [Fact]
+    public void Simulate_WhenEnterCallbackRemovesCurrentPair_ShouldNotReuseQueuedPairReference()
+    {
+        EnterDeactivationResult unpooled = RunEnterDeactivationScenario(poolingEnabled: false);
+        EnterDeactivationResult pooled = RunEnterDeactivationScenario(poolingEnabled: true);
+
+        pooled.Should().Be(unpooled);
+    }
+
+    private static EnterDeactivationResult RunEnterDeactivationScenario(bool poolingEnabled)
+    {
+        using GravitasWorldContext context = CreateContext(extent: 32);
+        context.Settings.PoolingEnabled = poolingEnabled;
+        SolidBody2D first = CreateCircle(context, Vector2d.Zero, immovable: false);
+        SolidBody2D removedSupport = CreateCircle(
+            context,
+            new Vector2d(Fixed64.FromFraction(3, 4), Fixed64.Zero),
+            immovable: true);
+        SolidBody2D second = CreateCircle(context, new Vector2d((Fixed64)8, Fixed64.Zero), immovable: false);
+        SolidBody2D secondSupport = CreateCircle(
+            context,
+            new Vector2d((Fixed64)8 + Fixed64.FromFraction(3, 4), Fixed64.Zero),
+            immovable: true);
+        int removedSupportId = removedSupport.Collider.Id;
+        int firstEntered = 0;
+        int firstExited = 0;
+        int secondEntered = 0;
+        first.Collider.OnContactEnter += other =>
+        {
+            other.Should().BeSameAs(removedSupport);
+            firstEntered++;
+            removedSupport.Deactivate();
+        };
+        first.Collider.OnContactExit += _ => firstExited++;
+        second.Collider.OnContactEnter += other =>
+        {
+            other.Should().BeSameAs(secondSupport);
+            secondEntered++;
+        };
+
+        Step(context);
+
+        first.Collider.TryGetCollisionPair(removedSupportId, out _).Should().BeFalse();
+        CollisionPair2D secondPair = GetPair(second, secondSupport);
+        secondPair.IsColliding.Should().BeTrue();
+        secondPair.LastFrame.Should().Be(context.FrameCount);
+        return new EnterDeactivationResult(
+            second.Position,
+            second.LinearVelocity,
+            firstEntered,
+            firstExited,
+            secondEntered,
+            context.Physics2D.ColliderCount);
+    }
+
+    private static GravitasWorldContext CreateContext(int extent, int frameRate = 4)
+    {
+        GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        context.SetFrameRate(frameRate);
+        context.Settings.RuntimeMode = PhysicsRuntimeMode.TwoD;
+        context.World.TryAddGrid(
+            new GridConfiguration(
+                new Vector3d((Fixed64)(-16), Fixed64.Zero, (Fixed64)(-16)),
+                new Vector3d((Fixed64)extent, Fixed64.Zero, (Fixed64)extent)),
+            out _).Should().BeTrue();
+        return context;
+    }
+
+    private static void Step(GravitasWorldContext context)
+    {
+        context.Simulate();
+        context.LateSimulate();
+    }
+
+    private static CollisionPair2D GetPair(SolidBody2D first, SolidBody2D second)
+    {
+        if (first.Collider.TryGetCollisionPair(second.Collider.Id, out CollisionPair2D? firstPair) && firstPair != null)
+            return firstPair;
+
+        second.Collider.TryGetCollisionPair(first.Collider.Id, out CollisionPair2D? secondPair).Should().BeTrue();
+        return secondPair!;
+    }
+
+    private static SolidBody2D CreateCircle(GravitasWorldContext context, Vector2d position, bool immovable)
+    {
+        return CreateBody(context, new LSCircleCollider2D(Fixed64.Half), position, immovable);
+    }
+
+    private static LSCircleCollider2D CreateBodylessCircle(
+        GravitasWorldContext context,
+        Vector2d position,
+        bool isTrigger)
+    {
+        var transform = new FixedTransform(
+            new Vector3d(position.X, Fixed64.Zero, position.Y),
+            FixedQuaternion.Identity,
+            Vector3d.One);
+        var agent = new TestMatterAgent(context, transform);
+        var collider = new LSCircleCollider2D(Fixed64.Half)
+        {
+            IsTrigger = isTrigger
+        };
+        collider.InitializeWithNoBody(agent);
+        return collider;
+    }
+
+    private static SolidBody2D CreateBody(
+        GravitasWorldContext context,
+        LSCollider2D collider,
+        Vector2d position,
+        bool immovable)
+    {
+        var transform = new FixedTransform(
+            new Vector3d(position.X, Fixed64.Zero, position.Y),
+            FixedQuaternion.Identity,
+            Vector3d.One);
+        var agent = new TestMatterAgent(context, transform);
+        var body = new SolidBody2D(agent, collider)
+        {
+            Mass = Fixed64.One,
+            FreezeAxes = immovable ? BodyFreezeAxes2D.Position : BodyFreezeAxes2D.None
+        };
+        body.Initialize(position);
+        return body;
+    }
+
+    private readonly record struct EnterDeactivationResult(
+        Vector2d Position,
+        Vector2d Velocity,
+        int FirstEntered,
+        int FirstExited,
+        int SecondEntered,
+        int ColliderCount);
+}

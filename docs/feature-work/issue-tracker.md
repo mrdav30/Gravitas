@@ -61,6 +61,33 @@ handling disconnected input without the AABB false-positive.
 
 ## Resolved Issues
 
+### Synchronous 2D Contact Callbacks Could Corrupt Pair Teardown And Reuse
+
+**Discovered:** 2026-07-12  
+**Resolved:** 2026-07-12  
+**Source:** 95%-to-100% coverage hardening, 2D pair/response lifecycle review  
+**Affected area:** `GravitasPhysics2DService` response expansion, pair cleanup,
+deactivation, and pooling
+
+RCA: 2D contact enter/exit callbacks run synchronously while the service is
+walking pair registries. A callback that deactivated a collider could mutate
+the active `SwiftDictionary` enumerator and throw. An enter callback could also
+remove and recycle the current pair before `ProcessCandidate(...)` appended
+its local reference, allowing that object to be reused by a later collision
+and solved twice.
+
+Fix: existing response edges are snapshotted into a pre-sized service buffer
+before callbacks. Pair cleanup snapshots stable keys, and direct teardown
+stages nested separation ranges, removes registry ownership before notifying,
+and recycles each still-current pair once. Response append paths revalidate
+registered pair identity and physical eligibility after notification.
+
+Verification: deterministic regressions cover current and later snapshotted
+pair removal during expansion, stale queued bodies and rootless response rows,
+cleanup removal of a later key, nested multi-pair deactivation with exact exit
+counts, distinct pooled replacements, and pooled/unpooled position equality
+after enter-callback removal.
+
 ### Fixed-Point Sphere Tangency Could Be Rejected By Normalization Residue
 
 **Discovered:** 2026-07-12  

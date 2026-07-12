@@ -492,6 +492,54 @@ public sealed class Constraint2DServiceTests
     }
 
     [Fact]
+    public void ConstraintIsland_WithOnlySleepingBodies_ShouldSkipSolvingAndRemainUnchanged()
+    {
+        using GravitasWorldContext context = CreateConstraintContext();
+        SolidBody2D first = CreateBody(context, Vector2d.Zero);
+        SolidBody2D second = CreateBody(context, Vector2d.Right * (Fixed64)3);
+        Joint2D joint = context.Constraints2D.RegisterJoint(CreatePin(first, second));
+        first.Sleep();
+        second.Sleep();
+        Vector2d firstPosition = first.Position;
+        Vector2d secondPosition = second.Position;
+
+        Step(context);
+
+        first.IsSleeping.Should().BeTrue();
+        second.IsSleeping.Should().BeTrue();
+        first.Position.Should().Be(firstPosition);
+        second.Position.Should().Be(secondPosition);
+        first.LinearVelocity.Should().Be(Vector2d.Zero);
+        second.LinearVelocity.Should().Be(Vector2d.Zero);
+        joint.LastSolvedRowCount.Should().Be(0);
+        joint.AccumulatedImpulseMagnitude.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void ConstraintIsland_WithSparseJointIdsAndMovableBodyA_ShouldSolveSurvivingJoint()
+    {
+        using GravitasWorldContext context = CreateConstraintContext();
+        SolidBody2D removedFirst = CreateBody(context, new Vector2d((Fixed64)(-8), Fixed64.Zero));
+        SolidBody2D removedSecond = CreateBody(context, new Vector2d((Fixed64)(-6), Fixed64.Zero));
+        Joint2D removed = context.Constraints2D.RegisterJoint(CreatePin(removedFirst, removedSecond));
+        SolidBody2D movable = CreateBody(context, Vector2d.Zero);
+        SolidBody2D anchor = CreateBody(context, Vector2d.Right * (Fixed64)3, immovable: true);
+        Joint2D surviving = context.Constraints2D.RegisterJoint(CreatePin(movable, anchor));
+        Vector2d anchorPosition = anchor.Position;
+        Vector2d movablePosition = movable.Position;
+
+        context.Constraints2D.RemoveJoint(removed.Id).Should().BeTrue();
+        Step(context, 2);
+
+        context.Constraints2D.RegisteredJointCount.Should().Be(1);
+        context.Constraints2D.GetJoint(surviving.Id).Should().BeSameAs(surviving);
+        movable.Position.Should().NotBe(movablePosition);
+        anchor.Position.Should().Be(anchorPosition);
+        surviving.LastSolvedRowCount.Should().BeGreaterThan(0);
+        surviving.AccumulatedImpulseMagnitude.Should().BeGreaterThan(Fixed64.Zero);
+    }
+
+    [Fact]
     public void ConstraintSolver_WithOnlyFrozen2DBodies_ShouldKeepJointRegisteredWithoutRows()
     {
         using GravitasWorldContext context = CreateConstraintContext();

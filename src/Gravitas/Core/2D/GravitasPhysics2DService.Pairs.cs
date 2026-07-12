@@ -94,7 +94,8 @@ public sealed partial class GravitasPhysics2DService
         ulong key = CreatePairKey(first.Id, second.Id);
         bool hasPair = _pairs.TryGetValue(key, out CollisionPair2D pair);
         bool hasAwakeMovableParticipant = HasAwakeMovableParticipant(first, second);
-        bool triggerPair = first.IsTrigger || second.IsTrigger;
+        // Partition distribution places a body-backed dynamic first; 2D triggers are bodyless static candidates.
+        bool triggerPair = second.IsTrigger;
         if (!hasPair && !hasAwakeMovableParticipant && !triggerPair)
             return;
 
@@ -132,6 +133,9 @@ public sealed partial class GravitasPhysics2DService
             RegisterPair(key, pair);
 
         pair.MarkCollidingDeferred(frame);
+        if (!IsCurrentResponsePair(key, pair))
+            return;
+
         _discreteResponsePairs.Add(pair);
     }
 
@@ -169,32 +173,42 @@ public sealed partial class GravitasPhysics2DService
 
     private void AddExistingResponsePairs(LSCollider2D collider, int frame)
     {
+        _existingResponsePairCandidates.FastClear();
         SwiftDictionary<int, CollisionPair2D>? ownedPairs = collider.CollisionPairs;
         if (ownedPairs != null)
         {
             foreach (var pairEntry in ownedPairs)
-                TryAddExistingResponsePair(pairEntry.Value, frame);
+                _existingResponsePairCandidates.Add(pairEntry.Value);
         }
 
         SwiftHashSet<int>? pairHolders = collider.CollisionPairHolders;
-        if (pairHolders == null)
-            return;
-
-        foreach (int holderId in pairHolders)
+        if (pairHolders != null)
         {
-            if (!TryGetColliderById(holderId, out LSCollider2D? holder)
-                || !holder!.TryGetCollisionPair(collider.Id, out CollisionPair2D? pair))
+            foreach (int holderId in pairHolders)
             {
-                continue;
-            }
+                if (!TryGetColliderById(holderId, out LSCollider2D? holder)
+                    || !holder!.TryGetCollisionPair(collider.Id, out CollisionPair2D? pair))
+                {
+                    continue;
+                }
 
-            TryAddExistingResponsePair(pair!, frame);
+                _existingResponsePairCandidates.Add(pair!);
+            }
         }
+
+        for (int i = 0; i < _existingResponsePairCandidates.Count; i++)
+            TryAddExistingResponsePair(_existingResponsePairCandidates[i], frame);
     }
 
     private void TryAddExistingResponsePair(CollisionPair2D pair, int frame)
     {
         ulong key = CreatePairKey(pair.Id1, pair.Id2);
+        if (!_pairs.TryGetValue(key, out CollisionPair2D currentPair)
+            || !ReferenceEquals(currentPair, pair))
+        {
+            return;
+        }
+
         if (!_processedPairKeys.Add(key))
             return;
 
@@ -214,6 +228,9 @@ public sealed partial class GravitasPhysics2DService
         else
             pair.MarkResting(frame);
 
+        if (!IsCurrentResponsePair(key, pair))
+            return;
+
         _discreteResponsePairs.Add(pair);
         AddDiscreteResponseBody(first.Body);
         AddDiscreteResponseBody(second.Body);
@@ -226,6 +243,13 @@ public sealed partial class GravitasPhysics2DService
 
         _discreteResponseBodyQueue.Add(body.DynamicId);
     }
+
+    private bool IsCurrentResponsePair(ulong key, CollisionPair2D pair) =>
+        _pairs.TryGetValue(key, out CollisionPair2D currentPair)
+        && ReferenceEquals(currentPair, pair)
+        && !pair.ColliderA.IsTrigger
+        && !pair.ColliderB.IsTrigger
+        && RequireCollisionPair(pair.ColliderA, pair.ColliderB);
 
     internal bool RequireCollisionPair(LSCollider2D first, LSCollider2D second)
     {
@@ -243,24 +267,24 @@ public sealed partial class GravitasPhysics2DService
     {
         _pairsToRemove.FastClear();
         foreach (var pairEntry in _pairs)
+            _pairsToRemove.Add(pairEntry.Key);
+
+        for (int i = 0; i < _pairsToRemove.Count; i++)
         {
-            CollisionPair2D pair = pairEntry.Value;
+            ulong key = _pairsToRemove[i];
+            if (!_pairs.TryGetValue(key, out CollisionPair2D pair))
+                continue;
+
             if (pair.LastFrame == frame)
                 continue;
 
             if (TryKeepUntouchedPair(pair, frame))
                 continue;
 
-            pair.MarkSeparated();
             RemovePairReferences(pair);
-            _pairsToRemove.Add(pairEntry.Key);
-        }
-
-        for (int i = 0; i < _pairsToRemove.Count; i++)
-        {
-            ulong key = _pairsToRemove[i];
-            RecyclePair(_pairs[key]);
             _pairs.Remove(key);
+            pair.MarkSeparated();
+            RecyclePair(pair);
         }
     }
 
@@ -306,17 +330,12 @@ public sealed partial class GravitasPhysics2DService
 
     private void RemovePairsForCollider(LSCollider2D collider)
     {
+        int separationStart = _pairsPendingSeparation.Count;
         SwiftDictionary<int, CollisionPair2D>? collisionPairs = collider.CollisionPairs;
         if (collisionPairs != null)
         {
             foreach (var pairEntry in collisionPairs)
-            {
-                CollisionPair2D pair = pairEntry.Value;
-                pair.MarkSeparated();
-                pair.ColliderB.TryRemoveCollisionPairHolder(pair.Id1);
-                _pairs.Remove(CreatePairKey(pair.Id1, pair.Id2));
-                RecyclePair(pair);
-            }
+                _pairsPendingSeparation.Add(pairEntry.Value);
         }
 
         SwiftHashSet<int>? collisionPairHolders = collider.CollisionPairHolders;
@@ -325,18 +344,33 @@ public sealed partial class GravitasPhysics2DService
             foreach (int holderId in collisionPairHolders)
             {
                 if (!TryGetColliderById(holderId, out LSCollider2D? holder)
-                    || !holder!.TryRemoveCollisionPair(collider.Id, out CollisionPair2D? pair))
+                    || !holder!.TryGetCollisionPair(collider.Id, out CollisionPair2D? pair))
                 {
                     continue;
                 }
 
-                pair!.MarkSeparated();
-                _pairs.Remove(CreatePairKey(pair.Id1, pair.Id2));
-                RecyclePair(pair);
+                _pairsPendingSeparation.Add(pair!);
             }
+        }
+
+        int separationEnd = _pairsPendingSeparation.Count;
+        for (int i = separationStart; i < separationEnd; i++)
+        {
+            CollisionPair2D pair = _pairsPendingSeparation[i];
+            ulong key = CreatePairKey(pair.Id1, pair.Id2);
+            if (!_pairs.ContainsKey(key))
+                continue;
+
+            RemovePairReferences(pair);
+            _pairs.Remove(key);
+            pair.MarkSeparated();
+            RecyclePair(pair);
         }
 
         collider.ClearCollisionPairState();
         collider.ClearRuntimeRelationships();
+
+        if (separationStart == 0)
+            _pairsPendingSeparation.FastClear();
     }
 }
