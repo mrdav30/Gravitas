@@ -234,10 +234,11 @@ public sealed class LSPolygonCollider2D : LSCollider2D
     private Fixed64 CalculateSignedDoubleArea()
     {
         Fixed64 signedDoubleArea = Fixed64.Zero;
+        Vector2d anchor = GetMassPropertyVertex(0);
         for (int i = 0; i < _localVertices.Length; i++)
         {
-            Vector2d a = GetMassPropertyVertex(i);
-            Vector2d b = GetMassPropertyVertex((i + 1) % _localVertices.Length);
+            Vector2d a = GetMassPropertyVertex(i) - anchor;
+            Vector2d b = GetMassPropertyVertex((i + 1) % _localVertices.Length) - anchor;
             signedDoubleArea += Vector2d.CrossProduct(a, b);
         }
 
@@ -248,10 +249,11 @@ public sealed class LSPolygonCollider2D : LSCollider2D
     {
         signedDoubleArea = Fixed64.Zero;
         Vector2d weightedCentroid = Vector2d.Zero;
+        Vector2d anchor = GetMassPropertyVertex(0);
         for (int i = 0; i < _localVertices.Length; i++)
         {
-            Vector2d a = GetMassPropertyVertex(i);
-            Vector2d b = GetMassPropertyVertex((i + 1) % _localVertices.Length);
+            Vector2d a = GetMassPropertyVertex(i) - anchor;
+            Vector2d b = GetMassPropertyVertex((i + 1) % _localVertices.Length) - anchor;
             Fixed64 cross = Vector2d.CrossProduct(a, b);
             signedDoubleArea += cross;
             weightedCentroid += (a + b) * cross;
@@ -263,7 +265,7 @@ public sealed class LSPolygonCollider2D : LSCollider2D
             return false;
         }
 
-        centroid = weightedCentroid / ((Fixed64)3 * signedDoubleArea);
+        centroid = anchor + weightedCentroid / ((Fixed64)3 * signedDoubleArea);
         return true;
     }
 

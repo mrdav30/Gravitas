@@ -9,6 +9,65 @@ namespace Gravitas.Tests.Colliders;
 
 public sealed class LSPolygonCollider2DCoverageTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void LargeTranslation_ShouldPreservePolygonCentroidAndInertia(bool clockwise)
+    {
+        Vector2d[] vertices = clockwise
+            ? new[] { Vector2d.Zero, Vector2d.Forward, Vector2d.Right }
+            : new[] { Vector2d.Zero, Vector2d.Right, Vector2d.Forward };
+        Vector2d translation = new((Fixed64)30000, (Fixed64)30000);
+        Vector2d[] translatedVertices =
+        {
+            vertices[0] + translation,
+            vertices[1] + translation,
+            vertices[2] + translation
+        };
+        var origin = new LSPolygonCollider2D(vertices);
+        var translated = new LSPolygonCollider2D(translatedVertices);
+        Vector2d originCentroid = origin.CalculateLocalCenterOfMassOffset();
+        Vector2d translatedCentroid = translated.CalculateLocalCenterOfMassOffset();
+        Vector2d originReference = new((Fixed64)2, (Fixed64)(-3));
+        Fixed64 mass = (Fixed64)100;
+
+        translatedCentroid.Should().Be(originCentroid + translation);
+        translated.CalculateMomentOfInertia(mass, translatedCentroid).m_rawValue
+            .Should().Be(origin.CalculateMomentOfInertia(mass, originCentroid).m_rawValue);
+        translated.CalculateMomentOfInertia(mass, originReference + translation).m_rawValue
+            .Should().Be(origin.CalculateMomentOfInertia(mass, originReference).m_rawValue);
+    }
+
+    [Fact]
+    public void LargeCompoundOffset_ShouldPreserveScaledPolygonCentroidAndInertia()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        Vector2d[] vertices = { Vector2d.Zero, Vector2d.Right, Vector2d.Forward };
+        Vector2d translation = new((Fixed64)30000, (Fixed64)30000);
+        Vector2d scale = new((Fixed64)2, (Fixed64)3);
+        Vector2d scaledTranslation = Vector2d.Multiply(translation, scale);
+        var originCompound = new LSCompoundCollider2D(
+            CompoundColliderPart2D.ConvexPolygon(vertices, Vector2d.Zero, Fixed64.Zero, scale));
+        var translatedCompound = new LSCompoundCollider2D(
+            CompoundColliderPart2D.ConvexPolygon(vertices, translation, Fixed64.Zero, scale));
+        var originBody = new SolidBody2D(new TestMatterAgent(context), originCompound);
+        var translatedBody = new SolidBody2D(new TestMatterAgent(context), translatedCompound);
+        originBody.Initialize(Vector2d.Zero);
+        translatedBody.Initialize(Vector2d.Zero);
+        var origin = (LSPolygonCollider2D)originCompound.GetPartCollider(0);
+        var translated = (LSPolygonCollider2D)translatedCompound.GetPartCollider(0);
+        Vector2d originCentroid = origin.CalculateLocalCenterOfMassOffset();
+        Vector2d translatedCentroid = translated.CalculateLocalCenterOfMassOffset();
+        Vector2d originReference = new((Fixed64)(-4), (Fixed64)5);
+        Fixed64 mass = (Fixed64)100;
+
+        translatedCentroid.Should().Be(originCentroid + scaledTranslation);
+        translated.CalculateMomentOfInertia(mass, translatedCentroid).m_rawValue
+            .Should().Be(origin.CalculateMomentOfInertia(mass, originCentroid).m_rawValue);
+        translated.CalculateMomentOfInertia(mass, originReference + scaledTranslation).m_rawValue
+            .Should().Be(origin.CalculateMomentOfInertia(mass, originReference).m_rawValue);
+    }
+
     [Fact]
     public void TranslatedPolygon_ShouldCalculateStableCenteredInertia()
     {
