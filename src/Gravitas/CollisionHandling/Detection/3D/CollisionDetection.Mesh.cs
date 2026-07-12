@@ -14,17 +14,6 @@ public static partial class CollisionDetection
 {
     #region Mesh
 
-    /// <summary>
-    /// Assumes collider A is the mesh collider and collider B is the sphere collider.
-    /// </summary>
-    /// <param name="pair"></param>
-    /// <returns>True if colliders intersect, otherwise false</returns>
-    public static bool DoMeshSphereCheck(CollisionPair pair)
-    {
-        pair.Manifold.BeginUpdate(pair.Context.FrameCount);
-        return DoMeshSphereCheck(CollisionWorkItem.Create(pair));
-    }
-
     private static bool DoMeshSphereCheck(CollisionWorkItem pair)
     {
         var meshCollider = (LSMeshCollider)pair.ColliderA;

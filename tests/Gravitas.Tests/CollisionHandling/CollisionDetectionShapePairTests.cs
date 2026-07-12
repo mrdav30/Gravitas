@@ -849,6 +849,71 @@ public sealed class CollisionDetectionShapePairTests
     }
 
     [Fact]
+    public void MeshSphere_WithCenterAboveConvexSurface_ShouldUseSurfaceDistance()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSMeshCollider> floor = scenario.CreateBody(
+            CreateHorizontalPlaneMesh(),
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+        ScenarioBody<LSSphereCollider> sphere = scenario.CreateSphere(
+            new Vector3d(Fixed64.Zero, Fixed64.FromFraction(1, 4), Fixed64.Zero));
+
+        CollisionPair pair = AssertCollision(scenario, floor.Collider, sphere.Collider, CollisionType.Mesh_Sphere);
+
+        pair.Manifold.PrimaryContact.PointA.Should().Be(Vector3d.Zero);
+        pair.Manifold.PrimaryContact.PointB.Should().Be(new Vector3d(Fixed64.Zero, -Fixed64.FromFraction(1, 4), Fixed64.Zero));
+        pair.Manifold.PrimaryContact.Depth.Should().Be(Fixed64.FromFraction(1, 4));
+        pair.Manifold.PrimaryContact.Normal.Should().Be(Vector3d.Up);
+    }
+
+    [Fact]
+    public void MeshSphere_WithCenterBeyondRadius_ShouldReturnSeparatedResult()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSMeshCollider> floor = scenario.CreateBody(
+            CreateHorizontalPlaneMesh(),
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+        ScenarioBody<LSSphereCollider> sphere = scenario.CreateSphere(Vector3d.Up);
+
+        AssertNoCollision(scenario, floor.Collider, sphere.Collider, CollisionType.Mesh_Sphere);
+    }
+
+    [Fact]
+    public void MeshSphere_WhenAcceptedMeshHasNoNearbyTriangle_ShouldUseBoundsSurfaceFallback()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSMeshCollider> mesh = scenario.CreateBody(
+            new LSMeshCollider(
+                new[]
+                {
+                    new Vector3d((Fixed64)4, (Fixed64)(-4), (Fixed64)(-4)),
+                    new Vector3d((Fixed64)4, (Fixed64)(-3), (Fixed64)(-4)),
+                    new Vector3d((Fixed64)4, (Fixed64)(-4), (Fixed64)(-3)),
+                    new Vector3d((Fixed64)(-4), (Fixed64)4, (Fixed64)(-4)),
+                    new Vector3d((Fixed64)(-3), (Fixed64)4, (Fixed64)(-4)),
+                    new Vector3d((Fixed64)(-4), (Fixed64)4, (Fixed64)(-3)),
+                    new Vector3d((Fixed64)(-4), (Fixed64)(-4), (Fixed64)4),
+                    new Vector3d((Fixed64)(-3), (Fixed64)(-4), (Fixed64)4),
+                    new Vector3d((Fixed64)(-4), (Fixed64)(-3), (Fixed64)4)
+                },
+                new[] { 0, 1, 2, 3, 4, 5, 6, 7, 8 },
+                MeshColliderMode.Convex,
+                MeshInertiaPolicy.SurfaceApproximation),
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+        Vector3d corner = new((Fixed64)4, (Fixed64)4, (Fixed64)4);
+        ScenarioBody<LSSphereCollider> sphere = scenario.CreateSphere(corner);
+
+        CollisionPair pair = AssertCollision(scenario, mesh.Collider, sphere.Collider, CollisionType.Mesh_Sphere);
+
+        pair.Manifold.PrimaryContact.PointA.Should().Be(corner);
+        pair.Manifold.PrimaryContact.Depth.Should().Be(Fixed64.Half);
+        pair.Manifold.PrimaryContact.Normal.Should().Be(corner.Normalized);
+    }
+
+    [Fact]
     public void MeshSphere_WithSphereCenterOnConcaveTriangle_ShouldUseFaceNormalFallback()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
@@ -1114,6 +1179,54 @@ public sealed class CollisionDetectionShapePairTests
     }
 
     [Fact]
+    public void MeshCuboid_WithOverlappingBoundsSeparatedByMeshFace_ShouldNotCollide()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        FixedQuaternion meshRotation = FixedQuaternion.FromEulerAnglesInDegrees(
+            Fixed64.Zero,
+            (Fixed64)45,
+            Fixed64.Zero);
+        ScenarioBody<LSMeshCollider> mesh = scenario.CreateBody(
+            MeshTestFixtures.CreateConvexCube(),
+            Vector3d.Zero,
+            meshRotation);
+        ScenarioBody<LSCuboidCollider> cuboid = scenario.CreateCuboid(
+            (meshRotation * Vector3d.Right) * Fixed64.FromFraction(5, 4));
+
+        mesh.Collider.Bounds.Intersects(cuboid.Collider.Bounds).Should().BeTrue();
+        AssertNoCollision(scenario, mesh.Collider, cuboid.Collider, CollisionType.Mesh_Cuboid);
+    }
+
+    [Fact]
+    public void MeshCuboid_WithOverlappingBoundsSeparatedByCuboidFace_ShouldNotCollide()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        FixedQuaternion middleFaceRotation = FixedQuaternion.FromEulerAnglesInDegrees(
+            Fixed64.Zero,
+            Fixed64.Zero,
+            (Fixed64)45);
+        ScenarioBody<LSMeshCollider> mesh = scenario.CreateBody(
+            MeshTestFixtures.CreateConvexCube(),
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+        ScenarioBody<LSCuboidCollider> middleFaceCuboid = scenario.CreateCuboid(
+            (middleFaceRotation * Vector3d.Up) * Fixed64.FromFraction(5, 4),
+            middleFaceRotation);
+        FixedQuaternion firstFaceRotation = FixedQuaternion.FromEulerAnglesInDegrees(
+            Fixed64.Zero,
+            (Fixed64)45,
+            Fixed64.Zero);
+        ScenarioBody<LSCuboidCollider> firstFaceCuboid = scenario.CreateCuboid(
+            (firstFaceRotation * Vector3d.Forward) * Fixed64.FromFraction(5, 4),
+            firstFaceRotation);
+
+        mesh.Collider.Bounds.Intersects(middleFaceCuboid.Collider.Bounds).Should().BeTrue();
+        mesh.Collider.Bounds.Intersects(firstFaceCuboid.Collider.Bounds).Should().BeTrue();
+        AssertNoCollision(scenario, mesh.Collider, middleFaceCuboid.Collider, CollisionType.Mesh_Cuboid);
+        AssertNoCollision(scenario, mesh.Collider, firstFaceCuboid.Collider, CollisionType.Mesh_Cuboid);
+    }
+
+    [Fact]
     public void MeshMesh_ShouldPreserveTriangleContact()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
@@ -1147,6 +1260,28 @@ public sealed class CollisionDetectionShapePairTests
                 Fixed64.FromFraction(5, 4)),
             FixedQuaternion.FromEulerAnglesInDegrees((Fixed64)32, (Fixed64)(-20), (Fixed64)12));
 
+        AssertNoCollision(scenario, first.Collider, second.Collider, CollisionType.Mesh_Mesh);
+        AssertNoCollision(scenario, second.Collider, first.Collider, CollisionType.Mesh_Mesh);
+    }
+
+    [Fact]
+    public void MeshMesh_WithOverlappingBoundsSeparatedByEitherFaceSource_ShouldNotCollide()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        FixedQuaternion firstRotation = FixedQuaternion.FromEulerAnglesInDegrees(
+            Fixed64.Zero,
+            (Fixed64)45,
+            Fixed64.Zero);
+        ScenarioBody<LSMeshCollider> first = scenario.CreateBody(
+            MeshTestFixtures.CreateConvexCube(),
+            Vector3d.Zero,
+            firstRotation);
+        ScenarioBody<LSMeshCollider> second = scenario.CreateBody(
+            MeshTestFixtures.CreateConvexCube(),
+            (firstRotation * Vector3d.Right) * Fixed64.FromFraction(5, 4),
+            FixedQuaternion.Identity);
+
+        first.Collider.Bounds.Intersects(second.Collider.Bounds).Should().BeTrue();
         AssertNoCollision(scenario, first.Collider, second.Collider, CollisionType.Mesh_Mesh);
         AssertNoCollision(scenario, second.Collider, first.Collider, CollisionType.Mesh_Mesh);
     }
