@@ -74,6 +74,46 @@ public sealed class GravitasQuery3DServiceConeTests
     }
 
     [Fact]
+    public void OverlapCone_WithSphereTouchingBase_ShouldAcceptIterationBudget()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSSphereCollider sphere = scenario.CreateBody(
+            new LSSphereCollider { Radius = Fixed64.Half },
+            new Vector3d(-Fixed64.FromFraction(3, 4), Fixed64.FromFraction(5, 2), -Fixed64.FromFraction(3, 16)),
+            FixedQuaternion.Identity).Collider;
+        LSSphereCollider separated = scenario.CreateBody(
+            new LSSphereCollider { Radius = Fixed64.Half },
+            new Vector3d(-Fixed64.FromFraction(5, 4), Fixed64.FromFraction(5, 2), -Fixed64.FromFraction(3, 16)),
+            FixedQuaternion.Identity).Collider;
+        var hits = new SwiftList<Physics3DHit>();
+
+        bool found = scenario.Context.Query3D.OverlapCone(
+            Vector3d.Zero,
+            Vector3d.Up,
+            (Fixed64)2,
+            Fixed64.One,
+            out Physics3DHit hit,
+            IncludeLayerZero);
+        int count = scenario.Context.Query3D.OverlapConeAll(
+            Vector3d.Zero,
+            Vector3d.Up,
+            (Fixed64)2,
+            Fixed64.One,
+            IncludeLayerZero,
+            hits);
+
+        found.Should().BeTrue();
+        hit.Collider.Should().BeSameAs(sphere);
+        hit.Distance.Should().Be((Fixed64)2);
+        count.Should().Be(1);
+        hits[0].Collider.Should().BeSameAs(sphere);
+        hits.Should().NotContain(candidate => ReferenceEquals(candidate.Collider, separated));
+        sphere.BoundsMin.Y.Should().Be((Fixed64)2);
+        separated.BoundsMax.X.Should().BeGreaterThanOrEqualTo(-Fixed64.One);
+        scenario.Context.Query3D.LastQueryCandidateCount.Should().Be(2);
+    }
+
+    [Fact]
     public void OverlapCone_WithUnsupportedTargetInsideBoundsButOutsideVolume_ShouldRejectConservativeMiss()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();

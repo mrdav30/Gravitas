@@ -82,7 +82,8 @@ internal static class ConvexColliderSupport
                 return true;
         }
 
-        return false;
+        // No separating support was found within the bounded search, so preserve touching/overlap.
+        return true;
     }
 
     public static bool IntersectsConeVolume(
@@ -121,7 +122,8 @@ internal static class ConvexColliderSupport
                 return true;
         }
 
-        return false;
+        // No separating support was found within the bounded search, so preserve touching/overlap.
+        return true;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

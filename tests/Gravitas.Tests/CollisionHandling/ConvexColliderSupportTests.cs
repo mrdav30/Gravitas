@@ -37,6 +37,39 @@ public sealed class ConvexColliderSupportTests
     }
 
     [Fact]
+    public void ProjectOntoAxis_WithNonZeroAxis_ShouldUseRequestedAxis()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> sphere = scenario.CreateSphere(
+            new Vector3d(Fixed64.Zero, (Fixed64)2, Fixed64.Zero));
+
+        FixedRange range = ConvexColliderSupport.ProjectOntoAxis(sphere.Collider, Vector3d.Up);
+
+        range.Min.Should().Be(Fixed64.FromFraction(3, 2));
+        range.Max.Should().Be(Fixed64.FromFraction(5, 2));
+    }
+
+    [Fact]
+    public void Support_WithZeroDirection_ShouldUseRightAxisFallback()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> sphere = scenario.CreateSphere(Vector3d.Zero);
+
+        ConvexColliderSupport.Support(sphere.Collider, Vector3d.Zero)
+            .Should().Be(new Vector3d(Fixed64.Half, Fixed64.Zero, Fixed64.Zero));
+    }
+
+    [Fact]
+    public void Support_WithCylinderAxisDirection_ShouldUseStableRadialTie()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSCylinderCollider> cylinder = scenario.CreateCylinder(Vector3d.Zero);
+
+        ConvexColliderSupport.Support(cylinder.Collider, Vector3d.Up)
+            .Should().Be(new Vector3d(Fixed64.Half, Fixed64.Half, Fixed64.Zero));
+    }
+
+    [Fact]
     public void Support_ShouldUseConvexMeshVerticesAndRejectUnsupportedColliders()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
@@ -146,6 +179,59 @@ public sealed class ConvexColliderSupportTests
     }
 
     [Fact]
+    public void Intersects_WithConeRimTouchingCuboidFace_ShouldAcceptEpsilonDirection()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSConeCollider> cone = scenario.CreateBody(
+            new LSConeCollider
+            {
+                Radius = Fixed64.One,
+                Size = new Vector3d((Fixed64)2, (Fixed64)2, (Fixed64)2)
+            },
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+        ScenarioBody<LSCuboidCollider> cuboid = scenario.CreateCuboid(
+            new Vector3d(-Fixed64.FromFraction(3, 2), -Fixed64.One, Fixed64.FromFraction(1, 8)));
+        Vector3d touchingPoint = new(-Fixed64.One, -Fixed64.One, Fixed64.Zero);
+        CollisionPair pair = scenario.CreatePair(cone.Collider, cuboid.Collider);
+
+        ConvexColliderSupport.Intersects(cone.Collider, cuboid.Collider).Should().BeTrue();
+        CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
+        pair.Manifold.HasContact.Should().BeTrue();
+        cone.Collider.WorldBaseCenter.Y.Should().Be(touchingPoint.Y);
+        cuboid.Collider.BoundsMax.X.Should().Be(touchingPoint.X);
+    }
+
+    [Fact]
+    public void Intersects_WithConeRimTouchingCuboidCorner_ShouldAcceptIterationBudget()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSConeCollider> cone = scenario.CreateBody(
+            new LSConeCollider
+            {
+                Radius = Fixed64.One,
+                Size = new Vector3d((Fixed64)2, (Fixed64)2, (Fixed64)2)
+            },
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+        ScenarioBody<LSCuboidCollider> cuboid = scenario.CreateCuboid(
+            new Vector3d(-Fixed64.FromFraction(3, 2), -Fixed64.Half, -Fixed64.Half));
+        ScenarioBody<LSCuboidCollider> separated = scenario.CreateCuboid(
+            new Vector3d(-Fixed64.FromFraction(13, 8), -Fixed64.Half, -Fixed64.Half));
+        Vector3d touchingPoint = new(-Fixed64.One, -Fixed64.One, Fixed64.Zero);
+        CollisionPair pair = scenario.CreatePair(cone.Collider, cuboid.Collider);
+
+        ConvexColliderSupport.Intersects(cone.Collider, cuboid.Collider).Should().BeTrue();
+        CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
+        pair.Manifold.HasContact.Should().BeTrue();
+        ConvexColliderSupport.Intersects(cone.Collider, separated.Collider).Should().BeFalse();
+        cone.Collider.WorldBaseCenter.Y.Should().Be(touchingPoint.Y);
+        cuboid.Collider.BoundsMax.X.Should().Be(touchingPoint.X);
+        cuboid.Collider.BoundsMin.Y.Should().Be(touchingPoint.Y);
+        cuboid.Collider.BoundsMax.Z.Should().Be(touchingPoint.Z);
+    }
+
+    [Fact]
     public void IntersectsConeVolume_ShouldDetectConvexHitsAndMisses()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
@@ -158,6 +244,41 @@ public sealed class ConvexColliderSupportTests
 
         ConvexColliderSupport.IntersectsConeVolume(hit.Collider, apex, axis, length, radius).Should().BeTrue();
         ConvexColliderSupport.IntersectsConeVolume(miss.Collider, apex, axis, length, radius).Should().BeFalse();
+    }
+
+    [Fact]
+    public void IntersectsConeVolume_WithSphereTouchingApex_ShouldReturnTrueImmediately()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> sphere = scenario.CreateSphere(
+            new Vector3d(Fixed64.Zero, -Fixed64.Half, Fixed64.Zero));
+
+        ConvexColliderSupport.IntersectsConeVolume(
+            sphere.Collider,
+            Vector3d.Zero,
+            Vector3d.Up,
+            (Fixed64)2,
+            Fixed64.One).Should().BeTrue();
+        sphere.Collider.BoundsMax.Y.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void IntersectsConeVolume_WithCuboidTouchingBaseRim_ShouldAcceptEpsilonDirection()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSCuboidCollider> cuboid = scenario.CreateCuboid(
+            new Vector3d(-Fixed64.FromFraction(3, 2), (Fixed64)2, Fixed64.FromFraction(1, 4)));
+        Vector3d touchingPoint = new(-Fixed64.One, (Fixed64)2, Fixed64.Zero);
+
+        ConvexColliderSupport.IntersectsConeVolume(
+            cuboid.Collider,
+            Vector3d.Zero,
+            Vector3d.Up,
+            (Fixed64)2,
+            Fixed64.One).Should().BeTrue();
+        cuboid.Collider.BoundsMax.X.Should().Be(touchingPoint.X);
+        cuboid.Collider.BoundsMin.Y.Should().BeLessThanOrEqualTo(touchingPoint.Y);
+        cuboid.Collider.BoundsMax.Y.Should().BeGreaterThanOrEqualTo(touchingPoint.Y);
     }
 
     [Fact]
