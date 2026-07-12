@@ -22,12 +22,12 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-task34-authoritative-reviewed-full/d7cb893a-e174-47d1-8ab2-e74e0192f7a9/coverage.cobertura.xml`.
+`TestResults/coverage-task35-authoritative-reviewed-full/ee4a6ffe-3a0a-4da4-96f2-ed57a4333592/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
-| Lines | 99.64% | 26,167 / 26,261 | 94 | 100% |
-| Branches | 98.88% | 10,179 / 10,294 | 115 | 100% |
+| Lines | 99.65% | 26,170 / 26,261 | 91 | 100% |
+| Branches | 98.91% | 10,180 / 10,292 | 112 | 100% |
 | Methods | 99.13% | 3,436 / 3,466 | 30 | 100% |
 
 The full coverage-enabled `Release` suite passes 2,350/2,350 tests, and
@@ -37,10 +37,10 @@ same final artifact.
 
 ### Immediate Next Block
 
-Finish `src/Gravitas/Queries/3D/GravitasQuery3DService.Batch.cs` before
-changing target. The current artifact reports three uncovered lines and three
-uncovered branch outcomes. Treat request validation, empty work, stable request
-ordering, and caller-owned output ranges as one deterministic batch contract.
+Finish `src/Gravitas/Colliders/2D/LSCollider2D.ReplayHash.cs` before changing
+target. The current artifact reports two uncovered lines and three uncovered
+branch outcomes. Treat replay identity modes, hierarchy state, shape/filter
+state, and omitted context-local ownership as one deterministic hash contract.
 
 ## Rules Of Engagement
 
@@ -107,16 +107,16 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | `Queries/3D/GravitasQuery3DService.Batch.cs` | 3 | 3 | 0 | Batch validation, empty work, and stable aggregate ordering. |
-| 2 | `Colliders/2D/LSCollider2D.ReplayHash.cs` | 2 | 3 | 0 | Replay identity modes and omitted runtime ownership. |
-| 3 | `Colliders/3D/LSCollider.ReplayHash.cs` | 2 | 3 | 0 | Replay identity modes and omitted runtime ownership. |
-| 4 | `Constraints/3D/JointSolver3D.cs` | 2 | 3 | 0 | Joint row admission and constrained impulse outcomes. |
-| 5 | `Core/2D/GravitasPhysics2DService.ContinuousCollision.cs` | 2 | 3 | 0 | CCD queue ownership and stale candidate cleanup. |
-| 6 | `Core/2D/SolidBody2D.ContinuousCollision.Rotational.cs` | 2 | 3 | 0 | Rotational sweep admission and fixed-point fallback. |
-| 7 | `Core/2D/SolidBody2D.Motion.cs` | 2 | 3 | 0 | Frozen-axis motion and deterministic sleep admission. |
-| 8 | `Support/Coroutines/GravitasCoroutineService.cs` | 1 | 3 | 0 | Completion, cancellation, and context ownership. |
-| 9 | `Colliders/2D/LSCompoundCollider2D.cs` | 1 | 3 | 0 | Owner geometry, empty parts, and authored fallback. |
-| 10 | `Colliders/3D/LSCapsuleCollider.cs` | 1 | 3 | 0 | Frontal area and degenerate axial geometry. |
+| 1 | `Colliders/2D/LSCollider2D.ReplayHash.cs` | 2 | 3 | 0 | Replay identity modes and omitted runtime ownership. |
+| 2 | `Colliders/3D/LSCollider.ReplayHash.cs` | 2 | 3 | 0 | Replay identity modes and omitted runtime ownership. |
+| 3 | `Constraints/3D/JointSolver3D.cs` | 2 | 3 | 0 | Joint row admission and constrained impulse outcomes. |
+| 4 | `Core/2D/GravitasPhysics2DService.ContinuousCollision.cs` | 2 | 3 | 0 | CCD queue ownership and stale candidate cleanup. |
+| 5 | `Core/2D/SolidBody2D.ContinuousCollision.Rotational.cs` | 2 | 3 | 0 | Rotational sweep admission and fixed-point fallback. |
+| 6 | `Core/2D/SolidBody2D.Motion.cs` | 2 | 3 | 0 | Frozen-axis motion and deterministic sleep admission. |
+| 7 | `Support/Coroutines/GravitasCoroutineService.cs` | 1 | 3 | 0 | Completion, cancellation, and context ownership. |
+| 8 | `Colliders/2D/LSCompoundCollider2D.cs` | 1 | 3 | 0 | Owner geometry, empty parts, and authored fallback. |
+| 9 | `Colliders/3D/LSCapsuleCollider.cs` | 1 | 3 | 0 | Frontal area and degenerate axial geometry. |
+| 10 | `Colliders/3D/LSCompoundCollider.cs` | 1 | 3 | 0 | Owner geometry, empty parts, and authored fallback. |
 
 ### Phase 1: Core Runtime And Service Ownership
 
@@ -197,6 +197,9 @@ incorrectly.
 - [x] Close and independently review 2D overlap queries through bounds-admitted
       diagonal exact misses, closest/all circle and AABB paths, default-overload
       delegation, and caller-buffer clearing.
+- [x] Close and independently review 3D batch queries through zero-length
+      all-ray ranges, exact source/displacement preparation reuse, changed-
+      displacement recomputation, and overlap miss/default behavior.
 - [x] Close cuboid detection through rotated face separation, exact AABB
       manifolds, zombie-guard removal, and insertion-ordered OBB/capsule SAT
       ties after independent review exposed pooled hash-order dependence.
@@ -378,6 +381,7 @@ of record.
 | 3D partition closure | 99.62% | 98.82% | 99.11% | 2,348 | PhysicsPartition reached 100%; diagnostic spurious removals and unattached awake no-op lifecycle were covered; obsolete GridForge `OnChange` surface was removed without involving the pooled spawn-token defect. |
 | 2D overlap query closure | 99.63% | 98.85% | 99.13% | 2,349 | The overlap service reached 100%; one bounds-admitted diagonal exact miss covers closest/all circle and AABB rejection, default-overload delegation, and caller-buffer clearing with four killed mutations. |
 | 3D convex sweep closure | 99.64% | 98.88% | 99.13% | 2,350 | ConvexSweepQueryWorker reached 100%; saturated extreme inputs prove deterministic budget termination and clean reuse, while source-only call-graph proof removed impossible triangle bounds and offset paths. |
+| 3D batch query closure | 99.65% | 98.91% | 99.13% | 2,350 | Batch queries reached 100%; zero-ray ranges, exact preparation reuse, changed-displacement recomputation, overlap miss/default behavior, and redundant result assignment were independently reviewed. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.
