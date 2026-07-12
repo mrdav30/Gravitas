@@ -8,6 +8,13 @@ using Xunit;
 
 namespace Gravitas.Tests.CollisionHandlingTests;
 
+[CollectionDefinition(Name, DisableParallelization = true)]
+public sealed class PooledAxisHistoryCollection
+{
+    public const string Name = nameof(PooledAxisHistoryCollection);
+}
+
+[Collection(PooledAxisHistoryCollection.Name)]
 public sealed class CuboidCollisionDetectionCoverageTests
 {
     [Fact]
