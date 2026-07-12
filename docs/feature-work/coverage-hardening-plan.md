@@ -22,26 +22,26 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-task9-authoritative-final-full/e13b5aa7-d704-4be7-95d4-59723dfb4007/coverage.cobertura.xml`.
+`TestResults/coverage-task10-authoritative-reviewed-full/2c2c2d27-d02e-47b2-9b78-39bf6bc80563/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
-| Lines | 99.3% | 25,800 / 25,969 | 169 | 100% |
-| Branches | 97.5% | 9,942 / 10,196 | 254 | 100% |
-| Methods | 98.9% | 3,411 / 3,449 | 38 | 100% |
+| Lines | 99.4% | 25,792 / 25,960 | 168 | 100% |
+| Branches | 97.6% | 9,939 / 10,184 | 245 | 100% |
+| Methods | 98.9% | 3,411 / 3,448 | 37 | 100% |
 
-The full coverage-enabled `Release` suite passes 2,215/2,215 tests, and
+The full coverage-enabled `Release` suite passes 2,226/2,226 tests, and
 `ReleaseLean` builds both targets without warnings. Branch coverage is now the
 primary constraint, but the remaining line and method gaps must close from the
 same final artifact.
 
 ### Immediate Next Block
 
-Finish `src/Gravitas/Core/3D/SolidBody.Motion.cs` before changing target. The
-current artifact reports one uncovered line, nine uncovered branch outcomes,
-and one uncovered method in this file. Trace fixed-step motion projection,
-freeze axes, grounding interaction, kinematic state, reset, and callback-safe
-lifecycle changes as one cohesive body-motion contract.
+Finish `src/Gravitas/Core/3D/GravitasPhysicsService.Response.cs` before
+changing target. The current artifact reports two uncovered lines and eight
+uncovered branch outcomes in this file. Trace response candidate admission,
+island/root ownership, stale pooled pairs, frozen/kinematic participants, and
+callback-driven teardown as one cohesive 3D response contract.
 
 ## Rules Of Engagement
 
@@ -106,14 +106,14 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | `Core/3D/SolidBody.Motion.cs` | 1 | 9 | 1 | Fixed-step body motion and state transitions. |
-| 2 | `Core/3D/GravitasPhysicsService.Response.cs` | 2 | 8 | 0 | 3D response dispatch and suppression. |
+| 1 | `Core/3D/GravitasPhysicsService.Response.cs` | 2 | 8 | 0 | 3D response dispatch and suppression. |
+| 2 | `Core/3D/GravitasPhysicsService.Pairs.cs` | 4 | 7 | 0 | 3D pair creation, ordering, and cleanup. |
 | 3 | `Colliders/2D/LSPolygonCollider2D.cs` | 4 | 7 | 0 | Authored polygon validation and geometry. |
-| 4 | `Core/3D/GravitasPhysicsService.Pairs.cs` | 4 | 7 | 0 | 3D pair creation, ordering, and cleanup. |
-| 5 | `CollisionHandling/Detection/3D/CollisionDetection.Cuboid.cs` | 3 | 7 | 0 | Cuboid feature selection and separation. |
-| 6 | `Core/2D/SolidBody2D.ContinuousCollision.Hits.cs` | 2 | 7 | 0 | 2D hit admission and deterministic reduction. |
-| 7 | `Core/Mixed/GravitasMixedCollisionService.Pairs.cs` | 5 | 6 | 0 | Mixed pair ownership and cleanup. |
-| 8 | `CollisionHandling/Detection/2D/CollisionDetection2D.cs` | 4 | 6 | 0 | Pure 2D dispatch and degenerate-shape rejection. |
+| 4 | `CollisionHandling/Detection/3D/CollisionDetection.Cuboid.cs` | 3 | 7 | 0 | Cuboid feature selection and separation. |
+| 5 | `Core/2D/SolidBody2D.ContinuousCollision.Hits.cs` | 2 | 7 | 0 | 2D hit admission and deterministic reduction. |
+| 6 | `Core/Mixed/GravitasMixedCollisionService.Pairs.cs` | 5 | 6 | 0 | Mixed pair ownership and cleanup. |
+| 7 | `CollisionHandling/Detection/2D/CollisionDetection2D.cs` | 4 | 6 | 0 | Pure 2D dispatch and degenerate-shape rejection. |
+| 8 | `Core/2D/SolidBody2D.ContinuousCollision.Dynamic.cs` | 4 | 6 | 0 | Dynamic 2D CCD handoff and substep state. |
 
 ### Phase 1: Core Runtime And Service Ownership
 
@@ -130,8 +130,9 @@ mid-block merely because another branch looks easier.
       families, including their callback and pooled-lifetime counterparts.
 - [x] Close residual world-context outcomes through real owned/attached
       lifetime, phase-routing, reset, and disposal workflows.
-- [ ] Close residual body-motion outcomes only through real
-      initialize, simulate, late-simulate, reset, and deactivate workflows.
+- [x] Close and independently review residual 3D body-motion outcomes through
+      initialize, simulate, late-simulate, reset, deactivate, shell reuse,
+      grounded friction, anisotropic gyro, and queued CCD workflows.
 
 Exit condition: the selected service family reports 100% line, branch, and
 method coverage from focused tests; the full artifact confirms the gains; no
@@ -271,6 +272,7 @@ of record.
 | 3D raycast segment worker | 99.3% | 97.2% | 98.9% | 2,172 | Fixed-point tangent false negative corrected; finite cone, OBB, mesh-plane, disabled-output, duplicate, and root-bound outcomes closed with mutation-sensitive review. |
 | 2D pair and response lifecycle | 99.3% | 97.4% | 98.9% | 2,194 | Callback-safe snapshots, ordered enter/exit delivery, lifetime-version shell reuse, trigger eligibility, busy-pair pooling exclusion, dense cleanup capacity, and caller-proven solver guards independently reviewed. |
 | 2D grounding lifecycle | 99.3% | 97.5% | 98.9% | 2,215 | Manual ownership, cached support, query/contact lifetime validation, callback replacement, nested body/pair snapshots, pooled pair generations, and automatic invalidation independently reviewed. |
+| 3D body motion | 99.4% | 97.6% | 98.9% | 2,226 | Reset/reuse stores, angular friction, analytic gyroscopic precession, total-step acceleration, queued CCD handoff, sleep/wake, and zombie correction state independently reviewed. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.
