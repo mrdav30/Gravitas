@@ -22,25 +22,25 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-task35-authoritative-reviewed-full/ee4a6ffe-3a0a-4da4-96f2-ed57a4333592/coverage.cobertura.xml`.
+`TestResults/coverage-task36-authoritative-reviewed-full/587bb078-ab05-4f61-b828-d3a479ff2f0a/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
-| Lines | 99.65% | 26,170 / 26,261 | 91 | 100% |
-| Branches | 98.91% | 10,180 / 10,292 | 112 | 100% |
+| Lines | 99.66% | 26,173 / 26,262 | 89 | 100% |
+| Branches | 98.94% | 10,181 / 10,290 | 109 | 100% |
 | Methods | 99.13% | 3,436 / 3,466 | 30 | 100% |
 
-The full coverage-enabled `Release` suite passes 2,350/2,350 tests, and
+The full coverage-enabled `Release` suite passes 2,352/2,352 tests, and
 `ReleaseLean` builds both targets without warnings. Branch coverage is now the
 primary constraint, but the remaining line and method gaps must close from the
 same final artifact.
 
 ### Immediate Next Block
 
-Finish `src/Gravitas/Colliders/2D/LSCollider2D.ReplayHash.cs` before changing
+Finish `src/Gravitas/Colliders/3D/LSCollider.ReplayHash.cs` before changing
 target. The current artifact reports two uncovered lines and three uncovered
-branch outcomes. Treat replay identity modes, hierarchy state, shape/filter
-state, and omitted context-local ownership as one deterministic hash contract.
+branch outcomes. Apply the reviewed live-registry and canonical-dimension proof
+symmetrically while retaining explicit 3D hierarchy hash behavior.
 
 ## Rules Of Engagement
 
@@ -107,16 +107,16 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | `Colliders/2D/LSCollider2D.ReplayHash.cs` | 2 | 3 | 0 | Replay identity modes and omitted runtime ownership. |
-| 2 | `Colliders/3D/LSCollider.ReplayHash.cs` | 2 | 3 | 0 | Replay identity modes and omitted runtime ownership. |
-| 3 | `Constraints/3D/JointSolver3D.cs` | 2 | 3 | 0 | Joint row admission and constrained impulse outcomes. |
-| 4 | `Core/2D/GravitasPhysics2DService.ContinuousCollision.cs` | 2 | 3 | 0 | CCD queue ownership and stale candidate cleanup. |
-| 5 | `Core/2D/SolidBody2D.ContinuousCollision.Rotational.cs` | 2 | 3 | 0 | Rotational sweep admission and fixed-point fallback. |
-| 6 | `Core/2D/SolidBody2D.Motion.cs` | 2 | 3 | 0 | Frozen-axis motion and deterministic sleep admission. |
-| 7 | `Support/Coroutines/GravitasCoroutineService.cs` | 1 | 3 | 0 | Completion, cancellation, and context ownership. |
-| 8 | `Colliders/2D/LSCompoundCollider2D.cs` | 1 | 3 | 0 | Owner geometry, empty parts, and authored fallback. |
-| 9 | `Colliders/3D/LSCapsuleCollider.cs` | 1 | 3 | 0 | Frontal area and degenerate axial geometry. |
-| 10 | `Colliders/3D/LSCompoundCollider.cs` | 1 | 3 | 0 | Owner geometry, empty parts, and authored fallback. |
+| 1 | `Colliders/3D/LSCollider.ReplayHash.cs` | 2 | 3 | 0 | Replay identity modes and omitted runtime ownership. |
+| 2 | `Constraints/3D/JointSolver3D.cs` | 2 | 3 | 0 | Joint row admission and constrained impulse outcomes. |
+| 3 | `Core/2D/GravitasPhysics2DService.ContinuousCollision.cs` | 2 | 3 | 0 | CCD queue ownership and stale candidate cleanup. |
+| 4 | `Core/2D/SolidBody2D.ContinuousCollision.Rotational.cs` | 2 | 3 | 0 | Rotational sweep admission and fixed-point fallback. |
+| 5 | `Core/2D/SolidBody2D.Motion.cs` | 2 | 3 | 0 | Frozen-axis motion and deterministic sleep admission. |
+| 6 | `Support/Coroutines/GravitasCoroutineService.cs` | 1 | 3 | 0 | Completion, cancellation, and context ownership. |
+| 7 | `Colliders/2D/LSCompoundCollider2D.cs` | 1 | 3 | 0 | Owner geometry, empty parts, and authored fallback. |
+| 8 | `Colliders/3D/LSCapsuleCollider.cs` | 1 | 3 | 0 | Frontal area and degenerate axial geometry. |
+| 9 | `Colliders/3D/LSCompoundCollider.cs` | 1 | 3 | 0 | Owner geometry, empty parts, and authored fallback. |
+| 10 | `CollisionHandling/Detection/3D/CollisionDetection.Cylinder.cs` | 2 | 2 | 0 | Axial separation and stable contact fallback. |
 
 ### Phase 1: Core Runtime And Service Ownership
 
@@ -200,6 +200,11 @@ incorrectly.
 - [x] Close and independently review 3D batch queries through zero-length
       all-ray ranges, exact source/displacement preparation reuse, changed-
       displacement recomputation, and overlap miss/default behavior.
+- [x] Close and independently review 2D collider replay hierarchy hashing
+      through live 2D/3D parents, clear-to-baseline behavior, canonical dimension
+      tags, and deletion of impossible registry/dimension guards; fix first-call
+      mixed hierarchy hash drift by preparing both registries before any
+      subsystem contribution.
 - [x] Close cuboid detection through rotated face separation, exact AABB
       manifolds, zombie-guard removal, and insertion-ordered OBB/capsule SAT
       ties after independent review exposed pooled hash-order dependence.
@@ -382,6 +387,7 @@ of record.
 | 2D overlap query closure | 99.63% | 98.85% | 99.13% | 2,349 | The overlap service reached 100%; one bounds-admitted diagonal exact miss covers closest/all circle and AABB rejection, default-overload delegation, and caller-buffer clearing with four killed mutations. |
 | 3D convex sweep closure | 99.64% | 98.88% | 99.13% | 2,350 | ConvexSweepQueryWorker reached 100%; saturated extreme inputs prove deterministic budget termination and clean reuse, while source-only call-graph proof removed impossible triangle bounds and offset paths. |
 | 3D batch query closure | 99.65% | 98.91% | 99.13% | 2,350 | Batch queries reached 100%; zero-ray ranges, exact preparation reuse, changed-displacement recomputation, overlap miss/default behavior, and redundant result assignment were independently reviewed. |
+| 2D replay hierarchy closure | 99.66% | 98.94% | 99.13% | 2,352 | The 2D collider hash reached 100%; live parent dimensions and clear-to-baseline behavior are exact, impossible guards were removed, and a P1 first-call mixed-hierarchy replay drift was fixed by preparing both dimensional registries up front. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.
