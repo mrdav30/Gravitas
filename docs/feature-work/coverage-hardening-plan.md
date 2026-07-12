@@ -1,6 +1,6 @@
 # Coverage Hardening Plan
 
-**Date:** 2026-07-11  
+**Date:** 2026-07-12  
 **Status:** Active - closing the final gap to 100% coverage  
 **Owner:** Gravitas coverage, test-quality, zombie-code, and branch-quality
 hardening
@@ -22,28 +22,27 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-task18-authoritative-reviewed-full/c1023df8-5f6c-4c23-9c1f-b7b4d617a7e9/coverage.cobertura.xml`.
+`TestResults/coverage-task19-authoritative-reviewed-full/9043ffa5-cc0f-4da6-ab03-d4597850b7b6/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
-| Lines | 99.50% | 26,168 / 26,297 | 129 | 100% |
-| Branches | 98.21% | 10,159 / 10,344 | 185 | 100% |
+| Lines | 99.52% | 26,167 / 26,293 | 126 | 100% |
+| Branches | 98.26% | 10,162 / 10,342 | 180 | 100% |
 | Methods | 99.02% | 3,435 / 3,469 | 34 | 100% |
 
-The full coverage-enabled `Release` suite passes 2,315/2,315 tests, and
+The full coverage-enabled `Release` suite passes 2,325/2,325 tests, and
 `ReleaseLean` builds both targets without warnings. Branch coverage is now the
 primary constraint, but the remaining line and method gaps must close from the
 same final artifact.
 
 ### Immediate Next Block
 
-Finish
-`src/Gravitas/CollisionHandling/Detection/Mixed/MixedEmbedded2DGeometry.cs`
+Finish `src/Gravitas/CollisionHandling/Response/3D/CollisionResponse.cs`
 before changing target. The current artifact reports three uncovered lines and
-five uncovered branch outcomes. Treat embedded circle/AABB/polygon support,
-boundary extraction, degenerate directions, slab orientation, and stable
-fallback points as one mixed-geometry contract. Use public mixed collision and
-query workflows wherever possible.
+five uncovered branch outcomes. Treat response admission, anchored/rootless
+participants, closing velocity, friction basis, and deterministic impulse
+application as one solver-policy contract. Trace public pair/island callers
+before retaining any defensive branch.
 
 ## Rules Of Engagement
 
@@ -108,16 +107,16 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | `CollisionHandling/Detection/Mixed/MixedEmbedded2DGeometry.cs` | 3 | 5 | 0 | Embedded-shape support points and degenerate geometry. |
-| 2 | `CollisionHandling/Response/3D/CollisionResponse.cs` | 3 | 5 | 0 | Reclose response outcomes no longer reached after stale-pair response removal. |
-| 3 | `Core/2D/SolidBody2D.ContinuousCollision.Dynamic.cs` | 3 | 5 | 0 | Dynamic 2D CCD handoff and substep state. |
-| 4 | `Core/3D/SolidBody.ContinuousCollision.Hits.cs` | 3 | 5 | 0 | 3D hit admission and deterministic reduction. |
-| 5 | `Partitions/RetainedPartitionLifecycle.cs` | 3 | 5 | 0 | Retained partition teardown, owner validation, and aggregate failure ordering. |
-| 6 | `CollisionHandling/Response/2D/CollisionResponse2D.cs` | 2 | 5 | 0 | 2D response admission and anchored-body outcomes. |
-| 7 | `Diagnostics/GravitasDiagnosticSink.cs` | 1 | 5 | 0 | Disabled sink, limits, and deterministic buffer policy. |
-| 8 | `Queries/Mixed/GravitasQueryMixedService.CircleAgainst3DReducers.cs` | 4 | 4 | 0 | Mixed circle/capsule reducers and conservative fallback admission. |
-| 9 | `Core/3D/GravitasPhysicsService.SupportTypes.cs` | 3 | 4 | 0 | Stable joint keys and ownerless endpoint ordering. |
-| 10 | `Colliders/3D/LSMeshCollider.cs` | 1 | 4 | 0 | Convex mode, empty mesh, and rebuild ownership. |
+| 1 | `CollisionHandling/Response/3D/CollisionResponse.cs` | 3 | 5 | 0 | Response admission and anchored/rootless solver outcomes. |
+| 2 | `Core/2D/SolidBody2D.ContinuousCollision.Dynamic.cs` | 3 | 5 | 0 | Dynamic 2D CCD handoff and substep state. |
+| 3 | `Core/3D/SolidBody.ContinuousCollision.Hits.cs` | 3 | 5 | 0 | 3D hit admission and deterministic reduction. |
+| 4 | `Partitions/RetainedPartitionLifecycle.cs` | 3 | 5 | 0 | Retained partition teardown, owner validation, and aggregate failure ordering. |
+| 5 | `CollisionHandling/Response/2D/CollisionResponse2D.cs` | 2 | 5 | 0 | 2D response admission and anchored-body outcomes. |
+| 6 | `Queries/Mixed/GravitasQueryMixedService.CircleAgainst3DReducers.cs` | 4 | 4 | 0 | Mixed circle/capsule reducers and conservative fallback admission. |
+| 7 | `Core/3D/GravitasPhysicsService.SupportTypes.cs` | 3 | 3 | 0 | Stable joint keys and ownerless endpoint ordering. |
+| 8 | `Queries/3D/GravitasQuery3DService.Batch.cs` | 3 | 3 | 0 | Batch validation, empty work, and stable aggregate ordering. |
+| 9 | `Core/2D/GravitasPhysics2DService.ContinuousCollision.cs` | 2 | 3 | 0 | CCD queue ownership and stale candidate cleanup. |
+| 10 | `Diagnostics/GravitasDiagnosticSink.Draw.cs` | 2 | 3 | 0 | Draw-buffer limits and deterministic disabled behavior. |
 
 ### Phase 1: Core Runtime And Service Ownership
 
@@ -171,6 +170,10 @@ incorrectly.
       including initial-origin and post-simplex epsilon contacts, bounded
       fixed-point cycles, nearby separating controls, and conservative
       no-witness exhaustion.
+- [x] Close and independently review mixed embedded-volume boundary geometry,
+      including unsupported-shape fallback, round coincident directions,
+      authored-first ties, exact polygon edges, valid authoring invariants, and
+      the `Fixed64.MaxValue` first-candidate sentinel regression.
 - [ ] Reassess the mixed circle-against-3D reducers,
       `AxisProjectionHelper`, and remaining geometry after each fresh artifact.
 - [ ] Delete reducer permutations or fallback branches that valid authored
@@ -207,7 +210,7 @@ has a caller-proven impossibility argument.
 - [ ] Complete the four remaining `ContactManifold` methods through meaningful
       construction, mutation, and reduction contracts or delete unused surface.
 - [ ] Regenerate the uncovered-method inventory from the latest full artifact
-      and classify all 35 current method gaps.
+      and classify all 34 current method gaps.
 - [ ] Delete unused wrappers, aliases, constructors, and helpers instead of
       invoking them solely for coverage.
 - [ ] Cover retained query overloads, diagnostic payloads, authored-shape
@@ -310,6 +313,7 @@ of record.
 | 2D CCD hit reduction | 99.47% | 98.10% | 98.99% | 2,295 | Hit reduction reached 100%; mixed/static arbitration, stale and filtered candidates, deterministic replacement, exact non-closing rejection, rotational restoration, and a caller-impossible relative-motion guard were independently reviewed. |
 | 2D narrow-phase detection | 99.49% | 98.16% | 99.02% | 2,307 | Detection reached 100%; clockwise false negatives and containment depth were corrected; signed interval exits decoupled normals from off-origin host transforms; exact owner manifolds and clip invariants were independently reviewed. |
 | 3D convex support GJK | 99.50% | 98.21% | 99.02% | 2,315 | Convex support reached 100%; exact touching cycles and epsilon simplex outcomes were covered; bounded exhaustion now preserves contact without conservative leakage beyond the fixed-point tolerance band. |
+| Mixed embedded 2D geometry | 99.52% | 98.26% | 99.02% | 2,325 | Embedded boundary geometry reached 100%; authored-first ties, exact boundary distances, authoring invariants, unsupported fallback, and maximum-distance compound candidates were covered and independently reviewed. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.
