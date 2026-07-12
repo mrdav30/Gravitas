@@ -22,25 +22,25 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-task32-authoritative-reviewed-full/ef6cb499-f056-4364-b346-0380eddd6d81/coverage.cobertura.xml`.
+`TestResults/coverage-task33-authoritative-reviewed-full/b8f55cfa-227b-4d6c-9636-de408640c991/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
-| Lines | 99.62% | 26,168 / 26,267 | 99 | 100% |
-| Branches | 98.82% | 10,176 / 10,298 | 122 | 100% |
-| Methods | 99.11% | 3,435 / 3,466 | 31 | 100% |
+| Lines | 99.63% | 26,169 / 26,267 | 98 | 100% |
+| Branches | 98.85% | 10,180 / 10,298 | 118 | 100% |
+| Methods | 99.13% | 3,436 / 3,466 | 30 | 100% |
 
-The full coverage-enabled `Release` suite passes 2,348/2,348 tests, and
+The full coverage-enabled `Release` suite passes 2,349/2,349 tests, and
 `ReleaseLean` builds both targets without warnings. Branch coverage is now the
 primary constraint, but the remaining line and method gaps must close from the
 same final artifact.
 
 ### Immediate Next Block
 
-Finish `src/Gravitas/Queries/2D/GravitasQuery2DService.Overlap.cs` before
-changing target. The current artifact reports one uncovered line and four
-uncovered branch outcomes. Treat filtering, empty candidates, stable admission,
-and caller-owned result behavior as one deterministic 2D overlap contract.
+Finish `src/Gravitas/Queries/3D/Sweeps/ConvexSweepQueryWorker.cs` before
+changing target. The current artifact reports three uncovered lines and three
+uncovered branch outcomes. Treat degenerate simplex reduction, conservative
+advance termination, and stable fixed-point hit geometry as one sweep contract.
 
 ## Rules Of Engagement
 
@@ -107,16 +107,16 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | `Queries/2D/GravitasQuery2DService.Overlap.cs` | 1 | 4 | 0 | Overlap filtering, empty candidates, and stable admission. |
-| 2 | `Queries/3D/Sweeps/ConvexSweepQueryWorker.cs` | 3 | 3 | 0 | Degenerate simplex and conservative sweep outcomes. |
-| 3 | `Queries/3D/GravitasQuery3DService.Batch.cs` | 3 | 3 | 0 | Batch validation, empty work, and stable aggregate ordering. |
-| 4 | `Colliders/2D/LSCollider2D.ReplayHash.cs` | 2 | 3 | 0 | Replay identity modes and omitted runtime ownership. |
-| 5 | `Colliders/3D/LSCollider.ReplayHash.cs` | 2 | 3 | 0 | Replay identity modes and omitted runtime ownership. |
-| 6 | `Constraints/3D/JointSolver3D.cs` | 2 | 3 | 0 | Joint row admission and constrained impulse outcomes. |
-| 7 | `Core/2D/GravitasPhysics2DService.ContinuousCollision.cs` | 2 | 3 | 0 | CCD queue ownership and stale candidate cleanup. |
-| 8 | `Core/2D/SolidBody2D.ContinuousCollision.Rotational.cs` | 2 | 3 | 0 | Rotational sweep admission and fixed-point fallback. |
-| 9 | `Core/2D/SolidBody2D.Motion.cs` | 2 | 3 | 0 | Frozen-axis motion and deterministic sleep admission. |
-| 10 | `Support/Coroutines/GravitasCoroutineService.cs` | 1 | 3 | 0 | Completion, cancellation, and context ownership. |
+| 1 | `Queries/3D/Sweeps/ConvexSweepQueryWorker.cs` | 3 | 3 | 0 | Degenerate simplex and conservative sweep outcomes. |
+| 2 | `Queries/3D/GravitasQuery3DService.Batch.cs` | 3 | 3 | 0 | Batch validation, empty work, and stable aggregate ordering. |
+| 3 | `Colliders/2D/LSCollider2D.ReplayHash.cs` | 2 | 3 | 0 | Replay identity modes and omitted runtime ownership. |
+| 4 | `Colliders/3D/LSCollider.ReplayHash.cs` | 2 | 3 | 0 | Replay identity modes and omitted runtime ownership. |
+| 5 | `Constraints/3D/JointSolver3D.cs` | 2 | 3 | 0 | Joint row admission and constrained impulse outcomes. |
+| 6 | `Core/2D/GravitasPhysics2DService.ContinuousCollision.cs` | 2 | 3 | 0 | CCD queue ownership and stale candidate cleanup. |
+| 7 | `Core/2D/SolidBody2D.ContinuousCollision.Rotational.cs` | 2 | 3 | 0 | Rotational sweep admission and fixed-point fallback. |
+| 8 | `Core/2D/SolidBody2D.Motion.cs` | 2 | 3 | 0 | Frozen-axis motion and deterministic sleep admission. |
+| 9 | `Support/Coroutines/GravitasCoroutineService.cs` | 1 | 3 | 0 | Completion, cancellation, and context ownership. |
+| 10 | `Colliders/2D/LSCompoundCollider2D.cs` | 1 | 3 | 0 | Owner geometry, empty parts, and authored fallback. |
 
 ### Phase 1: Core Runtime And Service Ownership
 
@@ -191,6 +191,9 @@ incorrectly.
 - [x] Close `LSPolygonCollider2D.cs` through authored/load/degenerate-scale
       workflows and translation-stable centroid/inertia math for both windings,
       compound offsets/scales, and arbitrary reference points.
+- [x] Close and independently review 2D overlap queries through bounds-admitted
+      diagonal exact misses, closest/all circle and AABB paths, default-overload
+      delegation, and caller-buffer clearing.
 - [x] Close cuboid detection through rotated face separation, exact AABB
       manifolds, zombie-guard removal, and insertion-ordered OBB/capsule SAT
       ties after independent review exposed pooled hash-order dependence.
@@ -370,6 +373,7 @@ of record.
 | 2D joint load closure | 99.61% | 98.73% | 99.05% | 2,346 | Joint2D reached 100%; explicit and legacy distance loads now prove suppression, enabled-count, frame, and cache synchronization; impossible nullable collider replay IDs were removed. |
 | 2D partition closure | 99.61% | 98.78% | 99.08% | 2,347 | PhysicsPartition2D reached 100%; diagnostic spurious removals and awake no-op lifecycle were covered; obsolete GridForge `OnChange` surface was removed. |
 | 3D partition closure | 99.62% | 98.82% | 99.11% | 2,348 | PhysicsPartition reached 100%; diagnostic spurious removals and unattached awake no-op lifecycle were covered; obsolete GridForge `OnChange` surface was removed without involving the pooled spawn-token defect. |
+| 2D overlap query closure | 99.63% | 98.85% | 99.13% | 2,349 | The overlap service reached 100%; one bounds-admitted diagonal exact miss covers closest/all circle and AABB rejection, default-overload delegation, and caller-buffer clearing with four killed mutations. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.
