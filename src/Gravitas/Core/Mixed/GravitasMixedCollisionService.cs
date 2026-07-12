@@ -45,7 +45,7 @@ internal sealed partial class GravitasMixedCollisionService
     private readonly SwiftList<int> _queryColliderIds = new();
     private readonly SwiftHashSet<int> _queryColliderRedundancy = new();
     private readonly SwiftDictionary<ulong, CollisionPairMixed> _pairs = new();
-    private readonly SwiftList<ulong> _pairsToRemove = new();
+    private readonly SwiftList<MixedPairLifetimeToken> _pairsToRemove = new();
     private readonly SwiftStack<CollisionPairMixed> _cachedPairs = new();
     private readonly SwiftList<CollisionPairMixed> _mixedResponsePairs = new();
     private readonly SwiftList<MixedIslandNode> _mixedIslandNodes = new();

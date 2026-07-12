@@ -12,6 +12,29 @@ using SwiftCollections;
 
 namespace Gravitas;
 
+internal readonly struct CollisionPairLifetimeToken
+{
+    internal CollisionPairLifetimeToken(CollisionPair pair)
+    {
+        Pair = pair;
+        LifetimeVersion = pair.LifetimeVersion;
+        ColliderA = new ColliderLifetimeToken(pair.ColliderA);
+        ColliderB = new ColliderLifetimeToken(pair.ColliderB);
+    }
+
+    internal CollisionPair Pair { get; }
+
+    internal long LifetimeVersion { get; }
+
+    private ColliderLifetimeToken ColliderA { get; }
+
+    private ColliderLifetimeToken ColliderB { get; }
+
+    internal bool IsCurrentLifetime => Pair.LifetimeVersion == LifetimeVersion
+        && ColliderA.IsCurrentLifetime
+        && ColliderB.IsCurrentLifetime;
+}
+
 public sealed partial class GravitasPhysicsService
 {
     internal CollisionPair? GetCollisionPair(int id1, int id2)
@@ -42,6 +65,7 @@ public sealed partial class GravitasPhysicsService
     internal bool RequireCollisionPair(LSCollider collider1, LSCollider collider2)
     {
         return collider1.IsActive && collider2.IsActive
+            && !collider1.IsDeactivationInProgress && !collider2.IsDeactivationInProgress
             && collider1.Shape != ColliderType.None && collider2.Shape != ColliderType.None
             && (collider1.Body != null || collider2.Body != null)
             && !IsLayerCollisionDisabled(collider1.Layer, collider2.Layer)
@@ -65,15 +89,12 @@ public sealed partial class GravitasPhysicsService
     {
         SwiftThrowHelper.ThrowIfNull(pair, nameof(pair));
         lock (_activeCollisionPairs)
-            _activeCollisionPairs.Enqueue(pair);
+            _activeCollisionPairs.Enqueue(new CollisionPairLifetimeToken(pair));
     }
 
     internal void FullDeactivateCollisionPair(CollisionPair pair)
     {
-        if (!pair.Active)
-            return;
-
-        TryRemovePairReferences(pair);
+        RemovePairReferences(pair);
         DeactivateAndPoolPair(pair);
     }
 
@@ -83,27 +104,24 @@ public sealed partial class GravitasPhysicsService
             return;
 
         pair.Deactivate();
-        if (_context.Settings.PoolingEnabled)
+        if (_context.Settings.PoolingEnabled && !pair.IsNotificationInProgress)
             _cachedCollisionPairs.Push(pair);
     }
 
-    internal bool TryRemovePairReferences(CollisionPair pair)
+    internal void RemovePairReferences(CollisionPair pair)
     {
-        return pair.ColliderA.TryRemoveCollisionPair(pair.Id2)
-            && pair.ColliderB.TryRemoveCollisionPairHolder(pair.Id1);
+        pair.ColliderA.TryRemoveCollisionPair(pair.Id2);
+        pair.ColliderB.TryRemoveCollisionPairHolder(pair.Id1);
     }
 
     internal void RemovePairsForCollider(LSCollider collider)
     {
+        int deactivationStart = _pairsPendingDeactivation.Count;
         SwiftDictionary<int, CollisionPair>? collisionPairs = collider.CollisionPairs;
         if (collisionPairs != null)
         {
             foreach (var pairEntry in collisionPairs)
-            {
-                CollisionPair pair = pairEntry.Value;
-                pair.ColliderB.TryRemoveCollisionPairHolder(pair.Id1);
-                DeactivateAndPoolPair(pair);
-            }
+                _pairsPendingDeactivation.Add(new CollisionPairLifetimeToken(pairEntry.Value));
         }
 
         SwiftHashSet<int>? collisionPairHolders = collider.CollisionPairHolders;
@@ -114,17 +132,34 @@ public sealed partial class GravitasPhysicsService
                 if (!TryGetColliderById(holderId, out LSCollider? holder))
                     continue;
 
-                holder!.TryRemoveCollisionPair(collider.Id);
+                if (holder!.TryGetCollisionPair(collider.Id, out CollisionPair? pair))
+                    _pairsPendingDeactivation.Add(new CollisionPairLifetimeToken(pair!));
             }
         }
 
-        collider.ClearCollisionPairState();
-        collider.ClearRuntimeRelationships();
+        int deactivationEnd = _pairsPendingDeactivation.Count;
+        try
+        {
+            for (int i = deactivationStart; i < deactivationEnd; i++)
+            {
+                CollisionPairLifetimeToken token = _pairsPendingDeactivation[i];
+                if (token.IsCurrentLifetime)
+                    FullDeactivateCollisionPair(token.Pair);
+            }
+
+            collider.ClearCollisionPairState();
+            collider.ClearRuntimeRelationships();
+        }
+        finally
+        {
+            if (deactivationStart == 0)
+                _pairsPendingDeactivation.FastClear();
+        }
     }
 
     private CollisionPair CreatePair(LSCollider collider1, LSCollider collider2)
     {
-        if (_cachedCollisionPairs.Count <= 0)
+        if (!_context.Settings.PoolingEnabled || _cachedCollisionPairs.Count <= 0)
             return new CollisionPair(collider1, collider2);
 
         CollisionPair pair = _cachedCollisionPairs.Pop();
@@ -134,35 +169,52 @@ public sealed partial class GravitasPhysicsService
 
     private void ProcessActiveCollisionPairs()
     {
+        int snapshotStart = _activeCollisionPairSnapshot.Count;
         int collisionCounter = _activeCollisionPairs.Count;
-        while (collisionCounter > 0)
+        for (int i = 0; i < collisionCounter; i++)
+            _activeCollisionPairSnapshot.Add(_activeCollisionPairs.Dequeue());
+
+        int snapshotEnd = _activeCollisionPairSnapshot.Count;
+        int processingIndex = snapshotStart;
+        try
         {
-            CollisionPair instancePair = _activeCollisionPairs.Dequeue();
-            if (instancePair == null || !instancePair.Active)
+            for (; processingIndex < snapshotEnd; processingIndex++)
             {
-                collisionCounter--;
-                continue;
+                CollisionPairLifetimeToken token = _activeCollisionPairSnapshot[processingIndex];
+                CollisionPair instancePair = token.Pair;
+                if (!token.IsCurrentLifetime || !instancePair.Active)
+                    continue;
+
+                if (!RequireCollisionPair(instancePair.ColliderA, instancePair.ColliderB))
+                {
+                    FullDeactivateCollisionPair(instancePair);
+                    continue;
+                }
+
+                bool preservedSleepingContact = instancePair.TryPreserveSleepingRestingContact();
+                int passedFrames = _context.FrameCount - instancePair.LastCollidedFrame;
+                if (!preservedSleepingContact && passedFrames >= InactiveFrameThreshold)
+                    FullDeactivateCollisionPair(instancePair);
+                else
+                {
+                    if (instancePair.CullCounter <= 0)
+                        instancePair.NotifyCollidersOfContact();
+                    if (token.IsCurrentLifetime && instancePair.Active)
+                        _activeCollisionPairs.Enqueue(token);
+                }
+            }
+        }
+        finally
+        {
+            for (; processingIndex < snapshotEnd; processingIndex++)
+            {
+                CollisionPairLifetimeToken token = _activeCollisionPairSnapshot[processingIndex];
+                if (token.IsCurrentLifetime && token.Pair.Active)
+                    _activeCollisionPairs.Enqueue(token);
             }
 
-            if (!RequireCollisionPair(instancePair.ColliderA, instancePair.ColliderB))
-            {
-                FullDeactivateCollisionPair(instancePair);
-                collisionCounter--;
-                continue;
-            }
-
-            bool preservedSleepingContact = instancePair.TryPreserveSleepingRestingContact();
-            int passedFrames = _context.FrameCount - instancePair.LastCollidedFrame;
-            if (!preservedSleepingContact && passedFrames >= InactiveFrameThreshold)
-                FullDeactivateCollisionPair(instancePair);
-            else
-            {
-                if (instancePair.CullCounter <= 0)
-                    instancePair.NotifyCollidersOfContact();
-                _activeCollisionPairs.Enqueue(instancePair);
-            }
-
-            collisionCounter--;
+            if (snapshotStart == 0)
+                _activeCollisionPairSnapshot.FastClear();
         }
     }
 

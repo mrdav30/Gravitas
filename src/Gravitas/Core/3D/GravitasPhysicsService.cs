@@ -30,7 +30,9 @@ public sealed partial class GravitasPhysicsService
     private readonly ColliderRegistry<LSCollider> _colliders = new(DefaultColliderSize);
     private SwiftList<LSCollider> _serviceRefreshColliders = new(DefaultColliderIdSize);
     private SwiftStack<CollisionPair> _cachedCollisionPairs = new();
-    private SwiftQueue<CollisionPair> _activeCollisionPairs = new();
+    private SwiftQueue<CollisionPairLifetimeToken> _activeCollisionPairs = new();
+    private readonly SwiftList<CollisionPairLifetimeToken> _activeCollisionPairSnapshot = new();
+    private readonly SwiftList<CollisionPairLifetimeToken> _pairsPendingDeactivation = new();
     private readonly SwiftList<CollisionPair> _discreteResponsePairs = new();
     private readonly SwiftList<DiscreteIslandNode> _discreteIslandNodes = new();
     private readonly SwiftList<DiscreteIslandConstraint> _discreteIslandConstraints = new();
@@ -187,6 +189,8 @@ public sealed partial class GravitasPhysicsService
         _serviceRefreshColliders.FastClear();
         _cachedCollisionPairs.FastClear();
         _activeCollisionPairs.FastClear();
+        _activeCollisionPairSnapshot.FastClear();
+        _pairsPendingDeactivation.FastClear();
         _discreteResponsePairs.FastClear();
         _discreteIslandNodes.FastClear();
         _discreteIslandConstraints.FastClear();

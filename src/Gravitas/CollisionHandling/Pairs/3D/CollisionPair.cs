@@ -62,6 +62,17 @@ public partial class CollisionPair
 
     private bool _isColliding;
     private bool _isCollidingChanged;
+    private bool _notificationInProgress;
+    private bool _separationPending;
+    private bool _colliderANotified;
+    private bool _colliderBNotified;
+    private SolidBody? _pendingBodyA;
+    private SolidBody? _pendingBodyB;
+    private long _lifetimeVersion;
+
+    internal bool IsNotificationInProgress => _notificationInProgress;
+
+    internal long LifetimeVersion => _lifetimeVersion;
 
     public ContactManifold Manifold { get; } = new();
 
@@ -86,6 +97,7 @@ public partial class CollisionPair
             "Colliders must be in the same context to create a CollisionPair.");
 
         Context = context;
+        _lifetimeVersion++;
 
         Reset();
 
@@ -156,7 +168,6 @@ public partial class CollisionPair
         UpdateLastFrame();
         DeactivateAndPoolIfRequired();
 
-        _isCollidingChanged = false;
         if (IsCullStateInvalidated())
             CullCounter = 0;
 
@@ -243,8 +254,152 @@ public partial class CollisionPair
 
     public void NotifyCollidersOfContact()
     {
-        ColliderA.NotifyContact(ColliderB, _isColliding, _isCollidingChanged);
-        ColliderB.NotifyContact(ColliderA, _isColliding, _isCollidingChanged);
+        bool isColliding = _isColliding;
+        bool isChanged = _isCollidingChanged;
+
+        var registrationA = new ColliderLifetimeToken(ColliderA);
+        var registrationB = new ColliderLifetimeToken(ColliderB);
+        LSCollider colliderA = registrationA.Collider;
+        LSCollider colliderB = registrationB.Collider;
+        SolidBody? bodyA = colliderA.Body;
+        SolidBody? bodyB = colliderB.Body;
+        bool isTriggerPair = colliderA.IsTrigger || colliderB.IsTrigger;
+        bool shouldRaiseTriggerA = isTriggerPair && ColliderTriggerEventPolicy.ShouldRaise(colliderA, colliderB);
+        bool shouldRaiseTriggerB = isTriggerPair && ColliderTriggerEventPolicy.ShouldRaise(colliderB, colliderA);
+        _notificationInProgress = true;
+        try
+        {
+            if (isColliding)
+            {
+                bool notifyEnterA = isChanged && !_colliderANotified;
+                _colliderANotified = true;
+                colliderA.NotifyContact(
+                    colliderB,
+                    bodyB,
+                    isColliding: true,
+                    notifyEnterA,
+                    allowInactive: false,
+                    registrationA,
+                    registrationB,
+                    isTriggerPair,
+                    shouldRaiseTriggerA);
+                if (registrationA.IsActive && registrationB.IsActive && !_separationPending)
+                {
+                    bool notifyEnterB = isChanged && !_colliderBNotified;
+                    _colliderBNotified = true;
+                    colliderB.NotifyContact(
+                        colliderA,
+                        bodyA,
+                        isColliding: true,
+                        notifyEnterB,
+                        allowInactive: false,
+                        registrationB,
+                        registrationA,
+                        isTriggerPair,
+                        shouldRaiseTriggerB);
+                }
+            }
+            else
+            {
+                if (_colliderANotified)
+                {
+                    colliderA.NotifyContact(
+                        colliderB,
+                        bodyB,
+                        isColliding: false,
+                        isChanged,
+                        allowInactive: true,
+                        registrationA,
+                        registrationB,
+                        isTriggerPair,
+                        shouldRaiseTriggerA);
+                }
+
+                if (_colliderBNotified && registrationB.IsCurrentLifetime)
+                {
+                    colliderB.NotifyContact(
+                        colliderA,
+                        bodyA,
+                        isColliding: false,
+                        isChanged,
+                        allowInactive: true,
+                        registrationB,
+                        registrationA,
+                        isTriggerPair,
+                        shouldRaiseTriggerB);
+                }
+
+                _colliderANotified = false;
+                _colliderBNotified = false;
+            }
+        }
+        finally
+        {
+            EndNotification(
+                registrationA,
+                registrationB,
+                isTriggerPair,
+                shouldRaiseTriggerA,
+                shouldRaiseTriggerB);
+            if (!_isColliding || (_colliderANotified && _colliderBNotified))
+                _isCollidingChanged = false;
+        }
+    }
+
+    private void EndNotification(
+        in ColliderLifetimeToken registrationA,
+        in ColliderLifetimeToken registrationB,
+        bool isTriggerPair,
+        bool shouldRaiseTriggerA,
+        bool shouldRaiseTriggerB)
+    {
+        _notificationInProgress = false;
+        if (!_separationPending)
+        {
+            ClearPendingNotificationState();
+            return;
+        }
+
+        bool notifyB = _colliderBNotified;
+        SolidBody? bodyA = _pendingBodyA;
+        SolidBody? bodyB = _pendingBodyB;
+        ClearPendingNotificationState();
+        if (_colliderANotified)
+        {
+            registrationA.Collider.NotifyContact(
+                registrationB.Collider,
+                bodyB,
+                isColliding: false,
+                isChanged: true,
+                allowInactive: true,
+                registrationA,
+                registrationB,
+                isTriggerPair,
+                shouldRaiseTriggerA);
+        }
+        if (notifyB && registrationB.IsCurrentLifetime)
+        {
+            registrationB.Collider.NotifyContact(
+                registrationA.Collider,
+                bodyA,
+                isColliding: false,
+                isChanged: true,
+                allowInactive: true,
+                registrationB,
+                registrationA,
+                isTriggerPair,
+                shouldRaiseTriggerB);
+        }
+
+        _colliderANotified = false;
+        _colliderBNotified = false;
+    }
+
+    private void ClearPendingNotificationState()
+    {
+        _separationPending = false;
+        _pendingBodyA = null;
+        _pendingBodyB = null;
     }
 
     private void HandleCullingIfNotColliding()
@@ -363,7 +518,12 @@ public partial class CollisionPair
         Manifold.Reset();
         _warmStart.Clear();
         _isColliding = false;
+        _isCollidingChanged = false;
         _isPooledForDeactivation = false;
+        _notificationInProgress = false;
+        _colliderANotified = false;
+        _colliderBNotified = false;
+        ClearPendingNotificationState();
     }
 
     internal void StoreWarmStartImpulse(
@@ -382,14 +542,25 @@ public partial class CollisionPair
     /// </summary>
     public void Deactivate()
     {
-        if (_isColliding)
+        bool notifySeparation = _isColliding || _colliderANotified || _colliderBNotified;
+        if (notifySeparation)
         {
             _isColliding = false;
             _isCollidingChanged = true;
-            NotifyCollidersOfContact();
+            if (_notificationInProgress)
+            {
+                _separationPending = true;
+                _pendingBodyA = ColliderA.Body;
+                _pendingBodyB = ColliderB.Body;
+            }
         }
 
-        Reset();
+        Manifold.Reset();
+        _warmStart.Clear();
+        _isPooledForDeactivation = false;
         Active = false;
+
+        if (notifySeparation && !_notificationInProgress)
+            NotifyCollidersOfContact();
     }
 }

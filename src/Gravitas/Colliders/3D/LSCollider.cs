@@ -30,6 +30,7 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
     private bool _drawBoundingBox;
 
     private bool _active = true;
+    private bool _deactivationInProgress;
     public bool IsActive
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -88,6 +89,11 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
 
     private int _replayOrdinal = -1;
     internal int ReplayOrdinal => _replayOrdinal;
+
+    private long _lifetimeVersion;
+    internal long LifetimeVersion => _lifetimeVersion;
+
+    internal bool IsDeactivationInProgress => _deactivationInProgress;
 
     private int _serviceRefreshIndex = -1;
     internal int ServiceRefreshIndex => _serviceRefreshIndex;
@@ -388,56 +394,6 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
         set => _queryState.CircleQueryVersion = value;
     }
 
-    internal int CollisionPairCount => _pairState.CollisionPairCount;
-
-    internal int CollisionPairHolderCount => _pairState.CollisionPairHolderCount;
-
-    internal SwiftDictionary<int, CollisionPair>? CollisionPairs => _pairState.CollisionPairs;
-
-    internal SwiftHashSet<int>? CollisionPairHolders => _pairState.CollisionPairHolders;
-
-    public delegate void BodyCollisionFunc(SolidBody other);
-    public event BodyCollisionFunc? OnContact;
-    public event BodyCollisionFunc? OnContactEnter;
-    public event BodyCollisionFunc? OnContactExit;
-
-    public delegate void TriggerCollisionFunc(LSCollider other);
-
-    /// <summary>
-    /// Raised on the first simulation frame this collider participates in a valid trigger pair.
-    /// </summary>
-    public event TriggerCollisionFunc? OnTriggerEnter;
-
-    /// <summary>
-    /// Raised each simulation frame this collider participates in an overlapped valid trigger pair.
-    /// </summary>
-    public event TriggerCollisionFunc? OnTriggerStay;
-
-    /// <summary>
-    /// Raised when this collider stops participating in a valid trigger pair.
-    /// </summary>
-    public event TriggerCollisionFunc? OnTriggerExit;
-
-    public delegate void MixedCollisionFunc(LSCollider2D other);
-    public event MixedCollisionFunc? OnMixedContact;
-    public event MixedCollisionFunc? OnMixedContactEnter;
-    public event MixedCollisionFunc? OnMixedContactExit;
-
-    /// <summary>
-    /// Raised on the first mixed 3D/2D simulation frame this collider participates in a valid trigger pair.
-    /// </summary>
-    public event MixedCollisionFunc? OnMixedTriggerEnter;
-
-    /// <summary>
-    /// Raised each mixed 3D/2D simulation frame this collider participates in an overlapped valid trigger pair.
-    /// </summary>
-    public event MixedCollisionFunc? OnMixedTriggerStay;
-
-    /// <summary>
-    /// Raised when this collider stops participating in a valid mixed 3D/2D trigger pair.
-    /// </summary>
-    public event MixedCollisionFunc? OnMixedTriggerExit;
-
     public bool IsChild => _hierarchyState.IsChild;
     public bool IsParent => _hierarchyState.IsParent;
     public int ParentId => ParentKey.Id;
@@ -477,12 +433,14 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
     private void InitCore(IMatterAgent agent)
     {
         SwiftThrowHelper.ThrowIfNull(agent, nameof(agent));
+        _lifetimeVersion++;
         OnBeforeInitialize(agent);
 
         _queryState.Reset();
 
         _agent = agent;
         _active = true;
+        _deactivationInProgress = false;
         BindContext(agent.Context);
         Context.Physics.AssimilateCollider(this);
         _hierarchyState.Initialize(_agent.IsParent);
@@ -749,92 +707,6 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
     protected static Fixed3x3 AddParallelAxisTensor(Fixed3x3 tensor, Fixed64 mass, Vector3d offset) =>
         InertiaTensorMath.AddParallelAxisTensor(tensor, mass, offset);
 
-    internal void NotifyContact(LSCollider other, bool isColliding, bool isChanged)
-    {
-        if (!IsActive)
-            return;
-
-        bool isTriggerPair = IsTrigger || other.IsTrigger;
-        if (isColliding)
-        {
-            if (isTriggerPair)
-            {
-                if (ColliderTriggerEventPolicy.ShouldRaise(this, other))
-                {
-                    if (isChanged)
-                        OnTriggerEnter?.Invoke(other);
-
-                    OnTriggerStay?.Invoke(other);
-                }
-
-                return;
-            }
-
-            if (isChanged && other.Body != null)
-                OnContactEnter?.Invoke(other.Body);
-
-            if (other.Body != null)
-                OnContact?.Invoke(other.Body);
-
-            return;
-        }
-
-        if (!isChanged)
-            return;
-
-        if (isTriggerPair)
-        {
-            if (ColliderTriggerEventPolicy.ShouldRaise(this, other))
-                OnTriggerExit?.Invoke(other);
-
-            return;
-        }
-
-        if (other.Body != null)
-            OnContactExit?.Invoke(other.Body);
-    }
-
-    internal void NotifyMixedContact(LSCollider2D other, bool isColliding, bool isChanged, bool isTriggerPair)
-    {
-        if (!IsActive)
-            return;
-
-        if (isColliding)
-        {
-            if (isTriggerPair)
-            {
-                if (ColliderTriggerEventPolicy.ShouldRaise(this, other))
-                {
-                    if (isChanged)
-                        OnMixedTriggerEnter?.Invoke(other);
-
-                    OnMixedTriggerStay?.Invoke(other);
-                }
-
-                return;
-            }
-
-            if (isChanged)
-                OnMixedContactEnter?.Invoke(other);
-
-            OnMixedContact?.Invoke(other);
-            return;
-        }
-
-        if (!isChanged)
-            return;
-
-        if (isTriggerPair)
-        {
-            if (ColliderTriggerEventPolicy.ShouldRaise(this, other))
-                OnMixedTriggerExit?.Invoke(other);
-
-            return;
-        }
-
-        OnMixedContactExit?.Invoke(other);
-    }
-
     /// <summary>
     /// The point on the surface of the capsule that's nearest to the given point
     /// </summary>
@@ -872,147 +744,6 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
     /// <param name="outputIntersectionPoints"></param>
     /// <returns></returns>
     public abstract bool ColliderOverlapsRay(RaycastSegmentWorker worker, ref SwiftList<Vector3d> outputIntersectionPoints);
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void SetPreviousGridBounds() =>
-        _partitionState.SetPreviousGridBounds(BoundsMin, BoundsMax, Context.Collisions.ResolvePartitionKind(this));
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal bool TryGetCollisionPair(int otherId, out CollisionPair? collisionPair) =>
-        _pairState.TryGetCollisionPair(otherId, out collisionPair);
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal bool TryAddCollisionPair(int otherId, CollisionPair collisionPair) =>
-        _pairState.TryAddCollisionPair(otherId, collisionPair);
-
-    internal bool TryRemoveCollisionPair(int otherId)
-    {
-        if (!_pairState.TryRemoveCollisionPair(otherId, out CollisionPair? collisionPair))
-            return false;
-
-        Context.Physics.DeactivateAndPoolPair(collisionPair!);
-        return true;
-    }
-
-    internal bool TryAddCollisionPairHolder(int otherId) => _pairState.TryAddCollisionPairHolder(otherId);
-
-    internal bool TryRemoveCollisionPairHolder(int otherId) => _pairState.TryRemoveCollisionPairHolder(otherId);
-
-    internal void ClearCollisionPairState()
-    {
-        _pairState.ClearCollisionPairs();
-        _pairState.ClearCollisionPairHolders();
-    }
-
-    internal void ClearRuntimeRelationships()
-    {
-        ClearChildParentReferences();
-        ClearParent();
-    }
-
-    public void Deactivate()
-    {
-        ThrowIfCompoundPartLifecycle(nameof(Deactivate));
-        if (_body != null)
-        {
-            _body.Deactivate();
-            return;
-        }
-
-        DeactivateRuntimeRegistration();
-    }
-
-    internal void DeactivateRuntimeRegistration()
-    {
-        if (_id >= 0)
-            Context.Physics.DessimilateCollider(this);
-
-        _active = false;
-        ClearBindingState();
-    }
-
-    private void ClearBindingState()
-    {
-        _body = null;
-        _agent = null;
-        _context = null;
-    }
-
-    private void ClearChildParentReferences()
-    {
-        SwiftHashSet<ulong>? children = _hierarchyState.Children;
-        if (children == null)
-            return;
-
-        foreach (ulong childPackedKey in children)
-        {
-            ColliderHierarchyKey childKey = ColliderHierarchyKey.FromPacked(childPackedKey);
-            if (((IColliderHierarchyNode)this).TryGetHierarchyColliderByKey(childKey, out IColliderHierarchyNode? child))
-                child!.ClearParentReference();
-        }
-
-        _hierarchyState.ClearChildren();
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal void BindContext(GravitasWorldContext context)
-    {
-        SwiftThrowHelper.ThrowIfNull(context, nameof(context));
-        SwiftThrowHelper.ThrowIfArgument(
-            _context != null && !ReferenceEquals(_context, context),
-            nameof(context),
-            "Collider is already bound to a different GravitasWorldContext.");
-        _context = context;
-    }
-
-    internal void BindCompoundPart(
-        LSCompoundCollider owner,
-        FixedQuaternion localRotation,
-        Vector3d localScale,
-        GravitasWorldContext context)
-    {
-        SwiftThrowHelper.ThrowIfNull(owner, nameof(owner));
-        SwiftThrowHelper.ThrowIfArgument(
-            HasHostBinding,
-            nameof(owner),
-            "Compound collider parts cannot be initialized as standalone colliders.");
-        _compoundOwner = owner;
-        _compoundLocalRotation = localRotation;
-        _compoundLocalScale = localScale;
-        BindContext(context);
-        RebuildRuntimeShapeState();
-    }
-
-    internal void ReserveCompoundPart(LSCompoundCollider owner)
-    {
-        SwiftThrowHelper.ThrowIfNull(owner, nameof(owner));
-        SwiftThrowHelper.ThrowIfArgument(
-            HasHostBinding,
-            nameof(owner),
-            "Compound collider parts cannot be initialized as standalone colliders.");
-        SwiftThrowHelper.ThrowIfArgument(
-            _compoundOwner != null && !ReferenceEquals(_compoundOwner, owner),
-            nameof(owner),
-            "Compound collider part is already owned by another compound collider.");
-
-        _compoundOwner = owner;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private void ThrowIfCompoundPartLifecycle(string operation)
-    {
-        SwiftThrowHelper.ThrowIfTrue(
-            _compoundOwner != null,
-            operation,
-            "Compound collider parts are geometry owned by LSCompoundCollider and cannot run standalone lifecycle operations.");
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal bool TryGetBoundContext(out GravitasWorldContext? context)
-    {
-        context = _context;
-        return context != null;
-    }
 
     void IColliderHierarchyNode.AddChild(ColliderHierarchyKey key)
     {

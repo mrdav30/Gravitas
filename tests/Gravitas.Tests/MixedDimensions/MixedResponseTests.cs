@@ -12,7 +12,7 @@ using Xunit;
 
 namespace Gravitas.Tests.MixedDimensions;
 
-public sealed class MixedResponseTests
+public sealed partial class MixedResponseTests
 {
     [Fact]
     public void Simulate_WithDynamic3DOnStatic2DSlab_ShouldResolveVerticallyAndNotify()
@@ -1103,64 +1103,6 @@ public sealed class MixedResponseTests
         body3D.Body.Position3d.Should().Be(Vector3d.Zero);
         body2D.Position.Should().Be(Vector2d.Zero);
         entered.Should().Be(0);
-    }
-
-    [Fact]
-    public void Simulate_WithSeparatedFormerMixedPair_ShouldEmitExitAndRecyclePair()
-    {
-        using GravitasWorldContext context = CreateMixedContext();
-        ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(context, Vector3d.Zero);
-        SolidBody2D body2D = CreateCircle2D(context, Vector2d.Zero);
-        int exited3D = 0;
-        int exited2D = 0;
-        body3D.Collider.OnMixedContactExit += other =>
-        {
-            other.Should().BeSameAs(body2D.Collider);
-            exited3D++;
-        };
-        body2D.Collider.OnMixedContactExit += other =>
-        {
-            other.Should().BeSameAs(body3D.Collider);
-            exited2D++;
-        };
-
-        Step(context);
-        body3D.Body.SetPosition(new Vector3d((Fixed64)6, Fixed64.Zero, Fixed64.Zero));
-        Step(context);
-
-        exited3D.Should().Be(1);
-        exited2D.Should().Be(1);
-        context.MixedCollisions.ActivePairCount.Should().Be(0);
-        context.MixedCollisions.PooledPairCount.Should().BeGreaterThan(0);
-    }
-
-    [Fact]
-    public void Deactivate2DParticipant_WithActiveMixedPair_ShouldEmitExitAndRecyclePair()
-    {
-        using GravitasWorldContext context = CreateMixedContext();
-        ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(context, Vector3d.Zero);
-        SolidBody2D body2D = CreateCircle2D(context, Vector2d.Zero);
-        int exited3D = 0;
-        int exited2D = 0;
-        body3D.Collider.OnMixedContactExit += other =>
-        {
-            other.Should().BeSameAs(body2D.Collider);
-            exited3D++;
-        };
-        body2D.Collider.OnMixedContactExit += other =>
-        {
-            other.Should().BeSameAs(body3D.Collider);
-            exited2D++;
-        };
-
-        Step(context);
-        body2D.Deactivate();
-
-        exited3D.Should().Be(1);
-        exited2D.Should().Be(1);
-        context.MixedCollisions.ActivePairCount.Should().Be(0);
-        context.MixedCollisions.PooledPairCount.Should().BeGreaterThan(0);
-        body2D.Collider.IsActive.Should().BeFalse();
     }
 
     [Fact]

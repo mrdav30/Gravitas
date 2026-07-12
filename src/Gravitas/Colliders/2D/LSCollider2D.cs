@@ -745,19 +745,48 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
             OnContactExit?.Invoke(otherBody);
     }
 
-    internal void NotifyMixedContact(LSCollider other, bool isColliding, bool isChanged, bool isTriggerPair)
+    internal void NotifyMixedContact(LSCollider other, bool isColliding, bool isChanged, bool isTriggerPair) =>
+        NotifyMixedContact(
+            other,
+            isColliding,
+            isChanged,
+            isTriggerPair,
+            allowInactive: false,
+            new ColliderLifetimeToken2D(this),
+            new ColliderLifetimeToken(other),
+            ColliderTriggerEventPolicy.ShouldRaise(other, this));
+
+    internal void NotifyMixedContact(
+        LSCollider other,
+        bool isColliding,
+        bool isChanged,
+        bool isTriggerPair,
+        bool allowInactive,
+        in ColliderLifetimeToken2D registration,
+        in ColliderLifetimeToken otherRegistration,
+        bool shouldRaiseTrigger)
     {
-        if (!IsActive)
+        if (isColliding
+            ? !registration.IsActive || !otherRegistration.IsActive
+            : allowInactive
+                ? !registration.IsCurrentLifetime || !otherRegistration.IsCurrentLifetime
+                : !registration.IsActive)
+        {
             return;
+        }
 
         if (isColliding)
         {
             if (isTriggerPair)
             {
-                if (ColliderTriggerEventPolicy.ShouldRaise(other, this))
+                if (shouldRaiseTrigger)
                 {
                     if (isChanged)
+                    {
                         OnMixedTriggerEnter?.Invoke(other);
+                        if (!registration.IsActive || !otherRegistration.IsActive)
+                            return;
+                    }
 
                     OnMixedTriggerStay?.Invoke(other);
                 }
@@ -766,7 +795,11 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
             }
 
             if (isChanged)
+            {
                 OnMixedContactEnter?.Invoke(other);
+                if (!registration.IsActive || !otherRegistration.IsActive)
+                    return;
+            }
 
             OnMixedContact?.Invoke(other);
             return;
@@ -777,7 +810,7 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
 
         if (isTriggerPair)
         {
-            if (ColliderTriggerEventPolicy.ShouldRaise(other, this))
+            if (shouldRaiseTrigger)
                 OnMixedTriggerExit?.Invoke(other);
 
             return;

@@ -11,45 +11,66 @@ using System.Runtime.CompilerServices;
 
 namespace Gravitas;
 
+internal readonly struct MixedPairLifetimeToken
+{
+    internal MixedPairLifetimeToken(CollisionPairMixed pair)
+    {
+        Pair = pair;
+        LifetimeVersion = pair.LifetimeVersion;
+        Collider3D = new ColliderLifetimeToken(pair.Collider3D);
+        Collider2D = new ColliderLifetimeToken2D(pair.Collider2D);
+    }
+
+    internal CollisionPairMixed Pair { get; }
+
+    internal long LifetimeVersion { get; }
+
+    private ColliderLifetimeToken Collider3D { get; }
+
+    private ColliderLifetimeToken2D Collider2D { get; }
+
+    internal bool IsCurrentLifetime => Pair.LifetimeVersion == LifetimeVersion
+        && Collider3D.IsCurrentLifetime
+        && Collider2D.IsCurrentLifetime;
+}
+
 internal sealed partial class GravitasMixedCollisionService
 {
     internal void RemovePairsFor3DCollider(LSCollider collider)
     {
         SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
-        _pairsToRemove.FastClear();
+        int removalStart = _pairsToRemove.Count;
         foreach (var pairEntry in _pairs)
         {
             CollisionPairMixed pair = pairEntry.Value;
             if (!ReferenceEquals(pair.Collider3D, collider))
                 continue;
 
-            pair.MarkSeparated();
-            _pairsToRemove.Add(pairEntry.Key);
+            _pairsToRemove.Add(new MixedPairLifetimeToken(pair));
         }
 
-        RemoveQueuedPairs();
+        RemoveQueuedPairs(removalStart, _pairsToRemove.Count);
     }
 
     internal void RemovePairsFor2DCollider(LSCollider2D collider)
     {
         SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
-        _pairsToRemove.FastClear();
+        int removalStart = _pairsToRemove.Count;
         foreach (var pairEntry in _pairs)
         {
             CollisionPairMixed pair = pairEntry.Value;
             if (!ReferenceEquals(pair.Collider2D, collider))
                 continue;
 
-            pair.MarkSeparated();
-            _pairsToRemove.Add(pairEntry.Key);
+            _pairsToRemove.Add(new MixedPairLifetimeToken(pair));
         }
 
-        RemoveQueuedPairs();
+        RemoveQueuedPairs(removalStart, _pairsToRemove.Count);
     }
 
     internal bool RequireCollisionPair(LSCollider collider3D, LSCollider2D collider2D)
     {
-        return collider3D.IsActive && collider2D.IsActive
+        return collider3D.IsActive && !collider3D.IsDeactivationInProgress && collider2D.IsActive
             && collider3D.Shape != ColliderType.None && collider2D.Shape != ColliderType2D.None
             && (collider3D.Body != null || collider2D.Body != null)
             && !ReferenceEquals(collider3D.AgentOrNull, collider2D.AgentOrNull)
@@ -97,21 +118,34 @@ internal sealed partial class GravitasMixedCollisionService
 
     private void CleanupUntouchedPairs(int frame)
     {
-        _pairsToRemove.FastClear();
+        int removalStart = _pairsToRemove.Count;
         foreach (var pairEntry in _pairs)
+            _pairsToRemove.Add(new MixedPairLifetimeToken(pairEntry.Value));
+
+        int removalEnd = _pairsToRemove.Count;
+        try
         {
-            CollisionPairMixed pair = pairEntry.Value;
-            if (pair.LastFrame == frame)
-                continue;
+            for (int i = removalStart; i < removalEnd; i++)
+            {
+                MixedPairLifetimeToken token = _pairsToRemove[i];
+                CollisionPairMixed pair = token.Pair;
+                if (!IsCurrentPair(token))
+                    continue;
 
-            if (TryKeepUntouchedPair(pair, frame))
-                continue;
+                if (pair.LastFrame == frame)
+                    continue;
 
-            pair.MarkSeparated();
-            _pairsToRemove.Add(pairEntry.Key);
+                if (TryKeepUntouchedPair(pair, frame))
+                    continue;
+
+                RemoveCurrentPair(token);
+            }
         }
-
-        RemoveQueuedPairs();
+        finally
+        {
+            if (removalStart == 0)
+                _pairsToRemove.FastClear();
+        }
     }
 
     private bool TryKeepUntouchedPair(CollisionPairMixed pair, int frame)
@@ -149,20 +183,40 @@ internal sealed partial class GravitasMixedCollisionService
         return new CollisionPairMixed(collider3D, collider2D);
     }
 
-    private void RemoveQueuedPairs()
+    private void RemoveQueuedPairs(int removalStart, int removalEnd)
     {
-        for (int i = 0; i < _pairsToRemove.Count; i++)
+        try
         {
-            ulong key = _pairsToRemove[i];
-            RecyclePair(_pairs[key]);
-            _pairs.Remove(key);
+            for (int i = removalStart; i < removalEnd; i++)
+                RemoveCurrentPair(_pairsToRemove[i]);
         }
+        finally
+        {
+            if (removalStart == 0)
+                _pairsToRemove.FastClear();
+        }
+    }
+
+    private bool IsCurrentPair(in MixedPairLifetimeToken token) =>
+        token.IsCurrentLifetime
+        && _pairs.TryGetValue(token.Pair.Key, out CollisionPairMixed currentPair)
+        && ReferenceEquals(currentPair, token.Pair);
+
+    private void RemoveCurrentPair(in MixedPairLifetimeToken token)
+    {
+        if (!IsCurrentPair(token))
+            return;
+
+        CollisionPairMixed pair = token.Pair;
+        _pairs.Remove(pair.Key);
+        pair.MarkSeparated();
+        RecyclePair(pair);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void RecyclePair(CollisionPairMixed pair)
     {
-        if (_context.Settings.PoolingEnabled)
+        if (_context.Settings.PoolingEnabled && !pair.IsNotificationInProgress)
             _cachedPairs.Push(pair);
     }
 
