@@ -22,27 +22,25 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-mesh-reviewed-full/b183df5e-7251-4b28-aae9-9d290cf13fb6/coverage.cobertura.xml`.
+`TestResults/coverage-ccd2d-helpers-reviewed-full/b809d1ee-951a-4273-ada8-eb5af981c7fe/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
-| Lines | 99.3% | 25,586 / 25,777 | 191 | 100% |
-| Branches | 96.9% | 9,808 / 10,122 | 314 | 100% |
+| Lines | 99.3% | 25,578 / 25,765 | 187 | 100% |
+| Branches | 97.0% | 9,811 / 10,112 | 301 | 100% |
 | Methods | 98.9% | 3,393 / 3,431 | 38 | 100% |
 
-The full coverage-enabled `Release` suite passes 2,156/2,156 tests, and
+The full coverage-enabled `Release` suite passes 2,163/2,163 tests, and
 `ReleaseLean` builds both targets without warnings. Branch coverage is now the
 primary constraint, but the remaining line and method gaps must close from the
 same final artifact.
 
 ### Immediate Next Block
 
-Finish
-`src/Gravitas/Core/2D/SolidBody2D.ContinuousCollision.Helpers.cs` before
-changing target. The current artifact reports four uncovered lines and nine
-uncovered branch outcomes in this file. Trace every helper through the dynamic,
-kinematic, rotational, and mixed CCD callers so shared invariants are proved
-once rather than patched per resolver.
+Finish `src/Gravitas/Runtime/GravitasWorldContext.cs` before changing target.
+The current artifact reports five uncovered lines and seven uncovered branch
+outcomes in this file. Trace owned/attached world lifetime, runtime-mode phase
+routing, CCD handoff coordination, reset, and disposal as one host contract.
 
 ## Rules Of Engagement
 
@@ -107,14 +105,14 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | `Core/2D/SolidBody2D.ContinuousCollision.Helpers.cs` | 4 | 9 | 0 | CCD helper invariants and degenerate outcomes. |
-| 2 | `Runtime/GravitasWorldContext.cs` | 5 | 7 | 0 | Context ownership and phase routing. |
-| 3 | `Queries/3D/RaycastSegmentWorker.cs` | 4 | 8 | 0 | Segment reduction, filtering, and hit ordering. |
-| 4 | `Core/Mixed/GravitasMixedCollisionService.Pairs.cs` | 5 | 6 | 0 | Mixed pair ownership and cleanup. |
+| 1 | `Runtime/GravitasWorldContext.cs` | 5 | 7 | 0 | Context ownership and phase routing. |
+| 2 | `Queries/3D/RaycastSegmentWorker.cs` | 4 | 8 | 0 | Segment reduction, filtering, and hit ordering. |
+| 3 | `Core/Mixed/GravitasMixedCollisionService.Pairs.cs` | 5 | 6 | 0 | Mixed pair ownership and cleanup. |
+| 4 | `Core/3D/GravitasPhysicsService.Pairs.cs` | 4 | 7 | 0 | 3D pair creation, ordering, and cleanup. |
 | 5 | `Colliders/2D/LSPolygonCollider2D.cs` | 4 | 7 | 0 | Authored polygon validation and geometry. |
-| 6 | `Core/3D/GravitasPhysicsService.Pairs.cs` | 4 | 7 | 0 | 3D pair creation, ordering, and cleanup. |
-| 7 | `CollisionHandling/Detection/3D/ConvexColliderSupport.cs` | 5 | 5 | 0 | Convex support and validated-shape outcomes. |
-| 8 | `Core/2D/GravitasPhysics2DService.Pairs.cs` | 2 | 10 | 0 | 2D pair creation, ordering, and cleanup. |
+| 6 | `CollisionHandling/Detection/3D/ConvexColliderSupport.cs` | 5 | 5 | 0 | Convex support and validated-shape outcomes. |
+| 7 | `Core/2D/GravitasPhysics2DService.Pairs.cs` | 2 | 10 | 0 | 2D pair creation, ordering, and cleanup. |
+| 8 | `CollisionHandling/Detection/2D/CollisionDetection2D.cs` | 4 | 6 | 0 | 2D narrow-phase and manifold outcomes. |
 
 ### Phase 1: Core Runtime And Service Ownership
 
@@ -155,8 +153,10 @@ public workflow.
 ### Phase 3: Motion, CCD, Grounding, And Constraints
 
 - [ ] Complete `SolidBody.Motion.cs` with fixed-step state-transition tests.
-- [ ] Complete `SolidBody2D.ContinuousCollision.Helpers.cs` and the remaining
-      2D CCD hit/reduction paths as one behavior family.
+- [x] Complete `SolidBody2D.ContinuousCollision.Helpers.cs` and tighten its
+      successful-hit caller contracts.
+- [ ] Complete the remaining 2D CCD hit, dynamic-response, and reduction paths
+      as one behavior family.
 - [ ] Close residual 2D grounding and 3D constraint-service outcomes through
       real simulation workflows.
 - [ ] Verify dimensional parity only where the physical models are intended to
@@ -260,6 +260,7 @@ of record.
 | 3D constraint service | 99.2% | 96.7% | 98.9% | 2,145 | Replay holes and ragdoll metadata pinned exactly; suppression cleanup covered; duplicate collider and resolver validation removed. |
 | 2D physics service | 99.2% | 96.8% | 98.9% | 2,150 | Disabled/direct phases, non-dynamic and stale teardown, pooling-off collision, and refresh ownership completed with 2D/3D parity review. |
 | 3D mesh detection | 99.3% | 96.9% | 98.9% | 2,156 | Convex sphere and SAT outcomes covered, callerless wrapper removed, fallback signal strengthened, and disconnected-convex false-positive tracked. |
+| 2D CCD helpers | 99.3% | 97.0% | 98.9% | 2,163 | Inheritance, closing, static/kinematic, and mixed policies covered; impossible geometry and duplicate hit guards removed. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.
