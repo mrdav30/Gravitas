@@ -333,6 +333,23 @@ public sealed class Constraint2DServiceTests
     }
 
     [Fact]
+    public void LinkedCollisionSuppression_ShouldBeRemovedWhenLargerColliderIdIsReused()
+    {
+        using GravitasWorldContext context = CreateConstraintContext();
+        SolidBody2D first = CreateBody(context, Vector2d.Zero);
+        SolidBody2D second = CreateBody(context, Vector2d.Right * (Fixed64)2);
+        context.Constraints2D.RegisterJoint(CreatePin(first, second));
+        int secondColliderId = second.Collider.Id;
+
+        first.Collider.Id.Should().BeLessThan(secondColliderId);
+        second.Deactivate();
+        SolidBody2D replacement = CreateBody(context, Vector2d.Forward * (Fixed64)4);
+
+        replacement.Collider.Id.Should().Be(secondColliderId);
+        context.Constraints2D.ShouldExcludeLinkedCollision(first.Collider, replacement.Collider).Should().BeFalse();
+    }
+
+    [Fact]
     public void DistanceJoint_ShouldReduceAnchorSeparationThroughPlanarImpulses()
     {
         using GravitasWorldContext context = CreateConstraintContext();

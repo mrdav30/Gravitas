@@ -136,20 +136,16 @@ public sealed class GravitasConstraint2DService
 
         int linkCount = definition.Links.Length;
         var links = new SolidBody2D[linkCount];
-        var linkIds = new int[linkCount];
         for (int i = 0; i < linkCount; i++)
-        {
-            linkIds[i] = definition.Links[i].LinkId;
             links[i] = definition.Links[i].Body;
-        }
 
         int jointCount = definition.Joints.Length;
         var joints = new Joint2D[jointCount];
         for (int i = 0; i < jointCount; i++)
         {
             RagdollJointDefinition2D authoredJoint = definition.Joints[i];
-            SolidBody2D bodyA = ResolveRagdollLink(linkIds, links, authoredJoint.LinkAId);
-            SolidBody2D bodyB = ResolveRagdollLink(linkIds, links, authoredJoint.LinkBId);
+            SolidBody2D bodyA = ResolveRagdollLink(definition.Links, authoredJoint.LinkAId);
+            SolidBody2D bodyB = ResolveRagdollLink(definition.Links, authoredJoint.LinkBId);
             JointCollisionPolicy collisionPolicy = definition.SelfCollisionPolicy == RagdollSelfCollisionPolicy.CollideAllLinks
                 ? JointCollisionPolicy.Collide
                 : authoredJoint.CollisionPolicy;
@@ -388,10 +384,6 @@ public sealed class GravitasConstraint2DService
             nameof(definition),
             "2D joint bodies must be active before registration.");
         SwiftThrowHelper.ThrowIfArgument(
-            definition.BodyA.Collider == null || definition.BodyB.Collider == null,
-            nameof(definition),
-            "2D joint bodies must have registered 2D colliders.");
-        SwiftThrowHelper.ThrowIfArgument(
             !Joint2D.IsSupportedType(definition.Type),
             nameof(definition.Type),
             "Unsupported 2D joint type.");
@@ -428,7 +420,7 @@ public sealed class GravitasConstraint2DService
                 nameof(definition.Links),
                 "All 2D ragdoll links must belong to this context.");
             SwiftThrowHelper.ThrowIfArgument(
-                !link.Body.Active || link.Body.Collider == null,
+                !link.Body.Active,
                 nameof(definition.Links),
                 "2D ragdoll links must have active 2D colliders.");
             SwiftThrowHelper.ThrowIfArgument(
@@ -486,17 +478,6 @@ public sealed class GravitasConstraint2DService
         {
             if (links[i].LinkId == linkId)
                 return links[i].Body;
-        }
-
-        throw new ArgumentException("2D ragdoll joint references an unknown link ID.", nameof(linkId));
-    }
-
-    private static SolidBody2D ResolveRagdollLink(int[] linkIds, SolidBody2D[] links, int linkId)
-    {
-        for (int i = 0; i < linkIds.Length; i++)
-        {
-            if (linkIds[i] == linkId)
-                return links[i];
         }
 
         throw new ArgumentException("2D ragdoll joint references an unknown link ID.", nameof(linkId));
