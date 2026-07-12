@@ -113,6 +113,37 @@ public sealed class Physics2DQueryTests
     }
 
     [Fact]
+    public void OverlapQueries_ShouldRejectDiagonalBoundsCandidateAndClearCallerResults()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        SolidBody2D diagonal = CreateCircle(
+            context,
+            new Vector2d(Fixed64.FromFraction(9, 10), Fixed64.FromFraction(9, 10)));
+        var hits = new SwiftList<Physics2DHit>();
+
+        context.Query2D.OverlapCircle(Vector2d.Zero, Fixed64.Half, out Physics2DHit circleHit).Should().BeFalse();
+        circleHit.Should().Be(default(Physics2DHit));
+        context.Query2D.LastQueryCandidateCount.Should().Be(1);
+
+        hits.Add(new Physics2DHit(diagonal.Collider, diagonal.Position, Vector2d.Right, Fixed64.Zero));
+        context.Query2D.OverlapCircleAll(Vector2d.Zero, Fixed64.Half, hits).Should().Be(0);
+        hits.Should().BeEmpty();
+        context.Query2D.LastQueryCandidateCount.Should().Be(1);
+
+        context.Query2D.OverlapAabb(Vector2d.Zero, Vector2d.One, out Physics2DHit aabbHit).Should().BeFalse();
+        aabbHit.Should().Be(default(Physics2DHit));
+        context.Query2D.LastQueryCandidateCount.Should().Be(1);
+
+        context.Query2D.OverlapAabb(diagonal.Position, Vector2d.One, out aabbHit).Should().BeTrue();
+        aabbHit.Collider.Should().BeSameAs(diagonal.Collider);
+
+        hits.Add(new Physics2DHit(diagonal.Collider, diagonal.Position, Vector2d.Right, Fixed64.Zero));
+        context.Query2D.OverlapAabbAll(Vector2d.Zero, Vector2d.One, hits).Should().Be(0);
+        hits.Should().BeEmpty();
+        context.Query2D.LastQueryCandidateCount.Should().Be(1);
+    }
+
+    [Fact]
     public void OverlapAabbAll_WithNonPositiveSize_ShouldThrow()
     {
         using GravitasWorldContext context = Create2DContext();
