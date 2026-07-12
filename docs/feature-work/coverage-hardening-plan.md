@@ -22,32 +22,28 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-task12-authoritative-reviewed-full-rerun/56f638df-6d66-4c69-a5e7-cfa6ba170f93/coverage.cobertura.xml`.
+`TestResults/coverage-task13-authoritative-reviewed-full/aa8c93e6-c1fc-4c16-826c-8aa11aeaec8d/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
-| Lines | 99.3% | 26,113 / 26,278 | 165 | 100% |
-| Branches | 97.6% | 10,107 / 10,354 | 247 | 100% |
-| Methods | 98.9% | 3,433 / 3,470 | 37 | 100% |
+| Lines | 99.4% | 26,122 / 26,271 | 149 | 100% |
+| Branches | 97.8% | 10,131 / 10,350 | 219 | 100% |
+| Methods | 98.9% | 3,433 / 3,468 | 35 | 100% |
 
-The full coverage-enabled `Release` suite passes 2,255/2,255 tests, and
+The full coverage-enabled `Release` suite passes 2,279/2,279 tests, and
 `ReleaseLean` builds both targets without warnings. Branch coverage is now the
 primary constraint, but the remaining line and method gaps must close from the
 same final artifact.
 
 ### Immediate Next Block
 
-Finish the mixed pair lifecycle family before changing target:
-`Core/Mixed/GravitasMixedCollisionService.Pairs.cs`,
-`CollisionHandling/Pairs/Mixed/CollisionPairMixed.cs`,
-`Core/Mixed/GravitasMixedCollisionService.Response.cs`, and the mixed
-notification paths in `LSCollider.Events.cs` and `LSCollider2D.cs`. Together
-they account for 16 uncovered lines, 29 uncovered branch outcomes, and two
-uncovered methods. Close pooling modes, stale lifetime tokens, nested callback
-mutation, trigger admission, resting pairs, response admission, and exact
-enter/stay/exit order as one contract. The newly completed 3D pair safeguards
-are a reference, not a reason to force dimensional parity where mixed ownership
-differs.
+Finish `src/Gravitas/Colliders/2D/LSPolygonCollider2D.cs` before changing
+target. The current artifact reports four uncovered lines and seven uncovered
+branch outcomes. Trace authored vertex validation, winding/convexity, scaled
+geometry, centroid/inertia ownership, degenerate polygons, and runtime shape
+refresh as one contract. Prefer public authored-shape workflows; delete only
+caller-proven impossible geometry guards, and keep all fixed-point ordering and
+validation behavior explicit.
 
 ## Rules Of Engagement
 
@@ -112,13 +108,13 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | Mixed pair lifecycle and response family | 16 | 29 | 2 | Mixed callbacks, pooled lifetime, response admission, ordering, and cleanup. |
-| 2 | `Colliders/2D/LSPolygonCollider2D.cs` | 4 | 7 | 0 | Authored polygon validation and geometry. |
-| 3 | `CollisionHandling/Detection/3D/CollisionDetection.Cuboid.cs` | 3 | 7 | 0 | Cuboid feature selection and separation. |
-| 4 | `Core/2D/SolidBody2D.ContinuousCollision.Hits.cs` | 2 | 7 | 0 | 2D hit admission and deterministic reduction. |
-| 5 | `CollisionHandling/Detection/2D/CollisionDetection2D.cs` | 4 | 6 | 0 | Pure 2D dispatch and degenerate-shape rejection. |
-| 6 | `Core/2D/SolidBody2D.ContinuousCollision.Dynamic.cs` | 4 | 6 | 0 | Dynamic 2D CCD handoff and substep state. |
-| 7 | `CollisionHandling/Detection/3D/ConvexColliderSupport.cs` | 5 | 5 | 0 | Convex volume tests and degenerate geometry. |
+| 1 | `Colliders/2D/LSPolygonCollider2D.cs` | 4 | 7 | 0 | Authored polygon validation and geometry. |
+| 2 | `CollisionHandling/Detection/3D/CollisionDetection.Cuboid.cs` | 3 | 7 | 0 | Cuboid feature selection and separation. |
+| 3 | `Core/2D/SolidBody2D.ContinuousCollision.Hits.cs` | 2 | 7 | 0 | 2D hit admission and deterministic reduction. |
+| 4 | `CollisionHandling/Detection/2D/CollisionDetection2D.cs` | 4 | 6 | 0 | Pure 2D dispatch and degenerate-shape rejection. |
+| 5 | `Core/2D/SolidBody2D.ContinuousCollision.Dynamic.cs` | 4 | 6 | 0 | Dynamic 2D CCD handoff and substep state. |
+| 6 | `CollisionHandling/Detection/3D/ConvexColliderSupport.cs` | 5 | 5 | 0 | Convex volume tests and degenerate geometry. |
+| 7 | `CollisionHandling/Detection/Mixed/MixedEmbedded2DGeometry.cs` | 3 | 5 | 0 | Embedded-shape support points and degenerate geometry. |
 | 8 | `CollisionHandling/Response/3D/CollisionResponse.cs` | 3 | 5 | 0 | Reclose response outcomes no longer reached after stale-pair response removal. |
 
 ### Phase 1: Core Runtime And Service Ownership
@@ -138,9 +134,10 @@ mid-block merely because another branch looks easier.
 - [x] Close and independently review the 3D pair lifecycle, including callback
       mutation, per-side admission, exception retry, stale queue snapshots,
       exact exit order, and pooled-lifetime reuse.
-- [ ] Close the mixed pair/response files as one cohesive dimensional family,
-      including their callback, response-admission, and pooled-lifetime
-      counterparts.
+- [x] Close and independently review the mixed pair/response family, including
+      stale queued candidates, pooled lifetimes, nested removal snapshots,
+      sleeping/rootless response admission, per-side callbacks, and rebound
+      suppression.
 - [x] Close residual world-context outcomes through real owned/attached
       lifetime, phase-routing, reset, and disposal workflows.
 - [x] Close and independently review residual 3D body-motion outcomes through
@@ -288,6 +285,7 @@ of record.
 | 3D body motion | 99.4% | 97.6% | 98.9% | 2,226 | Reset/reuse stores, angular friction, analytic gyroscopic precession, total-step acceleration, queued CCD handoff, sleep/wake, and zombie correction state independently reviewed. |
 | 3D response islands | 99.4% | 97.7% | 98.9% | 2,229 | Sleeping and single-contact islands, sparse and anchored joints, live rootless contacts, and the caller-impossible joint-root guard independently reviewed. |
 | 3D and mixed pair lifetime hardening | 99.3% | 97.6% | 98.9% | 2,255 | 3D pair coverage closed; callback-safe snapshots, admitted-side retry, exception-safe teardown, mixed lifetime tokens, deferred nested exits, and stale-generation suppression independently reviewed. |
+| Mixed pair and response closure | 99.4% | 97.8% | 98.9% | 2,279 | Mixed pair, response, and notification paths reached 100%; zombie getters and impossible admission branches removed; response admission assertions strengthened under independent review. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.
