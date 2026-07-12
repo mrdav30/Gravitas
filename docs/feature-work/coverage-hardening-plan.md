@@ -22,15 +22,15 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-task15-authoritative-reviewed-full/37405c65-819c-4ed5-901c-d3239331c85c/coverage.cobertura.xml`.
+`TestResults/coverage-task16-authoritative-reviewed-full/ba3f71ff-2073-48bc-8996-c789ec2277d9/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
-| Lines | 99.45% | 26,122 / 26,264 | 142 | 100% |
-| Branches | 98.01% | 10,135 / 10,340 | 205 | 100% |
+| Lines | 99.47% | 26,123 / 26,262 | 139 | 100% |
+| Branches | 98.10% | 10,142 / 10,338 | 196 | 100% |
 | Methods | 98.99% | 3,433 / 3,468 | 35 | 100% |
 
-The full coverage-enabled `Release` suite passes 2,290/2,290 tests, and
+The full coverage-enabled `Release` suite passes 2,295/2,295 tests, and
 `ReleaseLean` builds both targets without warnings. Branch coverage is now the
 primary constraint, but the remaining line and method gaps must close from the
 same final artifact.
@@ -38,14 +38,13 @@ same final artifact.
 ### Immediate Next Block
 
 Finish
-`src/Gravitas/Core/2D/SolidBody2D.ContinuousCollision.Hits.cs`
-before changing target. The current artifact reports two uncovered lines and
-seven uncovered branch outcomes. Treat static, dynamic, and mixed hit
-admission; exact relative-shape refinement; equal-distance/closing-speed
-ordering; no-hit output reset; temporary transform restoration; and target-kind
-selection as one 2D CCD contract. Coordinate the investigation with the
-adjacent dynamic-response file, but do not switch source blocks until the hit
-reducer is complete.
+`src/Gravitas/CollisionHandling/Detection/2D/CollisionDetection2D.cs`
+before changing target. The current artifact reports four uncovered lines and
+six uncovered branch outcomes. Treat 2D dispatch, winding and feature
+selection, degenerate primitives, projection separation, manifold orientation,
+and contact reduction as one narrow-phase contract. Use public collider-pair
+workflows wherever possible and delete only branches whose valid-shape caller
+invariants are proven.
 
 ## Rules Of Engagement
 
@@ -110,16 +109,16 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | `Core/2D/SolidBody2D.ContinuousCollision.Hits.cs` | 2 | 7 | 0 | 2D hit admission and deterministic reduction. |
-| 2 | `CollisionHandling/Detection/2D/CollisionDetection2D.cs` | 4 | 6 | 0 | Pure 2D dispatch and degenerate-shape rejection. |
-| 3 | `Core/2D/SolidBody2D.ContinuousCollision.Dynamic.cs` | 4 | 6 | 0 | Dynamic 2D CCD handoff and substep state. |
-| 4 | `CollisionHandling/Detection/3D/ConvexColliderSupport.cs` | 5 | 5 | 0 | Convex volume tests and degenerate geometry. |
-| 5 | `CollisionHandling/Detection/Mixed/MixedEmbedded2DGeometry.cs` | 3 | 5 | 0 | Embedded-shape support points and degenerate geometry. |
-| 6 | `CollisionHandling/Response/3D/CollisionResponse.cs` | 3 | 5 | 0 | Reclose response outcomes no longer reached after stale-pair response removal. |
-| 7 | `Core/3D/SolidBody.ContinuousCollision.Hits.cs` | 3 | 5 | 0 | 3D hit admission and deterministic reduction. |
-| 8 | `Partitions/RetainedPartitionLifecycle.cs` | 3 | 5 | 0 | Retained partition teardown, owner validation, and aggregate failure ordering. |
-| 9 | `CollisionHandling/Response/2D/CollisionResponse2D.cs` | 2 | 5 | 0 | 2D response admission and anchored-body outcomes. |
-| 10 | `Diagnostics/GravitasDiagnosticSink.cs` | 1 | 5 | 0 | Disabled sink, limits, and deterministic buffer policy. |
+| 1 | `CollisionHandling/Detection/2D/CollisionDetection2D.cs` | 4 | 6 | 0 | Pure 2D dispatch and degenerate-shape rejection. |
+| 2 | `CollisionHandling/Detection/3D/ConvexColliderSupport.cs` | 5 | 5 | 0 | Convex volume tests and degenerate geometry. |
+| 3 | `CollisionHandling/Detection/Mixed/MixedEmbedded2DGeometry.cs` | 3 | 5 | 0 | Embedded-shape support points and degenerate geometry. |
+| 4 | `CollisionHandling/Response/3D/CollisionResponse.cs` | 3 | 5 | 0 | Reclose response outcomes no longer reached after stale-pair response removal. |
+| 5 | `Core/2D/SolidBody2D.ContinuousCollision.Dynamic.cs` | 3 | 5 | 0 | Dynamic 2D CCD handoff and substep state. |
+| 6 | `Core/3D/SolidBody.ContinuousCollision.Hits.cs` | 3 | 5 | 0 | 3D hit admission and deterministic reduction. |
+| 7 | `Partitions/RetainedPartitionLifecycle.cs` | 3 | 5 | 0 | Retained partition teardown, owner validation, and aggregate failure ordering. |
+| 8 | `CollisionHandling/Response/2D/CollisionResponse2D.cs` | 2 | 5 | 0 | 2D response admission and anchored-body outcomes. |
+| 9 | `Diagnostics/GravitasDiagnosticSink.cs` | 1 | 5 | 0 | Disabled sink, limits, and deterministic buffer policy. |
+| 10 | `Queries/Mixed/GravitasQueryMixedService.CircleAgainst3DReducers.cs` | 4 | 4 | 0 | Mixed circle/capsule reducers and conservative fallback admission. |
 
 ### Phase 1: Core Runtime And Service Ownership
 
@@ -181,8 +180,12 @@ public workflow.
 - [x] Complete `SolidBody.Motion.cs` with fixed-step state-transition tests.
 - [x] Complete `SolidBody2D.ContinuousCollision.Helpers.cs` and tighten its
       successful-hit caller contracts.
-- [ ] Complete the remaining 2D CCD hit, dynamic-response, and reduction paths
-      as one behavior family.
+- [x] Complete and independently review 2D CCD hit admission and reduction,
+      including static/mixed precedence, stale and newly filtered candidates,
+      deterministic replacement, exact non-closing rejection, and temporary
+      transform restoration.
+- [ ] Complete the remaining 2D CCD dynamic-response paths as the adjacent
+      behavior family.
 - [x] Close and independently review residual 2D grounding through automatic,
       manual, cached-support, callback-reentrancy, shell-reuse, query, and
       deterministic contact-candidate workflows.
@@ -298,6 +301,7 @@ of record.
 | Mixed pair and response closure | 99.4% | 97.8% | 98.9% | 2,279 | Mixed pair, response, and notification paths reached 100%; zombie getters and impossible admission branches removed; response admission assertions strengthened under independent review. |
 | 2D polygon geometry | 99.4% | 97.9% | 98.9% | 2,286 | Polygon coverage reached 100%; empty/same-count loads and degenerate scale covered; centroid/area/inertia made translation-stable after fixed-point cancellation and overflow regressions. |
 | 3D cuboid detection | 99.45% | 98.01% | 98.99% | 2,290 | Cuboid coverage reached 100%; rotated and axis-aligned separation/manifold outcomes covered; redundant guards removed; pooled hash-order normal selection replaced with authored insertion order and independently reviewed. |
+| 2D CCD hit reduction | 99.47% | 98.10% | 98.99% | 2,295 | Hit reduction reached 100%; mixed/static arbitration, stale and filtered candidates, deterministic replacement, exact non-closing rejection, rotational restoration, and a caller-impossible relative-motion guard were independently reviewed. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.
