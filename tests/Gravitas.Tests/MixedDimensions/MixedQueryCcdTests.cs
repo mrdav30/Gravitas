@@ -429,6 +429,31 @@ public sealed class MixedQueryCcdTests
     }
 
     [Fact]
+    public void SweepCircleAgainst3D_NearVerticalCapsuleEndCapCorner_ShouldRejectExactPlanarMiss()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        _ = CreateBody3D(
+            context,
+            new LSCapsuleCollider { Size = new Vector3d(Fixed64.One, (Fixed64)3, Fixed64.One) },
+            new Vector3d(Fixed64.Zero, Fixed64.FromFraction(7, 5), Fixed64.One),
+            immovable: true);
+        var hits = new SwiftList<PhysicsMixedHit>();
+
+        int count = context.QueryMixed.SweepCircleAgainst3DAll(
+            new Vector2d((Fixed64)(-3), Fixed64.Zero),
+            new Vector2d((Fixed64)3, Fixed64.Zero),
+            Fixed64.Half,
+            Fixed64.Zero,
+            Fixed64.FromFraction(1, 4),
+            IncludeLayerZero,
+            hits);
+
+        count.Should().Be(0);
+        context.QueryMixed.LastQueryCandidateCount.Should().Be(1);
+        hits.Count.Should().Be(0);
+    }
+
+    [Fact]
     public void SweepCircleAgainst3D_WithRotatedCapsuleTarget_ShouldUseExactFiniteSlabReducer()
     {
         using GravitasWorldContext context = CreateMixedContext();
@@ -2315,7 +2340,7 @@ public sealed class MixedQueryCcdTests
     }
 
     [Fact]
-    public void SweepCircleAgainst3D_WithCompoundCuboidAndVerticalCylinderOutsideSlab_ShouldRejectParts()
+    public void SweepCircleAgainst3D_WithCompoundPartsOutsideFiniteSlab_ShouldRejectParts()
     {
         using GravitasWorldContext context = CreateMixedContext();
         _ = CreateBody3D(
@@ -2323,6 +2348,10 @@ public sealed class MixedQueryCcdTests
             new LSCompoundCollider(
                 CompoundColliderPart.Cuboid(
                     Vector3d.One,
+                    new Vector3d(Fixed64.Zero, (Fixed64)2, Fixed64.Zero)),
+                CompoundColliderPart.Capsule(
+                    Fixed64.Half,
+                    (Fixed64)3,
                     new Vector3d(Fixed64.Zero, (Fixed64)2, Fixed64.Zero)),
                 CompoundColliderPart.Cylinder(
                     Fixed64.Half,
@@ -2691,6 +2720,34 @@ public sealed class MixedQueryCcdTests
         hit.Distance.Should().Be(Fixed64.FromFraction(5, 2));
         hit.Point3D.Y.Should().Be(Fixed64.Half);
         hit.ReducerKind.Should().Be(PhysicsQueryReducerKind.Exact);
+        context.QueryMixed.LastMeshTriangleCandidateCount.Should().Be(3);
+    }
+
+    [Fact]
+    public void SweepCircleAgainst3D_WithDistinctDistanceMeshTriangles_ShouldUseNearestSurface()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSMeshCollider> mesh = CreateMesh3D(
+            context,
+            CreateDistinctDistanceTriangleMesh(),
+            Vector3d.Zero,
+            immovable: true);
+
+        bool mixedHit = context.QueryMixed.SweepCircleAgainst3D(
+            new Vector2d((Fixed64)(-3), Fixed64.Zero),
+            new Vector2d((Fixed64)3, Fixed64.Zero),
+            Fixed64.Half,
+            Fixed64.Zero,
+            Fixed64.Half,
+            IncludeLayerZero,
+            out PhysicsMixedHit hit);
+
+        mixedHit.Should().BeTrue();
+        hit.Collider3D.Should().BeSameAs(mesh.Collider);
+        hit.Distance.Should().Be(Fixed64.FromFraction(5, 2));
+        hit.Point3D.X.Should().Be(Fixed64.Zero);
+        hit.ReducerKind.Should().Be(PhysicsQueryReducerKind.Exact);
+        context.QueryMixed.LastMeshTriangleCandidateCount.Should().Be(2);
     }
 
     [Fact]
@@ -4483,7 +4540,27 @@ public sealed class MixedQueryCcdTests
                 new Vector3d(Fixed64.One, Fixed64.Half, Fixed64.Zero),
                 new Vector3d(Fixed64.Zero, Fixed64.FromFraction(3, 2), -Fixed64.One),
                 new Vector3d(Fixed64.Zero, Fixed64.FromFraction(3, 2), Fixed64.One),
-                new Vector3d(Fixed64.One, Fixed64.FromFraction(3, 2), Fixed64.Zero)
+                new Vector3d(Fixed64.One, Fixed64.FromFraction(3, 2), Fixed64.Zero),
+                new Vector3d(Fixed64.Zero, Fixed64.One, -Fixed64.One),
+                new Vector3d(Fixed64.Zero, Fixed64.One, Fixed64.One),
+                new Vector3d(Fixed64.One, Fixed64.One, Fixed64.Zero)
+            },
+            new[] { 0, 1, 2, 3, 4, 5, 6, 7, 8 },
+            MeshColliderMode.Convex,
+            MeshInertiaPolicy.SurfaceApproximation);
+    }
+
+    private static LSMeshCollider CreateDistinctDistanceTriangleMesh()
+    {
+        return new LSMeshCollider(
+            new[]
+            {
+                new Vector3d(Fixed64.One, -Fixed64.One, -Fixed64.One),
+                new Vector3d(Fixed64.One, Fixed64.One, -Fixed64.One),
+                new Vector3d(Fixed64.One, Fixed64.Zero, Fixed64.One),
+                new Vector3d(Fixed64.Zero, -Fixed64.One, -Fixed64.One),
+                new Vector3d(Fixed64.Zero, Fixed64.One, -Fixed64.One),
+                new Vector3d(Fixed64.Zero, Fixed64.Zero, Fixed64.One)
             },
             new[] { 0, 1, 2, 3, 4, 5 },
             MeshColliderMode.Convex,
