@@ -86,8 +86,6 @@ public class PhysicsPartition : IVoxelPartition, IRetainedPhysicsPartition<Gravi
         IsPartitioned = true;
     }
 
-    public void OnChange() { }
-
     internal void Distribute(
         SwiftList<int> dynamicIds,
         SwiftList<int> staticIds)

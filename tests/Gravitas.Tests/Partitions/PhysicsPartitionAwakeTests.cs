@@ -6,6 +6,7 @@ using Gravitas.Diagnostics;
 using Gravitas.Tests.Support;
 using GridForge.Grids;
 using GridForge.Spatial;
+using SwiftCollections.Diagnostics;
 using System;
 using System.Collections.Generic;
 using Xunit;
@@ -284,6 +285,60 @@ public sealed class PhysicsPartitionAwakeTests
         originalVoxel.TryGetPartition(out PhysicsPartition? reusedPartition).Should().BeTrue();
         reusedPartition.Should().BeSameAs(originalPartition);
         reusedPartition!.ContainedDynamicObjects!.Contains(body.Collider.Id).Should().BeTrue();
+    }
+
+    [Fact]
+    public void SpuriousPartitionMutations_ShouldPreserveTrackedLifecycleAndEmitDiagnostics()
+    {
+        var unattached = new PhysicsPartition();
+        unattached.SetDynamicObjectAwake(99, awake: true);
+        unattached.ContainedDynamicObjects.Should().BeNull();
+        unattached.ContainedAwakeDynamicObjects.Should().BeNull();
+
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
+        PhysicsPartition partition = GetFirstPartition(scenario, body.Collider);
+        int activationId = partition.ActivationId;
+        int activePartitionCount = scenario.Context.Collisions.ActivePartitionCount;
+        int retainedPartitionCount = scenario.Context.Collisions.RetainedPartitionCount;
+        bool originalDebugLogging = GravitasLogger.EnableDebugLogging;
+        DiagnosticLevel originalMinimumLevel = GravitasLogger.MinimumLevel;
+        Action<DiagnosticLevel, string, string> originalLogHandler = GravitasLogger.LogHandler;
+        var entries = new List<(DiagnosticLevel Level, string Message)>();
+
+        try
+        {
+            GravitasLogger.EnableDebugLogging = true;
+            GravitasLogger.MinimumLevel = DiagnosticLevel.Info;
+            GravitasLogger.LogHandler = (level, message, _) => entries.Add((level, message));
+
+            partition.RemoveDynamicObject(99);
+            partition.RemoveStaticObject(99);
+            partition.RemoveKinematicObject(99);
+
+            partition.ActivationId.Should().Be(activationId);
+            partition.IsPartitioned.Should().BeTrue();
+            partition.IsEmpty.Should().BeFalse();
+            partition.EmptySinceFrame.Should().Be(-1);
+            partition.ContainedDynamicObjects!.Should().Contain(body.Collider.Id);
+            partition.ContainedStaticObjects.Should().BeNull();
+            partition.ContainedKinematicObjects.Should().BeNull();
+            partition.ContainsAwakeDynamicObject(body.Collider.Id).Should().BeTrue();
+            partition.AwakeDynamicObjectCount.Should().Be(1);
+            scenario.Context.Collisions.ActivePartitionCount.Should().Be(activePartitionCount);
+            scenario.Context.Collisions.RetainedPartitionCount.Should().Be(retainedPartitionCount);
+            entries.Should().HaveCount(3);
+            entries.Should().OnlyContain(entry => entry.Level == DiagnosticLevel.Info);
+            entries.Should().Contain(entry => entry.Message.Contains("Dynamic item not removed - 99", StringComparison.Ordinal));
+            entries.Should().Contain(entry => entry.Message.Contains("Static item not removed - 99", StringComparison.Ordinal));
+            entries.Should().Contain(entry => entry.Message.Contains("Kinematic item not removed - 99", StringComparison.Ordinal));
+        }
+        finally
+        {
+            GravitasLogger.LogHandler = originalLogHandler;
+            GravitasLogger.MinimumLevel = originalMinimumLevel;
+            GravitasLogger.EnableDebugLogging = originalDebugLogging;
+        }
     }
 
     [Fact]
