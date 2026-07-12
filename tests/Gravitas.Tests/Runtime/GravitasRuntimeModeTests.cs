@@ -99,13 +99,11 @@ public sealed class GravitasRuntimeModeTests
             Vector3d.Zero,
             Vector3d.Right,
             scenario.Context.DeltaTime);
-        scenario.Context.Physics.ProcessQueuedContinuousCollisionHandoffs(iterationBudget: 1).Should().Be(1);
-        scenario.Context.Physics2D.BeginLateSimulateBodies(continuousCollisionFramePrepared: false).Should().BeTrue();
+        scenario.Context.Physics2D.BeginLateSimulateBodies(continuousCollisionFramePrepared: true).Should().BeTrue();
         body2D.ApplyContinuousCollisionHandoff(
             Vector2d.Zero,
             Vector2d.Right,
             scenario.Context.DeltaTime);
-        scenario.Context.Physics2D.ProcessQueuedContinuousCollisionHandoffs(iterationBudget: 1).Should().Be(1);
         Vector3d position3D = body3D.Body.Position3d;
         Vector2d position2D = body2D.Position;
         scenario.Context.Physics.SimulatePhysics = false;
@@ -119,12 +117,14 @@ public sealed class GravitasRuntimeModeTests
         lateSimulateHooks.Should().Be(1);
         body3D.Body.Position3d.Should().Be(position3D);
         body2D.Position.Should().Be(position2D);
-        scenario.Context.Physics.LastContinuousCollisionIslandCount.Should().Be(1);
-        scenario.Context.Physics.LastContinuousCollisionIslandIterationCount.Should().Be(1);
-        scenario.Context.Physics.LastContinuousCollisionIslandLimitReached.Should().BeFalse();
-        scenario.Context.Physics2D.LastContinuousCollisionIslandCount.Should().Be(1);
-        scenario.Context.Physics2D.LastContinuousCollisionIslandIterationCount.Should().Be(1);
-        scenario.Context.Physics2D.LastContinuousCollisionIslandLimitReached.Should().BeFalse();
+        body3D.Body.TryConsumeContinuousCollisionHandoff(
+            updateSleepState: false,
+            updateColliderState: false).Should().BeTrue();
+        body2D.TryConsumeContinuousCollisionHandoff(
+            updateSleepState: false,
+            updateColliderState: false).Should().BeTrue();
+        body3D.Body.Position3d.X.Should().Be(position3D.X + scenario.Context.DeltaTime);
+        body2D.Position.Should().Be(position2D + Vector2d.Right * scenario.Context.DeltaTime);
     }
 
     [Fact]

@@ -46,9 +46,13 @@ flowchart TB
 - `Attach(world, takeOwnership: false)` binds to a host-created active
   `GridWorld`.
 
-Internally, contexts use a weak ownership registry to prevent one active
-`GridWorld` from being attached to multiple active contexts. This registry is
-process-wide metadata, not simulation state.
+Internally, contexts use a strong, process-wide ownership registry to prevent
+one active `GridWorld` from being attached to multiple live contexts. World
+activity validation, registration, and disposal are serialized under the same
+lock. An owned world's entry remains registered until `GridWorld.Dispose()`
+finishes; a host-owned world's entry is released without disposing the world.
+Hosts must explicitly dispose every context to release its registry entry.
+This registry is process-wide metadata, not simulation state.
 
 ## Service Map
 

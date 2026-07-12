@@ -90,6 +90,33 @@ public sealed class GravitasWorldContextTests
     }
 
     [Fact]
+    public void DisposeOwned_ShouldKeepWorldRegisteredDuringWorldReset()
+    {
+        GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        GridWorld world = context.World;
+        GravitasWorldContext? reentrantContext = null;
+        Exception? attachException = null;
+        world.OnReset += () =>
+            attachException = Record.Exception(() => reentrantContext = GravitasWorldContext.Attach(world));
+
+        try
+        {
+            context.Dispose();
+
+            attachException.Should()
+                .BeOfType<InvalidOperationException>()
+                .Which.Message.Should().Contain("already attached");
+            reentrantContext.Should().BeNull();
+            world.IsActive.Should().BeFalse();
+        }
+        finally
+        {
+            reentrantContext?.Dispose();
+            context.Dispose();
+        }
+    }
+
+    [Fact]
     public void VoxelSize_ShouldReflectRepresentativeGridTopologyMetric()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();

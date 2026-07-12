@@ -61,6 +61,32 @@ handling disconnected input without the AABB false-positive.
 
 ## Resolved Issues
 
+### Context Disposal Ordering Could Admit Inactive Worlds And Invalidate Disabled CCD Handoffs
+
+**Discovered:** 2026-07-11  
+**Resolved:** 2026-07-11  
+**Source:** 95%-to-100% coverage hardening, world-context lifecycle review  
+**Affected area:** `GravitasWorldContext` world registration/disposal and
+disabled-service late-simulate CCD state
+
+RCA: `Attach(...)` validated `GridWorld.IsActive` before taking the ownership
+lock, while owned-context disposal removed its registry entry before
+`GridWorld.Dispose()`. A waiting or reset-handler attach could therefore bind
+an inactive or disposal-in-progress world. Separately, context late simulation
+advanced the CCD frame token even when both enabled dimensional physics
+services were disabled, making their untouched pending handoffs stale.
+
+Fix: world activity validation, registration, owned-world disposal, and entry
+release are now serialized under the ownership lock, with the entry retained
+through world disposal. The context advances its CCD token only when at least
+one dimensional physics service runs.
+
+Verification: a public owned-world reset regression proves reentrant attach is
+rejected until disposal completes. A disabled `Both`-mode regression seeds
+pending 3D and 2D handoffs, advances the public context clock and hook phase,
+and proves both body states remain unchanged and both handoffs remain
+consumable afterward.
+
 ### Partition Teardown Logged Errors After Host Grid Removal
 
 **Discovered:** 2026-07-11  

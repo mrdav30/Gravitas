@@ -288,11 +288,6 @@ public sealed class GravitasWorldContext : IDisposable
     public static GravitasWorldContext Attach(GridWorld world, bool takeOwnership = false)
     {
         SwiftThrowHelper.ThrowIfNull(world, nameof(world));
-        SwiftThrowHelper.ThrowIfTrue(
-            !world.IsActive,
-            nameof(GravitasWorldContext),
-            "GravitasWorldContext requires an active GridWorld.");
-
         return CreateRegistered(world, takeOwnership);
     }
 
@@ -335,15 +330,18 @@ public sealed class GravitasWorldContext : IDisposable
     {
         ThrowIfDisposed();
         _clock.LateSimulate();
-        AdvanceLateSimulateToken();
         PhysicsRuntimeMode runtimeMode = Settings.RuntimeMode;
+        bool willRun3D = runtimeMode.Runs3D() && Physics.SimulatePhysics;
+        bool willRun2D = runtimeMode.Runs2D() && Physics2D.SimulatePhysics;
+        if (willRun3D || willRun2D)
+            AdvanceLateSimulateToken();
         if (runtimeMode.Runs3D())
             Physics.PrepareContinuousCollisionFrame();
         if (runtimeMode.Runs2D())
             Physics2D.PrepareContinuousCollisionFrame();
-        bool ran3D = runtimeMode.Runs3D()
+        bool ran3D = willRun3D
             && Physics.BeginLateSimulateBodies(continuousCollisionFramePrepared: true);
-        bool ran2D = runtimeMode.Runs2D()
+        bool ran2D = willRun2D
             && Physics2D.BeginLateSimulateBodies(continuousCollisionFramePrepared: true);
         ProcessQueuedContinuousCollisionHandoffs(ran3D, ran2D);
         if (ran3D)
@@ -524,10 +522,15 @@ public sealed class GravitasWorldContext : IDisposable
                 return;
 
             _disposed = true;
-            ReleaseWorldOwnership(this);
-
-            if (_ownsWorld && World.IsActive)
-                World.Dispose();
+            try
+            {
+                if (_ownsWorld && World.IsActive)
+                    World.Dispose();
+            }
+            finally
+            {
+                ReleaseWorldOwnership(this);
+            }
         }
     }
 
@@ -535,6 +538,10 @@ public sealed class GravitasWorldContext : IDisposable
     {
         lock (_worldOwnershipLock)
         {
+            SwiftThrowHelper.ThrowIfTrue(
+                !world.IsActive,
+                nameof(GravitasWorldContext),
+                "GravitasWorldContext requires an active GridWorld.");
             ThrowIfWorldOwned(world);
             GravitasWorldContext context = new(world, ownsWorld);
             _worldOwners[world] = context;
