@@ -95,6 +95,68 @@ public sealed class CollisionPair2DManifoldTests
     }
 
     [Fact]
+    public void PairTransitions_WithoutContactOrPriorCollision_ShouldRemainSilent()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        SolidBody2D first = CreateCircle(context, Vector2d.Zero, immovable: false);
+        SolidBody2D second = CreateCircle(context, new Vector2d((Fixed64)4, Fixed64.Zero), immovable: false);
+        var pair = new CollisionPair2D(first.Collider, second.Collider);
+        int notifications = 0;
+        first.Collider.OnContactEnter += _ => notifications++;
+        first.Collider.OnContact += _ => notifications++;
+        first.Collider.OnContactExit += _ => notifications++;
+        second.Collider.OnContactEnter += _ => notifications++;
+        second.Collider.OnContact += _ => notifications++;
+        second.Collider.OnContactExit += _ => notifications++;
+
+        pair.MarkColliding(frame: 1);
+        pair.MarkCollidingDeferred(frame: 2);
+        pair.MarkSeparated();
+
+        pair.IsColliding.Should().BeFalse();
+        pair.LastFrame.Should().Be(-1);
+        pair.Manifold.HasContact.Should().BeFalse();
+        first.Position.Should().Be(Vector2d.Zero);
+        second.Position.Should().Be(new Vector2d((Fixed64)4, Fixed64.Zero));
+        first.LinearVelocity.Should().Be(Vector2d.Zero);
+        second.LinearVelocity.Should().Be(Vector2d.Zero);
+        notifications.Should().Be(0);
+    }
+
+    [Fact]
+    public void WakeSleepingBodiesForCollision_WithEitherBodyMissing_ShouldNotWakeTheBoundBody()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        LSCircleCollider2D bodylessFirst = CreateBodylessCircle(context, Vector2d.Zero);
+        SolidBody2D second = CreateCircle(context, Vector2d.Zero, immovable: false);
+        second.Sleep();
+        var firstPair = new CollisionPair2D(bodylessFirst, second.Collider);
+
+        SolidBody2D first = CreateCircle(context, new Vector2d((Fixed64)4, Fixed64.Zero), immovable: false);
+        LSCircleCollider2D bodylessSecond = CreateBodylessCircle(
+            context,
+            new Vector2d((Fixed64)4, Fixed64.Zero));
+        first.Sleep();
+        var secondPair = new CollisionPair2D(first.Collider, bodylessSecond);
+
+        firstPair.WakeSleepingBodiesForCollision();
+        secondPair.WakeSleepingBodiesForCollision();
+
+        SolidBody2D awake = CreateCircle(context, new Vector2d((Fixed64)8, Fixed64.Zero), immovable: false);
+        SolidBody2D sleeping = CreateCircle(
+            context,
+            new Vector2d((Fixed64)8 + Fixed64.Half, Fixed64.Zero),
+            immovable: false);
+        sleeping.Sleep();
+        var sleepingSecondPair = new CollisionPair2D(awake.Collider, sleeping.Collider);
+        sleepingSecondPair.WakeSleepingBodiesForCollision();
+
+        second.IsSleeping.Should().BeTrue();
+        first.IsSleeping.Should().BeTrue();
+        sleeping.IsSleeping.Should().BeFalse();
+    }
+
+    [Fact]
     public void TryCollide_WithCompoundCompoundSeparatedParts_ShouldReturnFalse()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();

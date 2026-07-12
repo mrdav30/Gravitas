@@ -16,6 +16,23 @@ using System.Runtime.CompilerServices;
 
 namespace Gravitas.Colliders;
 
+internal readonly struct ColliderLifetimeToken2D
+{
+    internal ColliderLifetimeToken2D(LSCollider2D collider)
+    {
+        Collider = collider;
+        LifetimeVersion = collider.LifetimeVersion;
+    }
+
+    internal LSCollider2D Collider { get; }
+
+    internal long LifetimeVersion { get; }
+
+    internal bool IsActive => Collider.IsActive && IsCurrentLifetime;
+
+    internal bool IsCurrentLifetime => Collider.LifetimeVersion == LifetimeVersion;
+}
+
 /// <summary>
 /// Base type for pure 2D collider shapes.
 /// </summary>
@@ -31,6 +48,7 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
     private int _serviceIndex = -1;
     private int _replayOrder = -1;
     private int _replayOrdinal = -1;
+    private long _lifetimeVersion;
     private int _serviceRefreshIndex = -1;
     private bool _isActive = true;
     private bool _isTrigger;
@@ -108,6 +126,8 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
     public int Id => _id;
 
     internal int ReplayOrdinal => _replayOrdinal;
+
+    internal long LifetimeVersion => _lifetimeVersion;
 
     internal int ServiceRefreshIndex => _serviceRefreshIndex;
 
@@ -406,6 +426,7 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
     private void InitCore(IMatterAgent agent, SolidBody2D? body)
     {
         SwiftThrowHelper.ThrowIfNull(agent, nameof(agent));
+        _lifetimeVersion++;
         _body = body;
         _agent = agent;
         _context = agent.Context;
@@ -648,20 +669,48 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
         ClearParent();
     }
 
-    internal void NotifyContact(LSCollider2D other, bool isColliding, bool isChanged)
-    {
-        if (!IsActive)
-            return;
+    internal void NotifyContact(LSCollider2D other, bool isColliding, bool isChanged) =>
+        NotifyContact(
+            other,
+            other.Body,
+            isColliding,
+            isChanged,
+            allowInactive: false,
+            new ColliderLifetimeToken2D(this),
+            new ColliderLifetimeToken2D(other),
+            IsTrigger || other.IsTrigger,
+            ColliderTriggerEventPolicy.ShouldRaise(this, other));
 
-        bool isTriggerPair = IsTrigger || other.IsTrigger;
+    internal void NotifyContact(
+        LSCollider2D other,
+        SolidBody2D? otherBody,
+        bool isColliding,
+        bool isChanged,
+        bool allowInactive,
+        in ColliderLifetimeToken2D registration,
+        in ColliderLifetimeToken2D otherRegistration,
+        bool isTriggerPair,
+        bool shouldRaiseTrigger)
+    {
+        if (isColliding
+            ? !registration.IsActive || !otherRegistration.IsActive
+            : allowInactive ? !registration.IsCurrentLifetime : !registration.IsActive)
+        {
+            return;
+        }
+
         if (isColliding)
         {
             if (isTriggerPair)
             {
-                if (ColliderTriggerEventPolicy.ShouldRaise(this, other))
+                if (shouldRaiseTrigger)
                 {
                     if (isChanged)
+                    {
                         OnTriggerEnter?.Invoke(other);
+                        if (!registration.IsActive || !otherRegistration.IsActive)
+                            return;
+                    }
 
                     OnTriggerStay?.Invoke(other);
                 }
@@ -669,11 +718,15 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
                 return;
             }
 
-            if (isChanged && other.Body != null)
-                OnContactEnter?.Invoke(other.Body);
+            if (isChanged && otherBody != null)
+            {
+                OnContactEnter?.Invoke(otherBody);
+                if (!registration.IsActive || !otherRegistration.IsActive)
+                    return;
+            }
 
-            if (other.Body != null)
-                OnContact?.Invoke(other.Body);
+            if (otherBody != null)
+                OnContact?.Invoke(otherBody);
             return;
         }
 
@@ -682,14 +735,14 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
 
         if (isTriggerPair)
         {
-            if (ColliderTriggerEventPolicy.ShouldRaise(this, other))
+            if (shouldRaiseTrigger)
                 OnTriggerExit?.Invoke(other);
 
             return;
         }
 
-        if (other.Body != null)
-            OnContactExit?.Invoke(other.Body);
+        if (otherBody != null)
+            OnContactExit?.Invoke(otherBody);
     }
 
     internal void NotifyMixedContact(LSCollider other, bool isColliding, bool isChanged, bool isTriggerPair)

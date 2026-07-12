@@ -324,7 +324,7 @@ public sealed partial class GravitasPhysics2DService
 
     private void RecyclePair(CollisionPair2D pair)
     {
-        if (_context.Settings.PoolingEnabled)
+        if (_context.Settings.PoolingEnabled && !pair.IsNotificationInProgress)
             _cachedPairs.Push(pair);
     }
 

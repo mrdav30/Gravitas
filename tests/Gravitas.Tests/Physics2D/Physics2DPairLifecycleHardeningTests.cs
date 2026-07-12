@@ -396,7 +396,294 @@ public sealed class Physics2DPairLifecycleHardeningTests
         EnterDeactivationResult unpooled = RunEnterDeactivationScenario(poolingEnabled: false);
         EnterDeactivationResult pooled = RunEnterDeactivationScenario(poolingEnabled: true);
 
+        unpooled.FirstEvents.Should().Be("enter;exit;");
+        unpooled.RemovedSupportEvents.Should().BeEmpty();
+        unpooled.SecondEvents.Should().Be("enter;");
         pooled.Should().Be(unpooled);
+    }
+
+    [Fact]
+    public void Simulate_WhenSecondEnterCallbackDeactivatesFirst_ShouldCompleteBothOrderedLifecycles()
+    {
+        using GravitasWorldContext context = CreateContext(extent: 16);
+        SolidBody2D first = CreateCircle(context, Vector2d.Zero, immovable: false);
+        SolidBody2D second = CreateCircle(
+            context,
+            new Vector2d(Fixed64.FromFraction(3, 4), Fixed64.Zero),
+            immovable: true);
+        string firstEvents = string.Empty;
+        string secondEvents = string.Empty;
+        first.Collider.OnContactEnter += _ => firstEvents += "enter;";
+        first.Collider.OnContactExit += _ => firstEvents += "exit;";
+        second.Collider.OnContactEnter += _ =>
+        {
+            secondEvents += "enter;";
+            first.Deactivate();
+        };
+        second.Collider.OnContactExit += _ => secondEvents += "exit;";
+
+        Step(context);
+
+        first.Active.Should().BeFalse();
+        second.Active.Should().BeTrue();
+        firstEvents.Should().Be("enter;exit;");
+        secondEvents.Should().Be("enter;exit;");
+        second.Collider.CollisionPairHolderCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void Simulate_WhenFirstEnterCallbackRebindsSecondBeforeItsTurn_ShouldNotNotifyReboundLifetime()
+    {
+        using GravitasWorldContext context = CreateContext(extent: 16);
+        SolidBody2D first = CreateCircle(context, Vector2d.Zero, immovable: false);
+        SolidBody2D second = CreateCircle(
+            context,
+            new Vector2d(Fixed64.FromFraction(3, 4), Fixed64.Zero),
+            immovable: true);
+        int originalSecondId = second.Collider.Id;
+        string firstEvents = string.Empty;
+        string secondEvents = string.Empty;
+        bool secondRebound = false;
+        first.Collider.OnContactEnter += _ =>
+        {
+            firstEvents += "enter;";
+            second.Deactivate();
+            second.Initialize(new Vector2d((Fixed64)8, Fixed64.Zero));
+            second.Collider.Id.Should().Be(originalSecondId);
+            secondRebound = true;
+        };
+        first.Collider.OnContact += _ => firstEvents += "contact;";
+        first.Collider.OnContactExit += _ => firstEvents += "exit;";
+        second.Collider.OnContactEnter += _ => secondEvents += secondRebound ? "new-enter;" : "old-enter;";
+        second.Collider.OnContact += _ => secondEvents += secondRebound ? "new-contact;" : "old-contact;";
+        second.Collider.OnContactExit += _ => secondEvents += secondRebound ? "new-exit;" : "old-exit;";
+
+        Step(context);
+
+        second.Collider.Id.Should().Be(originalSecondId);
+        second.Active.Should().BeTrue();
+        second.Position.Should().Be(new Vector2d((Fixed64)8, Fixed64.Zero));
+        firstEvents.Should().Be("enter;exit;");
+        secondEvents.Should().BeEmpty();
+        first.Collider.CollisionPairHolderCount.Should().Be(0);
+        second.Collider.CollisionPairHolderCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void Simulate_WhenFirstEnterCallbackRebindsItself_ShouldNotResumeOldPairAgainstNewLifetime()
+    {
+        using GravitasWorldContext context = CreateContext(extent: 16);
+        SolidBody2D first = CreateCircle(context, Vector2d.Zero, immovable: false);
+        SolidBody2D second = CreateCircle(
+            context,
+            new Vector2d(Fixed64.FromFraction(3, 4), Fixed64.Zero),
+            immovable: true);
+        int originalFirstId = first.Collider.Id;
+        string firstEvents = string.Empty;
+        string secondEvents = string.Empty;
+        bool firstRebound = false;
+        first.Collider.OnContactEnter += _ =>
+        {
+            firstEvents += "old-enter;";
+            first.Deactivate();
+            first.Initialize(new Vector2d((Fixed64)8, Fixed64.Zero));
+            first.Collider.Id.Should().Be(originalFirstId);
+            firstRebound = true;
+        };
+        first.Collider.OnContact += _ => firstEvents += firstRebound ? "new-contact;" : "old-contact;";
+        first.Collider.OnContactExit += _ => firstEvents += firstRebound ? "new-exit;" : "old-exit;";
+        second.Collider.OnContactEnter += _ => secondEvents += "enter;";
+        second.Collider.OnContact += _ => secondEvents += "contact;";
+        second.Collider.OnContactExit += _ => secondEvents += "exit;";
+
+        Step(context);
+
+        first.Collider.Id.Should().Be(originalFirstId);
+        first.Active.Should().BeTrue();
+        first.Position.Should().Be(new Vector2d((Fixed64)8, Fixed64.Zero));
+        firstEvents.Should().Be("old-enter;");
+        secondEvents.Should().BeEmpty();
+        first.Collider.CollisionPairHolderCount.Should().Be(0);
+        second.Collider.CollisionPairHolderCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void Simulate_WhenFirstEnterCallbackRebindsThenDeactivatesItself_ShouldNotNotifyReboundLifetime()
+    {
+        using GravitasWorldContext context = CreateContext(extent: 16);
+        SolidBody2D first = CreateCircle(context, Vector2d.Zero, immovable: false);
+        SolidBody2D second = CreateCircle(
+            context,
+            new Vector2d(Fixed64.FromFraction(3, 4), Fixed64.Zero),
+            immovable: true);
+        int originalFirstId = first.Collider.Id;
+        string firstEvents = string.Empty;
+        string secondEvents = string.Empty;
+        bool firstRebound = false;
+        first.Collider.OnContactEnter += _ =>
+        {
+            firstEvents += "old-enter;";
+            first.Deactivate();
+            first.Initialize(new Vector2d((Fixed64)8, Fixed64.Zero));
+            first.Collider.Id.Should().Be(originalFirstId);
+            firstRebound = true;
+            first.Deactivate();
+        };
+        first.Collider.OnContact += _ => firstEvents += firstRebound ? "new-contact;" : "old-contact;";
+        first.Collider.OnContactExit += _ => firstEvents += firstRebound ? "new-exit;" : "old-exit;";
+        second.Collider.OnContactEnter += _ => secondEvents += "enter;";
+        second.Collider.OnContact += _ => secondEvents += "contact;";
+        second.Collider.OnContactExit += _ => secondEvents += "exit;";
+
+        Step(context);
+
+        first.Active.Should().BeFalse();
+        first.Collider.Id.Should().Be(-1);
+        firstEvents.Should().Be("old-enter;");
+        secondEvents.Should().BeEmpty();
+        first.Collider.CollisionPairHolderCount.Should().Be(0);
+        second.Collider.CollisionPairHolderCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void Simulate_WhenTriggerEnterDeactivatesBody_ShouldSkipStayAndPreservePendingExitEligibility()
+    {
+        using GravitasWorldContext context = CreateContext(extent: 16);
+        LSCircleCollider2D trigger = CreateBodylessCircle(context, Vector2d.Zero, isTrigger: true);
+        SolidBody2D body = CreateCircle(
+            context,
+            new Vector2d(Fixed64.FromFraction(3, 4), Fixed64.Zero),
+            immovable: false);
+        string triggerEvents = string.Empty;
+        string bodyEvents = string.Empty;
+        trigger.OnTriggerEnter += other =>
+        {
+            other.Should().BeSameAs(body.Collider);
+            triggerEvents += "enter;";
+            body.Deactivate();
+        };
+        trigger.OnTriggerStay += _ => triggerEvents += "stay;";
+        trigger.OnTriggerExit += _ => triggerEvents += "exit;";
+        body.Collider.OnTriggerEnter += _ => bodyEvents += "enter;";
+        body.Collider.OnTriggerStay += _ => bodyEvents += "stay;";
+        body.Collider.OnTriggerExit += _ => bodyEvents += "exit;";
+
+        Step(context);
+
+        body.Active.Should().BeFalse();
+        triggerEvents.Should().Be("enter;exit;");
+        bodyEvents.Should().BeEmpty();
+        trigger.CollisionPairHolderCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void Simulate_WhenTriggerEnterDeactivatesItself_ShouldSkipStayAndPreservePendingExitEligibility()
+    {
+        using GravitasWorldContext context = CreateContext(extent: 16);
+        LSCircleCollider2D trigger = CreateBodylessCircle(context, Vector2d.Zero, isTrigger: true);
+        SolidBody2D body = CreateCircle(
+            context,
+            new Vector2d(Fixed64.FromFraction(3, 4), Fixed64.Zero),
+            immovable: false);
+        string triggerEvents = string.Empty;
+        string bodyEvents = string.Empty;
+        trigger.OnTriggerEnter += _ =>
+        {
+            triggerEvents += "enter;";
+            trigger.Deactivate();
+        };
+        trigger.OnTriggerStay += _ => triggerEvents += "stay;";
+        trigger.OnTriggerExit += _ => triggerEvents += "exit;";
+        body.Collider.OnTriggerEnter += _ => bodyEvents += "enter;";
+        body.Collider.OnTriggerStay += _ => bodyEvents += "stay;";
+        body.Collider.OnTriggerExit += _ => bodyEvents += "exit;";
+
+        Step(context);
+
+        trigger.IsActive.Should().BeFalse();
+        triggerEvents.Should().Be("enter;exit;");
+        bodyEvents.Should().BeEmpty();
+        body.Collider.CollisionPairHolderCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void Simulate_WhenSecondEnterCallbackRebindsItself_ShouldNotSendPendingExitToNewLifetime()
+    {
+        using GravitasWorldContext context = CreateContext(extent: 16);
+        SolidBody2D first = CreateCircle(context, Vector2d.Zero, immovable: false);
+        SolidBody2D second = CreateCircle(
+            context,
+            new Vector2d(Fixed64.FromFraction(3, 4), Fixed64.Zero),
+            immovable: true);
+        int originalSecondId = second.Collider.Id;
+        string firstEvents = string.Empty;
+        string secondEvents = string.Empty;
+        bool secondRebound = false;
+        first.Collider.OnContactEnter += _ => firstEvents += "enter;";
+        first.Collider.OnContact += _ => firstEvents += "contact;";
+        first.Collider.OnContactExit += _ => firstEvents += "exit;";
+        second.Collider.OnContactEnter += _ =>
+        {
+            secondEvents += "old-enter;";
+            second.Deactivate();
+            second.Initialize(new Vector2d((Fixed64)8, Fixed64.Zero));
+            second.Collider.Id.Should().Be(originalSecondId);
+            secondRebound = true;
+        };
+        second.Collider.OnContact += _ => secondEvents += secondRebound ? "new-contact;" : "old-contact;";
+        second.Collider.OnContactExit += _ => secondEvents += secondRebound ? "new-exit;" : "old-exit;";
+
+        Step(context);
+
+        second.Collider.Id.Should().Be(originalSecondId);
+        second.Active.Should().BeTrue();
+        second.Position.Should().Be(new Vector2d((Fixed64)8, Fixed64.Zero));
+        firstEvents.Should().Be("enter;contact;exit;");
+        secondEvents.Should().Be("old-enter;");
+        first.Collider.CollisionPairHolderCount.Should().Be(0);
+        second.Collider.CollisionPairHolderCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void Simulate_WhenEnterCallbackRecursivelyCreatesPair_ShouldNotRecycleNotifyingPair()
+    {
+        using GravitasWorldContext context = CreateContext(extent: 32);
+        context.Settings.PoolingEnabled = true;
+        SolidBody2D first = CreateCircle(context, Vector2d.Zero, immovable: false);
+        SolidBody2D removedSupport = CreateCircle(
+            context,
+            new Vector2d(Fixed64.FromFraction(3, 4), Fixed64.Zero),
+            immovable: true);
+        CollisionPair2D? notifyingPair = null;
+        CollisionPair2D? recursivePair = null;
+        SolidBody2D? recursiveFirst = null;
+        SolidBody2D? recursiveSecond = null;
+        string firstEvents = string.Empty;
+        first.Collider.OnContactEnter += _ =>
+        {
+            firstEvents += "enter;";
+            notifyingPair = GetPair(first, removedSupport);
+            removedSupport.Deactivate();
+            recursiveFirst = CreateCircle(context, new Vector2d((Fixed64)8, Fixed64.Zero), immovable: false);
+            recursiveSecond = CreateCircle(
+                context,
+                new Vector2d((Fixed64)8 + Fixed64.FromFraction(3, 4), Fixed64.Zero),
+                immovable: true);
+            Step(context);
+            recursivePair = GetPair(recursiveFirst, recursiveSecond);
+        };
+        first.Collider.OnContact += _ => firstEvents += "contact;";
+        first.Collider.OnContactExit += _ => firstEvents += "exit;";
+
+        Step(context);
+
+        notifyingPair.Should().NotBeNull();
+        recursivePair.Should().NotBeNull();
+        recursivePair.Should().NotBeSameAs(notifyingPair);
+        recursivePair!.ColliderA.Should().BeOneOf(recursiveFirst!.Collider, recursiveSecond!.Collider);
+        recursivePair.ColliderB.Should().BeOneOf(recursiveFirst.Collider, recursiveSecond.Collider);
+        firstEvents.Should().Be("enter;exit;");
+        first.Collider.CollisionPairHolderCount.Should().Be(0);
     }
 
     private static EnterDeactivationResult RunEnterDeactivationScenario(bool poolingEnabled)
@@ -414,21 +701,24 @@ public sealed class Physics2DPairLifecycleHardeningTests
             new Vector2d((Fixed64)8 + Fixed64.FromFraction(3, 4), Fixed64.Zero),
             immovable: true);
         int removedSupportId = removedSupport.Collider.Id;
-        int firstEntered = 0;
-        int firstExited = 0;
-        int secondEntered = 0;
+        string firstEvents = string.Empty;
+        string removedSupportEvents = string.Empty;
+        string secondEvents = string.Empty;
         first.Collider.OnContactEnter += other =>
         {
             other.Should().BeSameAs(removedSupport);
-            firstEntered++;
+            firstEvents += "enter;";
             removedSupport.Deactivate();
         };
-        first.Collider.OnContactExit += _ => firstExited++;
+        first.Collider.OnContactExit += _ => firstEvents += "exit;";
+        removedSupport.Collider.OnContactEnter += _ => removedSupportEvents += "enter;";
+        removedSupport.Collider.OnContactExit += _ => removedSupportEvents += "exit;";
         second.Collider.OnContactEnter += other =>
         {
             other.Should().BeSameAs(secondSupport);
-            secondEntered++;
+            secondEvents += "enter;";
         };
+        second.Collider.OnContactExit += _ => secondEvents += "exit;";
 
         Step(context);
 
@@ -439,9 +729,9 @@ public sealed class Physics2DPairLifecycleHardeningTests
         return new EnterDeactivationResult(
             second.Position,
             second.LinearVelocity,
-            firstEntered,
-            firstExited,
-            secondEntered,
+            firstEvents,
+            removedSupportEvents,
+            secondEvents,
             context.Physics2D.ColliderCount);
     }
 
@@ -519,8 +809,8 @@ public sealed class Physics2DPairLifecycleHardeningTests
     private readonly record struct EnterDeactivationResult(
         Vector2d Position,
         Vector2d Velocity,
-        int FirstEntered,
-        int FirstExited,
-        int SecondEntered,
+        string FirstEvents,
+        string RemovedSupportEvents,
+        string SecondEvents,
         int ColliderCount);
 }

@@ -296,9 +296,9 @@ public sealed partial class GravitasPhysics2DService
         if (colliderCount <= 0)
             return;
 
-        int expectedPairKeyCapacity = colliderCount * 4;
+        int expectedPairKeyCapacity = System.Math.Max(colliderCount * 4, _pairs.Count);
         _processedPairKeys.EnsureCapacity(expectedPairKeyCapacity);
-        _pairsToRemove.EnsureCapacity(colliderCount);
+        _pairsToRemove.EnsureCapacity(expectedPairKeyCapacity);
         _pairsPendingSeparation.EnsureCapacity(expectedPairKeyCapacity);
         _discreteResponsePairs.EnsureCapacity(expectedPairKeyCapacity);
         _existingResponsePairCandidates.EnsureCapacity(expectedPairKeyCapacity);
