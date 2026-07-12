@@ -252,8 +252,6 @@ public sealed partial class SolidBody2D
         Fixed64 constrainedInverseMassA = GetConstrainedInverseMass(normal);
         Fixed64 constrainedInverseMassB = target.GetConstrainedInverseMass(normal);
         Fixed64 inverseMass = constrainedInverseMassA + constrainedInverseMassB;
-        if (inverseMass <= Fixed64.Zero)
-            return false;
         if (!ContinuousCollisionImpulsePolicy.IsResolvableMobility(EffectiveInverseMass, constrainedInverseMassA)
             || !ContinuousCollisionImpulsePolicy.IsResolvableMobility(target.EffectiveInverseMass, constrainedInverseMassB))
         {
@@ -295,8 +293,6 @@ public sealed partial class SolidBody2D
         Fixed64 constrainedInverseMassA = GetConstrainedInverseMass(normal);
         Fixed64 constrainedInverseMassB = target.GetConstrainedInverseMass(normal3D);
         Fixed64 inverseMass = constrainedInverseMassA + constrainedInverseMassB;
-        if (inverseMass <= Fixed64.Zero)
-            return false;
         if (!ContinuousCollisionImpulsePolicy.IsResolvableMobility(EffectiveInverseMass, constrainedInverseMassA)
             || !ContinuousCollisionImpulsePolicy.IsResolvableMobility(target.EffectiveInverseMass, constrainedInverseMassB))
         {

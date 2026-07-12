@@ -3197,6 +3197,38 @@ public sealed class MixedQueryCcdTests
     }
 
     [Fact]
+    public void LateSimulate_WithNearSingularFrozen2DSourceMobility_ShouldRejectResponseBeforeDivision()
+    {
+        using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
+        context.Environment.Gravity = Fixed64.Zero;
+        Fixed64 smallOffset = Fixed64.Epsilon;
+        Vector2d sourceStart = new(-Fixed64.One + Fixed64.Epsilon, smallOffset);
+        SolidBody2D source = CreateCircle2D(context, sourceStart);
+        ScenarioBody<LSSphereCollider> target = CreateSphere3D(context, Vector3d.Zero);
+        source.FreezeAxes = BodyFreezeAxes2D.PositionX;
+        source.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        source.ApplyCollisionLinearVelocityDelta(Vector2d.Forward * Fixed64.Half);
+        target.Body.ApplyCollisionLinearVelocityDelta(-Vector3d.Right * (Fixed64)2);
+
+        context.LateSimulate();
+
+        source.LastContinuousCollisionToiIterationCount.Should().Be(1);
+        source.LastContinuousCollisionToiIterationLimitReached.Should().BeFalse();
+        source.LinearVelocity.X.Should().Be(Fixed64.Zero);
+        source.LinearVelocity.Y.Should().BeGreaterThan(Fixed64.Zero);
+        source.LinearVelocity.Y.Should().BeLessThan(Fixed64.Half);
+        // The 3D phase has already advanced the target; rejection must not queue a second handoff.
+        target.Body.Position3d.Should().Be(new Vector3d(
+            Fixed64.FromRaw(-512_673_560),
+            Fixed64.Zero,
+            Fixed64.FromRaw(-254)));
+        target.Body.LinearVelocity.Should().Be(new Vector3d(
+            Fixed64.FromRaw(45),
+            Fixed64.Zero,
+            Fixed64.FromRaw(330_382_150)));
+    }
+
+    [Fact]
     public void LateSimulate_WithNearSingularFrozen2DTargetMobility_ShouldUse3DSourceFallback()
     {
         using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
