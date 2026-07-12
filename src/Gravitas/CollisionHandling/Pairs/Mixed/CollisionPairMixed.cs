@@ -44,10 +44,6 @@ internal sealed partial class CollisionPairMixed
 
     public int LastFrame { get; private set; } = -1;
 
-    public bool IsColliding => _isColliding;
-
-    public bool IsTriggerPair => _isTriggerPair;
-
     public MixedContact Contact { get; private set; }
 
     internal long LifetimeVersion => _lifetimeVersion;
@@ -87,8 +83,7 @@ internal sealed partial class CollisionPairMixed
 
         var registration3D = new ColliderLifetimeToken(Collider3D);
         var registration2D = new ColliderLifetimeToken2D(Collider2D);
-        bool shouldRaiseTrigger3D = ColliderTriggerEventPolicy.ShouldRaise(Collider3D, Collider2D);
-        bool shouldRaiseTrigger2D = ColliderTriggerEventPolicy.ShouldRaise(Collider3D, Collider2D);
+        bool shouldRaiseTrigger = ColliderTriggerEventPolicy.ShouldRaise(Collider3D, Collider2D);
         _notificationInProgress = true;
         try
         {
@@ -102,7 +97,7 @@ internal sealed partial class CollisionPairMixed
                 allowInactive: false,
                 registration3D,
                 registration2D,
-                shouldRaiseTrigger3D);
+                shouldRaiseTrigger);
             if (_isColliding && registration3D.IsActive && registration2D.IsActive && !_separationPending)
             {
                 bool notifyEnter2D = changed || !_collider2DNotified;
@@ -115,7 +110,7 @@ internal sealed partial class CollisionPairMixed
                     allowInactive: false,
                     registration2D,
                     registration3D,
-                    shouldRaiseTrigger2D);
+                    shouldRaiseTrigger);
             }
         }
         finally
@@ -123,8 +118,7 @@ internal sealed partial class CollisionPairMixed
             EndNotification(
                 registration3D,
                 registration2D,
-                shouldRaiseTrigger3D,
-                shouldRaiseTrigger2D);
+                shouldRaiseTrigger);
         }
     }
 
@@ -141,7 +135,8 @@ internal sealed partial class CollisionPairMixed
 
     public void MarkSeparated()
     {
-        if (!_isColliding && !_collider3DNotified && !_collider2DNotified)
+        // The 2D side is admitted only after the 3D side, so it cannot be the sole notified side.
+        if (!_isColliding && !_collider3DNotified)
             return;
 
         _isColliding = false;
@@ -157,46 +152,39 @@ internal sealed partial class CollisionPairMixed
         NotifySeparation(
             registration3D,
             registration2D,
-            ColliderTriggerEventPolicy.ShouldRaise(Collider3D, Collider2D),
             ColliderTriggerEventPolicy.ShouldRaise(Collider3D, Collider2D));
     }
 
     private void EndNotification(
         in ColliderLifetimeToken registration3D,
         in ColliderLifetimeToken2D registration2D,
-        bool shouldRaiseTrigger3D,
-        bool shouldRaiseTrigger2D)
+        bool shouldRaiseTrigger)
     {
         _notificationInProgress = false;
         if (!_separationPending)
             return;
 
         _separationPending = false;
-        NotifySeparation(registration3D, registration2D, shouldRaiseTrigger3D, shouldRaiseTrigger2D);
+        NotifySeparation(registration3D, registration2D, shouldRaiseTrigger);
     }
 
     private void NotifySeparation(
         in ColliderLifetimeToken registration3D,
         in ColliderLifetimeToken2D registration2D,
-        bool shouldRaiseTrigger3D,
-        bool shouldRaiseTrigger2D)
+        bool shouldRaiseTrigger)
     {
-        bool notify3D = _collider3DNotified;
         bool notify2D = _collider2DNotified;
         _collider3DNotified = false;
         _collider2DNotified = false;
-        if (notify3D)
-        {
-            Collider3D.NotifyMixedContact(
-                Collider2D,
-                false,
-                true,
-                _isTriggerPair,
-                allowInactive: true,
-                registration3D,
-                registration2D,
-                shouldRaiseTrigger3D);
-        }
+        Collider3D.NotifyMixedContact(
+            Collider2D,
+            false,
+            true,
+            _isTriggerPair,
+            allowInactive: true,
+            registration3D,
+            registration2D,
+            shouldRaiseTrigger);
         if (notify2D)
         {
             Collider2D.NotifyMixedContact(
@@ -207,7 +195,7 @@ internal sealed partial class CollisionPairMixed
                 allowInactive: true,
                 registration2D,
                 registration3D,
-                shouldRaiseTrigger2D);
+                shouldRaiseTrigger);
         }
     }
 
