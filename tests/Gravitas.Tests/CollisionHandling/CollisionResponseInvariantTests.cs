@@ -115,19 +115,29 @@ public sealed class CollisionResponseInvariantTests
     public void CalculateImpulse_WithZeroNormalAndNoFallbackDirection_ShouldIgnoreContact()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
-        ScenarioBody<LSSphereCollider> left = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
-        ScenarioBody<LSSphereCollider> right = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
+        ScenarioBody<LSSphereCollider> left = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(-2, 0, 0));
+        ScenarioBody<LSSphereCollider> right = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(2, 0, 0));
         Push(left.Body, 60);
         Push(right.Body, -60);
+        left.Body.SetPosition(Vector3d.Zero);
+        right.Body.SetPosition(Vector3d.Zero);
         CollisionPair pair = scenario.CreatePair(left.Collider, right.Collider);
+        pair.ColliderA.Center.Should().Be(pair.ColliderB.Center);
         pair.Manifold.SetContact(left.Collider.Center, right.Collider.Center, Fixed64.FromFraction(1, 4), Vector3d.Zero);
+        ManifoldContact contact = pair.Manifold.PrimaryContact;
+        contact.Normal.Should().Be(Vector3d.Zero);
+        Vector3d leftPositionBefore = left.Body.Position3d;
+        Vector3d rightPositionBefore = right.Body.Position3d;
         Vector3d leftVelocityBefore = left.Body.LinearVelocity;
         Vector3d rightVelocityBefore = right.Body.LinearVelocity;
 
         CollisionResponse.CalculateImpulse(pair);
 
+        left.Body.Position3d.Should().Be(leftPositionBefore);
+        right.Body.Position3d.Should().Be(rightPositionBefore);
         left.Body.LinearVelocity.Should().Be(leftVelocityBefore);
         right.Body.LinearVelocity.Should().Be(rightVelocityBefore);
+        pair.TryGetWarmStartImpulse(contact.ContactId, out _).Should().BeFalse();
     }
 
     [Fact]
