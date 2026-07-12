@@ -42,8 +42,7 @@ public sealed partial class GravitasPhysics2DService
 
     private void AddContinuousCollisionCandidate(SolidBody2D body, bool buildMixedIndex)
     {
-        if (!body.Active
-            || body.IsPositionFullyFrozen
+        if (body.IsPositionFullyFrozen
             || body.IsKinematic
             || body.Collider.IsTrigger)
         {

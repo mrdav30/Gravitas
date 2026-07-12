@@ -8,6 +8,7 @@ using Gravitas.Tests.Support;
 using GridForge.Configuration;
 using GridForge.Grids.Topology;
 using SwiftCollections;
+using SwiftCollections.Query;
 using Xunit;
 
 namespace Gravitas.Tests.Physics2D;
@@ -508,6 +509,62 @@ public sealed class ContinuousCollision2DTests
         body.Position.X.Should().Be(Fixed64.One);
         body.LinearVelocity.Should().Be(Vector2d.Right);
         body.Collider.Center.X.Should().Be(Fixed64.One);
+    }
+
+    [Fact]
+    public void ContinuousHandoff_WhenUpdatedTwice_ShouldQueueOnceAndConsumeLatestState()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        SolidBody2D body = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.Half),
+            Vector2d.Zero,
+            immovable: false);
+        context.Physics2D.BeginLateSimulateBodies(continuousCollisionFramePrepared: false).Should().BeTrue();
+
+        body.ApplyContinuousCollisionHandoff(
+            Vector2d.Right * Fixed64.FromFraction(1, 4),
+            Vector2d.Right,
+            Fixed64.FromFraction(3, 4));
+        body.ApplyContinuousCollisionHandoff(
+            Vector2d.Right * Fixed64.Half,
+            Vector2d.Right,
+            Fixed64.FromFraction(1, 4));
+
+        context.Physics2D.ProcessQueuedContinuousCollisionHandoffs(iterationBudget: 1).Should().Be(1);
+
+        body.Position.Should().Be(Vector2d.Right);
+        body.LinearVelocity.Should().Be(Vector2d.Right * (Fixed64)2);
+        context.Physics2D.LastContinuousCollisionIslandCount.Should().Be(1);
+        context.Physics2D.LastContinuousCollisionIslandIterationCount.Should().Be(1);
+        context.Physics2D.LastContinuousCollisionIslandLimitReached.Should().BeFalse();
+        context.Physics2D.ProcessQueuedContinuousCollisionHandoffs(iterationBudget: 1).Should().Be(0);
+    }
+
+    [Fact]
+    public void QueryMixedContinuousCollisionCandidates_OutsideMixedMode_ShouldClearSharedCandidateBuffer()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        SolidBody2D body = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.Half),
+            Vector2d.Zero,
+            immovable: false);
+        DynamicCcdPlanarBounds planarBounds = DynamicCcdCandidateIndex2D.CreateSweptCircleBounds(
+            Vector2d.Zero,
+            Vector2d.Zero,
+            Fixed64.One);
+        SwiftList<int> planarCandidates = context.Physics2D.QueryPlanarContinuousCollisionCandidates(planarBounds);
+        planarCandidates.Should().ContainSingle().Which.Should().Be(body.DynamicId);
+        FixedBoundVolume mixedBounds = DynamicCcdCandidateIndex.CreateSweptSphereBounds(
+            Vector3d.Zero,
+            Vector3d.Zero,
+            Fixed64.One);
+
+        SwiftList<int> mixedCandidates = context.Physics2D.QueryMixedContinuousCollisionCandidates(mixedBounds);
+
+        mixedCandidates.Should().BeSameAs(planarCandidates);
+        mixedCandidates.Should().BeEmpty();
     }
 
     [Fact]
