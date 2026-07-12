@@ -30,7 +30,7 @@ public sealed class GravitasWorldContext : IDisposable
 {
     private static readonly object _worldOwnershipLock = new();
 
-    private static readonly SwiftDictionary<GridWorld, WeakReference<GravitasWorldContext>> _worldOwners = new();
+    private static readonly SwiftDictionary<GridWorld, GravitasWorldContext> _worldOwners = new();
 
     private readonly GravitasClock _clock = new();
 
@@ -384,9 +384,6 @@ public sealed class GravitasWorldContext : IDisposable
                 return;
         }
 
-        if (remainingIterations > 0)
-            return;
-
         if (runs3D)
             Physics.ProcessQueuedContinuousCollisionHandoffs(iterationBudget: 0);
         if (runs2D)
@@ -540,38 +537,22 @@ public sealed class GravitasWorldContext : IDisposable
         {
             ThrowIfWorldOwned(world);
             GravitasWorldContext context = new(world, ownsWorld);
-            _worldOwners[world] = new WeakReference<GravitasWorldContext>(context);
+            _worldOwners[world] = context;
             return context;
         }
     }
 
     private static void ThrowIfWorldOwned(GridWorld world)
     {
-        if (!_worldOwners.TryGetValue(world, out WeakReference<GravitasWorldContext> weakOwner))
-            return;
-
-        bool worldIsOwned =
-            weakOwner.TryGetTarget(out GravitasWorldContext? owner)
-            && !owner.IsDisposed
-            && owner.World.IsActive;
         SwiftThrowHelper.ThrowIfTrue(
-            worldIsOwned,
+            _worldOwners.ContainsKey(world),
             nameof(GravitasWorldContext),
             "GridWorld is already attached to an active GravitasWorldContext.");
-
-        _worldOwners.Remove(world);
     }
 
     private static void ReleaseWorldOwnership(GravitasWorldContext context)
     {
-        if (!_worldOwners.TryGetValue(context.World, out WeakReference<GravitasWorldContext> weakOwner))
-            return;
-
-        if (!weakOwner.TryGetTarget(out GravitasWorldContext? owner)
-            || ReferenceEquals(owner, context))
-        {
-            _worldOwners.Remove(context.World);
-        }
+        _worldOwners.Remove(context.World);
     }
 
     private void ThrowIfDisposed()

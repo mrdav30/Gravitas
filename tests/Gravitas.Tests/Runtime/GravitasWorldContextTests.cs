@@ -20,9 +20,11 @@ public sealed class GravitasWorldContextTests
 
         context.World.Should().BeSameAs(world);
         context.VoxelSize.Should().Be(GridWorld.DefaultRectangularCellSize);
+        context.IsDisposed.Should().BeFalse();
 
         context.Dispose();
 
+        context.IsDisposed.Should().BeTrue();
         world.IsActive.Should().BeTrue();
     }
 

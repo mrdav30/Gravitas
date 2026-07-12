@@ -83,6 +83,51 @@ public sealed class GravitasRuntimeModeTests
     }
 
     [Fact]
+    public void LateSimulate_WithBothServicesDisabled_ShouldAdvanceContextOnly()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        scenario.Context.Settings.RuntimeMode = PhysicsRuntimeMode.Both;
+        ScenarioBody<LSSphereCollider> body3D = scenario.CreateSphere(Vector3d.Zero);
+        SolidBody2D body2D = Create2DBody(scenario.Context, Vector3d.Zero);
+        int lateSimulateHooks = 0;
+        using IDisposable hook = scenario.Context.RegisterOnLateSimulate(
+            "RuntimeMode.DisabledServices",
+            0,
+            () => lateSimulateHooks++);
+        scenario.Context.Physics.BeginLateSimulateBodies(continuousCollisionFramePrepared: false).Should().BeTrue();
+        body3D.Body.ApplyContinuousCollisionHandoff(
+            Vector3d.Zero,
+            Vector3d.Right,
+            scenario.Context.DeltaTime);
+        scenario.Context.Physics.ProcessQueuedContinuousCollisionHandoffs(iterationBudget: 1).Should().Be(1);
+        scenario.Context.Physics2D.BeginLateSimulateBodies(continuousCollisionFramePrepared: false).Should().BeTrue();
+        body2D.ApplyContinuousCollisionHandoff(
+            Vector2d.Zero,
+            Vector2d.Right,
+            scenario.Context.DeltaTime);
+        scenario.Context.Physics2D.ProcessQueuedContinuousCollisionHandoffs(iterationBudget: 1).Should().Be(1);
+        Vector3d position3D = body3D.Body.Position3d;
+        Vector2d position2D = body2D.Position;
+        scenario.Context.Physics.SimulatePhysics = false;
+        scenario.Context.Physics2D.SimulatePhysics = false;
+
+        scenario.Context.Simulate();
+        scenario.Context.LateSimulate();
+
+        scenario.Context.FrameCount.Should().Be(1);
+        scenario.Context.ResetAccumulation.Should().BeTrue();
+        lateSimulateHooks.Should().Be(1);
+        body3D.Body.Position3d.Should().Be(position3D);
+        body2D.Position.Should().Be(position2D);
+        scenario.Context.Physics.LastContinuousCollisionIslandCount.Should().Be(1);
+        scenario.Context.Physics.LastContinuousCollisionIslandIterationCount.Should().Be(1);
+        scenario.Context.Physics.LastContinuousCollisionIslandLimitReached.Should().BeFalse();
+        scenario.Context.Physics2D.LastContinuousCollisionIslandCount.Should().Be(1);
+        scenario.Context.Physics2D.LastContinuousCollisionIslandIterationCount.Should().Be(1);
+        scenario.Context.Physics2D.LastContinuousCollisionIslandLimitReached.Should().BeFalse();
+    }
+
+    [Fact]
     public void RuntimePhases_WithMixedMode_ShouldRunTwoDThreeDAndMixedLifecycle()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
