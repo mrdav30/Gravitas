@@ -22,25 +22,25 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-task36-authoritative-reviewed-full/587bb078-ab05-4f61-b828-d3a479ff2f0a/coverage.cobertura.xml`.
+`TestResults/coverage-task37-authoritative-reviewed-full/bc8963e3-1bb1-496a-9be0-584d7b34a605/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
-| Lines | 99.66% | 26,173 / 26,262 | 89 | 100% |
-| Branches | 98.94% | 10,181 / 10,290 | 109 | 100% |
+| Lines | 99.67% | 26,172 / 26,259 | 87 | 100% |
+| Branches | 98.97% | 10,178 / 10,284 | 106 | 100% |
 | Methods | 99.13% | 3,436 / 3,466 | 30 | 100% |
 
-The full coverage-enabled `Release` suite passes 2,352/2,352 tests, and
+The full coverage-enabled `Release` suite passes 2,353/2,353 tests, and
 `ReleaseLean` builds both targets without warnings. Branch coverage is now the
 primary constraint, but the remaining line and method gaps must close from the
 same final artifact.
 
 ### Immediate Next Block
 
-Finish `src/Gravitas/Colliders/3D/LSCollider.ReplayHash.cs` before changing
-target. The current artifact reports two uncovered lines and three uncovered
-branch outcomes. Apply the reviewed live-registry and canonical-dimension proof
-symmetrically while retaining explicit 3D hierarchy hash behavior.
+Finish `src/Gravitas/Constraints/3D/JointSolver3D.cs` before changing target.
+The current artifact reports two uncovered lines and three uncovered branch
+outcomes. Treat joint-row admission, constrained mobility, impulse limits, and
+warm-start state as one deterministic solver contract.
 
 ## Rules Of Engagement
 
@@ -107,16 +107,16 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | `Colliders/3D/LSCollider.ReplayHash.cs` | 2 | 3 | 0 | Replay identity modes and omitted runtime ownership. |
-| 2 | `Constraints/3D/JointSolver3D.cs` | 2 | 3 | 0 | Joint row admission and constrained impulse outcomes. |
-| 3 | `Core/2D/GravitasPhysics2DService.ContinuousCollision.cs` | 2 | 3 | 0 | CCD queue ownership and stale candidate cleanup. |
-| 4 | `Core/2D/SolidBody2D.ContinuousCollision.Rotational.cs` | 2 | 3 | 0 | Rotational sweep admission and fixed-point fallback. |
-| 5 | `Core/2D/SolidBody2D.Motion.cs` | 2 | 3 | 0 | Frozen-axis motion and deterministic sleep admission. |
-| 6 | `Support/Coroutines/GravitasCoroutineService.cs` | 1 | 3 | 0 | Completion, cancellation, and context ownership. |
-| 7 | `Colliders/2D/LSCompoundCollider2D.cs` | 1 | 3 | 0 | Owner geometry, empty parts, and authored fallback. |
-| 8 | `Colliders/3D/LSCapsuleCollider.cs` | 1 | 3 | 0 | Frontal area and degenerate axial geometry. |
-| 9 | `Colliders/3D/LSCompoundCollider.cs` | 1 | 3 | 0 | Owner geometry, empty parts, and authored fallback. |
-| 10 | `CollisionHandling/Detection/3D/CollisionDetection.Cylinder.cs` | 2 | 2 | 0 | Axial separation and stable contact fallback. |
+| 1 | `Constraints/3D/JointSolver3D.cs` | 2 | 3 | 0 | Joint row admission and constrained impulse outcomes. |
+| 2 | `Core/2D/GravitasPhysics2DService.ContinuousCollision.cs` | 2 | 3 | 0 | CCD queue ownership and stale candidate cleanup. |
+| 3 | `Core/2D/SolidBody2D.ContinuousCollision.Rotational.cs` | 2 | 3 | 0 | Rotational sweep admission and fixed-point fallback. |
+| 4 | `Core/2D/SolidBody2D.Motion.cs` | 2 | 3 | 0 | Frozen-axis motion and deterministic sleep admission. |
+| 5 | `Support/Coroutines/GravitasCoroutineService.cs` | 1 | 3 | 0 | Completion, cancellation, and context ownership. |
+| 6 | `Colliders/2D/LSCompoundCollider2D.cs` | 1 | 3 | 0 | Owner geometry, empty parts, and authored fallback. |
+| 7 | `Colliders/3D/LSCapsuleCollider.cs` | 1 | 3 | 0 | Frontal area and degenerate axial geometry. |
+| 8 | `Colliders/3D/LSCompoundCollider.cs` | 1 | 3 | 0 | Owner geometry, empty parts, and authored fallback. |
+| 9 | `CollisionHandling/Detection/3D/CollisionDetection.Cylinder.cs` | 2 | 2 | 0 | Axial separation and stable contact fallback. |
+| 10 | `CollisionHandling/Detection/3D/CollisionDetection.cs` | 2 | 2 | 0 | Dispatch and unsupported-shape fallbacks. |
 
 ### Phase 1: Core Runtime And Service Ownership
 
@@ -205,6 +205,9 @@ incorrectly.
       tags, and deletion of impossible registry/dimension guards; fix first-call
       mixed hierarchy hash drift by preparing both registries before any
       subsystem contribution.
+- [x] Close and independently review the symmetric 3D collider replay hierarchy
+      contract through live 3D/2D parents, clear-to-baseline behavior, equal-
+      ordinal dimension tags, and churned raw-ID independence.
 - [x] Close cuboid detection through rotated face separation, exact AABB
       manifolds, zombie-guard removal, and insertion-ordered OBB/capsule SAT
       ties after independent review exposed pooled hash-order dependence.
@@ -388,6 +391,7 @@ of record.
 | 3D convex sweep closure | 99.64% | 98.88% | 99.13% | 2,350 | ConvexSweepQueryWorker reached 100%; saturated extreme inputs prove deterministic budget termination and clean reuse, while source-only call-graph proof removed impossible triangle bounds and offset paths. |
 | 3D batch query closure | 99.65% | 98.91% | 99.13% | 2,350 | Batch queries reached 100%; zero-ray ranges, exact preparation reuse, changed-displacement recomputation, overlap miss/default behavior, and redundant result assignment were independently reviewed. |
 | 2D replay hierarchy closure | 99.66% | 98.94% | 99.13% | 2,352 | The 2D collider hash reached 100%; live parent dimensions and clear-to-baseline behavior are exact, impossible guards were removed, and a P1 first-call mixed-hierarchy replay drift was fixed by preparing both dimensional registries up front. |
+| 3D replay hierarchy closure | 99.67% | 98.97% | 99.13% | 2,353 | The 3D collider hash reached 100%; equal-ordinal parent dimensions, clear-to-baseline state, and compact/churned raw-ID independence close the symmetric hierarchy contract after impossible guards were removed. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.
