@@ -78,6 +78,22 @@ public sealed class LSMeshColliderQueryTests
     }
 
     [Fact]
+    public void ColliderOverlapsRay_WithPointOffSlantedTrianglePlaneInsideBounds_ShouldReturnFalse()
+    {
+        LSMeshCollider mesh = CreateSlantedTriangleMesh();
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+        Vector3d point = new(Fixed64.Quarter, Fixed64.Quarter, Fixed64.Quarter);
+
+        worker.PrepareSegmentCheck(point, point);
+
+        bool hit = mesh.ColliderOverlapsRay(worker, ref hits);
+
+        hit.Should().BeFalse();
+        hits.Count.Should().Be(0);
+    }
+
+    [Fact]
     public void ColliderOverlapsRay_WithPointInTrianglePlaneOutsideTriangle_ShouldReturnFalse()
     {
         LSMeshCollider mesh = CreateTriangleMesh();
@@ -155,6 +171,23 @@ public sealed class LSMeshColliderQueryTests
         worker.PrepareSegmentCheck(
             new Vector3d(Fixed64.Half, Fixed64.FromFraction(3, 4), Fixed64.Zero),
             new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.Half, Fixed64.Zero));
+
+        bool hit = mesh.ColliderOverlapsRay(worker, ref hits);
+
+        hit.Should().BeFalse();
+        hits.Count.Should().Be(0);
+    }
+
+    [Fact]
+    public void ColliderOverlapsRay_WithParallelSegmentOffSlantedTrianglePlane_ShouldReturnFalse()
+    {
+        LSMeshCollider mesh = CreateSlantedTriangleMesh();
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+
+        worker.PrepareSegmentCheck(
+            new Vector3d(Fixed64.FromFraction(1, 10), Fixed64.FromFraction(3, 5), Fixed64.Quarter),
+            new Vector3d(Fixed64.FromFraction(3, 5), Fixed64.FromFraction(1, 10), Fixed64.Quarter));
 
         bool hit = mesh.ColliderOverlapsRay(worker, ref hits);
 
@@ -252,6 +285,18 @@ public sealed class LSMeshColliderQueryTests
                 Vector3d.Up
             },
             new[] { 0, 1, 2, 0, 2, 3 },
+            MeshColliderMode.Convex,
+            MeshInertiaPolicy.SurfaceApproximation);
+
+    private static LSMeshCollider CreateSlantedTriangleMesh() =>
+        new(
+            new[]
+            {
+                Vector3d.Zero,
+                new Vector3d(Fixed64.One, Fixed64.Zero, Fixed64.One),
+                new Vector3d(Fixed64.Zero, Fixed64.One, Fixed64.One)
+            },
+            new[] { 0, 1, 2 },
             MeshColliderMode.Convex,
             MeshInertiaPolicy.SurfaceApproximation);
 

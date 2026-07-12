@@ -73,9 +73,9 @@ public sealed class RaycastSegmentWorker
         }
 
         Fixed64 b = Vector3d.Dot(originFromCenter, _segmentDirection);
-        Fixed64 discriminant = b * b - c;
-        if (discriminant < Fixed64.Zero)
-            return false;
+        // In exact arithmetic the closest-point overlap proves a non-negative
+        // discriminant; clamp fixed-point normalization residue for tangencies.
+        Fixed64 discriminant = FixedMath.Max(b * b - c, Fixed64.Zero);
 
         Fixed64 root = FixedMath.Sqrt(discriminant);
         AddIntersectionPointIfOnSegment(-b - root, ref outputIntersectionPoints);
@@ -631,7 +631,7 @@ public sealed class RaycastSegmentWorker
 
     private void AddIntersectionPointIfOnSegment(Fixed64 distance, ref SwiftList<Vector3d> outputIntersectionPoints)
     {
-        if (distance < Fixed64.Zero || distance > _segmentLength)
+        if (distance > _segmentLength)
             return;
 
         outputIntersectionPoints.Add(_cachedOrigin + _segmentDirection * distance);

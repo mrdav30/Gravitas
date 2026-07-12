@@ -153,6 +153,29 @@ public sealed class RaycastSegmentWorkerTests
     }
 
     [Fact]
+    public void CheckSphereOverlaps_WithFixedPointTangent_ShouldReturnSingleIntersection()
+    {
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+
+        worker.PrepareSegmentCheck(
+            Vector3d.Zero,
+            new Vector3d((Fixed64)3, (Fixed64)4, Fixed64.Zero));
+
+        bool hit = worker.CheckSphereOverlaps(
+            new Vector3d(Fixed64.FromFraction(1, 5), Fixed64.FromFraction(3, 10), Fixed64.Zero),
+            Fixed64.FromFraction(1, 50) * Fixed64.FromFraction(1, 50),
+            ref hits);
+
+        hit.Should().BeTrue();
+        hits.Count.Should().Be(1);
+        hits[0].Should().Be(new Vector3d(
+            Fixed64.FromFraction(27, 125),
+            Fixed64.FromFraction(36, 125),
+            Fixed64.Zero));
+    }
+
+    [Fact]
     public void CheckSphereOverlaps_WithPointInsideAndIntersectionsDisabled_ShouldNotWritePoint()
     {
         var worker = new RaycastSegmentWorker();
@@ -608,6 +631,63 @@ public sealed class RaycastSegmentWorkerTests
     }
 
     [Fact]
+    public void CheckConeOverlaps_WithHorizontalSegmentBelowBase_ShouldReturnFalse()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSConeCollider cone = scenario.CreateCone(Vector3d.Zero).Collider;
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+        Fixed64 y = -cone.HalfHeight - cone.Height;
+
+        worker.PrepareSegmentCheck(
+            new Vector3d(-cone.ScaledRadius * (Fixed64)3, y, Fixed64.Zero),
+            new Vector3d(cone.ScaledRadius * (Fixed64)3, y, Fixed64.Zero));
+
+        bool hit = worker.CheckConeOverlaps(cone, ref hits);
+
+        hit.Should().BeFalse();
+        hits.Count.Should().Be(0);
+    }
+
+    [Fact]
+    public void CheckConeOverlaps_WithSegmentThroughBaseRim_ShouldSuppressDuplicatePoint()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSConeCollider cone = scenario.CreateCone(Vector3d.Zero).Collider;
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+
+        worker.PrepareSegmentCheck(
+            new Vector3d(cone.ScaledRadius, -cone.HalfHeight - cone.Height, Fixed64.Zero),
+            new Vector3d(cone.ScaledRadius, cone.HalfHeight + cone.Height, Fixed64.Zero));
+
+        bool hit = worker.CheckConeOverlaps(cone, ref hits);
+
+        hit.Should().BeTrue();
+        hits.Count.Should().Be(1);
+        hits[0].Should().Be(new Vector3d(cone.ScaledRadius, -cone.HalfHeight, Fixed64.Zero));
+    }
+
+    [Fact]
+    public void CheckConeOverlaps_WithIntersectionsDisabled_ShouldReturnTrueWithoutPoints()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSConeCollider cone = scenario.CreateCone(Vector3d.Zero).Collider;
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+
+        worker.PrepareSegmentCheck(
+            new Vector3d(cone.ScaledRadius, -cone.HalfHeight - cone.Height, Fixed64.Zero),
+            new Vector3d(cone.ScaledRadius, cone.HalfHeight + cone.Height, Fixed64.Zero),
+            calculateIntersectionPoints: false);
+
+        bool hit = worker.CheckConeOverlaps(cone, ref hits);
+
+        hit.Should().BeTrue();
+        hits.Count.Should().Be(0);
+    }
+
+    [Fact]
     public void CheckConeOverlaps_WithHorizontalSegmentMissingMidsection_ShouldReturnFalse()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
@@ -887,6 +967,26 @@ public sealed class RaycastSegmentWorkerTests
         worker.PrepareSegmentCheck(
             new Vector3d((Fixed64)(-3), (Fixed64)2, Fixed64.Zero),
             new Vector3d((Fixed64)3, (Fixed64)2, Fixed64.Zero));
+
+        bool hit = worker.CheckOBBoxOverlaps(box, ref hits);
+
+        hit.Should().BeFalse();
+        hits.Count.Should().Be(0);
+    }
+
+    [Fact]
+    public void CheckOBBoxOverlaps_WithSegmentOutsideFirstLocalAxis_ShouldReturnFalse()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSCuboidCollider box = scenario.CreateCuboid(
+            Vector3d.Zero,
+            PhysicsScenarioBuilder.Yaw(45)).Collider;
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+
+        worker.PrepareSegmentCheck(
+            LocalToWorld(box, new Vector3d((Fixed64)2, Fixed64.Zero, (Fixed64)(-2))),
+            LocalToWorld(box, new Vector3d((Fixed64)2, Fixed64.Zero, (Fixed64)2)));
 
         bool hit = worker.CheckOBBoxOverlaps(box, ref hits);
 

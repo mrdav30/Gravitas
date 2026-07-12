@@ -61,6 +61,28 @@ handling disconnected input without the AABB false-positive.
 
 ## Resolved Issues
 
+### Fixed-Point Sphere Tangency Could Be Rejected By Normalization Residue
+
+**Discovered:** 2026-07-12  
+**Resolved:** 2026-07-12  
+**Source:** 95%-to-100% coverage hardening, 3D raycast segment review  
+**Affected area:** `RaycastSegmentWorker.CheckSphereOverlaps(...)`
+
+RCA: the closest-point test could prove a segment touched a sphere while the
+subsequent quadratic discriminant evaluated to one negative raw fixed-point
+unit because the normalized segment direction was fractionally longer than
+one. The quadratic guard then rejected the exact tangent.
+
+Fix: after the closest-point overlap and outside-origin checks establish a
+non-negative discriminant geometrically, the worker clamps fixed-point residue
+to zero before calculating the tangent root. The same proof makes negative
+sphere-root distances unreachable, so their redundant lower-bound guard was
+removed.
+
+Verification: a deterministic regression casts `(0,0,0)->(3,4,0)` against a
+sphere centered at `(1/5,3/10,0)` with radius `1/50`; it failed before the fix
+and now returns exactly one hit at `(27/125,36/125,0)`.
+
 ### Context Disposal Ordering Could Admit Inactive Worlds And Invalidate Disabled CCD Handoffs
 
 **Discovered:** 2026-07-11  
