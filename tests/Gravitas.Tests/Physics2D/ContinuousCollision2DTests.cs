@@ -1702,6 +1702,93 @@ public sealed class ContinuousCollision2DTests
     }
 
     [Fact]
+    public void InheritMode_WithContextInheritSettings_ShouldUseDiscreteIntegration()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        context.Settings.DefaultContinuousCollisionMode = ContinuousCollisionMode.Inherit;
+        SolidBody2D mover = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
+        _ = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)5, Fixed64.Zero), immovable: true);
+
+        mover.AddForce(Vector2d.Right * (Fixed64)10);
+        context.LateSimulate();
+
+        mover.Position.Should().Be(Vector2d.Right * (Fixed64)10);
+        mover.LinearVelocity.Should().Be(Vector2d.Right * (Fixed64)10);
+        mover.LastContinuousCollisionToiIterationCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void InheritMode_ShouldUseTopParentContinuousBeforeContextDefault()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        SolidBody2D topParent = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)(-8), Fixed64.Zero), immovable: true);
+        SolidBody2D middleParent = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)(-7), Fixed64.Zero), immovable: true);
+        SolidBody2D mover = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
+        _ = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)5, Fixed64.Zero), immovable: true);
+        topParent.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        middleParent.Collider.SetParent(topParent.Collider);
+        mover.Collider.SetParent(middleParent.Collider);
+
+        mover.AddForce(Vector2d.Right * (Fixed64)10);
+        context.LateSimulate();
+
+        mover.Position.X.Should().Be((Fixed64)4);
+        mover.LinearVelocity.Should().Be(Vector2d.Zero);
+        mover.LastContinuousCollisionToiIterationCount.Should().Be(1);
+    }
+
+    [Fact]
+    public void InheritMode_ShouldUseParentDiscreteBeforeContextContinuousDefault()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        context.Settings.DefaultContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        SolidBody2D parent = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)(-8), Fixed64.Zero), immovable: true);
+        SolidBody2D mover = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
+        _ = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d((Fixed64)5, Fixed64.Zero), immovable: true);
+        parent.ContinuousCollisionMode = ContinuousCollisionMode.Discrete;
+        mover.Collider.SetParent(parent.Collider);
+
+        mover.AddForce(Vector2d.Right * (Fixed64)10);
+        context.LateSimulate();
+
+        mover.Position.Should().Be(Vector2d.Right * (Fixed64)10);
+        mover.LinearVelocity.Should().Be(Vector2d.Right * (Fixed64)10);
+        mover.LastContinuousCollisionToiIterationCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void ContinuousMode_ShouldClampAgainstBodylessStaticTarget()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        SolidBody2D mover = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
+        _ = CreateBodylessCircle(context, new Vector2d((Fixed64)5, Fixed64.Zero));
+        mover.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+
+        mover.AddForce(Vector2d.Right * (Fixed64)10);
+        context.LateSimulate();
+
+        mover.Position.X.Should().Be((Fixed64)4);
+        mover.LinearVelocity.Should().Be(Vector2d.Zero);
+        mover.LastContinuousCollisionToiIterationCount.Should().Be(1);
+    }
+
+    [Fact]
+    public void ContinuousMode_WithInitialOverlapMovingAway_ShouldNotClamp()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        SolidBody2D mover = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
+        _ = CreateBodylessCircle(context, new Vector2d(Fixed64.Half, Fixed64.Zero));
+        mover.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+
+        mover.AddForce(-Vector2d.Right * (Fixed64)2);
+        context.LateSimulate();
+
+        mover.Position.Should().Be(-Vector2d.Right * (Fixed64)2);
+        mover.LinearVelocity.Should().Be(-Vector2d.Right * (Fixed64)2);
+        mover.LastContinuousCollisionToiIterationCount.Should().Be(0);
+    }
+
+    [Fact]
     public void SweepCircleAll_ShouldReturnOrderedHitsAndFilterExcludedHierarchy()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);

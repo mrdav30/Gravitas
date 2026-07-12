@@ -168,7 +168,7 @@ public sealed partial class SolidBody2D
         for (int i = 0; i < hitCount; i++)
         {
             PhysicsMixedHit candidate = _continuousMixedCollisionHits[i];
-            if (!IsValidMixedContinuousCollisionHit(candidate)
+            if (!IsValidMixedContinuousCollisionHit(candidate.Collider3D!)
                 || !IsClosingContinuousCollisionHit(displacement, candidate.NormalFor2DSource))
                 continue;
 

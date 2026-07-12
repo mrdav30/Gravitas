@@ -58,9 +58,6 @@ public sealed partial class SolidBody2D
     private Fixed64 ResolveConvexContinuousCollisionProxyRadius()
     {
         int vertexCount = Collider.VertexCount;
-        if (vertexCount <= 0)
-            return Fixed64.Zero;
-
         Vector2d center = Collider.Center;
         Fixed64 bestDistanceSquared = Fixed64.Zero;
         for (int i = 0; i < vertexCount; i++)
@@ -70,9 +67,7 @@ public sealed partial class SolidBody2D
                 bestDistanceSquared = distanceSquared;
         }
 
-        return bestDistanceSquared > Fixed64.Zero
-            ? FixedMath.Sqrt(bestDistanceSquared)
-            : Fixed64.Zero;
+        return FixedMath.Sqrt(bestDistanceSquared);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -81,14 +76,10 @@ public sealed partial class SolidBody2D
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool IsClosingContinuousCollisionHit(Vector2d displacement, Vector2d normal) =>
-        normal.MagnitudeSquared > Fixed64.Epsilon
-        && Vector2d.Dot(displacement, normal) < -Fixed64.Epsilon;
+        Vector2d.Dot(displacement, normal) < -Fixed64.Epsilon;
 
-    private bool IsValidContinuousCollisionTarget(LSCollider2D? hitCollider)
+    private bool IsValidContinuousCollisionTarget(LSCollider2D hitCollider)
     {
-        if (hitCollider == null)
-            return false;
-
         SolidBody2D? hitBody = hitCollider.Body;
         return ContinuousCollisionTargetPolicy.AllowsStaticOrKinematic2DTarget(
             hasCollider: true,
@@ -100,12 +91,8 @@ public sealed partial class SolidBody2D
             hitBody != null && hitBody.IsKinematic);
     }
 
-    private bool IsValidMixedContinuousCollisionHit(PhysicsMixedHit hit)
+    private bool IsValidMixedContinuousCollisionHit(LSCollider hitCollider)
     {
-        LSCollider? hitCollider = hit.Collider3D;
-        if (hitCollider == null)
-            return false;
-
         SolidBody? hitBody = hitCollider.Body;
         return ContinuousCollisionTargetPolicy.AllowsMixedStaticOrKinematicTarget(
             hasCollider: true,

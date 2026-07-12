@@ -2930,6 +2930,40 @@ public sealed class MixedQueryCcdTests
     }
 
     [Fact]
+    public void LateSimulate_WithMixed2DContinuousCollision_ShouldClampAgainstBodyless3DTarget()
+    {
+        using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
+        context.Settings.DefaultContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        _ = CreateBodyless3D(context, new LSSphereCollider(), Vector3d.Zero);
+        SolidBody2D moving2D = CreateCircle2D(context, new Vector2d((Fixed64)(-3), Fixed64.Zero));
+
+        moving2D.AddForce(Vector2d.Right * (Fixed64)10);
+        context.Simulate();
+        context.LateSimulate();
+
+        moving2D.Position.X.Should().Be(-Fixed64.One);
+        moving2D.LinearVelocity.Should().Be(Vector2d.Zero);
+        moving2D.LastContinuousCollisionToiIterationCount.Should().Be(1);
+    }
+
+    [Fact]
+    public void LateSimulate_WithMixed2DContinuousCollision_ShouldClampAgainstKinematic3DTarget()
+    {
+        using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
+        context.Settings.DefaultContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        _ = CreateSphere3D(context, Vector3d.Zero, isKinematic: true);
+        SolidBody2D moving2D = CreateCircle2D(context, new Vector2d((Fixed64)(-3), Fixed64.Zero));
+
+        moving2D.AddForce(Vector2d.Right * (Fixed64)10);
+        context.Simulate();
+        context.LateSimulate();
+
+        moving2D.Position.X.Should().Be(-Fixed64.One);
+        moving2D.LinearVelocity.Should().Be(Vector2d.Zero);
+        moving2D.LastContinuousCollisionToiIterationCount.Should().Be(1);
+    }
+
+    [Fact]
     public void LateSimulate_WithMixed2DContinuousCollision_ShouldClampBeforeCrossing3DMesh()
     {
         using GravitasWorldContext context = CreateMixedContext(frameRate: 1);

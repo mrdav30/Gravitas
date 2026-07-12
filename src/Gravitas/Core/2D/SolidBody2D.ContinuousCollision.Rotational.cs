@@ -75,13 +75,12 @@ public sealed partial class SolidBody2D
                 for (int hitIndex = 0; hitIndex < hitCount; hitIndex++)
                 {
                     SampleRotationalContinuousPose(startPosition, displacement, startRotation, angularDelta, sampleTime);
-                    LSCollider2D? target = _continuousCollisionHits[hitIndex].Collider;
+                    LSCollider2D target = _continuousCollisionHits[hitIndex].Collider;
                     if (!TrySampleRotationalContinuousCollision(target, out Contact2D contact))
                         continue;
 
-                    LSCollider2D targetCollider = target!;
                     Fixed64 safeTime = RefineRotationalContinuousCollisionSafeTime(
-                        targetCollider,
+                        target,
                         startPosition,
                         displacement,
                         startRotation,
@@ -92,7 +91,7 @@ public sealed partial class SolidBody2D
                         out Contact2D refinedContact);
                     if (!ContinuousCollisionMath.ShouldReplaceContinuousCollisionHit(
                             safeTime,
-                            targetCollider.Id,
+                            target.Id,
                             foundSampleHit,
                             bestSafeTime,
                             bestTargetId))
@@ -102,7 +101,7 @@ public sealed partial class SolidBody2D
 
                     foundSampleHit = true;
                     bestSafeTime = safeTime;
-                    bestTargetId = targetCollider.Id;
+                    bestTargetId = target.Id;
                     bestContact = refinedContact;
                 }
 
@@ -185,13 +184,12 @@ public sealed partial class SolidBody2D
                 for (int hitIndex = 0; hitIndex < hitCount; hitIndex++)
                 {
                     SampleRotationalContinuousPose(startPosition, displacement, startRotation, angularDelta, sampleTime);
-                    LSCollider2D? target = _continuousCollisionHits[hitIndex].Collider;
+                    LSCollider2D target = _continuousCollisionHits[hitIndex].Collider;
                     if (!TrySampleRotationalContinuousCollision(target, out Contact2D contact))
                         continue;
 
-                    LSCollider2D targetCollider = target!;
                     Fixed64 safeTime = RefineRotationalContinuousCollisionSafeTime(
-                        targetCollider,
+                        target,
                         startPosition,
                         displacement,
                         startRotation,
@@ -202,7 +200,7 @@ public sealed partial class SolidBody2D
                         out _);
                     if (!ContinuousCollisionMath.ShouldReplaceContinuousCollisionHit(
                             safeTime,
-                            targetCollider.Id,
+                            target.Id,
                             foundSampleHit,
                             bestSafeTime,
                             bestTargetId))
@@ -212,7 +210,7 @@ public sealed partial class SolidBody2D
 
                     foundSampleHit = true;
                     bestSafeTime = safeTime;
-                    bestTargetId = targetCollider.Id;
+                    bestTargetId = target.Id;
                 }
 
                 if (!foundSampleHit)
@@ -246,7 +244,7 @@ public sealed partial class SolidBody2D
         Collider.RebuildRuntimeShapeOnly();
     }
 
-    private bool TrySampleRotationalContinuousCollision(LSCollider2D? target, out Contact2D contact)
+    private bool TrySampleRotationalContinuousCollision(LSCollider2D target, out Contact2D contact)
     {
         if (!IsValidContinuousCollisionTarget(target))
         {
@@ -254,7 +252,7 @@ public sealed partial class SolidBody2D
             return false;
         }
 
-        return CollisionDetection2D.TryCollide(Collider, target!, out contact);
+        return CollisionDetection2D.TryCollide(Collider, target, out contact);
     }
 
     private Fixed64 RefineRotationalContinuousCollisionSafeTime(
