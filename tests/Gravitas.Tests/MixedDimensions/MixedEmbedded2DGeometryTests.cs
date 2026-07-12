@@ -129,6 +129,23 @@ public sealed class MixedEmbedded2DGeometryTests
     }
 
     [Fact]
+    public void TryGetPlanarBoundaryPoint_WithMaximumDistanceCompoundPart_ShouldAdmitFirstCandidate()
+    {
+        var compound = new LSCompoundCollider2D(
+            CompoundColliderPart2D.Circle(Fixed64.MaxValue, Vector2d.Zero));
+
+        bool found = MixedEmbedded2DGeometry.TryGetPlanarBoundaryPoint(
+            compound,
+            Vector2d.Zero,
+            out Vector2d boundary,
+            out Fixed64 distance);
+
+        found.Should().BeTrue();
+        boundary.Should().Be(new Vector2d(Fixed64.MaxValue, Fixed64.Zero));
+        distance.Should().Be(Fixed64.MaxValue);
+    }
+
+    [Fact]
     public void ConvexAuthoring_ShouldRejectZeroVertices()
     {
         Action act = () => _ = new LSPolygonCollider2D(Array.Empty<Vector2d>());

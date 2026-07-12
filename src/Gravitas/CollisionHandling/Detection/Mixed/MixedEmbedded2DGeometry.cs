@@ -198,7 +198,7 @@ internal static class MixedEmbedded2DGeometry
                 continue;
 
             TryGetPlanarBoundaryPoint(part, point, out Vector2d candidate, out Fixed64 candidateDistance);
-            if (candidateDistance >= bestDistance)
+            if (found && candidateDistance >= bestDistance)
                 continue;
 
             boundary = candidate;
