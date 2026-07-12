@@ -1348,6 +1348,43 @@ public sealed class GravitasQuery3DServiceSweepTests
     }
 
     [Fact]
+    public void ConvexSweepWorker_WithSaturatedDisplacement_ShouldStopDeterministicallyAndRemainReusable()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSSphereCollider extremeTarget = CreateDynamicCollider(
+            context,
+            new LSSphereCollider(),
+            new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero));
+        LSSphereCollider ordinaryTarget = CreateDynamicCollider(context, new LSSphereCollider(), Vector3d.Zero);
+        var worker = new ConvexSweepQueryWorker();
+
+        // Squared magnitudes saturate at this representable extreme, so the
+        // fixed iteration budget is the deterministic termination contract.
+        worker.PrepareCircleSlabSource(
+            Vector3d.Zero,
+            Fixed64.FromFraction(1, 4),
+            Fixed64.FromFraction(1, 4),
+            new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero));
+        bool first = worker.TrySweepPreparedSource(extremeTarget, out Physics3DHit firstHit);
+        bool repeated = worker.TrySweepPreparedSource(extremeTarget, out Physics3DHit repeatedHit);
+
+        worker.PrepareCircleSlabSource(
+            -Vector3d.Right * (Fixed64)2,
+            Fixed64.FromFraction(1, 4),
+            Fixed64.FromFraction(1, 4),
+            Vector3d.Right * (Fixed64)4);
+        bool ordinary = worker.TrySweepPreparedSource(ordinaryTarget, out Physics3DHit ordinaryHit);
+
+        first.Should().BeFalse();
+        firstHit.Should().Be(default(Physics3DHit));
+        repeated.Should().BeFalse();
+        repeatedHit.Should().Be(default(Physics3DHit));
+        ordinary.Should().BeTrue();
+        ordinaryHit.Collider.Should().BeSameAs(ordinaryTarget);
+        ordinaryHit.Direction.Should().Be(Vector3d.Right);
+    }
+
+    [Fact]
     public void ConvexSweepWorker_WithCircleSlabSourceAndTargetBoundsMiss_ShouldReturnFalse()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();

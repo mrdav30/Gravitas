@@ -106,7 +106,7 @@ internal sealed class ConvexSweepQueryWorker
         _displacement = displacement;
         _length = displacement.Magnitude;
         _direction = _length <= Fixed64.Epsilon ? Vector3d.Zero : displacement / _length;
-        sourceShape.GetBounds(out Vector3d sourceMin, out Vector3d sourceMax);
+        sourceShape.GetSourceBounds(out Vector3d sourceMin, out Vector3d sourceMax);
         SweepBoundsUtility.CreateSweptBounds(
             sourceMin,
             sourceMax,
@@ -280,7 +280,7 @@ internal sealed class ConvexSweepQueryWorker
 
         for (int i = 0; i < MaxConservativeAdvancementIterations; i++)
         {
-            ConvexShape movedSource = sourceShape.WithOffset(_direction * travelDistance);
+            ConvexShape movedSource = sourceShape.WithSourceOffset(_direction * travelDistance);
             result = ComputeDistance(movedSource, targetShape);
             if (result.Intersects || result.Distance <= SweepContactTolerance)
             {
@@ -636,7 +636,7 @@ internal sealed class ConvexSweepQueryWorker
 
     private void CreateSweptSourceBounds(ConvexShape sourceShape, out Vector3d min, out Vector3d max)
     {
-        sourceShape.GetBounds(out Vector3d sourceMin, out Vector3d sourceMax);
+        sourceShape.GetSourceBounds(out Vector3d sourceMin, out Vector3d sourceMax);
         SweepBoundsUtility.CreateSweptBounds(
             sourceMin,
             sourceMax,
@@ -648,7 +648,7 @@ internal sealed class ConvexSweepQueryWorker
 
     private bool CanSweptSourceShapeReachTarget(ConvexShape sourceShape, LSCollider target)
     {
-        sourceShape.GetBounds(out Vector3d sourceMin, out Vector3d sourceMax);
+        sourceShape.GetSourceBounds(out Vector3d sourceMin, out Vector3d sourceMax);
         SweepBoundsUtility.CreateSweptBounds(
             sourceMin,
             sourceMax,
@@ -756,15 +756,8 @@ internal sealed class ConvexSweepQueryWorker
         public static ConvexShape CreateCircleSlab(Vector3d center, Fixed64 radius, Fixed64 halfHeight) =>
             new(center, radius, halfHeight, Vector3d.Zero);
 
-        public void GetBounds(out Vector3d min, out Vector3d max)
+        public void GetSourceBounds(out Vector3d min, out Vector3d max)
         {
-            if (_kind == ConvexShapeKind.Collider)
-            {
-                min = _collider!.Bounds.Min + _offset;
-                max = _collider.Bounds.Max + _offset;
-                return;
-            }
-
             if (_kind == ConvexShapeKind.CircleSlab)
             {
                 Vector3d center = _center + _offset;
@@ -774,16 +767,14 @@ internal sealed class ConvexSweepQueryWorker
                 return;
             }
 
-            min = Vector3d.Min(Vector3d.Min(_triangleA, _triangleB), _triangleC);
-            max = Vector3d.Max(Vector3d.Max(_triangleA, _triangleB), _triangleC);
+            min = _collider!.Bounds.Min + _offset;
+            max = _collider.Bounds.Max + _offset;
         }
 
-        public ConvexShape WithOffset(Vector3d additionalOffset) =>
-            _kind == ConvexShapeKind.Triangle
-                ? this
-                : _kind == ConvexShapeKind.CircleSlab
-                    ? new ConvexShape(_center, _radius, _halfHeight, _offset + additionalOffset)
-                    : new ConvexShape(_collider!, _offset + additionalOffset);
+        public ConvexShape WithSourceOffset(Vector3d additionalOffset) =>
+            _kind == ConvexShapeKind.CircleSlab
+                ? new ConvexShape(_center, _radius, _halfHeight, _offset + additionalOffset)
+                : new ConvexShape(_collider!, _offset + additionalOffset);
 
         public Vector3d Support(Vector3d direction)
         {

@@ -17,6 +17,24 @@
 
 ## Active Issues
 
+### Extreme Convex Sweeps Can Normalize To Non-Unit Directions
+
+**Discovered:** 2026-07-12  
+**Source:** 95%-to-100% coverage hardening, convex sweep termination review  
+**Affected area:** `ConvexSweepQueryWorker` displacement normalization and
+fixed-budget conservative advancement
+
+`ConvexSweepQueryWorker` derives sweep length from
+`displacement.Magnitude`. At extreme representable inputs, fixed-point squared
+magnitude saturates before the square root, so dividing the original
+displacement by that shortened length produces a non-unit sweep direction.
+The 32-iteration budget still guarantees deterministic termination and the
+worker remains reusable, but hit geometry at that scale is not physically
+trustworthy. Resolve this with an explicit large-vector normalization policy
+shared with FixedMathSharp or with validated sweep-range limits, then add
+boundary tests that preserve ordinary sweep results and deterministic failure
+outside the supported range.
+
 ### GridForge Reuses Grid Spawn Tokens Across Pooled Generations
 
 **Discovered:** 2026-07-11  
