@@ -22,27 +22,27 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-task24-authoritative-reviewed-full/3a313e7e-7be5-4e44-b3f7-b847561a17a2/coverage.cobertura.xml`.
+`TestResults/coverage-task25-authoritative-reviewed-full/ed2be684-f789-41e3-b478-bf2746374fde/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
-| Lines | 99.57% | 26,171 / 26,283 | 112 | 100% |
-| Branches | 98.49% | 10,167 / 10,322 | 155 | 100% |
+| Lines | 99.57% | 26,168 / 26,279 | 111 | 100% |
+| Branches | 98.54% | 10,166 / 10,316 | 150 | 100% |
 | Methods | 99.02% | 3,435 / 3,469 | 34 | 100% |
 
-The full coverage-enabled `Release` suite passes 2,337/2,337 tests, and
+The full coverage-enabled `Release` suite passes 2,338/2,338 tests, and
 `ReleaseLean` builds both targets without warnings. Branch coverage is now the
 primary constraint, but the remaining line and method gaps must close from the
 same final artifact.
 
 ### Immediate Next Block
 
-Finish `src/Gravitas/Diagnostics/GravitasDiagnosticSink.cs` before changing
-target. The current artifact reports one uncovered line and five uncovered
-branch outcomes. Treat diagnostic enablement, capacity, event ownership,
-disposal, and deterministic disabled behavior as one context-owned contract.
-Exercise it through public sink and world-context workflows without adding
-coverage-only seams.
+Finish
+`src/Gravitas/Queries/Mixed/GravitasQueryMixedService.CircleAgainst3DReducers.cs`
+before changing target. The current artifact reports four uncovered lines and
+four uncovered branch outcomes. Treat exact reducer selection, slab admission,
+conservative fallback, fixed-point boundary handling, and stable result
+metadata as one mixed-query geometry contract.
 
 ## Rules Of Engagement
 
@@ -107,16 +107,16 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | `Diagnostics/GravitasDiagnosticSink.cs` | 1 | 5 | 0 | Enablement, capacity, event ownership, and disposal behavior. |
-| 2 | `Queries/Mixed/GravitasQueryMixedService.CircleAgainst3DReducers.cs` | 4 | 4 | 0 | Mixed circle/capsule reducers and conservative fallback admission. |
-| 3 | `Core/3D/GravitasPhysicsService.SupportTypes.cs` | 3 | 4 | 0 | Stable joint keys and ownerless endpoint ordering. |
-| 4 | `Colliders/3D/LSMeshCollider.cs` | 1 | 4 | 0 | Authored topology validation and empty/degenerate ownership. |
-| 5 | `Constraints/2D/GravitasConstraint2DService.cs` | 1 | 4 | 0 | Endpoint ownership and stale registration outcomes. |
-| 6 | `Constraints/2D/Joint2D.cs` | 1 | 4 | 0 | Constrained endpoint and lifecycle admission. |
-| 7 | `Partitions/2D/PhysicsPartition2D.cs` | 1 | 4 | 0 | Partition membership and retained-owner outcomes. |
-| 8 | `Partitions/3D/PhysicsPartition.cs` | 1 | 4 | 0 | 3D partition membership and retained-owner outcomes. |
-| 9 | `Queries/2D/GravitasQuery2DService.Overlap.cs` | 1 | 4 | 0 | Overlap filtering, empty candidates, and stable admission. |
-| 10 | `Queries/3D/Sweeps/ConvexSweepQueryWorker.cs` | 4 | 3 | 0 | Degenerate simplex and conservative sweep outcomes. |
+| 1 | `Queries/Mixed/GravitasQueryMixedService.CircleAgainst3DReducers.cs` | 4 | 4 | 0 | Mixed circle/capsule reducers and conservative fallback admission. |
+| 2 | `Core/3D/GravitasPhysicsService.SupportTypes.cs` | 3 | 4 | 0 | Stable joint keys and ownerless endpoint ordering. |
+| 3 | `Colliders/3D/LSMeshCollider.cs` | 1 | 4 | 0 | Authored topology validation and empty/degenerate ownership. |
+| 4 | `Constraints/2D/GravitasConstraint2DService.cs` | 1 | 4 | 0 | Endpoint ownership and stale registration outcomes. |
+| 5 | `Constraints/2D/Joint2D.cs` | 1 | 4 | 0 | Constrained endpoint and lifecycle admission. |
+| 6 | `Partitions/2D/PhysicsPartition2D.cs` | 1 | 4 | 0 | Partition membership and retained-owner outcomes. |
+| 7 | `Partitions/3D/PhysicsPartition.cs` | 1 | 4 | 0 | 3D partition membership and retained-owner outcomes. |
+| 8 | `Queries/2D/GravitasQuery2DService.Overlap.cs` | 1 | 4 | 0 | Overlap filtering, empty candidates, and stable admission. |
+| 9 | `Queries/3D/Sweeps/ConvexSweepQueryWorker.cs` | 4 | 3 | 0 | Degenerate simplex and conservative sweep outcomes. |
+| 10 | `Queries/3D/GravitasQuery3DService.Batch.cs` | 3 | 3 | 0 | Batch validation, empty work, and stable aggregate ordering. |
 
 ### Phase 1: Core Runtime And Service Ownership
 
@@ -152,6 +152,10 @@ mid-block merely because another branch looks easier.
       stale indices, foreign and occupied partitions, missing attachments, and
       partial removal-callback failure recovery; remove the caller-impossible
       concurrent `TryRemovePartition` failure branch.
+- [x] Close and independently review diagnostic sink ownership through a
+      successful context-owned ground probe; remove redundant summary
+      enablement, mixed-contact hit, and implicit 2D dimension branches proven
+      by synchronous callers and constructible metadata invariants.
 - [x] Close and independently review residual 3D body-motion outcomes through
       initialize, simulate, late-simulate, reset, deactivate, shell reuse,
       grounded friction, anisotropic gyro, and queued CCD workflows.
@@ -336,6 +340,7 @@ of record.
 | 3D CCD hit reduction | 99.55% | 98.40% | 99.02% | 2,331 | 3D hit reduction reached 100%; epsilon fallback normals, non-closing exact hits, restored transforms, and post-index filtering were covered; duplicate sphere dispatch and an impossible relative-length guard were removed. |
 | Retained partition lifecycle | 99.56% | 98.45% | 99.02% | 2,334 | Retirement reached 100%; stale indices, foreign and occupied partitions, missing attachments, and partial removal-callback failures were covered; impossible concurrent removal bookkeeping was simplified after independent review. |
 | 2D response closure | 99.57% | 98.49% | 99.02% | 2,337 | Response reached 100%; both trigger orderings, frozen contact-axis rejection, frictionless preservation, and near-zero tangent mobility were covered; algebraically redundant friction-limit branches were removed after mutation-sensitive review. |
+| Diagnostic sink closure | 99.57% | 98.54% | 99.02% | 2,338 | Diagnostics reached 100%; successful ground-probe identity and geometry were covered; redundant summary enablement, mixed-contact hit, and implicit 2D inference branches were removed after complete call-graph review. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.
