@@ -209,6 +209,117 @@ public sealed class CollisionDetection2DGapTests
         contact.PointB.Should().Be(new Vector2d(-halfWidth, Fixed64.One));
     }
 
+    [Fact]
+    public void OffOriginContainedPolygon_ShouldUseShortestSignedAxisForBothOwners()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        context.Settings.RuntimeMode = PhysicsRuntimeMode.TwoD;
+        var polygon = new LSPolygonCollider2D(
+            new Vector2d((Fixed64)10, -Fixed64.One),
+            new Vector2d((Fixed64)12, -Fixed64.One),
+            new Vector2d((Fixed64)12, Fixed64.One),
+            new Vector2d((Fixed64)10, Fixed64.One));
+        var box = new LSAABBoxCollider2D(new Vector2d(Fixed64.FromFraction(7, 2), (Fixed64)4));
+        _ = CreateBody(context, polygon, Vector2d.Zero);
+        _ = CreateBody(context, box, new Vector2d(Fixed64.FromFraction(43, 4), Fixed64.Zero));
+
+        bool direct = CollisionDetection2D.TryCollide(polygon, box, out Contact2D contact);
+        ContactManifold2D forward = BuildManifold(polygon, box, frame: 29, out bool forwardHit);
+        ContactManifold2D reverse = BuildManifold(box, polygon, frame: 29, out bool reverseHit);
+
+        direct.Should().BeTrue();
+        contact.Normal.Should().Be(-Vector2d.Right);
+        contact.Depth.Should().Be(Fixed64.FromFraction(5, 2));
+        contact.PointA.Should().Be(new Vector2d((Fixed64)10, -Fixed64.One));
+        contact.PointB.Should().Be(new Vector2d(Fixed64.FromFraction(25, 2), (Fixed64)2));
+        forwardHit.Should().BeTrue();
+        reverseHit.Should().BeTrue();
+        forward.Count.Should().Be(2);
+        reverse.Count.Should().Be(2);
+        forward[0].ContactId.Should().BeLessThan(forward[1].ContactId);
+        forward[0].Normal.Should().Be(-Vector2d.Right);
+        forward[0].Depth.Should().Be(Fixed64.FromFraction(5, 2));
+        forward[0].PointA.Should().Be(new Vector2d((Fixed64)10, Fixed64.One));
+        forward[0].PointB.Should().Be(new Vector2d(Fixed64.FromFraction(25, 2), Fixed64.One));
+        forward[1].Normal.Should().Be(-Vector2d.Right);
+        forward[1].Depth.Should().Be(Fixed64.FromFraction(5, 2));
+        Fixed64 clippedBottom = -Fixed64.One - Fixed64.MinIncrement;
+        forward[1].PointA.Should().Be(new Vector2d((Fixed64)10, clippedBottom));
+        forward[1].PointB.Should().Be(new Vector2d(Fixed64.FromFraction(25, 2), clippedBottom));
+        reverse[0].ContactId.Should().BeLessThan(reverse[1].ContactId);
+        reverse[0].Normal.Should().Be(Vector2d.Right);
+        reverse[0].Depth.Should().Be(Fixed64.FromFraction(5, 2));
+        reverse[0].PointA.Should().Be(new Vector2d(Fixed64.FromFraction(25, 2), -Fixed64.One));
+        reverse[0].PointB.Should().Be(new Vector2d((Fixed64)10, -Fixed64.One));
+        reverse[1].Normal.Should().Be(Vector2d.Right);
+        reverse[1].Depth.Should().Be(Fixed64.FromFraction(5, 2));
+        reverse[1].PointA.Should().Be(new Vector2d(Fixed64.FromFraction(25, 2), Fixed64.One));
+        reverse[1].PointB.Should().Be(new Vector2d((Fixed64)10, Fixed64.One));
+    }
+
+    [Fact]
+    public void OffOriginSymmetricContainmentTie_ShouldKeepAuthoredAxis()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        context.Settings.RuntimeMode = PhysicsRuntimeMode.TwoD;
+        var polygon = new LSPolygonCollider2D(
+            new Vector2d((Fixed64)10, -Fixed64.One),
+            new Vector2d((Fixed64)12, -Fixed64.One),
+            new Vector2d((Fixed64)12, Fixed64.One),
+            new Vector2d((Fixed64)10, Fixed64.One));
+        var box = new LSAABBoxCollider2D(new Vector2d((Fixed64)4, (Fixed64)6));
+        _ = CreateBody(context, polygon, Vector2d.Zero);
+        _ = CreateBody(context, box, new Vector2d((Fixed64)11, Fixed64.Zero));
+
+        bool collided = CollisionDetection2D.TryCollide(polygon, box, out Contact2D contact);
+
+        collided.Should().BeTrue();
+        contact.Normal.Should().Be(-Vector2d.Right);
+        contact.Depth.Should().Be((Fixed64)3);
+        contact.PointA.Should().Be(new Vector2d((Fixed64)10, -Fixed64.One));
+        contact.PointB.Should().Be(new Vector2d((Fixed64)13, (Fixed64)3));
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(1)]
+    public void OffsetIntersectingCapsules_ShouldOrientCoincidentFeatureFallback(int offset)
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        context.Settings.RuntimeMode = PhysicsRuntimeMode.TwoD;
+        var horizontal = new LSCapsuleCollider2D(Fixed64.Half, (Fixed64)4);
+        var vertical = new LSCapsuleCollider2D(Fixed64.Half, (Fixed64)4);
+        _ = CreateBody(context, horizontal, Vector2d.Zero, FixedMath.DegToRad((Fixed64)90));
+        _ = CreateBody(context, vertical, (Fixed64)offset * Vector2d.Right);
+
+        bool collided = CollisionDetection2D.TryCollide(horizontal, vertical, out Contact2D contact);
+
+        collided.Should().BeTrue();
+        Vector2d normal = (Fixed64)offset * Vector2d.Right;
+        Vector2d intersection = (Fixed64)offset * (Fixed64.One - Fixed64.MinIncrement) * Vector2d.Right;
+        contact.Normal.Should().Be(normal);
+        contact.Depth.Should().Be(Fixed64.One);
+        contact.PointA.Should().Be(intersection + normal * Fixed64.Half);
+        contact.PointB.Should().Be(intersection - normal * Fixed64.Half);
+    }
+
+    private static ContactManifold2D BuildManifold(
+        LSCollider2D colliderA,
+        LSCollider2D colliderB,
+        int frame,
+        out bool collided)
+    {
+        var manifold = new ContactManifold2D();
+        collided = CollisionDetection2D.TryCollide(
+            new CollisionWorkItem2D(
+                colliderA,
+                colliderB,
+                ColliderSettings2D.GetCollisionType(colliderA.Shape, colliderB.Shape)),
+            manifold,
+            frame);
+        return manifold;
+    }
+
     private static SolidBody2D CreateBody(
         GravitasWorldContext context,
         LSCollider2D collider,

@@ -169,8 +169,7 @@ internal static class CollisionDetection2D
             return false;
         }
 
-        Vector2d direction = convex.Center - circle.Center;
-        Vector2d normal = OrientAxis(bestAxis, direction);
+        Vector2d normal = bestAxis;
         contact = new Contact2D(
             circle.GetSupportPoint(normal),
             convex.GetSupportPoint(-normal),
@@ -224,7 +223,7 @@ internal static class CollisionDetection2D
         Fixed64 distance = distanceSquared > Fixed64.Epsilon ? FixedMath.Sqrt(distanceSquared) : Fixed64.Zero;
         Vector2d normal = distance > Fixed64.Zero
             ? delta / distance
-            : OrientAxis(Vector2d.Right, circle.Center - capsule.Center);
+            : OrientCoincidentCapsuleNormal(circle.Center - capsule.Center);
         contact = new Contact2D(
             segmentPoint + normal * capsule.ScaledRadius,
             circle.Center - normal * circle.ScaledRadius,
@@ -284,7 +283,7 @@ internal static class CollisionDetection2D
         Fixed64 distance = distanceSquared > Fixed64.Epsilon ? FixedMath.Sqrt(distanceSquared) : Fixed64.Zero;
         Vector2d normal = distance > Fixed64.Zero
             ? delta / distance
-            : OrientAxis(Vector2d.Right, colliderB.Center - colliderA.Center);
+            : OrientCoincidentCapsuleNormal(colliderB.Center - colliderA.Center);
         contact = new Contact2D(
             pointAOnSegment + normal * colliderA.ScaledRadius,
             pointBOnSegment - normal * colliderB.ScaledRadius,
@@ -328,7 +327,7 @@ internal static class CollisionDetection2D
             return false;
         }
 
-        Vector2d normal = OrientAxis(bestAxis, convex.Center - capsule.Center);
+        Vector2d normal = bestAxis;
         contact = new Contact2D(
             capsule.GetSupportPoint(normal),
             convex.GetSupportPoint(-normal),
@@ -385,7 +384,7 @@ internal static class CollisionDetection2D
             return false;
         }
 
-        Vector2d normal = OrientAxis(bestAxis, colliderB.Center - colliderA.Center);
+        Vector2d normal = bestAxis;
         contact = new Contact2D(
             colliderA.GetSupportPoint(normal),
             colliderB.GetSupportPoint(-normal),
@@ -413,6 +412,7 @@ internal static class CollisionDetection2D
         var first = new ClipPoint2D(incidentEdge.Start);
         var second = new ClipPoint2D(incidentEdge.End);
 
+        // The minimum signed exit axis guarantees overlapping tangential feature intervals.
         ClipSegment(referenceEdge.Start, referenceEdge.Direction, ref first, ref second);
         int count = ClipSegment(referenceEdge.End, -referenceEdge.Direction, ref first, ref second);
 
@@ -488,17 +488,21 @@ internal static class CollisionDetection2D
         bool sourceIsA,
         ref MinimumAxis2D bestAxis)
     {
-        Vector2d normal = axis.Normalized;
-        Project(colliderA, normal, out Fixed64 minA, out Fixed64 maxA);
-        Project(colliderB, normal, out Fixed64 minB, out Fixed64 maxB);
-        if (!TryCalculateProjectionOverlap(minA, maxA, minB, maxB, out Fixed64 overlap))
+        Vector2d candidateAxis = axis.Normalized;
+        Project(colliderA, candidateAxis, out Fixed64 minA, out Fixed64 maxA);
+        Project(colliderB, candidateAxis, out Fixed64 minB, out Fixed64 maxB);
+        if (!TryCalculateProjectionOverlap(
+                candidateAxis,
+                minA,
+                maxA,
+                minB,
+                maxB,
+                out Fixed64 overlap,
+                out Vector2d normal))
             return false;
 
         if (!bestAxis.HasAxis || overlap < bestAxis.Overlap)
-        {
-            Vector2d orientedNormal = OrientAxis(normal, colliderB.Center - colliderA.Center);
-            bestAxis = new MinimumAxis2D(overlap, orientedNormal, sourceIsA, hasAxis: true);
-        }
+            bestAxis = new MinimumAxis2D(overlap, normal, sourceIsA, hasAxis: true);
 
         return true;
     }
@@ -527,10 +531,17 @@ internal static class CollisionDetection2D
         ref Fixed64 bestOverlap,
         ref Vector2d bestAxis)
     {
-        Vector2d normal = axis.Normalized;
-        Project(colliderA, normal, out Fixed64 minA, out Fixed64 maxA);
-        Project(colliderB, normal, out Fixed64 minB, out Fixed64 maxB);
-        if (!TryCalculateProjectionOverlap(minA, maxA, minB, maxB, out Fixed64 overlap))
+        Vector2d candidateAxis = axis.Normalized;
+        Project(colliderA, candidateAxis, out Fixed64 minA, out Fixed64 maxA);
+        Project(colliderB, candidateAxis, out Fixed64 minB, out Fixed64 maxB);
+        if (!TryCalculateProjectionOverlap(
+                candidateAxis,
+                minA,
+                maxA,
+                minB,
+                maxB,
+                out Fixed64 overlap,
+                out Vector2d normal))
             return false;
 
         if (overlap < bestOverlap)
@@ -549,13 +560,20 @@ internal static class CollisionDetection2D
         ref Fixed64 bestOverlap,
         ref Vector2d bestAxis)
     {
-        Vector2d normal = axis.Normalized;
-        Fixed64 centerProjection = Vector2d.Dot(circle.Center, normal);
+        Vector2d candidateAxis = axis.Normalized;
+        Fixed64 centerProjection = Vector2d.Dot(circle.Center, candidateAxis);
         Fixed64 radius = circle.ScaledRadius;
         Fixed64 minA = centerProjection - radius;
         Fixed64 maxA = centerProjection + radius;
-        Project(convex, normal, out Fixed64 minB, out Fixed64 maxB);
-        if (!TryCalculateProjectionOverlap(minA, maxA, minB, maxB, out Fixed64 overlap))
+        Project(convex, candidateAxis, out Fixed64 minB, out Fixed64 maxB);
+        if (!TryCalculateProjectionOverlap(
+                candidateAxis,
+                minA,
+                maxA,
+                minB,
+                maxB,
+                out Fixed64 overlap,
+                out Vector2d normal))
             return false;
 
         if (overlap < bestOverlap)
@@ -574,10 +592,17 @@ internal static class CollisionDetection2D
         ref Fixed64 bestOverlap,
         ref Vector2d bestAxis)
     {
-        Vector2d normal = axis.Normalized;
-        ProjectCapsule(capsule, normal, out Fixed64 minA, out Fixed64 maxA);
-        Project(convex, normal, out Fixed64 minB, out Fixed64 maxB);
-        if (!TryCalculateProjectionOverlap(minA, maxA, minB, maxB, out Fixed64 overlap))
+        Vector2d candidateAxis = axis.Normalized;
+        ProjectCapsule(capsule, candidateAxis, out Fixed64 minA, out Fixed64 maxA);
+        Project(convex, candidateAxis, out Fixed64 minB, out Fixed64 maxB);
+        if (!TryCalculateProjectionOverlap(
+                candidateAxis,
+                minA,
+                maxA,
+                minB,
+                maxB,
+                out Fixed64 overlap,
+                out Vector2d normal))
             return false;
 
         if (overlap < bestOverlap)
@@ -590,16 +615,27 @@ internal static class CollisionDetection2D
     }
 
     private static bool TryCalculateProjectionOverlap(
+        Vector2d axis,
         Fixed64 minA,
         Fixed64 maxA,
         Fixed64 minB,
         Fixed64 maxB,
-        out Fixed64 overlap)
+        out Fixed64 overlap,
+        out Vector2d normal)
     {
         Fixed64 positive = maxA - minB;
         Fixed64 negative = maxB - minA;
+        if (positive < Fixed64.Zero || negative < Fixed64.Zero)
+        {
+            overlap = Fixed64.Zero;
+            normal = axis;
+            return false;
+        }
+
         overlap = FixedMath.Min(positive, negative);
-        return positive >= Fixed64.Zero && negative >= Fixed64.Zero;
+        Vector2d nonzeroAxis = axis.MagnitudeSquared > Fixed64.Epsilon ? axis : Vector2d.Right;
+        normal = positive <= negative ? nonzeroAxis : -nonzeroAxis;
+        return true;
     }
 
     private static Vector2d FindCapsuleConvexClosestAxis(LSCapsuleCollider2D capsule, LSCollider2D convex)
@@ -1056,14 +1092,10 @@ internal static class CollisionDetection2D
         && colliderA.MaxY >= colliderB.MinY;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Vector2d OrientAxis(Vector2d axis, Vector2d direction)
-    {
-        Vector2d normal = axis.MagnitudeSquared > Fixed64.Epsilon ? axis.Normalized : Vector2d.Right;
-        if (direction.MagnitudeSquared > Fixed64.Epsilon && Vector2d.Dot(normal, direction) < Fixed64.Zero)
-            return -normal;
-
-        return normal;
-    }
+    private static Vector2d OrientCoincidentCapsuleNormal(Vector2d direction) =>
+        direction.MagnitudeSquared > Fixed64.Epsilon && direction.X < Fixed64.Zero
+            ? -Vector2d.Right
+            : Vector2d.Right;
 
     private readonly struct MinimumAxis2D
     {
