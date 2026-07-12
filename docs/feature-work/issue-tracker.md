@@ -37,6 +37,28 @@ reused. Fix this in GridForge with a world-owned generation token that changes
 on every grid allocation, then add a remove/re-add regression proving old
 `WorldVoxelIndex` values cannot resolve into the replacement grid.
 
+### Convex Mesh Mode Accepts Disconnected Topology And Can Collide In Empty Bounds Space
+
+**Discovered:** 2026-07-11  
+**Source:** 95%-to-100% coverage hardening, mesh/sphere fallback review  
+**Affected area:** `PhysicsMesh` validation, `MeshColliderMode.Convex`, and
+convex mesh/sphere closest-surface fallback
+
+`PhysicsMesh.ValidateInput(...)` validates counts, indices, and nondegenerate
+triangles but does not validate the topology promised by
+`MeshColliderMode.Convex`. Disconnected triangles can therefore be accepted as
+a convex mesh. Near an empty corner of their combined AABB, the local triangle
+query can return no candidates and the convex mesh/sphere path falls back to
+the AABB surface, producing a contact where no authored triangle exists.
+
+Open convex surfaces are supported intentionally, so requiring every convex
+mesh to be a closed volume would reject valid floors and other planar assets.
+Resolve this with an explicit semantic decision: either validate a documented
+connected/convex open-or-closed topology contract, or change the empty-query
+fallback so invalid topology cannot create an empty-space contact. Add a
+regression that preserves valid open convex surfaces while rejecting or safely
+handling disconnected input without the AABB false-positive.
+
 ## Resolved Issues
 
 ### Partition Teardown Logged Errors After Host Grid Removal

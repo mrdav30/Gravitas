@@ -903,14 +903,18 @@ public sealed class CollisionDetectionShapePairTests
                 MeshInertiaPolicy.SurfaceApproximation),
             Vector3d.Zero,
             FixedQuaternion.Identity);
-        Vector3d corner = new((Fixed64)4, (Fixed64)4, (Fixed64)4);
-        ScenarioBody<LSSphereCollider> sphere = scenario.CreateSphere(corner);
+        Vector3d boundsPoint = new((Fixed64)4, (Fixed64)4, (Fixed64)4);
+        Vector3d sphereCenter = boundsPoint + Vector3d.Right * Fixed64.FromFraction(1, 4);
+        ScenarioBody<LSSphereCollider> sphere = scenario.CreateSphere(sphereCenter);
 
         CollisionPair pair = AssertCollision(scenario, mesh.Collider, sphere.Collider, CollisionType.Mesh_Sphere);
 
-        pair.Manifold.PrimaryContact.PointA.Should().Be(corner);
-        pair.Manifold.PrimaryContact.Depth.Should().Be(Fixed64.Half);
-        pair.Manifold.PrimaryContact.Normal.Should().Be(corner.Normalized);
+        mesh.Collider.Bounds.ClosestPointOnSurface(sphereCenter).Should().Be(boundsPoint);
+        pair.Manifold.PrimaryContact.PointA.Should().Be(boundsPoint);
+        pair.Manifold.PrimaryContact.PointA.Should().NotBe(sphereCenter);
+        pair.Manifold.PrimaryContact.PointB.Should().Be(new Vector3d(Fixed64.FromFraction(15, 4), (Fixed64)4, (Fixed64)4));
+        pair.Manifold.PrimaryContact.Depth.Should().Be(Fixed64.FromFraction(1, 4));
+        pair.Manifold.PrimaryContact.Normal.Should().Be(Vector3d.Right);
     }
 
     [Fact]
