@@ -777,7 +777,7 @@ public sealed partial class GravitasQuery3DService
             ref closest,
             ref closestDistance);
 
-        hit = found ? closest : default;
+        hit = closest;
         return found;
     }
 

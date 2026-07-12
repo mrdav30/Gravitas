@@ -39,14 +39,12 @@ public sealed class GravitasQuery3DBatchTests
         PhysicsRaycast3DRequest[] requests =
         {
             new(Vector(-2, 0, 0), Vector(4, 0, 0), IncludeLayerZero),
+            new(Vector3d.Zero, Vector3d.Zero, IncludeLayerZero),
             new(Vector(-2, 2, 0), Vector(4, 2, 0), IncludeLayerZero)
         };
         var hits = new SwiftList<Physics3DHit>();
-        PhysicsQueryHitRange[] ranges =
-        {
-            new(12, 34),
-            default
-        };
+        PhysicsQueryHitRange[] ranges = new PhysicsQueryHitRange[requests.Length];
+        ranges[0] = new PhysicsQueryHitRange(12, 34);
         hits.Add(default);
 
         int count = scenario.Context.Query3D.RaycastAllBatch(requests, hits, ranges);
@@ -57,6 +55,8 @@ public sealed class GravitasQuery3DBatchTests
         ranges[0].Count.Should().Be(2);
         ranges[1].Start.Should().Be(2);
         ranges[1].Count.Should().Be(0);
+        ranges[2].Start.Should().Be(2);
+        ranges[2].Count.Should().Be(0);
         hits[0].Collider.Should().BeSameAs(near);
         hits[1].Collider.Should().BeSameAs(far);
     }
@@ -176,7 +176,8 @@ public sealed class GravitasQuery3DBatchTests
         PhysicsOverlapCircle3DRequest[] overlapRequests =
         {
             new(Vector3d.Zero, (Fixed64)2, IncludeLayerZero),
-            new(Vector3d.Right * 4, (Fixed64)2, IncludeLayerZero)
+            new(Vector3d.Right * 4, (Fixed64)2, IncludeLayerZero),
+            new(Vector(0, 0, 8), Fixed64.Half, IncludeLayerZero)
         };
         Physics3DHit[] closestSweeps = new Physics3DHit[sweepRequests.Length];
         Physics3DHit[] closestOverlaps = new Physics3DHit[overlapRequests.Length];
@@ -204,8 +205,11 @@ public sealed class GravitasQuery3DBatchTests
         overlapAllCount.Should().Be(2);
         closestOverlaps[0].Collider.Should().BeSameAs(first);
         closestOverlaps[1].Collider.Should().BeSameAs(second);
+        closestOverlaps[2].Should().Be(default(Physics3DHit));
         overlapHits[overlapRanges[0].Start].Collider.Should().BeSameAs(first);
         overlapHits[overlapRanges[1].Start].Collider.Should().BeSameAs(second);
+        overlapRanges[2].Start.Should().Be(2);
+        overlapRanges[2].Count.Should().Be(0);
     }
 
     [Fact]
@@ -217,7 +221,8 @@ public sealed class GravitasQuery3DBatchTests
         PhysicsSweepCuboid3DRequest[] requests =
         {
             new(source.Collider, Vector(6, 0, 0), IncludeLayerZero),
-            new(source.Collider, Vector3d.Zero, IncludeLayerZero)
+            new(source.Collider, Vector(6, 0, 0), IncludeLayerZero),
+            new(source.Collider, Vector(2, 0, 0), IncludeLayerZero)
         };
         Physics3DHit[] closestHits = new Physics3DHit[requests.Length];
         var hits = new SwiftList<Physics3DHit>();
@@ -226,13 +231,18 @@ public sealed class GravitasQuery3DBatchTests
         int closestCount = scenario.Context.Query3D.SweepCuboidBatch(requests, closestHits);
         int allCount = scenario.Context.Query3D.SweepCuboidAllBatch(requests, hits, ranges);
 
-        closestCount.Should().Be(1);
+        closestCount.Should().Be(2);
         closestHits[0].Collider.Should().BeSameAs(target);
-        closestHits[1].Collider.Should().BeNull();
-        allCount.Should().Be(1);
+        closestHits[1].Should().Be(closestHits[0]);
+        closestHits[2].Should().Be(default(Physics3DHit));
+        allCount.Should().Be(2);
         ranges[0].Count.Should().Be(1);
-        ranges[1].Count.Should().Be(0);
+        ranges[1].Start.Should().Be(1);
+        ranges[1].Count.Should().Be(1);
+        ranges[2].Start.Should().Be(2);
+        ranges[2].Count.Should().Be(0);
         hits[ranges[0].Start].Collider.Should().BeSameAs(target);
+        hits[ranges[1].Start].Should().Be(hits[ranges[0].Start]);
     }
 
     [Fact]
