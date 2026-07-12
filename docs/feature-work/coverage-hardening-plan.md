@@ -22,26 +22,27 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-constraint3d-reviewed-full/972ae9f3-9263-4370-9b00-e68d04b5d74d/coverage.cobertura.xml`.
+`TestResults/coverage-physics2d-reviewed-full/163c0da9-4725-46aa-b504-c30a06989437/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
-| Lines | 99.2% | 25,582 / 25,784 | 202 | 100% |
-| Branches | 96.7% | 9,798 / 10,128 | 330 | 100% |
-| Methods | 98.9% | 3,394 / 3,433 | 39 | 100% |
+| Lines | 99.2% | 25,582 / 25,779 | 197 | 100% |
+| Branches | 96.8% | 9,801 / 10,122 | 321 | 100% |
+| Methods | 98.9% | 3,393 / 3,432 | 39 | 100% |
 
-The full coverage-enabled `Release` suite passes 2,145/2,145 tests, and
+The full coverage-enabled `Release` suite passes 2,150/2,150 tests, and
 `ReleaseLean` builds both targets without warnings. Branch coverage is now the
 primary constraint, but the remaining line and method gaps must close from the
 same final artifact.
 
 ### Immediate Next Block
 
-Finish `src/Gravitas/Core/2D/GravitasPhysics2DService.cs` before changing
-target. The current artifact reports five uncovered lines and nine uncovered
-branch outcomes in this file. Trace body/collider registration, late-step
-routing, refresh ownership, and reset behavior together, and carry forward the
-proven 3D ownership invariants where the 2D model intentionally matches.
+Finish
+`src/Gravitas/CollisionHandling/Detection/3D/CollisionDetection.Mesh.cs`
+before changing target. The current artifact reports six uncovered lines,
+seven uncovered branch outcomes, and one uncovered method in this file. Trace
+mesh dispatch, authored topology guarantees, triangle reduction, and both pair
+orientations before deciding which fallbacks are real.
 
 ## Rules Of Engagement
 
@@ -106,14 +107,14 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | `Core/2D/GravitasPhysics2DService.cs` | 5 | 9 | 0 | 2D lifecycle and service parity. |
-| 2 | `CollisionHandling/Detection/3D/CollisionDetection.Mesh.cs` | 6 | 7 | 1 | Mesh dispatch and valid-topology geometry outcomes. |
-| 3 | `Core/2D/SolidBody2D.ContinuousCollision.Helpers.cs` | 4 | 9 | 0 | CCD helper invariants and degenerate outcomes. |
-| 4 | `Runtime/GravitasWorldContext.cs` | 5 | 7 | 0 | Context ownership and phase routing. |
-| 5 | `Queries/3D/RaycastSegmentWorker.cs` | 4 | 8 | 0 | Segment reduction, filtering, and hit ordering. |
-| 6 | `Core/Mixed/GravitasMixedCollisionService.Pairs.cs` | 5 | 6 | 0 | Mixed pair ownership and cleanup. |
+| 1 | `CollisionHandling/Detection/3D/CollisionDetection.Mesh.cs` | 6 | 7 | 1 | Mesh dispatch and valid-topology geometry outcomes. |
+| 2 | `Core/2D/SolidBody2D.ContinuousCollision.Helpers.cs` | 4 | 9 | 0 | CCD helper invariants and degenerate outcomes. |
+| 3 | `Runtime/GravitasWorldContext.cs` | 5 | 7 | 0 | Context ownership and phase routing. |
+| 4 | `Queries/3D/RaycastSegmentWorker.cs` | 4 | 8 | 0 | Segment reduction, filtering, and hit ordering. |
+| 5 | `Core/Mixed/GravitasMixedCollisionService.Pairs.cs` | 5 | 6 | 0 | Mixed pair ownership and cleanup. |
+| 6 | `Colliders/2D/LSPolygonCollider2D.cs` | 4 | 7 | 0 | Authored polygon validation and geometry. |
 | 7 | `Core/3D/GravitasPhysicsService.Pairs.cs` | 4 | 7 | 0 | 3D pair creation, ordering, and cleanup. |
-| 8 | `Colliders/2D/LSPolygonCollider2D.cs` | 4 | 7 | 0 | Authored polygon validation and geometry. |
+| 8 | `CollisionHandling/Detection/3D/ConvexColliderSupport.cs` | 5 | 5 | 0 | Convex support and validated-shape outcomes. |
 
 ### Phase 1: Core Runtime And Service Ownership
 
@@ -121,7 +122,7 @@ mid-block merely because another branch looks easier.
       `Constraints/3D/GravitasConstraint3DService.cs`.
 - [x] Complete and independently review
       `Core/3D/GravitasPhysicsService.cs`.
-- [ ] Complete `Core/2D/GravitasPhysics2DService.cs` and verify intentional
+- [x] Complete `Core/2D/GravitasPhysics2DService.cs` and verify intentional
       2D/3D lifecycle parity.
 - [ ] Close the related pair and response files as cohesive dimensional
       families, including `GravitasPhysics2DService.Pairs.cs`,
@@ -257,6 +258,7 @@ of record.
 | Last-mile checkpoint | 99.2% | 96.6% | 98.8% | 2,138 | Partition services, teardown/load ownership slices, compound collision, and mixed-query geometry completed and independently reviewed. |
 | 3D physics service | 99.2% | 96.7% | 98.9% | 2,142 | Service wrappers and impossible guards removed; disabled phases, sparse visualization, refresh ownership, diagnostics, and cross-context cleanup independently reviewed. |
 | 3D constraint service | 99.2% | 96.7% | 98.9% | 2,145 | Replay holes and ragdoll metadata pinned exactly; suppression cleanup covered; duplicate collider and resolver validation removed. |
+| 2D physics service | 99.2% | 96.8% | 98.9% | 2,150 | Disabled/direct phases, non-dynamic and stale teardown, pooling-off collision, and refresh ownership completed with 2D/3D parity review. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.
