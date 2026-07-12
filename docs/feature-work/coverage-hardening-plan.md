@@ -22,25 +22,25 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-ccd2d-helpers-reviewed-full/b809d1ee-951a-4273-ada8-eb5af981c7fe/coverage.cobertura.xml`.
+`TestResults/coverage-world-context-final-full/d5ac39b7-9fdf-41db-b645-e8e87d2cea97/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
-| Lines | 99.3% | 25,578 / 25,765 | 187 | 100% |
-| Branches | 97.0% | 9,811 / 10,112 | 301 | 100% |
+| Lines | 99.3% | 25,574 / 25,756 | 182 | 100% |
+| Branches | 97.1% | 9,810 / 10,104 | 294 | 100% |
 | Methods | 98.9% | 3,393 / 3,431 | 38 | 100% |
 
-The full coverage-enabled `Release` suite passes 2,163/2,163 tests, and
+The full coverage-enabled `Release` suite passes 2,165/2,165 tests, and
 `ReleaseLean` builds both targets without warnings. Branch coverage is now the
 primary constraint, but the remaining line and method gaps must close from the
 same final artifact.
 
 ### Immediate Next Block
 
-Finish `src/Gravitas/Runtime/GravitasWorldContext.cs` before changing target.
-The current artifact reports five uncovered lines and seven uncovered branch
-outcomes in this file. Trace owned/attached world lifetime, runtime-mode phase
-routing, CCD handoff coordination, reset, and disposal as one host contract.
+Finish `src/Gravitas/Queries/3D/RaycastSegmentWorker.cs` before changing
+target. The current artifact reports four uncovered lines and eight uncovered
+branch outcomes in this file. Trace segment reduction, filtering, stale
+candidate handling, ties, and deterministic hit ordering as one query contract.
 
 ## Rules Of Engagement
 
@@ -105,14 +105,14 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | `Runtime/GravitasWorldContext.cs` | 5 | 7 | 0 | Context ownership and phase routing. |
-| 2 | `Queries/3D/RaycastSegmentWorker.cs` | 4 | 8 | 0 | Segment reduction, filtering, and hit ordering. |
-| 3 | `Core/Mixed/GravitasMixedCollisionService.Pairs.cs` | 5 | 6 | 0 | Mixed pair ownership and cleanup. |
-| 4 | `Core/3D/GravitasPhysicsService.Pairs.cs` | 4 | 7 | 0 | 3D pair creation, ordering, and cleanup. |
+| 1 | `Queries/3D/RaycastSegmentWorker.cs` | 4 | 8 | 0 | Segment reduction, filtering, and hit ordering. |
+| 2 | `Core/2D/GravitasPhysics2DService.Pairs.cs` | 2 | 10 | 0 | 2D pair creation, ordering, and cleanup. |
+| 3 | `Core/2D/SolidBody2D.Grounding.cs` | 2 | 9 | 0 | Planar support refresh and grounding transitions. |
+| 4 | `Core/3D/SolidBody.Motion.cs` | 1 | 9 | 1 | Fixed-step body motion and state transitions. |
 | 5 | `Colliders/2D/LSPolygonCollider2D.cs` | 4 | 7 | 0 | Authored polygon validation and geometry. |
-| 6 | `CollisionHandling/Detection/3D/ConvexColliderSupport.cs` | 5 | 5 | 0 | Convex support and validated-shape outcomes. |
-| 7 | `Core/2D/GravitasPhysics2DService.Pairs.cs` | 2 | 10 | 0 | 2D pair creation, ordering, and cleanup. |
-| 8 | `CollisionHandling/Detection/2D/CollisionDetection2D.cs` | 4 | 6 | 0 | 2D narrow-phase and manifold outcomes. |
+| 6 | `Core/3D/GravitasPhysicsService.Pairs.cs` | 4 | 7 | 0 | 3D pair creation, ordering, and cleanup. |
+| 7 | `Core/Mixed/GravitasMixedCollisionService.Pairs.cs` | 5 | 6 | 0 | Mixed pair ownership and cleanup. |
+| 8 | `CollisionHandling/Contacts/3D/ContactManifold.cs` | 6 | 1 | 4 | Manifold construction, mutation, and reduction. |
 
 ### Phase 1: Core Runtime And Service Ownership
 
@@ -125,7 +125,9 @@ mid-block merely because another branch looks easier.
 - [ ] Close the related pair and response files as cohesive dimensional
       families, including `GravitasPhysics2DService.Pairs.cs`,
       `GravitasPhysicsService.Pairs.cs`, and their live response counterparts.
-- [ ] Close residual world-context and body-motion outcomes only through real
+- [x] Close residual world-context outcomes through real owned/attached
+      lifetime, phase-routing, reset, and disposal workflows.
+- [ ] Close residual body-motion outcomes only through real
       initialize, simulate, late-simulate, reset, and deactivate workflows.
 
 Exit condition: the selected service family reports 100% line, branch, and
@@ -261,6 +263,7 @@ of record.
 | 2D physics service | 99.2% | 96.8% | 98.9% | 2,150 | Disabled/direct phases, non-dynamic and stale teardown, pooling-off collision, and refresh ownership completed with 2D/3D parity review. |
 | 3D mesh detection | 99.3% | 96.9% | 98.9% | 2,156 | Convex sphere and SAT outcomes covered, callerless wrapper removed, fallback signal strengthened, and disconnected-convex false-positive tracked. |
 | 2D CCD helpers | 99.3% | 97.0% | 98.9% | 2,163 | Inheritance, closing, static/kinematic, and mixed policies covered; impossible geometry and duplicate hit guards removed. |
+| World context | 99.3% | 97.1% | 98.9% | 2,165 | Ownership validation and disposal serialized; disabled phases preserve pending CCD handoffs; strong disposal-scoped registry contract documented and independently reviewed. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.
