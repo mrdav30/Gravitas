@@ -3,6 +3,7 @@ using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Tests.Support;
+using SwiftCollections.Pool;
 using Xunit;
 
 namespace Gravitas.Tests.CollisionHandlingTests;
@@ -58,5 +59,49 @@ public sealed class CuboidCollisionDetectionCoverageTests
             contact.PointA.Y.Should().Be(-Fixed64.Half);
             contact.PointB.Y.Should().Be(-Fixed64.FromFraction(1, 4));
         }
+    }
+
+    [Fact]
+    public void ObbCapsule_EqualDepthAxes_ShouldKeepFirstFaceNormalAcrossPooledCapacityHistory()
+    {
+        SwiftHashSetPool<Vector3d>.Shared.Clear();
+        SwiftListPool<Vector3d>.Shared.Clear();
+
+        try
+        {
+            using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+            FixedQuaternion rotation = PhysicsScenarioBuilder.Yaw(45);
+            ScenarioBody<LSCuboidCollider> cuboid = scenario.CreateCuboid(Vector3d.Zero, rotation);
+            ScenarioBody<LSCapsuleCollider> capsule = scenario.CreateCapsule(Vector3d.Zero);
+            CollisionPair pair = scenario.CreatePair(cuboid.Collider, capsule.Collider);
+            Vector3d expectedNormal = (rotation * Vector3d.Forward).Normalized;
+
+            foreach (int retainedCapacity in new[] { 8, 64 })
+            {
+                PrimeAxisPools(retainedCapacity);
+
+                pair.CollisionType.Should().Be(CollisionType.OBBox_Capsule);
+                CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
+                pair.Manifold.Count.Should().Be(1);
+                pair.Manifold.PrimaryContact.Depth.Should().Be(Fixed64.One);
+                pair.Manifold.PrimaryContact.Normal.Should().Be(expectedNormal);
+            }
+        }
+        finally
+        {
+            SwiftHashSetPool<Vector3d>.Shared.Clear();
+            SwiftListPool<Vector3d>.Shared.Clear();
+        }
+    }
+
+    private static void PrimeAxisPools(int retainedCapacity)
+    {
+        var hashAxes = SwiftHashSetPool<Vector3d>.Shared.Rent();
+        hashAxes.EnsureCapacity(retainedCapacity);
+        SwiftHashSetPool<Vector3d>.Shared.Release(hashAxes);
+
+        var orderedAxes = SwiftListPool<Vector3d>.Shared.Rent();
+        orderedAxes.EnsureCapacity(retainedCapacity);
+        SwiftListPool<Vector3d>.Shared.Release(orderedAxes);
     }
 }

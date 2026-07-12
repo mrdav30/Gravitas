@@ -22,7 +22,7 @@ public static class AxisProjectionHelper
     public static void GetCuboidAndCapsuleAxisVectors(
         LSCuboidCollider cuboid,
         LSCapsuleCollider capsule,
-        ref SwiftHashSet<Vector3d> output)
+        ref SwiftList<Vector3d> output)
     {
         // for each face of the first polyhedron, add the normal of the face to the list of potential separating axes
         for (int i = 0; i < cuboid.FaceNormals.Length; i++)

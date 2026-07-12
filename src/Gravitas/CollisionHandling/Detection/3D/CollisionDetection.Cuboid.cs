@@ -98,7 +98,7 @@ public static partial class CollisionDetection
         penetration = default;
         bool overlaps = false;
 
-        SwiftHashSet<Vector3d> axes = SwiftHashSetPool<Vector3d>.Shared.Rent();
+        SwiftList<Vector3d> axes = SwiftListPool<Vector3d>.Shared.Rent();
         AxisProjectionHelper.GetCuboidAndCapsuleAxisVectors(obb, capsule, ref axes);
 
         Vector3d representativePointB = Vector3d.ClosestPointOnLineSegment(capsule.LineSegmentStart, capsule.LineSegmentEnd, obb.Center);
@@ -126,7 +126,7 @@ public static partial class CollisionDetection
             }
         }
 
-        SwiftHashSetPool<Vector3d>.Shared.Release(axes);
+        SwiftListPool<Vector3d>.Shared.Release(axes);
         return overlaps && penetration.HasValue;
     }
 
