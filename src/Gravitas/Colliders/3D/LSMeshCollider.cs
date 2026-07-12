@@ -21,7 +21,7 @@ public class LSMeshCollider : LSCollider
 
     public override int Priority => ColliderSettings.GetPriority(Shape);
 
-    public override Fixed64 Area => Mesh != null ? Mesh.TotalArea : Fixed64.Zero;
+    public override Fixed64 Area => Mesh.TotalArea;
 
     public PhysicsMesh Mesh { get; private set; }
 

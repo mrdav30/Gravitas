@@ -180,6 +180,16 @@ public sealed class PhysicsMeshTests
     }
 
     [Fact]
+    public void MeshColliderAreaAndFrontalArea_ShouldExposeMeshGeometry()
+    {
+        LSMeshCollider collider = MeshTestFixtures.CreateConvexQuadFloor();
+
+        collider.Area.Should().Be(collider.Mesh.TotalArea);
+        collider.GetFrontalArea(Vector3d.Up).Should().Be(collider.Mesh.TotalArea);
+        collider.GetFrontalArea(-Vector3d.Up).Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
     public void Constructor_ShouldStoreExplicitMeshColliderMode()
     {
         var collider = new LSMeshCollider(
@@ -268,14 +278,20 @@ public sealed class PhysicsMeshTests
             new FixedTransform(
                 Vector3d.Zero,
                 FixedQuaternion.Identity,
-                new Vector3d(Fixed64.Zero, (Fixed64)2, Fixed64.Zero)));
+                Vector3d.Zero));
         collider.InitializeWithNoBody(agent);
+        LSMeshCollider unscaled = MeshTestFixtures.CreateConvexCube();
+        unscaled.InitializeWithNoBody(new TestMatterAgent(
+            context,
+            new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)));
 
-        Action calculate = () => _ = collider.CalculateInertiaTensor(
+        Fixed3x3 tensor = collider.CalculateInertiaTensor(
             Fixed64.One,
             new Vector3d((Fixed64)3, (Fixed64)4, (Fixed64)5));
+        Fixed3x3 expected = unscaled.CalculateInertiaTensor(Fixed64.One, Vector3d.Zero);
 
-        calculate.Should().NotThrow();
+        collider.CalculateLocalCenterOfMassOffset().Should().Be(Vector3d.Zero);
+        tensor.Should().Be(expected);
     }
 
     [Fact]

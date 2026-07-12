@@ -206,6 +206,21 @@ public sealed class LSMeshColliderQueryTests
     }
 
     [Fact]
+    public void SurfaceQueries_WhenBvhNeighborhoodIsEmpty_ShouldFallBackToBounds()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSMeshCollider mesh = CreateDisconnectedCornerMesh();
+        mesh.InitializeWithNoBody(new TestMatterAgent(
+            context,
+            new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)));
+        Vector3d queryPoint = new((Fixed64)20, (Fixed64)(-20), (Fixed64)20);
+        Vector3d expectedClosest = new((Fixed64)10, (Fixed64)(-10), (Fixed64)9);
+
+        mesh.ClosestPointOnSurface(queryPoint).Should().Be(expectedClosest);
+        mesh.GetNormalAtPoint(queryPoint).Should().Be(queryPoint.Normalized);
+    }
+
+    [Fact]
     public void ClosestPointOnSurface_ShouldQueryMovedMeshInLocalBVHSpace()
     {
         using var scenario = PhysicsScenarioBuilder.Create();
@@ -313,6 +328,21 @@ public sealed class LSMeshColliderQueryTests
             },
             new[] { 0, 1, 2, 3, 4, 5 },
             MeshColliderMode.Convex,
+            MeshInertiaPolicy.SurfaceApproximation);
+
+    private static LSMeshCollider CreateDisconnectedCornerMesh() =>
+        new(
+            new[]
+            {
+                new Vector3d((Fixed64)9, (Fixed64)9, (Fixed64)9),
+                new Vector3d((Fixed64)10, (Fixed64)9, (Fixed64)9),
+                new Vector3d((Fixed64)9, (Fixed64)10, (Fixed64)9),
+                new Vector3d((Fixed64)(-9), (Fixed64)(-9), (Fixed64)(-9)),
+                new Vector3d((Fixed64)(-10), (Fixed64)(-9), (Fixed64)(-9)),
+                new Vector3d((Fixed64)(-9), (Fixed64)(-10), (Fixed64)(-9))
+            },
+            new[] { 0, 1, 2, 3, 4, 5 },
+            MeshColliderMode.Concave,
             MeshInertiaPolicy.SurfaceApproximation);
 
     private static bool ContainsTriangleIndex(SwiftList<int> indices, int triangleIndex)
