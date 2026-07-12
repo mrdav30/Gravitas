@@ -100,11 +100,6 @@ public static partial class CollisionDetection
 
         SwiftHashSet<Vector3d> axes = SwiftHashSetPool<Vector3d>.Shared.Rent();
         AxisProjectionHelper.GetCuboidAndCapsuleAxisVectors(obb, capsule, ref axes);
-        if (axes.Count <= 0)
-        {
-            SwiftHashSetPool<Vector3d>.Shared.Release(axes);
-            return false;
-        }
 
         Vector3d representativePointB = Vector3d.ClosestPointOnLineSegment(capsule.LineSegmentStart, capsule.LineSegmentEnd, obb.Center);
         // Check for a separating axis
@@ -126,11 +121,8 @@ public static partial class CollisionDetection
             Fixed64 checkDepth = penetration.HasValue ? penetration.Depth : Fixed64.MaxValue;
             if (FixedRange.CheckOverlap(axis, obbProjection, capProjection, checkDepth, sign, out (Vector3d Vector, Fixed64 Depth)? axisOverlap))
             {
-                AxisPenetration overlap = axisOverlap.HasValue
-                    ? new AxisPenetration(axisOverlap.Value.Vector, axisOverlap.Value.Depth)
-                    : default;
-                if (overlap.HasValue)
-                    penetration = overlap;
+                (Vector3d axisVector, Fixed64 axisDepth) = axisOverlap!.Value;
+                penetration = new AxisPenetration(axisVector, axisDepth);
             }
         }
 
