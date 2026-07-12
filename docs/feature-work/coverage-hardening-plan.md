@@ -22,15 +22,15 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-physics2d-reviewed-full/163c0da9-4725-46aa-b504-c30a06989437/coverage.cobertura.xml`.
+`TestResults/coverage-mesh-reviewed-full/b183df5e-7251-4b28-aae9-9d290cf13fb6/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
-| Lines | 99.2% | 25,582 / 25,779 | 197 | 100% |
-| Branches | 96.8% | 9,801 / 10,122 | 321 | 100% |
-| Methods | 98.9% | 3,393 / 3,432 | 39 | 100% |
+| Lines | 99.3% | 25,586 / 25,777 | 191 | 100% |
+| Branches | 96.9% | 9,808 / 10,122 | 314 | 100% |
+| Methods | 98.9% | 3,393 / 3,431 | 38 | 100% |
 
-The full coverage-enabled `Release` suite passes 2,150/2,150 tests, and
+The full coverage-enabled `Release` suite passes 2,156/2,156 tests, and
 `ReleaseLean` builds both targets without warnings. Branch coverage is now the
 primary constraint, but the remaining line and method gaps must close from the
 same final artifact.
@@ -38,11 +38,11 @@ same final artifact.
 ### Immediate Next Block
 
 Finish
-`src/Gravitas/CollisionHandling/Detection/3D/CollisionDetection.Mesh.cs`
-before changing target. The current artifact reports six uncovered lines,
-seven uncovered branch outcomes, and one uncovered method in this file. Trace
-mesh dispatch, authored topology guarantees, triangle reduction, and both pair
-orientations before deciding which fallbacks are real.
+`src/Gravitas/Core/2D/SolidBody2D.ContinuousCollision.Helpers.cs` before
+changing target. The current artifact reports four uncovered lines and nine
+uncovered branch outcomes in this file. Trace every helper through the dynamic,
+kinematic, rotational, and mixed CCD callers so shared invariants are proved
+once rather than patched per resolver.
 
 ## Rules Of Engagement
 
@@ -107,14 +107,14 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | `CollisionHandling/Detection/3D/CollisionDetection.Mesh.cs` | 6 | 7 | 1 | Mesh dispatch and valid-topology geometry outcomes. |
-| 2 | `Core/2D/SolidBody2D.ContinuousCollision.Helpers.cs` | 4 | 9 | 0 | CCD helper invariants and degenerate outcomes. |
-| 3 | `Runtime/GravitasWorldContext.cs` | 5 | 7 | 0 | Context ownership and phase routing. |
-| 4 | `Queries/3D/RaycastSegmentWorker.cs` | 4 | 8 | 0 | Segment reduction, filtering, and hit ordering. |
-| 5 | `Core/Mixed/GravitasMixedCollisionService.Pairs.cs` | 5 | 6 | 0 | Mixed pair ownership and cleanup. |
-| 6 | `Colliders/2D/LSPolygonCollider2D.cs` | 4 | 7 | 0 | Authored polygon validation and geometry. |
-| 7 | `Core/3D/GravitasPhysicsService.Pairs.cs` | 4 | 7 | 0 | 3D pair creation, ordering, and cleanup. |
-| 8 | `CollisionHandling/Detection/3D/ConvexColliderSupport.cs` | 5 | 5 | 0 | Convex support and validated-shape outcomes. |
+| 1 | `Core/2D/SolidBody2D.ContinuousCollision.Helpers.cs` | 4 | 9 | 0 | CCD helper invariants and degenerate outcomes. |
+| 2 | `Runtime/GravitasWorldContext.cs` | 5 | 7 | 0 | Context ownership and phase routing. |
+| 3 | `Queries/3D/RaycastSegmentWorker.cs` | 4 | 8 | 0 | Segment reduction, filtering, and hit ordering. |
+| 4 | `Core/Mixed/GravitasMixedCollisionService.Pairs.cs` | 5 | 6 | 0 | Mixed pair ownership and cleanup. |
+| 5 | `Colliders/2D/LSPolygonCollider2D.cs` | 4 | 7 | 0 | Authored polygon validation and geometry. |
+| 6 | `Core/3D/GravitasPhysicsService.Pairs.cs` | 4 | 7 | 0 | 3D pair creation, ordering, and cleanup. |
+| 7 | `CollisionHandling/Detection/3D/ConvexColliderSupport.cs` | 5 | 5 | 0 | Convex support and validated-shape outcomes. |
+| 8 | `Core/2D/GravitasPhysics2DService.Pairs.cs` | 2 | 10 | 0 | 2D pair creation, ordering, and cleanup. |
 
 ### Phase 1: Core Runtime And Service Ownership
 
@@ -137,7 +137,7 @@ incorrectly.
 
 ### Phase 2: Collision And Query Geometry
 
-- [ ] Complete `CollisionDetection.Mesh.cs` through public collision workflows
+- [x] Complete `CollisionDetection.Mesh.cs` through public collision workflows
       for meaningful dispatch, topology, separation, and contact-reduction
       outcomes.
 - [ ] Complete `RaycastSegmentWorker.cs` with exact hit, miss, filtering,
@@ -259,6 +259,7 @@ of record.
 | 3D physics service | 99.2% | 96.7% | 98.9% | 2,142 | Service wrappers and impossible guards removed; disabled phases, sparse visualization, refresh ownership, diagnostics, and cross-context cleanup independently reviewed. |
 | 3D constraint service | 99.2% | 96.7% | 98.9% | 2,145 | Replay holes and ragdoll metadata pinned exactly; suppression cleanup covered; duplicate collider and resolver validation removed. |
 | 2D physics service | 99.2% | 96.8% | 98.9% | 2,150 | Disabled/direct phases, non-dynamic and stale teardown, pooling-off collision, and refresh ownership completed with 2D/3D parity review. |
+| 3D mesh detection | 99.3% | 96.9% | 98.9% | 2,156 | Convex sphere and SAT outcomes covered, callerless wrapper removed, fallback signal strengthened, and disconnected-convex false-positive tracked. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.
