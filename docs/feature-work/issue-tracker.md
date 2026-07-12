@@ -61,6 +61,46 @@ handling disconnected input without the AABB false-positive.
 
 ## Resolved Issues
 
+### 3D Motion State Could Leak Across Reuse And Apply Incorrect Rotational Dynamics
+
+**Discovered:** 2026-07-12  
+**Resolved:** 2026-07-12  
+**Source:** 95%-to-100% coverage hardening, `SolidBody.Motion` review  
+**Affected area:** 3D body reset/reuse, grounded angular friction, and gyroscopic precession
+
+RCA: `Initialize(...)` and `ResetPosition(...)` cleared visible velocities but
+left queued force/torque and cached angular acceleration state intact. Grounded
+angular friction wrote to the linear acceleration store after linear
+integration, so the next frame overwrote it without slowing rotation.
+Gyroscopic precession also added the Euler correction instead of subtracting
+`I^-1(w x Iw)` and changed angular velocity after speed, direction, and
+acceleration had already been cached. The first cache fix measured only the
+precession delta, omitting torque acceleration applied earlier in the same
+fixed step. Queued CCD handoff consumption then applied another full-frame
+gyroscopic correction after the normal angular step even though the handoff
+changed only linear state.
+
+Fix: both reset paths now use the shared complete motion clear. Angular
+friction accumulates in the angular store. Gyroscopic precession applies the
+negative Euler term and refreshes angular motion state from the fixed-step
+starting velocity after the correction. Non-torque impulse paths use their own
+pre-gyro velocity as that refresh baseline.
+Linear-only queued handoffs no longer rebuild unchanged inertia orientation or
+run gyroscopic integration a second time.
+The unused planar `AddPositionCorrection(Vector3d)` API and its serialized and
+replay-hashed load-only state were deleted; collision response already uses the
+full 3D immediate correction path.
+
+Verification: RED regressions reproduced deferred motion after shell reuse and
+reset, unchanged grounded angular speed, and the wrong-sign off-principal
+anisotropic rotation. GREEN coverage proves exact reset poses, fresh/reused
+body replay-hash equality, repeat-run gyro determinism, correct correction
+sign against a final-orientation world-tensor reconstruction, and coherent
+angular velocity, speed, and total torque-plus-gyro acceleration. JSON
+snapshots also exclude the removed stale correction state. A service-phase CCD
+regression proves queued linear handoff processing preserves angular velocity,
+speed, acceleration, and rotation exactly after the normal body step.
+
 ### Synchronous 2D Contact Callbacks Could Corrupt Pair Teardown And Reuse
 
 **Discovered:** 2026-07-12  

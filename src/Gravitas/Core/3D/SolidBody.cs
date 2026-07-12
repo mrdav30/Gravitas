@@ -133,9 +133,6 @@ public partial class SolidBody : IRecordable
         _positionMutated = true;
     }
 
-    // Used to correct position after collision resolution to avoid sinking into other objects or the ground
-    private Vector2d _positionCorrection;
-
     public Vector3d Position3d
     {
         get => _position2dUnmarked.ToVector3d(_heightPosUnmarked);
@@ -587,11 +584,7 @@ public partial class SolidBody : IRecordable
 
         Active = true;
 
-        _linearAcceleration = Vector3d.Zero;
-        _linearVelocity = Vector3d.Zero;
-        _angularVelocity = Vector3d.Zero;
-        _linearSpeed = Fixed64.Zero;
-        _angularSpeed = Fixed64.Zero;
+        ClearMotionForSleep();
         _normalForce = Vector3d.Zero;
         _isSleeping = false;
         _sleepFrameCount = 0;
@@ -875,11 +868,7 @@ public partial class SolidBody : IRecordable
 
     public void ResetPosition(Vector3d position = default, FixedQuaternion rotation = default)
     {
-        _linearAcceleration = Vector3d.Zero;
-        _linearVelocity = Vector3d.Zero;
-        _angularVelocity = Vector3d.Zero;
-        _linearSpeed = Fixed64.Zero;
-        _angularSpeed = Fixed64.Zero;
+        ClearMotionForSleep();
         bool wasSleeping = _isSleeping;
         _isSleeping = false;
         _sleepFrameCount = 0;

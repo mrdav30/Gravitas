@@ -72,8 +72,7 @@ public partial class SolidBody
             _continuousCollisionHandoffIgnoredCollider2D = null;
         }
 
-        SetPosition2d(_positionCorrection + proposedPosition.ToVector2d());
-        _positionCorrection = Vector2d.Zero;
+        SetPosition2d(proposedPosition.ToVector2d());
         HeightPos = proposedPosition.Y;
 
         CheckGroundForSimulation();
@@ -83,8 +82,6 @@ public partial class SolidBody
             ResetGroundCalculations();
 
         CheckChangedValues();
-        UpdateInertiaTensorOrientation();
-        ApplyGyroscopicPrecession();
 
         if (updateColliderState)
             Collider.Simulate();

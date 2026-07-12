@@ -50,7 +50,6 @@ public partial class SolidBody
         _angularAcceleration = Vector3d.Zero;
         _angularSpeed = Fixed64.Zero;
         _impulseStore = Vector3d.Zero;
-        _positionCorrection = Vector2d.Zero;
     }
 
     private void ApplyFreezeConstraintsToMotion()
@@ -61,7 +60,6 @@ public partial class SolidBody
         _deltaAcceleration = ProjectLinearMotion(_deltaAcceleration);
         _linearAcceleration = ProjectLinearMotion(_linearAcceleration);
         _impulseStore = ProjectLinearMotion(_impulseStore);
-        _positionCorrection = ProjectLinearMotion(_positionCorrection.ToVector3d(Fixed64.Zero)).ToVector2d();
         RefreshLinearMotionState(lastLinearVelocity);
 
         Vector3d lastAngularVelocity = _angularVelocity;
@@ -74,7 +72,7 @@ public partial class SolidBody
 
     private void RefreshPartitionAwakeState()
     {
-        if (Collider is { IsPartitioned: true })
+        if (Collider.IsPartitioned)
             Context.Collisions.RefreshPartitionAwakeState(Collider);
     }
 
@@ -126,7 +124,7 @@ public partial class SolidBody
         _impulseStore += velocityDelta;
         // testing immediate reaction for collisions...
         UpdateLinearVelocity();
-        NonKinematicUpdate();
+        NonKinematicUpdate(_angularVelocity);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -144,7 +142,7 @@ public partial class SolidBody
     internal void ApplyCollisionLinearVelocityDelta(Vector3d velocityDelta)
     {
         velocityDelta = ProjectLinearMotion(velocityDelta);
-        if (!CanTranslate || IsKinematic || velocityDelta == Vector3d.Zero)
+        if (!CanTranslate || velocityDelta == Vector3d.Zero)
             return;
 
         WakeFromCollision();
@@ -157,7 +155,7 @@ public partial class SolidBody
     internal void ApplyCollisionAngularVelocityDelta(Vector3d velocityDelta)
     {
         velocityDelta = ProjectAngularMotion(velocityDelta);
-        if (!CanRotate || IsKinematic || velocityDelta == Vector3d.Zero)
+        if (!CanRotate || velocityDelta == Vector3d.Zero)
             return;
 
         WakeFromCollision();
@@ -170,7 +168,7 @@ public partial class SolidBody
     internal void ApplyCollisionPositionCorrection(Vector3d positionCorrection)
     {
         positionCorrection = ProjectLinearMotion(positionCorrection);
-        if (!CanTranslate || IsKinematic || positionCorrection == Vector3d.Zero)
+        if (!CanTranslate || positionCorrection == Vector3d.Zero)
             return;
 
         Position3d += positionCorrection;
@@ -185,10 +183,6 @@ public partial class SolidBody
 
         Position3d = position;
     }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void AddPositionCorrection(Vector3d positionCorrection) =>
-        _positionCorrection += ProjectLinearMotion(positionCorrection).ToVector2d();
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void SetHeight(Fixed64 height)
@@ -212,6 +206,7 @@ public partial class SolidBody
     {
         ApplyLinearForces();
         UpdateLinearVelocity();
+        Vector3d angularVelocityStepStart = _angularVelocity;
 
         if (CanRotate)
         {
@@ -220,7 +215,7 @@ public partial class SolidBody
         }
 
         // Non-kinematic bodies position is calculated based on current velocity
-        NonKinematicUpdate();
+        NonKinematicUpdate(angularVelocityStepStart);
 
     }
 
@@ -354,7 +349,7 @@ public partial class SolidBody
         }
 
         Fixed64 frictionMagnitude = effectiveFriction * _normalForce.Magnitude;
-        _linearAccelerationStore += (-_angularDirection * frictionMagnitude) * _inverseInertiaTensor;
+        _angularAccelerationStore += (-_angularDirection * frictionMagnitude) * _inverseInertiaTensor;
     }
 
     private void UpdateAngularVelocity()
@@ -388,10 +383,9 @@ public partial class SolidBody
 
             }
             else
-            {
                 _angularSpeed = desiredSpeed;
-                _angularDirection = _angularSpeed > Fixed64.Zero ? _angularVelocity.Normalized : Vector3d.Zero;
-            }
+
+            _angularDirection = _angularVelocity.Normalized;
         }
         else
         {
@@ -408,7 +402,7 @@ public partial class SolidBody
     private Fixed64 ResolveGroundDynamicFriction() =>
         Collider.Material.DynamicFriction;
 
-    private void NonKinematicUpdate()
+    private void NonKinematicUpdate(Vector3d angularVelocityStateStart)
     {
         if (IsKinematic)
             return;
@@ -431,7 +425,7 @@ public partial class SolidBody
             return;
 
         UpdateInertiaTensorOrientation();
-        ApplyGyroscopicPrecession();
+        ApplyGyroscopicPrecession(angularVelocityStateStart);
     }
 
     private void PositionBasedOnForce()
@@ -454,8 +448,7 @@ public partial class SolidBody
             HeightPos = velocityVector.Y;
 
         //  Apply the force
-        SetPosition2d(_positionCorrection + velocityAxis);
-        _positionCorrection = Vector2d.Zero;
+        SetPosition2d(velocityAxis);
     }
 
 
@@ -510,13 +503,21 @@ public partial class SolidBody
     }
 
     //  gyroscopic precession is a correction to the object's angular velocity based on its rotation
-    private void ApplyGyroscopicPrecession()
+    private void ApplyGyroscopicPrecession(Vector3d angularVelocityStateStart)
     {
-        if (!CanRotate || _worldInertiaTensor == Fixed3x3.Zero || _inverseInertiaTensor == Fixed3x3.Zero)
+        if (!CanRotate)
             return;
 
-        _angularVelocity += ProjectAngularMotion(_inverseInertiaTensor * Vector3d.Cross(_angularVelocity, _worldInertiaTensor * _angularVelocity) * Context.DeltaTime);
+        Vector3d gyroscopicCorrection = ProjectAngularMotion(
+            _inverseInertiaTensor
+            * Vector3d.Cross(_angularVelocity, _worldInertiaTensor * _angularVelocity)
+            * Context.DeltaTime);
+        if (gyroscopicCorrection == Vector3d.Zero)
+            return;
+
+        _angularVelocity -= gyroscopicCorrection;
         _angularVelocity = ProjectAngularMotion(_angularVelocity);
+        RefreshAngularMotionState(angularVelocityStateStart);
     }
 
 }

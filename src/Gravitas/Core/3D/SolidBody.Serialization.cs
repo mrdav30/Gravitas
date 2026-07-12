@@ -68,7 +68,6 @@ public partial class SolidBody
         RecordValues.Look(chronicler, ref _angularAccelerationStore, "AngularAccelerationStore");
         RecordValues.Look(chronicler, ref _angularAcceleration, "AngularAcceleration");
         RecordValues.Look(chronicler, ref _impulseStore, "ImpulseStore");
-        RecordValues.Look(chronicler, ref _positionCorrection, "PositionCorrection");
         RecordValues.Look(chronicler, ref LinearDragCoefficient, "LinearDragCoefficient");
         RecordValues.Look(chronicler, ref AngularDragCoefficient, "AngularDragCoefficient");
         RecordValues.Look(chronicler, ref _normalForce, "NormalForce");

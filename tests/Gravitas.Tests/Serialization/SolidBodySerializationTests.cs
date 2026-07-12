@@ -516,6 +516,7 @@ public sealed class SolidBodySerializationTests
         json.Should().NotContain("SettingVisualsCounter");
         json.Should().NotContain("PositionChangedBuffer");
         json.Should().NotContain("RotationChangedBuffer");
+        json.Should().NotContain("PositionCorrection");
     }
 
     private static PhysicsScenarioBuilder CreateReplayScenario()
