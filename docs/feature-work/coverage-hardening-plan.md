@@ -22,27 +22,27 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-task23-authoritative-reviewed-full/e4b24992-540e-4365-b1b4-c8f17e5e4011/coverage.cobertura.xml`.
+`TestResults/coverage-task24-authoritative-reviewed-full/3a313e7e-7be5-4e44-b3f7-b847561a17a2/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
-| Lines | 99.56% | 26,173 / 26,287 | 114 | 100% |
-| Branches | 98.45% | 10,170 / 10,330 | 160 | 100% |
+| Lines | 99.57% | 26,171 / 26,283 | 112 | 100% |
+| Branches | 98.49% | 10,167 / 10,322 | 155 | 100% |
 | Methods | 99.02% | 3,435 / 3,469 | 34 | 100% |
 
-The full coverage-enabled `Release` suite passes 2,334/2,334 tests, and
+The full coverage-enabled `Release` suite passes 2,337/2,337 tests, and
 `ReleaseLean` builds both targets without warnings. Branch coverage is now the
 primary constraint, but the remaining line and method gaps must close from the
 same final artifact.
 
 ### Immediate Next Block
 
-Finish
-`src/Gravitas/CollisionHandling/Response/2D/CollisionResponse2D.cs` before
-changing target. The current artifact reports two uncovered lines and five
-uncovered branch outcomes. Treat response admission, anchored participants,
-constrained mobility, and zero-normal rejection as one solver contract. Assert
-authoritative body and warm-start state through public collision workflows.
+Finish `src/Gravitas/Diagnostics/GravitasDiagnosticSink.cs` before changing
+target. The current artifact reports one uncovered line and five uncovered
+branch outcomes. Treat diagnostic enablement, capacity, event ownership,
+disposal, and deterministic disabled behavior as one context-owned contract.
+Exercise it through public sink and world-context workflows without adding
+coverage-only seams.
 
 ## Rules Of Engagement
 
@@ -107,16 +107,16 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | `CollisionHandling/Response/2D/CollisionResponse2D.cs` | 2 | 5 | 0 | 2D response admission, anchored participants, and constrained outcomes. |
+| 1 | `Diagnostics/GravitasDiagnosticSink.cs` | 1 | 5 | 0 | Enablement, capacity, event ownership, and disposal behavior. |
 | 2 | `Queries/Mixed/GravitasQueryMixedService.CircleAgainst3DReducers.cs` | 4 | 4 | 0 | Mixed circle/capsule reducers and conservative fallback admission. |
-| 3 | `Core/3D/GravitasPhysicsService.SupportTypes.cs` | 3 | 3 | 0 | Stable joint keys and ownerless endpoint ordering. |
-| 4 | `Queries/3D/GravitasQuery3DService.Batch.cs` | 3 | 3 | 0 | Batch validation, empty work, and stable aggregate ordering. |
-| 5 | `Core/2D/GravitasPhysics2DService.ContinuousCollision.cs` | 2 | 3 | 0 | CCD queue ownership and stale candidate cleanup. |
-| 6 | `Diagnostics/GravitasDiagnosticSink.Draw.cs` | 2 | 3 | 0 | Draw-buffer limits and deterministic disabled behavior. |
-| 7 | `Materials/PhysicsMaterial.cs` | 2 | 3 | 0 | Combine policy ties, load defaults, and deterministic validation. |
-| 8 | `Colliders/2D/LSCollider2D.ReplayHash.cs` | 2 | 3 | 0 | Replay identity modes and omitted runtime ownership. |
-| 9 | `Colliders/3D/LSCollider.ReplayHash.cs` | 2 | 3 | 0 | 3D replay identity modes and omitted runtime ownership. |
-| 10 | `Constraints/3D/JointSolver3D.cs` | 2 | 3 | 0 | Joint admission and constrained endpoint mobility. |
+| 3 | `Core/3D/GravitasPhysicsService.SupportTypes.cs` | 3 | 4 | 0 | Stable joint keys and ownerless endpoint ordering. |
+| 4 | `Colliders/3D/LSMeshCollider.cs` | 1 | 4 | 0 | Authored topology validation and empty/degenerate ownership. |
+| 5 | `Constraints/2D/GravitasConstraint2DService.cs` | 1 | 4 | 0 | Endpoint ownership and stale registration outcomes. |
+| 6 | `Constraints/2D/Joint2D.cs` | 1 | 4 | 0 | Constrained endpoint and lifecycle admission. |
+| 7 | `Partitions/2D/PhysicsPartition2D.cs` | 1 | 4 | 0 | Partition membership and retained-owner outcomes. |
+| 8 | `Partitions/3D/PhysicsPartition.cs` | 1 | 4 | 0 | 3D partition membership and retained-owner outcomes. |
+| 9 | `Queries/2D/GravitasQuery2DService.Overlap.cs` | 1 | 4 | 0 | Overlap filtering, empty candidates, and stable admission. |
+| 10 | `Queries/3D/Sweeps/ConvexSweepQueryWorker.cs` | 4 | 3 | 0 | Degenerate simplex and conservative sweep outcomes. |
 
 ### Phase 1: Core Runtime And Service Ownership
 
@@ -129,6 +129,10 @@ mid-block merely because another branch looks easier.
 - [x] Close and independently review the 2D pair and response lifecycle,
       including callback mutation, shell reuse, trigger ordering, pooling, and
       dense cleanup capacity.
+- [x] Close and independently review residual 2D solver outcomes through both
+      trigger orderings, frozen contact-axis mobility, frictionless contacts,
+      and near-zero tangential mobility; replace redundant non-negative
+      friction-limit predicates with direct deterministic products.
 - [x] Close and independently review 3D response island admission, sleeping
       suppression, sparse joint traversal, anchored participants, rootless
       contacts, and single-contact dispatch.
@@ -331,6 +335,7 @@ of record.
 | 2D dynamic CCD mobility | 99.54% | 98.36% | 99.02% | 2,328 | Dynamic 2D/mixed response reached 100%; near-singular constrained mobility is rejected before division, positive sub-epsilon sums remain valid, and duplicate zero-sum guards were removed after mutation-sensitive review. |
 | 3D CCD hit reduction | 99.55% | 98.40% | 99.02% | 2,331 | 3D hit reduction reached 100%; epsilon fallback normals, non-closing exact hits, restored transforms, and post-index filtering were covered; duplicate sphere dispatch and an impossible relative-length guard were removed. |
 | Retained partition lifecycle | 99.56% | 98.45% | 99.02% | 2,334 | Retirement reached 100%; stale indices, foreign and occupied partitions, missing attachments, and partial removal-callback failures were covered; impossible concurrent removal bookkeeping was simplified after independent review. |
+| 2D response closure | 99.57% | 98.49% | 99.02% | 2,337 | Response reached 100%; both trigger orderings, frozen contact-axis rejection, frictionless preservation, and near-zero tangent mobility were covered; algebraically redundant friction-limit branches were removed after mutation-sensitive review. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.
