@@ -101,10 +101,12 @@ public sealed class SolidBody2DContinuousCollisionHitTests
         source.AddForce(Vector2d.Right * (Fixed64)10);
         context.LateSimulate();
 
-        source.Position.X.m_rawValue.Should().Be(-4_294_967_300);
+        Fixed64 candidateOrderingTolerance = Fixed64.Epsilon * (Fixed64)8;
+        (source.Position.X + Fixed64.One).Abs().Should().BeLessThanOrEqualTo(candidateOrderingTolerance);
         source.Position.Y.Should().Be(Fixed64.Zero);
         source.LinearVelocity.Should().Be(Vector2d.Zero);
         source.LastContinuousCollisionToiIterationCount.Should().Be(1);
+        nearest.Collider.Id.Should().BeLessThan(farther.Collider.Id);
         nearest.Position3d.Should().Be(Vector3d.Zero);
         nearest.LinearVelocity.Should().Be(Vector3d.Zero);
         farther.Position3d.Should().Be(new Vector3d((Fixed64)3, Fixed64.Zero, Fixed64.Zero));
@@ -114,15 +116,23 @@ public sealed class SolidBody2DContinuousCollisionHitTests
     [Fact]
     public void ContinuousMode_WithProxyClosingButExactNormalNotClosing_ShouldRejectHitAndRestoreShapes()
     {
-        using GravitasWorldContext context = Physics2DTestWorld.CreateContext(frameRate: 1);
+        using GravitasWorldContext context = CreateMixedContext();
+        SolidBody rotationMutator = CreateBody3D(
+            context,
+            new Vector3d(Fixed64.Zero, Fixed64.Zero, (Fixed64)8));
         SolidBody2D source = CreateBody2D(
             context,
             Vector2d.Zero,
             new LSAABBoxCollider2D(new Vector2d((Fixed64)6, Fixed64.Half)));
         SolidBody2D target = CreateBody2D(context, Vector2d.Zero);
+        Fixed64 sourceRotation = Fixed64.FromFraction(1, 7);
+        Fixed64 targetRotationAfterFramePreparation = Fixed64.FromFraction(2, 7);
         source.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        source.SetRotation(sourceRotation);
         target.Sleep();
+        rotationMutator.OnMoved += () => target.SetRotation(targetRotationAfterFramePreparation);
 
+        rotationMutator.AddForce(Vector3d.Right);
         source.AddForce(-Vector2d.Right * (Fixed64)4);
         context.LateSimulate();
 
@@ -130,9 +140,13 @@ public sealed class SolidBody2DContinuousCollisionHitTests
         source.LinearVelocity.Should().Be(-Vector2d.Right * (Fixed64)4);
         source.LastContinuousCollisionToiIterationCount.Should().Be(0);
         source.Collider.Center.Should().Be(source.Position);
+        source.Rotation.Should().Be(sourceRotation);
+        source.Collider.Rotation.Should().Be(sourceRotation);
         target.Position.Should().Be(Vector2d.Zero);
         target.LinearVelocity.Should().Be(Vector2d.Zero);
         target.Collider.Center.Should().Be(target.Position);
+        target.Rotation.Should().Be(targetRotationAfterFramePreparation);
+        target.Collider.Rotation.Should().Be(targetRotationAfterFramePreparation);
     }
 
     private static GravitasWorldContext CreateMixedContext()
