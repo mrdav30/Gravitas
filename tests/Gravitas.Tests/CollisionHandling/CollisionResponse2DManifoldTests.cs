@@ -125,10 +125,29 @@ public sealed class CollisionResponse2DManifoldTests
             context,
             new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)));
         var triggerPair = new CollisionPair2D(trigger, triggerTarget.Collider);
+        triggerPair.ColliderB.Should().BeSameAs(trigger);
         triggerPair.Manifold.SetContact(Vector2d.Right, Vector2d.Right, Fixed64.Half, Vector2d.Right);
         triggerTarget.ApplyCollisionLinearVelocityDelta(Vector2d.Right);
         CollisionResponse2D.Resolve(triggerPair);
         triggerTarget.LinearVelocity.Should().Be(Vector2d.Right);
+
+        var leadingTrigger = new LSCompoundCollider2D(
+            CompoundColliderPart2D.Circle(Fixed64.Half, Vector2d.Zero))
+        {
+            IsTrigger = true
+        };
+        leadingTrigger.InitializeWithNoBody(new TestMatterAgent(
+            context,
+            new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)));
+        SolidBody2D secondTriggerTarget = CreateBox(context, new Vector2d((Fixed64)3, Fixed64.Zero));
+        var leadingTriggerPair = new CollisionPair2D(leadingTrigger, secondTriggerTarget.Collider);
+        leadingTriggerPair.ColliderA.Should().BeSameAs(leadingTrigger);
+        leadingTriggerPair.Manifold.SetContact(Vector2d.Right, Vector2d.Right, Fixed64.Half, Vector2d.Right);
+        secondTriggerTarget.ApplyCollisionLinearVelocityDelta(Vector2d.Right);
+        Vector2d secondTriggerPosition = secondTriggerTarget.Position;
+        CollisionResponse2D.Resolve(leadingTriggerPair);
+        secondTriggerTarget.Position.Should().Be(secondTriggerPosition);
+        secondTriggerTarget.LinearVelocity.Should().Be(Vector2d.Right);
 
         SolidBody2D emptyA = CreateBox(context, new Vector2d((Fixed64)4, Fixed64.Zero));
         SolidBody2D emptyB = CreateBox(context, new Vector2d((Fixed64)6, Fixed64.Zero));
@@ -145,6 +164,70 @@ public sealed class CollisionResponse2DManifoldTests
         frozenPair.TryGetWarmStartImpulse(
             frozenPair.Manifold.PrimaryContact.ContactId,
             out _).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Resolve_WhenContactAxisIsFrozen_ShouldSkipUnresolvableCorrectionAndImpulse()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        SolidBody2D moving = CreateBox(context, Vector2d.Zero);
+        SolidBody2D wall = CreateBox(context, new Vector2d((Fixed64)2, Fixed64.Zero), immovable: true);
+        moving.FreezeAxes = BodyFreezeAxes2D.PositionX | BodyFreezeAxes2D.Rotation;
+        var pair = new CollisionPair2D(moving.Collider, wall.Collider);
+        pair.Manifold.SetContact(Vector2d.Right, Vector2d.Right, Fixed64.Half, Vector2d.Right);
+        Vector2d positionBefore = moving.Position;
+
+        pair.MarkColliding(context.FrameCount);
+
+        moving.Position.Should().Be(positionBefore);
+        moving.LinearVelocity.Should().Be(Vector2d.Zero);
+        pair.TryGetWarmStartImpulse(
+            pair.Manifold.PrimaryContact.ContactId,
+            out ContactWarmStartImpulse impulse).Should().BeTrue();
+        impulse.NormalImpulse.Should().Be(Fixed64.Zero);
+        impulse.TangentImpulse.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void Resolve_WithFrictionlessContact_ShouldPreserveTangentialVelocity()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        SolidBody2D moving = CreateBox(context, Vector2d.Zero);
+        SolidBody2D wall = CreateBox(context, new Vector2d((Fixed64)2, Fixed64.Zero), immovable: true);
+        moving.Collider.Material = PhysicsMaterial.Frictionless;
+        wall.Collider.Material = PhysicsMaterial.Frictionless;
+        moving.FreezeAxes = BodyFreezeAxes2D.Rotation;
+        moving.ApplyCollisionLinearVelocityDelta(new Vector2d((Fixed64)4, (Fixed64)2));
+        var pair = new CollisionPair2D(moving.Collider, wall.Collider);
+        pair.Manifold.SetContact(Vector2d.Right, Vector2d.Right, Fixed64.Half, Vector2d.Right);
+        Fixed64 tangentialVelocity = moving.LinearVelocity.Y;
+
+        pair.MarkColliding(context.FrameCount);
+
+        moving.LinearVelocity.X.Should().BeLessThan((Fixed64)4);
+        moving.LinearVelocity.Y.Should().Be(tangentialVelocity);
+    }
+
+    [Fact]
+    public void Resolve_WithNearZeroTangentMobility_ShouldPreserveTangentialVelocity()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        SolidBody2D moving = CreateBox(context, Vector2d.Zero);
+        SolidBody2D wall = CreateBox(context, new Vector2d((Fixed64)2, Fixed64.Zero), immovable: true);
+        moving.Mass = Fixed64.MaxValue;
+        moving.FreezeAxes = BodyFreezeAxes2D.Rotation;
+        moving.ApplyCollisionLinearVelocityDelta(new Vector2d(Fixed64.Zero, Fixed64.One));
+        var pair = new CollisionPair2D(moving.Collider, wall.Collider);
+        pair.Manifold.SetContact(Vector2d.Right, Vector2d.Right, Fixed64.Zero, Vector2d.Right);
+        pair.StoreWarmStartImpulse(
+            pair.Manifold.PrimaryContact.ContactId,
+            Fixed64.One,
+            Fixed64.Zero);
+        Fixed64 tangentialVelocity = moving.LinearVelocity.Y;
+
+        pair.MarkColliding(context.FrameCount);
+
+        moving.LinearVelocity.Y.Should().Be(tangentialVelocity);
     }
 
     [Fact]

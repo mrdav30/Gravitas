@@ -219,12 +219,8 @@ public static class CollisionResponse2D
 
     private static Fixed64 SolveFrictionImpulse(SolverContact2D contact, Fixed64 normalImpulseScalar)
     {
-        Fixed64 staticFrictionLimit = normalImpulseScalar > Fixed64.Zero && contact.StaticFriction > Fixed64.Zero
-            ? normalImpulseScalar * contact.StaticFriction
-            : Fixed64.Zero;
-        Fixed64 dynamicFrictionLimit = normalImpulseScalar > Fixed64.Zero && contact.DynamicFriction > Fixed64.Zero
-            ? normalImpulseScalar * contact.DynamicFriction
-            : Fixed64.Zero;
+        Fixed64 staticFrictionLimit = normalImpulseScalar * contact.StaticFriction;
+        Fixed64 dynamicFrictionLimit = normalImpulseScalar * contact.DynamicFriction;
         Fixed64 impulseScalar = Fixed64.Zero;
         if (staticFrictionLimit > Fixed64.Zero || dynamicFrictionLimit > Fixed64.Zero)
         {
