@@ -22,26 +22,25 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-task28-authoritative-reviewed-full/b17ad57d-dcd5-4c3e-a1fa-19f4caf3bcc0/coverage.cobertura.xml`.
+`TestResults/coverage-task29-authoritative-reviewed-full/7ee56a85-60ce-4fde-a5f1-09a9c84c4ff3/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
-| Lines | 99.60% | 26,176 / 26,279 | 103 | 100% |
-| Branches | 98.66% | 10,172 / 10,310 | 138 | 100% |
-| Methods | 99.05% | 3,436 / 3,469 | 33 | 100% |
+| Lines | 99.61% | 26,167 / 26,269 | 102 | 100% |
+| Branches | 98.69% | 10,168 / 10,302 | 134 | 100% |
+| Methods | 99.05% | 3,435 / 3,468 | 33 | 100% |
 
-The full coverage-enabled `Release` suite passes 2,343/2,343 tests, and
+The full coverage-enabled `Release` suite passes 2,344/2,344 tests, and
 `ReleaseLean` builds both targets without warnings. Branch coverage is now the
 primary constraint, but the remaining line and method gaps must close from the
 same final artifact.
 
 ### Immediate Next Block
 
-Finish `src/Gravitas/Constraints/2D/GravitasConstraint2DService.cs` before
-changing target. The current artifact reports one uncovered line and four
-uncovered branch outcomes. Treat endpoint ownership, registration identity,
-suppression cleanup, stale handles, and deterministic service teardown as one
-constraint-lifecycle contract.
+Finish `src/Gravitas/Constraints/2D/Joint2D.cs` before changing target. The
+current artifact reports one uncovered line and four uncovered branch outcomes.
+Treat endpoint mobility, enabled/active state, motor and limit payloads, cache
+ownership, and service notifications as one joint-object contract.
 
 ## Rules Of Engagement
 
@@ -108,16 +107,16 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | `Constraints/2D/GravitasConstraint2DService.cs` | 1 | 4 | 0 | Endpoint ownership and stale registration outcomes. |
-| 2 | `Constraints/2D/Joint2D.cs` | 1 | 4 | 0 | Constrained endpoint and lifecycle admission. |
-| 3 | `Partitions/2D/PhysicsPartition2D.cs` | 1 | 4 | 0 | Partition membership and retained-owner outcomes. |
-| 4 | `Partitions/3D/PhysicsPartition.cs` | 1 | 4 | 0 | 3D partition membership and retained-owner outcomes. |
-| 5 | `Queries/2D/GravitasQuery2DService.Overlap.cs` | 1 | 4 | 0 | Overlap filtering, empty candidates, and stable admission. |
-| 6 | `Queries/3D/Sweeps/ConvexSweepQueryWorker.cs` | 4 | 3 | 0 | Degenerate simplex and conservative sweep outcomes. |
-| 7 | `Queries/3D/GravitasQuery3DService.Batch.cs` | 3 | 3 | 0 | Batch validation, empty work, and stable aggregate ordering. |
-| 8 | `Colliders/2D/LSCollider2D.ReplayHash.cs` | 2 | 3 | 0 | Replay identity modes and omitted runtime ownership. |
-| 9 | `Colliders/3D/LSCollider.ReplayHash.cs` | 2 | 3 | 0 | Replay identity modes and omitted runtime ownership. |
-| 10 | `Constraints/3D/JointSolver3D.cs` | 2 | 3 | 0 | Joint row admission and constrained impulse outcomes. |
+| 1 | `Constraints/2D/Joint2D.cs` | 1 | 4 | 0 | Constrained endpoint and lifecycle admission. |
+| 2 | `Partitions/2D/PhysicsPartition2D.cs` | 1 | 4 | 0 | Partition membership and retained-owner outcomes. |
+| 3 | `Partitions/3D/PhysicsPartition.cs` | 1 | 4 | 0 | 3D partition membership and retained-owner outcomes. |
+| 4 | `Queries/2D/GravitasQuery2DService.Overlap.cs` | 1 | 4 | 0 | Overlap filtering, empty candidates, and stable admission. |
+| 5 | `Queries/3D/Sweeps/ConvexSweepQueryWorker.cs` | 4 | 3 | 0 | Degenerate simplex and conservative sweep outcomes. |
+| 6 | `Queries/3D/GravitasQuery3DService.Batch.cs` | 3 | 3 | 0 | Batch validation, empty work, and stable aggregate ordering. |
+| 7 | `Colliders/2D/LSCollider2D.ReplayHash.cs` | 2 | 3 | 0 | Replay identity modes and omitted runtime ownership. |
+| 8 | `Colliders/3D/LSCollider.ReplayHash.cs` | 2 | 3 | 0 | Replay identity modes and omitted runtime ownership. |
+| 9 | `Constraints/3D/JointSolver3D.cs` | 2 | 3 | 0 | Joint row admission and constrained impulse outcomes. |
+| 10 | `Core/2D/GravitasPhysics2DService.ContinuousCollision.cs` | 2 | 3 | 0 | CCD queue ownership and stale candidate cleanup. |
 
 ### Phase 1: Core Runtime And Service Ownership
 
@@ -127,6 +126,9 @@ mid-block merely because another branch looks easier.
       `Core/3D/GravitasPhysicsService.cs`.
 - [x] Complete `Core/2D/GravitasPhysics2DService.cs` and verify intentional
       2D/3D lifecycle parity.
+- [x] Close and independently review residual 2D constraint-service ownership
+      through larger-ID suppression cleanup; remove impossible collider-null
+      checks and duplicate post-validation ragdoll materialization.
 - [x] Close and independently review the 2D pair and response lifecycle,
       including callback mutation, shell reuse, trigger ordering, pooling, and
       dense cleanup capacity.
@@ -355,6 +357,7 @@ of record.
 | Mixed circle reducer closure | 99.59% | 98.58% | 99.02% | 2,340 | Reducers reached 100%; vertical and planar capsule misses, nearest mesh selection, and both BVH-authored tie outcomes were covered. A stale mutation-built artifact was rejected and replaced with clean focused and full evidence. |
 | 3D response support ordering | 99.60% | 98.62% | 99.02% | 2,341 | Support types reached 100%; endpoint, kind, and joint-ID sorting now have mutation-sensitive diagnostic order; deferred-pair nullability and duplicate dynamic-ID guards were removed after lifecycle review. |
 | Mesh collider closure | 99.60% | 98.66% | 99.05% | 2,343 | Mesh collider reached 100%; public area/frontal area, disconnected-neighborhood bounds fallbacks, and all zero-scale inertia axes were covered; the impossible null mesh arm was removed. |
+| 2D constraint service closure | 99.61% | 98.69% | 99.05% | 2,344 | Constraint service reached 100%; larger-ID suppression cleanup was covered; impossible collider-null checks and duplicate post-validation ragdoll resolution/allocation were removed. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.
