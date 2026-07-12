@@ -5,6 +5,7 @@ using Gravitas.CollisionHandling;
 using Gravitas.Constraints;
 using Gravitas.Diagnostics;
 using Gravitas.Queries;
+using Gravitas.Support;
 using Gravitas.Tests.Support;
 using System;
 using Xunit;
@@ -104,6 +105,36 @@ public sealed class GravitasDiagnosticSinkTests
         events[3].Hit.Should().BeFalse();
 
         secondScenario.Context.Diagnostics.EventCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void SuccessfulGroundProbeDiagnostics_ShouldIdentifyHitCollider()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        var ground = new LSCuboidCollider
+        {
+            Layer = new PhysicsLayer(1),
+            Size = new Vector3d((Fixed64)8, Fixed64.One, (Fixed64)8)
+        };
+        scenario.InitializeStaticCollider(
+            ground,
+            new Vector3d(Fixed64.Zero, -Fixed64.Half, Fixed64.Zero));
+        scenario.Context.Settings.GroundCheckLayerMask = PhysicsLayerMask.FromLayer(1);
+        ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
+        scenario.Context.Diagnostics.Enable(eventCapacity: 2, drawCommandCapacity: 0);
+
+        body.Body.CheckGround();
+
+        GravitasDiagnosticEvent probe = scenario.Context.Diagnostics.Events[^1];
+        probe.Kind.Should().Be(GravitasDiagnosticEventKind.GroundProbe);
+        probe.BodyId.Should().Be(body.Body.DynamicId);
+        probe.ColliderAId.Should().Be(body.Collider.Id);
+        probe.ColliderBId.Should().Be(ground.Id);
+        probe.ColliderBType.Should().Be(ground.Shape);
+        probe.ColliderBDimension.Should().Be(GravitasColliderDimension.ThreeD);
+        probe.PointA.Should().Be(body.Body.HitPoint);
+        probe.Vector.Should().Be(body.Body.GroundNormal);
+        probe.Hit.Should().BeTrue();
     }
 
     [Fact]

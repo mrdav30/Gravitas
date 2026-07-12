@@ -302,9 +302,6 @@ public sealed partial class GravitasDiagnosticSink
         int fallbackHits,
         int rejectedConservativeCandidates)
     {
-        if (!Enabled)
-            return;
-
         AddEvent(
             GravitasDiagnosticEventKind.QuerySummary,
             colliderADimension: sourceDimension,
@@ -392,7 +389,7 @@ public sealed partial class GravitasDiagnosticSink
             hit: hit);
     }
 
-    internal void EmitMixedContact(CollisionPairMixed pair, MixedContact contact, bool hit)
+    internal void EmitMixedContact(CollisionPairMixed pair, MixedContact contact)
     {
         if (!Enabled)
             return;
@@ -409,7 +406,7 @@ public sealed partial class GravitasDiagnosticSink
             pointB: contact.Point2D,
             vector: contact.Normal3DTo2D,
             scalarA: contact.Depth,
-            hit: hit && contact.HasContact);
+            hit: true);
     }
 
     internal void EmitMixedResponseImpulse(
@@ -654,8 +651,8 @@ public sealed partial class GravitasDiagnosticSink
             jointId,
             colliderAId,
             colliderBId,
-            ResolveDimension(colliderADimension, colliderAType, colliderA2DType),
-            ResolveDimension(colliderBDimension, colliderBType, colliderB2DType),
+            ResolveDimension(colliderADimension, colliderAType),
+            ResolveDimension(colliderBDimension, colliderBType),
             colliderAType,
             colliderBType,
             colliderA2DType,
@@ -695,7 +692,7 @@ public sealed partial class GravitasDiagnosticSink
             _drawSequence++,
             kind,
             colliderId,
-            ResolveDimension(colliderDimension, colliderType, collider2DType),
+            ResolveDimension(colliderDimension, colliderType),
             colliderType,
             collider2DType,
             start,
@@ -713,16 +710,13 @@ public sealed partial class GravitasDiagnosticSink
 
     private static GravitasColliderDimension ResolveDimension(
         GravitasColliderDimension dimension,
-        ColliderType colliderType,
-        ColliderType2D collider2DType)
+        ColliderType colliderType)
     {
         if (dimension != GravitasColliderDimension.None)
             return dimension;
         if (colliderType != ColliderType.None)
             return GravitasColliderDimension.ThreeD;
-        return collider2DType != ColliderType2D.None
-            ? GravitasColliderDimension.TwoD
-            : GravitasColliderDimension.None;
+        return GravitasColliderDimension.None;
     }
 
     private static Vector3d ToDiagnosticVector(Vector2d value) => new(value.X, Fixed64.Zero, value.Y);

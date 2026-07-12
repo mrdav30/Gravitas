@@ -79,7 +79,7 @@ internal sealed partial class CollisionPairMixed
         Contact = contact;
         LastFrame = frame;
 
-        Context.Diagnostics.EmitMixedContact(this, contact, true);
+        Context.Diagnostics.EmitMixedContact(this, contact);
 
         var registration3D = new ColliderLifetimeToken(Collider3D);
         var registration2D = new ColliderLifetimeToken2D(Collider2D);
