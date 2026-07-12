@@ -151,8 +151,6 @@ public sealed partial class GravitasPhysicsService
             int nodeA = FindIslandNode(joint!.BodyA);
             int nodeB = FindIslandNode(joint.BodyB);
             int rootKey = ResolveConstraintRootKey(nodeA, nodeB);
-            if (rootKey < 0)
-                continue;
 
             GetStableJointKey(joint, out int minColliderId, out int maxColliderId);
             _discreteIslandConstraints.Add(DiscreteIslandConstraint.CreateJoint(
