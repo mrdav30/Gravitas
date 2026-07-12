@@ -22,12 +22,12 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-task19-authoritative-reviewed-full/9043ffa5-cc0f-4da6-ab03-d4597850b7b6/coverage.cobertura.xml`.
+`TestResults/coverage-task20-authoritative-reviewed-full-rerun/95aa4cda-427e-4e65-8d74-514ce8d81674/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
-| Lines | 99.52% | 26,167 / 26,293 | 126 | 100% |
-| Branches | 98.26% | 10,162 / 10,342 | 180 | 100% |
+| Lines | 99.53% | 26,170 / 26,293 | 123 | 100% |
+| Branches | 98.31% | 10,167 / 10,342 | 175 | 100% |
 | Methods | 99.02% | 3,435 / 3,469 | 34 | 100% |
 
 The full coverage-enabled `Release` suite passes 2,325/2,325 tests, and
@@ -37,12 +37,12 @@ same final artifact.
 
 ### Immediate Next Block
 
-Finish `src/Gravitas/CollisionHandling/Response/3D/CollisionResponse.cs`
+Finish `src/Gravitas/Core/2D/SolidBody2D.ContinuousCollision.Dynamic.cs`
 before changing target. The current artifact reports three uncovered lines and
-five uncovered branch outcomes. Treat response admission, anchored/rootless
-participants, closing velocity, friction basis, and deterministic impulse
-application as one solver-policy contract. Trace public pair/island callers
-before retaining any defensive branch.
+five uncovered branch outcomes. Treat dynamic target eligibility, constrained
+relative motion, time-of-impact response, remaining-step handoff, and temporary
+state restoration as one CCD contract. Extend the already-established 2D CCD
+public workflows instead of creating a private reducer seam.
 
 ## Rules Of Engagement
 
@@ -107,16 +107,16 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | `CollisionHandling/Response/3D/CollisionResponse.cs` | 3 | 5 | 0 | Response admission and anchored/rootless solver outcomes. |
-| 2 | `Core/2D/SolidBody2D.ContinuousCollision.Dynamic.cs` | 3 | 5 | 0 | Dynamic 2D CCD handoff and substep state. |
-| 3 | `Core/3D/SolidBody.ContinuousCollision.Hits.cs` | 3 | 5 | 0 | 3D hit admission and deterministic reduction. |
-| 4 | `Partitions/RetainedPartitionLifecycle.cs` | 3 | 5 | 0 | Retained partition teardown, owner validation, and aggregate failure ordering. |
-| 5 | `CollisionHandling/Response/2D/CollisionResponse2D.cs` | 2 | 5 | 0 | 2D response admission and anchored-body outcomes. |
-| 6 | `Queries/Mixed/GravitasQueryMixedService.CircleAgainst3DReducers.cs` | 4 | 4 | 0 | Mixed circle/capsule reducers and conservative fallback admission. |
-| 7 | `Core/3D/GravitasPhysicsService.SupportTypes.cs` | 3 | 3 | 0 | Stable joint keys and ownerless endpoint ordering. |
-| 8 | `Queries/3D/GravitasQuery3DService.Batch.cs` | 3 | 3 | 0 | Batch validation, empty work, and stable aggregate ordering. |
-| 9 | `Core/2D/GravitasPhysics2DService.ContinuousCollision.cs` | 2 | 3 | 0 | CCD queue ownership and stale candidate cleanup. |
-| 10 | `Diagnostics/GravitasDiagnosticSink.Draw.cs` | 2 | 3 | 0 | Draw-buffer limits and deterministic disabled behavior. |
+| 1 | `Core/2D/SolidBody2D.ContinuousCollision.Dynamic.cs` | 3 | 5 | 0 | Dynamic 2D CCD handoff and substep state. |
+| 2 | `Core/3D/SolidBody.ContinuousCollision.Hits.cs` | 3 | 5 | 0 | 3D hit admission and deterministic reduction. |
+| 3 | `Partitions/RetainedPartitionLifecycle.cs` | 3 | 5 | 0 | Retained partition teardown, owner validation, and aggregate failure ordering. |
+| 4 | `CollisionHandling/Response/2D/CollisionResponse2D.cs` | 2 | 5 | 0 | 2D response admission and anchored-body outcomes. |
+| 5 | `Queries/Mixed/GravitasQueryMixedService.CircleAgainst3DReducers.cs` | 4 | 4 | 0 | Mixed circle/capsule reducers and conservative fallback admission. |
+| 6 | `Core/3D/GravitasPhysicsService.SupportTypes.cs` | 3 | 3 | 0 | Stable joint keys and ownerless endpoint ordering. |
+| 7 | `Queries/3D/GravitasQuery3DService.Batch.cs` | 3 | 3 | 0 | Batch validation, empty work, and stable aggregate ordering. |
+| 8 | `Core/2D/GravitasPhysics2DService.ContinuousCollision.cs` | 2 | 3 | 0 | CCD queue ownership and stale candidate cleanup. |
+| 9 | `Diagnostics/GravitasDiagnosticSink.Draw.cs` | 2 | 3 | 0 | Draw-buffer limits and deterministic disabled behavior. |
+| 10 | `Materials/PhysicsMaterial.cs` | 2 | 3 | 0 | Combine policy ties, load defaults, and deterministic validation. |
 
 ### Phase 1: Core Runtime And Service Ownership
 
@@ -132,6 +132,9 @@ mid-block merely because another branch looks easier.
 - [x] Close and independently review 3D response island admission, sleeping
       suppression, sparse joint traversal, anchored participants, rootless
       contacts, and single-contact dispatch.
+- [x] Close and independently review the residual 3D response block by fixing
+      the vacuous coincident-center setup and asserting zero-normal rejection
+      through unchanged position, velocity, and warm-start state.
 - [x] Close and independently review the 3D pair lifecycle, including callback
       mutation, per-side admission, exception retry, stale queue snapshots,
       exact exit order, and pooled-lifetime reuse.
@@ -314,6 +317,7 @@ of record.
 | 2D narrow-phase detection | 99.49% | 98.16% | 99.02% | 2,307 | Detection reached 100%; clockwise false negatives and containment depth were corrected; signed interval exits decoupled normals from off-origin host transforms; exact owner manifolds and clip invariants were independently reviewed. |
 | 3D convex support GJK | 99.50% | 98.21% | 99.02% | 2,315 | Convex support reached 100%; exact touching cycles and epsilon simplex outcomes were covered; bounded exhaustion now preserves contact without conservative leakage beyond the fixed-point tolerance band. |
 | Mixed embedded 2D geometry | 99.52% | 98.26% | 99.02% | 2,325 | Embedded boundary geometry reached 100%; authored-first ties, exact boundary distances, authoring invariants, unsupported fallback, and maximum-distance compound candidates were covered and independently reviewed. |
+| 3D degenerate response | 99.53% | 98.31% | 99.02% | 2,325 | Response reached 100% after a vacuous coincident-center regression was corrected; zero-normal/no-fallback contacts now prove no position, velocity, or warm-start mutation under independent review. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.
