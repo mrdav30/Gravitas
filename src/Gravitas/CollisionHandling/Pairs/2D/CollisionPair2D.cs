@@ -20,6 +20,7 @@ internal sealed partial class CollisionPair2D
     private bool _colliderBNotified;
     private SolidBody2D? _pendingBodyA;
     private SolidBody2D? _pendingBodyB;
+    private long _lifetimeVersion;
 
     public CollisionPair2D(LSCollider2D colliderA, LSCollider2D colliderB)
     {
@@ -44,10 +45,13 @@ internal sealed partial class CollisionPair2D
 
     internal bool IsNotificationInProgress => _notificationInProgress;
 
+    internal long LifetimeVersion => _lifetimeVersion;
+
     public ContactManifold2D Manifold { get; } = new();
 
     public void Initialize(LSCollider2D colliderA, LSCollider2D colliderB)
     {
+        _lifetimeVersion++;
         AssignPriority(colliderA, colliderB);
         Id1 = ColliderA.Id;
         Id2 = ColliderB.Id;

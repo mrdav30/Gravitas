@@ -10,7 +10,7 @@ using Xunit;
 
 namespace Gravitas.Tests.Physics2D;
 
-public sealed class SolidBody2DGroundingTests
+public sealed partial class SolidBody2DGroundingTests
 {
     private static readonly Vector2d Up = Vector2d.Forward;
 
@@ -51,6 +51,30 @@ public sealed class SolidBody2DGroundingTests
     }
 
     [Fact]
+    public void CheckGround_InManualMode_ShouldLeaveHostOwnedStateUnchanged()
+    {
+        using GravitasWorldContext context = CreateContext();
+        SolidBody2D body = CreateCircle(context, new Vector2d(Fixed64.Zero, Fixed64.One));
+        Vector2d point = new(Fixed64.Half, Fixed64.Half);
+        Vector2d normal = new(Fixed64.One, Fixed64.One);
+        int groundedChanges = 0;
+        body.OnGrounded += _ => groundedChanges++;
+
+        body.SetManualGrounding(point, normal);
+        groundedChanges.Should().Be(1);
+        body.WasGrounded.Should().BeFalse();
+
+        body.CheckGround();
+
+        body.GroundingMode.Should().Be(GroundingMode.Manual);
+        body.IsGrounded.Should().BeTrue();
+        body.WasGrounded.Should().BeFalse();
+        body.GroundPoint.Should().Be(point);
+        body.GroundNormal.Should().Be(normal.Normalized);
+        groundedChanges.Should().Be(1);
+    }
+
+    [Fact]
     public void UseManualGrounding_ShouldClearStateAndIgnoreAutomaticSupport()
     {
         using GravitasWorldContext context = CreateContext();
@@ -88,6 +112,38 @@ public sealed class SolidBody2DGroundingTests
         body.IsGrounded.Should().BeTrue();
         body.GroundingMode.Should().Be(GroundingMode.Automatic);
         groundedChanges.Should().Be(1);
+    }
+
+    [Fact]
+    public void UseAutomaticGrounding_WhenInactive_ShouldOnlyChangeOwnershipMode()
+    {
+        using GravitasWorldContext context = CreateContext();
+        SolidBody2D body = CreateCircle(context, Vector2d.Zero);
+        body.UseManualGrounding();
+        body.Deactivate();
+
+        body.UseAutomaticGrounding();
+
+        body.Active.Should().BeFalse();
+        body.GroundingMode.Should().Be(GroundingMode.Automatic);
+        body.IsGrounded.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Initialize_WhenReusingManualBody_ShouldNotProbeAutomaticSupport()
+    {
+        using GravitasWorldContext context = CreateContext();
+        CreateStaticFloor(context);
+        SolidBody2D body = CreateCircle(context, new Vector2d(Fixed64.Zero, Fixed64.One));
+        body.UseManualGrounding();
+        body.Deactivate();
+
+        body.Initialize(new Vector2d(Fixed64.Zero, Fixed64.One));
+
+        body.GroundingMode.Should().Be(GroundingMode.Manual);
+        body.IsGrounded.Should().BeFalse();
+        body.GroundPoint.Should().Be(Vector2d.Zero);
+        body.GroundNormal.Should().Be(Vector2d.Zero);
     }
 
     [Fact]
@@ -294,6 +350,25 @@ public sealed class SolidBody2DGroundingTests
     }
 
     [Fact]
+    public void AutomaticRefresh_WhenCachedSupportIsDeactivated_ShouldClearGroundState()
+    {
+        using GravitasWorldContext context = CreateContext();
+        LSAABBoxCollider2D floor = CreateStaticFloor(context, layer: new PhysicsLayer(1));
+        context.Settings.GroundCheckLayerMask = PhysicsLayerMask.FromLayer(1);
+        SolidBody2D body = CreateCircle(context, new Vector2d(Fixed64.Zero, Fixed64.One));
+        body.IsGrounded.Should().BeTrue();
+
+        floor.Deactivate();
+        body.BeginAutomaticGroundingRefresh();
+        body.CompleteAutomaticGroundingRefresh();
+
+        body.IsGrounded.Should().BeFalse();
+        body.WasGrounded.Should().BeTrue();
+        body.GroundPoint.Should().Be(Vector2d.Zero);
+        body.GroundNormal.Should().Be(Vector2d.Zero);
+    }
+
+    [Fact]
     public void ContactGroundCandidate_ShouldRejectLayerMaskedAndLocallyIgnoredSupport()
     {
         using GravitasWorldContext layerContext = CreateContext();
@@ -325,6 +400,27 @@ public sealed class SolidBody2DGroundingTests
         ignoredBody.CompleteAutomaticGroundingRefresh();
 
         ignoredBody.IsGrounded.Should().BeFalse();
+    }
+
+    [Fact]
+    public void ContactGroundCandidate_WithZeroNormal_ShouldBeRejected()
+    {
+        using GravitasWorldContext context = CreateContext();
+        SolidBody2D body = CreateCircle(context, Vector2d.Zero);
+        LSAABBoxCollider2D support = CreateStaticFloor(context);
+        DisableProbeFallback(body);
+
+        body.BeginAutomaticGroundingRefresh();
+        body.TryAcceptContactGroundCandidate(
+            body.Collider,
+            support,
+            CreateGroundContact(1, Vector2d.One, Fixed64.Half, Vector2d.Zero),
+            ownColliderIsA: true);
+        body.CompleteAutomaticGroundingRefresh();
+
+        body.IsGrounded.Should().BeFalse();
+        body.GroundPoint.Should().Be(Vector2d.Zero);
+        body.GroundNormal.Should().Be(Vector2d.Zero);
     }
 
     [Fact]
@@ -462,6 +558,17 @@ public sealed class SolidBody2DGroundingTests
                 reuseFirstSupportForSecondCandidate: true)
             .Should()
             .Be(new Vector2d(Fixed64.Zero, Fixed64.One));
+
+        SubmitCandidatePairAndGetGroundPoint(
+                firstNormal: Up,
+                firstDepth: Fixed64.One,
+                firstContactId: 1,
+                secondNormal: Up,
+                secondDepth: Fixed64.One,
+                secondContactId: 10,
+                reuseFirstSupportForSecondCandidate: true)
+            .Should()
+            .Be(new Vector2d(Fixed64.Zero, Fixed64.One));
     }
 
     [Fact]
@@ -480,6 +587,32 @@ public sealed class SolidBody2DGroundingTests
             e.Kind == GravitasDiagnosticEventKind.GroundProbe
             && e.DataA == (int)GroundProbeMode2D.Ray
             && e.DataB == (int)GravitasColliderDimension.TwoD);
+    }
+
+    [Fact]
+    public void AutomaticProbe_WithUnsupportedColliderShape_ShouldResolveToZeroRadiusRay()
+    {
+        using GravitasWorldContext context = CreateContext();
+        context.Diagnostics.Enable();
+        Vector2d position = new(Fixed64.Zero, Fixed64.One);
+        var agent = new TestMatterAgent(context, new FixedTransform(
+            new Vector3d(position.X, Fixed64.Zero, position.Y),
+            FixedQuaternion.Identity,
+            Vector3d.One));
+        var body = new SolidBody2D(agent, new UnsupportedTestCollider2D())
+        {
+            Mass = Fixed64.One
+        };
+
+        body.Initialize(position);
+
+        body.GroundProbeMode.Should().Be(GroundProbeMode2D.Auto);
+        context.Diagnostics.Events.Length.Should().Be(1);
+        GravitasDiagnosticEvent probe = context.Diagnostics.Events[0];
+        probe.Kind.Should().Be(GravitasDiagnosticEventKind.GroundProbe);
+        probe.DataA.Should().Be((int)GroundProbeMode2D.Ray);
+        probe.ScalarA.Should().Be(Fixed64.Zero);
+        body.IsGrounded.Should().BeFalse();
     }
 
     [Fact]
@@ -563,6 +696,18 @@ public sealed class SolidBody2DGroundingTests
         };
         collider.InitializeWithNoBody(agent);
         return collider;
+    }
+
+    private static void ReinitializeStaticFloor(
+        GravitasWorldContext context,
+        LSAABBoxCollider2D collider,
+        Vector2d position)
+    {
+        var agent = new TestMatterAgent(context, new FixedTransform(
+            new Vector3d(position.X, Fixed64.Zero, position.Y),
+            FixedQuaternion.Identity,
+            Vector3d.One));
+        collider.InitializeWithNoBody(agent);
     }
 
     private static long MeasureAllocatedBytes(Action action)

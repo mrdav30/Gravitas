@@ -112,6 +112,7 @@ public sealed partial class SolidBody2D
             ApplyLoadedState();
             if (!Active)
                 Deactivate();
+            _groundingStateVersion++;
         }
     }
 

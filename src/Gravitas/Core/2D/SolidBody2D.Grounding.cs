@@ -32,6 +32,7 @@ public sealed partial class SolidBody2D
     private bool _isGrounded;
     private bool _wasGrounded;
     private bool _groundedTransitionCapturedForStep;
+    private long _groundingStateVersion;
     private Vector2d _groundNormal;
     private Vector2d _groundPoint;
     private Vector2d _lastGroundedPosition;
@@ -45,7 +46,7 @@ public sealed partial class SolidBody2D
     private ulong _groundContactCandidateId;
     private Vector2d _groundContactCandidateNormal;
     private Vector2d _groundContactCandidatePoint;
-    private LSCollider2D? _groundContactCandidateCollider;
+    private ColliderLifetimeToken2D _groundContactCandidateRegistration;
 
     /// <summary>
     /// Selects whether Gravitas owns planar support detection or preserves host-supplied state.
@@ -217,6 +218,9 @@ public sealed partial class SolidBody2D
     /// </summary>
     public void CheckGround()
     {
+        if (_groundingMode == GroundingMode.Manual)
+            return;
+
         CaptureGroundedTransitionState();
         CheckGround(force: true);
     }
@@ -274,7 +278,7 @@ public sealed partial class SolidBody2D
         _groundContactCandidateId = contact.ContactId;
         _groundContactCandidateNormal = normal;
         _groundContactCandidatePoint = point;
-        _groundContactCandidateCollider = otherCollider;
+        _groundContactCandidateRegistration = new ColliderLifetimeToken2D(otherCollider);
     }
 
     internal void CompleteAutomaticGroundingRefresh()
@@ -285,17 +289,30 @@ public sealed partial class SolidBody2D
             return;
         }
 
-        if (_hasGroundContactCandidate)
+        ColliderLifetimeToken2D candidateRegistration = _groundContactCandidateRegistration;
+        if (_hasGroundContactCandidate
+            && candidateRegistration.IsActive
+            && IsValidGroundCollider(candidateRegistration.Collider))
         {
-            SetGroundingState(
+            var bodyRegistration = new ColliderLifetimeToken2D(Collider);
+            long groundingStateVersion = SetGroundingState(
                 _groundContactCandidatePoint,
                 _groundContactCandidateNormal,
-                _groundContactCandidateCollider);
+                candidateRegistration.Collider);
+            if (!RevalidateAutomaticGroundingWrite(
+                    groundingStateVersion,
+                    bodyRegistration,
+                    candidateRegistration))
+            {
+                return;
+            }
+
             ClearGroundContactCandidate();
             CompleteGroundedStepState();
             return;
         }
 
+        ClearGroundContactCandidate();
         CheckGround(force: false);
         CompleteGroundedStepState();
     }
@@ -364,7 +381,10 @@ public sealed partial class SolidBody2D
             return;
         }
 
-        SetGroundingState(hit.Point, hit.Normal.Normalized, hit.Collider);
+        var bodyRegistration = new ColliderLifetimeToken2D(Collider);
+        var supportRegistration = new ColliderLifetimeToken2D(hit.Collider);
+        long groundingStateVersion = SetGroundingState(hit.Point, hit.Normal.Normalized, hit.Collider);
+        RevalidateAutomaticGroundingWrite(groundingStateVersion, bodyRegistration, supportRegistration);
     }
 
     private bool TryFindGroundHit(
@@ -424,25 +444,21 @@ public sealed partial class SolidBody2D
 
     private bool IsValidGroundHit(Physics2DHit hit)
     {
-        LSCollider2D? hitCollider = hit.Collider;
-        if (hitCollider == null || ReferenceEquals(hitCollider, Collider))
+        LSCollider2D hitCollider = hit.Collider;
+        if (ReferenceEquals(hitCollider, Collider))
             return false;
 
         if (!IsValidGroundCollider(hitCollider))
             return false;
 
         Vector2d up = ResolveGroundUpDirection();
-        Vector2d normal = hit.Normal.MagnitudeSquared > Fixed64.Epsilon
-            ? hit.Normal.Normalized
-            : up;
-        return Vector2d.Dot(normal, up) >= GroundMinNormalDot;
+        return Vector2d.Dot(hit.Normal.Normalized, up) >= GroundMinNormalDot;
     }
 
     private bool IsValidGroundCollider(LSCollider2D collider)
     {
         if (!collider.IsActive
             || collider.IsTrigger
-            || ReferenceEquals(collider, Collider)
             || !Context.Settings.GroundCheckLayerMask.Includes(collider.Layer)
             || !ColliderCollisionFilter.AllowsPhysicalPair(Collider, collider))
         {
@@ -503,11 +519,12 @@ public sealed partial class SolidBody2D
 
     private void ClearGrounding()
     {
-        IsGrounded = false;
+        _groundingStateVersion++;
         _groundNormal = Vector2d.Zero;
         _groundPoint = Vector2d.Zero;
         _groundCollider = null;
         _groundColliderBroadPhaseVersion = 0;
+        IsGrounded = false;
     }
 
     private void ClearGroundingForAutomaticRefresh()
@@ -520,20 +537,21 @@ public sealed partial class SolidBody2D
         CompleteGroundedStepState();
     }
 
-    private void SetGroundingState(Vector2d groundPoint, Vector2d groundNormal, LSCollider2D? groundCollider)
+    private long SetGroundingState(Vector2d groundPoint, Vector2d groundNormal, LSCollider2D? groundCollider)
     {
+        long groundingStateVersion = ++_groundingStateVersion;
         _groundPoint = groundPoint;
-        _groundNormal = groundNormal.MagnitudeSquared > Fixed64.Epsilon
-            ? groundNormal.Normalized
-            : ResolveGroundUpDirection();
+        _groundNormal = groundNormal;
         _lastGroundedPosition = _position;
         _groundCollider = groundCollider;
         _groundColliderBroadPhaseVersion = groundCollider?.BroadPhaseVersion ?? 0;
         IsGrounded = true;
+        return groundingStateVersion;
     }
 
     private void ResetGroundingForInitialize(Vector2d position)
     {
+        _groundingStateVersion++;
         _isGrounded = false;
         _wasGrounded = false;
         _groundedTransitionCapturedForStep = false;
@@ -546,6 +564,29 @@ public sealed partial class SolidBody2D
         ClearGroundContactCandidate();
     }
 
+    private bool RevalidateAutomaticGroundingWrite(
+        long groundingStateVersion,
+        in ColliderLifetimeToken2D bodyRegistration,
+        in ColliderLifetimeToken2D supportRegistration)
+    {
+        if (!bodyRegistration.IsCurrentLifetime)
+            return false;
+
+        if (_groundingStateVersion != groundingStateVersion)
+            return true;
+
+        if (_groundingMode == GroundingMode.Automatic
+            && (!bodyRegistration.IsActive
+                || !CanUseAutomaticGrounding
+                || !supportRegistration.IsActive
+                || !IsValidGroundCollider(supportRegistration.Collider)))
+        {
+            ClearGrounding();
+        }
+
+        return bodyRegistration.IsCurrentLifetime;
+    }
+
     private void ClearGroundContactCandidate()
     {
         _hasGroundContactCandidate = false;
@@ -555,7 +596,7 @@ public sealed partial class SolidBody2D
         _groundContactCandidateId = ulong.MaxValue;
         _groundContactCandidateNormal = Vector2d.Zero;
         _groundContactCandidatePoint = Vector2d.Zero;
-        _groundContactCandidateCollider = null;
+        _groundContactCandidateRegistration = default;
     }
 
     private int CompareGroundContactCandidate(
