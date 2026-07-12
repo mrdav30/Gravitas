@@ -22,25 +22,27 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-world-context-final-full/d5ac39b7-9fdf-41db-b645-e8e87d2cea97/coverage.cobertura.xml`.
+`TestResults/coverage-raycast-segment-reviewed-full/11a52c28-2cee-41d4-840b-dc5df9015fd6/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
-| Lines | 99.3% | 25,574 / 25,756 | 182 | 100% |
-| Branches | 97.1% | 9,810 / 10,104 | 294 | 100% |
+| Lines | 99.3% | 25,576 / 25,754 | 178 | 100% |
+| Branches | 97.2% | 9,814 / 10,100 | 286 | 100% |
 | Methods | 98.9% | 3,393 / 3,431 | 38 | 100% |
 
-The full coverage-enabled `Release` suite passes 2,165/2,165 tests, and
+The full coverage-enabled `Release` suite passes 2,172/2,172 tests, and
 `ReleaseLean` builds both targets without warnings. Branch coverage is now the
 primary constraint, but the remaining line and method gaps must close from the
 same final artifact.
 
 ### Immediate Next Block
 
-Finish `src/Gravitas/Queries/3D/RaycastSegmentWorker.cs` before changing
-target. The current artifact reports four uncovered lines and eight uncovered
-branch outcomes in this file. Trace segment reduction, filtering, stale
-candidate handling, ties, and deterministic hit ordering as one query contract.
+Finish `src/Gravitas/Core/2D/GravitasPhysics2DService.Pairs.cs` before
+changing target. The current artifact reports two uncovered lines and ten
+uncovered branch outcomes in this file. Trace 2D pair identity, creation,
+notification, cleanup, pooling, and stale-reference ownership as one lifecycle
+contract; include its live response counterpart when a branch crosses that
+boundary.
 
 ## Rules Of Engagement
 
@@ -105,14 +107,14 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | `Queries/3D/RaycastSegmentWorker.cs` | 4 | 8 | 0 | Segment reduction, filtering, and hit ordering. |
-| 2 | `Core/2D/GravitasPhysics2DService.Pairs.cs` | 2 | 10 | 0 | 2D pair creation, ordering, and cleanup. |
-| 3 | `Core/2D/SolidBody2D.Grounding.cs` | 2 | 9 | 0 | Planar support refresh and grounding transitions. |
-| 4 | `Core/3D/SolidBody.Motion.cs` | 1 | 9 | 1 | Fixed-step body motion and state transitions. |
-| 5 | `Colliders/2D/LSPolygonCollider2D.cs` | 4 | 7 | 0 | Authored polygon validation and geometry. |
-| 6 | `Core/3D/GravitasPhysicsService.Pairs.cs` | 4 | 7 | 0 | 3D pair creation, ordering, and cleanup. |
-| 7 | `Core/Mixed/GravitasMixedCollisionService.Pairs.cs` | 5 | 6 | 0 | Mixed pair ownership and cleanup. |
-| 8 | `CollisionHandling/Contacts/3D/ContactManifold.cs` | 6 | 1 | 4 | Manifold construction, mutation, and reduction. |
+| 1 | `Core/2D/GravitasPhysics2DService.Pairs.cs` | 2 | 10 | 0 | 2D pair creation, ordering, and cleanup. |
+| 2 | `Core/2D/SolidBody2D.Grounding.cs` | 2 | 9 | 0 | Planar support refresh and grounding transitions. |
+| 3 | `Core/3D/SolidBody.Motion.cs` | 1 | 9 | 1 | Fixed-step body motion and state transitions. |
+| 4 | `Colliders/2D/LSPolygonCollider2D.cs` | 4 | 7 | 0 | Authored polygon validation and geometry. |
+| 5 | `Core/3D/GravitasPhysicsService.Pairs.cs` | 4 | 7 | 0 | 3D pair creation, ordering, and cleanup. |
+| 6 | `Core/Mixed/GravitasMixedCollisionService.Pairs.cs` | 5 | 6 | 0 | Mixed pair ownership and cleanup. |
+| 7 | `CollisionHandling/Contacts/3D/ContactManifold.cs` | 6 | 1 | 4 | Manifold construction, mutation, and reduction. |
+| 8 | `Core/3D/GravitasPhysicsService.Response.cs` | 2 | 8 | 0 | 3D response dispatch and suppression. |
 
 ### Phase 1: Core Runtime And Service Ownership
 
@@ -140,7 +142,7 @@ incorrectly.
 - [x] Complete `CollisionDetection.Mesh.cs` through public collision workflows
       for meaningful dispatch, topology, separation, and contact-reduction
       outcomes.
-- [ ] Complete `RaycastSegmentWorker.cs` with exact hit, miss, filtering,
+- [x] Complete `RaycastSegmentWorker.cs` with exact hit, miss, filtering,
       stale-candidate, tie, and deterministic ordering assertions.
 - [ ] Reassess the mixed circle-against-3D reducers, cuboid detection, 2D
       detection, and polygon geometry after each fresh artifact.
@@ -264,6 +266,7 @@ of record.
 | 3D mesh detection | 99.3% | 96.9% | 98.9% | 2,156 | Convex sphere and SAT outcomes covered, callerless wrapper removed, fallback signal strengthened, and disconnected-convex false-positive tracked. |
 | 2D CCD helpers | 99.3% | 97.0% | 98.9% | 2,163 | Inheritance, closing, static/kinematic, and mixed policies covered; impossible geometry and duplicate hit guards removed. |
 | World context | 99.3% | 97.1% | 98.9% | 2,165 | Ownership validation and disposal serialized; disabled phases preserve pending CCD handoffs; strong disposal-scoped registry contract documented and independently reviewed. |
+| 3D raycast segment worker | 99.3% | 97.2% | 98.9% | 2,172 | Fixed-point tangent false negative corrected; finite cone, OBB, mesh-plane, disabled-output, duplicate, and root-bound outcomes closed with mutation-sensitive review. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.
