@@ -73,8 +73,6 @@ public sealed class PhysicsPartition2D : IVoxelPartition, IRetainedPhysicsPartit
         IsPartitioned = true;
     }
 
-    public void OnChange() { }
-
     internal void Distribute(
         SwiftList<int> dynamicIds,
         SwiftList<int> staticIds)

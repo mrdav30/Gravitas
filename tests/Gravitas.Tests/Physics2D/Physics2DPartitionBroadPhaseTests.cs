@@ -703,6 +703,59 @@ public sealed class Physics2DPartitionBroadPhaseTests
     }
 
     [Fact]
+    public void SpuriousPartitionMutations_ShouldPreserveTrackedLifecycleAndEmitDiagnostics()
+    {
+        var unattached = new PhysicsPartition2D();
+        unattached.SetDynamicObjectAwake(99, awake: true);
+        unattached.ContainedDynamicObjects.Should().BeNull();
+        unattached.ContainedAwakeDynamicObjects.Should().BeNull();
+
+        using GravitasWorldContext context = CreateContext(extent: 16);
+        SolidBody2D body = CreateCircle(context, Vector2d.Zero, immovable: false);
+        PhysicsPartition2D partition = GetFirstPartition(context, body.Collider);
+        int activationId = partition.ActivationId;
+        int activePartitionCount = context.Collisions2D.ActivePartitionCount;
+        int retainedPartitionCount = context.Collisions2D.RetainedPartitionCount;
+        bool originalDebugLogging = GravitasLogger.EnableDebugLogging;
+        DiagnosticLevel originalMinimumLevel = GravitasLogger.MinimumLevel;
+        Action<DiagnosticLevel, string, string> originalLogHandler = GravitasLogger.LogHandler;
+        var entries = new List<(DiagnosticLevel Level, string Message)>();
+
+        try
+        {
+            GravitasLogger.EnableDebugLogging = true;
+            GravitasLogger.MinimumLevel = DiagnosticLevel.Info;
+            GravitasLogger.LogHandler = (level, message, _) => entries.Add((level, message));
+
+            partition.RemoveDynamicObject(99);
+            partition.RemoveStaticObject(99);
+            partition.RemoveKinematicObject(99);
+
+            partition.ActivationId.Should().Be(activationId);
+            partition.IsPartitioned.Should().BeTrue();
+            partition.EmptySinceFrame.Should().Be(-1);
+            partition.ContainedDynamicObjects!.Should().Contain(body.Collider.Id);
+            partition.ContainedStaticObjects.Should().BeNull();
+            partition.ContainedKinematicObjects.Should().BeNull();
+            partition.ContainsAwakeDynamicObject(body.Collider.Id).Should().BeTrue();
+            partition.AwakeDynamicObjectCount.Should().Be(1);
+            context.Collisions2D.ActivePartitionCount.Should().Be(activePartitionCount);
+            context.Collisions2D.RetainedPartitionCount.Should().Be(retainedPartitionCount);
+            entries.Should().HaveCount(3);
+            entries.Should().OnlyContain(entry => entry.Level == DiagnosticLevel.Info);
+            entries.Should().Contain(entry => entry.Message.Contains("2D dynamic item not removed - 99", StringComparison.Ordinal));
+            entries.Should().Contain(entry => entry.Message.Contains("2D static item not removed - 99", StringComparison.Ordinal));
+            entries.Should().Contain(entry => entry.Message.Contains("2D kinematic item not removed - 99", StringComparison.Ordinal));
+        }
+        finally
+        {
+            GravitasLogger.LogHandler = originalLogHandler;
+            GravitasLogger.MinimumLevel = originalMinimumLevel;
+            GravitasLogger.EnableDebugLogging = originalDebugLogging;
+        }
+    }
+
+    [Fact]
     public void ResetRetainedMembership_WithFreshPartition_ShouldBeIdempotent()
     {
         var partition = new PhysicsPartition2D();
