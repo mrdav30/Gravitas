@@ -22,27 +22,25 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-task25-authoritative-reviewed-full/ed2be684-f789-41e3-b478-bf2746374fde/coverage.cobertura.xml`.
+`TestResults/coverage-task26-authoritative-reviewed-full-rerun/16e93cd6-e459-4fb6-8005-72c0ae1f2327/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
-| Lines | 99.57% | 26,168 / 26,279 | 111 | 100% |
-| Branches | 98.54% | 10,166 / 10,316 | 150 | 100% |
+| Lines | 99.59% | 26,172 / 26,279 | 107 | 100% |
+| Branches | 98.58% | 10,170 / 10,316 | 146 | 100% |
 | Methods | 99.02% | 3,435 / 3,469 | 34 | 100% |
 
-The full coverage-enabled `Release` suite passes 2,338/2,338 tests, and
+The full coverage-enabled `Release` suite passes 2,340/2,340 tests, and
 `ReleaseLean` builds both targets without warnings. Branch coverage is now the
 primary constraint, but the remaining line and method gaps must close from the
 same final artifact.
 
 ### Immediate Next Block
 
-Finish
-`src/Gravitas/Queries/Mixed/GravitasQueryMixedService.CircleAgainst3DReducers.cs`
-before changing target. The current artifact reports four uncovered lines and
-four uncovered branch outcomes. Treat exact reducer selection, slab admission,
-conservative fallback, fixed-point boundary handling, and stable result
-metadata as one mixed-query geometry contract.
+Finish `src/Gravitas/Core/3D/GravitasPhysicsService.SupportTypes.cs` before
+changing target. The current artifact reports three uncovered lines and four
+uncovered branch outcomes. Treat stable joint-key equality, endpoint ordering,
+ownerless bodies, and deterministic hashing as one service-identity contract.
 
 ## Rules Of Engagement
 
@@ -86,6 +84,8 @@ For each source block:
 4. Run the narrowest affected test classes.
 5. Collect focused coverage and confirm the intended source block reaches 100%
    line, branch, and method coverage.
+   Rebuild restored production source first after every temporary mutation and
+   reject artifacts whose module hash or IL offsets do not match that build.
 6. Run the full coverage-enabled `Release` suite.
 7. Run `ReleaseLean` when serialization, MemoryPack shims, conditional
    compilation, or package shape is touched.
@@ -107,16 +107,16 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | `Queries/Mixed/GravitasQueryMixedService.CircleAgainst3DReducers.cs` | 4 | 4 | 0 | Mixed circle/capsule reducers and conservative fallback admission. |
-| 2 | `Core/3D/GravitasPhysicsService.SupportTypes.cs` | 3 | 4 | 0 | Stable joint keys and ownerless endpoint ordering. |
-| 3 | `Colliders/3D/LSMeshCollider.cs` | 1 | 4 | 0 | Authored topology validation and empty/degenerate ownership. |
-| 4 | `Constraints/2D/GravitasConstraint2DService.cs` | 1 | 4 | 0 | Endpoint ownership and stale registration outcomes. |
-| 5 | `Constraints/2D/Joint2D.cs` | 1 | 4 | 0 | Constrained endpoint and lifecycle admission. |
-| 6 | `Partitions/2D/PhysicsPartition2D.cs` | 1 | 4 | 0 | Partition membership and retained-owner outcomes. |
-| 7 | `Partitions/3D/PhysicsPartition.cs` | 1 | 4 | 0 | 3D partition membership and retained-owner outcomes. |
-| 8 | `Queries/2D/GravitasQuery2DService.Overlap.cs` | 1 | 4 | 0 | Overlap filtering, empty candidates, and stable admission. |
-| 9 | `Queries/3D/Sweeps/ConvexSweepQueryWorker.cs` | 4 | 3 | 0 | Degenerate simplex and conservative sweep outcomes. |
-| 10 | `Queries/3D/GravitasQuery3DService.Batch.cs` | 3 | 3 | 0 | Batch validation, empty work, and stable aggregate ordering. |
+| 1 | `Core/3D/GravitasPhysicsService.SupportTypes.cs` | 3 | 4 | 0 | Stable joint keys and ownerless endpoint ordering. |
+| 2 | `Colliders/3D/LSMeshCollider.cs` | 1 | 4 | 0 | Authored topology validation and empty/degenerate ownership. |
+| 3 | `Constraints/2D/GravitasConstraint2DService.cs` | 1 | 4 | 0 | Endpoint ownership and stale registration outcomes. |
+| 4 | `Constraints/2D/Joint2D.cs` | 1 | 4 | 0 | Constrained endpoint and lifecycle admission. |
+| 5 | `Partitions/2D/PhysicsPartition2D.cs` | 1 | 4 | 0 | Partition membership and retained-owner outcomes. |
+| 6 | `Partitions/3D/PhysicsPartition.cs` | 1 | 4 | 0 | 3D partition membership and retained-owner outcomes. |
+| 7 | `Queries/2D/GravitasQuery2DService.Overlap.cs` | 1 | 4 | 0 | Overlap filtering, empty candidates, and stable admission. |
+| 8 | `Queries/3D/Sweeps/ConvexSweepQueryWorker.cs` | 4 | 3 | 0 | Degenerate simplex and conservative sweep outcomes. |
+| 9 | `Queries/3D/GravitasQuery3DService.Batch.cs` | 3 | 3 | 0 | Batch validation, empty work, and stable aggregate ordering. |
+| 10 | `Colliders/2D/LSCollider2D.ReplayHash.cs` | 2 | 3 | 0 | Replay identity modes and omitted runtime ownership. |
 
 ### Phase 1: Core Runtime And Service Ownership
 
@@ -189,8 +189,11 @@ incorrectly.
       including unsupported-shape fallback, round coincident directions,
       authored-first ties, exact polygon edges, valid authoring invariants, and
       the `Fixed64.MaxValue` first-candidate sentinel regression.
-- [ ] Reassess the mixed circle-against-3D reducers,
-      `AxisProjectionHelper`, and remaining geometry after each fresh artifact.
+- [x] Close and independently review mixed circle-against-3D reducers through
+      compound vertical separation, end-cap planar misses, nearest mesh
+      distance, and both BVH-authored tie outcomes.
+- [ ] Reassess `AxisProjectionHelper` and remaining geometry after each fresh
+      artifact.
 - [ ] Delete reducer permutations or fallback branches that valid authored
       shapes and validated callers cannot reach.
 
@@ -341,6 +344,7 @@ of record.
 | Retained partition lifecycle | 99.56% | 98.45% | 99.02% | 2,334 | Retirement reached 100%; stale indices, foreign and occupied partitions, missing attachments, and partial removal-callback failures were covered; impossible concurrent removal bookkeeping was simplified after independent review. |
 | 2D response closure | 99.57% | 98.49% | 99.02% | 2,337 | Response reached 100%; both trigger orderings, frozen contact-axis rejection, frictionless preservation, and near-zero tangent mobility were covered; algebraically redundant friction-limit branches were removed after mutation-sensitive review. |
 | Diagnostic sink closure | 99.57% | 98.54% | 99.02% | 2,338 | Diagnostics reached 100%; successful ground-probe identity and geometry were covered; redundant summary enablement, mixed-contact hit, and implicit 2D inference branches were removed after complete call-graph review. |
+| Mixed circle reducer closure | 99.59% | 98.58% | 99.02% | 2,340 | Reducers reached 100%; vertical and planar capsule misses, nearest mesh selection, and both BVH-authored tie outcomes were covered. A stale mutation-built artifact was rejected and replaced with clean focused and full evidence. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.
