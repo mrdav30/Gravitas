@@ -135,23 +135,20 @@ public sealed class LSPolygonCollider2D : LSCollider2D
 
         Fixed64 area = signedDoubleArea.Abs() * Fixed64.Half;
         Fixed64 density = mass / area;
-        Fixed64 originIntegral = Fixed64.Zero;
+        Fixed64 centeredIntegral = Fixed64.Zero;
         for (int i = 0; i < _localVertices.Length; i++)
         {
-            Vector2d a = GetMassPropertyVertex(i);
-            Vector2d b = GetMassPropertyVertex((i + 1) % _localVertices.Length);
+            Vector2d a = GetMassPropertyVertex(i) - centerOfMass;
+            Vector2d b = GetMassPropertyVertex((i + 1) % _localVertices.Length) - centerOfMass;
             Fixed64 cross = Vector2d.CrossProduct(a, b);
             Fixed64 term =
                 a.MagnitudeSquared +
                 Vector2d.Dot(a, b) +
                 b.MagnitudeSquared;
-            originIntegral += cross * term;
+            centeredIntegral += cross * term;
         }
 
-        Fixed64 momentAboutOrigin = (density * originIntegral).Abs() / (Fixed64)12;
-        Fixed64 momentAboutCenterOfMass = momentAboutOrigin - mass * centerOfMass.MagnitudeSquared;
-        if (momentAboutCenterOfMass < Fixed64.Zero && momentAboutCenterOfMass.Abs() <= Fixed64.Epsilon)
-            momentAboutCenterOfMass = Fixed64.Zero;
+        Fixed64 momentAboutCenterOfMass = (density * centeredIntegral).Abs() / (Fixed64)12;
 
         return ApplyParallelAxis(
             momentAboutCenterOfMass,
