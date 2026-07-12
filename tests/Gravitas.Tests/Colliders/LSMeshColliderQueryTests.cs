@@ -186,8 +186,8 @@ public sealed class LSMeshColliderQueryTests
         var hits = new SwiftList<Vector3d>();
 
         worker.PrepareSegmentCheck(
-            new Vector3d(Fixed64.FromFraction(1, 10), Fixed64.FromFraction(3, 5), Fixed64.Quarter),
-            new Vector3d(Fixed64.FromFraction(3, 5), Fixed64.FromFraction(1, 10), Fixed64.Quarter));
+            new Vector3d(Fixed64.FromFraction(3, 20), Fixed64.FromFraction(7, 20), Fixed64.FromFraction(13, 20)),
+            new Vector3d(Fixed64.FromFraction(7, 20), Fixed64.FromFraction(3, 20), Fixed64.FromFraction(13, 20)));
 
         bool hit = mesh.ColliderOverlapsRay(worker, ref hits);
 
