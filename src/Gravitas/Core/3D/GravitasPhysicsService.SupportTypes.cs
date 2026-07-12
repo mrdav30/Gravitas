@@ -15,16 +15,15 @@ namespace Gravitas;
 public sealed partial class GravitasPhysicsService
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool IsMovableIslandBody(SolidBody? body) =>
-        body != null && body.DynamicId >= 0 && body.CanTranslate;
+    private static bool IsMovableIslandBody(SolidBody body) => body.CanTranslate;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool HasAwakeResponseParticipant(CollisionPair pair) =>
-        IsAwakeIslandBody(pair.ColliderA.Body) || IsAwakeIslandBody(pair.ColliderB.Body);
+        IsAwakeIslandBody(pair.ColliderA.Body!) || IsAwakeIslandBody(pair.ColliderB.Body!);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool IsAwakeIslandBody(SolidBody? body) =>
-        IsMovableIslandBody(body) && body!.IsAwakeForCollision;
+    private static bool IsAwakeIslandBody(SolidBody body) =>
+        IsMovableIslandBody(body) && body.IsAwakeForCollision;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void GetStablePairKey(CollisionPair pair, out int minColliderId, out int maxColliderId)

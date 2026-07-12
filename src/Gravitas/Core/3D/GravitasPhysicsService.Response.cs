@@ -69,8 +69,8 @@ public sealed partial class GravitasPhysicsService
         for (int i = 0; i < _discreteResponsePairs.Count; i++)
         {
             CollisionPair pair = _discreteResponsePairs[i];
-            AddIslandNodeIfMovable(pair.ColliderA.Body);
-            AddIslandNodeIfMovable(pair.ColliderB.Body);
+            AddIslandNodeIfMovable(pair.ColliderA.Body!);
+            AddIslandNodeIfMovable(pair.ColliderB.Body!);
         }
 
         AddJointIslandNodes();
@@ -82,8 +82,8 @@ public sealed partial class GravitasPhysicsService
         for (int i = 0; i < _discreteResponsePairs.Count; i++)
         {
             CollisionPair pair = _discreteResponsePairs[i];
-            int nodeA = FindIslandNode(pair.ColliderA.Body);
-            int nodeB = FindIslandNode(pair.ColliderB.Body);
+            int nodeA = FindIslandNode(pair.ColliderA.Body!);
+            int nodeB = FindIslandNode(pair.ColliderB.Body!);
             if (nodeA >= 0 && nodeB >= 0)
                 UnionIslandNodes(nodeA, nodeB);
         }
@@ -95,8 +95,8 @@ public sealed partial class GravitasPhysicsService
         for (int i = 0; i < _discreteResponsePairs.Count; i++)
         {
             CollisionPair pair = _discreteResponsePairs[i];
-            int nodeA = FindIslandNode(pair.ColliderA.Body);
-            int nodeB = FindIslandNode(pair.ColliderB.Body);
+            int nodeA = FindIslandNode(pair.ColliderA.Body!);
+            int nodeB = FindIslandNode(pair.ColliderB.Body!);
             int rootKey = ResolveConstraintRootKey(nodeA, nodeB);
             if (rootKey < 0)
                 continue;
@@ -161,23 +161,23 @@ public sealed partial class GravitasPhysicsService
         }
     }
 
-    private void AddIslandNodeIfMovable(SolidBody? body)
+    private void AddIslandNodeIfMovable(SolidBody body)
     {
         if (!IsMovableIslandBody(body))
             return;
 
-        _discreteIslandNodes.Add(new DiscreteIslandNode(body!.DynamicId, body));
+        _discreteIslandNodes.Add(new DiscreteIslandNode(body.DynamicId, body));
     }
 
     private void SortAndDeduplicateIslandNodes() =>
         IslandGraphUtility.SortAndDeduplicate(_discreteIslandNodes, IslandNodeComparer);
 
-    private int FindIslandNode(SolidBody? body)
+    private int FindIslandNode(SolidBody body)
     {
         if (!IsMovableIslandBody(body))
             return -1;
 
-        return IslandGraphUtility.Find(_discreteIslandNodes, body!.DynamicId);
+        return IslandGraphUtility.Find(_discreteIslandNodes, body.DynamicId);
     }
 
     private void UnionIslandNodes(int nodeA, int nodeB) =>
