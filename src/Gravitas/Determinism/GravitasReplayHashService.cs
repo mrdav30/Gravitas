@@ -27,12 +27,17 @@ internal static class GravitasReplayHashService
         writer.WriteFixed64(context.TotalTime);
         writer.WriteInt32(context.LateSimulateToken);
 
+        PhysicsRuntimeMode runtimeMode = context.Settings.RuntimeMode;
+        if (runtimeMode.Runs3D())
+            context.Physics.PrepareReplayColliders();
+        if (runtimeMode.Runs2D())
+            context.Physics2D.PrepareReplayColliders();
+
         context.Settings.ContributeReplayHash(ref writer);
         context.Environment.ContributeReplayHash(ref writer);
         context.Constraints3D.ContributeReplayHash(ref writer, mode);
         context.Constraints2D.ContributeReplayHash(ref writer, mode);
 
-        PhysicsRuntimeMode runtimeMode = context.Settings.RuntimeMode;
         if (runtimeMode.Runs3D())
             context.Physics.ContributeReplayHash(ref writer, mode);
         if (runtimeMode.Runs2D())
