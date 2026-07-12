@@ -515,6 +515,41 @@ public sealed class ReplayHashBranchCoverageTests
     }
 
     [Fact]
+    public void Collider3DReplayHash_ShouldDistinguishLive3DAnd2DParentsAndClearToBaseline()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        LSSphereCollider child = CreateBodylessSphere3D(context, -Vector3d.Right);
+        LSSphereCollider parent3D = CreateBodylessSphere3D(context, Vector3d.Zero);
+        LSCircleCollider2D firstRemoved = CreateBodylessCircle2D(context, new Vector2d((Fixed64)8, Fixed64.Zero));
+        LSCircleCollider2D secondRemoved = CreateBodylessCircle2D(context, new Vector2d((Fixed64)9, Fixed64.Zero));
+        LSCircleCollider2D thirdRemoved = CreateBodylessCircle2D(context, new Vector2d((Fixed64)10, Fixed64.Zero));
+        firstRemoved.Deactivate();
+        thirdRemoved.Deactivate();
+        secondRemoved.Deactivate();
+        _ = CreateBodylessCircle2D(context, -Vector2d.Right);
+        LSCircleCollider2D parent2D = CreateBodylessCircle2D(context, Vector2d.Zero);
+        context.Physics.PrepareReplayColliders();
+        context.Physics2D.PrepareReplayColliders();
+        parent3D.ReplayOrdinal.Should().Be(parent2D.ReplayOrdinal);
+        parent2D.Id.Should().NotBe(parent2D.ReplayOrdinal);
+        ChronicleHash baseline = HashCollider3D(child, GravitasReplayHashMode.Authoritative);
+
+        child.SetParent(parent3D);
+        ChronicleHash parent3DHash = HashCollider3D(child, GravitasReplayHashMode.Authoritative);
+        child.ClearParent();
+        ChronicleHash cleared = HashCollider3D(child, GravitasReplayHashMode.Authoritative);
+        child.SetParent(parent2D);
+        ChronicleHash parent2DHash = HashCollider3D(child, GravitasReplayHashMode.Authoritative);
+        ChronicleHash compactParent2DHash = Hash3DChildWithCompact2DParent();
+
+        parent3DHash.Should().NotBe(baseline);
+        cleared.Should().Be(baseline);
+        parent2DHash.Should().NotBe(baseline);
+        parent2DHash.Should().NotBe(parent3DHash);
+        parent2DHash.Should().Be(compactParent2DHash);
+    }
+
+    [Fact]
     public void ComputeReplayHash_WithSeparatedAndPairedMixedStates_ShouldHashStableAuthoritativeState()
     {
         (ChronicleHash Hash, int PairCount) separated = HashMixedPairPresence(overlapping: false);
@@ -714,6 +749,18 @@ public sealed class ReplayHashBranchCoverageTests
         child2D.SetParent(parent3D);
         child3D.SetParent(parent2D);
         return context;
+    }
+
+    private static ChronicleHash Hash3DChildWithCompact2DParent()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        LSSphereCollider child = CreateBodylessSphere3D(context, -Vector3d.Right);
+        _ = CreateBodylessCircle2D(context, -Vector2d.Right);
+        LSCircleCollider2D parent = CreateBodylessCircle2D(context, Vector2d.Zero);
+        context.Physics.PrepareReplayColliders();
+        context.Physics2D.PrepareReplayColliders();
+        child.SetParent(parent);
+        return HashCollider3D(child, GravitasReplayHashMode.Authoritative);
     }
 
     private static CollisionPairMixed CreateReplayOrdinalMixedPair(GravitasWorldContext context)
@@ -1028,6 +1075,9 @@ public sealed class ReplayHashBranchCoverageTests
     }
 
     private static ChronicleHash HashCollider2D(LSCollider2D collider, GravitasReplayHashMode mode) =>
+        Hash((ref ChronicleHashWriter writer) => collider.ContributeReplayHash(ref writer, mode));
+
+    private static ChronicleHash HashCollider3D(LSCollider collider, GravitasReplayHashMode mode) =>
         Hash((ref ChronicleHashWriter writer) => collider.ContributeReplayHash(ref writer, mode));
 
     private static ChronicleHash HashBody3D(SolidBody body, GravitasReplayHashMode mode) =>
