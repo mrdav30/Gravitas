@@ -147,13 +147,6 @@ internal static class MixedEmbedded2DGeometry
         out Fixed64 distance)
     {
         int vertexCount = convex.VertexCount;
-        if (vertexCount <= 0)
-        {
-            boundary = default;
-            distance = Fixed64.Zero;
-            return false;
-        }
-
         Vector2d bestPoint = convex.GetVertexUnchecked(0);
         Fixed64 bestDistanceSquared = Fixed64.MaxValue;
         for (int i = 0; i < vertexCount; i++)
@@ -201,12 +194,12 @@ internal static class MixedEmbedded2DGeometry
         for (int i = 0; i < compound.PartCount; i++)
         {
             LSCollider2D part = compound.GetPartCollider(i);
-            if ((containingPartsOnly && !part.ContainsPoint(point))
-                || !TryGetPlanarBoundaryPoint(part, point, out Vector2d candidate, out Fixed64 candidateDistance)
-                || candidateDistance >= bestDistance)
-            {
+            if (containingPartsOnly && !part.ContainsPoint(point))
                 continue;
-            }
+
+            TryGetPlanarBoundaryPoint(part, point, out Vector2d candidate, out Fixed64 candidateDistance);
+            if (candidateDistance >= bestDistance)
+                continue;
 
             boundary = candidate;
             distance = candidateDistance;
