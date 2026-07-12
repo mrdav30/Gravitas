@@ -22,25 +22,25 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-task31-authoritative-reviewed-full/373e714e-81ff-46de-9270-ba9bbec78f30/coverage.cobertura.xml`.
+`TestResults/coverage-task32-authoritative-reviewed-full/ef6cb499-f056-4364-b346-0380eddd6d81/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
-| Lines | 99.61% | 26,168 / 26,268 | 100 | 100% |
-| Branches | 98.78% | 10,172 / 10,298 | 126 | 100% |
-| Methods | 99.08% | 3,435 / 3,467 | 32 | 100% |
+| Lines | 99.62% | 26,168 / 26,267 | 99 | 100% |
+| Branches | 98.82% | 10,176 / 10,298 | 122 | 100% |
+| Methods | 99.11% | 3,435 / 3,466 | 31 | 100% |
 
-The full coverage-enabled `Release` suite passes 2,347/2,347 tests, and
+The full coverage-enabled `Release` suite passes 2,348/2,348 tests, and
 `ReleaseLean` builds both targets without warnings. Branch coverage is now the
 primary constraint, but the remaining line and method gaps must close from the
 same final artifact.
 
 ### Immediate Next Block
 
-Finish `src/Gravitas/Partitions/3D/PhysicsPartition.cs` before changing target.
-The current artifact reports one uncovered line and four uncovered branch
-outcomes. Treat static, kinematic, and dynamic membership, owner-world identity,
-reset/reuse, and deterministic distribution as one 3D partition contract.
+Finish `src/Gravitas/Queries/2D/GravitasQuery2DService.Overlap.cs` before
+changing target. The current artifact reports one uncovered line and four
+uncovered branch outcomes. Treat filtering, empty candidates, stable admission,
+and caller-owned result behavior as one deterministic 2D overlap contract.
 
 ## Rules Of Engagement
 
@@ -107,16 +107,16 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | `Partitions/3D/PhysicsPartition.cs` | 1 | 4 | 0 | 3D partition membership and retained-owner outcomes. |
-| 2 | `Queries/2D/GravitasQuery2DService.Overlap.cs` | 1 | 4 | 0 | Overlap filtering, empty candidates, and stable admission. |
-| 3 | `Queries/3D/Sweeps/ConvexSweepQueryWorker.cs` | 4 | 3 | 0 | Degenerate simplex and conservative sweep outcomes. |
-| 4 | `Queries/3D/GravitasQuery3DService.Batch.cs` | 3 | 3 | 0 | Batch validation, empty work, and stable aggregate ordering. |
-| 5 | `Colliders/2D/LSCollider2D.ReplayHash.cs` | 2 | 3 | 0 | Replay identity modes and omitted runtime ownership. |
-| 6 | `Colliders/3D/LSCollider.ReplayHash.cs` | 2 | 3 | 0 | Replay identity modes and omitted runtime ownership. |
-| 7 | `Constraints/3D/JointSolver3D.cs` | 2 | 3 | 0 | Joint row admission and constrained impulse outcomes. |
-| 8 | `Core/2D/GravitasPhysics2DService.ContinuousCollision.cs` | 2 | 3 | 0 | CCD queue ownership and stale candidate cleanup. |
-| 9 | `Core/2D/SolidBody2D.ContinuousCollision.Rotational.cs` | 2 | 3 | 0 | Rotational sweep admission and fixed-point fallback. |
-| 10 | `Diagnostics/GravitasDiagnosticSink.Draw.cs` | 2 | 3 | 0 | Draw-buffer limits and deterministic disabled behavior. |
+| 1 | `Queries/2D/GravitasQuery2DService.Overlap.cs` | 1 | 4 | 0 | Overlap filtering, empty candidates, and stable admission. |
+| 2 | `Queries/3D/Sweeps/ConvexSweepQueryWorker.cs` | 3 | 3 | 0 | Degenerate simplex and conservative sweep outcomes. |
+| 3 | `Queries/3D/GravitasQuery3DService.Batch.cs` | 3 | 3 | 0 | Batch validation, empty work, and stable aggregate ordering. |
+| 4 | `Colliders/2D/LSCollider2D.ReplayHash.cs` | 2 | 3 | 0 | Replay identity modes and omitted runtime ownership. |
+| 5 | `Colliders/3D/LSCollider.ReplayHash.cs` | 2 | 3 | 0 | Replay identity modes and omitted runtime ownership. |
+| 6 | `Constraints/3D/JointSolver3D.cs` | 2 | 3 | 0 | Joint row admission and constrained impulse outcomes. |
+| 7 | `Core/2D/GravitasPhysics2DService.ContinuousCollision.cs` | 2 | 3 | 0 | CCD queue ownership and stale candidate cleanup. |
+| 8 | `Core/2D/SolidBody2D.ContinuousCollision.Rotational.cs` | 2 | 3 | 0 | Rotational sweep admission and fixed-point fallback. |
+| 9 | `Core/2D/SolidBody2D.Motion.cs` | 2 | 3 | 0 | Frozen-axis motion and deterministic sleep admission. |
+| 10 | `Support/Coroutines/GravitasCoroutineService.cs` | 1 | 3 | 0 | Completion, cancellation, and context ownership. |
 
 ### Phase 1: Core Runtime And Service Ownership
 
@@ -169,6 +169,9 @@ mid-block merely because another branch looks easier.
 - [x] Close and independently review 2D partition spurious-removal diagnostics,
       awake-membership no-op state, and retained lifecycle invariants; delete
       the obsolete GridForge `OnChange` method.
+- [x] Close and independently review the matching 3D partition contract through
+      diagnostic spurious removals, unattached awake no-op state, and unchanged
+      retained ownership; delete the obsolete GridForge `OnChange` method.
 - [x] Close and independently review residual 3D body-motion outcomes through
       initialize, simulate, late-simulate, reset, deactivate, shell reuse,
       grounded friction, anisotropic gyro, and queued CCD workflows.
@@ -366,6 +369,7 @@ of record.
 | 2D constraint service closure | 99.61% | 98.69% | 99.05% | 2,344 | Constraint service reached 100%; larger-ID suppression cleanup was covered; impossible collider-null checks and duplicate post-validation ragdoll resolution/allocation were removed. |
 | 2D joint load closure | 99.61% | 98.73% | 99.05% | 2,346 | Joint2D reached 100%; explicit and legacy distance loads now prove suppression, enabled-count, frame, and cache synchronization; impossible nullable collider replay IDs were removed. |
 | 2D partition closure | 99.61% | 98.78% | 99.08% | 2,347 | PhysicsPartition2D reached 100%; diagnostic spurious removals and awake no-op lifecycle were covered; obsolete GridForge `OnChange` surface was removed. |
+| 3D partition closure | 99.62% | 98.82% | 99.11% | 2,348 | PhysicsPartition reached 100%; diagnostic spurious removals and unattached awake no-op lifecycle were covered; obsolete GridForge `OnChange` surface was removed without involving the pooled spawn-token defect. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.
