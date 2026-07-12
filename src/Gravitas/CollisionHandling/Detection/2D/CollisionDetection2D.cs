@@ -413,13 +413,8 @@ internal static class CollisionDetection2D
         var first = new ClipPoint2D(incidentEdge.Start);
         var second = new ClipPoint2D(incidentEdge.End);
 
-        int count = ClipSegment(referenceEdge.Start, referenceEdge.Direction, ref first, ref second);
-        if (count == 0)
-            return false;
-
-        count = ClipSegment(referenceEdge.End, -referenceEdge.Direction, ref first, ref second);
-        if (count == 0)
-            return false;
+        ClipSegment(referenceEdge.Start, referenceEdge.Direction, ref first, ref second);
+        int count = ClipSegment(referenceEdge.End, -referenceEdge.Direction, ref first, ref second);
 
         bool found = false;
         for (int i = 0; i < count; i++)
@@ -496,8 +491,7 @@ internal static class CollisionDetection2D
         Vector2d normal = axis.Normalized;
         Project(colliderA, normal, out Fixed64 minA, out Fixed64 maxA);
         Project(colliderB, normal, out Fixed64 minB, out Fixed64 maxB);
-        Fixed64 overlap = FixedMath.Min(maxA, maxB) - FixedMath.Max(minA, minB);
-        if (overlap < Fixed64.Zero)
+        if (!TryCalculateProjectionOverlap(minA, maxA, minB, maxB, out Fixed64 overlap))
             return false;
 
         if (!bestAxis.HasAxis || overlap < bestAxis.Overlap)
@@ -536,8 +530,7 @@ internal static class CollisionDetection2D
         Vector2d normal = axis.Normalized;
         Project(colliderA, normal, out Fixed64 minA, out Fixed64 maxA);
         Project(colliderB, normal, out Fixed64 minB, out Fixed64 maxB);
-        Fixed64 overlap = FixedMath.Min(maxA, maxB) - FixedMath.Max(minA, minB);
-        if (overlap < Fixed64.Zero)
+        if (!TryCalculateProjectionOverlap(minA, maxA, minB, maxB, out Fixed64 overlap))
             return false;
 
         if (overlap < bestOverlap)
@@ -562,8 +555,7 @@ internal static class CollisionDetection2D
         Fixed64 minA = centerProjection - radius;
         Fixed64 maxA = centerProjection + radius;
         Project(convex, normal, out Fixed64 minB, out Fixed64 maxB);
-        Fixed64 overlap = FixedMath.Min(maxA, maxB) - FixedMath.Max(minA, minB);
-        if (overlap < Fixed64.Zero)
+        if (!TryCalculateProjectionOverlap(minA, maxA, minB, maxB, out Fixed64 overlap))
             return false;
 
         if (overlap < bestOverlap)
@@ -585,8 +577,7 @@ internal static class CollisionDetection2D
         Vector2d normal = axis.Normalized;
         ProjectCapsule(capsule, normal, out Fixed64 minA, out Fixed64 maxA);
         Project(convex, normal, out Fixed64 minB, out Fixed64 maxB);
-        Fixed64 overlap = FixedMath.Min(maxA, maxB) - FixedMath.Max(minA, minB);
-        if (overlap < Fixed64.Zero)
+        if (!TryCalculateProjectionOverlap(minA, maxA, minB, maxB, out Fixed64 overlap))
             return false;
 
         if (overlap < bestOverlap)
@@ -596,6 +587,19 @@ internal static class CollisionDetection2D
         }
 
         return true;
+    }
+
+    private static bool TryCalculateProjectionOverlap(
+        Fixed64 minA,
+        Fixed64 maxA,
+        Fixed64 minB,
+        Fixed64 maxB,
+        out Fixed64 overlap)
+    {
+        Fixed64 positive = maxA - minB;
+        Fixed64 negative = maxB - minA;
+        overlap = FixedMath.Min(positive, negative);
+        return positive >= Fixed64.Zero && negative >= Fixed64.Zero;
     }
 
     private static Vector2d FindCapsuleConvexClosestAxis(LSCapsuleCollider2D capsule, LSCollider2D convex)
@@ -923,12 +927,16 @@ internal static class CollisionDetection2D
     {
         int bestIndex = 0;
         Fixed64 bestDot = -Fixed64.MaxValue;
+        bool clockwise = Vector2d.CrossProduct(
+            collider.GetVertexUnchecked(1) - collider.GetVertexUnchecked(0),
+            collider.GetVertexUnchecked(2) - collider.GetVertexUnchecked(1)) < Fixed64.Zero;
         for (int i = 0; i < collider.VertexCount; i++)
         {
             Vector2d start = collider.GetVertexUnchecked(i);
             Vector2d end = collider.GetVertexUnchecked((i + 1) % collider.VertexCount);
             Vector2d edge = end - start;
-            Fixed64 dot = Vector2d.Dot(edge.LeftHandNormal.Normalized, outwardNormal);
+            Vector2d edgeNormal = clockwise ? edge.RightHandNormal : edge.LeftHandNormal;
+            Fixed64 dot = Vector2d.Dot(edgeNormal.Normalized, outwardNormal);
             if (dot > bestDot)
             {
                 bestDot = dot;
@@ -943,12 +951,16 @@ internal static class CollisionDetection2D
     {
         int bestIndex = 0;
         Fixed64 bestDot = Fixed64.MaxValue;
+        bool clockwise = Vector2d.CrossProduct(
+            collider.GetVertexUnchecked(1) - collider.GetVertexUnchecked(0),
+            collider.GetVertexUnchecked(2) - collider.GetVertexUnchecked(1)) < Fixed64.Zero;
         for (int i = 0; i < collider.VertexCount; i++)
         {
             Vector2d start = collider.GetVertexUnchecked(i);
             Vector2d end = collider.GetVertexUnchecked((i + 1) % collider.VertexCount);
             Vector2d edge = end - start;
-            Fixed64 dot = Vector2d.Dot(edge.LeftHandNormal.Normalized, referenceNormal);
+            Vector2d edgeNormal = clockwise ? edge.RightHandNormal : edge.LeftHandNormal;
+            Fixed64 dot = Vector2d.Dot(edgeNormal.Normalized, referenceNormal);
             if (dot < bestDot)
             {
                 bestDot = dot;
