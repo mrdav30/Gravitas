@@ -22,15 +22,15 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-task38-authoritative-reviewed-full/6eb1391e-4e0f-424b-bd1f-fffeada1c09f/coverage.cobertura.xml`.
+`TestResults/coverage-task39-authoritative-reviewed-full/5ac3b033-5195-49bf-bbd7-a8471df47944/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
-| Lines | 99.68% | 26,191 / 26,276 | 85 | 100% |
-| Branches | 99.00% | 10,191 / 10,294 | 103 | 100% |
+| Lines | 99.68% | 26,192 / 26,275 | 83 | 100% |
+| Branches | 99.02% | 10,191 / 10,292 | 101 | 100% |
 | Methods | 99.14% | 3,439 / 3,469 | 30 | 100% |
 
-The full coverage-enabled `Release` suite passes 2,362/2,362 tests, and
+The full coverage-enabled `Release` suite passes 2,364/2,364 tests, and
 `ReleaseLean` builds both targets without warnings. Branch coverage is now the
 primary constraint, but the remaining line and method gaps must close from the
 same final artifact.
@@ -38,10 +38,10 @@ same final artifact.
 ### Immediate Next Block
 
 Finish
-`src/Gravitas/Core/2D/GravitasPhysics2DService.ContinuousCollision.cs` before
+`src/Gravitas/Core/2D/SolidBody2D.ContinuousCollision.Rotational.cs` before
 changing target. The current artifact reports two uncovered lines and three
-uncovered branch outcomes. Treat candidate ownership, stale cleanup, queue
-lifetime, and deterministic handoff order as one 2D CCD service contract.
+uncovered branch outcomes. Treat rotational sweep admission, transform
+restoration, and fixed-point fallback behavior as one 2D CCD body contract.
 
 ## Rules Of Engagement
 
@@ -108,16 +108,16 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | `Core/2D/GravitasPhysics2DService.ContinuousCollision.cs` | 2 | 3 | 0 | CCD queue ownership and stale candidate cleanup. |
-| 2 | `Core/2D/SolidBody2D.ContinuousCollision.Rotational.cs` | 2 | 3 | 0 | Rotational sweep admission and fixed-point fallback. |
-| 3 | `Core/2D/SolidBody2D.Motion.cs` | 2 | 3 | 0 | Frozen-axis motion and deterministic sleep admission. |
-| 4 | `Support/Coroutines/GravitasCoroutineService.cs` | 1 | 3 | 0 | Completion, cancellation, and context ownership. |
-| 5 | `Colliders/2D/LSCompoundCollider2D.cs` | 1 | 3 | 0 | Owner geometry, empty parts, and authored fallback. |
-| 6 | `Colliders/3D/LSCapsuleCollider.cs` | 1 | 3 | 0 | Frontal area and degenerate axial geometry. |
-| 7 | `Colliders/3D/LSCompoundCollider.cs` | 1 | 3 | 0 | Owner geometry, empty parts, and authored fallback. |
-| 8 | `CollisionHandling/Detection/3D/CollisionDetection.Cylinder.cs` | 2 | 2 | 0 | Axial separation and stable contact fallback. |
-| 9 | `CollisionHandling/Detection/3D/CollisionDetection.cs` | 2 | 2 | 0 | Dispatch and unsupported-shape fallbacks. |
-| 10 | `Core/3D/SolidBody.ContinuousCollision.Helpers.cs` | 1 | 2 | 0 | Candidate filters and relative-motion fallback. |
+| 1 | `Core/2D/SolidBody2D.ContinuousCollision.Rotational.cs` | 2 | 3 | 0 | Rotational sweep admission and fixed-point fallback. |
+| 2 | `Core/2D/SolidBody2D.Motion.cs` | 2 | 3 | 0 | Frozen-axis motion and deterministic sleep admission. |
+| 3 | `Support/Coroutines/GravitasCoroutineService.cs` | 1 | 3 | 0 | Completion, cancellation, and context ownership. |
+| 4 | `Colliders/2D/LSCompoundCollider2D.cs` | 1 | 3 | 0 | Owner geometry, empty parts, and authored fallback. |
+| 5 | `Colliders/3D/LSCapsuleCollider.cs` | 1 | 3 | 0 | Frontal area and degenerate axial geometry. |
+| 6 | `Colliders/3D/LSCompoundCollider.cs` | 1 | 3 | 0 | Owner geometry, empty parts, and authored fallback. |
+| 7 | `CollisionHandling/Detection/3D/CollisionDetection.Cylinder.cs` | 2 | 2 | 0 | Axial separation and stable contact fallback. |
+| 8 | `CollisionHandling/Detection/3D/CollisionDetection.cs` | 2 | 2 | 0 | Dispatch and unsupported-shape fallbacks. |
+| 9 | `Core/3D/SolidBody.ContinuousCollision.Helpers.cs` | 1 | 2 | 0 | Candidate filters and relative-motion fallback. |
+| 10 | `Core/3D/SolidBody.ContinuousCollision.Rotational.cs` | 2 | 2 | 0 | Rotational sweep bounds and support fallback. |
 
 ### Phase 1: Core Runtime And Service Ownership
 
@@ -260,6 +260,10 @@ public workflow.
       paths through near-singular source/target mobility, positive sub-epsilon
       mass sums, exact mixed target non-handoff state, and duplicate zero-sum
       guard deletion aligned with the 3D solver.
+- [x] Close and independently review 2D CCD service candidate and handoff
+      ownership through duplicate queue updates, latest-state consumption, and
+      shared mixed-buffer clearing; remove the lifecycle-impossible inactive
+      body guard without involving GridForge.
 - [x] Close and independently review residual 2D grounding through automatic,
       manual, cached-support, callback-reentrancy, shell-reuse, query, and
       deterministic contact-candidate workflows.
@@ -275,7 +279,7 @@ has a caller-proven impossibility argument.
 - [ ] Complete the four remaining `ContactManifold` methods through meaningful
       construction, mutation, and reduction contracts or delete unused surface.
 - [ ] Regenerate the uncovered-method inventory from the latest full artifact
-      and classify all 34 current method gaps.
+      and classify all 30 current method gaps.
 - [ ] Delete unused wrappers, aliases, constructors, and helpers instead of
       invoking them solely for coverage.
 - [ ] Cover retained query overloads, diagnostic payloads, authored-shape
@@ -398,6 +402,7 @@ of record.
 | 2D replay hierarchy closure | 99.66% | 98.94% | 99.13% | 2,352 | The 2D collider hash reached 100%; live parent dimensions and clear-to-baseline behavior are exact, impossible guards were removed, and a P1 first-call mixed-hierarchy replay drift was fixed by preparing both dimensional registries up front. |
 | 3D replay hierarchy closure | 99.67% | 98.97% | 99.13% | 2,353 | The 3D collider hash reached 100%; equal-ordinal parent dimensions, clear-to-baseline state, and compact/churned raw-ID independence close the symmetric hierarchy contract after impossible guards were removed. |
 | 3D joint solver closure | 99.68% | 99.00% | 99.14% | 2,362 | JointSolver3D reached 100%; unrestricted rows are exact, cone-twist no longer over-constrains allowed swing, antiparallel swing is deterministic, and signed swing-twist limits are invariant across quaternion signs including exact pi. |
+| 2D CCD service closure | 99.68% | 99.02% | 99.14% | 2,364 | The 2D CCD service reached 100%; duplicate handoffs queue once and consume the latest state, shared planar/mixed candidate storage clears across disabled mixed queries, and the lifecycle-impossible inactive registry guard was removed after independent review. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.
