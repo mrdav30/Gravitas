@@ -296,7 +296,6 @@ public partial class SolidBody
     {
         return collider switch
         {
-            LSSphereCollider => true,
             LSCapsuleCollider => true,
             LSCuboidCollider => true,
             LSCylinderCollider => true,
@@ -423,8 +422,6 @@ public partial class SolidBody
 
         Vector3d relativeDisplacement = sourceDisplacement - targetDisplacement;
         Fixed64 relativeLength = relativeDisplacement.Magnitude;
-        if (relativeLength <= Fixed64.Epsilon)
-            return false;
 
         Vector3d relativeDirection = relativeDisplacement / relativeLength;
         Vector3d sourceDirection = sourceDisplacement / sourceLength;
