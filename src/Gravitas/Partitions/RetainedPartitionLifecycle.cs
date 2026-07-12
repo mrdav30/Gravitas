@@ -148,8 +148,7 @@ internal static class RetainedPartitionLifecycle
                 continue;
             }
 
-            if (!Retire(world, owner, partition, releasePartition))
-                retirementCursor++;
+            Retire(world, owner, partition, releasePartition);
         }
     }
 
@@ -178,7 +177,8 @@ internal static class RetainedPartitionLifecycle
             }
 
             int poolCount = inactivePartitionPool.Count;
-            if (Retire(world, owner, partition, releasePartition) && inactivePartitionPool.Count > poolCount)
+            Retire(world, owner, partition, releasePartition);
+            if (inactivePartitionPool.Count > poolCount)
                 return true;
 
             retirementCursor++;
@@ -214,7 +214,7 @@ internal static class RetainedPartitionLifecycle
         return idleFrames >= timeToKillFrames;
     }
 
-    private static bool Retire<TPartition, TOwner>(
+    private static void Retire<TPartition, TOwner>(
         GridWorld world,
         TOwner owner,
         TPartition partition,
@@ -225,16 +225,16 @@ internal static class RetainedPartitionLifecycle
         if (!world.TryGetVoxel(partition.WorldIndex, out Voxel? voxel))
         {
             releasePartition(partition);
-            return true;
+            return;
         }
 
         if (!voxel!.TryGetPartition(out TPartition? attachedPartition)
             || !ReferenceEquals(attachedPartition, partition))
         {
             releasePartition(partition);
-            return true;
+            return;
         }
 
-        return voxel.TryRemovePartition<TPartition>();
+        _ = voxel.TryRemovePartition<TPartition>();
     }
 }

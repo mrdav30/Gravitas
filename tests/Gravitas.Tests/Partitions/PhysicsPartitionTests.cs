@@ -535,6 +535,26 @@ public sealed class PhysicsPartitionTests
     }
 
     [Fact]
+    public void RetainedPartitionLifecycle_Untrack_WithStaleCollidingIndex_ShouldNotRemoveTrackedPartition()
+    {
+        var owner = new object();
+        var retained = new SwiftList<RetainedPartitionProbe>();
+        RetainedPartitionProbe tracked = CreateProbe(owner);
+        RetainedPartitionProbe stale = CreateProbe(owner);
+        RetainedPartitionLifecycle.Track(retained, owner, tracked, nameof(RetainedPartitionProbe));
+        stale.SetRetainedIndex(tracked.RetainedIndex);
+        int retirementCursor = 0;
+
+        RetainedPartitionLifecycle.Untrack(retained, owner, stale, ref retirementCursor);
+
+        retained.Count.Should().Be(1);
+        retained[0].Should().BeSameAs(tracked);
+        tracked.RetainedIndex.Should().Be(0);
+        stale.RetainedIndex.Should().Be(-1);
+        retirementCursor.Should().Be(0);
+    }
+
+    [Fact]
     public void RetainedPartitionLifecycle_Track_ShouldRejectAlreadyTrackedPartition()
     {
         var owner = new object();
@@ -690,6 +710,47 @@ public sealed class PhysicsPartitionTests
     }
 
     [Fact]
+    public void RetainedPartitionLifecycle_RetireExpired_ShouldSkipForeignPartitionAndReleaseMissingAttachment()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        EnsureGrid(context);
+        context.World.TryGetVoxel(Vector3d.Zero, out Voxel? voxel).Should().BeTrue();
+        var owner = new object();
+        var foreignOwner = new object();
+        var retained = new SwiftList<RetainedPartitionProbe>();
+        var pool = new SwiftStack<RetainedPartitionProbe>();
+        var release = new RetainedPartitionProbeRelease(retained, pool, owner);
+        RetainedPartitionProbe foreign = CreateProbe(foreignOwner);
+        RetainedPartitionProbe occupied = CreateProbe(owner);
+        RetainedPartitionProbe missing = CreateProbe(owner);
+        occupied.IsEmpty = false;
+        foreign.SetParentIndex(voxel!.WorldIndex);
+        occupied.SetParentIndex(voxel.WorldIndex);
+        missing.SetParentIndex(voxel.WorldIndex);
+        RetainedPartitionLifecycle.Track(retained, foreignOwner, foreign, nameof(RetainedPartitionProbe));
+        RetainedPartitionLifecycle.Track(retained, owner, occupied, nameof(RetainedPartitionProbe));
+        RetainedPartitionLifecycle.Track(retained, owner, missing, nameof(RetainedPartitionProbe));
+
+        RetainedPartitionLifecycle.RetireExpired(
+            retained,
+            context.World,
+            owner,
+            budget: 3,
+            currentFrame: 10,
+            timeToKillFrames: 1,
+            release.Release,
+            ref release.Cursor);
+
+        pool.Count.Should().Be(1);
+        pool.Peek().Should().BeSameAs(missing);
+        retained.Count.Should().Be(2);
+        retained[0].Should().BeSameAs(foreign);
+        retained[1].Should().BeSameAs(occupied);
+        foreign.RetainedIndex.Should().Be(0);
+        release.Cursor.Should().Be(0);
+    }
+
+    [Fact]
     public void RetainedPartitionLifecycle_DetachAll_ShouldReleaseOwnedPartitionsAndDropForeignRetainedEntries()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
@@ -722,6 +783,41 @@ public sealed class PhysicsPartitionTests
         pool.Count.Should().Be(2);
         foreign.RetainedIndex.Should().Be(-1);
         voxel.HasPartition<RetainedPartitionProbe>().Should().BeFalse();
+        attached.RemovedFromVoxelCount.Should().Be(1);
+    }
+
+    [Fact]
+    public void RetainedPartitionLifecycle_DetachAll_ShouldRecoverAfterRemovalCallbackPartiallyUntracks()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        EnsureGrid(context);
+        context.World.TryGetVoxel(Vector3d.Zero, out Voxel? voxel).Should().BeTrue();
+        var owner = new object();
+        var retained = new SwiftList<RetainedPartitionProbe>();
+        var pool = new SwiftStack<RetainedPartitionProbe>();
+        var release = new RetainedPartitionProbeRelease(retained, pool, owner);
+        RetainedPartitionProbe attached = CreateProbe(owner);
+        attached.Removed = partition =>
+        {
+            int cursor = -1;
+            RetainedPartitionLifecycle.Untrack(retained, owner, partition, ref cursor);
+            throw new InvalidOperationException("simulated partial release failure");
+        };
+        RetainedPartitionLifecycle.Track(retained, owner, attached, nameof(RetainedPartitionProbe));
+        voxel!.TryAddPartition(attached).Should().BeTrue();
+
+        RetainedPartitionLifecycle.DetachAll(
+            retained,
+            context.World,
+            owner,
+            release.Release,
+            nameof(RetainedPartitionProbe),
+            "detach failed");
+
+        retained.Count.Should().Be(0);
+        pool.Count.Should().Be(1);
+        pool.Peek().Should().BeSameAs(attached);
+        attached.IsOwnedBy(owner).Should().BeFalse();
         attached.RemovedFromVoxelCount.Should().Be(1);
     }
 
