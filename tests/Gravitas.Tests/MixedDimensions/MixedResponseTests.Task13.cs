@@ -87,11 +87,15 @@ public sealed partial class MixedResponseTests
             body3D.Body.Sleep();
             body2D.Sleep();
         };
+        Vector3d position3D = body3D.Body.Position3d;
+        Vector2d position2D = body2D.Position;
 
         Step(context);
 
         body3D.Body.IsSleeping.Should().BeTrue();
         body2D.IsSleeping.Should().BeTrue();
+        body3D.Body.Position3d.Should().Be(position3D);
+        body2D.Position.Should().Be(position2D);
         body3D.Body.LinearVelocity.Should().Be(Vector3d.Zero);
         body2D.LinearVelocity.Should().Be(Vector2d.Zero);
         context.MixedCollisions.ActivePairCount.Should().Be(1);
@@ -315,10 +319,14 @@ public sealed partial class MixedResponseTests
         SolidBody2D sleeping2D = CreateCircle2D(context, new Vector2d((Fixed64)(-3), Fixed64.Zero));
         SolidBody2D awake2D = CreateCircle2D(context, new Vector2d((Fixed64)3, Fixed64.Zero));
         Step(context);
-        sleeping3D.Body.SetPosition(new Vector3d((Fixed64)(-3), Fixed64.Zero, Fixed64.Zero));
-        awake3D.Body.SetPosition(new Vector3d((Fixed64)3, Fixed64.Zero, Fixed64.Zero));
-        sleeping2D.SetPosition(new Vector2d((Fixed64)(-3), Fixed64.Zero));
-        awake2D.SetPosition(new Vector2d((Fixed64)3, Fixed64.Zero));
+        Vector3d sleepingPosition3D = new((Fixed64)(-3), Fixed64.Zero, Fixed64.Zero);
+        Vector3d awakePosition3D = new(Fixed64.FromFraction(11, 4), Fixed64.Zero, Fixed64.Zero);
+        Vector2d sleepingPosition2D = new((Fixed64)(-3), Fixed64.Zero);
+        Vector2d awakePosition2D = new((Fixed64)3, Fixed64.Zero);
+        sleeping3D.Body.SetPosition(sleepingPosition3D);
+        awake3D.Body.SetPosition(awakePosition3D);
+        sleeping2D.SetPosition(sleepingPosition2D);
+        awake2D.SetPosition(awakePosition2D);
         sleeping3D.Collider.OnMixedContact += _ =>
         {
             sleeping3D.Body.Sleep();
@@ -331,6 +339,10 @@ public sealed partial class MixedResponseTests
         sleeping2D.IsSleeping.Should().BeTrue();
         awake3D.Body.IsSleeping.Should().BeFalse();
         awake2D.IsSleeping.Should().BeFalse();
+        sleeping3D.Body.Position3d.Should().Be(sleepingPosition3D);
+        sleeping2D.Position.Should().Be(sleepingPosition2D);
+        awake3D.Body.Position3d.Should().NotBe(awakePosition3D);
+        awake2D.Position.Should().NotBe(awakePosition2D);
         context.MixedCollisions.ActivePairCount.Should().Be(2);
     }
 
