@@ -22,25 +22,25 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-task26-authoritative-reviewed-full-rerun/16e93cd6-e459-4fb6-8005-72c0ae1f2327/coverage.cobertura.xml`.
+`TestResults/coverage-task27-authoritative-reviewed-full/632df92e-d161-4339-bbfa-7806af41c14e/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
-| Lines | 99.59% | 26,172 / 26,279 | 107 | 100% |
-| Branches | 98.58% | 10,170 / 10,316 | 146 | 100% |
+| Lines | 99.60% | 26,175 / 26,279 | 104 | 100% |
+| Branches | 98.62% | 10,170 / 10,312 | 142 | 100% |
 | Methods | 99.02% | 3,435 / 3,469 | 34 | 100% |
 
-The full coverage-enabled `Release` suite passes 2,340/2,340 tests, and
+The full coverage-enabled `Release` suite passes 2,341/2,341 tests, and
 `ReleaseLean` builds both targets without warnings. Branch coverage is now the
 primary constraint, but the remaining line and method gaps must close from the
 same final artifact.
 
 ### Immediate Next Block
 
-Finish `src/Gravitas/Core/3D/GravitasPhysicsService.SupportTypes.cs` before
-changing target. The current artifact reports three uncovered lines and four
-uncovered branch outcomes. Treat stable joint-key equality, endpoint ordering,
-ownerless bodies, and deterministic hashing as one service-identity contract.
+Finish `src/Gravitas/Colliders/3D/LSMeshCollider.cs` before changing target.
+The current artifact reports one uncovered line and four uncovered branch
+outcomes. Treat authored topology, transformed bounds, scaling, center of mass,
+and inertia ownership as one mesh-collider contract.
 
 ## Rules Of Engagement
 
@@ -107,16 +107,16 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | `Core/3D/GravitasPhysicsService.SupportTypes.cs` | 3 | 4 | 0 | Stable joint keys and ownerless endpoint ordering. |
-| 2 | `Colliders/3D/LSMeshCollider.cs` | 1 | 4 | 0 | Authored topology validation and empty/degenerate ownership. |
-| 3 | `Constraints/2D/GravitasConstraint2DService.cs` | 1 | 4 | 0 | Endpoint ownership and stale registration outcomes. |
-| 4 | `Constraints/2D/Joint2D.cs` | 1 | 4 | 0 | Constrained endpoint and lifecycle admission. |
-| 5 | `Partitions/2D/PhysicsPartition2D.cs` | 1 | 4 | 0 | Partition membership and retained-owner outcomes. |
-| 6 | `Partitions/3D/PhysicsPartition.cs` | 1 | 4 | 0 | 3D partition membership and retained-owner outcomes. |
-| 7 | `Queries/2D/GravitasQuery2DService.Overlap.cs` | 1 | 4 | 0 | Overlap filtering, empty candidates, and stable admission. |
-| 8 | `Queries/3D/Sweeps/ConvexSweepQueryWorker.cs` | 4 | 3 | 0 | Degenerate simplex and conservative sweep outcomes. |
-| 9 | `Queries/3D/GravitasQuery3DService.Batch.cs` | 3 | 3 | 0 | Batch validation, empty work, and stable aggregate ordering. |
-| 10 | `Colliders/2D/LSCollider2D.ReplayHash.cs` | 2 | 3 | 0 | Replay identity modes and omitted runtime ownership. |
+| 1 | `Colliders/3D/LSMeshCollider.cs` | 1 | 4 | 0 | Authored topology validation and empty/degenerate ownership. |
+| 2 | `Constraints/2D/GravitasConstraint2DService.cs` | 1 | 4 | 0 | Endpoint ownership and stale registration outcomes. |
+| 3 | `Constraints/2D/Joint2D.cs` | 1 | 4 | 0 | Constrained endpoint and lifecycle admission. |
+| 4 | `Partitions/2D/PhysicsPartition2D.cs` | 1 | 4 | 0 | Partition membership and retained-owner outcomes. |
+| 5 | `Partitions/3D/PhysicsPartition.cs` | 1 | 4 | 0 | 3D partition membership and retained-owner outcomes. |
+| 6 | `Queries/2D/GravitasQuery2DService.Overlap.cs` | 1 | 4 | 0 | Overlap filtering, empty candidates, and stable admission. |
+| 7 | `Queries/3D/Sweeps/ConvexSweepQueryWorker.cs` | 4 | 3 | 0 | Degenerate simplex and conservative sweep outcomes. |
+| 8 | `Queries/3D/GravitasQuery3DService.Batch.cs` | 3 | 3 | 0 | Batch validation, empty work, and stable aggregate ordering. |
+| 9 | `Colliders/2D/LSCollider2D.ReplayHash.cs` | 2 | 3 | 0 | Replay identity modes and omitted runtime ownership. |
+| 10 | `Colliders/3D/LSCollider.ReplayHash.cs` | 2 | 3 | 0 | Replay identity modes and omitted runtime ownership. |
 
 ### Phase 1: Core Runtime And Service Ownership
 
@@ -139,6 +139,10 @@ mid-block merely because another branch looks easier.
 - [x] Close and independently review the residual 3D response block by fixing
       the vacuous coincident-center setup and asserting zero-normal rejection
       through unchanged position, velocity, and warm-start state.
+- [x] Close and independently review 3D response support ordering through
+      canonical endpoint keys, contact-before-joint ordering, ascending
+      duplicate-joint IDs, and non-null deferred-pair ownership; remove
+      redundant nullable and dynamic-ID predicates after lifecycle proof.
 - [x] Close and independently review the 3D pair lifecycle, including callback
       mutation, per-side admission, exception retry, stale queue snapshots,
       exact exit order, and pooled-lifetime reuse.
@@ -345,6 +349,7 @@ of record.
 | 2D response closure | 99.57% | 98.49% | 99.02% | 2,337 | Response reached 100%; both trigger orderings, frozen contact-axis rejection, frictionless preservation, and near-zero tangent mobility were covered; algebraically redundant friction-limit branches were removed after mutation-sensitive review. |
 | Diagnostic sink closure | 99.57% | 98.54% | 99.02% | 2,338 | Diagnostics reached 100%; successful ground-probe identity and geometry were covered; redundant summary enablement, mixed-contact hit, and implicit 2D inference branches were removed after complete call-graph review. |
 | Mixed circle reducer closure | 99.59% | 98.58% | 99.02% | 2,340 | Reducers reached 100%; vertical and planar capsule misses, nearest mesh selection, and both BVH-authored tie outcomes were covered. A stale mutation-built artifact was rejected and replaced with clean focused and full evidence. |
+| 3D response support ordering | 99.60% | 98.62% | 99.02% | 2,341 | Support types reached 100%; endpoint, kind, and joint-ID sorting now have mutation-sensitive diagnostic order; deferred-pair nullability and duplicate dynamic-ID guards were removed after lifecycle review. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.
