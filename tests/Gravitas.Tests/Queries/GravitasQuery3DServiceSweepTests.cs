@@ -1198,13 +1198,13 @@ public sealed class GravitasQuery3DServiceSweepTests
             context,
             new LSCompoundCollider(
                 CompoundColliderPart.ConvexMesh(
-                    MeshTestFixtures.CreateConvexCube().Mesh.LocalVertices,
-                    MeshTestFixtures.CreateConvexCube().Mesh.Triangles,
+                    MeshTestFixtures.CreateConvexCube().Mesh.LocalVertices.ToArray(),
+                    MeshTestFixtures.CreateConvexCube().Mesh.Triangles.ToArray(),
                     new Vector3d(-Fixed64.Half, Fixed64.Zero, Fixed64.Zero),
                     MeshInertiaPolicy.SurfaceApproximation),
                 CompoundColliderPart.ConvexMesh(
-                    MeshTestFixtures.CreateConvexCube().Mesh.LocalVertices,
-                    MeshTestFixtures.CreateConvexCube().Mesh.Triangles,
+                    MeshTestFixtures.CreateConvexCube().Mesh.LocalVertices.ToArray(),
+                    MeshTestFixtures.CreateConvexCube().Mesh.Triangles.ToArray(),
                     new Vector3d(Fixed64.Half, Fixed64.Zero, Fixed64.Zero),
                     MeshInertiaPolicy.SurfaceApproximation)),
             new Vector3d((Fixed64)(-4), Fixed64.Zero, Fixed64.Zero));
@@ -1612,40 +1612,6 @@ public sealed class GravitasQuery3DServiceSweepTests
         hit.Should().BeTrue();
         centerAtImpact.Should().Be(new Vector3d(start.X, start.Y, -radius));
         AssertDistanceNear(distance, Fixed64.One - radius);
-        worker.LastMeshTriangleCandidateCount.Should().Be(1);
-    }
-
-    [Fact]
-    public void SweptSphereWorker_WithMutatedZeroMeshFaceNormal_ShouldSkipTriangleAndReturnDefault()
-    {
-        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
-        LSMeshCollider mesh = CreateDynamicCollider(
-            context,
-            new LSMeshCollider(
-                new[]
-                {
-                    new Vector3d(Fixed64.Zero, -Fixed64.One, -Fixed64.One),
-                    new Vector3d(Fixed64.Zero, Fixed64.One, -Fixed64.One),
-                    new Vector3d(Fixed64.Zero, Fixed64.Zero, Fixed64.One)
-                },
-                new[] { 0, 1, 2 },
-                MeshColliderMode.Concave,
-                MeshInertiaPolicy.SurfaceApproximation),
-            Vector3d.Zero);
-        mesh.Mesh.FaceNormals[0] = Vector3d.Zero;
-        var worker = new SweptSphereQueryWorker();
-        Vector3d start = -Vector3d.Right;
-        Vector3d end = Vector3d.Right;
-        Fixed64 radius = Fixed64.FromFraction(1, 10);
-        mesh.Mesh.GetFaceNormalWorld(0).Should().Be(Vector3d.Zero);
-        AssertSweptSphereBroadOverlap(start, end, radius, mesh);
-        worker.Prepare(start, end, radius);
-
-        bool hit = worker.TrySweep(mesh, out Vector3d centerAtImpact, out Fixed64 distance);
-
-        hit.Should().BeFalse();
-        centerAtImpact.Should().Be(Vector3d.Zero);
-        distance.Should().Be(Fixed64.Zero);
         worker.LastMeshTriangleCandidateCount.Should().Be(1);
     }
 

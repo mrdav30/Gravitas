@@ -248,7 +248,7 @@ public sealed class LSCompoundColliderMassPropertyTests
     }
 
     [Fact]
-    public void ClosedMeshPartCenterOfMass_ShouldTransformEntireLocalPointIntoOwnerSpace()
+    public void ClosedMeshPart_WithOwnerAndPartScaleRotation_ShouldTransformCenterAndReferenceTensor()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         Vector3d[] vertices =
@@ -269,28 +269,45 @@ public sealed class LSCompoundColliderMassPropertyTests
             Fixed64.Zero,
             Fixed64.Zero,
             (Fixed64)90);
+        Vector3d partScale = new((Fixed64)2, (Fixed64)3, (Fixed64)4);
+        Vector3d ownerScale = new((Fixed64)3, (Fixed64)2, Fixed64.One);
+        Vector3d partOffset = new((Fixed64)2, -Fixed64.One, Fixed64.Half);
         var compound = new LSCompoundCollider(
             CompoundColliderPart.ConvexMesh(
                 vertices,
                 triangles,
-                new Vector3d((Fixed64)2, Fixed64.Zero, Fixed64.Zero),
+                partOffset,
                 partRotation,
-                Vector3d.One));
-        compound.LocalOffset = Vector3d.Right;
-        scenario.CreateBody(compound, Vector3d.Zero, FixedQuaternion.Identity);
+                partScale));
+        compound.LocalOffset = new Vector3d(Fixed64.One, (Fixed64)2, (Fixed64)3);
+        var transform = new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, ownerScale);
+        var body = new SolidBody(new TestMatterAgent(scenario.Context, transform), compound)
+        {
+            Mass = Fixed64.One
+        };
+        body.Initialize(Vector3d.Zero, FixedQuaternion.Identity);
         var mesh = (LSMeshCollider)compound.GetPartCollider(0);
-        Vector3d localMeshCenter = new(
-            Fixed64.FromFraction(7, 4),
-            -Fixed64.FromFraction(1, 4),
-            -Fixed64.FromFraction(1, 4));
-        Vector3d expectedCenter = Vector3d.Right + partRotation * localMeshCenter;
+        Vector3d rawCenter = new(Fixed64.Quarter, Fixed64.Quarter, Fixed64.Quarter);
+        Vector3d effectiveScale = Vector3d.Multiply(ownerScale, partScale);
+        Vector3d partLocalCenter = Vector3d.Multiply(
+            partOffset + rawCenter - mesh.Mesh.LocalBounds.Center,
+            effectiveScale);
+        Vector3d expectedCenter = Vector3d.Multiply(compound.LocalOffset, ownerScale)
+            + partRotation * partLocalCenter;
 
         AssertVectorNear(mesh.CalculateLocalCenterOfMassOffset(), expectedCenter);
         AssertVectorNear(compound.CalculateLocalCenterOfMassOffset(), expectedCenter);
-        Fixed3x3 tensor = compound.CalculateInertiaTensor(Fixed64.One, expectedCenter);
-        tensor.M12.Should().Be(tensor.M21);
-        tensor.M13.Should().Be(tensor.M31);
-        tensor.M23.Should().Be(tensor.M32);
+        mesh.Mesh.TryGetClosedVolumeMassProperties(out MeshMassProperties properties, out _).Should().BeTrue();
+        Fixed3x3 meshCenterTensor = properties.CalculateInertiaTensor(Fixed64.One, properties.CenterOfMass);
+        Fixed3x3 ownerCenterTensor = InertiaTensorMath.RotateToFrame(meshCenterTensor, partRotation);
+        Vector3d ownerReference = expectedCenter + new Vector3d(Fixed64.One, (Fixed64)2, (Fixed64)3);
+        Fixed3x3 expectedTensor = InertiaTensorMath.AddParallelAxisTensor(
+            ownerCenterTensor,
+            Fixed64.One,
+            ownerReference - expectedCenter);
+        Fixed3x3 tensor = compound.CalculateInertiaTensor(Fixed64.One, ownerReference);
+
+        AssertMatrixNear(tensor, expectedTensor);
     }
 
     private static void AssertNear(Fixed64 actual, Fixed64 expected) =>
@@ -302,5 +319,18 @@ public sealed class LSCompoundColliderMassPropertyTests
         AssertNear(actual.X, expected.X);
         AssertNear(actual.Y, expected.Y);
         AssertNear(actual.Z, expected.Z);
+    }
+
+    private static void AssertMatrixNear(Fixed3x3 actual, Fixed3x3 expected)
+    {
+        AssertNear(actual.M11, expected.M11);
+        AssertNear(actual.M12, expected.M12);
+        AssertNear(actual.M13, expected.M13);
+        AssertNear(actual.M21, expected.M21);
+        AssertNear(actual.M22, expected.M22);
+        AssertNear(actual.M23, expected.M23);
+        AssertNear(actual.M31, expected.M31);
+        AssertNear(actual.M32, expected.M32);
+        AssertNear(actual.M33, expected.M33);
     }
 }

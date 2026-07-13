@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using System;
 using Gravitas.Colliders;
 using SwiftCollections;
 
@@ -60,7 +61,7 @@ public static class AxisProjectionHelper
     /// <param name="projection">The resulting projection range.</param>
     public static void ProjectPolygonOntoAxis(
         Vector3d axisVector,
-        Vector3d[] vertices,
+        ReadOnlySpan<Vector3d> vertices,
         ref FixedRange projection)
     {
         Fixed64 min = Vector3d.Dot(axisVector, vertices[0]);

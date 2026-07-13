@@ -1113,6 +1113,24 @@ public sealed class CollisionDetectionShapePairTests
     }
 
     [Fact]
+    public void MeshCuboid_WithNonUniformMeshScale_ShouldUseScaledCollisionGeometry()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSMeshCollider> floor = scenario.CreateBody(
+            CreateHorizontalPlaneMesh(),
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+        floor.Body.PositionTransform.Scale = new Vector3d((Fixed64)2, Fixed64.One, (Fixed64)3);
+        floor.Collider.Simulate();
+        ScenarioBody<LSCuboidCollider> cuboid = scenario.CreateCuboid(
+            new Vector3d((Fixed64)3, Fixed64.FromFraction(1, 4), Fixed64.Zero));
+
+        CollisionPair pair = AssertCollision(scenario, floor.Collider, cuboid.Collider, CollisionType.Mesh_Cuboid);
+
+        pair.Manifold.PrimaryContact.Normal.Y.Should().BeGreaterThan(Fixed64.Zero);
+    }
+
+    [Fact]
     public void MeshCuboid_FaceOverlap_ShouldGenerateFourClippedContacts()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
@@ -1259,13 +1277,30 @@ public sealed class CollisionDetectionShapePairTests
         ScenarioBody<LSMeshCollider> second = scenario.CreateBody(
             MeshTestFixtures.CreateConvexCube(),
             new Vector3d(
-                Fixed64.FromFraction(-1, 4),
-                Fixed64.FromFraction(-5, 8),
-                Fixed64.FromFraction(5, 4)),
-            FixedQuaternion.FromEulerAnglesInDegrees((Fixed64)32, (Fixed64)(-20), (Fixed64)12));
+                Fixed64.FromFraction(-9, 8),
+                Fixed64.FromFraction(-9, 8),
+                Fixed64.FromFraction(-3, 4)),
+            FixedQuaternion.FromEulerAnglesInDegrees((Fixed64)10, (Fixed64)35, (Fixed64)15));
 
+        first.Collider.Bounds.Intersects(second.Collider.Bounds).Should().BeTrue();
         AssertNoCollision(scenario, first.Collider, second.Collider, CollisionType.Mesh_Mesh);
         AssertNoCollision(scenario, second.Collider, first.Collider, CollisionType.Mesh_Mesh);
+    }
+
+    [Fact]
+    public void MeshMesh_WithTouchingFaces_ShouldNotTreatAdjacentProjectionsAsOverlap()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSMeshCollider> first = scenario.CreateBody(
+            MeshTestFixtures.CreateConvexCube(),
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+        ScenarioBody<LSMeshCollider> second = scenario.CreateBody(
+            MeshTestFixtures.CreateConvexCube(),
+            Vector3d.Right,
+            FixedQuaternion.Identity);
+
+        AssertNoCollision(scenario, first.Collider, second.Collider, CollisionType.Mesh_Mesh);
     }
 
     [Fact]

@@ -418,9 +418,6 @@ public sealed class SweptSphereQueryWorker
             int triangleIndex = _meshTriangleBuffer[i];
             mesh.Mesh.GetTriangleVertices(triangleIndex, out Vector3d first, out Vector3d second, out Vector3d third);
             Vector3d normal = mesh.Mesh.GetFaceNormalWorld(triangleIndex);
-            if (normal.MagnitudeSquared <= Fixed64.Epsilon)
-                continue;
-
             found |= TryKeepEarlierSweep(
                 TrySweepTriangle(first, second, third, normal.Normalized, out Vector3d triangleHit, out Fixed64 triangleDistance),
                 triangleHit,

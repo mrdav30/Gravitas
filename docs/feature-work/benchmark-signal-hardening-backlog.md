@@ -643,6 +643,44 @@ which depended on the enumerable GridForge line-trace path.
 **Closure criteria:** Met. The runtime allocation was eliminated and the 3D
 raycast path has a focused xUnit allocation guard.
 
+### Closed Signal: Checked Mesh Scale And Thin-Shell Cache Cost
+
+**Status:** Closed 2026-07-12
+
+**Evidence:** Task 46 extended `MeshMassPropertyBenchmarks` with matching
+scale-only and scale-plus-surface-inertia rows. The final post-change command was:
+
+```powershell
+dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll `
+    mesh-mass-property --filter "*UpdateNonUniformMeshScale*" --job short
+```
+
+The checked scale/cache rebuild measured about `5.530 us`, `282.282 us`, and
+`1.122 ms` at subdivisions `1`, `8`, and `16`. Scale plus lazy physical
+thin-shell integration measured `16.087 us`, `907.933 us`, and `3.609 ms`.
+Every row reported no managed allocation.
+
+A cache-focused follow-up used:
+
+```powershell
+dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll `
+    mesh-mass-property --filter "*CalculateCachedClosedVolumeInertiaTensor*" `
+    --job short --artifacts `
+    "artifacts/benchmarks/2026-07-12-task46-mesh-scale-cache-fix2"
+```
+
+Cached closed-volume inertia measured `61.14 ns`, `64.79 ns`, and `64.33 ns`
+at subdivisions `1`, `8`, and `16`, with no managed allocation.
+
+**Resolution:** Scale changes pay deterministic O(triangle-count) validation
+and scaled face-cache rebuilding. Surface integration stays lazy and its
+successfully prevalidated candidate is promoted into the live cache, so callers
+that do not select `SurfaceApproximation` do not pay the shell moment pass.
+Closed-volume properties are likewise cached by committed scale, including the
+default-scale initialization path; checked prevalidation is promoted at commit
+and pose-only updates retain the cache. Retain both transform and cached-read
+rows as regression signals for future mesh transform or mass-property work.
+
 ## Watch Items
 
 - Mixed full-runtime CCD rows were heavier than pure 2D or pure 3D rows at

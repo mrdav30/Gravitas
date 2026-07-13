@@ -99,34 +99,6 @@ reused. Fix this in GridForge with a world-owned generation token that changes
 on every grid allocation, then add a remove/re-add regression proving old
 `WorldVoxelIndex` values cannot resolve into the replacement grid.
 
-### Compound Mesh Scale And Legacy Shell Inertia Do Not Match Authored Geometry
-
-**Discovered:** 2026-07-12  
-**Source:** 95%-to-100% coverage hardening, 3D compound mass-property review  
-**Affected area:** `LSMeshCollider`, `PhysicsMesh`, compound mesh parts, and
-`MeshInertiaPolicy.SurfaceApproximation`
-
-`CompoundColliderPart` accepts a mesh `LocalScale`, and `LSMeshCollider` reads
-host scale for center-of-mass conversion, but `PhysicsMesh.UpdatePosition(...)`
-hardcodes unit scale in its transformation matrix. Authored scale therefore
-does not consistently reach mesh bounds, collision vertices, face areas,
-frontal area, closed-volume properties, or inertia. Correct nonuniform scale
-also requires inverse-transpose normal handling and invalidating scale-sensitive
-cached mass data without rebuilding immutable topology or its local BVH.
-
-The explicit legacy `SurfaceApproximation` inertia path is a separate part of
-the same mass-property boundary: it constructs a matrix directly from triangle
-vertex rows, area-weights those matrices, and divides by triangle count. That
-result can be nonsymmetric and is not a physical thin-triangle shell tensor.
-The 3D compound hardening block only uses unscaled closed volume, or unscaled
-`TotalArea` for the explicitly selected shell policy, as deterministic relative
-mass weights; it does not claim to repair either defect.
-
-Resolve mesh scale as one transform/cache design with collision, query, bounds,
-normal, frontal-area, COM, volume, and tensor regressions. Replace or retire the
-legacy shell tensor through an explicit thin-shell model with fixed-value tests
-and benchmark evidence.
-
 ### SolidBody Point Transforms Use Collider Dimensions As Transform Scale
 
 **Discovered:** 2026-07-12  
@@ -169,6 +141,57 @@ handling disconnected input without the AABB false-positive.
 
 ## Resolved Issues
 
+### Mesh Scale And Surface-Shell Mass Did Not Match Authored Geometry
+
+**Resolved:** 2026-07-12  
+**Source:** 95%-to-100% coverage hardening, mesh transform/mass follow-up  
+**Affected area:** `LSMeshCollider`, `PhysicsMesh`, compound mesh parts, and
+`MeshInertiaPolicy.SurfaceApproximation`
+
+RCA: `PhysicsMesh.UpdatePosition(...)` preserved only translation and rotation,
+so host and compound-part scale did not reach runtime mesh vertices, bounds,
+normals, area, queries, collision, closed-volume properties, or inertia. The
+legacy surface approximation also averaged triangle-row matrices rather than a
+physical thin-shell tensor.
+
+Fix: mesh points now use the explicit affine contract
+`origin + R * (S * source)`, with a normalized rigid rotation and strictly
+positive representably invertible diagonal scale. Scale and rotation are
+prevalidated before standalone registration, before compound part rebuilds,
+and before runtime cache mutation. Scaled bounds, face normals/areas, projected
+frontal area, closed-volume covariance, COM, and inertia now match authored
+geometry. The surface policy uses a stable two-pass uniform thin-shell
+integration relative to scaled bounds, and checked fixed-point arithmetic
+rejects collapsed, saturated, or otherwise nonrepresentable geometry and mass
+properties without publishing partial state.
+
+Immutable source vertices, triangle indices, convex SAT edge topology, support
+topology, and the local triangle BVH survive pose/scale changes. SAT edge
+classification now uses authored coplanarity rather than an angle threshold,
+which remains valid under positive nonsingular diagonal scale. Public topology
+and normal views are read-only; the unused public mesh tensor was removed.
+
+Verification:
+
+- Added fixed-value scaled bounds, normals, area, projected area, closed-volume
+  COM/tensor, physical shell tensor, triangulation, large-translation, query,
+  collision, BVH reuse, support-tree, standalone/compound lifecycle, and
+  checked underflow/saturation regressions.
+- Added a combined off-center compound regression with nonuniform owner and
+  part scale, part rotation, owner-local COM, and arbitrary-reference inertia.
+- Authoritative coverage artifact
+  `TestResults/coverage-mesh-task46-authoritative-final2/b5fa3c62-a27b-4416-a20c-5454bf41b21c/coverage.cobertura.xml`
+  reports 100% line and branch coverage for the new checked mesh files and the
+  touched mesh collision/SAT files.
+- Full `Release` tests passed 2,461/2,461; `ReleaseLean` built both target
+  frameworks without warnings.
+- Scale-only and scale-plus-shell benchmarks remain allocation-free. At
+  subdivision 16, the post-check implementation measured about 1.122 ms and
+  3.609 ms respectively under the BenchmarkDotNet short job. The final
+  scale-keyed closed-volume cache measured 64.33 ns with no allocation at the
+  same subdivision; its reviewed artifact is
+  `artifacts/benchmarks/2026-07-12-task46-mesh-scale-cache-fix2`.
+
 ### 3D Compound Mass And Geometry Used Incompatible Frames And Measures
 
 **Discovered:** 2026-07-12  
@@ -190,8 +213,8 @@ though it were owner-local scale.
 
 Fix: every 3D collider now implements an explicit compound mass-property
 measure. Solid primitives and validated closed meshes use volume; explicitly
-selected surface-approximation meshes use their documented local shell-area
-proxy. All-zero measures use equal authored-order center weights and nominal
+selected surface-approximation meshes use their scaled physical shell-area
+measure. All-zero measures use equal authored-order center weights and nominal
 mass shares. Fixed-point division assigns the exact residual mass to the last
 positive-weight part when one exists, otherwise to the last authored part.
 Part COM points include owner offset and authored local rotation. Center tensors

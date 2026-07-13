@@ -29,6 +29,30 @@ public sealed class LSMeshColliderQueryTests
     }
 
     [Fact]
+    public void ColliderOverlapsRay_WithNonUniformScale_ShouldUseScaledTriangleAndCachedBvh()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSMeshCollider mesh = CreateTriangleMesh();
+        mesh.InitializeWithNoBody(new TestMatterAgent(
+            context,
+            new FixedTransform(
+                Vector3d.Zero,
+                FixedQuaternion.Identity,
+                new Vector3d((Fixed64)2, (Fixed64)3, (Fixed64)4))));
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+        Vector3d expected = new(Fixed64.Half, Fixed64.FromFraction(3, 4), Fixed64.Zero);
+        worker.PrepareSegmentCheck(expected - Vector3d.Forward, expected + Vector3d.Forward);
+
+        bool hit = mesh.ColliderOverlapsRay(worker, ref hits);
+
+        hit.Should().BeTrue();
+        hits.Count.Should().Be(1);
+        hits[0].Should().Be(expected);
+        mesh.Mesh.TriangleBvhBuildCount.Should().Be(1);
+    }
+
+    [Fact]
     public void ColliderOverlapsRay_ShouldRejectBoundingBoxHitOutsideTriangle()
     {
         LSMeshCollider mesh = CreateTriangleMesh();

@@ -12,7 +12,10 @@ internal static class MeshTestFixtures
         if (mesh.Mode != MeshColliderMode.Convex)
             throw new ArgumentException("Only convex mesh fixtures can be converted to collider shape definitions.", nameof(mesh));
 
-        return ColliderShapeDefinition.ConvexMesh(mesh.Mesh.LocalVertices, mesh.Mesh.Triangles, mesh.InertiaPolicy);
+        return ColliderShapeDefinition.ConvexMesh(
+            mesh.Mesh.LocalVertices.ToArray(),
+            mesh.Mesh.Triangles.ToArray(),
+            mesh.InertiaPolicy);
     }
 
     public static ColliderShapeDefinition CreateConvexCubeDefinition(

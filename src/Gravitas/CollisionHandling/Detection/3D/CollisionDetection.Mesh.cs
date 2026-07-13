@@ -7,6 +7,7 @@
 
 using FixedMathSharp;
 using Gravitas.Colliders;
+using System;
 
 namespace Gravitas.CollisionHandling;
 
@@ -162,7 +163,7 @@ public static partial class CollisionDetection
     {
         penetration = default;
         PhysicsMesh physicsMesh = mesh.Mesh;
-        Vector3d[] meshVertices = physicsMesh.Vertices;
+        ReadOnlySpan<Vector3d> meshVertices = physicsMesh.Vertices;
         int triangleCount = physicsMesh.TriangleCount;
         Vector3d[] cuboidVertices = cuboid.Vertices;
         Vector3d meshToCuboid = cuboid.Center - mesh.Center;
@@ -179,7 +180,7 @@ public static partial class CollisionDetection
             || !CheckConvexMeshCuboidAxis(meshVertices, cuboidVertices, cuboid.FaceNormals[4], meshToCuboid, ref penetration))
             return false;
 
-        int[] edgeVertexPairs = physicsMesh.ConvexSatEdgeVertexPairs;
+        ReadOnlySpan<int> edgeVertexPairs = physicsMesh.ConvexSatEdgeVertexPairs;
         for (int i = 0; i < edgeVertexPairs.Length; i += 2)
         {
             Vector3d meshEdge = meshVertices[edgeVertexPairs[i + 1]] - meshVertices[edgeVertexPairs[i]];
@@ -191,8 +192,8 @@ public static partial class CollisionDetection
     }
 
     private static bool CheckConvexMeshCuboidEdgeAxes(
-        Vector3d[] meshVertices,
-        Vector3d[] cuboidVertices,
+        ReadOnlySpan<Vector3d> meshVertices,
+        ReadOnlySpan<Vector3d> cuboidVertices,
         LSCuboidCollider cuboid,
         Vector3d meshEdge,
         Vector3d meshToCuboid,
@@ -204,8 +205,8 @@ public static partial class CollisionDetection
     }
 
     private static bool CheckConvexMeshCuboidAxis(
-        Vector3d[] meshVertices,
-        Vector3d[] cuboidVertices,
+        ReadOnlySpan<Vector3d> meshVertices,
+        ReadOnlySpan<Vector3d> cuboidVertices,
         Vector3d axis,
         Vector3d meshToCuboid,
         ref AxisPenetration penetration)
@@ -285,8 +286,8 @@ public static partial class CollisionDetection
         penetration = default;
         PhysicsMesh physicsMeshA = meshA.Mesh;
         PhysicsMesh physicsMeshB = meshB.Mesh;
-        Vector3d[] verticesA = physicsMeshA.Vertices;
-        Vector3d[] verticesB = physicsMeshB.Vertices;
+        ReadOnlySpan<Vector3d> verticesA = physicsMeshA.Vertices;
+        ReadOnlySpan<Vector3d> verticesB = physicsMeshB.Vertices;
         Vector3d displacementAtoB = meshB.Center - meshA.Center;
 
         if (!CheckConvexMeshFaceAxes(physicsMeshA, verticesA, verticesB, displacementAtoB, ref penetration)
@@ -295,8 +296,8 @@ public static partial class CollisionDetection
             return false;
         }
 
-        int[] edgeVertexPairsA = physicsMeshA.ConvexSatEdgeVertexPairs;
-        int[] edgeVertexPairsB = physicsMeshB.ConvexSatEdgeVertexPairs;
+        ReadOnlySpan<int> edgeVertexPairsA = physicsMeshA.ConvexSatEdgeVertexPairs;
+        ReadOnlySpan<int> edgeVertexPairsB = physicsMeshB.ConvexSatEdgeVertexPairs;
         for (int a = 0; a < edgeVertexPairsA.Length; a += 2)
         {
             Vector3d edgeA = verticesA[edgeVertexPairsA[a + 1]] - verticesA[edgeVertexPairsA[a]];
@@ -313,8 +314,8 @@ public static partial class CollisionDetection
 
     private static bool CheckConvexMeshFaceAxes(
         PhysicsMesh axisSource,
-        Vector3d[] verticesA,
-        Vector3d[] verticesB,
+        ReadOnlySpan<Vector3d> verticesA,
+        ReadOnlySpan<Vector3d> verticesB,
         Vector3d displacementAtoB,
         ref AxisPenetration penetration)
     {

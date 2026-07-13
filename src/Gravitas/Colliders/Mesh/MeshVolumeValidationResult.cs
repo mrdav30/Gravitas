@@ -45,5 +45,15 @@ public enum MeshVolumeValidationResult
     /// <summary>
     /// The mesh repeats a triangle with the same three vertex indices.
     /// </summary>
-    DuplicateTriangle = 6
+    DuplicateTriangle = 6,
+
+    /// <summary>
+    /// The scaled solid volume exceeds the representable fixed-point range.
+    /// </summary>
+    NonRepresentableVolume = 7,
+
+    /// <summary>
+    /// The scaled center of mass or inertia moments exceed the representable fixed-point range.
+    /// </summary>
+    NonRepresentableMassProperties = 8
 }

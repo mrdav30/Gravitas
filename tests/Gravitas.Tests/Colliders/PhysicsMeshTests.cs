@@ -84,18 +84,16 @@ public sealed class PhysicsMeshTests
     }
 
     [Fact]
-    public void InverseTransformationMatrix_WithSingularRotation_ShouldRejectConversion()
+    public void Constructor_WithNonNormalizedRotation_ShouldRejectBeforeStateCreation()
     {
-        var mesh = new PhysicsMesh(
+        Action create = () => _ = new PhysicsMesh(
             ValidVertices(),
             ValidTriangles(),
             Vector3d.Zero,
             new FixedQuaternion(Fixed64.Half, Fixed64.Half, Fixed64.Zero, Fixed64.Zero));
 
-        Action convert = () => _ = mesh.ConvertWorldToLocal(Vector3d.Zero);
-
-        convert.Should().Throw<InvalidOperationException>()
-            .WithMessage("*invert*");
+        create.Should().Throw<ArgumentException>()
+            .WithMessage("*normalized*");
     }
 
     [Fact]
@@ -269,7 +267,7 @@ public sealed class PhysicsMeshTests
     }
 
     [Fact]
-    public void MeshColliderInertia_WithZeroScaleAxes_ShouldNotDivideByZero()
+    public void MeshCollider_WithZeroScaleAxes_ShouldRejectBeforeRegistration()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         LSMeshCollider collider = MeshTestFixtures.CreateConvexCube();
@@ -279,19 +277,12 @@ public sealed class PhysicsMeshTests
                 Vector3d.Zero,
                 FixedQuaternion.Identity,
                 Vector3d.Zero));
-        collider.InitializeWithNoBody(agent);
-        LSMeshCollider unscaled = MeshTestFixtures.CreateConvexCube();
-        unscaled.InitializeWithNoBody(new TestMatterAgent(
-            context,
-            new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)));
+        Action initialize = () => collider.InitializeWithNoBody(agent);
 
-        Fixed3x3 tensor = collider.CalculateInertiaTensor(
-            Fixed64.One,
-            new Vector3d((Fixed64)3, (Fixed64)4, (Fixed64)5));
-        Fixed3x3 expected = unscaled.CalculateInertiaTensor(Fixed64.One, Vector3d.Zero);
-
-        collider.CalculateLocalCenterOfMassOffset().Should().Be(Vector3d.Zero);
-        tensor.Should().Be(expected);
+        initialize.Should().Throw<ArgumentException>().WithMessage("*greater than zero*");
+        collider.Id.Should().Be(-1);
+        collider.HasHostBinding.Should().BeFalse();
+        context.Physics.ColliderCount.Should().Be(0);
     }
 
     [Fact]

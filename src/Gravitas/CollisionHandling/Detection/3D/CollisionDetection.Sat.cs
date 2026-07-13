@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using System;
 using System.Runtime.CompilerServices;
 
 namespace Gravitas.CollisionHandling;
@@ -34,8 +35,8 @@ public static partial class CollisionDetection
     }
 
     private static bool CheckVertexProjectionAxis(
-        Vector3d[] verticesA,
-        Vector3d[] verticesB,
+        ReadOnlySpan<Vector3d> verticesA,
+        ReadOnlySpan<Vector3d> verticesB,
         Vector3d axis,
         Vector3d displacementAtoB,
         ref AxisPenetration penetration)
@@ -55,8 +56,8 @@ public static partial class CollisionDetection
     {
         Fixed64 pushALeft = projectionA.Max - projectionB.Min;
         Fixed64 pushARight = projectionB.Max - projectionA.Min;
-        Fixed64 overlap = FixedMath.Min(pushALeft, pushARight);
-        return overlap > Fixed64.Zero ? overlap : Fixed64.Zero;
+        // FixedRange.Overlaps uses strict inequalities, so both distances are positive here.
+        return FixedMath.Min(pushALeft, pushARight);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

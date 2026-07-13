@@ -12,6 +12,8 @@ technical companion to [Collision Pipeline](COLLISION_PIPELINE.md).
   order.
 - Mesh colliders can be valid simulation/query targets; concave mesh source
   sweeps are outside the public runtime query surface.
+- Mesh topology and acceleration structures are immutable after construction;
+  pose and scale rebuild only scale-dependent runtime caches.
 - Narrow phase uses stable pair priority and stable contact-normal orientation.
 - SAT axes, mesh triangle candidates, and compound parts are processed in
   deterministic order.
@@ -89,8 +91,8 @@ partition coordinates, pair state, events, and query stamps.
 
 Cones use analytic support and closest-surface geometry instead of generating a
 runtime triangle fan. Mesh colliders use cached closed-volume mass properties by
-default when angular dynamics are enabled and keep explicit surface
-approximation opt-in for open meshes.
+default when angular dynamics are enabled and keep an explicit uniform
+thin-shell mass policy for open meshes.
 
 For a 3D capsule with normalized motion direction `n`, world-space axis
 `Rotation * Vector3d.Up`, radius `r`, and cylindrical height `h`, the projected
@@ -108,10 +110,11 @@ shift.
 
 3D compound colliders distribute uniform-density mass by each solid part's
 volume rather than by the public `Area` value, whose drag/diagnostic meaning is
-shape-specific. Closed-volume meshes contribute their validated local volume.
-Meshes explicitly authored with `SurfaceApproximation` contribute local triangle
-surface area as a legacy shell proxy; that policy is not dimensionally
-interchangeable with solid density and remains an explicit approximation.
+shape-specific. Closed-volume meshes contribute their validated scaled volume.
+Meshes explicitly authored with `SurfaceApproximation` contribute scaled
+triangle surface area and use physical uniform thin-shell COM/inertia
+integration. Surface density and solid volume density are not dimensionally
+interchangeable, so the policy stays an explicit authoring choice.
 Fixed-point mass division preserves the requested total mass by assigning the
 rounding residual to the last positive-weight authored part. If every part
 measure quantizes to zero, part centers and masses use equal authored-order
@@ -194,6 +197,35 @@ swept-sphere queries test mesh triangle candidates and return the owning
 `LSMeshCollider` once. Convex mesh source sweeps also support concave mesh
 targets by testing only target triangles inside the source swept bounds and
 reducing hits back to the target owner.
+
+Runtime mesh points follow one explicit transform contract:
+`origin + rotation * (scale * sourcePoint)`. Rotation must be a normalized,
+representable quaternion. Scale must be strictly positive, diagonally applied,
+representably invertible, and must preserve representable vertices, bounds,
+triangle areas, total area, and selected mass properties. Invalid standalone
+meshes reject before collider registration. Compound owners prevalidate every
+mesh part before rebuilding any part, so a failed scale/rotation change cannot
+leave half-updated geometry.
+
+Source vertices, triangle indices, authored face normals, convex SAT edge
+topology, support topology, and the local triangle BVH are immutable and exposed
+only through read-only views or internal query seams. Scale changes rebuild
+scaled bounds and face normal/area caches without rebuilding topology or the
+BVH. World normals use the rigid rotation of the inverse-transpose-scaled local
+normal and are normalized before projection. Frontal area is the positive
+projected physical triangle area and is invariant to direction magnitude.
+
+Closed-volume mass properties transform analytic covariance under diagonal
+scale. `SurfaceApproximation` performs stable two-pass thin-shell integration:
+area-weighted COM relative to scaled bounds, then authored-order triangle
+central tensors plus parallel-axis shifts. Checked fixed-point arithmetic
+rejects volume collapse, saturation, and nonrepresentable COM/tensors rather
+than publishing sentinel values.
+
+True hierarchy shear is outside this contract. Hosts that compose rotated
+nonuniform parent scales into shear must bake that affine deformation into
+authored mesh vertices or provide a future explicit affine-mesh API; Gravitas
+does not silently approximate shear as diagonal scale plus rotation.
 
 Concave mesh-as-source sweeping and automatic runtime decomposition are not part
 of the public runtime query surface. Author concave movers as offline
