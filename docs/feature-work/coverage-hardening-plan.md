@@ -22,15 +22,15 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-task40-authoritative-reviewed-full/3d31ea98-444b-49bf-99a1-362f376f59b8/coverage.cobertura.xml`.
+`TestResults/coverage-task41-authoritative-reviewed-full/d5b064bb-65d5-4887-b0b9-e3f089b8c44d/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
-| Lines | 99.69% | 26,202 / 26,283 | 81 | 100% |
-| Branches | 99.05% | 10,198 / 10,296 | 98 | 100% |
-| Methods | 99.14% | 3,440 / 3,470 | 30 | 100% |
+| Lines | 99.69% | 26,225 / 26,306 | 81 | 100% |
+| Branches | 99.08% | 10,201 / 10,296 | 95 | 100% |
+| Methods | 99.14% | 3,446 / 3,476 | 30 | 100% |
 
-The full coverage-enabled `Release` suite passes 2,369/2,369 tests, and
+The full coverage-enabled `Release` suite passes 2,376/2,376 tests, and
 `ReleaseLean` builds both targets without warnings. Branch coverage is now the
 primary constraint, but the remaining line and method gaps must close from the
 same final artifact.
@@ -38,10 +38,10 @@ same final artifact.
 ### Immediate Next Block
 
 Finish
-`src/Gravitas/Core/2D/SolidBody2D.Motion.cs` before
-changing target. The current artifact reports two uncovered lines and three
-uncovered branch outcomes. Treat frozen-axis motion, angular integration, and
-deterministic sleep admission as one 2D body-motion contract.
+`src/Gravitas/Support/Coroutines/GravitasCoroutineService.cs` before changing
+target. The current artifact reports one uncovered line and three uncovered
+branch outcomes. Treat completion, cancellation, context ownership, and pooled
+enumerator cleanup as one coroutine lifecycle contract.
 
 ## Rules Of Engagement
 
@@ -108,16 +108,16 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | `Core/2D/SolidBody2D.Motion.cs` | 2 | 3 | 0 | Frozen-axis motion and deterministic sleep admission. |
-| 2 | `Support/Coroutines/GravitasCoroutineService.cs` | 1 | 3 | 0 | Completion, cancellation, and context ownership. |
-| 3 | `Colliders/2D/LSCompoundCollider2D.cs` | 1 | 3 | 0 | Owner geometry, empty parts, and authored fallback. |
-| 4 | `Colliders/3D/LSCapsuleCollider.cs` | 1 | 3 | 0 | Frontal area and degenerate axial geometry. |
-| 5 | `Colliders/3D/LSCompoundCollider.cs` | 1 | 3 | 0 | Owner geometry, empty parts, and authored fallback. |
-| 6 | `CollisionHandling/Detection/3D/CollisionDetection.Cylinder.cs` | 2 | 2 | 0 | Axial separation and stable contact fallback. |
-| 7 | `CollisionHandling/Detection/3D/CollisionDetection.cs` | 2 | 2 | 0 | Dispatch and unsupported-shape fallbacks. |
-| 8 | `Core/3D/SolidBody.ContinuousCollision.Helpers.cs` | 1 | 2 | 0 | Candidate filters and relative-motion fallback. |
-| 9 | `Core/3D/SolidBody.ContinuousCollision.Rotational.cs` | 2 | 2 | 0 | Rotational sweep bounds and support fallback. |
-| 10 | `Core/Mixed/GravitasMixedCollisionService.Partitioning.cs` | 5 | 1 | 0 | Partition ownership, pooled retirement, and callback-failure recovery. |
+| 1 | `Support/Coroutines/GravitasCoroutineService.cs` | 1 | 3 | 0 | Completion, cancellation, and context ownership. |
+| 2 | `Colliders/2D/LSCompoundCollider2D.cs` | 1 | 3 | 0 | Owner geometry, empty parts, and authored fallback. |
+| 3 | `Colliders/3D/LSCapsuleCollider.cs` | 1 | 3 | 0 | Frontal area and degenerate axial geometry. |
+| 4 | `Colliders/3D/LSCompoundCollider.cs` | 1 | 3 | 0 | Owner geometry, empty parts, and authored fallback. |
+| 5 | `CollisionHandling/Detection/3D/CollisionDetection.Cylinder.cs` | 2 | 2 | 0 | Axial separation and stable contact fallback. |
+| 6 | `CollisionHandling/Detection/3D/CollisionDetection.cs` | 2 | 2 | 0 | Dispatch and unsupported-shape fallbacks. |
+| 7 | `Core/3D/SolidBody.ContinuousCollision.Helpers.cs` | 1 | 2 | 0 | Candidate filters and relative-motion fallback. |
+| 8 | `Core/3D/SolidBody.ContinuousCollision.Rotational.cs` | 2 | 2 | 0 | Rotational sweep bounds and support fallback. |
+| 9 | `Core/Mixed/GravitasMixedCollisionService.Partitioning.cs` | 5 | 1 | 0 | Partition ownership, pooled retirement, and callback-failure recovery. |
+| 10 | `Constraints/3D/RagdollRuntime3D.cs` | 2 | 1 | 0 | Replay load shape, link ownership, and stable reconstruction. |
 
 ### Phase 1: Core Runtime And Service Ownership
 
@@ -268,6 +268,10 @@ public workflow.
       sub-epsilon arcs, and invalid physical candidates; count accepted dynamic
       rotational impacts in both dimensions and normalize kinematic 2D yaw to
       the deterministic shortest arc across the signed boundary.
+- [x] Close and independently review 2D motion through zero and sub-resolution
+      effective angular inputs plus immediate zero-threshold sleep; align sleep
+      disabling and threshold validation with 3D lifecycle semantics and track
+      the separate frame-rate-dependent 3D impulse-units decision.
 - [x] Close and independently review residual 2D grounding through automatic,
       manual, cached-support, callback-reentrancy, shell-reuse, query, and
       deterministic contact-candidate workflows.
@@ -408,6 +412,7 @@ of record.
 | 3D joint solver closure | 99.68% | 99.00% | 99.14% | 2,362 | JointSolver3D reached 100%; unrestricted rows are exact, cone-twist no longer over-constrains allowed swing, antiparallel swing is deterministic, and signed swing-twist limits are invariant across quaternion signs including exact pi. |
 | 2D CCD service closure | 99.68% | 99.02% | 99.14% | 2,364 | The 2D CCD service reached 100%; duplicate handoffs queue once and consume the latest state, shared planar/mixed candidate storage clears across disabled mixed queries, and the lifecycle-impossible inactive registry guard was removed after independent review. |
 | 2D rotational CCD closure | 99.69% | 99.05% | 99.14% | 2,369 | The 2D rotational block reached 100%; real epsilon-proxy, sub-epsilon-arc, and post-broad-phase filter outcomes are covered; dynamic impacts now count in both dimensions; kinematic signed-boundary yaw uses the shortest arc; the endpoint-only sampling limitation is tracked with an exact reproducer. |
+| 2D motion closure | 99.69% | 99.08% | 99.14% | 2,376 | The motion block reached 100%; zero and quantized-away angular inputs preserve sleep, zero-frame thresholds sleep immediately, 2D sleep disable/validation matches 3D, serialization/replay remain stable, and the separate 3D impulse-unit defect is tracked. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.
