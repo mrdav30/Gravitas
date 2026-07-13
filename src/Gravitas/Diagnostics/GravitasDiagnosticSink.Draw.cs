@@ -321,9 +321,6 @@ public sealed partial class GravitasDiagnosticSink
         LSCollider collider,
         GravitasDiagnosticColor color)
     {
-        if (axis.MagnitudeSquared == Fixed64.Zero)
-            return;
-
         AddDrawCommand(
             GravitasDebugDrawKind.Ray,
             collider.Id,
@@ -512,9 +509,6 @@ public sealed partial class GravitasDiagnosticSink
         ColliderType2D colliderType)
     {
         int vertexCount = collider.VertexCount;
-        if (vertexCount <= 0)
-            return;
-
         Fixed64 topY = collider.MixedSlabCenterY + collider.MixedHalfThickness;
         Fixed64 bottomY = collider.MixedSlabCenterY - collider.MixedHalfThickness;
         for (int i = 0; i < vertexCount; i++)

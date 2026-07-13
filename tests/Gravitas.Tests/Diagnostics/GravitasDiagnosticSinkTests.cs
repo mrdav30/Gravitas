@@ -75,6 +75,27 @@ public sealed class GravitasDiagnosticSinkTests
     }
 
     [Fact]
+    public void CaptureUnsupportedColliders_ShouldNotConsumeDrawSequence()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        using GravitasWorldContext context2D = Physics2DTestWorld.CreateContext();
+        scenario.Context.Diagnostics.Enable(eventCapacity: 0, drawCommandCapacity: 1);
+        context2D.Diagnostics.Enable(eventCapacity: 0, drawCommandCapacity: 1);
+
+        scenario.Context.Diagnostics.CaptureCollider(new UnsupportedTestCollider3D(), GravitasDiagnosticColor.Cyan);
+        context2D.Diagnostics.CaptureMixedCollider(new UnsupportedTestCollider2D(), GravitasDiagnosticColor.Cyan);
+        scenario.Context.Diagnostics.CaptureLine(Vector3d.Zero, Vector3d.Right, GravitasDiagnosticColor.Green);
+        context2D.Diagnostics.CaptureLine(Vector3d.Zero, Vector3d.Right, GravitasDiagnosticColor.Green);
+
+        GravitasDebugDrawCommand command3D = scenario.Context.Diagnostics.DrawCommands.Should().ContainSingle().Which;
+        command3D.Kind.Should().Be(GravitasDebugDrawKind.Line);
+        command3D.Sequence.Should().Be(0);
+        GravitasDebugDrawCommand command2D = context2D.Diagnostics.DrawCommands.Should().ContainSingle().Which;
+        command2D.Kind.Should().Be(GravitasDebugDrawKind.Line);
+        command2D.Sequence.Should().Be(0);
+    }
+
+    [Fact]
     public void EnabledDiagnostics_ShouldRecordDeterministicEventsAndStayContextScoped()
     {
         using PhysicsScenarioBuilder firstScenario = PhysicsScenarioBuilder.Create();
@@ -598,6 +619,33 @@ public sealed class GravitasDiagnosticSinkTests
         Assert2DDrawCommandMetadata(commands2D[1], GravitasDebugDrawKind.Point, second2D.Collider.Id, ColliderType2D.Circle);
         Assert2DDrawCommandMetadata(commands2D[2], GravitasDebugDrawKind.Line, first2D.Collider.Id, ColliderType2D.Circle);
         Assert2DDrawCommandMetadata(commands2D[3], GravitasDebugDrawKind.Ray, first2D.Collider.Id, ColliderType2D.Circle);
+    }
+
+    [Fact]
+    public void CaptureJoint_WithZeroAuthoredFrameRotation_ShouldEmitUnitAxisRays()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> first = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
+        ScenarioBody<LSSphereCollider> second = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(2, 0, 0));
+        var zeroRotationFrame = new FixedTransform(Vector3d.Zero, default, Vector3d.One);
+        Joint3D joint = scenario.Context.Constraints3D.RegisterJoint(
+            new JointDefinition3D(
+                first.Body,
+                second.Body,
+                zeroRotationFrame,
+                zeroRotationFrame,
+                JointType3D.Hinge,
+                JointLimit3D.Unrestricted,
+                JointMotor3D.Disabled,
+                JointCollisionPolicy.SuppressLinked));
+
+        scenario.Context.Diagnostics.Enable(eventCapacity: 0, drawCommandCapacity: 5);
+        scenario.Context.Diagnostics.CaptureJoint(joint, GravitasDiagnosticColor.Cyan);
+
+        ReadOnlySpan<GravitasDebugDrawCommand> commands = scenario.Context.Diagnostics.DrawCommands;
+        commands.Length.Should().Be(5);
+        commands[3].End.Should().Be(commands[3].Start + Vector3d.Right);
+        commands[4].End.Should().Be(commands[4].Start + Vector3d.Right);
     }
 
     [Fact]

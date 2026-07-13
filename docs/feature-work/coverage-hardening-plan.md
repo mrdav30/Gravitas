@@ -22,31 +22,31 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-mesh-task46-authoritative-final2/b5fa3c62-a27b-4416-a20c-5454bf41b21c/coverage.cobertura.xml`.
+`TestResults/coverage-diagnostic-task47-authoritative-root-comparable/53982f2b-37f7-43b9-ab36-e428ba6dd57a/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
-| Lines | 99.73% | 26,944 / 27,015 | 71 | 100% |
-| Branches | 99.25% | 10,396 / 10,474 | 78 | 100% |
+| Lines | 99.74% | 26,942 / 27,011 | 69 | 100% |
+| Branches | 99.28% | 10,395 / 10,470 | 75 | 100% |
 | Methods | 99.35% | 3,518 / 3,541 | 23 | 100% |
 
-The authoritative full coverage-enabled `Release` suite passes 2,461/2,461 tests, and
+The authoritative full coverage-enabled `Release` suite passes 2,463/2,463 tests, and
 `ReleaseLean` builds both targets without warnings. Branch coverage is now the
 primary constraint, but the remaining line and method gaps must close from the
 same final artifact.
 
-Task 46's authoritative artifact reports 100% line and branch coverage for all
-new checked mesh files, scaled mass/cache ownership, and the touched mesh
-collision and shared SAT files.
+Task 47's authoritative artifact reports 100% line and branch coverage for the
+diagnostic draw block. Unsupported custom shapes preserve draw-command sequence
+ownership, zero authored joint rotations normalize to unit axes, and redundant
+zero-axis and zero-vertex guards are gone.
 
 ### Immediate Completed Block
 
-The mesh transform/mass boundary is resolved and independently reviewed.
-Authored scale now reaches collision vertices, bounds, normals, areas, queries,
-closed-volume properties, and inertia without rebuilding immutable topology or
-the local BVH. Surface approximation is a physical deterministic thin shell,
-invalid fixed-point geometry/mass rejects atomically, and the issue has moved to
-resolved history in [`issue-tracker.md`](issue-tracker.md).
+The diagnostic draw boundary is resolved and independently reviewed. Unsupported
+custom 3D and 2D collider shapes remain deterministic no-ops without consuming
+draw sequence IDs. Joint axes are guaranteed nonzero by normalized rotation of
+unit basis vectors, while empty custom 2D vertex sets already no-op through the
+loop contract, so both redundant guards were deleted.
 
 ## Rules Of Engagement
 
@@ -113,15 +113,14 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | `Diagnostics/GravitasDiagnosticSink.Draw.cs` | 2 | 3 | 0 | Shape dispatch, vertex ownership, and disabled-output behavior. |
-| 2 | `Materials/PhysicsMaterial.cs` | 2 | 3 | 0 | Authored validation, combine policy, and deterministic limits. |
-| 3 | `Colliders/Definitions/ColliderShapeDefinition.cs` | 1 | 3 | 0 | Validated kind-specific authoring and equality/hash behavior. |
-| 4 | `Colliders/Hierarchy/ColliderHierarchyState.cs` | 1 | 3 | 1 | Parent ownership, replay identity, and reset behavior. |
-| 5 | `Queries/Mixed/MixedSweepBoxUtility.cs` | 0 | 3 | 0 | Slab bounds, degenerate displacement, and stable extrema. |
-| 6 | `Core/3D/SolidBody.ContinuousCollision.Helpers.cs` | 0 | 3 | 0 | Candidate filters and relative-motion fallback. |
-| 7 | `CollisionHandling/Detection/3D/Sat/AxisProjectionHelper.cs` | 5 | 2 | 1 | Capsule/cuboid axes, sphere projection, and degenerate normals. |
-| 8 | `Constraints/3D/RagdollRuntime3D.cs` | 3 | 2 | 1 | Replay load shape, link ownership, and stable reconstruction. |
-| 9 | `Core/2D/GravitasPhysics2DService.SupportTypes.cs` | 3 | 2 | 0 | Stable support ordering and lifecycle-proven ownership. |
+| 1 | `Materials/PhysicsMaterial.cs` | 2 | 3 | 0 | Authored validation, combine policy, and deterministic limits. |
+| 2 | `Colliders/Definitions/ColliderShapeDefinition.cs` | 1 | 3 | 0 | Validated kind-specific authoring and equality/hash behavior. |
+| 3 | `Colliders/Hierarchy/ColliderHierarchyState.cs` | 1 | 3 | 1 | Parent ownership, replay identity, and reset behavior. |
+| 4 | `Queries/Mixed/MixedSweepBoxUtility.cs` | 0 | 3 | 0 | Slab bounds, degenerate displacement, and stable extrema. |
+| 5 | `Core/3D/SolidBody.ContinuousCollision.Helpers.cs` | 0 | 3 | 0 | Candidate filters and relative-motion fallback. |
+| 6 | `CollisionHandling/Detection/3D/Sat/AxisProjectionHelper.cs` | 5 | 2 | 1 | Capsule/cuboid axes, sphere projection, and degenerate normals. |
+| 7 | `Constraints/3D/RagdollRuntime3D.cs` | 3 | 2 | 1 | Replay load shape, link ownership, and stable reconstruction. |
+| 8 | `Core/2D/GravitasPhysics2DService.SupportTypes.cs` | 3 | 2 | 0 | Stable support ordering and lifecycle-proven ownership. |
 
 ### Phase 1: Core Runtime And Service Ownership
 
@@ -442,6 +441,7 @@ of record.
 | 3D capsule closure | 99.72% | 99.21% | 99.28% | 2,422 | The capsule reached 100%; drag area now follows the exact rotation-aware silhouette, solid hemisphere centroids contribute the missing transverse inertia term, quantized zero volume uses a shifted thin-rod limit, fixed-point cap-normal fallbacks remain covered, and one impossible closest-point guard was removed. |
 | 3D compound closure | 99.73% | 99.24% | 99.34% | 2,433 | The compound family reached 100%; mass now uses explicit solid volume or shell policy, fixed-point residual mass is exact, part COM/tensors and owner offsets share one frame, remote parts remain query-visible, false aggregate `ScaledSize` was removed, and the discovered mesh-scale and point-transform boundaries are tracked explicitly. |
 | Mesh transform and mass closure | 99.73% | 99.25% | 99.35% | 2,461 | Mesh scale now reaches bounds, normals, areas, queries, collision, closed-volume covariance, and physical thin-shell inertia through checked atomic lifecycle commits. Immutable topology/BVH caches survive transforms, closed mass is cached per committed scale, SAT edge separation is exact, and the touched mesh/SAT files reached 100%. |
+| Diagnostic draw closure | 99.74% | 99.28% | 99.35% | 2,463 | Diagnostic draw reached 100%; unsupported custom shapes preserve sequence ownership, zero authored joint rotations emit unit axes through normalized identity fallback, and redundant zero-axis and zero-vertex guards were removed after independent review. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.
