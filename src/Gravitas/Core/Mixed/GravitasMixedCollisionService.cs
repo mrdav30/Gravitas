@@ -181,6 +181,4 @@ internal sealed partial class GravitasMixedCollisionService
         _retainedPartitionRetirementCursor = 0;
     }
 
-    internal void Deactivate() => Reset();
-
 }

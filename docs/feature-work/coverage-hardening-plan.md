@@ -22,31 +22,32 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-settings-square-validation-task83-final-authoritative-root-comparable/a12df29a-6fdf-4bdb-a3ac-8c0c11751a0d/coverage.cobertura.xml`.
+`TestResults/coverage-mixed-runtime-tail-task84-authoritative/68c0b55b-20cb-4e2b-99bd-a30f5dc50011/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
-| Lines | 99.95% | 27,173 / 27,185 | 12 | 100% |
+| Lines | 99.96% | 27,174 / 27,183 | 9 | 100% |
 | Branches | 100% | 10,407 / 10,407 | 0 | 100% |
-| Methods | 99.69% | 3,537 / 3,548 | 11 | 100% |
+| Methods | 99.77% | 3,538 / 3,546 | 8 | 100% |
 
 The authoritative full coverage-enabled `Release` suite passes 2,555/2,555 tests, and
 `ReleaseLean` builds both targets without warnings. Branch coverage is now the
 first metric at 100%; the remaining line and method gaps must now close from the
 same final artifact.
 
-Task 83's authoritative artifact closes the final branch in settings matrix
-validation. Missing rows now fail deterministically, and overlong rows no longer
-violate the square-matrix contract through silent truncation.
+Task 84's authoritative artifact closes the mixed runtime lifecycle/accessor
+block. The retained public mixed-query service now proves exact context
+ownership beside its 2D and 3D counterparts, while two unreferenced lifecycle-
+shaped methods were deleted instead of being invoked artificially.
 
 ### Immediate Completed Block
 
-The settings matrix validation block is resolved. Default/missing `MatrixRow`
-values can arrive through direct callers, omitted JSON, MemoryPack, or Lean
-build consumers; they now produce the explicit square-matrix error instead of a
-`NullReferenceException`. Review also found that overlong rows were silently
-truncated. Exact-length validation now rejects both short and long rows, with
-failing-before-fix evidence for the overlong case.
+The mixed runtime lifecycle/accessor block is resolved. The public
+`GravitasQueryMixedService.Context` contract now has the same exact owner
+assertion as the 2D and 3D services. `GravitasMixedCollisionService.Deactivate`
+duplicated the live `Reset` path without a caller, and
+`PhysicsMixedPartition.OnChange` survived an obsolete GridForge contract; both
+were removed after complete Gravitas/GridForge call-graph review.
 
 ## Rules Of Engagement
 
@@ -113,10 +114,9 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | Mixed runtime lifecycle/accessor wrappers | 3 | 0 | 3 | Prove or delete `Deactivate`, partition `OnChange`, and query context exposure as one ownership block. |
-| 2 | Value-object hashes, settings accessor, and warm-start constructor | 4 | 0 | 4 | Pin one-line public/internal value contracts without invocation-only assertions. |
-| 3 | `Colliders/Mesh/MeshUtils.cs` | 2 | 0 | 2 | Classify legacy array geometry wrappers against current callers. |
-| 4 | `Diagnostics/Logging/GravitasLogger.cs` | 3 | 0 | 2 | Prove default formatting/dispatch or remove obsolete defaults. |
+| 1 | Value-object hashes, settings accessor, and warm-start constructor | 4 | 0 | 4 | Pin one-line public/internal value contracts without invocation-only assertions. |
+| 2 | `Colliders/Mesh/MeshUtils.cs` | 2 | 0 | 2 | Classify legacy array geometry wrappers against current callers. |
+| 3 | `Diagnostics/Logging/GravitasLogger.cs` | 3 | 0 | 2 | Prove default formatting/dispatch or remove obsolete defaults. |
 
 ### Phase 1: Core Runtime And Service Ownership
 
@@ -179,6 +179,10 @@ mid-block merely because another branch looks easier.
 - [x] Close and independently review the matching 3D partition contract through
       diagnostic spurious removals, unattached awake no-op state, and unchanged
       retained ownership; delete the obsolete GridForge `OnChange` method.
+- [x] Close and independently review the mixed runtime ownership tail: retain
+      exact query-context identity, delete the unused collision-service
+      `Deactivate` alias, and remove the obsolete mixed-partition `OnChange`
+      method.
 - [x] Close and independently review residual 3D body-motion outcomes through
       initialize, simulate, late-simulate, reset, deactivate, shell reuse,
       grounded friction, anisotropic gyro, and queued CCD workflows.
@@ -500,6 +504,7 @@ of record.
 | CCD zero-inverse-mass policy closure | 99.95% | 99.98% | 99.69% | 2,553 | Shared impulse policy now proves an infinite-mass participant is neutral rather than pair-rejecting, while the existing near-singular positive-mobility guard remains exact. |
 | 3D solver tangent fallback deletion | 99.95% | 99.99% | 99.69% | 2,553 | The sole caller supplies a normalized nonzero contact normal; least-component axis selection guarantees a nondegenerate cross product, so the unreachable epsilon fallback was deleted. |
 | Settings square-matrix validation closure | 99.95% | 100% | 99.69% | 2,555 | Missing rows now fail with the explicit square-matrix contract, overlong rows no longer truncate silently, and branch coverage reached 10,407/10,407. |
+| Mixed runtime lifecycle/accessor closure | 99.96% | 100% | 99.77% | 2,555 | Mixed queries now prove exact world-context ownership; the unused mixed-collision `Deactivate` alias and obsolete GridForge partition `OnChange` callback were deleted after complete call-graph review. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.

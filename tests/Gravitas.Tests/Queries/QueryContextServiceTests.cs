@@ -19,8 +19,10 @@ public sealed class QueryContextServiceTests
 
         context.Query2D.Should().NotBeNull();
         context.Query3D.Should().NotBeNull();
+        context.QueryMixed.Should().NotBeNull();
         context.Query2D.Context.Should().BeSameAs(context);
         context.Query3D.Context.Should().BeSameAs(context);
+        context.QueryMixed.Context.Should().BeSameAs(context);
     }
 
     [Fact]

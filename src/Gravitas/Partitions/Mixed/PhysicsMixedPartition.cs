@@ -97,8 +97,6 @@ internal sealed class PhysicsMixedPartition : IVoxelPartition, IRetainedPhysicsP
         IsPartitioned = true;
     }
 
-    public void OnChange() { }
-
     internal void Distribute(
         SwiftList<int> dynamic3DIds,
         SwiftList<int> kinematic3DIds,
