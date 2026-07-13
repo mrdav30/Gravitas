@@ -366,6 +366,38 @@ active/dynamic-ID admission predicates removed in Task 67.
 
 ## Resolved Issues
 
+### Pending CCD Replay Hashes Depended On Deleted Collider ID History
+
+**Resolved:** 2026-07-13  
+**Source:** 95%-to-100% coverage hardening, dimensional body replay review  
+**Affected area:** `SolidBody.ContributeReplayHash(...)` and
+`SolidBody2D.ContributeReplayHash(...)`
+
+RCA: pending 2D/3D CCD handoffs hashed ignored collider references using
+context-local registry IDs. Equivalent contexts with the same live registration
+order but different deleted-ID/free-list history could therefore produce
+different authoritative hashes, contradicting the documented dense
+replay-ordinal contract. Solver-cache subsections also wrote both ignored IDs a
+second time even though non-null references imply a pending handoff and were
+already encoded authoritatively.
+
+Fix: authoritative ignored references now hash their prepared `ReplayOrdinal`.
+The four duplicate solver-cache writes were removed. Both dimensional
+authoritative-CCD and solver-cache subsection versions were incremented from 1
+to 2.
+
+Verification:
+
+- Symmetric mixed handoff tests batch-create and delete six colliders, then
+  register the same live anchor and ignored collider. Compact and churned
+  contexts retain identical replay order while allocator IDs differ; hashes now
+  match in both 2D-to-3D and 3D-to-2D directions and fail under the old ID policy.
+- Focused replay suites pass 48/48 and both body replay-hash files report 100%
+  line, branch, and method coverage.
+- Authoritative artifact
+  `TestResults/coverage-body-replay-task76-final-authoritative-root-comparable/89757f3d-f55c-41d5-998b-e1d4f97f8d20/coverage.cobertura.xml`
+  passes 2,549/2,549 full `Release` tests.
+
 ### Mesh-Cone Triangle Containment Used Contact-Oriented Normals
 
 **Resolved:** 2026-07-13  

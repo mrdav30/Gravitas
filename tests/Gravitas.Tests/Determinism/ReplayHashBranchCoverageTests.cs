@@ -436,6 +436,13 @@ public sealed partial class ReplayHashBranchCoverageTests
         Hash2DHandoffWith3DIgnoredCollider(hasIgnoredCollider: true)
             .Should()
             .NotBe(Hash2DHandoffWith3DIgnoredCollider(hasIgnoredCollider: false));
+
+        Hash3DHandoffWith2DIgnoredCollider(hasIgnoredCollider: true, deletedColliderCount: 6)
+            .Should()
+            .Be(Hash3DHandoffWith2DIgnoredCollider(hasIgnoredCollider: true));
+        Hash2DHandoffWith3DIgnoredCollider(hasIgnoredCollider: true, deletedColliderCount: 6)
+            .Should()
+            .Be(Hash2DHandoffWith3DIgnoredCollider(hasIgnoredCollider: true));
     }
 
     [Fact]
@@ -844,10 +851,14 @@ public sealed partial class ReplayHashBranchCoverageTests
         return (context.ComputeReplayHash(), context.MixedCollisions.ActivePairCount);
     }
 
-    private static ChronicleHash Hash3DHandoffWith2DIgnoredCollider(bool hasIgnoredCollider)
+    private static ChronicleHash Hash3DHandoffWith2DIgnoredCollider(
+        bool hasIgnoredCollider,
+        int deletedColliderCount = 0)
     {
         using GravitasWorldContext context = CreateMixedContext();
         SolidBody body = CreateBody3D(context, Vector3d.Zero).Body!;
+        ChurnDeleted2DCollidersInBatch(context, deletedColliderCount);
+        _ = CreateBodylessCircle2D(context, new Vector2d((Fixed64)6, Fixed64.Zero));
         LSCircleCollider2D ignored = CreateBodylessCircle2D(context, Vector2d.Right * (Fixed64)4);
 
         body.ApplyContinuousCollisionHandoff(
@@ -856,13 +867,19 @@ public sealed partial class ReplayHashBranchCoverageTests
             Fixed64.FromFraction(1, 16),
             ignoredCollider2D: hasIgnoredCollider ? ignored : null);
 
+        context.Physics.PrepareReplayColliders();
+        context.Physics2D.PrepareReplayColliders();
         return HashBody3D(body, GravitasReplayHashMode.Authoritative);
     }
 
-    private static ChronicleHash Hash2DHandoffWith3DIgnoredCollider(bool hasIgnoredCollider)
+    private static ChronicleHash Hash2DHandoffWith3DIgnoredCollider(
+        bool hasIgnoredCollider,
+        int deletedColliderCount = 0)
     {
         using GravitasWorldContext context = CreateMixedContext();
         SolidBody2D body = CreateBody2D(context, Vector2d.Zero);
+        ChurnDeleted3DCollidersInBatch(context, deletedColliderCount);
+        _ = CreateBodylessSphere3D(context, new Vector3d((Fixed64)6, Fixed64.Zero, Fixed64.Zero));
         LSSphereCollider ignored = CreateBodylessSphere3D(context, Vector3d.Right * (Fixed64)4);
 
         body.ApplyContinuousCollisionHandoff(
@@ -871,6 +888,8 @@ public sealed partial class ReplayHashBranchCoverageTests
             Fixed64.FromFraction(1, 16),
             ignoredCollider3D: hasIgnoredCollider ? ignored : null);
 
+        context.Physics.PrepareReplayColliders();
+        context.Physics2D.PrepareReplayColliders();
         return HashBody2D(body, GravitasReplayHashMode.Authoritative);
     }
 
@@ -1085,6 +1104,20 @@ public sealed partial class ReplayHashBranchCoverageTests
         }
     }
 
+    private static void ChurnDeleted3DCollidersInBatch(GravitasWorldContext context, int count)
+    {
+        var colliders = new LSSphereCollider[count];
+        for (int i = 0; i < count; i++)
+        {
+            colliders[i] = CreateBodylessSphere3D(
+                context,
+                new Vector3d((Fixed64)(8 + i), Fixed64.Zero, Fixed64.Zero));
+        }
+
+        for (int i = 0; i < colliders.Length; i++)
+            colliders[i].Deactivate();
+    }
+
     private static void ChurnDeleted2DColliders(GravitasWorldContext context, int count)
     {
         for (int i = 0; i < count; i++)
@@ -1094,6 +1127,20 @@ public sealed partial class ReplayHashBranchCoverageTests
                 new Vector2d((Fixed64)(8 + i), Fixed64.Zero));
             collider.Deactivate();
         }
+    }
+
+    private static void ChurnDeleted2DCollidersInBatch(GravitasWorldContext context, int count)
+    {
+        var colliders = new LSCircleCollider2D[count];
+        for (int i = 0; i < count; i++)
+        {
+            colliders[i] = CreateBodylessCircle2D(
+                context,
+                new Vector2d((Fixed64)(8 + i), Fixed64.Zero));
+        }
+
+        for (int i = 0; i < colliders.Length; i++)
+            colliders[i].Deactivate();
     }
 
     private static ChronicleHash HashJoint2D(Joint2D joint, GravitasReplayHashMode mode) =>
