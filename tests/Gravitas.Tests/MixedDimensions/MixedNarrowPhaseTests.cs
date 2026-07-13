@@ -2,6 +2,7 @@ using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
+using Gravitas.Materials;
 using Gravitas.Tests.Support;
 using GridForge.Configuration;
 using SwiftCollections;
@@ -1589,6 +1590,42 @@ public sealed class MixedNarrowPhaseTests
         contact.Depth.Should().Be(shallow.Depth);
         contact.Normal3DTo2D.Should().Be(shallow.Normal3DTo2D);
         contact.Point2D.Should().Be(shallow.Point2D);
+    }
+
+    [Fact]
+    public void CompoundAgainstCompound2D_ShouldPreserveInnermostPartMaterials()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        var material3D = new PhysicsMaterial(
+            Fixed64.FromFraction(1, 2),
+            Fixed64.FromFraction(1, 4),
+            Fixed64.FromFraction(1, 3));
+        var material2D = new PhysicsMaterial(
+            Fixed64.FromFraction(3, 4),
+            Fixed64.FromFraction(1, 2),
+            Fixed64.FromFraction(2, 3));
+        var compound3D = new LSCompoundCollider(
+            CompoundColliderPart.Sphere(Fixed64.Half, Vector3d.Zero, material3D));
+        var compound2D = new LSCompoundCollider2D(
+            CompoundColliderPart2D.Circle(Fixed64.Half, Vector2d.Zero, material2D));
+        ScenarioBody<LSCompoundCollider> body3D = CreateBody3D(
+            context,
+            compound3D,
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+        SolidBody2D body2D = CreateBody2D(context, compound2D, Vector2d.Zero);
+        body3D.Collider.Material = PhysicsMaterial.Frictionless;
+        body2D.Collider.Material = PhysicsMaterial.Bouncy;
+
+        bool collided = CollisionDetectionMixed.TryCollide(
+            body3D.Collider,
+            body2D.Collider,
+            out MixedContact contact);
+
+        collided.Should().BeTrue();
+        contact.HasMaterialOverride.Should().BeTrue();
+        contact.Material3D.Should().Be(material3D);
+        contact.Material2D.Should().Be(material2D);
     }
 
     [Fact]
