@@ -22,33 +22,35 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-mixed-partition-task68-authoritative-root-comparable/0dfe6363-aeca-4fa3-b77f-3c68c5724bc4/coverage.cobertura.xml`.
+`TestResults/coverage-contact-manifolds-task69-authoritative-root-comparable/c4da30f9-5f46-4ea0-ab83-68a08547a432/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
-| Lines | 99.88% | 27,151 / 27,181 | 30 | 100% |
-| Branches | 99.79% | 10,410 / 10,431 | 21 | 100% |
-| Methods | 99.46% | 3,532 / 3,551 | 19 | 100% |
+| Lines | 99.92% | 27,152 / 27,173 | 21 | 100% |
+| Branches | 99.81% | 10,402 / 10,421 | 19 | 100% |
+| Methods | 99.66% | 3,537 / 3,549 | 12 | 100% |
 
-The authoritative full coverage-enabled `Release` suite passes 2,539/2,539 tests, and
+The authoritative full coverage-enabled `Release` suite passes 2,540/2,540 tests, and
 `ReleaseLean` builds both targets without warnings. Branch coverage is now the
 primary constraint, but the remaining line and method gaps must close from the
 same final artifact.
 
-Task 68's authoritative artifact reports 100% line, branch, and method coverage
-for mixed partitioning. The block collapsed an impossible partition-attach
-cleanup branch to the same fail-fast invariant used by pure 2D and 3D services.
+Task 69's authoritative artifact reports 100% line, branch, and method coverage
+for both 2D/3D contact manifolds and their enumerators. The block deleted dead
+material-setting overloads, simplified duplicate tie policy, and pinned the
+boxed enumeration contract.
 
 ### Immediate Completed Block
 
-The mixed partition attach block is resolved. `GetOrCreatePartition` receives a
-current traced voxel, performs an exact-type lookup, then rents an internal
-sealed partition whose owner is assigned before attachment. In supported
-single-thread deterministic execution, duplicate insertion cannot occur and
-`OnAddToVoxel` cannot fail. The untestable release-and-throw branch was replaced
-with the established `SwiftThrowHelper` invariant expression, so failure stays
-loud without preserving impossible recovery code. GridForge spawn-token reuse
-is unrelated because no stored coordinate is resolved on this path.
+The dimensional contact-manifold block is resolved. Callerless internal
+material-aware `SetContact` overloads and their coverage-only 2D test were
+deleted; live compound-part material flow remains on material-aware
+`AddContact`. Because contacts are unique and sorted by ascending identity,
+equal-depth scans always advance to the later/higher-ID incumbent, so both
+reducers now express that policy directly with `<=`. Symmetric exact tests kill
+`<=`-to-`<` mutations. Non-generic enumeration tests prove the required boxed
+`GetEnumerator`, `Current`, stable order, and `Reset` behavior while concrete
+runtime enumeration remains allocation-free.
 
 ## Rules Of Engagement
 
@@ -115,11 +117,11 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | `CollisionHandling/Contacts/3D/ContactManifold.cs` | 4 | 1 | 2 | Retained contact construction/reduction surface and threshold ownership. |
-| 2 | `Core/2D/GravitasPhysics2DService.SupportTypes.cs` | 3 | 1 | 0 | Service token/default state and sparse support ownership. |
-| 3 | `CollisionHandling/Contacts/2D/ContactManifold2D.cs` | 1 | 1 | 1 | Empty/default enumerator and retained contact ownership. |
-| 4 | `CollisionHandling/Continuous/ContinuousCollisionMath.cs` | 1 | 1 | 0 | Exact fixed-point threshold and fallback ownership. |
-| 5 | `CollisionHandling/Detection/3D/CollisionDetection.Cone.cs` | 1 | 1 | 0 | Cone contact degeneracy and fallback selection. |
+| 1 | `Core/2D/GravitasPhysics2DService.SupportTypes.cs` | 3 | 1 | 0 | Service token/default state and sparse support ownership. |
+| 2 | `CollisionHandling/Continuous/ContinuousCollisionMath.cs` | 1 | 1 | 0 | Exact fixed-point threshold and fallback ownership. |
+| 3 | `CollisionHandling/Detection/3D/CollisionDetection.Cone.cs` | 1 | 1 | 0 | Cone contact degeneracy and fallback selection. |
+| 4 | `CollisionHandling/Response/2D/SolverContactBuffer2D.cs` | 1 | 1 | 0 | Fixed-capacity contact-buffer admission and overflow policy. |
+| 5 | `CollisionHandling/Response/3D/SolverContactBuffer.cs` | 1 | 1 | 0 | Fixed-capacity contact-buffer admission and overflow policy. |
 | 6 | Remaining one-branch collision, query, replay, settings, and CCD blocks | 0-1 | 1 each | 0-1 | Re-rank from each authoritative artifact; finish one cohesive source block at a time. |
 
 ### Phase 1: Core Runtime And Service Ownership
@@ -489,6 +491,7 @@ of record.
 | 3D joint replay identity closure | 99.87% | 99.76% | 99.46% | 2,539 | `Joint3D` reached 100%; constructor-required collider references are hashed directly, legitimate unregistered IDs remain `-1`, and deliberately divergent dynamic/collider IDs pin both ordered identity fields. Independent review caught and corrected an initially coincident-ID witness. |
 | 2D/3D CCD service admission closure | 99.87% | 99.78% | 99.46% | 2,539 | Both continuous-collision service files reached 100%; registered-body traversal makes the 3D active check redundant, and `CanTranslate` makes both non-negative queue-ID checks caller-impossible while processed-body and duplicate-queue gates retain real ownership policy. |
 | Mixed partition attach closure | 99.88% | 99.79% | 99.46% | 2,539 | Mixed partitioning reached 100%; the impossible local attach-failure recovery was collapsed to the same fail-fast invariant as pure 2D/3D after proving current-voxel, exact-type, sealed-partition, owner, and single-thread guarantees. |
+| 2D/3D contact-manifold closure | 99.92% | 99.81% | 99.66% | 2,540 | Both manifolds and enumerators reached 100%; callerless material `SetContact` overloads were deleted, sorted-identity tie policy became direct `<=` depth selection, exact mutations prove highest-ID eviction, and boxed enumerator Current/Reset contracts are covered without changing hot paths. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.

@@ -1,6 +1,7 @@
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.CollisionHandling;
+using System.Collections;
 using System.Linq;
 using Xunit;
 
@@ -50,6 +51,25 @@ public sealed class ContactManifoldTests
 
         manifold.Count.Should().Be(1);
         manifold.PrimaryContact.Depth.Should().Be(Fixed64.FromFraction(1, 2));
+    }
+
+    [Fact]
+    public void NonGenericEnumerator_ShouldExposeCurrentAndSupportReset()
+    {
+        var manifold = new ContactManifold();
+        manifold.AddContact(Vector3d.Zero, Vector3d.Forward, Fixed64.Half, Vector3d.Forward);
+        manifold.AddContact(Vector3d.Right, Vector3d.Right + Vector3d.Forward, Fixed64.One, Vector3d.Forward);
+        IEnumerator enumerator = ((IEnumerable)manifold).GetEnumerator();
+
+        enumerator.MoveNext().Should().BeTrue();
+        enumerator.Current.Should().Be(manifold[0]);
+        enumerator.MoveNext().Should().BeTrue();
+        enumerator.Current.Should().Be(manifold[1]);
+
+        enumerator.Reset();
+
+        enumerator.MoveNext().Should().BeTrue();
+        enumerator.Current.Should().Be(manifold[0]);
     }
 
     [Fact]

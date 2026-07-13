@@ -110,18 +110,6 @@ public sealed class ContactManifold2D : IEnumerable<ManifoldContact2D>
         AddContact(pointA, pointB, depth, normal);
     }
 
-    internal void SetContact(
-        Vector2d pointA,
-        Vector2d pointB,
-        Fixed64 depth,
-        Vector2d normal,
-        PhysicsMaterial materialA,
-        PhysicsMaterial materialB)
-    {
-        _count = 0;
-        AddContact(pointA, pointB, depth, normal, materialA, materialB);
-    }
-
     /// <summary>
     /// Adds a contact, keeping the deepest two contacts and exposing them by stable contact identity.
     /// </summary>
@@ -197,8 +185,7 @@ public sealed class ContactManifold2D : IEnumerable<ManifoldContact2D>
 
     private int FindShallowestReplacementIndex(ManifoldContact2D candidate)
     {
-        int replaceIndex = _contact1.Depth < _contact0.Depth
-            || _contact1.Depth == _contact0.Depth && _contact1.ContactId > _contact0.ContactId
+        int replaceIndex = _contact1.Depth <= _contact0.Depth
             ? 1
             : 0;
 

@@ -1,7 +1,7 @@
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.CollisionHandling;
-using Gravitas.Materials;
+using System.Collections;
 using System.Linq;
 using Xunit;
 
@@ -112,7 +112,7 @@ public sealed class ContactManifold2DTests
     }
 
     [Fact]
-    public void AddContact_WhenFullWithEqualDepth_ShouldReplaceHigherIdentityContact()
+    public void AddContact_WhenFullWithEqualDepth_ShouldReplaceHighestIdentityContact()
     {
         ContactCandidate[] contacts = Enumerable.Range(-8, 17)
             .Select(static value => CreateCandidate(value))
@@ -120,16 +120,16 @@ public sealed class ContactManifold2DTests
             .ToArray();
         var manifold = new ContactManifold2D();
         ContactCandidate replacement = contacts[0];
-        ContactCandidate shallow = contacts[2];
-        ContactCandidate deep = contacts[3];
+        ContactCandidate kept = contacts[2];
+        ContactCandidate replaced = contacts[3];
 
-        manifold.AddContact(shallow.PointA, shallow.PointB, Fixed64.Half, Vector2d.Forward);
-        manifold.AddContact(deep.PointA, deep.PointB, Fixed64.One, Vector2d.Forward);
+        manifold.AddContact(kept.PointA, kept.PointB, Fixed64.Half, Vector2d.Forward);
+        manifold.AddContact(replaced.PointA, replaced.PointB, Fixed64.Half, Vector2d.Forward);
         manifold.AddContact(replacement.PointA, replacement.PointB, Fixed64.Half, Vector2d.Forward);
 
         manifold.Select(static contact => contact.ContactId)
             .Should()
-            .Equal(new[] { replacement.ContactId, deep.ContactId }.OrderBy(static id => id));
+            .Equal(new[] { replacement.ContactId, kept.ContactId }.OrderBy(static id => id));
     }
 
     [Fact]
@@ -189,26 +189,22 @@ public sealed class ContactManifold2DTests
     }
 
     [Fact]
-    public void SetContact_WithMaterialOverride_ShouldReplaceContactsAndPreserveMaterials()
+    public void NonGenericEnumerator_ShouldExposeCurrentAndSupportReset()
     {
         var manifold = new ContactManifold2D();
-        PhysicsMaterial materialA = new((Fixed64)2, Fixed64.One, Fixed64.FromFraction(1, 4));
-        PhysicsMaterial materialB = new(Fixed64.Half, Fixed64.Half, Fixed64.FromFraction(1, 8));
-        manifold.AddContact(new Vector2d(0, 0), new Vector2d(0, 1), Fixed64.One, Vector2d.Forward);
-        manifold.AddContact(new Vector2d(1, 0), new Vector2d(1, 1), Fixed64.One, Vector2d.Forward);
+        manifold.AddContact(Vector2d.Zero, Vector2d.Forward, Fixed64.Half, Vector2d.Forward);
+        manifold.AddContact(Vector2d.Right, Vector2d.Right + Vector2d.Forward, Fixed64.One, Vector2d.Forward);
+        IEnumerator enumerator = ((IEnumerable)manifold).GetEnumerator();
 
-        manifold.SetContact(
-            new Vector2d(2, 0),
-            new Vector2d(2, 1),
-            Fixed64.Half,
-            Vector2d.Right,
-            materialA,
-            materialB);
+        enumerator.MoveNext().Should().BeTrue();
+        enumerator.Current.Should().Be(manifold[0]);
+        enumerator.MoveNext().Should().BeTrue();
+        enumerator.Current.Should().Be(manifold[1]);
 
-        manifold.Count.Should().Be(1);
-        manifold.PrimaryContact.HasMaterialOverride.Should().BeTrue();
-        manifold.PrimaryContact.MaterialA.Should().Be(materialA);
-        manifold.PrimaryContact.MaterialB.Should().Be(materialB);
+        enumerator.Reset();
+
+        enumerator.MoveNext().Should().BeTrue();
+        enumerator.Current.Should().Be(manifold[0]);
     }
 
     [Fact]

@@ -121,18 +121,6 @@ public sealed class ContactManifold : IEnumerable<ManifoldContact>
         AddContact(pointA, pointB, depth, normal);
     }
 
-    internal void SetContact(
-        Vector3d pointA,
-        Vector3d pointB,
-        Fixed64 depth,
-        Vector3d normal,
-        PhysicsMaterial materialA,
-        PhysicsMaterial materialB)
-    {
-        _count = 0;
-        AddContact(pointA, pointB, depth, normal, materialA, materialB);
-    }
-
     /// <summary>
     /// Adds a contact, keeping the deepest four contacts and exposing them by stable contact identity.
     /// </summary>
@@ -214,8 +202,7 @@ public sealed class ContactManifold : IEnumerable<ManifoldContact>
         for (int i = 1; i < _count; i++)
         {
             ManifoldContact contact = GetContactUnchecked(i);
-            if (contact.Depth < shallowest.Depth
-                || contact.Depth == shallowest.Depth && contact.ContactId > shallowest.ContactId)
+            if (contact.Depth <= shallowest.Depth)
             {
                 shallowest = contact;
                 replaceIndex = i;
