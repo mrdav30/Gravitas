@@ -121,13 +121,15 @@ public sealed class ColliderShapeDefinition2DTests
         Action createUndefined = () => undefined.CreateCollider();
         Action readUndefinedPolygonVertex = () => _ = undefined.GetPolygonVertex(0);
         Action readCirclePolygonVertex = () => _ = circle.GetPolygonVertex(0);
-        Action createInvalidAabb = () => ColliderShapeDefinition2D.AABBox(new Vector2d(Fixed64.One, Fixed64.Zero));
+        Action createInvalidAabbX = () => ColliderShapeDefinition2D.AABBox(new Vector2d(Fixed64.Zero, Fixed64.One));
+        Action createInvalidAabbY = () => ColliderShapeDefinition2D.AABBox(new Vector2d(Fixed64.One, Fixed64.Zero));
         Action buildCircleFromBoxDefinition = () => _ = new LSCircleCollider2D(ColliderShapeDefinition2D.AABBox(Vector2d.One));
 
         createUndefined.Should().Throw<ArgumentException>().WithParameterName(nameof(ColliderShapeDefinition2D));
         readUndefinedPolygonVertex.Should().Throw<ArgumentException>().WithParameterName(nameof(ColliderShapeDefinition2D));
         readCirclePolygonVertex.Should().Throw<ArgumentException>().WithParameterName(nameof(ColliderShapeDefinition2D));
-        createInvalidAabb.Should().Throw<ArgumentException>().WithParameterName("size");
+        createInvalidAabbX.Should().Throw<ArgumentException>().WithParameterName("size");
+        createInvalidAabbY.Should().Throw<ArgumentException>().WithParameterName("size");
         buildCircleFromBoxDefinition.Should().Throw<ArgumentException>().WithParameterName(nameof(ColliderShapeDefinition2D));
     }
 

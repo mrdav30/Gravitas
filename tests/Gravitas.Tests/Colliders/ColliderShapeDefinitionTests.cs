@@ -122,6 +122,23 @@ public sealed class ColliderShapeDefinitionTests
         definition.MeshInertiaPolicy.Should().Be(MeshInertiaPolicy.RequireClosedVolume);
     }
 
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(3)]
+    public void ConvexMeshDefinition_ShouldRejectTriangleIndicesOutsideVertexArray(int vertexIndex)
+    {
+        Vector3d[] vertices =
+        {
+            Vector3d.Zero,
+            Vector3d.Right,
+            Vector3d.Up
+        };
+
+        Action create = () => ColliderShapeDefinition.ConvexMesh(vertices, new[] { 0, 1, vertexIndex });
+
+        create.Should().Throw<ArgumentException>().WithParameterName("triangles");
+    }
+
     [Fact]
     public void ShapeDefinitionAccessors_ShouldRejectUndefinedAndWrongShapeFamilies()
     {
@@ -226,11 +243,16 @@ public sealed class ColliderShapeDefinitionTests
     {
         ColliderShapeDefinition sphere = ColliderShapeDefinition.Sphere(Fixed64.Half);
         ColliderShapeDefinition same = ColliderShapeDefinition.Sphere(Fixed64.Half);
+        ColliderShapeDefinition explicitDefaultMaterial = ColliderShapeDefinition.Sphere(
+            Fixed64.Half,
+            PhysicsMaterial.Default);
         ColliderShapeDefinition differentRadius = ColliderShapeDefinition.Sphere(Fixed64.One);
         ColliderShapeDefinition capsule = ColliderShapeDefinition.Capsule(Fixed64.Half, (Fixed64)2);
 
         sphere.Should().Be(same);
         sphere.GetHashCode().Should().Be(same.GetHashCode());
+        sphere.Material.Should().Be(explicitDefaultMaterial.Material);
+        sphere.Should().NotBe(explicitDefaultMaterial);
         sphere.Equals((object?)null).Should().BeFalse();
         sphere.Should().NotBe(differentRadius);
         sphere.Should().NotBe(capsule);

@@ -22,33 +22,32 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-material-task48-authoritative-root-comparable/ca67eb88-101e-4cb1-a369-d1ec0857c452/coverage.cobertura.xml`.
+`TestResults/coverage-shape-task49-authoritative-root-comparable/30154899-3fb1-4cc9-8396-14b18ff243cb/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
-| Lines | 99.75% | 26,956 / 27,023 | 67 | 100% |
-| Branches | 99.31% | 10,400 / 10,472 | 72 | 100% |
+| Lines | 99.75% | 26,950 / 27,015 | 65 | 100% |
+| Branches | 99.36% | 10,403 / 10,470 | 67 | 100% |
 | Methods | 99.35% | 3,520 / 3,543 | 23 | 100% |
 
-The authoritative full coverage-enabled `Release` suite passes 2,472/2,472 tests, and
+The authoritative full coverage-enabled `Release` suite passes 2,474/2,474 tests, and
 `ReleaseLean` builds both targets without warnings. Branch coverage is now the
 primary constraint, but the remaining line and method gaps must close from the
 same final artifact.
 
-Task 48's authoritative artifact reports 100% line and branch coverage for
-`PhysicsMaterial`. Average and geometric-mean combination now remain stable at
-fixed-point extremes, combine validation has one authoritative path, and the
-default material-response benchmark remains allocation-free without a credible
-timing regression.
+Task 49's authoritative artifact reports 100% line and branch coverage for both
+3D and 2D collider shape definitions. Invalid/default dispatch now has one
+authoritative path, impossible private payload-null guards are gone, and mesh
+index plus planar size boundaries are covered symmetrically.
 
 ### Immediate Completed Block
 
-The material combine boundary is resolved and independently reviewed. Average
-uses an overflow-safe ties-to-even raw midpoint. Geometric mean preserves equal
-positive identity and avoids product underflow/saturation for unequal positive
-coefficients. Invalid policies retain exact public parameter names after
-duplicate prevalidation was removed. Policy precedence is now documented, and
-the matching FixedMathSharp vector-midpoint defect is tracked separately.
+The authored shape-definition boundary is resolved and independently reviewed
+across dimensions. Default definitions preserve their public
+`ArgumentException` contracts through the dispatch fallback itself. Private
+constructors and snapshot factories make null mesh/polygon payloads
+unrepresentable, so duplicate guards were deleted. Negative/high mesh indices
+and both nonpositive AABB axes now reject with stable parameter ownership.
 
 ## Rules Of Engagement
 
@@ -115,13 +114,12 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | `Colliders/Definitions/ColliderShapeDefinition.cs` | 1 | 3 | 0 | Validated kind-specific authoring and equality/hash behavior. |
-| 2 | `Colliders/Hierarchy/ColliderHierarchyState.cs` | 1 | 3 | 1 | Parent ownership, replay identity, and reset behavior. |
-| 3 | `Queries/Mixed/MixedSweepBoxUtility.cs` | 0 | 3 | 0 | Slab bounds, degenerate displacement, and stable extrema. |
-| 4 | `Core/3D/SolidBody.ContinuousCollision.Helpers.cs` | 0 | 3 | 0 | Candidate filters and relative-motion fallback. |
-| 5 | `CollisionHandling/Detection/3D/Sat/AxisProjectionHelper.cs` | 5 | 2 | 1 | Capsule/cuboid axes, sphere projection, and degenerate normals. |
-| 6 | `Constraints/3D/RagdollRuntime3D.cs` | 3 | 2 | 1 | Replay load shape, link ownership, and stable reconstruction. |
-| 7 | `Core/2D/GravitasPhysics2DService.SupportTypes.cs` | 3 | 2 | 0 | Stable support ordering and lifecycle-proven ownership. |
+| 1 | `Colliders/Hierarchy/ColliderHierarchyState.cs` | 1 | 3 | 1 | Parent ownership, replay identity, and reset behavior. |
+| 2 | `Queries/Mixed/MixedSweepBoxUtility.cs` | 0 | 3 | 0 | Slab bounds, degenerate displacement, and stable extrema. |
+| 3 | `Core/3D/SolidBody.ContinuousCollision.Helpers.cs` | 0 | 3 | 0 | Candidate filters and relative-motion fallback. |
+| 4 | `CollisionHandling/Detection/3D/Sat/AxisProjectionHelper.cs` | 5 | 2 | 1 | Capsule/cuboid axes, sphere projection, and degenerate normals. |
+| 5 | `Constraints/3D/RagdollRuntime3D.cs` | 3 | 2 | 1 | Replay load shape, link ownership, and stable reconstruction. |
+| 6 | `Core/2D/GravitasPhysics2DService.SupportTypes.cs` | 3 | 2 | 0 | Stable support ordering and lifecycle-proven ownership. |
 
 ### Phase 1: Core Runtime And Service Ownership
 
@@ -444,6 +442,7 @@ of record.
 | Mesh transform and mass closure | 99.73% | 99.25% | 99.35% | 2,461 | Mesh scale now reaches bounds, normals, areas, queries, collision, closed-volume covariance, and physical thin-shell inertia through checked atomic lifecycle commits. Immutable topology/BVH caches survive transforms, closed mass is cached per committed scale, SAT edge separation is exact, and the touched mesh/SAT files reached 100%. |
 | Diagnostic draw closure | 99.74% | 99.28% | 99.35% | 2,463 | Diagnostic draw reached 100%; unsupported custom shapes preserve sequence ownership, zero authored joint rotations emit unit axes through normalized identity fallback, and redundant zero-axis and zero-vertex guards were removed after independent review. |
 | Physics material closure | 99.75% | 99.31% | 99.35% | 2,472 | PhysicsMaterial reached 100%; duplicate validation was collapsed without changing parameter contracts, average is overflow-safe and ties-to-even, geometric mean preserves positive identity and extreme coefficients, and the relevant default-material response benchmark remains allocation-free without a credible regression. |
+| Authored shape-definition closure | 99.75% | 99.36% | 99.35% | 2,474 | The 3D and 2D authored definition families reached 100%; dispatch fallbacks now own invalid/default errors, impossible private payload-null guards were deleted, mesh index and planar size boundaries are exact, and omitted versus explicit default material semantics remain distinct. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.

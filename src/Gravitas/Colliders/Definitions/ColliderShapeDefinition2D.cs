@@ -157,15 +157,15 @@ public readonly struct ColliderShapeDefinition2D : IEquatable<ColliderShapeDefin
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal LSCollider2D CreateRuntimeCollider()
     {
-        EnsureDefined();
-
         return Kind switch
         {
             ColliderShapeDefinition2DKind.Circle => new LSCircleCollider2D(this),
             ColliderShapeDefinition2DKind.AABBox => new LSAABBoxCollider2D(this),
             ColliderShapeDefinition2DKind.ConvexPolygon => new LSPolygonCollider2D(this),
             ColliderShapeDefinition2DKind.Capsule => new LSCapsuleCollider2D(this),
-            _ => throw new InvalidOperationException("Unsupported 2D collider shape definition.")
+            _ => throw new ArgumentException(
+                "2D collider shape definition cannot be default.",
+                nameof(ColliderShapeDefinition2D))
         };
     }
 
@@ -196,14 +196,8 @@ public readonly struct ColliderShapeDefinition2D : IEquatable<ColliderShapeDefin
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private void EnsurePolygonDefinition()
-    {
+    private void EnsurePolygonDefinition() =>
         EnsureKind(ColliderShapeDefinition2DKind.ConvexPolygon);
-        SwiftThrowHelper.ThrowIfArgument(
-            _polygonVertices == null,
-            nameof(ColliderShapeDefinition2D),
-            "2D convex polygon definition is missing polygon data.");
-    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void ValidateRadius(Fixed64 radius) =>

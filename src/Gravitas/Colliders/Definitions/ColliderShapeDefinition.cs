@@ -249,8 +249,6 @@ public readonly struct ColliderShapeDefinition : IEquatable<ColliderShapeDefinit
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal LSCollider CreateRuntimeCollider()
     {
-        EnsureDefined();
-
         return Kind switch
         {
             ColliderShapeDefinitionKind.Sphere => new LSSphereCollider(this),
@@ -259,7 +257,9 @@ public readonly struct ColliderShapeDefinition : IEquatable<ColliderShapeDefinit
             ColliderShapeDefinitionKind.Cylinder => new LSCylinderCollider(this),
             ColliderShapeDefinitionKind.Cone => new LSConeCollider(this),
             ColliderShapeDefinitionKind.ConvexMesh => new LSMeshCollider(this),
-            _ => throw new InvalidOperationException("Unsupported collider shape definition.")
+            _ => throw new ArgumentException(
+                "Collider shape definition cannot be default.",
+                nameof(ColliderShapeDefinition))
         };
     }
 
@@ -297,14 +297,8 @@ public readonly struct ColliderShapeDefinition : IEquatable<ColliderShapeDefinit
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private void EnsureMeshDefinition()
-    {
+    private void EnsureMeshDefinition() =>
         EnsureKind(ColliderShapeDefinitionKind.ConvexMesh);
-        SwiftThrowHelper.ThrowIfArgument(
-            _meshVertices == null || _meshTriangles == null,
-            nameof(ColliderShapeDefinition),
-            "Convex mesh definition is missing mesh data.");
-    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void ValidateRadius(Fixed64 radius) =>
