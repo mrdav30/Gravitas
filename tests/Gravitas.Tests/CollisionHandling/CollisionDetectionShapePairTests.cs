@@ -1196,6 +1196,110 @@ public sealed class CollisionDetectionShapePairTests
     }
 
     [Fact]
+    public void MeshCone_WithBackFacingTriangleCrossingConeSide_ShouldUseWindingForContainment()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSMeshCollider> wall = scenario.CreateBody(
+            CreateConcaveTriangle(
+                new Vector3d(Fixed64.Zero, (Fixed64)(-2), (Fixed64)(-2)),
+                new Vector3d(Fixed64.Zero, (Fixed64)2, (Fixed64)(-2)),
+                new Vector3d(Fixed64.Zero, Fixed64.Zero, (Fixed64)2)),
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+        ScenarioBody<LSConeCollider> cone = CreateCone(
+            scenario,
+            new Vector3d(-Fixed64.FromFraction(2, 5), Fixed64.Zero, Fixed64.Zero));
+
+        CollisionPair pair = AssertCollision(scenario, wall.Collider, cone.Collider, CollisionType.Mesh_Cone);
+
+        pair.Manifold.PrimaryContact.Normal.X.Should().BeLessThan(Fixed64.Zero);
+        pair.Manifold.PrimaryContact.PointA.X.Should().Be(Fixed64.Zero);
+        pair.Manifold.PrimaryContact.PointB.X.Should().BeGreaterThan(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void MeshCone_WithOffsetMeshOrigin_ShouldOrientFromCandidateTriangle()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSMeshCollider> wall = scenario.CreateBody(
+            new LSMeshCollider(
+                new[]
+                {
+                    new Vector3d(Fixed64.Zero, (Fixed64)(-2), (Fixed64)(-2)),
+                    new Vector3d(Fixed64.Zero, (Fixed64)2, (Fixed64)(-2)),
+                    new Vector3d(Fixed64.Zero, Fixed64.Zero, (Fixed64)2),
+                    new Vector3d((Fixed64)10, (Fixed64)(-2), (Fixed64)(-2)),
+                    new Vector3d((Fixed64)10, (Fixed64)2, (Fixed64)(-2)),
+                    new Vector3d((Fixed64)10, Fixed64.Zero, (Fixed64)2)
+                },
+                new[] { 0, 1, 2, 3, 4, 5 },
+                MeshColliderMode.Concave,
+                MeshInertiaPolicy.SurfaceApproximation),
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+        ScenarioBody<LSConeCollider> cone = CreateCone(
+            scenario,
+            new Vector3d(Fixed64.FromFraction(2, 5), Fixed64.Zero, Fixed64.Zero));
+
+        wall.Collider.Center.X.Should().Be((Fixed64)5);
+        CollisionPair pair = scenario.CreatePair(wall.Collider, cone.Collider);
+
+        pair.CollisionType.Should().Be(CollisionType.Mesh_Cone);
+        CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
+        pair.Manifold.HasContact.Should().BeTrue();
+
+        pair.Manifold.PrimaryContact.Normal.X.Should().BeGreaterThan(Fixed64.Zero);
+        pair.Manifold.PrimaryContact.PointA.X.Should().Be(Fixed64.Zero);
+        pair.Manifold.PrimaryContact.PointB.X.Should().BeLessThan(Fixed64.Zero);
+        pair.Manifold.PrimaryContact.Depth.Should().Be(Fixed64.FromFraction(1, 10));
+    }
+
+    [Fact]
+    public void MeshCone_WithOverlappingBoundsBeyondTrianglePlane_ShouldRejectSupportContact()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSMeshCollider> mesh = scenario.CreateBody(
+            CreateConcaveTriangle(
+                new Vector3d(Fixed64.FromFraction(9, 20), -Fixed64.One, Fixed64.FromFraction(9, 20)),
+                new Vector3d(Fixed64.FromFraction(9, 20), Fixed64.One, Fixed64.FromFraction(9, 20)),
+                new Vector3d(Fixed64.FromFraction(9, 10), -Fixed64.One, Fixed64.Zero)),
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+        ScenarioBody<LSConeCollider> cone = CreateCone(scenario, Vector3d.Zero);
+
+        mesh.Collider.BoundsMin.X.Should().BeLessThan(cone.Collider.BoundsMax.X);
+        mesh.Collider.BoundsMin.Z.Should().BeLessThan(cone.Collider.BoundsMax.Z);
+
+        AssertNoCollision(scenario, mesh.Collider, cone.Collider, CollisionType.Mesh_Cone);
+    }
+
+    [Fact]
+    public void MeshConeTriangleSupport_AtPositiveEpsilonGap_ShouldAdmitZeroDepthToleranceContact()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        Fixed64 planeXShift = Fixed64.FromFraction(1, 6)
+            - Fixed64.Epsilon * Fixed64.FromFraction(5, 3);
+        ScenarioBody<LSMeshCollider> mesh = scenario.CreateBody(
+            CreateConcaveTriangle(
+                new Vector3d(planeXShift, Fixed64.Zero, (Fixed64)(-2)),
+                new Vector3d((Fixed64)(-4) + planeXShift, (Fixed64)3, (Fixed64)2),
+                new Vector3d((Fixed64)4 + planeXShift, (Fixed64)(-3), (Fixed64)2)),
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+        ScenarioBody<LSConeCollider> cone = CreateCone(
+            scenario,
+            new Vector3d((Fixed64)2, Fixed64.Zero, Fixed64.Zero));
+
+        CollisionPair pair = AssertCollision(scenario, mesh.Collider, cone.Collider, CollisionType.Mesh_Cone);
+
+        Vector3d.Dot(
+                pair.Manifold.PrimaryContact.PointB - pair.Manifold.PrimaryContact.PointA,
+                pair.Manifold.PrimaryContact.Normal)
+            .Should().Be(Fixed64.Epsilon);
+        pair.Manifold.PrimaryContact.Depth.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
     public void MeshCone_WithConeContainedInClosedConvexMesh_ShouldUseConvexFallback()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();

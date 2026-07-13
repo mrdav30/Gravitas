@@ -22,36 +22,35 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-continuous-math-task71-final-authoritative-root-comparable/74e3f071-bbf8-493e-9c2e-a2284311cf13/coverage.cobertura.xml`.
+`TestResults/coverage-cone-task72-final2-authoritative-root-comparable/5a77e663-470f-4ad0-89c8-df09249a72f0/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
-| Lines | 99.93% | 27,160 / 27,177 | 17 | 100% |
-| Branches | 99.84% | 10,405 / 10,421 | 16 | 100% |
+| Lines | 99.94% | 27,181 / 27,197 | 16 | 100% |
+| Branches | 99.85% | 10,406 / 10,421 | 15 | 100% |
 | Methods | 99.66% | 3,537 / 3,549 | 12 | 100% |
 
-The authoritative full coverage-enabled `Release` suite passes 2,543/2,543 tests, and
+The authoritative full coverage-enabled `Release` suite passes 2,547/2,547 tests, and
 `ReleaseLean` builds both targets without warnings. Branch coverage is now the
 primary constraint, but the remaining line and method gaps must close from the
 same final artifact.
 
-Task 71's authoritative artifact reports 100% line, branch, and method coverage
-for `ContinuousCollisionMath`. The block pins the exact positive closing-speed
-threshold and repairs underflow-safe tangential normals in both dimensions.
+Task 72's authoritative artifact reports 100% line, branch, and method coverage
+for `CollisionDetection.Cone.cs`. The block pins mesh-triangle half-space
+admission and separates winding geometry from contact-normal orientation.
 
 ### Immediate Completed Block
 
-The shared continuous-collision math block is resolved. An exact fixed-point
-3D sweep produces closing speed equal to `Fixed64.Epsilon` and proves the
-retained `<=` admission boundary. Review then exposed a real dimensional bug:
-small caller-admissible radii could have nonzero impact deltas whose squared
-magnitude quantized to zero, selecting the motion fallback and admitting pure
-tangency as a hit. Both 2D and 3D now scale every nonzero impact delta by its
-largest absolute component before normalization. The underflow-band regression
-independently kills the former fallback in each dimension, while the exact-zero
-overlap fallback remains covered. Extreme-range quadratic saturation is tracked
-separately because it occurs before normal resolution and does not block this
-coverage block.
+The mesh-cone triangle block is resolved. An oblique concave-triangle near miss
+proves the retained support-plane rejection: triangle and cone bounds overlap,
+but the whole cone remains beyond the plane. An exact positive-Epsilon witness
+proves the strict `>` tolerance boundary and deterministic zero depth. Review
+also exposed a real back-face defect: winding-sensitive triangle projection and
+containment were receiving a contact-oriented normal. Those responsibilities
+are now separate, and contact orientation is based on the candidate triangle
+rather than an unrelated mesh bounds center. Back-face and disconnected-mesh
+regressions independently kill both former policies. Convex fallback behavior
+remains unchanged.
 
 ## Rules Of Engagement
 
@@ -118,12 +117,11 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | `CollisionHandling/Detection/3D/CollisionDetection.Cone.cs` | 1 | 1 | 0 | Cone contact degeneracy and fallback selection. |
-| 2 | `CollisionHandling/Response/2D/SolverContactBuffer2D.cs` | 1 | 1 | 0 | Fixed-capacity contact-buffer admission and overflow policy. |
-| 3 | `CollisionHandling/Response/3D/SolverContactBuffer.cs` | 1 | 1 | 0 | Fixed-capacity contact-buffer admission and overflow policy. |
-| 4 | `Queries/Mixed/FiniteSlabProjectionSweep.cs` | 1 | 1 | 0 | Planar GJK reducer boundary and exact slab projection state. |
-| 5 | `Colliders/3D/ConeGeometry.cs` | 0 | 1 | 0 | Cone-axis basis and exact degenerate orientation policy. |
-| 6 | Remaining one-branch collision, query, replay, settings, and CCD blocks | 0-1 | 1 each | 0-1 | Re-rank from each authoritative artifact; finish one cohesive source block at a time. |
+| 1 | `CollisionHandling/Response/2D/SolverContactBuffer2D.cs` | 1 | 1 | 0 | Fixed-capacity contact-buffer admission and overflow policy. |
+| 2 | `CollisionHandling/Response/3D/SolverContactBuffer.cs` | 1 | 1 | 0 | Fixed-capacity contact-buffer admission and overflow policy. |
+| 3 | `Queries/Mixed/FiniteSlabProjectionSweep.cs` | 1 | 1 | 0 | Planar GJK reducer boundary and exact slab projection state. |
+| 4 | `Colliders/3D/ConeGeometry.cs` | 0 | 1 | 0 | Cone-axis basis and exact degenerate orientation policy. |
+| 5 | Remaining one-branch collision, query, replay, settings, and CCD blocks | 0-1 | 1 each | 0-1 | Re-rank from each authoritative artifact; finish one cohesive source block at a time. |
 
 ### Phase 1: Core Runtime And Service Ownership
 
@@ -495,6 +493,7 @@ of record.
 | 2D/3D contact-manifold closure | 99.92% | 99.81% | 99.66% | 2,540 | Both manifolds and enumerators reached 100%; callerless material `SetContact` overloads were deleted, sorted-identity tie policy became direct `<=` depth selection, exact mutations prove highest-ID eviction, and boxed enumerator Current/Reset contracts are covered without changing hot paths. |
 | 2D solver support-order closure | 99.93% | 99.83% | 99.66% | 2,541 | Every 2D support type reached 100%; a reversed first joint plus 16 canonical duplicates pins endpoint normalization and ascending final JointId order across the post-insertion-sort path, with both key mutations independently killed. |
 | Continuous-collision tangent closure | 99.93% | 99.84% | 99.66% | 2,543 | Shared CCD math reached 100%; an exact positive-Epsilon closing-speed witness pins admission, while scale-safe 2D/3D impact normals prevent caller-admissible radii from converting quantized tangency into false hits. Both former fallbacks are mutation-proven. |
+| Mesh-cone triangle closure | 99.94% | 99.85% | 99.66% | 2,547 | Cone detection reached 100%; live oblique-plane rejection and exact-Epsilon admission are pinned, while winding-sensitive triangle geometry is separated from per-candidate contact orientation with back-face and disconnected-mesh regressions. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.

@@ -331,6 +331,41 @@ active/dynamic-ID admission predicates removed in Task 67.
 
 ## Resolved Issues
 
+### Mesh-Cone Triangle Containment Used Contact-Oriented Normals
+
+**Resolved:** 2026-07-13  
+**Source:** 95%-to-100% coverage hardening, mesh-cone branch review  
+**Affected area:** `CollisionDetection.TryFindMeshConeTriangleContact(...)`
+
+RCA: mesh-cone triangle detection oriented each face normal toward the cone
+before passing it to `MeshUtils.ClosestPointOnTriangle(...)` and
+`IsPointInTrianglePlane(...)`. Those helpers classify edge half-spaces against
+the triangle's authored winding. Flipping the normal for a cone approaching the
+back face reversed every containment test and could reject a real crossing.
+The same contact normal was oriented from the collider's mesh-bounds center,
+so disconnected or strongly offset geometry could also face a valid contact in
+the wrong direction and publish the wrong support point and depth.
+
+Fix: retain the world winding normal for every triangle projection and
+containment operation. Derive a separate mesh-to-cone contact normal from the
+cone center and the candidate point on that triangle, then use only that normal
+for support half-space distance and manifold state.
+
+Verification:
+
+- A mirrored concave triangle now detects a back-face cone crossing and kills
+  any reuse of the oriented normal for winding containment.
+- A disconnected mesh moves the collider center away from the contacted
+  triangle; reverting orientation to the whole mesh center flips the pinned
+  normal, support point, and depth.
+- An oblique concave near miss kills removal of the retained plane-separation
+  guard. A separate exact positive-`Epsilon` signed gap kills `>` to `>=` while
+  confirming fixed-point distance quantizes its published depth to zero.
+- Authoritative artifact
+  `TestResults/coverage-cone-task72-final2-authoritative-root-comparable/5a77e663-470f-4ad0-89c8-df09249a72f0/coverage.cobertura.xml`
+  reports 100% line, branch, and method coverage for
+  `CollisionDetection.Cone.cs`; full `Release` passes 2,547/2,547 tests.
+
 ### Small CCD Proxy Radii Could Turn Tangency Into A Closing Hit
 
 **Resolved:** 2026-07-13  
