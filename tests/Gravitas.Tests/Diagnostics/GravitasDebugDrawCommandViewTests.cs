@@ -46,12 +46,69 @@ public sealed class GravitasDebugDrawCommandViewTests
             nameof(RecordingDebugDrawVisitor.VisitWireTriangle),
             nameof(RecordingDebugDrawVisitor.VisitWireCone),
             nameof(RecordingDebugDrawVisitor.VisitUnknown));
-        visitor.LastLine.Frame.Should().Be(5);
-        visitor.LastLine.Sequence.Should().Be(9);
-        visitor.LastLine.ColliderId.Should().Be(17);
-        visitor.LastLine.ColliderDimension.Should().Be(GravitasColliderDimension.ThreeD);
-        visitor.LastLine.ColliderType.Should().Be(ColliderType.Sphere);
-        visitor.LastLine.Collider2DType.Should().Be(ColliderType2D.None);
+        AssertExpectedMetadata(
+            visitor.LastLine.Frame,
+            visitor.LastLine.Sequence,
+            visitor.LastLine.ColliderId,
+            visitor.LastLine.ColliderDimension,
+            visitor.LastLine.ColliderType,
+            visitor.LastLine.Collider2DType);
+        AssertExpectedMetadata(
+            visitor.LastRay.Frame,
+            visitor.LastRay.Sequence,
+            visitor.LastRay.ColliderId,
+            visitor.LastRay.ColliderDimension,
+            visitor.LastRay.ColliderType,
+            visitor.LastRay.Collider2DType);
+        AssertExpectedMetadata(
+            visitor.LastPoint.Frame,
+            visitor.LastPoint.Sequence,
+            visitor.LastPoint.ColliderId,
+            visitor.LastPoint.ColliderDimension,
+            visitor.LastPoint.ColliderType,
+            visitor.LastPoint.Collider2DType);
+        AssertExpectedMetadata(
+            visitor.LastWireSphere.Frame,
+            visitor.LastWireSphere.Sequence,
+            visitor.LastWireSphere.ColliderId,
+            visitor.LastWireSphere.ColliderDimension,
+            visitor.LastWireSphere.ColliderType,
+            visitor.LastWireSphere.Collider2DType);
+        AssertExpectedMetadata(
+            visitor.LastWireBox.Frame,
+            visitor.LastWireBox.Sequence,
+            visitor.LastWireBox.ColliderId,
+            visitor.LastWireBox.ColliderDimension,
+            visitor.LastWireBox.ColliderType,
+            visitor.LastWireBox.Collider2DType);
+        AssertExpectedMetadata(
+            visitor.LastWireCapsule.Frame,
+            visitor.LastWireCapsule.Sequence,
+            visitor.LastWireCapsule.ColliderId,
+            visitor.LastWireCapsule.ColliderDimension,
+            visitor.LastWireCapsule.ColliderType,
+            visitor.LastWireCapsule.Collider2DType);
+        AssertExpectedMetadata(
+            visitor.LastWireCylinder.Frame,
+            visitor.LastWireCylinder.Sequence,
+            visitor.LastWireCylinder.ColliderId,
+            visitor.LastWireCylinder.ColliderDimension,
+            visitor.LastWireCylinder.ColliderType,
+            visitor.LastWireCylinder.Collider2DType);
+        AssertExpectedMetadata(
+            visitor.LastWireTriangle.Frame,
+            visitor.LastWireTriangle.Sequence,
+            visitor.LastWireTriangle.ColliderId,
+            visitor.LastWireTriangle.ColliderDimension,
+            visitor.LastWireTriangle.ColliderType,
+            visitor.LastWireTriangle.Collider2DType);
+        AssertExpectedMetadata(
+            visitor.LastWireCone.Frame,
+            visitor.LastWireCone.Sequence,
+            visitor.LastWireCone.ColliderId,
+            visitor.LastWireCone.ColliderDimension,
+            visitor.LastWireCone.ColliderType,
+            visitor.LastWireCone.Collider2DType);
         visitor.LastLine.Start.Should().Be(start);
         visitor.LastLine.End.Should().Be(end);
         visitor.LastLine.Color.Should().Be(color);
@@ -131,11 +188,11 @@ public sealed class GravitasDebugDrawCommandViewTests
     }
 
     [Fact]
-    public void DefaultDebugDrawVisitor_ShouldAcceptEveryDrawKindWithoutOverrides()
+    public void PartialDebugDrawVisitor_ShouldIgnoreUnimplementedKindsAndPreserveOverriddenRoute()
     {
-        var visitor = new DefaultDebugDrawVisitor();
+        var visitor = new PartialDebugDrawVisitor();
 
-        CreateCommand(GravitasDebugDrawKind.Line).DispatchTo(visitor);
+        CreateCommand(GravitasDebugDrawKind.Line, start: Vector3d.Right).DispatchTo(visitor);
         CreateCommand(GravitasDebugDrawKind.Ray).DispatchTo(visitor);
         CreateCommand(GravitasDebugDrawKind.Point).DispatchTo(visitor);
         CreateCommand(GravitasDebugDrawKind.WireSphere).DispatchTo(visitor);
@@ -145,6 +202,9 @@ public sealed class GravitasDebugDrawCommandViewTests
         CreateCommand(GravitasDebugDrawKind.WireTriangle).DispatchTo(visitor);
         CreateCommand(GravitasDebugDrawKind.WireCone).DispatchTo(visitor);
         CreateCommand((GravitasDebugDrawKind)250).DispatchTo(visitor);
+
+        visitor.LineVisitCount.Should().Be(1);
+        visitor.LastLine.Start.Should().Be(Vector3d.Right);
     }
 
     [Fact]
@@ -170,7 +230,7 @@ public sealed class GravitasDebugDrawCommandViewTests
         int colliderId = 17,
         GravitasColliderDimension colliderDimension = GravitasColliderDimension.ThreeD,
         ColliderType colliderType = ColliderType.Sphere,
-        ColliderType2D collider2DType = ColliderType2D.None,
+        ColliderType2D collider2DType = ColliderType2D.Circle,
         Vector3d start = default,
         Vector3d end = default,
         Vector3d center = default,
@@ -202,6 +262,22 @@ public sealed class GravitasDebugDrawCommandViewTests
             radius: radius,
             height: height,
             color: color);
+    }
+
+    private static void AssertExpectedMetadata(
+        int frame,
+        int sequence,
+        int colliderId,
+        GravitasColliderDimension colliderDimension,
+        ColliderType colliderType,
+        ColliderType2D collider2DType)
+    {
+        frame.Should().Be(5);
+        sequence.Should().Be(9);
+        colliderId.Should().Be(17);
+        colliderDimension.Should().Be(GravitasColliderDimension.ThreeD);
+        colliderType.Should().Be(ColliderType.Sphere);
+        collider2DType.Should().Be(ColliderType2D.Circle);
     }
 
     private sealed class RecordingDebugDrawVisitor : GravitasDebugDrawCommandVisitor
@@ -279,7 +355,16 @@ public sealed class GravitasDebugDrawCommandViewTests
         }
     }
 
-    private sealed class DefaultDebugDrawVisitor : GravitasDebugDrawCommandVisitor
+    private sealed class PartialDebugDrawVisitor : GravitasDebugDrawCommandVisitor
     {
+        public int LineVisitCount;
+        public GravitasLineDebugDrawView LastLine;
+
+        public override void VisitLine(in GravitasLineDebugDrawView view)
+        {
+            base.VisitLine(view);
+            LineVisitCount++;
+            LastLine = view;
+        }
     }
 }

@@ -7,14 +7,12 @@
 
 using FixedMathSharp;
 using Gravitas.Colliders;
-using System.Diagnostics.CodeAnalysis;
 
 namespace Gravitas.Diagnostics;
 
 /// <summary>
 /// Typed read-only view over a force diagnostic event.
 /// </summary>
-[ExcludeFromCodeCoverage]
 public readonly struct GravitasForceDeltaDiagnosticView
 {
     internal GravitasForceDeltaDiagnosticView(GravitasDiagnosticEvent diagnosticEvent) => Event = diagnosticEvent;
@@ -41,7 +39,6 @@ public readonly struct GravitasForceDeltaDiagnosticView
 /// <summary>
 /// Typed read-only view over a torque diagnostic event.
 /// </summary>
-[ExcludeFromCodeCoverage]
 public readonly struct GravitasTorqueDeltaDiagnosticView
 {
     internal GravitasTorqueDeltaDiagnosticView(GravitasDiagnosticEvent diagnosticEvent) => Event = diagnosticEvent;
@@ -66,7 +63,6 @@ public readonly struct GravitasTorqueDeltaDiagnosticView
 /// <summary>
 /// Typed read-only view over linear or angular velocity diagnostic events.
 /// </summary>
-[ExcludeFromCodeCoverage]
 public readonly struct GravitasVelocityDeltaDiagnosticView
 {
     internal GravitasVelocityDeltaDiagnosticView(GravitasDiagnosticEvent diagnosticEvent) => Event = diagnosticEvent;
@@ -97,7 +93,6 @@ public readonly struct GravitasVelocityDeltaDiagnosticView
 /// <summary>
 /// Typed read-only view over a ground-probe diagnostic event.
 /// </summary>
-[ExcludeFromCodeCoverage]
 public readonly struct GravitasGroundProbeDiagnosticView
 {
     internal GravitasGroundProbeDiagnosticView(GravitasDiagnosticEvent diagnosticEvent) => Event = diagnosticEvent;
@@ -148,7 +143,6 @@ public readonly struct GravitasGroundProbeDiagnosticView
 /// <summary>
 /// Typed read-only view over a 3D ray or swept-sphere query diagnostic event.
 /// </summary>
-[ExcludeFromCodeCoverage]
 public readonly struct GravitasRayQueryDiagnosticView
 {
     internal GravitasRayQueryDiagnosticView(GravitasDiagnosticEvent diagnosticEvent) => Event = diagnosticEvent;
@@ -185,7 +179,6 @@ public readonly struct GravitasRayQueryDiagnosticView
 /// <summary>
 /// Typed read-only view over a 3D X/Z circle-query diagnostic event.
 /// </summary>
-[ExcludeFromCodeCoverage]
 public readonly struct GravitasCircleQueryDiagnosticView
 {
     internal GravitasCircleQueryDiagnosticView(GravitasDiagnosticEvent diagnosticEvent) => Event = diagnosticEvent;
@@ -222,7 +215,6 @@ public readonly struct GravitasCircleQueryDiagnosticView
 /// <summary>
 /// Typed read-only view over query reducer quality counters.
 /// </summary>
-[ExcludeFromCodeCoverage]
 public readonly struct GravitasQuerySummaryDiagnosticView
 {
     internal GravitasQuerySummaryDiagnosticView(GravitasDiagnosticEvent diagnosticEvent) => Event = diagnosticEvent;
@@ -255,7 +247,6 @@ public readonly struct GravitasQuerySummaryDiagnosticView
 /// <summary>
 /// Typed read-only view over a 3D contact diagnostic event.
 /// </summary>
-[ExcludeFromCodeCoverage]
 public readonly struct GravitasContactDiagnosticView
 {
     internal GravitasContactDiagnosticView(GravitasDiagnosticEvent diagnosticEvent) => Event = diagnosticEvent;
@@ -290,7 +281,6 @@ public readonly struct GravitasContactDiagnosticView
 /// <summary>
 /// Typed read-only view over a 3D response-impulse diagnostic event.
 /// </summary>
-[ExcludeFromCodeCoverage]
 public readonly struct GravitasResponseImpulseDiagnosticView
 {
     internal GravitasResponseImpulseDiagnosticView(GravitasDiagnosticEvent diagnosticEvent) => Event = diagnosticEvent;
@@ -323,7 +313,6 @@ public readonly struct GravitasResponseImpulseDiagnosticView
 /// <summary>
 /// Typed read-only view over a mixed 3D/2D query diagnostic event.
 /// </summary>
-[ExcludeFromCodeCoverage]
 public readonly struct GravitasMixedQueryDiagnosticView
 {
     internal GravitasMixedQueryDiagnosticView(GravitasDiagnosticEvent diagnosticEvent) => Event = diagnosticEvent;
@@ -370,7 +359,6 @@ public readonly struct GravitasMixedQueryDiagnosticView
 /// <summary>
 /// Typed read-only view over a mixed 3D/2D contact diagnostic event.
 /// </summary>
-[ExcludeFromCodeCoverage]
 public readonly struct GravitasMixedContactDiagnosticView
 {
     internal GravitasMixedContactDiagnosticView(GravitasDiagnosticEvent diagnosticEvent) => Event = diagnosticEvent;
@@ -407,7 +395,6 @@ public readonly struct GravitasMixedContactDiagnosticView
 /// <summary>
 /// Typed read-only view over a mixed 3D/2D response-impulse diagnostic event.
 /// </summary>
-[ExcludeFromCodeCoverage]
 public readonly struct GravitasMixedResponseImpulseDiagnosticView
 {
     internal GravitasMixedResponseImpulseDiagnosticView(GravitasDiagnosticEvent diagnosticEvent) => Event = diagnosticEvent;
@@ -448,7 +435,6 @@ public readonly struct GravitasMixedResponseImpulseDiagnosticView
 /// <summary>
 /// Typed read-only view over a mixed 3D/2D response-island diagnostic event.
 /// </summary>
-[ExcludeFromCodeCoverage]
 public readonly struct GravitasMixedResponseIslandDiagnosticView
 {
     internal GravitasMixedResponseIslandDiagnosticView(GravitasDiagnosticEvent diagnosticEvent) => Event = diagnosticEvent;
@@ -471,7 +457,6 @@ public readonly struct GravitasMixedResponseIslandDiagnosticView
 /// <summary>
 /// Typed read-only view over a joint diagnostic event.
 /// </summary>
-[ExcludeFromCodeCoverage]
 public readonly struct GravitasJointDiagnosticView
 {
     internal GravitasJointDiagnosticView(GravitasDiagnosticEvent diagnosticEvent) => Event = diagnosticEvent;
@@ -524,7 +509,6 @@ public readonly struct GravitasJointDiagnosticView
 /// <summary>
 /// Typed read-only view over a 3D ragdoll diagnostic event.
 /// </summary>
-[ExcludeFromCodeCoverage]
 public readonly struct GravitasRagdollDiagnosticView
 {
     internal GravitasRagdollDiagnosticView(GravitasDiagnosticEvent diagnosticEvent) => Event = diagnosticEvent;

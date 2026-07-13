@@ -46,6 +46,7 @@ public sealed class GravitasDiagnosticEventViewTests
             scalarA: torque.Magnitude);
 
         torqueEvent.TryAsTorqueDelta(out GravitasTorqueDeltaDiagnosticView torqueView).Should().BeTrue();
+        torqueView.Frame.Should().Be(7);
         torqueView.BodyId.Should().Be(12);
         torqueView.ColliderId.Should().Be(22);
         torqueView.ColliderType.Should().Be(ColliderType.Capsule);
@@ -65,6 +66,9 @@ public sealed class GravitasDiagnosticEventViewTests
             scalarA: after.Magnitude);
 
         linearEvent.TryAsLinearVelocityDelta(out GravitasVelocityDeltaDiagnosticView linearView).Should().BeTrue();
+        linearView.Frame.Should().Be(7);
+        linearView.Sequence.Should().Be(3);
+        linearView.Kind.Should().Be(GravitasDiagnosticEventKind.LinearVelocityDelta);
         linearView.BodyId.Should().Be(13);
         linearView.ColliderId.Should().Be(23);
         linearView.ColliderType.Should().Be(ColliderType.OBBox);
@@ -84,6 +88,7 @@ public sealed class GravitasDiagnosticEventViewTests
             scalarA: after.Magnitude);
 
         angularEvent.TryAsAngularVelocityDelta(out GravitasVelocityDeltaDiagnosticView angularView).Should().BeTrue();
+        angularView.Kind.Should().Be(GravitasDiagnosticEventKind.AngularVelocityDelta);
         angularView.BodyId.Should().Be(14);
         angularView.ColliderId.Should().Be(24);
         angularView.ColliderType.Should().Be(ColliderType.Cylinder);
@@ -141,6 +146,8 @@ public sealed class GravitasDiagnosticEventViewTests
             hit: true);
 
         groundProbeEvent.TryAsGroundProbe(out GravitasGroundProbeDiagnosticView groundView).Should().BeTrue();
+        groundView.Frame.Should().Be(7);
+        groundView.Sequence.Should().Be(3);
         groundView.BodyId.Should().Be(31);
         groundView.ColliderId.Should().Be(41);
         groundView.HitColliderId.Should().Be(42);
@@ -196,6 +203,8 @@ public sealed class GravitasDiagnosticEventViewTests
             hit: true);
 
         rayEvent.TryAsRayQuery(out GravitasRayQueryDiagnosticView rayView).Should().BeTrue();
+        rayView.Frame.Should().Be(7);
+        rayView.Sequence.Should().Be(3);
         rayView.HitColliderId.Should().Be(51);
         rayView.HitColliderType.Should().Be(ColliderType.Compound);
         rayView.Start.Should().Be(start);
@@ -223,6 +232,8 @@ public sealed class GravitasDiagnosticEventViewTests
             hit: true);
 
         circleEvent.TryAsCircleQuery(out GravitasCircleQueryDiagnosticView circleView).Should().BeTrue();
+        circleView.Frame.Should().Be(7);
+        circleView.Sequence.Should().Be(3);
         circleView.HitColliderId.Should().Be(61);
         circleView.HitColliderType.Should().Be(ColliderType.Cylinder);
         circleView.Center.Should().Be(start);
@@ -248,6 +259,8 @@ public sealed class GravitasDiagnosticEventViewTests
             hit: true);
 
         querySummaryEvent.TryAsQuerySummary(out GravitasQuerySummaryDiagnosticView summaryView).Should().BeTrue();
+        summaryView.Frame.Should().Be(7);
+        summaryView.Sequence.Should().Be(3);
         summaryView.SourceDimension.Should().Be(GravitasColliderDimension.TwoD);
         summaryView.TargetDimension.Should().Be(GravitasColliderDimension.ThreeD);
         summaryView.Start.Should().Be(start);
@@ -257,6 +270,12 @@ public sealed class GravitasDiagnosticEventViewTests
         summaryView.FallbackHits.Should().Be(2);
         summaryView.RejectedConservativeCandidates.Should().Be(1);
         summaryView.HasConservativeFallback.Should().BeTrue();
+
+        CreateEvent(GravitasDiagnosticEventKind.QuerySummary)
+            .TryAsQuerySummary(out GravitasQuerySummaryDiagnosticView exactSummaryView)
+            .Should()
+            .BeTrue();
+        exactSummaryView.HasConservativeFallback.Should().BeFalse();
     }
 
     [Fact]
@@ -279,6 +298,8 @@ public sealed class GravitasDiagnosticEventViewTests
             hit: true);
 
         contactEvent.TryAsContact(out GravitasContactDiagnosticView contactView).Should().BeTrue();
+        contactView.Frame.Should().Be(7);
+        contactView.Sequence.Should().Be(3);
         contactView.ColliderAId.Should().Be(71);
         contactView.ColliderBId.Should().Be(72);
         contactView.ColliderAType.Should().Be(ColliderType.Sphere);
@@ -305,6 +326,8 @@ public sealed class GravitasDiagnosticEventViewTests
             hit: true);
 
         impulseEvent.TryAsResponseImpulse(out GravitasResponseImpulseDiagnosticView impulseView).Should().BeTrue();
+        impulseView.Frame.Should().Be(7);
+        impulseView.Sequence.Should().Be(3);
         impulseView.ColliderAId.Should().Be(73);
         impulseView.ColliderBId.Should().Be(74);
         impulseView.ColliderAType.Should().Be(ColliderType.Capsule);
@@ -322,6 +345,7 @@ public sealed class GravitasDiagnosticEventViewTests
         Vector3d point3D = new(Fixed64.One, Fixed64.Zero, Fixed64.Zero);
         Vector3d point2D = new(Fixed64.Zero, Fixed64.Zero, Fixed64.One);
         Vector3d normal = new(Fixed64.Zero, Fixed64.One, Fixed64.Zero);
+        Vector3d mixedQueryStart = new((Fixed64)(-2), Fixed64.One, (Fixed64)3);
         GravitasDiagnosticEvent mixedQueryEvent = CreateEvent(
             GravitasDiagnosticEventKind.MixedQuery,
             colliderAId: 81,
@@ -330,7 +354,7 @@ public sealed class GravitasDiagnosticEventViewTests
             colliderBDimension: GravitasColliderDimension.TwoD,
             colliderAType: ColliderType.Sphere,
             colliderB2DType: ColliderType2D.Compound,
-            start: Vector3d.Zero,
+            start: mixedQueryStart,
             end: Vector3d.Right,
             pointA: point3D,
             pointB: point2D,
@@ -342,12 +366,16 @@ public sealed class GravitasDiagnosticEventViewTests
             hit: true);
 
         mixedQueryEvent.TryAsMixedQuery(out GravitasMixedQueryDiagnosticView queryView).Should().BeTrue();
+        queryView.Frame.Should().Be(7);
+        queryView.Sequence.Should().Be(3);
         queryView.Collider3DId.Should().Be(81);
         queryView.Collider2DId.Should().Be(82);
         queryView.Collider3DType.Should().Be(ColliderType.Sphere);
         queryView.Collider2DType.Should().Be(ColliderType2D.Compound);
         queryView.Collider3DDimension.Should().Be(GravitasColliderDimension.ThreeD);
         queryView.Collider2DDimension.Should().Be(GravitasColliderDimension.TwoD);
+        queryView.Start.Should().Be(mixedQueryStart);
+        queryView.End.Should().Be(Vector3d.Right);
         queryView.Point3D.Should().Be(point3D);
         queryView.Point2D.Should().Be(point2D);
         queryView.Normal3DTo2D.Should().Be(normal);
@@ -372,10 +400,14 @@ public sealed class GravitasDiagnosticEventViewTests
             hit: true);
 
         mixedContactEvent.TryAsMixedContact(out GravitasMixedContactDiagnosticView contactView).Should().BeTrue();
+        contactView.Frame.Should().Be(7);
+        contactView.Sequence.Should().Be(3);
         contactView.Collider3DId.Should().Be(83);
         contactView.Collider2DId.Should().Be(84);
         contactView.Collider3DType.Should().Be(ColliderType.OBBox);
         contactView.Collider2DType.Should().Be(ColliderType2D.Circle);
+        contactView.Collider3DDimension.Should().Be(GravitasColliderDimension.ThreeD);
+        contactView.Collider2DDimension.Should().Be(GravitasColliderDimension.TwoD);
         contactView.Point3D.Should().Be(point3D);
         contactView.Point2D.Should().Be(point2D);
         contactView.Normal3DTo2D.Should().Be(normal);
@@ -401,10 +433,14 @@ public sealed class GravitasDiagnosticEventViewTests
             hit: true);
 
         mixedImpulseEvent.TryAsMixedResponseImpulse(out GravitasMixedResponseImpulseDiagnosticView impulseView).Should().BeTrue();
+        impulseView.Frame.Should().Be(7);
+        impulseView.Sequence.Should().Be(3);
         impulseView.Collider3DId.Should().Be(85);
         impulseView.Collider2DId.Should().Be(86);
         impulseView.Collider3DType.Should().Be(ColliderType.Mesh);
         impulseView.Collider2DType.Should().Be(ColliderType2D.AABox);
+        impulseView.Collider3DDimension.Should().Be(GravitasColliderDimension.ThreeD);
+        impulseView.Collider2DDimension.Should().Be(GravitasColliderDimension.TwoD);
         impulseView.Point3D.Should().Be(point3D);
         impulseView.Point2D.Should().Be(point2D);
         impulseView.Impulse.Should().Be(impulse);
@@ -421,6 +457,8 @@ public sealed class GravitasDiagnosticEventViewTests
             hit: true);
 
         mixedIslandEvent.TryAsMixedResponseIsland(out GravitasMixedResponseIslandDiagnosticView islandView).Should().BeTrue();
+        islandView.Frame.Should().Be(7);
+        islandView.Sequence.Should().Be(3);
         islandView.RootKey.Should().Be(123);
         islandView.ConstraintCount.Should().Be(3);
         islandView.IterationCount.Should().Be(4);
@@ -560,11 +598,11 @@ public sealed class GravitasDiagnosticEventViewTests
     }
 
     [Fact]
-    public void DefaultDiagnosticEventVisitor_ShouldAcceptEveryEventKindWithoutOverrides()
+    public void PartialDiagnosticEventVisitor_ShouldIgnoreUnimplementedKindsAndPreserveOverriddenRoute()
     {
-        var visitor = new DefaultDiagnosticEventVisitor();
+        var visitor = new PartialDiagnosticEventVisitor();
 
-        CreateEvent(GravitasDiagnosticEventKind.ForceDelta).DispatchTo(visitor);
+        CreateEvent(GravitasDiagnosticEventKind.ForceDelta, vector: Vector3d.Right).DispatchTo(visitor);
         CreateEvent(GravitasDiagnosticEventKind.TorqueDelta).DispatchTo(visitor);
         CreateEvent(GravitasDiagnosticEventKind.LinearVelocityDelta).DispatchTo(visitor);
         CreateEvent(GravitasDiagnosticEventKind.AngularVelocityDelta).DispatchTo(visitor);
@@ -584,6 +622,9 @@ public sealed class GravitasDiagnosticEventViewTests
         CreateEvent(GravitasDiagnosticEventKind.JointLimitReached).DispatchTo(visitor);
         CreateEvent(GravitasDiagnosticEventKind.RagdollActivated).DispatchTo(visitor);
         CreateEvent((GravitasDiagnosticEventKind)250).DispatchTo(visitor);
+
+        visitor.ForceVisitCount.Should().Be(1);
+        visitor.LastForce.Force.Should().Be(Vector3d.Right);
     }
 
     [Fact]
@@ -755,7 +796,16 @@ public sealed class GravitasDiagnosticEventViewTests
         }
     }
 
-    private sealed class DefaultDiagnosticEventVisitor : GravitasDiagnosticEventVisitor
+    private sealed class PartialDiagnosticEventVisitor : GravitasDiagnosticEventVisitor
     {
+        public int ForceVisitCount;
+        public GravitasForceDeltaDiagnosticView LastForce;
+
+        public override void VisitForceDelta(in GravitasForceDeltaDiagnosticView view)
+        {
+            base.VisitForceDelta(view);
+            ForceVisitCount++;
+            LastForce = view;
+        }
     }
 }

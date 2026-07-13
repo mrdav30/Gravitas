@@ -1,7 +1,7 @@
 # Coverage Hardening Plan
 
-**Date:** 2026-07-12  
-**Status:** Final verification - candidate 100% coverage achieved  
+**Date:** 2026-07-13  
+**Status:** Final verification - unexcluded candidate 100% achieved  
 **Owner:** Gravitas coverage, test-quality, zombie-code, and branch-quality
 hardening
 
@@ -21,31 +21,32 @@ count.
 
 ## Current Checkpoint
 
-The candidate 100% artifact is:
-`TestResults/coverage-100-task87-candidate-authoritative/cade66f4-716c-4063-82a4-ae427eb9ff4c/coverage.cobertura.xml`.
+The candidate unexcluded 100% artifact is:
+`TestResults/coverage-100-unexcluded-task88-candidate-authoritative/012827c2-383b-472c-b7a9-b40e855d954f/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
-| Lines | 100% | 27,179 / 27,179 | 0 | 100% |
-| Branches | 100% | 10,407 / 10,407 | 0 | 100% |
-| Methods | 100% | 3,542 / 3,542 | 0 | 100% |
+| Lines | 100% | 27,477 / 27,477 | 0 | 100% |
+| Branches | 100% | 10,411 / 10,411 | 0 | 100% |
+| Methods | 100% | 3,838 / 3,838 | 0 | 100% |
 
-The candidate full coverage-enabled `Release` suite passes 2,556/2,556 tests.
-All three coverage metrics are now exactly 100%; final post-commit coverage,
-`ReleaseLean`, CRAP/method-gap, diff, and independent-review gates remain before
-the campaign is complete.
+The candidate unexcluded full coverage-enabled `Release` suite passes
+2,556/2,556 tests. All 298 members exposed by removing the 24 hand-authored
+diagnostic-view exclusions are covered, including all four branch outcomes.
+No `ExcludeFromCodeCoverage` attribute remains in Gravitas source.
 
-Task 87's candidate artifact closes the final `GravitasLogger` tail. The public
-default formatter and handler now prove exact Gravitas source formatting plus
-normal-output/error-output routing through distinct mutation-sensitive checks.
+Task 88 closes the corrected diagnostic-view accounting. The earlier 100%
+artifacts remain useful evidence for other code but are invalid as completion
+artifacts because their denominators omitted these hand-authored public types.
 
 ### Immediate Completed Block
 
-The `GravitasLogger` tail is resolved. The public default methods remain useful
-to hosts even when configurable delegates are replaced and preserve ecosystem
-parity with GridForge. The regression resets the formatter, captures both
-console streams, calls both public facade methods, and restores global state in
-`finally`; independent no-op mutations of each wrapper fail.
+The exclusion correction is resolved. All 24 attributes and unused imports are
+removed. Every typed host-adapter getter is asserted through existing visitor
+workflows with non-default witnesses, and representative wrong-field mutations
+fail. The two former assertion-free visitor tests now use partial adapters to
+prove unimplemented kinds remain harmless while an overridden route preserves
+its exact payload.
 
 ## Rules Of Engagement
 
@@ -110,8 +111,8 @@ mid-block merely because another branch looks easier.
 
 ### Priority Queue
 
-No uncovered hand-authored source block remains in the candidate artifact.
-Only final convergence verification is active.
+No uncovered hand-authored source block remains in the unexcluded candidate
+artifact. Only final convergence verification is active.
 
 ### Phase 1: Core Runtime And Service Ownership
 
@@ -337,8 +338,10 @@ has a caller-proven impossibility argument.
       after current and historical call-graph review.
 - [x] Retain and mutation-prove the host-facing `GravitasLogger` default facade
       through exact formatting and standard/error stream routing.
-- [x] Regenerate the method inventory from the candidate full artifact and prove it
-      contains no uncovered hand-authored method.
+- [x] Remove the 24 hand-authored diagnostic-view exclusions and close all 77
+      newly accountable metadata getters through typed adapter workflows.
+- [x] Regenerate the method inventory from the candidate unexcluded artifact and
+      prove it contains no uncovered hand-authored method.
 
 Exit condition: the fresh artifact reports zero uncovered hand-authored methods
 and no production method was introduced merely to make testing easier.
@@ -502,7 +505,9 @@ of record.
 | Mixed runtime lifecycle/accessor closure | 99.96% | 100% | 99.77% | 2,555 | Mixed queries now prove exact world-context ownership; the unused mixed-collision `Deactivate` alias and obsolete GridForge partition `OnChange` callback were deleted after complete call-graph review. |
 | Deterministic value-contract closure | 99.98% | 100% | 99.89% | 2,555 | Multi-bit layer masks and dimensional hierarchy keys pin their deterministic hash payloads under mutation; unused fixed-frame-rate and three-argument warm-start conveniences were deleted. |
 | Mesh array-wrapper deletion | 99.99% | 100% | 99.94% | 2,555 | Two callerless overloads left from the allocation-heavy triangle-array API were removed; live geometry keeps the explicit vertex contract and now documents its winding-normal invariant. |
-| Logger facade closure | 100% | 100% | 100% | 2,556 | Public defaults now prove exact Gravitas formatting plus standard/error console routing; independent formatter and handler no-op mutations fail, closing the last uncovered hand-authored methods. |
+| Logger facade candidate | 100% | 100% | 100% | 2,556 | Public defaults prove exact Gravitas formatting plus standard/error console routing, but the apparent campaign completion was invalidated when final review found 24 hand-authored diagnostic view exclusions. |
+| Unexcluded diagnostic-view baseline | 99.71% | 100% | 97.99% | 2,556 | Removing every hand-authored coverage exclusion adds 298 accountable view members; 221 are already covered, leaving 77 metadata getters across the two typed adapter families. |
+| Unexcluded diagnostic-view closure | 100% | 100% | 100% | 2,556 | All 24 invalid exclusions are removed; 77 residual host-adapter getters and the no-op visitor fallback contracts are behaviorally asserted with non-default, mutation-sensitive payloads. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.

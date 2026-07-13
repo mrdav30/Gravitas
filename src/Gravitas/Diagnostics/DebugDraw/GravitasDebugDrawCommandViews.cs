@@ -7,14 +7,12 @@
 
 using FixedMathSharp;
 using Gravitas.Colliders;
-using System.Diagnostics.CodeAnalysis;
 
 namespace Gravitas.Diagnostics;
 
 /// <summary>
 /// Typed read-only view over a line draw command.
 /// </summary>
-[ExcludeFromCodeCoverage]
 public readonly struct GravitasLineDebugDrawView
 {
     internal GravitasLineDebugDrawView(GravitasDebugDrawCommand command) => Command = command;
@@ -43,7 +41,6 @@ public readonly struct GravitasLineDebugDrawView
 /// <summary>
 /// Typed read-only view over a ray draw command.
 /// </summary>
-[ExcludeFromCodeCoverage]
 public readonly struct GravitasRayDebugDrawView
 {
     internal GravitasRayDebugDrawView(GravitasDebugDrawCommand command) => Command = command;
@@ -72,7 +69,6 @@ public readonly struct GravitasRayDebugDrawView
 /// <summary>
 /// Typed read-only view over a point draw command.
 /// </summary>
-[ExcludeFromCodeCoverage]
 public readonly struct GravitasPointDebugDrawView
 {
     internal GravitasPointDebugDrawView(GravitasDebugDrawCommand command) => Command = command;
@@ -101,7 +97,6 @@ public readonly struct GravitasPointDebugDrawView
 /// <summary>
 /// Typed read-only view over a wire-sphere draw command.
 /// </summary>
-[ExcludeFromCodeCoverage]
 public readonly struct GravitasWireSphereDebugDrawView
 {
     internal GravitasWireSphereDebugDrawView(GravitasDebugDrawCommand command) => Command = command;
@@ -130,7 +125,6 @@ public readonly struct GravitasWireSphereDebugDrawView
 /// <summary>
 /// Typed read-only view over a wire-box draw command.
 /// </summary>
-[ExcludeFromCodeCoverage]
 public readonly struct GravitasWireBoxDebugDrawView
 {
     internal GravitasWireBoxDebugDrawView(GravitasDebugDrawCommand command) => Command = command;
@@ -161,7 +155,6 @@ public readonly struct GravitasWireBoxDebugDrawView
 /// <summary>
 /// Typed read-only view over a wire-capsule draw command.
 /// </summary>
-[ExcludeFromCodeCoverage]
 public readonly struct GravitasWireCapsuleDebugDrawView
 {
     internal GravitasWireCapsuleDebugDrawView(GravitasDebugDrawCommand command) => Command = command;
@@ -194,7 +187,6 @@ public readonly struct GravitasWireCapsuleDebugDrawView
 /// <summary>
 /// Typed read-only view over a wire-cylinder draw command.
 /// </summary>
-[ExcludeFromCodeCoverage]
 public readonly struct GravitasWireCylinderDebugDrawView
 {
     internal GravitasWireCylinderDebugDrawView(GravitasDebugDrawCommand command) => Command = command;
@@ -227,7 +219,6 @@ public readonly struct GravitasWireCylinderDebugDrawView
 /// <summary>
 /// Typed read-only view over a wire-triangle draw command.
 /// </summary>
-[ExcludeFromCodeCoverage]
 public readonly struct GravitasWireTriangleDebugDrawView
 {
     internal GravitasWireTriangleDebugDrawView(GravitasDebugDrawCommand command) => Command = command;
@@ -258,7 +249,6 @@ public readonly struct GravitasWireTriangleDebugDrawView
 /// <summary>
 /// Typed read-only view over a wire-cone draw command.
 /// </summary>
-[ExcludeFromCodeCoverage]
 public readonly struct GravitasWireConeDebugDrawView
 {
     internal GravitasWireConeDebugDrawView(GravitasDebugDrawCommand command) => Command = command;
