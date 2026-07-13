@@ -1055,6 +1055,9 @@ public sealed class Constraint3DServiceTests
         ScenarioBody<LSSphereCollider> child = scenario.CreateSphere(Vector3d.Right * (Fixed64)2, isKinematic: true);
         RagdollRuntime3D runtime = scenario.Context.Constraints3D.RegisterRagdoll(CreateTwoLinkRagdoll(root, child));
 
+        runtime.GetLink(0).Should().BeSameAs(root.Body);
+        runtime.GetLink(1).Should().BeSameAs(child.Body);
+
         runtime.ActivateDynamic();
 
         runtime.IsActive.Should().BeTrue();
@@ -1068,6 +1071,58 @@ public sealed class Constraint3DServiceTests
         root.Body.IsKinematic.Should().BeTrue();
         child.Body.IsKinematic.Should().BeTrue();
         runtime.GetJoint(0).IsEnabled.Should().BeFalse();
+    }
+
+    [Fact]
+    public void RagdollRuntime_WithSingleLinkAndNoJoints_ShouldEmitActivationDiagnostic()
+    {
+        using PhysicsScenarioBuilder scenario = CreateConstraintScenario();
+        ScenarioBody<LSSphereCollider> link = scenario.CreateSphere(Vector3d.Zero, isKinematic: true);
+        RagdollRuntime3D runtime = scenario.Context.Constraints3D.RegisterRagdoll(new RagdollDefinition3D(
+            new[] { new RagdollLinkDefinition3D(7, link.Body) },
+            Array.Empty<RagdollJointDefinition3D>()));
+        scenario.Context.Diagnostics.Enable(eventCapacity: 1, drawCommandCapacity: 0);
+
+        runtime.ActivateDynamic();
+
+        runtime.GetLink(0).Should().BeSameAs(link.Body);
+        runtime.IsActive.Should().BeTrue();
+        link.Body.IsKinematic.Should().BeFalse();
+        scenario.Context.Diagnostics.Events.Should().ContainSingle();
+        GravitasDiagnosticEvent diagnosticEvent = scenario.Context.Diagnostics.Events[0];
+        diagnosticEvent.Kind.Should().Be(GravitasDiagnosticEventKind.RagdollActivated);
+        diagnosticEvent.BodyId.Should().Be(runtime.Id);
+        diagnosticEvent.DataA.Should().Be(1);
+        diagnosticEvent.DataB.Should().Be(0);
+        diagnosticEvent.Hit.Should().BeTrue();
+    }
+
+    [Theory]
+    [MemberData(nameof(Transports))]
+    public void RagdollRecordData_ShouldApplyInactiveStateToActiveRuntime(GravitasSerializationTransport transport)
+    {
+        using PhysicsScenarioBuilder sourceScenario = CreateConstraintScenario();
+        ScenarioBody<LSSphereCollider> sourceRoot = sourceScenario.CreateSphere(Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> sourceChild = sourceScenario.CreateSphere(Vector3d.Right * (Fixed64)2);
+        RagdollRuntime3D source = sourceScenario.Context.Constraints3D.RegisterRagdoll(CreateTwoLinkRagdoll(sourceRoot, sourceChild));
+        source.DeactivateToKinematic();
+        object payload = GravitasSerializationHarness.Serialize(source, transport);
+
+        using PhysicsScenarioBuilder targetScenario = CreateConstraintScenario();
+        ScenarioBody<LSSphereCollider> targetRoot = targetScenario.CreateSphere(Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> targetChild = targetScenario.CreateSphere(Vector3d.Right * (Fixed64)2);
+        RagdollRuntime3D target = targetScenario.Context.Constraints3D.RegisterRagdoll(CreateTwoLinkRagdoll(targetRoot, targetChild));
+        targetScenario.Context.Diagnostics.Enable(eventCapacity: 1, drawCommandCapacity: 0);
+
+        GravitasSerializationHarness.Populate(target, payload, transport);
+
+        target.IsActive.Should().BeFalse();
+        targetRoot.Body.IsKinematic.Should().BeTrue();
+        targetChild.Body.IsKinematic.Should().BeTrue();
+        target.GetJoint(0).IsEnabled.Should().BeFalse();
+        targetScenario.Context.Constraints3D.EnabledJointCount.Should().Be(0);
+        targetScenario.Context.Diagnostics.Events.Should().ContainSingle();
+        targetScenario.Context.Diagnostics.Events[0].Hit.Should().BeFalse();
     }
 
     [Theory]

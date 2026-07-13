@@ -22,38 +22,32 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-axis-projection-task53-authoritative-root-comparable/7ec1eb48-d21b-4e88-b5b6-8b4b12bcc203/coverage.cobertura.xml`.
+`TestResults/coverage-ragdoll-runtime-task54-authoritative-root-comparable/5a161f6b-795b-48a3-be33-ab9d682908b9/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
-| Lines | 99.79% | 27,144 / 27,199 | 55 | 100% |
-| Branches | 99.49% | 10,406 / 10,459 | 53 | 100% |
-| Methods | 99.41% | 3,530 / 3,551 | 21 | 100% |
+| Lines | 99.81% | 27,148 / 27,199 | 51 | 100% |
+| Branches | 99.52% | 10,405 / 10,455 | 50 | 100% |
+| Methods | 99.46% | 3,532 / 3,551 | 19 | 100% |
 
-The authoritative full coverage-enabled `Release` suite passes 2,513/2,513 tests, and
+The authoritative full coverage-enabled `Release` suite passes 2,517/2,517 tests, and
 `ReleaseLean` builds both targets without warnings. Branch coverage is now the
 primary constraint, but the remaining line and method gaps must close from the
 same final artifact.
 
-Task 53's authoritative artifact reports 100% line, branch, and method coverage
-for 3D axis projection, cuboid/capsule detection, convex mesh/capsule detection,
-the shared 3D dispatch helper, `PhysicsMesh`, and `LSCuboidCollider`. The block
-closed seven lines, four branches, and one method from the repository-wide gap
-while adding exact rounded-feature, containment, transform, and support-feature
-behavior that raised the accountable denominator.
+Task 54's authoritative artifact reports 100% line, branch, and method coverage
+for both ragdoll runtime types. The block closed four lines, three net branch
+outcomes, and two methods from the repository-wide gap while replacing a stale
+joint-owned diagnostic condition with the validated link-owned context.
 
 ### Immediate Completed Block
 
-The capsule/convex boundary is resolved and independently approved. Cuboid
-contacts now use an exact segment-to-oriented-box distance solve for rounded
-features, inclusive touching, directional containment exits, quaternion-exact
-local transforms, ordered SAT, and tangentially matched support witnesses.
-Closed convex mesh containment uses the scaled world-space mass center, complete
-face plus edge-cross axes, and matched mesh features; off-representative surface
-contacts retain deterministic BVH fallback. Four inverted closest-segment calls,
-the lossy two-degree cross-axis pruning, an unused sphere projection helper, and
-duplicate AABB/OBB capsule reducers were removed or corrected. Critical touch,
-scale, scratch-lifetime, and axis mutations all fail the focused suite.
+The ragdoll runtime block is resolved and independently approved. Zero-joint
+ragdolls now emit activation diagnostics through their required first link in
+both dimensions instead of silently depending on an optional first joint. The
+3D runtime also proves public link ownership and inactive replay loading across
+JSON and MemoryPack, including body mobility, joint enablement, service counts,
+and diagnostics. The loading and zero-joint conditions are mutation-sensitive.
 
 ## Rules Of Engagement
 
@@ -120,11 +114,12 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | `Constraints/3D/RagdollRuntime3D.cs` | 3 | 2 | 1 | Replay load shape, link ownership, and stable reconstruction. |
-| 2 | `Constraints/2D/JointSolver2D.cs` | 2 | 2 | 0 | Degenerate rows, deterministic limit selection, and solver parity. |
-| 3 | `Core/2D/SolidBody2D.ContinuousCollision.Kinematic.cs` | 2 | 2 | 0 | Kinematic signed-boundary motion and deterministic candidate admission. |
-| 4 | `Queries/3D/GravitasQuery3DService.Cone.cs` | 2 | 2 | 0 | Cone query admission, filtering, and exact boundary behavior. |
-| 5 | Remaining one- and two-branch collision, constraint, query, replay, and CCD blocks | 0-5 | 1-2 each | 0-2 | Re-rank from each authoritative artifact; finish one cohesive source block at a time. |
+| 1 | `Constraints/2D/JointSolver2D.cs` | 2 | 2 | 0 | Degenerate rows, deterministic limit selection, and solver parity. |
+| 2 | `Core/2D/SolidBody2D.ContinuousCollision.Kinematic.cs` | 2 | 2 | 0 | Kinematic signed-boundary motion and deterministic candidate admission. |
+| 3 | `Queries/3D/GravitasQuery3DService.Cone.cs` | 2 | 2 | 0 | Cone query admission, filtering, and exact boundary behavior. |
+| 4 | `CollisionHandling/Detection/3D/CollisionDetection.Cylinder.cs` | 2 | 2 | 0 | Cylinder feature separation, containment, and exact contact ownership. |
+| 5 | `CollisionHandling/Response/Mixed/CollisionResponseMixed.cs` | 2 | 2 | 0 | Mixed mobility admission and constrained impulse behavior. |
+| 6 | Remaining one- and two-branch collision, constraint, query, replay, and CCD blocks | 0-5 | 1-2 each | 0-2 | Re-rank from each authoritative artifact; finish one cohesive source block at a time. |
 
 ### Phase 1: Core Runtime And Service Ownership
 
@@ -137,6 +132,10 @@ mid-block merely because another branch looks easier.
 - [x] Close and independently review residual 2D constraint-service ownership
       through larger-ID suppression cleanup; remove impossible collider-null
       checks and duplicate post-validation ragdoll materialization.
+- [x] Close and independently review both ragdoll runtime types through
+      zero-joint activation diagnostics, public link ownership, and inactive 3D
+      JSON/MemoryPack replay loading; use the required first link as the stable
+      diagnostic context owner.
 - [x] Close and independently review `Joint2D` explicit and legacy distance
       loads through suppression, enabled-count, frame, and solver-cache state;
       remove impossible nullable collider replay IDs.
@@ -321,7 +320,7 @@ has a caller-proven impossibility argument.
 - [ ] Complete the four remaining `ContactManifold` methods through meaningful
       construction, mutation, and reduction contracts or delete unused surface.
 - [ ] Regenerate the uncovered-method inventory from the latest full artifact
-      and classify all 30 current method gaps.
+      and classify all 19 current method gaps.
 - [ ] Delete unused wrappers, aliases, constructors, and helpers instead of
       invoking them solely for coverage.
 - [ ] Cover retained query overloads, diagnostic payloads, authored-shape
@@ -459,6 +458,7 @@ of record.
 | Shared segment-box clipping closure | 99.77% | 99.42% | 99.38% | 2,485 | Mixed fallback, ray AABB/OBB, and swept-sphere cuboid clipping reached 100%; exact-zero parallel policy preserves one-raw endpoint contacts, true ray exits remain exact, and three drifting clip implementations collapsed into SweepBoundsUtility with 77 net production lines deleted. |
 | 3D CCD helper and pair-policy closure | 99.77% | 99.45% | 99.38% | 2,490 | The 3D helper and shared target policy reached 100%; context `Inherit` falls back deterministically, duplicate proxy/normal guards were removed, and dynamic plus kinematic CCD now honor the canonical pair gate including linked-joint suppression. Independent review found no issues. |
 | Capsule/convex geometry closure | 99.79% | 99.49% | 99.41% | 2,513 | Axis projection, cuboid/capsule, convex mesh/capsule, shared dispatch, mesh transform, and cuboid feature ownership reached 100%. Exact rounded distance, inclusive touch, directional whole-capsule containment, quaternion-local transforms, scaled closed-mesh interiors, matched support features, and deterministic BVH fallback are mutation-sensitive and independently approved. |
+| Ragdoll runtime closure | 99.81% | 99.52% | 99.46% | 2,517 | Both runtime types reached 100%; zero-joint activation diagnostics now use required link ownership, 3D link access is exact, and inactive JSON/MemoryPack loads synchronize body, joint, service-count, and diagnostic state under mutation-sensitive independent review. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.

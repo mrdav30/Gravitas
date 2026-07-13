@@ -119,7 +119,7 @@ public sealed class RagdollRuntime2D : IRecordable
         }
 
         _isActive = isActive;
-        if (emitDiagnostics && _joints.Length > 0)
-            _joints[0].Context.Diagnostics.EmitRagdollActivated(Id, LinkCount, JointCount, isActive);
+        if (emitDiagnostics)
+            _links[0].Context.Diagnostics.EmitRagdollActivated(Id, LinkCount, JointCount, isActive);
     }
 }

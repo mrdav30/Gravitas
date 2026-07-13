@@ -770,6 +770,30 @@ public sealed class Constraint2DServiceTests
     }
 
     [Fact]
+    public void RagdollRuntime_WithSingleLinkAndNoJoints_ShouldEmitActivationDiagnostic()
+    {
+        using GravitasWorldContext context = CreateConstraintContext();
+        SolidBody2D link = CreateBody(context, Vector2d.Zero, isKinematic: true);
+        RagdollRuntime2D runtime = context.Constraints2D.RegisterRagdoll(new RagdollDefinition2D(
+            new[] { new RagdollLinkDefinition2D(7, link) },
+            Array.Empty<RagdollJointDefinition2D>()));
+        context.Diagnostics.Enable(eventCapacity: 1, drawCommandCapacity: 0);
+
+        runtime.ActivateDynamic();
+
+        runtime.GetLink(0).Should().BeSameAs(link);
+        runtime.IsActive.Should().BeTrue();
+        link.IsKinematic.Should().BeFalse();
+        context.Diagnostics.Events.Should().ContainSingle();
+        GravitasDiagnosticEvent diagnosticEvent = context.Diagnostics.Events[0];
+        diagnosticEvent.Kind.Should().Be(GravitasDiagnosticEventKind.RagdollActivated);
+        diagnosticEvent.BodyId.Should().Be(runtime.Id);
+        diagnosticEvent.DataA.Should().Be(1);
+        diagnosticEvent.DataB.Should().Be(0);
+        diagnosticEvent.Hit.Should().BeTrue();
+    }
+
+    [Fact]
     public void ConstraintServiceMotorHelpers_ShouldUpdateJointAndRagdollTargets()
     {
         using GravitasWorldContext context = CreateConstraintContext();
