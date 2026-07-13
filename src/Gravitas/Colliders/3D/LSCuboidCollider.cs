@@ -17,7 +17,7 @@ namespace Gravitas.Colliders;
 public class LSCuboidCollider : LSCollider
 {
     // Define faces with vertex indices
-    private static readonly int[][] FaceDefinitions = new int[][]
+    internal static readonly int[][] FaceDefinitions = new int[][]
     {
             new[] {0, 1, 3, 2}, // near quad
             new[] {4, 6, 7, 5}, // far quad

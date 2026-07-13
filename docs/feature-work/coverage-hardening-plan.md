@@ -22,33 +22,38 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-ccd-helpers-task52-authoritative-root-comparable/04c47dfc-f6b6-409e-8869-f56b269e1c28/coverage.cobertura.xml`.
+`TestResults/coverage-axis-projection-task53-authoritative-root-comparable/7ec1eb48-d21b-4e88-b5b6-8b4b12bcc203/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
-| Lines | 99.77% | 26,916 / 26,978 | 62 | 100% |
-| Branches | 99.45% | 10,343 / 10,400 | 57 | 100% |
-| Methods | 99.38% | 3,515 / 3,537 | 22 | 100% |
+| Lines | 99.79% | 27,144 / 27,199 | 55 | 100% |
+| Branches | 99.49% | 10,406 / 10,459 | 53 | 100% |
+| Methods | 99.41% | 3,530 / 3,551 | 21 | 100% |
 
-The authoritative full coverage-enabled `Release` suite passes 2,490/2,490 tests, and
+The authoritative full coverage-enabled `Release` suite passes 2,513/2,513 tests, and
 `ReleaseLean` builds both targets without warnings. Branch coverage is now the
 primary constraint, but the remaining line and method gaps must close from the
 same final artifact.
 
-Task 52's authoritative artifact reports 100% line, branch, and method coverage
-for the 3D body CCD helper and shared target policy. Final 3D target admission
-now delegates to the canonical collision-pair gate, closing a real linked-joint
-suppression defect while preserving collider lifecycle, hierarchy, layer, and
-authored-filter rules.
+Task 53's authoritative artifact reports 100% line, branch, and method coverage
+for 3D axis projection, cuboid/capsule detection, convex mesh/capsule detection,
+the shared 3D dispatch helper, `PhysicsMesh`, and `LSCuboidCollider`. The block
+closed seven lines, four branches, and one method from the repository-wide gap
+while adding exact rounded-feature, containment, transform, and support-feature
+behavior that raised the accountable denominator.
 
 ### Immediate Completed Block
 
-The 3D CCD helper boundary is resolved and independently reviewed. Context
-`Inherit` fallback, zero-scale bounds proxies, moving-away overlap rejection,
-and dynamic plus kinematic linked-joint suppression are mutation-sensitive.
-Duplicate proxy thresholding and normalized-normal checks were removed after
-caller proof, and the shared policy now receives one canonical physical-pair
-decision instead of a drifting subset of collision rules.
+The capsule/convex boundary is resolved and independently approved. Cuboid
+contacts now use an exact segment-to-oriented-box distance solve for rounded
+features, inclusive touching, directional containment exits, quaternion-exact
+local transforms, ordered SAT, and tangentially matched support witnesses.
+Closed convex mesh containment uses the scaled world-space mass center, complete
+face plus edge-cross axes, and matched mesh features; off-representative surface
+contacts retain deterministic BVH fallback. Four inverted closest-segment calls,
+the lossy two-degree cross-axis pruning, an unused sphere projection helper, and
+duplicate AABB/OBB capsule reducers were removed or corrected. Critical touch,
+scale, scratch-lifetime, and axis mutations all fail the focused suite.
 
 ## Rules Of Engagement
 
@@ -115,10 +120,11 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | `CollisionHandling/Detection/3D/Sat/AxisProjectionHelper.cs` | 5 | 2 | 1 | Capsule/cuboid axes, sphere projection, and degenerate normals. |
-| 2 | `Constraints/3D/RagdollRuntime3D.cs` | 3 | 2 | 1 | Replay load shape, link ownership, and stable reconstruction. |
-| 3 | `Core/2D/GravitasPhysics2DService.SupportTypes.cs` | 3 | 2 | 0 | Stable support ordering and lifecycle-proven ownership. |
-| 4 | Remaining two-branch collision, constraint, query, and CCD blocks | 0-2 | 2 each | 0 | Re-rank from the next authoritative artifact; finish one cohesive source block at a time. |
+| 1 | `Constraints/3D/RagdollRuntime3D.cs` | 3 | 2 | 1 | Replay load shape, link ownership, and stable reconstruction. |
+| 2 | `Constraints/2D/JointSolver2D.cs` | 2 | 2 | 0 | Degenerate rows, deterministic limit selection, and solver parity. |
+| 3 | `Core/2D/SolidBody2D.ContinuousCollision.Kinematic.cs` | 2 | 2 | 0 | Kinematic signed-boundary motion and deterministic candidate admission. |
+| 4 | `Queries/3D/GravitasQuery3DService.Cone.cs` | 2 | 2 | 0 | Cone query admission, filtering, and exact boundary behavior. |
+| 5 | Remaining one- and two-branch collision, constraint, query, replay, and CCD blocks | 0-5 | 1-2 each | 0-2 | Re-rank from each authoritative artifact; finish one cohesive source block at a time. |
 
 ### Phase 1: Core Runtime And Service Ownership
 
@@ -254,8 +260,11 @@ incorrectly.
 - [x] Close and independently review mesh collider area, frontal area,
       disconnected-BVH fallbacks, and all-zero-scale mass properties; remove
       the impossible constructor-owned null mesh arm.
-- [ ] Reassess `AxisProjectionHelper` and remaining geometry after each fresh
-      artifact.
+- [x] Close and independently review `AxisProjectionHelper` with the full
+      cuboid/capsule and convex-mesh/capsule boundary: retain every nonzero
+      fixed-point cross axis, delete the unused sphere projection, solve exact
+      rounded distance and containment exits, match support witnesses, and
+      preserve arbitrary-rotation inclusive contact.
 - [ ] Delete reducer permutations or fallback branches that valid authored
       shapes and validated callers cannot reach.
 
@@ -449,6 +458,7 @@ of record.
 | Hierarchy ownership closure | 99.76% | 99.38% | 99.38% | 2,476 | Shared hierarchy state reached 100%; the unused ParentId duplicate was removed, empty cleanup is idempotent, and reparent/clear ownership now releases the retained exact top parent instead of risking stale or reused-ID registry aliases. |
 | Shared segment-box clipping closure | 99.77% | 99.42% | 99.38% | 2,485 | Mixed fallback, ray AABB/OBB, and swept-sphere cuboid clipping reached 100%; exact-zero parallel policy preserves one-raw endpoint contacts, true ray exits remain exact, and three drifting clip implementations collapsed into SweepBoundsUtility with 77 net production lines deleted. |
 | 3D CCD helper and pair-policy closure | 99.77% | 99.45% | 99.38% | 2,490 | The 3D helper and shared target policy reached 100%; context `Inherit` falls back deterministically, duplicate proxy/normal guards were removed, and dynamic plus kinematic CCD now honor the canonical pair gate including linked-joint suppression. Independent review found no issues. |
+| Capsule/convex geometry closure | 99.79% | 99.49% | 99.41% | 2,513 | Axis projection, cuboid/capsule, convex mesh/capsule, shared dispatch, mesh transform, and cuboid feature ownership reached 100%. Exact rounded distance, inclusive touch, directional whole-capsule containment, quaternion-local transforms, scaled closed-mesh interiors, matched support features, and deterministic BVH fallback are mutation-sensitive and independently approved. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.

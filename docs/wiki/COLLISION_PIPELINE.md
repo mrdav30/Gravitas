@@ -105,10 +105,19 @@ Narrow phase owns shape truth. Supported shape coverage includes:
 | 2D | circle, capsule, AABB, convex polygon, compound |
 | Mixed | supported 3D shapes against embedded 2D circle/capsule/AABB/polygon/compound slabs |
 
-Convex SAT paths use stable axis generation and pair-oriented normals. Mesh
-paths use authored triangle order and local BVH candidate gathering. Compound
-paths scan parts in stable declaration order and return the owner collider as
-the public identity.
+Convex SAT paths use stable axis generation and pair-oriented normals. Cuboid
+versus capsule checks first solve exact segment-to-oriented-box distance for
+rounded features, then use ordered SAT only when the capsule core reaches the
+box; inclusive projections and directional exit depths preserve touching and
+containment semantics. Convex mesh versus capsule checks use the closest capsule-segment point
+to the mesh center for their exterior representative manifold and fall back to
+deterministic BVH traversal with stable contact-ID reduction when contact exists
+away from it. Closed-convex containment instead orients face planes from the
+scaled world-space center of mass and reduces the whole capsule over face and
+edge-cross axes to a matched support-feature exit manifold. Other mesh paths use the same deterministic BVH
+candidate ownership; candidate order follows the stable built tree rather than
+authored triangle indices. Compound paths scan parts in stable declaration order
+and return the owner collider as the public identity.
 
 For shape state, pair matrices, SAT invariants, mesh policy, and compound
 ownership details, read [Collider Shape Reference](COLLIDER_SHAPE_REFERENCE.md).

@@ -8,7 +8,7 @@
 using FixedMathSharp;
 using Gravitas.Colliders;
 using SwiftCollections;
-using SwiftCollections.Pool;
+using System;
 
 namespace Gravitas.CollisionHandling;
 
@@ -41,94 +41,291 @@ public static partial class CollisionDetection
         return true;
     }
 
-    private static bool DoAABoxCapsuleCheck(CollisionWorkItem pair)
+    private static bool DoCuboidCapsuleCheck(CollisionWorkItem pair)
     {
-        var aabb = (LSCuboidCollider)pair.ColliderA;
+        var cuboid = (LSCuboidCollider)pair.ColliderA;
         var capsule = (LSCapsuleCollider)pair.ColliderB;
 
-        // Calculate the closest point on the capsule line segment to the AABB center
-        Vector3d closestPointOnCapsuleLine = Vector3d.ClosestPointOnLineSegment(capsule.LineSegmentStart, capsule.LineSegmentEnd, aabb.Center);
-        Vector3d closestPointOnBox = aabb.ClosestPointOnSurface(closestPointOnCapsuleLine);
-        Vector3d penetrationVector = closestPointOnCapsuleLine - closestPointOnBox;
-        // Check if the distance from the closest point to the AABB is less than the capsule radius
-        if (penetrationVector.MagnitudeSquared > capsule.ScaledRadiusSqr)
-            return false; // No collision if the distance squared is greater than the radius squared
-                          // remove capsule's radius to find the actual depth
-
-        // remove the capsule's radius to get the actual penetration depth 
-        Vector3d penetrationNormal = ResolveNormal(penetrationVector, capsule.Center - aabb.Center);
-        pair.Manifold.SetContact(
-            closestPointOnBox,
-            closestPointOnCapsuleLine - penetrationNormal * capsule.ScaledRadius,
-            penetrationVector.Magnitude - capsule.ScaledRadius,
-            penetrationNormal
-        );
-
-        return true;
-    }
-
-    private static bool DoOBBoxCapsuleCheck(CollisionWorkItem pair)
-    {
-        var obb = (LSCuboidCollider)pair.ColliderA;
-        var capsule = (LSCapsuleCollider)pair.ColliderB;
-
-        if (!TestOBBoxCapsuleSeparatingAxes(obb, capsule, out AxisPenetration axisPenetration))
+        FindClosestPointsOnCuboidAndSegment(
+            cuboid,
+            capsule.LineSegmentStart,
+            capsule.LineSegmentEnd,
+            out Vector3d pointOnCuboid,
+            out Vector3d pointOnSegment);
+        Vector3d coreSeparation = pointOnSegment - pointOnCuboid;
+        Fixed64 coreDistanceSquared = coreSeparation.MagnitudeSquared;
+        if (coreDistanceSquared > capsule.ScaledRadiusSqr)
             return false;
 
-        // find closest point on capsules inner line segment relative to poly center
-        Vector3d closestPointOnCapsuleLine = Vector3d.ClosestPointOnLineSegment(capsule.LineSegmentStart, capsule.LineSegmentEnd, obb.Center);
-        // find the closest point on the poly relative to the closest point on capsule's line segment
-        Vector3d collisionPointOBBox = obb.ClosestPointOnSurface(closestPointOnCapsuleLine);
-        Vector3d collisionPointCapsule = capsule.ClosestPointOnSurface(collisionPointOBBox);
+        if (coreDistanceSquared > Fixed64.Zero)
+        {
+            Fixed64 coreDistance = FixedMath.Sqrt(coreDistanceSquared);
+            Vector3d radialNormal = coreSeparation / coreDistance;
+            pair.Manifold.SetContact(
+                pointOnCuboid,
+                pointOnSegment - radialNormal * capsule.ScaledRadius,
+                capsule.ScaledRadius - coreDistance,
+                radialNormal);
+            return true;
+        }
+
+        FindCuboidCapsulePenetration(cuboid, capsule, out AxisPenetration axisPenetration);
+
+        Vector3d normal = axisPenetration.Axis;
+        Vector3d collisionPointCapsule = ConvexColliderSupport.Support(capsule, -normal);
+        Vector3d collisionPointCuboid = FindCuboidSupportFeaturePoint(
+            cuboid,
+            normal,
+            collisionPointCapsule);
         pair.Manifold.SetContact(
-            collisionPointOBBox,
+            collisionPointCuboid,
             collisionPointCapsule,
             axisPenetration.Depth,
-            OrientNormal(axisPenetration.Axis, capsule.Center - obb.Center)
+            normal
         );
 
         return true;
     }
 
-    private static bool TestOBBoxCapsuleSeparatingAxes(
-        LSCuboidCollider obb,
+    private static void FindCuboidCapsulePenetration(
+        LSCuboidCollider cuboid,
         LSCapsuleCollider capsule,
         out AxisPenetration penetration)
     {
         penetration = default;
-        bool overlaps = false;
 
-        SwiftList<Vector3d> axes = SwiftListPool<Vector3d>.Shared.Rent();
-        AxisProjectionHelper.GetCuboidAndCapsuleAxisVectors(obb, capsule, ref axes);
+        SwiftList<Vector3d> axes = cuboid.Context.CollisionScratch.CuboidCapsuleAxes;
+        axes.FastClear();
+        AxisProjectionHelper.GetCuboidAndCapsuleAxisVectors(cuboid, capsule, ref axes);
 
-        Vector3d representativePointB = Vector3d.ClosestPointOnLineSegment(capsule.LineSegmentStart, capsule.LineSegmentEnd, obb.Center);
-        // Check for a separating axis
-        FixedRange obbProjection = FixedRange.MinRange, capProjection;
-        foreach (Vector3d axis in axes)
+        FixedRange cuboidProjection = FixedRange.MinRange, capProjection;
+        for (int i = 0; i < axes.Count; i++)
         {
-            AxisProjectionHelper.ProjectPolygonOntoAxis(axis, obb.Vertices, ref obbProjection);
+            Vector3d axis = axes[i];
+            AxisProjectionHelper.ProjectPolygonOntoAxis(axis, cuboid.Vertices, ref cuboidProjection);
             capProjection = AxisProjectionHelper.ProjectCapsuleOntoAxis(axis, capsule.LineSegmentStart, capsule.LineSegmentEnd, capsule.ScaledRadius);
-            if (!obbProjection.Overlaps(capProjection))
-            {
-                overlaps = false;
-                break;
-            }
-            else overlaps = true;
+            KeepDirectionalPenetration(axis, cuboidProjection, capProjection, ref penetration);
+        }
+    }
 
-            Vector3d representativePointA = obb.ClosestPointOnSurface(representativePointB);
-            // Determine the direction of the overlap
-            Fixed64 sign = Vector3d.Dot(axis, representativePointB - representativePointA) < Fixed64.Zero ? -Fixed64.One : Fixed64.One;
-            Fixed64 checkDepth = penetration.HasValue ? penetration.Depth : Fixed64.MaxValue;
-            if (FixedRange.CheckOverlap(axis, obbProjection, capProjection, checkDepth, sign, out (Vector3d Vector, Fixed64 Depth)? axisOverlap))
-            {
-                (Vector3d axisVector, Fixed64 axisDepth) = axisOverlap!.Value;
-                penetration = new AxisPenetration(axisVector, axisDepth);
-            }
+    private static void FindClosestPointsOnCuboidAndSegment(
+        LSCuboidCollider cuboid,
+        Vector3d segmentStart,
+        Vector3d segmentEnd,
+        out Vector3d pointOnCuboid,
+        out Vector3d pointOnSegment)
+    {
+        FixedQuaternion inverseRotation = cuboid.Rotation.Inverse();
+        Vector3d localStart = ToCuboidLocal(segmentStart, cuboid.Center, inverseRotation);
+        Vector3d localEnd = ToCuboidLocal(segmentEnd, cuboid.Center, inverseRotation);
+        Vector3d direction = localEnd - localStart;
+        Vector3d halfExtents = cuboid.ScaledSize * Fixed64.Half;
+
+        Span<Fixed64> breakpoints = stackalloc Fixed64[8];
+        int breakpointCount = 2;
+        breakpoints[0] = Fixed64.Zero;
+        breakpoints[1] = Fixed64.One;
+        AddSegmentBoxBreakpoints(localStart.X, direction.X, halfExtents.X, breakpoints, ref breakpointCount);
+        AddSegmentBoxBreakpoints(localStart.Y, direction.Y, halfExtents.Y, breakpoints, ref breakpointCount);
+        AddSegmentBoxBreakpoints(localStart.Z, direction.Z, halfExtents.Z, breakpoints, ref breakpointCount);
+        SortBreakpoints(breakpoints, breakpointCount);
+
+        Fixed64 directionLengthSquared = direction.MagnitudeSquared;
+        Fixed64 representativeParameter = directionLengthSquared == Fixed64.Zero
+            ? Fixed64.Zero
+            : FixedMath.Clamp(-Vector3d.Dot(localStart, direction) / directionLengthSquared, Fixed64.Zero, Fixed64.One);
+        Fixed64 bestDistanceSquared = Fixed64.MaxValue;
+        Fixed64 bestParameter = Fixed64.Zero;
+        Vector3d bestSegmentPoint = localStart;
+        Vector3d bestBoxPoint = ClampToCuboid(localStart, halfExtents);
+        for (int i = 0; i < breakpointCount - 1; i++)
+        {
+            Fixed64 left = breakpoints[i];
+            Fixed64 right = breakpoints[i + 1];
+            Fixed64 sample = (left + right) * Fixed64.Half;
+            Fixed64 numerator = Fixed64.Zero;
+            Fixed64 denominator = Fixed64.Zero;
+            AccumulateSegmentBoxDerivative(localStart.X, direction.X, halfExtents.X, sample, ref numerator, ref denominator);
+            AccumulateSegmentBoxDerivative(localStart.Y, direction.Y, halfExtents.Y, sample, ref numerator, ref denominator);
+            AccumulateSegmentBoxDerivative(localStart.Z, direction.Z, halfExtents.Z, sample, ref numerator, ref denominator);
+            Fixed64 candidate = denominator == Fixed64.Zero
+                ? FixedMath.Clamp(representativeParameter, left, right)
+                : FixedMath.Clamp(-numerator / denominator, left, right);
+            KeepClosestSegmentBoxCandidate(
+                localStart,
+                direction,
+                halfExtents,
+                candidate,
+                representativeParameter,
+                ref bestDistanceSquared,
+                ref bestParameter,
+                ref bestSegmentPoint,
+                ref bestBoxPoint);
         }
 
-        SwiftListPool<Vector3d>.Shared.Release(axes);
-        return overlaps && penetration.HasValue;
+        pointOnSegment = ToCuboidWorld(bestSegmentPoint, cuboid.Center, cuboid.Rotation);
+        pointOnCuboid = ToCuboidWorld(bestBoxPoint, cuboid.Center, cuboid.Rotation);
     }
+
+    private static void AddSegmentBoxBreakpoints(
+        Fixed64 start,
+        Fixed64 direction,
+        Fixed64 halfExtent,
+        Span<Fixed64> breakpoints,
+        ref int count)
+    {
+        if (direction == Fixed64.Zero)
+            return;
+
+        AddSegmentBoxBreakpoint((-halfExtent - start) / direction, breakpoints, ref count);
+        AddSegmentBoxBreakpoint((halfExtent - start) / direction, breakpoints, ref count);
+    }
+
+    private static void AddSegmentBoxBreakpoint(Fixed64 value, Span<Fixed64> breakpoints, ref int count)
+    {
+        if (value > Fixed64.Zero && value < Fixed64.One)
+            breakpoints[count++] = value;
+    }
+
+    private static void SortBreakpoints(Span<Fixed64> breakpoints, int count)
+    {
+        for (int i = 1; i < count; i++)
+        {
+            Fixed64 value = breakpoints[i];
+            int insertionIndex = i;
+            // Zero is the retained first breakpoint, while every inserted value is positive.
+            while (breakpoints[insertionIndex - 1] > value)
+            {
+                breakpoints[insertionIndex] = breakpoints[insertionIndex - 1];
+                insertionIndex--;
+            }
+
+            breakpoints[insertionIndex] = value;
+        }
+    }
+
+    private static void AccumulateSegmentBoxDerivative(
+        Fixed64 start,
+        Fixed64 direction,
+        Fixed64 halfExtent,
+        Fixed64 sample,
+        ref Fixed64 numerator,
+        ref Fixed64 denominator)
+    {
+        Fixed64 samplePosition = start + direction * sample;
+        Fixed64 boundary;
+        if (samplePosition < -halfExtent)
+            boundary = -halfExtent;
+        else if (samplePosition > halfExtent)
+            boundary = halfExtent;
+        else
+            return;
+
+        numerator += direction * (start - boundary);
+        denominator += direction * direction;
+    }
+
+    private static void KeepClosestSegmentBoxCandidate(
+        Vector3d start,
+        Vector3d direction,
+        Vector3d halfExtents,
+        Fixed64 parameter,
+        Fixed64 representativeParameter,
+        ref Fixed64 bestDistanceSquared,
+        ref Fixed64 bestParameter,
+        ref Vector3d bestSegmentPoint,
+        ref Vector3d bestBoxPoint)
+    {
+        Vector3d segmentPoint = start + direction * parameter;
+        Vector3d boxPoint = ClampToCuboid(segmentPoint, halfExtents);
+        Fixed64 distanceSquared = Vector3d.DistanceSquared(segmentPoint, boxPoint);
+        if (distanceSquared > bestDistanceSquared
+            || (distanceSquared == bestDistanceSquared
+                && (parameter - representativeParameter).Abs() >= (bestParameter - representativeParameter).Abs()))
+            return;
+
+        bestDistanceSquared = distanceSquared;
+        bestParameter = parameter;
+        bestSegmentPoint = segmentPoint;
+        bestBoxPoint = boxPoint;
+    }
+
+    private static Vector3d ClampToCuboid(Vector3d point, Vector3d halfExtents) =>
+        new(
+            FixedMath.Clamp(point.X, -halfExtents.X, halfExtents.X),
+            FixedMath.Clamp(point.Y, -halfExtents.Y, halfExtents.Y),
+            FixedMath.Clamp(point.Z, -halfExtents.Z, halfExtents.Z));
+
+    private static Vector3d FindCuboidSupportFeaturePoint(
+        LSCuboidCollider cuboid,
+        Vector3d direction,
+        Vector3d target)
+    {
+        Vector3d[] vertices = cuboid.Vertices;
+        Vector3d supportVertex = ConvexColliderSupport.Support(cuboid, direction);
+        Fixed64 supportProjection = Vector3d.Dot(supportVertex, direction);
+        Vector3d closest = supportVertex;
+        Fixed64 closestDistanceSquared = Vector3d.DistanceSquared(target, closest);
+
+        for (int i = 0; i < LSCuboidCollider.EdgeDefinitions.Length; i++)
+        {
+            int[] edge = LSCuboidCollider.EdgeDefinitions[i];
+            Vector3d start = vertices[edge[0]];
+            Vector3d end = vertices[edge[1]];
+            if (!IsOnSupportPlane(start, direction, supportProjection)
+                || !IsOnSupportPlane(end, direction, supportProjection))
+            {
+                continue;
+            }
+
+            KeepClosestFeaturePoint(
+                Vector3d.ClosestPointOnLineSegment(target, start, end),
+                target,
+                ref closest,
+                ref closestDistanceSquared);
+        }
+
+        for (int i = 0; i < LSCuboidCollider.FaceDefinitions.Length; i++)
+        {
+            int[] face = LSCuboidCollider.FaceDefinitions[i];
+            Vector3d first = vertices[face[0]];
+            Vector3d second = vertices[face[1]];
+            Vector3d third = vertices[face[2]];
+            Vector3d fourth = vertices[face[3]];
+            if (!(IsOnSupportPlane(first, direction, supportProjection)
+                & IsOnSupportPlane(second, direction, supportProjection)
+                & IsOnSupportPlane(third, direction, supportProjection)
+                & IsOnSupportPlane(fourth, direction, supportProjection)))
+            {
+                continue;
+            }
+
+            KeepClosestFeaturePoint(
+                MeshUtils.ClosestPointOnTriangle(first, second, third, direction, target),
+                target,
+                ref closest,
+                ref closestDistanceSquared);
+            KeepClosestFeaturePoint(
+                MeshUtils.ClosestPointOnTriangle(first, third, fourth, direction, target),
+                target,
+                ref closest,
+                ref closestDistanceSquared);
+        }
+
+        return closest;
+    }
+
+    private static Vector3d ToCuboidLocal(
+        Vector3d point,
+        Vector3d center,
+        FixedQuaternion inverseRotation) =>
+        inverseRotation * (point - center);
+
+    private static Vector3d ToCuboidWorld(
+        Vector3d point,
+        Vector3d center,
+        FixedQuaternion rotation) =>
+        center + rotation * point;
 
     /// <summary>
     /// Checks for collisions between two poly-poly colliders.

@@ -68,26 +68,177 @@ public static partial class CollisionDetection
                 capsule,
                 pair.Context.CollisionScratch.MeshTriangleCandidatesA);
 
-        // Calculate the closest point on the capsule line segment to the mesh center
-        Vector3d closestPointOnCapsuleLine = Vector3d.ClosestPointOnLineSegment(capsule.LineSegmentStart, capsule.LineSegmentEnd, mesh.Center);
-        Vector3d closetPointOnMesh = mesh.ClosestPointOnSurface(closestPointOnCapsuleLine);
-        // Check if the distance from the closest point to the mesh is less than the capsule radius
-        if ((closetPointOnMesh - closestPointOnCapsuleLine).MagnitudeSquared > capsule.ScaledRadiusSqr)
-            return false; // No collision if the distance squared is greater than the radius squared
-                          // remove capsule's radius to find the actual depth
+        Vector3d closestPointOnCapsuleLine = Vector3d.ClosestPointOnLineSegment(
+            mesh.Center,
+            capsule.LineSegmentStart,
+            capsule.LineSegmentEnd);
+        Vector3d closestPointOnMesh = mesh.ClosestPointOnSurface(closestPointOnCapsuleLine);
+        Vector3d separation = closestPointOnCapsuleLine - closestPointOnMesh;
+        Fixed64 distanceSquared = separation.MagnitudeSquared;
+        bool representativeInside = IsPointInsideClosedConvexMesh(mesh, closestPointOnCapsuleLine);
+        if (representativeInside)
+        {
+            FindConvexMeshCapsulePenetration(mesh, capsule, out AxisPenetration penetration);
+            Vector3d containedNormal = penetration.Axis;
+            Vector3d capsulePoint = ConvexColliderSupport.Support(capsule, -containedNormal);
+            pair.Manifold.SetContact(
+                FindMeshSupportFeaturePoint(mesh, containedNormal, capsulePoint),
+                capsulePoint,
+                penetration.Depth,
+                containedNormal);
+            return true;
+        }
 
-        // Use the normal of the triangle where the collision occurs.
-        Vector3d penetrationNormal = (closestPointOnCapsuleLine - closetPointOnMesh).Normalized;
-        // penetration vector should be along the normal direction
-        Vector3d penetrationVector = penetrationNormal * (capsule.ScaledRadius - Vector3d.Distance(closestPointOnCapsuleLine, closetPointOnMesh));
-        // find collision point on the capsule
-        Vector3d collisionPointCapsule = closestPointOnCapsuleLine - penetrationNormal * capsule.ScaledRadius;
+        if (distanceSquared > capsule.ScaledRadiusSqr)
+            return MeshTriangleContactGenerator.TryBuildMeshCapsuleManifold(
+                pair,
+                mesh,
+                capsule,
+                pair.Context.CollisionScratch.MeshTriangleCandidatesA);
+
+        Fixed64 distance = separation.Magnitude;
+        Vector3d normal = ResolveNormal(separation, capsule.Center - mesh.Center);
         pair.Manifold.SetContact(
-            closetPointOnMesh,
-            collisionPointCapsule,
-            penetrationVector.Magnitude,
-            penetrationNormal
+            closestPointOnMesh,
+            closestPointOnCapsuleLine - normal * capsule.ScaledRadius,
+            capsule.ScaledRadius - distance,
+            normal
         );
+
+        return true;
+    }
+
+    private static void FindConvexMeshCapsulePenetration(
+        LSMeshCollider mesh,
+        LSCapsuleCollider capsule,
+        out AxisPenetration penetration)
+    {
+        penetration = default;
+        PhysicsMesh physicsMesh = mesh.Mesh;
+        for (int i = 0; i < physicsMesh.TriangleCount; i++)
+        {
+            Vector3d axis = physicsMesh.GetFaceNormalWorld(i);
+            FixedRange meshProjection = ConvexColliderSupport.ProjectOntoAxis(mesh, axis);
+            FixedRange capsuleProjection = AxisProjectionHelper.ProjectCapsuleOntoAxis(
+                axis,
+                capsule.LineSegmentStart,
+                capsule.LineSegmentEnd,
+                capsule.ScaledRadius);
+            KeepDirectionalPenetration(axis, meshProjection, capsuleProjection, ref penetration);
+        }
+
+        ReadOnlySpan<int> edgeVertexPairs = physicsMesh.ConvexSatEdgeVertexPairs;
+        ReadOnlySpan<Vector3d> vertices = physicsMesh.Vertices;
+        for (int i = 0; i < edgeVertexPairs.Length; i += 2)
+        {
+            Vector3d edge = vertices[edgeVertexPairs[i + 1]] - vertices[edgeVertexPairs[i]];
+            Vector3d cross = Vector3d.Cross(edge, capsule.LineDirection);
+            if (cross.MagnitudeSquared == Fixed64.Zero)
+                continue;
+
+            Vector3d axis = cross.Normalized;
+            FixedRange meshProjection = ConvexColliderSupport.ProjectOntoAxis(mesh, axis);
+            FixedRange capsuleProjection = AxisProjectionHelper.ProjectCapsuleOntoAxis(
+                axis,
+                capsule.LineSegmentStart,
+                capsule.LineSegmentEnd,
+                capsule.ScaledRadius);
+            KeepDirectionalPenetration(axis, meshProjection, capsuleProjection, ref penetration);
+        }
+    }
+
+    private static Vector3d FindMeshSupportFeaturePoint(
+        LSMeshCollider mesh,
+        Vector3d direction,
+        Vector3d target)
+    {
+        PhysicsMesh physicsMesh = mesh.Mesh;
+        Vector3d supportVertex = ConvexColliderSupport.Support(mesh, direction);
+        Fixed64 supportProjection = Vector3d.Dot(supportVertex, direction);
+        Vector3d closest = supportVertex;
+        Fixed64 closestDistanceSquared = Vector3d.DistanceSquared(target, closest);
+
+        ReadOnlySpan<int> edgeVertexPairs = physicsMesh.ConvexSatEdgeVertexPairs;
+        ReadOnlySpan<Vector3d> vertices = physicsMesh.Vertices;
+        for (int i = 0; i < edgeVertexPairs.Length; i += 2)
+        {
+            Vector3d start = vertices[edgeVertexPairs[i]];
+            Vector3d end = vertices[edgeVertexPairs[i + 1]];
+            if (!IsOnSupportPlane(start, direction, supportProjection)
+                || !IsOnSupportPlane(end, direction, supportProjection))
+            {
+                continue;
+            }
+
+            KeepClosestFeaturePoint(
+                Vector3d.ClosestPointOnLineSegment(target, start, end),
+                target,
+                ref closest,
+                ref closestDistanceSquared);
+        }
+
+        for (int i = 0; i < physicsMesh.TriangleCount; i++)
+        {
+            physicsMesh.GetTriangleVertices(i, out Vector3d first, out Vector3d second, out Vector3d third);
+            if (!IsOnSupportPlane(first, direction, supportProjection)
+                || !IsOnSupportPlane(second, direction, supportProjection)
+                || !IsOnSupportPlane(third, direction, supportProjection))
+            {
+                continue;
+            }
+
+            KeepClosestFeaturePoint(
+                MeshUtils.ClosestPointOnTriangle(
+                    first,
+                    second,
+                    third,
+                    physicsMesh.GetFaceNormalWorld(i),
+                    target),
+                target,
+                ref closest,
+                ref closestDistanceSquared);
+        }
+
+        return closest;
+    }
+
+    private static bool IsOnSupportPlane(
+        Vector3d point,
+        Vector3d direction,
+        Fixed64 supportProjection) =>
+        (Vector3d.Dot(point, direction) - supportProjection).Abs() <= Fixed64.Epsilon;
+
+    private static void KeepClosestFeaturePoint(
+        Vector3d candidate,
+        Vector3d target,
+        ref Vector3d closest,
+        ref Fixed64 closestDistanceSquared)
+    {
+        Fixed64 candidateDistanceSquared = Vector3d.DistanceSquared(target, candidate);
+        if (candidateDistanceSquared >= closestDistanceSquared)
+            return;
+
+        closest = candidate;
+        closestDistanceSquared = candidateDistanceSquared;
+    }
+
+    private static bool IsPointInsideClosedConvexMesh(LSMeshCollider mesh, Vector3d point)
+    {
+        PhysicsMesh physicsMesh = mesh.Mesh;
+        if (!physicsMesh.TryGetClosedVolumeMassProperties(out MeshMassProperties massProperties, out _))
+            return false;
+
+        Vector3d interiorPoint = physicsMesh.ConvertScaledLocalToWorld(massProperties.CenterOfMass);
+        for (int i = 0; i < physicsMesh.TriangleCount; i++)
+        {
+            physicsMesh.GetTriangleVertices(i, out Vector3d first, out _, out _);
+            Vector3d outwardNormal = OrientNormal(
+                physicsMesh.GetFaceNormalWorld(i),
+                first - interiorPoint);
+
+            if (Vector3d.Dot(outwardNormal, point - first) > Fixed64.Epsilon)
+                return false;
+        }
 
         return true;
     }

@@ -19,8 +19,11 @@ public class CollisionDetectionBenchmarks
     private CollisionPair[] _cylinderCapPairs;
     private CollisionPair[] _cuboidFacePairs;
     private CollisionPair[] _cuboidSatPairs;
+    private CollisionPair[] _cuboidCapsulePairs;
     private CollisionPair[] _meshCylinderPairs;
     private CollisionPair[] _meshConePairs;
+    private CollisionPair[] _meshCapsulePairs;
+    private CollisionPair[] _meshCapsuleFallbackPairs;
     private CollisionPair[] _meshCuboidPairs;
     private CollisionPair[] _meshMeshPairs;
     private CollisionPair[] _concaveMeshCylinderPairs;
@@ -55,8 +58,11 @@ public class CollisionDetectionBenchmarks
         _cylinderCapPairs = CreatePairSet(CreateCylinderCapPair);
         _cuboidFacePairs = CreatePairSet(CreateCuboidFacePair);
         _cuboidSatPairs = CreatePairSet(CreateCuboidSatPair);
+        _cuboidCapsulePairs = CreatePairSet(CreateCuboidCapsulePair);
         _meshCylinderPairs = CreatePairSet(CreateMeshCylinderPair);
         _meshConePairs = CreatePairSet(CreateMeshConePair);
+        _meshCapsulePairs = CreatePairSet(CreateMeshCapsulePair);
+        _meshCapsuleFallbackPairs = CreatePairSet(CreateMeshCapsuleFallbackPair);
         _meshCuboidPairs = CreatePairSet(CreateMeshCuboidPair);
         _meshMeshPairs = CreatePairSet(CreateMeshMeshPair);
         _concaveMeshCylinderPairs = CreatePairSet(CreateConcaveMeshCylinderPair);
@@ -81,8 +87,11 @@ public class CollisionDetectionBenchmarks
         _cylinderCapPairs = null;
         _cuboidFacePairs = null;
         _cuboidSatPairs = null;
+        _cuboidCapsulePairs = null;
         _meshCylinderPairs = null;
         _meshConePairs = null;
+        _meshCapsulePairs = null;
+        _meshCapsuleFallbackPairs = null;
         _meshCuboidPairs = null;
         _meshMeshPairs = null;
         _concaveMeshCylinderPairs = null;
@@ -145,6 +154,12 @@ public class CollisionDetectionBenchmarks
     }
 
     [Benchmark]
+    public int CheckCuboidCapsulePairs()
+    {
+        return CountCollisions(_cuboidCapsulePairs);
+    }
+
+    [Benchmark]
     public int CheckMeshCylinderPairs()
     {
         return CountCollisions(_meshCylinderPairs);
@@ -166,6 +181,18 @@ public class CollisionDetectionBenchmarks
     public int GenerateMeshConeManifolds()
     {
         return CountManifoldContacts(_meshConePairs);
+    }
+
+    [Benchmark]
+    public int CheckMeshCapsulePairs()
+    {
+        return CountCollisions(_meshCapsulePairs);
+    }
+
+    [Benchmark]
+    public int CheckMeshCapsuleFallbackPairs()
+    {
+        return CountCollisions(_meshCapsuleFallbackPairs);
     }
 
     [Benchmark]
@@ -395,6 +422,15 @@ public class CollisionDetectionBenchmarks
             CreateCuboid(origin + new Vector3d(Fixed64.Half, Fixed64.Zero, Fixed64.Zero)));
     }
 
+    private CollisionPair CreateCuboidCapsulePair(int index, Vector3d origin)
+    {
+        return new CollisionPair(
+            CreateCuboid(origin, FixedQuaternion.FromEulerAnglesInDegrees(Fixed64.Zero, (Fixed64)20, Fixed64.Zero)),
+            CreateCapsule(
+                origin + new Vector3d(Fixed64.FromFraction(1, 4), Fixed64.Zero, Fixed64.FromFraction(1, 4)),
+                new Vector3d(Fixed64.One, (Fixed64)3, Fixed64.One)));
+    }
+
     private CollisionPair CreateMeshCylinderPair(int index, Vector3d origin)
     {
         return new CollisionPair(
@@ -407,6 +443,49 @@ public class CollisionDetectionBenchmarks
         return new CollisionPair(
             CreateMeshFloor(origin),
             CreateCone(origin + new Vector3d(Fixed64.Zero, Fixed64.FromFraction(1, 4), Fixed64.Zero)));
+    }
+
+    private CollisionPair CreateMeshCapsulePair(int index, Vector3d origin)
+    {
+        return new CollisionPair(
+            BenchmarkPhysicsScene.CreateDynamicConvexCube(_context, origin),
+            CreateCapsule(
+                origin + new Vector3d(Fixed64.FromFraction(1, 4), Fixed64.Zero, Fixed64.FromFraction(1, 4)),
+                new Vector3d(Fixed64.One, (Fixed64)3, Fixed64.One)));
+    }
+
+    private CollisionPair CreateMeshCapsuleFallbackPair(int index, Vector3d origin)
+    {
+        Vector3d segmentStart = origin + new Vector3d(
+            Fixed64.FromFraction(5, 4),
+            Fixed64.FromFraction(3, 2),
+            Fixed64.Half);
+        Vector3d segmentEnd = origin + new Vector3d(
+            Fixed64.Half,
+            Fixed64.FromFraction(-5, 4),
+            Fixed64.FromFraction(-3, 4));
+        Vector3d segment = segmentEnd - segmentStart;
+        Fixed64 segmentLength = segment.Magnitude;
+        Vector3d segmentDirection = segment / segmentLength;
+        Vector3d rotationAxis = Vector3d.Cross(Vector3d.Up, segmentDirection);
+        FixedQuaternion rotation = new FixedQuaternion(
+            rotationAxis.X,
+            rotationAxis.Y,
+            rotationAxis.Z,
+            Fixed64.One + Vector3d.Dot(Vector3d.Up, segmentDirection)).Normalized;
+        LSCapsuleCollider capsule = CreateBody(
+            new LSCapsuleCollider
+            {
+                Radius = Fixed64.FromFraction(1, 4),
+                Size = new Vector3d(Fixed64.Half, segmentLength + Fixed64.Half, Fixed64.Half)
+            },
+            (segmentStart + segmentEnd) * Fixed64.Half,
+            rotation,
+            preventAngularForces: true).Collider;
+
+        return new CollisionPair(
+            BenchmarkPhysicsScene.CreateDynamicConvexCube(_context, origin),
+            capsule);
     }
 
     private CollisionPair CreateMeshCuboidPair(int index, Vector3d origin)
@@ -490,7 +569,10 @@ public class CollisionDetectionBenchmarks
         CreateBody(new LSSphereCollider(), position).Collider;
 
     private LSCapsuleCollider CreateCapsule(Vector3d position) =>
-        CreateBody(new LSCapsuleCollider(), position, preventAngularForces: true).Collider;
+        CreateCapsule(position, Vector3d.One);
+
+    private LSCapsuleCollider CreateCapsule(Vector3d position, Vector3d size) =>
+        CreateBody(new LSCapsuleCollider { Size = size }, position, preventAngularForces: true).Collider;
 
     private LSCuboidCollider CreateCuboid(Vector3d position, FixedQuaternion? rotation = null) =>
         CreateBody(new LSCuboidCollider(), position, rotation ?? FixedQuaternion.Identity).Collider;

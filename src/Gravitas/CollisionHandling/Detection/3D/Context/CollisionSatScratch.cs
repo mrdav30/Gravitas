@@ -5,6 +5,7 @@
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
+using FixedMathSharp;
 using SwiftCollections;
 
 namespace Gravitas.CollisionHandling;
@@ -14,6 +15,8 @@ namespace Gravitas.CollisionHandling;
 /// </summary>
 internal sealed class CollisionSatScratch
 {
+    public SwiftList<Vector3d> CuboidCapsuleAxes { get; } = new(18);
+
     public SwiftList<int> MeshCylinderTriangles { get; } = new(8);
 
     public SwiftList<int> MeshTriangleCandidatesA { get; } = new(16);

@@ -5,6 +5,7 @@
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
+using FixedMathSharp;
 using Gravitas.Colliders;
 
 namespace Gravitas.CollisionHandling;
@@ -21,13 +22,12 @@ public static partial class CollisionDetection
     {
         return pair.CollisionType switch
         {
-            CollisionType.None => false,
             CollisionType.Sphere_Sphere => DoSpheresCheck(pair),
             CollisionType.Capsule_Sphere => DoCapsuleSphereCheck(pair),
             CollisionType.Capsule_Capsule => DoCapsulesCheck(pair),
             CollisionType.Cuboid_Sphere => DoCuboidSphereCheck(pair),
-            CollisionType.AABox_Capsule => DoAABoxCapsuleCheck(pair),
-            CollisionType.OBBox_Capsule => DoOBBoxCapsuleCheck(pair),
+            CollisionType.AABox_Capsule => DoCuboidCapsuleCheck(pair),
+            CollisionType.OBBox_Capsule => DoCuboidCapsuleCheck(pair),
             CollisionType.Cuboid_Cuboid => DoCuboidsCheck(pair),
             CollisionType.Cylinder_Sphere => DoCylinderSphereCheck(pair),
             CollisionType.Cylinder_Capsule => DoCylinderCapsuleCheck(pair),
@@ -44,6 +44,26 @@ public static partial class CollisionDetection
             CollisionType.Compound => DoCompoundCheck(pair),
             _ => false,
         };
+    }
+
+    private static void KeepDirectionalPenetration(
+        Vector3d axis,
+        FixedRange firstProjection,
+        FixedRange secondProjection,
+        ref AxisPenetration penetration)
+    {
+        Fixed64 positiveDepth = firstProjection.Max - secondProjection.Min;
+        Fixed64 negativeDepth = secondProjection.Max - firstProjection.Min;
+        Vector3d candidateAxis = axis;
+        Fixed64 candidateDepth = positiveDepth;
+        if (negativeDepth < positiveDepth)
+        {
+            candidateAxis = -axis;
+            candidateDepth = negativeDepth;
+        }
+
+        if (!penetration.HasValue || candidateDepth < penetration.Depth)
+            penetration = new AxisPenetration(candidateAxis, candidateDepth);
     }
 
 }

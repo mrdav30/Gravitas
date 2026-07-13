@@ -763,6 +763,9 @@ namespace Gravitas.Colliders
         public Vector3d ConvertLocalToWorld(Vector3d localPoint) =>
             TransformLocalPoint(localPoint);
 
+        internal Vector3d ConvertScaledLocalToWorld(Vector3d scaledLocalPoint) =>
+            _position + Fixed3x3.TransformDirection(_rotationMatrix, scaledLocalPoint);
+
         public Vector3d ConvertWorldDirectionToLocal(Vector3d worldDirection) =>
             Vector3d.Multiply(
                 _scale,

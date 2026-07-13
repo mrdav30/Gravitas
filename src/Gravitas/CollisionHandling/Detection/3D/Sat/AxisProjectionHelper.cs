@@ -16,10 +16,6 @@ public static class AxisProjectionHelper
 {
     #region Axis Vectors
 
-    public static readonly Fixed64 AngleThresholdDegrees = new(2); // 2 degrees
-    public static readonly Fixed64 AngleThresholdRadians = FixedMath.DegToRad(AngleThresholdDegrees);
-    public static readonly Fixed64 CosThreshold = FixedMath.Cos(AngleThresholdRadians);
-
     public static void GetCuboidAndCapsuleAxisVectors(
         LSCuboidCollider cuboid,
         LSCapsuleCollider capsule,
@@ -32,17 +28,10 @@ public static class AxisProjectionHelper
         // for each edge of the polyhedron
         foreach (Vector3d edge1 in cuboid.EdgeDirections)
         {
-            if (Vector3d.AreAlmostParallel(edge1, capsule.LineDirection, CosThreshold))
-            {
-                output.Add(edge1);
-                continue;
-            }
-
             // cross product of the edge vector and the capsule direction
             Vector3d crossProduct = Vector3d.Cross(edge1, capsule.LineDirection);
-            // crossProduct can be zero if the vectors are parallel - we check against a small number to account for floating point error
-            // otherwise add the normalized cross product to the list of potential separating axes
-            if (crossProduct.MagnitudeSquared <= Fixed64.Epsilon) continue;
+            // Fixed-point cross products are deterministic; skip only an exactly zero result.
+            if (crossProduct.MagnitudeSquared == Fixed64.Zero) continue;
             output.Add(crossProduct.Normalized);
         }
     }
@@ -76,19 +65,6 @@ public static class AxisProjectionHelper
         }
 
         projection.SetMinMax(min, max);
-    }
-
-    /// <summary>
-    /// Project position onto axis vector and add/subtract diameter to get center projection
-    /// </summary>
-    /// <param name="axisVector"></param>
-    /// <param name="position">Center position of circle</param>
-    /// <param name="radius">Diameter of circle (2*radius)</param>
-    /// <returns></returns>
-    public static FixedRange ProjectSphereOntoAxis(Vector3d axisVector, Vector3d position, Fixed64 radius)
-    {
-        Fixed64 centerProjection = axisVector.Dot(position.X, position.Y, position.Z);
-        return new FixedRange(centerProjection - radius, centerProjection + radius);
     }
 
     public static FixedRange ProjectCapsuleOntoAxis(Vector3d axisVector, Vector3d startPoint, Vector3d endPoint, Fixed64 radius)

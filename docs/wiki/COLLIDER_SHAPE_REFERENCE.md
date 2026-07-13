@@ -186,9 +186,11 @@ normal orientation and pair priority first.
 
 SAT and mesh candidate paths use context-owned scratch state through
 `GravitasWorldContext`. `CollisionSatScratch` owns reusable collision context,
-object-info buffers, triangle candidate buffers, and SAT axis sets for one
-world context. Concurrent worlds keep isolated scratch; repeated checks in the
-same world avoid per-check allocations and pool churn.
+object-info buffers, triangle candidate buffers, and SAT axis sets, including
+the ordered cuboid/capsule axes, for one world context. Every reducer clears its
+owned logical buffer before rebuilding it; concurrent worlds keep isolated
+scratch, while repeated checks in the same world avoid per-check allocations
+and pool churn.
 
 ## Mesh Policy
 
