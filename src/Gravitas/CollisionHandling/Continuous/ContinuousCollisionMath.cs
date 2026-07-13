@@ -214,8 +214,13 @@ internal static class ContinuousCollisionMath
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Vector3d ResolveNormal(Vector3d delta, Vector3d relativeDisplacement)
     {
-        if (delta.MagnitudeSquared > Fixed64.Epsilon)
-            return delta.Normalized;
+        if (delta != Vector3d.Zero)
+        {
+            Fixed64 scale = FixedMath.Max(
+                delta.X.Abs(),
+                FixedMath.Max(delta.Y.Abs(), delta.Z.Abs()));
+            return new Vector3d(delta.X / scale, delta.Y / scale, delta.Z / scale).Normalized;
+        }
 
         return -relativeDisplacement.Normalized;
     }
@@ -223,8 +228,11 @@ internal static class ContinuousCollisionMath
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Vector2d ResolveNormal(Vector2d delta, Vector2d relativeDisplacement)
     {
-        if (delta.MagnitudeSquared > Fixed64.Epsilon)
-            return delta.Normalized;
+        if (delta != Vector2d.Zero)
+        {
+            Fixed64 scale = FixedMath.Max(delta.X.Abs(), delta.Y.Abs());
+            return new Vector2d(delta.X / scale, delta.Y / scale).Normalized;
+        }
 
         return -relativeDisplacement.Normalized;
     }

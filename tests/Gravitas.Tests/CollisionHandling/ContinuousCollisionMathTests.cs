@@ -119,6 +119,65 @@ public sealed class ContinuousCollisionMathTests
     }
 
     [Fact]
+    public void TrySweepRelativeSpheres_AtClosingSpeedEpsilon_ShouldRejectNearTangency()
+    {
+        Fixed64 relativeClosingSpeed = Fixed64.Epsilon;
+        Fixed64 combinedRadius = (Fixed64)128;
+        Fixed64 radius = combinedRadius * Fixed64.Half;
+        bool hit = ContinuousCollisionMath.TrySweepRelativeSpheres(
+            new Vector3d(
+                combinedRadius + relativeClosingSpeed * Fixed64.Half,
+                -Fixed64.Half,
+                Fixed64.Zero),
+            new Vector3d(-relativeClosingSpeed, Fixed64.One, Fixed64.Zero),
+            radius,
+            Vector3d.Zero,
+            Vector3d.Zero,
+            radius,
+            out Fixed64 normalizedTime,
+            out _,
+            out Fixed64 closingSpeed);
+
+        hit.Should().BeFalse();
+        normalizedTime.Should().Be(Fixed64.Zero);
+        closingSpeed.Should().Be(Fixed64.Epsilon);
+    }
+
+    [Fact]
+    public void TrySweepRelative_WithUnderflowingNonzeroTangentRadius_ShouldUseScaledImpactNormal()
+    {
+        Fixed64 radius = Fixed64.Epsilon + Fixed64.MinIncrement;
+        Fixed64 combinedRadius = radius + radius;
+
+        radius.Should().BeGreaterThan(Fixed64.Epsilon);
+        (combinedRadius * combinedRadius).Should().Be(Fixed64.Zero);
+
+        bool sphereHit = ContinuousCollisionMath.TrySweepRelativeSpheres(
+            new Vector3d(-Fixed64.One, combinedRadius, Fixed64.Zero),
+            Vector3d.Right * (Fixed64)2,
+            radius,
+            Vector3d.Zero,
+            Vector3d.Zero,
+            radius,
+            out _,
+            out _,
+            out _);
+        bool circleHit = ContinuousCollisionMath.TrySweepRelativeCircles(
+            new Vector2d(-Fixed64.One, combinedRadius),
+            Vector2d.Right * (Fixed64)2,
+            radius,
+            Vector2d.Zero,
+            Vector2d.Zero,
+            radius,
+            out _,
+            out _,
+            out _);
+
+        sphereHit.Should().BeFalse();
+        circleHit.Should().BeFalse();
+    }
+
+    [Fact]
     public void TrySweepRelativeCircles_ShouldMirrorSphereRelativeSweepSemantics()
     {
         ContinuousCollisionMath.TrySweepRelativeCircles(

@@ -60,6 +60,25 @@ extent before runtime registration. Add 2D/3D proxy, candidate-admission, and
 coverage campaign because the Task 52 simplification preserves the existing
 radius calculation exactly; it only removes a duplicate zero threshold.
 
+### Relative CCD Quadratic Saturation Can Miss Extreme-Range Crossings
+
+**Discovered:** 2026-07-13  
+**Source:** 95%-to-100% coverage hardening, shared relative-sweep review  
+**Affected area:** 2D, 3D, and mixed relative continuous-collision sweeps
+
+The relative sphere/circle sweep evaluates its quadratic directly in Q32.32.
+At separations or per-frame displacements above roughly `46,340.95`, squared
+terms can saturate before the discriminant and root are formed. A crossing can
+then collapse to an endpoint candidate with the wrong impact normal and be
+rejected even though the swept broad phase admitted it.
+
+Resolve this with a scale-safe quadratic formulation or an explicit validated
+world/displacement range contract. Add symmetric 2D/3D regressions for large
+crossings, endpoint-adjacent hits, misses, and mixed CCD routing at the chosen
+boundary. This is distinct from conservative proxy-radius saturation and does
+not block coverage convergence because ordinary supported ranges and the
+current uncovered closing-speed boundary remain independently testable.
+
 ### FixedMathSharp Vector Midpoints Saturate Before Halving
 
 **Discovered:** 2026-07-13  
@@ -311,6 +330,36 @@ This does not block coverage convergence and is independent of the redundant
 active/dynamic-ID admission predicates removed in Task 67.
 
 ## Resolved Issues
+
+### Small CCD Proxy Radii Could Turn Tangency Into A Closing Hit
+
+**Resolved:** 2026-07-13  
+**Source:** 95%-to-100% coverage hardening, shared relative-sweep review  
+**Affected area:** `ContinuousCollisionMath` relative sphere and circle sweeps
+
+RCA: impact-normal selection compared the squared impact separation with the
+linear `Fixed64.Epsilon` threshold. Small, valid proxy radii could therefore
+produce a nonzero tangential impact delta whose square quantized below the
+threshold. The sweep selected the negated motion direction instead of the
+geometric normal, computed a positive closing speed, and reported a false CCD
+hit. Testing only `MagnitudeSquared > 0` was also insufficient because the
+square itself can quantize to zero.
+
+Fix: every exact-nonzero 2D/3D impact delta is scaled by its largest absolute
+component before normalization. The scaled magnitude remains representable,
+while an exact-zero delta alone retains the motion-direction fallback.
+
+Verification:
+
+- An exact fixed-point witness produces closing speed equal to
+  `Fixed64.Epsilon` and proves the retained `<=` rejection boundary.
+- Symmetric 2D/3D tangency regressions use radii above the admission epsilon
+  whose combined-radius square is exactly zero. Restoring the former fallback
+  independently fails each dimensional assertion.
+- Authoritative artifact
+  `TestResults/coverage-continuous-math-task71-final-authoritative-root-comparable/74e3f071-bbf8-493e-9c2e-a2284311cf13/coverage.cobertura.xml`
+  reports 100% line, branch, and method coverage for
+  `ContinuousCollisionMath`; full `Release` passes 2,543/2,543 tests.
 
 ### Mesh Scale And Surface-Shell Mass Did Not Match Authored Geometry
 

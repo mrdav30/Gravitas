@@ -22,33 +22,36 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-physics2d-support-task70-final-authoritative-root-comparable/991f7381-29d5-4776-a5c7-6881b751704b/coverage.cobertura.xml`.
+`TestResults/coverage-continuous-math-task71-final-authoritative-root-comparable/74e3f071-bbf8-493e-9c2e-a2284311cf13/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
-| Lines | 99.93% | 27,155 / 27,173 | 18 | 100% |
-| Branches | 99.83% | 10,404 / 10,421 | 17 | 100% |
+| Lines | 99.93% | 27,160 / 27,177 | 17 | 100% |
+| Branches | 99.84% | 10,405 / 10,421 | 16 | 100% |
 | Methods | 99.66% | 3,537 / 3,549 | 12 | 100% |
 
-The authoritative full coverage-enabled `Release` suite passes 2,541/2,541 tests, and
+The authoritative full coverage-enabled `Release` suite passes 2,543/2,543 tests, and
 `ReleaseLean` builds both targets without warnings. Branch coverage is now the
 primary constraint, but the remaining line and method gaps must close from the
 same final artifact.
 
-Task 70's authoritative artifact reports 100% line, branch, and method coverage
-for every class in `GravitasPhysics2DService.SupportTypes.cs`. The block pins
-reversed joint endpoint canonicalization and the final duplicate-joint ID key.
+Task 71's authoritative artifact reports 100% line, branch, and method coverage
+for `ContinuousCollisionMath`. The block pins the exact positive closing-speed
+threshold and repairs underflow-safe tangential normals in both dimensions.
 
 ### Immediate Completed Block
 
-The 2D solver support-order block is resolved. One integration witness registers
-joint 1 with reversed endpoints and joints 2-17 forward on the same body pair,
-then asserts first-pass joint-impulse diagnostics are strictly ascending by
-joint ID. Seventeen entries deliberately exceed SwiftCollections' stable
-small-list insertion-sort threshold, so deleting the final ID tie-break exposes
-the introsort reorder instead of passing accidentally. Separate mutations prove
-both the reversed endpoint swap and the final joint-ID comparison. No support
-DTO or comparer source required modification.
+The shared continuous-collision math block is resolved. An exact fixed-point
+3D sweep produces closing speed equal to `Fixed64.Epsilon` and proves the
+retained `<=` admission boundary. Review then exposed a real dimensional bug:
+small caller-admissible radii could have nonzero impact deltas whose squared
+magnitude quantized to zero, selecting the motion fallback and admitting pure
+tangency as a hit. Both 2D and 3D now scale every nonzero impact delta by its
+largest absolute component before normalization. The underflow-band regression
+independently kills the former fallback in each dimension, while the exact-zero
+overlap fallback remains covered. Extreme-range quadratic saturation is tracked
+separately because it occurs before normal resolution and does not block this
+coverage block.
 
 ## Rules Of Engagement
 
@@ -115,11 +118,11 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | `CollisionHandling/Continuous/ContinuousCollisionMath.cs` | 1 | 1 | 0 | Exact fixed-point threshold and fallback ownership. |
-| 2 | `CollisionHandling/Detection/3D/CollisionDetection.Cone.cs` | 1 | 1 | 0 | Cone contact degeneracy and fallback selection. |
-| 3 | `CollisionHandling/Response/2D/SolverContactBuffer2D.cs` | 1 | 1 | 0 | Fixed-capacity contact-buffer admission and overflow policy. |
-| 4 | `CollisionHandling/Response/3D/SolverContactBuffer.cs` | 1 | 1 | 0 | Fixed-capacity contact-buffer admission and overflow policy. |
-| 5 | `Queries/Mixed/FiniteSlabProjectionSweep.cs` | 1 | 1 | 0 | Planar GJK reducer boundary and exact slab projection state. |
+| 1 | `CollisionHandling/Detection/3D/CollisionDetection.Cone.cs` | 1 | 1 | 0 | Cone contact degeneracy and fallback selection. |
+| 2 | `CollisionHandling/Response/2D/SolverContactBuffer2D.cs` | 1 | 1 | 0 | Fixed-capacity contact-buffer admission and overflow policy. |
+| 3 | `CollisionHandling/Response/3D/SolverContactBuffer.cs` | 1 | 1 | 0 | Fixed-capacity contact-buffer admission and overflow policy. |
+| 4 | `Queries/Mixed/FiniteSlabProjectionSweep.cs` | 1 | 1 | 0 | Planar GJK reducer boundary and exact slab projection state. |
+| 5 | `Colliders/3D/ConeGeometry.cs` | 0 | 1 | 0 | Cone-axis basis and exact degenerate orientation policy. |
 | 6 | Remaining one-branch collision, query, replay, settings, and CCD blocks | 0-1 | 1 each | 0-1 | Re-rank from each authoritative artifact; finish one cohesive source block at a time. |
 
 ### Phase 1: Core Runtime And Service Ownership
@@ -491,6 +494,7 @@ of record.
 | Mixed partition attach closure | 99.88% | 99.79% | 99.46% | 2,539 | Mixed partitioning reached 100%; the impossible local attach-failure recovery was collapsed to the same fail-fast invariant as pure 2D/3D after proving current-voxel, exact-type, sealed-partition, owner, and single-thread guarantees. |
 | 2D/3D contact-manifold closure | 99.92% | 99.81% | 99.66% | 2,540 | Both manifolds and enumerators reached 100%; callerless material `SetContact` overloads were deleted, sorted-identity tie policy became direct `<=` depth selection, exact mutations prove highest-ID eviction, and boxed enumerator Current/Reset contracts are covered without changing hot paths. |
 | 2D solver support-order closure | 99.93% | 99.83% | 99.66% | 2,541 | Every 2D support type reached 100%; a reversed first joint plus 16 canonical duplicates pins endpoint normalization and ascending final JointId order across the post-insertion-sort path, with both key mutations independently killed. |
+| Continuous-collision tangent closure | 99.93% | 99.84% | 99.66% | 2,543 | Shared CCD math reached 100%; an exact positive-Epsilon closing-speed witness pins admission, while scale-safe 2D/3D impact normals prevent caller-admissible radii from converting quantized tangency into false hits. Both former fallbacks are mutation-proven. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.
