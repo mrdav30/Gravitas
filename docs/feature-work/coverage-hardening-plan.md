@@ -22,34 +22,34 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-cylinder-contact-task64-authoritative-root-comparable/fe5a4585-60a1-42bf-945f-1595d6dcbb5d/coverage.cobertura.xml`.
+`TestResults/coverage-collision-pair-task65-authoritative-root-comparable/0c7f180e-d656-4973-b7a8-2531c6ff51e2/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
 | Lines | 99.87% | 27,153 / 27,188 | 35 | 100% |
-| Branches | 99.72% | 10,416 / 10,445 | 29 | 100% |
+| Branches | 99.74% | 10,416 / 10,443 | 27 | 100% |
 | Methods | 99.46% | 3,532 / 3,551 | 19 | 100% |
 
-The authoritative full coverage-enabled `Release` suite passes 2,536/2,536 tests, and
+The authoritative full coverage-enabled `Release` suite passes 2,538/2,538 tests, and
 `ReleaseLean` builds both targets without warnings. Branch coverage is now the
 primary constraint, but the remaining line and method gaps must close from the
 same final artifact.
 
-Task 64's authoritative artifact reports 100% line, branch, and method coverage
-for shared cylinder contact geometry. The block closed two branch outcomes by
-covering the horizontal reference arm and deleting a caller-impossible tangent
-fallback.
+Task 65's authoritative artifact reports 100% line, branch, and method coverage
+for the 3D collision-pair runtime. The block closed two branch outcomes by
+covering reentrant deferred-exit admission and centralizing B lifetime policy.
 
 ### Immediate Completed Block
 
-Shared cylinder contact geometry is resolved. A horizontal cylinder/cylinder
-cap overlap produces four exact, repeat-stable point pairs with depth one
-quarter and a Right normal, covering the non-vertical reference basis. The old
-near-zero cross fallback was removed: all three production callers first require
-cap alignment, which rejects zero or quantized-away line directions, while any
-admitted normalized axis keeps the selected cross product roughly 520,000 times
-above epsilon. The fallback also could not recover a zero axis because its
-second tangent remained zero.
+The 3D collision-pair runtime is resolved. One ordinary-separation regression
+proves the retained A-admission guard prevents duplicate exit after A's exit
+callback rebinds B and recreates pending separation. A second two-frame witness
+admits both sides before A's stay callback rebinds B; A receives its one deferred
+exit while the rebound B lifetime receives no stale stay or exit. The redundant
+outer B lifetime conjunction was removed because `LSCollider.NotifyContact`
+already rejects the same stale self token before delegates. The separate
+callback-failure/reentrant retry edge is tracked in the issue tracker and does
+not block coverage convergence.
 
 ## Rules Of Engagement
 
@@ -116,11 +116,11 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | `CollisionHandling/Pairs/3D/CollisionPair.cs` | 0 | 2 | 0 | Retained pair state, notification ownership, and deterministic branch symmetry. |
-| 2 | `Constraints/3D/Joint3D.cs` | 0 | 2 | 0 | Residual joint state and validation boundary behavior. |
-| 3 | `Core/3D/GravitasPhysicsService.ContinuousCollision.cs` | 0 | 2 | 0 | Handoff queue ownership, budget accounting, and stable lifecycle state. |
-| 4 | `Core/Mixed/GravitasMixedCollisionService.Partitioning.cs` | 5 | 1 | 0 | Stale candidate ownership, partition lookup, and mixed bounds admission. |
-| 5 | `CollisionHandling/Contacts/3D/ContactManifold.cs` | 4 | 1 | 2 | Retained contact construction/reduction surface and threshold ownership. |
+| 1 | `Constraints/3D/Joint3D.cs` | 0 | 2 | 0 | Residual joint state and validation boundary behavior. |
+| 2 | `Core/3D/GravitasPhysicsService.ContinuousCollision.cs` | 0 | 2 | 0 | Handoff queue ownership, budget accounting, and stable lifecycle state. |
+| 3 | `Core/Mixed/GravitasMixedCollisionService.Partitioning.cs` | 5 | 1 | 0 | Stale candidate ownership, partition lookup, and mixed bounds admission. |
+| 4 | `CollisionHandling/Contacts/3D/ContactManifold.cs` | 4 | 1 | 2 | Retained contact construction/reduction surface and threshold ownership. |
+| 5 | `Core/2D/GravitasPhysics2DService.SupportTypes.cs` | 3 | 1 | 0 | Service token/default state and sparse support ownership. |
 | 6 | Remaining one- and two-branch collision, constraint, query, replay, and CCD blocks | 0-5 | 1-2 each | 0-2 | Re-rank from each authoritative artifact; finish one cohesive source block at a time. |
 
 ### Phase 1: Core Runtime And Service Ownership
@@ -486,6 +486,7 @@ of record.
 | GJK simplex policy closure | 99.86% | 99.67% | 99.46% | 2,532 | The shared policy reached 100%; exact-epsilon triangle and perpendicular fallbacks retain a deterministic unit search direction instead of allowing public GJK callers to report premature intersection. Both equality mutations fail under exact simplex-state assertions. |
 | Physics-service replay hash closure | 99.87% | 99.70% | 99.46% | 2,535 | Both dimensional service hash files reached 100%. Authoritative state ignores queue order, solver-cache identity preserves ordered DynamicIds, and replay-first plus replay-second pair lookup paths include retained state without conflating pair ownership. |
 | Cylinder contact geometry closure | 99.87% | 99.72% | 99.46% | 2,536 | Shared cap geometry reached 100%; horizontal cap contacts pin the non-vertical basis and exact manifold order, while the caller-impossible tangent fallback was removed after alignment and fixed-point lower-bound proof. |
+| 3D collision-pair notification closure | 99.87% | 99.74% | 99.46% | 2,538 | `CollisionPair` reached 100%; deferred A exit preserves reentrant admission state, stale rebound B lifetimes are centrally rejected, and the duplicate outer lifetime condition was removed. Independent review found and retained the real duplicate-exit guard. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.

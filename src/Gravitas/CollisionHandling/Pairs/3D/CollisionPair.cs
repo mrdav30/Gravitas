@@ -377,7 +377,7 @@ public partial class CollisionPair
                 isTriggerPair,
                 shouldRaiseTriggerA);
         }
-        if (notifyB && registrationB.IsCurrentLifetime)
+        if (notifyB)
         {
             registrationB.Collider.NotifyContact(
                 registrationA.Collider,

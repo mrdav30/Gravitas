@@ -224,6 +224,33 @@ fallback so invalid topology cannot create an empty-space contact. Add a
 regression that preserves valid open convex surfaces while rejecting or safely
 handling disconnected input without the AABB false-positive.
 
+### 3D Exit Callback Failure Can Duplicate Reentrant Separation Notifications
+
+**Discovered:** 2026-07-13  
+**Source:** 95%-to-100% coverage hardening, 3D collision-pair lifecycle review  
+**Affected area:** `CollisionPair.NotifyCollidersOfContact()`,
+`CollisionPair.EndNotification()`, and callback exception/reentrancy teardown
+
+If collider A's ordinary exit callback reentrantly deactivates a participant,
+the pair records pending separation. If that callback then throws, control
+skips the outer per-side admission-flag clears and enters `EndNotification()`
+with A still marked notified, so A can receive the same exit again. A second
+callback failure can mask the original exception and leave B or the admission
+flags incompletely cleaned. Deferred exits also run after
+`_notificationInProgress` is cleared, so a callback that captured the pair can
+reenter deactivation while admission state still exists.
+
+Resolve this as a dedicated lifecycle change: define at-most-once versus
+retryable callback semantics, snapshot and consume per-side admission before
+delegates when appropriate, keep cleanup exception-safe, define deterministic
+exception aggregation, and prevent direct pair reentry during deferred exits.
+Add regressions where A rebinds B and throws once during exit, and where a
+deferred exit deactivates its captured pair. Assert untouched rebound lifetimes,
+complete owner/holder cleanup, deterministic exception propagation, and no
+notifying-shell pool reuse. This does not block the coverage campaign because
+Task 65's retained A guard and centralized B lifetime admission are correct for
+nonthrowing callbacks and do not worsen this exception edge.
+
 ## Resolved Issues
 
 ### Mesh Scale And Surface-Shell Mass Did Not Match Authored Geometry

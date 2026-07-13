@@ -449,6 +449,111 @@ public sealed class CollisionPairLifecycleHardeningTests
     }
 
     [Fact]
+    public void Simulate_WhenFirstStayCallbackRebindsSecond_ShouldExitFirstWithoutNotifyingReboundLifetime()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> first = scenario.CreateSphere(Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> second = scenario.CreateSphere(
+            new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero),
+            immovable: true);
+        int originalSecondId = second.Collider.Id;
+        int firstStayCount = 0;
+        bool secondRebound = false;
+        string firstEvents = string.Empty;
+        string secondEvents = string.Empty;
+        first.Collider.OnContactEnter += _ => firstEvents += "enter;";
+        first.Collider.OnContact += _ =>
+        {
+            firstEvents += "contact;";
+            firstStayCount++;
+            if (firstStayCount != 2)
+                return;
+
+            second.Body.Deactivate();
+            second.Body.Initialize(new Vector3d((Fixed64)8, Fixed64.Zero, Fixed64.Zero), FixedQuaternion.Identity);
+            second.Collider.Id.Should().Be(originalSecondId);
+            secondRebound = true;
+        };
+        first.Collider.OnContactExit += _ => firstEvents += secondRebound ? "exit;" : "early-exit;";
+        second.Collider.OnContactEnter += _ => secondEvents += secondRebound ? "new-enter;" : "old-enter;";
+        second.Collider.OnContact += _ => secondEvents += secondRebound ? "new-contact;" : "old-contact;";
+        second.Collider.OnContactExit += _ => secondEvents += secondRebound ? "new-exit;" : "old-exit;";
+
+        Step(scenario.Context);
+
+        CollisionPair originalPair = GetPair(first.Collider, second.Collider);
+        originalPair.ColliderA.Should().BeSameAs(first.Collider);
+        originalPair.ColliderB.Should().BeSameAs(second.Collider);
+        originalPair.Active.Should().BeTrue();
+        first.Collider.CollisionPairCount.Should().Be(1);
+        second.Collider.CollisionPairHolderCount.Should().Be(1);
+        firstEvents.Should().Be("enter;contact;");
+        secondEvents.Should().Be("old-enter;old-contact;");
+
+        Step(scenario.Context);
+
+        second.Collider.Id.Should().Be(originalSecondId);
+        second.Body.Active.Should().BeTrue();
+        second.Body.Position3d.Should().Be(new Vector3d((Fixed64)8, Fixed64.Zero, Fixed64.Zero));
+        firstEvents.Should().Be("enter;contact;contact;exit;");
+        secondEvents.Should().Be("old-enter;old-contact;");
+        originalPair.Active.Should().BeFalse();
+        first.Collider.CollisionPairCount.Should().Be(0);
+        first.Collider.CollisionPairHolderCount.Should().Be(0);
+        second.Collider.CollisionPairCount.Should().Be(0);
+        second.Collider.CollisionPairHolderCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void Simulate_WhenFirstExitCallbackRebindsSecond_ShouldNotExitFirstTwice()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> first = scenario.CreateSphere(Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> second = scenario.CreateSphere(
+            new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero),
+            immovable: true);
+        int originalSecondId = second.Collider.Id;
+        int firstExitCount = 0;
+        bool secondRebound = false;
+        string secondEvents = string.Empty;
+        first.Collider.OnContactExit += _ =>
+        {
+            firstExitCount++;
+            if (firstExitCount != 1)
+                return;
+
+            second.Body.Deactivate();
+            second.Body.Initialize(new Vector3d((Fixed64)8, Fixed64.Zero, Fixed64.Zero), FixedQuaternion.Identity);
+            second.Collider.Id.Should().Be(originalSecondId);
+            secondRebound = true;
+        };
+        second.Collider.OnContactEnter += _ => secondEvents += secondRebound ? "new-enter;" : "old-enter;";
+        second.Collider.OnContact += _ => secondEvents += secondRebound ? "new-contact;" : "old-contact;";
+        second.Collider.OnContactExit += _ => secondEvents += secondRebound ? "new-exit;" : "old-exit;";
+
+        Step(scenario.Context);
+
+        CollisionPair originalPair = GetPair(first.Collider, second.Collider);
+        originalPair.ColliderA.Should().BeSameAs(first.Collider);
+        originalPair.ColliderB.Should().BeSameAs(second.Collider);
+
+        first.Body.SetPosition(new Vector3d(-Fixed64.Half, Fixed64.Zero, Fixed64.Zero));
+        Step(scenario.Context);
+
+        firstExitCount.Should().Be(1);
+        first.Body.Active.Should().BeTrue();
+        second.Collider.Id.Should().Be(originalSecondId);
+        second.Body.Active.Should().BeTrue();
+        second.Body.Position3d.Should().Be(new Vector3d((Fixed64)8, Fixed64.Zero, Fixed64.Zero));
+        secondEvents.Should().Be("old-enter;old-contact;");
+        originalPair.Active.Should().BeFalse();
+        first.Collider.CollisionPairCount.Should().Be(0);
+        first.Collider.CollisionPairHolderCount.Should().Be(0);
+        second.Collider.CollisionPairCount.Should().Be(0);
+        second.Collider.CollisionPairHolderCount.Should().Be(0);
+    }
+
+    [Fact]
     public void Simulate_WhenFirstEnterCallbackRebindsItself_ShouldNotResumeOldLifecycle()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
