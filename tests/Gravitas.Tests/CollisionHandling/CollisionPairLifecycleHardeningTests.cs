@@ -318,6 +318,35 @@ public sealed class CollisionPairLifecycleHardeningTests
     }
 
     [Fact]
+    public void Simulate_WhenTriggerEnterDeactivatesItself_ShouldSkipStayAndFinishPendingExit()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        var trigger = new LSSphereCollider { IsTrigger = true };
+        scenario.InitializeStaticCollider(trigger, Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(
+            new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
+        string bodyEvents = string.Empty;
+        string triggerEvents = string.Empty;
+        body.Collider.OnTriggerEnter += _ => bodyEvents += "enter;";
+        body.Collider.OnTriggerStay += _ => bodyEvents += "stay;";
+        body.Collider.OnTriggerExit += _ => bodyEvents += "exit;";
+        trigger.OnTriggerEnter += _ =>
+        {
+            triggerEvents += "enter;";
+            trigger.Deactivate();
+        };
+        trigger.OnTriggerStay += _ => triggerEvents += "stay;";
+        trigger.OnTriggerExit += _ => triggerEvents += "exit;";
+
+        Step(scenario.Context);
+
+        trigger.IsActive.Should().BeFalse();
+        triggerEvents.Should().Be("enter;exit;");
+        bodyEvents.Should().BeEmpty();
+        body.Collider.CollisionPairHolderCount.Should().Be(0);
+    }
+
+    [Fact]
     public void Deactivate_WhenPreviouslyNotifiedPairSeparatedBeforeQueueTurn_ShouldDeliverExistingExit()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
