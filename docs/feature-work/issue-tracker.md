@@ -17,6 +17,28 @@
 
 ## Active Issues
 
+### Rotational CCD Can Miss Contacts Between Bounded Pose Samples
+
+**Discovered:** 2026-07-12  
+**Source:** 95%-to-100% coverage hardening, rotational CCD review  
+**Affected area:** 2D rotational CCD sampling and the shared 2D/3D rotational
+substep policy
+
+Rotational CCD performs exact narrow-phase checks only at bounded substep
+endpoints and refines time of impact only after an endpoint overlaps. A
+confirmed 2D counterexample rotates a thin polygon from -5 to +5 degrees past a
+circle at the blade tip: both endpoints are separated, the shapes overlap near
+zero degrees, and the current one-step path commits the full rotation with zero
+TOI iterations. The 3D rotational path uses the same endpoint sampling policy
+and needs parity validation when this is resolved.
+
+Adding one midpoint is not a complete fix because a narrower contact window can
+fall between the new samples. Resolve this with a shape-aware continuous
+rotational sweep or a conservative interval-bracketing policy that cannot skip
+an intervening contact, while preserving fixed work bounds and deterministic
+target ordering. Add shifted narrow-window regressions plus 2D/3D parity and
+allocation checks.
+
 ### Extreme Convex Sweeps Can Normalize To Non-Unit Directions
 
 **Discovered:** 2026-07-12  

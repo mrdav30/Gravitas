@@ -521,6 +521,7 @@ public sealed class ContinuousCollisionDetectionTests
             Fixed64.Zero);
         FixedQuaternion.Angle(blade.Body.Rotation, fullTurn).Should().BeGreaterThan(Fixed64.Zero);
         blade.Body.AngularVelocity.Should().Be(Vector3d.Zero);
+        blade.Body.LastContinuousCollisionToiIterationCount.Should().Be(1);
     }
 
     [Fact]

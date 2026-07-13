@@ -110,6 +110,7 @@ public sealed partial class SolidBody2D
 
                 proposedPosition = startPosition + displacement * bestSafeTime;
                 proposedRotation = startRotation + angularDelta * bestSafeTime;
+                LastContinuousCollisionToiIterationCount++;
                 StopRotationalContinuousCollision(bestContact.Normal);
                 return true;
             }
@@ -133,7 +134,7 @@ public sealed partial class SolidBody2D
         if (!ShouldUseContinuousCollision(out ContinuousCollisionMode mode))
             return false;
 
-        Fixed64 angularDelta = proposedRotation - startRotation;
+        Fixed64 angularDelta = NormalizeKinematicAngularDelta(proposedRotation - startRotation);
         Fixed64 angularDistance = angularDelta.Abs();
         if (angularDistance <= Fixed64.Epsilon)
             return false;
@@ -230,6 +231,16 @@ public sealed partial class SolidBody2D
         }
 
         return false;
+    }
+
+    private static Fixed64 NormalizeKinematicAngularDelta(Fixed64 angularDelta)
+    {
+        angularDelta %= Fixed64.TwoPi;
+        if (angularDelta < -Fixed64.Pi)
+            angularDelta += Fixed64.TwoPi;
+        else if (angularDelta >= Fixed64.Pi)
+            angularDelta -= Fixed64.TwoPi;
+        return angularDelta;
     }
 
     private void SampleRotationalContinuousPose(

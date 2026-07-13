@@ -1307,6 +1307,7 @@ public sealed class ContinuousCollision2DTests
 
         blade.Rotation.Should().BeLessThan(FixedMath.DegToRad((Fixed64)90));
         blade.AngularVelocity.Should().Be(Fixed64.Zero);
+        blade.LastContinuousCollisionToiIterationCount.Should().Be(1);
     }
 
     [Fact]
@@ -1386,6 +1387,44 @@ public sealed class ContinuousCollision2DTests
         blade.LastContinuousCollisionToiIterationCount.Should().Be(1);
     }
 
+    [Theory]
+    [InlineData(179, -179)]
+    [InlineData(-179, 179)]
+    public void ContinuousMode_WithKinematicYawAcrossSignedBoundary_ShouldUseShortestArc(
+        int startDegrees,
+        int targetDegrees)
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        var bladeCollider = new LSPolygonCollider2D(
+            new Vector2d((Fixed64)(-3), Fixed64.FromFraction(-1, 10)),
+            new Vector2d((Fixed64)3, Fixed64.FromFraction(-1, 10)),
+            new Vector2d((Fixed64)3, Fixed64.FromFraction(1, 10)),
+            new Vector2d((Fixed64)(-3), Fixed64.FromFraction(1, 10)));
+        SolidBody2D blade = CreateBody(
+            context,
+            bladeCollider,
+            Vector2d.Zero,
+            immovable: false,
+            isKinematic: true);
+        _ = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.FromFraction(1, 4)),
+            new Vector2d(Fixed64.Zero, (Fixed64)2),
+            immovable: true);
+        blade.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        blade.SetRotation(FixedMath.DegToRad((Fixed64)startDegrees));
+        blade.Agent.Transform.Rotation = FixedQuaternion.FromEulerAnglesInDegrees(
+            Fixed64.Zero,
+            (Fixed64)targetDegrees,
+            Fixed64.Zero);
+        Fixed64 targetRotation = FixedMath.DegToRad(blade.Agent.Transform.EulerAngles.Y);
+
+        context.LateSimulate();
+
+        blade.Rotation.Should().Be(targetRotation);
+        blade.LastContinuousCollisionToiIterationCount.Should().Be(0);
+    }
+
     [Fact]
     public void ContinuousMode_WithKinematicEpsilonRadiusCircle_ShouldApplyHostRotationWithoutRotationalCcd()
     {
@@ -1403,6 +1442,58 @@ public sealed class ContinuousCollision2DTests
         context.LateSimulate();
 
         source.Rotation.Should().Be(Fixed64.Zero);
+        source.LastContinuousCollisionToiIterationCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void ContinuousMode_WithDynamicEpsilonProxyAndOffsetCenterOfMass_ShouldSkipRotationalCcd()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        SolidBody2D source = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.Epsilon),
+            Vector2d.Zero,
+            immovable: false);
+        source.LocalCenterOfMassOffset = Vector2d.Right;
+        source.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        _ = CreateBody(context, new LSCircleCollider2D(Fixed64.One), Vector2d.Zero, immovable: true);
+        Fixed64 requestedAngularVelocity = Fixed64.HalfPi;
+        source.AddAngularImpulse(requestedAngularVelocity / source.EffectiveInverseMomentOfInertia);
+        Fixed64 appliedAngularVelocity = source.AngularVelocity;
+        source.CanRotate.Should().BeTrue();
+        source.ResolveContinuousCollisionProxyRadius().Should().Be(Fixed64.Epsilon);
+
+        context.LateSimulate();
+
+        source.Rotation.Should().Be(appliedAngularVelocity);
+        source.AngularVelocity.Should().BeGreaterThan(Fixed64.Zero);
+        source.LastContinuousCollisionToiIterationCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void ContinuousMode_WithSubEpsilonRotationalArc_ShouldSkipRotationalCcd()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        Fixed64 proxyRadius = Fixed64.Epsilon + Fixed64.Epsilon;
+        SolidBody2D source = CreateBody(
+            context,
+            new LSCircleCollider2D(proxyRadius),
+            Vector2d.Zero,
+            immovable: false);
+        source.LocalCenterOfMassOffset = Vector2d.Right;
+        source.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        _ = CreateBody(context, new LSCircleCollider2D(Fixed64.One), Vector2d.Zero, immovable: true);
+        Fixed64 requestedAngularVelocity = Fixed64.Epsilon + Fixed64.Epsilon;
+        source.AddAngularImpulse(requestedAngularVelocity / source.EffectiveInverseMomentOfInertia);
+        Fixed64 appliedAngularVelocity = source.AngularVelocity;
+        appliedAngularVelocity.Should().BeGreaterThan(Fixed64.Epsilon);
+        (appliedAngularVelocity.Abs() * source.ResolveContinuousCollisionProxyRadius())
+            .Should().BeLessThanOrEqualTo(Fixed64.Epsilon);
+
+        context.LateSimulate();
+
+        source.Rotation.Should().Be(appliedAngularVelocity);
+        source.AngularVelocity.Should().Be(appliedAngularVelocity);
         source.LastContinuousCollisionToiIterationCount.Should().Be(0);
     }
 
@@ -1615,6 +1706,36 @@ public sealed class ContinuousCollision2DTests
 
         blade.Rotation.Should().Be(angularVelocity);
         blade.AngularVelocity.Should().Be(angularVelocity);
+    }
+
+    [Fact]
+    public void ContinuousMode_RotationalCandidateOnIgnoredPhysicalLayer_ShouldNotClamp()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        var bladeCollider = new LSPolygonCollider2D(
+            new Vector2d((Fixed64)(-3), Fixed64.FromFraction(-1, 10)),
+            new Vector2d((Fixed64)3, Fixed64.FromFraction(-1, 10)),
+            new Vector2d((Fixed64)3, Fixed64.FromFraction(1, 10)),
+            new Vector2d((Fixed64)(-3), Fixed64.FromFraction(1, 10)));
+        SolidBody2D blade = CreateBody(context, bladeCollider, Vector2d.Zero, immovable: false);
+        SolidBody2D target = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.FromFraction(1, 4)),
+            new Vector2d((Fixed64)2, (Fixed64)2),
+            immovable: true);
+        blade.UseManualGrounding();
+        blade.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        blade.Collider.IgnoredCollisionLayers = PhysicsLayerMask.FromLayer(target.Collider.Layer);
+        Fixed64 requestedAngularVelocity = FixedMath.DegToRad((Fixed64)90);
+        blade.AddAngularImpulse(requestedAngularVelocity / blade.EffectiveInverseMomentOfInertia);
+        Fixed64 appliedAngularVelocity = blade.AngularVelocity;
+
+        context.LateSimulate();
+
+        context.Query2D.LastQueryCandidateCount.Should().Be(1);
+        blade.Rotation.Should().Be(appliedAngularVelocity);
+        blade.AngularVelocity.Should().Be(appliedAngularVelocity);
+        blade.LastContinuousCollisionToiIterationCount.Should().Be(0);
     }
 
     [Fact]

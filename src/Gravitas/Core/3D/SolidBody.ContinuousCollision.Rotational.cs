@@ -110,6 +110,7 @@ public partial class SolidBody
 
                 proposedPosition = startPosition + displacement * bestSafeTime;
                 proposedRotation = IntegrateAngularRotation(startRotation, Context.DeltaTime * bestSafeTime);
+                LastContinuousCollisionToiIterationCount++;
                 StopRotationalContinuousCollision(bestContactNormal);
                 return true;
             }
