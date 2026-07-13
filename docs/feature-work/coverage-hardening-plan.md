@@ -22,12 +22,12 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-mixed-closest-task77-final-authoritative-root-comparable/2b1cbf8a-0dc1-4653-b3b0-71ec62fd813a/coverage.cobertura.xml`.
+`TestResults/coverage-2d-query-misses-task78-final-authoritative-root-comparable/c268e8b2-3d05-4eb6-9784-c5750d54f0cd/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
 | Lines | 99.95% | 27,176 / 27,188 | 12 | 100% |
-| Branches | 99.93% | 10,402 / 10,409 | 7 | 100% |
+| Branches | 99.95% | 10,404 / 10,409 | 5 | 100% |
 | Methods | 99.69% | 3,537 / 3,548 | 11 | 100% |
 
 The authoritative full coverage-enabled `Release` suite passes 2,551/2,551 tests, and
@@ -35,19 +35,18 @@ The authoritative full coverage-enabled `Release` suite passes 2,551/2,551 tests
 primary constraint, but the remaining line and method gaps must close from the
 same final artifact.
 
-Task 77's authoritative artifact closes the final branches in both mixed
-closest-sweep loops. The block proves closest-hit selection is independent of
-target registration and collider-ID order in both dimensional directions.
+Task 78's authoritative artifact closes the final branches in both pure-2D
+closest raycast and swept-circle loops. The block proves exact narrow phase can
+reject candidates admitted by the broad query envelope.
 
 ### Immediate Completed Block
 
-The mixed closest-sweep reducer block is resolved. Mixed candidate collectors
-sort targets by collider ID, not hit distance, so the closest loops must both
-retain an earlier nearer candidate and replace an earlier farther candidate.
-A symmetric two-order regression proves the same nearer target wins for 3D
-sphere-against-2D and 2D circle-against-3D sweeps regardless of registration
-order. Always-replace and first-hit-only mutations each fail the corresponding
-row, and the retained hit distance remains exact in both directions.
+The pure-2D closest-query rejection block is resolved without duplicating test
+fixtures. Existing negative-discriminant ray and convex-corner swept-circle
+misses now pass through the public query service. Each proves the broad phase
+admits exactly one AABB-overlapping candidate before exact shape math rejects
+it and returns a default miss. Negating either narrow-phase rejection guard is
+mutation-killed by the public false result.
 
 ## Rules Of Engagement
 
@@ -114,8 +113,7 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | 2D query raycast/sweep counterpart files | 0 | 2 | 0 | Query admission and exact-result parity. |
-| 2 | Remaining one-branch collider, contact, CCD, solver, and settings files | 0 | 5 | 0 | Finish one cohesive source block at a time. |
+| 1 | Remaining one-branch collider, contact, CCD, solver, and settings files | 0 | 5 | 0 | Finish one cohesive source block at a time. |
 
 ### Phase 1: Core Runtime And Service Ownership
 
@@ -493,6 +491,7 @@ of record.
 | Cone-bounds fallback closure | 99.95% | 99.89% | 99.69% | 2,549 | Cone geometry reached 100%; an exact admitted non-unit body rotation pins the deterministic zero-axis Up fallback, while consistent quaternion admission is tracked separately. |
 | 2D/3D body replay identity closure | 99.95% | 99.91% | 99.69% | 2,549 | Both body hash files reached 100%; duplicate solver-cache ignored IDs were removed, authoritative references use dense replay ordinals, and batch deleted-ID churn is mutation-proven in both cross-dimensional directions. |
 | Mixed closest-sweep ordering closure | 99.95% | 99.93% | 99.69% | 2,551 | Both mixed closest-sweep loops reached 100%; two registration orders prove the nearer target wins independently of collider-ID order and kill always-replace and first-hit-only mutations. |
+| Pure-2D closest-query exact-miss closure | 99.95% | 99.95% | 99.69% | 2,551 | Public raycast and swept-circle paths now prove one broad AABB candidate can be rejected by exact shape math; both narrow-phase guard-negation mutations fail. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.

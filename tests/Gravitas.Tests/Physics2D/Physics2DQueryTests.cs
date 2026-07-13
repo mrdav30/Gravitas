@@ -433,16 +433,16 @@ public sealed class Physics2DQueryTests
     public void Raycast_WithCircleCornerStartAndNonIntersectingDirectionInsideBounds_ShouldRejectNegativeDiscriminant()
     {
         using GravitasWorldContext context = Create2DContext();
-        SolidBody2D body = CreateCircle(context, Vector2d.Zero);
+        _ = CreateCircle(context, Vector2d.Zero);
 
-        bool hit = QueryDetection2D.TryRaycast(
+        bool hit = context.Query2D.Raycast(
             new Vector2d(Fixed64.FromFraction(2, 5), Fixed64.FromFraction(2, 5)),
             new Vector2d(Fixed64.FromFraction(-2, 5), Fixed64.FromFraction(6, 5)),
-            body.Collider,
             out Physics2DHit rayHit);
 
         hit.Should().BeFalse();
         rayHit.Should().Be(default(Physics2DHit));
+        context.Query2D.LastQueryCandidateCount.Should().Be(1);
     }
 
     [Fact]
@@ -1806,17 +1806,17 @@ public sealed class Physics2DQueryTests
     public void SweepCircle_WithConvexCornerInsideSweptBoundsButOutsideRadius_ShouldReturnFalse()
     {
         using GravitasWorldContext context = Create2DContext();
-        SolidBody2D target = CreatePolygon(context, Vector2d.Zero);
+        _ = CreatePolygon(context, Vector2d.Zero);
 
-        bool hit = QueryDetection2D.TrySweepCircle(
+        bool hit = context.Query2D.SweepCircle(
             new Vector2d(Fixed64.FromFraction(-7, 10), Fixed64.FromFraction(7, 10)),
             new Vector2d(Fixed64.FromFraction(-29, 50), Fixed64.FromFraction(29, 50)),
             Fixed64.FromFraction(1, 10),
-            target.Collider,
             out Physics2DHit sweepHit);
 
         hit.Should().BeFalse();
         sweepHit.Should().Be(default(Physics2DHit));
+        context.Query2D.LastQueryCandidateCount.Should().Be(1);
     }
 
     [Fact]
