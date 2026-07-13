@@ -1,5 +1,6 @@
 using Chronicler;
 using FixedMathSharp;
+using FixedMathSharp.Chronicler;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
@@ -99,6 +100,53 @@ public sealed partial class ReplayHashBranchCoverageTests
 
         HashJoint3D(joint, GravitasReplayHashMode.Authoritative).Should().Be(authoritativeBefore);
         HashJoint3D(joint, GravitasReplayHashMode.AuthoritativeWithSolverCaches).Should().NotBe(cacheBefore);
+    }
+
+    [Fact]
+    public void Joint3DReplayHash_ShouldEncodeExactParticipantIdentity()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        _ = CreateBodylessSphere3D(scenario.Context, Vector3d.Up * (Fixed64)8);
+        ScenarioBody<LSSphereCollider> first = scenario.CreateSphere(Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> second = scenario.CreateSphere(Vector3d.Right * (Fixed64)2);
+        Joint3D joint = scenario.Context.Constraints3D.RegisterJoint(new JointDefinition3D(
+            first.Body,
+            second.Body,
+            LocalFrame3D(Vector3d.Left),
+            LocalFrame3D(Vector3d.Right),
+            JointType3D.BallSocket,
+            JointLimit3D.Unrestricted,
+            JointMotor3D.Disabled,
+            JointCollisionPolicy.Collide));
+        first.Body.DynamicId.Should().NotBe(first.Collider.Id);
+        second.Body.DynamicId.Should().NotBe(second.Collider.Id);
+        ChronicleHash expected = Hash((ref ChronicleHashWriter writer) =>
+        {
+            writer.WriteSection("joint.3d", 1);
+            writer.WriteInt32(joint.Id);
+            writer.WriteInt32(first.Body.DynamicId);
+            writer.WriteInt32(second.Body.DynamicId);
+            writer.WriteInt32(first.Collider.Id);
+            writer.WriteInt32(second.Collider.Id);
+            writer.WriteBool(joint.IsActive);
+            writer.WriteBool(joint.IsEnabled);
+            writer.WriteEnum(joint.Type);
+            writer.WriteEnum(joint.Limits.Kind);
+            writer.WriteFixed64(joint.Limits.MaxHingeAngle);
+            writer.WriteFixed64(joint.Limits.MaxConeAngle);
+            writer.WriteFixed64(joint.Limits.MaxTwistAngle);
+            writer.WriteQuaternion(joint.Motor.TargetLocalRotation);
+            writer.WriteFixed64(joint.Motor.AngularDriveStrength);
+            writer.WriteFixed64(joint.Motor.AngularDriveDamping);
+            writer.WriteFixed64(joint.Motor.MaximumMotorImpulse);
+            writer.WriteEnum(joint.CollisionPolicy);
+            writer.WriteVector3d(joint.LocalFrameA.Position);
+            writer.WriteQuaternion(joint.LocalFrameA.Rotation);
+            writer.WriteVector3d(joint.LocalFrameB.Position);
+            writer.WriteQuaternion(joint.LocalFrameB.Rotation);
+        });
+
+        HashJoint3D(joint, GravitasReplayHashMode.Authoritative).Should().Be(expected);
     }
 
     [Fact]

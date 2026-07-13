@@ -190,8 +190,8 @@ public sealed class Joint3D : IRecordable
         writer.WriteInt32(Id);
         writer.WriteInt32(BodyA.DynamicId);
         writer.WriteInt32(BodyB.DynamicId);
-        writer.WriteInt32(BodyA.Collider?.Id ?? -1);
-        writer.WriteInt32(BodyB.Collider?.Id ?? -1);
+        writer.WriteInt32(BodyA.Collider.Id);
+        writer.WriteInt32(BodyB.Collider.Id);
         writer.WriteBool(IsActive);
         writer.WriteBool(IsEnabled);
         writer.WriteEnum(Type);

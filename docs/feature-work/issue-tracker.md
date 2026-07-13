@@ -251,6 +251,38 @@ notifying-shell pool reuse. This does not block the coverage campaign because
 Task 65's retained A guard and centralized B lifetime admission are correct for
 nonthrowing callbacks and do not worsen this exception edge.
 
+### Registered Joints Can Outlive Their Body And Collider Lifetimes
+
+**Discovered:** 2026-07-13  
+**Source:** 95%-to-100% coverage hardening, 3D joint replay-hash lifecycle review  
+**Affected area:** 2D/3D joint ownership, body/collider deactivation and reuse,
+linked-collision suppression, replay identity, and ragdoll lifecycle
+
+Joint registration requires active bodies, but later body/collider deactivation
+does not remove or suspend joints that reference the body. The joint remains
+active and enabled, keeps the constraint service on its joint-processing path,
+and can constrain the surviving active body against the inactive endpoint's
+frozen pose. Collider teardown separately removes every suppression key
+containing the released ID, so reinitializing the same body shell resumes the
+old joint without restoring its `SuppressLinked` policy. Rebinding the released
+collider shell to a different `SolidBody` is worse: the joint still references
+the stale inactive body while solver ordering and replay hashing read the
+collider shell's new registry identity.
+
+Choose and document one explicit endpoint-lifetime contract. The simplest safe
+contract is to remove dependent joints, reconciling any owning ragdoll runtime,
+before a body/collider registration is released; a reverse body-to-joint index
+would keep teardown proportional to attached joints. If joints instead survive
+pooling, capture endpoint generations, suspend while either endpoint is
+inactive, resume only for the same body lifetime, and deterministically rebuild
+suppression state. Add symmetric 2D/3D tests for first/second endpoint teardown,
+same-shell reinitialization, different-body collider rebinding, solver
+admission, registered/enabled counts, suppression restoration/removal, replay
+hashing, and ragdoll-owned joints. This does not block the coverage campaign:
+`SolidBody.Collider` itself is constructor-required and never null, and direct
+replay hashing still preserves the current deterministic `-1` unregistered-ID
+sentinel.
+
 ## Resolved Issues
 
 ### Mesh Scale And Surface-Shell Mass Did Not Match Authored Geometry
