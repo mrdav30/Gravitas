@@ -12,7 +12,7 @@ using Xunit;
 
 namespace Gravitas.Tests.Determinism;
 
-public sealed class ReplayHashBranchCoverageTests
+public sealed partial class ReplayHashBranchCoverageTests
 {
     [Fact]
     public void Joint2DReplayHash_AuthoritativeMode_ShouldIgnoreSolverCacheChanges()

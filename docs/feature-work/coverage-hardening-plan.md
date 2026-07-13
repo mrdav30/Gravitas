@@ -22,34 +22,34 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-gjk-policy-task62-authoritative-root-comparable/8ddf3cbb-d859-4120-8e82-84cef9f83eec/coverage.cobertura.xml`.
+`TestResults/coverage-service-replayhash-task63-authoritative-root-comparable/4b0656cf-1b66-4573-8b57-e2004b9b51e9/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
-| Lines | 99.86% | 27,154 / 27,191 | 37 | 100% |
-| Branches | 99.67% | 10,413 / 10,447 | 34 | 100% |
+| Lines | 99.87% | 27,156 / 27,191 | 35 | 100% |
+| Branches | 99.70% | 10,416 / 10,447 | 31 | 100% |
 | Methods | 99.46% | 3,532 / 3,551 | 19 | 100% |
 
-The authoritative full coverage-enabled `Release` suite passes 2,532/2,532 tests, and
+The authoritative full coverage-enabled `Release` suite passes 2,535/2,535 tests, and
 `ReleaseLean` builds both targets without warnings. Branch coverage is now the
 primary constraint, but the remaining line and method gaps must close from the
 same final artifact.
 
-Task 62's authoritative artifact reports 100% line, branch, and method coverage
-for the shared GJK simplex policy. The block closed one line and two branch
-outcomes with exact fixed-point equality witnesses; production remains
-unchanged because both deterministic progress fallbacks are required.
+Task 63's authoritative artifact reports 100% line, branch, and method coverage
+for both dimensional physics-service replay hash files. The block closed two
+lines and three branch outcomes through queue-order cache identity and retained
+pair lookup ownership; production remains unchanged.
 
 ### Immediate Completed Block
 
-The shared GJK simplex policy is resolved. Two `delta = sqrt(Epsilon)` inputs
-reach the exact equality boundaries in triangle reduction and stable
-perpendicular selection. Weakening the inclusive triangle guard returns an
-epsilon-sized Up direction; weakening the strict perpendicular checks returns
-an epsilon-sized negative Forward direction. Either value would make public GJK
-callers terminate as an intersection instead of continuing with the required
-stable unit direction. Direct policy tests pin simplex ordering and numerical
-progress without coupling the regression to authored-shape support ties.
+The 2D and 3D physics-service replay hash files are resolved. Equivalent worlds
+with identical body IDs, authoritative state, and per-body solver caches hash
+equally until pending handoffs are enqueued in opposite order; only the
+service-level solver-cache hashes then diverge. Replacing either queued DynamicId
+with a constant collapses that distinction and fails. A separate 2D witness
+stores a retained pair on the replay-first collider and proves the short-circuit
+lookup contributes stable state, complementing the existing second-side
+fallback without asserting an invalid owner/holder equivalence.
 
 ## Rules Of Engagement
 
@@ -116,11 +116,11 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | `Core/2D/GravitasPhysics2DService.ReplayHash.cs` | 1 | 2 | 0 | Replay contribution mode and authoritative solver-cache identity. |
-| 2 | `CollisionHandling/Detection/3D/CylinderContactGeometry.cs` | 0 | 2 | 0 | Cap alignment and stable tangent-basis ownership. |
-| 3 | `CollisionHandling/Pairs/3D/CollisionPair.cs` | 0 | 2 | 0 | Retained pair state, notification ownership, and deterministic branch symmetry. |
-| 4 | `Constraints/3D/Joint3D.cs` | 0 | 2 | 0 | Residual joint state and validation boundary behavior. |
-| 5 | `Core/3D/GravitasPhysicsService.ContinuousCollision.cs` | 0 | 2 | 0 | Handoff queue ownership, budget accounting, and stable lifecycle state. |
+| 1 | `CollisionHandling/Detection/3D/CylinderContactGeometry.cs` | 0 | 2 | 0 | Cap alignment and stable tangent-basis ownership. |
+| 2 | `CollisionHandling/Pairs/3D/CollisionPair.cs` | 0 | 2 | 0 | Retained pair state, notification ownership, and deterministic branch symmetry. |
+| 3 | `Constraints/3D/Joint3D.cs` | 0 | 2 | 0 | Residual joint state and validation boundary behavior. |
+| 4 | `Core/3D/GravitasPhysicsService.ContinuousCollision.cs` | 0 | 2 | 0 | Handoff queue ownership, budget accounting, and stable lifecycle state. |
+| 5 | `Core/Mixed/GravitasMixedCollisionService.Partitioning.cs` | 5 | 1 | 0 | Stale candidate ownership, partition lookup, and mixed bounds admission. |
 | 6 | Remaining one- and two-branch collision, constraint, query, replay, and CCD blocks | 0-5 | 1-2 each | 0-2 | Re-rank from each authoritative artifact; finish one cohesive source block at a time. |
 
 ### Phase 1: Core Runtime And Service Ownership
@@ -484,6 +484,7 @@ of record.
 | Mixed response denominator closure | 99.85% | 99.62% | 99.46% | 2,524 | Mixed response reached 100%; exact one-raw normal and exact-epsilon friction mobility witnesses preserve stable state, match the normal-only control, and independently kill removal of both singularity guards. |
 | 3D rotational CCD and capsule residual closure | 99.86% | 99.65% | 99.46% | 2,530 | Both blocks reached 100%. Unsupported rotational shapes safely fall through shared dispatch, while canonical pair filtering remains mandatory. Exact-epsilon capsule segments preserve forward/reverse manifold symmetry. Independent cross-review caught and corrected unsafe deletion of both retained guards before commit. |
 | GJK simplex policy closure | 99.86% | 99.67% | 99.46% | 2,532 | The shared policy reached 100%; exact-epsilon triangle and perpendicular fallbacks retain a deterministic unit search direction instead of allowing public GJK callers to report premature intersection. Both equality mutations fail under exact simplex-state assertions. |
+| Physics-service replay hash closure | 99.87% | 99.70% | 99.46% | 2,535 | Both dimensional service hash files reached 100%. Authoritative state ignores queue order, solver-cache identity preserves ordered DynamicIds, and replay-first plus replay-second pair lookup paths include retained state without conflating pair ownership. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.
