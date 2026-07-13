@@ -22,33 +22,32 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-value-contract-tail-task85-authoritative/834d6d92-b954-4eeb-ad7b-6e36ab2e384a/coverage.cobertura.xml`.
+`TestResults/coverage-mesh-array-wrapper-task86-authoritative/f3be8d2c-e685-4a5b-a7db-c4ed4da6ff04/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
-| Lines | 99.98% | 27,176 / 27,181 | 5 | 100% |
+| Lines | 99.99% | 27,176 / 27,179 | 3 | 100% |
 | Branches | 100% | 10,407 / 10,407 | 0 | 100% |
-| Methods | 99.89% | 3,540 / 3,544 | 4 | 100% |
+| Methods | 99.94% | 3,540 / 3,542 | 2 | 100% |
 
 The authoritative full coverage-enabled `Release` suite passes 2,555/2,555 tests, and
 `ReleaseLean` builds both targets without warnings. Branch coverage is now the
 first metric at 100%; the remaining line and method gaps must now close from the
 same final artifact.
 
-Task 85's authoritative artifact closes the value-contract tail. The retained
-layer-mask and collider-hierarchy hashes now prove deterministic identity
-payloads, while an unused fixed-frame-rate cast and unused warm-start
-constructor were deleted instead of being invoked artificially.
+Task 86's authoritative artifact closes the `MeshUtils` tail. Two callerless
+array overloads left behind by the migration away from per-triangle allocations
+were deleted, leaving the live allocation-free vertex APIs as the single
+geometry contract.
 
 ### Immediate Completed Block
 
-The value-contract tail is resolved. `PhysicsLayerMask.GetHashCode` maps a
-multi-bit mask to its exact bit payload, and `ColliderHierarchyKey.GetHashCode`
-maps both dimensional identities through their packed value; zero-hash
-mutations fail the focused tests. `PhysicsSettings.FixedFrameRate` duplicated
-an explicit cast of the live `FrameRate` API without any consumer, while the
-three-argument `ContactWarmStartImpulse` constructor sat unused between the
-live 2D and 3D forms. Both duplicate surfaces were removed.
+The `MeshUtils` array-wrapper tail is resolved. History and current call graphs
+show that the overloads survived the migration from allocated triangle arrays
+to explicit vertices; every source, test, and documented consumer uses the
+five-value form. The wrappers provided no validation or distinct semantics, so
+they were deleted rather than covered. The retained public summaries now state
+the winding-normal invariant used by triangle containment.
 
 ## Rules Of Engagement
 
@@ -115,8 +114,7 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | `Colliders/Mesh/MeshUtils.cs` | 2 | 0 | 2 | Classify legacy array geometry wrappers against current callers. |
-| 2 | `Diagnostics/Logging/GravitasLogger.cs` | 3 | 0 | 2 | Prove default formatting/dispatch or remove obsolete defaults. |
+| 1 | `Diagnostics/Logging/GravitasLogger.cs` | 3 | 0 | 2 | Prove default formatting/dispatch or remove obsolete defaults. |
 
 ### Phase 1: Core Runtime And Service Ownership
 
@@ -338,8 +336,10 @@ has a caller-proven impossibility argument.
       construction, mutation, reduction, and enumerator behavior.
 - [x] Close the mixed runtime and value-contract tails through exact ownership
       and deterministic hash assertions plus deletion of four unused surfaces.
-- [ ] Classify and close the four methods remaining in `MeshUtils` and
-      `GravitasLogger`; delete wrappers or defaults that have no real consumer.
+- [x] Delete the two callerless allocation-era array wrappers in `MeshUtils`
+      after current and historical call-graph review.
+- [ ] Classify and close the two methods remaining in `GravitasLogger`; delete
+      defaults that have no real consumer.
 - [ ] Regenerate the method inventory from the final full artifact and prove it
       contains no uncovered hand-authored method.
 
@@ -504,6 +504,7 @@ of record.
 | Settings square-matrix validation closure | 99.95% | 100% | 99.69% | 2,555 | Missing rows now fail with the explicit square-matrix contract, overlong rows no longer truncate silently, and branch coverage reached 10,407/10,407. |
 | Mixed runtime lifecycle/accessor closure | 99.96% | 100% | 99.77% | 2,555 | Mixed queries now prove exact world-context ownership; the unused mixed-collision `Deactivate` alias and obsolete GridForge partition `OnChange` callback were deleted after complete call-graph review. |
 | Deterministic value-contract closure | 99.98% | 100% | 99.89% | 2,555 | Multi-bit layer masks and dimensional hierarchy keys pin their deterministic hash payloads under mutation; unused fixed-frame-rate and three-argument warm-start conveniences were deleted. |
+| Mesh array-wrapper deletion | 99.99% | 100% | 99.94% | 2,555 | Two callerless overloads left from the allocation-heavy triangle-array API were removed; live geometry keeps the explicit vertex contract and now documents its winding-normal invariant. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.

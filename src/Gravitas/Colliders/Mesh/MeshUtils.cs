@@ -14,25 +14,10 @@ namespace Gravitas.Colliders;
 public static class MeshUtils
 {
     /// <summary>
-    /// Finds the closest point on this triangle to the given point.
-    /// 
-    /// The method first calculates the closest point on the infinite plane defined by this triangle.
-    /// This is done by projecting the given point onto the plane along the direction of the triangle's normal.
-    ///
-    /// It then checks whether this point on the plane is inside the triangle. 
-    /// If it is, the point on the plane is indeed the closest point on the triangle and is returned. 
-    /// 
-    /// If the point on the plane is outside the triangle, it means the closest point to the given point lies somewhere on the edges of the triangle. 
-    /// In this case, the method invokes the ClosestPointOnTriangleEdges method to calculate the closest point on each of the triangle's edges, 
-    /// and then compares these distances to return the closest one.
-    ///
-    /// This method uses the method of separating axes to check whether the point on the plane is inside the triangle.
+    /// Finds the closest point on a triangle to the supplied point. The normal
+    /// must match the winding of <paramref name="first"/>, <paramref name="second"/>,
+    /// and <paramref name="third"/>.
     /// </summary>
-    public static Vector3d ClosestPointOnTriangle(Vector3d[] triangle, Vector3d normal, Vector3d point)
-    {
-        return ClosestPointOnTriangle(triangle[0], triangle[1], triangle[2], normal, point);
-    }
-
     public static Vector3d ClosestPointOnTriangle(
         Vector3d first,
         Vector3d second,
@@ -47,9 +32,10 @@ public static class MeshUtils
         return ClosestPointOnTriangleEdges(first, second, third, point);
     }
 
-    public static bool IsPointInTrianglePlane(Vector3d[] triangle, Vector3d normal, Vector3d point) =>
-        IsPointInTrianglePlane(triangle[0], triangle[1], triangle[2], normal, point);
-
+    /// <summary>
+    /// Returns whether a coplanar point lies within or on the triangle boundary.
+    /// The normal must match the triangle's vertex winding.
+    /// </summary>
     public static bool IsPointInTrianglePlane(
         Vector3d first,
         Vector3d second,
