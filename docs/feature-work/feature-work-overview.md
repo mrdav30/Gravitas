@@ -23,15 +23,27 @@ instead of burying it in notes.
 
 ## Active Release-Scope
 
-- [`Coverage Hardening`](coverage-hardening-plan.md)
-  - Active living plan. Line, branch, and method coverage are above the 90%
-    release-hardening floor using the repository `coverlet.runsettings`, and the
-    95% branch gate is met. The active roadmap now targets 100% across the board.
-    Coverage work should remove zombie code, condense duplicate tests, and add
-    only high-signal behavior tests.
+- [`Cross-Stack Issue Resolution`](issue-tracker.md)
+  - Resolve release-blocking issues in dependency order: `FixedMathSharp`,
+    `SwiftCollections`, `GridForge`, then Gravitas. Use the `develop` worktrees
+    under `F:/gamedevrepos` and temporary local project references throughout
+    the consumer chain while validating lower-stack changes. Release each lower
+    library sequentially, restore package references as releases become
+    available, then remove all remaining local links and revalidate Gravitas
+    before resolving its library-local issues. Treat local links as temporary
+    validation scaffolding, not release dependency changes.
+- [`Benchmark Signal Hardening`](benchmark-signal-hardening-backlog.md)
+  - Reproduce and close confirmed release-relevant signals alongside the owning
+    library change. Do not broaden this into speculative optimization work.
 
 ## Recently Completed
 
+- [`Coverage Hardening`](done/coverage-hardening-plan.md)
+  - Completed 2026-07-13. The final unexcluded artifact reports 100% line,
+    branch, and method coverage across 27,477 lines, 10,411 branches, and 3,838
+    methods. The `Release` suite passes 2,556 tests, `ReleaseLean` passes 2,518
+    tests, both Lean targets build without warnings, and independent final
+    review found no actionable issues.
 - [`Pure 2D Constraint And Ragdoll Foundation`](done/2026-07-02-pure-2d-constraint-and-ragdoll-foundation-plan.md)
   - Completed 2026-07-03. Adds a native pure 2D constraint service, distance,
     pin/revolute, weld/fixed, and prismatic/slider joint rows, contact-
@@ -193,3 +205,14 @@ host-facing need appears.
 1. Keep the benchmark backlog and issue tracker as intake buckets; promote new
    measured risks into dated plans only when they are broader than a focused
    patch.
+2. Resolve the FixedMathSharp-owned active issues first and validate every
+   downstream consumer through temporary local project references.
+3. Update SwiftCollections to the released FixedMathSharp package, run its full
+   validation, and release SwiftCollections before advancing the chain.
+4. Update GridForge to the released lower-stack packages, resolve its pooled
+   grid-generation issue, validate downstream consumers, and release GridForge.
+5. Update Gravitas to the released package versions, remove every temporary
+   local link, and rerun `Release`, `ReleaseLean`, coverage, replay, and
+   relevant benchmark gates against package-only dependencies.
+6. Resolve the remaining Gravitas-owned issues in cohesive lifecycle, admission,
+   geometry, and numeric-range blocks before first public release.
