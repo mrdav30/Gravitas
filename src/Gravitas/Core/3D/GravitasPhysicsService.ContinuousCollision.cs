@@ -37,8 +37,7 @@ public sealed partial class GravitasPhysicsService
 
     private void AddContinuousCollisionCandidate(SolidBody body)
     {
-        if (!body.Active
-            || body.IsPositionFullyFrozen
+        if (body.IsPositionFullyFrozen
             || body.IsKinematic
             || body.Collider.IsTrigger)
         {
@@ -70,9 +69,7 @@ public sealed partial class GravitasPhysicsService
 
     internal void QueueContinuousCollisionHandoff(SolidBody body)
     {
-        int dynamicId = body.DynamicId;
-        if (dynamicId < 0
-            || !_processedContinuousCollisionBodies.Contains(body)
+        if (!_processedContinuousCollisionBodies.Contains(body)
             || !_queuedContinuousCollisionHandoffBodies.Add(body))
         {
             return;

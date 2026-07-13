@@ -97,9 +97,7 @@ public sealed partial class GravitasPhysics2DService
 
     internal void QueueContinuousCollisionHandoff(SolidBody2D body)
     {
-        int dynamicId = body.DynamicId;
-        if (dynamicId < 0
-            || !_processedContinuousCollisionBodies.Contains(body)
+        if (!_processedContinuousCollisionBodies.Contains(body)
             || !_queuedContinuousCollisionHandoffBodies.Add(body))
         {
             return;

@@ -283,6 +283,33 @@ hashing, and ragdoll-owned joints. This does not block the coverage campaign:
 replay hashing still preserves the current deterministic `-1` unregistered-ID
 sentinel.
 
+### CCD Handoff Dedupe Can Strand A Same-Frame Requeued Body
+
+**Discovered:** 2026-07-13  
+**Source:** 95%-to-100% coverage hardening, dimensional CCD service admission review  
+**Affected area:** 2D/3D continuous-collision handoff queues, same-frame relay
+cycles, mixed CCD routing, iteration-budget ownership, and replay continuity
+
+The handoff drain leaves each dequeued body in
+`_queuedContinuousCollisionHandoffBodies` until the entire queue is cleared. If
+body A is consumed and a later same-frame relay applies another handoff to A,
+`ApplyContinuousCollisionHandoff` marks A pending but queue admission rejects
+the re-enqueue because A is still present in the dedupe set. End-of-drain queue
+cleanup then erases service ownership without discarding A's new pending state;
+the next late-simulate token makes that state permanently stale. The same queue
+shape exists in 2D and 3D and can participate in pure or mixed relay cycles.
+
+Resolve this as a focused queue-ownership change. Remove a body from the dedupe
+set immediately before consuming its queue entry so a later same-frame relay
+can re-enqueue it under the existing deterministic iteration budget, while
+retaining dedupe for repeated updates before dequeue. Add symmetric 2D/3D
+state-machine regressions (and a mixed relay witness if practical) where A is
+queued, consumed, receives a second handoff before drain completion, and is
+either consumed again within budget or explicitly discarded at the cap. Assert
+no directly consumable or replay-visible pending handoff remains after drain.
+This does not block coverage convergence and is independent of the redundant
+active/dynamic-ID admission predicates removed in Task 67.
+
 ## Resolved Issues
 
 ### Mesh Scale And Surface-Shell Mass Did Not Match Authored Geometry

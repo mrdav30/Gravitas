@@ -22,12 +22,12 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-joint3d-task66-final-authoritative-root-comparable/517205bc-8d7d-4979-a697-1f281a7886b7/coverage.cobertura.xml`.
+`TestResults/coverage-ccd-service-parity-task67-authoritative-root-comparable/e0d05ced-fecd-4d7a-834f-8c7f8256d76f/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
-| Lines | 99.87% | 27,153 / 27,188 | 35 | 100% |
-| Branches | 99.76% | 10,414 / 10,439 | 25 | 100% |
+| Lines | 99.87% | 27,148 / 27,183 | 35 | 100% |
+| Branches | 99.78% | 10,411 / 10,433 | 22 | 100% |
 | Methods | 99.46% | 3,532 / 3,551 | 19 | 100% |
 
 The authoritative full coverage-enabled `Release` suite passes 2,539/2,539 tests, and
@@ -35,21 +35,23 @@ The authoritative full coverage-enabled `Release` suite passes 2,539/2,539 tests
 primary constraint, but the remaining line and method gaps must close from the
 same final artifact.
 
-Task 66's authoritative artifact reports 100% line, branch, and method coverage
-for `Joint3D`. The block removed two impossible nullable-collider replay branches
-and pinned the exact ordered body/collider identity payload.
+Task 67's authoritative artifact reports 100% line, branch, and method coverage
+for both dimensional continuous-collision service files. The block removed
+three caller- and registry-impossible admission predicates while retaining the
+real processed-body and duplicate-queue ownership gates.
 
 ### Immediate Completed Block
 
-The 3D joint replay block is resolved. `SolidBody.Collider` is constructor-
-required, assigned once, and retained through deactivation, so the nullable
-fallbacks represented impossible object states; direct `.Id` still preserves
-the legitimate `-1` unregistered sentinel. An exact replay-hash regression
-deliberately offsets collider IDs from dynamic IDs and independently kills
-sentinel substitution and body-ID substitution for both participants. Review
-also identified the separate joint-endpoint reuse contract now captured in the
-issue tracker; it does not justify nullable replay branches or block coverage
-convergence.
+The 2D/3D CCD service admission block is resolved. Candidate building walks the
+registered dynamic-body store, whose lifecycle already excludes inactive 3D
+bodies; 2D already relied on that invariant. The sole handoff-queue caller first
+requires `CanTranslate`, which includes active registration and a non-negative
+dynamic ID in both dimensions. The deleted predicates could therefore fire only
+through invalid direct-internal calls. Existing stale-candidate, queued-body
+deactivation, ID-reuse, duplicate-queue, consumed-before-drain, and budget
+regressions continue to pin the real lifecycle and ownership behavior.
+The separate same-frame requeue/dedupe ownership defect found during review is
+captured in the issue tracker and does not require retaining any deleted guard.
 
 ## Rules Of Engagement
 
@@ -116,11 +118,11 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | `Core/3D/GravitasPhysicsService.ContinuousCollision.cs` | 0 | 2 | 0 | Handoff queue ownership, budget accounting, and stable lifecycle state. |
-| 2 | `Core/Mixed/GravitasMixedCollisionService.Partitioning.cs` | 5 | 1 | 0 | Stale candidate ownership, partition lookup, and mixed bounds admission. |
-| 3 | `CollisionHandling/Contacts/3D/ContactManifold.cs` | 4 | 1 | 2 | Retained contact construction/reduction surface and threshold ownership. |
-| 4 | `Core/2D/GravitasPhysics2DService.SupportTypes.cs` | 3 | 1 | 0 | Service token/default state and sparse support ownership. |
-| 5 | `CollisionHandling/Contacts/2D/ContactManifold2D.cs` | 1 | 1 | 1 | Empty/default enumerator and retained contact ownership. |
+| 1 | `Core/Mixed/GravitasMixedCollisionService.Partitioning.cs` | 5 | 1 | 0 | Stale candidate ownership, partition lookup, and mixed bounds admission. |
+| 2 | `CollisionHandling/Contacts/3D/ContactManifold.cs` | 4 | 1 | 2 | Retained contact construction/reduction surface and threshold ownership. |
+| 3 | `Core/2D/GravitasPhysics2DService.SupportTypes.cs` | 3 | 1 | 0 | Service token/default state and sparse support ownership. |
+| 4 | `CollisionHandling/Contacts/2D/ContactManifold2D.cs` | 1 | 1 | 1 | Empty/default enumerator and retained contact ownership. |
+| 5 | `CollisionHandling/Continuous/ContinuousCollisionMath.cs` | 1 | 1 | 0 | Exact fixed-point threshold and fallback ownership. |
 | 6 | Remaining one-branch collision, query, replay, settings, and CCD blocks | 0-1 | 1 each | 0-1 | Re-rank from each authoritative artifact; finish one cohesive source block at a time. |
 
 ### Phase 1: Core Runtime And Service Ownership
@@ -488,6 +490,7 @@ of record.
 | Cylinder contact geometry closure | 99.87% | 99.72% | 99.46% | 2,536 | Shared cap geometry reached 100%; horizontal cap contacts pin the non-vertical basis and exact manifold order, while the caller-impossible tangent fallback was removed after alignment and fixed-point lower-bound proof. |
 | 3D collision-pair notification closure | 99.87% | 99.74% | 99.46% | 2,538 | `CollisionPair` reached 100%; deferred A exit preserves reentrant admission state, stale rebound B lifetimes are centrally rejected, and the duplicate outer lifetime condition was removed. Independent review found and retained the real duplicate-exit guard. |
 | 3D joint replay identity closure | 99.87% | 99.76% | 99.46% | 2,539 | `Joint3D` reached 100%; constructor-required collider references are hashed directly, legitimate unregistered IDs remain `-1`, and deliberately divergent dynamic/collider IDs pin both ordered identity fields. Independent review caught and corrected an initially coincident-ID witness. |
+| 2D/3D CCD service admission closure | 99.87% | 99.78% | 99.46% | 2,539 | Both continuous-collision service files reached 100%; registered-body traversal makes the 3D active check redundant, and `CanTranslate` makes both non-negative queue-ID checks caller-impossible while processed-body and duplicate-queue gates retain real ownership policy. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.
