@@ -2,12 +2,45 @@ using FluentAssertions;
 using SwiftCollections.Diagnostics;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using Xunit;
 
 namespace Gravitas.Tests.Diagnostics;
 
 public sealed class GravitasLoggerTests
 {
+    [Fact]
+    public void DefaultFacade_ShouldFormatAndRouteNormalAndErrorOutput()
+    {
+        Func<DiagnosticLevel, string, string, string> originalFormatter = GravitasLogger.CustomFormatter;
+        TextWriter originalOut = Console.Out;
+        TextWriter originalError = Console.Error;
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+
+        string formatted;
+        try
+        {
+            GravitasLogger.CustomFormatter = null!;
+            Console.SetOut(output);
+            Console.SetError(error);
+
+            formatted = GravitasLogger.DefaultLogFormatter(DiagnosticLevel.Warning, "message", "Core");
+            GravitasLogger.DefaultLogHandler(DiagnosticLevel.Info, "loaded", "Core");
+            GravitasLogger.DefaultLogHandler(DiagnosticLevel.Error, "failed", "Core");
+        }
+        finally
+        {
+            Console.SetOut(originalOut);
+            Console.SetError(originalError);
+            GravitasLogger.CustomFormatter = originalFormatter;
+        }
+
+        formatted.Should().Be("[Warning] Gravitas.Core: message");
+        output.ToString().Should().Be("[Info] Gravitas.Core: loaded" + Environment.NewLine);
+        error.ToString().Should().Be("[Error] Gravitas.Core: failed" + Environment.NewLine);
+    }
+
     [Fact]
     public void LoggerFacade_ShouldExposeConfiguredChannelsAndDebugGate()
     {

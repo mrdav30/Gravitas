@@ -1,7 +1,7 @@
 # Coverage Hardening Plan
 
 **Date:** 2026-07-12  
-**Status:** Active - closing the final gap to 100% coverage  
+**Status:** Final verification - candidate 100% coverage achieved  
 **Owner:** Gravitas coverage, test-quality, zombie-code, and branch-quality
 hardening
 
@@ -21,33 +21,31 @@ count.
 
 ## Current Checkpoint
 
-The authoritative artifact is:
-`TestResults/coverage-mesh-array-wrapper-task86-authoritative/f3be8d2c-e685-4a5b-a7db-c4ed4da6ff04/coverage.cobertura.xml`.
+The candidate 100% artifact is:
+`TestResults/coverage-100-task87-candidate-authoritative/cade66f4-716c-4063-82a4-ae427eb9ff4c/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
-| Lines | 99.99% | 27,176 / 27,179 | 3 | 100% |
+| Lines | 100% | 27,179 / 27,179 | 0 | 100% |
 | Branches | 100% | 10,407 / 10,407 | 0 | 100% |
-| Methods | 99.94% | 3,540 / 3,542 | 2 | 100% |
+| Methods | 100% | 3,542 / 3,542 | 0 | 100% |
 
-The authoritative full coverage-enabled `Release` suite passes 2,555/2,555 tests, and
-`ReleaseLean` builds both targets without warnings. Branch coverage is now the
-first metric at 100%; the remaining line and method gaps must now close from the
-same final artifact.
+The candidate full coverage-enabled `Release` suite passes 2,556/2,556 tests.
+All three coverage metrics are now exactly 100%; final post-commit coverage,
+`ReleaseLean`, CRAP/method-gap, diff, and independent-review gates remain before
+the campaign is complete.
 
-Task 86's authoritative artifact closes the `MeshUtils` tail. Two callerless
-array overloads left behind by the migration away from per-triangle allocations
-were deleted, leaving the live allocation-free vertex APIs as the single
-geometry contract.
+Task 87's candidate artifact closes the final `GravitasLogger` tail. The public
+default formatter and handler now prove exact Gravitas source formatting plus
+normal-output/error-output routing through distinct mutation-sensitive checks.
 
 ### Immediate Completed Block
 
-The `MeshUtils` array-wrapper tail is resolved. History and current call graphs
-show that the overloads survived the migration from allocated triangle arrays
-to explicit vertices; every source, test, and documented consumer uses the
-five-value form. The wrappers provided no validation or distinct semantics, so
-they were deleted rather than covered. The retained public summaries now state
-the winding-normal invariant used by triangle containment.
+The `GravitasLogger` tail is resolved. The public default methods remain useful
+to hosts even when configurable delegates are replaced and preserve ecosystem
+parity with GridForge. The regression resets the formatter, captures both
+console streams, calls both public facade methods, and restores global state in
+`finally`; independent no-op mutations of each wrapper fail.
 
 ## Rules Of Engagement
 
@@ -112,9 +110,8 @@ mid-block merely because another branch looks easier.
 
 ### Priority Queue
 
-| Order | Source block | Lines | Branches | Methods | Focus |
-| ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | `Diagnostics/Logging/GravitasLogger.cs` | 3 | 0 | 2 | Prove default formatting/dispatch or remove obsolete defaults. |
+No uncovered hand-authored source block remains in the candidate artifact.
+Only final convergence verification is active.
 
 ### Phase 1: Core Runtime And Service Ownership
 
@@ -338,9 +335,9 @@ has a caller-proven impossibility argument.
       and deterministic hash assertions plus deletion of four unused surfaces.
 - [x] Delete the two callerless allocation-era array wrappers in `MeshUtils`
       after current and historical call-graph review.
-- [ ] Classify and close the two methods remaining in `GravitasLogger`; delete
-      defaults that have no real consumer.
-- [ ] Regenerate the method inventory from the final full artifact and prove it
+- [x] Retain and mutation-prove the host-facing `GravitasLogger` default facade
+      through exact formatting and standard/error stream routing.
+- [x] Regenerate the method inventory from the candidate full artifact and prove it
       contains no uncovered hand-authored method.
 
 Exit condition: the fresh artifact reports zero uncovered hand-authored methods
@@ -505,6 +502,7 @@ of record.
 | Mixed runtime lifecycle/accessor closure | 99.96% | 100% | 99.77% | 2,555 | Mixed queries now prove exact world-context ownership; the unused mixed-collision `Deactivate` alias and obsolete GridForge partition `OnChange` callback were deleted after complete call-graph review. |
 | Deterministic value-contract closure | 99.98% | 100% | 99.89% | 2,555 | Multi-bit layer masks and dimensional hierarchy keys pin their deterministic hash payloads under mutation; unused fixed-frame-rate and three-argument warm-start conveniences were deleted. |
 | Mesh array-wrapper deletion | 99.99% | 100% | 99.94% | 2,555 | Two callerless overloads left from the allocation-heavy triangle-array API were removed; live geometry keeps the explicit vertex contract and now documents its winding-normal invariant. |
+| Logger facade closure | 100% | 100% | 100% | 2,556 | Public defaults now prove exact Gravitas formatting plus standard/error console routing; independent formatter and handler no-op mutations fail, closing the last uncovered hand-authored methods. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.
