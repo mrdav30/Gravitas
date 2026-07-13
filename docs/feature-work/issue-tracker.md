@@ -17,6 +17,33 @@
 
 ## Active Issues
 
+### Non-Unit Quaternion Admission Can Collapse Runtime Shape Axes
+
+**Discovered:** 2026-07-13  
+**Source:** 95%-to-100% coverage hardening, cone-bounds fallback review  
+**Affected area:** `SolidBody.Initialize(...)`, compound-part local rotations,
+collider bounds, partitioning, queries, and replay/load rotation admission
+
+Runtime body initialization and non-mesh compound-part authoring accept
+non-unit `FixedQuaternion` values. Some representable values collapse a rotated
+basis vector to exact zero; for example, an X-only quaternion whose squared X
+component is `Fixed64.Half` maps `Vector3d.Up` to zero. Cone bounds then
+use their deterministic Up-axis fallback, while other pose, normal, inertia,
+and debug geometry continues to consume the invalid quaternion directly. The
+fallback keeps bounds deterministic but cannot make the overall shape coherent.
+Dynamic cone initialization can subsequently reach grounding raycasts with a
+collapsed height and throw a deep `DivideByZeroException`, rather than rejecting
+the invalid rotation at admission.
+
+Resolve this at every public/authored/load rotation boundary with one explicit
+policy: reject non-unit rotations or normalize safely before publishing runtime
+state. Apply it consistently to standalone bodies, compound local rotations,
+host transforms, and replay population; preserve mesh rotation validation and
+add primitive/compound/replay regressions for zero, scaled, saturated, and
+near-unit quaternions. This does not block coverage convergence because Task 75
+pins the currently admitted fallback behavior without relying on it for valid
+rotations.
+
 ### Continuous-Collision Modes Accept Undefined Enum Values
 
 **Discovered:** 2026-07-13  

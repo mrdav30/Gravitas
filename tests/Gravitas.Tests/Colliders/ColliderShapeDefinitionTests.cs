@@ -77,6 +77,36 @@ public sealed class ColliderShapeDefinitionTests
     }
 
     [Fact]
+    public void ConeBounds_WithCollapsedNonUnitBodyRotation_ShouldUseDeterministicAxisFallback()
+    {
+        Fixed64 component = FixedMath.Sqrt(Fixed64.Half);
+        var collapsedRotation = new FixedQuaternion(
+            component,
+            Fixed64.Zero,
+            Fixed64.Zero,
+            Fixed64.Zero);
+
+        (component * component).Should().Be(Fixed64.Half);
+        (collapsedRotation * Vector3d.Up).Should().Be(Vector3d.Zero);
+
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        var collider = new LSConeCollider
+        {
+            Radius = Fixed64.Half,
+            Size = new Vector3d(Fixed64.One, (Fixed64)2, Fixed64.One)
+        };
+        var agent = new TestMatterAgent(
+            scenario.Context,
+            new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One));
+        var body = new SolidBody(agent, collider) { Mass = Fixed64.One };
+        body.UseManualGrounding();
+        body.Initialize(Vector3d.Zero, collapsedRotation);
+
+        collider.BoundsMin.Should().Be(new Vector3d(-Fixed64.Half, Fixed64.Zero, -Fixed64.Half));
+        collider.BoundsMax.Should().Be(new Vector3d(Fixed64.Half, Fixed64.Zero, Fixed64.Half));
+    }
+
+    [Fact]
     public void ConeDefinition_ShouldRejectInvalidDimensions()
     {
         Action zeroRadius = () => ColliderShapeDefinition.Cone(Fixed64.Zero, Fixed64.One);

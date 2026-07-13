@@ -22,35 +22,35 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-finite-slab-task74-final-authoritative-root-comparable/b36ce49c-64f5-4400-85fe-673a032f5d54/coverage.cobertura.xml`.
+`TestResults/coverage-cone-geometry-task75-final2-authoritative-root-comparable/8c719506-4940-4c20-abdc-90c28b9286e8/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
 | Lines | 99.95% | 27,180 / 27,192 | 12 | 100% |
-| Branches | 99.88% | 10,405 / 10,417 | 12 | 100% |
+| Branches | 99.89% | 10,406 / 10,417 | 11 | 100% |
 | Methods | 99.69% | 3,537 / 3,548 | 11 | 100% |
 
-The authoritative full coverage-enabled `Release` suite passes 2,548/2,548 tests, and
+The authoritative full coverage-enabled `Release` suite passes 2,549/2,549 tests, and
 `ReleaseLean` builds both targets without warnings. Branch coverage is now the
 primary constraint, but the remaining line and method gaps must close from the
 same final artifact.
 
-Task 74's authoritative artifact reports 100% line, branch, and method coverage
-for `FiniteSlabProjectionSweep` and every nested type. The block pins bounded
-termination under saturated distance math and removes an unused result factory.
+Task 75's authoritative artifact reports 100% line, branch, and method coverage
+for `ConeGeometry`. The block pins the live deterministic axis fallback reached
+by currently admitted non-unit body rotations.
 
 ### Immediate Completed Block
 
-The mixed finite-slab projection block is resolved. A maximum-length circle
-sweep starts at `Fixed64.MinValue` toward a valid cylinder beyond its reachable
-endpoint. The extreme separation saturates squared-distance math, producing a
-non-unit normal near `46,340` and advancement of only about one unit per step.
-The retained 32-step budget therefore returns the correct deterministic miss
-instead of performing effectively unbounded work across the maximum-length
-segment. Focused coverage proves the loop-false and terminal-return outcomes,
-and a false-hit mutation is killed. The unused `PlanarGjkResult.Separated`
-factory was deleted rather than invoked artificially. The broader large-vector
-normalization boundary remains tracked as non-blocking active work.
+The cone-bounds fallback block is resolved. Valid query cones and ordinary
+runtime cones supply nonzero axes, but body initialization currently accepts an
+X-only non-unit quaternion whose squared X component is `Fixed64.Half`; rotating
+Up then collapses to exact zero. A manually grounded body isolates that public
+rotation path without the separate grounding-ray failure and proves the current
+Up fallback publishes deterministic X/Z disk bounds. Replacing the fallback
+with zero-axis normalization changes Y extents from zero to ±radius and is
+mutation-killed. The fallback is retained until quaternion validation is fixed
+consistently across bodies, compound parts, hosts, and replay; that admission
+defect is recorded as non-blocking active work.
 
 ## Rules Of Engagement
 
@@ -117,8 +117,10 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | `Colliders/3D/ConeGeometry.cs` | 0 | 1 | 0 | Cone-axis basis and exact degenerate orientation policy. |
-| 2 | Remaining one-branch collision, query, replay, settings, and CCD blocks | 0-1 | 1 each | 0-1 | Re-rank from each authoritative artifact; finish one cohesive source block at a time. |
+| 1 | `Core/2D/SolidBody2D.ReplayHash.cs` + `Core/3D/SolidBody.ReplayHash.cs` | 0 | 2 | 0 | Dimensional replay identity parity. |
+| 2 | Mixed circle/sphere sweep counterpart files | 0 | 2 | 0 | Cross-dimensional reducer result policy. |
+| 3 | 2D query raycast/sweep counterpart files | 0 | 2 | 0 | Query admission and exact-result parity. |
+| 4 | Remaining one-branch collider, contact, CCD, solver, and settings files | 0 | 5 | 0 | Finish one cohesive source block at a time. |
 
 ### Phase 1: Core Runtime And Service Ownership
 
@@ -493,6 +495,7 @@ of record.
 | Mesh-cone triangle closure | 99.94% | 99.85% | 99.66% | 2,547 | Cone detection reached 100%; live oblique-plane rejection and exact-Epsilon admission are pinned, while winding-sensitive triangle geometry is separated from per-candidate contact orientation with back-face and disconnected-mesh regressions. |
 | 2D/3D solver contact-buffer closure | 99.94% | 99.87% | 99.66% | 2,547 | Both fixed buffers reached 100%; caller-impossible silent-overflow guards were deleted because sealed manifold capacity and sole response-builder ownership already prove legal admission bounds. |
 | Finite-slab projection closure | 99.95% | 99.88% | 99.69% | 2,548 | The mixed finite-slab file reached 100%; saturated large-vector distance math now pins the deterministic 32-step miss, and the unused separated-result factory was deleted instead of covered artificially. |
+| Cone-bounds fallback closure | 99.95% | 99.89% | 99.69% | 2,549 | Cone geometry reached 100%; an exact admitted non-unit body rotation pins the deterministic zero-axis Up fallback, while consistent quaternion admission is tracked separately. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.
