@@ -19,8 +19,6 @@ internal struct ColliderHierarchyState
 
     public bool IsParent { get; private set; }
 
-    public int ParentId => ParentKey.Id;
-
     public ColliderHierarchyKey ParentKey { get; private set; }
 
     public ColliderHierarchyKey TopParentKey => TopParent?.HierarchyKey ?? ColliderHierarchyKey.None;
@@ -69,12 +67,8 @@ internal struct ColliderHierarchyState
         IColliderHierarchyNode topParent = FindTopParent(owner, parent);
         ColliderHierarchyKey topParentKey = topParent.HierarchyKey;
         bool topParentChanged = ParentKey != topParentKey;
-        if (ParentKey.IsValid
-            && topParentChanged
-            && owner.TryGetHierarchyColliderByKey(ParentKey, out IColliderHierarchyNode? previousParent))
-        {
-            previousParent!.RemoveChild(owner.HierarchyKey);
-        }
+        if (ParentKey.IsValid && topParentChanged)
+            TopParent!.RemoveChild(owner.HierarchyKey);
 
         Parent = parent;
         TopParent = topParent;
@@ -86,8 +80,8 @@ internal struct ColliderHierarchyState
 
     public void ClearParent(IColliderHierarchyNode owner)
     {
-        if (ParentKey.IsValid && owner.TryGetHierarchyColliderByKey(ParentKey, out IColliderHierarchyNode? previousParent))
-            previousParent!.RemoveChild(owner.HierarchyKey);
+        if (ParentKey.IsValid)
+            TopParent!.RemoveChild(owner.HierarchyKey);
 
         Parent = null;
         TopParent = null;

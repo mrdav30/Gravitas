@@ -22,32 +22,32 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-shape-task49-authoritative-root-comparable/30154899-3fb1-4cc9-8396-14b18ff243cb/coverage.cobertura.xml`.
+`TestResults/coverage-hierarchy-task50-authoritative-root-comparable/008014d3-2820-443a-a958-c9ec7e9e0096/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
-| Lines | 99.75% | 26,950 / 27,015 | 65 | 100% |
-| Branches | 99.36% | 10,403 / 10,470 | 67 | 100% |
-| Methods | 99.35% | 3,520 / 3,543 | 23 | 100% |
+| Lines | 99.76% | 26,948 / 27,012 | 64 | 100% |
+| Branches | 99.38% | 10,402 / 10,466 | 64 | 100% |
+| Methods | 99.38% | 3,520 / 3,542 | 22 | 100% |
 
-The authoritative full coverage-enabled `Release` suite passes 2,474/2,474 tests, and
+The authoritative full coverage-enabled `Release` suite passes 2,476/2,476 tests, and
 `ReleaseLean` builds both targets without warnings. Branch coverage is now the
 primary constraint, but the remaining line and method gaps must close from the
 same final artifact.
 
-Task 49's authoritative artifact reports 100% line and branch coverage for both
-3D and 2D collider shape definitions. Invalid/default dispatch now has one
-authoritative path, impossible private payload-null guards are gone, and mesh
-index plus planar size boundaries are covered symmetrically.
+Task 50's authoritative artifact reports 100% line, branch, and method coverage
+for shared collider hierarchy state. Reparent and clear operations now remove
+ownership through the retained exact top-parent reference instead of a reusable
+registry ID lookup, and empty cleanup remains idempotent.
 
 ### Immediate Completed Block
 
-The authored shape-definition boundary is resolved and independently reviewed
-across dimensions. Default definitions preserve their public
-`ArgumentException` contracts through the dispatch fallback itself. Private
-constructors and snapshot factories make null mesh/polygon payloads
-unrepresentable, so duplicate guards were deleted. Negative/high mesh indices
-and both nonpositive AABB axes now reject with stable parameter ownership.
+The hierarchy ownership boundary is resolved and independently reviewed across
+2D, 3D, and mixed consumers. The unused state-level `ParentId` duplicate was
+deleted. Changed-top reparent and clear paths release the old root through the
+retained `TopParent`, preventing stale child ownership and reusable-ID aliasing
+even when registry lookup is unavailable. Null-backed child cleanup remains a
+deterministic no-op.
 
 ## Rules Of Engagement
 
@@ -114,12 +114,11 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | `Colliders/Hierarchy/ColliderHierarchyState.cs` | 1 | 3 | 1 | Parent ownership, replay identity, and reset behavior. |
-| 2 | `Queries/Mixed/MixedSweepBoxUtility.cs` | 0 | 3 | 0 | Slab bounds, degenerate displacement, and stable extrema. |
-| 3 | `Core/3D/SolidBody.ContinuousCollision.Helpers.cs` | 0 | 3 | 0 | Candidate filters and relative-motion fallback. |
-| 4 | `CollisionHandling/Detection/3D/Sat/AxisProjectionHelper.cs` | 5 | 2 | 1 | Capsule/cuboid axes, sphere projection, and degenerate normals. |
-| 5 | `Constraints/3D/RagdollRuntime3D.cs` | 3 | 2 | 1 | Replay load shape, link ownership, and stable reconstruction. |
-| 6 | `Core/2D/GravitasPhysics2DService.SupportTypes.cs` | 3 | 2 | 0 | Stable support ordering and lifecycle-proven ownership. |
+| 1 | `Queries/Mixed/MixedSweepBoxUtility.cs` | 0 | 3 | 0 | Slab bounds, degenerate displacement, and stable extrema. |
+| 2 | `Core/3D/SolidBody.ContinuousCollision.Helpers.cs` | 0 | 3 | 0 | Candidate filters and relative-motion fallback. |
+| 3 | `CollisionHandling/Detection/3D/Sat/AxisProjectionHelper.cs` | 5 | 2 | 1 | Capsule/cuboid axes, sphere projection, and degenerate normals. |
+| 4 | `Constraints/3D/RagdollRuntime3D.cs` | 3 | 2 | 1 | Replay load shape, link ownership, and stable reconstruction. |
+| 5 | `Core/2D/GravitasPhysics2DService.SupportTypes.cs` | 3 | 2 | 0 | Stable support ordering and lifecycle-proven ownership. |
 
 ### Phase 1: Core Runtime And Service Ownership
 
@@ -443,6 +442,7 @@ of record.
 | Diagnostic draw closure | 99.74% | 99.28% | 99.35% | 2,463 | Diagnostic draw reached 100%; unsupported custom shapes preserve sequence ownership, zero authored joint rotations emit unit axes through normalized identity fallback, and redundant zero-axis and zero-vertex guards were removed after independent review. |
 | Physics material closure | 99.75% | 99.31% | 99.35% | 2,472 | PhysicsMaterial reached 100%; duplicate validation was collapsed without changing parameter contracts, average is overflow-safe and ties-to-even, geometric mean preserves positive identity and extreme coefficients, and the relevant default-material response benchmark remains allocation-free without a credible regression. |
 | Authored shape-definition closure | 99.75% | 99.36% | 99.35% | 2,474 | The 3D and 2D authored definition families reached 100%; dispatch fallbacks now own invalid/default errors, impossible private payload-null guards were deleted, mesh index and planar size boundaries are exact, and omitted versus explicit default material semantics remain distinct. |
+| Hierarchy ownership closure | 99.76% | 99.38% | 99.38% | 2,476 | Shared hierarchy state reached 100%; the unused ParentId duplicate was removed, empty cleanup is idempotent, and reparent/clear ownership now releases the retained exact top parent instead of risking stale or reused-ID registry aliases. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.

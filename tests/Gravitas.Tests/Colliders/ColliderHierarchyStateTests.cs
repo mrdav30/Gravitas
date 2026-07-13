@@ -59,6 +59,19 @@ public sealed class ColliderHierarchyStateTests
     }
 
     [Fact]
+    public void EmptyChildCleanup_ShouldRemainIdempotent()
+    {
+        var state = new ColliderHierarchyState();
+        ColliderHierarchyKey child = ColliderHierarchyKey.Create3D(2);
+
+        state.ClearChildren();
+
+        state.RemoveChild(child).Should().BeFalse();
+        state.IsParent.Should().BeFalse();
+        state.ChildCount.Should().Be(0);
+    }
+
+    [Fact]
     public void AddAndRemoveChild_ShouldRejectInvalidDuplicatesAndMissingKeys()
     {
         var state = new ColliderHierarchyState();
@@ -143,6 +156,28 @@ public sealed class ColliderHierarchyStateTests
         child.State.Parent.Should().BeNull();
         child.State.TopParent.Should().BeNull();
         child.State.IsChild.Should().BeTrue();
+        top.State.ChildCount.Should().Be(2);
+    }
+
+    [Fact]
+    public void ReparentWithMissingPreviousTopParentLookup_ShouldAdoptNewTopParent()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        var previousTop = new TestNode(ColliderHierarchyKey.Create3D(1), scenario.Context);
+        var newTop = new TestNode(ColliderHierarchyKey.Create2D(2), scenario.Context);
+        var child = new TestNode(ColliderHierarchyKey.Create3D(3), scenario.Context);
+        RegisterAll(previousTop, newTop, child);
+        child.State.SetParent(child, previousTop);
+        child.RemoveFromLookup(previousTop.HierarchyKey);
+
+        child.State.SetParent(child, newTop);
+
+        child.State.Parent.Should().BeSameAs(newTop);
+        child.State.TopParent.Should().BeSameAs(newTop);
+        child.State.ParentKey.Should().Be(newTop.HierarchyKey);
+        previousTop.State.ChildCount.Should().Be(0);
+        previousTop.State.IsParent.Should().BeFalse();
+        newTop.State.ChildCount.Should().Be(1);
     }
 
     [Fact]
