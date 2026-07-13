@@ -22,29 +22,27 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-compound2d-task43-authoritative-final/70e3988d-cf30-429a-a64c-c8308463bbac/coverage.cobertura.xml`.
+`TestResults/coverage-capsule3d-task44-authoritative/040317be-0a91-48e6-8e2d-60720037f75b/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
-| Lines | 99.71% | 26,342 / 26,418 | 76 | 100% |
-| Branches | 99.16% | 10,255 / 10,342 | 87 | 100% |
-| Methods | 99.25% | 3,452 / 3,478 | 26 | 100% |
+| Lines | 99.72% | 26,365 / 26,440 | 75 | 100% |
+| Branches | 99.21% | 10,264 / 10,346 | 82 | 100% |
+| Methods | 99.28% | 3,453 / 3,478 | 25 | 100% |
 
-The full coverage-enabled `Release` suite passes 2,417/2,417 tests, and
+The full coverage-enabled `Release` suite passes 2,422/2,422 tests, and
 `ReleaseLean` builds both targets without warnings. Branch coverage is now the
 primary constraint, but the remaining line and method gaps must close from the
 same final artifact.
 
 ### Immediate Next Block
 
-Finish `src/Gravitas/Colliders/3D/LSCapsuleCollider.cs` before changing target.
-The current artifact reports one uncovered line, three uncovered branch
-outcomes, and one uncovered method. Treat frontal area, closest-point and normal
-fallbacks, degenerate axial geometry, and mass properties as one capsule
-contract. The 2D counterpart exposed a real fixed-point limit bug: a positive
-cylinder height with a radius and total volume quantized to zero currently
-divides by zero in 3D inertia calculation. Reproduce and fix that analogue in
-this block.
+Finish `src/Gravitas/Colliders/3D/LSCompoundCollider.cs` before changing target.
+The capsule regressions closed two compound outcomes incidentally, leaving one
+uncovered line, one branch outcome, and one method. Keep the 3D collider family
+cohesive: trace owner geometry, part selection, authored fallback, and
+zero-volume mass properties together, then compare the result explicitly with
+the completed 2D compound contract.
 
 ## Rules Of Engagement
 
@@ -111,16 +109,16 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | `Colliders/3D/LSCapsuleCollider.cs` | 1 | 3 | 1 | Frontal area, surface/normal fallbacks, and zero-volume axial inertia. |
-| 2 | `Colliders/3D/LSCompoundCollider.cs` | 1 | 3 | 1 | Owner geometry, empty parts, and authored fallback. |
+| 1 | `Colliders/3D/LSCompoundCollider.cs` | 1 | 1 | 1 | Finish the active 3D collider family and verify 2D mass-property parity. |
+| 2 | `Materials/PhysicsMaterial.cs` | 2 | 3 | 0 | Authored validation, combine policy, and deterministic limits. |
 | 3 | `Diagnostics/GravitasDiagnosticSink.Draw.cs` | 2 | 3 | 0 | Shape dispatch, vertex ownership, and disabled-output behavior. |
-| 4 | `Materials/PhysicsMaterial.cs` | 2 | 3 | 0 | Authored validation, combine policy, and deterministic limits. |
+| 4 | `Colliders/Hierarchy/ColliderHierarchyState.cs` | 1 | 3 | 1 | Parent ownership, replay identity, and reset behavior. |
 | 5 | `Colliders/Definitions/ColliderShapeDefinition.cs` | 1 | 3 | 0 | Validated kind-specific authoring and equality/hash behavior. |
-| 6 | `Colliders/Hierarchy/ColliderHierarchyState.cs` | 1 | 3 | 1 | Parent ownership, replay identity, and reset behavior. |
-| 7 | `Core/3D/SolidBody.ContinuousCollision.Helpers.cs` | 0 | 3 | 0 | Candidate filters and relative-motion fallback. |
-| 8 | `Queries/Mixed/MixedSweepBoxUtility.cs` | 0 | 3 | 0 | Slab bounds, degenerate displacement, and stable extrema. |
-| 9 | `CollisionHandling/Detection/3D/Sat/AxisProjectionHelper.cs` | 5 | 2 | 1 | Capsule/cuboid axes, sphere projection, and degenerate normals. |
-| 10 | `Constraints/3D/RagdollRuntime3D.cs` | 3 | 2 | 1 | Replay load shape, link ownership, and stable reconstruction. |
+| 6 | `Core/3D/SolidBody.ContinuousCollision.Helpers.cs` | 0 | 3 | 0 | Candidate filters and relative-motion fallback. |
+| 7 | `Queries/Mixed/MixedSweepBoxUtility.cs` | 0 | 3 | 0 | Slab bounds, degenerate displacement, and stable extrema. |
+| 8 | `CollisionHandling/Detection/3D/Sat/AxisProjectionHelper.cs` | 5 | 2 | 1 | Capsule/cuboid axes, sphere projection, and degenerate normals. |
+| 9 | `Constraints/3D/RagdollRuntime3D.cs` | 3 | 2 | 1 | Replay load shape, link ownership, and stable reconstruction. |
+| 10 | `Core/2D/GravitasPhysics2DService.SupportTypes.cs` | 3 | 2 | 0 | Stable support ordering and lifecycle-proven ownership. |
 
 ### Phase 1: Core Runtime And Service Ownership
 
@@ -206,6 +204,10 @@ incorrectly.
       authored-first geometry ties, conservative radius selection, valid and
       invalid AABB loads, allocation-free convex vertex ownership, and
       fixed-point zero-area center-of-mass and inertia limits.
+- [x] Close and independently review the 3D capsule contract through exact
+      rotation-aware frontal area, fixed-point projection overshoot, solid
+      hemisphere inertia, sphere/thin-rod limits, cap-normal underflow, and
+      deletion of the invariant-impossible closest-point guard.
 - [x] Close and independently review 2D overlap queries through bounds-admitted
       diagonal exact misses, closest/all circle and AABB paths, default-overload
       delegation, and caller-buffer clearing.
@@ -426,6 +428,7 @@ of record.
 | 2D motion closure | 99.69% | 99.08% | 99.14% | 2,376 | The motion block reached 100%; zero and quantized-away angular inputs preserve sleep, zero-frame thresholds sleep immediately, 2D sleep disable/validation matches 3D, serialization/replay remain stable, and the separate 3D impulse-unit defect is tracked. |
 | Coroutine lifecycle closure | 99.70% | 99.12% | 99.14% | 2,409 | The full coroutine subsystem reached 100%; sparse-slot scheduling, callback-safe cancellation, reset/dispose ownership, exception aggregation, instruction identity/context, snapshot and bucket cleanup, clock-observing waits, and frame wrap are deterministic and independently approved. |
 | 2D compound collider closure | 99.71% | 99.16% | 99.25% | 2,417 | The touched 2D collider family reached 100%; fake vertices were removed, authored-first geometry selection stayed stable, valid/invalid AABB loads synchronize exactly, and quantized-zero compound parts retain deterministic center-of-mass and parallel-axis inertia. The analogous 3D capsule zero-volume defect is carried directly into the next block. |
+| 3D capsule closure | 99.72% | 99.21% | 99.28% | 2,422 | The capsule reached 100%; drag area now follows the exact rotation-aware silhouette, solid hemisphere centroids contribute the missing transverse inertia term, quantized zero volume uses a shifted thin-rod limit, fixed-point cap-normal fallbacks remain covered, and one impossible closest-point guard was removed. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.
