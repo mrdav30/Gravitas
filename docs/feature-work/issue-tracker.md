@@ -366,6 +366,39 @@ Verification:
 - Full coverage-enabled `Release` passes 2,109/2,109, `ReleaseLean` builds both
   targets, and independent review approved with no findings.
 
+### Capsule Drag And Inertia Ignored Direction And Hemisphere Centroids
+
+**Discovered:** 2026-07-12  
+**Resolved:** 2026-07-12  
+**Source:** 95%-to-100% coverage hardening, `LSCapsuleCollider` block review  
+**Affected area:** 3D capsule linear/angular drag area and solid mass properties
+
+RCA: `LSCapsuleCollider.GetFrontalArea(...)` ignored its world direction and
+always returned the perpendicular capsule silhouette. The solid inertia model
+treated the two hemispheres as a sphere translated only from the cap centers,
+omitting the transverse cross term from each hemisphere centroid lying `3r/8`
+outward from its flat face. Positive-height capsules whose scaled radius and
+both component volumes quantized to zero also divided by zero while assigning
+component mass.
+
+Fix: frontal area now uses the exact rotation-aware orthographic capsule
+projection, with fixed-point overshoot clamped before its radial square root.
+The cap tensor includes the combined `3*mCaps*d*r/4` transverse term. A
+quantized zero-volume capsule uses the zero-radius thin-rod tensor before the
+normal parallel-axis shift. The invariant-impossible post-inside-test distance
+guard was removed, while cap-normal fallbacks reachable through fixed-point
+magnitude underflow were retained.
+
+Verification: RED regressions independently reproduced the direction-insensitive
+drag result, missing centroid inertia, and initialization-time divide-by-zero.
+GREEN tests cover zero, axial, perpendicular, diagonal, rotated, and
+over-normalized fixed-point directions; exact sphere, ordinary capsule, and
+shifted thin-rod inertia; and both sub-magnitude cap-normal fallbacks. The
+canonical coverage artifact reports `LSCapsuleCollider.cs` at 100%
+line/branch/method coverage; full coverage-enabled `Release` passes
+2,422/2,422, `ReleaseLean` builds both targets without warnings, and independent
+review approved.
+
 ### Inactive SolidBody2D Loads Could Preserve Or Invent Runtime Activity
 
 **Discovered:** 2026-07-11  

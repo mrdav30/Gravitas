@@ -80,7 +80,7 @@ partition coordinates, pair state, events, and query stamps.
 | Shape | Runtime notes |
 | --- | --- |
 | Sphere | Center/radius support, simple mass and inertia. |
-| Capsule | Segment plus radius; short capsules collapse to a sphere-like segment and use sphere inertia fallback. |
+| Capsule | Segment plus radius; rotation-aware projected frontal area and solid capsule mass properties with sphere and thin-rod limits. |
 | Cuboid | Face, edge, corner support; `Cuboid` covers axis-aligned and oriented cuboid dispatch. |
 | Finite cylinder | Flat-capped axis segment, cap centers, side/cap separation, finite-cylinder support. |
 | Finite cone | Base-to-apex axis, base cap, analytic support/closest-surface geometry, shape-derived COM. |
@@ -91,6 +91,20 @@ Cones use analytic support and closest-surface geometry instead of generating a
 runtime triangle fan. Mesh colliders use cached closed-volume mass properties by
 default when angular dynamics are enabled and keep explicit surface
 approximation opt-in for open meshes.
+
+For a 3D capsule with normalized motion direction `n`, world-space axis
+`Rotation * Vector3d.Up`, radius `r`, and cylindrical height `h`, the projected
+frontal area is `pi*r^2 + 2*r*h*sqrt(max(0, 1 - dot(n, axis)^2))`. A near-zero
+direction returns the collider's total `Area`, matching the other 3D primitive
+drag-area APIs. Solid capsule inertia assigns cylinder and cap masses in
+proportion to volume. The paired hemispheres contribute
+`mCaps*(2*r^2/5 + d^2 + 3*d*r/4)` transversely for `d = h/2`, including their
+centroid displacement from the cap centers, and `2*mCaps*r^2/5` axially. A
+capsule with no cylindrical span uses the solid-sphere limit `2*m*r^2/5`. If
+fixed-point scaling leaves a positive span but quantizes the radius and both
+volumes to zero, the tensor uses the thin-rod limit
+`diag(m*h^2/12, 0, m*h^2/12)` before applying any requested parallel-axis
+shift.
 
 ## 3D Shape-Pair Matrix
 

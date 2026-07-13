@@ -76,14 +76,9 @@ public class LSCapsuleCollider : LSCollider
         LineSegmentEnd = Center + (Rotation * HemisphereCenterTop);
     }
 
-    // The inertia tensor for a homogeneous solid cylinder of radius r and height h,
-    // about an axis through its center (which is the case for the cylindrical part of the capsule), is given by:
-    //     I_cylinder = (1/12) * mass * (3*r*r + h*h)
-    // And the inertia tensor for a solid sphere of radius r (which applies to the hemispherical ends of the capsule) is:
-    //     I_sphere = (2/5) * mass * r*r
-    // Therefore, for the capsule (assuming it's made of the same material throughout),
-    // we'll add the inertia of the two hemispheres and the cylinder to get:
-    //     I_capsule = I_cylinder + 2 * I_sphere
+    // The capsule is split into a cylinder and a pair of solid hemispheres with masses
+    // proportional to their volumes. Each hemisphere's centroid lies 3r/8 outward from
+    // its sphere center, which contributes the 3dr/4 cross term to transverse cap inertia.
     public override Fixed3x3 CalculateInertiaTensor(Fixed64 mass, Vector3d localCenterOfMassOffset)
     {
         if (CylinderHeight <= Fixed64.Epsilon)
@@ -101,6 +96,19 @@ public class LSCapsuleCollider : LSCollider
         Fixed64 cylinderVolume = Fixed64.Pi * ScaledRadiusSqr * CylinderHeight;
         Fixed64 sphereVolume = Fixed64.FromFraction(4, 3) * Fixed64.Pi * ScaledRadiusSqr * ScaledRadius;
         Fixed64 totalVolume = cylinderVolume + sphereVolume;
+        if (totalVolume <= Fixed64.Zero)
+        {
+            // Fixed-point scaling can quantize a positive radius and both volumes to zero.
+            // The remaining shape is the zero-radius limit: a thin rod along local Y.
+            Fixed64 rodInertiaXZ = Fixed64.FromFraction(1, 12) * mass * CylinderHeight * CylinderHeight;
+            Fixed3x3 rodTensor = new(
+                rodInertiaXZ, Fixed64.Zero, Fixed64.Zero,
+                Fixed64.Zero, Fixed64.Zero, Fixed64.Zero,
+                Fixed64.Zero, Fixed64.Zero, rodInertiaXZ
+            );
+            return ShiftInertiaTensorFromLocalCenterOfMass(rodTensor, mass, localCenterOfMassOffset);
+        }
+
         Fixed64 cylinderMass = mass * (cylinderVolume / totalVolume);
         Fixed64 sphereMass = mass - cylinderMass;
 
@@ -110,8 +118,10 @@ public class LSCapsuleCollider : LSCollider
         // Calculating the inertia tensors for the cylinder and the spheres
         Fixed64 cylinderInertiaY = Fixed64.FromFraction(1, 2) * cylinderMass * ScaledRadiusSqr;
         Fixed64 cylinderInertiaXZ = Fixed64.FromFraction(1, 12) * cylinderMass * ((3 * ScaledRadiusSqr) + (CylinderHeight * CylinderHeight));
-        // Multiply by 2 because there are two hemispheres and apply parallel axis theorem
-        Fixed64 sphereInertiaXZ = (Fixed64.FromFraction(2, 5) * sphereMass * ScaledRadiusSqr) + sphereMass * d * d;
+        Fixed64 sphereInertiaXZ = sphereMass
+            * (Fixed64.FromFraction(2, 5) * ScaledRadiusSqr
+                + d * d
+                + Fixed64.FromFraction(3, 4) * d * ScaledRadius);
         Fixed64 sphereInertiaY = Fixed64.FromFraction(2, 5) * sphereMass * ScaledRadiusSqr;
 
         // The total inertia tensor for the capsule
@@ -132,8 +142,24 @@ public class LSCapsuleCollider : LSCollider
     // If it's moving perpendicular to its main axis,
     // then the frontal area would be a rectangle with a semicircle on either end,
     // which would be (2r)*h + πr^2, where h is the height of the cylindrical part of the capsule.
-    public override Fixed64 GetFrontalArea(Vector3d direction) =>
-        2 * ScaledRadius * CylinderHeight + Fixed64.Pi * ScaledRadiusSqr;
+    public override Fixed64 GetFrontalArea(Vector3d direction)
+    {
+        Fixed64 directionMagnitude = direction.Magnitude;
+        if (directionMagnitude <= Fixed64.Epsilon)
+            return Area;
+
+        Vector3d normalizedDirection = direction / directionMagnitude;
+        Vector3d axis = Rotation * Vector3d.Up;
+        Fixed64 axial = Vector3d.Dot(normalizedDirection, axis).Abs();
+        Fixed64 radialFactorSqr = Fixed64.One - axial * axial;
+        Fixed64 radialFactor = radialFactorSqr <= Fixed64.Zero
+            ? Fixed64.Zero
+            : FixedMath.Sqrt(radialFactorSqr);
+
+        Fixed64 capArea = Fixed64.Pi * ScaledRadiusSqr;
+        Fixed64 sideProfile = 2 * ScaledRadius * CylinderHeight;
+        return capArea + radialFactor * sideProfile;
+    }
 
     public override Vector3d ClosestPointOnSurface(Vector3d other)
     {
@@ -183,11 +209,9 @@ public class LSCapsuleCollider : LSCollider
         if (distance <= ScaledRadius)
             return other;
 
-        if (distance > Fixed64.Zero)
-        {
-            direction /= distance; // normalize
-            direction *= ScaledRadius;
-        }
+        // The preceding inside test proves distance > ScaledRadius >= 0 here.
+        direction /= distance;
+        direction *= ScaledRadius;
 
         return projection + direction;
     }
