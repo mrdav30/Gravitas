@@ -22,32 +22,36 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-mixed-response-task59-authoritative-root-comparable/ebf425a8-4425-46c0-9b94-5cd95352d478/coverage.cobertura.xml`.
+`TestResults/coverage-rotational-capsule-task60-61-authoritative-root-comparable-corrected/483cac17-72cd-4f9b-95b8-17af1f6292ca/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
-| Lines | 99.85% | 27,152 / 27,193 | 41 | 100% |
-| Branches | 99.62% | 10,409 / 10,449 | 40 | 100% |
+| Lines | 99.86% | 27,153 / 27,191 | 38 | 100% |
+| Branches | 99.65% | 10,411 / 10,447 | 36 | 100% |
 | Methods | 99.46% | 3,532 / 3,551 | 19 | 100% |
 
-The authoritative full coverage-enabled `Release` suite passes 2,524/2,524 tests, and
+The authoritative full coverage-enabled `Release` suite passes 2,530/2,530 tests, and
 `ReleaseLean` builds both targets without warnings. Branch coverage is now the
 primary constraint, but the remaining line and method gaps must close from the
 same final artifact.
 
-Task 59's authoritative artifact reports 100% line, branch, and method coverage
-for mixed collision response. The block closed two lines and two branch
-outcomes from the repository-wide gap with exact normal and friction
-near-singular mobility witnesses.
+Tasks 60-61's authoritative artifact reports 100% line, branch, and method
+coverage for 3D rotational CCD and capsule/capsule detection. The blocks closed
+three net lines and four branch outcomes after removing one behavior-equivalent
+unsupported-dispatch early-out and retaining every threshold-sensitive policy
+guard exposed by independent review.
 
 ### Immediate Completed Block
 
-The mixed response denominator block is resolved. A bodyless-2D COM contact
-reaches the normal guard with exactly one raw unit of constrained mobility and
-preserves the closing 3D state. A second exact-unit-normal scenario reaches the
-friction guard with tangent mobility exactly equal to epsilon and matches a
-restitution-one frictionless control. Removing the guards respectively applies
-an invalid normal response and shifts Z velocity from -4 to -3.998046875.
+The 3D rotational and capsule residual blocks are resolved. Rotational sampling
+retains the canonical pair-policy gate because the static query does not apply
+collision-matrix or custom collider filters; deleting it falsely clamped a
+filtered authored 90-degree kinematic rotation to about 22 degrees. The
+`CollisionType.None` early-out was removed because the freshly cleared manifold
+and unsupported dispatch already return the same miss. Capsule closest-segment
+guards retain symmetric `<= Fixed64.Epsilon` classification: deleting the
+first-degenerate arm made forward and reversed exact-threshold pairs disagree,
+while the retained guards now produce mirrored points, normals, and depth.
 
 ## Rules Of Engagement
 
@@ -114,11 +118,11 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | `Core/3D/SolidBody.ContinuousCollision.Rotational.cs` | 2 | 2 | 0 | Rotational proxy admission, stable sampling, and exact boundary behavior. |
-| 2 | `CollisionHandling/Detection/3D/CollisionDetection.Capsule.cs` | 1 | 2 | 0 | Residual capsule admission and exact feature-boundary behavior. |
-| 3 | `CollisionHandling/Detection/3D/GjkSimplexPolicy.cs` | 1 | 2 | 0 | Degenerate simplex policy and deterministic progress ownership. |
-| 4 | `Core/2D/GravitasPhysics2DService.ReplayHash.cs` | 1 | 2 | 0 | Replay contribution mode and authoritative solver-cache identity. |
-| 5 | `CollisionHandling/Detection/3D/CylinderContactGeometry.cs` | 0 | 2 | 0 | Cap alignment and stable tangent-basis ownership. |
+| 1 | `CollisionHandling/Detection/3D/GjkSimplexPolicy.cs` | 1 | 2 | 0 | Degenerate simplex policy and deterministic progress ownership. |
+| 2 | `Core/2D/GravitasPhysics2DService.ReplayHash.cs` | 1 | 2 | 0 | Replay contribution mode and authoritative solver-cache identity. |
+| 3 | `CollisionHandling/Detection/3D/CylinderContactGeometry.cs` | 0 | 2 | 0 | Cap alignment and stable tangent-basis ownership. |
+| 4 | `CollisionHandling/Pairs/3D/CollisionPair.cs` | 0 | 2 | 0 | Retained pair state, notification ownership, and deterministic branch symmetry. |
+| 5 | `Constraints/3D/Joint3D.cs` | 0 | 2 | 0 | Residual joint state and validation boundary behavior. |
 | 6 | Remaining one- and two-branch collision, constraint, query, replay, and CCD blocks | 0-5 | 1-2 each | 0-2 | Re-rank from each authoritative artifact; finish one cohesive source block at a time. |
 
 ### Phase 1: Core Runtime And Service Ownership
@@ -480,6 +484,7 @@ of record.
 | 3D cone query closure | 99.83% | 99.58% | 99.46% | 2,520 | The cone query block reached 100%; closest/all paths ignore stale partition IDs with exact candidate accounting, the lookup guard is mutation-sensitive, and a behavior-neutral negative radial-square clamp was deleted after normalized-caller and saturating-arithmetic proof. |
 | Cylinder/cylinder SAT closure | 99.84% | 99.60% | 99.46% | 2,522 | Cylinder detection reached 100%; a fixed-point 15-degree case isolates the second cylinder axis, cross separation is explicitly duplicated by the final closest axis, and the retained cross early-out is justified by a 7.5% 64-pair speedup with zero allocations. |
 | Mixed response denominator closure | 99.85% | 99.62% | 99.46% | 2,524 | Mixed response reached 100%; exact one-raw normal and exact-epsilon friction mobility witnesses preserve stable state, match the normal-only control, and independently kill removal of both singularity guards. |
+| 3D rotational CCD and capsule residual closure | 99.86% | 99.65% | 99.46% | 2,530 | Both blocks reached 100%. Unsupported rotational shapes safely fall through shared dispatch, while canonical pair filtering remains mandatory. Exact-epsilon capsule segments preserve forward/reverse manifold symmetry. Independent cross-review caught and corrected unsafe deletion of both retained guards before commit. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.

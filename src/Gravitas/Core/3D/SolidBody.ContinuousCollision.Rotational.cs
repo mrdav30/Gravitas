@@ -341,9 +341,6 @@ public partial class SolidBody
 
         OrderRotationalContinuousCollisionPair(target, out LSCollider colliderA, out LSCollider colliderB, out bool sourceIsA);
         CollisionType collisionType = ColliderSettings.GetCollisionType(colliderA.Shape, colliderB.Shape);
-        if (collisionType == CollisionType.None)
-            return false;
-
         _rotationalContinuousCollisionManifold.BeginUpdate(Context.FrameCount);
         var workItem = new CollisionWorkItem(Context, colliderA, colliderB, collisionType, _rotationalContinuousCollisionManifold);
         if (!CollisionDetection.DoCollisionCheck(workItem) || !_rotationalContinuousCollisionManifold.HasContact)

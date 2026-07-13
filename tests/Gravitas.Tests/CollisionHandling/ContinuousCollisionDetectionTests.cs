@@ -10,7 +10,7 @@ using Xunit;
 
 namespace Gravitas.Tests.CollisionHandlingTests;
 
-public sealed class ContinuousCollisionDetectionTests
+public sealed partial class ContinuousCollisionDetectionTests
 {
     private static readonly Fixed64 WallThickness = Fixed64.FromFraction(1, 10);
     private static readonly Fixed64 ExpectedSphereImpactX = -(Fixed64.Half + WallThickness * Fixed64.Half);

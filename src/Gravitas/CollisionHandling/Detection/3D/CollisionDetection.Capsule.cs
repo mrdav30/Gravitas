@@ -74,6 +74,8 @@ public static partial class CollisionDetection
         bool firstDegenerate = (firstEnd - firstStart).MagnitudeSquared <= Fixed64.Epsilon;
         bool secondDegenerate = (secondEnd - secondStart).MagnitudeSquared <= Fixed64.Epsilon;
 
+        // Keep the <= Epsilon point classification symmetric. The generic solver treats threshold-length
+        // segments as finite and cannot safely accept an exactly degenerate second segment.
         if (firstDegenerate && secondDegenerate)
             return (firstStart, secondStart);
 
