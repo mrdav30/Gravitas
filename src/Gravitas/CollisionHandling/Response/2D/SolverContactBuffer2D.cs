@@ -26,9 +26,6 @@ internal struct SolverContactBuffer2D
 
     public void Add(SolverContact2D contact)
     {
-        if (Count >= ContactManifold2D.MaxContactCount)
-            return;
-
         if (Count == 0)
             _contact0 = contact;
         else

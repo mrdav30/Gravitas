@@ -40,9 +40,6 @@ internal struct SolverContactBuffer
 
     public void Add(SolverContact contact)
     {
-        if (Count >= ContactManifold.MaxContactCount)
-            return;
-
         switch (Count)
         {
             case 0:
