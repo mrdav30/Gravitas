@@ -17,9 +17,6 @@ internal readonly struct ContactWarmStartImpulse
     public ContactWarmStartImpulse(Fixed64 normalImpulse, Fixed64 tangentImpulse)
         : this(Vector3d.Zero, normalImpulse, tangentImpulse, Fixed64.Zero) { }
 
-    public ContactWarmStartImpulse(Vector3d normal, Fixed64 normalImpulse, Fixed64 tangentImpulse)
-        : this(normal, normalImpulse, tangentImpulse, Fixed64.Zero) { }
-
     public ContactWarmStartImpulse(
         Vector3d normal,
         Fixed64 normalImpulse,

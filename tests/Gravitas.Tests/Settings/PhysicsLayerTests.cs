@@ -61,6 +61,7 @@ public sealed class PhysicsLayerTests
         multiple.Includes(layerZero).Should().BeTrue();
         multiple.Includes(layerFive).Should().BeTrue();
         multiple.Includes(layerThree).Should().BeFalse();
+        multiple.GetHashCode().Should().Be(multiple.Bits);
 
         PhysicsLayerMask.All.Includes(layerThree).Should().BeTrue();
         PhysicsLayerMask.All.Bits.Should().Be(-1);

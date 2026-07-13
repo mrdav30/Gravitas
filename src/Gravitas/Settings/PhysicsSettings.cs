@@ -44,8 +44,6 @@ public sealed partial class PhysicsSettings
 
     public int FrameRate { get; private set; }
 
-    public Fixed64 FixedFrameRate => (Fixed64)FrameRate;
-
     private readonly bool[,] _collisionMatrix;
     public bool[,] CollisionMatrix => _collisionMatrix;
 

@@ -22,32 +22,33 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-mixed-runtime-tail-task84-authoritative/68c0b55b-20cb-4e2b-99bd-a30f5dc50011/coverage.cobertura.xml`.
+`TestResults/coverage-value-contract-tail-task85-authoritative/834d6d92-b954-4eeb-ad7b-6e36ab2e384a/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
-| Lines | 99.96% | 27,174 / 27,183 | 9 | 100% |
+| Lines | 99.98% | 27,176 / 27,181 | 5 | 100% |
 | Branches | 100% | 10,407 / 10,407 | 0 | 100% |
-| Methods | 99.77% | 3,538 / 3,546 | 8 | 100% |
+| Methods | 99.89% | 3,540 / 3,544 | 4 | 100% |
 
 The authoritative full coverage-enabled `Release` suite passes 2,555/2,555 tests, and
 `ReleaseLean` builds both targets without warnings. Branch coverage is now the
 first metric at 100%; the remaining line and method gaps must now close from the
 same final artifact.
 
-Task 84's authoritative artifact closes the mixed runtime lifecycle/accessor
-block. The retained public mixed-query service now proves exact context
-ownership beside its 2D and 3D counterparts, while two unreferenced lifecycle-
-shaped methods were deleted instead of being invoked artificially.
+Task 85's authoritative artifact closes the value-contract tail. The retained
+layer-mask and collider-hierarchy hashes now prove deterministic identity
+payloads, while an unused fixed-frame-rate cast and unused warm-start
+constructor were deleted instead of being invoked artificially.
 
 ### Immediate Completed Block
 
-The mixed runtime lifecycle/accessor block is resolved. The public
-`GravitasQueryMixedService.Context` contract now has the same exact owner
-assertion as the 2D and 3D services. `GravitasMixedCollisionService.Deactivate`
-duplicated the live `Reset` path without a caller, and
-`PhysicsMixedPartition.OnChange` survived an obsolete GridForge contract; both
-were removed after complete Gravitas/GridForge call-graph review.
+The value-contract tail is resolved. `PhysicsLayerMask.GetHashCode` maps a
+multi-bit mask to its exact bit payload, and `ColliderHierarchyKey.GetHashCode`
+maps both dimensional identities through their packed value; zero-hash
+mutations fail the focused tests. `PhysicsSettings.FixedFrameRate` duplicated
+an explicit cast of the live `FrameRate` API without any consumer, while the
+three-argument `ContactWarmStartImpulse` constructor sat unused between the
+live 2D and 3D forms. Both duplicate surfaces were removed.
 
 ## Rules Of Engagement
 
@@ -114,9 +115,8 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | Value-object hashes, settings accessor, and warm-start constructor | 4 | 0 | 4 | Pin one-line public/internal value contracts without invocation-only assertions. |
-| 2 | `Colliders/Mesh/MeshUtils.cs` | 2 | 0 | 2 | Classify legacy array geometry wrappers against current callers. |
-| 3 | `Diagnostics/Logging/GravitasLogger.cs` | 3 | 0 | 2 | Prove default formatting/dispatch or remove obsolete defaults. |
+| 1 | `Colliders/Mesh/MeshUtils.cs` | 2 | 0 | 2 | Classify legacy array geometry wrappers against current callers. |
+| 2 | `Diagnostics/Logging/GravitasLogger.cs` | 3 | 0 | 2 | Prove default formatting/dispatch or remove obsolete defaults. |
 
 ### Phase 1: Core Runtime And Service Ownership
 
@@ -334,16 +334,14 @@ has a caller-proven impossibility argument.
 
 ### Phase 4: Method And Public-Surface Closure
 
-- [ ] Complete the four remaining `ContactManifold` methods through meaningful
-      construction, mutation, and reduction contracts or delete unused surface.
-- [ ] Regenerate the uncovered-method inventory from the latest full artifact
-      and classify all 19 current method gaps.
-- [ ] Delete unused wrappers, aliases, constructors, and helpers instead of
-      invoking them solely for coverage.
-- [ ] Cover retained query overloads, diagnostic payloads, authored-shape
-      validation, and replay/load entry points through real host workflows.
-- [ ] Keep runtime IDs, delegates, caches, partitions, query stamps, and host
-      bindings out of serialized identity.
+- [x] Complete both dimensional `ContactManifold` contracts through meaningful
+      construction, mutation, reduction, and enumerator behavior.
+- [x] Close the mixed runtime and value-contract tails through exact ownership
+      and deterministic hash assertions plus deletion of four unused surfaces.
+- [ ] Classify and close the four methods remaining in `MeshUtils` and
+      `GravitasLogger`; delete wrappers or defaults that have no real consumer.
+- [ ] Regenerate the method inventory from the final full artifact and prove it
+      contains no uncovered hand-authored method.
 
 Exit condition: the fresh artifact reports zero uncovered hand-authored methods
 and no production method was introduced merely to make testing easier.
@@ -505,6 +503,7 @@ of record.
 | 3D solver tangent fallback deletion | 99.95% | 99.99% | 99.69% | 2,553 | The sole caller supplies a normalized nonzero contact normal; least-component axis selection guarantees a nondegenerate cross product, so the unreachable epsilon fallback was deleted. |
 | Settings square-matrix validation closure | 99.95% | 100% | 99.69% | 2,555 | Missing rows now fail with the explicit square-matrix contract, overlong rows no longer truncate silently, and branch coverage reached 10,407/10,407. |
 | Mixed runtime lifecycle/accessor closure | 99.96% | 100% | 99.77% | 2,555 | Mixed queries now prove exact world-context ownership; the unused mixed-collision `Deactivate` alias and obsolete GridForge partition `OnChange` callback were deleted after complete call-graph review. |
+| Deterministic value-contract closure | 99.98% | 100% | 99.89% | 2,555 | Multi-bit layer masks and dimensional hierarchy keys pin their deterministic hash payloads under mutation; unused fixed-frame-rate and three-argument warm-start conveniences were deleted. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.

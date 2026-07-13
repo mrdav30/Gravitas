@@ -20,6 +20,8 @@ public sealed class ColliderHierarchyStateTests
         none.Packed.Should().Be(0UL);
         ColliderHierarchyKey.FromPacked(0UL).Should().Be(none);
         ColliderHierarchyKey.FromPacked(twoD.Packed).Should().Be(twoD);
+        twoD.GetHashCode().Should().Be(twoD.Packed.GetHashCode());
+        threeD.GetHashCode().Should().Be(threeD.Packed.GetHashCode());
         twoD.Is2D.Should().BeTrue();
         twoD.Is3D.Should().BeFalse();
         threeD.Is3D.Should().BeTrue();
