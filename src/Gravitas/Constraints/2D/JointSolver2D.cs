@@ -363,9 +363,6 @@ internal static class JointSolver2D
             return;
         }
 
-        if (joint.Type != JointType2D.Prismatic)
-            return;
-
         Vector2d axis = Vector2d.Rotate(Vector2d.Right, frameAngleA).Normalized;
         Fixed64 errorTranslation = Vector2d.Dot(anchorError, axis) - motor.Target;
         motorErrorMagnitude = errorTranslation.Abs();
@@ -414,9 +411,6 @@ internal static class JointSolver2D
         int cacheIndex,
         JointConstraintRowKind2D kind = JointConstraintRowKind2D.Linear)
     {
-        if (axis.MagnitudeSquared <= RowEpsilon)
-            return;
-
         Vector2d normalizedAxis = axis.MagnitudeSquared == Fixed64.One
             ? axis
             : axis.Normalized;
