@@ -22,12 +22,12 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-ccd-zero-inverse-mass-task81-final-authoritative-root-comparable/d8173f27-3218-4456-a91d-eaa8135f30f9/coverage.cobertura.xml`.
+`TestResults/coverage-solver-tangent-task82-final-authoritative-root-comparable/4f73a0a7-4ece-4904-a851-b5452a50a4a8/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
-| Lines | 99.95% | 27,176 / 27,188 | 12 | 100% |
-| Branches | 99.98% | 10,407 / 10,409 | 2 | 100% |
+| Lines | 99.95% | 27,173 / 27,185 | 12 | 100% |
+| Branches | 99.99% | 10,406 / 10,407 | 1 | 100% |
 | Methods | 99.69% | 3,537 / 3,548 | 11 | 100% |
 
 The authoritative full coverage-enabled `Release` suite passes 2,553/2,553 tests, and
@@ -35,18 +35,18 @@ The authoritative full coverage-enabled `Release` suite passes 2,553/2,553 tests
 primary constraint, but the remaining line and method gaps must close from the
 same final artifact.
 
-Task 81's authoritative artifact closes the final shared CCD impulse-policy
-branch. The block proves zero effective inverse mass is a neutral participant,
-while near-singular positive mobility remains rejected before division.
+Task 82's authoritative artifact removes the final 3D solver-contact branch.
+The block deletes a caller-impossible tangent fallback rather than admitting an
+invalid zero-normal solver contact solely for coverage.
 
 ### Immediate Completed Block
 
-The zero-inverse-mass CCD policy block is resolved in the existing shared policy
-test. Dynamic candidate admission can include an active non-frozen body with
-zero effective inverse mass. That participant must not abort pair response; it
-contributes zero velocity delta while the movable participant resolves. The
-zero case is accepted, the prior near-singular positive case remains rejected,
-and removing the neutral-participant clause fails the exact assertion.
+The 3D solver tangent fallback is removed. The sole constructor caller first
+normalizes the contact or fallback direction and rejects zero. `CreateTangent`
+then crosses that unit normal with the cardinal axis having the smallest
+absolute component, guaranteeing squared tangent magnitude of at least roughly
+two thirds. The epsilon fallback was therefore unreachable under every legal
+solver contact; the direct normalized cross product is the complete policy.
 
 ## Rules Of Engagement
 
@@ -113,7 +113,7 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | Remaining one-branch solver and settings files | 0 | 2 | 0 | Finish one cohesive source block at a time. |
+| 1 | `Settings/PhysicsSettingsSaver.cs` | 0 | 1 | 0 | Close the final branch without weakening load semantics. |
 
 ### Phase 1: Core Runtime And Service Ownership
 
@@ -495,6 +495,7 @@ of record.
 | 3D trigger self-deactivation closure | 99.95% | 99.96% | 99.69% | 2,552 | Reentrant trigger self-deactivation now proves enter/exit completion, stay suppression, second-side non-admission, and pair-holder cleanup; removing the self-lifetime guard fails event order. |
 | Nested mixed-material fallback closure | 99.95% | 99.97% | 99.69% | 2,553 | Compound-vs-compound detection now proves already-selected innermost 3D/2D part materials survive the outer compound fallback; unconditional overwrite fails exact material identity. |
 | CCD zero-inverse-mass policy closure | 99.95% | 99.98% | 99.69% | 2,553 | Shared impulse policy now proves an infinite-mass participant is neutral rather than pair-rejecting, while the existing near-singular positive-mobility guard remains exact. |
+| 3D solver tangent fallback deletion | 99.95% | 99.99% | 99.69% | 2,553 | The sole caller supplies a normalized nonzero contact normal; least-component axis selection guarantees a nondegenerate cross product, so the unreachable epsilon fallback was deleted. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.

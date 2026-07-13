@@ -103,9 +103,6 @@ internal readonly struct SolverContact
                 ? Vector3d.Up
                 : Vector3d.Forward;
 
-        Vector3d tangent = Vector3d.Cross(reference, normal);
-        return tangent.MagnitudeSquared > Fixed64.Epsilon
-            ? tangent.Normalized
-            : Vector3d.Right;
+        return Vector3d.Cross(reference, normal).Normalized;
     }
 }
