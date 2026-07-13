@@ -132,6 +132,8 @@ Response rules:
 - default restitution combine policy is `Minimum`.
 - materials can choose `Minimum`, `Maximum`, `Average`, `Multiply`, or
   `GeometricMean`.
+- differing policies resolve deterministically in ascending precedence:
+  `Average < Minimum < GeometricMean < Multiply < Maximum`.
 - closing speeds at or below
   `PhysicsSettings.RestitutionVelocityThreshold` use zero restitution.
 - static and dynamic friction are non-negative Coulomb coefficients.

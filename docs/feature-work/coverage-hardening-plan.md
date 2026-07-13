@@ -22,31 +22,33 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-diagnostic-task47-authoritative-root-comparable/53982f2b-37f7-43b9-ab36-e428ba6dd57a/coverage.cobertura.xml`.
+`TestResults/coverage-material-task48-authoritative-root-comparable/ca67eb88-101e-4cb1-a369-d1ec0857c452/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
-| Lines | 99.74% | 26,942 / 27,011 | 69 | 100% |
-| Branches | 99.28% | 10,395 / 10,470 | 75 | 100% |
-| Methods | 99.35% | 3,518 / 3,541 | 23 | 100% |
+| Lines | 99.75% | 26,956 / 27,023 | 67 | 100% |
+| Branches | 99.31% | 10,400 / 10,472 | 72 | 100% |
+| Methods | 99.35% | 3,520 / 3,543 | 23 | 100% |
 
-The authoritative full coverage-enabled `Release` suite passes 2,463/2,463 tests, and
+The authoritative full coverage-enabled `Release` suite passes 2,472/2,472 tests, and
 `ReleaseLean` builds both targets without warnings. Branch coverage is now the
 primary constraint, but the remaining line and method gaps must close from the
 same final artifact.
 
-Task 47's authoritative artifact reports 100% line and branch coverage for the
-diagnostic draw block. Unsupported custom shapes preserve draw-command sequence
-ownership, zero authored joint rotations normalize to unit axes, and redundant
-zero-axis and zero-vertex guards are gone.
+Task 48's authoritative artifact reports 100% line and branch coverage for
+`PhysicsMaterial`. Average and geometric-mean combination now remain stable at
+fixed-point extremes, combine validation has one authoritative path, and the
+default material-response benchmark remains allocation-free without a credible
+timing regression.
 
 ### Immediate Completed Block
 
-The diagnostic draw boundary is resolved and independently reviewed. Unsupported
-custom 3D and 2D collider shapes remain deterministic no-ops without consuming
-draw sequence IDs. Joint axes are guaranteed nonzero by normalized rotation of
-unit basis vectors, while empty custom 2D vertex sets already no-op through the
-loop contract, so both redundant guards were deleted.
+The material combine boundary is resolved and independently reviewed. Average
+uses an overflow-safe ties-to-even raw midpoint. Geometric mean preserves equal
+positive identity and avoids product underflow/saturation for unequal positive
+coefficients. Invalid policies retain exact public parameter names after
+duplicate prevalidation was removed. Policy precedence is now documented, and
+the matching FixedMathSharp vector-midpoint defect is tracked separately.
 
 ## Rules Of Engagement
 
@@ -113,14 +115,13 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | `Materials/PhysicsMaterial.cs` | 2 | 3 | 0 | Authored validation, combine policy, and deterministic limits. |
-| 2 | `Colliders/Definitions/ColliderShapeDefinition.cs` | 1 | 3 | 0 | Validated kind-specific authoring and equality/hash behavior. |
-| 3 | `Colliders/Hierarchy/ColliderHierarchyState.cs` | 1 | 3 | 1 | Parent ownership, replay identity, and reset behavior. |
-| 4 | `Queries/Mixed/MixedSweepBoxUtility.cs` | 0 | 3 | 0 | Slab bounds, degenerate displacement, and stable extrema. |
-| 5 | `Core/3D/SolidBody.ContinuousCollision.Helpers.cs` | 0 | 3 | 0 | Candidate filters and relative-motion fallback. |
-| 6 | `CollisionHandling/Detection/3D/Sat/AxisProjectionHelper.cs` | 5 | 2 | 1 | Capsule/cuboid axes, sphere projection, and degenerate normals. |
-| 7 | `Constraints/3D/RagdollRuntime3D.cs` | 3 | 2 | 1 | Replay load shape, link ownership, and stable reconstruction. |
-| 8 | `Core/2D/GravitasPhysics2DService.SupportTypes.cs` | 3 | 2 | 0 | Stable support ordering and lifecycle-proven ownership. |
+| 1 | `Colliders/Definitions/ColliderShapeDefinition.cs` | 1 | 3 | 0 | Validated kind-specific authoring and equality/hash behavior. |
+| 2 | `Colliders/Hierarchy/ColliderHierarchyState.cs` | 1 | 3 | 1 | Parent ownership, replay identity, and reset behavior. |
+| 3 | `Queries/Mixed/MixedSweepBoxUtility.cs` | 0 | 3 | 0 | Slab bounds, degenerate displacement, and stable extrema. |
+| 4 | `Core/3D/SolidBody.ContinuousCollision.Helpers.cs` | 0 | 3 | 0 | Candidate filters and relative-motion fallback. |
+| 5 | `CollisionHandling/Detection/3D/Sat/AxisProjectionHelper.cs` | 5 | 2 | 1 | Capsule/cuboid axes, sphere projection, and degenerate normals. |
+| 6 | `Constraints/3D/RagdollRuntime3D.cs` | 3 | 2 | 1 | Replay load shape, link ownership, and stable reconstruction. |
+| 7 | `Core/2D/GravitasPhysics2DService.SupportTypes.cs` | 3 | 2 | 0 | Stable support ordering and lifecycle-proven ownership. |
 
 ### Phase 1: Core Runtime And Service Ownership
 
@@ -442,6 +443,7 @@ of record.
 | 3D compound closure | 99.73% | 99.24% | 99.34% | 2,433 | The compound family reached 100%; mass now uses explicit solid volume or shell policy, fixed-point residual mass is exact, part COM/tensors and owner offsets share one frame, remote parts remain query-visible, false aggregate `ScaledSize` was removed, and the discovered mesh-scale and point-transform boundaries are tracked explicitly. |
 | Mesh transform and mass closure | 99.73% | 99.25% | 99.35% | 2,461 | Mesh scale now reaches bounds, normals, areas, queries, collision, closed-volume covariance, and physical thin-shell inertia through checked atomic lifecycle commits. Immutable topology/BVH caches survive transforms, closed mass is cached per committed scale, SAT edge separation is exact, and the touched mesh/SAT files reached 100%. |
 | Diagnostic draw closure | 99.74% | 99.28% | 99.35% | 2,463 | Diagnostic draw reached 100%; unsupported custom shapes preserve sequence ownership, zero authored joint rotations emit unit axes through normalized identity fallback, and redundant zero-axis and zero-vertex guards were removed after independent review. |
+| Physics material closure | 99.75% | 99.31% | 99.35% | 2,472 | PhysicsMaterial reached 100%; duplicate validation was collapsed without changing parameter contracts, average is overflow-safe and ties-to-even, geometric mean preserves positive identity and extreme coefficients, and the relevant default-material response benchmark remains allocation-free without a credible regression. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.

@@ -151,17 +151,17 @@ public readonly partial struct PhysicsMaterial : IEquatable<PhysicsMaterial>
         Fixed64 right,
         PhysicsMaterialCombine policy)
     {
-        ValidateCombine(policy, nameof(policy));
         return policy switch
         {
             PhysicsMaterialCombine.Minimum => FixedMath.Min(left, right),
             PhysicsMaterialCombine.Maximum => FixedMath.Max(left, right),
-            PhysicsMaterialCombine.Average => (left + right) * Fixed64.Half,
+            PhysicsMaterialCombine.Average => Average(left, right),
             PhysicsMaterialCombine.Multiply => left * right,
-            PhysicsMaterialCombine.GeometricMean => left > Fixed64.Zero && right > Fixed64.Zero
-                ? FixedMath.Sqrt(left * right)
-                : Fixed64.Zero,
-            _ => throw new ArgumentOutOfRangeException(nameof(policy))
+            PhysicsMaterialCombine.GeometricMean => GeometricMean(left, right),
+            _ => throw new ArgumentOutOfRangeException(
+                nameof(policy),
+                policy,
+                "Unsupported physics material combine policy.")
         };
     }
 
@@ -173,9 +173,9 @@ public readonly partial struct PhysicsMaterial : IEquatable<PhysicsMaterial>
         PhysicsMaterialCombine left,
         PhysicsMaterialCombine right)
     {
-        ValidateCombine(left, nameof(left));
-        ValidateCombine(right, nameof(right));
-        return GetPolicyPriority(left) >= GetPolicyPriority(right) ? left : right;
+        int leftPriority = GetPolicyPriority(left, nameof(left));
+        int rightPriority = GetPolicyPriority(right, nameof(right));
+        return leftPriority >= rightPriority ? left : right;
     }
 
     public bool Equals(PhysicsMaterial other) =>
@@ -222,7 +222,24 @@ public readonly partial struct PhysicsMaterial : IEquatable<PhysicsMaterial>
                 "Unsupported physics material combine policy.");
     }
 
-    private static int GetPolicyPriority(PhysicsMaterialCombine policy) =>
+    private static Fixed64 Average(Fixed64 left, Fixed64 right)
+    {
+        long floor = (left.m_rawValue & right.m_rawValue)
+            + ((left.m_rawValue ^ right.m_rawValue) >> 1);
+        long tieToEvenCorrection = (left.m_rawValue ^ right.m_rawValue) & floor & 1L;
+        return Fixed64.FromRaw(floor + tieToEvenCorrection);
+    }
+
+    private static Fixed64 GeometricMean(Fixed64 left, Fixed64 right)
+    {
+        if (left <= Fixed64.Zero || right <= Fixed64.Zero)
+            return Fixed64.Zero;
+        return left == right
+            ? left
+            : FixedMath.Sqrt(left) * FixedMath.Sqrt(right);
+    }
+
+    private static int GetPolicyPriority(PhysicsMaterialCombine policy, string paramName) =>
         policy switch
         {
             PhysicsMaterialCombine.Average => 0,
@@ -230,6 +247,9 @@ public readonly partial struct PhysicsMaterial : IEquatable<PhysicsMaterial>
             PhysicsMaterialCombine.GeometricMean => 2,
             PhysicsMaterialCombine.Multiply => 3,
             PhysicsMaterialCombine.Maximum => 4,
-            _ => throw new ArgumentOutOfRangeException(nameof(policy))
+            _ => throw new ArgumentOutOfRangeException(
+                paramName,
+                policy,
+                "Unsupported physics material combine policy.")
         };
 }

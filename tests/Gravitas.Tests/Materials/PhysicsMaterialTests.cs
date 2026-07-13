@@ -54,6 +54,25 @@ public sealed class PhysicsMaterialTests
     }
 
     [Theory]
+    [InlineData(long.MaxValue, long.MaxValue, long.MaxValue)]
+    [InlineData(1L, 2L, 2L)]
+    [InlineData(2L, 3L, 2L)]
+    [InlineData(-2L, -1L, -2L)]
+    [InlineData(long.MinValue, long.MaxValue, 0L)]
+    public void CombineScalar_Average_ShouldNotOverflowAndShouldRoundTiesToEven(
+        long leftRaw,
+        long rightRaw,
+        long expectedRaw)
+    {
+        PhysicsMaterial.CombineScalar(
+                Fixed64.FromRaw(leftRaw),
+                Fixed64.FromRaw(rightRaw),
+                PhysicsMaterialCombine.Average)
+            .Should()
+            .Be(Fixed64.FromRaw(expectedRaw));
+    }
+
+    [Theory]
     [InlineData(0, 4)]
     [InlineData(4, 0)]
     [InlineData(-4, 9)]
@@ -64,6 +83,52 @@ public sealed class PhysicsMaterialTests
         PhysicsMaterial.CombineScalar((Fixed64)left, (Fixed64)right, PhysicsMaterialCombine.GeometricMean)
             .Should()
             .Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void CombineScalar_GeometricMean_ShouldAvoidProductUnderflow()
+    {
+        PhysicsMaterial.CombineScalar(
+                Fixed64.Epsilon,
+                Fixed64.Epsilon * 4,
+                PhysicsMaterialCombine.GeometricMean)
+            .Should()
+            .Be(Fixed64.Epsilon * 2);
+    }
+
+    [Fact]
+    public void CombineScalar_GeometricMean_ShouldAvoidProductSaturation()
+    {
+        PhysicsMaterial.CombineScalar(
+                (Fixed64)65536,
+                (Fixed64)262144,
+                PhysicsMaterialCombine.GeometricMean)
+            .Should()
+            .Be((Fixed64)131072);
+    }
+
+    [Fact]
+    public void CombineScalar_GeometricMean_ShouldRemainIdempotentWhenEqualProductSaturates()
+    {
+        Fixed64 coefficient = Fixed64.FromRaw(4818164225920357844L);
+
+        PhysicsMaterial.CombineScalar(
+                coefficient,
+                coefficient,
+                PhysicsMaterialCombine.GeometricMean)
+            .Should()
+            .Be(coefficient);
+    }
+
+    [Fact]
+    public void CombineScalar_GeometricMean_ShouldAvoidNearUnderflowProductRounding()
+    {
+        PhysicsMaterial.CombineScalar(
+                Fixed64.FromRaw(46340L),
+                Fixed64.FromRaw(46342L),
+                PhysicsMaterialCombine.GeometricMean)
+            .Should()
+            .Be(Fixed64.FromRaw(46341L));
     }
 
     [Fact]
@@ -112,16 +177,29 @@ public sealed class PhysicsMaterialTests
     public void CombineMethods_ShouldRejectUnsupportedPolicies()
     {
         const PhysicsMaterialCombine unsupported = (PhysicsMaterialCombine)250;
+        const PhysicsMaterialCombine unsupportedBelowRange = (PhysicsMaterialCombine)(-1);
         Action construct = () => new PhysicsMaterial(
             Fixed64.One,
             Fixed64.One,
             Fixed64.Zero,
             unsupported);
+        Action constructBelowRange = () => new PhysicsMaterial(
+            Fixed64.One,
+            Fixed64.One,
+            Fixed64.Zero,
+            unsupportedBelowRange);
+        Action constructWithUnsupportedRestitution = () => new PhysicsMaterial(
+            Fixed64.One,
+            Fixed64.One,
+            Fixed64.Zero,
+            restitutionCombine: unsupported);
         Action combineScalar = () => PhysicsMaterial.CombineScalar(Fixed64.One, Fixed64.One, unsupported);
         Action resolveDominant = () => PhysicsMaterial.ResolveDominantPolicy(PhysicsMaterialCombine.Minimum, unsupported);
         Action resolveDominantLeft = () => PhysicsMaterial.ResolveDominantPolicy(unsupported, PhysicsMaterialCombine.Minimum);
 
         construct.Should().Throw<ArgumentOutOfRangeException>().WithParameterName("frictionCombine");
+        constructBelowRange.Should().Throw<ArgumentOutOfRangeException>().WithParameterName("frictionCombine");
+        constructWithUnsupportedRestitution.Should().Throw<ArgumentOutOfRangeException>().WithParameterName("restitutionCombine");
         combineScalar.Should().Throw<ArgumentOutOfRangeException>().WithParameterName("policy");
         resolveDominant.Should().Throw<ArgumentOutOfRangeException>().WithParameterName("right");
         resolveDominantLeft.Should().Throw<ArgumentOutOfRangeException>().WithParameterName("left");

@@ -17,6 +17,27 @@
 
 ## Active Issues
 
+### FixedMathSharp Vector Midpoints Saturate Before Halving
+
+**Discovered:** 2026-07-13  
+**Source:** 95%-to-100% coverage hardening, physics-material average review  
+**Affected area:** FixedMathSharp `Vector3d.Midpoint(...)` and
+`Vector4d.Midpoint(...)`
+
+The FixedMathSharp vector midpoint helpers compute each component as
+`(left + right) * Fixed64.Half`. Because `Fixed64` addition saturates, equal
+extreme endpoints lose half their magnitude before the multiplication:
+`Midpoint(MaxValue, MaxValue)` returns approximately `MaxValue / 2`, with the
+symmetric failure at `MinValue`. Gravitas now uses an overflow-safe raw scalar
+midpoint for `PhysicsMaterialCombine.Average`, so this lower-stack defect does
+not block the coverage campaign.
+
+Resolve this in FixedMathSharp with an overflow-safe, ties-to-even scalar
+midpoint primitive shared by the vector helpers. Add equal extreme, opposite
+extreme, odd-raw tie, signed symmetry, and per-component vector regressions,
+then consume the released helper from Gravitas instead of duplicating the raw
+algorithm.
+
 ### 3D Angular Impulse Scales Immediate Velocity By Frame Delta
 
 **Discovered:** 2026-07-12  

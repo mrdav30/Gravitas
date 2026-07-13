@@ -64,6 +64,7 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 
 | Signal                                                      | Status | Closed     | Resolution                                                                                                                                                                                                                                  |
 | ----------------------------------------------------------- | ------ | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Physics-material combine numeric hardening                  | Closed | 2026-07-13 | Overflow-safe average and geometric-mean edge handling preserve deterministic coefficient semantics; the default geometric-material response benchmark remains allocation-free with no credible timing regression                           |
 | Replay hash collider-ID churn scaling                      | Closed | 2026-07-05 | 2D and 3D collider registration now uses a shared reusable-slot registry; authoritative replay hashes traverse canonical live registration order with dense replay ordinals, while deleted ID history remains outside replay identity      |
 | Pure 2D response position-correction repartition allocation | Closed | 2026-06-28 | Gravitas reuses empty retained partitions for immediate repartitioning; GridForge stores the common single voxel partition inline and keeps diagnostic names off success paths                                                              |
 | SwiftCollections sort hot-path allocation                   | Closed | 2026-06-24 | SwiftCollections owns allocation-free sort and sorted-key APIs; Gravitas removed `SwiftListSortUtility`                                                                                                                                     |
@@ -680,6 +681,34 @@ Closed-volume properties are likewise cached by committed scale, including the
 default-scale initialization path; checked prevalidation is promoted at commit
 and pose-only updates retain the cache. Retain both transform and cached-read
 rows as regression signals for future mesh transform or mass-property work.
+
+### Closed Signal: Physics-Material Combine Numeric Hardening
+
+**Status:** Closed 2026-07-13
+
+**Evidence:** Task 48 compared the existing default-material response row at
+the pre-change `577cdb1` checkpoint and the final arithmetic implementation.
+This row exercises the dominant `GeometricMean` friction policy rather than the
+distinct-material `Maximum` path.
+
+| Body count | Baseline | Final | Allocated |
+| ---------: | -------: | ----: | --------: |
+| 64 | `148.785 us` | `149.243 us` | `0 B` |
+| 1024 | `2.8145 ms` | `2.6088 ms` | `0 B` |
+
+The 64-body intervals overlap (`+0.31%` point estimate), while the 1024-body
+measurement was multimodal and is retained only as a no-regression signal, not
+as a speedup claim. Artifacts:
+
+- `artifacts/benchmarks/2026-07-13-task48-geometric-material-baseline`
+- `artifacts/benchmarks/2026-07-13-task48-geometric-material-after`
+
+**Resolution:** `Average` now computes an overflow-safe raw midpoint with
+ties-to-even rounding. Positive equal geometric inputs retain exact identity;
+positive unequal inputs multiply separately rounded square roots so coefficient
+products cannot saturate or quantize away before the root. The revised path is
+deterministic, allocation-free, symmetric in sampled review, and showed no
+credible regression in the default contact-response benchmark.
 
 ## Watch Items
 
