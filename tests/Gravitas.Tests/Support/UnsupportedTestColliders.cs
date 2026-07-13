@@ -32,10 +32,6 @@ internal sealed class UnsupportedTestCollider2D : LSCollider2D
 
     public override Vector2d GetSupportPoint(Vector2d direction) => Center;
 
-    internal override int VertexCount => 0;
-
-    internal override Vector2d GetVertexUnchecked(int index) => Center;
-
     public override Fixed64 CalculateMomentOfInertia(Fixed64 mass, Vector2d localReferencePoint) => Fixed64.Zero;
 
     internal override Fixed64 CalculateAreaForMassProperties() => Fixed64.Zero;

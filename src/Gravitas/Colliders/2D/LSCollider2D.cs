@@ -825,9 +825,15 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
 
     public abstract Vector2d GetSupportPoint(Vector2d direction);
 
-    internal abstract int VertexCount { get; }
+    internal int VertexCount
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => this is IConvexVertexSource2D source ? source.VertexCount : 0;
+    }
 
-    internal abstract Vector2d GetVertexUnchecked(int index);
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal Vector2d GetVertexUnchecked(int index) =>
+        ((IConvexVertexSource2D)this).GetVertexUnchecked(index);
 
     /// <summary>
     /// Calculates the body-local center of mass implied by this 2D collider's current shape state.

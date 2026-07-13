@@ -126,8 +126,6 @@ public sealed class LSCapsuleCollider2D : LSCollider2D
         }
     }
 
-    internal override int VertexCount => 0;
-
     public override bool ContainsPoint(Vector2d point)
     {
         CalculateSegment(out Vector2d start, out Vector2d end);
@@ -160,8 +158,6 @@ public sealed class LSCapsuleCollider2D : LSCollider2D
         Vector2d segmentPoint = Vector2d.Dot(axis, normal) >= Fixed64.Zero ? end : start;
         return segmentPoint + normal * ScaledRadius;
     }
-
-    internal override Vector2d GetVertexUnchecked(int index) => Center;
 
     internal override Fixed64 CalculateAreaForMassProperties()
     {
@@ -234,6 +230,9 @@ public sealed class LSCapsuleCollider2D : LSCollider2D
         Fixed64 rectangleArea = cylinderLength * radius * (Fixed64)2;
         Fixed64 circleArea = Fixed64.Pi * radius * radius;
         Fixed64 totalArea = rectangleArea + circleArea;
+        if (totalArea <= Fixed64.Zero)
+            return mass * cylinderLength * cylinderLength / (Fixed64)12;
+
         Fixed64 rectangleMass = mass * (rectangleArea / totalArea);
         Fixed64 capMass = mass * ((circleArea * Fixed64.Half) / totalArea);
         Fixed64 rectangleMoment =

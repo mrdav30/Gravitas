@@ -53,8 +53,6 @@ public sealed class LSCircleCollider2D : LSCollider2D
         get => _radius * FixedMath.Max(LocalScale.X, LocalScale.Y);
     }
 
-    internal override int VertexCount => 0;
-
     public override bool ContainsPoint(Vector2d point) =>
         Vector2d.DistanceSquared(point, Center) <= ScaledRadius * ScaledRadius;
 
@@ -74,8 +72,6 @@ public sealed class LSCircleCollider2D : LSCollider2D
 
         return Center + direction.Normalized * ScaledRadius;
     }
-
-    internal override Vector2d GetVertexUnchecked(int index) => Center;
 
     internal override Fixed64 CalculateAreaForMassProperties() =>
         Fixed64.Pi * ScaledRadius * ScaledRadius;

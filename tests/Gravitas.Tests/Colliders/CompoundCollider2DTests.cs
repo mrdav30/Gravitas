@@ -226,7 +226,8 @@ public sealed class CompoundCollider2DTests
         var compound = new LSCompoundCollider2D(
             CompoundColliderPart2D.Circle(Fixed64.Half, new Vector2d(-Fixed64.One, Fixed64.Zero)),
             CompoundColliderPart2D.Capsule(Fixed64.Half, (Fixed64)4, new Vector2d(Fixed64.Zero, (Fixed64)2)),
-            CompoundColliderPart2D.AABBox(new Vector2d((Fixed64)2, (Fixed64)2), new Vector2d((Fixed64)3, Fixed64.Zero)));
+            CompoundColliderPart2D.AABBox(new Vector2d((Fixed64)2, (Fixed64)2), new Vector2d((Fixed64)3, Fixed64.Zero)),
+            CompoundColliderPart2D.Capsule(Fixed64.Half, Fixed64.One, Vector2d.Zero));
 
         _ = CreateBody(context, compound, Vector2d.Zero);
 
@@ -261,8 +262,12 @@ public sealed class CompoundCollider2DTests
         _ = CreateBody(context, compound, Vector2d.Zero);
 
         Vector2d closest = compound.GetClosestPoint(new Vector2d((Fixed64)3, Fixed64.Zero));
+        Vector2d closestToFirst = compound.GetClosestPoint(new Vector2d((Fixed64)(-5), Fixed64.Zero));
+        Vector2d equalDistanceTie = compound.GetClosestPoint(new Vector2d(-Fixed64.One, Fixed64.Zero));
 
         closest.Should().Be(new Vector2d(Fixed64.FromFraction(5, 2), Fixed64.Zero));
+        closestToFirst.Should().Be(new Vector2d(-Fixed64.FromFraction(9, 2), Fixed64.Zero));
+        equalDistanceTie.Should().Be(new Vector2d(-Fixed64.FromFraction(7, 2), Fixed64.Zero));
     }
 
     [Fact]

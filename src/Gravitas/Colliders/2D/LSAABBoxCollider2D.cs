@@ -14,7 +14,7 @@ namespace Gravitas.Colliders;
 /// <summary>
 /// Pure 2D axis-aligned box collider.
 /// </summary>
-public sealed class LSAABBoxCollider2D : LSCollider2D
+public sealed class LSAABBoxCollider2D : LSCollider2D, IConvexVertexSource2D
 {
     private Vector2d _size;
     private Vector2d _halfExtents;
@@ -58,7 +58,7 @@ public sealed class LSAABBoxCollider2D : LSCollider2D
 
     public Vector2d ScaledHalfExtents => ScaledSize * Fixed64.Half;
 
-    internal override int VertexCount => 4;
+    int IConvexVertexSource2D.VertexCount => 4;
 
     public override bool ContainsPoint(Vector2d point) =>
         point.X >= MinX && point.X <= MaxX
@@ -74,7 +74,7 @@ public sealed class LSAABBoxCollider2D : LSCollider2D
             direction.X >= Fixed64.Zero ? MaxX : MinX,
             direction.Y >= Fixed64.Zero ? MaxY : MinY);
 
-    internal override Vector2d GetVertexUnchecked(int index)
+    Vector2d IConvexVertexSource2D.GetVertexUnchecked(int index)
     {
         return index switch
         {

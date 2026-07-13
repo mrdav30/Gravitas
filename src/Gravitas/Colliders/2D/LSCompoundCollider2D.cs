@@ -151,10 +151,6 @@ public sealed class LSCompoundCollider2D : LSCollider2D
         return bestPoint;
     }
 
-    internal override int VertexCount => 0;
-
-    internal override Vector2d GetVertexUnchecked(int index) => Center;
-
     public override Vector2d CalculateLocalCenterOfMassOffset()
     {
         Fixed64 totalArea = Fixed64.Zero;
@@ -163,16 +159,18 @@ public sealed class LSCompoundCollider2D : LSCollider2D
         {
             LSCollider2D partCollider = _partColliders[i];
             Fixed64 partArea = partCollider.CalculateAreaForMassProperties();
-            if (partArea <= Fixed64.Zero)
-                continue;
-
             totalArea += partArea;
             weightedCenter += partCollider.CalculateLocalCenterOfMassOffset() * partArea;
         }
 
-        return totalArea > Fixed64.Zero
-            ? weightedCenter / totalArea
-            : base.CalculateLocalCenterOfMassOffset();
+        if (totalArea > Fixed64.Zero)
+            return weightedCenter / totalArea;
+
+        Vector2d equalWeightedCenter = Vector2d.Zero;
+        for (int i = 0; i < _partColliders.Length; i++)
+            equalWeightedCenter += _partColliders[i].CalculateLocalCenterOfMassOffset();
+
+        return equalWeightedCenter / (Fixed64)_partColliders.Length;
     }
 
     internal override Fixed64 CalculateAreaForMassProperties()
@@ -190,18 +188,16 @@ public sealed class LSCompoundCollider2D : LSCollider2D
             return Fixed64.Zero;
 
         Fixed64 totalArea = CalculateAreaForMassProperties();
-        if (totalArea <= Fixed64.Zero)
-            return Fixed64.Zero;
+        Fixed64 equalPartMass = mass / (Fixed64)_partColliders.Length;
 
         Fixed64 moment = Fixed64.Zero;
         for (int i = 0; i < _partColliders.Length; i++)
         {
             LSCollider2D partCollider = _partColliders[i];
             Fixed64 partArea = partCollider.CalculateAreaForMassProperties();
-            if (partArea <= Fixed64.Zero)
-                continue;
-
-            Fixed64 partMass = mass * (partArea / totalArea);
+            Fixed64 partMass = totalArea > Fixed64.Zero
+                ? mass * (partArea / totalArea)
+                : equalPartMass;
             moment += partCollider.CalculateMomentOfInertia(partMass, localReferencePoint);
         }
 

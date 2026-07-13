@@ -15,7 +15,7 @@ namespace Gravitas.Colliders;
 /// <summary>
 /// Pure 2D convex polygon collider with deterministic vertex ordering.
 /// </summary>
-public sealed class LSPolygonCollider2D : LSCollider2D
+public sealed class LSPolygonCollider2D : LSCollider2D, IConvexVertexSource2D
 {
     private Vector2d[] _localVertices;
     private Vector2d[] _worldVertices;
@@ -40,7 +40,7 @@ public sealed class LSPolygonCollider2D : LSCollider2D
 
     public int Count => _worldVertices.Length;
 
-    internal override int VertexCount => _worldVertices.Length;
+    int IConvexVertexSource2D.VertexCount => _worldVertices.Length;
 
     public Vector2d GetWorldVertex(int index)
     {
@@ -109,7 +109,7 @@ public sealed class LSPolygonCollider2D : LSCollider2D
         return _worldVertices[bestIndex];
     }
 
-    internal override Vector2d GetVertexUnchecked(int index) => _worldVertices[index];
+    Vector2d IConvexVertexSource2D.GetVertexUnchecked(int index) => _worldVertices[index];
 
     public override Vector2d CalculateLocalCenterOfMassOffset()
     {
@@ -127,11 +127,15 @@ public sealed class LSPolygonCollider2D : LSCollider2D
 
     public override Fixed64 CalculateMomentOfInertia(Fixed64 mass, Vector2d localReferencePoint)
     {
-        if (mass <= Fixed64.Zero
-            || !TryCalculateSignedAreaAndCentroid(out Fixed64 signedDoubleArea, out Vector2d centerOfMass))
-        {
+        if (mass <= Fixed64.Zero)
             return Fixed64.Zero;
-        }
+
+        if (!TryCalculateSignedAreaAndCentroid(out Fixed64 signedDoubleArea, out Vector2d centerOfMass))
+            return ApplyParallelAxis(
+                Fixed64.Zero,
+                mass,
+                base.CalculateLocalCenterOfMassOffset(),
+                localReferencePoint);
 
         Fixed64 area = signedDoubleArea.Abs() * Fixed64.Half;
         Fixed64 density = mass / area;

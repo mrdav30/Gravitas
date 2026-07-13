@@ -210,6 +210,94 @@ public sealed class Collider2DMassPropertyTests
             .Should().Be(new Vector2d((Fixed64)6, -Fixed64.One));
     }
 
+    [Fact]
+    public void Compound_ShouldIgnoreQuantizedZeroAreaPartForCenterAndMoment()
+    {
+        Fixed64 tinyRadius = Fixed64.FromRaw(1);
+        var collider = new LSCompoundCollider2D(
+            CompoundColliderPart2D.Circle(tinyRadius, new Vector2d((Fixed64)100, Fixed64.Zero)),
+            CompoundColliderPart2D.Circle(Fixed64.One, new Vector2d((Fixed64)2, Fixed64.Zero)));
+
+        collider.GetPartCollider(0).CalculateAreaForMassProperties().Should().Be(Fixed64.Zero);
+        collider.CalculateAreaForMassProperties().Should().Be(Fixed64.Pi);
+        collider.CalculateLocalCenterOfMassOffset().Should().Be(new Vector2d((Fixed64)2, Fixed64.Zero));
+        collider.CalculateMomentOfInertia((Fixed64)4, new Vector2d((Fixed64)2, Fixed64.Zero))
+            .Should().Be((Fixed64)2);
+    }
+
+    [Fact]
+    public void Compound_WhenAllPartAreasQuantizeToZero_ShouldUseEqualMassFallback()
+    {
+        Fixed64 tinyRadius = Fixed64.FromRaw(1);
+        var collider = new LSCompoundCollider2D(
+            CompoundColliderPart2D.Circle(tinyRadius, new Vector2d(-Fixed64.One, Fixed64.Zero)),
+            CompoundColliderPart2D.Circle(tinyRadius, new Vector2d((Fixed64)3, Fixed64.Zero)));
+        Fixed64 mass = (Fixed64)2;
+
+        Vector2d center = collider.CalculateLocalCenterOfMassOffset();
+        Fixed64 moment = collider.CalculateMomentOfInertia(mass, center);
+
+        center.Should().Be(new Vector2d(Fixed64.One, Fixed64.Zero));
+        moment.Should().Be((Fixed64)8);
+    }
+
+    [Fact]
+    public void Compound_WithQuantizedZeroRadiusCapsule_ShouldUseThinRodMomentLimit()
+    {
+        var collider = new LSCompoundCollider2D(
+            CompoundColliderPart2D.Capsule(
+                Fixed64.Half,
+                (Fixed64)1_000_000_000,
+                Vector2d.Zero,
+                Fixed64.Zero,
+                new Vector2d(Fixed64.FromRaw(1), Fixed64.FromRaw(1))));
+        var capsule = (LSCapsuleCollider2D)collider.GetPartCollider(0);
+        Fixed64 mass = (Fixed64)3;
+        Fixed64 expectedMoment = mass * capsule.ScaledHeight * capsule.ScaledHeight / (Fixed64)12;
+
+        capsule.ScaledRadius.Should().Be(Fixed64.Zero);
+        capsule.CalculateAreaForMassProperties().Should().Be(Fixed64.Zero);
+        collider.CalculateMomentOfInertia(mass, Vector2d.Zero).Should().Be(expectedMoment);
+    }
+
+    [Fact]
+    public void Compound_WithQuantizedZeroAreaPolygons_ShouldKeepParallelAxisMoment()
+    {
+        Vector2d[] square =
+        {
+            new(-Fixed64.One, -Fixed64.One),
+            new(Fixed64.One, -Fixed64.One),
+            new(Fixed64.One, Fixed64.One),
+            new(-Fixed64.One, Fixed64.One)
+        };
+        Fixed64 offsetMagnitude = (Fixed64)1_000_000_000;
+        Vector2d tinyScale = new(Fixed64.FromRaw(1), Fixed64.FromRaw(1));
+        var collider = new LSCompoundCollider2D(
+            CompoundColliderPart2D.ConvexPolygon(
+                square,
+                new Vector2d(-offsetMagnitude, Fixed64.Zero),
+                Fixed64.Zero,
+                tinyScale),
+            CompoundColliderPart2D.ConvexPolygon(
+                square,
+                new Vector2d(offsetMagnitude, Fixed64.Zero),
+                Fixed64.Zero,
+                tinyScale));
+        Fixed64 mass = (Fixed64)2;
+        Fixed64 partMass = mass / (Fixed64)collider.PartCount;
+        Fixed64 expectedMoment = Fixed64.Zero;
+        for (int i = 0; i < collider.PartCount; i++)
+        {
+            Vector2d partCenter = collider.GetPartCollider(i).CalculateLocalCenterOfMassOffset();
+            expectedMoment += partMass * partCenter.MagnitudeSquared;
+        }
+
+        collider.CalculateAreaForMassProperties().Should().Be(Fixed64.Zero);
+        collider.CalculateLocalCenterOfMassOffset().Should().Be(Vector2d.Zero);
+        expectedMoment.Should().BeGreaterThan(Fixed64.Zero);
+        collider.CalculateMomentOfInertia(mass, Vector2d.Zero).Should().Be(expectedMoment);
+    }
+
     private static void AssertNear(Fixed64 actual, Fixed64 expected)
     {
         Fixed64 tolerance = Fixed64.Epsilon * (Fixed64)16;
