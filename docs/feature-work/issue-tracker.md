@@ -17,6 +17,28 @@
 
 ## Active Issues
 
+### 3D Angular Impulse Scales Immediate Velocity By Frame Delta
+
+**Discovered:** 2026-07-12  
+**Source:** 95%-to-100% coverage hardening, 2D/3D motion parity review  
+**Affected area:** `SolidBody.AddAngularImpulse(...)` units and frame-rate
+invariance
+
+The 3D angular-impulse API multiplies the supplied impulse by both inverse
+inertia and `GravitasWorldContext.DeltaTime` before changing angular velocity.
+Consequently, otherwise identical bodies receive different immediate angular
+velocity changes from the same impulse when their context frame rates differ.
+The 2D angular-impulse API and the usual physical impulse contract apply
+inverse inertia without a time-step factor. The adjacent 3D linear-impulse API
+uses the same time-step pattern and should be audited as part of the semantic
+decision.
+
+Resolve this as an explicit breaking API/units decision rather than removing
+the factor incidentally. Add cross-frame-rate regressions for immediate linear
+and angular impulse response, update XML/wiki unit documentation, and verify
+collision and constraint callers that may already compensate for the current
+scaling.
+
 ### Rotational CCD Can Miss Contacts Between Bounded Pose Samples
 
 **Discovered:** 2026-07-12  

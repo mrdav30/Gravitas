@@ -37,6 +37,9 @@ public sealed partial class SolidBody2D : IRecordable
     private bool _isSleeping;
     private bool _isDynamic;
     private int _sleepFrameCount;
+    private bool _sleepEnabled = true;
+    private int _sleepFrameThreshold = 16;
+    private Fixed64 _sleepLinearSpeedThreshold = (Fixed64)0.001f;
     private Fixed64 _sleepAngularSpeedThreshold = (Fixed64)0.001f;
     private ContinuousCollisionMode _continuousCollisionMode = ContinuousCollisionMode.Inherit;
     private int _continuousCollisionFrameToken = int.MinValue;
@@ -296,12 +299,55 @@ public sealed partial class SolidBody2D : IRecordable
         }
     }
 
-    public bool SleepEnabled { get; set; } = true;
+    /// <summary>
+    /// Enables deterministic sleep evaluation for this body. Disabling sleep wakes a sleeping body immediately.
+    /// </summary>
+    public bool SleepEnabled
+    {
+        get => _sleepEnabled;
+        set
+        {
+            if (_sleepEnabled == value)
+                return;
 
-    public int SleepFrameThreshold { get; set; } = 16;
+            _sleepEnabled = value;
+            if (!value)
+                Wake();
+        }
+    }
 
-    public Fixed64 SleepLinearSpeedThreshold { get; set; } = (Fixed64)0.001f;
+    /// <summary>
+    /// Number of consecutive fixed frames below sleep thresholds required before the body sleeps.
+    /// </summary>
+    public int SleepFrameThreshold
+    {
+        get => _sleepFrameThreshold;
+        set
+        {
+            SwiftThrowHelper.ThrowIfNegative(value, nameof(value));
+            _sleepFrameThreshold = value;
+        }
+    }
 
+    /// <summary>
+    /// Linear speed at or below which the body can count toward sleeping.
+    /// </summary>
+    public Fixed64 SleepLinearSpeedThreshold
+    {
+        get => _sleepLinearSpeedThreshold;
+        set
+        {
+            SwiftThrowHelper.ThrowIfArgument(
+                value < Fixed64.Zero,
+                nameof(value),
+                "2D sleep linear speed threshold cannot be negative.");
+            _sleepLinearSpeedThreshold = value;
+        }
+    }
+
+    /// <summary>
+    /// Angular speed at or below which the body can count toward sleeping.
+    /// </summary>
     public Fixed64 SleepAngularSpeedThreshold
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

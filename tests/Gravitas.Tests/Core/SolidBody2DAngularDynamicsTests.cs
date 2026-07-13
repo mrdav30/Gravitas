@@ -38,6 +38,68 @@ public sealed class SolidBody2DAngularDynamicsTests
     }
 
     [Fact]
+    public void AddTorque_WithZero_ShouldNotWakeSleepingBody()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext(frameRate: 4);
+        SolidBody2D body = CreateBody(context, new LSCircleCollider2D(Fixed64.One), mass: (Fixed64)2);
+        body.Sleep();
+
+        body.AddTorque(Fixed64.Zero);
+
+        body.IsSleeping.Should().BeTrue();
+        body.AngularAcceleration.Should().Be(Fixed64.Zero);
+        body.AngularVelocity.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void AddTorque_WithSubResolutionEffectiveDelta_ShouldNotWakeSleepingBody()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext(frameRate: 4);
+        SolidBody2D body = CreateBody(context, new LSCircleCollider2D((Fixed64)2), mass: (Fixed64)2);
+        Fixed64 smallestInput = Fixed64.FromRaw(1);
+        body.EffectiveInverseMomentOfInertia.Should().Be(Fixed64.FromFraction(1, 4));
+        (smallestInput * body.EffectiveInverseMomentOfInertia).Should().Be(Fixed64.Zero);
+        body.Sleep();
+
+        body.AddTorque(smallestInput);
+
+        body.IsSleeping.Should().BeTrue();
+        body.AngularAcceleration.Should().Be(Fixed64.Zero);
+        body.AngularVelocity.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void AddAngularImpulse_WithZero_ShouldNotWakeSleepingBody()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext(frameRate: 4);
+        SolidBody2D body = CreateBody(context, new LSCircleCollider2D(Fixed64.One), mass: (Fixed64)2);
+        body.Sleep();
+
+        body.AddAngularImpulse(Fixed64.Zero);
+
+        body.IsSleeping.Should().BeTrue();
+        body.AngularVelocity.Should().Be(Fixed64.Zero);
+        body.AngularSpeed.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void AddAngularImpulse_WithSubResolutionEffectiveDelta_ShouldNotWakeSleepingBody()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext(frameRate: 4);
+        SolidBody2D body = CreateBody(context, new LSCircleCollider2D((Fixed64)2), mass: (Fixed64)2);
+        Fixed64 smallestInput = Fixed64.FromRaw(1);
+        body.EffectiveInverseMomentOfInertia.Should().Be(Fixed64.FromFraction(1, 4));
+        (smallestInput * body.EffectiveInverseMomentOfInertia).Should().Be(Fixed64.Zero);
+        body.Sleep();
+
+        body.AddAngularImpulse(smallestInput);
+
+        body.IsSleeping.Should().BeTrue();
+        body.AngularVelocity.Should().Be(Fixed64.Zero);
+        body.AngularSpeed.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
     public void AngularForces_ShouldBeIgnoredWhenBodyCannotRotate()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext(frameRate: 4);
@@ -74,6 +136,51 @@ public sealed class SolidBody2DAngularDynamicsTests
         body.IsSleeping.Should().BeTrue();
         body.AngularVelocity.Should().Be(Fixed64.Zero);
         body.AngularSpeed.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void LateSimulate_WithZeroSleepFrameThreshold_ShouldSleepImmediately()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext(frameRate: 4);
+        SolidBody2D body = CreateBody(context, new LSCircleCollider2D(Fixed64.One), mass: (Fixed64)2);
+        body.SleepFrameThreshold = 0;
+
+        context.LateSimulate();
+
+        body.IsSleeping.Should().BeTrue();
+    }
+
+    [Fact]
+    public void DisablingSleep_ShouldWakeSleepingBodyAndAllowMotion()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext(frameRate: 4);
+        SolidBody2D body = CreateBody(context, new LSCircleCollider2D(Fixed64.One), mass: (Fixed64)2);
+        body.Sleep();
+
+        body.SleepEnabled = false;
+        body.IsSleeping.Should().BeFalse();
+        body.SleepEnabled = false;
+        body.SleepEnabled.Should().BeFalse();
+        body.SleepEnabled = true;
+        body.SleepEnabled.Should().BeTrue();
+        body.SleepEnabled = false;
+        body.AddForce(Vector2d.Right * (Fixed64)4);
+        context.LateSimulate();
+
+        body.Position.X.Should().BeGreaterThan(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void NegativeSleepThresholds_ShouldReject()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext(frameRate: 4);
+        SolidBody2D body = CreateBody(context, new LSCircleCollider2D(Fixed64.One), mass: (Fixed64)2);
+
+        System.Action setFrameThreshold = () => body.SleepFrameThreshold = -1;
+        System.Action setLinearThreshold = () => body.SleepLinearSpeedThreshold = -Fixed64.One;
+
+        setFrameThreshold.Should().Throw<System.ArgumentException>();
+        setLinearThreshold.Should().Throw<System.ArgumentException>();
     }
 
     [Fact]

@@ -22,22 +22,32 @@ public sealed partial class SolidBody2D
         _deltaAcceleration += accelerationDelta;
     }
 
+    /// <summary>
+    /// Accumulates planar torque for the next fixed step after applying the body's inverse moment of inertia.
+    /// </summary>
+    /// <param name="torque">The signed yaw torque applied to the body.</param>
     public void AddTorque(Fixed64 torque)
     {
-        if (torque == Fixed64.Zero || !CanRotate)
+        Fixed64 accelerationDelta = torque * EffectiveInverseMomentOfInertia;
+        if (accelerationDelta == Fixed64.Zero)
             return;
 
         Wake();
-        _deltaAngularAcceleration += torque * EffectiveInverseMomentOfInertia;
+        _deltaAngularAcceleration += accelerationDelta;
     }
 
+    /// <summary>
+    /// Applies an immediate yaw-velocity change derived from the supplied angular impulse and inverse moment of inertia.
+    /// </summary>
+    /// <param name="impulse">The signed yaw impulse applied to the body.</param>
     public void AddAngularImpulse(Fixed64 impulse)
     {
-        if (impulse == Fixed64.Zero || !CanRotate)
+        Fixed64 velocityDelta = impulse * EffectiveInverseMomentOfInertia;
+        if (velocityDelta == Fixed64.Zero)
             return;
 
         Wake();
-        _angularVelocity += impulse * EffectiveInverseMomentOfInertia;
+        _angularVelocity += velocityDelta;
         RefreshAngularSpeed();
     }
 
