@@ -582,6 +582,54 @@ public sealed class Constraint2DServiceTests
     }
 
     [Fact]
+    public void ConstraintIsland_WithReversedDuplicateEndpoints_ShouldSolveInAscendingJointIdOrder()
+    {
+        using GravitasWorldContext context = CreateConstraintContext();
+        SolidBody2D first = CreateBody(context, Vector2d.Zero);
+        SolidBody2D second = CreateBody(context, Vector2d.Right * (Fixed64)3);
+        // Cross SwiftCollections' 16-item insertion-sort threshold so equal keys cannot pass by stable input order.
+        const int jointCount = 17;
+        var joints = new Joint2D[jointCount];
+        joints[0] = context.Constraints2D.RegisterJoint(CreatePin(
+            second,
+            first,
+            JointCollisionPolicy.Collide));
+        for (int i = 1; i < joints.Length; i++)
+        {
+            joints[i] = context.Constraints2D.RegisterJoint(CreatePin(
+                first,
+                second,
+                JointCollisionPolicy.Collide));
+        }
+
+        context.Diagnostics.Enable(eventCapacity: 128, drawCommandCapacity: 0);
+
+        Step(context);
+
+        var firstSequences = new int[jointCount];
+        Array.Fill(firstSequences, -1);
+        ReadOnlySpan<GravitasDiagnosticEvent> events = context.Diagnostics.Events;
+        for (int i = 0; i < events.Length; i++)
+        {
+            GravitasDiagnosticEvent diagnosticEvent = events[i];
+            if (diagnosticEvent.Kind != GravitasDiagnosticEventKind.JointImpulse)
+                continue;
+
+            int jointIndex = diagnosticEvent.JointId - 1;
+            if ((uint)jointIndex < (uint)firstSequences.Length && firstSequences[jointIndex] < 0)
+                firstSequences[jointIndex] = diagnosticEvent.Sequence;
+        }
+
+        for (int i = 0; i < joints.Length; i++)
+        {
+            joints[i].LastSolvedRowCount.Should().BeGreaterThan(0);
+            firstSequences[i].Should().BeGreaterThanOrEqualTo(0);
+            if (i > 0)
+                firstSequences[i].Should().BeGreaterThan(firstSequences[i - 1]);
+        }
+    }
+
+    [Fact]
     public void RagdollFiltering_ShouldSuppressAdjacentLinksButAllowNonAdjacentByDefault()
     {
         using GravitasWorldContext context = CreateConstraintContext();

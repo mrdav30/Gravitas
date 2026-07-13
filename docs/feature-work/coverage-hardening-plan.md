@@ -22,35 +22,33 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-contact-manifolds-task69-authoritative-root-comparable/c4da30f9-5f46-4ea0-ab83-68a08547a432/coverage.cobertura.xml`.
+`TestResults/coverage-physics2d-support-task70-final-authoritative-root-comparable/991f7381-29d5-4776-a5c7-6881b751704b/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
-| Lines | 99.92% | 27,152 / 27,173 | 21 | 100% |
-| Branches | 99.81% | 10,402 / 10,421 | 19 | 100% |
+| Lines | 99.93% | 27,155 / 27,173 | 18 | 100% |
+| Branches | 99.83% | 10,404 / 10,421 | 17 | 100% |
 | Methods | 99.66% | 3,537 / 3,549 | 12 | 100% |
 
-The authoritative full coverage-enabled `Release` suite passes 2,540/2,540 tests, and
+The authoritative full coverage-enabled `Release` suite passes 2,541/2,541 tests, and
 `ReleaseLean` builds both targets without warnings. Branch coverage is now the
 primary constraint, but the remaining line and method gaps must close from the
 same final artifact.
 
-Task 69's authoritative artifact reports 100% line, branch, and method coverage
-for both 2D/3D contact manifolds and their enumerators. The block deleted dead
-material-setting overloads, simplified duplicate tie policy, and pinned the
-boxed enumeration contract.
+Task 70's authoritative artifact reports 100% line, branch, and method coverage
+for every class in `GravitasPhysics2DService.SupportTypes.cs`. The block pins
+reversed joint endpoint canonicalization and the final duplicate-joint ID key.
 
 ### Immediate Completed Block
 
-The dimensional contact-manifold block is resolved. Callerless internal
-material-aware `SetContact` overloads and their coverage-only 2D test were
-deleted; live compound-part material flow remains on material-aware
-`AddContact`. Because contacts are unique and sorted by ascending identity,
-equal-depth scans always advance to the later/higher-ID incumbent, so both
-reducers now express that policy directly with `<=`. Symmetric exact tests kill
-`<=`-to-`<` mutations. Non-generic enumeration tests prove the required boxed
-`GetEnumerator`, `Current`, stable order, and `Reset` behavior while concrete
-runtime enumeration remains allocation-free.
+The 2D solver support-order block is resolved. One integration witness registers
+joint 1 with reversed endpoints and joints 2-17 forward on the same body pair,
+then asserts first-pass joint-impulse diagnostics are strictly ascending by
+joint ID. Seventeen entries deliberately exceed SwiftCollections' stable
+small-list insertion-sort threshold, so deleting the final ID tie-break exposes
+the introsort reorder instead of passing accidentally. Separate mutations prove
+both the reversed endpoint swap and the final joint-ID comparison. No support
+DTO or comparer source required modification.
 
 ## Rules Of Engagement
 
@@ -117,11 +115,11 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | `Core/2D/GravitasPhysics2DService.SupportTypes.cs` | 3 | 1 | 0 | Service token/default state and sparse support ownership. |
-| 2 | `CollisionHandling/Continuous/ContinuousCollisionMath.cs` | 1 | 1 | 0 | Exact fixed-point threshold and fallback ownership. |
-| 3 | `CollisionHandling/Detection/3D/CollisionDetection.Cone.cs` | 1 | 1 | 0 | Cone contact degeneracy and fallback selection. |
-| 4 | `CollisionHandling/Response/2D/SolverContactBuffer2D.cs` | 1 | 1 | 0 | Fixed-capacity contact-buffer admission and overflow policy. |
-| 5 | `CollisionHandling/Response/3D/SolverContactBuffer.cs` | 1 | 1 | 0 | Fixed-capacity contact-buffer admission and overflow policy. |
+| 1 | `CollisionHandling/Continuous/ContinuousCollisionMath.cs` | 1 | 1 | 0 | Exact fixed-point threshold and fallback ownership. |
+| 2 | `CollisionHandling/Detection/3D/CollisionDetection.Cone.cs` | 1 | 1 | 0 | Cone contact degeneracy and fallback selection. |
+| 3 | `CollisionHandling/Response/2D/SolverContactBuffer2D.cs` | 1 | 1 | 0 | Fixed-capacity contact-buffer admission and overflow policy. |
+| 4 | `CollisionHandling/Response/3D/SolverContactBuffer.cs` | 1 | 1 | 0 | Fixed-capacity contact-buffer admission and overflow policy. |
+| 5 | `Queries/Mixed/FiniteSlabProjectionSweep.cs` | 1 | 1 | 0 | Planar GJK reducer boundary and exact slab projection state. |
 | 6 | Remaining one-branch collision, query, replay, settings, and CCD blocks | 0-1 | 1 each | 0-1 | Re-rank from each authoritative artifact; finish one cohesive source block at a time. |
 
 ### Phase 1: Core Runtime And Service Ownership
@@ -492,6 +490,7 @@ of record.
 | 2D/3D CCD service admission closure | 99.87% | 99.78% | 99.46% | 2,539 | Both continuous-collision service files reached 100%; registered-body traversal makes the 3D active check redundant, and `CanTranslate` makes both non-negative queue-ID checks caller-impossible while processed-body and duplicate-queue gates retain real ownership policy. |
 | Mixed partition attach closure | 99.88% | 99.79% | 99.46% | 2,539 | Mixed partitioning reached 100%; the impossible local attach-failure recovery was collapsed to the same fail-fast invariant as pure 2D/3D after proving current-voxel, exact-type, sealed-partition, owner, and single-thread guarantees. |
 | 2D/3D contact-manifold closure | 99.92% | 99.81% | 99.66% | 2,540 | Both manifolds and enumerators reached 100%; callerless material `SetContact` overloads were deleted, sorted-identity tie policy became direct `<=` depth selection, exact mutations prove highest-ID eviction, and boxed enumerator Current/Reset contracts are covered without changing hot paths. |
+| 2D solver support-order closure | 99.93% | 99.83% | 99.66% | 2,541 | Every 2D support type reached 100%; a reversed first joint plus 16 canonical duplicates pins endpoint normalization and ascending final JointId order across the post-insertion-sort path, with both key mutations independently killed. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.
