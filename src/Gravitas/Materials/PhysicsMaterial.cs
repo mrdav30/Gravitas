@@ -155,7 +155,7 @@ public readonly partial struct PhysicsMaterial : IEquatable<PhysicsMaterial>
         {
             PhysicsMaterialCombine.Minimum => FixedMath.Min(left, right),
             PhysicsMaterialCombine.Maximum => FixedMath.Max(left, right),
-            PhysicsMaterialCombine.Average => Average(left, right),
+            PhysicsMaterialCombine.Average => FixedMath.Midpoint(left, right),
             PhysicsMaterialCombine.Multiply => left * right,
             PhysicsMaterialCombine.GeometricMean => GeometricMean(left, right),
             _ => throw new ArgumentOutOfRangeException(
@@ -220,14 +220,6 @@ public readonly partial struct PhysicsMaterial : IEquatable<PhysicsMaterial>
                 paramName,
                 value,
                 "Unsupported physics material combine policy.");
-    }
-
-    private static Fixed64 Average(Fixed64 left, Fixed64 right)
-    {
-        long floor = (left.m_rawValue & right.m_rawValue)
-            + ((left.m_rawValue ^ right.m_rawValue) >> 1);
-        long tieToEvenCorrection = (left.m_rawValue ^ right.m_rawValue) & floor & 1L;
-        return Fixed64.FromRaw(floor + tieToEvenCorrection);
     }
 
     private static Fixed64 GeometricMean(Fixed64 left, Fixed64 right)

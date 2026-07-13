@@ -28,52 +28,50 @@ records follow with their original discovery context.
   transitive resolution is insufficient.
 - Treat local links as unstaged validation scaffolding. Do not publish or release
   with them in place.
-- Resolve items 1-4, validate every downstream consumer, release FixedMathSharp,
+- Resolve items 1-3, validate every downstream consumer, release FixedMathSharp,
   then restore its package references and validate/release SwiftCollections.
 - SwiftCollections has no library-specific active issue at this checkpoint; its
   place in the sequence is a full downstream compatibility and release gate.
-- Resolve item 5 against the released lower-stack packages, validate downstream
+- Resolve item 4 against the released lower-stack packages, validate downstream
   consumers, and release GridForge.
 - Update Gravitas to the released package versions, remove every local link, and
   rerun `Release`, `ReleaseLean`, coverage, replay, and relevant benchmark gates
-  before starting items 6-15.
+  before starting items 5-14.
 
 ### Ordered Queue
 
 1. **FixedMathSharp:**
-   [FixedMathSharp Vector Midpoints Saturate Before Halving](#fixedmathsharp-vector-midpoints-saturate-before-halving).
-2. **FixedMathSharp:**
    [FixedMathSharp Rays Treat Small Representable Directions As Parallel](#fixedmathsharp-rays-treat-small-representable-directions-as-parallel).
-3. **FixedMathSharp / Gravitas boundary:**
+2. **FixedMathSharp / Gravitas boundary:**
    [Extreme Collider Bounds Can Underestimate CCD Proxy Radius](#extreme-collider-bounds-can-underestimate-ccd-proxy-radius).
    Establish the shared overflow-safe magnitude or supported-range policy before
    choosing the final owning layer.
-4. **FixedMathSharp / Gravitas boundary:**
+3. **FixedMathSharp / Gravitas boundary:**
    [Extreme Convex Sweeps Can Normalize To Non-Unit Directions](#extreme-convex-sweeps-can-normalize-to-non-unit-directions).
-   Reuse the magnitude, normalization, or range policy established by item 3.
-5. **GridForge:**
+   Reuse the magnitude, normalization, or range policy established by item 2.
+4. **GridForge:**
    [GridForge Reuses Grid Spawn Tokens Across Pooled Generations](#gridforge-reuses-grid-spawn-tokens-across-pooled-generations).
-6. **Gravitas:**
+5. **Gravitas:**
    [Registered Joints Can Outlive Their Body And Collider Lifetimes](#registered-joints-can-outlive-their-body-and-collider-lifetimes).
-7. **Gravitas:**
+6. **Gravitas:**
    [Non-Unit Quaternion Admission Can Collapse Runtime Shape Axes](#non-unit-quaternion-admission-can-collapse-runtime-shape-axes).
-8. **Gravitas:**
+7. **Gravitas:**
    [Continuous-Collision Modes Accept Undefined Enum Values](#continuous-collision-modes-accept-undefined-enum-values).
-9. **Gravitas:**
+8. **Gravitas:**
    [3D Exit Callback Failure Can Duplicate Reentrant Separation Notifications](#3d-exit-callback-failure-can-duplicate-reentrant-separation-notifications).
+9. **Gravitas:**
+   [CCD Handoff Dedupe Can Strand A Same-Frame Requeued Body](#ccd-handoff-dedupe-can-strand-a-same-frame-requeued-body).
 10. **Gravitas:**
-    [CCD Handoff Dedupe Can Strand A Same-Frame Requeued Body](#ccd-handoff-dedupe-can-strand-a-same-frame-requeued-body).
-11. **Gravitas:**
     [SolidBody Point Transforms Use Collider Dimensions As Transform Scale](#solidbody-point-transforms-use-collider-dimensions-as-transform-scale).
-12. **Gravitas:**
+11. **Gravitas:**
     [3D Angular Impulse Scales Immediate Velocity By Frame Delta](#3d-angular-impulse-scales-immediate-velocity-by-frame-delta).
-13. **Gravitas:**
+12. **Gravitas:**
     [Rotational CCD Can Miss Contacts Between Bounded Pose Samples](#rotational-ccd-can-miss-contacts-between-bounded-pose-samples).
-14. **Gravitas:**
+13. **Gravitas:**
     [Convex Mesh Mode Accepts Disconnected Topology And Can Collide In Empty Bounds Space](#convex-mesh-mode-accepts-disconnected-topology-and-can-collide-in-empty-bounds-space).
-15. **Gravitas:**
+14. **Gravitas:**
     [Relative CCD Quadratic Saturation Can Miss Extreme-Range Crossings](#relative-ccd-quadratic-saturation-can-miss-extreme-range-crossings).
-    Apply the supported-range decision established by items 3-4 before adding a
+    Apply the supported-range decision established by items 2-3 before adding a
     separate scale-safe quadratic implementation.
 
 ### Non-Unit Quaternion Admission Can Collapse Runtime Shape Axes
@@ -164,27 +162,6 @@ crossings, endpoint-adjacent hits, misses, and mixed CCD routing at the chosen
 boundary. This is distinct from conservative proxy-radius saturation and does
 not block coverage convergence because ordinary supported ranges and the
 current uncovered closing-speed boundary remain independently testable.
-
-### FixedMathSharp Vector Midpoints Saturate Before Halving
-
-**Discovered:** 2026-07-13  
-**Source:** 95%-to-100% coverage hardening, physics-material average review  
-**Affected area:** FixedMathSharp `Vector3d.Midpoint(...)` and
-`Vector4d.Midpoint(...)`
-
-The FixedMathSharp vector midpoint helpers compute each component as
-`(left + right) * Fixed64.Half`. Because `Fixed64` addition saturates, equal
-extreme endpoints lose half their magnitude before the multiplication:
-`Midpoint(MaxValue, MaxValue)` returns approximately `MaxValue / 2`, with the
-symmetric failure at `MinValue`. Gravitas now uses an overflow-safe raw scalar
-midpoint for `PhysicsMaterialCombine.Average`, so this lower-stack defect does
-not block the coverage campaign.
-
-Resolve this in FixedMathSharp with an overflow-safe, ties-to-even scalar
-midpoint primitive shared by the vector helpers. Add equal extreme, opposite
-extreme, odd-raw tie, signed symmetry, and per-component vector regressions,
-then consume the released helper from Gravitas instead of duplicating the raw
-algorithm.
 
 ### FixedMathSharp Rays Treat Small Representable Directions As Parallel
 
@@ -424,6 +401,37 @@ This does not block coverage convergence and is independent of the redundant
 active/dynamic-ID admission predicates removed in Task 67.
 
 ## Resolved Issues
+
+### FixedMathSharp Vector Midpoints Saturated Before Halving
+
+**Resolved:** 2026-07-13  
+**Source:** 95%-to-100% coverage hardening, physics-material average review  
+**Affected area:** FixedMathSharp scalar and vector midpoint helpers plus
+Gravitas `PhysicsMaterialCombine.Average`
+
+RCA: `Vector3d.Midpoint(...)` and `Vector4d.Midpoint(...)` computed each
+component as `(left + right) * Fixed64.Half`. Saturating addition therefore
+discarded half the magnitude before halving equal extreme endpoints.
+
+Fix: FixedMathSharp now owns a branchless, overflow-safe
+`FixedMath.Midpoint(...)` primitive with nearest-even raw rounding. Both vector
+helpers delegate per component, and Gravitas delegates material averaging to
+the shared primitive instead of retaining a duplicate raw algorithm.
+
+Verification:
+
+- Regressions cover equal maximum and minimum values, opposite extremes,
+  positive and negative odd-raw ties, operand symmetry, and distinct vector
+  components.
+- Independent review checked 2,048,697 operand pairs with no arithmetic or
+  symmetry mismatch.
+- Full `Release` and `ReleaseLean` suites passed through FixedMathSharp,
+  SwiftCollections, GridForge, and Gravitas using explicit local project links.
+- Focused BenchmarkDotNet runs remained allocation-free and reduced the
+  1,024-pair vector midpoint jobs from `20.568 us` to `1.017 us` for
+  `Vector3d` and from `29.024 us` to `1.418 us` for `Vector4d`.
+- Local project links remain unstaged and must be removed before release;
+  Gravitas will transition to the published package after FixedMathSharp ships.
 
 ### Overlong Settings Collision Matrix Rows Were Silently Truncated
 
