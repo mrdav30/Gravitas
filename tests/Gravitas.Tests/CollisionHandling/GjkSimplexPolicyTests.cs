@@ -70,6 +70,69 @@ public sealed class GjkSimplexPolicyTests
         direction.Y.Should().Be(Fixed64.Zero);
     }
 
+    [Fact]
+    public void UpdateLine_WithThresholdAxisCandidates_ShouldUseForwardFallback()
+    {
+        Fixed64 delta = FixedMath.Sqrt(Fixed64.Epsilon);
+        Vector3d a = new(-delta, -delta, Fixed64.Zero);
+        Vector3d b = Vector3d.Zero;
+        Vector3d ab = b - a;
+        Vector3d ao = -a;
+        Vector3d tripleCross = Vector3d.Cross(Vector3d.Cross(ab, ao), ab);
+        Vector3d upCandidate = Vector3d.Cross(ab, Vector3d.Up);
+        Vector3d rightCandidate = Vector3d.Cross(ab, Vector3d.Right);
+        Vector3d[] simplex = { a, b, Vector3d.Zero, Vector3d.Zero };
+        int count = 2;
+        Vector3d direction = Vector3d.Zero;
+
+        (delta * delta).Should().Be(Fixed64.Epsilon);
+        Vector3d.Dot(ab, ao).Should().BeGreaterThan(Fixed64.Zero);
+        tripleCross.Should().Be(Vector3d.Zero);
+        upCandidate.MagnitudeSquared.Should().Be(Fixed64.Epsilon);
+        rightCandidate.MagnitudeSquared.Should().Be(Fixed64.Epsilon);
+
+        bool containsOrigin = GjkSimplexPolicy.UpdateLine(simplex, ref count, ref direction);
+
+        containsOrigin.Should().BeFalse();
+        count.Should().Be(2);
+        simplex[0].Should().Be(a);
+        simplex[1].Should().Be(b);
+        direction.Should().Be(Vector3d.Forward);
+        direction.MagnitudeSquared.Should().BeGreaterThan(Fixed64.Epsilon);
+    }
+
+    [Fact]
+    public void UpdateTriangle_WithThresholdAcDirection_ShouldUseStablePerpendicularFallback()
+    {
+        Fixed64 delta = FixedMath.Sqrt(Fixed64.Epsilon);
+        Vector3d a = new(-Fixed64.One, -delta, Fixed64.Zero);
+        Vector3d b = new(-Fixed64.One, -Fixed64.One - delta, Fixed64.Zero);
+        Vector3d c = new(Fixed64.Zero, -delta, Fixed64.Zero);
+        Vector3d ab = b - a;
+        Vector3d ac = c - a;
+        Vector3d ao = -a;
+        Vector3d abc = Vector3d.Cross(ab, ac);
+        Vector3d acPerpendicular = Vector3d.Cross(abc, ac);
+        Vector3d tripleCross = Vector3d.Cross(Vector3d.Cross(ac, ao), ac);
+        Vector3d[] simplex = { a, b, c, Vector3d.Zero };
+        int count = 3;
+        Vector3d direction = Vector3d.Zero;
+
+        (delta * delta).Should().Be(Fixed64.Epsilon);
+        Vector3d.Dot(acPerpendicular, ao).Should().BeGreaterThan(Fixed64.Zero);
+        Vector3d.Dot(ac, ao).Should().BeGreaterThan(Fixed64.Zero);
+        tripleCross.MagnitudeSquared.Should().Be(Fixed64.Epsilon);
+
+        bool containsOrigin = GjkSimplexPolicy.UpdateTriangle(simplex, ref count, ref direction);
+
+        containsOrigin.Should().BeFalse();
+        count.Should().Be(2);
+        simplex[0].Should().Be(a);
+        simplex[1].Should().Be(c);
+        direction.Should().Be(Vector3d.Forward);
+        direction.MagnitudeSquared.Should().BeGreaterThan(Fixed64.Epsilon);
+    }
+
     [Theory]
     [MemberData(nameof(TriangleRegionData))]
     public void UpdateTriangle_ShouldSelectExpectedSimplexRegion(
