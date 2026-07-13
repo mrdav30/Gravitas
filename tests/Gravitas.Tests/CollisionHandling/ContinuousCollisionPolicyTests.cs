@@ -18,18 +18,14 @@ public sealed class ContinuousCollisionPolicyTests
             positionFullyFrozen: false,
             kinematic: false,
             trigger: false,
-            sibling: false,
-            layerCollisionDisabled: false,
-            physicalPairAllowed: true).Should().BeTrue();
+            physicalPairRequired: true).Should().BeTrue();
 
-        ContinuousCollisionTargetPolicy.AllowsDynamic3DTarget(true, true, false, false, false, false, false, true).Should().BeFalse();
-        ContinuousCollisionTargetPolicy.AllowsDynamic3DTarget(false, false, false, false, false, false, false, true).Should().BeFalse();
-        ContinuousCollisionTargetPolicy.AllowsDynamic3DTarget(false, true, true, false, false, false, false, true).Should().BeFalse();
-        ContinuousCollisionTargetPolicy.AllowsDynamic3DTarget(false, true, false, true, false, false, false, true).Should().BeFalse();
-        ContinuousCollisionTargetPolicy.AllowsDynamic3DTarget(false, true, false, false, true, false, false, true).Should().BeFalse();
-        ContinuousCollisionTargetPolicy.AllowsDynamic3DTarget(false, true, false, false, false, true, false, true).Should().BeFalse();
-        ContinuousCollisionTargetPolicy.AllowsDynamic3DTarget(false, true, false, false, false, false, true, true).Should().BeFalse();
-        ContinuousCollisionTargetPolicy.AllowsDynamic3DTarget(false, true, false, false, false, false, false, false).Should().BeFalse();
+        ContinuousCollisionTargetPolicy.AllowsDynamic3DTarget(true, true, false, false, false, true).Should().BeFalse();
+        ContinuousCollisionTargetPolicy.AllowsDynamic3DTarget(false, false, false, false, false, true).Should().BeFalse();
+        ContinuousCollisionTargetPolicy.AllowsDynamic3DTarget(false, true, true, false, false, true).Should().BeFalse();
+        ContinuousCollisionTargetPolicy.AllowsDynamic3DTarget(false, true, false, true, false, true).Should().BeFalse();
+        ContinuousCollisionTargetPolicy.AllowsDynamic3DTarget(false, true, false, false, true, true).Should().BeFalse();
+        ContinuousCollisionTargetPolicy.AllowsDynamic3DTarget(false, true, false, false, false, false).Should().BeFalse();
 
         ContinuousCollisionTargetPolicy.AllowsDynamic2DTarget(false, true, false, false, false, true).Should().BeTrue();
         ContinuousCollisionTargetPolicy.AllowsDynamic2DTarget(true, true, false, false, false, true).Should().BeFalse();
@@ -50,16 +46,14 @@ public sealed class ContinuousCollisionPolicyTests
     [Fact]
     public void ContinuousCollisionTargetPolicy_ShouldGateStaticAndKinematicTargets()
     {
-        ContinuousCollisionTargetPolicy.AllowsStaticOrKinematic3DTarget(true, false, false, false, false, false, true, true, false).Should().BeTrue();
-        ContinuousCollisionTargetPolicy.AllowsStaticOrKinematic3DTarget(true, false, false, false, false, false, true, false, true).Should().BeTrue();
-        ContinuousCollisionTargetPolicy.AllowsStaticOrKinematic3DTarget(false, false, false, false, false, false, true, true, false).Should().BeFalse();
-        ContinuousCollisionTargetPolicy.AllowsStaticOrKinematic3DTarget(true, true, false, false, false, false, true, true, false).Should().BeFalse();
-        ContinuousCollisionTargetPolicy.AllowsStaticOrKinematic3DTarget(true, false, true, false, false, false, true, true, false).Should().BeFalse();
-        ContinuousCollisionTargetPolicy.AllowsStaticOrKinematic3DTarget(true, false, false, true, false, false, true, true, false).Should().BeFalse();
-        ContinuousCollisionTargetPolicy.AllowsStaticOrKinematic3DTarget(true, false, false, false, true, false, true, true, false).Should().BeFalse();
-        ContinuousCollisionTargetPolicy.AllowsStaticOrKinematic3DTarget(true, false, false, false, false, true, true, true, false).Should().BeFalse();
-        ContinuousCollisionTargetPolicy.AllowsStaticOrKinematic3DTarget(true, false, false, false, false, false, false, true, false).Should().BeFalse();
-        ContinuousCollisionTargetPolicy.AllowsStaticOrKinematic3DTarget(true, false, false, false, false, false, true, false, false).Should().BeFalse();
+        ContinuousCollisionTargetPolicy.AllowsStaticOrKinematic3DTarget(true, false, false, false, true, true, false).Should().BeTrue();
+        ContinuousCollisionTargetPolicy.AllowsStaticOrKinematic3DTarget(true, false, false, false, true, false, true).Should().BeTrue();
+        ContinuousCollisionTargetPolicy.AllowsStaticOrKinematic3DTarget(false, false, false, false, true, true, false).Should().BeFalse();
+        ContinuousCollisionTargetPolicy.AllowsStaticOrKinematic3DTarget(true, true, false, false, true, true, false).Should().BeFalse();
+        ContinuousCollisionTargetPolicy.AllowsStaticOrKinematic3DTarget(true, false, true, false, true, true, false).Should().BeFalse();
+        ContinuousCollisionTargetPolicy.AllowsStaticOrKinematic3DTarget(true, false, false, true, true, true, false).Should().BeFalse();
+        ContinuousCollisionTargetPolicy.AllowsStaticOrKinematic3DTarget(true, false, false, false, false, true, false).Should().BeFalse();
+        ContinuousCollisionTargetPolicy.AllowsStaticOrKinematic3DTarget(true, false, false, false, true, false, false).Should().BeFalse();
 
         ContinuousCollisionTargetPolicy.AllowsStaticOrKinematic2DTarget(true, false, false, false, true, true, false).Should().BeTrue();
         ContinuousCollisionTargetPolicy.AllowsStaticOrKinematic2DTarget(true, false, false, false, true, false, true).Should().BeTrue();

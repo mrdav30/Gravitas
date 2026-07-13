@@ -59,7 +59,9 @@ Static-style CCD targets include bodyless colliders, position-frozen bodies, and
 kinematic bodies. Public sweep queries can report movable dynamic, kinematic,
 position-frozen, and bodyless targets according to normal query filters; body
 CCD uses internal static-style collectors so movable dynamic targets are handled
-by the dynamic relative-motion path.
+by the dynamic relative-motion path. Final CCD target admission uses the owning
+collision service's physical-pair gate, including collider lifecycle, authored
+filters, hierarchy rules, and linked-joint collision suppression.
 
 For kinematic active-source CCD, hosts write deterministic target transforms
 before `context.LateSimulate()`. Gravitas captures the frame-start pose, reads

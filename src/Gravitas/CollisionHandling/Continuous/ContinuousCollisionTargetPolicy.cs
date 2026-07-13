@@ -15,17 +15,13 @@ internal static class ContinuousCollisionTargetPolicy
         bool positionFullyFrozen,
         bool kinematic,
         bool trigger,
-        bool sibling,
-        bool layerCollisionDisabled,
-        bool physicalPairAllowed) =>
+        bool physicalPairRequired) =>
         !isSelf
         && active
         && !positionFullyFrozen
         && !kinematic
         && !trigger
-        && !sibling
-        && !layerCollisionDisabled
-        && physicalPairAllowed;
+        && physicalPairRequired;
 
     internal static bool AllowsDynamic2DTarget(
         bool isSelf,
@@ -58,18 +54,14 @@ internal static class ContinuousCollisionTargetPolicy
         bool isSelf,
         bool ignored,
         bool trigger,
-        bool sibling,
-        bool layerCollisionDisabled,
-        bool physicalPairAllowed,
+        bool physicalPairRequired,
         bool isStatic,
         bool bodyKinematic) =>
         hasCollider
         && !isSelf
         && !ignored
         && !trigger
-        && !sibling
-        && !layerCollisionDisabled
-        && physicalPairAllowed
+        && physicalPairRequired
         && (isStatic || bodyKinematic);
 
     internal static bool AllowsStaticOrKinematic2DTarget(

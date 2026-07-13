@@ -22,32 +22,33 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-sweep-clip-task51-authoritative-root-comparable/dcc43e8a-838d-4c9a-b09f-e4a5ad526f5c/coverage.cobertura.xml`.
+`TestResults/coverage-ccd-helpers-task52-authoritative-root-comparable/04c47dfc-f6b6-409e-8869-f56b269e1c28/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
-| Lines | 99.77% | 26,927 / 26,989 | 62 | 100% |
-| Branches | 99.42% | 10,352 / 10,412 | 60 | 100% |
-| Methods | 99.38% | 3,516 / 3,538 | 22 | 100% |
+| Lines | 99.77% | 26,916 / 26,978 | 62 | 100% |
+| Branches | 99.45% | 10,343 / 10,400 | 57 | 100% |
+| Methods | 99.38% | 3,515 / 3,537 | 22 | 100% |
 
-The authoritative full coverage-enabled `Release` suite passes 2,485/2,485 tests, and
+The authoritative full coverage-enabled `Release` suite passes 2,490/2,490 tests, and
 `ReleaseLean` builds both targets without warnings. Branch coverage is now the
 primary constraint, but the remaining line and method gaps must close from the
 same final artifact.
 
-Task 51's authoritative artifact reports 100% line, branch, and method coverage
-for shared segment-box clipping plus raycast, swept-sphere, and mixed fallback
-consumers. One exact-zero policy replaced three drifting implementations, and
-the obsolete `MixedSweepBoxUtility` was deleted.
+Task 52's authoritative artifact reports 100% line, branch, and method coverage
+for the 3D body CCD helper and shared target policy. Final 3D target admission
+now delegates to the canonical collision-pair gate, closing a real linked-joint
+suppression defect while preserving collider lifecycle, hierarchy, layer, and
+authored-filter rules.
 
 ### Immediate Completed Block
 
-The segment-box clipping boundary is resolved and independently reviewed across
-mixed fallback, ray AABB/OBB, and swept-sphere cuboid consumers. Only exact zero
-is parallel; a one-raw normalized component that reaches a boundary at the
-endpoint remains real motion. Entry-only callers retain start-inside fast paths,
-while raycasts still compute the true exit. Three copies and their wrappers were
-collapsed into `SweepBoundsUtility`, deleting 77 net production lines.
+The 3D CCD helper boundary is resolved and independently reviewed. Context
+`Inherit` fallback, zero-scale bounds proxies, moving-away overlap rejection,
+and dynamic plus kinematic linked-joint suppression are mutation-sensitive.
+Duplicate proxy thresholding and normalized-normal checks were removed after
+caller proof, and the shared policy now receives one canonical physical-pair
+decision instead of a drifting subset of collision rules.
 
 ## Rules Of Engagement
 
@@ -114,10 +115,10 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | `Core/3D/SolidBody.ContinuousCollision.Helpers.cs` | 0 | 3 | 0 | Candidate filters and relative-motion fallback. |
-| 2 | `CollisionHandling/Detection/3D/Sat/AxisProjectionHelper.cs` | 5 | 2 | 1 | Capsule/cuboid axes, sphere projection, and degenerate normals. |
-| 3 | `Constraints/3D/RagdollRuntime3D.cs` | 3 | 2 | 1 | Replay load shape, link ownership, and stable reconstruction. |
-| 4 | `Core/2D/GravitasPhysics2DService.SupportTypes.cs` | 3 | 2 | 0 | Stable support ordering and lifecycle-proven ownership. |
+| 1 | `CollisionHandling/Detection/3D/Sat/AxisProjectionHelper.cs` | 5 | 2 | 1 | Capsule/cuboid axes, sphere projection, and degenerate normals. |
+| 2 | `Constraints/3D/RagdollRuntime3D.cs` | 3 | 2 | 1 | Replay load shape, link ownership, and stable reconstruction. |
+| 3 | `Core/2D/GravitasPhysics2DService.SupportTypes.cs` | 3 | 2 | 0 | Stable support ordering and lifecycle-proven ownership. |
+| 4 | Remaining two-branch collision, constraint, query, and CCD blocks | 0-2 | 2 each | 0 | Re-rank from the next authoritative artifact; finish one cohesive source block at a time. |
 
 ### Phase 1: Core Runtime And Service Ownership
 
@@ -295,6 +296,10 @@ public workflow.
 - [x] Close and independently review residual 2D grounding through automatic,
       manual, cached-support, callback-reentrancy, shell-reuse, query, and
       deterministic contact-candidate workflows.
+- [x] Close and independently review the 3D CCD helper and target policy:
+      context-default inheritance, exact bounds proxies, closing-hit admission,
+      and canonical dynamic/static/kinematic pair filtering including linked-
+      joint suppression.
 - [ ] Verify dimensional parity only where the physical models are intended to
       match; keep 2D, 3D, and mixed behavior explicit elsewhere.
 
@@ -443,6 +448,7 @@ of record.
 | Authored shape-definition closure | 99.75% | 99.36% | 99.35% | 2,474 | The 3D and 2D authored definition families reached 100%; dispatch fallbacks now own invalid/default errors, impossible private payload-null guards were deleted, mesh index and planar size boundaries are exact, and omitted versus explicit default material semantics remain distinct. |
 | Hierarchy ownership closure | 99.76% | 99.38% | 99.38% | 2,476 | Shared hierarchy state reached 100%; the unused ParentId duplicate was removed, empty cleanup is idempotent, and reparent/clear ownership now releases the retained exact top parent instead of risking stale or reused-ID registry aliases. |
 | Shared segment-box clipping closure | 99.77% | 99.42% | 99.38% | 2,485 | Mixed fallback, ray AABB/OBB, and swept-sphere cuboid clipping reached 100%; exact-zero parallel policy preserves one-raw endpoint contacts, true ray exits remain exact, and three drifting clip implementations collapsed into SweepBoundsUtility with 77 net production lines deleted. |
+| 3D CCD helper and pair-policy closure | 99.77% | 99.45% | 99.38% | 2,490 | The 3D helper and shared target policy reached 100%; context `Inherit` falls back deterministically, duplicate proxy/normal guards were removed, and dynamic plus kinematic CCD now honor the canonical pair gate including linked-joint suppression. Independent review found no issues. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.

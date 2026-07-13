@@ -2,6 +2,7 @@ using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
+using Gravitas.Constraints;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
 using GridForge.Configuration;
@@ -28,6 +29,21 @@ public sealed class ContinuousCollisionDetectionTests
         body.Position3d.X.Should().Be((Fixed64)2);
         body.LinearVelocity.X.Should().Be((Fixed64)4);
         scenario.Context.Query3D.RaycastVersion.Should().Be(raycastVersionBeforeImpulse);
+    }
+
+    [Fact]
+    public void InheritMode_WithContextInheritSettings_ShouldUseDiscreteIntegration()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        scenario.Context.Settings.DefaultContinuousCollisionMode = ContinuousCollisionMode.Inherit;
+        CreateStaticWall(scenario, Fixed64.Zero);
+        (SolidBody body, _) = CreateMover(scenario, TestColliderShape.Sphere);
+
+        ApplyFastImpulse(body);
+
+        body.Position3d.X.Should().Be((Fixed64)2);
+        body.LinearVelocity.X.Should().Be((Fixed64)4);
+        body.LastContinuousCollisionToiIterationCount.Should().Be(0);
     }
 
     [Fact]
@@ -280,6 +296,22 @@ public sealed class ContinuousCollisionDetectionTests
 
         body.Position3d.X.Should().BeLessThanOrEqualTo(-Fixed64.Half);
         body.LinearVelocity.X.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void ContinuousMode_WithInitialOverlapMovingAway_ShouldRejectNonClosingStaticHit()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        _ = scenario.CreateStaticSphere(Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> source = scenario.CreateSphere(Vector3d.Right * Fixed64.Half);
+        source.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        DisableGroundQueries(source.Body);
+
+        source.Body.AddLinearImpulse(Vector3d.Right * (Fixed64)4);
+
+        source.Body.Position3d.Should().Be(Vector3d.Right * Fixed64.FromFraction(9, 2));
+        source.Body.LinearVelocity.Should().Be(Vector3d.Right * (Fixed64)4);
+        source.Body.LastContinuousCollisionToiIterationCount.Should().Be(0);
     }
 
     [Fact]
@@ -1042,6 +1074,36 @@ public sealed class ContinuousCollisionDetectionTests
         source.Body.LinearVelocity.X.Should().Be((Fixed64)4);
         target.Body.Position3d.Should().Be(Vector3d.Zero);
         target.Body.LinearVelocity.Should().Be(Vector3d.Zero);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ContinuousMode_WithSuppressedLinkedTarget_ShouldIgnoreTargetAndClipExternalBlocker(
+        bool targetIsKinematic)
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        ScenarioBody<LSSphereCollider> source = scenario.CreateSphere(
+            new Vector3d((Fixed64)(-4), Fixed64.Zero, Fixed64.Zero));
+        ScenarioBody<LSSphereCollider> linked = scenario.CreateSphere(
+            Vector3d.Zero,
+            isKinematic: targetIsKinematic);
+        CreateStaticWall(scenario, (Fixed64)4);
+        Joint3D joint = RegisterSuppressedJoint(scenario, source.Body, linked.Body);
+        joint.IsEnabled = false;
+        source.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        DisableGroundQueries(source.Body);
+        DisableGroundQueries(linked.Body);
+
+        source.Body.AddForce(Vector3d.Right * (Fixed64)10);
+        scenario.Context.LateSimulate();
+
+        scenario.Context.Physics.RequireCollisionPair(source.Collider, linked.Collider).Should().BeFalse();
+        source.Body.Position3d.X.Should().BeGreaterThan(linked.Body.Position3d.X);
+        source.Body.Position3d.X.Should().BeLessThan((Fixed64)4);
+        linked.Body.Position3d.Should().Be(Vector3d.Zero);
+        linked.Body.LinearVelocity.Should().Be(Vector3d.Zero);
+        source.Collider.TryGetCollisionPair(linked.Collider.Id, out _).Should().BeFalse();
     }
 
     [Fact]
@@ -1812,6 +1874,29 @@ public sealed class ContinuousCollisionDetectionTests
     }
 
     [Fact]
+    public void ContinuousMode_WithZeroScaleKinematicCuboid_ShouldReachHostPoseWithoutCcd()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        CreateStaticWall(scenario, Fixed64.Zero);
+        ScenarioBody<LSCuboidCollider> source = scenario.CreateBody(
+            new LSCuboidCollider(),
+            new Vector3d((Fixed64)(-2), Fixed64.Zero, Fixed64.Zero),
+            FixedQuaternion.Identity,
+            isKinematic: true);
+        source.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        source.Body.PositionTransform.Scale = Vector3d.Zero;
+        source.Collider.Simulate();
+        source.Body.ResolveContinuousCollisionProxyRadius().Should().Be(Fixed64.Zero);
+        Vector3d targetPosition = new((Fixed64)2, Fixed64.Zero, Fixed64.Zero);
+
+        source.Body.Agent.Transform.Position = targetPosition;
+        scenario.Context.LateSimulate();
+
+        source.Body.Position3d.Should().Be(targetPosition);
+        source.Body.LastContinuousCollisionToiIterationCount.Should().Be(0);
+    }
+
+    [Fact]
     public void ContinuousMode_WithFastKinematicHostTranslation_ShouldClampBeforeStaticTarget()
     {
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();
@@ -2555,6 +2640,23 @@ public sealed class ContinuousCollisionDetectionTests
     private static (SolidBody Body, LSCollider Collider) ToTuple<TCollider>(ScenarioBody<TCollider> scenarioBody)
         where TCollider : LSCollider =>
         (scenarioBody.Body, scenarioBody.Collider);
+
+    private static Joint3D RegisterSuppressedJoint(
+        PhysicsScenarioBuilder scenario,
+        SolidBody first,
+        SolidBody second)
+    {
+        var localFrame = new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One);
+        return scenario.Context.Constraints3D.RegisterJoint(new JointDefinition3D(
+            first,
+            second,
+            localFrame,
+            localFrame,
+            JointType3D.BallSocket,
+            JointLimit3D.Unrestricted,
+            JointMotor3D.Disabled,
+            JointCollisionPolicy.SuppressLinked));
+    }
 
     private static void ApplyFastImpulse(SolidBody body) =>
         body.AddLinearImpulse(new Vector3d((Fixed64)4, Fixed64.Zero, Fixed64.Zero));

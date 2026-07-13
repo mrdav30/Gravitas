@@ -17,6 +17,49 @@
 
 ## Active Issues
 
+### Continuous-Collision Modes Accept Undefined Enum Values
+
+**Discovered:** 2026-07-13  
+**Source:** 95%-to-100% coverage hardening, 3D CCD helper review  
+**Affected area:** `PhysicsSettings.DefaultContinuousCollisionMode`,
+`SolidBody.ContinuousCollisionMode`, `SolidBody2D.ContinuousCollisionMode`, and
+replay/settings population
+
+The context setting and both body properties accept any byte-cast
+`ContinuousCollisionMode` value. Values outside `Inherit`, `Discrete`,
+`Continuous`, and `Auto` survive assignment and serialization, but the runtime
+mode check treats them as neither continuous nor automatic and silently falls
+back to discrete movement. That turns corrupt or invalid authored state into a
+quiet tunneling-policy change instead of an explicit deterministic failure.
+
+Resolve this consistently at all public assignment and load boundaries. Decide
+whether `Inherit` remains valid for the context default (it currently resolves
+to `Discrete` intentionally), add invalid byte-value regressions for 2D, 3D,
+settings save/apply, and replay population, and document the chosen exception
+and load behavior. This does not block the coverage campaign because no
+invalid value is needed to close the retained CCD branches.
+
+### Extreme Collider Bounds Can Underestimate CCD Proxy Radius
+
+**Discovered:** 2026-07-13  
+**Source:** 95%-to-100% coverage hardening, 3D CCD helper review  
+**Affected area:** 2D/3D non-sphere continuous-collision proxy radius and
+FixedMathSharp vector magnitude
+
+Non-sphere CCD derives its conservative proxy radius from the magnitude of the
+collider bounds scope. At extreme representable extents, the fixed-point
+sum-of-squares can saturate before the square root, so the returned radius is
+smaller than the actual corner distance. The dynamic candidate index and
+automatic-mode threshold can therefore under-bound a large collider even
+though ordinary-scale and degenerate-scale behavior remain correct.
+
+Resolve this with an overflow-safe fixed-point hypot/magnitude primitive shared
+with FixedMathSharp, or define and validate a maximum supported collider/world
+extent before runtime registration. Add 2D/3D proxy, candidate-admission, and
+`Auto`-threshold regressions at the chosen boundary. This does not block the
+coverage campaign because the Task 52 simplification preserves the existing
+radius calculation exactly; it only removes a duplicate zero threshold.
+
 ### FixedMathSharp Vector Midpoints Saturate Before Halving
 
 **Discovered:** 2026-07-13  

@@ -21,9 +21,7 @@ public partial class SolidBody
             target.IsPositionFullyFrozen,
             target.IsKinematic,
             target.Collider.IsTrigger,
-            target.Collider.IsSibling(Collider),
-            Context.Physics.IsLayerCollisionDisabled(Collider.Layer, target.Collider.Layer),
-            ColliderCollisionFilter.AllowsPhysicalPair(Collider, target.Collider));
+            Context.Physics.RequireCollisionPair(Collider, target.Collider));
 
     private bool IsEligibleDynamicMixed2DTarget(SolidBody2D target) =>
         ContinuousCollisionTargetPolicy.AllowsMixedDynamicTarget(
@@ -67,21 +65,13 @@ public partial class SolidBody
         return Collider switch
         {
             LSSphereCollider sphere => sphere.ScaledRadius,
-            _ => ResolveBoundsProxyRadius(Collider)
+            _ => Collider.Bounds.Scope.Magnitude
         };
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Fixed64 ResolveBoundsProxyRadius(LSCollider collider)
-    {
-        Fixed64 radius = collider.Bounds.Scope.Magnitude;
-        return radius > Fixed64.Epsilon ? radius : Fixed64.Zero;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool IsClosingContinuousCollisionHit(Vector3d displacement, Vector3d normal) =>
-        normal.MagnitudeSquared > Fixed64.Epsilon
-        && Vector3d.Dot(displacement, normal) < -Fixed64.Epsilon;
+        Vector3d.Dot(displacement, normal) < -Fixed64.Epsilon;
 
     private bool IsValidContinuousCollisionTarget(LSCollider hitCollider)
     {
@@ -91,9 +81,7 @@ public partial class SolidBody
             ReferenceEquals(hitCollider, Collider),
             ContinuousCollisionCandidateOrdering.IsIgnoredTarget(hitCollider, _continuousCollisionHandoffIgnoredCollider3D),
             hitCollider.IsTrigger,
-            hitCollider.IsSibling(Collider),
-            Context.Physics.IsLayerCollisionDisabled(Collider.Layer, hitCollider.Layer),
-            ColliderCollisionFilter.AllowsPhysicalPair(Collider, hitCollider),
+            Context.Physics.RequireCollisionPair(Collider, hitCollider),
             hitCollider.IsStatic,
             hitBody != null && hitBody.IsKinematic);
     }
