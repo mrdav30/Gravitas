@@ -24,10 +24,8 @@ internal static class CylinderContactGeometry
             ? Vector3d.Right
             : Vector3d.Up;
 
-        tangentA = Vector3d.Cross(axis, reference);
-        tangentA = tangentA.MagnitudeSquared <= Fixed64.Epsilon
-            ? Vector3d.Forward
-            : tangentA.Normalized;
+        // Callers require a cap-aligned normalized axis; the reference selection keeps this cross well above epsilon.
+        tangentA = Vector3d.Cross(axis, reference).Normalized;
         tangentB = Vector3d.Cross(axis, tangentA).Normalized;
     }
 
