@@ -22,15 +22,15 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-task39-authoritative-reviewed-full/5ac3b033-5195-49bf-bbd7-a8471df47944/coverage.cobertura.xml`.
+`TestResults/coverage-task40-authoritative-reviewed-full/3d31ea98-444b-49bf-99a1-362f376f59b8/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
-| Lines | 99.68% | 26,192 / 26,275 | 83 | 100% |
-| Branches | 99.02% | 10,191 / 10,292 | 101 | 100% |
-| Methods | 99.14% | 3,439 / 3,469 | 30 | 100% |
+| Lines | 99.69% | 26,202 / 26,283 | 81 | 100% |
+| Branches | 99.05% | 10,198 / 10,296 | 98 | 100% |
+| Methods | 99.14% | 3,440 / 3,470 | 30 | 100% |
 
-The full coverage-enabled `Release` suite passes 2,364/2,364 tests, and
+The full coverage-enabled `Release` suite passes 2,369/2,369 tests, and
 `ReleaseLean` builds both targets without warnings. Branch coverage is now the
 primary constraint, but the remaining line and method gaps must close from the
 same final artifact.
@@ -38,10 +38,10 @@ same final artifact.
 ### Immediate Next Block
 
 Finish
-`src/Gravitas/Core/2D/SolidBody2D.ContinuousCollision.Rotational.cs` before
+`src/Gravitas/Core/2D/SolidBody2D.Motion.cs` before
 changing target. The current artifact reports two uncovered lines and three
-uncovered branch outcomes. Treat rotational sweep admission, transform
-restoration, and fixed-point fallback behavior as one 2D CCD body contract.
+uncovered branch outcomes. Treat frozen-axis motion, angular integration, and
+deterministic sleep admission as one 2D body-motion contract.
 
 ## Rules Of Engagement
 
@@ -108,16 +108,16 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | `Core/2D/SolidBody2D.ContinuousCollision.Rotational.cs` | 2 | 3 | 0 | Rotational sweep admission and fixed-point fallback. |
-| 2 | `Core/2D/SolidBody2D.Motion.cs` | 2 | 3 | 0 | Frozen-axis motion and deterministic sleep admission. |
-| 3 | `Support/Coroutines/GravitasCoroutineService.cs` | 1 | 3 | 0 | Completion, cancellation, and context ownership. |
-| 4 | `Colliders/2D/LSCompoundCollider2D.cs` | 1 | 3 | 0 | Owner geometry, empty parts, and authored fallback. |
-| 5 | `Colliders/3D/LSCapsuleCollider.cs` | 1 | 3 | 0 | Frontal area and degenerate axial geometry. |
-| 6 | `Colliders/3D/LSCompoundCollider.cs` | 1 | 3 | 0 | Owner geometry, empty parts, and authored fallback. |
-| 7 | `CollisionHandling/Detection/3D/CollisionDetection.Cylinder.cs` | 2 | 2 | 0 | Axial separation and stable contact fallback. |
-| 8 | `CollisionHandling/Detection/3D/CollisionDetection.cs` | 2 | 2 | 0 | Dispatch and unsupported-shape fallbacks. |
-| 9 | `Core/3D/SolidBody.ContinuousCollision.Helpers.cs` | 1 | 2 | 0 | Candidate filters and relative-motion fallback. |
-| 10 | `Core/3D/SolidBody.ContinuousCollision.Rotational.cs` | 2 | 2 | 0 | Rotational sweep bounds and support fallback. |
+| 1 | `Core/2D/SolidBody2D.Motion.cs` | 2 | 3 | 0 | Frozen-axis motion and deterministic sleep admission. |
+| 2 | `Support/Coroutines/GravitasCoroutineService.cs` | 1 | 3 | 0 | Completion, cancellation, and context ownership. |
+| 3 | `Colliders/2D/LSCompoundCollider2D.cs` | 1 | 3 | 0 | Owner geometry, empty parts, and authored fallback. |
+| 4 | `Colliders/3D/LSCapsuleCollider.cs` | 1 | 3 | 0 | Frontal area and degenerate axial geometry. |
+| 5 | `Colliders/3D/LSCompoundCollider.cs` | 1 | 3 | 0 | Owner geometry, empty parts, and authored fallback. |
+| 6 | `CollisionHandling/Detection/3D/CollisionDetection.Cylinder.cs` | 2 | 2 | 0 | Axial separation and stable contact fallback. |
+| 7 | `CollisionHandling/Detection/3D/CollisionDetection.cs` | 2 | 2 | 0 | Dispatch and unsupported-shape fallbacks. |
+| 8 | `Core/3D/SolidBody.ContinuousCollision.Helpers.cs` | 1 | 2 | 0 | Candidate filters and relative-motion fallback. |
+| 9 | `Core/3D/SolidBody.ContinuousCollision.Rotational.cs` | 2 | 2 | 0 | Rotational sweep bounds and support fallback. |
+| 10 | `Core/Mixed/GravitasMixedCollisionService.Partitioning.cs` | 5 | 1 | 0 | Partition ownership, pooled retirement, and callback-failure recovery. |
 
 ### Phase 1: Core Runtime And Service Ownership
 
@@ -264,6 +264,10 @@ public workflow.
       ownership through duplicate queue updates, latest-state consumption, and
       shared mixed-buffer clearing; remove the lifecycle-impossible inactive
       body guard without involving GridForge.
+- [x] Close and independently review 2D rotational CCD through epsilon proxies,
+      sub-epsilon arcs, and invalid physical candidates; count accepted dynamic
+      rotational impacts in both dimensions and normalize kinematic 2D yaw to
+      the deterministic shortest arc across the signed boundary.
 - [x] Close and independently review residual 2D grounding through automatic,
       manual, cached-support, callback-reentrancy, shell-reuse, query, and
       deterministic contact-candidate workflows.
@@ -403,6 +407,7 @@ of record.
 | 3D replay hierarchy closure | 99.67% | 98.97% | 99.13% | 2,353 | The 3D collider hash reached 100%; equal-ordinal parent dimensions, clear-to-baseline state, and compact/churned raw-ID independence close the symmetric hierarchy contract after impossible guards were removed. |
 | 3D joint solver closure | 99.68% | 99.00% | 99.14% | 2,362 | JointSolver3D reached 100%; unrestricted rows are exact, cone-twist no longer over-constrains allowed swing, antiparallel swing is deterministic, and signed swing-twist limits are invariant across quaternion signs including exact pi. |
 | 2D CCD service closure | 99.68% | 99.02% | 99.14% | 2,364 | The 2D CCD service reached 100%; duplicate handoffs queue once and consume the latest state, shared planar/mixed candidate storage clears across disabled mixed queries, and the lifecycle-impossible inactive registry guard was removed after independent review. |
+| 2D rotational CCD closure | 99.69% | 99.05% | 99.14% | 2,369 | The 2D rotational block reached 100%; real epsilon-proxy, sub-epsilon-arc, and post-broad-phase filter outcomes are covered; dynamic impacts now count in both dimensions; kinematic signed-boundary yaw uses the shortest arc; the endpoint-only sampling limitation is tracked with an exact reproducer. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.
