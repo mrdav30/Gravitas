@@ -22,32 +22,32 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-jointsolver2d-task55-authoritative-root-comparable/7faf5c4e-93fd-488d-ad0d-d94b9adae01d/coverage.cobertura.xml`.
+`TestResults/coverage-kinematic2d-ccd-task56-authoritative-root-comparable/ecf0f899-0ce4-412a-8ac9-38af383521fc/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
-| Lines | 99.82% | 27,146 / 27,195 | 49 | 100% |
-| Branches | 99.54% | 10,403 / 10,451 | 48 | 100% |
+| Lines | 99.83% | 27,148 / 27,195 | 47 | 100% |
+| Branches | 99.56% | 10,405 / 10,451 | 46 | 100% |
 | Methods | 99.46% | 3,532 / 3,551 | 19 | 100% |
 
-The authoritative full coverage-enabled `Release` suite passes 2,517/2,517 tests, and
+The authoritative full coverage-enabled `Release` suite passes 2,519/2,519 tests, and
 `ReleaseLean` builds both targets without warnings. Branch coverage is now the
 primary constraint, but the remaining line and method gaps must close from the
 same final artifact.
 
-Task 55's authoritative artifact reports 100% line, branch, and method coverage
-for `JointSolver2D`. The block closed two lines and two branch outcomes from the
-repository-wide gap by deleting duplicate guards already guaranteed by joint
-payload validation and solver-owned axis construction.
+Task 56's authoritative artifact reports 100% line, branch, and method coverage
+for the 2D kinematic CCD block. The block closed two lines and two branch
+outcomes from the repository-wide gap with public near-singular mobility
+regressions for both pure 2D and mixed 3D targets.
 
 ### Immediate Completed Block
 
-The residual 2D joint solver block is resolved. Linear motors can only reach the
-solver on validated prismatic joints, so the duplicate type guard was removed.
-Every linear row axis is cardinal, normalized, perpendicular to a normalized
-axis, or a deterministic nonzero distance-joint fallback, so its duplicate
-near-zero guard was also removed. Existing public registration, loading,
-setter, and coincident-anchor tests kill mutations of both owning invariants.
+The 2D kinematic CCD handoff block is resolved. Positive constrained mobility
+can still be too small relative to body mobility for a stable response; pure 2D
+and mixed 3D targets now prove that the threshold rejects those near-singular
+handoffs without changing the kinematic source host pose or waking, moving, or
+accelerating the target. Removing either guard fails its exact parity
+regression.
 
 ## Rules Of Engagement
 
@@ -114,11 +114,11 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | `Core/2D/SolidBody2D.ContinuousCollision.Kinematic.cs` | 2 | 2 | 0 | Kinematic signed-boundary motion and deterministic candidate admission. |
-| 2 | `Queries/3D/GravitasQuery3DService.Cone.cs` | 2 | 2 | 0 | Cone query admission, filtering, and exact boundary behavior. |
-| 3 | `CollisionHandling/Detection/3D/CollisionDetection.Cylinder.cs` | 2 | 2 | 0 | Cylinder feature separation, containment, and exact contact ownership. |
-| 4 | `CollisionHandling/Response/Mixed/CollisionResponseMixed.cs` | 2 | 2 | 0 | Mixed mobility admission and constrained impulse behavior. |
-| 5 | `Core/3D/SolidBody.ContinuousCollision.Rotational.cs` | 2 | 2 | 0 | Rotational proxy admission, stable sampling, and exact boundary behavior. |
+| 1 | `Queries/3D/GravitasQuery3DService.Cone.cs` | 2 | 2 | 0 | Cone query admission, filtering, and exact boundary behavior. |
+| 2 | `CollisionHandling/Detection/3D/CollisionDetection.Cylinder.cs` | 2 | 2 | 0 | Cylinder feature separation, containment, and exact contact ownership. |
+| 3 | `CollisionHandling/Response/Mixed/CollisionResponseMixed.cs` | 2 | 2 | 0 | Mixed mobility admission and constrained impulse behavior. |
+| 4 | `Core/3D/SolidBody.ContinuousCollision.Rotational.cs` | 2 | 2 | 0 | Rotational proxy admission, stable sampling, and exact boundary behavior. |
+| 5 | `CollisionHandling/Detection/3D/CollisionDetection.Capsule.cs` | 1 | 2 | 0 | Residual capsule admission and exact feature-boundary behavior. |
 | 6 | Remaining one- and two-branch collision, constraint, query, replay, and CCD blocks | 0-5 | 1-2 each | 0-2 | Re-rank from each authoritative artifact; finish one cohesive source block at a time. |
 
 ### Phase 1: Core Runtime And Service Ownership
@@ -311,6 +311,9 @@ public workflow.
 - [x] Close and independently review the residual 2D joint solver by deleting
       solver-local motor-type and linear-axis guards already guaranteed by
       validated payloads and deterministic row builders.
+- [x] Close and independently review 2D kinematic CCD near-singular mobility
+      rejection for both pure 2D and mixed 3D dynamic targets without changing
+      source host pose or target sleep/motion state.
 - [ ] Verify dimensional parity only where the physical models are intended to
       match; keep 2D, 3D, and mixed behavior explicit elsewhere.
 
@@ -463,6 +466,7 @@ of record.
 | Capsule/convex geometry closure | 99.79% | 99.49% | 99.41% | 2,513 | Axis projection, cuboid/capsule, convex mesh/capsule, shared dispatch, mesh transform, and cuboid feature ownership reached 100%. Exact rounded distance, inclusive touch, directional whole-capsule containment, quaternion-local transforms, scaled closed-mesh interiors, matched support features, and deterministic BVH fallback are mutation-sensitive and independently approved. |
 | Ragdoll runtime closure | 99.81% | 99.52% | 99.46% | 2,517 | Both runtime types reached 100%; zero-joint activation diagnostics now use required link ownership, 3D link access is exact, and inactive JSON/MemoryPack loads synchronize body, joint, service-count, and diagnostic state under mutation-sensitive independent review. |
 | 2D joint solver closure | 99.82% | 99.54% | 99.46% | 2,517 | `JointSolver2D` reached 100%; duplicate non-prismatic motor and near-zero axis guards were removed after exhaustive validated-caller proof, while existing public validation and coincident-anchor behavior killed mutations of both owning invariants. |
+| 2D kinematic CCD mobility closure | 99.83% | 99.56% | 99.46% | 2,519 | The kinematic handoff block reached 100%; pure 2D and mixed 3D near-singular target mobility now preserves exact source host pose and target position, velocity, and sleep state, with each retained threshold guard independently mutation-sensitive. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.

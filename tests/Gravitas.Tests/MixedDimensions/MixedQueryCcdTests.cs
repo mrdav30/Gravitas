@@ -3967,6 +3967,36 @@ public sealed class MixedQueryCcdTests
     }
 
     [Fact]
+    public void LateSimulate_WithKinematic2DSourceCrossingNearSingularFrozen3DTarget_ShouldNotPushTarget()
+    {
+        using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
+        context.Environment.Gravity = Fixed64.Zero;
+        Fixed64 smallOffset = Fixed64.FromFraction(1, 65536);
+        Vector3d targetPosition = new(Fixed64.Zero, Fixed64.Zero, smallOffset);
+        ScenarioBody<LSSphereCollider> target = CreateSphere3D(context, targetPosition);
+        target.Body.FreezeAxes = BodyFreezeAxes3D.PositionX;
+        target.Body.Sleep();
+        SolidBody2D source = CreateCircle2D(
+            context,
+            new Vector2d((Fixed64)(-5), Fixed64.Zero),
+            isKinematic: true);
+        source.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        Vector2d hostTarget = Vector2d.Right * (Fixed64)5;
+
+        source.Agent.Transform.Position = new Vector3d(hostTarget.X, Fixed64.Zero, hostTarget.Y);
+        context.LateSimulate();
+
+        source.Position.Should().Be(hostTarget);
+        source.Rotation.Should().Be(Fixed64.Zero);
+        source.Agent.Transform.Position.Should().Be(new Vector3d(hostTarget.X, Fixed64.Zero, hostTarget.Y));
+        source.Agent.Transform.Rotation.Should().Be(FixedQuaternion.Identity);
+        source.LastContinuousCollisionToiIterationCount.Should().Be(0);
+        target.Body.Position3d.Should().Be(targetPosition);
+        target.Body.LinearVelocity.Should().Be(Vector3d.Zero);
+        target.Body.IsSleeping.Should().BeTrue();
+    }
+
+    [Fact]
     public void LateSimulate_WithKinematic2DSource_ShouldNotPushDynamic3DTargetBehindEarlierStaticPrimitive()
     {
         using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
