@@ -22,34 +22,35 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-solver-contact-buffers-task73-final-authoritative-root-comparable/9bcd9e97-2a54-48ca-a68a-7b306b85307b/coverage.cobertura.xml`.
+`TestResults/coverage-finite-slab-task74-final-authoritative-root-comparable/b36ce49c-64f5-4400-85fe-673a032f5d54/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
-| Lines | 99.94% | 27,179 / 27,193 | 14 | 100% |
-| Branches | 99.87% | 10,404 / 10,417 | 13 | 100% |
-| Methods | 99.66% | 3,537 / 3,549 | 12 | 100% |
+| Lines | 99.95% | 27,180 / 27,192 | 12 | 100% |
+| Branches | 99.88% | 10,405 / 10,417 | 12 | 100% |
+| Methods | 99.69% | 3,537 / 3,548 | 11 | 100% |
 
-The authoritative full coverage-enabled `Release` suite passes 2,547/2,547 tests, and
+The authoritative full coverage-enabled `Release` suite passes 2,548/2,548 tests, and
 `ReleaseLean` builds both targets without warnings. Branch coverage is now the
 primary constraint, but the remaining line and method gaps must close from the
 same final artifact.
 
-Task 73's authoritative artifact reports 100% line, branch, and method coverage
-for both `SolverContactBuffer2D` and `SolverContactBuffer`. The block removes
-caller-impossible overflow policy duplicated from the sealed manifolds.
+Task 74's authoritative artifact reports 100% line, branch, and method coverage
+for `FiniteSlabProjectionSweep` and every nested type. The block pins bounded
+termination under saturated distance math and removes an unused result factory.
 
 ### Immediate Completed Block
 
-The 2D/3D solver-contact buffer block is resolved. Each buffer is created fresh
-inside its sole response-builder caller and receives at most one contact per
-sealed manifold entry. Manifold capacity is structurally fixed at two contacts
-in 2D and four in 3D; invalid contact creation only lowers admissions. The
-buffer-level silent-overflow guards therefore described no producible physics
-state and duplicated an invariant already enforced by manifold reduction.
-Both guards were deleted symmetrically. Existing full-capacity response,
-deepest-contact retention, stable ordering, and invalid-normal filtering tests
-remain the behavioral evidence; no artificial internal overflow test was added.
+The mixed finite-slab projection block is resolved. A maximum-length circle
+sweep starts at `Fixed64.MinValue` toward a valid cylinder beyond its reachable
+endpoint. The extreme separation saturates squared-distance math, producing a
+non-unit normal near `46,340` and advancement of only about one unit per step.
+The retained 32-step budget therefore returns the correct deterministic miss
+instead of performing effectively unbounded work across the maximum-length
+segment. Focused coverage proves the loop-false and terminal-return outcomes,
+and a false-hit mutation is killed. The unused `PlanarGjkResult.Separated`
+factory was deleted rather than invoked artificially. The broader large-vector
+normalization boundary remains tracked as non-blocking active work.
 
 ## Rules Of Engagement
 
@@ -116,9 +117,8 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | `Queries/Mixed/FiniteSlabProjectionSweep.cs` | 1 | 1 | 0 | Planar GJK reducer boundary and exact slab projection state. |
-| 2 | `Colliders/3D/ConeGeometry.cs` | 0 | 1 | 0 | Cone-axis basis and exact degenerate orientation policy. |
-| 3 | Remaining one-branch collision, query, replay, settings, and CCD blocks | 0-1 | 1 each | 0-1 | Re-rank from each authoritative artifact; finish one cohesive source block at a time. |
+| 1 | `Colliders/3D/ConeGeometry.cs` | 0 | 1 | 0 | Cone-axis basis and exact degenerate orientation policy. |
+| 2 | Remaining one-branch collision, query, replay, settings, and CCD blocks | 0-1 | 1 each | 0-1 | Re-rank from each authoritative artifact; finish one cohesive source block at a time. |
 
 ### Phase 1: Core Runtime And Service Ownership
 
@@ -492,6 +492,7 @@ of record.
 | Continuous-collision tangent closure | 99.93% | 99.84% | 99.66% | 2,543 | Shared CCD math reached 100%; an exact positive-Epsilon closing-speed witness pins admission, while scale-safe 2D/3D impact normals prevent caller-admissible radii from converting quantized tangency into false hits. Both former fallbacks are mutation-proven. |
 | Mesh-cone triangle closure | 99.94% | 99.85% | 99.66% | 2,547 | Cone detection reached 100%; live oblique-plane rejection and exact-Epsilon admission are pinned, while winding-sensitive triangle geometry is separated from per-candidate contact orientation with back-face and disconnected-mesh regressions. |
 | 2D/3D solver contact-buffer closure | 99.94% | 99.87% | 99.66% | 2,547 | Both fixed buffers reached 100%; caller-impossible silent-overflow guards were deleted because sealed manifold capacity and sole response-builder ownership already prove legal admission bounds. |
+| Finite-slab projection closure | 99.95% | 99.88% | 99.69% | 2,548 | The mixed finite-slab file reached 100%; saturated large-vector distance math now pins the deterministic 32-step miss, and the unused separated-result factory was deleted instead of covered artificially. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.

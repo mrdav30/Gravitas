@@ -801,6 +801,30 @@ public sealed class MixedQueryCcdTests
     }
 
     [Fact]
+    public void FiniteSlabProjectionSweep_WithSaturatedDistanceAtMaximumLength_ShouldReturnMiss()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSCylinderCollider> target = CreateBody3D(
+            context,
+            new LSCylinderCollider { Size = new Vector3d(Fixed64.One, (Fixed64)3, Fixed64.One) },
+            Vector3d.Right * 2,
+            immovable: true);
+
+        bool found = FiniteSlabProjectionSweep.TrySweepCircleAgainstCylinder(
+            new Vector2d(Fixed64.MinValue, Fixed64.Zero),
+            Vector2d.Right,
+            Fixed64.MaxValue,
+            Fixed64.Half,
+            -Fixed64.Half,
+            Fixed64.Half,
+            target.Collider,
+            out Fixed64 distance);
+
+        found.Should().BeFalse();
+        distance.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
     public void FiniteSlabProjectionSweep_WithCylinderStartingInsideProjection_ShouldReturnZeroDistance()
     {
         using GravitasWorldContext context = CreateMixedContext();

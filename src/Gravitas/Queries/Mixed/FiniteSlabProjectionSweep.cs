@@ -825,8 +825,6 @@ internal static class FiniteSlabProjectionSweep
         public Vector2d Normal { get; }
 
         public static PlanarGjkResult Intersection => new(true, Fixed64.Zero, Vector2d.Zero);
-
-        public static PlanarGjkResult Separated => new(false, Fixed64.MaxValue, Vector2d.Zero);
     }
 
     private readonly struct ClosestPlanarSimplexResult

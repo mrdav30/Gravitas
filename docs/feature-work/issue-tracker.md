@@ -169,8 +169,8 @@ allocation checks.
 
 **Discovered:** 2026-07-12  
 **Source:** 95%-to-100% coverage hardening, convex sweep termination review  
-**Affected area:** `ConvexSweepQueryWorker` displacement normalization and
-fixed-budget conservative advancement
+**Affected area:** `ConvexSweepQueryWorker` displacement normalization,
+`FiniteSlabProjectionSweep`, and fixed-budget conservative advancement
 
 `ConvexSweepQueryWorker` derives sweep length from
 `displacement.Magnitude`. At extreme representable inputs, fixed-point squared
@@ -182,6 +182,14 @@ trustworthy. Resolve this with an explicit large-vector normalization policy
 shared with FixedMathSharp or with validated sweep-range limits, then add
 boundary tests that preserve ordinary sweep results and deterministic failure
 outside the supported range.
+
+The mixed finite-slab reducer has the same large-vector magnitude boundary in
+its GJK distance/normal path. Saturated squared magnitude can produce a
+non-unit normal near `46,340`, so conservative advancement moves by only about
+one unit across a maximum-length segment. Its 32-step cap preserves
+deterministic termination; Task 74 pins the correct extreme-range miss. Resolve
+both sweep families under the same scale-safe normalization or explicit
+supported-range policy.
 
 ### GridForge Reuses Grid Spawn Tokens Across Pooled Generations
 
