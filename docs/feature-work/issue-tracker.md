@@ -99,6 +99,52 @@ reused. Fix this in GridForge with a world-owned generation token that changes
 on every grid allocation, then add a remove/re-add regression proving old
 `WorldVoxelIndex` values cannot resolve into the replacement grid.
 
+### Compound Mesh Scale And Legacy Shell Inertia Do Not Match Authored Geometry
+
+**Discovered:** 2026-07-12  
+**Source:** 95%-to-100% coverage hardening, 3D compound mass-property review  
+**Affected area:** `LSMeshCollider`, `PhysicsMesh`, compound mesh parts, and
+`MeshInertiaPolicy.SurfaceApproximation`
+
+`CompoundColliderPart` accepts a mesh `LocalScale`, and `LSMeshCollider` reads
+host scale for center-of-mass conversion, but `PhysicsMesh.UpdatePosition(...)`
+hardcodes unit scale in its transformation matrix. Authored scale therefore
+does not consistently reach mesh bounds, collision vertices, face areas,
+frontal area, closed-volume properties, or inertia. Correct nonuniform scale
+also requires inverse-transpose normal handling and invalidating scale-sensitive
+cached mass data without rebuilding immutable topology or its local BVH.
+
+The explicit legacy `SurfaceApproximation` inertia path is a separate part of
+the same mass-property boundary: it constructs a matrix directly from triangle
+vertex rows, area-weights those matrices, and divides by triangle count. That
+result can be nonsymmetric and is not a physical thin-triangle shell tensor.
+The 3D compound hardening block only uses unscaled closed volume, or unscaled
+`TotalArea` for the explicitly selected shell policy, as deterministic relative
+mass weights; it does not claim to repair either defect.
+
+Resolve mesh scale as one transform/cache design with collision, query, bounds,
+normal, frontal-area, COM, volume, and tensor regressions. Replace or retire the
+legacy shell tensor through an explicit thin-shell model with fixed-value tests
+and benchmark evidence.
+
+### SolidBody Point Transforms Use Collider Dimensions As Transform Scale
+
+**Discovered:** 2026-07-12  
+**Source:** 95%-to-100% coverage hardening, 3D compound `ScaledSize` review  
+**Affected area:** `SolidBody.TransformPoint(...)`,
+`SolidBody.InverseTransformPoint(...)`, and collider size semantics
+
+The generic point-transform helpers multiply and divide by
+`Collider.ScaledSize`. For primitive colliders that value includes authored
+shape dimensions as well as host scale, so a local point is incorrectly scaled
+by the collider's geometry. The old compound override made the mismatch worse
+by returning a world-axis-aligned bounds size and then rotating it again.
+
+The compound override has been removed rather than preserving a false local
+size contract. Resolve the generic helpers against the host transform's actual
+scale, define zero-scale inverse behavior, and add primitive/compound round-trip
+tests across non-unit authored sizes, nonuniform host scale, and rotation.
+
 ### Convex Mesh Mode Accepts Disconnected Topology And Can Collide In Empty Bounds Space
 
 **Discovered:** 2026-07-11  
@@ -122,6 +168,48 @@ regression that preserves valid open convex surfaces while rejecting or safely
 handling disconnected input without the AABB false-positive.
 
 ## Resolved Issues
+
+### 3D Compound Mass And Geometry Used Incompatible Frames And Measures
+
+**Discovered:** 2026-07-12  
+**Resolved:** 2026-07-12  
+**Source:** 95%-to-100% coverage hardening, `LSCompoundCollider` block review  
+**Affected area:** 3D compound mass distribution, inertia, owner offsets,
+conservative query radius, and private part transforms
+
+RCA: `LSCompoundCollider` distributed mass by `Area`, whose 3D meaning varied
+between projected area, surface area, volume, and mesh triangle area. It also
+added anisotropic part tensors without rotating them into owner-local space,
+returned raw part COM offsets without applying authored local rotation, and
+positioned private parts from owner `Position` rather than owner `Center`.
+Consequently, owner offsets did not move part geometry and rotated compound
+inertia was physically wrong. `ScaledRadius` measured only the aggregate AABB
+half-size about the AABB center, allowing remote parts to fall outside query
+proxy checks. The compound `ScaledSize` override exposed a world-AABB size as
+though it were owner-local scale.
+
+Fix: every 3D collider now implements an explicit compound mass-property
+measure. Solid primitives and validated closed meshes use volume; explicitly
+selected surface-approximation meshes use their documented local shell-area
+proxy. All-zero measures use equal authored-order center weights and nominal
+mass shares. Fixed-point division assigns the exact residual mass to the last
+positive-weight part when one exists, otherwise to the last authored part.
+Part COM points include owner offset and authored local rotation. Center tensors
+are rotated by `R*I*R^T`, clamped near zero, and then shifted through the
+parallel-axis theorem. Private parts inherit owner `Center`; radius encloses the
+farthest aggregate-bounds corner about that center; the false `ScaledSize`
+override was removed.
+
+Verification: regressions cover analytic sphere volume weighting and tensor,
+rotated anisotropic cuboid inertia, rotated owner/part offsets, off-center closed
+mesh COM, every primitive and mesh mass measure, explicit shell policy, invalid
+closed-volume topology, exact residual assignment including trailing zero-weight
+parts, all-zero fixed-point fallback, remote-part public query visibility,
+authored-first geometry ties, capsule frontal aggregation, and degenerate cone
+projection. All touched executable production types report 100% line, branch,
+and method coverage; full coverage-enabled `Release` passes 2,433/2,433,
+`ReleaseLean` passes 2,396/2,396, both library targets build without warnings,
+and independent review approved.
 
 ### 3D Motion State Could Leak Across Reuse And Apply Incorrect Rotational Dynamics
 

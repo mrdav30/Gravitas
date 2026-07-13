@@ -65,6 +65,9 @@ public class LSCylinderCollider : LSCollider
     protected override Vector3d NormalizeSize(Vector3d value) =>
         new(_radius * 2, value.Y, _radius * 2);
 
+    protected internal override Fixed64 CalculateMassPropertyWeight() =>
+        Fixed64.Pi * ScaledRadiusSqr * Height;
+
     public override Fixed3x3 CalculateInertiaTensor(Fixed64 mass, Vector3d localCenterOfMassOffset)
     {
         Fixed64 radiusSqr = ScaledRadiusSqr;

@@ -85,7 +85,7 @@ partition coordinates, pair state, events, and query stamps.
 | Finite cylinder | Flat-capped axis segment, cap centers, side/cap separation, finite-cylinder support. |
 | Finite cone | Base-to-apex axis, base cap, analytic support/closest-surface geometry, shape-derived COM. |
 | Mesh | Convex or concave target geometry with triangle candidates and cached mass properties. |
-| Compound | Stable part-order reduction under one public collider identity. |
+| Compound | Stable part-order reduction under one public collider identity, with solid-volume mass distribution and deterministic equal-mass fallback when every part measure quantizes to zero. |
 
 Cones use analytic support and closest-surface geometry instead of generating a
 runtime triangle fan. Mesh colliders use cached closed-volume mass properties by
@@ -105,6 +105,25 @@ fixed-point scaling leaves a positive span but quantizes the radius and both
 volumes to zero, the tensor uses the thin-rod limit
 `diag(m*h^2/12, 0, m*h^2/12)` before applying any requested parallel-axis
 shift.
+
+3D compound colliders distribute uniform-density mass by each solid part's
+volume rather than by the public `Area` value, whose drag/diagnostic meaning is
+shape-specific. Closed-volume meshes contribute their validated local volume.
+Meshes explicitly authored with `SurfaceApproximation` contribute local triangle
+surface area as a legacy shell proxy; that policy is not dimensionally
+interchangeable with solid density and remains an explicit approximation.
+Fixed-point mass division preserves the requested total mass by assigning the
+rounding residual to the last positive-weight authored part. If every part
+measure quantizes to zero, part centers and masses use equal authored-order
+weights with the same residual rule.
+
+Part centers of mass and anisotropic center tensors are transformed into the
+compound owner's local frame before parallel-axis shifts. Aggregate frontal
+area remains the deterministic sum of part projections; it is conservative for
+overlapping projections rather than an exact silhouette union. Aggregate
+`ScaledRadius` encloses the compound's world bounds about the owner center.
+`ScaledSize` is not an aggregate-geometry API for compounds because a world AABB
+cannot represent an owner-local size under arbitrary part rotations.
 
 ## 3D Shape-Pair Matrix
 

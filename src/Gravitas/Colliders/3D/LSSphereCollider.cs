@@ -42,6 +42,9 @@ public class LSSphereCollider : LSCollider
     protected override void BuildShape() =>
         Area = Fixed64.Pi * ScaledRadiusSqr;  // The area of a circle is pi times the radius squared (A = π r²)
 
+    protected internal override Fixed64 CalculateMassPropertyWeight() =>
+        Fixed64.FromFraction(4, 3) * Fixed64.Pi * ScaledRadiusSqr * ScaledRadius;
+
     public override Fixed3x3 CalculateInertiaTensor(Fixed64 mass, Vector3d localCenterOfMassOffset)
     {
         // For a solid sphere, the inertia tensor is (2/5)*m*r^2 for the diagonal elements

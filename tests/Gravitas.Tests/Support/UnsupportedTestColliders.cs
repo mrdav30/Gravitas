@@ -67,6 +67,8 @@ internal sealed class UnsupportedTestCollider3D : LSCollider
     public override Fixed3x3 CalculateInertiaTensor(Fixed64 mass, Vector3d localCenterOfMassOffset) =>
         Fixed3x3.Zero;
 
+    protected internal override Fixed64 CalculateMassPropertyWeight() => Fixed64.Zero;
+
     public override Vector3d ClosestPointOnSurface(Vector3d other) => Center;
 
     public override Vector3d GetNormalAtPoint(Vector3d point) => Vector3d.Up;

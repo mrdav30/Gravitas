@@ -69,6 +69,10 @@ public class LSCapsuleCollider : LSCollider
         UpdateLineSegment();
     }
 
+    protected internal override Fixed64 CalculateMassPropertyWeight() =>
+        Fixed64.Pi * ScaledRadiusSqr * CylinderHeight
+        + Fixed64.FromFraction(4, 3) * Fixed64.Pi * ScaledRadiusSqr * ScaledRadius;
+
     private void UpdateLineSegment()
     {
         // Convert local start and end positions to world positions and add capsule position

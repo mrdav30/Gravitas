@@ -90,6 +90,9 @@ public class LSCuboidCollider : LSCollider
 
     public override Fixed64 ScaledRadius => ScaledSize.Magnitude * Fixed64.Half;
 
+    protected internal override Fixed64 CalculateMassPropertyWeight() =>
+        ScaledSize.X * ScaledSize.Y * ScaledSize.Z;
+
     public LSCuboidCollider()
     {
         _vertices = new Vector3d[8];

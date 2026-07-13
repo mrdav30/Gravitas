@@ -68,6 +68,17 @@ public sealed class InertiaTensorMathTests
         shifted.M32.Should().Be(shifted.M23);
     }
 
+    [Fact]
+    public void SubtractParallelAxisTensor_WithZeroMass_ShouldPreserveTensor()
+    {
+        Fixed3x3 tensor = Fixed3x3.Identity;
+
+        InertiaTensorMath.SubtractParallelAxisTensor(
+            tensor,
+            Fixed64.Zero,
+            Vector3d.One).Should().Be(tensor);
+    }
+
     private static void AssertIdentity(Fixed3x3 matrix)
     {
         AssertNear(matrix.M11, Fixed64.One);

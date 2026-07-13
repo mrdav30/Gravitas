@@ -87,6 +87,15 @@ internal static class InertiaTensorMath
         return ClampNearZero(tensor);
     }
 
+    public static Fixed3x3 RotateToFrame(Fixed3x3 tensor, FixedQuaternion rotation)
+    {
+        if (rotation == FixedQuaternion.Identity)
+            return tensor;
+
+        Fixed3x3 rotationMatrix = rotation.ToMatrix3x3();
+        return ClampNearZero(rotationMatrix * tensor * rotationMatrix.Transpose());
+    }
+
     private static Fixed3x3 InvertDiagonalForSolver(Fixed3x3 tensor) =>
         new(
             tensor.M11 > Fixed64.Zero ? Fixed64.One / tensor.M11 : Fixed64.Zero,

@@ -48,13 +48,15 @@ public sealed class LSCompoundCollider : LSCollider
     public override Fixed64 ScaledRadius
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        get => Bounds.Scope.Magnitude;
-    }
-
-    public override Vector3d ScaledSize
-    {
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        get => Bounds.Proportions;
+        get
+        {
+            Vector3d center = Center;
+            Vector3d farthestExtent = new(
+                FixedMath.Max((BoundsMin.X - center.X).Abs(), (BoundsMax.X - center.X).Abs()),
+                FixedMath.Max((BoundsMin.Y - center.Y).Abs(), (BoundsMax.Y - center.Y).Abs()),
+                FixedMath.Max((BoundsMin.Z - center.Z).Abs(), (BoundsMax.Z - center.Z).Abs()));
+            return farthestExtent.Magnitude;
+        }
     }
 
     public ReadOnlySpan<CompoundColliderPart> Parts => _parts;
@@ -114,40 +116,74 @@ public sealed class LSCompoundCollider : LSCollider
 
     public override Vector3d CalculateLocalCenterOfMassOffset()
     {
-        Fixed64 totalArea = Area;
-        Fixed64 totalWeight = Fixed64.Zero;
+        Fixed64 totalWeight = CalculateMassPropertyWeight();
         Vector3d weightedCenter = Vector3d.Zero;
-        for (int i = 0; i < _parts.Length; i++)
+        if (totalWeight > Fixed64.Zero)
         {
-            LSCollider part = _partColliders[i];
-            Fixed64 weight = totalArea > Fixed64.Zero
-                ? part.Area / totalArea
-                : Fixed64.One / (Fixed64)_parts.Length;
+            for (int i = 0; i < _parts.Length; i++)
+            {
+                LSCollider part = _partColliders[i];
+                weightedCenter += part.CalculateLocalCenterOfMassOffset()
+                    * part.CalculateMassPropertyWeight();
+            }
 
-            totalWeight += weight;
-            weightedCenter += part.CalculateLocalCenterOfMassOffset() * weight;
+            return weightedCenter / totalWeight;
         }
 
-        return totalWeight > Fixed64.Zero
-            ? weightedCenter / totalWeight
-            : ScaledOffset;
+        for (int i = 0; i < _parts.Length; i++)
+            weightedCenter += _partColliders[i].CalculateLocalCenterOfMassOffset();
+
+        return weightedCenter / (Fixed64)_parts.Length;
+    }
+
+    protected internal override Fixed64 CalculateMassPropertyWeight()
+    {
+        Fixed64 totalWeight = Fixed64.Zero;
+        for (int i = 0; i < _parts.Length; i++)
+            totalWeight += _partColliders[i].CalculateMassPropertyWeight();
+        return totalWeight;
     }
 
     public override Fixed3x3 CalculateInertiaTensor(Fixed64 mass, Vector3d localCenterOfMassOffset)
     {
-        Fixed64 totalArea = Area;
-        Fixed64 equalPartMass = mass / (Fixed64)_parts.Length;
+        Fixed64 totalWeight = Fixed64.Zero;
+        int residualPartIndex = _parts.Length - 1;
+        for (int i = 0; i < _parts.Length; i++)
+        {
+            Fixed64 weight = _partColliders[i].CalculateMassPropertyWeight();
+            totalWeight += weight;
+            if (weight > Fixed64.Zero)
+                residualPartIndex = i;
+        }
+
+        Fixed64 assignedMass = Fixed64.Zero;
         Fixed3x3 tensor = Fixed3x3.Zero;
 
         for (int i = 0; i < _parts.Length; i++)
         {
             LSCollider part = _partColliders[i];
-            Fixed64 partMass = totalArea > Fixed64.Zero
-                ? mass * (part.Area / totalArea)
-                : equalPartMass;
+            Fixed64 weight = part.CalculateMassPropertyWeight();
+            Fixed64 partMass;
+            if (i == residualPartIndex)
+            {
+                partMass = mass - assignedMass;
+            }
+            else if (totalWeight > Fixed64.Zero)
+            {
+                partMass = weight > Fixed64.Zero
+                    ? (mass * weight) / totalWeight
+                    : Fixed64.Zero;
+                assignedMass += partMass;
+            }
+            else
+            {
+                partMass = mass / (Fixed64)_parts.Length;
+                assignedMass += partMass;
+            }
 
             Vector3d partCenterOfMass = part.CalculateLocalCenterOfMassOffset();
             Fixed3x3 partTensor = part.CalculateInertiaTensor(partMass, partCenterOfMass);
+            partTensor = InertiaTensorMath.RotateToFrame(partTensor, part.CompoundLocalRotation);
             tensor += AddParallelAxisTensor(partTensor, partMass, localCenterOfMassOffset - partCenterOfMass);
         }
 

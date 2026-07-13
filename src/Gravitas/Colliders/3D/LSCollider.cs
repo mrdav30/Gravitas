@@ -143,7 +143,7 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
 
     public virtual Vector3d Position
     {
-        get => _compoundOwner?.Position
+        get => _compoundOwner?.Center
             ?? Body?.Position3d
             ?? _agent?.Transform.Position
             ?? throw new InvalidOperationException("Collider has no body or static transform.");
@@ -694,7 +694,18 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
     /// <summary>
     /// Calculates the body-local center of mass offset implied by this collider's current shape state.
     /// </summary>
-    public virtual Vector3d CalculateLocalCenterOfMassOffset() => ScaledOffset;
+    public virtual Vector3d CalculateLocalCenterOfMassOffset() =>
+        TransformMassPropertyPoint(ScaledOffset);
+
+    /// <summary>
+    /// Calculates the deterministic relative measure used to distribute mass
+    /// when this shape is owned by a compound collider.
+    /// </summary>
+    /// <remarks>
+    /// Solid shapes return volume. Explicit surface-approximation shapes may
+    /// return a documented shell measure instead.
+    /// </remarks>
+    protected internal abstract Fixed64 CalculateMassPropertyWeight();
 
     public abstract Fixed3x3 CalculateInertiaTensor(Fixed64 mass, Vector3d localCenterOfMassOffset);
 
@@ -706,6 +717,21 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
 
     protected static Fixed3x3 AddParallelAxisTensor(Fixed3x3 tensor, Fixed64 mass, Vector3d offset) =>
         InertiaTensorMath.AddParallelAxisTensor(tensor, mass, offset);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    protected Vector3d TransformMassPropertyPoint(Vector3d localPoint) =>
+        _compoundOwner == null
+            ? localPoint
+            : _compoundOwner.ScaledOffset + _compoundLocalRotation * localPoint;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    protected Vector3d InverseTransformMassPropertyPoint(Vector3d ownerLocalPoint) =>
+        _compoundOwner == null
+            ? ownerLocalPoint
+            : _compoundLocalRotation.Inverse()
+                * (ownerLocalPoint - _compoundOwner.ScaledOffset);
+
+    internal FixedQuaternion CompoundLocalRotation => _compoundLocalRotation;
 
     /// <summary>
     /// The point on the surface of the capsule that's nearest to the given point

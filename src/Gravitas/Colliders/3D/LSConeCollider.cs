@@ -108,13 +108,12 @@ public sealed class LSConeCollider : LSCollider
         SetBoundsMinMax(min, max);
     }
 
+    protected internal override Fixed64 CalculateMassPropertyWeight() => Volume;
+
     public override Vector3d CalculateLocalCenterOfMassOffset()
     {
         Vector3d localCom = new(Fixed64.Zero, -Height * Fixed64.FromFraction(1, 4), Fixed64.Zero);
-        FixedQuaternion ownerLocalRotation = CompoundOwner == null
-            ? FixedQuaternion.Identity
-            : (CompoundOwner.Rotation.Inverse() * Rotation).Normalized;
-        return ScaledOffset + ownerLocalRotation * localCom;
+        return TransformMassPropertyPoint(ScaledOffset + localCom);
     }
 
     public override Fixed3x3 CalculateInertiaTensor(Fixed64 mass, Vector3d localCenterOfMassOffset)

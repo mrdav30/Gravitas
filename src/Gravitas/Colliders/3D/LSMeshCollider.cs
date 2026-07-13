@@ -88,6 +88,17 @@ public class LSMeshCollider : LSCollider
         Mesh.UpdatePosition(meshOrigin, Rotation);
     }
 
+    protected internal override Fixed64 CalculateMassPropertyWeight()
+    {
+        if (InertiaPolicy == MeshInertiaPolicy.SurfaceApproximation)
+            return Mesh.TotalArea;
+
+        if (Mesh.TryGetClosedVolumeMassProperties(out MeshMassProperties properties, out _))
+            return properties.Volume;
+
+        return Fixed64.Zero;
+    }
+
     public override Vector3d CalculateLocalCenterOfMassOffset()
     {
         if (InertiaPolicy != MeshInertiaPolicy.RequireClosedVolume
@@ -96,7 +107,9 @@ public class LSMeshCollider : LSCollider
             return base.CalculateLocalCenterOfMassOffset();
         }
 
-        return ScaledOffset + Vector3d.Multiply(properties.CenterOfMass - Mesh.LocalBounds.Center, LocalScale);
+        Vector3d scaledLocalCenter = ScaledOffset
+            + Vector3d.Multiply(properties.CenterOfMass - Mesh.LocalBounds.Center, LocalScale);
+        return TransformMassPropertyPoint(scaledLocalCenter);
     }
 
     public override Fixed3x3 CalculateInertiaTensor(Fixed64 mass, Vector3d localCenterOfMassOffset)
@@ -104,7 +117,9 @@ public class LSMeshCollider : LSCollider
         if (InertiaPolicy != MeshInertiaPolicy.RequireClosedVolume)
             return Mesh.CalculateInertiaTensor(mass, InertiaPolicy);
 
-        Vector3d localMeshReference = Mesh.LocalBounds.Center + DivideByScale(localCenterOfMassOffset - ScaledOffset);
+        Vector3d partLocalReference = InverseTransformMassPropertyPoint(localCenterOfMassOffset);
+        Vector3d localMeshReference = Mesh.LocalBounds.Center
+            + DivideByScale(partLocalReference - ScaledOffset);
         return Mesh.CalculateInertiaTensor(mass, InertiaPolicy, localMeshReference);
     }
 
