@@ -22,12 +22,12 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-ccd-service-parity-task67-authoritative-root-comparable/e0d05ced-fecd-4d7a-834f-8c7f8256d76f/coverage.cobertura.xml`.
+`TestResults/coverage-mixed-partition-task68-authoritative-root-comparable/0dfe6363-aeca-4fa3-b77f-3c68c5724bc4/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
-| Lines | 99.87% | 27,148 / 27,183 | 35 | 100% |
-| Branches | 99.78% | 10,411 / 10,433 | 22 | 100% |
+| Lines | 99.88% | 27,151 / 27,181 | 30 | 100% |
+| Branches | 99.79% | 10,410 / 10,431 | 21 | 100% |
 | Methods | 99.46% | 3,532 / 3,551 | 19 | 100% |
 
 The authoritative full coverage-enabled `Release` suite passes 2,539/2,539 tests, and
@@ -35,23 +35,20 @@ The authoritative full coverage-enabled `Release` suite passes 2,539/2,539 tests
 primary constraint, but the remaining line and method gaps must close from the
 same final artifact.
 
-Task 67's authoritative artifact reports 100% line, branch, and method coverage
-for both dimensional continuous-collision service files. The block removed
-three caller- and registry-impossible admission predicates while retaining the
-real processed-body and duplicate-queue ownership gates.
+Task 68's authoritative artifact reports 100% line, branch, and method coverage
+for mixed partitioning. The block collapsed an impossible partition-attach
+cleanup branch to the same fail-fast invariant used by pure 2D and 3D services.
 
 ### Immediate Completed Block
 
-The 2D/3D CCD service admission block is resolved. Candidate building walks the
-registered dynamic-body store, whose lifecycle already excludes inactive 3D
-bodies; 2D already relied on that invariant. The sole handoff-queue caller first
-requires `CanTranslate`, which includes active registration and a non-negative
-dynamic ID in both dimensions. The deleted predicates could therefore fire only
-through invalid direct-internal calls. Existing stale-candidate, queued-body
-deactivation, ID-reuse, duplicate-queue, consumed-before-drain, and budget
-regressions continue to pin the real lifecycle and ownership behavior.
-The separate same-frame requeue/dedupe ownership defect found during review is
-captured in the issue tracker and does not require retaining any deleted guard.
+The mixed partition attach block is resolved. `GetOrCreatePartition` receives a
+current traced voxel, performs an exact-type lookup, then rents an internal
+sealed partition whose owner is assigned before attachment. In supported
+single-thread deterministic execution, duplicate insertion cannot occur and
+`OnAddToVoxel` cannot fail. The untestable release-and-throw branch was replaced
+with the established `SwiftThrowHelper` invariant expression, so failure stays
+loud without preserving impossible recovery code. GridForge spawn-token reuse
+is unrelated because no stored coordinate is resolved on this path.
 
 ## Rules Of Engagement
 
@@ -118,11 +115,11 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | `Core/Mixed/GravitasMixedCollisionService.Partitioning.cs` | 5 | 1 | 0 | Stale candidate ownership, partition lookup, and mixed bounds admission. |
-| 2 | `CollisionHandling/Contacts/3D/ContactManifold.cs` | 4 | 1 | 2 | Retained contact construction/reduction surface and threshold ownership. |
-| 3 | `Core/2D/GravitasPhysics2DService.SupportTypes.cs` | 3 | 1 | 0 | Service token/default state and sparse support ownership. |
-| 4 | `CollisionHandling/Contacts/2D/ContactManifold2D.cs` | 1 | 1 | 1 | Empty/default enumerator and retained contact ownership. |
-| 5 | `CollisionHandling/Continuous/ContinuousCollisionMath.cs` | 1 | 1 | 0 | Exact fixed-point threshold and fallback ownership. |
+| 1 | `CollisionHandling/Contacts/3D/ContactManifold.cs` | 4 | 1 | 2 | Retained contact construction/reduction surface and threshold ownership. |
+| 2 | `Core/2D/GravitasPhysics2DService.SupportTypes.cs` | 3 | 1 | 0 | Service token/default state and sparse support ownership. |
+| 3 | `CollisionHandling/Contacts/2D/ContactManifold2D.cs` | 1 | 1 | 1 | Empty/default enumerator and retained contact ownership. |
+| 4 | `CollisionHandling/Continuous/ContinuousCollisionMath.cs` | 1 | 1 | 0 | Exact fixed-point threshold and fallback ownership. |
+| 5 | `CollisionHandling/Detection/3D/CollisionDetection.Cone.cs` | 1 | 1 | 0 | Cone contact degeneracy and fallback selection. |
 | 6 | Remaining one-branch collision, query, replay, settings, and CCD blocks | 0-1 | 1 each | 0-1 | Re-rank from each authoritative artifact; finish one cohesive source block at a time. |
 
 ### Phase 1: Core Runtime And Service Ownership
@@ -491,6 +488,7 @@ of record.
 | 3D collision-pair notification closure | 99.87% | 99.74% | 99.46% | 2,538 | `CollisionPair` reached 100%; deferred A exit preserves reentrant admission state, stale rebound B lifetimes are centrally rejected, and the duplicate outer lifetime condition was removed. Independent review found and retained the real duplicate-exit guard. |
 | 3D joint replay identity closure | 99.87% | 99.76% | 99.46% | 2,539 | `Joint3D` reached 100%; constructor-required collider references are hashed directly, legitimate unregistered IDs remain `-1`, and deliberately divergent dynamic/collider IDs pin both ordered identity fields. Independent review caught and corrected an initially coincident-ID witness. |
 | 2D/3D CCD service admission closure | 99.87% | 99.78% | 99.46% | 2,539 | Both continuous-collision service files reached 100%; registered-body traversal makes the 3D active check redundant, and `CanTranslate` makes both non-negative queue-ID checks caller-impossible while processed-body and duplicate-queue gates retain real ownership policy. |
+| Mixed partition attach closure | 99.88% | 99.79% | 99.46% | 2,539 | Mixed partitioning reached 100%; the impossible local attach-failure recovery was collapsed to the same fail-fast invariant as pure 2D/3D after proving current-voxel, exact-type, sealed-partition, owner, and single-thread guarantees. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.

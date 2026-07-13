@@ -551,14 +551,10 @@ internal sealed partial class GravitasMixedCollisionService
             return partition!;
 
         partition = RentPartition();
-        if (!voxel.TryAddPartition(partition))
-        {
-            ReleasePartition(partition);
-            SwiftThrowHelper.ThrowIfTrue(
-                true,
-                nameof(GravitasMixedCollisionService),
-                "Unable to attach mixed physics partition to voxel.");
-        }
+        SwiftThrowHelper.ThrowIfTrue(
+            !voxel.TryAddPartition(partition),
+            nameof(GravitasMixedCollisionService),
+            "Unable to attach mixed physics partition to voxel.");
 
         TrackRetainedPartition(partition);
         return partition;
