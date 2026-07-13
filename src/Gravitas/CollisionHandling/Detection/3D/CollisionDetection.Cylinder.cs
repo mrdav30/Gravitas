@@ -226,6 +226,8 @@ public static partial class CollisionDetection
         if (!CheckCylinderCylinderAxis(cylinderA, cylinderB, cylinderB.LineDirection, ref penetration))
             return false;
 
+        // The closest-segment axis below also rejects cross-axis separation, but this ordered
+        // early-out avoids the more expensive segment solve for skew separated cylinders.
         Vector3d crossAxis = Vector3d.Cross(cylinderA.LineDirection, cylinderB.LineDirection);
         if (!CheckCylinderCylinderAxis(cylinderA, cylinderB, crossAxis, ref penetration))
             return false;

@@ -894,6 +894,54 @@ public sealed class CollisionDetectionShapePairTests
     }
 
     [Fact]
+    public void CylinderCylinder_WithSecondCylinderAxisSeparation_ShouldReturnFalse()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSCylinderCollider> cylinderA = scenario.CreateCylinder(Vector3d.Zero);
+        ScenarioBody<LSCylinderCollider> cylinderB = scenario.CreateBody(
+            new LSCylinderCollider { Size = new Vector3d(Fixed64.One, (Fixed64)2, Fixed64.One) },
+            new Vector3d(-Fixed64.FromFraction(19, 16), -Fixed64.FromFraction(11, 8), Fixed64.Zero),
+            FixedQuaternion.FromEulerAnglesInDegrees(Fixed64.Zero, Fixed64.Zero, (Fixed64)(-15)));
+
+        CylinderProjectionsOverlap(cylinderA.Collider, cylinderB.Collider, cylinderA.Collider.LineDirection).Should().BeTrue();
+        CylinderProjectionsOverlap(cylinderA.Collider, cylinderB.Collider, cylinderB.Collider.LineDirection).Should().BeFalse();
+        CylinderProjectionsOverlap(
+            cylinderA.Collider,
+            cylinderB.Collider,
+            Vector3d.Cross(cylinderA.Collider.LineDirection, cylinderB.Collider.LineDirection)).Should().BeTrue();
+        (Vector3d PointA, Vector3d PointB) closestPoints = Vector3d.ClosestPointsOnTwoLines(
+            cylinderA.Collider.LineSegmentStart,
+            cylinderA.Collider.LineSegmentEnd,
+            cylinderB.Collider.LineSegmentStart,
+            cylinderB.Collider.LineSegmentEnd);
+        CylinderProjectionsOverlap(cylinderA.Collider, cylinderB.Collider, closestPoints.PointB - closestPoints.PointA).Should().BeTrue();
+        AssertNoCollision(scenario, cylinderA.Collider, cylinderB.Collider, CollisionType.Cylinder_Cylinder);
+    }
+
+    [Fact]
+    public void CylinderCylinder_WithAxisCrossSeparation_ShouldReturnFalse()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSCylinderCollider> cylinderA = scenario.CreateCylinder(Vector3d.Zero);
+        ScenarioBody<LSCylinderCollider> cylinderB = scenario.CreateBody(
+            new LSCylinderCollider { Size = new Vector3d(Fixed64.One, (Fixed64)2, Fixed64.One) },
+            new Vector3d(Fixed64.Zero, Fixed64.Zero, Fixed64.FromFraction(5, 4)),
+            FixedQuaternion.FromEulerAnglesInDegrees(Fixed64.Zero, Fixed64.Zero, (Fixed64)90));
+
+        CylinderProjectionsOverlap(cylinderA.Collider, cylinderB.Collider, cylinderA.Collider.LineDirection).Should().BeTrue();
+        CylinderProjectionsOverlap(cylinderA.Collider, cylinderB.Collider, cylinderB.Collider.LineDirection).Should().BeTrue();
+        Vector3d crossAxis = Vector3d.Cross(cylinderA.Collider.LineDirection, cylinderB.Collider.LineDirection);
+        CylinderProjectionsOverlap(cylinderA.Collider, cylinderB.Collider, crossAxis).Should().BeFalse();
+        (Vector3d PointA, Vector3d PointB) closestPoints = Vector3d.ClosestPointsOnTwoLines(
+            cylinderA.Collider.LineSegmentStart,
+            cylinderA.Collider.LineSegmentEnd,
+            cylinderB.Collider.LineSegmentStart,
+            cylinderB.Collider.LineSegmentEnd);
+        CylinderProjectionsOverlap(cylinderA.Collider, cylinderB.Collider, closestPoints.PointB - closestPoints.PointA).Should().BeFalse();
+        AssertNoCollision(scenario, cylinderA.Collider, cylinderB.Collider, CollisionType.Cylinder_Cylinder);
+    }
+
+    [Fact]
     public void CylinderCylinder_ParallelCapOverlap_ShouldGenerateFourStableContacts()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
@@ -2060,6 +2108,30 @@ public sealed class CollisionDetectionShapePairTests
         pair.CollisionType.Should().Be(expectedType);
         CollisionDetection.DoCollisionCheck(pair).Should().BeFalse();
         pair.Manifold.Count.Should().Be(0);
+    }
+
+    private static bool CylinderProjectionsOverlap(
+        LSCylinderCollider cylinderA,
+        LSCylinderCollider cylinderB,
+        Vector3d axis)
+    {
+        if (axis.MagnitudeSquared <= Fixed64.Epsilon)
+            return true;
+
+        Vector3d normalizedAxis = axis.Normalized;
+        FixedRange projectionA = AxisProjectionHelper.ProjectCylinderOntoAxis(
+            normalizedAxis,
+            cylinderA.LineSegmentStart,
+            cylinderA.LineSegmentEnd,
+            cylinderA.LineDirection,
+            cylinderA.ScaledRadius);
+        FixedRange projectionB = AxisProjectionHelper.ProjectCylinderOntoAxis(
+            normalizedAxis,
+            cylinderB.LineSegmentStart,
+            cylinderB.LineSegmentEnd,
+            cylinderB.LineDirection,
+            cylinderB.ScaledRadius);
+        return projectionA.Overlaps(projectionB);
     }
 
     private static LSMeshCollider CreateHorizontalPlaneMesh(MeshColliderMode mode = MeshColliderMode.Convex) =>

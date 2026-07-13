@@ -22,32 +22,33 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-cone-query-task57-authoritative-root-comparable/adc1851a-79af-49af-a0cf-88142d7a2588/coverage.cobertura.xml`.
+`TestResults/coverage-cylinder-detection-task58-authoritative-root-comparable/faf17e9c-a838-497c-8e79-b69975196a50/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
-| Lines | 99.83% | 27,148 / 27,193 | 45 | 100% |
-| Branches | 99.58% | 10,405 / 10,449 | 44 | 100% |
+| Lines | 99.84% | 27,150 / 27,193 | 43 | 100% |
+| Branches | 99.60% | 10,407 / 10,449 | 42 | 100% |
 | Methods | 99.46% | 3,532 / 3,551 | 19 | 100% |
 
-The authoritative full coverage-enabled `Release` suite passes 2,520/2,520 tests, and
+The authoritative full coverage-enabled `Release` suite passes 2,522/2,522 tests, and
 `ReleaseLean` builds both targets without warnings. Branch coverage is now the
 primary constraint, but the remaining line and method gaps must close from the
 same final artifact.
 
-Task 57's authoritative artifact reports 100% line, branch, and method coverage
-for the 3D cone query block. The block closed two lines and two branch outcomes
-from the repository-wide gap by covering stale partition IDs and deleting a
-behavior-neutral negative radial-square clamp.
+Task 58's authoritative artifact reports 100% line, branch, and method coverage
+for 3D cylinder collision detection. The block closed two lines and two branch
+outcomes from the repository-wide gap with exact ordered-axis separation
+regressions and a measured cross-axis early-out.
 
 ### Immediate Completed Block
 
-The 3D cone query block is resolved. Closest and all-hit paths now ignore a
-nonexistent collider ID retained in a partition while preserving exact real-hit
-identity, counts, and candidate accounting; inverting the lookup guard fails at
-the dereference. The radial-square clamp was removed because a negative value
-already satisfies the only subsequent comparison against a nonnegative
-saturating fixed-point cone radius squared plus epsilon.
+The cylinder/cylinder SAT block is resolved. A fixed-point 15-degree geometry
+proves the second cylinder axis is the only separating axis and turns removal
+into a false-positive collision. Cross-axis separation is outcome-duplicated by
+the final closest-segment axis, but its ordered early-out remains intentional:
+removal slowed 64 separated pairs from 188.563 to 202.736 microseconds (7.5%)
+with zero allocations. The test records both the cross separation and the final
+axis redundancy explicitly.
 
 ## Rules Of Engagement
 
@@ -114,11 +115,11 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | `CollisionHandling/Detection/3D/CollisionDetection.Cylinder.cs` | 2 | 2 | 0 | Cylinder feature separation, containment, and exact contact ownership. |
-| 2 | `CollisionHandling/Response/Mixed/CollisionResponseMixed.cs` | 2 | 2 | 0 | Mixed mobility admission and constrained impulse behavior. |
-| 3 | `Core/3D/SolidBody.ContinuousCollision.Rotational.cs` | 2 | 2 | 0 | Rotational proxy admission, stable sampling, and exact boundary behavior. |
-| 4 | `CollisionHandling/Detection/3D/CollisionDetection.Capsule.cs` | 1 | 2 | 0 | Residual capsule admission and exact feature-boundary behavior. |
-| 5 | `CollisionHandling/Detection/3D/GjkSimplexPolicy.cs` | 1 | 2 | 0 | Degenerate simplex policy and deterministic progress ownership. |
+| 1 | `CollisionHandling/Response/Mixed/CollisionResponseMixed.cs` | 2 | 2 | 0 | Mixed mobility admission and constrained impulse behavior. |
+| 2 | `Core/3D/SolidBody.ContinuousCollision.Rotational.cs` | 2 | 2 | 0 | Rotational proxy admission, stable sampling, and exact boundary behavior. |
+| 3 | `CollisionHandling/Detection/3D/CollisionDetection.Capsule.cs` | 1 | 2 | 0 | Residual capsule admission and exact feature-boundary behavior. |
+| 4 | `CollisionHandling/Detection/3D/GjkSimplexPolicy.cs` | 1 | 2 | 0 | Degenerate simplex policy and deterministic progress ownership. |
+| 5 | `Core/2D/GravitasPhysics2DService.ReplayHash.cs` | 1 | 2 | 0 | Replay contribution mode and authoritative solver-cache identity. |
 | 6 | Remaining one- and two-branch collision, constraint, query, replay, and CCD blocks | 0-5 | 1-2 each | 0-2 | Re-rank from each authoritative artifact; finish one cohesive source block at a time. |
 
 ### Phase 1: Core Runtime And Service Ownership
@@ -267,6 +268,10 @@ incorrectly.
 - [x] Close and independently review the 3D cone query through stale partition
       collider IDs on closest/all paths and delete the behavior-neutral
       negative radial-square clamp after saturating Fixed64 caller proof.
+- [x] Close and independently review residual cylinder/cylinder ordered SAT:
+      isolate second-axis separation, prove cross-axis/final-axis redundancy,
+      and retain the cross early-out only after a measured 7.5% separated-pair
+      benefit with zero allocations.
 - [ ] Delete reducer permutations or fallback branches that valid authored
       shapes and validated callers cannot reach.
 
@@ -471,6 +476,7 @@ of record.
 | 2D joint solver closure | 99.82% | 99.54% | 99.46% | 2,517 | `JointSolver2D` reached 100%; duplicate non-prismatic motor and near-zero axis guards were removed after exhaustive validated-caller proof, while existing public validation and coincident-anchor behavior killed mutations of both owning invariants. |
 | 2D kinematic CCD mobility closure | 99.83% | 99.56% | 99.46% | 2,519 | The kinematic handoff block reached 100%; pure 2D and mixed 3D near-singular target mobility now preserves exact source host pose and target position, velocity, and sleep state, with each retained threshold guard independently mutation-sensitive. |
 | 3D cone query closure | 99.83% | 99.58% | 99.46% | 2,520 | The cone query block reached 100%; closest/all paths ignore stale partition IDs with exact candidate accounting, the lookup guard is mutation-sensitive, and a behavior-neutral negative radial-square clamp was deleted after normalized-caller and saturating-arithmetic proof. |
+| Cylinder/cylinder SAT closure | 99.84% | 99.60% | 99.46% | 2,522 | Cylinder detection reached 100%; a fixed-point 15-degree case isolates the second cylinder axis, cross separation is explicitly duplicated by the final closest axis, and the retained cross early-out is justified by a 7.5% 64-pair speedup with zero allocations. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.

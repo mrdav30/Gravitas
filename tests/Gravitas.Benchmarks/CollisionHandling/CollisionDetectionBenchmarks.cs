@@ -17,6 +17,7 @@ public class CollisionDetectionBenchmarks
     private CollisionPair[] _primitivePairs;
     private CollisionPair[] _conePrimitivePairs;
     private CollisionPair[] _cylinderCapPairs;
+    private CollisionPair[] _cylinderCrossSeparatedPairs;
     private CollisionPair[] _cuboidFacePairs;
     private CollisionPair[] _cuboidSatPairs;
     private CollisionPair[] _cuboidCapsulePairs;
@@ -56,6 +57,7 @@ public class CollisionDetectionBenchmarks
         _primitivePairs = CreatePairSet(CreatePrimitivePair);
         _conePrimitivePairs = CreatePairSet(CreateConePrimitivePair);
         _cylinderCapPairs = CreatePairSet(CreateCylinderCapPair);
+        _cylinderCrossSeparatedPairs = CreatePairSet(CreateCylinderCrossSeparatedPair);
         _cuboidFacePairs = CreatePairSet(CreateCuboidFacePair);
         _cuboidSatPairs = CreatePairSet(CreateCuboidSatPair);
         _cuboidCapsulePairs = CreatePairSet(CreateCuboidCapsulePair);
@@ -85,6 +87,7 @@ public class CollisionDetectionBenchmarks
         _primitivePairs = null;
         _conePrimitivePairs = null;
         _cylinderCapPairs = null;
+        _cylinderCrossSeparatedPairs = null;
         _cuboidFacePairs = null;
         _cuboidSatPairs = null;
         _cuboidCapsulePairs = null;
@@ -139,6 +142,12 @@ public class CollisionDetectionBenchmarks
     public int GenerateCylinderCapManifolds()
     {
         return CountManifoldContacts(_cylinderCapPairs);
+    }
+
+    [Benchmark]
+    public int CheckCylinderCrossSeparatedPairs()
+    {
+        return CountCollisions(_cylinderCrossSeparatedPairs);
     }
 
     [Benchmark]
@@ -413,6 +422,16 @@ public class CollisionDetectionBenchmarks
         return new CollisionPair(
             CreateCuboid(origin),
             CreateCylinder(upper));
+    }
+
+    private CollisionPair CreateCylinderCrossSeparatedPair(int index, Vector3d origin)
+    {
+        return new CollisionPair(
+            CreateCylinder(origin),
+            CreateBody(
+                new LSCylinderCollider { Size = new Vector3d(Fixed64.One, (Fixed64)2, Fixed64.One) },
+                origin + new Vector3d(Fixed64.Zero, Fixed64.Zero, Fixed64.FromFraction(5, 4)),
+                FixedQuaternion.FromEulerAnglesInDegrees(Fixed64.Zero, Fixed64.Zero, (Fixed64)90)).Collider);
     }
 
     private CollisionPair CreateCuboidSatPair(int index, Vector3d origin)
