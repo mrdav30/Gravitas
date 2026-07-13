@@ -23,8 +23,11 @@ public readonly struct WaitForNextSimulate : ILockedYieldInstruction
         _checkedInFrameCount = context.FrameCount;
     }
 
+    /// <inheritdoc />
+    public GravitasWorldContext Context => _context;
+
     public bool KeepWaiting =>
-         _context.FrameCount <= _checkedInFrameCount;
+         _context.FrameCount == _checkedInFrameCount;
 
     public object? Current => null;
 

@@ -144,6 +144,23 @@ Simulation code should use context time values rather than wall-clock APIs.
 elapsed real time. `ExpectedAccumulation` is clamped to one simulation frame so
 visual interpolation cannot overshoot its target.
 
+Context-owned coroutine waits observe this clock without mutating it. Frame
+waits remain correct when the signed frame counter wraps, while duration waits
+compare against `TotalTime`. Every yielded `ILockedYieldInstruction` must belong
+to the same context as its coroutine. A mismatched instruction faults and ends
+the coroutine rather than mixing context clocks.
+
+Coroutine simulation snapshots the handles present at coroutine-phase entry.
+Coroutines started during coroutine simulation therefore begin on the next
+step, including when a newly started handle reuses a slot vacated later in the
+current coroutine phase. Stopping,
+resetting, deactivating, or disposing the owning context disposes both the
+active yield instruction and its enumerator. Faulted coroutines are removed and
+disposed before the exception is propagated; reset continues cleaning the
+remaining handles if one dispose callback fails. Reentrant simulation and new
+starts are suppressed during reset, and disposed contexts cannot reactivate
+their coroutine service.
+
 ## Registration Model
 
 Dynamic 3D bodies are stored in a `SwiftBucket<SolidBody>`. Their `DynamicId` is

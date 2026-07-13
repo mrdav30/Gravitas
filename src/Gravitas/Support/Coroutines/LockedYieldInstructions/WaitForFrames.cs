@@ -13,7 +13,8 @@ namespace Gravitas.Support;
 public readonly struct WaitForFrames : ILockedYieldInstruction
 {
     private readonly GravitasWorldContext _context;
-    private readonly int _targetFrameCount;
+    private readonly int _startFrameCount;
+    private readonly uint _numberOfFrames;
 
     public WaitForFrames(GravitasWorldContext context, int numberOfFrames)
     {
@@ -21,11 +22,15 @@ public readonly struct WaitForFrames : ILockedYieldInstruction
         SwiftThrowHelper.ThrowIfNegative(numberOfFrames, nameof(numberOfFrames));
 
         _context = context;
-        _targetFrameCount = context.FrameCount + numberOfFrames;
+        _startFrameCount = context.FrameCount;
+        _numberOfFrames = (uint)numberOfFrames;
     }
 
+    /// <inheritdoc />
+    public GravitasWorldContext Context => _context;
+
     public bool KeepWaiting =>
-        _context.FrameCount < _targetFrameCount;
+        unchecked((uint)(_context.FrameCount - _startFrameCount)) < _numberOfFrames;
 
     public object? Current => null;
 

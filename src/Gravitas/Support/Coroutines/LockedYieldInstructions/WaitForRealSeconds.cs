@@ -10,31 +10,26 @@ using FixedMathSharp;
 namespace Gravitas.Support;
 
 /// <summary>
-/// A coroutine yield instruction that waits for a specified number of real-time seconds, using the GravitasWorldContext's delta time for accumulation.
+/// A coroutine yield instruction that waits for a specified duration on the owning context's deterministic clock.
 /// </summary>
-public struct WaitForRealSeconds : ILockedYieldInstruction
+public readonly struct WaitForRealSeconds : ILockedYieldInstruction
 {
     private readonly GravitasWorldContext _context;
-    private Fixed64 _accumulator;
-    private Fixed64 _waitTime;
+    private readonly Fixed64 _targetTime;
 
     public WaitForRealSeconds(GravitasWorldContext context, Fixed64 seconds)
     {
         SwiftThrowHelper.ThrowIfNull(context, nameof(context));
+        SwiftThrowHelper.ThrowIfArgument(seconds < Fixed64.Zero, nameof(seconds), "Wait duration cannot be negative.");
 
         _context = context;
-        _accumulator = Fixed64.Zero;
-        _waitTime = seconds;
+        _targetTime = context.TotalTime + seconds;
     }
 
-    public bool KeepWaiting
-    {
-        get
-        {
-            _accumulator += _context.DeltaTime;
-            return _accumulator < _waitTime;
-        }
-    }
+    /// <inheritdoc />
+    public GravitasWorldContext Context => _context;
+
+    public bool KeepWaiting => _context.TotalTime < _targetTime;
 
     public object? Current => null;
 

@@ -524,12 +524,19 @@ public sealed class GravitasWorldContext : IDisposable
             _disposed = true;
             try
             {
-                if (_ownsWorld && World.IsActive)
-                    World.Dispose();
+                Coroutines.Deactivate();
             }
             finally
             {
-                ReleaseWorldOwnership(this);
+                try
+                {
+                    if (_ownsWorld && World.IsActive)
+                        World.Dispose();
+                }
+                finally
+                {
+                    ReleaseWorldOwnership(this);
+                }
             }
         }
     }

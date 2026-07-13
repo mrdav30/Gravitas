@@ -16,6 +16,11 @@ namespace Gravitas.Support;
 public interface ILockedYieldInstruction : IEnumerator, IDisposable
 {
     /// <summary>
+    /// Gets the deterministic world context that owns this instruction's clock.
+    /// </summary>
+    GravitasWorldContext Context { get; }
+
+    /// <summary>
     /// Indicates if coroutine should be kept suspended.
     /// </summary>
     bool KeepWaiting { get; }
