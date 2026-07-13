@@ -22,15 +22,15 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-task41-authoritative-reviewed-full/d5b064bb-65d5-4887-b0b9-e3f089b8c44d/coverage.cobertura.xml`.
+`TestResults/coverage-task42-authoritative-reviewed-full/4df84e68-1a23-4529-b227-5e39e2fb1236/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
-| Lines | 99.69% | 26,225 / 26,306 | 81 | 100% |
-| Branches | 99.08% | 10,201 / 10,296 | 95 | 100% |
-| Methods | 99.14% | 3,446 / 3,476 | 30 | 100% |
+| Lines | 99.70% | 26,333 / 26,413 | 80 | 100% |
+| Branches | 99.12% | 10,249 / 10,340 | 91 | 100% |
+| Methods | 99.14% | 3,452 / 3,482 | 30 | 100% |
 
-The full coverage-enabled `Release` suite passes 2,376/2,376 tests, and
+The full coverage-enabled `Release` suite passes 2,409/2,409 tests, and
 `ReleaseLean` builds both targets without warnings. Branch coverage is now the
 primary constraint, but the remaining line and method gaps must close from the
 same final artifact.
@@ -38,10 +38,10 @@ same final artifact.
 ### Immediate Next Block
 
 Finish
-`src/Gravitas/Support/Coroutines/GravitasCoroutineService.cs` before changing
-target. The current artifact reports one uncovered line and three uncovered
-branch outcomes. Treat completion, cancellation, context ownership, and pooled
-enumerator cleanup as one coroutine lifecycle contract.
+`src/Gravitas/Colliders/2D/LSCompoundCollider2D.cs` before changing target. The
+current artifact reports one uncovered line and three uncovered branch
+outcomes. Treat owner geometry, part selection, authored fallback, and mass
+properties as one compound-collider contract.
 
 ## Rules Of Engagement
 
@@ -108,16 +108,16 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | `Support/Coroutines/GravitasCoroutineService.cs` | 1 | 3 | 0 | Completion, cancellation, and context ownership. |
-| 2 | `Colliders/2D/LSCompoundCollider2D.cs` | 1 | 3 | 0 | Owner geometry, empty parts, and authored fallback. |
-| 3 | `Colliders/3D/LSCapsuleCollider.cs` | 1 | 3 | 0 | Frontal area and degenerate axial geometry. |
-| 4 | `Colliders/3D/LSCompoundCollider.cs` | 1 | 3 | 0 | Owner geometry, empty parts, and authored fallback. |
-| 5 | `CollisionHandling/Detection/3D/CollisionDetection.Cylinder.cs` | 2 | 2 | 0 | Axial separation and stable contact fallback. |
-| 6 | `CollisionHandling/Detection/3D/CollisionDetection.cs` | 2 | 2 | 0 | Dispatch and unsupported-shape fallbacks. |
-| 7 | `Core/3D/SolidBody.ContinuousCollision.Helpers.cs` | 1 | 2 | 0 | Candidate filters and relative-motion fallback. |
-| 8 | `Core/3D/SolidBody.ContinuousCollision.Rotational.cs` | 2 | 2 | 0 | Rotational sweep bounds and support fallback. |
-| 9 | `Core/Mixed/GravitasMixedCollisionService.Partitioning.cs` | 5 | 1 | 0 | Partition ownership, pooled retirement, and callback-failure recovery. |
-| 10 | `Constraints/3D/RagdollRuntime3D.cs` | 2 | 1 | 0 | Replay load shape, link ownership, and stable reconstruction. |
+| 1 | `Colliders/2D/LSCompoundCollider2D.cs` | 1 | 3 | 0 | Owner geometry, empty parts, and authored fallback. |
+| 2 | `Colliders/3D/LSCapsuleCollider.cs` | 1 | 3 | 0 | Frontal area and degenerate axial geometry. |
+| 3 | `Colliders/3D/LSCompoundCollider.cs` | 1 | 3 | 0 | Owner geometry, empty parts, and authored fallback. |
+| 4 | `CollisionHandling/Detection/3D/CollisionDetection.Cylinder.cs` | 2 | 2 | 0 | Axial separation and stable contact fallback. |
+| 5 | `CollisionHandling/Detection/3D/CollisionDetection.cs` | 2 | 2 | 0 | Dispatch and unsupported-shape fallbacks. |
+| 6 | `Core/3D/SolidBody.ContinuousCollision.Helpers.cs` | 1 | 2 | 0 | Candidate filters and relative-motion fallback. |
+| 7 | `Core/3D/SolidBody.ContinuousCollision.Rotational.cs` | 2 | 2 | 0 | Rotational sweep bounds and support fallback. |
+| 8 | `Core/Mixed/GravitasMixedCollisionService.Partitioning.cs` | 5 | 1 | 0 | Partition ownership, pooled retirement, and callback-failure recovery. |
+| 9 | `Constraints/3D/RagdollRuntime3D.cs` | 2 | 1 | 0 | Replay load shape, link ownership, and stable reconstruction. |
+| 10 | `CollisionHandling/Detection/3D/Sat/AxisProjectionHelper.cs` | 5 | 2 | 1 | Capsule/cuboid axes, sphere projection, and degenerate normals. |
 
 ### Phase 1: Core Runtime And Service Ownership
 
@@ -176,6 +176,10 @@ mid-block merely because another branch looks easier.
 - [x] Close and independently review residual 3D body-motion outcomes through
       initialize, simulate, late-simulate, reset, deactivate, shell reuse,
       grounded friction, anisotropic gyro, and queued CCD workflows.
+- [x] Close and independently review the context-owned coroutine subsystem:
+      phase-entry snapshots, sparse-slot reuse, reset/deactivate/dispose,
+      callback-safe cancellation, dual-failure cleanup, instruction ownership,
+      reference/high-water release, pure clock waits, and frame wrap.
 
 Exit condition: the selected service family reports 100% line, branch, and
 method coverage from focused tests; the full artifact confirms the gains; no
@@ -413,6 +417,7 @@ of record.
 | 2D CCD service closure | 99.68% | 99.02% | 99.14% | 2,364 | The 2D CCD service reached 100%; duplicate handoffs queue once and consume the latest state, shared planar/mixed candidate storage clears across disabled mixed queries, and the lifecycle-impossible inactive registry guard was removed after independent review. |
 | 2D rotational CCD closure | 99.69% | 99.05% | 99.14% | 2,369 | The 2D rotational block reached 100%; real epsilon-proxy, sub-epsilon-arc, and post-broad-phase filter outcomes are covered; dynamic impacts now count in both dimensions; kinematic signed-boundary yaw uses the shortest arc; the endpoint-only sampling limitation is tracked with an exact reproducer. |
 | 2D motion closure | 99.69% | 99.08% | 99.14% | 2,376 | The motion block reached 100%; zero and quantized-away angular inputs preserve sleep, zero-frame thresholds sleep immediately, 2D sleep disable/validation matches 3D, serialization/replay remain stable, and the separate 3D impulse-unit defect is tracked. |
+| Coroutine lifecycle closure | 99.70% | 99.12% | 99.14% | 2,409 | The full coroutine subsystem reached 100%; sparse-slot scheduling, callback-safe cancellation, reset/dispose ownership, exception aggregation, instruction identity/context, snapshot and bucket cleanup, clock-observing waits, and frame wrap are deterministic and independently approved. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.
