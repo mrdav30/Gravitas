@@ -17,6 +17,65 @@
 
 ## Active Issues
 
+The numbered queue below is the authoritative execution order. Detailed issue
+records follow with their original discovery context.
+
+### Release Workflow
+
+- Use the `develop` worktrees under `F:/gamedevrepos` and temporary local project
+  references through the dependency chain while lower-stack changes are under
+  validation. Apply explicit links to library, test, and benchmark projects when
+  transitive resolution is insufficient.
+- Treat local links as unstaged validation scaffolding. Do not publish or release
+  with them in place.
+- Resolve items 1-4, validate every downstream consumer, release FixedMathSharp,
+  then restore its package references and validate/release SwiftCollections.
+- SwiftCollections has no library-specific active issue at this checkpoint; its
+  place in the sequence is a full downstream compatibility and release gate.
+- Resolve item 5 against the released lower-stack packages, validate downstream
+  consumers, and release GridForge.
+- Update Gravitas to the released package versions, remove every local link, and
+  rerun `Release`, `ReleaseLean`, coverage, replay, and relevant benchmark gates
+  before starting items 6-15.
+
+### Ordered Queue
+
+1. **FixedMathSharp:**
+   [FixedMathSharp Vector Midpoints Saturate Before Halving](#fixedmathsharp-vector-midpoints-saturate-before-halving).
+2. **FixedMathSharp:**
+   [FixedMathSharp Rays Treat Small Representable Directions As Parallel](#fixedmathsharp-rays-treat-small-representable-directions-as-parallel).
+3. **FixedMathSharp / Gravitas boundary:**
+   [Extreme Collider Bounds Can Underestimate CCD Proxy Radius](#extreme-collider-bounds-can-underestimate-ccd-proxy-radius).
+   Establish the shared overflow-safe magnitude or supported-range policy before
+   choosing the final owning layer.
+4. **FixedMathSharp / Gravitas boundary:**
+   [Extreme Convex Sweeps Can Normalize To Non-Unit Directions](#extreme-convex-sweeps-can-normalize-to-non-unit-directions).
+   Reuse the magnitude, normalization, or range policy established by item 3.
+5. **GridForge:**
+   [GridForge Reuses Grid Spawn Tokens Across Pooled Generations](#gridforge-reuses-grid-spawn-tokens-across-pooled-generations).
+6. **Gravitas:**
+   [Registered Joints Can Outlive Their Body And Collider Lifetimes](#registered-joints-can-outlive-their-body-and-collider-lifetimes).
+7. **Gravitas:**
+   [Non-Unit Quaternion Admission Can Collapse Runtime Shape Axes](#non-unit-quaternion-admission-can-collapse-runtime-shape-axes).
+8. **Gravitas:**
+   [Continuous-Collision Modes Accept Undefined Enum Values](#continuous-collision-modes-accept-undefined-enum-values).
+9. **Gravitas:**
+   [3D Exit Callback Failure Can Duplicate Reentrant Separation Notifications](#3d-exit-callback-failure-can-duplicate-reentrant-separation-notifications).
+10. **Gravitas:**
+    [CCD Handoff Dedupe Can Strand A Same-Frame Requeued Body](#ccd-handoff-dedupe-can-strand-a-same-frame-requeued-body).
+11. **Gravitas:**
+    [SolidBody Point Transforms Use Collider Dimensions As Transform Scale](#solidbody-point-transforms-use-collider-dimensions-as-transform-scale).
+12. **Gravitas:**
+    [3D Angular Impulse Scales Immediate Velocity By Frame Delta](#3d-angular-impulse-scales-immediate-velocity-by-frame-delta).
+13. **Gravitas:**
+    [Rotational CCD Can Miss Contacts Between Bounded Pose Samples](#rotational-ccd-can-miss-contacts-between-bounded-pose-samples).
+14. **Gravitas:**
+    [Convex Mesh Mode Accepts Disconnected Topology And Can Collide In Empty Bounds Space](#convex-mesh-mode-accepts-disconnected-topology-and-can-collide-in-empty-bounds-space).
+15. **Gravitas:**
+    [Relative CCD Quadratic Saturation Can Miss Extreme-Range Crossings](#relative-ccd-quadratic-saturation-can-miss-extreme-range-crossings).
+    Apply the supported-range decision established by items 3-4 before adding a
+    separate scale-safe quadratic implementation.
+
 ### Non-Unit Quaternion Admission Can Collapse Runtime Shape Axes
 
 **Discovered:** 2026-07-13  
