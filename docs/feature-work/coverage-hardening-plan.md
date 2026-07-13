@@ -22,31 +22,31 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-solver-tangent-task82-final-authoritative-root-comparable/4f73a0a7-4ece-4904-a851-b5452a50a4a8/coverage.cobertura.xml`.
+`TestResults/coverage-settings-square-validation-task83-final-authoritative-root-comparable/a12df29a-6fdf-4bdb-a3ac-8c0c11751a0d/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
 | Lines | 99.95% | 27,173 / 27,185 | 12 | 100% |
-| Branches | 99.99% | 10,406 / 10,407 | 1 | 100% |
+| Branches | 100% | 10,407 / 10,407 | 0 | 100% |
 | Methods | 99.69% | 3,537 / 3,548 | 11 | 100% |
 
-The authoritative full coverage-enabled `Release` suite passes 2,553/2,553 tests, and
+The authoritative full coverage-enabled `Release` suite passes 2,555/2,555 tests, and
 `ReleaseLean` builds both targets without warnings. Branch coverage is now the
-primary constraint, but the remaining line and method gaps must close from the
+first metric at 100%; the remaining line and method gaps must now close from the
 same final artifact.
 
-Task 82's authoritative artifact removes the final 3D solver-contact branch.
-The block deletes a caller-impossible tangent fallback rather than admitting an
-invalid zero-normal solver contact solely for coverage.
+Task 83's authoritative artifact closes the final branch in settings matrix
+validation. Missing rows now fail deterministically, and overlong rows no longer
+violate the square-matrix contract through silent truncation.
 
 ### Immediate Completed Block
 
-The 3D solver tangent fallback is removed. The sole constructor caller first
-normalizes the contact or fallback direction and rejects zero. `CreateTangent`
-then crosses that unit normal with the cardinal axis having the smallest
-absolute component, guaranteeing squared tangent magnitude of at least roughly
-two thirds. The epsilon fallback was therefore unreachable under every legal
-solver contact; the direct normalized cross product is the complete policy.
+The settings matrix validation block is resolved. Default/missing `MatrixRow`
+values can arrive through direct callers, omitted JSON, MemoryPack, or Lean
+build consumers; they now produce the explicit square-matrix error instead of a
+`NullReferenceException`. Review also found that overlong rows were silently
+truncated. Exact-length validation now rejects both short and long rows, with
+failing-before-fix evidence for the overlong case.
 
 ## Rules Of Engagement
 
@@ -113,7 +113,10 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | `Settings/PhysicsSettingsSaver.cs` | 0 | 1 | 0 | Close the final branch without weakening load semantics. |
+| 1 | Mixed runtime lifecycle/accessor wrappers | 3 | 0 | 3 | Prove or delete `Deactivate`, partition `OnChange`, and query context exposure as one ownership block. |
+| 2 | Value-object hashes, settings accessor, and warm-start constructor | 4 | 0 | 4 | Pin one-line public/internal value contracts without invocation-only assertions. |
+| 3 | `Colliders/Mesh/MeshUtils.cs` | 2 | 0 | 2 | Classify legacy array geometry wrappers against current callers. |
+| 4 | `Diagnostics/Logging/GravitasLogger.cs` | 3 | 0 | 2 | Prove default formatting/dispatch or remove obsolete defaults. |
 
 ### Phase 1: Core Runtime And Service Ownership
 
@@ -496,6 +499,7 @@ of record.
 | Nested mixed-material fallback closure | 99.95% | 99.97% | 99.69% | 2,553 | Compound-vs-compound detection now proves already-selected innermost 3D/2D part materials survive the outer compound fallback; unconditional overwrite fails exact material identity. |
 | CCD zero-inverse-mass policy closure | 99.95% | 99.98% | 99.69% | 2,553 | Shared impulse policy now proves an infinite-mass participant is neutral rather than pair-rejecting, while the existing near-singular positive-mobility guard remains exact. |
 | 3D solver tangent fallback deletion | 99.95% | 99.99% | 99.69% | 2,553 | The sole caller supplies a normalized nonzero contact normal; least-component axis selection guarantees a nondegenerate cross product, so the unreachable epsilon fallback was deleted. |
+| Settings square-matrix validation closure | 99.95% | 100% | 99.69% | 2,555 | Missing rows now fail with the explicit square-matrix contract, overlong rows no longer truncate silently, and branch coverage reached 10,407/10,407. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.

@@ -108,6 +108,38 @@ public sealed class PhysicsSettingsSaverTests
     }
 
     [Fact]
+    public void CreateSettings_WithOverlongCollisionMatrixRow_ShouldReject()
+    {
+        var saver = new PhysicsSettingsSaver
+        {
+            CollisionMatrix = new[]
+            {
+                new MatrixRow { row = new[] { true, false } },
+                new MatrixRow { row = new[] { false, true, false } }
+            }
+        };
+
+        Action act = () => _ = saver.CreateSettings();
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*square*");
+    }
+
+    [Fact]
+    public void CreateSettings_WithMissingCollisionMatrixRow_ShouldRejectDeterministically()
+    {
+        var saver = new PhysicsSettingsSaver
+        {
+            CollisionMatrix = new[] { default(MatrixRow) }
+        };
+
+        Action act = () => _ = saver.CreateSettings();
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*square*");
+    }
+
+    [Fact]
     public void CreateSettings_WithNoCollisionMatrix_ShouldUseDefaultLayerRules()
     {
         var saver = new PhysicsSettingsSaver();

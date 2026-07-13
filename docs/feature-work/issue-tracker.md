@@ -366,6 +366,34 @@ active/dynamic-ID admission predicates removed in Task 67.
 
 ## Resolved Issues
 
+### Overlong Settings Collision Matrix Rows Were Silently Truncated
+
+**Resolved:** 2026-07-13  
+**Source:** 95%-to-100% coverage hardening, final settings branch review  
+**Affected area:** `PhysicsSettingsSaver.CreateCollisionMatrix()`
+
+RCA: settings load validation required each collision-matrix row to contain at
+least the outer row count, then copied only that many entries. A longer row was
+therefore accepted and silently truncated even though the public failure message
+and matrix contract require square data. A missing row was guarded in production
+but lacked a regression proving deterministic failure instead of null dereference.
+
+Fix: row validation now requires exact length. Separate regressions cover short,
+overlong, and missing rows; all malformed shapes throw the explicit
+square-matrix `InvalidOperationException`.
+
+Verification:
+
+- The overlong-row regression failed before the fix because no exception was
+  thrown, then passed with exact-length validation.
+- Removing the null-row guard changes the declared settings error into a
+  `NullReferenceException` and fails the missing-row regression.
+- Focused settings coverage passes 7/7 with `PhysicsSettingsSaver` at 100% line,
+  branch, and method coverage.
+- Authoritative artifact
+  `TestResults/coverage-settings-square-validation-task83-final-authoritative-root-comparable/a12df29a-6fdf-4bdb-a3ac-8c0c11751a0d/coverage.cobertura.xml`
+  passes 2,555/2,555 full `Release` tests and reports 10,407/10,407 branches.
+
 ### Pending CCD Replay Hashes Depended On Deleted Collider ID History
 
 **Resolved:** 2026-07-13  

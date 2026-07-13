@@ -125,7 +125,7 @@ public sealed partial class PhysicsSettingsSaver : DefaultSaver
         {
             bool[] row = CollisionMatrix[i].row;
             SwiftThrowHelper.ThrowIfTrue(
-                row == null || row.Length < numberOfLayers,
+                row == null || row.Length != numberOfLayers,
                 nameof(CollisionMatrix),
                 "Physics settings collision matrix rows must be square.");
 
