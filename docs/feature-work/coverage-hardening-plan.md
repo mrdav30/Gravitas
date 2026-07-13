@@ -22,32 +22,32 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-hierarchy-task50-authoritative-root-comparable/008014d3-2820-443a-a958-c9ec7e9e0096/coverage.cobertura.xml`.
+`TestResults/coverage-sweep-clip-task51-authoritative-root-comparable/dcc43e8a-838d-4c9a-b09f-e4a5ad526f5c/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
-| Lines | 99.76% | 26,948 / 27,012 | 64 | 100% |
-| Branches | 99.38% | 10,402 / 10,466 | 64 | 100% |
-| Methods | 99.38% | 3,520 / 3,542 | 22 | 100% |
+| Lines | 99.77% | 26,927 / 26,989 | 62 | 100% |
+| Branches | 99.42% | 10,352 / 10,412 | 60 | 100% |
+| Methods | 99.38% | 3,516 / 3,538 | 22 | 100% |
 
-The authoritative full coverage-enabled `Release` suite passes 2,476/2,476 tests, and
+The authoritative full coverage-enabled `Release` suite passes 2,485/2,485 tests, and
 `ReleaseLean` builds both targets without warnings. Branch coverage is now the
 primary constraint, but the remaining line and method gaps must close from the
 same final artifact.
 
-Task 50's authoritative artifact reports 100% line, branch, and method coverage
-for shared collider hierarchy state. Reparent and clear operations now remove
-ownership through the retained exact top-parent reference instead of a reusable
-registry ID lookup, and empty cleanup remains idempotent.
+Task 51's authoritative artifact reports 100% line, branch, and method coverage
+for shared segment-box clipping plus raycast, swept-sphere, and mixed fallback
+consumers. One exact-zero policy replaced three drifting implementations, and
+the obsolete `MixedSweepBoxUtility` was deleted.
 
 ### Immediate Completed Block
 
-The hierarchy ownership boundary is resolved and independently reviewed across
-2D, 3D, and mixed consumers. The unused state-level `ParentId` duplicate was
-deleted. Changed-top reparent and clear paths release the old root through the
-retained `TopParent`, preventing stale child ownership and reusable-ID aliasing
-even when registry lookup is unavailable. Null-backed child cleanup remains a
-deterministic no-op.
+The segment-box clipping boundary is resolved and independently reviewed across
+mixed fallback, ray AABB/OBB, and swept-sphere cuboid consumers. Only exact zero
+is parallel; a one-raw normalized component that reaches a boundary at the
+endpoint remains real motion. Entry-only callers retain start-inside fast paths,
+while raycasts still compute the true exit. Three copies and their wrappers were
+collapsed into `SweepBoundsUtility`, deleting 77 net production lines.
 
 ## Rules Of Engagement
 
@@ -114,11 +114,10 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | `Queries/Mixed/MixedSweepBoxUtility.cs` | 0 | 3 | 0 | Slab bounds, degenerate displacement, and stable extrema. |
-| 2 | `Core/3D/SolidBody.ContinuousCollision.Helpers.cs` | 0 | 3 | 0 | Candidate filters and relative-motion fallback. |
-| 3 | `CollisionHandling/Detection/3D/Sat/AxisProjectionHelper.cs` | 5 | 2 | 1 | Capsule/cuboid axes, sphere projection, and degenerate normals. |
-| 4 | `Constraints/3D/RagdollRuntime3D.cs` | 3 | 2 | 1 | Replay load shape, link ownership, and stable reconstruction. |
-| 5 | `Core/2D/GravitasPhysics2DService.SupportTypes.cs` | 3 | 2 | 0 | Stable support ordering and lifecycle-proven ownership. |
+| 1 | `Core/3D/SolidBody.ContinuousCollision.Helpers.cs` | 0 | 3 | 0 | Candidate filters and relative-motion fallback. |
+| 2 | `CollisionHandling/Detection/3D/Sat/AxisProjectionHelper.cs` | 5 | 2 | 1 | Capsule/cuboid axes, sphere projection, and degenerate normals. |
+| 3 | `Constraints/3D/RagdollRuntime3D.cs` | 3 | 2 | 1 | Replay load shape, link ownership, and stable reconstruction. |
+| 4 | `Core/2D/GravitasPhysics2DService.SupportTypes.cs` | 3 | 2 | 0 | Stable support ordering and lifecycle-proven ownership. |
 
 ### Phase 1: Core Runtime And Service Ownership
 
@@ -443,6 +442,7 @@ of record.
 | Physics material closure | 99.75% | 99.31% | 99.35% | 2,472 | PhysicsMaterial reached 100%; duplicate validation was collapsed without changing parameter contracts, average is overflow-safe and ties-to-even, geometric mean preserves positive identity and extreme coefficients, and the relevant default-material response benchmark remains allocation-free without a credible regression. |
 | Authored shape-definition closure | 99.75% | 99.36% | 99.35% | 2,474 | The 3D and 2D authored definition families reached 100%; dispatch fallbacks now own invalid/default errors, impossible private payload-null guards were deleted, mesh index and planar size boundaries are exact, and omitted versus explicit default material semantics remain distinct. |
 | Hierarchy ownership closure | 99.76% | 99.38% | 99.38% | 2,476 | Shared hierarchy state reached 100%; the unused ParentId duplicate was removed, empty cleanup is idempotent, and reparent/clear ownership now releases the retained exact top parent instead of risking stale or reused-ID registry aliases. |
+| Shared segment-box clipping closure | 99.77% | 99.42% | 99.38% | 2,485 | Mixed fallback, ray AABB/OBB, and swept-sphere cuboid clipping reached 100%; exact-zero parallel policy preserves one-raw endpoint contacts, true ray exits remain exact, and three drifting clip implementations collapsed into SweepBoundsUtility with 77 net production lines deleted. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.

@@ -17,76 +17,151 @@ namespace Gravitas.Tests.MixedDimensions;
 public sealed class MixedQuerySupportTests
 {
     [Fact]
-    public void TrySweepBox_WhenStartIsInside_ShouldReturnZeroDistance()
+    public void TryClipSegment_WhenStartIsInside_ShouldReturnZeroEntryAndBoundaryExit()
     {
-        bool hit = MixedSweepBoxUtility.TrySweepBox(
+        bool hit = SweepBoundsUtility.TryClipSegment(
             Vector3d.Zero,
             Vector3d.Right,
             (Fixed64)4,
             -Vector3d.One,
             Vector3d.One,
-            out Fixed64 distance);
+            out Fixed64 entry,
+            out Fixed64 exit);
 
         hit.Should().BeTrue();
-        distance.Should().Be(Fixed64.Zero);
+        entry.Should().Be(Fixed64.Zero);
+        exit.Should().Be(Fixed64.One);
     }
 
     [Fact]
-    public void TrySweepBox_WhenParallelAxesAreInside_ShouldClipMovingAxis()
+    public void TryClipSegment_WhenParallelAxesAreInside_ShouldClipMovingAxis()
     {
-        bool hit = MixedSweepBoxUtility.TrySweepBox(
+        bool hit = SweepBoundsUtility.TryClipSegment(
             new Vector3d((Fixed64)(-3), Fixed64.Zero, Fixed64.Zero),
             Vector3d.Right,
             (Fixed64)6,
             -Vector3d.One,
             Vector3d.One,
-            out Fixed64 distance);
+            out Fixed64 distance,
+            out _);
 
         hit.Should().BeTrue();
         distance.Should().Be((Fixed64)2);
     }
 
     [Fact]
-    public void TrySweepBox_WhenParallelAxisStartsOutside_ShouldReject()
+    public void TryClipSegment_WhenParallelAxisStartsOutside_ShouldReject()
     {
-        bool hit = MixedSweepBoxUtility.TrySweepBox(
+        bool hit = SweepBoundsUtility.TryClipSegment(
             new Vector3d((Fixed64)(-3), (Fixed64)2, Fixed64.Zero),
             Vector3d.Right,
             (Fixed64)6,
             -Vector3d.One,
             Vector3d.One,
+            out _,
             out _);
 
         hit.Should().BeFalse();
     }
 
     [Fact]
-    public void TrySweepBox_WhenAxisIntervalsDoNotOverlap_ShouldReject()
+    public void TryClipSegment_WhenAxisIntervalsDoNotOverlap_ShouldReject()
     {
-        bool hit = MixedSweepBoxUtility.TrySweepBox(
+        bool hit = SweepBoundsUtility.TryClipSegment(
             new Vector3d((Fixed64)(-3), (Fixed64)3, Fixed64.Zero),
             new Vector3d(Fixed64.One, -Fixed64.FromFraction(1, 10), Fixed64.Zero),
             (Fixed64)6,
             -Vector3d.One,
             Vector3d.One,
+            out _,
             out _);
 
         hit.Should().BeFalse();
     }
 
     [Fact]
-    public void TrySweepBox_WhenMovingFromPositiveSide_ShouldSwapAxisEntryAndExit()
+    public void TryClipSegment_WhenMovingFromPositiveSide_ShouldSwapAxisEntryAndExit()
     {
-        bool hit = MixedSweepBoxUtility.TrySweepBox(
+        bool hit = SweepBoundsUtility.TryClipSegment(
             new Vector3d((Fixed64)3, Fixed64.Zero, Fixed64.Zero),
             -Vector3d.Right,
             (Fixed64)6,
             -Vector3d.One,
             Vector3d.One,
-            out Fixed64 distance);
+            out Fixed64 distance,
+            out _);
 
         hit.Should().BeTrue();
         distance.Should().Be((Fixed64)2);
+    }
+
+    [Fact]
+    public void TryClipSegment_WhenMovingAwayFromFirstAxis_ShouldReject()
+    {
+        bool hit = SweepBoundsUtility.TryClipSegment(
+            new Vector3d((Fixed64)(-3), Fixed64.Zero, Fixed64.Zero),
+            -Vector3d.Right,
+            (Fixed64)6,
+            -Vector3d.One,
+            Vector3d.One,
+            out _,
+            out _);
+
+        hit.Should().BeFalse();
+    }
+
+    [Fact]
+    public void TryClipSegment_WhenParallelAxisStartsBelowMinimum_ShouldReject()
+    {
+        bool hit = SweepBoundsUtility.TryClipSegment(
+            new Vector3d((Fixed64)(-3), (Fixed64)(-2), Fixed64.Zero),
+            Vector3d.Right,
+            (Fixed64)6,
+            -Vector3d.One,
+            Vector3d.One,
+            out _,
+            out _);
+
+        hit.Should().BeFalse();
+    }
+
+    [Fact]
+    public void TryClipSegment_WhenLaterAxisEntersEarlier_ShouldKeepLatestEntry()
+    {
+        Fixed64 directionX = Fixed64.FromFraction(3, 5);
+        bool hit = SweepBoundsUtility.TryClipSegment(
+            new Vector3d((Fixed64)(-3), (Fixed64)(-2), Fixed64.Zero),
+            new Vector3d(directionX, Fixed64.FromFraction(4, 5), Fixed64.Zero),
+            (Fixed64)10,
+            -Vector3d.One,
+            Vector3d.One,
+            out Fixed64 distance,
+            out _);
+
+        hit.Should().BeTrue();
+        distance.Should().Be((Fixed64)2 / directionX);
+    }
+
+    [Fact]
+    public void TryClipSegment_WhenSmallestDirectionComponentReachesBoundaryAtEndpoint_ShouldHit()
+    {
+        Fixed64 smallestIncrement = Fixed64.FromRaw(1);
+        Vector3d start = new(-Fixed64.One - smallestIncrement, Fixed64.Zero, -Fixed64.Half);
+        Vector3d end = new(-Fixed64.One, Fixed64.Zero, Fixed64.Half);
+        Vector3d segment = end - start;
+        Fixed64 length = segment.Magnitude;
+
+        bool hit = SweepBoundsUtility.TryClipSegment(
+            start,
+            segment / length,
+            length,
+            -Vector3d.One,
+            Vector3d.One,
+            out Fixed64 distance,
+            out _);
+
+        hit.Should().BeTrue();
+        distance.Should().Be(length);
     }
 
     [Fact]

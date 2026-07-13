@@ -393,12 +393,14 @@ public sealed class RaycastSegmentWorker
         if (_segmentLengthSqr == Fixed64.Zero)
             return CheckPointInsideBox(min, max, ref outputIntersectionPoints);
 
-        Fixed64 entry = Fixed64.Zero;
-        Fixed64 exit = _segmentLength;
-
-        if (!ClipSegmentAxis(_cachedOrigin.X, _segmentDirection.X, min.X, max.X, ref entry, ref exit)
-            || !ClipSegmentAxis(_cachedOrigin.Y, _segmentDirection.Y, min.Y, max.Y, ref entry, ref exit)
-            || !ClipSegmentAxis(_cachedOrigin.Z, _segmentDirection.Z, min.Z, max.Z, ref entry, ref exit))
+        if (!SweepBoundsUtility.TryClipSegment(
+            _cachedOrigin,
+            _segmentDirection,
+            _segmentLength,
+            min,
+            max,
+            out Fixed64 entry,
+            out Fixed64 exit))
         {
             return false;
         }
@@ -438,12 +440,14 @@ public sealed class RaycastSegmentWorker
         }
 
         Vector3d localDirection = _segmentDirection * inverseRotation;
-        Fixed64 entry = Fixed64.Zero;
-        Fixed64 exit = _segmentLength;
-
-        if (!ClipSegmentAxis(localOrigin.X, localDirection.X, min.X, max.X, ref entry, ref exit)
-            || !ClipSegmentAxis(localOrigin.Y, localDirection.Y, min.Y, max.Y, ref entry, ref exit)
-            || !ClipSegmentAxis(localOrigin.Z, localDirection.Z, min.Z, max.Z, ref entry, ref exit))
+        if (!SweepBoundsUtility.TryClipSegment(
+            localOrigin,
+            localDirection,
+            _segmentLength,
+            min,
+            max,
+            out Fixed64 entry,
+            out Fixed64 exit))
         {
             return false;
         }
@@ -637,29 +641,4 @@ public sealed class RaycastSegmentWorker
         outputIntersectionPoints.Add(_cachedOrigin + _segmentDirection * distance);
     }
 
-    private static bool ClipSegmentAxis(
-        Fixed64 position,
-        Fixed64 direction,
-        Fixed64 min,
-        Fixed64 max,
-        ref Fixed64 entry,
-        ref Fixed64 exit)
-    {
-        if (direction.Abs() <= Fixed64.Epsilon)
-            return position >= min && position <= max;
-
-        Fixed64 t1 = (min - position) / direction;
-        Fixed64 t2 = (max - position) / direction;
-
-        if (t1 > t2)
-            (t1, t2) = (t2, t1);
-
-        if (t1 > entry)
-            entry = t1;
-
-        if (t2 < exit)
-            exit = t2;
-
-        return entry <= exit;
-    }
 }

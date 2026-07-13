@@ -782,6 +782,37 @@ public sealed class RaycastSegmentWorkerTests
     }
 
     [Fact]
+    public void CheckAABBoxOverlaps_WithNonzeroSegmentStartingInside_ShouldReturnOriginAndBoxExit()
+    {
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+        worker.PrepareSegmentCheck(Vector3d.Zero, Vector3d.Right * (Fixed64)3);
+
+        bool hit = worker.CheckAABBoxOverlaps(-Vector3d.One, Vector3d.One, ref hits);
+
+        hit.Should().BeTrue();
+        hits.Count.Should().Be(2);
+        hits[0].Should().Be(Vector3d.Zero);
+        hits[1].Should().Be(Vector3d.Right);
+    }
+
+    [Fact]
+    public void CheckAABBoxOverlaps_WhenSmallestDirectionComponentReachesBoundaryAtEndpoint_ShouldHit()
+    {
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+        Fixed64 smallestIncrement = Fixed64.FromRaw(1);
+        Vector3d start = new(-Fixed64.One - smallestIncrement, Fixed64.Zero, -Fixed64.Half);
+        Vector3d end = new(-Fixed64.One, Fixed64.Zero, Fixed64.Half);
+        worker.PrepareSegmentCheck(start, end);
+
+        bool hit = worker.CheckAABBoxOverlaps(-Vector3d.One, Vector3d.One, ref hits);
+
+        hit.Should().BeTrue();
+        hits.Should().ContainSingle().Which.Should().Be(end);
+    }
+
+    [Fact]
     public void CheckAABBoxOverlaps_WithSegmentMissAfterAxisClip_ShouldReturnFalse()
     {
         var worker = new RaycastSegmentWorker();

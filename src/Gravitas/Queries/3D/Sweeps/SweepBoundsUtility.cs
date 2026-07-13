@@ -13,6 +13,23 @@ namespace Gravitas.Queries;
 internal static class SweepBoundsUtility
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static bool TryClipSegment(
+        Vector3d start,
+        Vector3d direction,
+        Fixed64 length,
+        Vector3d min,
+        Vector3d max,
+        out Fixed64 entry,
+        out Fixed64 exit)
+    {
+        entry = Fixed64.Zero;
+        exit = length;
+        return ClipSegmentAxis(start.X, direction.X, min.X, max.X, ref entry, ref exit)
+            && ClipSegmentAxis(start.Y, direction.Y, min.Y, max.Y, ref entry, ref exit)
+            && ClipSegmentAxis(start.Z, direction.Z, min.Z, max.Z, ref entry, ref exit);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static void CreateSweptBounds(
         Vector3d min,
         Vector3d max,
@@ -55,5 +72,29 @@ internal static class SweepBoundsUtility
             && firstMin.Y <= secondMax.Y
             && firstMax.Z >= secondMin.Z
             && firstMin.Z <= secondMax.Z;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool ClipSegmentAxis(
+        Fixed64 position,
+        Fixed64 direction,
+        Fixed64 min,
+        Fixed64 max,
+        ref Fixed64 entry,
+        ref Fixed64 exit)
+    {
+        if (direction == Fixed64.Zero)
+            return position >= min && position <= max;
+
+        Fixed64 first = (min - position) / direction;
+        Fixed64 second = (max - position) / direction;
+        if (first > second)
+            (first, second) = (second, first);
+
+        if (first > entry)
+            entry = first;
+        if (second < exit)
+            exit = second;
+        return entry <= exit;
     }
 }

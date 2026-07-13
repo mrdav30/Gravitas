@@ -1939,6 +1939,25 @@ public sealed class GravitasQuery3DServiceSweepTests
     }
 
     [Fact]
+    public void SweptSphereWorker_WhenSmallestDirectionComponentReachesCuboidAtEndpoint_ShouldHit()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSCuboidCollider cuboid = CreateDynamicCollider(context, new LSCuboidCollider(), Vector3d.Zero);
+        var worker = new SweptSphereQueryWorker();
+        Fixed64 radius = Fixed64.FromFraction(1, 4);
+        Fixed64 expandedMinX = -Fixed64.Half - radius;
+        Vector3d start = new(expandedMinX - Fixed64.FromRaw(1), Fixed64.Zero, -Fixed64.Half);
+        Vector3d end = new(expandedMinX, Fixed64.Zero, Fixed64.Half);
+        worker.Prepare(start, end, radius);
+
+        bool hit = worker.TrySweep(cuboid, out Vector3d centerAtImpact, out Fixed64 distance);
+
+        hit.Should().BeTrue();
+        centerAtImpact.Should().Be(end);
+        distance.Should().Be(Fixed64.One);
+    }
+
+    [Fact]
     public void SweptSphereWorker_WithZeroLengthSegment_ShouldReturnFalse()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();

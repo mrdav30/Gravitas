@@ -88,7 +88,9 @@ public sealed partial class GravitasQueryMixedService
         Vector3d radiusExtents = Vector3d.One * radius;
         Vector3d min = bounds.Min - radiusExtents;
         Vector3d max = bounds.Max + radiusExtents;
-        if (!MixedSweepBoxUtility.TrySweepBox(start, direction, length, min, max, out Fixed64 distance))
+        Fixed64 distance = Fixed64.Zero;
+        if (!SweepBoundsUtility.OverlapsInclusive(start, start, min, max)
+            && !SweepBoundsUtility.TryClipSegment(start, direction, length, min, max, out distance, out _))
         {
             hit = default;
             return false;

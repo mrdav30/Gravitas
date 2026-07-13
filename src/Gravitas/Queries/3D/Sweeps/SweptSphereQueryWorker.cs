@@ -642,17 +642,20 @@ public sealed class SweptSphereQueryWorker
         sphereCenterAtImpact = Vector3d.Zero;
         impactDistance = Fixed64.Zero;
 
-        if (IsPointInsideBox(localStart, min, max))
+        if (SweepBoundsUtility.OverlapsInclusive(localStart, localStart, min, max))
         {
             sphereCenterAtImpact = _start;
             return true;
         }
 
-        Fixed64 entry = Fixed64.Zero;
-        Fixed64 exit = _length;
-        if (!ClipSegmentAxis(localStart.X, localDirection.X, min.X, max.X, ref entry, ref exit)
-            || !ClipSegmentAxis(localStart.Y, localDirection.Y, min.Y, max.Y, ref entry, ref exit)
-            || !ClipSegmentAxis(localStart.Z, localDirection.Z, min.Z, max.Z, ref entry, ref exit))
+        if (!SweepBoundsUtility.TryClipSegment(
+            localStart,
+            localDirection,
+            _length,
+            min,
+            max,
+            out Fixed64 entry,
+            out _))
         {
             return false;
         }
@@ -707,11 +710,6 @@ public sealed class SweptSphereQueryWorker
         && localPoint.Y <= halfHeight
         && localPoint.X * localPoint.X + localPoint.Z * localPoint.Z <= radiusSqr;
 
-    private static bool IsPointInsideBox(Vector3d localPoint, Vector3d min, Vector3d max) =>
-        localPoint.X >= min.X && localPoint.X <= max.X
-        && localPoint.Y >= min.Y && localPoint.Y <= max.Y
-        && localPoint.Z >= min.Z && localPoint.Z <= max.Z;
-
     private Fixed64 GetSphereConeSeparation(LSConeCollider cone, Vector3d center)
     {
         Vector3d closest = cone.ClosestPointOnSurface(center);
@@ -735,31 +733,6 @@ public sealed class SweptSphereQueryWorker
         }
 
         return high;
-    }
-
-    private static bool ClipSegmentAxis(
-        Fixed64 position,
-        Fixed64 direction,
-        Fixed64 min,
-        Fixed64 max,
-        ref Fixed64 entry,
-        ref Fixed64 exit)
-    {
-        if (direction.Abs() <= Fixed64.Epsilon)
-            return position >= min && position <= max;
-
-        Fixed64 first = (min - position) / direction;
-        Fixed64 second = (max - position) / direction;
-        if (first > second)
-            (first, second) = (second, first);
-
-        if (first > entry)
-            entry = first;
-
-        if (second < exit)
-            exit = second;
-
-        return entry <= exit;
     }
 
     private static void CreateSweepBounds(Vector3d start, Vector3d end, Fixed64 radius, out Vector3d min, out Vector3d max)

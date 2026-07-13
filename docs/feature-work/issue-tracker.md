@@ -38,6 +38,27 @@ extreme, odd-raw tie, signed symmetry, and per-component vector regressions,
 then consume the released helper from Gravitas instead of duplicating the raw
 algorithm.
 
+### FixedMathSharp Rays Treat Small Representable Directions As Parallel
+
+**Discovered:** 2026-07-13  
+**Source:** 95%-to-100% coverage hardening, shared segment-box clipping review  
+**Affected area:** FixedMathSharp `FixedRay` and `FixedRay2d` slab intersection
+
+The FixedMathSharp ray slab helpers classify an axis as parallel when its
+direction magnitude is less than or equal to `Fixed64.Epsilon`. A direction
+component of `Fixed64.FromRaw(1)` is representable motion, not zero: with a
+unit displacement on another axis, the normalized component remains one raw
+unit and can reach a boundary exactly at the endpoint. Treating it as parallel
+therefore produces a false negative when the origin begins one raw unit outside
+that slab.
+
+Gravitas does not call these unbounded ray primitives. Its bounded raycast,
+swept-sphere, and mixed fallback paths now share an exact-zero segment clipper,
+so this lower-stack defect does not block the coverage campaign. Resolve it in
+FixedMathSharp by making only exact zero parallel, then add positive/negative
+one-raw endpoint-touch and true-zero outside-slab regressions for both 2D and
+3D rays.
+
 ### 3D Angular Impulse Scales Immediate Velocity By Frame Delta
 
 **Discovered:** 2026-07-12  
