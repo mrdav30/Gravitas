@@ -4,6 +4,7 @@ using Gravitas.Colliders;
 using Gravitas.Queries;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
+using GridForge.Grids;
 using SwiftCollections;
 using System;
 using Xunit;
@@ -52,6 +53,46 @@ public sealed class GravitasQuery3DServiceConeTests
         hits[3].Collider.Should().BeSameAs(cylinder);
         hits[4].Collider.Should().BeSameAs(cone);
         hits.Should().OnlyContain(hit => hit.Distance >= Fixed64.Zero);
+    }
+
+    [Fact]
+    public void OverlapConeQueries_WithStalePartitionColliderId_ShouldIgnoreStaleEntry()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSSphereCollider target = scenario.CreateSphere(new Vector3d((Fixed64)2, Fixed64.Zero, Fixed64.Zero)).Collider;
+        int staleId = target.Id + 1_000;
+        for (int i = 0; i < target.PartitionCoordinates!.Count; i++)
+        {
+            scenario.Context.World.TryGetVoxel(target.PartitionCoordinates[i], out Voxel? voxel).Should().BeTrue();
+            voxel!.TryGetPartition(out PhysicsPartition? partition).Should().BeTrue();
+            partition!.ContainedDynamicObjects!.Add(staleId).Should().BeTrue();
+        }
+
+        scenario.Context.Physics.TryGetColliderById(staleId, out _).Should().BeFalse();
+        var hits = new SwiftList<Physics3DHit>();
+
+        bool found = scenario.Context.Query3D.OverlapCone(
+            Vector3d.Zero,
+            Vector3d.Right,
+            (Fixed64)4,
+            Fixed64.One,
+            out Physics3DHit closest,
+            IncludeLayerZero);
+        int closestCandidateCount = scenario.Context.Query3D.LastQueryCandidateCount;
+        int count = scenario.Context.Query3D.OverlapConeAll(
+            Vector3d.Zero,
+            Vector3d.Right,
+            (Fixed64)4,
+            Fixed64.One,
+            IncludeLayerZero,
+            hits);
+
+        found.Should().BeTrue();
+        closest.Collider.Should().BeSameAs(target);
+        count.Should().Be(1);
+        hits.Should().ContainSingle().Which.Collider.Should().BeSameAs(target);
+        closestCandidateCount.Should().Be(1);
+        scenario.Context.Query3D.LastQueryCandidateCount.Should().Be(1);
     }
 
     [Fact]

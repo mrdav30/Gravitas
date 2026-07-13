@@ -542,9 +542,6 @@ public sealed partial class GravitasQuery3DService
             return false;
 
         Fixed64 radialSqr = delta.MagnitudeSquared - axialDistance * axialDistance;
-        if (radialSqr < Fixed64.Zero)
-            radialSqr = Fixed64.Zero;
-
         Fixed64 coneRadius = endRadius * (axialDistance / length);
         return radialSqr <= coneRadius * coneRadius + Fixed64.Epsilon;
     }

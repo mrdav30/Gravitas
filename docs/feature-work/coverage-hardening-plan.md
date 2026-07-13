@@ -22,32 +22,32 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-kinematic2d-ccd-task56-authoritative-root-comparable/ecf0f899-0ce4-412a-8ac9-38af383521fc/coverage.cobertura.xml`.
+`TestResults/coverage-cone-query-task57-authoritative-root-comparable/adc1851a-79af-49af-a0cf-88142d7a2588/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
-| Lines | 99.83% | 27,148 / 27,195 | 47 | 100% |
-| Branches | 99.56% | 10,405 / 10,451 | 46 | 100% |
+| Lines | 99.83% | 27,148 / 27,193 | 45 | 100% |
+| Branches | 99.58% | 10,405 / 10,449 | 44 | 100% |
 | Methods | 99.46% | 3,532 / 3,551 | 19 | 100% |
 
-The authoritative full coverage-enabled `Release` suite passes 2,519/2,519 tests, and
+The authoritative full coverage-enabled `Release` suite passes 2,520/2,520 tests, and
 `ReleaseLean` builds both targets without warnings. Branch coverage is now the
 primary constraint, but the remaining line and method gaps must close from the
 same final artifact.
 
-Task 56's authoritative artifact reports 100% line, branch, and method coverage
-for the 2D kinematic CCD block. The block closed two lines and two branch
-outcomes from the repository-wide gap with public near-singular mobility
-regressions for both pure 2D and mixed 3D targets.
+Task 57's authoritative artifact reports 100% line, branch, and method coverage
+for the 3D cone query block. The block closed two lines and two branch outcomes
+from the repository-wide gap by covering stale partition IDs and deleting a
+behavior-neutral negative radial-square clamp.
 
 ### Immediate Completed Block
 
-The 2D kinematic CCD handoff block is resolved. Positive constrained mobility
-can still be too small relative to body mobility for a stable response; pure 2D
-and mixed 3D targets now prove that the threshold rejects those near-singular
-handoffs without changing the kinematic source host pose or waking, moving, or
-accelerating the target. Removing either guard fails its exact parity
-regression.
+The 3D cone query block is resolved. Closest and all-hit paths now ignore a
+nonexistent collider ID retained in a partition while preserving exact real-hit
+identity, counts, and candidate accounting; inverting the lookup guard fails at
+the dereference. The radial-square clamp was removed because a negative value
+already satisfies the only subsequent comparison against a nonnegative
+saturating fixed-point cone radius squared plus epsilon.
 
 ## Rules Of Engagement
 
@@ -114,11 +114,11 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | `Queries/3D/GravitasQuery3DService.Cone.cs` | 2 | 2 | 0 | Cone query admission, filtering, and exact boundary behavior. |
-| 2 | `CollisionHandling/Detection/3D/CollisionDetection.Cylinder.cs` | 2 | 2 | 0 | Cylinder feature separation, containment, and exact contact ownership. |
-| 3 | `CollisionHandling/Response/Mixed/CollisionResponseMixed.cs` | 2 | 2 | 0 | Mixed mobility admission and constrained impulse behavior. |
-| 4 | `Core/3D/SolidBody.ContinuousCollision.Rotational.cs` | 2 | 2 | 0 | Rotational proxy admission, stable sampling, and exact boundary behavior. |
-| 5 | `CollisionHandling/Detection/3D/CollisionDetection.Capsule.cs` | 1 | 2 | 0 | Residual capsule admission and exact feature-boundary behavior. |
+| 1 | `CollisionHandling/Detection/3D/CollisionDetection.Cylinder.cs` | 2 | 2 | 0 | Cylinder feature separation, containment, and exact contact ownership. |
+| 2 | `CollisionHandling/Response/Mixed/CollisionResponseMixed.cs` | 2 | 2 | 0 | Mixed mobility admission and constrained impulse behavior. |
+| 3 | `Core/3D/SolidBody.ContinuousCollision.Rotational.cs` | 2 | 2 | 0 | Rotational proxy admission, stable sampling, and exact boundary behavior. |
+| 4 | `CollisionHandling/Detection/3D/CollisionDetection.Capsule.cs` | 1 | 2 | 0 | Residual capsule admission and exact feature-boundary behavior. |
+| 5 | `CollisionHandling/Detection/3D/GjkSimplexPolicy.cs` | 1 | 2 | 0 | Degenerate simplex policy and deterministic progress ownership. |
 | 6 | Remaining one- and two-branch collision, constraint, query, replay, and CCD blocks | 0-5 | 1-2 each | 0-2 | Re-rank from each authoritative artifact; finish one cohesive source block at a time. |
 
 ### Phase 1: Core Runtime And Service Ownership
@@ -264,6 +264,9 @@ incorrectly.
       fixed-point cross axis, delete the unused sphere projection, solve exact
       rounded distance and containment exits, match support witnesses, and
       preserve arbitrary-rotation inclusive contact.
+- [x] Close and independently review the 3D cone query through stale partition
+      collider IDs on closest/all paths and delete the behavior-neutral
+      negative radial-square clamp after saturating Fixed64 caller proof.
 - [ ] Delete reducer permutations or fallback branches that valid authored
       shapes and validated callers cannot reach.
 
@@ -467,6 +470,7 @@ of record.
 | Ragdoll runtime closure | 99.81% | 99.52% | 99.46% | 2,517 | Both runtime types reached 100%; zero-joint activation diagnostics now use required link ownership, 3D link access is exact, and inactive JSON/MemoryPack loads synchronize body, joint, service-count, and diagnostic state under mutation-sensitive independent review. |
 | 2D joint solver closure | 99.82% | 99.54% | 99.46% | 2,517 | `JointSolver2D` reached 100%; duplicate non-prismatic motor and near-zero axis guards were removed after exhaustive validated-caller proof, while existing public validation and coincident-anchor behavior killed mutations of both owning invariants. |
 | 2D kinematic CCD mobility closure | 99.83% | 99.56% | 99.46% | 2,519 | The kinematic handoff block reached 100%; pure 2D and mixed 3D near-singular target mobility now preserves exact source host pose and target position, velocity, and sleep state, with each retained threshold guard independently mutation-sensitive. |
+| 3D cone query closure | 99.83% | 99.58% | 99.46% | 2,520 | The cone query block reached 100%; closest/all paths ignore stale partition IDs with exact candidate accounting, the lookup guard is mutation-sensitive, and a behavior-neutral negative radial-square clamp was deleted after normalized-caller and saturating-arithmetic proof. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.
