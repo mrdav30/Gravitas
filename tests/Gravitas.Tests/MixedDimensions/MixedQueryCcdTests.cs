@@ -46,6 +46,62 @@ public sealed class MixedQueryCcdTests
         hit.Normal3DTo2D.Should().Be(-Vector3d.Up);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void MixedClosestSweeps_ShouldSelectNearestHitIndependentlyOfTargetIdOrder(bool registerNearFirst)
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        Vector2d nearPosition2D = new((Fixed64)(-1), Fixed64.Zero);
+        Vector2d farPosition2D = new((Fixed64)2, Fixed64.Zero);
+        Vector3d nearPosition3D = new((Fixed64)(-1), Fixed64.Zero, Fixed64.Zero);
+        Vector3d farPosition3D = new((Fixed64)2, Fixed64.Zero, Fixed64.Zero);
+        LSCollider2D near2D;
+        LSCollider near3D;
+
+        if (registerNearFirst)
+        {
+            near2D = CreateBodylessCircle2D(context, nearPosition2D);
+            _ = CreateBodylessCircle2D(context, farPosition2D);
+            near3D = CreateBodyless3D(context, new LSSphereCollider(), nearPosition3D);
+            _ = CreateBodyless3D(context, new LSSphereCollider(), farPosition3D);
+        }
+        else
+        {
+            _ = CreateBodylessCircle2D(context, farPosition2D);
+            near2D = CreateBodylessCircle2D(context, nearPosition2D);
+            _ = CreateBodyless3D(context, new LSSphereCollider(), farPosition3D);
+            near3D = CreateBodyless3D(context, new LSSphereCollider(), nearPosition3D);
+        }
+
+        bool sphereHit = context.QueryMixed.SweepSphereAgainst2D(
+            new Vector3d((Fixed64)(-5), Fixed64.Zero, Fixed64.Zero),
+            new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero),
+            Fixed64.Half,
+            IncludeLayerZero,
+            out PhysicsMixedHit sphereResult);
+        int sphereCandidateCount = context.QueryMixed.LastQueryCandidateCount;
+        bool circleHit = context.QueryMixed.SweepCircleAgainst3D(
+            new Vector2d((Fixed64)(-5), Fixed64.Zero),
+            new Vector2d((Fixed64)5, Fixed64.Zero),
+            Fixed64.Half,
+            Fixed64.Zero,
+            Fixed64.Half,
+            IncludeLayerZero,
+            out PhysicsMixedHit circleResult);
+
+        sphereHit.Should().BeTrue();
+        sphereCandidateCount.Should().Be(2);
+        sphereResult.Collider2D.Should().BeSameAs(near2D);
+        sphereResult.Distance.Should().Be((Fixed64)3);
+        sphereResult.ReducerKind.Should().Be(PhysicsQueryReducerKind.Exact);
+        circleHit.Should().BeTrue();
+        context.QueryMixed.LastQueryCandidateCount.Should().Be(2);
+        circleResult.Collider3D.Should().BeSameAs(near3D);
+        circleResult.Distance.Should().Be((Fixed64)3);
+        circleResult.ReducerKind.Should().Be(PhysicsQueryReducerKind.Exact);
+    }
+
     [Fact]
     public void SweepSphereAgainst2D_ShouldReturnCompound2DOwnerThroughPartGeometry()
     {
