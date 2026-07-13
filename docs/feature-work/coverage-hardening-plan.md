@@ -22,12 +22,12 @@ count.
 ## Current Checkpoint
 
 The authoritative artifact is:
-`TestResults/coverage-mixed-material-fallback-task80-final-authoritative-root-comparable/96826f76-7c31-488f-9020-b71d8e541615/coverage.cobertura.xml`.
+`TestResults/coverage-ccd-zero-inverse-mass-task81-final-authoritative-root-comparable/d8173f27-3218-4456-a91d-eaa8135f30f9/coverage.cobertura.xml`.
 
 | Metric | Current | Covered / Total | Remaining | Target |
 | ------ | ------: | --------------: | --------: | -----: |
 | Lines | 99.95% | 27,176 / 27,188 | 12 | 100% |
-| Branches | 99.97% | 10,406 / 10,409 | 3 | 100% |
+| Branches | 99.98% | 10,407 / 10,409 | 2 | 100% |
 | Methods | 99.69% | 3,537 / 3,548 | 11 | 100% |
 
 The authoritative full coverage-enabled `Release` suite passes 2,553/2,553 tests, and
@@ -35,18 +35,18 @@ The authoritative full coverage-enabled `Release` suite passes 2,553/2,553 tests
 primary constraint, but the remaining line and method gaps must close from the
 same final artifact.
 
-Task 80's authoritative artifact closes the final mixed-contact branch. The
-block proves nested compound reduction preserves the innermost authored 3D and
-2D part materials instead of overwriting them with compound-owner fallbacks.
+Task 81's authoritative artifact closes the final shared CCD impulse-policy
+branch. The block proves zero effective inverse mass is a neutral participant,
+while near-singular positive mobility remains rejected before division.
 
 ### Immediate Completed Block
 
-The nested compound material-precedence block is resolved through the public
-mixed narrow phase. A compound sphere part and compound circle part carry
-materials distinct from both owners. The inner reducer applies the authored
-part pair, and the outer fallback retains it. An always-overwrite mutation
-replaces the 3D part material with the frictionless owner and fails the exact
-material assertion.
+The zero-inverse-mass CCD policy block is resolved in the existing shared policy
+test. Dynamic candidate admission can include an active non-frozen body with
+zero effective inverse mass. That participant must not abort pair response; it
+contributes zero velocity delta while the movable participant resolves. The
+zero case is accepted, the prior near-singular positive case remains rejected,
+and removing the neutral-participant clause fails the exact assertion.
 
 ## Rules Of Engagement
 
@@ -113,7 +113,7 @@ mid-block merely because another branch looks easier.
 
 | Order | Source block | Lines | Branches | Methods | Focus |
 | ----: | ------------ | ----: | -------: | ------: | ----- |
-| 1 | Remaining one-branch CCD, solver, and settings files | 0 | 3 | 0 | Finish one cohesive source block at a time. |
+| 1 | Remaining one-branch solver and settings files | 0 | 2 | 0 | Finish one cohesive source block at a time. |
 
 ### Phase 1: Core Runtime And Service Ownership
 
@@ -494,6 +494,7 @@ of record.
 | Pure-2D closest-query exact-miss closure | 99.95% | 99.95% | 99.69% | 2,551 | Public raycast and swept-circle paths now prove one broad AABB candidate can be rejected by exact shape math; both narrow-phase guard-negation mutations fail. |
 | 3D trigger self-deactivation closure | 99.95% | 99.96% | 99.69% | 2,552 | Reentrant trigger self-deactivation now proves enter/exit completion, stay suppression, second-side non-admission, and pair-holder cleanup; removing the self-lifetime guard fails event order. |
 | Nested mixed-material fallback closure | 99.95% | 99.97% | 99.69% | 2,553 | Compound-vs-compound detection now proves already-selected innermost 3D/2D part materials survive the outer compound fallback; unconditional overwrite fails exact material identity. |
+| CCD zero-inverse-mass policy closure | 99.95% | 99.98% | 99.69% | 2,553 | Shared impulse policy now proves an infinite-mass participant is neutral rather than pair-rejecting, while the existing near-singular positive-mobility guard remains exact. |
 
 Completed campaigns established broad 2D, 3D, mixed, CCD, query, partition,
 lifecycle, replay, serialization, diagnostics, and authored-shape coverage.

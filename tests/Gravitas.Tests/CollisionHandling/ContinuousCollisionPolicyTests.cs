@@ -186,11 +186,14 @@ public sealed class ContinuousCollisionPolicyTests
     }
 
     [Fact]
-    public void ContinuousCollisionImpulsePolicy_ShouldRejectNearSingularMobilityBeforeResolvingVelocity()
+    public void ContinuousCollisionImpulsePolicy_ShouldAcceptZeroInverseMassAndRejectNearSingularMobility()
     {
         Fixed64 smallComponent = Fixed64.FromFraction(1, 65536);
         Fixed64 constrainedInverseMass = smallComponent * smallComponent;
         (Fixed64.One / constrainedInverseMass).Should().Be(Fixed64.MaxValue);
+        ContinuousCollisionImpulsePolicy.IsResolvableMobility(
+            Fixed64.Zero,
+            Fixed64.Zero).Should().BeTrue();
         ContinuousCollisionImpulsePolicy.IsResolvableMobility(
             Fixed64.One,
             constrainedInverseMass).Should().BeFalse();
