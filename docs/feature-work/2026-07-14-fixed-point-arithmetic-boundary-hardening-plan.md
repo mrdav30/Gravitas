@@ -6,14 +6,16 @@
 > checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Move reusable exact-arithmetic protections into FixedMathSharp, leave
-only GJK and sweep policy in Gravitas, and close the remaining extreme-range
+only GJK and solver policy in Gravitas, and close the remaining extreme-range
 correctness gaps without downstream arithmetic workarounds.
 
 **Architecture:** FixedMathSharp keeps its existing saturating operators and
 adds result-producing `TryAdd`/`TrySubtract` APIs that share the same private
-overflow core. FixedMathSharp also owns full-domain exact projection comparison
-and conservative nonnegative projection; Gravitas consumes those APIs while
-retaining coordinate-scaling and conservative-advancement policy.
+overflow core. Explicit fused `TryMultiplyDivide` overloads retain 128-bit or
+192-bit numerators until one final division and rounding step. FixedMathSharp
+also owns full-domain exact projection comparison and conservative nonnegative
+projection; Gravitas consumes those APIs while retaining coordinate-scaling,
+solver-conditioning, and conservative-advancement policy.
 
 **Tech Stack:** C# 11, Q32.32 `Fixed64`, FixedMathSharp `Vector2d`/`Vector3d`,
 xUnit v3, BenchmarkDotNet, Gravitas 2D/3D/mixed GJK and CCD.
@@ -22,6 +24,9 @@ xUnit v3, BenchmarkDotNet, Gravitas 2D/3D/mixed GJK and CCD.
 
 - Correctness and determinism precede maintainability and performance.
 - Preserve the existing saturating behavior of `Fixed64` and vector operators.
+- Do not make ordinary operator chains context-sensitive. Parentheses around a
+  multiplication do not retain a wide intermediate; fused arithmetic must be
+  requested explicitly.
 - Do not introduce floating-point arithmetic or target-specific `Int128`
   behavior; FixedMathSharp must continue targeting `netstandard2.1` and
   `net8.0` consistently.
@@ -63,6 +68,14 @@ xUnit v3, BenchmarkDotNet, Gravitas 2D/3D/mixed GJK and CCD.
    and conservative-advancement policy.
 6. Invalid `ConvexShape` source/target kind use is an internal programming
    error, not an ordinary query miss. It must fail explicitly in every build.
+7. `TryMultiplyDivide` is a distinct fused operation, not a correction to the
+   existing operators. It returns `false` for a zero divisor or an
+   unrepresentable final result, writes `default` on failure, and does not fail
+   merely because an ordinary intermediate `Fixed64` product would saturate or
+   underflow.
+8. Do not add saturating, throwing, vector, or arbitrary-factor fused variants
+   without a concrete package consumer. The two-factor and three-factor scalar
+   overloads are the complete approved public surface.
 
 ## Current Review Findings
 
@@ -86,6 +99,11 @@ xUnit v3, BenchmarkDotNet, Gravitas 2D/3D/mixed GJK and CCD.
   shifting.
 - Three `Debug.Assert` calls are the only guards against invalid release-state
   geometry behavior.
+- CCD mobility currently rejects a representable response when
+  `normalComponent = 1 / 65536`, `bodyInverseMass = 1`,
+  `constrainedInverseMass = Fixed64.MinIncrement`, and `responseSpeed = 1`.
+  The exact velocity delta is `65536`, but the ordinary inverse-mass ratio
+  saturates before the small normal component reduces it.
 
 ---
 
@@ -230,12 +248,102 @@ public partial struct Vector3d
 
 ---
 
-### Task 3: Gravitas Consumes FixedMathSharp Arithmetic
+### Task 3: FixedMathSharp Fused Multiply-Divide
+
+**Files:**
+
+- Modify: `../FixedMathSharp/src/FixedMathSharp/Numerics/Scalars/Fixed64.Operators.cs`
+- Test: `../FixedMathSharp/tests/FixedMathSharp.Tests/Numerics/Scalars/Fixed64.Tests.cs`
+- Benchmark: `../FixedMathSharp/tests/FixedMathSharp.Benchmarks/Fixed64ArithmeticBenchmarks.cs`
+
+**Interfaces:**
+
+- Consumes: the existing `AbsToUInt64` and `Multiply64To128` arithmetic core.
+- Produces:
+
+```csharp
+public partial struct Fixed64
+{
+    public static bool TryMultiplyDivide(
+        Fixed64 left,
+        Fixed64 right,
+        Fixed64 divisor,
+        out Fixed64 result);
+
+    public static bool TryMultiplyDivide(
+        Fixed64 first,
+        Fixed64 second,
+        Fixed64 third,
+        Fixed64 divisor,
+        out Fixed64 result);
+}
+```
+
+- For raw inputs `A`, `B`, `C`, and `D`, the two-factor overload rounds
+  `(A * B) / D` to the nearest raw integer and the three-factor overload rounds
+  `(A * B * C) / (D * 2^32)` to the nearest raw integer. Both use
+  round-half-to-even exactly once.
+- A zero divisor or final magnitude outside `long.MinValue..long.MaxValue`
+  returns `false` with `result = default`. Exact `long.MinValue` remains a
+  successful negative result.
+
+- [ ] **Step 1: Add two-factor red tests** using raw-value operands for all sign
+      combinations, exact zero, exact `MinValue`/`MaxValue`, divisor zero,
+      positive and negative final overflow, default failure output, and
+      half-to-even cases `1 * 1 / 2 -> 0` and `3 * 1 / 2 -> 2` raw units.
+- [ ] **Step 2: Add the rescued-intermediate regressions.** Prove that
+      `65536 * 65536 / 65536` returns `65536` although the ordinary product
+      saturates, and that `MinIncrement * Half / Half` returns `MinIncrement`
+      although the ordinary product rounds to zero.
+- [ ] **Step 3: Run the focused scalar tests and confirm both overloads are
+      missing.**
+
+```powershell
+dotnet test ../FixedMathSharp/tests/FixedMathSharp.Tests/FixedMathSharp.Tests.csproj -c Release --filter "FullyQualifiedName~Fixed64"
+```
+
+- [ ] **Step 4: Implement the two-factor overload** with the existing unsigned
+      64-by-64-to-128 multiplier and one allocation-free unsigned divide with
+      quotient/remainder. Apply the result sign after comparing the rounded
+      magnitude against the asymmetric positive and negative limits.
+- [ ] **Step 5: Add three-factor red tests** matching the two-factor sign,
+      boundary, zero-divisor, default-output, and half-to-even coverage. Add the
+      CCD regression with raw values `2^16`, `2^32`, `2^32`, and `1`; require
+      the representable raw result `2^48` (`65536`).
+- [ ] **Step 6: Implement the three-factor overload** by extending the existing
+      unsigned product to three 64-bit words. Divide that numerator by the
+      64-bit divisor, retain the quotient's low 32 discarded bits plus the
+      division remainder, and use both to round the final Q32.32 raw result
+      once. Do not use `BigInteger`, floating point, `Int128`, or a public wide
+      numeric type in runtime code.
+- [ ] **Step 7: Add deterministic oracle coverage** in the test project using
+      `BigInteger` only as an independently computed reference. Cover fixed
+      boundary vectors plus a seeded set of raw inputs for both overloads,
+      including cases where ordinary grouping saturates or underflows but the
+      fused result fits.
+- [ ] **Step 8: Run the focused tests in `Release` and `ReleaseLean`, then run
+      exact FixedMathSharp coverage.** Every divisor-zero, sign, carry,
+      quotient-overflow, rounding, and `long.MinValue` branch must be reachable.
+- [ ] **Step 9: Benchmark both overloads** against their ordinary operator
+      chains for common in-range inputs and rescued extreme inputs. Require zero
+      allocations; optimize a proven common path without weakening the
+      single-rounding contract.
+- [ ] **Step 10: Owner review checkpoint.** Leave all FixedMathSharp changes
+      unstaged and provide a proposed commit message.
+
+---
+
+### Task 4: Gravitas Consumes FixedMathSharp Arithmetic
 
 **Files:**
 
 - Delete: `src/Gravitas/Support/FixedVectorDifference.cs`
 - Delete: `src/Gravitas/CollisionHandling/Detection/3D/ConvexSupportProjection.cs`
+- Modify: `src/Gravitas/CollisionHandling/Continuous/ContinuousCollisionImpulsePolicy.cs`
+- Modify: `src/Gravitas/Core/2D/SolidBody2D.ContinuousCollision.Dynamic.cs`
+- Modify: `src/Gravitas/Core/2D/SolidBody2D.ContinuousCollision.Kinematic.cs`
+- Modify: `src/Gravitas/Core/3D/SolidBody.ContinuousCollision.Dynamic.cs`
+- Modify: `src/Gravitas/Core/3D/SolidBody.ContinuousCollision.Kinematic.cs`
 - Modify: every current caller returned by:
 
 ```powershell
@@ -244,6 +352,7 @@ rg -l "FixedVectorDifference|ConvexSupportProjection" src/Gravitas tests/Gravita
 
 - Modify: `src/Gravitas/Queries/GjkSimplexScale.cs`
 - Test: `tests/Gravitas.Tests/CollisionHandling/ContinuousCollisionMathTests.cs`
+- Test: `tests/Gravitas.Tests/CollisionHandling/ContinuousCollisionPolicyTests.cs`
 - Test: `tests/Gravitas.Tests/CollisionHandling/ConvexColliderSupportTests.cs`
 - Test: `tests/Gravitas.Tests/Queries/GjkSimplexScaleTests.cs`
 - Test: relevant 2D, 3D, and mixed query/CCD suites already exercising those
@@ -251,8 +360,27 @@ rg -l "FixedVectorDifference|ConvexSupportProjection" src/Gravitas tests/Gravita
 
 **Interfaces:**
 
-- Consumes: Tasks 1 and 2.
+- Consumes: Tasks 1 through 3.
 - Produces: no new Gravitas arithmetic API.
+- Replaces the internal `ResolveVelocityDelta` overloads with component-atomic
+  `TryResolveVelocityDelta` overloads. Failure writes `default` and occurs
+  before either collision participant is mutated.
+
+```csharp
+internal static bool TryResolveVelocityDelta(
+    Vector2d normal,
+    Fixed64 responseSpeed,
+    Fixed64 bodyInverseMass,
+    Fixed64 constrainedInverseMass,
+    out Vector2d velocityDelta);
+
+internal static bool TryResolveVelocityDelta(
+    Vector3d normal,
+    Fixed64 responseSpeed,
+    Fixed64 bodyInverseMass,
+    Fixed64 constrainedInverseMass,
+    out Vector3d velocityDelta);
+```
 
 - [ ] **Step 1: Add the odd-raw negative-expansion regression** using
       `MaxValue`, `MinValue`, and `Fixed64.MinIncrement`. Assert that the
@@ -278,12 +406,22 @@ rg -l "FixedVectorDifference|ConvexSupportProjection" src/Gravitas tests/Gravita
       internal three-value implementation detail.
 - [ ] **Step 8: Run focused GJK, support, query, and CCD tests in `Release` and
       `ReleaseLean`.**
-- [ ] **Step 9: Owner review checkpoint.** Leave Gravitas implementation changes
+- [ ] **Step 9: Delete the arithmetic-driven `IsResolvableMobility` cutoff** and
+      replace both `ResolveVelocityDelta` overloads with component-atomic
+      `TryResolveVelocityDelta` methods composed from the three-factor
+      `TryMultiplyDivide` overload. For two-body response, compute both velocity
+      deltas successfully before applying either one. Do not retain a
+      solver-conditioning threshold without separate physical evidence.
+- [ ] **Step 10: Add 2D and 3D CCD regressions** for the `65536` finite response,
+      zero inverse mass, final-result overflow rejection without partial body
+      mutation, and unchanged ordinary mobility. Run the focused
+      continuous-collision policy and sweep suites.
+- [ ] **Step 11: Owner review checkpoint.** Leave Gravitas implementation changes
       unstaged and provide a proposed commit message.
 
 ---
 
-### Task 4: Remove Release-Only Assertion Behavior
+### Task 5: Remove Release-Only Assertion Behavior
 
 **Files:**
 
@@ -310,7 +448,7 @@ rg -l "FixedVectorDifference|ConvexSupportProjection" src/Gravitas tests/Gravita
 
 ---
 
-### Task 5: Cross-Stack Validation And Documentation Closure
+### Task 6: Cross-Stack Validation And Documentation Closure
 
 **Files:**
 
@@ -324,8 +462,8 @@ rg -l "FixedVectorDifference|ConvexSupportProjection" src/Gravitas tests/Gravita
       builds, coverage, and CRAP analysis.** Update the complexity exception
       register only from the fresh report.
 - [ ] **Step 2: Run the focused FixedMathSharp benchmark rows** for scalar
-      arithmetic, vector `Try*`, magnitude/normalization, and projection. Record
-      medians and allocations.
+      arithmetic, fused multiply-divide, vector `Try*`, magnitude/normalization,
+      and projection. Record medians and allocations.
 - [ ] **Step 3: Validate SwiftCollections, GridForge, and Gravitas** through
       explicit local project references in each library, test, and benchmark
       project that requires them.
@@ -349,6 +487,11 @@ rg -l "FixedVectorDifference|ConvexSupportProjection" src/Gravitas tests/Gravita
   `PositiveFixed64RawHighLimit` no longer exist in Gravitas.
 - Existing operators remain saturating; `Try*` methods report exactness without
   throwing or exposing partial results.
+- Both fused multiply-divide overloads retain their complete numerator until one
+  final round-half-to-even conversion, report only final representability, and
+  allocate no managed memory.
+- Gravitas no longer rejects the finite `65536` CCD response because an
+  intermediate inverse-mass ratio would saturate.
 - Projection comparison is correct for the complete `Fixed64` component domain,
   not only normalized axes.
 - The odd-raw negative-expansion shift regression passes without saturation.
