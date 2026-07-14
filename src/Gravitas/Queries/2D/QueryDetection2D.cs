@@ -8,6 +8,7 @@
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
+using Gravitas.Support;
 using System;
 using System.Runtime.CompilerServices;
 
@@ -99,9 +100,19 @@ internal static class QueryDetection2D
 
     internal static bool TryRaycast(Vector2d start, Vector2d end, LSCollider2D collider, out Physics2DHit hit)
     {
-        Vector2d segment = end - start;
-        Fixed64 segmentLengthSquared = segment.MagnitudeSquared;
-        if (segmentLengthSquared == Fixed64.Zero || !SegmentBoundsOverlap(start, end, collider))
+        if (!FixedVectorDifference.TryCreate(start, end, out Vector2d segment))
+        {
+            hit = default;
+            return false;
+        }
+
+        if (segment == Vector2d.Zero || !SegmentBoundsOverlap(start, end, collider))
+        {
+            hit = default;
+            return false;
+        }
+
+        if (!Vector2d.TryGetMagnitude(segment, out Fixed64 segmentLength))
         {
             hit = default;
             return false;
@@ -110,8 +121,7 @@ internal static class QueryDetection2D
         if (collider is LSCompoundCollider2D compound)
             return TryRaycastCompound(start, end, compound, out hit);
 
-        Fixed64 segmentLength = FixedMath.Sqrt(segmentLengthSquared);
-        Vector2d direction = segment / segmentLength;
+        Vector2d direction = segment.Normalized;
         if (collider.ContainsPoint(start))
         {
             hit = new Physics2DHit(
@@ -137,9 +147,20 @@ internal static class QueryDetection2D
         LSCollider2D collider,
         out Physics2DHit hit)
     {
-        Vector2d segment = end - start;
-        Fixed64 segmentLengthSquared = segment.MagnitudeSquared;
-        if (segmentLengthSquared <= Fixed64.Epsilon || !SweepBoundsOverlap(start, end, radius, collider))
+        if (!FixedVectorDifference.TryCreate(start, end, out Vector2d segment))
+        {
+            hit = default;
+            return false;
+        }
+
+        if (segment == Vector2d.Zero || !SweepBoundsOverlap(start, end, radius, collider))
+        {
+            hit = default;
+            return false;
+        }
+
+        if (!Vector2d.TryGetMagnitude(segment, out Fixed64 segmentLength)
+            || segmentLength <= Fixed64.Epsilon)
         {
             hit = default;
             return false;
@@ -154,8 +175,7 @@ internal static class QueryDetection2D
             return true;
         }
 
-        Fixed64 segmentLength = FixedMath.Sqrt(segmentLengthSquared);
-        Vector2d direction = segment / segmentLength;
+        Vector2d direction = segment.Normalized;
         if (collider is LSCircleCollider2D circle)
             return TrySweepCircleCircle(start, direction, segmentLength, radius, circle, out hit);
         if (collider is LSCapsuleCollider2D capsule)
@@ -173,7 +193,8 @@ internal static class QueryDetection2D
         SwiftThrowHelper.ThrowIfNull(mover, nameof(mover));
         SwiftThrowHelper.ThrowIfNull(target, nameof(target));
 
-        if (displacement.MagnitudeSquared <= Fixed64.Epsilon)
+        if (!Vector2d.TryGetMagnitude(displacement, out Fixed64 displacementLength)
+            || displacementLength <= Fixed64.Epsilon)
         {
             hit = default;
             return false;
@@ -805,8 +826,8 @@ internal static class QueryDetection2D
             return true;
         }
 
-        Fixed64 length = displacement.Magnitude;
-        Vector2d direction = displacement / length;
+        _ = Vector2d.TryGetMagnitude(displacement, out Fixed64 length);
+        Vector2d direction = displacement.Normalized;
         bool found = false;
         Physics2DHit best = default;
 

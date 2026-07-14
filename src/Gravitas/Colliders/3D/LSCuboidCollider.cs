@@ -306,6 +306,12 @@ public class LSCuboidCollider : LSCollider
         return axisZ * SignedUnit(z);
     }
 
+    internal override bool TryGetPlanarSurfaceNormal(Vector3d point, out Vector3d normal)
+    {
+        normal = GetNormalAtPoint(point);
+        return true;
+    }
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Fixed64 SignedUnit(Fixed64 coordinate) =>
         coordinate < Fixed64.Zero ? -Fixed64.One : Fixed64.One;

@@ -8,6 +8,7 @@
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
+using Gravitas.Support;
 using SwiftCollections;
 using SwiftCollections.Query;
 using System;
@@ -20,19 +21,18 @@ namespace Gravitas.Queries;
 /// Performs deterministic translational convex-source sweeps against 3D query
 /// targets using support-mapped conservative advancement.
 /// </summary>
-internal sealed class ConvexSweepQueryWorker
+internal sealed partial class ConvexSweepQueryWorker
 {
     private const int MaxGjkIterations = 32;
     private const int MaxConservativeAdvancementIterations = 32;
     private static readonly Fixed64 DistanceTolerance = Fixed64.FromFraction(1, 1_048_576);
-    private static readonly Fixed64 DistanceToleranceSqr = DistanceTolerance * DistanceTolerance;
-    private static readonly Fixed64 SweepContactTolerance = Fixed64.FromFraction(1, 4096);
-    private static readonly Fixed64 ProgressToleranceSqr = DistanceToleranceSqr;
+    internal static readonly Fixed64 ContactTolerance = Fixed64.FromFraction(1, 4096);
     private static readonly SweepTriangleCandidateComparer SweepTriangleComparer = new();
 
     private readonly SupportPoint[] _simplex = new SupportPoint[4];
     private readonly SwiftList<int> _triangleCandidates = new(16);
     private readonly SwiftList<SweepTriangleCandidate> _sweepTriangleCandidates = new(16);
+    private readonly int _maxConservativeAdvancementIterations;
 
     private LSCollider? _source;
     private ConvexShape _sourceShape;
@@ -44,6 +44,10 @@ internal sealed class ConvexSweepQueryWorker
     private Fixed64 _length;
 
     internal int LastMeshTriangleCandidateCount { get; private set; }
+
+    internal ConvexSweepQueryWorker(
+        int maxConservativeAdvancementIterations = MaxConservativeAdvancementIterations) =>
+        _maxConservativeAdvancementIterations = maxConservativeAdvancementIterations;
 
     public void PrepareConvexMeshSource(LSMeshCollider source, Vector3d displacement)
     {
@@ -102,16 +106,29 @@ internal sealed class ConvexSweepQueryWorker
     private void Prepare(ConvexShape sourceShape, Vector3d displacement)
     {
         _sourceShape = sourceShape;
-        _hasSource = true;
         _displacement = displacement;
-        _length = displacement.Magnitude;
-        _direction = _length <= Fixed64.Epsilon ? Vector3d.Zero : displacement / _length;
+        _hasSource = Vector3d.TryGetMagnitude(displacement, out _length);
+        if (!_hasSource)
+        {
+            _direction = Vector3d.Zero;
+            return;
+        }
+
+        _direction = _length <= Fixed64.Epsilon ? Vector3d.Zero : displacement.Normalized;
         sourceShape.GetSourceBounds(out Vector3d sourceMin, out Vector3d sourceMax);
+        if (!FixedVectorDifference.TryTranslate(sourceMin, displacement, out _)
+            || !FixedVectorDifference.TryTranslate(sourceMax, displacement, out _))
+        {
+            _hasSource = false;
+            _direction = Vector3d.Zero;
+            return;
+        }
+
         SweepBoundsUtility.CreateSweptBounds(
             sourceMin,
             sourceMax,
             displacement,
-            SweepContactTolerance,
+            ContactTolerance,
             out _sweptSourceBoundsMin,
             out _sweptSourceBoundsMax);
     }
@@ -231,7 +248,7 @@ internal sealed class ConvexSweepQueryWorker
             int triangleIndex = _triangleCandidates[i];
             ConvexShape triangle = CreateTriangleShape(mesh, triangleIndex);
             Fixed64 lowerBound = ComputeSweepLowerBound(sourceShape, triangle);
-            if (lowerBound <= _length + SweepContactTolerance)
+            if (lowerBound <= _length + ContactTolerance)
                 _sweepTriangleCandidates.Add(new SweepTriangleCandidate(triangleIndex, lowerBound));
         }
 
@@ -243,8 +260,11 @@ internal sealed class ConvexSweepQueryWorker
     {
         Vector3d sourceFront = sourceShape.Support(_direction);
         Vector3d targetBack = targetShape.Support(-_direction);
-        Fixed64 lowerBound = Vector3d.Dot(targetBack - sourceFront, _direction) - SweepContactTolerance;
-        return FixedMath.Max(lowerBound, Fixed64.Zero);
+        Fixed64 projectedSeparation = ConvexSupportProjection.ProjectNonNegativeDifference(
+            targetBack,
+            sourceFront,
+            _direction);
+        return FixedMath.Max(projectedSeparation - ContactTolerance, Fixed64.Zero);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -260,11 +280,11 @@ internal sealed class ConvexSweepQueryWorker
         if (candidate.LowerBound > closestDistance + DistanceTolerance)
             return true;
 
-        // Conservative advancement accepts contacts inside SweepContactTolerance;
+        // Conservative advancement accepts contacts inside ContactTolerance;
         // once the best lower-index triangle is already at that recognized TOI,
         // later same-bound triangles cannot win the deterministic tie-break.
         return closestTriangleIndex < candidate.TriangleIndex
-            && closestDistance <= candidate.LowerBound + SweepContactTolerance;
+            && closestDistance <= candidate.LowerBound + ContactTolerance;
     }
 
     private bool TrySweepConvexTarget(
@@ -275,17 +295,28 @@ internal sealed class ConvexSweepQueryWorker
     {
         hit = default;
         Fixed64 travelDistance = Fixed64.Zero;
-        Vector3d normal = -_direction;
+        Vector3d normal = Vector3d.Zero;
         GjkResult result = default;
 
-        for (int i = 0; i < MaxConservativeAdvancementIterations; i++)
+        for (int i = 0; i < _maxConservativeAdvancementIterations; i++)
         {
             ConvexShape movedSource = sourceShape.WithSourceOffset(_direction * travelDistance);
             result = ComputeDistance(movedSource, targetShape);
-            if (result.Intersects || result.Distance <= SweepContactTolerance)
+            if (result.Intersects || result.Distance <= ContactTolerance)
             {
-                Vector3d point = ResolveHitPoint(targetShape, targetCollider, movedSource, result);
-                Vector3d hitNormal = ResolveHitNormal(targetCollider, point, result.Normal, normal);
+                Vector3d point = ResolveHitPoint(
+                    targetShape,
+                    targetCollider,
+                    movedSource,
+                    result,
+                    out bool hasRefinedSurfaceNormal);
+                Vector3d hitNormal = ResolveHitNormal(
+                    targetShape,
+                    targetCollider,
+                    point,
+                    result.Normal,
+                    normal,
+                    hasRefinedSurfaceNormal);
 
                 hit = new Physics3DHit(targetCollider, point, hitNormal, travelDistance, _direction);
                 return true;
@@ -297,9 +328,32 @@ internal sealed class ConvexSweepQueryWorker
                 return false;
 
             Fixed64 stepDistance = result.Distance / closingSpeed;
-            travelDistance += stepDistance;
-            if (travelDistance > _length)
-                return false;
+            Fixed64 nextTravelDistance = travelDistance + stepDistance;
+            if (nextTravelDistance > _length)
+            {
+                ConvexShape endpointSource = sourceShape.WithSourceOffset(_displacement);
+                GjkResult endpointResult = ComputeDistance(endpointSource, targetShape);
+                if (!endpointResult.Intersects && endpointResult.Distance > ContactTolerance)
+                    return false;
+
+                Vector3d point = ResolveHitPoint(
+                    targetShape,
+                    targetCollider,
+                    endpointSource,
+                    endpointResult,
+                    out bool hasRefinedSurfaceNormal);
+                Vector3d hitNormal = ResolveHitNormal(
+                    targetShape,
+                    targetCollider,
+                    point,
+                    endpointResult.Normal,
+                    normal,
+                    hasRefinedSurfaceNormal);
+                hit = new Physics3DHit(targetCollider, point, hitNormal, _length, _direction);
+                return true;
+            }
+
+            travelDistance = nextTravelDistance;
         }
 
         return false;
@@ -309,10 +363,19 @@ internal sealed class ConvexSweepQueryWorker
         ConvexShape targetShape,
         LSCollider targetCollider,
         ConvexShape movedSource,
-        GjkResult result)
+        GjkResult result,
+        out bool hasRefinedSurfaceNormal)
     {
-        if (targetShape.IsTriangle && result.PointB.MagnitudeSquared > Fixed64.Epsilon)
-            return result.PointB;
+        hasRefinedSurfaceNormal = false;
+        if (targetCollider is LSSphereCollider
+            && movedSource.TryGetClosestPointOnSurface(targetCollider.Center, out Vector3d sourcePoint))
+        {
+            // A sphere's closest pair is defined by its center and the closest
+            // source feature. Refining that feature removes arbitrary support
+            // tie bias without changing the conservative TOI.
+            hasRefinedSurfaceNormal = true;
+            return targetCollider.ClosestPointOnSurface(sourcePoint);
+        }
 
         if ((movedSource.Center - targetCollider.Center).MagnitudeSquared <= Fixed64.Epsilon)
         {
@@ -321,83 +384,146 @@ internal sealed class ConvexSweepQueryWorker
             return targetCollider.ClosestPointOnSurface(surfaceProbe);
         }
 
-        return targetCollider.ClosestPointOnSurface(movedSource.Center);
+        // GJK's target witness identifies the feature that stopped the sweep.
+        // Center-to-center projection can select an unrelated feature for long,
+        // offset shapes and therefore produce a non-physical response normal.
+        return targetShape.IsTriangle
+            ? result.PointB
+            : targetCollider.ClosestPointOnSurface(result.PointB);
     }
 
     private Vector3d ResolveHitNormal(
+        ConvexShape targetShape,
         LSCollider targetCollider,
         Vector3d point,
         Vector3d resultNormal,
-        Vector3d fallbackNormal) =>
-        ConvexSweepHitPolicy.ResolveHitNormal(targetCollider, point, resultNormal, fallbackNormal, _direction);
+        Vector3d fallbackNormal,
+        bool hasRefinedSurfaceNormal)
+    {
+        targetShape.TryGetPlanarSurfaceNormal(point, out Vector3d planarNormal);
+        return ConvexSweepHitPolicy.ResolveHitNormal(
+            targetCollider,
+            point,
+            resultNormal,
+            fallbackNormal,
+            _direction,
+            planarNormal,
+            hasRefinedSurfaceNormal);
+    }
 
     private GjkResult ComputeDistance(ConvexShape sourceShape, ConvexShape targetShape)
     {
+        sourceShape.GetBounds(out Vector3d sourceMin, out Vector3d sourceMax);
+        targetShape.GetBounds(out Vector3d targetMin, out Vector3d targetMax);
+        int workingShift = GjkSimplexScale.SelectTwoTermShift(sourceMin, sourceMax, targetMin, targetMax);
+        Fixed64 workingScale = GjkSimplexScale.GetCoordinateScale(workingShift);
+        Fixed64 workingDistanceTolerance = DistanceTolerance * workingScale;
         int simplexCount = 0;
-        Vector3d direction = targetShape.Center - sourceShape.Center;
-        if (direction.MagnitudeSquared <= Fixed64.Epsilon)
-            direction = Vector3d.Right;
+        Vector3d direction = GjkSimplexScale.CreateWorkingDifference(
+            targetShape.Center,
+            sourceShape.Center,
+            workingShift);
+        if (direction == Vector3d.Zero)
+        {
+            if (sourceShape.ContainsCenter && targetShape.ContainsCenter)
+                return GjkResult.CreateIntersection(sourceShape.Center, targetShape.Center);
 
-        Fixed64 previousDistanceSqr = Fixed64.MaxValue;
+            direction = Vector3d.Right;
+        }
+
+        bool hasPreviousDistance = false;
+        Fixed64 previousDistance = Fixed64.Zero;
         ClosestSimplexResult closest = default;
+        bool distanceIsRepresentable = false;
+        Fixed64 workingDistance = Fixed64.MaxValue;
 
         for (int i = 0; i < MaxGjkIterations; i++)
         {
-            SupportPoint support = CreateSupportPoint(sourceShape, targetShape, direction);
+            SupportPoint support = CreateSupportPoint(sourceShape, targetShape, direction, workingShift);
             if (ContainsSupportPoint(_simplex, simplexCount, support.Point))
                 break;
 
+            ClosestSimplexResult previousClosest = closest;
             _simplex[simplexCount++] = support;
-            closest = SolveClosestSimplex(_simplex, ref simplexCount);
-            if (closest.Intersects || closest.DistanceSqr <= DistanceToleranceSqr)
+            closest = SolveClosestSimplex(_simplex, ref simplexCount, workingScale);
+            distanceIsRepresentable = Vector3d.TryGetMagnitude(closest.Point, out workingDistance);
+            if (closest.Intersects)
             {
-                return GjkResult.CreateIntersection(closest.PointA, closest.PointB);
+                // Tetrahedron entry follows a valid one-to-three point simplex.
+                // Preserve that same-pose closest pair as the deterministic
+                // surface witness for the intersection result.
+                return GjkResult.CreateIntersection(previousClosest.PointA, previousClosest.PointB);
             }
 
-            if (previousDistanceSqr - closest.DistanceSqr <= ProgressToleranceSqr)
-                break;
+            if (distanceIsRepresentable && workingDistance <= workingDistanceTolerance)
+                return GjkResult.CreateIntersection(closest.PointA, closest.PointB);
 
-            previousDistanceSqr = closest.DistanceSqr;
+            if (hasPreviousDistance
+                && distanceIsRepresentable
+                && previousDistance - workingDistance <= Fixed64.Epsilon)
+            {
+                break;
+            }
+
+            hasPreviousDistance = distanceIsRepresentable;
+            previousDistance = workingDistance;
             direction = -closest.Point;
         }
 
-        Fixed64 distance = FixedMath.Sqrt(closest.DistanceSqr);
-        Vector3d normal = closest.Point.MagnitudeSquared > Fixed64.Epsilon
-            ? closest.Point.Normalized
-            : Vector3d.Zero;
+        Fixed64 distance = GjkSimplexScale.RestoreDistance(workingDistance, workingShift);
+        Vector3d normal = closest.Point.Normalized;
         return new GjkResult(false, distance, closest.PointA, closest.PointB, normal);
     }
 
-    private static SupportPoint CreateSupportPoint(ConvexShape sourceShape, ConvexShape targetShape, Vector3d direction)
+    private static SupportPoint CreateSupportPoint(
+        ConvexShape sourceShape,
+        ConvexShape targetShape,
+        Vector3d direction,
+        int workingShift)
     {
-        Vector3d pointA = sourceShape.Support(direction);
-        Vector3d pointB = targetShape.Support(-direction);
-        return new SupportPoint(pointA, pointB);
+        Vector3d supportDirection = direction.Normalized;
+        Vector3d pointA = sourceShape.Support(supportDirection);
+        Vector3d pointB = targetShape.Support(-supportDirection);
+        return new SupportPoint(pointA, pointB, workingShift);
     }
 
-    private static ClosestSimplexResult SolveClosestSimplex(SupportPoint[] simplex, ref int count)
+    private static ClosestSimplexResult SolveClosestSimplex(
+        SupportPoint[] simplex,
+        ref int count,
+        Fixed64 workingScale)
     {
         if (count == 1)
             return ClosestSimplexResult.FromWeights(simplex, 1, Fixed64.One, Fixed64.Zero, Fixed64.Zero, Fixed64.Zero);
 
         if (count == 2)
-            return ReduceSegment(simplex, ref count);
+            return ReduceSegment(simplex, ref count, workingScale);
 
         if (count == 3)
             return ReduceTriangle(simplex, ref count);
 
-        return ReduceTetrahedron(simplex, ref count);
+        return ReduceTetrahedron(simplex, ref count, workingScale);
     }
 
-    private static ClosestSimplexResult ReduceSegment(SupportPoint[] simplex, ref int count)
+    private static ClosestSimplexResult ReduceSegment(
+        SupportPoint[] simplex,
+        ref int count,
+        Fixed64 workingScale)
     {
         SupportPoint a = simplex[0];
         SupportPoint b = simplex[1];
-        Vector3d ab = b.Point - a.Point;
+        Span<Vector3d> scaled = stackalloc Vector3d[2];
+        scaled[0] = a.Point;
+        scaled[1] = b.Point;
+        Fixed64 productScale = GjkSimplexScale.ScaleForProducts(scaled);
+        Vector3d scaledA = scaled[0];
+        Vector3d ab = scaled[1] - scaledA;
         Fixed64 denominator = ab.MagnitudeSquared;
-        Fixed64 t = denominator <= Fixed64.Epsilon
+        Fixed64 workingScaleSqr = workingScale * workingScale;
+        Fixed64 productScaleSqr = productScale * productScale;
+        Fixed64 denominatorTolerance = Fixed64.Epsilon * workingScaleSqr * productScaleSqr;
+        Fixed64 t = denominator <= denominatorTolerance
             ? Fixed64.Zero
-            : FixedMath.Clamp(-Vector3d.Dot(a.Point, ab) / denominator, Fixed64.Zero, Fixed64.One);
+            : FixedMath.Clamp(-Vector3d.Dot(scaledA, ab) / denominator, Fixed64.Zero, Fixed64.One);
 
         if (t <= Fixed64.Epsilon)
         {
@@ -425,25 +551,33 @@ internal sealed class ConvexSweepQueryWorker
         return ReduceByWeights(simplex, ref count, weights.A, weights.B, weights.C, Fixed64.Zero);
     }
 
-    private static ClosestSimplexResult ReduceTetrahedron(SupportPoint[] simplex, ref int count)
+    private static ClosestSimplexResult ReduceTetrahedron(
+        SupportPoint[] simplex,
+        ref int count,
+        Fixed64 workingScale)
     {
-        if (IsOriginInsideTetrahedron(simplex[0].Point, simplex[1].Point, simplex[2].Point, simplex[3].Point))
+        if (IsOriginInsideTetrahedron(
+                simplex[0].Point,
+                simplex[1].Point,
+                simplex[2].Point,
+                simplex[3].Point,
+                workingScale))
         {
             count = 4;
             return ClosestSimplexResult.Intersection;
         }
 
         ClosestSimplexResult best = default;
-        Fixed64 bestDistanceSqr = Fixed64.MaxValue;
+        bool hasBest = false;
         Span<int> bestIndices = stackalloc int[3];
         Span<Fixed64> bestWeights = stackalloc Fixed64[3];
         Span<int> face = stackalloc int[3];
         Span<Fixed64> weights = stackalloc Fixed64[3];
 
-        EvaluateFace(simplex, 0, 1, 2, ref best, ref bestDistanceSqr, bestIndices, bestWeights, face, weights);
-        EvaluateFace(simplex, 0, 3, 1, ref best, ref bestDistanceSqr, bestIndices, bestWeights, face, weights);
-        EvaluateFace(simplex, 0, 2, 3, ref best, ref bestDistanceSqr, bestIndices, bestWeights, face, weights);
-        EvaluateFace(simplex, 1, 3, 2, ref best, ref bestDistanceSqr, bestIndices, bestWeights, face, weights);
+        EvaluateFace(simplex, 0, 1, 2, ref best, ref hasBest, bestIndices, bestWeights, face, weights);
+        EvaluateFace(simplex, 0, 3, 1, ref best, ref hasBest, bestIndices, bestWeights, face, weights);
+        EvaluateFace(simplex, 0, 2, 3, ref best, ref hasBest, bestIndices, bestWeights, face, weights);
+        EvaluateFace(simplex, 1, 3, 2, ref best, ref hasBest, bestIndices, bestWeights, face, weights);
 
         SupportPoint first = simplex[bestIndices[0]];
         SupportPoint second = simplex[bestIndices[1]];
@@ -461,7 +595,7 @@ internal sealed class ConvexSweepQueryWorker
         int second,
         int third,
         ref ClosestSimplexResult best,
-        ref Fixed64 bestDistanceSqr,
+        ref bool hasBest,
         Span<int> bestIndices,
         Span<Fixed64> bestWeights,
         Span<int> face,
@@ -478,17 +612,33 @@ internal sealed class ConvexSweepQueryWorker
         weights[1] = triangleWeights.B;
         weights[2] = triangleWeights.C;
         ClosestSimplexResult candidate = ClosestSimplexResult.FromIndexedWeights(simplex, face, weights);
-        if (candidate.DistanceSqr >= bestDistanceSqr)
+        if (hasBest && !IsCloser(
+                candidate.DistanceSqr,
+                candidate.Point,
+                best.DistanceSqr,
+                best.Point))
             return;
 
         best = candidate;
-        bestDistanceSqr = candidate.DistanceSqr;
+        hasBest = true;
         bestIndices[0] = first;
         bestIndices[1] = second;
         bestIndices[2] = third;
         bestWeights[0] = weights[0];
         bestWeights[1] = weights[1];
         bestWeights[2] = weights[2];
+    }
+
+    internal static bool IsCloser(
+        Fixed64 candidateDistanceSqr,
+        Vector3d candidatePoint,
+        Fixed64 bestDistanceSqr,
+        Vector3d bestPoint)
+    {
+        if (candidateDistanceSqr != bestDistanceSqr || candidateDistanceSqr != Fixed64.MaxValue)
+            return candidateDistanceSqr < bestDistanceSqr;
+
+        return Vector3d.CompareMagnitudeSquared(candidatePoint, bestPoint) < 0;
     }
 
     private static ClosestSimplexResult ReduceByWeights(
@@ -534,6 +684,15 @@ internal sealed class ConvexSweepQueryWorker
     /// </summary>
     internal static TriangleWeights ClosestPointOnTriangleToOrigin(Vector3d a, Vector3d b, Vector3d c)
     {
+        Span<Vector3d> scaled = stackalloc Vector3d[3];
+        scaled[0] = a;
+        scaled[1] = b;
+        scaled[2] = c;
+        GjkSimplexScale.ScaleForProducts(scaled);
+        a = scaled[0];
+        b = scaled[1];
+        c = scaled[2];
+
         Vector3d ab = b - a;
         Vector3d ac = c - a;
         Vector3d ap = -a;
@@ -581,36 +740,71 @@ internal sealed class ConvexSweepQueryWorker
         return new TriangleWeights(Fixed64.One - vInside - wInside, vInside, wInside);
     }
 
-    private static bool IsOriginInsideTetrahedron(Vector3d a, Vector3d b, Vector3d c, Vector3d d)
+    private static bool IsOriginInsideTetrahedron(
+        Vector3d a,
+        Vector3d b,
+        Vector3d c,
+        Vector3d d,
+        Fixed64 workingScale)
     {
-        if (SignedTetrahedronVolume6(a, b, c, d).Abs() <= DistanceTolerance)
+        Span<Vector3d> scaled = stackalloc Vector3d[4];
+        scaled[0] = a;
+        scaled[1] = b;
+        scaled[2] = c;
+        scaled[3] = d;
+        Fixed64 productScale = GjkSimplexScale.ScaleForProducts(scaled);
+        a = scaled[0];
+        b = scaled[1];
+        c = scaled[2];
+        d = scaled[3];
+
+        Fixed64 productScaleSqr = productScale * productScale;
+        Fixed64 productScaleCubed = productScaleSqr * productScale;
+        Fixed64 workingScaleSqr = workingScale * workingScale;
+        Fixed64 workingScaleCubed = workingScaleSqr * workingScale;
+        Fixed64 volumeTolerance = DistanceTolerance * workingScaleCubed * productScaleCubed;
+        if (SignedTetrahedronVolume6(a, b, c, d).Abs() <= volumeTolerance)
             return false;
 
-        return IsSameSideOfFace(Vector3d.Zero, d, a, b, c)
-            && IsSameSideOfFace(Vector3d.Zero, c, a, d, b)
-            && IsSameSideOfFace(Vector3d.Zero, b, a, c, d)
-            && IsSameSideOfFace(Vector3d.Zero, a, b, d, c);
+        Fixed64 workingScaleSixth = workingScaleCubed * workingScaleCubed;
+        Fixed64 sideTolerance =
+            DistanceTolerance * workingScaleSixth * productScaleCubed * productScaleCubed;
+        return IsSameSideOfFace(Vector3d.Zero, d, a, b, c, sideTolerance)
+            && IsSameSideOfFace(Vector3d.Zero, c, a, d, b, sideTolerance)
+            && IsSameSideOfFace(Vector3d.Zero, b, a, c, d, sideTolerance)
+            && IsSameSideOfFace(Vector3d.Zero, a, b, d, c, sideTolerance);
     }
 
-    private static bool IsSameSideOfFace(Vector3d point, Vector3d opposite, Vector3d a, Vector3d b, Vector3d c)
+    private static bool IsSameSideOfFace(
+        Vector3d point,
+        Vector3d opposite,
+        Vector3d a,
+        Vector3d b,
+        Vector3d c,
+        Fixed64 sideTolerance)
     {
         Vector3d normal = Vector3d.Cross(b - a, c - a);
-        if (normal.MagnitudeSquared <= DistanceToleranceSqr)
+        if (normal.MagnitudeSquared <= Fixed64.Zero)
             return false;
 
         Fixed64 pointSide = Vector3d.Dot(normal, point - a);
         Fixed64 oppositeSide = Vector3d.Dot(normal, opposite - a);
-        return pointSide * oppositeSide >= -DistanceTolerance;
+        return pointSide * oppositeSide >= -sideTolerance;
     }
 
     private static Fixed64 SignedTetrahedronVolume6(Vector3d a, Vector3d b, Vector3d c, Vector3d d) =>
         Vector3d.Dot(b - a, Vector3d.Cross(c - a, d - a));
 
-    private static bool ContainsSupportPoint(SupportPoint[] simplex, int count, Vector3d point)
+    private static bool ContainsSupportPoint(
+        SupportPoint[] simplex,
+        int count,
+        Vector3d point)
     {
         for (int i = 0; i < count; i++)
         {
-            if ((simplex[i].Point - point).MagnitudeSquared <= DistanceToleranceSqr)
+            Vector3d difference = simplex[i].Point - point;
+            if (Vector3d.TryGetMagnitude(difference, out Fixed64 distance)
+                && distance <= Fixed64.Epsilon)
                 return true;
         }
 
@@ -625,7 +819,7 @@ internal sealed class ConvexSweepQueryWorker
     private static ConvexShape CreateTriangleShape(LSMeshCollider mesh, int triangleIndex)
     {
         mesh.Mesh.GetTriangleVertices(triangleIndex, out Vector3d first, out Vector3d second, out Vector3d third);
-        return new ConvexShape(first, second, third);
+        return new ConvexShape(mesh, triangleIndex, first, second, third);
     }
 
     private static void ThrowIfConcaveSource(LSMeshCollider source)
@@ -641,7 +835,7 @@ internal sealed class ConvexSweepQueryWorker
             sourceMin,
             sourceMax,
             _displacement,
-            SweepContactTolerance,
+            ContactTolerance,
             out min,
             out max);
     }
@@ -653,7 +847,7 @@ internal sealed class ConvexSweepQueryWorker
             sourceMin,
             sourceMax,
             _displacement,
-            SweepContactTolerance,
+            ContactTolerance,
             out Vector3d min,
             out Vector3d max);
         return SweepBoundsUtility.OverlapsInclusive(min, max, target.BoundsMin, target.BoundsMax);
@@ -679,323 +873,4 @@ internal sealed class ConvexSweepQueryWorker
 
     private static ArgumentException CreateConcaveSourceException(LSMeshCollider source) =>
         new("Concave mesh sources are not supported by swept query APIs. Use an LSCompoundCollider built from authored convex decomposition parts.", nameof(source));
-
-    private readonly struct ConvexShape
-    {
-        private enum ConvexShapeKind
-        {
-            Collider,
-            Triangle,
-            CircleSlab
-        }
-
-        private readonly ConvexShapeKind _kind;
-        private readonly LSCollider? _collider;
-        private readonly Vector3d _offset;
-        private readonly Vector3d _triangleA;
-        private readonly Vector3d _triangleB;
-        private readonly Vector3d _triangleC;
-        private readonly Vector3d _center;
-        private readonly Fixed64 _radius;
-        private readonly Fixed64 _halfHeight;
-
-        public ConvexShape(LSCollider collider, Vector3d offset)
-        {
-            _kind = ConvexShapeKind.Collider;
-            _collider = collider;
-            _offset = offset;
-            _triangleA = Vector3d.Zero;
-            _triangleB = Vector3d.Zero;
-            _triangleC = Vector3d.Zero;
-            _center = Vector3d.Zero;
-            _radius = Fixed64.Zero;
-            _halfHeight = Fixed64.Zero;
-        }
-
-        public ConvexShape(Vector3d triangleA, Vector3d triangleB, Vector3d triangleC)
-        {
-            _kind = ConvexShapeKind.Triangle;
-            _collider = null;
-            _offset = Vector3d.Zero;
-            _triangleA = triangleA;
-            _triangleB = triangleB;
-            _triangleC = triangleC;
-            _center = Vector3d.Zero;
-            _radius = Fixed64.Zero;
-            _halfHeight = Fixed64.Zero;
-        }
-
-        private ConvexShape(Vector3d center, Fixed64 radius, Fixed64 halfHeight, Vector3d offset)
-        {
-            _kind = ConvexShapeKind.CircleSlab;
-            _collider = null;
-            _offset = offset;
-            _triangleA = Vector3d.Zero;
-            _triangleB = Vector3d.Zero;
-            _triangleC = Vector3d.Zero;
-            _center = center;
-            _radius = radius;
-            _halfHeight = halfHeight;
-        }
-
-        public Vector3d Center
-        {
-            get
-            {
-                return _kind switch
-                {
-                    ConvexShapeKind.Triangle => (_triangleA + _triangleB + _triangleC) / (Fixed64)3,
-                    ConvexShapeKind.CircleSlab => _center + _offset,
-                    _ => _collider!.Center + _offset
-                };
-            }
-        }
-
-        public bool IsTriangle => _kind == ConvexShapeKind.Triangle;
-
-        public static ConvexShape CreateCircleSlab(Vector3d center, Fixed64 radius, Fixed64 halfHeight) =>
-            new(center, radius, halfHeight, Vector3d.Zero);
-
-        public void GetSourceBounds(out Vector3d min, out Vector3d max)
-        {
-            if (_kind == ConvexShapeKind.CircleSlab)
-            {
-                Vector3d center = _center + _offset;
-                Vector3d extents = new(_radius, _halfHeight, _radius);
-                min = center - extents;
-                max = center + extents;
-                return;
-            }
-
-            min = _collider!.Bounds.Min + _offset;
-            max = _collider.Bounds.Max + _offset;
-        }
-
-        public ConvexShape WithSourceOffset(Vector3d additionalOffset) =>
-            _kind == ConvexShapeKind.CircleSlab
-                ? new ConvexShape(_center, _radius, _halfHeight, _offset + additionalOffset)
-                : new ConvexShape(_collider!, _offset + additionalOffset);
-
-        public Vector3d Support(Vector3d direction)
-        {
-            if (_kind == ConvexShapeKind.Triangle)
-                return SupportTriangle(direction);
-
-            if (_kind == ConvexShapeKind.CircleSlab)
-                return SupportCircleSlab(direction);
-
-            return ConvexColliderSupport.Support(_collider!, direction) + _offset;
-        }
-
-        private Vector3d SupportCircleSlab(Vector3d direction)
-        {
-            Vector3d radial = new(direction.X, Fixed64.Zero, direction.Z);
-            Fixed64 radialMagnitude = radial.Magnitude;
-            Vector3d radialSupport = radialMagnitude > Fixed64.Epsilon
-                ? radial / radialMagnitude * _radius
-                : Vector3d.Right * _radius;
-            Fixed64 y = direction.Y >= Fixed64.Zero ? _halfHeight : -_halfHeight;
-            return _center + _offset + new Vector3d(radialSupport.X, y, radialSupport.Z);
-        }
-
-        private Vector3d SupportTriangle(Vector3d direction)
-        {
-            Vector3d best = _triangleA;
-            Fixed64 bestProjection = Vector3d.Dot(best, direction);
-            Fixed64 projection = Vector3d.Dot(_triangleB, direction);
-            if (projection > bestProjection)
-            {
-                best = _triangleB;
-                bestProjection = projection;
-            }
-
-            projection = Vector3d.Dot(_triangleC, direction);
-            if (projection > bestProjection)
-                best = _triangleC;
-
-            return best;
-        }
-    }
-
-    private readonly struct SupportPoint
-    {
-        public SupportPoint(Vector3d pointA, Vector3d pointB)
-        {
-            PointA = pointA;
-            PointB = pointB;
-            Point = pointA - pointB;
-        }
-
-        public Vector3d PointA { get; }
-
-        public Vector3d PointB { get; }
-
-        public Vector3d Point { get; }
-    }
-
-    private readonly struct SweepTriangleCandidate
-    {
-        public SweepTriangleCandidate(int triangleIndex, Fixed64 lowerBound)
-        {
-            TriangleIndex = triangleIndex;
-            LowerBound = lowerBound;
-        }
-
-        public int TriangleIndex { get; }
-
-        public Fixed64 LowerBound { get; }
-    }
-
-    private sealed class SweepTriangleCandidateComparer : IComparer<SweepTriangleCandidate>
-    {
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public int Compare(SweepTriangleCandidate left, SweepTriangleCandidate right)
-        {
-            int lowerBoundCompare = left.LowerBound.CompareTo(right.LowerBound);
-            return lowerBoundCompare != 0
-                ? lowerBoundCompare
-                : left.TriangleIndex.CompareTo(right.TriangleIndex);
-        }
-    }
-
-    private readonly struct GjkResult
-    {
-        public GjkResult(bool intersects, Fixed64 distance, Vector3d pointA, Vector3d pointB, Vector3d normal)
-        {
-            Intersects = intersects;
-            Distance = distance;
-            PointA = pointA;
-            PointB = pointB;
-            Normal = normal;
-        }
-
-        public bool Intersects { get; }
-
-        public Fixed64 Distance { get; }
-
-        public Vector3d PointA { get; }
-
-        public Vector3d PointB { get; }
-
-        public Vector3d Normal { get; }
-
-        public static GjkResult CreateIntersection(Vector3d pointA, Vector3d pointB) =>
-            new(true, Fixed64.Zero, pointA, pointB, Vector3d.Zero);
-    }
-
-    private readonly struct ClosestSimplexResult
-    {
-        public ClosestSimplexResult(
-            bool intersects,
-            Vector3d point,
-            Vector3d pointA,
-            Vector3d pointB)
-        {
-            Intersects = intersects;
-            Point = point;
-            PointA = pointA;
-            PointB = pointB;
-            DistanceSqr = point.MagnitudeSquared;
-        }
-
-        public bool Intersects { get; }
-
-        public Vector3d Point { get; }
-
-        public Vector3d PointA { get; }
-
-        public Vector3d PointB { get; }
-
-        public Fixed64 DistanceSqr { get; }
-
-        public static ClosestSimplexResult Intersection =>
-            new(true, Vector3d.Zero, Vector3d.Zero, Vector3d.Zero);
-
-        public static ClosestSimplexResult FromWeights(
-            SupportPoint[] simplex,
-            int count,
-            Fixed64 first,
-            Fixed64 second,
-            Fixed64 third,
-            Fixed64 fourth)
-        {
-            Span<Fixed64> weights = stackalloc Fixed64[4];
-            weights[0] = first;
-            weights[1] = second;
-            weights[2] = third;
-            weights[3] = fourth;
-            return FromArrayWeights(simplex, weights, count);
-        }
-
-        public static ClosestSimplexResult FromIndexedWeights(
-            SupportPoint[] simplex,
-            Span<int> indices,
-            Span<Fixed64> weights)
-        {
-            Vector3d point = Vector3d.Zero;
-            Vector3d pointA = Vector3d.Zero;
-            Vector3d pointB = Vector3d.Zero;
-            for (int i = 0; i < 3; i++)
-            {
-                SupportPoint support = simplex[indices[i]];
-                point += support.Point * weights[i];
-                pointA += support.PointA * weights[i];
-                pointB += support.PointB * weights[i];
-            }
-
-            return new ClosestSimplexResult(false, point, pointA, pointB);
-        }
-
-        public static ClosestSimplexResult FromSpanWeights(
-            Span<SupportPoint> simplex,
-            Span<Fixed64> weights,
-            int count)
-        {
-            Vector3d point = Vector3d.Zero;
-            Vector3d pointA = Vector3d.Zero;
-            Vector3d pointB = Vector3d.Zero;
-            for (int i = 0; i < count; i++)
-            {
-                point += simplex[i].Point * weights[i];
-                pointA += simplex[i].PointA * weights[i];
-                pointB += simplex[i].PointB * weights[i];
-            }
-
-            return new ClosestSimplexResult(false, point, pointA, pointB);
-        }
-
-        private static ClosestSimplexResult FromArrayWeights(
-            SupportPoint[] simplex,
-            Span<Fixed64> weights,
-            int count)
-        {
-            Vector3d point = Vector3d.Zero;
-            Vector3d pointA = Vector3d.Zero;
-            Vector3d pointB = Vector3d.Zero;
-            for (int i = 0; i < count; i++)
-            {
-                point += simplex[i].Point * weights[i];
-                pointA += simplex[i].PointA * weights[i];
-                pointB += simplex[i].PointB * weights[i];
-            }
-
-            return new ClosestSimplexResult(false, point, pointA, pointB);
-        }
-    }
-
-    internal readonly struct TriangleWeights
-    {
-        public TriangleWeights(Fixed64 a, Fixed64 b, Fixed64 c)
-        {
-            A = a;
-            B = b;
-            C = c;
-        }
-
-        public Fixed64 A { get; }
-
-        public Fixed64 B { get; }
-
-        public Fixed64 C { get; }
-    }
 }

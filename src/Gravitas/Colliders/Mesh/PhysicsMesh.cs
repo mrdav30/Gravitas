@@ -7,6 +7,7 @@
 
 using FixedMathSharp;
 using FixedMathSharp.Bounds;
+using Gravitas.CollisionHandling;
 using SwiftCollections;
 using SwiftCollections.Query;
 using System;
@@ -534,38 +535,32 @@ namespace Gravitas.Colliders
         /// </summary>
         public Vector3d GetSupportVertexWorld(Vector3d direction)
         {
+            Vector3d localDirection = ConvertWorldDirectionToLocal(direction);
+            localDirection = localDirection != Vector3d.Zero
+                ? localDirection.Normalized
+                : Vector3d.Right;
+
             if (_supportTreeNodes != null && _supportVertexIndices != null)
-                return GetAcceleratedSupportVertexWorld(direction);
+                return TransformLocalPoint(_localVertices[FindSupportVertexIndex(localDirection)]);
 
-            EnsureWorldVertices();
-
-            Vector3d best = _worldVertices[0];
-            Fixed64 bestProjection = Vector3d.Dot(best, direction);
-            for (int i = 1; i < _worldVertices.Length; i++)
+            int bestIndex = 0;
+            for (int i = 1; i < _localVertices.Length; i++)
             {
-                Vector3d vertex = _worldVertices[i];
-                Fixed64 projection = Vector3d.Dot(vertex, direction);
-                if (projection <= bestProjection)
+                if (ConvexSupportProjection.Compare(
+                        _localVertices[i],
+                        _localVertices[bestIndex],
+                        localDirection) <= 0)
                     continue;
 
-                bestProjection = projection;
-                best = vertex;
+                bestIndex = i;
             }
 
-            return best;
-        }
-
-        private Vector3d GetAcceleratedSupportVertexWorld(Vector3d direction)
-        {
-            Vector3d localDirection = ConvertWorldDirectionToLocal(direction);
-            int supportIndex = FindSupportVertexIndex(localDirection);
-            return TransformLocalPoint(_localVertices[supportIndex]);
+            return TransformLocalPoint(_localVertices[bestIndex]);
         }
 
         private int FindSupportVertexIndex(Vector3d localDirection)
         {
             int bestIndex = 0;
-            Fixed64 bestProjection = Vector3d.Dot(_localVertices[0], localDirection);
             Span<int> stack = stackalloc int[SupportTreeStackCapacity];
             int stackCount = 0;
             stack[stackCount++] = 0;
@@ -574,31 +569,32 @@ namespace Gravitas.Colliders
             {
                 int nodeIndex = stack[--stackCount];
                 SupportTreeNode node = _supportTreeNodes![nodeIndex];
-                Fixed64 upperProjection = GetBoundsMaxProjection(node.Min, node.Max, localDirection);
-                int upperComparison = upperProjection.CompareTo(bestProjection);
+                Vector3d upperPoint = GetBoundsSupportPoint(node.Min, node.Max, localDirection);
+                int upperComparison = ConvexSupportProjection.Compare(
+                    upperPoint,
+                    _localVertices[bestIndex],
+                    localDirection);
                 if (upperComparison < 0 || (upperComparison == 0 && node.MinVertexIndex >= bestIndex))
                     continue;
 
                 if (node.IsLeaf)
                 {
-                    SearchSupportLeaf(node, localDirection, ref bestIndex, ref bestProjection);
+                    SearchSupportLeaf(node, localDirection, ref bestIndex);
                     continue;
                 }
 
                 SupportTreeNode left = _supportTreeNodes[node.Left];
                 SupportTreeNode right = _supportTreeNodes[node.Right];
-                Fixed64 leftProjection = GetBoundsMaxProjection(left.Min, left.Max, localDirection);
-                Fixed64 rightProjection = GetBoundsMaxProjection(right.Min, right.Max, localDirection);
 
-                if (ComesBeforeSupportNode(left, leftProjection, right, rightProjection))
+                if (ComesBeforeSupportNode(left, right, localDirection))
                 {
-                    PushSupportNode(right, rightProjection, bestIndex, bestProjection, stack, ref stackCount);
-                    PushSupportNode(left, leftProjection, bestIndex, bestProjection, stack, ref stackCount);
+                    PushSupportNode(right, bestIndex, localDirection, stack, ref stackCount);
+                    PushSupportNode(left, bestIndex, localDirection, stack, ref stackCount);
                     continue;
                 }
 
-                PushSupportNode(left, leftProjection, bestIndex, bestProjection, stack, ref stackCount);
-                PushSupportNode(right, rightProjection, bestIndex, bestProjection, stack, ref stackCount);
+                PushSupportNode(left, bestIndex, localDirection, stack, ref stackCount);
+                PushSupportNode(right, bestIndex, localDirection, stack, ref stackCount);
             }
 
             return bestIndex;
@@ -607,32 +603,35 @@ namespace Gravitas.Colliders
         private void SearchSupportLeaf(
             SupportTreeNode node,
             Vector3d localDirection,
-            ref int bestIndex,
-            ref Fixed64 bestProjection)
+            ref int bestIndex)
         {
             for (int i = 0; i < node.Count; i++)
             {
                 int vertexIndex = _supportVertexIndices![node.Start + i];
                 Vector3d vertex = _localVertices[vertexIndex];
-                Fixed64 projection = Vector3d.Dot(vertex, localDirection);
-                int projectionComparison = projection.CompareTo(bestProjection);
+                int projectionComparison = ConvexSupportProjection.Compare(
+                    vertex,
+                    _localVertices[bestIndex],
+                    localDirection);
                 if (projectionComparison < 0 || (projectionComparison == 0 && vertexIndex >= bestIndex))
                     continue;
 
-                bestProjection = projection;
                 bestIndex = vertexIndex;
             }
         }
 
-        private static void PushSupportNode(
+        private void PushSupportNode(
             SupportTreeNode node,
-            Fixed64 upperProjection,
             int bestIndex,
-            Fixed64 bestProjection,
+            Vector3d localDirection,
             Span<int> stack,
             ref int stackCount)
         {
-            int upperComparison = upperProjection.CompareTo(bestProjection);
+            Vector3d upperPoint = GetBoundsSupportPoint(node.Min, node.Max, localDirection);
+            int upperComparison = ConvexSupportProjection.Compare(
+                upperPoint,
+                _localVertices[bestIndex],
+                localDirection);
             if (upperComparison < 0 || (upperComparison == 0 && node.MinVertexIndex >= bestIndex))
                 return;
 
@@ -641,11 +640,15 @@ namespace Gravitas.Colliders
 
         private static bool ComesBeforeSupportNode(
             SupportTreeNode left,
-            Fixed64 leftProjection,
             SupportTreeNode right,
-            Fixed64 rightProjection)
+            Vector3d localDirection)
         {
-            int projectionComparison = leftProjection.CompareTo(rightProjection);
+            Vector3d leftPoint = GetBoundsSupportPoint(left.Min, left.Max, localDirection);
+            Vector3d rightPoint = GetBoundsSupportPoint(right.Min, right.Max, localDirection);
+            int projectionComparison = ConvexSupportProjection.Compare(
+                leftPoint,
+                rightPoint,
+                localDirection);
             if (projectionComparison != 0)
                 return projectionComparison > 0;
 
@@ -730,13 +733,11 @@ namespace Gravitas.Colliders
             return extents.Y >= extents.Z ? 1 : 2;
         }
 
-        private static Fixed64 GetBoundsMaxProjection(Vector3d min, Vector3d max, Vector3d direction)
-        {
-            Fixed64 x = direction.X >= Fixed64.Zero ? max.X : min.X;
-            Fixed64 y = direction.Y >= Fixed64.Zero ? max.Y : min.Y;
-            Fixed64 z = direction.Z >= Fixed64.Zero ? max.Z : min.Z;
-            return (x * direction.X) + (y * direction.Y) + (z * direction.Z);
-        }
+        private static Vector3d GetBoundsSupportPoint(Vector3d min, Vector3d max, Vector3d direction) =>
+            new(
+                direction.X >= Fixed64.Zero ? max.X : min.X,
+                direction.Y >= Fixed64.Zero ? max.Y : min.Y,
+                direction.Z >= Fixed64.Zero ? max.Z : min.Z);
 
         public Vector3d GetFaceNormalWorld(int index)
         {

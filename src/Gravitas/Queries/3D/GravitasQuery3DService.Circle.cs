@@ -71,7 +71,7 @@ public sealed partial class GravitasQuery3DService
         _redundantColliderCheck.Clear();
         _redundantVoxelCheck.Clear();
 
-        Vector3d normalizedDirection = direction.MagnitudeSquared == Fixed64.Zero ? Vector3d.Zero : direction.Normalized;
+        Vector3d normalizedDirection = direction == Vector3d.Zero ? Vector3d.Zero : direction.Normalized;
         Fixed64 maxDistanceSqr = maxDistance * maxDistance;
         Physics3DHit closestHit = default;
         Fixed64 closestDist = Fixed64.MaxValue;
@@ -393,7 +393,7 @@ public sealed partial class GravitasQuery3DService
         ref Physics3DHit closestHit,
         ref Fixed64 closestDist)
     {
-        if (colliderIds == null || direction.MagnitudeSquared == Fixed64.Zero)
+        if (colliderIds == null || direction == Vector3d.Zero)
             return;
 
         for (int i = colliderIds.Count - 1; i >= 0; i--)
@@ -475,7 +475,7 @@ public sealed partial class GravitasQuery3DService
 
     private static Vector3d GetClosestSurfacePoint(LSCollider collider, Vector3d position)
     {
-        if ((position - collider.Center).MagnitudeSquared == Fixed64.Zero)
+        if (position == collider.Center)
             return collider.Center + Vector3d.Right * collider.ScaledRadius;
 
         return collider.ClosestPointOnSurface(position);

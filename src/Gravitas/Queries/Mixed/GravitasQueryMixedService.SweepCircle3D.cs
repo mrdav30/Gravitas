@@ -115,8 +115,9 @@ public sealed partial class GravitasQueryMixedService
         SwiftThrowHelper.ThrowIfArgument(radius <= Fixed64.Zero, nameof(radius), "Mixed swept circle radius must be greater than zero.");
         SwiftThrowHelper.ThrowIfArgument(halfThickness <= Fixed64.Zero, nameof(halfThickness), "Mixed swept circle half-thickness must be greater than zero.");
 
-        Vector2d segment = end - start;
-        if (segment.MagnitudeSquared <= Fixed64.Epsilon)
+        if (!FixedVectorDifference.TryCreate(start, end, out Vector2d segment)
+            || !Vector2d.TryGetMagnitude(segment, out Fixed64 length)
+            || length <= Fixed64.Epsilon)
         {
             ResetLastQueryCounters();
             hit = default;
@@ -125,8 +126,7 @@ public sealed partial class GravitasQueryMixedService
 
         Vector3d start3D = new(start.X, slabCenterY, start.Y);
         Vector3d end3D = new(end.X, slabCenterY, end.Y);
-        Fixed64 length = segment.Magnitude;
-        Vector2d direction2D = segment / length;
+        Vector2d direction2D = segment.Normalized;
         Vector3d direction = new(direction2D.X, Fixed64.Zero, direction2D.Y);
         _circleSlabSweepWorker.PrepareCircleSlabSource(start3D, radius, halfThickness, direction * length);
         CreateCircleSlabSweepBounds(start, end, radius, slabCenterY, halfThickness, out Vector3d min, out Vector3d max);
@@ -206,8 +206,9 @@ public sealed partial class GravitasQueryMixedService
         SwiftThrowHelper.ThrowIfArgument(halfThickness <= Fixed64.Zero, nameof(halfThickness), "Mixed swept circle half-thickness must be greater than zero.");
 
         results.FastClear();
-        Vector2d segment = end - start;
-        if (segment.MagnitudeSquared <= Fixed64.Epsilon)
+        if (!FixedVectorDifference.TryCreate(start, end, out Vector2d segment)
+            || !Vector2d.TryGetMagnitude(segment, out Fixed64 length)
+            || length <= Fixed64.Epsilon)
         {
             ResetLastQueryCounters();
             return 0;
@@ -215,8 +216,7 @@ public sealed partial class GravitasQueryMixedService
 
         Vector3d start3D = new(start.X, slabCenterY, start.Y);
         Vector3d end3D = new(end.X, slabCenterY, end.Y);
-        Fixed64 length = segment.Magnitude;
-        Vector2d direction2D = segment / length;
+        Vector2d direction2D = segment.Normalized;
         Vector3d direction = new(direction2D.X, Fixed64.Zero, direction2D.Y);
         _circleSlabSweepWorker.PrepareCircleSlabSource(start3D, radius, halfThickness, direction * length);
         CreateCircleSlabSweepBounds(start, end, radius, slabCenterY, halfThickness, out Vector3d min, out Vector3d max);

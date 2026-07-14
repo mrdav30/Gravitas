@@ -30,9 +30,7 @@ public sealed partial class GravitasQuery3DService
         out Physics3DHit hit,
         PhysicsLayerMask layerMask)
     {
-        ValidateConeQuery(direction, length, endRadius);
-
-        Vector3d normalizedDirection = direction.Normalized;
+        Vector3d normalizedDirection = ValidateConeQuery(origin, direction, length, endRadius);
         _currentLayerMask = layerMask;
         NextCircleVersion();
         ResetLastQueryCounters();
@@ -76,9 +74,7 @@ public sealed partial class GravitasQuery3DService
         SwiftList<Physics3DHit> results)
     {
         SwiftThrowHelper.ThrowIfNull(results, nameof(results));
-        ValidateConeQuery(direction, length, endRadius);
-
-        Vector3d normalizedDirection = direction.Normalized;
+        Vector3d normalizedDirection = ValidateConeQuery(origin, direction, length, endRadius);
         _currentLayerMask = layerMask;
         NextCircleVersion();
         ResetLastQueryCounters();
@@ -569,10 +565,14 @@ public sealed partial class GravitasQuery3DService
         ConeGeometry.CreateFiniteConeBounds(origin, end, direction, endRadius, out min, out max);
     }
 
-    private static void ValidateConeQuery(Vector3d direction, Fixed64 length, Fixed64 endRadius)
+    private static Vector3d ValidateConeQuery(
+        Vector3d origin,
+        Vector3d direction,
+        Fixed64 length,
+        Fixed64 endRadius)
     {
         SwiftThrowHelper.ThrowIfArgument(
-            direction.MagnitudeSquared <= Fixed64.Epsilon,
+            direction == Vector3d.Zero,
             nameof(direction),
             "Cone query direction must be non-zero.");
         SwiftThrowHelper.ThrowIfArgument(
@@ -583,5 +583,13 @@ public sealed partial class GravitasQuery3DService
             endRadius <= Fixed64.Zero,
             nameof(endRadius),
             "Cone query end radius must be greater than zero.");
+
+        Vector3d normalizedDirection = direction.Normalized;
+        Vector3d requestedDisplacement = normalizedDirection * length;
+        SwiftThrowHelper.ThrowIfArgument(
+            !FixedVectorDifference.TryTranslate(origin, requestedDisplacement, out _),
+            nameof(length),
+            "Cone query endpoint must be representable without fixed-point saturation.");
+        return normalizedDirection;
     }
 }

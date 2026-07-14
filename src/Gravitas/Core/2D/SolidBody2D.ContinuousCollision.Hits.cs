@@ -267,8 +267,10 @@ public sealed partial class SolidBody2D
         hit = default;
         closingSpeed = Fixed64.Zero;
 
-        Vector2d relativeDisplacement = sourceDisplacement - targetDisplacement;
-        Fixed64 relativeLength = relativeDisplacement.Magnitude;
+        Vector2d relativeDisplacement = ContinuousCollisionSweepRange.ValidateRelativeDisplacement(
+            sourceDisplacement,
+            targetDisplacement,
+            out Fixed64 relativeLength);
 
         Vector2d originalSourcePosition = _position;
         Fixed64 originalSourceRotation = _rotation;

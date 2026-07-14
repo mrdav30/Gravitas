@@ -7,6 +7,7 @@
 
 using FixedMathSharp;
 using Gravitas.Colliders;
+using Gravitas.Support;
 using SwiftCollections;
 using SwiftCollections.Query;
 
@@ -22,8 +23,11 @@ public sealed class RaycastSegmentWorker
     private Vector3d _segmentDirection;
     private Fixed64 _segmentLength;
     private Fixed64 _segmentLengthSqr;
+    private bool _segmentIsValid;
     private bool _calculateIntersections;
     private readonly SwiftList<int> _meshTriangleBuffer = new();
+
+    internal Vector3d SegmentDirection => _segmentDirection;
 
     /// <summary>
     /// Prepares this worker for overlap checks against the line segment between two points.
@@ -33,10 +37,20 @@ public sealed class RaycastSegmentWorker
         _cachedOrigin = p1;
         _cachedEnd = p2;
 
-        Vector3d segment = p2 - p1;
+        if (!FixedVectorDifference.TryCreate(p1, p2, out Vector3d segment)
+            || !Vector3d.TryGetMagnitude(segment, out _segmentLength))
+        {
+            _segmentLengthSqr = Fixed64.Zero;
+            _segmentLength = Fixed64.Zero;
+            _segmentDirection = Vector3d.Zero;
+            _segmentIsValid = false;
+            _calculateIntersections = calculateIntersectionPoints;
+            return;
+        }
+
         _segmentLengthSqr = segment.MagnitudeSquared;
-        _segmentLength = _segmentLengthSqr == Fixed64.Zero ? Fixed64.Zero : segment.Magnitude;
-        _segmentDirection = _segmentLength == Fixed64.Zero ? Vector3d.Zero : segment / _segmentLength;
+        _segmentDirection = _segmentLength == Fixed64.Zero ? Vector3d.Zero : segment.Normalized;
+        _segmentIsValid = true;
         _calculateIntersections = calculateIntersectionPoints;
     }
 
@@ -51,6 +65,9 @@ public sealed class RaycastSegmentWorker
         Fixed64 sqrRadius,
         ref SwiftList<Vector3d> outputIntersectionPoints)
     {
+        if (!_segmentIsValid)
+            return false;
+
         if (_segmentLengthSqr == Fixed64.Zero)
             return CheckPointInsideSphere(position, sqrRadius, ref outputIntersectionPoints);
 
@@ -110,6 +127,9 @@ public sealed class RaycastSegmentWorker
 
     public bool CheckConeOverlaps(LSConeCollider coneCollider, ref SwiftList<Vector3d> outputIntersectionPoints)
     {
+        if (!_segmentIsValid)
+            return false;
+
         FixedQuaternion inverseRotation = coneCollider.Rotation.Inverse();
         Vector3d localOrigin = (_cachedOrigin - coneCollider.Center) * inverseRotation;
 
@@ -146,12 +166,15 @@ public sealed class RaycastSegmentWorker
 
     public bool CheckMeshOverlaps(LSMeshCollider meshCollider, ref SwiftList<Vector3d> outputIntersectionPoints)
     {
+        if (!_segmentIsValid)
+            return false;
+
         Vector3d localOrigin = meshCollider.Mesh.ConvertWorldToLocal(_cachedOrigin);
         Vector3d localEnd = meshCollider.Mesh.ConvertWorldToLocal(_cachedEnd);
         Vector3d localSegment = localEnd - localOrigin;
         Fixed64 localSegmentLengthSqr = localSegment.MagnitudeSquared;
         Fixed64 localSegmentLength = localSegmentLengthSqr == Fixed64.Zero ? Fixed64.Zero : localSegment.Magnitude;
-        Vector3d localSegmentDirection = localSegmentLength == Fixed64.Zero ? Vector3d.Zero : localSegment / localSegmentLength;
+        Vector3d localSegmentDirection = localSegmentLength == Fixed64.Zero ? Vector3d.Zero : localSegment.Normalized;
 
         _meshTriangleBuffer.FastClear();
         meshCollider.Mesh.GetTrianglesInLocalBounds(CreateSegmentBounds(localOrigin, localEnd), _meshTriangleBuffer);
@@ -203,6 +226,9 @@ public sealed class RaycastSegmentWorker
         bool includeCaps,
         ref SwiftList<Vector3d> outputIntersectionPoints)
     {
+        if (!_segmentIsValid)
+            return false;
+
         FixedQuaternion inverseRotation = rotation.Inverse();
         Vector3d localOrigin = (_cachedOrigin - center) * inverseRotation;
 
@@ -390,6 +416,9 @@ public sealed class RaycastSegmentWorker
     /// </summary>
     public bool CheckAABBoxOverlaps(Vector3d min, Vector3d max, ref SwiftList<Vector3d> outputIntersectionPoints)
     {
+        if (!_segmentIsValid)
+            return false;
+
         if (_segmentLengthSqr == Fixed64.Zero)
             return CheckPointInsideBox(min, max, ref outputIntersectionPoints);
 
@@ -420,6 +449,9 @@ public sealed class RaycastSegmentWorker
     /// </summary>
     public bool CheckOBBoxOverlaps(LSCuboidCollider oobox, ref SwiftList<Vector3d> outputIntersectionPoints)
     {
+        if (!_segmentIsValid)
+            return false;
+
         FixedQuaternion inverseRotation = oobox.Rotation.Inverse();
         Vector3d localOrigin = (_cachedOrigin - oobox.Center) * inverseRotation;
         Vector3d halfExtents = oobox.ScaledSize * Fixed64.Half;

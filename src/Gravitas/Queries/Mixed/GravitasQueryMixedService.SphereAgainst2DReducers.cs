@@ -551,7 +551,7 @@ public sealed partial class GravitasQueryMixedService
             ref best);
 
         Fixed64 segmentLength = FixedMath.Sqrt(segmentLengthSqr);
-        Vector3d axis = segment / segmentLength;
+        Vector3d axis = segment.Normalized;
         Vector3d toStart = start - segmentStart;
         Fixed64 startProjection = Vector3d.Dot(toStart, axis);
         Fixed64 directionProjection = Vector3d.Dot(direction, axis);

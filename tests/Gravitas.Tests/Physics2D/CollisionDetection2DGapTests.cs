@@ -190,7 +190,7 @@ public sealed class CollisionDetection2DGapTests
     }
 
     [Fact]
-    public void UltraThinPositiveBoxes_ShouldKeepDeterministicZeroAxisFallback()
+    public void UltraThinPositiveBoxes_ShouldPreserveMinimumRepresentablePenetration()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         context.Settings.RuntimeMode = PhysicsRuntimeMode.TwoD;
@@ -202,11 +202,11 @@ public sealed class CollisionDetection2DGapTests
         bool collided = CollisionDetection2D.TryCollide(first, second, out Contact2D contact);
 
         collided.Should().BeTrue();
-        contact.Depth.Should().Be(Fixed64.Zero);
-        contact.Normal.Should().Be(Vector2d.Right);
+        contact.Depth.Should().Be(Fixed64.Epsilon);
+        contact.Normal.Should().Be(-Vector2d.Right);
         Fixed64 halfWidth = Fixed64.Epsilon * Fixed64.Half;
-        contact.PointA.Should().Be(new Vector2d(halfWidth, Fixed64.One));
-        contact.PointB.Should().Be(new Vector2d(-halfWidth, Fixed64.One));
+        contact.PointA.Should().Be(new Vector2d(-halfWidth, Fixed64.One));
+        contact.PointB.Should().Be(new Vector2d(halfWidth, Fixed64.One));
     }
 
     [Fact]

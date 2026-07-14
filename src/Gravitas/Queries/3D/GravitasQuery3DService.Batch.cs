@@ -643,8 +643,9 @@ public sealed partial class GravitasQuery3DService
     private bool TryRaycastBatchRequest(PhysicsRaycast3DRequest request, out Physics3DHit hit)
     {
         _currentLayerMask = request.LayerMask;
-        Vector3d segment = request.End - request.Start;
-        if (segment.MagnitudeSquared == Fixed64.Zero)
+        if (!FixedVectorDifference.TryCreate(request.Start, request.End, out Vector3d segment)
+            || !Vector3d.TryGetMagnitude(segment, out Fixed64 segmentLength)
+            || segmentLength == Fixed64.Zero)
         {
             ResetLastQueryCounters();
             hit = default;
@@ -660,8 +661,9 @@ public sealed partial class GravitasQuery3DService
     {
         _currentLayerMask = request.LayerMask;
         results.FastClear();
-        Vector3d segment = request.End - request.Start;
-        if (segment.MagnitudeSquared == Fixed64.Zero)
+        if (!FixedVectorDifference.TryCreate(request.Start, request.End, out Vector3d segment)
+            || !Vector3d.TryGetMagnitude(segment, out Fixed64 segmentLength)
+            || segmentLength == Fixed64.Zero)
         {
             ResetLastQueryCounters();
             return 0;
@@ -676,8 +678,10 @@ public sealed partial class GravitasQuery3DService
     private int SweepSphereAllBatchRequest(PhysicsSweepSphere3DRequest request, SwiftList<Physics3DHit> results)
     {
         results.FastClear();
-        Vector3d segment = request.End - request.Start;
-        if (segment.MagnitudeSquared == Fixed64.Zero || request.Radius <= Fixed64.Zero)
+        if (!FixedVectorDifference.TryCreate(request.Start, request.End, out Vector3d segment)
+            || !Vector3d.TryGetMagnitude(segment, out Fixed64 segmentLength)
+            || segmentLength <= Fixed64.Epsilon
+            || request.Radius <= Fixed64.Zero)
         {
             ResetLastQueryCounters();
             return 0;
@@ -706,7 +710,8 @@ public sealed partial class GravitasQuery3DService
     {
         PrepareBatchConvexSweepSource(source, displacement, ref preparedSource, ref preparedDisplacement);
         LSCollider prepared = preparedSource!;
-        if (displacement.MagnitudeSquared <= Fixed64.Epsilon)
+        if (!Vector3d.TryGetMagnitude(displacement, out Fixed64 displacementLength)
+            || displacementLength <= Fixed64.Epsilon)
         {
             ResetLastQueryCounters();
             hit = default;
@@ -730,7 +735,8 @@ public sealed partial class GravitasQuery3DService
         results.FastClear();
         PrepareBatchConvexSweepSource(source, displacement, ref preparedSource, ref preparedDisplacement);
         LSCollider prepared = preparedSource!;
-        if (displacement.MagnitudeSquared <= Fixed64.Epsilon)
+        if (!Vector3d.TryGetMagnitude(displacement, out Fixed64 displacementLength)
+            || displacementLength <= Fixed64.Epsilon)
         {
             ResetLastQueryCounters();
             return 0;
@@ -805,7 +811,7 @@ public sealed partial class GravitasQuery3DService
         _redundantColliderCheck.Clear();
         _redundantVoxelCheck.Clear();
 
-        Vector3d direction = request.Direction.MagnitudeSquared == Fixed64.Zero
+        Vector3d direction = request.Direction == Vector3d.Zero
             ? Vector3d.Zero
             : request.Direction.Normalized;
         Fixed64 maxDistanceSqr = request.MaxDistance * request.MaxDistance;

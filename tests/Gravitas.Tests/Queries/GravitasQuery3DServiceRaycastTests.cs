@@ -106,6 +106,40 @@ public sealed class GravitasQuery3DServiceRaycastTests
     }
 
     [Fact]
+    public void Raycast_WithSmallRepresentableDirection_ShouldUseRobustNormalization()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSSphereCollider target = CreateDynamicSphere(context, Vector3d.Zero);
+
+        bool hit = context.Query3D.Raycast(
+            new Vector3d((Fixed64)(-2), Fixed64.Zero, Fixed64.Zero),
+            new Vector3d(Fixed64.MinIncrement, Fixed64.Zero, Fixed64.Zero),
+            (Fixed64)4,
+            out Physics3DHit rayHit,
+            IncludeLayerZero);
+
+        hit.Should().BeTrue();
+        rayHit.Collider.Should().BeSameAs(target);
+    }
+
+    [Fact]
+    public void Raycast_WithSaturatedDirectionalEndpoint_ShouldRejectBeforeTracing()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+
+        bool hit = context.Query3D.Raycast(
+            new Vector3d(Fixed64.MaxValue - Fixed64.One, Fixed64.Zero, Fixed64.Zero),
+            Vector3d.Right,
+            (Fixed64)2,
+            out Physics3DHit rayHit,
+            IncludeLayerZero);
+
+        hit.Should().BeFalse();
+        rayHit.Should().Be(default(Physics3DHit));
+        context.Query3D.LastQueryCandidateCount.Should().Be(0);
+    }
+
+    [Fact]
     public void RaycastAll_WithZeroLengthSegment_ShouldReturnZeroAndClearResults()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
@@ -116,6 +150,22 @@ public sealed class GravitasQuery3DServiceRaycastTests
 
         count.Should().Be(0);
         hits.Count.Should().Be(0);
+        context.Query3D.LastQueryCandidateCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void RaycastAll_WithExtremeEndpointDifferences_ShouldRejectAndClearResults()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        var hits = new SwiftList<Physics3DHit> { new() };
+        Vector3d componentStart = new(Fixed64.MinValue, Fixed64.Zero, Fixed64.Zero);
+        Vector3d componentEnd = new(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero);
+        Vector3d magnitudeEnd = new(Fixed64.MaxValue, Fixed64.MaxValue, Fixed64.Zero);
+
+        context.Query3D.RaycastAll(componentStart, componentEnd, IncludeLayerZero, hits).Should().Be(0);
+        context.Query3D.RaycastAll(Vector3d.Zero, magnitudeEnd, IncludeLayerZero, hits).Should().Be(0);
+
+        hits.Should().BeEmpty();
         context.Query3D.LastQueryCandidateCount.Should().Be(0);
     }
 

@@ -633,8 +633,7 @@ internal static class CollisionDetection2D
         }
 
         overlap = FixedMath.Min(positive, negative);
-        Vector2d nonzeroAxis = axis.MagnitudeSquared > Fixed64.Epsilon ? axis : Vector2d.Right;
-        normal = positive <= negative ? nonzeroAxis : -nonzeroAxis;
+        normal = positive <= negative ? axis : -axis;
         return true;
     }
 

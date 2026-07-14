@@ -114,7 +114,13 @@ public sealed partial class SolidBody2D
         if (!forceContinuous && !ShouldUseContinuousCollision(out mode))
             return false;
 
-        Vector2d displacement = proposedPosition - startPosition;
+        Vector2d requestedDisplacement = _linearVelocity * initialRemainingTime;
+        Vector2d displacement = ContinuousCollisionSweepRange.ValidateEndpoint(
+            startPosition,
+            proposedPosition,
+            requestedDisplacement,
+            out _);
+
         Fixed64 displacementMagnitudeSquared = displacement.MagnitudeSquared;
         if (displacementMagnitudeSquared <= Fixed64.Epsilon)
             return false;
@@ -134,12 +140,15 @@ public sealed partial class SolidBody2D
         int maxToiIterations = Context.Settings.ContinuousCollisionMaxToiIterations;
         for (int toiIteration = 0; toiIteration < maxToiIterations; toiIteration++)
         {
-            Vector2d segmentDisplacement = _linearVelocity * remainingTime;
-            Fixed64 segmentLength = segmentDisplacement.Magnitude;
-            if (segmentLength <= Fixed64.Epsilon)
-                break;
+            Vector2d requestedSegmentDisplacement = _linearVelocity * remainingTime;
+            Vector2d requestedSegmentEnd = currentPosition + requestedSegmentDisplacement;
+            Vector2d segmentDisplacement = ContinuousCollisionSweepRange.ValidateEndpoint(
+                currentPosition,
+                requestedSegmentEnd,
+                requestedSegmentDisplacement,
+                out Fixed64 segmentLength);
+            Vector2d segmentEnd = requestedSegmentEnd;
 
-            Vector2d segmentEnd = currentPosition + segmentDisplacement;
             Fixed64 elapsedFraction = elapsedTime / Context.DeltaTime;
             Fixed64 remainingFraction = remainingTime / Context.DeltaTime;
             if (!TryGetFirstContinuousCollisionHit(

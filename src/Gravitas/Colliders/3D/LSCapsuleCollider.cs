@@ -228,27 +228,21 @@ public class LSCapsuleCollider : LSCollider
         if (rotatedPoint.Y > HemisphereCenterTop.Y)
         {
             Vector3d topDirection = rotatedPoint - HemisphereCenterTop;
-            Fixed64 topDistance = topDirection.Magnitude;
-            return topDistance > Fixed64.Zero
-                ? Rotation * (topDirection / topDistance)
-                : Rotation * Vector3d.Up;
+            return Rotation * topDirection.Normalized;
         }
 
         // If the point is on the bottom hemisphere
         if (rotatedPoint.Y < HemisphereCenterBottom.Y)
         {
             Vector3d bottomDirection = rotatedPoint - HemisphereCenterBottom;
-            Fixed64 bottomDistance = bottomDirection.Magnitude;
-            return bottomDistance > Fixed64.Zero
-                ? Rotation * (bottomDirection / bottomDistance)
-                : Rotation * -Vector3d.Up;
+            return Rotation * bottomDirection.Normalized;
         }
 
         // If the point is along the length of the cylinder
         Vector3d direction = new(rotatedPoint.X, Fixed64.Zero, rotatedPoint.Z);
         Fixed64 distance = direction.Magnitude;
         return distance > Fixed64.Zero
-            ? Rotation * (direction / distance)
+            ? Rotation * direction.Normalized
             : Rotation * Vector3d.Right;
     }
 

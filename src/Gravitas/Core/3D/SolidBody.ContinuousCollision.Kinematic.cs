@@ -20,9 +20,11 @@ public partial class SolidBody
         Vector3d targetPosition,
         FixedQuaternion startRotation)
     {
+        Vector3d frameDisplacement = ProjectLinearMotion(
+            ContinuousCollisionSweepRange.ValidateEndpoint(startPosition, targetPosition, out _));
         _continuousCollisionFrameToken = Context.LateSimulateToken;
         _continuousCollisionFrameStart = startPosition;
-        _continuousCollisionFrameDisplacement = ProjectLinearMotion(targetPosition - startPosition);
+        _continuousCollisionFrameDisplacement = frameDisplacement;
         _continuousCollisionFrameRotation = startRotation;
     }
 
@@ -31,8 +33,10 @@ public partial class SolidBody
         if (!ShouldUseContinuousCollision(out ContinuousCollisionMode mode))
             return false;
 
-        Vector3d displacement = ProjectLinearMotion(proposedPosition - startPosition);
-        proposedPosition = startPosition + displacement;
+        Vector3d displacement = ContinuousCollisionSweepRange.ValidateEndpoint(
+            startPosition,
+            proposedPosition,
+            out Fixed64 sourceLength);
         Fixed64 displacementMagnitudeSquared = displacement.MagnitudeSquared;
         if (displacementMagnitudeSquared <= Fixed64.Epsilon)
             return false;
@@ -45,7 +49,6 @@ public partial class SolidBody
             return false;
         }
 
-        Fixed64 sourceLength = FixedMath.Sqrt(displacementMagnitudeSquared);
         bool foundStatic = TryGetFirstKinematicStaticContinuousCollisionHit(
             startPosition,
             proposedPosition,
@@ -63,7 +66,7 @@ public partial class SolidBody
 
         LastContinuousCollisionToiIterationCount++;
         if (foundStatic)
-            proposedPosition = startPosition + displacement / sourceLength * staticHitDistance;
+            proposedPosition = startPosition + displacement.Normalized * staticHitDistance;
 
         return true;
     }

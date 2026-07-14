@@ -1045,6 +1045,50 @@ public sealed class RaycastSegmentWorkerTests
         hits.Count.Should().Be(0);
     }
 
+    [Fact]
+    public void PrepareSegmentCheck_WithSmallMultiAxisSegment_ShouldKeepUnitDirection()
+    {
+        var worker = new RaycastSegmentWorker();
+        Vector3d end = new(
+            Fixed64.FromRaw(300),
+            Fixed64.FromRaw(300),
+            Fixed64.Zero);
+
+        worker.PrepareSegmentCheck(Vector3d.Zero, end);
+
+        FixedMath.Abs(worker.SegmentDirection.Magnitude - Fixed64.One)
+            .Should().BeLessThanOrEqualTo(Fixed64.Epsilon);
+    }
+
+    [Fact]
+    public void PrepareSegmentCheck_WithInvalidFixedRange_ShouldRejectEveryShapeWorker()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        var componentOverflowWorker = new RaycastSegmentWorker();
+        var magnitudeOverflowWorker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+        LSMeshCollider mesh = MeshTestFixtures.CreateConvexCube();
+        LSConeCollider cone = scenario.CreateCone(Vector3d.Zero).Collider;
+        LSCylinderCollider cylinder = scenario.CreateCylinder(Vector3d.Zero).Collider;
+        LSCuboidCollider cuboid = scenario.CreateCuboid(Vector3d.Zero).Collider;
+
+        componentOverflowWorker.PrepareSegmentCheck(
+            new Vector3d(Fixed64.MinValue, Fixed64.Zero, Fixed64.Zero),
+            new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero));
+        magnitudeOverflowWorker.PrepareSegmentCheck(
+            Vector3d.Zero,
+            new Vector3d(Fixed64.MaxValue, Fixed64.MaxValue, Fixed64.Zero));
+
+        componentOverflowWorker.CheckSphereOverlaps(Vector3d.Zero, Fixed64.One, ref hits).Should().BeFalse();
+        componentOverflowWorker.CheckConeOverlaps(cone, ref hits).Should().BeFalse();
+        componentOverflowWorker.CheckMeshOverlaps(mesh, ref hits).Should().BeFalse();
+        componentOverflowWorker.CheckCylinderOverlaps(cylinder, ref hits).Should().BeFalse();
+        componentOverflowWorker.CheckAABBoxOverlaps(-Vector3d.One, Vector3d.One, ref hits).Should().BeFalse();
+        componentOverflowWorker.CheckOBBoxOverlaps(cuboid, ref hits).Should().BeFalse();
+        magnitudeOverflowWorker.CheckSphereOverlaps(Vector3d.Zero, Fixed64.One, ref hits).Should().BeFalse();
+        hits.Should().BeEmpty();
+    }
+
     public static TheoryData<Vector3d> BoxBoundaryPoints() => new()
     {
         Vector3d.Zero,

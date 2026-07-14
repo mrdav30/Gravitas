@@ -247,6 +247,9 @@ public class LSMeshCollider : LSCollider
             ? normal
             : (point - Center).Normalized;
 
+    internal override bool TryGetPlanarSurfaceNormal(Vector3d point, out Vector3d normal) =>
+        TryFindClosestPointOnSurface(point, _triangleQueryBuffer, out _, out normal);
+
     public Vector3d GetSupportPoint(Vector3d point)
     {
         Vector3d closestPoint = Bounds.ClosestPointOnSurface(point);

@@ -329,7 +329,7 @@ public partial class SolidBody
 
         Vector3d sourceDisplacement = proposedPosition - startPosition;
         Fixed64 sourceLength = sourceDisplacement.Magnitude;
-        Vector3d sourceDirection = sourceDisplacement / sourceLength;
+        Vector3d sourceDirection = sourceDisplacement.Normalized;
         bool found = false;
         Physics3DHit best = default;
         Fixed64 bestClosingSpeed = Fixed64.Zero;
@@ -420,11 +420,13 @@ public partial class SolidBody
         closingSpeed = Fixed64.Zero;
         exactSupported = false;
 
-        Vector3d relativeDisplacement = sourceDisplacement - targetDisplacement;
-        Fixed64 relativeLength = relativeDisplacement.Magnitude;
+        Vector3d relativeDisplacement = ContinuousCollisionSweepRange.ValidateRelativeDisplacement(
+            sourceDisplacement,
+            targetDisplacement,
+            out Fixed64 relativeLength);
 
-        Vector3d relativeDirection = relativeDisplacement / relativeLength;
-        Vector3d sourceDirection = sourceDisplacement / sourceLength;
+        Vector3d relativeDirection = relativeDisplacement.Normalized;
+        Vector3d sourceDirection = sourceDisplacement.Normalized;
         Vector3d originalSourcePosition = Position3d;
         FixedQuaternion originalSourceRotation = Rotation;
         bool originalSourcePositionMutated = _positionMutated;
@@ -534,7 +536,7 @@ public partial class SolidBody
 
         Vector3d sourceDisplacement = proposedPosition - startPosition;
         Fixed64 sourceLength = sourceDisplacement.Magnitude;
-        Vector3d sourceDirection = sourceDisplacement / sourceLength;
+        Vector3d sourceDirection = sourceDisplacement.Normalized;
         bool found = false;
         PhysicsMixedHit best = default;
         Fixed64 bestClosingSpeed = Fixed64.Zero;

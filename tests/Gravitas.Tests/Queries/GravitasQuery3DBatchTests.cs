@@ -213,6 +213,82 @@ public sealed class GravitasQuery3DBatchTests
     }
 
     [Fact]
+    public void SweepBatches_WithUnrepresentableSegmentLength_ShouldRejectAndClearOutputs()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSCuboidCollider> source = scenario.CreateCuboid(Vector3d.Zero);
+        Vector3d unrepresentable = new(Fixed64.MaxValue, Fixed64.MaxValue, Fixed64.Zero);
+        PhysicsSweepSphere3DRequest[] sphereRequests =
+        {
+            new(Vector3d.Zero, unrepresentable, Fixed64.Half, IncludeLayerZero)
+        };
+        PhysicsSweepCuboid3DRequest[] cuboidRequests =
+        {
+            new(source.Collider, unrepresentable, IncludeLayerZero)
+        };
+        var closest = new Physics3DHit[1];
+        var hits = new SwiftList<Physics3DHit> { new() };
+        var ranges = new PhysicsQueryHitRange[1];
+
+        int sphereClosestCount = scenario.Context.Query3D.SweepSphereBatch(sphereRequests, closest);
+        int sphereAllCount = scenario.Context.Query3D.SweepSphereAllBatch(sphereRequests, hits, ranges);
+
+        sphereClosestCount.Should().Be(0);
+        sphereAllCount.Should().Be(0);
+        closest[0].Should().Be(default(Physics3DHit));
+        hits.Should().BeEmpty();
+        ranges[0].Should().Be(new PhysicsQueryHitRange(0, 0));
+
+        closest[0] = new Physics3DHit();
+        hits.Add(new Physics3DHit());
+        int cuboidClosestCount = scenario.Context.Query3D.SweepCuboidBatch(cuboidRequests, closest);
+        int cuboidAllCount = scenario.Context.Query3D.SweepCuboidAllBatch(cuboidRequests, hits, ranges);
+
+        cuboidClosestCount.Should().Be(0);
+        cuboidAllCount.Should().Be(0);
+        closest[0].Should().Be(default(Physics3DHit));
+        hits.Should().BeEmpty();
+        ranges[0].Should().Be(new PhysicsQueryHitRange(0, 0));
+        scenario.Context.Query3D.LastQueryCandidateCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void RayAndSphereBatches_WithExtremeEndpointDifferences_ShouldRejectBeforeCandidateCollection()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        Vector3d componentStart = new(Fixed64.MinValue, Fixed64.Zero, Fixed64.Zero);
+        Vector3d componentEnd = new(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero);
+        Vector3d magnitudeEnd = new(Fixed64.MaxValue, Fixed64.MaxValue, Fixed64.Zero);
+        PhysicsRaycast3DRequest[] rayRequests =
+        {
+            new(componentStart, componentEnd, IncludeLayerZero),
+            new(Vector3d.Zero, magnitudeEnd, IncludeLayerZero)
+        };
+        PhysicsSweepSphere3DRequest[] sphereRequests =
+        {
+            new(componentStart, componentEnd, Fixed64.Half, IncludeLayerZero),
+            new(Vector3d.Zero, magnitudeEnd, Fixed64.Half, IncludeLayerZero)
+        };
+        var closest = new Physics3DHit[2];
+        var hits = new SwiftList<Physics3DHit> { new() };
+        var ranges = new PhysicsQueryHitRange[2];
+
+        scenario.Context.Query3D.RaycastBatch(rayRequests, closest).Should().Be(0);
+        scenario.Context.Query3D.RaycastAllBatch(rayRequests, hits, ranges).Should().Be(0);
+        closest.Should().OnlyContain(hit => hit.Equals(default(Physics3DHit)));
+        hits.Should().BeEmpty();
+        ranges.Should().OnlyContain(range => range.Count == 0);
+
+        hits.Add(new Physics3DHit());
+        scenario.Context.Query3D.SweepSphereBatch(sphereRequests, closest).Should().Be(0);
+        scenario.Context.Query3D.SweepSphereAllBatch(sphereRequests, hits, ranges).Should().Be(0);
+        closest.Should().OnlyContain(hit => hit.Equals(default(Physics3DHit)));
+        hits.Should().BeEmpty();
+        ranges.Should().OnlyContain(range => range.Count == 0);
+        scenario.Context.Query3D.LastQueryCandidateCount.Should().Be(0);
+    }
+
+    [Fact]
     public void RegisteredSourceSweepBatch_ShouldReuseExactSourceSweepBehavior()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();

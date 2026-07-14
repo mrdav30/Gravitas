@@ -8,6 +8,7 @@
 using Chronicler;
 using FixedMathSharp;
 using Gravitas.Colliders;
+using Gravitas.CollisionHandling;
 using Gravitas.Queries;
 using SwiftCollections;
 using System.Runtime.CompilerServices;
@@ -197,6 +198,14 @@ public sealed partial class SolidBody2D : IRecordable
 
         Fixed64 x = (_freezeAxes & BodyFreezeAxes2D.PositionX) == BodyFreezeAxes2D.PositionX ? Fixed64.Zero : value.X;
         Fixed64 y = (_freezeAxes & BodyFreezeAxes2D.PositionY) == BodyFreezeAxes2D.PositionY ? Fixed64.Zero : value.Y;
+        return new Vector2d(x, y);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private Vector2d ProjectLinearEndpoint(Vector2d start, Vector2d end)
+    {
+        Fixed64 x = (_freezeAxes & BodyFreezeAxes2D.PositionX) == BodyFreezeAxes2D.PositionX ? start.X : end.X;
+        Fixed64 y = (_freezeAxes & BodyFreezeAxes2D.PositionY) == BodyFreezeAxes2D.PositionY ? start.Y : end.Y;
         return new Vector2d(x, y);
     }
 
@@ -522,9 +531,9 @@ public sealed partial class SolidBody2D : IRecordable
             Vector2d startPosition = _position;
             Vector2d proposedPosition = startPosition + _linearVelocity * Context.DeltaTime;
             TryResolveContinuousCollision(startPosition, ref proposedPosition);
-            proposedPosition = startPosition + ProjectLinearMotion(proposedPosition - startPosition);
+            proposedPosition = ProjectLinearEndpoint(startPosition, proposedPosition);
             TryResolveRotationalContinuousCollision(startPosition, ref proposedPosition, startRotation, ref proposedRotation);
-            proposedPosition = startPosition + ProjectLinearMotion(proposedPosition - startPosition);
+            proposedPosition = ProjectLinearEndpoint(startPosition, proposedPosition);
             _position = proposedPosition;
             _rotation = proposedRotation;
             if (updateColliderState)
@@ -569,9 +578,11 @@ public sealed partial class SolidBody2D : IRecordable
             return;
 
         Wake();
-        Vector2d resolvedPosition = kinematicPosition;
+        Vector2d resolvedPosition = ProjectLinearEndpoint(startPosition, kinematicPosition);
+        if (ShouldUseContinuousCollision(out _))
+            _ = ContinuousCollisionSweepRange.ValidateEndpoint(startPosition, resolvedPosition, out _);
         Fixed64 resolvedRotation = kinematicRotation;
-        CaptureKinematicContinuousCollisionFrame(startPosition, kinematicPosition, startRotation);
+        CaptureKinematicContinuousCollisionFrame(startPosition, resolvedPosition, startRotation);
         TryResolveKinematicContinuousCollision(startPosition, ref resolvedPosition);
         TryResolveKinematicRotationalContinuousCollision(startPosition, ref resolvedPosition, startRotation, ref resolvedRotation);
 

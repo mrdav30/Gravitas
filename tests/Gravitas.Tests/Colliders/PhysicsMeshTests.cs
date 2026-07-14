@@ -163,6 +163,34 @@ public sealed class PhysicsMeshTests
     }
 
     [Fact]
+    public void GetSupportVertexWorld_WithZeroDirection_ShouldUseStableRightAxisFallback()
+    {
+        PhysicsMesh mesh = MeshTestFixtures.CreateConvexCube().Mesh;
+
+        mesh.GetSupportVertexWorld(Vector3d.Zero)
+            .Should().Be(ScanSupportWithGetVertexWorld(mesh, Vector3d.Right));
+    }
+
+    [Fact]
+    public void GetSupportVertexWorld_WithAcceleratedExtremeTranslatedMesh_ShouldCompareLocalFeatures()
+    {
+        PhysicsMesh mesh = MeshTestFixtures.CreateSubdividedInsideCorner(
+            4,
+            MeshColliderMode.Convex,
+            MeshInertiaPolicy.SurfaceApproximation).Mesh;
+        Fixed64 offset = new(2_000_000_000);
+        mesh.UpdatePosition(
+            new Vector3d(offset, offset, Fixed64.Zero),
+            FixedQuaternion.Identity);
+
+        Vector3d support = mesh.GetSupportVertexWorld(
+            new Vector3d(Fixed64.One, Fixed64.One, Fixed64.Zero).Normalized);
+
+        support.X.Should().Be(offset + (Fixed64)4);
+        support.Y.Should().Be(offset + (Fixed64)4);
+    }
+
+    [Fact]
     public void GetFrontalArea_ShouldSumOnlyFacingWorldTriangles()
     {
         PhysicsMesh mesh = MeshTestFixtures.CreateConvexQuadFloor().Mesh;

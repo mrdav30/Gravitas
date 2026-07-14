@@ -70,6 +70,111 @@ public sealed class ConvexColliderSupportTests
     }
 
     [Fact]
+    public void Support_WithExtremeTranslatedCuboid_ShouldCompareCenteredFeatures()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        Fixed64 offset = new(2_000_000_000);
+        ScenarioBody<LSCuboidCollider> cuboid = scenario.CreateCuboid(
+            new Vector3d(offset, offset, Fixed64.Zero));
+        Vector3d direction = new Vector3d(Fixed64.One, Fixed64.One, Fixed64.Zero).Normalized;
+
+        Vector3d support = ConvexColliderSupport.Support(cuboid.Collider, direction);
+
+        support.Should().Be(new Vector3d(offset + Fixed64.Half, offset + Fixed64.Half, -Fixed64.Half));
+    }
+
+    [Fact]
+    public void Support_WithExtremeTranslatedConvexMesh_ShouldCompareLocalFeatures()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        Fixed64 offset = new(2_000_000_000);
+        ScenarioBody<LSMeshCollider> mesh = scenario.CreateBody(
+            MeshTestFixtures.CreateConvexCube(inertiaPolicy: MeshInertiaPolicy.SurfaceApproximation),
+            new Vector3d(offset, offset, Fixed64.Zero),
+            FixedQuaternion.Identity);
+        Vector3d direction = new Vector3d(Fixed64.One, Fixed64.One, Fixed64.Zero).Normalized;
+
+        Vector3d support = ConvexColliderSupport.Support(mesh.Collider, direction);
+
+        support.X.Should().Be(offset + Fixed64.Half);
+        support.Y.Should().Be(offset + Fixed64.Half);
+    }
+
+    [Fact]
+    public void Support_WithExtremeTranslatedRotatedCapsule_ShouldSelectForwardSegmentEndpoint()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        Fixed64 offset = new(2_000_000_000);
+        ScenarioBody<LSCapsuleCollider> capsule = scenario.CreateBody(
+            new LSCapsuleCollider { Size = new Vector3d(Fixed64.One, (Fixed64)3, Fixed64.One) },
+            new Vector3d(offset, offset, Fixed64.Zero),
+            FixedQuaternion.FromEulerAnglesInDegrees(Fixed64.Zero, Fixed64.Zero, (Fixed64)(-45)));
+        Vector3d direction = capsule.Collider.LineDirection;
+
+        Vector3d support = ConvexColliderSupport.Support(capsule.Collider, direction);
+
+        support.Should().Be(capsule.Collider.LineSegmentEnd + direction * capsule.Collider.ScaledRadius);
+    }
+
+    [Fact]
+    public void ExactSupportProjection_ShouldOrderAndTieAcrossFullCoordinateRange()
+    {
+        Vector3d direction3D = new Vector3d(Fixed64.One, Fixed64.One, Fixed64.Zero).Normalized;
+        ConvexSupportProjection.Compare(
+                new Vector3d(Fixed64.MaxValue, Fixed64.MaxValue, Fixed64.Zero),
+                new Vector3d(Fixed64.MinValue, Fixed64.MinValue, Fixed64.Zero),
+                direction3D)
+            .Should().BePositive();
+        ConvexSupportProjection.Compare(
+                new Vector3d(Fixed64.MinValue, Fixed64.MinValue, Fixed64.Zero),
+                new Vector3d(Fixed64.MaxValue, Fixed64.MaxValue, Fixed64.Zero),
+                direction3D)
+            .Should().BeNegative();
+        ConvexSupportProjection.Compare(
+                new Vector3d(Fixed64.MaxValue, Fixed64.MinValue, Fixed64.Zero),
+                new Vector3d(Fixed64.MinValue, Fixed64.MaxValue, Fixed64.Zero),
+                direction3D)
+            .Should().Be(0);
+
+        Vector2d direction2D = Vector2d.One.Normalized;
+        ConvexSupportProjection.Compare(
+                new Vector2d(Fixed64.MaxValue, Fixed64.MaxValue),
+                new Vector2d(Fixed64.MinValue, Fixed64.MinValue),
+                direction2D)
+            .Should().BePositive();
+        ConvexSupportProjection.Compare(
+                new Vector2d(Fixed64.MaxValue, Fixed64.MinValue),
+                new Vector2d(Fixed64.MinValue, Fixed64.MaxValue),
+                direction2D)
+            .Should().Be(0);
+    }
+
+    [Fact]
+    public void ExactNonNegativeProjectionDifference_ShouldCancelThenClampOnlyAfterRescaling()
+    {
+        Vector3d direction = new Vector3d(Fixed64.One, Fixed64.One, Fixed64.Zero).Normalized;
+        Vector3d source = new(Fixed64.MinValue, Fixed64.MaxValue, Fixed64.Zero);
+        Vector3d cancellingTarget = new(Fixed64.MaxValue, Fixed64.MinValue + Fixed64.MinIncrement, Fixed64.Zero);
+
+        ConvexSupportProjection.ProjectNonNegativeDifference(cancellingTarget, source, direction)
+            .Should().Be(Fixed64.Zero);
+        ConvexSupportProjection.ProjectNonNegativeDifference(source, cancellingTarget, direction)
+            .Should().Be(Fixed64.Zero);
+        ConvexSupportProjection.ProjectNonNegativeDifference(
+                new Vector3d(Fixed64.MaxValue, Fixed64.MaxValue, Fixed64.MaxValue),
+                new Vector3d(Fixed64.MinValue, Fixed64.MinValue, Fixed64.MinValue),
+                Vector3d.One.Normalized)
+            .Should().Be(Fixed64.MaxValue);
+
+        Vector3d oneUnitTarget = new(
+            Fixed64.MaxValue,
+            Fixed64.MinValue + Fixed64.One,
+            Fixed64.Zero);
+        ConvexSupportProjection.ProjectNonNegativeDifference(oneUnitTarget, source, direction)
+            .Should().Be(direction.X);
+    }
+
+    [Fact]
     public void Support_ShouldUseConvexMeshVerticesAndRejectUnsupportedColliders()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
@@ -95,6 +200,16 @@ public sealed class ConvexColliderSupportTests
         ScenarioBody<LSSphereCollider> second = scenario.CreateSphere(Vector3d.Zero);
 
         ConvexColliderSupport.Intersects(first.Collider, second.Collider).Should().BeTrue();
+    }
+
+    [Fact]
+    public void Intersects_WhenIterationBudgetIsExhaustedWithoutSeparation_ShouldRemainConservative()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> first = scenario.CreateSphere(Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> second = scenario.CreateSphere(Vector3d.Right * (Fixed64)4);
+
+        ConvexColliderSupport.Intersects(first.Collider, second.Collider, maxIterations: 0).Should().BeTrue();
     }
 
     [Fact]

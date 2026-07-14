@@ -98,7 +98,7 @@ public sealed partial class GravitasQuery3DService
         PhysicsLayerMask layerMask)
     {
         _currentLayerMask = layerMask;
-        if (direction.MagnitudeSquared == Fixed64.Zero || maxDistance <= Fixed64.Zero)
+        if (direction == Vector3d.Zero || maxDistance <= Fixed64.Zero)
         {
             ResetLastQueryCounters();
             raycastHit = default;
@@ -106,7 +106,13 @@ public sealed partial class GravitasQuery3DService
         }
 
         Vector3d rayDirection = direction.Normalized;
-        Vector3d end = origin + rayDirection * maxDistance;
+        Vector3d requestedDisplacement = rayDirection * maxDistance;
+        if (!FixedVectorDifference.TryTranslate(origin, requestedDisplacement, out Vector3d end))
+        {
+            ResetLastQueryCounters();
+            raycastHit = default;
+            return false;
+        }
 
         BeginRaycastTrace(origin, end);
         bool hit = TryFindClosestHit(origin, end, rayDirection, out raycastHit);
@@ -135,8 +141,9 @@ public sealed partial class GravitasQuery3DService
         _currentLayerMask = layerMask;
         results.FastClear();
 
-        Vector3d segment = end3d - start3d;
-        if (segment.MagnitudeSquared == Fixed64.Zero)
+        if (!FixedVectorDifference.TryCreate(start3d, end3d, out Vector3d segment)
+            || !Vector3d.TryGetMagnitude(segment, out Fixed64 segmentLength)
+            || segmentLength == Fixed64.Zero)
         {
             ResetLastQueryCounters();
             return 0;
@@ -168,7 +175,7 @@ public sealed partial class GravitasQuery3DService
         PhysicsLayerMask layerMask,
         LSCollider? excludedCollider = null)
     {
-        if (direction.MagnitudeSquared == Fixed64.Zero || maxDistance <= Fixed64.Zero)
+        if (direction == Vector3d.Zero || maxDistance <= Fixed64.Zero)
         {
             ResetLastQueryCounters();
             sweepHit = default;
@@ -176,7 +183,13 @@ public sealed partial class GravitasQuery3DService
         }
 
         Vector3d sweepDirection = direction.Normalized;
-        Vector3d end = origin + sweepDirection * maxDistance;
+        Vector3d requestedDisplacement = sweepDirection * maxDistance;
+        if (!FixedVectorDifference.TryTranslate(origin, requestedDisplacement, out Vector3d end))
+        {
+            ResetLastQueryCounters();
+            sweepHit = default;
+            return false;
+        }
         bool hit = SweepSphere(origin, end, radius, layerMask, excludedCollider, out sweepHit);
         _context.Diagnostics.EmitRayQuery(
             origin,
@@ -530,8 +543,10 @@ public sealed partial class GravitasQuery3DService
         SwiftThrowHelper.ThrowIfNull(results, nameof(results));
 
         results.FastClear();
-        Vector3d segment = end3d - start3d;
-        if (segment.MagnitudeSquared == Fixed64.Zero || radius <= Fixed64.Zero)
+        if (!FixedVectorDifference.TryCreate(start3d, end3d, out Vector3d segment)
+            || !Vector3d.TryGetMagnitude(segment, out Fixed64 segmentLength)
+            || segmentLength <= Fixed64.Epsilon
+            || radius <= Fixed64.Zero)
         {
             ResetLastQueryCounters();
             return 0;
@@ -560,7 +575,8 @@ public sealed partial class GravitasQuery3DService
         bool includeTriggers)
     {
         sweepHit = default;
-        if (displacement.MagnitudeSquared <= Fixed64.Epsilon)
+        if (!Vector3d.TryGetMagnitude(displacement, out Fixed64 displacementLength)
+            || displacementLength <= Fixed64.Epsilon)
         {
             ResetLastQueryCounters();
             return false;
@@ -589,7 +605,8 @@ public sealed partial class GravitasQuery3DService
         bool staticTargetsOnly = false)
     {
         results.FastClear();
-        if (displacement.MagnitudeSquared <= Fixed64.Epsilon)
+        if (!Vector3d.TryGetMagnitude(displacement, out Fixed64 displacementLength)
+            || displacementLength <= Fixed64.Epsilon)
         {
             ResetLastQueryCounters();
             return 0;
@@ -677,8 +694,9 @@ public sealed partial class GravitasQuery3DService
             return false;
         }
 
-        Vector3d segment = end - start;
-        if (segment.MagnitudeSquared == Fixed64.Zero)
+        if (!FixedVectorDifference.TryCreate(start, end, out Vector3d segment)
+            || !Vector3d.TryGetMagnitude(segment, out Fixed64 segmentLength)
+            || segmentLength <= Fixed64.Epsilon)
         {
             ResetLastQueryCounters();
             return false;

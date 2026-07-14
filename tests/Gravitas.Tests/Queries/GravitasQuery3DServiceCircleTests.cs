@@ -154,6 +154,24 @@ public sealed class GravitasQuery3DServiceCircleTests
     }
 
     [Fact]
+    public void OverlapCircleInDirection_WithSmallRepresentableDirection_ShouldUseRobustNormalization()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSSphereCollider target = CreateDynamicSphere(context, new Vector3d((Fixed64)2, Fixed64.Zero, Fixed64.Zero));
+
+        bool hit = context.Query3D.OverlapCircleInDirection(
+            Vector3d.Zero,
+            (Fixed64)3,
+            new Vector3d(Fixed64.MinIncrement, Fixed64.Zero, Fixed64.Zero),
+            out Physics3DHit hitInfo,
+            (Fixed64)3,
+            IncludeLayerZero);
+
+        hit.Should().BeTrue();
+        hitInfo.Collider.Should().BeSameAs(target);
+    }
+
+    [Fact]
     public void OverlapCircleInDirection_WithHitBeyondMaxDistance_ShouldReturnNoHit()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();

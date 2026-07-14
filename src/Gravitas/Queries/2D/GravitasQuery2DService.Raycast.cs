@@ -29,8 +29,9 @@ public sealed partial class GravitasQuery2DService
     /// </summary>
     public bool Raycast(Vector2d start, Vector2d end, PhysicsLayerMask layerMask, out Physics2DHit hit)
     {
-        Vector2d segment = end - start;
-        if (segment.MagnitudeSquared == Fixed64.Zero)
+        if (!FixedVectorDifference.TryCreate(start, end, out Vector2d segment)
+            || !Vector2d.TryGetMagnitude(segment, out Fixed64 segmentLength)
+            || segmentLength == Fixed64.Zero)
         {
             LastQueryCandidateCount = 0;
             hit = default;
@@ -82,8 +83,9 @@ public sealed partial class GravitasQuery2DService
         SwiftThrowHelper.ThrowIfNull(results, nameof(results));
 
         results.FastClear();
-        Vector2d segment = end - start;
-        if (segment.MagnitudeSquared == Fixed64.Zero)
+        if (!FixedVectorDifference.TryCreate(start, end, out Vector2d segment)
+            || !Vector2d.TryGetMagnitude(segment, out Fixed64 segmentLength)
+            || segmentLength == Fixed64.Zero)
         {
             LastQueryCandidateCount = 0;
             return 0;

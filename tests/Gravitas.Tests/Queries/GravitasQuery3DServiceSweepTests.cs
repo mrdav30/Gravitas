@@ -1,12 +1,14 @@
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
+using Gravitas.CollisionHandling;
 using Gravitas.Constraints;
 using Gravitas.Queries;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
 using GridForge.Configuration;
 using GridForge.Grids;
+using Moq;
 using SwiftCollections;
 using System;
 using Xunit;
@@ -17,12 +19,27 @@ public sealed class GravitasQuery3DServiceSweepTests
 {
     private static readonly PhysicsLayerMask IncludeLayerZero = PhysicsLayerMask.FromLayer(0);
     private static readonly Fixed64 QueryTolerance = Fixed64.FromFraction(1, 1_000_000);
+    private static readonly Fixed64 SweepContactTolerance = Fixed64.FromFraction(1, 4096);
 
     public static TheoryData<Vector3d, Vector3d, Vector3d, Vector3d, Vector3d> ConvexSweepHitNormalCases => new()
     {
         { Vector3d.Right, Vector3d.Zero, Vector3d.Zero, Vector3d.Right, -Vector3d.Right },
         { -Vector3d.Right, Vector3d.Zero, Vector3d.Zero, Vector3d.Right, -Vector3d.Right },
         { Vector3d.Zero, Vector3d.Right, Vector3d.Zero, Vector3d.Right, -Vector3d.Right },
+        {
+            Vector3d.Zero,
+            new Vector3d(-Fixed64.One, Fixed64.FromFraction(1, 2500), Fixed64.Zero),
+            Vector3d.Zero,
+            Vector3d.Right,
+            new Vector3d(-Fixed64.One, Fixed64.FromFraction(1, 2500), Fixed64.Zero).Normalized
+        },
+        {
+            new Vector3d(-Fixed64.Half, Fixed64.FromFraction(1, 100), Fixed64.Zero),
+            -Vector3d.Right,
+            Vector3d.Zero,
+            Vector3d.Right,
+            -Vector3d.Right
+        },
         { Vector3d.Zero, Vector3d.Zero, Vector3d.Up, Vector3d.Right, Vector3d.Up },
         { Vector3d.Zero, Vector3d.Zero, Vector3d.Zero, Vector3d.Right, -Vector3d.Right },
         { Vector3d.Zero, Vector3d.Zero, Vector3d.Zero, Vector3d.Zero, Vector3d.Zero }
@@ -94,6 +111,42 @@ public sealed class GravitasQuery3DServiceSweepTests
     }
 
     [Fact]
+    public void SweepSphere_WithSmallRepresentableDirection_ShouldUseRobustNormalization()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSSphereCollider target = CreateDynamicCollider(context, new LSSphereCollider(), Vector3d.Zero);
+
+        bool hit = context.Query3D.SweepSphere(
+            new Vector3d((Fixed64)(-2), Fixed64.Zero, Fixed64.Zero),
+            Fixed64.Half,
+            new Vector3d(Fixed64.MinIncrement, Fixed64.Zero, Fixed64.Zero),
+            (Fixed64)4,
+            out Physics3DHit sweepHit,
+            IncludeLayerZero);
+
+        hit.Should().BeTrue();
+        sweepHit.Collider.Should().BeSameAs(target);
+    }
+
+    [Fact]
+    public void SweepSphere_WithSaturatedDirectionalEndpoint_ShouldRejectBeforeTracing()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+
+        bool hit = context.Query3D.SweepSphere(
+            new Vector3d(Fixed64.MaxValue - Fixed64.One, Fixed64.Zero, Fixed64.Zero),
+            Fixed64.Half,
+            Vector3d.Right,
+            (Fixed64)2,
+            out Physics3DHit sweepHit,
+            IncludeLayerZero);
+
+        hit.Should().BeFalse();
+        sweepHit.Should().Be(default(Physics3DHit));
+        context.Query3D.LastQueryCandidateCount.Should().Be(0);
+    }
+
+    [Fact]
     public void SweepSphere_WithZeroRadius_ShouldReturnFalseWithoutTraversingCandidates()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
@@ -131,6 +184,43 @@ public sealed class GravitasQuery3DServiceSweepTests
 
         count.Should().Be(0);
         hits.Count.Should().Be(0);
+        context.Query3D.LastQueryCandidateCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void SweepSphereAll_WithUnrepresentableSegmentLength_ShouldReturnZeroAndClearResults()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        _ = CreateDynamicCollider(context, new LSSphereCollider(), new Vector3d(100, 100, 0));
+        var hits = new SwiftList<Physics3DHit> { new() };
+
+        int count = context.Query3D.SweepSphereAll(
+            Vector3d.Zero,
+            new Vector3d(Fixed64.MaxValue, Fixed64.MaxValue, Fixed64.Zero),
+            Fixed64.Half,
+            IncludeLayerZero,
+            hits);
+
+        count.Should().Be(0);
+        hits.Count.Should().Be(0);
+        context.Query3D.LastQueryCandidateCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void SweepSphereAll_WithComponentOverflow_ShouldReturnZeroAndClearResults()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        var hits = new SwiftList<Physics3DHit> { new() };
+
+        int count = context.Query3D.SweepSphereAll(
+            new Vector3d(Fixed64.MinValue, Fixed64.Zero, Fixed64.Zero),
+            new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero),
+            Fixed64.Half,
+            IncludeLayerZero,
+            hits);
+
+        count.Should().Be(0);
+        hits.Should().BeEmpty();
         context.Query3D.LastQueryCandidateCount.Should().Be(0);
     }
 
@@ -528,8 +618,8 @@ public sealed class GravitasQuery3DServiceSweepTests
         hit.Should().BeTrue();
         sweepHit.Collider.Should().BeSameAs(target);
         sweepHit.Distance.Should().Be((Fixed64)2);
-        sweepHit.Point.Should().Be(new Vector3d(-Fixed64.Half, Fixed64.Zero, Fixed64.Zero));
-        sweepHit.Normal.Should().Be(-Vector3d.Right);
+        AssertSweepPointNear(sweepHit.Point, new Vector3d(-Fixed64.Half, Fixed64.Zero, Fixed64.Zero));
+        AssertConvexNormalNear(sweepHit.Normal, -Vector3d.Right);
     }
 
     [Fact]
@@ -552,7 +642,7 @@ public sealed class GravitasQuery3DServiceSweepTests
         hit.Should().BeTrue();
         sweepHit.Collider.Should().BeSameAs(target);
         AssertDistanceNear(sweepHit.Distance, (Fixed64)2);
-        sweepHit.Normal.Should().Be(-Vector3d.Right);
+        AssertConvexNormalNear(sweepHit.Normal, -Vector3d.Right);
     }
 
     [Fact]
@@ -654,6 +744,33 @@ public sealed class GravitasQuery3DServiceSweepTests
         hits.Count.Should().Be(0);
         context.Query3D.LastQueryCandidateCount.Should().Be(0);
         context.Query3D.LastMeshTriangleCandidateCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void ConvexSweep_WithUnrepresentableDisplacementLength_ShouldRejectAndClearResults()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSCuboidCollider source = CreateDynamicCollider(context, new LSCuboidCollider(), Vector3d.Zero);
+        _ = CreateDynamicCollider(context, new LSSphereCollider(), new Vector3d(100, 100, 0));
+        Vector3d displacement = new(Fixed64.MaxValue, Fixed64.MaxValue, Fixed64.Zero);
+        var hits = new SwiftList<Physics3DHit> { new() };
+
+        bool closest = context.Query3D.SweepCuboid(
+            source,
+            displacement,
+            IncludeLayerZero,
+            out Physics3DHit closestHit);
+        int allCount = context.Query3D.SweepCuboidAll(
+            source,
+            displacement,
+            IncludeLayerZero,
+            hits);
+
+        closest.Should().BeFalse();
+        closestHit.Should().Be(default(Physics3DHit));
+        allCount.Should().Be(0);
+        hits.Should().BeEmpty();
+        context.Query3D.LastQueryCandidateCount.Should().Be(0);
     }
 
     [Fact]
@@ -777,7 +894,7 @@ public sealed class GravitasQuery3DServiceSweepTests
         hit.Should().BeTrue();
         sweepHit.Collider.Should().BeSameAs(target);
         AssertDistanceNear(sweepHit.Distance, (Fixed64)2);
-        sweepHit.Normal.Should().Be(-Vector3d.Right);
+        AssertConvexNormalNear(sweepHit.Normal, -Vector3d.Right);
     }
 
     [Fact]
@@ -800,7 +917,7 @@ public sealed class GravitasQuery3DServiceSweepTests
         hit.Should().BeTrue();
         sweepHit.Collider.Should().BeSameAs(target);
         sweepHit.Distance.Should().BeLessThan((Fixed64)3);
-        sweepHit.Normal.Should().Be(-Vector3d.Right);
+        AssertConvexNormalNear(sweepHit.Normal, -Vector3d.Right);
     }
 
     [Fact]
@@ -824,6 +941,41 @@ public sealed class GravitasQuery3DServiceSweepTests
         sweepHit.Distance.Should().Be(Fixed64.Zero);
         sweepHit.Point.Should().Be(new Vector3d(-Fixed64.Half, Fixed64.Zero, Fixed64.Zero));
         sweepHit.Normal.Should().Be(-Vector3d.Right);
+    }
+
+    [Fact]
+    public void ConvexSweepWorker_WithCenteredMeshParticipant_ShouldUseFallbackSearchDirection()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSMeshCollider mesh = CreateDynamicCollider(
+            context,
+            MeshTestFixtures.CreateConvexCube(inertiaPolicy: MeshInertiaPolicy.SurfaceApproximation),
+            Vector3d.Zero);
+        LSSphereCollider sphere = CreateDynamicCollider(context, new LSSphereCollider(), Vector3d.Zero);
+        var meshSourceWorker = new ConvexSweepQueryWorker();
+        var meshTargetWorker = new ConvexSweepQueryWorker();
+        var circleSlabWorker = new ConvexSweepQueryWorker();
+
+        meshSourceWorker.PrepareConvexMeshSource(mesh, Vector3d.Right * (Fixed64)2);
+        bool meshSourceHit = meshSourceWorker.TrySweepPreparedSource(sphere, out Physics3DHit meshSourceResult);
+        meshTargetWorker.PreparePrimitiveSource(sphere, Vector3d.Right * (Fixed64)2);
+        bool meshTargetHit = meshTargetWorker.TrySweepPreparedSource(mesh, out Physics3DHit meshTargetResult);
+        circleSlabWorker.PrepareCircleSlabSource(
+            Vector3d.Zero,
+            Fixed64.Half,
+            Fixed64.Half,
+            Vector3d.Right * (Fixed64)2);
+        bool circleSlabHit = circleSlabWorker.TrySweepPreparedSource(sphere, out Physics3DHit circleSlabResult);
+
+        meshSourceHit.Should().BeTrue();
+        meshSourceResult.Collider.Should().BeSameAs(sphere);
+        meshSourceResult.Distance.Should().Be(Fixed64.Zero);
+        meshTargetHit.Should().BeTrue();
+        meshTargetResult.Collider.Should().BeSameAs(mesh);
+        meshTargetResult.Distance.Should().Be(Fixed64.Zero);
+        circleSlabHit.Should().BeTrue();
+        circleSlabResult.Collider.Should().BeSameAs(sphere);
+        circleSlabResult.Distance.Should().Be(Fixed64.Zero);
     }
 
     [Fact]
@@ -853,10 +1005,35 @@ public sealed class GravitasQuery3DServiceSweepTests
         count.Should().Be(2);
         hits[0].Collider.Should().BeSameAs(capsule);
         hits[0].Distance.Should().Be((Fixed64)2);
-        hits[0].Normal.Should().Be(-Vector3d.Right);
+        AssertConvexNormalNear(hits[0].Normal, -Vector3d.Right);
         hits[1].Collider.Should().BeSameAs(cylinder);
-        hits[1].Distance.Should().Be((Fixed64)5);
-        hits[1].Normal.Should().Be(-Vector3d.Right);
+        AssertDistanceNear(hits[1].Distance, (Fixed64)5);
+        AssertConvexNormalNear(hits[1].Normal, -Vector3d.Right);
+    }
+
+    [Fact]
+    public void SweepCuboid_AgainstOffsetSphere_ShouldUseClosestFeatureNormal()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSCuboidCollider source = CreateDynamicCollider(
+            context,
+            new LSCuboidCollider
+            {
+                Size = new Vector3d(Fixed64.One, Fixed64.One, (Fixed64)8)
+            },
+            new Vector3d((Fixed64)(-5), Fixed64.Zero, (Fixed64)3));
+        LSSphereCollider target = CreateDynamicCollider(context, new LSSphereCollider(), Vector3d.Zero);
+
+        bool hit = context.Query3D.SweepCuboid(
+            source,
+            Vector3d.Right * (Fixed64)10,
+            IncludeLayerZero,
+            out Physics3DHit sweepHit);
+
+        hit.Should().BeTrue();
+        sweepHit.Collider.Should().BeSameAs(target);
+        AssertDistanceNear(sweepHit.Distance, (Fixed64)4);
+        AssertConvexNormalNear(sweepHit.Normal, -Vector3d.Right);
     }
 
     [Fact]
@@ -883,8 +1060,8 @@ public sealed class GravitasQuery3DServiceSweepTests
         hit.Should().BeTrue();
         sweepHit.Collider.Should().BeSameAs(target);
         sweepHit.Distance.Should().Be((Fixed64)3);
-        sweepHit.Point.Should().Be(new Vector3d(-Fixed64.Half, Fixed64.Zero, Fixed64.Zero));
-        sweepHit.Normal.Should().Be(-Vector3d.Right);
+        AssertSweepPointNear(sweepHit.Point, new Vector3d(-Fixed64.Half, Fixed64.Zero, Fixed64.Zero));
+        AssertConvexNormalNear(sweepHit.Normal, -Vector3d.Right);
     }
 
     [Fact]
@@ -1009,6 +1186,40 @@ public sealed class GravitasQuery3DServiceSweepTests
         second.Distance.Should().Be(first.Distance);
         firstCandidateCount.Should().Be(3);
         context.Query3D.LastMeshTriangleCandidateCount.Should().Be(3);
+    }
+
+    [Fact]
+    public void ConvexSweepWorker_WithAdjacentConcaveFaces_ShouldUseReducerWinningTriangleNormal()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSCuboidCollider source = CreateDynamicCollider(
+            context,
+            new LSCuboidCollider(),
+            new Vector3d((Fixed64)(-3), Fixed64.Zero, Fixed64.Half));
+        LSMeshCollider target = CreateDynamicCollider(
+            context,
+            new LSMeshCollider(
+                new[]
+                {
+                    new Vector3d(Fixed64.Zero, -Fixed64.One, Fixed64.Zero),
+                    new Vector3d(Fixed64.Zero, Fixed64.One, Fixed64.Zero),
+                    new Vector3d(Fixed64.Zero, Fixed64.Zero, (Fixed64)(-2)),
+                    new Vector3d(Fixed64.One, Fixed64.Zero, (Fixed64)2)
+                },
+                new[] { 0, 1, 2, 0, 1, 3 },
+                MeshColliderMode.Concave,
+                MeshInertiaPolicy.SurfaceApproximation),
+            Vector3d.Zero);
+        var worker = new ConvexSweepQueryWorker();
+
+        worker.PreparePrimitiveSource(source, Vector3d.Right * (Fixed64)6);
+        bool hit = worker.TrySweepPreparedSource(target, out Physics3DHit sweepHit);
+
+        hit.Should().BeTrue();
+        sweepHit.Collider.Should().BeSameAs(target);
+        AssertDistanceNear(sweepHit.Distance, Fixed64.FromFraction(5, 2));
+        AssertConvexNormalNear(sweepHit.Normal, -Vector3d.Right);
+        worker.LastMeshTriangleCandidateCount.Should().Be(2);
     }
 
     [Fact]
@@ -1348,20 +1559,41 @@ public sealed class GravitasQuery3DServiceSweepTests
     }
 
     [Fact]
-    public void ConvexSweepWorker_WithSaturatedDisplacement_ShouldStopDeterministicallyAndRemainReusable()
+    public void ConvexSweepWorker_WithOffsetInitialOverlap_ShouldUseSamePoseSourceFeatureWitness()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        Vector3d sourceCenter = new(10, 10, 0);
+        LSCuboidCollider source = CreateDynamicCollider(context, new LSCuboidCollider(), sourceCenter);
+        LSSphereCollider target = CreateDynamicCollider(
+            context,
+            new LSSphereCollider(),
+            new Vector3d(Fixed64.FromFraction(41, 4), Fixed64.FromFraction(101, 10), Fixed64.Zero));
+        var worker = new ConvexSweepQueryWorker();
+
+        worker.PreparePrimitiveSource(source, Vector3d.Right);
+        bool found = worker.TrySweepPreparedSource(target, out Physics3DHit hit);
+
+        found.Should().BeTrue();
+        hit.Distance.Should().Be(Fixed64.Zero);
+        Vector3d sourceFeature = source.ClosestPointOnSurface(target.Center);
+        hit.Point.Should().Be(target.ClosestPointOnSurface(sourceFeature));
+        hit.Point.Should().NotBe(target.ClosestPointOnSurface(sourceCenter));
+        hit.Point.Should().NotBe(target.ClosestPointOnSurface(Vector3d.Zero));
+    }
+
+    [Fact]
+    public void ConvexSweepWorker_WithMaximumRepresentableDisplacement_ShouldHitDeterministicallyAndRemainReusable()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         LSSphereCollider extremeTarget = CreateDynamicCollider(
             context,
             new LSSphereCollider(),
-            new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero));
+            new Vector3d(Fixed64.MaxValue - Fixed64.Half, Fixed64.Zero, Fixed64.Zero));
         LSSphereCollider ordinaryTarget = CreateDynamicCollider(context, new LSSphereCollider(), Vector3d.Zero);
         var worker = new ConvexSweepQueryWorker();
 
-        // Squared magnitudes saturate at this representable extreme, so the
-        // fixed iteration budget is the deterministic termination contract.
         worker.PrepareCircleSlabSource(
-            Vector3d.Zero,
+            -Vector3d.Right * Fixed64.FromFraction(1, 4),
             Fixed64.FromFraction(1, 4),
             Fixed64.FromFraction(1, 4),
             new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero));
@@ -1375,13 +1607,263 @@ public sealed class GravitasQuery3DServiceSweepTests
             Vector3d.Right * (Fixed64)4);
         bool ordinary = worker.TrySweepPreparedSource(ordinaryTarget, out Physics3DHit ordinaryHit);
 
-        first.Should().BeFalse();
-        firstHit.Should().Be(default(Physics3DHit));
-        repeated.Should().BeFalse();
-        repeatedHit.Should().Be(default(Physics3DHit));
+        first.Should().BeTrue();
+        firstHit.Collider.Should().BeSameAs(extremeTarget);
+        firstHit.Direction.Should().Be(Vector3d.Right);
+        repeated.Should().BeTrue();
+        repeatedHit.Collider.Should().BeSameAs(extremeTarget);
+        repeatedHit.Distance.Should().Be(firstHit.Distance);
+        repeatedHit.Direction.Should().Be(firstHit.Direction);
         ordinary.Should().BeTrue();
         ordinaryHit.Collider.Should().BeSameAs(ordinaryTarget);
         ordinaryHit.Direction.Should().Be(Vector3d.Right);
+    }
+
+    [Fact]
+    public void ConvexCircleSlabSweep_WithSphereCenterInsideSource_ShouldRefineSideAndCapFeatures()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSSphereCollider sideTarget = CreateDynamicCollider(
+            context,
+            new LSSphereCollider(),
+            new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
+        LSSphereCollider capTarget = CreateDynamicCollider(
+            context,
+            new LSSphereCollider(),
+            new Vector3d(Fixed64.Zero, Fixed64.FromFraction(3, 4), Fixed64.Zero));
+        var worker = new ConvexSweepQueryWorker();
+
+        worker.PrepareCircleSlabSource(Vector3d.Zero, Fixed64.One, Fixed64.One, Vector3d.Right);
+        bool sideHit = worker.TrySweepPreparedSource(sideTarget, out Physics3DHit sideResult);
+        bool capHit = worker.TrySweepPreparedSource(capTarget, out Physics3DHit capResult);
+
+        sideHit.Should().BeTrue();
+        capHit.Should().BeTrue();
+        sideResult.Collider.Should().BeSameAs(sideTarget);
+        capResult.Collider.Should().BeSameAs(capTarget);
+        sideResult.Point.X.Should().BeGreaterThan(sideTarget.Center.X);
+        capResult.Point.Y.Should().BeGreaterThan(capTarget.Center.Y);
+    }
+
+    [Fact]
+    public void ConvexSweepWorker_WhenTranslatedSourceBoundsSaturate_ShouldRejectAndRemainReusable()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSSphereCollider target = CreateDynamicCollider(context, new LSSphereCollider(), Vector3d.Zero);
+        var worker = new ConvexSweepQueryWorker();
+
+        worker.PrepareCircleSlabSource(
+            Vector3d.Zero,
+            Fixed64.FromFraction(1, 4),
+            Fixed64.FromFraction(1, 4),
+            Vector3d.Right * Fixed64.MaxValue);
+        bool saturatedHit = worker.TrySweepPreparedSource(target, out Physics3DHit saturatedResult);
+
+        worker.PrepareCircleSlabSource(
+            Vector3d.Zero,
+            Fixed64.FromFraction(1, 4),
+            Fixed64.FromFraction(1, 4),
+            -Vector3d.Right * Fixed64.MaxValue);
+        bool negativeSaturatedHit = worker.TrySweepPreparedSource(target, out Physics3DHit negativeSaturatedResult);
+
+        worker.PrepareCircleSlabSource(
+            -Vector3d.Right * (Fixed64)2,
+            Fixed64.FromFraction(1, 4),
+            Fixed64.FromFraction(1, 4),
+            Vector3d.Right * (Fixed64)4);
+        bool ordinaryHit = worker.TrySweepPreparedSource(target, out Physics3DHit ordinaryResult);
+
+        saturatedHit.Should().BeFalse();
+        saturatedResult.Should().Be(default(Physics3DHit));
+        negativeSaturatedHit.Should().BeFalse();
+        negativeSaturatedResult.Should().Be(default(Physics3DHit));
+        ordinaryHit.Should().BeTrue();
+        ordinaryResult.Collider.Should().BeSameAs(target);
+    }
+
+    [Fact]
+    public void ConvexSweepWorker_WithLongRepresentableDisplacement_ShouldReachTarget()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        Fixed64 targetDistance = new(100_000_000);
+        LSSphereCollider target = CreateDynamicCollider(
+            context,
+            new LSSphereCollider(),
+            Vector3d.Right * targetDistance);
+        var worker = new ConvexSweepQueryWorker();
+
+        worker.PrepareCircleSlabSource(
+            Vector3d.Zero,
+            Fixed64.FromFraction(1, 4),
+            Fixed64.FromFraction(1, 4),
+            Vector3d.Right * new Fixed64(100_000_010));
+        bool hit = worker.TrySweepPreparedSource(target, out Physics3DHit sweepHit);
+
+        hit.Should().BeTrue();
+        sweepHit.Collider.Should().BeSameAs(target);
+        sweepHit.Distance.Should().BeGreaterThan(new Fixed64(99_000_000));
+        sweepHit.Direction.Should().Be(Vector3d.Right);
+    }
+
+    [Fact]
+    public void ConvexSweepWorker_WithNearMaximumConcaveTriangle_ShouldNotUseSaturatedCentroid()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        Fixed64 targetX = Fixed64.MaxValue - (Fixed64)2;
+        Fixed64 saturatedCentroidX = Fixed64.MaxValue / (Fixed64)3;
+        var sourceTransform = new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One);
+        var targetTransform = new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One);
+        var source = new LSCuboidCollider();
+        var target = new LSMeshCollider(
+            new[]
+            {
+                new Vector3d(Fixed64.Zero, -Fixed64.One, -Fixed64.One),
+                new Vector3d(Fixed64.Zero, Fixed64.One, -Fixed64.One),
+                new Vector3d(Fixed64.Zero, Fixed64.Zero, (Fixed64)2)
+            },
+            new[] { 0, 1, 2 },
+            MeshColliderMode.Concave,
+            MeshInertiaPolicy.SurfaceApproximation);
+        source.InitializeWithNoBody(new TestMatterAgent(context, sourceTransform));
+        target.InitializeWithNoBody(new TestMatterAgent(context, targetTransform));
+
+        // Register cheap local shapes first, then move them beyond practical
+        // partition spans so this remains a focused narrow-phase regression.
+        sourceTransform.Position = new Vector3d(saturatedCentroidX, Fixed64.Zero, Fixed64.Zero);
+        source.RebuildRuntimeShapeOnly(refreshMassProperties: false);
+        targetTransform.Position = new Vector3d(targetX, Fixed64.Zero, Fixed64.Zero);
+        target.RebuildRuntimeShapeOnly(refreshMassProperties: false);
+        Vector3d displacement = new(targetX - saturatedCentroidX, Fixed64.Zero, Fixed64.Zero);
+        var worker = new ConvexSweepQueryWorker();
+
+        worker.PreparePrimitiveSource(source, displacement);
+        bool hit = worker.TrySweepPreparedSource(target, out Physics3DHit sweepHit);
+
+        hit.Should().BeTrue();
+        sweepHit.Collider.Should().BeSameAs(target);
+        sweepHit.Distance.Should().BeGreaterThan(Fixed64.Zero);
+        AssertDistanceNear(sweepHit.Distance, displacement.X - Fixed64.Half);
+        sweepHit.Direction.Should().Be(Vector3d.Right);
+    }
+
+    [Fact]
+    public void ConvexSweepWorker_WhenInitialSupportMagnitudeIsUnrepresentable_ShouldContinueToRepresentableHit()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        Vector3d sourceCenter = new(-1_309_023_996, -975_185_424, 673_763_066);
+        Vector3d targetCenter = new(-140_275_797, -980_083_574, -218_799_507);
+        Vector3d sourceForward = new Vector3d(-533_351_154, 604_083_950, -592_131_005).Normalized;
+        Vector3d targetForward = new Vector3d(-651_378_630, 676_982_755, -342_637_168).Normalized;
+        var sourceTransform = new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One);
+        var targetTransform = new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One);
+        var source = new LSCuboidCollider();
+        var target = new LSCuboidCollider();
+        source.InitializeWithNoBody(new TestMatterAgent(context, sourceTransform));
+        target.InitializeWithNoBody(new TestMatterAgent(context, targetTransform));
+
+        // Build the extreme runtime shapes after their cheap initial registration;
+        // the worker is under test here, not billion-unit GridForge partition spans.
+        sourceTransform.Position = sourceCenter;
+        sourceTransform.Rotation = FixedQuaternion.FromDirection(sourceForward);
+        source.Size = new Vector3d(Fixed64.One, Fixed64.One, (Fixed64)1_991_825_759);
+        source.RebuildRuntimeShapeOnly(refreshMassProperties: false);
+        targetTransform.Position = targetCenter;
+        targetTransform.Rotation = FixedQuaternion.FromDirection(targetForward);
+        target.Size = new Vector3d(Fixed64.One, Fixed64.One, (Fixed64)2_066_414_647);
+        target.RebuildRuntimeShapeOnly(refreshMassProperties: false);
+
+        Vector3d centerDirection = target.Center - source.Center;
+        Vector3d firstSupportDifference = ConvexColliderSupport.Support(source, centerDirection)
+            - ConvexColliderSupport.Support(target, -centerDirection);
+        Vector3d.TryGetMagnitude(firstSupportDifference, out _).Should().BeFalse();
+        SweepBoundsUtility.OverlapsInclusive(
+            source.BoundsMin,
+            source.BoundsMax,
+            target.BoundsMin,
+            target.BoundsMax).Should().BeTrue();
+
+        // Aligning the centers guarantees an overlap while keeping the sweep
+        // length representable.
+        Vector3d displacement = centerDirection;
+        Vector3d.TryGetMagnitude(displacement, out _).Should().BeTrue();
+
+        var worker = new ConvexSweepQueryWorker();
+        worker.PreparePrimitiveSource(source, displacement);
+        bool hit = worker.TrySweepPreparedSource(target, out Physics3DHit sweepHit);
+
+        hit.Should().BeTrue();
+        sweepHit.Collider.Should().BeSameAs(target);
+        sweepHit.Distance.Should().BeGreaterThan(Fixed64.Zero);
+        FixedMath.Abs(sweepHit.Direction.Magnitude - Fixed64.One).Should().BeLessThan(QueryTolerance);
+    }
+
+    [Fact]
+    public void ConvexSweepWorker_WithUnrepresentableDisplacementLength_ShouldReject()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSSphereCollider target = CreateDynamicCollider(
+            context,
+            new LSSphereCollider(),
+            new Vector3d(100, 100, 0));
+        var worker = new ConvexSweepQueryWorker();
+
+        worker.PrepareCircleSlabSource(
+            Vector3d.Zero,
+            Fixed64.FromFraction(1, 4),
+            Fixed64.FromFraction(1, 4),
+            new Vector3d(Fixed64.MaxValue, Fixed64.MaxValue, Fixed64.Zero));
+        bool hit = worker.TrySweepPreparedSource(target, out Physics3DHit sweepHit);
+
+        hit.Should().BeFalse();
+        sweepHit.Should().Be(default(Physics3DHit));
+    }
+
+    [Fact]
+    public void ConvexSweepWorker_WhenConservativeAdvancementBudgetIsExhausted_ShouldReturnMiss()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSSphereCollider target = CreateDynamicCollider(context, new LSSphereCollider(), Vector3d.Zero);
+        var exhaustedWorker = new ConvexSweepQueryWorker(maxConservativeAdvancementIterations: 0);
+        var defaultWorker = new ConvexSweepQueryWorker();
+
+        exhaustedWorker.PrepareCircleSlabSource(
+            -Vector3d.Right * (Fixed64)4,
+            Fixed64.Half,
+            Fixed64.Half,
+            Vector3d.Right * (Fixed64)8);
+        bool exhaustedHit = exhaustedWorker.TrySweepPreparedSource(target, out Physics3DHit exhaustedResult);
+
+        defaultWorker.PrepareCircleSlabSource(
+            -Vector3d.Right * (Fixed64)4,
+            Fixed64.Half,
+            Fixed64.Half,
+            Vector3d.Right * (Fixed64)8);
+        bool defaultHit = defaultWorker.TrySweepPreparedSource(target, out Physics3DHit defaultResult);
+
+        exhaustedHit.Should().BeFalse();
+        exhaustedResult.Should().Be(default(Physics3DHit));
+        defaultHit.Should().BeTrue();
+        defaultResult.Collider.Should().BeSameAs(target);
+    }
+
+    [Fact]
+    public void ConvexSweepWorker_SaturatedSimplexOrdering_ShouldUseExactMagnitudeAndRemainStable()
+    {
+        Vector3d closer = new(30_000, 40_000, 0);
+        Vector3d farther = new(60_000, 80_000, 0);
+        Vector3d unrepresentableShorter = new(Fixed64.MaxValue, Fixed64.MaxValue - Fixed64.One, Fixed64.Zero);
+        Vector3d unrepresentable = new(Fixed64.MaxValue, Fixed64.MaxValue, Fixed64.Zero);
+
+        ConvexSweepQueryWorker.IsCloser((Fixed64)2, Vector3d.Zero, (Fixed64)3, Vector3d.Zero).Should().BeTrue();
+        ConvexSweepQueryWorker.IsCloser((Fixed64)3, Vector3d.Zero, (Fixed64)2, Vector3d.Zero).Should().BeFalse();
+        ConvexSweepQueryWorker.IsCloser((Fixed64)2, Vector3d.Zero, (Fixed64)2, Vector3d.Zero).Should().BeFalse();
+        ConvexSweepQueryWorker.IsCloser(Fixed64.MaxValue, closer, Fixed64.MaxValue, farther).Should().BeTrue();
+        ConvexSweepQueryWorker.IsCloser(Fixed64.MaxValue, farther, Fixed64.MaxValue, closer).Should().BeFalse();
+        ConvexSweepQueryWorker.IsCloser(Fixed64.MaxValue, closer, Fixed64.MaxValue, unrepresentable).Should().BeTrue();
+        ConvexSweepQueryWorker.IsCloser(Fixed64.MaxValue, unrepresentable, Fixed64.MaxValue, closer).Should().BeFalse();
+        ConvexSweepQueryWorker.IsCloser(Fixed64.MaxValue, unrepresentableShorter, Fixed64.MaxValue, unrepresentable).Should().BeTrue();
+        ConvexSweepQueryWorker.IsCloser(Fixed64.MaxValue, unrepresentable, Fixed64.MaxValue, unrepresentableShorter).Should().BeFalse();
+        ConvexSweepQueryWorker.IsCloser(Fixed64.MaxValue, unrepresentable, Fixed64.MaxValue, unrepresentable).Should().BeFalse();
     }
 
     [Fact]
@@ -1504,9 +1986,27 @@ public sealed class GravitasQuery3DServiceSweepTests
             point,
             resultNormal,
             fallbackNormal,
-            sweepDirection);
+            sweepDirection,
+            Vector3d.Zero);
 
         normal.Should().Be(expected);
+    }
+
+    [Fact]
+    public void ConvexSweepHitPolicy_WithUnavailableSurfaceNormal_ShouldUseGjkNormal()
+    {
+        var target = new Mock<LSCollider>();
+        target.Setup(collider => collider.GetNormalAtPoint(Vector3d.Zero)).Returns(Vector3d.Zero);
+
+        Vector3d normal = ConvexSweepHitPolicy.ResolveHitNormal(
+            target.Object,
+            Vector3d.Zero,
+            -Vector3d.Up,
+            Vector3d.Right,
+            Vector3d.Right,
+            Vector3d.Zero);
+
+        normal.Should().Be(-Vector3d.Up);
     }
 
     [Fact]
@@ -1613,6 +2113,37 @@ public sealed class GravitasQuery3DServiceSweepTests
         centerAtImpact.Should().Be(new Vector3d(start.X, start.Y, -radius));
         AssertDistanceNear(distance, Fixed64.One - radius);
         worker.LastMeshTriangleCandidateCount.Should().Be(1);
+    }
+
+    [Fact]
+    public void SweptSphereWorker_WithUnrepresentableSegmentLength_ShouldRejectAndRemainReusable()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSSphereCollider target = CreateDynamicCollider(context, new LSSphereCollider(), Vector3d.Zero);
+        var worker = new SweptSphereQueryWorker();
+
+        worker.Prepare(
+            new Vector3d(Fixed64.MinValue, Fixed64.Zero, Fixed64.Zero),
+            new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero),
+            Fixed64.Half);
+        bool componentInvalidHit = worker.TrySweep(target, out _, out _);
+
+        worker.Prepare(
+            Vector3d.Zero,
+            new Vector3d(Fixed64.MaxValue, Fixed64.MaxValue, Fixed64.Zero),
+            Fixed64.Half);
+        bool invalidHit = worker.TrySweep(target, out Vector3d invalidCenter, out Fixed64 invalidDistance);
+
+        worker.Prepare(-Vector3d.Right * 2, Vector3d.Right * 2, Fixed64.Half);
+        bool ordinaryHit = worker.TrySweep(target, out Vector3d ordinaryCenter, out Fixed64 ordinaryDistance);
+
+        componentInvalidHit.Should().BeFalse();
+        invalidHit.Should().BeFalse();
+        invalidCenter.Should().Be(Vector3d.Zero);
+        invalidDistance.Should().Be(Fixed64.Zero);
+        ordinaryHit.Should().BeTrue();
+        ordinaryCenter.X.Should().Be(-Fixed64.One);
+        ordinaryDistance.Should().Be(Fixed64.One);
     }
 
     [Fact]
@@ -2042,6 +2573,20 @@ public sealed class GravitasQuery3DServiceSweepTests
     private static void AssertDistanceNear(Fixed64 actual, Fixed64 expected)
     {
         (actual - expected).Abs().Should().BeLessThan(QueryTolerance);
+    }
+
+    private static void AssertSweepPointNear(Vector3d actual, Vector3d expected)
+    {
+        Vector3d.TryGetMagnitude(actual - expected, out Fixed64 distance).Should().BeTrue();
+        distance.Should().BeLessThan(SweepContactTolerance);
+    }
+
+    private static void AssertConvexNormalNear(Vector3d actual, Vector3d expected)
+    {
+        // Tolerance-terminated convex sweeps report a surface normal at their
+        // approximate witness; exact components are not an angular contract.
+        FixedMath.Abs(actual.Magnitude - Fixed64.One).Should().BeLessThanOrEqualTo(QueryTolerance);
+        Vector3d.Dot(actual, expected).Should().BeGreaterThanOrEqualTo(Fixed64.One - QueryTolerance);
     }
 
     private static void AssertSweptSphereBroadOverlap(

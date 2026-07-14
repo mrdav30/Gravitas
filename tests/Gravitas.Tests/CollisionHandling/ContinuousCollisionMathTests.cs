@@ -1,6 +1,8 @@
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.CollisionHandling;
+using Gravitas.Support;
+using System;
 using Xunit;
 
 namespace Gravitas.Tests.CollisionHandlingTests;
@@ -32,6 +34,18 @@ public sealed class ContinuousCollisionMathTests
             displacement,
             displacement.MagnitudeSquared,
             proxyRadius).Should().BeFalse();
+
+        Vector3d maximumAxisDisplacement = new(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero);
+        ContinuousCollisionMath.IsWithinProxyRadius(
+            maximumAxisDisplacement,
+            maximumAxisDisplacement.MagnitudeSquared,
+            Fixed64.MaxValue).Should().BeTrue();
+
+        Vector3d unrepresentableLength = new(Fixed64.MaxValue, Fixed64.MaxValue, Fixed64.Zero);
+        ContinuousCollisionMath.IsWithinProxyRadius(
+            unrepresentableLength,
+            unrepresentableLength.MagnitudeSquared,
+            Fixed64.MaxValue).Should().BeFalse();
     }
 
     [Fact]
@@ -58,6 +72,12 @@ public sealed class ContinuousCollisionMathTests
             unrepresentableLength,
             unrepresentableLength.MagnitudeSquared,
             Fixed64.MaxValue).Should().BeFalse();
+
+        Vector2d maximumAxisDisplacement = new(Fixed64.MaxValue, Fixed64.Zero);
+        ContinuousCollisionMath.IsWithinProxyRadius(
+            maximumAxisDisplacement,
+            maximumAxisDisplacement.MagnitudeSquared,
+            Fixed64.MaxValue).Should().BeTrue();
     }
 
     [Fact]
@@ -387,5 +407,167 @@ public sealed class ContinuousCollisionMathTests
                 currentSafeTime: Fixed64.Half,
                 currentTargetId: 4)
             .Should().BeFalse();
+    }
+
+    [Fact]
+    public void ValidateSweepEndpoint_ShouldPreserveRepresentableMotionAndRejectExtreme3DMotion()
+    {
+        Vector3d ordinaryEnd = new((Fixed64)3, (Fixed64)4, Fixed64.Zero);
+        Vector3d ordinaryDisplacement = ContinuousCollisionSweepRange.ValidateEndpoint(
+            Vector3d.Zero,
+            ordinaryEnd,
+            out Fixed64 ordinaryLength);
+        ordinaryDisplacement.Should().Be(ordinaryEnd);
+        ordinaryLength.Should().Be((Fixed64)5);
+
+        Vector3d requestedExtremeEnd = new(Fixed64.MaxValue, Fixed64.MaxValue, Fixed64.MaxValue);
+        Action validate = () => ContinuousCollisionSweepRange.ValidateEndpoint(
+            Vector3d.Zero,
+            requestedExtremeEnd,
+            out _);
+
+        validate.Should().Throw<ArgumentOutOfRangeException>();
+    }
+
+    [Fact]
+    public void ValidateSweepEndpoint_ShouldRejectComponentOverflowAndAcceptZero()
+    {
+        Vector2d start2D = new(Fixed64.MinValue, Fixed64.MinValue);
+        Vector2d end2D = new(Fixed64.MaxValue, Fixed64.MaxValue);
+        Action validate2D = () => ContinuousCollisionSweepRange.ValidateEndpoint(start2D, end2D, out _);
+        Action validate3D = () => ContinuousCollisionSweepRange.ValidateEndpoint(
+            new Vector3d(Fixed64.MinValue, Fixed64.Zero, Fixed64.Zero),
+            new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero),
+            out _);
+
+        validate2D.Should().Throw<ArgumentOutOfRangeException>();
+        validate3D.Should().Throw<ArgumentOutOfRangeException>();
+        ContinuousCollisionSweepRange.ValidateEndpoint(
+                Vector3d.Zero,
+                Vector3d.Zero,
+                out Fixed64 zeroLength)
+            .Should().Be(Vector3d.Zero);
+        zeroLength.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void ValidateSweepEndpoint_WithRequestedDisplacement_ShouldRejectSaturatedAddition()
+    {
+        Vector2d start2D = new(Fixed64.MaxValue - Fixed64.Half, Fixed64.Zero);
+        Vector2d requested2D = Vector2d.Right;
+        Vector2d saturatedEnd2D = start2D + requested2D;
+        Vector3d start3D = new(Fixed64.MaxValue - Fixed64.Half, Fixed64.Zero, Fixed64.Zero);
+        Vector3d requested3D = Vector3d.Right;
+        Vector3d saturatedEnd3D = start3D + requested3D;
+
+        Action validate2D = () => ContinuousCollisionSweepRange.ValidateEndpoint(
+            start2D,
+            saturatedEnd2D,
+            requested2D,
+            out _);
+        Action validate3D = () => ContinuousCollisionSweepRange.ValidateEndpoint(
+            start3D,
+            saturatedEnd3D,
+            requested3D,
+            out _);
+
+        validate2D.Should().Throw<ArgumentOutOfRangeException>();
+        validate3D.Should().Throw<ArgumentOutOfRangeException>();
+        ContinuousCollisionSweepRange.ValidateEndpoint(
+                Vector3d.Zero,
+                Vector3d.Right,
+                Vector3d.Right,
+                out Fixed64 exactLength)
+            .Should().Be(Vector3d.Right);
+        exactLength.Should().Be(Fixed64.One);
+        ContinuousCollisionSweepRange.ValidateEndpoint(
+                Vector2d.Zero,
+                Vector2d.Right,
+                Vector2d.Right,
+                out _)
+            .Should().Be(Vector2d.Right);
+
+        FixedVectorDifference.TryTranslate(Vector2d.Zero, Vector2d.Right, out Vector2d translated2D)
+            .Should().BeTrue();
+        translated2D.Should().Be(Vector2d.Right);
+        FixedVectorDifference.TryTranslate(start2D, requested2D, out _).Should().BeFalse();
+    }
+
+    [Fact]
+    public void ValidateRelativeDisplacement_ShouldPreserveSmallMotionAndRejectRangeOverflow()
+    {
+        Vector3d source3D = new(
+            Fixed64.FromRaw(1_000),
+            Fixed64.FromRaw(1_000),
+            Fixed64.Zero);
+        Vector3d target3D = new(
+            Fixed64.FromRaw(700),
+            Fixed64.FromRaw(700),
+            Fixed64.Zero);
+
+        Vector3d relative3D = ContinuousCollisionSweepRange.ValidateRelativeDisplacement(
+            source3D,
+            target3D,
+            out Fixed64 length3D);
+
+        relative3D.Should().Be(new Vector3d(Fixed64.FromRaw(300), Fixed64.FromRaw(300), Fixed64.Zero));
+        length3D.Should().BeGreaterThan(Fixed64.Zero);
+        FixedMath.Abs(relative3D.Normalized.Magnitude - Fixed64.One).Should().BeLessThanOrEqualTo(Fixed64.Epsilon);
+
+        Action componentOverflow2D = () => ContinuousCollisionSweepRange.ValidateRelativeDisplacement(
+            new Vector2d(Fixed64.MaxValue, Fixed64.Zero),
+            new Vector2d(-Fixed64.One, Fixed64.Zero),
+            out _);
+        Action magnitudeOverflow2D = () => ContinuousCollisionSweepRange.ValidateRelativeDisplacement(
+            new Vector2d(Fixed64.MaxValue, Fixed64.MaxValue),
+            Vector2d.Zero,
+            out _);
+        Action componentOverflow3D = () => ContinuousCollisionSweepRange.ValidateRelativeDisplacement(
+            new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero),
+            new Vector3d(-Fixed64.One, Fixed64.Zero, Fixed64.Zero),
+            out _);
+        Action magnitudeOverflow3D = () => ContinuousCollisionSweepRange.ValidateRelativeDisplacement(
+            new Vector3d(Fixed64.MaxValue, Fixed64.MaxValue, Fixed64.Zero),
+            Vector3d.Zero,
+            out _);
+
+        componentOverflow2D.Should().Throw<ArgumentOutOfRangeException>();
+        magnitudeOverflow2D.Should().Throw<ArgumentOutOfRangeException>();
+        componentOverflow3D.Should().Throw<ArgumentOutOfRangeException>();
+        magnitudeOverflow3D.Should().Throw<ArgumentOutOfRangeException>();
+        ContinuousCollisionSweepRange.ValidateRelativeDisplacement(
+                Vector2d.Zero,
+                Vector2d.Zero,
+                out Fixed64 zeroLength)
+            .Should().Be(Vector2d.Zero);
+        zeroLength.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void RelativeSweepEntryPoints_ShouldRejectUnrepresentableRelativeMotionBeforeProxyMath()
+    {
+        Action sweepSpheres = () => ContinuousCollisionMath.TrySweepRelativeSpheres(
+            Vector3d.Zero,
+            new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero),
+            Fixed64.Half,
+            Vector3d.Right,
+            -Vector3d.Right,
+            Fixed64.Half,
+            out _,
+            out _,
+            out _);
+        Action sweepCircles = () => ContinuousCollisionMath.TrySweepRelativeCircles(
+            Vector2d.Zero,
+            new Vector2d(Fixed64.MaxValue, Fixed64.MaxValue),
+            Fixed64.Half,
+            Vector2d.Right,
+            Vector2d.Zero,
+            Fixed64.Half,
+            out _,
+            out _,
+            out _);
+
+        sweepSpheres.Should().Throw<ArgumentOutOfRangeException>();
+        sweepCircles.Should().Throw<ArgumentOutOfRangeException>();
     }
 }

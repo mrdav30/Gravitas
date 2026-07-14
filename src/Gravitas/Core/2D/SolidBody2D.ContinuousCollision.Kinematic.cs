@@ -17,9 +17,11 @@ public sealed partial class SolidBody2D
 {
     private void CaptureKinematicContinuousCollisionFrame(Vector2d startPosition, Vector2d targetPosition, Fixed64 startRotation)
     {
+        Vector2d frameDisplacement = ProjectLinearMotion(
+            ContinuousCollisionSweepRange.ValidateEndpoint(startPosition, targetPosition, out _));
         _continuousCollisionFrameToken = Context.LateSimulateToken;
         _continuousCollisionFrameStart = startPosition;
-        _continuousCollisionFrameDisplacement = ProjectLinearMotion(targetPosition - startPosition);
+        _continuousCollisionFrameDisplacement = frameDisplacement;
         _continuousCollisionFrameRotation = startRotation;
     }
 
@@ -28,8 +30,10 @@ public sealed partial class SolidBody2D
         if (!ShouldUseContinuousCollision(out ContinuousCollisionMode mode))
             return false;
 
-        Vector2d displacement = ProjectLinearMotion(proposedPosition - startPosition);
-        proposedPosition = startPosition + displacement;
+        Vector2d displacement = ContinuousCollisionSweepRange.ValidateEndpoint(
+            startPosition,
+            proposedPosition,
+            out Fixed64 sourceLength);
         Fixed64 displacementMagnitudeSquared = displacement.MagnitudeSquared;
         if (displacementMagnitudeSquared <= Fixed64.Epsilon)
             return false;
@@ -42,7 +46,6 @@ public sealed partial class SolidBody2D
             return false;
         }
 
-        Fixed64 sourceLength = FixedMath.Sqrt(displacementMagnitudeSquared);
         bool foundStatic = TryGetFirstKinematicStaticContinuousCollisionHit(
             startPosition,
             proposedPosition,
@@ -60,7 +63,7 @@ public sealed partial class SolidBody2D
 
         LastContinuousCollisionToiIterationCount++;
         if (foundStatic)
-            proposedPosition = startPosition + displacement / sourceLength * staticHitDistance;
+            proposedPosition = startPosition + displacement.Normalized * staticHitDistance;
 
         return true;
     }

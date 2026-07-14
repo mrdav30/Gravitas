@@ -8,6 +8,7 @@
 using FixedMathSharp;
 using Gravitas.Colliders;
 using System;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 
 namespace Gravitas.CollisionHandling;
@@ -25,7 +26,7 @@ internal static class ConvexColliderSupport
 
     public static Vector3d Support(LSCollider collider, Vector3d direction)
     {
-        Vector3d normal = direction.MagnitudeSquared > Fixed64.Epsilon
+        Vector3d normal = direction != Vector3d.Zero
             ? direction.Normalized
             : Vector3d.Right;
 
@@ -44,7 +45,7 @@ internal static class ConvexColliderSupport
 
     public static FixedRange ProjectOntoAxis(LSCollider collider, Vector3d axis)
     {
-        Vector3d normalized = axis.MagnitudeSquared > Fixed64.Epsilon
+        Vector3d normalized = axis != Vector3d.Zero
             ? axis.Normalized
             : Vector3d.Right;
         Fixed64 min = Vector3d.Dot(Support(collider, -normalized), normalized);
@@ -52,7 +53,7 @@ internal static class ConvexColliderSupport
         return new FixedRange(min, max);
     }
 
-    public static bool Intersects(LSCollider first, LSCollider second)
+    public static bool Intersects(LSCollider first, LSCollider second, int maxIterations = 32)
     {
         if (!IsSupported(first) || !IsSupported(second))
             return false;
@@ -68,7 +69,7 @@ internal static class ConvexColliderSupport
         if (direction.MagnitudeSquared <= Fixed64.Epsilon)
             return true;
 
-        for (int i = 0; i < 32; i++)
+        for (int i = 0; i < maxIterations; i++)
         {
             Vector3d point = SupportMinkowski(first, second, direction);
             if (Vector3d.Dot(point, direction) < -Fixed64.Epsilon)
@@ -147,6 +148,8 @@ internal static class ConvexColliderSupport
         Fixed64 endRadius,
         Vector3d direction)
     {
+        Debug.Assert(direction != Vector3d.Zero, "GJK must resolve a zero search direction before support mapping.");
+        direction = direction.Normalized;
         Vector3d baseCenter = apex + axis * length;
         Vector3d radial = direction - axis * Vector3d.Dot(direction, axis);
         Fixed64 radialMagnitude = radial.Magnitude;
@@ -154,16 +157,17 @@ internal static class ConvexColliderSupport
             ? baseCenter + radial / radialMagnitude * endRadius
             : baseCenter;
 
-        Fixed64 apexProjection = Vector3d.Dot(apex, direction);
-        Fixed64 baseProjection = Vector3d.Dot(baseSupport, direction);
-        return baseProjection >= apexProjection ? baseSupport : apex;
+        return ConvexSupportProjection.Compare(baseSupport, apex, direction) >= 0
+            ? baseSupport
+            : apex;
     }
 
     private static Vector3d SupportCapsule(LSCapsuleCollider capsule, Vector3d direction)
     {
-        Fixed64 startProjection = Vector3d.Dot(capsule.LineSegmentStart, direction);
-        Fixed64 endProjection = Vector3d.Dot(capsule.LineSegmentEnd, direction);
-        Vector3d segmentPoint = endProjection > startProjection
+        Vector3d segmentPoint = ConvexSupportProjection.Compare(
+                capsule.LineSegmentEnd,
+                capsule.LineSegmentStart,
+                direction) > 0
             ? capsule.LineSegmentEnd
             : capsule.LineSegmentStart;
         return segmentPoint + direction * capsule.ScaledRadius;
@@ -192,23 +196,22 @@ internal static class ConvexColliderSupport
 
         Vector3d localBase = new(radialSupport.X, -cone.HalfHeight, radialSupport.Z);
         Vector3d localApex = new(Fixed64.Zero, cone.HalfHeight, Fixed64.Zero);
-        Fixed64 baseProjection = Vector3d.Dot(localBase, localDirection);
-        Fixed64 apexProjection = Vector3d.Dot(localApex, localDirection);
-        return cone.Center + cone.Rotation * (apexProjection >= baseProjection ? localApex : localBase);
+        return cone.Center + cone.Rotation * (
+            ConvexSupportProjection.Compare(localApex, localBase, localDirection) >= 0
+                ? localApex
+                : localBase);
     }
 
     private static Vector3d SupportVertices(Vector3d[] vertices, Vector3d direction)
     {
         Vector3d best = vertices[0];
-        Fixed64 bestProjection = Vector3d.Dot(best, direction);
         for (int i = 1; i < vertices.Length; i++)
         {
-            Fixed64 projection = Vector3d.Dot(vertices[i], direction);
-            if (projection <= bestProjection)
+            Vector3d candidate = vertices[i];
+            if (ConvexSupportProjection.Compare(candidate, best, direction) <= 0)
                 continue;
 
-            bestProjection = projection;
-            best = vertices[i];
+            best = candidate;
         }
 
         return best;

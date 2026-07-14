@@ -100,8 +100,9 @@ public sealed partial class GravitasQueryMixedService
     {
         SwiftThrowHelper.ThrowIfArgument(radius <= Fixed64.Zero, nameof(radius), "Mixed swept sphere radius must be greater than zero.");
 
-        Vector3d segment = end - start;
-        if (segment.MagnitudeSquared <= Fixed64.Epsilon)
+        if (!FixedVectorDifference.TryCreate(start, end, out Vector3d segment)
+            || !Vector3d.TryGetMagnitude(segment, out Fixed64 length)
+            || length <= Fixed64.Epsilon)
         {
             ResetLastQueryCounters();
             hit = default;
@@ -109,7 +110,6 @@ public sealed partial class GravitasQueryMixedService
         }
 
         Vector3d direction = segment.Normalized;
-        Fixed64 length = segment.Magnitude;
         CreateSweepBounds(start, end, radius, out Vector3d min, out Vector3d max);
         _context.MixedCollisions.Collect2DCandidatesInMixedBounds(
             min,
@@ -181,15 +181,15 @@ public sealed partial class GravitasQueryMixedService
         SwiftThrowHelper.ThrowIfArgument(radius <= Fixed64.Zero, nameof(radius), "Mixed swept sphere radius must be greater than zero.");
 
         results.FastClear();
-        Vector3d segment = end - start;
-        if (segment.MagnitudeSquared <= Fixed64.Epsilon)
+        if (!FixedVectorDifference.TryCreate(start, end, out Vector3d segment)
+            || !Vector3d.TryGetMagnitude(segment, out Fixed64 length)
+            || length <= Fixed64.Epsilon)
         {
             ResetLastQueryCounters();
             return 0;
         }
 
         Vector3d direction = segment.Normalized;
-        Fixed64 length = segment.Magnitude;
         CreateSweepBounds(start, end, radius, out Vector3d min, out Vector3d max);
         _context.MixedCollisions.Collect2DCandidatesInMixedBounds(
             min,

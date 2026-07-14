@@ -43,9 +43,8 @@ internal static class ContinuousCollisionMath
         if (displacementMagnitudeSquared != Fixed64.MaxValue || proxyRadiusSquared != Fixed64.MaxValue)
             return displacementMagnitudeSquared <= proxyRadiusSquared;
 
-        Fixed64 displacementMagnitude = displacement.Magnitude;
-        // MaxValue cannot distinguish exact equality from a true unrepresentable length; sweep conservatively.
-        return displacementMagnitude != Fixed64.MaxValue && displacementMagnitude <= proxyRadius;
+        return Vector3d.TryGetMagnitude(displacement, out Fixed64 displacementMagnitude)
+            && displacementMagnitude <= proxyRadius;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -58,9 +57,8 @@ internal static class ContinuousCollisionMath
         if (displacementMagnitudeSquared != Fixed64.MaxValue || proxyRadiusSquared != Fixed64.MaxValue)
             return displacementMagnitudeSquared <= proxyRadiusSquared;
 
-        Fixed64 displacementMagnitude = displacement.Magnitude;
-        // MaxValue cannot distinguish exact equality from a true unrepresentable length; sweep conservatively.
-        return displacementMagnitude != Fixed64.MaxValue && displacementMagnitude <= proxyRadius;
+        return Vector2d.TryGetMagnitude(displacement, out Fixed64 displacementMagnitude)
+            && displacementMagnitude <= proxyRadius;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -110,7 +108,10 @@ internal static class ContinuousCollisionMath
         out Fixed64 closingSpeed)
     {
         Vector3d delta = sourceStart - targetStart;
-        Vector3d relativeDisplacement = sourceDisplacement - targetDisplacement;
+        Vector3d relativeDisplacement = ContinuousCollisionSweepRange.ValidateRelativeDisplacement(
+            sourceDisplacement,
+            targetDisplacement,
+            out _);
         Fixed64 combinedRadius = sourceRadius + targetRadius;
         return TrySweepRelative(
             delta,
@@ -134,7 +135,10 @@ internal static class ContinuousCollisionMath
         out Fixed64 closingSpeed)
     {
         Vector2d delta = sourceStart - targetStart;
-        Vector2d relativeDisplacement = sourceDisplacement - targetDisplacement;
+        Vector2d relativeDisplacement = ContinuousCollisionSweepRange.ValidateRelativeDisplacement(
+            sourceDisplacement,
+            targetDisplacement,
+            out _);
         Fixed64 combinedRadius = sourceRadius + targetRadius;
         return TrySweepRelative(
             delta,

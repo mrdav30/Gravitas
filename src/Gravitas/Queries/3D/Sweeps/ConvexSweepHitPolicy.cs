@@ -17,11 +17,22 @@ internal static class ConvexSweepHitPolicy
         Vector3d point,
         Vector3d resultNormal,
         Vector3d fallbackNormal,
-        Vector3d sweepDirection)
+        Vector3d sweepDirection,
+        Vector3d planarNormal,
+        bool hasRefinedSurfaceNormal = false)
     {
-        Vector3d normal = targetCollider.GetNormalAtPoint(point);
-        if (normal.MagnitudeSquared <= Fixed64.Epsilon)
-            normal = resultNormal.MagnitudeSquared > Fixed64.Epsilon ? resultNormal : fallbackNormal;
+        Vector3d surfaceNormal = hasRefinedSurfaceNormal
+            ? targetCollider.GetNormalAtPoint(point)
+            : Vector3d.Zero;
+        Vector3d normal = surfaceNormal.MagnitudeSquared > Fixed64.Epsilon
+            ? surfaceNormal
+            : planarNormal.MagnitudeSquared > Fixed64.Epsilon
+                ? planarNormal
+            : resultNormal.MagnitudeSquared > Fixed64.Epsilon
+                ? resultNormal
+                : fallbackNormal.MagnitudeSquared > Fixed64.Epsilon
+                    ? fallbackNormal
+                    : targetCollider.GetNormalAtPoint(point);
 
         if (normal.MagnitudeSquared <= Fixed64.Epsilon)
             return sweepDirection.MagnitudeSquared > Fixed64.Epsilon ? -sweepDirection : Vector3d.Zero;

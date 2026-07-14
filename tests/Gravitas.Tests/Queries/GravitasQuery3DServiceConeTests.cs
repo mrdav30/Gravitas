@@ -56,6 +56,42 @@ public sealed class GravitasQuery3DServiceConeTests
     }
 
     [Fact]
+    public void OverlapCone_WithSmallRepresentableDirection_ShouldUseRobustNormalization()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSSphereCollider target = scenario.CreateSphere(
+            new Vector3d((Fixed64)2, Fixed64.Zero, Fixed64.Zero)).Collider;
+
+        bool found = scenario.Context.Query3D.OverlapCone(
+            Vector3d.Zero,
+            new Vector3d(Fixed64.MinIncrement, Fixed64.Zero, Fixed64.Zero),
+            (Fixed64)4,
+            Fixed64.One,
+            out Physics3DHit hit,
+            IncludeLayerZero);
+
+        found.Should().BeTrue();
+        hit.Collider.Should().BeSameAs(target);
+    }
+
+    [Fact]
+    public void OverlapCone_WithSaturatedEndpoint_ShouldRejectBeforeCandidateCollection()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+
+        Action query = () => scenario.Context.Query3D.OverlapCone(
+            new Vector3d(Fixed64.MaxValue - Fixed64.One, Fixed64.Zero, Fixed64.Zero),
+            Vector3d.Right,
+            (Fixed64)2,
+            Fixed64.One,
+            out _,
+            IncludeLayerZero);
+
+        query.Should().Throw<ArgumentException>().WithParameterName("length");
+        scenario.Context.Query3D.LastQueryCandidateCount.Should().Be(0);
+    }
+
+    [Fact]
     public void OverlapConeQueries_WithStalePartitionColliderId_ShouldIgnoreStaleEntry()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();

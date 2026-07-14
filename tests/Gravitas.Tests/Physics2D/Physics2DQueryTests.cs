@@ -527,6 +527,38 @@ public sealed class Physics2DQueryTests
     }
 
     [Fact]
+    public void SegmentQueries_WithExtremeEndpoints_ShouldRejectComponentAndMagnitudeOverflow()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        SolidBody2D target = CreateCircle(context, Vector2d.Zero);
+        Vector2d componentStart = new(Fixed64.MinValue, Fixed64.Zero);
+        Vector2d componentEnd = new(Fixed64.MaxValue, Fixed64.Zero);
+        Vector2d magnitudeEnd = new(Fixed64.MaxValue, Fixed64.MaxValue);
+        var rayHits = new SwiftList<Physics2DHit> { new() };
+        var sweepHits = new SwiftList<Physics2DHit> { new() };
+
+        context.Query2D.Raycast(componentStart, componentEnd, out _).Should().BeFalse();
+        context.Query2D.Raycast(Vector2d.Zero, magnitudeEnd, out _).Should().BeFalse();
+        context.Query2D.RaycastAll(componentStart, componentEnd, rayHits).Should().Be(0);
+        context.Query2D.RaycastAll(Vector2d.Zero, magnitudeEnd, rayHits).Should().Be(0);
+        rayHits.Should().BeEmpty();
+
+        context.Query2D.SweepCircle(componentStart, componentEnd, Fixed64.Half, out _).Should().BeFalse();
+        context.Query2D.SweepCircle(Vector2d.Zero, magnitudeEnd, Fixed64.Half, out _).Should().BeFalse();
+        context.Query2D.SweepCircleAll(componentStart, componentEnd, Fixed64.Half, sweepHits).Should().Be(0);
+        context.Query2D.SweepCircleAll(Vector2d.Zero, magnitudeEnd, Fixed64.Half, sweepHits).Should().Be(0);
+        sweepHits.Should().BeEmpty();
+        context.Query2D.LastQueryCandidateCount.Should().Be(0);
+
+        QueryDetection2D.TryRaycast(componentStart, componentEnd, target.Collider, out _).Should().BeFalse();
+        QueryDetection2D.TryRaycast(Vector2d.Zero, magnitudeEnd, target.Collider, out _).Should().BeFalse();
+        QueryDetection2D.TryRaycast(Vector2d.Zero, Vector2d.Zero, target.Collider, out _).Should().BeFalse();
+        QueryDetection2D.TrySweepCircle(componentStart, componentEnd, Fixed64.Half, target.Collider, out _).Should().BeFalse();
+        QueryDetection2D.TrySweepCircle(Vector2d.Zero, magnitudeEnd, Fixed64.Half, target.Collider, out _).Should().BeFalse();
+        QueryDetection2D.TrySweepCircle(Vector2d.Zero, Vector2d.Zero, Fixed64.Half, target.Collider, out _).Should().BeFalse();
+    }
+
+    [Fact]
     public void SweepCircle_WithZeroLengthSegment_ShouldReturnNoHit()
     {
         using GravitasWorldContext context = Create2DContext();
@@ -545,6 +577,58 @@ public sealed class Physics2DQueryTests
         allCount.Should().Be(0);
         hits.Count.Should().Be(0);
         context.Query2D.LastQueryCandidateCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void SweepCircle_WithLongRepresentableSegment_ShouldReachTarget()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        SolidBody2D target = CreateCircle(context, Vector2d.Right * new Fixed64(100_000_000));
+
+        bool hit = QueryDetection2D.TrySweepCircle(
+            Vector2d.Zero,
+            Vector2d.Right * new Fixed64(100_000_010),
+            Fixed64.Half,
+            target.Collider,
+            out Physics2DHit sweepHit);
+
+        hit.Should().BeTrue();
+        sweepHit.Collider.Should().BeSameAs(target.Collider);
+        sweepHit.Distance.Should().BeGreaterThan(new Fixed64(99_000_000));
+    }
+
+    [Fact]
+    public void SweepCircle_WithUnrepresentableSegmentLength_ShouldReject()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        SolidBody2D target = CreateCircle(context, new Vector2d(100, 100));
+
+        bool hit = QueryDetection2D.TrySweepCircle(
+            Vector2d.Zero,
+            new Vector2d(Fixed64.MaxValue, Fixed64.MaxValue),
+            Fixed64.Half,
+            target.Collider,
+            out Physics2DHit sweepHit);
+
+        hit.Should().BeFalse();
+        sweepHit.Should().Be(default(Physics2DHit));
+    }
+
+    [Fact]
+    public void TrySweepMoverShape_WithUnrepresentableDisplacementLength_ShouldReject()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        SolidBody2D mover = CreateCircle(context, Vector2d.Zero);
+        SolidBody2D target = CreateCircle(context, new Vector2d(100, 100));
+
+        bool hit = QueryDetection2D.TrySweepMoverShape(
+            mover.Collider,
+            new Vector2d(Fixed64.MaxValue, Fixed64.MaxValue),
+            target.Collider,
+            out Physics2DHit sweepHit);
+
+        hit.Should().BeFalse();
+        sweepHit.Should().Be(default(Physics2DHit));
     }
 
     [Fact]

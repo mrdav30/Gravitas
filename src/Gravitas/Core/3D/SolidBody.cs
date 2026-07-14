@@ -167,7 +167,10 @@ public partial class SolidBody : IRecordable
     private readonly ContactManifold _rotationalContinuousCollisionManifold = new();
     private readonly SweptSphereQueryWorker _shapeExactContinuousSweepWorker = new();
     private readonly ConvexSweepQueryWorker _shapeExactContinuousConvexSweepWorker = new();
-    private static readonly Fixed64 ShapeExactContinuousContactSlop = Fixed64.FromFraction(1, 2048);
+    // Shape-exact CCD must remain separated even when a degenerate support
+    // feature is recognized at the far edge of the convex sweep contact band.
+    private static readonly Fixed64 ShapeExactContinuousContactSlop =
+        ConvexSweepQueryWorker.ContactTolerance * (Fixed64)4;
 
 
     public bool CanSetVisualPosition;
@@ -338,6 +341,15 @@ public partial class SolidBody : IRecordable
         Fixed64 x = (_freezeAxes & BodyFreezeAxes3D.PositionX) == BodyFreezeAxes3D.PositionX ? Fixed64.Zero : value.X;
         Fixed64 y = (_freezeAxes & BodyFreezeAxes3D.PositionY) == BodyFreezeAxes3D.PositionY ? Fixed64.Zero : value.Y;
         Fixed64 z = (_freezeAxes & BodyFreezeAxes3D.PositionZ) == BodyFreezeAxes3D.PositionZ ? Fixed64.Zero : value.Z;
+        return new Vector3d(x, y, z);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private Vector3d ProjectLinearEndpoint(Vector3d start, Vector3d end)
+    {
+        Fixed64 x = (_freezeAxes & BodyFreezeAxes3D.PositionX) == BodyFreezeAxes3D.PositionX ? start.X : end.X;
+        Fixed64 y = (_freezeAxes & BodyFreezeAxes3D.PositionY) == BodyFreezeAxes3D.PositionY ? start.Y : end.Y;
+        Fixed64 z = (_freezeAxes & BodyFreezeAxes3D.PositionZ) == BodyFreezeAxes3D.PositionZ ? start.Z : end.Z;
         return new Vector3d(x, y, z);
     }
 
@@ -682,9 +694,11 @@ public partial class SolidBody : IRecordable
 
         Wake();
 
-        Vector3d resolvedPosition = kinematicPosition;
+        Vector3d resolvedPosition = ProjectLinearEndpoint(startPosition, kinematicPosition);
+        if (ShouldUseContinuousCollision(out _))
+            _ = ContinuousCollisionSweepRange.ValidateEndpoint(startPosition, resolvedPosition, out _);
         FixedQuaternion resolvedRotation = kinematicRotation;
-        CaptureKinematicContinuousCollisionFrame(startPosition, kinematicPosition, startRotation);
+        CaptureKinematicContinuousCollisionFrame(startPosition, resolvedPosition, startRotation);
         TryResolveKinematicContinuousCollision(startPosition, ref resolvedPosition);
         TryResolveKinematicRotationalContinuousCollision(startPosition, ref resolvedPosition, startRotation, ref resolvedRotation);
 

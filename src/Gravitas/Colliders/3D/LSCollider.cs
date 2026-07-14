@@ -748,6 +748,17 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
     public abstract Vector3d GetNormalAtPoint(Vector3d point);
 
     /// <summary>
+    /// Tries to resolve a normal that is invariant across the planar surface
+    /// feature containing <paramref name="point"/>. A successful result must
+    /// be a nonzero outward normal.
+    /// </summary>
+    internal virtual bool TryGetPlanarSurfaceNormal(Vector3d point, out Vector3d normal)
+    {
+        normal = Vector3d.Zero;
+        return false;
+    }
+
+    /// <summary>
     /// Checks if position is in the padded bounds of the collider, used for broad phase collision detection
     /// </summary>
     /// <param name="cellPadding">The topology cell edge used to conservatively pad the bounds.</param>

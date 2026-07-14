@@ -7,6 +7,7 @@
 
 using FixedMathSharp;
 using Gravitas.Colliders;
+using Gravitas.Support;
 using SwiftCollections;
 using SwiftCollections.Query;
 
@@ -42,10 +43,17 @@ public sealed class SweptSphereQueryWorker
         _end = end;
         _radius = radius;
 
-        Vector3d segment = end - start;
+        if (!FixedVectorDifference.TryCreate(start, end, out Vector3d segment)
+            || !Vector3d.TryGetMagnitude(segment, out _length))
+        {
+            _length = Fixed64.Zero;
+            _lengthSqr = Fixed64.Zero;
+            _direction = Vector3d.Zero;
+            return;
+        }
+
         _lengthSqr = segment.MagnitudeSquared;
-        _length = _lengthSqr <= Fixed64.Epsilon ? Fixed64.Zero : segment.Magnitude;
-        _direction = _length <= Fixed64.Epsilon ? Vector3d.Zero : segment / _length;
+        _direction = _length <= Fixed64.Epsilon ? Vector3d.Zero : segment.Normalized;
         SweepBoundsUtility.CreateSweptSphereBounds(
             start,
             end,

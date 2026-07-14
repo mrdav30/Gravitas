@@ -9,6 +9,7 @@ using GridForge.Configuration;
 using GridForge.Grids.Topology;
 using SwiftCollections;
 using SwiftCollections.Query;
+using System;
 using Xunit;
 
 namespace Gravitas.Tests.Physics2D;
@@ -56,6 +57,88 @@ public sealed class ContinuousCollision2DTests
 
         mover.Position.X.Should().BeLessThan((Fixed64)5);
         mover.LinearVelocity.X.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void ContinuousMode_WithUnrepresentableDynamicDisplacementLength_ShouldFailBeforeMoving()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        SolidBody2D mover = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.Half),
+            Vector2d.Zero,
+            immovable: false);
+        Vector2d displacement = new(Fixed64.MaxValue, Fixed64.MaxValue);
+        mover.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+
+        mover.ApplyCollisionLinearVelocityDelta(displacement);
+        Action simulate = context.LateSimulate;
+
+        simulate.Should().Throw<ArgumentOutOfRangeException>();
+        mover.Position.Should().Be(Vector2d.Zero);
+        mover.LastContinuousCollisionToiIterationCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void ContinuousMode_WithUnrepresentableKinematicDisplacementLength_ShouldFailBeforeMoving()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        SolidBody2D mover = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.Half),
+            Vector2d.Zero,
+            immovable: false,
+            isKinematic: true);
+        Vector2d endpoint = new(Fixed64.MaxValue, Fixed64.MaxValue);
+        mover.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+
+        mover.Agent.Transform.Position = new Vector3d(endpoint.X, Fixed64.Zero, endpoint.Y);
+        Action simulate = context.LateSimulate;
+
+        simulate.Should().Throw<ArgumentOutOfRangeException>();
+        mover.Position.Should().Be(Vector2d.Zero);
+        mover.LastContinuousCollisionToiIterationCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void ContinuousMode_WithExtremeHostChangeOnFrozenKinematicAxis_ShouldPreserveFrozenAxis()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        Vector2d start = new(-Fixed64.One, Fixed64.Zero);
+        SolidBody2D mover = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.Half),
+            start,
+            immovable: false,
+            isKinematic: true);
+        mover.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        mover.FreezeAxes = BodyFreezeAxes2D.PositionX;
+
+        mover.Agent.Transform.Position = new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.One);
+        context.LateSimulate();
+
+        mover.Position.Should().Be(new Vector2d(start.X, Fixed64.One));
+        mover.Agent.Transform.Position.ToVector2d().Should().Be(mover.Position);
+    }
+
+    [Fact]
+    public void ContinuousMode_WithExtremeHostChangeOnFrozenKinematicYAxis_ShouldPreserveFrozenAxis()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        SolidBody2D mover = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.Half),
+            Vector2d.Zero,
+            immovable: false,
+            isKinematic: true);
+        mover.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        mover.FreezeAxes = BodyFreezeAxes2D.PositionY;
+
+        mover.Agent.Transform.Position = new Vector3d(Fixed64.One, Fixed64.Zero, Fixed64.MaxValue);
+        context.LateSimulate();
+
+        mover.Position.Should().Be(Vector2d.Right);
+        mover.Agent.Transform.Position.ToVector2d().Should().Be(Vector2d.Right);
     }
 
     [Fact]
@@ -760,7 +843,7 @@ public sealed class ContinuousCollision2DTests
     }
 
     [Fact]
-    public void ContinuousMode_WithQuantizedTailAfterContact_ShouldStopAtImpact()
+    public void ContinuousMode_WithQuantizedTailAfterContact_ShouldConsumeTangentialRemainder()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);
         Fixed64 remainingTail = Fixed64.Epsilon * (Fixed64)2;
@@ -781,7 +864,7 @@ public sealed class ContinuousCollision2DTests
         mover.ApplyCollisionLinearVelocityDelta(new Vector2d(Fixed64.One, Fixed64.Half));
         context.LateSimulate();
 
-        mover.Position.Should().Be(impactPosition);
+        mover.Position.Should().Be(new Vector2d(impactPosition.X, Fixed64.Half));
         mover.LinearVelocity.Should().Be(new Vector2d(Fixed64.Zero, Fixed64.Half));
         mover.LastContinuousCollisionToiIterationCount.Should().Be(1);
         mover.LastContinuousCollisionToiIterationLimitReached.Should().BeFalse();
