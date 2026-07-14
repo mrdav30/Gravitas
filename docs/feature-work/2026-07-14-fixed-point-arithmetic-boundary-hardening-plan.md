@@ -9,7 +9,8 @@
 only GJK and solver policy in Gravitas, and close the remaining extreme-range
 correctness gaps without downstream arithmetic workarounds.
 
-**Architecture:** FixedMathSharp keeps its existing saturating operators and
+**Architecture:** FixedMathSharp first corrects `/` and `FastDiv` to share one
+round-half-to-even division core. It keeps its existing saturating operators and
 adds result-producing `TryAdd`/`TrySubtract` APIs that share the same private
 overflow core. Explicit fused `TryMultiplyDivide` overloads retain 128-bit or
 192-bit numerators until one final division and rounding step. FixedMathSharp
@@ -24,6 +25,9 @@ xUnit v3, BenchmarkDotNet, Gravitas 2D/3D/mixed GJK and CCD.
 
 - Correctness and determinism precede maintainability and performance.
 - Preserve the existing saturating behavior of `Fixed64` and vector operators.
+- Correct `Fixed64` division midpoint behavior to round-half-to-even, matching
+  multiplication, conversions, midpoint arithmetic, and the documented
+  division contract. Do not preserve the current half-away-from-zero defect.
 - Do not make ordinary operator chains context-sensitive. Parentheses around a
   multiplication do not retain a wide intermediate; fused arithmetic must be
   requested explicitly.
@@ -48,37 +52,52 @@ xUnit v3, BenchmarkDotNet, Gravitas 2D/3D/mixed GJK and CCD.
 
 ## Decisions Locked By This Plan
 
-1. `PositiveFixed64RawHighLimit` will not remain in Gravitas. If the
+1. `Fixed64.operator /` and `FixedMath.FastDiv` use one shared
+   round-half-to-even core. For every representable `x`, exact binary reciprocal
+   identities such as `x / Fixed64.Two == x * Fixed64.Half` must hold. No such
+   identity is promised when the reciprocal was already rounded, such as
+   `Fixed64.One / 3`.
+2. `PositiveFixed64RawHighLimit` will not remain in Gravitas. If the
    FixedMathSharp implementation still needs that boundary internally, derive
    it from `long.MaxValue >> FixedMath.SHIFT_AMOUNT_I`; do not copy the hex
    literal downstream.
-2. Hex literals provide no runtime advantage over decimal literals. Use them
+3. Hex literals provide no runtime advantage over decimal literals. Use them
    only where their bit layout is the clearest representation, and accompany
    them with a decimal or invariant-based explanation. Prefer named constants,
    shifts, `uint.MaxValue`, and `long.MaxValue` derivations.
-3. Saturating operators remain the convenient default. Separate `Try*` methods
+4. Saturating operators remain the convenient default. Separate `Try*` methods
    are required because an operator can return only the resulting value and
    cannot also report whether saturation occurred. The separate surface is a
    semantic requirement; avoiding the current calculate-and-reverse-check work
    is a secondary performance benefit.
-4. `FixedVectorDifference` is deleted from Gravitas. Component-exact vector
+5. `FixedVectorDifference` is deleted from Gravitas. Component-exact vector
    addition and subtraction belong to FixedMathSharp.
-5. Full-width projection accumulation and ordering belong to FixedMathSharp.
+6. Full-width projection accumulation and ordering belong to FixedMathSharp.
    Gravitas owns GJK shift selection, safe-product thresholds, sweep admission,
    and conservative-advancement policy.
-6. Invalid `ConvexShape` source/target kind use is an internal programming
+7. Invalid `ConvexShape` source/target kind use is an internal programming
    error, not an ordinary query miss. It must fail explicitly in every build.
-7. `TryMultiplyDivide` is a distinct fused operation, not a correction to the
+8. `TryMultiplyDivide` is a distinct fused operation, not a correction to the
    existing operators. It returns `false` for a zero divisor or an
    unrepresentable final result, writes `default` on failure, and does not fail
    merely because an ordinary intermediate `Fixed64` product would saturate or
    underflow.
-8. Do not add saturating, throwing, vector, or arbitrary-factor fused variants
+9. Do not add saturating, throwing, vector, or arbitrary-factor fused variants
    without a concrete package consumer. The two-factor and three-factor scalar
    overloads are the complete approved public surface.
 
 ## Current Review Findings
 
+- `Fixed64.operator /` has claimed round-half-to-even behavior since the initial
+  repository commit, but it increments every guarded quotient with a low bit of
+  one. Exact midpoint magnitudes therefore round away from zero. Raw inputs
+  `1`, `5`, and `9` expose `x / Two != x * Half`; raw inputs `3` and `7` agree
+  only because the away-from-zero result is also the even neighbor. The April
+  2026 scalar hardening corrected multiplication from half-up to true
+  half-to-even but left both division implementations unchanged.
+- `FixedMath.FastDiv` duplicates the same division loop and rounding defect.
+  Correcting only the public operator would leave normalization and geometry
+  paths with different arithmetic semantics.
 - `FixedVectorDifference` detects saturation by performing a vector operation
   and then an inverse operation. The policy is useful, but the implementation
   belongs at the scalar/vector arithmetic source of truth.
@@ -107,7 +126,116 @@ xUnit v3, BenchmarkDotNet, Gravitas 2D/3D/mixed GJK and CCD.
 
 ---
 
-### Task 1: FixedMathSharp Exact Add And Subtract Contract
+### Task 1: FixedMathSharp Division Rounding Contract
+
+**Files:**
+
+- Modify: `../FixedMathSharp/src/FixedMathSharp/Numerics/Scalars/Fixed64.Operators.cs`
+- Modify: `../FixedMathSharp/src/FixedMathSharp/Core/FixedMath.cs`
+- Modify: `../FixedMathSharp/docs/wiki/fixed64-representation.md`
+- Test: `../FixedMathSharp/tests/FixedMathSharp.Tests/Numerics/Scalars/Fixed64.Tests.cs`
+- Test: `../FixedMathSharp/tests/FixedMathSharp.Tests/Core/FixedMath.Tests.cs`
+- Benchmark: `../FixedMathSharp/tests/FixedMathSharp.Benchmarks/Fixed64ArithmeticBenchmarks.cs`
+
+**Interfaces:**
+
+- Produces no new public API. `Fixed64.operator /` and `FixedMath.FastDiv`
+  preserve divide-by-zero and final saturation behavior while changing exact
+  midpoint results from away-from-zero to round-half-to-even.
+- Produces one internal unsigned-magnitude division core and one reusable final
+  rounding helper:
+
+```csharp
+internal static Fixed64 DivideMagnitude(
+    ulong dividendMagnitude,
+    ulong divisorMagnitude,
+    bool negative);
+
+internal static ulong RoundGuardedQuotientToEven(
+    ulong guardedQuotient,
+    bool hasTrailingRemainder,
+    out bool overflowed);
+```
+
+- `DivideMagnitude` requires a nonzero divisor magnitude. Its callers own the
+  public divide-by-zero contract and determine the result sign before entering
+  the unsigned core.
+- `RoundGuardedQuotientToEven` treats bit zero as the guard bit. It increments
+  only when that bit is set and either trailing remainder exists or the retained
+  magnitude is odd.
+
+- [ ] **Step 1: Add the midpoint regression before changing source.**
+
+```csharp
+[Theory]
+[InlineData(1L, 0L)]
+[InlineData(3L, 2L)]
+[InlineData(5L, 2L)]
+[InlineData(-1L, 0L)]
+[InlineData(-3L, -2L)]
+[InlineData(-5L, -2L)]
+public void DivideByTwo_MidpointsRoundToEven(long inputRaw, long expectedRaw)
+{
+    Fixed64 result = Fixed64.FromRaw(inputRaw) / Fixed64.Two;
+
+    Assert.Equal(Fixed64.FromRaw(expectedRaw), result);
+}
+```
+
+- [ ] **Step 2: Add exact binary reciprocal identity tests** across
+      `long.MinValue`, `long.MaxValue`, zero, and raw values `-9..9`:
+
+```csharp
+Assert.Equal(value * Fixed64.Half, value / Fixed64.Two);
+Assert.Equal(value * Fixed64.Quarter, value / new Fixed64(4));
+Assert.Equal(value * Fixed64.Eighth, value / new Fixed64(8));
+```
+
+- [ ] **Step 3: Add below/at/above midpoint and fast-path tests.** For raw
+      dividend `1`, use divisors `Fixed64.Two + Fixed64.MinIncrement`,
+      `Fixed64.Two`, and `Fixed64.Two - Fixed64.MinIncrement`; require raw
+      results `0`, `0`, and `1`. Repeat with a negative dividend and assert
+      `FastDiv` exactly matches `/` for every positive divisor case.
+- [ ] **Step 4: Run the focused tests and confirm the exact-even midpoint cases
+      fail while below/above midpoint behavior remains correct.**
+
+```powershell
+dotnet test ../FixedMathSharp/tests/FixedMathSharp.Tests/FixedMathSharp.Tests.csproj -c Release --filter "FullyQualifiedName~Fixed64|FullyQualifiedName~FastDiv"
+```
+
+- [ ] **Step 5: Extract the existing magnitude division loop** into
+      `DivideMagnitude` and route both `/` and the positive-divisor `FastDiv`
+      path through it. Keep `FastDiv`'s non-positive-divisor fallback and the
+      public operator's divide-by-zero exception unchanged.
+- [ ] **Step 6: Replace the false banker-rounding branch** with
+      `RoundGuardedQuotientToEven`. Preserve the loop's extra guard bit, pass
+      whether its final remainder is nonzero as the sticky condition, and test
+      rounded carry against the asymmetric positive `long.MaxValue` and
+      negative `2^63` magnitude limits before constructing the result.
+- [ ] **Step 7: Add a deterministic `BigInteger` oracle in tests only.** Compare
+      `/` and positive-divisor `FastDiv` against exact
+      `abs(dividendRaw) * 2^32 / abs(divisorRaw)` quotient/remainder arithmetic.
+      Cover seeded raw pairs plus exact ties, both signs, zero dividend,
+      `long.MinValue`, `long.MaxValue`, divisor `long.MinValue`, final rounding
+      carry, saturation, and divide by zero.
+- [ ] **Step 8: Document the arithmetic contract** in
+      `fixed64-representation.md`: multiplication and division round exact
+      midpoints to the even raw value; exact binary reciprocal identities hold;
+      pre-rounded reciprocals such as one third can still differ from direct
+      division.
+- [ ] **Step 9: Run the scalar and `FastDiv` tests in `Release` and
+      `ReleaseLean`, then run exact FixedMathSharp coverage.** Require all
+      guard, sticky, retained-parity, sign, carry, saturation, and zero-divisor
+      branches to be covered.
+- [ ] **Step 10: Benchmark `Divide` and `FastDiv`** before and after the shared
+      core. Require zero allocations and no material regression; optimize the
+      shared loop rather than restoring duplicated rounding implementations.
+- [ ] **Step 11: Owner review checkpoint.** Leave all FixedMathSharp changes
+      unstaged and provide a proposed commit message.
+
+---
+
+### Task 2: FixedMathSharp Exact Add And Subtract Contract
 
 **Files:**
 
@@ -177,7 +305,7 @@ dotnet test ../FixedMathSharp/tests/FixedMathSharp.Tests/FixedMathSharp.Tests.cs
 
 ---
 
-### Task 2: FixedMathSharp Full-Domain Projection Arithmetic
+### Task 3: FixedMathSharp Full-Domain Projection Arithmetic
 
 **Files:**
 
@@ -191,7 +319,7 @@ dotnet test ../FixedMathSharp/tests/FixedMathSharp.Tests/FixedMathSharp.Tests.cs
 
 **Interfaces:**
 
-- Consumes: Task 1 arithmetic and the existing private full-width multiplication
+- Consumes: Task 2 arithmetic and the existing private full-width multiplication
   implementation.
 - Produces:
 
@@ -248,7 +376,7 @@ public partial struct Vector3d
 
 ---
 
-### Task 3: FixedMathSharp Fused Multiply-Divide
+### Task 4: FixedMathSharp Fused Multiply-Divide
 
 **Files:**
 
@@ -258,7 +386,8 @@ public partial struct Vector3d
 
 **Interfaces:**
 
-- Consumes: the existing `AbsToUInt64` and `Multiply64To128` arithmetic core.
+- Consumes: Task 1's verified `RoundGuardedQuotientToEven` policy plus the
+  existing `AbsToUInt64` and `Multiply64To128` arithmetic core.
 - Produces:
 
 ```csharp
@@ -304,7 +433,8 @@ dotnet test ../FixedMathSharp/tests/FixedMathSharp.Tests/FixedMathSharp.Tests.cs
 
 - [ ] **Step 4: Implement the two-factor overload** with the existing unsigned
       64-by-64-to-128 multiplier and one allocation-free unsigned divide with
-      quotient/remainder. Apply the result sign after comparing the rounded
+      quotient/remainder. Feed its guard and sticky state through Task 1's
+      rounding helper, then apply the result sign after comparing the rounded
       magnitude against the asymmetric positive and negative limits.
 - [ ] **Step 5: Add three-factor red tests** matching the two-factor sign,
       boundary, zero-divisor, default-output, and half-to-even coverage. Add the
@@ -313,9 +443,10 @@ dotnet test ../FixedMathSharp/tests/FixedMathSharp.Tests/FixedMathSharp.Tests.cs
 - [ ] **Step 6: Implement the three-factor overload** by extending the existing
       unsigned product to three 64-bit words. Divide that numerator by the
       64-bit divisor, retain the quotient's low 32 discarded bits plus the
-      division remainder, and use both to round the final Q32.32 raw result
-      once. Do not use `BigInteger`, floating point, `Int128`, or a public wide
-      numeric type in runtime code.
+      division remainder, reduce them to one guard bit plus sticky state, and
+      use Task 1's rounding helper to produce the final Q32.32 raw result once.
+      Do not use `BigInteger`, floating point, `Int128`, or a public wide numeric
+      type in runtime code.
 - [ ] **Step 7: Add deterministic oracle coverage** in the test project using
       `BigInteger` only as an independently computed reference. Cover fixed
       boundary vectors plus a seeded set of raw inputs for both overloads,
@@ -333,7 +464,7 @@ dotnet test ../FixedMathSharp/tests/FixedMathSharp.Tests/FixedMathSharp.Tests.cs
 
 ---
 
-### Task 4: Gravitas Consumes FixedMathSharp Arithmetic
+### Task 5: Gravitas Consumes FixedMathSharp Arithmetic
 
 **Files:**
 
@@ -360,7 +491,7 @@ rg -l "FixedVectorDifference|ConvexSupportProjection" src/Gravitas tests/Gravita
 
 **Interfaces:**
 
-- Consumes: Tasks 1 through 3.
+- Consumes: Tasks 1 through 4.
 - Produces: no new Gravitas arithmetic API.
 - Replaces the internal `ResolveVelocityDelta` overloads with component-atomic
   `TryResolveVelocityDelta` overloads. Failure writes `default` and occurs
@@ -421,7 +552,7 @@ internal static bool TryResolveVelocityDelta(
 
 ---
 
-### Task 5: Remove Release-Only Assertion Behavior
+### Task 6: Remove Release-Only Assertion Behavior
 
 **Files:**
 
@@ -448,7 +579,7 @@ internal static bool TryResolveVelocityDelta(
 
 ---
 
-### Task 6: Cross-Stack Validation And Documentation Closure
+### Task 7: Cross-Stack Validation And Documentation Closure
 
 **Files:**
 
@@ -462,7 +593,7 @@ internal static bool TryResolveVelocityDelta(
       builds, coverage, and CRAP analysis.** Update the complexity exception
       register only from the fresh report.
 - [ ] **Step 2: Run the focused FixedMathSharp benchmark rows** for scalar
-      arithmetic, fused multiply-divide, vector `Try*`, magnitude/normalization,
+      division, fused multiply-divide, vector `Try*`, magnitude/normalization,
       and projection. Record medians and allocations.
 - [ ] **Step 3: Validate SwiftCollections, GridForge, and Gravitas** through
       explicit local project references in each library, test, and benchmark
@@ -471,9 +602,10 @@ internal static bool TryResolveVelocityDelta(
       replay, and the existing convex-sweep benchmark rows.** Require 100% line
       and branch coverage and zero allocation regression.
 - [ ] **Step 5: Update the issue tracker resolution record** with the arithmetic
-      ownership correction, odd-raw GJK regression, final test counts, coverage
-      artifact, and benchmark evidence. Remove the previous claim that the
-      staged downstream arithmetic was already the final ownership boundary.
+      ownership correction, division-rounding RCA, exact reciprocal identities,
+      odd-raw GJK regression, final test counts, coverage artifact, and benchmark
+      evidence. Remove the previous claim that the staged downstream arithmetic
+      was already the final ownership boundary.
 - [ ] **Step 6: Move this plan to `docs/feature-work/done/`** and update the
       overview only after all package-local and downstream gates pass.
 - [ ] **Step 7: Request independent final review** of correctness,
@@ -485,6 +617,12 @@ internal static bool TryResolveVelocityDelta(
   multiplier, or exact projection accumulator.
 - `FixedVectorDifference`, `ConvexSupportProjection`, and
   `PositiveFixed64RawHighLimit` no longer exist in Gravitas.
+- `Fixed64.operator /` and `FixedMath.FastDiv` share one magnitude-division and
+  rounding core, match the `BigInteger` oracle, and round exact midpoints to the
+  even raw value for both signs.
+- `x / Two == x * Half`, `x / 4 == x * Quarter`, and
+  `x / 8 == x * Eighth` hold across the tested raw domain including
+  `long.MinValue` and `long.MaxValue`.
 - Existing operators remain saturating; `Try*` methods report exactness without
   throwing or exposing partial results.
 - Both fused multiply-divide overloads retain their complete numerator until one
