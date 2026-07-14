@@ -22,12 +22,12 @@ records follow with their original discovery context.
 
 ### Release Workflow
 
-- Use the `develop` worktrees under `F:/gamedevrepos` and temporary local project
-  references through the dependency chain while lower-stack changes are under
-  validation. Apply explicit links to library, test, and benchmark projects when
-  transitive resolution is insufficient.
-- Treat local links as unstaged validation scaffolding. Do not publish or release
-  with them in place.
+- Use the `develop` worktrees under `F:/gamedevrepos` and temporary local
+  project references through the dependency chain while lower-stack changes are
+  under validation. Apply explicit links to library, test, and benchmark
+  projects when transitive resolution is insufficient.
+- Treat local links as unstaged validation scaffolding. Do not publish or
+  release with them in place.
 - The FixedMathSharp extreme-vector issue is resolved in source. Validate every
   downstream consumer, release FixedMathSharp, then restore its package
   references and validate/release SwiftCollections.
@@ -58,7 +58,7 @@ records follow with their original discovery context.
 8. **Gravitas:**
    [3D Angular Impulse Scales Immediate Velocity By Frame Delta](#3d-angular-impulse-scales-immediate-velocity-by-frame-delta).
 9. **Gravitas:**
-    [Rotational CCD Can Miss Contacts Between Bounded Pose Samples](#rotational-ccd-can-miss-contacts-between-bounded-pose-samples).
+   [Rotational CCD Can Miss Contacts Between Bounded Pose Samples](#rotational-ccd-can-miss-contacts-between-bounded-pose-samples).
 10. **Gravitas:**
     [Convex Mesh Mode Accepts Disconnected Topology And Can Collide In Empty Bounds Space](#convex-mesh-mode-accepts-disconnected-topology-and-can-collide-in-empty-bounds-space).
 11. **Gravitas:**
@@ -74,12 +74,12 @@ records follow with their original discovery context.
 **Affected area:** `SolidBody.Initialize(...)`, compound-part local rotations,
 collider bounds, partitioning, queries, and replay/load rotation admission
 
-Runtime body initialization and non-mesh compound-part authoring accept
-non-unit `FixedQuaternion` values. Some representable values collapse a rotated
-basis vector to exact zero; for example, an X-only quaternion whose squared X
-component is `Fixed64.Half` maps `Vector3d.Up` to zero. Cone bounds then
-use their deterministic Up-axis fallback, while other pose, normal, inertia,
-and debug geometry continues to consume the invalid quaternion directly. The
+Runtime body initialization and non-mesh compound-part authoring accept non-unit
+`FixedQuaternion` values. Some representable values collapse a rotated basis
+vector to exact zero; for example, an X-only quaternion whose squared X
+component is `Fixed64.Half` maps `Vector3d.Up` to zero. Cone bounds then use
+their deterministic Up-axis fallback, while other pose, normal, inertia, and
+debug geometry continues to consume the invalid quaternion directly. The
 fallback keeps bounds deterministic but cannot make the overall shape coherent.
 Dynamic cone initialization can subsequently reach grounding raycasts with a
 collapsed height and throw a deep `DivideByZeroException`, rather than rejecting
@@ -113,8 +113,8 @@ Resolve this consistently at all public assignment and load boundaries. Decide
 whether `Inherit` remains valid for the context default (it currently resolves
 to `Discrete` intentionally), add invalid byte-value regressions for 2D, 3D,
 settings save/apply, and replay population, and document the chosen exception
-and load behavior. This does not block the coverage campaign because no
-invalid value is needed to close the retained CCD branches.
+and load behavior. This does not block the coverage campaign because no invalid
+value is needed to close the retained CCD branches.
 
 ### Relative CCD Quadratic Saturation Can Miss Extreme-Range Crossings
 
@@ -122,18 +122,18 @@ invalid value is needed to close the retained CCD branches.
 **Source:** 95%-to-100% coverage hardening, shared relative-sweep review  
 **Affected area:** 2D, 3D, and mixed relative continuous-collision sweeps
 
-The relative sphere/circle sweep evaluates its quadratic directly in Q32.32.
-At separations or per-frame displacements above roughly `46,340.95`, squared
-terms can saturate before the discriminant and root are formed. A crossing can
-then collapse to an endpoint candidate with the wrong impact normal and be
-rejected even though the swept broad phase admitted it.
+The relative sphere/circle sweep evaluates its quadratic directly in Q32.32. At
+separations or per-frame displacements above roughly `46,340.95`, squared terms
+can saturate before the discriminant and root are formed. A crossing can then
+collapse to an endpoint candidate with the wrong impact normal and be rejected
+even though the swept broad phase admitted it.
 
 Resolve this with a scale-safe quadratic formulation or an explicit validated
 world/displacement range contract. Add symmetric 2D/3D regressions for large
 crossings, endpoint-adjacent hits, misses, and mixed CCD routing at the chosen
 boundary. This is distinct from conservative proxy-radius saturation and does
-not block coverage convergence because ordinary supported ranges and the
-current uncovered closing-speed boundary remain independently testable.
+not block coverage convergence because ordinary supported ranges and the current
+uncovered closing-speed boundary remain independently testable.
 
 ### 3D Angular Impulse Scales Immediate Velocity By Frame Delta
 
@@ -146,14 +146,13 @@ The 3D angular-impulse API multiplies the supplied impulse by both inverse
 inertia and `GravitasWorldContext.DeltaTime` before changing angular velocity.
 Consequently, otherwise identical bodies receive different immediate angular
 velocity changes from the same impulse when their context frame rates differ.
-The 2D angular-impulse API and the usual physical impulse contract apply
-inverse inertia without a time-step factor. The adjacent 3D linear-impulse API
-uses the same time-step pattern and should be audited as part of the semantic
-decision.
+The 2D angular-impulse API and the usual physical impulse contract apply inverse
+inertia without a time-step factor. The adjacent 3D linear-impulse API uses the
+same time-step pattern and should be audited as part of the semantic decision.
 
-Resolve this as an explicit breaking API/units decision rather than removing
-the factor incidentally. Add cross-frame-rate regressions for immediate linear
-and angular impulse response, update XML/wiki unit documentation, and verify
+Resolve this as an explicit breaking API/units decision rather than removing the
+factor incidentally. Add cross-frame-rate regressions for immediate linear and
+angular impulse response, update XML/wiki unit documentation, and verify
 collision and constraint callers that may already compensate for the current
 scaling.
 
@@ -194,9 +193,9 @@ replacement grid when its old local voxel index also exists there.
 
 Gravitas now handles removed grids, missing voxel addresses, and detached
 physics partitions without error-log spam, but it cannot distinguish a
-same-slot, same-shaped replacement whose lower-stack generation token is
-reused. Fix this in GridForge with a world-owned generation token that changes
-on every grid allocation, then add a remove/re-add regression proving old
+same-slot, same-shaped replacement whose lower-stack generation token is reused.
+Fix this in GridForge with a world-owned generation token that changes on every
+grid allocation, then add a remove/re-add regression proving old
 `WorldVoxelIndex` values cannot resolve into the replacement grid.
 
 ### SolidBody Point Transforms Use Collider Dimensions As Transform Scale
@@ -209,13 +208,13 @@ on every grid allocation, then add a remove/re-add regression proving old
 The generic point-transform helpers multiply and divide by
 `Collider.ScaledSize`. For primitive colliders that value includes authored
 shape dimensions as well as host scale, so a local point is incorrectly scaled
-by the collider's geometry. The old compound override made the mismatch worse
-by returning a world-axis-aligned bounds size and then rotating it again.
+by the collider's geometry. The old compound override made the mismatch worse by
+returning a world-axis-aligned bounds size and then rotating it again.
 
-The compound override has been removed rather than preserving a false local
-size contract. Resolve the generic helpers against the host transform's actual
-scale, define zero-scale inverse behavior, and add primitive/compound round-trip
-tests across non-unit authored sizes, nonuniform host scale, and rotation.
+The compound override has been removed rather than preserving a false local size
+contract. Resolve the generic helpers against the host transform's actual scale,
+define zero-scale inverse behavior, and add primitive/compound round-trip tests
+across non-unit authored sizes, nonuniform host scale, and rotation.
 
 ### Convex Mesh Mode Accepts Disconnected Topology And Can Collide In Empty Bounds Space
 
@@ -226,14 +225,14 @@ convex mesh/sphere closest-surface fallback
 
 `PhysicsMesh.ValidateInput(...)` validates counts, indices, and nondegenerate
 triangles but does not validate the topology promised by
-`MeshColliderMode.Convex`. Disconnected triangles can therefore be accepted as
-a convex mesh. Near an empty corner of their combined AABB, the local triangle
-query can return no candidates and the convex mesh/sphere path falls back to
-the AABB surface, producing a contact where no authored triangle exists.
+`MeshColliderMode.Convex`. Disconnected triangles can therefore be accepted as a
+convex mesh. Near an empty corner of their combined AABB, the local triangle
+query can return no candidates and the convex mesh/sphere path falls back to the
+AABB surface, producing a contact where no authored triangle exists.
 
-Open convex surfaces are supported intentionally, so requiring every convex
-mesh to be a closed volume would reject valid floors and other planar assets.
-Resolve this with an explicit semantic decision: either validate a documented
+Open convex surfaces are supported intentionally, so requiring every convex mesh
+to be a closed volume would reject valid floors and other planar assets. Resolve
+this with an explicit semantic decision: either validate a documented
 connected/convex open-or-closed topology contract, or change the empty-query
 fallback so invalid topology cannot create an empty-space contact. Add a
 regression that preserves valid open convex surfaces while rejecting or safely
@@ -247,13 +246,13 @@ handling disconnected input without the AABB false-positive.
 `CollisionPair.EndNotification()`, and callback exception/reentrancy teardown
 
 If collider A's ordinary exit callback reentrantly deactivates a participant,
-the pair records pending separation. If that callback then throws, control
-skips the outer per-side admission-flag clears and enters `EndNotification()`
-with A still marked notified, so A can receive the same exit again. A second
-callback failure can mask the original exception and leave B or the admission
-flags incompletely cleaned. Deferred exits also run after
-`_notificationInProgress` is cleared, so a callback that captured the pair can
-reenter deactivation while admission state still exists.
+the pair records pending separation. If that callback then throws, control skips
+the outer per-side admission-flag clears and enters `EndNotification()` with A
+still marked notified, so A can receive the same exit again. A second callback
+failure can mask the original exception and leave B or the admission flags
+incompletely cleaned. Deferred exits also run after `_notificationInProgress` is
+cleared, so a callback that captured the pair can reenter deactivation while
+admission state still exists.
 
 Resolve this as a dedicated lifecycle change: define at-most-once versus
 retryable callback semantics, snapshot and consume per-side admission before
@@ -269,7 +268,8 @@ nonthrowing callbacks and do not worsen this exception edge.
 ### Registered Joints Can Outlive Their Body And Collider Lifetimes
 
 **Discovered:** 2026-07-13  
-**Source:** 95%-to-100% coverage hardening, 3D joint replay-hash lifecycle review  
+**Source:** 95%-to-100% coverage hardening, 3D joint replay-hash lifecycle
+review  
 **Affected area:** 2D/3D joint ownership, body/collider deactivation and reuse,
 linked-collision suppression, replay identity, and ragdoll lifecycle
 
@@ -301,7 +301,8 @@ sentinel.
 ### CCD Handoff Dedupe Can Strand A Same-Frame Requeued Body
 
 **Discovered:** 2026-07-13  
-**Source:** 95%-to-100% coverage hardening, dimensional CCD service admission review  
+**Source:** 95%-to-100% coverage hardening, dimensional CCD service admission
+review  
 **Affected area:** 2D/3D continuous-collision handoff queues, same-frame relay
 cycles, mixed CCD routing, iteration-budget ownership, and replay continuity
 
@@ -315,14 +316,14 @@ the next late-simulate token makes that state permanently stale. The same queue
 shape exists in 2D and 3D and can participate in pure or mixed relay cycles.
 
 Resolve this as a focused queue-ownership change. Remove a body from the dedupe
-set immediately before consuming its queue entry so a later same-frame relay
-can re-enqueue it under the existing deterministic iteration budget, while
-retaining dedupe for repeated updates before dequeue. Add symmetric 2D/3D
-state-machine regressions (and a mixed relay witness if practical) where A is
-queued, consumed, receives a second handoff before drain completion, and is
-either consumed again within budget or explicitly discarded at the cap. Assert
-no directly consumable or replay-visible pending handoff remains after drain.
-This does not block coverage convergence and is independent of the redundant
+set immediately before consuming its queue entry so a later same-frame relay can
+re-enqueue it under the existing deterministic iteration budget, while retaining
+dedupe for repeated updates before dequeue. Add symmetric 2D/3D state-machine
+regressions (and a mixed relay witness if practical) where A is queued,
+consumed, receives a second handoff before drain completion, and is either
+consumed again within budget or explicitly discarded at the cap. Assert no
+directly consumable or replay-visible pending handoff remains after drain. This
+does not block coverage convergence and is independent of the redundant
 active/dynamic-ID admission predicates removed in Task 67.
 
 ## Resolved Issues
@@ -336,18 +337,17 @@ and averaging; Gravitas 2D, 3D, and mixed query/CCD sweep admission, GJK,
 conservative advancement, and concave-mesh hit geometry
 
 **Follow-up status:** Active under
-[`FixedMathSharp Foundation Hardening`](2026-07-14-fixedmathsharp-foundation-hardening-plan.md).
+[`FixedMathSharp Foundation Hardening`](F:\gamedevrepos\FixedMathSharp\docs\feature-work\2026-07-14-fixedmathsharp-foundation-hardening-plan.md).
 The committed FixedMathSharp magnitude/normalization fix remains valid, but the
 staged Gravitas arithmetic ownership and GJK shift boundary are not release
 closure.
 
-RCA: fixed-point squared magnitude saturated before the square root. Dividing
-an extreme vector by the shortened result produced a non-unit direction, while
-saturating endpoint subtraction could publish a different displacement than
-the caller requested. Fixed-coordinate GJK tolerances, support projection,
-same-sign triangle-centroid sums, and whole-mesh normal rediscovery introduced
-additional range and feature-identity failures after the initial direction was
-formed.
+RCA: fixed-point squared magnitude saturated before the square root. Dividing an
+extreme vector by the shortened result produced a non-unit direction, while
+saturating endpoint subtraction could publish a different displacement than the
+caller requested. Fixed-coordinate GJK tolerances, support projection, same-sign
+triangle-centroid sums, and whole-mesh normal rediscovery introduced additional
+range and feature-identity failures after the initial direction was formed.
 
 Fix: FixedMathSharp now owns exact raw squared-magnitude representability and
 comparison across 2D/3D/4D vectors, scale-safe magnitude and normalization
@@ -365,27 +365,27 @@ Verification:
   endpoint and relative displacement, false GJK/support outcomes, a false
   distance-zero near-maximum triangle hit, and adjacent-face normal drift.
 - FixedMathSharp passed `1,173` Release and `1,152` ReleaseLean tests, plus `7`
-  Chronicler tests in each configuration. All `14` focused Vector2/3/4
-  magnitude and normalization benchmarks remained allocation-free.
+  Chronicler tests in each configuration. All `14` focused Vector2/3/4 magnitude
+  and normalization benchmarks remained allocation-free.
 - SwiftCollections passed `1,091` Release and `1,063` ReleaseLean tests;
   GridForge passed `431` in each configuration through explicit source links.
 - Gravitas passed `2,635` Release and `2,597` ReleaseLean tests. The final
   authoritative artifact
   `TestResults/coverage-extreme-convex-final2-authoritative-reviewed/9a281922-a26f-4e7c-aeb1-540eb004fb49/coverage.cobertura.xml`
   reports `28,098/28,098` lines and `10,697/10,697` branches.
-- Convex sphere-target sweeps remained allocation-free. Removing the
-  whole-mesh normal rescan improved dense concave sweeps at 8/16/32
-  subdivisions from `117.22 us` / `436.02 us` / `1.6676 ms` to `77.58 us` /
-  `277.52 us` / `1.0848 ms`, also with zero allocations.
+- Convex sphere-target sweeps remained allocation-free. Removing the whole-mesh
+  normal rescan improved dense concave sweeps at 8/16/32 subdivisions from
+  `117.22 us` / `436.02 us` / `1.6676 ms` to `77.58 us` / `277.52 us` /
+  `1.0848 ms`, also with zero allocations.
 - The initial independent review reported no remaining findings. Owner review
   then identified misplaced downstream arithmetic, and a focused follow-up
   reproduced an odd-raw negative-expansion shift that can still saturate by one
   raw unit. The preceding counts remain useful baseline evidence, not final
   release closure.
-- The separate relative-CCD quadratic saturation issue remains active; this
-  work validates its inputs but does not replace its scale-sensitive quadratic.
-- Local project links remain unstaged and must be removed before package
-  release validation.
+- The separate relative-CCD quadratic saturation issue remains active; this work
+  validates its inputs but does not replace its scale-sensitive quadratic.
+- Local project links remain unstaged and must be removed before package release
+  validation.
 
 ### Extreme Collider Bounds Underestimated CCD Proxy Radius
 
@@ -402,8 +402,8 @@ compound proxy loops and in `Auto` threshold checks.
 
 Fix: FixedMathSharp retains its direct square/root path for ordinary values and
 uses max-component scaling only when the square sum saturates. Gravitas keeps
-its squared fast paths and falls back to robust distances only on saturation;
-an unrepresentable `MaxValue` displacement conservatively enables CCD.
+its squared fast paths and falls back to robust distances only on saturation; an
+unrepresentable `MaxValue` displacement conservatively enables CCD.
 
 Verification:
 
@@ -416,8 +416,8 @@ Verification:
   mode; Gravitas passed `2,563` and `2,525`.
 - Final magnitude and dynamic CCD benchmarks remained allocation-neutral and
   within the established baseline variance.
-- Independent review found and verified the near-unit distance correction,
-  then reported no remaining Critical or Important issues.
+- Independent review found and verified the near-unit distance correction, then
+  reported no remaining Critical or Important issues.
 - Local project links remain unstaged and must be removed before release.
 
 ### FixedMathSharp Rays Now Treat Only Exact-Zero Slab Directions As Parallel
@@ -460,8 +460,8 @@ discarded half the magnitude before halving equal extreme endpoints.
 
 Fix: FixedMathSharp now owns a branchless, overflow-safe
 `FixedMath.Midpoint(...)` primitive with nearest-even raw rounding. Both vector
-helpers delegate per component, and Gravitas delegates material averaging to
-the shared primitive instead of retaining a duplicate raw algorithm.
+helpers delegate per component, and Gravitas delegates material averaging to the
+shared primitive instead of retaining a duplicate raw algorithm.
 
 Verification:
 
@@ -473,8 +473,8 @@ Verification:
 - Full `Release` and `ReleaseLean` suites passed through FixedMathSharp,
   SwiftCollections, GridForge, and Gravitas using explicit local project links.
 - Focused BenchmarkDotNet runs remained allocation-free and reduced the
-  1,024-pair vector midpoint jobs from `20.568 us` to `1.017 us` for
-  `Vector3d` and from `29.024 us` to `1.418 us` for `Vector4d`.
+  1,024-pair vector midpoint jobs from `20.568 us` to `1.017 us` for `Vector3d`
+  and from `29.024 us` to `1.418 us` for `Vector4d`.
 - Local project links remain unstaged and must be removed before release;
   Gravitas will transition to the published package after FixedMathSharp ships.
 
@@ -488,7 +488,8 @@ RCA: settings load validation required each collision-matrix row to contain at
 least the outer row count, then copied only that many entries. A longer row was
 therefore accepted and silently truncated even though the public failure message
 and matrix contract require square data. A missing row was guarded in production
-but lacked a regression proving deterministic failure instead of null dereference.
+but lacked a regression proving deterministic failure instead of null
+dereference.
 
 Fix: row validation now requires exact length. Separate regressions cover short,
 overlong, and missing rows; all malformed shapes throw the explicit
@@ -531,7 +532,8 @@ Verification:
 - Symmetric mixed handoff tests batch-create and delete six colliders, then
   register the same live anchor and ignored collider. Compact and churned
   contexts retain identical replay order while allocator IDs differ; hashes now
-  match in both 2D-to-3D and 3D-to-2D directions and fail under the old ID policy.
+  match in both 2D-to-3D and 3D-to-2D directions and fail under the old ID
+  policy.
 - Focused replay suites pass 48/48 and both body replay-hash files report 100%
   line, branch, and method coverage.
 - Authoritative artifact
@@ -548,10 +550,10 @@ RCA: mesh-cone triangle detection oriented each face normal toward the cone
 before passing it to `MeshUtils.ClosestPointOnTriangle(...)` and
 `IsPointInTrianglePlane(...)`. Those helpers classify edge half-spaces against
 the triangle's authored winding. Flipping the normal for a cone approaching the
-back face reversed every containment test and could reject a real crossing.
-The same contact normal was oriented from the collider's mesh-bounds center,
-so disconnected or strongly offset geometry could also face a valid contact in
-the wrong direction and publish the wrong support point and depth.
+back face reversed every containment test and could reject a real crossing. The
+same contact normal was oriented from the collider's mesh-bounds center, so
+disconnected or strongly offset geometry could also face a valid contact in the
+wrong direction and publish the wrong support point and depth.
 
 Fix: retain the world winding normal for every triangle projection and
 containment operation. Derive a separate mesh-to-cone contact normal from the
@@ -593,15 +595,15 @@ while an exact-zero delta alone retains the motion-direction fallback.
 
 Verification:
 
-- An exact fixed-point witness produces closing speed equal to
-  `Fixed64.Epsilon` and proves the retained `<=` rejection boundary.
+- An exact fixed-point witness produces closing speed equal to `Fixed64.Epsilon`
+  and proves the retained `<=` rejection boundary.
 - Symmetric 2D/3D tangency regressions use radii above the admission epsilon
   whose combined-radius square is exactly zero. Restoring the former fallback
   independently fails each dimensional assertion.
 - Authoritative artifact
   `TestResults/coverage-continuous-math-task71-final-authoritative-root-comparable/74e3f071-bbf8-493e-9c2e-a2284311cf13/coverage.cobertura.xml`
-  reports 100% line, branch, and method coverage for
-  `ContinuousCollisionMath`; full `Release` passes 2,543/2,543 tests.
+  reports 100% line, branch, and method coverage for `ContinuousCollisionMath`;
+  full `Release` passes 2,543/2,543 tests.
 
 ### Mesh Scale And Surface-Shell Mass Did Not Match Authored Geometry
 
@@ -619,8 +621,8 @@ physical thin-shell tensor.
 Fix: mesh points now use the explicit affine contract
 `origin + R * (S * source)`, with a normalized rigid rotation and strictly
 positive representably invertible diagonal scale. Scale and rotation are
-prevalidated before standalone registration, before compound part rebuilds,
-and before runtime cache mutation. Scaled bounds, face normals/areas, projected
+prevalidated before standalone registration, before compound part rebuilds, and
+before runtime cache mutation. Scaled bounds, face normals/areas, projected
 frontal area, closed-volume covariance, COM, and inertia now match authored
 geometry. The surface policy uses a stable two-pass uniform thin-shell
 integration relative to scaled bounds, and checked fixed-point arithmetic
@@ -637,10 +639,10 @@ Verification:
 
 - Added fixed-value scaled bounds, normals, area, projected area, closed-volume
   COM/tensor, physical shell tensor, triangulation, large-translation, query,
-  collision, BVH reuse, support-tree, standalone/compound lifecycle, and
-  checked underflow/saturation regressions.
-- Added a combined off-center compound regression with nonuniform owner and
-  part scale, part rotation, owner-local COM, and arbitrary-reference inertia.
+  collision, BVH reuse, support-tree, standalone/compound lifecycle, and checked
+  underflow/saturation regressions.
+- Added a combined off-center compound regression with nonuniform owner and part
+  scale, part rotation, owner-local COM, and arbitrary-reference inertia.
 - Authoritative coverage artifact
   `TestResults/coverage-mesh-task46-authoritative-final2/b5fa3c62-a27b-4416-a20c-5454bf41b21c/coverage.cobertura.xml`
   reports 100% line and branch coverage for the new checked mesh files and the
@@ -678,63 +680,62 @@ measure. Solid primitives and validated closed meshes use volume; explicitly
 selected surface-approximation meshes use their scaled physical shell-area
 measure. All-zero measures use equal authored-order center weights and nominal
 mass shares. Fixed-point division assigns the exact residual mass to the last
-positive-weight part when one exists, otherwise to the last authored part.
-Part COM points include owner offset and authored local rotation. Center tensors
-are rotated by `R*I*R^T`, clamped near zero, and then shifted through the
+positive-weight part when one exists, otherwise to the last authored part. Part
+COM points include owner offset and authored local rotation. Center tensors are
+rotated by `R*I*R^T`, clamped near zero, and then shifted through the
 parallel-axis theorem. Private parts inherit owner `Center`; radius encloses the
 farthest aggregate-bounds corner about that center; the false `ScaledSize`
 override was removed.
 
 Verification: regressions cover analytic sphere volume weighting and tensor,
-rotated anisotropic cuboid inertia, rotated owner/part offsets, off-center closed
-mesh COM, every primitive and mesh mass measure, explicit shell policy, invalid
-closed-volume topology, exact residual assignment including trailing zero-weight
-parts, all-zero fixed-point fallback, remote-part public query visibility,
-authored-first geometry ties, capsule frontal aggregation, and degenerate cone
-projection. All touched executable production types report 100% line, branch,
-and method coverage; full coverage-enabled `Release` passes 2,433/2,433,
-`ReleaseLean` passes 2,396/2,396, both library targets build without warnings,
-and independent review approved.
+rotated anisotropic cuboid inertia, rotated owner/part offsets, off-center
+closed mesh COM, every primitive and mesh mass measure, explicit shell policy,
+invalid closed-volume topology, exact residual assignment including trailing
+zero-weight parts, all-zero fixed-point fallback, remote-part public query
+visibility, authored-first geometry ties, capsule frontal aggregation, and
+degenerate cone projection. All touched executable production types report 100%
+line, branch, and method coverage; full coverage-enabled `Release` passes
+2,433/2,433, `ReleaseLean` passes 2,396/2,396, both library targets build
+without warnings, and independent review approved.
 
 ### 3D Motion State Could Leak Across Reuse And Apply Incorrect Rotational Dynamics
 
 **Discovered:** 2026-07-12  
 **Resolved:** 2026-07-12  
 **Source:** 95%-to-100% coverage hardening, `SolidBody.Motion` review  
-**Affected area:** 3D body reset/reuse, grounded angular friction, and gyroscopic precession
+**Affected area:** 3D body reset/reuse, grounded angular friction, and
+gyroscopic precession
 
 RCA: `Initialize(...)` and `ResetPosition(...)` cleared visible velocities but
 left queued force/torque and cached angular acceleration state intact. Grounded
 angular friction wrote to the linear acceleration store after linear
-integration, so the next frame overwrote it without slowing rotation.
-Gyroscopic precession also added the Euler correction instead of subtracting
-`I^-1(w x Iw)` and changed angular velocity after speed, direction, and
-acceleration had already been cached. The first cache fix measured only the
-precession delta, omitting torque acceleration applied earlier in the same
-fixed step. Queued CCD handoff consumption then applied another full-frame
-gyroscopic correction after the normal angular step even though the handoff
-changed only linear state.
+integration, so the next frame overwrote it without slowing rotation. Gyroscopic
+precession also added the Euler correction instead of subtracting `I^-1(w x Iw)`
+and changed angular velocity after speed, direction, and acceleration had
+already been cached. The first cache fix measured only the precession delta,
+omitting torque acceleration applied earlier in the same fixed step. Queued CCD
+handoff consumption then applied another full-frame gyroscopic correction after
+the normal angular step even though the handoff changed only linear state.
 
-Fix: both reset paths now use the shared complete motion clear. Angular
-friction accumulates in the angular store. Gyroscopic precession applies the
-negative Euler term and refreshes angular motion state from the fixed-step
-starting velocity after the correction. Non-torque impulse paths use their own
-pre-gyro velocity as that refresh baseline.
-Linear-only queued handoffs no longer rebuild unchanged inertia orientation or
-run gyroscopic integration a second time.
-The unused planar `AddPositionCorrection(Vector3d)` API and its serialized and
+Fix: both reset paths now use the shared complete motion clear. Angular friction
+accumulates in the angular store. Gyroscopic precession applies the negative
+Euler term and refreshes angular motion state from the fixed-step starting
+velocity after the correction. Non-torque impulse paths use their own pre-gyro
+velocity as that refresh baseline. Linear-only queued handoffs no longer rebuild
+unchanged inertia orientation or run gyroscopic integration a second time. The
+unused planar `AddPositionCorrection(Vector3d)` API and its serialized and
 replay-hashed load-only state were deleted; collision response already uses the
 full 3D immediate correction path.
 
 Verification: RED regressions reproduced deferred motion after shell reuse and
 reset, unchanged grounded angular speed, and the wrong-sign off-principal
-anisotropic rotation. GREEN coverage proves exact reset poses, fresh/reused
-body replay-hash equality, repeat-run gyro determinism, correct correction
-sign against a final-orientation world-tensor reconstruction, and coherent
-angular velocity, speed, and total torque-plus-gyro acceleration. JSON
-snapshots also exclude the removed stale correction state. A service-phase CCD
-regression proves queued linear handoff processing preserves angular velocity,
-speed, acceleration, and rotation exactly after the normal body step.
+anisotropic rotation. GREEN coverage proves exact reset poses, fresh/reused body
+replay-hash equality, repeat-run gyro determinism, correct correction sign
+against a final-orientation world-tensor reconstruction, and coherent angular
+velocity, speed, and total torque-plus-gyro acceleration. JSON snapshots also
+exclude the removed stale correction state. A service-phase CCD regression
+proves queued linear handoff processing preserves angular velocity, speed,
+acceleration, and rotation exactly after the normal body step.
 
 ### Synchronous 2D Contact Callbacks Could Corrupt Pair Teardown And Reuse
 
@@ -745,20 +746,20 @@ speed, acceleration, and rotation exactly after the normal body step.
 deactivation, and pooling
 
 RCA: 2D contact enter/exit callbacks run synchronously while the service is
-walking pair registries. A callback that deactivated a collider could mutate
-the active `SwiftDictionary` enumerator and throw. An enter callback could also
-remove and recycle the current pair before `ProcessCandidate(...)` appended
-its local reference, allowing that object to be reused by a later collision
-and solved twice.
+walking pair registries. A callback that deactivated a collider could mutate the
+active `SwiftDictionary` enumerator and throw. An enter callback could also
+remove and recycle the current pair before `ProcessCandidate(...)` appended its
+local reference, allowing that object to be reused by a later collision and
+solved twice.
 
 Fix: existing response edges are snapshotted into a pre-sized service buffer
-before callbacks. Pair cleanup snapshots stable keys, and direct teardown
-stages nested separation ranges, removes registry ownership before notifying,
-and recycles each still-current pair once. Response append paths revalidate
+before callbacks. Pair cleanup snapshots stable keys, and direct teardown stages
+nested separation ranges, removes registry ownership before notifying, and
+recycles each still-current pair once. Response append paths revalidate
 registered pair identity and physical eligibility after notification.
 
-Verification: deterministic regressions cover current and later snapshotted
-pair removal during expansion, stale queued bodies and rootless response rows,
+Verification: deterministic regressions cover current and later snapshotted pair
+removal during expansion, stale queued bodies and rootless response rows,
 cleanup removal of a later key, nested multi-pair deactivation with exact exit
 counts, distinct pooled replacements, and pooled/unpooled position equality
 after enter-callback removal.
@@ -771,9 +772,9 @@ after enter-callback removal.
 **Affected area:** `RaycastSegmentWorker.CheckSphereOverlaps(...)`
 
 RCA: the closest-point test could prove a segment touched a sphere while the
-subsequent quadratic discriminant evaluated to one negative raw fixed-point
-unit because the normalized segment direction was fractionally longer than
-one. The quadratic guard then rejected the exact tangent.
+subsequent quadratic discriminant evaluated to one negative raw fixed-point unit
+because the normalized segment direction was fractionally longer than one. The
+quadratic guard then rejected the exact tangent.
 
 Fix: after the closest-point overlap and outside-origin checks establish a
 non-negative discriminant geometrically, the worker clamps fixed-point residue
@@ -795,10 +796,10 @@ disabled-service late-simulate CCD state
 
 RCA: `Attach(...)` validated `GridWorld.IsActive` before taking the ownership
 lock, while owned-context disposal removed its registry entry before
-`GridWorld.Dispose()`. A waiting or reset-handler attach could therefore bind
-an inactive or disposal-in-progress world. Separately, context late simulation
-advanced the CCD frame token even when both enabled dimensional physics
-services were disabled, making their untouched pending handoffs stale.
+`GridWorld.Dispose()`. A waiting or reset-handler attach could therefore bind an
+inactive or disposal-in-progress world. Separately, context late simulation
+advanced the CCD frame token even when both enabled dimensional physics services
+were disabled, making their untouched pending handoffs stale.
 
 Fix: world activity validation, registration, owned-world disposal, and entry
 release are now serialized under the ownership lock, with the entry retained
@@ -808,14 +809,15 @@ one dimensional physics service runs.
 Verification: a public owned-world reset regression proves reentrant attach is
 rejected until disposal completes. A disabled `Both`-mode regression seeds
 pending 3D and 2D handoffs, advances the public context clock and hook phase,
-and proves both body states remain unchanged and both handoffs remain
-consumable afterward.
+and proves both body states remain unchanged and both handoffs remain consumable
+afterward.
 
 ### Partition Teardown Logged Errors After Host Grid Removal
 
 **Discovered:** 2026-07-11  
 **Resolved:** 2026-07-11  
-**Source:** 95%-to-100% coverage hardening, dimensional partition-service review  
+**Source:** 95%-to-100% coverage hardening, dimensional partition-service
+review  
 **Affected area:** 2D/3D partition clear and awake-state refresh after host grid
 lifecycle changes
 
@@ -851,10 +853,10 @@ service indices, and left the old registry and partition membership orphaned.
 After context reset, the same unregistered shell could also be rebound to a
 different host agent without an explicit teardown.
 
-Fix: both dimensional entry points reject registered colliders and foreign
-host bindings before mutating collider state. A context-reset shell may be
-explicitly reinitialized only through the same agent binding; full deactivation
-clears the binding for general reuse.
+Fix: both dimensional entry points reject registered colliders and foreign host
+bindings before mutating collider state. A context-reset shell may be explicitly
+reinitialized only through the same agent binding; full deactivation clears the
+binding for general reuse.
 
 Verification:
 
@@ -923,13 +925,13 @@ area. A `2 x 4 x 6` cuboid moving along world X therefore reported the X/Y face
 area `8` instead of the correct Y/Z projection `24`. Non-axis-aligned motion
 also discarded the other two projected face contributions.
 
-Fix: the cuboid now computes the exact orthographic box projection as the sum
-of each face area multiplied by the absolute dot product between its local axis
-and the normalized world direction. The epsilon zero-direction fallback
-matches the existing cylinder/cone contract. The same block removed unused
-centroid and copied topology caches, duplicate cuboid-state policy, dead public
-edge helpers and build hooks, and public mutable-array exposure; collision and
-query consumers retain internal access to live geometry.
+Fix: the cuboid now computes the exact orthographic box projection as the sum of
+each face area multiplied by the absolute dot product between its local axis and
+the normalized world direction. The epsilon zero-direction fallback matches the
+existing cylinder/cone contract. The same block removed unused centroid and
+copied topology caches, duplicate cuboid-state policy, dead public edge helpers
+and build hooks, and public mutable-array exposure; collision and query
+consumers retain internal access to live geometry.
 
 Verification:
 
@@ -968,9 +970,9 @@ GREEN tests cover zero, axial, perpendicular, diagonal, rotated, and
 over-normalized fixed-point directions; exact sphere, ordinary capsule, and
 shifted thin-rod inertia; and both sub-magnitude cap-normal fallbacks. The
 canonical coverage artifact reports `LSCapsuleCollider.cs` at 100%
-line/branch/method coverage; full coverage-enabled `Release` passes
-2,422/2,422, `ReleaseLean` builds both targets without warnings, and independent
-review approved.
+line/branch/method coverage; full coverage-enabled `Release` passes 2,422/2,422,
+`ReleaseLean` builds both targets without warnings, and independent review
+approved.
 
 ### Inactive SolidBody2D Loads Could Preserve Or Invent Runtime Activity
 
@@ -990,20 +992,20 @@ that could neither simulate correctly nor be explicitly initialized.
 
 Fix: body teardown now returns early only when both activity is false and the
 collider has no live registry ID. Inactive loads reconcile runtime ownership
-after shape/transform restoration while bindings are valid. Snapshot activity
-is accepted only for an already registered shell; an unregistered shell remains
+after shape/transform restoration while bindings are valid. Snapshot activity is
+accepted only for an already registered shell; an unregistered shell remains
 inactive until its host explicitly calls `Initialize()`.
 
 Verification:
 
 - Added JSON and MemoryPack transitions covering registered active to inactive,
-  immediate registry/partition cleanup, repeated teardown, attempted active
-  load into the unregistered shell, and explicit reinitialization.
+  immediate registry/partition cleanup, repeated teardown, attempted active load
+  into the unregistered shell, and explicit reinitialization.
 - Verified registered active snapshot loads retain their existing continuation
   contract.
 - `SolidBody2D.cs` and `SolidBody2D.Serialization.cs` report 100%
-  line/branch/method coverage, full `Release` passes 2,106/2,106,
-  `ReleaseLean` builds both targets, and independent review approved.
+  line/branch/method coverage, full `Release` passes 2,106/2,106, `ReleaseLean`
+  builds both targets, and independent review approved.
 
 ### 2D Collider Teardown And Load Paths Could Preserve Invalid Runtime Ownership
 
@@ -1074,22 +1076,21 @@ Verification:
 query visibility, and collider state loading
 
 RCA: the 3D `SetStatus(...)` method changed only the active flag, unlike the 2D
-active-state lifecycle. Deactivated colliders could therefore remain in
-primary and mixed partitions and continue appearing in spatial queries. The
-load path had related ownership holes: an inactive payload cleared membership,
-but a later active payload skipped primary repartitioning; an unbound shell
-attempted shape rebuild before its context guard; and an active payload applied
-to a fully deactivated shell attempted to partition the unregistered ID `-1`.
-Repeated inactive loads also called primary partition cleanup after membership
-was already gone, emitting a false invariant error.
+active-state lifecycle. Deactivated colliders could therefore remain in primary
+and mixed partitions and continue appearing in spatial queries. The load path
+had related ownership holes: an inactive payload cleared membership, but a later
+active payload skipped primary repartitioning; an unbound shell attempted shape
+rebuild before its context guard; and an active payload applied to a fully
+deactivated shell attempted to partition the unregistered ID `-1`. Repeated
+inactive loads also called primary partition cleanup after membership was
+already gone, emitting a false invariant error.
 
 Fix: 3D collider activation is now an explicit `IsActive` lifecycle property.
 Registered deactivation clears primary and mixed membership, while reactivation
-rebuilds primary membership and refreshes mixed membership when enabled.
-Loading now defers unbound rebuilds, skips partition ownership for unregistered
-shells, restores primary membership for registered inactive-to-active loads,
-and guards idempotent primary/mixed cleanup by the corresponding partition
-flags.
+rebuilds primary membership and refreshes mixed membership when enabled. Loading
+now defers unbound rebuilds, skips partition ownership for unregistered shells,
+restores primary membership for registered inactive-to-active loads, and guards
+idempotent primary/mixed cleanup by the corresponding partition flags.
 
 Verification:
 
@@ -1116,25 +1117,24 @@ RCA: 3D queries stamp each visited collider with the current raycast or circle
 version. The service reserved zero as the reset sentinel and wrapped
 `uint.MaxValue` back to one, but it did not invalidate collider stamps from the
 previous version-one query. The public `GravitasQuery3DService.Reset()` had the
-same practical defect: it rewound service versions to zero while live
-colliders retained their old stamps. The next query could therefore reuse a
-collider's cached version and reject it as already visited, producing a false
-negative.
+same practical defect: it rewound service versions to zero while live colliders
+retained their old stamps. The next query could therefore reuse a collider's
+cached version and reject it as already visited, producing a false negative.
 
 Fix: raycast and circle version invalidation now scan the context's compact
-live-collider registry. Public reset clears both cache families before
-rewinding the service counters, while each rollover path clears only its own
-cache family before advancing to version one. The scan is allocation-free and
-the rollover cost occurs only once per full 32-bit version cycle.
+live-collider registry. Public reset clears both cache families before rewinding
+the service counters, while each rollover path clears only its own cache family
+before advancing to version one. The scan is allocation-free and the rollover
+cost occurs only once per full 32-bit version cycle.
 
 Verification:
 
 - Added failing raycast and circle rollover regressions with both the service
   and live collider seeded at the colliding version-one stamp.
-- Added a failing standalone public-reset regression proving both ray and
-  circle queries still find the same live collider after reset.
-- Focused 3D query suites pass 158/158, the complete raycast source reports
-  100% line/branch coverage, full `Release` passes 2,085/2,085, and independent
+- Added a failing standalone public-reset regression proving both ray and circle
+  queries still find the same live collider after reset.
+- Focused 3D query suites pass 158/158, the complete raycast source reports 100%
+  line/branch coverage, full `Release` passes 2,085/2,085, and independent
   review approved the registry scan and reset lifecycle.
 
 ### CCD Rejected Finite Heavy-Body Response As Zero Inverse Mass
@@ -1144,16 +1144,15 @@ Verification:
 **Source:** 95%-to-100% coverage hardening, dynamic TOI loop review  
 **Affected area:** 2D, 3D, and mixed dynamic/kinematic CCD impulse response
 
-RCA: CCD response treated a positive combined inverse mass less than or equal
-to `Fixed64.Epsilon` as immovable. For supported finite masses whose inverse
-mass is still representable, this rejected the pair impulse and fell back to
-removing only the source body's closing velocity. A target-driven zero-time
-hit could therefore freeze at impact with unresolved relative motion, while a
-stagnation guard merely prevented the same hit from consuming the full TOI
-budget. Simply accepting the smaller inverse mass also exposed a second fixed-
-point hazard: computing the shared impulse scalar before multiplying by each
-body's inverse mass could saturate even when both final velocity deltas were
-representable.
+RCA: CCD response treated a positive combined inverse mass less than or equal to
+`Fixed64.Epsilon` as immovable. For supported finite masses whose inverse mass
+is still representable, this rejected the pair impulse and fell back to removing
+only the source body's closing velocity. A target-driven zero-time hit could
+therefore freeze at impact with unresolved relative motion, while a stagnation
+guard merely prevented the same hit from consuming the full TOI budget. Simply
+accepting the smaller inverse mass also exposed a second fixed- point hazard:
+computing the shared impulse scalar before multiplying by each body's inverse
+mass could saturate even when both final velocity deltas were representable.
 
 Fix: equivalent 2D, 3D, mixed, and kinematic CCD response paths now reject only
 nonpositive combined inverse mass and calculate per-body velocity deltas from
@@ -1162,8 +1161,8 @@ impulse intermediate. CCD rejects near-singular constrained-axis mobility when
 the constrained-to-raw inverse-mass ratio is at or below epsilon, which keeps
 the ratio calculation within fixed-point resolution without rejecting fully
 mobile heavy bodies. Per-body deltas scale the normal by the bounded inverse-
-mass ratio before response speed so oblique components remain representable.
-The 2D and 3D stagnation guards remain because zero-planar mixed hits and
+mass ratio before response speed so oblique components remain representable. The
+2D and 3D stagnation guards remain because zero-planar mixed hits and
 near-singular fallback can legitimately leave source velocity unchanged.
 
 Verification:
@@ -1203,9 +1202,9 @@ current late-simulate token and otherwise stale in runtime-full replay state.
 Fix: the queue and its frame-local processed/deduplication sets now preserve
 body instance identity instead of treating a recyclable dynamic ID as ownership.
 Budget-exhaustion cleanup discards pending handoff state on every queued body
-before clearing service ownership, including entries left after a partial
-drain. The 2D and 3D body deactivation paths also discard pending handoffs
-before deregistration, so both services use the same explicit lifecycle.
+before clearing service ownership, including entries left after a partial drain.
+The 2D and 3D body deactivation paths also discard pending handoffs before
+deregistration, so both services use the same explicit lifecycle.
 
 Verification:
 
@@ -1238,15 +1237,15 @@ drain for standalone service calls. The context-driven mixed runtime reused the
 same service method and then ran an additional context-level handoff relay
 afterward. That split ownership meant `ContinuousCollisionMaxToiIterations`
 could be consumed independently by each pure service before the context-level
-mixed relay, making the mixed-frame budget less explicit than the public
-setting implied.
+mixed relay, making the mixed-frame budget less explicit than the public setting
+implied.
 
 Fix: the pure physics services now expose an internal begin/complete late-step
 split. Direct service calls remain self-contained, while
-`GravitasWorldContext.LateSimulate()` integrates 3D and 2D bodies first,
-drains the shared queued CCD handoff budget once at the context level, then
-completes partitioning, discrete response, active-pair processing, and sleep
-updates for the services that actually ran.
+`GravitasWorldContext.LateSimulate()` integrates 3D and 2D bodies first, drains
+the shared queued CCD handoff budget once at the context level, then completes
+partitioning, discrete response, active-pair processing, and sleep updates for
+the services that actually ran.
 
 Verification:
 
@@ -1304,8 +1303,8 @@ convex mesh/mesh.
 Fix: rotated cuboid/cuboid now uses explicit full OBB SAT over three
 representative face axes from each cuboid plus the nine representative
 edge-cross axes. Convex mesh/mesh now uses full convex SAT over both meshes'
-face normals plus cross products of cached SAT mesh edges. `PhysicsMesh`
-builds the convex SAT edge cache once at construction time, skipping coplanar
+face normals plus cross products of cached SAT mesh edges. `PhysicsMesh` builds
+the convex SAT edge cache once at construction time, skipping coplanar
 triangulation diagonals and omitting the cache for concave meshes. The obsolete
 `CollisionContext`, `CollisionObjectInfo`, `CuboidObjectInfo`, and
 `MeshObjectInfo` reduced SAT path was removed.
@@ -1322,7 +1321,8 @@ Verification:
 
 **Discovered:** 2026-07-06  
 **Resolved:** 2026-07-06  
-**Source:** Coverage Workstream 1 zombie-code sweep and subagent geometry review  
+**Source:** Coverage Workstream 1 zombie-code sweep and subagent geometry
+review  
 **Affected area:** `CollisionDetection.Mesh`, convex mesh vs cuboid fallback
 contact generation
 
@@ -1353,8 +1353,8 @@ Verification:
 **Discovered:** 2026-07-06  
 **Resolved:** 2026-07-06  
 **Source:** Coverage Workstream 1 branch inventory and subagent query review  
-**Affected area:** `RaycastSegmentWorker.CheckOBBoxOverlaps(...)`,
-3D raycast queries against rotated `LSCuboidCollider`
+**Affected area:** `RaycastSegmentWorker.CheckOBBoxOverlaps(...)`, 3D raycast
+queries against rotated `LSCuboidCollider`
 
 RCA: rotated cuboid raycasts first clipped the ray segment against the
 collider's enclosing world-space AABB, then rotated those world-space
@@ -1380,15 +1380,15 @@ Verification:
 **Affected area:** `LSCollider.RecordData(...)`, 3D bodyless collider
 serialization, primary and mixed partition state cleanup
 
-RCA: 3D direct-collider serialization correctly wrote and loaded
-`Active=false`, but the inactive load branch only removed the collider from the
-partition services. It did not mark the collider's own primary/mixed partition
-state unpartitioned or clear cached coordinates. The matching 2D path already
-cleared service membership and collider-local partition state, so 3D could
-remain inactive while still reporting stale partition membership.
+RCA: 3D direct-collider serialization correctly wrote and loaded `Active=false`,
+but the inactive load branch only removed the collider from the partition
+services. It did not mark the collider's own primary/mixed partition state
+unpartitioned or clear cached coordinates. The matching 2D path already cleared
+service membership and collider-local partition state, so 3D could remain
+inactive while still reporting stale partition membership.
 
-Fix: `LSCollider.ApplyLoadedState()` now clears collider-local primary and
-mixed partition state after loading inactive collider state.
+Fix: `LSCollider.ApplyLoadedState()` now clears collider-local primary and mixed
+partition state after loading inactive collider state.
 
 Verification:
 

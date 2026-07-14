@@ -23,7 +23,7 @@ instead of burying it in notes.
 
 ## Active Release-Scope
 
-- [`FixedMathSharp Foundation Hardening`](2026-07-14-fixedmathsharp-foundation-hardening-plan.md)
+- [`FixedMathSharp Foundation Hardening`](F:\gamedevrepos\FixedMathSharp\docs\feature-work\2026-07-14-fixedmathsharp-foundation-hardening-plan.md)
   - Make FixedMathSharp the shared owner of exact boundary arithmetic,
     vector/quaternion invariants, finite-segment geometry, and explicit X/Z
     transform behavior. Remove Gravitas math duplicates and solver workarounds,
