@@ -36,7 +36,8 @@ public sealed partial class SolidBody2D
 
         Fixed64 proxyRadius = ResolveContinuousCollisionProxyRadius();
         if (proxyRadius <= Fixed64.Epsilon
-            || (mode == ContinuousCollisionMode.Auto && displacementMagnitudeSquared <= proxyRadius * proxyRadius))
+            || (mode == ContinuousCollisionMode.Auto
+                && ContinuousCollisionMath.IsWithinProxyRadius(displacement, displacementMagnitudeSquared, proxyRadius)))
         {
             return false;
         }

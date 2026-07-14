@@ -34,6 +34,36 @@ internal static class ContinuousCollisionMath
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool IsWithinProxyRadius(
+        Vector3d displacement,
+        Fixed64 displacementMagnitudeSquared,
+        Fixed64 proxyRadius)
+    {
+        Fixed64 proxyRadiusSquared = proxyRadius * proxyRadius;
+        if (displacementMagnitudeSquared != Fixed64.MaxValue || proxyRadiusSquared != Fixed64.MaxValue)
+            return displacementMagnitudeSquared <= proxyRadiusSquared;
+
+        Fixed64 displacementMagnitude = displacement.Magnitude;
+        // MaxValue cannot distinguish exact equality from a true unrepresentable length; sweep conservatively.
+        return displacementMagnitude != Fixed64.MaxValue && displacementMagnitude <= proxyRadius;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool IsWithinProxyRadius(
+        Vector2d displacement,
+        Fixed64 displacementMagnitudeSquared,
+        Fixed64 proxyRadius)
+    {
+        Fixed64 proxyRadiusSquared = proxyRadius * proxyRadius;
+        if (displacementMagnitudeSquared != Fixed64.MaxValue || proxyRadiusSquared != Fixed64.MaxValue)
+            return displacementMagnitudeSquared <= proxyRadiusSquared;
+
+        Fixed64 displacementMagnitude = displacement.Magnitude;
+        // MaxValue cannot distinguish exact equality from a true unrepresentable length; sweep conservatively.
+        return displacementMagnitude != Fixed64.MaxValue && displacementMagnitude <= proxyRadius;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Vector3d ResolveContactPointOnTarget(
         Vector3d sourceCenter,
         Vector3d targetCenter,

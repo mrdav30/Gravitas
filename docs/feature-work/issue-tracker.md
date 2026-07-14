@@ -28,49 +28,46 @@ records follow with their original discovery context.
   transitive resolution is insufficient.
 - Treat local links as unstaged validation scaffolding. Do not publish or release
   with them in place.
-- Resolve items 1-2, validate every downstream consumer, release FixedMathSharp,
+- Resolve item 1, validate every downstream consumer, release FixedMathSharp,
   then restore its package references and validate/release SwiftCollections.
 - SwiftCollections has no library-specific active issue at this checkpoint; its
   place in the sequence is a full downstream compatibility and release gate.
-- Resolve item 3 against the released lower-stack packages, validate downstream
+- Resolve item 2 against the released lower-stack packages, validate downstream
   consumers, and release GridForge.
 - Update Gravitas to the released package versions, remove every local link, and
   rerun `Release`, `ReleaseLean`, coverage, replay, and relevant benchmark gates
-  before starting items 4-13.
+  before starting items 3-12.
 
 ### Ordered Queue
 
 1. **FixedMathSharp / Gravitas boundary:**
-   [Extreme Collider Bounds Can Underestimate CCD Proxy Radius](#extreme-collider-bounds-can-underestimate-ccd-proxy-radius).
-   Establish the shared overflow-safe magnitude or supported-range policy before
-   choosing the final owning layer.
-2. **FixedMathSharp / Gravitas boundary:**
    [Extreme Convex Sweeps Can Normalize To Non-Unit Directions](#extreme-convex-sweeps-can-normalize-to-non-unit-directions).
-   Reuse the magnitude, normalization, or range policy established by item 1.
-3. **GridForge:**
+   Reuse the overflow-safe magnitude policy established by the resolved proxy
+   radius issue and complete the corresponding normalization policy.
+2. **GridForge:**
    [GridForge Reuses Grid Spawn Tokens Across Pooled Generations](#gridforge-reuses-grid-spawn-tokens-across-pooled-generations).
-4. **Gravitas:**
+3. **Gravitas:**
    [Registered Joints Can Outlive Their Body And Collider Lifetimes](#registered-joints-can-outlive-their-body-and-collider-lifetimes).
-5. **Gravitas:**
+4. **Gravitas:**
    [Non-Unit Quaternion Admission Can Collapse Runtime Shape Axes](#non-unit-quaternion-admission-can-collapse-runtime-shape-axes).
-6. **Gravitas:**
+5. **Gravitas:**
    [Continuous-Collision Modes Accept Undefined Enum Values](#continuous-collision-modes-accept-undefined-enum-values).
-7. **Gravitas:**
+6. **Gravitas:**
    [3D Exit Callback Failure Can Duplicate Reentrant Separation Notifications](#3d-exit-callback-failure-can-duplicate-reentrant-separation-notifications).
-8. **Gravitas:**
+7. **Gravitas:**
    [CCD Handoff Dedupe Can Strand A Same-Frame Requeued Body](#ccd-handoff-dedupe-can-strand-a-same-frame-requeued-body).
+8. **Gravitas:**
+   [SolidBody Point Transforms Use Collider Dimensions As Transform Scale](#solidbody-point-transforms-use-collider-dimensions-as-transform-scale).
 9. **Gravitas:**
-    [SolidBody Point Transforms Use Collider Dimensions As Transform Scale](#solidbody-point-transforms-use-collider-dimensions-as-transform-scale).
+   [3D Angular Impulse Scales Immediate Velocity By Frame Delta](#3d-angular-impulse-scales-immediate-velocity-by-frame-delta).
 10. **Gravitas:**
-    [3D Angular Impulse Scales Immediate Velocity By Frame Delta](#3d-angular-impulse-scales-immediate-velocity-by-frame-delta).
-11. **Gravitas:**
     [Rotational CCD Can Miss Contacts Between Bounded Pose Samples](#rotational-ccd-can-miss-contacts-between-bounded-pose-samples).
-12. **Gravitas:**
+11. **Gravitas:**
     [Convex Mesh Mode Accepts Disconnected Topology And Can Collide In Empty Bounds Space](#convex-mesh-mode-accepts-disconnected-topology-and-can-collide-in-empty-bounds-space).
-13. **Gravitas:**
+12. **Gravitas:**
     [Relative CCD Quadratic Saturation Can Miss Extreme-Range Crossings](#relative-ccd-quadratic-saturation-can-miss-extreme-range-crossings).
-    Apply the supported-range decision established by items 1-2 before adding a
-    separate scale-safe quadratic implementation.
+    Apply the magnitude and normalization policy established by item 1 before
+    adding a separate scale-safe quadratic implementation.
 
 ### Non-Unit Quaternion Admission Can Collapse Runtime Shape Axes
 
@@ -120,27 +117,6 @@ to `Discrete` intentionally), add invalid byte-value regressions for 2D, 3D,
 settings save/apply, and replay population, and document the chosen exception
 and load behavior. This does not block the coverage campaign because no
 invalid value is needed to close the retained CCD branches.
-
-### Extreme Collider Bounds Can Underestimate CCD Proxy Radius
-
-**Discovered:** 2026-07-13  
-**Source:** 95%-to-100% coverage hardening, 3D CCD helper review  
-**Affected area:** 2D/3D non-sphere continuous-collision proxy radius and
-FixedMathSharp vector magnitude
-
-Non-sphere CCD derives its conservative proxy radius from the magnitude of the
-collider bounds scope. At extreme representable extents, the fixed-point
-sum-of-squares can saturate before the square root, so the returned radius is
-smaller than the actual corner distance. The dynamic candidate index and
-automatic-mode threshold can therefore under-bound a large collider even
-though ordinary-scale and degenerate-scale behavior remain correct.
-
-Resolve this with an overflow-safe fixed-point hypot/magnitude primitive shared
-with FixedMathSharp, or define and validate a maximum supported collider/world
-extent before runtime registration. Add 2D/3D proxy, candidate-admission, and
-`Auto`-threshold regressions at the chosen boundary. This does not block the
-coverage campaign because the Task 52 simplification preserves the existing
-radius calculation exactly; it only removes a duplicate zero threshold.
 
 ### Relative CCD Quadratic Saturation Can Miss Extreme-Range Crossings
 
@@ -378,6 +354,39 @@ This does not block coverage convergence and is independent of the redundant
 active/dynamic-ID admission predicates removed in Task 67.
 
 ## Resolved Issues
+
+### Extreme Collider Bounds Underestimated CCD Proxy Radius
+
+**Resolved:** 2026-07-13  
+**Source:** 95%-to-100% coverage hardening, 3D CCD helper review  
+**Affected area:** FixedMathSharp vector magnitude/distance and Gravitas 2D/3D
+continuous-collision proxy radius, candidate admission, and `Auto` gating
+
+RCA: fixed-point vector magnitude and distance squared every component before
+taking the square root. Once the square sum saturated at `Fixed64.MaxValue`, a
+larger but still representable length collapsed to approximately `46,340.95`.
+Gravitas also compared saturated squared distances directly in 2D convex and
+compound proxy loops and in `Auto` threshold checks.
+
+Fix: FixedMathSharp retains its direct square/root path for ordinary values and
+uses max-component scaling only when the square sum saturates. Gravitas keeps
+its squared fast paths and falls back to robust distances only on saturation;
+an unrepresentable `MaxValue` displacement conservatively enables CCD.
+
+Verification:
+
+- Red regressions reproduced underestimated 2D/3D/4D magnitudes, convex and
+  compound proxy radii, and incorrect `Auto` threshold decisions.
+- Near-unit distance regressions preserve the original raw fixed-point result;
+  signed extreme endpoint tests cover each vector dimension.
+- FixedMathSharp passed `1,149` Release and `1,128` ReleaseLean tests;
+  SwiftCollections passed `1,091` and `1,063`; GridForge passed `431` in each
+  mode; Gravitas passed `2,563` and `2,525`.
+- Final magnitude and dynamic CCD benchmarks remained allocation-neutral and
+  within the established baseline variance.
+- Independent review found and verified the near-unit distance correction,
+  then reported no remaining Critical or Important issues.
+- Local project links remain unstaged and must be removed before release.
 
 ### FixedMathSharp Rays Now Treat Only Exact-Zero Slab Directions As Parallel
 

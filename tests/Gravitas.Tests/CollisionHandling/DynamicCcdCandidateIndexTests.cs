@@ -148,6 +148,27 @@ public sealed class DynamicCcdCandidateIndexTests
     }
 
     [Fact]
+    public void Query_ShouldAdmitCandidatesCoveredOnlyByExtremeProxyRadii()
+    {
+        Fixed64 radius3D = new Vector3d((Fixed64)20000, (Fixed64)40000, (Fixed64)40000).Magnitude;
+        var index3D = new DynamicCcdCandidateIndex(1);
+        index3D.Add(7, DynamicCcdCandidateIndex.CreateSweptSphereBounds(Vector3d.Zero, Vector3d.Zero, radius3D));
+        index3D.Sort();
+        var results3D = new SwiftList<int>(1);
+        index3D.Query(CreateBounds((Fixed64)55000, Fixed64.Zero), results3D);
+
+        Fixed64 radius2D = new Vector2d((Fixed64)60000, (Fixed64)80000).Magnitude;
+        var index2D = new DynamicCcdCandidateIndex2D(1);
+        index2D.Add(11, DynamicCcdCandidateIndex2D.CreateSweptCircleBounds(Vector2d.Zero, Vector2d.Zero, radius2D));
+        index2D.Sort();
+        var results2D = new SwiftList<int>(1);
+        index2D.Query(CreatePlanarBounds((Fixed64)75000, Fixed64.Zero), results2D);
+
+        results3D.Should().Equal(7);
+        results2D.Should().Equal(11);
+    }
+
+    [Fact]
     public void CreateSweptCircleBounds_ShouldCreatePlanarBounds()
     {
         DynamicCcdPlanarBounds bounds = DynamicCcdCandidateIndex2D.CreateSweptCircleBounds(

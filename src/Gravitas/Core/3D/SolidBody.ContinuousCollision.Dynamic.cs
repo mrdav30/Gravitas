@@ -128,12 +128,14 @@ public partial class SolidBody
             return false;
 
         Vector3d displacement = proposedPosition - startPosition;
-        if (displacement.MagnitudeSquared <= Fixed64.Epsilon)
+        Fixed64 displacementMagnitudeSquared = displacement.MagnitudeSquared;
+        if (displacementMagnitudeSquared <= Fixed64.Epsilon)
             return false;
 
         Fixed64 proxyRadius = ResolveContinuousCollisionProxyRadius();
         if (proxyRadius <= Fixed64.Epsilon
-            || (mode == ContinuousCollisionMode.Auto && displacement.MagnitudeSquared <= proxyRadius * proxyRadius))
+            || (mode == ContinuousCollisionMode.Auto
+                && ContinuousCollisionMath.IsWithinProxyRadius(displacement, displacementMagnitudeSquared, proxyRadius)))
         {
             return false;
         }

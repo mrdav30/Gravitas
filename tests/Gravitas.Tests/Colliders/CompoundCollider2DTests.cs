@@ -296,6 +296,24 @@ public sealed class CompoundCollider2DTests
         compound.GetSupportPoint(Vector2d.Left).Should().Be(new Vector2d(-Fixed64.FromFraction(5, 2), Fixed64.Zero));
     }
 
+    [Fact]
+    public void ScaledRadius_WithSaturatingVertexSquares_ShouldRemainConservative()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext(extent: 2);
+        var compound = new LSCompoundCollider2D(
+            CompoundColliderPart2D.ConvexPolygon(
+                new[]
+                {
+                    Vector2d.Zero,
+                    new Vector2d((Fixed64)60000, Fixed64.Zero),
+                    new Vector2d((Fixed64)60000, (Fixed64)80000)
+                },
+                Vector2d.Zero));
+        _ = CreateBody(context, compound, Vector2d.Zero);
+
+        compound.ScaledRadius.Should().Be((Fixed64)100000);
+    }
+
     private static SolidBody2D CreateBody(GravitasWorldContext context, LSCollider2D collider, Vector2d position)
     {
         var transform = new FixedTransform(new Vector3d(position.X, Fixed64.Zero, position.Y), FixedQuaternion.Identity, Vector3d.One);

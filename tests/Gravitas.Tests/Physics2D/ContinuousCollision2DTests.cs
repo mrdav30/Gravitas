@@ -1481,6 +1481,39 @@ public sealed class ContinuousCollision2DTests
     }
 
     [Fact]
+    public void AabbProxyRadius_WithSaturatingHalfExtentSquares_ShouldRemainConservative()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        var collider = new LSAABBoxCollider2D(Vector2d.One);
+        SolidBody2D source = CreateBody(
+            context,
+            collider,
+            Vector2d.Zero,
+            immovable: false);
+        collider.Size = new Vector2d((Fixed64)120000, (Fixed64)160000);
+        source.Collider.RebuildRuntimeShapeOnly();
+
+        source.ResolveContinuousCollisionProxyRadius().Should().Be((Fixed64)100000);
+    }
+
+    [Fact]
+    public void ConvexProxyRadius_WithSaturatingVertexSquares_ShouldRemainConservative()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1, extent: 2);
+        SolidBody2D source = CreateBody(
+            context,
+            new LSPolygonCollider2D(
+                new Vector2d((Fixed64)(-60000), (Fixed64)(-80000)),
+                new Vector2d((Fixed64)60000, (Fixed64)(-80000)),
+                new Vector2d((Fixed64)60000, (Fixed64)80000),
+                new Vector2d((Fixed64)(-60000), (Fixed64)80000)),
+            Vector2d.Zero,
+            immovable: false);
+
+        source.ResolveContinuousCollisionProxyRadius().Should().Be((Fixed64)100000);
+    }
+
+    [Fact]
     public void ContinuousMode_WithDynamicEpsilonProxyAndOffsetCenterOfMass_ShouldSkipRotationalCcd()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);

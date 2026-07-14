@@ -1897,6 +1897,17 @@ public sealed partial class ContinuousCollisionDetectionTests
     }
 
     [Fact]
+    public void CuboidProxyRadius_WithSaturatingBoundsSquares_ShouldRemainConservative()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        ScenarioBody<LSCuboidCollider> source = scenario.CreateCuboid(Vector3d.Zero);
+        source.Body.PositionTransform.Scale = new Vector3d((Fixed64)40000, (Fixed64)80000, (Fixed64)80000);
+        source.Collider.RebuildRuntimeShapeOnly(refreshMassProperties: false);
+
+        source.Body.ResolveContinuousCollisionProxyRadius().Should().Be((Fixed64)60000);
+    }
+
+    [Fact]
     public void ContinuousMode_WithFastKinematicHostTranslation_ShouldClampBeforeStaticTarget()
     {
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();

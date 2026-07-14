@@ -59,15 +59,27 @@ public sealed partial class SolidBody2D
     {
         int vertexCount = Collider.VertexCount;
         Vector2d center = Collider.Center;
+        Fixed64 bestDistance = Fixed64.Zero;
         Fixed64 bestDistanceSquared = Fixed64.Zero;
         for (int i = 0; i < vertexCount; i++)
         {
-            Fixed64 distanceSquared = Vector2d.DistanceSquared(center, Collider.GetVertexUnchecked(i));
-            if (distanceSquared > bestDistanceSquared)
-                bestDistanceSquared = distanceSquared;
+            Vector2d vertex = Collider.GetVertexUnchecked(i);
+            Fixed64 distanceSquared = Vector2d.DistanceSquared(center, vertex);
+            if (distanceSquared == Fixed64.MaxValue)
+            {
+                bestDistance = FixedMath.Max(bestDistance, Vector2d.Distance(center, vertex));
+                bestDistanceSquared = Fixed64.MaxValue;
+                continue;
+            }
+
+            if (distanceSquared <= bestDistanceSquared)
+                continue;
+
+            bestDistanceSquared = distanceSquared;
+            bestDistance = FixedMath.Sqrt(distanceSquared);
         }
 
-        return FixedMath.Sqrt(bestDistanceSquared);
+        return bestDistance;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

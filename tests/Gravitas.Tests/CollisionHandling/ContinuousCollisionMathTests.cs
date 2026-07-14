@@ -21,6 +21,46 @@ public sealed class ContinuousCollisionMathTests
     }
 
     [Fact]
+    public void IsWithinProxyRadius_WhenBothSquaresSaturate_ShouldCompare3DLengths()
+    {
+        Vector3d displacement = new((Fixed64)20000, (Fixed64)40000, (Fixed64)40000);
+        Fixed64 proxyRadius = (Fixed64)50000;
+
+        displacement.MagnitudeSquared.Should().Be(Fixed64.MaxValue);
+        (proxyRadius * proxyRadius).Should().Be(Fixed64.MaxValue);
+        ContinuousCollisionMath.IsWithinProxyRadius(
+            displacement,
+            displacement.MagnitudeSquared,
+            proxyRadius).Should().BeFalse();
+    }
+
+    [Fact]
+    public void IsWithinProxyRadius_WhenBothSquaresSaturate_ShouldCompare2DLengths()
+    {
+        Vector2d displacement = new((Fixed64)40000, (Fixed64)40000);
+        Fixed64 proxyRadius = (Fixed64)50000;
+
+        displacement.MagnitudeSquared.Should().Be(Fixed64.MaxValue);
+        (proxyRadius * proxyRadius).Should().Be(Fixed64.MaxValue);
+        ContinuousCollisionMath.IsWithinProxyRadius(
+            displacement,
+            displacement.MagnitudeSquared,
+            proxyRadius).Should().BeFalse();
+
+        Vector2d shorterDisplacement = new((Fixed64)30000, (Fixed64)40000);
+        ContinuousCollisionMath.IsWithinProxyRadius(
+            shorterDisplacement,
+            shorterDisplacement.MagnitudeSquared,
+            (Fixed64)60000).Should().BeTrue();
+
+        Vector2d unrepresentableLength = new(Fixed64.MaxValue, Fixed64.MaxValue);
+        ContinuousCollisionMath.IsWithinProxyRadius(
+            unrepresentableLength,
+            unrepresentableLength.MagnitudeSquared,
+            Fixed64.MaxValue).Should().BeFalse();
+    }
+
+    [Fact]
     public void TrySweepRelativeSpheres_ShouldCoverClosingSeparatingAndOutOfRangeCases()
     {
         ContinuousCollisionMath.TrySweepRelativeSpheres(

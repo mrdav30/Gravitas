@@ -81,7 +81,15 @@ public sealed class LSCompoundCollider2D : LSCollider2D
 
                 for (int j = 0; j < part.VertexCount; j++)
                 {
-                    Fixed64 distanceSquared = Vector2d.DistanceSquared(center, part.GetVertexUnchecked(j));
+                    Vector2d vertex = part.GetVertexUnchecked(j);
+                    Fixed64 distanceSquared = Vector2d.DistanceSquared(center, vertex);
+                    if (distanceSquared == Fixed64.MaxValue)
+                    {
+                        bestDistance = FixedMath.Max(bestDistance, Vector2d.Distance(center, vertex));
+                        bestDistanceSquared = Fixed64.MaxValue;
+                        continue;
+                    }
+
                     if (distanceSquared <= bestDistanceSquared)
                         continue;
 
