@@ -335,6 +335,12 @@ active/dynamic-ID admission predicates removed in Task 67.
 and averaging; Gravitas 2D, 3D, and mixed query/CCD sweep admission, GJK,
 conservative advancement, and concave-mesh hit geometry
 
+**Follow-up status:** Active under
+[`Fixed-Point Arithmetic Boundary Hardening`](2026-07-14-fixed-point-arithmetic-boundary-hardening-plan.md).
+The committed FixedMathSharp magnitude/normalization fix remains valid, but the
+staged Gravitas arithmetic ownership and GJK shift boundary are not release
+closure.
+
 RCA: fixed-point squared magnitude saturated before the square root. Dividing
 an extreme vector by the shortened result produced a non-unit direction, while
 saturating endpoint subtraction could publish a different displacement than
@@ -371,9 +377,11 @@ Verification:
   whole-mesh normal rescan improved dense concave sweeps at 8/16/32
   subdivisions from `117.22 us` / `436.02 us` / `1.6676 ms` to `77.58 us` /
   `277.52 us` / `1.0848 ms`, also with zero allocations.
-- Independent review reported no remaining actionable correctness,
-  determinism, performance, or coverage findings and judged the result a
-  cohesive range-safety contract rather than a downstream workaround.
+- The initial independent review reported no remaining findings. Owner review
+  then identified misplaced downstream arithmetic, and a focused follow-up
+  reproduced an odd-raw negative-expansion shift that can still saturate by one
+  raw unit. The preceding counts remain useful baseline evidence, not final
+  release closure.
 - The separate relative-CCD quadratic saturation issue remains active; this
   work validates its inputs but does not replace its scale-sensitive quadratic.
 - Local project links remain unstaged and must be removed before package

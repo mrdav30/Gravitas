@@ -23,6 +23,11 @@ instead of burying it in notes.
 
 ## Active Release-Scope
 
+- [`Fixed-Point Arithmetic Boundary Hardening`](2026-07-14-fixed-point-arithmetic-boundary-hardening-plan.md)
+  - Move component-exact add/subtract and full-domain projection arithmetic into
+    FixedMathSharp, remove the duplicate Gravitas helpers, fix the odd-raw
+    negative-expansion GJK shift boundary, and eliminate release-only
+    `Debug.Assert` behavior before accepting the staged extreme-sweep work.
 - [`Cross-Stack Issue Resolution`](issue-tracker.md)
   - Resolve release-blocking issues in dependency order: `FixedMathSharp`,
     `SwiftCollections`, `GridForge`, then Gravitas. Use the `develop` worktrees
