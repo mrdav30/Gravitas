@@ -336,7 +336,7 @@ and averaging; Gravitas 2D, 3D, and mixed query/CCD sweep admission, GJK,
 conservative advancement, and concave-mesh hit geometry
 
 **Follow-up status:** Active under
-[`Fixed-Point Arithmetic Boundary Hardening`](2026-07-14-fixed-point-arithmetic-boundary-hardening-plan.md).
+[`FixedMathSharp Foundation Hardening`](2026-07-14-fixedmathsharp-foundation-hardening-plan.md).
 The committed FixedMathSharp magnitude/normalization fix remains valid, but the
 staged Gravitas arithmetic ownership and GJK shift boundary are not release
 closure.
