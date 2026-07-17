@@ -34,35 +34,34 @@ records follow with their original discovery context.
   references and validate/release SwiftCollections.
 - SwiftCollections has no library-specific active issue at this checkpoint; its
   place in the sequence is a full downstream compatibility and release gate.
-- Resolve item 1 against the released lower-stack packages, validate downstream
-  consumers, and release GridForge.
+- GridForge's runtime-identity defect is resolved. Update GridForge to the
+  released lower-stack packages, validate its completed identity hardening and
+  downstream consumers, and release GridForge.
 - Update Gravitas to the released package versions, remove every local link, and
   rerun `Release`, `ReleaseLean`, coverage, replay, and relevant benchmark gates
-  before starting items 2-11.
+  before starting items 1-10.
 
 ### Ordered Queue
 
-1. **GridForge:**
-   [GridForge Reuses Grid Spawn Tokens Across Pooled Generations](#gridforge-reuses-grid-spawn-tokens-across-pooled-generations).
-2. **Gravitas:**
+1. **Gravitas:**
    [Registered Joints Can Outlive Their Body And Collider Lifetimes](#registered-joints-can-outlive-their-body-and-collider-lifetimes).
-3. **Gravitas:**
+2. **Gravitas:**
    [Non-Unit Quaternion Admission Can Collapse Runtime Shape Axes](#non-unit-quaternion-admission-can-collapse-runtime-shape-axes).
-4. **Gravitas:**
+3. **Gravitas:**
    [Continuous-Collision Modes Accept Undefined Enum Values](#continuous-collision-modes-accept-undefined-enum-values).
-5. **Gravitas:**
+4. **Gravitas:**
    [3D Exit Callback Failure Can Duplicate Reentrant Separation Notifications](#3d-exit-callback-failure-can-duplicate-reentrant-separation-notifications).
-6. **Gravitas:**
+5. **Gravitas:**
    [CCD Handoff Dedupe Can Strand A Same-Frame Requeued Body](#ccd-handoff-dedupe-can-strand-a-same-frame-requeued-body).
-7. **Gravitas:**
+6. **Gravitas:**
    [SolidBody Point Transforms Use Collider Dimensions As Transform Scale](#solidbody-point-transforms-use-collider-dimensions-as-transform-scale).
-8. **Gravitas:**
+7. **Gravitas:**
    [3D Angular Impulse Scales Immediate Velocity By Frame Delta](#3d-angular-impulse-scales-immediate-velocity-by-frame-delta).
-9. **Gravitas:**
+8. **Gravitas:**
    [Rotational CCD Can Miss Contacts Between Bounded Pose Samples](#rotational-ccd-can-miss-contacts-between-bounded-pose-samples).
-10. **Gravitas:**
+9. **Gravitas:**
     [Convex Mesh Mode Accepts Disconnected Topology And Can Collide In Empty Bounds Space](#convex-mesh-mode-accepts-disconnected-topology-and-can-collide-in-empty-bounds-space).
-11. **Gravitas:**
+10. **Gravitas:**
     [Relative CCD Quadratic Saturation Can Miss Extreme-Range Crossings](#relative-ccd-quadratic-saturation-can-miss-extreme-range-crossings).
     Reuse the magnitude and normalization policy established by the resolved
     extreme-convex-sweep work when adding the separate scale-safe quadratic
@@ -178,26 +177,6 @@ rotational sweep or a conservative interval-bracketing policy that cannot skip
 an intervening contact, while preserving fixed work bounds and deterministic
 target ordering. Add shifted narrow-window regressions plus 2D/3D parity and
 allocation checks.
-
-### GridForge Reuses Grid Spawn Tokens Across Pooled Generations
-
-**Discovered:** 2026-07-11  
-**Source:** 95%-to-100% coverage hardening, 3D partition teardown review  
-**Affected area:** GridForge pooled `VoxelGrid` identity and stale
-`WorldVoxelIndex` rejection
-
-`VoxelGrid` assigns `SpawnToken = GetHashCode()` during initialization and
-resets the token when returned to its pool. Reusing the same pooled instance in
-the same `GridWorld` slot therefore recreates the same grid spawn token. A stale
-`WorldVoxelIndex` can pass the intended generation check and resolve against a
-replacement grid when its old local voxel index also exists there.
-
-Gravitas now handles removed grids, missing voxel addresses, and detached
-physics partitions without error-log spam, but it cannot distinguish a
-same-slot, same-shaped replacement whose lower-stack generation token is reused.
-Fix this in GridForge with a world-owned generation token that changes on every
-grid allocation, then add a remove/re-add regression proving old
-`WorldVoxelIndex` values cannot resolve into the replacement grid.
 
 ### SolidBody Point Transforms Use Collider Dimensions As Transform Scale
 
@@ -328,6 +307,37 @@ does not block coverage convergence and is independent of the redundant
 active/dynamic-ID admission predicates removed in Task 67.
 
 ## Resolved Issues
+
+### GridForge Reuses Grid Spawn Tokens Across Pooled Generations
+
+**Resolved:** 2026-07-17  
+**Source:** 95%-to-100% coverage hardening, 3D partition teardown review  
+**Affected area:** GridForge pooled `VoxelGrid` identity, exact traversal, and
+Gravitas 2D/3D/mixed partition and query consumers
+
+RCA: GridForge derived world and grid allocation tokens from `GetHashCode()`
+values. Removing and re-adding an identical pooled grid could reuse both the
+world-local slot and token, allowing a stale `WorldVoxelIndex` to resolve
+replacement state. Hash-derived voxel tokens also made hash collisions capable
+of suppressing distinct traversal results.
+
+Fix: GridForge commit `0c5420f` added process-unique 64-bit world identity and a
+nonrepeating grid generation owned by each world, preserved across
+non-deactivating reset. `WorldVoxelIndex` now validates the world token, the
+recyclable `GridIndex`, the grid generation, and the voxel coordinate. GridForge
+commit `cc2c451` changed unique traversal to
+`SwiftHashSet<WorldVoxelIndex>` and removed hash-derived voxel and scan-cell
+identity. Gravitas commit `598c2de` consumes the exact key in 3D query
+deduplication and adds same-configuration replacement regressions for pure 2D,
+3D, and mixed partitions.
+
+Verification: with Gravitas locally linked to the corrected GridForge, each
+2D/3D/mixed regression proves the stale coordinate fails, the replacement grid
+receives a different generation, and its live partition resolves normally. The
+focused Gravitas identity/query/order suite passed `159/159`; GridForge's exact
+traversal regressions cover duplicate suppression, synthetic hash collisions,
+and `0 B` warm reusable-set traversal. The local project links remain temporary
+uncommitted release-validation scaffolding.
 
 ### Extreme Convex Sweeps Can Normalize To Non-Unit Directions
 

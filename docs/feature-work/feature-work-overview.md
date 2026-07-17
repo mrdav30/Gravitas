@@ -215,8 +215,8 @@ host-facing need appears.
 2. Release FixedMathSharp from the reviewed foundation-hardening tree.
 3. Update SwiftCollections to the released FixedMathSharp package, run its full
    validation, and release SwiftCollections before advancing the chain.
-4. Update GridForge to the released lower-stack packages, resolve its pooled
-   grid-generation issue, validate downstream consumers, and release GridForge.
+4. Update GridForge to the released lower-stack packages, validate its resolved
+   runtime-identity hardening and downstream consumers, and release GridForge.
 5. Update Gravitas to the released package versions, remove every temporary
    local link, and rerun `Release`, `ReleaseLean`, coverage, replay, and
    relevant benchmark gates against package-only dependencies.
