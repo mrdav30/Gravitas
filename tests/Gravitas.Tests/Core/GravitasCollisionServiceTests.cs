@@ -214,6 +214,29 @@ public sealed class GravitasCollisionServiceTests
     }
 
     [Fact]
+    public void SameConfigurationGridReplacement_ShouldRejectStale3DCoordinatesAndResolveReplacementPartition()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSSphereCollider staleCollider = CreateDynamicSphere(context);
+        WorldVoxelIndex staleCoordinate = staleCollider.PartitionCoordinates![0];
+        GridConfiguration configuration = context.World.ActiveGrids[0].Configuration;
+
+        context.World.TryRemoveGrid(0).Should().BeTrue();
+        context.World.TryAddGrid(configuration, out ushort replacementIndex).Should().BeTrue();
+
+        replacementIndex.Should().Be(staleCoordinate.GridIndex);
+        context.World.TryGetVoxel(staleCoordinate, out _).Should().BeFalse();
+        context.Collisions.ClearPartitionedObject(staleCollider, force: true).Should().BeTrue();
+
+        LSSphereCollider replacement = CreateDynamicSphereInExistingGrid(context);
+        WorldVoxelIndex replacementCoordinate = replacement.PartitionCoordinates![0];
+        replacementCoordinate.GridSpawnToken.Should().NotBe(staleCoordinate.GridSpawnToken);
+        context.World.TryGetVoxel(replacementCoordinate, out Voxel? replacementVoxel).Should().BeTrue();
+        replacementVoxel!.TryGetPartition(out PhysicsPartition? replacementPartition).Should().BeTrue();
+        replacementPartition!.ContainedDynamicObjects!.Contains(replacement.Id).Should().BeTrue();
+    }
+
+    [Fact]
     public void RefreshPartitionAwakeState_WithMissingGridOrVoxelPartition_ShouldIgnoreStaleCoordinates()
     {
         using GravitasWorldContext detachedPartitionContext = GravitasWorldContext.CreateOwned();
@@ -262,6 +285,11 @@ public sealed class GravitasCollisionServiceTests
     private static LSSphereCollider CreateDynamicSphere(GravitasWorldContext context)
     {
         EnsureGrid(context);
+        return CreateDynamicSphereInExistingGrid(context);
+    }
+
+    private static LSSphereCollider CreateDynamicSphereInExistingGrid(GravitasWorldContext context)
+    {
         var agent = new TestMatterAgent(context);
         var collider = new LSSphereCollider();
         var body = new SolidBody(agent, collider)

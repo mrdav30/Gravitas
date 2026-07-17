@@ -52,6 +52,6 @@ public sealed class WorldVoxelIndexOrderingTests
         WorldVoxelIndexOrdering.ComparePlanar(origin, origin).Should().Be(0);
     }
 
-    private static WorldVoxelIndex Create(ushort gridIndex, int gridSpawnToken, int x, int y, int z) =>
+    private static WorldVoxelIndex Create(ushort gridIndex, long gridSpawnToken, int x, int y, int z) =>
         new(3, gridIndex, gridSpawnToken, new VoxelIndex(x, y, z));
 }

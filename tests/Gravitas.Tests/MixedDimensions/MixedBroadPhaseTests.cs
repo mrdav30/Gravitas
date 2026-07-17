@@ -380,6 +380,35 @@ public sealed class MixedBroadPhaseTests
     }
 
     [Fact]
+    public void SameConfigurationGridReplacement_ShouldRejectStaleMixedCoordinatesAndResolveReplacementPartition()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSSphereCollider> stale3D = CreateSphere3D(context, Vector3d.Zero, immovable: false);
+        SolidBody2D stale2D = CreateCircle2D(context, Vector2d.Zero, immovable: false);
+        Step(context);
+        WorldVoxelIndex staleCoordinate = stale3D.Collider.MixedPartitionCoordinates![0];
+        GridConfiguration configuration = context.World.ActiveGrids[0].Configuration;
+
+        context.World.TryRemoveGrid(0).Should().BeTrue();
+        context.World.TryAddGrid(configuration, out ushort replacementIndex).Should().BeTrue();
+
+        replacementIndex.Should().Be(staleCoordinate.GridIndex);
+        context.World.TryGetVoxel(staleCoordinate, out _).Should().BeFalse();
+        context.MixedCollisions.ClearPartitioned3DCollider(stale3D.Collider, force: true).Should().BeTrue();
+        context.MixedCollisions.ClearPartitioned2DCollider(stale2D.Collider, force: true).Should().BeTrue();
+
+        ScenarioBody<LSSphereCollider> replacement3D = CreateSphere3D(context, Vector3d.Zero, immovable: false);
+        SolidBody2D replacement2D = CreateCircle2D(context, Vector2d.Zero, immovable: false);
+        Step(context);
+        WorldVoxelIndex replacementCoordinate = replacement3D.Collider.MixedPartitionCoordinates![0];
+        replacementCoordinate.GridSpawnToken.Should().NotBe(staleCoordinate.GridSpawnToken);
+        context.World.TryGetVoxel(replacementCoordinate, out Voxel? replacementVoxel).Should().BeTrue();
+        replacementVoxel!.TryGetPartition(out PhysicsMixedPartition? replacementPartition).Should().BeTrue();
+        replacementPartition!.ContainedDynamic3DObjects!.Contains(replacement3D.Collider.Id).Should().BeTrue();
+        replacementPartition.ContainedDynamic2DObjects!.Contains(replacement2D.Collider.Id).Should().BeTrue();
+    }
+
+    [Fact]
     public void Refresh3DColliderPartition_WithInactiveCollider_ShouldClearMixedMembership()
     {
         using GravitasWorldContext context = CreateMixedContext();

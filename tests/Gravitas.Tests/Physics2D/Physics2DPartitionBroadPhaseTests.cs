@@ -498,6 +498,29 @@ public sealed class Physics2DPartitionBroadPhaseTests
     }
 
     [Fact]
+    public void SameConfigurationGridReplacement_ShouldRejectStale2DCoordinatesAndResolveReplacementPartition()
+    {
+        using GravitasWorldContext context = CreateContext(extent: 16);
+        SolidBody2D staleBody = CreateCircle(context, Vector2d.Zero, immovable: false);
+        WorldVoxelIndex staleCoordinate = staleBody.Collider.PartitionCoordinates![0];
+        GridConfiguration configuration = context.World.ActiveGrids[0].Configuration;
+
+        context.World.TryRemoveGrid(0).Should().BeTrue();
+        context.World.TryAddGrid(configuration, out ushort replacementIndex).Should().BeTrue();
+
+        replacementIndex.Should().Be(staleCoordinate.GridIndex);
+        context.World.TryGetVoxel(staleCoordinate, out _).Should().BeFalse();
+        context.Collisions2D.ClearPartitionedCollider(staleBody.Collider, force: true).Should().BeTrue();
+
+        SolidBody2D replacement = CreateCircle(context, Vector2d.Zero, immovable: false);
+        WorldVoxelIndex replacementCoordinate = replacement.Collider.PartitionCoordinates![0];
+        replacementCoordinate.GridSpawnToken.Should().NotBe(staleCoordinate.GridSpawnToken);
+        context.World.TryGetVoxel(replacementCoordinate, out Voxel? replacementVoxel).Should().BeTrue();
+        replacementVoxel!.TryGetPartition(out PhysicsPartition2D? replacementPartition).Should().BeTrue();
+        replacementPartition!.ContainedDynamicObjects!.Contains(replacement.Collider.Id).Should().BeTrue();
+    }
+
+    [Fact]
     public void RefreshPartitionAwakeState_WithMissingGridVoxelOrPartition_ShouldSkipStaleCoordinatesWithoutErrors()
     {
         using GravitasWorldContext detachedContext = CreateContext(extent: 16);
@@ -1184,8 +1207,8 @@ public sealed class Physics2DPartitionBroadPhaseTests
     }
 
     private static WorldVoxelIndex CreateWorldVoxel(
-        int worldSpawnToken,
-        int gridSpawnToken,
+        long worldSpawnToken,
+        long gridSpawnToken,
         int x,
         int y,
         int z) =>

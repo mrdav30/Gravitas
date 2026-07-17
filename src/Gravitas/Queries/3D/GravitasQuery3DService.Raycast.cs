@@ -10,6 +10,7 @@ using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Support;
 using GridForge.Grids;
+using GridForge.Spatial;
 using GridForge.Utility;
 using SwiftCollections;
 using System.Runtime.CompilerServices;
@@ -28,7 +29,7 @@ public sealed partial class GravitasQuery3DService
     private SwiftList<Vector3d> _bufferIntersectionPoints = new();
     private readonly SwiftList<int> _meshTriangleCandidates = new(16);
     private readonly SwiftHashSet<int> _redundantColliderCheck = new();
-    private readonly SwiftHashSet<int> _redundantVoxelCheck = new();
+    private readonly SwiftHashSet<WorldVoxelIndex> _redundantVoxelCheck = new();
     private readonly SwiftList<Voxel> _coveredVoxels = new();
     private readonly GridTraceScratch _traceScratch = new();
 
