@@ -8,7 +8,6 @@
 using FixedMathSharp;
 using Gravitas.Colliders;
 using System;
-using System.Diagnostics;
 using System.Runtime.CompilerServices;
 
 namespace Gravitas.CollisionHandling;
@@ -26,9 +25,7 @@ internal static class ConvexColliderSupport
 
     public static Vector3d Support(LSCollider collider, Vector3d direction)
     {
-        Vector3d normal = direction != Vector3d.Zero
-            ? direction.Normalized
-            : Vector3d.Right;
+        Vector3d normal = ResolveSupportDirection(direction);
 
         return collider switch
         {
@@ -148,8 +145,7 @@ internal static class ConvexColliderSupport
         Fixed64 endRadius,
         Vector3d direction)
     {
-        Debug.Assert(direction != Vector3d.Zero, "GJK must resolve a zero search direction before support mapping.");
-        direction = direction.Normalized;
+        direction = ResolveSupportDirection(direction);
         Vector3d baseCenter = apex + axis * length;
         Vector3d radial = direction - axis * Vector3d.Dot(direction, axis);
         Fixed64 radialMagnitude = radial.Magnitude;
@@ -161,6 +157,12 @@ internal static class ConvexColliderSupport
             ? baseSupport
             : apex;
     }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Vector3d ResolveSupportDirection(Vector3d direction) =>
+        direction != Vector3d.Zero
+            ? direction.Normalized
+            : Vector3d.Right;
 
     private static Vector3d SupportCapsule(LSCapsuleCollider capsule, Vector3d direction)
     {

@@ -46,6 +46,36 @@ public sealed class GravitasQuery3DServiceSweepTests
     };
 
     [Fact]
+    public void ConvexShape_TriangleCannotProvideSweepSourceSurface()
+    {
+        ConvexShape triangle = new(
+            MeshTestFixtures.CreateConvexCube(),
+            0,
+            Vector3d.Zero,
+            Vector3d.Right,
+            Vector3d.Forward);
+
+        Action act = () => triangle.TryGetClosestPointOnSurface(Vector3d.Zero, out _);
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("Triangle shapes are stationary mesh targets and cannot be sweep sources.");
+    }
+
+    [Fact]
+    public void ConvexShape_CircleSlabCannotProvideTargetNormal()
+    {
+        ConvexShape circleSlab = ConvexShape.CreateCircleSlab(
+            Vector3d.Zero,
+            Fixed64.One,
+            Fixed64.Half);
+
+        Action act = () => circleSlab.TryGetPlanarSurfaceNormal(Vector3d.Zero, out _);
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("Circle slabs are sweep sources and cannot be target shapes.");
+    }
+
+    [Fact]
     public void SweepSphere_ShouldReportTimeOfImpactAndTargetSurfacePoint()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();

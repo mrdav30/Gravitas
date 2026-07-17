@@ -8,7 +8,7 @@
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
-using System.Diagnostics;
+using SwiftCollections;
 
 namespace Gravitas.Queries;
 
@@ -150,8 +150,9 @@ internal readonly struct ConvexShape
 
     public bool TryGetClosestPointOnSurface(Vector3d point, out Vector3d closest)
     {
-        Debug.Assert(
-            _kind != ConvexShapeKind.Triangle,
+        SwiftThrowHelper.ThrowIfTrue(
+            _kind == ConvexShapeKind.Triangle,
+            nameof(ConvexShape),
             "Triangle shapes are stationary mesh targets and cannot be sweep sources.");
 
         if (_kind == ConvexShapeKind.Collider)
@@ -195,8 +196,9 @@ internal readonly struct ConvexShape
 
     public bool TryGetPlanarSurfaceNormal(Vector3d point, out Vector3d normal)
     {
-        Debug.Assert(
-            _kind != ConvexShapeKind.CircleSlab,
+        SwiftThrowHelper.ThrowIfTrue(
+            _kind == ConvexShapeKind.CircleSlab,
+            nameof(ConvexShape),
             "Circle slabs are sweep sources and cannot be target shapes.");
 
         if (_kind == ConvexShapeKind.Triangle)
