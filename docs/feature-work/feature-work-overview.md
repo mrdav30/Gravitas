@@ -23,13 +23,6 @@ instead of burying it in notes.
 
 ## Active Release-Scope
 
-- [`FixedMathSharp Foundation Hardening`](F:\gamedevrepos\FixedMathSharp\docs\feature-work\2026-07-14-fixedmathsharp-foundation-hardening-plan.md)
-  - Make FixedMathSharp the shared owner of exact boundary arithmetic,
-    vector/quaternion invariants, finite-segment geometry, and explicit X/Z
-    transform behavior. Remove Gravitas math duplicates and solver workarounds,
-    correct 2D host yaw parity and multi-turn state, fix the odd-raw GJK shift
-    boundary, eliminate release-only `Debug.Assert` behavior, and re-achieve
-    100% reachable line, branch, and method coverage before release.
 - [`Cross-Stack Issue Resolution`](issue-tracker.md)
   - Resolve release-blocking issues in dependency order: `FixedMathSharp`,
     `SwiftCollections`, `GridForge`, then Gravitas. Use the `develop` worktrees
@@ -45,6 +38,13 @@ instead of burying it in notes.
 
 ## Recently Completed
 
+- [`FixedMathSharp Foundation Hardening`](../../../FixedMathSharp/docs/feature-work/done/2026-07-14-fixedmathsharp-foundation-hardening-plan.md)
+  - Completed 2026-07-17. FixedMathSharp now owns the shared full-domain
+    arithmetic, vector/quaternion, segment/triangle, and transform contracts;
+    Gravitas consumes those contracts without duplicate math. The final artifact
+    reports 100% line, branch, and method coverage, with 1,406 standard and
+    1,385 Lean tests passing. Sequential package releases remain tracked by the
+    issue tracker.
 - [`Coverage Hardening`](done/coverage-hardening-plan.md)
   - Completed 2026-07-13. The final unexcluded artifact reports 100% line,
     branch, and method coverage across 27,477 lines, 10,411 branches, and 3,838
@@ -212,8 +212,7 @@ host-facing need appears.
 1. Keep the benchmark backlog and issue tracker as intake buckets; promote new
    measured risks into dated plans only when they are broader than a focused
    patch.
-2. Resolve the FixedMathSharp-owned active issues first and validate every
-   downstream consumer through temporary local project references.
+2. Release FixedMathSharp from the reviewed foundation-hardening tree.
 3. Update SwiftCollections to the released FixedMathSharp package, run its full
    validation, and release SwiftCollections before advancing the chain.
 4. Update GridForge to the released lower-stack packages, resolve its pooled

@@ -28,8 +28,9 @@ records follow with their original discovery context.
   projects when transitive resolution is insufficient.
 - Treat local links as unstaged validation scaffolding. Do not publish or
   release with them in place.
-- The FixedMathSharp extreme-vector issue is resolved in source. Validate every
-  downstream consumer, release FixedMathSharp, then restore its package
+- FixedMathSharp foundation hardening is complete and committed. Its final
+  artifact reports 100% line, branch, and method coverage, with 1,406 standard
+  and 1,385 Lean tests passing. Release FixedMathSharp, then restore its package
   references and validate/release SwiftCollections.
 - SwiftCollections has no library-specific active issue at this checkpoint; its
   place in the sequence is a full downstream compatibility and release gate.
@@ -336,11 +337,12 @@ active/dynamic-ID admission predicates removed in Task 67.
 and averaging; Gravitas 2D, 3D, and mixed query/CCD sweep admission, GJK,
 conservative advancement, and concave-mesh hit geometry
 
-**Follow-up status:** Active under
-[`FixedMathSharp Foundation Hardening`](F:\gamedevrepos\FixedMathSharp\docs\feature-work\2026-07-14-fixedmathsharp-foundation-hardening-plan.md).
-The committed FixedMathSharp magnitude/normalization fix remains valid, but the
-staged Gravitas arithmetic ownership and GJK shift boundary are not release
-closure.
+**Follow-up status:** Closed by
+[`FixedMathSharp Foundation Hardening`](../../../FixedMathSharp/docs/feature-work/done/2026-07-14-fixedmathsharp-foundation-hardening-plan.md).
+FixedMathSharp now owns the shared full-domain arithmetic and Gravitas consumes
+it without local overflow helpers. The odd-raw GJK expansion boundary is fixed
+and committed. The separately tracked relative-CCD quadratic issue remains
+active.
 
 RCA: fixed-point squared magnitude saturated before the square root. Dividing an
 extreme vector by the shortened result produced a non-unit direction, while
@@ -364,24 +366,22 @@ Verification:
 - Red regressions reproduced non-unit tiny/extreme normalization, saturated
   endpoint and relative displacement, false GJK/support outcomes, a false
   distance-zero near-maximum triangle hit, and adjacent-face normal drift.
-- FixedMathSharp passed `1,173` Release and `1,152` ReleaseLean tests, plus `7`
-  Chronicler tests in each configuration. All `14` focused Vector2/3/4 magnitude
-  and normalization benchmarks remained allocation-free.
+- Final FixedMathSharp verification passed `1,398` Release and `1,377`
+  ReleaseLean tests, plus `8` Chronicler tests in each configuration. Its merged
+  artifact reports `8,679/8,679` lines, `2,924/2,924` branches, and
+  `1,469/1,469` methods. Focused vector magnitude and normalization benchmarks
+  remained allocation-free.
 - SwiftCollections passed `1,091` Release and `1,063` ReleaseLean tests;
   GridForge passed `431` in each configuration through explicit source links.
-- Gravitas passed `2,635` Release and `2,597` ReleaseLean tests. The final
-  authoritative artifact
-  `TestResults/coverage-extreme-convex-final2-authoritative-reviewed/9a281922-a26f-4e7c-aeb1-540eb004fb49/coverage.cobertura.xml`
-  reports `28,098/28,098` lines and `10,697/10,697` branches.
+- Gravitas passed `2,659` Release and `2,620` ReleaseLean tests after consuming
+  the final FixedMathSharp contracts and removing release-only assertions.
 - Convex sphere-target sweeps remained allocation-free. Removing the whole-mesh
   normal rescan improved dense concave sweeps at 8/16/32 subdivisions from
   `117.22 us` / `436.02 us` / `1.6676 ms` to `77.58 us` / `277.52 us` /
   `1.0848 ms`, also with zero allocations.
-- The initial independent review reported no remaining findings. Owner review
-  then identified misplaced downstream arithmetic, and a focused follow-up
-  reproduced an odd-raw negative-expansion shift that can still saturate by one
-  raw unit. The preceding counts remain useful baseline evidence, not final
-  release closure.
+- Independent task reviews and the final FixedMathSharp coverage review reported
+  no remaining findings after arithmetic ownership and the odd-raw expansion
+  boundary were corrected.
 - The separate relative-CCD quadratic saturation issue remains active; this work
   validates its inputs but does not replace its scale-sensitive quadratic.
 - Local project links remain unstaged and must be removed before package release
