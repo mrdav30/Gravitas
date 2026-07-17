@@ -15,23 +15,33 @@ namespace Gravitas.Constraints;
 /// </summary>
 public sealed class RagdollRuntime3D : IRecordable
 {
+    private readonly GravitasConstraint3DService _service;
     private readonly SolidBody[] _links;
     private readonly Joint3D[] _joints;
     private bool _isActive;
 
     internal RagdollRuntime3D(
+        GravitasConstraint3DService service,
         int id,
         SolidBody[] links,
         Joint3D[] joints,
         RagdollSelfCollisionPolicy selfCollisionPolicy,
         bool startsActive)
     {
+        _service = service;
         Id = id;
         _links = links;
         _joints = joints;
         SelfCollisionPolicy = selfCollisionPolicy;
+        IsRegistered = true;
         ApplyActivationState(startsActive, emitDiagnostics: false);
     }
+
+    internal GravitasConstraint3DService Service => _service;
+
+    internal RagdollRuntime3D? PreviousRegistered { get; set; }
+
+    internal RagdollRuntime3D? NextRegistered { get; set; }
 
     /// <summary>
     /// Gets this context-local ragdoll ID.
@@ -42,6 +52,11 @@ public sealed class RagdollRuntime3D : IRecordable
     /// Gets ragdoll-internal collision filtering behavior.
     /// </summary>
     public RagdollSelfCollisionPolicy SelfCollisionPolicy { get; }
+
+    /// <summary>
+    /// Gets whether this articulation remains registered with its owning constraint service.
+    /// </summary>
+    public bool IsRegistered { get; private set; }
 
     /// <summary>
     /// Gets whether the ragdoll links are currently dynamic.
@@ -85,6 +100,10 @@ public sealed class RagdollRuntime3D : IRecordable
     /// </summary>
     public void RecordData(IChronicler chronicler)
     {
+        SwiftThrowHelper.ThrowIfTrue(
+            !IsRegistered,
+            nameof(RagdollRuntime3D),
+            "Removed ragdolls cannot participate in serialization.");
         bool isActive = _isActive;
         RecordValues.Look(chronicler, ref isActive, "IsActive", false);
         if (chronicler.Mode != SerializationMode.Loading)
@@ -95,6 +114,11 @@ public sealed class RagdollRuntime3D : IRecordable
 
     private void ApplyActivationState(bool isActive, bool emitDiagnostics)
     {
+        SwiftThrowHelper.ThrowIfTrue(
+            !IsRegistered,
+            nameof(RagdollRuntime3D),
+            "Removed ragdolls cannot mutate simulation state.");
+
         if (isActive)
         {
             for (int i = 0; i < _links.Length; i++)
@@ -118,5 +142,13 @@ public sealed class RagdollRuntime3D : IRecordable
         _isActive = isActive;
         if (emitDiagnostics)
             _links[0].Context.Diagnostics.EmitRagdollActivated(Id, LinkCount, JointCount, isActive);
+    }
+
+    internal void Invalidate()
+    {
+        IsRegistered = false;
+        _isActive = false;
+        PreviousRegistered = null;
+        NextRegistered = null;
     }
 }

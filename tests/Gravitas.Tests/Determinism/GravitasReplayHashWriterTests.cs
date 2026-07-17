@@ -1,7 +1,10 @@
 using Chronicler;
+using FixedMathSharp;
 using FluentAssertions;
+using Gravitas.Colliders;
 using Gravitas.Constraints;
 using Gravitas.Support;
+using Gravitas.Tests.Support;
 using System;
 using Xunit;
 
@@ -54,12 +57,25 @@ public sealed class GravitasChronicleHashWriterExtensionsTests
     [Fact]
     public void ChronicleHashSerializer_ShouldNotReplaceRagdollRuntimeReplayContributor()
     {
-        var runtime = new RagdollRuntime3D(
-            7,
-            Array.Empty<SolidBody>(),
-            Array.Empty<Joint3D>(),
-            RagdollSelfCollisionPolicy.SuppressAllLinks,
-            startsActive: false);
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> root = scenario.CreateSphere(Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> child = scenario.CreateSphere(Vector3d.Right * (Fixed64)2);
+        RagdollRuntime3D runtime = scenario.Context.Constraints3D.RegisterRagdoll(new RagdollDefinition3D(
+            new[]
+            {
+                new RagdollLinkDefinition3D(0, root.Body),
+                new RagdollLinkDefinition3D(1, child.Body)
+            },
+            new[]
+            {
+                new RagdollJointDefinition3D(
+                    0,
+                    1,
+                    JointType3D.BallSocket,
+                    new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One),
+                    new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One))
+            },
+            RagdollSelfCollisionPolicy.SuppressAllLinks));
 
         ChronicleHash serializerHash = Hash((ref ChronicleHashWriter writer) =>
             ChronicleHashSerializer.Contribute(runtime, ref writer));

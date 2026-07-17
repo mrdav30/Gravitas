@@ -34,34 +34,32 @@ records follow with their original discovery context.
   references and validate/release SwiftCollections.
 - SwiftCollections has no library-specific active issue at this checkpoint; its
   place in the sequence is a full downstream compatibility and release gate.
-- GridForge's runtime-identity defect is resolved. Update GridForge to the
-  released lower-stack packages, validate its completed identity hardening and
-  downstream consumers, and release GridForge.
-- Update Gravitas to the released package versions, remove every local link, and
-  rerun `Release`, `ReleaseLean`, coverage, replay, and relevant benchmark gates
-  before starting items 1-10.
+- GridForge's runtime-identity defect is resolved. Keep the lower stack locally
+  linked while the remaining Gravitas queue is hardened so another downstream
+  discovery does not force a partial release cycle.
+- After the Gravitas queue closes, release the lower stack in dependency order,
+  replace local links with released packages at each layer, and rerun Gravitas
+  `Release`, `ReleaseLean`, coverage, replay, and relevant benchmark gates.
 
 ### Ordered Queue
 
 1. **Gravitas:**
-   [Registered Joints Can Outlive Their Body And Collider Lifetimes](#registered-joints-can-outlive-their-body-and-collider-lifetimes).
-2. **Gravitas:**
    [Non-Unit Quaternion Admission Can Collapse Runtime Shape Axes](#non-unit-quaternion-admission-can-collapse-runtime-shape-axes).
-3. **Gravitas:**
+2. **Gravitas:**
    [Continuous-Collision Modes Accept Undefined Enum Values](#continuous-collision-modes-accept-undefined-enum-values).
-4. **Gravitas:**
+3. **Gravitas:**
    [3D Exit Callback Failure Can Duplicate Reentrant Separation Notifications](#3d-exit-callback-failure-can-duplicate-reentrant-separation-notifications).
-5. **Gravitas:**
+4. **Gravitas:**
    [CCD Handoff Dedupe Can Strand A Same-Frame Requeued Body](#ccd-handoff-dedupe-can-strand-a-same-frame-requeued-body).
-6. **Gravitas:**
+5. **Gravitas:**
    [SolidBody Point Transforms Use Collider Dimensions As Transform Scale](#solidbody-point-transforms-use-collider-dimensions-as-transform-scale).
-7. **Gravitas:**
+6. **Gravitas:**
    [3D Angular Impulse Scales Immediate Velocity By Frame Delta](#3d-angular-impulse-scales-immediate-velocity-by-frame-delta).
-8. **Gravitas:**
+7. **Gravitas:**
    [Rotational CCD Can Miss Contacts Between Bounded Pose Samples](#rotational-ccd-can-miss-contacts-between-bounded-pose-samples).
-9. **Gravitas:**
+8. **Gravitas:**
     [Convex Mesh Mode Accepts Disconnected Topology And Can Collide In Empty Bounds Space](#convex-mesh-mode-accepts-disconnected-topology-and-can-collide-in-empty-bounds-space).
-10. **Gravitas:**
+9. **Gravitas:**
     [Relative CCD Quadratic Saturation Can Miss Extreme-Range Crossings](#relative-ccd-quadratic-saturation-can-miss-extreme-range-crossings).
     Reuse the magnitude and normalization policy established by the resolved
     extreme-convex-sweep work when adding the separate scale-safe quadratic
@@ -245,39 +243,6 @@ notifying-shell pool reuse. This does not block the coverage campaign because
 Task 65's retained A guard and centralized B lifetime admission are correct for
 nonthrowing callbacks and do not worsen this exception edge.
 
-### Registered Joints Can Outlive Their Body And Collider Lifetimes
-
-**Discovered:** 2026-07-13  
-**Source:** 95%-to-100% coverage hardening, 3D joint replay-hash lifecycle
-review  
-**Affected area:** 2D/3D joint ownership, body/collider deactivation and reuse,
-linked-collision suppression, replay identity, and ragdoll lifecycle
-
-Joint registration requires active bodies, but later body/collider deactivation
-does not remove or suspend joints that reference the body. The joint remains
-active and enabled, keeps the constraint service on its joint-processing path,
-and can constrain the surviving active body against the inactive endpoint's
-frozen pose. Collider teardown separately removes every suppression key
-containing the released ID, so reinitializing the same body shell resumes the
-old joint without restoring its `SuppressLinked` policy. Rebinding the released
-collider shell to a different `SolidBody` is worse: the joint still references
-the stale inactive body while solver ordering and replay hashing read the
-collider shell's new registry identity.
-
-Choose and document one explicit endpoint-lifetime contract. The simplest safe
-contract is to remove dependent joints, reconciling any owning ragdoll runtime,
-before a body/collider registration is released; a reverse body-to-joint index
-would keep teardown proportional to attached joints. If joints instead survive
-pooling, capture endpoint generations, suspend while either endpoint is
-inactive, resume only for the same body lifetime, and deterministically rebuild
-suppression state. Add symmetric 2D/3D tests for first/second endpoint teardown,
-same-shell reinitialization, different-body collider rebinding, solver
-admission, registered/enabled counts, suppression restoration/removal, replay
-hashing, and ragdoll-owned joints. This does not block the coverage campaign:
-`SolidBody.Collider` itself is constructor-required and never null, and direct
-replay hashing still preserves the current deterministic `-1` unregistered-ID
-sentinel.
-
 ### CCD Handoff Dedupe Can Strand A Same-Frame Requeued Body
 
 **Discovered:** 2026-07-13  
@@ -307,6 +272,49 @@ does not block coverage convergence and is independent of the redundant
 active/dynamic-ID admission predicates removed in Task 67.
 
 ## Resolved Issues
+
+### Registered Joints Can Outlive Their Body And Collider Lifetimes
+
+**Resolved:** 2026-07-17  
+**Source:** 95%-to-100% coverage hardening, 3D joint replay-hash lifecycle
+review  
+**Affected area:** 2D/3D joint ownership, body/collider deactivation and reuse,
+linked-collision suppression, replay identity, and ragdoll lifecycle
+
+RCA: joint services owned registrations independently from endpoint body and
+collider lifetimes. Deactivating an endpoint released its reusable collider ID
+and broadly deleted matching suppression keys, but left the joint active and
+enabled. Same-shell reuse could therefore resume a stale joint without its
+filter policy, while rebinding the collider to another body exposed the old
+joint to a new registry identity.
+
+Fix: 2D and 3D constraint services now index joint IDs by endpoint body and
+remove affected registrations before collider identity release. Removal
+reconciles exact ref-counted suppressions and never scans the context's peak
+joint range or the whole suppression table. Intrusive endpoint links make each
+unlink O(1), preserve reverse-registration teardown order, and keep total body
+teardown O(attached joints). Ragdolls are atomic registrations: a body can
+belong to one registered ragdoll, link teardown or
+`RemoveRagdoll(...)` removes the runtime and all owned joints, independent
+owned-joint removal is rejected, and stale joint/ragdoll handles cannot mutate
+or serialize later simulation lifetimes. Their intrusive registration-order
+chain gives O(1) removal without making replay hashes depend on removal history.
+Context reset and disposal invalidate all handles, and mutating constraint APIs
+reject a disposed context.
+
+Verification: symmetric tests cover both endpoint positions, multiple attached
+joints, same-shell reinitialization, different-body collider rebinding, solver
+admission, counts, exact suppression removal, automatic-versus-explicit replay
+hash equivalence, zero-joint ragdolls, out-of-order ragdoll removal, overlapping
+and duplicate link admission, stable replay hashes across ragdoll removal
+orders, reset/disposal invalidation, stable endpoint teardown order, and
+stale-handle mutation and serialization. The focused constraint, context, and
+replay-writer suite passes `168/168` in `Release` with the locally linked lower
+stack; the full suites pass `2692/2692` in `Release` and `2653/2653` in
+`ReleaseLean`. Every source method changed by this resolution has full line and
+branch coverage. Project-wide coverage is `99.9%` line and `99.8%` branch; the
+remaining six lines and eleven branches are confined to the separately queued
+continuous-collision handoff paths.
 
 ### GridForge Reuses Grid Spawn Tokens Across Pooled Generations
 

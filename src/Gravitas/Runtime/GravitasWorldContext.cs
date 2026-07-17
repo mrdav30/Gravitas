@@ -521,6 +521,8 @@ public sealed class GravitasWorldContext : IDisposable
             if (_disposed)
                 return;
 
+            Constraints3D.Reset();
+            Constraints2D.Reset();
             _disposed = true;
             try
             {
@@ -569,7 +571,7 @@ public sealed class GravitasWorldContext : IDisposable
         _worldOwners.Remove(context.World);
     }
 
-    private void ThrowIfDisposed()
+    internal void ThrowIfDisposed()
     {
         SwiftThrowHelper.ThrowIfDisposed(_disposed, nameof(GravitasWorldContext));
         SwiftThrowHelper.ThrowIfTrue(

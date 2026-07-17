@@ -141,7 +141,6 @@ public sealed class Constraint3DServiceTests
             JointCollisionPolicy.SuppressLinked,
             JointCollisionPolicy.SuppressLinked);
         scenario.Context.Constraints3D.ShouldExcludeLinkedCollision(first.Collider, second.Collider).Should().BeTrue();
-        scenario.Context.Constraints3D.RemoveSuppressionsForCollider(unregistered.Id);
 
         scenario.Context.Constraints3D.RemoveJoint(joint.Id).Should().BeTrue();
         joint.SetCollisionPolicyFromRecord(JointCollisionPolicy.Collide);
@@ -385,6 +384,124 @@ public sealed class Constraint3DServiceTests
         scenario.Context.Constraints3D.ShouldExcludeLinkedCollision(first.Collider, replacement.Collider).Should().BeFalse();
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void DeactivateEndpoint_ShouldRemoveEveryAttachedJointBeforeSameShellReinitialization(bool deactivateFirst)
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> first = scenario.CreateSphere(Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> second = scenario.CreateSphere(Vector3d.Right * (Fixed64)2);
+        JointDefinition3D definition = CreateBallSocket(first.Body, second.Body);
+        Joint3D firstJoint = scenario.Context.Constraints3D.RegisterJoint(definition);
+        Joint3D secondJoint = scenario.Context.Constraints3D.RegisterJoint(definition);
+        SolidBody endpoint = deactivateFirst ? first.Body : second.Body;
+
+        endpoint.Deactivate();
+
+        firstJoint.IsActive.Should().BeFalse();
+        secondJoint.IsActive.Should().BeFalse();
+        scenario.Context.Constraints3D.RegisteredJointCount.Should().Be(0);
+        scenario.Context.Constraints3D.EnabledJointCount.Should().Be(0);
+        scenario.Context.Constraints3D.TryGetJointForSolver(firstJoint.Id, out _).Should().BeFalse();
+        scenario.Context.Constraints3D.TryGetJointForSolver(secondJoint.Id, out _).Should().BeFalse();
+        Action mutateRemovedJoint = () => firstJoint.IsEnabled = false;
+        Action clearRemovedMotor = firstJoint.ClearMotor;
+        Action serializeRemovedJoint = () => GravitasSerializationHarness.Serialize(
+            firstJoint,
+            GravitasSerializationTransport.Json);
+
+        mutateRemovedJoint.Should().Throw<InvalidOperationException>();
+        clearRemovedMotor.Should().Throw<InvalidOperationException>();
+        serializeRemovedJoint.Should().Throw<InvalidOperationException>();
+
+        endpoint.Initialize(Vector3d.Up * (Fixed64)4, FixedQuaternion.Identity);
+
+        scenario.Context.Constraints3D.RegisteredJointCount.Should().Be(0);
+        scenario.Context.Constraints3D.ShouldExcludeLinkedCollision(first.Collider, second.Collider).Should().BeFalse();
+    }
+
+    [Fact]
+    public void DeactivatedCollider_WhenReboundToDifferentBody_ShouldNotRetargetRemovedJoint()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> first = scenario.CreateSphere(Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> second = scenario.CreateSphere(Vector3d.Right * (Fixed64)2);
+        Joint3D joint = scenario.Context.Constraints3D.RegisterJoint(CreateBallSocket(first.Body, second.Body));
+        LSSphereCollider reboundCollider = second.Collider;
+
+        second.Body.Deactivate();
+        Vector3d reboundPosition = Vector3d.Up * (Fixed64)4;
+        var reboundBody = new SolidBody(
+            new TestMatterAgent(
+                scenario.Context,
+                new FixedTransform(reboundPosition, FixedQuaternion.Identity, Vector3d.One)),
+            reboundCollider);
+        reboundBody.Initialize(reboundPosition, FixedQuaternion.Identity);
+
+        joint.IsActive.Should().BeFalse();
+        joint.BodyB.Should().BeSameAs(second.Body);
+        reboundCollider.Body.Should().BeSameAs(reboundBody);
+        scenario.Context.Constraints3D.RegisteredJointCount.Should().Be(0);
+        scenario.Context.Constraints3D.TryGetJointForSolver(joint.Id, out _).Should().BeFalse();
+        scenario.Context.Constraints3D.ShouldExcludeLinkedCollision(first.Collider, reboundCollider).Should().BeFalse();
+    }
+
+    [Fact]
+    public void EndpointTeardown_ShouldMatchExplicitJointRemovalReplayState()
+    {
+        using PhysicsScenarioBuilder automatic = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> automaticFirst = automatic.CreateSphere(Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> automaticSecond = automatic.CreateSphere(Vector3d.Right * (Fixed64)2);
+        automatic.Context.Constraints3D.RegisterJoint(CreateBallSocket(automaticFirst.Body, automaticSecond.Body));
+
+        using PhysicsScenarioBuilder explicitRemoval = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> explicitFirst = explicitRemoval.CreateSphere(Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> explicitSecond = explicitRemoval.CreateSphere(Vector3d.Right * (Fixed64)2);
+        Joint3D explicitJoint = explicitRemoval.Context.Constraints3D.RegisterJoint(CreateBallSocket(explicitFirst.Body, explicitSecond.Body));
+
+        automaticSecond.Body.Deactivate();
+        explicitRemoval.Context.Constraints3D.RemoveJoint(explicitJoint.Id).Should().BeTrue();
+        explicitSecond.Body.Deactivate();
+
+        automatic.Context.ComputeReplayHash().Should().Be(explicitRemoval.Context.ComputeReplayHash());
+        automatic.Context.ComputeReplayHash(GravitasReplayHashMode.AuthoritativeWithSolverCaches)
+            .Should()
+            .Be(explicitRemoval.Context.ComputeReplayHash(GravitasReplayHashMode.AuthoritativeWithSolverCaches));
+    }
+
+    [Fact]
+    public void EndpointTeardown_AfterUnlinkingEarlierJoint_ShouldRemoveRemainingJointsInReverseRegistrationOrder()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> center = scenario.CreateSphere(Vector3d.Zero);
+        var spokes = new[]
+        {
+            scenario.CreateSphere(Vector3d.Right * (Fixed64)2),
+            scenario.CreateSphere(Vector3d.Up * (Fixed64)2),
+            scenario.CreateSphere(Vector3d.Forward * (Fixed64)2),
+            scenario.CreateSphere(Vector3d.Left * (Fixed64)2)
+        };
+        var joints = new Joint3D[spokes.Length];
+        scenario.Context.Diagnostics.Enable(eventCapacity: 32, drawCommandCapacity: 0);
+        for (int i = 0; i < spokes.Length; i++)
+            joints[i] = scenario.Context.Constraints3D.RegisterJoint(CreateBallSocket(center.Body, spokes[i].Body));
+
+        spokes[0].Body.Deactivate();
+        scenario.Context.Diagnostics.Clear();
+
+        center.Body.Deactivate();
+
+        var removedJointIds = new List<int>();
+        foreach (GravitasDiagnosticEvent diagnosticEvent in scenario.Context.Diagnostics.Events)
+        {
+            if (diagnosticEvent.Kind == GravitasDiagnosticEventKind.JointRemoved)
+                removedJointIds.Add(diagnosticEvent.JointId);
+        }
+
+        removedJointIds.Should().Equal(joints[3].Id, joints[2].Id, joints[1].Id);
+    }
+
     [Fact]
     public void RagdollFiltering_ShouldSuppressAdjacentLinksButAllowNonAdjacentByDefault()
     {
@@ -410,6 +527,227 @@ public sealed class Constraint3DServiceTests
         scenario.Context.Constraints3D.ShouldExcludeLinkedCollision(root.Collider, middle.Collider).Should().BeTrue();
         scenario.Context.Constraints3D.ShouldExcludeLinkedCollision(middle.Collider, end.Collider).Should().BeTrue();
         scenario.Context.Constraints3D.ShouldExcludeLinkedCollision(root.Collider, end.Collider).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void DeactivateRagdollLink_ShouldRemoveAtomicRuntimeBeforeSameShellReinitialization(bool deactivateRoot)
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> root = scenario.CreateSphere(Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> child = scenario.CreateSphere(Vector3d.Right * (Fixed64)2);
+        RagdollRuntime3D runtime = scenario.Context.Constraints3D.RegisterRagdoll(CreateTwoLinkRagdoll(root, child));
+        Joint3D joint = runtime.GetJoint(0);
+        SolidBody endpoint = deactivateRoot ? root.Body : child.Body;
+
+        endpoint.Deactivate();
+
+        runtime.IsRegistered.Should().BeFalse();
+        runtime.IsActive.Should().BeFalse();
+        joint.IsActive.Should().BeFalse();
+        scenario.Context.Constraints3D.RegisteredRagdollCount.Should().Be(0);
+        scenario.Context.Constraints3D.RegisteredJointCount.Should().Be(0);
+        scenario.Context.Constraints3D.EnabledJointCount.Should().Be(0);
+        scenario.Context.Constraints3D.RemoveRagdoll(runtime.Id).Should().BeFalse();
+        Action reactivate = runtime.ActivateDynamic;
+        Action setPose = () => scenario.Context.Constraints3D.SetRagdollPoseTargets(
+            runtime,
+            new[] { JointMotor3D.Disabled });
+        Action serializeRemovedRagdoll = () => GravitasSerializationHarness.Serialize(
+            runtime,
+            GravitasSerializationTransport.Json);
+        reactivate.Should().Throw<InvalidOperationException>();
+        setPose.Should().Throw<InvalidOperationException>();
+        serializeRemovedRagdoll.Should().Throw<InvalidOperationException>();
+
+        endpoint.Initialize(Vector3d.Up * (Fixed64)4, FixedQuaternion.Identity);
+
+        scenario.Context.Constraints3D.ShouldExcludeLinkedCollision(root.Collider, child.Collider).Should().BeFalse();
+    }
+
+    [Fact]
+    public void RemoveRagdoll_ShouldReleaseOwnedJointsAndEverySelfCollisionSuppression()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> root = scenario.CreateSphere(Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> middle = scenario.CreateSphere(Vector3d.Right * (Fixed64)2);
+        ScenarioBody<LSSphereCollider> end = scenario.CreateSphere(Vector3d.Right * (Fixed64)4);
+        RagdollRuntime3D runtime = scenario.Context.Constraints3D.RegisterRagdoll(new RagdollDefinition3D(
+            new[]
+            {
+                new RagdollLinkDefinition3D(0, root.Body),
+                new RagdollLinkDefinition3D(1, middle.Body),
+                new RagdollLinkDefinition3D(2, end.Body)
+            },
+            new[]
+            {
+                new RagdollJointDefinition3D(0, 1, JointType3D.BallSocket, LocalFrame(Vector3d.Zero), LocalFrame(Vector3d.Zero)),
+                new RagdollJointDefinition3D(1, 2, JointType3D.BallSocket, LocalFrame(Vector3d.Zero), LocalFrame(Vector3d.Zero))
+            },
+            RagdollSelfCollisionPolicy.SuppressAllLinks));
+        Action removeOwnedJoint = () => scenario.Context.Constraints3D.RemoveJoint(runtime.GetJoint(0).Id);
+
+        removeOwnedJoint.Should().Throw<InvalidOperationException>();
+        scenario.Context.Constraints3D.RemoveRagdoll(runtime.Id).Should().BeTrue();
+
+        runtime.IsRegistered.Should().BeFalse();
+        runtime.IsActive.Should().BeFalse();
+        scenario.Context.Constraints3D.RegisteredRagdollCount.Should().Be(0);
+        scenario.Context.Constraints3D.RegisteredJointCount.Should().Be(0);
+        scenario.Context.Constraints3D.EnabledJointCount.Should().Be(0);
+        scenario.Context.Constraints3D.ShouldExcludeLinkedCollision(root.Collider, middle.Collider).Should().BeFalse();
+        scenario.Context.Constraints3D.ShouldExcludeLinkedCollision(middle.Collider, end.Collider).Should().BeFalse();
+        scenario.Context.Constraints3D.ShouldExcludeLinkedCollision(root.Collider, end.Collider).Should().BeFalse();
+    }
+
+    [Fact]
+    public void DeactivateSingleLinkRagdoll_ShouldRemoveZeroJointRuntime()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
+        RagdollRuntime3D runtime = scenario.Context.Constraints3D.RegisterRagdoll(new RagdollDefinition3D(
+            new[] { new RagdollLinkDefinition3D(0, body.Body) },
+            Array.Empty<RagdollJointDefinition3D>()));
+
+        body.Body.Deactivate();
+
+        runtime.IsRegistered.Should().BeFalse();
+        scenario.Context.Constraints3D.RegisteredRagdollCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void RemoveRagdolls_OutOfOrder_ShouldKeepMovedRuntimeIndexed()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> firstRoot = scenario.CreateSphere(Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> firstChild = scenario.CreateSphere(Vector3d.Right * (Fixed64)2);
+        ScenarioBody<LSSphereCollider> secondRoot = scenario.CreateSphere(Vector3d.Up * (Fixed64)4);
+        ScenarioBody<LSSphereCollider> secondChild = scenario.CreateSphere(
+            Vector3d.Up * (Fixed64)4 + Vector3d.Right * (Fixed64)2);
+        RagdollRuntime3D first = scenario.Context.Constraints3D.RegisterRagdoll(CreateTwoLinkRagdoll(firstRoot, firstChild));
+        RagdollRuntime3D second = scenario.Context.Constraints3D.RegisterRagdoll(CreateTwoLinkRagdoll(secondRoot, secondChild));
+
+        scenario.Context.Constraints3D.RemoveRagdoll(first.Id).Should().BeTrue();
+        scenario.Context.Constraints3D.RemoveRagdoll(second.Id).Should().BeTrue();
+
+        first.IsRegistered.Should().BeFalse();
+        second.IsRegistered.Should().BeFalse();
+        scenario.Context.Constraints3D.RegisteredRagdollCount.Should().Be(0);
+        scenario.Context.Constraints3D.RegisteredJointCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void RagdollReplayHash_ShouldNotDependOnRemovalOrder()
+    {
+        using PhysicsScenarioBuilder first = PhysicsScenarioBuilder.Create();
+        using PhysicsScenarioBuilder second = PhysicsScenarioBuilder.Create();
+        var firstRagdolls = new RagdollRuntime3D[4];
+        var secondRagdolls = new RagdollRuntime3D[4];
+        for (int i = 0; i < firstRagdolls.Length; i++)
+        {
+            ScenarioBody<LSSphereCollider> firstBody = first.CreateSphere(Vector3d.Right * (Fixed64)(i * 2));
+            ScenarioBody<LSSphereCollider> secondBody = second.CreateSphere(Vector3d.Right * (Fixed64)(i * 2));
+            firstRagdolls[i] = first.Context.Constraints3D.RegisterRagdoll(new RagdollDefinition3D(
+                new[] { new RagdollLinkDefinition3D(i, firstBody.Body) },
+                Array.Empty<RagdollJointDefinition3D>()));
+            secondRagdolls[i] = second.Context.Constraints3D.RegisterRagdoll(new RagdollDefinition3D(
+                new[] { new RagdollLinkDefinition3D(i, secondBody.Body) },
+                Array.Empty<RagdollJointDefinition3D>()));
+        }
+
+        first.Context.Constraints3D.RemoveRagdoll(firstRagdolls[0].Id).Should().BeTrue();
+        first.Context.Constraints3D.RemoveRagdoll(firstRagdolls[1].Id).Should().BeTrue();
+        second.Context.Constraints3D.RemoveRagdoll(secondRagdolls[1].Id).Should().BeTrue();
+        second.Context.Constraints3D.RemoveRagdoll(secondRagdolls[0].Id).Should().BeTrue();
+
+        first.Context.ComputeReplayHash().Should().Be(second.Context.ComputeReplayHash());
+        first.Context.ComputeReplayHash(GravitasReplayHashMode.AuthoritativeWithSolverCaches)
+            .Should()
+            .Be(second.Context.ComputeReplayHash(GravitasReplayHashMode.AuthoritativeWithSolverCaches));
+    }
+
+    [Fact]
+    public void RegisterRagdoll_WithBodyInExistingRagdoll_ShouldFailBeforeRuntimeMutation()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> root = scenario.CreateSphere(Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> child = scenario.CreateSphere(Vector3d.Right * (Fixed64)2);
+        ScenarioBody<LSSphereCollider> other = scenario.CreateSphere(Vector3d.Right * (Fixed64)4);
+        scenario.Context.Constraints3D.RegisterRagdoll(CreateTwoLinkRagdoll(root, child));
+
+        Action registerOverlap = () => scenario.Context.Constraints3D.RegisterRagdoll(CreateTwoLinkRagdoll(root, other));
+
+        registerOverlap.Should().Throw<ArgumentException>();
+        scenario.Context.Constraints3D.RegisteredRagdollCount.Should().Be(1);
+        scenario.Context.Constraints3D.RegisteredJointCount.Should().Be(1);
+        scenario.Context.Constraints3D.EnabledJointCount.Should().Be(1);
+    }
+
+    [Fact]
+    public void RegisterRagdoll_WithDuplicateBodyLinks_ShouldFailBeforeRuntimeMutation()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
+        var definition = new RagdollDefinition3D(
+            new[]
+            {
+                new RagdollLinkDefinition3D(0, body.Body),
+                new RagdollLinkDefinition3D(1, body.Body)
+            },
+            Array.Empty<RagdollJointDefinition3D>());
+
+        Action registerDuplicate = () => scenario.Context.Constraints3D.RegisterRagdoll(definition);
+
+        registerDuplicate.Should().Throw<ArgumentException>();
+        scenario.Context.Constraints3D.RegisteredRagdollCount.Should().Be(0);
+        scenario.Context.Constraints3D.RegisteredJointCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void Reset_WithRegisteredRagdoll_ShouldInvalidateRuntimeAndOwnedJoints()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> root = scenario.CreateSphere(Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> child = scenario.CreateSphere(Vector3d.Right * (Fixed64)2);
+        RagdollRuntime3D runtime = scenario.Context.Constraints3D.RegisterRagdoll(CreateTwoLinkRagdoll(root, child));
+        Joint3D joint = runtime.GetJoint(0);
+
+        scenario.Context.Reset();
+
+        runtime.IsRegistered.Should().BeFalse();
+        joint.IsActive.Should().BeFalse();
+        scenario.Context.Constraints3D.RegisteredRagdollCount.Should().Be(0);
+        scenario.Context.Constraints3D.RegisteredJointCount.Should().Be(0);
+        Action reactivate = runtime.ActivateDynamic;
+        reactivate.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void Dispose_WithRegisteredConstraints_ShouldInvalidateHandlesAndRejectFurtherMutation()
+    {
+        PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> first = scenario.CreateSphere(Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> second = scenario.CreateSphere(Vector3d.Right * (Fixed64)2);
+        ScenarioBody<LSSphereCollider> root = scenario.CreateSphere(Vector3d.Up * (Fixed64)4);
+        ScenarioBody<LSSphereCollider> child = scenario.CreateSphere(Vector3d.Up * (Fixed64)6);
+        Joint3D joint = scenario.Context.Constraints3D.RegisterJoint(CreateBallSocket(first.Body, second.Body));
+        RagdollRuntime3D ragdoll = scenario.Context.Constraints3D.RegisterRagdoll(CreateTwoLinkRagdoll(root, child));
+
+        scenario.Context.Dispose();
+
+        joint.IsActive.Should().BeFalse();
+        ragdoll.IsRegistered.Should().BeFalse();
+        scenario.Context.Constraints3D.RegisteredJointCount.Should().Be(0);
+        scenario.Context.Constraints3D.RegisteredRagdollCount.Should().Be(0);
+        Action register = () => scenario.Context.Constraints3D.RegisterJoint(CreateBallSocket(first.Body, second.Body));
+        Action remove = () => scenario.Context.Constraints3D.RemoveJoint(joint.Id);
+        Action reactivate = ragdoll.ActivateDynamic;
+        register.Should().Throw<ObjectDisposedException>();
+        remove.Should().Throw<ObjectDisposedException>();
+        reactivate.Should().Throw<InvalidOperationException>();
+
+        scenario.Dispose();
     }
 
     [Fact]

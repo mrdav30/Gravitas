@@ -117,7 +117,8 @@ public sealed partial class GravitasPhysics2DService
     internal void DessimilateCollider(LSCollider2D collider)
     {
         SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
-        _context.Constraints2D.RemoveSuppressionsForCollider(collider.Id);
+        if (collider.Body != null)
+            _context.Constraints2D.RemoveJointsForBody(collider.Body);
         RemovePairsForCollider(collider);
         _context.MixedCollisions.RemovePairsFor2DCollider(collider);
         if (collider.IsMixedPartitioned)

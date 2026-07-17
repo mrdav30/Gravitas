@@ -46,7 +46,7 @@ orientation, and use [AGENTS.md](AGENTS.md) for detailed contributor guidance.
   tracing, `PhysicsPartition`, and `PhysicsPartition2D`.
 - Runtime systems for 3D, pure 2D, and mixed 2D/3D bodies/colliders, authored
   shape definitions, compound collision assets, collision pairs, collision
-  detection/response, 3D joints/ragdolls, opt-in CCD, raycasts, circlecasts,
+  detection/response, 2D/3D joints and ragdolls, opt-in CCD, raycasts, circlecasts,
   swept queries, pure 2D overlap/raycast queries, and physics settings.
 - Mixed 2D/3D simulation where 2D bodies are embedded as explicit finite
   slabs/prisms and constrained to X/Z impulse response.
@@ -107,7 +107,8 @@ Gravitas is centered around explicit world-context ownership:
    environment values, lifecycle hooks, and context-local services.
 4. `GravitasPhysicsService` owns 3D body/collider registration, collider ID
    lookup, collision-pair pooling, and physics lifecycle work for one context.
-5. `GravitasConstraint3DService` owns deterministic 3D joint IDs, ragdoll
+5. `GravitasConstraint3DService` and `GravitasConstraint2DService` own
+   deterministic joint IDs, endpoint-bound joint lifetimes, atomic ragdoll
    runtimes, linked-collider self-filtering, motor targets, replay hashing, and
    joint diagnostics.
 6. `GravitasPhysics2DService` owns pure 2D registration, pair state, response,

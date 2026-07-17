@@ -41,6 +41,8 @@ public sealed class Joint2D : IRecordable
 
     internal GravitasConstraint2DService Service { get; }
 
+    internal RagdollRuntime2D? OwningRagdoll { get; set; }
+
     /// <summary>
     /// Gets the owning world context.
     /// </summary>
@@ -104,6 +106,10 @@ public sealed class Joint2D : IRecordable
         get => _isEnabled;
         set
         {
+            SwiftThrowHelper.ThrowIfTrue(
+                !IsActive,
+                nameof(Joint2D),
+                "Removed joints cannot mutate simulation state.");
             if (_isEnabled == value)
                 return;
 
@@ -136,6 +142,10 @@ public sealed class Joint2D : IRecordable
     /// </summary>
     public void SetMotor(JointMotor2D motor)
     {
+        SwiftThrowHelper.ThrowIfTrue(
+            !IsActive,
+            nameof(Joint2D),
+            "Removed joints cannot mutate simulation state.");
         motor.Validate();
         ValidatePayload(Type, Limits, motor);
         Motor = motor;
@@ -235,6 +245,10 @@ public sealed class Joint2D : IRecordable
     /// </summary>
     public void RecordData(IChronicler chronicler)
     {
+        SwiftThrowHelper.ThrowIfTrue(
+            !IsActive,
+            nameof(Joint2D),
+            "Removed joints cannot participate in serialization.");
         bool isEnabled = IsEnabled;
         JointType2D type = Type;
         JointLimitKind2D limitKind = Limits.Kind;

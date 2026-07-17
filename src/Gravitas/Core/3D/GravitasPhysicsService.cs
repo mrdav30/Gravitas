@@ -254,7 +254,8 @@ public sealed partial class GravitasPhysicsService
             return;
         }
 
-        _context.Constraints3D.RemoveSuppressionsForCollider(id);
+        if (collider.Body != null)
+            _context.Constraints3D.RemoveJointsForBody(collider.Body);
         RemovePairsForCollider(collider);
         if (collider.IsPartitioned)
             _context.Collisions.ClearPartitionedObject(collider, true);

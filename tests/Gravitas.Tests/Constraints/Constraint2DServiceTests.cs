@@ -185,7 +185,6 @@ public sealed class Constraint2DServiceTests
             JointCollisionPolicy.SuppressLinked,
             JointCollisionPolicy.SuppressLinked);
         context.Constraints2D.ShouldExcludeLinkedCollision(first.Collider, second.Collider).Should().BeTrue();
-        context.Constraints2D.RemoveSuppressionsForCollider(unregistered.Id);
 
         context.Constraints2D.RemoveJoint(joint.Id).Should().BeTrue();
         joint.SetCollisionPolicyFromRecord(JointCollisionPolicy.Collide);
@@ -347,6 +346,127 @@ public sealed class Constraint2DServiceTests
 
         replacement.Collider.Id.Should().Be(secondColliderId);
         context.Constraints2D.ShouldExcludeLinkedCollision(first.Collider, replacement.Collider).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void DeactivateEndpoint_ShouldRemoveEveryAttached2DJointBeforeSameShellReinitialization(bool deactivateFirst)
+    {
+        using GravitasWorldContext context = CreateConstraintContext();
+        SolidBody2D first = CreateBody(context, Vector2d.Zero);
+        SolidBody2D second = CreateBody(context, Vector2d.Right * (Fixed64)2);
+        JointDefinition2D definition = CreatePin(first, second);
+        Joint2D firstJoint = context.Constraints2D.RegisterJoint(definition);
+        Joint2D secondJoint = context.Constraints2D.RegisterJoint(definition);
+        SolidBody2D endpoint = deactivateFirst ? first : second;
+
+        endpoint.Deactivate();
+
+        firstJoint.IsActive.Should().BeFalse();
+        secondJoint.IsActive.Should().BeFalse();
+        context.Constraints2D.RegisteredJointCount.Should().Be(0);
+        context.Constraints2D.EnabledJointCount.Should().Be(0);
+        context.Constraints2D.TryGetJointForSolver(firstJoint.Id, out _).Should().BeFalse();
+        context.Constraints2D.TryGetJointForSolver(secondJoint.Id, out _).Should().BeFalse();
+        Action mutateRemovedJoint = () => firstJoint.IsEnabled = false;
+        Action clearRemovedMotor = firstJoint.ClearMotor;
+        Action serializeRemovedJoint = () => GravitasSerializationHarness.Serialize(
+            firstJoint,
+            GravitasSerializationTransport.Json);
+
+        mutateRemovedJoint.Should().Throw<InvalidOperationException>();
+        clearRemovedMotor.Should().Throw<InvalidOperationException>();
+        serializeRemovedJoint.Should().Throw<InvalidOperationException>();
+
+        endpoint.Initialize(Vector2d.Forward * (Fixed64)4);
+
+        context.Constraints2D.RegisteredJointCount.Should().Be(0);
+        context.Constraints2D.ShouldExcludeLinkedCollision(first.Collider, second.Collider).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Deactivated2DCollider_WhenReboundToDifferentBody_ShouldNotRetargetRemovedJoint()
+    {
+        using GravitasWorldContext context = CreateConstraintContext();
+        SolidBody2D first = CreateBody(context, Vector2d.Zero);
+        SolidBody2D second = CreateBody(context, Vector2d.Right * (Fixed64)2);
+        Joint2D joint = context.Constraints2D.RegisterJoint(CreatePin(first, second));
+        LSCircleCollider2D reboundCollider = (LSCircleCollider2D)second.Collider;
+
+        second.Deactivate();
+        Vector2d reboundPosition = Vector2d.Forward * (Fixed64)4;
+        var reboundBody = new SolidBody2D(
+            new TestMatterAgent(
+                context,
+                new FixedTransform(
+                    new Vector3d(reboundPosition.X, Fixed64.Zero, reboundPosition.Y),
+                    FixedQuaternion.Identity,
+                    Vector3d.One)),
+            reboundCollider);
+        reboundBody.Initialize(reboundPosition);
+
+        joint.IsActive.Should().BeFalse();
+        joint.BodyB.Should().BeSameAs(second);
+        reboundCollider.Body.Should().BeSameAs(reboundBody);
+        context.Constraints2D.RegisteredJointCount.Should().Be(0);
+        context.Constraints2D.TryGetJointForSolver(joint.Id, out _).Should().BeFalse();
+        context.Constraints2D.ShouldExcludeLinkedCollision(first.Collider, reboundCollider).Should().BeFalse();
+    }
+
+    [Fact]
+    public void EndpointTeardown_ShouldMatchExplicit2DJointRemovalReplayState()
+    {
+        using GravitasWorldContext automatic = CreateConstraintContext();
+        SolidBody2D automaticFirst = CreateBody(automatic, Vector2d.Zero);
+        SolidBody2D automaticSecond = CreateBody(automatic, Vector2d.Right * (Fixed64)2);
+        automatic.Constraints2D.RegisterJoint(CreatePin(automaticFirst, automaticSecond));
+
+        using GravitasWorldContext explicitRemoval = CreateConstraintContext();
+        SolidBody2D explicitFirst = CreateBody(explicitRemoval, Vector2d.Zero);
+        SolidBody2D explicitSecond = CreateBody(explicitRemoval, Vector2d.Right * (Fixed64)2);
+        Joint2D explicitJoint = explicitRemoval.Constraints2D.RegisterJoint(CreatePin(explicitFirst, explicitSecond));
+
+        automaticSecond.Deactivate();
+        explicitRemoval.Constraints2D.RemoveJoint(explicitJoint.Id).Should().BeTrue();
+        explicitSecond.Deactivate();
+
+        automatic.ComputeReplayHash().Should().Be(explicitRemoval.ComputeReplayHash());
+        automatic.ComputeReplayHash(GravitasReplayHashMode.AuthoritativeWithSolverCaches)
+            .Should()
+            .Be(explicitRemoval.ComputeReplayHash(GravitasReplayHashMode.AuthoritativeWithSolverCaches));
+    }
+
+    [Fact]
+    public void EndpointTeardown_AfterUnlinkingEarlier2DJoint_ShouldRemoveRemainingJointsInReverseRegistrationOrder()
+    {
+        using GravitasWorldContext context = CreateConstraintContext();
+        SolidBody2D center = CreateBody(context, Vector2d.Zero);
+        var spokes = new[]
+        {
+            CreateBody(context, Vector2d.Right * (Fixed64)2),
+            CreateBody(context, Vector2d.Forward * (Fixed64)2),
+            CreateBody(context, Vector2d.Left * (Fixed64)2),
+            CreateBody(context, -Vector2d.Forward * (Fixed64)2)
+        };
+        var joints = new Joint2D[spokes.Length];
+        context.Diagnostics.Enable(eventCapacity: 32, drawCommandCapacity: 0);
+        for (int i = 0; i < spokes.Length; i++)
+            joints[i] = context.Constraints2D.RegisterJoint(CreatePin(center, spokes[i]));
+
+        spokes[0].Deactivate();
+        context.Diagnostics.Clear();
+
+        center.Deactivate();
+
+        var removedJointIds = new List<int>();
+        foreach (GravitasDiagnosticEvent diagnosticEvent in context.Diagnostics.Events)
+        {
+            if (diagnosticEvent.Kind == GravitasDiagnosticEventKind.JointRemoved)
+                removedJointIds.Add(diagnosticEvent.JointId);
+        }
+
+        removedJointIds.Should().Equal(joints[3].Id, joints[2].Id, joints[1].Id);
     }
 
     [Fact]
@@ -662,6 +782,226 @@ public sealed class Constraint2DServiceTests
         context.Constraints2D.ShouldExcludeLinkedCollision(root.Collider, middle.Collider).Should().BeTrue();
         context.Constraints2D.ShouldExcludeLinkedCollision(middle.Collider, end.Collider).Should().BeTrue();
         context.Constraints2D.ShouldExcludeLinkedCollision(root.Collider, end.Collider).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void DeactivateRagdollLink_ShouldRemoveAtomic2DRuntimeBeforeSameShellReinitialization(bool deactivateRoot)
+    {
+        using GravitasWorldContext context = CreateConstraintContext();
+        SolidBody2D root = CreateBody(context, Vector2d.Zero);
+        SolidBody2D child = CreateBody(context, Vector2d.Right * (Fixed64)2);
+        RagdollRuntime2D runtime = context.Constraints2D.RegisterRagdoll(CreateTwoLinkRagdoll(root, child));
+        Joint2D joint = runtime.GetJoint(0);
+        SolidBody2D endpoint = deactivateRoot ? root : child;
+
+        endpoint.Deactivate();
+
+        runtime.IsRegistered.Should().BeFalse();
+        runtime.IsActive.Should().BeFalse();
+        joint.IsActive.Should().BeFalse();
+        context.Constraints2D.RegisteredRagdollCount.Should().Be(0);
+        context.Constraints2D.RegisteredJointCount.Should().Be(0);
+        context.Constraints2D.EnabledJointCount.Should().Be(0);
+        context.Constraints2D.RemoveRagdoll(runtime.Id).Should().BeFalse();
+        Action reactivate = runtime.ActivateDynamic;
+        Action setPose = () => context.Constraints2D.SetRagdollPoseTargets(
+            runtime,
+            new[] { JointMotor2D.Disabled });
+        Action serializeRemovedRagdoll = () => GravitasSerializationHarness.Serialize(
+            runtime,
+            GravitasSerializationTransport.Json);
+        reactivate.Should().Throw<InvalidOperationException>();
+        setPose.Should().Throw<InvalidOperationException>();
+        serializeRemovedRagdoll.Should().Throw<InvalidOperationException>();
+
+        endpoint.Initialize(Vector2d.Forward * (Fixed64)4);
+
+        context.Constraints2D.ShouldExcludeLinkedCollision(root.Collider, child.Collider).Should().BeFalse();
+    }
+
+    [Fact]
+    public void RemoveRagdoll_ShouldReleaseOwned2DJointsAndEverySelfCollisionSuppression()
+    {
+        using GravitasWorldContext context = CreateConstraintContext();
+        SolidBody2D root = CreateBody(context, Vector2d.Zero);
+        SolidBody2D middle = CreateBody(context, Vector2d.Right * (Fixed64)2);
+        SolidBody2D end = CreateBody(context, Vector2d.Right * (Fixed64)4);
+        RagdollRuntime2D runtime = context.Constraints2D.RegisterRagdoll(new RagdollDefinition2D(
+            new[]
+            {
+                new RagdollLinkDefinition2D(0, root),
+                new RagdollLinkDefinition2D(1, middle),
+                new RagdollLinkDefinition2D(2, end)
+            },
+            new[]
+            {
+                new RagdollJointDefinition2D(0, 1, JointType2D.Pin, JointFrame2D.Identity, JointFrame2D.Identity),
+                new RagdollJointDefinition2D(1, 2, JointType2D.Pin, JointFrame2D.Identity, JointFrame2D.Identity)
+            },
+            RagdollSelfCollisionPolicy.SuppressAllLinks));
+        Action removeOwnedJoint = () => context.Constraints2D.RemoveJoint(runtime.GetJoint(0).Id);
+
+        removeOwnedJoint.Should().Throw<InvalidOperationException>();
+        context.Constraints2D.RemoveRagdoll(runtime.Id).Should().BeTrue();
+
+        runtime.IsRegistered.Should().BeFalse();
+        runtime.IsActive.Should().BeFalse();
+        context.Constraints2D.RegisteredRagdollCount.Should().Be(0);
+        context.Constraints2D.RegisteredJointCount.Should().Be(0);
+        context.Constraints2D.EnabledJointCount.Should().Be(0);
+        context.Constraints2D.ShouldExcludeLinkedCollision(root.Collider, middle.Collider).Should().BeFalse();
+        context.Constraints2D.ShouldExcludeLinkedCollision(middle.Collider, end.Collider).Should().BeFalse();
+        context.Constraints2D.ShouldExcludeLinkedCollision(root.Collider, end.Collider).Should().BeFalse();
+    }
+
+    [Fact]
+    public void DeactivateSingleLinkRagdoll_ShouldRemoveZeroJoint2DRuntime()
+    {
+        using GravitasWorldContext context = CreateConstraintContext();
+        SolidBody2D body = CreateBody(context, Vector2d.Zero);
+        RagdollRuntime2D runtime = context.Constraints2D.RegisterRagdoll(new RagdollDefinition2D(
+            new[] { new RagdollLinkDefinition2D(0, body) },
+            Array.Empty<RagdollJointDefinition2D>()));
+
+        body.Deactivate();
+
+        runtime.IsRegistered.Should().BeFalse();
+        context.Constraints2D.RegisteredRagdollCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void Remove2DRagdolls_OutOfOrder_ShouldKeepMovedRuntimeIndexed()
+    {
+        using GravitasWorldContext context = CreateConstraintContext();
+        SolidBody2D firstRoot = CreateBody(context, Vector2d.Zero);
+        SolidBody2D firstChild = CreateBody(context, Vector2d.Right * (Fixed64)2);
+        SolidBody2D secondRoot = CreateBody(context, Vector2d.Forward * (Fixed64)4);
+        SolidBody2D secondChild = CreateBody(
+            context,
+            Vector2d.Forward * (Fixed64)4 + Vector2d.Right * (Fixed64)2);
+        RagdollRuntime2D first = context.Constraints2D.RegisterRagdoll(CreateTwoLinkRagdoll(firstRoot, firstChild));
+        RagdollRuntime2D second = context.Constraints2D.RegisterRagdoll(CreateTwoLinkRagdoll(secondRoot, secondChild));
+
+        context.Constraints2D.RemoveRagdoll(first.Id).Should().BeTrue();
+        context.Constraints2D.RemoveRagdoll(second.Id).Should().BeTrue();
+
+        first.IsRegistered.Should().BeFalse();
+        second.IsRegistered.Should().BeFalse();
+        context.Constraints2D.RegisteredRagdollCount.Should().Be(0);
+        context.Constraints2D.RegisteredJointCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void Ragdoll2DReplayHash_ShouldNotDependOnRemovalOrder()
+    {
+        using GravitasWorldContext first = CreateConstraintContext();
+        using GravitasWorldContext second = CreateConstraintContext();
+        var firstRagdolls = new RagdollRuntime2D[4];
+        var secondRagdolls = new RagdollRuntime2D[4];
+        for (int i = 0; i < firstRagdolls.Length; i++)
+        {
+            SolidBody2D firstBody = CreateBody(first, Vector2d.Right * (Fixed64)(i * 2));
+            SolidBody2D secondBody = CreateBody(second, Vector2d.Right * (Fixed64)(i * 2));
+            firstRagdolls[i] = first.Constraints2D.RegisterRagdoll(new RagdollDefinition2D(
+                new[] { new RagdollLinkDefinition2D(i, firstBody) },
+                Array.Empty<RagdollJointDefinition2D>()));
+            secondRagdolls[i] = second.Constraints2D.RegisterRagdoll(new RagdollDefinition2D(
+                new[] { new RagdollLinkDefinition2D(i, secondBody) },
+                Array.Empty<RagdollJointDefinition2D>()));
+        }
+
+        first.Constraints2D.RemoveRagdoll(firstRagdolls[0].Id).Should().BeTrue();
+        first.Constraints2D.RemoveRagdoll(firstRagdolls[1].Id).Should().BeTrue();
+        second.Constraints2D.RemoveRagdoll(secondRagdolls[1].Id).Should().BeTrue();
+        second.Constraints2D.RemoveRagdoll(secondRagdolls[0].Id).Should().BeTrue();
+
+        first.ComputeReplayHash().Should().Be(second.ComputeReplayHash());
+        first.ComputeReplayHash(GravitasReplayHashMode.AuthoritativeWithSolverCaches)
+            .Should()
+            .Be(second.ComputeReplayHash(GravitasReplayHashMode.AuthoritativeWithSolverCaches));
+    }
+
+    [Fact]
+    public void RegisterRagdoll_WithBodyInExisting2DRagdoll_ShouldFailBeforeRuntimeMutation()
+    {
+        using GravitasWorldContext context = CreateConstraintContext();
+        SolidBody2D root = CreateBody(context, Vector2d.Zero);
+        SolidBody2D child = CreateBody(context, Vector2d.Right * (Fixed64)2);
+        SolidBody2D other = CreateBody(context, Vector2d.Right * (Fixed64)4);
+        context.Constraints2D.RegisterRagdoll(CreateTwoLinkRagdoll(root, child));
+
+        Action registerOverlap = () => context.Constraints2D.RegisterRagdoll(CreateTwoLinkRagdoll(root, other));
+
+        registerOverlap.Should().Throw<ArgumentException>();
+        context.Constraints2D.RegisteredRagdollCount.Should().Be(1);
+        context.Constraints2D.RegisteredJointCount.Should().Be(1);
+        context.Constraints2D.EnabledJointCount.Should().Be(1);
+    }
+
+    [Fact]
+    public void RegisterRagdoll_WithDuplicate2DBodyLinks_ShouldFailBeforeRuntimeMutation()
+    {
+        using GravitasWorldContext context = CreateConstraintContext();
+        SolidBody2D body = CreateBody(context, Vector2d.Zero);
+        var definition = new RagdollDefinition2D(
+            new[]
+            {
+                new RagdollLinkDefinition2D(0, body),
+                new RagdollLinkDefinition2D(1, body)
+            },
+            Array.Empty<RagdollJointDefinition2D>());
+
+        Action registerDuplicate = () => context.Constraints2D.RegisterRagdoll(definition);
+
+        registerDuplicate.Should().Throw<ArgumentException>();
+        context.Constraints2D.RegisteredRagdollCount.Should().Be(0);
+        context.Constraints2D.RegisteredJointCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void Reset_WithRegistered2DRagdoll_ShouldInvalidateRuntimeAndOwnedJoints()
+    {
+        using GravitasWorldContext context = CreateConstraintContext();
+        SolidBody2D root = CreateBody(context, Vector2d.Zero);
+        SolidBody2D child = CreateBody(context, Vector2d.Right * (Fixed64)2);
+        RagdollRuntime2D runtime = context.Constraints2D.RegisterRagdoll(CreateTwoLinkRagdoll(root, child));
+        Joint2D joint = runtime.GetJoint(0);
+
+        context.Reset();
+
+        runtime.IsRegistered.Should().BeFalse();
+        joint.IsActive.Should().BeFalse();
+        context.Constraints2D.RegisteredRagdollCount.Should().Be(0);
+        context.Constraints2D.RegisteredJointCount.Should().Be(0);
+        Action reactivate = runtime.ActivateDynamic;
+        reactivate.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void Dispose_WithRegistered2DConstraints_ShouldInvalidateHandlesAndRejectFurtherMutation()
+    {
+        GravitasWorldContext context = CreateConstraintContext();
+        SolidBody2D first = CreateBody(context, Vector2d.Zero);
+        SolidBody2D second = CreateBody(context, Vector2d.Right * (Fixed64)2);
+        SolidBody2D root = CreateBody(context, Vector2d.Forward * (Fixed64)4);
+        SolidBody2D child = CreateBody(context, Vector2d.Forward * (Fixed64)6);
+        Joint2D joint = context.Constraints2D.RegisterJoint(CreatePin(first, second));
+        RagdollRuntime2D ragdoll = context.Constraints2D.RegisterRagdoll(CreateTwoLinkRagdoll(root, child));
+
+        context.Dispose();
+
+        joint.IsActive.Should().BeFalse();
+        ragdoll.IsRegistered.Should().BeFalse();
+        context.Constraints2D.RegisteredJointCount.Should().Be(0);
+        context.Constraints2D.RegisteredRagdollCount.Should().Be(0);
+        Action register = () => context.Constraints2D.RegisterJoint(CreatePin(first, second));
+        Action remove = () => context.Constraints2D.RemoveJoint(joint.Id);
+        Action reactivate = ragdoll.ActivateDynamic;
+        register.Should().Throw<ObjectDisposedException>();
+        remove.Should().Throw<ObjectDisposedException>();
+        reactivate.Should().Throw<InvalidOperationException>();
     }
 
     [Fact]

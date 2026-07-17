@@ -22,11 +22,15 @@ public sealed class GravitasConstraint3DService
     private const int DefaultJointCapacity = 64;
 
     private readonly GravitasWorldContext _context;
+    private readonly ConstraintEndpointJointIndex<SolidBody> _jointIdsByBody = new();
+    private readonly SwiftDictionary<SolidBody, RagdollRuntime3D> _ragdollByBody = new();
+    private readonly SwiftDictionary<int, RagdollRuntime3D> _ragdollsById = new();
     private readonly SwiftDictionary<ulong, int> _suppressedColliderPairs = new();
-    private readonly SwiftList<ulong> _suppressedPairsToRemove = new();
-    private readonly SwiftList<RagdollRuntime3D> _ragdolls = new();
     private Joint3D?[] _joints = new Joint3D?[DefaultJointCapacity];
+    private RagdollRuntime3D? _firstRagdoll;
+    private RagdollRuntime3D? _lastRagdoll;
     private int _nextRagdollId;
+    private int _registeredRagdollCount;
     private int _enabledJointCount;
 
     internal GravitasConstraint3DService(GravitasWorldContext context)
@@ -53,7 +57,7 @@ public sealed class GravitasConstraint3DService
     /// <summary>
     /// Gets the number of registered ragdoll runtimes.
     /// </summary>
-    public int RegisteredRagdollCount => _ragdolls.Count;
+    public int RegisteredRagdollCount => _registeredRagdollCount;
 
     internal int EnabledJointCount => _enabledJointCount;
 
@@ -64,6 +68,7 @@ public sealed class GravitasConstraint3DService
     /// </summary>
     public Joint3D RegisterJoint(in JointDefinition3D definition)
     {
+        _context.ThrowIfDisposed();
         ValidateDefinition(definition);
         JointFrame3D frameA = JointFrame3D.FromTransform(definition.LocalFrameA, nameof(definition.LocalFrameA));
         JointFrame3D frameB = JointFrame3D.FromTransform(definition.LocalFrameB, nameof(definition.LocalFrameB));
@@ -72,6 +77,7 @@ public sealed class GravitasConstraint3DService
         EnsureJointCapacity(id + 1);
         var joint = new Joint3D(this, id, definition, frameA, frameB);
         _joints[id] = joint;
+        _jointIdsByBody.Add(joint.BodyA, joint.BodyB, id);
         RegisteredJointCount++;
         _enabledJointCount++;
 
@@ -87,12 +93,24 @@ public sealed class GravitasConstraint3DService
     /// </summary>
     public bool RemoveJoint(int jointId)
     {
+        _context.ThrowIfDisposed();
         if (!TryGetJoint(jointId, out Joint3D? joint))
             return false;
 
+        SwiftThrowHelper.ThrowIfTrue(
+            joint!.OwningRagdoll?.IsRegistered == true,
+            nameof(jointId),
+            "Ragdoll-owned joints cannot be removed independently. Remove the owning ragdoll instead.");
+        return RemoveJointCore(joint);
+    }
+
+    private bool RemoveJointCore(Joint3D joint)
+    {
+        int jointId = joint.Id;
         _joints[jointId] = null;
+        _jointIdsByBody.Remove(jointId);
         RegisteredJointCount--;
-        if (joint!.IsEnabled)
+        if (joint.IsEnabled)
             _enabledJointCount--;
         joint.IsActive = false;
         joint.ClearSolverCache();
@@ -134,6 +152,7 @@ public sealed class GravitasConstraint3DService
     /// </summary>
     public RagdollRuntime3D RegisterRagdoll(RagdollDefinition3D definition)
     {
+        _context.ThrowIfDisposed();
         ValidateRagdollDefinition(definition);
 
         int linkCount = definition.Links.Length;
@@ -167,13 +186,32 @@ public sealed class GravitasConstraint3DService
             AddAllRagdollPairSuppressions(links);
 
         var runtime = new RagdollRuntime3D(
+            this,
             ++_nextRagdollId,
             links,
             joints,
             definition.SelfCollisionPolicy,
             startsActive: !HasKinematicLink(links));
-        _ragdolls.Add(runtime);
+        AppendRagdoll(runtime);
+        _ragdollsById.Add(runtime.Id, runtime);
+        for (int i = 0; i < links.Length; i++)
+            _ragdollByBody.Add(links[i], runtime);
+        for (int i = 0; i < joints.Length; i++)
+            joints[i].OwningRagdoll = runtime;
         return runtime;
+    }
+
+    /// <summary>
+    /// Removes a registered ragdoll and every joint and collision suppression it owns.
+    /// </summary>
+    public bool RemoveRagdoll(int ragdollId)
+    {
+        _context.ThrowIfDisposed();
+        if (!_ragdollsById.TryGetValue(ragdollId, out RagdollRuntime3D? ragdoll))
+            return false;
+
+        RemoveRagdollCore(ragdoll);
+        return true;
     }
 
     /// <summary>
@@ -181,6 +219,7 @@ public sealed class GravitasConstraint3DService
     /// </summary>
     public bool SetJointMotorTarget(int jointId, FixedQuaternion targetLocalRotation)
     {
+        _context.ThrowIfDisposed();
         if (!TryGetJoint(jointId, out Joint3D? joint))
             return false;
 
@@ -198,6 +237,7 @@ public sealed class GravitasConstraint3DService
     /// </summary>
     public bool ClearJointMotorTarget(int jointId)
     {
+        _context.ThrowIfDisposed();
         if (!TryGetJoint(jointId, out Joint3D? joint))
             return false;
 
@@ -210,7 +250,16 @@ public sealed class GravitasConstraint3DService
     /// </summary>
     public void SetRagdollPoseTargets(RagdollRuntime3D ragdoll, ReadOnlySpan<JointMotor3D> motors)
     {
+        _context.ThrowIfDisposed();
         SwiftThrowHelper.ThrowIfNull(ragdoll, nameof(ragdoll));
+        SwiftThrowHelper.ThrowIfArgument(
+            !ReferenceEquals(ragdoll.Service, this),
+            nameof(ragdoll),
+            "Ragdoll targets must be applied through the owning constraint service.");
+        SwiftThrowHelper.ThrowIfTrue(
+            !ragdoll.IsRegistered,
+            nameof(ragdoll),
+            "Removed ragdolls cannot mutate simulation state.");
         SwiftThrowHelper.ThrowIfArgument(
             motors.Length != ragdoll.JointCount,
             nameof(motors),
@@ -219,10 +268,6 @@ public sealed class GravitasConstraint3DService
         for (int i = 0; i < motors.Length; i++)
         {
             Joint3D joint = ragdoll.GetJoint(i);
-            SwiftThrowHelper.ThrowIfArgument(
-                !ReferenceEquals(joint.Service, this),
-                nameof(ragdoll),
-                "Ragdoll targets must be applied through the owning constraint service.");
             joint.SetMotor(motors[i]);
         }
     }
@@ -254,21 +299,13 @@ public sealed class GravitasConstraint3DService
         return true;
     }
 
-    internal void RemoveSuppressionsForCollider(int colliderId)
+    internal void RemoveJointsForBody(SolidBody body)
     {
-        if (colliderId < 0 || _suppressedColliderPairs.Count == 0)
-            return;
+        if (_ragdollByBody.TryGetValue(body, out RagdollRuntime3D? ragdoll))
+            RemoveRagdollCore(ragdoll);
 
-        _suppressedPairsToRemove.FastClear();
-        foreach (var pair in _suppressedColliderPairs)
-        {
-            if (ColliderPairKeyContains(pair.Key, colliderId))
-                _suppressedPairsToRemove.Add(pair.Key);
-        }
-
-        for (int i = 0; i < _suppressedPairsToRemove.Count; i++)
-            _suppressedColliderPairs.Remove(_suppressedPairsToRemove[i]);
-        _suppressedPairsToRemove.FastClear();
+        while (_jointIdsByBody.TryGetLast(body, out int jointId))
+            RemoveJointCore(GetJoint(jointId));
     }
 
     internal void UpdateJointCollisionPolicy(
@@ -298,6 +335,14 @@ public sealed class GravitasConstraint3DService
 
     internal void Reset()
     {
+        RagdollRuntime3D? ragdoll = _firstRagdoll;
+        while (ragdoll != null)
+        {
+            RagdollRuntime3D? next = ragdoll.NextRegistered;
+            ragdoll.Invalidate();
+            ragdoll = next;
+        }
+
         for (int i = 1; i <= PeakJointCount && i < _joints.Length; i++)
         {
             Joint3D? joint = _joints[i];
@@ -306,14 +351,19 @@ public sealed class GravitasConstraint3DService
 
             joint.IsActive = false;
             joint.ClearSolverCache();
+            joint.OwningRagdoll = null;
             _joints[i] = null;
         }
 
         _suppressedColliderPairs.Clear();
-        _suppressedPairsToRemove.FastClear();
-        _ragdolls.FastClear();
+        _jointIdsByBody.Clear();
+        _ragdollByBody.Clear();
+        _ragdollsById.Clear();
+        _firstRagdoll = null;
+        _lastRagdoll = null;
         PeakJointCount = 0;
         RegisteredJointCount = 0;
+        _registeredRagdollCount = 0;
         _enabledJointCount = 0;
         _nextRagdollId = 0;
     }
@@ -333,10 +383,11 @@ public sealed class GravitasConstraint3DService
                 joint!.ContributeReplayHash(ref writer, mode);
         }
 
-        writer.WriteInt32(_ragdolls.Count);
-        for (int i = 0; i < _ragdolls.Count; i++)
+        writer.WriteInt32(_registeredRagdollCount);
+        for (RagdollRuntime3D? ragdoll = _firstRagdoll;
+             ragdoll != null;
+             ragdoll = ragdoll.NextRegistered)
         {
-            RagdollRuntime3D ragdoll = _ragdolls[i];
             writer.WriteInt32(ragdoll.Id);
             writer.WriteEnum(ragdoll.SelfCollisionPolicy);
             writer.WriteBool(ragdoll.IsActive);
@@ -350,12 +401,6 @@ public sealed class GravitasConstraint3DService
         uint min = (uint)(colliderAId <= colliderBId ? colliderAId : colliderBId);
         uint max = (uint)(colliderAId <= colliderBId ? colliderBId : colliderAId);
         return ((ulong)min << 32) | max;
-    }
-
-    private static bool ColliderPairKeyContains(ulong key, int colliderId)
-    {
-        uint id = (uint)colliderId;
-        return (uint)(key >> 32) == id || (uint)key == id;
     }
 
     private void EnsureJointCapacity(int required)
@@ -432,6 +477,10 @@ public sealed class GravitasConstraint3DService
                 !ReferenceEquals(link.Body.Collider, link.Collider),
                 nameof(definition.Links),
                 "Ragdoll link collider must match the link body's collider.");
+            SwiftThrowHelper.ThrowIfArgument(
+                _ragdollByBody.ContainsKey(link.Body),
+                nameof(definition.Links),
+                "A body cannot belong to more than one registered ragdoll.");
 
             for (int j = i + 1; j < definition.Links.Length; j++)
             {
@@ -439,6 +488,10 @@ public sealed class GravitasConstraint3DService
                     link.LinkId == definition.Links[j].LinkId,
                     nameof(definition.Links),
                     "Ragdoll link IDs must be unique.");
+                SwiftThrowHelper.ThrowIfArgument(
+                    ReferenceEquals(link.Body, definition.Links[j].Body),
+                    nameof(definition.Links),
+                    "Ragdoll bodies must be unique.");
             }
         }
 
@@ -495,6 +548,63 @@ public sealed class GravitasConstraint3DService
             for (int j = i + 1; j < links.Length; j++)
                 AddSuppressedColliderPair(links[i].Collider, links[j].Collider);
         }
+    }
+
+    private void RemoveRagdollCore(RagdollRuntime3D ragdoll)
+    {
+        _ragdollsById.Remove(ragdoll.Id);
+        for (int i = 0; i < ragdoll.LinkCount; i++)
+            _ragdollByBody.Remove(ragdoll.GetLink(i));
+
+        if (ragdoll.SelfCollisionPolicy == RagdollSelfCollisionPolicy.SuppressAllLinks)
+        {
+            for (int i = 0; i < ragdoll.LinkCount; i++)
+            {
+                for (int j = i + 1; j < ragdoll.LinkCount; j++)
+                {
+                    RemoveSuppressedColliderPair(
+                        ragdoll.GetLink(i).Collider,
+                        ragdoll.GetLink(j).Collider);
+                }
+            }
+        }
+
+        UnlinkRagdoll(ragdoll);
+        ragdoll.Invalidate();
+
+        for (int i = 0; i < ragdoll.JointCount; i++)
+        {
+            Joint3D joint = ragdoll.GetJoint(i);
+            joint.OwningRagdoll = null;
+            RemoveJointCore(joint);
+        }
+    }
+
+    private void AppendRagdoll(RagdollRuntime3D ragdoll)
+    {
+        ragdoll.PreviousRegistered = _lastRagdoll;
+        if (_lastRagdoll == null)
+            _firstRagdoll = ragdoll;
+        else
+            _lastRagdoll.NextRegistered = ragdoll;
+
+        _lastRagdoll = ragdoll;
+        _registeredRagdollCount++;
+    }
+
+    private void UnlinkRagdoll(RagdollRuntime3D ragdoll)
+    {
+        if (ragdoll.PreviousRegistered == null)
+            _firstRagdoll = ragdoll.NextRegistered;
+        else
+            ragdoll.PreviousRegistered.NextRegistered = ragdoll.NextRegistered;
+
+        if (ragdoll.NextRegistered == null)
+            _lastRagdoll = ragdoll.PreviousRegistered;
+        else
+            ragdoll.NextRegistered.PreviousRegistered = ragdoll.PreviousRegistered;
+
+        _registeredRagdollCount--;
     }
 
     private void AddSuppressedColliderPair(LSCollider colliderA, LSCollider colliderB)

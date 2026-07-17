@@ -184,7 +184,26 @@ change through that ownership path.
 3D joints use context-local IDs allocated by `GravitasConstraint3DService`.
 Removing a joint releases solver cache and linked-collider suppression state,
 but does not reuse that joint ID in the same context. 2D joints follow the same
-context-local ownership principle through `GravitasConstraint2DService`.
+context-local ownership principle through `GravitasConstraint2DService`. A
+joint belongs to the current registered lifetimes of both endpoint bodies.
+Deactivating either endpoint removes every attached joint before the collider's
+reusable ID is released. Intrusive per-endpoint registration links make each
+joint unlink O(1), so teardown is O(attached joints) instead of scanning either
+the endpoint list, the context's peak joint range, or the suppression table.
+The links retain reverse-registration teardown order after unrelated endpoint
+removals.
+
+Ragdolls are atomic articulation registrations. A body can belong to at most
+one registered ragdoll, `RemoveRagdoll(...)` removes the runtime and all owned
+joints and suppression references, and deactivating any link performs the same
+removal automatically. A ragdoll-owned joint cannot be removed independently.
+Removed joint and ragdoll handles remain inspectable, but mutation and
+serialization through those stale handles fail explicitly. Registered ragdolls
+also retain an intrusive registration-order chain: removal is O(1), while replay
+hashing remains ordered by stable ragdoll ID regardless of removal history.
+Context reset and disposal invalidate every registered joint and ragdoll; a
+retained constraint-service reference rejects later mutation once its context is
+disposed.
 
 `SolidBody(agent, collider)` requires the agent and collider to belong to the
 same context. `CollisionPair.Initialize(...)` rejects colliders from different
@@ -332,6 +351,8 @@ or unregisters another hook.
   `PhysicsRuntimeMode.Mixed` is active.
 - 2D joints and ragdolls link `SolidBody2D` instances through planar anchors and
   scalar angles, not projected 3D frames.
+- Joint endpoint lifetime cannot outlive either registered body/collider
+  lifetime; ragdoll link lifetime is atomic across the articulation.
 - Partition ownership is through the corresponding collision service.
 - Query services resolve collider IDs through their owning context only.
 - Diagnostic events and draw commands describe one context only.

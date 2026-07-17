@@ -31,7 +31,7 @@ testing, and replay tools.
 | `SolidBody`, `SolidBody2D`                         | 3D grounding state and 2D planar support state.                                                                                                               |
 | Concrete `LSCollider` and `LSCollider2D` types     | Active/trigger state for bodyless trigger volumes, layer, local ignored physical layers, material, local offset, shape inputs, mixed half-thickness override. |
 | Compound runtime shells and private part colliders | Authored shape/part values needed to rebuild deterministic geometry.                                                                                          |
-| Existing `Joint3D`, `Joint2D`, ragdoll runtimes    | Joint enabled state, type, frames, limits, motors, linked collision policy, ragdoll activation state.                                                         |
+| Existing registered `Joint3D`, `Joint2D`, ragdoll runtimes | Joint enabled state, type, frames, limits, motors, linked collision policy, ragdoll activation state.                                              |
 | Renderer, ECS, networking, pooling, editor state   | Nothing. These remain host-owned.                                                                                                                             |
 
 Runtime-owned state that should not be serialized:
@@ -72,6 +72,13 @@ authoritative.
 Pair-local contact caches and joint solver caches are rebuildable runtime data
 unless a drift investigation explicitly hashes them through
 `GravitasReplayHashMode.AuthoritativeWithSolverCaches`.
+
+Joint and ragdoll handles are valid serialization targets only while registered
+with their owning constraint service. Endpoint teardown removes dependent
+joints and any owning ragdoll before collider identity release; removed handles
+reject save and load operations instead of applying state to a later pooled body
+or collider lifetime. Context reset and disposal invalidate those handles by the
+same rule.
 
 ## Replay Workflow
 
