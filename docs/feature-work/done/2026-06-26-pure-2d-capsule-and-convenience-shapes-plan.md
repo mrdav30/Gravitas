@@ -1,12 +1,24 @@
 # Pure 2D Capsule And Convenience Shapes Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use
+> superpowers:subagent-driven-development (recommended) or
+> superpowers:executing-plans to implement this plan task-by-task. Steps use
+> checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add a first-class deterministic pure 2D capsule collider and lightweight triangle authoring helpers that materialize as existing convex polygons.
+**Goal:** Add a first-class deterministic pure 2D capsule collider and
+lightweight triangle authoring helpers that materialize as existing convex
+polygons.
 
-**Architecture:** Treat the 2D capsule as a real primitive because it is common in character-style physics and should not depend on polygon approximation. Treat 2D triangles as convenience input for `LSPolygonCollider2D`/`ColliderShapeDefinition2D.ConvexPolygon` so the runtime shape model stays simple.
+**Architecture:** Treat the 2D capsule as a real primitive because it is common
+in character-style physics and should not depend on polygon approximation. Treat
+2D triangles as convenience input for
+`LSPolygonCollider2D`/`ColliderShapeDefinition2D.ConvexPolygon` so the runtime
+shape model stays simple.
 
-**Tech Stack:** .NET 8, xUnit v3, BenchmarkDotNet where dense primitive-pair cost needs evidence, FixedMathSharp `Vector2d`/`Fixed64`, SwiftCollections buffers, Gravitas 2D collision/query/CCD/mixed services, Chronicler explicit recording.
+**Tech Stack:** .NET 8, xUnit v3, BenchmarkDotNet where dense primitive-pair
+cost needs evidence, FixedMathSharp `Vector2d`/`Fixed64`, SwiftCollections
+buffers, Gravitas 2D collision/query/CCD/mixed services, Chronicler explicit
+recording.
 
 ---
 
@@ -19,8 +31,8 @@
 
 Pure 2D currently supports circles, axis-aligned boxes, convex polygons, and
 compounds. That is enough for many scenes, but capsules are a first-class shape
-in platformer and character physics because they move smoothly over edges,
-avoid snagging on small corners, and pair naturally with 2D grounding/support.
+in platformer and character physics because they move smoothly over edges, avoid
+snagging on small corners, and pair naturally with 2D grounding/support.
 
 Approximating capsules with convex polygons is possible, but it creates more
 vertices, poorer contact normals, less predictable mass properties, and extra
@@ -101,12 +113,12 @@ without creating a second way to represent triangles.
 - [x] Add `Capsule` to `ColliderType2D`.
 - [x] Add `Capsule` to `ColliderShapeDefinition2DKind`.
 - [x] Implement `LSCapsuleCollider2D` under `src/Gravitas/Colliders/2D`.
-- [x] Add `Radius`, `Height`, `ScaledRadius`, `SegmentStart`, `SegmentEnd`,
-  and capsule bounds rebuild state.
+- [x] Add `Radius`, `Height`, `ScaledRadius`, `SegmentStart`, `SegmentEnd`, and
+      capsule bounds rebuild state.
 - [x] Ensure `LocalOffset`, local scale, compound-local transform, and body
-  rotation rebuild the capsule segment deterministically.
+      rotation rebuild the capsule segment deterministically.
 - [x] Update `ColliderSettings2D` priority ordering. The capsule should sort
-  near circle/convex shapes without destabilizing existing pair priority.
+      near circle/convex shapes without destabilizing existing pair priority.
 
 **Done Criteria**
 
@@ -130,13 +142,13 @@ so `SolidBody2D` response remains physically explainable.
   - moment of inertia scales with mass, radius, and height.
   - equal height and diameter behaves consistently with a circle-like capsule.
 - [x] Implement `CalculateArea()`, `CalculateLocalCenterOfMassOffset()`, and
-  `CalculateMomentOfInertia(...)` for `LSCapsuleCollider2D`.
+      `CalculateMomentOfInertia(...)` for `LSCapsuleCollider2D`.
 - [x] Add explicit comments or docs for any fixed-point constants used in the
-  inertia formula.
+      inertia formula.
 - [x] Update `ColliderShapeSnapshot2D` if capsule shape state needs snapshot
-  coverage.
+      coverage.
 - [x] Update `LSCapsuleCollider2D.RecordData(...)` and shape definition
-  recording paths.
+      recording paths.
 - [x] Add JSON/MemoryPack-compatible save/populate tests for capsule colliders.
 
 **Done Criteria**
@@ -170,16 +182,16 @@ stable contacts for warm-started response.
   - deeply overlapping centers with deterministic fallback normal.
 - [x] Add capsule dispatch to `CollisionDetection2D`.
 - [x] Implement closest-segment and inflated-convex reducers needed for capsule
-  contacts.
+      contacts.
 - [x] Ensure `ContactManifold2D` contact IDs remain stable when a capsule rests
-  on a flat surface.
+      on a flat surface.
 - [x] Add response tests proving capsule contacts warm start and apply friction
-  like existing two-contact manifolds.
+      like existing two-contact manifolds.
 
 **Done Criteria**
 
-- Capsule participates in pure 2D discrete contacts with stable normals,
-  depths, and contact identities.
+- Capsule participates in pure 2D discrete contacts with stable normals, depths,
+  and contact identities.
 - Existing circle/AABB/polygon/compound behavior is unchanged.
 - Warm-started resting capsule contacts are stable.
 
@@ -201,11 +213,11 @@ surfaces to recognize capsules. It also needs to pair cleanly with the planned
   - swept circle.
   - all-hit deterministic ordering.
 - [x] Add query tests for capsule sources where pure 2D CCD performs exact
-  mover-shape validation.
+      mover-shape validation.
 - [x] Add capsule support to `QueryDetection2D`.
 - [x] Add capsule mover/target support to pure 2D CCD exact validation.
 - [x] Add allocation tests for repeated capsule raycast/sweep/overlap queries
-  after warmup.
+      after warmup.
 - [x] Add grounding/support tests once the 2D grounding plan is implemented:
   - capsule body grounds from side/foot contacts using correct planar normal.
   - capsule ground probe radius can derive from capsule radius.
@@ -226,7 +238,7 @@ without mixed support would create a dimensional parity hole.
 **Tasks**
 
 - [x] Add mixed collision tests for 3D primitives against embedded 2D capsule
-  slabs:
+      slabs:
   - sphere.
   - cuboid.
   - capsule.
@@ -234,14 +246,14 @@ without mixed support would create a dimensional parity hole.
   - convex mesh where existing mixed reducers support the target/source family.
 - [x] Add `SweepSphereAgainst2D` tests for capsule slab targets.
 - [x] Add mixed CCD tests for 3D sphere/capsule sources against 2D capsule
-  targets where existing source policy supports exact reducers.
+      targets where existing source policy supports exact reducers.
 - [x] Extend mixed bounds generation for `LSCapsuleCollider2D`.
 - [x] Extend `CollisionDetectionMixed` to handle capsule slab contact points and
-  normals.
+      normals.
 - [x] Extend `GravitasQueryMixedService` sphere-against-2D reducers for capsule
-  slabs.
+      slabs.
 - [x] Ensure compound 2D colliders containing capsules preserve owner identity
-  and stable part ordering.
+      and stable part ordering.
 
 **Done Criteria**
 
@@ -258,8 +270,8 @@ need to make the support surface obvious.
 
 **Tasks**
 
-- [x] Update `docs/wiki/DIMENSIONS.md` with the new 2D shape family and
-  triangle convenience behavior.
+- [x] Update `docs/wiki/DIMENSIONS.md` with the new 2D shape family and triangle
+      convenience behavior.
 - [x] Update `docs/wiki/COLLISION_PIPELINE.md` with capsule contact support.
 - [x] Update `docs/wiki/QUERY_SERVICES.md` with capsule query/CCD coverage.
 - [x] Update `docs/wiki/SERIALIZATION.md` with capsule shape state.

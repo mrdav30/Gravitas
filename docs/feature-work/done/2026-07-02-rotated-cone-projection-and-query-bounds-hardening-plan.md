@@ -32,14 +32,14 @@ mixed query services.
 shape-derived mass properties, support mapping, ray/sweep/query integration,
 mixed mode participation, diagnostics, serialization, and benchmark smoke.
 
-At plan start, one remaining asymmetry was intentionally called out in the
-mixed query surface: `QueryMixed.SweepCircleAgainst3D` treated vertical
-finite-cone targets as exact finite-slab reductions, while rotated finite-cone
-targets used whole-cone projection and reported
-`PhysicsQueryReducerKind.ConservativeFallback`. That was safe and honest, but
-it could report earlier or extra hits when a tilted cone's whole X/Z projection
-overlapped the swept 2D slab even though the cone volume
-clipped to that slab does not.
+At plan start, one remaining asymmetry was intentionally called out in the mixed
+query surface: `QueryMixed.SweepCircleAgainst3D` treated vertical finite-cone
+targets as exact finite-slab reductions, while rotated finite-cone targets used
+whole-cone projection and reported
+`PhysicsQueryReducerKind.ConservativeFallback`. That was safe and honest, but it
+could report earlier or extra hits when a tilted cone's whole X/Z projection
+overlapped the swept 2D slab even though the cone volume clipped to that slab
+does not.
 
 This plan owns the investigation and promotion of rotated cone slab reducers to
 exact. It also captures adjacent cone bound work because tighter analytic cone
@@ -277,11 +277,11 @@ boundary without making the feature sound unfinished.
 - Mixed rotated cone short in-process benchmark smoke:
   - 64 dense targets: standard rotated cone 3.101 ms, long/narrow 2.913 ms,
     short/wide 2.708 ms.
-  - 1024 dense targets: standard rotated cone 58.245 ms, long/narrow
-    48.056 ms, short/wide 42.983 ms.
-  - BenchmarkDotNet reported tiny in-process memory noise on some rows
-    (`2 B` to `69 B`), but the focused xUnit allocation guard for the same
-    mixed primitive finite-slab family reported zero steady-state allocations.
+  - 1024 dense targets: standard rotated cone 58.245 ms, long/narrow 48.056 ms,
+    short/wide 42.983 ms.
+  - BenchmarkDotNet reported tiny in-process memory noise on some rows (`2 B` to
+    `69 B`), but the focused xUnit allocation guard for the same mixed primitive
+    finite-slab family reported zero steady-state allocations.
 - 3D cone-volume query short in-process benchmark smoke:
   - baseline populated cone query: 1.176 ms for 64 targets.
   - long/narrow query: 1.096 ms.

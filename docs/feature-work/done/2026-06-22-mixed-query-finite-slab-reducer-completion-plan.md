@@ -1,8 +1,9 @@
 # Mixed Query Finite-Slab Reducer Completion Plan
 
-> **For agentic workers:** Treat this as a living context guide. Update progress as
-> workstreams complete, and move genuinely deferred discoveries into their own
-> plan or the evergreen trackers instead of leaving vague wiki caveats behind.
+> **For agentic workers:** Treat this as a living context guide. Update progress
+> as workstreams complete, and move genuinely deferred discoveries into their
+> own plan or the evergreen trackers instead of leaving vague wiki caveats
+> behind.
 
 **Goal:** Promote the remaining mixed swept-circle conservative target families
 to exact finite-slab reducers where deterministic shape math can provide
@@ -20,9 +21,8 @@ and CCD services.
 
 ---
 
-**Date:** 2026-06-22
-**Status:** Done
-**Owner:** Gravitas query and mixed CCD hardening
+**Date:** 2026-06-22 **Status:** Done **Owner:** Gravitas query and mixed CCD
+hardening
 
 ## Purpose
 
@@ -33,8 +33,8 @@ labeled `ConservativeFallback` path. That fallback was safe from false
 negatives, but it could report earlier or extra hits in dense mixed scenes.
 
 For alpha, that policy should either become exact for the current runtime shape
-families or remain explicitly justified by benchmark evidence and documented
-API semantics. This plan owns that closure so the completed query hardening plan
+families or remain explicitly justified by benchmark evidence and documented API
+semantics. This plan owns that closure so the completed query hardening plan
 does not carry hidden follow-up work.
 
 ## Relationship To Existing Plans
@@ -56,20 +56,20 @@ does not carry hidden follow-up work.
 **Tasks**
 
 - [x] Add red tests for rotated capsule and rotated finite-cylinder targets
-  where the circumsphere fallback reports an early or extra hit.
+      where the circumsphere fallback reports an early or extra hit.
 - [x] Research and implement deterministic fixed-point reducers for a 2D circle
-  slab swept against arbitrarily oriented capsules and finite cylinders.
+      slab swept against arbitrarily oriented capsules and finite cylinders.
 - [x] Preserve world-Y capsule/cylinder fast paths and exact labels.
 - [x] Keep `ConservativeFallback` only for cases that remain deliberately
-  unsupported after measured evidence.
+      unsupported after measured evidence.
 - [x] Add benchmark rows for dense rotated capsule/cylinder mixed sweeps.
 
 **Implementation notes**
 
-- Rotated capsule and finite-cylinder targets now use deterministic
-  finite-slab projection support reducers instead of the mixed circumsphere
-  fallback. The reducer sweeps the 2D circle in X/Z against the target volume
-  clipped to the slab Y interval.
+- Rotated capsule and finite-cylinder targets now use deterministic finite-slab
+  projection support reducers instead of the mixed circumsphere fallback. The
+  reducer sweeps the 2D circle in X/Z against the target volume clipped to the
+  slab Y interval.
 - World-Y capsule/cylinder paths still use the cheaper vertical-interval
   reducers.
 - Mesh and compound target fallback policy was closed by Workstream 2.
@@ -81,14 +81,15 @@ does not carry hidden follow-up work.
 **Tasks**
 
 - [x] Add tests that distinguish finite-slab truth from current fallback hits
-  for mesh triangle targets and authored compound targets.
+      for mesh triangle targets and authored compound targets.
 - [x] Implement exact finite-slab reducers against mesh triangle candidates,
-  reducing hits back to the owning mesh collider with stable triangle ordering.
+      reducing hits back to the owning mesh collider with stable triangle
+      ordering.
 - [x] Implement compound target reduction over supported parts in authored part
-  order, preserving one owner hit and deterministic tie-breaks.
+      order, preserving one owner hit and deterministic tie-breaks.
 - [x] Share reducer policy with mixed static CCD collectors.
 - [x] Benchmark mesh and compound mixed sweeps at sparse, dense, and
-  false-positive-heavy scales.
+      false-positive-heavy scales.
 
 **Implementation notes**
 
@@ -114,14 +115,14 @@ does not carry hidden follow-up work.
 **Tasks**
 
 - [x] Add a high-vertex convex mesh source benchmark beyond the current cube
-  source row.
+      source row.
 - [x] Measure whether per-support full-vertex scans are acceptable for alpha
-  query workloads.
+      query workloads.
 - [x] If measured cost is high, prototype deterministic support acceleration or
-  cached directional support data without introducing floating-point or
-  platform-order dependence.
+      cached directional support data without introducing floating-point or
+      platform-order dependence.
 - [x] Keep concave mesh sources unsupported; hosts should use authored convex
-  decomposition into `LSCompoundCollider` parts.
+      decomposition into `LSCompoundCollider` parts.
 
 **Implementation notes**
 
@@ -151,12 +152,13 @@ does not carry hidden follow-up work.
 **Tasks**
 
 - [x] Ensure `GravitasQuerySummaryDiagnosticView` remains accurate for exact
-  attempt, accepted hit, fallback hit, and rejected fallback candidate counts.
+      attempt, accepted hit, fallback hit, and rejected fallback candidate
+      counts.
 - [x] Update `docs/wiki/QUERY_SERVICES.md`, `COLLISION_PIPELINE.md`, and
-  `DIMENSIONS.md` with final exact/fallback policy.
+      `DIMENSIONS.md` with final exact/fallback policy.
 - [x] Validate Release and ReleaseLean builds/tests.
 - [x] Move this plan to `docs/feature-work/done` when all mixed query reducer
-  work owned by this plan is closed or intentionally extracted.
+      work owned by this plan is closed or intentionally extracted.
 
 **Implementation notes**
 
@@ -167,8 +169,8 @@ does not carry hidden follow-up work.
   `SweepSphereAgainst2D` prism-bound candidates.
 - Removed the per-mesh triangle-candidate sort from the mixed mesh target
   reducer. Equal-distance hits now preserve lower authored triangle index by
-  tracking the best triangle index directly, avoiding an unnecessary `O(k log k)`
-  step in the hot path.
+  tracking the best triangle index directly, avoiding an unnecessary
+  `O(k log k)` step in the hot path.
 - Wiki docs now state the final policy for this plan: `SweepCircleAgainst3D`
   target reducers are exact for supported 3D target families; the remaining
   public mixed query fallback is the opposite source direction.

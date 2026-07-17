@@ -8,7 +8,6 @@ using Gravitas.Constraints;
 using Gravitas.Materials;
 using Gravitas.Tests.Support;
 using GridForge.Configuration;
-using System.Linq;
 using Xunit;
 
 namespace Gravitas.Tests.Determinism;

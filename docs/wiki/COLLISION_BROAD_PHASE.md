@@ -9,8 +9,7 @@ and deterministic pair routing.
 
 - 3D uses `PhysicsPartition`.
 - 2D uses `PhysicsPartition2D` on the internal Y=0 storage plane.
-- Mixed uses `PhysicsMixedPartition` with dimension-tagged 3D/2D candidate
-  keys.
+- Mixed uses `PhysicsMixedPartition` with dimension-tagged 3D/2D candidate keys.
 - Partitions store context-local collider IDs, not collider references.
 - Static, kinematic, dynamic, and awake-dynamic membership are separate.
 - Sleeping colliders remain query-visible but do not activate solver work by
@@ -20,11 +19,11 @@ and deterministic pair routing.
 
 ## Partition Owners
 
-| Domain | Partition type | Owner service |
-| --- | --- | --- |
-| 3D | `PhysicsPartition` | `GravitasCollisionService` |
-| 2D | `PhysicsPartition2D` | `GravitasCollision2DService` |
-| Mixed | `PhysicsMixedPartition` | `GravitasMixedCollisionService` |
+| Domain | Partition type          | Owner service                   |
+| ------ | ----------------------- | ------------------------------- |
+| 3D     | `PhysicsPartition`      | `GravitasCollisionService`      |
+| 2D     | `PhysicsPartition2D`    | `GravitasCollision2DService`    |
+| Mixed  | `PhysicsMixedPartition` | `GravitasMixedCollisionService` |
 
 Partition ownership must flow through the owning service. Do not manually return
 the same partition through a second path; that risks double-release and stale
@@ -41,8 +40,8 @@ one bounds/shape rebuild.
 `GravitasCollisionService.PartitionObject(...)`:
 
 1. validates that the collider belongs to the service context.
-2. asks GridForge `GridTracer.GetCoveredVoxelsInto(...)` for topology-aware voxel
-   coverage.
+2. asks GridForge `GridTracer.GetCoveredVoxelsInto(...)` for topology-aware
+   voxel coverage.
 3. uses GridForge traversal state and topology metrics for conservative
    voxel-position padding.
 4. suppresses duplicate voxel visits with GridForge traversal helpers and
@@ -56,8 +55,8 @@ When a collider leaves a voxel, Gravitas removes the collider ID from the
 partition but keeps the empty `PhysicsPartition` attached to that voxel. Empty
 partitions are inactive and query-invisible. `PhysicsSettings`
 `RetainedPartitionTimeToKillFrames` controls the deterministic retention window,
-and `RetainedPartitionRetirementSweepBudget` bounds how many retained
-partitions the collision service checks per distribution step.
+and `RetainedPartitionRetirementSweepBudget` bounds how many retained partitions
+the collision service checks per distribution step.
 
 `GravitasWorldContext.Reset()` is a stronger session boundary: it detaches
 retained Gravitas partition payloads from GridForge voxels, clears retained
@@ -75,8 +74,8 @@ That Y=0 plane is broad-phase identity only. It is not physical thickness and
 does not imply mixed collision. Mixed collision uses separate embedded 2D slab
 state owned by `LSCollider2D` and `GravitasMixedCollisionService`.
 
-2D partitions retain and retire empty payloads through the same
-deterministic TTK settings and return them to the 2D collision service's pool.
+2D partitions retain and retire empty payloads through the same deterministic
+TTK settings and return them to the 2D collision service's pool.
 
 ## Mixed Partitioning
 
@@ -93,13 +92,13 @@ comparable because the services intentionally own separate ID spaces.
 
 Membership is explicit:
 
-| Collider/body state | Partition bucket |
-| --- | --- |
-| Bodyless collider | static |
-| Body with all translation axes frozen | static |
-| `IsKinematic == true` | kinematic |
-| Movable non-kinematic body | dynamic |
-| Awake movable non-kinematic body | dynamic plus awake-dynamic |
+| Collider/body state                   | Partition bucket           |
+| ------------------------------------- | -------------------------- |
+| Bodyless collider                     | static                     |
+| Body with all translation axes frozen | static                     |
+| `IsKinematic == true`                 | kinematic                  |
+| Movable non-kinematic body            | dynamic                    |
+| Awake movable non-kinematic body      | dynamic plus awake-dynamic |
 
 Partial 3D or planar position freezes remain dynamic. The solver constrains the
 frozen axes later through effective mass/inertia.
@@ -131,17 +130,17 @@ until a deterministic wake reason changes a body or collider shape state.
 Candidate pairs are rejected before exact shape work when any required filter
 fails:
 
-| Filter | Notes |
-| --- | --- |
-| Context | Colliders must belong to the same context. |
-| Active state | Inactive colliders do not produce pairs. |
-| Same agent | Host-owned same-agent collisions are suppressed. |
-| Explicit hierarchy | Parent/child and sibling filters use dimension-tagged hierarchy keys. |
-| Collision matrix | Context-wide physical layer matrix must allow the pair. |
-| Collider-local ignored layers | Either collider can reject the other collider's layer. |
-| Trigger policy | Bodyless trigger volumes skip physical response and emit trigger events only when exactly one collider is a trigger and the other collider is body-owned. |
-| Bounds | Broad bounds must overlap before narrow phase. |
-| Awake/resting policy | Sleeping/sleeping fresh links exit; retained resting links can keep island state. |
+| Filter                        | Notes                                                                                                                                                     |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Context                       | Colliders must belong to the same context.                                                                                                                |
+| Active state                  | Inactive colliders do not produce pairs.                                                                                                                  |
+| Same agent                    | Host-owned same-agent collisions are suppressed.                                                                                                          |
+| Explicit hierarchy            | Parent/child and sibling filters use dimension-tagged hierarchy keys.                                                                                     |
+| Collision matrix              | Context-wide physical layer matrix must allow the pair.                                                                                                   |
+| Collider-local ignored layers | Either collider can reject the other collider's layer.                                                                                                    |
+| Trigger policy                | Bodyless trigger volumes skip physical response and emit trigger events only when exactly one collider is a trigger and the other collider is body-owned. |
+| Bounds                        | Broad bounds must overlap before narrow phase.                                                                                                            |
+| Awake/resting policy          | Sleeping/sleeping fresh links exit; retained resting links can keep island state.                                                                         |
 
 Collider-local ignored layer masks affect collision pairs, trigger pairs,
 internal CCD target eligibility, and grounding/support acceptance. Public query
@@ -203,16 +202,16 @@ renderer distance or presentation priority.
 6. returns the collider ID to the context-local physics service.
 7. marks the collider inactive.
 
-2D and mixed cleanup follow the same ownership principle through their
-owning services.
+2D and mixed cleanup follow the same ownership principle through their owning
+services.
 
 ## Source Map
 
-| Area | Source |
-| --- | --- |
-| 3D partition service | [`src/Gravitas/Core/3D/GravitasCollisionService.cs`](../../src/Gravitas/Core/3D/GravitasCollisionService.cs) |
-| 2D partition service | [`src/Gravitas/Core/2D/GravitasCollision2DService.cs`](../../src/Gravitas/Core/2D/GravitasCollision2DService.cs) |
-| Mixed partition service | [`src/Gravitas/Core/Mixed/GravitasMixedCollisionService.Partitioning.cs`](../../src/Gravitas/Core/Mixed/GravitasMixedCollisionService.Partitioning.cs) |
-| Partition payloads | [`src/Gravitas/Partitions`](../../src/Gravitas/Partitions) |
-| Collider partition state | [`src/Gravitas/Colliders/State`](../../src/Gravitas/Colliders/State) |
-| Local filtering | [`src/Gravitas/CollisionHandling/ColliderCollisionFilter.cs`](../../src/Gravitas/CollisionHandling/ColliderCollisionFilter.cs) |
+| Area                     | Source                                                                                                                                                 |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 3D partition service     | [`src/Gravitas/Core/3D/GravitasCollisionService.cs`](../../src/Gravitas/Core/3D/GravitasCollisionService.cs)                                           |
+| 2D partition service     | [`src/Gravitas/Core/2D/GravitasCollision2DService.cs`](../../src/Gravitas/Core/2D/GravitasCollision2DService.cs)                                       |
+| Mixed partition service  | [`src/Gravitas/Core/Mixed/GravitasMixedCollisionService.Partitioning.cs`](../../src/Gravitas/Core/Mixed/GravitasMixedCollisionService.Partitioning.cs) |
+| Partition payloads       | [`src/Gravitas/Partitions`](../../src/Gravitas/Partitions)                                                                                             |
+| Collider partition state | [`src/Gravitas/Colliders/State`](../../src/Gravitas/Colliders/State)                                                                                   |
+| Local filtering          | [`src/Gravitas/CollisionHandling/ColliderCollisionFilter.cs`](../../src/Gravitas/CollisionHandling/ColliderCollisionFilter.cs)                         |

@@ -1,8 +1,7 @@
 # Alpha Physics Follow-Up Hardening Plan
 
-**Date:** 2026-06-01
-**Status:** Done
-**Owner:** Gravitas runtime/collision hardening
+**Date:** 2026-06-01 **Status:** Done **Owner:** Gravitas runtime/collision
+hardening
 
 ## Purpose
 
@@ -30,14 +29,14 @@ complexity without hiding physics semantics.
   - `GravitasQuery2DService`
   - `GravitasQuery3DService`
 - [x] Decide whether the extraction belongs in Gravitas support code or as a
-  small reusable GridForge helper. Push the primitive into GridForge if
-  Gravitas is hand-rolling generic grid traversal.
+      small reusable GridForge helper. Push the primitive into GridForge if
+      Gravitas is hand-rolling generic grid traversal.
 - [x] Preserve deterministic voxel ordering, partition identity, and caller
-  ownership of temporary buffers.
+      ownership of temporary buffers.
 - [x] Add regression tests for sparse, dense, edge, negative-coordinate, and
-  retained-partition traversal cases.
+      retained-partition traversal cases.
 - [x] Capture a post-migration benchmark baseline for the hot paths so future
-  changes can compare the same benchmark selections.
+      changes can compare the same benchmark selections.
 
 **Exit Criteria**
 
@@ -76,75 +75,75 @@ baseline is recorded here for future comparison.
 
 ### CollisionPartitionBenchmarks
 
-| Method | Size | Mean | Allocated |
-| --- | ---: | ---: | ---: |
-| CreateAndRegisterDynamicSpheres | 64 | 2,371.1 us | 2665388 B |
-| CreateAndPartitionStaticSpheres | 64 | 2,083.6 us | 2585585 B |
-| SimulatePartitionedDynamicSpheres | 64 | 186.3 us | 0 B |
+| Method                            | Size |       Mean | Allocated |
+| --------------------------------- | ---: | ---------: | --------: |
+| CreateAndRegisterDynamicSpheres   |   64 | 2,371.1 us | 2665388 B |
+| CreateAndPartitionStaticSpheres   |   64 | 2,083.6 us | 2585585 B |
+| SimulatePartitionedDynamicSpheres |   64 |   186.3 us |       0 B |
 
 ### MixedBroadPhaseBenchmarks
 
-| Method | Size | Mean | Allocated |
-| --- | ---: | ---: | ---: |
-| SparseCandidateGathering | 64 | 727.1 us | 64 B |
-| DenseCandidateGathering | 64 | 1,731.6 us | 42688 B |
-| RetainedPartitionCleanupAfterChurn | 64 | 1,228.0 us | 64 B |
-| SparseCandidateGathering | 1024 | 50,536.5 us | 64 B |
-| DenseCandidateGathering | 1024 | 77,166.6 us | 480448 B |
-| RetainedPartitionCleanupAfterChurn | 1024 | 63,522.5 us | 64 B |
-| SparseCandidateGathering | 4096 | 617,662.2 us | 64 B |
-| DenseCandidateGathering | 4096 | 214,682.5 us | 962368 B |
-| RetainedPartitionCleanupAfterChurn | 4096 | 600,213.1 us | 64 B |
+| Method                             | Size |         Mean | Allocated |
+| ---------------------------------- | ---: | -----------: | --------: |
+| SparseCandidateGathering           |   64 |     727.1 us |      64 B |
+| DenseCandidateGathering            |   64 |   1,731.6 us |   42688 B |
+| RetainedPartitionCleanupAfterChurn |   64 |   1,228.0 us |      64 B |
+| SparseCandidateGathering           | 1024 |  50,536.5 us |      64 B |
+| DenseCandidateGathering            | 1024 |  77,166.6 us |  480448 B |
+| RetainedPartitionCleanupAfterChurn | 1024 |  63,522.5 us |      64 B |
+| SparseCandidateGathering           | 4096 | 617,662.2 us |      64 B |
+| DenseCandidateGathering            | 4096 | 214,682.5 us |  962368 B |
+| RetainedPartitionCleanupAfterChurn | 4096 | 600,213.1 us |      64 B |
 
 ### PartitionCullingBenchmarks
 
-| Method | Size | Mean | Allocated |
-| --- | ---: | ---: | ---: |
-| RepartitionTeleportedDynamicSpheres | 64 | 679,202.86 ns | 72640 B |
-| RemoveAndReAddDynamicPartitionMembers | 64 | 1,094.55 ns | 0 B |
-| DistributeSleepingOnlyDynamicPartition | 64 | 12.20 ns | 0 B |
-| RecheckCulledPairAfterColliderMove | 64 | 469.51 ns | 0 B |
+| Method                                 | Size |          Mean | Allocated |
+| -------------------------------------- | ---: | ------------: | --------: |
+| RepartitionTeleportedDynamicSpheres    |   64 | 679,202.86 ns |   72640 B |
+| RemoveAndReAddDynamicPartitionMembers  |   64 |   1,094.55 ns |       0 B |
+| DistributeSleepingOnlyDynamicPartition |   64 |      12.20 ns |       0 B |
+| RecheckCulledPairAfterColliderMove     |   64 |     469.51 ns |       0 B |
 
 ### Physics2DBenchmarks
 
-| Method | Size | Mean | Allocated |
-| --- | ---: | ---: | ---: |
-| IntegrateDynamicBodies | 64 | 20,406.6 ns | 0 B |
-| ResolveOverlappingCirclePairs_SweepBaseline | 64 | 21,740.1 ns | 0 B |
-| ResolveOverlappingCirclePairs | 64 | 127,667.1 ns | 0 B |
-| SimulateUnchangedColliders | 64 | 899.0 ns | 0 B |
-| CheckRequiredShapePairs | 64 | 70,889.3 ns | 0 B |
-| OverlapCircleAll_SweepBaseline | 64 | 23,664.9 ns | 0 B |
-| OverlapCircleAll | 64 | 190,633.7 ns | 0 B |
-| RaycastAll_SweepBaseline | 64 | 7,856.1 ns | 0 B |
-| RaycastAll | 64 | 11,401.8 ns | 0 B |
-| SweepCircleAll_NoHit | 64 | 2,111.0 ns | 0 B |
-| SweepCircleAll_SparseHit | 64 | 29,430.5 ns | 0 B |
-| SweepCircleAll_DenseHit | 64 | 338,467.9 ns | 0 B |
-| DeactivateOverlappingPairOwners | 64 | 275,750.0 ns | 0 B |
-| IntegrateDynamicBodies | 1024 | 357,359.2 ns | 0 B |
-| ResolveOverlappingCirclePairs_SweepBaseline | 1024 | 1,699,518.2 ns | 0 B |
-| ResolveOverlappingCirclePairs | 1024 | 4,838,581.2 ns | 0 B |
-| SimulateUnchangedColliders | 1024 | 33,061.7 ns | 0 B |
-| CheckRequiredShapePairs | 1024 | 1,283,779.0 ns | 0 B |
-| OverlapCircleAll_SweepBaseline | 1024 | 261,118.5 ns | 0 B |
-| OverlapCircleAll | 1024 | 229,527.2 ns | 0 B |
-| RaycastAll_SweepBaseline | 1024 | 237,793.7 ns | 0 B |
-| RaycastAll | 1024 | 11,181.0 ns | 0 B |
-| SweepCircleAll_NoHit | 1024 | 2,047.7 ns | 0 B |
-| SweepCircleAll_SparseHit | 1024 | 30,524.5 ns | 0 B |
-| SweepCircleAll_DenseHit | 1024 | 498,968.2 ns | 0 B |
-| DeactivateOverlappingPairOwners | 1024 | 6,544,433.3 ns | 0 B |
+| Method                                      | Size |           Mean | Allocated |
+| ------------------------------------------- | ---: | -------------: | --------: |
+| IntegrateDynamicBodies                      |   64 |    20,406.6 ns |       0 B |
+| ResolveOverlappingCirclePairs_SweepBaseline |   64 |    21,740.1 ns |       0 B |
+| ResolveOverlappingCirclePairs               |   64 |   127,667.1 ns |       0 B |
+| SimulateUnchangedColliders                  |   64 |       899.0 ns |       0 B |
+| CheckRequiredShapePairs                     |   64 |    70,889.3 ns |       0 B |
+| OverlapCircleAll_SweepBaseline              |   64 |    23,664.9 ns |       0 B |
+| OverlapCircleAll                            |   64 |   190,633.7 ns |       0 B |
+| RaycastAll_SweepBaseline                    |   64 |     7,856.1 ns |       0 B |
+| RaycastAll                                  |   64 |    11,401.8 ns |       0 B |
+| SweepCircleAll_NoHit                        |   64 |     2,111.0 ns |       0 B |
+| SweepCircleAll_SparseHit                    |   64 |    29,430.5 ns |       0 B |
+| SweepCircleAll_DenseHit                     |   64 |   338,467.9 ns |       0 B |
+| DeactivateOverlappingPairOwners             |   64 |   275,750.0 ns |       0 B |
+| IntegrateDynamicBodies                      | 1024 |   357,359.2 ns |       0 B |
+| ResolveOverlappingCirclePairs_SweepBaseline | 1024 | 1,699,518.2 ns |       0 B |
+| ResolveOverlappingCirclePairs               | 1024 | 4,838,581.2 ns |       0 B |
+| SimulateUnchangedColliders                  | 1024 |    33,061.7 ns |       0 B |
+| CheckRequiredShapePairs                     | 1024 | 1,283,779.0 ns |       0 B |
+| OverlapCircleAll_SweepBaseline              | 1024 |   261,118.5 ns |       0 B |
+| OverlapCircleAll                            | 1024 |   229,527.2 ns |       0 B |
+| RaycastAll_SweepBaseline                    | 1024 |   237,793.7 ns |       0 B |
+| RaycastAll                                  | 1024 |    11,181.0 ns |       0 B |
+| SweepCircleAll_NoHit                        | 1024 |     2,047.7 ns |       0 B |
+| SweepCircleAll_SparseHit                    | 1024 |    30,524.5 ns |       0 B |
+| SweepCircleAll_DenseHit                     | 1024 |   498,968.2 ns |       0 B |
+| DeactivateOverlappingPairOwners             | 1024 | 6,544,433.3 ns |       0 B |
 
 ### QueryServiceBenchmarks
 
-| Method | Size | Mean | Allocated |
-| --- | ---: | ---: | ---: |
-| RaycastAllAcrossPopulatedContext | 64 | 132.845 us | 672 B |
-| OverlapCircleAllAcrossPopulatedContext | 64 | 9.712 us | 0 B |
-| DirectionalOverlapCircleAcrossPopulatedContext | 64 | 9.922 us | 0 B |
-| RaycastAcrossTwoOverlappingContexts | 64 | 272.285 us | 1344 B |
-| SweepSphereAllAcrossPopulatedContext | 64 | 262.301 us | 0 B |
+| Method                                         | Size |       Mean | Allocated |
+| ---------------------------------------------- | ---: | ---------: | --------: |
+| RaycastAllAcrossPopulatedContext               |   64 | 132.845 us |     672 B |
+| OverlapCircleAllAcrossPopulatedContext         |   64 |   9.712 us |       0 B |
+| DirectionalOverlapCircleAcrossPopulatedContext |   64 |   9.922 us |       0 B |
+| RaycastAcrossTwoOverlappingContexts            |   64 | 272.285 us |    1344 B |
+| SweepSphereAllAcrossPopulatedContext           |   64 | 262.301 us |       0 B |
 
 ## Phase 2: Mixed Swept-Circle Precision
 
@@ -162,16 +161,16 @@ shape-specific solvers are justified.
 **Tasks**
 
 - [x] Add targeted tests that demonstrate current over-report behavior at slab
-  corners and tall thickness values.
+      corners and tall thickness values.
 - [x] Design a deterministic swept-circle/slab or swept-prism solver that keeps
-  stable ordering and explicit failure behavior.
+      stable ordering and explicit failure behavior.
 - [x] Compare the exact solver against the current swept-sphere proxy for:
   - correctness on corner/edge cases.
   - false-positive rate.
   - steady-state allocation.
   - sparse and dense query cost.
 - [x] Keep the proxy path only if it remains the better alpha tradeoff and is
-  clearly documented as conservative.
+      clearly documented as conservative.
 
 **Exit Criteria**
 
@@ -180,19 +179,19 @@ shape-specific solvers are justified.
 
 **Progress - 2026-06-17**
 
-Implemented the first exact finite-slab solver for
-`SweepCircleAgainst3D` sphere targets. The sphere solver keeps the 2D source as
-a finite vertical slab: vertical overlap determines the sphere's effective
-planar reach, then a deterministic 2D point sweep produces the time of impact.
-This removes false positives where the old `max(radius, halfThickness)`
-swept-sphere proxy inflated horizontal reach for tall slabs or rounded slab
-corner cases.
+Implemented the first exact finite-slab solver for `SweepCircleAgainst3D` sphere
+targets. The sphere solver keeps the 2D source as a finite vertical slab:
+vertical overlap determines the sphere's effective planar reach, then a
+deterministic 2D point sweep produces the time of impact. This removes false
+positives where the old `max(radius, halfThickness)` swept-sphere proxy inflated
+horizontal reach for tall slabs or rounded slab corner cases.
 
 The broad-phase query bounds now use the swept circle-slab volume instead of the
 proxy sphere radius. Capsule, cuboid, finite cylinder, mesh, and compound
 targets still use the existing conservative swept-sphere worker fallback. That
-fallback remains documented as an alpha tradeoff in `docs/wiki/QUERY_SERVICES.md`
-until shape-specific finite-slab solvers replace it.
+fallback remains documented as an alpha tradeoff in
+`docs/wiki/QUERY_SERVICES.md` until shape-specific finite-slab solvers replace
+it.
 
 New tests:
 
@@ -216,14 +215,14 @@ dotnet tests\Gravitas.Benchmarks\bin\Release\net8.0\Gravitas.Benchmarks.dll mixe
 BenchmarkDotNet ShortRun baseline on Windows 11, .NET 8.0.28, Intel Core
 i7-9700K:
 
-| Method | Size | Mean | Allocated |
-| --- | ---: | ---: | ---: |
-| SweepCircleAgainst3DAll_SparseSphereTargets | 64 | 549.2 us | 0 B |
-| SweepCircleAgainst3DAll_DenseSphereTargets | 64 | 243.5 us | 0 B |
-| SweepCircleAgainst3DAll_CornerProxyMissSphereTargets | 64 | 143.3 us | 0 B |
-| SweepCircleAgainst3DAll_SparseSphereTargets | 1024 | 17,070.5 us | 0 B |
-| SweepCircleAgainst3DAll_DenseSphereTargets | 1024 | 6,885.9 us | 0 B |
-| SweepCircleAgainst3DAll_CornerProxyMissSphereTargets | 1024 | 4,016.7 us | 0 B |
+| Method                                               | Size |        Mean | Allocated |
+| ---------------------------------------------------- | ---: | ----------: | --------: |
+| SweepCircleAgainst3DAll_SparseSphereTargets          |   64 |    549.2 us |       0 B |
+| SweepCircleAgainst3DAll_DenseSphereTargets           |   64 |    243.5 us |       0 B |
+| SweepCircleAgainst3DAll_CornerProxyMissSphereTargets |   64 |    143.3 us |       0 B |
+| SweepCircleAgainst3DAll_SparseSphereTargets          | 1024 | 17,070.5 us |       0 B |
+| SweepCircleAgainst3DAll_DenseSphereTargets           | 1024 |  6,885.9 us |       0 B |
+| SweepCircleAgainst3DAll_CornerProxyMissSphereTargets | 1024 |  4,016.7 us |       0 B |
 
 ## Phase 3: Retained Partition Reset Semantics
 
@@ -241,13 +240,14 @@ then apply the rule consistently across 3D, 2D, and mixed services.
   - `GravitasCollision2DService`
   - `GravitasMixedCollisionService`
 - [x] Decide the reset contract for long-running contexts, context reuse, and
-  deterministic replay setup.
+      deterministic replay setup.
 - [x] If reset detaches retained partitions, ensure voxel payload removal is
-  stable and does not break partition reuse after the next registration.
+      stable and does not break partition reuse after the next registration.
 - [x] Do not keep retained payloads attached across reset; document reset as a
-  session boundary and keep normal retained-partition reuse on runtime churn.
+      session boundary and keep normal retained-partition reuse on runtime
+      churn.
 - [x] Add tests for context reset after sparse, dense, and mixed partition
-  usage.
+      usage.
 - [x] Benchmark reset plus re-registration churn before and after any change.
 
 **Exit Criteria**
@@ -276,9 +276,8 @@ New reset tests cover:
 
 The reset contract is documented in `docs/wiki/COLLISION_PIPELINE.md`,
 `docs/wiki/HOST_INTEGRATION.md`, and `docs/wiki/RUNTIME_ARCHITECTURE.md`.
-`CollisionPartitionBenchmarks` now includes
-`ResetAndReRegisterDynamicSpheres` as the forward reset/re-registration churn
-baseline.
+`CollisionPartitionBenchmarks` now includes `ResetAndReRegisterDynamicSpheres`
+as the forward reset/re-registration churn baseline.
 
 Pre-change benchmark artifacts:
 
@@ -299,17 +298,17 @@ The broad post-change run exported artifacts but printed a post-cleanup
 The focused retry completed cleanly and supplies the retained-cleanup comparison
 rows below.
 
-| Benchmark | Before | After | Allocated |
-| --- | ---: | ---: | ---: |
-| CreateAndRegisterDynamicSpheres(64) | 2,546.9 us | 2,541.3 us | 2,665,388 B |
-| CreateAndPartitionStaticSpheres(64) | 2,258.1 us | 2,233.8 us | 2,585,585 B |
-| SimulatePartitionedDynamicSpheres(64) | 194.4 us | 195.2 us | 0 B |
-| ResetAndReRegisterDynamicSpheres(64) | n/a | 1,126.8 us | 1,013,891 B |
-| RepartitionTeleportedDynamicSpheres(64) | 723,079.10 ns | 721,618.31 ns | 72,640 B |
-| RemoveAndReAddDynamicPartitionMembers(64) | 1,107.14 ns | 1,109.58 ns | 0 B |
-| Mixed RetainedPartitionCleanupAfterChurn(64) | 1,692.0 us | 1.736 ms | 64 B |
-| Mixed RetainedPartitionCleanupAfterChurn(1024) | 71,638.4 us | 74.961 ms | 64 B |
-| Mixed RetainedPartitionCleanupAfterChurn(4096) | 651,880.1 us | 669.843 ms | 64 B |
+| Benchmark                                      |        Before |         After |   Allocated |
+| ---------------------------------------------- | ------------: | ------------: | ----------: |
+| CreateAndRegisterDynamicSpheres(64)            |    2,546.9 us |    2,541.3 us | 2,665,388 B |
+| CreateAndPartitionStaticSpheres(64)            |    2,258.1 us |    2,233.8 us | 2,585,585 B |
+| SimulatePartitionedDynamicSpheres(64)          |      194.4 us |      195.2 us |         0 B |
+| ResetAndReRegisterDynamicSpheres(64)           |           n/a |    1,126.8 us | 1,013,891 B |
+| RepartitionTeleportedDynamicSpheres(64)        | 723,079.10 ns | 721,618.31 ns |    72,640 B |
+| RemoveAndReAddDynamicPartitionMembers(64)      |   1,107.14 ns |   1,109.58 ns |         0 B |
+| Mixed RetainedPartitionCleanupAfterChurn(64)   |    1,692.0 us |      1.736 ms |        64 B |
+| Mixed RetainedPartitionCleanupAfterChurn(1024) |   71,638.4 us |     74.961 ms |        64 B |
+| Mixed RetainedPartitionCleanupAfterChurn(4096) |  651,880.1 us |    669.843 ms |        64 B |
 
 ShortRun variance is high for the large mixed retained-cleanup rows, but the
 existing steady-state partitioning selections did not show a meaningful
@@ -320,8 +319,8 @@ regression from reset-only lifecycle cleanup.
 **Goal:** Hardening mesh physics for alpha without turning runtime collision
 into an implicit asset-processing pipeline. Runtime mesh collision should keep
 the raw local-BVH triangle path for simple concave geometry, require meaningful
-closed-volume mass properties for dynamic mesh bodies by default, and give
-users an explicit authored convex-piece path for complex collision assets.
+closed-volume mass properties for dynamic mesh bodies by default, and give users
+an explicit authored convex-piece path for complex collision assets.
 
 **Context**
 
@@ -342,15 +341,15 @@ dotnet tests\Gravitas.Benchmarks\bin\Release\net8.0\Gravitas.Benchmarks.dll coll
 
 Important rows:
 
-| Method | Size | Mean | Allocated |
-| --- | ---: | ---: | ---: |
-| BuildValidatedMeshTriangleBVH | 64 | 2.031 us | 2944 B |
-| MoveMeshRuntimeShapeStateAndQueryTriangles | 64 | 9.282 us | 0 B |
-| MoveDynamicConcaveMeshAndQueryTriangles | 64 | 41.145 us | 0 B |
-| MoveCompoundRuntimeShapeStateAcrossPartitions | 64 | 28.086 us | 0 B |
-| CheckMeshMeshPairs | 64 | 449.94 us | 0 B |
-| CheckConcaveMeshCuboidPairs | 64 | 1,529.12 us | 0 B |
-| CheckConcaveMeshMeshPairs | 64 | 6,667.72 us | 0 B |
+| Method                                        | Size |        Mean | Allocated |
+| --------------------------------------------- | ---: | ----------: | --------: |
+| BuildValidatedMeshTriangleBVH                 |   64 |    2.031 us |    2944 B |
+| MoveMeshRuntimeShapeStateAndQueryTriangles    |   64 |    9.282 us |       0 B |
+| MoveDynamicConcaveMeshAndQueryTriangles       |   64 |   41.145 us |       0 B |
+| MoveCompoundRuntimeShapeStateAcrossPartitions |   64 |   28.086 us |       0 B |
+| CheckMeshMeshPairs                            |   64 |   449.94 us |       0 B |
+| CheckConcaveMeshCuboidPairs                   |   64 | 1,529.12 us |       0 B |
+| CheckConcaveMeshMeshPairs                     |   64 | 6,667.72 us |       0 B |
 
 Focused mesh, mixed, and swept-query tests passed under `ReleaseLean`:
 
@@ -380,15 +379,15 @@ meshes may remain possible only through an explicit opt-in approximation policy.
   - zero-area, non-manifold, boundary, duplicate, and disconnected shell cases
     return explicit failure reasons.
 - [x] Implement or specify closed-polyhedron mass properties using fixed-point
-  signed tetrahedral integration over triangle faces.
+      signed tetrahedral integration over triangle faces.
 - [x] Add reference tests for cube, rectangular prism, tetrahedron or simple
-  wedge, translated mesh, rotated mesh, reversed winding, open plane, open
-  U-channel, non-manifold edge, and disconnected shells.
+      wedge, translated mesh, rotated mesh, reversed winding, open plane, open
+      U-channel, non-manifold edge, and disconnected shells.
 - [x] Add benchmarks for validation and mass-property generation on small,
-  medium, and dense closed meshes.
+      medium, and dense closed meshes.
 - [x] Update `docs/wiki/COLLISION_PIPELINE.md` and public XML docs so users
-  understand when mesh inertia is solid-volume truth, explicit approximation,
-  or rejected.
+      understand when mesh inertia is solid-volume truth, explicit
+      approximation, or rejected.
 
 **Exit Criteria**
 
@@ -426,10 +425,9 @@ inverse inertia tensor into the body's initial orientation.
 
 Focused tests cover closed unit-cube inertia, rigid movement invariance,
 reversed winding, explicit open-surface approximation, open plane rejection,
-duplicate-face rejection, non-manifold edge rejection, disconnected
-closed-shell rejection, default dynamic open-mesh rejection,
-bodyless/immovable/kinematic legality, and rotated non-uniform cuboid
-inverse-inertia orientation.
+duplicate-face rejection, non-manifold edge rejection, disconnected closed-shell
+rejection, default dynamic open-mesh rejection, bodyless/immovable/kinematic
+legality, and rotated non-uniform cuboid inverse-inertia orientation.
 
 Phase 4A pre-change mesh baseline:
 
@@ -443,20 +441,20 @@ Forward mass-property benchmark baseline:
 dotnet tests\Gravitas.Benchmarks\bin\Release\net8.0\Gravitas.Benchmarks.dll mesh-mass-property --filter "*" --job short --exporters json --artifacts artifacts\benchmarks\2026-06-17-phase4a-closed-volume-inertia-after-duplicate-validation
 ```
 
-| Method | Subdivision | Mean | Allocated |
-| --- | ---: | ---: | ---: |
-| BuildValidatedMeshTriangleBVH | n/a | 1.913 us | 2944 B |
-| MoveMeshRuntimeShapeStateAndQueryTriangles | n/a | 9.023 us | 0 B |
-| MoveDynamicConcaveMeshAndQueryTriangles | n/a | 40.513 us | 0 B |
-| BuildAndValidateClosedVolume | 1 | 9.252 us | 10176 B |
-| BuildAndValidateClosedVolume | 8 | 708.406 us | 529327 B |
-| BuildAndValidateClosedVolume | 16 | 2.589 ms | 2111592 B |
-| CalculateCachedClosedVolumeInertiaTensor | 1 | 49.06 ns | 0 B |
-| CalculateCachedClosedVolumeInertiaTensor | 8 | 47.20 ns | 0 B |
-| CalculateCachedClosedVolumeInertiaTensor | 16 | 47.07 ns | 0 B |
-| CalculateSurfaceApproximationInertiaTensor | 1 | 973.95 ns | 0 B |
-| CalculateSurfaceApproximationInertiaTensor | 8 | 66.770 us | 0 B |
-| CalculateSurfaceApproximationInertiaTensor | 16 | 279.786 us | 0 B |
+| Method                                     | Subdivision |       Mean | Allocated |
+| ------------------------------------------ | ----------: | ---------: | --------: |
+| BuildValidatedMeshTriangleBVH              |         n/a |   1.913 us |    2944 B |
+| MoveMeshRuntimeShapeStateAndQueryTriangles |         n/a |   9.023 us |       0 B |
+| MoveDynamicConcaveMeshAndQueryTriangles    |         n/a |  40.513 us |       0 B |
+| BuildAndValidateClosedVolume               |           1 |   9.252 us |   10176 B |
+| BuildAndValidateClosedVolume               |           8 | 708.406 us |  529327 B |
+| BuildAndValidateClosedVolume               |          16 |   2.589 ms | 2111592 B |
+| CalculateCachedClosedVolumeInertiaTensor   |           1 |   49.06 ns |       0 B |
+| CalculateCachedClosedVolumeInertiaTensor   |           8 |   47.20 ns |       0 B |
+| CalculateCachedClosedVolumeInertiaTensor   |          16 |   47.07 ns |       0 B |
+| CalculateSurfaceApproximationInertiaTensor |           1 |  973.95 ns |       0 B |
+| CalculateSurfaceApproximationInertiaTensor |           8 |  66.770 us |       0 B |
+| CalculateSurfaceApproximationInertiaTensor |          16 | 279.786 us |       0 B |
 
 **Captured Phase 4A Follow-Ups**
 
@@ -491,22 +489,22 @@ collision truth for simple meshes where raw BVH remains the right answer.
 **Tasks**
 
 - [x] Add comparison fixtures for simple concave, dense concave, contact-heavy
-  U-channel, inside-corner, closed dense shell, and dynamic concave cases.
+      U-channel, inside-corner, closed dense shell, and dynamic concave cases.
 - [x] Benchmark current triangle-gather mesh-mesh behavior before changing the
-  algorithm.
+      algorithm.
 - [x] Evaluate direct BVH-vs-BVH paired traversal for mesh-mesh candidate
-  generation so repeated per-triangle queries are reduced.
+      generation so repeated per-triangle queries are reduced.
 - [x] Preserve deterministic candidate order, contact identity, manifold
-  reduction, and zero-allocation steady-state behavior.
+      reduction, and zero-allocation steady-state behavior.
 - [x] Compare raw triangle BVH, BVH-vs-BVH traversal, and authored convex-piece
-  collision assets for:
+      collision assets for:
   - candidate count.
   - contact correctness.
   - manifold quality.
   - dense mesh-mesh cost.
   - simple mesh overhead.
 - [x] Document whether the final recommendation is raw triangle BVH, paired BVH
-  traversal, authored decomposition, or a thresholded combination.
+      traversal, authored decomposition, or a thresholded combination.
 
 **Exit Criteria**
 
@@ -534,8 +532,8 @@ row.
 
 The retained runtime optimization is narrower and safer: triangle-triangle SAT
 now projects onto raw axes first, exits on separation, and only normalizes an
-axis when it can update the stored penetration depth/normal. This keeps the
-same triangle candidates and contact generation while avoiding unnecessary
+axis when it can update the stored penetration depth/normal. This keeps the same
+triangle candidates and contact generation while avoiding unnecessary
 fixed-point vector normalization on non-winning axes.
 
 Expanded pre-change baseline:
@@ -556,13 +554,13 @@ Final SAT-axis optimization measurement:
 dotnet tests\Gravitas.Benchmarks\bin\Release\net8.0\Gravitas.Benchmarks.dll collision-detection --filter "*MeshMesh*" --job short --exporters json --artifacts artifacts\benchmarks\2026-06-17-phase4b-meshmesh-sat-axis-after
 ```
 
-| Method | Before | Paired BVH | Final SAT Axis | Allocated |
-| --- | ---: | ---: | ---: | ---: |
-| CheckMeshMeshPairs | 457.2 us | 470.3 us | 475.1 us | 0 B |
-| CheckConcaveMeshMeshPairs | 7,079.4 us | 10,062.7 us | 5,977.8 us | 0 B |
-| CheckDenseConcaveMeshMeshPairs | 43,289.2 us | 133,113.7 us | 41,422.0 us | 0 B |
-| CheckContactHeavyConcaveMeshMeshPairs | 62,379.6 us | 179,498.2 us | 60,230.7 us | 0 B |
-| CheckClosedDenseMeshMeshPairs | 302,322.0 us | 730,064.6 us | 296,628.3 us | 0 B |
+| Method                                |       Before |   Paired BVH | Final SAT Axis | Allocated |
+| ------------------------------------- | -----------: | -----------: | -------------: | --------: |
+| CheckMeshMeshPairs                    |     457.2 us |     470.3 us |       475.1 us |       0 B |
+| CheckConcaveMeshMeshPairs             |   7,079.4 us |  10,062.7 us |     5,977.8 us |       0 B |
+| CheckDenseConcaveMeshMeshPairs        |  43,289.2 us | 133,113.7 us |    41,422.0 us |       0 B |
+| CheckContactHeavyConcaveMeshMeshPairs |  62,379.6 us | 179,498.2 us |    60,230.7 us |       0 B |
+| CheckClosedDenseMeshMeshPairs         | 302,322.0 us | 730,064.6 us |   296,628.3 us |       0 B |
 
 The tiny `CheckMeshMeshPairs` regression is on the convex mesh path and inside
 ShortRun noise for this phase; the optimized code is only used by the
@@ -596,16 +594,16 @@ complex meshes while preserving one host-facing collider identity.
 **Tasks**
 
 - [x] Decide whether authored convex pieces should use existing
-  `LSCompoundCollider`, a mesh-owned internal piece path, or both:
+      `LSCompoundCollider`, a mesh-owned internal piece path, or both:
   - `LSCompoundCollider` is already one collider ID, one body binding, one
     broad-phase identity, one event surface, and stable part order.
   - A future mesh-owned piece path may be justified only if public compound
     semantics do not fit baked mesh assets.
 - [x] Add tests that prove decomposed/authored assets do not leak internal
-  collider IDs, pair ownership, events, diagnostics, hierarchy bindings, or
-  broad-phase identities.
+      collider IDs, pair ownership, events, diagnostics, hierarchy bindings, or
+      broad-phase identities.
 - [x] Add benchmark fixtures comparing raw concave triangle BVH against authored
-  convex/compound proxies on dense meshes.
+      convex/compound proxies on dense meshes.
 - [x] Document the tradeoff:
   - raw triangle BVH is exact and strong for simple concave physics meshes.
   - dense rendered meshes should not be used as physics meshes.
@@ -643,10 +641,10 @@ Implementation notes:
   shape rebuilds so private runtime collider mutation cannot silently change the
   baked compound layout.
 - `LSMeshCollider` now applies `LocalOffset` to its `PhysicsMesh` transform by
-  translating the mesh origin relative to `PhysicsMesh.LocalBounds.Center`.
-  This keeps mesh vertices, mesh bounds, collider center, compound aggregation,
-  diagnostics, and triangle queries aligned when convex mesh pieces are
-  offset inside an authored compound.
+  translating the mesh origin relative to `PhysicsMesh.LocalBounds.Center`. This
+  keeps mesh vertices, mesh bounds, collider center, compound aggregation,
+  diagnostics, and triangle queries aligned when convex mesh pieces are offset
+  inside an authored compound.
 - Tests cover one public collider identity, private internal part IDs,
   broad-phase owner membership, contact/event ownership, and diagnostics that
   draw convex mesh parts through the compound owner ID.
@@ -663,9 +661,9 @@ dotnet tests\Gravitas.Benchmarks\bin\Release\net8.0\Gravitas.Benchmarks.dll coll
 
 The first broad `collider-shape` run emitted a BenchmarkDotNet child-process
 `AccessViolationException` after two measured iterations of
-`MoveCompoundRuntimeShapeStateAcrossPartitions`. A focused retry of that row
-and a full rerun completed cleanly, so the usable baseline is the rerun
-artifact above.
+`MoveCompoundRuntimeShapeStateAcrossPartitions`. A focused retry of that row and
+a full rerun completed cleanly, so the usable baseline is the rerun artifact
+above.
 
 Post-change authored proxy artifact:
 
@@ -675,13 +673,13 @@ dotnet tests\Gravitas.Benchmarks\bin\Release\net8.0\Gravitas.Benchmarks.dll coll
 
 Important rows:
 
-| Benchmark | Before | After | Allocated |
-| --- | ---: | ---: | ---: |
-| CheckDenseConcaveMeshMeshPairs | 41,212.1 us | n/a | 0 B |
-| CheckClosedDenseMeshMeshPairs | 298,802.6 us | n/a | 0 B |
-| CheckAuthoredCompoundProxyPairs | 555.1 us | 540.2 us | 0 B |
-| GenerateAuthoredCompoundProxyManifolds | 575.9 us | 573.6 us | 0 B |
-| CheckDenseConcaveMeshAuthoredCompoundProxyPairs | 29,003.2 us | 28,744.0 us | 0 B |
+| Benchmark                                       |       Before |       After | Allocated |
+| ----------------------------------------------- | -----------: | ----------: | --------: |
+| CheckDenseConcaveMeshMeshPairs                  |  41,212.1 us |         n/a |       0 B |
+| CheckClosedDenseMeshMeshPairs                   | 298,802.6 us |         n/a |       0 B |
+| CheckAuthoredCompoundProxyPairs                 |     555.1 us |    540.2 us |       0 B |
+| GenerateAuthoredCompoundProxyManifolds          |     575.9 us |    573.6 us |       0 B |
+| CheckDenseConcaveMeshAuthoredCompoundProxyPairs |  29,003.2 us | 28,744.0 us |       0 B |
 
 The benchmark signal matches the policy: authored compound proxies are orders of
 magnitude cheaper when both sides avoid dense triangle sets. If a dense concave
@@ -730,27 +728,27 @@ authored shape data and transforms, not child collider lifecycle objects.
 **Tasks**
 
 - [x] Capture a pre-change benchmark baseline for the relevant Phase 4C rows:
-  authored compound proxy collision, compound manifold generation, dense mesh
-  vs authored compound, and compound runtime shape/partition movement.
-- [x] Add a deterministic `ColliderShapeDefinition` API with factory helpers
-  for supported alpha runtime shapes:
+      authored compound proxy collision, compound manifold generation, dense
+      mesh vs authored compound, and compound runtime shape/partition movement.
+- [x] Add a deterministic `ColliderShapeDefinition` API with factory helpers for
+      supported alpha runtime shapes:
   - sphere.
   - capsule.
   - cuboid.
   - finite cylinder.
   - convex mesh with vertices, triangles, and mesh inertia policy.
 - [x] Keep concave mesh definitions out of compound parts unless a later phase
-  proves they have coherent one-identity compound semantics.
+      proves they have coherent one-identity compound semantics.
 - [x] Add constructor/factory paths from `ColliderShapeDefinition` to standalone
-  runtime colliders, for example `new LSCuboidCollider(definition)` or a focused
-  factory if constructor overloads become ambiguous.
+      runtime colliders, for example `new LSCuboidCollider(definition)` or a
+      focused factory if constructor overloads become ambiguous.
 - [x] Redesign `CompoundColliderPart` so public authored parts own
-  `ColliderShapeDefinition`, local offset, local rotation, and local scale.
+      `ColliderShapeDefinition`, local offset, local rotation, and local scale.
 - [x] Make `LSCompoundCollider` materialize any internal runtime part colliders
-  privately and deterministically, preserving stable part order and existing
-  collision semantics.
+      privately and deterministically, preserving stable part order and existing
+      collision semantics.
 - [x] Remove or make internal the public API that exposes compound child
-  collider lifecycle objects, unless a real host-facing use case remains.
+      collider lifecycle objects, unless a real host-facing use case remains.
 - [x] Add tests that prove shape definitions:
   - contain no context/body/id/partition/pair/event state.
   - can build equivalent standalone colliders.
@@ -760,11 +758,11 @@ authored shape data and transforms, not child collider lifecycle objects.
   - keep nested compound and concave mesh out of the definition surface and
     reject default parts.
 - [x] Do not add built-in serialization transport support for shape definitions
-  yet; they are a data-only runtime construction API that host/tooling asset
-  formats can serialize explicitly.
+      yet; they are a data-only runtime construction API that host/tooling asset
+      formats can serialize explicitly.
 - [x] Update docs so Phase 7 tooling knows its runtime export target is
-  `ColliderShapeDefinition[]` plus stable part transforms, not instantiated
-  runtime colliders.
+      `ColliderShapeDefinition[]` plus stable part transforms, not instantiated
+      runtime colliders.
 
 **Exit Criteria**
 
@@ -793,9 +791,9 @@ runtime collider from data.
 
 `CompoundColliderPart` is now the public authored descriptor:
 `ColliderShapeDefinition Shape`, `LocalOffset`, `LocalRotation`, and
-`LocalScale`. Convenience factories cover sphere, capsule, cuboid, cylinder,
-and convex mesh parts. `LSCompoundCollider` keeps public parts as authored data
-and privately materializes runtime part colliders in stable declaration order so
+`LocalScale`. Convenience factories cover sphere, capsule, cuboid, cylinder, and
+convex mesh parts. `LSCompoundCollider` keeps public parts as authored data and
+privately materializes runtime part colliders in stable declaration order so
 existing narrow-phase, query, diagnostics, and inertia behavior is reused
 without exposing fake child-collider lifecycle objects.
 
@@ -821,18 +819,18 @@ dotnet tests\Gravitas.Benchmarks\bin\Release\net8.0\Gravitas.Benchmarks.dll coll
 
 Important rows:
 
-| Benchmark | Before | After | Allocated |
-| --- | ---: | ---: | ---: |
-| CheckAuthoredCompoundProxyPairs | 582.8 us | 600.0 us | 0 B |
-| GenerateAuthoredCompoundProxyManifolds | 541.2 us | 544.5 us | 0 B |
-| CheckDenseConcaveMeshAuthoredCompoundProxyPairs | 29,683.4 us | 28,513.2 us | 0 B |
-| MoveCompoundRuntimeShapeStateAcrossPartitions | 28.83 us | 28.29 us | 0 B |
+| Benchmark                                       |      Before |       After | Allocated |
+| ----------------------------------------------- | ----------: | ----------: | --------: |
+| CheckAuthoredCompoundProxyPairs                 |    582.8 us |    600.0 us |       0 B |
+| GenerateAuthoredCompoundProxyManifolds          |    541.2 us |    544.5 us |       0 B |
+| CheckDenseConcaveMeshAuthoredCompoundProxyPairs | 29,683.4 us | 28,513.2 us |       0 B |
+| MoveCompoundRuntimeShapeStateAcrossPartitions   |    28.83 us |    28.29 us |       0 B |
 
 The authored compound proxy rows are within ShortRun variance and keep zero
 managed allocation. The shape-movement row is unchanged to slightly better in
 this run, which matches the intended implementation: the new data layer affects
-construction/authoring, while steady-state compound runtime traversal still
-uses the existing materialized part path.
+construction/authoring, while steady-state compound runtime traversal still uses
+the existing materialized part path.
 
 Verification:
 
@@ -862,9 +860,9 @@ currently has first-class `LSCircleCollider2D`, `LSAABBoxCollider2D`, and
 and later CCD/diagnostic work could accidentally assume every 2D collider is a
 single primitive.
 
-The 2D model should be a sibling, not a reuse of the 3D definition type. Pure
-2D uses X/Z projection with `Vector2d`, scalar yaw, `FixedBoundArea`, 2D
-collision priorities, and optional mixed slab metadata. A separate
+The 2D model should be a sibling, not a reuse of the 3D definition type. Pure 2D
+uses X/Z projection with `Vector2d`, scalar yaw, `FixedBoundArea`, 2D collision
+priorities, and optional mixed slab metadata. A separate
 `ColliderShapeDefinition2D` keeps that contract explicit.
 
 Proposed public data shape:
@@ -886,25 +884,26 @@ CompoundColliderPart2D
 **Tasks**
 
 - [x] Capture focused 2D collision/query/partition benchmarks before source
-  edits.
+      edits.
 - [x] Add a deterministic `ColliderShapeDefinition2D` API with factory helpers
-  for circle, AABB, and convex polygon shapes.
+      for circle, AABB, and convex polygon shapes.
 - [x] Add definition-based constructors/factories for existing standalone 2D
-  colliders without adding runtime lifecycle state to definitions.
+      colliders without adding runtime lifecycle state to definitions.
 - [x] Add `CompoundColliderPart2D` as data-only authored part input with stable
-  local offset, rotation, and scale.
+      local offset, rotation, and scale.
 - [x] Add `LSCompoundCollider2D` with one public 2D collider ID, one body
-  binding, one event surface, one broad-phase identity, and private runtime part
-  colliders materialized in deterministic declaration order.
+      binding, one event surface, one broad-phase identity, and private runtime
+      part colliders materialized in deterministic declaration order.
 - [x] Extend pure 2D collision settings, narrow-phase dispatch, partitioning,
-  query services, and result ordering to handle compound 2D colliders without
-  exposing child collider lifecycle.
+      query services, and result ordering to handle compound 2D colliders
+      without exposing child collider lifecycle.
 - [x] Define and test mixed embedding behavior for 2D compound colliders so
-  mixed 2D/3D contacts and swept queries use the owning 2D compound identity.
+      mixed 2D/3D contacts and swept queries use the owning 2D compound
+      identity.
 - [x] Add diagnostics/debug draw coverage for authored 2D compound parts while
-  preserving owner collider IDs in emitted events.
+      preserving owner collider IDs in emitted events.
 - [x] Update docs and tests so future CCD and diagnostics phases know that pure
-  2D includes compound authored data, not only primitive shapes.
+      2D includes compound authored data, not only primitive shapes.
 
 **Exit Criteria**
 
@@ -914,17 +913,16 @@ CompoundColliderPart2D
   membership, events, queries, diagnostics, hierarchy filtering, and mixed
   identity.
 - 2D compound parts never leak public runtime child collider lifecycle objects.
-- Benchmarks show no steady-state allocation regression in 2D collision,
-  query, and partition hot paths.
+- Benchmarks show no steady-state allocation regression in 2D collision, query,
+  and partition hot paths.
 
 **Progress - 2026-06-18**
 
-Implemented `ColliderShapeDefinition2D` and
-`ColliderShapeDefinition2DKind` as the pure 2D data-only authoring surface for
-circle, axis-aligned box, and convex polygon shapes. Definitions snapshot
-polygon vertices, validate dimensions and convexity, can materialize standalone
-runtime colliders, and contain no body, context, collider ID, partition, pair,
-hierarchy, query, event, or buffer state.
+Implemented `ColliderShapeDefinition2D` and `ColliderShapeDefinition2DKind` as
+the pure 2D data-only authoring surface for circle, axis-aligned box, and convex
+polygon shapes. Definitions snapshot polygon vertices, validate dimensions and
+convexity, can materialize standalone runtime colliders, and contain no body,
+context, collider ID, partition, pair, hierarchy, query, event, or buffer state.
 
 `CompoundColliderPart2D` now mirrors the 3D authored part model with
 `ColliderShapeDefinition2D`, `Vector2d LocalOffset`, `Fixed64 LocalRotation`,
@@ -937,13 +935,13 @@ collision, queries, mixed embedding, CCD proxy radius, and diagnostics.
 Pure 2D collision dispatch now includes compound owners through
 `ColliderType2D.Compound` and `CollisionType2D.Compound`. Queries return the
 owning compound collider, not the private part collider, and continue to use
-caller-owned hit buffers and deterministic ordering. Mixed narrow phase,
-mixed swept-sphere queries, and mixed debug draw now treat a 2D compound as an
+caller-owned hit buffers and deterministic ordering. Mixed narrow phase, mixed
+swept-sphere queries, and mixed debug draw now treat a 2D compound as an
 embedded slab aggregate while preserving the owner collider ID in emitted hits
 and diagnostic commands.
 
-One benchmark side finding was fixed while measuring Phase 6: the primitive
-2D raycast sweep-baseline benchmark exposed a fixed-point divide-by-zero on
+One benchmark side finding was fixed while measuring Phase 6: the primitive 2D
+raycast sweep-baseline benchmark exposed a fixed-point divide-by-zero on
 parallel segment intersection. `QueryDetection2D.TryIntersectSegments` now has
 an explicit zero denominator guard, with a regression test for repeated
 horizontal raycasts through polygon edges.
@@ -969,26 +967,26 @@ baselines.
 
 Important rows:
 
-| Benchmark | Before | After | Allocated |
-| --- | ---: | ---: | ---: |
-| SimulateUnchangedColliders(64) | 0.922 us | 1.052 us | 0 B |
-| SimulateUnchangedColliders(1024) | 30.454 us | 32.837 us | 0 B |
-| CheckRequiredShapePairs(64) | 79.638 us | 75.334 us | 0 B |
-| CheckRequiredShapePairs(1024) | 1,288.722 us | 1,191.208 us | 0 B |
-| OverlapCircleAll(64) | 200.109 us | 191.973 us | 0 B |
-| OverlapCircleAll(1024) | 234.015 us | 225.887 us | 0 B |
-| SweepCircleAll_SparseHit(64) | 29.716 us | 30.663 us | 0 B |
-| SweepCircleAll_DenseHit(1024) | 493.625 us | 460.360 us | 0 B |
-| SimulateUnchangedCompoundColliders(64) | n/a | 1.094 us | 0 B |
-| CheckCompoundShapePairs(64) | n/a | 146.264 us | 0 B |
-| OverlapCircleAll_CompoundTargets(64) | n/a | 218.421 us | 0 B |
-| SweepCircleAll_CompoundTargets(64) | n/a | 39.014 us | 0 B |
-| SimulateUnchangedCompoundColliders(1024) | n/a | 37.338 us | 0 B |
-| CheckCompoundShapePairs(1024) | n/a | 2,716.276 us | 0 B |
-| OverlapCircleAll_CompoundTargets(1024) | n/a | 275.366 us | 0 B |
-| SweepCircleAll_CompoundTargets(1024) | n/a | 39.179 us | 0 B |
-| SweepSphereAgainst2DAll_Compound2DTargets(64) | n/a | 435.0 us | 0 B |
-| SweepSphereAgainst2DAll_Compound2DTargets(1024) | n/a | 16,803.7 us | 0 B |
+| Benchmark                                       |       Before |        After | Allocated |
+| ----------------------------------------------- | -----------: | -----------: | --------: |
+| SimulateUnchangedColliders(64)                  |     0.922 us |     1.052 us |       0 B |
+| SimulateUnchangedColliders(1024)                |    30.454 us |    32.837 us |       0 B |
+| CheckRequiredShapePairs(64)                     |    79.638 us |    75.334 us |       0 B |
+| CheckRequiredShapePairs(1024)                   | 1,288.722 us | 1,191.208 us |       0 B |
+| OverlapCircleAll(64)                            |   200.109 us |   191.973 us |       0 B |
+| OverlapCircleAll(1024)                          |   234.015 us |   225.887 us |       0 B |
+| SweepCircleAll_SparseHit(64)                    |    29.716 us |    30.663 us |       0 B |
+| SweepCircleAll_DenseHit(1024)                   |   493.625 us |   460.360 us |       0 B |
+| SimulateUnchangedCompoundColliders(64)          |          n/a |     1.094 us |       0 B |
+| CheckCompoundShapePairs(64)                     |          n/a |   146.264 us |       0 B |
+| OverlapCircleAll_CompoundTargets(64)            |          n/a |   218.421 us |       0 B |
+| SweepCircleAll_CompoundTargets(64)              |          n/a |    39.014 us |       0 B |
+| SimulateUnchangedCompoundColliders(1024)        |          n/a |    37.338 us |       0 B |
+| CheckCompoundShapePairs(1024)                   |          n/a | 2,716.276 us |       0 B |
+| OverlapCircleAll_CompoundTargets(1024)          |          n/a |   275.366 us |       0 B |
+| SweepCircleAll_CompoundTargets(1024)            |          n/a |    39.179 us |       0 B |
+| SweepSphereAgainst2DAll_Compound2DTargets(64)   |          n/a |     435.0 us |       0 B |
+| SweepSphereAgainst2DAll_Compound2DTargets(1024) |          n/a |  16,803.7 us |       0 B |
 
 Verification:
 
@@ -1011,23 +1009,25 @@ effort in
 Research context from CGAL and decomposition literature should inform the
 tooling design, but not create a runtime dependency. Exact convex decomposition
 of closed polyhedra can produce `O(r^2)` convex pieces in the number of reflex
-edges, while approximate convex decomposition can produce fewer, tighter
-runtime shapes by allowing controlled volume over-coverage. Any future Gravitas
-tool should expose deterministic failure/result codes, stable ordering, bounded
+edges, while approximate convex decomposition can produce fewer, tighter runtime
+shapes by allowing controlled volume over-coverage. Any future Gravitas tool
+should expose deterministic failure/result codes, stable ordering, bounded
 settings, and benchmarked quality metrics before its output becomes a
 recommended alpha asset path.
 
 **Progress - 2026-06-18**
 
-The Phase 7 tooling plan was captured in a separate document linked above. The plan includes:
+The Phase 7 tooling plan was captured in a separate document linked above. The
+plan includes:
 
 - A research summary of exact and approximate convex decomposition methods,
   including their theoretical complexity, practical performance, and quality
   tradeoffs.
-- A proposed API design for a Gravitas-owned mesh simplification and decomposition
-  tool, including input/output formats, configuration settings, and deterministic
-  result codes.
-- A roadmap for implementation, testing, and benchmarking before the tool's output is recommended for alpha asset workflows.
+- A proposed API design for a Gravitas-owned mesh simplification and
+  decomposition tool, including input/output formats, configuration settings,
+  and deterministic result codes.
+- A roadmap for implementation, testing, and benchmarking before the tool's
+  output is recommended for alpha asset workflows.
 
 ## Phase 8: Dynamic CCD And Swept Mesh Families
 
@@ -1040,24 +1040,24 @@ queries have physically explainable deterministic policy.
 Current CCD support is opt-in/auto and intentionally bounded. 3D and 2D body
 movement can use swept primitive proxies against static or kinematic targets,
 and mixed sweeps include alpha mesh/compound support. Dynamic-vs-dynamic CCD
-must be deterministic and physically explainable before alpha: simultaneous
-fast movers should clamp at a shared time of impact instead of depending on
-body iteration order. Moving mesh and compound bodies may use conservative
-proxy radii until exact shape-specific swept-source solvers have stronger
-evidence.
+must be deterministic and physically explainable before alpha: simultaneous fast
+movers should clamp at a shared time of impact instead of depending on body
+iteration order. Moving mesh and compound bodies may use conservative proxy
+radii until exact shape-specific swept-source solvers have stronger evidence.
 
 **Tasks**
 
-- [x] Specify deterministic dynamic-vs-dynamic CCD ordering for 3D, pure 2D,
-  and mixed contact paths.
-- [x] Define how relative velocity, pair priority, body IDs, hierarchy keys,
-  and contact normals break ties.
+- [x] Specify deterministic dynamic-vs-dynamic CCD ordering for 3D, pure 2D, and
+      mixed contact paths.
+- [x] Define how relative velocity, pair priority, body IDs, hierarchy keys, and
+      contact normals break ties.
 - [x] Add fixtures for tunneling dynamic bodies, opposing high-speed bodies,
-  thin static geometry, and mixed 2D slab interactions.
+      thin static geometry, and mixed 2D slab interactions.
 - [x] Investigate shape-specific swept mesh behavior before adding public APIs:
-  ray/segment vs mesh, swept sphere/circle vs mesh, and mesh-as-moving-source.
+      ray/segment vs mesh, swept sphere/circle vs mesh, and
+      mesh-as-moving-source.
 - [x] Benchmark CCD candidate gathering, clip resolution, and false-positive
-  rates before replacing any current conservative proxy.
+      rates before replacing any current conservative proxy.
 
 **Exit Criteria**
 
@@ -1117,12 +1117,12 @@ dotnet tests\Gravitas.Benchmarks\bin\Release\net8.0\Gravitas.Benchmarks.dll cont
 
 BenchmarkDotNet on Windows 11, .NET 8.0.28, Intel Core i7-9700K:
 
-| Method | Baseline Mean | After Mean | Allocated |
-| --- | ---: | ---: | ---: |
-| DiscreteFastMove | 2.925 us | 2.882 us | 672 B |
-| ContinuousFastMoveAgainstThinWall | 13.164 us | 12.909 us | 672 B |
-| ContinuousOpposingDynamicSpheres | n/a | 26.144 us | 1344 B |
-| ContinuousFastMoveAgainstImmovableMesh | n/a | 21.704 us | 672 B |
+| Method                                 | Baseline Mean | After Mean | Allocated |
+| -------------------------------------- | ------------: | ---------: | --------: |
+| DiscreteFastMove                       |      2.925 us |   2.882 us |     672 B |
+| ContinuousFastMoveAgainstThinWall      |     13.164 us |  12.909 us |     672 B |
+| ContinuousOpposingDynamicSpheres       |           n/a |  26.144 us |    1344 B |
+| ContinuousFastMoveAgainstImmovableMesh |           n/a |  21.704 us |     672 B |
 
 Captured follow-up: if real alpha scenarios enable `Continuous` on many movable
 bodies at once, add a size-parameter CCD benchmark and evaluate a GridForge
@@ -1149,20 +1149,20 @@ avoiding CCD at scale.
 
 The prefilter must be conservative over both sides of motion. A target that
 starts outside the source's swept bounds but moves into it during the frame must
-remain a candidate. Candidate ordering must stay explicit and stable; no hash
-or grid iteration order can become observable physics behavior.
+remain a candidate. Candidate ordering must stay explicit and stable; no hash or
+grid iteration order can become observable physics behavior.
 
 **Tasks**
 
-- [x] Add size-parameter dynamic CCD benchmarks before runtime changes:
-  sparse 3D, dense 3D, sparse 2D, dense 2D, and mixed 3D/2D.
+- [x] Add size-parameter dynamic CCD benchmarks before runtime changes: sparse
+      3D, dense 3D, sparse 2D, dense 2D, and mixed 3D/2D.
 - [x] Measure current candidate-scan scaling and allocations for representative
-  body counts.
+      body counts.
 - [x] Evaluate lower-stack spatial assets first (`GridForge`, then
-  `SwiftCollections.FixedMathSharp`) before introducing Gravitas-specific
-  structures.
+      `SwiftCollections.FixedMathSharp`) before introducing Gravitas-specific
+      structures.
 - [x] Implement the smallest deterministic prefilter that materially improves
-  measured scaling:
+      measured scaling:
   - cache frame-start position and predicted displacement as Phase 8 already
     does.
   - build conservative swept proxy bounds for dynamic CCD targets.
@@ -1170,8 +1170,8 @@ or grid iteration order can become observable physics behavior.
     swept proxy bounds.
   - traverse candidates in stable sorted order before relative TOI checks.
 - [x] Add correctness tests for targets moving into a source sweep from outside
-  the source's start bounds, deterministic tie ordering, disabled layers,
-  triggers, siblings, and mixed dimensional candidates.
+      the source's start bounds, deterministic tie ordering, disabled layers,
+      triggers, siblings, and mixed dimensional candidates.
 - [x] Re-run the same benchmark selection and document before/after results.
 
 **Exit Criteria**
@@ -1184,21 +1184,21 @@ or grid iteration order can become observable physics behavior.
 
 **Progress - 2026-06-18**
 
-Added `DynamicCcdScalingBenchmarks` with sparse/dense 3D, sparse/dense 2D,
-and sparse/dense mixed 3D/2D rows at 64 and 256 total bodies. An initial
-64/256/1024 matrix timed out on the prefilter baseline, so the committed
-benchmark keeps 64/256 as the repeatable comparison set and leaves 1024 as a
-future stress run once the broader mixed path is cheaper.
+Added `DynamicCcdScalingBenchmarks` with sparse/dense 3D, sparse/dense 2D, and
+sparse/dense mixed 3D/2D rows at 64 and 256 total bodies. An initial 64/256/1024
+matrix timed out on the prefilter baseline, so the committed benchmark keeps
+64/256 as the repeatable comparison set and leaves 1024 as a future stress run
+once the broader mixed path is cheaper.
 
 Lower-stack review found `SwiftFixedSpatialHash<T>` is available and suitable
 for persistent spatial indexing, but Phase 8B's data is a single-frame set of
-already-computed swept proxy bounds. The implemented runtime path therefore
-uses a Gravitas-owned sweep-and-prune candidate index instead of rebuilding a
-hash every late frame. The index stores one swept AABB per eligible movable
-dynamic target, sorts entries by fixed-point bounds and dynamic ID with an
-allocation-free internal heap sort, and queries a conservative X-window
-expanded by the largest target extent before exact relative sphere/circle TOI.
-This preserves deterministic ordering without depending on hash or GridForge
+already-computed swept proxy bounds. The implemented runtime path therefore uses
+a Gravitas-owned sweep-and-prune candidate index instead of rebuilding a hash
+every late frame. The index stores one swept AABB per eligible movable dynamic
+target, sorts entries by fixed-point bounds and dynamic ID with an
+allocation-free internal heap sort, and queries a conservative X-window expanded
+by the largest target extent before exact relative sphere/circle TOI. This
+preserves deterministic ordering without depending on hash or GridForge
 traversal order.
 
 `GravitasWorldContext.LateSimulate()` now prepares 3D and 2D dynamic CCD
@@ -1208,8 +1208,8 @@ remains for direct service/body paths such as immediate impulse tests.
 
 Mixed CCD also now uses internal static-only mixed sweep variants before the
 dynamic relative-motion pass. Public mixed queries still include dynamic
-colliders; continuous-collision resolution avoids doing exact static-style
-mixed sweeps against movable dynamics that will be handled by the dynamic CCD
+colliders; continuous-collision resolution avoids doing exact static-style mixed
+sweeps against movable dynamics that will be handled by the dynamic CCD
 candidate path.
 
 Baseline:
@@ -1224,31 +1224,31 @@ Final measured comparison:
 dotnet tests\Gravitas.Benchmarks\bin\Release\net8.0\Gravitas.Benchmarks.dll dynamic-ccd-scaling --filter "*" --artifacts artifacts\benchmarks\2026-06-18-phase8b-dynamic-ccd-scaling-post-heap-sort --launchCount 1 --warmupCount 1 --iterationCount 5 --unrollFactor 1
 ```
 
-| Method | Bodies | Baseline | Final | Allocated |
-| --- | ---: | ---: | ---: | ---: |
-| Sparse3DDynamicCcd | 64 | 5.736 ms | 2.796 ms | 43008 B |
-| Dense3DDynamicCcd | 64 | 6.583 ms | 3.447 ms | 43008 B |
-| Sparse2DDynamicCcd | 64 | 3.983 ms | 3.191 ms | 0 B |
-| Dense2DDynamicCcd | 64 | 4.419 ms | 3.132 ms | 0 B |
-| SparseMixedDynamicCcd | 64 | 26.147 ms | 25.001 ms | 21504 B |
-| DenseMixedDynamicCcd | 64 | 27.603 ms | 27.892 ms | 21504 B |
-| Sparse3DDynamicCcd | 256 | 30.433 ms | 11.862 ms | 172032 B |
-| Dense3DDynamicCcd | 256 | 32.377 ms | 13.673 ms | 172032 B |
-| Sparse2DDynamicCcd | 256 | 25.111 ms | 13.886 ms | 0 B |
-| Dense2DDynamicCcd | 256 | 29.026 ms | 13.564 ms | 0 B |
-| SparseMixedDynamicCcd | 256 | 130.307 ms | 102.397 ms | 86016 B |
-| DenseMixedDynamicCcd | 256 | 144.508 ms | 132.923 ms | 86016 B |
+| Method                | Bodies |   Baseline |      Final | Allocated |
+| --------------------- | -----: | ---------: | ---------: | --------: |
+| Sparse3DDynamicCcd    |     64 |   5.736 ms |   2.796 ms |   43008 B |
+| Dense3DDynamicCcd     |     64 |   6.583 ms |   3.447 ms |   43008 B |
+| Sparse2DDynamicCcd    |     64 |   3.983 ms |   3.191 ms |       0 B |
+| Dense2DDynamicCcd     |     64 |   4.419 ms |   3.132 ms |       0 B |
+| SparseMixedDynamicCcd |     64 |  26.147 ms |  25.001 ms |   21504 B |
+| DenseMixedDynamicCcd  |     64 |  27.603 ms |  27.892 ms |   21504 B |
+| Sparse3DDynamicCcd    |    256 |  30.433 ms |  11.862 ms |  172032 B |
+| Dense3DDynamicCcd     |    256 |  32.377 ms |  13.673 ms |  172032 B |
+| Sparse2DDynamicCcd    |    256 |  25.111 ms |  13.886 ms |       0 B |
+| Dense2DDynamicCcd     |    256 |  29.026 ms |  13.564 ms |       0 B |
+| SparseMixedDynamicCcd |    256 | 130.307 ms | 102.397 ms |   86016 B |
+| DenseMixedDynamicCcd  |    256 | 144.508 ms | 132.923 ms |   86016 B |
 
 The pure 3D/2D paths now show the intended scaling improvement without adding
 managed allocations after warmup. Mixed dynamic CCD improves at the larger
 comparison size but remains the next visible hotspot and is noisy in the short
-single-frame benchmark: even with dynamic relative checks prefiltered, mixed
-CCD still pays for opposite-dimension query collection and broader mixed
-embedding work. A partition-level static-only collector experiment was tried
-and rejected for this phase because it pushed kinematic/static classification
-into partition membership without a complete state-transition model. That
-was revisited in Phase 8C and accepted only after adding explicit
-dynamic/kinematic/static membership state and mobility-transition tests.
+single-frame benchmark: even with dynamic relative checks prefiltered, mixed CCD
+still pays for opposite-dimension query collection and broader mixed embedding
+work. A partition-level static-only collector experiment was tried and rejected
+for this phase because it pushed kinematic/static classification into partition
+membership without a complete state-transition model. That was revisited in
+Phase 8C and accepted only after adding explicit dynamic/kinematic/static
+membership state and mobility-transition tests.
 
 ## Phase 8C: Mixed CCD Signal And Shared Query Cost
 
@@ -1258,36 +1258,36 @@ deterministic ordering, or conservative swept-volume candidate policy.
 
 **Context**
 
-Phase 8B removed the obvious dynamic-target scan from 3D, 2D, and mixed CCD.
-The pure 3D/2D benchmark rows now show a strong scaling win, but mixed CCD is
-still the visible hotspot. The 256-body mixed rows improved, while 64-body
-dense mixed was effectively noise, and BenchmarkDotNet still warned that some
-single-frame iterations were too short for a stable signal. That makes Phase
-8C both a measurement-hardening phase and an optimization phase.
+Phase 8B removed the obvious dynamic-target scan from 3D, 2D, and mixed CCD. The
+pure 3D/2D benchmark rows now show a strong scaling win, but mixed CCD is still
+the visible hotspot. The 256-body mixed rows improved, while 64-body dense mixed
+was effectively noise, and BenchmarkDotNet still warned that some single-frame
+iterations were too short for a stable signal. That makes Phase 8C both a
+measurement-hardening phase and an optimization phase.
 
 Do not start by adding a clever mixed shortcut. First isolate where time is
 actually going:
 
 - mixed benchmark harness variance and short-iteration warning behavior.
 - opposite-dimension candidate collection through the mixed broad phase.
-- static-only CCD paths collecting movable dynamic colliders and filtering
-  after collection.
+- static-only CCD paths collecting movable dynamic colliders and filtering after
+  collection.
 - exact mixed sweep dispatch and shape-specific narrow-phase cost.
-- duplicated swept-bound, proxy-radius, and candidate-buffer work across
-  3D, 2D, and mixed continuous collision paths.
+- duplicated swept-bound, proxy-radius, and candidate-buffer work across 3D, 2D,
+  and mixed continuous collision paths.
 
 The rejected Phase 8B partition-level static-only collector experiment is a
 useful warning, not a dead end. Filtering during collection may be a good
 optimization. Persistently splitting partition membership by static/dynamic
 state is only acceptable if the state-transition model is explicit and tested
-for body activation, deactivation, immovable/kinematic changes, trigger
-changes, layer changes, and repartitioning.
+for body activation, deactivation, immovable/kinematic changes, trigger changes,
+layer changes, and repartitioning.
 
 **Tasks**
 
 - [x] Capture a fresh mixed CCD baseline before runtime changes. If benchmark
-  methodology changes, re-run the baseline under the new methodology before
-  comparing runtime changes.
+      methodology changes, re-run the baseline under the new methodology before
+      comparing runtime changes.
 - [x] Stabilize the mixed CCD benchmark signal:
   - add batched or microbenchmark variants that raise minimum iteration time
     without hiding per-frame reset/setup cost.
@@ -1298,34 +1298,35 @@ changes, layer changes, and repartitioning.
   - document BenchmarkDotNet warnings, outliers, and confidence intervals
     alongside mean timings.
 - [x] Add benchmark-visible internal counters where they improve attribution:
-  mixed 2D/3D candidates collected, candidates rejected by static/dynamic
-  policy, exact mixed sweeps attempted, dynamic CCD candidates returned, and
-  final hits. Phase 8C used the existing mixed query candidate count and split
-  benchmark rows rather than adding runtime counters to hot paths.
-- [x] Review lower-stack assets before adding new structures:
-  `GridForge` traversal/partition APIs, `SwiftFixedBVH<T>`,
-  `SwiftFixedSpatialHash<T>`, existing mixed broad-phase benchmarks, and any
-  reusable FixedMathSharp bounds helpers.
+      mixed 2D/3D candidates collected, candidates rejected by static/dynamic
+      policy, exact mixed sweeps attempted, dynamic CCD candidates returned, and
+      final hits. Phase 8C used the existing mixed query candidate count and
+      split benchmark rows rather than adding runtime counters to hot paths.
+- [x] Review lower-stack assets before adding new structures: `GridForge`
+      traversal/partition APIs, `SwiftFixedBVH<T>`, `SwiftFixedSpatialHash<T>`,
+      existing mixed broad-phase benchmarks, and any reusable FixedMathSharp
+      bounds helpers.
 - [x] Implement only the measured highest-impact optimization. Candidate
-  directions to evaluate:
+      directions to evaluate:
   - mixed static-only collectors that filter during broad-phase collection
     without unsafe static/dynamic partition membership.
   - a per-frame or retained static mixed candidate index if repeated static
     sweep collection dominates many-CCD-body scenes.
-  - shared swept-bound/proxy helpers if duplicated 3D/2D/mixed CCD prep shows
-  up in profiles or allocation counters.
+  - shared swept-bound/proxy helpers if duplicated 3D/2D/mixed CCD prep shows up
+    in profiles or allocation counters.
   - shape-specific mixed sweep fast paths if exact mixed narrow phase dominates.
 - [x] If a proven change also benefits pure 2D or 3D CCD/query paths, apply it
-  there with separate before/after measurements instead of leaving the shared
-  win on the table. Phase 8C's accepted optimization is mixed-partition
-  specific, so pure 2D/3D CCD was left untouched.
+      there with separate before/after measurements instead of leaving the
+      shared win on the table. Phase 8C's accepted optimization is
+      mixed-partition specific, so pure 2D/3D CCD was left untouched.
 - [x] Add correctness tests for any changed mixed broad-phase or query policy:
-  public mixed queries still include dynamic targets, CCD static-only queries
-  include bodyless/immovable/kinematic targets only, triggers/layers/sibling
-  filters still apply, and hit ordering remains deterministic.
+      public mixed queries still include dynamic targets, CCD static-only
+      queries include bodyless/immovable/kinematic targets only,
+      triggers/layers/sibling filters still apply, and hit ordering remains
+      deterministic.
 - [x] Re-run focused CCD/mixed tests, full `Release`, full `ReleaseLean`, and
-  the same benchmark set. Update this section with before/after results and
-  rejected experiments.
+      the same benchmark set. Update this section with before/after results and
+      rejected experiments.
 
 **Exit Criteria**
 
@@ -1333,8 +1334,8 @@ changes, layer changes, and repartitioning.
   remaining noise is explicitly explained and bounded.
 - The retained optimization is supported by measured cost attribution, not just
   by code-shape suspicion.
-- Mixed CCD improves materially at the representative higher body counts
-  without regressing public mixed query behavior.
+- Mixed CCD improves materially at the representative higher body counts without
+  regressing public mixed query behavior.
 - Pure 2D/3D shared-query improvements are included when the same measured
   change clearly helps them.
 - Hot-path managed allocations do not increase after warmup.
@@ -1343,19 +1344,19 @@ changes, layer changes, and repartitioning.
 
 **Progress - 2026-06-18**
 
-Captured a fresh Phase 8C baseline before runtime changes and then added
-batched mixed CCD attribution rows. The new benchmark rows keep sparse/dense
-mixed `LateSimulate` coverage while also splitting static 2D-target and static
+Captured a fresh Phase 8C baseline before runtime changes and then added batched
+mixed CCD attribution rows. The new benchmark rows keep sparse/dense mixed
+`LateSimulate` coverage while also splitting static 2D-target and static
 3D-target mixed query batches. The first measurement showed the real cost:
 static mixed query collection was roughly 44-46 ms/op at 256 bodies, accounting
 for most of the mixed CCD row.
 
-Implemented explicit mixed partition mobility membership:
-`dynamic`, `kinematic`, and `static` sets now exist for both 3D and 2D collider
-IDs. Public mixed queries still copy every set; static CCD copies only
-kinematic+static sets. Collider mixed partition state stores the last mobility
-kind so dynamic/kinematic/immovable transitions remove IDs from the correct old
-set before repartitioning.
+Implemented explicit mixed partition mobility membership: `dynamic`,
+`kinematic`, and `static` sets now exist for both 3D and 2D collider IDs. Public
+mixed queries still copy every set; static CCD copies only kinematic+static
+sets. Collider mixed partition state stores the last mobility kind so
+dynamic/kinematic/immovable transitions remove IDs from the correct old set
+before repartitioning.
 
 The kinematic/static split hardened correctness but was not the main benchmark
 win by itself. The accepted high-impact optimization is a phase-scoped target
@@ -1374,23 +1375,23 @@ dotnet tests\Gravitas.Benchmarks\bin\Release\net8.0\Gravitas.Benchmarks.dll dyna
 dotnet tests\Gravitas.Benchmarks\bin\Release\net8.0\Gravitas.Benchmarks.dll dynamic-ccd-scaling --filter "*Mixed*Batch8*" --artifacts artifacts\benchmarks\2026-06-18-phase8c-mixed-ccd-post-phase-cache --launchCount 1 --warmupCount 1 --iterationCount 7 --unrollFactor 1
 ```
 
-| Method | BodyCount | Baseline | Final | Allocated |
-| --- | ---: | ---: | ---: | ---: |
-| SparseMixedDynamicCcdBatch8 | 64 | 7.862 ms | 3.663 ms | 21504 B |
-| DenseMixedDynamicCcdBatch8 | 64 | 7.751 ms | 4.282 ms | 21504 B |
-| SparseMixedStatic2DQueryBatch8 | 64 | 2.250 ms | 923.0 us | 0 B |
-| DenseMixedStatic2DQueryBatch8 | 64 | 2.837 ms | 985.8 us | 0 B |
-| SparseMixedStatic3DQueryBatch8 | 64 | 2.124 ms | 909.8 us | 0 B |
-| DenseMixedStatic3DQueryBatch8 | 64 | 2.586 ms | 1.010 ms | 0 B |
-| SparseMixedDynamicCcdBatch8 | 256 | 95.449 ms | 8.037 ms | 86016 B |
-| DenseMixedDynamicCcdBatch8 | 256 | 106.479 ms | 9.709 ms | 86016 B |
-| SparseMixedStatic2DQueryBatch8 | 256 | 44.639 ms | 2.992 ms | 0 B |
-| DenseMixedStatic2DQueryBatch8 | 256 | 44.568 ms | 2.876 ms | 0 B |
-| SparseMixedStatic3DQueryBatch8 | 256 | 46.017 ms | 2.552 ms | 0 B |
-| DenseMixedStatic3DQueryBatch8 | 256 | 44.548 ms | 2.852 ms | 0 B |
+| Method                         | BodyCount |   Baseline |    Final | Allocated |
+| ------------------------------ | --------: | ---------: | -------: | --------: |
+| SparseMixedDynamicCcdBatch8    |        64 |   7.862 ms | 3.663 ms |   21504 B |
+| DenseMixedDynamicCcdBatch8     |        64 |   7.751 ms | 4.282 ms |   21504 B |
+| SparseMixedStatic2DQueryBatch8 |        64 |   2.250 ms | 923.0 us |       0 B |
+| DenseMixedStatic2DQueryBatch8  |        64 |   2.837 ms | 985.8 us |       0 B |
+| SparseMixedStatic3DQueryBatch8 |        64 |   2.124 ms | 909.8 us |       0 B |
+| DenseMixedStatic3DQueryBatch8  |        64 |   2.586 ms | 1.010 ms |       0 B |
+| SparseMixedDynamicCcdBatch8    |       256 |  95.449 ms | 8.037 ms |   86016 B |
+| DenseMixedDynamicCcdBatch8     |       256 | 106.479 ms | 9.709 ms |   86016 B |
+| SparseMixedStatic2DQueryBatch8 |       256 |  44.639 ms | 2.992 ms |       0 B |
+| DenseMixedStatic2DQueryBatch8  |       256 |  44.568 ms | 2.876 ms |       0 B |
+| SparseMixedStatic3DQueryBatch8 |       256 |  46.017 ms | 2.552 ms |       0 B |
+| DenseMixedStatic3DQueryBatch8  |       256 |  44.548 ms | 2.852 ms |       0 B |
 
-BenchmarkDotNet still reports short-iteration warnings and some noisy
-confidence intervals, so these rows should be treated as directionally strong
+BenchmarkDotNet still reports short-iteration warnings and some noisy confidence
+intervals, so these rows should be treated as directionally strong
 alpha-hardening evidence rather than release-grade performance constants. The
 large 256-body delta is big enough to keep the optimization.
 
@@ -1423,11 +1424,11 @@ alpha.
 
 **Context:**
 
-Phase 8B and Phase 8C proved dynamic-vs-dynamic CCD and mixed CCD can scale
-much better when candidate work is explicit and measured. Phase 8C's large win
-came from mixed-specific repeated target partition refresh removal, but its
-kinematic/static membership split remained worth checking for the pure 2D and
-3D paths. Pure partition membership should change only when the benchmark and
+Phase 8B and Phase 8C proved dynamic-vs-dynamic CCD and mixed CCD can scale much
+better when candidate work is explicit and measured. Phase 8C's large win came
+from mixed-specific repeated target partition refresh removal, but its
+kinematic/static membership split remained worth checking for the pure 2D and 3D
+paths. Pure partition membership should change only when the benchmark and
 lifecycle tests prove the extra state is justified.
 
 **Files:**
@@ -1449,59 +1450,60 @@ lifecycle tests prove the extra state is justified.
 **Tasks:**
 
 - [x] Capture a fresh pure 2D and pure 3D CCD baseline before runtime changes,
-  using the same batched methodology introduced for mixed Phase 8C where it
-  applies.
+      using the same batched methodology introduced for mixed Phase 8C where it
+      applies.
 - [x] Split benchmark attribution for pure CCD:
   - static target collection cost.
   - dynamic relative-target candidate cost.
   - exact sweep cost.
   - final hit ordering and response handoff cost.
 - [x] Evaluate pure static-style CCD collectors that include bodyless,
-  immovable, and kinematic targets while skipping movable dynamic targets.
+      immovable, and kinematic targets while skipping movable dynamic targets.
 - [x] Only split pure `PhysicsPartition` / `PhysicsPartition2D` kinematic ID
-  sets if benchmarks show candidate collection or distribution benefits large
-  enough to justify the added lifecycle state.
+      sets if benchmarks show candidate collection or distribution benefits
+      large enough to justify the added lifecycle state.
 - [x] If kinematic sets are retained, add lifecycle tests for dynamic ->
-  kinematic -> immovable -> dynamic transitions, deactivation, reset, retained
-  partition cleanup, and query visibility in both 2D and 3D.
+      kinematic -> immovable -> dynamic transitions, deactivation, reset,
+      retained partition cleanup, and query visibility in both 2D and 3D.
 - [x] Verify public pure 2D/3D queries still include dynamic, kinematic,
-  bodyless, and immovable colliders according to their existing query contract.
+      bodyless, and immovable colliders according to their existing query
+      contract.
 - [x] Audit CCD proxy-radius behavior for sphere/circle, capsule, cuboid/AABB,
-  cylinder, compound, convex mesh, and concave mesh cases:
+      cylinder, compound, convex mesh, and concave mesh cases:
   - identify conservative false-positive cases.
   - identify any false-negative tunneling risk.
   - document why each shape family uses its current proxy.
 - [x] Add focused tests for proxy-policy edge cases where the current
-  conservative approximation could be misunderstood by hosts.
+      conservative approximation could be misunderstood by hosts.
 - [x] Improve benchmark guardrails if short-iteration warnings remain noisy:
-  increase operations per invoke, add a larger stress row, or document why a
-  row is only directional evidence.
-- [x] Re-run focused CCD tests, full `Release`, full `ReleaseLean`, and the
-  same benchmark set. Retain only measured optimizations.
+      increase operations per invoke, add a larger stress row, or document why a
+      row is only directional evidence.
+- [x] Re-run focused CCD tests, full `Release`, full `ReleaseLean`, and the same
+      benchmark set. Retain only measured optimizations.
 
 **Implementation Notes:**
 
 - Added batched pure CCD benchmark rows for dynamic CCD, static-style query
-  cost, dynamic candidate-index query cost, and dynamic relative-sweep cost.
-  The pre-change baseline was captured under
+  cost, dynamic candidate-index query cost, and dynamic relative-sweep cost. The
+  pre-change baseline was captured under
   `artifacts/benchmarks/2026-06-18-phase8d-pure-ccd-baseline`. Short-iteration
   warnings remained, so these rows are directional guardrails rather than
   canonical release numbers.
 - The first implementation pass used internal static-style query collectors
   while keeping pure partitions dynamic/static. That improved some 64-body
-  static-query rows, but post-change benchmark rows still showed movable
-  dynamic scanning in the static leg. The retained implementation therefore
-  adds `ContainedKinematicObjects` to both `PhysicsPartition` and
+  static-query rows, but post-change benchmark rows still showed movable dynamic
+  scanning in the static leg. The retained implementation therefore adds
+  `ContainedKinematicObjects` to both `PhysicsPartition` and
   `PhysicsPartition2D`.
 - Pure partitions now classify bodyless and immovable colliders as static,
   kinematic bodies as kinematic, and movable non-kinematic bodies as dynamic.
-  Dynamic membership remains the only membership that activates solver
-  partition work. Static-style CCD collectors copy only kinematic/static IDs,
-  while public pure queries copy dynamic, kinematic, and static IDs.
+  Dynamic membership remains the only membership that activates solver partition
+  work. Static-style CCD collectors copy only kinematic/static IDs, while public
+  pure queries copy dynamic, kinematic, and static IDs.
 - `SolidBody.Immovable`, `SolidBody.IsKinematic`, `SolidBody2D.Immovable`, and
-  `SolidBody2D.IsKinematic` refresh partition mobility when changed on an
-  active body. Collider partition state stores the last mobility kind so clears
-  remove IDs from the bucket they were actually inserted into.
+  `SolidBody2D.IsKinematic` refresh partition mobility when changed on an active
+  body. Collider partition state stores the last mobility kind so clears remove
+  IDs from the bucket they were actually inserted into.
 - Added dynamic -> kinematic -> immovable -> dynamic transition tests for pure
   3D and pure 2D partitions, plus reset cleanup assertions for the kinematic
   buckets.
@@ -1516,11 +1518,11 @@ lifecycle tests prove the extra state is justified.
 - Post-split benchmark artifacts were captured under
   `artifacts/benchmarks/2026-06-18-phase8d-pure-ccd-after-partition-split`.
   Compared with the pre-change baseline, 64-body static-query rows improved
-  across 3D and 2D (`0.82x` to `0.89x` for dense/static rows, `0.86x` for
-  sparse 3D, `0.83x` for sparse 2D). Dense 256-body 3D static query improved
-  (`0.61x`), while sparse 256-body static rows remained noisy or neutral.
-  BenchmarkDotNet still warned that these smoke rows have short iteration
-  times, so treat them as directional regression guardrails.
+  across 3D and 2D (`0.82x` to `0.89x` for dense/static rows, `0.86x` for sparse
+  3D, `0.83x` for sparse 2D). Dense 256-body 3D static query improved (`0.61x`),
+  while sparse 256-body static rows remained noisy or neutral. BenchmarkDotNet
+  still warned that these smoke rows have short iteration times, so treat them
+  as directional regression guardrails.
 - Captured deeper future CCD work in
   `docs/feature-work/done/2026-06-18-continuous-collision-depth-hardening-plan.md`:
   rotational CCD, exact swept mover proxies, production-grade CCD benchmark
@@ -1532,8 +1534,8 @@ lifecycle tests prove the extra state is justified.
   explicitly documents why mixed-only classification is the right alpha choice.
 - Any new pure partition mobility state has complete transition and cleanup
   tests.
-- CCD proxy behavior is documented as conservative approximation, exact
-  support, or unsupported for each alpha shape family.
+- CCD proxy behavior is documented as conservative approximation, exact support,
+  or unsupported for each alpha shape family.
 - Benchmarks are stable enough to catch future CCD regressions, or remaining
   noise is called out with the affected rows.
 - No hot-path managed allocation regression after warmup.
@@ -1554,14 +1556,14 @@ reason to bloat the capture hot path.
 **Tasks**
 
 - [x] Inventory repeated event-decoding switch logic in host adapters, samples,
-  or future tooling.
+      or future tooling.
 - [x] If repetition becomes error-prone, design typed read-only view helpers
-  over existing `GravitasDiagnosticEvent` payloads without changing capture
-  storage.
+      over existing `GravitasDiagnosticEvent` payloads without changing capture
+      storage.
 - [x] Add tests for each typed view's field mapping, including mixed-dimension
-  payloads.
+      payloads.
 - [x] Keep helpers outside authoritative runtime loops and benchmark any
-  observable/tooling projection that fans diagnostics out to subscribers.
+      observable/tooling projection that fans diagnostics out to subscribers.
 
 **Exit Criteria**
 
@@ -1574,24 +1576,24 @@ reason to bloat the capture hot path.
 
 Added typed read-only diagnostic event views over the existing compact
 `GravitasDiagnosticEvent` payload. The event struct exposes `TryAs...` helpers
-for every current `GravitasDiagnosticEventKind`:
-`ForceDelta`, `TorqueDelta`, linear and angular velocity deltas, ground probes,
-ray/swept-sphere queries, X/Z circle queries, contacts, response impulses,
-mixed queries, mixed contacts, and mixed response impulses.
+for every current `GravitasDiagnosticEventKind`: `ForceDelta`, `TorqueDelta`,
+linear and angular velocity deltas, ground probes, ray/swept-sphere queries, X/Z
+circle queries, contacts, response impulses, mixed queries, mixed contacts, and
+mixed response impulses.
 
 A follow-up ergonomics pass added `GravitasDiagnosticEventVisitor`,
 `GravitasDebugDrawCommandVisitor`, event/draw `DispatchTo(...)`, and
-`GravitasDiagnosticSink.DispatchEventsTo(...)` /
-`DispatchDrawCommandsTo(...)`. These are now the preferred host-adapter entry
-points so Unity/Godot/server adapters can override typed visit methods instead
-of guessing which `TryAs...` helper or manual switch belongs to a payload.
+`GravitasDiagnosticSink.DispatchEventsTo(...)` / `DispatchDrawCommandsTo(...)`.
+These are now the preferred host-adapter entry points so Unity/Godot/server
+adapters can override typed visit methods instead of guessing which `TryAs...`
+helper or manual switch belongs to a payload.
 
 The views and visitors do not change capture storage, diagnostic buffering,
 event ordering, draw-command ordering, or disabled-path behavior. They give host
 adapters semantic property names such as `Force`, `AccelerationDelta`,
-`SweepRadius`, `ContactCount`, `Collider3DId`, `Collider2DId`,
-`Normal3DTo2D`, `ImpulseMagnitude`, `Center`, `Radius`, `Rotation`, and
-`PointA` instead of asking every adapter to decode generic fields by hand.
+`SweepRadius`, `ContactCount`, `Collider3DId`, `Collider2DId`, `Normal3DTo2D`,
+`ImpulseMagnitude`, `Center`, `Radius`, `Rotation`, and `PointA` instead of
+asking every adapter to decode generic fields by hand.
 
 Focused tests cover body-force/torque/velocity event views, query event views,
 contact and response impulse event views, mixed-dimension event views, event
@@ -1601,8 +1603,7 @@ benchmark; the helpers are ordinary value wrappers outside authoritative runtime
 loops.
 
 Diagnostic docs now show visitors as the preferred adapter decoding surface
-while keeping the generic event and draw command tables as the storage
-contract.
+while keeping the generic event and draw command tables as the storage contract.
 
 **Plan Closure - 2026-06-18**
 

@@ -8,7 +8,6 @@
 using Chronicler;
 using FixedMathSharp;
 using FixedMathSharp.Bounds;
-using Gravitas.CollisionHandling;
 using System;
 
 namespace Gravitas.Colliders;

@@ -46,8 +46,8 @@ inside the same deterministic 2D island graph as contacts.
 - `GravitasPhysics2DService` owns 2D body/collider registration, 2D collision
   pair processing, response/event processing, partition refresh, and grounding.
 - Pure 2D contact response has manifold and warm-start support.
-- At plan start, 3D constraints existed under `src/Gravitas/Constraints/3D`,
-  but there was no `Constraints/2D` subsystem.
+- At plan start, 3D constraints existed under `src/Gravitas/Constraints/3D`, but
+  there was no `Constraints/2D` subsystem.
 - Existing collider hierarchy keys can identify 2D colliders, but physical
   articulation should live in dedicated constraint types.
 
@@ -92,8 +92,8 @@ Implementation results:
 - Added allocation-free linked-collider suppression for 2D joint/ragdoll self
   collisions in physical pair creation and 2D CCD source filtering.
 - Added `RagdollDefinition2D`, `RagdollLinkDefinition2D`,
-  `RagdollJointDefinition2D`, and `RagdollRuntime2D` over ordinary
-  `SolidBody2D` links and `LSCollider2D` colliders.
+  `RagdollJointDefinition2D`, and `RagdollRuntime2D` over ordinary `SolidBody2D`
+  links and `LSCollider2D` colliders.
 - Added Chronicler `RecordData(...)`, replay hash contribution, diagnostic
   events, debug draw capture, tests, and benchmark smoke coverage for the pure
   2D articulated-body path.
@@ -107,19 +107,22 @@ Evidence captured during implementation:
 
 - Focused constraint tests cover registration, invalid payloads, cross-context
   rejection, solver correction, freeze-axis behavior, deterministic order,
-  linked wake state, ragdoll activation/filtering, serialization, 2D CCD
-  linked filtering, diagnostics, and disabled diagnostics/filtering allocation
+  linked wake state, ragdoll activation/filtering, serialization, 2D CCD linked
+  filtering, diagnostics, and disabled diagnostics/filtering allocation
   guardrails.
 - `tests/Gravitas.Benchmarks/Core/Constraint2DBenchmarks.cs` mirrors the 3D
   stress families for long chains, resting ragdolls, contact-heavy articulated
   stacks, motor-driven chains, linked filtering, inactive ragdolls, and
   activation toggles.
 - Validation passed:
-  - `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~Constraint2D"`: 25 passed.
-  - `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~Constraint3D"`: 29 passed.
+  - `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~Constraint2D"`:
+    25 passed.
+  - `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~Constraint3D"`:
+    29 passed.
   - `dotnet test Gravitas.slnx --configuration Release`: 951 passed.
   - `dotnet test Gravitas.slnx --configuration ReleaseLean`: 933 passed.
-  - `dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll constraint-2d --filter "*SimulateInactiveRagdoll*" --job Dry --warmupCount 1 --iterationCount 1`: benchmark smoke passed with no managed allocation reported.
+  - `dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll constraint-2d --filter "*SimulateInactiveRagdoll*" --job Dry --warmupCount 1 --iterationCount 1`:
+    benchmark smoke passed with no managed allocation reported.
 
 Deferred work: none. Mixed-dimension articulated constraints remain outside the
 current model by design; they are not a hidden gap in this pure 2D plan.

@@ -6,9 +6,9 @@
 //=======================================================================
 
 using FixedMathSharp;
-using System;
 using Gravitas.Colliders;
 using SwiftCollections;
+using System;
 
 namespace Gravitas.CollisionHandling;
 

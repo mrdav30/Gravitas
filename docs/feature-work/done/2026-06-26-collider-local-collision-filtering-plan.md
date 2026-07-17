@@ -1,12 +1,23 @@
 # Collider Local Collision Filtering Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use
+> superpowers:subagent-driven-development (recommended) or
+> superpowers:executing-plans to implement this plan task-by-task. Steps use
+> checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add collider-owned ignore-layer masks for physical collider-to-collider interactions without changing public query include-mask semantics.
+**Goal:** Add collider-owned ignore-layer masks for physical
+collider-to-collider interactions without changing public query include-mask
+semantics.
 
-**Architecture:** Store an explicit `PhysicsLayerMask` on `LSCollider` and `LSCollider2D`, then route every physical pair gate through shared deterministic filter helpers. The mask is one-way by ownership but pair rejection is symmetric: if either collider ignores the other collider's layer, the physical interaction is rejected.
+**Architecture:** Store an explicit `PhysicsLayerMask` on `LSCollider` and
+`LSCollider2D`, then route every physical pair gate through shared deterministic
+filter helpers. The mask is one-way by ownership but pair rejection is
+symmetric: if either collider ignores the other collider's layer, the physical
+interaction is rejected.
 
-**Tech Stack:** .NET 8, xUnit v3, FixedMathSharp, SwiftCollections, Gravitas 2D/3D/mixed collision services, CCD helpers, grounding/support checks, Chronicler explicit recording.
+**Tech Stack:** .NET 8, xUnit v3, FixedMathSharp, SwiftCollections, Gravitas
+2D/3D/mixed collision services, CCD helpers, grounding/support checks,
+Chronicler explicit recording.
 
 ---
 
@@ -99,13 +110,13 @@ both dimensional collider bases without creating duplicate concepts.
 - [x] Add `IgnoredCollisionLayers` to `LSCollider`.
 - [x] Add `IgnoredCollisionLayers` to `LSCollider2D`.
 - [x] Add internal layer-check helpers on both collider bases or one shared
-  internal static helper.
+      internal static helper.
 - [x] Update `LSCollider.RecordData(...)` to record the mask bits.
 - [x] Update `LSCollider2D.RecordData(...)` to record the mask bits.
 - [x] Add serialization tests proving save/populate preserves the masks for 3D
-  and 2D colliders.
+      and 2D colliders.
 - [x] Add XML docs explaining that the mask affects physical
-  collider-to-collider interactions only.
+      collider-to-collider interactions only.
 
 **Done Criteria**
 
@@ -117,8 +128,8 @@ both dimensional collider bases without creating duplicate concepts.
 
 **Problem**
 
-Pair creation is the lowest-cost place to reject most physical interactions.
-The rule must be applied consistently across dimensional services.
+Pair creation is the lowest-cost place to reject most physical interactions. The
+rule must be applied consistently across dimensional services.
 
 **Tasks**
 
@@ -131,13 +142,13 @@ The rule must be applied consistently across dimensional services.
 - [x] Add pure 2D tests with the same one-way and symmetric rejection cases.
 - [x] Add mixed 2D/3D tests with 3D-owned and 2D-owned ignore masks.
 - [x] Route `GravitasPhysicsService.RequireCollisionPair(...)` through the
-  shared local-filter helper.
+      shared local-filter helper.
 - [x] Route `GravitasPhysics2DService.RequireCollisionPair(...)` through the
-  shared local-filter helper.
+      shared local-filter helper.
 - [x] Route `GravitasMixedCollisionService.RequireCollisionPair(...)` through
-  the shared local-filter helper.
+      the shared local-filter helper.
 - [x] Ensure resting-pair preservation and cleanup re-check the filter so
-  changing a mask at runtime removes stale pairs deterministically.
+      changing a mask at runtime removes stale pairs deterministically.
 
 **Done Criteria**
 
@@ -156,14 +167,14 @@ intent and should not automatically apply these masks.
 **Tasks**
 
 - [x] Add 3D CCD tests proving an ignored-layer target does not clamp a moving
-  body and does not receive dynamic handoff.
+      body and does not receive dynamic handoff.
 - [x] Add 2D CCD tests with the same behavior for pure 2D movement.
 - [x] Add mixed CCD tests for both source dimensions.
 - [x] Add 3D grounding tests proving ignored-layer ground candidates are
-  rejected after query collection.
+      rejected after query collection.
 - [x] Add 2D grounding/support tests to the 2D grounding plan or this plan,
-  depending on execution order, proving ignored-layer support candidates are
-  rejected.
+      depending on execution order, proving ignored-layer support candidates are
+      rejected.
 - [x] Route 3D CCD target eligibility helpers through the local filter.
 - [x] Route pure 2D CCD target eligibility helpers through the local filter.
 - [x] Route mixed CCD target eligibility helpers through the local filter.
@@ -194,11 +205,11 @@ hide results because a collider happens to ignore a physical layer.
   - `QueryMixed` still returns ignored-layer colliders when the caller include
     mask selects them.
 - [x] Update `docs/wiki/QUERY_SERVICES.md` to state that query masks are caller
-  include masks and do not apply collider-local physical ignore masks.
+      include masks and do not apply collider-local physical ignore masks.
 - [x] Update `docs/wiki/COLLISION_PIPELINE.md` with the discrete/CCD filtering
-  rule.
+      rule.
 - [x] Update `docs/wiki/HOST_INTEGRATION.md` with an example of local physical
-  layer ignore usage.
+      layer ignore usage.
 - [x] Update `docs/wiki/SERIALIZATION.md` for collider-local mask recording.
 
 **Done Criteria**
@@ -219,10 +230,10 @@ kept cheaper than repeated ad hoc branch logic.
 - [x] Run focused collision, CCD, grounding, mixed, and query test filters.
 - [x] Run full Release and ReleaseLean test passes.
 - [x] Inspect hot paths for duplicate local-mask checks that can be centralized.
-- [x] Add a benchmark row only if focused collision distribution benchmarks
-  show measurable regression.
+- [x] Add a benchmark row only if focused collision distribution benchmarks show
+      measurable regression.
 - [x] Update `docs/feature-work/feature-work-overview.md` when the plan is
-  completed and moved to `done`.
+      completed and moved to `done`.
 
 **Done Criteria**
 
@@ -239,4 +250,3 @@ kept cheaper than repeated ad hoc branch logic.
   local masks.
 - Public query services remain caller-mask driven.
 - Serialization, docs, and tests cover the new filtering boundary.
-

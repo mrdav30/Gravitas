@@ -2,8 +2,8 @@ using FluentAssertions;
 using Gravitas.Support;
 using System;
 using System.Collections.Generic;
-using static Gravitas.Tests.Support.Coroutines.CoroutineTestRoutines;
 using Xunit;
+using static Gravitas.Tests.Support.Coroutines.CoroutineTestRoutines;
 
 namespace Gravitas.Tests.Support.Coroutines;
 

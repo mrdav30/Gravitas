@@ -1,18 +1,27 @@
 # Query And Mixed Swept Shape Hardening Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use
+> superpowers:subagent-driven-development (recommended) or
+> superpowers:executing-plans to implement this plan task-by-task. Steps use
+> checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Make Gravitas query and swept-shape behavior first-class across pure 2D, mixed 2D/3D, primitive/convex mesh/compound swept sources, and finite-slab mixed CCD paths.
+**Goal:** Make Gravitas query and swept-shape behavior first-class across pure
+2D, mixed 2D/3D, primitive/convex mesh/compound swept sources, and finite-slab
+mixed CCD paths.
 
-**Architecture:** Keep caller-owned result buffers, deterministic candidate ordering, and conservative broad candidates. Add shape-specific exact query reducers only when they remove meaningful false positives without introducing false negatives or unacceptable hot-path cost.
+**Architecture:** Keep caller-owned result buffers, deterministic candidate
+ordering, and conservative broad candidates. Add shape-specific exact query
+reducers only when they remove meaningful false positives without introducing
+false negatives or unacceptable hot-path cost.
 
-**Tech Stack:** .NET 8, xUnit v3, BenchmarkDotNet, FixedMathSharp geometry primitives, SwiftCollections buffers, GridForge-backed partitions, Gravitas query and CCD services.
+**Tech Stack:** .NET 8, xUnit v3, BenchmarkDotNet, FixedMathSharp geometry
+primitives, SwiftCollections buffers, GridForge-backed partitions, Gravitas
+query and CCD services.
 
 ---
 
-**Date:** 2026-06-21
-**Status:** Done
-**Owner:** Gravitas query and swept-shape hardening
+**Date:** 2026-06-21 **Status:** Done **Owner:** Gravitas query and swept-shape
+hardening
 
 ## Purpose
 
@@ -23,8 +32,8 @@ gaps are sharper: explicit convex swept-source APIs need a bounded runtime
 policy for primitives, convex meshes, and authored compounds, and mixed
 swept-circle queries now have exact primitive finite-slab reducers for sphere,
 cuboid, world-Y capsule, and world-Y finite-cylinder targets while mesh,
-compound, and unsupported rotated curved primitives remain explicit
-conservative fallbacks.
+compound, and unsupported rotated curved primitives remain explicit conservative
+fallbacks.
 
 For a first-class physics engine, those limitations need explicit reducer
 policy, tests, benchmarks, and docs. A public query API that works by
@@ -47,8 +56,8 @@ and known not to create false negatives.
 - 3D query services expose raycast, swept-sphere, overlap-circle, and
   proximity-style X/Z queries with caller-owned hit buffers.
 - Pure 2D query services expose circle, AABB, and convex polygon overlap
-  queries, segment raycasts, swept-circle queries, and static-style
-  swept-circle collectors used by 2D CCD.
+  queries, segment raycasts, swept-circle queries, and static-style swept-circle
+  collectors used by 2D CCD.
 - Mixed `SweepSphereAgainst2D` treats 2D shapes as finite slabs/prisms.
 - Mixed `SweepCircleAgainst3D` uses exact finite-slab reducers for 3D sphere,
   cuboid, world-Y capsule, and world-Y finite-cylinder targets.
@@ -80,14 +89,15 @@ and known not to create false negatives.
 
 **Tasks**
 
-- [x] Inventory every public query and internal CCD query path, including
-  source shape, target shape, exact reducer, conservative fallback, ordering
-  key, and allocation behavior.
+- [x] Inventory every public query and internal CCD query path, including source
+      shape, target shape, exact reducer, conservative fallback, ordering key,
+      and allocation behavior.
 - [x] Add tests that distinguish exact shape truth from accepted conservative
-  fallback for mixed swept-circle and concave/raw mesh-source query families.
+      fallback for mixed swept-circle and concave/raw mesh-source query
+      families.
 - [x] Update query docs with an explicit support matrix and fallback labels.
 - [x] Rank missing query families by end-user value, false-positive severity,
-  and benchmark cost before implementing new reducers.
+      and benchmark cost before implementing new reducers.
 
 **Progress 2026-06-22:** Workstream 1 established the explicit query surface
 inventory in `docs/wiki/QUERY_SERVICES.md`, covering public query APIs and
@@ -116,29 +126,29 @@ not need to approximate every area query with a circle.
 **Tasks**
 
 - [x] Add tests for `OverlapAabb2D` style queries against circle, AABB, convex
-  polygon, and compound colliders.
+      polygon, and compound colliders.
 - [x] Add tests for convex polygon area queries, including separated,
-  edge-touching, full-overlap, and compound-part cases.
+      edge-touching, full-overlap, and compound-part cases.
 - [x] Reuse `QueryDetection2D` and existing collision SAT helpers where they
-  preserve deterministic ordering and avoid allocations.
+      preserve deterministic ordering and avoid allocations.
 - [x] Expose single-hit and all-hit APIs with caller-owned `SwiftList` buffers,
-  matching existing 2D query naming and layer/trigger semantics.
+      matching existing 2D query naming and layer/trigger semantics.
 - [x] Update query docs and benchmarks for 2D area-query parity.
 
 **Progress 2026-06-22:** Workstream 2 added exact pure 2D AABB and convex
 polygon area queries through `GravitasQuery2DService.OverlapAabb`,
 `OverlapAabbAll`, `OverlapPolygon`, and `OverlapPolygonAll`, and closed the
-legacy closest-hit gap with `OverlapCircle`. The service
-validates area inputs once, gathers GridForge-backed 2D bounds candidates, runs
-allocation-free fixed-point SAT/closest-point checks in `QueryDetection2D`, and
-sorts all-hit buffers by distance then collider ID. Compound targets reduce to
-their owning `LSCompoundCollider2D` through stable best-part selection.
+legacy closest-hit gap with `OverlapCircle`. The service validates area inputs
+once, gathers GridForge-backed 2D bounds candidates, runs allocation-free
+fixed-point SAT/closest-point checks in `QueryDetection2D`, and sorts all-hit
+buffers by distance then collider ID. Compound targets reduce to their owning
+`LSCompoundCollider2D` through stable best-part selection.
 
-Focused coverage now includes AABB queries against circle, AABB, convex
-polygon, and compound-style scenes, polygon queries for separated,
-edge-touching, full-overlap, closest-hit, and compound owner behavior, and an
-after-warmup allocation guard for both area-query families. Query docs and 2D
-benchmark rows were updated for general and compound target scenes.
+Focused coverage now includes AABB queries against circle, AABB, convex polygon,
+and compound-style scenes, polygon queries for separated, edge-touching,
+full-overlap, closest-hit, and compound owner behavior, and an after-warmup
+allocation guard for both area-query families. Query docs and 2D benchmark rows
+were updated for general and compound target scenes.
 
 ## Workstream 3: Mixed Finite-Slab Swept-Circle Solvers
 
@@ -152,30 +162,29 @@ false-positive hits.
 **Tasks**
 
 - [x] Add red tests for cuboid, capsule, and finite-cylinder targets where the
-  conservative fallback reports a hit that finite-slab geometry should reject
-  or report later.
+      conservative fallback reports a hit that finite-slab geometry should
+      reject or report later.
 - [x] Implement exact finite-slab reducers for cuboid, capsule, and finite
-  cylinder targets before considering mesh or compound expansion.
+      cylinder targets before considering mesh or compound expansion.
 - [x] Preserve current sphere exact behavior and result ordering.
 - [x] Route mixed 2D CCD through the same finite-slab reducers used by public
-  `QueryMixed` APIs.
+      `QueryMixed` APIs.
 - [x] Add benchmark rows for dense mixed swept-circle scenes, including false
-  positives, accepted hits, and candidate counts.
+      positives, accepted hits, and candidate counts.
 
-**Progress 2026-06-22:** Workstream 3 promoted mixed
-`SweepCircleAgainst3D` primitive targets away from the accidental generic
-swept-sphere proxy. Sphere behavior remains exact. Cuboid targets now clip the
-target box against the source slab's Y interval, build a deterministic X/Z
-convex projection, and sweep the source circle against that projection without
-allocations. World-Y capsule and finite-cylinder targets use exact
-vertical-interval reducers; unsupported rotated capsule/cylinder targets remain
-explicit `ConservativeFallback` paths until a measured rotated curved-surface
-solver is justified. Mesh and compound targets also remain labeled fallback, now
-using a circumsphere source proxy so fallback paths cannot miss finite-slab
-corner cases. Focused mixed query/CCD tests cover exact primitive reducer labels,
-tall-slab report-later cases, proxy-only rejection, and fallback labeling.
-`MixedQueryBenchmarks` now includes dense cuboid, capsule, and cylinder
-swept-circle rows plus candidate-count rows.
+**Progress 2026-06-22:** Workstream 3 promoted mixed `SweepCircleAgainst3D`
+primitive targets away from the accidental generic swept-sphere proxy. Sphere
+behavior remains exact. Cuboid targets now clip the target box against the
+source slab's Y interval, build a deterministic X/Z convex projection, and sweep
+the source circle against that projection without allocations. World-Y capsule
+and finite-cylinder targets use exact vertical-interval reducers; unsupported
+rotated capsule/cylinder targets remain explicit `ConservativeFallback` paths
+until a measured rotated curved-surface solver is justified. Mesh and compound
+targets also remain labeled fallback, now using a circumsphere source proxy so
+fallback paths cannot miss finite-slab corner cases. Focused mixed query/CCD
+tests cover exact primitive reducer labels, tall-slab report-later cases,
+proxy-only rejection, and fallback labeling. `MixedQueryBenchmarks` now includes
+dense cuboid, capsule, and cylinder swept-circle rows plus candidate-count rows.
 
 ## Workstream 4: Convex Swept Source Query Families
 
@@ -191,50 +200,48 @@ triangles or hide convex decomposition inside runtime queries.
 
 **Tasks**
 
-- [x] Define which convex source queries belong in runtime for alpha:
-  primitive source, convex mesh source, authored compound source, exact concave
-  mesh source expansion, or explicit no-runtime-support for concave/raw mesh
-  sources.
+- [x] Define which convex source queries belong in runtime for alpha: primitive
+      source, convex mesh source, authored compound source, exact concave mesh
+      source expansion, or explicit no-runtime-support for concave/raw mesh
+      sources.
 - [x] Add tests for the chosen source boundary, preserving owner collider
-  identity and stable primitive, triangle, or part ordering.
+      identity and stable primitive, triangle, or part ordering.
 - [x] Add mesh-target and mesh/compound source benchmark rows before concave
-  source expansion.
+      source expansion.
 - [x] Prefer offline convex decomposition or authored compound colliders when
-  exact concave mesh-source sweeps would have unbounded triangle cost.
+      exact concave mesh-source sweeps would have unbounded triangle cost.
 - [x] Keep mesh target query behavior stable while source-family work is added.
 
-**Progress 2026-06-22:** Workstream 4 added explicit
-`Query3D.SweepCapsule`, `SweepCapsuleAll`, `SweepCuboid`, `SweepCuboidAll`,
-`SweepCylinder`, `SweepCylinderAll`, `SweepConvexMesh`,
-`SweepConvexMeshAll`, `SweepCompound`, and `SweepCompoundAll` APIs. Capsule,
-cuboid, finite-cylinder, and convex mesh sources use support-mapped
-conservative advancement against sphere, capsule, cuboid, finite-cylinder,
-convex mesh, concave mesh target triangles, and compound targets. Authored
-compound sources reduce supported convex parts in stable part order and report
-the target owner once. Concave mesh sources are rejected with a clear error that
-points hosts to offline convex decomposition into `LSCompoundCollider` parts;
-raw mesh source queries and runtime decomposition remain intentionally
-unsupported.
+**Progress 2026-06-22:** Workstream 4 added explicit `Query3D.SweepCapsule`,
+`SweepCapsuleAll`, `SweepCuboid`, `SweepCuboidAll`, `SweepCylinder`,
+`SweepCylinderAll`, `SweepConvexMesh`, `SweepConvexMeshAll`, `SweepCompound`,
+and `SweepCompoundAll` APIs. Capsule, cuboid, finite-cylinder, and convex mesh
+sources use support-mapped conservative advancement against sphere, capsule,
+cuboid, finite-cylinder, convex mesh, concave mesh target triangles, and
+compound targets. Authored compound sources reduce supported convex parts in
+stable part order and report the target owner once. Concave mesh sources are
+rejected with a clear error that points hosts to offline convex decomposition
+into `LSCompoundCollider` parts; raw mesh source queries and runtime
+decomposition remain intentionally unsupported.
 `SweptSphereQueryWorker.TrySweep(LSCollider collider, ...)` remains a
-sphere-source reducer against a target collider, including mesh targets.
-Focused tests cover primitive source hits, rotated capsule/cylinder source
-geometry, convex mesh source hits, concave source rejection, compound source
-reduction, mesh-target owner collapse, and the absence of generic/raw
-mesh-source APIs. `QueryServiceBenchmarks` now includes mesh-target swept
-sphere, capsule source, cuboid source, cylinder source, convex mesh source, and
-compound source rows.
+sphere-source reducer against a target collider, including mesh targets. Focused
+tests cover primitive source hits, rotated capsule/cylinder source geometry,
+convex mesh source hits, concave source rejection, compound source reduction,
+mesh-target owner collapse, and the absence of generic/raw mesh-source APIs.
+`QueryServiceBenchmarks` now includes mesh-target swept sphere, capsule source,
+cuboid source, cylinder source, convex mesh source, and compound source rows.
 
 ## Workstream 5: Query Diagnostics, Docs, And Release Validation
 
 **Tasks**
 
 - [x] Add optional diagnostic counters for query fallback hits, exact reducer
-  attempts, accepted hits, and rejected conservative candidates where they help
-  hosts debug query quality.
+      attempts, accepted hits, and rejected conservative candidates where they
+      help hosts debug query quality.
 - [x] Update `docs/wiki/QUERY_SERVICES.md`, `docs/wiki/COLLISION_PIPELINE.md`,
-  and `docs/wiki/DIMENSIONS.md` with the final support matrix.
+      and `docs/wiki/DIMENSIONS.md` with the final support matrix.
 - [x] Add or update benchmarks for every new public query family and exact mixed
-  reducer.
+      reducer.
 - [x] Validate `Release` and `ReleaseLean` after runtime query changes.
 
 **Progress 2026-06-22:** Workstream 5 added `QuerySummary` diagnostics through
@@ -242,11 +249,11 @@ compound source rows.
 from mixed query paths, and kept disabled diagnostics on the existing early
 return path. Final review hardening also centralized deterministic query
 ordering: closest 3D raycasts now use the same distance/collider-ID tie-break as
-all-hit raycasts and sweeps, 2D and mixed all-hit sorters now use allocation-free
-heap sorting instead of duplicated insertion sorts, mixed single-hit queries now
-keep the best candidate directly instead of filling and sorting all results, and
-convex sweep reducer ties now use authored compound part or mesh triangle order
-before collapsing hits back to owner identity.
+all-hit raycasts and sweeps, 2D and mixed all-hit sorters now use
+allocation-free heap sorting instead of duplicated insertion sorts, mixed
+single-hit queries now keep the best candidate directly instead of filling and
+sorting all results, and convex sweep reducer ties now use authored compound
+part or mesh triangle order before collapsing hits back to owner identity.
 
 Docs were updated across query, collision, dimensions, and diagnostics pages,
 including the missing `Physics2DHit` hit-data entry and the final query
@@ -262,8 +269,7 @@ high-vertex convex mesh source benchmark signal, was extracted to
   world-Y capsule, and world-Y finite cylinder) no longer relies on accidental
   generic sphere proxy behavior.
 - Primitive, convex mesh, and compound source query behavior is explicit,
-  tested, documented, and benchmarked; concave/raw mesh sources remain
-  rejected.
+  tested, documented, and benchmarked; concave/raw mesh sources remain rejected.
 - Public query docs distinguish exact support from conservative fallback.
 - All new recurring query paths are allocation-free after warmup.
 

@@ -24,15 +24,15 @@ testing, and replay tools.
 
 ## Ownership Contract
 
-| Host-created shell | Serialized state |
-| --- | --- |
-| `GravitasWorldContext` and `GridWorld` | Settings that affect deterministic execution. |
-| `IMatterAgent`, `FixedTransform`, engine wrappers | Body position, rotation, velocities, force/torque stores, gravity scale, sleep, CCD, freeze axes. |
-| `SolidBody`, `SolidBody2D` | 3D grounding state and 2D planar support state. |
-| Concrete `LSCollider` and `LSCollider2D` types | Active/trigger state for bodyless trigger volumes, layer, local ignored physical layers, material, local offset, shape inputs, mixed half-thickness override. |
-| Compound runtime shells and private part colliders | Authored shape/part values needed to rebuild deterministic geometry. |
-| Existing `Joint3D`, `Joint2D`, ragdoll runtimes | Joint enabled state, type, frames, limits, motors, linked collision policy, ragdoll activation state. |
-| Renderer, ECS, networking, pooling, editor state | Nothing. These remain host-owned. |
+| Host-created shell                                 | Serialized state                                                                                                                                              |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GravitasWorldContext` and `GridWorld`             | Settings that affect deterministic execution.                                                                                                                 |
+| `IMatterAgent`, `FixedTransform`, engine wrappers  | Body position, rotation, velocities, force/torque stores, gravity scale, sleep, CCD, freeze axes.                                                             |
+| `SolidBody`, `SolidBody2D`                         | 3D grounding state and 2D planar support state.                                                                                                               |
+| Concrete `LSCollider` and `LSCollider2D` types     | Active/trigger state for bodyless trigger volumes, layer, local ignored physical layers, material, local offset, shape inputs, mixed half-thickness override. |
+| Compound runtime shells and private part colliders | Authored shape/part values needed to rebuild deterministic geometry.                                                                                          |
+| Existing `Joint3D`, `Joint2D`, ragdoll runtimes    | Joint enabled state, type, frames, limits, motors, linked collision policy, ragdoll activation state.                                                         |
+| Renderer, ECS, networking, pooling, editor state   | Nothing. These remain host-owned.                                                                                                                             |
 
 Runtime-owned state that should not be serialized:
 
@@ -52,18 +52,18 @@ authoritative state instead of being treated as replay truth.
 
 ## Recordable Types
 
-| Type | What it records | What it does not own |
-| --- | --- | --- |
-| `SolidBody` | 3D position/height, rotation, freeze axes, motion stores, mass, COM, gravity scale, sleep, CCD, grounding/probe state, owned collider state. | `FixedTransform` identity, service IDs, partitions, pairs. |
-| `SolidBody2D` | X/Z position, scalar rotation, freeze axes, planar motion stores, scalar angular state, mass, COM, scalar moment policy, gravity, grounding/probe state, sleep, CCD, owned collider state. | Host transform identity, runtime service IDs, query buffers. |
-| `LSCollider` | 3D active state, bodyless trigger state, layer/filter state, local ignored physical mask, material, shape state. | Context-owned collider ID, partition identity, pairs/events. |
-| `LSCollider2D` | 2D active state, bodyless trigger state, layer/filter state, material, shape-local values, mixed half-thickness override. | Context-owned collider ID, private runtime pair/partition state. |
-| `ColliderShapeDefinition` | Data-only 3D authoring/import values for primitive, mesh, and compound part inputs. | Runtime body, context, collider ID, pairs, hierarchy, events. |
-| `ColliderShapeDefinition2D` | Data-only 2D authoring/import values for circle, capsule, AABB, convex polygon, triangle convenience, and compound parts. | Runtime body, context, collider ID, pairs, hierarchy, events. |
-| `PhysicsSettingsSaver` | Frame rate, collision matrix, ground mask, CCD settings, restitution threshold, retained partition cleanup, runtime mode, mixed 2D thickness. | Runtime service state. |
-| `Joint3D` / `Joint2D` | Mutable joint continuation state: enabled flag, type, frames/anchors, limits, motors, linked-collider policy. | Body link construction, service joint IDs, solver caches. |
-| `RagdollRuntime3D` / `RagdollRuntime2D` | Runtime activation state for existing handles. | Definitions, link bodies, colliders, joint ownership. |
-| `PhysicsLayer` / `PhysicsLayerMask` | JSON/MemoryPack-friendly value fields. | Chronicler graph identity. |
+| Type                                    | What it records                                                                                                                                                                            | What it does not own                                             |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------- |
+| `SolidBody`                             | 3D position/height, rotation, freeze axes, motion stores, mass, COM, gravity scale, sleep, CCD, grounding/probe state, owned collider state.                                               | `FixedTransform` identity, service IDs, partitions, pairs.       |
+| `SolidBody2D`                           | X/Z position, scalar rotation, freeze axes, planar motion stores, scalar angular state, mass, COM, scalar moment policy, gravity, grounding/probe state, sleep, CCD, owned collider state. | Host transform identity, runtime service IDs, query buffers.     |
+| `LSCollider`                            | 3D active state, bodyless trigger state, layer/filter state, local ignored physical mask, material, shape state.                                                                           | Context-owned collider ID, partition identity, pairs/events.     |
+| `LSCollider2D`                          | 2D active state, bodyless trigger state, layer/filter state, material, shape-local values, mixed half-thickness override.                                                                  | Context-owned collider ID, private runtime pair/partition state. |
+| `ColliderShapeDefinition`               | Data-only 3D authoring/import values for primitive, mesh, and compound part inputs.                                                                                                        | Runtime body, context, collider ID, pairs, hierarchy, events.    |
+| `ColliderShapeDefinition2D`             | Data-only 2D authoring/import values for circle, capsule, AABB, convex polygon, triangle convenience, and compound parts.                                                                  | Runtime body, context, collider ID, pairs, hierarchy, events.    |
+| `PhysicsSettingsSaver`                  | Frame rate, collision matrix, ground mask, CCD settings, restitution threshold, retained partition cleanup, runtime mode, mixed 2D thickness.                                              | Runtime service state.                                           |
+| `Joint3D` / `Joint2D`                   | Mutable joint continuation state: enabled flag, type, frames/anchors, limits, motors, linked-collider policy.                                                                              | Body link construction, service joint IDs, solver caches.        |
+| `RagdollRuntime3D` / `RagdollRuntime2D` | Runtime activation state for existing handles.                                                                                                                                             | Definitions, link bodies, colliders, joint ownership.            |
+| `PhysicsLayer` / `PhysicsLayerMask`     | JSON/MemoryPack-friendly value fields.                                                                                                                                                     | Chronicler graph identity.                                       |
 
 Collider geometry can derive default COM/mass properties for new shells, but
 populated snapshots restore body-owned COM state directly where that state is
@@ -112,8 +112,8 @@ The authoritative hash follows the same boundary as
 - rebuildable runtime caches are excluded.
 - active cross-frame CCD handoff state is included because it can affect the
   next fixed step.
-- runtime collider IDs are context-local lookup and pair keys; replay hashes
-  use canonical live registration order with dense replay ordinals for collider,
+- runtime collider IDs are context-local lookup and pair keys; replay hashes use
+  canonical live registration order with dense replay ordinals for collider,
   hierarchy, and pair identity, so deleted collider ID history and allocator
   holes are excluded.
 - solver caches and diagnostic counters are included only in
@@ -159,13 +159,13 @@ When changing serialized fields, defaults, or load behavior:
 
 ## Source Map
 
-| Area | Source |
-| --- | --- |
-| 3D body serialization | [`src/Gravitas/Core/3D/SolidBody.Serialization.cs`](../../src/Gravitas/Core/3D/SolidBody.Serialization.cs) |
-| 2D body serialization | [`src/Gravitas/Core/2D/SolidBody2D.Serialization.cs`](../../src/Gravitas/Core/2D/SolidBody2D.Serialization.cs) |
-| 3D collider replay/record state | [`src/Gravitas/Colliders/3D/LSCollider.ReplayHash.cs`](../../src/Gravitas/Colliders/3D/LSCollider.ReplayHash.cs) |
-| 2D collider replay/record state | [`src/Gravitas/Colliders/2D/LSCollider2D.ReplayHash.cs`](../../src/Gravitas/Colliders/2D/LSCollider2D.ReplayHash.cs) |
-| Settings saver | [`src/Gravitas/Settings/PhysicsSettingsSaver.cs`](../../src/Gravitas/Settings/PhysicsSettingsSaver.cs) |
-| Replay hash service | [`src/Gravitas/Determinism/GravitasReplayHashService.cs`](../../src/Gravitas/Determinism/GravitasReplayHashService.cs) |
-| Serialization tests | [`tests/Gravitas.Tests/Serialization`](../../tests/Gravitas.Tests/Serialization) |
-| Replay conformance tests | [`tests/Gravitas.Tests/Determinism`](../../tests/Gravitas.Tests/Determinism) |
+| Area                            | Source                                                                                                                 |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| 3D body serialization           | [`src/Gravitas/Core/3D/SolidBody.Serialization.cs`](../../src/Gravitas/Core/3D/SolidBody.Serialization.cs)             |
+| 2D body serialization           | [`src/Gravitas/Core/2D/SolidBody2D.Serialization.cs`](../../src/Gravitas/Core/2D/SolidBody2D.Serialization.cs)         |
+| 3D collider replay/record state | [`src/Gravitas/Colliders/3D/LSCollider.ReplayHash.cs`](../../src/Gravitas/Colliders/3D/LSCollider.ReplayHash.cs)       |
+| 2D collider replay/record state | [`src/Gravitas/Colliders/2D/LSCollider2D.ReplayHash.cs`](../../src/Gravitas/Colliders/2D/LSCollider2D.ReplayHash.cs)   |
+| Settings saver                  | [`src/Gravitas/Settings/PhysicsSettingsSaver.cs`](../../src/Gravitas/Settings/PhysicsSettingsSaver.cs)                 |
+| Replay hash service             | [`src/Gravitas/Determinism/GravitasReplayHashService.cs`](../../src/Gravitas/Determinism/GravitasReplayHashService.cs) |
+| Serialization tests             | [`tests/Gravitas.Tests/Serialization`](../../tests/Gravitas.Tests/Serialization)                                       |
+| Replay conformance tests        | [`tests/Gravitas.Tests/Determinism`](../../tests/Gravitas.Tests/Determinism)                                           |

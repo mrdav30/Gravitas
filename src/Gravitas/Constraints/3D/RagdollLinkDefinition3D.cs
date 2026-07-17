@@ -6,7 +6,6 @@
 //=======================================================================
 
 using Gravitas.Colliders;
-using SwiftCollections;
 
 namespace Gravitas.Constraints;
 

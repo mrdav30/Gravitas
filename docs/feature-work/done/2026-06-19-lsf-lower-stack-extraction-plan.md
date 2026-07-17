@@ -1,18 +1,30 @@
 # LSF Lower-Stack Extraction Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use
+> superpowers:subagent-driven-development (recommended) or
+> superpowers:executing-plans to implement this plan task-by-task. Steps use
+> checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Move reusable deterministic math, traversal, and save/apply infrastructure out of Gravitas into the correct lower LSF libraries without weakening Gravitas' physics-facing APIs.
+**Goal:** Move reusable deterministic math, traversal, and save/apply
+infrastructure out of Gravitas into the correct lower LSF libraries without
+weakening Gravitas' physics-facing APIs.
 
-**Architecture:** FixedMathSharp should own reusable fixed-point transform and geometry algebra. GridForge should own grid traversal/topology helpers that reason over `GridWorld`, `VoxelGrid`, and voxel partitions. Chronicler should own the reusable default save/apply phase base. Gravitas keeps physics-specific wrappers, collider ownership, body mobility policy, mesh mass-property integration, and runtime service integration.
+**Architecture:** FixedMathSharp should own reusable fixed-point transform and
+geometry algebra. GridForge should own grid traversal/topology helpers that
+reason over `GridWorld`, `VoxelGrid`, and voxel partitions. Chronicler should
+own the reusable default save/apply phase base. Gravitas keeps physics-specific
+wrappers, collider ownership, body mobility policy, mesh mass-property
+integration, and runtime service integration.
 
-**Tech Stack:** C# 11, FixedMathSharp `Fixed64`/`Vector3d`/`FixedQuaternion`/`Fixed3x3`, GridForge `GridWorld`/`VoxelGrid`/`IVoxelPartition`, Chronicler.Core, SwiftCollections, xUnit, Gravitas Release/ReleaseLean validation.
+**Tech Stack:** C# 11, FixedMathSharp
+`Fixed64`/`Vector3d`/`FixedQuaternion`/`Fixed3x3`, GridForge
+`GridWorld`/`VoxelGrid`/`IVoxelPartition`, Chronicler.Core, SwiftCollections,
+xUnit, Gravitas Release/ReleaseLean validation.
 
 ---
 
-**Date:** 2026-06-19
-**Status:** Done / all workstreams complete
-**Owner:** LSF lower-stack hardening
+**Date:** 2026-06-19 **Status:** Done / all workstreams complete **Owner:** LSF
+lower-stack hardening
 
 ## Purpose
 
@@ -26,9 +38,9 @@ LSF stack:
   fixed-point barycentric product algebra. Gravitas should keep `PhysicsMesh`,
   mesh volume validation, center-of-mass calculation, and inertia formulas
   because those are physics mass-property concerns.
-- GridForge traversal/topology helpers reason about GridForge topology and
-  voxel traversal. Gravitas now consumes those helpers from GridForge instead
-  of owning them locally.
+- GridForge traversal/topology helpers reason about GridForge topology and voxel
+  traversal. Gravitas now consumes those helpers from GridForge instead of
+  owning them locally.
 - `DefaultSaver` is a general save/apply lifecycle pattern that future LSF
   libraries can reuse through Chronicler.
 
@@ -38,9 +50,8 @@ behavior changes.
 
 ## Current Baseline
 
-- Before Workstream 2, Gravitas owned
-  `src/Gravitas/Support/FixedTransform.cs`; FixedMathSharp now owns the shared
-  `FixedMathSharp.FixedTransform` type.
+- Before Workstream 2, Gravitas owned `src/Gravitas/Support/FixedTransform.cs`;
+  FixedMathSharp now owns the shared `FixedMathSharp.FixedTransform` type.
 - Gravitas owns closed-volume mesh mass-property integration inside
   `src/Gravitas/Colliders/Support/PhysicsMesh/PhysicsMesh.cs`. Only the
   barycentric product algebra is reusable enough for FixedMathSharp.
@@ -64,11 +75,11 @@ behavior changes.
 - Keep any parent/host hierarchy semantics minimal and deterministic. If
   `Parent` remains, it should be a simple transform reference, not a scene graph
   or engine object bridge.
-- Move reusable barycentric product algebra, not the Gravitas
-  closed-volume mesh mass-property model. Gravitas still owns mesh volume
-  validation, center-of-mass calculation, inertia formulas, collider limits,
-  mesh collider modes, runtime bounds, query acceleration, shape definitions,
-  and body/collider integration.
+- Move reusable barycentric product algebra, not the Gravitas closed-volume mesh
+  mass-property model. Gravitas still owns mesh volume validation,
+  center-of-mass calculation, inertia formulas, collider limits, mesh collider
+  modes, runtime bounds, query acceleration, shape definitions, and
+  body/collider integration.
 - Prefer FixedMathSharp APIs that operate on fixed-point primitives and explicit
   buffers. Avoid APIs that allocate hidden collections in hot paths unless the
   allocation is already part of the current Gravitas caller contract.
@@ -85,7 +96,8 @@ behavior changes.
 
 ### FixedMathSharp
 
-- Added `../FixedMathSharp/src/FixedMathSharp/Numerics/Matrices/FixedTransform.cs`.
+- Added
+  `../FixedMathSharp/src/FixedMathSharp/Numerics/Matrices/FixedTransform.cs`.
 - Modify `../FixedMathSharp/src/FixedMathSharp/Core/FixedMath.cs` for scalar
   barycentric product helpers if they fit the existing `FixedMath` surface.
 - Modify `../FixedMathSharp/src/FixedMathSharp/Numerics/Matrices/Fixed3x3.cs`
@@ -95,7 +107,8 @@ behavior changes.
 ### GridForge
 
 - Added `../GridForge/src/GridForge/Utility/GridTraversal.cs`.
-- Added `../GridForge/src/GridForge/Grids/Topology/GridTopologyMetricUtility.cs`.
+- Added
+  `../GridForge/src/GridForge/Grids/Topology/GridTopologyMetricUtility.cs`.
 - Added traversal/topology tests under `../GridForge/tests/GridForge.Tests`.
 
 ### Chronicler
@@ -108,7 +121,8 @@ behavior changes.
 - Delete or replace local wrappers:
   - `src/Gravitas/Support/FixedTransform.cs`
   - `src/Gravitas/Support/GridForgeTraversal.cs` (removed in Workstream 4)
-  - `src/Gravitas/Support/GridTopologyMetricUtility.cs` (removed in Workstream 4)
+  - `src/Gravitas/Support/GridTopologyMetricUtility.cs` (removed in
+    Workstream 4)
   - `src/Gravitas/Support/DefaultSaver.cs`
 - Modify `src/Gravitas/Colliders/Support/PhysicsMesh/PhysicsMesh.cs` to call
   FixedMathSharp barycentric product matrix helpers.
@@ -138,19 +152,19 @@ Get-Content ..\Chronicler\AGENTS.md
 ```
 
 - [x] Inspect current target frameworks and package references for all four
-  repositories so moved APIs compile for the lowest supported targets.
+      repositories so moved APIs compile for the lowest supported targets.
 
 - [x] Decide the exact FixedMathSharp transform namespace and type shape before
-  implementation. The default recommendation is a mutable reference type that
-  preserves current Gravitas host-publication semantics.
+      implementation. The default recommendation is a mutable reference type
+      that preserves current Gravitas host-publication semantics.
 
 - [x] Decide the reusable geometry API names:
-  `FixedMath.SumSquaredBarycentricProducts(...)`,
-  `FixedMath.SumBarycentricProducts(...)`, and
-  `Fixed3x3.CreateBarycentricProductSums(...)`.
+      `FixedMath.SumSquaredBarycentricProducts(...)`,
+      `FixedMath.SumBarycentricProducts(...)`, and
+      `Fixed3x3.CreateBarycentricProductSums(...)`.
 
 - [x] Record any API name changes directly in this plan before implementation
-  starts.
+      starts.
 
 Expected result: the lower-stack type names, namespaces, and reference strategy
 are explicit enough that implementation can proceed without guesswork.
@@ -167,17 +181,17 @@ Recorded decisions:
 
 ## Workstream 2: FixedMathSharp Transform Extraction
 
-**Goal:** Make deterministic transform state available to Trailblazer,
-Gravitas, and future LSF libraries through FixedMathSharp.
+**Goal:** Make deterministic transform state available to Trailblazer, Gravitas,
+and future LSF libraries through FixedMathSharp.
 
 Tasks:
 
 - [x] Add FixedMathSharp tests covering construction from position/rotation/
-  scale, construction from matrix, position mutation, rotation mutation, scale
-  mutation, Euler angle round trip, and optional parent assignment.
+      scale, construction from matrix, position mutation, rotation mutation,
+      scale mutation, Euler angle round trip, and optional parent assignment.
 
 - [x] Move or recreate `FixedTransform` in FixedMathSharp using only
-  FixedMathSharp dependencies.
+      FixedMathSharp dependencies.
 
 - [x] Preserve deterministic matrix-backed behavior:
   - `Position` maps to matrix translation.
@@ -187,7 +201,7 @@ Tasks:
   - `EulerAngles` uses `FixedQuaternion.FromEulerAnglesInDegrees(...)`.
 
 - [x] Update Gravitas to consume the FixedMathSharp transform type and remove
-  the local Gravitas definition.
+      the local Gravitas definition.
 
 - [x] Run FixedMathSharp tests for the new transform coverage.
 
@@ -231,8 +245,8 @@ Tasks:
   - `Fixed3x3.CreateBarycentricProductSums(a, b, c)`.
 
 - [x] Move scalar barycentric product helpers into FixedMathSharp beside
-  existing barycentric helpers, and add the symmetric product-sum factory to
-  `Fixed3x3`.
+      existing barycentric helpers, and add the symmetric product-sum factory to
+      `Fixed3x3`.
 
 - [x] Keep Gravitas-specific mesh policy in Gravitas:
   - closed-volume mesh validation.
@@ -244,7 +258,7 @@ Tasks:
   - collider shape definition boundaries.
 
 - [x] Update `PhysicsMesh` closed-volume integration to call the FixedMathSharp
-  symmetric barycentric product-sum matrix helper.
+      symmetric barycentric product-sum matrix helper.
 
 - [x] Run FixedMathSharp scalar and matrix math tests.
 
@@ -283,16 +297,16 @@ GridForge.
 Tasks:
 
 - [x] Add GridForge tests equivalent to current
-  `tests/Gravitas.Tests/Support/GridForgeTraversalTests.cs`.
+      `tests/Gravitas.Tests/Support/GridForgeTraversalTests.cs`.
 
 - [x] Move `GridTopologyMetricUtility` behavior into GridForge with public or
-  internal APIs appropriate for GridForge consumers.
+      internal APIs appropriate for GridForge consumers.
 
 - [x] Move `GridForgeTraversalState`, traversal padding mode, unique-partition
-  lookup, and padded-bounds tests into GridForge.
+      lookup, and padded-bounds tests into GridForge.
 
 - [x] Preserve the distinction between 3D max-cell-edge padding and X/Z planar
-  max-cell-edge padding.
+      max-cell-edge padding.
 
 - [x] Update Gravitas services and queries to consume GridForge-owned helpers.
 
@@ -315,9 +329,9 @@ Notes:
   `GridTraversalState`, and `GridTraversalPaddingMode` under
   `GridForge.Utility`. This avoids the stuttered `GridForgeTraversal` name once
   the helper lives inside GridForge.
-- GridForge owns `GridTopologyMetricUtility` under
-  `GridForge.Grids.Topology`, including full 3D, planar X/Z, and
-  representative world cell-edge measurements.
+- GridForge owns `GridTopologyMetricUtility` under `GridForge.Grids.Topology`,
+  including full 3D, planar X/Z, and representative world cell-edge
+  measurements.
 - Gravitas no longer carries local traversal/topology helper files or local
   helper-specific tests; equivalent behavior is covered in GridForge.
 
@@ -328,11 +342,11 @@ Notes:
 Tasks:
 
 - [x] Add Chronicler tests or compile coverage for a derived saver that observes
-  `Save`, `EarlyApply`, `Apply`, and `LateApply` calling the matching protected
-  hooks.
+      `Save`, `EarlyApply`, `Apply`, and `LateApply` calling the matching
+      protected hooks.
 
 - [x] Move `DefaultSaver` into Chronicler.Core using a namespace that future LSF
-  libraries can consume without referencing Gravitas.
+      libraries can consume without referencing Gravitas.
 
 - [x] Update `PhysicsSettingsSaver` to inherit the Chronicler-owned base.
 
@@ -370,8 +384,8 @@ Tasks:
 - [x] Remove obsolete Gravitas namespaces/usings from source and tests.
 
 - [x] Update `README.md`, `AGENTS.md`, and `docs/wiki` where they describe
-  source ownership for transforms, mesh math, GridForge traversal, or saver
-  bases.
+      source ownership for transforms, mesh math, GridForge traversal, or saver
+      bases.
 
 - [x] Verify no stale local type references remain:
 
@@ -394,7 +408,7 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 ```
 
 - [x] Confirm package references are restored after the lower-stack release
-  sequence.
+      sequence.
 
 Expected result: lower-stack APIs are the source of truth, Gravitas has no
 duplicate utility implementations, and Release/ReleaseLean are clean.
@@ -409,7 +423,8 @@ Notes:
 - `Gravitas.slnx` contains only Gravitas projects, while the main package uses
   `FixedMathSharp`/`SwiftCollections` `5.0.2`, `GridForge` `7.1.2`, and
   `Chronicler.Core` `0.2.1` package references plus matching Lean packages.
-- Validation completed with `dotnet build Gravitas.slnx --configuration Release`,
+- Validation completed with
+  `dotnet build Gravitas.slnx --configuration Release`,
   `dotnet test Gravitas.slnx --configuration Release`,
   `dotnet build Gravitas.slnx --configuration ReleaseLean`, and
   `dotnet test Gravitas.slnx --configuration ReleaseLean`.
@@ -420,8 +435,8 @@ Notes:
   Gravitas and Trailblazer.
 - FixedMathSharp owns reusable barycentric product algebra.
 - Gravitas owns closed-volume mesh validation and mesh mass-property math.
-- Gravitas `PhysicsMesh` remains the collider/runtime wrapper and no longer
-  owns duplicated reusable barycentric product formulas.
+- Gravitas `PhysicsMesh` remains the collider/runtime wrapper and no longer owns
+  duplicated reusable barycentric product formulas.
 - GridForge owns traversal and topology metric helpers used by Gravitas.
 - Chronicler owns `DefaultSaver`.
 - Gravitas docs identify the new source-of-truth libraries.

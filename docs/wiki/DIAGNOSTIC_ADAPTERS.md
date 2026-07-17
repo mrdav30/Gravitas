@@ -24,8 +24,8 @@ An adapter should:
 - consume diagnostics after the deterministic frame or debug capture window has
   finished.
 - preserve `Frame` and `Sequence` as ordering keys.
-- resolve body, collider, and joint IDs through the same
-  `GravitasWorldContext` that produced the payload.
+- resolve body, collider, and joint IDs through the same `GravitasWorldContext`
+  that produced the payload.
 - translate fixed-point values at the edge when the host renderer or log format
   requires floats or text.
 - call `context.Diagnostics.Clear()` after consumption when the host wants a
@@ -259,8 +259,8 @@ adapters. Do not overload an event or draw kind with undocumented meanings.
 
 ## Source Map
 
-| Area | Source |
-| --- | --- |
-| Event visitors/views | [`src/Gravitas/Diagnostics/Events`](../../src/Gravitas/Diagnostics/Events) |
-| Draw visitors/views | [`src/Gravitas/Diagnostics/DebugDraw`](../../src/Gravitas/Diagnostics/DebugDraw) |
-| Diagnostic sink | [`src/Gravitas/Diagnostics/GravitasDiagnosticSink.cs`](../../src/Gravitas/Diagnostics/GravitasDiagnosticSink.cs) |
+| Area                 | Source                                                                                                           |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Event visitors/views | [`src/Gravitas/Diagnostics/Events`](../../src/Gravitas/Diagnostics/Events)                                       |
+| Draw visitors/views  | [`src/Gravitas/Diagnostics/DebugDraw`](../../src/Gravitas/Diagnostics/DebugDraw)                                 |
+| Diagnostic sink      | [`src/Gravitas/Diagnostics/GravitasDiagnosticSink.cs`](../../src/Gravitas/Diagnostics/GravitasDiagnosticSink.cs) |

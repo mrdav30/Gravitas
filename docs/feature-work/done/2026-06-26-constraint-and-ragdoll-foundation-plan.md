@@ -1,12 +1,25 @@
 # Constraint And Ragdoll Foundation Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use
+> superpowers:subagent-driven-development (recommended) or
+> superpowers:executing-plans to implement this plan task-by-task. Steps use
+> checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add first-class deterministic articulated-body physics so Gravitas can support ragdolls, linked rigid bodies, joint limits, and animation-driven physical handoff without depending on an engine animation or rigidbody system.
+**Goal:** Add first-class deterministic articulated-body physics so Gravitas can
+support ragdolls, linked rigid bodies, joint limits, and animation-driven
+physical handoff without depending on an engine animation or rigidbody system.
 
-**Architecture:** Reuse existing collider hierarchy keys for articulated group identity and default self-filtering, but add a dedicated constraint/joint model for physical links. Integrate joints into deterministic 3D solver islands alongside contacts, preserve warm-start state, expose authoring definitions for ragdoll links, and keep future animation libraries as hosts that feed deterministic targets into Gravitas rather than owning physical truth.
+**Architecture:** Reuse existing collider hierarchy keys for articulated group
+identity and default self-filtering, but add a dedicated constraint/joint model
+for physical links. Integrate joints into deterministic 3D solver islands
+alongside contacts, preserve warm-start state, expose authoring definitions for
+ragdoll links, and keep future animation libraries as hosts that feed
+deterministic targets into Gravitas rather than owning physical truth.
 
-**Tech Stack:** .NET 8, xUnit v3, BenchmarkDotNet for scaling signals, FixedMathSharp `Fixed64`/`Vector3d`/`FixedQuaternion`/`Fixed3x3`, SwiftCollections buffers and pools, Gravitas 3D body/collider/collision services, Chronicler explicit state recording.
+**Tech Stack:** .NET 8, xUnit v3, BenchmarkDotNet for scaling signals,
+FixedMathSharp `Fixed64`/`Vector3d`/`FixedQuaternion`/`Fixed3x3`,
+SwiftCollections buffers and pools, Gravitas 3D body/collider/collision
+services, Chronicler explicit state recording.
 
 ---
 
@@ -31,9 +44,9 @@
   physical joint system; hierarchy remains collider ownership/default grouping
   infrastructure.
 - Added Chronicler record data for mutable joint and ragdoll runtime state,
-  deterministic replay hashing for constraints, joint/ragdoll diagnostic
-  events, engine-agnostic joint debug draw capture, focused tests, and
-  constraint benchmark signal.
+  deterministic replay hashing for constraints, joint/ragdoll diagnostic events,
+  engine-agnostic joint debug draw capture, focused tests, and constraint
+  benchmark signal.
 - No deferred work was split out from this plan.
 
 ## Purpose
@@ -43,8 +56,8 @@ continuous collision detection, mixed-dimension response, hierarchy-based
 collider grouping, and warm-started solver islands. It does not yet have a
 first-class physical articulation model.
 
-Ragdolls should not be a thin Unity-style toggle that enables engine
-`Rigidbody` and `Collider` components. For Gravitas, ragdoll support means:
+Ragdolls should not be a thin Unity-style toggle that enables engine `Rigidbody`
+and `Collider` components. For Gravitas, ragdoll support means:
 
 - multiple deterministic bodies linked by deterministic constraints.
 - explicit joint frames, anchors, angular limits, and optional motor targets.
@@ -55,8 +68,8 @@ Ragdolls should not be a thin Unity-style toggle that enables engine
   physical simulation.
 - serialization, diagnostics, and benchmarks that prove the model is reliable.
 
-Future deterministic animation libraries can consume this foundation by
-creating ragdoll definitions, setting kinematic or motor targets, and reading
+Future deterministic animation libraries can consume this foundation by creating
+ragdoll definitions, setting kinematic or motor targets, and reading
 support/query/contact state. They should not own the physics constraints or rely
 on engine-specific APIs.
 
@@ -64,8 +77,8 @@ on engine-specific APIs.
 
 - `src/Gravitas/Colliders/Hierarchy/ColliderHierarchyState.cs` stores
   parent/child/top-parent collider state, tracks dimension-tagged
-  `ColliderHierarchyKey` values, suppresses parent-child and sibling
-  collisions, and clears child parent references on deactivation.
+  `ColliderHierarchyKey` values, suppresses parent-child and sibling collisions,
+  and clears child parent references on deactivation.
 - `LSCollider` and `LSCollider2D` already expose hierarchy-backed filtering
   through `ExcludesCollisionWith(...)`.
 - Pure 3D, pure 2D, and mixed broad phases already respect hierarchy filtering
@@ -217,18 +230,18 @@ registration order, and settings before any joint math lands.
   - duplicate body pair registration is allowed only when joint IDs differ.
 - [ ] Add `src/Gravitas/Constraints/3D/GravitasConstraint3DService.cs`.
 - [ ] Expose the service from `GravitasWorldContext` with a clear property such
-  as `Constraints3D`.
+      as `Constraints3D`.
 - [ ] Add `src/Gravitas/Constraints/3D/Joint3D.cs` as runtime joint state.
 - [ ] Add `src/Gravitas/Constraints/3D/JointDefinition3D.cs` as the public
-  validated registration input.
+      validated registration input.
 - [ ] Add `src/Gravitas/Constraints/3D/JointType3D.cs`.
 - [ ] Add `src/Gravitas/Constraints/3D/JointLimit3D.cs`.
 - [ ] Add `src/Gravitas/Constraints/3D/JointMotor3D.cs`.
 - [ ] Add `src/Gravitas/Constraints/3D/JointCollisionPolicy.cs`.
 - [ ] Add `PhysicsSettings.ConstraintSolverIterations` only if solver iteration
-  count should differ from contact response. If the same solver loop handles
-  contacts and joints, rename or document the existing discrete solver setting
-  so it clearly applies to all discrete constraints.
+      count should differ from contact response. If the same solver loop handles
+      contacts and joints, rename or document the existing discrete solver
+      setting so it clearly applies to all discrete constraints.
 - [ ] Validate joint definitions:
   - body A and body B are non-null.
   - body A and body B are different bodies.
@@ -237,7 +250,7 @@ registration order, and settings before any joint math lands.
   - limits are non-negative and ordered.
   - motor strengths are non-negative.
 - [ ] Run:
-  `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter Constraint`
+      `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter Constraint`
 
 **Done Criteria**
 
@@ -265,18 +278,18 @@ hierarchy identity while allowing authored self-collision policy.
   - non-adjacent links can be suppressed when the ragdoll policy forbids it.
   - external colliders still collide with ragdoll links.
 - [ ] Introduce an explicit articulation self-collision policy rather than
-  changing `ColliderHierarchyState.ExcludesCollisionWith(...)` into a ragdoll
-  solver.
+      changing `ColliderHierarchyState.ExcludesCollisionWith(...)` into a
+      ragdoll solver.
 - [ ] Reuse `ColliderHierarchyKey` as the stable identity stored by the
-  articulation filter.
+      articulation filter.
 - [ ] Add an allocation-free service helper for physical pair filters:
-  `ShouldExcludeLinkedCollision(colliderA, colliderB)`.
+      `ShouldExcludeLinkedCollision(colliderA, colliderB)`.
 - [ ] Route 3D broad-phase pair creation through the new helper after layer and
-  local collision filtering.
+      local collision filtering.
 - [ ] Route 3D query and CCD source-skip filtering through the same policy where
-  linked self-collision would otherwise produce false hits.
+      linked self-collision would otherwise produce false hits.
 - [ ] Keep pure 2D and mixed hierarchy behavior unchanged unless tests reveal a
-  regression from shared helpers.
+      regression from shared helpers.
 
 **Done Criteria**
 
@@ -299,8 +312,8 @@ error and angular limit error.
   - linear error is zero when anchors coincide.
   - angular error is zero when joint frames are aligned.
   - hinge axes and cone/twist axes are normalized deterministically.
-- [ ] Add `src/Gravitas/Constraints/3D/JointConstraintRow3D.cs` for internal
-  row state:
+- [ ] Add `src/Gravitas/Constraints/3D/JointConstraintRow3D.cs` for internal row
+      state:
   - Jacobian linear axis.
   - angular axis for body A.
   - angular axis for body B.
@@ -309,20 +322,21 @@ error and angular limit error.
   - bias velocity.
   - lower and upper impulse bounds.
 - [ ] Add `src/Gravitas/Constraints/3D/JointSolver3D.cs` for row preparation,
-  warm-start application, iteration solve, and impulse storage.
-- [ ] Implement fixed-point effective mass using existing body mass/inertia APIs.
+      warm-start application, iteration solve, and impulse storage.
+- [ ] Implement fixed-point effective mass using existing body mass/inertia
+      APIs.
 - [ ] Include body-axis freeze constraints from the previous plan in effective
-  mass calculations.
+      mass calculations.
 - [ ] Implement linear anchor rows for ball-socket behavior.
 - [ ] Implement angular rows for fixed orientation behavior.
 - [ ] Implement hinge limit rows.
 - [ ] Implement cone/twist limit rows for shoulders, hips, neck, and spine-like
-  ragdoll joints.
+      ragdoll joints.
 - [ ] Apply warm-start impulses only when the same joint row identity remains
-  valid across frames.
+      valid across frames.
 - [ ] Clamp impulses deterministically using fixed lower/upper bounds.
 - [ ] Add tests proving repeated runs produce identical body poses and
-  accumulated impulses.
+      accumulated impulses.
 
 **Done Criteria**
 
@@ -347,7 +361,7 @@ constraint graph, not separate contact and joint passes fighting each other.
   - sleeping one linked body wakes the connected island when another link is
     pushed.
 - [ ] Extend 3D island graph construction to union dynamic bodies connected by
-  enabled joints.
+      enabled joints.
 - [ ] Sort island constraints by:
   - island root dynamic ID.
   - constraint type, with contacts and joints in a documented deterministic
@@ -359,7 +373,7 @@ constraint graph, not separate contact and joint passes fighting each other.
 - [ ] Iterate contacts and joints in the same bounded solver loop.
 - [ ] Persist joint warm-start data after the solve.
 - [ ] Update sleep logic so linked bodies sleep and wake as one island when
-  joints are enabled.
+      joints are enabled.
 - [ ] Add diagnostics counters for island joint count and row count.
 
 **Done Criteria**
@@ -391,14 +405,15 @@ data before activation.
   - invalid cycles are rejected only when they would create impossible hierarchy
     ownership; tree-like humanoid chains are accepted.
 - [ ] Add a registration method such as
-  `Constraints3D.RegisterRagdoll(in RagdollDefinition3D definition)`.
+      `Constraints3D.RegisterRagdoll(in RagdollDefinition3D definition)`.
 - [ ] Bind ragdoll links to collider hierarchy keys for group identity.
 - [ ] Register one or more joints per ragdoll joint definition.
 - [ ] Provide `ActivateDynamic()` to switch linked bodies into dynamic ragdoll
-  simulation deterministically.
+      simulation deterministically.
 - [ ] Provide `DeactivateToKinematic()` to return linked bodies to
-  host/animation-driven kinematic control without losing definitions.
-- [ ] Ensure activation order is stable by link ID, not array reference identity.
+      host/animation-driven kinematic control without losing definitions.
+- [ ] Ensure activation order is stable by link ID, not array reference
+      identity.
 
 **Done Criteria**
 
@@ -434,7 +449,7 @@ hooks.
   - `SetRagdollPoseTargets(...)` using caller-owned arrays or spans.
 - [ ] Keep motor target application in deterministic simulation phases only.
 - [ ] Document that FootIK, HandIK, look-at, and animation event curves belong
-  in the future animation library.
+      in the future animation library.
 - [ ] Add a small host-boundary sample in docs showing:
   - animation library computes target link frames.
   - host passes fixed target frames into Gravitas before `Simulate`.
@@ -468,7 +483,7 @@ called release-ready.
     continuation.
   - ragdoll activation state round-trips.
 - [ ] Add Chronicler `RecordData(...)` implementations for runtime joint and
-  ragdoll state.
+      ragdoll state.
 - [ ] Add diagnostic events:
   - joint registered/removed.
   - joint impulse.
@@ -476,7 +491,7 @@ called release-ready.
   - motor target error.
   - ragdoll activated/deactivated.
 - [ ] Add debug draw commands for joint frames, anchor error, hinge axes, and
-  cone/twist limits.
+      cone/twist limits.
 - [ ] Add benchmarks:
   - `constraint-chain-scaling`
   - `humanoid-ragdoll-resting-stack`
@@ -487,14 +502,10 @@ called release-ready.
   - steady-state registered ragdoll solve.
   - disabled diagnostics path.
   - linked self-filtering checks.
-- [ ] Run:
-  `dotnet build Gravitas.slnx --configuration Release`
-- [ ] Run:
-  `dotnet test Gravitas.slnx --configuration Release`
-- [ ] Run:
-  `dotnet build Gravitas.slnx --configuration ReleaseLean`
-- [ ] Run:
-  `dotnet test Gravitas.slnx --configuration ReleaseLean`
+- [ ] Run: `dotnet build Gravitas.slnx --configuration Release`
+- [ ] Run: `dotnet test Gravitas.slnx --configuration Release`
+- [ ] Run: `dotnet build Gravitas.slnx --configuration ReleaseLean`
+- [ ] Run: `dotnet test Gravitas.slnx --configuration ReleaseLean`
 
 **Done Criteria**
 
@@ -514,23 +525,23 @@ obvious.
 **Tasks**
 
 - [ ] Update `docs/wiki/RUNTIME_ARCHITECTURE.md` with constraint service
-  ownership and island integration.
+      ownership and island integration.
 - [ ] Update `docs/wiki/COLLISION_PIPELINE.md` with joint/contact island solve
-  order and self-collision filtering.
+      order and self-collision filtering.
 - [ ] Update `docs/wiki/HOST_INTEGRATION.md` with ragdoll registration,
-  activation, deactivation, and motor target examples.
+      activation, deactivation, and motor target examples.
 - [ ] Update `docs/wiki/SERIALIZATION.md` with joint and ragdoll runtime state.
 - [ ] Update `docs/wiki/DIAGNOSTICS.md` with joint and ragdoll diagnostic
-  events.
+      events.
 - [ ] Update `docs/wiki/OVERVIEW.md` with the new constraint/ragdoll subsystem.
 - [ ] Update `AGENTS.md` if constraint/ragdoll work changes contributor
-  guidance, source layout, or release validation expectations.
+      guidance, source layout, or release validation expectations.
 - [ ] Run a final source-structure review and split any file approaching the
-  1000-line warning threshold.
+      1000-line warning threshold.
 - [ ] Search for stale wording:
-  `rg -n "future ragdoll|no joint|no constraint|animation owns physics|Unity Rigidbody|Animator" docs src/Gravitas`
+      `rg -n "future ragdoll|no joint|no constraint|animation owns physics|Unity Rigidbody|Animator" docs src/Gravitas`
 - [ ] Mark this plan done and move it to `docs/feature-work/done` only after
-  deferred work is either completed or captured in a focused follow-up plan.
+      deferred work is either completed or captured in a focused follow-up plan.
 
 **Done Criteria**
 

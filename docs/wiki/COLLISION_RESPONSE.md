@@ -1,8 +1,8 @@
 # Collision Response
 
 Response converts contact manifolds into deterministic body motion, trigger and
-contact events, warm-start caches, sleep/wake state, and cleanup. 3D, 2D,
-and mixed response share ordering principles while keeping dimensional math
+contact events, warm-start caches, sleep/wake state, and cleanup. 3D, 2D, and
+mixed response share ordering principles while keeping dimensional math
 explicit.
 
 ## Quick Read
@@ -47,11 +47,11 @@ not contact data.
 After active partitions distribute candidates, the owning physics service sorts
 queued response pairs by stable pair key and combines them with enabled joints:
 
-| Domain | Contact rows | Joint rows | Island key |
-| --- | --- | --- | --- |
-| 3D | `CollisionPair` / `ContactManifold` | `Joint3D` | `SolidBody.DynamicId` |
-| 2D | `CollisionPair2D` / `ContactManifold2D` | `Joint2D` | `SolidBody2D.DynamicId` |
-| Mixed | `CollisionPairMixed` / `MixedContact` | none | dimension-tagged body keys |
+| Domain | Contact rows                            | Joint rows | Island key                 |
+| ------ | --------------------------------------- | ---------- | -------------------------- |
+| 3D     | `CollisionPair` / `ContactManifold`     | `Joint3D`  | `SolidBody.DynamicId`      |
+| 2D     | `CollisionPair2D` / `ContactManifold2D` | `Joint2D`  | `SolidBody2D.DynamicId`    |
+| Mixed  | `CollisionPairMixed` / `MixedContact`   | none       | dimension-tagged body keys |
 
 Fully sleeping islands are skipped. If an island contains an awake participant,
 connected sleeping dynamic bodies are woken in deterministic order. Contact-only
@@ -134,8 +134,8 @@ Response rules:
   `GeometricMean`.
 - differing policies resolve deterministically in ascending precedence:
   `Average < Minimum < GeometricMean < Multiply < Maximum`.
-- closing speeds at or below
-  `PhysicsSettings.RestitutionVelocityThreshold` use zero restitution.
+- closing speeds at or below `PhysicsSettings.RestitutionVelocityThreshold` use
+  zero restitution.
 - static and dynamic friction are non-negative Coulomb coefficients.
 - dynamic friction must not exceed static friction.
 - values above one are allowed for intentional high-friction surfaces.
@@ -218,14 +218,14 @@ data, response behavior, or replay state.
 
 ## Source Map
 
-| Area | Source |
-| --- | --- |
-| 3D contact data | [`src/Gravitas/CollisionHandling/Contacts/3D`](../../src/Gravitas/CollisionHandling/Contacts/3D) |
-| 2D contact data | [`src/Gravitas/CollisionHandling/Contacts/2D`](../../src/Gravitas/CollisionHandling/Contacts/2D) |
-| Mixed contacts | [`src/Gravitas/CollisionHandling/Contacts/Mixed`](../../src/Gravitas/CollisionHandling/Contacts/Mixed) |
-| 3D response | [`src/Gravitas/CollisionHandling/Response/3D`](../../src/Gravitas/CollisionHandling/Response/3D) |
-| 2D response | [`src/Gravitas/CollisionHandling/Response/2D`](../../src/Gravitas/CollisionHandling/Response/2D) |
-| Mixed response | [`src/Gravitas/CollisionHandling/Response/Mixed`](../../src/Gravitas/CollisionHandling/Response/Mixed) |
-| Materials | [`src/Gravitas/Materials`](../../src/Gravitas/Materials) |
-| 3D constraints | [`src/Gravitas/Constraints/3D`](../../src/Gravitas/Constraints/3D) |
-| 2D constraints | [`src/Gravitas/Constraints/2D`](../../src/Gravitas/Constraints/2D) |
+| Area            | Source                                                                                                 |
+| --------------- | ------------------------------------------------------------------------------------------------------ |
+| 3D contact data | [`src/Gravitas/CollisionHandling/Contacts/3D`](../../src/Gravitas/CollisionHandling/Contacts/3D)       |
+| 2D contact data | [`src/Gravitas/CollisionHandling/Contacts/2D`](../../src/Gravitas/CollisionHandling/Contacts/2D)       |
+| Mixed contacts  | [`src/Gravitas/CollisionHandling/Contacts/Mixed`](../../src/Gravitas/CollisionHandling/Contacts/Mixed) |
+| 3D response     | [`src/Gravitas/CollisionHandling/Response/3D`](../../src/Gravitas/CollisionHandling/Response/3D)       |
+| 2D response     | [`src/Gravitas/CollisionHandling/Response/2D`](../../src/Gravitas/CollisionHandling/Response/2D)       |
+| Mixed response  | [`src/Gravitas/CollisionHandling/Response/Mixed`](../../src/Gravitas/CollisionHandling/Response/Mixed) |
+| Materials       | [`src/Gravitas/Materials`](../../src/Gravitas/Materials)                                               |
+| 3D constraints  | [`src/Gravitas/Constraints/3D`](../../src/Gravitas/Constraints/3D)                                     |
+| 2D constraints  | [`src/Gravitas/Constraints/2D`](../../src/Gravitas/Constraints/2D)                                     |

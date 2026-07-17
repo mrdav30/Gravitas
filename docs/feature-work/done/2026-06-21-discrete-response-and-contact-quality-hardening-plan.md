@@ -1,18 +1,28 @@
 # Discrete Response And Contact Quality Hardening Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use
+> superpowers:subagent-driven-development (recommended) or
+> superpowers:executing-plans to implement this plan task-by-task. Steps use
+> checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Upgrade Gravitas discrete contact response from alpha-solid behavior to a first-class deterministic solver for resting stacks, cached impulse application, contact islands, cylinder contacts, mesh clipping, and mixed-dimension response.
+**Goal:** Upgrade Gravitas discrete contact response from alpha-solid behavior
+to a first-class deterministic solver for resting stacks, cached impulse
+application, contact islands, cylinder contacts, mesh clipping, and
+mixed-dimension response.
 
-**Architecture:** Keep the current narrow-phase/contact-pair ownership model, then harden the solver around explicit contact identity, stable island ordering, and measurable response quality. CCD-specific island time stepping remains in the CCD service-level island plan; this plan owns ordinary discrete/resting response after contacts exist.
+**Architecture:** Keep the current narrow-phase/contact-pair ownership model,
+then harden the solver around explicit contact identity, stable island ordering,
+and measurable response quality. CCD-specific island time stepping remains in
+the CCD service-level island plan; this plan owns ordinary discrete/resting
+response after contacts exist.
 
-**Tech Stack:** .NET 8, xUnit v3, BenchmarkDotNet, FixedMathSharp, SwiftCollections, Gravitas collision detection/response services.
+**Tech Stack:** .NET 8, xUnit v3, BenchmarkDotNet, FixedMathSharp,
+SwiftCollections, Gravitas collision detection/response services.
 
 ---
 
-**Date:** 2026-06-21
-**Status:** Done
-**Owner:** Gravitas response and contact hardening
+**Date:** 2026-06-21 **Status:** Done **Owner:** Gravitas response and contact
+hardening
 
 ## Purpose
 
@@ -34,9 +44,9 @@ solver invariants.
 
 - [`2026-06-21-ccd-service-level-island-solver-plan.md`](2026-06-21-ccd-service-level-island-solver-plan.md)
   owns continuous-collision TOI islands and same-frame advancement.
-- This plan owns ordinary discrete contact islands, resting response,
-  warm-start application, and island-wide sleep/wake after CCD has produced or
-  handed off contact state.
+- This plan owns ordinary discrete contact islands, resting response, warm-start
+  application, and island-wide sleep/wake after CCD has produced or handed off
+  contact state.
 - [`2026-06-21-query-and-mixed-swept-shape-hardening-plan.md`](2026-06-21-query-and-mixed-swept-shape-hardening-plan.md)
   owns public query and sweep exactness. This plan consumes the resulting
   contacts and improves response quality.
@@ -64,10 +74,10 @@ solver invariants.
   mesh/cylinder contacts. Face/cap overlaps now clip stable support contacts to
   triangle candidates for convex and concave meshes before falling back to
   representative contacts where needed.
-- Mixed response applies planar X/Z impulse and angular yaw impulse to 2D
-  bodies while constraining vertical response to the 3D participant. It now
-  collects non-trigger mixed pairs into dedicated mixed islands solved in stable
-  pair-key order for `PhysicsSettings.DiscreteSolverIterations`; mixed islands
+- Mixed response applies planar X/Z impulse and angular yaw impulse to 2D bodies
+  while constraining vertical response to the 3D participant. It now collects
+  non-trigger mixed pairs into dedicated mixed islands solved in stable pair-key
+  order for `PhysicsSettings.DiscreteSolverIterations`; mixed islands
   deliberately do not merge into pure 3D or pure 2D island solvers.
 
 ## Guiding Rules
@@ -89,14 +99,14 @@ solver invariants.
 **Tasks**
 
 - [x] Inventory current 3D, 2D, and mixed response paths, including cached
-  impulse storage, tangent basis selection, contact IDs, pair ordering, and
-  sleep/wake hooks.
+      impulse storage, tangent basis selection, contact IDs, pair ordering, and
+      sleep/wake hooks.
 - [x] Add or update tests that expose the current limitations: resting-stack
-  drift, stale 3D cached impulses, same-island wake propagation, cylinder
-  edge-touching, and mesh clipping ambiguity.
-- [x] Add benchmark rows only where runtime cost is expected to change:
-  dense resting contacts, cylinder-heavy scenes, mesh-contact scenes, and mixed
-  response scenes.
+      drift, stale 3D cached impulses, same-island wake propagation, cylinder
+      edge-touching, and mesh clipping ambiguity.
+- [x] Add benchmark rows only where runtime cost is expected to change: dense
+      resting contacts, cylinder-heavy scenes, mesh-contact scenes, and mixed
+      response scenes.
 - [x] Document the baseline before changing solver behavior.
 
 **Progress 2026-06-21:** Workstream 1 added a current-baseline evidence slice
@@ -104,8 +114,8 @@ without changing runtime solver behavior. The new
 `DiscreteResponseCurrentBaselineTests` file records that:
 
 - stored 3D warm-start impulses did not affect the fresh single-pair solve
-  before Workstream 2, confirming the original storage-only behavior. That
-  stale baseline test was removed when 3D warm-start application landed.
+  before Workstream 2, confirming the original storage-only behavior. That stale
+  baseline test was removed when 3D warm-start application landed.
 - a short 3D cuboid stack under gravity remains awake and drifts, preserving
   evidence for the resting-friction/warm-start workstream.
 - the original cylinder rim current-baseline case was converted into positive
@@ -121,11 +131,11 @@ island builder is introduced.
 
 Current response inventory:
 
-| Path | Current Behavior |
-| --- | --- |
-| 3D response | `CollisionPair` owns one four-contact `ContactManifold`, pair-local `ContactWarmStartCache`, and priority/speed/candidate-order collider ordering. Workstream 2 updated `CollisionResponse` to apply normal-compatible cached impulses before solving, accumulate/clamp normal impulses, solve friction over a deterministic two-axis tangent basis, then store normal/tangent impulse scalars and the solved normal by contact identity. Sleeping body wake happens before response when the opposite participant is awake. |
-| Pure 2D response | `CollisionPair2D` owns a two-contact `ContactManifold2D` and `ContactWarmStartCache2D`. `CollisionResponse2D` reads cached normal/tangent impulses, applies them before the fresh solve, accumulates/clamps normal impulses, clamps tangent impulses to the current Coulomb bound, and stores the refreshed cache. Pair ordering uses priority, speed, then collider ID. Wake happens through pair handling after solid response. |
-| Mixed response | `CollisionPairMixed` owns stable 3D/2D identity, retained contact state, trigger/contact notification, and pair pooling. `GravitasMixedCollisionService` collects non-trigger mixed pairs into a dedicated island graph keyed by dimension-tagged body IDs, wakes connected mixed participants, and solves constraints in root-key then mixed pair-key order. `CollisionResponseMixed` applies constrained 3D/2D positional correction, normal impulse, and friction: planar X/Z impulse can move and yaw the 2D body, while vertical Y response is constrained out of the 2D participant. |
+| Path             | Current Behavior                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 3D response      | `CollisionPair` owns one four-contact `ContactManifold`, pair-local `ContactWarmStartCache`, and priority/speed/candidate-order collider ordering. Workstream 2 updated `CollisionResponse` to apply normal-compatible cached impulses before solving, accumulate/clamp normal impulses, solve friction over a deterministic two-axis tangent basis, then store normal/tangent impulse scalars and the solved normal by contact identity. Sleeping body wake happens before response when the opposite participant is awake.                                                               |
+| Pure 2D response | `CollisionPair2D` owns a two-contact `ContactManifold2D` and `ContactWarmStartCache2D`. `CollisionResponse2D` reads cached normal/tangent impulses, applies them before the fresh solve, accumulates/clamps normal impulses, clamps tangent impulses to the current Coulomb bound, and stores the refreshed cache. Pair ordering uses priority, speed, then collider ID. Wake happens through pair handling after solid response.                                                                                                                                                          |
+| Mixed response   | `CollisionPairMixed` owns stable 3D/2D identity, retained contact state, trigger/contact notification, and pair pooling. `GravitasMixedCollisionService` collects non-trigger mixed pairs into a dedicated island graph keyed by dimension-tagged body IDs, wakes connected mixed participants, and solves constraints in root-key then mixed pair-key order. `CollisionResponseMixed` applies constrained 3D/2D positional correction, normal impulse, and friction: planar X/Z impulse can move and yaw the 2D body, while vertical Y response is constrained out of the 2D participant. |
 
 Benchmark evidence rows were expanded before solver changes:
 
@@ -135,9 +145,9 @@ Benchmark evidence rows were expanded before solver changes:
 - `mixed-collision-response` covers prepared mixed sphere/circle response and
   bounded mixed-iteration loops at `16` and `64` pairs.
 
-The short in-process benchmark smoke executed successfully for the new rows,
-but emitted BenchmarkDotNet minimum-iteration-time warnings. Treat that run as
-setup validation, not canonical performance evidence.
+The short in-process benchmark smoke executed successfully for the new rows, but
+emitted BenchmarkDotNet minimum-iteration-time warnings. Treat that run as setup
+validation, not canonical performance evidence.
 
 ## Workstream 2: 3D Warm-Start And Resting Friction
 
@@ -150,17 +160,17 @@ dynamic-friction oriented and does not fully stabilize resting stacks.
 **Tasks**
 
 - [x] Add tests where persistent 3D resting contacts avoid tangential jitter
-  only when cached impulses are applied safely. Connected multi-body stack
-  settling remains Workstream 3 because flat pair iteration should not be
-  misrepresented as an island solver.
+      only when cached impulses are applied safely. Connected multi-body stack
+      settling remains Workstream 3 because flat pair iteration should not be
+      misrepresented as an island solver.
 - [x] Add tests where stale cached impulses unwind instead of injecting energy
-  after contact normals or IDs change.
+      after contact normals or IDs change.
 - [x] Apply cached normal and tangent impulses before the fresh 3D solve,
-  following the pure 2D accumulated-impulse rules where they fit 3D.
+      following the pure 2D accumulated-impulse rules where they fit 3D.
 - [x] Introduce explicit static-friction behavior for near-resting tangential
-  motion, with deterministic thresholds and material combination rules.
+      motion, with deterministic thresholds and material combination rules.
 - [x] Re-run existing restitution, friction, and replay tests after each solver
-  change.
+      change.
 
 **Progress 2026-06-21:** Workstream 2 updated 3D response to consume the
 pair-local warm-start cache. Solver contacts now derive a deterministic 3D
@@ -182,8 +192,8 @@ impulse exceeds that bound.
 
 Tests now cover persistent resting-load friction, stale cached impulse unwind,
 normal-incompatible cache rejection, warm-start storage/reset, and the existing
-restitution/friction/response invariants. The Workstream 1 storage-only
-baseline was removed because it described behavior that no longer exists.
+restitution/friction/response invariants. The Workstream 1 storage-only baseline
+was removed because it described behavior that no longer exists.
 
 ## Workstream 3: Deterministic Discrete Island Model
 
@@ -195,15 +205,15 @@ islands, island-wide wake, or multi-iteration stabilization.
 **Tasks**
 
 - [x] Add tests for connected bodies where solving pairs independently produces
-  order-sensitive drift or incomplete wake propagation.
+      order-sensitive drift or incomplete wake propagation.
 - [x] Introduce an island builder keyed by stable body/collider IDs and pair
-  keys, with explicit ordering for bodies, contacts, and constraints.
+      keys, with explicit ordering for bodies, contacts, and constraints.
 - [x] Add a bounded multi-iteration solve path for islands that need
-  stabilization.
+      stabilization.
 - [x] Connect island-wide wake/sleep to existing wake reasons without changing
-  pure query or trigger-only behavior.
+      pure query or trigger-only behavior.
 - [x] Keep single-pair scenes on a low-overhead path when island solving is not
-  needed.
+      needed.
 
 **Progress 2026-06-21:** Workstream 3 moved the 3D discrete response pass to
 post-integration `LateSimulate`: dynamic bodies integrate first, service-owned
@@ -214,22 +224,22 @@ self-contained for callers outside the service path.
 
 `GravitasCollisionService` now owns deterministic discrete island assembly.
 Queued response pairs are ordered by stable collider ID pair. Movable island
-nodes are keyed by `SolidBody.DynamicId`, union roots pick the lower stable
-body key, and constraints are solved in root-key then pair-key order.
-Single-pair scenes bypass island construction and keep the direct response path.
+nodes are keyed by `SolidBody.DynamicId`, union roots pick the lower stable body
+key, and constraints are solved in root-key then pair-key order. Single-pair
+scenes bypass island construction and keep the direct response path.
 Multi-constraint islands run the bounded
-`PhysicsSettings.DiscreteSolverIterations` count; cached warm-start impulses
-and positional correction apply on the first iteration, with later iterations
+`PhysicsSettings.DiscreteSolverIterations` count; cached warm-start impulses and
+positional correction apply on the first iteration, with later iterations
 refining velocity response without repeating the positional correction.
 
 `PhysicsPartition.Distribute()` now emits all local dynamic-dynamic links and
 all dynamic/static-style links when at least one dynamic collider in the
 partition is awake. Sleeping bodies stay query-visible and can now participate
 in a connected island when an awake body activates that partition. Island wake
-uses the existing deterministic collision wake path so connected sleeping
-bodies wake without changing trigger-only or query behavior. Fully sleeping
-islands emitted only because another awake body activated the same partition are
-not solved; they keep contact state visible without mutating sleeping body
+uses the existing deterministic collision wake path so connected sleeping bodies
+wake without changing trigger-only or query behavior. Fully sleeping islands
+emitted only because another awake body activated the same partition are not
+solved; they keep contact state visible without mutating sleeping body
 positions.
 
 **2D/Mixed parity follow-up 2026-06-21:** Pure 2D now follows the same
@@ -249,9 +259,9 @@ mixed contacts from seeing stale pre-integration collider positions. Workstream
 5 later completed the dedicated mixed response island model.
 
 The full-step validation exposed a hot-path allocation RCA in the newly
-exercised 3D late collision pass. That originally required local
-allocation-free sort helpers in Gravitas because SwiftCollections did not yet
-offer the needed reusable scratch-buffer sorting API.
+exercised 3D late collision pass. That originally required local allocation-free
+sort helpers in Gravitas because SwiftCollections did not yet offer the needed
+reusable scratch-buffer sorting API.
 
 **SwiftCollections v5.1.0 cleanup 2026-06-22:** After Gravitas moved to
 SwiftCollections v5.1.0 and GridForge v7.1.3, the 3D, pure 2D, and mixed
@@ -265,8 +275,8 @@ allocation-free hot-path ordering instead of separate service-local heap,
 quicksort, and insertion-sort helpers. Single-source partition ID copies use
 `SwiftSparseSet.CopyKeysTo(...)` followed by the same no-allocation sorter;
 merged ID buckets append then sort the caller-owned scratch list once. This
-preserves partition, collider, pair, and island ordering semantics while
-leaving the lower-stack package allocation gap visible for follow-up.
+preserves partition, collider, pair, and island ordering semantics while leaving
+the lower-stack package allocation gap visible for follow-up.
 
 ## Workstream 4: Cylinder And Mesh Contact Geometry
 
@@ -279,32 +289,32 @@ across edge/cap/side transitions.
 **Tasks**
 
 - [x] Add cylinder edge-case tests for sphere, capsule, cuboid, cylinder, mesh,
-  and mixed embedded-2D slab contacts.
+      and mixed embedded-2D slab contacts.
 - [x] Add mesh contact clipping tests where a triangle-level hit should produce
-  a stable contact surface rather than a noisy point or ambiguous normal.
+      a stable contact surface rather than a noisy point or ambiguous normal.
 - [x] Harden finite-cylinder cap, side, and rim contact selection without
-  treating cylinders as capsules.
+      treating cylinders as capsules.
 - [x] Preserve mesh triangle candidate ordering and authored collider identity
-  when multiple clipped contacts reduce to an external contact surface.
+      when multiple clipped contacts reduce to an external contact surface.
 - [x] Add benchmarks for cylinder-heavy and mesh-contact-heavy scenes before
-  expanding clipping complexity.
+      expanding clipping complexity.
 
 **Progress 2026-06-22:** Workstream 4 hardened cylinder and mesh contact
 geometry without changing the finite-cylinder model into a capsule
 approximation. Cylinder/sphere rim overlap now has explicit positive-depth
 coverage with finite rim normals. Parallel cylinder/cylinder cap overlap and
 cuboid/cylinder face-cap overlap generate four stable cap contacts using a
-deterministic cap tangent basis; side/rim fallbacks remain representative
-single contacts.
+deterministic cap tangent basis; side/rim fallbacks remain representative single
+contacts.
 
 Mesh/cuboid and mesh/cylinder detection now routes convex and concave meshes
 through the triangle candidate manifold generator first. Cuboid support-face
 vertices are clipped to authored triangle planes, and cylinder cap contacts are
 sampled deterministically on the active cap then clipped to triangle candidates.
 Convex mesh paths keep their older SAT/representative fallback only when the
-triangle path cannot produce a contact; concave paths stay triangle-owned.
-Tests cover mesh/cuboid clipped four-contact surfaces, mesh/cylinder cap
-surfaces, pair reversal, contact ID ordering, and allocation-free warm paths.
+triangle path cannot produce a contact; concave paths stay triangle-owned. Tests
+cover mesh/cuboid clipped four-contact surfaces, mesh/cylinder cap surfaces,
+pair reversal, contact ID ordering, and allocation-free warm paths.
 
 `collision-detection` benchmark signal now includes
 `GenerateCylinderCapManifolds`, `GenerateMeshCylinderManifolds`, and
@@ -322,14 +332,14 @@ boundary.
 **Tasks**
 
 - [x] Add tests for mixed resting contacts where planar impulse, yaw torque,
-  vertical constraint, and 3D participant motion interact.
+      vertical constraint, and 3D participant motion interact.
 - [x] Decide whether mixed response should participate in discrete islands with
-  pure 3D contacts, pure 2D contacts, or a dedicated mixed island type.
+      pure 3D contacts, pure 2D contacts, or a dedicated mixed island type.
 - [x] Preserve `PhysicsRuntimeMode.Both` isolation from mixed response work.
 - [x] Add diagnostics for mixed response iteration count and cap hits if mixed
-  islands become iterative.
+      islands become iterative.
 - [x] Document unsupported mixed solver behavior explicitly instead of leaving
-  it as an implementation accident.
+      it as an implementation accident.
 
 **Progress 2026-06-22:** Workstream 5 promoted mixed response from direct
 pair-local solving to a dedicated mixed island model. Mixed response does not
@@ -342,17 +352,17 @@ state, while the service collects non-trigger mixed pairs into response
 constraints sorted by stable mixed pair key. Movable 3D and 2D bodies use
 dimension-tagged body keys in a deterministic union-find graph. Connected mixed
 islands wake through existing collision wake paths and solve for the configured
-`PhysicsSettings.DiscreteSolverIterations` cap; positional correction is
-applied only on the first island iteration, while later iterations refine
-velocity response.
+`PhysicsSettings.DiscreteSolverIterations` cap; positional correction is applied
+only on the first island iteration, while later iterations refine velocity
+response.
 
 `CollisionResponseMixed` now exposes an iteration-aware internal solve path and
 returns whether an impulse was applied. Mixed impulse diagnostics record the
 iteration and iteration cap. A new `MixedResponseIsland` diagnostic reports the
 island root key, constraint count, iterations used, and whether the configured
-cap was reached. Tests cover planar impulse, yaw torque, vertical 2D
-constraint, 3D participant correction, single-pair iteration metadata,
-connected mixed-island cap reporting, and `Both` mode isolation.
+cap was reached. Tests cover planar impulse, yaw torque, vertical 2D constraint,
+3D participant correction, single-pair iteration metadata, connected
+mixed-island cap reporting, and `Both` mode isolation.
 
 The `mixed-collision-response` benchmark now includes a bounded mixed-iteration
 loop row in addition to the prepared single-pass pair row.
@@ -378,9 +388,9 @@ loop row in addition to the prepared single-pass pair row.
 
 ## Post-Completion Review 2026-06-22
 
-Reviewed commits `2b206465cab43837c21e6e9daa1e788f85cf4851`
-through `618457884dca770ce388134360167e96824a3d6d` for parity,
-correctness, deferred work, and performance follow-up.
+Reviewed commits `2b206465cab43837c21e6e9daa1e788f85cf4851` through
+`618457884dca770ce388134360167e96824a3d6d` for parity, correctness, deferred
+work, and performance follow-up.
 
 - Fixed mixed-dimension island parity so retained sleeping mixed links can
   bridge an awake connected island, while brand-new sleeping/sleeping links

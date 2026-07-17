@@ -1,27 +1,34 @@
 # CCD Exact TOI And Shape Reducers Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use
+> superpowers:subagent-driven-development (recommended) or
+> superpowers:executing-plans to implement this plan task-by-task. Steps use
+> checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace the remaining conservative CCD reductions with exact fixed-point TOI solvers where they provide meaningful correctness or precision gains without unacceptable hot-path cost.
+**Goal:** Replace the remaining conservative CCD reductions with exact
+fixed-point TOI solvers where they provide meaningful correctness or precision
+gains without unacceptable hot-path cost.
 
-**Architecture:** Keep conservative bounds as the broad candidate stage, then add shape-specific exact reducers with deterministic tie-breakers, fallback policy, and benchmark attribution before expanding each family.
+**Architecture:** Keep conservative bounds as the broad candidate stage, then
+add shape-specific exact reducers with deterministic tie-breakers, fallback
+policy, and benchmark attribution before expanding each family.
 
-**Tech Stack:** .NET 8, xUnit v3, BenchmarkDotNet, FixedMathSharp geometry primitives, Gravitas collision/query/narrow-phase code.
+**Tech Stack:** .NET 8, xUnit v3, BenchmarkDotNet, FixedMathSharp geometry
+primitives, Gravitas collision/query/narrow-phase code.
 
 ---
 
-**Date:** 2026-06-21
-**Status:** Done - completed 2026-06-23
-**Owner:** Gravitas collision/query hardening
+**Date:** 2026-06-21 **Status:** Done - completed 2026-06-23 **Owner:** Gravitas
+collision/query hardening
 
 ## Purpose
 
 The completed CCD depth work intentionally kept several precision gaps out of
 the runtime path until they had their own tests and benchmark signal. Remaining
-conservative areas include shape-exact angular time-of-impact, exact 3D
-reducers against non-sphere primitive targets, exact dynamic-vs-dynamic
-relative-motion reducers, mixed-dimension shape reducers, and exact
-mesh/compound relative TOI decisions.
+conservative areas include shape-exact angular time-of-impact, exact 3D reducers
+against non-sphere primitive targets, exact dynamic-vs-dynamic relative-motion
+reducers, mixed-dimension shape reducers, and exact mesh/compound relative TOI
+decisions.
 
 These are not wiki footnotes for a first-class physics engine. They need an
 explicit plan because each exact solver can improve physical quality while also
@@ -64,10 +71,10 @@ adding nontrivial math and runtime cost.
 
 - [x] Inventory every CCD path that still returns conservative proxy hits.
 - [x] Add benchmark attribution for candidate count, exact reducer attempts,
-  accepted hits, and rejected false positives where current rows cannot explain
-  cost.
+      accepted hits, and rejected false positives where current rows cannot
+      explain cost.
 - [x] Rank exact reducer families by correctness gain, expected use frequency,
-  and measured cost.
+      and measured cost.
 - [x] Record unsupported pairs explicitly in collision pipeline docs.
 
 **Result:** Public query reducers already supplied the strongest reusable 3D
@@ -85,13 +92,13 @@ previous safe sample rather than the exact angular time of impact.
 **Tasks**
 
 - [x] Add red tests where angular sampling produces visibly earlier clamping
-  than an exact 2D convex/AABB angular TOI should.
-- [x] Prototype exact 2D convex polygon and AABB angular TOI against circles
-  and convex targets.
+      than an exact 2D convex/AABB angular TOI should.
+- [x] Prototype exact 2D convex polygon and AABB angular TOI against circles and
+      convex targets.
 - [x] Evaluate 3D cuboid and capsule angular TOI against spheres before
-  expanding to other targets.
+      expanding to other targets.
 - [x] Keep deterministic fallback to conservative sampling for unsupported
-  pairs.
+      pairs.
 
 **Result:** The runtime did not adopt separate closed-form angular solvers.
 Instead, it now brackets contacts with deterministic samples and refines the
@@ -102,18 +109,18 @@ the practical precision gain while preserving one narrow-phase source of truth.
 
 **Problem**
 
-Current 3D exact reduction is strongest for sphere targets. Primitive
-non-sphere targets can still cause conservative early stops.
+Current 3D exact reduction is strongest for sphere targets. Primitive non-sphere
+targets can still cause conservative early stops.
 
 **Tasks**
 
 - [x] Add false-positive and true-hit tests for cuboid, capsule, cylinder, and
-  convex mesh target families.
+      convex mesh target families.
 - [x] Prefer reusable fixed-point geometric primitives over bespoke math.
 - [x] Add cheap deterministic rejection before expensive exact work when
-  benchmark attribution proves it helps.
+      benchmark attribution proves it helps.
 - [x] Preserve fallback behavior for concave mesh targets until mesh evidence
-  justifies a more exact path.
+      justifies a more exact path.
 
 **Result:** Supported convex 3D sources reuse `ConvexSweepQueryWorker`,
 including convex mesh and supported compound sources. Concave mesh targets are
@@ -130,13 +137,13 @@ is safe but can over-clamp elongated or compound dynamic shapes.
 **Tasks**
 
 - [x] Add dynamic-vs-dynamic false-positive tests for elongated 2D and 3D shape
-  pairs.
+      pairs.
 - [x] Implement exact 2D relative reducers for convex/AABB pairs first, reusing
-  existing swept SAT where possible.
+      existing swept SAT where possible.
 - [x] Evaluate 3D primitive relative reducers only after attribution shows the
-  proxy false positives are worth the added cost.
-- [x] Preserve deterministic tie-breakers when two exact relative hits share
-  the same TOI.
+      proxy false positives are worth the added cost.
+- [x] Preserve deterministic tie-breakers when two exact relative hits share the
+      same TOI.
 
 **Result:** Pure 2D dynamic relative CCD now validates proxy candidates through
 `QueryDetection2D.TrySweepMoverShape`. Pure 3D dynamic relative CCD now supports
@@ -154,19 +161,19 @@ exact reduction scans too much private geometry.
 **Tasks**
 
 - [x] Add compound part-order TOI tests where multiple private parts hit at
-  different times.
+      different times.
 - [x] Add mesh reducer benchmarks before any exact concave mesh relative TOI
-  implementation.
+      implementation.
 - [x] Decide whether convex mesh exact TOI belongs in runtime or offline
-  authored convex decomposition.
+      authored convex decomposition.
 - [x] Add mixed-dimension reducer tests that preserve finite slab/prism
-  embedding and plane-constrained normal orientation.
+      embedding and plane-constrained normal orientation.
 
 **Result:** Convex mesh and supported compound source casts belong in runtime
 because they share the public exact query worker. Concave mesh source casts do
-not belong in runtime; hosts should use offline convex decomposition into
-stable `LSCompoundCollider` parts. Mixed public/static reducers are exact for
-supported slab families, while mixed dynamic CCD remains conservative until the
+not belong in runtime; hosts should use offline convex decomposition into stable
+`LSCompoundCollider` parts. Mixed public/static reducers are exact for supported
+slab families, while mixed dynamic CCD remains conservative until the
 service-level island solver owns cross-dimension advancement and velocity
 handoff.
 

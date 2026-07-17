@@ -58,14 +58,14 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 
 | Signal | Status | Priority | Tracking |
 | ------ | ------ | -------- | -------- |
-| _None_ | - | - | - |
+| _None_ | -      | -        | -        |
 
 ## Closed Signals
 
 | Signal                                                      | Status | Closed     | Resolution                                                                                                                                                                                                                                  |
 | ----------------------------------------------------------- | ------ | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Physics-material combine numeric hardening                  | Closed | 2026-07-13 | Overflow-safe average and geometric-mean edge handling preserve deterministic coefficient semantics; the default geometric-material response benchmark remains allocation-free with no credible timing regression                           |
-| Replay hash collider-ID churn scaling                      | Closed | 2026-07-05 | 2D and 3D collider registration now uses a shared reusable-slot registry; authoritative replay hashes traverse canonical live registration order with dense replay ordinals, while deleted ID history remains outside replay identity      |
+| Replay hash collider-ID churn scaling                       | Closed | 2026-07-05 | 2D and 3D collider registration now uses a shared reusable-slot registry; authoritative replay hashes traverse canonical live registration order with dense replay ordinals, while deleted ID history remains outside replay identity       |
 | Pure 2D response position-correction repartition allocation | Closed | 2026-06-28 | Gravitas reuses empty retained partitions for immediate repartitioning; GridForge stores the common single voxel partition inline and keeps diagnostic names off success paths                                                              |
 | SwiftCollections sort hot-path allocation                   | Closed | 2026-06-24 | SwiftCollections owns allocation-free sort and sorted-key APIs; Gravitas removed `SwiftListSortUtility`                                                                                                                                     |
 | Mixed mesh finite-slab triangle scaling signal              | Closed | 2026-06-24 | Mixed and pure 3D query services expose mesh-triangle candidate counts, dedicated triangle-volume benchmarks cover dense and false-positive mesh targets, and pure 3D convex-source mesh sweeps use ordered lower-bound triangle candidates |
@@ -92,28 +92,28 @@ dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll repl
 
 Initial measurement on 2026-07-05:
 
-| Row | Mean | Allocated |
-| --- | ---: | --------: |
-| `ColliderCount=64` live, 512 created IDs | `119.0 us` | `0 B` |
-| `ColliderCount=256` live, 2048 created IDs | `483.9 us` | `0 B` |
+| Row                                        |       Mean | Allocated |
+| ------------------------------------------ | ---------: | --------: |
+| `ColliderCount=64` live, 512 created IDs   | `119.0 us` |     `0 B` |
+| `ColliderCount=256` live, 2048 created IDs | `483.9 us` |     `0 B` |
 
-**RCA:** 2D and 3D services had separate collider ownership structures:
-compact live lists, ID dictionaries, and manual next-ID/high-water counters.
-Replay hashing walked the high-water ID range and emitted deleted-hole state,
-while mixed replay hashing crossed 3D and 2D high-water ranges before checking
-whether a mixed pair existed. That made deleted context-local allocation
-history part of authoritative replay identity even though serialization treats
-context-local collider IDs, service indices, partitions, and pair tables as
-runtime-owned state.
+**RCA:** 2D and 3D services had separate collider ownership structures: compact
+live lists, ID dictionaries, and manual next-ID/high-water counters. Replay
+hashing walked the high-water ID range and emitted deleted-hole state, while
+mixed replay hashing crossed 3D and 2D high-water ranges before checking whether
+a mixed pair existed. That made deleted context-local allocation history part of
+authoritative replay identity even though serialization treats context-local
+collider IDs, service indices, partitions, and pair tables as runtime-owned
+state.
 
 **Resolution:** 2D and 3D collider registration now goes through a shared
 registry backed by reusable `SwiftBucket` slots plus compact live iteration.
 `-1` is the unregistered collider sentinel across dimensions; `0` is a valid
 context-local collider ID. Runtime IDs remain lookup and pair keys, while
-authoritative replay hashes traverse canonical live registration order and
-write dense replay ordinals for collider, hierarchy, and pair identity. Deleted
-ID holes, free-list ordering, and allocator history are excluded from
-authoritative hashes, while registry peak counts remain cache diagnostics for
+authoritative replay hashes traverse canonical live registration order and write
+dense replay ordinals for collider, hierarchy, and pair identity. Deleted ID
+holes, free-list ordering, and allocator history are excluded from authoritative
+hashes, while registry peak counts remain cache diagnostics for
 `AuthoritativeWithSolverCaches`.
 
 Post-fix command:
@@ -124,14 +124,14 @@ dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll repl
 
 Post-fix measurement on 2026-07-05:
 
-| Row | Mean | Allocated |
-| --- | ---: | --------: |
-| `replay-hash-3d-churned-ids`, `ColliderCount=64` | `114.7 us` | `0 B` |
-| `replay-hash-2d-churned-ids`, `ColliderCount=64` | `124.3 us` | `0 B` |
-| `replay-hash-mixed-churned-ids`, `ColliderCount=64` | `124.3 us` | `0 B` |
-| `replay-hash-3d-churned-ids`, `ColliderCount=256` | `489.2 us` | `0 B` |
-| `replay-hash-2d-churned-ids`, `ColliderCount=256` | `537.9 us` | `0 B` |
-| `replay-hash-mixed-churned-ids`, `ColliderCount=256` | `550.9 us` | `0 B` |
+| Row                                                  |       Mean | Allocated |
+| ---------------------------------------------------- | ---------: | --------: |
+| `replay-hash-3d-churned-ids`, `ColliderCount=64`     | `114.7 us` |     `0 B` |
+| `replay-hash-2d-churned-ids`, `ColliderCount=64`     | `124.3 us` |     `0 B` |
+| `replay-hash-mixed-churned-ids`, `ColliderCount=64`  | `124.3 us` |     `0 B` |
+| `replay-hash-3d-churned-ids`, `ColliderCount=256`    | `489.2 us` |     `0 B` |
+| `replay-hash-2d-churned-ids`, `ColliderCount=256`    | `537.9 us` |     `0 B` |
+| `replay-hash-mixed-churned-ids`, `ColliderCount=256` | `550.9 us` |     `0 B` |
 
 **Verification:** Added replay-hash tests proving deleted 3D, 2D, and mixed
 collider churn and free-list ordering do not affect authoritative hashes, live
@@ -649,7 +649,8 @@ raycast path has a focused xUnit allocation guard.
 **Status:** Closed 2026-07-12
 
 **Evidence:** Task 46 extended `MeshMassPropertyBenchmarks` with matching
-scale-only and scale-plus-surface-inertia rows. The final post-change command was:
+scale-only and scale-plus-surface-inertia rows. The final post-change command
+was:
 
 ```powershell
 dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll `
@@ -658,8 +659,8 @@ dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll `
 
 The checked scale/cache rebuild measured about `5.530 us`, `282.282 us`, and
 `1.122 ms` at subdivisions `1`, `8`, and `16`. Scale plus lazy physical
-thin-shell integration measured `16.087 us`, `907.933 us`, and `3.609 ms`.
-Every row reported no managed allocation.
+thin-shell integration measured `16.087 us`, `907.933 us`, and `3.609 ms`. Every
+row reported no managed allocation.
 
 A cache-focused follow-up used:
 
@@ -670,11 +671,11 @@ dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll `
     "artifacts/benchmarks/2026-07-12-task46-mesh-scale-cache-fix2"
 ```
 
-Cached closed-volume inertia measured `61.14 ns`, `64.79 ns`, and `64.33 ns`
-at subdivisions `1`, `8`, and `16`, with no managed allocation.
+Cached closed-volume inertia measured `61.14 ns`, `64.79 ns`, and `64.33 ns` at
+subdivisions `1`, `8`, and `16`, with no managed allocation.
 
-**Resolution:** Scale changes pay deterministic O(triangle-count) validation
-and scaled face-cache rebuilding. Surface integration stays lazy and its
+**Resolution:** Scale changes pay deterministic O(triangle-count) validation and
+scaled face-cache rebuilding. Surface integration stays lazy and its
 successfully prevalidated candidate is promoted into the live cache, so callers
 that do not select `SurfaceApproximation` do not pay the shell moment pass.
 Closed-volume properties are likewise cached by committed scale, including the
@@ -686,15 +687,15 @@ rows as regression signals for future mesh transform or mass-property work.
 
 **Status:** Closed 2026-07-13
 
-**Evidence:** Task 48 compared the existing default-material response row at
-the pre-change `577cdb1` checkpoint and the final arithmetic implementation.
-This row exercises the dominant `GeometricMean` friction policy rather than the
+**Evidence:** Task 48 compared the existing default-material response row at the
+pre-change `577cdb1` checkpoint and the final arithmetic implementation. This
+row exercises the dominant `GeometricMean` friction policy rather than the
 distinct-material `Maximum` path.
 
-| Body count | Baseline | Final | Allocated |
-| ---------: | -------: | ----: | --------: |
-| 64 | `148.785 us` | `149.243 us` | `0 B` |
-| 1024 | `2.8145 ms` | `2.6088 ms` | `0 B` |
+| Body count |     Baseline |        Final | Allocated |
+| ---------: | -----------: | -----------: | --------: |
+|         64 | `148.785 us` | `149.243 us` |     `0 B` |
+|       1024 |  `2.8145 ms` |  `2.6088 ms` |     `0 B` |
 
 The 64-body intervals overlap (`+0.31%` point estimate), while the 1024-body
 measurement was multimodal and is retained only as a no-regression signal, not

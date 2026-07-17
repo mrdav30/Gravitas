@@ -1,18 +1,25 @@
 # Pure 2D Grounding And Support Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use
+> superpowers:subagent-driven-development (recommended) or
+> superpowers:executing-plans to implement this plan task-by-task. Steps use
+> checkbox (`- [x]`) syntax for tracking.
 
-**Goal:** Add first-class pure 2D grounded-state support that matches Gravitas' 3D grounding quality bar while preserving the X/Z planar 2D coordinate contract.
+**Goal:** Add first-class pure 2D grounded-state support that matches Gravitas'
+3D grounding quality bar while preserving the X/Z planar 2D coordinate contract.
 
-**Architecture:** Treat pure 2D grounding as planar support, not world-Y height. `SolidBody2D` should expose `IsGrounded`-style state and automatic/manual ownership, derive automatic support from 2D contacts and deterministic in-plane probes, and keep host-owned height or visual Y outside pure 2D physics.
+**Architecture:** Treat pure 2D grounding as planar support, not world-Y height.
+`SolidBody2D` should expose `IsGrounded`-style state and automatic/manual
+ownership, derive automatic support from 2D contacts and deterministic in-plane
+probes, and keep host-owned height or visual Y outside pure 2D physics.
 
-**Tech Stack:** .NET 8, xUnit v3, BenchmarkDotNet where hot-path signal is needed, FixedMathSharp `Vector2d`/`Fixed64`, SwiftCollections buffers, Gravitas 2D collision/query/response services, Chronicler explicit state recording.
+**Tech Stack:** .NET 8, xUnit v3, BenchmarkDotNet where hot-path signal is
+needed, FixedMathSharp `Vector2d`/`Fixed64`, SwiftCollections buffers, Gravitas
+2D collision/query/response services, Chronicler explicit state recording.
 
 ---
 
-**Date:** 2026-06-26
-**Status:** Done
-**Owner:** Gravitas 2D runtime hardening
+**Date:** 2026-06-26 **Status:** Done **Owner:** Gravitas 2D runtime hardening
 
 ## Purpose
 
@@ -28,8 +35,8 @@ contract remains:
 - authoritative 2D position is `Vector2d`.
 - `Vector2d.X` maps to world X.
 - `Vector2d.Y` maps to world Z.
-- world Y is host visual height or mixed embedding metadata, not pure 2D
-  physics state.
+- world Y is host visual height or mixed embedding metadata, not pure 2D physics
+  state.
 
 This plan adds planar support semantics: a 2D body is grounded when it has a
 valid support normal in the 2D plane, either from contact manifolds or from a
@@ -43,8 +50,8 @@ parity with `SolidBody`; docs can describe the underlying model as 2D support.
 - `GroundingMode` currently supports `Automatic` and `Manual`.
 - `GroundProbeMode` currently supports 3D `Auto`, `Ray`, and `SweptSphere`
   probes.
-- `SolidBody2D` has no grounding partial, no grounded state, and no ground
-  probe buffer.
+- `SolidBody2D` has no grounding partial, no grounded state, and no ground probe
+  buffer.
 - `SolidBody2D.LateSimulate(...)` always integrates `Gravity` into planar
   velocity.
 - Pure 2D discrete response runs after body integration in
@@ -62,8 +69,8 @@ parity with `SolidBody`; docs can describe the underlying model as 2D support.
   interpolation, or world-Y heightmap ownership to `SolidBody2D`.
 - Do not make pure 2D bodies depend on `GravitasQuery3DService` or mixed slab
   queries for ordinary 2D grounding.
-- Do not expose duplicate public names for the same concept. Prefer
-  `IsGrounded` over adding a separate public `IsSupported` alias.
+- Do not expose duplicate public names for the same concept. Prefer `IsGrounded`
+  over adding a separate public `IsSupported` alias.
 - Do not treat ordinary movable dynamic bodies as ground by default.
 - Do not add engine-specific tilemap, character-controller, or renderer hooks to
   core Gravitas.
@@ -73,8 +80,8 @@ parity with `SolidBody`; docs can describe the underlying model as 2D support.
 - Preserve deterministic ordering for support candidate selection.
 - Keep manual grounding paths allocation-free.
 - Reuse caller/body-owned `SwiftList` buffers for probe hits.
-- Keep probe shape choices explicit and dimension-correct:
-  2D ray or 2D swept-circle, not 3D swept-sphere.
+- Keep probe shape choices explicit and dimension-correct: 2D ray or 2D
+  swept-circle, not 3D swept-sphere.
 - Derive automatic support from contacts first when available; use probes to
   cover near-ground, character-controller, and post-separation cases.
 - Keep host-owned deterministic tilemap or heightfield-style data possible
@@ -122,13 +129,13 @@ language favors grounded naming.
 
 **Problem**
 
-2D needs grounding parity with 3D without copying 3D's world-Y height model.
-The first step is to define mode, probe, direction, and state ownership cleanly.
+2D needs grounding parity with 3D without copying 3D's world-Y height model. The
+first step is to define mode, probe, direction, and state ownership cleanly.
 
 **Tasks**
 
 - [x] Add tests that describe the intended state transitions before
-  implementation:
+      implementation:
   - automatic starts ungrounded when no support exists.
   - `WasGrounded` is false before the first successful automatic or manual
     grounded update.
@@ -138,12 +145,12 @@ The first step is to define mode, probe, direction, and state ownership cleanly.
   - manual clear state clears grounding and ignores automatic probes.
   - returning to automatic can immediately refresh support.
 - [x] Reject a dedicated disabled grounding mode because `Manual` already
-  disables automatic probes, and a third public mode only duplicated
-  `UseManualGrounding()` / `ClearManualGrounding()` behavior.
+      disables automatic probes, and a third public mode only duplicated
+      `UseManualGrounding()` / `ClearManualGrounding()` behavior.
 - [x] Add `GroundProbeMode2D` instead of overloading 3D `GroundProbeMode` with
-  shape names that do not fit 2D.
+      shape names that do not fit 2D.
 - [x] Add `SolidBody2D.Grounding.cs` as a focused partial. Keep the root
-  `SolidBody2D.cs` file as state ownership and broad body configuration.
+      `SolidBody2D.cs` file as state ownership and broad body configuration.
 - [x] Define planar up/down behavior explicitly:
   - if gravity-derived mode is chosen, use `-Gravity.Normalized` when gravity is
     non-zero.
@@ -151,9 +158,9 @@ The first step is to define mode, probe, direction, and state ownership cleanly.
     `GroundUpDirection`.
   - reject zero explicit up vectors.
 - [x] Keep public naming aligned with 3D: expose `IsGrounded`, `GroundNormal`,
-  and `GroundPoint`; use "support" in docs to explain the 2D model.
+      and `GroundPoint`; use "support" in docs to explain the 2D model.
 - [x] Add XML docs to all new public members explaining that the values live in
-  the X/Z simulation plane.
+      the X/Z simulation plane.
 
 **Done Criteria**
 
@@ -180,8 +187,9 @@ queries in the common case and keeps grounding consistent with response.
   - ordinary movable dynamic bodies are not accepted as ground by default.
   - kinematic and position-frozen bodies are accepted as ground.
 - [x] Add a service-owned post-response grounding pass in
-  `GravitasPhysics2DService.LateSimulate(...)` after
-  `SolveDiscreteResponsePairs()` and before `UpdateSleepStatesAfterPhysicsStep()`.
+      `GravitasPhysics2DService.LateSimulate(...)` after
+      `SolveDiscreteResponsePairs()` and before
+      `UpdateSleepStatesAfterPhysicsStep()`.
 - [x] Scan current solid `CollisionPair2D` manifolds without allocations.
 - [x] For each contact, orient the support normal for each body:
   - collider A receives `-contact.Normal`.
@@ -190,7 +198,8 @@ queries in the common case and keeps grounding consistent with response.
   - the body is active and automatic grounding is enabled.
   - the other collider is not the same collider.
   - the other body is null, position-frozen, or kinematic.
-  - the oriented normal has `Dot(normal, GroundUpDirection) >= GroundMinNormalDot`.
+  - the oriented normal has
+    `Dot(normal, GroundUpDirection) >= GroundMinNormalDot`.
   - the pair is non-trigger and the contact belongs to the current frame.
 - [x] Choose the winning support candidate deterministically:
   - highest up-dot.
@@ -198,7 +207,7 @@ queries in the common case and keeps grounding consistent with response.
   - then lowest other collider ID.
   - then lowest contact ID.
 - [x] Store `GroundNormal`, `GroundPoint`, and `LastGroundedPosition` from the
-  winning candidate.
+      winning candidate.
 
 **Done Criteria**
 
@@ -228,10 +237,10 @@ before contact is rebuilt or immediately after tiny separations.
     identity.
 - [x] Add a body-owned `SwiftList<Physics2DHit>` probe buffer.
 - [x] Implement `CheckGround()` and simulation-time `CheckGroundForSimulation()`
-  for `SolidBody2D`.
+      for `SolidBody2D`.
 - [x] Use `Context.Query2D.RaycastAll(...)` for `GroundProbeMode2D.Ray`.
 - [x] Use `Context.Query2D.SweepCircleAgainstStaticAll(...)` or an equivalent
-  internal static-target collector for `GroundProbeMode2D.SweptCircle`.
+      internal static-target collector for `GroundProbeMode2D.SweptCircle`.
 - [x] Resolve `Auto` deterministically:
   - use swept-circle when `GroundProbeRadius` is positive.
   - otherwise derive a radius for circle, AABB, convex polygon, and supported
@@ -242,7 +251,7 @@ before contact is rebuilt or immediately after tiny separations.
     and whose hit platform has not moved.
   - force probes when switching to automatic or during initialization.
 - [x] Add allocation tests proving repeated probes allocate `0` bytes after
-  warmup.
+      warmup.
 
 **Done Criteria**
 
@@ -266,20 +275,20 @@ breaking CCD, sleep, or deterministic service ordering.
     it.
   - leaving ground restores full gravity.
 - [x] Update `SolidBody2D.LateSimulate(...)` to remove the into-ground component
-  of gravity/acceleration when grounded rather than relying on positional
-  correction every frame.
+      of gravity/acceleration when grounded rather than relying on positional
+      correction every frame.
 - [x] Clamp residual velocity into the support normal when support is active and
-  the velocity would push the body deeper into ground.
+      the velocity would push the body deeper into ground.
 - [x] Ensure dynamic CCD still runs from the correct frame-start position and
-  displacement after grounding modifies planar acceleration or velocity.
+      displacement after grounding modifies planar acceleration or velocity.
 - [x] Ensure kinematic active-source CCD does not let host-driven movement
-  silently inherit stale grounded state.
+      silently inherit stale grounded state.
 - [x] Update sleep behavior so grounded resting bodies can sleep, while support
-  loss wakes or remains awake according to existing wake rules.
-- [x] Decide whether mixed 2D/3D contacts should contribute to pure 2D
-  grounded state. Prefer no in this plan unless a specific mixed gameplay case
-  demands it; mixed vertical impulse is intentionally constrained out of the 2D
-  body model.
+      loss wakes or remains awake according to existing wake rules.
+- [x] Decide whether mixed 2D/3D contacts should contribute to pure 2D grounded
+      state. Prefer no in this plan unless a specific mixed gameplay case
+      demands it; mixed vertical impulse is intentionally constrained out of the
+      2D body model.
 
 **Done Criteria**
 
@@ -291,8 +300,8 @@ breaking CCD, sleep, or deterministic service ordering.
 
 **Problem**
 
-Grounding state is authoritative enough to affect deterministic continuation.
-It must serialize explicitly, show up in docs, and expose diagnostics without
+Grounding state is authoritative enough to affect deterministic continuation. It
+must serialize explicitly, show up in docs, and expose diagnostics without
 allocating when disabled.
 
 **Tasks**
@@ -307,9 +316,9 @@ allocating when disabled.
   - previous grounded state.
   - ground normal, ground point, and last grounded position.
 - [x] Add save/populate replay tests covering automatic, manual, and disabled
-  grounding states.
+      grounding states.
 - [x] Add or extend diagnostics for 2D ground probes. Reuse the existing
-  diagnostic sink pattern, but keep dimension and probe shape explicit.
+      diagnostic sink pattern, but keep dimension and probe shape explicit.
 - [x] Prove diagnostics disabled path allocates `0` bytes after warmup.
 - [x] Update wiki docs:
   - `docs/wiki/RUNTIME_ARCHITECTURE.md`
@@ -317,10 +326,9 @@ allocating when disabled.
   - `docs/wiki/HOST_INTEGRATION.md`
   - `docs/wiki/SERIALIZATION.md`
   - `docs/wiki/DIAGNOSTICS.md`
-- [x] Update `AGENTS.md` if the 2D grounding model changes contributor
-  guidance.
+- [x] Update `AGENTS.md` if the 2D grounding model changes contributor guidance.
 - [x] Add benchmark rows only if probe/contact scan cost shows up in focused
-  tests or if dense platformer scenes need a baseline.
+      tests or if dense platformer scenes need a baseline.
 - [x] Run:
   - `dotnet build Gravitas.slnx --configuration Release`
   - `dotnet test Gravitas.slnx --configuration Release`

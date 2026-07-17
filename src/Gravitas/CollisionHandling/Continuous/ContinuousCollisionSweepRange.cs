@@ -6,7 +6,6 @@
 //=======================================================================
 
 using FixedMathSharp;
-using Gravitas.Support;
 using System;
 using System.Runtime.CompilerServices;
 

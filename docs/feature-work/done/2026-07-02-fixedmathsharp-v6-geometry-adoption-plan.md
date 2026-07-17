@@ -6,13 +6,24 @@
 
 ---
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use
+> superpowers:subagent-driven-development (recommended) or
+> superpowers:executing-plans to implement this plan task-by-task. Steps use
+> checkbox (`- [x]`) syntax for tracking.
 
-**Goal:** Adopt FixedMathSharp v6 geometry primitives in Gravitas where they reduce duplicated geometry logic without weakening deterministic physics behavior or hot-path performance.
+**Goal:** Adopt FixedMathSharp v6 geometry primitives in Gravitas where they
+reduce duplicated geometry logic without weakening deterministic physics
+behavior or hot-path performance.
 
-**Architecture:** Use `FixedTriangle` as the canonical ordered 3D triangle value in mesh and mixed collision paths, while keeping Gravitas-owned cached normals and query bounds where profiling proves they matter. Treat `FixedBoundCircle`, `FixedSegment`, `FixedSegment2d`, and `FixedRay2d` as evidence-gated cleanup targets rather than a broad mechanical rewrite.
+**Architecture:** Use `FixedTriangle` as the canonical ordered 3D triangle value
+in mesh and mixed collision paths, while keeping Gravitas-owned cached normals
+and query bounds where profiling proves they matter. Treat `FixedBoundCircle`,
+`FixedSegment`, `FixedSegment2d`, and `FixedRay2d` as evidence-gated cleanup
+targets rather than a broad mechanical rewrite.
 
-**Tech Stack:** .NET 8, xUnit v3, BenchmarkDotNet, FixedMathSharp v6 geometry primitives, SwiftCollections query buffers, GridForge-backed physics partitions, Gravitas 3D/pure 2D/mixed collision and query services.
+**Tech Stack:** .NET 8, xUnit v3, BenchmarkDotNet, FixedMathSharp v6 geometry
+primitives, SwiftCollections query buffers, GridForge-backed physics partitions,
+Gravitas 3D/pure 2D/mixed collision and query services.
 
 ## Purpose
 
@@ -29,8 +40,8 @@ partly by Gravitas' needs:
 
 The first Gravitas package-reference migration handled compile-time API breaks
 and obvious bounds fixes. This plan captures the next cleanup layer: removing
-local triangle/segment geometry duplication where the new lower-stack
-primitives are the better long-term owner.
+local triangle/segment geometry duplication where the new lower-stack primitives
+are the better long-term owner.
 
 The migration should improve code navigation and reduce duplicated math without
 introducing hidden allocations, looser contact behavior, or extra per-candidate
@@ -44,10 +55,8 @@ Read these before implementation:
   `F:/gamedevrepos/FixedMathSharp/docs/feature-work/done/2026-06-28-bounds-and-2d-geometry-hardening-plan.md`
 - FixedMathSharp migration notes:
   `F:/gamedevrepos/FixedMathSharp/docs/MIGRATION.md`
-- Gravitas active release scope:
-  `docs/feature-work/feature-work-overview.md`
-- Gravitas benchmark guide:
-  `tests/Gravitas.Benchmarks/README.md`
+- Gravitas active release scope: `docs/feature-work/feature-work-overview.md`
+- Gravitas benchmark guide: `tests/Gravitas.Benchmarks/README.md`
 
 Important FixedMathSharp v6 guidance from the completed plan:
 
@@ -84,8 +93,8 @@ Important FixedMathSharp v6 guidance from the completed plan:
 - Do not remove cached mesh normals from Gravitas unless tests and benchmarks
   show recomputing `FixedTriangle.Normal` is not a regression.
 - Do not mechanically replace every segment calculation with `FixedSegment`.
-  Two-segment closest-point routines and algorithm-specific simplex state
-  should remain in Gravitas unless FixedMathSharp gains matching primitives.
+  Two-segment closest-point routines and algorithm-specific simplex state should
+  remain in Gravitas unless FixedMathSharp gains matching primitives.
 - Do not migrate `SweepTriangleCandidate`, `TriangleWeights`, or
   `PhysicsMesh.TriangleUse`; those are algorithm/topology state, not geometry
   primitives.
@@ -151,8 +160,7 @@ organization. A good first target is:
   `src/Gravitas/CollisionHandling/Detection/3D/Mesh/MeshTriangleContactGenerator.cs`
 - Modify:
   `src/Gravitas/CollisionHandling/Detection/Mixed/CollisionDetectionMixed.Complex.cs`
-- Delete:
-  `src/Gravitas/CollisionHandling/Detection/Mixed/MixedTriangle.cs`
+- Delete: `src/Gravitas/CollisionHandling/Detection/Mixed/MixedTriangle.cs`
 
 If mixed detection should not depend on a file physically under `3D/Mesh`, move
 the new type to a shared detection folder such as:
@@ -218,8 +226,8 @@ The right migration is a shared Gravitas wrapper backed by `FixedTriangle`.
 
 **Tasks**
 
-- [x] Add focused tests that construct a mesh triangle through the same
-      vertices used by mesh contact generation and verify:
+- [x] Add focused tests that construct a mesh triangle through the same vertices
+      used by mesh contact generation and verify:
   - `A`, `B`, and `C` preserve ordered vertices.
   - `Center` matches `(A + B + C) / 3`.
   - `GetEdgeVector(0/1/2)` matches the old `AB`, `BC`, `CA` vectors.
@@ -228,8 +236,8 @@ The right migration is a shared Gravitas wrapper backed by `FixedTriangle`.
     `FixedTriangle.Normal`.
 - [x] Create the shared internal collision triangle wrapper using
       `FixedMathSharp.Bounds.FixedTriangle`.
-- [x] Replace the nested `TriangleData` in
-      `MeshTriangleContactGenerator.cs` with the shared wrapper.
+- [x] Replace the nested `TriangleData` in `MeshTriangleContactGenerator.cs`
+      with the shared wrapper.
 - [x] Replace `MixedTriangle` in mixed mesh-vs-slab logic with the shared
       wrapper.
 - [x] Delete `MixedTriangle.cs` after all references are removed.
@@ -308,9 +316,8 @@ guaranteed runtime value.
 - [x] Use `FixedBoundCircle` only where it removes duplicated bound/containment
       math without increasing per-candidate construction cost.
 - [x] Inventory 3D and 2D finite segment call sites.
-- [x] Use `FixedSegment` or `FixedSegment2d` where the domain object is a
-      finite segment and the replacement removes unsafe or duplicated edge
-      math.
+- [x] Use `FixedSegment` or `FixedSegment2d` where the domain object is a finite
+      segment and the replacement removes unsafe or duplicated edge math.
 - [x] Do not replace two-segment closest-point routines unless a lower-stack
       primitive exists for that exact operation.
 - [x] Leave `FixedRay2d` adoption to pure 2D query code only if it simplifies
@@ -412,8 +419,8 @@ Completed 2026-07-02.
 Adopted:
 
 - Added `CollisionTriangle`, a shared Gravitas-owned wrapper backed by
-  `FixedTriangle` while preserving cached mesh normals and
-  `FixedBoundVolume` query bounds at SwiftCollections BVH boundaries.
+  `FixedTriangle` while preserving cached mesh normals and `FixedBoundVolume`
+  query bounds at SwiftCollections BVH boundaries.
 - Replaced the 3D mesh `TriangleData` and mixed `MixedTriangle` local geometry
   models with `CollisionTriangle`; deleted `MixedTriangle.cs`.
 - Routed `MeshUtils.ClosestPointOnEdge(...)` through `FixedSegment` and added a
@@ -444,34 +451,41 @@ Intentionally skipped:
 
 Validation:
 
-- `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~Mesh|FullyQualifiedName~Mixed"`: passed 222 tests before refactor.
-- `dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj --configuration Release -f net8.0`: passed before and after refactor.
-- `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~Mesh|FullyQualifiedName~Cone|FullyQualifiedName~Query|FullyQualifiedName~Mixed"`: passed 315 tests.
-- `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~Physics2D|FullyQualifiedName~Query|FullyQualifiedName~Capsule|FullyQualifiedName~Grounding2D|FullyQualifiedName~Mixed"`: passed 402 tests.
-- `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~PlanarSegmentGeometryTests|FullyQualifiedName~CollisionTriangleTests|FullyQualifiedName~MeshUtilsTests"`: passed 13 tests.
+- `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~Mesh|FullyQualifiedName~Mixed"`:
+  passed 222 tests before refactor.
+- `dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj --configuration Release -f net8.0`:
+  passed before and after refactor.
+- `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~Mesh|FullyQualifiedName~Cone|FullyQualifiedName~Query|FullyQualifiedName~Mixed"`:
+  passed 315 tests.
+- `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~Physics2D|FullyQualifiedName~Query|FullyQualifiedName~Capsule|FullyQualifiedName~Grounding2D|FullyQualifiedName~Mixed"`:
+  passed 402 tests.
+- `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter "FullyQualifiedName~PlanarSegmentGeometryTests|FullyQualifiedName~CollisionTriangleTests|FullyQualifiedName~MeshUtilsTests"`:
+  passed 13 tests.
 - `dotnet test Gravitas.slnx --configuration Release`: passed 917 tests.
 - `dotnet test Gravitas.slnx --configuration ReleaseLean`: passed 901 tests.
 
 Benchmark smoke:
 
-- Command: `dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll collision-detection collision-response query-service collider-shape --filter "*" -j Short -i --exporters json`
+- Command:
+  `dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll collision-detection collision-response query-service collider-shape --filter "*" -j Short -i --exporters json`
 - Result: completed 69 benchmarks successfully. Baseline JSON artifacts were
-  preserved under `BenchmarkDotNet.Artifacts/results/fixedmathsharp-v6-geometry-baseline`
-  before the post-change run.
+  preserved under
+  `BenchmarkDotNet.Artifacts/results/fixedmathsharp-v6-geometry-baseline` before
+  the post-change run.
 - Key comparisons, baseline to post-change:
-  - `MoveMeshRuntimeShapeStateAndQueryTriangles`: 9.046 us to 8.566 us, 0 B to
-    0 B.
-  - `MoveDynamicConcaveMeshAndQueryTriangles`: 35.753 us to 36.480 us, 0 B to
-    0 B.
+  - `MoveMeshRuntimeShapeStateAndQueryTriangles`: 9.046 us to 8.566 us, 0 B to 0
+    B.
+  - `MoveDynamicConcaveMeshAndQueryTriangles`: 35.753 us to 36.480 us, 0 B to 0
+    B.
   - `CheckMeshCylinderPairs`: 476.226 us to 480.236 us, 0 B to 0 B.
-  - `GenerateMeshCylinderManifolds`: 476.439 us to 480.925 us, 0 B to 1 B.
-    The 1 B value is a MemoryDiagnoser rounding artifact from 960 B benchmark
+  - `GenerateMeshCylinderManifolds`: 476.439 us to 480.925 us, 0 B to 1 B. The 1
+    B value is a MemoryDiagnoser rounding artifact from 960 B benchmark
     accounting over 1024 operations; no GC collections were reported.
   - `CheckMeshMeshPairs`: 492.486 us to 487.514 us, 0 B to 0 B.
   - `CheckClosedDenseMeshMeshPairs`: 303081.867 us to 294214.667 us, unchanged
     480 B MemoryDiagnoser artifact.
-  - `SweepSphereAllAcrossMeshTargetContext`: 880.878 us to 876.831 us,
-    unchanged 1 B artifact.
+  - `SweepSphereAllAcrossMeshTargetContext`: 880.878 us to 876.831 us, unchanged
+    1 B artifact.
   - `SweepConvexMeshAllAcrossSphereTargets_HighVertexSource`: 2667.851 us to
     2641.299 us, unchanged 4 B artifact.
 - Conclusion: no obvious mesh/mixed/query timing regression. Allocation profiles

@@ -5,11 +5,11 @@
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
-using System.Runtime.CompilerServices;
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Materials;
+using System.Runtime.CompilerServices;
 
 namespace Gravitas;
 

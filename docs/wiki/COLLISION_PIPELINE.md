@@ -2,8 +2,8 @@
 
 Collision in Gravitas is split into deterministic stages: broad phase, pair
 filtering, narrow phase, contact manifold generation, response, notifications,
-and cleanup. The same structure exists for 3D, 2D, and explicit mixed
-2D/3D contacts, with each domain owning its own state and ordering rules.
+and cleanup. The same structure exists for 3D, 2D, and explicit mixed 2D/3D
+contacts, with each domain owning its own state and ordering rules.
 
 This page is the readable entry point. Use the reference pages when you need the
 full implementation contract:
@@ -44,19 +44,18 @@ flowchart LR
 
 ## Runtime Paths
 
-| Path | Body/collider types | Broad phase | Pair/response owner |
-| --- | --- | --- | --- |
-| 3D | `SolidBody`, `LSCollider` | `PhysicsPartition` on GridForge voxels | `GravitasPhysicsService` |
-| 2D | `SolidBody2D`, `LSCollider2D` | `PhysicsPartition2D` on the internal Y=0 storage plane | `GravitasPhysics2DService` |
-| Mixed 2D/3D | existing 3D and 2D types | `PhysicsMixedPartition` using embedded 2D slabs | `GravitasMixedCollisionService` |
+| Path        | Body/collider types           | Broad phase                                            | Pair/response owner             |
+| ----------- | ----------------------------- | ------------------------------------------------------ | ------------------------------- |
+| 3D          | `SolidBody`, `LSCollider`     | `PhysicsPartition` on GridForge voxels                 | `GravitasPhysicsService`        |
+| 2D          | `SolidBody2D`, `LSCollider2D` | `PhysicsPartition2D` on the internal Y=0 storage plane | `GravitasPhysics2DService`      |
+| Mixed 2D/3D | existing 3D and 2D types      | `PhysicsMixedPartition` using embedded 2D slabs        | `GravitasMixedCollisionService` |
 
-2D uses X/Z host projection: world `Vector3d.x` maps to `Vector2d.x` and
-world `Vector3d.z` maps to `Vector2d.y`. World `Vector3d.y` is height or mixed
+2D uses X/Z host projection: world `Vector3d.x` maps to `Vector2d.x` and world
+`Vector3d.z` maps to `Vector2d.y`. World `Vector3d.y` is height or mixed
 embedding metadata, not a 2D collision axis.
 
-`PhysicsRuntimeMode.Both` runs 2D and 3D side by side without
-cross-dimensional contacts. `PhysicsRuntimeMode.Mixed` adds the dedicated mixed
-lifecycle.
+`PhysicsRuntimeMode.Both` runs 2D and 3D side by side without cross-dimensional
+contacts. `PhysicsRuntimeMode.Mixed` adds the dedicated mixed lifecycle.
 
 ## End-To-End Phase Order
 
@@ -81,16 +80,16 @@ post-integration 2D and 3D positions.
 
 Broad-phase candidate pairs are filtered before exact shape work:
 
-| Filter | Purpose |
-| --- | --- |
-| Context ownership | Reject colliders from another context. |
-| Same-agent/hierarchy | Suppress host-owned sibling/parent-child collisions. |
-| Runtime mode | Keep 2D, 3D, `Both`, and `Mixed` behavior explicit. |
-| Mobility/awake state | Avoid response work for fully sleeping local partitions. |
-| Layer matrix | Apply context-wide physical collision policy. |
-| Collider-local ignored layers | Apply per-collider physical ignore masks. |
-| Bounds | Reject separated broad colliders before narrow phase. |
-| Duplicate partition routing | Ensure a pair shared by several voxels runs once. |
+| Filter                        | Purpose                                                  |
+| ----------------------------- | -------------------------------------------------------- |
+| Context ownership             | Reject colliders from another context.                   |
+| Same-agent/hierarchy          | Suppress host-owned sibling/parent-child collisions.     |
+| Runtime mode                  | Keep 2D, 3D, `Both`, and `Mixed` behavior explicit.      |
+| Mobility/awake state          | Avoid response work for fully sleeping local partitions. |
+| Layer matrix                  | Apply context-wide physical collision policy.            |
+| Collider-local ignored layers | Apply per-collider physical ignore masks.                |
+| Bounds                        | Reject separated broad colliders before narrow phase.    |
+| Duplicate partition routing   | Ensure a pair shared by several voxels runs once.        |
 
 Public queries do not use collider-local ignored physical layer masks. Query
 include masks are caller-owned; see [Query Services](QUERY_SERVICES.md).
@@ -99,25 +98,26 @@ include masks are caller-owned; see [Query Services](QUERY_SERVICES.md).
 
 Narrow phase owns shape truth. Supported shape coverage includes:
 
-| Domain | Shape families |
-| --- | --- |
-| 3D | sphere, capsule, cuboid, finite cylinder, finite cone, mesh, compound |
-| 2D | circle, capsule, AABB, convex polygon, compound |
-| Mixed | supported 3D shapes against embedded 2D circle/capsule/AABB/polygon/compound slabs |
+| Domain | Shape families                                                                     |
+| ------ | ---------------------------------------------------------------------------------- |
+| 3D     | sphere, capsule, cuboid, finite cylinder, finite cone, mesh, compound              |
+| 2D     | circle, capsule, AABB, convex polygon, compound                                    |
+| Mixed  | supported 3D shapes against embedded 2D circle/capsule/AABB/polygon/compound slabs |
 
 Convex SAT paths use stable axis generation and pair-oriented normals. Cuboid
 versus capsule checks first solve exact segment-to-oriented-box distance for
 rounded features, then use ordered SAT only when the capsule core reaches the
 box; inclusive projections and directional exit depths preserve touching and
-containment semantics. Convex mesh versus capsule checks use the closest capsule-segment point
-to the mesh center for their exterior representative manifold and fall back to
-deterministic BVH traversal with stable contact-ID reduction when contact exists
-away from it. Closed-convex containment instead orients face planes from the
-scaled world-space center of mass and reduces the whole capsule over face and
-edge-cross axes to a matched support-feature exit manifold. Other mesh paths use the same deterministic BVH
-candidate ownership; candidate order follows the stable built tree rather than
-authored triangle indices. Compound paths scan parts in stable declaration order
-and return the owner collider as the public identity.
+containment semantics. Convex mesh versus capsule checks use the closest
+capsule-segment point to the mesh center for their exterior representative
+manifold and fall back to deterministic BVH traversal with stable contact-ID
+reduction when contact exists away from it. Closed-convex containment instead
+orients face planes from the scaled world-space center of mass and reduces the
+whole capsule over face and edge-cross axes to a matched support-feature exit
+manifold. Other mesh paths use the same deterministic BVH candidate ownership;
+candidate order follows the stable built tree rather than authored triangle
+indices. Compound paths scan parts in stable declaration order and return the
+owner collider as the public identity.
 
 For shape state, pair matrices, SAT invariants, mesh policy, and compound
 ownership details, read [Collider Shape Reference](COLLIDER_SHAPE_REFERENCE.md).
@@ -134,15 +134,16 @@ CCD is opt-in per body or through context defaults. The runtime supports:
 - mixed handoffs when `PhysicsRuntimeMode.Mixed` is active.
 
 The CCD reference explains exact reducer paths, conservative proxy boundaries,
-TOI ordering, and service counters: [Continuous Collision Detection](CONTINUOUS_COLLISION_DETECTION.md).
+TOI ordering, and service counters:
+[Continuous Collision Detection](CONTINUOUS_COLLISION_DETECTION.md).
 
 ## Response And Notifications
 
 Non-trigger contacts are solved through deterministic manifold response.
 Bodyless trigger volumes skip physical response and emit trigger notifications
-only when exactly one collider in the pair is a trigger and the other collider is
-body-owned. Both colliders in a valid trigger pair receive enter, stay, and exit
-callbacks.
+only when exactly one collider in the pair is a trigger and the other collider
+is body-owned. Both colliders in a valid trigger pair receive enter, stay, and
+exit callbacks.
 
 3D and 2D response both:
 
@@ -162,13 +163,13 @@ event timing, read [Collision Response](COLLISION_RESPONSE.md).
 
 ## Common Extension Points
 
-| Goal | Start with |
-| --- | --- |
-| Add or improve a shape pair | [Collider Shape Reference](COLLIDER_SHAPE_REFERENCE.md), then shape-pair tests. |
-| Change broad-phase partition behavior | [Collision Broad Phase](COLLISION_BROAD_PHASE.md), then partition/candidate benchmarks. |
-| Change tunneling behavior | [Continuous Collision Detection](CONTINUOUS_COLLISION_DETECTION.md), then CCD replay and stress tests. |
-| Change friction/restitution/contact solve behavior | [Collision Response](COLLISION_RESPONSE.md), then response invariant tests and benchmarks. |
-| Add host-facing query behavior | [Query Services](QUERY_SERVICES.md) and [Query Reference](QUERY_REFERENCE.md). |
+| Goal                                               | Start with                                                                                             |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Add or improve a shape pair                        | [Collider Shape Reference](COLLIDER_SHAPE_REFERENCE.md), then shape-pair tests.                        |
+| Change broad-phase partition behavior              | [Collision Broad Phase](COLLISION_BROAD_PHASE.md), then partition/candidate benchmarks.                |
+| Change tunneling behavior                          | [Continuous Collision Detection](CONTINUOUS_COLLISION_DETECTION.md), then CCD replay and stress tests. |
+| Change friction/restitution/contact solve behavior | [Collision Response](COLLISION_RESPONSE.md), then response invariant tests and benchmarks.             |
+| Add host-facing query behavior                     | [Query Services](QUERY_SERVICES.md) and [Query Reference](QUERY_REFERENCE.md).                         |
 
 ## Rules That Matter
 
@@ -186,14 +187,14 @@ event timing, read [Collision Response](COLLISION_RESPONSE.md).
 
 ## Source Map
 
-| Area | Source |
-| --- | --- |
-| 3D collision service | [`src/Gravitas/Core/3D/GravitasCollisionService.cs`](../../src/Gravitas/Core/3D/GravitasCollisionService.cs) |
-| 3D physics/pairs/response | [`src/Gravitas/Core/3D/GravitasPhysicsService.cs`](../../src/Gravitas/Core/3D/GravitasPhysicsService.cs), [`src/Gravitas/Core/3D/GravitasPhysicsService.Pairs.cs`](../../src/Gravitas/Core/3D/GravitasPhysicsService.Pairs.cs), [`src/Gravitas/Core/3D/GravitasPhysicsService.Response.cs`](../../src/Gravitas/Core/3D/GravitasPhysicsService.Response.cs) |
-| 2D collision service | [`src/Gravitas/Core/2D/GravitasCollision2DService.cs`](../../src/Gravitas/Core/2D/GravitasCollision2DService.cs) |
+| Area                      | Source                                                                                                                                                                                                                                                                                                                                                                 |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 3D collision service      | [`src/Gravitas/Core/3D/GravitasCollisionService.cs`](../../src/Gravitas/Core/3D/GravitasCollisionService.cs)                                                                                                                                                                                                                                                           |
+| 3D physics/pairs/response | [`src/Gravitas/Core/3D/GravitasPhysicsService.cs`](../../src/Gravitas/Core/3D/GravitasPhysicsService.cs), [`src/Gravitas/Core/3D/GravitasPhysicsService.Pairs.cs`](../../src/Gravitas/Core/3D/GravitasPhysicsService.Pairs.cs), [`src/Gravitas/Core/3D/GravitasPhysicsService.Response.cs`](../../src/Gravitas/Core/3D/GravitasPhysicsService.Response.cs)             |
+| 2D collision service      | [`src/Gravitas/Core/2D/GravitasCollision2DService.cs`](../../src/Gravitas/Core/2D/GravitasCollision2DService.cs)                                                                                                                                                                                                                                                       |
 | 2D physics/pairs/response | [`src/Gravitas/Core/2D/GravitasPhysics2DService.cs`](../../src/Gravitas/Core/2D/GravitasPhysics2DService.cs), [`src/Gravitas/Core/2D/GravitasPhysics2DService.Pairs.cs`](../../src/Gravitas/Core/2D/GravitasPhysics2DService.Pairs.cs), [`src/Gravitas/Core/2D/GravitasPhysics2DService.Response.cs`](../../src/Gravitas/Core/2D/GravitasPhysics2DService.Response.cs) |
-| Mixed collision | [`src/Gravitas/Core/Mixed`](../../src/Gravitas/Core/Mixed) |
-| Narrow phase | [`src/Gravitas/CollisionHandling/Detection`](../../src/Gravitas/CollisionHandling/Detection) |
-| Contact data | [`src/Gravitas/CollisionHandling/Contacts`](../../src/Gravitas/CollisionHandling/Contacts) |
-| Response | [`src/Gravitas/CollisionHandling/Response`](../../src/Gravitas/CollisionHandling/Response) |
-| Collision tests | [`tests/Gravitas.Tests/CollisionHandling`](../../tests/Gravitas.Tests/CollisionHandling), [`tests/Gravitas.Tests/Physics2D`](../../tests/Gravitas.Tests/Physics2D), [`tests/Gravitas.Tests/MixedDimensions`](../../tests/Gravitas.Tests/MixedDimensions) |
+| Mixed collision           | [`src/Gravitas/Core/Mixed`](../../src/Gravitas/Core/Mixed)                                                                                                                                                                                                                                                                                                             |
+| Narrow phase              | [`src/Gravitas/CollisionHandling/Detection`](../../src/Gravitas/CollisionHandling/Detection)                                                                                                                                                                                                                                                                           |
+| Contact data              | [`src/Gravitas/CollisionHandling/Contacts`](../../src/Gravitas/CollisionHandling/Contacts)                                                                                                                                                                                                                                                                             |
+| Response                  | [`src/Gravitas/CollisionHandling/Response`](../../src/Gravitas/CollisionHandling/Response)                                                                                                                                                                                                                                                                             |
+| Collision tests           | [`tests/Gravitas.Tests/CollisionHandling`](../../tests/Gravitas.Tests/CollisionHandling), [`tests/Gravitas.Tests/Physics2D`](../../tests/Gravitas.Tests/Physics2D), [`tests/Gravitas.Tests/MixedDimensions`](../../tests/Gravitas.Tests/MixedDimensions)                                                                                                               |

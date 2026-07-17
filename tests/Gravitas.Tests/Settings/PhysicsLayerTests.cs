@@ -5,8 +5,8 @@ using Gravitas.Queries;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
 using GridForge.Configuration;
-using System;
 using SwiftCollections;
+using System;
 using Xunit;
 
 namespace Gravitas.Tests.Settings;

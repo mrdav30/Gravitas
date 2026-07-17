@@ -8,7 +8,6 @@
 using Chronicler;
 using FixedMathSharp;
 using FluentAssertions;
-using Gravitas.CollisionHandling;
 using Gravitas.Tests.Support;
 using Xunit;
 

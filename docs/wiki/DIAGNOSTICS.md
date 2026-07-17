@@ -53,43 +53,43 @@ foreach (GravitasDebugDrawCommand command in context.Diagnostics.DrawCommands)
 context.Diagnostics.Clear();
 ```
 
-`Enable(...)` reserves capacity to avoid resize spikes when expected event counts
-are known. `Clear()` resets captured data and per-frame sequence values while
-keeping allocated buffers. `Disable()` clears and stops capture.
+`Enable(...)` reserves capacity to avoid resize spikes when expected event
+counts are known. `Clear()` resets captured data and per-frame sequence values
+while keeping allocated buffers. `Disable()` clears and stops capture.
 
 ## Event Stream
 
 `GravitasDiagnosticEvent` is a compact generic payload. The common fields are:
 
-| Field | Meaning |
-| --- | --- |
-| `Frame` | Owning context frame count when captured. |
-| `Sequence` | Capture order inside the current buffer. |
-| `Kind` | Event payload type. |
-| `BodyId`, `JointId` | Context-local IDs, or `-1` when not applicable. |
-| `ColliderAId`, `ColliderBId` | Context-local collider IDs, or `-1` when not applicable. |
-| `ColliderADimension`, `ColliderBDimension` | Collider runtime surface: `ThreeD`, `TwoD`, or `None`. |
-| `ColliderAType`, `ColliderBType` | 3D collider shape types when present. |
-| `ColliderA2DType`, `ColliderB2DType` | 2D collider shape types when present. |
-| `Start`, `End` | Query segment, previous/current velocity, or other vector pair. |
-| `PointA`, `PointB` | Contact points, hit point, acceleration delta, or shape-specific point data. |
-| `Vector` | Force, torque, velocity delta, query normal, contact normal, or impulse direction. |
-| `ScalarA`, `ScalarB` | Event-specific fixed-point values. |
-| `DataA`, `DataB` | Event-specific integer values. |
-| `Hit` | Whether the event represents a successful hit/contact. |
+| Field                                      | Meaning                                                                            |
+| ------------------------------------------ | ---------------------------------------------------------------------------------- |
+| `Frame`                                    | Owning context frame count when captured.                                          |
+| `Sequence`                                 | Capture order inside the current buffer.                                           |
+| `Kind`                                     | Event payload type.                                                                |
+| `BodyId`, `JointId`                        | Context-local IDs, or `-1` when not applicable.                                    |
+| `ColliderAId`, `ColliderBId`               | Context-local collider IDs, or `-1` when not applicable.                           |
+| `ColliderADimension`, `ColliderBDimension` | Collider runtime surface: `ThreeD`, `TwoD`, or `None`.                             |
+| `ColliderAType`, `ColliderBType`           | 3D collider shape types when present.                                              |
+| `ColliderA2DType`, `ColliderB2DType`       | 2D collider shape types when present.                                              |
+| `Start`, `End`                             | Query segment, previous/current velocity, or other vector pair.                    |
+| `PointA`, `PointB`                         | Contact points, hit point, acceleration delta, or shape-specific point data.       |
+| `Vector`                                   | Force, torque, velocity delta, query normal, contact normal, or impulse direction. |
+| `ScalarA`, `ScalarB`                       | Event-specific fixed-point values.                                                 |
+| `DataA`, `DataB`                           | Event-specific integer values.                                                     |
+| `Hit`                                      | Whether the event represents a successful hit/contact.                             |
 
 The stream is scoped to one context. Collider, body, and joint IDs are not
 global and must be resolved through the same context that produced the event.
 
 ## Event Families
 
-| Family | Event kinds | Typical use |
-| --- | --- | --- |
-| Body deltas | `ForceDelta`, `TorqueDelta`, `LinearVelocityDelta`, `AngularVelocityDelta` | Inspect force/torque application and response velocity changes. |
-| Queries | `GroundProbe`, `RayQuery`, `CircleQuery`, `MixedQuery`, `QuerySummary` | Inspect hit counts, layer masks, probe shape, reducer quality, and mixed query results. |
-| Contacts and response | `Contact`, `ResponseImpulse`, `MixedContact`, `MixedResponseImpulse`, `MixedResponseIsland` | Inspect manifolds, impulse magnitude, island iteration behavior, and mixed response. |
-| Constraints | `JointRegistered`, `JointRemoved`, `JointImpulse`, `JointLimitReached` | Inspect joint ownership, solve metrics, limits, motors, and collision policy. |
-| Ragdolls | `RagdollActivated` | Inspect activation state, link count, and joint count. |
+| Family                | Event kinds                                                                                 | Typical use                                                                             |
+| --------------------- | ------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Body deltas           | `ForceDelta`, `TorqueDelta`, `LinearVelocityDelta`, `AngularVelocityDelta`                  | Inspect force/torque application and response velocity changes.                         |
+| Queries               | `GroundProbe`, `RayQuery`, `CircleQuery`, `MixedQuery`, `QuerySummary`                      | Inspect hit counts, layer masks, probe shape, reducer quality, and mixed query results. |
+| Contacts and response | `Contact`, `ResponseImpulse`, `MixedContact`, `MixedResponseImpulse`, `MixedResponseIsland` | Inspect manifolds, impulse magnitude, island iteration behavior, and mixed response.    |
+| Constraints           | `JointRegistered`, `JointRemoved`, `JointImpulse`, `JointLimitReached`                      | Inspect joint ownership, solve metrics, limits, motors, and collision policy.           |
+| Ragdolls              | `RagdollActivated`                                                                          | Inspect activation state, link count, and joint count.                                  |
 
 `QuerySummary` reports eligible top-level exact reducer attempts, accepted hits,
 fallback hits, and rejected conservative candidates. Mixed query diagnostics use
@@ -134,25 +134,25 @@ Available views cover the event stream:
 
 `GravitasGroundProbeDiagnosticView` exposes both 3D and 2D probe metadata. Use
 `Mode` for 3D `GroundProbeMode`, `Mode2D` for 2D `GroundProbeMode2D`, and
-dimension/type properties to route shape payloads. 2D probe points are
-stored in the X/Z debug plane: event X is planar X, event Z is planar Y, and
-event Y is zero.
+dimension/type properties to route shape payloads. 2D probe points are stored in
+the X/Z debug plane: event X is planar X, event Z is planar Y, and event Y is
+zero.
 
-The views are read-only wrappers over the event value. Visitors and views do
-not change capture storage, event ordering, diagnostic buffering, or disabled
-path cost. Lower-level `TryAs...` helpers remain available for one-off filters
-over known event kinds.
+The views are read-only wrappers over the event value. Visitors and views do not
+change capture storage, event ordering, diagnostic buffering, or disabled path
+cost. Lower-level `TryAs...` helpers remain available for one-off filters over
+known event kinds.
 
 ## Solver And Query Counters
 
 Some diagnostics are service-local counters instead of event-buffer entries:
 
-| Counter family | Surface |
-| --- | --- |
-| CCD island handoff | `GravitasPhysicsService` and `GravitasPhysics2DService` `LastContinuousCollisionIslandCount`, `LastContinuousCollisionIslandIterationCount`, `LastContinuousCollisionIslandLimitReached` |
-| Body TOI work | `SolidBody.LastContinuousCollisionToiIterationCount`, `LastContinuousCollisionToiIterationLimitReached`, and matching `SolidBody2D` values |
-| Batch queries | `Query2D`, `Query3D`, and `QueryMixed` `LastBatchRequestCount`, `LastBatchHitCount`, `LastBatchCandidateCount` |
-| Mixed batch mesh work | `QueryMixed.LastBatchMeshTriangleCandidateCount` |
+| Counter family        | Surface                                                                                                                                                                                  |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CCD island handoff    | `GravitasPhysicsService` and `GravitasPhysics2DService` `LastContinuousCollisionIslandCount`, `LastContinuousCollisionIslandIterationCount`, `LastContinuousCollisionIslandLimitReached` |
+| Body TOI work         | `SolidBody.LastContinuousCollisionToiIterationCount`, `LastContinuousCollisionToiIterationLimitReached`, and matching `SolidBody2D` values                                               |
+| Batch queries         | `Query2D`, `Query3D`, and `QueryMixed` `LastBatchRequestCount`, `LastBatchHitCount`, `LastBatchCandidateCount`                                                                           |
+| Mixed batch mesh work | `QueryMixed.LastBatchMeshTriangleCandidateCount`                                                                                                                                         |
 
 These counters are deterministic frame-local state for tuning, tests, host
 telemetry, and benchmark triage. They are not serialized replay state.
@@ -169,17 +169,17 @@ views and are measurement state, not extra tuning knobs.
 primitive draw descriptions; hosts translate them into their own debug drawing
 API.
 
-| Kind | Required payload |
-| --- | --- |
-| `Line` | `Start`, `End`, `Color` |
-| `Ray` | `Start`, `End`, `Color` |
-| `Point` | `Center`, `Radius`, `Color` |
-| `WireSphere` | `Center`, `Radius`, `Color` |
-| `WireBox` | `Center`, `Size`, `Rotation`, `Color` |
-| `WireCapsule` | `Center`, `Radius`, `Height`, `Rotation`, `Color` |
+| Kind           | Required payload                                  |
+| -------------- | ------------------------------------------------- |
+| `Line`         | `Start`, `End`, `Color`                           |
+| `Ray`          | `Start`, `End`, `Color`                           |
+| `Point`        | `Center`, `Radius`, `Color`                       |
+| `WireSphere`   | `Center`, `Radius`, `Color`                       |
+| `WireBox`      | `Center`, `Size`, `Rotation`, `Color`             |
+| `WireCapsule`  | `Center`, `Radius`, `Height`, `Rotation`, `Color` |
 | `WireCylinder` | `Center`, `Radius`, `Height`, `Rotation`, `Color` |
-| `WireCone` | `Center`, `Radius`, `Height`, `Rotation`, `Color` |
-| `WireTriangle` | `PointA`, `PointB`, `PointC`, `Color` |
+| `WireCone`     | `Center`, `Radius`, `Height`, `Rotation`, `Color` |
+| `WireTriangle` | `PointA`, `PointB`, `PointC`, `Color`             |
 
 Host renderers can consume draw commands through
 `GravitasDebugDrawCommandVisitor` and
@@ -207,9 +207,9 @@ and polygons as top, bottom, and vertical slab edges. Commands are tagged with
 `GravitasColliderDimension.TwoD`.
 
 `CaptureJoint(Joint3D, ...)` emits anchors, anchor-error line, and active
-angular axes for hinge, cone-twist, and fixed joints. `CaptureJoint(Joint2D,
-...)` emits planar anchors, anchor-error line, and prismatic slider axis where
-applicable.
+angular axes for hinge, cone-twist, and fixed joints.
+`CaptureJoint(Joint2D, ...)` emits planar anchors, anchor-error line, and
+prismatic slider axis where applicable.
 
 ## Performance Rules
 
@@ -233,10 +233,10 @@ applicable.
 
 ## Source Map
 
-| Area | Source |
-| --- | --- |
-| Diagnostic sink | [`src/Gravitas/Diagnostics/GravitasDiagnosticSink.cs`](../../src/Gravitas/Diagnostics/GravitasDiagnosticSink.cs), [`src/Gravitas/Diagnostics/GravitasDiagnosticSink.Draw.cs`](../../src/Gravitas/Diagnostics/GravitasDiagnosticSink.Draw.cs) |
-| Event payloads and views | [`src/Gravitas/Diagnostics/Events`](../../src/Gravitas/Diagnostics/Events) |
-| Debug draw payloads and views | [`src/Gravitas/Diagnostics/DebugDraw`](../../src/Gravitas/Diagnostics/DebugDraw) |
-| Diagnostics tests | [`tests/Gravitas.Tests/Diagnostics`](../../tests/Gravitas.Tests/Diagnostics) |
-| Diagnostics benchmarks | [`tests/Gravitas.Benchmarks/Diagnostics`](../../tests/Gravitas.Benchmarks/Diagnostics) |
+| Area                          | Source                                                                                                                                                                                                                                       |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Diagnostic sink               | [`src/Gravitas/Diagnostics/GravitasDiagnosticSink.cs`](../../src/Gravitas/Diagnostics/GravitasDiagnosticSink.cs), [`src/Gravitas/Diagnostics/GravitasDiagnosticSink.Draw.cs`](../../src/Gravitas/Diagnostics/GravitasDiagnosticSink.Draw.cs) |
+| Event payloads and views      | [`src/Gravitas/Diagnostics/Events`](../../src/Gravitas/Diagnostics/Events)                                                                                                                                                                   |
+| Debug draw payloads and views | [`src/Gravitas/Diagnostics/DebugDraw`](../../src/Gravitas/Diagnostics/DebugDraw)                                                                                                                                                             |
+| Diagnostics tests             | [`tests/Gravitas.Tests/Diagnostics`](../../tests/Gravitas.Tests/Diagnostics)                                                                                                                                                                 |
+| Diagnostics benchmarks        | [`tests/Gravitas.Benchmarks/Diagnostics`](../../tests/Gravitas.Benchmarks/Diagnostics)                                                                                                                                                       |

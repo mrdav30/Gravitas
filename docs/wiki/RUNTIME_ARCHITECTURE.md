@@ -51,30 +51,30 @@ one active `GridWorld` from being attached to multiple live contexts. World
 activity validation, registration, and disposal are serialized under the same
 lock. An owned world's entry remains registered until `GridWorld.Dispose()`
 finishes; a host-owned world's entry is released without disposing the world.
-Hosts must explicitly dispose every context to release its registry entry.
-This registry is process-wide metadata, not simulation state.
+Hosts must explicitly dispose every context to release its registry entry. This
+registry is process-wide metadata, not simulation state.
 
 ## Service Map
 
 Most host code should interact with the context and domain objects. Mutable
 implementation details stay inside services.
 
-| Service | Primary responsibility |
-| --- | --- |
-| `GravitasPhysicsService` | 3D body/collider registration, 3D CCD, 3D pairs, 3D response islands, sleep. |
-| `GravitasConstraint3DService` | Context-local 3D joints, ragdolls, linked-collider filtering, metrics, replay hashing. |
-| `GravitasPhysics2DService` | 2D body/collider registration, 2D CCD, 2D pairs, response islands, grounding, visualization. |
-| `GravitasConstraint2DService` | Context-local 2D joints, ragdolls, linked-collider filtering, metrics, replay hashing. |
-| `GravitasMixedCollisionService` | Dedicated mixed 2D/3D broad phase, pair lifecycle, constrained response, partition cleanup. |
-| `GravitasCollisionService` | GridForge-backed 3D partitions, duplicate suppression, culling, retained partition cleanup. |
-| `GravitasCollision2DService` | GridForge-backed 2D partitions, awake dynamic membership, retained partition cleanup. |
-| `GravitasQuery3DService` | 3D raycasts, swept-sphere and convex-source sweeps, cone volumes, X/Z circle proximity. |
-| `GravitasQuery2DService` | 2D overlaps, segment raycasts, swept-circle queries, hit ordering. |
-| `GravitasQueryMixedService` | Explicit mixed sphere-against-2D and circle-against-3D sweeps. |
-| `GravitasCoroutineService` | Lockstep coroutines and context-bound waits. |
-| `GravitasDiagnosticSink` | Disabled-by-default event and debug draw buffers. |
-| `GravitasLifecycleHooks` | Ordered simulate, late-simulate, visualize, late-visualize, reset, and frame-rate callbacks. |
-| `GravitasReplayHashService` | Fixed-order replay hash contributor over authoritative context/runtime state. |
+| Service                         | Primary responsibility                                                                       |
+| ------------------------------- | -------------------------------------------------------------------------------------------- |
+| `GravitasPhysicsService`        | 3D body/collider registration, 3D CCD, 3D pairs, 3D response islands, sleep.                 |
+| `GravitasConstraint3DService`   | Context-local 3D joints, ragdolls, linked-collider filtering, metrics, replay hashing.       |
+| `GravitasPhysics2DService`      | 2D body/collider registration, 2D CCD, 2D pairs, response islands, grounding, visualization. |
+| `GravitasConstraint2DService`   | Context-local 2D joints, ragdolls, linked-collider filtering, metrics, replay hashing.       |
+| `GravitasMixedCollisionService` | Dedicated mixed 2D/3D broad phase, pair lifecycle, constrained response, partition cleanup.  |
+| `GravitasCollisionService`      | GridForge-backed 3D partitions, duplicate suppression, culling, retained partition cleanup.  |
+| `GravitasCollision2DService`    | GridForge-backed 2D partitions, awake dynamic membership, retained partition cleanup.        |
+| `GravitasQuery3DService`        | 3D raycasts, swept-sphere and convex-source sweeps, cone volumes, X/Z circle proximity.      |
+| `GravitasQuery2DService`        | 2D overlaps, segment raycasts, swept-circle queries, hit ordering.                           |
+| `GravitasQueryMixedService`     | Explicit mixed sphere-against-2D and circle-against-3D sweeps.                               |
+| `GravitasCoroutineService`      | Lockstep coroutines and context-bound waits.                                                 |
+| `GravitasDiagnosticSink`        | Disabled-by-default event and debug draw buffers.                                            |
+| `GravitasLifecycleHooks`        | Ordered simulate, late-simulate, visualize, late-visualize, reset, and frame-rate callbacks. |
+| `GravitasReplayHashService`     | Fixed-order replay hash contributor over authoritative context/runtime state.                |
 
 ## Frame Phases
 
@@ -151,15 +151,14 @@ to the same context as its coroutine. A mismatched instruction faults and ends
 the coroutine rather than mixing context clocks.
 
 Coroutine simulation snapshots the handles present at coroutine-phase entry.
-Coroutines started during coroutine simulation therefore begin on the next
-step, including when a newly started handle reuses a slot vacated later in the
-current coroutine phase. Stopping,
-resetting, deactivating, or disposing the owning context disposes both the
-active yield instruction and its enumerator. Faulted coroutines are removed and
-disposed before the exception is propagated; reset continues cleaning the
-remaining handles if one dispose callback fails. Reentrant simulation and new
-starts are suppressed during reset, and disposed contexts cannot reactivate
-their coroutine service.
+Coroutines started during coroutine simulation therefore begin on the next step,
+including when a newly started handle reuses a slot vacated later in the current
+coroutine phase. Stopping, resetting, deactivating, or disposing the owning
+context disposes both the active yield instruction and its enumerator. Faulted
+coroutines are removed and disposed before the exception is propagated; reset
+continues cleaning the remaining handles if one dispose callback fails.
+Reentrant simulation and new starts are suppressed during reset, and disposed
+contexts cannot reactivate their coroutine service.
 
 ## Registration Model
 
@@ -174,8 +173,8 @@ compacts service iteration. Because IDs are context-local, two different
 contexts can both have collider ID `0`. Lookups must go through the owning
 context's physics service. Replay hashing does not treat reusable bucket IDs as
 authoritative snapshot identity: each hash pass builds canonical live
-registration order and writes dense replay ordinals for collider, hierarchy,
-and pair identity.
+registration order and writes dense replay ordinals for collider, hierarchy, and
+pair identity.
 
 Both 3D and 2D physics services keep compact service-refresh lists for bodyless
 and non-dynamic colliders. Dynamic body buckets refresh dynamic-body colliders,
@@ -184,8 +183,8 @@ change through that ownership path.
 
 3D joints use context-local IDs allocated by `GravitasConstraint3DService`.
 Removing a joint releases solver cache and linked-collider suppression state,
-but does not reuse that joint ID in the same context. 2D joints follow the
-same context-local ownership principle through `GravitasConstraint2DService`.
+but does not reuse that joint ID in the same context. 2D joints follow the same
+context-local ownership principle through `GravitasConstraint2DService`.
 
 `SolidBody(agent, collider)` requires the agent and collider to belong to the
 same context. `CollisionPair.Initialize(...)` rejects colliders from different
@@ -256,14 +255,14 @@ the host's vertical height.
 - contact and trigger events.
 
 Dense mutable groups inside `LSCollider` are split into internal state helpers:
-runtime shape, partition, query, hierarchy, and pair state. 2D colliders use
-the same helper pattern through `LSCollider2D`, with dimensional payloads kept
+runtime shape, partition, query, hierarchy, and pair state. 2D colliders use the
+same helper pattern through `LSCollider2D`, with dimensional payloads kept
 2D-specific.
 
-Dynamic colliders update through their bodies during simulation phases.
-Bodyless 3D and 2D colliders are refreshed from their agent transforms during
-fixed-step partition preparation, so host-authored transform changes are visible
-on the next step. Hosts can still call `collider.Simulate()` when they need an
+Dynamic colliders update through their bodies during simulation phases. Bodyless
+3D and 2D colliders are refreshed from their agent transforms during fixed-step
+partition preparation, so host-authored transform changes are visible on the
+next step. Hosts can still call `collider.Simulate()` when they need an
 immediate bounds and partition refresh before issuing same-frame queries.
 
 ## Serialization And Replay State
@@ -277,13 +276,13 @@ Host bindings, context-local service IDs, partition lists, pair tables, query
 buffers, diagnostic buffers, delegates, and visual interpolation state are not
 snapshot identity.
 
-Replay hashing follows the same boundary: body/collider values are
-authoritative when they affect deterministic continuation. Runtime collider IDs
-remain context-local lookup and pair keys, while replay hashing uses canonical
-live registration order with dense replay ordinals. Deleted ID history,
-free-list ordering, and allocator holes are not authoritative replay identity.
-Retained pair/contact state and active CCD handoffs are hashed by the context
-services that own their ordering.
+Replay hashing follows the same boundary: body/collider values are authoritative
+when they affect deterministic continuation. Runtime collider IDs remain
+context-local lookup and pair keys, while replay hashing uses canonical live
+registration order with dense replay ordinals. Deleted ID history, free-list
+ordering, and allocator holes are not authoritative replay identity. Retained
+pair/contact state and active CCD handoffs are hashed by the context services
+that own their ordering.
 
 Read [Serialization And Replay](SERIALIZATION.md) before changing serialized
 fields, load defaults, or replay tests.
@@ -308,8 +307,8 @@ benchmarks, and clear units.
 
 ## Coroutines And Hooks
 
-`GravitasCoroutineService` runs lockstep coroutines during
-`context.Simulate()`. Supported wait instructions are context-bound:
+`GravitasCoroutineService` runs lockstep coroutines during `context.Simulate()`.
+Supported wait instructions are context-bound:
 
 - `WaitForFrames`
 - `WaitForNextSimulate`
@@ -320,8 +319,8 @@ multi-context safe.
 
 Lifecycle hooks are internal context registrations. Each hook has an owner name
 and order. Hooks are sorted by order, then owner name. Invocation snapshots the
-hook list before callbacks run, keeping iteration stable if a callback
-registers or unregisters another hook.
+hook list before callbacks run, keeping iteration stable if a callback registers
+or unregisters another hook.
 
 ## Runtime Invariants
 
@@ -331,8 +330,8 @@ registers or unregisters another hook.
 - 2D bodies and colliders are simulated by `GravitasPhysics2DService`.
 - 2D/3D contacts are produced only by `GravitasMixedCollisionService` when
   `PhysicsRuntimeMode.Mixed` is active.
-- 2D joints and ragdolls link `SolidBody2D` instances through planar
-  anchors and scalar angles, not projected 3D frames.
+- 2D joints and ragdolls link `SolidBody2D` instances through planar anchors and
+  scalar angles, not projected 3D frames.
 - Partition ownership is through the corresponding collision service.
 - Query services resolve collider IDs through their owning context only.
 - Diagnostic events and draw commands describe one context only.
@@ -341,16 +340,16 @@ registers or unregisters another hook.
 
 ## Source Map
 
-| Area | Source |
-| --- | --- |
-| Context | [`src/Gravitas/Runtime/GravitasWorldContext.cs`](../../src/Gravitas/Runtime/GravitasWorldContext.cs) |
-| Clock | [`src/Gravitas/Runtime/GravitasClock.cs`](../../src/Gravitas/Runtime/GravitasClock.cs) |
+| Area            | Source                                                                                                   |
+| --------------- | -------------------------------------------------------------------------------------------------------- |
+| Context         | [`src/Gravitas/Runtime/GravitasWorldContext.cs`](../../src/Gravitas/Runtime/GravitasWorldContext.cs)     |
+| Clock           | [`src/Gravitas/Runtime/GravitasClock.cs`](../../src/Gravitas/Runtime/GravitasClock.cs)                   |
 | Lifecycle hooks | [`src/Gravitas/Runtime/GravitasLifecycleHooks.cs`](../../src/Gravitas/Runtime/GravitasLifecycleHooks.cs) |
-| 3D body/service | [`src/Gravitas/Core/3D`](../../src/Gravitas/Core/3D) |
-| 2D body/service | [`src/Gravitas/Core/2D`](../../src/Gravitas/Core/2D) |
-| Mixed service | [`src/Gravitas/Core/Mixed`](../../src/Gravitas/Core/Mixed) |
-| Colliders | [`src/Gravitas/Colliders`](../../src/Gravitas/Colliders) |
-| Partitions | [`src/Gravitas/Partitions`](../../src/Gravitas/Partitions) |
-| Queries | [`src/Gravitas/Queries`](../../src/Gravitas/Queries) |
-| Diagnostics | [`src/Gravitas/Diagnostics`](../../src/Gravitas/Diagnostics) |
-| Replay hashing | [`src/Gravitas/Determinism`](../../src/Gravitas/Determinism) |
+| 3D body/service | [`src/Gravitas/Core/3D`](../../src/Gravitas/Core/3D)                                                     |
+| 2D body/service | [`src/Gravitas/Core/2D`](../../src/Gravitas/Core/2D)                                                     |
+| Mixed service   | [`src/Gravitas/Core/Mixed`](../../src/Gravitas/Core/Mixed)                                               |
+| Colliders       | [`src/Gravitas/Colliders`](../../src/Gravitas/Colliders)                                                 |
+| Partitions      | [`src/Gravitas/Partitions`](../../src/Gravitas/Partitions)                                               |
+| Queries         | [`src/Gravitas/Queries`](../../src/Gravitas/Queries)                                                     |
+| Diagnostics     | [`src/Gravitas/Diagnostics`](../../src/Gravitas/Diagnostics)                                             |
+| Replay hashing  | [`src/Gravitas/Determinism`](../../src/Gravitas/Determinism)                                             |

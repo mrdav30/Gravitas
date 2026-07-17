@@ -1,6 +1,6 @@
+using Chronicler;
 using FixedMathSharp;
 using FluentAssertions;
-using Chronicler;
 using Gravitas.Support;
 using System;
 using System.Collections.Generic;

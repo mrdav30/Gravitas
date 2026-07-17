@@ -4,10 +4,10 @@ using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Tests.Support;
+using SwiftCollections;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using SwiftCollections;
 using Xunit;
 
 namespace Gravitas.Tests.CollisionHandlingTests;

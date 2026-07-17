@@ -8,7 +8,6 @@
 using FixedMathSharp;
 using Gravitas.CollisionHandling;
 using SwiftCollections;
-using System;
 using System.Runtime.CompilerServices;
 
 namespace Gravitas.Colliders;

@@ -1,12 +1,23 @@
 # Cone Collider And Query Support Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use
+> superpowers:subagent-driven-development (recommended) or
+> superpowers:executing-plans to implement this plan task-by-task. Steps use
+> checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add a first-class deterministic 3D cone primitive and cone-volume query support without relying on high-triangle mesh approximations.
+**Goal:** Add a first-class deterministic 3D cone primitive and cone-volume
+query support without relying on high-triangle mesh approximations.
 
-**Architecture:** Model the cone as an analytic convex primitive with deterministic support, bounds, mass properties, collision contacts, CCD/query reducers, serialization, diagnostics, and docs. Build cone-volume queries as query primitives over fixed-point cone geometry rather than as temporary mesh colliders.
+**Architecture:** Model the cone as an analytic convex primitive with
+deterministic support, bounds, mass properties, collision contacts, CCD/query
+reducers, serialization, diagnostics, and docs. Build cone-volume queries as
+query primitives over fixed-point cone geometry rather than as temporary mesh
+colliders.
 
-**Tech Stack:** .NET 8, xUnit v3, BenchmarkDotNet for reducer/query cost, FixedMathSharp `Fixed64`/`Vector3d`/`FixedQuaternion`/`Fixed3x3`, SwiftCollections buffers, Gravitas 3D collision/query/CCD/mixed services, Chronicler explicit recording.
+**Tech Stack:** .NET 8, xUnit v3, BenchmarkDotNet for reducer/query cost,
+FixedMathSharp `Fixed64`/`Vector3d`/`FixedQuaternion`/`Fixed3x3`,
+SwiftCollections buffers, Gravitas 3D collision/query/CCD/mixed services,
+Chronicler explicit recording.
 
 ---
 
@@ -24,8 +35,9 @@
   generation.
 - Mixed `SweepCircleAgainst3D` treats vertical finite-cone slabs as exact. When
   the 3D cone is rotated relative to the horizontal mixed slab, the reducer uses
-  a safe whole-cone projection and reports `PhysicsQueryReducerKind.ConservativeFallback`
-  rather than claiming exact slab clipping.
+  a safe whole-cone projection and reports
+  `PhysicsQueryReducerKind.ConservativeFallback` rather than claiming exact slab
+  clipping.
 
 ## Purpose
 
@@ -37,9 +49,9 @@ can provide better bounds, query pruning, mass properties, contact normals, and
 end-user ergonomics.
 
 This plan treats cone support as a serious physics feature. It should not be a
-mesh shortcut with a friendlier constructor. If Gravitas exposes `LSConeCollider`
-or cone queries, the shape needs deterministic fixed-point geometry, stable
-ordering, clear reducer policy, tests, and benchmark evidence.
+mesh shortcut with a friendlier constructor. If Gravitas exposes
+`LSConeCollider` or cone queries, the shape needs deterministic fixed-point
+geometry, stable ordering, clear reducer policy, tests, and benchmark evidence.
 
 ## Current Baseline
 
@@ -53,8 +65,7 @@ ordering, clear reducer policy, tests, and benchmark evidence.
 - Mixed finite-slab reducers include shape-specific support for existing 3D
   primitive target families.
 - Query services expose raycast, swept-sphere, primitive source sweeps, convex
-  mesh source sweeps, compound source sweeps, and X/Z overlap/proximity
-  queries.
+  mesh source sweeps, compound source sweeps, and X/Z overlap/proximity queries.
 - No public cone collider or cone-volume query API exists.
 
 ## Non-Goals
@@ -116,21 +127,22 @@ choose one and document it before tests and reducers are written.
   - transformed axis.
   - shape-derived COM offset direction.
 - [x] Decide and document whether `LSConeCollider` local origin represents the
-  bounding-volume center or another point. Prefer bounding-volume center for
-  consistency with cylinder/capsule bounds, while storing COM offset separately.
+      bounding-volume center or another point. Prefer bounding-volume center for
+      consistency with cylinder/capsule bounds, while storing COM offset
+      separately.
 - [x] Decide cone query input form:
   - `origin + direction + length + endRadius`.
-  - or `center + rotation + radius + height`.
-  Prefer the first for gameplay queries such as directional effects.
+  - or `center + rotation + radius + height`. Prefer the first for gameplay
+    queries such as directional effects.
 - [x] Add `ColliderType.Cone`.
 - [x] Add `ColliderShapeDefinitionKind.Cone`.
 - [x] Add shape-definition tests for radius/height validation and runtime
-  collider materialization.
+      collider materialization.
 - [x] Add `LSConeCollider` skeleton with radius, height, base center, apex,
-  axis, bounds, and support-point methods.
+      axis, bounds, and support-point methods.
 - [x] Add debug draw command/view coverage if cone visualization needs a new
-  diagnostic primitive. Wireframe triangle-fan debug drawing is acceptable for
-  visualization only.
+      diagnostic primitive. Wireframe triangle-fan debug drawing is acceptable
+      for visualization only.
 
 **Done Criteria**
 
@@ -153,13 +165,13 @@ that as a strength rather than hiding it behind a mesh approximation.
   - principal inertia about the cone's local axis.
   - perpendicular principal inertia about the cone COM.
 - [x] Add formula tests using fixed-point expected values and scale
-  relationships.
+      relationships.
 - [x] Implement cone bounds rebuild for rotated cones without underestimating.
 - [x] Implement shape-derived mass properties in `LSConeCollider`.
 - [x] Ensure `SolidBody` receives the cone COM offset and full inertia tensor
-  correctly.
+      correctly.
 - [x] Update `ColliderShapeSnapshot` if cone runtime state needs snapshot
-  coverage.
+      coverage.
 - [x] Add Chronicler recording for cone shape state.
 - [x] Add serialization replay tests for cone colliders.
 
@@ -173,9 +185,9 @@ that as a strength rather than hiding it behind a mesh approximation.
 
 **Problem**
 
-Gameplay often needs a cone query without creating a collider, such as a cone
-of frost or directional sensor. This query should be deterministic, explicit,
-and allocation-conscious.
+Gameplay often needs a cone query without creating a collider, such as a cone of
+frost or directional sensor. This query should be deterministic, explicit, and
+allocation-conscious.
 
 **Tasks**
 
@@ -192,15 +204,15 @@ and allocation-conscious.
 - [x] Add query argument validation:
   - direction must be non-zero.
   - length must be positive.
-  - end radius must be positive or non-negative according to the selected
-    query contract.
+  - end radius must be positive or non-negative according to the selected query
+    contract.
 - [x] Implement broad candidate bounds for finite cone volume.
 - [x] Implement exact or conservative-without-false-negative reducers per target
-  family. Any conservative accepted hit must be explicitly labeled or documented
-  if the public hit type is extended.
+      family. Any conservative accepted hit must be explicitly labeled or
+      documented if the public hit type is extended.
 - [x] Add caller-owned all-hit buffer overloads.
 - [x] Add allocation tests proving repeated cone queries allocate `0` bytes
-  after warmup.
+      after warmup.
 - [x] Add benchmark rows for dense cone-volume queries.
 
 **Done Criteria**
@@ -214,9 +226,9 @@ and allocation-conscious.
 
 **Problem**
 
-Physical cone colliders need stable contacts against existing 3D shapes. This
-is the highest-risk part of the plan because cones combine a curved side, base
-cap, apex, and asymmetric mass properties.
+Physical cone colliders need stable contacts against existing 3D shapes. This is
+the highest-risk part of the plan because cones combine a curved side, base cap,
+apex, and asymmetric mass properties.
 
 **Tasks**
 
@@ -241,11 +253,11 @@ cap, apex, and asymmetric mass properties.
   - reusable deterministic convex-support contact generation for convex
     primitives, with cone as the first new consumer.
 - [x] Choose the route that gives better deterministic contact quality and
-  maintainable shape expansion.
+      maintainable shape expansion.
 - [x] Implement the chosen narrow-phase path without adding runtime mesh
-  approximation.
+      approximation.
 - [x] Ensure contact generation produces stable manifold ordering for response
-  and warm start.
+      and warm start.
 - [x] Add regression tests proving existing non-cone shape pairs are unchanged.
 
 **Done Criteria**
@@ -272,16 +284,16 @@ other convex primitives.
   - cone source against convex mesh.
   - cone source against compound.
 - [x] Add cone target tests for swept sphere and supported primitive source
-  sweeps.
+      sweeps.
 - [x] Add CCD tests for dynamic cone movers and cone targets.
 - [x] Add rotational CCD tests for fast-spinning cone edge/apex cases where
-  existing rotational bounds need cone participation.
+      existing rotational bounds need cone participation.
 - [x] Extend mixed finite-slab reducers for cone targets in
-  `SweepCircleAgainst3D` and mixed collision where the cone is a 3D participant.
-- [x] Add mixed CCD tests for 3D cone bodies interacting with embedded 2D
-  slabs.
+      `SweepCircleAgainst3D` and mixed collision where the cone is a 3D
+      participant.
+- [x] Add mixed CCD tests for 3D cone bodies interacting with embedded 2D slabs.
 - [x] Add benchmark rows if cone support mapping or mixed reducers show dense
-  candidate cost.
+      candidate cost.
 
 **Done Criteria**
 
@@ -301,13 +313,13 @@ mode, and diagnostics. The docs need to make that surface easy to understand.
 
 - [x] Update `docs/wiki/DIMENSIONS.md` with cone shape support.
 - [x] Update `docs/wiki/COLLISION_PIPELINE.md` with cone contact and CCD policy.
-- [x] Update `docs/wiki/QUERY_SERVICES.md` with cone-volume query and cone
-  sweep coverage.
+- [x] Update `docs/wiki/QUERY_SERVICES.md` with cone-volume query and cone sweep
+      coverage.
 - [x] Update `docs/wiki/SERIALIZATION.md` with cone shape state.
 - [x] Update `docs/wiki/DIAGNOSTICS.md` and diagnostic adapters if cone debug
-  draw support is added.
+      draw support is added.
 - [x] Add benchmark selections for cone volume queries and cone collision
-  scaling where measured value exists.
+      scaling where measured value exists.
 - [x] Run:
   - `dotnet build Gravitas.slnx --configuration Release`
   - `dotnet test Gravitas.slnx --configuration Release`
@@ -323,8 +335,8 @@ mode, and diagnostics. The docs need to make that surface easy to understand.
 
 ## Final Done Criteria
 
-- `LSConeCollider` is a first-class 3D primitive across mass properties,
-  bounds, serialization, collision, query, CCD, mixed mode, and docs.
+- `LSConeCollider` is a first-class 3D primitive across mass properties, bounds,
+  serialization, collision, query, CCD, mixed mode, and docs.
 - Cone-volume queries support gameplay-style directional effects without
   requiring temporary collider creation.
 - Runtime cone behavior is analytic, deterministic, and benchmark-informed.

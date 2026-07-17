@@ -6,13 +6,26 @@
 
 ---
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use
+> superpowers:subagent-driven-development (recommended) or
+> superpowers:executing-plans to implement this plan task-by-task. Steps use
+> checkbox (`- [x]`) syntax for tracking.
 
-**Goal:** Replace Gravitas-local generic replay hash infrastructure with Chronicler and FixedMathSharp.Chronicler APIs while preserving Gravitas-owned replay inclusion policy, deterministic ordering, and no-allocation steady-state behavior.
+**Goal:** Replace Gravitas-local generic replay hash infrastructure with
+Chronicler and FixedMathSharp.Chronicler APIs while preserving Gravitas-owned
+replay inclusion policy, deterministic ordering, and no-allocation steady-state
+behavior.
 
-**Architecture:** Use `Chronicler.ChronicleHash` and `Chronicler.ChronicleHashWriter` as the generic hash value/writer, use `FixedMathSharp.Chronicler` extension methods for fixed-point math primitives, and keep Gravitas-specific contributors for physics-domain ordering and inclusion modes. Remove duplicate local hash primitives instead of carrying compatibility aliases before the first public release.
+**Architecture:** Use `Chronicler.ChronicleHash` and
+`Chronicler.ChronicleHashWriter` as the generic hash value/writer, use
+`FixedMathSharp.Chronicler` extension methods for fixed-point math primitives,
+and keep Gravitas-specific contributors for physics-domain ordering and
+inclusion modes. Remove duplicate local hash primitives instead of carrying
+compatibility aliases before the first public release.
 
-**Tech Stack:** .NET 8, xUnit v3, BenchmarkDotNet, Chronicler.Core `0.3.x`, FixedMathSharp.Chronicler `6.x`, FixedMathSharp v6, SwiftCollections, GridForge, Gravitas replay/conformance harness.
+**Tech Stack:** .NET 8, xUnit v3, BenchmarkDotNet, Chronicler.Core `0.3.x`,
+FixedMathSharp.Chronicler `6.x`, FixedMathSharp v6, SwiftCollections, GridForge,
+Gravitas replay/conformance harness.
 
 ## Purpose
 
@@ -38,22 +51,19 @@ This plan was extracted from:
 
 ## Current Baseline
 
-- `GravitasWorldContext.ComputeReplayHash(...)` returns
-  `GravitasReplayHash`.
+- `GravitasWorldContext.ComputeReplayHash(...)` returns `GravitasReplayHash`.
 - `src/Gravitas/Determinism/GravitasReplayHash.cs` duplicates
   `Chronicler.ChronicleHash`.
 - `src/Gravitas/Determinism/GravitasReplayHashWriter.cs` duplicates
-  `Chronicler.ChronicleHashWriter` plus FixedMathSharp primitive writer
-  methods.
+  `Chronicler.ChronicleHashWriter` plus FixedMathSharp primitive writer methods.
 - `GravitasReplayHashMode` is real Gravitas policy and should stay.
 - `ContributeReplayHash(...)` partials manually walk context-owned services,
   bodies, colliders, pairs, constraints, warm-start caches, and mixed state in
   deterministic order.
 - `src/Gravitas/Gravitas.csproj` references `Chronicler.Core`, but does not yet
   reference `FixedMathSharp.Chronicler`.
-- Existing determinism tests cover repeated 3D, pure 2D, mixed, CCD,
-  Chronicler restore continuation, query-cache exclusion, and no-allocation
-  replay hashing.
+- Existing determinism tests cover repeated 3D, pure 2D, mixed, CCD, Chronicler
+  restore continuation, query-cache exclusion, and no-allocation replay hashing.
 
 ## Non-Goals
 
@@ -65,8 +75,8 @@ This plan was extracted from:
 - Do not hash JSON, MemoryPack, or serialized byte payloads as the authoritative
   replay signal.
 - Do not preserve `GravitasReplayHash` or `GravitasReplayHashWriter` as public
-  compatibility aliases unless implementation discovers a strong reason. This
-  is pre-public-release cleanup.
+  compatibility aliases unless implementation discovers a strong reason. This is
+  pre-public-release cleanup.
 - Do not introduce reflection, LINQ, iterator allocations, unordered collection
   traversal, culture formatting, wall-clock state, or runtime object identity.
 - Do not accept allocation regressions in warmed replay-hash paths.
@@ -127,8 +137,8 @@ internal static class GravitasChronicleHashWriterExtensions
 }
 ```
 
-The final helper may include material or shape-policy writers only if it
-removes real duplication from existing contributors.
+The final helper may include material or shape-policy writers only if it removes
+real duplication from existing contributors.
 
 ## Workstream 1: Dependency Surface And Baseline Evidence
 
@@ -209,8 +219,7 @@ muddy the public API and force unnecessary conversions.
       `ComputeReplayHash(...)`.
 - [x] Change `GravitasWorldContext.ComputeReplayHash(...)` to return
       `ChronicleHash`.
-- [x] Change `GravitasReplayHashService.Compute(...)` to return
-      `ChronicleHash`.
+- [x] Change `GravitasReplayHashService.Compute(...)` to return `ChronicleHash`.
 - [x] Delete `GravitasReplayHash.cs` if no strong domain-wrapper need appears.
 - [x] Update replay conformance helpers and tests from `GravitasReplayHash` to
       `ChronicleHash`.
@@ -246,12 +255,10 @@ physics-domain writer extensions.
 
 **Tasks**
 
-- [x] Replace `new GravitasReplayHashWriter()` with
-      `new ChronicleHashWriter()`.
+- [x] Replace `new GravitasReplayHashWriter()` with `new ChronicleHashWriter()`.
 - [x] Add `using Chronicler;` where contributors need the writer or hash value.
-- [x] Add `using FixedMathSharp.Chronicler;` where contributors write
-      `Fixed64`, vectors, quaternions, transforms, matrices, bounds, rays, or
-      planes.
+- [x] Add `using FixedMathSharp.Chronicler;` where contributors write `Fixed64`,
+      vectors, quaternions, transforms, matrices, bounds, rays, or planes.
 - [x] Move `WritePhysicsLayer(...)` and `WritePhysicsLayerMask(...)` into a
       Gravitas-owned extension helper over `ChronicleHashWriter`.
 - [x] Replace local writer fixed-math calls with FixedMathSharp.Chronicler
@@ -303,8 +310,8 @@ where it preserves the existing replay signal and allocation profile.
 
 **Tasks**
 
-- [x] Pick one representative simple Gravitas `IRecordable` state shell, such
-      as `PhysicsSettings` or `PhysicsEnvironment`, and compare:
+- [x] Pick one representative simple Gravitas `IRecordable` state shell, such as
+      `PhysicsSettings` or `PhysicsEnvironment`, and compare:
   - current manual contributor hash payload.
   - `ChronicleHashSerializer.Contribute(...)` payload.
 - [x] Add a regression test that documents whether the chosen shell can safely
@@ -314,9 +321,9 @@ where it preserves the existing replay signal and allocation profile.
 - [x] If serializer contribution adds unwanted field-name/type/schema payload or
       allocates, keep manual contributors and document the no-change decision in
       completion notes.
-- [x] Do not route service-owned ordered collections, collider tables,
-      collision pairs, warm-start caches, constraint islands, or mixed contact
-      state through generic `IRecordable` traversal.
+- [x] Do not route service-owned ordered collections, collider tables, collision
+      pairs, warm-start caches, constraint islands, or mixed contact state
+      through generic `IRecordable` traversal.
 - [x] Run the replay allocation test after any serializer adoption:
 
 ```bash
@@ -335,8 +342,8 @@ dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release -
 **Problem**
 
 The migration changes public replay hash type names and lower-stack ownership.
-Docs, tests, and benchmark guardrails must prove the new public surface is
-clear and performance-neutral.
+Docs, tests, and benchmark guardrails must prove the new public surface is clear
+and performance-neutral.
 
 **Files**
 
@@ -397,8 +404,8 @@ dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll repl
   hash mechanics.
 - Gravitas keeps only physics-domain replay inclusion policy and domain writer
   helpers.
-- Local `GravitasReplayHash` and `GravitasReplayHashWriter` are removed unless
-  a documented implementation finding justifies keeping a wrapper.
+- Local `GravitasReplayHash` and `GravitasReplayHashWriter` are removed unless a
+  documented implementation finding justifies keeping a wrapper.
 - Determinism tests pass across 3D, pure 2D, mixed, CCD, query-cache mutation,
   and Chronicler restore continuation scenarios.
 - Release and ReleaseLean validation pass.
@@ -411,21 +418,20 @@ Completed 2026-07-02.
 - Public replay hashes now use `Chronicler.ChronicleHash` directly from
   `GravitasWorldContext.ComputeReplayHash(...)`,
   `GravitasReplayHashService.Compute(...)`, replay tests, and replay-hash
-  benchmarks. `GravitasReplayHashMode` remains in Gravitas as the
-  physics-domain inclusion policy.
+  benchmarks. `GravitasReplayHashMode` remains in Gravitas as the physics-domain
+  inclusion policy.
 - Deleted the duplicate local generic hash value and writer:
   `src/Gravitas/Determinism/GravitasReplayHash.cs` and
   `src/Gravitas/Determinism/GravitasReplayHashWriter.cs`.
-- Added `src/Gravitas/Determinism/GravitasChronicleHashWriterExtensions.cs`
-  for the only Gravitas-owned writer helpers: `PhysicsLayer` and
-  `PhysicsLayerMask`.
+- Added `src/Gravitas/Determinism/GravitasChronicleHashWriterExtensions.cs` for
+  the only Gravitas-owned writer helpers: `PhysicsLayer` and `PhysicsLayerMask`.
 - Replay contributors now write into `ChronicleHashWriter` and use
   `FixedMathSharp.Chronicler` extension methods for `Fixed64`, vectors,
   quaternions, matrices, and related fixed math payloads.
 - `ChronicleHashSerializer.Contribute(...)` was evaluated but not adopted for
   runtime replay contributors. The representative `RagdollRuntime3D` guardrail
-  test documents why: its `IRecordable` payload only transfers activation
-  state, while the replay signal must also include service-owned ragdoll ID,
+  test documents why: its `IRecordable` payload only transfers activation state,
+  while the replay signal must also include service-owned ragdoll ID,
   self-collision policy, link count, and joint count. The same boundary applies
   more strongly to bodies, colliders, service tables, collision pairs,
   warm-start caches, constraint islands, and mixed contact state.
@@ -442,8 +448,8 @@ Validation:
   `dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll replay-hash --filter "*" -j Short -i --exporters json`
   completed 10 rows; baseline artifacts were copied under
   `BenchmarkDotNet.Artifacts/results/chronicler-replay-hash-baseline`.
-- Focused red check after test migration failed with the expected compile
-  errors because production still returned `GravitasReplayHash`.
+- Focused red check after test migration failed with the expected compile errors
+  because production still returned `GravitasReplayHash`.
 - Focused replay/material tests after migration passed 26 tests.
 - `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter Determinism`
   passed 15 tests after the duplicate fixed-math writer assertion was removed
@@ -459,18 +465,18 @@ Validation:
 
 Benchmark comparison, baseline to post-migration:
 
-| Row | Baseline | Current | Allocation notes |
-| --- | ---: | ---: | --- |
-| `replay-hash-3d-sparse`, 64 | 302.6 us | 316.8 us | unchanged, 0 B |
-| `replay-hash-3d-dense`, 64 | 216.5 us | 227.7 us | unchanged, 0 B |
-| `replay-hash-2d-sparse`, 64 | 123.2 us | 129.3 us | unchanged, 0 B |
-| `replay-hash-mixed`, 64 | 123.8 us | 127.4 us | unchanged, 0 B |
-| `replay-hash-with-solver-caches`, 64 | 303.3 us | 323.8 us | unchanged, 0 B |
-| `replay-hash-3d-sparse`, 256 | 1,372.7 us | 1,471.9 us | unchanged 1 B BDN artifact |
-| `replay-hash-3d-dense`, 256 | 923.3 us | 955.1 us | unchanged, 0 B |
-| `replay-hash-2d-sparse`, 256 | 526.4 us | 547.4 us | 1 B baseline artifact did not repeat |
-| `replay-hash-mixed`, 256 | 581.2 us | 575.0 us | current 1 B BDN artifact |
-| `replay-hash-with-solver-caches`, 256 | 1,277.9 us | 1,333.9 us | unchanged 1 B BDN artifact |
+| Row                                   |   Baseline |    Current | Allocation notes                     |
+| ------------------------------------- | ---------: | ---------: | ------------------------------------ |
+| `replay-hash-3d-sparse`, 64           |   302.6 us |   316.8 us | unchanged, 0 B                       |
+| `replay-hash-3d-dense`, 64            |   216.5 us |   227.7 us | unchanged, 0 B                       |
+| `replay-hash-2d-sparse`, 64           |   123.2 us |   129.3 us | unchanged, 0 B                       |
+| `replay-hash-mixed`, 64               |   123.8 us |   127.4 us | unchanged, 0 B                       |
+| `replay-hash-with-solver-caches`, 64  |   303.3 us |   323.8 us | unchanged, 0 B                       |
+| `replay-hash-3d-sparse`, 256          | 1,372.7 us | 1,471.9 us | unchanged 1 B BDN artifact           |
+| `replay-hash-3d-dense`, 256           |   923.3 us |   955.1 us | unchanged, 0 B                       |
+| `replay-hash-2d-sparse`, 256          |   526.4 us |   547.4 us | 1 B baseline artifact did not repeat |
+| `replay-hash-mixed`, 256              |   581.2 us |   575.0 us | current 1 B BDN artifact             |
+| `replay-hash-with-solver-caches`, 256 | 1,277.9 us | 1,333.9 us | unchanged 1 B BDN artifact           |
 
 The current ShortRun timing is modestly slower in most rows but still within the
 expected noise band for a structural writer ownership migration, and the

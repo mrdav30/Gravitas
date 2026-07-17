@@ -95,15 +95,15 @@ Tuning decision:
 
 - No new public `JointStabilization3D` or `JointSolverTuning3D` API was added.
   The stress evidence did not justify a broader stiffness/compliance surface.
-  Current release-scope tuning remains `PhysicsSettings.DiscreteSolverIterations`
-  plus explicit `JointMotor3D` drive strength, damping, and maximum impulse.
-  The new metrics provide the evidence path for future tuning if measured
-  instability appears.
+  Current release-scope tuning remains
+  `PhysicsSettings.DiscreteSolverIterations` plus explicit `JointMotor3D` drive
+  strength, damping, and maximum impulse. The new metrics provide the evidence
+  path for future tuning if measured instability appears.
 
 Benchmark smoke:
 
-- Dry `Constraint3DBenchmarks` smoke at `LinkCount=32` completed with no
-  managed allocations reported:
+- Dry `Constraint3DBenchmarks` smoke at `LinkCount=32` completed with no managed
+  allocations reported:
   - `SimulateLongConstraintChain`: 4.518 ms.
   - `SimulateHumanoidRagdollResting`: 1.808 ms.
   - `SimulateContactHeavyRagdollStack`: 5.071 ms.
@@ -135,10 +135,10 @@ architecture, but it improved the release quality bar in four practical ways:
   error path could feed slightly out-of-range fixed-point quaternion values into
   `Acos`; the solver now uses a safe deterministic quaternion-log path with
   explicit clamping and a named vector epsilon.
-- Warmed runtime allocation behavior improved. The pass found first-non-empty
-  3D body query buffers in CCD/grounding paths that could allocate during
-  warmed simulation. Those buffers are pre-sized now, which benefits ordinary
-  body simulation beyond the constraint tests.
+- Warmed runtime allocation behavior improved. The pass found first-non-empty 3D
+  body query buffers in CCD/grounding paths that could allocate during warmed
+  simulation. Those buffers are pre-sized now, which benefits ordinary body
+  simulation beyond the constraint tests.
 - Benchmark signal improved. The old constraint benchmark mostly measured a
   simple chain plus activation toggling. The suite now separates long chains,
   resting ragdolls, contact-heavy ragdoll stacks, motor-driven chains,

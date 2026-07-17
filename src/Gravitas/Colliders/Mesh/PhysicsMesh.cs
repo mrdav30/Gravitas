@@ -7,7 +7,6 @@
 
 using FixedMathSharp;
 using FixedMathSharp.Bounds;
-using Gravitas.CollisionHandling;
 using SwiftCollections;
 using SwiftCollections.Query;
 using System;

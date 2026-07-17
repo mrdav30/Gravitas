@@ -1,12 +1,25 @@
 # Restitution Gravity And Grounded State Hardening Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use
+> superpowers:subagent-driven-development (recommended) or
+> superpowers:executing-plans to implement this plan task-by-task. Steps use
+> checkbox (`- [x]`) syntax for tracking.
 
-**Goal:** Replace hardcoded bounce cutoffs and coarse gravity/grounded-state body hooks with explicit deterministic settings that apply consistently across 3D, pure 2D, mixed response, and CCD.
+**Goal:** Replace hardcoded bounce cutoffs and coarse gravity/grounded-state
+body hooks with explicit deterministic settings that apply consistently across
+3D, pure 2D, mixed response, and CCD.
 
-**Architecture:** Move the restitution velocity threshold into `PhysicsSettings`, route discrete and continuous response through context-owned configuration, add body-level gravity scaling instead of duplicate ignore flags, and expose previous-frame grounded state where grounding is authoritative. Keep these changes small and mechanically verifiable before broader 2D grounding work lands.
+**Architecture:** Move the restitution velocity threshold into
+`PhysicsSettings`, route discrete and continuous response through context-owned
+configuration, add body-level gravity scaling instead of duplicate ignore flags,
+and expose previous-frame grounded state where grounding is authoritative. Keep
+these changes small and mechanically verifiable before broader 2D grounding work
+lands.
 
-**Tech Stack:** .NET 8, xUnit v3, FixedMathSharp `Fixed64`/`Vector2d`/`Vector3d`, Gravitas collision response services, Chronicler explicit state recording, MemoryPack-compatible settings serialization.
+**Tech Stack:** .NET 8, xUnit v3, FixedMathSharp
+`Fixed64`/`Vector2d`/`Vector3d`, Gravitas collision response services,
+Chronicler explicit state recording, MemoryPack-compatible settings
+serialization.
 
 ---
 
@@ -45,8 +58,8 @@ axis freeze work is captured separately.
   `src/Gravitas/Core/3D/SolidBody.ContinuousCollision.Dynamic.cs` reads the 3D
   static threshold.
 - Pure 2D dynamic CCD restitution in
-  `src/Gravitas/Core/2D/SolidBody2D.ContinuousCollision.Dynamic.cs` reads the
-  2D static threshold.
+  `src/Gravitas/Core/2D/SolidBody2D.ContinuousCollision.Dynamic.cs` reads the 2D
+  static threshold.
 - `PhysicsSettings` owns other solver-level tunables such as
   `DiscreteSolverIterations`, `ContinuousCollisionMaxToiIterations`, and
   `Mixed2DHalfThickness`.
@@ -114,24 +127,25 @@ share one deterministic policy.
 **Tasks**
 
 - [x] Add a failing settings test in
-  `tests/Gravitas.Tests/Settings/PhysicsSettingsTests.cs` or the nearest
-  existing settings test file:
+      `tests/Gravitas.Tests/Settings/PhysicsSettingsTests.cs` or the nearest
+      existing settings test file:
   - default threshold equals `(Fixed64)0.25`.
   - setting a positive threshold stores the value.
   - setting zero is allowed and means every positive closing speed can bounce.
   - setting a negative threshold throws.
 - [x] Add `public static readonly Fixed64 DefaultRestitutionVelocityThreshold`
-  to `src/Gravitas/Settings/PhysicsSettings.cs`.
+      to `src/Gravitas/Settings/PhysicsSettings.cs`.
 - [x] Add a private backing field and public property:
-  `public Fixed64 RestitutionVelocityThreshold`.
-- [x] Validate with `SwiftThrowHelper.ThrowIfArgument(value < Fixed64.Zero, ...)`.
+      `public Fixed64 RestitutionVelocityThreshold`.
+- [x] Validate with
+      `SwiftThrowHelper.ThrowIfArgument(value < Fixed64.Zero, ...)`.
 - [x] Add `Fixed64? RestitutionVelocityThreshold` to
-  `src/Gravitas/Settings/PhysicsSettingsSaver.cs`.
+      `src/Gravitas/Settings/PhysicsSettingsSaver.cs`.
 - [x] Update `CreateSettings()` so saved values apply after construction.
-- [x] Add JSON and MemoryPack serialization coverage for the new settings
-  field using the existing settings serialization tests.
+- [x] Add JSON and MemoryPack serialization coverage for the new settings field
+      using the existing settings serialization tests.
 - [x] Run focused settings tests:
-  `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter PhysicsSettings`
+      `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter PhysicsSettings`
 
 **Done Criteria**
 
@@ -149,27 +163,27 @@ Every response path should use the same context setting.
 **Tasks**
 
 - [x] Add focused 3D response tests in
-  `tests/Gravitas.Tests/CollisionHandling/CollisionResponseInvariantTests.cs`:
+      `tests/Gravitas.Tests/CollisionHandling/CollisionResponseInvariantTests.cs`:
   - closing speed below the configured threshold produces no restitution bounce.
   - closing speed above the configured threshold applies restitution.
   - changing `context.Settings.RestitutionVelocityThreshold` changes the result.
 - [x] Add pure 2D manifold response tests in
-  `tests/Gravitas.Tests/CollisionHandling/CollisionResponse2DManifoldTests.cs`
-  or the nearest response file with the same three assertions.
+      `tests/Gravitas.Tests/CollisionHandling/CollisionResponse2DManifoldTests.cs`
+      or the nearest response file with the same three assertions.
 - [x] Add mixed response tests in
-  `tests/Gravitas.Tests/MixedDimensions/MixedResponseTests.cs` with the same
-  three assertions.
+      `tests/Gravitas.Tests/MixedDimensions/MixedResponseTests.cs` with the same
+      three assertions.
 - [x] Thread `PhysicsSettings.RestitutionVelocityThreshold` into the 3D response
-  calculation through the existing pair, island, or context call path.
+      calculation through the existing pair, island, or context call path.
 - [x] Thread the same setting into pure 2D response without adding per-contact
-  allocations.
+      allocations.
 - [x] Thread the same setting into mixed response.
 - [x] Remove `CollisionResponse.RestitutionVelocityThreshold`,
-  `CollisionResponse2D.RestitutionVelocityThreshold`, and
-  `CollisionResponseMixed.RestitutionVelocityThreshold` once no call sites need
-  them.
+      `CollisionResponse2D.RestitutionVelocityThreshold`, and
+      `CollisionResponseMixed.RestitutionVelocityThreshold` once no call sites
+      need them.
 - [x] Run focused response tests:
-  `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter CollisionResponse`
+      `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter CollisionResponse`
 
 **Done Criteria**
 
@@ -189,25 +203,25 @@ updated at the same time.
 **Tasks**
 
 - [x] Add 3D CCD tests in
-  `tests/Gravitas.Tests/CollisionHandling/ContinuousCollisionDetectionTests.cs`
-  proving the configured threshold controls bounce after TOI resolution.
+      `tests/Gravitas.Tests/CollisionHandling/ContinuousCollisionDetectionTests.cs`
+      proving the configured threshold controls bounce after TOI resolution.
 - [x] Add pure 2D CCD tests in
-  `tests/Gravitas.Tests/Physics2D/ContinuousCollision2DTests.cs` proving the
-  configured threshold controls bounce after TOI resolution.
+      `tests/Gravitas.Tests/Physics2D/ContinuousCollision2DTests.cs` proving the
+      configured threshold controls bounce after TOI resolution.
 - [x] Add mixed CCD tests only if the mixed dynamic path applies restitution in
-  the current implementation; otherwise document the non-use in the test name
-  that verifies no stale static threshold remains.
+      the current implementation; otherwise document the non-use in the test
+      name that verifies no stale static threshold remains.
 - [x] Replace static threshold reads in
-  `src/Gravitas/Core/3D/SolidBody.ContinuousCollision.Dynamic.cs` with the
-  context setting.
+      `src/Gravitas/Core/3D/SolidBody.ContinuousCollision.Dynamic.cs` with the
+      context setting.
 - [x] Replace static threshold reads in
-  `src/Gravitas/Core/2D/SolidBody2D.ContinuousCollision.Dynamic.cs` with the
-  context setting.
+      `src/Gravitas/Core/2D/SolidBody2D.ContinuousCollision.Dynamic.cs` with the
+      context setting.
 - [x] Search with
-  `rg -n "RestitutionVelocityThreshold" src/Gravitas tests/Gravitas.Tests`
-  and ensure remaining references are settings, tests, or docs.
+      `rg -n "RestitutionVelocityThreshold" src/Gravitas tests/Gravitas.Tests`
+      and ensure remaining references are settings, tests, or docs.
 - [x] Run focused CCD tests:
-  `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter ContinuousCollision`
+      `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release --filter ContinuousCollision`
 
 **Done Criteria**
 
@@ -227,34 +241,34 @@ positive values cover common gameplay tuning.
 **Tasks**
 
 - [x] Add 3D integration tests in
-  `tests/Gravitas.Tests/Core/SolidBodyIntegrationTests.cs`:
+      `tests/Gravitas.Tests/Core/SolidBodyIntegrationTests.cs`:
   - default `GravityScale` preserves current gravity behavior.
   - `GravityScale = Fixed64.Zero` prevents environment gravity from changing
     velocity.
   - `GravityScale = Fixed64.Half` applies half gravity.
   - negative values throw.
 - [x] Add pure 2D integration tests in
-  `tests/Gravitas.Tests/Physics2D/Physics2DSimulationTests.cs` or
-  `tests/Gravitas.Tests/Core/SolidBody2DAngularDynamicsTests.cs`:
+      `tests/Gravitas.Tests/Physics2D/Physics2DSimulationTests.cs` or
+      `tests/Gravitas.Tests/Core/SolidBody2DAngularDynamicsTests.cs`:
   - default scale preserves current per-body `Gravity`.
   - zero scale prevents planar gravity from changing velocity.
   - half scale applies half planar gravity.
   - negative values throw.
 - [x] Add `GravityScale` to `src/Gravitas/Core/3D/SolidBody.cs` with
-  `Fixed64.One` default and negative-value validation.
+      `Fixed64.One` default and negative-value validation.
 - [x] Apply `GravityScale` in 3D integration in
-  `src/Gravitas/Core/3D/SolidBody.Motion.cs`.
+      `src/Gravitas/Core/3D/SolidBody.Motion.cs`.
 - [x] Apply `GravityScale` in 3D CCD prediction in
-  `src/Gravitas/Core/3D/SolidBody.ContinuousCollision.cs`.
+      `src/Gravitas/Core/3D/SolidBody.ContinuousCollision.cs`.
 - [x] Add `GravityScale` to `src/Gravitas/Core/2D/SolidBody2D.cs` with the same
-  validation.
+      validation.
 - [x] Apply `GravityScale` in pure 2D integration and CCD prediction.
 - [x] Record `GravityScale` in `SolidBody.Serialization.cs` and
-  `SolidBody2D.Serialization.cs`.
+      `SolidBody2D.Serialization.cs`.
 - [x] Add serialization tests proving save/populate preserves the scale for both
-  body types.
+      body types.
 - [x] Update docs in `docs/wiki/HOST_INTEGRATION.md`,
-  `docs/wiki/RUNTIME_ARCHITECTURE.md`, and `docs/wiki/SERIALIZATION.md`.
+      `docs/wiki/RUNTIME_ARCHITECTURE.md`, and `docs/wiki/SERIALIZATION.md`.
 
 **Done Criteria**
 
@@ -274,26 +288,27 @@ behavior, and the planned pure 2D grounding model.
 **Tasks**
 
 - [x] Add 3D grounding tests in
-  `tests/Gravitas.Tests/Core/SolidBodyGroundingTests.cs` or the nearest
-  grounding test file:
+      `tests/Gravitas.Tests/Core/SolidBodyGroundingTests.cs` or the nearest
+      grounding test file:
   - `WasGrounded` is false before the first successful ground check.
   - `WasGrounded` is true on the frame after a grounded check succeeds.
   - `WasGrounded` remains true for the authoritative step where the body loses
     support and `IsGrounded` becomes false.
   - manual grounding updates `WasGrounded` deterministically.
 - [x] Add `public bool WasGrounded { get; private set; }` to the 3D grounding
-  partial.
+      partial.
 - [x] Update `WasGrounded` exactly once per authoritative grounding refresh
-  before changing `IsGrounded`.
+      before changing `IsGrounded`.
 - [x] Ensure disabled grounding clears `IsGrounded` while preserving the
-  previous value long enough for the current step's transition to be observable.
+      previous value long enough for the current step's transition to be
+      observable.
 - [x] Decide whether `WasGrounded` must be serialized for deterministic
-  continuation. If landing/leave-ground events can be replayed differently
-  after load without it, record the field in `SolidBody.Serialization.cs`.
+      continuation. If landing/leave-ground events can be replayed differently
+      after load without it, record the field in `SolidBody.Serialization.cs`.
 - [x] Verify the pure 2D grounding plan still carries `WasGrounded` state and
-  transition tests before implementation starts.
+      transition tests before implementation starts.
 - [x] Update `docs/wiki/HOST_INTEGRATION.md` to describe the frame boundary for
-  `IsGrounded` and `WasGrounded`.
+      `IsGrounded` and `WasGrounded`.
 
 **Done Criteria**
 
@@ -311,25 +326,21 @@ serialization. Docs and validation need to cover both standard and Lean builds.
 **Tasks**
 
 - [x] Update `docs/wiki/COLLISION_PIPELINE.md` so restitution threshold is
-  described as `PhysicsSettings.RestitutionVelocityThreshold`.
+      described as `PhysicsSettings.RestitutionVelocityThreshold`.
 - [x] Update `docs/wiki/HOST_INTEGRATION.md` with gravity-scale examples for 3D
-  and pure 2D hosts.
+      and pure 2D hosts.
 - [x] Update `docs/wiki/SERIALIZATION.md` with new settings/body fields.
 - [x] Update `docs/wiki/DIMENSIONS.md` only if the 2D grounding plan is amended
-  in this pass.
+      in this pass.
 - [x] Add benchmark rows only if response threshold routing or gravity scaling
-  changes a hot path in a measurable way. Otherwise record no benchmark delta in
-  the workstream summary.
-- [x] Run:
-  `dotnet build Gravitas.slnx --configuration Release`
-- [x] Run:
-  `dotnet test Gravitas.slnx --configuration Release`
-- [x] Run:
-  `dotnet build Gravitas.slnx --configuration ReleaseLean`
-- [x] Run:
-  `dotnet test Gravitas.slnx --configuration ReleaseLean`
+      changes a hot path in a measurable way. Otherwise record no benchmark
+      delta in the workstream summary.
+- [x] Run: `dotnet build Gravitas.slnx --configuration Release`
+- [x] Run: `dotnet test Gravitas.slnx --configuration Release`
+- [x] Run: `dotnet build Gravitas.slnx --configuration ReleaseLean`
+- [x] Run: `dotnet test Gravitas.slnx --configuration ReleaseLean`
 - [x] Search for stale policy:
-  `rg -n "RestitutionVelocityThreshold|IgnoreGravity|WasGrounded|GravityScale" src/Gravitas docs/wiki tests/Gravitas.Tests`
+      `rg -n "RestitutionVelocityThreshold|IgnoreGravity|WasGrounded|GravityScale" src/Gravitas docs/wiki tests/Gravitas.Tests`
 
 **Done Criteria**
 

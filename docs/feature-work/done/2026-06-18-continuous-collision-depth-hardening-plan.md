@@ -1,8 +1,7 @@
 # Continuous Collision Depth Hardening Plan
 
-**Date:** 2026-06-18
-**Status:** Done
-**Owner:** Gravitas runtime/collision hardening
+**Date:** 2026-06-18 **Status:** Done **Owner:** Gravitas runtime/collision
+hardening
 
 ## Purpose
 
@@ -110,8 +109,8 @@ translational CCD misses the scenario. Then compare:
 
 The likely first implementation should be conservative and opt-in through the
 same `ContinuousCollisionMode` contract. Exact angular shape solvers should be
-promoted only after benchmarks prove they are not worse than conservative
-bounds in typical lockstep scenes.
+promoted only after benchmarks prove they are not worse than conservative bounds
+in typical lockstep scenes.
 
 **Tests To Add First**
 
@@ -121,8 +120,8 @@ bounds in typical lockstep scenes.
   crossing.
 - 3D rotating long cuboid sweeps through a sphere while center translation is
   zero.
-- 3D rotating compound collider part sweeps through a kinematic target while
-  the owning body center stays outside contact range.
+- 3D rotating compound collider part sweeps through a kinematic target while the
+  owning body center stays outside contact range.
 - Deterministic tie test where linear and angular candidate hits have equal TOI.
 - No-hit tests for near misses to quantify conservative false positives.
 
@@ -149,10 +148,10 @@ avoids shape-specific angular casts until benchmarks show a need for them.
   motion for the frame. Linear closing velocity is removed using the accepted
   contact normal so tangential motion can still be handled by the ordinary
   response path.
-- Focused regressions now cover a rotating 2D thin polygon crossing a circle,
-  a rotating 3D long cuboid crossing a sphere, no-hit angular near misses in
-  both dimensions, and a rotated cuboid/sphere closest-point narrow-phase bug
-  found while hardening the 3D case.
+- Focused regressions now cover a rotating 2D thin polygon crossing a circle, a
+  rotating 3D long cuboid crossing a sphere, no-hit angular near misses in both
+  dimensions, and a rotated cuboid/sphere closest-point narrow-phase bug found
+  while hardening the 3D case.
 - 2D and 3D rotational CCD late-simulate paths now have allocation guardrails
   that require zero managed allocations after warmup.
 - Benchmark rows now cover angular CCD with no angular motion, sparse angular
@@ -162,8 +161,8 @@ Remaining work has been split into follow-up plans: kinematic host rotation as
 an active swept source lives in the active swept-source plan, exact
 shape-specific angular time-of-impact solvers live in the exact TOI/reducer
 plan, explicit compound/mesh benchmark signal lives in the benchmark-signal
-backlog, and continuous solver-island handling lives in the service-level
-island plan.
+backlog, and continuous solver-island handling lives in the service-level island
+plan.
 
 **Likely Files**
 
@@ -181,10 +180,10 @@ island plan.
 **Problem**
 
 The current non-sphere/non-circle mover policy is conservative: use a
-bounds-derived radius so wide or elongated shapes do not tunnel when their
-wider portions cross a target away from the center path. This removes
-false-negative risk, but it can stop early and report contacts that exact swept
-shape tests would reject.
+bounds-derived radius so wide or elongated shapes do not tunnel when their wider
+portions cross a target away from the center path. This removes false-negative
+risk, but it can stop early and report contacts that exact swept shape tests
+would reject.
 
 **Why It Matters**
 
@@ -268,13 +267,13 @@ without changing the public CCD mode contract.
   compound aggregate-radius false positive, true 2D polygon hits, 3D thin
   cuboid/capsule false positives against spheres, true 3D cuboid hits, and
   allocation-free 2D/3D exact translational CCD after warmup.
-- Benchmark rows now cover false-positive-heavy 2D and 3D shape-exact CCD
-  scenes through `DynamicCcdScalingBenchmarks`.
+- Benchmark rows now cover false-positive-heavy 2D and 3D shape-exact CCD scenes
+  through `DynamicCcdScalingBenchmarks`.
 
 Remaining exact-reducer work has been split into the exact TOI/reducer plan:
-exact 3D reducers against non-sphere primitive targets, exact
-dynamic-vs-dynamic shape reducers, mixed-dimension shape-exact reducers, and
-mesh/compound reducer policy.
+exact 3D reducers against non-sphere primitive targets, exact dynamic-vs-dynamic
+shape reducers, mixed-dimension shape-exact reducers, and mesh/compound reducer
+policy.
 
 **Likely Files**
 
@@ -330,15 +329,15 @@ Build a heavier CCD benchmark selection that complements the short smoke rows:
 
 **Candidate Approach**
 
-Keep the current `DynamicCcdScalingBenchmarks` rows for quick regression
-checks. Add a separate heavier benchmark mode or parameter set for serious CCD
-performance evidence. Prefer explicit benchmark methods over reflection-heavy
-or runtime-configured scenarios so benchmark names remain stable in artifacts.
+Keep the current `DynamicCcdScalingBenchmarks` rows for quick regression checks.
+Add a separate heavier benchmark mode or parameter set for serious CCD
+performance evidence. Prefer explicit benchmark methods over reflection-heavy or
+runtime-configured scenarios so benchmark names remain stable in artifacts.
 
 **Tests To Add First**
 
-This workstream is primarily benchmark infrastructure, but it should include
-one focused determinism test for any reusable benchmark scene generator:
+This workstream is primarily benchmark infrastructure, but it should include one
+focused determinism test for any reusable benchmark scene generator:
 
 - same seed/settings produce identical body positions, collider IDs, and layer
   assignments across repeated construction.
@@ -406,8 +405,8 @@ a more integrated time-of-impact model.
 
 Large lockstep simulations may have many player-controlled or important dynamic
 objects moving quickly at once. A deeper CCD solver could reduce artifacts such
-as over-clamping, missed secondary contacts after the first TOI, or solver
-order dependence in dense high-speed scenes.
+as over-clamping, missed secondary contacts after the first TOI, or solver order
+dependence in dense high-speed scenes.
 
 **Initial Scope**
 
@@ -442,10 +441,10 @@ substep island model in tests/benchmarks before changing the default runtime
 path. Promote only if it improves correctness without unacceptable allocation or
 time-complexity growth.
 
-The implementation path should strengthen `Continuous` itself rather than
-adding a weaker legacy/advanced split. `Continuous` should be the first-class
-bounded TOI solver contract, while `Auto` should use the same solver after it
-decides the frame displacement needs CCD.
+The implementation path should strengthen `Continuous` itself rather than adding
+a weaker legacy/advanced split. `Continuous` should be the first-class bounded
+TOI solver contract, while `Auto` should use the same solver after it decides
+the frame displacement needs CCD.
 
 **Tests To Add First**
 
@@ -492,9 +491,10 @@ Workstream 4 upgraded `Continuous` and `Auto` from single-hit clamping to a
 bounded body-owned TOI substep solver for pure 2D, pure 3D, and the existing
 mixed candidate comparison path.
 
-- `PhysicsSettings.ContinuousCollisionMaxToiIterations` now controls the deterministic
-  same-frame impact budget, with
-  `PhysicsSettings.DefaultContinuousCollisionMaxToiIterations` defaulting to `4`.
+- `PhysicsSettings.ContinuousCollisionMaxToiIterations` now controls the
+  deterministic same-frame impact budget, with
+  `PhysicsSettings.DefaultContinuousCollisionMaxToiIterations` defaulting to
+  `4`.
 - On each accepted translational hit, the body advances to the TOI, removes only
   the closing component of linear velocity, consumes that portion of frame time,
   and continues sweeping the remaining segment with the updated velocity.
@@ -508,15 +508,15 @@ mixed candidate comparison path.
 - `SolidBody.LastContinuousCollisionToiIterationCount`,
   `SolidBody.LastContinuousCollisionToiIterationLimitReached`,
   `SolidBody2D.LastContinuousCollisionToiIterationCount`, and
-  `SolidBody2D.LastContinuousCollisionToiIterationLimitReached` expose deterministic
-  last-step solver status for diagnostics and tests.
+  `SolidBody2D.LastContinuousCollisionToiIterationLimitReached` expose
+  deterministic last-step solver status for diagnostics and tests.
 - Focused 2D and 3D regressions now cover same-frame two-contact sliding,
   bounded-limit reporting, and zero-allocation steady-state substep paths. 2D
   also covers intermediate-shape sampling for non-circle movers.
-- `ContinuousCollisionToiIterationBenchmarks` adds two-contact pure 2D and pure 3D
-  rows across `1`, `2`, and `4` max-substep settings, preserving the first-hit
-  clamp shape as measurable evidence without keeping it as the default runtime
-  behavior.
+- `ContinuousCollisionToiIterationBenchmarks` adds two-contact pure 2D and pure
+  3D rows across `1`, `2`, and `4` max-substep settings, preserving the
+  first-hit clamp shape as measurable evidence without keeping it as the default
+  runtime behavior.
 - A short in-process substep benchmark smoke completed all 12 new rows. The run
   is useful as setup validation, not canonical timing evidence. It also repeated
   the already-tracked 3D full-runtime allocation shape, so allocation RCA stays

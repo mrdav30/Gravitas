@@ -33,33 +33,33 @@ flowchart LR
 
 ### 3D Queries
 
-| Family | Closest hit | All hits |
-| --- | --- | --- |
-| Raycast | `Query3D.Raycast(...)` | `Query3D.RaycastAll(...)` |
-| Swept sphere | `Query3D.SweepSphere(...)` | `Query3D.SweepSphereAll(...)` |
-| Registered convex source sweeps | `SweepCapsule`, `SweepCuboid`, `SweepCylinder`, `SweepCone`, `SweepConvexMesh`, `SweepCompound` | matching `*All` overloads |
-| Cone volume | `Query3D.OverlapCone(...)` | `Query3D.OverlapConeAll(...)` |
-| X/Z circle proximity | `OverlapCircle`, `OverlapCircleInDirection` | `OverlapCircleAll` |
+| Family                          | Closest hit                                                                                     | All hits                      |
+| ------------------------------- | ----------------------------------------------------------------------------------------------- | ----------------------------- |
+| Raycast                         | `Query3D.Raycast(...)`                                                                          | `Query3D.RaycastAll(...)`     |
+| Swept sphere                    | `Query3D.SweepSphere(...)`                                                                      | `Query3D.SweepSphereAll(...)` |
+| Registered convex source sweeps | `SweepCapsule`, `SweepCuboid`, `SweepCylinder`, `SweepCone`, `SweepConvexMesh`, `SweepCompound` | matching `*All` overloads     |
+| Cone volume                     | `Query3D.OverlapCone(...)`                                                                      | `Query3D.OverlapConeAll(...)` |
+| X/Z circle proximity            | `OverlapCircle`, `OverlapCircleInDirection`                                                     | `OverlapCircleAll`            |
 
 ### 2D Queries
 
-| Family | Closest hit | All hits |
-| --- | --- | --- |
-| Circle overlap | `Query2D.OverlapCircle(...)` | `Query2D.OverlapCircleAll(...)` |
-| AABB overlap | `Query2D.OverlapAabb(...)` | `Query2D.OverlapAabbAll(...)` |
+| Family                 | Closest hit                   | All hits                         |
+| ---------------------- | ----------------------------- | -------------------------------- |
+| Circle overlap         | `Query2D.OverlapCircle(...)`  | `Query2D.OverlapCircleAll(...)`  |
+| AABB overlap           | `Query2D.OverlapAabb(...)`    | `Query2D.OverlapAabbAll(...)`    |
 | Convex polygon overlap | `Query2D.OverlapPolygon(...)` | `Query2D.OverlapPolygonAll(...)` |
-| Segment raycast | `Query2D.Raycast(...)` | `Query2D.RaycastAll(...)` |
-| Swept circle | `Query2D.SweepCircle(...)` | `Query2D.SweepCircleAll(...)` |
+| Segment raycast        | `Query2D.Raycast(...)`        | `Query2D.RaycastAll(...)`        |
+| Swept circle           | `Query2D.SweepCircle(...)`    | `Query2D.SweepCircleAll(...)`    |
 
 ### Mixed Queries
 
-| Family | Closest hit | All hits |
-| --- | --- | --- |
+| Family                              | Closest hit                            | All hits                                  |
+| ----------------------------------- | -------------------------------------- | ----------------------------------------- |
 | 3D sphere against embedded 2D slabs | `QueryMixed.SweepSphereAgainst2D(...)` | `QueryMixed.SweepSphereAgainst2DAll(...)` |
 | 2D circle slab against 3D colliders | `QueryMixed.SweepCircleAgainst3D(...)` | `QueryMixed.SweepCircleAgainst3DAll(...)` |
 
-`Query2D` and `Query3D` stay dimension-local and never report
-cross-dimensional hits. Mixed queries are always explicit.
+`Query2D` and `Query3D` stay dimension-local and never report cross-dimensional
+hits. Mixed queries are always explicit.
 
 ## Common Usage
 
@@ -154,10 +154,10 @@ excluded-collider arguments select.
 
 ## Hit Data
 
-| Hit type | Used by | Key fields |
-| --- | --- | --- |
-| `Physics3DHit` | `Query3D` | `Collider`, `Body`, `Point`, `Normal`, `Distance`, `Direction` |
-| `Physics2DHit` | `Query2D` | `Collider`, `Body`, `Point`, `Normal`, `Distance` |
+| Hit type          | Used by      | Key fields                                                                                                                                              |
+| ----------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Physics3DHit`    | `Query3D`    | `Collider`, `Body`, `Point`, `Normal`, `Distance`, `Direction`                                                                                          |
+| `Physics2DHit`    | `Query2D`    | `Collider`, `Body`, `Point`, `Normal`, `Distance`                                                                                                       |
 | `PhysicsMixedHit` | `QueryMixed` | `Collider3D`, `Collider2D`, `Body3D`, `Body2D`, `Point3D`, `Point2D`, `Normal3DTo2D`, source-oriented normals, `ReducerKind`, `Distance`, `Direction3D` |
 
 Static/bodyless hits can have a collider with a null body.
@@ -168,9 +168,9 @@ provided so CCD helpers do not need to reinterpret that invariant.
 
 ## Reentrancy
 
-Query services keep mutable buffers on the service instance. Do not run
-multiple queries concurrently against the same context service. The design
-matches a single-threaded deterministic lockstep loop.
+Query services keep mutable buffers on the service instance. Do not run multiple
+queries concurrently against the same context service. The design matches a
+single-threaded deterministic lockstep loop.
 
 Hosts that need parallel query workloads should use separate contexts or add an
 explicit caller-owned query job/state design with tests and benchmarks.
@@ -189,11 +189,11 @@ explicit caller-owned query job/state design with tests and benchmarks.
 
 ## Source Map
 
-| Area | Source |
-| --- | --- |
-| 3D queries | [`src/Gravitas/Queries/3D`](../../src/Gravitas/Queries/3D) |
-| 2D queries | [`src/Gravitas/Queries/2D`](../../src/Gravitas/Queries/2D) |
-| Mixed queries | [`src/Gravitas/Queries/Mixed`](../../src/Gravitas/Queries/Mixed) |
-| Common hit ranges | [`src/Gravitas/Queries/Common/PhysicsQueryHitRange.cs`](../../src/Gravitas/Queries/Common/PhysicsQueryHitRange.cs) |
-| Query tests | [`tests/Gravitas.Tests/Queries`](../../tests/Gravitas.Tests/Queries), [`tests/Gravitas.Tests/Physics2D`](../../tests/Gravitas.Tests/Physics2D), [`tests/Gravitas.Tests/MixedDimensions`](../../tests/Gravitas.Tests/MixedDimensions) |
-| Query benchmarks | [`tests/Gravitas.Benchmarks/Queries`](../../tests/Gravitas.Benchmarks/Queries) |
+| Area              | Source                                                                                                                                                                                                                               |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 3D queries        | [`src/Gravitas/Queries/3D`](../../src/Gravitas/Queries/3D)                                                                                                                                                                           |
+| 2D queries        | [`src/Gravitas/Queries/2D`](../../src/Gravitas/Queries/2D)                                                                                                                                                                           |
+| Mixed queries     | [`src/Gravitas/Queries/Mixed`](../../src/Gravitas/Queries/Mixed)                                                                                                                                                                     |
+| Common hit ranges | [`src/Gravitas/Queries/Common/PhysicsQueryHitRange.cs`](../../src/Gravitas/Queries/Common/PhysicsQueryHitRange.cs)                                                                                                                   |
+| Query tests       | [`tests/Gravitas.Tests/Queries`](../../tests/Gravitas.Tests/Queries), [`tests/Gravitas.Tests/Physics2D`](../../tests/Gravitas.Tests/Physics2D), [`tests/Gravitas.Tests/MixedDimensions`](../../tests/Gravitas.Tests/MixedDimensions) |
+| Query benchmarks  | [`tests/Gravitas.Benchmarks/Queries`](../../tests/Gravitas.Benchmarks/Queries)                                                                                                                                                       |
