@@ -12,6 +12,55 @@ namespace Gravitas.Tests.Colliders;
 public sealed class CompoundCollider2DTests
 {
     [Fact]
+    public void Initialize_WithUnderflowedPartWorldScale_ShouldRejectBeforeBinding()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        var compound = new LSCompoundCollider2D(CompoundColliderPart2D.Circle(
+            Fixed64.Half,
+            Vector2d.Zero,
+            Fixed64.Zero,
+            new Vector2d(Fixed64.MinIncrement, Fixed64.One)));
+        var transform = new FixedTransform(
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            new Vector3d(Fixed64.Half, Fixed64.One, Fixed64.One));
+
+        Action initialize = () => compound.InitializeWithNoBody(new TestMatterAgent(context, transform));
+
+        initialize.Should().Throw<ArgumentException>().WithParameterName("scale");
+        compound.Id.Should().Be(-1);
+        compound.HasHostBinding.Should().BeFalse();
+        context.Physics2D.ColliderCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void BodyInitialize_WithUnderflowedPartWorldScale_ShouldRejectBeforeRuntimeMutation()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        var compound = new LSCompoundCollider2D(CompoundColliderPart2D.Circle(
+            Fixed64.Half,
+            Vector2d.Zero,
+            Fixed64.Zero,
+            new Vector2d(Fixed64.MinIncrement, Fixed64.One)));
+        var transform = new FixedTransform(
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            new Vector3d(Fixed64.Half, Fixed64.One, Fixed64.One));
+        var body = new SolidBody2D(new TestMatterAgent(context, transform), compound);
+
+        Action initialize = () => body.Initialize(Vector2d.Zero);
+
+        initialize.Should().Throw<ArgumentException>().WithParameterName("scale");
+        body.Active.Should().BeFalse();
+        body.DynamicId.Should().Be(-1);
+        compound.Id.Should().Be(-1);
+        compound.Body.Should().BeNull();
+        compound.HasHostBinding.Should().BeFalse();
+        context.Physics2D.BodyCount.Should().Be(0);
+        context.Physics2D.ColliderCount.Should().Be(0);
+    }
+
+    [Fact]
     public void Initialize_ShouldRegisterOnlyOwningColliderAndAggregatePartBounds()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();

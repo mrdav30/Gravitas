@@ -74,6 +74,7 @@ public sealed partial class SolidBody2D
 
         if (chronicler.Mode == SerializationMode.Loading)
         {
+            _rotation = CanonicalizeRotation(_rotation);
             Active = active && Collider.Id >= 0;
             _freezeAxes = freezeAxes;
             _isKinematic = isKinematic;
@@ -118,13 +119,7 @@ public sealed partial class SolidBody2D
 
     private void ApplyLoadedState()
     {
-        FixedTransform transform = Agent.Transform;
-        Vector3d currentPosition = transform.Position;
-        transform.Position = new Vector3d(_position.X, currentPosition.Y, _position.Y);
-        transform.Rotation = FixedQuaternion.FromEulerAnglesInDegrees(
-            Fixed64.Zero,
-            FixedMath.RadToDeg(_rotation),
-            Fixed64.Zero);
+        SetHostWorldPose(Agent.Transform, _position, _rotation);
         Collider.Rebuild();
     }
 }

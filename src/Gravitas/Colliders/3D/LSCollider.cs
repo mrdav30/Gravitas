@@ -145,7 +145,7 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
     {
         get => _compoundOwner?.Center
             ?? Body?.Position3d
-            ?? _agent?.Transform.Position
+            ?? _agent?.Transform.WorldPosition
             ?? throw new InvalidOperationException("Collider has no body or static transform.");
         set
         {
@@ -158,9 +158,12 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
                 nameof(Position),
                 "Collider is not bound to a static transform.");
 
-            if (_agent.Transform.Position == value)
+            if (_agent.Transform.WorldPosition == value)
                 return;
-            _agent.Transform.Position = value;
+            SwiftThrowHelper.ThrowIfTrue(
+                !_agent.Transform.TrySetWorldPosition(value),
+                nameof(Position),
+                "Static collider transform cannot represent the requested world position.");
         }
     }
 
@@ -169,7 +172,7 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
         get => _compoundOwner != null
             ? _compoundOwner.Rotation * _compoundLocalRotation
             : Body?.Rotation
-            ?? _agent?.Transform.Rotation
+            ?? _agent?.Transform.WorldRotation
             ?? throw new InvalidOperationException("Collider has no body or static transform.");
         set
         {
@@ -182,9 +185,12 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
                 nameof(Rotation),
                 "Collider is not bound to a static transform.");
 
-            if (_agent.Transform.Rotation == value)
+            if (_agent.Transform.WorldRotation == value)
                 return;
-            _agent.Transform.Rotation = value;
+            SwiftThrowHelper.ThrowIfTrue(
+                !_agent.Transform.TrySetWorldPose(_agent.Transform.WorldPosition, value),
+                nameof(Rotation),
+                "Static collider transform cannot represent the requested world rotation.");
         }
     }
 
@@ -413,8 +419,7 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
 
     internal void Initialize(SolidBody body)
     {
-        ThrowIfCompoundPartLifecycle(nameof(Initialize));
-        ThrowIfTriggerWouldAttachToBody(nameof(Initialize));
+        PreflightBodyInitialization(body);
         _body = body;
         InitCore(body.Agent);
     }
@@ -427,14 +432,28 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
             Id >= 0 || (HasHostBinding && !ReferenceEquals(_agent, agent)),
             nameof(agent),
             "Collider is already registered or bound to another host agent.");
+        PreflightInitialization(agent);
         InitCore(agent);
+    }
+
+    internal void PreflightBodyInitialization(SolidBody body)
+    {
+        ThrowIfCompoundPartLifecycle(nameof(Initialize));
+        SwiftThrowHelper.ThrowIfNull(body, nameof(body));
+        ThrowIfTriggerWouldAttachToBody(nameof(Initialize));
+        PreflightInitialization(body.Agent);
+    }
+
+    private void PreflightInitialization(IMatterAgent agent)
+    {
+        SwiftThrowHelper.ThrowIfNull(agent, nameof(agent));
+        ColliderScalePolicy.Validate(agent.Transform);
+        OnBeforeInitialize(agent);
     }
 
     private void InitCore(IMatterAgent agent)
     {
-        SwiftThrowHelper.ThrowIfNull(agent, nameof(agent));
         _lifetimeVersion++;
-        OnBeforeInitialize(agent);
 
         _queryState.Reset();
 
@@ -561,8 +580,18 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
         BuildShape();
     }
 
-    private ColliderShapeSnapshot CaptureShapeSnapshot() =>
-        new(Center, Rotation, LocalScale, _offset, _size, _radius);
+    private ColliderShapeSnapshot CaptureShapeSnapshot()
+    {
+        Vector3d scale;
+        if (_compoundOwner == null && _agent != null)
+            scale = ColliderScalePolicy.Validate(_agent.Transform);
+        else
+        {
+            scale = LocalScale;
+            ColliderScalePolicy.Validate(scale);
+        }
+        return new ColliderShapeSnapshot(Center, Rotation, scale, _offset, _size, _radius);
+    }
 
     protected virtual void BuildBoundingBox()
     {

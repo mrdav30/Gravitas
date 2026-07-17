@@ -1729,9 +1729,9 @@ public sealed class GravitasQuery3DServiceSweepTests
 
         // Register cheap local shapes first, then move them beyond practical
         // partition spans so this remains a focused narrow-phase regression.
-        sourceTransform.Position = new Vector3d(saturatedCentroidX, Fixed64.Zero, Fixed64.Zero);
+        sourceTransform.LocalPosition = new Vector3d(saturatedCentroidX, Fixed64.Zero, Fixed64.Zero);
         source.RebuildRuntimeShapeOnly(refreshMassProperties: false);
-        targetTransform.Position = new Vector3d(targetX, Fixed64.Zero, Fixed64.Zero);
+        targetTransform.LocalPosition = new Vector3d(targetX, Fixed64.Zero, Fixed64.Zero);
         target.RebuildRuntimeShapeOnly(refreshMassProperties: false);
         Vector3d displacement = new(targetX - saturatedCentroidX, Fixed64.Zero, Fixed64.Zero);
         var worker = new ConvexSweepQueryWorker();
@@ -1763,12 +1763,12 @@ public sealed class GravitasQuery3DServiceSweepTests
 
         // Build the extreme runtime shapes after their cheap initial registration;
         // the worker is under test here, not billion-unit GridForge partition spans.
-        sourceTransform.Position = sourceCenter;
-        sourceTransform.Rotation = FixedQuaternion.FromDirection(sourceForward);
+        sourceTransform.LocalPosition = sourceCenter;
+        sourceTransform.LocalRotation = FixedQuaternion.FromDirection(sourceForward);
         source.Size = new Vector3d(Fixed64.One, Fixed64.One, (Fixed64)1_991_825_759);
         source.RebuildRuntimeShapeOnly(refreshMassProperties: false);
-        targetTransform.Position = targetCenter;
-        targetTransform.Rotation = FixedQuaternion.FromDirection(targetForward);
+        targetTransform.LocalPosition = targetCenter;
+        targetTransform.LocalRotation = FixedQuaternion.FromDirection(targetForward);
         target.Size = new Vector3d(Fixed64.One, Fixed64.One, (Fixed64)2_066_414_647);
         target.RebuildRuntimeShapeOnly(refreshMassProperties: false);
 

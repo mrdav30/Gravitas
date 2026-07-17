@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using FixedMathSharp.Bounds;
 using Gravitas.Colliders;
 
 namespace Gravitas.CollisionHandling;
@@ -71,21 +72,23 @@ public static partial class CollisionDetection
         Vector3d secondStart,
         Vector3d secondEnd)
     {
+        FixedSegment first = new(firstStart, firstEnd);
+        FixedSegment second = new(secondStart, secondEnd);
         bool firstDegenerate = (firstEnd - firstStart).MagnitudeSquared <= Fixed64.Epsilon;
         bool secondDegenerate = (secondEnd - secondStart).MagnitudeSquared <= Fixed64.Epsilon;
 
-        // Keep the <= Epsilon point classification symmetric. The generic solver treats threshold-length
-        // segments as finite and cannot safely accept an exactly degenerate second segment.
+        // Collider center lines at or below Epsilon are intentionally sphere-like. This physics policy is
+        // broader than FixedSegment's Q32.32-resolution degeneracy contract and must remain symmetric.
         if (firstDegenerate && secondDegenerate)
             return (firstStart, secondStart);
 
         if (firstDegenerate)
-            return (firstStart, Vector3d.ClosestPointOnLineSegment(firstStart, secondStart, secondEnd));
+            return (firstStart, second.ClosestPoint(firstStart));
 
         if (secondDegenerate)
-            return (Vector3d.ClosestPointOnLineSegment(secondStart, firstStart, firstEnd), secondStart);
+            return (first.ClosestPoint(secondStart), secondStart);
 
-        return Vector3d.ClosestPointsOnTwoLines(firstStart, firstEnd, secondStart, secondEnd);
+        return first.GetClosestPoints(second);
     }
 
     #endregion

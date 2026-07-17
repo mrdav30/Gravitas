@@ -915,7 +915,7 @@ internal static partial class FiniteSlabProjectionSweep
     {
         if (found)
         {
-            int projectionComparison = ConvexSupportProjection.Compare(candidate, best, direction);
+            int projectionComparison = Vector2d.CompareProjection(candidate, best, direction);
             if (projectionComparison < 0)
                 return;
 

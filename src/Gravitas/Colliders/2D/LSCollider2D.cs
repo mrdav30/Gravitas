@@ -354,11 +354,9 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
 
     public virtual Vector2d LocalScale => _compoundOwner != null
         ? Vector2d.Multiply(_compoundOwner.LocalScale, _compoundLocalScale)
-        : Vector2d.One;
+        : _agent?.Transform.LossyScale.ToVector2d() ?? Vector2d.One;
 
-    public Vector2d ScaledLocalOffset => _compoundOwner != null
-        ? Vector2d.Multiply(_localOffset, LocalScale)
-        : _localOffset;
+    public Vector2d ScaledLocalOffset => Vector2d.Multiply(_localOffset, LocalScale);
 
     public Vector2d Center => Position + Rotate(ScaledLocalOffset, Rotation);
 
@@ -405,9 +403,7 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
 
     internal void Initialize(SolidBody2D body)
     {
-        ThrowIfCompoundPartLifecycle(nameof(Initialize));
-        SwiftThrowHelper.ThrowIfNull(body, nameof(body));
-        ThrowIfTriggerWouldAttachToBody(nameof(Initialize));
+        PreflightBodyInitialization(body);
         InitCore(body.Agent, body);
     }
 
@@ -419,13 +415,28 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
             Id >= 0 || (HasHostBinding && !ReferenceEquals(_agent, agent)),
             nameof(agent),
             "2D collider is already registered or bound to another host agent.");
+        PreflightInitialization(agent);
         InitCore(agent, null);
         Context.Physics2D.AssimilateCollider(this);
     }
 
-    private void InitCore(IMatterAgent agent, SolidBody2D? body)
+    internal void PreflightBodyInitialization(SolidBody2D body)
+    {
+        ThrowIfCompoundPartLifecycle(nameof(Initialize));
+        SwiftThrowHelper.ThrowIfNull(body, nameof(body));
+        ThrowIfTriggerWouldAttachToBody(nameof(Initialize));
+        PreflightInitialization(body.Agent);
+    }
+
+    private void PreflightInitialization(IMatterAgent agent)
     {
         SwiftThrowHelper.ThrowIfNull(agent, nameof(agent));
+        ColliderScalePolicy.ValidatePlanar(agent.Transform);
+        OnBeforeInitialize(agent);
+    }
+
+    private void InitCore(IMatterAgent agent, SolidBody2D? body)
+    {
         _lifetimeVersion++;
         _body = body;
         _agent = agent;
@@ -436,6 +447,8 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
         _runtimeShapeState.MarkDirty();
         RebuildRuntimeShapeState();
     }
+
+    protected virtual void OnBeforeInitialize(IMatterAgent agent) { }
 
     internal void SetPhysicsState(int id, int serviceIndex, int replayOrder)
     {
@@ -895,6 +908,7 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
         {
             Fixed64 rotation = _compoundOwner.Rotation + _compoundLocalRotation;
             Vector2d localScale = Vector2d.Multiply(_compoundOwner.LocalScale, _compoundLocalScale);
+            ColliderScalePolicy.Validate(localScale);
             Vector2d center = _compoundOwner.Center + Rotate(Vector2d.Multiply(_localOffset, localScale), rotation);
             return new(
                 center,
@@ -907,11 +921,20 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
         }
 
         Fixed64 standaloneRotation = ResolveStandaloneRotation();
-        Vector2d standaloneCenter = ResolveStandalonePosition() + Rotate(_localOffset, standaloneRotation);
+        Vector2d standaloneScale;
+        if (_agent != null)
+            standaloneScale = ColliderScalePolicy.ValidatePlanar(_agent.Transform);
+        else
+        {
+            standaloneScale = LocalScale;
+            ColliderScalePolicy.Validate(standaloneScale);
+        }
+        Vector2d standaloneCenter = ResolveStandalonePosition()
+            + Rotate(Vector2d.Multiply(_localOffset, standaloneScale), standaloneRotation);
         return new(
             standaloneCenter,
             standaloneRotation,
-            Vector2d.One,
+            standaloneScale,
             _localOffset,
             _shapeVersion,
             ResolveMixedSlabCenterY(),
@@ -922,12 +945,12 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
         _mixedHalfThicknessOverride ?? _context?.Settings.Mixed2DHalfThickness ?? PhysicsSettings.DefaultMixed2DHalfThickness;
 
     private Fixed64 ResolveMixedSlabCenterY() =>
-        _agent?.Transform.Position.Y ?? Fixed64.Zero;
+        _agent?.Transform.WorldPosition.Y ?? Fixed64.Zero;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private Vector2d ResolveStandalonePosition() =>
         _body?.Position
-        ?? _agent?.Transform.Position.ToVector2d()
+        ?? _agent?.Transform.WorldPositionXZ
         ?? Vector2d.Zero;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1013,7 +1036,7 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
     {
         return _agent == null
             ? Fixed64.Zero
-            : FixedMath.DegToRad(_agent.Transform.EulerAngles.Y);
+            : _agent.Transform.WorldRotationXZRadians;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

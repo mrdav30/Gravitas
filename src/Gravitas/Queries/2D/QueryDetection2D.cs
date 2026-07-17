@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using FixedMathSharp.Bounds;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Support;
@@ -100,7 +101,7 @@ internal static class QueryDetection2D
 
     internal static bool TryRaycast(Vector2d start, Vector2d end, LSCollider2D collider, out Physics2DHit hit)
     {
-        if (!FixedVectorDifference.TryCreate(start, end, out Vector2d segment))
+        if (!Vector2d.TrySubtract(end, start, out Vector2d segment))
         {
             hit = default;
             return false;
@@ -147,7 +148,7 @@ internal static class QueryDetection2D
         LSCollider2D collider,
         out Physics2DHit hit)
     {
-        if (!FixedVectorDifference.TryCreate(start, end, out Vector2d segment))
+        if (!Vector2d.TrySubtract(end, start, out Vector2d segment))
         {
             hit = default;
             return false;
@@ -299,7 +300,9 @@ internal static class QueryDetection2D
         }
 
         Vector2d pointOnRay = start + direction * distance;
-        Vector2d segmentPoint = PlanarSegmentGeometry.ClosestPoint(pointOnRay, capsule.SegmentStart, capsule.SegmentEnd);
+        Vector2d segmentPoint = new FixedSegment2d(
+            capsule.SegmentStart,
+            capsule.SegmentEnd).ClosestPoint(pointOnRay);
         Vector2d normal = ResolveCapsuleNormal(pointOnRay, segmentPoint);
         hit = new Physics2DHit(
             capsule,
@@ -332,7 +335,9 @@ internal static class QueryDetection2D
         }
 
         Vector2d sweptCenter = start + direction * distance;
-        Vector2d segmentPoint = PlanarSegmentGeometry.ClosestPoint(sweptCenter, capsule.SegmentStart, capsule.SegmentEnd);
+        Vector2d segmentPoint = new FixedSegment2d(
+            capsule.SegmentStart,
+            capsule.SegmentEnd).ClosestPoint(sweptCenter);
         Vector2d normal = ResolveCapsuleNormal(sweptCenter, segmentPoint);
         hit = new Physics2DHit(
             capsule,
@@ -533,7 +538,9 @@ internal static class QueryDetection2D
         Vector2d bestPoint = vertices[0];
         for (int i = 0; i < vertices.Length; i++)
         {
-            Vector2d candidate = PlanarSegmentGeometry.ClosestPoint(point, vertices[i], vertices[(i + 1) % vertices.Length]);
+            Vector2d candidate = new FixedSegment2d(
+                vertices[i],
+                vertices[(i + 1) % vertices.Length]).ClosestPoint(point);
             Fixed64 distance = Vector2d.DistanceSquared(point, candidate);
             if (distance >= bestDistance)
                 continue;
@@ -685,12 +692,13 @@ internal static class QueryDetection2D
         Fixed64 bestT = Fixed64.MaxValue;
         Vector2d bestPoint = Vector2d.Zero;
         Vector2d bestNormal = Vector2d.Right;
+        FixedSegment2d raySegment = new(start, start + segment);
 
         for (int i = 0; i < collider.VertexCount; i++)
         {
             Vector2d a = collider.GetVertexUnchecked(i);
             Vector2d b = collider.GetVertexUnchecked((i + 1) % collider.VertexCount);
-            if (!PlanarSegmentGeometry.TryIntersect(start, segment, a, b - a, out Fixed64 t))
+            if (!raySegment.TryGetUniqueIntersection(new FixedSegment2d(a, b), out Fixed64 t))
                 continue;
 
             if (found && t >= bestT)
@@ -952,7 +960,7 @@ internal static class QueryDetection2D
 
         Vector2d movedSegmentStart = mover.SegmentStart + direction * distance;
         Vector2d movedSegmentEnd = mover.SegmentEnd + direction * distance;
-        Vector2d segmentPoint = PlanarSegmentGeometry.ClosestPoint(targetPoint, movedSegmentStart, movedSegmentEnd);
+        Vector2d segmentPoint = new FixedSegment2d(movedSegmentStart, movedSegmentEnd).ClosestPoint(targetPoint);
         Vector2d normal = ResolveCapsuleNormal(segmentPoint, targetPoint);
         Vector2d point = targetRadius > Fixed64.Zero
             ? targetPoint + normal * targetRadius
@@ -1002,7 +1010,9 @@ internal static class QueryDetection2D
             if (moverMax < edgeMin || edgeMax < moverMin)
                 continue;
 
-            ClosestPointsOnSegments(movedStart, movedEnd, edgeStart, edgeEnd, out Vector2d moverPoint, out Vector2d edgePoint);
+            (Vector2d moverPoint, Vector2d edgePoint) = new FixedSegment2d(
+                movedStart,
+                movedEnd).GetClosestPoints(new FixedSegment2d(edgeStart, edgeEnd));
             Vector2d point = Vector2d.DistanceSquared(moverPoint, edgePoint) > Fixed64.Epsilon
                 ? moverPoint - normal * mover.ScaledRadius
                 : edgePoint;
@@ -1114,7 +1124,7 @@ internal static class QueryDetection2D
         Fixed64 radius,
         out Fixed64 distance)
     {
-        Vector2d closestAtStart = PlanarSegmentGeometry.ClosestPoint(start, segmentStart, segmentEnd);
+        Vector2d closestAtStart = new FixedSegment2d(segmentStart, segmentEnd).ClosestPoint(start);
         if (Vector2d.DistanceSquared(start, closestAtStart) <= radius * radius)
         {
             distance = Fixed64.Zero;
@@ -1277,7 +1287,7 @@ internal static class QueryDetection2D
         for (int i = 0; i < vertices.Length; i++)
         {
             Vector2d vertex = vertices[i];
-            Vector2d segmentPoint = PlanarSegmentGeometry.ClosestPoint(vertex, segmentStart, segmentEnd);
+            Vector2d segmentPoint = new FixedSegment2d(segmentStart, segmentEnd).ClosestPoint(vertex);
             KeepClosestAxis(vertex - segmentPoint, ref bestDistance, ref bestAxis);
         }
 
@@ -1291,30 +1301,6 @@ internal static class QueryDetection2D
             : CalculateAverageCenter(vertices) - capsule.Center;
     }
 
-    private static void ClosestPointsOnSegments(
-        Vector2d firstStart,
-        Vector2d firstEnd,
-        Vector2d secondStart,
-        Vector2d secondEnd,
-        out Vector2d firstPoint,
-        out Vector2d secondPoint)
-    {
-        if (PlanarSegmentGeometry.TryIntersect(firstStart, firstEnd - firstStart, secondStart, secondEnd - secondStart, out Fixed64 t))
-        {
-            firstPoint = firstStart + (firstEnd - firstStart) * t;
-            secondPoint = firstPoint;
-            return;
-        }
-
-        firstPoint = firstStart;
-        secondPoint = PlanarSegmentGeometry.ClosestPoint(firstStart, secondStart, secondEnd);
-        Fixed64 bestDistance = Vector2d.DistanceSquared(firstPoint, secondPoint);
-
-        KeepClosestSegmentPair(firstEnd, PlanarSegmentGeometry.ClosestPoint(firstEnd, secondStart, secondEnd), ref firstPoint, ref secondPoint, ref bestDistance);
-        KeepClosestSegmentPair(PlanarSegmentGeometry.ClosestPoint(secondStart, firstStart, firstEnd), secondStart, ref firstPoint, ref secondPoint, ref bestDistance);
-        KeepClosestSegmentPair(PlanarSegmentGeometry.ClosestPoint(secondEnd, firstStart, firstEnd), secondEnd, ref firstPoint, ref secondPoint, ref bestDistance);
-    }
-
     private static void KeepClosestAxis(Vector2d axis, ref Fixed64 bestDistance, ref Vector2d bestAxis)
     {
         Fixed64 distance = axis.MagnitudeSquared;
@@ -1323,22 +1309,6 @@ internal static class QueryDetection2D
 
         bestDistance = distance;
         bestAxis = axis;
-    }
-
-    private static void KeepClosestSegmentPair(
-        Vector2d candidateA,
-        Vector2d candidateB,
-        ref Vector2d bestA,
-        ref Vector2d bestB,
-        ref Fixed64 bestDistance)
-    {
-        Fixed64 distance = Vector2d.DistanceSquared(candidateA, candidateB);
-        if (distance >= bestDistance)
-            return;
-
-        bestA = candidateA;
-        bestB = candidateB;
-        bestDistance = distance;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

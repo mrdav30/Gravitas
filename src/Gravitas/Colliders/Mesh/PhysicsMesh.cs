@@ -546,7 +546,7 @@ namespace Gravitas.Colliders
             int bestIndex = 0;
             for (int i = 1; i < _localVertices.Length; i++)
             {
-                if (ConvexSupportProjection.Compare(
+                if (Vector3d.CompareProjection(
                         _localVertices[i],
                         _localVertices[bestIndex],
                         localDirection) <= 0)
@@ -570,7 +570,7 @@ namespace Gravitas.Colliders
                 int nodeIndex = stack[--stackCount];
                 SupportTreeNode node = _supportTreeNodes![nodeIndex];
                 Vector3d upperPoint = GetBoundsSupportPoint(node.Min, node.Max, localDirection);
-                int upperComparison = ConvexSupportProjection.Compare(
+                int upperComparison = Vector3d.CompareProjection(
                     upperPoint,
                     _localVertices[bestIndex],
                     localDirection);
@@ -609,7 +609,7 @@ namespace Gravitas.Colliders
             {
                 int vertexIndex = _supportVertexIndices![node.Start + i];
                 Vector3d vertex = _localVertices[vertexIndex];
-                int projectionComparison = ConvexSupportProjection.Compare(
+                int projectionComparison = Vector3d.CompareProjection(
                     vertex,
                     _localVertices[bestIndex],
                     localDirection);
@@ -628,7 +628,7 @@ namespace Gravitas.Colliders
             ref int stackCount)
         {
             Vector3d upperPoint = GetBoundsSupportPoint(node.Min, node.Max, localDirection);
-            int upperComparison = ConvexSupportProjection.Compare(
+            int upperComparison = Vector3d.CompareProjection(
                 upperPoint,
                 _localVertices[bestIndex],
                 localDirection);
@@ -645,7 +645,7 @@ namespace Gravitas.Colliders
         {
             Vector3d leftPoint = GetBoundsSupportPoint(left.Min, left.Max, localDirection);
             Vector3d rightPoint = GetBoundsSupportPoint(right.Min, right.Max, localDirection);
-            int projectionComparison = ConvexSupportProjection.Compare(
+            int projectionComparison = Vector3d.CompareProjection(
                 leftPoint,
                 rightPoint,
                 localDirection);

@@ -82,7 +82,7 @@ public sealed class PhysicsMeshScaleTests
         collider.CalculateInertiaTensor(Fixed64.One, Vector3d.Zero);
         collider.Mesh.ClosedVolumeScaleEvaluationCount.Should().Be(1);
 
-        transform.Scale = new Vector3d((Fixed64)3, (Fixed64)2, (Fixed64)4);
+        transform.LocalScale = new Vector3d((Fixed64)3, (Fixed64)2, (Fixed64)4);
         collider.Simulate();
 
         collider.Mesh.ClosedVolumeScaleEvaluationCount.Should().Be(2);
@@ -102,7 +102,7 @@ public sealed class PhysicsMeshScaleTests
         collider.CalculateInertiaTensor(Fixed64.One, Vector3d.Zero);
         collider.Mesh.ClosedVolumeScaleEvaluationCount.Should().Be(1);
 
-        transform.Position = new Vector3d((Fixed64)3, (Fixed64)4, (Fixed64)5);
+        transform.LocalPosition = new Vector3d((Fixed64)3, (Fixed64)4, (Fixed64)5);
         collider.Simulate();
         collider.CalculateInertiaTensor(Fixed64.One, Vector3d.Zero);
 
@@ -415,6 +415,31 @@ public sealed class PhysicsMeshScaleTests
     }
 
     [Fact]
+    public void BodyInitialize_WithCollapsedScaledMeshVolume_ShouldRejectBeforeRuntimeMutation()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        Vector3d scale = Vector3d.One * Fixed64.FromFraction(1, 200);
+        var collider = new LSMeshCollider(
+            CreateTetrahedronVertices(),
+            TetrahedronTriangles(),
+            MeshColliderMode.Convex,
+            MeshInertiaPolicy.RequireClosedVolume);
+        var transform = new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, scale);
+        var body = new SolidBody(new TestMatterAgent(context, transform), collider);
+
+        Action initialize = () => body.Initialize(Vector3d.Zero, FixedQuaternion.Identity);
+
+        initialize.Should().Throw<ArgumentException>().WithMessage("*ZeroVolume*");
+        body.Active.Should().BeFalse();
+        body.DynamicId.Should().Be(-1);
+        collider.Id.Should().Be(-1);
+        collider.Body.Should().BeNull();
+        collider.HasHostBinding.Should().BeFalse();
+        context.Physics.BodyCount.Should().Be(0);
+        context.Physics.ColliderCount.Should().Be(0);
+    }
+
+    [Fact]
     public void RequireClosed_WithSaturatedScaledVolume_ShouldReportAndRejectNonRepresentableVolume()
     {
         CreateSubdividedClosedCubeTopology(8, out Vector3d[] vertices, out int[] triangles);
@@ -516,7 +541,7 @@ public sealed class PhysicsMeshScaleTests
         FixedBoundBox sphereBounds = spherePart.Bounds;
         FixedBoundBox compoundBounds = compound.Bounds;
 
-        transform.Scale = Vector3d.Zero;
+        transform.LocalScale = Vector3d.Zero;
         Action simulate = compound.Simulate;
 
         simulate.Should().Throw<ArgumentException>();
@@ -526,7 +551,7 @@ public sealed class PhysicsMeshScaleTests
         compound.Bounds.Should().Be(compoundBounds);
         context.Physics.ColliderCount.Should().Be(1);
 
-        transform.Scale = new Vector3d((Fixed64)2, Fixed64.One, Fixed64.One);
+        transform.LocalScale = new Vector3d((Fixed64)2, Fixed64.One, Fixed64.One);
         compound.Simulate();
 
         spherePart.RuntimeShapeVersion.Should().BeGreaterThan(sphereVersion);

@@ -83,7 +83,7 @@ public class LSMeshCollider : LSCollider
         SetBounds(Mesh.Bounds);
 
     protected override void OnBeforeInitialize(IMatterAgent agent) =>
-        ValidateRuntimeTransform(agent.Transform.LossyScale, agent.Transform.Rotation);
+        ValidateRuntimeTransform(agent.Transform.LossyScale, agent.Transform.WorldRotation);
 
     protected override void BuildShape()
     {

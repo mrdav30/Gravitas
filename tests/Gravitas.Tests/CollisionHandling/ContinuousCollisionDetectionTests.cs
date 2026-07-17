@@ -1,4 +1,5 @@
 using FixedMathSharp;
+using FixedMathSharp.Bounds;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
@@ -182,7 +183,7 @@ public sealed partial class ContinuousCollisionDetectionTests
         Vector3d endpoint = new(Fixed64.MaxValue, Fixed64.MaxValue, Fixed64.Zero);
         mover.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
 
-        mover.Body.Agent.Transform.Position = endpoint;
+        mover.Body.Agent.Transform.LocalPosition = endpoint;
         Action simulate = scenario.Context.LateSimulate;
 
         simulate.Should().Throw<ArgumentOutOfRangeException>();
@@ -199,11 +200,11 @@ public sealed partial class ContinuousCollisionDetectionTests
         mover.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
         mover.Body.FreezeAxes = BodyFreezeAxes3D.PositionX;
 
-        mover.Body.Agent.Transform.Position = new Vector3d(Fixed64.MaxValue, Fixed64.One, Fixed64.Zero);
+        mover.Body.Agent.Transform.LocalPosition = new Vector3d(Fixed64.MaxValue, Fixed64.One, Fixed64.Zero);
         scenario.Context.LateSimulate();
 
         mover.Body.Position3d.Should().Be(new Vector3d(start.X, Fixed64.One, Fixed64.Zero));
-        mover.Body.Agent.Transform.Position.Should().Be(mover.Body.Position3d);
+        mover.Body.Agent.Transform.LocalPosition.Should().Be(mover.Body.Position3d);
     }
 
     [Fact]
@@ -214,11 +215,11 @@ public sealed partial class ContinuousCollisionDetectionTests
         mover.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
         mover.Body.FreezeAxes = BodyFreezeAxes3D.PositionY | BodyFreezeAxes3D.PositionZ;
 
-        mover.Body.Agent.Transform.Position = new Vector3d(Fixed64.One, Fixed64.MaxValue, Fixed64.MaxValue);
+        mover.Body.Agent.Transform.LocalPosition = new Vector3d(Fixed64.One, Fixed64.MaxValue, Fixed64.MaxValue);
         scenario.Context.LateSimulate();
 
         mover.Body.Position3d.Should().Be(Vector3d.Right);
-        mover.Body.Agent.Transform.Position.Should().Be(Vector3d.Right);
+        mover.Body.Agent.Transform.LocalPosition.Should().Be(Vector3d.Right);
     }
 
     [Fact]
@@ -884,7 +885,7 @@ public sealed partial class ContinuousCollisionDetectionTests
     }
 
     [Fact]
-    public void ContinuousMode_WithNearSingularFrozenTargetMobility_ShouldUseSourceFallback()
+    public void ContinuousMode_WithNearSingularFrozenTargetMobility_ShouldApplyRepresentableResponse()
     {
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();
         Fixed64 smallOffset = Fixed64.FromFraction(1, 65536);
@@ -900,12 +901,81 @@ public sealed partial class ContinuousCollisionDetectionTests
 
         source.Body.LastContinuousCollisionToiIterationCount.Should().Be(1);
         source.Body.LastContinuousCollisionToiIterationLimitReached.Should().BeFalse();
-        target.Body.Position3d.Should().Be(new Vector3d(Fixed64.Zero, smallOffset, Fixed64.Zero));
-        target.Body.LinearVelocity.Should().Be(Vector3d.Zero);
+        target.Body.Position3d.Should().Be(new Vector3d(Fixed64.Zero, smallOffset * (Fixed64)4, Fixed64.Zero));
+        target.Body.LinearVelocity.Should().Be(Vector3d.Up * (smallOffset * (Fixed64)3));
     }
 
     [Fact]
-    public void ContinuousMode_WithNearSingularFrozenSourceMobility_ShouldStopZeroTimeIteration()
+    public void ContinuousMode_WithOverflowOnlyOnFrozenTargetAxis_ShouldApplyRepresentableResponse()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        ScenarioBody<LSSphereCollider> source = scenario.CreateSphere(-Vector3d.Right * (Fixed64)2);
+        ScenarioBody<LSSphereCollider> target = scenario.CreateSphere(Vector3d.Zero);
+        source.Body.Mass = Fixed64.MaxValue;
+        target.Body.Mass = Fixed64.MinIncrement;
+        target.Body.FreezeAxes = BodyFreezeAxes3D.PositionX;
+        target.Body.Sleep();
+        source.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        DisableGroundQueries(source.Body);
+
+        source.Body.ApplyCollisionLinearVelocityDelta(Vector3d.Right * (Fixed64)2);
+        scenario.Context.LateSimulate();
+
+        source.Body.LinearVelocity.X.Should().BeLessThan(Fixed64.Zero);
+        target.Body.Position3d.Should().Be(Vector3d.Zero);
+        target.Body.LinearVelocity.Should().Be(Vector3d.Zero);
+        target.Body.IsSleeping.Should().BeTrue();
+        source.Body.LastContinuousCollisionToiIterationCount.Should().Be(1);
+    }
+
+    [Fact]
+    public void ContinuousMode_WithAllowedTargetComponentOverflow_ShouldRejectPairAtomically()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        scenario.Context.SetFrameRate(65536);
+        scenario.Context.Environment.MaxSpeed = Fixed64.MaxValue;
+        scenario.Context.Environment.MaxFallSpeed = Fixed64.MaxValue;
+        Fixed64 normalOffset = Fixed64.FromFraction(1, 65536);
+        Vector3d direction = new Vector3d(Fixed64.One, normalOffset, Fixed64.Zero).Normalized;
+        ScenarioBody<LSSphereCollider> source = scenario.CreateSphere(direction * Fixed64.FromFraction(-3, 2));
+        ScenarioBody<LSSphereCollider> target = scenario.CreateSphere(Vector3d.Zero);
+        source.Body.Mass = Fixed64.MaxValue;
+        target.Body.Mass = Fixed64.MinIncrement;
+        target.Body.FreezeAxes = BodyFreezeAxes3D.PositionX;
+        target.Body.Sleep();
+        source.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        DisableGroundQueries(source.Body);
+
+        Fixed64 responseSpeed = (Fixed64)49152;
+        Fixed64 constrainedInverseMass = source.Body.GetConstrainedInverseMass(-direction)
+            + target.Body.GetConstrainedInverseMass(direction);
+        ContinuousCollisionImpulsePolicy.TryResolveVelocityDelta(
+            source.Body.ProjectLinearMotion(-direction),
+            responseSpeed,
+            source.Body.EffectiveInverseMass,
+            constrainedInverseMass,
+            out _).Should().BeTrue();
+        ContinuousCollisionImpulsePolicy.TryResolveVelocityDelta(
+            target.Body.ProjectLinearMotion(direction),
+            responseSpeed,
+            target.Body.EffectiveInverseMass,
+            constrainedInverseMass,
+            out Vector3d rejectedTargetDelta).Should().BeFalse();
+        rejectedTargetDelta.Should().Be(default);
+
+        source.Body.ApplyCollisionLinearVelocityDelta(direction * (Fixed64)32768);
+        scenario.Context.LateSimulate();
+
+        target.Body.Position3d.Should().Be(Vector3d.Zero);
+        target.Body.LinearVelocity.Should().Be(Vector3d.Zero);
+        target.Body.IsSleeping.Should().BeTrue();
+        source.Body.Position3d.X.Should().BeLessThan(Fixed64.Zero);
+        source.Body.LinearVelocity.Magnitude.Should().BeLessThanOrEqualTo(normalOffset);
+        source.Body.LastContinuousCollisionToiIterationCount.Should().Be(1);
+    }
+
+    [Fact]
+    public void ContinuousMode_WithNearSingularFrozenSourceMobility_ShouldApplyRepresentableResponse()
     {
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();
         Fixed64 smallOffset = Fixed64.FromFraction(1, 65536);
@@ -920,8 +990,10 @@ public sealed partial class ContinuousCollisionDetectionTests
 
         scenario.Context.LateSimulate();
 
-        source.Body.Position3d.Should().Be(sourceStart);
-        source.Body.LinearVelocity.Should().Be(Vector3d.Up * Fixed64.Half);
+        Fixed64 responseVelocity = Fixed64.Half + Fixed64.FromRaw((3L * 65536L) - 1L);
+        Fixed64 responsePosition = Fixed64.Half + Fixed64.FromRaw((4L * 65536L) - 1L);
+        source.Body.Position3d.Should().Be(new Vector3d(-Fixed64.One, responsePosition, Fixed64.Zero));
+        source.Body.LinearVelocity.Should().Be(Vector3d.Up * responseVelocity);
         source.Body.LastContinuousCollisionToiIterationCount.Should().Be(1);
         source.Body.LastContinuousCollisionToiIterationLimitReached.Should().BeFalse();
     }
@@ -1926,7 +1998,7 @@ public sealed partial class ContinuousCollisionDetectionTests
             isKinematic: true);
         source.Body.ContinuousCollisionMode = ContinuousCollisionMode.Auto;
 
-        source.Body.Agent.Transform.Position = new Vector3d(
+        source.Body.Agent.Transform.LocalPosition = new Vector3d(
             Fixed64.FromFraction(-19, 4),
             Fixed64.Zero,
             Fixed64.Zero);
@@ -1949,7 +2021,7 @@ public sealed partial class ContinuousCollisionDetectionTests
         _ = scenario.CreateStaticSphere(Vector3d.Right);
         source.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
 
-        source.Body.Agent.Transform.Position = Vector3d.Right * (Fixed64)2;
+        source.Body.Agent.Transform.LocalPosition = Vector3d.Right * (Fixed64)2;
         scenario.Context.LateSimulate();
 
         tinyRadius.Should().BeGreaterThan(Fixed64.Zero);
@@ -1960,26 +2032,28 @@ public sealed partial class ContinuousCollisionDetectionTests
     }
 
     [Fact]
-    public void ContinuousMode_WithZeroScaleKinematicCuboid_ShouldReachHostPoseWithoutCcd()
+    public void ContinuousMode_WithZeroScaleKinematicCuboid_ShouldRejectBeforeCcdStateMutation()
     {
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();
-        CreateStaticWall(scenario, Fixed64.Zero);
         ScenarioBody<LSCuboidCollider> source = scenario.CreateBody(
             new LSCuboidCollider(),
             new Vector3d((Fixed64)(-2), Fixed64.Zero, Fixed64.Zero),
             FixedQuaternion.Identity,
             isKinematic: true);
         source.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
-        source.Body.PositionTransform.Scale = Vector3d.Zero;
-        source.Collider.Simulate();
-        source.Body.ResolveContinuousCollisionProxyRadius().Should().Be(Fixed64.Zero);
-        Vector3d targetPosition = new((Fixed64)2, Fixed64.Zero, Fixed64.Zero);
+        Vector3d originalPosition = source.Body.Position3d;
+        FixedBoundBox originalBounds = source.Collider.Bounds;
+        uint originalShapeVersion = source.Collider.RuntimeShapeVersion;
+        source.Body.PositionTransform.LocalScale = Vector3d.Zero;
 
-        source.Body.Agent.Transform.Position = targetPosition;
-        scenario.Context.LateSimulate();
+        Action rebuild = source.Collider.Simulate;
 
-        source.Body.Position3d.Should().Be(targetPosition);
+        rebuild.Should().Throw<ArgumentException>().WithParameterName("scale");
+        source.Body.Position3d.Should().Be(originalPosition);
+        source.Collider.Bounds.Should().Be(originalBounds);
+        source.Collider.RuntimeShapeVersion.Should().Be(originalShapeVersion);
         source.Body.LastContinuousCollisionToiIterationCount.Should().Be(0);
+        source.Body.PositionTransform.LocalScale.Should().Be(Vector3d.Zero);
     }
 
     [Fact]
@@ -1987,7 +2061,7 @@ public sealed partial class ContinuousCollisionDetectionTests
     {
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();
         ScenarioBody<LSCuboidCollider> source = scenario.CreateCuboid(Vector3d.Zero);
-        source.Body.PositionTransform.Scale = new Vector3d((Fixed64)40000, (Fixed64)80000, (Fixed64)80000);
+        source.Body.PositionTransform.LocalScale = new Vector3d((Fixed64)40000, (Fixed64)80000, (Fixed64)80000);
         source.Collider.RebuildRuntimeShapeOnly(refreshMassProperties: false);
 
         source.Body.ResolveContinuousCollisionProxyRadius().Should().Be((Fixed64)60000);
@@ -2003,7 +2077,7 @@ public sealed partial class ContinuousCollisionDetectionTests
             isKinematic: true);
         source.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
 
-        source.Body.Agent.Transform.Position = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
+        source.Body.Agent.Transform.LocalPosition = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
         scenario.Context.LateSimulate();
 
         source.Body.Position3d.X.Should().BeLessThanOrEqualTo(-Fixed64.One);
@@ -2021,7 +2095,7 @@ public sealed partial class ContinuousCollisionDetectionTests
             isKinematic: true);
         source.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
 
-        source.Body.Agent.Transform.Position = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
+        source.Body.Agent.Transform.LocalPosition = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
         scenario.Context.LateSimulate();
 
         source.Body.Position3d.X.Should().Be((Fixed64)5);
@@ -2045,7 +2119,7 @@ public sealed partial class ContinuousCollisionDetectionTests
         target.Body.InverseMass.Should().BeGreaterThan(Fixed64.Zero);
         target.Body.InverseMass.Should().BeLessThanOrEqualTo(Fixed64.Epsilon);
 
-        source.Body.Agent.Transform.Position = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
+        source.Body.Agent.Transform.LocalPosition = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
         scenario.Context.LateSimulate();
 
         source.Body.Position3d.X.Should().Be((Fixed64)5);
@@ -2070,7 +2144,7 @@ public sealed partial class ContinuousCollisionDetectionTests
         var hostTarget = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
 
         deactivator.Body.AddForce(Vector3d.Right);
-        source.Body.Agent.Transform.Position = hostTarget;
+        source.Body.Agent.Transform.LocalPosition = hostTarget;
         scenario.Context.LateSimulate();
 
         deactivator.Body.Position3d.Should().Be(new Vector3d(Fixed64.One, Fixed64.Zero, (Fixed64)3));
@@ -2098,7 +2172,7 @@ public sealed partial class ContinuousCollisionDetectionTests
         Vector3d hostTarget = Vector3d.Right * (Fixed64)5;
 
         deactivator.Body.AddForce(Vector3d.Right);
-        source.Body.Agent.Transform.Position = hostTarget;
+        source.Body.Agent.Transform.LocalPosition = hostTarget;
         scenario.Context.LateSimulate();
 
         target.Body.Active.Should().BeTrue();
@@ -2128,7 +2202,7 @@ public sealed partial class ContinuousCollisionDetectionTests
         DisableGroundQueries(source.Body);
         DisableGroundQueries(target.Body);
 
-        source.Body.Agent.Transform.Position = Vector3d.Right * (Fixed64)10;
+        source.Body.Agent.Transform.LocalPosition = Vector3d.Right * (Fixed64)10;
         scenario.Context.LateSimulate();
 
         source.Body.Position3d.X.Should().Be((Fixed64)10);
@@ -2165,7 +2239,7 @@ public sealed partial class ContinuousCollisionDetectionTests
             || sourceBounds.Max.Z < targetBounds.Min.Z);
         broadBoundsOverlap.Should().BeTrue();
 
-        source.Body.Agent.Transform.Position = hostTarget;
+        source.Body.Agent.Transform.LocalPosition = hostTarget;
         scenario.Context.LateSimulate();
 
         source.Body.Position3d.Should().Be(hostTarget);
@@ -2187,7 +2261,7 @@ public sealed partial class ContinuousCollisionDetectionTests
             isKinematic: true);
         source.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
 
-        source.Body.Agent.Transform.Position = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
+        source.Body.Agent.Transform.LocalPosition = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
         scenario.Context.LateSimulate();
 
         source.Body.Position3d.X.Should().Be((Fixed64)5);
@@ -2198,7 +2272,7 @@ public sealed partial class ContinuousCollisionDetectionTests
     }
 
     [Fact]
-    public void ContinuousMode_WithKinematicSourceAndNearSingularFrozenTargetMobility_ShouldNotPushTarget()
+    public void ContinuousMode_WithKinematicSourceAndNearSingularFrozenTargetMobility_ShouldPushAllowedAxis()
     {
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();
         Fixed64 smallOffset = Fixed64.FromFraction(1, 65536);
@@ -2212,14 +2286,18 @@ public sealed partial class ContinuousCollisionDetectionTests
         source.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
         Vector3d hostTarget = Vector3d.Right * (Fixed64)5;
 
-        source.Body.Agent.Transform.Position = hostTarget;
+        source.Body.Agent.Transform.LocalPosition = hostTarget;
         scenario.Context.LateSimulate();
 
         source.Body.Position3d.Should().Be(hostTarget);
-        source.Body.LastContinuousCollisionToiIterationCount.Should().Be(0);
-        target.Body.Position3d.Should().Be(new Vector3d(Fixed64.Zero, smallOffset, Fixed64.Zero));
-        target.Body.LinearVelocity.Should().Be(Vector3d.Zero);
-        target.Body.IsSleeping.Should().BeTrue();
+        target.Body.Position3d.X.Should().Be(Fixed64.Zero);
+        target.Body.Position3d.Y.Should().BeGreaterThan(smallOffset);
+        target.Body.Position3d.Z.Should().Be(Fixed64.Zero);
+        target.Body.LinearVelocity.X.Should().Be(Fixed64.Zero);
+        target.Body.LinearVelocity.Y.Should().BeGreaterThan(Fixed64.Zero);
+        target.Body.LinearVelocity.Z.Should().Be(Fixed64.Zero);
+        target.Body.IsSleeping.Should().BeFalse();
+        source.Body.LastContinuousCollisionToiIterationCount.Should().Be(1);
     }
 
     [Fact]
@@ -2235,7 +2313,7 @@ public sealed partial class ContinuousCollisionDetectionTests
             isKinematic: true);
         source.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
 
-        source.Body.Agent.Transform.Position = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
+        source.Body.Agent.Transform.LocalPosition = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
         scenario.Context.LateSimulate();
 
         middle.Body.IsSleeping.Should().BeFalse();
@@ -2259,7 +2337,7 @@ public sealed partial class ContinuousCollisionDetectionTests
             isKinematic: true);
         source.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
 
-        source.Body.Agent.Transform.Position = new Vector3d((Fixed64)7, Fixed64.Zero, Fixed64.Zero);
+        source.Body.Agent.Transform.LocalPosition = new Vector3d((Fixed64)7, Fixed64.Zero, Fixed64.Zero);
         scenario.Context.LateSimulate();
 
         source.Body.Position3d.X.Should().BeLessThan((Fixed64)7);
@@ -2282,7 +2360,7 @@ public sealed partial class ContinuousCollisionDetectionTests
             isKinematic: true);
         source.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
 
-        source.Body.Agent.Transform.Position = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
+        source.Body.Agent.Transform.LocalPosition = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
         scenario.Context.LateSimulate();
 
         Fixed64 expectedFirstHitX = -Fixed64.One;
@@ -2314,7 +2392,7 @@ public sealed partial class ContinuousCollisionDetectionTests
             Fixed64.Zero,
             (Fixed64)90,
             Fixed64.Zero);
-        blade.Body.Agent.Transform.Rotation = fullTurn;
+        blade.Body.Agent.Transform.LocalRotation = fullTurn;
         scenario.Context.LateSimulate();
 
         FixedQuaternion.Angle(blade.Body.Rotation, fullTurn).Should().BeGreaterThan(Fixed64.Zero);
@@ -2385,8 +2463,8 @@ public sealed partial class ContinuousCollisionDetectionTests
         blade.Body.ContinuousCollisionMode = ContinuousCollisionMode.Auto;
         FixedQuaternion hostRotation = PhysicsScenarioBuilder.Yaw(5);
 
-        blade.Body.Agent.Transform.Rotation = hostRotation;
-        FixedQuaternion expectedRotation = blade.Body.Agent.Transform.Rotation;
+        blade.Body.Agent.Transform.LocalRotation = hostRotation;
+        FixedQuaternion expectedRotation = blade.Body.Agent.Transform.LocalRotation;
         scenario.Context.LateSimulate();
 
         blade.Body.Rotation.Should().Be(expectedRotation);
@@ -2405,7 +2483,7 @@ public sealed partial class ContinuousCollisionDetectionTests
         blade.Body.ContinuousCollisionMode = ContinuousCollisionMode.Auto;
         FixedQuaternion hostRotation = PhysicsScenarioBuilder.Yaw(90);
 
-        blade.Body.Agent.Transform.Rotation = hostRotation;
+        blade.Body.Agent.Transform.LocalRotation = hostRotation;
         scenario.Context.LateSimulate();
 
         FixedQuaternion.Angle(blade.Body.Rotation, FixedQuaternion.Identity).Should().BeGreaterThan(Fixed64.Zero);
@@ -2421,7 +2499,7 @@ public sealed partial class ContinuousCollisionDetectionTests
         blade.Body.ContinuousCollisionMode = ContinuousCollisionMode.Auto;
         FixedQuaternion hostRotation = PhysicsScenarioBuilder.Yaw(90);
 
-        blade.Body.Agent.Transform.Rotation = hostRotation;
+        blade.Body.Agent.Transform.LocalRotation = hostRotation;
         scenario.Context.LateSimulate();
 
         blade.Body.Rotation.Should().Be(hostRotation);
@@ -2447,8 +2525,8 @@ public sealed partial class ContinuousCollisionDetectionTests
             Fixed64.Zero,
             (Fixed64)90,
             Fixed64.Zero);
-        blade.Body.Agent.Transform.Position = Vector3d.Zero;
-        blade.Body.Agent.Transform.Rotation = fullTurn;
+        blade.Body.Agent.Transform.LocalPosition = Vector3d.Zero;
+        blade.Body.Agent.Transform.LocalRotation = fullTurn;
         scenario.Context.LateSimulate();
 
         FixedQuaternion.Angle(blade.Body.Rotation, fullTurn).Should().BeGreaterThan(Fixed64.Zero);
@@ -2475,7 +2553,7 @@ public sealed partial class ContinuousCollisionDetectionTests
             Fixed64.Zero,
             (Fixed64)90,
             Fixed64.Zero);
-        blade.Body.Agent.Transform.Rotation = hostRotation;
+        blade.Body.Agent.Transform.LocalRotation = hostRotation;
         scenario.Context.LateSimulate();
 
         blade.Body.Rotation.Should().Be(hostRotation);
@@ -2495,7 +2573,7 @@ public sealed partial class ContinuousCollisionDetectionTests
         void SimulateKinematicCcd()
         {
             source.Body.ResetPosition(new Vector3d((Fixed64)(-5), Fixed64.Zero, Fixed64.Zero), FixedQuaternion.Identity);
-            source.Body.Agent.Transform.Position = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
+            source.Body.Agent.Transform.LocalPosition = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
             scenario.Context.Simulate();
             scenario.Context.LateSimulate();
         }
@@ -2541,7 +2619,7 @@ public sealed partial class ContinuousCollisionDetectionTests
                 SolidBody source = sources[i];
                 Vector3d position = positions[i];
                 source.ResetPosition(position, FixedQuaternion.Identity);
-                source.Agent.Transform.Position = position + displacement;
+                source.Agent.Transform.LocalPosition = position + displacement;
             }
 
             context.Simulate();

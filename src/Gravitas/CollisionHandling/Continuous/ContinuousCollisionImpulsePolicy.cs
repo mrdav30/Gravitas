@@ -11,26 +11,54 @@ namespace Gravitas.CollisionHandling;
 
 internal static class ContinuousCollisionImpulsePolicy
 {
-    internal static bool IsResolvableMobility(
-        Fixed64 bodyInverseMass,
-        Fixed64 constrainedInverseMass) =>
-        bodyInverseMass <= Fixed64.Zero
-        || (constrainedInverseMass > Fixed64.Zero
-            && constrainedInverseMass / bodyInverseMass > Fixed64.Epsilon);
-
-    internal static Vector3d ResolveVelocityDelta(
+    internal static bool TryResolveVelocityDelta(
         Vector3d normal,
         Fixed64 responseSpeed,
         Fixed64 bodyInverseMass,
-        Fixed64 constrainedInverseMass) =>
-        (normal * (bodyInverseMass / constrainedInverseMass)) * responseSpeed;
+        Fixed64 constrainedInverseMass,
+        out Vector3d velocityDelta)
+    {
+        if (bodyInverseMass == Fixed64.Zero)
+        {
+            velocityDelta = default;
+            return true;
+        }
 
-    internal static Vector2d ResolveVelocityDelta(
+        if (!Fixed64.TryMultiplyDivide(normal.X, responseSpeed, bodyInverseMass, constrainedInverseMass, out Fixed64 x)
+            || !Fixed64.TryMultiplyDivide(normal.Y, responseSpeed, bodyInverseMass, constrainedInverseMass, out Fixed64 y)
+            || !Fixed64.TryMultiplyDivide(normal.Z, responseSpeed, bodyInverseMass, constrainedInverseMass, out Fixed64 z))
+        {
+            velocityDelta = default;
+            return false;
+        }
+
+        velocityDelta = new Vector3d(x, y, z);
+        return true;
+    }
+
+    internal static bool TryResolveVelocityDelta(
         Vector2d normal,
         Fixed64 responseSpeed,
         Fixed64 bodyInverseMass,
-        Fixed64 constrainedInverseMass) =>
-        (normal * (bodyInverseMass / constrainedInverseMass)) * responseSpeed;
+        Fixed64 constrainedInverseMass,
+        out Vector2d velocityDelta)
+    {
+        if (bodyInverseMass == Fixed64.Zero)
+        {
+            velocityDelta = default;
+            return true;
+        }
+
+        if (!Fixed64.TryMultiplyDivide(normal.X, responseSpeed, bodyInverseMass, constrainedInverseMass, out Fixed64 x)
+            || !Fixed64.TryMultiplyDivide(normal.Y, responseSpeed, bodyInverseMass, constrainedInverseMass, out Fixed64 y))
+        {
+            velocityDelta = default;
+            return false;
+        }
+
+        velocityDelta = new Vector2d(x, y);
+        return true;
+    }
 
     internal static bool TryResolveSourceNormal(
         Vector3d normalForSource,

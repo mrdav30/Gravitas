@@ -111,6 +111,61 @@ public sealed class GjkSimplexScaleTests
     }
 
     [Fact]
+    public void ThreeTermShift_ShouldCoverNegativeOddRawExpansion()
+    {
+        Vector2d point = new(Fixed64.MaxValue, Fixed64.Zero);
+        Vector2d target = new(Fixed64.MinValue, Fixed64.Zero);
+        Vector2d negativeExpansion = new(-Fixed64.MinIncrement, Fixed64.Zero);
+
+        int shift = GjkSimplexScale.SelectThreeTermShift(
+            point,
+            target,
+            target,
+            Fixed64.MinIncrement);
+        Vector2d difference = GjkSimplexScale.CreateWorkingDifference(
+            point,
+            target,
+            negativeExpansion,
+            shift);
+
+        Assert.Equal(2, shift);
+        Assert.Equal(Fixed64.FromRaw(1L << 62), difference.X);
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(3)]
+    public void CoordinateShiftOutsideSupportedRange_ShouldThrow(int shift)
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => GjkSimplexScale.GetCoordinateScale(shift));
+        Assert.Throws<ArgumentOutOfRangeException>(() => GjkSimplexScale.RestoreDistance(Fixed64.One, shift));
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            GjkSimplexScale.CreateWorkingDifference(Vector3d.Zero, Vector3d.Zero, shift));
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            GjkSimplexScale.CreateWorkingDifference(Vector2d.Zero, Vector2d.Zero, shift));
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            GjkSimplexScale.CreateWorkingDifference(Vector2d.Zero, Vector2d.Zero, Vector2d.Zero, shift));
+    }
+
+    [Fact]
+    public void WorkingDifference_WithInsufficientValidShift_ShouldThrow()
+    {
+        Assert.Throws<InvalidOperationException>(() => GjkSimplexScale.CreateWorkingDifference(
+            new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero),
+            new Vector3d(Fixed64.MinValue, Fixed64.Zero, Fixed64.Zero),
+            shift: 0));
+        Assert.Throws<InvalidOperationException>(() => GjkSimplexScale.CreateWorkingDifference(
+            new Vector2d(Fixed64.MaxValue, Fixed64.Zero),
+            new Vector2d(Fixed64.MinValue, Fixed64.Zero),
+            shift: 0));
+        Assert.Throws<InvalidOperationException>(() => GjkSimplexScale.CreateWorkingDifference(
+            new Vector2d(Fixed64.MaxValue, Fixed64.Zero),
+            new Vector2d(Fixed64.MinValue, Fixed64.Zero),
+            new Vector2d(-Fixed64.MinIncrement, Fixed64.Zero),
+            shift: 1));
+    }
+
+    [Fact]
     public void ScaleForProducts_ShouldBoundExtremeSpatialCoordinates()
     {
         Span<Vector3d> points = stackalloc Vector3d[2];

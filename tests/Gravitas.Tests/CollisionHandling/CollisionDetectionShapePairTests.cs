@@ -1,4 +1,5 @@
 using FixedMathSharp;
+using FixedMathSharp.Bounds;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
@@ -909,11 +910,12 @@ public sealed class CollisionDetectionShapePairTests
             cylinderA.Collider,
             cylinderB.Collider,
             Vector3d.Cross(cylinderA.Collider.LineDirection, cylinderB.Collider.LineDirection)).Should().BeTrue();
-        (Vector3d PointA, Vector3d PointB) closestPoints = Vector3d.ClosestPointsOnTwoLines(
+        (Vector3d PointA, Vector3d PointB) closestPoints = new FixedSegment(
             cylinderA.Collider.LineSegmentStart,
-            cylinderA.Collider.LineSegmentEnd,
-            cylinderB.Collider.LineSegmentStart,
-            cylinderB.Collider.LineSegmentEnd);
+            cylinderA.Collider.LineSegmentEnd).GetClosestPoints(
+                new FixedSegment(
+                    cylinderB.Collider.LineSegmentStart,
+                    cylinderB.Collider.LineSegmentEnd));
         CylinderProjectionsOverlap(cylinderA.Collider, cylinderB.Collider, closestPoints.PointB - closestPoints.PointA).Should().BeTrue();
         AssertNoCollision(scenario, cylinderA.Collider, cylinderB.Collider, CollisionType.Cylinder_Cylinder);
     }
@@ -932,11 +934,12 @@ public sealed class CollisionDetectionShapePairTests
         CylinderProjectionsOverlap(cylinderA.Collider, cylinderB.Collider, cylinderB.Collider.LineDirection).Should().BeTrue();
         Vector3d crossAxis = Vector3d.Cross(cylinderA.Collider.LineDirection, cylinderB.Collider.LineDirection);
         CylinderProjectionsOverlap(cylinderA.Collider, cylinderB.Collider, crossAxis).Should().BeFalse();
-        (Vector3d PointA, Vector3d PointB) closestPoints = Vector3d.ClosestPointsOnTwoLines(
+        (Vector3d PointA, Vector3d PointB) closestPoints = new FixedSegment(
             cylinderA.Collider.LineSegmentStart,
-            cylinderA.Collider.LineSegmentEnd,
-            cylinderB.Collider.LineSegmentStart,
-            cylinderB.Collider.LineSegmentEnd);
+            cylinderA.Collider.LineSegmentEnd).GetClosestPoints(
+                new FixedSegment(
+                    cylinderB.Collider.LineSegmentStart,
+                    cylinderB.Collider.LineSegmentEnd));
         CylinderProjectionsOverlap(cylinderA.Collider, cylinderB.Collider, closestPoints.PointB - closestPoints.PointA).Should().BeFalse();
         AssertNoCollision(scenario, cylinderA.Collider, cylinderB.Collider, CollisionType.Cylinder_Cylinder);
     }
@@ -1912,7 +1915,7 @@ public sealed class CollisionDetectionShapePairTests
             CreateHorizontalPlaneMesh(),
             Vector3d.Zero,
             FixedQuaternion.Identity);
-        floor.Body.PositionTransform.Scale = new Vector3d((Fixed64)2, Fixed64.One, (Fixed64)3);
+        floor.Body.PositionTransform.LocalScale = new Vector3d((Fixed64)2, Fixed64.One, (Fixed64)3);
         floor.Collider.Simulate();
         ScenarioBody<LSCuboidCollider> cuboid = scenario.CreateCuboid(
             new Vector3d((Fixed64)3, Fixed64.FromFraction(1, 4), Fixed64.Zero));

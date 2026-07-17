@@ -29,16 +29,38 @@ internal static class GjkSimplexScale
         CreateWorkingDifference(first, second, 1);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Vector3d CreateWorkingDifference(Vector3d first, Vector3d second, int shift) =>
-        ScaleByPowerOfTwo(first, shift) - ScaleByPowerOfTwo(second, shift);
+    public static Vector3d CreateWorkingDifference(Vector3d first, Vector3d second, int shift)
+    {
+        ValidateShift(shift);
+        if (Vector3d.TrySubtract(
+            ScaleByPowerOfTwo(first, shift),
+            ScaleByPowerOfTwo(second, shift),
+            out Vector3d difference))
+        {
+            return difference;
+        }
+
+        throw new InvalidOperationException("The selected GJK working shift does not preserve an exact difference.");
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Vector2d CreateWorkingDifference(Vector2d first, Vector2d second) =>
         CreateWorkingDifference(first, second, 2);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Vector2d CreateWorkingDifference(Vector2d first, Vector2d second, int shift) =>
-        ScaleByPowerOfTwo(first, shift) - ScaleByPowerOfTwo(second, shift);
+    public static Vector2d CreateWorkingDifference(Vector2d first, Vector2d second, int shift)
+    {
+        ValidateShift(shift);
+        if (Vector2d.TrySubtract(
+            ScaleByPowerOfTwo(first, shift),
+            ScaleByPowerOfTwo(second, shift),
+            out Vector2d difference))
+        {
+            return difference;
+        }
+
+        throw new InvalidOperationException("The selected GJK working shift does not preserve an exact difference.");
+    }
 
     /// <summary>
     /// Creates a three-term Minkowski difference in the shared GJK working
@@ -53,10 +75,23 @@ internal static class GjkSimplexScale
         Vector2d first,
         Vector2d second,
         Vector2d third,
-        int shift) =>
-        ScaleByPowerOfTwo(first, shift)
-            - ScaleByPowerOfTwo(second, shift)
-            - ScaleByPowerOfTwo(third, shift);
+        int shift)
+    {
+        ValidateShift(shift);
+        if (Vector2d.TrySubtract(
+                ScaleByPowerOfTwo(first, shift),
+                ScaleByPowerOfTwo(second, shift),
+                out Vector2d difference)
+            && Vector2d.TrySubtract(
+                difference,
+                ScaleByPowerOfTwo(third, shift),
+                out Vector2d result))
+        {
+            return result;
+        }
+
+        throw new InvalidOperationException("The selected GJK working shift does not preserve an exact difference.");
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Fixed64 RestoreTwoTermDistance(Fixed64 workingDistance) =>
@@ -67,17 +102,23 @@ internal static class GjkSimplexScale
         RestoreDistance(workingDistance, 2);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Fixed64 RestoreDistance(Fixed64 workingDistance, int shift) =>
-        shift == 0 ? workingDistance : workingDistance * (1 << shift);
+    public static Fixed64 RestoreDistance(Fixed64 workingDistance, int shift)
+    {
+        ValidateShift(shift);
+        return shift == 0 ? workingDistance : workingDistance * (1 << shift);
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Fixed64 GetCoordinateScale(int shift) =>
-        shift switch
+    public static Fixed64 GetCoordinateScale(int shift)
+    {
+        ValidateShift(shift);
+        return shift switch
         {
             0 => Fixed64.One,
             1 => Fixed64.Half,
             _ => Fixed64.Quarter
         };
+    }
 
     public static int SelectTwoTermShift(
         Vector3d firstMin,
@@ -101,27 +142,23 @@ internal static class GjkSimplexScale
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Vector3d ScaleByPowerOfTwo(Vector3d value, int shift) =>
         new(
-            Fixed64.FromRaw(value.X.m_rawValue >> shift),
-            Fixed64.FromRaw(value.Y.m_rawValue >> shift),
-            Fixed64.FromRaw(value.Z.m_rawValue >> shift));
+            value.X >> shift,
+            value.Y >> shift,
+            value.Z >> shift);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Vector2d ScaleByPowerOfTwo(Vector2d value, int shift) =>
         new(
-            Fixed64.FromRaw(value.X.m_rawValue >> shift),
-            Fixed64.FromRaw(value.Y.m_rawValue >> shift));
+            value.X >> shift,
+            value.Y >> shift);
 
     private static bool CanSubtractBounds(
         Vector3d firstMin,
         Vector3d firstMax,
         Vector3d secondMin,
         Vector3d secondMax) =>
-        CanSubtract(firstMax.X.m_rawValue, secondMin.X.m_rawValue)
-            && CanSubtract(firstMin.X.m_rawValue, secondMax.X.m_rawValue)
-            && CanSubtract(firstMax.Y.m_rawValue, secondMin.Y.m_rawValue)
-            && CanSubtract(firstMin.Y.m_rawValue, secondMax.Y.m_rawValue)
-            && CanSubtract(firstMax.Z.m_rawValue, secondMin.Z.m_rawValue)
-            && CanSubtract(firstMin.Z.m_rawValue, secondMax.Z.m_rawValue);
+        Vector3d.TrySubtract(firstMax, secondMin, out _)
+            && Vector3d.TrySubtract(firstMin, secondMax, out _);
 
     private static bool CanSubtractExpandedBounds(
         Vector2d point,
@@ -130,47 +167,33 @@ internal static class GjkSimplexScale
         Fixed64 expansionRadius,
         int shift)
     {
-        long pointX = point.X.m_rawValue >> shift;
-        long pointY = point.Y.m_rawValue >> shift;
-        long targetMinX = targetMin.X.m_rawValue >> shift;
-        long targetMinY = targetMin.Y.m_rawValue >> shift;
-        long targetMaxX = targetMax.X.m_rawValue >> shift;
-        long targetMaxY = targetMax.Y.m_rawValue >> shift;
-        long radius = expansionRadius.m_rawValue >> shift;
+        Vector2d scaledPoint = ScaleByPowerOfTwo(point, shift);
+        Vector2d scaledMin = ScaleByPowerOfTwo(targetMin, shift);
+        Vector2d scaledMax = ScaleByPowerOfTwo(targetMax, shift);
+        Fixed64 scaledRadius = ScaleRadiusCeiling(expansionRadius, shift);
+        Vector2d radius = new(scaledRadius, scaledRadius);
 
-        return CanSubtractThenAdd(pointX, targetMinX, radius)
-            && CanSubtractThenSubtract(pointX, targetMaxX, radius)
-            && CanSubtractThenAdd(pointY, targetMinY, radius)
-            && CanSubtractThenSubtract(pointY, targetMaxY, radius);
+        return Vector2d.TrySubtract(scaledPoint, scaledMin, out Vector2d positiveDifference)
+            && Vector2d.TryAdd(positiveDifference, radius, out _)
+            && Vector2d.TrySubtract(scaledPoint, scaledMax, out Vector2d negativeDifference)
+            && Vector2d.TrySubtract(negativeDifference, radius, out _);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool CanSubtract(long first, long second)
+    private static Fixed64 ScaleRadiusCeiling(Fixed64 radius, int shift)
     {
-        long result = unchecked(first - second);
-        return ((first ^ second) & (first ^ result)) >= 0;
+        Fixed64 scaled = radius >> shift;
+        if (shift == 0 || (scaled << shift) == radius)
+            return scaled;
+
+        return scaled + Fixed64.MinIncrement;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool CanSubtractThenAdd(long first, long second, long third)
+    private static void ValidateShift(int shift)
     {
-        long difference = unchecked(first - second);
-        if (((first ^ second) & (first ^ difference)) < 0)
-            return false;
-
-        long result = unchecked(difference + third);
-        return ((difference ^ result) & (third ^ result)) >= 0;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool CanSubtractThenSubtract(long first, long second, long third)
-    {
-        long difference = unchecked(first - second);
-        if (((first ^ second) & (first ^ difference)) < 0)
-            return false;
-
-        long result = unchecked(difference - third);
-        return ((difference ^ third) & (difference ^ result)) >= 0;
+        if ((uint)shift > 2U)
+            throw new ArgumentOutOfRangeException(nameof(shift), "GJK coordinate shifts must be between zero and two.");
     }
 
     public static Fixed64 ScaleForProducts(Span<Vector3d> points)

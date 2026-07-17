@@ -603,6 +603,33 @@ public sealed class Constraint3DServiceTests
     }
 
     [Fact]
+    public void FixedJoint_WithQuaternionLogEndpointDrift_ShouldSolveWithoutDomainFailure()
+    {
+        using PhysicsScenarioBuilder scenario = CreateConstraintScenario();
+        ScenarioBody<LSSphereCollider> first = scenario.CreateSphere(Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> second = scenario.CreateSphere(Vector3d.Right * (Fixed64)2);
+        second.Body.SetRotation(new FixedQuaternion(
+            Fixed64.FromRaw(4_096),
+            Fixed64.Zero,
+            Fixed64.Zero,
+            Fixed64.One + Fixed64.MinIncrement));
+        Joint3D joint = scenario.Context.Constraints3D.RegisterJoint(new JointDefinition3D(
+            first.Body,
+            second.Body,
+            LocalFrame(Vector3d.Zero),
+            LocalFrame(Vector3d.Zero),
+            JointType3D.Fixed,
+            JointLimit3D.Unrestricted,
+            JointMotor3D.Disabled,
+            JointCollisionPolicy.SuppressLinked));
+
+        Action solve = () => Step(scenario.Context, 1);
+
+        solve.Should().NotThrow();
+        joint.LastSolvedRowCount.Should().BeGreaterThan(0);
+    }
+
+    [Fact]
     public void HingeJoint_ShouldAlignHingeAxesWithoutLockingHingeRotation()
     {
         using PhysicsScenarioBuilder scenario = CreateConstraintScenario();

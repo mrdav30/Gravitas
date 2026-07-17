@@ -100,7 +100,7 @@ public sealed partial class GravitasQueryMixedService
     {
         SwiftThrowHelper.ThrowIfArgument(radius <= Fixed64.Zero, nameof(radius), "Mixed swept sphere radius must be greater than zero.");
 
-        if (!FixedVectorDifference.TryCreate(start, end, out Vector3d segment)
+        if (!Vector3d.TrySubtract(end, start, out Vector3d segment)
             || !Vector3d.TryGetMagnitude(segment, out Fixed64 length)
             || length <= Fixed64.Epsilon)
         {
@@ -181,7 +181,7 @@ public sealed partial class GravitasQueryMixedService
         SwiftThrowHelper.ThrowIfArgument(radius <= Fixed64.Zero, nameof(radius), "Mixed swept sphere radius must be greater than zero.");
 
         results.FastClear();
-        if (!FixedVectorDifference.TryCreate(start, end, out Vector3d segment)
+        if (!Vector3d.TrySubtract(end, start, out Vector3d segment)
             || !Vector3d.TryGetMagnitude(segment, out Fixed64 length)
             || length <= Fixed64.Epsilon)
         {

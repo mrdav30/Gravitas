@@ -6,6 +6,7 @@ using Gravitas.Tests.Support;
 using GridForge.Spatial;
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using Xunit;
 
 namespace Gravitas.Tests.Serialization;
@@ -13,6 +14,27 @@ namespace Gravitas.Tests.Serialization;
 public sealed class SolidBody2DSerializationTests
 {
     public static TheoryData<GravitasSerializationTransport> Transports => GravitasSerializationTransportCases.All();
+
+    [Theory]
+    [MemberData(nameof(Transports))]
+    public void Populate_WithLegacyMultiTurnRotation_ShouldCanonicalizeAuthoritativeState(
+        GravitasSerializationTransport transport)
+    {
+        using GravitasWorldContext sourceContext = Physics2DTestWorld.CreateContext();
+        SolidBody2D source = CreateDynamicCircle(sourceContext);
+        FieldInfo rotationField = typeof(SolidBody2D).GetField(
+            "_rotation",
+            BindingFlags.Instance | BindingFlags.NonPublic)!;
+        rotationField.SetValue(source, Fixed64.Pi * (Fixed64)3);
+        object payload = GravitasSerializationHarness.Serialize(source, transport);
+
+        using GravitasWorldContext targetContext = Physics2DTestWorld.CreateContext();
+        SolidBody2D target = CreateDynamicCircle(targetContext);
+
+        GravitasSerializationHarness.Populate(target, payload, transport);
+
+        target.Rotation.Should().Be(-Fixed64.Pi);
+    }
 
     [Theory]
     [MemberData(nameof(Transports))]

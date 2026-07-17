@@ -65,7 +65,7 @@ public sealed class MatterAgentContextTests
 
         collider.InitializeWithNoBody(agent);
 
-        transform.Position = new Vector3d((Fixed64)4, Fixed64.Zero, Fixed64.Zero);
+        transform.LocalPosition = new Vector3d((Fixed64)4, Fixed64.Zero, Fixed64.Zero);
         context.Simulate();
         context.LateSimulate();
 

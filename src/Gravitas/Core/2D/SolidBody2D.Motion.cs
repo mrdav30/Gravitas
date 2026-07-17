@@ -62,10 +62,11 @@ public sealed partial class SolidBody2D
 
     public void SetRotation(Fixed64 rotation)
     {
-        if (_rotation != rotation)
+        Fixed64 canonicalRotation = CanonicalizeRotation(rotation);
+        if (_rotation != canonicalRotation)
             Wake();
 
-        _rotation = rotation;
+        _rotation = canonicalRotation;
         Collider.Rebuild();
     }
 

@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using FixedMathSharp.Bounds;
 using Gravitas.Colliders;
 
 namespace Gravitas.CollisionHandling;
@@ -95,7 +96,7 @@ internal static class MixedEmbedded2DGeometry
         out Vector2d boundary,
         out Fixed64 distance)
     {
-        Vector2d segmentPoint = PlanarSegmentGeometry.ClosestPoint(point, capsule.SegmentStart, capsule.SegmentEnd);
+        Vector2d segmentPoint = new FixedSegment2d(capsule.SegmentStart, capsule.SegmentEnd).ClosestPoint(point);
         Vector2d delta = point - segmentPoint;
         Fixed64 magnitude = delta.Magnitude;
         Vector2d direction = magnitude > Fixed64.Epsilon ? delta / magnitude : Vector2d.Right;
@@ -153,7 +154,7 @@ internal static class MixedEmbedded2DGeometry
         {
             Vector2d a = convex.GetVertexUnchecked(i);
             Vector2d b = convex.GetVertexUnchecked((i + 1) % vertexCount);
-            Vector2d candidate = PlanarSegmentGeometry.ClosestPoint(point, a, b);
+            Vector2d candidate = new FixedSegment2d(a, b).ClosestPoint(point);
             Fixed64 candidateDistanceSquared = Vector2d.DistanceSquared(point, candidate);
             if (candidateDistanceSquared >= bestDistanceSquared)
                 continue;

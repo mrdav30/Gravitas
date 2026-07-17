@@ -43,6 +43,9 @@ public sealed class LSCompoundCollider2D : LSCollider2D
 
     public override int Priority => ColliderSettings2D.GetPriority(Shape);
 
+    protected override void OnBeforeInitialize(IMatterAgent agent) =>
+        ValidatePartWorldScales(agent.Transform.LossyScale.ToVector2d());
+
     /// <summary>
     /// Gets the radius of a circle that conservatively contains the current
     /// aggregate shape.
@@ -214,6 +217,7 @@ public sealed class LSCompoundCollider2D : LSCollider2D
 
     protected override void RebuildShape()
     {
+        ValidatePartWorldScales(LocalScale);
         Vector2d min = Vector2d.Zero;
         Vector2d max = Vector2d.Zero;
 
@@ -239,6 +243,12 @@ public sealed class LSCompoundCollider2D : LSCollider2D
         }
 
         SetBoundsFromMinMax(min, max);
+    }
+
+    private void ValidatePartWorldScales(Vector2d ownerScale)
+    {
+        for (int i = 0; i < _parts.Length; i++)
+            ColliderScalePolicy.Validate(Vector2d.Multiply(ownerScale, _parts[i].LocalScale));
     }
 
     private int FindClosestPartIndex(Vector2d point)

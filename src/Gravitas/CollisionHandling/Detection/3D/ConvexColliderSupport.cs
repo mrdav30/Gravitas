@@ -157,14 +157,14 @@ internal static class ConvexColliderSupport
             ? baseCenter + radial / radialMagnitude * endRadius
             : baseCenter;
 
-        return ConvexSupportProjection.Compare(baseSupport, apex, direction) >= 0
+        return Vector3d.CompareProjection(baseSupport, apex, direction) >= 0
             ? baseSupport
             : apex;
     }
 
     private static Vector3d SupportCapsule(LSCapsuleCollider capsule, Vector3d direction)
     {
-        Vector3d segmentPoint = ConvexSupportProjection.Compare(
+        Vector3d segmentPoint = Vector3d.CompareProjection(
                 capsule.LineSegmentEnd,
                 capsule.LineSegmentStart,
                 direction) > 0
@@ -197,7 +197,7 @@ internal static class ConvexColliderSupport
         Vector3d localBase = new(radialSupport.X, -cone.HalfHeight, radialSupport.Z);
         Vector3d localApex = new(Fixed64.Zero, cone.HalfHeight, Fixed64.Zero);
         return cone.Center + cone.Rotation * (
-            ConvexSupportProjection.Compare(localApex, localBase, localDirection) >= 0
+            Vector3d.CompareProjection(localApex, localBase, localDirection) >= 0
                 ? localApex
                 : localBase);
     }
@@ -208,7 +208,7 @@ internal static class ConvexColliderSupport
         for (int i = 1; i < vertices.Length; i++)
         {
             Vector3d candidate = vertices[i];
-            if (ConvexSupportProjection.Compare(candidate, best, direction) <= 0)
+            if (Vector3d.CompareProjection(candidate, best, direction) <= 0)
                 continue;
 
             best = candidate;

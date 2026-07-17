@@ -25,7 +25,7 @@ public sealed class MixedEmbeddingContractTests
             Mass = Fixed64.One
         };
 
-        body.Initialize(transform.Position.ToVector2d());
+        body.Initialize(transform.WorldPositionXZ);
 
         collider.MixedHalfThickness.Should().Be((Fixed64)2);
         collider.MixedSlabCenterY.Should().Be((Fixed64)7);
@@ -69,7 +69,7 @@ public sealed class MixedEmbeddingContractTests
         var collider = new LSCircleCollider2D(Fixed64.One);
         collider.InitializeWithNoBody(agent);
 
-        transform.Position = new Vector3d((Fixed64)4, (Fixed64)9, (Fixed64)6);
+        transform.LocalPosition = new Vector3d((Fixed64)4, (Fixed64)9, (Fixed64)6);
 
         collider.Rebuild();
         collider.MixedSlabCenterY.Should().Be((Fixed64)9);

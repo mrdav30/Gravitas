@@ -116,8 +116,8 @@ internal sealed partial class ConvexSweepQueryWorker
 
         _direction = _length <= Fixed64.Epsilon ? Vector3d.Zero : displacement.Normalized;
         sourceShape.GetSourceBounds(out Vector3d sourceMin, out Vector3d sourceMax);
-        if (!FixedVectorDifference.TryTranslate(sourceMin, displacement, out _)
-            || !FixedVectorDifference.TryTranslate(sourceMax, displacement, out _))
+        if (!Vector3d.TryAdd(sourceMin, displacement, out _)
+            || !Vector3d.TryAdd(sourceMax, displacement, out _))
         {
             _hasSource = false;
             _direction = Vector3d.Zero;
@@ -260,7 +260,7 @@ internal sealed partial class ConvexSweepQueryWorker
     {
         Vector3d sourceFront = sourceShape.Support(_direction);
         Vector3d targetBack = targetShape.Support(-_direction);
-        Fixed64 projectedSeparation = ConvexSupportProjection.ProjectNonNegativeDifference(
+        Fixed64 projectedSeparation = Vector3d.ProjectNonNegativeDifference(
             targetBack,
             sourceFront,
             _direction);

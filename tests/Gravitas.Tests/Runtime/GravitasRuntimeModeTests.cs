@@ -223,7 +223,7 @@ public sealed class GravitasRuntimeModeTests
         scenario.Context.Visualize();
 
         visualizeHooks.Should().Be(1);
-        transform.Position.Should().Be(Vector3d.Zero);
+        transform.WorldPosition.Should().Be(Vector3d.Zero);
     }
 
     private static SolidBody2D Create2DBody(GravitasWorldContext context, Vector3d position)

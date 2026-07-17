@@ -593,6 +593,7 @@ public partial class SolidBody : IRecordable
                 || (Collider.HasHostBinding && !ReferenceEquals(Collider.Body, this)),
             nameof(Collider),
             "Body collider must be unregistered and free of another host binding before initialization.");
+        Collider.PreflightBodyInitialization(this);
 
         Active = true;
 
@@ -687,8 +688,8 @@ public partial class SolidBody : IRecordable
     {
         Vector3d startPosition = Position3d;
         FixedQuaternion startRotation = Rotation;
-        Vector3d kinematicPosition = _positionTransform.Position;
-        FixedQuaternion kinematicRotation = _rotationTransform.Rotation;
+        Vector3d kinematicPosition = _positionTransform.WorldPosition;
+        FixedQuaternion kinematicRotation = _rotationTransform.WorldRotation;
         if (startPosition == kinematicPosition && startRotation == kinematicRotation)
             return;
 
@@ -703,9 +704,9 @@ public partial class SolidBody : IRecordable
         TryResolveKinematicRotationalContinuousCollision(startPosition, ref resolvedPosition, startRotation, ref resolvedRotation);
 
         if (resolvedPosition != kinematicPosition)
-            _positionTransform.Position = resolvedPosition;
+            SetPositionTransformWorldPosition(resolvedPosition);
         if (resolvedRotation != kinematicRotation)
-            _rotationTransform.Rotation = resolvedRotation;
+            SetRotationTransformWorldRotation(resolvedRotation);
 
         SetPosition2d(resolvedPosition.ToVector2d());
         HeightPos = resolvedPosition.Y;
@@ -776,7 +777,7 @@ public partial class SolidBody : IRecordable
         if (CanSetVisualPosition)
         {
             Vector3d expectedPosition = Vector3d.SpeedLerp(_lastVisualPosition, _visualPosition, Fixed64.One, Context.ExpectedAccumulation);
-            _positionTransform.Position = expectedPosition;
+            SetPositionTransformWorldPosition(expectedPosition);
         }
 
         if (!CanSetVisualRotation)
@@ -784,9 +785,9 @@ public partial class SolidBody : IRecordable
 
         Fixed64 targetSpeed = ResolveVisualRotationStep();
         FixedQuaternion expectedRotation = _rotationInterpoleSpeed > Fixed64.Zero
-            ? FixedQuaternion.Slerp(_rotationTransform.Rotation, _visualRotation, targetSpeed)
+            ? FixedQuaternion.Slerp(_rotationTransform.WorldRotation, _visualRotation, targetSpeed)
             : FixedQuaternion.Slerp(_lastVisualRotation, _visualRotation, targetSpeed);
-        _rotationTransform.Rotation = expectedRotation;
+        SetRotationTransformWorldRotation(expectedRotation);
     }
 
     private Fixed64 ResolveVisualRotationStep()
@@ -795,6 +796,22 @@ public partial class SolidBody : IRecordable
             return Context.ExpectedAccumulation;
 
         return FixedMath.Clamp01(Context.DeltaTime * _rotationInterpoleSpeed * _rotationSpeed);
+    }
+
+    private void SetPositionTransformWorldPosition(Vector3d position)
+    {
+        SwiftThrowHelper.ThrowIfTrue(
+            !_positionTransform.TrySetWorldPosition(position),
+            nameof(FixedTransform),
+            "Position transform cannot represent the requested world position.");
+    }
+
+    private void SetRotationTransformWorldRotation(FixedQuaternion rotation)
+    {
+        SwiftThrowHelper.ThrowIfTrue(
+            !_rotationTransform.TrySetWorldPose(_rotationTransform.WorldPosition, rotation),
+            nameof(FixedTransform),
+            "Rotation transform cannot represent the requested world rotation.");
     }
 
     public void Deactivate()
@@ -892,11 +909,11 @@ public partial class SolidBody : IRecordable
         HeightPos = position.Y;
         _lastPosition = position;
         _lastVisualPosition = _visualPosition = position;
-        _positionTransform.Position = position;
+        SetPositionTransformWorldPosition(position);
         Rotation = rotation;
 
         _visualRotation = rotation;
-        _rotationTransform.Rotation = rotation;
+        SetRotationTransformWorldRotation(rotation);
 
         if (wasSleeping)
             RefreshPartitionAwakeState();

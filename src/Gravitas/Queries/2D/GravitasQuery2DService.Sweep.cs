@@ -39,7 +39,7 @@ public sealed partial class GravitasQuery2DService
     {
         SwiftThrowHelper.ThrowIfArgument(radius <= Fixed64.Zero, nameof(radius), "2D sweep radius must be greater than zero.");
 
-        if (!FixedVectorDifference.TryCreate(start, end, out Vector2d segment)
+        if (!Vector2d.TrySubtract(end, start, out Vector2d segment)
             || !Vector2d.TryGetMagnitude(segment, out Fixed64 segmentLength)
             || segmentLength <= Fixed64.Epsilon)
         {
@@ -144,7 +144,7 @@ public sealed partial class GravitasQuery2DService
         SwiftThrowHelper.ThrowIfArgument(radius <= Fixed64.Zero, nameof(radius), "2D sweep radius must be greater than zero.");
 
         results.FastClear();
-        if (!FixedVectorDifference.TryCreate(start, end, out Vector2d segment)
+        if (!Vector2d.TrySubtract(end, start, out Vector2d segment)
             || !Vector2d.TryGetMagnitude(segment, out Fixed64 segmentLength)
             || segmentLength <= Fixed64.Epsilon)
         {

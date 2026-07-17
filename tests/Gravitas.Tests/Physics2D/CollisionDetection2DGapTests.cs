@@ -296,11 +296,12 @@ public sealed class CollisionDetection2DGapTests
 
         collided.Should().BeTrue();
         Vector2d normal = (Fixed64)offset * Vector2d.Right;
-        Vector2d intersection = (Fixed64)offset * (Fixed64.One - Fixed64.MinIncrement) * Vector2d.Right;
+        Vector2d pointAOnSegment = (Fixed64)offset * (Fixed64.One - Fixed64.MinIncrement) * Vector2d.Right;
+        Vector2d pointBOnSegment = (Fixed64)offset * Vector2d.Right;
         contact.Normal.Should().Be(normal);
         contact.Depth.Should().Be(Fixed64.One);
-        contact.PointA.Should().Be(intersection + normal * Fixed64.Half);
-        contact.PointB.Should().Be(intersection - normal * Fixed64.Half);
+        contact.PointA.Should().Be(pointAOnSegment + normal * Fixed64.Half);
+        contact.PointB.Should().Be(pointBOnSegment - normal * Fixed64.Half);
     }
 
     private static ContactManifold2D BuildManifold(

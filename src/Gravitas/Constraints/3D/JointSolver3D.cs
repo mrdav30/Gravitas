@@ -15,7 +15,8 @@ internal static class JointSolver3D
     internal const int MaxRowsPerJoint = 12;
     private static readonly Fixed64 BiasFactor = Fixed64.One / (Fixed64)5;
     private static readonly Fixed64 RowEpsilon = Fixed64.Epsilon;
-    private static readonly Fixed64 QuaternionLogVectorEpsilon = Fixed64.FromRaw(0x00001000L);
+    // 4,096 raw Q32.32 units, approximately 9.536743e-7 radians.
+    private static readonly Fixed64 QuaternionTwistVectorEpsilon = Fixed64.FromRaw(4_096);
 
     internal static void Solve(Joint3D joint, bool applyCachedImpulse)
     {
@@ -320,20 +321,7 @@ internal static class JointSolver3D
     private static Vector3d GetAngularError(FixedQuaternion reference, FixedQuaternion current)
     {
         FixedQuaternion error = (current * reference.Inverse()).Normalized;
-        return GetSafeQuaternionLog(error);
-    }
-
-    private static Vector3d GetSafeQuaternionLog(FixedQuaternion quaternion)
-    {
-        FixedQuaternion normalized = quaternion.Normalized;
-        Vector3d vector = new(normalized.X, normalized.Y, normalized.Z);
-        Fixed64 vectorLength = vector.Magnitude;
-        if (vectorLength < QuaternionLogVectorEpsilon)
-            return Vector3d.Zero;
-
-        Fixed64 w = FixedMath.Clamp(normalized.W, -Fixed64.One, Fixed64.One);
-        Fixed64 theta = Fixed64.Two * FixedMath.Acos(w);
-        return (vector / vectorLength) * theta;
+        return FixedQuaternion.QuaternionLog(error);
     }
 
     private static Fixed64 GetSignedTwistAngle(
@@ -344,8 +332,8 @@ internal static class JointSolver3D
         FixedQuaternion relative = (worldRotationB * worldRotationA.Inverse()).Normalized;
         Vector3d relativeVector = new(relative.X, relative.Y, relative.Z);
         Fixed64 projectedTwist = Vector3d.Dot(relativeVector, twistAxis);
-        if (projectedTwist.Abs() < QuaternionLogVectorEpsilon
-            && relative.W.Abs() < QuaternionLogVectorEpsilon)
+        if (projectedTwist.Abs() < QuaternionTwistVectorEpsilon
+            && relative.W.Abs() < QuaternionTwistVectorEpsilon)
         {
             return Fixed64.Zero;
         }

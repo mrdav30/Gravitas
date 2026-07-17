@@ -170,8 +170,8 @@ public sealed class SolidBodySerializationTests
         target.Body.GravityScale.Should().Be(source.Body.GravityScale);
         target.Body.PositionTransform.Should().BeSameAs(targetTransform);
         target.Body.RotationTransform.Should().BeSameAs(targetTransform);
-        targetTransform.Position.Should().Be(source.Body.Position3d);
-        targetTransform.Rotation.Should().Be(source.Body.Rotation);
+        targetTransform.LocalPosition.Should().Be(source.Body.Position3d);
+        targetTransform.LocalRotation.Should().Be(source.Body.Rotation);
         target.Collider.Radius.Should().Be(source.Collider.Radius);
         target.Collider.LocalOffset.Should().Be(source.Collider.LocalOffset);
         target.Collider.Layer.Should().Be(source.Collider.Layer);

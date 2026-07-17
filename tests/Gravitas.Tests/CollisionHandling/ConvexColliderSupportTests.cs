@@ -117,64 +117,6 @@ public sealed class ConvexColliderSupportTests
     }
 
     [Fact]
-    public void ExactSupportProjection_ShouldOrderAndTieAcrossFullCoordinateRange()
-    {
-        Vector3d direction3D = new Vector3d(Fixed64.One, Fixed64.One, Fixed64.Zero).Normalized;
-        ConvexSupportProjection.Compare(
-                new Vector3d(Fixed64.MaxValue, Fixed64.MaxValue, Fixed64.Zero),
-                new Vector3d(Fixed64.MinValue, Fixed64.MinValue, Fixed64.Zero),
-                direction3D)
-            .Should().BePositive();
-        ConvexSupportProjection.Compare(
-                new Vector3d(Fixed64.MinValue, Fixed64.MinValue, Fixed64.Zero),
-                new Vector3d(Fixed64.MaxValue, Fixed64.MaxValue, Fixed64.Zero),
-                direction3D)
-            .Should().BeNegative();
-        ConvexSupportProjection.Compare(
-                new Vector3d(Fixed64.MaxValue, Fixed64.MinValue, Fixed64.Zero),
-                new Vector3d(Fixed64.MinValue, Fixed64.MaxValue, Fixed64.Zero),
-                direction3D)
-            .Should().Be(0);
-
-        Vector2d direction2D = Vector2d.One.Normalized;
-        ConvexSupportProjection.Compare(
-                new Vector2d(Fixed64.MaxValue, Fixed64.MaxValue),
-                new Vector2d(Fixed64.MinValue, Fixed64.MinValue),
-                direction2D)
-            .Should().BePositive();
-        ConvexSupportProjection.Compare(
-                new Vector2d(Fixed64.MaxValue, Fixed64.MinValue),
-                new Vector2d(Fixed64.MinValue, Fixed64.MaxValue),
-                direction2D)
-            .Should().Be(0);
-    }
-
-    [Fact]
-    public void ExactNonNegativeProjectionDifference_ShouldCancelThenClampOnlyAfterRescaling()
-    {
-        Vector3d direction = new Vector3d(Fixed64.One, Fixed64.One, Fixed64.Zero).Normalized;
-        Vector3d source = new(Fixed64.MinValue, Fixed64.MaxValue, Fixed64.Zero);
-        Vector3d cancellingTarget = new(Fixed64.MaxValue, Fixed64.MinValue + Fixed64.MinIncrement, Fixed64.Zero);
-
-        ConvexSupportProjection.ProjectNonNegativeDifference(cancellingTarget, source, direction)
-            .Should().Be(Fixed64.Zero);
-        ConvexSupportProjection.ProjectNonNegativeDifference(source, cancellingTarget, direction)
-            .Should().Be(Fixed64.Zero);
-        ConvexSupportProjection.ProjectNonNegativeDifference(
-                new Vector3d(Fixed64.MaxValue, Fixed64.MaxValue, Fixed64.MaxValue),
-                new Vector3d(Fixed64.MinValue, Fixed64.MinValue, Fixed64.MinValue),
-                Vector3d.One.Normalized)
-            .Should().Be(Fixed64.MaxValue);
-
-        Vector3d oneUnitTarget = new(
-            Fixed64.MaxValue,
-            Fixed64.MinValue + Fixed64.One,
-            Fixed64.Zero);
-        ConvexSupportProjection.ProjectNonNegativeDifference(oneUnitTarget, source, direction)
-            .Should().Be(direction.X);
-    }
-
-    [Fact]
     public void Support_ShouldUseConvexMeshVerticesAndRejectUnsupportedColliders()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();

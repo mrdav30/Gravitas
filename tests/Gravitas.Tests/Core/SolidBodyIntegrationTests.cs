@@ -249,7 +249,7 @@ public sealed class SolidBodyIntegrationTests
         scenario.Context.LateSimulate();
         scenario.Context.Visualize();
 
-        FixedQuaternion.Angle(body.Body.RotationTransform.Rotation, target).Should().BeLessThan(Tolerance);
+        FixedQuaternion.Angle(body.Body.RotationTransform.LocalRotation, target).Should().BeLessThan(Tolerance);
         body.Body.LastVisualRotation.Should().Be(FixedQuaternion.Identity);
         body.Body.VisualRotation.Should().Be(target);
     }
@@ -282,9 +282,9 @@ public sealed class SolidBodyIntegrationTests
         body.Body.UpdateRotation(target, Fixed64.One);
         scenario.Context.LateSimulate();
         scenario.Context.Visualize();
-        FixedQuaternion firstVisual = body.Body.RotationTransform.Rotation;
+        FixedQuaternion firstVisual = body.Body.RotationTransform.LocalRotation;
         scenario.Context.Visualize();
-        FixedQuaternion secondVisual = body.Body.RotationTransform.Rotation;
+        FixedQuaternion secondVisual = body.Body.RotationTransform.LocalRotation;
 
         firstVisual.Should().NotBe(FixedQuaternion.Identity);
         firstVisual.Should().NotBe(target);
@@ -328,9 +328,9 @@ public sealed class SolidBodyIntegrationTests
             FixedQuaternion.Identity,
             target,
             scenario.Context.DeltaTime * body.InteractionRotationSpeed);
-        FixedQuaternion.Angle(transform.Rotation, expected).Should().BeLessThan(Tolerance);
-        transform.Rotation.Should().NotBe(FixedQuaternion.Identity);
-        transform.Rotation.Should().NotBe(target);
+        FixedQuaternion.Angle(transform.WorldRotation, expected).Should().BeLessThan(Tolerance);
+        transform.WorldRotation.Should().NotBe(FixedQuaternion.Identity);
+        transform.WorldRotation.Should().NotBe(target);
     }
 
     private static PhysicsScenarioBuilder CreateIntegrationScenario(int frameRate)

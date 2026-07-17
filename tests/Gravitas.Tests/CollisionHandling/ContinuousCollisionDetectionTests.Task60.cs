@@ -19,7 +19,7 @@ public sealed partial class ContinuousCollisionDetectionTests
         ScenarioBody<LSCuboidCollider> blade = CreateKinematicRotationalCcdBlade(scenario);
         blade.Body.ContinuousCollisionMode = ContinuousCollisionMode.Discrete;
         FixedQuaternion hostRotation = PhysicsScenarioBuilder.Yaw(90);
-        blade.Body.Agent.Transform.Rotation = hostRotation;
+        blade.Body.Agent.Transform.LocalRotation = hostRotation;
 
         scenario.Context.LateSimulate();
 
@@ -94,7 +94,7 @@ public sealed partial class ContinuousCollisionDetectionTests
             includeTriggers: false).Should().Be(1);
         candidates[0].Collider.Should().BeSameAs(target);
 
-        blade.Body.Agent.Transform.Rotation = hostRotation;
+        blade.Body.Agent.Transform.LocalRotation = hostRotation;
         scenario.Context.LateSimulate();
 
         blade.Body.Rotation.Should().Be(hostRotation);

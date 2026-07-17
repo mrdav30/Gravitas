@@ -186,58 +186,83 @@ public sealed class ContinuousCollisionPolicyTests
     }
 
     [Fact]
-    public void ContinuousCollisionImpulsePolicy_ShouldAcceptZeroInverseMassAndRejectNearSingularMobility()
+    public void TryResolveVelocityDelta_ShouldAcceptExactFiniteAndZeroMobility()
     {
-        Fixed64 smallComponent = Fixed64.FromFraction(1, 65536);
-        Fixed64 constrainedInverseMass = smallComponent * smallComponent;
-        (Fixed64.One / constrainedInverseMass).Should().Be(Fixed64.MaxValue);
-        ContinuousCollisionImpulsePolicy.IsResolvableMobility(
-            Fixed64.Zero,
-            Fixed64.Zero).Should().BeTrue();
-        ContinuousCollisionImpulsePolicy.IsResolvableMobility(
+        Fixed64 normalComponent = Fixed64.FromFraction(1, 65536);
+
+        ContinuousCollisionImpulsePolicy.TryResolveVelocityDelta(
+            new Vector2d(Fixed64.Zero, normalComponent),
             Fixed64.One,
-            constrainedInverseMass).Should().BeFalse();
-        ContinuousCollisionImpulsePolicy.IsResolvableMobility(
-            Fixed64.Epsilon,
-            Fixed64.Epsilon).Should().BeTrue();
+            Fixed64.One,
+            Fixed64.MinIncrement,
+            out Vector2d delta2D).Should().BeTrue();
+        ContinuousCollisionImpulsePolicy.TryResolveVelocityDelta(
+            new Vector3d(Fixed64.Zero, normalComponent, Fixed64.Zero),
+            Fixed64.One,
+            Fixed64.One,
+            Fixed64.MinIncrement,
+            out Vector3d delta3D).Should().BeTrue();
+        ContinuousCollisionImpulsePolicy.TryResolveVelocityDelta(
+            Vector3d.One,
+            Fixed64.MaxValue,
+            Fixed64.Zero,
+            Fixed64.Zero,
+            out Vector3d zeroDelta).Should().BeTrue();
+        ContinuousCollisionImpulsePolicy.TryResolveVelocityDelta(
+            Vector2d.One,
+            Fixed64.MaxValue,
+            Fixed64.Zero,
+            Fixed64.Zero,
+            out Vector2d zeroDelta2D).Should().BeTrue();
 
-        Vector2d delta2D = ContinuousCollisionImpulsePolicy.ResolveVelocityDelta(
-            Vector2d.Right,
-            Fixed64.Epsilon * (Fixed64)2,
-            Fixed64.Epsilon,
-            Fixed64.Epsilon);
-        Vector3d delta3D = ContinuousCollisionImpulsePolicy.ResolveVelocityDelta(
-            Vector3d.Right,
-            Fixed64.Epsilon * (Fixed64)2,
-            Fixed64.Epsilon,
-            Fixed64.Epsilon);
-
-        delta2D.Should().Be(Vector2d.Right * (Fixed64.Epsilon * (Fixed64)2));
-        delta3D.Should().Be(Vector3d.Right * (Fixed64.Epsilon * (Fixed64)2));
+        delta2D.Should().Be(new Vector2d(Fixed64.Zero, (Fixed64)65536));
+        delta3D.Should().Be(new Vector3d(Fixed64.Zero, (Fixed64)65536, Fixed64.Zero));
+        zeroDelta.Should().Be(Vector3d.Zero);
+        zeroDelta2D.Should().Be(Vector2d.Zero);
     }
 
     [Fact]
-    public void ContinuousCollisionImpulsePolicy_ShouldScaleObliqueNormalBeforeLargeResponse()
+    public void TryResolveVelocityDelta_ShouldRejectOnlyFinalOverflowAndRemainComponentAtomic()
     {
-        Fixed64 allowedComponent = Fixed64.FromFraction(1, 32768);
-        Fixed64 constrainedInverseMass = allowedComponent * allowedComponent * (Fixed64)2;
-        Fixed64 inverseMassRatio = Fixed64.One / constrainedInverseMass;
-        Fixed64 responseSpeed = (Fixed64)8;
-        (responseSpeed * inverseMassRatio).Should().Be(Fixed64.MaxValue);
-        Fixed64 expectedAllowedDelta = (allowedComponent * inverseMassRatio) * responseSpeed;
-
-        Vector2d delta2D = ContinuousCollisionImpulsePolicy.ResolveVelocityDelta(
-            new Vector2d(Fixed64.Zero, allowedComponent),
-            responseSpeed,
+        ContinuousCollisionImpulsePolicy.TryResolveVelocityDelta(
+            Vector2d.Right,
+            Fixed64.Two,
             Fixed64.One,
-            constrainedInverseMass);
-        Vector3d delta3D = ContinuousCollisionImpulsePolicy.ResolveVelocityDelta(
-            new Vector3d(Fixed64.Zero, allowedComponent, Fixed64.Zero),
-            responseSpeed,
             Fixed64.One,
-            constrainedInverseMass);
+            out Vector2d ordinaryDelta).Should().BeTrue();
+        ContinuousCollisionImpulsePolicy.TryResolveVelocityDelta(
+            new Vector2d(Fixed64.MinIncrement, Fixed64.One),
+            Fixed64.Two,
+            Fixed64.MaxValue,
+            Fixed64.One,
+            out Vector2d overflow2D).Should().BeFalse();
+        ContinuousCollisionImpulsePolicy.TryResolveVelocityDelta(
+            new Vector3d(Fixed64.MinIncrement, Fixed64.Zero, Fixed64.One),
+            Fixed64.Two,
+            Fixed64.MaxValue,
+            Fixed64.One,
+            out Vector3d overflow3D).Should().BeFalse();
+        ContinuousCollisionImpulsePolicy.TryResolveVelocityDelta(
+            Vector2d.One,
+            Fixed64.Two,
+            Fixed64.MaxValue,
+            Fixed64.One,
+            out _).Should().BeFalse();
+        ContinuousCollisionImpulsePolicy.TryResolveVelocityDelta(
+            new Vector3d(Fixed64.MinIncrement, Fixed64.One, Fixed64.Zero),
+            Fixed64.Two,
+            Fixed64.MaxValue,
+            Fixed64.One,
+            out _).Should().BeFalse();
+        ContinuousCollisionImpulsePolicy.TryResolveVelocityDelta(
+            Vector3d.One,
+            Fixed64.Two,
+            Fixed64.MaxValue,
+            Fixed64.One,
+            out _).Should().BeFalse();
 
-        delta2D.Y.Should().Be(expectedAllowedDelta);
-        delta3D.Y.Should().Be(expectedAllowedDelta);
+        ordinaryDelta.Should().Be(Vector2d.Right * Fixed64.Two);
+        overflow2D.Should().Be(default);
+        overflow3D.Should().Be(default);
     }
 }

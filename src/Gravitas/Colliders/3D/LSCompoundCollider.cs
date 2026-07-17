@@ -84,11 +84,11 @@ public sealed class LSCompoundCollider : LSCollider
     protected override void RebuildRuntimeShape() => BuildShape();
 
     protected override void OnBeforeInitialize(IMatterAgent agent) =>
-        ValidateMeshTransforms(agent.Transform.LossyScale, agent.Transform.Rotation);
+        ValidatePartTransforms(agent.Transform.LossyScale, agent.Transform.WorldRotation);
 
     protected override void BuildShape()
     {
-        ValidateMeshTransforms(LocalScale, Rotation);
+        ValidatePartTransforms(LocalScale, Rotation);
 
         Area = Fixed64.Zero;
         Vector3d min = Vector3d.Zero;
@@ -119,14 +119,16 @@ public sealed class LSCompoundCollider : LSCollider
         SetBoundsMinMax(min, max);
     }
 
-    private void ValidateMeshTransforms(Vector3d ownerScale, FixedQuaternion ownerRotation)
+    private void ValidatePartTransforms(Vector3d ownerScale, FixedQuaternion ownerRotation)
     {
         for (int i = 0; i < _parts.Length; i++)
         {
+            Vector3d partScale = Vector3d.Multiply(ownerScale, _parts[i].LocalScale);
+            ColliderScalePolicy.Validate(partScale);
             if (_partColliders[i] is LSMeshCollider mesh)
             {
                 mesh.ValidateRuntimeTransform(
-                    Vector3d.Multiply(ownerScale, _parts[i].LocalScale),
+                    partScale,
                     ownerRotation * _parts[i].LocalRotation);
             }
         }

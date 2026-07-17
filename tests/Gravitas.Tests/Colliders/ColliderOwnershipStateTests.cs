@@ -1,4 +1,5 @@
 using FixedMathSharp;
+using FixedMathSharp.Bounds;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.Support;
@@ -14,6 +15,254 @@ namespace Gravitas.Tests.Colliders;
 
 public sealed class ColliderOwnershipStateTests
 {
+    [Fact]
+    public void BodyInitialization_ShouldRejectNonPositiveConsumedScaleBeforeRuntimeMutation()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+
+        var transform3D = new FixedTransform(
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            new Vector3d(Fixed64.Zero, Fixed64.One, Fixed64.One));
+        var collider3D = new LSSphereCollider { Radius = Fixed64.Half };
+        var body3D = new SolidBody(new TestMatterAgent(context, transform3D), collider3D);
+
+        Action initialize3D = () => body3D.Initialize(Vector3d.Right, FixedQuaternion.Identity);
+
+        initialize3D.Should().Throw<ArgumentException>().WithParameterName("scale");
+        body3D.Active.Should().BeFalse();
+        body3D.DynamicId.Should().Be(-1);
+        collider3D.Id.Should().Be(-1);
+        collider3D.Body.Should().BeNull();
+        collider3D.HasHostBinding.Should().BeFalse();
+        context.Physics.BodyCount.Should().Be(0);
+        context.Physics.ColliderCount.Should().Be(0);
+
+        var transform2D = new FixedTransform(
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            new Vector3d(Fixed64.One, Fixed64.One, -Fixed64.One));
+        var collider2D = new LSCircleCollider2D(Fixed64.Half);
+        bool collider2DActiveBefore = collider2D.IsActive;
+        var body2D = new SolidBody2D(new TestMatterAgent(context, transform2D), collider2D);
+
+        Action initialize2D = () => body2D.Initialize(Vector2d.Right);
+
+        initialize2D.Should().Throw<ArgumentException>().WithParameterName("scale");
+        body2D.Active.Should().BeFalse();
+        body2D.DynamicId.Should().Be(-1);
+        collider2D.Id.Should().Be(-1);
+        collider2D.Body.Should().BeNull();
+        collider2D.HasHostBinding.Should().BeFalse();
+        collider2D.IsActive.Should().Be(collider2DActiveBefore);
+        context.Physics2D.BodyCount.Should().Be(0);
+        context.Physics2D.ColliderCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void StandaloneColliderInitialization_ShouldRejectNonPositiveConsumedWorldScaleBeforeBinding()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        Vector3d[] invalid3DScales =
+        {
+            new(Fixed64.Zero, Fixed64.One, Fixed64.One),
+            new(-Fixed64.One, Fixed64.One, Fixed64.One),
+            new(Fixed64.One, Fixed64.Zero, Fixed64.One),
+            new(Fixed64.One, -Fixed64.One, Fixed64.One),
+            new(Fixed64.One, Fixed64.One, Fixed64.Zero),
+            new(Fixed64.One, Fixed64.One, -Fixed64.One),
+            new(-Fixed64.One, Fixed64.One, -Fixed64.One)
+        };
+        Vector3d[] invalid2DScales =
+        {
+            new(Fixed64.Zero, Fixed64.One, Fixed64.One),
+            new(-Fixed64.One, Fixed64.One, Fixed64.One),
+            new(Fixed64.One, Fixed64.One, Fixed64.Zero),
+            new(Fixed64.One, Fixed64.One, -Fixed64.One),
+            new(-Fixed64.One, Fixed64.One, -Fixed64.One)
+        };
+
+        for (int i = 0; i < invalid3DScales.Length; i++)
+        {
+            var collider = new LSSphereCollider { Radius = Fixed64.Half };
+            var transform = new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, invalid3DScales[i]);
+
+            Action initialize = () => collider.InitializeWithNoBody(new TestMatterAgent(context, transform));
+
+            initialize.Should().Throw<ArgumentException>().WithParameterName("scale");
+            collider.Id.Should().Be(-1);
+            collider.HasHostBinding.Should().BeFalse();
+            transform.LocalScale.Should().Be(invalid3DScales[i]);
+        }
+
+        for (int i = 0; i < invalid2DScales.Length; i++)
+        {
+            var collider = new LSCircleCollider2D(Fixed64.Half);
+            var transform = new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, invalid2DScales[i]);
+
+            Action initialize = () => collider.InitializeWithNoBody(new TestMatterAgent(context, transform));
+
+            initialize.Should().Throw<ArgumentException>().WithParameterName("scale");
+            collider.Id.Should().Be(-1);
+            collider.HasHostBinding.Should().BeFalse();
+            transform.LocalScale.Should().Be(invalid2DScales[i]);
+        }
+
+        context.Physics.ColliderCount.Should().Be(0);
+        context.Physics2D.ColliderCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void StandaloneColliderInitialization_ShouldRejectCanceledAncestryReflectionsBeforeBinding()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        var parent3D = new FixedTransform(
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            new Vector3d(-Fixed64.One, Fixed64.One, Fixed64.One));
+        var transform3D = new FixedTransform(
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            new Vector3d(-Fixed64.One, Fixed64.One, Fixed64.One),
+            parent3D);
+        var collider3D = new LSSphereCollider { Radius = Fixed64.Half };
+
+        Action initialize3D = () => collider3D.InitializeWithNoBody(new TestMatterAgent(context, transform3D));
+
+        initialize3D.Should().Throw<ArgumentException>().WithParameterName("scale");
+        collider3D.Id.Should().Be(-1);
+        collider3D.HasHostBinding.Should().BeFalse();
+
+        var parent2D = new FixedTransform(
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            new Vector3d(Fixed64.One, Fixed64.One, -Fixed64.One));
+        var transform2D = new FixedTransform(
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            new Vector3d(Fixed64.One, Fixed64.One, -Fixed64.One),
+            parent2D);
+        var collider2D = new LSCircleCollider2D(Fixed64.Half);
+
+        Action initialize2D = () => collider2D.InitializeWithNoBody(new TestMatterAgent(context, transform2D));
+
+        initialize2D.Should().Throw<ArgumentException>().WithParameterName("scale");
+        collider2D.Id.Should().Be(-1);
+        collider2D.HasHostBinding.Should().BeFalse();
+        context.Physics.ColliderCount.Should().Be(0);
+        context.Physics2D.ColliderCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void RuntimeScaleRebuild_ShouldRejectBeforeMutatingColliderStateAndPreserveAuthoredScale()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        var transform3D = new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One);
+        var collider3D = new LSSphereCollider { Radius = Fixed64.Half };
+        collider3D.InitializeWithNoBody(new TestMatterAgent(context, transform3D));
+        FixedBoundBox bounds3D = collider3D.Bounds;
+        int id3D = collider3D.Id;
+
+        var transform2D = new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One);
+        var collider2D = new LSCircleCollider2D(Fixed64.Half);
+        collider2D.InitializeWithNoBody(new TestMatterAgent(context, transform2D));
+        FixedBoundArea bounds2D = collider2D.Bounds;
+        int id2D = collider2D.Id;
+
+        transform3D.LocalScale = new Vector3d(-Fixed64.One, Fixed64.One, Fixed64.One);
+        transform2D.LocalScale = new Vector3d(Fixed64.One, Fixed64.One, Fixed64.Zero);
+
+        Action rebuild3D = collider3D.Simulate;
+        Action rebuild2D = collider2D.Simulate;
+
+        rebuild3D.Should().Throw<ArgumentException>().WithParameterName("scale");
+        rebuild2D.Should().Throw<ArgumentException>().WithParameterName("scale");
+        collider3D.Bounds.Should().Be(bounds3D);
+        collider2D.Bounds.Should().Be(bounds2D);
+        collider3D.Id.Should().Be(id3D);
+        collider2D.Id.Should().Be(id2D);
+        transform3D.LocalScale.Should().Be(new Vector3d(-Fixed64.One, Fixed64.One, Fixed64.One));
+        transform2D.LocalScale.Should().Be(new Vector3d(Fixed64.One, Fixed64.One, Fixed64.Zero));
+    }
+
+    [Fact]
+    public void RuntimeScaleRebuild_ShouldRejectCanceledAncestryReflectionsWithoutMutation()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        var parent3D = new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One);
+        var transform3D = new FixedTransform(
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            Vector3d.One,
+            parent3D);
+        var collider3D = new LSSphereCollider { Radius = Fixed64.Half };
+        collider3D.InitializeWithNoBody(new TestMatterAgent(context, transform3D));
+        FixedBoundBox bounds3D = collider3D.Bounds;
+        uint version3D = collider3D.RuntimeShapeVersion;
+        bool partitioned3D = collider3D.IsPartitioned;
+
+        var parent2D = new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One);
+        var transform2D = new FixedTransform(
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            Vector3d.One,
+            parent2D);
+        var collider2D = new LSCircleCollider2D(Fixed64.Half);
+        collider2D.InitializeWithNoBody(new TestMatterAgent(context, transform2D));
+        FixedBoundArea bounds2D = collider2D.Bounds;
+        uint version2D = collider2D.RuntimeShapeVersion;
+        bool partitioned2D = collider2D.IsPartitioned;
+
+        parent3D.LocalScale = new Vector3d(-Fixed64.One, Fixed64.One, Fixed64.One);
+        transform3D.LocalScale = new Vector3d(-Fixed64.One, Fixed64.One, Fixed64.One);
+        parent2D.LocalScale = new Vector3d(Fixed64.One, Fixed64.One, -Fixed64.One);
+        transform2D.LocalScale = new Vector3d(Fixed64.One, Fixed64.One, -Fixed64.One);
+
+        Action rebuild3D = collider3D.Simulate;
+        Action rebuild2D = collider2D.Simulate;
+
+        rebuild3D.Should().Throw<ArgumentException>().WithParameterName("scale");
+        rebuild2D.Should().Throw<ArgumentException>().WithParameterName("scale");
+        collider3D.Bounds.Should().Be(bounds3D);
+        collider3D.RuntimeShapeVersion.Should().Be(version3D);
+        collider3D.IsPartitioned.Should().Be(partitioned3D);
+        collider2D.Bounds.Should().Be(bounds2D);
+        collider2D.RuntimeShapeVersion.Should().Be(version2D);
+        collider2D.IsPartitioned.Should().Be(partitioned2D);
+        collider3D.Id.Should().BeGreaterThanOrEqualTo(0);
+        collider2D.Id.Should().BeGreaterThanOrEqualTo(0);
+    }
+
+    [Fact]
+    public void ParentedColliderScale_ShouldConsumePositiveHierarchyLossyScale()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        var parent = new FixedTransform(
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            Vector3d.One * (Fixed64)2);
+        var transform3D = new FixedTransform(
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            Vector3d.One * (Fixed64)3,
+            parent);
+        var collider3D = new LSSphereCollider { Radius = Fixed64.Half };
+        collider3D.InitializeWithNoBody(new TestMatterAgent(context, transform3D));
+
+        var transform2D = new FixedTransform(
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            Vector3d.One * (Fixed64)3,
+            parent);
+        var collider2D = new LSCircleCollider2D(Fixed64.Half);
+        collider2D.InitializeWithNoBody(new TestMatterAgent(context, transform2D));
+
+        collider3D.LocalScale.Should().Be(Vector3d.One * (Fixed64)6);
+        collider3D.ScaledRadius.Should().Be((Fixed64)3);
+        collider2D.LocalScale.Should().Be(Vector2d.One * (Fixed64)6);
+        collider2D.ScaledRadius.Should().Be((Fixed64)3);
+    }
+
     [Fact]
     public void UnboundColliderPositionAndRotationSetters_ShouldThrow()
     {
@@ -64,19 +313,61 @@ public sealed class ColliderOwnershipStateTests
         collider.InitializeWithNoBody(agent);
         collider.World.Should().BeSameAs(scenario.Context.World);
         collider.Transform.Should().BeSameAs(transform);
-        collider.Position = transform.Position;
-        agent.Transform.Position.Should().Be(transform.Position);
+        collider.Position = transform.WorldPosition;
+        agent.Transform.LocalPosition.Should().Be(transform.LocalPosition);
         collider.Position = Vector3d.Forward;
-        agent.Transform.Position.Should().Be(Vector3d.Forward);
+        agent.Transform.LocalPosition.Should().Be(Vector3d.Forward);
         collider.Rotation = FixedQuaternion.Identity;
         collider.Rotation.Should().Be(FixedQuaternion.Identity);
 
         FixedQuaternion rotation = FixedQuaternion.FromAxisAngle(Vector3d.Up, Fixed64.Half);
         collider.Rotation = rotation;
 
-        agent.Transform.Rotation.Should().Be(collider.Rotation);
-        agent.Transform.Rotation.Should().NotBe(FixedQuaternion.Identity);
+        agent.Transform.LocalRotation.Should().Be(collider.Rotation);
+        agent.Transform.LocalRotation.Should().NotBe(FixedQuaternion.Identity);
         collider.Transform.Should().BeSameAs(transform);
+    }
+
+    [Fact]
+    public void BodylessColliderPose_ShouldUseParentedWorldContractAndRejectSingularParentWritesAtomically()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        var parent = new FixedTransform(
+            new Vector3d((Fixed64)10, Fixed64.Zero, Fixed64.Zero),
+            FixedQuaternion.Identity,
+            Vector3d.One);
+        var transform = new FixedTransform(
+            new Vector3d((Fixed64)2, Fixed64.Zero, Fixed64.Zero),
+            FixedQuaternion.Identity,
+            Vector3d.One,
+            parent);
+        var collider = new LSSphereCollider();
+        collider.InitializeWithNoBody(new TestMatterAgent(scenario.Context, transform));
+        FixedQuaternion worldRotation = FixedQuaternion.FromAxisAngle(Vector3d.Up, Fixed64.Half);
+
+        collider.Position = new Vector3d((Fixed64)20, Fixed64.One, (Fixed64)3);
+        collider.Rotation = worldRotation;
+
+        collider.Position.Should().Be(new Vector3d((Fixed64)20, Fixed64.One, (Fixed64)3));
+        transform.WorldPosition.Should().Be(collider.Position);
+        transform.LocalPosition.Should().Be(new Vector3d((Fixed64)10, Fixed64.One, (Fixed64)3));
+        transform.WorldRotation.Should().Be(worldRotation.Normalized);
+
+        var singularParent = new FixedTransform(
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            new Vector3d(Fixed64.Zero, Fixed64.One, Fixed64.One));
+        transform.SetParentKeepingLocal(singularParent);
+        Vector3d localPosition = transform.LocalPosition;
+        FixedQuaternion localRotation = transform.LocalRotation;
+
+        Action setPosition = () => collider.Position = Vector3d.Right;
+        Action setRotation = () => collider.Rotation = FixedQuaternion.Identity;
+
+        setPosition.Should().Throw<InvalidOperationException>();
+        setRotation.Should().Throw<InvalidOperationException>();
+        transform.LocalPosition.Should().Be(localPosition);
+        transform.LocalRotation.Should().Be(localRotation);
     }
 
     [Fact]
@@ -255,7 +546,7 @@ public sealed class ColliderOwnershipStateTests
         {
             Mass = Fixed64.One
         };
-        body.Initialize(transform.Position, transform.Rotation);
+        body.Initialize(transform.WorldPosition, transform.WorldRotation);
         LSCollider part = collider.GetPartCollider(0);
 
         part.World.Should().BeSameAs(scenario.Context.World);

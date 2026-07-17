@@ -587,7 +587,7 @@ public sealed partial class GravitasQuery3DService
         Vector3d normalizedDirection = direction.Normalized;
         Vector3d requestedDisplacement = normalizedDirection * length;
         SwiftThrowHelper.ThrowIfArgument(
-            !FixedVectorDifference.TryTranslate(origin, requestedDisplacement, out _),
+            !Vector3d.TryAdd(origin, requestedDisplacement, out _),
             nameof(length),
             "Cone query endpoint must be representable without fixed-point saturation.");
         return normalizedDirection;

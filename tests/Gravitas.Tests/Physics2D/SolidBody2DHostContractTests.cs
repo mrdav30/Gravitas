@@ -22,7 +22,7 @@ public sealed class SolidBody2DHostContractTests
         {
             Mass = Fixed64.One
         };
-        body.Initialize(transform.Position.ToVector2d());
+        body.Initialize(transform.WorldPositionXZ);
 
         body.Agent.Should().BeSameAs(agent);
         body.Context.Should().BeSameAs(context);
@@ -43,9 +43,9 @@ public sealed class SolidBody2DHostContractTests
             IsKinematic = true,
             Mass = Fixed64.One
         };
-        body.Initialize(transform.Position.ToVector2d());
+        body.Initialize(transform.WorldPositionXZ);
 
-        transform.Position = new Vector3d((Fixed64)5, (Fixed64)11, (Fixed64)7);
+        transform.LocalPosition = new Vector3d((Fixed64)5, (Fixed64)11, (Fixed64)7);
         context.LateSimulate();
 
         body.Position.Should().Be(new Vector2d((Fixed64)5, (Fixed64)7));
@@ -70,10 +70,10 @@ public sealed class SolidBody2DHostContractTests
         body.SetRotation(FixedMath.DegToRad((Fixed64)90));
         context.Visualize();
 
-        transform.Position.Should().Be(new Vector3d((Fixed64)4, (Fixed64)9, (Fixed64)6));
+        transform.WorldPosition.Should().Be(new Vector3d((Fixed64)4, (Fixed64)9, (Fixed64)6));
         FixedQuaternion.Angle(
-            transform.Rotation,
-            FixedQuaternion.FromEulerAnglesInDegrees(Fixed64.Zero, (Fixed64)90, Fixed64.Zero))
+            transform.WorldRotation,
+            FixedQuaternion.FromAxisAngle(Vector3d.Up, -(Fixed64.Pi * Fixed64.Half)))
             .Should().BeLessThan(Fixed64.Epsilon);
     }
 
@@ -93,7 +93,7 @@ public sealed class SolidBody2DHostContractTests
         body.SetPosition(new Vector2d((Fixed64)4, (Fixed64)6));
         context.Visualize();
 
-        transform.Position.Should().Be(new Vector3d(Fixed64.Zero, (Fixed64)9, Fixed64.Zero));
+        transform.WorldPosition.Should().Be(new Vector3d(Fixed64.Zero, (Fixed64)9, Fixed64.Zero));
     }
 
     [Fact]
@@ -140,24 +140,21 @@ public sealed class SolidBody2DHostContractTests
         SolidBody2D body = CreateDynamicCircle(context, Vector2d.Zero);
         FixedTransform transform = body.Agent.Transform;
         Vector3d hostPosition = new((Fixed64)5, (Fixed64)9, (Fixed64)7);
-        FixedQuaternion hostRotation = FixedQuaternion.FromEulerAnglesInDegrees(
-            Fixed64.Zero,
-            (Fixed64)90,
-            Fixed64.Zero);
+        Fixed64 hostRotation = Fixed64.Pi * Fixed64.Half;
         body.IsKinematic = true;
-        transform.Position = hostPosition;
-        transform.Rotation = hostRotation;
+        transform.LocalPosition = hostPosition;
+        transform.LocalRotationXZRadians = hostRotation;
 
         body.LateSimulate();
 
         body.Position.Should().Be(new Vector2d((Fixed64)5, (Fixed64)7));
         body.Collider.Center.Should().Be(body.Position);
-        body.Rotation.Should().Be(FixedMath.DegToRad((Fixed64)90));
+        body.Rotation.Should().Be(hostRotation);
 
         context.Visualize();
 
-        transform.Position.Should().Be(hostPosition);
-        transform.Rotation.Should().Be(hostRotation);
+        transform.WorldPosition.Should().Be(hostPosition);
+        transform.WorldRotationXZRadians.Should().Be(hostRotation);
     }
 
     [Fact]
@@ -189,7 +186,7 @@ public sealed class SolidBody2DHostContractTests
 
         collider.InitializeWithNoBody(agent);
 
-        transform.Position = new Vector3d((Fixed64)4, Fixed64.Zero, Fixed64.Zero);
+        transform.LocalPosition = new Vector3d((Fixed64)4, Fixed64.Zero, Fixed64.Zero);
         Step(context);
 
         collider.Center.Should().Be(new Vector2d((Fixed64)4, Fixed64.Zero));
@@ -231,6 +228,119 @@ public sealed class SolidBody2DHostContractTests
         triggerCount.Should().Be(0);
     }
 
+    [Theory]
+    [InlineData(1)]
+    [InlineData(-1)]
+    public void PlanarHostRotation_ShouldPreserveSignedHalfPiAcrossPublishAndKinematicReadback(int sign)
+    {
+        using GravitasWorldContext context = Create2DContext();
+        var transform = new FixedTransform(
+            new Vector3d(Fixed64.Zero, (Fixed64)9, Fixed64.Zero),
+            FixedQuaternion.Identity,
+            Vector3d.One);
+        var body = new SolidBody2D(
+            new TestMatterAgent(context, transform),
+            new LSAABBoxCollider2D(new Vector2d((Fixed64)2, Fixed64.One)))
+        {
+            Mass = Fixed64.One
+        };
+        Fixed64 halfPi = Fixed64.Pi * Fixed64.Half;
+        Fixed64 angle = sign > 0 ? halfPi : -halfPi;
+        body.Initialize(Vector2d.Zero);
+
+        body.SetRotation(angle);
+        context.Visualize();
+
+        Vector2d embeddedRight = transform.WorldRotation.Rotate(Vector3d.Right).ToVector2d();
+        Vector2d expectedRight = Vector2d.Rotate(Vector2d.Right, angle);
+        embeddedRight.FuzzyEqualAbsolute(expectedRight, Fixed64.Epsilon).Should().BeTrue();
+        transform.WorldRotationXZRadians.Should().Be(angle);
+
+        body.IsKinematic = true;
+        transform.LocalRotationXZRadians = -angle;
+        context.LateSimulate();
+
+        body.Rotation.Should().Be(-angle);
+    }
+
+    [Fact]
+    public void PlanarRotationAssignments_ShouldUseOneCanonicalHalfOpenRepresentative()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        SolidBody2D body = CreateDynamicCircle(context, Vector2d.Zero, Fixed64.Pi);
+
+        body.Rotation.Should().Be(-Fixed64.Pi);
+
+        body.ResetPosition(Vector2d.Zero, -Fixed64.Pi);
+        body.Rotation.Should().Be(-Fixed64.Pi);
+
+        body.SetRotation(Fixed64.Pi * (Fixed64)3);
+        body.Rotation.Should().Be(-Fixed64.Pi);
+
+        body.SetRotation(-Fixed64.Pi * (Fixed64)3);
+        body.Rotation.Should().Be(-Fixed64.Pi);
+
+        body.SetRotation(Fixed64.TwoPi + Fixed64.Half);
+        body.Rotation.Should().Be(Fixed64.Half);
+
+        body.SetRotation(-Fixed64.TwoPi - Fixed64.Half);
+        body.Rotation.Should().Be(-Fixed64.Half);
+    }
+
+    [Fact]
+    public void DynamicAngularIntegration_ShouldCanonicalizeWhenCrossingPositivePi()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        SolidBody2D body = CreateDynamicCircle(context, Vector2d.Zero);
+        body.SleepEnabled = false;
+        body.SetRotation(Fixed64.Pi - Fixed64.FromFraction(1, 100));
+        body.AddAngularImpulse(Fixed64.One);
+
+        body.LateSimulate();
+
+        body.Rotation.Should().BeGreaterThanOrEqualTo(-Fixed64.Pi);
+        body.Rotation.Should().BeLessThan(Fixed64.Pi);
+        body.Rotation.Should().BeLessThan(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void ParentedHostTransform_ShouldSynchronizeUsingWorldPlanarPoseAndPreserveWorldY()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        var parent = new FixedTransform(
+            new Vector3d((Fixed64)10, (Fixed64)3, (Fixed64)(-4)),
+            FixedQuaternion.Identity,
+            Vector3d.One);
+        var child = new FixedTransform(
+            new Vector3d((Fixed64)2, (Fixed64)6, (Fixed64)5),
+            FixedQuaternion.Identity,
+            Vector3d.One,
+            parent);
+        var body = new SolidBody2D(
+            new TestMatterAgent(context, child),
+            new LSCircleCollider2D(Fixed64.Half))
+        {
+            Mass = Fixed64.One
+        };
+        body.Initialize(child.WorldPositionXZ);
+
+        body.SetPosition(new Vector2d((Fixed64)20, (Fixed64)30));
+        Fixed64 halfPi = Fixed64.Pi * Fixed64.Half;
+        body.SetRotation(halfPi);
+        context.Visualize();
+
+        child.WorldPosition.Should().Be(new Vector3d((Fixed64)20, (Fixed64)9, (Fixed64)30));
+        child.WorldRotationXZRadians.Should().Be(halfPi);
+
+        body.IsKinematic = true;
+        child.LocalPosition = new Vector3d((Fixed64)(-3), (Fixed64)6, (Fixed64)8);
+        child.LocalRotationXZRadians = -halfPi;
+        context.LateSimulate();
+
+        body.Position.Should().Be(child.WorldPositionXZ);
+        body.Rotation.Should().Be(-halfPi);
+    }
+
     private static GravitasWorldContext Create2DContext()
     {
         return Physics2DTestWorld.CreateContext();
@@ -242,7 +352,10 @@ public sealed class SolidBody2DHostContractTests
         context.LateSimulate();
     }
 
-    private static SolidBody2D CreateDynamicCircle(GravitasWorldContext context, Vector2d position)
+    private static SolidBody2D CreateDynamicCircle(
+        GravitasWorldContext context,
+        Vector2d position,
+        Fixed64 rotation = default)
     {
         var transform = new FixedTransform(new Vector3d(position.X, Fixed64.Zero, position.Y), FixedQuaternion.Identity, Vector3d.One);
         var agent = new TestMatterAgent(context, transform);
@@ -250,7 +363,7 @@ public sealed class SolidBody2DHostContractTests
         {
             Mass = Fixed64.One
         };
-        body.Initialize(position);
+        body.Initialize(position, rotation);
         return body;
     }
 }

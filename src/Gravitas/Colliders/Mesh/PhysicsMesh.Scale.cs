@@ -116,9 +116,10 @@ public partial class PhysicsMesh
         if (_validatedScaleValid & scale == _validatedScale)
             return;
 
-        ValidateScaleComponent(scale.X, nameof(scale));
-        ValidateScaleComponent(scale.Y, nameof(scale));
-        ValidateScaleComponent(scale.Z, nameof(scale));
+        ColliderScalePolicy.Validate(scale);
+        ValidateScaleReciprocal(scale.X, nameof(scale));
+        ValidateScaleReciprocal(scale.Y, nameof(scale));
+        ValidateScaleReciprocal(scale.Z, nameof(scale));
 
         bool determinantValid = TryMultiply(scale.X, scale.Y, out Fixed64 determinant);
         determinantValid &= TryMultiply(determinant, scale.Z, out determinant);
@@ -197,14 +198,6 @@ public partial class PhysicsMesh
 
         _validatedRotation = rotation;
         _validatedRotationValid = true;
-    }
-
-    private static void ValidateScaleComponent(Fixed64 component, string parameterName)
-    {
-        if (component <= Fixed64.Zero)
-            throw new ArgumentException("Mesh scale components must be greater than zero.", parameterName);
-
-        ValidateScaleReciprocal(component, parameterName);
     }
 
     private static void ValidateScaleReciprocal(Fixed64 value, string parameterName)

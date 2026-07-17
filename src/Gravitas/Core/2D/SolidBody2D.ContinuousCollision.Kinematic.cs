@@ -305,8 +305,6 @@ public sealed partial class SolidBody2D
         Fixed64 constrainedInverseMass = target.GetConstrainedInverseMass(normal);
         if (constrainedInverseMass <= Fixed64.Zero)
             return false;
-        if (!ContinuousCollisionImpulsePolicy.IsResolvableMobility(target.EffectiveInverseMass, constrainedInverseMass))
-            return false;
 
         Vector2d sourceVelocity = sourceDisplacement / deltaTime;
         Vector2d relativeVelocity = sourceVelocity - target.ResolveContinuousCollisionFrameVelocity();
@@ -314,13 +312,20 @@ public sealed partial class SolidBody2D
         Fixed64 restitution = ResolveContinuousCollisionRestitution(target, -normalVelocity);
         Fixed64 responseSpeed = -(Fixed64.One + restitution) * normalVelocity;
         Fixed64 hitTime = FixedMath.Clamp01(hitDistance / sourceLength);
+        Vector2d targetResponseNormal = target.ProjectLinearMotion(-normal);
+        if (!ContinuousCollisionImpulsePolicy.TryResolveVelocityDelta(
+            targetResponseNormal,
+            responseSpeed,
+            target.EffectiveInverseMass,
+            constrainedInverseMass,
+            out Vector2d targetVelocityDelta))
+        {
+            return false;
+        }
+
         target.ApplyContinuousCollisionHandoff(
             targetPositionAtImpact,
-            -ContinuousCollisionImpulsePolicy.ResolveVelocityDelta(
-                normal,
-                responseSpeed,
-                target.EffectiveInverseMass,
-                constrainedInverseMass),
+            targetVelocityDelta,
             deltaTime * (Fixed64.One - hitTime),
             ignoredCollider2D: Collider);
         return true;
@@ -340,8 +345,6 @@ public sealed partial class SolidBody2D
         Fixed64 constrainedInverseMass = target.GetConstrainedInverseMass(normal.ToVector3d(Fixed64.Zero));
         if (constrainedInverseMass <= Fixed64.Zero)
             return false;
-        if (!ContinuousCollisionImpulsePolicy.IsResolvableMobility(target.EffectiveInverseMass, constrainedInverseMass))
-            return false;
 
         Vector3d normal3D = normal.ToVector3d(Fixed64.Zero);
         Vector3d sourceVelocity = (sourceDisplacement / deltaTime).ToVector3d(Fixed64.Zero);
@@ -353,13 +356,20 @@ public sealed partial class SolidBody2D
         Fixed64 restitution = ResolveContinuousCollisionRestitution(target, -normalVelocity);
         Fixed64 responseSpeed = -(Fixed64.One + restitution) * normalVelocity;
         Fixed64 hitTime = FixedMath.Clamp01(hitDistance / sourceLength);
+        Vector3d targetResponseNormal = target.ProjectLinearMotion(-normal3D);
+        if (!ContinuousCollisionImpulsePolicy.TryResolveVelocityDelta(
+            targetResponseNormal,
+            responseSpeed,
+            target.EffectiveInverseMass,
+            constrainedInverseMass,
+            out Vector3d targetVelocityDelta))
+        {
+            return false;
+        }
+
         target.ApplyContinuousCollisionHandoff(
             targetPositionAtImpact,
-            -ContinuousCollisionImpulsePolicy.ResolveVelocityDelta(
-                normal3D,
-                responseSpeed,
-                target.EffectiveInverseMass,
-                constrainedInverseMass),
+            targetVelocityDelta,
             deltaTime * (Fixed64.One - hitTime),
             ignoredCollider2D: Collider);
         return true;

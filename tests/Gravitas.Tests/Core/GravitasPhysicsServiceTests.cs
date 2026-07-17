@@ -305,7 +305,7 @@ public sealed class GravitasPhysicsServiceTests
         context.Visualize();
 
         context.Physics.BodyCount.Should().Be(1);
-        retained.PositionTransform.Position.Should().Be(Vector3d.Right);
+        retained.PositionTransform.LocalPosition.Should().Be(Vector3d.Right);
     }
 
     [Fact]

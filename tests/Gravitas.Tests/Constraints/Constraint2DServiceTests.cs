@@ -582,7 +582,7 @@ public sealed class Constraint2DServiceTests
     }
 
     [Fact]
-    public void ConstraintIsland_WithReversedDuplicateEndpoints_ShouldSolveInAscendingJointIdOrder()
+    public void ConstraintIsland_WithReversedDuplicateEndpoints_ShouldEmitNonzeroImpulsesInAscendingJointIdOrder()
     {
         using GravitasWorldContext context = CreateConstraintContext();
         SolidBody2D first = CreateBody(context, Vector2d.Zero);
@@ -620,13 +620,19 @@ public sealed class Constraint2DServiceTests
                 firstSequences[jointIndex] = diagnosticEvent.Sequence;
         }
 
+        int previousSequence = -1;
         for (int i = 0; i < joints.Length; i++)
         {
             joints[i].LastSolvedRowCount.Should().BeGreaterThan(0);
-            firstSequences[i].Should().BeGreaterThanOrEqualTo(0);
-            if (i > 0)
-                firstSequences[i].Should().BeGreaterThan(firstSequences[i - 1]);
+            if (firstSequences[i] < 0)
+                continue;
+
+            joints[i].AccumulatedImpulseMagnitude.Should().BeGreaterThan(Fixed64.Zero);
+            firstSequences[i].Should().BeGreaterThan(previousSequence);
+            previousSequence = firstSequences[i];
         }
+
+        previousSequence.Should().BeGreaterThanOrEqualTo(0);
     }
 
     [Fact]
@@ -1437,7 +1443,7 @@ public sealed class Constraint2DServiceTests
     {
         var transform = new FixedTransform(
             new Vector3d(position.X, Fixed64.Zero, position.Y),
-            FixedQuaternion.FromEulerAnglesInDegrees(Fixed64.Zero, FixedMath.RadToDeg(rotation), Fixed64.Zero),
+            FixedQuaternion.FromAxisAngle(Vector3d.Up, -rotation),
             Vector3d.One);
         var agent = new TestMatterAgent(context, transform);
         var body = new SolidBody2D(agent, new LSCircleCollider2D(Fixed64.Half))

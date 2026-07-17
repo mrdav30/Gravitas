@@ -189,7 +189,7 @@ public partial class SolidBody
         }
 
         // Only perform SphereCast if enough frames have passed
-        bool hitPlatformMoved = _hitPlatform != null && _hitPlatform.Position != _hitPlatformPosition;
+        bool hitPlatformMoved = _hitPlatform != null && _hitPlatform.WorldPosition != _hitPlatformPosition;
         bool frameGuard = !force
             && !hitPlatformMoved
             && Vector3d.Distance(_lastPosition, Position3d) < _groundCheckThreshold
@@ -341,7 +341,7 @@ public partial class SolidBody
     private void SetGroundingState(Vector3d hitPoint, Vector3d groundNormal, FixedTransform? hitPlatform)
     {
         _hitPlatform = hitPlatform;
-        _hitPlatformPosition = _hitPlatform?.Position ?? Vector3d.Zero;
+        _hitPlatformPosition = _hitPlatform?.WorldPosition ?? Vector3d.Zero;
         _hitPoint = hitPoint;
         _groundNormal = groundNormal;
 

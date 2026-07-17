@@ -3701,7 +3701,7 @@ public sealed class MixedQueryCcdTests
     }
 
     [Fact]
-    public void LateSimulate_WithNearSingularFrozen2DSourceMobility_ShouldRejectResponseBeforeDivision()
+    public void LateSimulate_WithNearSingularFrozen2DSourceMobility_ShouldApplyRepresentableResponse()
     {
         using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
         context.Environment.Gravity = Fixed64.Zero;
@@ -3718,22 +3718,19 @@ public sealed class MixedQueryCcdTests
 
         source.LastContinuousCollisionToiIterationCount.Should().Be(1);
         source.LastContinuousCollisionToiIterationLimitReached.Should().BeFalse();
-        source.LinearVelocity.X.Should().Be(Fixed64.Zero);
-        source.LinearVelocity.Y.Should().BeGreaterThan(Fixed64.Zero);
-        source.LinearVelocity.Y.Should().BeLessThan(Fixed64.Half);
-        // The 3D phase has already advanced the target; rejection must not queue a second handoff.
+        source.Position.Should().Be(new Vector2d(
+            sourceStart.X,
+            Fixed64.Half + Fixed64.FromRaw(768)));
+        source.LinearVelocity.Should().Be(Vector2d.Forward * (Fixed64.Half + Fixed64.FromRaw(512)));
         target.Body.Position3d.Should().Be(new Vector3d(
-            Fixed64.FromRaw(-512_673_560),
+            Fixed64.FromRaw(6_198_364_188),
             Fixed64.Zero,
-            Fixed64.FromRaw(-254)));
-        target.Body.LinearVelocity.Should().Be(new Vector3d(
-            Fixed64.FromRaw(45),
-            Fixed64.Zero,
-            Fixed64.FromRaw(330_382_150)));
+            Fixed64.FromRaw(-512)));
+        target.Body.LinearVelocity.Should().Be(target.Body.Position3d);
     }
 
     [Fact]
-    public void LateSimulate_WithNearSingularFrozen2DTargetMobility_ShouldUse3DSourceFallback()
+    public void LateSimulate_WithNearSingularFrozen2DTargetMobility_ShouldApplyRepresentableResponse()
     {
         using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
         context.Environment.Gravity = Fixed64.Zero;
@@ -3752,12 +3749,20 @@ public sealed class MixedQueryCcdTests
 
         source.Body.LastContinuousCollisionToiIterationCount.Should().Be(1);
         source.Body.LastContinuousCollisionToiIterationLimitReached.Should().BeFalse();
-        target.Position.Should().Be(new Vector2d(Fixed64.Zero, smallOffset));
-        target.LinearVelocity.Should().Be(Vector2d.Zero);
+        source.Body.Position3d.Should().Be(new Vector3d(
+            Fixed64.FromRaw(-4_294_966_397),
+            Fixed64.Zero,
+            -smallOffset * (Fixed64)3));
+        source.Body.LinearVelocity.Should().Be(new Vector3d(
+            Fixed64.FromRaw(1_792),
+            Fixed64.Zero,
+            -smallOffset * (Fixed64)7));
+        target.Position.Should().Be(new Vector2d(Fixed64.Zero, smallOffset * (Fixed64)4));
+        target.LinearVelocity.Should().Be(Vector2d.Forward * (smallOffset * (Fixed64)7));
     }
 
     [Fact]
-    public void LateSimulate_WithNearSingularFrozen3DSourceMobility_ShouldStopZeroTimeIteration()
+    public void LateSimulate_WithNearSingularFrozen3DSourceMobility_ShouldApplyRepresentableResponse()
     {
         using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
         context.Environment.Gravity = Fixed64.Zero;
@@ -3772,9 +3777,17 @@ public sealed class MixedQueryCcdTests
 
         context.LateSimulate();
 
-        source.Body.Position3d.Should().Be(sourceStart);
-        source.Body.LastContinuousCollisionToiIterationCount.Should().Be(1);
+        source.Body.Position3d.Should().Be(new Vector3d(
+            -Fixed64.One,
+            Fixed64.Zero,
+            Fixed64.FromRaw(598_220_249)));
+        source.Body.LinearVelocity.Should().Be(Vector3d.Forward * Fixed64.FromRaw(598_154_713));
+        source.Body.LastContinuousCollisionToiIterationCount.Should().Be(2);
         source.Body.LastContinuousCollisionToiIterationLimitReached.Should().BeFalse();
+        target.Position.Should().Be(new Vector2d(
+            Fixed64.FromRaw(8_589_916_336),
+            Fixed64.FromRaw(-262_144)));
+        target.LinearVelocity.Should().Be(target.Position);
     }
 
     [Fact]
@@ -3923,7 +3936,7 @@ public sealed class MixedQueryCcdTests
         source.Collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.Half);
         target.Collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.Half);
 
-        source.Body.Agent.Transform.Position = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
+        source.Body.Agent.Transform.LocalPosition = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
         context.LateSimulate();
 
         source.Body.Position3d.X.Should().Be((Fixed64)5);
@@ -3951,7 +3964,7 @@ public sealed class MixedQueryCcdTests
         var hostTarget = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
 
         deactivator.Body.AddForce(Vector3d.Right);
-        source.Body.Agent.Transform.Position = hostTarget;
+        source.Body.Agent.Transform.LocalPosition = hostTarget;
         context.LateSimulate();
 
         deactivator.Body.Position3d.Should().Be(new Vector3d(Fixed64.One, Fixed64.Zero, (Fixed64)3));
@@ -3981,7 +3994,7 @@ public sealed class MixedQueryCcdTests
         Vector3d hostTarget = Vector3d.Right * (Fixed64)5;
 
         deactivator.Body.AddForce(Vector3d.Right);
-        source.Body.Agent.Transform.Position = hostTarget;
+        source.Body.Agent.Transform.LocalPosition = hostTarget;
         context.LateSimulate();
 
         target.Active.Should().BeTrue();
@@ -4023,7 +4036,7 @@ public sealed class MixedQueryCcdTests
             || sourceBounds.Max.Z < targetBounds.Min.Z);
         broadBoundsOverlap.Should().BeTrue();
 
-        source.Body.Agent.Transform.Position = hostTarget;
+        source.Body.Agent.Transform.LocalPosition = hostTarget;
         context.LateSimulate();
 
         source.Body.Position3d.Should().Be(hostTarget);
@@ -4047,7 +4060,7 @@ public sealed class MixedQueryCcdTests
             isKinematic: true);
         source.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
 
-        source.Body.Agent.Transform.Position = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
+        source.Body.Agent.Transform.LocalPosition = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
         context.LateSimulate();
 
         source.Body.Position3d.X.Should().Be((Fixed64)5);
@@ -4058,7 +4071,7 @@ public sealed class MixedQueryCcdTests
     }
 
     [Fact]
-    public void LateSimulate_WithKinematic3DSourceAndNearSingularFrozen2DTargetMobility_ShouldNotPushTarget()
+    public void LateSimulate_WithKinematic3DSourceAndNearSingularFrozen2DTargetMobility_ShouldPushAllowedAxis()
     {
         using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
         context.Environment.Gravity = Fixed64.Zero;
@@ -4073,14 +4086,18 @@ public sealed class MixedQueryCcdTests
         source.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
         Vector3d hostTarget = Vector3d.Right * (Fixed64)5;
 
-        source.Body.Agent.Transform.Position = hostTarget;
+        source.Body.Agent.Transform.LocalPosition = hostTarget;
         context.LateSimulate();
 
-        source.Body.Position3d.Should().Be(hostTarget);
-        source.Body.LastContinuousCollisionToiIterationCount.Should().Be(0);
-        target.Position.Should().Be(new Vector2d(Fixed64.Zero, smallOffset));
-        target.LinearVelocity.Should().Be(Vector2d.Zero);
-        target.IsSleeping.Should().BeTrue();
+        target.Position.X.Should().Be(Fixed64.Zero);
+        target.Position.Y.Should().BeGreaterThan(smallOffset);
+        target.LinearVelocity.X.Should().Be(Fixed64.Zero);
+        target.LinearVelocity.Y.Should().BeGreaterThan(Fixed64.Zero);
+        target.IsSleeping.Should().BeFalse();
+        source.Body.Position3d.X.Should().Be(hostTarget.X);
+        source.Body.Position3d.Y.Should().Be(hostTarget.Y);
+        source.Body.Position3d.Z.Should().Be(hostTarget.Z);
+        source.Body.LastContinuousCollisionToiIterationCount.Should().Be(1);
     }
 
     [Fact]
@@ -4097,7 +4114,7 @@ public sealed class MixedQueryCcdTests
             isKinematic: true);
         source.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
 
-        source.Body.Agent.Transform.Position = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
+        source.Body.Agent.Transform.LocalPosition = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
         context.LateSimulate();
 
         Fixed64 expectedFirstHitX = -Fixed64.One;
@@ -4123,7 +4140,7 @@ public sealed class MixedQueryCcdTests
             isKinematic: true);
         source.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
 
-        source.Body.Agent.Transform.Position = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
+        source.Body.Agent.Transform.LocalPosition = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
         context.LateSimulate();
 
         Fixed64 expectedFirstHitX = -Fixed64.One;
@@ -4145,7 +4162,7 @@ public sealed class MixedQueryCcdTests
             isKinematic: true);
         source.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
 
-        source.Agent.Transform.Position = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
+        source.Agent.Transform.LocalPosition = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
         context.LateSimulate();
 
         Fixed64 expectedFirstHitX = -Fixed64.One;
@@ -4173,7 +4190,7 @@ public sealed class MixedQueryCcdTests
         deactivator.Body.OnMoved += target.Deactivate;
 
         deactivator.Body.AddForce(Vector3d.Right);
-        source.Agent.Transform.Position = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
+        source.Agent.Transform.LocalPosition = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
         context.LateSimulate();
 
         deactivator.Body.Position3d.Should().Be(new Vector3d(Fixed64.One, Fixed64.Zero, (Fixed64)3));
@@ -4204,7 +4221,7 @@ public sealed class MixedQueryCcdTests
             target.Collider.IgnoredCollisionLayers = PhysicsLayerMask.FromLayer(source.Collider.Layer);
 
         deactivator.Body.AddForce(Vector3d.Right);
-        source.Agent.Transform.Position = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
+        source.Agent.Transform.LocalPosition = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
         context.LateSimulate();
 
         deactivator.Body.Position3d.Should().Be(new Vector3d(Fixed64.One, Fixed64.Zero, (Fixed64)3));
@@ -4234,7 +4251,7 @@ public sealed class MixedQueryCcdTests
         deactivator.Body.OnMoved += target.Body.Deactivate;
 
         deactivator.Body.AddForce(Vector3d.Right);
-        source.Agent.Transform.Position = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
+        source.Agent.Transform.LocalPosition = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
         context.LateSimulate();
 
         deactivator.Body.Position3d.Should().Be(new Vector3d(Fixed64.One, Fixed64.Zero, (Fixed64)3));
@@ -4264,7 +4281,7 @@ public sealed class MixedQueryCcdTests
             target.Collider.IgnoredCollisionLayers = PhysicsLayerMask.FromLayer(source.Collider.Layer);
 
         deactivator.Body.AddForce(Vector3d.Right);
-        source.Agent.Transform.Position = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
+        source.Agent.Transform.LocalPosition = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
         context.LateSimulate();
 
         deactivator.Body.Position3d.Should().Be(new Vector3d(Fixed64.One, Fixed64.Zero, (Fixed64)3));
@@ -4310,7 +4327,7 @@ public sealed class MixedQueryCcdTests
             || sourceBounds.Max.Z < targetBounds.Min.Z);
         broadBoundsOverlap.Should().BeTrue();
 
-        source.Agent.Transform.Position = new Vector3d(hostTarget.X, Fixed64.Zero, hostTarget.Y);
+        source.Agent.Transform.LocalPosition = new Vector3d(hostTarget.X, Fixed64.Zero, hostTarget.Y);
         context.LateSimulate();
 
         source.Position.Should().Be(hostTarget);
@@ -4336,7 +4353,7 @@ public sealed class MixedQueryCcdTests
         source.Collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.Half);
         target.Collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.Half);
 
-        source.Agent.Transform.Position = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
+        source.Agent.Transform.LocalPosition = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
         context.LateSimulate();
 
         source.Position.X.Should().Be((Fixed64)5);
@@ -4361,7 +4378,7 @@ public sealed class MixedQueryCcdTests
             isKinematic: true);
         source.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
 
-        source.Agent.Transform.Position = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
+        source.Agent.Transform.LocalPosition = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
         context.LateSimulate();
 
         source.Position.X.Should().Be((Fixed64)5);
@@ -4372,7 +4389,7 @@ public sealed class MixedQueryCcdTests
     }
 
     [Fact]
-    public void LateSimulate_WithKinematic2DSourceCrossingNearSingularFrozen3DTarget_ShouldNotPushTarget()
+    public void LateSimulate_WithKinematic2DSourceCrossingNearSingularFrozen3DTarget_ShouldPushAllowedAxis()
     {
         using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
         context.Environment.Gravity = Fixed64.Zero;
@@ -4388,17 +4405,21 @@ public sealed class MixedQueryCcdTests
         source.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
         Vector2d hostTarget = Vector2d.Right * (Fixed64)5;
 
-        source.Agent.Transform.Position = new Vector3d(hostTarget.X, Fixed64.Zero, hostTarget.Y);
+        source.Agent.Transform.LocalPosition = new Vector3d(hostTarget.X, Fixed64.Zero, hostTarget.Y);
         context.LateSimulate();
 
         source.Position.Should().Be(hostTarget);
         source.Rotation.Should().Be(Fixed64.Zero);
-        source.Agent.Transform.Position.Should().Be(new Vector3d(hostTarget.X, Fixed64.Zero, hostTarget.Y));
-        source.Agent.Transform.Rotation.Should().Be(FixedQuaternion.Identity);
-        source.LastContinuousCollisionToiIterationCount.Should().Be(0);
-        target.Body.Position3d.Should().Be(targetPosition);
-        target.Body.LinearVelocity.Should().Be(Vector3d.Zero);
-        target.Body.IsSleeping.Should().BeTrue();
+        target.Body.Position3d.X.Should().Be(Fixed64.Zero);
+        target.Body.Position3d.Y.Should().Be(Fixed64.Zero);
+        target.Body.Position3d.Z.Should().BeGreaterThan(smallOffset);
+        target.Body.LinearVelocity.X.Should().Be(Fixed64.Zero);
+        target.Body.LinearVelocity.Y.Should().Be(Fixed64.Zero);
+        target.Body.LinearVelocity.Z.Should().BeGreaterThan(Fixed64.Zero);
+        target.Body.IsSleeping.Should().BeFalse();
+        source.Agent.Transform.LocalPosition.Should().Be(new Vector3d(hostTarget.X, Fixed64.Zero, hostTarget.Y));
+        source.Agent.Transform.LocalRotation.Should().Be(FixedQuaternion.Identity);
+        source.LastContinuousCollisionToiIterationCount.Should().Be(1);
     }
 
     [Fact]
@@ -4415,7 +4436,7 @@ public sealed class MixedQueryCcdTests
             isKinematic: true);
         source.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
 
-        source.Agent.Transform.Position = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
+        source.Agent.Transform.LocalPosition = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
         context.LateSimulate();
 
         Fixed64 expectedFirstHitX = -Fixed64.One;
@@ -4442,7 +4463,7 @@ public sealed class MixedQueryCcdTests
             isKinematic: true);
         source.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
 
-        source.Body.Agent.Transform.Position = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
+        source.Body.Agent.Transform.LocalPosition = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
         context.LateSimulate();
 
         source.Body.Position3d.X.Should().Be((Fixed64)5);
@@ -4466,7 +4487,7 @@ public sealed class MixedQueryCcdTests
             isKinematic: true);
         source.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
 
-        source.Agent.Transform.Position = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
+        source.Agent.Transform.LocalPosition = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
         context.LateSimulate();
 
         source.Position.X.Should().Be((Fixed64)5);
@@ -4491,7 +4512,7 @@ public sealed class MixedQueryCcdTests
         source.Collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.One);
         target.Collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.One);
 
-        source.Agent.Transform.Position = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
+        source.Agent.Transform.LocalPosition = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
         context.LateSimulate();
 
         source.Position.X.Should().Be((Fixed64)5);
@@ -4521,7 +4542,7 @@ public sealed class MixedQueryCcdTests
         middle.Sleep();
         receiver.Body.Sleep();
 
-        source.Body.Agent.Transform.Position = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
+        source.Body.Agent.Transform.LocalPosition = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
         context.LateSimulate();
 
         middle.IsSleeping.Should().BeFalse();
@@ -4552,7 +4573,7 @@ public sealed class MixedQueryCcdTests
         middle.Body.Sleep();
         receiver.Sleep();
 
-        source.Agent.Transform.Position = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
+        source.Agent.Transform.LocalPosition = new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
         context.LateSimulate();
 
         middle.Body.IsSleeping.Should().BeFalse();
@@ -5166,7 +5187,7 @@ public sealed class MixedQueryCcdTests
         source.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
 
         if (isKinematic)
-            source.Agent.Transform.Position = Vector3d.Zero;
+            source.Agent.Transform.LocalPosition = Vector3d.Zero;
         else
             source.AddForce(Vector2d.Right * (Fixed64)2);
 

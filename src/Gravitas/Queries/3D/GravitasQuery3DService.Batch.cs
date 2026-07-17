@@ -643,7 +643,7 @@ public sealed partial class GravitasQuery3DService
     private bool TryRaycastBatchRequest(PhysicsRaycast3DRequest request, out Physics3DHit hit)
     {
         _currentLayerMask = request.LayerMask;
-        if (!FixedVectorDifference.TryCreate(request.Start, request.End, out Vector3d segment)
+        if (!Vector3d.TrySubtract(request.End, request.Start, out Vector3d segment)
             || !Vector3d.TryGetMagnitude(segment, out Fixed64 segmentLength)
             || segmentLength == Fixed64.Zero)
         {
@@ -661,7 +661,7 @@ public sealed partial class GravitasQuery3DService
     {
         _currentLayerMask = request.LayerMask;
         results.FastClear();
-        if (!FixedVectorDifference.TryCreate(request.Start, request.End, out Vector3d segment)
+        if (!Vector3d.TrySubtract(request.End, request.Start, out Vector3d segment)
             || !Vector3d.TryGetMagnitude(segment, out Fixed64 segmentLength)
             || segmentLength == Fixed64.Zero)
         {
@@ -678,7 +678,7 @@ public sealed partial class GravitasQuery3DService
     private int SweepSphereAllBatchRequest(PhysicsSweepSphere3DRequest request, SwiftList<Physics3DHit> results)
     {
         results.FastClear();
-        if (!FixedVectorDifference.TryCreate(request.Start, request.End, out Vector3d segment)
+        if (!Vector3d.TrySubtract(request.End, request.Start, out Vector3d segment)
             || !Vector3d.TryGetMagnitude(segment, out Fixed64 segmentLength)
             || segmentLength <= Fixed64.Epsilon
             || request.Radius <= Fixed64.Zero)

@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using FixedMathSharp.Bounds;
 using Gravitas.Colliders;
 using System.Runtime.CompilerServices;
 
@@ -200,11 +201,10 @@ public static partial class CollisionDetectionMixed
         if (!CheckCapsuleCircleSlabAxis(capsule, circle, Vector3d.Cross(capsule.LineDirection, Vector3d.Up), ref penetration))
             return false;
 
-        (Vector3d CapsulePoint, Vector3d CirclePoint) closest = ClosestPointsOnSegments(
+        (Vector3d CapsulePoint, Vector3d CirclePoint) closest = new FixedSegment(
             capsule.LineSegmentStart,
-            capsule.LineSegmentEnd,
-            circleStart,
-            circleEnd);
+            capsule.LineSegmentEnd).GetClosestPoints(
+                new FixedSegment(circleStart, circleEnd));
         if (!CheckCapsuleCircleSlabAxis(capsule, circle, closest.CirclePoint - closest.CapsulePoint, ref penetration))
             return false;
 
@@ -227,11 +227,10 @@ public static partial class CollisionDetectionMixed
         if (!CheckCylinderCircleSlabAxis(cylinder, circle, Vector3d.Cross(cylinder.LineDirection, Vector3d.Up), ref penetration))
             return false;
 
-        (Vector3d CylinderPoint, Vector3d CirclePoint) closest = ClosestPointsOnSegments(
+        (Vector3d CylinderPoint, Vector3d CirclePoint) closest = new FixedSegment(
             cylinder.LineSegmentStart,
-            cylinder.LineSegmentEnd,
-            circleStart,
-            circleEnd);
+            cylinder.LineSegmentEnd).GetClosestPoints(
+                new FixedSegment(circleStart, circleEnd));
         if (!CheckCylinderCircleSlabAxis(cylinder, circle, closest.CirclePoint - closest.CylinderPoint, ref penetration))
             return false;
 
@@ -906,18 +905,6 @@ public static partial class CollisionDetectionMixed
         axis = new Vector3d(segment.X, Fixed64.Zero, segment.Y);
         Vector2d planarNormal = segment.RightHandNormal;
         normal = new Vector3d(planarNormal.X, Fixed64.Zero, planarNormal.Y);
-    }
-
-    private static (Vector3d First, Vector3d Second) ClosestPointsOnSegments(
-        Vector3d firstStart,
-        Vector3d firstEnd,
-        Vector3d secondStart,
-        Vector3d secondEnd)
-    {
-        if ((firstEnd - firstStart).MagnitudeSquared <= Fixed64.Epsilon)
-            return (firstStart, Vector3d.ClosestPointOnLineSegment(firstStart, secondStart, secondEnd));
-
-        return Vector3d.ClosestPointsOnTwoLines(firstStart, firstEnd, secondStart, secondEnd);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

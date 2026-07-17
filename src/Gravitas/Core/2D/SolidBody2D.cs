@@ -384,9 +384,10 @@ public sealed partial class SolidBody2D : IRecordable
                 || (Collider.HasHostBinding && !ReferenceEquals(Collider.Body, this)),
             nameof(Collider),
             "Body collider must be unregistered and free of another host binding before initialization.");
+        Collider.PreflightBodyInitialization(this);
 
         _position = position;
-        _rotation = rotation;
+        _rotation = CanonicalizeRotation(rotation);
         _linearVelocity = Vector2d.Zero;
         _linearAccelerationStore = Vector2d.Zero;
         _deltaAcceleration = Vector2d.Zero;
@@ -425,7 +426,7 @@ public sealed partial class SolidBody2D : IRecordable
         _isSleeping = false;
         _sleepFrameCount = 0;
         _position = position;
-        _rotation = rotation;
+        _rotation = CanonicalizeRotation(rotation);
         ResetGroundingForInitialize(position);
 
         if (!Active)
@@ -535,7 +536,7 @@ public sealed partial class SolidBody2D : IRecordable
             TryResolveRotationalContinuousCollision(startPosition, ref proposedPosition, startRotation, ref proposedRotation);
             proposedPosition = ProjectLinearEndpoint(startPosition, proposedPosition);
             _position = proposedPosition;
-            _rotation = proposedRotation;
+            _rotation = CanonicalizeRotation(proposedRotation);
             if (updateColliderState)
                 Collider.Rebuild();
 
@@ -559,21 +560,16 @@ public sealed partial class SolidBody2D : IRecordable
         if (IsKinematic)
             return;
 
-        FixedTransform transform = Agent.Transform;
-        Vector3d currentPosition = transform.Position;
-        transform.Position = new Vector3d(_position.X, currentPosition.Y, _position.Y);
-        transform.Rotation = FixedQuaternion.FromEulerAnglesInDegrees(
-            Fixed64.Zero,
-            FixedMath.RadToDeg(_rotation),
-            Fixed64.Zero);
+        SetHostWorldPose(Agent.Transform, _position, _rotation);
     }
 
     private void UpdateKinematicPositionAndRotation(bool updateColliderState)
     {
         Vector2d startPosition = _position;
         Fixed64 startRotation = _rotation;
-        Vector2d kinematicPosition = Agent.Transform.Position.ToVector2d();
-        Fixed64 kinematicRotation = FixedMath.DegToRad(Agent.Transform.EulerAngles.Y);
+        FixedTransform transform = Agent.Transform;
+        Vector2d kinematicPosition = transform.WorldPositionXZ;
+        Fixed64 kinematicRotation = CanonicalizeRotation(transform.WorldRotationXZRadians);
         if (startPosition == kinematicPosition && startRotation == kinematicRotation)
             return;
 
@@ -586,24 +582,42 @@ public sealed partial class SolidBody2D : IRecordable
         TryResolveKinematicContinuousCollision(startPosition, ref resolvedPosition);
         TryResolveKinematicRotationalContinuousCollision(startPosition, ref resolvedPosition, startRotation, ref resolvedRotation);
 
-        if (resolvedPosition != kinematicPosition)
-        {
-            Vector3d hostPosition = Agent.Transform.Position;
-            Agent.Transform.Position = new Vector3d(resolvedPosition.X, hostPosition.Y, resolvedPosition.Y);
-        }
-
-        if (resolvedRotation != kinematicRotation)
-        {
-            Agent.Transform.Rotation = FixedQuaternion.FromEulerAnglesInDegrees(
-                Fixed64.Zero,
-                FixedMath.RadToDeg(resolvedRotation),
-                Fixed64.Zero);
-        }
+        resolvedRotation = CanonicalizeRotation(resolvedRotation);
+        if (resolvedPosition != kinematicPosition || resolvedRotation != kinematicRotation)
+            SetHostWorldPose(transform, resolvedPosition, resolvedRotation);
 
         _position = resolvedPosition;
         _rotation = resolvedRotation;
         if (updateColliderState)
             Collider.Rebuild();
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Fixed64 CanonicalizeRotation(Fixed64 rotation)
+    {
+        if (rotation >= -Fixed64.Pi && rotation < Fixed64.Pi)
+            return rotation;
+
+        rotation %= Fixed64.TwoPi;
+        if (rotation >= Fixed64.Pi)
+            return rotation - Fixed64.TwoPi;
+        if (rotation < -Fixed64.Pi)
+            return rotation + Fixed64.TwoPi;
+        return rotation;
+    }
+
+    private static void SetHostWorldPose(
+        FixedTransform transform,
+        Vector2d position,
+        Fixed64 rotation)
+    {
+        Vector3d currentWorldPosition = transform.WorldPosition;
+        Vector3d worldPosition = new(position.X, currentWorldPosition.Y, position.Y);
+        FixedQuaternion worldRotation = FixedQuaternion.FromAxisAngle(Vector3d.Up, -rotation);
+        SwiftThrowHelper.ThrowIfTrue(
+            !transform.TrySetWorldPose(worldPosition, worldRotation),
+            nameof(FixedTransform),
+            "Host transform cannot represent the requested world-space 2D pose.");
     }
 
     /// <summary>

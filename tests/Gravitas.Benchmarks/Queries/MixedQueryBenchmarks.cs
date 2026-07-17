@@ -397,7 +397,7 @@ public class MixedQueryBenchmarks
     {
         var agent = new BenchmarkMatterAgent(context, position);
         FixedQuaternion startRotation = rotation ?? FixedQuaternion.Identity;
-        agent.Transform.Rotation = startRotation;
+        agent.Transform.LocalRotation = startRotation;
         var body = new SolidBody(agent, collider)
         {
             Mass = Fixed64.One,

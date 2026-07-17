@@ -107,7 +107,7 @@ public sealed partial class GravitasQuery3DService
 
         Vector3d rayDirection = direction.Normalized;
         Vector3d requestedDisplacement = rayDirection * maxDistance;
-        if (!FixedVectorDifference.TryTranslate(origin, requestedDisplacement, out Vector3d end))
+        if (!Vector3d.TryAdd(origin, requestedDisplacement, out Vector3d end))
         {
             ResetLastQueryCounters();
             raycastHit = default;
@@ -141,7 +141,7 @@ public sealed partial class GravitasQuery3DService
         _currentLayerMask = layerMask;
         results.FastClear();
 
-        if (!FixedVectorDifference.TryCreate(start3d, end3d, out Vector3d segment)
+        if (!Vector3d.TrySubtract(end3d, start3d, out Vector3d segment)
             || !Vector3d.TryGetMagnitude(segment, out Fixed64 segmentLength)
             || segmentLength == Fixed64.Zero)
         {
@@ -184,7 +184,7 @@ public sealed partial class GravitasQuery3DService
 
         Vector3d sweepDirection = direction.Normalized;
         Vector3d requestedDisplacement = sweepDirection * maxDistance;
-        if (!FixedVectorDifference.TryTranslate(origin, requestedDisplacement, out Vector3d end))
+        if (!Vector3d.TryAdd(origin, requestedDisplacement, out Vector3d end))
         {
             ResetLastQueryCounters();
             sweepHit = default;
@@ -543,7 +543,7 @@ public sealed partial class GravitasQuery3DService
         SwiftThrowHelper.ThrowIfNull(results, nameof(results));
 
         results.FastClear();
-        if (!FixedVectorDifference.TryCreate(start3d, end3d, out Vector3d segment)
+        if (!Vector3d.TrySubtract(end3d, start3d, out Vector3d segment)
             || !Vector3d.TryGetMagnitude(segment, out Fixed64 segmentLength)
             || segmentLength <= Fixed64.Epsilon
             || radius <= Fixed64.Zero)
@@ -694,7 +694,7 @@ public sealed partial class GravitasQuery3DService
             return false;
         }
 
-        if (!FixedVectorDifference.TryCreate(start, end, out Vector3d segment)
+        if (!Vector3d.TrySubtract(end, start, out Vector3d segment)
             || !Vector3d.TryGetMagnitude(segment, out Fixed64 segmentLength)
             || segmentLength <= Fixed64.Epsilon)
         {

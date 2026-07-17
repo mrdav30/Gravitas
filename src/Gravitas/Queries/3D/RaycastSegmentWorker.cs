@@ -37,7 +37,7 @@ public sealed class RaycastSegmentWorker
         _cachedOrigin = p1;
         _cachedEnd = p2;
 
-        if (!FixedVectorDifference.TryCreate(p1, p2, out Vector3d segment)
+        if (!Vector3d.TrySubtract(p2, p1, out Vector3d segment)
             || !Vector3d.TryGetMagnitude(segment, out _segmentLength))
         {
             _segmentLengthSqr = Fixed64.Zero;

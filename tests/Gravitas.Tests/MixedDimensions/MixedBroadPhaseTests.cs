@@ -834,7 +834,7 @@ public sealed class MixedBroadPhaseTests
             Mass = Fixed64.One,
             FreezeAxes = immovable ? BodyFreezeAxes3D.Position : BodyFreezeAxes3D.None
         };
-        body.Initialize(agent.Transform.Position, agent.Transform.Rotation);
+        body.Initialize(agent.Transform.LocalPosition, agent.Transform.LocalRotation);
         return new ScenarioBody<LSSphereCollider>(body, collider);
     }
 
@@ -884,7 +884,7 @@ public sealed class MixedBroadPhaseTests
             FreezeAxes = immovable ? BodyFreezeAxes2D.Position : BodyFreezeAxes2D.None,
             IsKinematic = isKinematic
         };
-        body.Initialize(agent.Transform.Position.ToVector2d());
+        body.Initialize(agent.Transform.LocalPosition.ToVector2d());
         return body;
     }
 

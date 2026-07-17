@@ -97,8 +97,8 @@ public partial class SolidBody
 
     private void ApplyLoadedState()
     {
-        _positionTransform.Position = Position3d;
-        _rotationTransform.Rotation = Rotation;
+        SetPositionTransformWorldPosition(Position3d);
+        SetRotationTransformWorldRotation(Rotation);
 
         _positionMutated = false;
         _positionChangedBuffer = false;

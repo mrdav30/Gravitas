@@ -200,7 +200,7 @@ public sealed partial class GravitasDiagnosticSink
         SwiftThrowHelper.ThrowIfNull(joint, nameof(joint));
         SolidBody2D bodyA = joint.BodyA;
         SolidBody2D bodyB = joint.BodyB;
-        Fixed64 y = bodyA.Agent.Transform.Position.Y;
+        Fixed64 y = bodyA.Agent.Transform.WorldPosition.Y;
         Vector2d anchorA2D = bodyA.Position + Vector2d.Rotate(joint.LocalFrameA.Anchor, bodyA.Rotation);
         Vector2d anchorB2D = bodyB.Position + Vector2d.Rotate(joint.LocalFrameB.Anchor, bodyB.Rotation);
         Vector3d anchorA = new(anchorA2D.X, y, anchorA2D.Y);

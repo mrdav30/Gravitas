@@ -248,7 +248,7 @@ public sealed class GravitasReplayConformanceTests
             Mass = (Fixed64)2,
             FreezeAxes = BodyFreezeAxes3D.Position
         };
-        body3D.Initialize(agent3D.Transform.Position, FixedQuaternion.Identity);
+        body3D.Initialize(agent3D.Transform.LocalPosition, FixedQuaternion.Identity);
 
         SolidBody2D body2D = CreateCircle2D(context, new Vector2d((Fixed64)(-1), Fixed64.Zero));
         body2D.AddForce(new Vector2d((Fixed64)6, Fixed64.Zero));

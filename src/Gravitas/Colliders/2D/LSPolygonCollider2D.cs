@@ -7,6 +7,7 @@
 
 using Chronicler;
 using FixedMathSharp;
+using FixedMathSharp.Bounds;
 using Gravitas.CollisionHandling;
 using System;
 
@@ -80,7 +81,7 @@ public sealed class LSPolygonCollider2D : LSCollider2D, IConvexVertexSource2D
         {
             Vector2d a = _worldVertices[i];
             Vector2d b = _worldVertices[(i + 1) % _worldVertices.Length];
-            Vector2d candidate = PlanarSegmentGeometry.ClosestPoint(point, a, b);
+            Vector2d candidate = new FixedSegment2d(a, b).ClosestPoint(point);
             Fixed64 distance = Vector2d.DistanceSquared(point, candidate);
             if (distance >= bestDistance)
                 continue;

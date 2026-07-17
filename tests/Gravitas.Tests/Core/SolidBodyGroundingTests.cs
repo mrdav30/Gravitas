@@ -75,7 +75,7 @@ public sealed class SolidBodyGroundingTests
         scenario.Context.Settings.GroundCheckLayerMask = PhysicsLayerMask.FromLayer(1);
         ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
 
-        ground.Transform.Position = new Vector3d(Fixed64.Zero, -Fixed64.FromFraction(1, 4), Fixed64.Zero);
+        ground.Transform.LocalPosition = new Vector3d(Fixed64.Zero, -Fixed64.FromFraction(1, 4), Fixed64.Zero);
         ground.Collider.Simulate();
         scenario.Context.Simulate();
         scenario.Context.LateSimulate();

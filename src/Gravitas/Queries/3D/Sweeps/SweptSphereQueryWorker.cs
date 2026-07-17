@@ -43,7 +43,7 @@ public sealed class SweptSphereQueryWorker
         _end = end;
         _radius = radius;
 
-        if (!FixedVectorDifference.TryCreate(start, end, out Vector3d segment)
+        if (!Vector3d.TrySubtract(end, start, out Vector3d segment)
             || !Vector3d.TryGetMagnitude(segment, out _length))
         {
             _length = Fixed64.Zero;

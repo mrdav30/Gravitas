@@ -222,10 +222,10 @@ internal readonly struct ConvexShape
     private Vector3d SupportTriangle(Vector3d direction)
     {
         Vector3d best = _triangleA;
-        if (ConvexSupportProjection.Compare(_triangleB, best, direction) > 0)
+        if (Vector3d.CompareProjection(_triangleB, best, direction) > 0)
             best = _triangleB;
 
-        if (ConvexSupportProjection.Compare(_triangleC, best, direction) > 0)
+        if (Vector3d.CompareProjection(_triangleC, best, direction) > 0)
             best = _triangleC;
 
         return best;

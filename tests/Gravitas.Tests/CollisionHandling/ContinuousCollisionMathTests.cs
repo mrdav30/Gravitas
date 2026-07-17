@@ -487,10 +487,6 @@ public sealed class ContinuousCollisionMathTests
                 out _)
             .Should().Be(Vector2d.Right);
 
-        FixedVectorDifference.TryTranslate(Vector2d.Zero, Vector2d.Right, out Vector2d translated2D)
-            .Should().BeTrue();
-        translated2D.Should().Be(Vector2d.Right);
-        FixedVectorDifference.TryTranslate(start2D, requested2D, out _).Should().BeFalse();
     }
 
     [Fact]

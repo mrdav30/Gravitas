@@ -390,7 +390,7 @@ public class KinematicActiveCcdScalingBenchmarks
             SolidBody source = sources[i];
             Vector3d position = positions[i];
             source.ResetPosition(position, FixedQuaternion.Identity);
-            source.Agent.Transform.Position = position + displacement;
+            source.Agent.Transform.LocalPosition = position + displacement;
         }
     }
 
@@ -401,7 +401,7 @@ public class KinematicActiveCcdScalingBenchmarks
             SolidBody source = sources[i];
             Vector3d position = positions[i];
             source.ResetPosition(position, FixedQuaternion.Identity);
-            source.Agent.Transform.Rotation = QuarterTurn3D;
+            source.Agent.Transform.LocalRotation = QuarterTurn3D;
         }
     }
 
@@ -413,8 +413,8 @@ public class KinematicActiveCcdScalingBenchmarks
             Vector2d position = positions[i];
             source.SetPosition(position);
             source.SetRotation(Fixed64.Zero);
-            source.Agent.Transform.Position = (position + displacement).ToVector3d(Fixed64.Zero);
-            source.Agent.Transform.Rotation = FixedQuaternion.Identity;
+            source.Agent.Transform.LocalPosition = (position + displacement).ToVector3d(Fixed64.Zero);
+            source.Agent.Transform.LocalRotation = FixedQuaternion.Identity;
         }
     }
 
@@ -426,11 +426,8 @@ public class KinematicActiveCcdScalingBenchmarks
             Vector2d position = positions[i];
             source.SetPosition(position);
             source.SetRotation(Fixed64.Zero);
-            source.Agent.Transform.Position = position.ToVector3d(Fixed64.Zero);
-            source.Agent.Transform.Rotation = FixedQuaternion.FromEulerAnglesInDegrees(
-                Fixed64.Zero,
-                FixedMath.RadToDeg(QuarterTurn2D),
-                Fixed64.Zero);
+            source.Agent.Transform.LocalPosition = position.ToVector3d(Fixed64.Zero);
+            source.Agent.Transform.LocalRotationXZRadians = QuarterTurn2D;
         }
     }
 }

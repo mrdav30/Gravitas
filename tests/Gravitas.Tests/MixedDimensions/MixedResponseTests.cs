@@ -70,7 +70,7 @@ public sealed partial class MixedResponseTests
 
         body3D.Body.Position3d.X.Should().BeLessThan(-Fixed64.FromFraction(1, 4));
         body2D.Position.X.Should().BeGreaterThan(Fixed64.Zero);
-        body2D.Agent.Transform.Position.Y.Should().Be(Fixed64.Zero);
+        body2D.Agent.Transform.LocalPosition.Y.Should().Be(Fixed64.Zero);
     }
 
     [Fact]
@@ -325,7 +325,7 @@ public sealed partial class MixedResponseTests
         CollisionResponseMixed.Resolve(pair, contact);
 
         body3D.Body.Position3d.Y.Should().BeLessThan(-Fixed64.FromFraction(1, 4));
-        body2D.Agent.Transform.Position.Y.Should().Be(Fixed64.Zero);
+        body2D.Agent.Transform.LocalPosition.Y.Should().Be(Fixed64.Zero);
         body2D.LinearVelocity.X.Should().BeGreaterThan(Fixed64.Zero);
         body2D.LinearVelocity.Y.Should().Be(Fixed64.Zero);
         body2D.AngularVelocity.Should().BeLessThan(Fixed64.Zero);

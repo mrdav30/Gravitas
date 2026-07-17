@@ -87,7 +87,7 @@ public sealed class SolidBody2DContinuousCollisionHitTests
     }
 
     [Fact]
-    public void ContinuousMode_WithTwoDynamicMixedCandidates_ShouldKeepNearestTarget()
+    public void ContinuousMode_WithTwoDynamicMixedCandidates_ShouldReboundFromNearestFrozenAxisTarget()
     {
         using GravitasWorldContext context = CreateMixedContext();
         SolidBody nearest = CreateBody3D(context, Vector3d.Zero);
@@ -102,9 +102,9 @@ public sealed class SolidBody2DContinuousCollisionHitTests
         context.LateSimulate();
 
         Fixed64 candidateOrderingTolerance = Fixed64.Epsilon * (Fixed64)8;
-        (source.Position.X + Fixed64.One).Abs().Should().BeLessThanOrEqualTo(candidateOrderingTolerance);
+        (source.Position.X + (Fixed64)4).Abs().Should().BeLessThanOrEqualTo(candidateOrderingTolerance);
         source.Position.Y.Should().Be(Fixed64.Zero);
-        source.LinearVelocity.Should().Be(Vector2d.Zero);
+        source.LinearVelocity.Should().Be(-Vector2d.Right * (Fixed64)5);
         source.LastContinuousCollisionToiIterationCount.Should().Be(1);
         nearest.Collider.Id.Should().BeLessThan(farther.Collider.Id);
         nearest.Position3d.Should().Be(Vector3d.Zero);

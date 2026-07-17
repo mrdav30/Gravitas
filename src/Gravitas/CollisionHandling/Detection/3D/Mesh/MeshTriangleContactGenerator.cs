@@ -494,7 +494,9 @@ internal static class MeshTriangleContactGenerator
         ref Vector3d pointOnTriangle,
         ref Fixed64 bestDistanceSqr)
     {
-        (Vector3d segmentPoint, Vector3d edgePoint) = Vector3d.ClosestPointsOnTwoLines(segmentStart, segmentEnd, edgeStart, edgeEnd);
+        (Vector3d segmentPoint, Vector3d edgePoint) = new FixedSegment(
+            segmentStart,
+            segmentEnd).GetClosestPoints(new FixedSegment(edgeStart, edgeEnd));
         Fixed64 distanceSqr = Vector3d.DistanceSquared(segmentPoint, edgePoint);
         if (distanceSqr >= bestDistanceSqr)
             return;

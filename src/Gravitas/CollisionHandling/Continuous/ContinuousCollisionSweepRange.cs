@@ -23,7 +23,7 @@ internal static class ContinuousCollisionSweepRange
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Vector2d ValidateEndpoint(Vector2d start, Vector2d end, out Fixed64 length)
     {
-        if (!FixedVectorDifference.TryCreate(start, end, out Vector2d displacement)
+        if (!Vector2d.TrySubtract(end, start, out Vector2d displacement)
             || !Vector2d.TryGetMagnitude(displacement, out length))
         {
             throw new ArgumentOutOfRangeException(nameof(end), RangeMessage);
@@ -35,7 +35,7 @@ internal static class ContinuousCollisionSweepRange
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Vector3d ValidateEndpoint(Vector3d start, Vector3d end, out Fixed64 length)
     {
-        if (!FixedVectorDifference.TryCreate(start, end, out Vector3d displacement)
+        if (!Vector3d.TrySubtract(end, start, out Vector3d displacement)
             || !Vector3d.TryGetMagnitude(displacement, out length))
         {
             throw new ArgumentOutOfRangeException(nameof(end), RangeMessage);
@@ -78,7 +78,7 @@ internal static class ContinuousCollisionSweepRange
         Vector2d targetDisplacement,
         out Fixed64 length)
     {
-        if (!FixedVectorDifference.TryCreate(targetDisplacement, sourceDisplacement, out Vector2d relativeDisplacement)
+        if (!Vector2d.TrySubtract(sourceDisplacement, targetDisplacement, out Vector2d relativeDisplacement)
             || !Vector2d.TryGetMagnitude(relativeDisplacement, out length))
         {
             throw new ArgumentOutOfRangeException(nameof(sourceDisplacement), RangeMessage);
@@ -93,7 +93,7 @@ internal static class ContinuousCollisionSweepRange
         Vector3d targetDisplacement,
         out Fixed64 length)
     {
-        if (!FixedVectorDifference.TryCreate(targetDisplacement, sourceDisplacement, out Vector3d relativeDisplacement)
+        if (!Vector3d.TrySubtract(sourceDisplacement, targetDisplacement, out Vector3d relativeDisplacement)
             || !Vector3d.TryGetMagnitude(relativeDisplacement, out length))
         {
             throw new ArgumentOutOfRangeException(nameof(sourceDisplacement), RangeMessage);

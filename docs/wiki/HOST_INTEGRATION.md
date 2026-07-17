@@ -1,8 +1,8 @@
 # Host Integration
 
 Gravitas does not own your application loop. A game engine, server,
-deterministic simulation harness, or unit test creates the host objects and calls
-Gravitas at deterministic points.
+deterministic simulation harness, or unit test creates the host objects and
+calls Gravitas at deterministic points.
 
 This page is the practical starting point for wiring Gravitas into a host. For
 runtime ownership details, read [Runtime Architecture](RUNTIME_ARCHITECTURE.md).
@@ -19,8 +19,7 @@ For replay and snapshot boundaries, read
 - Apply deterministic commands before `context.Simulate()`.
 - Call `context.Simulate()` and `context.LateSimulate()` from the authoritative
   fixed step.
-- Use `context.Visualize()` and `context.LateVisualize()` only for
-  presentation.
+- Use `context.Visualize()` and `context.LateVisualize()` only for presentation.
 - Deactivate bodies and colliders before pooling or destroying host wrappers.
 
 ```mermaid
@@ -34,37 +33,37 @@ flowchart LR
 
 ## Public Surface
 
-| Need | Use |
-| --- | --- |
-| Create an owned world | `GravitasWorldContext.CreateOwned(...)` |
-| Attach a host-owned world | `GravitasWorldContext.Attach(world, takeOwnership)` |
-| Bind a host object | `IMatterAgent` |
-| Register a 3D body | `new SolidBody(agent, collider).Initialize(...)` |
-| Register a 2D body | `new SolidBody2D(agent, collider).Initialize(...)` |
-| Register bodyless geometry | `collider.InitializeWithNoBody(agent)` |
-| Set runtime mode | `context.Settings.RuntimeMode` |
-| Run 3D constraints/ragdolls | `context.Constraints3D` |
-| Run 2D constraints/ragdolls | `context.Constraints2D` |
+| Need                            | Use                                                        |
+| ------------------------------- | ---------------------------------------------------------- |
+| Create an owned world           | `GravitasWorldContext.CreateOwned(...)`                    |
+| Attach a host-owned world       | `GravitasWorldContext.Attach(world, takeOwnership)`        |
+| Bind a host object              | `IMatterAgent`                                             |
+| Register a 3D body              | `new SolidBody(agent, collider).Initialize(...)`           |
+| Register a 2D body              | `new SolidBody2D(agent, collider).Initialize(...)`         |
+| Register bodyless geometry      | `collider.InitializeWithNoBody(agent)`                     |
+| Set runtime mode                | `context.Settings.RuntimeMode`                             |
+| Run 3D constraints/ragdolls     | `context.Constraints3D`                                    |
+| Run 2D constraints/ragdolls     | `context.Constraints2D`                                    |
 | Query 3D, 2D, or mixed geometry | `context.Query3D`, `context.Query2D`, `context.QueryMixed` |
-| Hash replay state | `context.ComputeReplayHash()` |
-| Reset a session | `context.Reset()` |
-| End a context | `context.Dispose()` |
+| Hash replay state               | `context.ComputeReplayHash()`                              |
+| Reset a session                 | `context.Reset()`                                          |
+| End a context                   | `context.Dispose()`                                        |
 
 ## Lifecycle Contract
 
 Use the LSF lifecycle names as a mental model, not as engine-specific APIs:
 
-| Phase | Host responsibility | Gravitas call |
-| --- | --- | --- |
-| `Setup` | Create package defaults, host resources, and worlds. | Create or attach `GravitasWorldContext`. |
-| `Initialize` | Bind agents, transforms, colliders, bodies, settings, and grids. | Initialize colliders and bodies. |
-| `Execute` | Apply deterministic commands or network input in ordered frame batches. | No direct call. Mutate host-owned state before simulation. |
-| `Simulate` | Advance the authoritative fixed step. | `context.Simulate()`. |
-| `LateSimulate` | Finish deterministic end-of-frame work. | `context.LateSimulate()`. |
-| `Visualize` | Interpolate or publish presentation state. | `context.Visualize()`. |
-| `LateVisualize` | Finish presentation-only work. | `context.LateVisualize()`. |
-| `Deactivate` | Pool/despawn agents and release registrations. | `body.Deactivate()` or `collider.Deactivate()`. |
-| `Quit` | Shut down the host process/session. | `context.Dispose()` when the context is no longer needed. |
+| Phase           | Host responsibility                                                     | Gravitas call                                              |
+| --------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `Setup`         | Create package defaults, host resources, and worlds.                    | Create or attach `GravitasWorldContext`.                   |
+| `Initialize`    | Bind agents, transforms, colliders, bodies, settings, and grids.        | Initialize colliders and bodies.                           |
+| `Execute`       | Apply deterministic commands or network input in ordered frame batches. | No direct call. Mutate host-owned state before simulation. |
+| `Simulate`      | Advance the authoritative fixed step.                                   | `context.Simulate()`.                                      |
+| `LateSimulate`  | Finish deterministic end-of-frame work.                                 | `context.LateSimulate()`.                                  |
+| `Visualize`     | Interpolate or publish presentation state.                              | `context.Visualize()`.                                     |
+| `LateVisualize` | Finish presentation-only work.                                          | `context.LateVisualize()`.                                 |
+| `Deactivate`    | Pool/despawn agents and release registrations.                          | `body.Deactivate()` or `collider.Deactivate()`.            |
+| `Quit`          | Shut down the host process/session.                                     | `context.Dispose()` when the context is no longer needed.  |
 
 Authoritative simulation state belongs in `Simulate` and `LateSimulate`.
 `Visualize` and `LateVisualize` are for interpolation and presentation; do not
@@ -211,18 +210,29 @@ SolidBody2D body = new(agent, collider)
     Mass = Fixed64.One
 };
 
-body.Initialize(agent.Transform.Position.ToVector2d(), isDynamic: true);
+body.Initialize(agent.Transform.WorldPositionXZ, isDynamic: true);
 ```
 
 The 2D projection uses the LSF X/Z convention: world X maps to 2D X and world Z
 maps to 2D Y. World Y remains vertical height or mixed embedding metadata.
+Positive planar rotation turns `Vector2d.Right` toward `Vector2d.Forward` and is
+exposed as `WorldRotationXZRadians`; its 3D embedding is a negative Y-axis
+quaternion rotation. Gravitas canonicalizes authoritative 2D yaw to
+`[-Fixed64.Pi, Fixed64.Pi)`, including serialized and multi-turn inputs.
+
+`FixedTransform` distinguishes authored local components from hierarchy-aware
+world views. Host adapters should populate `LocalPosition`, `LocalRotation`, and
+`LocalScale` from their engine object, then use the explicit `World*` members
+when synchronizing physics. Gravitas kinematic readback and dynamic publication
+use world position/rotation and preserve a 2D host's world Y. A failed parent
+inverse is reported rather than silently writing the wrong local pose.
 
 ### Bodyless Geometry
 
-Use `InitializeWithNoBody(...)` for static or trigger geometry that does not need
-body-owned state. `IsTrigger` is valid only on bodyless colliders; use a normal
-body-owned collider for the moving participant that should receive trigger
-callbacks:
+Use `InitializeWithNoBody(...)` for static or trigger geometry that does not
+need body-owned state. `IsTrigger` is valid only on bodyless colliders; use a
+normal body-owned collider for the moving participant that should receive
+trigger callbacks:
 
 ```csharp
 using Gravitas.Colliders;
@@ -245,6 +255,16 @@ fixed-step partition preparation. If the host mutates a bodyless collider's
 transform and needs query results before the next step, call
 `collider.Simulate()` after the mutation to refresh bounds and partition
 membership immediately.
+
+Authored `FixedTransform.LocalScale` may be signed or zero, but physical
+collider dimensions may not. Gravitas requires every consumed authored local
+axis throughout the transform ancestry, plus the resulting hierarchy-derived
+`LossyScale`, to remain positive: X/Z for 2D colliders and X/Y/Z for 3D
+colliders. This deliberately rejects canceled pairs of reflections because
+`WorldRotation` plus canonical `LossyScale` cannot preserve which authored axes
+were reflected. Initialization and runtime rebuild reject invalid scale before
+changing body registration, shape, or partition state; the host's local scale
+remains untouched so an adapter or authoring tool can correct it explicitly.
 
 ## Common Configuration
 
@@ -307,10 +327,10 @@ context.Environment.Gravity = Fixed64.FromFraction(49, 5);
 ```
 
 Different contexts can run at different frame rates and settings in the same
-process. Frame-derived values such as `DeltaTime`, `FrameCount`, and
-`TotalTime` are read through the context. Frame rates must stay between `1` and
-`PhysicsSettings.MaxResolvableFrameRate`; ordinary lockstep rates are far below that
-ceiling.
+process. Frame-derived values such as `DeltaTime`, `FrameCount`, and `TotalTime`
+are read through the context. Frame rates must stay between `1` and
+`PhysicsSettings.MaxResolvableFrameRate`; ordinary lockstep rates are far below
+that ceiling.
 
 Per-body gravity tuning lives on the body. `SolidBody.GravityScale` multiplies
 context gravity for that body; `Fixed64.Zero` disables environment-gravity
@@ -322,10 +342,10 @@ policy to that body's planar gravity vector.
 `context.Constraints3D` owns deterministic 3D joints and ragdoll runtimes.
 `context.Constraints2D` owns deterministic 2D joints and ragdoll runtimes.
 
-| Domain | Runtime types | Joint shape | Solved with |
-| --- | --- | --- | --- |
-| 3D | `Joint3D`, `RagdollRuntime3D` | Local frames, angular axes, 3D motors/limits | 3D contact islands in `LateSimulate()` |
-| 2D | `Joint2D`, `RagdollRuntime2D` | Planar anchors, scalar angles, scalar motors/limits | 2D contact islands in `LateSimulate()` |
+| Domain | Runtime types                 | Joint shape                                         | Solved with                            |
+| ------ | ----------------------------- | --------------------------------------------------- | -------------------------------------- |
+| 3D     | `Joint3D`, `RagdollRuntime3D` | Local frames, angular axes, 3D motors/limits        | 3D contact islands in `LateSimulate()` |
+| 2D     | `Joint2D`, `RagdollRuntime2D` | Planar anchors, scalar angles, scalar motors/limits | 2D contact islands in `LateSimulate()` |
 
 3D example:
 
@@ -530,13 +550,13 @@ context is finished.
 
 ## Source Map
 
-| Area | Source |
-| --- | --- |
-| Context and lifecycle | [`src/Gravitas/Runtime/GravitasWorldContext.cs`](../../src/Gravitas/Runtime/GravitasWorldContext.cs), [`src/Gravitas/Runtime/GravitasClock.cs`](../../src/Gravitas/Runtime/GravitasClock.cs) |
-| Host boundary | [`src/Gravitas/Core/IMatterAgent.cs`](../../src/Gravitas/Core/IMatterAgent.cs) |
-| 3D body/service | [`src/Gravitas/Core/3D/SolidBody.cs`](../../src/Gravitas/Core/3D/SolidBody.cs), [`src/Gravitas/Core/3D/GravitasPhysicsService.cs`](../../src/Gravitas/Core/3D/GravitasPhysicsService.cs) |
-| 2D body/service | [`src/Gravitas/Core/2D/SolidBody2D.cs`](../../src/Gravitas/Core/2D/SolidBody2D.cs), [`src/Gravitas/Core/2D/GravitasPhysics2DService.cs`](../../src/Gravitas/Core/2D/GravitasPhysics2DService.cs) |
-| Settings | [`src/Gravitas/Settings/PhysicsSettings.cs`](../../src/Gravitas/Settings/PhysicsSettings.cs), [`src/Gravitas/Settings/PhysicsRuntimeMode.cs`](../../src/Gravitas/Settings/PhysicsRuntimeMode.cs) |
-| Constraints | [`src/Gravitas/Constraints/3D`](../../src/Gravitas/Constraints/3D), [`src/Gravitas/Constraints/2D`](../../src/Gravitas/Constraints/2D) |
-| Query APIs | [`src/Gravitas/Queries`](../../src/Gravitas/Queries) |
-| Replay hash | [`src/Gravitas/Determinism/GravitasReplayHashService.cs`](../../src/Gravitas/Determinism/GravitasReplayHashService.cs) |
+| Area                  | Source                                                                                                                                                                                           |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Context and lifecycle | [`src/Gravitas/Runtime/GravitasWorldContext.cs`](../../src/Gravitas/Runtime/GravitasWorldContext.cs), [`src/Gravitas/Runtime/GravitasClock.cs`](../../src/Gravitas/Runtime/GravitasClock.cs)     |
+| Host boundary         | [`src/Gravitas/Core/IMatterAgent.cs`](../../src/Gravitas/Core/IMatterAgent.cs)                                                                                                                   |
+| 3D body/service       | [`src/Gravitas/Core/3D/SolidBody.cs`](../../src/Gravitas/Core/3D/SolidBody.cs), [`src/Gravitas/Core/3D/GravitasPhysicsService.cs`](../../src/Gravitas/Core/3D/GravitasPhysicsService.cs)         |
+| 2D body/service       | [`src/Gravitas/Core/2D/SolidBody2D.cs`](../../src/Gravitas/Core/2D/SolidBody2D.cs), [`src/Gravitas/Core/2D/GravitasPhysics2DService.cs`](../../src/Gravitas/Core/2D/GravitasPhysics2DService.cs) |
+| Settings              | [`src/Gravitas/Settings/PhysicsSettings.cs`](../../src/Gravitas/Settings/PhysicsSettings.cs), [`src/Gravitas/Settings/PhysicsRuntimeMode.cs`](../../src/Gravitas/Settings/PhysicsRuntimeMode.cs) |
+| Constraints           | [`src/Gravitas/Constraints/3D`](../../src/Gravitas/Constraints/3D), [`src/Gravitas/Constraints/2D`](../../src/Gravitas/Constraints/2D)                                                           |
+| Query APIs            | [`src/Gravitas/Queries`](../../src/Gravitas/Queries)                                                                                                                                             |
+| Replay hash           | [`src/Gravitas/Determinism/GravitasReplayHashService.cs`](../../src/Gravitas/Determinism/GravitasReplayHashService.cs)                                                                           |
