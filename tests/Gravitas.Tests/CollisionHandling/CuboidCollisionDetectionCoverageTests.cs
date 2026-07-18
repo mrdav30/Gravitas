@@ -90,8 +90,10 @@ public sealed class CuboidCollisionDetectionCoverageTests
                 pair.CollisionType.Should().Be(CollisionType.OBBox_Capsule);
                 CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
                 pair.Manifold.Count.Should().Be(1);
-                pair.Manifold.PrimaryContact.Depth.Should().Be(Fixed64.One);
-                pair.Manifold.PrimaryContact.Normal.Should().Be(expectedNormal);
+                (pair.Manifold.PrimaryContact.Depth - Fixed64.One)
+                    .Abs().Should().BeLessThanOrEqualTo(Fixed64.Epsilon);
+                Vector3d.Distance(pair.Manifold.PrimaryContact.Normal, expectedNormal)
+                    .Should().BeLessThanOrEqualTo(Fixed64.Epsilon);
             }
         }
         finally

@@ -8,6 +8,7 @@
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
+using System;
 using System.Runtime.CompilerServices;
 
 namespace Gravitas;
@@ -62,11 +63,33 @@ public partial class SolidBody
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal Fixed64 ResolveContinuousCollisionProxyRadius()
     {
-        return Collider switch
+        if (Collider is LSSphereCollider sphere)
         {
-            LSSphereCollider sphere => sphere.ScaledRadius,
-            _ => Collider.Bounds.Scope.Magnitude
-        };
+            if (!Vector3d.TrySubtract(sphere.Center, Position3d, out Vector3d centerOffset)
+                || !Vector3d.TryGetMagnitude(centerOffset, out Fixed64 offsetDistance)
+                || !Fixed64.TryAdd(offsetDistance, sphere.ScaledRadius, out Fixed64 sphereRadius))
+            {
+                return Fixed64.MaxValue;
+            }
+
+            return sphereRadius;
+        }
+
+        Span<Vector3d> corners = stackalloc Vector3d[FixedMathSharp.Bounds.FixedBoundBox.CornerCount];
+        Collider.Bounds.CopyCorners(corners);
+        Fixed64 bestDistance = Fixed64.Zero;
+        for (int i = 0; i < corners.Length; i++)
+        {
+            if (!Vector3d.TrySubtract(corners[i], Position3d, out Vector3d offset)
+                || !Vector3d.TryGetMagnitude(offset, out Fixed64 distance))
+            {
+                return Fixed64.MaxValue;
+            }
+
+            bestDistance = FixedMath.Max(bestDistance, distance);
+        }
+
+        return bestDistance;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

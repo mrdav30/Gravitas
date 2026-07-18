@@ -14,6 +14,11 @@ namespace Gravitas.CollisionHandling;
 
 public static partial class CollisionDetection
 {
+    // Candidate distances are already squared. Equivalent closest features can
+    // differ by a few Q32.32 output units after local/world projection, so this
+    // is deliberately a squared-distance comparison tolerance.
+    private static readonly Fixed64 ClosestSegmentBoxSquaredDistanceTolerance = Fixed64.Epsilon;
+
     #region Cuboid
 
     private static bool DoCuboidSphereCheck(CollisionWorkItem pair)
@@ -57,9 +62,19 @@ public static partial class CollisionDetection
         if (coreDistanceSquared > capsule.ScaledRadiusSqr)
             return false;
 
-        if (coreDistanceSquared > Fixed64.Zero)
+        // A segment transformed into an OBB can retain a few raw units of
+        // round-trip residue while geometrically inside the box. Treat that as
+        // the penetrating-core path instead of fabricating a radial surface hit.
+        if (coreSeparation.X.Abs() > Fixed64.Epsilon
+            || coreSeparation.Y.Abs() > Fixed64.Epsilon
+            || coreSeparation.Z.Abs() > Fixed64.Epsilon)
         {
-            Fixed64 coreDistance = FixedMath.Sqrt(coreDistanceSquared);
+            if (!Vector3d.TryGetMagnitude(coreSeparation, out Fixed64 coreDistance)
+                || coreDistance > capsule.ScaledRadius)
+            {
+                return false;
+            }
+
             Vector3d radialNormal = coreSeparation / coreDistance;
             pair.Manifold.SetContact(
                 pointOnCuboid,
@@ -72,7 +87,15 @@ public static partial class CollisionDetection
         FindCuboidCapsulePenetration(cuboid, capsule, out AxisPenetration axisPenetration);
 
         Vector3d normal = axisPenetration.Axis;
-        Vector3d collisionPointCapsule = ConvexColliderSupport.Support(capsule, -normal);
+        if (!TryFindCapsuleSupportFeaturePoint(
+                capsule,
+                -normal,
+                cuboid.Center,
+                out Vector3d collisionPointCapsule))
+        {
+            return false;
+        }
+
         Vector3d collisionPointCuboid = FindCuboidSupportFeaturePoint(
             cuboid,
             normal,
@@ -85,6 +108,39 @@ public static partial class CollisionDetection
         );
 
         return true;
+    }
+
+    internal static bool TryFindCapsuleSupportFeaturePoint(
+        LSCapsuleCollider capsule,
+        Vector3d direction,
+        Vector3d target,
+        out Vector3d supportPoint)
+    {
+        if (!Vector3d.TrySubtract(
+                capsule.LineSegmentEnd,
+                capsule.LineSegmentStart,
+                out Vector3d segment))
+        {
+            supportPoint = default;
+            return false;
+        }
+
+        Fixed64 segmentProjection = Vector3d.Dot(segment, direction);
+        Vector3d segmentPoint;
+        if (segmentProjection > Fixed64.Epsilon)
+            segmentPoint = capsule.LineSegmentEnd;
+        else if (segmentProjection < -Fixed64.Epsilon)
+            segmentPoint = capsule.LineSegmentStart;
+        else
+            segmentPoint = Vector3d.ClosestPointOnLineSegment(
+                target,
+                capsule.LineSegmentStart,
+                capsule.LineSegmentEnd);
+
+        return Vector3d.TryAdd(
+            segmentPoint,
+            direction * capsule.ScaledRadius,
+            out supportPoint);
     }
 
     private static void FindCuboidCapsulePenetration(
@@ -239,10 +295,17 @@ public static partial class CollisionDetection
         Vector3d segmentPoint = start + direction * parameter;
         Vector3d boxPoint = ClampToCuboid(segmentPoint, halfExtents);
         Fixed64 distanceSquared = Vector3d.DistanceSquared(segmentPoint, boxPoint);
-        if (distanceSquared > bestDistanceSquared
-            || (distanceSquared == bestDistanceSquared
-                && (parameter - representativeParameter).Abs() >= (bestParameter - representativeParameter).Abs()))
-            return;
+        if (bestDistanceSquared != Fixed64.MaxValue)
+        {
+            Fixed64 distanceDelta = distanceSquared - bestDistanceSquared;
+            if (distanceDelta > ClosestSegmentBoxSquaredDistanceTolerance
+                || (distanceDelta.Abs() <= ClosestSegmentBoxSquaredDistanceTolerance
+                    && (parameter - representativeParameter).Abs()
+                        >= (bestParameter - representativeParameter).Abs()))
+            {
+                return;
+            }
+        }
 
         bestDistanceSquared = distanceSquared;
         bestParameter = parameter;

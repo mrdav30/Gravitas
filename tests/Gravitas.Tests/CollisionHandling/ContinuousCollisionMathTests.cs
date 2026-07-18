@@ -8,17 +8,74 @@ namespace Gravitas.Tests.CollisionHandlingTests;
 
 public sealed class ContinuousCollisionMathTests
 {
-    [Theory]
-    [InlineData(0, 0)]
-    [InlineData(1, 1)]
-    [InlineData(30, 2)]
-    [InlineData(360, 16)]
-    public void ResolveRotationalSubstepCount_ShouldBoundAngularSampling(int degrees, int expected)
+    [Fact]
+    public void RotationalIntervalMotionBound_WithLargePivot_ShouldCoverScaleDependentPoseRounding()
     {
-        int steps = ContinuousCollisionMath.ResolveRotationalSubstepCount(
-            FixedMath.DegToRad((Fixed64)degrees));
+        Fixed64 pivotRadius = (Fixed64)1_000_000;
 
-        steps.Should().Be(expected);
+        ContinuousCollisionMath.TryResolveRotationalIntervalMotionBound(
+            Vector2d.Zero,
+            Fixed64.Zero,
+            pivotRadius,
+            Fixed64.One,
+            out Fixed64 planarBound).Should().BeTrue();
+        ContinuousCollisionMath.TryResolveRotationalIntervalMotionBound(
+            Vector3d.Zero,
+            Fixed64.Zero,
+            pivotRadius,
+            Fixed64.One,
+            out Fixed64 spatialBound).Should().BeTrue();
+
+        Fixed64.TryMultiplyDivide(
+            pivotRadius,
+            Fixed64.MinIncrement,
+            Fixed64.One,
+            out Fixed64 oneRawUnitAtScale).Should().BeTrue();
+        planarBound.Should().BeGreaterThan(oneRawUnitAtScale);
+        spatialBound.Should().Be(planarBound);
+    }
+
+    [Fact]
+    public void RotationalIntervalMotionBound_ShouldCoverEvaluatedLargePivotPose()
+    {
+        Fixed64 pivotRadius = (Fixed64)1_000;
+        Fixed64 midpointAngle = Fixed64.FromRaw(-23_617_013_816);
+        Fixed64 halfSpan = Fixed64.FromRaw(4_294_967);
+        Vector2d pivotOffset = new(pivotRadius, Fixed64.Zero);
+        Vector2d midpoint = Vector2d.Rotate(pivotOffset, midpointAngle);
+        Vector2d endpoint = Vector2d.Rotate(pivotOffset, midpointAngle + halfSpan);
+
+        Vector2d.TrySubtract(endpoint, midpoint, out Vector2d evaluatedMotion).Should().BeTrue();
+        Vector2d.TryGetMagnitude(evaluatedMotion, out Fixed64 evaluatedDistance).Should().BeTrue();
+        ContinuousCollisionMath.TryResolveRotationalIntervalMotionBound(
+            Vector2d.Zero,
+            Fixed64.One,
+            pivotRadius,
+            halfSpan * Fixed64.Two,
+            out Fixed64 planarMotionBound).Should().BeTrue();
+
+        planarMotionBound.Should().BeGreaterThanOrEqualTo(evaluatedDistance);
+
+        Vector3d spatialPivotOffset = new(pivotRadius, Fixed64.Zero, Fixed64.Zero);
+        Vector3d spatialMidpoint = FixedQuaternion.FromAxisAngle(Vector3d.Up, midpointAngle)
+            * spatialPivotOffset;
+        Vector3d spatialEndpoint = FixedQuaternion.FromAxisAngle(Vector3d.Up, midpointAngle + halfSpan)
+            * spatialPivotOffset;
+        Vector3d.TrySubtract(
+            spatialEndpoint,
+            spatialMidpoint,
+            out Vector3d evaluatedSpatialMotion).Should().BeTrue();
+        Vector3d.TryGetMagnitude(
+            evaluatedSpatialMotion,
+            out Fixed64 evaluatedSpatialDistance).Should().BeTrue();
+        ContinuousCollisionMath.TryResolveRotationalIntervalMotionBound(
+            Vector3d.Zero,
+            Fixed64.One,
+            pivotRadius,
+            halfSpan * Fixed64.Two,
+            out Fixed64 spatialMotionBound).Should().BeTrue();
+
+        spatialMotionBound.Should().BeGreaterThanOrEqualTo(evaluatedSpatialDistance);
     }
 
     [Fact]

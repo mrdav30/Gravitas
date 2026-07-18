@@ -982,7 +982,60 @@ public sealed class RaycastSegmentWorkerTests
 
         hit.Should().BeTrue();
         hits.Count.Should().Be(1);
-        hits[0].Should().Be(LocalToWorld(box, new Vector3d(-Fixed64.Half, Fixed64.Half, Fixed64.Half)));
+        Vector3d.Distance(
+            hits[0],
+            LocalToWorld(box, new Vector3d(-Fixed64.Half, Fixed64.Half, Fixed64.Half)))
+            .Should().BeLessThanOrEqualTo(Fixed64.Epsilon);
+    }
+
+    [Fact]
+    public void CheckOBBoxOverlaps_WithLargeScaleTangentAndCompoundRotation_ShouldReturnSingleIntersection()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        Fixed64 halfExtent = (Fixed64)50_000;
+        FixedQuaternion rotation = FixedQuaternion.FromEulerAnglesInDegrees(
+            (Fixed64)23,
+            (Fixed64)37,
+            (Fixed64)11);
+        LSCuboidCollider box = scenario.CreateBody(
+            new LSCuboidCollider(),
+            Vector3d.Zero,
+            rotation,
+            immovable: true).Collider;
+        box.Size = Vector3d.One * (halfExtent * 2);
+        box.RebuildRuntimeShapeOnly();
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+        Vector3d localStart = new(-halfExtent * 4, -halfExtent * 2, halfExtent);
+        Vector3d localEnd = new(halfExtent * 4, halfExtent * 6, halfExtent);
+        Vector3d localTangent = new(-halfExtent, halfExtent, halfExtent);
+
+        worker.PrepareSegmentCheck(LocalToWorld(box, localStart), LocalToWorld(box, localEnd));
+
+        bool hit = worker.CheckOBBoxOverlaps(box, ref hits);
+
+        hit.Should().BeTrue();
+        hits.Count.Should().Be(1);
+        Vector3d.Distance(hits[0], LocalToWorld(box, localTangent))
+            .Should().BeLessThanOrEqualTo(Fixed64.FromFraction(1, 1_000));
+
+        hits.FastClear();
+        Vector3d outsideOffset = Vector3d.Forward * Fixed64.FromFraction(1, 100);
+        worker.PrepareSegmentCheck(
+            LocalToWorld(box, localStart + outsideOffset),
+            LocalToWorld(box, localEnd + outsideOffset));
+
+        worker.CheckOBBoxOverlaps(box, ref hits).Should().BeFalse();
+        hits.Should().BeEmpty();
+
+        long allocatedBytes = AllocationTestHelper.MeasureSteadyState(() =>
+        {
+            hits.FastClear();
+            worker.PrepareSegmentCheck(LocalToWorld(box, localStart), LocalToWorld(box, localEnd));
+            _ = worker.CheckOBBoxOverlaps(box, ref hits);
+        });
+
+        allocatedBytes.Should().Be(0);
     }
 
     [Fact]

@@ -272,11 +272,35 @@ public sealed class CollisionDetectionShapePairTests
         Vector3d closestOnCuboid = cuboid.Collider.ClosestPointOnSurface(closestOnCapsule);
 
         cuboid.Collider.Shape.Should().Be(ColliderType.OBBox);
-        (cuboidRotation.Inverse() * capsule.Collider.LineDirection).Should().Be(Vector3d.Right);
+        Vector3d.Distance(
+            cuboidRotation.Inverse() * capsule.Collider.LineDirection,
+            Vector3d.Right).Should().BeLessThanOrEqualTo(Fixed64.Epsilon);
         cuboid.Collider.Bounds.Intersects(capsule.Collider.Bounds).Should().BeTrue();
         Vector3d.Distance(closestOnCapsule, closestOnCuboid).Should().BeGreaterThan(capsule.Collider.ScaledRadius);
         AssertNoCollision(scenario, cuboid.Collider, capsule.Collider, CollisionType.OBBox_Capsule);
         AssertNoCollision(scenario, capsule.Collider, cuboid.Collider, CollisionType.OBBox_Capsule);
+    }
+
+    [Fact]
+    public void CuboidCapsule_WithSaturatedSquaredDistances_ShouldRejectRepresentableSeparation()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSCuboidCollider> cuboid = scenario.CreateCuboid(Vector3d.Zero);
+        ScenarioBody<LSCapsuleCollider> capsule = scenario.CreateCapsule(Vector3d.Zero);
+        Fixed64 radius = (Fixed64)48_000;
+        capsule.Collider.Size = Vector3d.One * (radius * 2);
+        capsule.Collider.Radius = radius;
+        capsule.Body.ResetPosition(new Vector3d((Fixed64)50_001, Fixed64.Zero, Fixed64.Zero));
+        capsule.Collider.RebuildRuntimeShapeOnly();
+
+        Vector3d separation = capsule.Collider.Center - cuboid.Collider.BoundsMax;
+        separation.MagnitudeSquared.Should().Be(Fixed64.MaxValue);
+        capsule.Collider.ScaledRadiusSqr.Should().Be(Fixed64.MaxValue);
+        Vector3d.TryGetMagnitude(separation, out Fixed64 distance).Should().BeTrue();
+        distance.Should().BeGreaterThan(radius);
+
+        AssertNoCollision(scenario, cuboid.Collider, capsule.Collider, CollisionType.AABox_Capsule);
+        AssertNoCollision(scenario, capsule.Collider, cuboid.Collider, CollisionType.AABox_Capsule);
     }
 
     [Fact]
@@ -333,6 +357,41 @@ public sealed class CollisionDetectionShapePairTests
             contact.Depth.Should().Be(capsule.Collider.ScaledRadius - distance);
             contact.Normal.Should().Be(expectedNormal);
         }
+    }
+
+    [Fact]
+    public void CuboidCapsule_CoreSeparatedBeyondLinearTolerance_ShouldUseRadialCornerManifold()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSCuboidCollider> cuboid = scenario.CreateCuboid(Vector3d.Zero);
+        Fixed64 radius = Fixed64.FromFraction(1, 10);
+        Fixed64 gap = Fixed64.FromFraction(1, 10_000);
+        Vector3d separation = new(gap, gap, Fixed64.Zero);
+        ScenarioBody<LSCapsuleCollider> capsule = scenario.CreateBody(
+            new LSCapsuleCollider
+            {
+                Radius = radius,
+                Size = Vector3d.One * (radius * 2)
+            },
+            new Vector3d(Fixed64.Half + gap, Fixed64.Half + gap, Fixed64.Zero),
+            FixedQuaternion.Identity);
+        Vector3d expectedNormal = separation.Normalized;
+
+        CollisionPair pair = AssertCollision(
+            scenario,
+            cuboid.Collider,
+            capsule.Collider,
+            CollisionType.AABox_Capsule);
+        ManifoldContact contact = pair.Manifold.PrimaryContact;
+
+        Vector3d.Distance(contact.Normal, expectedNormal)
+            .Should().BeLessThanOrEqualTo(Fixed64.Epsilon);
+        Vector3d.Distance(
+            contact.PointA,
+            new Vector3d(Fixed64.Half, Fixed64.Half, Fixed64.Zero))
+            .Should().BeLessThanOrEqualTo(Fixed64.Epsilon);
+        (contact.Depth - (radius - separation.Magnitude))
+            .Abs().Should().BeLessThanOrEqualTo(Fixed64.Epsilon);
     }
 
     [Fact]
@@ -456,6 +515,43 @@ public sealed class CollisionDetectionShapePairTests
             cuboidRotation * new Vector3d(Fixed64.Zero, Fixed64.FromFraction(1, 4), Fixed64.Zero)).Should().BeLessThanOrEqualTo(Fixed64.Epsilon);
         (contact.Depth - Fixed64.FromFraction(1, 4)).Abs().Should().BeLessThanOrEqualTo(Fixed64.Epsilon);
         Vector3d.Distance(contact.Normal, cuboidRotation * Vector3d.Up).Should().BeLessThanOrEqualTo(Fixed64.Epsilon);
+    }
+
+    [Fact]
+    public void CapsuleSupportFeature_LargeCommonTranslation_ShouldPreserveEndpointSelection()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        Vector3d normal = Vector3d.One.Normalized;
+        FixedQuaternion capsuleRotation = FixedQuaternion.FromAxisAngle(
+            Vector3d.Cross(Vector3d.Up, normal).Normalized,
+            FixedMath.Acos(Vector3d.Dot(Vector3d.Up, normal)));
+        ScenarioBody<LSCapsuleCollider> capsule = scenario.CreateBody(
+            new LSCapsuleCollider
+            {
+                Size = new Vector3d(Fixed64.One, (Fixed64)3, Fixed64.One)
+            },
+            normal * Fixed64.FromFraction(5, 4),
+            capsuleRotation);
+        CollisionDetection.TryFindCapsuleSupportFeaturePoint(
+            capsule.Collider,
+            -normal,
+            Vector3d.Zero,
+            out Vector3d originSupport).Should().BeTrue();
+        Vector3d translation = Vector3d.One * (Fixed64)1_300_000_000;
+
+        capsule.Body.ResetPosition(
+            translation + normal * Fixed64.FromFraction(5, 4),
+            capsuleRotation);
+        capsule.Collider.RebuildRuntimeShapeOnly();
+
+        CollisionDetection.TryFindCapsuleSupportFeaturePoint(
+            capsule.Collider,
+            -normal,
+            translation,
+            out Vector3d translatedSupport).Should().BeTrue();
+
+        Vector3d.Distance(translatedSupport - translation, originSupport)
+            .Should().BeLessThanOrEqualTo(Fixed64.Epsilon);
     }
 
     [Fact]

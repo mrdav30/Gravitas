@@ -62,7 +62,8 @@ public static partial class CollisionDetection
             candidateDepth = negativeDepth;
         }
 
-        if (!penetration.HasValue || candidateDepth < penetration.Depth)
+        if (!penetration.HasValue
+            || candidateDepth + Fixed64.Epsilon < penetration.Depth)
             penetration = new AxisPenetration(candidateAxis, candidateDepth);
     }
 

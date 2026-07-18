@@ -24,9 +24,16 @@ internal static class SweepBoundsUtility
     {
         entry = Fixed64.Zero;
         exit = length;
-        return ClipSegmentAxis(start.X, direction.X, min.X, max.X, ref entry, ref exit)
+        bool overlaps = ClipSegmentAxis(start.X, direction.X, min.X, max.X, ref entry, ref exit)
             && ClipSegmentAxis(start.Y, direction.Y, min.Y, max.Y, ref entry, ref exit)
             && ClipSegmentAxis(start.Z, direction.Z, min.Z, max.Z, ref entry, ref exit);
+        if (!overlaps)
+            return false;
+
+        if (entry > exit)
+            entry = exit = FixedMath.Midpoint(entry, exit);
+
+        return true;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -95,6 +102,6 @@ internal static class SweepBoundsUtility
             entry = first;
         if (second < exit)
             exit = second;
-        return entry <= exit;
+        return entry <= exit || entry - exit <= Fixed64.Epsilon;
     }
 }

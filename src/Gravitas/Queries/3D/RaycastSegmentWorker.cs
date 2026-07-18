@@ -452,12 +452,33 @@ public sealed class RaycastSegmentWorker
             return false;
 
         FixedQuaternion inverseRotation = oobox.Rotation.Inverse();
-        Vector3d localOrigin = (_cachedOrigin - oobox.Center) * inverseRotation;
         Vector3d halfExtents = oobox.ScaledSize * Fixed64.Half;
         Vector3d min = -halfExtents;
         Vector3d max = halfExtents;
+        if (!Vector3d.TrySubtract(_cachedOrigin, oobox.Center, out Vector3d originOffset)
+            || !Vector3d.TrySubtract(_cachedEnd, oobox.Center, out Vector3d endOffset)
+            || !TryTransformObbOffsetToLocal(originOffset, oobox.Rotation, inverseRotation, out Vector3d transformedOrigin)
+            || !TryTransformObbOffsetToLocal(endOffset, oobox.Rotation, inverseRotation, out Vector3d transformedEnd))
+        {
+            return false;
+        }
 
-        if (_segmentLengthSqr == Fixed64.Zero)
+        Vector3d localOrigin = SnapLocalPointToBounds(
+            transformedOrigin,
+            min,
+            max);
+        Vector3d localEnd = SnapLocalPointToBounds(
+            transformedEnd,
+            min,
+            max);
+
+        if (!Vector3d.TrySubtract(localEnd, localOrigin, out Vector3d localSegment)
+            || !Vector3d.TryGetMagnitude(localSegment, out Fixed64 localLength))
+        {
+            return false;
+        }
+
+        if (localLength == Fixed64.Zero)
         {
             if (localOrigin.X < min.X || localOrigin.X > max.X
                 || localOrigin.Y < min.Y || localOrigin.Y > max.Y
@@ -470,11 +491,11 @@ public sealed class RaycastSegmentWorker
             return true;
         }
 
-        Vector3d localDirection = _segmentDirection * inverseRotation;
+        Vector3d localDirection = localSegment / localLength;
         if (!SweepBoundsUtility.TryClipSegment(
             localOrigin,
             localDirection,
-            _segmentLength,
+            localLength,
             min,
             max,
             out Fixed64 entry,
@@ -491,6 +512,41 @@ public sealed class RaycastSegmentWorker
         }
 
         return true;
+    }
+
+    private static bool TryTransformObbOffsetToLocal(
+        Vector3d worldOffset,
+        FixedQuaternion rotation,
+        FixedQuaternion inverseRotation,
+        out Vector3d localOffset)
+    {
+        localOffset = inverseRotation * worldOffset;
+
+        // Quaternion-vector multiplication is a rounded Q32.32 matrix
+        // transform. One deterministic iterative-refinement step solves the
+        // represented rotation matrix more accurately at large coordinates,
+        // keeping tangent classification scale independent without widening
+        // the geometric box.
+        if (!Vector3d.TrySubtract(worldOffset, rotation * localOffset, out Vector3d residual))
+            return false;
+        if (residual == Vector3d.Zero)
+            return true;
+
+        return Vector3d.TryAdd(localOffset, inverseRotation * residual, out localOffset);
+    }
+
+    private static Vector3d SnapLocalPointToBounds(Vector3d point, Vector3d min, Vector3d max) =>
+        new(
+            SnapLocalCoordinateToBounds(point.X, min.X, max.X),
+            SnapLocalCoordinateToBounds(point.Y, min.Y, max.Y),
+            SnapLocalCoordinateToBounds(point.Z, min.Z, max.Z));
+
+    private static Fixed64 SnapLocalCoordinateToBounds(Fixed64 value, Fixed64 min, Fixed64 max)
+    {
+        if ((value - min).Abs() <= Fixed64.Epsilon)
+            return min;
+
+        return (value - max).Abs() <= Fixed64.Epsilon ? max : value;
     }
 
     private bool TryAddFiniteCylinderPoint(

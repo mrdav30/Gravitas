@@ -118,10 +118,29 @@ proxy candidates used by dynamic CCD paths.
 
 ## Rotational CCD
 
-Rotational CCD is bounded and deterministic. Supported rotational paths refine
-candidate intervals with fixed iteration counts and exact narrow-phase
-validation where the shape family has a supported reducer. Unsupported source
-families stay conservative rather than silently claiming exact shape truth.
+Same-dimensional rotational CCD is bounded and deterministic. It traverses
+normalized-time intervals earliest-first for each candidate and samples exact
+narrow phase at each midpoint. Shape-specific closest-feature separation, with
+an AABB fallback, certifies an interval only when its gap exceeds an
+outward-rounded bound on translation and pivot-centered angular travel. The
+bound also scales fixed-point pose uncertainty by pivot radius. An unresolved
+interval is subdivided until a fixed depth or per-candidate work budget;
+exhaustion clamps at the interval's lower time. It never borrows a normal from
+another candidate; when the same target already has an exact later contact
+witness, that upper-bound normal may remove closing linear velocity at the
+earlier conservative clamp. Without a same-target witness, only rotational
+motion is stopped. Candidate results are then ordered by time and collider ID.
+This permits an early conservative stop but cannot silently advance through an
+unresolved contact window.
+
+Rotational broad-phase radii are measured from the body's actual rotation pivot,
+not merely from the collider center, so local offsets and remote compound parts
+remain inside the candidate volume. Unsupported collision pairs are skipped
+explicitly. If the required pivot radius exceeds the scalar domain, candidate
+admission scans the bounded context registry instead of issuing an effectively
+unbounded GridForge query. Dynamic-target handoff and mixed-dimensional
+rotational sweeps are a separate active hardening contract; the current
+rotational interval path covers same-dimensional static and kinematic targets.
 
 ## Diagnostics And Replay
 

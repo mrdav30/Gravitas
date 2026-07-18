@@ -44,16 +44,16 @@ records follow with their original discovery context.
 ### Ordered Queue
 
 1. **Gravitas:**
-   [Rotational CCD Can Miss Contacts Between Bounded Pose Samples](#rotational-ccd-can-miss-contacts-between-bounded-pose-samples).
-2. **Gravitas:**
    [Convex Mesh Mode Accepts Disconnected Topology And Can Collide In Empty Bounds Space](#convex-mesh-mode-accepts-disconnected-topology-and-can-collide-in-empty-bounds-space).
-3. **Gravitas:**
+2. **Gravitas:**
    [Relative CCD Quadratic Saturation Can Miss Extreme-Range Crossings](#relative-ccd-quadratic-saturation-can-miss-extreme-range-crossings).
    Reuse the magnitude and normalization policy established by the resolved
    extreme-convex-sweep work when adding the separate scale-safe quadratic
    implementation.
-4. **Gravitas:**
+3. **Gravitas:**
    [3D CCD Handoff Callback Failure Can Abandon Queue Cleanup](#3d-ccd-handoff-callback-failure-can-abandon-queue-cleanup).
+4. **Gravitas:**
+   [Rotational CCD Omits Dynamic And Mixed Targets](#rotational-ccd-omits-dynamic-and-mixed-targets).
 
 ### Relative CCD Quadratic Saturation Can Miss Extreme-Range Crossings
 
@@ -73,28 +73,6 @@ crossings, endpoint-adjacent hits, misses, and mixed CCD routing at the chosen
 boundary. This is distinct from conservative proxy-radius saturation and does
 not block coverage convergence because ordinary supported ranges and the current
 uncovered closing-speed boundary remain independently testable.
-
-### Rotational CCD Can Miss Contacts Between Bounded Pose Samples
-
-**Discovered:** 2026-07-12  
-**Source:** 95%-to-100% coverage hardening, rotational CCD review  
-**Affected area:** 2D rotational CCD sampling and the shared 2D/3D rotational
-substep policy
-
-Rotational CCD performs exact narrow-phase checks only at bounded substep
-endpoints and refines time of impact only after an endpoint overlaps. A
-confirmed 2D counterexample rotates a thin polygon from -5 to +5 degrees past a
-circle at the blade tip: both endpoints are separated, the shapes overlap near
-zero degrees, and the current one-step path commits the full rotation with zero
-TOI iterations. The 3D rotational path uses the same endpoint sampling policy
-and needs parity validation when this is resolved.
-
-Adding one midpoint is not a complete fix because a narrower contact window can
-fall between the new samples. Resolve this with a shape-aware continuous
-rotational sweep or a conservative interval-bracketing policy that cannot skip
-an intervening contact, while preserving fixed work bounds and deterministic
-target ordering. Add shifted narrow-window regressions plus 2D/3D parity and
-allocation checks.
 
 ### Convex Mesh Mode Accepts Disconnected Topology And Can Collide In Empty Bounds Space
 
@@ -143,7 +121,75 @@ step. Add a real multi-entry queue regression where the first consumed body's
 consumable nor replay-visible afterward. Keep the successful drain
 allocation-free and define counter behavior for the partially completed batch.
 
+### Rotational CCD Omits Dynamic And Mixed Targets
+
+**Discovered:** 2026-07-18  
+**Source:** between-sample rotational CCD final parity review  
+**Affected area:** 2D/3D rotational candidate gathering, mixed collision mode,
+dynamic target response, and same-frame CCD handoffs
+
+The same-dimensional rotational path gathers only through the static-target
+query surface. Pure rotation also leaves the translational active-source path
+before dynamic candidate indexing or mixed routing can run. A rotating body can
+therefore be protected against static geometry while still rotating through a
+dynamic same-dimensional target or an embedded mixed-dimensional slab. A
+kinematic rotation also cannot wake or push a dynamic target through the
+existing handoff mechanism.
+
+Resolve this as a first-class moving-pair contract rather than treating dynamic
+targets as static proxies. The interval proof must bound both bodies' pose
+motion, mixed mode must use dimension-tagged deterministic candidate identity,
+and dynamic hits must enter the existing bounded handoff/response lifecycle.
+`PhysicsRuntimeMode.Both` must continue to exclude cross-dimensional contacts.
+Add pure 2D, pure 3D, both mixed source directions, dynamic handoff, replay, and
+allocation regressions.
+
 ## Resolved Issues
+
+### Rotational CCD Could Miss Contacts Between Bounded Pose Samples
+
+**Resolved:** 2026-07-18  
+**Source:** 95%-to-100% coverage hardening, rotational CCD review  
+**Affected area:** 2D/3D rotational CCD, pivot-centered candidate proxies,
+deterministic interval traversal, and conservative fixed-point separation
+
+RCA: both dimensional paths sampled only bounded substep endpoints and entered
+time-of-impact refinement only when an endpoint overlapped. A thin blade could
+therefore enter and leave a circle or sphere between samples. The Boolean
+overlap bisection also assumed monotonic overlap even though rotational motion
+can enter, exit, and re-enter within one interval. Separately, proxy radii were
+shape-centered while their broad queries originated at the body pivot, so an
+offset shape could rotate outside its admitted candidate volume.
+
+Fix: rotational CCD now resolves each candidate independently through a
+normalized-time interval traversal, then selects the earliest result with
+collider-ID tie ordering. Each midpoint uses an exact narrow-phase test and
+shape-specific closest-feature or AABB separation against an outward-rounded
+bound on translational and pivot-centered angular motion. That bound includes a
+pivot-radius-scaled fixed-point pose uncertainty instead of relying on a fixed
+absolute tolerance. A real midpoint contact narrows the search to the earlier
+half. Any interval still unresolved at the fixed depth or per-candidate node
+budget clamps at its lower bound, so bounded work can produce an early
+conservative stop but not a skipped contact. Candidate-local fallbacks cannot
+borrow another collider's contact normal; an exact later witness from the same
+target remains the upper-bound response normal if an earlier interval exhausts
+the budget. Unsupported collision pairs are ignored, the traversal uses only
+stack storage, and proxy radii now enclose every source point around the actual
+body pivot in both dimensions. An unrepresentable pivot radius falls back to a
+bounded service-registry scan rather than a full-domain spatial query.
+
+Verification:
+
+- Added 2D and 3D regressions for contact windows between endpoints and
+  midpoints, plus offset circle/sphere regressions for pivot-centered candidate
+  admission and scale-propagated evaluated-pose error coverage.
+- The focused rotational, near-miss, and angular-tunneling surface passes all
+  51 tests, including existing unsupported-pair and allocation contracts.
+- Dense unresolved-candidate benchmarks cover 2D and 3D aggregate interval
+  costs at `1`, `8`, and `32` admitted targets. The final short-run means were
+  `1.80`/`4.90`/`7.23` ms in 3D and `0.73`/`1.33`/`1.98` ms in 2D.
+- Benchmark and full-suite release evidence are recorded in the resolving
+  commit.
 
 ### 3D Angular Impulse Scaled Immediate Velocity By Frame Delta
 

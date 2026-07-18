@@ -41,14 +41,21 @@ public sealed partial class SolidBody2D
 
     internal Fixed64 ResolveContinuousCollisionProxyRadius()
     {
-        return Collider switch
+        if (Collider is LSCircleCollider2D circle)
         {
-            LSCircleCollider2D circle => circle.ScaledRadius,
-            LSCapsuleCollider2D capsule => capsule.ScaledHeight * Fixed64.Half,
-            LSAABBoxCollider2D box => box.ScaledHalfExtents.Magnitude,
-            LSCompoundCollider2D compound => compound.ScaledRadius,
-            _ => ResolveConvexContinuousCollisionProxyRadius()
-        };
+            if (!Vector2d.TrySubtract(circle.Center, _position, out Vector2d centerOffset)
+                || !Vector2d.TryGetMagnitude(centerOffset, out Fixed64 offsetDistance)
+                || !Fixed64.TryAdd(offsetDistance, circle.ScaledRadius, out Fixed64 circleRadius))
+            {
+                return Fixed64.MaxValue;
+            }
+
+            return circleRadius;
+        }
+
+        return Collider.VertexCount > 0
+            ? ResolveConvexContinuousCollisionProxyRadius()
+            : ResolveBoundsContinuousCollisionProxyRadius();
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -58,28 +65,41 @@ public sealed partial class SolidBody2D
     private Fixed64 ResolveConvexContinuousCollisionProxyRadius()
     {
         int vertexCount = Collider.VertexCount;
-        Vector2d center = Collider.Center;
         Fixed64 bestDistance = Fixed64.Zero;
-        Fixed64 bestDistanceSquared = Fixed64.Zero;
         for (int i = 0; i < vertexCount; i++)
         {
             Vector2d vertex = Collider.GetVertexUnchecked(i);
-            Fixed64 distanceSquared = Vector2d.DistanceSquared(center, vertex);
-            if (distanceSquared == Fixed64.MaxValue)
-            {
-                bestDistance = FixedMath.Max(bestDistance, Vector2d.Distance(center, vertex));
-                bestDistanceSquared = Fixed64.MaxValue;
-                continue;
-            }
-
-            if (distanceSquared <= bestDistanceSquared)
-                continue;
-
-            bestDistanceSquared = distanceSquared;
-            bestDistance = FixedMath.Sqrt(distanceSquared);
+            if (!TryKeepPivotDistance(vertex, ref bestDistance))
+                return Fixed64.MaxValue;
         }
 
         return bestDistance;
+    }
+
+    private Fixed64 ResolveBoundsContinuousCollisionProxyRadius()
+    {
+        Vector2d min = Collider.Bounds.Min;
+        Vector2d max = Collider.Bounds.Max;
+        Fixed64 bestDistance = Fixed64.Zero;
+        return TryKeepPivotDistance(min, ref bestDistance)
+            && TryKeepPivotDistance(new Vector2d(min.X, max.Y), ref bestDistance)
+            && TryKeepPivotDistance(new Vector2d(max.X, min.Y), ref bestDistance)
+            && TryKeepPivotDistance(max, ref bestDistance)
+                ? bestDistance
+                : Fixed64.MaxValue;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private bool TryKeepPivotDistance(Vector2d point, ref Fixed64 bestDistance)
+    {
+        if (!Vector2d.TrySubtract(point, _position, out Vector2d offset)
+            || !Vector2d.TryGetMagnitude(offset, out Fixed64 distance))
+        {
+            return false;
+        }
+
+        bestDistance = FixedMath.Max(bestDistance, distance);
+        return true;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

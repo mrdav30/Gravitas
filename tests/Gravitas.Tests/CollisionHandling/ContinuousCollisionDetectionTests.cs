@@ -2457,7 +2457,7 @@ public sealed partial class ContinuousCollisionDetectionTests
         source.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
         FixedQuaternion startRotation = PhysicsScenarioBuilder.Yaw(1);
         Fixed64 angularDistance = FixedMath.DegToRad(
-            FixedQuaternion.Angle(startRotation, FixedQuaternion.Identity) * (Fixed64)2);
+            FixedQuaternion.Angle(startRotation, FixedQuaternion.Identity));
         angularDistance.Should().BeGreaterThan(Fixed64.Epsilon);
         (angularDistance * smallPositiveRadius).Should().BeLessThanOrEqualTo(Fixed64.Epsilon);
         source.Body.SetRotation(startRotation);

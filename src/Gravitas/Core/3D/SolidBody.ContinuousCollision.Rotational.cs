@@ -8,7 +8,9 @@
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
+using Gravitas.Queries;
 using Gravitas.Support;
+using System;
 
 namespace Gravitas;
 
@@ -27,93 +29,51 @@ public partial class SolidBody
         if (angularDistance <= Fixed64.Epsilon)
             return false;
 
-        Fixed64 proxyRadius = ResolveContinuousCollisionProxyRadius();
-        Fixed64 angularArcLength = angularDistance * proxyRadius;
-        if (proxyRadius <= Fixed64.Epsilon
+        Fixed64 pivotRadius = ResolveContinuousCollisionProxyRadius();
+        Fixed64 angularArcLength = angularDistance * pivotRadius;
+        if (pivotRadius <= Fixed64.Epsilon
             || angularArcLength <= Fixed64.Epsilon
-            || (mode == ContinuousCollisionMode.Auto && angularArcLength <= proxyRadius))
+            || (mode == ContinuousCollisionMode.Auto && angularArcLength <= pivotRadius))
         {
             return false;
         }
 
         Vector3d displacement = proposedPosition - startPosition;
-        int hitCount = displacement.MagnitudeSquared <= Fixed64.Epsilon
-            ? Context.Query3D.OverlapSphereAgainstStaticAll(
-                startPosition,
-                proxyRadius,
-                PhysicsLayerMask.All,
-                _continuousCollisionHits,
-                Collider,
-                includeTriggers: false)
-            : Context.Query3D.SweepSphereAgainstStaticAll(
-                startPosition,
-                proposedPosition,
-                proxyRadius,
-                PhysicsLayerMask.All,
-                _continuousCollisionHits,
-                Collider,
-                includeTriggers: false);
-
+        int hitCount = GatherRotationalContinuousCollisionCandidates(
+            startPosition,
+            proposedPosition,
+            displacement,
+            pivotRadius);
         if (hitCount == 0)
             return false;
 
-        int stepCount = ContinuousCollisionMath.ResolveRotationalSubstepCount(angularDistance);
         Vector3d originalPosition = Position3d;
         FixedQuaternion originalRotation = Rotation;
         bool originalPositionMutated = _positionMutated;
         bool originalRotationMutated = _rotationMutated;
         try
         {
-            for (int step = 1; step <= stepCount; step++)
+            if (!TryFindEarliestRotationalContinuousCollision(
+                    startPosition,
+                    displacement,
+                    startRotation,
+                    proposedRotation,
+                    angularDistance,
+                    pivotRadius,
+                    hitCount,
+                    isKinematic: false,
+                    out Fixed64 safeTime,
+                    out Vector3d contactNormal,
+                    out bool hasContact))
             {
-                Fixed64 lowerTime = (Fixed64)(step - 1) / (Fixed64)stepCount;
-                Fixed64 sampleTime = (Fixed64)step / (Fixed64)stepCount;
-                bool foundSampleHit = false;
-                Fixed64 bestSafeTime = Fixed64.Zero;
-                int bestTargetId = int.MaxValue;
-                Vector3d bestContactNormal = Vector3d.Zero;
-
-                for (int hitIndex = 0; hitIndex < hitCount; hitIndex++)
-                {
-                    SampleDynamicRotationalContinuousPose(startPosition, displacement, startRotation, sampleTime);
-                    LSCollider target = _continuousCollisionHits[hitIndex].Collider!;
-                    if (!TrySampleRotationalContinuousCollision(target, out Vector3d contactNormal))
-                        continue;
-
-                    Fixed64 safeTime = RefineDynamicRotationalContinuousCollisionSafeTime(
-                        target,
-                        startPosition,
-                        displacement,
-                        startRotation,
-                        lowerTime,
-                        sampleTime,
-                        contactNormal,
-                        out Vector3d refinedNormal);
-                    if (!ContinuousCollisionMath.ShouldReplaceContinuousCollisionHit(
-                            safeTime,
-                            target.Id,
-                            foundSampleHit,
-                            bestSafeTime,
-                            bestTargetId))
-                    {
-                        continue;
-                    }
-
-                    foundSampleHit = true;
-                    bestSafeTime = safeTime;
-                    bestTargetId = target.Id;
-                    bestContactNormal = refinedNormal;
-                }
-
-                if (!foundSampleHit)
-                    continue;
-
-                proposedPosition = startPosition + displacement * bestSafeTime;
-                proposedRotation = IntegrateAngularRotation(startRotation, Context.DeltaTime * bestSafeTime);
-                LastContinuousCollisionToiIterationCount++;
-                StopRotationalContinuousCollision(bestContactNormal);
-                return true;
+                return false;
             }
+
+            proposedPosition = startPosition + displacement * safeTime;
+            proposedRotation = IntegrateAngularRotation(startRotation, Context.DeltaTime * safeTime);
+            LastContinuousCollisionToiIterationCount++;
+            StopRotationalContinuousCollision(hasContact ? contactNormal : Vector3d.Zero);
+            return true;
         }
         finally
         {
@@ -123,8 +83,6 @@ public partial class SolidBody
             _positionMutated = originalPositionMutated;
             _rotationMutated = originalRotationMutated;
         }
-
-        return false;
     }
 
     private bool TryResolveKinematicRotationalContinuousCollision(
@@ -140,37 +98,24 @@ public partial class SolidBody
         if (angularDistance <= Fixed64.Epsilon)
             return false;
 
-        Fixed64 proxyRadius = ResolveContinuousCollisionProxyRadius();
-        Fixed64 angularArcLength = angularDistance * proxyRadius;
-        if (proxyRadius <= Fixed64.Epsilon
+        Fixed64 pivotRadius = ResolveContinuousCollisionProxyRadius();
+        Fixed64 angularArcLength = angularDistance * pivotRadius;
+        if (pivotRadius <= Fixed64.Epsilon
             || angularArcLength <= Fixed64.Epsilon
-            || (mode == ContinuousCollisionMode.Auto && angularArcLength <= proxyRadius))
+            || (mode == ContinuousCollisionMode.Auto && angularArcLength <= pivotRadius))
         {
             return false;
         }
 
         Vector3d displacement = proposedPosition - startPosition;
-        int hitCount = displacement.MagnitudeSquared <= Fixed64.Epsilon
-            ? Context.Query3D.OverlapSphereAgainstStaticAll(
-                startPosition,
-                proxyRadius,
-                PhysicsLayerMask.All,
-                _continuousCollisionHits,
-                Collider,
-                includeTriggers: false)
-            : Context.Query3D.SweepSphereAgainstStaticAll(
-                startPosition,
-                proposedPosition,
-                proxyRadius,
-                PhysicsLayerMask.All,
-                _continuousCollisionHits,
-                Collider,
-                includeTriggers: false);
-
+        int hitCount = GatherRotationalContinuousCollisionCandidates(
+            startPosition,
+            proposedPosition,
+            displacement,
+            pivotRadius);
         if (hitCount == 0)
             return false;
 
-        int stepCount = ContinuousCollisionMath.ResolveRotationalSubstepCount(angularDistance);
         FixedQuaternion targetRotation = proposedRotation;
         Vector3d originalPosition = Position3d;
         FixedQuaternion originalRotation = Rotation;
@@ -178,54 +123,26 @@ public partial class SolidBody
         bool originalRotationMutated = _rotationMutated;
         try
         {
-            for (int step = 1; step <= stepCount; step++)
+            if (!TryFindEarliestRotationalContinuousCollision(
+                    startPosition,
+                    displacement,
+                    startRotation,
+                    targetRotation,
+                    angularDistance,
+                    pivotRadius,
+                    hitCount,
+                    isKinematic: true,
+                    out Fixed64 safeTime,
+                    out _,
+                    out _))
             {
-                Fixed64 lowerTime = (Fixed64)(step - 1) / (Fixed64)stepCount;
-                Fixed64 sampleTime = (Fixed64)step / (Fixed64)stepCount;
-                bool foundSampleHit = false;
-                Fixed64 bestSafeTime = Fixed64.Zero;
-                int bestTargetId = int.MaxValue;
-
-                for (int hitIndex = 0; hitIndex < hitCount; hitIndex++)
-                {
-                    SampleKinematicRotationalContinuousPose(startPosition, displacement, startRotation, targetRotation, sampleTime);
-                    LSCollider target = _continuousCollisionHits[hitIndex].Collider!;
-                    if (!TrySampleRotationalContinuousCollision(target, out Vector3d contactNormal))
-                        continue;
-
-                    Fixed64 safeTime = RefineKinematicRotationalContinuousCollisionSafeTime(
-                        target,
-                        startPosition,
-                        displacement,
-                        startRotation,
-                        targetRotation,
-                        lowerTime,
-                        sampleTime,
-                        contactNormal,
-                        out _);
-                    if (!ContinuousCollisionMath.ShouldReplaceContinuousCollisionHit(
-                            safeTime,
-                            target.Id,
-                            foundSampleHit,
-                            bestSafeTime,
-                            bestTargetId))
-                    {
-                        continue;
-                    }
-
-                    foundSampleHit = true;
-                    bestSafeTime = safeTime;
-                    bestTargetId = target.Id;
-                }
-
-                if (!foundSampleHit)
-                    continue;
-
-                proposedPosition = startPosition + displacement * bestSafeTime;
-                proposedRotation = FixedQuaternion.Slerp(startRotation, targetRotation, bestSafeTime).Normalized;
-                LastContinuousCollisionToiIterationCount++;
-                return true;
+                return false;
             }
+
+            proposedPosition = startPosition + displacement * safeTime;
+            proposedRotation = FixedQuaternion.Slerp(startRotation, targetRotation, safeTime).Normalized;
+            LastContinuousCollisionToiIterationCount++;
+            return true;
         }
         finally
         {
@@ -235,8 +152,312 @@ public partial class SolidBody
             _positionMutated = originalPositionMutated;
             _rotationMutated = originalRotationMutated;
         }
+    }
 
+    internal int GatherRotationalContinuousCollisionCandidates(
+        Vector3d startPosition,
+        Vector3d proposedPosition,
+        Vector3d displacement,
+        Fixed64 pivotRadius)
+    {
+        if (pivotRadius == Fixed64.MaxValue)
+            return GatherAllRegisteredRotationalContinuousCollisionCandidates();
+
+        return displacement.MagnitudeSquared <= Fixed64.Epsilon
+            ? Context.Query3D.OverlapSphereAgainstStaticAll(
+                startPosition,
+                pivotRadius,
+                PhysicsLayerMask.All,
+                _continuousCollisionHits,
+                Collider,
+                includeTriggers: false)
+            : Context.Query3D.SweepSphereAgainstStaticAll(
+                startPosition,
+                proposedPosition,
+                pivotRadius,
+                PhysicsLayerMask.All,
+                _continuousCollisionHits,
+                Collider,
+                includeTriggers: false);
+    }
+
+    private int GatherAllRegisteredRotationalContinuousCollisionCandidates()
+    {
+        _continuousCollisionHits.FastClear();
+        int colliderCount = Context.Physics.ColliderCount;
+        _continuousCollisionHits.EnsureCapacity(colliderCount);
+        for (int serviceIndex = 0; serviceIndex < colliderCount; serviceIndex++)
+        {
+            LSCollider target = Context.Physics.GetColliderByServiceIndex(serviceIndex);
+            if (!IsValidContinuousCollisionTarget(target))
+                continue;
+
+            _continuousCollisionHits.Add(new Physics3DHit(
+                target,
+                target.Center,
+                Vector3d.Zero,
+                Fixed64.Zero,
+                Vector3d.Zero));
+        }
+
+        return _continuousCollisionHits.Count;
+    }
+
+    private bool TryFindEarliestRotationalContinuousCollision(
+        Vector3d startPosition,
+        Vector3d displacement,
+        FixedQuaternion startRotation,
+        FixedQuaternion targetRotation,
+        Fixed64 angularDistance,
+        Fixed64 pivotRadius,
+        int hitCount,
+        bool isKinematic,
+        out Fixed64 safeTime,
+        out Vector3d contactNormal,
+        out bool hasContact)
+    {
+        safeTime = Fixed64.Zero;
+        contactNormal = Vector3d.Zero;
+        hasContact = false;
+
+        bool foundCollision = false;
+        Fixed64 earliestTime = Fixed64.One;
+        int earliestTargetId = int.MaxValue;
+        Vector3d earliestContactNormal = Vector3d.Zero;
+        bool earliestHasContact = false;
+
+        for (int hitIndex = 0; hitIndex < hitCount; hitIndex++)
+        {
+            LSCollider target = _continuousCollisionHits[hitIndex].Collider!;
+            if (!IsValidContinuousCollisionTarget(target)
+                || ColliderSettings.GetCollisionType(Collider.Shape, target.Shape) == CollisionType.None
+                || !TryFindEarliestRotationalContinuousCollisionAgainstTarget(
+                    target,
+                    startPosition,
+                    displacement,
+                    startRotation,
+                    targetRotation,
+                    angularDistance,
+                    pivotRadius,
+                    isKinematic,
+                    out Fixed64 candidateTime,
+                    out Vector3d candidateContactNormal,
+                    out bool candidateHasContact))
+            {
+                continue;
+            }
+
+            if (!ContinuousCollisionMath.ShouldReplaceContinuousCollisionHit(
+                    candidateTime,
+                    target.Id,
+                    foundCollision,
+                    earliestTime,
+                    earliestTargetId))
+            {
+                continue;
+            }
+
+            foundCollision = true;
+            earliestTime = candidateTime;
+            earliestTargetId = target.Id;
+            earliestContactNormal = candidateContactNormal;
+            earliestHasContact = candidateHasContact;
+        }
+
+        if (!foundCollision)
+            return false;
+
+        safeTime = earliestTime;
+        contactNormal = earliestContactNormal;
+        hasContact = earliestHasContact;
+        return true;
+    }
+
+    private bool TryFindEarliestRotationalContinuousCollisionAgainstTarget(
+        LSCollider target,
+        Vector3d startPosition,
+        Vector3d displacement,
+        FixedQuaternion startRotation,
+        FixedQuaternion targetRotation,
+        Fixed64 angularDistance,
+        Fixed64 pivotRadius,
+        bool isKinematic,
+        out Fixed64 safeTime,
+        out Vector3d contactNormal,
+        out bool hasContact)
+    {
+        safeTime = Fixed64.Zero;
+        contactNormal = Vector3d.Zero;
+        hasContact = false;
+        Span<ContinuousCollisionMath.RotationalInterval> intervals =
+            stackalloc ContinuousCollisionMath.RotationalInterval[
+                ContinuousCollisionMath.RotationalIntervalMaxDepth + 2];
+        int intervalCount = 1;
+        int processedNodeCount = 0;
+        bool hasKnownContact = false;
+        Fixed64 knownContactTime = Fixed64.One;
+        Vector3d knownContactNormal = Vector3d.Zero;
+        intervals[0] = new ContinuousCollisionMath.RotationalInterval(
+            Fixed64.Zero,
+            Fixed64.One,
+            depth: 0);
+
+        while (intervalCount > 0)
+        {
+            ContinuousCollisionMath.RotationalInterval interval = intervals[--intervalCount];
+            if (hasKnownContact && interval.LowerTime >= knownContactTime)
+                continue;
+
+            Fixed64 midpoint = (interval.LowerTime + interval.UpperTime) * Fixed64.Half;
+            Fixed64 intervalSpan = interval.UpperTime - interval.LowerTime;
+            if (isKinematic)
+            {
+                SampleKinematicRotationalContinuousPose(
+                    startPosition,
+                    displacement,
+                    startRotation,
+                    targetRotation,
+                    midpoint);
+            }
+            else
+            {
+                SampleDynamicRotationalContinuousPose(
+                    startPosition,
+                    displacement,
+                    startRotation,
+                    midpoint);
+            }
+
+            processedNodeCount++;
+            bool hasMotionBound = ContinuousCollisionMath.TryResolveRotationalIntervalMotionBound(
+                displacement,
+                angularDistance,
+                pivotRadius,
+                intervalSpan,
+                out Fixed64 motionBound);
+            bool sampleHasContact = TrySampleRotationalContinuousCollision(
+                target,
+                out Vector3d sampleContactNormal);
+            if (sampleHasContact
+                && (!hasKnownContact || midpoint < knownContactTime))
+            {
+                hasKnownContact = true;
+                knownContactTime = midpoint;
+                knownContactNormal = sampleContactNormal;
+            }
+
+            if (!sampleHasContact
+                && hasMotionBound
+                && IsRotationalIntervalSeparated(target, motionBound))
+            {
+                continue;
+            }
+
+            if (interval.Depth >= ContinuousCollisionMath.RotationalIntervalMaxDepth
+                || processedNodeCount >= ContinuousCollisionMath.RotationalIntervalNodeBudget)
+            {
+                safeTime = interval.LowerTime;
+                // The search is target-local. A witnessed later contact remains
+                // the valid upper-bound normal when an earlier interval cannot
+                // be certified empty within the deterministic work budget.
+                contactNormal = hasKnownContact ? knownContactNormal : sampleContactNormal;
+                hasContact = hasKnownContact || sampleHasContact;
+                return true;
+            }
+
+            int childDepth = interval.Depth + 1;
+            if (sampleHasContact)
+            {
+                // A real midpoint contact is already an upper bound. Only the
+                // earlier half can contain an earlier first contact.
+                intervals[intervalCount++] = new ContinuousCollisionMath.RotationalInterval(
+                    interval.LowerTime,
+                    midpoint,
+                    childDepth);
+                continue;
+            }
+
+            intervals[intervalCount++] = new ContinuousCollisionMath.RotationalInterval(
+                midpoint,
+                interval.UpperTime,
+                childDepth);
+            intervals[intervalCount++] = new ContinuousCollisionMath.RotationalInterval(
+                interval.LowerTime,
+                midpoint,
+                childDepth);
+        }
+
+        if (!hasKnownContact)
+            return false;
+
+        safeTime = knownContactTime;
+        contactNormal = knownContactNormal;
+        hasContact = true;
+        return true;
+    }
+
+    private bool IsRotationalIntervalSeparated(LSCollider target, Fixed64 motionBound)
+    {
+        if (TryGetSpherePairSeparationGap(target, out Fixed64 closestPointGap))
+            return closestPointGap > motionBound;
+
+        return ContinuousCollisionMath.AreBoundsSeparatedByMoreThan(
+            Collider.Bounds,
+            target.Bounds,
+            motionBound);
+    }
+
+    private bool TryGetSpherePairSeparationGap(LSCollider target, out Fixed64 separationGap)
+    {
+        if (Collider is LSSphereCollider sourceSphere)
+            return TryGetSphereSeparationGap(sourceSphere, target, out separationGap);
+
+        if (target is LSSphereCollider targetSphere)
+            return TryGetSphereSeparationGap(targetSphere, Collider, out separationGap);
+
+        separationGap = default;
         return false;
+    }
+
+    private static bool TryGetSphereSeparationGap(
+        LSSphereCollider sphere,
+        LSCollider other,
+        out Fixed64 separationGap)
+    {
+        Vector3d closestPoint;
+        Fixed64 otherRadius;
+        if (other is LSSphereCollider otherSphere)
+        {
+            closestPoint = otherSphere.Center;
+            otherRadius = otherSphere.ScaledRadius;
+        }
+        else if (other is LSCuboidCollider cuboid)
+        {
+            closestPoint = cuboid.ClosestPointOnSurface(sphere.Center);
+            otherRadius = Fixed64.Zero;
+        }
+        else
+        {
+            separationGap = default;
+            return false;
+        }
+
+        if (!Vector3d.TrySubtract(sphere.Center, closestPoint, out Vector3d separation)
+            || !Vector3d.TryGetMagnitude(separation, out Fixed64 distance)
+            || !Fixed64.TryAdd(sphere.ScaledRadius, otherRadius, out Fixed64 combinedRadius)
+            || !Fixed64.TrySubtract(distance, combinedRadius, out Fixed64 rawGap)
+            || !Fixed64.TryAdd(distance, combinedRadius, out Fixed64 characteristicScale)
+            || !Fixed64.TryAdd(characteristicScale, other.ScaledRadius, out characteristicScale)
+            || !ContinuousCollisionMath.TrySubtractClosestFeatureUncertainty(
+                rawGap,
+                characteristicScale,
+                out separationGap))
+        {
+            separationGap = default;
+            return false;
+        }
+
+        return separationGap > Fixed64.Zero;
     }
 
     private void SampleDynamicRotationalContinuousPose(
@@ -262,89 +483,35 @@ public partial class SolidBody
         Collider.RebuildRuntimeShapeOnly(refreshMassProperties: false);
     }
 
-    private Fixed64 RefineDynamicRotationalContinuousCollisionSafeTime(
-        LSCollider target,
-        Vector3d startPosition,
-        Vector3d displacement,
+    private static Fixed64 ResolveKinematicAngularDistanceRadians(
         FixedQuaternion startRotation,
-        Fixed64 lowerTime,
-        Fixed64 upperTime,
-        Vector3d upperContactNormal,
-        out Vector3d contactNormal)
+        FixedQuaternion proposedRotation)
     {
-        Fixed64 safeTime = lowerTime;
-        Fixed64 hitTime = upperTime;
-        contactNormal = upperContactNormal;
-
-        for (int iteration = 0; iteration < ContinuousCollisionMath.RotationalToiRefinementIterations; iteration++)
-        {
-            Fixed64 sampleTime = (safeTime + hitTime) * Fixed64.Half;
-            SampleDynamicRotationalContinuousPose(startPosition, displacement, startRotation, sampleTime);
-            if (TrySampleRotationalContinuousCollision(target, out Vector3d sampleContactNormal))
-            {
-                hitTime = sampleTime;
-                contactNormal = sampleContactNormal;
-            }
-            else
-            {
-                safeTime = sampleTime;
-            }
-        }
-
-        return safeTime;
-    }
-
-    private Fixed64 RefineKinematicRotationalContinuousCollisionSafeTime(
-        LSCollider target,
-        Vector3d startPosition,
-        Vector3d displacement,
-        FixedQuaternion startRotation,
-        FixedQuaternion targetRotation,
-        Fixed64 lowerTime,
-        Fixed64 upperTime,
-        Vector3d upperContactNormal,
-        out Vector3d contactNormal)
-    {
-        Fixed64 safeTime = lowerTime;
-        Fixed64 hitTime = upperTime;
-        contactNormal = upperContactNormal;
-
-        for (int iteration = 0; iteration < ContinuousCollisionMath.RotationalToiRefinementIterations; iteration++)
-        {
-            Fixed64 sampleTime = (safeTime + hitTime) * Fixed64.Half;
-            SampleKinematicRotationalContinuousPose(startPosition, displacement, startRotation, targetRotation, sampleTime);
-            if (TrySampleRotationalContinuousCollision(target, out Vector3d sampleContactNormal))
-            {
-                hitTime = sampleTime;
-                contactNormal = sampleContactNormal;
-            }
-            else
-            {
-                safeTime = sampleTime;
-            }
-        }
-
-        return safeTime;
-    }
-
-    private static Fixed64 ResolveKinematicAngularDistanceRadians(FixedQuaternion startRotation, FixedQuaternion proposedRotation)
-    {
-        Fixed64 angleDegrees = FixedQuaternion.Angle(startRotation, proposedRotation) * (Fixed64)2;
+        Fixed64 angleDegrees = FixedQuaternion.Angle(startRotation, proposedRotation);
         return FixedMath.DegToRad(angleDegrees.Abs());
     }
 
     private bool TrySampleRotationalContinuousCollision(LSCollider target, out Vector3d contactNormal)
     {
         contactNormal = Vector3d.Zero;
-        if (!IsValidContinuousCollisionTarget(target))
-            return false;
-
-        OrderRotationalContinuousCollisionPair(target, out LSCollider colliderA, out LSCollider colliderB, out bool sourceIsA);
+        OrderRotationalContinuousCollisionPair(
+            target,
+            out LSCollider colliderA,
+            out LSCollider colliderB,
+            out bool sourceIsA);
         CollisionType collisionType = ColliderSettings.GetCollisionType(colliderA.Shape, colliderB.Shape);
         _rotationalContinuousCollisionManifold.BeginUpdate(Context.FrameCount);
-        var workItem = new CollisionWorkItem(Context, colliderA, colliderB, collisionType, _rotationalContinuousCollisionManifold);
-        if (!CollisionDetection.DoCollisionCheck(workItem) || !_rotationalContinuousCollisionManifold.HasContact)
+        var workItem = new CollisionWorkItem(
+            Context,
+            colliderA,
+            colliderB,
+            collisionType,
+            _rotationalContinuousCollisionManifold);
+        if (!CollisionDetection.DoCollisionCheck(workItem)
+            || !_rotationalContinuousCollisionManifold.HasContact)
+        {
             return false;
+        }
 
         contactNormal = _rotationalContinuousCollisionManifold.PrimaryContact.Normal;
         if (!sourceIsA)
@@ -374,7 +541,11 @@ public partial class SolidBody
 
     private FixedQuaternion IntegrateAngularRotation(FixedQuaternion startRotation, Fixed64 deltaTime)
     {
-        FixedQuaternion angularVelocityQuaternion = new(_angularVelocity.X, _angularVelocity.Y, _angularVelocity.Z, Fixed64.Zero);
+        FixedQuaternion angularVelocityQuaternion = new(
+            _angularVelocity.X,
+            _angularVelocity.Y,
+            _angularVelocity.Z,
+            Fixed64.Zero);
         FixedQuaternion spin = angularVelocityQuaternion * startRotation * Fixed64.Half * deltaTime;
         return (startRotation + spin).Normalized;
     }
@@ -391,5 +562,4 @@ public partial class SolidBody
         Context.Diagnostics.EmitAngularVelocityDelta(this, lastVelocity, _angularVelocity);
         RemoveClosingContinuousCollisionVelocity(contactNormal);
     }
-
 }
